@@ -73,6 +73,9 @@ describe.skipIf(process.platform === "win32")("scripts/vercel-ignore-build.sh", 
       "scripts/verify-precache.ts",
       "scripts/gen-third-party-notices.ts",
       "scripts/engine-bundle.allow.txt",
+      // The release merge deletes the notes, and that deploy must build.
+      ".changes/some-branch.md",
+      ".changes/README.md",
       // Not listed anywhere, so it builds.
       "some-new-top-level-file.txt",
       "newfolder/file.ts",
@@ -110,6 +113,8 @@ describe.skipIf(process.platform === "win32")("scripts/vercel-ignore-build.sh", 
       "scripts/posthog-report.mjs",
       "scripts/posthog-report.d.mts",
       "scripts/rollback-rehearsal.ts",
+      "scripts/release.ts",
+      "scripts/version-check.ts",
     ];
 
     it("builds every path that can reach the deployed app or its build checks", () => {
@@ -142,7 +147,7 @@ describe.skipIf(process.platform === "win32")("scripts/vercel-ignore-build.sh", 
     /** A repo whose first commit holds `before`, and a second that applies
      *  `after` (a null value deletes the file). Returns the script's exit
      *  code, with the first commit as Vercel's previous deploy. */
-    function exitCode(before: Record<string, string>, after: Record<string, string | null>, previous: "sha" | "none" = "sha"): number | null {
+    function exitCode(before: Record<string, string>, after: Record<string, string | null>, previous: "sha" | "none" = "sha", vercelEnv = ""): number | null {
       const root = mkdtempSync(join(tmpdir(), "vc-ignore-build-"));
       roots.push(root);
       git(root, "init", "-q");
@@ -161,7 +166,7 @@ describe.skipIf(process.platform === "win32")("scripts/vercel-ignore-build.sh", 
       write(before);
       const first = git(root, "rev-parse", "HEAD");
       write(after);
-      const env = { ...process.env, VERCEL_GIT_PREVIOUS_SHA: previous === "sha" ? first : "" };
+      const env = { ...process.env, VERCEL_ENV: vercelEnv, VERCEL_GIT_PREVIOUS_SHA: previous === "sha" ? first : "" };
       return spawnSync("bash", [SCRIPT], { cwd: root, env, encoding: "utf8" }).status;
     }
 
@@ -184,6 +189,35 @@ describe.skipIf(process.platform === "win32")("scripts/vercel-ignore-build.sh", 
 
     it("builds when a commit deletes a built file", () => {
       expect(exitCode(base, { "src/a.ts": null })).toBe(1);
+    });
+
+    describe("the production hold for pending change notes", () => {
+      const note = (app: string, crate: string, eol = "\n") => ["---", `app: ${app}`, `crate: ${crate} # a comment`, "---", "## Player", "- A line."].join(eol) + eol;
+
+      it("holds production while a note asks for an app or crate release", () => {
+        expect(exitCode(base, { "src/a.ts": "b", ".changes/x.md": note("minor", "none") }, "sha", "production")).toBe(0);
+        expect(exitCode(base, { "src/a.ts": "b", ".changes/x.md": note("none", "patch") }, "sha", "production")).toBe(0);
+        expect(exitCode(base, { "src/a.ts": "b", ".changes/x.md": note("major", "none", "\r\n") }, "sha", "production")).toBe(0);
+        expect(exitCode(base, { "src/a.ts": "b", ".changes/a.md": note("none", "none"), ".changes/b.md": note("patch", "none") }, "sha", "production")).toBe(0);
+        // An indented level parses, so it holds too.
+        expect(exitCode(base, { "src/a.ts": "b", ".changes/x.md": note("none", "none").replace("app: none", "  app: minor") }, "sha", "production")).toBe(0);
+      });
+
+      it("builds a preview with pending notes, and production when every note is none", () => {
+        expect(exitCode(base, { "src/a.ts": "b", ".changes/x.md": note("minor", "minor") }, "sha", "preview")).toBe(1);
+        expect(exitCode(base, { "src/a.ts": "b", ".changes/x.md": note("minor", "minor") })).toBe(1);
+        expect(exitCode(base, { "src/a.ts": "b", ".changes/x.md": note("none", "none") }, "sha", "production")).toBe(1);
+        // The folder's README is not a note, and a level outside the front matter does not count.
+        expect(exitCode(base, { "src/a.ts": "b", ".changes/README.md": note("minor", "minor") }, "sha", "production")).toBe(1);
+        expect(exitCode(base, { "src/a.ts": "b", ".changes/x.md": `${note("none", "none")}app: minor\n` }, "sha", "production")).toBe(1);
+      });
+
+      it("builds the release merge that deletes the notes", () => {
+        const pending = { ...base, ".changes/x.md": note("minor", "none") };
+        expect(exitCode(pending, { "package.json": "{}", ".changes/x.md": null }, "sha", "production")).toBe(1);
+        // A release that only consumes none notes still builds, so the hold never outlives it.
+        expect(exitCode({ ...base, ".changes/x.md": note("none", "none") }, { ".changes/x.md": null }, "sha", "production")).toBe(1);
+      });
     });
 
     it("diffs against the parent commit when Vercel gives no previous deploy", () => {

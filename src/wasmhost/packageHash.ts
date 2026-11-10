@@ -22,6 +22,13 @@ function lineEndingsAsLF(data: Buffer): Buffer {
 }
 
 /**
+ * What a caller hashes of each file instead of its bytes: `label` is the path
+ * relative to the crate, `data` the LF-normalized contents, and null leaves the
+ * file out. The fuzz window key uses it to ignore a release's version edits.
+ */
+export type SourceView = (label: string, data: Buffer) => Buffer | null;
+
+/**
  * A hash over everything the served package is built from, by path and
  * content, so `src/public/engine/BUILD.json` can say which engine it holds,
  * CI can key its package cache on it, and a test can tell when the sources
@@ -45,9 +52,12 @@ function lineEndingsAsLF(data: Buffer): Buffer {
  * test runs (every deploy builds the package from source), so a miss here
  * could stale a test run, never a release.
  *
+ * With a `view`, each file hashes as the view returns it (see `SourceView`);
+ * without one, as it is.
+ *
  * Node only (the build script, CI and the test); never imported by the app.
  */
-export function engineSourceHash(crate: string): string {
+export function engineSourceHash(crate: string, view?: SourceView): string {
   const files = new Set<string>();
   const walk = (dir: string) => {
     for (const name of readdirSync(dir).sort()) {
@@ -88,9 +98,12 @@ export function engineSourceHash(crate: string): string {
   });
   const h = createHash("sha256");
   for (const [label, p] of labeled) {
+    const data = lineEndingsAsLF(readFileSync(p));
+    const seen = view ? view(label, data) : data;
+    if (seen === null) continue;
     h.update(label);
     h.update("\0");
-    h.update(lineEndingsAsLF(readFileSync(p)));
+    h.update(seen);
     h.update("\0");
   }
   return h.digest("hex");

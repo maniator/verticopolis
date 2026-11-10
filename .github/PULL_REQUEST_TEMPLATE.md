@@ -46,12 +46,12 @@ Delete this section only if the change cannot affect gameplay (e.g. docs/tooling
 ## Versioning
 
 <!--
-Bump package.json `version` on any player-facing change:
-  minor = new player-facing capability, patch = player-noticeable fix/behavior change.
-Internal-only work needs no bump.
+Do not edit a version. Add .changes/<branch-slug>.md with the app and crate tiers
+(major / minor / patch / none) and the Player and Engine lines; the release PR
+raises the versions. See .changes/README.md.
 -->
 
-- [ ] Bumped `version` (minor / patch), **or** this change is internal-only and needs no bump
+- [ ] Added a `.changes` note with the right `app:` and `crate:` levels, **or** this PR changes no deployed path
 
 ## Complexity
 

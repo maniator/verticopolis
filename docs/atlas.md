@@ -18,7 +18,9 @@ Pin your frontend to a version tag's commit and fetch that tag's release.
 
 The release flow, for maintainers:
 
-- Pushing a version tag is the publish step (CONTRIBUTING.md, Versioning). The
+- A version tag is the publish step (CONTRIBUTING.md, Versioning). A release
+  PR's merge creates it and dispatches this workflow
+  (`.github/workflows/release-tag.yml`); a maintainer can also push one. The
   tag must equal `v<package.json version>` at that commit, and the version must
   be a plain `x.y.z`, or the workflow stops.
 - The workflow opens the tag's release as a draft (or reuses its draft),

@@ -498,24 +498,31 @@ time as `__APP_VERSION__` (see `vite.config.ts`). It's shown on the splash and
 is the anchor the PWA update flow reports against. It is **not** auto-derived, so
 it only moves if a change moves it.
 
-Bump it with `npm version <patch|minor> --no-git-tag-version`, not by hand-editing
-`package.json` alone: that also updates **`package-lock.json`**, which must move in
-lockstep (a stale lockfile breaks `npm ci` and misreports the build). A CI guard,
-`src/tests/versionLockSync.test.ts`, fails the moment the two drift.
+A feature PR never edits a version. It records the tier in a change note, and
+a release PR raises the versions (see "Change notes and the release PR" below).
+That release step runs `npm version <level> --no-git-tag-version`, which also
+updates **`package-lock.json`** in lockstep (a stale lockfile breaks `npm ci`
+and misreports the build). A CI guard, `src/tests/versionLockSync.test.ts`,
+fails the moment the two drift.
 
-A version becomes a GitHub release only when a maintainer tags it. After the
-bump merges, tag that merge commit on `main` with `v<version>` and push the tag
-(`git tag v2.30.0 <commit> && git push origin v2.30.0`). The tag runs
-`.github/workflows/atlas-release.yml`, which publishes the release with the
-version's player notes and the sprite atlas (docs/atlas.md). Not every
-bump needs a tag; tag the versions a frontend on the open engine should pin.
-Only commits that contain the atlas exporter can get an atlas. A tag push runs
+Every release becomes a GitHub release on its own. When a release PR merges,
+`.github/workflows/release-tag.yml` tags the merge commit `v<version>` for an
+app version change and dispatches `.github/workflows/atlas-release.yml`, which
+publishes the release with the version's player notes and the sprite atlas
+(docs/atlas.md). A crate version change gets its own `engine-v<version>`
+release with that version's `engine-rs/CHANGELOG.md` section and the built
+WASM package attached, never marked Latest, so a frontend can depend on the
+crate at that tag or download the package. The same build goes to GitHub
+Packages as `@maniator/verticopolis-engine` (installing it needs a GitHub
+token, even though it is public). A maintainer can
+still tag a commit by hand (`git tag v2.30.0 <commit> && git push origin
+v2.30.0`). Only commits that contain the atlas exporter can get an atlas. A tag push runs
 the workflow file as it is at the tagged commit. A manual run (Actions, "Sprite
 atlas release", with the tag as input) uses the copy on the branch or tag it
 runs from: it builds and publishes when the tag has no published release, and only
 audits when it does.
 
-**Bump `version` in the same PR as any player-facing change.** The tier is keyed
+**Declare the tier in the same PR as any player-facing change.** The tier is keyed
 to one question: would a player notice anything different?
 
 - **major** (`X.0.0`): the save format or compatibility breaks (an old tower
@@ -533,10 +540,49 @@ changes by how they were built rather than by what a player feels, so the
 minor/patch line kept coming down to a judgment call. Sort by player impact
 instead, and the question answers itself.
 
-A player-facing change that ships **without** a bump is a review finding: the
-splash (and the update prompt's build-id line) would otherwise misreport the build
-as unchanged. Bump once per PR, not per commit. When two open PRs both bump,
-whoever merges second rebases and re-bumps.
+A player-facing change whose note says `app: none` (or has no note) is a review
+finding: the splash (and the update prompt's build-id line) would otherwise
+misreport the build as unchanged. One note per PR, not per commit.
+
+### Change notes and the release PR
+
+Every PR that changes a deployed path (anything `scripts/vercel-ignore-build.sh
+--classify` calls "build") adds one file, `.changes/<branch-slug>.md`, with the
+app tier, the crate tier and the changelog lines. The format and its rules are
+in [`.changes/README.md`](./.changes/README.md). The file is named after the
+branch, so two open PRs never edit the same line and never conflict over a
+version.
+
+The release driver cuts a release:
+
+1. Branch `release/<version>` off an up-to-date `main`.
+2. Run `npm run release` (or `npm run release -- --app 3.0.0` for a headline
+   release). It raises the app version by the highest pending `app` level,
+   writes the `CHANGELOG.md` section from the Player lines, and, when a note
+   has a crate level, raises the crate in `engine-rs/Cargo.toml` and both
+   `Cargo.lock` files, writes the `engine-rs/CHANGELOG.md` section from the
+   Engine lines and runs `npm run engine:compat`. It deletes the notes.
+3. Trim the player lines to the few that matter (the prompt shows three),
+   commit, and open the PR. It merges like any other PR, and its merge tags
+   and publishes the GitHub releases.
+
+A release consumes every pending note. If another note lands on `main` first,
+merge `main` in, reset the release files and run it again.
+
+CI's "Versions and change notes" step in the test job (`npm run
+version:check` locally, after committing) holds both sides to this: a feature
+PR keeps every version line and changelog heading as `main` has them, keeps
+`main`'s pending notes, adds a note when it changes a deployed path, and sets
+`crate:` in its own note when it moves a pin in the compatibility record. A
+release PR raises each version by exactly its notes' highest level (the app may
+go to a later version the driver names), consumes every note and changes
+nothing but the release files.
+
+**Production waits for the release PR.** While a pending note has a level other
+than `none`, `scripts/vercel-ignore-build.sh` skips the production deploy, so a
+player never gets new behavior under the old version and the old "What's new"
+notes. Previews still build. The release merge deletes the notes, builds, and
+ships everything pending as one numbered build.
 
 ### The engine crate version
 
@@ -544,7 +590,8 @@ whoever merges second rebases and re-bumps.
 the answer to "which engine contract is this?": `engineIdentity()` reports it
 and About will show it (#963 slice 3). The app version stays what players see.
 
-**The crate version goes up in the same PR as any of these:**
+**The crate version goes up with any of these** (the PR that moves one sets
+`crate:` in its note, and the release PR raises the version):
 
 - the conformance lock: `catalog-digests.json`, `events/catalog.json`,
   `expected.json`, `loader-cases.json` or `tdt-cases.json` under `conformance/`
@@ -571,14 +618,18 @@ it and writing the compatibility policy stay with #893; the bump rules after
 1.0.0 are part of that policy, so #893 sets them, and until then the 0.x rules
 above still say when a bump is due.
 
-**How:** raise `version` in `engine-rs/Cargo.toml`, then in `engine-rs/Cargo.lock`
-and `engine-rs/consumer/Cargo.lock` (CI builds the consumer with `--locked`),
+**How:** in the feature PR, set `crate:` and add an Engine line in its note,
 then run `npm run engine:compat`. It rewrites `engine-rs/src/compat-record.json`
 from the tree, fetches `origin/main`, and refuses a pin that moved from main's
-record under an unchanged version, a version that is not a later `x.y.z`
-release, or a main record it cannot read. A version that has not merged yet can
-be re-recorded as often as main's lock moves under it. When two open PRs bump,
-whoever merges second merges main in, bumps again and re-records.
+record under an unchanged version unless a pending note declares a crate
+level, a version that is not a later `x.y.z` release, or a main record it
+cannot read. The record keeps the crate version main has, and the Rust identity
+test still checks the recorded version constants against the code. The release
+PR raises `version` in `engine-rs/Cargo.toml`, `engine-rs/Cargo.lock` and
+`engine-rs/consumer/Cargo.lock` (CI builds the consumer with `--locked`) and
+re-records, so `engineIdentity()` reports the new version. Two PRs that both
+move the lock still meet in the record's `lockDigest`; whoever merges second
+merges main in and re-records.
 
 **What the guard sees and what it does not.** `src/tests/engineCompat.guard.test.ts`
 recomputes the lock digest, the five version constants and a digest of
@@ -594,7 +645,7 @@ same PR also skips the main comparison, so a reviewer reads the record's diff.
 
 Two files, by audience. `CHANGELOG.md` is for players, one section per app
 version. `engine-rs/CHANGELOG.md` is for people who build on the engine, one
-section per crate version, and a crate bump adds its section in the same PR
+section per crate version, and the release PR adds its section from the notes' Engine lines
 (`src/tests/engineChangelog.guard.test.ts` fails otherwise). Classify a change
 by what a player would notice, not by which layer changed: an engine fix a
 player can feel gets a line in `CHANGELOG.md`; a contract-only change gets just
@@ -637,8 +688,8 @@ commit). Fewer lines beat more, and a release that is a patch or internal-only
 gets none, just the build-id line. Curation is the point: the modal is a "here's
 what's new, get back in" moment, not a patch-note viewer.
 
-When you bump the version for a player-facing change, add a section at the top of
-`CHANGELOG.md`:
+For a player-facing change, write the lines under `## Player` in the PR's change
+note. The release PR gathers them into a section at the top of `CHANGELOG.md`:
 
 ```
 ## 1.51.0

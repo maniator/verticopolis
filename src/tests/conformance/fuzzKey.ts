@@ -19,13 +19,19 @@
  *               `engine-fuzz.yml`, `package.json`'s `type` and `engines`, and
  *               the cargo configuration and `rust-toolchain` files when there are any
  *   fixtures    `conformance/fixtures/`
- * A version bump leaves the key alone.
+ * A version bump leaves the key alone: the app's (the lockfile's root `version`
+ * fields are blanked) and the crate's, since a release PR (`npm run release`)
+ * would otherwise restart the window with no simulation change. The engine part
+ * hashes the crate through `releaseNeutral`, which drops the `[package]`
+ * version from `Cargo.toml`, the crate's own version from both `Cargo.lock`
+ * files, and `src/compat-record.json` (identity metadata the release rewrites,
+ * not a simulation input).
  */
 import { createHash } from "node:crypto";
 import { existsSync, lstatSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import ts from "typescript";
-import { engineSourceHash } from "../../wasmhost/packageHash.ts";
+import { engineSourceHash, type SourceView } from "../../wasmhost/packageHash.ts";
 
 /** The scripts the nightly runs, and the shrinker and the corpus replay that
  *  share its compare. The WASM runner is reached through `fuzz-compare.ts`. */
@@ -140,6 +146,53 @@ function lockfileText(root: string): string {
   return JSON.stringify(lock);
 }
 
+/** The `[package]` table's `version` line in a Cargo.toml, by line index, or -1. */
+function packageVersionLine(lines: readonly string[]): number {
+  const start = lines.findIndex((l) => l.trim() === "[package]");
+  if (start < 0) return -1;
+  for (let i = start + 1; i < lines.length && !lines[i].trim().startsWith("["); i++) {
+    if (/^version\s*=/.test(lines[i].trim())) return i;
+  }
+  return -1;
+}
+
+/** The `[package]` table's `name`, when the Cargo.toml states one. */
+function packageName(cargoToml: string): string | null {
+  const lines = cargoToml.split("\n");
+  const start = lines.findIndex((l) => l.trim() === "[package]");
+  if (start < 0) return null;
+  for (let i = start + 1; i < lines.length && !lines[i].trim().startsWith("["); i++) {
+    const m = /^name\s*=\s*"([^"]+)"/.exec(lines[i].trim());
+    if (m) return m[1];
+  }
+  return null;
+}
+
+/** The crate's files without what a release PR edits: its own version in the
+ *  manifest and both lockfiles, and the compatibility record. A dependency's
+ *  version, the edition and every other line still move the key. */
+export function releaseNeutral(crateToml: string): SourceView {
+  const name = packageName(crateToml.replace(/\r\n/g, "\n"));
+  const own = name === null ? null : `name = "${name}"`;
+  return (label, data) => {
+    if (label === "src/compat-record.json") return null;
+    if (label === "Cargo.toml") {
+      const lines = data.toString("utf8").split("\n");
+      const i = packageVersionLine(lines);
+      return i < 0 ? data : Buffer.from(lines.filter((_, j) => j !== i).join("\n"), "utf8");
+    }
+    if ((label === "Cargo.lock" || label === "consumer/Cargo.lock") && own !== null) {
+      const lines = data.toString("utf8").split("\n");
+      const drop = new Set<number>();
+      lines.forEach((l, i) => {
+        if (l === own && lines[i + 1]?.startsWith("version = ")) drop.add(i + 1);
+      });
+      return Buffer.from(lines.filter((_, j) => !drop.has(j)).join("\n"), "utf8");
+    }
+    return data;
+  };
+}
+
 /** The files each part hashes, by path (the two parts that are not plain file
  *  sets are the crate and the pins' lockfile; see `fuzzKeyParts`). */
 export function fuzzKeyFiles(root: string = process.cwd()): Record<"srcEngine" | "scripts" | "wasmBuild" | "fixtures", string[]> {
@@ -163,7 +216,7 @@ export function fuzzKeyParts(root: string = process.cwd()): KeyParts {
   const wasmLine = pkg.scripts["wasm:build"];
   if (typeof wasmLine !== "string") throw new Error("fuzz key: package.json has no wasm:build script");
   return {
-    engine: engineSourceHash(join(root, "engine-rs")),
+    engine: engineSourceHash(join(root, "engine-rs"), releaseNeutral(readFileSync(join(root, "engine-rs/Cargo.toml"), "utf8"))),
     srcEngine: filesHash(root, files.srcEngine),
     scripts: filesHash(root, files.scripts),
     wasmBuild: sha(`${filesHash(root, files.wasmBuild)}\n${wasmLine}`),

@@ -139,12 +139,12 @@ full spec see the PRD under `_bmad-output/planning-artifacts/prds/`.
   The Rust engine in `engine-rs/` follows these rules with no grandfathered
   comments, plus the 500-line file ceiling (see CONTRIBUTING "Conventions").
 - **Merge commits only** to `main` (never squash). Commit/push only when asked.
-- **Version bump on player-facing change:** bump `package.json` `version` (semver
-  by player impact: **minor** for a new player-facing capability, **patch** for a
-  player-noticeable fix/behavior change) in the same PR; internal-only work
-  (refactor / perf-with-identical-behavior / tests / docs / tooling) needs none.
-  It's injected as `__APP_VERSION__` on the splash and anchors the update flow, so
-  a missing bump on a player-facing change is a review finding.
+- **Version tier in a change note:** a PR never edits a version. It adds
+  `.changes/<branch-slug>.md` with `app:` by player impact (see CONTRIBUTING.md
+  "Versioning" for major, minor, patch and none) and `crate:` for the engine
+  crate, and the release PR (`npm run release`) raises the versions. A
+  player-facing change with `app: none`, or a missing note, is a review finding.
+  See `.changes/README.md`.
 - **Deep adversarial review is MANDATORY and runs in the SAME session that writes the
   code, and it means actually invoking `/gds-code-review` (gameplay/engine) or
   `/bmad-code-review` (everything else, incl. storage/persistence/tooling/UI plumbing).

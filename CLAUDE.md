@@ -88,13 +88,17 @@ review skill. The BMAD agent rules live in `_bmad-output/project-context.md`.
   boundary rules to `engine-rs/tests/independence.rs`, which keeps the simulation
   free of host access (files, network, console, clock; a few named referee
   functions may read fixtures) and the JavaScript binding inside `src/wasm.rs` and `src/wasm/`.
-- **Bump `package.json` `version` on any player-facing change**, keyed to "would a
-  player notice anything different?": **major** for a save/compat break or a
-  headline milestone, **minor** as the default for anything a player notices,
-  **patch** for a fix-only re-deploy; internal-only work needs none. Bump the
-  lockfile in lockstep (use `npm version`; a CI guard enforces it). It's injected
-  as `__APP_VERSION__` on the splash and anchors the update flow, so a missing bump
-  misreports the build. See [CONTRIBUTING.md](./CONTRIBUTING.md) → **Versioning**.
+- **Declare the version tier in a change note; never edit a version.** A PR that
+  changes a deployed path adds `.changes/<branch-slug>.md` with `app:` keyed to
+  "would a player notice anything different?" (**major** for a save/compat break
+  or a headline milestone, **minor** as the default for anything a player
+  notices, **patch** for a fix-only re-deploy, **none** for internal-only work),
+  `crate:` for the engine crate, and the `## Player` / `## Engine` lines. The
+  release driver's `npm run release` PR (a `release/` branch) raises the
+  versions and writes both changelogs; `scripts/version-check.ts` fails a
+  feature PR that edits a version line, and production waits for the release
+  PR. See [`.changes/README.md`](./.changes/README.md) and
+  [CONTRIBUTING.md](./CONTRIBUTING.md) → **Versioning**.
 - **Screenshots come from the pinned Playwright Docker container, never a host
   browser.** Regenerate `docs/screenshots/**` either by approving the
   `commit-on-approval` job on the PR's `pr-drift-check` run (it renders in the
@@ -226,10 +230,11 @@ review skill. The BMAD agent rules live in `_bmad-output/project-context.md`.
   import of it to frontend code.
 - **The engine crate version (`engine-rs/Cargo.toml`) goes up with the
   conformance lock, the save/frame layout/catalog/identity versions and the
-  binding declaration `src/dualrun/engine.d.ts`.** Raise it in `Cargo.toml`,
-  `Cargo.lock` and `engine-rs/consumer/Cargo.lock`, then run
-  `npm run engine:compat`; a guard fails the PR otherwise. Steps and limits are
-  in CONTRIBUTING.md → Versioning → The engine crate version.
+  binding declaration `src/dualrun/engine.d.ts`.** The PR that moves one sets
+  `crate:` in its change note, adds an Engine line and runs
+  `npm run engine:compat`; the release PR raises the version in `Cargo.toml`
+  and both `Cargo.lock` files. Steps and limits are in CONTRIBUTING.md →
+  Versioning → The engine crate version.
 
 - **The Rust engine (`engine-rs/`) is the source of truth for gameplay rules,
   caps and tuning.** Per-tower build caps live in `engine-rs/src/facilities.rs`

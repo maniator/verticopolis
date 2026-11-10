@@ -1,9 +1,10 @@
 /**
  * Rewrites `engine-rs/src/compat-record.json` from the tree (`npm run engine:compat`).
- * Bump `version` in `engine-rs/Cargo.toml` first (and in `engine-rs/Cargo.lock`
- * and `engine-rs/consumer/Cargo.lock`) when the conformance lock, `SAVE_VERSION`
- * or the public Rust/WASM interface changed; the rules and the guard are in
- * `src/build/engineCompat.ts`.
+ * Run it after changing the conformance lock, a version constant or the public
+ * Rust/WASM interface. A feature PR does not bump the crate itself: its
+ * `.changes` note declares `crate: <level>`, and the release PR raises the
+ * version (`npm run release`, which runs this again). The rules and the guard
+ * are in `src/build/engineCompat.ts` and `src/build/changeNotes.ts`.
  *
  * The bump is judged against what `origin/main` records, since a version that
  * has not merged yet may be re-recorded as often as main's lock moves under it.
@@ -24,6 +25,7 @@ import {
   recordText,
   unbumpedPins,
 } from "../src/build/engineCompat.ts";
+import { readNotes } from "../src/build/changeNotes.ts";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const git = (args: string[]) =>
@@ -63,10 +65,22 @@ if (base?.record) {
       `crate ${record.crateVersion} is not a later x.y.z release than ${was} on ${base.source}`,
     );
   const moved = unbumpedPins(base.record, record);
-  if (moved.length > 0)
-    refuse(
-      `${moved.join(", ")} changed from ${base.source}'s record but the crate is still ${record.crateVersion}: bump \`version\` in engine-rs/Cargo.toml, engine-rs/Cargo.lock and engine-rs/consumer/Cargo.lock first (release plan 7.4)`,
+  if (moved.length > 0) {
+    let notes;
+    try {
+      notes = readNotes(root);
+    } catch (e) {
+      refuse(e instanceof Error ? e.message : String(e));
+    }
+    const carriers = (notes ?? []).filter((n) => n.crate !== "none");
+    if (carriers.length === 0)
+      refuse(
+        `${moved.join(", ")} changed from ${base.source}'s record but the crate is still ${record.crateVersion} and no .changes note declares a crate level: set \`crate:\` in this PR's note, and the release PR raises the version (CONTRIBUTING.md "The engine crate version")`,
+      );
+    console.log(
+      `${moved.join(", ")} moved under crate ${record.crateVersion}; ${carriers.map((n) => n.file).join(", ")} carry the bump to the release PR`,
     );
+  }
 }
 writeFileSync(resolve(root, COMPAT_RECORD_PATH), recordText(record));
 console.log(

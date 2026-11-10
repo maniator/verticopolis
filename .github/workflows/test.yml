@@ -191,6 +191,17 @@ jobs:
         if: ${{ needs.changes.outputs.tests != 'false' }}
         run: npm run typecheck
 
+      # Versions move only in a release PR; a feature PR adds a .changes note
+      # instead (CONTRIBUTING.md "Versioning"). The checkout is the PR's merge
+      # commit, so its first parent is main as the PR would merge into it.
+      - name: Versions and change notes
+        if: ${{ github.event_name == 'pull_request' && needs.changes.outputs.tests != 'false' }}
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          git fetch --no-tags --quiet --depth=2 origin "$GITHUB_SHA"
+          node scripts/version-check.ts --base HEAD^1 --branch "$HEAD_REF"
+
       # engine conformance (holidays-classic runs 720 in-game hours of a large
       # tower, 15 s of CPU alone) is excluded here and runs in the next step.
       # Under v8 coverage with the other test files running beside it, it took
