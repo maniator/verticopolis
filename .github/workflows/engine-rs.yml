@@ -23,7 +23,6 @@ on:
       - "src/storage/**"
       - "src/catalog/**"
       - "src/tests/conformance/**"
-      - "src/tests/integration/conformance.integration.test.ts"
       - "src/tests/integration/conformanceWasm.integration.test.ts"
       - "src/tests/integration/conformanceWasmLoadFidelity.integration.test.ts"
       - "src/tests/integration/conformanceWasmCanBuild.integration.test.ts"
@@ -499,18 +498,19 @@ jobs:
 
   # The seeded differential's corpus (conformance/fuzz-corpus/): scenarios the
   # nightly once diverged on, shrunk by scripts/fuzz-shrink.ts, plus smoke
-  # entries so the job never runs on nothing. Each is replayed on the Rust
-  # engine (the fuzzer's --replay mode) and on the TypeScript engine, and the
-  # two must agree at every checkpoint. The nightly keeps growing new seeds;
-  # this job only holds what it already found. The whole job is held to ten
-  # minutes, and the script stops at its own 240 s budget and fails rather
-  # than skip an entry.
+  # entries so the job never runs on nothing. Each is replayed on the native
+  # Rust engine (the fuzzer's --replay mode), which must reproduce the entry's
+  # pinned golden (conformance/fuzz-corpus/goldens/), and through the shipped
+  # WASM build, which must agree with the native run at every checkpoint. The
+  # nightly keeps growing new seeds; this job only holds what it already
+  # found. The script stops at its own 240 s budget and fails rather than
+  # skip an entry; the job's limit leaves room for a cache-miss WASM build.
   fuzz-corpus:
     needs: changes
     # Fail closed, as the rust job above.
     if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.engine == 'true') }}
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -543,7 +543,11 @@ jobs:
         run: cargo build --locked --release --features conformance --bin fuzz
         working-directory: engine-rs
 
-      - name: Replay the corpus on both engines
+      # The shipped build's Node package (engine-rs/pkg/), from the shared
+      # cache and built on a miss with the pinned wasm-bindgen CLI.
+      - uses: ./.github/actions/engine-wasm
+
+      - name: Replay the corpus natively and through the WASM build
         run: npx tsx scripts/fuzz-corpus.ts --budget 240
 
       - name: Fail a cancelled run

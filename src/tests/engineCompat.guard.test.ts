@@ -384,9 +384,11 @@ describe("engine crate version rule", () => {
   it("the five lock files are the whole conformance lock", () => {
     // A new file at the top of conformance/ or in events/ has to be placed:
     // add it to LOCK_FILES (and the Rust test's list) when it pins the engine,
-    // or to this list when it is an input the lock already covers or has no
-    // pinned hashes (the fuzz corpus holds only the engines' agreement, and
-    // the fuzz window marker only says whether a replay window is open).
+    // or to this list when it is an input the lock already covers or is not
+    // part of the engine's contract (the fuzz corpus's goldens are the native
+    // run's own regression records, refreshed on purpose with
+    // `fuzz-corpus --update`, and the fuzz window marker only says whether a
+    // replay window is open).
     const inputs = new Set(["README.md", "fixtures", "fuzz-corpus", "fuzz-window.json", "scenarios"]);
     const locked = new Set(LOCK_FILES.map((f) => f.split("/")[0]));
     const visible = (dir: string) =>

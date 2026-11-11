@@ -1,15 +1,15 @@
 /**
- * Replay one scenario file on the TypeScript engine and compare it with the
- * Rust records beside it (`<id>.rs.json` and `<id>.rs.detail.json`, as the
+ * Replay one scenario file on the shipped WASM build in Node and compare it
+ * with the native Rust records beside it (`<id>.rs.json` and `<id>.rs.detail.json`, as the
  * fuzzer or `fuzz --replay` writes them). `scripts/fuzz-compare.ts` (the
  * nightly), `scripts/fuzz-shrink.ts` and `scripts/fuzz-corpus.ts` all go
  * through it, so the three agree on what a divergence is.
  */
 import { existsSync, readFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
-import { compareRuns, describeDivergence, type Leg, type RunRecord } from "./fuzzCompare";
+import { compareRuns, describeDivergence } from "./fuzzCompare";
 import { DetailError, isWasmTrap, type CheckpointDetail } from "./checkpointDetail";
-import { loadScenario, runScenario, startTsEngine, type Checkpoint, type EngineStart, type ScenarioEngine } from "./scenario";
+import { loadScenario, runScenario, type Checkpoint, type EngineStart } from "./scenario";
 import { hasWasmPackage, startWasmEngine, wasm, WASM_PKG } from "./wasmEngine";
 
 export type ReplayResult =
@@ -23,7 +23,7 @@ export type ReplayResult =
    *  scenario. Never an engine divergence. */
   | { status: "harness"; message: string };
 
-/** What a TypeScript refusal names, so a shrink cannot settle on a different
+/** What a refusal the replay threw names, so a shrink cannot settle on a different
  *  refusal: the runner's messages start with the command (`build fitnessClub @
  *  4,196 failed: ...`, `buildTransport elevatorExpress @ x212 failed: ...`,
  *  `resolveChoice: cannot pay`), so the words before ` @`, ` failed` or `:`
@@ -31,41 +31,6 @@ export type ReplayResult =
 export function throwSignature(message: string): string {
   const head = /^([A-Za-z][\w-]*(?: [A-Za-z][\w-]*)?)(?: @| failed|:)/.exec(message);
   return head ? `threw:${head[1].replace(/ /g, ":")}` : "threw";
-}
-
-/** Where a bomb ransom ends the TypeScript leg's compare. The Rust engine
- *  gates the call (Classic needs Security, and no call comes during a search)
- *  and answers a refusal with a timed search (#349); the reference, slated for
- *  deletion (#1875), calls without the gate and settles a refusal at once. So
- *  from the checkpoint that carries a ransom call on, the two engines may play
- *  different games by design. The owner granted this exception for 3.0.1 on
- *  2026-11-11 (#1886). A call shows on the reference as a pending `bombThreat`
- *  at a checkpoint, or as its `emergency_resolved` when it came and went
- *  between two checkpoints. */
-interface RansomCut {
-  /** The first checkpoint past the reference, or `null` while none is. */
-  at: number | null;
-}
-
-export function isRansomAnswer(event: unknown): boolean {
-  if (typeof event !== "object" || event === null) return false;
-  const { name, payload } = event as { name?: unknown; payload?: { kind?: unknown } };
-  return name === "emergency_resolved" && payload?.kind === "bombThreat";
-}
-
-/** The reference engine, watching each checkpoint for a ransom call. A
- *  reload's engine is watched the same way. */
-function watchRansoms(e: ScenarioEngine, cut: RansomCut, checkpointsSoFar: () => number): ScenarioEngine {
-  return {
-    ...e,
-    drainEvents: () => {
-      const events = e.drainEvents();
-      const called = e.pendingChoice()?.kind === "bombThreat" || events.some(isRansomAnswer);
-      if (cut.at === null && called) cut.at = checkpointsSoFar();
-      return events;
-    },
-    reload: () => watchRansoms(e.reload(), cut, checkpointsSoFar),
-  };
 }
 
 const harness = (message: string): ReplayResult => ({ status: "harness", message: `HARNESS: ${message}` });
@@ -81,12 +46,15 @@ function readRecord<T>(path: string, what: string): T[] | string {
   return Array.isArray(parsed) ? (parsed as T[]) : `${path}: expected a ${what} array`;
 }
 
-/** Run `file` on the TypeScript engine (or, with `leg` `WASM`, on the shipped
- *  build through the binding in Node) and compare it with the Rust records in
- *  `rustDir` (the scenario's own folder by default). */
-export function replayCompare(file: string, rustDir: string = dirname(file), leg: Leg = "TypeScript"): ReplayResult {
-  let start: EngineStart = startTsEngine;
-  if (leg === "WASM") {
+/** Run `file` on the shipped WASM build through the binding in Node and
+ *  compare it with the native Rust records in `rustDir` (the scenario's own
+ *  folder by default). `engine` replaces the WASM build, for the harness's own
+ *  tests; the replay is still reported as the WASM leg. */
+export function replayCompare(file: string, rustDir: string = dirname(file), engine?: EngineStart): ReplayResult {
+  const leg = "WASM";
+  let start: EngineStart;
+  if (engine) start = engine;
+  else {
     if (!hasWasmPackage()) return harness(`no WASM package at ${WASM_PKG} (npm run wasm:build)`);
     // A package that is present but will not load (a stale binding, a bad cache) is
     // the harness failing, not the engine disagreeing.
@@ -110,62 +78,51 @@ export function replayCompare(file: string, rustDir: string = dirname(file), leg
   } catch (e) {
     return harness((e as Error).message);
   }
-  const tsDetails: CheckpointDetail[] = [];
-  const cut: RansomCut = { at: null };
-  if (leg === "TypeScript") {
-    const plain = start;
-    start = (s) => watchRansoms(plain(s), cut, () => tsDetails.length);
-  }
-  let tsCheckpoints: Checkpoint[];
+  const details: CheckpointDetail[] = [];
+  let checkpoints: Checkpoint[];
   try {
-    tsCheckpoints = runScenario(scenario, start, tsDetails);
+    checkpoints = runScenario(scenario, start, details);
   } catch (e) {
     if (e instanceof DetailError) return harness(e.message);
-    // Past a ransom call the reference may refuse what the Rust engine
-    // played; compare what came before.
-    if (cut.at !== null) return compareUpTo(cut.at, tsDetails, rustCheckpoints, rustDetails, leg);
-    if (leg === "WASM" && isWasmTrap(e)) {
+    if (isWasmTrap(e)) {
       return { status: "diverged", signature: "trap", trap: true, message: `TRAPPED, the WASM build trapped instead of finishing the scenario: ${(e as Error).message}` };
     }
-    // The TypeScript engine refused a command the Rust engine accepted (or an
+    // The WASM build refused a command the native engine accepted (or an
     // expectFail it did not meet): the divergence the fuzzer exists to find.
     return { status: "diverged", signature: throwSignature((e as Error).message), message: `DIVERGED before any hash compare, ${leg} runner threw: ${(e as Error).message}` };
   }
-  if (cut.at !== null) return compareUpTo(cut.at, tsDetails, rustCheckpoints, rustDetails, leg, tsCheckpoints);
-  return compareRecords({ checkpoints: tsCheckpoints, details: tsDetails }, { checkpoints: rustCheckpoints, details: rustDetails }, leg);
-}
-
-function compareRecords(ts: RunRecord, rust: RunRecord, leg: Leg): ReplayResult {
   try {
-    const d = compareRuns(ts, rust, leg);
+    const d = compareRuns({ checkpoints, details }, { checkpoints: rustCheckpoints, details: rustDetails }, leg);
     if (d) return { status: "diverged", signature: d.field ? `${d.kind}:${d.field}` : d.kind, message: describeDivergence(d, leg) };
   } catch (e) {
     return harness((e as Error).message);
   }
-  return { status: "ok", checkpoints: ts.checkpoints.length };
+  return { status: "ok", checkpoints: checkpoints.length };
 }
 
-/** The compare of the checkpoints before a ransom call (see RansomCut). A
- *  run that threw returned no hashes, so its compare reads the details alone
- *  (money, log, a digest of every save field, fx), which cover the same state. */
-function compareUpTo(
-  at: number,
-  tsDetails: CheckpointDetail[],
-  rustCheckpoints: Checkpoint[],
-  rustDetails: CheckpointDetail[],
-  leg: Leg,
-  tsCheckpoints: Checkpoint[] = rustCheckpoints,
-): ReplayResult {
-  // Only the checkpoints from the call on are excused. A Rust record that ends
-  // before the call is missing checkpoints the reference still plays.
-  const rustHas = Math.min(rustCheckpoints.length, rustDetails.length);
-  if (rustHas < at) {
-    return { status: "diverged", signature: "count", message: `DIVERGED, the Rust record ends after ${rustHas} checkpoint(s), before the bomb ransom call at checkpoint ${at}` };
+/** Compare the native Rust records a fresh `fuzz --replay` of `file` wrote in
+ *  `freshDir` with the golden pinned in `goldenDir`: the Rust engine's own
+ *  regression check, now that no second engine referees it. A missing or
+ *  malformed golden is a harness failure, so an entry without one can never
+ *  pass for an entry that agrees. */
+export function goldenCompare(file: string, goldenDir: string, freshDir: string): ReplayResult {
+  const stem = basename(file).replace(/\.json$/, "");
+  const load = (dir: string, what: string): { checkpoints: Checkpoint[]; details: CheckpointDetail[] } | string => {
+    const checkpoints = readRecord<Checkpoint>(join(dir, `${stem}.rs.json`), `${what} checkpoints`);
+    if (typeof checkpoints === "string") return checkpoints;
+    const details = readRecord<CheckpointDetail>(join(dir, `${stem}.rs.detail.json`), `${what} checkpoint detail`);
+    if (typeof details === "string") return details;
+    return { checkpoints, details };
+  };
+  const golden = load(goldenDir, "golden");
+  if (typeof golden === "string") return harness(`${golden} (pin it with fuzz-corpus --update)`);
+  const fresh = load(freshDir, "Rust");
+  if (typeof fresh === "string") return harness(fresh);
+  try {
+    const d = compareRuns(golden, fresh, "golden");
+    if (d) return { status: "diverged", signature: d.field ? `${d.kind}:${d.field}` : d.kind, message: describeDivergence(d, "golden") };
+  } catch (e) {
+    return harness((e as Error).message);
   }
-  const n = Math.min(at, tsCheckpoints.length, tsDetails.length);
-  return compareRecords(
-    { checkpoints: tsCheckpoints.slice(0, n), details: tsDetails.slice(0, n) },
-    { checkpoints: rustCheckpoints.slice(0, n), details: rustDetails.slice(0, n) },
-    leg,
-  );
+  return { status: "ok", checkpoints: fresh.checkpoints.length };
 }

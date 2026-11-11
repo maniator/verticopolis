@@ -95,9 +95,8 @@ and never imports this reference. The
 card-text sweep (`src/tests/integration/cardTextParity.integration.test.ts`)
 holds the Rust card's lines for every room and shaft of 19 tower cases per
 mode, in both modes and in card order, to a committed golden of the
-reference card's lines (`src/tests/goldens/card-text/`, since #1809), and
-`src/tests/integration/cardTextReferee.integration.test.ts` holds the golden
-to the TypeScript card while that engine exists. The cases are service
+reference card's lines (`src/tests/goldens/card-text/`, since #1809), which
+a TypeScript referee held to the TypeScript card until #1875. The cases are service
 rooms, retail venues (also on a rainy day), lobby distance, every kind a
 slab tower takes (all but the basement kinds and the wedding hall) in each
 of seven states, the winning tower, some of them made unhappy (at a top
@@ -391,7 +390,7 @@ included. One row per rule the game's comparison dialog
 | The paid exterminator | proven same | the `hotel-exterminator-modern` and `hotel-exterminator-reload-modern` scenarios, `bookExterminator` in section 3 |
 | Build hints before the click | proven same | `quoteBuild`, `quoteShaft` and `lastReason` in section 3 |
 | A livelier day (school runs, errands, late checkout, gentler rain) | proven same | the Modern scenarios' checkpoints, which hash every person's state; `src/tests/integration/hotelLateCheckoutEngine.integration.test.ts` (the understaffed late checkout on both engines, since #1800) |
-| Calendar pace (real-world or compressed) | proven same | the Modern scenarios run the real-world calendar; `src/tests/integration/conformanceWasmFrameDays.integration.test.ts` holds the Rust engine to the frame-day golden, which runs the compressed one on a new Modern game for a day and on `conformance/fixtures/split-tower.vctower` for four days across a quarter's end ("split-tower on the canon calendar across a quarter, at speed 3"), and `src/tests/integration/frameDaysReferee.integration.test.ts` holds the TypeScript engine to the same golden |
+| Calendar pace (real-world or compressed) | proven same | the Modern scenarios run the real-world calendar; `src/tests/integration/conformanceWasmFrameDays.integration.test.ts` holds the Rust engine to the frame-day golden, which runs the compressed one on a new Modern game for a day and on `conformance/fixtures/split-tower.vctower` for four days across a quarter's end ("split-tower on the canon calendar across a quarter, at speed 3"); until #1875 a TypeScript referee held that engine to the same golden |
 | Office rent smoothed over the calendar | proven same | the Modern scenarios' checkpoints, `src/tests/integration/ledger.integration.test.ts` (`describeEngines`) |
 
 ## 7. Test exclusions
@@ -436,8 +435,8 @@ this order under #878:
   relocation tests
   (`src/tests/integration/condoRelocationEngine.integration.test.ts`).
 
-`src/tests/tsEngineTests.ratchet.txt` lists 187 files that still drive the
-TypeScript engine directly (157 test files and 30 fixtures and helpers; the
+`src/tests/tsEngineTests.ratchet.txt` lists 184 files that still drive the
+TypeScript engine directly (154 test files and 30 fixtures and helpers; the
 list shrinks as tests convert and grows only with a reason the PR states, as
 when #1792, #1795, #1797 and #1800 added
 `src/tests/integration/segmentRoutingMealRush.integration.test.ts`,
@@ -446,16 +445,16 @@ when #1792, #1795, #1797 and #1800 added
 `src/tests/integration/hotelLateCheckoutEngine.integration.test.ts`, port kit
 suites that author their towers on a `Simulation`, #1805 the port kit's
 TypeScript tooling, `src/tests/portKit/tsTooling.ts`, #1809 the two
-golden referees, and #1421 the fixture loader `src/tests/conformance/fixtureSim.ts`,
+golden referees (gone again with #1421's in #1875's first step), and #1421 the fixture loader `src/tests/conformance/fixtureSim.ts`,
 moved out of the deleted dual-run harness), and `src/tests/portKit/converted.txt` lists 24 suites
 already on the port kit. #1421 deleted the hosted WASM projects
 (`integrationWasm` and `unitWasm`), so no suite runs on a hosted `Simulation`
 any more; the suites that start the Rust engine themselves run in
 `npm run test:wasm`. The card-text sweep is one of them,
 and since #1809 (#1806) it holds the Rust card to a committed golden of the
-reference card's lines (`src/tests/goldens/card-text/`), which
-`src/tests/integration/cardTextReferee.integration.test.ts` holds to the
-TypeScript card while that engine exists, so the canary outlives the referee.
+reference card's lines (`src/tests/goldens/card-text/`), so the canary
+outlived the TypeScript referee that held the golden to that card until
+#1875.
 
 ## 8. Known divergences and exceptions
 

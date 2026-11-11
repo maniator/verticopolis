@@ -9,8 +9,6 @@ import { afterAll, type RunnerTask } from "vitest";
  * never rewrites another, and no run has two suites writing the same file:
  * - `VC_FRAME_DAYS_UPDATE=1`: the frame-day golden, from the Rust engine;
  * - `VC_PORT_EDITS_UPDATE=1`: the port-edit golden, from the Rust engine;
- * - `VC_CARD_TEXT_UPDATE=typescript`: the card-text towers and their lines,
- *   from the TypeScript referee;
  * - `VC_CARD_TEXT_UPDATE=rust`: the card-text lines, from the Rust sweep, on
  *   the committed towers.
  */
@@ -31,12 +29,11 @@ export const FRAME_DAYS_UPDATE = refreshSwitch("VC_FRAME_DAYS_UPDATE", ["1"]) ==
 /** `VC_PORT_EDITS_UPDATE=1`: the Rust run writes the port-edit golden. */
 export const PORT_EDITS_UPDATE = refreshSwitch("VC_PORT_EDITS_UPDATE", ["1"]) === "1";
 
-/** Which suite writes the card-text golden in this run, if any. The other
- *  suite skips, since it would read files the writer is replacing; run it on
- *  the new files afterwards. Once the referee goes with `src/engine/`, the
- *  sweep is the only writer. */
-export type CardTextWriter = "typescript" | "rust";
-export const CARD_TEXT_WRITER: CardTextWriter | undefined = refreshSwitch("VC_CARD_TEXT_UPDATE", ["typescript", "rust"] as const);
+/** `VC_CARD_TEXT_UPDATE=rust`: the Rust sweep writes the card-text lines.
+ *  The value names the writer, as it did while a TypeScript referee could
+ *  write the golden too (until #1875). */
+export type CardTextWriter = "rust";
+export const CARD_TEXT_WRITER: CardTextWriter | undefined = refreshSwitch("VC_CARD_TEXT_UPDATE", ["rust"] as const);
 
 /** The full names of the tests under `task` that did not pass: the ones
  *  that failed, and the ones a filter (`-t`) or a skip left out. */

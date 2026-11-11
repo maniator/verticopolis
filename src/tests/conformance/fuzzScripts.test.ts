@@ -15,11 +15,11 @@ import { hasWasmPackage } from "./wasmEngine";
 const dir = mkdtempSync(join(tmpdir(), "vc-fuzz-scripts-"));
 afterAll(() => rmSync(dir, { recursive: true, force: true }));
 
-function run(script: string, args: string[], fuzzBin: string): { code: number | null; out: string } {
+function run(script: string, args: string[], fuzzBin: string, env: NodeJS.ProcessEnv = {}): { code: number | null; out: string } {
   const r = spawnSync(process.execPath, ["--import", "tsx", resolve(REPO_ROOT, "scripts", script), ...args], {
     cwd: REPO_ROOT,
     encoding: "utf8",
-    env: { ...process.env, VC_FUZZ_BIN: fuzzBin },
+    env: { ...process.env, VC_FUZZ_BIN: fuzzBin, ...env },
     timeout: 60_000,
   });
   return { code: r.status, out: `${r.stdout}${r.stderr}` };
@@ -34,6 +34,16 @@ describe("scripts/fuzz-corpus.ts", () => {
     const r = run("fuzz-corpus.ts", ["--budget", "0"], present);
     expect(r.code).toBe(2);
     expect(r.out).toContain("usage: fuzz-corpus");
+  });
+
+  it("exits 2 on a flag it does not know", () => {
+    expect(run("fuzz-corpus.ts", ["--wasm"], present).code).toBe(2);
+  });
+
+  it("refuses --update in CI, since a golden is pinned on purpose and by hand", () => {
+    const r = run("fuzz-corpus.ts", ["--update"], present, { CI: "true" });
+    expect(r.code).toBe(2);
+    expect(r.out).toContain("never runs in CI");
   });
 
   it("exits 3 when there is no fuzzer, rather than passing on nothing", () => {
@@ -64,6 +74,12 @@ describe("scripts/fuzz-corpus.ts", () => {
   it.skipIf(!posix)("exits 3 when the fuzzer fails in a way that is not the engine's", () => {
     expect(run("fuzz-corpus.ts", [], failing(7, "bad input")).code).toBe(3);
   });
+
+  it.skipIf(!posix)("exits 3 when the native replay leaves no records to hold to the golden", () => {
+    const r = run("fuzz-corpus.ts", [], failing(0, ""), { CI: "" });
+    expect(r.code).toBe(3);
+    expect(r.out).toContain("no Rust checkpoints");
+  });
 });
 
 describe("scripts/fuzz-shrink.ts", () => {
@@ -78,9 +94,9 @@ describe("scripts/fuzz-shrink.ts", () => {
     expect(run("fuzz-shrink.ts", ["in.json", "ok-name", "--max-tests", "0"], present).code).toBe(2);
   });
 
-  it("exits 2 on a flag it does not know or one given twice, so a typo never picks the leg", () => {
-    expect(run("fuzz-shrink.ts", ["in.json", "ok-name", "--wams"], present).code).toBe(2);
-    expect(run("fuzz-shrink.ts", ["in.json", "ok-name", "--wasm", "--wasm"], present).code).toBe(2);
+  it("exits 2 on a flag it does not know or one given twice", () => {
+    expect(run("fuzz-shrink.ts", ["in.json", "ok-name", "--wasm"], present).code).toBe(2);
+    expect(run("fuzz-shrink.ts", ["in.json", "ok-name", "--max-tests", "5", "--max-tests", "5"], present).code).toBe(2);
     expect(run("fuzz-shrink.ts", ["in.json", "ok-name", "--max-tests"], present).code).toBe(2);
   });
 
@@ -104,22 +120,19 @@ describe("scripts/fuzz-shrink.ts", () => {
 
 describe("scripts/fuzz-compare.ts", () => {
   it("exits 2 with the usage line on no file, a stray argument, or a file that is not json", () => {
-    for (const args of [[], ["--wasm"], ["a.json", "b.json"], ["--wasm", "a.json", "b.json"], ["a.txt"], ["--wasm", "a.txt"]]) {
+    for (const args of [[], ["a.json", "b.json"], ["--wasm", "a.json"], ["a.txt"]]) {
       const r = run("fuzz-compare.ts", args, present);
       expect(r.code, args.join(" ")).toBe(2);
     }
-    expect(run("fuzz-compare.ts", [], present).out).toContain("usage: fuzz-compare [--wasm]");
+    expect(run("fuzz-compare.ts", [], present).out).toContain("usage: fuzz-compare <scenario.json>");
   });
 
-  it("exits 3 on either leg when the Rust records are missing, rather than passing on nothing", () => {
+  it("exits 3 when the Rust records or the WASM package are missing, rather than passing on nothing", () => {
     const file = join(dir, "no-records.json");
     writeFileSync(file, "{}");
-    const ts = run("fuzz-compare.ts", [file], present);
-    expect(ts.code).toBe(3);
-    expect(ts.out).toContain("no Rust checkpoints");
-    // Without the package the WASM leg stops earlier, for that reason; with it, for the records.
-    const wasmLeg = run("fuzz-compare.ts", ["--wasm", file], present);
-    expect(wasmLeg.code).toBe(3);
-    expect(wasmLeg.out).toContain(hasWasmPackage() ? "no Rust checkpoints" : "no WASM package");
+    const r = run("fuzz-compare.ts", [file], present);
+    expect(r.code).toBe(3);
+    // Without the package the replay stops earlier, for that reason; with it, for the records.
+    expect(r.out).toContain(hasWasmPackage() ? "no Rust checkpoints" : "no WASM package");
   });
 });

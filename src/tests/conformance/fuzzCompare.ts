@@ -1,7 +1,8 @@
 /**
- * The seeded differential's compare: the TypeScript engine's checkpoints and
- * details against the Rust fuzzer's, naming the first field that differs.
- * `scripts/fuzz-compare.ts` is the command line around it.
+ * The seeded differential's compare: one run's checkpoints and details against
+ * the native Rust run's, naming the first field that differs. The other run is
+ * the shipped WASM build in Node (the nightly, `scripts/fuzz-compare.ts`) or a
+ * corpus entry's pinned golden (`scripts/fuzz-corpus.ts`).
  */
 import type { Checkpoint } from "./scenario";
 import type { CheckpointDetail } from "./checkpointDetail";
@@ -15,10 +16,10 @@ export interface RunRecord {
  *  the label, the three hashes, then the detail (money, log, save field, fx slots). */
 export type DivergenceKind = "count" | "label" | "state" | "crowd" | "events" | "money" | "log" | "save" | "fx";
 
-/** The engine compared with the native Rust run: the TypeScript reference, or
- *  the shipped WASM build in Node. The record fields keep the name `ts`
- *  whichever leg filled them. */
-export type Leg = "TypeScript" | "WASM";
+/** What the native Rust run is compared with: the shipped WASM build in Node,
+ *  or the golden record a corpus entry pins. The divergence's `other` field
+ *  holds that side's value. */
+export type Leg = "WASM" | "golden";
 
 export interface Divergence {
   /** The checkpoint index, or the shorter run's length for `count`. */
@@ -27,7 +28,8 @@ export interface Divergence {
   kind: DivergenceKind;
   /** The log part (`seq`, `count`, `digest`) or the save field's name. */
   field?: string;
-  ts: string;
+  /** The compared leg's value (the WASM build's, or the golden's). */
+  other: string;
   rust: string;
 }
 
@@ -50,16 +52,16 @@ export function recordProblem(run: RunRecord, what: string): string | null {
 }
 
 /** The first detail difference at one checkpoint, if any. */
-function detailDivergence(a: CheckpointDetail, b: CheckpointDetail): Pick<Divergence, "kind" | "field" | "ts" | "rust"> | null {
-  if (a.money !== b.money) return { kind: "money", ts: String(a.money), rust: String(b.money) };
+function detailDivergence(a: CheckpointDetail, b: CheckpointDetail): Pick<Divergence, "kind" | "field" | "other" | "rust"> | null {
+  if (a.money !== b.money) return { kind: "money", other: String(a.money), rust: String(b.money) };
   for (const part of ["seq", "count", "digest"] as const) {
-    if (a.log[part] !== b.log[part]) return { kind: "log", field: part, ts: String(a.log[part]), rust: String(b.log[part]) };
+    if (a.log[part] !== b.log[part]) return { kind: "log", field: part, other: String(a.log[part]), rust: String(b.log[part]) };
   }
   for (const key of [...new Set([...Object.keys(a.save), ...Object.keys(b.save)])].sort()) {
-    if (a.save[key] !== b.save[key]) return { kind: "save", field: key, ts: String(a.save[key] ?? "(absent)"), rust: String(b.save[key] ?? "(absent)") };
+    if (a.save[key] !== b.save[key]) return { kind: "save", field: key, other: String(a.save[key] ?? "(absent)"), rust: String(b.save[key] ?? "(absent)") };
   }
   for (const key of [...new Set([...Object.keys(a.fx), ...Object.keys(b.fx)])].sort()) {
-    if (a.fx[key] !== b.fx[key]) return { kind: "fx", field: key, ts: String(a.fx[key] ?? "(absent)"), rust: String(b.fx[key] ?? "(absent)") };
+    if (a.fx[key] !== b.fx[key]) return { kind: "fx", field: key, other: String(a.fx[key] ?? "(absent)"), rust: String(b.fx[key] ?? "(absent)") };
   }
   return null;
 }
@@ -68,30 +70,30 @@ function detailDivergence(a: CheckpointDetail, b: CheckpointDetail): Pick<Diverg
  *  agree. A hash difference also names the first thing the detail records show
  *  differing (money, a log part or a save field), so the report points at the
  *  cause as well as the digest. Throws when a record cannot be compared. */
-export function compareRuns(ts: RunRecord, rust: RunRecord, leg: Leg = "TypeScript"): Divergence | null {
-  const problem = recordProblem(ts, leg) ?? recordProblem(rust, "Rust");
+export function compareRuns(run: RunRecord, rust: RunRecord, leg: Leg = "WASM"): Divergence | null {
+  const problem = recordProblem(run, leg) ?? recordProblem(rust, "Rust");
   if (problem) throw new Error(problem);
-  const n = Math.min(ts.checkpoints.length, rust.checkpoints.length);
+  const n = Math.min(run.checkpoints.length, rust.checkpoints.length);
   for (let i = 0; i < n; i++) {
-    const a = ts.checkpoints[i];
+    const a = run.checkpoints[i];
     const b = rust.checkpoints[i];
-    if (a.label !== b.label) return { index: i, label: a.label, kind: "label", ts: a.label, rust: b.label };
-    const detail = detailDivergence(ts.details[i], rust.details[i]);
+    if (a.label !== b.label) return { index: i, label: a.label, kind: "label", other: a.label, rust: b.label };
+    const detail = detailDivergence(run.details[i], rust.details[i]);
     for (const h of HASHES) {
       if (a[h] !== b[h]) {
-        return { index: i, label: a.label, kind: h, ...(detail ? { field: detail.field ?? detail.kind } : {}), ts: a[h], rust: b[h] };
+        return { index: i, label: a.label, kind: h, ...(detail ? { field: detail.field ?? detail.kind } : {}), other: a[h], rust: b[h] };
       }
     }
     if (detail) return { index: i, label: a.label, ...detail };
   }
-  if (ts.checkpoints.length !== rust.checkpoints.length) {
-    return { index: n, label: "(count)", kind: "count", ts: String(ts.checkpoints.length), rust: String(rust.checkpoints.length) };
+  if (run.checkpoints.length !== rust.checkpoints.length) {
+    return { index: n, label: "(count)", kind: "count", other: String(run.checkpoints.length), rust: String(rust.checkpoints.length) };
   }
   return null;
 }
 
 /** One line for the nightly's log and summary. */
-export function describeDivergence(d: Divergence, leg: Leg = "TypeScript"): string {
+export function describeDivergence(d: Divergence, leg: Leg = "WASM"): string {
   const where = d.kind === "count" ? "checkpoint count" : `checkpoint ${d.index} (${d.label}): ${d.kind}${d.field ? ` field ${d.field}` : ""}`;
-  return `DIVERGED at ${where}, ${leg} ${d.ts} vs Rust ${d.rust}`;
+  return `DIVERGED at ${where}, ${leg} ${d.other} vs Rust ${d.rust}`;
 }
