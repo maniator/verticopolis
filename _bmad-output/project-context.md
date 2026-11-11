@@ -127,6 +127,12 @@ full spec see the PRD under `_bmad-output/planning-artifacts/prds/`.
   run; test fixtures must assert every construction step the claim depends on
   (`expect(r.ok)`), because a silently degraded fixture tests a different tower
   than the one described.
+- **Unit tests mock the engine; every test asserts what it names** (full rule
+  in `CONTRIBUTING.md` -> What every test must do): a unit test mocks the
+  engine port with `vi.fn` spies and canned JSON answers and asserts the calls
+  and what the code did with them; real-engine checks are integration or Rust
+  tests; never replay recorded engine answers (PR #1923). Guard:
+  `src/tests/testHonesty.guard.test.ts`.
 - **No em-dashes in prose** (player-facing copy, docs, comments, commit and PR
   text) in anything new you write. Use commas, colons, parentheses, or separate
   sentences instead. Two standing exceptions: en-dashes in numeric ranges

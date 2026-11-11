@@ -51,6 +51,15 @@ All four pass before pushing. `npm run build` needs the engine package
 game. Copilot reviews are one-shot snapshots, so re-request one after pushing
 fixes for its findings.
 
+- Flag any unit test (`*.test.ts`) that starts a real engine (Rust or the
+  TypeScript reference) or replays recorded engine answers: unit tests mock the
+  engine port with `vi.fn` spies, use JSON fixtures only as canned answers, and
+  assert the calls made and what the code did with the answers. Real-engine
+  checks belong in `*.integration.test.ts` or Rust tests. Also flag a test
+  whose assertions cannot fail when the code it names breaks: one named for a
+  behavior that only checks "does not throw", or one that asserts a mock
+  returned what the test told it to (`CONTRIBUTING.md` → What every test must
+  do).
 - Do not add tests that match workflow YAML, Playwright or Vitest config text
   (`CONTRIBUTING.md` → Quality gates).
 - American English everywhere. No new em-dashes in prose, no "X, not Y"

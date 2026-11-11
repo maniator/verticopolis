@@ -87,8 +87,8 @@ Verticopolis has **two test tiers**:
   simulation over a tall tower. It is split by filename into two **vitest
   projects** (`vite.config.ts` `test.projects`):
   - **unit** (`*.test.ts`): sits next to the module it covers (`foo.ts` +
-    `foo.test.ts`) and mocks its collaborators. `npm run test:unit` runs only
-    these.
+    `foo.test.ts`) and mocks its collaborators, the engine included (see
+    **What every test must do** below). `npm run test:unit` runs only these.
   - **integration** (`*.integration.test.ts`): drives several modules or a whole
     `Sim`/`Tower` (golden-master round-trips, playthroughs, subsystem flows).
     These typically live under `src/tests/integration/`, but the `.integration`
@@ -356,6 +356,45 @@ The gallery and the Playwright visual baselines are both the Rust engine's
 WASM engine, and it needs the engine package (`npm run wasm:build`). The
 baselines are minted and compared on the `chromium-serial` project, in `npm run
 e2e` and in `update-visual-baselines`.
+
+### What every test must do
+
+A test earns its place by failing when the code it names breaks. PR #1923
+showed the failure mode: "unit" tests replayed recorded engine answers through
+a stand-in port and asserted the recorded values back, so they passed whatever
+the code under test did. The rules:
+
+- **A unit test mocks the engine.** It stands in for the engine port (or any
+  collaborator) with `vi.fn` spies. JSON fixtures are allowed only as the
+  canned answers those spies return. The test asserts the calls the code made
+  (`toHaveBeenCalledWith`) and what the code did with the answers: the state
+  it left, the value it returned, the DOM it drew. It never starts the Rust
+  engine or the TypeScript reference engine.
+- **A check that needs the real engine is an integration test**
+  (`*.integration.test.ts`, listed in `test:wasm:host` when it needs the
+  package) **or a Rust test** in `engine-rs/`.
+- **No recorded engine answers.** Never capture what the engine said and replay
+  it as a stand-in engine, and never refresh a unit test's fixtures from a live
+  engine. (The conformance locks and catalog digests are written from the Rust
+  engine on purpose: they pin the engine itself, checked in the integration
+  tier.) A
+  value a test pins comes from the rule it checks (the 1994 original, the
+  catalog, a hand-worked example). A value captured from a past run of the
+  same code checks nothing.
+- **Every test asserts what its name promises.** A test named for a behavior
+  checks that behavior. "Does not throw" is enough only for a test whose name
+  says so (a "never throws" contract). Asserting that a mock returned what the
+  test told it to return checks nothing.
+
+`src/tests/testHonesty.guard.test.ts` holds the parts a machine can check: no
+unit test reaches a module that starts a real engine (directly or through test
+fixtures), no `recordings` directory or `*:record` script, and no `it`/`test`
+in the unit, integration or e2e tiers and no Rust `#[test]` without an
+assertion. Its allowlist,
+`src/tests/testHonesty.allow.txt`, only shrinks, and each line carries its
+reason. `tsEngineTests.guard.test.ts` separately holds the tests that still run
+the TypeScript reference engine to a shrink-only list. The rest is review work:
+the review skills, Copilot and PR-Agent check it on every PR.
 
 ### Coverage floors
 
