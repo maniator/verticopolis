@@ -34,7 +34,7 @@ export const INSTANCE_METHODS = [
   "fires", "bombThreat", "evaluateStar", "setClock", "setUnitState", "setCustomersIn", "setWeather",
   "clearRetailTallies", "startFireAt", "vacateUnit", "setUnitRent",
   "callExterminator", "autoBridge", "toggleAutoBridge", "setFilmPolicy", "rerollSubtype", "applyRentBatch",
-  "pendingChoice", "resolveChoice", "tick",
+  "pendingChoice", "bombSearch", "resolveChoice", "tick",
   "serialize", "stateView", "crowdView", "stateDigest", "crowdDigest", "frameView", "logSince",
   "elevatorTelemetry", "seedElevatorTelemetry", "advanceClock", "seedLoopMemos", "loopMemos",
   "housekeepingReport", "commuteStress", "commuteStressRevision", "drainGameplayEvents",

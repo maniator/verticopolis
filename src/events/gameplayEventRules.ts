@@ -26,5 +26,6 @@ export const GAMEPLAY_EVENT_RULES: GameplayEventRules = {
     { name: "bomb_detonated", payload: { rooms: { type: "integer", min: 0, max: 10000 } } },
     { name: "emergency_resolved", payload: { kind: { type: "enum", enum: "emergencyKind" }, decision: { type: "enum", enum: "emergencyDecision" }, source: { type: "enum", enum: "emergencySource" } } },
     { name: "milestone_reached", payload: { id: { type: "enum", enum: "milestoneId" } } },
+    { name: "bomb_found", payload: {} },
   ],
 };

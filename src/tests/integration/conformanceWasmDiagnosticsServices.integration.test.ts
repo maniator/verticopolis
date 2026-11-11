@@ -19,6 +19,7 @@ import {
   tsEngine,
   type Checkpoint,
   type ScenarioEngine,
+  PAST_THE_TYPESCRIPT_REFERENCE,
 } from "../conformance/scenario";
 import { hasWasmPackage, reloadWasmHandle, startWasmHandle, wasmEngine, wasmRequired } from "../conformance/wasmEngine";
 import type { WasmEngine } from "../../dualrun/binding";
@@ -42,7 +43,9 @@ import viewLayout from "../../engine/viewLayout.json";
 
 const SCENARIO_DIR = resolve(CONFORMANCE_DIR, "scenarios");
 const lock = JSON.parse(readFileSync(resolve(CONFORMANCE_DIR, "expected.json"), "utf8")) as { scenarios: Record<string, Checkpoint[]> };
-const files = readdirSync(SCENARIO_DIR).filter((f) => f.endsWith(".json")).sort();
+const files = readdirSync(SCENARIO_DIR)
+  .filter((f) => f.endsWith(".json") && !PAST_THE_TYPESCRIPT_REFERENCE.has(f))
+  .sort();
 
 if (wasmRequired() && !hasWasmPackage()) throw new Error("VC_REQUIRE_WASM=1 but engine-rs/pkg/ is not built; run npm run wasm:build");
 
@@ -250,13 +253,16 @@ const nearCapacity = (card: Card): boolean => card.slots[CARD_NEAR_CAPACITY] ===
 
 /** The sections the corpus reached when this test was written. A corpus or
  *  engine change that stops reaching one, or starts reaching a new one, fails
- *  the last test, so the comparison's coverage cannot change unseen. */
+ *  the last test, so the comparison's coverage cannot change unseen. An inert
+ *  cinema and shop left with ransom-ignored-modern, whose blast-gutted rooms
+ *  only that scenario reached; it is past the TypeScript reference now (#349),
+ *  and the Rust engine's own lock still pins it. */
 const CORPUS_SECTIONS: readonly string[] = [
   "commercial:lobbyFar:false", "commercial:lobbyFar:true",
   "hotel:counts:dirty", "hotel:counts:infested", "hotel:counts:other", "hotel:excluded:dirty", "hotel:excluded:other",
   "housekeeping:adequate", "housekeeping:nominalShortfall", "housekeeping:observedShortfall",
-  "inert:amusements", "inert:boutiqueBay", "inert:cinema", "inert:daycare", "inert:fastFood", "inert:foodHall",
-  "inert:nightclub", "inert:parking", "inert:shop", "inert:skyBar", "inert:spa",
+  "inert:amusements", "inert:boutiqueBay", "inert:daycare", "inert:fastFood", "inert:foodHall",
+  "inert:nightclub", "inert:parking", "inert:skyBar", "inert:spa",
   "parking:connected", "parking:disconnected", "parking:ramp",
   "recycling:met:filling",
   "retail:advice:none", "retail:advice:overBuilt", "retail:advice:underServed", "retail:rain",

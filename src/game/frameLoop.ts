@@ -13,6 +13,10 @@ import { hudSource } from "./hudSource";
 import { calendarOf } from "../simport/headerClock";
 import { groupDigits } from "../ui/format";
 
+/** Real milliseconds between two ticks of the bomb's clock. */
+const BOMB_TICK_MS = 1000;
+let lastBombTickAt = -Infinity;
+
 /**
  * The per-frame simulation + throttled UI/audio refresh, split out of the
  * `GameApp` class. `runFrame(app, dtMs)` is called from the engine's `onUpdate`
@@ -120,6 +124,13 @@ export function runFrame(app: GameApp, dtMs: number): void {
     if (header.star > app.lastStar) {
       app.lastStar = header.star;
       if (header.star < 6) app.audio.sfx("promote");
+    }
+    // The bomb's clock ticks once a real second while a search runs and the
+    // game is not paused, and the music dips for the whole countdown.
+    app.audio.setMusicDucked(header.bombSearch !== null);
+    if (header.bombSearch !== null && minutesPerSecond > 0 && now - lastBombTickAt >= BOMB_TICK_MS) {
+      lastBombTickAt = now;
+      app.audio.sfx("tick");
     }
     // Auto-surfaced modals must never stack over the boot/return splash. A
     // loaded save can carry a pending emergency (or an already-won TOWER), and

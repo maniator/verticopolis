@@ -63,7 +63,7 @@ function makeApp(sim: Simulation, ui: UI) {
     reader: new ViewReader(enginePort, facilityFloors),
     portCodes: new PortCodes(enginePort),
     accMinutes: 0,
-    audio: { update: vi.fn(), sfx: vi.fn() },
+    audio: { update: vi.fn(), sfx: vi.fn(), setMusicDucked: vi.fn() },
     engine: { focus: vi.fn(() => ({})) },
     ui,
     onboarding: { tick: vi.fn() },

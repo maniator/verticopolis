@@ -1,0 +1,35 @@
+{
+  "id": "ransom-declined-modern",
+  "description": "The Modern tower-one at four stars (the towerone fixture with star raised to four and the treasury filled) runs at hour ticks until a bomb threat is called in and refuses the ransom, so Security searches the tower against the 1:00 PM deadline; the run goes on two days so the search ends, found or not. A refused ransom that settles at once (the bug #349 fixed) moves this scenario's checkpoints.",
+  "start": {
+    "fixture": "conformance/fixtures/towerone-star4.vctower",
+    "mode": "modern"
+  },
+  "commands": [
+    {
+      "op": "tick",
+      "dt": 60,
+      "times": 256,
+      "checkpointEvery": 64
+    },
+    {
+      "op": "checkpoint",
+      "label": "ransom-demanded"
+    },
+    {
+      "op": "resolveChoice",
+      "accept": false,
+      "kind": "bombThreat"
+    },
+    {
+      "op": "checkpoint",
+      "label": "ransom-refused"
+    },
+    {
+      "op": "tick",
+      "dt": 60,
+      "times": 48,
+      "checkpointEvery": 6
+    }
+  ]
+}

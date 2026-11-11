@@ -37,6 +37,9 @@ export interface SfxVoices {
    *  window (a sell inside an error's 0.28 s gap) is accepted as rare and
    *  brief rather than guarded. */
   bloop2: Tone.Synth;
+  /** The bomb search's clock: a dry woodblock knock, its own mono voice so
+   *  its near-instant attack never reshapes the bloops. */
+  tick: Tone.Synth;
   /** Quiet partials over the deeper bloops (octave + twelfth), poly so a
    *  double bloop's partials can overlap. */
   bloopPartial: Tone.PolySynth;
@@ -86,6 +89,10 @@ function buildSfxVoices(bus: Tone.ToneAudioNode, built: Array<{ dispose(): void 
     oscillator: { type: "sine" },
     envelope: { attack: 0.008, decay: 0.2, sustain: 0, release: 0.08 },
   }).connect(bus));
+  const tick = track(new Tone.Synth({
+    oscillator: { type: "sine" },
+    envelope: { attack: 0.001, decay: 0.05, sustain: 0, release: 0.02 },
+  }).connect(bus));
   const bloopPartial = track(new Tone.PolySynth(Tone.Synth, {
     oscillator: { type: "sine" },
     envelope: { attack: 0.008, decay: 0.18, sustain: 0, release: 0.06 },
@@ -101,7 +108,7 @@ function buildSfxVoices(bus: Tone.ToneAudioNode, built: Array<{ dispose(): void 
     envelope: { attack: 0.002, decay: 0.5, sustain: 0, release: 0.2 },
   }).connect(bus));
   bellPartial.maxPolyphony = 12;
-  return { jingle, bloop, bloop2, bloopPartial, bell, bellPartial };
+  return { jingle, bloop, bloop2, tick, bloopPartial, bell, bellPartial };
 }
 
 /** One bell strike: the fundamental plus a partial 19 semitones up (just shy
@@ -211,6 +218,15 @@ export function playSfx(voices: SfxVoices, name: SfxName): void {
     case "notify":
       // A single ping on G4: the onboarding step chime and other small nudges.
       strikeBell(voices, 67, t, 0.7);
+      break;
+    case "tick":
+      // The bomb's clock, once a second while a bomb search runs: a woodblock
+      // knock (the owner's pick of three previews), a 1 ms strike that drops
+      // from 900 to 700 Hz in 10 ms and dies away within about 50 ms.
+      voices.tick.triggerAttackRelease(900, 0.03, t, 0.5);
+      voices.tick.frequency.cancelScheduledValues(t);
+      voices.tick.frequency.setValueAtTime(900, t);
+      voices.tick.frequency.exponentialRampToValueAtTime(700, t + 0.01);
       break;
   }
 }

@@ -10,7 +10,7 @@
 use serde_json::{json, Map, Value};
 
 /// The version of the view's layout, reported by `viewLayout()`.
-pub const VIEW_LAYOUT_VERSION: u32 = 12;
+pub const VIEW_LAYOUT_VERSION: u32 = 13;
 
 /// The dynamic frame's header slots, one name each. `UNLOCKED` holds the
 /// unlocked kinds as a bitmask by kind code in one double, with more than 32
@@ -22,6 +22,8 @@ pub const VIEW_LAYOUT_VERSION: u32 = 12;
 /// count, the day of the week, the weekend flag as 0 or 1, the quarter and the
 /// year, all counted from 0) and the calendar's week and weekend lengths in
 /// days, so a host shows dates without doing the date arithmetic.
+/// `BOMB_SEARCH_SEQ` is 0 while no bomb search runs and otherwise moves with
+/// every change to it, so a host rereads `bombSearch()` only when it moved.
 pub mod header {
     pub const MINUTES: usize = 0;
     pub const TOWER_REVISION: usize = 1;
@@ -62,10 +64,11 @@ pub mod header {
     pub const YEAR: usize = 36;
     pub const WEEK_DAYS: usize = 37;
     pub const WEEKEND_DAYS: usize = 38;
+    pub const BOMB_SEARCH_SEQ: usize = 39;
 }
 
 /// Slots of the dynamic frame's header.
-pub const HEADER: usize = header::WEEKEND_DAYS + 1;
+pub const HEADER: usize = header::BOMB_SEARCH_SEQ + 1;
 
 /// The slots of a drawn person's record.
 pub mod person {
@@ -237,6 +240,7 @@ pub(crate) const TABLES: &[Table] = &[
             ("year", header::YEAR),
             ("weekDays", header::WEEK_DAYS),
             ("weekendDays", header::WEEKEND_DAYS),
+            ("bombSearchSeq", header::BOMB_SEARCH_SEQ),
         ],
         width_name: "headerWidth",
         width: HEADER,

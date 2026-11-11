@@ -41,6 +41,7 @@ fn one_of_each() -> Vec<GameplayEvent> {
             source: EmergencySource::Timeout,
         },
         GameplayEvent::MilestoneReached { id: "full-house" },
+        GameplayEvent::BombFound,
     ]
 }
 
@@ -440,6 +441,13 @@ fn stars_milestones_fires_bombs_and_resolutions_report_in_order() {
         events[0],
         json!({ "name": "emergency_resolved", "payload": { "kind": "bombThreat", "decision": "decline", "source": "timeout" } })
     );
-    assert_eq!(events[1]["name"], "bomb_detonated");
-    assert!(events[1]["payload"]["rooms"].as_i64().unwrap() > 0);
+    // Classic hides the bomb and waits out the deadline: this tower has no
+    // Security, so nobody searches and it goes off then.
+    assert_eq!(events.as_array().unwrap().len(), 1);
+    let deadline = sim.events.bomb.as_ref().expect("a search runs").deadline;
+    sim.clock.minutes = deadline;
+    sim.advance_bomb_search();
+    let events = drained(&mut sim);
+    assert_eq!(events[0]["name"], "bomb_detonated");
+    assert!(events[0]["payload"]["rooms"].as_i64().unwrap() > 0);
 }

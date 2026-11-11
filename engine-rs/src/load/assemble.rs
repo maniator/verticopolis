@@ -376,6 +376,9 @@ pub(crate) fn assemble(
                 message,
             })
         });
+        sim.events.bomb = ev
+            .get("bomb")
+            .and_then(crate::events::BombSearch::from_save);
     }
     sim.weather = weather_for(sim.clock.day());
     sim.last_day = sim.clock.day();

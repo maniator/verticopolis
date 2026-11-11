@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest";
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { replayCompare, throwSignature } from "./fuzzReplay";
+import { isRansomAnswer, replayCompare, throwSignature } from "./fuzzReplay";
 import { DetailError, isWasmTrap, requireDetail } from "./checkpointDetail";
-import { loadScenario, runScenario, startTsEngine, type Checkpoint } from "./scenario";
+import { CONFORMANCE_DIR, loadScenario, runScenario, startTsEngine, type Checkpoint } from "./scenario";
 import type { CheckpointDetail } from "./checkpointDetail";
 
 const dir = mkdtempSync(join(tmpdir(), "vc-fuzz-replay-"));
@@ -143,6 +143,53 @@ describe("replayCompare", () => {
     expect(readFileSync(join(dir, "seed-9315-min.rs.detail.json"), "utf8")).toBe(detailsAfterFirst);
     expect(a).toMatchObject({ status: "diverged", signature: "money" });
     expect(b).toEqual(a);
+  });
+});
+
+describe("a bomb ransom call on the TypeScript leg (owner exception, #1886)", () => {
+  // The refused-ransom replay: hour ticks until the call, a refusal, two days.
+  const file = join(dir, "ransom.json");
+  writeFileSync(file, readFileSync(join(CONFORMANCE_DIR, "scenarios", "ransom-declined-modern.json")));
+  const details: CheckpointDetail[] = [];
+  const checkpoints = runScenario(loadScenario(file), undefined, details);
+  const rust = (tweak: (c: Checkpoint[], d: CheckpointDetail[]) => void) => {
+    const c = structuredClone(checkpoints);
+    const d = structuredClone(details);
+    tweak(c, d);
+    writeFileSync(join(dir, "ransom.rs.json"), JSON.stringify(c));
+    writeFileSync(join(dir, "ransom.rs.detail.json"), JSON.stringify(d));
+  };
+
+  it("ends the compare at the checkpoint that carries the call", () => {
+    rust((c, d) => {
+      c[c.length - 1].state = "rust searched";
+      d[d.length - 1].money += 1;
+    });
+    const r = replayCompare(file);
+    expect(r.status).toBe("ok");
+    expect(r.status === "ok" && r.checkpoints).toBeGreaterThan(0);
+    expect(r.status === "ok" && r.checkpoints).toBeLessThan(checkpoints.length);
+  });
+
+  it("still compares every checkpoint before it", () => {
+    rust((c) => {
+      c[0].state = "x";
+    });
+    expect(replayCompare(file)).toMatchObject({ status: "diverged" });
+  });
+
+  it("fails a Rust record that ends before the call", () => {
+    rust((c, d) => {
+      c.splice(1);
+      d.splice(1);
+    });
+    expect(replayCompare(file)).toMatchObject({ status: "diverged", signature: "count" });
+  });
+
+  it("reads only a ransom's answer as a call", () => {
+    expect(isRansomAnswer({ name: "emergency_resolved", payload: { kind: "bombThreat", decision: "decline", source: "timeout" } })).toBe(true);
+    expect(isRansomAnswer({ name: "emergency_resolved", payload: { kind: "fireRescue", decision: "decline", source: "player" } })).toBe(false);
+    expect(isRansomAnswer(null)).toBe(false);
   });
 });
 

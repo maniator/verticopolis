@@ -6,6 +6,9 @@ import {
   resetDecorativeClock,
   MAX_EXPLOSIONS,
   MAX_TREASURES,
+  bombCountdownText,
+  bombPulseAlpha,
+  guardPosition,
 } from "./towerOverlay";
 
 /**
@@ -351,5 +354,48 @@ describe("reduced motion and the decorative clock", () => {
     resetDecorativeClock(e);
     expect(e.animClock).toBe(0);
     expect(e.d.anim).toBe(0);
+  });
+});
+
+describe("the bomb search on screen", () => {
+  it("counts down in hours and minutes", () => {
+    expect(bombCountdownText(125.2)).toBe("💣 Bomb search: 2:06 left");
+    expect(bombCountdownText(-3)).toBe("💣 Bomb search: 0:00 left");
+  });
+
+  it("beats the edge glow once a second, harder in the last hour", () => {
+    const calm = [0, 0.25, 0.5].map((t) => bombPulseAlpha(t, 120, false));
+    expect(calm[0]).toBeGreaterThan(calm[1]);
+    expect(calm[1]).toBeGreaterThan(calm[2]);
+    expect(bombPulseAlpha(1, 120, false)).toBeCloseTo(calm[0]);
+    expect(bombPulseAlpha(0, 30, false)).toBeGreaterThan(calm[0]);
+    expect(Math.max(...calm)).toBeLessThan(0.3);
+  });
+
+  it("holds the glow still under reduced motion", () => {
+    const still = [0, 0.25, 0.5, 0.75].map((t) => bombPulseAlpha(t, 120, true));
+    expect(new Set(still).size).toBe(1);
+    expect(still[0]).toBeGreaterThan(0);
+  });
+});
+
+describe("a search guard on screen", () => {
+  // Off from floor 2 at minute 100, three floors of stairs (6 minutes) up to
+  // floor 5, then the rooms from tile 160 to 200 until minute 126.
+  const g = { floor: 5, left: 160, right: 200, from: 2, start: 100, arrive: 106, done: 126 };
+
+  it("climbs the emergency stairs beside the rooms, floor by floor", () => {
+    expect(guardPosition(g, 100)).toEqual({ floor: 2, x: 159, climbing: true });
+    expect(guardPosition(g, 103)).toEqual({ floor: 3.5, x: 159, climbing: true });
+  });
+
+  it("walks the floor left to right as the sweep goes", () => {
+    expect(guardPosition(g, 106)).toEqual({ floor: 5, x: 160, climbing: false });
+    expect(guardPosition(g, 116)).toEqual({ floor: 5, x: 180, climbing: false });
+    expect(guardPosition(g, 200)).toEqual({ floor: 5, x: 200, climbing: false });
+  });
+
+  it("goes down the stairs as well as up", () => {
+    expect(guardPosition({ ...g, from: 8 }, 103).floor).toBe(6.5);
   });
 });

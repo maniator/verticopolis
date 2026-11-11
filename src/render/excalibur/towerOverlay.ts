@@ -3,8 +3,8 @@ import { isElevatorKind } from "../../presentation/viewKinds";
 import { catalogFacility } from "../../catalog/catalogTypes";
 import { towerCatalog } from "../../catalog/towerCatalog";
 import { viewWorld } from "../../presentation/viewWorld";
-import type { TransportView } from "../../simport/view";
-import { drawExplosion, drawThief, drawTreasure, drawVipLimo } from "../sprites/events";
+import type { BombSearchGuard, TransportView } from "../../simport/view";
+import { drawExplosion, drawSearchGuard, drawThief, drawTreasure, drawVipLimo } from "../sprites/events";
 import { FLOOR, TILE } from "../scale";
 import type { ScreenRect } from "./towerInputCamera";
 import type { TowerEngine } from "./TowerEngine";
@@ -131,6 +131,7 @@ export function drawOverlay(engine: TowerEngine, ctx: CanvasRenderingContext2D):
   ctx.clearRect(0, 0, engine.viewWidth, engine.viewHeight);
   drawShaftNumbers(engine, ctx);
   drawRain(engine, ctx);
+  renderBombSearch(engine, ctx);
   renderExplosions(engine, ctx);
   renderTreasures(engine, ctx);
   renderVip(engine, ctx);
@@ -138,6 +139,84 @@ export function drawOverlay(engine: TowerEngine, ctx: CanvasRenderingContext2D):
   drawPreview(engine, ctx);
   drawSelection(engine, ctx);
   drawRuler(engine, ctx);
+}
+
+/** The countdown text: hours and minutes of game time left. */
+export function bombCountdownText(minutesLeft: number): string {
+  const left = Math.max(0, Math.ceil(minutesLeft));
+  return `💣 Bomb search: ${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")} left`;
+}
+
+/** Where a guard is at minute `now`: climbing the emergency stairs at the
+ *  left edge of its floor's rooms from `from` to `floor` until `arrive`, then
+ *  walking the rooms left to right until `done`. `floor` may be fractional
+ *  on the stairs; `x` is in tiles. */
+export function guardPosition(g: BombSearchGuard, now: number): { floor: number; x: number; climbing: boolean } {
+  const part = (a: number, b: number): number => (b > a ? Math.min(1, Math.max(0, (now - a) / (b - a))) : 1);
+  if (now < g.arrive) {
+    return { floor: g.from + (g.floor - g.from) * part(g.start, g.arrive), x: g.left - 1, climbing: true };
+  }
+  return { floor: g.floor, x: g.left + (g.right - g.left) * part(g.arrive, g.done), climbing: false };
+}
+
+/** How strong the red glow at the screen's edges is during a bomb search:
+ *  one slow beat a second (in step with the tick), stronger in the last game
+ *  hour. Under reduced motion it holds steady, never beating. Far below any
+ *  flash threshold: one soft beat a second at low contrast. */
+export function bombPulseAlpha(animSeconds: number, minutesLeft: number, reducedMotion: boolean): number {
+  const peak = minutesLeft <= 60 ? 0.28 : 0.16;
+  if (reducedMotion) return peak * 0.6;
+  const beat = 0.5 + 0.5 * Math.cos(2 * Math.PI * animSeconds);
+  return peak * (0.35 + 0.65 * beat * beat);
+}
+
+/** The bomb search: each guard climbing the emergency stairs or walking a
+ *  floor's rooms (where the engine's timing says it is), the time left
+ *  before the deadline, and a red glow beating at the screen's edges. Under
+ *  reduced motion the glow holds still. */
+function renderBombSearch(engine: TowerEngine, ctx: CanvasRenderingContext2D): void {
+  const search = engine.sim.bombSearch;
+  if (!search) return;
+  const scale = Math.max(0.9, engine.cam.zoom);
+  for (const g of search.sweeping) {
+    const at = guardPosition(g, engine.sim.clock.minutes);
+    const x = engine.worldToScreenX(at.x);
+    const y = engine.worldToScreenY(at.floor) + FLOOR * engine.cam.zoom;
+    drawSearchGuard(ctx, x, y, scale);
+  }
+  const minutesLeft = search.deadline - engine.sim.clock.minutes;
+  drawEdgeGlow(ctx, engine.viewWidth, engine.viewHeight, bombPulseAlpha(engine.d.anim, minutesLeft, engine.reducedMotion));
+  const text = bombCountdownText(minutesLeft);
+  ctx.save();
+  ctx.font = "bold 14px sans-serif";
+  const w = ctx.measureText(text).width + 16;
+  const x = (engine.viewWidth - w) / 2;
+  ctx.fillStyle = "rgba(120,16,16,0.85)";
+  ctx.fillRect(x, 8, w, 24);
+  ctx.fillStyle = "#ffffff";
+  ctx.textBaseline = "middle";
+  ctx.fillText(text, x + 8, 20);
+  ctx.restore();
+}
+
+/** A red glow fading in from the four screen edges. */
+function drawEdgeGlow(ctx: CanvasRenderingContext2D, w: number, h: number, alpha: number): void {
+  const depth = Math.min(w, h) * 0.12;
+  const red = (a: number): string => `rgba(200,20,20,${a})`;
+  ctx.save();
+  for (const [x0, y0, x1, y1, rx, ry, rw, rh] of [
+    [0, 0, 0, depth, 0, 0, w, depth],
+    [0, h, 0, h - depth, 0, h - depth, w, depth],
+    [0, 0, depth, 0, 0, 0, depth, h],
+    [w, 0, w - depth, 0, w - depth, 0, depth, h],
+  ] as const) {
+    const g = ctx.createLinearGradient(x0, y0, x1, y1);
+    g.addColorStop(0, red(alpha));
+    g.addColorStop(1, red(0));
+    ctx.fillStyle = g;
+    ctx.fillRect(rx, ry, rw, rh);
+  }
+  ctx.restore();
 }
 
 /** Bomb-blast flashes at their epicenters, projected to screen (see syncEventFx). */

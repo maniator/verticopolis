@@ -7,11 +7,15 @@ use crate::facilities::Kind;
 use crate::gameplay::{EmergencyDecision, EmergencyKind, EmergencySource, GameplayEvent};
 use crate::rng::Rng;
 use crate::services::with_thousands;
-use crate::sim::{LogKind, PointFx, Simulation, ThiefFx};
+use crate::sim::{LogKind, Simulation, ThiefFx};
 use crate::tower::UnitState;
 
 #[path = "events_fire.rs"]
 mod fire;
+
+#[path = "events_bomb.rs"]
+pub mod bomb;
+pub use bomb::{BombSearch, Guard};
 
 #[derive(Clone, Debug)]
 pub struct PendingChoice {
@@ -35,6 +39,8 @@ pub struct EventSystem {
     /// hold a fraction, which then never equals a year).
     pub last_santa_year: f64,
     pub pending: Option<PendingChoice>,
+    /// Classic's bomb search while one runs (`events_bomb.rs`).
+    pub bomb: Option<BombSearch>,
 }
 
 const SECURITY_RADIUS: i64 = 8;
@@ -51,6 +57,7 @@ impl EventSystem {
             extra: Rng::new(seed ^ 0x5a17a),
             last_santa_year: -1.0,
             pending: None,
+            bomb: None,
         }
     }
 
@@ -63,7 +70,11 @@ impl EventSystem {
             Some(p) => json!({ "kind": p.kind, "cost": p.cost, "message": p.message }),
             None => Value::Null,
         };
-        json!({ "lastSantaYear": self.last_santa_year, "rngState": self.extra.seed(), "pending": pending })
+        let mut state = json!({ "lastSantaYear": self.last_santa_year, "rngState": self.extra.seed(), "pending": pending });
+        if let Some(b) = &self.bomb {
+            state["bomb"] = b.save_state();
+        }
+        state
     }
 
     pub fn count(&self) -> usize {
@@ -110,7 +121,9 @@ impl Simulation {
             }
             return;
         }
-        if self.star >= 4 && roll < fire_chance + 0.05 {
+        let ransom_allowed = self.events.bomb.is_none()
+            && (!self.mode.ransom_needs_security() || self.has_any(Kind::Security));
+        if self.star >= 4 && roll < fire_chance + 0.05 && ransom_allowed {
             let message = "💣 A caller demands a $300,000 ransom or a bomb detonates. Pay, or have Security search the tower.".to_string();
             self.events.pending = Some(PendingChoice {
                 kind: "bombThreat",
@@ -178,7 +191,7 @@ impl Simulation {
                 LogKind::Money,
             );
         } else {
-            self.bomb_threat();
+            self.start_bomb_search();
         }
     }
 
@@ -442,35 +455,14 @@ impl Simulation {
             return;
         }
         let fine = 15_000.0 + self.rng.int(0, 15_000) as f64;
-        self.money -= fine;
-        self.events.bombs_detonated += 1;
         let targets = self.flammable_units();
-        let mut destroyed = 0;
-        if !targets.is_empty() {
-            let gi = *self.rng.pick(&targets);
-            let ground = &self.tower.units[gi];
-            let epicenter = ground.floor;
-            self.fx.explosion = PointFx {
-                floor: epicenter,
-                x: ground.x as f64 + ground.width as f64 / 2.0,
-                seq: self.fx.explosion.seq + 1,
-            };
-            for i in 0..self.tower.units.len() {
-                let u = &self.tower.units[i];
-                if (u.floor - epicenter).abs() <= 2
-                    && !u.kind.is_structural()
-                    && u.state != UnitState::Construction
-                    && u.state != UnitState::Gutted
-                {
-                    let id = u.id;
-                    self.events.active.shift_remove(&id);
-                    self.gut(i);
-                    destroyed += 1;
-                }
-            }
-        }
-        self.gameplay
-            .push(GameplayEvent::BombDetonated { rooms: destroyed });
+        let epicenter = if targets.is_empty() {
+            None
+        } else {
+            let ground = &self.tower.units[*self.rng.pick(&targets)];
+            Some((ground.floor, ground.x as f64 + ground.width as f64 / 2.0))
+        };
+        let destroyed = self.blast(fine, epicenter);
         self.emit(&format!("💣 A bomb detonated with no security to stop it. {destroyed} room(s) across ~5 floors were gutted, plus a ${} fine. Build Security!", with_thousands(fine)), LogKind::Bad);
     }
 }

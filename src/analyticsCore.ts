@@ -208,6 +208,11 @@ export interface GameplayEvents {
    *  engine's `emergency_resolved`: an accept the tower could not pay for is a
    *  decline (through 2.29.4 it reported the button pressed). */
   emergency_choice: { kind: EmergencyKind; decision: EmergencyDecision };
+  /** How a bomb threat ended, one row per threat: `paid` (the ransom, from the
+   *  engine's `emergency_resolved` accept, a timed-out decline included in the
+   *  other two), `found` (Security defused it before the deadline, the
+   *  engine's `bomb_found`) or `exploded` (the engine's `bomb_detonated`). */
+  bomb_outcome: { outcome: BombOutcome };
   /** Per-session summary of the SIMULATION-fired emergency activity: how many fire
    *  outbreaks ignited, how many rooms they gutted, and how many bombs detonated.
    *  Emitted once at session end like `session_builds`, and emitted EVEN WHEN ALL
@@ -259,6 +264,8 @@ export type EconomyActionName = "demolish" | "price_tune" | "capacity_tune";
 export type EmergencyKind = "fireRescue" | "bombThreat";
 /** The player's answer to an emergency prompt. */
 export type EmergencyDecision = "accept" | "decline";
+/** How a bomb threat ended (see `bomb_outcome`). */
+export type BombOutcome = "paid" | "found" | "exploded";
 
 /** The closed set of app-chrome actions {@link import("./analyticsActions").trackAppAction}
  *  reports. A union (not a bare string) so every call site is checked and the
