@@ -203,21 +203,18 @@ jobs:
         if: ${{ needs.changes.outputs.tests != 'false' }}
         run: npm run typecheck
 
-      # engine conformance (holidays-classic runs 720 in-game hours of a large
-      # tower, 15 s of CPU alone) is excluded here and runs in the next step.
-      # Under v8 coverage with the other test files running beside it, it took
-      # 61 s against its 60 s limit and failed unrelated PRs. Keep the scenario
-      # in the separate no-coverage step, which CI executes directly (on the
-      # unitWasm leg below, so it runs in parallel with this one). The same
-      # holds for two long port-kit suites: condoRelocationEngine (30 years of
-      # hourly ticks, about 60 s locally, 390 s under coverage against its
-      # 300 s limit) and roomCountsEngine (a check after every step on three
-      # conformance towers, 225 s under coverage against 300 s).
+      # Two long port-kit suites are excluded here and run without coverage on
+      # the unitWasm leg below, in parallel with this one: condoRelocationEngine
+      # (30 years of hourly ticks, about 60 s locally, 390 s under coverage
+      # against its 300 s limit) and roomCountsEngine (a check after every step
+      # on three conformance towers, 225 s under coverage against 300 s). The
+      # engine conformance suite runs on the Rust engine (conformanceWasm, in
+      # test:wasm:host on the integrationWasm leg).
       - name: Run tests
         if: ${{ needs.changes.outputs.tests != 'false' }}
-        run: npm run test:coverage -- --run --exclude '**/conformance.integration.test.ts' --exclude '**/condoRelocationEngine.integration.test.ts' --exclude '**/roomCountsEngine.integration.test.ts'
+        run: npm run test:coverage -- --run --exclude '**/condoRelocationEngine.integration.test.ts' --exclude '**/roomCountsEngine.integration.test.ts'
 
-      # The three excluded suites run without coverage on the unitWasm leg of
+      # The two excluded suites run without coverage on the unitWasm leg of
       # test-wasm-parity, beside this job instead of after it.
 
       # This job only proves the bundle builds, with no engine package (the e2e
@@ -301,16 +298,16 @@ jobs:
 
       # The two halves of `npm run test:wasm` used to run one after the other
       # on the integrationWasm leg. The port-kit suites run on their own
-      # portKit leg, and the no-coverage engine conformance (moved here from
-      # the test job) runs after the unit tests, so the three legs finish at
+      # portKit leg, and the two long ones the test job leaves out run here
+      # without coverage after the unit tests, so the three legs finish at
       # about the same time.
       - name: Port-kit suites
         if: ${{ needs.changes.outputs.code != 'false' && matrix.project == 'portKit' }}
         run: npm run test:port
 
-      - name: Engine conformance (no coverage)
+      - name: Long port-kit suites (no coverage)
         if: ${{ !cancelled() && needs.changes.outputs.code != 'false' && needs.changes.outputs.tests != 'false' && matrix.project == 'unitWasm' }}
-        run: npm exec --no -- vitest run --project integration conformance.integration condoRelocationEngine roomCountsEngine
+        run: npm exec --no -- vitest run --project integration condoRelocationEngine roomCountsEngine
 
       # The suites that start the Rust engine themselves (conformance, the
       # goldens, perf comparison), run once, on the integrationWasm leg; the

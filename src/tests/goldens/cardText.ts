@@ -13,25 +13,15 @@ import { writeGoldenFile } from "./updateGate";
  * the tower the case builds (a `.vctower` file) and the lines the reference
  * card prints for every room and shaft in it, in card order (a `.json` file).
  * `cardTextParity.integration.test.ts` loads each tower into the Rust engine
- * and holds the shipped card to those lines; while the TypeScript engine
- * exists, `cardTextReferee.integration.test.ts` builds each case again and
- * holds the golden to the TypeScript reference card itself.
+ * and holds the shipped card to those lines. The lines and towers came from
+ * the TypeScript reference card and builders, whose referee held the golden to
+ * them until #1875 deleted that engine.
  *
- * A refresh is a reviewed change, so a moved line shows in the diff. The
- * switch names the one suite that writes in that run, and that suite writes
- * only once every test in its file ran and passed (`updateGate.ts`); the
- * other suite skips:
- * - `VC_CARD_TEXT_UPDATE=typescript`: the referee writes the towers, and the
- *   lines from the TypeScript card;
- * - `VC_CARD_TEXT_UPDATE=rust`: the sweep writes the lines from the Rust card,
- *   keeping the towers.
- *
- * While the referee exists the two cards must print the same lines, so either
- * refresh writes the same file; a line the Rust card prints differently on
- * purpose is named in the referee's `referenceLines`, with its reason, as the
- * "Avg load: 0% full" line is. A builder change is the referee's refresh. Once
- * the referee is gone, the sweep's refresh carries the lines, and a new case
- * needs a builder on the Rust engine.
+ * A refresh is a reviewed change, so a moved line shows in the diff:
+ * `VC_CARD_TEXT_UPDATE=rust` makes the sweep write the lines from the Rust
+ * card, keeping the towers, only once every test in its file ran and passed
+ * (`updateGate.ts`). A new case, or a change to a committed tower, needs a
+ * builder on the Rust engine.
  *
  * The cards format numbers for the reader's locale, and the golden holds the
  * US English text, so these suites refuse to run under another locale (the

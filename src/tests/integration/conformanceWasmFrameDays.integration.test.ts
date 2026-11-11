@@ -37,9 +37,7 @@ import { FRAME_DAYS_UPDATE as UPDATE, writeAfterPassingRun } from "../goldens/up
  * passed (so a `-t` filter that leaves a test out writes nothing), and it
  * refuses to run in CI. The conformance lock's refresh
  * (`VC_CONFORMANCE_UPDATE=1`) does not write this golden; it checks it, when
- * the engine package is built. While the TypeScript engine exists, its
- * referee check (`frameDaysReferee.integration.test.ts`) must pass on the new
- * file too.
+ * the engine package is built.
  */
 
 if ((wasmRequired() || UPDATE) && !hasWasmPackage()) throw new Error("the frame-day golden needs the engine package (VC_REQUIRE_WASM=1 or VC_FRAME_DAYS_UPDATE=1), and engine-rs/pkg/ is not built; run npm run wasm:build");

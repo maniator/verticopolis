@@ -1,6 +1,6 @@
 {
-  "open": true,
-  "key": "bec79845c33f67ee99f2722c361ba31864f5d792591cdaf83471a11a6eef3f22",
+  "open": false,
+  "key": null,
   "resets": [
     {
       "from": "ecadbdf6ab8149c42c0ba567d3a7e56ef0e48ab9bcca5f0b9e2a99dd1bd6bc56",

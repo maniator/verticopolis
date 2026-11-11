@@ -23,8 +23,6 @@ function tree(): string {
   };
   put("engine-rs/Cargo.toml", "[package]\n");
   put("engine-rs/src/lib.rs", "pub fn f() {}\n");
-  put("src/engine/a.ts", "export const a = 1;\n");
-  put("src/engine/a.test.ts", "export const t = 1;\n");
   put("scripts/fuzz-compare.ts", 'import { helper } from "../src/tests/helper";\nexport const c = helper;\n');
   put("scripts/fuzz-key.ts", "export {};\n");
   put("scripts/fuzz-shrink.ts", "export {};\n");
@@ -69,7 +67,6 @@ describe("the differential's window key", () => {
     };
     expect(moved("engine-rs/src/lib.rs", "pub fn g() {}\n")).toEqual(["engine"]);
     expect(moved("engine-rs/Cargo.toml", "[package]\nname = \"x\"\n")).toEqual(["engine"]);
-    expect(moved("src/engine/a.ts", "export const a = 2;\n")).toEqual(["srcEngine"]);
     expect(moved("src/tests/helper.ts", "export const helper = 2;\n")).toEqual(["scripts"]);
     expect(moved("scripts/fuzz-compare.ts", "export {};\n")).toEqual(["scripts"]);
     expect(moved("tsconfig.json", '{"a":1}\n')).toEqual(["scripts"]);
@@ -121,7 +118,7 @@ describe("the differential's window key", () => {
     const a = tree();
     const b = tree();
     expect(keyOf(a)).toBe(keyOf(b));
-    writeFileSync(join(b, "src/engine/a.ts"), "export const a = 1;\r\n");
+    writeFileSync(join(b, "src/tests/helper.ts"), "export const helper = 1;\r\n");
     expect(keyOf(b)).toBe(keyOf(a));
     writeFileSync(join(b, "conformance/fixtures/.DS_Store"), "junk");
     linkFolder(join(b, "conformance/fixtures"), join(b, "conformance/fixtures/loop"));
@@ -129,13 +126,12 @@ describe("the differential's window key", () => {
     unlinkSync(join(b, "conformance/fixtures/loop"));
   });
 
-  it("leaves a version bump, an engine test file and unrelated files alone", () => {
+  it("leaves a version bump and unrelated files alone", () => {
     const root = tree();
     const base = keyOf(root);
     const lock = { ...LOCK, version: "1.1.0", packages: { ...LOCK.packages, "": { name: "x", version: "1.1.0" } } };
     edit(root, "package-lock.json", JSON.stringify(lock));
     edit(root, "package.json", JSON.stringify({ name: "x", version: "1.1.0", scripts: { "wasm:build": "bash scripts/build-engine-wasm.sh" } }));
-    edit(root, "src/engine/a.test.ts", "export const t = 2;\n");
     mkdirSync(join(root, "docs"), { recursive: true });
     writeFileSync(join(root, "docs/notes.md"), "notes\n");
     expect(keyOf(root)).toBe(base);
@@ -228,8 +224,6 @@ describe("the real tree's key", () => {
   it("covers the scripts the nightly runs and the fixtures", () => {
     const files = fuzzKeyFiles(repoRoot);
     expect(files.scripts).toEqual(expect.arrayContaining(["scripts/fuzz-compare.ts", "scripts/fuzz-key.ts", "src/tests/conformance/fuzzKey.ts", "src/tests/conformance/scenario.ts", "tsconfig.json"]));
-    expect(files.scripts.some((f) => f.startsWith("src/engine/"))).toBe(false);
-    expect(files.srcEngine.some((f) => f.endsWith(".test.ts"))).toBe(false);
     expect(files.fixtures.length).toBeGreaterThan(0);
   });
 });

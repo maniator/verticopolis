@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { existsSync } from "node:fs";
+import { existsSync, readdirSync } from "node:fs";
 import { basename, join } from "node:path";
-import { corpusDir, corpusFiles } from "./fuzzCorpus";
+import { corpusDir, corpusFiles, goldenDir, goldenFiles } from "./fuzzCorpus";
 import { CONFORMANCE_DIR, loadScenario, type Scenario } from "./scenario";
 
 /**
@@ -29,6 +29,17 @@ describe("the fuzz corpus entries", () => {
 
   it.each(entries)("%s is named after its file", (file) => {
     expect(load(file).id).toBe(file.replace(/\.json$/, ""));
+  });
+
+  // The corpus job holds each entry to its golden; one without a golden fails
+  // there as a harness failure, so this names the missing file up front.
+  it.each(entries)("%s has its golden pinned", (file) => {
+    for (const record of goldenFiles(file.replace(/\.json$/, ""))) expect(existsSync(join(goldenDir(), record)), record).toBe(true);
+  });
+
+  it("keeps no golden for an entry that is gone", () => {
+    const pinned = new Set(entries.flatMap((f) => goldenFiles(f.replace(/\.json$/, ""))));
+    expect(readdirSync(goldenDir()).filter((f) => !pinned.has(f))).toEqual([]);
   });
 });
 

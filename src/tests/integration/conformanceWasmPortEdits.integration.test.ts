@@ -20,9 +20,7 @@ import { PORT_EDITS_UPDATE as UPDATE, writeAfterPassingRun } from "../goldens/up
  * same pull request, saying why:
  * `VC_PORT_EDITS_UPDATE=1 npx vitest run --project integration conformanceWasmPortEdits`.
  * An update writes only from a run in which every test in this file ran and
- * passed, and it refuses to run in CI. While the TypeScript engine exists, its
- * referee check (`portEditsReferee.integration.test.ts`) must pass on the new
- * file too.
+ * passed, and it refuses to run in CI.
  */
 
 if ((wasmRequired() || UPDATE) && !hasWasmPackage()) throw new Error("the port-edit golden needs the engine package (VC_REQUIRE_WASM=1 or VC_PORT_EDITS_UPDATE=1), and engine-rs/pkg/ is not built; run npm run wasm:build");
