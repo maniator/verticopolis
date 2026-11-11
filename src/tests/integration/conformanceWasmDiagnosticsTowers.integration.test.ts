@@ -4,7 +4,7 @@ import { GRID } from "../../engine/facilities";
 import { rentConfig } from "../../engine/econConfig";
 import type { SerializedGame } from "../../shared/serializedGame";
 import type { FacilityKind, GameMode, Unit, UnitState } from "../../shared/types";
-import { hasWasmPackage, reloadWasmHandle, wasm, wasmRequired } from "../conformance/wasmEngine";
+import { hasWasmPackage, reloadWasmHandle, wasm } from "../conformance/wasmEngine";
 import { tsDiagnosticFacts, type DiagnosticFacts, type GripeFacts } from "../diagnostics/tsDiagnosticFacts";
 import { inspectorDisagreements } from "../diagnostics/inspectorAgreement";
 
@@ -31,7 +31,6 @@ import { inspectorDisagreements } from "../diagnostics/inspectorAgreement";
  * one that does.
  */
 
-if (wasmRequired() && !hasWasmPackage()) throw new Error("VC_REQUIRE_WASM=1 but engine-rs/pkg/ is not built; run npm run wasm:build");
 
 const W = GRID.width;
 const C = Math.floor(W / 2);

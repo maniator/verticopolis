@@ -31,7 +31,7 @@ import { fromTowerFile, toTowerFile } from "../../storage/towerFileCodec";
 import { setEngineWriter } from "../../storage/vctowerWriter";
 import { decodeVctower } from "../../storage/vctowerContainer";
 import { tsEngine } from "../conformance/scenario";
-import { hasWasmPackage, wasm, wasmRequired } from "../conformance/wasmEngine";
+import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
 import { saveOf, importTower } from "../fixtures/saveText";
 
 const FIXTURES = resolve(__dirname, "../../../conformance/fixtures");
@@ -54,7 +54,7 @@ function payloadText(text: string): string {
   return new TextDecoder("utf-8", { fatal: true }).decode(inflateCapped(fromBase64(stored.value.slice(STORE_MAGIC.length))));
 }
 
-const run = hasWasmPackage() || wasmRequired();
+const run = hasWasmPackage();
 
 describe.runIf(run)("the engine's .vctower writer opens in the web game", () => {
   it("has fixtures to check", () => {

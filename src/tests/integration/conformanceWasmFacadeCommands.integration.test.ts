@@ -10,7 +10,7 @@ import type { SerializedGame } from "../../shared/serializedGame";
 import { decodeVctower } from "../../storage/vctowerContainer";
 import { markFounderFromLoadedFile } from "../../engine/sim/founderStatus";
 import { REPO_ROOT } from "../conformance/scenario";
-import { hasWasmPackage, wasm, wasmRequired } from "../conformance/wasmEngine";
+import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
 import type { WasmEngine } from "../../dualrun/binding";
 
 /**
@@ -22,7 +22,6 @@ import type { WasmEngine } from "../../dualrun/binding";
  * field for field, and the previews have to write nothing.
  */
 
-if (wasmRequired() && !hasWasmPackage()) throw new Error("VC_REQUIRE_WASM=1 but engine-rs/pkg/ is not built; run npm run wasm:build");
 
 const KINDS = Object.keys(FACILITIES) as FacilityKind[];
 const TRANSPORTS = KINDS.filter((k) => FACILITIES[k].transport);

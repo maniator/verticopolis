@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { WasmEngine } from "../../dualrun/binding";
 import type { EnginePort } from "../../simport/enginePort";
 import { canonicalJson } from "../conformance/canonical";
-import { hasWasmPackage, wasm, wasmRequired } from "../conformance/wasmEngine";
+import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
 import type { FrameDayStart } from "../goldens/frameDays";
 import { BULLDOZE, PORT_EDIT_CASES, runPortEditCase, type PortEditCase } from "../goldens/portEditCases";
 import { firstPortEditDifference, portEditProblems, readPortEdits, writePortEdits, type PortEditGolden, type PortEditLine } from "../goldens/portEditLines";
@@ -23,7 +23,7 @@ import { PORT_EDITS_UPDATE as UPDATE, writeAfterPassingRun } from "../goldens/up
  * passed, and it refuses to run in CI.
  */
 
-if ((wasmRequired() || UPDATE) && !hasWasmPackage()) throw new Error("the port-edit golden needs the engine package (VC_REQUIRE_WASM=1 or VC_PORT_EDITS_UPDATE=1), and engine-rs/pkg/ is not built; run npm run wasm:build");
+if (UPDATE && !hasWasmPackage()) throw new Error("the port-edit golden needs the engine package (VC_PORT_EDITS_UPDATE=1), and engine-rs/pkg/ is not built; run npm run wasm:build");
 
 /** A fresh Rust engine; the case loads or founds its own tower over the
  *  placeholder it starts with. */

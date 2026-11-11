@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { VIEW_LAYOUT, VIEW_LAYOUT_TEXT } from "../../engine/port/layout";
-import { hasWasmPackage, wasm, wasmRequired } from "../conformance/wasmEngine";
+import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
 
 /**
  * `src/engine/viewLayout.json` is the port's layout as the built package
@@ -10,7 +10,6 @@ import { hasWasmPackage, wasm, wasmRequired } from "../conformance/wasmEngine";
  * check fails a package rebuilt without committing the file.
  */
 
-if (wasmRequired() && !hasWasmPackage()) throw new Error("VC_REQUIRE_WASM=1 but engine-rs/pkg/ is not built; run npm run wasm:build");
 
 describe("viewLayout.json", () => {
   it.skipIf(!hasWasmPackage())("is the package's layout, text for text", () => {

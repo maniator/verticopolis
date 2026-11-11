@@ -4,7 +4,7 @@ import type { SerializedGame } from "../../shared/serializedGame";
 import { stateView } from "../../engine/conformanceView";
 import { INVALID_REQUEST } from "../../engine/request";
 import { digest } from "../conformance/canonical";
-import { hasWasmPackage, wasm, wasmRequired } from "../conformance/wasmEngine";
+import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
 
 /**
  * The relayed edit commands' malformed-input boundary (#996), called raw:
@@ -22,7 +22,6 @@ import { hasWasmPackage, wasm, wasmRequired } from "../conformance/wasmEngine";
  * `null`, the value that text spells).
  */
 
-if (wasmRequired() && !hasWasmPackage()) throw new Error("VC_REQUIRE_WASM=1 but engine-rs/pkg/ is not built; run npm run wasm:build");
 
 type Raw = (...args: unknown[]) => unknown;
 type Engine = Record<string, Raw> & { stateDigest(): string; drainGameplayEvents(): string; free(): void };

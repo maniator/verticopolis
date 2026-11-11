@@ -8,8 +8,8 @@
  * there is none, or hide a real one. The native half of the same check is the
  * corpus job (`scripts/fuzz-corpus.ts`), which needs the fuzzer binary.
  *
- * Runs in `npm run test:wasm` (the required wasm-parity checks), where a missing package fails it
- * under `VC_REQUIRE_WASM=1`; a plain `npm test` skips it without the package and runs it with one.
+ * Runs in `npm run test:wasm` (the required engine checks, which build the package first); a plain
+ * `npm test` skips it without the package and runs it with one.
  */
 import { copyFileSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -18,9 +18,9 @@ import { afterAll, describe, expect, it } from "vitest";
 import type { CheckpointDetail } from "../conformance/checkpointDetail";
 import { corpusFiles, goldenDir, goldenFiles } from "../conformance/fuzzCorpus";
 import { replayCompare } from "../conformance/fuzzReplay";
-import { hasWasmPackage, wasmRequired } from "../conformance/wasmEngine";
+import { hasWasmPackage } from "../conformance/wasmEngine";
 
-const run = hasWasmPackage() || wasmRequired();
+const run = hasWasmPackage();
 const dir = mkdtempSync(join(tmpdir(), "vc-fuzz-wasm-"));
 afterAll(() => rmSync(dir, { recursive: true, force: true }));
 

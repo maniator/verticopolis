@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import type { EnginePort, PortRecord } from "../../simport/enginePort";
 import { done, kind, lobbyCenter, must, subject, type Subject } from "../../simport/engineSubject.fixture";
-import { hasWasmPackage, wasm, wasmRequired } from "../conformance/wasmEngine";
+import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
 import { releaseDrafts } from "../portKit/drafts";
 
 /**
@@ -10,7 +10,6 @@ import { releaseDrafts } from "../portKit/drafts";
  * every done step raises the revision above every revision the tower had, so
  * the Rust engine is held to it here, step after step.
  */
-if (wasmRequired() && !hasWasmPackage()) throw new Error("VC_REQUIRE_WASM=1 but engine-rs/pkg/ is not built; run npm run wasm:build");
 
 type RustEngine = EnginePort & { free(): void };
 const made: RustEngine[] = [];

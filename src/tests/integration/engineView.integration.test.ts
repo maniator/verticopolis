@@ -4,7 +4,7 @@ import type { SerializedGame } from "../../shared/serializedGame";
 import { isStructural } from "../../engine/tower/towerTopology";
 import type { FacilityKind, Unit } from "../../shared/types";
 import { towerStateSig } from "../../engine/UndoHistory";
-import { hasWasmPackage, wasm, wasmRequired } from "../conformance/wasmEngine";
+import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
 
 /**
  * The renderer-facing view (facade slice 6a, #1213) through the real
@@ -15,7 +15,6 @@ import { hasWasmPackage, wasm, wasmRequired } from "../conformance/wasmEngine";
  * view.
  */
 
-if (wasmRequired() && !hasWasmPackage()) throw new Error("VC_REQUIRE_WASM=1 but engine-rs/pkg/ is not built; run npm run wasm:build");
 
 type Slots = Record<string, number>;
 interface Layout {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { decodeHeader } from "../../wasmhost/frameView";
-import { hasWasmPackage, startWasmHandle, wasmRequired } from "../conformance/wasmEngine";
+import { hasWasmPackage, startWasmHandle } from "../conformance/wasmEngine";
 
 /**
  * A refused bomb ransom through the shipped engine build, the way the game
@@ -9,7 +9,7 @@ import { hasWasmPackage, startWasmHandle, wasmRequired } from "../conformance/wa
  * at once ("found nothing", or an instant blast) and the screen showed
  * nothing; this fails if that comes back.
  */
-const run = hasWasmPackage() || wasmRequired();
+const run = hasWasmPackage();
 
 describe.runIf(run)("a refused bomb ransom through the WASM binding", () => {
   for (const mode of ["classic", "modern"] as const) {

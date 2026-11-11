@@ -6,7 +6,7 @@ import { RoomTierReader } from "../../simport/roomTiers";
 import { rustBootTower } from "../../wasmhost/rustEngine";
 import { digest } from "../conformance/canonical";
 import { CONFORMANCE_DIR, REPO_ROOT } from "../conformance/scenario";
-import { hasWasmPackage, wasm, wasmRequired } from "../conformance/wasmEngine";
+import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
 
 /**
  * One engine package carries the read-only catalog (`catalog(mode)`, #930),
@@ -19,7 +19,6 @@ import { hasWasmPackage, wasm, wasmRequired } from "../conformance/wasmEngine";
  * them is stale.
  */
 
-if (wasmRequired() && !hasWasmPackage()) throw new Error("VC_REQUIRE_WASM=1 but engine-rs/pkg/ is not built; run npm run wasm:build");
 
 describe.skipIf(!hasWasmPackage())("engine package surface", () => {
   it("one module exports catalog(mode), and its Engine no longer has the relay ops", () => {

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Simulation } from "../../engine/Simulation";
 import type { WasmEngine } from "../../dualrun/binding";
 import { telemetryDocument, type TelemetryDocument } from "../../wasmhost/telemetry";
-import { hasWasmPackage, wasm, wasmRequired } from "../conformance/wasmEngine";
+import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
 import { FIXTURES, loadFixture } from "../conformance/fixtureSim";
 
 /**
@@ -15,7 +15,6 @@ import { FIXTURES, loadFixture } from "../conformance/fixtureSim";
  * (`Engine.fromSave`) and compares them directly, hour by hour.
  */
 
-if (wasmRequired() && !hasWasmPackage()) throw new Error("VC_REQUIRE_WASM=1 but engine-rs/pkg/ is not built; run npm run wasm:build");
 
 const engineTelemetry = (json: string) => JSON.parse(json) as TelemetryDocument;
 

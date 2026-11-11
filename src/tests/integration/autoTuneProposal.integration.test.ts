@@ -6,7 +6,7 @@ import type { AutoTuneProposal, EnginePort } from "../../simport/enginePort";
 import { scheduleSlots } from "../../simport/scheduleSlots";
 import { telemetryDocument } from "../../wasmhost/telemetry";
 import { MIXED, WARM, COLD, measure, ring, tower, type Slots } from "../fixtures/scheduleTower";
-import { hasWasmPackage, wasm, wasmRequired } from "../conformance/wasmEngine";
+import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
 
 /**
  * Auto-tune lives in the engine (#1550): the Rust query, through the real
@@ -16,7 +16,6 @@ import { hasWasmPackage, wasm, wasmRequired } from "../conformance/wasmEngine";
  * engine leg is.
  */
 
-if (wasmRequired() && !hasWasmPackage()) throw new Error("VC_REQUIRE_WASM=1 but the engine's WASM package was not built");
 
 type RustPort = EnginePort & {
   free(): void;

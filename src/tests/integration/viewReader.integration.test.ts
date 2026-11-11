@@ -8,7 +8,7 @@ import { roomUnits, structureRuns } from "../../engine/tower/rooms";
 import type { EnginePort } from "../../simport/enginePort";
 import type { SimView } from "../../simport/view";
 import { ViewReader } from "../../simport/viewReader";
-import { hasWasmPackage, wasm, wasmRequired } from "../conformance/wasmEngine";
+import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
 
 /**
  * The shared reader (contract section 5) on both engines: a `ViewReader`
@@ -17,7 +17,6 @@ import { hasWasmPackage, wasm, wasmRequired } from "../conformance/wasmEngine";
  * through play, builds, label and subtype changes, an emergency and a swap.
  */
 
-if (wasmRequired() && !hasWasmPackage()) throw new Error("VC_REQUIRE_WASM=1 but engine-rs/pkg/ is not built; run npm run wasm:build");
 
 type RustEngine = EnginePort & { free(): void };
 const freed: RustEngine[] = [];

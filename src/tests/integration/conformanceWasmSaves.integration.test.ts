@@ -40,7 +40,7 @@ import { importTower } from "../fixtures/saveText";
 import { MAX_SAVE_INFLATED_BYTES, STORE_MAGIC, TOWER_FILE_MAGIC, fromBase64, inflateCapped, parseSaveJson } from "../../storage/saveCompression";
 import { decodeVctower } from "../../storage/vctowerContainer";
 import { canonicalJson } from "../conformance/canonical";
-import { hasWasmPackage, wasm, wasmRequired } from "../conformance/wasmEngine";
+import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
 
 const ROOT = resolve(__dirname, "../../..");
 const FIXTURES = resolve(ROOT, "conformance/fixtures");
@@ -58,7 +58,7 @@ interface LoaderCase {
 type RustSaves = { encodeVctower: typeof encodeVctower; Engine: typeof Engine };
 const rustSaves = (): RustSaves => wasm() as unknown as RustSaves;
 
-const run = hasWasmPackage() || wasmRequired();
+const run = hasWasmPackage();
 
 /** The save JSON text inside a `.vctower` file. */
 const jsonOfFile = (file: string): string => new TextDecoder().decode(inflateCapped(fromBase64(file.slice(TOWER_FILE_MAGIC.length).replace(/\s+/g, ""))));

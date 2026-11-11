@@ -21,7 +21,7 @@ import {
   type ScenarioEngine,
   PAST_THE_TYPESCRIPT_REFERENCE,
 } from "../conformance/scenario";
-import { hasWasmPackage, reloadWasmHandle, startWasmHandle, wasmEngine, wasmRequired } from "../conformance/wasmEngine";
+import { hasWasmPackage, reloadWasmHandle, startWasmHandle, wasmEngine } from "../conformance/wasmEngine";
 import type { WasmEngine } from "../../dualrun/binding";
 import viewLayout from "../../engine/viewLayout.json";
 
@@ -47,7 +47,6 @@ const files = readdirSync(SCENARIO_DIR)
   .filter((f) => f.endsWith(".json") && !PAST_THE_TYPESCRIPT_REFERENCE.has(f))
   .sort();
 
-if (wasmRequired() && !hasWasmPackage()) throw new Error("VC_REQUIRE_WASM=1 but engine-rs/pkg/ is not built; run npm run wasm:build");
 
 /** The tower's recycling reads: capacity, fill and whether demand is met. */
 interface Recycling { capacity: number; fill: number; met: boolean }

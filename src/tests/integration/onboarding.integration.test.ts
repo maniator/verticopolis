@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { VIEW_LAYOUT } from "../../engine/port/layout";
 import { newSeededDraft, LOT_WIDTH } from "../portKit/draftFixtures";
 import { PortSim, describeEngines, defaultLeg, releaseAll, type Leg, draftTower } from "../portKit/portSim";
-import { hasWasmPackage, wasmRequired } from "../conformance/wasmEngine";
+import { hasWasmPackage } from "../conformance/wasmEngine";
 import {
   ONBOARD_STEPS,
   ONBOARDING_FLAG,
@@ -16,8 +16,8 @@ import {
 const C = Math.floor(LOT_WIDTH / 2);
 
 /** The splash tests that adopt a tower need the engine package; they skip
- *  without it, as {@link describeEngines} does (and fail under VC_REQUIRE_WASM). */
-const noEngine = !hasWasmPackage() && !wasmRequired();
+ *  without it, as {@link describeEngines} does. */
+const noEngine = !hasWasmPackage();
 
 describe("Onboarding — flag persistence", () => {
   beforeEach(() => clearOnboarded());

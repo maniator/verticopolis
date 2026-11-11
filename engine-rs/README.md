@@ -236,8 +236,8 @@ or renamed in `wasm.rs` reaches TypeScript as a type change, and the
 commit it with the Rust change). The WASM suite
 (`src/tests/integration/conformanceWasm.integration.test.ts`) skips itself
 when the package is missing, so `npm test` stays green without a Rust
-toolchain; CI builds the package and runs the suite in `engine-rs.yml` with
-`VC_REQUIRE_WASM=1`, under which a missing package fails the run. Rebuild
+toolchain; CI builds the package first (the engine-wasm action fails when a
+package file is missing) and then runs the suite. Rebuild
 the package after any change to the Rust source; the suite replays whatever
 was built last.
 

@@ -2,7 +2,7 @@ import { afterEach } from "vitest";
 import { useTowerCatalogSource } from "../../catalog/towerCatalog";
 import { readCatalog } from "../../dualrun/catalog";
 import { draftTower, releaseDrafts, type Draft } from "./drafts";
-import { hasWasmPackage, wasm, wasmRequired } from "../conformance/wasmEngine";
+import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
 import { ToolingTower, type ToolingEngine } from "../../game/toolingTower";
 import type { EnginePort } from "../../simport/enginePort";
 
@@ -17,7 +17,6 @@ import type { EnginePort } from "../../simport/enginePort";
 
 /** No engine package here: the suites that need one skip. */
 export const noEngine = !hasWasmPackage();
-if (wasmRequired() && noEngine) throw new Error("VC_REQUIRE_WASM=1 but engine-rs/pkg/ is not built; run npm run wasm:build");
 
 type Freed = EnginePort & { free(): void };
 const made: Freed[] = [];

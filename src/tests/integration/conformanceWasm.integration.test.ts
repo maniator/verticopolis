@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { CONFORMANCE_DIR, firstDivergence, loadScenario, runScenario, type Checkpoint, type EngineStart } from "../conformance/scenario";
-import { hasWasmPackage, startWasmEngine, startWasmHandle, wasm, wasmEngine, wasmRequired } from "../conformance/wasmEngine";
+import { hasWasmPackage, startWasmEngine, startWasmHandle, wasm, wasmEngine } from "../conformance/wasmEngine";
 import { CATALOG_VERSION, readCatalog } from "../../dualrun/catalog";
 import { catalogLockView } from "../conformance/catalogLockView";
 import { canonicalJson, digest } from "../conformance/canonical";
@@ -20,8 +20,8 @@ import { writeAfterPassingRun, writeGoldenFile } from "../goldens/updateGate";
  * checks the same lock and never writes it. The catalog lock
  * (`conformance/catalog-digests.json`) is written by the same run from the
  * binding's `catalog(mode)`, the only catalog the game reads. The binding is built by
- * `npm run wasm:build`; without it the suite skips, unless `VC_REQUIRE_WASM=1`
- * (CI builds it and sets the switch, so a missing package fails there).
+ * `npm run wasm:build`; without it the suite skips (CI builds it first, so a
+ * missing package fails the build step there).
  */
 
 const SCENARIO_DIR = resolve(CONFORMANCE_DIR, "scenarios");
@@ -49,7 +49,6 @@ function writeLock(l: Lock): void {
   writeGoldenFile(LOCK, `{\n  "scenarios": {\n${body.join(",\n")}\n  }\n}\n`);
 }
 
-if (wasmRequired() && !hasWasmPackage()) throw new Error("VC_REQUIRE_WASM=1 but engine-rs/pkg/ is not built; run npm run wasm:build");
 if (UPDATE && !hasWasmPackage()) throw new Error("VC_CONFORMANCE_UPDATE=1 writes the lock from the Rust engine; run npm run wasm:build first");
 
 // An update writes the lock only from a run in which every test in this file

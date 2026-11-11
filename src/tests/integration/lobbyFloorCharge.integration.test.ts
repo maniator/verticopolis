@@ -16,7 +16,7 @@ import { renderToFragment } from "../../ui/testing/litTestUtils";
 import { groupDigits } from "../../ui/format";
 import { decodeVctower } from "../../storage/vctowerContainer";
 import { kind, money, must, slot } from "../../simport/engineSubject.fixture";
-import { hasWasmPackage, wasm, wasmRequired } from "../conformance/wasmEngine";
+import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
 
 /**
  * A lobby placed where there is no floor yet pays for that floor too, as the
@@ -28,7 +28,6 @@ import { hasWasmPackage, wasm, wasmRequired } from "../conformance/wasmEngine";
  * tool lays a lobby on the ground floor.
  */
 
-if (wasmRequired() && !hasWasmPackage()) throw new Error("VC_REQUIRE_WASM=1 but engine-rs/pkg/ is not built; run npm run wasm:build");
 
 const MODES: readonly GameMode[] = ["classic", "modern"];
 /** Where the cases lay the ground lobby, in the middle of the lot. */

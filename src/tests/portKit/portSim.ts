@@ -6,7 +6,7 @@ import type { EnginePort } from "../../simport/enginePort";
 import type { StatsReport } from "../../simport/panels";
 import { PortCodes } from "../../simport/portCodes";
 import { statsReport } from "../../simport/statsSheet";
-import { hasWasmPackage, wasm, wasmRequired } from "../conformance/wasmEngine";
+import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
 import type { WasmEngine } from "../../dualrun/binding";
 import { rustTooling, type ToolingSetters } from "./tooling";
 import { Snapshot, draftFromSave, releaseDrafts, type Draft, type Leg } from "./drafts";
@@ -426,17 +426,14 @@ export class PortSim {
   }
 }
 
-/** Run `body` on the Rust engine when the package is built.
- *  `VC_REQUIRE_WASM=1` (CI's switch) makes a missing package an error
- *  instead of a skip. */
+/** Run `body` on the Rust engine when the package is built, and skip it
+ *  otherwise. */
 export function describeEngines(name: string, body: (leg: Leg) => void): void {
   if (hasWasmPackage()) {
     describe(`${name} [rust]`, () => {
       afterEach(releaseAll);
       body("rust");
     });
-  } else if (wasmRequired()) {
-    throw new Error(`${name}: the Rust engine needs engine-rs/pkg/; run npm run wasm:build`);
   } else {
     describe.skip(`${name} [rust: no engine package]`, () => undefined);
   }

@@ -22,8 +22,8 @@ export function catalogFacts(mode: "classic" | "modern" = "classic"): CatalogFac
 }
 
 /** The lot's width in tiles, from the engine's catalog. Without an engine
- *  package it reads 0: the kit's suites skip then (or fail first under
- *  VC_REQUIRE_WASM), so no test runs on it, and the import still loads. */
+ *  package it reads 0: the kit's suites skip then, so no test runs on it,
+ *  and the import still loads. */
 export const LOT_WIDTH = hasWasmPackage() ? catalogFacts().world.lotWidth : 0;
 export const MID = Math.floor(LOT_WIDTH / 2);
 
