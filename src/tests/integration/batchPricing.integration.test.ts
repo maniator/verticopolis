@@ -1,17 +1,15 @@
 import { describe, it, expect } from "vitest";
-import { newSeededGame } from "../fixtures/towerFixtures";
-import { GRID } from "../../engine/facilities";
+import { newSeededDraft, LOT_WIDTH } from "../portKit/draftFixtures";
 import { rentOf, PRICED_KINDS } from "../../engine/econConfig";
-import type { Simulation } from "../../engine/Simulation";
 import type { FacilityKind, Unit } from "../../shared/types";
-import { PortSim, describeEngines, type Leg } from "../portKit/portSim";
+import { PortSim, describeEngines, type Leg, type Draft } from "../portKit/portSim";
 
 /** A served floor-2 tower of `mode` with `n` rooms of `kind`, `width` apart
  *  (all still on the default price). The fixture asserts its own
  *  construction through `mustBuild`. */
 function roomTower(leg: Leg, mode: "classic" | "modern", seed: number, kind: FacilityKind, n: number, width: number) {
-  const draft = newSeededGame(seed, mode);
-  const x0 = Math.floor(GRID.width / 2) - 20;
+  const draft = newSeededDraft(seed, mode);
+  const x0 = Math.floor(LOT_WIDTH / 2) - 20;
   for (let i = 0; i < 40; i++) draft.tower.place("floor", 2, x0 + i);
   draft.money = 1e9;
   const sim = new PortSim(leg, draft);
@@ -24,11 +22,11 @@ function roomTower(leg: Leg, mode: "classic" | "modern", seed: number, kind: Fac
 
 /** Mark a condo sold, the way a save carries one: an occupied unit that has
  *  been lived in. (A vacant unit's `everOccupied` does not survive a load.) */
-function sell(draft: Simulation, id: number): Unit {
+function sell(draft: Draft, id: number): Unit {
   const condo = draft.tower.units.find((u) => u.id === id)!;
   condo.everOccupied = true;
   condo.state = "occupied";
-  return condo;
+  return condo as unknown as Unit;
 }
 
 /** A served floor-2 MODERN tower with `n` offices (all still on the default
@@ -176,7 +174,7 @@ describeEngines("No-Rate units earn nothing until repriced", (leg) => {
     expect(sim.noRate(id)).toBe(true);
     expect(rentOf(rooms()[0])).toBe(0);
     sim.stepRent(id, 1); // any explicit reprice returns it to market
-    expect(rooms()[0].noRate).toBeUndefined();
+    expect(rooms()[0].noRate).toBe(false);
     expect(rentOf(rooms()[0])).toBeGreaterThan(0);
   });
 
@@ -184,7 +182,7 @@ describeEngines("No-Rate units earn nothing until repriced", (leg) => {
     const { sim, rooms } = classicOfficeTower(leg, 1, 2); // Modern never holds No Rate
     expect(sim.noRate(rooms()[0].id)).toBe(true);
     sim.rentBatch("office", 15_000);
-    expect(rooms().every((u) => u.noRate === undefined)).toBe(true);
+    expect(rooms().every((u) => u.noRate === false)).toBe(true);
     expect(rooms().every((u) => rentOf(u) === 15_000)).toBe(true);
   });
 
@@ -200,7 +198,7 @@ describeEngines("No-Rate units earn nothing until repriced", (leg) => {
     expect(res.skippedSold).toBe(1);
     const byId = (id: number) => rooms().find((u) => u.id === id)!;
     expect(byId(soldId).noRate).toBe(true); // skipped unit KEEPS its flag
-    expect(byId(openId).noRate).toBeUndefined(); // repriced unit cleared it
+    expect(byId(openId).noRate).toBe(false); // repriced unit cleared it
     expect(rentOf(byId(openId))).toBe(200_000);
   });
 });
@@ -229,7 +227,7 @@ describeEngines("Batch pricing on the Classic ladder", (leg) => {
     });
     const preview = sim.quoteRentBatch("office", "noRate")!;
     expect(preview.changed).toBe(3);
-    expect(rooms().every((u) => u.noRate === undefined)).toBe(true); // preview is pure
+    expect(rooms().every((u) => u.noRate === false)).toBe(true); // preview is pure
     const res = sim.rentBatch("office", "noRate")!;
     expect(res).toEqual(preview);
     expect(rooms().every((u) => u.noRate === true)).toBe(true);
@@ -251,10 +249,10 @@ describeEngines("Batch pricing on the Classic ladder", (leg) => {
     const res = sim.rentBatch("condo", "noRate")!;
     expect(res.skippedSold).toBe(1);
     expect(res.changed).toBe(1);
-    expect(rooms().find((u) => u.id === soldId)!.noRate).toBeUndefined();
+    expect(rooms().find((u) => u.id === soldId)!.noRate).toBe(false);
     expect(rooms().find((u) => u.id === openId)!.noRate).toBe(true);
     // Modern's engine never holds the state: a "noRate" batch is refused whole.
-    const modern = new PortSim(leg, newSeededGame(3, "modern"));
+    const modern = new PortSim(leg, newSeededDraft(3, "modern"));
     expect(modern.quoteRentBatch("office", "noRate")).toBeNull();
     expect(modern.rentBatch("office", "noRate")).toBeNull();
   });

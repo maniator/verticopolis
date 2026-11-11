@@ -1,12 +1,11 @@
 import { describe, it, expect } from "vitest";
 import { Ledger, WINDOW, ledgerCatFor } from "../../engine/Ledger";
-import { Simulation } from "../../engine/Simulation";
-import { GRID } from "../../engine/facilities";
-import { PortSim, describeEngines, type Leg } from "../portKit/portSim";
+import { LOT_WIDTH } from "../portKit/draftFixtures";
+import { PortSim, describeEngines, type Leg, draftTower, type Draft } from "../portKit/portSim";
 
-const W = GRID.width;
+const W = LOT_WIDTH;
 const C = Math.floor(W / 2);
-function lay(sim: Simulation, kind: "floor" | "lobby", floor: number): void {
+function lay(sim: Draft, kind: "floor" | "lobby", floor: number): void {
   for (let x = C; x < W; x++) sim.tower.place(kind, floor, x);
   for (let x = C - 1; x >= 0; x--) sim.tower.place(kind, floor, x);
 }
@@ -88,7 +87,7 @@ describe("Ledger (rolling income/expense record)", () => {
  *  Occupied offices give the shop a demand pool to serve (income is
  *  demand-driven), so the retail line takes real dollars. */
 function shopTower(leg: Leg, seed: number): PortSim {
-  const draft = Simulation.newGame(seed);
+  const draft = draftTower(seed);
   draft.money = 1e9;
   draft.star = 3;
   lay(draft, "lobby", 1);

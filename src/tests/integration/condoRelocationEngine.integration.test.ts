@@ -1,6 +1,5 @@
 import { it, expect } from "vitest";
-import { newSeededGame, lay } from "../fixtures/towerFixtures";
-import { GRID } from "../../engine/facilities";
+import { newSeededDraft, lay, LOT_WIDTH } from "../portKit/draftFixtures";
 import type { GameMode } from "../../shared/types";
 import { PortSim, describeEngines, type Leg } from "../portKit/portSim";
 
@@ -10,7 +9,7 @@ import { PortSim, describeEngines, type Leg } from "../portKit/portSim";
  *  maintenance period at the day boundary, so one month of ticks still gives
  *  each sold condo a month's worth of rolls. */
 
-const C = Math.floor(GRID.width / 2);
+const C = Math.floor(LOT_WIDTH / 2);
 /** One 30-day month. */
 const MONTH = 60 * 24 * 30;
 
@@ -22,7 +21,7 @@ function towerWithSoldCondo(
   residents: number,
   edit: (condo: Record<string, unknown>) => void = () => {},
 ): { sim: PortSim; id: number } {
-  const draft = newSeededGame(4, mode);
+  const draft = newSeededDraft(4, mode);
   draft.money = 10_000_000;
   draft.star = 1; // suppress random fire/bomb events
   lay(draft, "lobby", 1);
@@ -85,8 +84,7 @@ describeEngines(
       expect(sim.state.money).toBeLessThan(before); // the reclaim (buy-back) was charged
     }, 60_000);
 
-    // Thirty years on the hourly model take over a minute on the TypeScript leg,
-    // hence the long timeout.
+    // Thirty years on the hourly model, hence the long timeout.
     it("Classic: a sold condo never relocates over decades (stays 1994-sticky)", () => {
       const { sim, id } = towerWithSoldCondo(leg, "classic", 3);
       for (let m = 0; m < 360; m++) {

@@ -1,8 +1,7 @@
 import { expect, it } from "vitest";
-import { Simulation } from "../../engine/Simulation";
 import { FACILITIES } from "../../engine/facilities";
 import { HK_CHECKOUT_HOUR, HK_LATE_CHECKOUT_HOUR } from "../../engine/EconomySystem";
-import { PortSim, describeEngines, type Leg } from "../portKit/portSim";
+import { PortSim, describeEngines, type Leg, draftTower } from "../portKit/portSim";
 
 /**
  * #304 understaffed housekeeping (AC8) on both engines: a Modern late-checkout
@@ -29,7 +28,7 @@ const LAST_HOUR = 22;
 /** A hotel wing of `rooms` asleep rooms on floors 2 and 3, a lunch restaurant on
  *  4 and one elevator, as the original's fixture builds it (no housekeeping). */
 function hotelTower(leg: Leg, rooms: number, seed = 2024): PortSim {
-  const draft = new Simulation(seed, "modern", "realWorld");
+  const draft = draftTower(seed, "modern", "realWorld");
   draft.money = 1_000_000;
   draft.star = 3;
   for (let x = 0; x < 40; x++) expect(draft.tower.place("lobby", 1, x).ok).toBe(true);

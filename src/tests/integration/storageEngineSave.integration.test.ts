@@ -1,8 +1,7 @@
 import { expect, it } from "vitest";
-import { newSeededGame } from "../fixtures/towerFixtures";
+import { newSeededDraft, LOT_WIDTH } from "../portKit/draftFixtures";
 import { ECON } from "../../engine/econConfig";
 import { SAVE_VERSION } from "../../engine/saveMigration";
-import { GRID } from "../../engine/facilities";
 import { PortSim, describeEngines, type Leg } from "../portKit/portSim";
 
 /**
@@ -18,8 +17,8 @@ type Save = Record<string, unknown> & { units: unknown[] };
 
 /** The save of a small office tower after five hours on `leg`. */
 function playedSave(leg: Leg): Save {
-  const draft = newSeededGame(42);
-  const x0 = Math.floor(GRID.width / 2) - 20;
+  const draft = newSeededDraft(42);
+  const x0 = Math.floor(LOT_WIDTH / 2) - 20;
   for (let i = 0; i < 12; i++) expect(draft.tower.place("floor", 2, x0 + i).ok).toBe(true);
   const shaft = draft.buildTransport("elevatorStandard", x0, 1, 2);
   expect(shaft.ok, shaft.reason).toBe(true);
@@ -49,15 +48,10 @@ function saveText(data: Save): string {
   return text.replace(/"__vc_(?:neg_)?inf__"/g, (m) => literal.get(m)!);
 }
 
-/** A save with an overflowing literal (see saveText): the two engines part
- *  ways here, and neither lets the infinity into the game. The TypeScript
- *  loader reads it as an infinity and coerces the field, so `check` runs on
- *  the save it writes back; the Rust loader refuses the whole text as a
- *  number out of range, so the engine is never loaded with it. */
-function expectInfinityHandled(leg: Leg, data: Save, check: (save: Save) => void): void {
-  if (leg === "ts") check(resave(leg, data));
-  else if (leg === "rust") expect(() => load(leg, data)).toThrow(/number out of range/);
-  else throw new Error(`expectInfinityHandled: no expectation for the ${String(leg)} leg`);
+/** A save with an overflowing literal (see saveText): the engine refuses the
+ *  whole text as a number out of range, so it is never loaded with it. */
+function expectInfinityHandled(leg: Leg, data: Save, _check: (save: Save) => void): void {
+  expect(() => load(leg, data)).toThrow(/number out of range/);
 }
 
 /** The engine on `leg` loaded from `data`. */

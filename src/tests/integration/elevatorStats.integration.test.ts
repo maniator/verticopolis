@@ -1,18 +1,17 @@
 import { it, expect } from "vitest";
-import { Simulation } from "../../engine/Simulation";
-import { GRID } from "../../engine/facilities";
-import { PortSim, describeEngines, type Leg } from "../portKit/portSim";
+import { LOT_WIDTH } from "../portKit/draftFixtures";
+import { PortSim, describeEngines, type Leg, draftTower, type Draft } from "../portKit/portSim";
 
-const W = GRID.width;
+const W = LOT_WIDTH;
 const C = Math.floor(W / 2);
-function lay(sim: Simulation, kind: "floor" | "lobby", floor: number): void {
+function lay(sim: Draft, kind: "floor" | "lobby", floor: number): void {
   for (let x = C; x < W; x++) sim.tower.place(kind, floor, x);
   for (let x = C - 1; x >= 0; x--) sim.tower.place(kind, floor, x);
 }
 
 describeEngines("Elevator utilization stats", (leg: Leg) => {
   it("reports passenger shafts busiest-first, and a ridden shaft shows load", () => {
-    const draft = Simulation.newGame(91);
+    const draft = draftTower(91);
     draft.money = 1e12;
     draft.star = 1;
     lay(draft, "lobby", 1);
@@ -39,7 +38,7 @@ describeEngines("Elevator utilization stats", (leg: Leg) => {
   });
 
   it("excludes staff-only service elevators from the passenger report", () => {
-    const draft = Simulation.newGame(92);
+    const draft = draftTower(92);
     draft.money = 1e12;
     lay(draft, "lobby", 1);
     for (let f = 2; f <= 5; f++) lay(draft, "floor", f);
@@ -50,7 +49,7 @@ describeEngines("Elevator utilization stats", (leg: Leg) => {
   });
 
   it("forgets a shaft's utilization once it's removed", () => {
-    const draft = Simulation.newGame(93);
+    const draft = draftTower(93);
     draft.money = 1e12;
     lay(draft, "lobby", 1);
     for (let f = 2; f <= 5; f++) lay(draft, "floor", f);

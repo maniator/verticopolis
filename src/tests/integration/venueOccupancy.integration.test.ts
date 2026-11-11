@@ -1,8 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { Simulation } from "../../engine/Simulation";
 import { FACILITIES } from "../../engine/facilities";
-import { Clock } from "../../engine/Clock";
-import { PortSim, describeEngines, type Leg } from "../portKit/portSim";
+import { PortSim, describeEngines, type Leg, type Draft, draftTower } from "../portKit/portSim";
 
 /**
  * Guards commercial venue occupant behavior:
@@ -14,17 +12,17 @@ import { PortSim, describeEngines, type Leg } from "../portKit/portSim";
  *     shop 20, fastFood 25, restaurant 35.
  */
 
-function setHour(sim: Simulation, hour: number): void {
-  // Avoid Clock(0): constructor treats 0 minutes as "use default start time"
-  // (7am). Use 1 minute past midnight for hour 0; Math.floor(1/60) = 0.
-  // Do not call with hour=0 expecting midnight and then tick to hour 1 --
-  // call setHour(sim, 23) + triggerHour() instead to cross the 23->0 boundary.
-  sim.clock = new Clock(hour * 60 || 1, sim.clock.calendar);
+function setHour(sim: Draft, hour: number): void {
+  // Use 1 minute past midnight for hour 0 (Math.floor(1/60) = 0), as the
+  // TypeScript clock needed. Do not call with hour=0 expecting midnight and
+  // then tick to hour 1: call setHour(sim, 23) and triggerHour() instead to
+  // cross the 23->0 boundary.
+  sim.clock.minutes = hour * 60 || 1;
 }
 
 /** Build a minimal tower with a single tenanted commercial venue on a draft. */
-function venueDraft(kind: "fastFood" | "restaurant" | "shop"): { draft: Simulation; id: number } {
-  const draft = new Simulation(2024, "classic", "realWorld");
+function venueDraft(kind: "fastFood" | "restaurant" | "shop"): { draft: Draft; id: number } {
+  const draft = draftTower(2024, "classic", "realWorld");
   draft.money = 5_000_000;
   for (let x = 0; x < 40; x++) draft.tower.place("lobby", 1, x);
   for (let f = 2; f <= 5; f++) for (let x = 0; x < 40; x++) draft.tower.place("floor", f, x);
@@ -41,7 +39,7 @@ function venueDraft(kind: "fastFood" | "restaurant" | "shop"): { draft: Simulati
  *  so the first hour it steps into fires onHour. `edit` changes the draft's
  *  venue first. `venue()` reads the venue as the engine holds it, and
  *  `triggerHour()` advances one hour so onHour/updatePresence fires. */
-function venueFixture(leg: Leg, kind: "fastFood" | "restaurant" | "shop", hour: number, edit?: (draft: Simulation, id: number) => void) {
+function venueFixture(leg: Leg, kind: "fastFood" | "restaurant" | "shop", hour: number, edit?: (draft: Draft, id: number) => void) {
   const { draft, id } = venueDraft(kind);
   edit?.(draft, id);
   setHour(draft, hour);
@@ -149,27 +147,26 @@ describeEngines("occupants flips at open/close hour boundaries", (leg: Leg) => {
 // Still on the TypeScript Simulation: it writes `customersIn` between two reads,
 // and a save does not carry live customers, so it needs a tooling-only write on
 // the engine before it can run through the port kit.
-describe("v2 spatial congestion reads live customers, never the commercial catalog value", () => {
+describeEngines("v2 spatial congestion reads live customers, never the commercial catalog value", (leg: Leg) => {
   it("an occupied fastFood with no customers adds zero floor congestion; live customers add pressure", () => {
-    const sim = new Simulation(2024, "modern", "realWorld");
-    sim.simModel = "v2";
-    sim.money = 1_000_000;
-    for (let x = 0; x < 40; x++) sim.tower.place("lobby", 1, x);
-    for (let x = 0; x < 40; x++) sim.tower.place("floor", 2, x);
-    const r = sim.tower.place("fastFood", 2, 0);
-    const u = sim.tower.units.find((x) => x.id === r.unitId)!;
-    u.state = "occupied";
+    const draft = draftTower(2024, "modern", "realWorld");
+    draft.money = 1_000_000;
+    for (let x = 0; x < 40; x++) draft.tower.place("lobby", 1, x);
+    for (let x = 0; x < 40; x++) draft.tower.place("floor", 2, x);
+    const r = draft.tower.place("fastFood", 2, 0);
+    draft.tower.getUnit(r.unitId!)!.state = "occupied";
     // A single weak shaft so the floor is served (unserved floors are skipped
     // by the spatial model) and 25 riders visibly stress it.
-    sim.tower.placeTransport("elevatorStandard", 30, 1, 2);
-    sim.tower.setCars(sim.tower.transports[0].id, 1);
-    setHour(sim, 12);
+    const shaft = draft.tower.placeTransport("elevatorStandard", 30, 1, 2);
+    draft.tower.setCars(shaft.transportId!, 1);
+    setHour(draft, 12);
+    const sim = new PortSim(leg, draft);
     // No live customers: the venue must not stress floor 2 with its catalog 25.
     // The pre-fix code summed residentCount for every present unit, so a lone
     // occupied fastFood faked a full elevator load around the clock.
-    expect(sim.congestionAt(2)).toBe(0);
-    u.customersIn = 25;
-    expect(sim.congestionAt(2)).toBeGreaterThan(0);
+    expect(sim.floorCongestion(2)).toBe(0);
+    sim.setCustomersIn(r.unitId!, 25);
+    expect(sim.floorCongestion(2)).toBeGreaterThan(0);
   });
 });
 

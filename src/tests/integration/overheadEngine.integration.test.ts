@@ -1,6 +1,5 @@
 import { it, expect } from "vitest";
-import { newSeededGame, lay } from "../fixtures/towerFixtures";
-import { GRID } from "../../engine/facilities";
+import { newSeededDraft, lay, LOT_WIDTH } from "../portKit/draftFixtures";
 import { ECON, rentConfig } from "../../engine/econConfig";
 import type { GameMode } from "../../shared/types";
 import { PortSim, describeEngines, type Leg } from "../portKit/portSim";
@@ -13,7 +12,7 @@ import { PortSim, describeEngines, type Leg } from "../portKit/portSim";
  *  their plain tests keep the WASM parity runs. Each block keeps the month
  *  length its source file used. */
 
-const C = Math.floor(GRID.width / 2);
+const C = Math.floor(LOT_WIDTH / 2);
 const MONTH_30_DAYS = 60 * 24 * 30;
 const MONTH_31_DAYS = 60 * 24 * 31;
 
@@ -24,7 +23,7 @@ describeEngines(
      *  unsold condo on an UNSERVED floor (no elevator), so nobody moves in and the
      *  condo can't sell: the ONLY money movement is the overhead + hold-tax sinks. */
     function monthlyDrain(mode: GameMode): number {
-      const draft = newSeededGame(4, mode);
+      const draft = newSeededDraft(4, mode);
       draft.money = 1_000_000;
       draft.star = 1;
       lay(draft, "lobby", 1);
@@ -61,7 +60,7 @@ describeEngines(
   (leg: Leg) => {
     it("charges overhead on vacant/unserved space (pure carrying cost)", () => {
       // Operating overhead is a Modern-only "deeper economy" sink (Classic is 0).
-      const draft = newSeededGame(1, "modern");
+      const draft = newSeededDraft(1, "modern");
       draft.money = 1e9;
       draft.star = 1; // keep events off
       lay(draft, "lobby", 1);
@@ -78,7 +77,7 @@ describeEngines(
     });
 
     it("a unit under construction pays no overhead", () => {
-      const draft = newSeededGame(2);
+      const draft = newSeededDraft(2);
       draft.money = 1e9;
       draft.star = 1;
       lay(draft, "lobby", 1);
@@ -102,7 +101,7 @@ describeEngines("operating overhead consumes no RNG (F3)", (leg: Leg) => {
     // economyDepth.integration.test.ts with the v1 model dropped; the RNG
     // position is read from the engine's save.
     const build = (withOverhead: boolean): number => {
-      const draft = newSeededGame(123);
+      const draft = newSeededDraft(123);
       draft.money = 1e9;
       draft.star = 1;
       lay(draft, "lobby", 1);

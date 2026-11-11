@@ -1,9 +1,7 @@
 import { expect, it } from "vitest";
-import { newSeededGame } from "../fixtures/towerFixtures";
-import type { Simulation } from "../../engine/Simulation";
-import { GRID } from "../../engine/facilities";
+import { newSeededDraft, LOT_WIDTH } from "../portKit/draftFixtures";
 import type { FacilityKind } from "../../shared/types";
-import { PortSim, describeEngines, type Leg } from "../portKit/portSim";
+import { PortSim, describeEngines, type Leg, type Draft } from "../portKit/portSim";
 
 /**
  * The commercial-venue inspector's cosmetic invariant on both engines: the
@@ -16,11 +14,11 @@ import { PortSim, describeEngines, type Leg } from "../portKit/portSim";
  * `PortSim.clearRetailTallies` clears them on the engine.
  */
 
-const X0 = Math.floor(GRID.width / 2) - 20;
+const X0 = Math.floor(LOT_WIDTH / 2) - 20;
 
 /** Floor 2 over [X0, X0 + 40), linked to the ground by one elevator. */
-function builtTower(seed: number): Simulation {
-  const sim = newSeededGame(seed);
+function builtTower(seed: number): Draft {
+  const sim = newSeededDraft(seed);
   for (let i = 0; i < 40; i++) sim.tower.place("floor", 2, X0 + i);
   expect(sim.buildTransport("elevatorStandard", X0, 1, 2).ok, "elevator built").toBe(true);
   return sim;
@@ -28,7 +26,7 @@ function builtTower(seed: number): Simulation {
 
 /** Build one `kind` on floor 2 at `x`. Star 3 unlocks the shop, then the star
  *  drops back to 1 so no random fire or bomb can gut a venue mid-run. */
-function buildOne(sim: Simulation, kind: FacilityKind, x: number): number {
+function buildOne(sim: Draft, kind: FacilityKind, x: number): number {
   sim.money = 1e12;
   sim.star = 3;
   const r = sim.build(kind, 2, x);
