@@ -3,8 +3,9 @@ import type { HeaderView } from "./view";
 /**
  * The clock reads the renderer makes (hour, minute, and the morning, evening
  * and night windows), derived from the header's `minutes` alone (facade
- * slice 3, #1210). The windows are the same ones `Clock` answers; the test
- * pins every minute of several days against `Clock`, so the two cannot drift.
+ * slice 3, #1210). The windows are the engine's (morning 07:00 to 09:59,
+ * evening 17:00 to 20:59, night 21:00 to 05:59); the test pins their edges
+ * and every minute of several days.
  *
  * One instance is meant to be reused: `set` takes the header's minute and the
  * getters answer for it, so a frame reads the clock without allocating.

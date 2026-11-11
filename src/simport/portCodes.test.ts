@@ -1,30 +1,36 @@
 import { describe, expect, it } from "vitest";
-import { Simulation } from "../engine/Simulation";
-import { TsEngine } from "../engine/port/tsEngine";
 import { PortCodes, outcome } from "./portCodes";
+import { LAYOUT, mockPort, record } from "../tests/portKit/mockPort";
 
-describe("PortCodes over TsEngine", () => {
-  it("passes names as the layout's codes and reads named slots", () => {
-    const sim = Simulation.newGame(5, "modern");
-    sim.money = 1e8;
-    const e = new TsEngine(sim);
-    const c = new PortCodes(e);
+/** The layout's code tables and a command's outcome, over a mock port. The
+ *  engine side runs in `portReads.integration.test.ts`. */
+
+describe("PortCodes", () => {
+  it("reads the layout once and passes names as its codes", () => {
+    const port = mockPort();
+    const c = new PortCodes(port);
+    expect(port.viewLayout).toHaveBeenCalledOnce();
     expect([c.code("modes", "modern"), c.code("logKinds", "bad"), c.code("heatModes", "nope")]).toEqual([1, 2, NaN]);
-    const rec = e.paintTiles(c.kind("lobby"), 1, Float64Array.of(160, 161, 162));
-    expect(outcome(e, rec)).toEqual({ ok: true, delta: rec[1] });
-    expect(rec[1]).toBeLessThan(0);
+    expect([c.kind("lobby"), c.kind("office"), c.code("filmPolicies", "blockbuster")]).toEqual([0, 2, 2]);
+    expect(c.names("kinds")).toEqual(LAYOUT.kinds);
+    expect([c.fields("paintTiles"), c.fields("noSuchOp")]).toEqual([["status", "delta", "placed"], []]);
+  });
+
+  it("reads a record's named slots", () => {
+    const c = new PortCodes(mockPort());
+    const rec = record("paintTiles", { status: 1, delta: -1500, placed: 3 });
     expect(c.slot(rec, "paintTiles", "placed")).toBe(3);
     expect(c.slot(rec, "paintTiles", "missing")).toBeNaN();
     expect(c.slot(rec, "noSuchOp", "placed")).toBeNaN();
   });
+});
 
-  it("reads a refusal's reason before the next command clears it", () => {
-    const e = new TsEngine(Simulation.newGame(5, "modern"));
-    const c = new PortCodes(e);
-    const refused = outcome(e, e.buildAt(c.kind("office"), 40, 160));
-    expect(refused.ok).toBe(false);
-    expect(refused.reason).toBe(e.lastReason());
-    expect(typeof refused.reason).toBe("string");
-    expect(outcome(e, e.buildAt(NaN, 1, 160)).ok).toBe(false);
+describe("outcome", () => {
+  it("asks the reason only for a refusal", () => {
+    const port = mockPort({ lastReason: () => "Too high to build" });
+    expect(outcome(port, record("buildAt", { status: 1, delta: -40_000 }))).toEqual({ ok: true, delta: -40_000 });
+    expect(port.lastReason).not.toHaveBeenCalled();
+    expect(outcome(port, record("buildAt", { status: 0, delta: 0 }))).toEqual({ ok: false, reason: "Too high to build", delta: 0 });
+    expect(port.lastReason).toHaveBeenCalledOnce();
   });
 });

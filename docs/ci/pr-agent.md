@@ -61,9 +61,8 @@ The settings in `.pr_agent.toml` address this without disabling code review:
   disabled too; title and explicit issue URLs may still supply ticket context
   during an opt-in analysis. Such analysis remains advisory.
 - Generated golden snapshots (`frame-days.json`, `port-edits.json`, the
-  card-text outputs, the fuzz corpus goldens in
-  `conformance/fuzz-corpus/goldens/` and the port's recorded engine answers in
-  `src/simport/recordings/`) are excluded from the AI's diff context so the **source
+  card-text outputs and the fuzz corpus goldens in
+  `conformance/fuzz-corpus/goldens/`) are excluded from the AI's diff context so the **source
   generators, assertions, Rust/WASM checks, TypeScript referee, and other
   tests** have priority. These files remain in GitHub, and their committed
   values remain checked by CI. Model review does **not** validate the
