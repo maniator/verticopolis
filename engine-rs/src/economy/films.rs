@@ -30,7 +30,10 @@ pub enum FilmRefusal {
     /// The theatre is not open: under construction, burning or gutted.
     Closed,
     /// The film would cost more than the tower holds.
-    Funds { cost: f64 },
+    Funds {
+        /// The price of the film the player asked for.
+        cost: f64,
+    },
 }
 
 impl FilmRefusal {
@@ -53,9 +56,11 @@ pub(crate) fn draws_full_house(u: &Unit) -> bool {
 }
 
 impl Simulation {
-    /// Show a new film, or a classic when `classic`, at theatre `id`: the
-    /// price is charged, and the film starts its first day. Answers the
-    /// price paid.
+    /// Shows a new film, or a classic when `classic`, at cinema `id`
+    /// (Classic only; Modern books films each period). Charges the price
+    /// ([`catalog`](crate::catalog::catalog)'s `new_film_price` or
+    /// `classic_film_price`) and starts the film on its first day. Returns
+    /// the price paid, or why the film did not change.
     pub fn change_film(&mut self, id: i64, classic: bool) -> Result<f64, FilmRefusal> {
         let Some((new_price, classic_price)) = self.tower.mode.film_changes() else {
             return Err(FilmRefusal::Unavailable);

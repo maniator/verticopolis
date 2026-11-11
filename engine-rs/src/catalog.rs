@@ -133,9 +133,10 @@ pub struct Economy {
     pub garbage_collect_hour: f64,
     /// The paid exterminator's fees, or null where the mode has none.
     pub exterminator: Option<ExterminatorFees>,
-    /// Showing a new film and a classic where the player changes films (and
-    /// books none each period), or null where the mode books films.
+    /// The price of showing a new film where the player changes a cinema's
+    /// film (and books none each period), or null where the mode books films.
     pub new_film_price: Option<f64>,
+    /// The price of showing a classic film, null where `new_film_price` is.
     pub classic_film_price: Option<f64>,
     /// Whether the player can switch automatic bridging off. When false,
     /// bridging is always on. When true, a tower starts bridged unless it

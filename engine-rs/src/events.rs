@@ -22,6 +22,9 @@ mod fire;
 #[path = "events_bomb.rs"]
 #[doc(hidden)]
 pub mod bomb;
+/// Why [`Simulation::change_film`] refused, kept here beside the other
+/// cinema command, [`Simulation::set_film_policy`].
+pub use crate::economy::films::FilmRefusal;
 #[doc(hidden)]
 pub use bomb::{BombSearch, Guard};
 

@@ -42,7 +42,7 @@
 //! | Build and sell | [`can_build`](sim::Simulation::can_build), [`build`](sim::Simulation::build), [`paint_brush`](sim::Simulation::paint_brush), [`can_build_transport`](sim::Simulation::can_build_transport), [`build_transport`](sim::Simulation::build_transport), [`sell_at`](sim::Simulation::sell_at), [`toggle_auto_bridge`](sim::Simulation::toggle_auto_bridge) |
 //! | Change elevators and remove things | [`add_car`](sim::Simulation::add_car), [`remove_car`](sim::Simulation::remove_car), [`begin_extend`](sim::Simulation::begin_extend), [`extend_transport`](sim::Simulation::extend_transport), [`end_extend`](sim::Simulation::end_extend), [`remove_facility`](sim::Simulation::remove_facility) |
 //! | Set prices | [`adjust_rent`](sim::Simulation::adjust_rent), [`price_unit`](sim::Simulation::price_unit), [`set_no_rate`](sim::Simulation::set_no_rate), [`apply_rent_batch`](sim::Simulation::apply_rent_batch) |
-//! | Answer the game | [`resolve_choice`](sim::Simulation::resolve_choice), [`set_film_policy`](sim::Simulation::set_film_policy) |
+//! | Answer the game | [`resolve_choice`](sim::Simulation::resolve_choice), [`set_film_policy`](sim::Simulation::set_film_policy), [`change_film`](sim::Simulation::change_film) |
 //! | Draw the tower | [`view`]: [`structure_view`](view::structure_view), [`ViewReader`](view::ViewReader), [`meta_since`](view::meta_since); or the older flat [`frame`] |
 //! | React to what happened | [`gameplay`]: drain `sim.gameplay` after each frame |
 //! | Show prices and rules | [`catalog::catalog`] |
