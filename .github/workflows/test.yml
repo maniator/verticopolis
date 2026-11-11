@@ -551,11 +551,13 @@ jobs:
   # One check for the three browser-suite shards: green when every shard
   # passed, or when the suite was skipped on purpose (a prose-only change or a
   # merge queue run); red when a shard failed or was cancelled, or when the
-  # shards were skipped because a job they need failed.
+  # shards were skipped because a job they need failed. It does not run when
+  # the whole workflow run is cancelled (a newer push supersedes it), so a
+  # superseded run leaves no red check behind.
   e2e-wasm-only-result:
     name: e2e-wasm-only
     needs: [changes, e2e-wasm-only]
-    if: ${{ always() }}
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
