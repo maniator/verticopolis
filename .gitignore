@@ -67,3 +67,6 @@ conformance/fuzz-corpus/*.rs.detail.json
 # Rollback rehearsal output and its throwaway browser profile (#1221)
 .rollback-rehearsal/
 .rollback-profile/
+
+# Playwright MCP server snapshots and traces (tools/agent-env/playwright-mcp.mjs)
+.playwright-mcp/
