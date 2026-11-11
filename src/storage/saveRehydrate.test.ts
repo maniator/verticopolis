@@ -1,11 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { Simulation } from "../engine/Simulation";
-import { markFounderFromLoadedFile } from "../engine/sim/founderStatus";
 import { SaveGame } from "./SaveGame";
 import { deflateSync } from "fflate";
 import { fromBase64, inflateCapped, STORE_MAGIC, toBase64, TOWER_FILE_MAGIC } from "./saveCompression";
 import { fromTowerFile, toTowerFile } from "./towerFileCodec";
-import { saveOf, importTower } from "../tests/fixtures/saveText";
+import { SMALL_TOWER_SAVE } from "../tests/fixtures/handSaves";
 
 /** A tower as an OLD build wrote it: no appVersion, plus the two fields
  *  `SaveGame.importText` insists on. */
@@ -90,10 +88,10 @@ describe("Founder survives the reverse trip", () => {
     if (!back.ok) return;
 
     const decoded = decodeStoreValue(back.value);
+    // No appVersion is what the engine marks a founder's tower by; the engine's
+    // side of it is saveRepair.integration.test.ts's.
     expect(decoded.appVersion).toBeUndefined();
-    const sim = { founder: false };
-    markFounderFromLoadedFile(sim, decoded);
-    expect(sim.founder).toBe(true);
+    expect(decoded).toEqual(PRE_2_0_SAVE);
   });
 
   it("NEGATIVE CONTROL: a stamped tower still does not earn it", () => {
@@ -101,9 +99,7 @@ describe("Founder survives the reverse trip", () => {
     const back = fromTowerFile((toTowerFile(storeValue(stamped)) as { text: string }).text);
     expect(back.ok).toBe(true);
     if (!back.ok) return;
-    const sim = { founder: false };
-    markFounderFromLoadedFile(sim, decodeStoreValue(back.value));
-    expect(sim.founder).toBe(false);
+    expect(decodeStoreValue(back.value).appVersion).toBe("2.9.0");
   });
 });
 
@@ -119,8 +115,7 @@ describe("Founder survives the reverse trip", () => {
  */
 describe("a CompressionStream-written tower reads back through fflate", () => {
   it("survives export, reverse conversion, and an fflate decode", async () => {
-    const sim = Simulation.newGame(9182);
-    const exported = await SaveGame.export(saveOf(sim));
+    const exported = await SaveGame.export(SMALL_TOWER_SAVE);
     expect(exported.startsWith(TOWER_FILE_MAGIC + "\n")).toBe(true);
 
     const back = fromTowerFile(exported);
@@ -129,15 +124,13 @@ describe("a CompressionStream-written tower reads back through fflate", () => {
 
     // The fflate side, which is what `readSlot` actually calls.
     const decoded = decodeStoreValue(back.value);
-    expect(decoded.minutes).toBe(sim.serialize().minutes);
-    expect(decoded.towerName).toBe(sim.tower.towerName);
+    expect(decoded).toMatchObject(JSON.parse(SMALL_TOWER_SAVE) as object);
   });
 
   it("and the tower still loads through the real reader", async () => {
     // End to end on the codec: export with the stream API, convert back, then
     // load through `SaveGame.importText`, which is the production reader.
-    const sim = Simulation.newGame(4242);
-    const exported = await SaveGame.export(saveOf(sim));
+    const exported = await SaveGame.export(SMALL_TOWER_SAVE);
     const back = fromTowerFile(exported);
     expect(back.ok).toBe(true);
     if (!back.ok) return;
@@ -146,9 +139,9 @@ describe("a CompressionStream-written tower reads back through fflate", () => {
     const forward = toTowerFile(back.value);
     expect(forward.ok).toBe(true);
     if (!forward.ok) return;
-    const loaded = await importTower(forward.text);
-    expect(loaded.population).toBe(sim.population);
-    expect(loaded.tower.towerName).toBe(sim.tower.towerName);
+    // The engine's load of that text is saveRepair.integration.test.ts's.
+    const imported = JSON.parse(await SaveGame.importText(forward.text)) as Record<string, unknown>;
+    expect(imported).toEqual({ ...(JSON.parse(SMALL_TOWER_SAVE) as object), savedAt: imported.savedAt, appVersion: __APP_VERSION__ });
   });
 });
 
