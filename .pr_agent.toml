@@ -80,4 +80,8 @@ glob = [
   # The fuzz corpus goldens: native replay records, pinned by
   # `fuzz-corpus --update` and held to the engine by the fuzz-corpus job.
   "conformance/fuzz-corpus/goldens/*.json",
+  # The conformance lock and the TDT case hashes: digests the engine tests
+  # write and check, which crowd the source out of a chunked review.
+  "conformance/expected.json",
+  "conformance/tdt-cases.json",
 ]
