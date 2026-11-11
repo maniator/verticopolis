@@ -16,6 +16,10 @@ pub struct DemandMap {
     pub retail_venue_count: i64,
     pub pool: f64,
     pub total_cap: f64,
+    /// Daily income capacity of the reachable attendance venues (cinemas,
+    /// party halls, aquatic centers) where the mode counts them as amenities
+    /// (#705); 0 otherwise. Coverage reads it; the income share does not.
+    pub attendance_cap: f64,
     pub bonus: f64,
 }
 
@@ -88,11 +92,19 @@ pub fn compute_demand_map(sim: &mut Simulation) -> DemandMap {
     let mut venues: Vec<(i64, f64)> = Vec::new();
     let mut total_cap = 0.0;
     let mut retail_venue_count = 0;
+    let mut attendance_cap = 0.0;
+    let attendance_is_amenity = mode.attendance_counts_toward_coverage();
     for &(id, kind, floor, x, state, _) in &rooms {
         let Some(cap) = crate::economy::commercial_daily_income(mode, kind) else {
             continue;
         };
         if kind.attendance_cap().is_some() {
+            // An attendance venue earns from live fill, not from this pool
+            // (#424), so it never joins the share. Where the mode counts it
+            // as an amenity it still covers the tenants who can reach it.
+            if attendance_is_amenity && operational(state) && draws(sim, floor, x) {
+                attendance_cap += cap;
+            }
             continue;
         }
         if !operational(state) {
@@ -143,6 +155,7 @@ pub fn compute_demand_map(sim: &mut Simulation) -> DemandMap {
         retail_venue_count,
         pool,
         total_cap,
+        attendance_cap,
         bonus,
     }
 }
@@ -186,8 +199,23 @@ pub fn unmet_coverage(dm: &DemandMap, u: &Unit) -> Option<f64> {
         return Some(0.0);
     }
     Some(if dm.share > 0.0 {
-        (1.0 / dm.share).min(1.0)
+        if dm.attendance_cap > 0.0 {
+            // Retail and attendance capacity together against the same
+            // demand (#705): (retail + attendance) / demand, written through
+            // `share` (demand / retail) because the move-in probe
+            // (`would_evict_fresh_tenant`) adds its tenant's demand to the
+            // share and not to `pool`. Only a mode that counts attendance
+            // gets here, and only with a shop in reach: seats add to the
+            // retail on offer, they do not stand in for it.
+            ((1.0 + dm.attendance_cap / dm.total_cap) / dm.share).min(1.0)
+        } else {
+            (1.0 / dm.share).min(1.0)
+        }
     } else {
         1.0
     })
 }
+
+#[cfg(test)]
+#[path = "demand_tests.rs"]
+mod tests;
