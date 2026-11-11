@@ -1,4 +1,4 @@
-import type { FacilityKind } from "../engine/types";
+import type { FacilityKind } from "../shared/types";
 import type { ViewFocus } from "../render/excalibur/TowerEngine";
 
 /**

@@ -6,7 +6,7 @@
  */
 import { readFileSync } from "node:fs";
 import { Simulation } from "../src/engine/Simulation";
-import type { SerializedGame } from "../src/engine/types";
+import type { SerializedGame } from "../src/shared/types";
 import { canonicalJson } from "../src/tests/conformance/canonical";
 import { stateView } from "../src/tests/conformance/scenario";
 

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Simulation } from "../../engine/Simulation";
-import type { VacateReason } from "../../engine/types";
+import type { VacateReason } from "../../shared/types";
 import { vacate } from "../../engine/sim/churn";
 import { buildSatisfactionContext, wouldEvictFreshTenant } from "../../engine/sim/satisfactionStep";
 import { wontLeaseText } from "../diagnostics/gripeCopy";

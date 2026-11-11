@@ -1,4 +1,4 @@
-import type { LedgerCat } from "../engine/Ledger";
+import type { LedgerCat } from "../shared/engineTypes";
 
 /**
  * The words the Statistics window prints for two things the engine reports by

@@ -1,10 +1,10 @@
 import { describe, expectTypeOf, it } from "vitest";
 import type { Crowd } from "../engine/Crowd";
-import type { Person } from "../engine/crowd/person";
+import type { Person } from "../shared/engineTypes";
 import type { Simulation } from "../engine/Simulation";
 import type { Tower } from "../engine/Tower";
 import type { roomUnits, StructureRun, structureRuns } from "../engine/tower/rooms";
-import type { Transport, Unit } from "../engine/types";
+import type { Transport, Unit } from "../shared/types";
 import type { Command, CommandResults } from "./commands";
 import type { Query, QueryResults } from "./queries";
 import type { CrowdView, FxView, HeaderView, PersonView, SimView, StructureRunView, TowerView, TransportView, UnitView } from "./view";

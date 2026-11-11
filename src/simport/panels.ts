@@ -1,7 +1,7 @@
-import type { LedgerCat } from "../engine/Ledger";
-import type { HeatmapMode } from "../engine/sim/constants";
-import type { StarGateId } from "../engine/sim/star";
-import type { FacilityKind, UnitState, VacateReason } from "../engine/types";
+import type { LedgerCat } from "../shared/engineTypes";
+import type { HeatmapMode } from "../shared/engineTypes";
+import type { StarGateId } from "../shared/engineTypes";
+import type { FacilityKind, UnitState, VacateReason } from "../shared/types";
 
 /**
  * What the panels ask the engine and what it answers (facade slice 4, #1211).

@@ -1,5 +1,5 @@
 import { Simulation } from "../../engine/Simulation";
-import type { GameMode, Unit, UnitState } from "../../engine/types";
+import type { GameMode, Unit, UnitState } from "../../shared/types";
 import { mustBuild, placeUnit } from "./towerFixtures";
 
 /**

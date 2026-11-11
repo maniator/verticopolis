@@ -1,6 +1,6 @@
 import type { Simulation } from "../engine/Simulation";
-import type { HourlyByDay } from "../engine/elevatorSchedule";
-import type { OriginRings } from "../engine/scheduleOrigins";
+import type { HourlyByDay } from "../shared/engineTypes";
+import type { OriginRings } from "../shared/engineTypes";
 
 /**
  * The hourly elevator telemetry (`elevatorUtil`, `elevatorHourly`,

@@ -7,7 +7,7 @@ import { Clock } from "../../engine/Clock";
 import { RNG } from "../../engine/rng";
 import { CLASSIC_RULES } from "../../engine/gameRules";
 import { FACILITIES, GRID } from "../../engine/facilities";
-import type { FacilityKind, GameMode } from "../../engine/types";
+import type { FacilityKind, GameMode } from "../../shared/types";
 
 /**
  * Regression tests for the BMAD-review findings fixed in this PR. Each `it` pins

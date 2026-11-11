@@ -1,7 +1,7 @@
 import { it, expect } from "vitest";
 import { newSeededGame } from "../fixtures/towerFixtures";
 import { GRID } from "../../engine/facilities";
-import { isOperational } from "../../engine/types";
+import { isOperational } from "../../shared/types";
 import { PortSim, describeEngines, type Leg } from "../portKit/portSim";
 
 /** A floor-2 tower served by an elevator, with `n` occupied offices — the only

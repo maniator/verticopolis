@@ -1,5 +1,7 @@
 import type { FacilityKind, Unit } from "../types";
 import { CAR_FLOORS_PER_MINUTE } from "../ElevatorDispatch";
+import type { PersonState, Person, QueueLanding, ElevatorQueueView } from "../../shared/engineTypes";
+export type { PersonState, Person, QueueLanding, ElevatorQueueView };
 
 /**
  * The Person model plus the crowd's shared tuning constants and the
@@ -24,100 +26,6 @@ export type StaffKind = "security" | "medical" | "housekeeping" | "recycling";
  * It advances on real seconds (passed in by the renderer) so people move at a
  * steady, watchable pace regardless of the game-speed time compression.
  */
-
-export type PersonState = "toShaft" | "waiting" | "riding" | "climbing" | "toDest" | "dwelling" | "done";
-
-export interface Person {
-  id: number;
-  seed: number;
-  state: PersonState;
-  /** Discrete current floor (where they're standing / boarding). */
-  floor: number;
-  /** Continuous floor for rendering while riding a car. */
-  fy: number;
-  /** Continuous tile x. */
-  x: number;
-  /** Per-leg transport route: floors[0]=origin … floors[n]=destination. */
-  floors: number[];
-  /** Immutable origin floor stamped at spawn. `floors[0]` is rewritten for a
-   *  round-tripper's return leg (it becomes the venue floor), so the commute-
-   *  stress accumulator (#514) keys on THIS instead, keeping a round-trip's wait
-   *  attributed to the tenant's true origin rather than the venue they visited. */
-  originFloor: number;
-  /** shaft id used for leg i (floors[i] → floors[i+1]); always a valid id. An
-   *  unreachable destination yields no route at all (routing returns null), so
-   *  this array never holds a sentinel. */
-  shafts: number[];
-  leg: number;
-  shaftId: number | null;
-  carIndex: number | null;
-  /** Tile x to stroll to on the destination floor (within built structure). */
-  destX: number;
-  /** Seconds spent waiting on the current call (drives stress). */
-  wait: number;
-  /** Cumulative landing-wait seconds across this whole trip (every leg). Unlike
-   *  {@link wait}, which is per-call and zeroed on boarding, this sums each
-   *  served call's wait so a multi-transfer commute contributes the wait of
-   *  every leg, not just the last. Folded into the per-origin commute-stress
-   *  accumulator at {@link finish} (read-only measurement, #514); in-memory
-   *  only, like every Person field. */
-  tripWait: number;
-  /** Total seconds in transit (origin → destination), for the give-up valve. */
-  age: number;
-  /** Idle timer once arrived, before despawning. */
-  linger: number;
-  /** True for tower staff (housekeepers): they route over the STAFF network
-   *  (service elevators / stairs), never count toward tenant stress, and
-   *  render in a work uniform. */
-  staff?: boolean;
-  /** Unit id this staffer is dispatched to service (a dirty hotel room). */
-  cleanUnitId?: number;
-  /** Unit id of the meal venue chosen at spawn for a round-trip meal person;
-   *  `destX` points inside this unit's footprint. Distinct from `venueUnitId`:
-   *  this records the intent (set on spawn), while `venueUnitId` records the
-   *  census count actually taken (set on dwell entry), so a give-up before
-   *  arrival never decrements a count that was never incremented. */
-  mealVenueId?: number;
-  /** Unit id of the commercial venue (fastFood / restaurant / shop) where this
-   *  person is currently attending. Set when the person enters the
-   *  `dwelling` state;
-   *  used to decrement `venueUnit.customersIn` when they leave. Undefined for
-   *  all non-meal persons and for eaters at non-commercial destinations. */
-  venueUnitId?: number;
-  /** True when this counted eater came from a HOTEL origin, so finish() also
-   *  decrements the venue's `hotelCustomersIn` (the 4-star-plus census
-   *  exclusion). Captured at dwell entry, when the origin still exists. */
-  countedHotelGuest?: boolean;
-  /** Unit id of the ORIGIN room for a round-trip meal person (an office,
-   *  condo, or hotel room whose visible occupancy dropped by 1 when this
-   *  person spawned outbound). Undefined for lobby-centric commuter trips
-   *  and staff dispatches. On return arrival the person decrements
-   *  `originUnit.outForMeal`, guarded so a bulldozed origin cannot ghost-
-   *  decrement a fresh unit built in the same slot after. */
-  originUnitId?: number;
-  /** Remaining crowd-seconds in the `dwelling` state (a stationary stay at
-   *  the destination floor after the outbound trip's `toDest` completes: a
-   *  meal, a showing, a party, a wedding). Only set for round-trippers;
-   *  drained in the `advance` loop. */
-  dwellSecondsLeft?: number;
-  /** True once the outbound arrival has transitioned this person into their
-   *  return trip (venue -> origin). Distinguishes the two `toDest` completions
-   *  a round-tripper has (outbound arrival triggers the dwell; return arrival
-   *  triggers the outForMeal decrement + despawn). */
-  returning?: boolean;
-  /** Which demographic routine (condo-demographic-routines, #397) spawned this
-   *  person: a condo school-run leg or an office sales call. A transient tag
-   *  for attribution (tests, future overlays); the waves are purely
-   *  statistical, so it names the routine, never an identity, and like every
-   *  Person field it is in-memory only (nothing persists who is a child). */
-  routine?: "schoolRun" | "salesCall";
-  /** Extended arrival linger (crowd-seconds): how long to hold the arrived
-   *  pose before despawning. A metro commuter waiting on the platform for
-   *  their train. Unset for ordinary trips, which keep the default 2-second
-   *  linger; distinct from the venue round-trippers' `dwelling` state and
-   *  its `dwellSecondsLeft`. In-memory only, like every Person field. */
-  lingerFor?: number;
-}
 
 /** A transport route as a list of floors and the shaft used between each. */
 export interface Route {
@@ -168,35 +76,6 @@ export interface ElevatorCalls {
   hall: ReadonlyMap<number, ReadonlyMap<number, number>>;
   /** Cab buttons: shaftId → carIndex → floors that car's riders need. */
   cab: ReadonlyMap<number, ReadonlyMap<number, ReadonlySet<number>>>;
-}
-
-/** One landing's waiting line in an {@link ElevatorQueueView}: how many real
- *  people wait there and a bounded wait-tier (0 content, 1 impatient, 2 fed up),
- *  the max over its waiters. */
-export interface QueueLanding {
-  count: number;
-  tier: 0 | 1 | 2;
-}
-
-/**
- * Read-only projection of the waiting crowd and per-car occupancy, sized for
- * the render layer (see `elevatorQueueView`). A VIEW of state the crowd
- * already tracks (the same `waiting` people {@link ElevatorCalls} counts, and
- * each car's drawn occupancy `crowd.carRiders`), so it re-simulates nothing:
- * it surfaces boarding, it does not perform it. Both halves count ONE
- * population, the drawn crowd, so a waiter boarding moves the same figure
- * from a landing into a car. {@link Crowd.queueView} memoizes it once per
- * outer sim step, so a render frame reads it without re-scanning the crowd.
- */
-export interface ElevatorQueueView {
-  /** Landing queues: shaftId → floor → count and wait-tier. The waiters' stable
-   *  order in `crowd.people` is the queue order the render draws; this view
-   *  carries the length and tier, not the identities. */
-  landings: ReadonlyMap<number, ReadonlyMap<number, QueueLanding>>;
-  /** Boarded riders per car: shaftId → carIndex → count, read from
-   *  `crowd.carRiders` (the drawn per-car occupancy, the same routed figures
-   *  `landings` counts, now aboard). Not the dispatch's statistical `carLoad`. */
-  boarded: ReadonlyMap<number, ReadonlyMap<number, number>>;
 }
 
 /**

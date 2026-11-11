@@ -4,7 +4,7 @@ import type { Catalog } from "./catalogTypes";
 import { catalogFacility, findCatalogFacility } from "./catalogTypes";
 import { Simulation } from "../engine/Simulation";
 import { towerCatalog, useTowerCatalogSource } from "./towerCatalog";
-import type { GameMode } from "../engine/types";
+import type { GameMode } from "../shared/types";
 
 describe("a tower's catalog handle (#921)", () => {
   it("reads the TypeScript tables for the tower's own mode by default", () => {

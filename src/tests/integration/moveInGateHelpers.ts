@@ -1,6 +1,6 @@
 import { expect } from "vitest";
 import { Simulation } from "../../engine/Simulation";
-import type { GameMode, Unit } from "../../engine/types";
+import type { GameMode, Unit } from "../../shared/types";
 import { GRID } from "../../engine/facilities";
 
 /** Shared fixtures for the move-in sustainability gate tests

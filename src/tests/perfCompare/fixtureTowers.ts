@@ -1,7 +1,7 @@
 import { Simulation } from "../../engine/Simulation";
 import { FACILITIES, GRID } from "../../engine/facilities";
 import { isSkyLobbyFloor } from "../../engine/tower/towerTopology";
-import type { FacilityKind, Unit } from "../../engine/types";
+import type { FacilityKind, Unit } from "../../shared/types";
 
 /**
  * Towers for the size-threshold run and the unit-count rows (issue #1270).

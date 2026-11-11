@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { Simulation } from "../../engine/Simulation";
 import { rentOf } from "../../engine/econConfig";
 import { GRID } from "../../engine/facilities";
-import type { Unit } from "../../engine/types";
+import type { Unit } from "../../shared/types";
 import { statsBodyOf } from "../../ui/templates/stats.fixture";
 import { renderToFragment } from "../../ui/testing/litTestUtils";
 import { unitEditor } from "../../game/cardKit.fixture";

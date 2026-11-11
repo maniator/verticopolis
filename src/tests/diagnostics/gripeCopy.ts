@@ -1,5 +1,5 @@
 import type { Simulation } from "../../engine/Simulation";
-import type { Unit, VacateReason } from "../../engine/types";
+import type { Unit, VacateReason } from "../../shared/types";
 import { unmetCoverage, dominantGripe, nearNightclub, servingTransportKindsAt, bindingTransportClassAt } from "../../engine/sim/gripe";
 import { buildSatisfactionContext, wouldEvictFreshTenant } from "../../engine/sim/satisfactionStep";
 import { unitPrice } from "../../ui/catalogPricing";

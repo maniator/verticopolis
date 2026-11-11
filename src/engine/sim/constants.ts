@@ -1,5 +1,7 @@
 import type { Unit } from "../types";
 import { GRID } from "../facilitiesData";
+import type { HeatmapMode, HeatCell, BatchTarget, BatchRentOptions, BatchRentResult } from "../../shared/engineTypes";
+export type { HeatmapMode, HeatCell, BatchTarget, BatchRentOptions, BatchRentResult };
 
 /** How long (game minutes) an office/condo tenant stays "on notice" in the
  *  `vacating` state before actually leaving, a grace window the player can use
@@ -301,9 +303,6 @@ export const LOG_SAVE_CAP = LOG_RING_CAP;
  *  panel renders via textContent, so this bounds memory, not injection). */
 export const LOG_TEXT_CAP = 400;
 
-/** The metric the colored stats overlay tints floors by. */
-export type HeatmapMode = "congestion" | "occupancy" | "satisfaction" | "cleanliness";
-
 /** Congestion ratio at which tenants begin leaving (see {@link Simulation.updateSatisfaction},
  *  `cong > 1`), the overlay paints this AMBER so the color never contradicts the sim. */
 export const CONGESTION_CHURN = 1.0;
@@ -344,48 +343,6 @@ export function congestionSeverity(cong: number): number {
     CONGESTION_AMBER_SEVERITY +
     (1 - CONGESTION_AMBER_SEVERITY) * ((cong - CONGESTION_CHURN) / (CONGESTION_GRIDLOCK - CONGESTION_CHURN))
   );
-}
-
-/** One tinted rectangle in the stats overlay: a column span on a floor and how
- *  bad it reads (0 = green/good … 1 = red/bad). Congestion and occupancy emit
- *  one cell per floor (they're floor-level metrics); satisfaction emits one cell
- *  per present tenant unit so a single unhappy suite reddens on its own instead
- *  of being averaged away by content neighbors sharing the floor.
- *
- *  `tint` is an optional SEMANTIC category for cells whose meaning the plain
- *  good-to-bad ramp cannot carry (the engine names the state; the renderer
- *  picks the pixels): `infested` marks a hotel room housekeeping can no longer
- *  clean (terminal, distinct from "unreached"), `na` marks a unit the overlay's
- *  metric does not apply to (a condo on the housekeeping map), so a blank never
- *  reads as an uncovered room. Cells without a tint read the severity ramp.
- *  Numeric consumers aggregating `severity` must SKIP `na` cells (their 0
- *  means "not applicable", never "perfectly covered"); `infested` cells keep
- *  an honest hot severity for anything reading the number alone. */
-export interface HeatCell {
-  floor: number;
-  minX: number;
-  maxX: number;
-  severity: number;
-  tint?: "infested" | "na";
-}
-
-/** Batch-pricing target: an exact price, "default" to return to the neutral
- *  anchor (band default / Classic Average rung), or "noRate" to take the kind
- *  off the market (ladder modes only; Modern never holds the No Rate state). */
-export type BatchTarget = number | "default" | "noRate";
-export interface BatchRentOptions {
-  /** Only touch units still on the default price (skip hand-tuned ones). */
-  onlyDefaultPriced?: boolean;
-}
-export interface BatchRentResult {
-  matched: number; // priced units of this kind (incl. sold condos)
-  eligible: number; // matched − skippedSold − skippedCustom
-  changed: number; // units whose effective price actually differs after the write
-  skippedSold: number; // condo && everOccupied
-  skippedCustom: number; // had a custom price and onlyDefaultPriced was set (left alone)
-  customOverwritten: number; // eligible custom-priced units being replaced (protect toggle off)
-  clampedLow: number; // eligible units whose target was below the band minimum
-  clampedHigh: number; // eligible units whose target was above the band maximum
 }
 
 /**

@@ -2,7 +2,7 @@ import { it, expect } from "vitest";
 import { newSeededGame, lay } from "../fixtures/towerFixtures";
 import { GRID } from "../../engine/facilities";
 import { ECON, rentConfig } from "../../engine/econConfig";
-import type { GameMode } from "../../engine/types";
+import type { GameMode } from "../../shared/types";
 import { PortSim, describeEngines, type Leg } from "../portKit/portSim";
 
 /** The Modern carrying costs (operating overhead and the condo hold-tax), on

@@ -18,7 +18,7 @@
  * engine lists with no evaluation (Eval) or with no rent level or No Rate
  * (Pricing) keeps its Edit look.
  */
-import type { FacilityKind } from "../../engine/types";
+import type { FacilityKind } from "../../shared/types";
 import type { EvalTier, RentTier, RoomTiers } from "../../simport/roomTiers";
 import type { UnitView } from "../../simport/view";
 import { floorsFor } from "./drawList";

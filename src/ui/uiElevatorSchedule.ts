@@ -1,8 +1,8 @@
 import type { UI } from "./UI";
 import { render } from "lit-html";
 import { elevatorScheduleTemplate, floorLabel, type FloorRow, type SchedCtx, type SchedState, type SchedHandlers } from "./templates/elevatorSchedule";
-import type { ElevatorSchedule } from "../engine/elevatorSchedule";
-import type { OriginRings } from "../engine/scheduleOrigins";
+import type { ElevatorSchedule } from "../shared/engineTypes";
+import type { OriginRings } from "../shared/engineTypes";
 import { SCHEDULE_HOURS } from "../simport/scheduleSlots";
 import { hotspotFloors, type ElevatorScheduleUX } from "./scheduleDialogRules";
 import type { AssistedPreset, AutoTuneProposal, PresetProposal, ScheduleFacts, SchedulePresetName } from "../simport/enginePort";

@@ -39,7 +39,7 @@
  * Switching views never pauses the game (the original's tinted views do;
  * whether ours should is a check on the PC reference, parity plan item 7).
  */
-import type { FacilityKind } from "../engine/types";
+import type { FacilityKind } from "../shared/types";
 import { NO_GESTURE } from "../game/appHistory";
 import { NO_ROOM_TIERS, type RoomTiers } from "../simport/roomTiers";
 import type { MapLayout } from "../render/overviewMap/geometry";
@@ -48,7 +48,7 @@ import type { MapPaintContext, PatternSource } from "../render/overviewMap/paint
 import { EVAL_LEGEND, paintTierMarks, PRICING_LEGEND, TierMarks, type TierRoom, type TierViewId } from "../render/overviewMap/tierView";
 import { DEFAULT_MAP_VIEW, type MapViewId } from "../render/overviewMap/views";
 import { HEAT_MODE_OF_VIEW, HeatMarks, OCCUPANCY_LEGEND, paintHeatMarks, TRAFFIC_LEGEND, type HeatCellView, type HeatViewId } from "../render/overviewMap/heatView";
-import type { HeatmapMode } from "../engine/sim/constants";
+import type { HeatmapMode } from "../shared/engineTypes";
 import type { MapDom } from "./overviewMapDom";
 import { MapLegend } from "./overviewMapLegend";
 import { MapViewPicker } from "./overviewMapPicker";

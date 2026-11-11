@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeAll, afterAll } from "vitest";
 import { FACILITIES } from "../engine/facilities";
 import { FLOOR, TILE } from "../render/scale";
-import type { Transport, Unit } from "../engine/types";
+import type { Transport, Unit } from "../shared/types";
 import { fakeContext, importRemovingWindowListeners } from "./spriteReviewPageHarness";
 
 /**

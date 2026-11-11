@@ -3,7 +3,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { isDeepStrictEqual } from "node:util";
 import type { Simulation } from "../../engine/Simulation";
-import type { Unit } from "../../engine/types";
+import type { Unit } from "../../shared/types";
 import { serviceDiagnostics } from "../../engine/port/reports";
 import { shaftCard } from "../../engine/port/queries";
 import { isCommercialKind } from "../../engine/facilities";

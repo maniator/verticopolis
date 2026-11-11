@@ -1,5 +1,5 @@
 import type { Tool } from "../ui/UI";
-import type { FacilityKind } from "../engine/types";
+import type { FacilityKind } from "../shared/types";
 import { catalogFacility, type Catalog } from "../catalog/catalogTypes";
 
 /**

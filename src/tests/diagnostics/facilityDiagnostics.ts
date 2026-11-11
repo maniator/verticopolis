@@ -11,9 +11,9 @@ import { commercialLobbyLines, hotelRatingLines, parkingDisplayLines, retailDisp
 import { recyclingLinesOf } from "../../game/recyclingDiagnostics";
 import { reachesLobby } from "../../engine/sim/gripe";
 import { gripeLineText, wontLeaseText } from "./gripeCopy";
-import { isOperational, isPresent } from "../../engine/types";
+import { isOperational, isPresent } from "../../shared/types";
 import { FAR_WALK_COPY, accessCopy, noRateCopy, lobbyWarningCopy, noticeCopy } from "../../ui/tenantDiagnosticCopy";
-import type { FacilityKind, Transport, Unit } from "../../engine/types";
+import type { FacilityKind, Transport, Unit } from "../../shared/types";
 import { towerCatalog } from "../../catalog/towerCatalog";
 import { hasAccessDiagnostic, transportLoadLines } from "../../game/cardLines";
 

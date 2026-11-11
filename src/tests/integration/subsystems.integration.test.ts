@@ -7,7 +7,7 @@ import type { ElevatorCalls } from "../../engine/Crowd";
 import { EconomySystem } from "../../engine/EconomySystem";
 import { ECON } from "../../engine/econConfig";
 import type { SimContext } from "../../engine/SimContext";
-import type { FacilityKind } from "../../engine/types";
+import type { FacilityKind } from "../../shared/types";
 
 /**
  * The engine subsystems extracted from Simulation are exercised here in

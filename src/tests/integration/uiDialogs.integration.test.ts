@@ -12,7 +12,7 @@ import { setMode } from "../../ui/uiStatus";
 import { Simulation } from "../../engine/Simulation";
 import { CLASSIC_RULES, MODERN_RULES } from "../../engine/gameRules";
 import type { ScheduleDialogCtx } from "../../ui/uiElevatorSchedule";
-import type { Unit } from "../../engine/types";
+import type { Unit } from "../../shared/types";
 import { toggleMute } from "../../game/audioPrefs";
 import { loadPrefs } from "../../storage/Prefs";
 import { unitEditor } from "../../game/cardKit.fixture";

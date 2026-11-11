@@ -2,7 +2,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { Simulation } from "../engine/Simulation";
-import type { SerializedGame } from "../engine/serializedGame";
+import type { SerializedGame } from "../shared/serializedGame";
 import { decodeVctower } from "../storage/vctowerContainer";
 import { calendarOf, clockOf, type ClockView } from "./headerClock";
 import { facilityFloors } from "../engine/facilities";

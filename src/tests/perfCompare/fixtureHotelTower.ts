@@ -1,6 +1,6 @@
 import { Simulation } from "../../engine/Simulation";
 import { FACILITIES } from "../../engine/facilities";
-import type { FacilityKind, Unit } from "../../engine/types";
+import type { FacilityKind, Unit } from "../../shared/types";
 import { must } from "./fixtureTowers";
 
 /**

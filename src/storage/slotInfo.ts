@@ -1,4 +1,4 @@
-import type { GameMode } from "../engine/types";
+import type { GameMode } from "../shared/types";
 
 /**
  * The slot-metadata shape the saves manager and the title screen's tower picker

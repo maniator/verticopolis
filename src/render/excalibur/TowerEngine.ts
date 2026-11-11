@@ -1,5 +1,5 @@
 import * as ex from "excalibur";
-import type { FacilityKind, SerializedView } from "../../engine/types";
+import type { FacilityKind, SerializedView } from "../../shared/types";
 import type { SimView, UnitView, TransportView } from "../../simport/view";
 import type { RenderSim } from "../renderSim";
 import { PinchTracker } from "../pinchTracker";

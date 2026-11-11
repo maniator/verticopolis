@@ -6,9 +6,9 @@ import { isElevatorKind } from "../engine/facilityPredicates";
 import { SCHEDULE_HOURS } from "../engine/elevatorSchedule";
 import { TsEngine } from "../engine/port/tsEngine";
 import { decodeVctower } from "../storage/vctowerContainer";
-import type { SerializedGame } from "../engine/types";
+import type { SerializedGame } from "../shared/types";
 import { scheduleFromSlots } from "../simport/scheduleSlots";
-import type { ElevatorSchedule } from "../engine/elevatorSchedule";
+import type { ElevatorSchedule } from "../shared/engineTypes";
 import {
   acknowledgementKey,
   isElevator,

@@ -1,6 +1,6 @@
 import { html, nothing, type TemplateResult } from "lit-html";
 import { live } from "lit-html/directives/live.js";
-import type { ElevatorSchedule } from "../../engine/elevatorSchedule";
+import type { ElevatorSchedule } from "../../shared/engineTypes";
 import type { ElevatorScheduleUX } from "../scheduleDialogRules";
 import type { AssistedPreset, AutoTuneStatus } from "../../simport/enginePort";
 // floorLabel is a DOM-free pure helper in its own module (so the schedule

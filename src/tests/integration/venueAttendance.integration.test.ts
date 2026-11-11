@@ -6,7 +6,7 @@ import { attendanceCap, censusCount, syncAttendanceOccupants, ALL_KINDS, FACILIT
 import { spawnFloors } from "../../engine/crowd/spawn";
 import { dwellSecondsRange, EAT_SECONDS_MIN, EAT_SECONDS_MAX, CROWD_SECONDS_PER_MINUTE } from "../../engine/crowd/person";
 import { pushVenueVisitOptions, spawnVenueVisit } from "../../engine/crowd/visits";
-import type { Unit } from "../../engine/types";
+import type { Unit } from "../../shared/types";
 
 /**
  * Venue people-routing regression suite (gdd-venue-people-routing-2026-07-14).

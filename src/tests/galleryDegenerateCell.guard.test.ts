@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeAll, afterAll } from "vitest";
-import type { Unit } from "../engine/types";
-import type { Transport } from "../engine/types";
+import type { Unit } from "../shared/types";
+import type { Transport } from "../shared/types";
 import { fakeContext, importRemovingWindowListeners } from "./spriteReviewPageHarness";
 
 /**

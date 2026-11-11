@@ -1,6 +1,6 @@
-import type { LogEntry } from "../engine/types";
+import type { LogEntry } from "../shared/types";
 import { catalogFacility, type Catalog } from "../catalog/catalogTypes";
-import type { FacilityKind, GameMode } from "../engine/types";
+import type { FacilityKind, GameMode } from "../shared/types";
 import type { EnginePort } from "../simport/enginePort";
 import type { PortCodes } from "../simport/portCodes";
 import { clockOf } from "../simport/headerClock";

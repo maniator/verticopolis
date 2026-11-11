@@ -3,7 +3,7 @@ import { newSeededGame } from "../fixtures/towerFixtures";
 import { Simulation } from "../../engine/Simulation";
 import { GRID } from "../../engine/facilities";
 import { rentOf } from "../../engine/econConfig";
-import type { SerializedGame, Unit } from "../../engine/types";
+import type { SerializedGame, Unit } from "../../shared/types";
 
 /**
  * The Classic/Modern pricing split (#299): the No Rate off-market state, the

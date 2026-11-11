@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Simulation } from "../engine/Simulation";
 import { TsEngine } from "../engine/port/tsEngine";
-import type { SerializedGame } from "../engine/types";
+import type { SerializedGame } from "../shared/types";
 import { decodeVctower } from "./vctowerContainer";
 import { engineSaveText, importObjection, looksLikeTowerSave, readSavedAt } from "./saveTextRead";
 import { stampText } from "./saveStamp";

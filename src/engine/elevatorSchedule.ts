@@ -1,40 +1,6 @@
-/**
- * A per-shaft manual elevator schedule (elevator-scheduling, #305). Every field
- * is optional so a sparse save stores only what the player set; an absent field
- * falls back to today's automatic behavior. Authored state, read deterministically
- * (no RNG). Defined here, the engine leaf, so the sim and (later) the TDT codec
- * share one definition; `types.ts` imports it for the `Transport.schedule` field.
- * See `_bmad-output/planning-artifacts/design/arch-elevator-scheduling-2026-07-16.md`.
- */
-export interface ElevatorSchedule {
-  /** Cars running each of the 24 hours, per day type. Each present row is a
-   *  length-24 array; entry `h` is clamped to `[0, cars]` on read. An absent row
-   *  (or hour) means "all cars run". */
-  activeCars?: { weekday?: number[]; weekend?: number[] };
-  /** Waiting Car Response: how many floors closer to a call an idle car must be
-   *  than the assigned car before it answers. Absent = the dispatcher default. */
-  waitingCarResponse?: number;
-  /** Standard Floor Departure: seconds a car holds at a served floor before it
-   *  departs. Absent = the global dwell default. */
-  standardFloorDeparture?: number;
-  /** Per-car home/waiting floor; index `i` is car `i`. An absent or short entry
-   *  falls back to the derived lowest-lobby idle floor. */
-  homeFloors?: number[];
-}
 
-/**
- * A shaft's measured hourly demand, split by day type (#466): one 24-slot ring
- * per day of EMA'd load fractions (0..1), so weekend samples never blend into
- * the weekday curve. A slot of 0 means "no positive sample yet": a genuinely
- * zero-load hour also reads 0, so consumers cannot tell the two apart (the
- * conflation is tracked as #474). Transient (never serialized): a fresh load
- * reads empty, never a fabricated curve.
- */
-export interface HourlyByDay {
-  weekday: number[];
-  weekend: number[];
-}
-
+import type { ElevatorSchedule, HourlyByDay } from "../shared/engineTypes";
+export type { ElevatorSchedule, HourlyByDay };
 /**
  * Which authoring affordances the schedule dialog shows (Phase 3). Returned by
  * the `GameRules.elevatorScheduleUX()` seam: Classic all-false except

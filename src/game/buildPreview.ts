@@ -1,5 +1,5 @@
 import type { GameApp } from "../main";
-import type { FacilityKind } from "../engine/types";
+import type { FacilityKind } from "../shared/types";
 import type { Picked } from "../render/excalibur/TowerEngine";
 import { catalogBuildKind, catalogFacility, catalogTileCost, type Catalog } from "../catalog/catalogTypes";
 import { brushTiles, snapX, type PlaceOutcome } from "../ui/placement";

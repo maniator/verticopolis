@@ -1,7 +1,7 @@
 import type { TemplateResult } from "lit-html";
 import { hotelConditionLines, housekeepingDisplayLines } from "../../game/portServiceDiagnostics";
 import type { Simulation } from "../../engine/Simulation";
-import type { Unit } from "../../engine/types";
+import type { Unit } from "../../shared/types";
 import { HK_MAIDS_PER_UNIT, HK_NOMINAL_ROOMS_PER_MAID, INFEST_DAYS } from "../../engine/economy/housekeeping";
 import { towerCatalog } from "../../catalog/towerCatalog";
 

@@ -1,7 +1,7 @@
 import { html, render } from "lit-html";
 import { facilityColor } from "../presentation/facilityPresentation";
 import { catalogFacility, type Catalog, type CatalogFacility } from "../catalog/catalogTypes";
-import type { FacilityCategory, FacilityKind } from "../engine/types";
+import type { FacilityCategory, FacilityKind } from "../shared/types";
 import type { Tool, UI } from "./UI";
 import { shortMoney } from "./format";
 import { iconTemplate } from "./icons";

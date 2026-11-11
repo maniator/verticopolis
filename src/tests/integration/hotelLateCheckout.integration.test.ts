@@ -5,7 +5,7 @@ import { FACILITIES } from "../../engine/facilities";
 import { rentOf, ECON } from "../../engine/econConfig";
 import { CLASSIC_RULES, MODERN_RULES } from "../../engine/ruleSets";
 import { HK_LATE_CHECKOUT_HOUR, HK_LATE_CHECKOUT_END } from "../../engine/EconomySystem";
-import type { GameMode } from "../../engine/types";
+import type { GameMode } from "../../shared/types";
 
 const HOTEL_POP = FACILITIES.hotelSingle.population;
 

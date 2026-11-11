@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import type { FacilityKind, UnitState } from "../../engine/types";
+import type { FacilityKind, UnitState } from "../../shared/types";
 import { FACILITY_PRESENTATION } from "../../presentation/facilityPresentation";
 import { SKY_HEADROOM_FLOORS } from "../cameraBounds";
 import { extentFloors, fitLayout, mapExtent } from "./geometry";

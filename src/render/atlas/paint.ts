@@ -1,4 +1,4 @@
-import type { FacilityKind, UnitState } from "../../engine/types";
+import type { FacilityKind, UnitState } from "../../shared/types";
 import type { UnitView, TransportView } from "../../simport/view";
 import type { PersonBuild } from "../pixelSprites/common";
 import { personFigure } from "../pixelSprites/common";

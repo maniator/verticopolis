@@ -2,7 +2,7 @@
 // catalog), and facility widths and names from the catalog itself (#921).
 import { viewWorld } from "../presentation/viewWorld";
 import { catalogBuildKind, catalogFacility, type Catalog } from "../catalog/catalogTypes";
-import type { FacilityKind } from "../engine/types";
+import type { FacilityKind } from "../shared/types";
 
 /**
  * Placement geometry and announce copy for the build tools — pure functions of

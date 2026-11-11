@@ -2,7 +2,7 @@ import { expect } from "vitest";
 import { facilityFloors } from "../engine/facilities";
 import { CALENDAR_CODES, KIND_CODES, MODE_CODES, VIEW_LAYOUT, codeOf } from "../engine/port/layout";
 import { Simulation } from "../engine/Simulation";
-import type { FacilityKind } from "../engine/types";
+import type { FacilityKind } from "../shared/types";
 import { newSeededGame } from "../tests/fixtures/towerFixtures";
 import type { EnginePort, PortRecord } from "./enginePort";
 import { ViewReader } from "./viewReader";

@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { Simulation } from "../../engine/Simulation";
 import { FACILITIES } from "../../engine/facilities";
-import type { SerializedGame } from "../../engine/serializedGame";
+import type { SerializedGame } from "../../shared/serializedGame";
 import { decodeVctower } from "../../storage/vctowerContainer";
 import { buildWinningTower } from "../fixtures/winningTower";
 import { buildHotelTower } from "./fixtureHotelTower";

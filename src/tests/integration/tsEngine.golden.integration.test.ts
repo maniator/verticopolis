@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { deflateSync } from "fflate";
 import { afterEach, describe, expect, it } from "vitest";
 import { Simulation } from "../../engine/Simulation";
-import type { SerializedGame } from "../../engine/serializedGame";
+import type { SerializedGame } from "../../shared/serializedGame";
 import { VIEW_LAYOUT, VIEW_LAYOUT_TEXT, codeOf, KIND_CODES } from "../../engine/port/layout";
 import { TsEngine } from "../../engine/port/tsEngine";
 import type { EnginePort } from "../../simport/enginePort";

@@ -1,7 +1,7 @@
 import { it, expect } from "vitest";
 import { newSeededGame, lay } from "../fixtures/towerFixtures";
 import { GRID } from "../../engine/facilities";
-import type { GameMode } from "../../engine/types";
+import type { GameMode } from "../../shared/types";
 import { PortSim, describeEngines, type Leg } from "../portKit/portSim";
 
 /** Household-aware condo departures (Modern only), on both engines. Moved from

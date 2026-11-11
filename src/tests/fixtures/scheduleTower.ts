@@ -1,5 +1,5 @@
 import { Simulation } from "../../engine/Simulation";
-import type { FacilityKind, GameMode } from "../../engine/types";
+import type { FacilityKind, GameMode } from "../../shared/types";
 
 /**
  * A measured tower for the schedule-authoring parity tests: the Rust engine's

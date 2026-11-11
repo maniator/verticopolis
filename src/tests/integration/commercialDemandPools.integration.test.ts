@@ -9,7 +9,7 @@ import { RNG } from "../../engine/rng";
 import { CLASSIC_RULES } from "../../engine/gameRules";
 import { ECON } from "../../engine/econConfig";
 import { GRID, FACILITIES } from "../../engine/facilities";
-import type { FacilityKind, GameMode, Unit } from "../../engine/types";
+import type { FacilityKind, GameMode, Unit } from "../../shared/types";
 import { facilityDiagnostics } from "../diagnostics/facilityDiagnostics";
 import { renderToFragment } from "../../ui/testing/litTestUtils";
 

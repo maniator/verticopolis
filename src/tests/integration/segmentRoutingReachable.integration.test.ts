@@ -6,7 +6,7 @@ import { Clock } from "../../engine/Clock";
 import { EconomySystem } from "../../engine/EconomySystem";
 import { computeDemandMap } from "../../engine/sim/demand";
 import { FACILITIES } from "../../engine/facilities";
-import type { Unit } from "../../engine/types";
+import type { Unit } from "../../shared/types";
 
 /**
  * Segment routing on a REACHABLE split floor (#647 fix round).

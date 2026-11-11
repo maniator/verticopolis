@@ -1,8 +1,5 @@
-import type { Person, PersonState } from "../engine/crowd/person";
-import type { EventSystem } from "../engine/EventSystem";
-import type { Simulation } from "../engine/Simulation";
-import type { Tower } from "../engine/Tower";
-import type { Transport, Unit, UnitState, WeatherKind } from "../engine/types";
+import type { Person, PersonState } from "../shared/engineTypes";
+import type { Transport, Unit, UnitState, WeatherKind } from "../shared/types";
 
 /**
  * The engine's per-frame read model, decoded from the flat number array
@@ -16,18 +13,30 @@ export const PERSON_STATES: readonly PersonState[] = ["toShaft", "waiting", "rid
 export const UNIT_STATES: readonly UnitState[] = ["construction", "empty", "occupied", "moving_in", "vacating", "asleep", "dirty", "infested", "fire", "gutted"];
 export const WEATHERS: readonly WeatherKind[] = ["clear", "cloudy", "rain"];
 
-/** The header: the Simulation fields the engine sends every frame, named as
- *  the instance names them so a merge is a plain assignment, plus the tower
+/** The header: the tower fields the engine sends every frame, named as the
+ *  read model names them so a merge is a plain assignment, plus the tower
  *  revisions, the log cursor, and the record counts that follow. */
-export type FrameHeader = Pick<Simulation, "money" | "star" | "weather" | "santaFxSeq" | "explosionFx" | "thiefFx" | "treasureFx" | "vipFxSeq" | "onHourRuns" | "logSeq"> &
-  Pick<Tower, "revision" | "mealOverlayRevision"> & {
-    minutes: number;
-    counts: EventSystem["counts"];
-    pending: boolean;
-    people: number;
-    units: number;
-    transports: number;
-  };
+export interface FrameHeader {
+  money: number;
+  /** 1 to 5 stars, 6 for TOWER. */
+  star: number;
+  weather: WeatherKind;
+  santaFxSeq: number;
+  explosionFx: { floor: number; x: number; seq: number };
+  thiefFx: { caught: boolean; floor: number; seq: number };
+  treasureFx: { floor: number; x: number; seq: number };
+  vipFxSeq: number;
+  onHourRuns: number;
+  logSeq: number;
+  revision: number;
+  mealOverlayRevision: number;
+  minutes: number;
+  counts: { fires: number; firesGutRooms: number; bombs: number };
+  pending: boolean;
+  people: number;
+  units: number;
+  transports: number;
+}
 
 /** The fixed slots of a person record, before its route (`floors`, then
  *  `shafts`); mirrors `PERSON_FIXED` in `engine-rs/src/frame.rs`. */

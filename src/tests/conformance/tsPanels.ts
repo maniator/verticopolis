@@ -1,4 +1,5 @@
-import { isNearCapacity, type HeatmapMode } from "../../engine/sim/constants";
+import { isNearCapacity } from "../../engine/sim/constants";
+import type { HeatmapMode } from "../../shared/engineTypes";
 import type { Simulation } from "../../engine/Simulation";
 import { catalogFacility } from "../../catalog/catalogTypes";
 import { householdMix } from "../../engine/households";

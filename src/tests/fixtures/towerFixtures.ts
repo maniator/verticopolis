@@ -1,6 +1,6 @@
 import { Simulation } from "../../engine/Simulation";
 import { GRID } from "../../engine/facilities";
-import type { Unit } from "../../engine/types";
+import type { Unit } from "../../shared/types";
 
 /**
  * Shared tower-construction helpers for integration fixtures. Every one

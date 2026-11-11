@@ -5,7 +5,7 @@ import { GRID } from "../../engine/facilities";
 import { HK_CLEAN_MINUTES, HK_MAIDS_PER_UNIT } from "../../engine/economy/housekeeping";
 import { maxStaffFor } from "../../engine/crowd/spawn";
 import { CROWD_SECONDS_PER_MINUTE } from "../../engine/Crowd";
-import type { GameMode } from "../../engine/types";
+import type { GameMode } from "../../shared/types";
 
 /**
  * Time-simulated maids (housekeeping-overhaul GDD, epic 2): the canon shift

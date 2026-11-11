@@ -5,7 +5,7 @@ import type { EnginePort } from "../../simport/enginePort";
 import { PortCodes } from "../../simport/portCodes";
 import { ViewReader } from "../../simport/viewReader";
 import { facilityFloors } from "../../engine/facilities";
-import type { FacilityKind, GameMode } from "../../engine/types";
+import type { FacilityKind, GameMode } from "../../shared/types";
 import { catalogFacility, catalogTileCost, type Catalog } from "../../catalog/catalogTypes";
 import { catalogOf, isUnlocked, quoteBuild } from "../../game/portAccess";
 import { BuildActions } from "../../game/buildActions";

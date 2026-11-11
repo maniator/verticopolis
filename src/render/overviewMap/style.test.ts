@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import type { FacilityKind } from "../../engine/types";
+import type { FacilityKind } from "../../shared/types";
 import { FACILITY_PRESENTATION } from "../../presentation/facilityPresentation";
 import { GROUP_PATTERN, KIND_GROUP, SHAFT_FILL, UNKNOWN_KIND_STYLE, contrastRatio, hexLuminance, mapStyleFor, patternInk, type MapGroup } from "./style";
 import { MAP_BACKDROP } from "./viewMark";

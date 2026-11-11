@@ -1,4 +1,4 @@
-import type { FacilityKind } from "../../engine/types";
+import type { FacilityKind } from "../../shared/types";
 import { FACILITIES } from "../../engine/facilitiesData";
 
 /** Field types: "int" a whole number, "u32" a whole number from 0 to

@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { afterEach, describe, expect, it } from "vitest";
 import { Simulation } from "../../engine/Simulation";
-import type { SerializedGame } from "../../engine/serializedGame";
+import type { SerializedGame } from "../../shared/serializedGame";
 import { stateView } from "../../engine/conformanceView";
 import { digest } from "../conformance/canonical";
 import { TsEngine } from "../../engine/port/tsEngine";

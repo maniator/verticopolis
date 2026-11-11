@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { FacilityKind, Unit } from "../../engine/types";
+import type { FacilityKind, Unit } from "../../shared/types";
 import { FACILITIES } from "../../engine/facilities";
 import { drawRoom } from "../pixelSprites";
 import { FLOOR, TILE } from "../scale";

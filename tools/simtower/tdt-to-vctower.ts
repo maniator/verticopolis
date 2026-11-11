@@ -16,7 +16,7 @@ import { basename } from "node:path";
 import { deflateSync } from "fflate";
 import { buildTDT, parseTDT } from "../../src/tests/conformance/tdtWasm";
 import { SAVE_VERSION } from "../../src/engine/saveMigration";
-import type { SerializedGame } from "../../src/engine/types";
+import type { SerializedGame } from "../../src/shared/types";
 
 function toVctower(save: unknown) {
   const json = new TextEncoder().encode(JSON.stringify(save));

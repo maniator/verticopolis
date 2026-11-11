@@ -1,5 +1,5 @@
 import { catalogBuildKind, catalogFacility, catalogTileCost, type Catalog } from "../catalog/catalogTypes";
-import type { FacilityKind } from "../engine/types";
+import type { FacilityKind } from "../shared/types";
 import type { Picked } from "../render/excalibur/TowerEngine";
 import type { UI } from "../ui/UI";
 import type { AudioEngine } from "../audio/Audio";

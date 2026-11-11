@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { drawTransport } from "./sprites";
-import type { Transport } from "../engine/types";
+import type { Transport } from "../shared/types";
 
 /**
  * Regression tests for the stairway/escalator flight geometry: a transport

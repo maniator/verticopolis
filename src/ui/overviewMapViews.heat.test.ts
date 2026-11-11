@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
-import type { HeatmapMode } from "../engine/sim/constants";
-import type { FacilityKind } from "../engine/types";
+import type { HeatmapMode } from "../shared/engineTypes";
+import type { FacilityKind } from "../shared/types";
 import { SKY_HEADROOM_FLOORS } from "../render/cameraBounds";
 import { extentFloors, fitLayout, mapExtent } from "../render/overviewMap/geometry";
 import type { HeatCellView } from "../render/overviewMap/heatView";

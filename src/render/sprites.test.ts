@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import type { Unit } from "../engine/types";
+import type { Unit } from "../shared/types";
 import { AMUSEMENTS_SUBTYPES, BOUTIQUE_SUBTYPES, CLINIC_SUBTYPES, FASTFOOD_SUBTYPES, FITNESS_SUBTYPES, RESTAURANT_SUBTYPES, SHOP_SUBTYPES } from "../engine/retailSubtypes";
 import {
   drawUnit,

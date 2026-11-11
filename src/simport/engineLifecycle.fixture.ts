@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { Simulation } from "../engine/Simulation";
 import { towerStateSig } from "../engine/UndoHistory";
-import type { SerializedGame } from "../engine/types";
+import type { SerializedGame } from "../shared/types";
 import { MID, newSeededGame } from "../tests/fixtures/towerFixtures";
 import { UNDO_NOTHING_TO_STEP, type EnginePort, type PortRecord } from "./enginePort";
 import {

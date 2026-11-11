@@ -20,7 +20,7 @@
 import { describe, expect, it } from "vitest";
 import type { Engine } from "../../dualrun/engine";
 import { Simulation } from "../../engine/Simulation";
-import type { SerializedGame } from "../../engine/types";
+import type { SerializedGame } from "../../shared/types";
 import { canonicalJson } from "../conformance/canonical";
 import { hasWasmPackage, wasm, wasmRequired } from "../conformance/wasmEngine";
 

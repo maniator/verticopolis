@@ -1,5 +1,5 @@
 import { html, nothing, type TemplateResult } from "lit-html";
-import type { PriceRung } from "../../engine/gameRules";
+import type { PriceRung } from "../../shared/engineTypes";
 import { groupDigits } from "../format";
 
 /**

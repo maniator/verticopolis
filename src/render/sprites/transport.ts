@@ -1,6 +1,6 @@
 import { isElevatorKind } from "../../presentation/viewKinds";
 import { facilityColor } from "../../presentation/facilityPresentation";
-import type { FacilityKind } from "../../engine/types";
+import type { FacilityKind } from "../../shared/types";
 import type { TransportView } from "../../simport/view";
 import { personRider } from "../pixelSprites/common";
 import { layerBreak, layerEnd } from "../pixelSprites/layers";

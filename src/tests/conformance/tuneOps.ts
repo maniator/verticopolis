@@ -1,4 +1,4 @@
-import type { FacilityKind } from "../../engine/types";
+import type { FacilityKind } from "../../shared/types";
 import type { At, Outcome, ScenarioEngine, Spec } from "./scenario";
 
 /**

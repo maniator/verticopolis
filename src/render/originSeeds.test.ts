@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { facilityFloors } from "../engine/facilities";
-import type { FacilityKind, Unit } from "../engine/types";
+import type { FacilityKind, Unit } from "../shared/types";
 import { OFFSETS, crop, paintAt, paintPastSeam, parseColor, rasterCtx, tail, unitOf } from "../tests/originSeedsHarness";
 import { skylineWindowLit } from "./pixelSprites/skyBar";
 import { FLOOR, TILE } from "./scale";

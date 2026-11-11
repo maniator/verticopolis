@@ -1,6 +1,6 @@
 import { censusCount } from "../../engine/census";
 import { isHotelKind } from "../../engine/facilities";
-import { isPresent, isTenanted, type Unit } from "../../engine/types";
+import { isPresent, isTenanted, type Unit } from "../../shared/types";
 
 /** The HUD's room counts as `stats()` computed them before it read the rooms
  *  list or kept counts: a walk over every unit, the population summed over

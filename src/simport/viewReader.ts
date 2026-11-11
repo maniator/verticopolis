@@ -1,6 +1,6 @@
-import type { FacilityKind, GameMode, UnitState, WeatherKind } from "../engine/types";
-import type { CalendarKind } from "../engine/calendar";
-import type { PersonState } from "../engine/crowd/person";
+import type { FacilityKind, GameMode, UnitState, WeatherKind } from "../shared/types";
+import type { CalendarKind } from "../shared/engineTypes";
+import type { PersonState } from "../shared/engineTypes";
 import type { EnginePort } from "./enginePort";
 import { EmergencyReads } from "./emergencyReads";
 import type {

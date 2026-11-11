@@ -1,8 +1,8 @@
 import { isElevatorKind, isHotelKind } from "../presentation/viewKinds";
 import { catalogFacility } from "../catalog/catalogTypes";
 import { priceOptionsFor } from "../ui/catalogPricing";
-import type { FacilityKind } from "../engine/types";
-import type { BatchRentResult } from "../engine/sim/constants";
+import type { FacilityKind } from "../shared/types";
+import type { BatchRentResult } from "../shared/engineTypes";
 import type { UI } from "../ui/UI";
 import type { AudioEngine } from "../audio/Audio";
 import type { BuildActions } from "./buildActions";

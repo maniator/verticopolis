@@ -1,4 +1,4 @@
-import type { VacateReason } from "../engine/types";
+import type { VacateReason } from "../shared/types";
 import { VACATE_REASON_TEXT } from "../shared/vacateReasonText";
 import { groupDigits } from "./format";
 

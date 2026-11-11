@@ -7,7 +7,7 @@ import { PortCodes } from "../simport/portCodes";
 import { ViewReader } from "../simport/viewReader";
 import { onHistoryClick, setHistoryButtons, toast, update, type HudSource } from "./uiStatus";
 import type { Catalog } from "../catalog/catalogTypes";
-import type { GameMode } from "../engine/types";
+import type { GameMode } from "../shared/types";
 import type { UI } from "./UI";
 import { useGermanDefaultLocale } from "../tests/localeStub";
 

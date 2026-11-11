@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { clampCameraY, fitZoom, FIT_SKY_FLOORS, MIN_FIT_SPAN_FLOORS, MAX_FIT_ZOOM, SKY_HEADROOM_FLOORS } from "./cameraBounds";
-import { VIEW_ZOOM_MIN } from "../engine/types";
+import { VIEW_ZOOM_MIN } from "../shared/types";
 import { GRID } from "../engine/facilities";
 import { CRANE_H } from "./sprites/structure/rooftop";
 // Pull the buildable bounds from the real GRID and FLOOR from the pure

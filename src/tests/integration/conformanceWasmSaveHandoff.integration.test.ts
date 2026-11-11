@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Simulation } from "../../engine/Simulation";
-import type { SerializedGame } from "../../engine/types";
+import type { SerializedGame } from "../../shared/types";
 import { parseSaveJson } from "../../storage/saveCompression";
 import { canonicalJson } from "../conformance/canonical";
 import { hasWasmPackage, wasm, wasmRequired } from "../conformance/wasmEngine";

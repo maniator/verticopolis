@@ -5,8 +5,8 @@ import { Tower } from "../../engine/Tower";
 import { Crowd } from "../../engine/Crowd";
 import { Simulation } from "../../engine/Simulation";
 import { dominantGripe, reachesLobby } from "../../engine/sim/gripe";
-import { VACATE_REASON_TEXT } from "../../engine/types";
-import type { SerializedGame } from "../../engine/types";
+import { VACATE_REASON_TEXT } from "../../shared/types";
+import type { SerializedGame } from "../../shared/types";
 
 /**
  * Contiguous-floor-SEGMENT pedestrian pathfinding (#647).

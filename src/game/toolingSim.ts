@@ -2,7 +2,7 @@ import { Simulation } from "../engine/Simulation";
 import { TsEngine } from "../engine/port/tsEngine";
 import { catalogFor } from "../engine/catalog";
 import { useTowerCatalogSource } from "../catalog/towerCatalog";
-import type { FacilityKind } from "../engine/types";
+import type { FacilityKind } from "../shared/types";
 import type { EnginePort, PortRecord } from "../simport/enginePort";
 import type { PortRenderSim } from "../simport/portRenderSim";
 import { newRenderSim } from "./portAccess";

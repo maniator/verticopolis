@@ -7,7 +7,7 @@ import {
 } from "../fixtures/towerFixtures";
 import { ECON } from "../../engine/econConfig";
 import { GRID } from "../../engine/facilities";
-import type { SerializedGame } from "../../engine/types";
+import type { SerializedGame } from "../../shared/types";
 import { PortSim, describeEngines, type Leg } from "../portKit/portSim";
 
 /** The Classic condo price rules that need a price written mid-run, on both

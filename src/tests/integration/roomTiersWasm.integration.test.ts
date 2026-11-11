@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { facilityFloors } from "../../engine/facilities";
-import type { GameMode, UnitState } from "../../engine/types";
+import type { GameMode, UnitState } from "../../shared/types";
 import type { EnginePort, PortRecord } from "../../simport/enginePort";
 import { EVAL_TIERS, RENT_TIERS, RoomTierReader, type EvalTier, type RentTier, type RoomTiers } from "../../simport/roomTiers";
 import { ViewReader } from "../../simport/viewReader";

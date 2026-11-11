@@ -11,7 +11,7 @@
  * Traffic and Occupancy views read its heat cells through the renderer's sim.
  */
 import type { GameApp } from "../main";
-import type { FacilityKind } from "../engine/types";
+import type { FacilityKind } from "../shared/types";
 import { findViewKind } from "../presentation/viewKinds";
 import { NO_ROOM_TIERS, RoomTierReader, type RoomTiers } from "../simport/roomTiers";
 import { FLOOR, TILE } from "../render/scale";

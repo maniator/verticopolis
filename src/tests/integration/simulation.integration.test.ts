@@ -4,8 +4,8 @@ import { Simulation, ECON, VACATE_RESCIND } from "../../engine/Simulation";
 import { rentOf } from "../../engine/econConfig";
 import { ElevatorDispatch } from "../../engine/ElevatorDispatch";
 import { FACILITIES, GRID } from "../../engine/facilities";
-import type { FacilityKind, SerializedUnit, Unit } from "../../engine/types";
-import { isOperational } from "../../engine/types";
+import type { FacilityKind, SerializedUnit, Unit } from "../../shared/types";
+import { isOperational } from "../../shared/types";
 import { SHOP_SUBTYPES } from "../../engine/retailSubtypes";
 
 describe("Rent / price controls", () => {

@@ -8,7 +8,7 @@ import { RNG } from "../../engine/rng";
 import { ECON } from "../../engine/econConfig";
 import { CLASSIC_RULES, MODERN_RULES } from "../../engine/gameRules";
 import type { SimContext } from "../../engine/SimContext";
-import type { FacilityKind } from "../../engine/types";
+import type { FacilityKind } from "../../shared/types";
 
 /** A day-N clock on a given calendar. Clock treats minutes===0 as 07:00 day 0,
  *  so seed a day from its minute count (day 0 uses a tiny non-zero offset). */

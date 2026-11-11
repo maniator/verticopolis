@@ -1,6 +1,6 @@
 import type { Simulation } from "./engine/Simulation";
 import { createAppHistory, type AppHistory } from "./game/appHistory";
-import type { FacilityKind } from "./engine/types";
+import type { FacilityKind } from "./shared/types";
 import type { TransportView, UnitView } from "./simport/view";
 import { TowerEngine, type Picked } from "./render/excalibur/TowerEngine";
 import { AudioEngine } from "./audio/Audio";

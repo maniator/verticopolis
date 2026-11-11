@@ -1,4 +1,6 @@
 import type { GameMode } from "./types";
+import type { CalendarKind } from "../shared/engineTypes";
+export type { CalendarKind };
 
 /**
  * Calendar model: the lengths of a week, quarter and year, plus the weekend
@@ -38,9 +40,6 @@ export interface Calendar {
    */
   readonly maintPeriodDays: number;
 }
-
-/** A calendar identity. Also the value persisted for a Modern tower's choice. */
-export type CalendarKind = "canon" | "realWorld";
 
 /**
  * The real 1994 SimTower calendar. Weekend is the LAST of the 3 day-slots

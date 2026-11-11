@@ -4,8 +4,8 @@ import { TUNE_OPS, applyTune, expectOk, expectOutcome, type TuneCommand } from "
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Simulation } from "../../engine/Simulation";
-import type { FacilityKind, GameMode } from "../../engine/types";
-import type { SerializedGame } from "../../engine/serializedGame";
+import type { FacilityKind, GameMode } from "../../shared/types";
+import type { SerializedGame } from "../../shared/serializedGame";
 import { decodeVctower } from "../../storage/vctowerContainer";
 import { markFounderFromLoadedFile } from "../../engine/sim/founderStatus";
 import { rentOf } from "../../engine/econConfig";

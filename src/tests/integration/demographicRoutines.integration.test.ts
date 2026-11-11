@@ -4,8 +4,8 @@ import { Clock } from "../../engine/Clock";
 import { CROWD_SECONDS_PER_MINUTE } from "../../engine/Crowd";
 import { ECON } from "../../engine/econConfig";
 import { FACILITIES } from "../../engine/facilities";
-import type { FacilityKind, Unit } from "../../engine/types";
-import type { Person } from "../../engine/crowd/person";
+import type { FacilityKind, Unit } from "../../shared/types";
+import type { Person } from "../../shared/engineTypes";
 import {
   SCHOOL_RUN_DEPART_START,
   SCHOOL_RUN_DEPART_END,

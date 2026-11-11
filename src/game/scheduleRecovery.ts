@@ -1,5 +1,5 @@
-import type { FacilityKind } from "../engine/types";
-import type { ElevatorSchedule } from "../engine/elevatorSchedule";
+import type { FacilityKind } from "../shared/types";
+import type { ElevatorSchedule } from "../shared/engineTypes";
 
 /**
  * Older towers can hold an elevator with more cars than its schedule runs:

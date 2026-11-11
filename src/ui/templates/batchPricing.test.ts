@@ -12,7 +12,8 @@ import {
   type BatchRungState,
   type BatchRungHandlers,
 } from "./batchPricing";
-import { CLASSIC_RULES, type PriceRung } from "../../engine/gameRules";
+import { CLASSIC_RULES } from "../../engine/gameRules";
+import type { PriceRung } from "../../shared/engineTypes";
 import type { BatchRentResult } from "../../engine/Simulation";
 import { renderToFragment, click, change, input } from "../testing/litTestUtils";
 

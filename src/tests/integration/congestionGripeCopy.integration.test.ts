@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Simulation } from "../../engine/Simulation";
 import { GRID } from "../../engine/facilities";
-import type { FacilityKind, Unit } from "../../engine/types";
+import type { FacilityKind, Unit } from "../../shared/types";
 import { spatialCongestionAttributionByFloor } from "../../engine/sim/congestion";
 import { gripeLineText } from "../diagnostics/gripeCopy";
 

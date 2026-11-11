@@ -35,7 +35,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import type { Engine, encodeVctower } from "../../dualrun/engine";
 import { Simulation } from "../../engine/Simulation";
-import type { SerializedGame } from "../../engine/types";
+import type { SerializedGame } from "../../shared/types";
 import { importTower } from "../fixtures/saveText";
 import { MAX_SAVE_INFLATED_BYTES, STORE_MAGIC, TOWER_FILE_MAGIC, fromBase64, inflateCapped, parseSaveJson } from "../../storage/saveCompression";
 import { decodeVctower } from "../../storage/vctowerContainer";

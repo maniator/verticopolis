@@ -6,7 +6,7 @@ import ownersSave from "../../../conformance/fixtures/split-tower-4.vctower?raw"
 import starFour from "../../../conformance/fixtures/towerone-star4.vctower?raw";
 import { FACILITIES } from "../../engine/facilities";
 import { isCommercialKind } from "../../engine/facilityPredicates";
-import type { FacilityKind, SerializedGame, Unit } from "../../engine/types";
+import type { FacilityKind, SerializedGame, Unit } from "../../shared/types";
 import { PortCodes } from "../../simport/portCodes";
 import { walkedStats } from "../fixtures/walkedStats";
 import { PortSim, describeEngines, type Leg } from "../portKit/portSim";

@@ -3,7 +3,7 @@ import { newSeededGame } from "../fixtures/towerFixtures";
 import { Simulation } from "../../engine/Simulation";
 import { GRID } from "../../engine/facilities";
 import { HK_MAIDS_PER_UNIT, HK_NOMINAL_ROOMS_PER_MAID, INFEST_DAYS } from "../../engine/economy/housekeeping";
-import type { FacilityKind, GameMode, Unit } from "../../engine/types";
+import type { FacilityKind, GameMode, Unit } from "../../shared/types";
 
 /**
  * The cockroach infestation lifecycle and its recovery paths (see

@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { Simulation } from "../../engine/Simulation";
-import type { SerializedGame } from "../../engine/serializedGame";
+import type { SerializedGame } from "../../shared/serializedGame";
 import { markFounderFromLoadedFile } from "../../engine/sim/founderStatus";
 import { decodeVctower } from "../../storage/vctowerContainer";
 import { REPO_ROOT } from "./scenario";

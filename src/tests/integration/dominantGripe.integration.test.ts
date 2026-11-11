@@ -5,7 +5,7 @@ import { dominantGripe, vacateCause, unmetCoverage } from "../../engine/sim/grip
 import type { DemandMap } from "../../engine/sim/demand";
 import { UNMET_DEMAND_FLOOR } from "../../engine/sim/constants";
 import { GRID } from "../../engine/facilities";
-import type { FacilityKind, Unit } from "../../engine/types";
+import type { FacilityKind, Unit } from "../../shared/types";
 import { facilityDiagnostics } from "../diagnostics/facilityDiagnostics";
 import { gripeLineText } from "../diagnostics/gripeCopy";
 import { renderToFragment } from "../../ui/testing/litTestUtils";

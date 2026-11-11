@@ -4,7 +4,7 @@ import { catalogFor } from "../../engine/catalog";
 import { Simulation } from "../../engine/Simulation";
 import { FACILITIES, GRID, isFixedSpanTransport } from "../../engine/facilities";
 import { ECON, rentOf, carResaleRefund, resaleRefund } from "../../engine/econConfig";
-import type { FacilityKind, Transport, Unit } from "../../engine/types";
+import type { FacilityKind, Transport, Unit } from "../../shared/types";
 import type { Picked, TowerEngine } from "../../render/excalibur/TowerEngine";
 import type { Tool } from "../../ui/UI";
 import { unitEditor, transportEditor, editorPortDeps, inspectorPortDeps } from "../../game/cardKit.fixture";

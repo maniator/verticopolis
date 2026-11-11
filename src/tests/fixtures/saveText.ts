@@ -2,7 +2,7 @@ import { Simulation } from "../../engine/Simulation";
 import { facilityFloors } from "../../engine/facilities";
 import { TsEngine } from "../../engine/port/tsEngine";
 import { markFounderFromLoadedFile } from "../../engine/sim/founderStatus";
-import type { SerializedGame } from "../../engine/types";
+import type { SerializedGame } from "../../shared/types";
 import { SaveGame } from "../../storage/SaveGame";
 import { loadStored } from "../../game/portLifecycle";
 import type { SaveLoadDeps } from "../../game/saveLoad";

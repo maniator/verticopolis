@@ -1,5 +1,5 @@
 import { SKYLINE_FILLS } from "../sceneryLayout";
-import type { FacilityKind } from "../../engine/types";
+import type { FacilityKind } from "../../shared/types";
 import type { PersonBuild } from "../pixelSprites/common";
 import { BUILDS as FIGURE_BUILDS, SHIRTS, moodTint } from "../pixelSprites/common";
 import { FLOOR, TILE } from "../scale";

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { CATALOG_VERSION, catalogFor } from "../engine/catalog";
-import type { GameMode } from "../engine/types";
+import type { GameMode } from "../shared/types";
 import { readCatalog } from "./catalog";
 
 const reply = (text: string) => ({ catalog: () => text });

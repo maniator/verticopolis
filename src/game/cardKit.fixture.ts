@@ -3,7 +3,7 @@ import { facilityFloors } from "../engine/facilities";
 import type { Simulation } from "../engine/Simulation";
 import { TsEngine } from "../engine/port/tsEngine";
 import { towerCatalog } from "../catalog/towerCatalog";
-import type { Transport, Unit } from "../engine/types";
+import type { Transport, Unit } from "../shared/types";
 import { clockOf } from "../simport/headerClock";
 import { PortCodes } from "../simport/portCodes";
 import { ViewReader } from "../simport/viewReader";

@@ -6,7 +6,7 @@ import towerFile from "../../../conformance/fixtures/sixseven_2.vctower?raw";
 import { Simulation } from "../../engine/Simulation";
 import { SAVE_VERSION, migrateSave, upgradeV4toV5 } from "../../engine/saveMigration";
 import { FACILITIES, GRID, isElevatorKind } from "../../engine/facilities";
-import type { SerializedGame, Transport } from "../../engine/types";
+import type { SerializedGame, Transport } from "../../shared/types";
 
 /** Decode a `.vctower` container (magic line + base64 deflate-raw JSON). */
 function decodeVctower(text: string): SerializedGame {

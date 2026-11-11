@@ -2,7 +2,7 @@ import { html, nothing, type TemplateResult } from "lit-html";
 import { catalogBuildKind, catalogFacility, catalogTileCost, type Catalog } from "../../catalog/catalogTypes";
 import { isCommercialKind } from "../../presentation/viewKinds";
 import { facilityDescription } from "../../presentation/facilityPresentation";
-import type { FacilityKind } from "../../engine/types";
+import type { FacilityKind } from "../../shared/types";
 import { groupDigits } from "../format";
 
 /**

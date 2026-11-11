@@ -1,4 +1,4 @@
-import type { SerializedView } from "../engine/types";
+import type { SerializedView } from "../shared/types";
 import type { EnginePort, PortRecord } from "../simport/enginePort";
 import { engineTrapped, noteEngineThrow } from "./engineFault";
 

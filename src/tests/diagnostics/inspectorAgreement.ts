@@ -1,5 +1,5 @@
 import type { Simulation } from "../../engine/Simulation";
-import { VACATE_REASON_TEXT, type Unit } from "../../engine/types";
+import { VACATE_REASON_TEXT, type Unit } from "../../shared/types";
 import { groupDigits } from "../../ui/format";
 import { facilityDiagnostics } from "./facilityDiagnostics";
 import { gripeLineText } from "./gripeCopy";

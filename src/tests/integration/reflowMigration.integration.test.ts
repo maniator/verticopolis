@@ -5,7 +5,7 @@ import towerFile from "../../../conformance/fixtures/towerone_6.vctower?raw";
 import { Simulation } from "../../engine/Simulation";
 import { SAVE_VERSION, floatingStructureCount, reflowV1toV2 } from "../../engine/saveMigration";
 import { FACILITIES, facilityFloors } from "../../engine/facilities";
-import type { SerializedGame, Unit } from "../../engine/types";
+import type { SerializedGame, Unit } from "../../shared/types";
 
 /** Decode a `.vctower` container (magic line + base64 deflate-raw JSON) with
  *  fflate — synchronous and env-agnostic (no DecompressionStream needed). */
