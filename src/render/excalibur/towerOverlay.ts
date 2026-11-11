@@ -3,11 +3,11 @@ import { isElevatorKind } from "../../presentation/viewKinds";
 import { catalogFacility } from "../../catalog/catalogTypes";
 import { towerCatalog } from "../../catalog/towerCatalog";
 import { viewWorld } from "../../presentation/viewWorld";
-import type { BombSearchGuard, TransportView } from "../../simport/view";
+import type { BombSearchGuard, TransportView, UnitView } from "../../simport/view";
 import { drawExplosion, drawSearchGuard, drawThief, drawTreasure, drawVipLimo } from "../sprites/events";
 import { FLOOR, TILE } from "../scale";
 import type { ScreenRect } from "./towerInputCamera";
-import type { TowerEngine } from "./TowerEngine";
+import type { ThiefSpan, TowerEngine } from "./TowerEngine";
 import { drawShaftNumbers } from "./towerShaftNumbers";
 
 /**
@@ -41,6 +41,7 @@ export function setReducedMotion(engine: TowerEngine, on: boolean): void {
     engine.explosions = [];
     engine.thiefStart = null;
     engine.thiefCaught = false;
+    engine.thiefSpan = null;
     engine.treasures = [];
     engine.vipStart = null;
   }
@@ -90,10 +91,13 @@ export function syncEventFx(engine: TowerEngine, animating: boolean): void {
   }
   if (engine.sim.thiefFx.seq !== engine.lastThiefSeq) {
     engine.lastThiefSeq = engine.sim.thiefFx.seq;
-    if (animating) {
+    // He runs the floor's rooms; a floor with none has nowhere to prowl.
+    const span = animating ? floorRoomSpan(engine.sim.tower.units, engine.sim.thiefFx.floor) : null;
+    if (span) {
       engine.thiefStart = engine.d.anim;
       engine.thiefCaught = engine.sim.thiefFx.caught;
       engine.thiefFloor = engine.sim.thiefFx.floor;
+      engine.thiefSpan = span;
     }
   }
   if (engine.sim.treasureFx.seq !== engine.lastTreasureSeq) {
@@ -260,16 +264,37 @@ function renderVip(engine: TowerEngine, ctx: CanvasRenderingContext2D): void {
   drawVipLimo(ctx, x, groundSy, Math.max(0.9, engine.cam.zoom));
 }
 
-/** A thief slinking along a tower floor (a guard trails him if caught). He
- *  sweeps left→right across the viewport, but his feet are pinned to the
- *  floor he's prowling (world-space Y, like the VIP limo), so he walks the
- *  tower and scrolls with the camera instead of floating at mid-screen. */
+/** The tile span of the rooms on `floor` (left edge, right edge), or null
+ *  when it has none. Bare floor and lobby tiles do not count, the same span
+ *  the bomb search's guards walk. One pass over the units, made once when a
+ *  thief appears (at most once a game day), never per frame. */
+export function floorRoomSpan(units: ReadonlyArray<Pick<UnitView, "kind" | "floor" | "x" | "width">>, floor: number): ThiefSpan | null {
+  let span: ThiefSpan | null = null;
+  for (const u of units) {
+    if (u.floor !== floor || u.kind === "floor" || u.kind === "lobby") continue;
+    if (!span) span = { left: u.x, right: u.x + u.width };
+    else span = { left: Math.min(span.left, u.x), right: Math.max(span.right, u.x + u.width) };
+  }
+  return span;
+}
+
+/** Where the thief is, in tiles, a fraction `p` of the way through his run:
+ *  he comes off the emergency stairs just left of the floor's rooms (where
+ *  the guards climb) and runs the rooms to their right edge. */
+export function thiefX(span: ThiefSpan, p: number): number {
+  const from = span.left - 1;
+  return from + (span.right - from) * Math.min(1, Math.max(0, p));
+}
+
+/** A thief running along the floor he's prowling (a guard trails him if
+ *  caught), in world space: feet on that floor, from the emergency stairs at
+ *  the left of its rooms to their right edge, scrolling with the camera. */
 function renderThief(engine: TowerEngine, ctx: CanvasRenderingContext2D): void {
-  if (engine.thiefStart === null) return;
+  if (engine.thiefStart === null || engine.thiefSpan === null) return;
   const p = (engine.d.anim - engine.thiefStart) / THIEF_RUN_SECONDS;
   if (p < 0 || p > 1) return;
-  const x = -80 + p * (engine.viewWidth + 160);
-  const y = engine.worldToScreenY(engine.thiefFloor) + FLOOR * engine.cam.zoom * 0.5;
+  const x = engine.worldToScreenX(thiefX(engine.thiefSpan, p));
+  const y = engine.worldToScreenY(engine.thiefFloor) + FLOOR * engine.cam.zoom;
   drawThief(ctx, x, y, Math.max(0.9, engine.cam.zoom), engine.thiefCaught);
 }
 

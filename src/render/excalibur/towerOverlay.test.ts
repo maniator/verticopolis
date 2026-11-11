@@ -2,6 +2,8 @@ import { describe, it, expect } from "vitest";
 import {
   drawOverlay,
   syncEventFx,
+  floorRoomSpan,
+  thiefX,
   setReducedMotion,
   resetDecorativeClock,
   MAX_EXPLOSIONS,
@@ -160,9 +162,9 @@ describe("weather and event visuals paint", () => {
 
   it("the thief paints, and its caught variant differs from the free one", () => {
     const free = spyCtx();
-    drawOverlay(eng({ thiefStart: 0, thiefCaught: false, d: { anim: 1 } }), free.ctx);
+    drawOverlay(eng({ thiefStart: 0, thiefCaught: false, thiefSpan: { left: 100, right: 140 }, d: { anim: 1 } }), free.ctx);
     const caught = spyCtx();
-    drawOverlay(eng({ thiefStart: 0, thiefCaught: true, d: { anim: 1 } }), caught.ctx);
+    drawOverlay(eng({ thiefStart: 0, thiefCaught: true, thiefSpan: { left: 100, right: 140 }, d: { anim: 1 } }), caught.ctx);
     expect(free.painted()).toBe(true);
     expect(free.log.join("|")).not.toBe(caught.log.join("|"));
   });
@@ -256,6 +258,7 @@ describe("syncEventFx event-visual state machine", () => {
         thiefFx: { seq: 0, caught: false, floor: 0 },
         treasureFx: { seq: 0, x: 0, floor: 0 },
         vipFxSeq: 0,
+        tower: { units: [{ kind: "office", floor: 8, x: 100, width: 9 }] },
       },
       ...over,
     };
@@ -275,6 +278,7 @@ describe("syncEventFx event-visual state machine", () => {
     expect(e.thiefStart).toBe(10);
     expect(e.thiefCaught).toBe(true);
     expect(e.thiefFloor).toBe(8);
+    expect(e.thiefSpan).toEqual({ left: 100, right: 109 });
     expect(e.treasures).toHaveLength(1);
     expect(e.vipStart).toBe(10);
   });
@@ -397,5 +401,80 @@ describe("a search guard on screen", () => {
 
   it("goes down the stairs as well as up", () => {
     expect(guardPosition({ ...g, from: 8 }, 103).floor).toBe(6.5);
+  });
+});
+
+describe("the thief runs his floor's rooms (he no longer crosses the whole screen)", () => {
+  const units = [
+    { kind: "lobby", floor: 1, x: 80, width: 40 },
+    { kind: "floor", floor: 4, x: 90, width: 60 },
+    { kind: "office", floor: 4, x: 100, width: 9 },
+    { kind: "security", floor: 4, x: 120, width: 16 },
+    { kind: "office", floor: 5, x: 60, width: 9 },
+  ] as const;
+
+  it("takes the span of the floor's rooms, leaving out bare floor and lobby tiles", () => {
+    expect(floorRoomSpan(units, 4)).toEqual({ left: 100, right: 136 });
+    expect(floorRoomSpan(units, 1)).toBeNull(); // a lobby alone has no rooms
+    expect(floorRoomSpan(units, 9)).toBeNull();
+  });
+
+  it("comes off the emergency stairs left of the rooms and stops at their right edge", () => {
+    const span = { left: 100, right: 136 };
+    expect(thiefX(span, 0)).toBe(99);
+    expect(thiefX(span, 1)).toBe(136);
+    expect(thiefX(span, 0.5)).toBeCloseTo(117.5);
+    expect(thiefX(span, -1)).toBe(99);
+    expect(thiefX(span, 2)).toBe(136);
+  });
+
+  it("is drawn in world space on his floor's feet line, inside the rooms' span", () => {
+    const xs: number[] = [];
+    const ys: number[] = [];
+    const s = spyCtx();
+    drawOverlay(
+      eng({
+        thiefStart: 0,
+        thiefFloor: 4,
+        thiefSpan: { left: 100, right: 136 },
+        d: { anim: 2 },
+        cam: { zoom: 1 },
+        worldToScreenX: (tile: number) => (xs.push(tile), tile * 10),
+        worldToScreenY: (floor: number) => (ys.push(floor), 300 - floor * 10),
+      }),
+      s.ctx,
+    );
+    expect(xs).toContain(117.5); // halfway through his run, in tiles
+    expect(ys).toContain(4);
+  });
+
+  it("does not start on a floor with no rooms", () => {
+    const e: any = {
+      d: { anim: 10 },
+      santaStart: null,
+      lastSantaSeq: 0,
+      explosions: [],
+      lastExplosionSeq: 0,
+      thiefStart: null,
+      thiefCaught: false,
+      thiefFloor: 1,
+      thiefSpan: null,
+      lastThiefSeq: 0,
+      treasures: [],
+      lastTreasureSeq: 0,
+      vipStart: null,
+      lastVipSeq: 0,
+      sim: {
+        santaFxSeq: 0,
+        explosionFx: { seq: 0, x: 0, floor: 0 },
+        thiefFx: { seq: 1, caught: true, floor: 1 },
+        treasureFx: { seq: 0, x: 0, floor: 0 },
+        vipFxSeq: 0,
+        tower: { units },
+      },
+    };
+    syncEventFx(e, true);
+    expect(e.lastThiefSeq).toBe(1);
+    expect(e.thiefStart).toBeNull();
   });
 });
