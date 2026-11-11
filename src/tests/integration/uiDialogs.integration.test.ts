@@ -19,6 +19,7 @@ import { unitDetail } from "../fixtures/detailCards";
 import { unitEditorTemplate } from "../../ui/templates/editor";
 import { toggleMute } from "../../game/audioPrefs";
 import { loadPrefs } from "../../storage/Prefs";
+import { noEngine } from "../portKit/rustEngine";
 
 /** Each mode's schedule dialog options, from the engine catalog's rules as the
  *  game reads them (`editorActions.ts`). */
@@ -2588,7 +2589,10 @@ describe("showBatchPricingDialog — the Classic ladder variant (rung picker + a
   });
 });
 
-describe("showElevatorScheduleDialog — the per-shaft Schedule dialog", () => {
+// The schedule dialog asks a Rust engine for its answers (the double in
+// `fixtures/autoTuneDouble.ts`), so these cases skip without the package;
+// `src/ui/uiElevatorSchedule.test.ts` covers the dialog with canned answers.
+describe.skipIf(noEngine)("showElevatorScheduleDialog — the per-shaft Schedule dialog", () => {
   /** A 4-car standard shaft over floors 1..10, lobby at 1, sky lobby at 8. */
   /** A fake in-memory stops port over floors 1..10 with lobbies at 1 and 8:
    *  read() mirrors a live tower's descending rows and the toggles mutate it,

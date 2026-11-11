@@ -4,6 +4,7 @@ import { mountAppDom, makeUI } from "../uiFixture";
 import { catalogFor } from "../catalogFixture";
 import { scheduleDialogUX } from "../../ui/scheduleDialogRules";
 import type { ScheduleDialogCtx } from "../../ui/uiElevatorSchedule";
+import { noEngine } from "../portKit/rustEngine";
 
 /**
  * The schedule dialog's "All cars, all hours" button
@@ -39,7 +40,7 @@ const oneCar = { activeCars: { weekday: Array(24).fill(1), weekend: Array(24).fi
 
 beforeEach(() => mountAppDom());
 
-describe("schedule dialog: run all cars", () => {
+describe.skipIf(noEngine)("schedule dialog: run all cars", () => {
   it("saves a full fleet for every hour of both day types", async () => {
     const { ui } = makeUI();
     const apply = vi.fn(async (_s: any) => {});
