@@ -19,7 +19,7 @@ describe.runIf(run)("a refused bomb ransom through the WASM binding", () => {
         let hours = 0;
         while (!(w.pendingChoice() ?? "").includes("bombThreat")) {
           w.tick(60);
-          if (++hours > 1000) throw new Error("no ransom call in 1000 hours");
+          if (++hours > 2500) throw new Error("no ransom call in 2500 hours");
         }
         const before = decodeHeader(w.frameView());
         expect(w.bombSearch()).toBeUndefined();

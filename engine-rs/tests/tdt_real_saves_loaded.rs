@@ -207,13 +207,7 @@ fn the_loaded_census_matches_the_file_except_where_a_known_gap_says_otherwise() 
             .unwrap_or([0; TDT_POPULATION_CLASSES]);
         let ours = census_by_class(&sim);
         for class in 0..TDT_POPULATION_CLASSES {
-            if is_known_census_gap(class) {
-                // #1500: the file counts people inside, a loaded tower has nobody inside.
-                assert_eq!(
-                    ours[class], 0,
-                    "{name} class {class}: the known gap moved; update #1500's row"
-                );
-            } else if (name, class) == ("TOWER5.TDT", POP_SHOP) {
+            if (name, class) == ("TOWER5.TDT", POP_SHOP) {
                 // #1500: unexplained, its block counts twice the 4 x 10 served.
                 assert_eq!((ours[class], file[class]), (40, 80), "{name} shops");
             } else {
@@ -224,8 +218,9 @@ fn the_loaded_census_matches_the_file_except_where_a_known_gap_says_otherwise() 
 }
 
 #[test]
-fn the_census_gap_is_real_on_the_saves_that_have_those_rooms() {
-    // Guards the test above: these classes are nonzero in the file.
+fn the_census_test_covers_classes_the_saves_count() {
+    // Guards the test above: these classes are nonzero in the file, so the
+    // match is not two zeros.
     let file = parsed("TOWER7.TDT")
         .tower
         .tail
@@ -240,12 +235,6 @@ fn the_census_gap_is_real_on_the_saves_that_have_those_rooms() {
     ] {
         assert!(file[class] > 0, "TOWER7 class {class}");
     }
-}
-
-/// Classes whose loaded count is not the file's (#1500): they count people
-/// inside or an event audience, neither of which is saved.
-fn is_known_census_gap(class: usize) -> bool {
-    matches!(class, POP_PARTY_HALL | POP_THEATRE)
 }
 
 /// What an exported file keeps of a shaft: kind, column, span and skipped floors.

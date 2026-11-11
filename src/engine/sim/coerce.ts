@@ -8,6 +8,7 @@ import { FACILITIES, GRID, isHotelKind } from "../facilities";
 import { INFEST_DAYS } from "../economy/housekeeping";
 import { subtypeListFor } from "../retailSubtypes";
 import { UNIT_CAP } from "./deserializeGuards";
+import { censusFollowsTheDay } from "./visitors";
 
 /** The billed room ids a save carries for a pending booking. Missing means a
  * legacy save, whose treatment clears every infested room. Any other value
@@ -85,10 +86,11 @@ export function serializeUnit(u: Unit): SerializedUnit {
   if (subtypeListFor(kind) !== null) {
     if (patronageToday !== undefined) out.patronageToday = patronageToday;
     if (patronageYest !== undefined) out.patronageYest = patronageYest;
-    if (visitorsYest !== undefined) out.visitorsYest = visitorsYest;
     if (profitToday !== undefined) out.profitToday = profitToday;
     if (profitYest !== undefined) out.profitYest = profitYest;
   }
+  // A venue's visitors, or a hall's or theatre's audience (#1500).
+  if (censusFollowsTheDay(kind) && visitorsYest !== undefined) out.visitorsYest = visitorsYest;
   if (completeAt !== undefined) out.completeAt = completeAt;
   // The dirty-day clock persists only while it is actually ticking (a room
   // currently `dirty` with at least one full day banked); 0/undefined and a

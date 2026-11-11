@@ -67,9 +67,10 @@ pub struct Unit {
     pub hotel_customers_in: Option<i64>,
     pub out_for_meal: Option<i64>,
     pub residents: Option<i64>,
-    /// A shop's, fast food's or restaurant's visitors served yesterday,
-    /// its census (`economy::visitors`, #1500).
-    /// A byte is enough (the largest cap is 50) and keeps a unit small.
+    /// The census a room carries from the day before (`economy::visitors`,
+    /// #1500): a shop's, fast food's or restaurant's visitors served
+    /// yesterday, or a party hall's or theatre's set audience. A byte is
+    /// enough (the largest is a theatre's 120) and keeps a unit small.
     pub visitors_yest: Option<u8>,
     pub ever_occupied: bool,
     pub pending_income: f64,

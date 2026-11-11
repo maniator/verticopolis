@@ -2,7 +2,10 @@
 
 use indexmap::IndexMap;
 
-use super::visitors::{climb_steps, expected_visitors, served_visitors};
+use super::visitors::{
+    climb_steps, counts_set_audience, expected_visitors, served_visitors, set_audience,
+    NEW_FILM_DRAW,
+};
 use super::{
     is_overhead_kind, ledger_cat_for, rental_message, service_maintenance_monthly,
     CINEMA_BOOKING_BLOCKBUSTER, CINEMA_BOOKING_MONTHLY, MAINTENANCE_PER_CAR_MONTHLY,
@@ -128,7 +131,8 @@ impl Simulation {
         self.emit(&rental_message(amt, n), LogKind::Money);
     }
 
-    /// `rollOverRetailDay`.
+    /// `rollOverRetailDay`: each venue's day ends, and a party hall or theatre
+    /// open through the night starts counting its audience (#1500).
     pub fn roll_over_retail_day(&mut self) {
         // The day that just ended: its weekend sets the venues' caps.
         let ended_weekend = self.clock.is_weekend_on(self.clock.day() - 1);
@@ -136,7 +140,21 @@ impl Simulation {
         let rooms = self.tower.room_index();
         for &i in rooms.iter() {
             let u = &self.tower.units[i];
-            if u.kind.subtype_list().is_none() || !u.is_operational() {
+            if !u.is_operational() {
+                continue;
+            }
+            if counts_set_audience(u.kind) {
+                // A hall or theatre counts its audience from the morning after
+                // it opens. A theatre keeps the draw it has: the engine has no
+                // film age to wear it down.
+                if u.visitors_yest.is_none() {
+                    let audience = set_audience(u.kind, NEW_FILM_DRAW).unwrap_or(0);
+                    let (u, at) = self.tower.marked(i);
+                    u.set_visitors_yest(at, Some(u8::try_from(audience).unwrap_or(u8::MAX)));
+                }
+                continue;
+            }
+            if u.kind.subtype_list().is_none() {
                 continue;
             }
             let tally = u.extras();
@@ -166,3 +184,7 @@ impl Simulation {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "upkeep_audience_tests.rs"]
+mod upkeep_audience_tests;

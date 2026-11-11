@@ -269,7 +269,7 @@ const CORPUS_SECTIONS: readonly string[] = [
   "recycling:met:filling",
   "retail:advice:none", "retail:advice:overBuilt", "retail:advice:underServed", "retail:rain",
   "retail:tier:average", "retail:tier:booming", "retail:tier:low", "retail:tier:noData",
-  "shaft:idle:elevatorStandard", "shaft:load:elevatorExpress", "shaft:load:elevatorStandard",
+  "shaft:idle:elevatorStandard", "shaft:load:elevatorExpress", "shaft:load:elevatorStandard", "shaft:nearCapacity:elevatorExpress",
   "shaft:noReading:elevatorExpress", "shaft:noReading:elevatorService", "shaft:noReading:elevatorStandard",
   "shaft:noReading:escalator", "shaft:noReading:stairs",
 ];

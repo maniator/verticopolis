@@ -6,7 +6,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use crate::economy::visitors::counts_daily_visitors;
+use crate::economy::visitors::census_follows_the_day;
 use crate::tower::{Unit, UnitState};
 
 #[derive(Default)]
@@ -85,10 +85,11 @@ impl Unit {
     }
 
     /// `censusCount`: the head count the population shows. Shops, fast food
-    /// and restaurants count yesterday's served visitors (#1500); every other
-    /// room counts its `live_load`.
+    /// and restaurants count yesterday's served visitors, and party halls and
+    /// theatres their set audience (#1500); every other room counts its
+    /// `live_load`.
     pub fn census_count(&self) -> i64 {
-        if counts_daily_visitors(self.kind) {
+        if census_follows_the_day(self.kind) {
             return i64::from(self.visitors_yest.unwrap_or(0));
         }
         self.live_load()

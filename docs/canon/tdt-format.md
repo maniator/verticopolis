@@ -368,6 +368,16 @@ match exactly). Example, TOWER7: 1,428 office, 1,362 shop, 292 fast food, 205
 restaurant, 480 theatre, 462 condo. TOWER4 totals 4,515 with 1,620 office and
 1,131 condo.
 
+Party halls and theatres count a set audience, observed over a week of play on
+a tower built for it (#1500). A party hall counts 50 from the morning after it
+opens, every day, whether or not a party was held that day. A theatre counts 40
+for each step of its film's draw plus 40: 120 for a new film (draw 2), 80 at
+draw 1. The draw is byte 15 of each of the theatre's records (byte map
+section 3.1). The census picks up a changed draw the next morning: TOWER7's
+theatres fell from draw 2 to 1 on day 18 and its line went from 480 to 320 that
+morning. Every Reddit save fits this, TOWER4's mix of draws included (2 x 120 +
+2 x 80 = 400). A hall or theatre built that day counts nothing yet (TOWER3).
+
 The 12 undecoded flag bytes and the 42 undecoded bytes after the finance block
 are written as zeros.
 
@@ -440,9 +450,14 @@ serviced-only.
   byte 8 (yesterday's served visitors), which is their census in both the
   original and our engine, so the app matches the file's three lines on the
   observation saves (`engine-rs/tests/tdt_observed_census.rs`). One known gap:
-  TOWER5's finance line counts 80 shop visitors where its rows sum to 40. Party
-  halls and theatres cannot be seeded yet; their counts start below the file's
-  total. Both are tracked in #1500.
+  TOWER5's finance line counts 80 shop visitors where its rows sum to 40,
+  tracked in #1500. Party halls and theatres take the audience section 11
+  gives them (a theatre's from its byte 15) when the class adds up to the
+  finance line. A save taken after a film's draw fell but before the morning
+  census does not add up; when the line splits evenly into an audience each
+  room could count, every room takes that share. Otherwise the class seeds
+  nothing, and each room counts from its first morning in the engine. The
+  engine has no film age, so a theatre keeps the count it opened or loaded with.
 - **Widths.** A room arrives at the width its record gives. New builds of
   security, medical, housekeeping, recycling and the metro use the sizes in
   section 6.1, so a rebuilt room matches the original. The engine puts nothing
@@ -462,6 +477,9 @@ point after the first import. Known canonical forms:
 - Yesterday's venue visitors are not exported: our rows carry the floor alone,
   so a shop, fast food or restaurant reimports with a census of 0 until its
   first day passes.
+- A theatre's film draw is not exported: byte 15 is written 0. Its count still
+  reaches the finance line, so it reimports at that count (an even share), but
+  the original reads draw 0 and counts the theatre at 40 from its next morning.
 - A room the file's flags mark occupied but whose people the finance lines do not
   count comes back vacant and never lived in.
 - An infested hotel room is written as a dirty room (`0x20`) and comes back

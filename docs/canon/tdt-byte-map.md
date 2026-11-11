@@ -146,7 +146,7 @@ reads it to find the room a retail row describes (section 5).
 | 12 | u8 | small count | 255 on units that are not rooms; a small count on rooms | Unknown |
 | 13 | u8 | flag | 0 or 1 | Unknown |
 | 14 | u8 | usually 1 | | Unknown |
-| 15 | u8 | state | 2 normal; 1, 0, 3 seen; 255 on vacant or non-applicable units | Unknown |
+| 15 | u8 | state | Theatres (all four parts): the film's draw, 2 for a new film, then 1 and 0 as it ages. The census counts a theatre at 40 per step plus 40 (120, 80, 40) and picks up a changed draw the next morning (`tdt-format.md` section 11). Party halls: 255. Other kinds: 2 normal; 1, 0, 3 seen; 255 on vacant or non-applicable units | Known for theatres |
 | 16 | u8 | rent | 0 Very Low, 1 Low, 2 Average, 3 High, 4 none | Inferred |
 | 17 | u8 | live value | 0 for retail, hotels, lobby, security, housekeeping; small nonzero for offices and condos | Unknown |
 

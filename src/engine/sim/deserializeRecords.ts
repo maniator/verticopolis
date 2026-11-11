@@ -10,6 +10,7 @@ import { isUnitState, isVacateReason } from "../types";
 import { coerceSchedule } from "../elevatorSchedule";
 import { SOLD_CONDO_MIN_PRICE, SOLD_CONDO_MAX_PRICE } from "./constants";
 import { coerceDirtyDays, knownTransportKeys, savedInt } from "./coerce";
+import { censusFollowsTheDay } from "./visitors";
 
 /** One unit and one transport record of a save, hardened the way
  *  `deserialize` reads them. Apart from it so the worker host can read the
@@ -128,8 +129,8 @@ export function coerceUnitRecord(sim: Simulation, u: SerializedGame["units"][num
     // indistinguishable from a fresh retail unit that hasn't earned yet.
     patronageToday: subtypeListFor(u.kind as FacilityKind) === null || u.patronageToday === undefined ? undefined : Math.max(0, num(u.patronageToday, 0)),
     patronageYest: subtypeListFor(u.kind as FacilityKind) === null || u.patronageYest === undefined ? undefined : Math.max(0, num(u.patronageYest, 0)),
-    // Carried for the Rust engine's census (#1500); the reference never reads it.
-    visitorsYest: subtypeListFor(u.kind as FacilityKind) === null || u.visitorsYest === undefined ? undefined : Math.min(255, Math.floor(Math.max(0, num(u.visitorsYest, 0)))),
+    // The census count a venue, hall or theatre carries from the day before (#1500).
+    visitorsYest: !censusFollowsTheDay(u.kind as FacilityKind) || u.visitorsYest === undefined ? undefined : Math.min(255, Math.floor(Math.max(0, num(u.visitorsYest, 0)))),
     profitToday: subtypeListFor(u.kind as FacilityKind) === null || u.profitToday === undefined ? undefined : Math.max(0, num(u.profitToday, 0)),
     profitYest: subtypeListFor(u.kind as FacilityKind) === null || u.profitYest === undefined ? undefined : Math.max(0, num(u.profitYest, 0)),
     // Preserve an in-progress eviction across save/reload, hardened like
