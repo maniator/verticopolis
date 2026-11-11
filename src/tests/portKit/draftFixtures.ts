@@ -60,9 +60,10 @@ export function ensureStarterLobby(draft: Draft): void {
   for (let x = startX; x < startX + 40; x++) layTile(draft, "lobby", 1, x);
 }
 
-/** A new draft with the starter lobby, as `newSeededGame` makes one. */
-export function newSeededDraft(seed = 12345, mode: "classic" | "modern" = "classic"): Draft {
-  const draft = draftTower(seed, mode);
+/** A new draft with the starter lobby, as `newSeededGame` makes one.
+ *  `calendar` is Modern's calendar key ("realWorld" or "canon"). */
+export function newSeededDraft(seed = 12345, mode: "classic" | "modern" = "classic", calendar?: string): Draft {
+  const draft = draftTower(seed, mode, calendar);
   ensureStarterLobby(draft);
   return draft;
 }

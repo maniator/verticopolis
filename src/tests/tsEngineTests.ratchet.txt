@@ -35,17 +35,7 @@ src/presentation/statsCopy.test.ts Ledger
 src/render/excalibur/towerInputCamera.test.ts Tower
 src/render/excalibur/towerScenery.test.ts Simulation
 src/render/excalibur/towerWalkerBuild.test.ts Tower tower/segments tower/towerTopology
-src/simport/cards.test.ts Simulation port/tsEngine
-src/simport/clockView.test.ts Clock
-src/simport/engineContract.test.ts port/tsEngine
-src/simport/engineLifecycle.fixture.ts Simulation UndoHistory
-src/simport/engineSubject.fixture.ts Simulation
-src/simport/headerClock.test.ts Simulation port/tsEngine
-src/simport/portCodes.test.ts Simulation port/tsEngine
-src/simport/portEvents.test.ts Simulation port/tsEngine
-src/simport/portRenderSim.test.ts Simulation port/tsEngine
 src/simport/tsPanels.test.ts Simulation port/tsEngine sim/star
-src/simport/viewReader.test.ts Simulation port/tsEngine tower/rooms
 src/storage/saveCompression.test.ts Simulation
 src/storage/saveRehydrate.test.ts Simulation sim/founderStatus
 src/storage/saveText.test.ts Simulation port/tsEngine
@@ -95,7 +85,6 @@ src/tests/integration/elevatorDispatchBalancing.integration.test.ts Crowd Tower 
 src/tests/integration/elevatorSchedule.integration.test.ts Simulation
 src/tests/integration/elevatorScheduling.integration.test.ts ElevatorDispatch Tower
 src/tests/integration/elevatorWidthMigration.integration.test.ts Simulation
-src/tests/integration/engagementParity.integration.test.ts port/tsEngine
 src/tests/integration/engineView.integration.test.ts Simulation UndoHistory tower/towerTopology
 src/tests/integration/eventSprites.integration.test.ts Simulation
 src/tests/integration/faqComplete.integration.test.ts Simulation

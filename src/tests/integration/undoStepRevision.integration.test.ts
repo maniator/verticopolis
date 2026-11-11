@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it } from "vitest";
-import type { Simulation } from "../../engine/Simulation";
 import type { EnginePort, PortRecord } from "../../simport/enginePort";
 import { done, kind, lobbyCenter, must, subject, type Subject } from "../../simport/engineSubject.fixture";
 import { hasWasmPackage, wasm, wasmRequired } from "../conformance/wasmEngine";
+import { releaseDrafts } from "../portKit/drafts";
 
 /**
  * The renderer keeps its scene through an undo or redo step and finds the
@@ -16,10 +16,11 @@ type RustEngine = EnginePort & { free(): void };
 const made: RustEngine[] = [];
 afterEach(() => {
   for (const e of made.splice(0)) e.free();
+  releaseDrafts();
 });
 
-function make(sim: Simulation): EnginePort {
-  const engine = wasm().Engine.fromSave(JSON.stringify(sim.serialize())) as unknown as RustEngine;
+function make(save: string): EnginePort {
+  const engine = wasm().Engine.fromSave(save) as unknown as RustEngine;
   made.push(engine);
   return engine;
 }

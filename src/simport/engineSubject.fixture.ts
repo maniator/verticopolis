@@ -1,33 +1,32 @@
 import { expect } from "vitest";
 import { facilityFloors } from "../engine/facilities";
 import { CALENDAR_CODES, KIND_CODES, MODE_CODES, VIEW_LAYOUT, codeOf } from "../engine/port/layout";
-import { Simulation } from "../engine/Simulation";
 import type { FacilityKind } from "../shared/types";
-import { newSeededGame } from "../tests/fixtures/towerFixtures";
+import type { Draft } from "../tests/portKit/drafts";
+import { newSeededDraft } from "../tests/portKit/draftFixtures";
 import type { EnginePort, PortRecord } from "./enginePort";
 import { ViewReader } from "./viewReader";
 
 /**
  * The engine under the port contracts (`engineContract.fixture.ts`,
- * `engineLifecycle.fixture.ts`): either engine, started from a tower's save,
- * with the shared reader over it. The contracts drive the engine through
- * `EnginePort` alone and read it back through the reader, its records, its
- * events and its save, so the same cases run on `TsEngine` and the Rust
- * `Engine`.
+ * `engineLifecycle.fixture.ts`): the Rust engine, started from a tower's
+ * save, with the shared reader over it. The contracts drive the engine
+ * through `EnginePort` alone and read it back through the reader, its
+ * records, its events and its save.
  */
 
-/** An engine on the save of `sim`. */
-export type MakeEngine = (sim: Simulation) => EnginePort;
+/** An engine on save text. */
+export type MakeEngine = (save: string) => EnginePort;
 
 export interface Subject {
   readonly port: EnginePort;
   readonly reader: ViewReader;
 }
 
-/** The engine on `sim`'s save: by default a freshly founded Modern tower
+/** The engine on `tower`'s save: by default a freshly founded Modern tower
  *  standing on its starter lobby (a ground-floor strip of lobby tiles). */
-export function subject(make: MakeEngine, sim: Simulation = newSeededGame(7, "modern")): Subject {
-  const port = make(sim);
+export function subject(make: MakeEngine, tower: Draft = newSeededDraft(7, "modern")): Subject {
+  const port = make(tower.saveText());
   return { port, reader: new ViewReader(port, facilityFloors) };
 }
 
@@ -89,7 +88,7 @@ export interface SavedTower {
   founder?: boolean;
   towerName?: string;
   view?: { tile: number; floor: number; zoom?: number };
-  units: { id: number; kind: string; floor: number; x: number; rent?: number; label?: string }[];
+  units: { id: number; kind: string; floor: number; x: number; rent?: number; label?: string; noRate?: boolean; filmPolicy?: string }[];
   transports: { id: number; skipFloors?: number[]; schedule?: Record<string, unknown> }[];
   log?: { text: string; kind: string }[];
 }
@@ -165,5 +164,3 @@ export function expectUnmoved(s: Subject, call: (port: EnginePort) => PortRecord
   return rec;
 }
 
-/** A copy of `sim` through its save, so a factory never shares a tower. */
-export const copyOf = (sim: Simulation): Simulation => Simulation.deserialize(JSON.parse(JSON.stringify(sim.serialize())));

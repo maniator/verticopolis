@@ -24,7 +24,7 @@ import {
 import { scheduleSlots } from "./scheduleSlots";
 
 /**
- * The command contract of `EnginePort`, run on either engine (PR 5e part 4
+ * The command contract of `EnginePort` on the Rust engine (PR 5e part 4
  * moved it here from the retired `SimPort` contracts). Each case starts from
  * a freshly founded Modern tower on its starter lobby and builds what it
  * needs through the port, asserting each step: an accepted command answers
@@ -34,8 +34,8 @@ import { scheduleSlots } from "./scheduleSlots";
  * one by one, lay.
  *
  * The towers the port cannot found (an emergency, an infested room, 3 stars,
- * Classic rules) are set up on the TypeScript `Simulation` first and handed
- * to the engine as a save, which `make` loads on either engine.
+ * Classic rules) are set up on a draft first and handed to the engine as a
+ * save, which `make` loads.
  */
 export function describeEngineContract(name: string, make: MakeEngine): void {
   describe(`${name}: the engine port's commands`, () => {

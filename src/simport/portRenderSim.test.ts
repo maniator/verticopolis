@@ -1,81 +1,93 @@
-import { describe, expect, it } from "vitest";
-import { facilityFloors } from "../engine/facilities";
-import { Simulation } from "../engine/Simulation";
-import type { HeatmapMode } from "../shared/engineTypes";
-import { TsEngine } from "../engine/port/tsEngine";
+import { describe, expect, it, vi } from "vitest";
 import { PortRenderSim } from "./portRenderSim";
-import { ViewReader } from "./viewReader";
+import type { ViewReader } from "./viewReader";
+import { code, mockPort } from "../tests/portKit/mockPort";
 
 /**
- * The renderer's reads over the port answer what the simulation answers when
- * the renderer holds it directly, so the renderer can draw the port in its
- * place. The golden test holds the port's render queries to the Rust engine.
+ * The renderer's reads over a mock port: which port reads each one makes,
+ * what it decodes, and when the queue projection is asked for again. The
+ * render sim on the Rust engine runs in `portReads.integration.test.ts`.
  */
 
-function tower(): Simulation {
-  const sim = Simulation.newGame(5, "modern");
-  sim.money = 1e8;
-  sim.star = 3;
-  for (let x = 160; x < 280; x++) expect(sim.build("lobby", 1, x).ok).toBe(true);
-  for (const floor of [2, 3]) for (let x = 160; x < 280; x++) expect(sim.build("floor", floor, x).ok).toBe(true);
-  for (const x of [170, 180, 200]) expect(sim.build("office", 2, x).ok).toBe(true);
-  expect(sim.build("hotelSingle", 3, 170).ok).toBe(true);
-  expect(sim.build("fastFood", 3, 200).ok).toBe(true);
-  expect(sim.buildTransport("elevatorStandard", 162, 1, 3).ok).toBe(true);
-  expect(sim.buildTransport("stairs", 275, 1, 2).ok).toBe(true);
-  return sim;
+const FX = {
+  santaSeq: 1,
+  vipSeq: 2,
+  explosion: { floor: 3, x: 200, seq: 4 },
+  thief: { caught: true, floor: 5, seq: 6 },
+  treasure: { floor: 7, x: 210, seq: 8 },
+};
+
+/** The reader fields the render sim reads: the header and the tower's lookups. */
+function readerOf() {
+  const header = { mode: "modern", sceneSeed: 77, camera: { tile: 200, floor: 2, zoom: 1.5 }, weather: "rain", population: 412, minutes: 1440 + 600, revision: 5, fx: FX, bombSearch: null };
+  const people = [{ id: 7 }];
+  const tower = { unitAt: vi.fn(() => undefined), revision: 5 };
+  return { header, crowd: { people }, tower } as unknown as ViewReader & { header: typeof header };
 }
 
-const MODES: HeatmapMode[] = ["congestion", "occupancy", "satisfaction", "cleanliness"];
-
-function sameReads(sim: Simulation, r: PortRenderSim): void {
-  expect(r.mode).toBe(sim.mode);
-  expect(r.rng.initialSeed).toBe(sim.rng.initialSeed);
-  expect(r.view).toEqual(sim.view);
-  expect(r.weather).toBe(sim.weather);
-  expect(r.population).toBe(sim.population);
-  for (const k of ["minutes", "hour", "minute", "minuteOfDay"] as const) expect(r.clock[k], k).toBe(sim.clock[k]);
-  expect([r.clock.isMorning(), r.clock.isEvening(), r.clock.isNight()]).toEqual([sim.clock.isMorning(), sim.clock.isEvening(), sim.clock.isNight()]);
-  expect([r.santaFxSeq, r.vipFxSeq]).toEqual([sim.santaFxSeq, sim.vipFxSeq]);
-  expect([r.explosionFx, r.thiefFx, r.treasureFx]).toEqual([sim.explosionFx, sim.thiefFx, sim.treasureFx]);
-  expect(r.congestion()).toBe(sim.congestion());
-  expect(r.peakCongestion()).toBe(sim.peakCongestion());
-  for (const m of MODES) expect(r.floorHeatmap(m), m).toEqual(sim.floorHeatmap(m));
-  expect(r.tower.functionalParkingSet()).toEqual(sim.tower.functionalParkingSet());
-  for (const spots of [0, 2, 30]) expect(r.parkingUsage(spots), `spots ${spots}`).toBe(sim.parkingUsage(spots));
-  expect(r.recyclingFill()).toBe(sim.recyclingFill());
-  for (const [floor, x] of [[1, 170], [2, 170], [3, 200], [4, 170]]) {
-    expect(r.positionReachable(floor, x), `${floor} ${x}`).toBe(sim.positionReachable(floor, x));
-  }
-  expect(r.crowd.queueView(r.tower)).toEqual(sim.crowd.queueView(sim.tower));
-  expect(r.crowd.people.map((p) => p.id)).toEqual(sim.crowd.people.map((p) => p.id));
+function sim(answers: Parameters<typeof mockPort>[0] = {}) {
+  const port = mockPort(answers);
+  const reader = readerOf();
+  return { port, reader, r: new PortRenderSim(port, reader) };
 }
 
-describe("PortRenderSim over TsEngine", () => {
-  it("reads what the simulation answers, before and after play", () => {
-    const sim = tower();
-    const engine = new TsEngine(sim);
-    const reader = new ViewReader(engine, facilityFloors);
-    const r = new PortRenderSim(engine, reader);
-    sameReads(sim, r);
-    for (let i = 0; i < 8; i++) {
-      engine.tick(75);
-      reader.update();
-      sameReads(sim, r);
-    }
+describe("PortRenderSim", () => {
+  it("reads the view through the reader's header, asking the port nothing", () => {
+    const { port, reader, r } = sim();
+    expect([r.mode, r.rng.initialSeed, r.view, r.weather, r.population, r.bombSearch]).toEqual(["modern", 77, { tile: 200, floor: 2, zoom: 1.5 }, "rain", 412, null]);
+    expect([r.santaFxSeq, r.vipFxSeq, r.explosionFx, r.thiefFx, r.treasureFx]).toEqual([1, 2, FX.explosion, FX.thief, FX.treasure]);
+    expect([r.clock.minutes, r.clock.hour, r.clock.minute]).toEqual([1440 + 600, 10, 0]);
+    expect(r.crowd.people).toBe(reader.crowd.people);
+    r.tower.unitAt(2, 170);
+    expect(reader.tower.unitAt).toHaveBeenCalledWith(2, 170);
+    expect(port.viewLayout).toHaveBeenCalledOnce();
   });
 
-  it("keeps the queue projection until the clock or the tower moves", () => {
-    const sim = tower();
-    const engine = new TsEngine(sim);
-    const reader = new ViewReader(engine, facilityFloors);
-    const r = new PortRenderSim(engine, reader);
-    engine.tick(600);
-    reader.update();
+  it("passes the render queries to the port with their arguments", () => {
+    const { port, r } = sim({
+      congestion: () => 0.25,
+      hotspot: () => Float64Array.of(0.75, 3, 200),
+      recyclingFill: () => 0.5,
+      parkingUsage: (spots) => spots / 10,
+      positionReachable: (floor) => floor < 4,
+      parkingSet: () => Float64Array.of(2, 41, 42),
+    });
+    expect([r.congestion(), r.peakCongestion(), r.recyclingFill(), r.parkingUsage(30)]).toEqual([0.25, 0.75, 0.5, 3]);
+    expect([r.positionReachable(3, 200), r.positionReachable(4, 170)]).toEqual([true, false]);
+    expect([...r.tower.functionalParkingSet()]).toEqual([41, 42]);
+    expect(vi.mocked(port.parkingUsage).mock.calls).toEqual([[30]]);
+    expect(vi.mocked(port.positionReachable).mock.calls).toEqual([
+      [3, 200],
+      [4, 170],
+    ]);
+  });
+
+  it("asks for a heatmap by the layout's code, and decodes its cells and tints", () => {
+    const infested = code("heatTints", "infested");
+    const { port, r } = sim({ heatCells: () => Float64Array.of(2, 160, 169, 0.5, 0, 3, 170, 200, 1, infested, 9) });
+    expect(r.floorHeatmap("cleanliness")).toEqual([
+      { floor: 2, minX: 160, maxX: 169, severity: 0.5 },
+      { floor: 3, minX: 170, maxX: 200, severity: 1, tint: "infested" },
+    ]);
+    expect(vi.mocked(port.heatCells).mock.calls).toEqual([[code("heatModes", "cleanliness")]]);
+  });
+
+  it("decodes the queue projection and keeps it until the tower, the minute or the revision moves", () => {
+    let gen = 1;
+    // One landing (shaft 20, floor 1: 6 waiting, tier 2) and one boarded car (shaft 20, car 0: 4 riders).
+    const { port, reader, r } = sim({ generation: () => gen, queueView: () => Float64Array.of(1, 1, 20, 1, 6, 2, 20, 0, 4) });
     const q = r.crowd.queueView(r.tower);
+    expect([...q.landings.get(20)!]).toEqual([[1, { count: 6, tier: 2 }]]);
+    expect([...q.boarded.get(20)!]).toEqual([[0, 4]]);
     expect(r.crowd.queueView(r.tower)).toBe(q);
-    engine.tick(1);
-    reader.update();
-    expect(r.crowd.queueView(r.tower)).not.toBe(q);
+    expect(port.queueView).toHaveBeenCalledOnce();
+    reader.header.minutes++;
+    const second = r.crowd.queueView(r.tower);
+    reader.header.revision++;
+    const third = r.crowd.queueView(r.tower);
+    gen++;
+    const fourth = r.crowd.queueView(r.tower);
+    expect([second === q, third === second, fourth === third]).toEqual([false, false, false]);
+    expect(port.queueView).toHaveBeenCalledTimes(4);
   });
 });

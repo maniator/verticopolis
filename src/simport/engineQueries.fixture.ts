@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { VIEW_LAYOUT } from "../engine/port/layout";
-import { newSeededGame } from "../tests/fixtures/towerFixtures";
+import { newSeededDraft } from "../tests/portKit/draftFixtures";
 import { Cards } from "./cards";
 import { type MakeEngine, type Subject, kind, lobbyCenter, must, subject } from "./engineSubject.fixture";
 import { PortCodes } from "./portCodes";
 import { statsReport } from "./statsSheet";
 
 /**
- * The panel queries of `EnginePort`, run on either engine (PR 5e part 4
+ * The panel queries of `EnginePort` on the Rust engine (PR 5e part 4
  * moved them here from the retired `SimPort` panel contract): each answer
  * read through the decoder the panels use, consistent with the reader and
  * with the other answers. The golden test holds the two engines' records
@@ -16,7 +16,7 @@ import { statsReport } from "./statsSheet";
 export function describeEngineQueries(name: string, make: MakeEngine): void {
   describe(`${name}: the engine port's panel queries`, () => {
     it("carries the founding mode and calendar on the header", () => {
-      const s = subject(make, newSeededGame(7, "modern", "realWorld"));
+      const s = subject(make, newSeededDraft(7, "modern", "realWorld"));
       expect([s.reader.header.mode, s.reader.header.modernCalendar]).toEqual(["modern", "realWorld"]);
     });
 

@@ -73,7 +73,4 @@ glob = [
   # The fuzz corpus goldens: native replay records, pinned by
   # `fuzz-corpus --update` and held to the engine by the fuzz-corpus job.
   "conformance/fuzz-corpus/goldens/*.json",
-  # The port's recorded engine answers, written by `npm run port:record` and
-  # checked against the Rust engine on the unit leg that builds the package.
-  "src/simport/recordings/*.json",
 ]

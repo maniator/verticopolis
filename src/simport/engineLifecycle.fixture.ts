@@ -1,8 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { Simulation } from "../engine/Simulation";
-import { towerStateSig } from "../engine/UndoHistory";
 import type { SerializedGame } from "../shared/types";
-import { MID, newSeededGame } from "../tests/fixtures/towerFixtures";
+import { MID, newSeededDraft } from "../tests/portKit/draftFixtures";
 import { UNDO_NOTHING_TO_STEP, type EnginePort, type PortRecord } from "./enginePort";
 import {
   type MakeEngine,
@@ -26,13 +24,12 @@ import { scheduleSlots } from "./scheduleSlots";
 
 /**
  * The lifecycle half of the `EnginePort` contract, and the commands that need
- * a tower the port cannot found, run on either engine (PR 5e part 4 moved
- * these from the retired `SimPort` contracts and `TsSim`'s own tests).
+ * a tower the port cannot found (PR 5e part 4 moved these from the retired
+ * `SimPort` contracts).
  *
- * The undo signature is held to a reference that changes exactly when the
- * undo history's `towerStateSig` of the same tower would: the TypeScript
- * signature of the engine's own save, read back. So on the Rust engine the
- * reference is independent of the signature under test.
+ * The undo signature is held to a reference that changes exactly when what a
+ * player can undo changes: a fingerprint of the engine's own save, read back
+ * (see {@link reference}), so it is independent of the signature under test.
  */
 export function describeEngineLifecycle(name: string, make: MakeEngine): void {
   describe(`${name}: the engine port's lifecycle`, () => {
@@ -258,9 +255,9 @@ export function describeEngineLifecycle(name: string, make: MakeEngine): void {
     });
 
     it("moves the undo signature on a cinema's film policy and on No Rate, which a grown Classic tower takes", () => {
-      const sim = newSeededGame(7, "classic");
-      Object.assign(sim, { star: 3, money: 1e9 });
-      const s = subject(make, sim);
+      const tower = newSeededDraft(7, "classic");
+      Object.assign(tower, { star: 3, money: 1e9 });
+      const s = subject(make, tower);
       const mid = lobbyCenter(s);
       const step = (label: string, call: (p: EnginePort) => PortRecord, moves: boolean, free = false) => {
         const before = [s.port.undoSignature(), reference(s.port)];
@@ -285,7 +282,7 @@ export function describeEngineLifecycle(name: string, make: MakeEngine): void {
 
   describe(`${name}: the commands that need a grown tower`, () => {
     it("keeps a Classic tower bridging, refusing a change", () => {
-      const s = subject(make, newSeededGame(7, "classic"));
+      const s = subject(make, newSeededDraft(7, "classic"));
       silent(s, () => {
         const flip = run(s, (p) => p.flipAutoBridge(), "flip");
         expect([done(flip), slot("flipAutoBridge", flip, "value")]).toEqual([false, 1]);
@@ -297,23 +294,23 @@ export function describeEngineLifecycle(name: string, make: MakeEngine): void {
     });
 
     it("sets a cinema's film policy, and refuses it on an office", () => {
-      const sim = newSeededGame(7, "modern");
-      Object.assign(sim, { star: 3, money: 10_000_000 });
-      const s = subject(make, sim);
+      const tower = newSeededDraft(7, "modern");
+      Object.assign(tower, { star: 3, money: 10_000_000 });
+      const s = subject(make, tower);
       must(s, (p) => p.buildAt(kind("cinema"), 2, MID - 20), "cinema");
       must(s, (p) => p.buildAt(kind("office"), 2, MID + 11), "office");
       const cinema = mustFind(s.reader.tower.units, (u) => u.kind === "cinema").id;
       const office = mustFind(s.reader.tower.units, (u) => u.kind === "office").id;
       const set = must(s, (p) => p.setFilm(cinema, filmPolicy("blockbuster")), "a blockbuster");
       expect([delta(set), slot("setFilm", set, "policyCode")]).toEqual([0, filmPolicy("blockbuster")]);
-      expect(mustFind(Simulation.deserialize(JSON.parse(s.port.serialize()) as SerializedGame).tower.units, (u) => u.id === cinema).filmPolicy).toBe("blockbuster");
+      expect(mustFind(saved(s).units, (u) => u.id === cinema).filmPolicy).toBe("blockbuster");
       expect(done(run(s, (p) => p.setFilm(office, filmPolicy("auto")), "a film for an office"))).toBe(false);
     });
 
     it("answers a stop the engine keeps (an endpoint, an express non-lobby floor) and changes nothing", () => {
-      const sim = newSeededGame(7, "modern");
-      Object.assign(sim, { star: 3, money: 10_000_000 });
-      const s = subject(make, sim);
+      const tower = newSeededDraft(7, "modern");
+      Object.assign(tower, { star: 3, money: 10_000_000 });
+      const s = subject(make, tower);
       const tiles = Float64Array.of(MID + 14, MID + 15, MID + 16, MID + 17);
       for (const floor of [2, 3]) expect(slot("paintTiles", must(s, (p) => p.paintTiles(kind("floor"), floor, tiles), `floor ${floor}`), "placed")).toBe(4);
       must(s, (p) => p.buildShaft(kind("elevatorExpress"), MID + 14, 1, 3), "an express");
@@ -331,9 +328,9 @@ export function describeEngineLifecycle(name: string, make: MakeEngine): void {
 
     it("refuses a Classic escalator that serves an office floor, and builds the same one in Modern", () => {
       for (const m of ["classic", "modern"] as const) {
-        const sim = newSeededGame(7, m);
-        Object.assign(sim, { star: 3, money: 1e8 });
-        const s = subject(make, sim);
+        const tower = newSeededDraft(7, m);
+        Object.assign(tower, { star: 3, money: 1e8 });
+        const s = subject(make, tower);
         must(s, (p) => p.buildAt(kind("office"), 2, MID - 4), `${m}: an office on 2`);
         const tiles = Float64Array.from({ length: 8 }, (_, i) => MID + 8 + i);
         expect(slot("paintTiles", must(s, (p) => p.paintTiles(kind("floor"), 2, tiles), `${m}: floor 2`), "placed")).toBe(8);
@@ -352,9 +349,9 @@ export function describeEngineLifecycle(name: string, make: MakeEngine): void {
 
     it("answers a waiting emergency with what it paid, and a decline pays nothing", () => {
       for (const accept of [true, false]) {
-        const sim = newSeededGame(7, "modern");
-        sim.events.pending = { kind: "fireRescue", cost: 40_000, message: "fire" };
-        const s = subject(make, sim);
+        const tower = newSeededDraft(7, "modern");
+        tower.write("top", "events.pending", { kind: "fireRescue", cost: 40_000, message: "fire" });
+        const s = subject(make, tower);
         expect(s.port.pendingChoice()).toBeDefined();
         expect(delta(must(s, (p) => p.answerChoice(accept), `answer ${accept}`))).toBe(accept ? -40_000 : 0);
         expect(s.port.pendingChoice()).toBeUndefined();
@@ -363,12 +360,12 @@ export function describeEngineLifecycle(name: string, make: MakeEngine): void {
     });
 
     it("books the exterminator for an infested room, with its price and the charge", () => {
-      const sim = newSeededGame(7, "modern");
-      for (let x = MID - 6; x < MID + 6; x++) sim.tower.place("floor", 2, x);
-      expect(sim.tower.place("hotelSingle", 2, MID - 4).ok).toBe(true);
-      mustFind(sim.tower.units, (u) => u.kind === "hotelSingle").state = "infested";
-      Object.assign(sim, { money: 1e8 });
-      const s = subject(make, sim);
+      const tower = newSeededDraft(7, "modern");
+      for (let x = MID - 6; x < MID + 6; x++) tower.tower.place("floor", 2, x);
+      expect(tower.tower.place("hotelSingle", 2, MID - 4).ok).toBe(true);
+      mustFind(tower.tower.units, (u) => u.kind === "hotelSingle").state = "infested";
+      Object.assign(tower, { money: 1e8 });
+      const s = subject(make, tower);
       const booked = must(s, (p) => p.bookExterminator(), "the exterminator");
       expect(slot("bookExterminator", booked, "rooms")).toBe(1);
       const cost = slot("bookExterminator", booked, "cost");
@@ -377,11 +374,11 @@ export function describeEngineLifecycle(name: string, make: MakeEngine): void {
     });
 
     it("takes a Classic office off the market", () => {
-      const s = subject(make, newSeededGame(7, "classic"));
+      const s = subject(make, newSeededDraft(7, "classic"));
       must(s, (p) => p.buildAt(kind("office"), 2, MID - 4), "office");
       const office = mustFind(s.reader.tower.units, (u) => u.kind === "office").id;
       expect(delta(must(s, (p) => p.noRate(office), "No Rate"))).toBe(0);
-      expect(mustFind(Simulation.deserialize(JSON.parse(s.port.serialize()) as SerializedGame).tower.units, (u) => u.id === office).noRate).toBe(true);
+      expect(mustFind(saved(s).units, (u) => u.id === office).noRate).toBe(true);
     });
   });
 }
@@ -397,10 +394,17 @@ interface Step {
   after?: () => void;
 }
 
-/** The undo history's signature of the engine's own save, read back. */
+/**
+ * What a player can undo, read from the engine's own save: the balance, each
+ * room's place, name, rent, No Rate, film policy and variety, and each
+ * shaft's place, span, cars, skipped floors and schedule. Nothing else (the
+ * clock, the crowd, the camera, a bulletin) is in it.
+ */
 function reference(port: EnginePort): string {
-  const sim = Simulation.deserialize(JSON.parse(port.serialize()) as SerializedGame);
-  return towerStateSig(sim.tower, sim.money);
+  const save = JSON.parse(port.serialize()) as SerializedGame;
+  const units = save.units.map((u) => [u.kind, u.floor, u.x, u.label ?? "", u.rent ?? "", u.noRate === true, u.filmPolicy ?? "", u.subtype ?? ""]);
+  const shafts = save.transports.map((t) => [t.kind, t.x, t.bottom, t.top, t.cars, t.skipFloors ?? [], t.schedule ?? null]);
+  return JSON.stringify([save.money, units, shafts]);
 }
 
 /** Run `body` and check it raised no gameplay event and wrote no log line. */

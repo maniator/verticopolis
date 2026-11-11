@@ -2,34 +2,29 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("../../analyticsEngineStatus", () => ({ noteEngineEngaged: vi.fn() }));
 import { noteEngineEngaged } from "../../analyticsEngineStatus";
 import { PLAY_SECONDS } from "../../analyticsEngagement";
-import { TsEngine } from "../../engine/port/tsEngine";
-import type { Simulation } from "../../engine/Simulation";
 import { startEngagementWatch } from "../../game/engagementWatch";
 import type { EnginePort } from "../../simport/enginePort";
 import { kind, lobbyCenter, subject, type MakeEngine } from "../../simport/engineSubject.fixture";
-import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
+import { hasWasmPackage, wasm, wasmRequired } from "../conformance/wasmEngine";
+import { releaseDrafts } from "../portKit/drafts";
 
 /**
- * The engagement parity test (#1090, the analytics packet's section 6): one
- * detector above the host, so a scripted session engages the TypeScript and
- * the Rust engine at the same point, by the same branch.
+ * The engagement test (#1090, the analytics packet's section 6): one detector
+ * above the host, so a scripted session on the engine engages at the point
+ * and by the branch the packet names.
  */
+if (wasmRequired() && !hasWasmPackage()) throw new Error("VC_REQUIRE_WASM=1 but engine-rs/pkg/ is not built; run npm run wasm:build");
 
 type RustEngine = EnginePort & { free(): void };
 const made: RustEngine[] = [];
 
-const engines: [string, MakeEngine][] = [["TypeScript", (sim: Simulation) => new TsEngine(sim)]];
-if (hasWasmPackage())
-  engines.push([
-    "Rust",
-    (sim: Simulation) => {
-      const engine = wasm().Engine.fromSave(JSON.stringify(sim.serialize())) as unknown as RustEngine;
-      made.push(engine);
-      return engine;
-    },
-  ]);
+const make: MakeEngine = (save) => {
+  const engine = wasm().Engine.fromSave(save) as unknown as RustEngine;
+  made.push(engine);
+  return engine;
+};
 
-describe.each(engines)("engagement on the %s engine", (_name, make) => {
+describe.skipIf(!hasWasmPackage())("engagement on the engine", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.spyOn(document, "visibilityState", "get").mockReturnValue("visible");
@@ -39,6 +34,7 @@ describe.each(engines)("engagement on the %s engine", (_name, make) => {
     vi.useRealTimers();
     vi.restoreAllMocks();
     for (const e of made.splice(0)) e.free();
+    releaseDrafts();
   });
 
   it("engages on the first accepted gameplay command, not on a refused one or a rename", () => {
