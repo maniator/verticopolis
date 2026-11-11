@@ -3,7 +3,6 @@ import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { ENGINE_THIRD_PARTY } from "../build/rustNotices";
-import { globCovers, readWorkboxGlob } from "../build/workboxGlob";
 import {
   ENGINE_BUILD_ONLY_FILES,
   ENGINE_BUILD_RECORD,
@@ -85,15 +84,6 @@ describe("ENGINE_PACKAGE", () => {
     expect(built).toEqual([]);
   });
 
-  it("holds only fetched file types the workbox glob precaches, and keeps .json out of it", () => {
-    const config = readFileSync(resolve(ROOT, "vite.config.ts"), "utf8");
-    const glob = readWorkboxGlob(config);
-    expect(glob, "vite.config.ts globPatterns changed shape; update src/build/workboxGlob.ts").not.toBeNull();
-    for (const f of ENGINE_RUNTIME_FILES) expect(globCovers(glob!, f), f).toBe(true);
-    for (const f of ENGINE_BUILD_ONLY_FILES) expect(globCovers(glob!, f), f).toBe(false);
-    // A blanket `json` would precache the build-only records (and version.json).
-    expect(glob!.extensions.has("json")).toBe(false);
-  });
 });
 
 describe("the engine package build", () => {

@@ -105,7 +105,7 @@ when the owner approves the reconciled plan at the final review; until then
 | `engine-rs/src/tower_query.rs`, `tower_routing.rs` (#859; a new file in `perf-rust-859.patch`) | WS-P (lands before the freeze) | |
 | `src/render/**`, sprites | WS-R, until WS-D needs these files | WS-D (#921 parts 2b and 2c, and their `src/render` lint rule). WS-D waits only until the stack parks: when it needs `src/render`, the stack parks at its next PR boundary (the coordinator's call) unless its open PR is ready to merge, and later stack PRs rebase over WS-D |
 | `src/ui/**`, `src/game/**` catalog reads | WS-D | |
-| The About and Diagnostics UI (#963); `src/build/workboxGlob.ts`, `scripts/verify-precache.ts` (#985 criteria 5 and 7) | WS-C | |
+| The About and Diagnostics UI (#963); `scripts/verify-precache.ts` (#985 criteria 5 and 7) | WS-C | |
 | `scripts/wasm-build.ts`, `src/wasmhost/engineAssets.ts`, `src/wasmhost/enginePackageNames.ts` | WS-C (C1) | WS-P (#932's feature split) |
 | `_bmad-output/planning-artifacts/release-3.0-exception-register.md` | WS-A (A2's PR opens it) | After A2 merges, each lane that adds an entry (B6 for S12, A6 for #1067, the release lane for S14); the release lane attaches it at the sign-off |
 
