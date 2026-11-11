@@ -1,10 +1,10 @@
 # PR-Agent uses the GitHub API. Never checkout or execute PR code in this
-# secrets-bearing pull_request_target / issue_comment workflow.
+# secrets-bearing issue_comment workflow.
+# It runs only when a trusted collaborator comments a command (owner,
+# 2026-11-11): the automatic review on every push cost about $27 in two days.
 name: PR Agent (OpenAI)
 
 on:
-  pull_request_target:
-    types: [opened, reopened, ready_for_review, synchronize]
   issue_comment:
     types: [created]
 
@@ -16,43 +16,158 @@ permissions:
 jobs:
   pr-agent:
     name: Review and requested code suggestions
+    # Only commands whose usage the cost ledger can read: /review and /improve
+    # publish an "Agent run details" block in an issue comment. /describe
+    # writes it into the PR description, which also overwrites the description
+    # the owner maintains, and /ask is not known to publish one. /help and
+    # /config call no model.
     if: >-
       github.event.sender.type != 'Bot' &&
+      github.event.issue.pull_request &&
+      contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association) &&
       (
-        (github.event_name == 'pull_request_target' && github.event.pull_request.draft == false) ||
-        (
-          github.event_name == 'issue_comment' &&
-          github.event.issue.pull_request &&
-          contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association) &&
-          (
-            startsWith(github.event.comment.body, '/review') ||
-            startsWith(github.event.comment.body, '/improve') ||
-            startsWith(github.event.comment.body, '/ask') ||
-            startsWith(github.event.comment.body, '/describe') ||
-            startsWith(github.event.comment.body, '/help') ||
-            startsWith(github.event.comment.body, '/config')
-          )
-        )
+        startsWith(github.event.comment.body, '/review') ||
+        startsWith(github.event.comment.body, '/improve') ||
+        startsWith(github.event.comment.body, '/help') ||
+        startsWith(github.event.comment.body, '/config')
       )
-    # Job-level concurrency is evaluated only for an eligible command/PR.
-    # Ordinary or unauthorized issue comments must never cancel a review.
-    # A push cancels the PR's older automatic review only. Each command
-    # comment gets its own group, so `/review` and `/improve` posted together
-    # both finish, and a later push never cancels a requested review.
+    # One job per PR, run one after another: the spending check, the model
+    # run and the cost ledger update all happen inside it, so a second command
+    # cannot read the total before the first one has been added to it, and a
+    # second run cannot overwrite PR-Agent's edited comment before its cost is
+    # captured. GitHub keeps one waiting run per group, so a command that
+    # arrives while two others are already queued is dropped: comment it again.
     concurrency:
-      group: pr-agent-${{ github.event.pull_request.number || github.event.issue.number }}-${{ github.event.comment.id || 'auto' }}
-      cancel-in-progress: true
+      group: pr-agent-${{ github.event.issue.number }}
+      cancel-in-progress: false
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
+    # Spending cap (owner, 2026-11-11): once the PR's running total in the cost
+    # comment reaches a cap, no further run starts on it until someone with
+    # write access adds the override label. Checked before the model is
+    # called, so the run in flight can overshoot by its own cost.
+    env:
+      PR_AGENT_COST_CAP_USD: '2.00'
+      # Second cap that does not depend on PR-Agent knowing the model's price:
+      # an unpriced model can print a $0.00 estimate for a real bill.
+      PR_AGENT_INPUT_TOKEN_CAP: '1000000'
+      # Third cap that counts commands, not what PR-Agent prints: a committable
+      # /improve publishes inline suggestions and no run details block, so its
+      # spending is invisible to the other two caps.
+      PR_AGENT_RUN_CAP: '20'
+      PR_AGENT_OVERRIDE_LABEL: pr-agent-override
     steps:
+      - name: Compare the running total with the cap
+        id: gate
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.issue.number }}
+          LABELS: ${{ toJSON(github.event.issue.labels.*.name) }}
+        run: |
+          set -euo pipefail
+          api="repos/$REPO/issues/$PR/comments"
+          all=$(gh api --paginate "$api?per_page=100" | jq -s '[.[][]]')
+          ledger=$(jq -r 'map(select(.user.login == "github-actions[bot]" and (.body | startswith("<!-- pr-agent-cost-ledger -->")))) | first | .body // ""' <<<"$all")
+          data=$(printf '%s\n' "$ledger" | sed -n 's/.*<!-- pr-agent-cost-data: \(.*\) -->.*/\1/p' | head -n1)
+          total=$(jq -r '(map(.cost) | add // 0) as $t | ($t * 100 | round) / 100' <<<"${data:-[]}")
+          tokens=$(jq -r 'map(.tokens_in) | add // 0' <<<"${data:-[]}")
+          runs=$(jq -r 'map(select(.kind == "run")) | length' <<<"${data:-[]}")
+          override=$(jq -r --arg l "$PR_AGENT_OVERRIDE_LABEL" 'index($l) != null' <<<"$LABELS")
+          echo "Running total \$$total of \$$PR_AGENT_COST_CAP_USD, $tokens of $PR_AGENT_INPUT_TOKEN_CAP input tokens, $runs of $PR_AGENT_RUN_CAP commands, override label present: $override"
+          if [ "$override" = "true" ] || { awk -v t="$total" -v c="$PR_AGENT_COST_CAP_USD" 'BEGIN { exit !(t < c) }' \
+               && [ "$tokens" -lt "$PR_AGENT_INPUT_TOKEN_CAP" ] && [ "$runs" -lt "$PR_AGENT_RUN_CAP" ]; }; then
+            echo "allowed=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "allowed=false" >> "$GITHUB_OUTPUT"
+          note="<!-- pr-agent-cost-cap -->
+          PR-Agent did not run: this PR's runs have added up to about \$$total and $tokens input tokens over $runs commands, which reaches a cap (\$$PR_AGENT_COST_CAP_USD, $PR_AGENT_INPUT_TOKEN_CAP input tokens or $PR_AGENT_RUN_CAP commands). To allow more runs, add the \`$PR_AGENT_OVERRIDE_LABEL\` label to the PR and comment the command again. The running total is in the \"PR-Agent cost on this PR\" comment."
+          existing=$(jq -r 'map(select(.user.login == "github-actions[bot]" and (.body | startswith("<!-- pr-agent-cost-cap -->")))) | first | .id // empty' <<<"$all")
+          if [ -n "$existing" ]; then
+            gh api -X PATCH "repos/$REPO/issues/comments/$existing" -f body="$note" >/dev/null
+          else
+            gh api -X POST "$api" -f body="$note" >/dev/null
+          fi
+
       # v0.49.0 GitHub Actions runtime: immutable versioned Docker image.
       - name: PR-Agent
+        if: steps.gate.outputs.allowed == 'true'
         uses: docker://pragent/pr-agent:0.49.0-github_action
         env:
           OPENAI_KEY: ${{ secrets.OPENAI_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          github_action_config.auto_review: 'true'
+          github_action_config.auto_review: 'false'
           github_action_config.auto_describe: 'false'
           github_action_config.auto_improve: 'false'
-          github_action_config.pr_actions: '["opened", "reopened", "ready_for_review", "synchronize"]'
           config.restricted_mode: 'true'
+
+      # PR-Agent edits its review and suggestion comments in place, so each one
+      # shows only its latest run. This step keeps one running comment per PR
+      # that adds up every run's own cost line (PR-Agent's estimate, rounded to
+      # cents; OpenAI's usage page is the bill). It reads comments through the
+      # API and never checks out or executes PR code.
+      - name: Add this run to the cost comment
+        if: ${{ !cancelled() && steps.gate.outputs.allowed == 'true' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.issue.number }}
+          SINCE: ${{ github.event.comment.created_at }}
+          COMMENT_BODY: ${{ github.event.comment.body }}
+          RUN_KEY: ${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          set -euo pipefail
+          api="repos/$REPO/issues/$PR/comments"
+          marker='<!-- pr-agent-cost-ledger -->'
+          all=$(gh api --paginate "$api?per_page=100" | jq -s '[.[][]]')
+          new=$(jq -c --arg since "$SINCE" '
+            def num($re): (capture($re).n | gsub(","; "") | tonumber) // 0;
+            [ .[]
+              | select(.user.login == "github-actions[bot]"
+                       and (.body | contains("Agent run details"))
+                       and .updated_at >= $since)
+              | .body as $b
+              | { key: "\(.id)@\(.updated_at)",
+                  kind: "usage",
+                  at: .updated_at,
+                  command: (if ($b | test("PR Code Suggestions")) then "improve"
+                            elif ($b | test("PR Reviewer Guide")) then "review"
+                            else "other" end),
+                  model: (($b | capture("- Model: (?<m>[^\n]+)").m) // "unknown"),
+                  tokens_in: ($b | num("- Tokens: (?<n>[0-9,]+) in")),
+                  tokens_out: ($b | num("/ (?<n>[0-9,]+) out")),
+                  calls: ($b | num("- AI calls: (?<n>[0-9]+)")),
+                  cost: (($b | capture("Estimated API cost: \\$(?<n>[0-9.]+)").n | tonumber) // 0) } ]
+            ' <<<"$all")
+          ledger=$(jq -c --arg m "$marker" 'map(select(.user.login == "github-actions[bot]" and (.body | startswith($m)))) | first // empty' <<<"$all")
+          old='[]'
+          id=''
+          if [ -n "$ledger" ]; then
+            id=$(jq -r '.id' <<<"$ledger")
+            old=$(jq -r '.body' <<<"$ledger" | sed -n 's/.*<!-- pr-agent-cost-data: \(.*\) -->.*/\1/p' | head -n1)
+            old=${old:-[]}
+          fi
+          word=${COMMENT_BODY%%[[:space:]]*}
+          run_row=$(jq -cn --arg key "run-$RUN_KEY" --arg cmd "${word:0:16}" --arg at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            '[{ key: $key, kind: "run", at: $at, command: $cmd, model: "", tokens_in: 0, tokens_out: 0, calls: 0, cost: 0 }]')
+          rows=$(jq -c --argjson old "$old" --argjson run "$run_row" '($run + .) as $cand | [ $cand[] | select(.key as $k | $old | map(.key) | index($k) | not) ] as $add | $old + $add' <<<"$new")
+          if [ "$(jq 'length' <<<"$rows")" = "$(jq 'length' <<<"$old")" ]; then
+            echo "No new PR-Agent run to add."
+            exit 0
+          fi
+          body=$(jq -r --arg m "$marker" '
+            def usd: (. * 100 | round) as $c
+              | "$\($c / 100 | floor).\($c % 100 | tostring | if length < 2 then "0" + . else . end)";
+            "\($m)\n<!-- pr-agent-cost-data: \(tojson) -->\n### PR-Agent cost on this PR\n\n"
+            + "Every run on this PR, as PR-Agent estimates it (rounded to cents; the OpenAI usage page is the bill).\n\n"
+            + "| Run | Command | Model | Calls | Tokens in | Tokens out | Est. cost |\n| --- | --- | --- | ---: | ---: | ---: | ---: |\n"
+            + (map(select(.kind != "run")) | to_entries | map("| \(.key + 1) | \(.value.command) | \(.value.model) | \(.value.calls) | \(.value.tokens_in) | \(.value.tokens_out) | \(.value.cost | usd) |") | join("\n"))
+            + "\n| | **Total** | | **\(map(.calls) | add)** | **\(map(.tokens_in) | add)** | **\(map(.tokens_out) | add)** | **\(map(.cost) | add | usd)** |\n"
+            + "\nCommands run: \(map(select(.kind == "run")) | length). A committable `/improve` publishes no run details, so its usage is not in the table; the command count still counts it.\n"
+          ' <<<"$rows")
+          if [ -n "$id" ]; then
+            gh api -X PATCH "repos/$REPO/issues/comments/$id" -f body="$body" >/dev/null
+          else
+            gh api -X POST "$api" -f body="$body" >/dev/null
+          fi
