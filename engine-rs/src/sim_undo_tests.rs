@@ -192,6 +192,18 @@ fn selling_the_floor_under_nothing_round_trips() {
 }
 
 #[test]
+fn removing_a_sold_condo_round_trips_its_buy_back() {
+    // #713: the removal nets the buy-back against the refund; undo returns that net.
+    let mut sim = tower();
+    let id = sim.tower.place(Kind::Condo, 2, 20).unit_id.unwrap();
+    let u = sim.tower.get_unit_mut(id).unwrap();
+    (u.state, u.ever_occupied, u.rent) = (UnitState::Occupied, true, Some(150_000.0));
+    round_trip(&mut sim, |s| {
+        assert!(s.remove_facility(id, RemovalMethod::Sell).ok)
+    });
+}
+
+#[test]
 fn building_and_selling_in_one_gesture_leaves_the_tower_as_it_was() {
     let mut sim = tower();
     let before = shape(&sim);
