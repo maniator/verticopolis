@@ -263,3 +263,16 @@ export function notesSinceRunning(info: UpdateInfo, runningVersion: string, seen
   const more = carried.length >= MAX_RELEASES && carried.every((r) => isNewerVersion(r.version, floor));
   return { ...info, notes, releases: shown, since: floor, ...(more ? { more } : {}) };
 }
+
+/**
+ * `info`, already narrowed by {@link notesSinceRunning} when its build was
+ * detected, narrowed again when the prompt opens: another tab may have shown
+ * some of its notes in between, which moved `seenVersion` past `info.since`.
+ * Unchanged when the seen version has not moved. The "earlier updates" line
+ * is dropped once it has, because the other tab already showed it.
+ */
+export function notesStillUnseen(info: UpdateInfo, runningVersion: string, seenVersion?: string): UpdateInfo {
+  if (!isNewerVersion(seenVersion, info.since ?? runningVersion)) return info;
+  const { more: _more, ...rest } = notesSinceRunning(info, runningVersion, seenVersion);
+  return rest;
+}

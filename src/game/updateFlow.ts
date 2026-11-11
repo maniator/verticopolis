@@ -1,6 +1,6 @@
 import type { GameApp } from "../main";
 import type { UpdateInfo } from "../pwa";
-import { rememberNotesSeen } from "../pwaUpdateInfo";
+import { notesStillUnseen, readNotesSeen, rememberNotesSeen } from "../pwaUpdateInfo";
 import { gameplaySession } from "../analytics";
 import { hasBlockingModal, isDialogOpen, isSplashUp } from "./interactionState";
 
@@ -68,8 +68,11 @@ export function showUpdatePrompt(app: GameApp): void {
   const activate = app.pendingUpdate!;
   app.updatePromptShown = true;
   app.shownUpdate = true; // freeze the sim while the prompt is up
-  // The notes up to this version are on screen now; a later prompt starts after them (#1897).
-  rememberNotesSeen(app.pendingUpdateInfo?.version);
+  // The notes were picked when the build was detected. Another tab may have
+  // shown some of them since, so drop those now, then record that the notes up
+  // to this version are on screen, so a later prompt starts after them (#1897).
+  const info = app.pendingUpdateInfo ? notesStillUnseen(app.pendingUpdateInfo, typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "dev", readNotesSeen()) : null;
+  rememberNotesSeen(info?.version);
   app.ui.showUpdatePrompt(
     // Update now: save the tower FIRST, then activate (skipWaiting + reload).
     // If the save fails we do NOT reload (dropping unsaved progress is the one
@@ -142,6 +145,6 @@ export function showUpdatePrompt(app: GameApp): void {
         /* best-effort, a failed baseline save just leaves the last autosave in place */
       }
     },
-    app.pendingUpdateInfo,
+    info,
   );
 }

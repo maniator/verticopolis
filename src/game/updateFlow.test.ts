@@ -52,6 +52,7 @@ function clearApp() {
 
 beforeEach(() => {
   sessionStorage.clear();
+  localStorage.clear();
   document.getElementById("splash")?.remove();
 });
 
@@ -153,6 +154,23 @@ describe("showUpdatePrompt remembers the notes it shows (#1897)", () => {
     raw.pendingUpdateInfo = { version: "3.0.2", notes: ["n"] };
     showUpdatePrompt(app);
     expect(localStorage.getItem(NOTES_SEEN_KEY)).toBe("3.0.2");
+  });
+  it("drops notes another tab showed after the build was detected", () => {
+    localStorage.clear();
+    const { app, raw, captured } = clearApp();
+    raw.pendingUpdateInfo = {
+      version: "3.0.3",
+      notes: ["c"],
+      since: "3.0.0",
+      releases: [
+        { version: "3.0.3", notes: ["c"] },
+        { version: "3.0.2", notes: ["b"] },
+      ],
+    };
+    localStorage.setItem(NOTES_SEEN_KEY, "3.0.2"); // the other tab's prompt
+    showUpdatePrompt(app);
+    expect((captured.last?.info as { releases: { version: string }[] }).releases.map((r) => r.version)).toEqual(["3.0.3"]);
+    expect(localStorage.getItem(NOTES_SEEN_KEY)).toBe("3.0.3");
   });
 });
 

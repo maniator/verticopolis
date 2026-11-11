@@ -6,6 +6,7 @@ import {
   withUpdateKind,
   isNewerVersion,
   notesSinceRunning,
+  notesStillUnseen,
   readNotesSeen,
   rememberNotesSeen,
   NOTES_SEEN_KEY,
@@ -280,5 +281,25 @@ describe("notes since the player's version (#1897)", () => {
     expect(readNotesSeen()).toBe("3.0.2");
     localStorage.setItem(NOTES_SEEN_KEY, "garbage");
     expect(readNotesSeen()).toBeUndefined();
+  });
+});
+
+describe("notes still unseen when the prompt opens (#1897)", () => {
+  const rel = (version: string) => ({ version, notes: [`${version} note.`] });
+  const detected = notesSinceRunning(
+    { version: "3.0.3", notes: ["3.0.3 note."], releases: [rel("3.0.3"), rel("3.0.2"), rel("3.0.1")] },
+    "3.0.0",
+  );
+
+  it("drops notes another tab showed between detection and display", () => {
+    const shown = notesStillUnseen(detected, "3.0.0", "3.0.2");
+    expect(shown.releases?.map((r) => r.version)).toEqual(["3.0.3"]);
+    expect(shown.since).toBe("3.0.2");
+    expect(notesStillUnseen(detected, "3.0.0", "3.0.3").releases).toEqual([]);
+  });
+
+  it("leaves the notes alone while the seen version has not moved", () => {
+    expect(notesStillUnseen(detected, "3.0.0", undefined)).toBe(detected);
+    expect(notesStillUnseen(detected, "3.0.0", "3.0.0")).toBe(detected);
   });
 });
