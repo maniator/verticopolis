@@ -128,6 +128,8 @@ export function coerceUnitRecord(sim: Simulation, u: SerializedGame["units"][num
     // indistinguishable from a fresh retail unit that hasn't earned yet.
     patronageToday: subtypeListFor(u.kind as FacilityKind) === null || u.patronageToday === undefined ? undefined : Math.max(0, num(u.patronageToday, 0)),
     patronageYest: subtypeListFor(u.kind as FacilityKind) === null || u.patronageYest === undefined ? undefined : Math.max(0, num(u.patronageYest, 0)),
+    // Carried for the Rust engine's census (#1500); the reference never reads it.
+    visitorsYest: subtypeListFor(u.kind as FacilityKind) === null || u.visitorsYest === undefined ? undefined : Math.max(0, num(u.visitorsYest, 0)),
     profitToday: subtypeListFor(u.kind as FacilityKind) === null || u.profitToday === undefined ? undefined : Math.max(0, num(u.profitToday, 0)),
     profitYest: subtypeListFor(u.kind as FacilityKind) === null || u.profitYest === undefined ? undefined : Math.max(0, num(u.profitYest, 0)),
     // Preserve an in-progress eviction across save/reload, hardened like

@@ -174,6 +174,15 @@ impl Unit {
             at.marks.note(at.i);
         }
     }
+
+    /// Set yesterday's served visitors, logging the unit when they change:
+    /// the census counts them for a shop, fast food or restaurant.
+    pub(crate) fn set_visitors_yest(&mut self, at: Mark<'_>, n: Option<u8>) {
+        if self.visitors_yest != n {
+            self.visitors_yest = n;
+            at.marks.note(at.i);
+        }
+    }
 }
 
 /// The rules the setters and the frame share with the unit predicates in

@@ -280,6 +280,7 @@ impl Tower {
             hotel_customers_in: None,
             out_for_meal: None,
             residents: None,
+            visitors_yest: None,
             ever_occupied: false,
             pending_income: 0.0,
             rent: None,

@@ -110,7 +110,7 @@ export interface RoomCounts {
  *  one marks its room. `roomCounts.test.ts` holds the counts to reading only
  *  these, and the writers guard (`src/tests/roomCountsWriters.guard.test.ts`)
  *  scans for writes of these. */
-export const COUNTED_FIELDS = ["state", "noRate", "everOccupied", "residents", "customersIn"] as const;
+export const COUNTED_FIELDS = ["state", "noRate", "everOccupied", "residents", "customersIn", "visitorsYest"] as const;
 
 /** The unit fields the port's view reads besides {@link COUNTED_FIELDS}: the
  *  frame's counters and the meta log's text. A write of one marks its room as

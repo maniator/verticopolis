@@ -87,7 +87,7 @@ const RAW_WRITES: Record<string, Record<string, number>> = {
   // closed venue goes through presence's emptyVenue).
   "src/engine/EconomySystem.ts": { occupants: 3 },
   // gut(), startFire(), spreadFireTo(): covered by their setRoomState.
-  "src/engine/EventSystem.ts": { everOccupied: 1, residents: 1, label: 1, occupants: 3 },
+  "src/engine/EventSystem.ts": { everOccupied: 1, residents: 1, label: 1, occupants: 3, visitorsYest: 1 },
   // setLabel(): markRoom after the write.
   "src/engine/Tower.ts": { label: 1 },
   // syncAttendanceOccupants(): each caller marks the venue, the crowd beside
@@ -112,13 +112,15 @@ const RAW_WRITES: Record<string, Record<string, number>> = {
   "src/engine/sim/churn.ts": { everOccupied: 7, residents: 3, label: 4, occupants: 1, subtype: 1 },
   // The save writer, serializeUnit(): its writes go only into the new record
   // it builds from a unit.
-  "src/engine/sim/coerce.ts": { state: 1, everOccupied: 1, residents: 1, noRate: 1, occupants: 1, label: 1, subtype: 1 },
+  "src/engine/sim/coerce.ts": { state: 1, everOccupied: 1, residents: 1, noRate: 1, occupants: 1, label: 1, subtype: 1, visitorsYest: 1 },
   // updatePresence(), emptyVenue(): markRoom when a room's count moved.
   "src/engine/sim/presence.ts": { occupants: 8 },
   // priceUnit(), setNoRate(), computeBatch(): markRoom after each write.
   "src/engine/sim/rent.ts": { noRate: 4 },
   // The paid extermination: covered by its setRoomState.
   "src/engine/sim/services.ts": { occupants: 1 },
+  // rollOverRetailDay(): markRoom after the venue's visitors change (#1500).
+  "src/engine/sim/satisfaction.ts": { visitorsYest: 1 },
   // setRoomState itself.
   "src/engine/tower/rooms.ts": { state: 1 },
   // The shared reader's own decoded rooms, never an engine unit: it keeps

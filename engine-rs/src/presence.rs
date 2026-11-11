@@ -138,7 +138,7 @@ impl Simulation {
                 metro += 1;
             }
             if u.is_present() {
-                let p = u.census_count();
+                let p = u.live_load();
                 if p > 0 && u.floor != 1 {
                     *pop_by_floor.entry(u.floor).or_insert(0.0) += p as f64;
                 }

@@ -2,6 +2,7 @@
 
 use indexmap::IndexMap;
 
+use super::visitors::{climb_steps, expected_visitors, served_visitors};
 use super::{
     is_overhead_kind, ledger_cat_for, rental_message, service_maintenance_monthly,
     CINEMA_BOOKING_BLOCKBUSTER, CINEMA_BOOKING_MONTHLY, MAINTENANCE_PER_CAR_MONTHLY,
@@ -129,7 +130,10 @@ impl Simulation {
 
     /// `rollOverRetailDay`.
     pub fn roll_over_retail_day(&mut self) {
-        for u in self.tower.units.iter_mut() {
+        // The day that just ended: its weekend sets the venues' caps.
+        let ended_weekend = self.clock.is_weekend_on(self.clock.day() - 1);
+        for i in 0..self.tower.units.len() {
+            let u = &self.tower.units[i];
             if u.kind.subtype_list().is_none() || !u.is_operational() {
                 continue;
             }
@@ -140,6 +144,15 @@ impl Simulation {
                 || tally.profit_yest.is_some();
             if !has_data {
                 continue;
+            }
+            let served_before = u.visitors_yest.map(i64::from);
+            let steps = climb_steps(self.rng.initial_seed, self.clock.day() - 1, u.id);
+            let (u, at) = self.tower.marked(i);
+            if let Some(expected) = expected_visitors(u.kind, ended_weekend, served_before, steps) {
+                let patronage = u.extras().patronage_today.unwrap_or(0.0);
+                let served = served_visitors(expected, patronage);
+                // Served never exceeds a cap, and every cap fits a byte.
+                u.set_visitors_yest(at, Some(u8::try_from(served).unwrap_or(u8::MAX)));
             }
             let mut tally = u.extras_mut();
             tally.patronage_yest = Some(tally.patronage_today.unwrap_or(0.0));

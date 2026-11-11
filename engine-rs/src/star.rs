@@ -1,5 +1,6 @@
 //! Port of `sim/star.ts` and `milestones.ts`.
 
+use crate::economy::visitors::counts_daily_visitors;
 use crate::facilities::Kind;
 use crate::gameplay::GameplayEvent;
 use crate::sim::{LogKind, Simulation};
@@ -24,7 +25,10 @@ impl Simulation {
         for u in self.tower.room_units() {
             if u.is_present() && !u.kind.is_hotel() {
                 pop += u.census_count();
-                if u.kind.is_commercial() && u.kind.facility().population > 0 {
+                if u.kind.is_commercial()
+                    && u.kind.facility().population > 0
+                    && !counts_daily_visitors(u.kind)
+                {
                     pop -= u
                         .hotel_customers_in
                         .unwrap_or(0)

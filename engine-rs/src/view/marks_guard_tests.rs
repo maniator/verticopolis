@@ -38,6 +38,7 @@ fn the_frame_and_the_census_read_only_marked_fields() {
             hotel_customers_in: _,
             out_for_meal: _,
             residents: _,
+            visitors_yest: _,
             ever_occupied,
             pending_income,
             rent,
@@ -111,13 +112,14 @@ fn the_frame_and_the_census_read_only_marked_fields() {
 }
 
 /// The fields the setters in `view/marks.rs` write.
-pub(super) const FIELDS: [&str; 6] = [
+pub(super) const FIELDS: [&str; 7] = [
     "state",
     "occupants",
     "customers_in",
     "hotel_customers_in",
     "out_for_meal",
     "residents",
+    "visitors_yest",
 ];
 
 /// The methods that only read a frame field (a `UnitState`, an `i64` or an
@@ -320,7 +322,7 @@ fn only_the_setters_write_the_frame_fields() {
         writers.iter().all(|w| w.starts_with("view/marks.rs:")),
         "{writers:?}"
     );
-    assert_eq!(writers.len(), 6, "{writers:?}");
+    assert_eq!(writers.len(), FIELDS.len(), "{writers:?}");
 }
 
 /// `load/assemble.rs`'s one fill of a unit list, one of the list half's three

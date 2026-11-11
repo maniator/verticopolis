@@ -1,6 +1,7 @@
 //! Reading a save into a `Simulation`: the entry points and the per-unit reader.
 
 use super::*;
+use crate::economy::visitors::counts_daily_visitors;
 use crate::tower::Extras;
 
 /// The sentence a save written by a newer build is refused with.
@@ -242,6 +243,12 @@ pub(crate) fn unit_from_value(u: &Value, modern: bool) -> Option<(Unit, Option<i
         hotel_customers_in: None,
         out_for_meal: None,
         residents,
+        visitors_yest: if counts_daily_visitors(kind) {
+            u.get("visitorsYest")
+                .map(|v| num(Some(v), 0.0).clamp(0.0, f64::from(u8::MAX)).floor() as u8)
+        } else {
+            None
+        },
         ever_occupied,
         pending_income: num(u.get("pendingIncome"), 0.0),
         rent,

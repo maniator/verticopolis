@@ -48,7 +48,13 @@ export class Clock {
   get isWeekend(): boolean {
     // The weekend is the trailing `weekendDays` slots of the week (real-world:
     // Sat+Sun of 7; canon: the last 1 of 3).
-    return this.dayOfWeek >= this.calendar.weekDays - this.calendar.weekendDays;
+    return this.isWeekendOn(this.day);
+  }
+
+  /** Whether `day` (a day number, as `day` gives) falls on a weekend. */
+  isWeekendOn(day: number): boolean {
+    const dow = ((day % this.calendar.weekDays) + this.calendar.weekDays) % this.calendar.weekDays;
+    return dow >= this.calendar.weekDays - this.calendar.weekendDays;
   }
 
   /** Quarter index 0..3 used for office rent collection. */

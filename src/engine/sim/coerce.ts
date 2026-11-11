@@ -47,7 +47,7 @@ export function serializeUnit(u: Unit): SerializedUnit {
   // future field is added to Unit, `unhandled` stops satisfying
   // Record<string, never> and this fails to compile, forcing the new field
   // into the omit table below instead of silently vanishing from saves.
-  const { id, kind, floor, x, width, state, satisfaction, occupants, everOccupied, pendingIncome, label, residents, rent, noRate, vacateReason, vacateAt, filmPolicy, subtype, patronageToday, patronageYest, profitToday, profitYest, completeAt, dirtyDays, outForMeal: _outForMeal, customersIn: _customersIn, hotelCustomersIn: _hotelCustomersIn, ...unhandled } = u;
+  const { id, kind, floor, x, width, state, satisfaction, occupants, everOccupied, pendingIncome, label, residents, rent, noRate, vacateReason, vacateAt, filmPolicy, subtype, patronageToday, patronageYest, visitorsYest, profitToday, profitYest, completeAt, dirtyDays, outForMeal: _outForMeal, customersIn: _customersIn, hotelCustomersIn: _hotelCustomersIn, ...unhandled } = u;
   void _outForMeal; // Transient: not persisted; a save/reload resets it to 0.
   void _customersIn; // Transient: not persisted; rebuilt from meal round-trips.
   void _hotelCustomersIn; // Transient: the hotel-origin subset of customersIn.
@@ -85,6 +85,7 @@ export function serializeUnit(u: Unit): SerializedUnit {
   if (subtypeListFor(kind) !== null) {
     if (patronageToday !== undefined) out.patronageToday = patronageToday;
     if (patronageYest !== undefined) out.patronageYest = patronageYest;
+    if (visitorsYest !== undefined) out.visitorsYest = visitorsYest;
     if (profitToday !== undefined) out.profitToday = profitToday;
     if (profitYest !== undefined) out.profitYest = profitYest;
   }
