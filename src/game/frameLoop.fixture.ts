@@ -1,35 +1,29 @@
 import { vi } from "vitest";
 import type { GameApp } from "../main";
-import { Simulation } from "../engine/Simulation";
-import { TsEngine } from "../engine/port/tsEngine";
-import { advanceOwedMinutes } from "../engine/sim/frameStep";
 import { PortCodes } from "../simport/portCodes";
+import { mockPort } from "../tests/portKit/mockPort";
 
 /** The fake engine port the frame loop tests drive: its commands land on the
  *  spies of a fake sim. */
 interface SpiedSim {
-  tick: unknown;
-  clock: { minuteOfDay: number };
   resolveChoice: unknown;
   emit: unknown;
   evaluatedTower?: boolean;
 }
 
-export const portCodes = new PortCodes(new TsEngine(Simulation.newGame(1)));
+/** The codes, from the engine's published layout. */
+export const portCodes = new PortCodes(mockPort());
 const LOG_KINDS = ["info", "good", "bad", "money"];
 /** The date slots a fake header carries (a real one reads them off the engine). */
 const DATE_SLOTS = { day: 0, dayOfWeek: 0, isWeekend: false, quarter: 0, year: 0, weekDays: 7, weekendDays: 2 };
 
 export function fakeEnginePort(sim: SpiedSim) {
-  // The step mode outlives a frame, as the engine's does.
-  const debt = { minutes: 0 };
   return {
     generation: vi.fn(() => 0),
-    advance: vi.fn((owed: number, dtMs: number, minutesPerSecond: number, steadyClock: boolean, step: boolean) => {
-      const host = { sim: sim as { tick(dt: number): void; clock: { minuteOfDay: number } }, accMinutes: owed };
-      advanceOwedMinutes(host, debt, dtMs, minutesPerSecond, steadyClock, step);
-      return Float64Array.of(0, host.accMinutes);
-    }),
+    // How the engine cuts owed minutes into steps is its own
+    // (`engine-rs/tests/fixed_step.rs`): this one steps nothing and hands back
+    // the carry it was given, unless a test answers otherwise.
+    advance: vi.fn((owed: number, _dtMs: number, _minutesPerSecond: number, _steadyClock: boolean, _step: boolean) => Float64Array.of(0, owed)),
     hotspot: vi.fn(() => Float64Array.of(0, NaN)),
     evaluatedTower: vi.fn(() => sim.evaluatedTower === true),
     answerChoice: vi.fn((accept: boolean) => {
@@ -61,11 +55,10 @@ export function fakeReader(sim: { star: number; pendingChoice: unknown; clock: {
   };
 }
 
-/** The fake simulation behind a frame loop test's app: the tick, the clock,
- *  the emergency and the event drain the loop drives. */
+/** The fake simulation behind a frame loop test's app: the clock, the
+ *  emergency and the event drain the loop drives. */
 export interface FakeSim {
   clock: { minuteOfDay: number; minutes: number; calendar: { weekDays: number; weekendDays: number } };
-  tick: ReturnType<typeof vi.fn>;
   star: number;
   pendingChoice: { kind?: "fireRescue" | "bombThreat"; message: string; cost: number } | null;
   evaluatedTower: boolean;
@@ -80,7 +73,6 @@ export interface FakeSim {
 export function makeSim(over: Partial<FakeSim> = {}): FakeSim {
   return {
     clock: { minuteOfDay: 0, minutes: 0, calendar: { weekDays: 7, weekendDays: 2 } },
-    tick: vi.fn(),
     star: 1,
     pendingChoice: null,
     evaluatedTower: false,

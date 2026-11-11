@@ -1,10 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { facilityFloors } from "../engine/facilities";
-import { Simulation } from "../engine/Simulation";
-import { towerCatalog } from "../catalog/towerCatalog";
-import { TsEngine } from "../engine/port/tsEngine";
 import { PortCodes } from "../simport/portCodes";
-import { ViewReader } from "../simport/viewReader";
+import type { SimView } from "../simport/view";
+import { catalogFor } from "../tests/catalogFixture";
+import { mockPort, record } from "../tests/portKit/mockPort";
 import { onHistoryClick, setHistoryButtons, toast, update, type HudSource } from "./uiStatus";
 import type { Catalog } from "../catalog/catalogTypes";
 import type { GameMode } from "../shared/types";
@@ -113,21 +111,36 @@ describe("toast rail", () => {
   });
 });
 
-/** A UI whose elements are made on demand, pumped from `sim` through the port.
- *  The palette, catalog and log keys already match, so only the status bar,
- *  the mode badge, the stats grid and the Undo and Redo buttons draw. */
-function hud(sim: Simulation) {
+/** The header the HUD reads: a 1-star Classic tower at 07:00 on day one. */
+const HEADER = { money: 2_000_000, star: 1, mode: "classic", logSeq: 0, minutes: 420, day: 0, dayOfWeek: 0, isWeekend: false, quarter: 0, year: 0, weekDays: 7, weekendDays: 2 };
+
+/** A HUD source over a mock port: the strip, the log and the steps it answers,
+ *  and a reader whose header a test states. */
+function source(header: Partial<typeof HEADER> = {}, strip: Record<string, number> = { population: 6 }, depths: number[] = [0, 0]) {
+  const port = mockPort({
+    statsStrip: () => record("statsStrip", strip),
+    logAfter: () => new Float64Array(0),
+    undoDepths: () => Float64Array.from(depths),
+  });
+  const reader = { header: { ...HEADER, ...header }, tower: { towerName: "Tower One" } } as unknown as Pick<SimView, "header" | "tower">;
+  const src: HudSource = { reader, port, codes: new PortCodes(port) };
+  return { src, port };
+}
+
+/** A UI whose elements are made on demand. The palette, catalog and log keys
+ *  already match `header`, so only the status bar, the mode badge, the stats
+ *  grid and the Undo and Redo buttons draw. */
+function hud(header: Partial<typeof HEADER> = {}) {
   const made: Record<string, HTMLElement> = { undo: document.createElement("button"), redo: document.createElement("button") };
   const el = new Proxy(made, {
     get: (target, key: string) => (target[key] ??= document.createElement("div")),
   });
-  const catalog = towerCatalog(sim);
-  let scanKey = sim.mode + ":" + sim.star;
-  for (const f of catalog.facilities) scanKey += sim.money >= f.cost ? "1" : "0";
-  const ui = { el, cb: { getCatalog: () => catalog }, paletteCatalog: catalog, paletteScanKey: scanKey, lastLogSeq: sim.logSeq, tool: { type: "inspect" }, setTowerName: () => {} } as unknown as UI;
-  const port = new TsEngine(sim);
-  const src: HudSource = { reader: new ViewReader(port, facilityFloors), port, codes: new PortCodes(port) };
-  return { ui, el, src, port };
+  const h = { ...HEADER, ...header };
+  const catalog = catalogFor("classic");
+  let scanKey = h.mode + ":" + h.star;
+  for (const f of catalog.facilities) scanKey += h.money >= f.cost ? "1" : "0";
+  const ui = { el, cb: { getCatalog: () => catalog }, paletteCatalog: catalog, paletteScanKey: scanKey, lastLogSeq: h.logSeq, tool: { type: "inspect" }, setTowerName: () => {} } as unknown as UI;
+  return { ui, el };
 }
 
 describe("update", () => {
@@ -135,39 +148,25 @@ describe("update", () => {
     vi.restoreAllMocks();
   });
 
-  it("reads stats() once and labels the population from it", () => {
-    const sim = Simulation.newGame(3, "classic");
-    sim.money = 1e9;
-    for (let x = 170; x < 200; x++) expect(sim.build("lobby", 1, x).ok).toBe(true);
-    expect(sim.build("office", 2, 175).ok).toBe(true);
-    for (const u of sim.tower.units) if (u.kind === "office") u.state = "occupied";
-    const want = sim.stats().population;
-    expect(want).toBeGreaterThan(0);
-    const { ui, el, src } = hud(sim);
+  it("reads the stats strip once and labels the population from it", () => {
+    const header = { money: 123_456_789 };
+    const { ui, el } = hud(header);
     // A population big enough to need a separator, so the grouping shows.
-    const strip = { ...sim.stats(), population: 12_345 };
-    const reads = vi.spyOn(sim, "stats").mockReturnValue(strip);
-    const population = vi.spyOn(sim, "population", "get");
-    const census = vi.spyOn(sim.tower, "totalPopulation");
+    const { src, port } = source(header, { population: 12_345 });
     // A German default would group with dots; the English UI groups the US way.
     useGermanDefaultLocale();
     update(ui, src);
-    expect(reads).toHaveBeenCalledTimes(1);
-    expect(population).not.toHaveBeenCalled();
-    expect(census).not.toHaveBeenCalled();
+    expect(port.statsStrip).toHaveBeenCalledOnce();
     expect(el.pop.textContent).toBe("12,345");
     // Funds are in the hundreds of millions here, so they carry separators.
-    expect(el.money.textContent).toBe(`$${String(Math.round(sim.money)).replace(/\B(?=(\d{3})+$)/g, ",")}`);
-    expect(el.money.textContent).toMatch(/^\$\d{3},\d{3},\d{3}$/);
+    expect(el.money.textContent).toBe("$123,456,789");
   });
 
   it("shows funds that round to zero as $0 in the funds color, and a bad value as NaN", () => {
-    const sim = Simulation.newGame(3, "classic");
     // A fresh HUD per value, so the reader takes the new funds.
     const shown = (money: number) => {
-      sim.money = money;
-      const { ui, el, src } = hud(sim);
-      update(ui, src);
+      const { ui, el } = hud({ money });
+      update(ui, source({ money }).src);
       return { text: el.money.textContent, color: el.money.style.color };
     };
     expect(shown(-0.3)).toEqual({ text: "$0", color: "var(--money)" });
@@ -176,26 +175,18 @@ describe("update", () => {
   });
 
   it("grays out Undo and Redo from the engine's steps on every pump", () => {
-    const sim = Simulation.newGame(3, "classic");
-    sim.money = 1e9;
-    const { ui, el, src, port } = hud(sim);
+    // What the engine holds after an edit, an undo, a redo and a load is its
+    // own (engine-rs/src/sim_undo_tests.rs); the HUD shows whatever it answers.
+    const { ui, el } = hud();
     const grayed = () => [el.undo, el.redo].map((b) => b.getAttribute("aria-disabled") === "true");
-    update(ui, src);
-    expect(grayed(), "a new tower has no steps").toEqual([true, true]);
-    port.undoCapture("Build Lobby");
-    expect(sim.build("lobby", 1, 180).ok).toBe(true);
-    port.undoCommit();
-    update(ui, src);
-    expect(grayed(), "after an edit").toEqual([false, true]);
-    port.undo();
-    update(ui, src);
-    expect(grayed(), "after its undo").toEqual([true, false]);
-    port.redo();
-    update(ui, src);
-    expect(grayed(), "after its redo").toEqual([false, true]);
-    expect(port.loadSave(port.serialize())[0], "a tower adopted through the port").toBe(1);
-    update(ui, src);
-    expect(grayed(), "forgets the steps").toEqual([true, true]);
+    const pumped: boolean[][] = [];
+    for (const depths of [[0, 0], [1, 0], [0, 1], [1, 0], [0, 0]]) {
+      const { src, port } = source({}, { population: 6 }, depths);
+      update(ui, src);
+      expect(port.undoDepths).toHaveBeenCalledOnce();
+      pumped.push(grayed());
+    }
+    expect(pumped).toEqual([[true, true], [false, true], [true, false], [false, true], [true, true]]);
   });
 });
 
@@ -279,9 +270,7 @@ describe("the palette's lock scan", () => {
   // the engine's own rule, so a Modern-only venue stays hidden in Classic at
   // any star and shows in Modern once the star allows it.
   const lockScan = (mode: GameMode, edit: (catalog: Catalog) => Catalog = (c) => c) => {
-    const sim = Simulation.newGame(3, mode);
-    sim.star = 5;
-    const base = towerCatalog(sim);
+    const base = catalogFor(mode);
     let catalog = edit(base);
     const palette = document.createElement("div");
     for (const kind of ["foodHall", "office"]) {
@@ -293,10 +282,9 @@ describe("the palette's lock scan", () => {
     const el = new Proxy({ palette } as Record<string, HTMLElement>, {
       get: (made, key: string) => (made[key] ??= document.createElement("div")),
     });
-    const ui = { el, cb: { getCatalog: () => catalog }, paletteCatalog: catalog, paletteScanKey: "", lastLogSeq: sim.logSeq, tool: { type: "inspect" }, setTowerName: () => {} } as unknown as UI;
+    const ui = { el, cb: { getCatalog: () => catalog }, paletteCatalog: catalog, paletteScanKey: "", lastLogSeq: 0, tool: { type: "inspect" }, setTowerName: () => {} } as unknown as UI;
     ui.selectTool = (tool) => { ui.tool = tool; };
-    const port = new TsEngine(sim);
-    const pump = () => update(ui, { reader: new ViewReader(port, facilityFloors), port, codes: new PortCodes(port) });
+    const pump = () => update(ui, source({ mode, star: 5, money: 1e9 }).src);
     pump();
     return {
       ui,

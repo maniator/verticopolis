@@ -3,9 +3,8 @@ import { catalogFor } from "../tests/catalogFixture";
 import type { GameMode } from "../shared/types";
 import { createUICallbacks, type GameAppPorts } from "./uiCallbacks";
 import { NO_GESTURE } from "./appHistory";
-import { Simulation } from "../engine/Simulation";
 import type { EnginePort } from "../simport/enginePort";
-import { TsEngine } from "../engine/port/tsEngine";
+import { mockPort } from "../tests/portKit/mockPort";
 import { PortCodes } from "../simport/portCodes";
 
 /**
@@ -25,7 +24,7 @@ function makePorts() {
     getCatalog: vi.fn(() => catalogFor("classic")),
     reader,
     enginePort: { flipAutoBridge: vi.fn(() => Float64Array.of(1, 0, 0)), autoBridge: vi.fn(() => true) } as unknown as EnginePort,
-    portCodes: new PortCodes(new TsEngine(Simulation.newGame(1))),
+    portCodes: new PortCodes(mockPort()),
     audio: { muted: true, musicVolume: 0.4, ambienceVolume: 0.7, sfxVolume: 0.6 },
     saveLoad: {
       save: vi.fn(),

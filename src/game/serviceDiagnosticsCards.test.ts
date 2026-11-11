@@ -1,120 +1,115 @@
-import { describe, expect, it } from "vitest";
-import { facilityFloors } from "../engine/facilities";
-import { TsEngine } from "../engine/port/tsEngine";
-import type { EnginePort } from "../simport/enginePort";
-import { ViewReader } from "../simport/viewReader";
-import { serviceDiagnosticsFixture, retailServiceFixture, setFixtureHotelState } from "../tests/fixtures/serviceDiagnostics.fixture";
+import { describe, expect, it, vi } from "vitest";
 import { html } from "lit-html";
+import type { ServiceDiagnosticFacts } from "../simport/enginePort";
+import type { ViewReader } from "../simport/viewReader";
+import { LAYOUT, code, mockPort, record } from "../tests/portKit/mockPort";
 import { renderToFragment } from "../ui/testing/litTestUtils";
 import { unitEditorTemplate } from "../ui/templates/editor";
 import { unitInspectorTemplate } from "../ui/templates/inspector";
 import { createCardKit } from "./cardKit";
 
-/** Exercise the exact Rust UI branch: EnginePort without a .sim property.
- * The separate WASM integration tests prove the real Rust binder's facts. */
-function hostedFixture() {
-  const f = serviceDiagnosticsFixture();
-  const ts = new TsEngine(f.sim);
-  let reads = 0;
-  const port = new Proxy(ts, {
-    get(target, key) {
-      if (key === "sim") return undefined;
-      if (key === "serviceDiagnostics") return (id: number) => {
-        reads++;
-        return target.serviceDiagnostics(id);
-      };
-      return Reflect.get(target, key, target);
-    },
-  }) as unknown as EnginePort;
-  const reader = new ViewReader(port, facilityFloors);
+/**
+ * The service sections on a unit's card, through the card kit over a mock
+ * port: the engine's service facts reach the editor and the inspector, the
+ * kit reads them once until it is told the tower moved, and a unit with no
+ * service facts adds no service lines. The wording of each section is
+ * `portServiceDiagnostics.test.ts`; the facts on the Rust engine (an inert
+ * unit's sections switched off included) are
+ * `portServiceDiagnostics.integration.test.ts`.
+ */
+
+const ID = 40;
+
+const NONE: ServiceDiagnosticFacts = {
+  hotel: { rating: "notApplicable", condition: "other", infestDays: null, recovery: null },
+  parking: { status: "notApplicable", shortage: null, have: null, total: null, offices: null, suites: null },
+  retail: { active: false, today: null, barWidth: null, tier: "notApplicable", localDemandPct: null, advice: "none", profitYest: null, rainy: null },
+  commercial: { lobbyFar: null },
+  housekeeping: {
+    status: "notApplicable", crews: null, maids: null, rooms: null, maidsPerUnit: null, roomsPerMaid: null,
+    cleaned: null, leftover: null, infested: null, outOfReach: null, hasInfested: null, hasOutOfReach: null, recovery: null,
+  },
+};
+
+const DIRTY_HOTEL: ServiceDiagnosticFacts = { ...NONE, hotel: { rating: "excluded", condition: "dirty", infestDays: 3, recovery: false } };
+const INFESTED_HOTEL: ServiceDiagnosticFacts = { ...NONE, hotel: { rating: "excluded", condition: "infested", infestDays: null, recovery: true } };
+const HOUSEKEEPING: ServiceDiagnosticFacts = {
+  ...NONE,
+  housekeeping: { ...NONE.housekeeping, status: "adequate", crews: 1, maids: 6, rooms: 10, maidsPerUnit: 6, roomsPerMaid: 2, cleaned: 10, leftover: 0, infested: 0, outOfReach: 0, hasInfested: false, hasOutOfReach: false, recovery: false },
+};
+const SHOP: ServiceDiagnosticFacts = { ...NONE, retail: { active: true, today: 3, barWidth: 1, tier: "low", localDemandPct: null, advice: "none", profitYest: 100, rainy: false } };
+
+/** A kit whose port answers one occupied unit of `kind` with `facts`. */
+function kitFor(kind: string, facts: ServiceDiagnosticFacts | undefined) {
+  const port = mockPort({
+    unitCard: () => record("unitCard", { id: ID, kindCode: code("kinds", kind), floor: 2, x: 170, width: 9, stateCode: code("unitStates", "occupied"), rent: NaN, price: 0, vacateReason: NaN, filmPolicy: NaN, blockbuster: NaN, served: 1, reachable: 1, floorHasLobby: 1 }),
+    unitLabel: () => undefined,
+    unitSubtype: () => undefined,
+    unitFacts: () => record("unitFacts", { id: ID, access: (LAYOUT as unknown as { accessLines: string[] }).accessLines.indexOf("reachable") }),
+    serviceDiagnostics: () => facts,
+    generation: () => 1,
+  });
+  const header = { revision: 1, minutes: 600, minuteOfDay: 600, population: 100, star: 4, mode: "classic" };
+  const reader = { header, tower: { revision: 1 } } as unknown as ViewReader;
   const kit = createCardKit({ enginePort: port, reader });
-  const copy = (id: number, fresh = true) => kit.diagnostics.unit(id, fresh)
-    .map((line) => line.strings.map((s, i) => s + (i < line.values.length ? String(line.values[i]) : "")).join(""))
-    .join("\n");
-  return { ...f, port, reader, kit, copy, reads: () => reads };
+  const copy = (fresh = true) => renderToFragment(html`${kit.diagnostics.unit(ID, fresh)}`).textContent ?? "";
+  return { port, kit, header, copy };
 }
 
-describe("service inspector cards against the Rust-style EnginePort", () => {
-  it("renders dirty and infested hotel warnings on desktop and mobile without accessing a TS tower", () => {
-    const f = hostedFixture();
-    f.sim.star = 4;
-    setFixtureHotelState(f, "dirty");
-    const lines = f.kit.diagnostics.unit(f.hotel.id, true);
-    const unit = f.kit.cards.unit(f.hotel.id);
-    if (!unit) throw new Error("fixture's hotel card is missing");
-    const mobile = renderToFragment(unitEditorTemplate(unit, f.kit.catalog(), 12, true, lines));
-    const desktop = renderToFragment(unitInspectorTemplate(unit, f.kit.catalog(), 12, lines));
+describe("service sections on a unit's card", () => {
+  it("shows a dirty hotel's warnings in the editor and the inspector, and an infested one's", () => {
+    const { kit, copy } = kitFor("hotelSingle", DIRTY_HOTEL);
+    const lines = kit.diagnostics.unit(ID, true);
+    const unit = kit.cards.unit(ID)!;
+    const mobile = renderToFragment(unitEditorTemplate(unit, kit.catalog(), 12, true, lines));
+    const desktop = renderToFragment(unitInspectorTemplate(unit, kit.catalog(), 12, lines));
     for (const target of [mobile.textContent, desktop.textContent]) {
       expect(target).toContain("Counts toward stars: no");
       expect(target).toContain("Left dirty for 3 days");
     }
-    setFixtureHotelState(f, "infested");
-    const text = f.copy(f.hotel.id, true);
-    expect(text).toContain("Cockroach infested");
-    expect(text).toContain("Call an exterminator");
+    expect(copy()).toContain("Left dirty for 3 days");
+    const infested = kitFor("hotelSingle", INFESTED_HOTEL).copy();
+    expect(infested).toContain("Cockroach infested");
+    expect(infested).toContain("Call an exterminator");
   });
 
-  it("shows connected and disconnected parking in the inspector without inventing per-space demand", () => {
-    const f = hostedFixture();
-    expect(f.copy(f.connectedParking.id)).toContain("Ramp access: connected");
-    const disconnected = f.copy(f.disconnectedParking.id);
-    expect(disconnected).toContain("Ramp access: none");
-    expect(disconnected).not.toContain("Parking demand:");
-    expect(f.copy(f.ramp.id)).toContain("Parking demand:");
+  it("reads the engine's facts once until it is told the tower moved, and never repeats a line", () => {
+    const { port, kit, header, copy } = kitFor("housekeeping", HOUSEKEEPING);
+    const text = copy();
+    expect(text.match(/Fields 6 maids/g)).toHaveLength(1);
+    expect(port.serviceDiagnostics).toHaveBeenCalledExactlyOnceWith(ID);
+    for (let i = 0; i < 8; i++) expect(copy(false)).toBe(text);
+    expect(port.serviceDiagnostics, "the kit kept the lines it read").toHaveBeenCalledOnce();
+    kit.diagnostics.invalidate();
+    expect(copy(false)).toBe(text);
+    expect(port.serviceDiagnostics).toHaveBeenCalledTimes(2);
+    header.revision = 2;
+    copy(false);
+    expect(port.serviceDiagnostics, "a new revision reads again").toHaveBeenCalledTimes(3);
+    copy(true);
+    expect(port.serviceDiagnostics, "a fresh read always asks").toHaveBeenCalledTimes(4);
   });
 
-  it("shows the engine's housekeeping coverage and never duplicates warnings on refresh", () => {
-    const f = hostedFixture();
-    const text = f.copy(f.housekeeping.id);
-    expect(text).toContain("Fields 6 maids");
-    expect(text).toContain("Tower: 1 crew");
-    expect(text).not.toContain("Falling behind:");
-    expect((text.match(/Fields 6 maids/g) ?? [])).toHaveLength(1);
-    const count = f.reads();
-    for (let i = 0; i < 8; i++) f.kit.diagnostics.unit(f.housekeeping.id);
-    expect(f.reads()).toBe(count);
-    f.kit.diagnostics.invalidate();
-    f.kit.diagnostics.unit(f.housekeeping.id);
-    expect(f.reads()).toBeGreaterThan(count);
-  });
-
-  it("does not duplicate commercial lines through the Rust-style card cache and refresh", () => {
-    const fixture = retailServiceFixture("modern");
-    const ts = new TsEngine(fixture.sim);
-    let reads = 0;
-    const port = new Proxy(ts, {
-      get(target, key) {
-        if (key === "sim") return undefined;
-        if (key === "serviceDiagnostics") return (id: number) => {
-          reads++;
-          return target.serviceDiagnostics(id);
-        };
-        return Reflect.get(target, key, target);
-      },
-    }) as unknown as EnginePort;
-    const reader = new ViewReader(port, facilityFloors);
-    const kit = createCardKit({ enginePort: port, reader });
-    const count = (parts: ReturnType<typeof kit.diagnostics.unit>) =>
-      renderToFragment(html`${parts}`).textContent ?? "";
-    const first = count(kit.diagnostics.unit(fixture.shop.id, true));
+  it("keeps a shop's patronage to one line through the cache and a refresh", () => {
+    const { kit, copy } = kitFor("shop", SHOP);
+    const first = copy();
     expect(first.split("Today's patronage:")).toHaveLength(2);
     expect(first.split("Very few customers.")).toHaveLength(2);
-    const readsAfter = reads;
-    for (let i = 0; i < 8; i++) {
-      expect(count(kit.diagnostics.unit(fixture.shop.id))).toBe(first);
-    }
-    expect(reads).toBe(readsAfter);
+    for (let i = 0; i < 8; i++) expect(copy(false)).toBe(first);
     kit.diagnostics.invalidate();
-    const refreshed = count(kit.diagnostics.unit(fixture.shop.id, true));
-    expect(refreshed.split("Today's patronage:")).toHaveLength(2);
+    expect(copy().split("Today's patronage:")).toHaveLength(2);
   });
 
-  it("does not render service warnings for offices or construction-state service units", () => {
-    const f = hostedFixture();
-    const office = f.copy(f.office.id);
-    expect(office).not.toContain("Ramp access:");
-    expect(office).not.toContain("Counts toward stars:");
-    f.housekeeping.state = "construction";
-    expect(f.copy(f.housekeeping.id)).not.toContain("Fields 6 maids");
+  it("adds no service lines for a unit the engine gives no service facts", () => {
+    const office = kitFor("office", NONE).copy();
+    expect(office).not.toMatch(/Ramp access:|Counts toward stars:|maids/);
+    expect(kitFor("office", undefined).copy(), "the tenant lines alone").toBe(office);
+  });
+
+  it("asks for the unit it shows", () => {
+    const { port, copy } = kitFor("hotelSingle", DIRTY_HOTEL);
+    copy();
+    expect(vi.mocked(port.unitCard).mock.calls[0]).toEqual([ID]);
+    expect(port.unitFacts).toHaveBeenCalledWith(ID);
   });
 });

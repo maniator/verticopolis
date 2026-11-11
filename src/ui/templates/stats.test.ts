@@ -1,13 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { Simulation } from "../../engine/Simulation";
-import { GRID } from "../../engine/facilities";
-import { cumulativeStarGates, nextStarRequirements } from "../../engine/sim/star";
-import { markRoom } from "../../engine/tower/rooms";
 import { nothing } from "lit-html";
-import { incomeSection, milestonesSection, nextStarSection, statsModalTemplate, statsTemplate, canCallExterminator, STAR_GATE_LABELS } from "./stats";
-import { statsBodyOf, statsScreenOf } from "./stats.fixture";
+import { incomeSection, milestonesSection, nextStarSection, statsModalTemplate, statsTemplate, STAR_GATE_LABELS } from "./stats";
 import { renderToFragment } from "../testing/litTestUtils";
 import type { StarGateId } from "../../simport/panels";
+import { LAYOUT } from "../../tests/portKit/mockPort";
+import { ledger, milestoneList, statsScreenFor, type ScreenParts } from "../../tests/fixtures/statsScreens";
 
 /**
  * The Tower Statistics dialog body (E3-S5). Package: the window grammar
@@ -19,176 +16,106 @@ import type { StarGateId } from "../../simport/panels";
  * equivalent to the retired `buildStatsHtml` by transitional
  * `assertDomEquivalent` guards across all of these fixtures (removed with
  * the string builders in the final sweep; see git history for the guard
- * suite).
+ * suite). The screens are hand-built (`statsScreens.ts`): each test states
+ * the report fields its branch reads. What the engine reports (the VIP
+ * review, the parking gate, the 4-star rating count, the ledger, the
+ * vacancies, the star gates) is the Rust engine's, in its panel tests
+ * (`engine-rs/src/panels/tests*.rs`) and `wasm_port_reports_tests.rs`.
  */
 
-/** A small built Classic tower with a lobby row, a floor, an occupied office,
- *  and one standard elevator (so the elevator/tenancy sections are non-empty).
- *  One milestone is forced achieved so the Milestones `done` (✓ / `ms-done`)
- *  markup and a non-zero progress-bar width render. */
-function builtTower(): Simulation {
-  const sim = new Simulation();
-  for (let x = 10; x < 30; x++) expect(sim.tower.place("lobby", 1, x).ok).toBe(true);
-  for (let x = 10; x < 30; x++) expect(sim.tower.place("floor", 2, x).ok).toBe(true);
-  const r = sim.tower.place("office", 2, 12);
-  expect(r.ok).toBe(true);
-  sim.tower.units.find((u) => u.id === r.unitId)!.state = "occupied";
-  expect(sim.buildTransport("elevatorStandard", 10, 1, 2).ok).toBe(true);
-  sim.achievedMilestones.add("pop-500");
-  return sim;
-}
+const body = (parts: ScreenParts = {}) => renderToFragment(statsTemplate(statsScreenFor(parts)));
 
-/** A Modern tower with two present, sold condos carrying DIFFERENT household
- *  sizes (4 and 2), so the Households "Size mix" line joins more than one size
- *  with " · ". Lay a lobby + floor across the grid (tolerating the starter
- *  tower's existing tiles), then place the condos and force them occupied. */
-function modernWithHousehold(): Simulation {
-  const sim = Simulation.newGame(3, "modern");
-  const C = Math.floor(GRID.width / 2);
-  for (let x = 0; x < GRID.width; x++) sim.tower.place("lobby", 1, x);
-  for (let x = 0; x < GRID.width; x++) sim.tower.place("floor", 2, x);
-  const occupy = (col: number, size: number): void => {
-    const r = sim.tower.place("condo", 2, col);
-    expect(r.ok).toBe(true);
-    const condo = sim.tower.units.find((u) => u.id === r.unitId)!;
-    condo.state = "occupied";
-    condo.everOccupied = true;
-    condo.residents = size;
-  };
-  occupy(C + 4, 4);
-  occupy(C + 24, 2);
-  return sim;
-}
+/** The value cell after the key `key`. */
+const cellAfter = (frag: DocumentFragment, key: string): HTMLElement | null =>
+  ([...frag.querySelectorAll("span.k")].find((k) => k.textContent === key)?.nextElementSibling as HTMLElement) ?? null;
 
-/** Four passenger shafts, so the elevator section's two-column split renders
- *  with more than one row per column (the built tower has only one shaft, which
- *  leaves the second column empty). */
-function manyShafts(): Simulation {
-  const sim = new Simulation();
-  for (let x = 0; x < GRID.width; x++) sim.tower.place("lobby", 1, x);
-  for (let f = 2; f <= 5; f++) for (let x = 0; x < GRID.width; x++) sim.tower.place("floor", f, x);
-  expect(sim.buildTransport("elevatorStandard", 10, 1, 3).ok).toBe(true);
-  expect(sim.buildTransport("elevatorStandard", 14, 1, 4).ok).toBe(true);
-  expect(sim.buildTransport("elevatorStandard", 18, 2, 5).ok).toBe(true);
-  expect(sim.buildTransport("elevatorStandard", 22, 1, 5).ok).toBe(true);
-  return sim;
-}
-
-/** A built tower ticked until the income ledger has a trailing-quarter average,
- *  so the Income section renders its rows, its two columns, and the Net line. */
-function withIncome(): Simulation {
-  const sim = builtTower();
-  sim.money = 1e9; // never go bankrupt mid-run
-  for (let i = 0; i < 24 * 120 && !sim.incomeBreakdown().hasData; i++) sim.tick(60);
-  return sim;
-}
-
-/** The VIP row's value cell (the span after the "VIP visits" key), so tests can
- *  assert the verdict COLOR directly; the builder-vs-builder equivalence guard
- *  alone would pass a wrong color applied identically to both builders. */
-async function vipCell(sim: Simulation): Promise<HTMLElement | null> {
-  const frag = renderToFragment(await statsBodyOf(sim));
-  const key = [...frag.querySelectorAll("span.k")].find((k) => k.textContent === "VIP visits");
-  return (key?.nextElementSibling as HTMLElement) ?? null;
-}
+/** The VIP row's value cell, so tests can assert the verdict COLOR directly. */
+const vipCell = (parts: ScreenParts) => cellAfter(body(parts), "VIP visits");
 
 describe("statsTemplate structure", () => {
-  it("renders the stats grid with the Overview section", async () => {
-    const frag = renderToFragment(await statsBodyOf(builtTower()));
+  it("renders the stats grid with the Overview section", () => {
+    const frag = body();
     expect(frag.querySelector(".stats-grid")).not.toBeNull();
     expect(frag.textContent).toContain("Overview");
     expect(frag.textContent).toContain("Tower name");
   });
 
-  it("shows the VIP visits row from 3★ and reflects the earned review", async () => {
-    const sim = builtTower();
-    expect(renderToFragment(await statsBodyOf(sim)).textContent).not.toContain("VIP visits");
-    sim.star = 3;
-    let frag = renderToFragment(await statsBodyOf(sim));
+  it("shows the VIP visits row from 3★ and reflects the earned review", () => {
+    expect(body().textContent).not.toContain("VIP visits");
+    let frag = body({ stats: { star: 3 } });
     expect(frag.textContent).toContain("VIP visits");
     expect(frag.textContent).toContain("None yet");
-    sim.vipVisits = 3;
-    sim.vipFavorable = true;
-    frag = renderToFragment(await statsBodyOf(sim));
+    frag = body({ stats: { star: 3 }, report: { vipVisits: 3, vipFavorable: true } });
     expect(frag.textContent).toContain("3 · review earned");
     // The verdict trusts the flag alone: favorable with no recorded visits
     // (fixtures, tampered saves) still reads earned, never a muted "None yet".
-    sim.vipVisits = 0;
-    frag = renderToFragment(await statsBodyOf(sim));
+    frag = body({ stats: { star: 3 }, report: { vipVisits: 0, vipFavorable: true } });
     expect(frag.textContent).toContain("Review earned");
     expect(frag.textContent).not.toContain("None yet");
   });
 
-  it("colors the VIP verdict by the earned flag alone: good when earned, muted otherwise", async () => {
-    const sim = builtTower();
-    sim.star = 3;
+  it("colors the VIP verdict by the earned flag alone: good when earned, muted otherwise", () => {
     // No visits, no review: muted "None yet".
-    expect((await vipCell(sim))!.getAttribute("style")).toContain("var(--muted)");
+    expect(vipCell({ stats: { star: 3 } })!.getAttribute("style")).toContain("var(--muted)");
     // Visits without the review: still muted, with the not-yet wording.
-    sim.vipVisits = 2;
-    const struggling = (await vipCell(sim))!;
+    const struggling = vipCell({ stats: { star: 3 }, report: { vipVisits: 2 } })!;
     expect(struggling.textContent).toContain("2 · review not yet earned");
     expect(struggling.getAttribute("style")).toContain("var(--muted)");
     // The review alone flips the color, even with zero visits, and the flag
     // alone keeps the row visible below 3★.
-    sim.vipFavorable = true;
-    sim.vipVisits = 0;
-    sim.star = 1;
-    const earned = (await vipCell(sim))!;
+    const earned = vipCell({ stats: { star: 1 }, report: { vipVisits: 0, vipFavorable: true } })!;
     expect(earned.textContent).toContain("Review earned");
     expect(earned.getAttribute("style")).toContain("var(--good)");
   });
 
-  it("hides the parking demand row until parking unlocks at 3★", async () => {
-    const sim = builtTower(); // occupied office at 1★, no parking buildable yet
-    expect(renderToFragment(await statsBodyOf(sim)).textContent).not.toContain("Parking demand");
-    sim.star = 3;
-    expect(renderToFragment(await statsBodyOf(sim)).textContent).toContain("Parking demand");
+  it("hides the parking demand row until the engine reports a demand or a space", () => {
+    // Below 3★ the engine reports no demand (parking is not buildable yet).
+    expect(body().textContent).not.toContain("Parking demand");
+    const demand = { officePop: 6, offices: 1, suites: 0, total: 1 };
+    expect(body({ stats: { star: 3 }, report: { parkingDemand: demand } }).textContent).toContain("Parking demand");
+    expect(cellAfter(body({ stats: { parkingSpaces: 2 } }), "Parking spaces")!.textContent).toBe("0 / 2 working");
   });
 
-  it("escapes a hostile tower name as text, injecting no element", async () => {
-    const sim = builtTower();
-    sim.tower.towerName = `<img src=x onerror="alert(1)">`;
-    const frag = renderToFragment(await statsBodyOf(sim));
+  it("escapes a hostile tower name as text, injecting no element", () => {
+    const frag = body({ towerName: `<img src=x onerror="alert(1)">` });
     expect(frag.querySelector("img")).toBeNull();
     expect(frag.textContent).toContain(`<img src=x onerror="alert(1)">`);
   });
 });
 
-describe("statsTemplate sections across fixture towers", () => {
-  it("renders every section as a mini title bar with the solvency-styled Funds cell", async () => {
+describe("statsTemplate sections", () => {
+  it("renders every section as a mini title bar with the solvency-styled Funds cell", () => {
     // The window grammar the design system reads: section strips use the
     // documented .win-title.sm variant and Funds carries the money class.
-    const frag = renderToFragment(await statsBodyOf(builtTower()));
+    const frag = body();
     for (const section of ["Overview", "Tenancy", "Transport & access", "Milestones"]) {
       expect(frag.textContent).toContain(section);
     }
     expect(frag.querySelectorAll(".stats-section.win-title.sm").length).toBeGreaterThanOrEqual(4);
     expect(frag.querySelector(".v.money")).not.toBeNull();
+    expect(body({ stats: { money: -5 } }).querySelector(".v.loss"), "debt reads as a loss").not.toBeNull();
   });
 
-  it("splits the milestones checklist into two kv columns; the achieved goal reads done with a filled gauge", async () => {
-    // builtTower forces one achieved milestone, so the done marker and a
-    // non-zero gauge width must render (the ms-done markup the retired
-    // equivalence guard used to verify).
-    const frag = renderToFragment(await statsBodyOf(builtTower()));
+  it("splits the milestones checklist into two kv columns; the achieved goal reads done with a filled gauge", () => {
+    const frag = body({ report: { milestones: milestoneList(["pop-500"]) } });
     expect(frag.querySelectorAll(".col.ms.kv").length).toBe(2);
     expect(frag.querySelector(".ms-done")).not.toBeNull();
-    expect(frag.textContent).toContain("\u2713");
+    expect(frag.textContent).toContain("✓");
     const gauge = frag.querySelector<HTMLElement>(".evalbar > span")!;
     expect(gauge.getAttribute("style")).toMatch(/width:\s*[1-9]/); // non-zero progress
   });
 
-  it("an empty tower still renders the grid; a Modern tower gains the Households section", async () => {
-    expect(renderToFragment(await statsBodyOf(new Simulation())).querySelector(".stats-grid")).not.toBeNull();
-    expect(renderToFragment(await statsBodyOf(Simulation.newGame(3, "classic"))).textContent).not.toContain("Households");
-    expect(renderToFragment(await statsBodyOf(Simulation.newGame(3, "modern"))).textContent).toContain("Households");
+  it("an empty tower still renders the grid; a Modern tower gains the Households section", () => {
+    const empty = { population: 0, offices: 0, occupiedOffices: 0, floors: 0, elevators: 0, transports: 0 };
+    expect(body({ stats: empty, report: { elevators: [] } }).querySelector(".stats-grid")).not.toBeNull();
+    expect(body({ mode: "classic" }).textContent).not.toContain("Households");
+    expect(body({ mode: "modern" }).textContent).toContain("Households");
   });
 
-  it("the catalog's variantHouseholds rule decides the Households section, whatever the mode's name", async () => {
+  it("the catalog's variantHouseholds rule decides the Households section, whatever the mode's name", () => {
     // Each mode with the rule on and off, so neither mode's name can stand in.
     for (const mode of ["classic", "modern"] as const) {
-      const screen = await statsScreenOf(Simulation.newGame(3, mode));
+      const screen = statsScreenFor({ mode });
       for (const variantHouseholds of [true, false]) {
         const catalog = { ...screen.catalog, rules: { ...screen.catalog.rules, variantHouseholds } };
         const text = renderToFragment(statsTemplate({ ...screen, catalog })).textContent;
@@ -198,61 +125,47 @@ describe("statsTemplate sections across fixture towers", () => {
     }
   });
 
-  it("a sold Modern household renders the multi-size mix", async () => {
+  it("a sold Modern household renders the multi-size mix", () => {
     // Scope to the Size mix VALUE cell: the elevator and VIP rows also join
     // with the same separator, so a whole-dialog probe could pass vacuously.
-    const frag = renderToFragment(await statsBodyOf(modernWithHousehold()));
-    const key = [...frag.querySelectorAll("span.k")].find((el) => el.textContent === "Size mix")!;
-    expect(key).toBeTruthy();
-    expect(key.nextElementSibling!.textContent).toMatch(/×.+·.+×/); // two buckets joined
+    const households = { households: 2, residents: 6, mix: [[2, 1], [4, 1]] as const };
+    const cell = cellAfter(body({ mode: "modern", report: { households } }), "Size mix")!;
+    expect(cell).toBeTruthy();
+    expect(cell.textContent).toMatch(/×.+·.+×/); // two buckets joined
   });
 
-  it("a multi-shaft tower renders EVERY shaft's utilization row; income history renders rows and Net", async () => {
-    const shafts = manyShafts();
-    expect(shafts.elevatorStats().length).toBe(4);
-    const frag = renderToFragment(await statsBodyOf(shafts));
+  it("a multi-shaft tower renders EVERY shaft's utilization row; income history renders rows and Net", () => {
+    const shaft = (id: number, bottom: number, top: number) => ({ id, kind: "elevatorStandard" as const, bottom, top, cars: 1, capacity: 21, utilization: 0.1 * id });
+    const elevators = [shaft(4, 1, 5), shaft(3, 2, 5), shaft(2, 1, 4), shaft(1, 1, 3)];
+    const frag = body({ stats: { elevators: 4, transports: 4 }, report: { elevators } });
     // All four shafts render a "% full" value cell (the two-column split holds
     // every row, none silently dropped).
     expect([...frag.querySelectorAll("span.v")].filter((v) => /% full$/.test(v.textContent ?? "")).length).toBe(4);
-    const income = withIncome();
-    expect(income.incomeBreakdown().hasData).toBe(true);
-    expect(renderToFragment(await statsBodyOf(income)).textContent).toContain("Net");
+    const income = { averages: ledger({ offices: 2_500, upkeep: -400 }), hasData: true };
+    expect(body({ report: { income } }).textContent).toContain("Net");
   });
 
-  it("a 4-star tower whose hotel guests diverge the rating count shows the row and explainer", async () => {
-    const sim = builtTower();
-    const r = sim.tower.place("hotelSingle", 2, 22);
-    expect(r.ok).toBe(true);
-    const room = sim.tower.units.find((u) => u.id === r.unitId)!;
-    room.state = "asleep"; // guest in residence tonight
-    room.occupants = 1;
-    sim.star = 4;
-    // Guard the fixture: the divergence must be real or the row never renders.
-    expect(sim.ratingPopulation()).toBeLessThan(sim.stats().population);
-    const frag = renderToFragment(await statsBodyOf(sim));
+  it("a 4-star tower whose hotel guests diverge the rating count shows the row and explainer", () => {
+    const frag = body({ stats: { star: 4, population: 7 }, report: { ratingPopulation: 6 } });
     expect(frag.textContent).toContain("Counts toward stars");
     expect(frag.textContent).toContain("Hotel guests count toward your star rating");
+    // At 3★, or with no divergence, the row stays out.
+    expect(body({ stats: { star: 3, population: 7 }, report: { ratingPopulation: 6 } }).textContent).not.toContain("Counts toward stars");
+    expect(body({ stats: { star: 4, population: 7 }, report: { ratingPopulation: 7 } }).textContent).not.toContain("Counts toward stars");
   });
 
-  it("an express shaft reads its Express label in the elevator list", async () => {
-    const sim = builtTower();
-    // Tower-level placement: the star/money gates live in sim.buildTransport
-    // and are not what this pins.
-    expect(sim.tower.placeTransport("elevatorExpress", 16, 1, 2).ok).toBe(true);
-    expect(renderToFragment(await statsBodyOf(sim)).textContent).toContain("Express");
+  it("an express shaft reads its Express label in the elevator list", () => {
+    const elevators = [{ id: 2, kind: "elevatorExpress" as const, bottom: 1, top: 2, cars: 1, capacity: 42, utilization: 0 }];
+    expect(body({ report: { elevators } }).textContent).toContain("Express");
   });
 });
 
 describe("incomeSection (income breakdown)", () => {
-  it("Net sums only the shown rows, excluding hidden sub-dollar lines", async () => {
-    const sim = Simulation.newGame(91);
+  it("Net sums only the shown rows, excluding hidden sub-dollar lines", () => {
     // One clearly-shown line and two sub-$0.50/day lines that the row filter
     // hides (a realistic case: a small annual-ish charge amortized over 90 days).
-    sim.recordMoney("offices", 1000);
-    sim.recordMoney("food", 0.3); // rounds to $0, hidden row
-    sim.recordMoney("retail", 0.3); // rounds to $0, hidden row
-
-    const text = renderToFragment(incomeSection((await statsScreenOf(sim)).report.income) as Exclude<ReturnType<typeof incomeSection>, typeof nothing>).textContent!;
+    const income = { averages: ledger({ offices: 1000, food: 0.3, retail: 0.3 }), hasData: true };
+    const text = renderToFragment(incomeSection(income) as Exclude<ReturnType<typeof incomeSection>, typeof nothing>).textContent!;
 
     // The big line shows; the sub-dollar lines are omitted from the list.
     expect(text).toContain("Offices");
@@ -273,43 +186,24 @@ describe("incomeSection (income breakdown)", () => {
     expect(norm).not.toContain("$1001"); // the old, hidden-lines-included Net
   });
 
-  it("renders nothing before any money has been recorded", async () => {
+  it("renders nothing before any money has been recorded", () => {
     // `nothing` renders no nodes: the whole section is absent from the dialog,
     // and the section function itself returns the sentinel (not an empty shell).
-    const sim = Simulation.newGame(92);
-    expect(incomeSection((await statsScreenOf(sim)).report.income)).toBe(nothing);
-    expect(renderToFragment(await statsBodyOf(sim)).textContent).not.toContain("Income (avg / day");
+    expect(incomeSection({ averages: ledger({}), hasData: false })).toBe(nothing);
+    expect(body().textContent).not.toContain("Income (avg / day");
   });
 });
 
 describe("Tenancy vacancies split off-market (No Rate) counts out", () => {
-  it("plain vacancies read the bare number; off-market vacancies add the parenthetical", async () => {
-    const sim = builtTower();
-    // Widen the strip first so both extra offices place cleanly, then add
-    // them: one plain-vacant, one vacant AND off-market. Every placement is
-    // asserted successful, so a fixture-width change fails loudly here
-    // instead of silently testing a different tower.
-    for (let x = 30; x < 45; x++) expect(sim.tower.place("lobby", 1, x).ok).toBe(true);
-    for (let x = 30; x < 45; x++) expect(sim.tower.place("floor", 2, x).ok).toBe(true);
-    const a = sim.tower.place("office", 2, 12 + 9);
-    expect(a.ok).toBe(true);
-    const c = sim.tower.place("office", 2, 30);
-    expect(c.ok).toBe(true);
-    const vacantRow = async () => {
-      const frag = renderToFragment(await statsBodyOf(sim));
-      const key = [...frag.querySelectorAll("span.k")].find((k) => k.textContent === "Vacancies");
-      return (key?.nextElementSibling as HTMLElement).textContent;
-    };
-    expect(await vacantRow()).toBe("2"); // two vacant, none off-market: unchanged
-    const office = sim.tower.units.find((u) => u.id === c.unitId)!;
-    office.noRate = true;
-    markRoom(sim.tower, office); // as the engine's rate commands do
-    expect(await vacantRow()).toBe("2 (1 off-market)"); // the honest split
+  it("plain vacancies read the bare number; off-market vacancies add the parenthetical", () => {
+    const vacancies = (vacant: number, vacantNoRate: number) => cellAfter(body({ stats: { vacant, vacantNoRate } }), "Vacancies")!.textContent;
+    expect(vacancies(2, 0)).toBe("2"); // two vacant, none off-market: unchanged
+    expect(vacancies(2, 1)).toBe("2 (1 off-market)"); // the honest split
   });
 });
 
 describe("the exterminator row is never a dialog footer", () => {
-  it("renders nested, so the sticky-footer rule cannot reach it", async () => {
+  it("renders nested, so the sticky-footer rule cannot reach it", () => {
     // `.modal-box > .modal-actions:last-child` pins the DIALOG FOOTER. Tower
     // Statistics also renders a `.modal-actions` mid-body for the exterminator,
     // and pinning that would park a button on an opaque band over the sections
@@ -319,37 +213,27 @@ describe("the exterminator row is never a dialog footer", () => {
     // row really is nested. `openModalTemplate` makes the modal template's
     // TOP-LEVEL nodes the children of `.modal-box`, so "not a top-level node"
     // is exactly "not reachable by that selector".
-    const sim = Simulation.newGame(3, "modern");
-    for (let x = 0; x < GRID.width; x++) sim.tower.place("lobby", 1, x);
-    for (let x = 0; x < GRID.width; x++) sim.tower.place("floor", 2, x);
-    const r = sim.tower.place("hotelSingle", 2, Math.floor(GRID.width / 2));
-    expect(r.ok).toBe(true);
-    sim.tower.units.find((u) => u.id === r.unitId)!.state = "infested";
-    // Fixture premise: without an offerable extermination there is no row to
-    // place, and this test would pass by rendering nothing.
-    const screen = await statsScreenOf(sim);
-    expect(canCallExterminator(screen.report, screen.catalog)).toBe(true);
-
-    const frag = renderToFragment(statsModalTemplate(await statsBodyOf(sim)));
+    const housekeeping = { rooms: 1, crews: 0, maids: 0, dailyCapacity: 0, outOfReach: 0, dirty: 0, infested: 1 };
+    const screen = statsScreenFor({ mode: "modern", stats: { hotelRooms: 1 }, report: { housekeeping } });
+    const frag = renderToFragment(statsModalTemplate(statsTemplate(screen)));
     const footers = [...frag.children].filter((el) => el.classList.contains("modal-actions"));
     expect(footers).toHaveLength(1);
     expect(footers[0].querySelector('[data-act="close"]')).not.toBeNull();
     const exterm = frag.querySelector('[data-act="exterminate"]');
+    // Fixture premise: without an offerable extermination there is no row,
+    // and this test would pass by rendering nothing.
     expect(exterm).not.toBeNull();
     expect(footers[0].contains(exterm)).toBe(false);
   });
 });
 
 describe("star gate copy", () => {
-  it("labels each star gate as the engine's own table does", () => {
-    // The engine answers gates by id; the screen's copy must stay the label
-    // the TypeScript engine attaches, gate for gate, on every rung.
-    const sim = Simulation.newGame(3, "modern");
-    const gates = [...cumulativeStarGates(sim, 5)];
-    sim.star = 5;
-    gates.push(...nextStarRequirements(sim)!.gates);
-    expect(new Set(gates.map((g) => g.id))).toEqual(new Set(Object.keys(STAR_GATE_LABELS)));
-    for (const g of gates) expect(STAR_GATE_LABELS[g.id], g.id).toBe(g.label);
+  it("labels every star gate the engine reports, and no other", () => {
+    // The engine answers gates by id from its published table; the screen
+    // words each one.
+    const published = (LAYOUT as unknown as { starGates: string[] }).starGates;
+    expect(Object.keys(STAR_GATE_LABELS).sort()).toEqual([...published].sort());
+    for (const id of published) expect(STAR_GATE_LABELS[id as StarGateId], id).toMatch(/\S/);
   });
 
   it("shows a gate id the table does not know as the id itself", () => {

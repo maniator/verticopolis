@@ -1,19 +1,63 @@
 import { describe, expect, it } from "vitest";
+import type { CatalogRent } from "../catalog/catalogTypes";
 import { catalogFor } from "../tests/catalogFixture";
-import { ALL_KINDS } from "../engine/facilities";
-import { makeRules } from "../engine/gameRules";
 import { priceOptionsFor, priceOptionsFromRent, unitPrice } from "./catalogPricing";
-import { rentOf } from "../engine/econConfig";
-import { Simulation } from "../engine/Simulation";
+
+/**
+ * The price controls and a unit's price, read from a catalog. The engine's
+ * half (a fresh build of every priced kind charges what `unitPrice` reads) is
+ * `catalogPricing.integration.test.ts`, on the Rust engine.
+ */
+
+const BAND: CatalogRent = { shape: "band", cadence: "quarterly", default: 10_000, min: 2_000, max: 20_000, step: 500, noRate: false };
+const LADDER: CatalogRent = {
+  shape: "ladder",
+  cadence: "quarterly",
+  default: 20_000,
+  noRate: true,
+  rungs: [
+    { level: 0, label: "Very Low", value: 5_000 },
+    { level: 1, label: "Low", value: 10_000 },
+    { level: 2, label: "Average", value: 20_000 },
+    { level: 3, label: "High", value: 30_000 },
+  ],
+};
 
 describe("price options from the catalog (#921)", () => {
-  for (const mode of ["classic", "modern"] as const) {
-    it(`match the ${mode} rule set's priceOptions for every kind`, () => {
-      const catalog = catalogFor(mode);
-      const rules = makeRules(mode);
-      for (const kind of ALL_KINDS) expect(priceOptionsFor(catalog, kind), kind).toEqual(rules.priceOptions(kind));
+  it("offer a band as its default, limits and step", () => {
+    expect(priceOptionsFromRent(BAND)).toEqual({ shape: "band", band: { default: 10_000, min: 2_000, max: 20_000, step: 500 } });
+  });
+
+  it("offer a ladder's rungs with No Rate", () => {
+    expect(priceOptionsFromRent(LADDER)).toEqual({
+      shape: "ladder",
+      noRate: true,
+      rungs: [
+        { level: 0, label: "Very Low", value: 5_000 },
+        { level: 1, label: "Low", value: 10_000 },
+        { level: 2, label: "Average", value: 20_000 },
+        { level: 3, label: "High", value: 30_000 },
+      ],
     });
-  }
+  });
+
+  it("offer nothing for a kind the mode does not price", () => {
+    expect(priceOptionsFromRent(null)).toBeNull();
+    expect(priceOptionsFor(catalogFor("classic"), "lobby")).toBeNull();
+  });
+
+  it("read the kind's own catalog entry: Classic prices on a ladder, Modern on a band", () => {
+    const classic = catalogFor("classic");
+    const modern = catalogFor("modern");
+    for (const [catalog, shape] of [[classic, "ladder"], [modern, "band"]] as const) {
+      const priced = catalog.facilities.filter((f) => f.rent);
+      expect(priced.length, `${catalog.mode} prices some kinds`).toBeGreaterThan(3);
+      for (const f of priced) {
+        expect(priceOptionsFor(catalog, f.key), `${catalog.mode} ${f.key}`).toEqual(priceOptionsFromRent(f.rent));
+        expect(priceOptionsFor(catalog, f.key)!.shape, `${catalog.mode} ${f.key}`).toBe(shape);
+      }
+    }
+  });
 
   it("refuses a ladder rung that is not one of the four canon rungs", () => {
     const rung = (level: number, label: string) => ({ shape: "ladder" as const, cadence: "quarterly" as const, default: 1, noRate: true as const, rungs: [{ level, label, value: 1 }] });
@@ -23,45 +67,19 @@ describe("price options from the catalog (#921)", () => {
 });
 
 describe("a unit's price from the catalog (#921)", () => {
-  it("matches rentOf for a stored price, No Rate, and an unset unit of every kind the mode builds", () => {
+  it("is nothing off the market, the stored price when set, and the catalog default otherwise", () => {
     for (const mode of ["classic", "modern"] as const) {
       const catalog = catalogFor(mode);
       for (const f of catalog.facilities) {
-        if (!f.available || !f.rent) continue;
-        const kind = f.key;
-        expect(unitPrice(catalog, { kind, rent: 1234 }), `${mode} ${kind} stored`).toBe(rentOf({ kind, rent: 1234 }));
-        expect(unitPrice(catalog, { kind, rent: 1234, noRate: true }), `${mode} ${kind} no rate`).toBe(0);
-        // An unset unit charges the catalog default. Where the engine's
-        // fallback table differs (Classic hotels and condos), no Classic path
-        // leaves the price unset: a build and a load store the Average rung.
-        if (mode === "modern" || kind === "office") expect(unitPrice(catalog, { kind }), `${mode} ${kind} unset`).toBe(rentOf({ kind }));
-        else expect(unitPrice(catalog, { kind }), `${mode} ${kind} unset`).toBe(f.rent.default);
+        if (!f.rent) continue;
+        expect(unitPrice(catalog, { kind: f.key, rent: 1234 }), `${mode} ${f.key} stored`).toBe(1234);
+        expect(unitPrice(catalog, { kind: f.key, rent: 1234, noRate: true }), `${mode} ${f.key} no rate`).toBe(0);
+        expect(unitPrice(catalog, { kind: f.key }), `${mode} ${f.key} unset`).toBe(f.rent.default);
       }
     }
   });
 
-  it("matches what both modes charge for a fresh build of every priced kind", () => {
-    for (const mode of ["classic", "modern"] as const) {
-      const catalog = catalogFor(mode);
-      const sim = Simulation.newGame(5, mode);
-      sim.money = 1e12;
-      sim.star = 6;
-      for (let x = 150; x < 300; x++) sim.build("lobby", 1, x);
-      let floor = 2;
-      const eligible = catalog.facilities.filter((f) => f.available && f.rent && !f.transport && !f.basement);
-      let built = 0;
-      for (const f of eligible) {
-        for (let x = 150; x < 300; x++) sim.build("floor", floor, x);
-        const res = sim.build(f.key, floor, 152);
-        // Every priced kind must build, or the sweep would quietly check fewer.
-        expect(res.ok, `${mode} ${f.key}: ${res.ok ? "" : res.reason}`).toBe(true);
-        const u = sim.tower.unitAt(floor, 152)!;
-        expect(unitPrice(catalog, u), `${mode} ${f.key}`).toBe(rentOf(u));
-        built++;
-        floor += f.floors;
-      }
-      expect(built, `${mode}: every priced kind was built`).toBe(eligible.length);
-      expect(built, `${mode}: the sweep covers priced kinds`).toBeGreaterThan(3);
-    }
+  it("is nothing for a kind the mode does not price", () => {
+    expect(unitPrice(catalogFor("classic"), { kind: "lobby" })).toBe(0);
   });
 });

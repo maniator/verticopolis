@@ -1,13 +1,11 @@
 import { describe, it, expect, vi, beforeAll, afterAll } from "vitest";
 import * as ex from "excalibur";
-import { Simulation } from "../../engine/Simulation";
-import { newSeededGame } from "../../tests/fixtures/towerFixtures";
+import { catalogFor } from "../../tests/catalogFixture";
+import type { UnitView } from "../../simport/view";
 import { apronRange, plantSpots, plantVisible, ROUNDABOUT_START, skylineRects } from "../sceneryLayout";
-import { GRID } from "../../engine/facilities";
 import { TILE } from "../scale";
 import { STRIP_MAX_SEG, syncScenery } from "./towerScenery";
 import type { TowerEngine } from "./TowerEngine";
-import type { RenderSim } from "../renderSim";
 
 /**
  * Unit coverage for the scenery module against a stub engine: the world is
@@ -32,8 +30,10 @@ const SEED = 4400;
  *  `towerScenery` computes them. Pinning a literal went stale the moment the
  *  world scale moved: TILE 11 -> 10 shortened both strips and dropped one. */
 const FIXED_ACTORS = 10;
-const ROAD_SEGMENTS = Math.ceil(((ROUNDABOUT_START + GRID.width) * TILE) / STRIP_MAX_SEG);
-const GROUND_SEGMENTS = Math.ceil((GRID.width * TILE) / STRIP_MAX_SEG);
+/** The lot's width in tiles, from the engine's catalog. */
+const LOT_WIDTH = catalogFor("classic").world.lotWidth;
+const ROAD_SEGMENTS = Math.ceil(((ROUNDABOUT_START + LOT_WIDTH) * TILE) / STRIP_MAX_SEG);
+const GROUND_SEGMENTS = Math.ceil((LOT_WIDTH * TILE) / STRIP_MAX_SEG);
 const STATIC_ACTORS = FIXED_ACTORS + ROAD_SEGMENTS + GROUND_SEGMENTS;
 
 // happy-dom canvases have no 2d context, which excalibur's Raster requires at
@@ -62,10 +62,53 @@ afterAll(() => {
   vi.restoreAllMocks();
 });
 
-function fakeEngine(sim: Simulation): { eng: TowerEngine; added: ex.Actor[]; swap: (s: Simulation) => void } {
+/** What the scenery reads of the render sim: the founding seed, the tower's
+ *  revision and ground-floor units, and the clock. That the port's render sim
+ *  answers these from the engine is checked in `portReads.integration.test.ts`. */
+interface SceneSim {
+  rng: { initialSeed: number };
+  tower: { revision: number; units: UnitView[] };
+  clock: { minuteOfDay: number };
+  money: number;
+  /** Lay a lobby tile, as a build moves the tower's revision. */
+  build(kind: "lobby", floor: number, x: number): { ok: boolean };
+}
+
+/** A one-tile lobby unit on the ground floor. */
+const lobbyTile = (id: number, x: number): UnitView => ({
+  id,
+  kind: "lobby",
+  floor: 1,
+  x,
+  width: 1,
+  state: "occupied",
+  label: "",
+  occupants: 0,
+});
+
+/** A tower founded on `seed` with the 40-tile starter lobby centered on the lot. */
+function newSeededGame(seed: number): SceneSim {
+  const start = Math.floor(LOT_WIDTH / 2) - 20;
+  const units = Array.from({ length: 40 }, (_, i) => lobbyTile(i + 1, start + i));
+  const sim: SceneSim = {
+    rng: { initialSeed: seed },
+    tower: { revision: 1, units },
+    clock: { minuteOfDay: 600 },
+    money: 0,
+    build: (kind, floor, x) => {
+      if (sim.tower.units.some((u) => u.floor === floor && u.x === x)) return { ok: false };
+      sim.tower.units = [...sim.tower.units, { ...lobbyTile(sim.tower.units.length + 1, x), kind, floor }];
+      sim.tower.revision++;
+      return { ok: true };
+    },
+  };
+  return sim;
+}
+
+function fakeEngine(sim: SceneSim): { eng: TowerEngine; added: ex.Actor[]; swap: (s: SceneSim) => void } {
   const added: ex.Actor[] = [];
   const eng = { engine: { add: (a: ex.Actor) => void added.push(a) }, sim, d: { anim: 0 } } as unknown as TowerEngine;
-  return { eng, added, swap: (s) => ((eng as { sim: RenderSim }).sim = s) };
+  return { eng, added, swap: (s) => ((eng as unknown as { sim: SceneSim }).sim = s) };
 }
 
 /** A recording 2D-context stand-in (same idiom as the pixelSprites tests). */
@@ -186,7 +229,7 @@ describe("towerScenery", () => {
     const sim = newSeededGame(SEED);
     const { eng, added, swap } = fakeEngine(sim);
     syncScenery(eng);
-    const snapshot = sim.serialize();
+    const snapshot = structuredClone(sim.tower);
     const spots = plantSpots(SEED);
     const plants = plantActors(added);
     const apron0 = apronRange(sim.tower.units)!;
@@ -199,8 +242,8 @@ describe("towerScenery", () => {
 
     // Undo-style swap: restore the snapshot and force the revision counter to
     // collide with the live tower's, the exact hazard the review flagged.
-    const sim2 = Simulation.deserialize(snapshot);
-    sim2.tower.revision = sim.tower.revision;
+    const sim2 = newSeededGame(SEED);
+    sim2.tower = { ...snapshot, revision: sim.tower.revision };
     const count = added.length;
     swap(sim2);
     syncScenery(eng);
@@ -225,7 +268,7 @@ describe("towerScenery", () => {
     expect(added.length).toBe(count + skylineRects(other).length + plantSpots(other).length);
     // The new plants follow the NEW sim's apron from their first frame.
     const newPlants = plantActors(added.slice(count), 0);
-    const apron = apronRange((eng as unknown as { sim: Simulation }).sim.tower.units);
+    const apron = apronRange((eng as unknown as { sim: SceneSim }).sim.tower.units);
     plantSpots(other).forEach((s, i) => expect(newPlants[i].graphics.opacity).toBe(plantVisible(s, apron) ? 1 : 0));
   });
 });

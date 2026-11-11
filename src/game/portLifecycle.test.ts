@@ -1,18 +1,29 @@
 import { describe, expect, it, vi } from "vitest";
-import { Simulation } from "../engine/Simulation";
-import { TsEngine } from "../engine/port/tsEngine";
 import { SaveGame } from "../storage/SaveGame";
+import { SMALL_TOWER_SAVE } from "../tests/fixtures/handSaves";
+import { mockPort } from "../tests/portKit/mockPort";
 import { SWAP_REFUSED, TRAPPED_SAVE_REFUSED, exportFileText, loadStored, saveText, swapDone } from "./portLifecycle";
 import { noteEngineThrow, watchEngineTraps } from "./engineFault";
 
-const textOf = (sim: Simulation): string => JSON.stringify(sim.serialize());
+/**
+ * The app's side of the tower's life over a mock port: what it hands the
+ * engine and what it does with the answers. The engine's side (a load, the
+ * founder rule on a stored save, a refused text) is the Rust engine's, in
+ * `saveRepair.integration.test.ts` and its load tests.
+ */
+
+const DONE = Float64Array.of(1, 2);
+const REFUSED = Float64Array.of(0, 1);
+
+/** A port whose load answers `answer`, with `reason` for a refusal. */
+const loader = (answer: Float64Array = DONE, reason?: string) => mockPort({ loadSave: () => answer, lastReason: () => reason });
 
 describe("swapDone", () => {
   it("returns on a done swap and throws the engine's refusal otherwise", () => {
-    const engine = new TsEngine(Simulation.newGame(1));
-    expect(() => swapDone(engine, engine.loadSave(textOf(Simulation.newGame(2))))).not.toThrow();
-    const refused = engine.loadSave("not a save");
-    expect(() => swapDone(engine, refused)).toThrow(engine.lastReason()!);
+    const engine = loader(DONE, "The save is not JSON.");
+    expect(() => swapDone(engine, DONE)).not.toThrow();
+    expect(engine.lastReason, "a done swap reads no reason").not.toHaveBeenCalled();
+    expect(() => swapDone(engine, REFUSED)).toThrow("The save is not JSON.");
   });
 
   it("says the stock refusal when the engine gives no reason", () => {
@@ -22,8 +33,8 @@ describe("swapDone", () => {
 
 describe("saveText", () => {
   it("asks a trapped engine for nothing, so no save, slot or export replaces the last good one (#1422)", () => {
-    const engine = new TsEngine(Simulation.newGame(1));
-    const serialize = vi.spyOn(engine, "serialize");
+    const engine = mockPort({ serialize: () => SMALL_TOWER_SAVE, setCamera: () => new Float64Array() });
+    const serialize = vi.mocked(engine.serialize);
     watchEngineTraps(() => {});
     try {
       expect(noteEngineThrow(new WebAssembly.RuntimeError("unreachable"))).toBe(true);
@@ -37,19 +48,21 @@ describe("saveText", () => {
   });
 
   it("stamps the live camera before the save, so the view travels with it", () => {
-    const sim = Simulation.newGame(1);
-    const engine = new TsEngine(sim);
-    const text = saveText(engine, { tile: 120, floor: 7, zoom: 2 });
-    expect((JSON.parse(text) as { view: unknown }).view).toEqual({ tile: 120, floor: 7, zoom: 2 });
+    const calls: string[] = [];
+    const engine = mockPort({
+      setCamera: () => (calls.push("camera"), new Float64Array()),
+      serialize: () => (calls.push("save"), SMALL_TOWER_SAVE),
+    });
+    expect(saveText(engine, { tile: 120, floor: 7, zoom: 2 })).toBe(SMALL_TOWER_SAVE);
+    expect(engine.setCamera).toHaveBeenCalledExactlyOnceWith(120, 7, 2);
+    expect(calls).toEqual(["camera", "save"]);
   });
 
   it("stamps nothing without a camera, keeping the view the tower carries", () => {
-    const sim = Simulation.newGame(1);
-    sim.view = { tile: 33, floor: 4, zoom: 1 };
+    const carried = JSON.stringify({ ...(JSON.parse(SMALL_TOWER_SAVE) as object), view: { tile: 33, floor: 4, zoom: 1 } });
     const setCamera = vi.fn();
-    const text = saveText({ setCamera, serialize: () => textOf(sim) }, null);
+    expect(saveText({ setCamera, serialize: () => carried }, null)).toBe(carried);
     expect(setCamera).not.toHaveBeenCalled();
-    expect((JSON.parse(text) as { view: unknown }).view).toEqual({ tile: 33, floor: 4, zoom: 1 });
   });
 });
 
@@ -115,38 +128,36 @@ describe("exportFileText", () => {
 });
 
 describe("loadStored", () => {
-  it("loads a stored save through the engine, which applies the founder rule", () => {
+  it("hands a stored save to the engine's load, which applies the founder rule", () => {
     localStorage.clear();
-    const engine = new TsEngine(Simulation.newGame(1));
-    const unstamped = Simulation.newGame(5);
-    unstamped.founder = false;
-    // A save with no appVersion predates the stamp, so its tower is a founder's.
-    expect(loadStored(engine)(textOf(unstamped))).toBe(true);
-    expect(engine.sim.founder).toBe(true);
+    const engine = loader();
+    // A save with no appVersion predates the stamp; the engine reads it as a
+    // founder's (saveRepair.integration.test.ts), so it is handed over as is.
+    expect(loadStored(engine)(SMALL_TOWER_SAVE)).toBe(true);
+    expect(engine.loadSave).toHaveBeenLastCalledWith(SMALL_TOWER_SAVE);
     // SaveGame stamps what it writes, so a stored save keeps its own status.
-    SaveGame.saveSlot(2, textOf(unstamped));
+    SaveGame.saveSlot(2, SMALL_TOWER_SAVE);
     expect(SaveGame.loadSlot(2, loadStored(engine))).toBe(true);
-    expect(engine.sim.founder).toBe(false);
+    const handed = JSON.parse(vi.mocked(engine.loadSave).mock.lastCall![0]) as { appVersion?: string; towerName: string };
+    expect([typeof handed.appVersion, handed.towerName]).toEqual(["string", "Tower One"]);
   });
 
   it("answers false for a save the engine refuses", () => {
-    expect(loadStored(new TsEngine(Simulation.newGame(1)))("not a save")).toBe(false);
+    expect(loadStored(loader(REFUSED))("not a save")).toBe(false);
   });
 });
 
 describe("loadStored's follow (PR 5e: the app follows a swap itself)", () => {
-  it("calls the follow once a load is done, after the engine holds the new tower", () => {
-    const engine = new TsEngine(Simulation.newGame(1));
-    const before = engine.generation();
-    const followed = vi.fn(() => expect(engine.generation()).toBeGreaterThan(before));
-    expect(loadStored(engine, followed)(textOf(Simulation.newGame(2)))).toBe(true);
+  it("calls the follow once a load is done, after the engine took the new tower", () => {
+    const engine = loader();
+    const followed = vi.fn(() => expect(engine.loadSave).toHaveBeenCalledOnce());
+    expect(loadStored(engine, followed)(SMALL_TOWER_SAVE)).toBe(true);
     expect(followed).toHaveBeenCalledOnce();
   });
 
   it("calls nothing for a refused load", () => {
-    const engine = new TsEngine(Simulation.newGame(1));
     const followed = vi.fn();
-    expect(loadStored(engine, followed)("nope")).toBe(false);
+    expect(loadStored(loader(REFUSED), followed)("nope")).toBe(false);
     expect(followed).not.toHaveBeenCalled();
   });
 });

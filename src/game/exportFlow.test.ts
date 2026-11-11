@@ -1,7 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { Simulation } from "../engine/Simulation";
 import { SaveGame } from "../storage/SaveGame";
-import { saveOf, importTower } from "../tests/fixtures/saveText";
 import { runExportFlow, runLegacyDownload, resetExportFlowForTests, EXPORT_WATCHDOG_MS } from "./exportFlow";
 
 /**
@@ -47,16 +45,18 @@ function fakeUi(downloadStarts: boolean[] = []) {
   };
 }
 
-function flowDeps(ui: ReturnType<typeof fakeUi>["ui"], sim = Simulation.newGame(7)) {
-  return { getSim: () => sim, ui };
+function flowDeps(ui: ReturnType<typeof fakeUi>["ui"]) {
+  return { ui };
 }
 
 const FAKE_FILE = "VCTOWER1\nfake";
 
 /** The flow's save callback: the engine's `.vctower` text (or a promise of it,
- *  to hold an export open) and the tower's name. */
-function saved(file: string | Promise<string> = FAKE_FILE, sim = Simulation.newGame(7)) {
-  return () => ({ file, towerName: sim.tower.towerName });
+ *  to hold an export open) and the tower's name. Whether the engine's text
+ *  reads back as the same tower is checked on the Rust engine in
+ *  `src/tests/integration/saveRepair.integration.test.ts`. */
+function saved(file: string | Promise<string> = FAKE_FILE, towerName = "Tower Seven") {
+  return () => ({ file, towerName });
 }
 
 const HUNG_TOAST = { text: "The export is not responding. You can try exporting again.", kind: "bad" };
@@ -76,20 +76,12 @@ afterEach(() => {
 });
 
 describe("export single-flight latch (GH #760)", () => {
-  it("hands the player a real .vctower download and says how big it is", async () => {
+  it("hands the player the engine's file under the tower's name, and says how big it is", async () => {
     const { ui, toasts, downloads } = fakeUi();
-    const sim = Simulation.newGame(7);
-    await runExportFlow(flowDeps(ui, sim), saved(await SaveGame.export(saveOf(sim)), sim));
-    expect(downloads).toHaveLength(1);
-    expect(downloads[0]!.filename).toBe(SaveGame.exportFilename(sim.tower.towerName));
-    const text = downloads[0]!.contents as string;
-    expect(typeof text).toBe("string");
-    // The file reads back as the same tower.
-    const back = await importTower(text);
-    expect(back.tower.towerName).toBe(sim.tower.towerName);
-    expect(toasts).toHaveLength(1);
-    expect(toasts[0]!.kind).toBe("good");
-    expect(toasts[0]!.text).toMatch(/^Tower exported \(\d+\.\d KB\)\. Check your downloads\.$/);
+    const file = "VCTOWER1\n" + "x".repeat(2048 - 9);
+    await runExportFlow(flowDeps(ui), saved(file, "Skyline One"));
+    expect(downloads).toEqual([{ filename: SaveGame.exportFilename("Skyline One"), contents: file }]);
+    expect(toasts).toEqual([{ text: "Tower exported (2.0 KB). Check your downloads.", kind: "good" }]);
   });
 
   it("REGRESSION (GH #997): a download that failed gets no success toast, and the latch frees", async () => {

@@ -10,31 +10,9 @@
 # port kit (src/tests/portKit/) or retire it on evidence, then delete its line.
 # Adding a line needs a reason the PR states and a reviewer accepts.
 
-src/analyticsEngineBridge.test.ts Simulation
-src/bootstrapEngine.test.ts Simulation
-src/catalog/towerCatalog.test.ts Simulation
-src/game/appBootBackdrop.test.ts Simulation port/tsEngine
-src/game/appHistory.test.ts Simulation port/tsEngine
 src/game/appModals.fixture.ts Simulation port/tsEngine
-src/game/buildPreview.test.ts Simulation
 src/game/cardKit.fixture.ts port/tsEngine
-src/game/cardKit.test.ts Simulation port/tsEngine
-src/game/engineWiring.test.ts Simulation
-src/game/exportFlow.test.ts Simulation
-src/game/frameLoop.fixture.ts Simulation port/tsEngine sim/frameStep
-src/game/portAccess.test.ts Simulation
 src/game/portDeps.fixture.ts port/tsEngine
-src/game/portLifecycle.test.ts Simulation port/tsEngine
-src/game/scheduleRecovery.test.ts Simulation port/tsEngine
-src/game/scheduleReview.test.ts Simulation port/tsEngine
-src/game/serviceDiagnosticsCards.test.ts port/tsEngine
-src/game/trafficHud.test.ts Simulation port/tsEngine
-src/game/trafficHudPort.test.ts Simulation port/tsEngine
-src/game/uiCallbacks.test.ts Simulation port/tsEngine
-src/presentation/statsCopy.test.ts Ledger
-src/render/excalibur/towerInputCamera.test.ts Tower
-src/render/excalibur/towerScenery.test.ts Simulation
-src/render/excalibur/towerWalkerBuild.test.ts Tower tower/segments tower/towerTopology
 src/simport/tsPanels.test.ts Simulation port/tsEngine sim/star
 src/tests/barrelSurface.test.ts Crowd EconomySystem Simulation Tower
 src/tests/conformance/checkpointDetail.test.ts Simulation
@@ -145,12 +123,6 @@ src/tests/integration/weatherCrowd.integration.test.ts Clock EconomySystem Simul
 src/tests/integration/weatherEvents.integration.test.ts Clock EventSystem Simulation Tower rng
 src/tests/integration/weekendPatronage.integration.test.ts Simulation
 src/tests/roomCountsWriters.guard.test.ts tower/rooms
-src/ui/catalogPricing.test.ts Simulation
-src/ui/editorPatch.test.ts Simulation
 src/ui/hud.fixture.ts port/tsEngine
-src/ui/templates/editor.test.ts Simulation
-src/ui/templates/inspector.test.ts Simulation
 src/ui/templates/stats.fixture.ts port/tsEngine
-src/ui/templates/stats.test.ts Simulation sim/star tower/rooms
-src/ui/uiStatus.test.ts Simulation port/tsEngine
 src/wasmhost/stepLoopAbsent.test.ts Simulation

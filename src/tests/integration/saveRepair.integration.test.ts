@@ -7,6 +7,7 @@ import { SaveGame } from "../../storage/SaveGame";
 import { MAX_SAVE_INFLATED_BYTES, STORE_MAGIC, toBase64 } from "../../storage/saveCompression";
 import { engineSaveText } from "../../storage/saveTextRead";
 import { fromTowerFile, toTowerFile } from "../../storage/towerFileCodec";
+import { runExportFlow } from "../../game/exportFlow";
 import { engineFromSave, newEngine, noEngine } from "../portKit/rustEngine";
 
 /**
@@ -68,6 +69,21 @@ describe.skipIf(noEngine)("the storage code's saves on the engine", () => {
     const want = read(source);
     expect(want.population).toBeGreaterThan(0);
     expect(read(loaded)).toEqual(want);
+  });
+
+  it("downloads, through the export flow, a file that imports as the same tower", async () => {
+    const source = engineFromSave(await SaveGame.importText(readFileSync(FIXTURE, "utf8")));
+    const { towerName } = JSON.parse(source.serialize()) as { towerName: string };
+    const downloads: { filename: string; contents: string | Uint8Array }[] = [];
+    const ui = {
+      toast: () => {},
+      downloadFile: (filename: string, contents: string | Uint8Array) => (downloads.push({ filename, contents }), true),
+    };
+    await runExportFlow({ ui }, () => ({ file: SaveGame.export(source.serialize()), towerName }));
+    expect(downloads.map((d) => d.filename)).toEqual([SaveGame.exportFilename(towerName)]);
+    const back = engineFromSave(await SaveGame.importText(downloads[0]!.contents as string));
+    expect(JSON.parse(back.serialize())).toMatchObject({ towerName });
+    expect(newViewReader(back).header.population).toBe(newViewReader(source).header.population);
   });
 
   it("opens a save of exactly the cap that the storage writers pass, as saveCap.test.ts builds it", () => {

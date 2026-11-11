@@ -1,445 +1,331 @@
-import { describe, it, expect, vi } from "vitest";
-import { catalogFor } from "../tests/catalogFixture";
-import { Simulation } from "../engine/Simulation";
-import { FACILITIES, GRID } from "../engine/facilities";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { useTowerCatalogSource } from "../catalog/towerCatalog";
-import { snapX, brushTiles } from "../ui/placement";
 import type { GameMode } from "../shared/types";
+import { PortCodes } from "../simport/portCodes";
+import { catalogFor } from "../tests/catalogFixture";
+import { code, mockPort, record } from "../tests/portKit/mockPort";
+import { brushTiles, snapX } from "../ui/placement";
 import type { GameApp } from "../main";
-import { portDeps } from "./portDeps.fixture";
 import {
+  clearBuildRefusal,
+  isPaintTool,
+  isTransportTool,
   pickedAt,
   placeSimpleBuild,
-  isTransportTool,
-  isPaintTool,
+  touchBuildLiftFloors,
   updateBuildPreview,
   updateBuildRefusal,
-  clearBuildRefusal,
-  touchBuildLiftFloors,
 } from "./buildPreview";
 
-const CAT = catalogFor("classic");
-
 /**
- * Colocated unit tests for the build-preview / placement / pick-resolution
- * friend functions. `pickedAt`, `placeSimpleBuild`, and `isTransportTool` run
- * against the real (headless) Simulation so the tower geometry is real; the
- * ui/engine/build ports are minimal fakes. Mirrors the fixture idiom in
- * src/tests/integration/gameControllers.integration.test.ts.
+ * The build preview, placement and pick resolution over a mock port and a
+ * hand-built view: the quotes it asks for, the reads it makes, and the ghost
+ * it draws from the answers. The same paths on the Rust engine's own geometry
+ * and quotes are in `src/tests/integration/buildPreview.integration.test.ts`.
  */
 
-/** A tower with a lobby strip, a floor strip above it, one office, and one
- *  standard elevator, asserting every placement so a silent fixture failure
- *  can't make an assertion below pass for the wrong reason. */
-function fixture(mode: GameMode = "classic") {
-  const sim = new Simulation(12345, mode);
-  for (let x = 10; x < 30; x++) expect(sim.tower.place("lobby", 1, x).ok).toBe(true);
-  for (let x = 10; x < 30; x++) expect(sim.tower.place("floor", 2, x).ok).toBe(true);
-  const r = sim.tower.place("office", 2, 12);
-  expect(r.ok).toBe(true);
-  const office = sim.tower.units.find((u) => u.id === r.unitId)!;
-  expect(sim.buildTransport("elevatorStandard", 10, 1, 2).ok).toBe(true);
-  const lift = sim.tower.transports[sim.tower.transports.length - 1];
-  return { sim, office, lift };
+const CAT = catalogFor("classic");
+const price = (key: string, mode: GameMode = "classic") => catalogFor(mode).facilities.find((f) => f.key === key)!.cost;
+/** One bare ground-floor tile of the Floor tool: a lobby with the floor it lays. */
+const BARE_LOBBY = price("lobby") + price("floor");
+
+/** A view of a tower: built structure by `floor:x`, rooms by the cells they
+ *  cover, and shafts with their stored width. */
+interface Tower {
+  structure?: Record<string, string>;
+  rooms?: Record<string, { id: number; kind: string }>;
+  transports?: { id: number; kind: string; x: number; width: number; bottom: number; top: number }[];
+  money?: number;
+  mode?: GameMode;
+  unlocked?: boolean;
 }
 
-/** A recording `app.ui`/`app.engine` and a hand-built `app.build`; only the
- *  fields the module under test reads are present. */
+/** `floor:x` keys for a run of tiles on one floor. */
+const run = (floor: number, from: number, to: number, kind: string): Record<string, string> =>
+  Object.fromEntries(Array.from({ length: to - from + 1 }, (_, i) => [`${floor}:${from + i}`, kind]));
+
+function viewOf(t: Tower) {
+  const structure = t.structure ?? {};
+  const at = (floor: number, x: number) => structure[`${floor}:${x}`];
+  return {
+    header: { mode: t.mode ?? "classic", money: t.money ?? 1e9 },
+    unlocked: vi.fn(() => t.unlocked ?? true),
+    roomAt: vi.fn((floor: number, x: number) => t.rooms?.[`${floor}:${x}`]),
+    structureBeside: vi.fn((floor: number, x: number, dir: -1 | 1) => {
+      for (let tx = x + dir; tx >= 0 && tx < 400; tx += dir) if (at(floor, tx)) return { kind: at(floor, tx), x: tx };
+      return undefined;
+    }),
+    tower: {
+      unitAt: vi.fn((floor: number, x: number) => t.rooms?.[`${floor}:${x}`]),
+      transports: t.transports ?? [],
+      structureKindAt: vi.fn(at),
+    },
+  };
+}
+
+/** The app over a mock port whose quotes answer `quote` (by tile) and `shaftOk`. */
 function makeApp(
-  sim: Simulation,
   tool: GameApp["tool"],
-  overrides: Partial<{
-    build: Record<string, ReturnType<typeof vi.fn>>;
-    buildRefusalShowing: boolean;
-  }> = {},
+  tower: Tower = {},
+  answers: { quote?: (x: number) => { ok: boolean; cost: number }; shaftOk?: boolean; reason?: string } = {},
+  build: Record<string, ReturnType<typeof vi.fn>> = {},
 ) {
+  const enginePort = mockPort({
+    quoteBuild: vi.fn((_kind: number, _floor: number, x: number) => {
+      const q = answers.quote?.(x) ?? { ok: true, cost: 0 };
+      return record("quoteBuild", { ok: q.ok ? 1 : 0, cost: q.cost });
+    }),
+    quoteShaft: () => record("quoteShaft", { ok: answers.shaftOk === false ? 0 : 1 }),
+    lastReason: () => answers.reason,
+  });
   const showInspector = vi.fn();
-  const engine = {
-    preview: null as unknown,
-    transportPreview: null as unknown,
-  };
-  const { engine: enginePort, codes: portCodes, reader } = portDeps(sim);
   const app = {
-    sim,
     enginePort,
-    portCodes,
-    reader,
+    portCodes: new PortCodes(mockPort()),
+    reader: viewOf(tower),
     tool,
-    engine,
+    engine: { preview: null as unknown, transportPreview: null as unknown },
     ui: { showInspector },
-    build: overrides.build ?? {},
+    build,
     inspectAnchor: null as unknown,
-    buildRefusalShowing: overrides.buildRefusalShowing ?? false,
+    buildRefusalShowing: false,
   };
-  return { app: app as unknown as GameApp, raw: app, showInspector, engine };
+  return { app: app as unknown as GameApp, raw: app, showInspector, enginePort };
 }
 
-const buildTool = (kind: string): GameApp["tool"] =>
-  ({ type: "build", kind }) as unknown as GameApp["tool"];
+const buildTool = (kind: string): GameApp["tool"] => ({ type: "build", kind }) as unknown as GameApp["tool"];
+const inspectTool = { type: "inspect" } as unknown as GameApp["tool"];
+
+/** Run `body` with the engine's catalog for `app` swapped for one with `previewNamesRefusal` set. */
+function withRefusalRule(app: GameApp, previewNamesRefusal: boolean, body: () => void): void {
+  useTowerCatalogSource(app.enginePort, (m) => {
+    const base = catalogFor(m);
+    return { ...base, rules: { ...base.rules, previewNamesRefusal } };
+  });
+  try {
+    body();
+  } finally {
+    useTowerCatalogSource(app.enginePort, null);
+  }
+}
+
+afterEach(() => vi.restoreAllMocks());
 
 describe("pickedAt", () => {
-  it("resolves a room unit at its cell", () => {
-    const { sim, office } = fixture();
-    const { app } = makeApp(sim, buildTool("office"));
-    expect(pickedAt(app, office.floor, office.x)).toEqual({
-      type: "unit",
-      id: office.id,
-      kind: "office",
-    });
+  it("resolves the room the view answers at a cell, and no structure tile", () => {
+    const { app, raw } = makeApp(buildTool("office"), { rooms: { "2:12": { id: 5, kind: "office" }, "1:25": { id: 0, kind: "lobby" } } });
+    expect(pickedAt(app, 2, 12)).toEqual({ type: "unit", id: 5, kind: "office" });
+    expect(raw.reader.tower.unitAt).toHaveBeenLastCalledWith(2, 12);
+    expect(pickedAt(app, 1, 25), "a lobby tile is not pickable").toBeNull();
+    expect(pickedAt(app, 8, 0)).toBeNull();
   });
 
   it("resolves a transport by its stored width and span", () => {
-    const { sim, lift } = fixture();
-    const { app } = makeApp(sim, buildTool("office"));
-    // A cell inside the shaft's stored footprint resolves the transport.
-    const got = pickedAt(app, lift.bottom, lift.x + lift.width - 1);
-    expect(got).toEqual({ type: "transport", id: lift.id, kind: lift.kind });
-    // One column past the stored width is outside the pick zone.
-    expect(pickedAt(app, lift.bottom, lift.x + lift.width)).toBeNull();
-  });
-
-  it("resolves every story of a room taller than one floor, as the tower does", () => {
-    const { sim } = fixture();
-    for (let x = 30; x < 80; x++) expect(sim.tower.place("lobby", 1, x).ok).toBe(true);
-    for (const floor of [2, 3]) for (let x = 30; x < 80; x++) expect(sim.tower.place("floor", floor, x).ok).toBe(true);
-    const r = sim.tower.place("cinema", 2, 40);
-    expect(r.reason).toBeUndefined();
-    const cinema = sim.tower.units.find((u) => u.id === r.unitId)!;
-    const { app } = makeApp(sim, buildTool("office"));
-    const want = { type: "unit", id: cinema.id, kind: "cinema" };
-    for (let floor = 2; floor <= 3; floor++) {
-      expect(sim.tower.unitAt(floor, cinema.x)?.id).toBe(cinema.id);
-      expect(pickedAt(app, floor, cinema.x), `floor ${floor}`).toEqual(want);
-      expect(pickedAt(app, floor, cinema.x + cinema.width - 1), `floor ${floor}`).toEqual(want);
-    }
-    expect(pickedAt(app, 4, cinema.x)).toBeNull();
-  });
-
-  it("returns null for empty cells and for floor/lobby structure", () => {
-    const { sim } = fixture();
-    const { app } = makeApp(sim, buildTool("office"));
-    expect(pickedAt(app, 8, 0)).toBeNull(); // empty air
-    expect(pickedAt(app, 1, 25)).toBeNull(); // a bare lobby cell is not pickable
+    const lift = { id: 9, kind: "elevatorStandard", x: 10, width: 4, bottom: 1, top: 3 };
+    const { app } = makeApp(buildTool("office"), { transports: [lift] });
+    expect(pickedAt(app, 3, 13)).toEqual({ type: "transport", id: 9, kind: "elevatorStandard" });
+    expect(pickedAt(app, 3, 14), "one column past the stored width").toBeNull();
+    expect(pickedAt(app, 4, 10), "one floor past the top").toBeNull();
   });
 });
 
 describe("placeSimpleBuild", () => {
-  it("paint: reports ok from paintBrush placed count and passes the reason through", () => {
-    const { sim } = fixture();
-    const paintBrush = vi.fn(() => ({ placed: 3, reason: undefined }));
-    const { app } = makeApp(sim, buildTool("floor"), { build: { paintBrush } });
+  it("paint: reports ok from the brush's placed count and passes the reason through", () => {
+    const paintBrush = vi.fn().mockReturnValueOnce({ placed: 3 }).mockReturnValueOnce({ placed: 0, reason: "Floor already built here" });
+    const { app } = makeApp(buildTool("floor"), {}, {}, { paintBrush });
     expect(placeSimpleBuild(app, "floor", 14, 2)).toEqual({ what: "paint", ok: true, reason: undefined });
     expect(paintBrush).toHaveBeenCalledWith("floor", 14, 2);
-
-    const paintBrush0 = vi.fn(() => ({ placed: 0, reason: "Floor already built here" }));
-    const { app: app2 } = makeApp(sim, buildTool("floor"), { build: { paintBrush: paintBrush0 } });
-    expect(placeSimpleBuild(app2, "floor", 14, 2)).toEqual({
-      what: "paint",
-      ok: false,
-      reason: "Floor already built here",
-    });
+    expect(placeSimpleBuild(app, "floor", 14, 2)).toEqual({ what: "paint", ok: false, reason: "Floor already built here" });
   });
 
   it("flight: routes a fixed-span transport through tryBuildTransport across two floors", () => {
-    const { sim } = fixture();
     const tryBuildTransport = vi.fn(() => ({ ok: true, reason: "" }));
-    const { app } = makeApp(sim, buildTool("stairs"), { build: { tryBuildTransport } });
+    const { app } = makeApp(buildTool("stairs"), {}, {}, { tryBuildTransport });
     expect(placeSimpleBuild(app, "stairs", 14, 3)).toEqual({ what: "flight", ok: true, reason: "" });
-    expect(tryBuildTransport).toHaveBeenCalledWith("stairs", snapX(CAT, "stairs", 14), 3, 4);
+    expect(tryBuildTransport).toHaveBeenCalledExactlyOnceWith("stairs", snapX(CAT, "stairs", 14), 3, 4);
   });
 
-  it("room: reports ok from the engine's answer to the build", () => {
-    const { sim } = fixture();
-    const before0 = sim.tower.units.length;
-    const tryBuild = vi.fn((kind: string, floor: number, x: number) => sim.build(kind as never, floor, x).ok);
-    const { app } = makeApp(sim, buildTool("office"), { build: { tryBuild } });
+  it("room: builds at the snapped column and reports the engine's answer", () => {
+    const tryBuild = vi.fn().mockReturnValueOnce(true).mockReturnValueOnce(false);
+    const { app } = makeApp(buildTool("office"), {}, {}, { tryBuild });
     expect(placeSimpleBuild(app, "office", 21, 2)).toEqual({ what: "room", ok: true });
-    expect(sim.tower.units.length).toBe(before0 + 1);
     expect(tryBuild).toHaveBeenCalledWith("office", 2, snapX(CAT, "office", 21));
-    // A refused build (the same spot again) reports not placed.
     expect(placeSimpleBuild(app, "office", 21, 2)).toEqual({ what: "room", ok: false });
   });
 
   it("null: a drag-sized shaft is left to the caller's anchor gesture", () => {
-    const { sim } = fixture();
-    const { app } = makeApp(sim, buildTool("elevatorStandard"), { build: {} });
+    const { app } = makeApp(buildTool("elevatorStandard"));
     expect(placeSimpleBuild(app, "elevatorStandard", 14, 2)).toBeNull();
   });
 });
 
 describe("isTransportTool / isPaintTool", () => {
   it("isTransportTool is true for a transport build tool, false otherwise", () => {
-    const { sim } = fixture();
-    expect(isTransportTool(makeApp(sim, buildTool("elevatorStandard")).app)).toBe(true);
-    expect(isTransportTool(makeApp(sim, buildTool("stairs")).app)).toBe(true);
-    expect(isTransportTool(makeApp(sim, buildTool("office")).app)).toBe(false);
-    expect(isTransportTool(makeApp(sim, { type: "inspect" } as unknown as GameApp["tool"]).app)).toBe(false);
+    expect(isTransportTool(makeApp(buildTool("elevatorStandard")).app)).toBe(true);
+    expect(isTransportTool(makeApp(buildTool("stairs")).app)).toBe(true);
+    expect(isTransportTool(makeApp(buildTool("office")).app)).toBe(false);
+    expect(isTransportTool(makeApp(inspectTool).app)).toBe(false);
   });
 
   it("isPaintTool is true only for the drag-paint kinds", () => {
-    const { sim } = fixture();
-    for (const k of ["floor", "lobby", "parking"]) {
-      expect(isPaintTool(makeApp(sim, buildTool(k)).app)).toBe(true);
-    }
-    expect(isPaintTool(makeApp(sim, buildTool("office")).app)).toBe(false);
-    expect(isPaintTool(makeApp(sim, buildTool("elevatorStandard")).app)).toBe(false);
-    expect(isPaintTool(makeApp(sim, { type: "bulldoze" } as unknown as GameApp["tool"]).app)).toBe(false);
+    for (const k of ["floor", "lobby", "parking"]) expect(isPaintTool(makeApp(buildTool(k)).app)).toBe(true);
+    expect(isPaintTool(makeApp(buildTool("office")).app)).toBe(false);
+    expect(isPaintTool(makeApp(buildTool("elevatorStandard")).app)).toBe(false);
+    expect(isPaintTool(makeApp({ type: "bulldoze" } as unknown as GameApp["tool"]).app)).toBe(false);
   });
 });
 
 describe("updateBuildPreview", () => {
+  it("clears both previews and any refusal when the tool is not a build tool", () => {
+    const { app, raw, showInspector, enginePort } = makeApp(inspectTool);
+    raw.buildRefusalShowing = true;
+    raw.engine.preview = { anything: true };
+    raw.engine.transportPreview = { anything: true };
+    updateBuildPreview(app, 12, 2);
+    expect([raw.engine.preview, raw.engine.transportPreview, raw.buildRefusalShowing]).toEqual([null, null, false]);
+    expect(showInspector).toHaveBeenLastCalledWith(null);
+    expect(enginePort.quoteBuild).not.toHaveBeenCalled();
+  });
+
+  it("fixed-span transport: quotes the two-floor span and needs the unlock too", () => {
+    const x = snapX(CAT, "stairs", 14);
+    for (const [shaftOk, unlocked, valid] of [
+      [true, true, true],
+      [false, true, false],
+      [true, false, false],
+    ] as const) {
+      const { app, raw, enginePort } = makeApp(buildTool("stairs"), { unlocked }, { shaftOk });
+      updateBuildPreview(app, 14, 3);
+      expect(raw.engine.transportPreview).toEqual({ kind: "stairs", x, bottom: 3, top: 4, valid });
+      expect(raw.engine.preview).toBeNull();
+      if (unlocked) expect(enginePort.quoteShaft).toHaveBeenCalledExactlyOnceWith(code("kinds", "stairs"), x, 3, 4);
+    }
+  });
+
+  it("drag-sized transport: a single-floor ghost keyed to the unlock, with no quote", () => {
+    const { app, raw, enginePort } = makeApp(buildTool("elevatorStandard"), { unlocked: false });
+    updateBuildPreview(app, 14, 2);
+    expect(raw.engine.preview).toEqual({ kind: "elevatorStandard", floor: 2, x: snapX(CAT, "elevatorStandard", 14), valid: false });
+    expect(raw.engine.transportPreview).toBeNull();
+    expect(enginePort.quoteShaft).not.toHaveBeenCalled();
+  });
+
   it("snaps to the engine's catalog when the engine installed one", () => {
-    const { sim } = fixture();
-    const { app, raw } = makeApp(sim, buildTool("office"));
-    const tile = GRID.width - 1;
-    updateBuildPreview(app, tile, 2);
+    const { app, raw } = makeApp(buildTool("office"));
+    updateBuildPreview(app, 399, 2);
     const own = (raw.engine.preview as { x: number }).x;
-    expect(own).toBe(snapX(CAT, "office", tile));
+    expect(own).toBe(snapX(CAT, "office", 399));
     useTowerCatalogSource(app.enginePort, (mode) => {
       const base = catalogFor(mode);
       return { ...base, facilities: base.facilities.map((f) => (f.key === "office" ? { ...f, width: f.width + 2 } : f)) };
     });
-    updateBuildPreview(app, tile, 2);
-    expect((raw.engine.preview as { x: number }).x).toBe(own - 2);
-  });
-
-  it("clears both previews and any refusal when the tool is not a build tool", () => {
-    const { sim } = fixture();
-    const { app, raw, showInspector } = makeApp(sim, { type: "inspect" } as unknown as GameApp["tool"], {
-      buildRefusalShowing: true,
-    });
-    raw.engine.preview = { anything: true };
-    raw.engine.transportPreview = { anything: true };
-    updateBuildPreview(app, 12, 2);
-    expect(raw.engine.preview).toBeNull();
-    expect(raw.engine.transportPreview).toBeNull();
-    expect(raw.buildRefusalShowing).toBe(false);
-    expect(showInspector).toHaveBeenLastCalledWith(null);
-  });
-
-  it("fixed-span transport: sets the two-floor transportPreview with real validity, clears preview", () => {
-    const { sim } = fixture();
-    const { app, raw } = makeApp(sim, buildTool("stairs"));
-    const x = snapX(CAT, "stairs", 14);
-    const expectedValid = sim.isUnlocked("stairs") && sim.tower.placeTransportDryRun("stairs", x, 3, 4);
-    updateBuildPreview(app, 14, 3);
-    expect(raw.engine.transportPreview).toEqual({ kind: "stairs", x, bottom: 3, top: 4, valid: expectedValid });
-    expect(raw.engine.preview).toBeNull();
-  });
-
-  it("drag-sized transport: sets a single-floor preview keyed to unlock, clears transportPreview", () => {
-    const { sim } = fixture();
-    const { app, raw } = makeApp(sim, buildTool("elevatorStandard"));
-    const x = snapX(CAT, "elevatorStandard", 14);
-    updateBuildPreview(app, 14, 2);
-    expect(raw.engine.preview).toEqual({ kind: "elevatorStandard", floor: 2, x, valid: sim.isUnlocked("elevatorStandard") });
-    expect(raw.engine.transportPreview).toBeNull();
-  });
-
-  it("floor brush: previews the centered strip span and never a transportPreview", () => {
-    const { sim } = fixture();
-    const { app, raw, showInspector } = makeApp(sim, buildTool("floor"));
-    const tiles = brushTiles(14);
-    const left = tiles[0];
-    const span = tiles[tiles.length - 1] - left + 1;
-    updateBuildPreview(app, 14, 3);
-    const preview = raw.engine.preview as { kind: string; floor: number; x: number; span: number };
-    expect(preview.kind).toBe("floor");
-    expect(preview.floor).toBe(3);
-    expect(preview.x).toBe(left);
-    expect(preview.span).toBe(span);
-    expect(raw.engine.transportPreview).toBeNull();
-    // Classic never surfaces the refusal reason, so no inspector card is shown.
-    expect(showInspector).not.toHaveBeenCalledWith(expect.anything());
-  });
-
-  it("floor tool on the ground floor previews a LOBBY ghost (floor 1 is lobby-only)", () => {
-    const { sim } = fixture(); // lobby spans x=10..29 on floor 1
-    sim.money = 10_000_000;
-    const { app, raw } = makeApp(sim, buildTool("floor"));
-    updateBuildPreview(app, 20, 1);
-    const preview = raw.engine.preview as { kind: string; floor: number };
-    expect(preview.kind).toBe("lobby"); // the Floor tool auto-converts on floor 1
-    expect(preview.floor).toBe(1);
-  });
-
-  it("the ground-floor ghost goes invalid when the whole brush of lobby tiles is unaffordable", () => {
-    const { sim } = fixture(); // lobby spans x=10..29 on floor 1
-    const { app, raw } = makeApp(sim, buildTool("floor"));
-    // Tile 30 sits at the lobby's edge, so the anchor tile alone IS affordable (a
-    // lobby with its floor). But the 8-wide brush would lay ~4 empty tiles past the
-    // edge; a single-tile check would show green, the whole-brush guard must not.
-    for (const [money, valid] of [[FACILITIES.lobby.cost + FACILITIES.floor.cost, false], [10_000_000, true]] as const) {
-      sim.money = money;
-      app.reader.update();
-      updateBuildPreview(app, 30, 1);
-      const preview = raw.engine.preview as { kind: string; valid: boolean };
-      expect([preview.kind, preview.valid], `with $${money}`).toEqual(["lobby", valid]);
+    try {
+      updateBuildPreview(app, 399, 2);
+      expect((raw.engine.preview as { x: number }).x).toBe(own - 2);
+    } finally {
+      useTowerCatalogSource(app.enginePort, null);
     }
   });
 
-  it("the ground-floor ghost prices only the tiles the Floor tool lays, skipping plain floor", () => {
-    const { sim } = fixture(); // lobby spans x=10..29 on floor 1
-    expect(sim.tower.place("floor", 1, 30).ok).toBe(true); // plain floor, as an old save can hold: the Floor brush skips it
-    const { app, raw } = makeApp(sim, buildTool("floor"));
-    const validWith = (money: number, hover: number) => {
-      sim.money = money;
-      app.reader.update();
-      updateBuildPreview(app, hover, 1);
+  it("room: the quote decides the ghost, and the catalog's rule whether the reason and card show", () => {
+    const x = snapX(CAT, "office", 21);
+    const width = CAT.facilities.find((f) => f.key === "office")!.width;
+    for (const previewNamesRefusal of [true, false]) {
+      const { app, raw, showInspector, enginePort } = makeApp(
+        buildTool("office"),
+        {},
+        { quote: () => ({ ok: false, cost: 0 }), reason: "No floor here." },
+      );
+      withRefusalRule(app, previewNamesRefusal, () => updateBuildPreview(app, 21, 6));
+      expect(enginePort.quoteBuild).toHaveBeenCalledExactlyOnceWith(code("kinds", "office"), 6, x);
+      const reason = previewNamesRefusal ? "No floor here." : undefined;
+      expect(raw.engine.preview, `rule ${previewNamesRefusal}`).toEqual({ kind: "office", floor: 6, x, valid: false, reason });
+      expect(raw.buildRefusalShowing).toBe(previewNamesRefusal);
+      expect(raw.inspectAnchor).toEqual(
+        previewNamesRefusal ? { x: x + Math.floor(width / 2), left: x + Math.floor(width / 2), floor: 6 } : null,
+      );
+      expect(showInspector).toHaveBeenCalledTimes(previewNamesRefusal ? 1 : 0);
+    }
+    const { app, raw } = makeApp(buildTool("office"));
+    updateBuildPreview(app, 21, 2);
+    expect(raw.engine.preview).toEqual({ kind: "office", floor: 2, x, valid: true, reason: undefined });
+  });
+
+  it("floor brush: previews the centered strip and quotes the tile against the tower", () => {
+    const tiles = brushTiles(14);
+    const { app, raw, enginePort } = makeApp(buildTool("floor"), { structure: { ...run(1, 0, 40, "lobby"), ...run(2, 12, 13, "floor") } });
+    updateBuildPreview(app, 14, 2);
+    expect(raw.engine.preview).toMatchObject({
+      kind: "floor",
+      floor: 2,
+      x: tiles[0],
+      span: tiles[tiles.length - 1] - tiles[0] + 1,
+      valid: true,
+    });
+    expect(raw.engine.transportPreview).toBeNull();
+    // The brush lays 10..17 over built floor at 12..13: the tile laid beside
+    // it on the left (11) is quoted, then the run past it (from 14), since the
+    // built floor stops the first quote's scan right.
+    expect(vi.mocked(enginePort.quoteBuild).mock.calls).toEqual([
+      [code("kinds", "floor"), 2, 11],
+      [code("kinds", "floor"), 2, 14],
+    ]);
+  });
+
+  it("the ground-floor ghost is a lobby, green only when the money covers every tile the brush lays", () => {
+    // Lobby on 10..29; the brush at 30 lays 30..33, four bare tiles.
+    const tower = { structure: run(1, 10, 29, "lobby") };
+    const validWith = (money: number) => {
+      const { app, raw, enginePort } = makeApp(buildTool("floor"), { ...tower, money }, { quote: () => ({ ok: true, cost: BARE_LOBBY }) });
+      updateBuildPreview(app, 30, 1);
+      expect(enginePort.quoteBuild).toHaveBeenCalledExactlyOnceWith(code("kinds", "lobby"), 1, 30);
+      return raw.engine.preview as { kind: string; valid: boolean };
+    };
+    expect(validWith(4 * BARE_LOBBY)).toMatchObject({ kind: "lobby", valid: true });
+    expect(validWith(4 * BARE_LOBBY - 1)).toMatchObject({ kind: "lobby", valid: false });
+  });
+
+  it("counts a quoted bridge past the brush's end in the strip's price", () => {
+    // Lobby on 10..29; the brush at 35 lays 31..38, detached, and its quote
+    // bridges tile 30 back to the lobby: one more bare tile than the brush.
+    const tower = { structure: run(1, 10, 29, "lobby") };
+    const quote = () => ({ ok: true, cost: 2 * BARE_LOBBY });
+    const validWith = (money: number) => {
+      const { app, raw } = makeApp(buildTool("floor"), { ...tower, money }, { quote });
+      updateBuildPreview(app, 35, 1);
+      expect(raw.reader.structureBeside).toHaveBeenCalledWith(1, 31, -1);
       return (raw.engine.preview as { valid: boolean }).valid;
     };
-    // At 31 the brush spans 27..34 (the plain floor, four bare tiles); at 30, 26..33 (its anchor on it, three bare).
-    for (const [hover, bare] of [[31, 4], [30, 3]]) {
-      const strip = bare * (FACILITIES.lobby.cost + FACILITIES.floor.cost);
-      expect([validWith(strip, hover), validWith(strip - 1, hover)], `at ${hover}`).toEqual([true, false]);
-    }
-    for (const x of [31, 32, 33]) expect(sim.tower.place("lobby", 1, x).ok).toBe(true);
-    expect(validWith(1e9, 30), "with those built too, a brush that lays nothing is never green").toBe(false);
+    expect([validWith(9 * BARE_LOBBY), validWith(9 * BARE_LOBBY - 1)]).toEqual([true, false]);
   });
 
-  it("floor brush: the catalog's previewNamesRefusal rule decides whether a refused strip says why, whatever the mode's name", () => {
-    // Each mode with the rule on and off, so neither mode's name can stand in.
-    // Three strips: one the player cannot afford, one they can, and one whose
-    // anchor the engine refuses, which names the engine's own reason.
-    for (const mode of ["classic", "modern"] as const) {
-      for (const previewNamesRefusal of [true, false]) {
-        const label = `${mode}, previewNamesRefusal ${previewNamesRefusal}`;
-        const { sim } = fixture(mode); // lobby spans x=10..29 on floor 1
-        const { app, raw } = makeApp(sim, buildTool("floor"));
-        useTowerCatalogSource(app.enginePort, (m) => {
-          const base = catalogFor(m);
-          return { ...base, rules: { ...base.rules, previewNamesRefusal } };
-        });
-        try {
-          const price = (key: string) => catalogFor(mode).facilities.find((f) => f.key === key)!.cost;
-          sim.money = price("lobby") + price("floor"); // one bare tile's price, short of the strip
-          app.reader.update();
-          updateBuildPreview(app, 30, 1);
-          const preview = raw.engine.preview as { kind: string; valid: boolean; reason?: string };
-          expect(preview.kind, label).toBe("lobby");
-          expect(preview.valid, label).toBe(false);
-          expect(preview.reason, label).toBe(previewNamesRefusal ? "Not enough money." : undefined);
-          sim.money = 1_000_000_000;
-          app.reader.update();
-          updateBuildPreview(app, 30, 1);
-          const affordable = raw.engine.preview as { valid: boolean; reason?: string };
-          expect(affordable.valid, label).toBe(true);
-          expect(affordable.reason, label).toBeUndefined();
-          // Floor 6 has no structure, so the engine refuses the anchor for a
-          // reason of its own, with money to spare.
-          const can = sim.canBuild("floor", 6, snapX(CAT, "floor", 21));
-          expect(typeof can.reason, label).toBe("string");
-          expect(can.reason, label).not.toBe("Not enough money.");
-          updateBuildPreview(app, 21, 6);
-          const refused = raw.engine.preview as { kind: string; valid: boolean; reason?: string };
-          expect(refused.kind, label).toBe("floor");
-          expect(refused.valid, label).toBe(false);
-          expect(refused.reason, label).toBe(previewNamesRefusal ? can.reason : undefined);
-          // Structural rejection wins over insufficient money: a broke player
-          // still needs the engine's explanation for an unsupported floor.
-          sim.money = 1;
-          app.reader.update();
-          updateBuildPreview(app, 21, 6);
-          const brokeAndUnsupported = raw.engine.preview as { valid: boolean; reason?: string };
-          expect(brokeAndUnsupported.valid, label).toBe(false);
-          expect(brokeAndUnsupported.reason, label).toBe(previewNamesRefusal ? can.reason : undefined);
-        } finally {
-          useTowerCatalogSource(app.enginePort, null);
-        }
-      }
+  it("names the refusal on a refused strip as the catalog's rule says: money short, or the engine's reason", () => {
+    const tower = { structure: run(1, 10, 29, "lobby"), money: 1 };
+    for (const previewNamesRefusal of [true, false]) {
+      const short = makeApp(buildTool("floor"), tower, { quote: () => ({ ok: true, cost: BARE_LOBBY }) });
+      withRefusalRule(short.app, previewNamesRefusal, () => updateBuildPreview(short.app, 30, 1));
+      expect((short.raw.engine.preview as { reason?: string }).reason).toBe(previewNamesRefusal ? "Not enough money." : undefined);
+      // A structural refusal wins over money short: the engine's reason.
+      const refused = makeApp(buildTool("floor"), tower, { quote: () => ({ ok: false, cost: 0 }), reason: "Build floors below first." });
+      withRefusalRule(refused.app, previewNamesRefusal, () => updateBuildPreview(refused.app, 21, 6));
+      expect(refused.raw.engine.preview).toMatchObject({
+        kind: "floor",
+        valid: false,
+        reason: previewNamesRefusal ? "Build floors below first." : undefined,
+      });
     }
   });
 
-  it("counts the auto-bridge gap-fill in the ground-floor ghost affordability (detached click)", () => {
-    const { sim } = fixture(); // lobby spans x=10..29 on floor 1; autoBridge on (classic)
-    const { app, raw } = makeApp(sim, buildTool("floor"));
-    // Hover past the lobby edge so the placement auto-bridges the gap with extra
-    // lobby tiles. A naive estimate of 8 tiles, each a lobby with its floor, would
-    // greenlight, but the real cost including the bridge run is higher, so the
-    // ghost must be red rather than promise a run that only partial-builds.
-    sim.money = 8 * (FACILITIES.lobby.cost + FACILITIES.floor.cost);
-    app.reader.update();
-    updateBuildPreview(app, 35, 1);
+  it("a brush that lays nothing is never green", () => {
+    const { app, raw } = makeApp(buildTool("floor"), { structure: run(1, 0, 60, "lobby") });
+    updateBuildPreview(app, 30, 1);
     expect((raw.engine.preview as { valid: boolean }).valid).toBe(false);
-    // Ample money clears it.
-    sim.money = 1_000_000;
-    app.reader.update();
-    updateBuildPreview(app, 35, 1);
-    expect((raw.engine.preview as { valid: boolean }).valid).toBe(true);
-  });
-
-  it("room (Classic): a valid cell previews valid with no reason and no refusal card", () => {
-    const { sim } = fixture("classic");
-    const { app, raw, showInspector } = makeApp(sim, buildTool("office"));
-    const x = snapX(CAT, "office", 21);
-    updateBuildPreview(app, 21, 2); // floor-2 strip supports an office here
-    expect(raw.engine.preview).toEqual({ kind: "office", floor: 2, x, valid: true, reason: undefined });
-    expect(raw.buildRefusalShowing).toBe(false);
-    expect(showInspector).not.toHaveBeenCalledWith(expect.anything());
-  });
-
-  it("room (Modern): an invalid cell surfaces the refusal reason and pins the inspector card", () => {
-    const { sim } = fixture("modern");
-    const { app, raw, showInspector } = makeApp(sim, buildTool("office"));
-    // Floor 6 has no structure, so canBuild refuses and Modern shows why.
-    const can = sim.canBuild("office", 6, snapX(CAT, "office", 21));
-    expect(can.ok).toBe(false);
-    updateBuildPreview(app, 21, 6);
-    const preview = raw.engine.preview as { valid: boolean; reason?: string };
-    expect(preview.valid).toBe(false);
-    expect(preview.reason).toBe(can.reason);
-    expect(raw.buildRefusalShowing).toBe(true);
-    expect(raw.inspectAnchor).toEqual({
-      x: snapX(CAT, "office", 21) + Math.floor(FACILITIES.office.width / 2),
-      left: snapX(CAT, "office", 21) + Math.floor(FACILITIES.office.width / 2),
-      floor: 6,
-    });
-    expect(showInspector).toHaveBeenCalledWith(expect.anything());
-  });
-
-  it("room: the catalog's previewNamesRefusal rule decides whether the reason shows, whatever the mode's name", () => {
-    // Each mode with the rule on and off, so neither mode's name can stand in.
-    for (const mode of ["classic", "modern"] as const) {
-      for (const previewNamesRefusal of [true, false]) {
-        const label = `${mode}, previewNamesRefusal ${previewNamesRefusal}`;
-        const { sim } = fixture(mode);
-        const { app, raw } = makeApp(sim, buildTool("office"));
-        useTowerCatalogSource(app.enginePort, (m) => {
-          const base = catalogFor(m);
-          return { ...base, rules: { ...base.rules, previewNamesRefusal } };
-        });
-        try {
-          const can = sim.canBuild("office", 6, snapX(CAT, "office", 21));
-          // A refusal with a reason, so the rule-on case cannot pass on two
-          // undefined values.
-          expect(typeof can.reason, label).toBe("string");
-          updateBuildPreview(app, 21, 6);
-          const preview = raw.engine.preview as { valid: boolean; reason?: string };
-          expect(preview.valid, label).toBe(false);
-          expect(preview.reason, label).toBe(previewNamesRefusal ? can.reason : undefined);
-        } finally {
-          useTowerCatalogSource(app.enginePort, null);
-        }
-      }
-    }
-  });
-
-  it("room (Classic): an invalid cell previews invalid but withholds the reason and the card", () => {
-    const { sim } = fixture("classic");
-    const { app, raw, showInspector } = makeApp(sim, buildTool("office"));
-    updateBuildPreview(app, 21, 6);
-    const preview = raw.engine.preview as { valid: boolean; reason?: string };
-    expect(preview.valid).toBe(false);
-    expect(preview.reason).toBeUndefined();
-    expect(raw.buildRefusalShowing).toBe(false);
-    expect(showInspector).not.toHaveBeenCalledWith(expect.anything());
   });
 });
 
 describe("updateBuildRefusal / clearBuildRefusal", () => {
   it("updateBuildRefusal with a reason anchors and pins the inspector card", () => {
-    const { sim } = fixture();
-    const { app, raw, showInspector } = makeApp(sim, buildTool("office"));
+    const { app, raw, showInspector } = makeApp(buildTool("office"));
     updateBuildRefusal(app, "Not enough money.", 4, 17);
     expect(raw.inspectAnchor).toEqual({ x: 17, left: 17, floor: 4 });
     expect(raw.buildRefusalShowing).toBe(true);
@@ -447,8 +333,8 @@ describe("updateBuildRefusal / clearBuildRefusal", () => {
   });
 
   it("updateBuildRefusal with no reason falls through to clearBuildRefusal", () => {
-    const { sim } = fixture();
-    const { app, raw, showInspector } = makeApp(sim, buildTool("office"), { buildRefusalShowing: true });
+    const { app, raw, showInspector } = makeApp(buildTool("office"));
+    raw.buildRefusalShowing = true;
     raw.inspectAnchor = { x: 1, left: 1, floor: 1 };
     updateBuildRefusal(app, undefined, 4, 17);
     expect(raw.buildRefusalShowing).toBe(false);
@@ -457,16 +343,14 @@ describe("updateBuildRefusal / clearBuildRefusal", () => {
   });
 
   it("clearBuildRefusal only clears when the build path owns the card", () => {
-    const { sim } = fixture();
-    // Not showing: a live inspect-tool card must not be stomped.
-    const notShowing = makeApp(sim, buildTool("office"), { buildRefusalShowing: false });
+    const notShowing = makeApp(buildTool("office"));
     notShowing.raw.inspectAnchor = { x: 9, floor: 9 };
     clearBuildRefusal(notShowing.app);
     expect(notShowing.showInspector).not.toHaveBeenCalled();
     expect(notShowing.raw.inspectAnchor).toEqual({ x: 9, floor: 9 });
 
-    // Showing: the build path clears its own card.
-    const showing = makeApp(sim, buildTool("office"), { buildRefusalShowing: true });
+    const showing = makeApp(buildTool("office"));
+    showing.raw.buildRefusalShowing = true;
     showing.raw.inspectAnchor = { x: 9, floor: 9 };
     clearBuildRefusal(showing.app);
     expect(showing.showInspector).toHaveBeenCalledWith(null);
@@ -475,9 +359,8 @@ describe("updateBuildRefusal / clearBuildRefusal", () => {
   });
 });
 
-describe("touchBuildLiftFloors — a capped, zoom-aware lift", () => {
-  const liftAt = (zoom: number) =>
-    touchBuildLiftFloors({ engine: { cam: { zoom } } } as unknown as GameApp);
+describe("touchBuildLiftFloors: a capped, zoom-aware lift", () => {
+  const liftAt = (zoom: number) => touchBuildLiftFloors({ engine: { cam: { zoom } } } as unknown as GameApp);
 
   it("lifts at least one floor when zoomed in (a fingertip is under a floor tall there)", () => {
     expect(liftAt(5)).toBe(1);
@@ -485,7 +368,6 @@ describe("touchBuildLiftFloors — a capped, zoom-aware lift", () => {
   });
 
   it("caps the lift when zoomed out, so the ghost never drifts far up the tower", () => {
-    // Uncapped, a fingertip of screen distance is many floors at whole-tower zoom.
     expect(liftAt(0.06)).toBe(2);
     expect(liftAt(0.1)).toBe(2);
   });

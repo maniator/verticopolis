@@ -60,8 +60,7 @@ export function canCallExterminator(report: Pick<StatsReport, "housekeeping" | "
 }
 
 /** Each star gate's line on the "Next" checklist, keyed by the id the engine
- *  answers (the TypeScript `star.ts` carries the same labels; a test pins the
- *  two together). */
+ *  answers (a test holds the keys to the ids the engine's layout publishes). */
 export const STAR_GATE_LABELS: Readonly<Record<StarGateId, string>> = {
   security: "2+ security offices",
   medical: "Medical center",

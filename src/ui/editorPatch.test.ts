@@ -1,10 +1,13 @@
 // @vitest-environment happy-dom
 import { describe, it, expect, vi } from "vitest";
 import { render } from "lit-html";
-import { Simulation } from "../engine/Simulation";
-import type { Transport, Unit } from "../shared/types";
+import type { TemplateResult } from "lit-html";
+import type { TransportDetail, UnitDetail } from "../simport/panels";
+import type { GameMode } from "../shared/types";
+import { catalogFor } from "../tests/catalogFixture";
+import { transportDetail, unitDetail } from "../tests/fixtures/detailCards";
+import { transportEditorTemplate, unitEditorTemplate } from "./templates/editor";
 import { syncRungSelects } from "./templates/rungPicker";
-import { unitEditor, transportEditor } from "../game/cardKit.fixture";
 
 /**
  * The editor card's update-in-place invariant, rewritten for lit (E6-S1).
@@ -16,37 +19,31 @@ import { unitEditor, transportEditor } from "../game/cardKit.fixture";
  * editorBusy, hide/close) is pinned by the renderEditor integration block.
  */
 
-/** A small built MODERN tower with an occupied office (rename + the '+ rent'
- *  stepper these identity tests pin; Classic renders the rung picker, which
- *  has its own identity test below) and a standard elevator. Placements are
- *  asserted so a silent fixture failure can't make the identity assertions
- *  pass vacuously. */
-function fixture(): { sim: Simulation; office: Unit; lift: Transport } {
-  const sim = new Simulation(12345, "modern");
-  for (let x = 10; x < 30; x++) expect(sim.tower.place("lobby", 1, x).ok).toBe(true);
-  for (let x = 10; x < 30; x++) expect(sim.tower.place("floor", 2, x).ok).toBe(true);
-  const r = sim.tower.place("office", 2, 12);
-  expect(r.ok).toBe(true);
-  const office = sim.tower.units.find((u) => u.id === r.unitId)!;
-  office.state = "occupied";
-  expect(sim.buildTransport("elevatorStandard", 10, 1, 2).ok).toBe(true);
-  const lift = sim.tower.transports[sim.tower.transports.length - 1];
-  return { sim, office, lift };
+/** The cards a refresh redraws: a MODERN occupied office (rename + the
+ *  '+ rent' stepper these identity tests pin; Classic renders the rung
+ *  picker, which has its own identity test below) and a standard elevator.
+ *  Each refresh is a new card, as the pump reads one. */
+const office = (over: Partial<UnitDetail> = {}, mode: GameMode = "modern") => unitDetail(mode, "office", { id: 1, x: 12, ...over });
+const lift = (cars: number) => transportDetail("elevatorStandard", 2, { id: 5, cars });
+
+function unitEditor(u: UnitDetail, mode: GameMode = "modern"): TemplateResult {
+  return unitEditorTemplate(u, catalogFor(mode), 7, false, []);
+}
+
+function transportEditor(t: TransportDetail): TemplateResult {
+  return transportEditorTemplate(t, catalogFor("classic"), []);
 }
 
 describe("editor card lit diffing — updates in place, element identity survives", () => {
   it("patches a changed stat cell without recreating the buttons or the rename input", () => {
-    const { sim, office } = fixture();
-    office.satisfaction = 0.5;
     const card = document.createElement("div");
-    render(unitEditor(sim, office), card);
+    render(unitEditor(office({ satisfaction: 0.5 })), card);
     const btn = card.querySelector<HTMLElement>('[data-edit="rentUp"]')!;
     const name = card.querySelector<HTMLInputElement>("#ed-name")!;
     const evalCell = card.querySelector('[data-field="eval"]')!;
     expect(evalCell.textContent).toContain("50%");
 
-    office.satisfaction = 0.78;
-    render(unitEditor(sim, office), card);
+    render(unitEditor(office({ satisfaction: 0.78 })), card);
 
     expect(evalCell.textContent).toContain("78%");
     // Same element identities → a click that began before the refresh still lands.
@@ -60,32 +57,26 @@ describe("editor card lit diffing — updates in place, element identity survive
     // carry that identity via lit's `keyed`. Without it, the reused input's
     // dirty (mid-edit) value would survive the attribute update and unit A's
     // half-typed text would show, and commit, on unit B.
-    const { sim, office } = fixture();
-    const r2 = sim.tower.place("office", 2, 21); // 9 wide → spans 21..29 on the 10..29 floor
-    expect(r2.ok).toBe(true);
-    const officeB = sim.tower.units.find((u) => u.id === r2.unitId)!;
-    officeB.state = "occupied";
+    const officeB = office({ id: 2, x: 21, label: "Office B" });
     const card = document.createElement("div");
-    render(unitEditor(sim, office), card);
+    render(unitEditor(office()), card);
     const inputA = card.querySelector<HTMLInputElement>("#ed-name")!;
     inputA.value = "half-typed"; // player is mid-rename when the selection moves
 
-    render(unitEditor(sim, officeB), card);
+    render(unitEditor(officeB), card);
     const inputB = card.querySelector<HTMLInputElement>("#ed-name")!;
     expect(inputB).not.toBe(inputA); // new selection, new input
     expect(inputB.value).toBe(officeB.label);
   });
 
   it("a click listener attached before a refresh still fires on the same button after it", () => {
-    const { sim, office } = fixture();
     const card = document.createElement("div");
-    render(unitEditor(sim, office), card);
+    render(unitEditor(office()), card);
     const btn = card.querySelector<HTMLElement>('[data-edit="rentUp"]')!;
     const onClick = vi.fn();
     btn.addEventListener("click", onClick);
 
-    office.satisfaction = 0.3; // a stat tick lands "mid-click"
-    render(unitEditor(sim, office), card);
+    render(unitEditor(office({ satisfaction: 0.3 })), card); // a stat tick lands "mid-click"
 
     btn.click();
     expect(onClick).toHaveBeenCalledOnce();
@@ -99,28 +90,22 @@ describe("editor card lit diffing — updates in place, element identity survive
     // post-render pass that writes select.value from data-current (lit commits
     // option bindings before the options attach, so the value write must come
     // after render).
-    const sim = new Simulation(); // Classic
-    for (let x = 10; x < 30; x++) expect(sim.tower.place("lobby", 1, x).ok).toBe(true);
-    for (let x = 10; x < 30; x++) expect(sim.tower.place("floor", 2, x).ok).toBe(true);
-    const r = sim.tower.place("office", 2, 12);
-    expect(r.ok).toBe(true);
-    const office = sim.tower.units.find((u) => u.id === r.unitId)!;
-    office.state = "occupied";
+    let classic = office({}, "classic");
     const card = document.createElement("div");
     // Mirror renderEditor: selection is written post-render by syncRungSelects
     // (a select's options must be attached before its value can be set).
     const paint = () => {
-      render(unitEditor(sim, office), card);
+      render(unitEditor(classic, "classic"), card);
       syncRungSelects(card);
     };
     paint();
     const select = card.querySelector<HTMLSelectElement>("#ed-rung")!;
     expect(select).not.toBeNull();
     expect(select.value).toBe("2"); // Average, the default rung
-    office.satisfaction = 0.4; // a stat tick lands mid-interaction
+    classic = office({ satisfaction: 0.4 }, "classic"); // a stat tick lands mid-interaction
     paint();
     expect(card.querySelector("#ed-rung")).toBe(select);
-    sim.priceUnit(office, 15_000); // High
+    classic = office({ satisfaction: 0.4, rent: 15_000 }, "classic"); // High
     paint();
     expect(card.querySelector("#ed-rung")).toBe(select);
     expect(select.value).toBe("3");
@@ -131,18 +116,12 @@ describe("editor card lit diffing — updates in place, element identity survive
     // open list, before change commits; the ~6 Hz editor pump must not write
     // engine truth over that in-progress pick. After blur, the next sync
     // reconciles normally.
-    const sim = new Simulation(); // Classic
-    for (let x = 10; x < 30; x++) expect(sim.tower.place("lobby", 1, x).ok).toBe(true);
-    for (let x = 10; x < 30; x++) expect(sim.tower.place("floor", 2, x).ok).toBe(true);
-    const r = sim.tower.place("office", 2, 12);
-    expect(r.ok).toBe(true);
-    const office = sim.tower.units.find((u) => u.id === r.unitId)!;
-    office.state = "occupied";
+    const classic = office({}, "classic");
     const card = document.createElement("div");
     document.body.appendChild(card); // focus needs a connected element
     try {
       const paint = () => {
-        render(unitEditor(sim, office), card);
+        render(unitEditor(classic, "classic"), card);
         syncRungSelects(card);
       };
       paint();
@@ -161,15 +140,13 @@ describe("editor card lit diffing — updates in place, element identity survive
   });
 
   it("a shape change (gutted) restructures rows while the action buttons keep identity", () => {
-    const { sim, office } = fixture();
     const card = document.createElement("div");
-    render(unitEditor(sim, office), card);
+    render(unitEditor(office()), card);
     expect(card.textContent).toContain("Resale value");
     const sell = card.querySelector<HTMLElement>('[data-edit="sell"]')!;
     const status = card.querySelector('[data-field="status"]')!;
 
-    office.state = "gutted";
-    render(unitEditor(sim, office), card);
+    render(unitEditor(office({ state: "gutted" })), card);
 
     expect(status.textContent).toBe("gutted");
     expect(card.textContent).toContain("Scrap value");
@@ -178,17 +155,15 @@ describe("editor card lit diffing — updates in place, element identity survive
   });
 
   it("a car button crossing its disabled bound flips the attribute on the SAME element", () => {
-    const { sim, lift } = fixture();
     const card = document.createElement("div");
-    render(transportEditor(sim, lift), card);
+    render(transportEditor(lift(1)), card);
     const remove = card.querySelector<HTMLButtonElement>('[data-edit="removecar"]')!;
     // The legacy protocol REBUILT the whole card at this bound (it was part of
     // the shape key); lit just patches the attribute, so even this refresh can
     // no longer swallow an in-flight click.
-    expect(remove.disabled).toBe(lift.cars <= 1);
-    expect(sim.tower.setCars(lift.id, lift.cars <= 1 ? 2 : 1)).toBe(true);
-    render(transportEditor(sim, lift), card);
+    expect(remove.disabled).toBe(true);
+    render(transportEditor(lift(2)), card);
     expect(card.querySelector('[data-edit="removecar"]')).toBe(remove);
-    expect(remove.disabled).toBe(lift.cars <= 1);
+    expect(remove.disabled).toBe(false);
   });
 });

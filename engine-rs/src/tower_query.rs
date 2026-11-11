@@ -465,3 +465,7 @@ impl Tower {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "tower_landing_tests.rs"]
+mod landing_tests;

@@ -1,9 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { GameApp } from "../main";
-import type { GameplayEvent } from "../events/gameplayEvents";
-import { Simulation } from "../engine/Simulation";
-import { TsEngine } from "../engine/port/tsEngine";
-import { PortCodes } from "../simport/portCodes";
+import { mockPort } from "../tests/portKit/mockPort";
 import { PortEvents } from "../simport/portEvents";
 import { runBootFlow } from "./appBoot";
 
@@ -22,32 +19,28 @@ vi.mock("../ui/Onboarding", () => ({
  * The boot backdrop's gameplay events (#873). Split out of appBoot.test.ts,
  * which sits at the file-size ceiling. With no readable save the boot tower
  * is only the title screen's backdrop and the player founds their own from
- * New Tower, so whatever the backdrop emitted stays behind when that tower
- * takes over (the engine's swap drops a backdrop's buffer, `TsEngine.adopt`). A
- * real tower behind Continue hands its events on as usual.
+ * New Tower, so the boot marks it as the backdrop and the engine hands none
+ * of its events on past the swap. A real tower behind Continue is not marked.
+ * The engine's half (a marked tower hands on nothing) is
+ * `the_backdrop_hands_on_nothing` in `engine-rs/src/wasm_port_life_tests.rs`
+ * and the backdrop case in `portReads.integration.test.ts`.
  */
 
-function makeApp(hadReadableSave: boolean): GameApp {
-  const enginePort = new TsEngine(Simulation.newGame(Date.parse("2024-01-01")));
+function makeApp(hadReadableSave: boolean) {
+  const enginePort = mockPort({ setBackdrop: () => undefined, generation: () => 3, founder: () => false });
+  const events = new PortEvents(enginePort);
   const app = {
     mobileMq: { matches: false },
     audio: { sfx: vi.fn(), setProgram: vi.fn() },
     setSpeed: vi.fn(),
     ui: { toast: vi.fn(), newTowerModal: vi.fn(), showHelp: vi.fn() },
     enginePort,
-    events: new PortEvents(enginePort),
+    events,
     saveLoad: { autosave: vi.fn(), newGame: vi.fn() },
     hadReadableSave,
     saveWasCorrupt: false,
   } as unknown as GameApp;
-  return app;
-}
-
-/** New Tower's swap through the port, then the bridge's next drain. */
-function foundNewTower(app: GameApp): GameplayEvent[] {
-  const codes = new PortCodes(app.enginePort);
-  app.enginePort.foundTower(7, codes.code("modes", "modern"), codes.code("calendars", "realWorld"), false);
-  return app.events.drainGameplayEvents();
+  return { app, enginePort, events };
 }
 
 describe("runBootFlow: the boot backdrop's events", () => {
@@ -62,17 +55,17 @@ describe("runBootFlow: the boot backdrop's events", () => {
     sessionStorage.clear();
   });
 
-  it("stay behind when the player founds a tower, even ones emitted after the splash", () => {
-    const app = makeApp(false);
+  it("marks the title's backdrop tower when there is no save, so its events stay behind", () => {
+    const { app, enginePort, events } = makeApp(false);
     runBootFlow(app);
-    (app.enginePort as TsEngine).sim.gameplayEvents.push("fire_started", {}); // the backdrop, still running behind the title
-    const events = foundNewTower(app);
-    expect(events).toEqual([{ name: "tower_founded", payload: { mode: "modern" } }]);
+    expect(enginePort.setBackdrop).toHaveBeenCalledExactlyOnceWith(true);
+    expect(events.gameplayEvents.discardOnHandOff, "the bridge drops the backdrop's events").toBe(true);
   });
 
-  it("go on with a saved tower", () => {
-    const app = makeApp(true);
+  it("leaves a saved tower unmarked, so its events go on", () => {
+    const { app, enginePort, events } = makeApp(true);
     runBootFlow(app);
-    expect(foundNewTower(app).filter((e) => e.name === "tower_founded")).toHaveLength(2);
+    expect(enginePort.setBackdrop).not.toHaveBeenCalled();
+    expect(events.gameplayEvents.discardOnHandOff).toBe(false);
   });
 });
