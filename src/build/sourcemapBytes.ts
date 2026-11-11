@@ -5,7 +5,7 @@
  * source. Bytes before a line's first segment, and segments with no source,
  * are "unmapped". Used by scripts/engine-bundle-size.ts to measure how much of
  * the shipped JavaScript is the TypeScript engine
- * (docs/performance/wasm-only-bundle.md).
+ * (docs/performance/player-bundle.md).
  *
  * Keep this file ERASABLE (no enums, namespaces or parameter properties).
  */

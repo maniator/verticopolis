@@ -1,4 +1,4 @@
-# The wasm-only build: what leaves the bundle, and what does not
+# The player bundle: what left it, and what did not
 
 > **The TypeScript engine has left the production bundle (#921, 2026-11-10).**
 > A production build now ships no `src/engine/` module: the boot catalog check
@@ -159,7 +159,7 @@ every build:
 
 When this was written, a one-off comparison (not part of the guard) found
 the sourcemaps list the same 85 engine modules as Rollup's own metadata for
-the build (modules with `renderedLength` above zero). The `e2e-wasm-only`
+the build (modules with `renderedLength` above zero). The `e2e-general`
 CI job adds a step-loop import to `src/bootstrap.ts` and checks that the
 build fails with the guard's message.
 `src/build/engineAliases.test.ts` pins that only `Simulation.ts` imports
@@ -169,7 +169,7 @@ specifier alias matches the text from any importer.
 
 ## Offline and fallback behavior
 
-Checked by `e2e/wasmOnly.spec.ts`, which CI's `e2e-wasm-only` job runs with
+Checked by `e2e/engineBoot.spec.ts`, which CI's `e2e-general` job runs with
 the rest of the general e2e suite (the `chromium` Playwright project).
 
 - **Boot:** the build boots on WASM whatever `?engine=` or `vc.engine` says.

@@ -11,7 +11,7 @@ import { defineConfig, devices } from "@playwright/test";
 //   - `chromium-serial`: pixel baselines (visual, atlas), the perf gate and
 //     the engine identity and status specs. These want exclusive CPU and fixed timing.
 //   - `chromium`: the general browser regression suite.
-// `npm run e2e` runs both; CI runs them as the `e2e` and `e2e-wasm-only` jobs
+// `npm run e2e` runs both; CI runs them as the `e2e-serial` and `e2e-general` jobs
 // with `--project`.
 const SERIAL_SPECS = ["engineIdentity", "engineStatusRows", "atlas", "visual", "perf", "overviewMapPerf"];
 const SERIAL_SPEC_PATTERN = new RegExp(`(?:^|[\\\\/])(?:${SERIAL_SPECS.join("|")})\\.spec\\.ts$`);

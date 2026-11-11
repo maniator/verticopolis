@@ -20,7 +20,7 @@ name: PR screenshot drift-check
 #
 # The gallery renders on the Rust engine only (the WASM package hosts the tower;
 # #1353). There is no second, TypeScript render to compare it with, and the
-# visual baselines are checked in test.yml's `e2e` job.
+# visual baselines are checked in test.yml's `e2e-serial` job.
 #
 # PREREQUISITE: the `screenshot-approval` Environment must exist with a required
 # reviewer (repo Settings -> Environments). Without a required reviewer the gate

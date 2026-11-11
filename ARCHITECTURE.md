@@ -243,7 +243,7 @@ engine and any failure.
 `scripts/verify-engine-bundle.ts` checks the bundle from the emitted
 sourcemaps after every build. The rest of the TypeScript engine still ships
 in the bundle, because the read model, the command path and the save
-loader use it; [the bundle report](docs/performance/wasm-only-bundle.md)
+loader use it; [the bundle report](docs/performance/player-bundle.md)
 measures it and names the cutover items that remove it.
 
 ## The engine port (the cutover in progress)

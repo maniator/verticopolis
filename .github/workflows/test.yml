@@ -15,8 +15,8 @@ on:
   # checks as the pull request run.
   merge_group:
 
-# The default job (lint/typecheck/tests/build) needs no browser, and the e2e job
-# runs inside the pinned Playwright image whose Chromium is already bundled, so
+# The default job (lint/typecheck/tests/build) needs no browser, and the e2e jobs
+# run inside the pinned Playwright image whose Chromium is already bundled, so
 # skip Playwright's browser download during `npm ci` workflow-wide. The docs
 # gallery is regenerated on a PR by pr-drift-check.yml (its approval-gated commit),
 # not here.
@@ -121,7 +121,7 @@ jobs:
   # The Rust engine's WASM package (src/public/engine/, engine-rs/pkg/) is build
   # output and is not checked in. This job restores it from the Actions cache,
   # keyed on the engine's source hash, or builds and caches it on a miss (an
-  # engine change), then hands it to the e2e job as a run artifact: e2e serves
+  # engine change), then hands it to the e2e jobs as a run artifact: they serve
   # it to the browser projects, and its container has no Rust toolchain to
   # build it. The test job needs no package (its hash test skips without one),
   # so lint, typecheck and the unit tests never wait on a Rust build.
@@ -248,7 +248,7 @@ jobs:
       # job below builds with one), so it opts out of the engine requirement
       # scripts/verify-precache.ts puts on every build. The build reads
       # CHANGELOG.md, so the prose lane builds too; the rust lane does not,
-      # since the bundle reads nothing under engine-rs/ (the e2e-wasm-only
+      # since the bundle reads nothing under engine-rs/ (the e2e-general
       # job's player build covers the engine package).
       - name: Build
         if: ${{ needs.changes.outputs.tests != 'false' && needs.changes.outputs.lane != 'rust' }}
@@ -355,7 +355,7 @@ jobs:
         run: npm run test:wasm:host
 
   # Resolve the Playwright container tag from the repo's own Playwright version so
-  # the e2e job's browser can never drift from the one baselines were minted with
+  # the e2e jobs' browser can never drift from the one baselines were minted with
   # the whole basis of a stable visual gate. (container.image is fixed before a
   # job's steps run, so the tag has to come from a prior job's output.)
   resolve-image:
@@ -380,7 +380,8 @@ jobs:
   # update-visual-baselines and the screenshot capture (screenshot-capture.yml) use,
   # so the baselines it compares against are minted against the identical renderer. Kept
   # in its own job so the container pull never slows the fast lint/test lane.
-  e2e:
+  e2e-serial:
+    name: e2e-serial
     needs: [changes, resolve-image, engine-wasm]
     # Skipped only for a prose-only change; a skipped job counts as passed for
     # the required check. With code changed, a failed engine package or image
@@ -456,20 +457,18 @@ jobs:
   # (scripts/verify-engine-bundle.ts) reads the emitted sourcemaps and the
   # precache; this job also proves that guard fails when app code imports the
   # TypeScript step loop, then runs the general e2e suite (the `chromium`
-  # project) on a tooling build. The `e2e` job above runs the
+  # project) on a tooling build. The `e2e-serial` job above runs the
   # serial project: pixel baselines, the perf gate and the engine-status specs.
-  e2e-wasm-only:
-    # Not a required check. It runs in three shards on three runners, since one
-    # worker on one runner took 13 to 18 minutes, the longest job on a pull
-    # request. Each shard keeps one worker (see playwright.config.ts), so the
-    # specs keep the timing they expect. The e2e-wasm-only-result job below
-    # reports the three shards as one e2e-wasm-only check.
-    name: e2e-wasm-only (shard ${{ matrix.shard }} of 3)
+  e2e-general:
+    # It runs in three shards on three runners, since one worker on one runner
+    # took 13 to 18 minutes, the longest job on a pull request. Each shard
+    # keeps one worker (see playwright.config.ts), so the specs keep the timing
+    # they expect. The e2e-general-result job below reports the three shards
+    # as one e2e-general check, which is required.
+    name: e2e-general (shard ${{ matrix.shard }} of 3)
     needs: [changes, resolve-image, engine-wasm]
-    # As the e2e job: skipped only for a prose-only change. It is not a
-    # required check, so a merge queue run skips it; the pull request's own run
-    # already ran it on the same change.
-    if: ${{ !cancelled() && github.event_name != 'merge_group' && needs.changes.outputs.code != 'false' }}
+    # As the e2e-serial job: skipped only for a prose-only change.
+    if: ${{ !cancelled() && needs.changes.outputs.code != 'false' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
@@ -571,31 +570,30 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: playwright-wasm-only-results-${{ matrix.shard }}
+          name: playwright-general-results-${{ matrix.shard }}
           path: test-results/
           if-no-files-found: ignore
 
   # One check for the three browser-suite shards: green when every shard
-  # passed, or when the suite was skipped on purpose (a prose-only change or a
-  # merge queue run); red when a shard failed or was cancelled, or when the
+  # passed, or when the suite was skipped on purpose (a prose-only change);
+  # red when a shard failed or was cancelled, or when the
   # shards were skipped because a job they need failed. It does not run when
   # the whole workflow run is cancelled (a newer push supersedes it), so a
   # superseded run leaves no red check behind.
-  e2e-wasm-only-result:
-    name: e2e-wasm-only
-    needs: [changes, e2e-wasm-only]
+  e2e-general-result:
+    name: e2e-general
+    needs: [changes, e2e-general]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - name: Every shard passed, or the suite was skipped on purpose
         env:
-          SHARDS: ${{ needs.e2e-wasm-only.result }}
+          SHARDS: ${{ needs.e2e-general.result }}
           CODE: ${{ needs.changes.outputs.code }}
-          EVENT: ${{ github.event_name }}
         run: |
-          echo "e2e-wasm-only shards: $SHARDS (code changed: $CODE, event: $EVENT)"
-          if [ "$SHARDS" = skipped ] && { [ "$CODE" = false ] || [ "$EVENT" = merge_group ]; }; then
+          echo "e2e-general shards: $SHARDS (code changed: $CODE)"
+          if [ "$SHARDS" = skipped ] && [ "$CODE" = false ]; then
             exit 0
           fi
           test "$SHARDS" = success
