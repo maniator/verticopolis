@@ -8,7 +8,7 @@ use super::format::*;
 use super::resync::{empty_slots_in_gap, find_next_header, MAX_BUILT_PAYLOAD, MIN_BUILT_PAYLOAD};
 pub use super::stair_scan::{locate_stairs, stairs_in_table_at, stairs_table_starts_at};
 use super::stamp::stamped_generation;
-use super::types::{TdtElevator, TdtStair, TdtTail};
+use super::types::{TdtElevator, TdtRetailRow, TdtStair, TdtTail};
 
 /// Does the trailing routing region begin exactly at `at`?
 fn routing_tail_starts_at(bytes: &[u8], at: usize) -> bool {
@@ -334,11 +334,16 @@ pub fn walk_tolerant_tail(r: &mut ByteReader) -> TdtTail {
     }
     let mut occupied = 0;
     for _ in 0..TDT_RETAIL_SLOTS {
-        let floor = r.u8().expect("retail table sized");
-        r.skip(TDT_RETAIL_RECORD_SIZE - 1)
-            .expect("retail table sized");
-        if floor != 0xff {
+        let row: Vec<u8> = (0..TDT_RETAIL_RECORD_SIZE)
+            .map(|_| r.u8().expect("retail table sized") as u8)
+            .collect();
+        if row[0] != 0xff {
             occupied += 1;
+            tail.retail.push(TdtRetailRow {
+                floor: row[0],
+                slot: row[1],
+                served: row[RETAIL_SERVED_BYTE],
+            });
         }
     }
     tail.retail_rows = Some(occupied);

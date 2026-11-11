@@ -32,6 +32,17 @@ pub struct TdtFloor {
     pub left_edge: i64,
     pub right_edge: i64,
     pub tenants: Vec<TdtTenant>,
+    /// The floor's 94-entry map from a retail row's room slot to its tenant.
+    pub index_map: Vec<u16>,
+}
+
+/// One row of the retail table: its floor index, room slot (through the
+/// floor's `index_map`) and the visitors it served yesterday (byte 8, #1500).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct TdtRetailRow {
+    pub floor: u8,
+    pub slot: u8,
+    pub served: u8,
 }
 
 /// The fixed-offset header fields v1 consumes (`TdtHeader`).
@@ -81,6 +92,8 @@ pub struct TdtTail {
     pub people_at: Option<usize>,
     pub people_count: Option<i64>,
     pub retail_rows: Option<i64>,
+    /// The retail table's filled rows, in file order.
+    pub retail: Vec<TdtRetailRow>,
     pub elevators: Option<Vec<TdtElevator>>,
     pub stairs: Option<Vec<TdtStair>>,
     pub parking_connected: Option<i64>,

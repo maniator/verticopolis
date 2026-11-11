@@ -41,6 +41,9 @@ pub const TDT_VIEW_W: f64 = 640.0;
 pub const TDT_VIEW_H: f64 = 469.0;
 pub const TDT_RETAIL_SLOTS: usize = 512;
 pub const TDT_RETAIL_RECORD_SIZE: usize = 18;
+/// The retail row byte that holds the visitors the room served yesterday
+/// (#1500): its census.
+pub const RETAIL_SERVED_BYTE: usize = 8;
 pub const TDT_ELEVATOR_SLOTS: usize = 24;
 pub const TDT_ELEVATOR_HEADER_SIZE: usize = 194;
 /// Built shafts append a fixed block measured at 3140 bytes against real
@@ -332,12 +335,16 @@ pub fn parse_tdt_binary(bytes: &[u8]) -> Result<TdtTower, LegacyImportError> {
                 subtype,
             });
         }
-        r.skip(TDT_FLOOR_INDEX_ENTRIES * 2)?;
+        let mut index_map = Vec::with_capacity(TDT_FLOOR_INDEX_ENTRIES);
+        for _ in 0..TDT_FLOOR_INDEX_ENTRIES {
+            index_map.push(r.u16()? as u16);
+        }
         floors.push(TdtFloor {
             index,
             left_edge,
             right_edge,
             tenants,
+            index_map,
         });
     }
 
