@@ -301,6 +301,7 @@ fn zoned_tower() -> Simulation {
             x += OFFICE_WIDTH;
         }
     }
+    assert!(pop >= goal, "the offices reach the population goal");
     sim
 }
 

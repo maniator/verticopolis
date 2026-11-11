@@ -37,9 +37,10 @@ fn add_offices(sim: &mut Simulation, mut floor: i64, target: i64) -> i64 {
         lay(sim, Kind::Floor, floor);
         let mut x = 0;
         while x + OFFICE_WIDTH <= W && sim.tower.total_population() < target {
-            if let Some(id) = sim.tower.place(Kind::Office, floor, x).unit_id {
-                set(sim, id, UnitState::Occupied);
-            }
+            let placed = sim.tower.place(Kind::Office, floor, x);
+            assert!(placed.ok, "{:?}", placed.reason);
+            let id = placed.unit_id.unwrap();
+            set(sim, id, UnitState::Occupied);
             x += OFFICE_WIDTH;
         }
         floor += 1;
@@ -121,9 +122,10 @@ fn hotel_guests_count_for_the_rating_only_below_four_stars() {
     lay(&mut sim, Kind::Lobby, 1);
     lay(&mut sim, Kind::Floor, 2);
     for i in 0..50 {
-        if let Some(id) = sim.tower.place(Kind::HotelSingle, 2, i * 4).unit_id {
-            set(&mut sim, id, UnitState::Asleep);
-        }
+        let placed = sim.tower.place(Kind::HotelSingle, 2, i * 4);
+        assert!(placed.ok, "{:?}", placed.reason);
+        let id = placed.unit_id.unwrap();
+        set(&mut sim, id, UnitState::Asleep);
     }
     sim.star = 3;
     assert!(sim.rating_population() > 0);
@@ -142,9 +144,10 @@ fn a_three_star_tower_never_reaches_five_on_hotel_guests() {
         lay(&mut sim, Kind::Floor, floor);
         let mut x = 0;
         while x + suite <= W && sim.tower.total_population() < 10_200 {
-            if let Some(id) = sim.tower.place(Kind::HotelSuite, floor, x).unit_id {
-                set(&mut sim, id, UnitState::Asleep);
-            }
+            let placed = sim.tower.place(Kind::HotelSuite, floor, x);
+            assert!(placed.ok, "{:?}", placed.reason);
+            let id = placed.unit_id.unwrap();
+            set(&mut sim, id, UnitState::Asleep);
             x += suite;
         }
         floor += 1;

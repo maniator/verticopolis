@@ -9,6 +9,10 @@ use std::collections::HashSet;
 use crate::clock::{resolve_calendar, CalendarKind, Clock, GameMode};
 use crate::crowd::meals::{meal_window_for, staff_on_shift, MealOrigin, MealWindow};
 use crate::crowd::MAX_PEOPLE;
+use crate::demand::compute_demand_map;
+use crate::economy::{
+    commercial_daily_income, weekend_multiplier, TRAFFIC_FACTOR_MIN, TRAFFIC_FACTOR_SPAN,
+};
 use crate::facilities::Kind;
 use crate::sim::Simulation;
 use crate::tower::UnitState;
@@ -16,6 +20,9 @@ use crate::tower::UnitState;
 use super::{at_time, place_seated, shaft, strip_tower};
 
 const SATURDAY: i64 = 5;
+const CLOSED_HOUR: i64 = 3;
+const LUNCH_HOUR: i64 = 12;
+const EVENING_HOUR: i64 = 18;
 const OFFICE_FLOOR: i64 = 2;
 const CONDO_FLOOR: i64 = 3;
 const HOTEL_FLOOR: i64 = 4;
@@ -280,21 +287,66 @@ fn the_crowd_cap_holds_through_a_lunch_peak() {
     assert_eq!(peak, MAX_PEOPLE, "the lunch filled the crowd to its cap");
 }
 
-/// The meal cadence adds no income source: two identical fast food towers
-/// bank the same take at each sampled hour.
+/// A fast food beside two staffed offices (so it has demand to draw on), at
+/// `hour` of the first day.
+fn fast_food_tower(hour: i64) -> (Simulation, i64) {
+    let mut sim = strip_tower(1, GameMode::Classic, 40, 2);
+    sim.money = 0.0;
+    sim.star = 5;
+    shaft(&mut sim, Kind::ElevatorStandard, 4, 1, 2);
+    let id = place_seated(&mut sim, Kind::FastFood, 2, 0, UnitState::Occupied, 0);
+    for x in [20, 29] {
+        place_seated(
+            &mut sim,
+            Kind::Office,
+            2,
+            x,
+            UnitState::Occupied,
+            OFFICE_STAFF,
+        );
+    }
+    at_time(&mut sim, 0, hour);
+    (sim, id)
+}
+
+/// What the hour earned: the cash plus what the shop banked toward its
+/// next payout.
+fn fast_food_hour(hour: i64) -> f64 {
+    let (mut sim, id) = fast_food_tower(hour);
+    sim.collect_traffic_income();
+    sim.money + sim.tower.get_unit(id).unwrap().pending_income
+}
+
+/// The hour's share worked out independently on a twin tower: the daily take
+/// over the open hours, times the shop's demand fraction, the weekday factor
+/// and the traffic roll the routine will draw next.
+fn expected_hour(hour: i64) -> f64 {
+    let (mut twin, id) = fast_food_tower(hour);
+    let daily =
+        commercial_daily_income(GameMode::Classic, Kind::FastFood).expect("fast food earns");
+    let open_hours = Kind::FastFood.open_hours_per_day() as f64;
+    let frac = compute_demand_map(&mut twin).fraction_by_unit[&id];
+    let weekday = weekend_multiplier(GameMode::Classic, Kind::FastFood, twin.clock.is_weekend());
+    let roll = TRAFFIC_FACTOR_MIN + twin.rng.clone().next() * TRAFFIC_FACTOR_SPAN;
+    daily / open_hours * frac * weekday * roll
+}
+
+/// The meal cadence adds no income source: an open hour earns exactly the
+/// shop's share of its daily take, and a closed one earns nothing.
 #[test]
-fn traffic_income_is_the_same_on_twin_towers() {
-    let fresh = |hour: i64| {
-        let mut sim = strip_tower(1, GameMode::Classic, 40, 2);
-        sim.money = 0.0;
-        sim.star = 5;
-        shaft(&mut sim, Kind::ElevatorStandard, 4, 1, 2);
-        place_seated(&mut sim, Kind::FastFood, 2, 0, UnitState::Occupied, 0);
-        at_time(&mut sim, 0, hour);
-        sim.collect_traffic_income();
-        sim.money
-    };
-    for hour in [3, 12, 18] {
-        assert_eq!(fresh(hour), fresh(hour), "hour {hour}");
+fn traffic_income_is_the_shops_hourly_share_and_nothing_more() {
+    assert_eq!(
+        fast_food_hour(CLOSED_HOUR),
+        0.0,
+        "a closed shop earns nothing"
+    );
+    for hour in [LUNCH_HOUR, EVENING_HOUR] {
+        let earned = fast_food_hour(hour);
+        let expected = expected_hour(hour);
+        assert!(expected > 0.0, "hour {hour}: the shop has demand");
+        assert!(
+            (earned - expected).abs() < 1e-9,
+            "hour {hour}: earned {earned}, expected {expected}"
+        );
     }
 }

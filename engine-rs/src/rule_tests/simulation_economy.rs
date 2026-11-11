@@ -231,12 +231,14 @@ fn occupied_offices(sim: &mut Simulation, top: i64, count: usize) {
             if placed == count {
                 break 'floors;
             }
-            if let Some(id) = sim.tower.place(Kind::Office, floor, X0 + i).unit_id {
-                sim.tower.get_unit_mut(id).unwrap().state = UnitState::Occupied;
-                placed += 1;
-            }
+            let r = sim.tower.place(Kind::Office, floor, X0 + i);
+            assert!(r.ok, "{:?}", r.reason);
+            let id = r.unit_id.unwrap();
+            sim.tower.get_unit_mut(id).unwrap().state = UnitState::Occupied;
+            placed += 1;
         }
     }
+    assert_eq!(placed, count, "every office fit");
 }
 
 #[test]

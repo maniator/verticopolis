@@ -67,9 +67,10 @@ fn each_congestion_cell_is_its_floors_congestion_through_the_ramp() {
     assert!(sim.tower.set_cars(shaft, 1));
     for f in 2..=8 {
         for x in (0..=mid - 9).step_by(9) {
-            if let Some(id) = sim.tower.place(Kind::Office, f, x).unit_id {
-                sim.tower.get_unit_mut(id).unwrap().state = UnitState::Occupied;
-            }
+            let r = sim.tower.place(Kind::Office, f, x);
+            assert!(r.ok, "an office at {f}/{x}: {:?}", r.reason);
+            let id = r.unit_id.unwrap();
+            sim.tower.get_unit_mut(id).unwrap().state = UnitState::Occupied;
         }
     }
     for _ in 0..24 {

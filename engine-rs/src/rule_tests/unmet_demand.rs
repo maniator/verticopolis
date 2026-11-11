@@ -221,9 +221,10 @@ fn an_oversubscribed_tower_sheds_tenants_for_unmet_demand_then_settles() {
     }
     for floor in 3..=7 {
         for x in (14..=W - 49).step_by(11) {
-            if let Some(id) = sim.tower.place(Kind::Office, floor, x).unit_id {
-                seat(&mut sim, id, UnitState::Occupied, 1.0);
-            }
+            let placed = sim.tower.place(Kind::Office, floor, x);
+            assert!(placed.ok, "{:?}", placed.reason);
+            let id = placed.unit_id.unwrap();
+            seat(&mut sim, id, UnitState::Occupied, 1.0);
         }
     }
     let dm = compute_demand_map(&mut sim);
