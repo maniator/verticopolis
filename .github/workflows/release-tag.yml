@@ -106,6 +106,10 @@ jobs:
       # The built package: engine-rs/pkg (Node) and src/public/engine
       # (browser), with their third-party records, as a zip with a checksum
       # for the release and as an npm package for GitHub Packages.
+      # scripts/engine-package-files.sh adds the package's own README and the
+      # browser build's declarations from packages/verticopolis-engine/
+      # (outside engine-rs/, so they do not move the engine's source hash),
+      # the engine changelog and the license, and writes package.json.
       - name: Pack the engine
         id: pack
         if: ${{ steps.versions.outputs.compare == 'true' && steps.versions.outputs.crate != steps.versions.outputs.crate_was }}
@@ -115,29 +119,15 @@ jobs:
           VERSION: ${{ steps.versions.outputs.crate }}
         run: |
           set -euo pipefail
-          if ! printf '%s' "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then echo "::error::Crate version $VERSION is not a plain x.y.z."; exit 1; fi
           mkdir -p npm/node npm/web
           cp -R engine-rs/pkg/. npm/node/
           cp -R src/public/engine/. npm/web/
+          npm_name="$(sh scripts/engine-package-files.sh npm "$VERSION" "$OWNER" "$GH_REPO")"
           zip="verticopolis-engine-wasm-$VERSION.zip"
-          (cd npm && zip -qr "../$zip" node web)
+          (cd npm && zip -qr "../$zip" node web README.md CHANGELOG.md LICENSE)
           sha256sum "$zip" > "$zip.sha256"
-          scope="$(printf '%s' "$OWNER" | tr 'A-Z' 'a-z')"
-          SCOPE="$scope" node -e '
-            const e = process.env;
-            const pkg = {
-              name: `@${e.SCOPE}/verticopolis-engine`,
-              version: e.VERSION,
-              description: "The Verticopolis simulation engine as WebAssembly: node/ for Node, web/ for the browser.",
-              license: "MIT",
-              repository: { type: "git", url: `git+https://github.com/${e.GH_REPO}.git`, directory: "engine-rs" },
-              main: "node/verticopolis_engine.js",
-              files: ["node", "web"],
-              publishConfig: { registry: "https://npm.pkg.github.com" },
-            };
-            require("fs").writeFileSync("npm/package.json", JSON.stringify(pkg, null, 2) + "\n");'
           echo "zip=$zip" >> "$GITHUB_OUTPUT"
-          echo "npm=@$scope/verticopolis-engine" >> "$GITHUB_OUTPUT"
+          echo "npm=$npm_name" >> "$GITHUB_OUTPUT"
 
       - name: Tag the crate version and publish its release
         if: ${{ steps.pack.outcome == 'success' }}

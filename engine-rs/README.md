@@ -47,6 +47,10 @@ readouts the hashed state never reads (`scheduleOrigins.ts`,
 
 [`API.md`](API.md) is the page for a host that is not the web game: how to
 depend on the crate, the calls a frontend makes, and what is stable.
+[`packages/verticopolis-engine/README.md`](../packages/verticopolis-engine/README.md)
+is the README of the WASM package each crate
+release publishes to GitHub Packages (`@maniator/verticopolis-engine`), for a
+JavaScript host; `.github/workflows/release-tag.yml` packs it.
 `consumer/` is a small crate that depends on the engine by path and makes
 those calls; CI builds and runs a copy of it outside the checkout, in the
 Rust container image with no Node.js and a checkout holding only

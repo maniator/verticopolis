@@ -22,6 +22,8 @@ coverage/
 # The gameplay event types, generated from conformance/events/catalog.json
 # by gen:events (and wasm:build) and checked in.
 !src/events/gameplayEvents.d.ts
+# The engine npm package's browser declarations, hand-written and checked in.
+!packages/verticopolis-engine/web.d.ts
 *.js
 !dist/*.js
 !eslint.config.js
