@@ -659,8 +659,13 @@ instant rollback without a rebuild, find the release with
 `vercel ls --prod --meta release=v<version>` and `vercel promote` its URL (the
 Deploy production run's summary prints that command for its own deployment). An
 app release also gets the deployed web build attached as
-`verticopolis-web-<version>.zip` with its SHA-256 checksum, beside the engine
-package zip a crate release carries. It
+`verticopolis-web-<version>.zip` with its SHA-256 checksum and
+`verticopolis-web-<version>.SHA256SUMS`, one checksum per file, beside the
+engine package zip a crate release carries. Before a deploy passes, it checks
+every file production serves (source maps aside, which production does not
+serve publicly) against that list, so the live site is byte for byte the
+release's build; `sha256sum -c` against the list checks a download the same
+way. It
 needs the `VERCEL_TOKEN`, `VERCEL_ORG_ID` and `VERCEL_PROJECT_ID` secrets in
 the `production` environment and fails, naming the missing one, without them.
 

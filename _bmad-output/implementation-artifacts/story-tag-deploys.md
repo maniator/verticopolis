@@ -134,6 +134,14 @@ older tag**.
   plus checksum to the app release, waiting for github-release.yml to publish
   it and leaving an existing archive alone. Exercised with a stubbed `gh`:
   uploads when missing, skips when present.
+- Owner ask: verify with checksums that what was deployed is what the
+  release holds. A hash cannot go in version.json (it is one of the hashed
+  files), so the deploy writes a per-file SHA256SUMS of dist/, checks every
+  file production serves against it byte for byte, and the archive job
+  publishes the list with the release. Source maps are skipped in the live
+  check because production answers 403 for them (seen on sw.js.map and an
+  asset map). Exercised against a local server: all match, then a changed
+  and a missing file are both reported.
 
 ### File List
 
