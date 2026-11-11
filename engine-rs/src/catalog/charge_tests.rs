@@ -227,6 +227,12 @@ fn film_and_dj_bookings_follow_the_quote() {
                 ("feature", economy.cinema_booking_monthly),
                 ("blockbuster", economy.cinema_booking_blockbuster_monthly),
             ] {
+                // A mode where the player changes films books none.
+                let booking = if economy.new_film_price.is_some() {
+                    0.0
+                } else {
+                    booking
+                };
                 assert_eq!(sim.set_film_policy(cinema, policy), Some(policy));
                 assert_eq!(
                     maintenance_charge(&mut sim),

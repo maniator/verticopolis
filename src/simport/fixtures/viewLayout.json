@@ -1,5 +1,5 @@
 {
-  "version": 13,
+  "version": 14,
   "header": {
     "minutes": 0,
     "towerRevision": 1,
@@ -284,6 +284,11 @@
       "delta",
       "policyCode"
     ],
+    "changeFilm": [
+      "status",
+      "delta",
+      "cost"
+    ],
     "markStop": [
       "status",
       "delta"
@@ -474,7 +479,9 @@
       "served",
       "reachable",
       "floorHasLobby",
-      "blockbuster"
+      "blockbuster",
+      "filmDays",
+      "filmClassic"
     ],
     "shaftCard": [
       "id",

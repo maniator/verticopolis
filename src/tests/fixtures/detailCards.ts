@@ -36,6 +36,8 @@ export function unitDetail(mode: GameMode, kind: FacilityKind, over: Partial<Uni
     reachable: true,
     floorHasLobby: false,
     blockbuster: null,
+    filmDays: null,
+    filmClassic: null,
     ...over,
   } satisfies Omit<UnitDetail, "price">;
   const price = over.price ?? unitPrice(catalog, { kind, rent: base.rent ?? undefined, noRate: base.noRate });

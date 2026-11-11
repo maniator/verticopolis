@@ -102,6 +102,7 @@ export class Engine {
      */
     canBuild(kind: string, floor: number, x: number): string;
     changeCars(id: number, add: boolean): Float64Array;
+    changeFilm(id: number, classic: boolean): Float64Array;
     chooseAutoBridge(value: boolean): Float64Array;
     /**
      * Tooling only: clear every unit's four retail tallies (patronage and

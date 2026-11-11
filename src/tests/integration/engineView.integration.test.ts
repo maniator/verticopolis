@@ -92,7 +92,7 @@ const layout = (): Layout => {
 describe.skipIf(!hasWasmPackage())("the engine view through the binding (#1213)", () => {
   it("hands over its layout by name, every slot named once", () => {
     const l = layout();
-    expect(l.version).toBe(13);
+    expect(l.version).toBe(14);
     const tables: [Slots, number][] = [
       [l.header, l.headerWidth], [l.person, l.personWidth], [l.unit, l.unitWidth],
       [l.transport, l.transportFixed], [l.car, l.carWidth], [l.structure, l.structureWidth],

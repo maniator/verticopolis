@@ -24,9 +24,9 @@ export type EngagedBy = (typeof ENGAGED_BY)[number];
 export const PLAY_SECONDS = 30;
 
 /** The port commands that count as a player's gameplay: building, transport,
- *  demolishing or selling, rent, cars, schedules, no-rate, an emergency answer
- *  and the exterminator. Naming, the camera, the log and the auto-bridge
- *  preference are not gameplay. */
+ *  demolishing or selling, rent, cars, schedules, no-rate, an emergency answer,
+ *  the exterminator and a theatre's film change. Naming, the camera, the log
+ *  and the auto-bridge preference are not gameplay. */
 export const GAMEPLAY_COMMANDS = [
   "buildAt",
   "paintTiles",
@@ -45,6 +45,7 @@ export const GAMEPLAY_COMMANDS = [
   "noRate",
   "answerChoice",
   "bookExterminator",
+  "changeFilm",
 ] as const satisfies readonly (keyof EnginePortCommands)[];
 
 /** What one second of play is judged on, read at each sample. */

@@ -214,6 +214,7 @@ impl Simulation {
             extras.dirty_days = None;
             // A rebuilt theatre opens with a new film.
             extras.film_days = None;
+            extras.film_classic = false;
         }
         let name = u.kind.facility().name;
         self.tower.set_unit_label_at(i, name.to_string());

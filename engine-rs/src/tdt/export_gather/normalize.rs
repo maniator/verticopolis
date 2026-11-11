@@ -87,6 +87,7 @@ pub(super) fn norm(raw: &Value) -> Result<GatheredRoom, LegacyExportError> {
             .get("residents")
             .map(|v| js_finite(Some(v)).unwrap_or(f64::NAN)),
         film_days: js_finite(raw.get("filmDays")).map(|d| d.floor().max(0.0) as i64),
+        film_classic: raw.get("filmClassic") == Some(&Value::Bool(true)),
         emitted: false,
         skip_reason: None,
     })

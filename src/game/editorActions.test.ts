@@ -205,6 +205,41 @@ describe("EditorActions: unit card", () => {
     }
   });
 
+  it("shows a new film or a classic through changeFilm, with no undo step for the payment's sake", async () => {
+    for (const [action, classic] of [
+      ["newFilm", false],
+      ["classicFilm", true],
+    ] as const) {
+      const { actions, deps, port } = setup({
+        changeFilm: () => rec("changeFilm", true, { cost: 1 }),
+      });
+      await actions.handleEditAction(action, root(""));
+      expect(port.changeFilm).toHaveBeenCalledExactlyOnceWith(office.id, classic);
+      expect(deps.captureUndo).toHaveBeenCalledExactlyOnceWith("Film change");
+      expect(deps.audio.sfx).toHaveBeenCalledExactlyOnceWith("build");
+      expect(deps.announce).toHaveBeenCalledExactlyOnceWith(classic ? "A classic film is showing." : "A new film is showing.");
+      expect(deps.refreshEditor).toHaveBeenCalledOnce();
+    }
+  });
+
+  it("says what a film costs when the tower can't pay, and gives a plain refusal otherwise", async () => {
+    const broke = setup({
+      changeFilm: () => rec("changeFilm", false, { cost: 300000 }),
+      lastReason: () => "funds",
+    });
+    await broke.actions.handleEditAction("newFilm", root(""));
+    expect(broke.deps.ui.toast).toHaveBeenCalledExactlyOnceWith("Not enough funds to show that film ($300,000).", "bad");
+    expect(broke.deps.audio.sfx).toHaveBeenCalledExactlyOnceWith("error");
+    expect(broke.deps.refreshEditor).not.toHaveBeenCalled();
+    const closed = setup({
+      changeFilm: () => rec("changeFilm", false),
+      lastReason: () => "closed",
+    });
+    await closed.actions.handleEditAction("classicFilm", root(""));
+    expect(closed.deps.ui.toast).toHaveBeenCalledExactlyOnceWith("That film can't be shown now.", "bad");
+    expect(closed.deps.announce).not.toHaveBeenCalled();
+  });
+
   it("rerolls a shop's variety, sounding only when the engine rerolled it", async () => {
     const { actions, deps, port } = setup({
       rerollUnit: vi

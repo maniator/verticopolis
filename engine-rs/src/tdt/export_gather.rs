@@ -49,7 +49,7 @@ use super::tables::{
 use super::venues::OutVenueHalf;
 use super::LegacyExportError;
 use crate::econ::rent_config;
-use crate::economy::visitors::film_draw;
+use crate::economy::visitors::showing_draw;
 use crate::facilities::{is_lobby_floor, Kind, LOT_WIDTH};
 
 mod gathered;
@@ -296,7 +296,7 @@ pub fn gather_units<U: Borrow<Value>>(
                             status: 0,
                             rent_class,
                             subtype_idx: None,
-                            draw: exported_film_draw(u.kind, u.film_days.unwrap_or(0)),
+                            draw: exported_film_draw(u),
                             venue: venue_half(u, idx, i == 1, construction),
                         },
                     );
@@ -447,15 +447,17 @@ fn venue_half(
         room,
         upper,
         film_days,
+        film_classic: u.film_classic,
     })
 }
 
 /// The draw byte a theatre writes (#1932): the draw its film had last night,
 /// the age before this morning's step (a theatre that has not seen a morning
-/// shows a new film's draw). Every other room writes 0.
-fn exported_film_draw(kind: Kind, film_days: i64) -> i64 {
-    if kind != Kind::Cinema {
+/// shows a new film's draw, and a classic's tops out at 1). Every other room
+/// writes 0.
+fn exported_film_draw(u: &GatheredRoom) -> i64 {
+    if u.kind != Kind::Cinema {
         return 0;
     }
-    film_draw((film_days - 1).max(0))
+    showing_draw((u.film_days.unwrap_or(0) - 1).max(0), u.film_classic)
 }

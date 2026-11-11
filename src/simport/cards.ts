@@ -63,6 +63,7 @@ export class Cards {
     const at = this.unitAt;
     const l = this.layout;
     const blockbuster = r[at.blockbuster];
+    const filmClassic = r[at.filmClassic];
     return {
       id: r[at.id],
       kind: l.kinds[r[at.kindCode]] as FacilityKind,
@@ -86,6 +87,8 @@ export class Cards {
       reachable: r[at.reachable] === 1,
       floorHasLobby: r[at.floorHasLobby] === 1,
       blockbuster: Number.isNaN(blockbuster) ? null : blockbuster === 1,
+      filmDays: nullable(r[at.filmDays]),
+      filmClassic: Number.isNaN(filmClassic) ? null : filmClassic === 1,
     };
   }
 

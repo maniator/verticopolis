@@ -137,6 +137,10 @@ export interface UnitDetail {
   readonly floorHasLobby: boolean;
   /** Whether a cinema is booked for the blockbuster; null off a cinema. */
   readonly blockbuster: boolean | null;
+  /** The mornings a theatre's film has shown; null off a cinema (#1932). */
+  readonly filmDays: number | null;
+  /** Whether a theatre shows a classic film; null off a cinema. */
+  readonly filmClassic: boolean | null;
 }
 
 /** One floor of an elevator's stop list, top floor first. */

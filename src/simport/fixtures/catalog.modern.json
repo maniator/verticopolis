@@ -21,6 +21,7 @@
     "carResaleRefund": 20000,
     "cinemaBookingBlockbusterMonthly": 300000,
     "cinemaBookingMonthly": 150000,
+    "classicFilmPrice": null,
     "condoHoldTaxRate": 0.015,
     "exterminator": {
       "calloutFee": 5000,
@@ -28,6 +29,7 @@
     },
     "garbageCollectHour": 5,
     "maintenancePerCarMonthly": 600,
+    "newFilmPrice": null,
     "nightclubDjMonthly": 40000,
     "overheadPerUnitMonthly": 700,
     "startingMoney": 2000000,
@@ -1921,7 +1923,7 @@
     "scheduleAssist": true,
     "variantHouseholds": true
   },
-  "version": 7,
+  "version": 8,
   "world": {
     "groundFloor": 1,
     "groundFloorStructure": "lobby",

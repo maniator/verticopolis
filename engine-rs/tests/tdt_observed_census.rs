@@ -13,6 +13,7 @@ use verticopolis_engine::economy::visitors::{daily_visitor_cap, set_audience};
 use verticopolis_engine::facilities::Kind;
 use verticopolis_engine::load::deserialize_tdt;
 use verticopolis_engine::sim::Simulation;
+use verticopolis_engine::tdt::export_tdt;
 use verticopolis_engine::tdt::format::{
     population_class, POP_FAST_FOOD, POP_PARTY_HALL, POP_RESTAURANT, POP_SHOP, POP_THEATRE,
     TDT_POPULATION_CLASSES,
@@ -158,4 +159,41 @@ fn a_played_hall_keeps_its_audience_and_a_theatre_loses_it_as_its_film_ages() {
         );
     }
     assert_eq!(seen, [4, 4], "T7O01 has four halls and four theatres");
+}
+
+#[test]
+fn a_changed_film_and_a_classic_keep_their_kind_through_an_export() {
+    // Of T7O01's four theatres, their films five days old, one shows a new
+    // film and one a classic; a trip through a .TDT brings all four back as
+    // they left.
+    let name = "T7O01.TDT";
+    let parsed = parse_tdt(&fixture(name), name).expect("imports");
+    let mut sim = deserialize_tdt(&parsed.save).expect("loads");
+    sim.money = 1.0e9;
+    let theatres: Vec<i64> = sim
+        .tower
+        .room_units()
+        .filter(|u| u.kind == Kind::Cinema)
+        .map(|u| u.id)
+        .collect();
+    sim.change_film(theatres[0], false).expect("a new film");
+    sim.change_film(theatres[1], true).expect("a classic");
+    let bytes = export_tdt(&sim.save_text()).expect("exports");
+    let back = parse_tdt(&bytes, "BACK.TDT").expect("reimports");
+    let back = deserialize_tdt(&back.save).expect("loads");
+    let films: Vec<_> = back
+        .tower
+        .room_units()
+        .filter(|u| u.kind == Kind::Cinema)
+        .map(|u| (u.extras().film_days, u.extras().film_classic))
+        .collect();
+    assert_eq!(
+        films,
+        [
+            (Some(0), false),
+            (Some(0), true),
+            (Some(5), false),
+            (Some(5), false)
+        ]
+    );
 }

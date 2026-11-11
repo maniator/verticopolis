@@ -18,6 +18,7 @@
 //! reach it.
 use crate::brush::{BrushResult, BRUSH_TILE_LIMIT};
 use crate::charges::{whole, ExtendEnd, INVALID_REQUEST};
+use crate::economy::films::FilmRefusal;
 use crate::facilities::{Kind, FACILITIES};
 use crate::gameplay::RemovalMethod;
 use crate::services::ExterminatorRefusal;
@@ -51,7 +52,7 @@ pub(crate) const ONBOARDING_FLAGS: [u8; 5] = [
 ];
 
 /// Each command's own slots after [`DELTA`], for the view layout.
-pub(crate) const COMMAND_RECORDS: [(&str, &[&str]); 27] = [
+pub(crate) const COMMAND_RECORDS: [(&str, &[&str]); 28] = [
     ("buildAt", &[]),
     ("paintTiles", &["placed"]),
     ("buildShaft", &[]),
@@ -62,6 +63,7 @@ pub(crate) const COMMAND_RECORDS: [(&str, &[&str]); 27] = [
     ("bookExterminator", &["cost", "rooms"]),
     ("setCamera", &[]),
     ("setFilm", &["policyCode"]),
+    ("changeFilm", &["cost"]),
     ("markStop", &[]),
     ("expressStops", &[]),
     ("dropStops", &[]),
@@ -323,6 +325,22 @@ impl Engine {
                 self.refuse("funds", &[cost, rooms as f64])
             }
             Err(other) => self.refuse(other.reason(), &[0.0, 0.0]),
+        }
+    }
+
+    /// Show a new film, or a classic when `classic`, at theatre `id`, with
+    /// the price paid. A refusal for want of funds is "funds" and carries
+    /// the price; the others carry 0.
+    pub(crate) fn port_change_film(&mut self, id: f64, classic: bool) -> Vec<f64> {
+        self.reason = None;
+        let Some(id) = whole(id) else {
+            return self.refuse(INVALID_REQUEST, &[0.0]);
+        };
+        let before = self.sim.money;
+        match self.sim.change_film(id, classic) {
+            Ok(cost) => self.finish(before, true, None, &[cost]),
+            Err(FilmRefusal::Funds { cost }) => self.refuse("funds", &[cost]),
+            Err(other) => self.refuse(other.reason(), &[0.0]),
         }
     }
 
