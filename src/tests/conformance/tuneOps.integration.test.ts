@@ -3,13 +3,14 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { loadScenario, runScenario } from "./scenario";
+import { hasWasmPackage, startWasmEngine } from "./wasmEngine";
 
 const dir = mkdtempSync(join(tmpdir(), "vc-scenario-tune-"));
 
 function run(commands: unknown[]): void {
   const file = join(dir, "s.json");
   writeFileSync(file, JSON.stringify({ id: "t", description: "d", start: { newGame: { seed: 1, mode: "classic" } }, commands }));
-  runScenario(loadScenario(file));
+  runScenario(loadScenario(file), startWasmEngine);
 }
 
 const withOffice = [
@@ -19,7 +20,7 @@ const withOffice = [
   { op: "build", kind: "office", floor: 2, x: 170 },
 ];
 
-describe("expectFail on the tuning ops", () => {
+describe.skipIf(!hasWasmPackage())("expectFail on the tuning ops", () => {
   const withLobby = [
     { op: "setMoney", amount: 500000000 },
     { op: "buildRow", kind: "lobby", floor: 1, from: 167, to: 206 },

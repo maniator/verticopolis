@@ -1,44 +1,25 @@
 import { readFileSync } from "node:fs";
-import { CHARGE_OPS, applyCharge, tsCharges, type ChargeCommand, type ChargeEngine } from "./chargeOps";
+import { CHARGE_OPS, applyCharge, type ChargeCommand, type ChargeEngine } from "./chargeOps";
 import { TUNE_OPS, applyTune, expectOk, expectOutcome, type TuneCommand } from "./tuneOps";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { Simulation } from "../../engine/Simulation";
 import type { FacilityKind, GameMode } from "../../shared/types";
-import type { SerializedGame } from "../../shared/serializedGame";
-import { decodeVctower } from "../../storage/vctowerContainer";
-import { markFounderFromLoadedFile } from "../../engine/sim/founderStatus";
-import { rentOf } from "../../engine/econConfig";
-import { serializeUnit } from "../../engine/sim/coerce";
 import { reloadChanged } from "./reloadCheck";
 import { digest } from "./canonical";
 import { check, own, type Spec } from "./scenarioSchema";
 export type { Spec } from "./scenarioSchema";
-import { requireDetail, tsCheckpointDetail, type CheckpointDetail } from "./checkpointDetail";
-import { crowdView, stateView } from "../../engine/conformanceView";
+import { requireDetail, type CheckpointDetail } from "./checkpointDetail";
 import { drainChecked } from "./gameplayEvents";
 
 /**
- * The TypeScript reference runner for the engine conformance suite. The format
- * and the hash definition are documented in conformance/README.md; a second
- * engine implements the same runner and must produce the same checkpoint list.
+ * The scenario runner for the engine conformance suite. The format and the
+ * hash definition are documented in conformance/README.md. The Rust engine
+ * runs scenarios natively (`engine-rs/src/scenario.rs`) and through its WASM
+ * binding here (`wasmEngine.ts`), and both must produce the locked checkpoints.
  */
 
 export const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 export const CONFORMANCE_DIR = resolve(REPO_ROOT, "conformance");
-
-/** Scenarios the TypeScript reference can no longer play, because the Rust
- *  engine changed a rule the reference, slated for deletion (#1875), does
- *  not follow: a refused bomb ransom starts a timed search (#349), and in
- *  Modern cinemas and party halls count toward a tenant's amenity coverage
- *  (#705, metro-express-modern). The Rust engine's lock pins them; the
- *  room-fact suites that replay each scenario on both engines leave them out. */
-export const PAST_THE_TYPESCRIPT_REFERENCE: ReadonlySet<string> = new Set([
-  "metro-express-modern.json",
-  "ransom-declined-classic.json",
-  "ransom-declined-modern.json",
-  "ransom-ignored-modern.json",
-]);
 
 export type Start =
   | { newGame: { seed: number; mode: GameMode; star?: number } }
@@ -140,8 +121,8 @@ export function loadScenario(file: string): Scenario {
 export interface Outcome { ok: boolean; reason?: string }
 
 /** What a scenario drives: one engine behind the small command surface the
- *  ops use. The TypeScript engine implements it directly (`tsEngine`); a port
- *  implements it through its binding, and the runner cannot tell them apart.
+ *  ops use. The Rust engine implements it through its WASM binding
+ *  (`wasmEngine.ts`); a test may wrap that to watch a read.
  *  Ids and tile queries read the engine as it stands, so a method that moves
  *  something (`adjustRent`, `setCars`) is checked by asking again. */
 export interface ScenarioEngine extends ChargeEngine {
@@ -197,102 +178,6 @@ export interface ScenarioEngine extends ChargeEngine {
 
 /** How a runner starts an engine from a scenario's `start`. */
 export type EngineStart = (start: Start) => ScenarioEngine;
-
-/** The TypeScript engine behind the scenario surface. */
-export function tsEngine(sim: Simulation): ScenarioEngine {
-  return {
-    mode: () => sim.mode,
-    money: () => sim.money,
-    setMoney: (amount) => { sim.money = amount; },
-    build: (kind, floor, x) => sim.build(kind, floor, x),
-    buildTransport: (kind, x, bottom, top) => sim.buildTransport(kind, x, bottom, top),
-    sellAt: (floor, x) => sim.sellAt(floor, x),
-    unitAt: (floor, x) => {
-      const u = sim.tower.unitAt(floor, x);
-      // The rent is read off the unit as a save carries it, the same shape a
-      // port's binding hands back, so both engines measure one quantity.
-      return u ? { id: u.id, kind: u.kind, rent: rentOf(serializeUnit(u)) } : null;
-    },
-    transportAt: (floor, x) => {
-      const t = sim.tower.transportAt(floor, x);
-      return t ? { id: t.id, kind: t.kind, cars: t.cars } : null;
-    },
-    adjustRent: (id, dir) => sim.adjustRent(id, dir),
-    setNoRate: (id) => sim.setNoRate(id),
-    setCars: (id, cars) => sim.setCars(id, cars),
-    ...tsCharges(sim),
-    setSchedule: (id, schedule) => sim.tower.setSchedule(id, schedule),
-    startFire: () => sim.startFire(),
-    fires: () => sim.fires,
-    bombThreat: () => sim.bombThreat(),
-    evaluateStar: () => sim.evaluateStar(),
-    callExterminator: () => {
-      const r = sim.callExterminator();
-      return r.ok ? { ok: true } : { ok: false, reason: r.reason };
-    },
-    autoBridge: () => sim.autoBridge,
-    toggleAutoBridge: () => sim.toggleAutoBridge(),
-    resizeTransport: (id, bottom, top) => {
-      const r = sim.resizeTransport(id, bottom, top);
-      return r.ok ? { ok: true } : { ok: false, reason: r.reason };
-    },
-    clearStops: (id) => sim.tower.clearStops(id),
-    setStop: (id, floor, stop) => sim.tower.setStop(id, floor, stop),
-    priceUnit: (id, target) => {
-      const u = sim.tower.getUnit(id);
-      return u ? sim.priceUnit(u, target) : null;
-    },
-    setFilmPolicy: (id, policy) => sim.setFilmPolicy(id, policy),
-    rerollSubtype: (id) => sim.rerollSubtype(id) ?? null,
-    applyRentBatch: (kind, target, onlyDefaultPriced) => sim.applyRentBatch(kind, target, { onlyDefaultPriced })?.matched ?? null,
-    pendingChoice: () => sim.pendingChoice,
-    resolveChoice: (accept) => sim.resolveChoice(accept ? "accept" : "decline"),
-    tick: (dt) => sim.tick(dt),
-    reload: () => tsEngine(reloadTsSim(sim)),
-    stateDigest: () => digest(stateView(sim)),
-    stateView: () => stateView(sim),
-    crowdDigest: () => digest(crowdView(sim)),
-    drainEvents: () => sim.drainGameplayEvents(),
-    eventsDropped: () => sim.gameplayEventsDropped,
-    detail: () => tsCheckpointDetail(sim),
-  };
-}
-
-/** The `reload` command's save round trip on the TypeScript engine. */
-export const reloadTsSim = (sim: Simulation): Simulation =>
-  Simulation.deserialize(JSON.parse(JSON.stringify(sim.serialize())) as SerializedGame);
-
-/** The TypeScript simulation a scenario's `start` founds or loads. */
-export function startTsSim(start: Start): Simulation {
-  if ("newGame" in start) {
-    const sim = Simulation.newGame(start.newGame.seed, start.newGame.mode);
-    if (sim.mode !== start.newGame.mode) throw new Error(`new game founded as ${sim.mode}, not ${start.newGame.mode}`);
-    // A start state, not a command: the star the game opens at, so the kinds
-    // and shafts that unlock above one star are in reach from a new game. The
-    // founded game is saved, raised to the star and loaded back, the route all
-    // three runners take, so a load's milestones and boundary markers are the
-    // same everywhere. One star is the founded game itself.
-    const star = start.newGame.star;
-    if (star !== undefined && star > 1) {
-      const save = JSON.parse(JSON.stringify(sim.serialize())) as SerializedGame;
-      save.star = star;
-      return Simulation.deserialize(save);
-    }
-    return sim;
-  }
-  const raw = decodeVctower(readFileSync(resolve(REPO_ROOT, start.fixture), "utf8"), start.fixture) as SerializedGame;
-  if (start.mode) raw.mode = start.mode;
-  // The import path's steps after decoding (SaveGame.importText).
-  const sim = Simulation.deserialize(raw);
-  markFounderFromLoadedFile(sim, raw);
-  if (start.mode && sim.mode !== start.mode) throw new Error(`${start.fixture} loaded as ${sim.mode}, not ${start.mode}`);
-  return sim;
-}
-
-/** Start the TypeScript engine from a scenario's `start`. */
-export const startTsEngine: EngineStart = (start) => tsEngine(startTsSim(start));
-
-export { crowdView, stateView };
 
 function unitAt(e: ScenarioEngine, at: At) {
   const u = e.unitAt(at.floor, at.x);
@@ -419,9 +304,9 @@ export function firstDivergence(got: Checkpoint[], want: Checkpoint[]): { checkp
 
 /** Run a scenario from its start, returning every checkpoint in order: `start`
  *  before the first command, the ones the commands take, and `final` after the
- *  last command, so nothing a scenario runs goes unchecked. The engine defaults
- *  to the TypeScript one; a port passes its own `start`; `details` collects the fuzz record. */
-export function runScenario(s: Scenario, start: EngineStart = startTsEngine, details?: CheckpointDetail[]): Checkpoint[] {
+ *  last command, so nothing a scenario runs goes unchecked. `start` founds the
+ *  engine (`startWasmEngine` for the Rust one); `details` collects the fuzz record. */
+export function runScenario(s: Scenario, start: EngineStart, details?: CheckpointDetail[]): Checkpoint[] {
   let e = start(s.start);
   const out: Checkpoint[] = [];
   const clock = { minutes: 0 };

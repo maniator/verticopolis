@@ -3,6 +3,7 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { loadScenario, runScenario } from "./scenario";
+import { hasWasmPackage, startWasmEngine } from "./wasmEngine";
 
 const dir = mkdtempSync(join(tmpdir(), "vc-scenario-reason-"));
 const NO_LOBBY = "Lay a lobby on the ground line first to open your tower.";
@@ -10,12 +11,12 @@ const NO_LOBBY = "Lay a lobby on the ground line first to open your tower.";
 function run(commands: unknown[]): void {
   const file = join(dir, "s.json");
   writeFileSync(file, JSON.stringify({ id: "t", description: "d", start: { newGame: { seed: 1, mode: "classic" } }, commands }));
-  runScenario(loadScenario(file));
+  runScenario(loadScenario(file), startWasmEngine);
 }
 
 const floorBeforeLobby = { op: "build", kind: "floor", floor: 2, x: 170, expectFail: true };
 
-describe("a refusal pinned by its reason", () => {
+describe.skipIf(!hasWasmPackage())("a refusal pinned by its reason", () => {
   it("passes when the engine gives that reason", () => {
     expect(() => run([{ ...floorBeforeLobby, reason: NO_LOBBY }])).not.toThrow();
   });

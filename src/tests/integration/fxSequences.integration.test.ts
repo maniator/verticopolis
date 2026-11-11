@@ -4,13 +4,13 @@
  * outside the hashed views, so the conformance lock never sees them (#879).
  * The checkpoint detail carries them (`FX_SLOTS`), the seeded differential
  * compares them every hour, and this suite pins them at the end of the
- * scenarios that reach each site, on the TypeScript engine and on the shipped
- * build: an off-by-one at any site, on either engine, changes a pinned value.
+ * scenarios that reach each site on the shipped build: an off-by-one at any
+ * site changes a pinned value.
  */
-import { basename, resolve } from "node:path";
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { FX_SLOTS, type CheckpointDetail, type FxSlot } from "../conformance/checkpointDetail";
-import { CONFORMANCE_DIR, loadScenario, PAST_THE_TYPESCRIPT_REFERENCE, runScenario } from "../conformance/scenario";
+import { CONFORMANCE_DIR, loadScenario, runScenario } from "../conformance/scenario";
 import { hasWasmPackage, startWasmEngine } from "../conformance/wasmEngine";
 
 type Nonzero = Partial<Record<FxSlot, number>>;
@@ -31,24 +31,17 @@ const PINNED: Record<string, Nonzero> = {
 
 const asRecord = (d: CheckpointDetail): Nonzero => Object.fromEntries(Object.entries(d.fx).filter(([, v]) => v !== 0)) as Nonzero;
 
-/** Two engines over a month or two of game time; the longest takes about half a minute on a busy runner. */
+/** A month or two of game time; the longest takes several seconds on a busy runner. */
 const SLOW = 180_000;
 
 const run = hasWasmPackage();
 
-describe.runIf(run)("the fx sequences and emergency counters, pinned on both engines", () => {
+describe.runIf(run)("the fx sequences and emergency counters, pinned on the shipped build", () => {
   for (const [file, expected] of Object.entries(PINNED)) {
-    it(`${file}: the TypeScript engine and the shipped build agree on every checkpoint and end on the pinned values`, () => {
-      const scenario = loadScenario(resolve(CONFORMANCE_DIR, file));
-      const ts: CheckpointDetail[] = [];
+    it(`${file}: the shipped build ends on the pinned values`, () => {
       const wasm: CheckpointDetail[] = [];
-      runScenario(scenario, startWasmEngine, wasm);
+      runScenario(loadScenario(resolve(CONFORMANCE_DIR, file)), startWasmEngine, wasm);
       expect(asRecord(wasm[wasm.length - 1])).toEqual(expected);
-      // The reference cannot play a refused ransom's search; the shipped build alone is pinned there.
-      if (PAST_THE_TYPESCRIPT_REFERENCE.has(basename(file))) return;
-      runScenario(scenario, undefined, ts);
-      expect(wasm.map((d) => d.fx)).toEqual(ts.map((d) => d.fx));
-      expect(asRecord(ts[ts.length - 1])).toEqual(expected);
     }, SLOW);
   }
 

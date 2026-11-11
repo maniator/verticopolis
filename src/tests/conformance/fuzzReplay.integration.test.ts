@@ -4,15 +4,15 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { replayCompare, throwSignature } from "./fuzzReplay";
 import { DetailError, isWasmTrap, requireDetail } from "./checkpointDetail";
-import { loadScenario, runScenario, startTsEngine, type Checkpoint } from "./scenario";
+import { loadScenario, runScenario, type Checkpoint, type EngineStart } from "./scenario";
+import { hasWasmPackage, startWasmEngine } from "./wasmEngine";
 import type { CheckpointDetail } from "./checkpointDetail";
 
 const dir = mkdtempSync(join(tmpdir(), "vc-fuzz-replay-"));
 
-// The replay runs the shipped WASM build; these harness tests hand it the
-// TypeScript engine instead (`replayCompare`'s `engine`), so they run without
-// the package. They move to a stand-in of their own before src/engine/ goes
-// (#1875, step 5 of the story's deletion stack).
+// The replay runs the shipped WASM build, so these harness tests run where the
+// engine package is built. The "Rust records" each test writes come from the
+// same build's run, edited where a test needs a divergence.
 
 const commands = (extra: unknown[] = []) => [
   { op: "setMoney", amount: 500000000 },
@@ -23,7 +23,7 @@ const commands = (extra: unknown[] = []) => [
 ];
 
 /** Write a scenario and, beside it, the records a Rust run would leave: the
- *  TypeScript run's own, edited by `tweak`, so the compare has agreement to
+ *  WASM run's own, edited by `tweak`, so the compare has agreement to
  *  start from. */
 function setup(
   name: string,
@@ -38,7 +38,7 @@ function setup(
   writeFileSync(file, JSON.stringify({ id: name, description: "d", start: { newGame }, commands: cmds }));
   if (tweak) {
     const details: CheckpointDetail[] = [];
-    const checkpoints = runScenario(loadScenario(file), undefined, details);
+    const checkpoints = runScenario(loadScenario(file), startWasmEngine, details);
     tweak(checkpoints, details);
     writeFileSync(join(dir, `${name}.rs.json`), JSON.stringify(checkpoints));
     writeFileSync(join(dir, `${name}.rs.detail.json`), JSON.stringify(details));
@@ -46,10 +46,10 @@ function setup(
   return file;
 }
 
-describe("replayCompare", () => {
+describe.skipIf(!hasWasmPackage())("replayCompare", () => {
   it("reads agreement as ok", () => {
     const file = setup("agree", commands(), () => {});
-    expect(replayCompare(file, undefined, startTsEngine)).toEqual({ status: "ok", checkpoints: 3 });
+    expect(replayCompare(file)).toEqual({ status: "ok", checkpoints: 3 });
   });
 
   it("names a hash divergence by kind and field, without its position", () => {
@@ -57,7 +57,7 @@ describe("replayCompare", () => {
       c[1].state = "x";
       d[1].save.clock = "other";
     });
-    const r = replayCompare(file, undefined, startTsEngine);
+    const r = replayCompare(file);
     expect(r).toMatchObject({ status: "diverged", signature: "state:clock" });
     expect(r.status === "diverged" && r.message).toMatch(/checkpoint 1 \(built\)/);
   });
@@ -66,30 +66,30 @@ describe("replayCompare", () => {
     const file = setup("money", commands(), (_c, d) => {
       d[2].money += 1;
     });
-    expect(replayCompare(file, undefined, startTsEngine)).toMatchObject({ status: "diverged", signature: "money" });
+    expect(replayCompare(file)).toMatchObject({ status: "diverged", signature: "money" });
   });
 
   it("reads records in another folder", () => {
     const file = setup("elsewhere", commands());
     const other = mkdtempSync(join(tmpdir(), "vc-fuzz-replay-rust-"));
     const details: CheckpointDetail[] = [];
-    const checkpoints = runScenario(loadScenario(file), undefined, details);
+    const checkpoints = runScenario(loadScenario(file), startWasmEngine, details);
     writeFileSync(join(other, "elsewhere.rs.json"), JSON.stringify(checkpoints));
     writeFileSync(join(other, "elsewhere.rs.detail.json"), JSON.stringify(details));
-    expect(replayCompare(file, other, startTsEngine).status).toBe("ok");
-    expect(replayCompare(file, undefined, startTsEngine).status).toBe("harness");
+    expect(replayCompare(file, other).status).toBe("ok");
+    expect(replayCompare(file).status).toBe("harness");
   });
 
   it("reads a runner throw as a divergence, not a harness failure", () => {
     const agreed = setup("threw-ok", commands());
     const details: CheckpointDetail[] = [];
-    const checkpoints = runScenario(loadScenario(agreed), undefined, details);
+    const checkpoints = runScenario(loadScenario(agreed), startWasmEngine, details);
     // The Rust records say the build was accepted; the scenario below asks the
     // replayed engine to refuse a build it accepts.
     const file = setup("threw", commands([{ op: "build", kind: "floor", floor: 2, x: 170, expectFail: true }]));
     writeFileSync(join(dir, "threw.rs.json"), JSON.stringify(checkpoints));
     writeFileSync(join(dir, "threw.rs.detail.json"), JSON.stringify(details));
-    const r = replayCompare(file, undefined, startTsEngine);
+    const r = replayCompare(file);
     expect(r).toMatchObject({ status: "diverged", signature: "threw:build:floor" });
   });
 
@@ -103,17 +103,17 @@ describe("replayCompare", () => {
   });
 
   it("reads missing, malformed and mismatched records as harness failures", () => {
-    expect(replayCompare(setup("missing", commands()), undefined, startTsEngine)).toMatchObject({ status: "harness" });
+    expect(replayCompare(setup("missing", commands()))).toMatchObject({ status: "harness" });
     const file = setup("malformed", commands(), () => {});
     writeFileSync(join(dir, "malformed.rs.json"), "{not json");
-    expect(replayCompare(file, undefined, startTsEngine)).toMatchObject({ status: "harness", message: expect.stringContaining("HARNESS:") });
+    expect(replayCompare(file)).toMatchObject({ status: "harness", message: expect.stringContaining("HARNESS:") });
     const short = setup("short", commands(), (c) => {
       c.pop();
     });
-    expect(replayCompare(short, undefined, startTsEngine)).toMatchObject({ status: "harness" });
+    expect(replayCompare(short)).toMatchObject({ status: "harness" });
     writeFileSync(join(dir, "notarray.rs.json"), "{}");
     writeFileSync(join(dir, "notarray.rs.detail.json"), "[]");
-    expect(replayCompare(setup("notarray", commands()), undefined, startTsEngine)).toMatchObject({ status: "harness" });
+    expect(replayCompare(setup("notarray", commands()))).toMatchObject({ status: "harness" });
   });
 
   it("reads an unreadable scenario as a harness failure", () => {
@@ -121,7 +121,7 @@ describe("replayCompare", () => {
     writeFileSync(file, JSON.stringify({ id: "bad", description: "d", start: { newGame: { seed: 1, mode: "classic" } }, commands: [{ op: "nope" }] }));
     writeFileSync(join(dir, "bad.rs.json"), "[]");
     writeFileSync(join(dir, "bad.rs.detail.json"), "[]");
-    expect(replayCompare(file, undefined, startTsEngine)).toMatchObject({ status: "harness" });
+    expect(replayCompare(file)).toMatchObject({ status: "harness" });
   });
 
   it("replays a minimized known failing seed deterministically", () => {
@@ -140,10 +140,10 @@ describe("replayCompare", () => {
       "modern",
       5,
     );
-    const a = replayCompare(file, undefined, startTsEngine);
+    const a = replayCompare(file);
     const checkpointsAfterFirst = readFileSync(join(dir, "seed-9315-min.rs.json"), "utf8");
     const detailsAfterFirst = readFileSync(join(dir, "seed-9315-min.rs.detail.json"), "utf8");
-    const b = replayCompare(file, undefined, startTsEngine);
+    const b = replayCompare(file);
     expect(readFileSync(join(dir, "seed-9315-min.rs.json"), "utf8")).toBe(checkpointsAfterFirst);
     expect(readFileSync(join(dir, "seed-9315-min.rs.detail.json"), "utf8")).toBe(detailsAfterFirst);
     expect(a).toMatchObject({ status: "diverged", signature: "money" });
@@ -179,16 +179,19 @@ describe("isWasmTrap", () => {
   });
 });
 
-describe("a trap during a run", () => {
-  const trapping = (where: "detail" | "command"): ((start: Parameters<typeof startTsEngine>[0]) => ReturnType<typeof startTsEngine>) =>
+describe.skipIf(!hasWasmPackage())("a trap during a run", () => {
+  const trapping = (where: "detail" | "command"): EngineStart =>
     (start) => {
-      const e = startTsEngine(start);
+      const e = startWasmEngine(start);
       const trap = () => new WebAssembly.RuntimeError("unreachable");
       return {
         ...e,
         ...(where === "detail" ? { detail: () => { throw trap(); } } : { tick: () => { throw trap(); } }),
         // A poisoned instance's free throws a plain error of its own.
-        free: () => { throw new Error("null pointer passed to rust"); },
+        free: () => {
+          e.free?.();
+          throw new Error("null pointer passed to rust");
+        },
       };
     };
   const scenario = () => {
@@ -210,7 +213,10 @@ describe("a trap during a run", () => {
   });
 
   it("still lets a free that fails after a clean run through", () => {
-    const e = (start: Parameters<typeof startTsEngine>[0]) => ({ ...startTsEngine(start), free: () => { throw new Error("free failed"); } });
+    const e: EngineStart = (start) => {
+      const engine = startWasmEngine(start);
+      return { ...engine, free: () => { engine.free?.(); throw new Error("free failed"); } };
+    };
     expect(() => runScenario(scenario(), e, [])).toThrow("free failed");
   });
 

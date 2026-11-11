@@ -1,5 +1,21 @@
-import type { FacilityKind } from "../../shared/types";
-import { FACILITIES } from "../../engine/facilitiesData";
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { readCatalog } from "../../dualrun/catalog";
+
+/** The Rust engine's Classic catalog as checked in (the file `catalogFor` in
+ *  `src/tests/catalogFixture.ts` reads; `portReads.integration.test.ts` holds
+ *  it to the engine). Read here by this module's own path, since the fuzz
+ *  scripts load it as an ES module, where `catalogFixture.ts`'s `__dirname`
+ *  is absent. */
+const CLASSIC_CATALOG = resolve(dirname(fileURLToPath(import.meta.url)), "../../simport/fixtures/catalog.classic.json");
+
+/** Each facility kind the engine lists, with its transport flag. Every mode's
+ *  catalog lists every kind (a Modern-only one carries `modernOnly`), so the
+ *  Classic one names them all. */
+const TRANSPORT_BY_KIND: ReadonlyMap<string, boolean> = new Map(
+  readCatalog({ catalog: () => readFileSync(CLASSIC_CATALOG, "utf8") }, "classic").facilities.map((f) => [f.key, f.transport]),
+);
 
 /** Field types: "int" a whole number, "u32" a whole number from 0 to
  *  4294967295, "count" a whole number above zero, "dir" 1 or -1, "num" a finite
@@ -20,11 +36,11 @@ function fits(type: FieldType, v: unknown): boolean {
     case "num": return typeof v === "number" && Number.isFinite(v);
     case "str": return typeof v === "string" && v.length > 0;
     case "bool": return typeof v === "boolean";
-    case "place": return typeof v === "string" && own(FACILITIES, v) && !FACILITIES[v as FacilityKind].transport;
-    case "shaft": return typeof v === "string" && own(FACILITIES, v) && !!FACILITIES[v as FacilityKind].transport;
+    case "place": return typeof v === "string" && TRANSPORT_BY_KIND.get(v) === false;
+    case "shaft": return typeof v === "string" && TRANSPORT_BY_KIND.get(v) === true;
     case "mode": return v === "classic" || v === "modern";
     case "obj": return typeof v === "object" && v !== null && !Array.isArray(v);
-    case "kind": return typeof v === "string" && own(FACILITIES, v);
+    case "kind": return typeof v === "string" && TRANSPORT_BY_KIND.has(v);
     case "choice": return v === "fireRescue" || v === "bombThreat";
     case "policy": return v === "auto" || v === "feature" || v === "blockbuster";
     case "target": return v === "default" || v === "noRate" || (typeof v === "number" && Number.isFinite(v));

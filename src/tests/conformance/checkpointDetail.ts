@@ -1,6 +1,3 @@
-import type { Simulation } from "../../engine/Simulation";
-import { digest } from "./canonical";
-
 /** What the seeded differential compares at a checkpoint beyond the hashes:
  *  the money, the log, and a digest of each top-level field of the full save.
  *  The Rust fuzzer writes the same record (`engine-rs/src/scenario_detail.rs`).
@@ -14,8 +11,9 @@ export interface CheckpointDetail {
   /** The cosmetic fx sequences and the emergency counters, outside the hashed
    *  views (#879), one number per named slot of {@link FX_SLOTS}. The record
    *  also holds what the Rust runner wrote to a file, so its keys are checked
-   *  when it is compared (`recordProblem`); the two writers in this repository
-   *  return `Record<FxSlot, number>`, so the compiler holds them to the list. */
+   *  when it is compared (`recordProblem`); the writer in this repository (the
+   *  WASM adapter) returns `Record<FxSlot, number>`, so the compiler holds it
+   *  to the list. */
   fx: Record<string, number>;
 }
 
@@ -31,28 +29,6 @@ export const FX_SLOTS = [
   "fires", "firesGutRooms", "bombs",
 ] as const;
 export type FxSlot = (typeof FX_SLOTS)[number];
-
-export function tsFxSlots(sim: Simulation): Record<FxSlot, number> {
-  const counts = sim.events.counts;
-  return {
-    santaFxSeq: sim.santaFxSeq,
-    explosionSeq: sim.explosionFx.seq, explosionFloor: sim.explosionFx.floor, explosionX: sim.explosionFx.x,
-    thiefSeq: sim.thiefFx.seq, thiefCaught: sim.thiefFx.caught ? 1 : 0, thiefFloor: sim.thiefFx.floor,
-    treasureSeq: sim.treasureFx.seq, treasureFloor: sim.treasureFx.floor, treasureX: sim.treasureFx.x,
-    vipFxSeq: sim.vipFxSeq,
-    fires: counts.fires, firesGutRooms: counts.firesGutRooms, bombs: counts.bombs,
-  };
-}
-
-export function tsCheckpointDetail(sim: Simulation): Omit<CheckpointDetail, "label"> {
-  const save = sim.serialize() as unknown as Record<string, unknown>;
-  return {
-    money: sim.money,
-    log: { seq: sim.logSeq, count: sim.log.length, digest: digest(sim.log.map((e) => ({ minute: e.minute, text: e.text, kind: e.kind }))) },
-    save: Object.fromEntries(Object.entries(save).filter(([, v]) => v !== undefined).map(([k, v]) => [k, digest(v)])),
-    fx: tsFxSlots(sim),
-  };
-}
 
 /** A WebAssembly trap (an unreachable, an out-of-bounds access, an exhausted
  *  stack or memory) rather than the JavaScript error the binding throws for a

@@ -4,8 +4,10 @@ import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { rustMessage } from "./fuzzBinary";
 import { CORPUS_NAME, corpusExit, corpusFiles, lateFailure, rustVerdict } from "./fuzzCorpus";
-import { loadScenario, runScenario } from "./scenario";
+import { loadScenario } from "./scenario";
 
+/** Each entry is replayed on the Rust engine by the corpus job and, through
+ *  the WASM binding, against its golden by `fuzzWasmLeg.integration.test.ts`. */
 describe("the fuzz corpus", () => {
   const files = corpusFiles();
 
@@ -13,7 +15,7 @@ describe("the fuzz corpus", () => {
     expect(files.length).toBeGreaterThanOrEqual(3);
   });
 
-  it.each(files.map((f) => [basename(f), f]))("%s is a well-formed entry the TypeScript engine runs", (name, file) => {
+  it.each(files.map((f) => [basename(f), f]))("%s is a well-formed entry", (name, file) => {
     const stem = name.replace(/\.json$/, "");
     expect(stem).toMatch(CORPUS_NAME);
     const scenario = loadScenario(file);
@@ -22,7 +24,6 @@ describe("the fuzz corpus", () => {
     expect(scenario.description.length).toBeGreaterThan(40);
     expect(scenario.description).not.toMatch(/\u2014/);
     expect(readFileSync(file, "utf8").endsWith("\n")).toBe(true);
-    expect(runScenario(scenario).length).toBeGreaterThan(1);
   });
 });
 

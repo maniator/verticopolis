@@ -1,7 +1,8 @@
-//! The Rust step driver against the TypeScript's: `tests/data/fixed-step-cases.json`
-//! holds what the web host loop does with each frame sequence, and the driver
-//! must cut the same ticks and carry the same debt, bit for bit. The cases are
-//! written by `src/tests/conformance/fixedStepCases.test.ts`.
+//! The Rust step driver against the pinned cases: `tests/data/fixed-step-cases.json`
+//! holds what the web host loop did with each frame sequence, and the driver
+//! must cut the same ticks and carry the same debt, bit for bit. The cases were
+//! written by the retired TypeScript host loop (#1875) and are now a fixed
+//! record; `src/tests/conformance/fixedStepCases.test.ts` checks their coverage.
 
 use serde_json::Value;
 use verticopolis_engine::clock::GameMode;

@@ -3,7 +3,6 @@ import { PortCodes } from "../../simport/portCodes";
 import { exportFacts, importFacts } from "../../simport/tdtRecords";
 import { exportReport, type ExportReport } from "../../storage/tdtExportReport";
 import { importReport, type ImportReport } from "../../storage/tdtImportReport";
-import { codecFromModule, useTdtCodec } from "../../engine/port/tdtCodec";
 import { describe, it } from "vitest";
 import { hasWasmPackage, wasm } from "./wasmEngine";
 
@@ -106,10 +105,4 @@ export function buildTDT(save: SerializedGame | string): BuiltTdt {
   } finally {
     engine.free();
   }
-}
-
-/** Give the TypeScript engine the Rust `.TDT` codec from the built package, as
- *  the game does after it loads the package. Call it where `hasWasmPackage()`. */
-export function installTdtCodec(): void {
-  useTdtCodec(codecFromModule(wasm()));
 }

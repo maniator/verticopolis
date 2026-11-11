@@ -3,6 +3,7 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { loadScenario, runScenario } from "./scenario";
+import { hasWasmPackage, startWasmEngine } from "./wasmEngine";
 
 const dir = mkdtempSync(join(tmpdir(), "vc-scenario-star-"));
 
@@ -11,7 +12,7 @@ function run(star: unknown, commands: unknown[]): void {
   const newGame: Record<string, unknown> = { seed: 1, mode: "classic" };
   if (star !== undefined) newGame.star = star;
   writeFileSync(file, JSON.stringify({ id: "t", description: "d", start: { newGame }, commands }));
-  runScenario(loadScenario(file));
+  runScenario(loadScenario(file), startWasmEngine);
 }
 
 const escalator = (expectFail: boolean) => [
@@ -31,7 +32,7 @@ const refused = (kind: string, floor: number, x: number, reason: string) => [
   { op: "build", kind, floor, x, expectFail: true, reason },
 ];
 
-describe("a new game that opens at a higher star", () => {
+describe.skipIf(!hasWasmPackage())("a new game that opens at a higher star", () => {
   it("keeps the escalator locked at one star, as a game with no star does", () => {
     expect(() => run(undefined, escalator(true))).not.toThrow();
     expect(() => run(1, escalator(true))).not.toThrow();
