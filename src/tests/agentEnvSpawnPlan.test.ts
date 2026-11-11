@@ -21,6 +21,10 @@ describe("agent-env spawnPlan", () => {
     expect(plan.args).toEqual(["-y", "pkg@1.0.0", "--executablePath", '"C:\\Program Files\\Chrome\\chrome.exe"']);
   });
 
+  it("quotes cmd metacharacters for the Windows shell", () => {
+    expect(spawnPlan("npx", ["C:\\R&D\\chrome.exe", "a|b", "plain"], "win32").args).toEqual(['"C:\\R&D\\chrome.exe"', '"a|b"', "plain"]);
+  });
+
   it("never uses a shell off Windows", () => {
     expect(spawnPlan("npx", ["a b"], "linux")).toEqual({ command: "npx", args: ["a b"], shell: false });
   });
