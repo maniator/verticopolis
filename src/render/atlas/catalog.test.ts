@@ -7,9 +7,13 @@ import { allJobs } from "./browserEntry";
 import { UNIT_STATES, hourFor, occupantCap, roomJobs, roomKinds, variantPlacements, type StillJob } from "./catalog";
 import { paint, cloudOrigin, unitOf, type PaintSpec } from "./paint";
 
-/** A 2D context that accepts every call. This covers the paint dispatch; the
- *  e2e comparison spec checks the pixels in a real browser. */
-function sinkCtx(): CanvasRenderingContext2D {
+/** The context calls that put pixels on the canvas. */
+const DRAWS = new Set(["fill", "fillRect", "stroke", "strokeRect", "fillText", "strokeText", "drawImage", "putImageData"]);
+
+/** A 2D context that accepts every call; `draws` counts the ones that paint.
+ *  This covers the paint dispatch; the e2e comparison spec checks the pixels
+ *  in a real browser. */
+function sinkCtx(draws: { count: number } = { count: 0 }): CanvasRenderingContext2D {
   const grad = { addColorStop: () => undefined };
   return new Proxy({} as Record<string, unknown>, {
     get(target, prop) {
@@ -17,6 +21,7 @@ function sinkCtx(): CanvasRenderingContext2D {
       if (prop === "createLinearGradient" || prop === "createRadialGradient" || prop === "createPattern") return () => grad;
       if (prop === "measureText") return () => ({ width: 10 });
       if (prop === "getLineDash") return () => [];
+      if (typeof prop === "string" && DRAWS.has(prop)) return () => void draws.count++;
       return () => undefined;
     },
     set(target, prop, v) {
@@ -97,12 +102,17 @@ describe("room catalog", () => {
 });
 
 describe("paint", () => {
-  it("paints every spec in the catalog without throwing", () => {
-    const ctx = sinkCtx();
+  it("paints every spec in the catalog onto the canvas", () => {
+    const blank: string[] = [];
     for (const j of allJobs()) {
       const specs = j.type === "anim" ? j.frames : [j.paint, ...Object.values(j.overlays ?? {}), ...Object.values(j.chains ?? {}).flatMap((c) => c.steps.slice(0, 3))];
-      for (const s of specs) paint(ctx, s, j.w, j.h);
+      specs.forEach((s, i) => {
+        const draws = { count: 0 };
+        paint(sinkCtx(draws), s, j.w, j.h);
+        if (draws.count === 0) blank.push(`${j.name}[${i}]`);
+      });
     }
+    expect(blank, "specs that drew nothing").toEqual([]);
   });
   it("rejects an unknown spec", () => {
     expect(() => paint(sinkCtx(), { p: "nope" } as unknown as PaintSpec, 1, 1)).toThrow(/unknown paint spec/);

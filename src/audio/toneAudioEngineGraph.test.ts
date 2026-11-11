@@ -15,6 +15,17 @@ vi.mock("tone", async () => (await import("./toneRecordingMock")).toneMock());
 
 import { beat, graph, type NodeRec } from "./toneRecordingMock";
 import { ToneAudioEngine, type SfxName } from "./ToneAudioEngine";
+import { SCENES, type Scene } from "./toneScenes";
+
+/** A built node's record, read through the recording mock's `__rec` handle. */
+const recOf = (n: unknown): NodeRec => (n as { __rec: NodeRec }).__rec;
+
+/** The engine's private graph state the assertions below read. */
+type Inner = { scene: Scene; ambFilter: unknown; rain: { rainGain: unknown } | null; started: boolean };
+const inner = (eng: ToneAudioEngine): Inner => eng as unknown as Inner;
+
+/** Every one-shot note any built node has been asked to play so far. */
+const triggerCount = (): number => graph.nodes.reduce((sum, n) => sum + n.triggers.length, 0);
 
 const focus = (over: Partial<ViewFocus> = {}): ViewFocus =>
   ({ centerFloor: 5, dominant: "office", night: false, zoom: 1, ...over }) as ViewFocus;
@@ -59,14 +70,37 @@ describe("ToneAudioEngine — full graph driven with a mocked Tone.js", () => {
       focus({ zoom: 2.0, dominant: "empty", centerFloor: -3 }), // metro (basement)
       focus({ zoom: 0.35, dominant: "empty", centerFloor: 30 }), // back out → overview
     ];
-    for (const f of path) expect(() => eng.update(f)).not.toThrow();
+    const expected: Scene[] = ["overview", "office", "hotel", "food", "cinema", "service", "outside", "metro", "overview"];
+    const ambFilter = recOf(inner(eng).ambFilter);
+    path.forEach((f, i) => {
+      const before = ambFilter.ramps.length;
+      eng.update(f);
+      expect(inner(eng).scene, `step ${i}`).toBe(expected[i]);
+      // The scene change reached the graph: the room-tone filter glides to the scene's cutoff.
+      expect(ambFilter.ramps.slice(before), `step ${i}`).toContainEqual([SCENES[expected[i]].amb.freq, 1.2]);
+    });
+  });
+
+  it("holds the overview scene between the enter and exit zooms (hysteresis)", () => {
+    const eng = new ToneAudioEngine();
+    eng.start();
+    eng.update(focus({ zoom: 0.5, dominant: "office" })); // below the enter threshold
+    expect(inner(eng).scene).toBe("overview");
+    eng.update(focus({ zoom: 0.6, dominant: "office" })); // between enter and exit: stays latched
+    expect(inner(eng).scene).toBe("overview");
+    eng.update(focus({ zoom: 0.7, dominant: "office" })); // past the exit threshold
+    expect(inner(eng).scene).toBe("office");
   });
 
   it("sfx() plays every cue once the graph is up", () => {
     const eng = new ToneAudioEngine();
     eng.start();
-    const names: SfxName[] = ["build", "sell", "error", "promote", "money", "notify", "click"];
-    for (const n of names) expect(() => eng.sfx(n)).not.toThrow();
+    const names: SfxName[] = ["build", "sell", "error", "promote", "money", "notify", "click", "tick"];
+    for (const n of names) {
+      const before = triggerCount();
+      eng.sfx(n);
+      expect(triggerCount(), n).toBeGreaterThan(before);
+    }
   });
 
   it("the recorded percussion bypasses the music tone filters on its way to the bus", () => {
@@ -121,9 +155,14 @@ describe("ToneAudioEngine — full graph driven with a mocked Tone.js", () => {
     const eng = new ToneAudioEngine();
     eng.start();
     expect(() => eng.setMuted(true)).not.toThrow();
+    const muted = triggerCount();
     expect(() => eng.sfx("build")).not.toThrow(); // muted → no-op path
+    expect(triggerCount()).toBe(muted);
     expect(() => eng.update(focus({ zoom: 2 }))).not.toThrow();
     expect(() => eng.setMuted(false)).not.toThrow();
+    const unmuted = triggerCount();
+    eng.sfx("build");
+    expect(triggerCount()).toBeGreaterThan(unmuted);
   });
 
   it("builds the crowd ambience layer into the graph (its steep filters exist)", () => {
@@ -248,9 +287,14 @@ describe("ToneAudioEngine — full graph driven with a mocked Tone.js", () => {
   it("rain weather adds an outdoor layer when the sky is visible", () => {
     const eng = new ToneAudioEngine();
     eng.start();
-    expect(() => eng.update(focus({ zoom: 0.3, dominant: "empty", centerFloor: 30, weather: "rain" }))).not.toThrow();
-    expect(() => eng.update(focus({ zoom: 1.6, dominant: "outside", weather: "rain" }))).not.toThrow();
-    expect(() => eng.update(focus({ zoom: 2.2, dominant: "office", weather: "rain" }))).not.toThrow(); // indoors → no rain
+    const rain = recOf(inner(eng).rain!.rainGain);
+    eng.update(focus({ zoom: 0.3, dominant: "empty", centerFloor: 30, weather: "rain" }));
+    expect(rain.ramps[rain.ramps.length - 1]).toEqual([0.13, 1.5]); // the sky is in view from the overview
+    const ramps = rain.ramps.length;
+    eng.update(focus({ zoom: 1.6, dominant: "outside", weather: "rain" }));
+    expect(rain.ramps.length).toBe(ramps); // still outdoors: the level holds, no new ramp
+    eng.update(focus({ zoom: 2.2, dominant: "office", weather: "rain" }));
+    expect(rain.ramps[rain.ramps.length - 1]).toEqual([0, 1.5]); // indoors → no rain
   });
 
 
@@ -384,6 +428,15 @@ describe("ToneAudioEngine — full graph driven with a mocked Tone.js", () => {
   it("dispose tears the built graph down", () => {
     const eng = new ToneAudioEngine();
     eng.start();
-    expect(() => eng.dispose()).not.toThrow();
+    // Every audio node start() built, music, sfx, ambience, rain and crowd alike.
+    // The anonymous chainable stubs (Transport, context) are not graph nodes.
+    const built = graph.nodes.filter((n) => n.kind !== "anon" && n.kind !== "Context");
+    expect(built.length).toBeGreaterThan(0);
+    eng.dispose();
+    expect(inner(eng).started).toBe(false);
+    expect(inner(eng).ambFilter).toBeNull();
+    expect(inner(eng).rain).toBeNull();
+    const leaked = built.filter((n) => !n.disposed && n.kind !== "ToneAudioBuffer").map((n) => `${n.kind} #${graph.nodes.indexOf(n)}`);
+    expect(leaked, "nodes still alive after dispose").toEqual([]);
   });
 });

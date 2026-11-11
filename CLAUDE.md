@@ -49,6 +49,16 @@ review skill. The BMAD agent rules live in `_bmad-output/project-context.md`.
   words. Section 1
   also records the owner's scope decision for the pull requests that were open
   when the page merged.
+- **Unit tests mock the engine; tests assert what they name.** A unit test
+  (`*.test.ts`) stands in for the engine port with `vi.fn` spies, uses JSON
+  fixtures only as the canned answers they return, and asserts the calls made
+  and what the code did with the answers. Real-engine checks go in
+  `*.integration.test.ts` or Rust tests. Never record engine answers and
+  replay them as a stand-in engine (the pattern the owner rejected in PR
+  #1923), and never write a test whose assertions cannot fail when the code it
+  names breaks. `src/tests/testHonesty.guard.test.ts` enforces the mechanical
+  half; reviewers check the rest. See CONTRIBUTING.md → **What every test must
+  do**.
 - **Quality gates before pushing:** `npm run typecheck`, `npm run lint`,
   `npm test`, `npm run build`. All four must be green. The build needs the
   engine package (`npm run wasm:build`), or `VC_ALLOW_NO_ENGINE=1` for a

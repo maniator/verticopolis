@@ -40,6 +40,7 @@ persistent_comment = true
 persistent_finding_state = true
 extra_instructions = """
 Focus on correctness, Rust/WASM engine authority, save compatibility, deterministic behavior, simulation hot-path performance, meaningful regression tests, and CI coverage. For parity PRs, prioritize the register, guards, engine implementation, and conformance tests.
+Flag a unit test (*.test.ts) that starts a real engine or replays recorded engine answers: unit tests mock the engine port with vi.fn spies, use JSON fixtures only as canned answers, and assert the calls made and what the code did with them; real-engine checks belong in *.integration.test.ts or Rust tests. Flag a test whose assertions cannot fail when the code it names breaks (only 'does not throw' under a behavior name, or a mock's own canned answer asserted back).
 Assess the intended scope of THIS PR. A linked parent issue or planned follow-up is context, not a promise to finish the whole issue.
 An unread or omitted patch is not evidence that a changed file, golden, or test is absent. Cross-check GitHub's complete changed-file list before declaring a file absent; state incomplete coverage explicitly rather than inventing missing work or repeating generic verification demands.
 Only report actionable code findings with concrete file/line evidence. Do not treat pending CI as failed CI, or a test wired into CI as an executed passing test.

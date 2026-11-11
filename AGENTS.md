@@ -249,6 +249,16 @@ These rules sit on top of the two test tiers in
   tower shipped for months with no sky lobbies and no express elevators
   because nothing checked `ok`, and it kept passing for the wrong reason.
 
+- **Unit tests mock the engine, and every test asserts what it names.** A
+  unit test mocks the engine port with `vi.fn` spies and canned JSON answers,
+  then asserts the calls and what the code did with the answers; a check that
+  needs the real engine is an integration or Rust test. No recorded engine
+  answers replayed as a stand-in (PR #1923). A test named for a behavior
+  asserts that behavior; "does not throw" is only enough when the name says
+  so. Before you call a converted or new test done, break the code it names
+  and watch it fail. Rules: CONTRIBUTING.md → **What every test must do**;
+  guard: `src/tests/testHonesty.guard.test.ts`.
+
 - **No tests that mirror CI or test config text.** Do not introduce
   standalone test files or add source-text assertions for workflow YAML,
   Playwright/Vitest settings, or other test configuration. Check the resolved

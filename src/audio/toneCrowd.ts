@@ -60,6 +60,8 @@ export class CrowdLayer {
   private humLow: Tone.Oscillator | null = null;
   private humHigh: Tone.Oscillator | null = null;
   private humLfo: Tone.LFO | null = null;
+  /** The swell the LFO breathes between the hum's two sines and its gain. */
+  private humSwell: Tone.Gain | null = null;
   private voices: CrowdVoices | null = null;
   private party: PartyBand | null = null;
   private cinema: CinemaProgram | null = null;
@@ -109,7 +111,7 @@ export class CrowdLayer {
       // The street hum: two well-separated sines breathing on a slow swell.
       this.humGain = new Tone.Gain(0).connect(this.master);
       this.humLfo = new Tone.LFO({ frequency: 0.08, min: 0.55, max: 1 });
-      const humSwell = new Tone.Gain(1).connect(this.humGain);
+      const humSwell = (this.humSwell = new Tone.Gain(1).connect(this.humGain));
       this.humLfo.connect(humSwell.gain);
       this.humLfo.start();
       this.humLow = new Tone.Oscillator({ frequency: 65, type: "sine", volume: -18 }).connect(humSwell);
@@ -385,7 +387,7 @@ export class CrowdLayer {
     this.metro?.dispose();
     const nodes = [
       this.pingSynth, this.thudSynth, this.noiseSynth, this.noiseFilter,
-      this.humLow, this.humHigh, this.humLfo, this.humGain,
+      this.humLow, this.humHigh, this.humLfo, this.humSwell, this.humGain,
       this.toneGain, this.murmurFilter, this.murmurGain, this.master,
     ];
     for (const n of nodes) {
@@ -404,6 +406,7 @@ export class CrowdLayer {
     this.noiseFilter = this.murmurFilter = null;
     this.humLow = this.humHigh = null;
     this.humLfo = null;
+    this.humSwell = null;
     this.humGain = null;
     this.toneGain = this.murmurGain = this.master = null;
   }

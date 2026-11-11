@@ -63,6 +63,9 @@ fixed and every `defer` recorded.
   cache miss).
 - Behavior that rests on incidental order, such as object key order.
 - A fixture that builds a tower without asserting that each placement worked.
+- A unit test that starts a real engine or replays recorded engine answers,
+  or a test whose assertions cannot fail when the code it names breaks
+  (`CONTRIBUTING.md` → What every test must do).
 - A scan or wait loop that keeps going after it has what it needs.
 - A newer CSS or web feature with no fallback line.
 - A TypeScript leg and a Rust leg that accept or refuse different inputs.
