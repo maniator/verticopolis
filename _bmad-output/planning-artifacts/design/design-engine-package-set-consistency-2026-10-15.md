@@ -259,8 +259,7 @@ diagnostics.
    without a Rust toolchain). The value lands in the hashed shell chunk, so the shell's own name
    moves when the expected package moves.
 2. **`BUILD.json` joins the precache** by its own path:
-   `globPatterns` gains `"engine/BUILD.json"` (the shape
-   `src/build/workboxGlob.ts` already reads), and `engineAssets.ts` marks it
+   `globPatterns` gains `"engine/BUILD.json"`, and `engineAssets.ts` marks it
    `runtime: true` in the same change. `THIRD-PARTY.json` stays out.
 3. **Integrity on the three engine entries.** A `manifestTransforms` entry
    in the workbox options reads each engine file from the build output and

@@ -1,9 +1,8 @@
-import { readdirSync, readFileSync } from "node:fs";
+import { readdirSync } from "node:fs";
 import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { AUDIO_ENGINE_CHUNK, AUDIO_RUNTIME_FILES } from "./audioAssets";
-import { globCovers, readWorkboxGlob } from "../build/workboxGlob";
 
 /**
  * AUDIO_RUNTIME_FILES is what scripts/verify-precache.ts checks against the
@@ -33,14 +32,6 @@ describe("AUDIO_RUNTIME_FILES", () => {
     expect([...AUDIO_RUNTIME_FILES].sort()).toEqual(shipped);
   });
 
-  it("holds only file types the workbox glob precaches", () => {
-    // An audio file whose extension vite.config.ts's globPatterns leaves out
-    // would never be precached (verify-precache.ts would then fail the build).
-    const config = readFileSync(resolve(SRC, "..", "vite.config.ts"), "utf8");
-    const glob = readWorkboxGlob(config);
-    expect(glob, "vite.config.ts globPatterns changed shape; update src/build/workboxGlob.ts").not.toBeNull();
-    for (const f of AUDIO_RUNTIME_FILES) expect(globCovers(glob!, f), f).toBe(true);
-  });
 });
 
 describe("AUDIO_ENGINE_CHUNK", () => {

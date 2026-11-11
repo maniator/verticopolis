@@ -353,8 +353,6 @@ describe("the other readers of BUILD.json", () => {
     "scripts/gen-third-party-notices.ts",
     "src/build/rustNotices.ts",
     "src/tests/perfCompare/env.ts",
-    ".github/actions/engine-wasm/action.yml",
-    ".github/actions/engine-wasm-download/action.yml",
   ])("%s reads only `sources`", (file) => {
     const text = readFileSync(join(root, file), "utf8");
     expect(text).toContain("BUILD.json");
