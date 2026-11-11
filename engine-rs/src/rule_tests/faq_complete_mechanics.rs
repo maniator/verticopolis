@@ -116,13 +116,19 @@ fn new_offices_filled(with_parking: bool) -> usize {
     let shaft = sim.tower.transports[0].id;
     sim.tower.set_cars(shaft, 8);
     for &x in &xs {
-        if let Some(id) = sim.tower.place(Kind::Office, 2, x).unit_id {
-            sim.tower.get_unit_mut(id).unwrap().state = UnitState::Occupied;
-        }
+        let id = sim
+            .tower
+            .place(Kind::Office, 2, x)
+            .unit_id
+            .expect("an office on floor 2");
+        sim.tower.get_unit_mut(id).unwrap().state = UnitState::Occupied;
     }
     for floor in 3..=4 {
         for &x in &xs {
-            sim.tower.place(Kind::Office, floor, x);
+            assert!(
+                sim.tower.place(Kind::Office, floor, x).ok,
+                "an office on floor {floor}"
+            );
         }
     }
     sim.star = 3;
@@ -130,7 +136,10 @@ fn new_offices_filled(with_parking: bool) -> usize {
         lay(&mut sim, Kind::Floor, 0);
         assert!(sim.tower.place(Kind::ParkingRamp, 0, 0).ok);
         for x in (RAMP_WIDTH..=W - SPACE_WIDTH).step_by(SPACE_WIDTH as usize) {
-            sim.tower.place(Kind::Parking, 0, x);
+            assert!(
+                sim.tower.place(Kind::Parking, 0, x).ok,
+                "a parking space at {x}"
+            );
         }
     }
     for _ in 0..12 {

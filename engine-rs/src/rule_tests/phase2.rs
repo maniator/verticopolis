@@ -61,6 +61,7 @@ fn fill_floor(sim: &mut Simulation, floor: i64, count: usize) {
         }
         x += OFFICE_WIDTH;
     }
+    assert_eq!(placed, count, "floor {floor} holds the requested offices");
 }
 
 /// A one-car standard shaft at `x` from `bottom` to `top`.
