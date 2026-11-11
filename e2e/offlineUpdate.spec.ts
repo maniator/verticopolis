@@ -291,3 +291,28 @@ test("a worker with the same engine bytes does not trust entries stored under th
     await context?.close();
   }
 });
+
+/**
+ * A host that rewrites the HTML page must not block updates. The Vercel
+ * toolbar appends its script to the page for a signed-in team member, and an
+ * antivirus web shield or a filtering proxy does the same for a player. The
+ * page's precache entry carries an integrity, so before the fix every install
+ * of a new worker failed on the rewritten page and the installed app never
+ * offered another update (an installed copy sat on 2.33.0 through 3.0.1).
+ */
+test("an update still installs when the host rewrites the HTML page", async ({ browser }) => {
+  let context: BrowserContext | undefined;
+  try {
+    const first = await installedFirst(browser);
+    context = first.context;
+    deployments.rewritePage(true);
+    await updateTo(first.page, "B", "999.0.0");
+    await expectCacheIs(first.page, "B");
+    const page = await first.page.evaluate(async () => (await caches.match("index.html", { ignoreSearch: true }))?.text());
+    expect(page, "the page is stored as the server sent it").toContain("data-host-toolbar");
+  } finally {
+    deployments.rewritePage(false);
+    deployments.serve("A");
+    await context?.close();
+  }
+});
