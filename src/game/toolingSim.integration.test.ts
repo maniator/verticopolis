@@ -7,7 +7,7 @@ import type { ToolingEngine, ToolingTowerClass } from "./toolingTower";
 
 // The tower drives the real Rust engine, so this is an integration suite: a
 // unit test mocks the engine instead of running it. It runs where the engine
-// package is built (a local build, `test:wasm:host` on the integrationWasm
+// package is built (a local build, `test:wasm:host` on the test-engine (host)
 // shards) and skips without one. Where the package is required a missing one
 // is a failure.
 if (wasmRequired() && !hasWasmPackage()) throw new Error("VC_REQUIRE_WASM=1 but engine-rs/pkg is not built; run npm run wasm:build");

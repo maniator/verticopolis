@@ -215,8 +215,8 @@ Verticopolis has **two test tiers**:
     legs, the telemetry and log-text comparisons, perf comparison) with the
     engine package required. CI runs it
     once per PR in three shards, reported as the required
-    `test-wasm-parity (integrationWasm)` check; the
-    `test-wasm-parity (unitWasm)` leg runs the unit tests with the package
+    `test-engine (host)` check; the
+    `test-engine (unit)` leg runs the unit tests with the package
     required, so the package's own tests run instead of skipping. Until
     #1421 those legs also ran every suite with each `Simulation` hosted on
     the engine (story-engine-test-parity, #878); the hosted projects and the
@@ -435,7 +435,7 @@ Also excluded are non-product tooling entry points that are build/dev plumbing,
 not game logic: the gallery/preview pages (`src/gallery.ts`,
 `src/preview.ts`), the PWA bootstrap (`src/pwa.ts`), the harnesses' tower
 (`src/game/toolingTower.ts` and `toolingSim.ts`, which drive the Rust engine
-package the coverage run does not build; their tests run on the unitWasm leg,
+package the coverage run does not build; their tests run on the `test-engine (unit)` leg,
 and the e2e specs and the screenshot gallery drive them),
 plus the usual non-code (`*.d.ts`, `*.config.*`) and the tests themselves.
 

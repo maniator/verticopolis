@@ -10,7 +10,7 @@
  *   conformance suite, this workflow). One shared path runs everything.
  * - `rust`: the rest of `engine-rs/`. The Rust engine workflow tests it,
  *   and Test CI still runs its browser, parity and integration checks, so
- *   only the plain unit run (which the unitWasm parity leg repeats with
+ *   only the plain unit run (which the test-engine (unit) leg repeats with
  *   the engine package), lint, typecheck and the build are skipped.
  * - `prose`: docs, planning files, root markdown and `.changes` notes.
  *   Guard tests read them (the backlog mirror, the changelog, the change

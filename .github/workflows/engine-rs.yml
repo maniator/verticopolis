@@ -447,7 +447,7 @@ jobs:
 
   # Verify the WASM binding builds and its generated declarations match
   # the sources. The host-driven WASM conformance and golden suites are
-  # executed ONCE in the required test-wasm-parity (integrationWasm) check
+  # executed ONCE in the required test-engine (host) check
   # from test.yml. Running them again here would duplicate billed minutes.
   # This job and fuzz-corpus below need Node.js; the native Rust jobs do not.
   # The package comes from .github/actions/engine-wasm, shared by cache with
