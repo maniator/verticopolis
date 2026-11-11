@@ -219,9 +219,14 @@ function drawGuardFigure(ctx: CanvasRenderingContext2D, x: number, footY: number
   px(0, -19, 7, 13, "#274B8F"); // navy uniform with edge shades
   px(0, -19, 1, 13, "#1C3A6E");
   px(6, -19, 1, 13, "#3A5A8F");
+  px(4, -17, 2, 2, "#F2C14E"); // gold chest badge, so a guard reads apart from navy-suited staff
+  px(4, -17, 1, 1, "#FFF1B8"); // its glint
+  px(0, -10, 7, 1, "#15171D"); // black duty belt
+  px(3, -10, 1, 1, "#F2C14E"); // gold buckle
   px(1, -24, 5, 5, "#E8C9A0"); // skin face
   px(0, -25, 7, 3, "#16305E"); // peaked cap
   px(0, -22, 7, 1, "#3A5A8F"); // cap band
+  px(3, -24, 1, 1, "#F2C14E"); // gold cap badge
   px(2, -29, 2, 2, "rgba(255,64,64,0.92)"); // alert beacon
 }
 
