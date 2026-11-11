@@ -1,10 +1,11 @@
 import { afterAll, describe, expect, it } from "vitest";
-import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { REPO_ROOT } from "./scenario";
 import { hasWasmPackage } from "./wasmEngine";
+import { goldenDir } from "./fuzzCorpus";
 
 /**
  * The exit codes of the two fuzz scripts. The corpus job is a required check,
@@ -24,6 +25,10 @@ function run(script: string, args: string[], fuzzBin: string, env: NodeJS.Proces
   });
   return { code: r.status, out: `${r.stdout}${r.stderr}` };
 }
+
+/** Every committed golden's name and content, to show an --update run left them alone. */
+const goldenSnapshot = (): Record<string, string> =>
+  Object.fromEntries(readdirSync(goldenDir()).sort().map((f) => [f, readFileSync(join(goldenDir(), f), "utf8")]));
 
 /** Any existing file stands in for the fuzzer when the script stops before it would be run. */
 const present = process.execPath;
@@ -69,6 +74,14 @@ describe("scripts/fuzz-corpus.ts", () => {
 
   it.skipIf(!posix)("exits 1 when the Rust engine refuses every entry", () => {
     expect(run("fuzz-corpus.ts", [], failing(1, "refused")).code).toBe(1);
+  });
+
+  it.skipIf(!posix)("writes no golden when an --update run fails, so a refresh never lands half done", () => {
+    const before = goldenSnapshot();
+    const r = run("fuzz-corpus.ts", ["--update"], failing(1, "refused"), { CI: "" });
+    expect(r.code).toBe(1);
+    expect(r.out).toContain("no golden written");
+    expect(goldenSnapshot()).toEqual(before);
   });
 
   it.skipIf(!posix)("exits 3 when the fuzzer fails in a way that is not the engine's", () => {

@@ -59,6 +59,11 @@ const work = mkdtempSync(join(tmpdir(), "vc-corpus-"));
 const started = Date.now();
 const failed: string[] = [];
 let harness = false;
+/** With --update, the entries whose fresh records wait to be pinned. Nothing is
+ *  written to the goldens until every entry has passed, so a failed or
+ *  over-budget refresh leaves the committed goldens as they were. */
+const toPin: string[] = [];
+let elapsed = 0;
 try {
   for (const file of files) {
     const name = basename(file);
@@ -82,10 +87,8 @@ try {
       continue;
     }
     const id = name.replace(/\.json$/, "");
-    if (update) {
-      mkdirSync(goldenDir(), { recursive: true });
-      for (const record of goldenFiles(id)) copyFileSync(join(work, record), join(goldenDir(), record));
-    } else {
+    if (update) toPin.push(id);
+    else {
       const g = goldenCompare(file, goldenDir(), work);
       if (g.status !== "ok") {
         console.log(`${name}: native Rust against its golden: ${g.message}`);
@@ -95,18 +98,25 @@ try {
       }
     }
     const r = replayCompare(file, work);
-    if (r.status === "ok") console.log(`${name}: ok (${r.checkpoints} checkpoints${update ? ", golden pinned" : ""})`);
+    if (r.status === "ok") console.log(`${name}: ok (${r.checkpoints} checkpoints)`);
     else {
       console.log(`${name}: ${r.message}`);
       if (r.status === "harness") harness = true;
       else failed.push(name);
     }
   }
+  elapsed = (Date.now() - started) / 1000;
+  failed.push(...lateFailure(elapsed, budget, failed));
+  if (update) {
+    if (failed.length === 0 && !harness) {
+      mkdirSync(goldenDir(), { recursive: true });
+      for (const id of toPin) for (const record of goldenFiles(id)) copyFileSync(join(work, record), join(goldenDir(), record));
+      console.log(`${toPin.length} goldens pinned`);
+    } else console.log("no golden written: the refresh did not pass on every entry");
+  }
 } finally {
   rmSync(work, { recursive: true, force: true });
 }
-const elapsed = (Date.now() - started) / 1000;
-failed.push(...lateFailure(elapsed, budget, failed));
 const seconds = elapsed.toFixed(1);
 console.log(`${files.length} corpus entries in ${seconds} s${failed.length ? `; failed: ${failed.join(", ")}` : ""}`);
 process.exit(corpusExit(failed, harness));
