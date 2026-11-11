@@ -49,6 +49,7 @@ export class AudioEngine {
   musicVolume = 1;
   ambienceVolume = 1;
   sfxVolume = 1;
+  private musicDucked = false;
   /** Which composed track should play. Stored here (start screen vs. tower) so
    *  a pre-load switch lands on the engine the moment it builds. */
   program: ProgramKind = "game";
@@ -103,7 +104,7 @@ export class AudioEngine {
         // stays reachable by dispose() rather than leaking as an orphan.
         this.impl = impl;
         impl.setMuted(this.muted);
-        impl.setVolumes(this.musicVolume, this.ambienceVolume, this.sfxVolume);
+        impl.setVolumes(this.heardMusic(), this.ambienceVolume, this.sfxVolume);
         impl.setProgram(this.program);
         impl.start();
         this.started = impl.started;
@@ -138,7 +139,21 @@ export class AudioEngine {
     this.musicVolume = saneLevel(music, this.musicVolume);
     this.ambienceVolume = saneLevel(ambience, this.ambienceVolume);
     this.sfxVolume = saneLevel(sfx, this.sfxVolume);
-    this.impl?.setVolumes(this.musicVolume, this.ambienceVolume, this.sfxVolume);
+    this.impl?.setVolumes(this.heardMusic(), this.ambienceVolume, this.sfxVolume);
+  }
+
+  /** Dip the music to half while a bomb search counts down, so the tick and
+   *  the outcome stand out; ambience and effects stay as they are. The
+   *  player's own music level is kept and comes back when the search ends. */
+  setMusicDucked(ducked: boolean): void {
+    if (ducked === this.musicDucked) return;
+    this.musicDucked = ducked;
+    this.impl?.setVolumes(this.heardMusic(), this.ambienceVolume, this.sfxVolume);
+  }
+
+  /** The music level the engine plays: the player's, halved while ducked. */
+  private heardMusic(): number {
+    return this.musicDucked ? this.musicVolume * MUSIC_DUCK : this.musicVolume;
   }
 
   update(focus: ViewFocus): void {
@@ -160,6 +175,9 @@ export class AudioEngine {
     this.started = false;
   }
 }
+
+/** How far the music dips while a bomb search counts down. */
+const MUSIC_DUCK = 0.5;
 
 /** Clamp a level into 0..1; a non-finite input falls back to `prev`. */
 function saneLevel(v: number, prev: number): number {

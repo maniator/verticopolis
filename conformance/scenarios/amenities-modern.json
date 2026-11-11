@@ -1,6 +1,6 @@
 {
   "id": "amenities-modern",
-  "description": "The Modern tower-one at four stars (the towerone fixture with star raised to four and the treasury filled) builds the Modern amenities the basement and ground floor have room for (a nightclub and a daycare two floors under the lowest condos, a fitness club, a spa, a clinic, a food hall, an amusement arcade, a boutique bay, a sky bar and two rentals), puts the express shaft on an authored schedule whose home floors are not express stops so they snap to the nearest lobby, and runs ten days at hour ticks across the monthly maintenance roll: condo households relocate, nightclub noise and the amenity halos reach the satisfaction step and its vacate reasons, and the rental studio leases (the apartment stays empty across the run).",
+  "description": "The Modern tower-one at four stars (the towerone fixture with star raised to four and the treasury filled) builds the Modern amenities the basement and ground floor have room for (a nightclub and a daycare two floors under the lowest condos, a fitness club, a spa, a clinic, a food hall, an amusement arcade, a boutique bay, a sky bar and two rentals), puts the express shaft on an authored schedule whose home floors are not express stops so they snap to the nearest lobby, and runs ten days at hour ticks across the monthly maintenance roll: condo households relocate, nightclub noise and the amenity halos reach the satisfaction step and its vacate reasons, and the rental studio leases (the apartment stays empty across the run). The bomb ransom the daily roll calls in on day six is paid, so the run stays one both engines play the same way.",
   "start": {
     "fixture": "conformance/fixtures/towerone-star4.vctower",
     "mode": "modern"
@@ -152,7 +152,22 @@
     {
       "op": "tick",
       "dt": 60,
-      "times": 240,
+      "times": 136,
+      "checkpointEvery": 24
+    },
+    {
+      "op": "resolveChoice",
+      "accept": true,
+      "kind": "bombThreat"
+    },
+    {
+      "op": "checkpoint",
+      "label": "ransom-paid"
+    },
+    {
+      "op": "tick",
+      "dt": 60,
+      "times": 104,
       "checkpointEvery": 24
     }
   ]

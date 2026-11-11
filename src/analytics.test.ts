@@ -393,6 +393,7 @@ const EVERY_EVENT: { [K in keyof GameplayEvents]: GameplayEvents[K] } = {
   app_action: { action: "quick_save" },
   economy_action: { action: "demolish", detail: "sell" },
   emergency_choice: { kind: "fireRescue", decision: "accept" },
+  bomb_outcome: { outcome: "found" },
   session_emergencies: { fires: 1, firesGutRooms: 2, bombs: 0 },
   session_crashes: { crashes: 3 },
   engine_status: {

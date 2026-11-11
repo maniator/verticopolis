@@ -511,9 +511,10 @@ fails the moment the two drift.
 
 Every release becomes a GitHub release on its own. When a release PR merges,
 `.github/workflows/release-tag.yml` tags the merge commit `v<version>` for an
-app version change and dispatches `.github/workflows/atlas-release.yml`, which
-publishes the release with the version's player notes and the sprite atlas
-(docs/atlas.md). A crate version change gets its own `engine-v<version>`
+app version change and dispatches `.github/workflows/github-release.yml`, which
+publishes the release with the version's player notes and then dispatches
+`.github/workflows/sprite-atlas.yml` to bake the sprite atlas and attach it
+(docs/atlas.md). The release never waits on the atlas. A crate version change gets its own `engine-v<version>`
 release with that version's `engine-rs/CHANGELOG.md` section and the built
 WASM package attached, never marked Latest, so a frontend can depend on the
 crate at that tag or download the package. The same build goes to GitHub
@@ -521,10 +522,11 @@ Packages as `@maniator/verticopolis-engine` (installing it needs a GitHub
 token, even though it is public). A maintainer can
 still tag a commit by hand (`git tag v2.30.0 <commit> && git push origin
 v2.30.0`). Only commits that contain the atlas exporter can get an atlas. A tag push runs
-the workflow file as it is at the tagged commit. A manual run (Actions, "Sprite
-atlas release", with the tag as input) uses the copy on the branch or tag it
-runs from: it builds and publishes when the tag has no published release, and only
-audits when it does.
+the release workflow file as it is at the tagged commit. A manual run (Actions,
+"GitHub release" or "Sprite atlas", with the tag as input) uses the copy on the
+branch or tag it runs from. The release workflow publishes when the tag has no
+published release and leaves a published one alone; the atlas workflow attaches
+the atlas when the release lacks it and only audits when it has it.
 
 **Declare the tier in the same PR as any player-facing change.** The tier is keyed
 to one question: would a player notice anything different?

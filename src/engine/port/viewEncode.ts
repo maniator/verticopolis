@@ -196,6 +196,8 @@ export class FrameEncoder {
     v[h.year] = sim.clock.year;
     v[h.weekDays] = sim.clock.calendar.weekDays;
     v[h.weekendDays] = sim.clock.calendar.weekendDays;
+    // The reference engine never runs Classic's bomb search.
+    v[h.bombSearchSeq] = 0;
     v[h.towerRevision] = tower.revision;
     v[h.metaRevision] = meta.revision;
     v[h.mealOverlayRevision] = tower.mealOverlayRevision;

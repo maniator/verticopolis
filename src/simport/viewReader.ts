@@ -2,11 +2,11 @@ import type { FacilityKind, GameMode, UnitState, WeatherKind } from "../engine/t
 import type { CalendarKind } from "../engine/calendar";
 import type { PersonState } from "../engine/crowd/person";
 import type { EnginePort } from "./enginePort";
+import { EmergencyReads } from "./emergencyReads";
 import type {
   CameraView,
   CrowdView,
   HeaderView,
-  PendingChoiceView,
   PersonView,
   SimView,
   StructureRunView,
@@ -141,8 +141,7 @@ export class ViewReader implements SimView {
   private revision = NaN;
   private metaRevision = 0;
   private full = true;
-  private choiceUp = false;
-  private choice: PendingChoiceView | null = null;
+  private readonly emergency = new EmergencyReads();
   private camera: CameraView | null = null;
   private byId = new Map<number, Room>();
   private shafts: Shaft[] = [];
@@ -211,7 +210,7 @@ export class ViewReader implements SimView {
       this.revision = NaN;
       this.metaRevision = 0;
       this.full = true;
-      this.choiceUp = false;
+      this.emergency.reset();
       this.byId = new Map();
       this.pool = new Map();
       const v = this.port.view();
@@ -351,14 +350,7 @@ export class ViewReader implements SimView {
       thief: { caught: f[h.thiefFxCaught] === 1, floor: f[h.thiefFxFloor], seq: f[h.thiefFxSeq] },
       treasure: { floor: f[h.treasureFxFloor], x: f[h.treasureFxX], seq: f[h.treasureFxSeq] },
     };
-    const up = f[h.pendingChoice] === 1;
-    if (up && !this.choiceUp) {
-      const text = this.port.pendingChoice();
-      this.choice = text === undefined ? null : (JSON.parse(text) as PendingChoiceView);
-    } else if (!up) {
-      this.choice = null;
-    }
-    this.choiceUp = up;
+    this.emergency.read(this.port, f[h.pendingChoice] === 1, f[h.bombSearchSeq]);
     this.unlockedKinds = f[h.unlocked];
     const minutes = f[h.minutes];
     this.header = {
@@ -367,7 +359,8 @@ export class ViewReader implements SimView {
       population: f[h.population],
       weather: l.weather[f[h.weather]],
       logSeq: f[h.logSeq],
-      pendingChoice: this.choice,
+      pendingChoice: this.emergency.choice,
+      bombSearch: this.emergency.bomb,
       minutes,
       minuteOfDay: ((minutes % 1440) + 1440) % 1440,
       day: f[h.day],

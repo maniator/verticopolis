@@ -1,7 +1,7 @@
 import type { ElevatorQueueView } from "../engine/crowd/person";
 import type { HeatCell, HeatmapMode } from "../engine/sim/constants";
 import type { GameMode, SerializedView, WeatherKind } from "../engine/types";
-import type { CrowdView, TowerView } from "../simport/view";
+import type { BombSearchView, CrowdView, TowerView } from "../simport/view";
 
 /**
  * Everything the renderer reads from the simulation, and nothing else (facade
@@ -55,6 +55,8 @@ export interface RenderSim {
   readonly explosionFx: { readonly floor: number; readonly x: number; readonly seq: number };
   readonly thiefFx: { readonly caught: boolean; readonly floor: number; readonly seq: number };
   readonly treasureFx: { readonly floor: number; readonly x: number; readonly seq: number };
+  /** Classic's bomb search while one runs, else null. View: `header.bombSearch`. */
+  readonly bombSearch?: BombSearchView | null;
 
   /** Frame slices (3b): answered by the live engine today. */
   congestion(): number;

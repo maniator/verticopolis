@@ -101,6 +101,7 @@ fn the_named_slots_read_their_values() {
         (YEAR, 0.0),
         (WEEK_DAYS, sim.clock.calendar.week_days as f64),
         (WEEKEND_DAYS, sim.clock.calendar.weekend_days as f64),
+        (BOMB_SEARCH_SEQ, 0.0),
     ];
     let first = [
         (POPULATION, population),

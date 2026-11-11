@@ -158,6 +158,21 @@ impl GameMode {
             )
     }
 
+    /// Whether a Security office that opens during a bomb search sends its
+    /// guards to join it. Modern lets the player answer the countdown by
+    /// building; Classic searches with the guards it had when the call came
+    /// (the Mac FAQ has no Security built during a threat).
+    pub fn security_joins_bomb_search(self) -> bool {
+        self == GameMode::Modern
+    }
+
+    /// Whether the ransom call needs a Security office in the tower first:
+    /// the SimTower manual has terrorists strike only a tower with security
+    /// personnel. Modern rolls it at four stars either way.
+    pub fn ransom_needs_security(self) -> bool {
+        self == GameMode::Classic
+    }
+
     pub fn walkway_willingness_applies(self) -> bool {
         self == GameMode::Classic
     }

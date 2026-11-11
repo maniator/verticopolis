@@ -8,10 +8,11 @@ same art without porting the drawing code.
 ## Getting it
 
 Every version tag (`v<package.json version>`, for example `v2.30.0`) gets a
-published GitHub release carrying `verticopolis-atlas-<tag>.zip` and a
-`.sha256` file beside it (`.github/workflows/atlas-release.yml`). Check the
-archive against the checksum before you unpack it. Nothing generated is
-committed to this repository.
+published GitHub release, and the sprite atlas workflow
+(`.github/workflows/sprite-atlas.yml`) attaches `verticopolis-atlas-<tag>.zip`
+and a `.sha256` file beside it shortly after. Check the archive against the
+checksum before you unpack it. Nothing generated is committed to this
+repository.
 
 The game deploys from `main` without a tag, so most commits have no atlas.
 Pin your frontend to a version tag's commit and fetch that tag's release.
@@ -19,28 +20,28 @@ Pin your frontend to a version tag's commit and fetch that tag's release.
 The release flow, for maintainers:
 
 - A version tag is the publish step (CONTRIBUTING.md, Versioning). A release
-  PR's merge creates it and dispatches this workflow
-  (`.github/workflows/release-tag.yml`); a maintainer can also push one. The
-  tag must equal `v<package.json version>` at that commit, and the version must
-  be a plain `x.y.z`, or the workflow stops.
-- The workflow opens the tag's release as a draft (or reuses its draft),
-  attaches the zip and checksum while it is still a draft, then publishes it.
-  Publishing is the last step, so it works with GitHub's immutable releases.
-  The notes are that version's player notes, read from `CHANGELOG.md` by the
-  reader the in-game update prompt uses (every top-level bullet of the
-  section's first list, uncapped), each printed as plain text with its
-  Markdown escaped (`releaseNoteLines`), so the page shows a note the way the
-  prompt does; a version with no player notes gets a plain line. The release becomes Latest unless a higher version has already been
-  released, so a backport tagged later leaves Latest alone. Two tags pushed
-  within the same few minutes can both decide they are Latest; push one at a
-  time, or set Latest by hand if that happens.
-- A published release is never edited. Running the workflow again for a
-  published tag is an audit: it checks the attached zip against the attached
-  checksum and re-bakes, passing only when the bake reproduces that checksum.
-- Publish releases only through the tag. A release published by hand without
-  the atlas makes the workflow fail: a maintainer then deletes that release
-  and re-runs the workflow (possible only while releases are not immutable),
-  or ships the atlas with the next version's tag.
+  PR's merge creates it and dispatches `.github/workflows/github-release.yml`
+  (from `.github/workflows/release-tag.yml`); a maintainer can also push one.
+  The tag must equal `v<package.json version>` at that commit, and the version
+  must be a plain `x.y.z`, or the workflow stops.
+- The release workflow publishes the release first, then dispatches the atlas
+  workflow, so a slow or failed bake never holds the release back. The notes
+  are that version's player notes, read from `CHANGELOG.md` by the reader the
+  in-game update prompt uses (every top-level bullet of the section's first
+  list, uncapped), each printed as plain text with its Markdown escaped
+  (`releaseNoteLines`), so the page shows a note the way the prompt does; a
+  version with no player notes gets a plain line. The release becomes Latest
+  unless a higher version has already been released, so a backport tagged
+  later leaves Latest alone. Two tags pushed within the same few minutes can
+  both decide they are Latest; push one at a time, or set Latest by hand if
+  that happens. A release that is already published is left as it is.
+- The atlas workflow bakes the atlas and attaches the zip, then the checksum,
+  to the tag's published release. It only adds assets, so it relies on
+  releases staying mutable (GitHub's immutable releases setting is off). If a
+  bake fails, run the "Sprite atlas" workflow by hand with the tag as input.
+  When both files are already attached, a run is an audit: it checks the
+  attached zip against the attached checksum and re-bakes, passing only when
+  the bake reproduces that checksum.
 
 To build it yourself:
 

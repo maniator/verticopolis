@@ -105,7 +105,7 @@ export function makeApp(over: Record<string, unknown> = {}) {
     enginePort: fakeEnginePort(sim), // commands land on the fake's spies
     portCodes,
     accMinutes: 0,
-    audio: { update: vi.fn(), sfx: vi.fn() },
+    audio: { update: vi.fn(), sfx: vi.fn(), setMusicDucked: vi.fn() },
     engine: { focus: vi.fn(() => ({})) },
     reader: fakeReader(sim),
     ui: {

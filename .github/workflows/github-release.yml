@@ -1,0 +1,141 @@
+name: GitHub release
+
+# Publishes the GitHub release for a version tag with that version's player
+# notes, then hands the tag to the sprite atlas workflow (sprite-atlas.yml),
+# which bakes the atlas and attaches it to this release on its own. The
+# release never waits for the atlas: a slow or failed bake leaves the release
+# published, and the atlas workflow can be re-run for the tag later.
+#
+# Release flow: a version tag (v<package.json version>, plain x.y.z) is the
+# publish signal. release-tag.yml creates it when a release PR merges and
+# dispatches this workflow (a tag created with the workflow token does not
+# start a tag-push run); a maintainer can also push one. A published release
+# is never edited: running this again for a published tag only re-dispatches
+# the atlas workflow, which attaches a missing atlas or audits an attached one.
+on:
+  push:
+    # Plain x.y.z version tags only; resolve re-checks the exact form.
+    tags: ["v*.*.*", "!v*-*", '!v*\+*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing version tag (v<version>) to publish"
+        required: true
+
+env:
+  PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: github-release-${{ github.event.inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  # Resolve the tag to its commit (a manual run checks out refs/tags/<tag>
+  # explicitly, so a branch of the same name can never stand in for it),
+  # check that it names the commit's own package.json version, and write the
+  # release notes from that commit's CHANGELOG.md.
+  #
+  # No concurrency group across tags on purpose: GitHub keeps one pending job
+  # per group, so a shared group would cancel a waiting publish when a third
+  # tag queued. Two tags published minutes apart can both claim Latest instead
+  # (docs/atlas.md).
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      actions: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/{0}', github.event.inputs.tag) || github.ref }}
+          persist-credentials: false
+
+      - name: Check the tag
+        env:
+          TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        run: |
+          sha="$(git rev-parse HEAD)"
+          tagged="$(git rev-parse --verify --quiet "refs/tags/$TAG^{commit}" || true)"
+          if [ "$sha" != "$tagged" ]; then echo "HEAD $sha is not tag $TAG ($tagged)."; exit 1; fi
+          version="$(node -p "require('./package.json').version")"
+          if [ "$TAG" != "v$version" ]; then echo "Tag $TAG does not match package.json version $version (expected v$version)."; exit 1; fi
+          # Plain releases only: a pre-release would publish as a full release,
+          # and build metadata (+) would change the atlas archive's name.
+          if ! printf '%s' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then echo "Tag $TAG is not a plain x.y.z version."; exit 1; fi
+
+      - name: Use Node.js (from .nvmrc)
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: ".nvmrc"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      # The release notes are this version's player notes, picked out of
+      # CHANGELOG.md by the game's own reader (src/changelog.ts), the one the
+      # update prompt uses, without the prompt's three-line and length caps.
+      # Each note is plain text, so releaseNoteLines escapes its Markdown
+      # characters and the page shows it as the prompt does.
+      # A version with no player notes (an internal build) gets a plain line.
+      - name: Write the release notes
+        env:
+          TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        run: |
+          mkdir -p release
+          VERSION="${TAG#v}" npx tsx -e 'import { readFileSync } from "node:fs"; import { releaseNoteLines } from "./src/changelog.ts"; for (const line of releaseNoteLines(readFileSync("CHANGELOG.md", "utf8"), process.env.VERSION ?? "")) console.log(line);' > release/notes.md
+          if ! grep -q '[^[:space:]]' release/notes.md; then
+            echo "::notice::CHANGELOG.md has no player notes for ${TAG#v}; the release notes are a plain line."
+            echo "Verticopolis ${TAG}." > release/notes.md
+          fi
+          printf '\nThe sprite atlas for this version (%s, with its SHA-256 checksum) is attached to this release by a separate workflow; see docs/atlas.md.\n' "verticopolis-atlas-${TAG}.zip" >> release/notes.md
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          # Every release for the tag, as "id draft" lines. The whole list is
+          # read before it is inspected, and an API error fails the step
+          # rather than reading as "no release".
+          list="$(gh api "repos/$GH_REPO/releases" --paginate --jq '.[] | select(.tag_name == env.TAG) | "\(.id) \(.draft)"')"
+          published="$(printf '%s\n' "$list" | awk '$2 == "false" { print $1 }')"
+          drafts="$(printf '%s\n' "$list" | awk '$2 == "true" { print $1 }')"
+          if [ -n "$published" ]; then
+            echo "Release $TAG is already published; leaving it as it is."
+            exit 0
+          fi
+          if [ "$(printf '%s\n' "$drafts" | grep -c .)" -gt 1 ]; then
+            echo "::error::Tag $TAG has more than one draft release; delete the extras and re-run."
+            exit 1
+          fi
+          # The release becomes Latest unless a higher version has already
+          # been released (a backport tagged later).
+          tags="$(gh api "repos/$GH_REPO/releases" --paginate --jq '.[] | select(.draft == false and .prerelease == false) | .tag_name')"
+          latest_tag="$(printf '%s\n' "$tags" | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n 1 || true)"
+          make_latest=true
+          if [ -n "$latest_tag" ] && [ "$(printf '%s\n%s\n' "$latest_tag" "$TAG" | sort -V | tail -n 1)" != "$TAG" ]; then make_latest=false; fi
+          if [ -n "$drafts" ]; then
+            # A draft left by an earlier attempt is published as it stands.
+            gh api -X PATCH "repos/$GH_REPO/releases/$drafts" -F draft=false -F prerelease=false -f name="$TAG" -f make_latest="$make_latest" -F body=@release/notes.md > /dev/null
+          else
+            gh api "repos/$GH_REPO/releases" -f tag_name="$TAG" -f name="$TAG" -F draft=false -F prerelease=false -f make_latest="$make_latest" -F body=@release/notes.md > /dev/null
+          fi
+          echo "Published $TAG."
+
+      # The atlas is its own workflow so its bake never holds up the release.
+      # A dispatch from the workflow token does start a run.
+      - name: Hand the tag to the sprite atlas workflow
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        run: |
+          gh workflow run sprite-atlas.yml --ref main -f tag="$TAG"
+          echo "Dispatched the sprite atlas for $TAG."
