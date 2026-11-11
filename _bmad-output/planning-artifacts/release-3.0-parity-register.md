@@ -391,7 +391,7 @@ included. One row per rule the game's comparison dialog
 ## 7. Test exclusions
 
 On this commit `src/tests/parity/exclusions.ratchet.txt` holds 5
-`itTypeScriptOnly` marks in 3 files and 9 `atEngineFrameCadence` calls in 4
+`itTypeScriptOnly` marks in 3 files and 7 `atEngineFrameCadence` calls in 3
 files, with no `onWasmParityProject` branches;
 `src/tests/parity/exclusions.guard.test.ts` pins each count to the source in
 both directions, and the test-mapping table in
@@ -430,8 +430,8 @@ this order under #878:
   relocation tests
   (`src/tests/integration/condoRelocationEngine.integration.test.ts`).
 
-`src/tests/tsEngineTests.ratchet.txt` lists 182 files that still drive the
-TypeScript engine directly (152 test files and 30 fixtures and helpers; the
+`src/tests/tsEngineTests.ratchet.txt` lists 174 files that still drive the
+TypeScript engine directly (148 test files and 26 fixtures and helpers; the
 list shrinks as tests convert and grows only with a reason the PR states, as
 when #1792, #1795, #1797 and #1800 added
 `src/tests/integration/segmentRoutingMealRush.integration.test.ts`,
@@ -441,7 +441,9 @@ when #1792, #1795, #1797 and #1800 added
 suites that author their towers on a `Simulation`, #1805 the port kit's
 TypeScript tooling, `src/tests/portKit/tsTooling.ts`, #1809 the two
 golden referees (gone again with #1421's in #1875's first step), and #1421 the fixture loader `src/tests/conformance/fixtureSim.ts`,
-moved out of the deleted dual-run harness), and `src/tests/portKit/converted.txt` lists 24 suites
+moved out of the deleted dual-run harness; #1875's test conversions then
+shrink it, the first by pinning the perf harnesses' towers as saves under
+`src/tests/perfCompare/towers/`), and `src/tests/portKit/converted.txt` lists 24 suites
 already on the port kit. #1421 deleted the hosted WASM projects
 (`integrationWasm` and `unitWasm`), so no suite runs on a hosted `Simulation`
 any more; the suites that start the Rust engine themselves run in

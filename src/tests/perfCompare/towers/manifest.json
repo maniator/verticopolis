@@ -1,0 +1,44 @@
+{
+  "small": {
+    "sha256": "8018a9e0591009070780a22ecf2209c57f72ee861217b58bc51574a1b5bd8c1f",
+    "population": 729,
+    "units": 2240,
+    "transports": 2
+  },
+  "bracket-a": {
+    "sha256": "069bfa319797b9c48253c6034820a148ce9b5182b90dfe1df3913873aa4aefe9",
+    "population": 1155,
+    "units": 3904,
+    "transports": 2
+  },
+  "bracket-b": {
+    "sha256": "a1d32b1098aea3c029c87eb66eb5171e09ae7c7f9ea4e52f6ee5eaedbc9b7190",
+    "population": 1803,
+    "units": 7222,
+    "transports": 4
+  },
+  "medium": {
+    "sha256": "159b444c6a652384d759b82c82cac50ac8251c2f64c51f851b27e0b15d4456de",
+    "population": 3219,
+    "units": 12062,
+    "transports": 15
+  },
+  "large": {
+    "sha256": "fe381e36acf1267fa088d40ab1ff65fcfa1605e217d291618253fc46b202b20e",
+    "population": 17314,
+    "units": 43358,
+    "transports": 5
+  },
+  "many-unit": {
+    "sha256": "b7e3ac2e813c58d725accb64a28b19f72ff849aa63ef7d7b9212fe8a548f3211",
+    "population": 504,
+    "units": 41880,
+    "transports": 88
+  },
+  "hotel-heavy": {
+    "sha256": "d402407ea9c48584e4d5ef63373a8344c89cd1f0cfa52d2535e7eeabaeb20f05",
+    "population": 1420,
+    "units": 10490,
+    "transports": 10
+  }
+}

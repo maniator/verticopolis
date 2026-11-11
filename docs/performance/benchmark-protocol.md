@@ -341,11 +341,14 @@ and large scenarios with their pinned scenario hashes.
 
 **Bracket and many-unit towers (#1270).** The three default towers are sized by
 people. Three more are named on purpose with `--scenarios` and never run by
-default, so an existing run keeps its meaning. Each is a save built in Node
-through the engine's own commands (every cap in `src/engine/facilities.ts`
-holds, and the floors, shafts and walkways are asserted; occupancy is written
-to the unit state, and the tests bound the people and units) and handed unchanged to both engines
-(`src/tests/perfCompare/fixtureTowers.ts`):
+default, so an existing run keeps its meaning. Each was built in Node
+through the engine's own commands (every cap held, and the floors, shafts and
+walkways were asserted; occupancy was written to the unit state). When the
+TypeScript engine was retired (#1875) the saves were pinned byte for byte in
+`src/tests/perfCompare/towers/`, beside a `manifest.json` that records each
+one's hash, people, units and transports; a file that no longer hashes to its
+record stops the run. A new tower is built in the game (a `VC_TOOLING=1`
+build's `game.sim`) or the Rust engine, saved there and pinned the same way:
 
 | Name | People | Units | Transports | Save bytes | What it is for |
 | --- | --- | --- | --- | --- | --- |

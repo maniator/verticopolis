@@ -1,13 +1,8 @@
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { Simulation } from "../../engine/Simulation";
-import { FACILITIES } from "../../engine/facilities";
 import type { SerializedGame } from "../../shared/serializedGame";
 import { decodeVctower } from "../../storage/vctowerContainer";
-import { buildWinningTower } from "../fixtures/winningTower";
-import { buildHotelTower } from "./fixtureHotelTower";
-import { buildBracketTower, buildManyUnitTower } from "./fixtureTowers";
 
 /** Every tower the harnesses can run, small to large by people with the
  *  special-purpose towers after them. A run with no
@@ -18,15 +13,15 @@ export type ScenarioName = (typeof SCENARIO_NAMES)[number];
 export const DEFAULT_SCENARIOS: readonly ScenarioName[] = ["small", "medium", "large"];
 
 /**
- * The towers the engine comparison runs (issue #972; #1270 added three). Each one is a
- * save, built or decoded here in Node and handed unchanged to both engines,
- * so the two start from the same bytes. None carries a crowd (saves never
- * do), so both engines grow their crowd from the same empty start.
+ * The towers the harnesses run (issue #972; #1270 added three). Each one is a
+ * committed save, decoded here in Node and handed unchanged to the page, so
+ * every run starts from the same bytes. None carries a crowd (saves never
+ * do), so each run grows its crowd from the same empty start.
  */
 export interface Scenario {
   name: ScenarioName;
   description: string;
-  /** The save as JSON text, exactly as both engines receive it. */
+  /** The save as JSON text, exactly as the engine receives it. */
   save: string;
   /** SHA-256 of `save`, recorded so a report names the exact input. */
   sha256: string;
@@ -37,88 +32,52 @@ export interface Scenario {
 
 const REPO_ROOT = resolve(import.meta.dirname, "../../..");
 
-/** A small, fully occupied 15-floor tower: two elevators, a row of offices
- *  (or, every third floor, condos) on floors 3 to 15, one fast food. Deterministic (seeded founding, no ticks). */
-export function buildSmallTower(): Simulation {
-  const sim = Simulation.newGame(7, "classic");
-  const t = sim.tower;
-  sim.money = 1_000_000_000;
-  const left = 120;
-  const right = 260;
-  // Every placement is asserted, so a rule change that refuses one fails
-  // here instead of quietly benchmarking a smaller tower than described.
-  const must = (kind: Parameters<typeof t.place>[0], floor: number, x: number): void => {
-    const r = t.place(kind, floor, x);
-    if (!r.ok) throw new Error(`small tower: ${kind} at floor ${floor}, x ${x} refused: ${r.reason}`);
-  };
-  for (let x = left; x < right; x++) must("lobby", 1, x);
-  for (let f = 2; f <= 15; f++) for (let x = left; x < right; x++) must("floor", f, x);
-  for (const x of [left, right - FACILITIES.elevatorStandard.width]) {
-    const r = t.placeTransport("elevatorStandard", x, 1, 15);
-    if (!r.ok) throw new Error(`small tower: elevator at ${x} refused: ${r.reason}`);
-  }
-  for (let f = 3; f <= 15; f++) {
-    const kind = f % 3 === 0 ? "condo" : "office";
-    const w = FACILITIES[kind].width;
-    for (let x = left + 8; x + w <= right - 8; x += w) must(kind, f, x);
-  }
-  must("fastFood", 2, left + 10);
-  for (const u of t.units) {
-    if (u.kind === "office" || u.kind === "condo") {
-      u.state = "occupied";
-      u.everOccupied = true;
-      u.satisfaction = 1;
-    }
-  }
-  sim.evaluateStar();
-  return sim;
-}
-
-/** The repository's deterministic TOWER-scale fixture (the Tier-1 win
- *  tower): 100 floors, five elevator bands, about 17,000 occupants. */
-export function buildLargeTower(): Simulation {
-  const sim = Simulation.newGame(1, "classic");
-  buildWinningTower(sim);
-  sim.evaluateStar();
-  return sim;
-}
-
-/** A committed player-built fixture, decoded the way the import path does. */
+/** A committed tower file, decoded the way the import path does. */
 export function loadFixtureSave(file: string): SerializedGame {
   return decodeVctower(readFileSync(resolve(REPO_ROOT, file), "utf8"), file) as SerializedGame;
 }
 
-function describeSave(name: Scenario["name"], description: string, data: SerializedGame): Scenario {
-  const save = JSON.stringify(data);
-  const sim = Simulation.deserialize(JSON.parse(save) as SerializedGame);
-  return {
-    name,
-    description,
-    save,
-    sha256: createHash("sha256").update(save, "utf8").digest("hex"),
-    population: sim.population,
-    units: sim.tower.units.length,
-    transports: sim.tower.transports.length,
-  };
+/** What `towers/manifest.json` records for each tower: the hash of its save
+ *  text and the counts a report prints beside it. */
+export interface PinnedTower {
+  sha256: string;
+  population: number;
+  units: number;
+  transports: number;
 }
 
-/** The bracket towers' sizes: geometric steps between small (729 people, 2,240
- *  units, 15 floors) and medium (3,240, 12,062, 78), so the size threshold is
- *  read off a curve. */
-const BRACKETS = {
-  "bracket-a": { seed: 11, floors: 26, population: 1150 },
-  "bracket-b": { seed: 11, floors: 48, population: 1800 },
-} as const;
+/** The pinned towers' records, read once. */
+export function pinnedTowers(): Record<ScenarioName, PinnedTower> {
+  return JSON.parse(readFileSync(resolve(import.meta.dirname, "towers/manifest.json"), "utf8")) as Record<ScenarioName, PinnedTower>;
+}
 
-const BUILDERS: Record<ScenarioName, () => Scenario> = {
-  small: () => describeSave("small", "synthetic 15-floor tower (scripts: buildSmallTower)", buildSmallTower().serialize()),
-  "bracket-a": () => describeSave("bracket-a", "bracket tower: 26 floors, about 1,150 people (fixtureTowers: buildBracketTower)", buildBracketTower(BRACKETS["bracket-a"]).serialize()),
-  "bracket-b": () => describeSave("bracket-b", "bracket tower: 48 floors, about 1,800 people (fixtureTowers: buildBracketTower)", buildBracketTower(BRACKETS["bracket-b"]).serialize()),
-  medium: () => describeSave("medium", "player fixture conformance/fixtures/sixseven_2.vctower", loadFixtureSave("conformance/fixtures/sixseven_2.vctower")),
-  large: () => describeSave("large", "Tier-1 win tower (src/tests/fixtures/winningTower.ts)", buildLargeTower().serialize()),
-  "many-unit": () => describeSave("many-unit", "many units, few people: the large tower's shell with about 500 people (fixtureTowers: buildManyUnitTower)", buildManyUnitTower({ seed: 13, population: 500 }).serialize()),
-  "hotel-heavy": () => describeSave("hotel-heavy", "Modern hotel tower: 852 rooms, 24 housekeeping units, a split staff network and a wing no crew can route to (fixtureHotelTower: buildHotelTower)", buildHotelTower({ seed: 21, floors: 62, crews: 24 }).serialize()),
+/**
+ * Each tower is a committed save. The synthetic ones (all but medium) were
+ * built by TypeScript builders that issued the engine's own placement
+ * commands; when the TypeScript engine was retired (#1875) their saves were
+ * pinned byte for byte under `towers/`, so every recorded run keeps naming
+ * the same input by its hash. A file that no longer hashes to its record
+ * stops the run here instead of quietly measuring another tower.
+ */
+const TOWERS: Record<ScenarioName, { file: string; description: string }> = {
+  small: { file: "src/tests/perfCompare/towers/small.vctower", description: "synthetic 15-floor tower (towers/small.vctower)" },
+  "bracket-a": { file: "src/tests/perfCompare/towers/bracket-a.vctower", description: "bracket tower: 26 floors, about 1,150 people (towers/bracket-a.vctower)" },
+  "bracket-b": { file: "src/tests/perfCompare/towers/bracket-b.vctower", description: "bracket tower: 48 floors, about 1,800 people (towers/bracket-b.vctower)" },
+  medium: { file: "conformance/fixtures/sixseven_2.vctower", description: "player fixture conformance/fixtures/sixseven_2.vctower" },
+  large: { file: "src/tests/perfCompare/towers/large.vctower", description: "Tier-1 win tower (towers/large.vctower)" },
+  "many-unit": { file: "src/tests/perfCompare/towers/many-unit.vctower", description: "many units, few people: the large tower's shell with about 500 people (towers/many-unit.vctower)" },
+  "hotel-heavy": { file: "src/tests/perfCompare/towers/hotel-heavy.vctower", description: "Modern hotel tower: 852 rooms, 24 housekeeping units, a split staff network and a wing no crew can route to (towers/hotel-heavy.vctower)" },
 };
+
+/** One tower, checked against its record. */
+export function loadScenario(name: ScenarioName, pinned: PinnedTower | undefined): Scenario {
+  const { file, description } = TOWERS[name];
+  if (pinned === undefined) throw new Error(`${name}: towers/manifest.json has no record for ${file}`);
+  const save = JSON.stringify(loadFixtureSave(file));
+  const sha256 = createHash("sha256").update(save, "utf8").digest("hex");
+  if (sha256 !== pinned.sha256) throw new Error(`${name}: ${file} hashes to ${sha256}, but towers/manifest.json records ${pinned.sha256}`);
+  return { name, description, save, sha256, population: pinned.population, units: pinned.units, transports: pinned.transports };
+}
 
 /** The names that are not a tower the harnesses can run. */
 export function unknownScenarios(names: readonly string[]): string[] {
@@ -130,5 +89,6 @@ export function unknownScenarios(names: readonly string[]): string[] {
  *  `unknownScenarios` first. */
 export function buildScenarios(names?: readonly string[] | null): Scenario[] {
   const wanted = names ?? DEFAULT_SCENARIOS;
-  return SCENARIO_NAMES.filter((n) => wanted.includes(n)).map((n) => BUILDERS[n]());
+  const pinned = pinnedTowers();
+  return SCENARIO_NAMES.filter((n) => wanted.includes(n)).map((n) => loadScenario(n, pinned[n]));
 }

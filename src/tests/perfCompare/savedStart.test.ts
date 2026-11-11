@@ -1,12 +1,13 @@
 // @vitest-environment node
 // Node, as in the runner and main.ts, which pack and check the seeds.
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { SaveGame } from "../../storage/SaveGame";
 import { AUTOSAVE_KEY, autosaveSeed, autosaveState, checkAutosaveSeeds } from "./savedStart";
-import { buildSmallTower } from "./scenarios";
+import { buildScenarios } from "./scenarios";
 
 const small = () => {
-  const sim = buildSmallTower();
-  return { name: "small" as const, save: JSON.stringify(sim.serialize()), population: sim.population };
+  const [sc] = buildScenarios(["small"]);
+  return { name: sc.name, save: sc.save, population: sc.population };
 };
 
 describe("autosaveSeed", () => {
@@ -24,9 +25,9 @@ describe("autosaveSeed", () => {
     const sc = small();
     const first = autosaveSeed(sc);
     expect(autosaveSeed({ ...sc })).toBe(first);
-    const other = buildSmallTower();
+    const other = JSON.parse(sc.save) as { money: number };
     other.money += 1;
-    const second = autosaveSeed({ save: JSON.stringify(other.serialize()) });
+    const second = autosaveSeed({ save: JSON.stringify(other) });
     expect(second.sha256).not.toBe(first.sha256);
   });
 });
@@ -34,7 +35,13 @@ describe("autosaveSeed", () => {
 describe("checkAutosaveSeeds", () => {
   it("stops the run before any browser when a seed would not boot the scenario's tower", () => {
     const sc = small();
-    expect(() => checkAutosaveSeeds([{ ...sc, population: sc.population + 1 }])).toThrow(/small: the autosave seed does not load back \(population \d+, the save \d+\)/);
+    // A packed value the boot cannot read (a fresh save text, so no seed is cached).
+    const pack = vi.spyOn(SaveGame, "packSync").mockReturnValue("VCZ1:not a packed save");
+    try {
+      expect(() => checkAutosaveSeeds([{ ...sc, save: `${sc.save} ` }])).toThrow(/small: the autosave seed does not load back \(no tower, read as corrupt\)/);
+    } finally {
+      pack.mockRestore();
+    }
     expect(() => checkAutosaveSeeds([{ ...sc, population: 0 }])).toThrow(/needs a tower with people in it/);
   });
 });
