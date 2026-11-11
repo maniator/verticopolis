@@ -13,12 +13,21 @@
  * have committed pairs the `/help` page reuses; the data/math divergences stay
  * caption-only per media-plan.md.
  *
+ * The theater card pair (#1932): Modern books a film each period (the
+ * Booking button), Classic shows the film's days and the buttons that change
+ * it, as in the original.
+ *
  * Split into two scenes (not two shots in one) because the runner keys
  * deviceScaleFactor on the SCENE's outDir; both are `features` so the pair mints
  * at the same 2x scale, the pricing and schedule pairs' precedent.
  */
 import { type Scene } from "../screenshot-env.ts";
-import { buildEscalatorOfficeModern, buildEscalatorOfficeClassic } from "../screenshot-builders.ts";
+import {
+  buildEscalatorOfficeModern,
+  buildEscalatorOfficeClassic,
+  buildCinemaModern,
+  buildCinemaClassic,
+} from "../screenshot-builders.ts";
 
 export const CLASSIC_VS_MODERN_SCENES: Scene[] = [
   {
@@ -64,6 +73,66 @@ export const CLASSIC_VS_MODERN_SCENES: Scene[] = [
           });
         },
         wait: 400,
+      },
+    ],
+  },
+  {
+    id: "compare-cinema-modern",
+    outDir: "features",
+    build: buildCinemaModern,
+    assertUnits: 3,
+    shots: [
+      {
+        // The theater's card under Modern: the film row and the Booking
+        // button. Fail closed if the Classic film buttons rendered instead.
+        name: "cinema-card-modern",
+        crop: "#editor",
+        clock: 10,
+        setup: async (page) => {
+          await page.evaluate(() => {
+            const g = (window as unknown as { game: any }).game;
+            const cinema = g.sim.tower.units.find((u: any) => u.kind === "cinema");
+            if (!cinema) throw new Error("Modern tower has no theater to select");
+            g.selected = { type: "unit", id: cinema.id };
+            g.engine.selectedId = cinema.id;
+            g.refreshEditor();
+          });
+          await page.waitForSelector('#editor [data-edit="filmPolicy"]', { timeout: 4000 });
+          await page.evaluate(() => {
+            if (document.querySelector('#editor [data-edit="newFilm"]')) throw new Error("Modern card shows the Classic film buttons");
+          });
+        },
+        wait: 300,
+      },
+    ],
+  },
+  {
+    id: "compare-cinema-classic",
+    outDir: "features",
+    build: buildCinemaClassic,
+    assertUnits: 3,
+    shots: [
+      {
+        // The same theater under Classic: the film, its days, and a new film
+        // or a classic at the catalog's prices. No booking control.
+        name: "cinema-card-classic",
+        crop: "#editor",
+        clock: 10,
+        setup: async (page) => {
+          await page.evaluate(() => {
+            const g = (window as unknown as { game: any }).game;
+            const cinema = g.sim.tower.units.find((u: any) => u.kind === "cinema");
+            if (!cinema) throw new Error("Classic tower has no theater to select");
+            g.selected = { type: "unit", id: cinema.id };
+            g.engine.selectedId = cinema.id;
+            g.refreshEditor();
+          });
+          await page.waitForSelector('#editor [data-edit="newFilm"]', { timeout: 4000 });
+          await page.evaluate(() => {
+            if (document.querySelector('#editor [data-edit="filmPolicy"]')) throw new Error("Classic card shows the Modern booking control");
+          });
+        },
+        wait: 300,
       },
     ],
   },
