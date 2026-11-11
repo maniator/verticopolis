@@ -205,6 +205,31 @@ test.describe("dialog chrome", () => {
     await expect(page.locator("#modal .modal-box")).toHaveScreenshot("update-prompt-notes.png");
   });
 
+  test("update prompt with several skipped versions matches baseline", async ({ page }) => {
+    // A player who skipped versions sees each unseen version's notes, newest
+    // first, in a log that scrolls in place once it is taller than its cap
+    // (#1897). Four versions overflow the cap, so the baseline pins both the
+    // per-version headings and the scroll well. Deterministic stub info.
+    await page.evaluate(() =>
+      (window as any).game.onUpdateAvailable(async () => {}, {
+        version: "1.4.0",
+        sha: "abc1234",
+        notes: ["Offices pay rent on time more often."],
+        since: "1.0.0",
+        releases: [
+          { version: "1.4.0", notes: ["Offices pay rent on time more often."] },
+          { version: "1.3.0", notes: ["Elevators pick up waiting riders more reliably.", "Condos sell for more as your tower's rating climbs."] },
+          { version: "1.2.0", notes: ["Modern towers now draw families of two to five."] },
+          { version: "1.1.0", notes: ["The Map opens on the view you used last."] },
+        ],
+      }),
+    );
+    await page.waitForSelector("#modal[open]");
+    await expect(page.locator("#modal .whatsnew-ver")).toHaveCount(4);
+    await page.evaluate(() => ((window as any).game.setSpeed(0)));
+    await expect(page.locator("#modal .modal-box")).toHaveScreenshot("update-prompt-skipped-versions.png");
+  });
+
   test("deferred update chip matches baseline", async ({ page }) => {
     // Find an update, then choose "Later" — the deferred state where the modal
     // is gone but the "↻ Update" chip stays in the speed toolbar as the way back

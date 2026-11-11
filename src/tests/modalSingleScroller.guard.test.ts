@@ -211,12 +211,17 @@ describe("one scroll container per dialog", () => {
     }
   });
 
-  it("gives the dialog subtree exactly one vertical scroller: .modal-box", () => {
+  it("gives the dialog subtree one vertical scroller, .modal-box, plus the ratified notes log", () => {
     // The #513 and #717 regressions were both a SECOND live vertical scroll
     // container inside an already-scrolling dialog. Whatever else a dialog
-    // needs, its base cascade may scroll exactly one element.
+    // needs, its base cascade may scroll exactly one element. The one
+    // ratified exception is the update prompt's log of skipped versions'
+    // notes (#1897): the owner asked for a long log to scroll in place, and
+    // its cap (min(200px, 22vh)) keeps that small dialog under the box's
+    // 82vh, so in practice only one scroller is live. The same reasoning as
+    // the .es-grid well (#513).
     const scrollers = ALL_RULES.filter((r) => !r.conditional && inDialogSubtree(r.selector) && scrollsVertically(r.body));
-    expect(scrollers.map((r) => r.selector)).toEqual([".modal-box"]);
+    expect(scrollers.map((r) => r.selector)).toEqual([".modal-box", ".whatsnew-log"]);
   });
 
   it("lets media blocks re-scroll only the ratified schedule-grid well", () => {

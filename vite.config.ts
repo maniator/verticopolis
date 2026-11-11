@@ -4,10 +4,10 @@ import { resolve } from "node:path";
 import { existsSync, readFileSync } from "node:fs";
 import { execSync } from "node:child_process";
 import { VitePWA } from "vite-plugin-pwa";
-import { notesForVersion } from "./src/changelog";
+import { notesForVersion, recentReleaseNotes, type ReleaseNotes } from "./src/changelog";
 import { PACKAGE_STYLESHEET, isPackagePath } from "./src/build/thirdPartyNotices";
 import { entryWithIntegrity, precacheIntegrityTransform, readExpectedPackage } from "./src/build/enginePackageBuild";
-import type { BuildFingerprint } from "./src/pwaUpdateInfo";
+import { MAX_RELEASES, type BuildFingerprint } from "./src/pwaUpdateInfo";
 import { tsEngineSourceHash } from "./src/build/tsEngineSources";
 import { ENGINE_PRELOAD_FILES, enginePreloadAttrs } from "./src/build/enginePreload";
 import { ENGINE_BUILD_RECORD, ENGINE_DIR } from "./src/wasmhost/enginePackageNames";
@@ -21,6 +21,17 @@ const pkgVersion = JSON.parse(readFileSync(resolve(__dirname, "package.json"), "
 function changelogNotes(): string[] {
   try {
     return notesForVersion(readFileSync(resolve(__dirname, "CHANGELOG.md"), "utf8"), pkgVersion);
+  } catch {
+    return [];
+  }
+}
+
+/** The notes of this version and the ones before it, newest first, so a client
+ *  that skipped versions can show what it missed (#1897). Empty when the file
+ *  is missing or names no section for this version. */
+function changelogReleases(): ReleaseNotes[] {
+  try {
+    return recentReleaseNotes(readFileSync(resolve(__dirname, "CHANGELOG.md"), "utf8"), pkgVersion, MAX_RELEASES);
   } catch {
     return [];
   }
@@ -118,7 +129,9 @@ function captureOutDir(set: (dir: string) => void): Plugin {
  * Workbox's `globPatterns` does not match, so it is never precached and is
  * always fetched network-fresh. `notes` is the player-facing "What's new" list,
  * read from the CHANGELOG.md section matching this version (see `changelogNotes`
- * and CONTRIBUTING.md → "Player notes").
+ * and CONTRIBUTING.md → "Player notes"). `releases` carries this version's and
+ * the previous versions' notes, so a client that skipped versions shows all of
+ * them; `notes` stays for clients built before `releases` existed.
  */
 function emitVersionJson(fingerprint: BuildFingerprint): Plugin {
   return {
@@ -128,7 +141,7 @@ function emitVersionJson(fingerprint: BuildFingerprint): Plugin {
       this.emitFile({
         type: "asset",
         fileName: "version.json",
-        source: JSON.stringify({ version: pkgVersion, sha: gitShortSha(), notes: changelogNotes(), shell: fingerprint.shell, engine: fingerprint.engine }),
+        source: JSON.stringify({ version: pkgVersion, sha: gitShortSha(), notes: changelogNotes(), releases: changelogReleases(), shell: fingerprint.shell, engine: fingerprint.engine }),
       });
     },
   };

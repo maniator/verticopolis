@@ -2,8 +2,8 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { marked } from "marked";
-import { escapeMarkdown, notesForVersion, releaseNoteLines } from "./changelog";
-import { MAX_NOTES, MAX_NOTE_LEN } from "./pwaUpdateInfo";
+import { escapeMarkdown, notesForVersion, recentReleaseNotes, releaseNoteLines } from "./changelog";
+import { MAX_NOTES, MAX_NOTE_LEN, MAX_RELEASES } from "./pwaUpdateInfo";
 
 /**
  * The build-time reader that turns the committed CHANGELOG.md into the update
@@ -201,5 +201,50 @@ describe("releaseNoteLines", () => {
   it("leaves plain prose as it reads", () => {
     const prose = "Elevators pick up riders faster, at 3:00 p.m. (mostly).";
     expect(escapeMarkdown(prose)).toBe(prose);
+  });
+});
+
+describe("recentReleaseNotes (#1897)", () => {
+  const LOG = `# Changelog
+
+## 3.0.2
+
+- Second patch.
+
+## 3.0.1
+
+## 3.0.0
+
+- Headline.
+- Second line.
+
+## 2.90.0
+
+- Older.
+`;
+
+  it("returns this version and the ones before it, newest first, skipping a section with no notes", () => {
+    expect(recentReleaseNotes(LOG, "3.0.2", 10)).toEqual([
+      { version: "3.0.2", notes: ["Second patch."] },
+      { version: "3.0.0", notes: ["Headline.", "Second line."] },
+      { version: "2.90.0", notes: ["Older."] },
+    ]);
+  });
+
+  it("starts at the given version and stops after count sections with notes", () => {
+    expect(recentReleaseNotes(LOG, "3.0.0", 1)).toEqual([{ version: "3.0.0", notes: ["Headline.", "Second line."] }]);
+  });
+
+  it("returns [] when the version has no section", () => {
+    expect(recentReleaseNotes(LOG, "9.9.9", 10)).toEqual([]);
+  });
+
+  it("reads the real CHANGELOG.md with the current version first", () => {
+    const real = readFileSync(resolve(__dirname, "..", "CHANGELOG.md"), "utf8");
+    const version = JSON.parse(readFileSync(resolve(__dirname, "..", "package.json"), "utf8")).version as string;
+    const releases = recentReleaseNotes(real, version, MAX_RELEASES);
+    expect(releases[0]?.version).toBe(version);
+    expect(releases.length).toBe(MAX_RELEASES);
+    for (const r of releases) expect(r.notes.length).toBeGreaterThan(0);
   });
 });

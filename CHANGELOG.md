@@ -2,8 +2,11 @@
 
 Player-facing release notes. Each `## <version>` section lists the lines shown
 in the in-game "What's new" update prompt for that build: the build reads the
-section matching `package.json` `version` into `dist/version.json` `notes` (see
-`emitVersionJson` in `vite.config.ts`). Only genuinely player-noticeable changes
+section matching `package.json` `version` into `dist/version.json` `notes`, and
+that section plus the sections below it (ten with notes in all) into `releases`
+(see `emitVersionJson` in `vite.config.ts`). A player who skipped versions sees
+each version newer than the one they ran, newest first, and never a version's
+notes twice. Only genuinely player-noticeable changes
 earn a line. Internal, tooling, perf, and refactor work gets none, and that build
 simply shows the build-id line. At most three lines are shown; keep to the few
 that matter, written as a player outcome in a calm voice (see CONTRIBUTING.md
@@ -18,8 +21,7 @@ here. A change to the engine's contract alone gets only a crate entry; the updat
 prompt already tells players it is an engine update and shows the new version.
 
 Entries below 1.51.1 were curated from the commit history after the fact, so they
-are documentation only: a client only ever fetches the currently deployed build's
-notes, never a past version's.
+are documentation only: no build that a client fetches carries them.
 
 ## 3.0.0
 
