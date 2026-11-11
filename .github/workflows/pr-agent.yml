@@ -16,6 +16,11 @@ permissions:
 jobs:
   pr-agent:
     name: Review and requested code suggestions
+    # Only commands whose usage the cost ledger can read: /review and /improve
+    # publish an "Agent run details" block in an issue comment. /describe
+    # writes it into the PR description, which also overwrites the description
+    # the owner maintains, and /ask is not known to publish one. /help and
+    # /config call no model.
     if: >-
       github.event.sender.type != 'Bot' &&
       github.event.issue.pull_request &&
@@ -23,8 +28,6 @@ jobs:
       (
         startsWith(github.event.comment.body, '/review') ||
         startsWith(github.event.comment.body, '/improve') ||
-        startsWith(github.event.comment.body, '/ask') ||
-        startsWith(github.event.comment.body, '/describe') ||
         startsWith(github.event.comment.body, '/help') ||
         startsWith(github.event.comment.body, '/config')
       )

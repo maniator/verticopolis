@@ -19,8 +19,11 @@ ChatGPT subscription. No OpenAI organization ID or other variable is required.
   runs against 80 requested ones), so the workflow no longer listens to
   pull request events at all.
 - Trusted repo owners, members and collaborators comment `/review` for a
-  review, `/improve` for **committable inline suggestions**,
-  `/ask "question"` for focused PR analysis, and `/describe` on demand.
+  review and `/improve` for **committable inline suggestions**. `/help` and
+  `/config` also work and call no model. `/ask` and `/describe` are not wired
+  up: `/describe` puts its usage in the PR description (and rewrites it), and
+  the cost ledger and the spending cap cannot see usage that is not in an
+  issue comment. Adding one back means teaching the ledger to read its usage.
 - `/improve` **proposes changes for a human to apply**; it does not push
   changes to the branch. This workflow runs in restricted mode and never
   checks out, installs or executes untrusted PR code.
