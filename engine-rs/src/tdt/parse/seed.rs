@@ -3,6 +3,7 @@
 use std::collections::HashMap;
 
 use super::OutUnit;
+use crate::crowd::fasthash::FastMap;
 use crate::economy::visitors::counts_daily_visitors;
 use crate::facilities::Kind;
 use crate::tdt::format::TDT_FLOOR_OFFSET;
@@ -111,7 +112,7 @@ pub(super) fn seed_visitors(units: &mut [serde_json::Value], tdt: &TdtTower) {
     // One pass over the units: each counted venue's floor and span, keyed by
     // floor, so a row looks at its own floor's few venues and never at the
     // tower's thousands of floor tiles.
-    let mut venues: HashMap<i64, Vec<(usize, i64, i64)>> = HashMap::new();
+    let mut venues: FastMap<i64, Vec<(usize, i64, i64)>> = FastMap::default();
     for (i, u) in units.iter().enumerate() {
         let counted = u
             .get("kind")
@@ -123,10 +124,14 @@ pub(super) fn seed_visitors(units: &mut [serde_json::Value], tdt: &TdtTower) {
         }
         let field = |k: &str| u.get(k).and_then(serde_json::Value::as_i64);
         if let (Some(f), Some(x), Some(w)) = (field("floor"), field("x"), field("width")) {
-            venues.entry(f).or_default().push((i, x, x + w));
+            venues.get_or_insert_with(f, Vec::new).push((i, x, x + w));
         }
     }
-    let floors: HashMap<i64, &TdtFloor> = tdt.floors.iter().map(|f| (f.index, f)).collect();
+    let mut floors: FastMap<i64, &TdtFloor> = FastMap::default();
+    for f in &tdt.floors {
+        // The first floor with an index wins, as a search would find it.
+        floors.get_or_insert_with(f.index, || f);
+    }
     for row in &tdt.tail.retail {
         let Some(floor) = floors.get(&i64::from(row.floor)) else {
             continue;
