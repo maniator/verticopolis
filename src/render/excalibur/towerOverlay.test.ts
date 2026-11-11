@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { FLOOR, TILE } from "../scale";
 import {
   drawOverlay,
   syncEventFx,
@@ -206,8 +207,19 @@ describe("preview and selection painters", () => {
     e.sim.tower.getUnit = () => undefined;
     e.sim.tower.getTransport = () => ({ kind: "elevatorStandard", x: 100, width: 4, top: 20, bottom: 4 });
     drawOverlay(e, s.ctx);
-    expect(e.arrowHit.up).toBeTruthy();
-    expect(e.arrowHit.down).toBeTruthy();
+    // Shaft at tile 100, 4 tiles wide, floors 4..20, zoom 1: the tabs center on
+    // the shaft just past each end, and each hit rect pads its tab by 4 px.
+    const cx = 100 + (4 * TILE) / 2;
+    const tabW = Math.min(4 * TILE, 18);
+    const top = 300 - 20;
+    const bottom = top + 17 * FLOOR;
+    expect(e.arrowHit).toEqual({
+      up: { x: cx - tabW / 2 - 4, y: top - 11 - 3 - 4, w: tabW + 8, h: 19 },
+      down: { x: cx - tabW / 2 - 4, y: bottom + 3 - 4, w: tabW + 8, h: 19 },
+    });
+    // Both tabs are drawn where their hit rects sit.
+    expect(s.log).toContain(`fillRect:${JSON.stringify([cx - tabW / 2, top - 11 - 3, tabW, 11])}`);
+    expect(s.log).toContain(`fillRect:${JSON.stringify([cx - tabW / 2, bottom + 3, tabW, 11])}`);
   });
 
   it("selecting a non-elevator shaft outlines it but grows no arrows", () => {
