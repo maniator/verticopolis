@@ -435,7 +435,9 @@ jobs:
     # Not a required check. It runs in three shards on three runners, since one
     # worker on one runner took 13 to 18 minutes, the longest job on a pull
     # request. Each shard keeps one worker (see playwright.config.ts), so the
-    # specs keep the timing they expect.
+    # specs keep the timing they expect. The e2e-wasm-only-result job below
+    # reports the three shards as one e2e-wasm-only check.
+    name: e2e-wasm-only (shard ${{ matrix.shard }} of 3)
     needs: [changes, resolve-image, engine-wasm]
     # As the e2e job: skipped only for a prose-only change. It is not a
     # required check, so a merge queue run skips it; the pull request's own run
@@ -545,3 +547,28 @@ jobs:
           name: playwright-wasm-only-results-${{ matrix.shard }}
           path: test-results/
           if-no-files-found: ignore
+
+  # One check for the three browser-suite shards: green when every shard
+  # passed, or when the suite was skipped on purpose (a prose-only change or a
+  # merge queue run); red when a shard failed or was cancelled, or when the
+  # shards were skipped because a job they need failed. It does not run when
+  # the whole workflow run is cancelled (a newer push supersedes it), so a
+  # superseded run leaves no red check behind.
+  e2e-wasm-only-result:
+    name: e2e-wasm-only
+    needs: [changes, e2e-wasm-only]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Every shard passed, or the suite was skipped on purpose
+        env:
+          SHARDS: ${{ needs.e2e-wasm-only.result }}
+          CODE: ${{ needs.changes.outputs.code }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          echo "e2e-wasm-only shards: $SHARDS (code changed: $CODE, event: $EVENT)"
+          if [ "$SHARDS" = skipped ] && { [ "$CODE" = false ] || [ "$EVENT" = merge_group ]; }; then
+            exit 0
+          fi
+          test "$SHARDS" = success

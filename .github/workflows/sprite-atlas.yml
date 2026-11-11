@@ -1,0 +1,183 @@
+name: Sprite atlas
+
+# Builds the sprite atlas archive (scripts/export-atlas.ts, issue #909) for a
+# version tag and attaches it, with a SHA-256 checksum, to that tag's GitHub
+# release, so any frontend on the open engine can fetch the art for the exact
+# commit it pins. Nothing generated is committed. The bake runs inside the
+# pinned Playwright image (the same Chromium the screenshot workflows use), so
+# the pixels and the checksum are reproducible.
+#
+# The release itself comes from github-release.yml, which publishes it first
+# and then dispatches this workflow, so the atlas never delays or blocks a
+# release. This workflow only adds assets. When the tag's release already
+# carries both files, a run is an audit: it checks the attached zip against
+# its checksum, re-bakes, and fails on any difference. A maintainer can run it
+# by hand for a tag whose bake failed.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing version tag (v<version>) to attach or audit the atlas for"
+        required: true
+
+env:
+  PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sprite-atlas-${{ github.event.inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  # Resolve the tag to its commit (checking out refs/tags/<tag> explicitly, so
+  # a branch of the same name can never stand in for it), check that it names
+  # the commit's own package.json version, and pick the Playwright image from
+  # that commit's lockfile. A wrong tag fails here, before any container pull
+  # or install.
+  resolve:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      image: ${{ steps.pin.outputs.image }}
+      sha: ${{ steps.pin.outputs.sha }}
+      tag: ${{ steps.pin.outputs.tag }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ format('refs/tags/{0}', github.event.inputs.tag) }}
+          persist-credentials: false
+      - id: pin
+        env:
+          TAG: ${{ github.event.inputs.tag }}
+        run: |
+          sha="$(git rev-parse HEAD)"
+          tagged="$(git rev-parse --verify --quiet "refs/tags/$TAG^{commit}" || true)"
+          if [ "$sha" != "$tagged" ]; then echo "HEAD $sha is not tag $TAG ($tagged)."; exit 1; fi
+          version="$(node -p "require('./package.json').version")"
+          if [ "$TAG" != "v$version" ]; then echo "Tag $TAG does not match package.json version $version (expected v$version)."; exit 1; fi
+          # Build metadata (+) or a pre-release suffix would change the
+          # archive's name; the release workflow only publishes plain x.y.z.
+          if ! printf '%s' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then echo "Tag $TAG is not a plain x.y.z version."; exit 1; fi
+          ver=$(node -e "const l=require('./package-lock.json');const p=l.packages&&l.packages['node_modules/playwright'];process.stdout.write((p&&p.version)||require('./package.json').devDependencies.playwright.replace(/[^0-9.]/g,''))")
+          echo "image=mcr.microsoft.com/playwright:v${ver}-jammy" >> "$GITHUB_OUTPUT"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: resolve
+    runs-on: ubuntu-latest
+    # A full bake takes about eight minutes; anything near this is a hang.
+    timeout-minutes: 45
+    container:
+      image: ${{ needs.resolve.outputs.image }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.resolve.outputs.sha }}
+          persist-credentials: false
+
+      # The image ships an older Node; install the repo's pinned one over it.
+      - name: Use Node.js (from .nvmrc)
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: ".nvmrc"
+
+      # git refuses a workspace owned by another user inside the container;
+      # the export reads the commit it records from git.
+      - name: Trust the workspace
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      - name: Install dependencies
+        run: npm ci
+
+      # The export launches Playwright's own Chromium from the image (the
+      # binary the e2e comparison uses), checks the atlas against the game's
+      # paint for the sample signatures, bakes, checks the packed pages, and
+      # writes the archive named after the tag.
+      - name: Bake the atlas in the pinned Chromium
+        env:
+          TAG: ${{ needs.resolve.outputs.tag }}
+        run: npm run atlas -- --out dist-atlas --label "$TAG"
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: sprite-atlas
+          path: dist-atlas/
+          if-no-files-found: error
+
+  attach:
+    needs: [resolve, build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: sprite-atlas
+          path: dist-atlas
+
+      - name: Check the checksum after the transfer
+        working-directory: dist-atlas
+        run: sha256sum --check ./*.sha256
+
+      - name: Attach to the release, or audit what is attached
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ needs.resolve.outputs.tag }}
+        run: |
+          set -euo pipefail
+          zip="dist-atlas/verticopolis-atlas-${TAG}.zip"
+          sum="${zip}.sha256"
+          test -f "$zip" && test -f "$sum"
+          # The tag's published release. An API error fails the step rather
+          # than reading as "no release".
+          list="$(gh api "repos/$GH_REPO/releases" --paginate --jq '.[] | select(.tag_name == env.TAG and .draft == false) | .id')"
+          count="$(printf '%s\n' "$list" | grep -c . || true)"
+          if [ "$count" -eq 0 ]; then
+            echo "::error::Tag $TAG has no published release. Run the GitHub release workflow for it first; it dispatches this one when it finishes."
+            exit 1
+          fi
+          if [ "$count" -gt 1 ]; then
+            echo "::error::Tag $TAG has more than one published release."
+            exit 1
+          fi
+          id="$list"
+          # The release's assets, as "id name" lines.
+          assets="$(gh api "repos/$GH_REPO/releases/$id/assets" --paginate --jq '.[] | "\(.id) \(.name)"')"
+          zip_id="$(printf '%s\n' "$assets" | awk -v n="$(basename "$zip")" '$2 == n { print $1 }')"
+          sum_id="$(printf '%s\n' "$assets" | awk -v n="$(basename "$sum")" '$2 == n { print $1 }')"
+
+          if [ -n "$zip_id" ] && [ -n "$sum_id" ]; then
+            # Both files are attached: never replace them. A rebuild is an
+            # audit: the attached zip must match the attached checksum, and
+            # the fresh bake must reproduce that checksum exactly.
+            mkdir -p attached
+            gh api "repos/$GH_REPO/releases/assets/$zip_id" -H "Accept: application/octet-stream" > "attached/$(basename "$zip")"
+            gh api "repos/$GH_REPO/releases/assets/$sum_id" -H "Accept: application/octet-stream" > "attached/$(basename "$sum")"
+            if ! (cd attached && sha256sum --check "$(basename "$sum")"); then
+              echo "::error::The zip attached to release $TAG does not match the checksum attached beside it."
+              exit 1
+            fi
+            if cmp -s "attached/$(basename "$sum")" "$sum"; then
+              echo "Release $TAG already carries this atlas: $(cut -d' ' -f1 "$sum")"
+              exit 0
+            fi
+            echo "::error::Rebuilding $TAG gave a different atlas than the one attached (a tag moved after publishing is one likely cause). Attached: $(cut -d' ' -f1 "attached/$(basename "$sum")"), rebuilt: $(cut -d' ' -f1 "$sum")."
+            exit 1
+          fi
+
+          # Nothing, or only half of a pair from an interrupted attempt, is
+          # attached. Drop the half and upload the zip, then the checksum, so a
+          # checksum on the page always has its zip beside it.
+          for old in $zip_id $sum_id; do
+            gh api -X DELETE "repos/$GH_REPO/releases/assets/$old"
+          done
+          for f in "$zip" "$sum"; do
+            gh api -X POST "https://uploads.github.com/repos/$GH_REPO/releases/$id/assets?name=$(basename "$f")" \
+              -H "Content-Type: application/octet-stream" --input "$f" > /dev/null
+          done
+          echo "Attached $(basename "$zip") ($(cut -d' ' -f1 "$sum")) to release $TAG."

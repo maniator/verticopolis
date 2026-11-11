@@ -126,8 +126,8 @@ export function escapeMarkdown(text: string): string {
  * The release page's notes for `version`: one Markdown bullet per player note
  * ({@link notesForVersion} with the caps lifted), whitespace collapsed to one
  * line and the plain text escaped ({@link escapeMarkdown}), so a note shows on
- * the page exactly as the update prompt shows it. The atlas release workflow
- * (`.github/workflows/atlas-release.yml`) prints these lines. Empty when the
+ * the page exactly as the update prompt shows it. The GitHub release workflow
+ * (`.github/workflows/github-release.yml`) prints these lines. Empty when the
  * version has no player notes.
  */
 export function releaseNoteLines(changelog: string, version: string): string[] {

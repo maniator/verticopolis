@@ -5,8 +5,9 @@ name: Release tags
 # without a maintainer pushing a tag:
 #
 # - an app version change in package.json tags v<version> on the merge commit
-#   and dispatches atlas-release.yml for it, which publishes the release with
-#   the version's player notes and the sprite atlas. A tag created with the
+#   and dispatches github-release.yml for it, which publishes the release with
+#   the version's player notes and then hands the tag to sprite-atlas.yml to
+#   attach the sprite atlas. A tag created with the
 #   workflow token does not start a tag-push workflow, so this dispatches the
 #   run itself (a workflow_dispatch from the workflow token does run);
 # - a crate version change in engine-rs/Cargo.toml publishes engine-v<version>
@@ -79,8 +80,8 @@ jobs:
             gh api "repos/$GH_REPO/git/refs" -f ref="refs/tags/$tag" -f sha="$GITHUB_SHA" > /dev/null
             echo "Tagged $tag at $GITHUB_SHA."
           fi
-          gh workflow run atlas-release.yml --ref main -f tag="$tag"
-          echo "Dispatched the atlas release for $tag."
+          gh workflow run github-release.yml --ref main -f tag="$tag"
+          echo "Dispatched the GitHub release for $tag."
 
       # The crate release carries the built WASM package. These steps run only
       # for a crate version change, and the package usually comes from the
