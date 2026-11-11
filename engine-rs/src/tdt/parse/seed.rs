@@ -133,6 +133,12 @@ pub(super) fn seed_visitors(units: &mut [serde_json::Value], tdt: &TdtTower) {
         floors.get_or_insert_with(f.index, || f);
     }
     for row in &tdt.tail.retail {
+        // A row that served nobody seeds nothing: the venue counts 0 either
+        // way, and our own exporter writes zero rows over a zero remap that
+        // would otherwise pin a 0 on the floor's first room.
+        if row.served == 0 {
+            continue;
+        }
         let Some(floor) = floors.get(&i64::from(row.floor)) else {
             continue;
         };

@@ -246,14 +246,15 @@ export function rollOverRetailDay(sim: Simulation): void {
   // The day that just ended: its weekend sets the venues' caps (#1500).
   const endedDay = sim.clock.day - 1;
   const endedWeekend = sim.clock.isWeekendOn(endedDay);
-  for (const u of sim.tower.units) {
+  for (const u of roomUnits(sim.tower)) {
     if (subtypeListFor(u.kind) === null) continue;
     if (!isOperational(u)) continue;
     const hasData =
       u.patronageToday !== undefined ||
       u.patronageYest !== undefined ||
       u.profitToday !== undefined ||
-      u.profitYest !== undefined;
+      u.profitYest !== undefined ||
+      u.visitorsYest !== undefined; // an imported venue arrives with its count alone (#1500)
     if (!hasData) continue;
     const expected = expectedVisitors(u.kind, endedWeekend, u.visitorsYest, climbSteps(sim.rng.initialSeed, endedDay, u.id));
     if (expected !== null) {

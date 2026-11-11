@@ -132,7 +132,9 @@ impl Simulation {
     pub fn roll_over_retail_day(&mut self) {
         // The day that just ended: its weekend sets the venues' caps.
         let ended_weekend = self.clock.is_weekend_on(self.clock.day() - 1);
-        for i in 0..self.tower.units.len() {
+        // Rooms only: the tower's floor tiles never carry a venue.
+        let rooms = self.tower.room_index();
+        for &i in rooms.iter() {
             let u = &self.tower.units[i];
             if u.kind.subtype_list().is_none() || !u.is_operational() {
                 continue;
@@ -141,7 +143,9 @@ impl Simulation {
             let has_data = tally.patronage_today.is_some()
                 || tally.patronage_yest.is_some()
                 || tally.profit_today.is_some()
-                || tally.profit_yest.is_some();
+                || tally.profit_yest.is_some()
+                // An imported venue arrives with its count alone (#1500).
+                || u.visitors_yest.is_some();
             if !has_data {
                 continue;
             }
