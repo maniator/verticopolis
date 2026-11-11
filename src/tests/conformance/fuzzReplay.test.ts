@@ -178,6 +178,14 @@ describe("a bomb ransom call on the TypeScript leg (owner exception, #1886)", ()
     expect(replayCompare(file)).toMatchObject({ status: "diverged" });
   });
 
+  it("fails a Rust record that ends before the call", () => {
+    rust((c, d) => {
+      c.splice(1);
+      d.splice(1);
+    });
+    expect(replayCompare(file)).toMatchObject({ status: "diverged", signature: "count" });
+  });
+
   it("reads only a ransom's answer as a call", () => {
     expect(isRansomAnswer({ name: "emergency_resolved", payload: { kind: "bombThreat", decision: "decline", source: "timeout" } })).toBe(true);
     expect(isRansomAnswer({ name: "emergency_resolved", payload: { kind: "fireRescue", decision: "decline", source: "player" } })).toBe(false);

@@ -85,10 +85,10 @@ describe("the repository's marker", () => {
     // A reset or a closed window changes this on purpose, in the same PR.
     expect(marker).toEqual({
       open: true,
-      key: "e6e86f4380cc99c8d57a0ce6643e2c30ec2edd192a74f86693dc85bd600f7356",
+      key: "7f22e38cf30e60e5bf8ada216b2ec45db15ddaedfa924d86b49b4283a1dd87d4",
       resets: [
         { from: "ecadbdf6ab8149c42c0ba567d3a7e56ef0e48ab9bcca5f0b9e2a99dd1bd6bc56", to: "429e7e2cd4a3d3a10cac1655b45660febc2ec79276da817d117a761222b3cb65", approval: "https://github.com/maniator/verticopolis/issues/945#issuecomment-6781559256" },
-        { from: "429e7e2cd4a3d3a10cac1655b45660febc2ec79276da817d117a761222b3cb65", to: "e6e86f4380cc99c8d57a0ce6643e2c30ec2edd192a74f86693dc85bd600f7356", approval: "https://github.com/maniator/verticopolis/pull/1886#issuecomment-6787552594" },
+        { from: "429e7e2cd4a3d3a10cac1655b45660febc2ec79276da817d117a761222b3cb65", to: "7f22e38cf30e60e5bf8ada216b2ec45db15ddaedfa924d86b49b4283a1dd87d4", approval: "https://github.com/maniator/verticopolis/pull/1886#issuecomment-6787552594" },
       ],
     });
   });

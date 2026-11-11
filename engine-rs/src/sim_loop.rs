@@ -102,8 +102,7 @@ impl Simulation {
         if !staff_jobs.is_empty() {
             self.dispatch_housekeepers();
         }
-        self.finish_construction();
-        self.advance_bomb_search();
+        self.finish_construction_and_search();
 
         let hour = self.clock.hour();
         if hour != self.last_hour {
@@ -165,6 +164,15 @@ impl Simulation {
         self.nudge_service_shortfalls();
         self.roll_over_retail_day();
         self.ledger.end_day();
+    }
+
+    /// Settles the bomb search up to now before any new Security office
+    /// joins it, so guards already out move on from the minutes they
+    /// finished, and an office opening late in a long step cannot take a
+    /// floor they reached first (or join a search that already ended).
+    pub(crate) fn finish_construction_and_search(&mut self) {
+        self.advance_bomb_search();
+        self.finish_construction();
     }
 
     pub fn finish_construction(&mut self) {

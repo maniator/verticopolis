@@ -156,7 +156,13 @@ function compareUpTo(
   leg: Leg,
   tsCheckpoints: Checkpoint[] = rustCheckpoints,
 ): ReplayResult {
-  const n = Math.min(at, tsCheckpoints.length, tsDetails.length, rustCheckpoints.length);
+  // Only the checkpoints from the call on are excused. A Rust record that ends
+  // before the call is missing checkpoints the reference still plays.
+  const rustHas = Math.min(rustCheckpoints.length, rustDetails.length);
+  if (rustHas < at) {
+    return { status: "diverged", signature: "count", message: `DIVERGED, the Rust record ends after ${rustHas} checkpoint(s), before the bomb ransom call at checkpoint ${at}` };
+  }
+  const n = Math.min(at, tsCheckpoints.length, tsDetails.length);
   return compareRecords(
     { checkpoints: tsCheckpoints.slice(0, n), details: tsDetails.slice(0, n) },
     { checkpoints: rustCheckpoints.slice(0, n), details: rustDetails.slice(0, n) },
