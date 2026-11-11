@@ -1,5 +1,7 @@
 import { it, expect } from "vitest";
-import { FACILITIES, STAR_THRESHOLDS, TOWER_POPULATION } from "../../engine/facilities";
+import { catalogFacility } from "../../catalog/catalogTypes";
+import { catalogFor } from "../catalogFixture";
+import type { FacilityKind } from "../../shared/types";
 import { LOT_WIDTH } from "../portKit/draftFixtures";
 import { PortSim, describeEngines, draftTower, type Draft } from "../portKit/portSim";
 
@@ -8,6 +10,17 @@ import { PortSim, describeEngines, draftTower, type Draft } from "../portKit/por
 // without running the crowd sim.
 const W = LOT_WIDTH;
 const C = Math.floor(W / 2);
+
+/** A facility's published facts (width, population, attendance), from the
+ *  engine's Modern catalog; both modes state the same sizes. */
+const facility = (kind: FacilityKind) => catalogFacility(catalogFor("modern"), kind);
+
+/** The population each star asks for, by star (engine-rs/src/star.rs
+ *  `STAR_THRESHOLDS`). */
+const STAR_THRESHOLDS = [0, 0, 300, 1000, 5000, 10000] as const;
+/** The population a 5-star tower needs to become a TOWER (engine-rs/src/star.rs
+ *  `TOWER_POPULATION`). */
+const TOWER_POPULATION = 15000;
 
 function layFull(sim: Draft, kind: "floor" | "lobby", floor: number): void {
   for (let x = C; x < W; x++) sim.tower.place(kind, floor, x);
@@ -24,7 +37,7 @@ function layFull(sim: Draft, kind: "floor" | "lobby", floor: number): void {
 }
 
 function fillOffices(sim: Draft, floor: number, rightClear = 0): number {
-  const w = FACILITIES.office.width;
+  const w = facility("office").width;
   let n = 0;
   for (let x = 0; x + w <= W - rightClear; x += w) {
     const r = sim.tower.place("office", floor, x);
@@ -64,7 +77,7 @@ describeEngines("nextStarRequirements (what blocks the next star)", (leg) => {
     // edge free for the Security office.
     for (let f = 2; f <= 12; f++) {
       layFull(draft, "floor", f);
-      fillOffices(draft, f, FACILITIES.security.width);
+      fillOffices(draft, f, facility("security").width);
     }
     const sim = new PortSim(leg, draft);
     expect(sim.state.tower.totalPopulation()).toBeGreaterThanOrEqual(STAR_THRESHOLDS[3]);
@@ -84,14 +97,14 @@ describeEngines("nextStarRequirements (what blocks the next star)", (leg) => {
       expect(sec.ok).toBe(true);
       d.tower.units.find((u) => u.id === sec.unitId)!.state = "occupied";
     };
-    sim.setup((d) => addSecurity(d, 2, W - FACILITIES.security.width));
+    sim.setup((d) => addSecurity(d, 2, W - facility("security").width));
     req = sim.state.nextStarRequirements()!;
     expect(req.gates.find((g) => g.id === "security")!.met).toBe(false);
     sim.evaluateStar();
     expect(sim.state.star).toBe(2);
 
     // The second office makes it ready, and evaluateStar promotes.
-    sim.setup((d) => addSecurity(d, 3, W - FACILITIES.security.width));
+    sim.setup((d) => addSecurity(d, 3, W - facility("security").width));
     req = sim.state.nextStarRequirements()!;
     expect(req.gates.find((g) => g.id === "security")!.met).toBe(true);
     expect(req.allMet).toBe(true);

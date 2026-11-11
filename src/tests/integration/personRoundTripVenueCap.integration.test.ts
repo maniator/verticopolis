@@ -1,7 +1,13 @@
 import { expect, it } from "vitest";
-import { FACILITIES } from "../../engine/facilities";
+import { catalogFacility } from "../../catalog/catalogTypes";
+import { catalogFor } from "../catalogFixture";
+import type { FacilityKind } from "../../shared/types";
 import type { Person } from "../../shared/engineTypes";
 import { PortSim, describeEngines, type Leg, draftTower } from "../portKit/portSim";
+
+/** A facility's published facts (width, population, attendance), from the
+ *  engine's Modern catalog; both modes state the same sizes. */
+const facility = (kind: FacilityKind) => catalogFacility(catalogFor("modern"), kind);
 
 /**
  * The two venue-capacity cases of `personRoundTrip.integration.test.ts` that
@@ -40,7 +46,7 @@ describeEngines("venue customer capacity: the cap holds against a stamped-full v
   it("an en-route eater arriving at a just-filled venue eats uncounted (arrival clamp)", () => {
     const { sim, ff } = officeAndFastFood(leg);
     sim.setClock(12 * 60);
-    const cap = FACILITIES.fastFood.population;
+    const cap = facility("fastFood").population;
     // Wait for one meal round-tripper to be en route to the venue.
     let traveler: Person | undefined;
     for (let m = 0; m < 30 && !traveler; m++) {
@@ -92,7 +98,7 @@ describeEngines("venue customer capacity: the cap holds against a stamped-full v
 
   it("a full venue attracts no new meal trips (spawn-side filter)", () => {
     const { sim, ff } = officeAndFastFood(leg);
-    const cap = FACILITIES.fastFood.population;
+    const cap = facility("fastFood").population;
     sim.setCustomersIn(ff, cap); // full before lunch begins
     sim.setClock(12 * 60);
     for (let m = 0; m < 60; m++) {
@@ -155,8 +161,8 @@ describeEngines("setCustomersIn: refusals and the attendance mirror", (leg: Leg)
 
   it("mirrors the tally into an attendance venue's occupants, and leaves a plain venue's occupants alone", () => {
     const { sim, hall, ff } = withPartyHall(leg);
-    expect(FACILITIES.partyHall.attendance, "the party hall keeps attendance").toBeDefined();
-    expect(FACILITIES.fastFood.attendance, "the fast food keeps none").toBeUndefined();
+    expect(facility("partyHall").attendance, "the party hall keeps attendance").not.toBeNull();
+    expect(facility("fastFood").attendance, "the fast food keeps none").toBeNull();
     const ffOccupants = occupants(sim, ff);
     sim.setCustomersIn(hall, 5);
     expect(customersIn(sim, hall)).toBe(5);

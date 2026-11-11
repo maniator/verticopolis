@@ -1,12 +1,18 @@
 import { it, expect } from "vitest";
-import { MILESTONES } from "../../engine/milestones";
-import { FACILITIES } from "../../engine/facilities";
+import { catalogFacility } from "../../catalog/catalogTypes";
+import { catalogFor } from "../catalogFixture";
+import type { GameplayMilestoneId } from "../../events/gameplayEvents";
+import type { FacilityKind } from "../../shared/types";
 import { LOT_WIDTH } from "../portKit/draftFixtures";
 import { PortSim, describeEngines, type Leg, draftTower, type Draft } from "../portKit/portSim";
 
 
 const W = LOT_WIDTH;
 const C = Math.floor(W / 2);
+
+/** A facility's published facts (width, population, attendance), from the
+ *  engine's Modern catalog; both modes state the same sizes. */
+const facility = (kind: FacilityKind) => catalogFacility(catalogFor("modern"), kind);
 const DAY = 60 * 24;
 
 function layFull(sim: Draft, kind: "floor" | "lobby", floor: number): void {
@@ -18,7 +24,7 @@ function layFull(sim: Draft, kind: "floor" | "lobby", floor: number): void {
  *  are stamped occupied unless `occupy` is false, which leaves them for the
  *  engine's own move-ins. */
 function fillOffices(sim: Draft, floor: number, rightClear = 0, occupy = true): number {
-  const w = FACILITIES.office.width;
+  const w = facility("office").width;
   let n = 0;
   for (let x = 0; x + w <= W - rightClear; x += w) {
     const r = sim.tower.place("office", floor, x);
@@ -35,7 +41,9 @@ function fillOffices(sim: Draft, floor: number, rightClear = 0, occupy = true): 
  *  whether the engine awarded one. */
 const awarded = (sim: PortSim): string[] => (JSON.parse(sim.save()) as { milestones?: string[] }).milestones ?? [];
 
-const done = (sim: PortSim, label: string): boolean => awarded(sim).includes(MILESTONES.find((m) => m.label === label)!.id);
+/** Whether the engine awarded milestone `id` ("pop-500" is "Getting Started",
+ *  "well-served" is "Smooth Operator"). */
+const done = (sim: PortSim, id: GameplayMilestoneId): boolean => awarded(sim).includes(id);
 
 /** A founded tower with three office floors and a standard elevator on the
  *  right edge, enough to clear the 500-population milestone. The last
@@ -60,11 +68,11 @@ describeEngines("Milestones (optional goals)", (leg: Leg) => {
     const sim = new PortSim(leg, startedTower(1)); // the top floor is left for move-ins
     expect(sim.state.population).toBeLessThan(500); // below the bar at load, so the load adopts nothing
 
-    expect(done(sim, "Getting Started")).toBe(false);
+    expect(done(sim, "pop-500")).toBe(false);
     sim.tick(DAY); // crosses a day boundary → onDay → checkMilestones
     expect(sim.state.population).toBeGreaterThanOrEqual(500);
     expect(sim.state.population).toBeLessThan(2000); // only the pop-500 milestone is eligible
-    expect(done(sim, "Getting Started")).toBe(true);
+    expect(done(sim, "pop-500")).toBe(true);
 
     // Fires exactly once: the achieved set doesn't grow on a further day.
     const achieved = awarded(sim).length;
@@ -75,10 +83,10 @@ describeEngines("Milestones (optional goals)", (leg: Leg) => {
   it("achievements survive save/reload (no re-announce)", () => {
     const sim = new PortSim(leg, startedTower());
     sim.tick(DAY);
-    expect(done(sim, "Getting Started")).toBe(true);
+    expect(done(sim, "pop-500")).toBe(true);
 
     const reloaded = new PortSim(leg, sim.save());
-    expect(done(reloaded, "Getting Started")).toBe(true); // restored, still achieved
+    expect(done(reloaded, "pop-500")).toBe(true); // restored, still achieved
     const achieved = awarded(reloaded).length;
     reloaded.tick(DAY); // already achieved → must not re-announce
     expect(awarded(reloaded).length).toBe(achieved);
@@ -99,12 +107,12 @@ describeEngines("Milestones (optional goals)", (leg: Leg) => {
     const sim = new PortSim(leg, draft);
     expect(sim.state.population).toBeGreaterThanOrEqual(5000);
 
-    expect(done(sim, "Smooth Operator")).toBe(false); // floor 25 is not served yet
+    expect(done(sim, "well-served")).toBe(false); // floor 25 is not served yet
     // One standard elevator serving floors 1..25 makes every occupied floor reachable.
     expect(sim.extendShaft(sim.state.tower.transports[0].id, true, 25).ok).toBe(true);
-    expect(done(sim, "Smooth Operator")).toBe(false); // not evaluated until a day passes
+    expect(done(sim, "well-served")).toBe(false); // not evaluated until a day passes
     sim.tick(DAY);
-    expect(done(sim, "Smooth Operator")).toBe(true);
+    expect(done(sim, "well-served")).toBe(true);
   });
 });
 
@@ -141,7 +149,7 @@ describeEngines("Milestone review follow-ups", (leg: Leg) => {
     delete data.milestones;
     const reloaded = new PortSim(leg, JSON.stringify(data));
 
-    expect(done(reloaded, "Getting Started")).toBe(true); // adopted at load, not announced
+    expect(done(reloaded, "pop-500")).toBe(true); // adopted at load, not announced
     expect(reloaded.state.log.some((e) => e.text.includes("🏅"))).toBe(false); // no burst headline
   });
 });

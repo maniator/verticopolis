@@ -4,7 +4,7 @@ import type { GameApp } from "../../main";
 import type { EnginePort } from "../../simport/enginePort";
 import { PortCodes } from "../../simport/portCodes";
 import { ViewReader } from "../../simport/viewReader";
-import { facilityFloors } from "../../engine/facilities";
+import { floorsOfPort } from "../../game/portAccess";
 import type { FacilityKind, GameMode } from "../../shared/types";
 import { catalogFacility, catalogTileCost, type Catalog } from "../../catalog/catalogTypes";
 import { catalogOf, isUnlocked, quoteBuild } from "../../game/portAccess";
@@ -45,7 +45,7 @@ function tower(mode: GameMode, save?: string) {
   const engine = save === undefined ? wasm().Engine.newGame(7, mode) : wasm().Engine.fromSave(save);
   made.push(engine);
   const port = engine as unknown as EnginePort;
-  const reader = new ViewReader(port, facilityFloors);
+  const reader = new ViewReader(port, floorsOfPort(port));
   const s = { port, reader };
   engine.setMoney(100_000_000);
   for (let x = LOBBY_LEFT; x < LOBBY_RIGHT && save === undefined; x++) {

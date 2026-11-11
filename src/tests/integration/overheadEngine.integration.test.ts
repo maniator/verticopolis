@@ -1,6 +1,7 @@
 import { it, expect } from "vitest";
 import { newSeededDraft, lay, LOT_WIDTH } from "../portKit/draftFixtures";
-import { ECON, rentConfig } from "../../engine/econConfig";
+import { catalogFacility } from "../../catalog/catalogTypes";
+import { catalogFor } from "../catalogFixture";
 import type { GameMode } from "../../shared/types";
 import { PortSim, describeEngines, type Leg } from "../portKit/portSim";
 
@@ -15,6 +16,16 @@ import { PortSim, describeEngines, type Leg } from "../portKit/portSim";
 const C = Math.floor(LOT_WIDTH / 2);
 const MONTH_30_DAYS = 60 * 24 * 30;
 const MONTH_31_DAYS = 60 * 24 * 31;
+/** The Modern economy the engine publishes: the overhead per leasable unit
+ *  and the condo hold-tax rate. */
+const MODERN = catalogFor("modern");
+
+/** The asking price of an unpriced condo: the Modern band default. */
+function unpricedCondoAsk(): number {
+  const rent = catalogFacility(MODERN, "condo").rent;
+  if (rent?.shape !== "band") throw new Error("the Modern condo is priced on a band");
+  return rent.default;
+}
 
 describeEngines(
   "operating overhead + condo hold-tax are Modern-only",
@@ -46,9 +57,9 @@ describeEngines(
       // Two overhead-bearing units (vacant office + unsold condo) + the condo
       // hold-tax on its asking price. Asserting the EXACT figure (not just > 0)
       // catches a sign/tuning error in either sink.
-      const overhead = 2 * ECON.overheadPerLeasableUnitMonthly;
+      const overhead = 2 * MODERN.economy.overheadPerUnitMonthly;
       const condoTax = Math.ceil(
-        rentConfig("condo")!.default * ECON.condoMonthlyTaxRate,
+        unpricedCondoAsk() * MODERN.economy.condoHoldTaxRate,
       );
       expect(monthlyDrain("modern")).toBe(overhead + condoTax);
     });
@@ -72,7 +83,7 @@ describeEngines(
       const before = sim.state.money;
       sim.tick(MONTH_31_DAYS); // crosses one month boundary → payMaintenance once
       expect(before - sim.state.money).toBe(
-        5 * ECON.overheadPerLeasableUnitMonthly,
+        5 * MODERN.economy.overheadPerUnitMonthly,
       );
     });
 

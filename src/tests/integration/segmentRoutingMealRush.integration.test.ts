@@ -1,7 +1,13 @@
 import { expect, it } from "vitest";
-import { FACILITIES } from "../../engine/facilities";
+import { catalogFacility } from "../../catalog/catalogTypes";
+import { catalogFor } from "../catalogFixture";
+import type { FacilityKind } from "../../shared/types";
 import type { Person } from "../../shared/engineTypes";
 import { PortSim, describeEngines, type Leg, type Draft, draftTower } from "../portKit/portSim";
+
+/** A facility's published facts (width, population, attendance), from the
+ *  engine's Modern catalog; both modes state the same sizes. */
+const facility = (kind: FacilityKind) => catalogFacility(catalogFor("modern"), kind);
 
 /**
  * Meal trips on a REACHABLE split floor (#647 fix round), on both engines.
@@ -38,7 +44,7 @@ function mealTower(leg: Leg, draft: Draft, condoAt: number, venueAt: number): Me
   const venue = draft.tower.units.find((u) => u.id === venueRes.unitId)!;
   // Occupy them: the condo houses meal-goers, the venue is open for business.
   condo.state = "occupied";
-  condo.occupants = FACILITIES.condo.population;
+  condo.occupants = facility("condo").population;
   venue.state = "occupied";
   return { sim: new PortSim(leg, draft), condo: condo.id, venue: venue.id };
 }
@@ -71,7 +77,7 @@ function reachableSplitSim(leg: Leg, condoRun: "left" | "right", venueRun: "left
 function driveMealRush({ sim, condo, venue }: MealTower, ticks: number, visit: (p: Person) => void): boolean {
   let sawGap = false;
   for (let i = 0; i < ticks; i++) {
-    sim.setUnitState(condo, "occupied", FACILITIES.condo.population);
+    sim.setUnitState(condo, "occupied", facility("condo").population);
     sim.setUnitState(venue, "occupied");
     sim.setClock(12 * 60); // pin lunch: dispatch + crowd only
     sim.tick(1);

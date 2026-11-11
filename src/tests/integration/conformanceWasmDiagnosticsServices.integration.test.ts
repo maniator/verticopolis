@@ -1,60 +1,56 @@
 import { describe, it, expect, afterAll } from "vitest";
 import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
-import { isDeepStrictEqual } from "node:util";
-import type { Simulation } from "../../engine/Simulation";
-import type { Unit } from "../../shared/types";
-import { serviceDiagnostics } from "../../engine/port/reports";
-import { shaftCard } from "../../engine/port/queries";
-import { isCommercialKind } from "../../engine/facilities";
+import type { SerializedGame, Unit } from "../../shared/types";
 import { isOperational } from "../../shared/unitState";
+import { catalogFacility } from "../../catalog/catalogTypes";
+import { catalogFor } from "../catalogFixture";
 import type { ServiceDiagnosticFacts } from "../../simport/enginePort";
 import {
   CONFORMANCE_DIR,
   firstDivergence,
   loadScenario,
-  reloadTsSim,
   runScenario,
-  startTsSim,
-  tsEngine,
   type Checkpoint,
   type ScenarioEngine,
-  PAST_THE_TYPESCRIPT_REFERENCE,
 } from "../conformance/scenario";
 import { hasWasmPackage, reloadWasmHandle, startWasmHandle, wasmEngine } from "../conformance/wasmEngine";
 import type { WasmEngine } from "../../dualrun/binding";
-import viewLayout from "../../engine/viewLayout.json";
+import viewLayout from "../../simport/fixtures/viewLayout.json";
 
 /**
  * The service, venue and transport facts behind the card (#1215, facade slice
- * 6c, families 2 to 4) against the TypeScript reference, over the whole
- * conformance corpus, as `conformanceWasmDiagnostics` does for the tenant
- * family. Every scenario runs on each engine, and both are asked at every
- * checkpoint, before the state is hashed, and on each side of a reload: every
- * room's `serviceDiagnostics` (hotel, parking, housekeeping, retail and the
- * venue's lobby distance), the first floor tile's and the first lobby tile's,
- * every shaft's `shaftCard` (which carries the elevator load and the
- * near-capacity advice) and the tower's three recycling reads. The two runs
- * must agree read for read, and both must still reproduce the pinned
- * checkpoints, which is the proof that asking moves no hash on either engine.
+ * 6c, families 2 to 4) over the whole conformance corpus on the Rust engine,
+ * as `conformanceWasmDiagnostics` does for the tenant family. Every scenario
+ * runs, and the engine is asked at every checkpoint, before the state is
+ * hashed, and on each side of a reload: every room's `serviceDiagnostics`
+ * (hotel, parking, housekeeping, retail and the venue's lobby distance), the
+ * first floor tile's and the first lobby tile's, every shaft's `shaftCard`
+ * (which carries the elevator load and the near-capacity advice) and the
+ * tower's three recycling reads. The run must still reproduce the pinned
+ * checkpoints, which is the proof that asking moves no hash, every room and
+ * shaft must answer, and an inert service room must answer no service section.
  * A read that raises a gameplay event the next checkpoint would not hash (the
- * one before a reload, or the last one) fails the run.
+ * one before a reload, or the last one) fails the run. What each answer says
+ * is held by the Rust tests (`wasm_port_reports_tests`) and, on the card, by
+ * `cardVerdicts` and `cardTextParity`; the TypeScript reference these reads
+ * were once compared with is gone.
  */
 
 const SCENARIO_DIR = resolve(CONFORMANCE_DIR, "scenarios");
 const lock = JSON.parse(readFileSync(resolve(CONFORMANCE_DIR, "expected.json"), "utf8")) as { scenarios: Record<string, Checkpoint[]> };
 const files = readdirSync(SCENARIO_DIR)
-  .filter((f) => f.endsWith(".json") && !PAST_THE_TYPESCRIPT_REFERENCE.has(f))
+  .filter((f) => f.endsWith(".json"))
   .sort();
 
 
 /** The tower's recycling reads: capacity, fill and whether demand is met. */
 interface Recycling { capacity: number; fill: number; met: boolean }
 
-/** A shaft card as both engines write it: the typed array's kind and its slots. */
+/** A shaft card as the engine writes it: the typed array's kind and its slots. */
 interface Card { type: string; slots: number[] }
 
-/** One read: the rooms and shafts asked about and what each engine gave. */
+/** One read: the rooms and shafts asked about and what the engine gave. */
 interface Read {
   rooms: number[];
   shafts: number[];
@@ -65,7 +61,7 @@ interface Read {
 
 /** Every room, plus the first floor tile and the first lobby tile (which
  *  carry no service section; the rest are skipped for time), in tower order. */
-function roomIds(units: readonly Unit[]): number[] {
+function roomIds(units: readonly Pick<Unit, "id" | "kind">[]): number[] {
   const floor = units.find((u) => u.kind === "floor");
   const lobby = units.find((u) => u.kind === "lobby");
   return units.filter((u) => (u.kind !== "floor" && u.kind !== "lobby") || u === floor || u === lobby).map((u) => u.id);
@@ -77,11 +73,10 @@ const cardOf = (card: Float64Array | Int32Array | ArrayLike<number>): Card => ({
  *  construction) switches off: parking, housekeeping and a venue's retail
  *  block. A venue's lobby distance is still answered. */
 const isServiceKind = (kind: Unit["kind"]): boolean =>
-  kind === "parking" || kind === "parkingRamp" || kind === "housekeeping" || isCommercialKind(kind);
+  kind === "parking" || kind === "parkingRamp" || kind === "housekeeping" || catalogFacility(catalogFor("modern"), kind).commercial;
 
-/** The kinds of the inert service rooms in each TypeScript read, and of its
- *  shafts, for the tally only: the facts themselves are compared whatever the
- *  state. */
+/** The kinds of the inert service rooms in each read, and of its shafts, for
+ *  the tally. */
 const inertOf = new WeakMap<Read, string[]>();
 const shaftKindsOf = new WeakMap<Read, string[]>();
 
@@ -95,85 +90,42 @@ function quiet(engine: ScenarioEngine, when: string): void {
   if (left.length > 0) throw new Error(`${left.length} gameplay event(s) pending after the read ${when}, which no hash sees`);
 }
 
-/** One read of the TypeScript engine. */
-function readTs(sim: Simulation, reads: Read[]): void {
-  const rooms = roomIds(sim.tower.units);
-  const shafts = sim.tower.transports.map((t) => t.id);
+/** One read of the engine: every room's service facts, every shaft's card
+ *  and the recycling reads. */
+function read(handle: WasmEngine, reads: Read[]): void {
+  const save = JSON.parse(handle.serialize()) as SerializedGame;
+  const rooms = roomIds(save.units);
+  const shafts = save.transports.map((t) => t.id);
   const read: Read = {
     rooms,
     shafts,
     facts: rooms.map((id) => {
-      const facts = serviceDiagnostics(sim, id);
-      if (!facts) throw new Error(`the reference's serviceDiagnostics(${id}) answered nothing for a unit`);
+      const facts = handle.serviceDiagnostics(id) as ServiceDiagnosticFacts | undefined;
+      if (!facts) throw new Error(`serviceDiagnostics(${id}) answered nothing for a unit`);
       return facts;
     }),
     cards: shafts.map((id) => {
-      const card = cardOf(shaftCard(sim, id));
+      const card = cardOf(handle.shaftCard(id));
       // A real shaft's card always carries its header, load slots included.
       if (card.slots.length <= Math.max(CARD_UTILIZATION, CARD_NEAR_CAPACITY)) {
-        throw new Error(`the reference's shaftCard(${id}) answered ${card.slots.length} slots for a real shaft`);
+        throw new Error(`shaftCard(${id}) answered ${card.slots.length} slots for a real shaft`);
       }
       return card;
     }),
-    recycling: { capacity: sim.recyclingCapacity(), fill: sim.recyclingFill(), met: sim.recyclingDemandMet() },
+    recycling: { capacity: handle.recyclingCapacity(), fill: handle.recyclingFill(), met: handle.recyclingDemandMet() },
   };
-  const inert = sim.tower.units.filter((u) => isServiceKind(u.kind) && !isOperational(u));
-  // The reference switches those sections off, and the comparison holds the
-  // Rust engine to the same answer.
+  // The save leaves an empty room's state out, as a load reads it.
+  const inert = save.units.filter((u) => isServiceKind(u.kind) && !isOperational({ state: u.state ?? "empty" }));
+  // An inert room switches those sections off.
   for (const u of inert) {
     const { parking, housekeeping, retail } = read.facts[rooms.indexOf(u.id)];
     if (parking.status !== "notApplicable" || housekeeping.status !== "notApplicable" || retail.active) {
-      throw new Error(`the reference's inert ${u.kind} ${u.id} still answers a service section`);
+      throw new Error(`the inert ${u.kind} ${u.id} still answers a service section`);
     }
   }
   inertOf.set(read, inert.map((u) => u.kind));
-  shaftKindsOf.set(read, sim.tower.transports.map((t) => t.kind));
+  shaftKindsOf.set(read, save.transports.map((t) => t.kind));
   reads.push(read);
-}
-
-/** One read of the Rust engine, asked about the ids the TypeScript run read
- *  at the same point (the pinned hashes hold the two towers equal). */
-function readRs(handle: WasmEngine, want: readonly Read[], reads: Read[]): void {
-  const at = want[reads.length];
-  if (!at) throw new Error(`the Rust run read ${reads.length + 1} times, more than the TypeScript run's ${want.length}`);
-  const { rooms, shafts } = at;
-  reads.push({
-    rooms,
-    shafts,
-    facts: rooms.map((id) => {
-      const facts = handle.serviceDiagnostics(id) as ServiceDiagnosticFacts | undefined;
-      if (!facts) throw new Error(`the Rust serviceDiagnostics(${id}) answered nothing for a unit`);
-      return facts;
-    }),
-    cards: shafts.map((id) => cardOf(handle.shaftCard(id))),
-    recycling: { capacity: handle.recyclingCapacity(), fill: handle.recyclingFill(), met: handle.recyclingDemandMet() },
-  });
-}
-
-/** The TypeScript engine with a read before each hash and on each side of a
- *  reload. An event the read after a reload raises lands in the next hash.
- *  Its reload is `tsEngine`'s (`reloadTsSim`, in `scenario.ts`) with the
- *  reads around it, so a change there belongs here too. */
-function tsWithReads(sim: Simulation, reads: Read[]): ScenarioEngine {
-  const base = tsEngine(sim);
-  return {
-    ...base,
-    stateDigest: () => {
-      readTs(sim, reads);
-      return base.stateDigest();
-    },
-    reload: () => {
-      readTs(sim, reads);
-      quiet(base, "before a reload");
-      const loaded = reloadTsSim(sim);
-      readTs(loaded, reads);
-      return tsWithReads(loaded, reads);
-    },
-    free: () => {
-      quiet(base, "at the last checkpoint");
-      base.free?.();
-    },
-  };
 }
 
 /** Frees a handle on a path that is already failing, keeping that failure:
@@ -186,13 +138,15 @@ function freeQuietly(free: () => void): void {
   }
 }
 
-/** The Rust engine with the same reads at the same points. Its reload is
+/** The Rust engine with a read before each hash and on each side of a
+ *  reload. An event the read after a reload raises lands in the next hash.
+ *  Its reload is
  *  `wasmEngine`'s (`reloadWasmHandle`, then the old handle freed, in
  *  `wasmEngine.ts`) with the reads around it, so a change there belongs here
  *  too. After a trap the instance is poisoned and its free can throw, which
  *  must not replace the error on its way out, as the runner has it
  *  (`scenario.ts`). */
-function wasmWithReads(handle: WasmEngine, want: readonly Read[], reads: Read[]): ScenarioEngine {
+function wasmWithReads(handle: WasmEngine, reads: Read[]): ScenarioEngine {
   const base = wasmEngine(handle);
   let freed = false;
   const release = (): void => {
@@ -203,11 +157,11 @@ function wasmWithReads(handle: WasmEngine, want: readonly Read[], reads: Read[])
   return {
     ...base,
     stateDigest: () => {
-      readRs(handle, want, reads);
+      read(handle, reads);
       return base.stateDigest();
     },
     reload: () => {
-      readRs(handle, want, reads);
+      read(handle, reads);
       quiet(base, "before a reload");
       let loaded: WasmEngine;
       try {
@@ -218,12 +172,12 @@ function wasmWithReads(handle: WasmEngine, want: readonly Read[], reads: Read[])
       }
       try {
         release();
-        readRs(loaded, want, reads);
+        read(loaded, reads);
       } catch (e) {
         freeQuietly(() => loaded.free());
         throw e;
       }
-      return wasmWithReads(loaded, want, reads);
+      return wasmWithReads(loaded, reads);
     },
     // A second free, such as a runner's cleanup after a reload freed this
     // handle, does nothing.
@@ -241,7 +195,7 @@ function wasmWithReads(handle: WasmEngine, want: readonly Read[], reads: Read[])
 }
 
 /** The `shaftCard` header slots this test tallies, by name from the view
- *  layout both engines write their cards in. */
+ *  layout the engine writes its cards in. */
 const CARD_UTILIZATION = viewLayout.records.shaftCard.indexOf("utilization");
 const CARD_NEAR_CAPACITY = viewLayout.records.shaftCard.indexOf("nearCapacity");
 /** A set flag slot holds 1 (the Rust port's `flag` in
@@ -252,10 +206,10 @@ const nearCapacity = (card: Card): boolean => card.slots[CARD_NEAR_CAPACITY] ===
 
 /** The sections the corpus reached when this test was written. A corpus or
  *  engine change that stops reaching one, or starts reaching a new one, fails
- *  the last test, so the comparison's coverage cannot change unseen. An inert
- *  cinema and shop left with ransom-ignored-modern, whose blast-gutted rooms
- *  only that scenario reached; it is past the TypeScript reference now (#349),
- *  and the Rust engine's own lock still pins it. A standard elevator near
+ *  the last test, so the run's coverage cannot change unseen. The inert
+ *  cinema and shop come from ransom-ignored-modern, whose blast-gutted rooms
+ *  only that scenario reaches; it ran past the TypeScript reference (#349) and
+ *  rejoined the run when the reference was retired. A standard elevator near
  *  capacity left when venues began counting yesterday's visitors (#1500):
  *  the slower star pace thins the corpus's crowds below the cutoff, and
  *  `cardVerdicts.integration.test.ts` still pins the flag on both sides of it. */
@@ -263,8 +217,8 @@ const CORPUS_SECTIONS: readonly string[] = [
   "commercial:lobbyFar:false", "commercial:lobbyFar:true",
   "hotel:counts:dirty", "hotel:counts:infested", "hotel:counts:other", "hotel:excluded:dirty", "hotel:excluded:other",
   "housekeeping:adequate", "housekeeping:nominalShortfall", "housekeeping:observedShortfall",
-  "inert:amusements", "inert:boutiqueBay", "inert:daycare", "inert:fastFood", "inert:foodHall",
-  "inert:nightclub", "inert:parking", "inert:skyBar", "inert:spa",
+  "inert:amusements", "inert:boutiqueBay", "inert:cinema", "inert:daycare", "inert:fastFood", "inert:foodHall",
+  "inert:nightclub", "inert:parking", "inert:shop", "inert:skyBar", "inert:spa",
   "parking:connected", "parking:disconnected", "parking:ramp",
   "recycling:met:filling",
   "retail:advice:none", "retail:advice:overBuilt", "retail:advice:underServed", "retail:rain",
@@ -312,32 +266,15 @@ describe.skipIf(!hasWasmPackage())("service, venue and transport facts through t
 
   for (const file of files) {
     const scenario = loadScenario(resolve(SCENARIO_DIR, file));
-    it(`${scenario.id}: every room's service facts, every shaft's card and the recycling reads match the TypeScript reference`, () => {
+    it(`${scenario.id}: every room's service facts, every shaft's card and the recycling reads answer without moving a hash`, () => {
       const pinned = lock.scenarios[scenario.id];
-      if (!pinned?.length) throw new Error(`${scenario.id} has no checkpoints in the lock; regenerate it with the TypeScript run first`);
-      const tsReads: Read[] = [];
-      expect(firstDivergence(runScenario(scenario, (start) => tsWithReads(startTsSim(start), tsReads)), pinned)).toBeNull();
-      const rsReads: Read[] = [];
-      expect(firstDivergence(runScenario(scenario, (start) => wasmWithReads(startWasmHandle(start), tsReads, rsReads)), pinned)).toBeNull();
-      // One read per checkpoint and two per reload, on each engine.
+      if (!pinned?.length) throw new Error(`${scenario.id} has no checkpoints in the lock; regenerate it with the Rust run first`);
+      const reads: Read[] = [];
+      expect(firstDivergence(runScenario(scenario, (start) => wasmWithReads(startWasmHandle(start), reads)), pinned)).toBeNull();
+      // One read per checkpoint and two per reload.
       const reloads = scenario.commands.filter((c) => c.op === "reload").length;
-      expect(tsReads.length, `${scenario.id}: TypeScript reads`).toBe(pinned.length + 2 * reloads);
-      expect(rsReads.length, `${scenario.id}: Rust reads`).toBe(tsReads.length);
-      tsReads.forEach((want, i) => {
-        const got = rsReads[i]!;
-        // Drill to the first difference only when the read differs, so a
-        // matching read builds no message per room.
-        if (isDeepStrictEqual(got, want)) return;
-        want.rooms.forEach((id, j) => {
-          expect(got.facts[j], `${scenario.id}, read ${i}, unit ${id}`).toStrictEqual(want.facts[j]);
-        });
-        want.shafts.forEach((id, j) => {
-          expect(got.cards[j], `${scenario.id}, read ${i}, shaft ${id}`).toStrictEqual(want.cards[j]);
-        });
-        expect(got.recycling, `${scenario.id}, read ${i}, recycling`).toStrictEqual(want.recycling);
-        expect(got, `${scenario.id}, read ${i}`).toStrictEqual(want);
-      });
-      tsReads.forEach(tally);
+      expect(reads.length, `${scenario.id}: reads`).toBe(pinned.length + 2 * reloads);
+      reads.forEach(tally);
       passed.add(file);
     }, 120_000);
   }
