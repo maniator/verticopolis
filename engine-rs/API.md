@@ -159,8 +159,11 @@ unavailable, never as a failure of the engine.
 
 ## Stability
 
-- **No semver promise yet.** The crate is unpublished (its version is in
-  `Cargo.toml`); a consumer pins a commit. The version goes up with the
+- **No semver promise yet.** The crate is on no Cargo registry (its version
+  is in `Cargo.toml`); a consumer pins a commit or an `engine-v<version>`
+  tag. Each crate release also publishes the WASM build to GitHub Packages
+  as `@maniator/verticopolis-engine`, whose README is
+  `packages/verticopolis-engine/README.md`. The version goes up with the
   conformance lock, the save, frame layout, view layout, catalog and
   identity record versions and the binding declaration (`src/compat-record.json`, held by
   `src/tests/engineCompat.guard.test.ts`; the Rust `pub` API is a review

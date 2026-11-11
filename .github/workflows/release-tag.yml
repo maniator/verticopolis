@@ -105,7 +105,12 @@ jobs:
 
       # The built package: engine-rs/pkg (Node) and src/public/engine
       # (browser), with their third-party records, as a zip with a checksum
-      # for the release and as an npm package for GitHub Packages.
+      # for the release and as an npm package for GitHub Packages. The
+      # package carries its own README and the browser build's declarations
+      # from packages/verticopolis-engine/ (outside engine-rs/, so they do not
+      # move the engine's source hash), so the package page does not fall
+      # back to the repository's README, plus the engine changelog and the
+      # license.
       - name: Pack the engine
         id: pack
         if: ${{ steps.versions.outputs.compare == 'true' && steps.versions.outputs.crate != steps.versions.outputs.crate_was }}
@@ -119,8 +124,12 @@ jobs:
           mkdir -p npm/node npm/web
           cp -R engine-rs/pkg/. npm/node/
           cp -R src/public/engine/. npm/web/
+          cp packages/verticopolis-engine/web.d.ts npm/web/verticopolis_engine.d.ts
+          cp packages/verticopolis-engine/README.md npm/README.md
+          cp engine-rs/CHANGELOG.md npm/CHANGELOG.md
+          cp LICENSE npm/LICENSE
           zip="verticopolis-engine-wasm-$VERSION.zip"
-          (cd npm && zip -qr "../$zip" node web)
+          (cd npm && zip -qr "../$zip" node web README.md CHANGELOG.md LICENSE)
           sha256sum "$zip" > "$zip.sha256"
           scope="$(printf '%s' "$OWNER" | tr 'A-Z' 'a-z')"
           SCOPE="$scope" node -e '
@@ -131,8 +140,12 @@ jobs:
               description: "The Verticopolis simulation engine as WebAssembly: node/ for Node, web/ for the browser.",
               license: "MIT",
               repository: { type: "git", url: `git+https://github.com/${e.GH_REPO}.git`, directory: "engine-rs" },
+              homepage: `https://github.com/${e.GH_REPO}/tree/main/packages/verticopolis-engine#readme`,
+              bugs: { url: `https://github.com/${e.GH_REPO}/issues` },
+              keywords: ["verticopolis", "simulation", "game-engine", "webassembly", "wasm", "tower"],
               main: "node/verticopolis_engine.js",
-              files: ["node", "web"],
+              types: "node/verticopolis_engine.d.ts",
+              files: ["node", "web", "CHANGELOG.md"],
               publishConfig: { registry: "https://npm.pkg.github.com" },
             };
             require("fs").writeFileSync("npm/package.json", JSON.stringify(pkg, null, 2) + "\n");'
