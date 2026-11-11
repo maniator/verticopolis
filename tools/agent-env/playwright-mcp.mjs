@@ -42,7 +42,9 @@ function pinnedImage() {
 }
 
 function dockerHasImage(image) {
-  if (isWindows || process.env.VC_PLAYWRIGHT_MCP_HOST) return false;
+  // Linux only: Docker Desktop (macOS, Windows) has no host networking by
+  // default, so the container could not open the host's dev server.
+  if (process.platform !== "linux" || process.env.VC_PLAYWRIGHT_MCP_HOST) return false;
   const probe = spawnSync("docker", ["image", "inspect", image], { stdio: "ignore", timeout: 10_000 });
   return probe.status === 0;
 }
