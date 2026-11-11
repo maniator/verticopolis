@@ -3,7 +3,7 @@ import type { GameApp } from "../main";
 import { Simulation } from "../engine/Simulation";
 import { TsEngine } from "../engine/port/tsEngine";
 import { PortCodes } from "../simport/portCodes";
-import { catalogFor } from "../engine/catalog";
+import { catalogFor } from "../tests/catalogFixture";
 import { catalogOn, useTowerCatalogSource } from "../catalog/towerCatalog";
 import type { CatalogEconomy } from "../catalog/catalogTypes";
 

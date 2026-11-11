@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { catalogFor } from "../engine/catalog";
+import { catalogFor } from "../tests/catalogFixture";
 import { bindViewWorld, resetViewWorldForTests, viewWorld } from "./viewWorld";
 
 describe("the view world (#921)", () => {

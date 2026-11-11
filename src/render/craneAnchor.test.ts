@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { craneAnchorTile } from "./sprites";
 import { facadeGeometry } from "./facadeGeometry";
-import { catalogFor } from "../engine/catalog";
+import { catalogFor } from "../tests/catalogFixture";
 import type { FacilityKind, Unit } from "../shared/types";
 
 const MODERN = catalogFor("modern");

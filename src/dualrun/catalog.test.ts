@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { CATALOG_VERSION, catalogFor } from "../engine/catalog";
+import { CATALOG_VERSION } from "../catalog/catalogTypes";
+import { catalogFor } from "../tests/catalogFixture";
 import type { GameMode } from "../shared/types";
 import { readCatalog } from "./catalog";
 

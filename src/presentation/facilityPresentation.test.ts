@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { catalogFor } from "../engine/catalog";
+import { catalogFor } from "../tests/catalogFixture";
 import { FACILITY_PRESENTATION, facilityColor, facilityDescription } from "./facilityPresentation";
 
 describe("the facility presentation table (#921)", () => {

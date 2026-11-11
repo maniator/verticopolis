@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { catalogFor } from "../engine/catalog";
+import { catalogFor } from "../tests/catalogFixture";
 import { GRID } from "../engine/facilities";
 import {
   STRUCTURE_BRUSH,

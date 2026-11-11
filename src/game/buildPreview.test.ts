@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { catalogFor } from "../engine/catalog";
+import { catalogFor } from "../tests/catalogFixture";
 import { Simulation } from "../engine/Simulation";
 import { FACILITIES, GRID } from "../engine/facilities";
 import { useTowerCatalogSource } from "../catalog/towerCatalog";

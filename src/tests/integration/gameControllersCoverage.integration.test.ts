@@ -3,7 +3,7 @@ import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { Simulation } from "../../engine/Simulation";
 import type { BatchTarget, BatchRentOptions, BatchRentResult } from "../../engine/Simulation";
 import { FACILITIES, GRID, maxCarsFor } from "../../engine/facilities";
-import { catalogFor } from "../../engine/catalog";
+import { catalogFor } from "../catalogFixture";
 import { useTowerCatalogSource } from "../../catalog/towerCatalog";
 import { ECON, rentOf, resaleRefund } from "../../engine/econConfig";
 import type { PriceOptions } from "../../shared/engineTypes";

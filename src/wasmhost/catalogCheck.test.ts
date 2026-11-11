@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { catalogFor } from "../engine/catalog";
+import { catalogFor } from "../tests/catalogFixture";
 import type { Catalog } from "../catalog/catalogTypes";
 import { refuseForeignCatalogs } from "./catalogCheck";
 

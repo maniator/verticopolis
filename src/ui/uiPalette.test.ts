@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { toolInfoFor } from "./templates/toolInfo";
 import { renderToFragment } from "./testing/litTestUtils";
-import { catalogFor } from "../engine/catalog";
+import { catalogFor } from "../tests/catalogFixture";
 import { buildPalette, relabelPalette, selectGroup, syncPaletteTabs } from "./uiPalette";
 import type { Tool, UI } from "./UI";
 

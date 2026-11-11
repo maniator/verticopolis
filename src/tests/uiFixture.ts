@@ -1,5 +1,5 @@
 import { vi } from "vitest";
-import { catalogFor } from "../engine/catalog";
+import { catalogFor } from "./catalogFixture";
 import { UI, type UICallbacks } from "../ui/UI";
 
 /**

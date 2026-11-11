@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { CRASH_SCREEN_ID } from "../ui/crashScreen";
 import { ENGINE_FAILURE_ID } from "./interactionState";
-import { catalogFor } from "../engine/catalog";
+import { catalogFor } from "../tests/catalogFixture";
 import { buildPalette } from "../ui/uiPalette";
 import type { UI } from "../ui/UI";
 import { makeApp, pointer, press, release, tap } from "./inputKeys.fixture";
