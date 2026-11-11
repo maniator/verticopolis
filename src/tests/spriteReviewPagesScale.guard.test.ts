@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeAll, afterAll } from "vitest";
-import { FACILITIES } from "../engine/facilities";
+import { catalogFor } from "./catalogFixture";
 import { FLOOR, TILE } from "../render/scale";
 import type { Transport, Unit } from "../shared/types";
 import { fakeContext, importRemovingWindowListeners } from "./spriteReviewPageHarness";
@@ -54,24 +54,28 @@ vi.mock("../render/sprites", () => ({
 vi.mock("../telemetry", () => ({ injectVercelTelemetry: () => {} }));
 vi.mock("../analytics", () => ({ trackAppAction: () => {} }));
 // The gallery reads the Rust engine's catalog before it draws. This run has no
-// engine package, so the read answers with the TypeScript tables' catalog, which
-// holds the same kinds; what the page does with it is what these guards watch.
-vi.mock("../wasmhost/rustEngine", () => ({ loadWasmEngine: async () => ({}) }));
-vi.mock("../dualrun/catalog", async () => {
-  const { catalogFor } = await import("../engine/catalog");
-  return { readCatalog: (_mod: unknown, mode: "classic" | "modern") => catalogFor(mode) };
+// engine package, so the engine's stand-in answers with the Rust catalog's
+// checked-in fixture; what the page does with it is what these guards watch.
+vi.mock("../wasmhost/rustEngine", async () => {
+  const { readFileSync } = await import("node:fs");
+  const { catalogFixturePath } = await import("./catalogFixture");
+  return { loadWasmEngine: async () => ({ catalog: (mode: "classic" | "modern") => readFileSync(catalogFixturePath(mode), "utf8") }) };
 });
 
 /** The world's floor pitch, in tiles. Both pages must reproduce this whatever
  *  they magnify or shrink by. */
 const TILES_PER_FLOOR = FLOOR / TILE;
 
+/** Gallery cells whose footprint is wider than the cell, so they draw below
+ *  the world scale. */
+const MAX_SHRUNK_CELLS = 4;
+
 /** Tiles per floor a drawn box implies. */
 function tilesPerFloor(tiles: number, floors: number, w: number, h: number): number {
   return h / floors / (w / tiles);
 }
 
-const floorsOf = (u: Unit): number => FACILITIES[u.kind].floors ?? 1;
+const floorsOf = (u: Unit): number => catalogFor("modern").facilities.find((f) => f.key === u.kind)?.floors ?? 1;
 
 /** The metro spans the whole lot. Its platform art composes itself into whatever
  *  width it is handed, so the gallery deliberately fills the cell width and takes
@@ -180,7 +184,8 @@ describe("the sprite-review pages draw at the world scale", () => {
     // A cell may step down from 3x to 2x or 1x when its footprint is too big,
     // but at or above the world scale only whole multiples keep each world
     // pixel a whole block of screen pixels. Below 1x is allowed only for a
-    // footprint wider than the cell, so it must be the rare case.
+    // footprint wider than the cell, so it must be the rare case: four cells
+    // today, one of them the Rust catalog's 28-tile, five-floor wedding hall.
     const scales = rec.scales.gallery.map(([sx]) => sx);
     expect(Math.max(...scales)).toBe(3);
     for (const s of scales) {
@@ -188,6 +193,6 @@ describe("the sprite-review pages draw at the world scale", () => {
       if (s >= 1) expect(Number.isInteger(s), `a cell magnified by ${s}x`).toBe(true);
     }
     const fractional = scales.filter((s) => s < 1).length;
-    expect(fractional, "too many gallery cells shrank below the world scale").toBeLessThanOrEqual(3);
+    expect(fractional, "too many gallery cells shrank below the world scale").toBeLessThanOrEqual(MAX_SHRUNK_CELLS);
   });
 });

@@ -25,9 +25,7 @@ import { rustAssertionFreeTests } from "./testHonestyRust";
  *
  * 1. No unit test reaches a module that starts a real engine
  *    ({@link ENGINE_RUNNERS}), directly or through test-support code. Its
- *    package probe (`hasWasmPackage`) starts nothing and is allowed. The
- *    TypeScript reference engine has its own shrink-only list,
- *    `tsEngineTests.guard.test.ts`.
+ *    package probe (`hasWasmPackage`) starts nothing and is allowed.
  * 2. No recorded engine answers: no `recordings` directory, no `*:record`
  *    script, and no module named for recordings beyond the allowlist.
  * 3. Every `it`/`test` in the unit, integration and e2e tiers asserts, in its
@@ -62,7 +60,7 @@ const PACKAGE_PROBES: ReadonlySet<string> = new Set(["hasWasmPackage"]);
 const ENGINE_PACKAGES = ["engine-rs/pkg/", "src/public/engine/"] as const;
 
 const isRunner = (rel: string): boolean => ENGINE_RUNNERS.includes(rel);
-const isUnitTest = (rel: string): boolean => /\.test\.tsx?$/.test(rel) && !/\.integration\.test\.tsx?$/.test(rel) && !rel.startsWith("src/engine/");
+const isUnitTest = (rel: string): boolean => /\.test\.tsx?$/.test(rel) && !/\.integration\.test\.tsx?$/.test(rel);
 /** Test-support code a unit test's reach is followed through: production
  *  modules are the code under test, which a unit test mocks at its boundary. */
 const isTestSupport = (rel: string): boolean => (rel.startsWith("src/tests/") && !isTestFile(rel)) || /\.fixture\.tsx?$/.test(rel);
@@ -285,7 +283,7 @@ const e2eSpecs = sourceFiles("e2e", [".ts"]).map(repoRel).filter((rel) => rel.en
 const unitTests = srcTests.filter(isUnitTest);
 /** Compile-time suites: their checks are type errors, so a body need not call expect. */
 const isTypeSuite = (rel: string): boolean => rel.endsWith(".types.test.ts");
-const assertingTiers = [...srcTests.filter((rel) => /\.test\.tsx?$/.test(rel) && !rel.startsWith("src/engine/") && !isTypeSuite(rel)), ...e2eSpecs];
+const assertingTiers = [...srcTests.filter((rel) => /\.test\.tsx?$/.test(rel) && !isTypeSuite(rel)), ...e2eSpecs];
 
 describe("unit tests mock the engine; integration tests run it", () => {
   it("scans the unit tier", () => {

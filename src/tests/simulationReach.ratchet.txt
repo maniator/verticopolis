@@ -1,6 +1,0 @@
-# Production files outside src/engine/ that import the TypeScript Simulation
-# at runtime (directly or through an engine module that does), with the
-# modules each imports and why. Read by simulationReach.guard.test.ts; one
-# file per line: `<file> <module> ... # reason`. The list shrinks as the
-# facade's slices (#1207) move each consumer behind the port; a new line needs
-# a reason the PR states and a reviewer accepts.

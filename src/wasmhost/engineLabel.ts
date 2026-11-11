@@ -2,15 +2,13 @@ import { APP_VERSION } from "../appVersion";
 import { settleEngineIdentity, type EngineBootState } from "./engineBoot";
 import { parseEngineIdentity } from "./engineIdentity";
 import { shortId } from "./enginePackageRecord";
-import { TS_ENGINE_SOURCES, TS_ENGINE_VERSION } from "./tsEngineIdentity";
 
 /**
  * The player-visible name of the engine running the simulation, for the
  * version lines on the splash, Settings, and Help's About, with the engine's
- * own version and a short source hash (#1422): "v2.51.0 · TypeScript engine
- * 2.0 (1a2b3c4d5e6f)" or "v2.51.0 · Rust engine 0.20.0 (…)", so a player or
- * tester can tell from the title screen which engine, and which build of it,
- * they are on without opening the console. The Rust engine's version is the
+ * own version and a short source hash (#1422): "v2.51.0 · Rust engine 0.20.0
+ * (1a2b3c4d5e6f)", so a player or tester can tell from the title screen which
+ * build of the engine they are on without opening the console. The Rust engine's version is the
  * crate version its package reports and the hash is its binary's; either is
  * left out when the package did not report it.
  */
@@ -43,16 +41,9 @@ export function engineSuffix(g: LabelSource = pageSource()): string {
 
 /** The suffix from what `g` holds now, without reading a deferred identity. */
 function suffixOf(g: LabelSource): string {
-  // The host's status decides once there is a host, as in the diagnostics:
-  // a later tower can fall back to TypeScript. Before it attaches, the boot
-  // state says which engine is starting. A Rust engine that stopped after a
-  // trap (`engine: "none"`) and a wasm-only build, which has no TypeScript
-  // engine, are never named TypeScript.
-  const boot = g.__vcEngineBoot;
-  const hosted = activeEngine(g) === "wasm";
-  const stopped = !hosted && boot?.engine === "none";
-  const rust = hosted || stopped || boot?.build === "wasm-only" || (!g.__vcEngine && boot?.engine === "wasm");
-  if (!rust) return ` · TypeScript engine ${TS_ENGINE_VERSION} (${shortId(TS_ENGINE_SOURCES)})`;
+  // The Rust engine is the only engine (#1875). A Rust engine that stopped
+  // after a trap reads `engine: "none"` until the reload, and says so.
+  const stopped = activeEngine(g) !== "wasm" && g.__vcEngineBoot?.engine === "none";
   const version = parseEngineIdentity(g.__vcEngineBoot?.identity)?.crate.version;
   const binary = g.__vcEngineBoot?.binary;
   const hash = binary?.state === "ok" ? shortId(binary.sourceHash) : null;

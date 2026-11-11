@@ -20,8 +20,7 @@ import { repoRoot, repoRel, sourceFiles } from "./guardFiles";
  * 2. No source outside the allowed scope calls a tier 3 op, on the binding or
  *    on the TypeScript instance the relay mirrors, and none assigns `.money`
  *    (the relay turns that write into `setMoney`). The allowed scope: the
- *    TypeScript engine itself (`src/engine/`, whose own calls are its
- *    implementation), the relay (`src/dualrun/`), the host and its suppressed
+ *    relay (`src/dualrun/`), the host and its suppressed
  *    frame sync (`src/wasmhost/`), the generated package (`src/public/engine/`),
  *    the tooling harnesses' tower on the Rust engine (`src/game/toolingSim.ts`),
  *    tests (`src/tests/`, `*.test.*`, `e2e/`, which is not scanned) and the
@@ -52,7 +51,7 @@ const WASM_RS = "engine-rs/src/wasm.rs";
 /** The binding's exported members sit in child modules of `wasm.rs`. */
 const WASM_DIR = "engine-rs/src/wasm";
 const bindingFiles = (): string[] => [WASM_RS, ...sourceFiles(WASM_DIR, [".rs"]).map(repoRel).sort()];
-const ALLOWED_DIRS = ["src/engine/", "src/dualrun/", "src/wasmhost/", "src/public/engine/", "src/tests/"];
+const ALLOWED_DIRS = ["src/dualrun/", "src/wasmhost/", "src/public/engine/", "src/tests/"];
 const SCANNED_TREES = ["src", "api", "tools"];
 const SOURCE = /\.(m|c)?[jt]sx?$/;
 const TEST = /\.test\.(m|c)?[jt]sx?$/;

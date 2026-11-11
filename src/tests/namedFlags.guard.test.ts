@@ -25,7 +25,6 @@ interface Allowed {
 }
 
 const ALLOWED: Readonly<Record<string, Allowed>> = {
-  "src/engine/port/viewEncode.ts": { sites: 1, reason: "the unlocked-kinds mask, bit k = kind code k (the whole catalog, past 32 bits)" },
   "engine-rs/src/view/reader.rs": { sites: 1, reason: "the unlocked-kinds mask, bit k = kind code k" },
   "src/simport/viewReader.ts": { sites: 1, reason: "reads the unlocked-kinds mask, bit k = kind code k (the whole catalog, past 32 bits)" },
   "engine-rs/src/dispatch.rs": { sites: 2, reason: "the car's cab-floor bitset, indexed by stop" },

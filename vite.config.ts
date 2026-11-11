@@ -8,7 +8,6 @@ import { notesForVersion, recentReleaseNotes, type ReleaseNotes } from "./src/ch
 import { PACKAGE_STYLESHEET, isPackagePath } from "./src/build/thirdPartyNotices";
 import { entryWithIntegrity, precacheIntegrityTransform, readExpectedPackage } from "./src/build/enginePackageBuild";
 import { MAX_RELEASES, type BuildFingerprint } from "./src/pwaUpdateInfo";
-import { tsEngineSourceHash } from "./src/build/tsEngineSources";
 import { ENGINE_PRELOAD_FILES, enginePreloadAttrs } from "./src/build/enginePreload";
 import { ENGINE_BUILD_RECORD, ENGINE_DIR } from "./src/wasmhost/enginePackageNames";
 import { buildFingerprint } from "./src/build/buildFingerprint";
@@ -78,21 +77,13 @@ const TOOLING_BUILD = toolingBuild();
  * each specifier and that no other specifier reaches the real module, and
  * `scripts/verify-engine-bundle.ts` proves from the emitted sourcemaps that
  * the swapped module did not ship.
- *   - `Simulation.ts`'s step loop becomes a stand-in that throws, since the
- *     WASM host replaces `tick` on every tower it holds. Vitest keeps the real
- *     loop: the TypeScript engine's own tests, and the ones that read it as a
- *     reference, run it until the engine's code is deleted.
- *   - `main.ts`'s tooling tower (`src/game/toolingSim.ts`, a TypeScript
- *     `Simulation` the e2e and screenshot harnesses edit by hand) becomes a
- *     stand-in in every build but a `VC_TOOLING=1` one, so a production build
- *     ships none of the TypeScript engine (#921). A dev serve keeps the real
- *     module, as its `window.game` does.
+ *   - `main.ts`'s tooling tower (`src/game/toolingSim.ts`, the editable tower
+ *     the e2e and screenshot harnesses drive) becomes a stand-in in every
+ *     build but a `VC_TOOLING=1` one, so a production build ships none of it
+ *     (#921). A dev serve keeps the real module, as its `window.game` does.
  */
 function engineAliases(command: "build" | "serve"): { find: RegExp; replacement: string }[] {
   const aliases: { find: RegExp; replacement: string }[] = [];
-  if (!process.env.VITEST) {
-    aliases.push({ find: /^\.\/sim\/loop$/, replacement: resolve(__dirname, "src/wasmhost/stepLoopAbsent.ts") });
-  }
   if (!process.env.VITEST && command === "build" && !TOOLING_BUILD) {
     aliases.push({ find: /^\.\/game\/toolingSim$/, replacement: resolve(__dirname, "src/game/toolingSimAbsent.ts") });
   }
@@ -305,7 +296,6 @@ export default defineConfig(({ command }) => ({
     // The TypeScript engine's source hash (#1422), shown with its pinned
     // version (src/wasmhost/tsEngineIdentity.ts) on the version line and in
     // the diagnostics, as the Rust binary's source hash is.
-    __TS_ENGINE_SOURCES__: JSON.stringify(tsEngineSourceHash(resolve(__dirname, "src/engine"))),
   },
   plugins: [
     captureOutDir((dir) => {

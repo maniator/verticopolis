@@ -497,10 +497,10 @@ jobs:
 
   # The player build, the one every deploy makes (src/build/engineBundle.ts):
   # the Rust/WASM engine is the only engine, with no runtime switch, none of
-  # the TypeScript engine and no fallback. Its postbuild guard
+  # the harnesses' tower and no fallback. Its postbuild guard
   # (scripts/verify-engine-bundle.ts) reads the emitted sourcemaps and the
-  # precache; this job also proves that guard fails when app code imports the
-  # TypeScript step loop, then runs the general e2e suite (the `chromium`
+  # precache; this job also proves that guard fails when app code imports test
+  # code, then runs the general e2e suite (the `chromium`
   # project) on a tooling build. The `e2e-serial` job above runs the
   # serial project: pixel baselines, the perf gate and the engine-status specs.
   e2e-general:
@@ -548,9 +548,9 @@ jobs:
         if: ${{ matrix.shard == 1 }}
         run: npm run build
 
-      # A legacy import from app code (the alias only covers Simulation.ts's
-      # own import) must fail the build with the guard's message.
-      - name: The bundle guard catches a TypeScript step loop import
+      # An import of test code from app code must fail the build with the
+      # guard's message.
+      - name: The bundle guard catches a test code import
         if: ${{ matrix.shard == 1 }}
         shell: bash
         run: |
@@ -558,13 +558,13 @@ jobs:
           # Put the file back however the step ends; the next build step then
           # rebuilds dist/ from the real source.
           trap 'cp "$RUNNER_TEMP/bootstrap.ts" src/bootstrap.ts' EXIT
-          printf 'import { tick as legacyTick } from "./engine/sim/loop";\n(globalThis as unknown as { legacyTick?: unknown }).legacyTick = legacyTick;\n' >> src/bootstrap.ts
+          printf 'import { PHONE_TIER as canaryTier } from "./tests/phoneTier";\n(globalThis as unknown as { canaryTier?: unknown }).canaryTier = canaryTier;\n' >> src/bootstrap.ts
           if npm run build > canary.log 2>&1; then
             cat canary.log
-            echo "::error::the build passed with the TypeScript step loop imported; scripts/verify-engine-bundle.ts missed it"
+            echo "::error::the build passed with test code imported; scripts/verify-engine-bundle.ts missed it"
             exit 1
           fi
-          grep -F "carries the TypeScript step loop (src/engine/sim/loop.ts)" canary.log
+          grep -F "carries test code (src/tests/phoneTier.ts)" canary.log
 
       - name: Download tooling app artifact
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
