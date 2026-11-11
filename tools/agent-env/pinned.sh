@@ -49,7 +49,11 @@ if (exec 3<>/dev/tcp/127.0.0.1/4173) 2>/dev/null; then
 fi
 docker image inspect "$IMAGE" > /dev/null 2>&1 || docker pull "$IMAGE"
 
-node_dir="/opt/node-v$(tr -d ' \r\n' < .nvmrc)"
+# The .nvmrc Node: the host's own when it is that version (setup.sh's, or one
+# a CI runner installed), else setup.sh's install; otherwise the image's Node.
+node_want="$(tr -d ' \r\n' < .nvmrc)"
+node_dir="/opt/node-v${node_want}"
+[ "$(node -v 2>/dev/null)" = "v${node_want}" ] && node_dir="$(dirname "$(dirname "$(node -p 'process.execPath')")")"
 node_mount=()
 [ -x "$node_dir/bin/node" ] && node_mount=(-v "$node_dir:/opt/vc-node:ro")
 

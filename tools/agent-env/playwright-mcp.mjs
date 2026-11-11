@@ -20,6 +20,7 @@
 // still come from tools/agent-env/pinned.sh.
 import { spawn, spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -79,12 +80,24 @@ if (installed && image && dockerHasImage(image)) {
     image, "bash", "-c", script, "playwright-mcp", ...extra,
   ]);
 } else {
-  const chromium = process.env.PW_CHROMIUM_PATH || (existsSync("/opt/pw-browsers/chromium") ? "/opt/pw-browsers/chromium" : "");
-  const browserArgs = ["--output-dir", join(root, ".playwright-mcp")];
+  // A preinstalled Chromium (a cloud sandbox), else the repository's own
+  // Playwright browser (`npx playwright install chromium`), else the server's.
+  let chromium = process.env.PW_CHROMIUM_PATH || (existsSync("/opt/pw-browsers/chromium") ? "/opt/pw-browsers/chromium" : "");
+  if (!chromium) {
+    try {
+      const repoPlaywright = createRequire(join(root, "package.json"))("playwright");
+      const executable = repoPlaywright.chromium.executablePath();
+      if (existsSync(executable)) chromium = executable;
+    } catch {
+      // No repository dependencies: keep the server's own browser.
+    }
+  }
+  const browserArgs = ["--output-dir", join(root, ".playwright-mcp"), "--isolated"];
   // Headed only where there is a display to show it on (a person's desktop).
-  const noDisplay = process.platform === "linux" && !process.env.DISPLAY && !process.env.WAYLAND_DISPLAY;
-  if (chromium || noDisplay) browserArgs.push("--headless");
-  if (chromium) browserArgs.push("--no-sandbox", "--isolated", "--executable-path", chromium);
+  if (process.platform === "linux" && !process.env.DISPLAY && !process.env.WAYLAND_DISPLAY) browserArgs.push("--headless");
+  // Chromium refuses its sandbox as root (cloud sandboxes run as root).
+  if (process.getuid?.() === 0) browserArgs.push("--no-sandbox");
+  if (chromium) browserArgs.push("--executable-path", chromium);
   if (installed) run(process.execPath, [installedCli, ...browserArgs, ...extra]);
   else run("npx", ["-y", MCP_PACKAGE, ...browserArgs, ...extra]);
 }
