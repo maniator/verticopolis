@@ -341,11 +341,14 @@ and large scenarios with their pinned scenario hashes.
 
 **Bracket and many-unit towers (#1270).** The three default towers are sized by
 people. Three more are named on purpose with `--scenarios` and never run by
-default, so an existing run keeps its meaning. Each is a save built in Node
-through the engine's own commands (every cap in `src/engine/facilities.ts`
-holds, and the floors, shafts and walkways are asserted; occupancy is written
-to the unit state, and the tests bound the people and units) and handed unchanged to both engines
-(`src/tests/perfCompare/fixtureTowers.ts`):
+default, so an existing run keeps its meaning. Each was built in Node
+through the engine's own commands (every cap held, and the floors, shafts and
+walkways were asserted; occupancy was written to the unit state). When the
+TypeScript engine was retired (#1875) the saves were pinned byte for byte in
+`src/tests/perfCompare/towers/`, beside a `manifest.json` that records each
+one's hash, people, units and transports; a file that no longer hashes to its
+record stops the run. A new tower is built in the game (a `VC_TOOLING=1`
+build's `game.sim`) or the Rust engine, saved there and pinned the same way:
 
 | Name | People | Units | Transports | Save bytes | What it is for |
 | --- | --- | --- | --- | --- | --- |
@@ -613,8 +616,9 @@ both modes. An `--aa ts` pass still runs that probe, on the verdict run's
 schedule, so the page lifecycle matches. Boot order differs only when the two
 slots run different engines, so DOMContentLoaded and the load event are
 compared in an A/A folder. An `--aa ts` pass still needs the WASM package
-and the Node check of both engines to pass, because the harness validates the
-whole setup.
+and the Node check to pass, because the harness validates the whole setup.
+Since #1875 the Node check runs the WASM package alone: every browser sample
+must start and end in the state it records.
 
 `npm run perf:calibrate -- <A/A folder>... --out <dir>` (`npm.cmd run
 perf:calibrate` in PowerShell) applies steps 1 to 4 to a set of

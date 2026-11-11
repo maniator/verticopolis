@@ -1,9 +1,7 @@
 import { createHash } from "node:crypto";
-import { Simulation } from "../../engine/Simulation";
-import type { SerializedGame } from "../../shared/serializedGame";
+import { isDeepStrictEqual } from "node:util";
 import { SaveGame } from "../../storage/SaveGame";
 import type { Scenario } from "./scenarios";
-import { saveOf, loadResultSim } from "../fixtures/saveText";
 
 /**
  * The cold start with a saved tower (#1254): a scenario's save placed in the
@@ -24,16 +22,16 @@ export interface AutosaveSeed {
 
 const seeds = new Map<string, AutosaveSeed>();
 
-/** The stored autosave value for a save: loaded into the TypeScript engine
- *  and packed by `SaveGame.packSync`, the game's own autosave writer, so the
- *  boot reads it exactly as it reads a real one. Packed once per save text
+/** The stored autosave value for a save: its text packed by
+ *  `SaveGame.packSync`, the game's own autosave writer, so the boot reads it
+ *  exactly as it reads a real one. Packed once per save text
  *  in a Node process, so all of a run's processes and both engines boot the
  *  same bytes. The pack stamps the write time, so a resumed run (a new Node
  *  process) packs different bytes; each result records the sha256 it used. */
 export function autosaveSeed(sc: Pick<Scenario, "save">): AutosaveSeed {
   let seed = seeds.get(sc.save);
   if (seed === undefined) {
-    const value = SaveGame.packSync(saveOf(Simulation.deserialize(JSON.parse(sc.save) as SerializedGame)));
+    const value = SaveGame.packSync(sc.save);
     seed = { value, sha256: createHash("sha256").update(value).digest("hex") };
     seeds.set(sc.save, seed);
   }
@@ -42,15 +40,36 @@ export function autosaveSeed(sc: Pick<Scenario, "save">): AutosaveSeed {
 
 /** Before any browser runs: pack each scenario's seed and read it back
  *  through `SaveGame.loadResult`, the reader the boot uses, so a seed the
- *  boot could not load stops the run before its first measurement. */
+ *  boot could not read stops the run before its first measurement. The read
+ *  must hand the engine the scenario's save, changed only by the write stamp
+ *  the autosave writer adds; the runner checks the booted tower's population
+ *  on the page. */
 export function checkAutosaveSeeds(scenarios: readonly Pick<Scenario, "name" | "save" | "population">[]): void {
   for (const sc of scenarios) {
     // An empty tower would pass the runner's population check without the
     // save ever loading.
     if (!(sc.population > 0)) throw new Error(`${sc.name}: the saved-tower start needs a tower with people in it; this save has population ${sc.population}`);
-    const loaded = withAutosave(autosaveSeed(sc).value, () => loadResultSim());
-    if (!loaded.sim || loaded.corrupt || loaded.sim.population !== sc.population) throw new Error(`${sc.name}: the autosave seed does not load back (${loaded.sim ? `population ${loaded.sim.population}, the save ${sc.population}` : "no tower"}${loaded.corrupt ? ", read as corrupt" : ""})`);
+    let handed: string | null = null;
+    const read = withAutosave(autosaveSeed(sc).value, () =>
+      SaveGame.loadResult((text) => {
+        handed = text;
+        return true;
+      }),
+    );
+    const same = handed !== null && isDeepStrictEqual(unstamped(handed), unstamped(sc.save));
+    if (read.loaded && !read.corrupt && same) continue;
+    let what = "a different tower";
+    if (handed === null) what = "no tower";
+    else if (same) what = "loaded";
+    throw new Error(`${sc.name}: the autosave seed does not load back (${what}${read.corrupt ? ", read as corrupt" : ""})`);
   }
+}
+
+/** A save's tower without the write stamp (`savedAt`, `appVersion`) that
+ *  every autosave write sets. */
+function unstamped(text: string): unknown {
+  const { savedAt: _savedAt, appVersion: _appVersion, ...tower } = JSON.parse(text) as Record<string, unknown>;
+  return tower;
 }
 
 /** Run `fn` with a storage holding only the autosave slot, then restore the

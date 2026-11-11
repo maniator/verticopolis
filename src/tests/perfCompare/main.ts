@@ -208,8 +208,8 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
   log(`perf:compare: measuring ${environment.commit}${environment.dirty ? " (dirty tree)" : ""}; origin/main is ${environment.mainCommit ?? "unknown"}${environment.behindMain !== null ? `, ${environment.behindMain} commit(s) not in this tree` : ""}`);
   log("perf:compare: Node conformance check of both engines on every scenario");
   const mod = await loadWebPackage(join(distPerf, "engine"));
-  const nodeChecks = scenarios.map((sc, i) => checkScenario(mod, sc, config.steps, config.dt, config.warmSteps, i % 2 === 0 ? "ts-first" : "wasm-first"));
-  for (const c of nodeChecks) log(`  ${c.scenario}: ${c.match ? "engines agree" : "ENGINES DISAGREE"} (Node: ts ${c.nodeTsMs.toFixed(0)} ms, wasm ${c.nodeWasmMs.toFixed(0)} ms)`);
+  const nodeChecks = scenarios.map((sc) => checkScenario(mod, sc, config.steps, config.dt, config.warmSteps));
+  for (const c of nodeChecks) log(`  ${c.scenario}: end state ${c.end.state} (Node: wasm ${c.nodeWasmMs.toFixed(0)} ms)`);
   // Hourly save churn on the WASM engine; no TypeScript side, so an A/A pass
   // of TypeScript has nothing to add and an A/A pass of WASM repeats it.
   const churn = scenarios.map((sc) => measureChurn(mod, sc, Math.max(1, Math.floor((config.steps * config.dt) / 60)), config.dt, config.warmSteps));

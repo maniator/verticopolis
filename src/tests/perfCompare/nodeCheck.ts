@@ -1,34 +1,31 @@
 import { readFileSync } from "node:fs";
 import { posix, resolve, win32 } from "node:path";
 import { pathToFileURL } from "node:url";
-import { Simulation } from "../../engine/Simulation";
-import type { SerializedGame } from "../../shared/serializedGame";
-import { crowdView, stateView } from "../../engine/conformanceView";
 import { checkBinding, type WasmModule } from "../../dualrun/binding";
-import { digest } from "../conformance/canonical";
 import type { Scenario } from "./scenarios";
 
 /**
- * The authoritative outcome check for the comparison (issue #972), in Node
- * with the conformance digests: for each scenario, the TypeScript engine and
- * the served WASM package (the browser build, `src/public/engine/` or a
- * build directory's `engine/`, instantiated with `initSync`) start from the
- * same save, run the same ticks, and must agree on the state view AND the
- * crowd view, at the start and at the end. The browser runs compare the
- * state digest again on the real page; only this check sees the crowd.
+ * The outcome anchor for the comparison (issue #972), in Node with the
+ * conformance digests: for each scenario, the served WASM package (the
+ * browser build's `engine/`, instantiated with `initSync`) starts from the
+ * scenario's save and runs the timed passes' ticks. Every browser sample, in
+ * either slot, must start and end in the state this check records, so a page
+ * that ran some other simulation fails the run. Only this check sees the crowd.
  *
- * It also times the same loop on both engines in Node. Those numbers are a
- * secondary data point (Node's V8, not Chromium's), labeled as such.
+ * Until #1875 it ran the TypeScript engine beside the package and required
+ * the two to agree; the TypeScript engine is gone, and the Rust engine's own
+ * conformance lock holds the package to the scenarios that check covered.
+ *
+ * It also times the loop in Node. That number is a secondary data point
+ * (Node's V8, not Chromium's), labeled as such.
  */
 
 export interface NodeCheck {
   scenario: string;
   steps: number;
   dt: number;
-  start: { tsState: string; wasmState: string; tsCrowd: string; wasmCrowd: string };
-  end: { tsState: string; wasmState: string; tsCrowd: string; wasmCrowd: string };
-  match: boolean;
-  nodeTsMs: number;
+  start: { state: string; crowd: string };
+  end: { state: string; crowd: string };
   nodeWasmMs: number;
 }
 
@@ -46,36 +43,21 @@ export async function loadWebPackage(dir: string): Promise<WasmModule> {
   return checkBinding(glue);
 }
 
-export function checkScenario(mod: WasmModule, sc: Scenario, steps: number, dt: number, warmSteps: number, order: "ts-first" | "wasm-first" = "ts-first"): NodeCheck {
-  // Warm both engines on throwaway copies, as the browser runs do.
+export function checkScenario(mod: WasmModule, sc: Scenario, steps: number, dt: number, warmSteps: number): NodeCheck {
+  // Warm the engine on a throwaway copy, as the browser runs do.
   {
-    const ts = Simulation.deserialize(JSON.parse(sc.save) as SerializedGame);
     const w = mod.Engine.fromSave(sc.save);
-    for (let i = 0; i < warmSteps; i++) {
-      ts.tick(dt);
-      w.tick(dt);
-    }
+    for (let i = 0; i < warmSteps; i++) w.tick(dt);
     w.free();
   }
-  const ts = Simulation.deserialize(JSON.parse(sc.save) as SerializedGame);
   const w = mod.Engine.fromSave(sc.save);
-  const start = { tsState: digest(stateView(ts)), wasmState: w.stateDigest(), tsCrowd: digest(crowdView(ts)), wasmCrowd: w.crowdDigest() };
-  const time = (tick: () => void): number => {
+  try {
+    const start = { state: w.stateDigest(), crowd: w.crowdDigest() };
     const t = performance.now();
-    for (let i = 0; i < steps; i++) tick();
-    return performance.now() - t;
-  };
-  let nodeTsMs: number;
-  let nodeWasmMs: number;
-  if (order === "ts-first") {
-    nodeTsMs = time(() => ts.tick(dt));
-    nodeWasmMs = time(() => w.tick(dt));
-  } else {
-    nodeWasmMs = time(() => w.tick(dt));
-    nodeTsMs = time(() => ts.tick(dt));
+    for (let i = 0; i < steps; i++) w.tick(dt);
+    const nodeWasmMs = performance.now() - t;
+    return { scenario: sc.name, steps, dt, start, end: { state: w.stateDigest(), crowd: w.crowdDigest() }, nodeWasmMs };
+  } finally {
+    w.free();
   }
-  const end = { tsState: digest(stateView(ts)), wasmState: w.stateDigest(), tsCrowd: digest(crowdView(ts)), wasmCrowd: w.crowdDigest() };
-  w.free();
-  const match = start.tsState === start.wasmState && start.tsCrowd === start.wasmCrowd && end.tsState === end.wasmState && end.tsCrowd === end.wasmCrowd;
-  return { scenario: sc.name, steps, dt, start, end, match, nodeTsMs, nodeWasmMs };
 }

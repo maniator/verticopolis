@@ -94,7 +94,7 @@ describe("contextLossFinding", () => {
 });
 
 describe("the compare validation", () => {
-  const nodeCheck = { scenario: "small", steps: 10, dt: 2, start: { tsState: "a", wasmState: "a", tsCrowd: "c", wasmCrowd: "c" }, end: { tsState: "b", wasmState: "b", tsCrowd: "d", wasmCrowd: "d" }, match: true, nodeTsMs: 1, nodeWasmMs: 1 };
+  const nodeCheck = { scenario: "small", steps: 10, dt: 2, start: { state: "a", crowd: "c" }, end: { state: "b", crowd: "d" }, nodeWasmMs: 1 };
   const runs = (lost: string[] | undefined) => [processRun(0, "ts"), processRun(0, "wasm"), processRun(1, "wasm"), processRun(1, "ts")].map((r, i) => (i === 2 ? { ...r, contextLost: lost } : r));
 
   it("fails a run that lost a context, in a full run, a quick run and under a renderer exception", () => {

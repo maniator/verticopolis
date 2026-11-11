@@ -167,15 +167,14 @@ export function validateResults(config: CompareConfig, runs: readonly ProcessRun
     }
     const node = nodeChecks.find((c) => c.scenario === name);
     if (node && node.steps === config.steps && node.dt === config.dt) {
-      if (starts.size === 1 && !starts.has(node.start.tsState)) errors.push(`${name}: the browser runs started from ${[...starts.keys()][0]}, not the Node check's ${node.start.tsState}`);
-      if (ends.size === 1 && !ends.has(node.end.tsState)) errors.push(`${name}: the browser runs ended in ${[...ends.keys()][0]}, not the Node check's ${node.end.tsState}`);
+      if (starts.size === 1 && !starts.has(node.start.state)) errors.push(`${name}: the browser runs started from ${[...starts.keys()][0]}, not the Node check's ${node.start.state}`);
+      if (ends.size === 1 && !ends.has(node.end.state)) errors.push(`${name}: the browser runs ended in ${[...ends.keys()][0]}, not the Node check's ${node.end.state}`);
     }
     if (starts.size > 1) errors.push(`${name}: the samples did not start from one state: ${describeGroups(starts)}`);
     if (ends.size > 1) errors.push(`${name}: the samples did not end in one state after the same ticks: ${describeGroups(ends)}`);
     if (minutes.size > 1) errors.push(`${name}: the samples ended at different clock minutes: ${[...minutes].join(", ")}`);
   }
 
-  for (const c of nodeChecks) if (!c.match) errors.push(`${c.scenario}: the Node conformance check found the engines disagree (start ${c.start.tsState}/${c.start.wasmState}, end ${c.end.tsState}/${c.end.wasmState}, crowd ${c.end.tsCrowd}/${c.end.wasmCrowd})`);
   for (const name of config.scenarios) if (!nodeChecks.some((c) => c.scenario === name)) errors.push(`${name}: no Node conformance check ran`);
 
   for (const engine of ENGINES) if (!good.some((r) => r.engine === engine)) errors.push(`no successful ${engine} process: the configurations cannot be compared`);
