@@ -357,8 +357,8 @@ jobs:
 
       - name: Unit tests
         # Run native/default and WASM-feature variants. The conformance
-        # feature variant is exercised below by cargo llvm-cov's test run;
-        # don't run those same tests twice in this job.
+        # feature variant is exercised by cargo llvm-cov's test run in the
+        # rust-coverage job; don't run those same tests twice.
         # Keep debug assertions and overflow checks enabled.
         env:
           CARGO_PROFILE_TEST_OPT_LEVEL: "1"
@@ -368,6 +368,53 @@ jobs:
 
       - name: Conformance
         run: cargo run --locked --release --features conformance --bin conformance
+
+      # A cancelled run can skip every step above and still leave the job
+      # green, which would pass the required check unchecked. Fail instead.
+      - name: Fail a cancelled run
+        if: ${{ cancelled() }}
+        run: exit 1
+
+  # Line coverage of the unit tests and the referee, split out of the rust
+  # job so the two run side by side: coverage alone takes about 8 minutes,
+  # and after the unit tests it made the rust job the longest PR check.
+  rust-coverage:
+    needs: changes
+    # Fail closed: run unless the filter succeeded and found no engine file.
+    # !cancelled(), not always(), as the consumer job above explains: a run a
+    # newer push cancelled must stop here. The engine-rs job fails it.
+    if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.engine == 'true') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: engine-rs
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # ubuntu-latest ships a stable toolchain through rustup; pin the channel
+      # the crate was written against rather than whatever the image happens
+      # to carry. Every cargo step runs --locked so a stale Cargo.lock fails
+      # the run instead of being rewritten on the runner.
+      - name: Rust toolchain
+        run: |
+          rustup toolchain install 1.97.0 --profile minimal
+          rustup default 1.97.0
+          # The image's own stable toolchain is unused here, and the cache
+          # key hashes every installed toolchain, so an image update would
+          # otherwise miss the cache on every pull request.
+          rustup toolchain uninstall stable || true
+
+      # The cargo registry and the compiled dependencies, keyed on the
+      # installed toolchains, Cargo.lock and the job. Only a run on main
+      # saves, so a pull request reads main's cache and never writes one of
+      # its own. Bump prefix-key to start the cache over when it grows.
+      - name: Cargo cache
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          prefix-key: v1-rust
+          workspaces: engine-rs -> target
+          save-if: ${{ github.ref == 'refs/heads/main' }}
 
       # The prebuilt cargo-llvm-cov release, checked against the hash the
       # action's manifest records, in place of a compile from source. With
@@ -385,7 +432,8 @@ jobs:
       # floor sits about a point and a half under the measurement).
       # The conformance-feature unit tests run here (not a second time
       # in the Unit tests step). The referee runs in the debug profile here
-      # to merge coverage; the release replay above is the parity gate.
+      # to merge coverage; the release replay in the rust job is the parity
+      # gate.
       - name: Coverage
         run: |
           rustup component add llvm-tools-preview
@@ -394,8 +442,6 @@ jobs:
           cargo llvm-cov --no-report --locked run --features conformance --bin conformance
           cargo llvm-cov report --fail-under-lines 87
 
-      # A cancelled run can skip every step above and still leave the job
-      # green, which would pass the required check unchecked. Fail instead.
       - name: Fail a cancelled run
         if: ${{ cancelled() }}
         run: exit 1
@@ -511,7 +557,7 @@ jobs:
   # filter did not ask for) fails it, so the binding's checks and the
   # Node-free consumer gate a merge alongside the Rust job.
   engine-rs:
-    needs: [changes, consumer, rust, wasm-binding, fuzz-corpus]
+    needs: [changes, consumer, rust, rust-coverage, wasm-binding, fuzz-corpus]
     if: ${{ always() }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -522,14 +568,15 @@ jobs:
           ENGINE: ${{ needs.changes.outputs.engine }}
           CONSUMER: ${{ needs.consumer.result }}
           RUST: ${{ needs.rust.result }}
+          COVERAGE: ${{ needs.rust-coverage.result }}
           BINDING: ${{ needs.wasm-binding.result }}
           CORPUS: ${{ needs.fuzz-corpus.result }}
         run: |
-          echo "changes: $FILTER (engine=$ENGINE), consumer: $CONSUMER, rust: $RUST, wasm-binding: $BINDING, fuzz-corpus: $CORPUS"
-          if [ "$FILTER" = success ] && [ "$ENGINE" = false ] && [ "$CONSUMER" = skipped ] && [ "$RUST" = skipped ] && [ "$BINDING" = skipped ] && [ "$CORPUS" = skipped ]; then
+          echo "changes: $FILTER (engine=$ENGINE), consumer: $CONSUMER, rust: $RUST, rust-coverage: $COVERAGE, wasm-binding: $BINDING, fuzz-corpus: $CORPUS"
+          if [ "$FILTER" = success ] && [ "$ENGINE" = false ] && [ "$CONSUMER" = skipped ] && [ "$RUST" = skipped ] && [ "$COVERAGE" = skipped ] && [ "$BINDING" = skipped ] && [ "$CORPUS" = skipped ]; then
             exit 0
           fi
-          test "$CONSUMER" = success && test "$RUST" = success && test "$BINDING" = success && test "$CORPUS" = success
+          test "$CONSUMER" = success && test "$RUST" = success && test "$COVERAGE" = success && test "$BINDING" = success && test "$CORPUS" = success
 
       - name: Fail a cancelled run
         if: ${{ cancelled() }}

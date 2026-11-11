@@ -207,7 +207,8 @@ jobs:
       # tower, 15 s of CPU alone) is excluded here and runs in the next step.
       # Under v8 coverage with the other test files running beside it, it took
       # 61 s against its 60 s limit and failed unrelated PRs. Keep the scenario
-      # in the separate no-coverage step, which CI executes directly. The same
+      # in the separate no-coverage step, which CI executes directly (on the
+      # unitWasm leg below, so it runs in parallel with this one). The same
       # holds for two long port-kit suites: condoRelocationEngine (30 years of
       # hourly ticks, about 60 s locally, 390 s under coverage against its
       # 300 s limit) and roomCountsEngine (a check after every step on three
@@ -216,9 +217,8 @@ jobs:
         if: ${{ needs.changes.outputs.tests != 'false' }}
         run: npm run test:coverage -- --run --exclude '**/conformance.integration.test.ts' --exclude '**/condoRelocationEngine.integration.test.ts' --exclude '**/roomCountsEngine.integration.test.ts'
 
-      - name: Engine conformance (no coverage)
-        if: ${{ !cancelled() && needs.changes.outputs.tests != 'false' }}
-        run: npm exec --no -- vitest run --project integration conformance.integration condoRelocationEngine roomCountsEngine
+      # The three excluded suites run without coverage on the unitWasm leg of
+      # test-wasm-parity, beside this job instead of after it.
 
       # This job only proves the bundle builds, with no engine package (the e2e
       # job below builds with one), so it opts out of the engine requirement
@@ -295,9 +295,23 @@ jobs:
           VC_LOG_TEST_STARTS: "1"
         run: npx vitest run --project unit
 
+      # The two halves of `npm run test:wasm` used to run one after the other
+      # on the integrationWasm leg. The port-kit suites and the no-coverage
+      # engine conformance (moved here from the test job) run on this shorter
+      # leg instead, so both legs and the test job finish at about the same
+      # time.
+      - name: Port-kit suites
+        if: ${{ !cancelled() && needs.changes.outputs.code != 'false' && matrix.project == 'unitWasm' }}
+        run: npm run test:port
+
+      - name: Engine conformance (no coverage)
+        if: ${{ !cancelled() && needs.changes.outputs.code != 'false' && needs.changes.outputs.tests != 'false' && matrix.project == 'unitWasm' }}
+        run: npm exec --no -- vitest run --project integration conformance.integration condoRelocationEngine roomCountsEngine
+
       # The suites that start the Rust engine themselves (conformance, the
       # goldens, perf comparison), run once, on the integrationWasm leg; the
-      # Rust workflow does not repeat this test:wasm script.
+      # Rust workflow does not repeat this test:wasm script. The script's
+      # test:port half runs on the unitWasm leg.
       # This step has its own timeout and logs each test start (#1152). With
       # both diagnostics corpus differentials in it (#1811), the step takes
       # 4.5 to 8.5 minutes, depending on the runner, so the timeout leaves
@@ -307,7 +321,7 @@ jobs:
         timeout-minutes: 18
         env:
           VC_LOG_TEST_STARTS: "1"
-        run: npm run test:wasm
+        run: npm run test:wasm:host
 
   # Resolve the Playwright container tag from the repo's own Playwright version so
   # the e2e job's browser can never drift from the one baselines were minted with
@@ -414,8 +428,10 @@ jobs:
   # project) on a tooling build. The `e2e` job above runs the
   # serial project: pixel baselines, the perf gate and the engine-status specs.
   e2e-wasm-only:
-    # Keep this job id/check name stable for required-check safety until branch
-    # protection is explicitly migrated to a renamed status.
+    # Not a required check. It runs in two shards on two runners, since one
+    # worker on one runner took 13 to 18 minutes, the longest job on a pull
+    # request. Each shard keeps one worker (see playwright.config.ts), so the
+    # specs keep the timing they expect.
     needs: [changes, resolve-image, engine-wasm]
     # As the e2e job: skipped only for a prose-only change. It is not a
     # required check, so a merge queue run skips it; the pull request's own run
@@ -423,6 +439,10 @@ jobs:
     if: ${{ !cancelled() && github.event_name != 'merge_group' && needs.changes.outputs.code != 'false' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
     permissions:
       contents: read
     container:
@@ -445,13 +465,17 @@ jobs:
           artifact-name: engine-wasm
 
       # The player build, exactly as a deploy would make it, with every
-      # postbuild check (the engine bundle guard among them).
+      # postbuild check (the engine bundle guard among them). The tests run
+      # on the tooling build below, so the player build and its canary run
+      # on the first shard only.
       - name: Build (player)
+        if: ${{ matrix.shard == 1 }}
         run: npm run build
 
       # A legacy import from app code (the alias only covers Simulation.ts's
       # own import) must fail the build with the guard's message.
       - name: The bundle guard catches a TypeScript step loop import
+        if: ${{ matrix.shard == 1 }}
         shell: bash
         run: |
           cp src/bootstrap.ts "$RUNNER_TEMP/bootstrap.ts"
@@ -482,15 +506,28 @@ jobs:
           mkdir -p "$GITHUB_WORKSPACE/dist"
           tar -C "$GITHUB_WORKSPACE/dist" -xzf tooling-dist.tgz
 
+      # Playwright decides which shard gets milestones.spec.ts, so the shard
+      # that lists it is the one whose upload must find the shots.
+      - name: Does this shard run the milestone spec
+        id: milestones
+        shell: bash
+        run: |
+          npx playwright test --project=chromium --grep-invert @perf --shard=${{ matrix.shard }}/2 --list > "$RUNNER_TEMP/shard-list.txt"
+          if grep -q 'milestones\.spec\.ts' "$RUNNER_TEMP/shard-list.txt"; then
+            echo "here=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "here=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Run end-to-end tests (general suite)
-        run: npx playwright test --project=chromium --grep-invert @perf
+        run: npx playwright test --project=chromium --grep-invert @perf --shard=${{ matrix.shard }}/2
 
       # Per-run visual proof of the ★-progression. milestones.spec.ts writes to
       # the untracked e2e/output/ dir (never the committed, human-blessed
       # docs/screenshots/milestones/ gallery, which only the pinned-container
       # pipeline may regenerate), and this uploads that per-run set.
       - name: Upload milestone screenshots
-        if: always()
+        if: ${{ always() && steps.milestones.outputs.here == 'true' }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: milestone-screenshots
@@ -501,6 +538,6 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: playwright-wasm-only-results
+          name: playwright-wasm-only-results-${{ matrix.shard }}
           path: test-results/
           if-no-files-found: ignore

@@ -142,7 +142,7 @@ Verticopolis has **two test tiers**:
     Rust engine. The TypeScript engine changes only when the shared lock, a parity test or the
     catalog digest needs it (for example the catalog size and price tables both engines read), and
     the PR says why; no feature or fix is ported to it for its own sake. An engine PR that adds a branch adds a scenario that reaches it;
-    the Rust job's coverage step (`cargo llvm-cov`, line floor in
+    the `rust-coverage` job (`cargo llvm-cov`, line floor in
     `engine-rs.yml`) is how review checks that, and the floor only moves up.
     The catalog every frontend reads (prices, sizes and build rules,
     `src/engine/catalog.ts` and `engine-rs/src/catalog.rs`) is pinned the
@@ -236,8 +236,9 @@ Verticopolis has **two test tiers**:
   `engineStatusRows`, `atlas`, `visual`, `perf`) and runs with one worker, as
   the `e2e` job; `chromium` holds the general browser regression suite,
   including `e2e/wasmOnly.spec.ts` (boot, failures and offline start), and CI
-  runs it as the `e2e-wasm-only` job, which also runs the
-  negative bundle canary and uploads the milestone screenshots
+  runs it as the `e2e-wasm-only` job, in two shards on two runners. The
+  first shard also runs the negative bundle canary, and the shard that runs
+  `milestones.spec.ts` uploads the milestone screenshots
   (`milestone-screenshots`). `npm run e2e` runs both locally; pass
   `--project=chromium` or `--project=chromium-serial` for one.
   The suite runs on the Rust engine only, and so does the perf gate, whose
