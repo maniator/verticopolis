@@ -170,7 +170,10 @@ describe.skipIf(process.platform === "win32")("scripts/vercel-ignore-build.sh", 
       return spawnSync("bash", [SCRIPT], { cwd: root, env, encoding: "utf8" }).status;
     }
 
-    const base = { "src/a.ts": "a", "docs/a.md": "a", "README.md": "a" };
+    const pkg = (version: string, dep = "0") => `{\n  "name": "x",\n  "version": "${version}",\n  "dep": "${dep}"\n}\n`;
+    const crate = (version: string) => `[package]\nname = "verticopolis-engine"\nversion = "${version}"\n\n[dependencies]\nversion = "9.9.9"\n`;
+    const bump = (version: string) => ({ "package.json": pkg(version) });
+    const base = { "src/a.ts": "a", "docs/a.md": "a", "README.md": "a", "package.json": pkg("2.0.0"), "engine-rs/Cargo.toml": crate("1.0.0") };
 
     it("skips (0) when only skipped paths changed", () => {
       expect(exitCode(base, { "docs/a.md": "b", "README.md": "b", ".github/workflows/x.yml": "b", "src/a.test.ts": "b" })).toBe(0);
@@ -206,17 +209,47 @@ describe.skipIf(process.platform === "win32")("scripts/vercel-ignore-build.sh", 
       it("builds a preview with pending notes, and production when every note is none", () => {
         expect(exitCode(base, { "src/a.ts": "b", ".changes/x.md": note("minor", "minor") }, "sha", "preview")).toBe(1);
         expect(exitCode(base, { "src/a.ts": "b", ".changes/x.md": note("minor", "minor") })).toBe(1);
-        expect(exitCode(base, { "src/a.ts": "b", ".changes/x.md": note("none", "none") }, "sha", "production")).toBe(1);
+        expect(exitCode(base, { "src/a.ts": "b", ".changes/x.md": note("none", "none"), ...bump("2.1.0") }, "sha", "production")).toBe(1);
         // The folder's README is not a note, and a level outside the front matter does not count.
-        expect(exitCode(base, { "src/a.ts": "b", ".changes/README.md": note("minor", "minor") }, "sha", "production")).toBe(1);
-        expect(exitCode(base, { "src/a.ts": "b", ".changes/x.md": `${note("none", "none")}app: minor\n` }, "sha", "production")).toBe(1);
+        expect(exitCode(base, { "src/a.ts": "b", ".changes/README.md": note("minor", "minor"), ...bump("2.1.0") }, "sha", "production")).toBe(1);
+        expect(exitCode(base, { "src/a.ts": "b", ".changes/x.md": `${note("none", "none")}app: minor\n`, ...bump("2.1.0") }, "sha", "production")).toBe(1);
       });
 
       it("builds the release merge that deletes the notes", () => {
         const pending = { ...base, ".changes/x.md": note("minor", "none") };
-        expect(exitCode(pending, { "package.json": "{}", ".changes/x.md": null }, "sha", "production")).toBe(1);
-        // A release that only consumes none notes still builds, so the hold never outlives it.
-        expect(exitCode({ ...base, ".changes/x.md": note("none", "none") }, { ".changes/x.md": null }, "sha", "production")).toBe(1);
+        expect(exitCode(pending, { ...bump("2.1.0"), ".changes/x.md": null }, "sha", "production")).toBe(1);
+      });
+    });
+
+    describe("production only on a release merge", () => {
+      it("skips a production push that changes no version, however much else it changes", () => {
+        expect(exitCode(base, { "src/a.ts": "b" }, "sha", "production")).toBe(0);
+        expect(exitCode(base, { "src/a.ts": "b", "package.json": pkg("2.0.0", "1") }, "sha", "production")).toBe(0);
+        // A release that consumed only none notes moved nothing, so it deploys nothing.
+        expect(exitCode({ ...base, ".changes/x.md": "---\napp: none\ncrate: none\n---\n" }, { ".changes/x.md": null }, "sha", "production")).toBe(0);
+      });
+
+      it("builds production when the app or the engine crate version changes", () => {
+        expect(exitCode(base, bump("2.1.0"), "sha", "production")).toBe(1);
+        expect(exitCode(base, { "engine-rs/Cargo.toml": crate("1.1.0") }, "sha", "production")).toBe(1);
+      });
+
+      it("skips a production push with no version move even when the previous deploy cannot be fetched", () => {
+        const root = mkdtempSync(join(tmpdir(), "vc-ignore-build-"));
+        roots.push(root);
+        git(root, "init", "-q");
+        for (const text of ["a", "b"]) {
+          writeFileSync(join(root, "package.json"), pkg("2.0.0"));
+          writeFileSync(join(root, "src.ts"), text);
+          git(root, "add", "-A");
+          git(root, "commit", "-q", "-m", "c");
+        }
+        const env = { ...process.env, VERCEL_ENV: "production", VERCEL_GIT_PROVIDER: "", VERCEL_GIT_PREVIOUS_SHA: "0123456789012345678901234567890123456789" };
+        expect(spawnSync("bash", [SCRIPT], { cwd: root, env, encoding: "utf8" }).status).toBe(0);
+      });
+
+      it("still builds a preview for a change with no version move", () => {
+        expect(exitCode(base, { "src/a.ts": "b" }, "sha", "preview")).toBe(1);
       });
     });
 

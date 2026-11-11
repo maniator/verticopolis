@@ -1,0 +1,87 @@
+name: Cut release
+
+# Opens the release PR (CONTRIBUTING.md "Change notes and the release PR")
+# without anyone running `npm run release` by hand. Run it from the Actions
+# tab (Run workflow) on main: it cuts release/<version> from the pending notes
+# with scripts/release.ts, commits the result and opens the "Release <version>"
+# PR. Leave "app" empty for the levels the notes ask for, or name a headline
+# version such as 3.0.0 (a pending note must still ask for an app level).
+#
+# Merging the PR is still a person's call: it is the production deploy
+# (scripts/vercel-ignore-build.sh holds production while a note is pending),
+# and release-tag.yml tags and publishes the release once it merges.
+#
+# It pushes and opens the PR with the default GITHUB_TOKEN, which needs
+# "Allow GitHub Actions to create and approve pull requests" (Settings,
+# Actions, General). A PR from that token starts no workflow runs on its own,
+# so a maintainer starts the required checks: with the run button on the PR when
+# GitHub shows one, or else by closing and reopening the PR, which a person's
+# reopen always does (pull_request: reopened).
+on:
+  workflow_dispatch:
+    inputs:
+      app:
+        description: "Name the app version (for example 3.0.0); leave empty for the levels the notes ask for"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: cut-release
+  cancel-in-progress: false
+
+jobs:
+  cut:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: ".nvmrc"
+          cache: "npm"
+      - run: npm ci
+      - name: Cut the release and open the PR
+        env:
+          APP: ${{ inputs.app }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -n "$APP" ] && ! printf '%s' "$APP" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::app must be a version like 3.0.0, got '$APP'"
+            exit 2
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          base=$(git rev-parse --short HEAD)
+          git checkout -b release/pending
+          if [ -n "$APP" ]; then npm run release -- --app "$APP"; else npm run release; fi
+          app=$(node -p 'require("./package.json").version')
+          crate=$(awk '/^\[package\]/ { p = 1; next } /^\[/ { p = 0 } p && /^version *=/ { gsub(/.*= *"|".*/, ""); print; exit }' engine-rs/Cargo.toml)
+          branch="release/$app"
+          if git ls-remote --exit-code --heads origin "$branch" > /dev/null; then
+            echo "::error::$branch already exists on origin; merge or delete its PR first"
+            exit 1
+          fi
+          git branch -m "$branch"
+          title="Release $app"
+          if ! git diff --quiet HEAD -- engine-rs/Cargo.toml; then title="$title (engine crate $crate)"; fi
+          git add -A
+          git commit -m "$title"
+          git push origin "$branch"
+          {
+            echo "Cut by the **Cut release** workflow from the pending change notes on main $base."
+            echo
+            echo "- App: $app"
+            echo "- Engine crate: $crate"
+            echo
+            echo "**Start the checks:** this PR was opened by the workflow token, which starts no runs on its own. Start the required checks with the run button on this PR if GitHub shows one, or else close and reopen this PR."
+            echo
+            echo "Review the changelog sections, then merge with a merge commit. Merging is the production deploy, and release-tag.yml tags and publishes the release."
+          } > "$RUNNER_TEMP/body.md"
+          gh pr create --base main --head "$branch" --title "$title" --body-file "$RUNNER_TEMP/body.md"
