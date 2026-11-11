@@ -3,7 +3,7 @@ import { isElevatorKind } from "../../presentation/viewKinds";
 import { catalogFacility } from "../../catalog/catalogTypes";
 import { towerCatalog } from "../../catalog/towerCatalog";
 import { viewWorld } from "../../presentation/viewWorld";
-import type { TransportView } from "../../simport/view";
+import type { BombSearchGuard, TransportView } from "../../simport/view";
 import { drawExplosion, drawSearchGuard, drawThief, drawTreasure, drawVipLimo } from "../sprites/events";
 import { FLOOR, TILE } from "../scale";
 import type { ScreenRect } from "./towerInputCamera";
@@ -147,6 +147,18 @@ export function bombCountdownText(minutesLeft: number): string {
   return `💣 Bomb search: ${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")} left`;
 }
 
+/** Where a guard is at minute `now`: climbing the emergency stairs at the
+ *  left edge of its floor's rooms from `from` to `floor` until `arrive`, then
+ *  walking the rooms left to right until `done`. `floor` may be fractional
+ *  on the stairs; `x` is in tiles. */
+export function guardPosition(g: BombSearchGuard, now: number): { floor: number; x: number; climbing: boolean } {
+  const part = (a: number, b: number): number => (b > a ? Math.min(1, Math.max(0, (now - a) / (b - a))) : 1);
+  if (now < g.arrive) {
+    return { floor: g.from + (g.floor - g.from) * part(g.start, g.arrive), x: g.left - 1, climbing: true };
+  }
+  return { floor: g.floor, x: g.left + (g.right - g.left) * part(g.arrive, g.done), climbing: false };
+}
+
 /** How strong the red glow at the screen's edges is during a bomb search:
  *  one slow beat a second (in step with the tick), stronger in the last game
  *  hour. Under reduced motion it holds steady, never beating. Far below any
@@ -158,18 +170,18 @@ export function bombPulseAlpha(animSeconds: number, minutesLeft: number, reduced
   return peak * (0.35 + 0.65 * beat * beat);
 }
 
-/** The bomb search: a guard pacing each floor being swept, the time left
+/** The bomb search: each guard climbing the emergency stairs or walking a
+ *  floor's rooms (where the engine's timing says it is), the time left
  *  before the deadline, and a red glow beating at the screen's edges. Under
- *  reduced motion the guards stand at their floor's middle and the glow holds
- *  still. */
+ *  reduced motion the glow holds still. */
 function renderBombSearch(engine: TowerEngine, ctx: CanvasRenderingContext2D): void {
   const search = engine.sim.bombSearch;
   if (!search) return;
   const scale = Math.max(0.9, engine.cam.zoom);
-  for (const { floor, left, right } of search.sweeping) {
-    const phase = engine.reducedMotion ? 0.5 : 0.5 + 0.5 * Math.sin(engine.d.anim * 0.8 + floor);
-    const x = engine.worldToScreenX(left + (right - left) * phase);
-    const y = engine.worldToScreenY(floor) + FLOOR * engine.cam.zoom;
+  for (const g of search.sweeping) {
+    const at = guardPosition(g, engine.sim.clock.minutes);
+    const x = engine.worldToScreenX(at.x);
+    const y = engine.worldToScreenY(at.floor) + FLOOR * engine.cam.zoom;
     drawSearchGuard(ctx, x, y, scale);
   }
   const minutesLeft = search.deadline - engine.sim.clock.minutes;

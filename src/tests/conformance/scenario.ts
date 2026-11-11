@@ -33,7 +33,6 @@ export const CONFORMANCE_DIR = resolve(REPO_ROOT, "conformance");
  *  lock pins them; the room-fact suites that replay each scenario on both
  *  engines leave them out. */
 export const PAST_THE_TYPESCRIPT_REFERENCE: ReadonlySet<string> = new Set([
-  "amenities-modern.json",
   "ransom-declined-classic.json",
   "ransom-declined-modern.json",
   "ransom-ignored-modern.json",

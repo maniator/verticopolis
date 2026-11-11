@@ -42,11 +42,15 @@ fn deadline_after(now: f64) -> f64 {
 }
 
 /// One guard on the search: the floor it is sweeping, or `None` once no
-/// floor is left for it, and the minute that sweep ends.
+/// floor is left for it, and the minute that sweep ends. `from` and `start`
+/// are where and when it set off for that floor, so a host can draw the
+/// climb up the emergency stairs before the walk along the rooms.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Guard {
     pub floor: Option<i64>,
     pub done_at: f64,
+    pub from: i64,
+    pub start: f64,
 }
 
 /// A bomb waiting to be found. `floor` and `x` are its hiding place (the
@@ -71,7 +75,7 @@ impl BombSearch {
             "floor": self.floor,
             "x": self.x,
             "deadline": self.deadline,
-            "guards": self.guards.iter().map(|g| json!({"floor": g.floor, "doneAt": g.done_at})).collect::<Vec<_>>(),
+            "guards": self.guards.iter().map(|g| json!({"floor": g.floor, "doneAt": g.done_at, "from": g.from, "start": g.start})).collect::<Vec<_>>(),
             "searched": self.searched,
             "seq": self.seq,
         })
@@ -96,7 +100,20 @@ impl BombSearch {
                 Some(Value::Null) | None => None,
                 Some(f) => Some(f.as_f64().filter(|n| n.is_finite())?.trunc() as i64),
             };
-            guards.push(Guard { floor, done_at });
+            // A save from before the climb was drawn starts the guard where
+            // it already is.
+            let num = |k: &str| match g.get(k) {
+                None => Some(None),
+                Some(v) => v.as_f64().filter(|n| n.is_finite()).map(Some),
+            };
+            let from = num("from")?.map_or(floor.unwrap_or(0), |n| n.trunc() as i64);
+            let start = num("start")?.unwrap_or(done_at);
+            guards.push(Guard {
+                floor,
+                done_at,
+                from,
+                start,
+            });
         }
         let mut searched = Vec::new();
         for f in o.get("searched").and_then(Value::as_array)? {
@@ -128,8 +145,9 @@ fn clock_label(minutes: f64) -> String {
 
 impl Simulation {
     /// The host's read of the search: the deadline, each floor guards are
-    /// sweeping now with the tile span of its rooms (where a guard paces),
-    /// and the floors already clear. The hiding place stays out. One pass
+    /// sweeping now with the tile span of its rooms, where the guard set off
+    /// from and the minutes it left, reaches the floor by the emergency
+    /// stairs and finishes the walk, and the floors already clear. The hiding place stays out. One pass
     /// over the units, read only when the search's `seq` moves.
     pub fn bomb_search_view(&self) -> Option<Value> {
         let b = self.events.bomb.as_ref()?;
@@ -137,11 +155,14 @@ impl Simulation {
         let sweeping: Vec<Value> = b
             .guards
             .iter()
-            .filter_map(|g| g.floor)
-            .filter_map(|f| {
-                spans
-                    .get(&f)
-                    .map(|&(left, right)| json!({ "floor": f, "left": left, "right": right }))
+            .filter_map(|g| Some((g, g.floor?)))
+            .filter_map(|(g, f)| {
+                let &(left, right) = spans.get(&f)?;
+                let arrive = g.start + (f - g.from).abs() as f64 * STAIR_MINUTES_PER_FLOOR;
+                Some(json!({
+                    "floor": f, "left": left, "right": right,
+                    "from": g.from, "start": g.start, "arrive": arrive, "done": g.done_at,
+                }))
             })
             .collect();
         Some(
@@ -381,10 +402,14 @@ fn sweep(next: Option<(i64, i64)>, from: i64, start: f64) -> Guard {
             done_at: start
                 + (f - from).abs() as f64 * STAIR_MINUTES_PER_FLOOR
                 + width as f64 * SWEEP_MINUTES_PER_TILE,
+            from,
+            start,
         },
         None => Guard {
             floor: None,
             done_at: start,
+            from,
+            start,
         },
     }
 }

@@ -127,10 +127,22 @@ export interface FxView {
 /** Classic's bomb search: the minute the bomb goes off, the floors guards
  *  are sweeping now and the floors already clear. The engine keeps the
  *  bomb's hiding place to itself. */
+export interface BombSearchGuard {
+  readonly floor: number;
+  readonly left: number;
+  readonly right: number;
+  readonly from: number;
+  readonly start: number;
+  readonly arrive: number;
+  readonly done: number;
+}
+
 export interface BombSearchView {
   readonly deadline: number;
-  /** Each floor a guard is on, with the tile span of its rooms. */
-  readonly sweeping: readonly { readonly floor: number; readonly left: number; readonly right: number }[];
+  /** Each floor a guard is headed for or sweeping, with the tile span of
+   *  its rooms, the floor it set off from, and the minutes it left, reaches
+   *  the floor by the emergency stairs, and finishes the walk. */
+  readonly sweeping: readonly BombSearchGuard[];
   readonly searched: readonly number[];
   readonly seq: number;
 }

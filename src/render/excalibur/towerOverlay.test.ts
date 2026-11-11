@@ -8,6 +8,7 @@ import {
   MAX_TREASURES,
   bombCountdownText,
   bombPulseAlpha,
+  guardPosition,
 } from "./towerOverlay";
 
 /**
@@ -375,5 +376,26 @@ describe("the bomb search on screen", () => {
     const still = [0, 0.25, 0.5, 0.75].map((t) => bombPulseAlpha(t, 120, true));
     expect(new Set(still).size).toBe(1);
     expect(still[0]).toBeGreaterThan(0);
+  });
+});
+
+describe("a search guard on screen", () => {
+  // Off from floor 2 at minute 100, three floors of stairs (6 minutes) up to
+  // floor 5, then the rooms from tile 160 to 200 until minute 126.
+  const g = { floor: 5, left: 160, right: 200, from: 2, start: 100, arrive: 106, done: 126 };
+
+  it("climbs the emergency stairs beside the rooms, floor by floor", () => {
+    expect(guardPosition(g, 100)).toEqual({ floor: 2, x: 159, climbing: true });
+    expect(guardPosition(g, 103)).toEqual({ floor: 3.5, x: 159, climbing: true });
+  });
+
+  it("walks the floor left to right as the sweep goes", () => {
+    expect(guardPosition(g, 106)).toEqual({ floor: 5, x: 160, climbing: false });
+    expect(guardPosition(g, 116)).toEqual({ floor: 5, x: 180, climbing: false });
+    expect(guardPosition(g, 200)).toEqual({ floor: 5, x: 200, climbing: false });
+  });
+
+  it("goes down the stairs as well as up", () => {
+    expect(guardPosition({ ...g, from: 8 }, 103).floor).toBe(6.5);
   });
 });

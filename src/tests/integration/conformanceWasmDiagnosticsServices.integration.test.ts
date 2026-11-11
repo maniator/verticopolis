@@ -253,13 +253,16 @@ const nearCapacity = (card: Card): boolean => card.slots[CARD_NEAR_CAPACITY] ===
 
 /** The sections the corpus reached when this test was written. A corpus or
  *  engine change that stops reaching one, or starts reaching a new one, fails
- *  the last test, so the comparison's coverage cannot change unseen. */
+ *  the last test, so the comparison's coverage cannot change unseen. An inert
+ *  cinema and shop left with ransom-ignored-modern, whose blast-gutted rooms
+ *  only that scenario reached; it is past the TypeScript reference now (#349),
+ *  and the Rust engine's own lock still pins it. */
 const CORPUS_SECTIONS: readonly string[] = [
   "commercial:lobbyFar:false", "commercial:lobbyFar:true",
   "hotel:counts:dirty", "hotel:counts:infested", "hotel:counts:other", "hotel:excluded:dirty", "hotel:excluded:other",
   "housekeeping:adequate", "housekeeping:nominalShortfall", "housekeeping:observedShortfall",
-  "inert:amusements", "inert:boutiqueBay", "inert:cinema", "inert:daycare", "inert:fastFood", "inert:foodHall",
-  "inert:nightclub", "inert:parking", "inert:shop", "inert:skyBar", "inert:spa",
+  "inert:amusements", "inert:boutiqueBay", "inert:daycare", "inert:fastFood", "inert:foodHall",
+  "inert:nightclub", "inert:parking", "inert:skyBar", "inert:spa",
   "parking:connected", "parking:disconnected", "parking:ramp",
   "recycling:met:filling",
   "retail:advice:none", "retail:advice:overBuilt", "retail:advice:underServed", "retail:rain",
