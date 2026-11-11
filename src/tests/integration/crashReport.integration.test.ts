@@ -1,28 +1,17 @@
 import { describe, expect, it } from "vitest";
 import { strFromU8, unzipSync } from "fflate";
-import { Simulation } from "../../engine/Simulation";
 import { SaveGame } from "../../storage/SaveGame";
 import { readImport } from "../fixtures/saveText";
 import { buildCrashDetails, buildCrashReportZip, bugReportUrl } from "../../game/crashReport";
-import type { CrashDescription, CrashTower } from "../../game/crashReport";
-import { facilityFloors } from "../../engine/facilities";
-import { TsEngine } from "../../engine/port/tsEngine";
-import { ViewReader } from "../../simport/viewReader";
+import type { CrashDescription } from "../../game/crashReport";
+import { crashTower } from "../../game/crashReport.fixture";
 
-/** The crash report's view of `sim`, through the port as the game reads it. */
-function towerOf(sim: Simulation): CrashTower {
-  const port = new TsEngine(sim);
-  return { port, view: new ViewReader(port, facilityFloors) };
-}
 
 const CRASH: CrashDescription = { kind: "webgl-context-lost", repeat: false, saveFlushed: true, behindSplash: false, recoveryFailed: false };
 
 describe("crash report packaging", () => {
   it("buildCrashDetails captures the build, the tower summary, and the frame-error trail", () => {
-    const sim = new Simulation();
-    sim.tower.towerName = "Crash Test Tower";
-    sim.money = 424_242;
-    const tower = towerOf(sim);
+    const tower = crashTower({ towerName: "Crash Test Tower", money: 424_242, units: 5 });
     const details = buildCrashDetails(tower, CRASH, {
       version: "9.9.9",
       speed: 3,
@@ -33,7 +22,7 @@ describe("crash report packaging", () => {
     expect(details.crash).toEqual(CRASH);
     expect(details.tower?.name).toBe("Crash Test Tower");
     expect(details.tower?.money).toBe(424_242);
-    expect(details.tower?.units).toBe(sim.tower.units.length);
+    expect(details.tower?.units).toBe(5);
     expect(details.tower?.speed).toBe(3);
     expect(details.recentFrameErrors).toEqual([{ at: "2026-07-12T00:00:00.000Z", message: "boom" }]);
     // createdAt must be a real ISO timestamp; it becomes the zip's filename stamp.
@@ -41,9 +30,7 @@ describe("crash report packaging", () => {
   });
 
   it("the zip holds crash-report.json and a .vctower save the import path reads back", async () => {
-    const sim = new Simulation();
-    sim.money = 314_159;
-    const tower = towerOf(sim);
+    const tower = crashTower({ money: 314_159 });
     const details = buildCrashDetails(tower, CRASH, { version: "1.2.3", speed: 2, frameErrors: [] });
     const { filename, bytes } = await buildCrashReportZip(tower, details);
     expect(filename).toMatch(/^verticopolis-crash-report-[\d-]+\.zip$/);
@@ -56,12 +43,11 @@ describe("crash report packaging", () => {
     // path must accept it and read back the tower's save.
     const imported = await readImport(strFromU8(files["tower.vctower"]));
     expect(imported.money).toBe(314_159);
+    expect(tower.port.serialize).toHaveBeenCalledTimes(1); // one read of the engine
   });
 
   it("falls back to raw tower.json when the .vctower container can't be built", async () => {
-    const sim = new Simulation();
-    sim.money = 271_828;
-    const tower = towerOf(sim);
+    const tower = crashTower({ money: 271_828 });
     // Simulate a browser without CompressionStream: SaveGame.export throws.
     const original = SaveGame.export;
     SaveGame.export = () => Promise.reject(new Error("no CompressionStream"));

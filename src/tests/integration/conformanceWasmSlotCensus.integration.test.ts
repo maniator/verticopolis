@@ -7,13 +7,12 @@
  */
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import towerFile from "../../../conformance/fixtures/towerone_6.vctower?raw";
-import { Simulation } from "../../engine/Simulation";
+import { draftTower, type Draft } from "../portKit/drafts";
 import { SaveGame } from "../../storage/SaveGame";
 import { setSlotPopulationReader } from "../../storage/slotCensus";
 import { populationReaderFromModule } from "../../wasmhost/slotPopulation";
 import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
 import { saveOf, importTower } from "../fixtures/saveText";
-import type { Draft } from "../portKit/drafts";
 import { PortCodes } from "../../simport/portCodes";
 import type { EnginePort } from "../../simport/enginePort";
 
@@ -49,7 +48,7 @@ describe.skipIf(!run)("slot rows count their population through the engine", () 
     setSlotPopulationReader(() => {
       throw new Error("The engine refused this save.");
     });
-    SaveGame.saveSlot(2, saveOf(Simulation.newGame(7)));
+    SaveGame.saveSlot(2, saveOf(draftTower(7)));
     const row = SaveGame.listSlots().find((s) => s.slot === 2)!;
     expect(row.exists).toBe(false);
     expect(row.present).toBe(true);
@@ -57,7 +56,7 @@ describe.skipIf(!run)("slot rows count their population through the engine", () 
 
   it("shows no population while no engine is installed, and keeps the other facts", () => {
     setSlotPopulationReader(null);
-    const sim = Simulation.newGame(7);
+    const sim = draftTower(7);
     SaveGame.saveSlot(1, saveOf(sim));
     const row = SaveGame.listSlots().find((s) => s.slot === 1)!;
     expect(row.exists).toBe(true);
@@ -69,11 +68,11 @@ describe.skipIf(!run)("slot rows count their population through the engine", () 
     const inner = populationReaderFromModule(wasm());
     let reads = 0;
     setSlotPopulationReader((text) => (reads++, inner(text)));
-    SaveGame.saveSlot(1, saveOf(Simulation.newGame(7)));
+    SaveGame.saveSlot(1, saveOf(draftTower(7)));
     const first = SaveGame.listSlots().find((s) => s.slot === 1)!;
     expect(SaveGame.listSlots().find((s) => s.slot === 1)).toEqual(first);
     expect(reads).toBe(1);
-    SaveGame.saveSlot(1, saveOf(Simulation.newGame(8)));
+    SaveGame.saveSlot(1, saveOf(draftTower(8)));
     expect(SaveGame.listSlots().find((s) => s.slot === 1)!.exists).toBe(true);
     expect(reads).toBe(2);
   });

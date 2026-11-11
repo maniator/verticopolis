@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { Simulation } from "../../engine/Simulation";
-import { towerCatalog, useTowerCatalogSource } from "../../catalog/towerCatalog";
+import { towerCatalog } from "../../catalog/towerCatalog";
+import { portOf } from "../../game/cardKit.fixture";
+import { draftTower } from "../portKit/drafts";
 import type { EnginePort } from "../../simport/enginePort";
 import { newRenderSim, newViewReader } from "../../game/portAccess";
 import { bindViewKinds, findViewKind } from "../../presentation/viewKinds";
@@ -16,27 +17,22 @@ import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
  */
 
 
-type RustEngine = EnginePort & { free(): void };
-const freed: RustEngine[] = [];
 afterEach(() => {
-  for (const e of freed.splice(0)) e.free();
   bindViewKinds(catalogFor("modern"));
 });
 
 const HALL_X = 100;
 
-/** A tower reaching floor 100 with the TypeScript hall on top, saved and read by the Rust engine, which widens it to its own 28 by 5. */
-function towerWithHall(): RustEngine {
-  const built = Simulation.newGame(5, "modern");
+/** A tower reaching floor 100 with a wedding hall on top, built on the Rust engine. */
+function towerWithHall(): EnginePort {
+  const built = draftTower(5, "modern");
   built.money = 1e9;
   built.star = 5;
-  for (let x = HALL_X - 4; x < HALL_X + 36; x++) expect(built.build("lobby", 1, x).ok).toBe(true);
-  for (let floor = 2; floor <= 100; floor++) for (let x = HALL_X - 4; x < HALL_X + 36; x++) expect(built.build("floor", floor, x).ok, `floor ${floor}`).toBe(true);
+  for (let x = HALL_X - 4; x < HALL_X + 36; x++) expect(built.tower.place("lobby", 1, x).ok).toBe(true);
+  for (let floor = 2; floor <= 100; floor++) for (let x = HALL_X - 4; x < HALL_X + 36; x++) expect(built.tower.place("floor", floor, x).ok, `floor ${floor}`).toBe(true);
+  built.settle();
   expect(built.build("weddingHall", 100, HALL_X).ok).toBe(true);
-  const rust = wasm().Engine.fromSave(JSON.stringify(built.serialize())) as unknown as RustEngine;
-  freed.push(rust);
-  useTowerCatalogSource(rust, (mode) => readCatalog(wasm(), mode));
-  return rust;
+  return portOf(built);
 }
 
 describe.skipIf(!hasWasmPackage())("the reader over the Rust engine's wedding hall", () => {

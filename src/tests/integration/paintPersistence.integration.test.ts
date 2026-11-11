@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { newSeededGame } from "../fixtures/towerFixtures";
-import { Simulation } from "../../engine/Simulation";
-import { GRID, attendanceCap } from "../../engine/facilities";
+import { LOT_WIDTH, newSeededDraft } from "../portKit/draftFixtures";
+import { draftFromSave, draftTower, type Draft } from "../portKit/drafts";
+import { noEngine } from "../portKit/rustEngine";
+import { attendanceCap } from "../../engine/facilities";
 import { FASTFOOD_SUBTYPES, RESTAURANT_SUBTYPES, SHOP_SUBTYPES } from "../../engine/retailSubtypes";
 import { drawRoom, type RoomCtx } from "../../render/pixelSprites";
 import { buildTDT, describeWithCodec, parseTDT } from "../conformance/tdtWasm";
@@ -57,11 +58,14 @@ function hourFor(kind: FacilityKind): number {
   return 20;
 }
 
-describe("save round-trip paints identical pixels (.vctower serialize/deserialize)", () => {
+/** The rooms as the engine holds them, painted from its records. */
+const roomsOf = (sim: Draft): Unit[] => (sim.settle(), sim.tower.units as unknown as Unit[]);
+
+describe.skipIf(noEngine)("save round-trip paints identical pixels (.vctower serialize/deserialize)", () => {
   /** Rooms across kinds, positions, and every canon retail variety, spread
    *  over floors so the geo seed exercises different layouts and mirrors. */
-  function buildFixture(): Simulation {
-    const sim = new Simulation(2024, "modern", "realWorld");
+  function buildFixture(): Draft {
+    const sim = draftTower(2024, "modern", "realWorld");
     sim.money = 100_000_000;
     for (let x = 0; x < 120; x++) sim.tower.place("lobby", 1, x);
     for (let f = 2; f <= 14; f++) for (let x = 0; x < 120; x++) sim.tower.place("floor", f, x);
@@ -83,7 +87,7 @@ describe("save round-trip paints identical pixels (.vctower serialize/deserializ
         x = 0;
       }
       const r = sim.tower.place(kind, f, x);
-      const u = sim.tower.units.find((q) => q.id === r.unitId)!;
+      const u = sim.tower.getUnit(r.unitId!) as unknown as Unit;
       u.state = "occupied";
       u.subtype = subtype;
       x += width + 2;
@@ -97,25 +101,26 @@ describe("save round-trip paints identical pixels (.vctower serialize/deserializ
     // occupants mirrors the transient live-attendance tally and restores to
     // 0 on load by design, so a pinned nonzero value would (correctly) fail
     // the round-trip. Their empty-house paint is still compared.
-    for (const u of sim.tower.units) {
+    for (const u of sim.tower.units as unknown as Unit[]) {
       if (u.kind === "floor" || u.kind === "lobby") continue;
       if (u.state === "empty" || u.state === "construction") u.state = "occupied";
       if (u.occupants === 0 && attendanceCap(u.kind) === undefined) u.occupants = 3;
     }
+    sim.settle(); // the engine holds the tower as painted below
     return sim;
   }
 
   it("every room paints byte-identical after serialize -> deserialize", () => {
     const sim = buildFixture();
     const before = new Map<string, string>();
-    for (const u of sim.tower.units) {
+    for (const u of roomsOf(sim)) {
       if (u.kind === "floor" || u.kind === "lobby") continue;
       before.set(`${u.floor}:${u.x}`, paint(u, hourFor(u.kind)));
     }
     expect(before.size).toBeGreaterThan(30);
-    const restored = Simulation.deserialize(sim.serialize());
+    const restored = draftFromSave(sim.serialize());
     let compared = 0;
-    for (const u of restored.tower.units) {
+    for (const u of roomsOf(restored)) {
       if (u.kind === "floor" || u.kind === "lobby") continue;
       const key = `${u.floor}:${u.x}`;
       const prior = before.get(key);
@@ -135,12 +140,12 @@ describeWithCodec("TDT round-trip preserves the retail varieties' paint (geometr
     // Diner/shopper presence still reads the grandfathered hash(u.id), so the
     // comparison paints both sides with occupants pinned and the same id to
     // isolate the persisted inputs (subtype + geography).
-    const sim = newSeededGame(3);
+    const sim = newSeededDraft(3);
     sim.money = 1e12;
     // Anchor at the ensured starter lobby's left edge (the fixture lays 40
     // lobby tiles from mid - 20) and grow rightward: lobbies and floors must
     // connect to the existing tower, so a detached strip would be refused.
-    const x0 = Math.floor(GRID.width / 2) - 20;
+    const x0 = Math.floor(LOT_WIDTH / 2) - 20;
     for (let i = 40; i < 110; i++) sim.tower.place("lobby", 1, x0 + i);
     for (let f = 2; f <= 8; f++) for (let i = 0; i < 110; i++) sim.tower.place("floor", f, x0 + i);
     sim.buildTransport("elevatorStandard", x0 + 100, 1, 8);
@@ -156,7 +161,7 @@ describeWithCodec("TDT round-trip preserves the retail varieties' paint (geometr
         x = x0;
       }
       const r = sim.tower.place(kind, f, x);
-      const u = sim.tower.units.find((q) => q.id === r.unitId)!;
+      const u = sim.tower.getUnit(r.unitId!) as unknown as Unit;
       u.state = "occupied";
       u.subtype = subtype;
       spots.push({ kind, subtype, floor: f, x });
@@ -169,7 +174,7 @@ describeWithCodec("TDT round-trip preserves the retail varieties' paint (geometr
     const { bytes } = buildTDT(sim.serialize());
     const back = parseTDT(bytes.buffer as ArrayBuffer, "R.TDT").save;
     for (const spot of spots) {
-      const orig = sim.tower.units.find((q) => q.kind === spot.kind && q.floor === spot.floor && q.x === spot.x)!;
+      const orig = roomsOf(sim).find((q) => q.kind === spot.kind && q.floor === spot.floor && q.x === spot.x)!;
       const imported = back.units.find((q) => q.kind === spot.kind && q.floor === spot.floor && q.x === spot.x);
       expect(imported, `${spot.kind} "${spot.subtype}" lost its spot in the TDT round-trip`).toBeDefined();
       expect(imported!.subtype).toBe(spot.subtype);

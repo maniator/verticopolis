@@ -1,27 +1,22 @@
 /**
  * The Saves row of #945 (#1236): every save the web can load, loaded by the
- * Rust engine through its WASM binding, serializes to the bytes the TypeScript
- * engine writes for the same input.
+ * Rust engine through its WASM binding, serializes to the bytes the web's
+ * import path gives for the same input.
  *
  * "Byte for byte" here means the canonical JSON (keys sorted), plus the file
  * the engine writes. The binding's `serialize()` text is not compared raw: it
  * prints an integer-valued double with a trailing `.0` where JavaScript
- * prints `13551601`, and the order of a transport's keys follows the history
- * of the TypeScript object (`carLoad` lands after `load` when dispatch adds
- * it and before it when a save carries it, and one fixture's stairs carry
- * their keys sorted). Both are EX-2, proposed; the
- * owner has not yet said whether canonical equality is the row's criterion.
- * The file the engine writes (`encodeVctower`) prints numbers the JavaScript
- * way, so the raw-form test below holds it to the same text as the one made
- * from the TypeScript save, up to each transport's key order.
+ * prints `13551601` (EX-2). The file the engine writes (`encodeVctower`)
+ * prints numbers the JavaScript way, so the raw-form test below holds it to
+ * the same text as the one made from the web import's save, up to each
+ * transport's key order.
  *
  * - Every `.vctower` fixture, loaded the way an import loads it (`fromVctower`
- *   against `SaveGame.importText`).
- * - Every loader-table case (`conformance/loader-cases.json`: forged and
- *   hand-edited saves), `fromSave` against `Simulation.deserialize`. A case
- *   marked `knownDivergence` is pinned as still different, so a fix flips it
- *   here and the marker has to be removed on purpose. None carries one since
- *   #858 was fixed.
+ *   against `SaveGame.importText` and the engine's `loadSave`).
+ * - The loader table (`conformance/loader-cases.json`: forged and
+ *   hand-edited saves) is replayed by the Rust test
+ *   `forged_saves_load_as_the_typescript_loads_them`; here only its
+ *   no-known-divergence state is pinned.
  * - Text that is not plain ASCII (astral characters, combining marks, a lone
  *   surrogate) in the tower name, read the way the web reads save text
  *   (`parseSaveJson`), and a save of exactly 32 MiB and one byte more,
@@ -34,7 +29,6 @@ import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import type { Engine, encodeVctower } from "../../dualrun/engine";
-import { Simulation } from "../../engine/Simulation";
 import type { SerializedGame } from "../../shared/types";
 import { importTower } from "../fixtures/saveText";
 import { MAX_SAVE_INFLATED_BYTES, STORE_MAGIC, TOWER_FILE_MAGIC, fromBase64, inflateCapped, parseSaveJson } from "../../storage/saveCompression";
@@ -82,12 +76,11 @@ export function firstDifference(a: unknown, b: unknown, path = "$"): string | nu
 /** The save as canonical JSON text, the form both engines' saves compare in. */
 const canonical = (save: string): string => canonicalJson(JSON.parse(save));
 
-/** What each engine serializes for one save text, read the way the web reads it. */
-function bothSerialize(save: string): { ts: string; rust: string } {
-  const ts = JSON.stringify(Simulation.deserialize(parseSaveJson(save) as SerializedGame).serialize());
+/** What the engine serializes for one save text. */
+function engineSerialize(save: string): string {
   const engine = wasm().Engine.fromSave(save);
   try {
-    return { ts, rust: engine.serialize() };
+    return engine.serialize();
   } finally {
     engine.free();
   }
@@ -127,7 +120,7 @@ describe.runIf(run)("saves audit: the Rust engine loads what the web loads, byte
     transports: (save.transports as Array<Record<string, unknown>>).map((t) => Object.fromEntries(Object.entries(t).sort(([x], [y]) => x.localeCompare(y, "en")))),
   });
 
-  it.each(fixtures)("%s: the written file is the TypeScript writer's text up to a transport's key order, and the binding text only adds .0", async (name) => {
+  it.each(fixtures)("%s: the written file is the web import's text up to a transport's key order, and the binding text only adds .0", async (name) => {
     const text = readFileSync(resolve(FIXTURES, name), "utf8");
     const ts = JSON.stringify((await importTower(text)).serialize());
     const engine = wasm().Engine.fromVctower(text);
@@ -149,15 +142,11 @@ describe.runIf(run)("saves audit: the Rust engine loads what the web loads, byte
     }
   });
 
-  it.each(cases.filter((c) => c.knownDivergence === undefined).map((c) => [c.id, c] as const))("loader case %s: fromSave serializes the bytes deserialize does", (_id, c) => {
-    const { ts, rust } = bothSerialize(JSON.stringify(c.input));
-    expect(firstDifference(JSON.parse(ts), JSON.parse(rust)), c.id).toBeNull();
-    expect(canonical(rust)).toBe(canonical(ts));
-  });
-
-  it.each(cases.filter((c) => c.knownDivergence !== undefined).map((c) => [c.id, c] as const))("known divergence %s: still different, so a fix removes the entry", (_id, c) => {
-    const { ts, rust } = bothSerialize(JSON.stringify(c.input));
-    expect(canonical(rust), `${c.id} (${c.knownDivergence}) now matches: remove its knownDivergence`).not.toBe(canonical(ts));
+  // The loader table's cases (forged and hand-edited saves) are replayed
+  // against their recorded state hashes by the Rust test
+  // `forged_saves_load_as_the_typescript_loads_them` (engine-rs/src/load/loader_cases.rs).
+  it("has no loader case still marked as a known divergence", () => {
+    expect(cases.filter((c) => c.knownDivergence !== undefined).map((c) => c.id)).toEqual([]);
   });
 });
 
@@ -173,24 +162,23 @@ describe.runIf(run)("saves audit: text and size edges through the engine", () =>
     ["a very long name", "x".repeat(70_000)],
   ];
 
-  it.each(names)("a tower name with %s loads and serializes the same", (_what, name) => {
+  it.each(names)("a tower name with %s loads and serializes as written", (_what, name) => {
     const save = { ...base(), towerName: name };
-    const { ts, rust } = bothSerialize(JSON.stringify(save));
-    expect(firstDifference(JSON.parse(ts), JSON.parse(rust))).toBeNull();
-    expect(canonical(rust)).toBe(canonical(ts));
+    const rust = engineSerialize(JSON.stringify(save));
+    expect((JSON.parse(rust) as { towerName: string }).towerName).toBe(name);
+    // A second load changes nothing.
+    expect(canonical(engineSerialize(rust))).toBe(canonical(rust));
   });
 
   // The web reads save text through `parseSaveJson`, which repairs a lone
   // surrogate escape to U+FFFD as the engine's loader does, so the character
-  // loads the same in both. (`Simulation.deserialize` on a raw `JSON.parse`
-  // would keep the half character, but no web reader calls it that way.)
-  it("a lone surrogate in the tower name loads as U+FFFD in both engines through the web's reader", () => {
+  // reads the same in both.
+  it("a lone surrogate in the tower name loads as U+FFFD in the engine and the web's reader", () => {
     const text = JSON.stringify({ ...base(), towerName: "a\uD800b" });
     expect(text).toContain("\\ud800");
-    const { ts, rust } = bothSerialize(text);
-    expect((JSON.parse(ts) as { towerName: string }).towerName).toBe("a\uFFFDb");
-    expect(firstDifference(JSON.parse(ts), JSON.parse(rust))).toBeNull();
-    expect(canonical(rust)).toBe(canonical(ts));
+    const rust = engineSerialize(text);
+    expect((JSON.parse(rust) as { towerName: string }).towerName).toBe("a\uFFFDb");
+    expect((parseSaveJson(text) as { towerName: string }).towerName).toBe("a\uFFFDb");
   });
 
   const CAP = MAX_SAVE_INFLATED_BYTES;

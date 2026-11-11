@@ -1,15 +1,15 @@
-import { facilityFloors } from "../../engine/facilities";
 // @vitest-environment happy-dom
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { GameApp } from "../../main";
-import { Simulation } from "../../engine/Simulation";
 import { runFrame } from "../../game/frameLoop";
 import { hasBlockingModal } from "../../game/interactionState";
 import type { UI } from "../../ui/UI";
 import { mountAppDom, makeUI } from "../uiFixture";
-import { TsEngine } from "../../engine/port/tsEngine";
 import { PortCodes } from "../../simport/portCodes";
-import { ViewReader } from "../../simport/viewReader";
+import { newViewReader } from "../../game/portAccess";
+import { portOf } from "../../game/cardKit.fixture";
+import { draftFromSave, draftTower, type Draft } from "../portKit/drafts";
+import { noEngine } from "../portKit/rustEngine";
 
 /**
  * The TOWER congratulations and the dialogs that freeze time (#1120).
@@ -21,11 +21,10 @@ import { ViewReader } from "../../simport/viewReader";
  * the shared dialog, wiping the choice's buttons while `shownChoice` stayed
  * latched, so time never moved again, on every Continue of that save.
  *
- * This drives the real frame loop, the real `UI` dialog and a real
- * `Simulation` loaded from a save that carries both flags. The WASM parity
- * project hosts that Simulation on the Rust engine at its first tick, so the
- * same file also proves that engine carries the save's open choice and its
- * TOWER rating through a frame.
+ * This drives the real frame loop, the real `UI` dialog and the Rust engine
+ * loaded from a save that carries both flags, so the same file also proves
+ * the engine carries the save's open choice and its TOWER rating through a
+ * frame.
  */
 
 vi.mock("../../game/trafficHud", () => ({ updateTraffic: vi.fn() }));
@@ -42,16 +41,21 @@ const click = (sel: string): void => {
 const showingCongrats = (): boolean => dialog().open && (dialog().textContent ?? "").includes("TOWER achieved");
 
 /** A mid-morning Classic tower saved as a TOWER win, with or without an open fire rescue. */
-function savedTower(withChoice: boolean): Simulation {
-  const raw = JSON.parse(JSON.stringify(new Simulation(2024, "classic").serialize()));
+function savedTower(withChoice: boolean): Draft {
+  const raw = draftTower(2024, "classic").serialize() as unknown as Record<string, unknown> & { events: Record<string, unknown> };
   raw.evaluatedTower = true;
   raw.minutes = 9 * 60;
   if (withChoice) raw.events.pending = { kind: "fireRescue", cost: 150_000, message: "Fire on the 40th floor!" };
-  return Simulation.deserialize(raw);
+  return draftFromSave(raw);
 }
 
-function makeApp(sim: Simulation, ui: UI) {
-  const enginePort = new TsEngine(sim);
+/** What the engine holds now: the frame loop moves it past the draft's read. */
+const minutesOf = (sim: Draft): number => (sim.settle(), sim.clock.minutes);
+const choiceOf = (sim: Draft) => (sim.settle(), sim.pendingChoice as { kind: string } | null);
+const ratedTower = (sim: Draft): boolean => (sim.settle(), sim.evaluatedTower);
+
+function makeApp(sim: Draft, ui: UI) {
+  const enginePort = portOf(sim);
   const app = {
     shownChoice: false,
     shownUpdate: false,
@@ -60,7 +64,7 @@ function makeApp(sim: Simulation, ui: UI) {
     prefs: { steadyClock: true },
     sim,
     enginePort,
-    reader: new ViewReader(enginePort, facilityFloors),
+    reader: newViewReader(enginePort),
     portCodes: new PortCodes(enginePort),
     accMinutes: 0,
     audio: { update: vi.fn(), sfx: vi.fn(), setMusicDucked: vi.fn() },
@@ -97,7 +101,7 @@ afterEach(() => {
   document.body.innerHTML = "";
 });
 
-describe("a TOWER save with an open emergency", () => {
+describe.skipIf(noEngine)("a TOWER save with an open emergency", () => {
   it("shows the choice first, keeps its buttons, and brings the congratulations after the answer", async () => {
     const { ui } = makeUI();
     vi.spyOn(ui, "update").mockImplementation(() => {});
@@ -105,8 +109,8 @@ describe("a TOWER save with an open emergency", () => {
     const { app, raw } = makeApp(sim, ui);
     pass(app, raw);
     // The loaded save carries both flags, whichever engine hosts it.
-    expect(sim.evaluatedTower).toBe(true);
-    expect(sim.pendingChoice?.kind).toBe("fireRescue");
+    expect(ratedTower(sim)).toBe(true);
+    expect(choiceOf(sim)?.kind).toBe("fireRescue");
     expect(raw.shownChoice).toBe(true);
     expect(has('[data-act="accept"]')).toBe(true);
     expect(has('[data-act="decline"]')).toBe(true);
@@ -114,16 +118,16 @@ describe("a TOWER save with an open emergency", () => {
     expect(raw.shownWin).toBe(false);
     expect(raw.audio.sfx).not.toHaveBeenCalledWith("promote");
     // Time stays frozen under the open choice, and the choice stays on screen.
-    const minutes = sim.clock.minutes;
+    const minutes = minutesOf(sim);
     for (let i = 0; i < 5; i++) pass(app, raw);
-    expect(sim.clock.minutes).toBe(minutes);
+    expect(minutesOf(sim)).toBe(minutes);
     expect(has('[data-act="accept"]')).toBe(true);
     // The player answers: the latch clears once the engine has answered, and
     // the game moves again.
     click('[data-act="decline"]');
     await new Promise((r) => setTimeout(r, 0));
     expect(raw.shownChoice).toBe(false);
-    expect(sim.pendingChoice).toBeNull();
+    expect(choiceOf(sim)).toBeNull();
     expect(hasBlockingModal(app)).toBe(false);
     pass(app, raw);
     expect(showingCongrats()).toBe(true);
@@ -132,9 +136,9 @@ describe("a TOWER save with an open emergency", () => {
     // Dismissing the congratulations leaves nothing latched, and time runs.
     click('[data-act="close"]');
     expect(dialog().open).toBe(false);
-    const before = sim.clock.minutes;
+    const before = minutesOf(sim);
     for (let i = 0; i < 3; i++) pass(app, raw);
-    expect(sim.clock.minutes).toBeGreaterThan(before);
+    expect(minutesOf(sim)).toBeGreaterThan(before);
     expect(raw.shownChoice).toBe(false);
   });
 
@@ -150,17 +154,17 @@ describe("a TOWER save with an open emergency", () => {
     dialog().dispatchEvent(new Event("cancel", { cancelable: true }));
     await new Promise((r) => setTimeout(r, 0));
     expect(raw.shownChoice).toBe(false);
-    expect(sim.pendingChoice).toBeNull();
+    expect(choiceOf(sim)).toBeNull();
     pass(app, raw);
     expect(showingCongrats()).toBe(true);
     click('[data-act="close"]');
-    const before = sim.clock.minutes;
+    const before = minutesOf(sim);
     for (let i = 0; i < 3; i++) pass(app, raw);
-    expect(sim.clock.minutes).toBeGreaterThan(before);
+    expect(minutesOf(sim)).toBeGreaterThan(before);
   });
 });
 
-describe("a TOWER win with the update prompt due in the same pass", () => {
+describe.skipIf(noEngine)("a TOWER win with the update prompt due in the same pass", () => {
   it("shows the update prompt first, and the congratulations once it is dismissed", async () => {
     const { ui } = makeUI();
     vi.spyOn(ui, "update").mockImplementation(() => {});
@@ -168,15 +172,15 @@ describe("a TOWER win with the update prompt due in the same pass", () => {
     const { app, raw } = makeApp(sim, ui);
     raw.pendingUpdate = async () => {};
     pass(app, raw);
-    expect(sim.evaluatedTower).toBe(true);
+    expect(ratedTower(sim)).toBe(true);
     expect(raw.shownUpdate).toBe(true);
     expect(has('[data-act="later"]')).toBe(true);
     expect(showingCongrats()).toBe(false);
     expect(raw.shownWin).toBe(false);
     // Frozen under the prompt, and still frozen on later passes.
-    const minutes = sim.clock.minutes;
+    const minutes = minutesOf(sim);
     pass(app, raw);
-    expect(sim.clock.minutes).toBe(minutes);
+    expect(minutesOf(sim)).toBe(minutes);
     click('[data-act="later"]');
     // The prompt's handler runs on a microtask, so the latch clears just after.
     await vi.waitFor(() => expect(raw.shownUpdate).toBe(false));
@@ -186,8 +190,8 @@ describe("a TOWER win with the update prompt due in the same pass", () => {
     expect(showingCongrats()).toBe(true);
     expect(raw.shownWin).toBe(true);
     click('[data-act="close"]');
-    const before = sim.clock.minutes;
+    const before = minutesOf(sim);
     pass(app, raw);
-    expect(sim.clock.minutes).toBeGreaterThan(before);
+    expect(minutesOf(sim)).toBeGreaterThan(before);
   });
 });

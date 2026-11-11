@@ -1,9 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { UNDO_CAP, UndoHistory, UndoSteps } from "../../engine/UndoHistory";
-import { Simulation } from "../../engine/Simulation";
-import { GRID } from "../../engine/facilities";
 import { createAppHistory } from "../../game/appHistory";
-import { TsEngine } from "../../engine/port/tsEngine";
+import { look, must, newEngine, noEngine } from "../portKit/rustEngine";
+import { LOT_WIDTH } from "../portKit/draftFixtures";
 
 // The reference engine's copy of the Rust engine's undo stacks. The cases
 // mirror `engine-rs/src/undo_tests.rs`: keep the two tables identical.
@@ -83,9 +82,11 @@ describe("UndoHistory: stack semantics", () => {
   });
 });
 
-describe("the app's history through the port", () => {
+describe.skipIf(noEngine)("the app's history through the port", () => {
+  // A refused step's reason is the unit suite's (`appHistory.test.ts`, "shows
+  // the engine's reason for a refused step and resolves").
   it("steps through the engine and follows the restore, keeping the trail", async () => {
-    const enginePort = new TsEngine(Simulation.newGame(1));
+    const enginePort = newEngine(1);
     const toasts: string[] = [];
     const followed: string[] = [];
     const hist = createAppHistory({ enginePort, ui: { toast: (m) => toasts.push(m) }, followSwap: (follow) => followed.push(follow), showSteps: () => {} });
@@ -94,7 +95,7 @@ describe("the app's history through the port", () => {
     expect(followed, "nothing was swapped").toEqual([]);
 
     hist.capture("build");
-    enginePort.sim.build("lobby", 1, 160);
+    must(look(enginePort).build("lobby", 1, 160), "the lobby");
     hist.commit();
     await hist.undo();
     expect(followed).toEqual(["step"]);
@@ -103,39 +104,27 @@ describe("the app's history through the port", () => {
     expect(toasts[toasts.length - 1]).toBe("Redid: build");
   });
 
-  it("tells the player the engine's reason when it refuses a step", async () => {
-    const enginePort = Object.assign(new TsEngine(Simulation.newGame(1)), {
-      undo: () => Float64Array.of(0, 0),
-      lastReason: () => "no load",
-    });
-    const toasts: string[] = [];
-    const followed: string[] = [];
-    const hist = createAppHistory({
-      enginePort,
-      ui: { toast: (m: string) => void toasts.push(m) },
-      followSwap: (follow: string) => void followed.push(follow),
-      showSteps: () => {},
-    });
-    await expect(hist.undo()).resolves.toBeUndefined();
-    expect(toasts).toEqual(["no load"]);
-    expect(followed).toEqual([]);
-  });
-
   it("undo of a build restores the exact tower and keeps a bridging toggle changed afterward", async () => {
     // `restore` carries the live autoBridge across, so undoing a BUILD never
     // silently flips a Settings toggle the player changed after that build.
-    const enginePort = new TsEngine(Simulation.newGame(3, "modern", "realWorld"));
+    const enginePort = newEngine(3, "modern", "realWorld");
+    const tower = look(enginePort);
     const hist = createAppHistory({ enginePort, ui: { toast: () => {} }, followSwap: () => {}, showSteps: () => {} });
-    const cx = Math.floor(GRID.width / 2);
-    const before = enginePort.sim.serialize();
+    const cx = Math.floor(LOT_WIDTH / 2);
+    const before = JSON.parse(enginePort.serialize()) as Record<string, unknown>;
+    expect(enginePort.autoBridge()).toBe(true);
     hist.capture("Build"); // snapshot taken while bridging is on
-    expect(enginePort.sim.tower.place("lobby", 1, cx).ok).toBe(true);
+    must(tower.tower.place("lobby", 1, cx), "the lobby");
     hist.commit();
-    enginePort.sim.autoBridge = false; // the player turns bridging off AFTER the build
+    expect(enginePort.chooseAutoBridge(false)[0]).toBe(1); // the player turns bridging off AFTER the build
     await hist.undo();
-    expect(enginePort.sim.tower.unitAt(1, cx)).toBeUndefined();
-    expect(enginePort.sim.autoBridge).toBe(false);
-    expect({ ...enginePort.sim.serialize(), autoBridge: true }).toEqual({ ...before, autoBridge: true });
+    expect(tower.tower.structureKindAt(1, cx)).toBeUndefined();
+    expect(enginePort.autoBridge()).toBe(false);
+    // The step reverses the build, not a snapshot, so the id counter stays
+    // past the undone lobby's id (a redo builds it again under that id).
+    const after = JSON.parse(enginePort.serialize()) as Record<string, unknown>;
+    expect(after.nextId).toBe((before.nextId as number) + 1);
+    expect({ ...after, autoBridge: true, nextId: 0 }).toEqual({ ...before, autoBridge: true, nextId: 0 });
   });
 });
 
