@@ -1,40 +1,36 @@
 # Engine conformance suite
 
-This folder is the referee for every engine that runs Verticopolis. It holds
-scripted scenarios and the hashes the TypeScript engine produces at fixed points
-while it plays them. Another engine (for example a port to another language)
-passes when it replays every scenario and produces the same list of checkpoints,
-byte for byte.
+This folder is the referee for the Rust engine (`engine-rs/`), the only engine
+the game runs. It holds scripted scenarios and the hashes the engine produces at
+fixed points while it plays them. Another engine (for example a port to another
+language) passes when it replays every scenario and produces the same list of
+checkpoints, byte for byte.
 
 Frontends may differ. Simulations may not.
 
 - `scenarios/*.json`: one scenario per file. The file name is the scenario `id`.
 - `expected.json`: the pinned checkpoints for every scenario, written by the
-  TypeScript reference runner, as
+  Rust engine's run through the WASM binding, as
   `{ "scenarios": { "<id>": [ { "label", "state", "crowd", "events" }, ... ] } }`.
 - `events/catalog.json`: the gameplay event catalog, the contract for the
-  events both engines emit (see Checkpoints).
+  events the engine emits (see Checkpoints).
+- `fuzz-corpus/`: scenarios the nightly fuzzer once diverged on, and smoke
+  entries, each with its golden under `fuzz-corpus/goldens/` (the native
+  run's records, as `fuzz --replay` writes them).
 
-The reference runner is `src/tests/conformance/scenario.ts`, and
-`src/tests/integration/conformance.integration.test.ts` runs it in CI (its own
-step of the `test` job, without coverage) and in `npm test`. A mismatch fails
-the build and names the first checkpoint that differs.
-
-The runner drives any engine behind its `ScenarioEngine` interface. The
-TypeScript engine is the default; the Rust engine answers twice, natively
-through `cargo run --release --features conformance --bin conformance` and through its WASM binding
-from Node (`npm run wasm:build && npm run test:wasm`, see
-`engine-rs/README.md`), where the same TypeScript runner replays every
-scenario against this lock. Beyond the scripted scenarios, the frame-day
+The runner is `src/tests/conformance/scenario.ts`. It drives any engine
+behind its `ScenarioEngine` interface. The Rust engine answers twice:
+natively through `cargo run --release --features conformance --bin conformance`, and through its WASM
+binding from Node (`npm run wasm:build && npm run test:wasm`, see
+`engine-rs/README.md`), where `conformanceWasm.integration.test.ts` replays
+every scenario against this lock. A mismatch fails the build and names the
+first checkpoint that differs. Beyond the scripted scenarios, the frame-day
 golden (`src/tests/goldens/frame-days.json`, built by
 `src/tests/goldens/frameDays.ts`) pins a day on every fixture at every speed,
 played through the port's `advance` as the web frame loop plays it, as
 hashes of the same two views and of the gameplay events at the start, after
-the first frame, every hour and at the end of the day. The Rust engine is
-checked against it in `npm run test:wasm`
-(`conformanceWasmFrameDays.integration.test.ts`), and the TypeScript engine
-is checked against the same file (`frameDaysReferee.integration.test.ts`)
-until it is deleted, so the two engines agree through it. It is written by
+the first frame, every hour and at the end of the day
+(`conformanceWasmFrameDays.integration.test.ts`). It is written by
 the Rust run under its own switch (`VC_FRAME_DAYS_UPDATE=1 npx vitest run
 --project integration conformanceWasmFrameDays`, with the engine package
 built), on purpose and in the same pull request as the change that moves it,
@@ -44,9 +40,13 @@ version. The port-edit golden (`src/tests/goldens/port-edits.json`, built by
 `src/tests/goldens/portEdits.ts`) does the same for the player's edits: the
 mirror's edit and brush checks sent as the game's port commands, and the
 game's undo and redo, with every answer and the same hashes after each step
-(`conformanceWasmPortEdits`, written under `VC_PORT_EDITS_UPDATE=1`, and
-`portEditsReferee` on the TypeScript engine). The dual run (`src/dualrun/`) still compares the two engines through
-the mirror until #1421 retires it.
+(`conformanceWasmPortEdits`, written under `VC_PORT_EDITS_UPDATE=1`). Until
+#1875 the TypeScript reference engine was held to the lock and the goldens too.
+
+The fuzz corpus's goldens move the same way: when a change moves an entry on
+purpose, pin the new records with `npx tsx scripts/fuzz-corpus.ts --update`
+(the fuzzer and the WASM package built) and commit them with the change. They
+are not lock files and do not move the crate version.
 
 ## When a hash moves
 
@@ -54,12 +54,13 @@ A moved hash means the simulation changed. If the change is intended, regenerate
 the lock and commit it in the same pull request, saying why:
 
 ```sh
-VC_CONFORMANCE_UPDATE=1 npx vitest run --project integration conformance
+npm run wasm:build
+VC_CONFORMANCE_UPDATE=1 npx vitest run --project integration conformanceWasm
 ```
 
 An update writes the lock only when every test in the run passes and every
-scenario finishes, and it refuses to run in CI. With the engine package built,
-the same command also matches `conformanceWasmFrameDays` and
+scenario finishes, and it refuses to run in CI or without the engine package.
+The same command also matches `conformanceWasmFrameDays` and
 `conformanceWasmPortEdits`, which check their goldens and never write them. A simulation change that moves the lock
 usually moves those goldens too, so that run fails there until each is
 refreshed with its own switch (above); all of them go in the diff.
@@ -282,36 +283,44 @@ it is fixed.
 
 `fuzz-corpus/*.json` holds scenarios the seeded differential found trouble
 with, plus smoke entries that keep the job from running on nothing. They use
-the scenario format above, but they are not part of the lock: there are no
-pinned hashes, only the two engines' agreement. The file name is the scenario
+the scenario format above, but they are not part of the lock: each entry's
+golden pins the native Rust run's own records, refreshed on purpose without a
+crate version move. The file name is the scenario
 `id`. Three entries (`fx-thief-uncaught`, `fx-thief-caught`, `fx-treasure-cap`)
 reach cosmetic fx sites the locked scenarios do not; `fxSequences.integration.test.ts`
 pins their end values. `pool-caps-tall` is the generator's burst for a tall seed with its two
 cap refusals pinned by reason, so a change that stops either pool from filling fails the
 guard in `fuzzCorpusEntries.test.ts`.
 
-A pull request that touches either engine replays every entry on both and
-fails if they differ at any checkpoint (`scripts/fuzz-corpus.ts`, the
-`fuzz-corpus` job of `engine-rs.yml`, held to ten minutes):
+A pull request that touches the engine replays every entry natively and
+through the shipped WASM build, and fails if the native run leaves the
+entry's golden (`goldens/<id>.rs.json` and `goldens/<id>.rs.detail.json`) or
+the WASM run leaves the native one at any checkpoint (`scripts/fuzz-corpus.ts`,
+the `fuzz-corpus` job of `engine-rs.yml`, with a 240 s budget of its own):
 
 ```sh
 (cd engine-rs && cargo build --release --features conformance --bin fuzz)
-npx tsx scripts/fuzz-corpus.ts
+npm run wasm:build
+npx tsx scripts/fuzz-corpus.ts            # check
+npx tsx scripts/fuzz-corpus.ts --update   # pin the goldens on purpose
 ```
+
+`npm run test:wasm` holds the WASM run to the same goldens without the fuzzer
+binary (`fuzzWasmLeg.integration.test.ts`).
 
 When a night diverges, shrink its scenario and add the result in the fix pull
 request:
 
 ```sh
-npx tsx scripts/fuzz-shrink.ts fuzz-out/fuzz-<seed>.json <entry-name> [--wasm] [--max-tests 4000]
+npx tsx scripts/fuzz-shrink.ts fuzz-out/fuzz-<seed>.json <entry-name> [--max-tests 4000]
 ```
 
 The shrinker drops commands until none can go, keeping a candidate only when
-the Rust engine runs it cleanly and the TypeScript replay shows the same kind
-of divergence (with `--wasm`, the shipped WASM build in Node shows it instead,
-which includes a trap), then writes `fuzz-corpus/<entry-name>.json`. Before the fix the
-entry fails the corpus job; after it, the entry passes and stays as a
-regression. A tall night needs about 1300 tests, so the default limit is 4000;
+the native Rust engine runs it cleanly and the shipped WASM build in Node
+shows the same kind of divergence (a trap included), then writes
+`fuzz-corpus/<entry-name>.json`. Before the fix the entry fails the corpus
+job; after it, pin its golden with `fuzz-corpus --update`, and the entry
+passes and stays as a regression. A tall night needs about 1300 tests, so the default limit is 4000;
 a run that reaches `--max-tests` says so, and its list may not be minimal.
 `fuzz --replay <scenario.json> <out-dir>` is the Rust half: it runs any
 scenario and writes the records `scripts/fuzz-compare.ts` reads

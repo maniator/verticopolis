@@ -30,10 +30,9 @@ import { writeGoldenFile } from "./updateGate";
  *
  * `frame-days.json` holds the checkpoints. The Rust engine is checked against
  * it in `conformanceWasmFrameDays.integration.test.ts`, which also writes it
- * (`VC_FRAME_DAYS_UPDATE=1`, `updateGate.ts`). While the TypeScript engine exists,
- * `frameDaysReferee.integration.test.ts` runs the same cases on it against the
- * same file, so the golden is what the dual run compared, and the two engines
- * agree through it. That check goes with `src/engine/`.
+ * (`VC_FRAME_DAYS_UPDATE=1`, `updateGate.ts`). Until #1875 a TypeScript
+ * referee ran the same cases on that engine against the same file, so the
+ * golden began as what the dual run compared.
  *
  * A moved hash tells you the hour; the field takes a dump. Dump the views of a
  * case before and after the change and diff the files:

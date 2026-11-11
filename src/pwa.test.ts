@@ -184,7 +184,7 @@ describe("registerPWA: offline", () => {
         const onUpdateAvailable = await needRefresh();
         await vi.waitFor(() => expect(onUpdateAvailable).toHaveBeenCalledTimes(1));
         expect(versionJsonCall(fetchSpy), "version.json was requested").toBeDefined();
-        expect(onUpdateAvailable.mock.calls[0][1]).toEqual({ version: undefined, sha: undefined, notes: [] });
+        expect(onUpdateAvailable.mock.calls[0][1]).toEqual({ version: undefined, sha: undefined, notes: [], releases: [] });
       });
     },
   );
@@ -219,7 +219,15 @@ describe("registerPWA: offline", () => {
     await withFetch(async () => new Response(body, { status: 200 }), async (fetchSpy) => {
       const onUpdateAvailable = await needRefresh();
       await vi.waitFor(() => expect(onUpdateAvailable).toHaveBeenCalledTimes(1));
-      expect(onUpdateAvailable.mock.calls[0][1]).toEqual({ version: "9.9.9", sha: "abc1234", notes: ["A new thing."] });
+      // A payload without `releases` (an older server) still shows its own notes,
+      // as the one version newer than the running build (#1897).
+      expect(onUpdateAvailable.mock.calls[0][1]).toEqual({
+        version: "9.9.9",
+        sha: "abc1234",
+        notes: ["A new thing."],
+        releases: [{ version: "9.9.9", notes: ["A new thing."] }],
+        since: __APP_VERSION__,
+      });
       // It is fetched fresh: never from a cache, never precached.
       const call = versionJsonCall(fetchSpy);
       expect(call, "version.json was requested").toBeDefined();

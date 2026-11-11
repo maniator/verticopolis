@@ -31,9 +31,8 @@ import { answerNumber, outcomeOf, STATUS_SLOT, type AnswerValue, type LineKind, 
  * `port-edits.json` holds the lines (`portEditLines.ts` reads, writes,
  * checks and compares them). The Rust engine is checked against it in
  * `conformanceWasmPortEdits.integration.test.ts`, which also writes it
- * (`VC_PORT_EDITS_UPDATE=1`, `updateGate.ts`), and while the TypeScript
- * engine exists `portEditsReferee.integration.test.ts` runs the same scripts
- * on it against the same file. That check goes with `src/engine/`.
+ * (`VC_PORT_EDITS_UPDATE=1`, `updateGate.ts`). Until #1875 a TypeScript
+ * referee ran the same scripts on that engine against the same file.
  *
  * A moved hash tells you the step; the field takes a dump:
  * `VC_PORT_EDITS_DUMP=<dir> VC_PORT_EDITS_CASE=<case id>` writes each line's

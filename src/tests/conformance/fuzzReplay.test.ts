@@ -2,12 +2,17 @@ import { describe, expect, it } from "vitest";
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { isRansomAnswer, replayCompare, throwSignature } from "./fuzzReplay";
+import { replayCompare, throwSignature } from "./fuzzReplay";
 import { DetailError, isWasmTrap, requireDetail } from "./checkpointDetail";
-import { CONFORMANCE_DIR, loadScenario, runScenario, startTsEngine, type Checkpoint } from "./scenario";
+import { loadScenario, runScenario, startTsEngine, type Checkpoint } from "./scenario";
 import type { CheckpointDetail } from "./checkpointDetail";
 
 const dir = mkdtempSync(join(tmpdir(), "vc-fuzz-replay-"));
+
+// The replay runs the shipped WASM build; these harness tests hand it the
+// TypeScript engine instead (`replayCompare`'s `engine`), so they run without
+// the package. They move to a stand-in of their own before src/engine/ goes
+// (#1875, step 5 of the story's deletion stack).
 
 const commands = (extra: unknown[] = []) => [
   { op: "setMoney", amount: 500000000 },
@@ -44,7 +49,7 @@ function setup(
 describe("replayCompare", () => {
   it("reads agreement as ok", () => {
     const file = setup("agree", commands(), () => {});
-    expect(replayCompare(file)).toEqual({ status: "ok", checkpoints: 3 });
+    expect(replayCompare(file, undefined, startTsEngine)).toEqual({ status: "ok", checkpoints: 3 });
   });
 
   it("names a hash divergence by kind and field, without its position", () => {
@@ -52,7 +57,7 @@ describe("replayCompare", () => {
       c[1].state = "x";
       d[1].save.clock = "other";
     });
-    const r = replayCompare(file);
+    const r = replayCompare(file, undefined, startTsEngine);
     expect(r).toMatchObject({ status: "diverged", signature: "state:clock" });
     expect(r.status === "diverged" && r.message).toMatch(/checkpoint 1 \(built\)/);
   });
@@ -61,7 +66,7 @@ describe("replayCompare", () => {
     const file = setup("money", commands(), (_c, d) => {
       d[2].money += 1;
     });
-    expect(replayCompare(file)).toMatchObject({ status: "diverged", signature: "money" });
+    expect(replayCompare(file, undefined, startTsEngine)).toMatchObject({ status: "diverged", signature: "money" });
   });
 
   it("reads records in another folder", () => {
@@ -71,20 +76,20 @@ describe("replayCompare", () => {
     const checkpoints = runScenario(loadScenario(file), undefined, details);
     writeFileSync(join(other, "elsewhere.rs.json"), JSON.stringify(checkpoints));
     writeFileSync(join(other, "elsewhere.rs.detail.json"), JSON.stringify(details));
-    expect(replayCompare(file, other).status).toBe("ok");
-    expect(replayCompare(file).status).toBe("harness");
+    expect(replayCompare(file, other, startTsEngine).status).toBe("ok");
+    expect(replayCompare(file, undefined, startTsEngine).status).toBe("harness");
   });
 
-  it("reads a TypeScript throw as a divergence, not a harness failure", () => {
+  it("reads a runner throw as a divergence, not a harness failure", () => {
     const agreed = setup("threw-ok", commands());
     const details: CheckpointDetail[] = [];
     const checkpoints = runScenario(loadScenario(agreed), undefined, details);
     // The Rust records say the build was accepted; the scenario below asks the
-    // TypeScript engine to refuse a build it accepts.
+    // replayed engine to refuse a build it accepts.
     const file = setup("threw", commands([{ op: "build", kind: "floor", floor: 2, x: 170, expectFail: true }]));
     writeFileSync(join(dir, "threw.rs.json"), JSON.stringify(checkpoints));
     writeFileSync(join(dir, "threw.rs.detail.json"), JSON.stringify(details));
-    const r = replayCompare(file);
+    const r = replayCompare(file, undefined, startTsEngine);
     expect(r).toMatchObject({ status: "diverged", signature: "threw:build:floor" });
   });
 
@@ -98,17 +103,17 @@ describe("replayCompare", () => {
   });
 
   it("reads missing, malformed and mismatched records as harness failures", () => {
-    expect(replayCompare(setup("missing", commands()))).toMatchObject({ status: "harness" });
+    expect(replayCompare(setup("missing", commands()), undefined, startTsEngine)).toMatchObject({ status: "harness" });
     const file = setup("malformed", commands(), () => {});
     writeFileSync(join(dir, "malformed.rs.json"), "{not json");
-    expect(replayCompare(file)).toMatchObject({ status: "harness", message: expect.stringContaining("HARNESS:") });
+    expect(replayCompare(file, undefined, startTsEngine)).toMatchObject({ status: "harness", message: expect.stringContaining("HARNESS:") });
     const short = setup("short", commands(), (c) => {
       c.pop();
     });
-    expect(replayCompare(short)).toMatchObject({ status: "harness" });
+    expect(replayCompare(short, undefined, startTsEngine)).toMatchObject({ status: "harness" });
     writeFileSync(join(dir, "notarray.rs.json"), "{}");
     writeFileSync(join(dir, "notarray.rs.detail.json"), "[]");
-    expect(replayCompare(setup("notarray", commands()))).toMatchObject({ status: "harness" });
+    expect(replayCompare(setup("notarray", commands()), undefined, startTsEngine)).toMatchObject({ status: "harness" });
   });
 
   it("reads an unreadable scenario as a harness failure", () => {
@@ -116,7 +121,7 @@ describe("replayCompare", () => {
     writeFileSync(file, JSON.stringify({ id: "bad", description: "d", start: { newGame: { seed: 1, mode: "classic" } }, commands: [{ op: "nope" }] }));
     writeFileSync(join(dir, "bad.rs.json"), "[]");
     writeFileSync(join(dir, "bad.rs.detail.json"), "[]");
-    expect(replayCompare(file)).toMatchObject({ status: "harness" });
+    expect(replayCompare(file, undefined, startTsEngine)).toMatchObject({ status: "harness" });
   });
 
   it("replays a minimized known failing seed deterministically", () => {
@@ -135,61 +140,14 @@ describe("replayCompare", () => {
       "modern",
       5,
     );
-    const a = replayCompare(file);
+    const a = replayCompare(file, undefined, startTsEngine);
     const checkpointsAfterFirst = readFileSync(join(dir, "seed-9315-min.rs.json"), "utf8");
     const detailsAfterFirst = readFileSync(join(dir, "seed-9315-min.rs.detail.json"), "utf8");
-    const b = replayCompare(file);
+    const b = replayCompare(file, undefined, startTsEngine);
     expect(readFileSync(join(dir, "seed-9315-min.rs.json"), "utf8")).toBe(checkpointsAfterFirst);
     expect(readFileSync(join(dir, "seed-9315-min.rs.detail.json"), "utf8")).toBe(detailsAfterFirst);
     expect(a).toMatchObject({ status: "diverged", signature: "money" });
     expect(b).toEqual(a);
-  });
-});
-
-describe("a bomb ransom call on the TypeScript leg (owner exception, #1886)", () => {
-  // The refused-ransom replay: hour ticks until the call, a refusal, two days.
-  const file = join(dir, "ransom.json");
-  writeFileSync(file, readFileSync(join(CONFORMANCE_DIR, "scenarios", "ransom-declined-modern.json")));
-  const details: CheckpointDetail[] = [];
-  const checkpoints = runScenario(loadScenario(file), undefined, details);
-  const rust = (tweak: (c: Checkpoint[], d: CheckpointDetail[]) => void) => {
-    const c = structuredClone(checkpoints);
-    const d = structuredClone(details);
-    tweak(c, d);
-    writeFileSync(join(dir, "ransom.rs.json"), JSON.stringify(c));
-    writeFileSync(join(dir, "ransom.rs.detail.json"), JSON.stringify(d));
-  };
-
-  it("ends the compare at the checkpoint that carries the call", () => {
-    rust((c, d) => {
-      c[c.length - 1].state = "rust searched";
-      d[d.length - 1].money += 1;
-    });
-    const r = replayCompare(file);
-    expect(r.status).toBe("ok");
-    expect(r.status === "ok" && r.checkpoints).toBeGreaterThan(0);
-    expect(r.status === "ok" && r.checkpoints).toBeLessThan(checkpoints.length);
-  });
-
-  it("still compares every checkpoint before it", () => {
-    rust((c) => {
-      c[0].state = "x";
-    });
-    expect(replayCompare(file)).toMatchObject({ status: "diverged" });
-  });
-
-  it("fails a Rust record that ends before the call", () => {
-    rust((c, d) => {
-      c.splice(1);
-      d.splice(1);
-    });
-    expect(replayCompare(file)).toMatchObject({ status: "diverged", signature: "count" });
-  });
-
-  it("reads only a ransom's answer as a call", () => {
-    expect(isRansomAnswer({ name: "emergency_resolved", payload: { kind: "bombThreat", decision: "decline", source: "timeout" } })).toBe(true);
-    expect(isRansomAnswer({ name: "emergency_resolved", payload: { kind: "fireRescue", decision: "decline", source: "player" } })).toBe(false);
-    expect(isRansomAnswer(null)).toBe(false);
   });
 });
 

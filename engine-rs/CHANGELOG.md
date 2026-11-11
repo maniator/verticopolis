@@ -15,6 +15,12 @@ raised the version, so they are documentation only.
 There is no entry for 0.17.0, which only
 existed as a step inside a stacked branch.
 
+## 1.24.0 (2026-11-11)
+
+- A declined ransom starts a timed bomb search in both modes (a hidden bomb, guards sweeping floors from the emergency stairs, a deadline) that the save keeps as `events.bomb` while it runs; Classic still calls only on a tower with Security.
+- `bombSearch()` reads the search (each guard's floor, rooms, start, arrival and finish), and the view's header adds `bombSearchSeq` (view layout 13).
+- New gameplay event `bomb_found`; the web build reports `bomb_outcome` (paid, found or exploded).
+
 ## 1.23.0 (2026-11-10)
 
 - The binding drops `towerSetCars` and `towerResizeTransport`, the silent tower edits only the retired dual-run mirror called; `setCars` and `resizeTransport` stay for uncharged edits.

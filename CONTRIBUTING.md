@@ -52,12 +52,11 @@ npm run build       # production build must succeed
 `npm run test:coverage` (`vitest run --coverage`) is the **CI coverage gate**. It
 enforces the coverage floors described below and fails the build if any floor
 is breached. Run it locally when you touch measured code. CI runs it without
-`src/tests/integration/conformance.integration.test.ts`,
 `src/tests/integration/condoRelocationEngine.integration.test.ts` and
 `src/tests/integration/roomCountsEngine.integration.test.ts`, which have their
-own step without coverage (the 720-hour `holidays-classic` scenario, the
-30-year condo run and the every-step room-count walk are too slow under
-coverage on a shared runner); `npm test` still runs everything.
+own step without coverage (the 30-year condo run and the every-step
+room-count walk are too slow under coverage on a shared runner); `npm test`
+still runs everything.
 
 Workflow YAML and test-runner configuration are configuration, not behavior.
 Do not create standalone test files, or add assertions to existing tests, that
@@ -99,23 +98,23 @@ Verticopolis has **two test tiers**:
     `npm run test:integration` runs only these.
     The engine conformance suite runs in this tier: scripted scenarios in
     `conformance/` whose checkpoint hashes are pinned in
-    `conformance/expected.json` and checked by
-    `conformance.integration.test.ts`. A moved hash is a simulation change:
-    regenerate the lock only on purpose, in the same PR. See
+    `conformance/expected.json` and checked on the Rust engine by
+    `conformanceWasm.integration.test.ts`, which is also the only writer of
+    the lock. A moved hash is a simulation change: regenerate the lock only on
+    purpose, in the same PR. See
     [conformance/README.md](./conformance/README.md).
 
     **One engine, with a TypeScript reference.** `engine-rs/` is the engine the
     game runs (app 2.66.0, engine crate 1.0.0). It is a Rust port of
     `src/engine/`, which the shipped game no longer runs: the TypeScript engine
-    stays only as the reference the conformance lock, the dual run and the
-    differential fuzzer compare against, until its code is deleted. The Rust
-    engine is held to the same lock by its own referee
-    (`cargo run --release --features conformance --bin conformance`, and again through the WASM
-    binding from Node with `npm run wasm:build && npm run test:wasm`, which
-    also holds the Rust engine to the frame-day golden: a day on every
-    fixture at every speed, played through the engine's own step driver,
-    pinned every hour; `npm test` holds the TypeScript engine to the same
-    file, and the mirror-based dual run still runs beside it until #1421).
+    stays only for the tests that still run it, until its code is deleted
+    (#1875). The conformance lock, the goldens and the fuzz corpus are the
+    Rust engine's own regression records, written by the Rust run and checked
+    natively (`cargo run --release --features conformance --bin conformance`)
+    and through the WASM binding from Node with
+    `npm run wasm:build && npm run test:wasm`, which also holds the engine to
+    the frame-day golden: a day on every fixture at every speed, played
+    through the engine's own step driver, pinned every hour.
     The `.TDT` codec has one
     implementation, `engine-rs/src/tdt/`, and the TypeScript engine reads and
     writes `.TDT` files through the WASM package
@@ -172,21 +171,26 @@ Verticopolis has **two test tiers**:
     each night and opens an issue on a failure. To replay one seed, from
     `engine-rs/`: `VC_TDT_FUZZ_FIRST=<seed> VC_TDT_FUZZ_SEEDS=1 cargo test
     --release --test tdt_fuzz`. A nightly differential fuzzer
-    (`engine-fuzz.yml`) runs seeded random scenarios through both engines and
+    (`engine-fuzz.yml`) grows seeded random scenarios on the native Rust
+    engine, replays each through the shipped WASM build in Node and
     compares the state, crowd and events hashes at checkpoints at least
     every in-game hour, then the money, the log, each field of the full
     save, and the fx sequences and emergency counters (which sit outside the
     hashed views), naming the first one that differs (`scripts/fuzz-compare.ts`; exit
     3 marks a harness failure, not a divergence). One seed in four grows a
     tall tower that fills the shaft and stair pools; every seed sets a cash
-    profile once the tower is built, and cash can drop to zero or below mid-run. A divergence it finds is
-    pinned as a named scenario in the fix PR. One seed in four (`wasm_every`)
-    is also replayed through the shipped WASM build in Node and compared with
-    the native Rust run (`scripts/fuzz-compare.ts --wasm`), which is where a
-    wasm32-only difference shows (a WASM trap is its own finding: exit 4, its
-    own line in the summary, and a red night). A run summary names its seed range and the
-    `seed_block` and `seed_offset` that replay it, the seeds that diverged on
-    each leg, the seeds that timed out, and the time each leg took. The 14
+    profile once the tower is built, and cash can drop to zero or below mid-run. This is
+    where a wasm32-only difference shows (a WASM trap is its own finding:
+    exit 4, its own line in the summary, and a red night), and a scenario the
+    engine refuses while growing it fails the night too. A divergence it
+    finds is shrunk (`scripts/fuzz-shrink.ts`) and pinned in the fix PR as a
+    corpus entry with its golden (`npx tsx scripts/fuzz-corpus.ts --update`
+    pins the native run's records under `conformance/fuzz-corpus/goldens/`);
+    the `fuzz-corpus` job then holds every entry's native run to its golden
+    and the WASM run to the native one. Until #1875 the scenarios were also
+    replayed on the TypeScript engine. A run summary names its seed range and the
+    `seed_block` and `seed_offset` that replay it, the seeds that diverged,
+    the seeds that timed out, and the time the WASM leg took. The 14
     counted nights need one unchanged window key (`scripts/fuzz-key.ts`). The
     `fuzz-freeze` check (`scripts/fuzz-freeze.ts`) fails a PR that moves the
     key while `conformance/fuzz-window.json` is open. The owner opens the
@@ -710,6 +714,16 @@ committed file is used rather than git commit trailers because releases land on
 `main` as **merge commits**, and a merge commit's message carries none of the
 branch commits' trailers, so a trailer harvest would silently drop the note. The
 file is always present at the exact commit the deploy builds.
+
+The build also writes `releases`: the notes of this version and the versions
+before it, newest first, ten versions with notes at most (`recentReleaseNotes` in
+`src/changelog.ts`). The running client shows the versions newer than the one it
+runs, or than the newest version an earlier prompt already showed
+(`notesSinceRunning` in `src/pwaUpdateInfo.ts`), so a player who skipped versions
+sees all of them and nobody sees a version's notes twice. Two or more versions
+go in a "What's new since <version>" log that scrolls on its own once it is
+long. So don't repeat an earlier version's headline in a later version's notes:
+the prompt already carries it to a player who skipped it.
 
 Cadence: one curated block **per player-noticeable release** (per PR, not per
 commit). Fewer lines beat more, and a release that is a patch or internal-only

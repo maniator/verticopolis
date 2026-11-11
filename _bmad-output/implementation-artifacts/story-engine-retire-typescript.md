@@ -1,6 +1,6 @@
 ---
 story: engine-retire-typescript
-status: planned
+status: in-progress
 depends_on: engine-wasm-switch, engine-tdt-port
 ---
 
@@ -242,3 +242,46 @@ own line: the PR, the files, and why the fallback needs them):
 See the roadmap's "Order and gates" section:
 scenario library, then WASM build and binding, then dual run, then the
 switch, then TDT in the crate, then this story.
+
+## The deletion stack (3.x, #1875)
+
+Owner decisions: delete the source after 3.0.0 (2026-11-10, #1875); build
+the cleanup as a stack of pull requests that merges only after the 3.0.0
+release and the owner's go (2026-11-11). Nothing in the stack changes `main`
+or the 3.0.0 replay key before then. Each PR is its own reviewable step, keeps
+every gate green on its own, and goes up against the one before it.
+
+1. **Replay checks on Rust goldens** (first PR). The nightly `engine-fuzz`
+   compares every seed's native Rust run with the shipped WASM build instead
+   of the TypeScript engine. Each fuzz corpus entry gets a golden, the native
+   run's records under `conformance/fuzz-corpus/goldens/`; the `fuzz-corpus`
+   job holds the native run to it and the WASM run to the native one, and
+   `fuzz-corpus --update` pins it on purpose. The shrinker shrinks against
+   the WASM leg. The window key drops its `srcEngine` part, and the 3.0.0
+   replay window closes in the same PR (it has nothing left to count once the
+   TypeScript leg is gone). The conformance lock is written by the Rust run
+   (`conformanceWasm`, `VC_CONFORMANCE_UPDATE=1`), which reproduces today's
+   lock byte for byte, and the TypeScript conformance suite and the three
+   TypeScript referees of the goldens (frame days, port edits, card text) go.
+2. **The catalog has one source.** The Rust catalog is the only table: the
+   digest lock is written from it, `src/engine/facilities.ts` stops being a
+   pinned copy, the atlas bake's `catalogFor` reads the Rust catalog, and the
+   CLAUDE.md rule loses its copy step.
+3. **Shared types move out of `src/engine/`.** The types the shipped code
+   imports (`types.ts` and the rest of the 87 files' type imports) get a home
+   outside the engine folder, so deleting it breaks no shipped import.
+4. **The tooling tower runs on the Rust engine.** `game.sim` in tooling builds
+   (`src/game/toolingSim.ts`, the e2e and screenshot scenes) drives the WASM
+   engine.
+5. **The tests that still run the TypeScript engine** convert to the port kit
+   or retire against Rust coverage, in batches by area, until
+   `src/tests/tsEngineTests.ratchet.txt` is empty. The `perf:compare`
+   TypeScript slots, the fuzz harness's own tests (which use the TypeScript
+   engine as a stand-in for the WASM build) and #878's last marks go here.
+6. **Delete `src/engine/`** with the import ratchets, the ESLint rule's engine
+   exemption, the TypeScript event emission (#873 step 5) and the docs that
+   still describe two engines. AC5 holds: no app version bump; the crate
+   moves only if the lock or the binding does.
+
+Separately, and on the same hold: a pull request that removes GitHub
+workflows nothing runs or relies on any more (owner, 2026-11-11).

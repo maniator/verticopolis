@@ -70,4 +70,7 @@ glob = [
   # Review the generator and test logic instead of spending context on JSON.
   "src/tests/goldens/frame-days.json",
   "src/tests/goldens/port-edits.json",
+  # The fuzz corpus goldens: native replay records, pinned by
+  # `fuzz-corpus --update` and held to the engine by the fuzz-corpus job.
+  "conformance/fuzz-corpus/goldens/*.json",
 ]

@@ -51,12 +51,7 @@ function plainText(tokens: Token[] | undefined): string {
  * while `## 1.2.30` does not.
  */
 function headingNamesVersion(text: string, version: string): boolean {
-  const token = text
-    .trim()
-    .split(/\s+/)[0]
-    .replace(/^\[|\]$/g, "")
-    .replace(/^v/i, "");
-  return token === version;
+  return headingVersion(text) === version;
 }
 
 /**
@@ -93,6 +88,46 @@ export function notesForVersion(
     }
   }
   return [];
+}
+
+/** One version's player notes, as `version.json` `releases` carries them. */
+export interface ReleaseNotes {
+  version: string;
+  notes: string[];
+}
+
+/** The version a `## <heading>` names (its first token, without `[ ]` or a leading `v`). */
+function headingVersion(text: string): string {
+  return text
+    .trim()
+    .split(/\s+/)[0]
+    .replace(/^\[|\]$/g, "")
+    .replace(/^v/i, "");
+}
+
+/**
+ * The player notes of `version` and the versions below it, newest first, as
+ * the update prompt needs them to show a player everything they skipped
+ * (#1897). Reads the file's `## <version>` sections in order (the file keeps
+ * the newest on top), starts at `version`'s section, skips a section with no
+ * bullets (an internal release) and stops after `count` sections with notes.
+ * Each section goes through {@link notesForVersion}, so the caps match the
+ * single-version notes. `[]` when `version` has no section.
+ */
+export function recentReleaseNotes(changelog: string, version: string, count: number): ReleaseNotes[] {
+  const versions = marked
+    .lexer(changelog)
+    .filter((t): t is Extract<Token, { type: "heading" }> => t.type === "heading" && t.depth === 2)
+    .map((t) => headingVersion(t.text));
+  const start = versions.indexOf(version);
+  if (start < 0) return [];
+  const out: ReleaseNotes[] = [];
+  for (const v of versions.slice(start)) {
+    if (out.length >= count) break;
+    const notes = notesForVersion(changelog, v);
+    if (notes.length > 0) out.push({ version: v, notes });
+  }
+  return out;
 }
 
 /** U+2060 WORD JOINER: invisible, and it splits a token GitHub would link. */

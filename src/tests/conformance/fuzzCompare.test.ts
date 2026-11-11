@@ -21,7 +21,7 @@ describe("seeded differential compare", () => {
     for (const hash of ["state", "crowd", "events"] as const) {
       const rust = run();
       rust.checkpoints[1][hash] = "x";
-      expect(compareRuns(run(), rust)).toMatchObject({ index: 1, label: "h1", kind: hash, ts: run().checkpoints[1][hash], rust: "x" });
+      expect(compareRuns(run(), rust)).toMatchObject({ index: 1, label: "h1", kind: hash, other: run().checkpoints[1][hash], rust: "x" });
     }
   });
 
@@ -35,7 +35,7 @@ describe("seeded differential compare", () => {
   it("names an fx sequence or an emergency counter by its slot", () => {
     const rust = run();
     rust.details[1].fx.bombs += 1;
-    expect(compareRuns(run(), rust)).toMatchObject({ index: 1, kind: "fx", field: "bombs", ts: "1", rust: "2" });
+    expect(compareRuns(run(), rust)).toMatchObject({ index: 1, kind: "fx", field: "bombs", other: "1", rust: "2" });
     const absent = run();
     delete absent.details[1].fx.santaFxSeq;
     expect(compareRuns(run(), absent)).toMatchObject({ kind: "fx", field: "santaFxSeq", rust: "(absent)" });
@@ -49,16 +49,17 @@ describe("seeded differential compare", () => {
     rust.details[1].money += 1;
     const d = compareRuns(run(), rust, "WASM");
     expect(d && describeDivergence(d, "WASM")).toMatch(/WASM 2000100 vs Rust 2000101/);
-    expect(d && describeDivergence(d)).toMatch(/TypeScript 2000100 vs Rust 2000101/);
+    expect(d && describeDivergence(d, "golden")).toMatch(/golden 2000100 vs Rust 2000101/);
     const bad = run();
     bad.details.pop();
     expect(() => compareRuns(bad, run(), "WASM")).toThrow(/^WASM:/);
+    expect(() => compareRuns(bad, run(), "golden")).toThrow(/^golden:/);
   });
 
   it("names a money difference", () => {
     const rust = run();
     rust.details[1].money += 1;
-    expect(compareRuns(run(), rust)).toMatchObject({ index: 1, kind: "money", ts: "2000100", rust: "2000101" });
+    expect(compareRuns(run(), rust)).toMatchObject({ index: 1, kind: "money", other: "2000100", rust: "2000101" });
   });
 
   it("names which part of the log differs", () => {
@@ -75,7 +76,7 @@ describe("seeded differential compare", () => {
     expect(compareRuns(run(), rust)).toMatchObject({ index: 0, kind: "save", field: "clock" });
     const extra = run();
     extra.details[1].save.founder = "f";
-    expect(compareRuns(run(), extra)).toMatchObject({ kind: "save", field: "founder", ts: "(absent)", rust: "f" });
+    expect(compareRuns(run(), extra)).toMatchObject({ kind: "save", field: "founder", other: "(absent)", rust: "f" });
   });
 
   it("names a label or a count difference", () => {
@@ -86,7 +87,7 @@ describe("seeded differential compare", () => {
     const short = run();
     short.checkpoints.pop();
     short.details.pop();
-    expect(compareRuns(run(), short)).toMatchObject({ kind: "count", ts: "2", rust: "1" });
+    expect(compareRuns(run(), short)).toMatchObject({ kind: "count", other: "2", rust: "1" });
   });
 
   it("names the detail when a hash and the money both differ", () => {
@@ -108,7 +109,7 @@ describe("seeded differential compare", () => {
     expect(() => compareRuns(run(), noEvents)).toThrow(/Rust: checkpoint 0/);
     const noLog = run();
     delete (noLog.details[0] as Partial<(typeof noLog.details)[0]>).log;
-    expect(() => compareRuns(noLog, run())).toThrow(/TypeScript: detail 0/);
+    expect(() => compareRuns(noLog, run())).toThrow(/WASM: detail 0/);
     expect(() => compareRuns(run(), { ...run(), details: [null as never, null as never] })).toThrow(/Rust: detail 0/);
   });
 
@@ -116,6 +117,6 @@ describe("seeded differential compare", () => {
     const rust = run();
     rust.details[1].save.units = "other";
     const d = compareRuns(run(), rust)!;
-    expect(describeDivergence(d)).toBe("DIVERGED at checkpoint 1 (h1): save field units, TypeScript u1 vs Rust other");
+    expect(describeDivergence(d)).toBe("DIVERGED at checkpoint 1 (h1): save field units, WASM u1 vs Rust other");
   });
 });

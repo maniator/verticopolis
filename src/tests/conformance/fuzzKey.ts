@@ -10,9 +10,8 @@
  * The key is deliberately wide: an extra reset costs time, a missing input
  * lets an untested change through. It covers
  *   engine      the Rust crate and the event catalog (`engineSourceHash`)
- *   srcEngine   `src/engine` without its `*.test.ts` files
- *   scripts     the scripts the nightly runs, with their import closure
- *               outside `src/engine`, and `tsconfig.json`
+ *   scripts     the scripts the nightly runs, with their import closure, and
+ *               `tsconfig.json`
  *   wasmBuild   the WASM build's inputs (the closure of `scripts/wasm-build.ts`,
  *               the build script, the cache action and the `wasm:build` line)
  *   pins        the lockfile without its root `version` fields, `.nvmrc`,
@@ -52,7 +51,7 @@ const CARGO_CONFIG = [
   "engine-rs/rust-toolchain",
 ];
 
-export const PART_NAMES = ["engine", "srcEngine", "scripts", "wasmBuild", "pins", "fixtures"] as const;
+export const PART_NAMES = ["engine", "scripts", "wasmBuild", "pins", "fixtures"] as const;
 export type PartName = (typeof PART_NAMES)[number];
 export type KeyParts = Record<PartName, string>;
 
@@ -63,7 +62,7 @@ const posix = (p: string): string => p.split(sep).join("/");
  *  `engineSourceHash`, it skips dotfiles and symlinks, so a stray `.DS_Store`
  *  or editor backup cannot make a local key differ from CI's. A missing
  *  directory throws: a rename must not turn into an empty hash. */
-function walk(root: string, dir: string, skip: (rel: string) => boolean = () => false): string[] {
+function walk(root: string, dir: string): string[] {
   if (!existsSync(dir)) throw new Error(`fuzz key: ${posix(relative(root, dir))} is listed but missing`);
   const out: string[] = [];
   const visit = (d: string) => {
@@ -71,7 +70,6 @@ function walk(root: string, dir: string, skip: (rel: string) => boolean = () => 
       if (name.startsWith(".")) continue;
       const p = join(d, name);
       const rel = posix(relative(root, p));
-      if (skip(rel)) continue;
       const st = lstatSync(p);
       if (st.isSymbolicLink()) continue;
       if (st.isDirectory()) visit(p);
@@ -195,11 +193,9 @@ export function releaseNeutral(crateToml: string): SourceView {
 
 /** The files each part hashes, by path (the two parts that are not plain file
  *  sets are the crate and the pins' lockfile; see `fuzzKeyParts`). */
-export function fuzzKeyFiles(root: string = process.cwd()): Record<"srcEngine" | "scripts" | "wasmBuild" | "fixtures", string[]> {
-  const srcEngine = walk(root, join(root, "src/engine"), (rel) => rel.endsWith(".test.ts"));
-  const closure = importClosure(root, FUZZ_ENTRIES).filter((f) => !f.startsWith("src/engine/"));
+export function fuzzKeyFiles(root: string = process.cwd()): Record<"scripts" | "wasmBuild" | "fixtures", string[]> {
+  const closure = importClosure(root, FUZZ_ENTRIES);
   return {
-    srcEngine,
     scripts: [...closure, "tsconfig.json"].sort(),
     wasmBuild: [
       ...importClosure(root, [WASM_BUILD_ENTRY]),
@@ -217,7 +213,6 @@ export function fuzzKeyParts(root: string = process.cwd()): KeyParts {
   if (typeof wasmLine !== "string") throw new Error("fuzz key: package.json has no wasm:build script");
   return {
     engine: engineSourceHash(join(root, "engine-rs"), releaseNeutral(readFileSync(join(root, "engine-rs/Cargo.toml"), "utf8"))),
-    srcEngine: filesHash(root, files.srcEngine),
     scripts: filesHash(root, files.scripts),
     wasmBuild: sha(`${filesHash(root, files.wasmBuild)}\n${wasmLine}`),
     pins: sha(

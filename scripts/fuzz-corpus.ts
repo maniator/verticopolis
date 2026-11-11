@@ -1,27 +1,41 @@
 /**
- * Replay every entry of conformance/fuzz-corpus/ on both engines and fail if
- * they disagree. The pull-request job (engine-rs.yml, `fuzz-corpus`) runs it
- * on a change to either engine. Usage:
+ * Replay every entry of conformance/fuzz-corpus/ on the native Rust engine and
+ * through the shipped WASM build, and fail when the native run leaves the
+ * entry's golden (conformance/fuzz-corpus/goldens/) or the WASM run leaves the
+ * native one. The pull-request job (engine-rs.yml, `fuzz-corpus`) runs it on
+ * an engine change. Usage:
  *   (cd engine-rs && cargo build --release --features conformance --bin fuzz)
- *   npx tsx scripts/fuzz-corpus.ts [--budget <seconds>]
+ *   npm run wasm:build
+ *   npx tsx scripts/fuzz-corpus.ts [--budget <seconds>] [--update]
+ * --update pins each entry's native records as its golden instead of checking
+ * them (local only, never in CI), and still checks the WASM leg; commit the
+ * goldens with the change that moves them and say why.
  * Exit 0 all entries agree, 1 a divergence, an engine refusal or the budget
  * ran out (default 240 s, well under the job's ten-minute limit; a Rust replay
- * still running at the deadline is cut off, the TypeScript half has no timer
- * of its own so a hang there waits for the job's limit, and a run that
- * finishes late fails), 2 bad arguments, 3 the harness failed (no fuzzer, an
- * unreadable entry or folder, an empty corpus).
+ * still running at the deadline is cut off, the WASM half has no timer of its
+ * own so a hang there waits for the job's limit, and a run that finishes late
+ * fails), 2 bad arguments, 3 the harness failed (no fuzzer, no WASM package,
+ * an unreadable entry or folder, an empty corpus, a missing golden).
  */
-import { mkdtempSync, rmSync } from "node:fs";
+import { copyFileSync, mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { binaryProblem, rustMessage, rustReplay } from "../src/tests/conformance/fuzzBinary";
-import { corpusExit, corpusFiles, lateFailure, rustVerdict } from "../src/tests/conformance/fuzzCorpus";
-import { replayCompare } from "../src/tests/conformance/fuzzReplay";
+import { corpusExit, corpusFiles, goldenDir, goldenFiles, lateFailure, rustVerdict } from "../src/tests/conformance/fuzzCorpus";
+import { goldenCompare, replayCompare } from "../src/tests/conformance/fuzzReplay";
 
-const flag = process.argv.indexOf("--budget");
-const budget = flag >= 0 ? Number(process.argv[flag + 1]) : 240;
-if (!Number.isFinite(budget) || budget <= 0) {
-  console.error("usage: fuzz-corpus [--budget <seconds>]");
+const USAGE = "usage: fuzz-corpus [--budget <seconds>] [--update]";
+const args = process.argv.slice(2);
+const update = args.includes("--update");
+const flag = args.indexOf("--budget");
+const budget = flag >= 0 ? Number(args[flag + 1]) : 240;
+const known = args.filter((a, i) => a === "--update" || a === "--budget" || (flag >= 0 && i === flag + 1));
+if (!Number.isFinite(budget) || budget <= 0 || known.length !== args.length) {
+  console.error(USAGE);
+  process.exit(2);
+}
+if (update && process.env.CI) {
+  console.error("fuzz-corpus --update is a local regeneration switch and never runs in CI");
   process.exit(2);
 }
 const problem = binaryProblem();
@@ -45,6 +59,11 @@ const work = mkdtempSync(join(tmpdir(), "vc-corpus-"));
 const started = Date.now();
 const failed: string[] = [];
 let harness = false;
+/** With --update, the entries whose fresh records wait to be pinned. Nothing is
+ *  written to the goldens until every entry has passed, so a failed or
+ *  over-budget refresh leaves the committed goldens as they were. */
+const toPin: string[] = [];
+let elapsed = 0;
 try {
   for (const file of files) {
     const name = basename(file);
@@ -67,6 +86,17 @@ try {
       else harness = true;
       continue;
     }
+    const id = name.replace(/\.json$/, "");
+    if (update) toPin.push(id);
+    else {
+      const g = goldenCompare(file, goldenDir(), work);
+      if (g.status !== "ok") {
+        console.log(`${name}: native Rust against its golden: ${g.message}`);
+        if (g.status === "harness") harness = true;
+        else failed.push(name);
+        continue;
+      }
+    }
     const r = replayCompare(file, work);
     if (r.status === "ok") console.log(`${name}: ok (${r.checkpoints} checkpoints)`);
     else {
@@ -75,11 +105,18 @@ try {
       else failed.push(name);
     }
   }
+  elapsed = (Date.now() - started) / 1000;
+  failed.push(...lateFailure(elapsed, budget, failed));
+  if (update) {
+    if (failed.length === 0 && !harness) {
+      mkdirSync(goldenDir(), { recursive: true });
+      for (const id of toPin) for (const record of goldenFiles(id)) copyFileSync(join(work, record), join(goldenDir(), record));
+      console.log(`${toPin.length} goldens pinned`);
+    } else console.log("no golden written: the refresh did not pass on every entry");
+  }
 } finally {
   rmSync(work, { recursive: true, force: true });
 }
-const elapsed = (Date.now() - started) / 1000;
-failed.push(...lateFailure(elapsed, budget, failed));
 const seconds = elapsed.toFixed(1);
 console.log(`${files.length} corpus entries in ${seconds} s${failed.length ? `; failed: ${failed.join(", ")}` : ""}`);
 process.exit(corpusExit(failed, harness));

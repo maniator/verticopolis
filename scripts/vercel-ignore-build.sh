@@ -26,7 +26,8 @@
 #   - the engine's Rust tests and consumer crate, and its markdown
 #   - the hour-boundary bench crate (engine-bench/), which only its weekly
 #     workflow builds
-#   - .pr_agent.toml, the PR review bot's settings
+#   - .pr_agent.toml, the PR review bot's settings, and .mcp.json, the
+#     agents' MCP servers
 #   - the conformance suite, except the files the engine crate compiles in
 #   - standalone dev scripts (screenshots, perf, fuzz, PostHog, rollback,
 #     release and version check)
@@ -63,7 +64,7 @@ affects_deploy() {
     # Documentation, agent skills, workflows and other repo meta.
     docs/* | _bmad/* | _bmad-output/* | .agents/* | .claude/* | .github/* | .vscode/*) return 1 ;;
     e2e/* | tools/*) return 1 ;;
-    .gitignore | .pr_agent.toml) return 1 ;;
+    .gitignore | .pr_agent.toml | .mcp.json) return 1 ;;
     README.md | CONTRIBUTING.md | AGENTS.md | CLAUDE.md | ARCHITECTURE.md | PARITY.md | SECURITY.md | SOUNDS.md) return 1 ;;
     playwright.config.ts | eslint.config.js) return 1 ;;
 

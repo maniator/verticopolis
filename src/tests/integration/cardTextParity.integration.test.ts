@@ -42,23 +42,16 @@ import { CARD_TEXT_WRITER, writeAfterPassingRun } from "../goldens/updateGate";
  * tower after the same play (`CARD_TEXT_PLAY_MINUTES`). It runs in
  * `npm run test:wasm`.
  *
- * The golden's lines came from the reference card, and while the TypeScript
- * engine exists `cardTextReferee.integration.test.ts` holds them to it. A
- * deliberate change to a card line is a golden refresh, reviewed in the diff:
+ * The golden's lines came from the TypeScript reference card, which held
+ * them to it until #1875 deleted that engine. A deliberate change to a card
+ * line is a golden refresh, reviewed in the diff:
  * `VC_CARD_TEXT_UPDATE=rust npx vitest run --project integration cardTextParity`
  * rewrites the lines from the Rust card (the towers stay), only from a run in
- * which every test in this file ran and passed (the referee skips in that
- * run). The referee
- * must then pass on them too, or name the line the two cards print
- * differently on purpose (`cardText.ts` says how).
+ * which every test in this file ran and passed.
  */
 
 const WRITING = CARD_TEXT_WRITER === "rust";
 if ((wasmRequired() || WRITING) && !hasWasmPackage()) throw new Error("the card-text sweep needs the engine package (VC_REQUIRE_WASM=1 or VC_CARD_TEXT_UPDATE=rust); run npm run wasm:build");
-
-/** A run in which the referee writes the golden skips the sweep, which would
- *  read the files it is replacing; run it on the new files afterwards. */
-const REFEREE_WRITING = CARD_TEXT_WRITER === "typescript";
 
 const fresh: CardTextGolden[] = [];
 writeAfterPassingRun(
@@ -73,7 +66,7 @@ type RustPort = EnginePort & { free(): void };
 const roomsOf = (units: CardTextGolden["units"]) => units.map((u) => `${u.kind} #${u.id} on floor ${u.floor}`).sort();
 const shaftsOf = (transports: readonly { readonly kind: string; readonly id: number }[]) => transports.map((t) => `${t.kind} #${t.id}`).sort();
 
-describe.skipIf(REFEREE_WRITING)("the card-text golden's files", () => {
+describe("the card-text golden's files", () => {
   it("are a tower and its lines for every case and mode, and nothing else", () => {
     const want = cardTextFiles();
     expect(new Set(want).size, "two cases share a file name").toBe(want.length);
@@ -81,7 +74,7 @@ describe.skipIf(REFEREE_WRITING)("the card-text golden's files", () => {
   });
 });
 
-describe.skipIf(!hasWasmPackage() || REFEREE_WRITING)("the Rust card prints the lines the TypeScript card did", () => {
+describe.skipIf(!hasWasmPackage())("the Rust card prints the lines the TypeScript card did", () => {
   for (const mode of CARD_TEXT_MODES) {
     for (const name of CARD_TEXT_CASES) {
       it(`${mode}: ${name}`, () => {
