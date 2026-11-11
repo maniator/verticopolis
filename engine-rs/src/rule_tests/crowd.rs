@@ -199,9 +199,13 @@ fn a_rider_whose_car_is_trimmed_away_steps_off() {
     let rider = rider.expect("a commuter boarded");
     let cars = sim.tower.get_transport(ev).unwrap().car_positions.len() as i64;
     assert!(cars > 1, "the trim leaves fewer cars");
+    // Seat the rider in the last car, a real car the trim then removes.
+    let last_car = cars - 1;
     let p = sim.crowd.people.iter_mut().find(|p| p.id == rider).unwrap();
-    (p.shaft_id, p.car_index) = (Some(ev), Some(cars));
+    (p.shaft_id, p.car_index) = (Some(ev), Some(last_car));
     assert!(sim.tower.set_cars(ev, 1));
+    let fleet = sim.tower.get_transport(ev).unwrap().car_positions.len();
+    assert_eq!(fleet, 1, "the trim left one car");
     pump(&mut sim, 0.05, 1);
     assert!(
         sim.crowd.people.iter().all(|p| p.id != rider),

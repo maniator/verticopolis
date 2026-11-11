@@ -205,6 +205,16 @@ fn idle_cars_rest_at_the_shafts_lobby_floor() {
         }
     }
     assert!(sim.build_transport(Kind::ElevatorStandard, C, 1, 10).ok);
+    // Park every car up the shaft first, so resting at the lobby is a move
+    // the idle cars make rather than where they started.
+    const PARKED_FLOOR: f64 = 7.0;
+    for p in sim.tower.transports[0].car_positions.iter_mut() {
+        *p = PARKED_FLOOR;
+    }
+    assert!(sim.tower.transports[0]
+        .car_positions
+        .iter()
+        .all(|p| (p - 1.0).abs() >= 0.5));
     for _ in 0..300 {
         sim.tick(1.0);
     }

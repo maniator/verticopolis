@@ -216,20 +216,34 @@ fn the_dwell_ends_in_a_ride_from_the_venue_home() {
         p.state == PState::Dwelling && p.meal_venue_id.is_some()
     });
     assert_eq!(origin, office);
-    for _ in 0..90 {
-        sim.tick(1.0);
-    }
-    let mine =
-        |p: &&crate::crowd::Person| p.origin_unit_id == Some(origin) && p.meal_venue_id.is_some();
-    assert!(!sim
+    let diner = sim
         .crowd
         .people
         .iter()
-        .filter(mine)
-        .any(|p| p.state == PState::Dwelling));
-    for p in sim.crowd.people.iter().filter(mine).filter(|p| p.returning) {
-        assert_eq!((p.floors[0], *p.floors.last().unwrap()), (VENUE_FLOOR, 2));
+        .find(|p| {
+            p.origin_unit_id == Some(origin)
+                && p.state == PState::Dwelling
+                && p.meal_venue_id.is_some()
+        })
+        .map(|p| p.id)
+        .expect("a diner from the office is dwelling");
+    // Follow that diner until the dwell ends: it must still be in the crowd,
+    // now on a returning route from the venue's floor to the office's.
+    let mut route_home = None;
+    for _ in 0..90 {
+        sim.tick(1.0);
+        let p = sim
+            .crowd
+            .people
+            .iter()
+            .find(|p| p.id == diner)
+            .expect("the diner left the crowd when the dwell ended");
+        if p.state != PState::Dwelling {
+            route_home = Some((p.returning, p.floors[0], *p.floors.last().unwrap()));
+            break;
+        }
     }
+    assert_eq!(route_home, Some((true, VENUE_FLOOR, 2)));
 }
 
 #[test]

@@ -92,14 +92,25 @@ fn a_metro_relieves_elevator_congestion() {
     }
     assert!(sim.build_transport(Kind::ElevatorStandard, X0, 1, 20).ok);
     let shaft = sim.tower.transports[0].id;
-    sim.tower.set_cars(shaft, 1);
+    assert!(sim.tower.set_cars(shaft, 1));
     for floor in 2..=20 {
         for i in (0..=21).step_by(9) {
-            if let Some(id) = sim.tower.place(Kind::Office, floor, X0 + i).unit_id {
-                sim.tower.get_unit_mut(id).unwrap().state = UnitState::Occupied;
-            }
+            let id = sim
+                .tower
+                .place(Kind::Office, floor, X0 + i)
+                .unit_id
+                .expect("every office fits");
+            sim.tower.get_unit_mut(id).unwrap().state = UnitState::Occupied;
         }
     }
+    const OFFICES: usize = 19 * 3;
+    let built = sim
+        .tower
+        .units
+        .iter()
+        .filter(|u| u.kind == Kind::Office)
+        .count();
+    assert_eq!(built, OFFICES);
     let before = sim.congestion();
     for floor in [0, -1, -2] {
         for x in (X0..LOT_WIDTH).chain((0..X0).rev()) {
