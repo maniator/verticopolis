@@ -1,13 +1,15 @@
 import { describe, expect, it, beforeEach, vi } from "vitest";
 import { withPorts } from "../fixtures/saveText";
 import { catalogFor } from "../catalogFixture";
-import { Simulation } from "../../engine/Simulation";
-import { FACILITIES, GRID, isFixedSpanTransport } from "../../engine/facilities";
-import { ECON, rentOf, carResaleRefund, resaleRefund } from "../../engine/econConfig";
+import { catalogFacility } from "../../catalog/catalogTypes";
 import type { FacilityKind, Transport, Unit } from "../../shared/types";
+import { PortEvents } from "../../simport/portEvents";
+import { LOT_WIDTH } from "../portKit/draftFixtures";
+import { draftTower, type Draft } from "../portKit/drafts";
+import { noEngine } from "../portKit/rustEngine";
 import type { Picked, TowerEngine } from "../../render/excalibur/TowerEngine";
 import type { Tool } from "../../ui/UI";
-import { unitEditor, transportEditor, editorPortDeps, inspectorPortDeps } from "../../game/cardKit.fixture";
+import { kitOf, portOf, unitEditor, transportEditor, editorPortDeps, inspectorPortDeps } from "../../game/cardKit.fixture";
 import { announceForPlacement, snapX, type PlaceOutcome } from "../../ui/placement";
 import { BuildActions } from "../../game/buildActions";
 import { EditorActions } from "../../game/editorActions";
@@ -18,11 +20,19 @@ import { render, type TemplateResult } from "lit-html";
 import { portDeps } from "../../game/portDeps.fixture";
 
 const CAT = catalogFor("classic");
+/** A kind's catalog entry (Classic). */
+const fac = (kind: FacilityKind) => catalogFacility(CAT, kind);
 
 /** The src/game/ controllers extracted from the GameApp class run against the
- *  real (headless) Simulation with minimal fake ui/audio ports — these tests
- *  pin the money paths, the inspector's ✕-latch, and the keyboard cursor's
- *  announce lines that were previously locked inside main.ts. */
+ *  Rust engine (a port kit draft) with minimal fake ui/audio ports: these
+ *  tests pin the money paths, the inspector's close latch, and the keyboard
+ *  cursor's announce lines that were previously locked inside main.ts. */
+
+/** The draft's units and shafts as its engine holds them now (a controller
+ *  changes the engine through the port, past the draft's read). */
+const unitsOf = (sim: Draft) => (sim.settle(), sim.tower.units);
+const shaftsOf = (sim: Draft) => (sim.settle(), sim.tower.transports);
+const shaftOf = (sim: Draft, id: number) => shaftsOf(sim).find((t) => t.id === id)! as unknown as Transport;
 
 /** The most recent entry (tsconfig's lib predates Array.prototype.at). */
 function last<T>(arr: T[]): T {
@@ -71,20 +81,21 @@ function fakes() {
 /** The editorHtml.test.ts fixture idiom: assert every placement so a silent
  *  fixture failure can't make the assertions below pass for the wrong reason. */
 function fixture() {
-  const sim = new Simulation();
+  const sim = draftTower();
   for (let x = 10; x < 30; x++) expect(sim.tower.place("lobby", 1, x).ok).toBe(true);
   for (let x = 10; x < 30; x++) expect(sim.tower.place("floor", 2, x).ok).toBe(true);
   const r = sim.tower.place("office", 2, 12);
   expect(r.ok).toBe(true);
-  const office = sim.tower.units.find((u) => u.id === r.unitId)!;
+  const office = sim.tower.getUnit(r.unitId!)! as unknown as Unit;
   office.state = "occupied";
   expect(sim.buildTransport("elevatorStandard", 10, 1, 2).ok).toBe(true);
-  const lift = sim.tower.transports[sim.tower.transports.length - 1];
+  const shafts = shaftsOf(sim);
+  const lift = shafts[shafts.length - 1] as unknown as Transport;
   return { sim, office, lift };
 }
 
-describe("BuildActions (the money boundary)", () => {
-  let sim: Simulation;
+describe.skipIf(noEngine)("BuildActions (the money boundary)", () => {
+  let sim: Draft;
   let office: Unit;
   let lift: Transport;
   let f: ReturnType<typeof fakes>;
@@ -105,15 +116,15 @@ describe("BuildActions (the money boundary)", () => {
   it("tryRemoveUnit pays the shared resale refund on sell", async () => {
     const before = sim.money;
     expect(await build.tryRemoveUnit(office, "sell")).toBe(true);
-    expect(sim.money - before).toBe(resaleRefund("office"));
-    expect(sim.tower.units.some((u) => u.id === office.id)).toBe(false);
+    expect(sim.money - before).toBe(fac("office").resaleRefund);
+    expect(unitsOf(sim).some((u) => u.id === office.id)).toBe(false);
   });
 
   it("removeTransportWithRefund pays the one shared shaft resale", async () => {
     const before = sim.money;
     expect(await build.removeTransportWithRefund(lift, "sell")).toBe(true);
-    expect(sim.money - before).toBe(resaleRefund("elevatorStandard"));
-    expect(sim.tower.transports.some((t) => t.id === lift.id)).toBe(false);
+    expect(sim.money - before).toBe(fac("elevatorStandard").resaleRefund);
+    expect(shaftsOf(sim).some((t) => t.id === lift.id)).toBe(false);
   });
 
   it("removeTransportWithRefund reports a refusal (the shaft already gone) and pays nothing", async () => {
@@ -125,7 +136,8 @@ describe("BuildActions (the money boundary)", () => {
 
   it("reports each shell removal to the engine with the gesture as its method, and a refusal as none", async () => {
     // The analytics bridge sends demolish from these; the shell no longer does.
-    const removals = () => sim.drainGameplayEvents().filter((e) => e.name === "facility_removed");
+    const events = new PortEvents(portOf(sim));
+    const removals = () => events.drainGameplayEvents().filter((e) => e.name === "facility_removed");
     removals();
     expect(await build.tryRemoveUnit(office, "bulldoze")).toBe(true);
     expect(await build.removeTransportWithRefund(lift, "sell")).toBe(true);
@@ -138,12 +150,13 @@ describe("BuildActions (the money boundary)", () => {
 
   it("tryRemoveUnit surfaces the engine's refusal: a burning unit stays, no refund", async () => {
     office.state = "fire";
+    sim.settle();
     const before = sim.money;
     expect(await build.tryRemoveUnit(office, "sell")).toBe(false);
     expect(sim.money).toBe(before);
     expect(f.toasts).toEqual([{ text: "You can't sell a burning unit. Call fire rescue or let it burn out.", kind: "bad" }]);
     expect(f.sfx).toEqual(["error"]);
-    expect(sim.tower.getUnit(office.id)).toBe(office);
+    expect(unitsOf(sim).find((u) => u.id === office.id)?.state).toBe("fire");
   });
 
   it("paintBrush reports honestly: already-built strip vs the engine's refusal", async () => {
@@ -187,8 +200,8 @@ describe("BuildActions (the money boundary)", () => {
   });
 });
 
-describe("EditorActions (editor-card money paths)", () => {
-  let sim: Simulation;
+describe.skipIf(noEngine)("EditorActions (editor-card money paths)", () => {
+  let sim: Draft;
   let office: Unit;
   let lift: Transport;
   let f: ReturnType<typeof fakes>;
@@ -234,8 +247,8 @@ describe("EditorActions (editor-card money paths)", () => {
     render(unitEditor(sim, office), root);
     const before = sim.money;
     await editor.handleEditAction("sell", root);
-    expect(sim.money - before).toBe(resaleRefund("office"));
-    expect(sim.tower.units.some((u) => u.id === office.id)).toBe(false);
+    expect(sim.money - before).toBe(fac("office").resaleRefund);
+    expect(unitsOf(sim).some((u) => u.id === office.id)).toBe(false);
     expect(sel).toBeNull();
     expect(undo.captures).toEqual(["Sell"]);
     expect(undo.commits).toBe(1);
@@ -247,8 +260,8 @@ describe("EditorActions (editor-card money paths)", () => {
     render(transportEditor(sim, lift), root);
     const before = sim.money;
     await editor.handleEditAction("sell", root);
-    expect(sim.money - before).toBe(resaleRefund("elevatorStandard"));
-    expect(sim.tower.transports.some((t) => t.id === lift.id)).toBe(false);
+    expect(sim.money - before).toBe(fac("elevatorStandard").resaleRefund);
+    expect(shaftsOf(sim).some((t) => t.id === lift.id)).toBe(false);
     expect(sel).toBeNull();
   });
 
@@ -270,12 +283,12 @@ describe("EditorActions (editor-card money paths)", () => {
   });
 
   it("mobile editor keeps the access row for a zero-population service kind (no diagnostics access line)", () => {
-    const sim = new Simulation();
+    const sim = draftTower();
     for (let x = 10; x < 30; x++) expect(sim.tower.place("lobby", 1, x).ok).toBe(true);
     for (let x = 10; x < 30; x++) expect(sim.tower.place("floor", 2, x).ok).toBe(true);
     const r = sim.tower.place("security", 2, 12);
     expect(r.ok).toBe(true);
-    const sec = sim.tower.units.find((u) => u.id === r.unitId)!;
+    const sec = sim.tower.getUnit(r.unitId!)! as unknown as Unit;
     sec.state = "occupied";
     // Security has no population and no traffic income, so facilityDiagnostics
     // emits no access line: the mobile editor keeps the plain "Elevator access"
@@ -284,12 +297,12 @@ describe("EditorActions (editor-card money paths)", () => {
   });
 
   it("mobile editor folds the retail patronage block into a shop's panel", () => {
-    const sim = new Simulation();
+    const sim = draftTower();
     for (let x = 10; x < 40; x++) expect(sim.tower.place("lobby", 1, x).ok).toBe(true);
     for (let x = 10; x < 40; x++) expect(sim.tower.place("floor", 2, x).ok).toBe(true);
     const r = sim.tower.place("shop", 2, 12);
     expect(r.ok).toBe(true);
-    const shop = sim.tower.units.find((u) => u.id === r.unitId)!;
+    const shop = sim.tower.getUnit(r.unitId!)! as unknown as Unit;
     shop.state = "occupied";
     expect(renderedCard(unitEditor(sim, shop, true)).textContent).toContain("patronage");
     expect(renderedCard(unitEditor(sim, shop, false)).textContent).not.toContain("patronage");
@@ -298,12 +311,13 @@ describe("EditorActions (editor-card money paths)", () => {
   it("rentUp/rentDown clamp a real office to the ends of the Classic ladder", async () => {
     sel = { type: "unit", id: office.id };
     render(unitEditor(sim, office), root);
-    // A default Simulation is Classic: nudges step whole rungs and clamp at
-    // the ladder ends (High $15,000 / Very Low $2,000), never the Modern band.
+    // A default tower is Classic: nudges step whole rungs and clamp at the
+    // ladder ends (High $15,000 / Very Low $2,000), never the Modern band.
+    const price = () => kitOf(sim).kit.cards.unit(office.id)!.price;
     for (let i = 0; i < 100; i++) await editor.handleEditAction("rentUp", root);
-    expect(rentOf(office)).toBe(15_000);
+    expect(price()).toBe(15_000);
     for (let i = 0; i < 200; i++) await editor.handleEditAction("rentDown", root);
-    expect(rentOf(office)).toBe(2_000);
+    expect(price()).toBe(2_000);
   });
 
   it("addcar charges and removecar refunds the half-back car resale", async () => {
@@ -312,11 +326,11 @@ describe("EditorActions (editor-card money paths)", () => {
     const cars0 = lift.cars;
     const before = sim.money;
     await editor.handleEditAction("addcar", root);
-    expect(lift.cars).toBe(cars0 + 1);
-    expect(sim.money).toBe(before - ECON.addCarCost);
+    expect(shaftOf(sim, lift.id).cars).toBe(cars0 + 1);
+    expect(sim.money).toBe(before - CAT.economy.addCarCost);
     await editor.handleEditAction("removecar", root);
-    expect(lift.cars).toBe(cars0);
-    expect(sim.money).toBe(before - ECON.addCarCost + carResaleRefund());
+    expect(shaftOf(sim, lift.id).cars).toBe(cars0);
+    expect(sim.money).toBe(before - CAT.economy.addCarCost + CAT.economy.carResaleRefund);
   });
 
   it("extendUp refuses when broke: toast, error sfx, shaft unchanged", async () => {
@@ -325,21 +339,21 @@ describe("EditorActions (editor-card money paths)", () => {
     sim.money = 0;
     const { top, bottom } = lift;
     await editor.handleEditAction("extendUp", root);
-    expect(lift.top).toBe(top);
-    expect(lift.bottom).toBe(bottom);
+    expect(shaftOf(sim, lift.id).top).toBe(top);
+    expect(shaftOf(sim, lift.id).bottom).toBe(bottom);
     expect(f.toasts).toEqual([{ text: "Not enough money.", kind: "bad" }]);
     expect(f.sfx).toContain("error");
   });
 });
 
-describe("SaveLoad (tower-swap contracts)", () => {
-  let sim: Simulation;
+describe.skipIf(noEngine)("SaveLoad (tower-swap contracts)", () => {
+  let sim: Draft;
   let f: ReturnType<typeof fakes>;
-  let adopted: Simulation[];
+  let adopted: Draft[];
   let saveLoad: SaveLoad;
 
   beforeEach(() => {
-    sim = new Simulation();
+    sim = draftTower();
     f = fakes();
     adopted = [];
     saveLoad = new SaveLoad(withPorts({
@@ -355,14 +369,16 @@ describe("SaveLoad (tower-swap contracts)", () => {
     }));
   });
 
-  it("newGame adopts a fresh sim (the dep's shape forbids preserving the undo trail)", () => {
-    // SaveLoadDeps.adoptSim deliberately takes no preserveHistory flag — the
-    // type itself now guarantees a tower swap through this module invalidates
+  it("newGame adopts a fresh tower (the dep's shape forbids preserving the undo trail)", () => {
+    // SaveLoadDeps.adoptSim deliberately takes no preserveHistory flag: the
+    // type itself guarantees a tower swap through this module invalidates
     // the undo history, so Undo can never resurrect the abandoned tower.
+    expect(sim.tower.place("lobby", 1, 10).ok).toBe(true);
+    const generation = portOf(sim).generation();
     saveLoad.newGame();
-    expect(adopted).toHaveLength(1);
-    expect(adopted[0]).toBeInstanceOf(Simulation);
-    expect(adopted[0]).not.toBe(sim);
+    expect(adopted).toEqual([sim]);
+    expect(portOf(sim).generation(), "the engine swapped towers").not.toBe(generation);
+    expect(unitsOf(sim), "the new tower's lot is empty").toEqual([]);
     // Classic founds an empty lot, so the founding toast carries the
     // actionable lobby line instead of the plain send-off.
     expect(f.toasts).toEqual([{ text: "New tower founded. Lay a lobby on the ground line to open it.", kind: "good" }]);
@@ -445,8 +461,8 @@ describe("SaveLoad (tower-swap contracts)", () => {
   });
 });
 
-describe("InspectorController (✕-dismissal latch)", () => {
-  let sim: Simulation;
+describe.skipIf(noEngine)("InspectorController (✕-dismissal latch)", () => {
+  let sim: Draft;
   let office: Unit;
   let lift: Transport;
   let shown: (string | null)[];
@@ -484,13 +500,13 @@ describe("InspectorController (✕-dismissal latch)", () => {
     inspector.resetLatch();
     inspector.inspectPicked(officePick);
     expect(shown.length).toBe(calls + 1);
-    expect(last(shown)).toContain(FACILITIES.office.name);
+    expect(last(shown)).toContain(fac("office").name);
   });
 
   it("dismiss latches the target: same-facility hover picks stay closed, null picks don't spend it", () => {
     inspector.inspectPicked(officePick);
-    expect(last(shown)).toContain(FACILITIES.office.name);
-    expect(anchor).toEqual({ x: office.x + office.width, left: office.x, floor: office.floor });
+    expect(last(shown)).toContain(fac("office").name);
+    expect(anchor).toEqual({ x: office.x + fac("office").width, left: office.x, floor: office.floor });
     inspector.dismiss();
     expect(last(shown)).toBeNull();
     const calls = shown.length;
@@ -506,9 +522,9 @@ describe("InspectorController (✕-dismissal latch)", () => {
     inspector.inspectPicked(officePick);
     inspector.dismiss();
     inspector.inspectPicked(liftPick); // different facility opens…
-    expect(last(shown)).toContain(FACILITIES.elevatorStandard.name);
+    expect(last(shown)).toContain(fac("elevatorStandard").name);
     inspector.inspectPicked(officePick); // …and re-arms the dismissed one
-    expect(last(shown)).toContain(FACILITIES.office.name);
+    expect(last(shown)).toContain(fac("office").name);
   });
 
   it("clear() and resetLatch() drop the latch (tower swap / explicit tap)", () => {
@@ -516,24 +532,24 @@ describe("InspectorController (✕-dismissal latch)", () => {
     inspector.dismiss();
     inspector.clear(); // adoptSim path: recycled ids must not stay muted
     inspector.inspectPicked(officePick);
-    expect(last(shown)).toContain(FACILITIES.office.name);
+    expect(last(shown)).toContain(fac("office").name);
     inspector.dismiss();
     inspector.resetLatch(); // selectPicked path: a tap is fresh intent
     inspector.inspectPicked(officePick);
-    expect(last(shown)).toContain(FACILITIES.office.name);
+    expect(last(shown)).toContain(fac("office").name);
   });
 });
 
-describe("KeyboardPlay (commit announcements)", () => {
-  const mid = Math.floor(GRID.width / 2);
-  let sim: Simulation;
+describe.skipIf(noEngine)("KeyboardPlay (commit announcements)", () => {
+  const mid = Math.floor(LOT_WIDTH / 2);
+  let sim: Draft;
   let announced: string[];
   let tool: Tool;
   let keyboard: KeyboardPlay;
   let undoLog: string[];
 
   beforeEach(() => {
-    sim = new Simulation();
+    sim = draftTower();
     // Structure under the keyboard cursor's reveal cell (mid-lot, floor 1).
     for (let x = mid - 15; x < mid + 15; x++) expect(sim.tower.place("lobby", 1, x).ok).toBe(true);
     for (let x = mid - 15; x < mid + 15; x++) expect(sim.tower.place("floor", 2, x).ok).toBe(true);
@@ -547,14 +563,15 @@ describe("KeyboardPlay (commit announcements)", () => {
       selectedId: () => null,
       clearSelection: () => {},
     });
-    const isTransportTool = () => tool.type === "build" && !!FACILITIES[tool.kind].transport;
+    const isTransportTool = () => tool.type === "build" && fac(tool.kind).transport;
     // Mirrors pickedAt in src/game/buildPreview.ts: the injected picker contract.
     // Uses the shaft's OWN stored width (tr.width), matching the real impl, so an
     // old save whose stored width differs from the catalog resolves identically.
     const pickedAt = (floor: number, tile: number): Picked | null => {
+      sim.settle();
       const u = sim.tower.unitAt(floor, tile);
-      if (u && u.kind !== "floor" && u.kind !== "lobby") return { type: "unit", id: u.id, kind: u.kind };
-      const t = sim.tower.transports.find(
+      if (u && u.kind !== "floor" && u.kind !== "lobby") return { type: "unit", id: u.id, kind: u.kind as FacilityKind };
+      const t = (sim.tower.transports as unknown as Transport[]).find(
         (tr) => tile >= tr.x && tile < tr.x + tr.width && floor >= tr.bottom && floor <= tr.top,
       );
       return t ? { type: "transport", id: t.id, kind: t.kind } : null;
@@ -565,11 +582,11 @@ describe("KeyboardPlay (commit announcements)", () => {
         const r = build.paintBrush(kind, tile, floor);
         return { what: "paint", ok: r.placed > 0, reason: r.reason };
       }
-      if (isFixedSpanTransport(kind)) {
+      if (fac(kind).fixedSpan) {
         const r = build.tryBuildTransport(kind, snapX(CAT, kind, tile), floor, floor + 1);
         return { what: "flight", ok: r.ok, reason: r.reason };
       }
-      if (FACILITIES[kind].transport) return null;
+      if (fac(kind).transport) return null;
       return { what: "room", ok: build.tryBuild(kind, floor, snapX(CAT, kind, tile)) };
     };
     const fakeEngine = {
@@ -614,7 +631,7 @@ describe("KeyboardPlay (commit announcements)", () => {
     tool = { type: "build", kind: "stairs" };
     await keyboard.commitCursor();
     expect(last(announced)).toBe(announceForPlacement({ what: "flight", ok: true, reason: "" }, CAT, "stairs", 1));
-    expect(last(announced)).toBe(`${FACILITIES.stairs.name} built, floors 1 to 2`);
+    expect(last(announced)).toBe(`${fac("stairs").name} built, floors 1 to 2`);
   });
 
   it("room commit announces the announceForPlacement room line", async () => {
@@ -650,13 +667,13 @@ describe("KeyboardPlay (commit announcements)", () => {
   });
 });
 
-describe("InspectorController (data-rich cards: parking, recycling, notice)", () => {
-  function place(sim: Simulation, kind: FacilityKind, floor: number, x: number): Unit {
+describe.skipIf(noEngine)("InspectorController (data-rich cards: parking, recycling, notice)", () => {
+  function place(sim: Draft, kind: FacilityKind, floor: number, x: number): Unit {
     const r = sim.tower.place(kind, floor, x);
     expect(r.ok, `place ${kind} @${floor},${x}`).toBe(true);
-    return sim.tower.units.find((u) => u.id === r.unitId)!;
+    return sim.tower.getUnit(r.unitId!)! as unknown as Unit;
   }
-  function makeInspector(sim: Simulation) {
+  function makeInspector(sim: Draft) {
     const shown: (string | null)[] = [];
     const inspector = new InspectorController({
       ...inspectorPortDeps(sim),
@@ -667,7 +684,7 @@ describe("InspectorController (data-rich cards: parking, recycling, notice)", ()
   }
 
   it("a parking ramp shows the tower-wide demand line; a chained space reads connected, an orphan reads dead", () => {
-    const sim = new Simulation();
+    const sim = draftTower();
     for (let x = 10; x < 46; x++) expect(sim.tower.place("lobby", 1, x).ok).toBe(true);
     for (let x = 10; x < 46; x++) expect(sim.tower.place("floor", 0, x).ok).toBe(true);
     const ramp = place(sim, "parkingRamp", 0, 20); // tiles 20–35 (canon 16-wide ramp)
@@ -688,7 +705,7 @@ describe("InspectorController (data-rich cards: parking, recycling, notice)", ()
   });
 
   it("a recycling center shows its fill and the capacity/demand verdict", () => {
-    const sim = new Simulation();
+    const sim = draftTower();
     for (let x = 10; x < 40; x++) expect(sim.tower.place("lobby", 1, x).ok).toBe(true);
     for (const f of [0, -1]) for (let x = 10; x < 40; x++) expect(sim.tower.place("floor", f, x).ok).toBe(true);
     const rec = place(sim, "recycling", -1, 12); // 2-floor, width-20 center

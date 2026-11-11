@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { strFromU8, unzipSync } from "fflate";
 import { Simulation } from "../../engine/Simulation";
 import { SaveGame } from "../../storage/SaveGame";
-import { importTower } from "../fixtures/saveText";
+import { readImport } from "../fixtures/saveText";
 import { buildCrashDetails, buildCrashReportZip, bugReportUrl } from "../../game/crashReport";
 import type { CrashDescription, CrashTower } from "../../game/crashReport";
 import { facilityFloors } from "../../engine/facilities";
@@ -54,7 +54,7 @@ describe("crash report packaging", () => {
     expect(report.tower.money).toBe(314_159);
     // The save inside the zip is a first-class .vctower: the normal import
     // path must accept it and reproduce the tower.
-    const imported = await importTower(strFromU8(files["tower.vctower"]));
+    const imported = await readImport(strFromU8(files["tower.vctower"]));
     expect(imported.money).toBe(314_159);
   });
 

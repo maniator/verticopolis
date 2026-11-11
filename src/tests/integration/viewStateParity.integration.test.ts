@@ -1,6 +1,5 @@
 import { describe, expect, it, beforeEach, vi } from "vitest";
 import { inflateSync } from "fflate";
-import { Simulation } from "../../engine/Simulation";
 import { FLOOR, TILE, TowerEngine } from "../../render/excalibur/TowerEngine";
 import { GRID } from "../../engine/facilities";
 import type { SerializedGame, SerializedView } from "../../shared/types";
@@ -10,6 +9,12 @@ import { buildTDT, installTdtCodec, parseTDT } from "../conformance/tdtWasm";
 import { hasWasmPackage } from "../conformance/wasmEngine";
 import { buildTdt, sampleTowerSpec } from "../fixtures/tdtBuilder";
 import { loadAuto, loadSlotSim, withPorts } from "../fixtures/saveText";
+import { draftTower, type Draft } from "../portKit/drafts";
+import { noEngine } from "../portKit/rustEngine";
+import type { EnginePort } from "../../simport/enginePort";
+
+/** The view a tower's save carries. */
+const viewOf = (sim: Draft | null): SerializedView | undefined => sim?.serialize().view;
 
 /**
  * View-state save parity: the camera (tile/floor/zoom) rides inside every
@@ -38,17 +43,17 @@ const WORDS_200_20 = { x: 1280, y: 3024 };
 
 const readHdrU16 = (bytes: Uint8Array, off: number): number => bytes[off] | (bytes[off + 1] << 8);
 
-describe("SaveLoad stamps the live camera onto the CURRENT tower's saves", () => {
+describe.skipIf(noEngine)("SaveLoad stamps the live camera onto the CURRENT tower's saves", () => {
   const camera: SerializedView = { tile: 42, floor: 3, zoom: 1.5 };
-  let sim: Simulation;
-  let adopted: Simulation[];
+  let sim: Draft;
+  let adopted: Draft[];
   let importReports: { open: () => void }[];
   let saveLoad: SaveLoad;
 
   beforeEach(() => {
     localStorage.clear();
     document.getElementById("splash")?.remove();
-    sim = new Simulation();
+    sim = draftTower();
     adopted = [];
     importReports = [];
     saveLoad = new SaveLoad(withPorts({
@@ -74,11 +79,12 @@ describe("SaveLoad stamps the live camera onto the CURRENT tower's saves", () =>
 
   it("save() stamps the view; the reloaded autosave carries it", () => {
     saveLoad.save(true);
-    expect(loadAuto()!.view).toEqual(camera);
+    expect(viewOf(loadAuto())).toEqual(camera);
   });
 
   it("a null camera (headless) stamps nothing and never erases a view the sim already carries", () => {
-    sim.view = { tile: 7, floor: 8 }; // e.g. brought over by a TDT import
+    // e.g. brought over by a TDT import: the engine holds the camera
+    (sim.port as unknown as EnginePort).setCamera(7, 8, NaN);
     saveLoad = new SaveLoad(withPorts({
       getSim: () => sim,
       getView: () => null,
@@ -89,13 +95,13 @@ describe("SaveLoad stamps the live camera onto the CURRENT tower's saves", () =>
       armOnboarding: () => {},
     }));
     saveLoad.save(true);
-    expect(sim.view).toEqual({ tile: 7, floor: 8 });
-    expect(loadAuto()!.view).toEqual({ tile: 7, floor: 8 });
+    expect(viewOf(sim)).toEqual({ tile: 7, floor: 8 });
+    expect(viewOf(loadAuto())).toEqual({ tile: 7, floor: 8 });
   });
 
   it("autosave() stamps the view on the async path too", async () => {
     await saveLoad.autosave();
-    expect(loadAuto()!.view).toEqual(camera);
+    expect(viewOf(loadAuto())).toEqual(camera);
   });
 
   it("exportGame() stamps the view into the .vctower payload", async () => {
@@ -130,13 +136,13 @@ describe("SaveLoad stamps the live camera onto the CURRENT tower's saves", () =>
     importReports[0].open();
     // The adopted tower and its fresh-slot copy carry the FILE's view
     // (zoomless, fractional: the words quantize to 8px/36px).
-    expect(adopted[0].view!.zoom).toBeUndefined();
-    expect(adopted[0].view!.tile).toBeCloseTo(200, 1);
-    expect(adopted[0].view!.floor).toBeCloseTo(20, 1);
-    expect(loadSlotSim(1)!.view!.tile).toBeCloseTo(200, 1);
-    expect(loadSlotSim(1)!.view!.floor).toBeCloseTo(20, 1);
+    expect(viewOf(adopted[0])!.zoom).toBeUndefined();
+    expect(viewOf(adopted[0])!.tile).toBeCloseTo(200, 1);
+    expect(viewOf(adopted[0])!.floor).toBeCloseTo(20, 1);
+    expect(viewOf(loadSlotSim(1))!.tile).toBeCloseTo(200, 1);
+    expect(viewOf(loadSlotSim(1))!.floor).toBeCloseTo(20, 1);
     // The previous tower's autosave flush carries the live camera.
-    expect(loadAuto()!.view).toEqual(camera);
+    expect(viewOf(loadAuto())).toEqual(camera);
   });
 });
 

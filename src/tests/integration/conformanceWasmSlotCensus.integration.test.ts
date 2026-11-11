@@ -13,6 +13,16 @@ import { setSlotPopulationReader } from "../../storage/slotCensus";
 import { populationReaderFromModule } from "../../wasmhost/slotPopulation";
 import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
 import { saveOf, importTower } from "../fixtures/saveText";
+import type { Draft } from "../portKit/drafts";
+import { PortCodes } from "../../simport/portCodes";
+import type { EnginePort } from "../../simport/enginePort";
+
+/** The tower's population, from the engine's stats strip. */
+function population(sim: Draft): number {
+  sim.settle();
+  const port = sim.port as unknown as EnginePort;
+  return new PortCodes(port).slot(port.statsStrip(), "statsStrip", "population");
+}
 
 const run = hasWasmPackage();
 
@@ -26,13 +36,13 @@ describe.skipIf(!run)("slot rows count their population through the engine", () 
     localStorage.clear();
   });
 
-  it("matches the TypeScript engine's census for a populated tower", async () => {
+  it("matches the loaded engine's census for a populated tower", async () => {
     const sim = await importTower(towerFile);
-    expect(sim.population).toBeGreaterThan(0);
+    expect(population(sim)).toBeGreaterThan(0);
     SaveGame.saveSlot(1, saveOf(sim));
     const row = SaveGame.listSlots().find((s) => s.slot === 1)!;
     expect(row.exists).toBe(true);
-    expect(row.population).toBe(sim.population);
+    expect(row.population).toBe(population(sim));
   });
 
   it("does not offer a slot the engine refuses, though its bytes are present", () => {

@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { referenceEngine } from "../fixtures/autoTuneDouble";
 import { describe, it, expect, vi, beforeEach, afterEach, afterAll } from "vitest";
-import { pump, rebaseLog } from "../../ui/hud.fixture";
+import { HudTower, pump, rebaseLog } from "../../ui/hud.fixture";
 import { towerCatalog, useTowerCatalogSource } from "../../catalog/towerCatalog";
 import { catalogFor } from "../catalogFixture";
 import { html, type TemplateResult } from "lit-html";
@@ -9,13 +9,14 @@ import { finishModal, MODAL_TITLE_ID } from "../../ui/uiModal";
 import type { UI } from "../../ui/UI";
 import { mountAppDom, makeUI } from "../uiFixture";
 import { setMode } from "../../ui/uiStatus";
-import { Simulation } from "../../engine/Simulation";
 import { CLASSIC_RULES, MODERN_RULES } from "../../engine/gameRules";
 import type { ScheduleDialogCtx } from "../../ui/uiElevatorSchedule";
-import type { Unit } from "../../shared/types";
+import type { GameMode } from "../../shared/types";
+import type { UnitDetail } from "../../simport/panels";
+import { unitDetail } from "../fixtures/detailCards";
+import { unitEditorTemplate } from "../../ui/templates/editor";
 import { toggleMute } from "../../game/audioPrefs";
 import { loadPrefs } from "../../storage/Prefs";
-import { unitEditor } from "../../game/cardKit.fixture";
 
 // Every toast in this file passes through here; see the hooks below the
 // file-level beforeEach for why a toast on the real clock fails its test.
@@ -626,34 +627,23 @@ describe("aria-labelledby across the real dialogs: every modal names itself for 
 describe("renderEditor — lit diff patches in place; delegated actions dispatch", () => {
   const editorEl = (): HTMLElement => document.getElementById("editor")!;
 
-  /** A small built tower with an occupied office, so the card carries the
-   *  rename input, the rent adjuster, and live stat cells. Modern, so the
-   *  card carries the '+ rent' stepper this identity regression pins (the
-   *  Classic card renders the rung picker instead; see editor.test.ts). */
-  function officeSim(): { sim: Simulation; office: Unit } {
-    const sim = new Simulation(12345, "modern");
-    for (let x = 10; x < 30; x++) expect(sim.tower.place("lobby", 1, x).ok).toBe(true);
-    for (let x = 10; x < 30; x++) expect(sim.tower.place("floor", 2, x).ok).toBe(true);
-    const r = sim.tower.place("office", 2, 12);
-    expect(r.ok).toBe(true);
-    const office = sim.tower.units.find((u) => u.id === r.unitId)!;
-    office.state = "occupied";
-    return { sim, office };
-  }
+  /** An occupied office's card, so it carries the rename input, the rent
+   *  adjuster, and live stat cells. Modern by default, so the card carries the
+   *  '+ rent' stepper this identity regression pins (the Classic card renders
+   *  the rung picker instead; see editor.test.ts). */
+  const officeCard = (over: Partial<UnitDetail> = {}, mode: GameMode = "modern"): TemplateResult =>
+    unitEditorTemplate(unitDetail(mode, "office", over), catalogFor(mode), 9);
 
   it("a refresh patches changed cells in place; buttons and the rename input keep identity", () => {
     const { ui } = makeUI();
-    const { sim, office } = officeSim();
-    office.satisfaction = 0.5;
-    ui.renderEditor(unitEditor(sim, office));
+    ui.renderEditor(officeCard({ satisfaction: 0.5 }));
     expect(ui.isEditorOpen()).toBe(true);
     const btn = editorEl().querySelector<HTMLElement>('[data-edit="rentUp"]')!;
     const name = editorEl().querySelector<HTMLInputElement>("#ed-name")!;
     const evalCell = editorEl().querySelector('[data-field="eval"]')!;
     expect(evalCell.textContent).toContain("50%");
 
-    office.satisfaction = 0.78;
-    ui.renderEditor(unitEditor(sim, office));
+    ui.renderEditor(officeCard({ satisfaction: 0.78 }));
     expect(evalCell.textContent).toContain("78%");
     expect(editorEl().querySelector('[data-edit="rentUp"]')).toBe(btn); // no swallowed click
     expect(editorEl().querySelector("#ed-name")).toBe(name);
@@ -661,16 +651,14 @@ describe("renderEditor — lit diff patches in place; delegated actions dispatch
 
   it("a refresh landing between pointerdown and pointerup does not recreate the pressed button (the '+ rent' bug)", () => {
     const { ui, cb } = makeUI();
-    const { sim, office } = officeSim();
-    ui.renderEditor(unitEditor(sim, office));
+    ui.renderEditor(officeCard());
     const btn = editorEl().querySelector<HTMLElement>('[data-edit="rentUp"]')!;
 
     // Press... the main loop's refresh gate (editorBusy) arms,
     btn.dispatchEvent(new Event("pointerdown", { bubbles: true }));
     expect(ui.isEditorBusy()).toBe(true);
     // ...but even a refresh that slips through mid-click keeps the element:
-    office.satisfaction = 0.9;
-    ui.renderEditor(unitEditor(sim, office));
+    ui.renderEditor(officeCard({ satisfaction: 0.9 }));
     expect(editorEl().querySelector('[data-edit="rentUp"]')).toBe(btn);
     // ...release, and the click that began before the refresh still lands.
     document.dispatchEvent(new Event("pointerup", { bubbles: true }));
@@ -681,53 +669,42 @@ describe("renderEditor — lit diff patches in place; delegated actions dispatch
 
   it("[data-edit] clicks dispatch through the delegated listener after any re-render", () => {
     const { ui, cb } = makeUI();
-    const { sim, office } = officeSim();
-    ui.renderEditor(unitEditor(sim, office));
-    office.state = "gutted"; // shape change: rows restructure
-    ui.renderEditor(unitEditor(sim, office));
+    ui.renderEditor(officeCard());
+    ui.renderEditor(officeCard({ state: "gutted" })); // shape change: rows restructure
     editorEl().querySelector<HTMLElement>('[data-edit="sell"]')!.click();
     expect(cb.onEditAction).toHaveBeenCalledExactlyOnceWith("sell", editorEl());
   });
 
   it("the Classic rung picker's change event dispatches through the delegated listener, and renderEditor syncs its selection", () => {
     const { ui, cb } = makeUI();
-    const sim = new Simulation(); // Classic: the card renders the rung picker
-    for (let x = 10; x < 30; x++) expect(sim.tower.place("lobby", 1, x).ok).toBe(true);
-    for (let x = 10; x < 30; x++) expect(sim.tower.place("floor", 2, x).ok).toBe(true);
-    const r = sim.tower.place("office", 2, 12);
-    expect(r.ok).toBe(true);
-    const office = sim.tower.units.find((u) => u.id === r.unitId)!;
-    office.state = "occupied";
-    ui.renderEditor(unitEditor(sim, office));
+    // Classic: the card renders the rung picker.
+    ui.renderEditor(officeCard({}, "classic"));
     const select = editorEl().querySelector<HTMLSelectElement>("#ed-rung")!;
     expect(select.value).toBe("2"); // renderEditor synced the Average selection post-render
     select.value = "3";
     select.dispatchEvent(new Event("change", { bubbles: true }));
     expect(cb.onEditAction).toHaveBeenCalledExactlyOnceWith("rung", editorEl());
     // An engine-side change re-syncs the picker on the next pump render.
-    sim.priceUnit(office, 2_000);
-    ui.renderEditor(unitEditor(sim, office));
+    ui.renderEditor(officeCard({ rent: 2_000 }, "classic"));
     expect(editorEl().querySelector<HTMLSelectElement>("#ed-rung")!.value).toBe("0");
   });
 
   it("hideEditor clears the card through lit and a later render reopens it", () => {
     const { ui } = makeUI();
-    const { sim, office } = officeSim();
-    ui.renderEditor(unitEditor(sim, office));
+    ui.renderEditor(officeCard());
     ui.hideEditor();
     expect(ui.isEditorOpen()).toBe(false);
     expect(editorEl().textContent?.trim()).toBe("");
     expect(editorEl().querySelector("[data-edit]")).toBeNull();
 
-    ui.renderEditor(unitEditor(sim, office));
+    ui.renderEditor(officeCard());
     expect(ui.isEditorOpen()).toBe(true);
     expect(editorEl().querySelector('[data-edit="sell"]')).not.toBeNull();
   });
 
   it("the editor card's title-bar ✕ hides it via the delegated listener", () => {
     const { ui } = makeUI();
-    const { sim, office } = officeSim();
-    ui.renderEditor(unitEditor(sim, office));
+    ui.renderEditor(officeCard());
     expect(ui.isEditorOpen()).toBe(true);
     editorEl().querySelector<HTMLElement>(".ed-close")!.click();
     expect(ui.isEditorOpen()).toBe(false);
@@ -1443,18 +1420,14 @@ describe("event-log toast/bulletin pump (regression: froze at the cap; now a bou
 
   it("keeps toasting and appending the bulletin past the log cap — never freezes", () => {
     const { ui } = makeUI();
-    const sim = Simulation.newGame(1);
-    pump(ui, sim); // sync the UI cursor past any founding log entry
-    const startSeq = sim.logSeq;
+    const sim = new HudTower();
+    pump(ui, sim);
     const toastSpy = vi.spyOn(ui, "toast").mockImplementation(() => {});
     // Fire 320 good events (past the 300 buffer cap), pumping the UI each time.
     for (let i = 1; i <= 320; i++) {
       sim.emit(`event ${i}`, "good");
       pump(ui, sim);
     }
-    // Engine: the buffer is capped, but the cursor stays monotonic.
-    expect(sim.log.length).toBe(300);
-    expect(sim.logSeq - startSeq).toBe(320);
     // The bug froze toasts at the cap; now every good entry still toasts through 320…
     expect(toastSpy).toHaveBeenCalledTimes(320);
     expect(toastSpy).toHaveBeenLastCalledWith("event 320", "good");
@@ -1469,7 +1442,7 @@ describe("event-log toast/bulletin pump (regression: froze at the cap; now a bou
 
   it("holds the DOM node count constant under a long session (mobile-safe, can't crash)", () => {
     const { ui } = makeUI();
-    const sim = Simulation.newGame(1);
+    const sim = new HudTower();
     for (let i = 1; i <= 1000; i++) {
       sim.emit(`event ${i}`, i % 2 ? "good" : "info");
       if (i % 7 === 0) pump(ui, sim); // realistic: UI is throttled, not every emit
@@ -1484,7 +1457,7 @@ describe("event-log toast/bulletin pump (regression: froze at the cap; now a bou
 
   it("caps toasts per frame on a catch-up burst but records every line in the bulletin", () => {
     const { ui } = makeUI();
-    const sim = Simulation.newGame(1);
+    const sim = new HudTower();
     pump(ui, sim); // sync the cursor past the founding entry
     const toastSpy = vi.spyOn(ui, "toast").mockImplementation(() => {});
     // Backgrounded-tab / fast-forward: 50 good events flush between two frames.
@@ -1504,7 +1477,7 @@ describe("event-log toast/bulletin pump (regression: froze at the cap; now a bou
 
   it("keeps the bulletin line even when toast() throws (line is the durable record)", () => {
     const { ui } = makeUI();
-    const sim = Simulation.newGame(1);
+    const sim = new HudTower();
     pump(ui, sim);
     vi.spyOn(ui, "toast").mockImplementation(() => {
       throw new Error("toast boom");
@@ -1519,14 +1492,14 @@ describe("event-log toast/bulletin pump (regression: froze at the cap; now a bou
 
   it("rebases the log cursor on a tower swap so old entries don't replay and new ones aren't skipped", () => {
     const { ui } = makeUI();
-    const a = Simulation.newGame(1);
+    const a = new HudTower();
     for (let i = 0; i < 3; i++) {
       a.emit(`a${i}`, "good");
       pump(ui, a);
     }
     const toastSpy = vi.spyOn(ui, "toast").mockImplementation(() => {});
     // Swap to a fresh tower (what adoptSim does) and rebase the cursor.
-    const b = Simulation.newGame(2);
+    const b = new HudTower();
     rebaseLog(ui, b);
     b.emit("swapped tower event", "bad");
     pump(ui, b);
@@ -1548,7 +1521,7 @@ describe("build palette — locked-tier visibility (SimTower parity)", () => {
 
   it("hides locked facilities and empty group headers at 1★, reveals them at 3★", () => {
     const { ui } = makeUI();
-    const sim = Simulation.newGame(1);
+    const sim = new HudTower();
 
     sim.star = 1;
     pump(ui, sim);
@@ -1584,7 +1557,7 @@ describe("build palette — locked-tier visibility (SimTower parity)", () => {
     // nor any kind's affordability changed. The scan is observable through the
     // palette's querySelectorAll walks.
     const { ui } = makeUI();
-    const sim = Simulation.newGame(1);
+    const sim = new HudTower();
     sim.star = 1;
     // Mid-band funds: the costliest kinds sit at 1M and 3M, so 2M puts every
     // affordability comparison well away from a boundary.
@@ -1637,7 +1610,7 @@ describe("build palette — locked-tier visibility (SimTower parity)", () => {
 
   it("falls back to Inspect when the active build tool becomes locked after a lower-star swap", () => {
     const { ui, cb } = makeUI();
-    const sim = Simulation.newGame(1);
+    const sim = new HudTower();
 
     sim.star = 4;
     pump(ui, sim);
@@ -1654,7 +1627,7 @@ describe("build palette — locked-tier visibility (SimTower parity)", () => {
 
   it("keeps an unlocked-but-unaffordable tool visible (only dimmed), not hidden", () => {
     const { ui } = makeUI();
-    const sim = Simulation.newGame(1);
+    const sim = new HudTower();
     sim.star = 1;
     sim.money = 0; // can't afford anything
     pump(ui, sim);
@@ -3538,7 +3511,7 @@ describe("the palette and tool card follow the tower's catalog (#921)", () => {
   });
 
   it("redraws names and prices when the tower's catalog source changes, and back", () => {
-    const sim = Simulation.newGame(51, "classic");
+    const sim = new HudTower();
     const { ui } = makeUI({ getCatalog: () => towerCatalog(sim) });
     pump(ui, sim);
     const office = () => document.querySelector<HTMLElement>('.pal-item[data-kind="office"]')!;
