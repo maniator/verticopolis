@@ -92,7 +92,7 @@ test.describe("dialog chrome", () => {
       // engine's tower, which the engine then loads in one step, as buildToStar
       // hands its tower over: built one at a time through the engine, each
       // build would read the engine's whole state back, far past the test's
-      // budget. On the TypeScript engine they go on the engine's own tower.
+      // budget.
       const port = (window as any).__vcEngine?.port;
       const hosted = Boolean(port) && g.enginePort === port;
       const s = hosted ? g.sim.constructor.deserialize(JSON.parse(JSON.stringify(g.sim.serialize()))) : g.sim;

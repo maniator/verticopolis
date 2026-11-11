@@ -218,7 +218,6 @@ export function buildHotspotTower(): void {
   const Sim = g.sim.constructor;
   g.sim = Sim.newGame(1);
   const s = g.sim;
-  s.simModel = "v2";
   s.money = 1e12;
   s.star = 5;
   const W = g.grid.width;
@@ -416,7 +415,6 @@ export function buildTabletTower(): void {
   const Sim = g.sim.constructor;
   g.sim = Sim.newGame(7);
   const s = g.sim;
-  s.simModel = "v2";
   s.money = 1e12;
   s.star = 5;
   const W = g.grid.width;

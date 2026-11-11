@@ -7,10 +7,10 @@
  * stored choice, and the hosted checks below fail a scene that did not end up on the engine, so
  * a missing engine package can never render under a green gate.
  *
- * On the Rust engine `game.sim` is a copy of the engine's save
- * (src/game/toolingSim.ts): scene builders build in place (a fresh
- * `Simulation` swapped into `game.sim`, `tower.place`, unit state writes), and
- * the copy hands what they did to the engine as a restore of its save. The
+ * `game.sim` is the harnesses' tower over the engine (src/game/toolingTower.ts):
+ * scene builders build in place (a fresh tower swapped into `game.sim`,
+ * `tower.place`, unit state writes), and what they did reaches the engine as a
+ * restore of its save. The
  * scenes also go through the app's load path (`adoptSim`) at the settle points
  * below. A load is not a no-op: it prices an unpriced Classic room on its
  * ladder, adopts the milestones the tower already meets, and starts the crowd,
@@ -22,7 +22,7 @@
  * edits the engine's current tower.
  *
  * Each settle carries the loop's pass memos and the elevator telemetry
- * across, from the engine, and the copy hands both back with its edits.
+ * across, from the engine, and the tower hands both back with its edits.
  *
  * Everywhere else the scene checks that what a clock pin or a setup changed
  * reached the engine (see SETTLE_AFTER_SETUP for what that covers).
@@ -46,7 +46,7 @@ export function assertEnginePackage(): void {
 
 /** The shots whose setup edits the tower in place (a unit's state or
  *  occupancy, a fire, a placed room), as "scene/shot". Such an edit reaches the
- *  engine as a load of the copy's save, so the scene settles after these setups
+ *  engine as a load of the tower's save, so the scene settles after these setups
  *  and loads at a fixed point; `beginSettleStep` hands on any pending edit
  *  first, so the setup edits the engine's current tower. A setup missing from
  *  the list is caught by the hosted check, which finds the edit unfollowed. */
@@ -71,10 +71,8 @@ export const SETTLE_AFTER_SETUP: ReadonlySet<string> = new Set<string>([
 export function shotShape(v: any): any {
   return {
     star: v.star,
-    // Money stays out: a build on fresh ground can roll a treasure from the
-    // copy's rng, which the engine's own build need not match (#868), a
-    // known gap that must not fail a scene. A money write reaches the engine
-    // as `setMoney`.
+    // Money stays out: a money write reaches the engine as `setMoney`, and a
+    // build pays from the engine's own balance.
     minutes: v.minutes,
     vipVisitDay: v.vipVisitDay,
     builtWeddingHall: v.builtWeddingHall,
@@ -177,12 +175,12 @@ export async function checkHosted(page: Page, where: string, before: string, fix
 
 /** What to change when `checkHosted` fails, by where it ran. */
 export const HOSTED_FIX = {
-  setup: "the setup's edit did not reach the engine: check the copy's hand on (src/game/toolingSim.ts), and add the shot to SETTLE_AFTER_SETUP (if only the clock differs and the setup calls pgSetClock, check pgSetClock and the engine's advanceClock instead)",
+  setup: "the setup's edit did not reach the engine: check the tower's hand on (src/game/toolingTower.ts), and add the shot to SETTLE_AFTER_SETUP (if only the clock differs and the setup calls pgSetClock, check pgSetClock and the engine's advanceClock instead)",
   clock: "the clock pin did not reach the engine: check pgSetClock and the engine's advanceClock",
   settled: "code that ran after a builder's __vcShotHandoff edited the tower in a way the engine did not follow: move that edit before the handoff",
 } as const;
 
-/** In-page: the page's tower (`game.sim`, the copy of the engine's save) in the
+/** In-page: the page's tower (`game.sim`, the harnesses' tower over the engine) in the
  *  shared shape, as JSON. */
 export function pgOwnShape(): string {
   const w = window as unknown as { game?: any; __vcShotShape?: (v: any) => any };
@@ -237,9 +235,9 @@ export function pgCheckHosted(before: string): string {
 }
 
 /**
- * In-page: settle the live tower through the app's load path. The page's save
- * is deserialized and adopted with `adoptSim` (the restore flavor, so the
- * camera stays) and the engine loads it. What a load resets is
+ * In-page: settle the live tower through the app's load path. The page's
+ * tower is adopted with `adoptSim` (the restore flavor, so the camera stays)
+ * and the engine loads its save. What a load resets is
  * carried over from the engine: the loop's pass memos and the elevator
  * telemetry. What `adoptSim` resets in the app is put back (speed, pause, the star and win
  * latches, the step accumulator, the meal-rush day, the log cursor and
@@ -263,23 +261,13 @@ export function pgSettle(): string {
     // reference changes nothing on screen (its pause is undone below, its
     // toast swept).
     if (document.getElementById("splash")) return "skipped: the title screen is up";
-    const sim = g.sim;
-    const Sim = sim.constructor;
     const engineBefore = vc.port;
-    // The instance's telemetry in the engine's document shape (see
-    // src/wasmhost/telemetry.ts; restated here, as injected code cannot import).
-    const telemetryOf = (s: any) => ({
-      util: [...s.elevatorUtil],
-      hourly: [...s.elevatorHourly].map(([id, r]: [number, any]) => [id, { weekday: [...r.weekday], weekend: [...r.weekend] }]),
-      origins: [...s.elevatorOrigins].map(([id, r]: [number, any]) => [id, { weekday: r.weekday.map((m: Map<number, number>) => [...m]), weekend: r.weekend.map((m: Map<number, number>) => [...m]) }]),
-    });
     // Telemetry is compared as parsed values with sorted keys: the engine
     // writes a whole float as 0.0 and its keys in its own order.
     const canonOf = (v: unknown) =>
       JSON.stringify(v, (_k, x) => (x && typeof x === "object" && !Array.isArray(x) ? Object.fromEntries(Object.entries(x).sort(([a], [b]) => (a < b ? -1 : 1))) : x));
     const telemetry = JSON.parse(engineBefore.elevatorTelemetry());
     const memos: number[] = [...engineBefore.loopMemos()];
-    const own = sim.serialize();
     const keep = {
       speed: g.speed,
       paused: g.engine.paused,
@@ -287,35 +275,16 @@ export function pgSettle(): string {
       shownWin: g.shownWin,
       accMinutes: g.accMinutes,
       lastMealRushDay: { ...g.lastMealRushDay },
-      logSeq: sim.logSeq,
       uiLogSeq: g.ui.lastLogSeq,
       logLines: [...g.ui.el.log.childNodes],
       selected: g.selected,
       selectedId: g.engine.selectedId,
     };
-    const fresh = Sim.deserialize(JSON.parse(JSON.stringify(own)));
-    // A load restarts the log cursor; keep the live one, before the engine
-    // loads the tower.
-    fresh.logSeq = keep.logSeq;
-    // The memos and the telemetry ride on the instance; `adoptSim` seeds them
-    // into the engine after the load.
-    [fresh.lastHour, fresh.lastDay, fresh.lastMonth, fresh.lastQuarter] = memos;
-    const adopt = (store: Map<number, unknown>, entries: [number, unknown][]) => {
-      store.clear();
-      for (const [id, v] of entries) store.set(id, v);
-    };
-    adopt(fresh.elevatorUtil, telemetry.util);
-    adopt(
-      fresh.elevatorHourly,
-      telemetry.hourly.map(([id, r]: [number, any]) => [id, { weekday: [...r.weekday], weekend: [...r.weekend] }]),
-    );
-    adopt(
-      fresh.elevatorOrigins,
-      telemetry.origins.map(([id, r]: [number, any]) => [id, { weekday: r.weekday.map((s: [number, number][]) => new Map(s)), weekend: r.weekend.map((s: [number, number][]) => new Map(s)) }]),
-    );
     let refused = "";
     try {
-      g.adoptSim(fresh, true);
+      // Adopting the page's own tower loads it again, with the engine's
+      // telemetry and memos carried across (src/game/toolingSim.ts).
+      g.adoptSim(g.sim, true);
     } catch (e) {
       refused = `the engine refused the settled tower: ${e instanceof Error ? e.message : String(e)}`;
     }
@@ -335,9 +304,6 @@ export function pgSettle(): string {
     if (refused) return refused;
     if (canonOf(JSON.parse(vc.port.elevatorTelemetry())) !== canonOf(telemetry)) return "the engine's elevator telemetry differs from the one handed to it";
     if (JSON.stringify([...vc.port.loopMemos()]) !== JSON.stringify(memos)) return "the engine's loop memos differ from the ones handed to it";
-    // The page holds the carried telemetry: a fresh copy reads it back from the
-    // engine, so this also checks that the copy decodes the seeded document.
-    if (canonOf(telemetryOf(g.sim)) !== canonOf(telemetry)) return "the page's elevator telemetry differs from the one carried over";
     const settled = JSON.stringify(shapeOf(g.sim.serialize()));
     // The engine loaded the same tower the page did.
     if (JSON.stringify(shapeOf(JSON.parse(vc.port.serialize()))) !== settled) return "the engine's tower differs from the one handed to it";
