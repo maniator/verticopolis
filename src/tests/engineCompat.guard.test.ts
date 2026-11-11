@@ -387,9 +387,8 @@ describe("engine crate version rule", () => {
     // or to this list when it is an input the lock already covers or is not
     // part of the engine's contract (the fuzz corpus's goldens are the native
     // run's own regression records, refreshed on purpose with
-    // `fuzz-corpus --update`, and the fuzz window marker only says whether a
-    // replay window is open).
-    const inputs = new Set(["README.md", "fixtures", "fuzz-corpus", "fuzz-window.json", "scenarios"]);
+    // `fuzz-corpus --update`).
+    const inputs = new Set(["README.md", "fixtures", "fuzz-corpus", "scenarios"]);
     const locked = new Set(LOCK_FILES.map((f) => f.split("/")[0]));
     const visible = (dir: string) =>
       readdirSync(resolve(ROOT, dir)).filter((n) => !n.startsWith("."));
