@@ -119,10 +119,10 @@ is [`engine-rs/consumer/`](https://github.com/maniator/verticopolis/tree/main/en
 
 ## The host API
 
-These are the calls a frontend makes. The repository's
+These are the calls a frontend makes, in short. The repository's
 [`engine-rs/API.md`](https://github.com/maniator/verticopolis/blob/main/engine-rs/API.md)
-gives each one in full, and a test names each one, so a rename fails CI until
-the docs follow.
+gives each one in full; a test there names each of its calls, so a rename
+fails CI until that page and the example host follow.
 
 | Need | Call |
 | --- | --- |
