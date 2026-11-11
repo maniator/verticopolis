@@ -740,8 +740,9 @@ touches any of those files and deploys it to GitHub Pages when
 `release-tag.yml` dispatches it for a new `engine-v<version>` tag, so the site
 shows the latest engine release. Run it by hand from the Actions tab to
 republish a tag. Locally: `cargo install mdbook --locked --version 0.5.4`, then
-`mdbook serve docs/engine-site`. `src/tests/engineDocsSite.guard.test.ts` keeps
-the includes, the workflow's paths and the release dispatch in step.
+`mdbook serve docs/engine-site`. `src/tests/engineDocsSite.guard.test.ts` checks
+that every include names a real file; the workflow's own pull request run checks
+the build.
 
 ### Two changelogs, and the update label
 
