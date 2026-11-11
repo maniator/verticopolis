@@ -37,6 +37,14 @@ ChatGPT subscription. No OpenAI organization ID or other variable is required.
   PR-Agent's estimate, rounded to cents). It reads comments through the API
   only. The estimate is not the bill: the OpenAI usage page is. A run that
   fails before it posts a details block (no credits, a model error) adds no row.
+- **Spending cap per PR (owner, 2026-11-11).** The `cost-gate` job reads that
+  running total before every command. At $2.00 or more (`PR_AGENT_COST_CAP_USD`
+  in the workflow) the model is not called, and a "PR-Agent did not run"
+  comment says so. To allow more runs, add the `pr-agent-override` label to the
+  PR (it needs write access) and comment the command again; removing the label
+  restores the cap. The check runs before the call, so the last run can
+  overshoot the cap by its own cost. Raising the cap is a one-line workflow
+  change in a reviewed PR.
 - PR-Agent complements, and does not replace, Rust/test/coverage CI,
   independent reviews, Copilot or Codex.
 
