@@ -6,8 +6,9 @@ import { repoRel, sourceFiles } from "./guardFiles";
  * The Rust engine follows the same prose rule as the TypeScript (CONTRIBUTING
  * "Conventions"): no em-dashes in comments, doc comments or strings. The
  * TypeScript side grandfathers its older comments; the Rust side has none, so
- * this guard holds it at zero. It walks `engine-rs/` (build output and the
- * generated package aside, see `guardFiles.ts`) and fails any `.rs` file with
+ * this guard holds it at zero. It walks `engine-rs/` and the bench crate
+ * `engine-bench/` (build output and the generated package aside, see
+ * `guardFiles.ts`) and fails any `.rs` file with
  * an em-dash, naming each line. An en-dash in a numeric range (`2–5`) is
  * allowed, as in the TypeScript.
  */
@@ -15,7 +16,7 @@ import { repoRel, sourceFiles } from "./guardFiles";
 const EM_DASH = "\u2014";
 
 describe("Rust prose guard", () => {
-  const files = sourceFiles("engine-rs", [".rs"]);
+  const files = [...sourceFiles("engine-rs", [".rs"]), ...sourceFiles("engine-bench", [".rs"])];
 
   it("finds the Rust sources", () => {
     expect(files.length).toBeGreaterThan(20);

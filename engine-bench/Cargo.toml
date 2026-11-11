@@ -1,0 +1,19 @@
+[package]
+name = "verticopolis-engine-bench"
+version = "0.0.0"
+edition = "2021"
+rust-version = "1.97"
+publish = false
+description = "The weekly hour-boundary cost bench of the Verticopolis engine: report-only timings, never a gate"
+
+# Its own workspace root, outside engine-rs/, like engine-rs/consumer/ but
+# deliberately not inside the crate: every file under engine-rs/ is part of
+# the engine source hash (and so of the fuzz window key), and a bench is not
+# a simulation input.
+[workspace]
+
+[dependencies]
+verticopolis-engine = { path = "../engine-rs" }
+
+[profile.release]
+debug = 1

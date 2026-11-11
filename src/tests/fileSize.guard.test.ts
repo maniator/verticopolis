@@ -34,6 +34,7 @@ const SCANNED_DIRS: { dir: string; exts: readonly string[] }[] = [
   { dir: "src", exts: [".ts", ".tsx"] },
   { dir: "scripts", exts: [".ts", ".tsx"] },
   { dir: "engine-rs", exts: [".rs"] },
+  { dir: "engine-bench", exts: [".rs"] },
 ];
 
 /**
