@@ -14,6 +14,8 @@
 
 import { test, expect, type Page } from "@playwright/test";
 import { MAP_OPEN_STORAGE_KEY, MAP_OPEN_VALUE } from "../src/ui/overviewMapPrefs";
+import type { FixtureBuilder, FixtureTower } from "../src/tests/fixtures/serviceDiagnostics.fixture";
+import type { GameMode } from "../src/shared/types";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -139,6 +141,31 @@ export async function dispatchTouch(
 
 /** The engine's own save (null before the engine is published), for a spec that
  *  asserts the engine reached a state. */
+/**
+ * Run a self-contained fixture builder (`src/tests/fixtures/
+ * serviceDiagnostics.fixture.ts`) on a new tower from the page's own engine,
+ * then `edit`, which is self-contained the same way and may name more records.
+ * Answers the built save's text and every record the two name, as plain JSON.
+ * The source runs as a page expression, so the page's script policy does not
+ * apply to it; nothing is loaded into the running game.
+ */
+export async function buildInPage<T extends object, E extends object = Record<never, never>>(
+  page: Page,
+  builder: FixtureBuilder<T>,
+  mode: GameMode,
+  edit?: (built: { sim: FixtureTower } & T) => E,
+): Promise<{ save: string } & T & E> {
+  const source = `(() => {
+    const game = window.game;
+    const start = (seed, mode) => game.sim.constructor.newGame(seed, mode);
+    const built = (${builder.toString()})(start, ${JSON.stringify(mode)});
+    const more = ${edit ? `(${edit.toString()})(built)` : "{}"};
+    const { sim, ...records } = built;
+    return JSON.parse(JSON.stringify({ ...records, ...more, save: JSON.stringify(sim.serialize()) }));
+  })()`;
+  return page.evaluate(source) as Promise<{ save: string } & T & E>;
+}
+
 export async function engineSave(page: Page): Promise<Record<string, any> | null> {
   return page.evaluate(() => {
     const port = (window as any).__vcEngine?.port;

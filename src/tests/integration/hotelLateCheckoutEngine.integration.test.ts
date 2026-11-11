@@ -1,15 +1,15 @@
 import { expect, it } from "vitest";
-import { FACILITIES } from "../../engine/facilities";
-import { HK_CHECKOUT_HOUR, HK_LATE_CHECKOUT_HOUR } from "../../engine/EconomySystem";
 import { PortSim, describeEngines, type Leg, draftTower } from "../portKit/portSim";
+import { catalogFacts } from "../portKit/draftFixtures";
 
 /**
- * #304 understaffed housekeeping (AC8) on both engines: a Modern late-checkout
- * room with no maid stays dirty for the rest of the day and is never re-let,
- * like a morning-dirtied room. The other late-checkout cases stay in
- * `hotelLateCheckout.integration.test.ts`; `hotelTower` mirrors that file's
- * copy (change both together). It builds the same tower, with the mode fixed
- * to Modern, and hands back a `PortSim` built from the draft.
+ * #304 understaffed housekeeping (AC8) on the Rust engine: a Modern
+ * late-checkout room with no maid stays dirty for the rest of the day and is
+ * never re-let, like a morning-dirtied room. The other late-checkout cases are
+ * Rust tests in `engine-rs/src/rule_tests/hotel_late_checkout.rs`, whose
+ * `hotel_tower` builds the same tower. This one, with the mode fixed to
+ * Modern, hands back a `PortSim` built from the draft, and reads the room
+ * width from the engine's catalog.
  *
  * The original called `economy.hotelCheckout()` and `hotelLateCheckout()` on a
  * TypeScript instance. Here the engine runs them itself, from its hourly
@@ -19,11 +19,25 @@ import { PortSim, describeEngines, type Leg, draftTower } from "../portKit/portS
 
 const HOTEL_KIND = "hotelSingle";
 const ROOMS = 10;
+/** The hour of the morning checkout (`Simulation::on_hour`,
+ *  `engine-rs/src/sim_loop.rs`). */
+const HK_CHECKOUT_HOUR = 8;
+/** The first hour of Modern's late-checkout window, 14:00 to 16:59
+ *  (`Simulation::on_hour`). */
+const HK_LATE_CHECKOUT_HOUR = 14;
 /** The first hour of the evening window in which an empty hotel room can be
  *  let (`Clock.isEvening`: the hours 17 to 20). */
 const EVENING_FILL_HOUR = 17;
 /** The last hour both tests step into, as the original's run did. */
 const LAST_HOUR = 22;
+
+/** The hotel room's width in tiles, from the engine's Modern catalog. */
+function hotelWidth(): number {
+  const { facilities } = catalogFacts("modern") as unknown as { facilities: readonly { key: string; width: number }[] };
+  const entry = facilities.find((f) => f.key === HOTEL_KIND);
+  if (!entry) throw new Error(`the catalog has no ${HOTEL_KIND}`);
+  return entry.width;
+}
 
 /** A hotel wing of `rooms` asleep rooms on floors 2 and 3, a lunch restaurant on
  *  4 and one elevator, as the original's fixture builds it (no housekeeping). */
@@ -39,7 +53,7 @@ function hotelTower(leg: Leg, rooms: number, seed = 2024): PortSim {
   const rest = draft.tower.place("restaurant", 4, 0);
   expect(rest.ok, `restaurant placed: ${rest.reason}`).toBe(true);
   draft.tower.units.find((u) => u.id === rest.unitId)!.state = "occupied";
-  const HOTEL_W = FACILITIES[HOTEL_KIND].width;
+  const HOTEL_W = hotelWidth();
   let placed = 0;
   for (let f = 2; f <= 3 && placed < rooms; f++) {
     for (let x = 10; x + HOTEL_W <= 40 && placed < rooms; x += HOTEL_W) {

@@ -5,7 +5,6 @@
 # and the files that use the kit in step.
 src/tests/integration/fire.integration.test.ts
 src/tests/integration/batchPricing.integration.test.ts
-src/tests/integration/ledger.integration.test.ts
 src/tests/integration/milestones.integration.test.ts
 src/tests/integration/nextStarRequirements.integration.test.ts
 src/tests/integration/elevatorStats.integration.test.ts
@@ -27,3 +26,6 @@ src/tests/integration/overheadEngine.integration.test.ts
 src/tests/integration/condoRelocationEngine.integration.test.ts
 src/tests/integration/condoModesEngine.integration.test.ts
 src/tests/integration/roomCountsEngine.integration.test.ts
+src/tests/integration/chargeBindingRaw.integration.test.ts
+src/tests/integration/portServiceDiagnostics.integration.test.ts
+src/tests/integration/relayedCommandRaw.integration.test.ts

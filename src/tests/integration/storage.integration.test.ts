@@ -1,27 +1,30 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { newSeededGame } from "../fixtures/towerFixtures";
 import { deflateSync } from "fflate";
-import { SAVE_VERSION, Simulation } from "../../engine/Simulation";
+import { draftTower, type Draft } from "../portKit/drafts";
+import { LOT_WIDTH } from "../portKit/draftFixtures";
 import { SaveGame } from "../../storage/SaveGame";
 import { toBase64, deflate } from "../../storage/saveCompression";
-import { FACILITIES, GRID } from "../../engine/facilities";
-import { UNIT_CAP } from "../../engine/sim/deserializeGuards";
 import { saveOf, loadAuto, importTower, readAuto, readImport, readResult, readSlot } from "../fixtures/saveText";
 import { noEngine } from "../portKit/rustEngine";
 
 /** A check of the engine's load of the stored save, skipped where no engine package is built. */
 const itEngine = it.skipIf(noEngine);
-import type { Draft } from "../portKit/drafts";
 
-describe("SaveGame", () => {
+describe.skipIf(noEngine)("SaveGame", () => {
   beforeEach(() => localStorage.clear());
   // Several compression tests stub browser stream globals; always restore them
   // so later export/import tests see the real environment.
   afterEach(() => vi.unstubAllGlobals());
 
-  function sampleGame(): Simulation {
-    const sim = newSeededGame(42);
-    const x0 = Math.floor(GRID.width / 2) - 20;
+  /** Rename the tower through the engine's own setter. */
+  const nameTower = (sim: Draft, name: string): void => (sim.port as unknown as { setTowerName(name: string): void }).setTowerName(name);
+
+  /** A played tower on the Rust engine: the seeded lobby, floor 2 over part
+   *  of it, an elevator, an office and five hours of play. */
+  function sampleGame(): Draft {
+    const sim = draftTower(42);
+    const x0 = Math.floor(LOT_WIDTH / 2) - 20;
+    for (let x = x0; x < x0 + 40; x++) sim.tower.place("lobby", 1, x);
     for (let i = 0; i < 12; i++) sim.tower.place("floor", 2, x0 + i);
     sim.buildTransport("elevatorStandard", x0, 1, 2);
     sim.build("office", 2, x0);
@@ -30,267 +33,9 @@ describe("SaveGame", () => {
     return sim;
   }
 
-  it("coerces non-finite unit fields from a tampered save to safe values", () => {
-    const sim = sampleGame();
-    const data = sim.serialize();
-    // Simulate a hand-edited / foreign save with a poisoned satisfaction field.
-    (data.units[0] as { satisfaction: unknown }).satisfaction = undefined;
-    (data.units[0] as { occupants: unknown }).occupants = NaN;
-    const loaded = Simulation.deserialize(data);
-    const u = loaded.tower.units[0];
-    expect(Number.isFinite(u.satisfaction)).toBe(true);
-    expect(u.satisfaction).toBeGreaterThanOrEqual(0);
-    expect(u.satisfaction).toBeLessThanOrEqual(1);
-    expect(Number.isFinite(u.occupants)).toBe(true);
-  });
-
-  it("drops null/malformed unit and transport entries from a corrupt save without throwing", () => {
-    const sim = sampleGame();
-    const data = sim.serialize();
-    const validUnits = data.units.length;
-    const validTransports = data.transports.length;
-    // A forged / partially-written save can hold a null (or a non-object
-    // primitive, or a kind-less object) in the arrays. Reading `.kind` off a
-    // null entry would throw and abort the WHOLE load — turning a recoverable
-    // save into a hard failure. Cover the null-at-front position too.
-    (data.units as unknown[]).unshift(null);
-    (data.units as unknown[]).splice(2, 0, "junk", 42, {});
-    (data.transports as unknown[]).unshift(null);
-    (data.transports as unknown[]).push({});
-    let loaded!: Simulation;
-    expect(() => {
-      loaded = Simulation.deserialize(data);
-    }).not.toThrow();
-    // The bad entries are dropped; every valid unit/transport survives.
-    expect(loaded.tower.units).toHaveLength(validUnits);
-    expect(loaded.tower.transports).toHaveLength(validTransports);
-  });
-
-  it("survives a non-array units/transports container in a corrupt save", () => {
-    const sim = sampleGame();
-    const data = sim.serialize();
-    // A forged save can clobber the array field itself to a scalar/object.
-    // `(data.units ?? [])` only guards null/undefined, so `.filter` on a
-    // non-array would throw and abort the load — guard the container type.
-    (data as { units: unknown }).units = 5;
-    (data as { transports: unknown }).transports = { nope: true };
-    let loaded!: Simulation;
-    expect(() => {
-      loaded = Simulation.deserialize(data);
-    }).not.toThrow();
-    expect(loaded.tower.units).toHaveLength(0);
-    expect(loaded.tower.transports).toHaveLength(0);
-  });
-
-  it("clamps forged unit/transport geometry from a tampered save to the lot", () => {
-    const sim = sampleGame();
-    const data = sim.serialize();
-    // Forged geometry would flow into renderer math (silhouette edges, lobby
-    // variant indexing, per-tile draw loops, shaft band graphics) as
-    // NaN/Infinity or absurd spans.
-    (data.units[0] as { x: unknown }).x = -5.5;
-    (data.units[0] as { floor: unknown }).floor = NaN;
-    (data.units[0] as { width: unknown }).width = 1e9;
-    // A near-edge origin with a huge width must not overhang the lot.
-    (data.units[1] as { x: unknown }).x = GRID.width - 1;
-    (data.units[1] as { width: unknown }).width = 50;
-    (data.transports[0] as { x: unknown }).x = Infinity;
-    (data.transports[0] as { top: unknown }).top = 1e9;
-    // A forged bottom at/above the roof must not push top past maxFloor.
-    (data.transports[0] as { bottom: unknown }).bottom = 1e9;
-    const loaded = Simulation.deserialize(data);
-    for (const u of [loaded.tower.units[0], loaded.tower.units[1]]) {
-      expect(Number.isInteger(u.x) && u.x >= 0 && u.x < GRID.width).toBe(true);
-      expect(Number.isInteger(u.floor) && u.floor >= GRID.minFloor && u.floor <= GRID.maxFloor).toBe(true);
-      expect(Number.isInteger(u.width) && u.width >= 1).toBe(true);
-      expect(u.x + u.width).toBeLessThanOrEqual(GRID.width);
-    }
-    const t = loaded.tower.transports[0];
-    expect(Number.isInteger(t.x) && t.x >= 0).toBe(true);
-    expect(t.x + FACILITIES[t.kind].width).toBeLessThanOrEqual(GRID.width);
-    expect(t.bottom).toBeGreaterThanOrEqual(GRID.minFloor);
-    expect(t.top).toBeLessThanOrEqual(GRID.maxFloor);
-    expect(t.top).toBeGreaterThan(t.bottom);
-  });
-
-  it("preserves a legacy (narrower) transport width, clamps an over-wide one, and falls back for a corrupt one", () => {
-    // A transport's stored width is trusted BELOW the catalog width so legacy
-    // shafts survive a catalog width change (canon widths only ever grew:
-    // stairs 4→8, standard elevator 3→4). Pinned with a WALKWAY because the
-    // v5 heal-on-load pass deliberately re-widens narrow elevators; walkways
-    // keep their stored width forever. A width ABOVE the catalog is always
-    // forged and clamps down, or one corrupt entry could shadow-drop every
-    // transport under its bogus footprint via the load-time overlap filter.
-    // And a non-finite/non-positive width must not reach the consumers: it
-    // would NaN-poison the W1 span scan (Tower.transportColumns) and make the
-    // shaft unpickable (hit-testing).
-    const legacy = sampleGame();
-    const legacyData = legacy.serialize();
-    legacyData.transports.push({
-      ...legacyData.transports[0],
-      id: 9_001,
-      kind: "stairs",
-      x: 5,
-      width: 4, // the pre-E1b legacy flight width (catalog is 8)
-      bottom: 1,
-      top: 2,
-      cars: 0,
-      carPositions: [],
-      carDir: [],
-    });
-    const legacyLoaded = Simulation.deserialize(legacyData);
-    expect(legacyLoaded.tower.transports.find((t) => t.kind === "stairs")?.width).toBe(4);
-
-    const kind = legacyData.transports[0].kind;
-    const forged = sampleGame();
-    const forgedData = forged.serialize();
-    (forgedData.transports[0] as { width: unknown }).width = FACILITIES[kind].width + 3;
-    const forgedLoaded = Simulation.deserialize(forgedData);
-    expect(forgedLoaded.tower.transports[0].width).toBe(FACILITIES[kind].width);
-
-    for (const bad of [NaN, Infinity, -4, 0, "8" as unknown as number]) {
-      const sim = sampleGame();
-      const data = sim.serialize();
-      (data.transports[0] as { width: unknown }).width = bad;
-      const t = Simulation.deserialize(data).tower.transports[0];
-      expect(Number.isInteger(t.width) && t.width > 0).toBe(true);
-      expect(t.width).toBe(FACILITIES[t.kind].width);
-    }
-  });
-
-  it("coerces forged unit state/label strings from a tampered save", () => {
-    const sim = sampleGame();
-    const data = sim.serialize();
-    // A forged `state` would flow into UI innerHTML (inspector "Status:" line)
-    // and state-machine compares; a non-string label would crash escaping.
-    (data.units[0] as { state: unknown }).state = '<img src=x onerror="x">';
-    (data.units[0] as { label: unknown }).label = 42;
-    const loaded = Simulation.deserialize(data);
-    const u = loaded.tower.units[0];
-    expect(u.state).toBe("empty");
-    expect(u.label).toBe(FACILITIES[u.kind].name);
-  });
-
-  it("clamps a tampered nextId so new placements can never reuse a live id", () => {
-    const sim = sampleGame();
-    const data = sim.serialize();
-    // A hand-edited/corrupt id counter — lower than ids already in use, or
-    // missing entirely (→ NaN ids). Either would let a new placement alias an
-    // existing unit's id, which the renderer keys its retained actors by.
-    for (const forged of [1, undefined]) {
-      (data as { nextId: unknown }).nextId = forged;
-      const loaded = Simulation.deserialize(data);
-      const before = new Set([
-        ...loaded.tower.units.map((u) => u.id),
-        ...loaded.tower.transports.map((t) => t.id),
-      ]);
-      // Adjacent to sampleGame's floor strip (x0..x0+11), so placement rules pass.
-      const res = loaded.tower.place("floor", 2, Math.floor(GRID.width / 2) - 20 + 12);
-      expect(res.ok).toBe(true);
-      expect(Number.isFinite(res.unitId)).toBe(true);
-      expect(before.has(res.unitId!)).toBe(false);
-    }
-  });
-
-  it("repairs corrupt unit ids (NaN / duplicate / unsafe) so ids stay sane and unique", () => {
-    const sim = sampleGame();
-    const data = sim.serialize();
-    // NaN would poison a raw Math.max over ids (and nextId with it); a
-    // duplicate would alias by-id lookups and the renderer's retained actors;
-    // an id past 2^53 would make the ++ repair (and allocateId later) a
-    // precision no-op that re-mints the same id forever; negatives are out of
-    // contract. A forged huge nextId must not win the counter max either.
-    (data.units[0] as { id: unknown }).id = NaN;
-    (data.units[1] as { id: unknown }).id = data.units[2].id;
-    (data.units[3] as { id: unknown }).id = 2 ** 60;
-    (data.units[4] as { id: unknown }).id = -7;
-    (data as { nextId: unknown }).nextId = 1e308;
-    const loaded = Simulation.deserialize(data);
-    const ids = [
-      ...loaded.tower.units.map((u) => u.id),
-      ...loaded.tower.transports.map((t) => t.id),
-    ];
-    expect(ids.every((id) => Number.isSafeInteger(id) && id > 0)).toBe(true);
-    expect(new Set(ids).size).toBe(ids.length);
-    // The counter must have landed above every repaired id (and stayed in the
-    // range where ++ still increments).
-    const res = loaded.tower.place("floor", 2, Math.floor(GRID.width / 2) - 20 + 12);
-    expect(res.ok).toBe(true);
-    expect(Number.isSafeInteger(res.unitId)).toBe(true);
-    expect(ids.includes(res.unitId!)).toBe(false);
-    const again = loaded.tower.place("floor", 2, Math.floor(GRID.width / 2) - 20 + 13);
-    expect(again.unitId).not.toBe(res.unitId);
-  });
-
-  it("recomputes the sky weather on load (not left stale)", () => {
-    const sim = sampleGame();
-    sim.tick(60 * 24 * 5); // advance a few days
-    const loaded = Simulation.deserialize(sim.serialize());
-    expect(loaded.weather).toBe(Simulation.weatherFor(loaded.clock.day));
-    expect(loaded.weather).toBe(sim.weather);
-  });
-
-  it("drops a later unit whose footprint overlaps an earlier one (forged save), per layer like the TDT importer", () => {
-    const sim = sampleGame();
-    const data = sim.serialize();
-    const office = data.units.find((u) => u.kind === "office")!;
-    const floorTile = data.units.find((u) => u.kind === "floor")!;
-    // Forged twins: one exact-footprint room copy, one partially-shifted room
-    // copy, and one structural (floor-tile) copy. Fresh ids so the id-repair
-    // pass isn't what resolves them; the overlap claim is.
-    data.units.push({ ...office, id: 999_001 });
-    data.units.push({ ...office, id: 999_002, x: office.x + 1 });
-    data.units.push({ ...floorTile, id: 999_003 });
-    const loaded = Simulation.deserialize(data);
-    // First kept wins, all three overlappers dropped: the tower matches the
-    // original, and the per-tile room index points at the kept office. The
-    // office legally sitting ON structure survives untouched (rooms and
-    // structure are separate index layers, each claiming only against itself).
-    expect(loaded.tower.units).toHaveLength(sim.tower.units.length);
-    expect(loaded.tower.roomAt(office.floor, office.x)?.id).toBe(office.id);
-    expect(loaded.tower.hasStructure(office.floor, office.x)).toBe(true);
-    // Round-trip idempotence on the repaired tower: nothing re-drops.
-    const again = Simulation.deserialize(loaded.serialize());
-    expect(again.tower.units).toHaveLength(loaded.tower.units.length);
-  });
-
-  it("rejects a forged save whose unit count exceeds the lot's capacity, before building any units", () => {
-    const sim = sampleGame();
-    const data = sim.serialize();
-    // Pin the LITERAL cap, not the implementation's formula: two index layers
-    // (structure + rooms) times the 375 x 110 lot. If the formula drifts,
-    // this number is the tripwire.
-    const cap = 82_500;
-    expect(UNIT_CAP).toBe(cap);
-    // Entries carry a REAL kind (the count filter reads it) but a poisoned
-    // `floor` getter: if the per-unit map ever runs, its `...u` spread fires
-    // the getter and this test fails with "map touched a unit" instead of
-    // the honest cap message. That pins "rejected BEFORE building any units"
-    // structurally, with no flaky wall-clock assertion.
-    const poisoned = Object.defineProperty({ kind: "office" }, "floor", {
-      enumerable: true,
-      get() {
-        throw new Error("map touched a unit past the cap");
-      },
-    });
-    data.units = Array.from({ length: cap + 1 }, () => poisoned) as typeof data.units;
-    expect(() => Simulation.deserialize(data)).toThrow(/cannot be a real tower/);
-    // Junk entries do NOT count toward the cap (the kind filter drops them
-    // first): a salvageable save padded with garbage still loads.
-    data.units = [
-      ...Array.from({ length: 3 }, () => ({ ...sim.serialize().units[0] })),
-      ...Array.from({ length: cap }, () => null),
-    ] as typeof data.units;
-    const salvaged = Simulation.deserialize(data);
-    expect(salvaged.tower.units.length).toBeGreaterThan(0);
-    // AT the cap it still loads in bounded time: the overlap pass then keeps
-    // the first of the identical entries and drops the rest, so even a
-    // max-count forged file resolves to a consistent tower.
-    const forged = sim.serialize().units[0];
-    data.units = Array.from({ length: cap }, () => forged) as typeof data.units;
-    const loaded = Simulation.deserialize(data);
-    expect(loaded.tower.units).toHaveLength(1);
-  });
+  // What a load does with a tampered save (forged fields, ids, geometry,
+  // overlaps, the unit cap) is a Rust test since #1875:
+  // engine-rs/src/rule_tests/save_hardening.rs.
 
   it("a storage-layer quota throw propagates out of saveSlot (the manual-save catch depends on it)", () => {
     // Pins the OTHER half of the #537 AC at the localStorage layer: appModals
@@ -326,7 +71,7 @@ describe("SaveGame", () => {
     const sim = sampleGame();
     SaveGame.save(saveOf(sim));
     const loaded = loadAuto()!;
-    const x0 = Math.floor(GRID.width / 2) - 20;
+    const x0 = Math.floor(LOT_WIDTH / 2) - 20;
     expect(loaded.tower.unitAt(2, x0)).toBeDefined();
   });
 
@@ -708,7 +453,7 @@ describe("SaveGame", () => {
 
   it("listSlots reads compressed slots — name / star / savedAt survive the round-trip", () => {
     const sim = sampleGame();
-    sim.tower.towerName = "Compressed Tower";
+    nameTower(sim, "Compressed Tower");
     SaveGame.saveSlot(1, saveOf(sim));
     const info = SaveGame.listSlots().find((s) => s.slot === 1)!;
     expect(info.exists).toBe(true);
@@ -742,7 +487,7 @@ describe("SaveGame", () => {
     // and give it no Load control, while Continue one row above opens that same
     // tower fine.
     const sim = sampleGame();
-    sim.tower.towerName = "Legacy Rescue";
+    nameTower(sim, "Legacy Rescue");
     SaveGame.save(saveOf(sim)); // writes the current key
     localStorage.setItem("simtower-clone-save", localStorage.getItem("verticopolis-save")!);
     localStorage.setItem("verticopolis-save", "VCZ1:not-actually-base64-deflate");
@@ -781,11 +526,8 @@ describe("SaveGame", () => {
   });
 
   it("names the export file after the tower", () => {
-    const sim = sampleGame();
-    sim.tower.towerName = "Naftali's Tower #1";
-    expect(SaveGame.exportFilename(sim.tower.towerName)).toBe("naftali-s-tower-1.vctower");
-    sim.tower.towerName = "✨✨"; // slugs to nothing → fallback
-    expect(SaveGame.exportFilename(sim.tower.towerName)).toBe("tower.vctower");
+    expect(SaveGame.exportFilename("Naftali's Tower #1")).toBe("naftali-s-tower-1.vctower");
+    expect(SaveGame.exportFilename("✨✨")).toBe("tower.vctower"); // slugs to nothing, so the fallback
   });
 
   it("rejects a raw-JSON tower export — only .vctower containers import now", async () => {
@@ -883,116 +625,8 @@ describe("SaveGame", () => {
     expect(SaveGame.hasSave()).toBe(false);
   });
 
-  it("round-trips serialize -> deserialize -> serialize without drift", () => {
-    const sim = sampleGame();
-    // The nested per-car arrays are where serialization drift hides, not the
-    // scalars — so assert they're populated before trusting the round-trip.
-    const t = sim.tower.transports[0];
-    expect(t.carPositions.length).toBeGreaterThan(0);
-
-    const first = sim.serialize();
-    const second = Simulation.deserialize(first).serialize();
-    expect(second).toEqual(first);
-    // And the deep-copied car arrays survive intact, value for value.
-    expect(second.transports[0].carPositions).toEqual(first.transports[0].carPositions);
-  });
-
-  it("loads a save from an unknown future version without throwing", () => {
-    const sim = sampleGame();
-    const data = sim.serialize();
-    // A save written by a newer build must degrade gracefully, not crash.
-    (data as { version: number }).version = 999;
-    expect(() => Simulation.deserialize(data)).not.toThrow();
-    const loaded = Simulation.deserialize(data);
-    expect(loaded.money).toBe(sim.money);
-    expect(loaded.tower.units.length).toBe(sim.tower.units.length);
-  });
-
-  it("migrates a v2 save through the version ladder to the current schema", () => {
-    const sim = sampleGame();
-    const data = sim.serialize();
-    (data as { version: number }).version = 2;
-    const loaded = Simulation.deserialize(data);
-    expect(SAVE_VERSION).toBe(7);
-    expect(loaded.money).toBe(sim.money);
-    expect(loaded.serialize().version).toBe(SAVE_VERSION);
-  });
-
-  it("drops units with an unrecognized kind on load", () => {
-    const sim = sampleGame();
-    const data = sim.serialize();
-    const before = data.units.length;
-    // Inject a bogus unit as if from a tampered/old save file.
-    (data.units as any).push({ ...data.units[0], id: 99999, kind: "spaceport" });
-    const loaded = Simulation.deserialize(data);
-    expect(loaded.tower.units.length).toBe(before);
-    expect(loaded.tower.units.some((u) => (u.kind as string) === "spaceport")).toBe(false);
-  });
-
-  describe("Ground-floor recognition (2.0)", () => {
-    // The file-layer provenance stamp SaveGame writes (`data.appVersion`); the
-    // serialize() kernel itself never carries it, so the tests set it directly.
-    function stamp(data: ReturnType<Simulation["serialize"]>, appVersion: string) {
-      (data as { appVersion?: string }).appVersion = appVersion;
-      return data;
-    }
-
-    it("marks a pre-2.0 save as a ground-floor tower from its appVersion", () => {
-      const sim = sampleGame();
-      expect(sim.founder).toBe(false);
-      const loaded = Simulation.deserialize(stamp(sim.serialize(), "1.99.0"));
-      expect(loaded.founder).toBe(true);
-    });
-
-    it("does NOT mark a tower first saved in 2.0+ as a Founder", () => {
-      const sim = sampleGame();
-      const loaded = Simulation.deserialize(stamp(sim.serialize(), "2.0.0"));
-      expect(loaded.founder).toBe(false);
-      const later = Simulation.deserialize(stamp(sim.serialize(), "2.4.1"));
-      expect(later.founder).toBe(false);
-    });
-
-    it("persists Founder status once set, even after appVersion restamps to 2.0+", () => {
-      // A pre-2.0 tower loaded in 2.0 becomes a Founder; re-saving stamps the
-      // current (2.0+) appVersion, but the explicit flag now carries the status.
-      const sim = sampleGame();
-      const founding = Simulation.deserialize(stamp(sim.serialize(), "1.98.0"));
-      expect(founding.founder).toBe(true);
-      const resaved = founding.serialize();
-      expect((resaved as { founder?: boolean }).founder).toBe(true);
-      const reloaded = Simulation.deserialize(stamp(resaved, "2.1.0"));
-      expect(reloaded.founder).toBe(true);
-    });
-
-    it("deserialize() alone does NOT found an unstamped save (undo-snapshot safety)", () => {
-      // deserialize() runs for BOTH file loads and in-session serialize() snapshots
-      // (undo/redo, crash report), which are stamp-free. So at THIS layer a missing
-      // appVersion must not grant Founder, or an undo on a brand-new 2.0 tower would
-      // flip it to Founder and persist that. The oldest-tower recognition lives at
-      // the file-load boundary instead (markFounderFromLoadedFile), tested below.
-      const sim = sampleGame();
-      const data = sim.serialize();
-      delete (data as { appVersion?: string }).appVersion;
-      expect(Simulation.deserialize(data).founder).toBe(false);
-    });
-
-    it("writes NO founder key for a non-founder, so the save stays byte-identical", () => {
-      // The `...(sim.founder ? { founder: true } : {})` spread must contribute
-      // nothing when false: a non-founder tower's serialized bytes are unchanged
-      // from before this feature existed (no phantom key, no reordering).
-      const sim = sampleGame();
-      expect(sim.founder).toBe(false);
-      expect("founder" in sim.serialize()).toBe(false);
-    });
-
-    it("a brand-new game is never a Founder (the badge is per-tower, not per-player)", () => {
-      // Starting a new tower must not inherit Founder from a prior loaded tower:
-      // newGame() builds a fresh Simulation (founder defaults false), and nothing
-      // copies the flag across. A pre-2.0 player's NEW towers are ordinary towers.
-      expect(Simulation.newGame(1, "classic").founder).toBe(false);
-      expect(Simulation.newGame(2, "modern").founder).toBe(false);
-    });
-  });
+  // The round trip, the version ladder, unknown kinds and the founder mark
+  // are Rust tests since #1875: engine-rs/src/rule_tests/save_versions.rs.
 
   describe.skipIf(noEngine)("Ground-floor recognition through the real file-load path", () => {
     // Build a genuine .vctower container (magic + base64 of the async-deflated
@@ -1000,7 +634,7 @@ describe("SaveGame", () => {
     // the provenance-stamp -> detection wiring is exercised end-to-end via the
     // real import path (which calls markFounderFromLoadedFile), not a hand-stamped
     // object handed straight to deserialize().
-    async function importWith(sim: Simulation, appVersion?: string, fields: Record<string, unknown> = {}): Promise<Draft> {
+    async function importWith(sim: Draft, appVersion?: string, fields: Record<string, unknown> = {}): Promise<Draft> {
       const data = { ...(sim.serialize() as unknown as Record<string, unknown>), ...fields };
       if (appVersion === undefined) delete data.appVersion;
       else data.appVersion = appVersion;

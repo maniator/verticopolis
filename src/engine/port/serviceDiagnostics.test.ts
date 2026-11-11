@@ -1,6 +1,21 @@
 import { describe, expect, it, vi } from "vitest";
 import { TsEngine } from "./tsEngine";
-import { serviceDiagnosticsFixture, setFixtureHotelState } from "../../tests/fixtures/serviceDiagnostics.fixture";
+import { Simulation } from "../Simulation";
+import type { GameMode, UnitState } from "../../shared/types";
+import {
+  serviceDiagnosticsFixture as buildFixture, type FixtureTower,
+} from "../../tests/fixtures/serviceDiagnostics.fixture";
+
+/** The shared fixture on the reference engine's own `Simulation`. */
+function serviceDiagnosticsFixture(mode: GameMode = "modern") {
+  const f = buildFixture((seed, m) => Simulation.newGame(seed, m) as unknown as FixtureTower, mode);
+  return { ...f, sim: f.sim as unknown as Simulation };
+}
+
+function setFixtureHotelState(f: ReturnType<typeof serviceDiagnosticsFixture>, state: UnitState): void {
+  f.hotel.state = state;
+  f.hotel.dirtyDays = state === "dirty" ? 1 : 0;
+}
 
 describe("TypeScript reference engine's keyed service diagnostics", () => {
   for (const mode of ["classic", "modern"] as const) {

@@ -2,8 +2,8 @@
 import { readFileSync } from "node:fs";
 import { test, expect, type Page } from "@playwright/test";
 import { lobbyDistanceFixture } from "../src/tests/fixtures/serviceDiagnostics.fixture";
-import { placeUnit } from "../src/tests/fixtures/towerFixtures";
-import { expectEngineHosted } from "./helpers";
+import type { Unit } from "../src/shared/types";
+import { buildInPage, expectEngineHosted } from "./helpers";
 
 /**
  * The tenant explanations on the real Rust engine, in the browser (#1561's
@@ -127,28 +127,37 @@ async function loadSave(page: Page, save: string): Promise<void> {
 
 test("No Rate, shoppers too far, a notice and the editor's access row show on the Rust engine", async ({ page }) => {
   // Classic: Modern never holds the No Rate state, and both engines drop it on load there.
-  const f = lobbyDistanceFixture("classic");
-  f.office.noRate = true;
-  // An office on notice (only lease tenants such as offices and condos ever give notice).
-  const leaving = placeUnit(f.sim, "office", 4, 235);
-  leaving.state = "vacating";
-  leaving.vacateReason = "rent";
-  leaving.vacateAt = f.sim.clock.minutes + 600;
-  // A security office draws no commuters, so it prints no access line, and the
-  // phone editor shows its plain "Elevator access" row instead. The row's
-  // answer is the floor being served, read from the engine's unit card. The
-  // elevator runs 1 to 8, so a second office on a short floor 9 is unserved.
-  for (let x = 190; x < 220; x++) {
-    const slab = f.sim.tower.place("floor", 9, x);
-    if (!slab.ok) throw new Error(`floor 9 at ${x}: ${slab.reason}`);
-  }
-  const guards = [placeUnit(f.sim, "security", 5, 200), placeUnit(f.sim, "security", 9, 200)];
-  const access = guards.map((g) => (f.sim.tower.isFloorServed(g.floor) ? "Yes" : "No"));
-  expect(access, "the reference reads one served floor and one unserved").toEqual(["Yes", "No"]);
   await page.goto("/");
   await page.waitForFunction(() => Boolean((window as any).__vcEngine?.status?.hosted && (window as any).game), undefined, { timeout: 30_000 });
   await page.evaluate(() => (window as any).game.onboarding.dismissSplash());
-  await loadSave(page, JSON.stringify(f.sim.serialize()));
+  // Built on the page's own engine; the edit is self-contained, as it runs there too.
+  const f = await buildInPage(page, lobbyDistanceFixture, "classic", ({ sim, office }) => {
+    const room = (kind: string, floor: number, x: number): Unit => {
+      const r = sim.tower.place(kind, floor, x);
+      if (!r.ok || r.unitId === undefined) throw new Error(`place ${kind} at ${floor},${x}: ${r.reason ?? "no reason"}`);
+      return sim.tower.getUnit(r.unitId) as Unit;
+    };
+    office.noRate = true;
+    // An office on notice (only lease tenants such as offices and condos ever give notice).
+    const leaving = room("office", 4, 235);
+    leaving.state = "vacating";
+    leaving.vacateReason = "rent";
+    leaving.vacateAt = sim.clock.minutes + 600;
+    // A security office draws no commuters, so it prints no access line, and the
+    // phone editor shows its plain "Elevator access" row instead. The row's
+    // answer is the floor being served, read from the engine's unit card. The
+    // elevator runs 1 to 8, so a second office on a short floor 9 is unserved.
+    for (let x = 190; x < 220; x++) {
+      const slab = sim.tower.place("floor", 9, x);
+      if (!slab.ok) throw new Error(`floor 9 at ${x}: ${slab.reason ?? "no reason"}`);
+    }
+    const guards = [room("security", 5, 200), room("security", 9, 200)];
+    const access = guards.map((g) => (sim.tower.isFloorServed(g.floor) ? "Yes" : "No"));
+    return { leaving, guards, access };
+  });
+  const { leaving, guards, access } = f;
+  expect(access, "the engine reads one served floor and one unserved").toEqual(["Yes", "No"]);
+  await loadSave(page, f.save);
 
   const checks: ReadonlyArray<readonly [{ id: number; kind: string }, string]> = [
     [f.office, "No Rate: the tenant stays"],
