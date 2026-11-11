@@ -115,8 +115,12 @@ fn the_recycling_reads_follow_the_marked_rooms_an_edit_and_a_load() {
     assert_eq!(e.sim.inspector_recycling(), counted(&e));
     let then = counted(&e);
     let (u, at) = e.sim.tower.marked_by_id(food).unwrap();
-    u.set_customers_in(at, Some(40));
-    assert_ne!(counted(&e), then, "a restaurant's diners are in the census");
+    u.set_visitors_yest(at, Some(30));
+    assert_ne!(
+        counted(&e),
+        then,
+        "a restaurant's visitors yesterday are in the census"
+    );
     assert_eq!(e.sim.inspector_recycling(), counted(&e));
     assert_eq!(read(&mut e), fresh(&e));
     // The clock moves the fill and no count: a move-out the setters missed
