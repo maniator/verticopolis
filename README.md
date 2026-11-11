@@ -7,13 +7,13 @@ vertical metropolis you build floor by floor. Wire it with elevators, attract
 tenants, set the rents, keep everyone happy, and climb the star ratings all the
 way to a coveted **TOWER**.
 
-Written in **TypeScript** on the **[Excalibur.js](https://excaliburjs.com/)**
-game engine (camera, scene, culling, collision and the render loop). The
-simulation has two implementations that are held to the same conformance tests:
-the TypeScript one and a Rust one compiled to WebAssembly (see
-[Simulation engines](#simulation-engines)). A procedural **WebAudio** soundtrack
-changes depending on which part of the tower you're looking at. No external art
-assets: every sprite is drawn in code.
+The simulation is a **Rust** engine (`engine-rs/`) compiled to
+**WebAssembly**, and it is the only engine the game runs (see
+[Simulation engine](#simulation-engine)). Everything around it is
+**TypeScript** on the **[Excalibur.js](https://excaliburjs.com/)** game engine
+(camera, scene, culling and the render loop). A procedural soundtrack built on
+**[Tone.js](https://tonejs.github.io/)** changes depending on which part of the
+tower you're looking at. No external art assets: every sprite is drawn in code.
 
 ![Sprite gallery](docs/screenshots/06-sprite-gallery.png)
 
@@ -21,15 +21,21 @@ assets: every sprite is drawn in code.
 
 ```bash
 npm install
-npm run dev      # open the printed localhost URL
+npm run wasm:build   # build the Rust engine package (needs the toolchain in engine-rs/README.md)
+npm run dev          # open the printed localhost URL
 ```
+
+The game cannot start without the engine package. On x86_64 Linux,
+`bash scripts/build-engine-wasm.sh` installs the pinned Rust toolchain and builds
+it in one step.
 
 Other scripts:
 
 ```bash
 npm run build        # production build to dist/
 npm run preview      # serve the production build
-npm run screenshots  # build + headless-capture screenshots into docs/screenshots
+npm run screenshots  # preview capture only; the committed gallery is rendered in the pinned
+                     # Playwright container (see docs/screenshots.md)
 ```
 
 Contributing? See **[CONTRIBUTING.md](CONTRIBUTING.md)** for the dev workflow:
@@ -60,9 +66,10 @@ knowing:
 ## How to play
 
 - **Found your tower.** *New Tower* lets you pick a **rule-set**: *Classic*
-  (pixel-faithful 1994) or *Modern* (adds variant **2–5 person condo
-  households**). It's chosen once and fixed for that tower's life; start another
-  to play the other way.
+  (the 1994 game, rule for rule) or *Modern* (everything in Classic, plus
+  **2–5 person condo households** that can move out, a deeper economy, and a
+  choice of calendar pace). It's chosen once and fixed for that tower's life;
+  start another to play the other way.
 - **Build floors first.** Lay `Floor` tiles, then place rooms on top of them.
   The ground floor and every 15th floor want a `Lobby`.
 - **Move people.** Every floor needs an `Elevator` or `Stairs` chain back to the
@@ -106,12 +113,17 @@ knowing:
   housekeeping cycle (rooms get dirty after checkout and need cleaning).
 - **Star ratings** with population thresholds and facility gates, ending in the
   VIP TOWER evaluation.
+- **The Map:** one overview of the whole tower with the Eval, Pricing, Hotel,
+  Traffic and Occupancy views.
+- **Events:** fires that Security has to contain, bomb threats where refusing
+  the ransom sends Security searching floor by floor against the clock, and
+  buried treasure under the basements.
 - **Location-aware soundtrack:** a procedural WebAudio synth crossfades between
   musical "scenes" (lobby muzak, office hum, hotel calm, food-court bustle,
   cinema score, subway rumble…) based on what the camera is centered on, plus
   build/sell/promotion jingles.
 - **Save anywhere:** autosave to `localStorage`, multiple save slots, plus
-  tower-file (`.vctower`) export/import.
+  tower-file (`.vctower`) export/import and the original game's `.TDT` files.
 
 ## Saving & loading
 
@@ -128,34 +140,27 @@ so a 1994 tower can be opened here and a Classic tower built here can be written
 out as a `.TDT` (Modern towers are refused, since SimTower can only load Classic
 ones). The format is documented in [docs/canon/tdt-format.md](docs/canon/tdt-format.md).
 
-**How it works.** A save is a snapshot of the **headless simulation**, not the
-renderer. `Simulation.serialize()` writes the deterministic source of truth into a plain
-`SerializedGame` object: money, star rating, the game clock, the RNG seed,
-every unit and transport, the event system (fires, seasonal events) and
-excavation history. `SaveGame` (`src/storage/SaveGame.ts`) stores that object
-in `localStorage`. On load, `Simulation.deserialize()` rebuilds the
-model and the Excalibur scene is regenerated from it.
+**How it works.** A save is a snapshot of the **simulation**, not the
+renderer. The Rust engine writes the deterministic source of truth (money, star
+rating, the game clock, the RNG seed, every unit and transport, the event
+system and excavation history) as save text, and `SaveGame`
+(`src/storage/SaveGame.ts`) compresses it into `localStorage`. On load, the
+engine rebuilds the tower from that text and the Excalibur scene is regenerated
+from the engine. The scene graph is *derived* view state and is never saved.
 
-> **Why not Excalibur's `Serializer`?** Excalibur ships a serializer, but it
-> targets the render layer: Actors, Components, the scene graph. In this project
-> those are *derived* view state, rebuilt from the simulation whenever the tower
-> changes; they hold none of the authoritative game state. Serializing them would
-> mean two save paths and a format coupled to the renderer, so the save system
-> deliberately serializes the headless `Simulation` instead.
-
-Saves are treated as **untrusted input**. `deserialize()` coerces non-finite
-numbers, drops units/transports with an unrecognized kind, and clamps car counts
-and shaft heights, so a hand-edited, corrupt, or foreign file degrades gracefully
-rather than crashing the game. A `version` field plus a `migrateSave()` seam
-gates loading: a save from a *newer* build loads best-effort instead of being
-discarded, and any future format change has a single place to add an upgrade
-step. The `serialize → deserialize → serialize` round-trip is covered by the
-Vitest suite.
+Saves are treated as **untrusted input**. The engine's loader
+(`engine-rs/src/load.rs`) bounds the inflate, coerces bad numbers, drops units
+it does not recognize and clamps car counts and shaft heights, so a hand-edited,
+corrupt or foreign file degrades gracefully instead of crashing the game. Older
+saves are migrated on load; a save from a *newer* build is refused with a
+message asking the player to update. The save round-trip is covered by the
+engine's Rust tests and the Vitest suite.
 
 ## 1994 SimTower parity
 
-How the clone maps to the original's mechanics. Items marked ✅ are implemented
-and covered by the Vitest suite and/or the captured screenshots.
+How the clone maps to the original's mechanics, in brief. Items marked ✅ are
+implemented and covered by the test suites and/or the captured screenshots.
+[PARITY.md](PARITY.md) has the full list, with the known gaps.
 
 | Original mechanic | Status |
 | --- | --- |
@@ -169,7 +174,7 @@ and covered by the Vitest suite and/or the captured screenshots.
 | Multi-floor cinema, party hall | ✅ |
 | Parking, security, medical, housekeeping, recycling | ✅ |
 | Whole-floor basement metro that brings visitors & eases the commute | ✅ |
-| Cathedral → **religion-agnostic Wedding Hall**: 28 wide, five floors tall, standing on floor 100 (Rust engine) | ✅ |
+| Cathedral → **religion-agnostic Wedding Hall**: 28 wide, five floors tall, standing on floor 100 | ✅ |
 | Stairs, escalators, standard / service / express elevators | ✅ |
 | Adjustable elevator cars + per-floor (express) stop config | ✅ |
 | **Demand-driven elevator cars** (SCAN dispatch toward waiting floors) | ✅ |
@@ -180,11 +185,11 @@ and covered by the Vitest suite and/or the captured screenshots.
 | Stressed crowds turn red when transport is overwhelmed | ✅ |
 | Construction time with scaffolding; destruction/sell refunds | ✅ |
 | **Fire** that spreads unless security/medical contain it | ✅ |
-| **Bomb threats** (defused by security) on prestige towers | ✅ |
+| **Bomb threats**: pay the ransom, or Security searches floor by floor before the deadline | ✅ |
 | **Buried treasure** found while excavating basements | ✅ |
 | Living tower: walking people, riding cars, the metro train, day/night | ✅ |
 | Save/load, multiple slots, .vctower export/import | ✅ |
-| Per-person stress/routing simulation | ◻︎ abstracted as an aggregate model |
+| Per-person routing and stress | ◑ commuters are routed one by one; shop and restaurant traffic is still an aggregate model |
 
 **Desktop vs. mobile:** the desktop layout mirrors the original's dollhouse
 cross-section; mobile gets a responsive portrait layout with an icon toolbar and
@@ -194,64 +199,50 @@ docks the tools in a column on the left (`docs/screenshots/09d-mobile-landscape-
 ## Architecture
 
 ```
+engine-rs/     # the simulation: a deterministic Rust engine, compiled to WebAssembly
+               # (rules, caps, tuning, the catalog, saves, .TDT, the frame the renderer reads)
 src/
-  engine/      # the TypeScript reference engine (a test referee; the boot catalog check still
-               # runs its catalogFor until #921; the game runs engine-rs/)
-    types.ts        shared types
-    facilities.ts   reference copy of the Rust facility table (engine-rs/src/facilities.rs)
-    Clock.ts        game time (days, weekdays, day phases, quarters)
-    rng.ts          deterministic PRNG (mulberry32)
-    Tower.ts        spatial model: two-layer grid, placement rules, reachability
-    Simulation.ts   economy, population, satisfaction, ratings, events, save
-  render/      # presentation
-    excalibur/TowerEngine.ts  Excalibur.js scene shell; delegates to friend-modules below
-    excalibur/towerScene.ts   scene construction, graphics baking, sky, lifecycle
-    excalibur/towerReconcile.ts  retained-actor reconciliation (rooms, structure, facade)
-    excalibur/towerCrowd.ts   cars, train, garbage/garage traffic, ambient walkers
-    excalibur/towerInputCamera.ts  pointer input, picking, camera, coords, audio focus
-    excalibur/towerOverlay.ts  2D overlay/stats painters + decorative event visuals
-    sprites.ts      procedural per-facility drawing (drawn into Excalibur canvases)
-    pixelSprites.ts dollhouse room interiors + walking/seated people
-  ui/          # DOM controls: palette, status bar, editor panel, modals, toasts
-    UI.ts           shell class; delegates to friend-modules below
-    templates/      lit-html template bodies; uiDialogs.ts dialog controllers
-    uiPanels.ts     editor/inspector panels; uiStatus.ts status+log pump; uiPalette.ts palette build
-  audio/Audio.ts  # location-based procedural soundtrack + SFX
-    # ToneAudioEngine (orchestrator) + toneScenes (data/math) + toneVoices (synthesis)
-  storage/SaveGame.ts  # localStorage + .vctower export/import
-  main.ts      # GameApp: tool semantics, sim tick, glue (input/camera via Excalibur)
-  gallery.ts   # standalone sprite-catalog page (docs/screenshots)
-  tests/       # Vitest unit tests for the engine
+  main.ts      # GameApp: the composition root, owns the game loop
+  game/        # controllers: build/editor actions, save/load, input, inspector, HUD wiring
+  simport/     # EnginePort: the one synchronous interface the game uses to talk to the engine
+  dualrun/     # the WASM binding and its type declaration (engine.d.ts)
+  wasmhost/    # loading the engine package, its build metadata and catalog checks
+  render/      # Excalibur.js scene, procedural sprites, the overview Map
+  ui/          # DOM controls: palette, status bar, editor panel, modals (lit-html templates)
+  audio/       # location-based procedural soundtrack and effects (Tone.js)
+  storage/     # localStorage slots, .vctower and .TDT import/export
+  shared/      # types and small helpers shared across the game
+  engine/      # the old TypeScript engine, kept only as a test reference while it is removed
+  tests/       # repository-wide guard tests (file sizes, prose, named flags, ...)
+conformance/   # the conformance lock and catalog digests the engine is held to
+e2e/           # Playwright end-to-end specs
 ```
 
-The **engine** is deliberately DOM-free and deterministic so it can be unit
-tested in isolation (`npm test`). Rendering, the camera, panning, zooming and
+The **engine** has no access to the DOM, files, network or clock (enforced by
+`engine-rs/tests/independence.rs`), so it is deterministic and tested on its
+own (`cargo test` in `engine-rs/`). Rendering, the camera, panning, zooming and
 pointer input all run on **[Excalibur.js](https://excaliburjs.com/)**:
-`TowerEngine` owns the game loop and scene, drawing each facility, transport and
-merged structural "run" as an Excalibur actor whose graphic reuses our pixel-art
-sprite code. `main.ts` only supplies tool semantics through the engine's
-controller hooks and advances the simulation each frame. It never touches the
-camera or raw pointer math directly.
+`TowerEngine` owns the scene, drawing each facility, transport and merged
+structural "run" as an Excalibur actor whose graphic reuses our pixel-art sprite
+code. `main.ts` supplies tool semantics through the engine's controller hooks
+and steps the simulation each frame through `EnginePort`.
 
-For diagrams of the layers, the frame loop, the engine subsystems, input flow,
-and persistence, see **[ARCHITECTURE.md](ARCHITECTURE.md)**.
+For diagrams of the layers, the frame loop, input flow and persistence, see
+**[ARCHITECTURE.md](ARCHITECTURE.md)**.
 
-## Simulation engines
+## Simulation engine
 
 The game runs on the **Rust** engine (`engine-rs/`), compiled to WebAssembly,
-which it drives directly through `EnginePort`. The game is the Rust-only
-build: there is no engine choice in Settings and no TypeScript fallback, and if
-the engine cannot start the game stops with a message. The version line in
-Settings and Help names the engine that is running.
+which it drives directly through `EnginePort`. There is no engine choice in
+Settings and no TypeScript fallback: if the engine cannot start, the game stops
+with a message. The version line in Settings and Help names the engine that is
+running. The engine crate is versioned separately from the app; see
+[CONTRIBUTING.md](CONTRIBUTING.md) for building the engine package
+(`npm run wasm:build`) and for how versions move.
 
-The old **TypeScript** engine (`src/engine/`) is still in the repository, as the
-reference the conformance lock and the tests compare the Rust engine against, and
-because the interface still reads some of its data. It is not run by the shipped
-game and will be deleted in a later release. During the cutover the game moved
-onto one synchronous numeric interface, `EnginePort`; see
-[ARCHITECTURE.md](ARCHITECTURE.md#the-engine-port-the-cutover-in-progress) for
-the design and [CONTRIBUTING.md](CONTRIBUTING.md) for building the engine
-package (`npm run wasm:build`).
+The old **TypeScript** engine in `src/engine/` is not part of the shipped game.
+It is still in the repository only while its remaining tests are moved onto the
+Rust engine, and it is being deleted.
 
 ## Screenshots
 
@@ -282,10 +273,12 @@ shown here are continuously proven against what the game actually does.
 
 ## Tests
 
-Two tiers: a fast **Vitest** unit suite (engine, game logic, UI, sprites, audio,
-storage: placement, reachability, economy, star gates, housekeeping, save/load
-round-trips) and a **Playwright** browser end-to-end smoke that proves the game
-stays winnable and renders. Run `npm test` and `npm run e2e` (after
+The simulation's rules are tested in Rust (`cargo test` in `engine-rs/`), and
+the engine is held to the conformance lock in `conformance/`. The web game has
+two tiers: a fast **Vitest** unit suite (game logic, UI, sprites, audio,
+storage, save/load round-trips, and the engine through its WASM package) and a
+**Playwright** browser end-to-end suite that proves the game stays winnable and
+renders. Run `npm test` and `npm run e2e` (after
 `VC_TOOLING=1 npm run build`; the flag publishes the `window.game` handle the
 e2e specs drive, which production builds compile away). The full testing
 strategy (the two tiers, the enforced
