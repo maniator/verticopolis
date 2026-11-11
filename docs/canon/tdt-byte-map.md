@@ -129,7 +129,8 @@ Each floor: 6-byte header, `n` unit records of 18 bytes, a 188-byte remap.
 `left` and `right` match the units on every floor of every save. The remap maps
 the id that people records and retail rows use ("logical id") to the unit's
 position in the list; ids are unique per floor. Our exporter writes zeros here
-and the game loads that fine; the game's own re-saves rebuild it.
+and the game loads that fine; the game's own re-saves rebuild it. The importer
+reads it to find the room a retail row describes (section 5).
 
 ### 3.1 Unit record (18 bytes)
 
@@ -206,9 +207,19 @@ those units in each save.
 | --- | --- | --- | --- | --- |
 | 0 | u8 | floor | Floor index; `0xFF` marks an empty row | Known |
 | 1 | u8 | unit | Logical unit id | Known |
-| 2 to 12 | 11 B | venue statistics | Customers, income and the like; not decoded | Unknown |
+| 2 to 5 | 4 B | venue statistics | Not decoded | Unknown |
+| 6, 7 | 2 x u8 | expected visitors | Their sum is the visitors the room expects that day; it starts at 10 when a room opens and climbs by 5 to 15 a day to the cap (#1500) | Observed |
+| 8 | u8 | served yesterday | The visitors the room served the day before: its census. The finance block's shop, fast food and restaurant lines are the sums of this byte by class | Known |
+| 9 to 12 | 4 B | venue statistics | Not decoded | Unknown |
 | 13 | u8 | constant | 255 in every row | Known |
 | 14 to 17 | 4 B | venue statistics | | Unknown |
+
+Byte 8 is pinned by the seven observation saves in
+`conformance/fixtures/tdt-observed/` (the original game playing two of the
+Reddit towers forward, #1500): on every one, the sum of byte 8 per class equals
+the finance block's line for shops, fast food and restaurants. The caps the
+original keeps are 25 a day for a shop (30 on a weekend) and 35 for fast food
+and restaurants (50 on a weekend).
 
 ---
 

@@ -76,13 +76,13 @@ describe("single room writes reach the HUD's kept counts", () => {
     expect(sim.stats()).toMatchObject({ ...walkedStats(sim), occupiedHotel: 0, dirty: 1 });
   });
 
-  it("a venue left empty with customers inside opening again for the hour", () => {
+  it("a venue left empty with yesterday's visitors on it opening again for the hour", () => {
     const { sim, placed } = tower([["shop", 2, 160]]);
     const [shop] = placed;
-    set(sim, shop, { state: "occupied", customersIn: 2 });
+    set(sim, shop, { state: "occupied", visitorsYest: 2 });
     const start = sim.stats();
-    sim.vacate(shop, "access"); // its tally stays on the room, but an empty room counts nobody
-    expect(shop.customersIn).toBe(2);
+    sim.vacate(shop, "access"); // its count stays on the room, but an empty room counts nobody
+    expect(shop.visitorsYest).toBe(2);
     expect(sim.stats()).toMatchObject({ ...walkedStats(sim), population: start.population - 2 });
     sim.clock.minutes = 12 * 60; // midday: open
     sim.economy.collectTrafficIncome();

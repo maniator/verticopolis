@@ -128,7 +128,13 @@ impl Clock {
     }
 
     pub fn is_weekend(&self) -> bool {
-        self.day_of_week() >= self.calendar.week_days - self.calendar.weekend_days
+        self.is_weekend_on(self.day())
+    }
+
+    /// Whether `day` (a day number, as `day()` gives) falls on a weekend.
+    pub fn is_weekend_on(&self, day: i64) -> bool {
+        day.rem_euclid(self.calendar.week_days)
+            >= self.calendar.week_days - self.calendar.weekend_days
     }
 
     pub fn quarter(&self) -> i64 {

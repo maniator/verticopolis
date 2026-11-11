@@ -11,7 +11,8 @@ import { isDormant, isOperational, VACATE_REASON_TEXT } from "../types";
 
 import { VACATE_NOTICE_MINUTES, VACATE_RESCIND, NOISE_CAP, OFFICE_NOISE_TILES, HOTEL_NOISE_TILES } from "./constants";
 import { buildSatisfactionContext, satisfactionStep } from "./satisfactionStep";
-import { roomUnits, setRoomState } from "../tower/rooms";
+import { markRoom, roomUnits, setRoomState } from "../tower/rooms";
+import { climbSteps, expectedVisitors, servedVisitors } from "./visitors";
 
 /** Satisfaction, noise notices, and the amenity halos for the Simulation, as
  * friend functions taking the instance. Extracted from `Simulation.ts`; the
@@ -242,15 +243,28 @@ export function dirtyRooms(sim: Simulation): number {
  *  its first midnight. A venue with ANY field set (it traded today, or it has
  *  a prior day) does roll over, so a genuine idle day correctly records 0. */
 export function rollOverRetailDay(sim: Simulation): void {
-  for (const u of sim.tower.units) {
+  // The day that just ended: its weekend sets the venues' caps (#1500).
+  const endedDay = sim.clock.day - 1;
+  const endedWeekend = sim.clock.isWeekendOn(endedDay);
+  for (const u of roomUnits(sim.tower)) {
     if (subtypeListFor(u.kind) === null) continue;
     if (!isOperational(u)) continue;
     const hasData =
       u.patronageToday !== undefined ||
       u.patronageYest !== undefined ||
       u.profitToday !== undefined ||
-      u.profitYest !== undefined;
+      u.profitYest !== undefined ||
+      u.visitorsYest !== undefined; // an imported venue arrives with its count alone (#1500)
     if (!hasData) continue;
+    const expected = expectedVisitors(u.kind, endedWeekend, u.visitorsYest, climbSteps(sim.rng.initialSeed, endedDay, u.id));
+    if (expected !== null) {
+      const served = servedVisitors(expected, u.patronageToday ?? 0);
+      // The census reads it, so the room counts must hear of the change.
+      if (served !== u.visitorsYest) {
+        u.visitorsYest = served;
+        markRoom(sim.tower, u);
+      }
+    }
     u.patronageYest = u.patronageToday ?? 0;
     u.patronageToday = 0;
     u.profitYest = u.profitToday ?? 0;

@@ -213,6 +213,9 @@ fn the_loaded_census_matches_the_file_except_where_a_known_gap_says_otherwise() 
                     ours[class], 0,
                     "{name} class {class}: the known gap moved; update #1500's row"
                 );
+            } else if (name, class) == ("TOWER5.TDT", POP_SHOP) {
+                // #1500: unexplained, its block counts twice the 4 x 10 served.
+                assert_eq!((ours[class], file[class]), (40, 80), "{name} shops");
             } else {
                 assert_eq!(ours[class], file[class], "{name} class {class}");
             }
@@ -242,10 +245,7 @@ fn the_census_gap_is_real_on_the_saves_that_have_those_rooms() {
 /// Classes whose loaded count is not the file's (#1500): they count people
 /// inside or an event audience, neither of which is saved.
 fn is_known_census_gap(class: usize) -> bool {
-    matches!(
-        class,
-        POP_SHOP | POP_FAST_FOOD | POP_RESTAURANT | POP_PARTY_HALL | POP_THEATRE
-    )
+    matches!(class, POP_PARTY_HALL | POP_THEATRE)
 }
 
 /// What an exported file keeps of a shaft: kind, column, span and skipped floors.

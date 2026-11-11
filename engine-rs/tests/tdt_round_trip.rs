@@ -41,7 +41,9 @@ fn save_of(bytes: &[u8], name: &str) -> Value {
 }
 
 /// A list of objects as sorted strings, so neither the order nor the ids
-/// (which follow the file's order) matter.
+/// (which follow the file's order) matter. A venue's `visitorsYest` is left
+/// out: the exporter does not write it (tdt-format.md section 18), so a
+/// reimported venue starts its count again (#1500).
 fn as_set(list: &Value) -> Vec<String> {
     let mut out: Vec<String> = list
         .as_array()
@@ -49,7 +51,9 @@ fn as_set(list: &Value) -> Vec<String> {
         .iter()
         .map(|v| {
             let mut v = v.clone();
-            v.as_object_mut().expect("object").remove("id");
+            let object = v.as_object_mut().expect("object");
+            object.remove("id");
+            object.remove("visitorsYest");
             v.to_string()
         })
         .collect();

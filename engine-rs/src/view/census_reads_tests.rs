@@ -8,10 +8,11 @@ use super::marks_guard_tests::FIELDS;
 use super::source_scan_tests::{closing, engine_sources, is_ident};
 
 /// The census share, whether a recycling center works, and what they call.
-const PREDICATES: [&str; 5] = [
+const PREDICATES: [&str; 6] = [
     "census_share",
     "is_present",
     "census_count",
+    "live_load",
     "resident_count",
     "is_operational",
 ];

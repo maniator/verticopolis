@@ -63,7 +63,23 @@ fn a_file_cut_after_the_floor_map_keeps_its_rooms_and_rebuilds_the_transport() {
         serde_json::from_str(&import_tdt(&bytes, "X.TDT").expect("imports").0).expect("json");
     let (json, _) = import_tdt(&bytes[..100_000], "X.TDT").expect("imports without its tail");
     let cut: Value = serde_json::from_str(&json).expect("json");
-    assert_eq!(cut["units"], full["units"], "the floors are all there");
+    // The cut file lost its retail table, so its venues carry no visitors
+    // (#1500); everything else about the rooms is the same.
+    let seeded = |u: &Value| u.get("visitorsYest").is_some();
+    assert!(full["units"].as_array().expect("units").iter().any(seeded));
+    assert!(!cut["units"].as_array().expect("units").iter().any(seeded));
+    let without_visitors = |units: &Value| -> Vec<Value> {
+        let mut units = units.as_array().expect("units").clone();
+        for u in &mut units {
+            u.as_object_mut().expect("object").remove("visitorsYest");
+        }
+        units
+    };
+    assert_eq!(
+        without_visitors(&cut["units"]),
+        without_visitors(&full["units"]),
+        "the floors are all there"
+    );
     let rebuilt = cut["transports"].as_array().expect("transports");
     assert!(!rebuilt.is_empty(), "a working layout was rebuilt");
     assert!(rebuilt.iter().any(|t| t["kind"] == "elevatorStandard"));

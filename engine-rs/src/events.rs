@@ -201,6 +201,8 @@ impl Simulation {
         u.set_occupants(at, 0);
         u.ever_occupied = false;
         u.set_residents(at, None);
+        // A gutted venue reopens as a new one and counts no visitors (#1500).
+        u.set_visitors_yest(at, None);
         u.satisfaction = 0.0;
         u.pending_income = 0.0;
         {

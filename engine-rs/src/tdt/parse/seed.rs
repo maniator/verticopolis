@@ -3,16 +3,21 @@
 use std::collections::HashMap;
 
 use super::OutUnit;
+use crate::crowd::fasthash::FastMap;
+use crate::economy::visitors::counts_daily_visitors;
 use crate::facilities::Kind;
+use crate::tdt::format::TDT_FLOOR_OFFSET;
 use crate::tdt::format::{POP_CONDO, POP_OFFICE, TDT_POPULATION_CLASSES};
 use crate::tdt::import_report::ImportCounts;
+use crate::tdt::types::{TdtFloor, TdtTower};
 
 /// The classes whose people the finance block counts and the load seeds: the
 /// kind, its slot in the block and the state a room with people in it takes.
 /// Hotels keep the states their own flags decode to, since a guest count cannot
-/// say which double room holds one guest or two. Shops, restaurants, fast food
-/// and theatres are left out: their customers are runtime state and arrive as
-/// the tower runs.
+/// say which double room holds one guest or two. Shops, restaurants and fast
+/// food are seeded from their retail rows instead (`seed_visitors`), and
+/// theatres are left out: their customers are runtime state and arrive as the
+/// tower runs.
 const SEEDED_CLASSES: [(Kind, usize, &str); 2] = [
     (Kind::Office, POP_OFFICE, "occupied"),
     (Kind::Condo, POP_CONDO, "occupied"),
@@ -97,4 +102,63 @@ fn seed_residents(
         })
         .collect();
     (seeded, target)
+}
+
+/// Give each shop, fast food and restaurant the visitors its retail row says
+/// it served yesterday, the census SimTower shows for it (#1500). A row names
+/// its room by floor and a slot the floor's index map turns into a tenant; the
+/// unit is the room of a counted kind on that floor that covers the tenant.
+pub(super) fn seed_visitors(units: &mut [serde_json::Value], tdt: &TdtTower) {
+    // One pass over the units: each counted venue's floor and span, keyed by
+    // floor, so a row looks at its own floor's few venues and never at the
+    // tower's thousands of floor tiles.
+    let mut venues: FastMap<i64, Vec<(usize, i64, i64)>> = FastMap::default();
+    for (i, u) in units.iter().enumerate() {
+        let counted = u
+            .get("kind")
+            .and_then(serde_json::Value::as_str)
+            .and_then(Kind::parse)
+            .is_some_and(counts_daily_visitors);
+        if !counted {
+            continue;
+        }
+        let field = |k: &str| u.get(k).and_then(serde_json::Value::as_i64);
+        if let (Some(f), Some(x), Some(w)) = (field("floor"), field("x"), field("width")) {
+            venues.get_or_insert_with(f, Vec::new).push((i, x, x + w));
+        }
+    }
+    let mut floors: FastMap<i64, &TdtFloor> = FastMap::default();
+    for f in &tdt.floors {
+        // The first floor with an index wins, as a search would find it.
+        floors.get_or_insert_with(f.index, || f);
+    }
+    for row in &tdt.tail.retail {
+        // A row that served nobody seeds nothing: the venue counts 0 either
+        // way, and our own exporter writes zero rows over a zero remap that
+        // would otherwise pin a 0 on the floor's first room.
+        if row.served == 0 {
+            continue;
+        }
+        let Some(floor) = floors.get(&i64::from(row.floor)) else {
+            continue;
+        };
+        let Some(tenant) = floor
+            .index_map
+            .get(usize::from(row.slot))
+            .and_then(|&t| floor.tenants.get(usize::from(t)))
+        else {
+            continue;
+        };
+        let Some(on_floor) = venues.get(&(floor.index - TDT_FLOOR_OFFSET)) else {
+            continue;
+        };
+        let hit = on_floor
+            .iter()
+            .find(|&&(_, left, right)| left < tenant.right && tenant.left < right);
+        if let Some(&(i, _, _)) = hit {
+            if let serde_json::Value::Object(m) = &mut units[i] {
+                m.insert("visitorsYest".into(), row.served.into());
+            }
+        }
+    }
 }

@@ -256,7 +256,10 @@ const nearCapacity = (card: Card): boolean => card.slots[CARD_NEAR_CAPACITY] ===
  *  the last test, so the comparison's coverage cannot change unseen. An inert
  *  cinema and shop left with ransom-ignored-modern, whose blast-gutted rooms
  *  only that scenario reached; it is past the TypeScript reference now (#349),
- *  and the Rust engine's own lock still pins it. */
+ *  and the Rust engine's own lock still pins it. A standard elevator near
+ *  capacity left when venues began counting yesterday's visitors (#1500):
+ *  the slower star pace thins the corpus's crowds below the cutoff, and
+ *  `cardVerdicts.integration.test.ts` still pins the flag on both sides of it. */
 const CORPUS_SECTIONS: readonly string[] = [
   "commercial:lobbyFar:false", "commercial:lobbyFar:true",
   "hotel:counts:dirty", "hotel:counts:infested", "hotel:counts:other", "hotel:excluded:dirty", "hotel:excluded:other",
@@ -267,7 +270,7 @@ const CORPUS_SECTIONS: readonly string[] = [
   "recycling:met:filling",
   "retail:advice:none", "retail:advice:overBuilt", "retail:advice:underServed", "retail:rain",
   "retail:tier:average", "retail:tier:booming", "retail:tier:low", "retail:tier:noData",
-  "shaft:idle:elevatorStandard", "shaft:load:elevatorExpress", "shaft:load:elevatorStandard", "shaft:nearCapacity:elevatorStandard",
+  "shaft:idle:elevatorStandard", "shaft:load:elevatorExpress", "shaft:load:elevatorStandard",
   "shaft:noReading:elevatorExpress", "shaft:noReading:elevatorService", "shaft:noReading:elevatorStandard",
   "shaft:noReading:escalator", "shaft:noReading:stairs",
 ];

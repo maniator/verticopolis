@@ -8,6 +8,7 @@ import type { FacilityKind } from "../types";
 import { isPresent } from "../types";
 import { roomUnits } from "../tower/rooms";
 import type { StarGateId } from "../../shared/engineTypes";
+import { countsDailyVisitors } from "./visitors";
 export type { StarGateId };
 
 /** The Windows Help file asks for more than one Security Office at 3 stars. */
@@ -95,7 +96,7 @@ export function occupantPopulation(sim: Simulation): number {
       // included: a commercial kind censusCount skips (cinema) must not have
       // forged or future customer counters subtracted from a tally that
       // never added them.
-      if (isCommercialKind(u.kind) && FACILITIES[u.kind].population > 0) {
+      if (isCommercialKind(u.kind) && FACILITIES[u.kind].population > 0 && !countsDailyVisitors(u.kind)) {
         pop -= Math.min(u.hotelCustomersIn ?? 0, u.customersIn ?? 0);
       }
     }

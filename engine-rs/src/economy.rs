@@ -11,6 +11,7 @@ use crate::sim::{LogKind, Simulation};
 
 mod traffic;
 mod upkeep;
+pub mod visitors;
 
 pub const COMMERCIAL_LOBBY_FLOORS: i64 = 2;
 const COMMERCIAL_LOBBY_FAR_MULT: f64 = 0.5;

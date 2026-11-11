@@ -1,6 +1,6 @@
 import type { Simulation } from "../Simulation";
 
-import { FACILITIES, censusCount, facilityFloors, isElevatorKind, isStaffOnlyTransport, isHotelKind, transportCarCapacity } from "../facilities";
+import { FACILITIES, facilityFloors, isElevatorKind, isStaffOnlyTransport, isHotelKind, transportCarCapacity } from "../facilities";
 import type { FacilityKind } from "../types";
 
 import { isOperational, isPresent } from "../types";
@@ -8,6 +8,7 @@ import { isOperational, isPresent } from "../types";
 import { HeatmapMode, congestionSeverity, HeatCell } from "./constants";
 import { emptyOriginRings, foldOrigins } from "../scheduleOrigins";
 import { roomUnits } from "../tower/rooms";
+import { liveLoad } from "../census";
 
 /** Congestion, heatmap, elevator utilization for the Simulation, as friend functions taking the
  * instance. Extracted from `Simulation.ts`; the class keeps thin delegations. */
@@ -164,11 +165,9 @@ function buildSpatialCongestion(sim: Simulation): {
   for (const u of roomUnits(sim.tower)) {
     if (u.kind === "metro" && isOperational(u)) metro++;
     if (isPresent(u)) {
-      // censusCount, not residentCount: a commercial venue stresses its floor
-      // by its LIVE customers (0 when nobody is eating), never by the catalog
-      // value, or every occupied fast food would fake 25 riders around the
-      // clock (review P2 on the commercial census change).
-      const p = censusCount(u);
+      // liveLoad: a venue stresses its floor by its LIVE customers (0 when nobody
+      // is eating), never its catalog value or yesterday's visitors (#1500).
+      const p = liveLoad(u);
       // The ground lobby (floor 1) generates no riding demand OF ITS OWN, it is
       // a pass-through, so it never seeds popByFloor. It still gets a congestion
       // reading below from the boarding pressure of the floors its shafts serve

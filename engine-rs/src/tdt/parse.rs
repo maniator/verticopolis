@@ -371,6 +371,7 @@ pub fn parse_tdt(bytes: &[u8], filename: &str) -> Result<ParsedLegacyTower, Lega
 
     // The paving pass: width-1 tiles, lobby on lobby floors.
     let mut unit_values: Vec<Value> = units.iter().map(OutUnit::to_json).collect();
+    seed::seed_visitors(&mut unit_values, &tdt);
     let mut built_extents: BuiltExtents = BTreeMap::new();
     for (&floor, row) in &paved {
         let kind = if is_lobby_floor(floor) {

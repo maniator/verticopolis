@@ -180,7 +180,9 @@ describe("golden master (modern): Simulation serialize() is byte-stable across r
  * three-day week), so its fixed three-day run reaches the weekend on day 2,
  * where Classic applies the literal 1994 visitor lift (fast food at 48/35).
  */
-// Re-pinned for the Classic 1994 commercial ceilings (#572,
+// Re-pinned in both modes for the daily venue visitors (#1500): shops, fast
+// food and restaurants now count yesterday's visitors and save `visitorsYest`.
+// Before that, re-pinned for the Classic 1994 commercial ceilings (#572,
 // spec-classic-economy-followups-2026-07-22): Classic's commercialDailyIncome
 // now reads the period chart's top-tier daily takes, so the fixture's traffic
 // venues earn against larger ceilings and bid larger capacities into the
@@ -192,7 +194,7 @@ describe("golden master (modern): Simulation serialize() is byte-stable across r
 // became 1 and the fixture's offices began collecting their full rent each
 // canon quarter; that hash was itself unchanged by the Modern empty-lot
 // founding (Classic already founded empty).
-const PINNED_STATE_HASH = "8dd8445a0f36c9f7662f4a845eac775ecdd37e00b5937d70dc391d5fe69f35d4";
+const PINNED_STATE_HASH = "60b8edadd7bd642c240d0ad69a8b560f28e1e222b07a0a842cea2b784b9ec579";
 
 /**
  * The Modern-mode golden-master fingerprint: the same fixed build-and-run
@@ -230,4 +232,4 @@ const PINNED_STATE_HASH = "8dd8445a0f36c9f7662f4a845eac775ecdd37e00b5937d70dc391
 // seeds the Modern center lobby, so the fixture's ensureStarterLobby lays those
 // 40 tiles itself (different unit ids and revision history than the founding seed
 // produced).
-const PINNED_MODERN_STATE_HASH = "f70e83b7e230a95bba5ca05bd39b57aaa82709f6e0b5fab780ee139f86778e5b";
+const PINNED_MODERN_STATE_HASH = "69a07dc2c1bc9ce3fbde09e343795e564260d15532608bbf711770261f7ebaaa";

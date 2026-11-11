@@ -176,22 +176,22 @@ describe("ghost guard: bulldozing the origin mid-meal does not corrupt the censu
 });
 
 describe("integration: meal census rises during lunch while HUD population rises too", () => {
-  it("associatedPopulation rises at the lunch peak; population returns to base after", () => {
+  it("associatedPopulation rises at the lunch peak while population holds at base", () => {
     const sim = officeAndFastFood();
     setHour(sim, 11);
-    const base = sim.tower.totalPopulation(); // office workers only (no customers yet)
+    const base = sim.tower.totalPopulation(); // office workers only (no visitors yesterday)
     let sawAssociatedRise = false;
-    let sawPopulationRise = false;
+    let sawLiveCustomers = false;
     for (let m = 0; m < 180; m++) {
       sim.tick(1);
       if (sim.tower.associatedPopulation() > 0) sawAssociatedRise = true;
-      // Population can only stay the same or rise during lunch (customers
-      // arriving at the venue add to the live census).
-      expect(sim.population).toBeGreaterThanOrEqual(base);
-      if (sim.population > base) sawPopulationRise = true;
+      if ((sim.tower.units.find((u) => u.kind === "fastFood")!.customersIn ?? 0) > 0) sawLiveCustomers = true;
+      // The venue counts yesterday's visitors (#1500), so live eaters never
+      // move the census within the day.
+      expect(sim.population).toBe(base);
     }
     expect(sawAssociatedRise).toBe(true);
-    expect(sawPopulationRise).toBe(true);
+    expect(sawLiveCustomers).toBe(true);
     // Run out the window + straggler wind-down: every customer is home, census returns.
     for (let m = 0; m < 120; m++) sim.tick(1);
     expect(sim.tower.associatedPopulation()).toBe(0);
@@ -207,14 +207,16 @@ describe("commercial venues (fastFood/restaurant/shop) count toward totalPopulat
     expect(sim.tower.totalPopulation()).toBe(6); // office only (6), no fastFood customers
   });
 
-  it("fastFood with customersIn = 5 adds exactly 5 to totalPopulation", () => {
+  it("fastFood with 5 visitors yesterday adds exactly 5 to totalPopulation, whatever is eating now", () => {
     const sim = officeAndFastFood();
     const ff = sim.tower.units.find((u) => u.kind === "fastFood")!;
-    ff.customersIn = 5;
-    expect(sim.tower.totalPopulation()).toBe(11); // 6 office + 5 customers
+    ff.visitorsYest = 5;
+    expect(sim.tower.totalPopulation()).toBe(11); // 6 office + 5 visitors
+    ff.customersIn = 9; // live eaters are not the census (#1500)
+    expect(sim.tower.totalPopulation()).toBe(11);
   });
 
-  it("occupied restaurant and shop each add their live customersIn to totalPopulation", () => {
+  it("occupied restaurant and shop each add yesterday's visitors to totalPopulation", () => {
     const sim = new Simulation(2024, "modern", "realWorld");
     sim.money = 1_000_000;
     for (let x = 0; x < 40; x++) sim.tower.place("lobby", 1, x);
@@ -224,21 +226,21 @@ describe("commercial venues (fastFood/restaurant/shop) count toward totalPopulat
     const restUnit = sim.tower.units.find((u) => u.id === rest.unitId)!;
     const shUnit = sim.tower.units.find((u) => u.id === sh.unitId)!;
     restUnit.state = "occupied";
-    restUnit.customersIn = 12;
+    restUnit.visitorsYest = 12;
     shUnit.state = "occupied";
-    shUnit.customersIn = 8;
+    shUnit.visitorsYest = 8;
     expect(sim.tower.totalPopulation()).toBe(20);
   });
 
   it("commercial census flows into ratingPopulation at all star rungs", () => {
     const sim = officeAndFastFood();
     const ff = sim.tower.units.find((u) => u.kind === "fastFood")!;
-    ff.customersIn = 10;
+    ff.visitorsYest = 10;
     for (const star of [1, 2, 3, 4, 5] as const) {
       sim.star = star;
-      // Exactly office (6) + fastFood customers (10) at every rung: below 4 via
-      // totalPopulation, at 4+ via occupantPopulation (no hotels here, and the
-      // customers stay in). An inexact bound would let double counting slip by.
+      // Exactly office (6) + fastFood visitors (10) at every rung: below 4 via
+      // totalPopulation, at 4+ via occupantPopulation (no hotels here). An
+      // inexact bound would let double counting slip by.
       expect(sim.ratingPopulation()).toBe(16);
     }
   });
@@ -291,7 +293,7 @@ describe("commercial venues (fastFood/restaurant/shop) count toward totalPopulat
       const r = sim.tower.place("fastFood", 2, 0);
       const u = sim.tower.units.find((u) => u.id === r.unitId)!;
       u.state = "occupied";
-      u.customersIn = 3;
+      u.visitorsYest = 3;
       expect(sim.tower.totalPopulation()).toBe(3);
     }
   });
@@ -336,17 +338,18 @@ describe("save version is 7 and a v3 save migrates cleanly", () => {
 });
 
 describe("hotel-origin venue customers stay out of the 4-star-plus census", () => {
-  it("hotelCustomersIn is subtracted from ratingPopulation at 4-star and above", () => {
+  it("a venue's daily visitors count whole at every rung, hotel-origin eaters included", () => {
     const sim = officeAndFastFood();
     const ff = sim.tower.units.find((u) => u.kind === "fastFood")!;
+    ff.visitorsYest = 10;
     ff.customersIn = 10;
-    ff.hotelCustomersIn = 4; // four of the ten eaters are hotel guests
+    ff.hotelCustomersIn = 4; // four of the ten eating now are hotel guests
     sim.star = 3;
-    // Below 4-star: hotels still count, so all ten customers count.
-    expect(sim.ratingPopulation()).toBe(16); // 6 office + 10 customers
+    expect(sim.ratingPopulation()).toBe(16); // 6 office + 10 visitors
     sim.star = 4;
-    // At 4-star-plus: the four hotel-origin eaters drop with their guests.
-    expect(sim.ratingPopulation()).toBe(12); // 6 office + 6 non-hotel customers
+    // Yesterday's visitors are a head count with no origin, so the live
+    // hotel-origin eaters subtract nothing from it (#1500).
+    expect(sim.ratingPopulation()).toBe(16);
   });
 
   it("forged counters on a population-0 commercial kind (cinema) never subtract", () => {

@@ -2,6 +2,7 @@ import type { FacilityKind, Unit } from "./types";
 import { isOperational } from "./types";
 import { FACILITIES } from "./facilitiesData";
 import { isCommercialKind } from "./facilityPredicates";
+import { countsDailyVisitors } from "./sim/visitors";
 
 /** The kinds whose units may carry their own household size: a condo and a
  *  rental apartment. */
@@ -39,8 +40,16 @@ export function residentCount(u: Pick<Unit, "kind"> & { residents?: number }): n
  * and Simulation.spatialCongestionByFloor must never drift apart on this rule.
  */
 export function censusCount(
-  u: Pick<Unit, "kind"> & { residents?: number; customersIn?: number },
+  u: Pick<Unit, "kind"> & { residents?: number; customersIn?: number; visitorsYest?: number },
 ): number {
+  // Shops, fast food and restaurants count yesterday's served visitors (#1500).
+  if (countsDailyVisitors(u.kind)) return u.visitorsYest ?? 0;
+  return liveLoad(u);
+}
+
+/** The people a room puts on its floor right now, which floor congestion
+ *  reads: a commercial venue's live customers, everyone else's residents. */
+export function liveLoad(u: Pick<Unit, "kind"> & { residents?: number; customersIn?: number }): number {
   if (isCommercialKind(u.kind) && FACILITIES[u.kind].population > 0) return u.customersIn ?? 0;
   return residentCount(u);
 }

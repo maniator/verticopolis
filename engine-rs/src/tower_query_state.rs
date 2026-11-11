@@ -6,6 +6,7 @@
 
 use std::collections::{HashMap, HashSet};
 
+use crate::economy::visitors::counts_daily_visitors;
 use crate::tower::{Unit, UnitState};
 
 #[derive(Default)]
@@ -83,8 +84,20 @@ impl Unit {
         self.kind.facility().population
     }
 
-    /// `censusCount`.
+    /// `censusCount`: the head count the population shows. Shops, fast food
+    /// and restaurants count yesterday's served visitors (#1500); every other
+    /// room counts its `live_load`.
     pub fn census_count(&self) -> i64 {
+        if counts_daily_visitors(self.kind) {
+            return i64::from(self.visitors_yest.unwrap_or(0));
+        }
+        self.live_load()
+    }
+
+    /// `liveLoad`: the people a room puts on its floor right now, which floor
+    /// congestion reads. A commercial venue counts its live customers, never
+    /// yesterday's visitors or its catalog value.
+    pub fn live_load(&self) -> i64 {
         if self.kind.is_commercial() && self.kind.facility().population > 0 {
             return self.customers_in.unwrap_or(0);
         }
@@ -170,6 +183,7 @@ mod tests {
             hotel_customers_in: None,
             out_for_meal,
             residents: None,
+            visitors_yest: None,
             ever_occupied: true,
             pending_income: 0.0,
             rent: None,

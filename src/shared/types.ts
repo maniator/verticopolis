@@ -285,6 +285,10 @@ export interface Unit {
    *  the field. Display-only: the money loop never reads them back. */
   patronageToday?: number;
   patronageYest?: number;
+  /** Shop, fast food and restaurant: the visitors served yesterday, the
+   *  room's census in the Rust engine (#1500). The TypeScript reference only
+   *  carries it through a save. */
+  visitorsYest?: number;
   profitToday?: number;
   profitYest?: number;
   /** Game-clock minute at which construction finishes (for the build phase). */

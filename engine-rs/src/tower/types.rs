@@ -67,6 +67,10 @@ pub struct Unit {
     pub hotel_customers_in: Option<i64>,
     pub out_for_meal: Option<i64>,
     pub residents: Option<i64>,
+    /// A shop's, fast food's or restaurant's visitors served yesterday,
+    /// its census (`economy::visitors`, #1500).
+    /// A byte is enough (the largest cap is 50) and keeps a unit small.
+    pub visitors_yest: Option<u8>,
     pub ever_occupied: bool,
     pub pending_income: f64,
     pub rent: Option<f64>,
@@ -193,6 +197,9 @@ impl Unit {
         }
         if let Some(r) = self.residents {
             m.insert("residents".into(), json!(r));
+        }
+        if let Some(v) = self.visitors_yest {
+            m.insert("visitorsYest".into(), json!(v));
         }
         if let Some(r) = self.rent {
             m.insert("rent".into(), json!(r));

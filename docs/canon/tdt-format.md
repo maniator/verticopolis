@@ -283,8 +283,10 @@ tower in four tries.
 ## 8. Retail table and variants
 
 The retail table is 512 slots of 18 bytes
-([byte map section 5](./tdt-byte-map.md#5-retail-table-512-rows-of-18)); only its
-floor byte is used.
+([byte map section 5](./tdt-byte-map.md#5-retail-table-512-rows-of-18)). The
+importer reads three bytes of each filled row: the floor, the logical unit id
+(mapped to a room through the floor's remap) and byte 8, the visitors the room
+served yesterday, which seeds its census (section 17).
 
 The variant a room renders with is byte 6 of its unit record:
 
@@ -434,10 +436,13 @@ serviced-only.
   rooms are full (office 6, condo 3), capped by the rooms built, so the app
   matches the file exactly on the real saves. Hotel guests come from each
   room's stay state (section 5.1), which reproduces the finance line for every
-  save. Shops, restaurants,
-  fast food and theatres cannot be seeded: their customers are runtime state in
-  our engine and build up after load, so the app's count starts below the
-  file's total. Tracked in #1500.
+  save. Shops, fast food and restaurants are seeded from each retail row's
+  byte 8 (yesterday's served visitors), which is their census in both the
+  original and our engine, so the app matches the file's three lines on the
+  observation saves (`engine-rs/tests/tdt_observed_census.rs`). One known gap:
+  TOWER5's finance line counts 80 shop visitors where its rows sum to 40. Party
+  halls and theatres cannot be seeded yet; their counts start below the file's
+  total. Both are tracked in #1500.
 - **Widths.** A room arrives at the width its record gives. New builds of
   security, medical, housekeeping, recycling and the metro use the sizes in
   section 6.1, so a rebuilt room matches the original. The engine puts nothing
@@ -454,6 +459,9 @@ point after the first import. Known canonical forms:
   difference; the game writes type 24 there).
 - A never-simulated shop comes back occupied with a concrete subtype (the format
   has no vacant retail cell).
+- Yesterday's venue visitors are not exported: our rows carry the floor alone,
+  so a shop, fast food or restaurant reimports with a census of 0 until its
+  first day passes.
 - A room the file's flags mark occupied but whose people the finance lines do not
   count comes back vacant and never lived in.
 - An infested hotel room is written as a dirty room (`0x20`) and comes back
