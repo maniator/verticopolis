@@ -84,7 +84,8 @@ if [ -n "$RUST_WANT" ] && ! command -v rustup >/dev/null 2>&1; then
   warn "rustup is not installed; scripts/build-engine-wasm.sh installs it below"
 elif [ -n "$RUST_WANT" ]; then
   if ! rustup target list --installed --toolchain "$RUST_WANT" 2>/dev/null | grep -qx wasm32-unknown-unknown \
-    || ! rustup component list --installed --toolchain "$RUST_WANT" 2>/dev/null | grep -q '^clippy'; then
+    || ! rustup component list --installed --toolchain "$RUST_WANT" 2>/dev/null | grep -q '^clippy' \
+    || ! rustup component list --installed --toolchain "$RUST_WANT" 2>/dev/null | grep -q '^rustfmt'; then
     say "installing Rust ${RUST_WANT} (rustfmt, clippy, wasm32)"
     if ! { rustup toolchain install "$RUST_WANT" --profile minimal --component rustfmt,clippy \
         && rustup target add wasm32-unknown-unknown --toolchain "$RUST_WANT"; } > "$LOG_DIR/rustup.log" 2>&1; then

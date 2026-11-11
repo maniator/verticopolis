@@ -61,20 +61,30 @@ const image = pinnedImage();
 if (installed && image && dockerHasImage(image)) {
   // The image needs no network: the server comes from the host's install.
   const nodeDir = `/opt/node-v${readFileSync(join(root, ".nvmrc"), "utf8").trim()}`;
-  const mounts = ["-v", `${installDir}:${installDir}:ro`];
+  // The checkout is mounted at its own path and is the working directory, so
+  // uploads can read its files and saved screenshots and snapshots land in
+  // .playwright-mcp/ there (gitignored) instead of vanishing with the container.
+  const mounts = ["-v", `${root}:${root}`, "-w", root, "-v", `${installDir}:${installDir}:ro`];
   if (existsSync(join(nodeDir, "bin", "node"))) mounts.push("-v", `${nodeDir}:/opt/vc-node:ro`);
   const script = [
     '[ -x /opt/vc-node/bin/node ] && export PATH="/opt/vc-node/bin:$PATH"',
     'chrome="$(ls -d /ms-playwright/chromium-*/chrome-linux*/chrome | head -1)"',
-    `exec node "${installedCli}" --headless --no-sandbox --isolated --executable-path "$chrome" "$@"`,
+    `exec node "${installedCli}" --headless --no-sandbox --isolated --output-dir "${join(root, ".playwright-mcp")}" --executable-path "$chrome" "$@"`,
   ].join("; ");
+  // Run as the calling user, so files it writes into the checkout are theirs.
+  const uid = process.getuid?.();
+  const user = uid && uid !== 0 ? ["-u", `${uid}:${process.getgid?.()}`, "-e", "HOME=/tmp"] : [];
   run("docker", [
-    "run", "--rm", "-i", "--network", "host", "--ipc", "host", ...mounts,
+    "run", "--rm", "-i", "--network", "host", "--ipc", "host", ...user, ...mounts,
     image, "bash", "-c", script, "playwright-mcp", ...extra,
   ]);
 } else {
   const chromium = process.env.PW_CHROMIUM_PATH || (existsSync("/opt/pw-browsers/chromium") ? "/opt/pw-browsers/chromium" : "");
-  const browserArgs = chromium ? ["--headless", "--no-sandbox", "--isolated", "--executable-path", chromium] : [];
+  const browserArgs = ["--output-dir", join(root, ".playwright-mcp")];
+  // Headed only where there is a display to show it on (a person's desktop).
+  const noDisplay = process.platform === "linux" && !process.env.DISPLAY && !process.env.WAYLAND_DISPLAY;
+  if (chromium || noDisplay) browserArgs.push("--headless");
+  if (chromium) browserArgs.push("--no-sandbox", "--isolated", "--executable-path", chromium);
   if (installed) run(process.execPath, [installedCli, ...browserArgs, ...extra]);
   else run("npx", ["-y", MCP_PACKAGE, ...browserArgs, ...extra]);
 }

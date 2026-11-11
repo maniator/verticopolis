@@ -24,7 +24,10 @@ Logs go to `$TMPDIR/vc-agent-setup/`.
   server, and `enabledMcpjsonServers` in the same settings file approves it.
   The first start in a fresh container takes two to four minutes (most of it
   the engine build); a resume takes about a second. Both start only once this
-  is merged to `main`, or on a session that checks out this branch.
+  is merged to `main`, or on a session that checks out this branch. If a
+  session that starts above the checkout (a project thread with several
+  repositories) does not run the hook, set the environment's setup script to
+  `if [ -d verticopolis ]; then AGENT_ENV_FILE=$HOME/.bashrc bash verticopolis/tools/agent-env/setup.sh; fi`.
 - **Codex** (and any other Linux sandbox with a setup-script field): set the
   environment's setup script to
   `AGENT_ENV_FILE=$HOME/.bashrc bash tools/agent-env/setup.sh`, so later
