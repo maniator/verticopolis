@@ -91,3 +91,78 @@ fn modern_sells_security_recycling_and_the_movie_theater() {
         assert!(sim.remove_facility(id, RemovalMethod::Sell).ok, "{kind:?}");
     }
 }
+
+/// A condo on floor 2 that sold to a household of `residents` at `price`.
+fn sold_condo(sim: &mut Simulation, price: f64, residents: Option<i64>) -> i64 {
+    let id = sim.tower.place(Kind::Condo, 2, 20).unit_id.unwrap();
+    let u = sim.tower.get_unit_mut(id).unwrap();
+    u.state = UnitState::Occupied;
+    u.ever_occupied = true;
+    u.rent = Some(price);
+    u.residents = residents;
+    id
+}
+
+#[test]
+fn removing_a_sold_condo_buys_it_back_before_the_resale_refund() {
+    // #713: the household already paid for the unit, so a sale or a
+    // bulldoze cannot pocket the shell's refund on top of the sale price.
+    for (mode, residents) in [(GameMode::Classic, None), (GameMode::Modern, Some(3))] {
+        for method in [RemovalMethod::Sell, RemovalMethod::Bulldoze] {
+            let mut sim = tower_in(mode);
+            let id = sold_condo(&mut sim, 150_000.0, residents);
+            let before = sim.money;
+            let paid = sim.remove_facility(id, method);
+            let net = Kind::Condo.resale_refund() - 150_000.0;
+            assert_eq!(paid, ChargeResult::paid(net), "{mode:?} {method:?}");
+            assert_eq!(sim.money - before, net);
+            assert!(sim.tower.get_unit(id).is_none());
+            assert_eq!(
+                sim.log.last().unwrap().text,
+                "You bought back Condominium on floor 2 for $150,000 to remove it."
+            );
+        }
+    }
+}
+
+#[test]
+fn a_modern_buy_back_follows_the_household_size() {
+    // A household of 4 paid 4/3 of the asking, as `vacate` buys it back.
+    let mut sim = tower_in(GameMode::Modern);
+    let id = sold_condo(&mut sim, 150_000.0, Some(4));
+    let before = sim.money;
+    assert!(sim.remove_facility(id, RemovalMethod::Sell).ok);
+    assert_eq!(sim.money - before, Kind::Condo.resale_refund() - 200_000.0);
+}
+
+#[test]
+fn an_unsold_or_gutted_condo_pays_only_its_refund() {
+    for mode in [GameMode::Classic, GameMode::Modern] {
+        let mut sim = tower_in(mode);
+        let unsold = sim.tower.place(Kind::Condo, 2, 20).unit_id.unwrap();
+        let before = sim.money;
+        assert!(sim.remove_facility(unsold, RemovalMethod::Sell).ok);
+        assert_eq!(sim.money - before, Kind::Condo.resale_refund());
+
+        let gutted = sold_condo(&mut sim, 150_000.0, None);
+        sim.tower.get_unit_mut(gutted).unwrap().state = UnitState::Gutted;
+        let before = sim.money;
+        assert!(sim.remove_facility(gutted, RemovalMethod::Bulldoze).ok);
+        assert_eq!(sim.money, before);
+    }
+}
+
+#[test]
+fn a_sold_condo_stays_when_the_buy_back_is_out_of_reach() {
+    let mut sim = tower_in(GameMode::Classic);
+    let id = sold_condo(&mut sim, 150_000.0, None);
+    sim.money = 100_000.0;
+    let r = sim.remove_facility(id, RemovalMethod::Sell);
+    assert!(!r.ok);
+    assert_eq!(
+        r.reason.as_deref(),
+        Some("You can't sell this condo without buying it back for $150,000.")
+    );
+    assert!(sim.tower.get_unit(id).is_some());
+    assert_eq!(sim.money, 100_000.0);
+}

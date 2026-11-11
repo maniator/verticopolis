@@ -11,9 +11,12 @@
 //! `capacity_changed` like the raw one, and `remove_facility` reports
 //! `facility_removed` with its method.
 
+use crate::churn::household_price;
+use crate::econ::rent_config;
 use crate::facilities::Kind;
 use crate::gameplay::{GameplayEvent, RemovalMethod};
-use crate::sim::Simulation;
+use crate::services::with_thousands;
+use crate::sim::{LogKind, Simulation};
 use crate::tower::UnitState;
 
 /// `ECON.addCarCost`.
@@ -334,12 +337,33 @@ impl Simulation {
             if self.stays_for_good(kind, state) {
                 return ChargeResult::refuse(permanent_room_refusal(kind));
             }
-            self.tower.remove_unit(id);
             let refund = if state == UnitState::Gutted {
                 0.0
             } else {
                 kind.resale_refund()
             };
+            // A sold condo belongs to its household: removing it buys the
+            // unit back at the price it sold for, as an owner leaving does
+            // (`vacate`), before the shell's resale refund (#713).
+            let buyback = self.sold_condo_buyback(id, state);
+            if buyback > 0.0 && self.money + refund < buyback {
+                return ChargeResult::refuse(format!(
+                    "You can't {} this condo without buying it back for ${}.",
+                    method.as_str(),
+                    with_thousands(buyback)
+                ));
+            }
+            let floor = self.tower.get_unit(id).map(|u| u.floor).unwrap_or(0);
+            self.tower.remove_unit(id);
+            if buyback > 0.0 {
+                let msg = format!(
+                    "You bought back Condominium on {} for ${} to remove it.",
+                    self.floor_label(floor),
+                    with_thousands(buyback)
+                );
+                self.emit(&msg, LogKind::Money);
+            }
+            let refund = refund - buyback;
             self.money += refund;
             self.note_edit_cash(refund);
             if kind == Kind::WeddingHall
@@ -362,6 +386,21 @@ impl Simulation {
         self.gameplay
             .push(GameplayEvent::FacilityRemoved { kind, method });
         ChargeResult::paid(refund)
+    }
+
+    /// What removing unit `id` costs to buy back: the price a sold condo's
+    /// household paid (scaled by its size, as `vacate` buys it back), or
+    /// nothing for any other room, an unsold condo or a gutted shell.
+    fn sold_condo_buyback(&self, id: i64, state: UnitState) -> f64 {
+        match self.tower.get_unit(id) {
+            Some(u) if u.kind == Kind::Condo && u.ever_occupied && state != UnitState::Gutted => {
+                let sale_price = u
+                    .rent
+                    .unwrap_or_else(|| rent_config(Kind::Condo).map(|c| c.default).unwrap_or(0.0));
+                household_price(sale_price, u.residents)
+            }
+            _ => 0.0,
+        }
     }
 
     /// Whether the tower keeps a room of `kind` in `state` for good, so no
