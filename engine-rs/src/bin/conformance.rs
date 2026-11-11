@@ -30,9 +30,7 @@ fn main() {
     let lock: serde_json::Value = serde_json::from_str(&lock_text).expect("expected.json parses");
     let want: BTreeMap<String, Vec<Checkpoint>> =
         serde_json::from_value(lock["scenarios"].clone()).expect("lock shape");
-    // The scenario directory and the lock must name the same set (the
-    // "has a scenario for every lock entry" test in
-    // src/tests/integration/conformance.integration.test.ts), so a new
+    // The scenario directory and the lock must name the same set, so a new
     // scenario cannot slip past the referee and a stale lock entry cannot
     // pass for a deleted one.
     let scenario_dir = root.join("scenarios");
@@ -78,8 +76,7 @@ fn main() {
                     let text = std::fs::read_to_string(&path)
                         .map_err(|e| format!("cannot read {}: {e}", path.display()))?;
                     let scenario = Scenario::parse(&text)?;
-                    // "a unique id per file" in conformance.integration.test.ts:
-                    // the internal id equals the stem, so a copied scenario
+                    // The internal id equals the stem, so a copied scenario
                     // cannot run under another file's lock entry.
                     if scenario.id != *id {
                         return Err(format!(
