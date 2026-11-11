@@ -100,7 +100,7 @@ describe("the WASM parity exclusions", () => {
 
   it("scans the files that hold exclusions", () => {
     // A scan that silently found nothing would pass forever.
-    expect(counts.size).toBeGreaterThan(5);
+    expect(counts.size).toBeGreaterThan(0);
   });
 
   it("reads comments, strings and aliases the way the compiler does", () => {

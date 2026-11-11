@@ -14,7 +14,7 @@ import type { FacilityKind } from "../../shared/types";
  * mechanics (fire spread/containment, thief, Santa, weather, buried treasure,
  * the VIP inspection) are pinned elsewhere — fire.integration.test.ts, phase2.integration.test.ts,
  * weatherEvents.integration.test.ts, simulation.integration.test.ts, reviewFixes.integration.test.ts,
- * parity.integration.test.ts. What was NOT covered, and is here, are the interactive
+ * and the engine's own VIP test (engine-rs/src/services/tests.rs). What was NOT covered, and is here, are the interactive
  * choice flows and the star gating that decides which emergency can fire:
  *
  *  - a fire arriving on the daily roll and offering a rescue, then ACCEPT

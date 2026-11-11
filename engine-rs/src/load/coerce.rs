@@ -107,4 +107,64 @@ mod tests {
         assert_eq!(VIEW_ZOOM_MIN, 0.06);
         assert_eq!(VIEW_ZOOM_MAX, 3.0);
     }
+
+    fn view(v: Value) -> Option<Value> {
+        coerce_view(Some(&v))
+    }
+
+    /// A save's camera view crosses the load boundary as written, with or
+    /// without a zoom (a TDT import carries none, and a null zoom is absent).
+    #[test]
+    fn a_view_loads_as_written() {
+        let stamped = json!({ "tile": 123.5, "floor": 42.25, "zoom": 1.7 });
+        assert_eq!(view(stamped.clone()), Some(stamped));
+        let zoomless = json!({ "tile": 10, "floor": 5 });
+        assert_eq!(
+            view(zoomless.clone()),
+            Some(json!({ "tile": 10.0, "floor": 5.0 }))
+        );
+        assert_eq!(
+            view(json!({ "tile": 10, "floor": 5, "zoom": null })),
+            Some(json!({ "tile": 10.0, "floor": 5.0 }))
+        );
+        assert_eq!(
+            coerce_view(None),
+            None,
+            "a save without a view loads viewless"
+        );
+    }
+
+    /// A malformed view is dropped whole, so the camera falls back to the
+    /// tower's center: the wrong container, a missing or non-numeric member,
+    /// or a member a JSON writer turned to null (NaN and Infinity).
+    #[test]
+    fn a_malformed_view_is_dropped_whole() {
+        for bad in [
+            json!("over there"),
+            json!(42),
+            json!({}),
+            json!({ "tile": "12", "floor": 5 }),
+            json!({ "tile": null, "floor": 5 }),
+            json!({ "tile": 12, "floor": null }),
+            json!({ "tile": 12, "floor": 5, "zoom": "big" }),
+        ] {
+            assert_eq!(view(bad.clone()), None, "{bad}");
+        }
+    }
+
+    /// Out-of-range numbers clamp onto the lot, the floor range and the zoom
+    /// range (a TDT view word can decode to a floor above the grid).
+    #[test]
+    fn an_out_of_range_view_clamps() {
+        let high = json!({ "tile": 1e9, "floor": -1e9, "zoom": 1e308 });
+        assert_eq!(
+            view(high),
+            Some(json!({ "tile": LOT as f64, "floor": MIN_FLOOR as f64, "zoom": VIEW_ZOOM_MAX }))
+        );
+        let low = json!({ "tile": -5, "floor": 1e9, "zoom": 0 });
+        assert_eq!(
+            view(low),
+            Some(json!({ "tile": 0.0, "floor": MAX_FLOOR as f64, "zoom": VIEW_ZOOM_MIN }))
+        );
+    }
 }

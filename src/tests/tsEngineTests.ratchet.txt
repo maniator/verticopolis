@@ -111,7 +111,6 @@ src/tests/integration/moveInGateRentals.integration.test.ts Simulation sim/gripe
 src/tests/integration/moveInSustainabilityGate.integration.test.ts Simulation sim/demand sim/satisfactionStep
 src/tests/integration/noiseMemo.integration.test.ts Simulation UndoHistory sim/constants sim/satisfaction
 src/tests/integration/paintPersistence.integration.test.ts Simulation
-src/tests/integration/parity.integration.test.ts Simulation
 src/tests/integration/partyHallTwoFloor.integration.test.ts Simulation
 src/tests/integration/personCensus.integration.test.ts Clock Simulation
 src/tests/integration/personRoundTrip.integration.test.ts Clock Crowd Simulation

@@ -34,8 +34,8 @@ merge rules (who arms, when) stay where they are.
 
 Use the rule in steps 1 and 2 of `.github/copilot-instructions.md`:
 `gds-code-review` for gameplay and engine paths, `bmad-code-review` for the
-rest, gds for a mixed diff, and `engine-parity-review` as a checklist on top
-when the diff touches `src/engine/`, `engine-rs/`, `conformance/` or the save
+rest, gds for a mixed diff, and `engine-review` as a checklist on top
+when the diff touches `engine-rs/`, `conformance/` or the save
 loaders. Run its three lenses yourself: Blind Hunter on the diff alone, Edge
 Case Hunter with the repository open, and Acceptance Auditor against the PR
 body and its issue. If you already ran that skill on this head commit, reuse

@@ -17,8 +17,8 @@ This file is the review method. Do these steps on every PR, in order:
    economy, ratings, events, elevators, facilities, RNG). Use `bmad-code-review`
    for everything else (other storage, tooling, build/CI, UI plumbing, docs). A mixed
    diff uses `gds-code-review`. Both are in `.agents/skills/`.
-2. **Then, only if the diff touches `src/engine/`, `engine-rs/`, `conformance/`
-   or the save loaders (`src/storage/`), also activate `engine-parity-review`** (`.github/skills/`)
+2. **Then, only if the diff touches `engine-rs/`, `conformance/`
+   or the save loaders (`src/storage/`), also activate `engine-review`** (`.github/skills/`)
    as a checklist. So a review activates one skill, or two when this step
    applies, and never any other skill.
 3. **Run the skill's layers inline.** Read its `SKILL.md` and `steps/*.md` from
