@@ -14,7 +14,10 @@ import type { UpdateInfo } from "../../pwa";
  * `notes`/`version`/`sha` come from `version.json` (see src/pwa.ts) and are
  * auto-escaped by lit; the notes list uses nested `html` sub-templates, never
  * string interpolation. The `data-act` attributes are kept for structural parity
- * and as stable test selectors; dispatch is via `@click`.
+ * and as stable test selectors; dispatch is via `@click`. Later carries
+ * `autofocus` so the dialog opens on it, as it did before the skipped-versions
+ * log (#1897) became the first focusable element: opening the prompt never
+ * lands focus inside the notes.
  */
 
 /** The two actions the update prompt dispatches, bound inline in the template. */
@@ -76,7 +79,7 @@ export function updatePromptTemplate(
       ${engineLine}
       ${buildLine}
       <div class="modal-actions">
-        <button class="btn" data-act="later" @click=${actions.onLater}>Later</button>
+        <button class="btn" data-act="later" autofocus @click=${actions.onLater}>Later</button>
         <button class="btn primary" data-act="update" @click=${actions.onUpdate}>Update now</button>
       </div>
     `;

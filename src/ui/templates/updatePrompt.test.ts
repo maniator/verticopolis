@@ -128,6 +128,8 @@ describe("updatePromptTemplate skipped versions (#1897)", () => {
     expect(log?.getAttribute("tabindex")).toBe("0");
     expect(log?.getAttribute("role")).toBe("region");
     expect(log?.getAttribute("aria-labelledby")).toBe("whatsnew-title");
+    // The dialog opens on Later, never inside the focusable log.
+    expect(frag.querySelector('[data-act="later"]')?.hasAttribute("autofocus")).toBe(true);
     expect(frag.getElementById("whatsnew-title")).not.toBeNull();
     expect([...frag.querySelectorAll(".whatsnew-ver")].map((h) => h.textContent)).toEqual(["1.6.0", "1.5.1", "1.5.0"]);
     expect([...frag.querySelectorAll(".whatsnew-log li")].map((li) => li.textContent)).toEqual(["New.", "Fix.", "A.", "B."]);
