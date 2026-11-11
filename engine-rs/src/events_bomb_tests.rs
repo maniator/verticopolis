@@ -211,3 +211,18 @@ fn classic_needs_security_before_a_ransom_call() {
         sim.events.active.clear();
     }
 }
+
+#[test]
+fn one_long_step_still_finds_a_bomb_a_guard_reached_in_time() {
+    // A guard that clears floors in a row inside one big step reaches the
+    // bomb's floor before the deadline: found, though the step ends after it.
+    let mut sim = tower(30, 1);
+    decline(&mut sim);
+    let b = sim.events.bomb.as_mut().unwrap();
+    b.floor = 9;
+    let deadline = b.deadline;
+    sim.clock.minutes = deadline + 30.0;
+    sim.advance_bomb_search();
+    assert!(sim.events.bomb.is_none());
+    assert_eq!(sim.events.bombs_detonated, 0);
+}

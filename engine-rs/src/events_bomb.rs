@@ -267,14 +267,25 @@ impl Simulation {
             .map(|(&f, &(left, right))| (f, right - left))
     }
 
-    /// One step of the search: guards who finished a floor either found the
-    /// bomb there or move on; at the deadline it goes off. A guard whose
-    /// sweep ends after the deadline is too late.
+    /// One step of the search: guards who finished a floor move on (a big
+    /// step can finish several floors for one guard), then a guard who
+    /// swept the bomb's floor by the deadline finds it, and otherwise at the
+    /// deadline it goes off.
     pub fn advance_bomb_search(&mut self) {
         let Some(b) = self.events.bomb.as_ref() else {
             return;
         };
         let now = self.clock.minutes;
+        let moved = b
+            .guards
+            .iter()
+            .any(|g| g.floor.is_some_and(|f| f != b.floor) && g.done_at <= now);
+        if moved {
+            self.move_finished_guards(now);
+        }
+        let Some(b) = self.events.bomb.as_ref() else {
+            return;
+        };
         let deadline = b.deadline;
         let found = b
             .guards
@@ -287,37 +298,39 @@ impl Simulation {
             self.money -= cost;
             let at = self.floor_label(floor);
             self.emit(&format!("💣 Security found the bomb on {at} and defused it in time. The evacuation cost ${}.", with_thousands(cost)), LogKind::Good);
-            return;
-        }
-        if now >= deadline {
+        } else if now >= deadline {
             let (floor, x) = (b.floor, b.x);
             self.events.bomb = None;
             let fine = 15_000.0 + self.rng.int(0, 15_000) as f64;
             let destroyed = self.blast(fine, Some((floor, x)));
             self.emit(&format!("💣 Security ran out of time and the bomb went off on {}. {destroyed} room(s) across ~5 floors were gutted, plus a ${} fine.", self.floor_label(floor), with_thousands(fine)), LogKind::Bad);
-            return;
         }
-        let finished: Vec<usize> = b
-            .guards
-            .iter()
-            .enumerate()
-            .filter(|(_, g)| g.floor.is_some() && g.done_at <= now)
-            .map(|(i, _)| i)
-            .collect();
-        if finished.is_empty() {
-            return;
-        }
+    }
+
+    /// Every guard whose sweep of a floor without the bomb has ended by
+    /// `now` marks it clear and starts the next, from the minute it finished,
+    /// until each is busy past `now` or out of floors. One walk of the rooms.
+    fn move_finished_guards(&mut self, now: f64) {
         let spans = self.floor_spans();
-        for i in finished {
+        loop {
+            let Some(b) = self.events.bomb.as_ref() else {
+                return;
+            };
+            let bomb_floor = b.floor;
+            let Some(i) = b
+                .guards
+                .iter()
+                .position(|g| g.floor.is_some_and(|f| f != bomb_floor) && g.done_at <= now)
+            else {
+                break;
+            };
             let Some(b) = self.events.bomb.as_mut() else {
                 return;
             };
             let done = b.guards[i].clone();
-            if let Some(f) = done.floor {
-                b.searched.push(f);
-            }
+            let from = done.floor.unwrap_or(bomb_floor);
+            b.searched.push(from);
             b.guards[i].floor = None;
-            let from = done.floor.unwrap_or(b.floor);
             let next = self.next_floor_to_sweep(from, &[], &spans);
             if let Some(b) = self.events.bomb.as_mut() {
                 b.guards[i] = sweep(next, from, done.done_at);
