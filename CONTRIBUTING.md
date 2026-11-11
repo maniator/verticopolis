@@ -214,7 +214,8 @@ Verticopolis has **two test tiers**:
     that start the Rust engine themselves (conformance, the goldens' Rust
     legs, the telemetry and log-text comparisons, perf comparison) with the
     engine package required. CI runs it
-    once per PR on the required `test-wasm-parity (integrationWasm)` leg; the
+    once per PR in three shards, reported as the required
+    `test-wasm-parity (integrationWasm)` check; the
     `test-wasm-parity (unitWasm)` leg runs the unit tests with the package
     required, so the package's own tests run instead of skipping. Until
     #1421 those legs also ran every suite with each `Simulation` hosted on
