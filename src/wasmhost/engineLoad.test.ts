@@ -73,7 +73,7 @@ describe("compileEngineBinary", () => {
 });
 
 // Like the other package tests, it runs where the engine package is built (a
-// local build, `test-wasm-parity (unitWasm)`) and skips in the plain unit job.
+// local build, `test-engine (unit)`) and skips in the plain unit job.
 // Where the package is required (`VC_REQUIRE_WASM=1`) a missing one is a failure.
 const PACKAGE_BUILD = resolve(__dirname, "../public/engine/BUILD.json");
 if (wasmRequired() && !existsSync(PACKAGE_BUILD)) throw new Error("VC_REQUIRE_WASM=1 but src/public/engine/ is not built; run npm run wasm:build");

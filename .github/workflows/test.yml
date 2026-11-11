@@ -39,7 +39,7 @@ jobs:
   #   full:  everything (any shared, UI or tooling path).
   #   rust:  only engine-rs/ sources and prose. The Rust engine workflow tests
   #          the crate, and the browser, parity and integration checks still
-  #          run here; the plain unit run (the unitWasm leg repeats it with the
+  #          run here; the plain unit run (the unit leg repeats it with the
   #          engine package), lint, typecheck and the build are skipped.
   #   prose: docs, planning files and .changes notes only. The guard tests
   #          and the build still run, without coverage, lint or typecheck.
@@ -216,18 +216,18 @@ jobs:
         run: npm run typecheck
 
       # Two long port-kit suites are excluded here and run without coverage on
-      # the unitWasm leg below, in parallel with this one: condoRelocationEngine
-      # (30 years of hourly ticks, about 60 s locally, 390 s under coverage
+      # the unit leg of test-engine below, in parallel with this one:
+      # condoRelocationEngine (30 years of hourly ticks, about 60 s locally, 390 s under coverage
       # against its 300 s limit) and roomCountsEngine (a check after every step
       # on three conformance towers, 225 s under coverage against 300 s). The
       # engine conformance suite runs on the Rust engine (conformanceWasm, in
-      # test:wasm:host on the integrationWasm shards).
+      # test:wasm:host on the test-engine (host) shards).
       - name: Run tests
         if: ${{ needs.changes.outputs.tests != 'false' && needs.changes.outputs.lane != 'rust' && needs.changes.outputs.lane != 'prose' }}
         run: npm run test:coverage -- --run --exclude '**/condoRelocationEngine.integration.test.ts' --exclude '**/roomCountsEngine.integration.test.ts'
 
       # A Rust-only change (src/build/prLane.ts): no TypeScript changed, so
-      # coverage cannot move, and the unitWasm leg runs the unit project with
+      # coverage cannot move, and the unit leg runs the unit project with
       # the engine package. The integration project still runs here, minus the
       # two suites that leg runs.
       - name: Integration tests (Rust-only change, no coverage)
@@ -241,8 +241,8 @@ jobs:
         if: ${{ needs.changes.outputs.tests != 'false' && needs.changes.outputs.lane == 'prose' }}
         run: npx vitest run --project unit
 
-      # The two excluded suites run without coverage on the unitWasm leg of
-      # test-wasm-parity, beside this job instead of after it.
+      # The two excluded suites run without coverage on the unit leg of
+      # test-engine, beside this job instead of after it.
 
       # This job only proves the bundle builds, with no engine package (the e2e
       # job below builds with one), so it opts out of the engine requirement
@@ -270,14 +270,12 @@ jobs:
 
   # The suites that need the Rust/WASM engine package, with the package
   # required (VC_REQUIRE_WASM=1), so a missing one fails instead of skipping.
-  # Until #1421 these legs ran the unit and integration suites again with
-  # every Simulation hosted on the engine (the unitWasm and integrationWasm
-  # Vitest projects); the legs keep those names because the two checks are
-  # required for merging. The unitWasm leg runs the unit tests, which include
-  # the engine package's own (they skip in the plain unit job); the
-  # integrationWasm check runs the host suites (the integration-wasm job
-  # below, in three shards), and the portKit leg runs the port-kit suites.
-  test-wasm-parity:
+  # The unit leg runs the unit tests, which include the engine package's own
+  # (they skip in the plain unit job); the port-kit leg runs the port-kit
+  # suites, and the host suites run in the engine-host job below, in three
+  # shards.
+  test-engine:
+    name: test-engine (${{ matrix.leg }})
     # The legs restore the engine package from the Actions cache themselves
     # (and build it on a miss, which fails the leg if the build fails), so
     # they start beside the engine-wasm job instead of waiting about a minute
@@ -293,7 +291,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        project: [unitWasm, portKit]
+        leg: [unit, port-kit]
     steps:
       - name: No code changed, nothing to run
         if: ${{ needs.changes.outputs.code == 'false' }}
@@ -319,33 +317,33 @@ jobs:
         if: ${{ needs.changes.outputs.code != 'false' }}
 
       - name: Unit tests with the engine package required
-        if: ${{ needs.changes.outputs.code != 'false' && matrix.project == 'unitWasm' }}
+        if: ${{ needs.changes.outputs.code != 'false' && matrix.leg == 'unit' }}
         env:
           VC_REQUIRE_WASM: "1"
           VC_LOG_TEST_STARTS: "1"
         run: npx vitest run --project unit
 
-      # The port-kit suites run on their own portKit leg, and the two long ones
-      # the test job leaves out run on the unitWasm leg, without coverage,
+      # The port-kit suites run on their own port-kit leg, and the two long
+      # ones the test job leaves out run on the unit leg, without coverage,
       # after the unit tests, so the legs finish at about the same time.
       - name: Port-kit suites
-        if: ${{ needs.changes.outputs.code != 'false' && matrix.project == 'portKit' }}
+        if: ${{ needs.changes.outputs.code != 'false' && matrix.leg == 'port-kit' }}
         run: npm run test:port
 
       - name: Long port-kit suites (no coverage)
-        if: ${{ !cancelled() && needs.changes.outputs.code != 'false' && needs.changes.outputs.tests != 'false' && matrix.project == 'unitWasm' }}
+        if: ${{ !cancelled() && needs.changes.outputs.code != 'false' && needs.changes.outputs.tests != 'false' && matrix.leg == 'unit' }}
         run: npm exec --no -- vitest run --project integration condoRelocationEngine roomCountsEngine
 
   # The suites that start the Rust engine themselves (conformance, the
   # goldens, perf comparison), run once per PR; the Rust workflow does not
-  # repeat this test:wasm script, and its test:port half runs on the portKit
-  # leg. Vitest splits the files across three shards, so a slow runner no
-  # longer pushes the whole set past its timeout, and the
-  # integration-wasm-result job reports them as the one required
-  # test-wasm-parity (integrationWasm) check. Like the parity legs, the
-  # shards always run and skip their steps on a prose-only change.
-  integration-wasm:
-    name: test-wasm-parity (integrationWasm, shard ${{ matrix.shard }} of 3)
+  # repeat this test:wasm script, and its test:port half runs on the
+  # port-kit leg. Vitest splits the files across three shards, so a slow
+  # runner no longer pushes the whole set past its timeout, and the
+  # engine-host-result job reports them as the one required
+  # test-engine (host) check. Like the other legs, the shards always run
+  # and skip their steps on a prose-only change.
+  engine-host:
+    name: test-engine (host, shard ${{ matrix.shard }} of 3)
     needs: changes
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
@@ -387,18 +385,18 @@ jobs:
           VC_LOG_TEST_STARTS: "1"
         run: npm run test:wasm:host -- --shard=${{ matrix.shard }}/3
 
-  integration-wasm-result:
-    name: test-wasm-parity (integrationWasm)
-    needs: integration-wasm
+  engine-host-result:
+    name: test-engine (host)
+    needs: engine-host
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - name: Every shard passed
         env:
-          SHARDS: ${{ needs.integration-wasm.result }}
+          SHARDS: ${{ needs.engine-host.result }}
         run: |
-          echo "integrationWasm shards: $SHARDS"
+          echo "host suite shards: $SHARDS"
           test "$SHARDS" = success
 
   # Resolve the Playwright container tag from the repo's own Playwright version so
