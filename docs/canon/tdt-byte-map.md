@@ -124,7 +124,7 @@ Each floor: 6-byte header, `n` unit records of 18 bytes, a 188-byte remap.
 | 2 | u16 | left | Smallest `left` of the floor's units | Known |
 | 4 | u16 | right | Largest `right` of the floor's units | Known |
 | 6 | 18 n | units | Unit records, ascending `left` | Known |
-| 6 + 18 n | 188 | remap | 94 x u16: logical unit id to list index | Known |
+| 6 + 18 n | 188 | remap | 94 x u16: logical unit id to list index. Our exporter writes logical id n for the floor's nth record and 0 past them (the game assigns ids in build order; unused entries are 0) | Known |
 
 `left` and `right` match the units on every floor of every save. The remap maps
 the id that people records and retail rows use ("logical id") to the unit's
@@ -403,7 +403,7 @@ gaps (the sizes add up to 17,242).
 | 4,012 | 3,072 | 512 parking stall records of 6 bytes: floor index, ordinal, value; count equals the stall count; empty `FF 00 00 00 00 00` | Inferred |
 | 7,084 | 96 | 16 lobby records of 6 bytes: pad, 3-byte elevator bitmask, floor, pad; empty `00 00 00 00 FF 00`; seven lobbies in the nine saves (floor indexes 10, 24, 39, 54, 69, 84, 99) | Inferred |
 | 7,180 | 40 | Ten clinic records of 4 bytes: floor, extra; empty `FF FF 00 00` | Inferred |
-| 7,220 | 192 | 16 housekeeping records of 12 bytes; empty `FE FE ...` | Inferred |
+| 7,220 | 192 | The party hall and theatre table: 16 records of 12 bytes, one per hall or theatre. Bytes 0 and 1 the floor indexes of its upper and lower half, 2 and 3 its logical unit id on each, 4 and 5 the audience left per half (reset each night: a theatre 20 per half for each step of its draw plus 20, a hall 0 and 50), 7 the film number (`FF` for a hall), 9 the mornings the film has shown (a hall: days since it opened), 10 and 11 a counter that runs during the day. Empty `FE FE` then zeros (`tdt-format.md` section 14) | Known for bytes 0 to 3, 7 and 9 |
 | 7,412 | 120 | Unknown band | Unknown |
 | 7,532 | 4,354 | Seven records of 622 bytes: u16 count then u16 lists | Unknown |
 | 11,886 | 2,114 | Seven records of 302 bytes: same shape | Unknown |

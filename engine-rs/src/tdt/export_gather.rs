@@ -46,8 +46,10 @@ use super::tables::{
     is_priced, rent_from_class, HOTEL_ASLEEP_FLAG, HOTEL_DIRTY_FLAG, HOTEL_OCCUPANT_MASK,
     HOTEL_STAY_VACANT,
 };
+use super::venues::OutVenueHalf;
 use super::LegacyExportError;
 use crate::econ::rent_config;
+use crate::economy::visitors::film_draw;
 use crate::facilities::{is_lobby_floor, Kind, LOT_WIDTH};
 
 mod gathered;
@@ -277,6 +279,8 @@ pub fn gather_units<U: Borrow<Value>>(
                             status: 0,
                             rent_class,
                             subtype_idx: None,
+                            draw: 0,
+                            venue: None,
                         },
                     );
                 }
@@ -292,6 +296,8 @@ pub fn gather_units<U: Borrow<Value>>(
                             status: 0,
                             rent_class,
                             subtype_idx: None,
+                            draw: exported_film_draw(u.kind, u.film_days.unwrap_or(0)),
+                            venue: venue_half(u, idx, i == 1, construction),
                         },
                     );
                 }
@@ -321,6 +327,8 @@ pub fn gather_units<U: Borrow<Value>>(
                 status,
                 rent_class,
                 subtype_idx: if sub_idx >= 0 { Some(sub_idx) } else { None },
+                draw: 0,
+                venue: None,
             },
         );
         if matches!(u.kind, Kind::Shop | Kind::FastFood | Kind::Restaurant) {
@@ -390,6 +398,8 @@ pub fn gather_units<U: Borrow<Value>>(
                     status: if lobby { 0 } else { 2 },
                     rent_class: 4,
                     subtype_idx: None,
+                    draw: 0,
+                    venue: None,
                 },
             );
             *run_start = None;
@@ -419,3 +429,33 @@ pub fn gather_units<U: Borrow<Value>>(
 
 #[cfg(test)]
 mod tests;
+
+/// The venue table's half for a finished hall, or a finished theatre whose
+/// film has an age (#1932); `None` for every other record.
+fn venue_half(
+    u: &GatheredRoom,
+    room: usize,
+    upper: bool,
+    construction: bool,
+) -> Option<OutVenueHalf> {
+    let film_days = match u.kind {
+        Kind::Cinema => Some(u.film_days?),
+        Kind::PartyHall => None,
+        _ => return None,
+    };
+    (!construction).then_some(OutVenueHalf {
+        room,
+        upper,
+        film_days,
+    })
+}
+
+/// The draw byte a theatre writes (#1932): the draw its film had last night,
+/// the age before this morning's step (a theatre that has not seen a morning
+/// shows a new film's draw). Every other room writes 0.
+fn exported_film_draw(kind: Kind, film_days: i64) -> i64 {
+    if kind != Kind::Cinema {
+        return 0;
+    }
+    film_draw((film_days - 1).max(0))
+}

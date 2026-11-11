@@ -77,6 +77,17 @@ pub(super) fn coerce_dirty_days(state: UnitState, kind: Kind, raw: Option<&Value
     Some(n.min(crate::housekeeping::INFEST_DAYS - 1))
 }
 
+/// A theatre's film age (#1932): a whole number of days, held to a byte as
+/// the original keeps it. Any other kind, or a value that is not a finite
+/// number, carries none.
+pub(super) fn film_days(kind: Kind, raw: Option<&Value>) -> Option<u8> {
+    if kind != Kind::Cinema {
+        return None;
+    }
+    let days = raw?.as_f64().filter(|x| x.is_finite())?;
+    Some(days.floor().clamp(0.0, f64::from(u8::MAX)) as u8)
+}
+
 pub(super) fn parse_state(v: Option<&Value>) -> Option<UnitState> {
     UnitState::from_name(v?.as_str()?)
 }

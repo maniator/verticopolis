@@ -114,7 +114,13 @@ fn read_stairs(bytes: &[u8], base: usize) -> Vec<TdtStair> {
 
 /// The flights found by [`find_stairs_table`], or none.
 pub fn locate_stairs(bytes: &[u8], from: usize) -> Vec<TdtStair> {
-    find_stairs_table(bytes, from).map_or_else(Vec::new, |base| read_stairs(bytes, base))
+    locate_stairs_at(bytes, from).map_or_else(Vec::new, |(_, stairs)| stairs)
+}
+
+/// Where the signature scan from `from` finds the stairs table, and its
+/// flights.
+pub fn locate_stairs_at(bytes: &[u8], from: usize) -> Option<(usize, Vec<TdtStair>)> {
+    find_stairs_table(bytes, from).map(|base| (base, read_stairs(bytes, base)))
 }
 
 /// The flights of a complete stairs table that starts exactly at `at`, or

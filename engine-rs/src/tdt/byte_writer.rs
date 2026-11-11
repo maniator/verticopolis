@@ -52,6 +52,11 @@ impl ByteWriter {
         self.chunks.resize(self.chunks.len() + n, 0xff);
     }
 
+    /// `bytes` as they are.
+    pub fn bytes(&mut self, bytes: &[u8]) {
+        self.chunks.extend_from_slice(bytes);
+    }
+
     /// Back-patch a little-endian u16 at an absolute offset already written.
     pub fn set_u16(&mut self, off: usize, v: i64) {
         assert!(

@@ -1,6 +1,6 @@
 //! The daily rollover's set audiences (#1500): a party hall counts 50 and a
 //! new theatre 120 from the first night it is open, a room still being built
-//! counts nothing, and a theatre keeps the draw it loaded with.
+//! counts nothing, and a theatre's count falls as its film ages (#1932).
 
 use crate::clock::GameMode;
 use crate::facilities::Kind;
@@ -66,12 +66,31 @@ fn an_open_hall_and_theatre_count_their_audience_after_their_first_night() {
 }
 
 #[test]
-fn a_theatre_keeps_the_draw_it_loaded_with() {
+fn a_theatre_counts_120_for_six_mornings_then_80_for_three_then_40() {
+    let (mut sim, [hall, theatre, _]) = venues();
+    let mut counts = vec![];
+    for _ in 0..12 {
+        sim.roll_over_retail_day();
+        counts.push(count(&sim, theatre).unwrap());
+    }
+    assert_eq!(
+        counts,
+        [120, 120, 120, 120, 120, 120, 80, 80, 80, 40, 40, 40]
+    );
+    let film_days = sim.tower.get_unit(theatre).unwrap().extras().film_days;
+    assert_eq!(film_days, Some(12));
+    assert_eq!(count(&sim, hall), Some(50), "a hall's count does not age");
+}
+
+#[test]
+fn a_theatre_counts_the_draw_of_the_film_age_it_loaded_with() {
     let (mut sim, [_, theatre, _]) = venues();
-    let (u, at) = sim.tower.marked_by_id(theatre).unwrap();
-    u.set_visitors_yest(at, Some(80));
+    let (u, _) = sim.tower.marked_by_id(theatre).unwrap();
+    u.extras_mut().film_days = Some(7);
     sim.roll_over_retail_day();
     assert_eq!(count(&sim, theatre), Some(80));
+    let film_days = sim.tower.get_unit(theatre).unwrap().extras().film_days;
+    assert_eq!(film_days, Some(8));
 }
 
 #[test]

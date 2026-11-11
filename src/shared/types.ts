@@ -273,6 +273,9 @@ export interface Unit {
   /** Per-cinema film-booking policy. `undefined` ⇒ "auto" (the legacy 40% roll),
    *  so old saves and demo towers behave identically. */
   filmPolicy?: "auto" | "feature" | "blockbuster";
+  /** A theatre's film age: the mornings its film has shown (#1932). Its
+   *  draw falls as it ages; `undefined` is a new film. */
+  filmDays?: number;
   /** Canon retail variant name for shop / fastFood / restaurant only (per
    *  `docs/canon/tdt-format.md` §7 lists). `undefined` on every other kind,
    *  and on legacy retail units from saves that predate this field, so they

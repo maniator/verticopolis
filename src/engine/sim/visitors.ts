@@ -30,6 +30,20 @@ export const PARTY_HALL_AUDIENCE = 50;
 export const THEATRE_AUDIENCE_PER_DRAW = 40;
 export const NEW_FILM_DRAW = 2;
 
+/** A new film keeps its draw for six mornings, fades to 1 for three, then is
+ *  spent at 0 (#1932). */
+export const NEW_FILM_FULL_DRAW_DAYS = 6;
+export const FILM_SPENT_DAYS = 9;
+export const FADING_FILM_DRAW = 1;
+export const SPENT_FILM_DRAW = 0;
+
+/** The draw of a film that has shown `daysShown` mornings (#1932). */
+export function filmDraw(daysShown: number): number {
+  if (daysShown < NEW_FILM_FULL_DRAW_DAYS) return NEW_FILM_DRAW;
+  if (daysShown < FILM_SPENT_DAYS) return FADING_FILM_DRAW;
+  return SPENT_FILM_DRAW;
+}
+
 /** Whether `kind`'s census is a set audience (party halls and theatres). */
 export function countsSetAudience(kind: FacilityKind): boolean {
   return kind === "partyHall" || kind === "cinema";

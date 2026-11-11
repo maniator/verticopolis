@@ -118,6 +118,8 @@ export function coerceUnitRecord(sim: Simulation, u: SerializedGame["units"][num
       u.filmPolicy === "feature" || u.filmPolicy === "blockbuster" || u.filmPolicy === "auto"
         ? u.filmPolicy
         : undefined,
+    // A theatre's film age (#1932), a whole number of mornings held to a byte.
+    filmDays: u.kind !== "cinema" || typeof u.filmDays !== "number" || !Number.isFinite(u.filmDays) ? undefined : Math.min(255, Math.max(0, Math.floor(u.filmDays))),
     // Whitelist-coerce the canon retail variant name against the kind's
     // §7 list, so a scrambled save or a subtype from a kind that doesn't
     // carry one drops to undefined (unit renders as the generic name).

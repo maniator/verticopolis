@@ -5,13 +5,14 @@
 use serde_json::Value;
 
 use super::byte_writer::{to_int32, ByteWriter};
-use super::export_gather::{js_finite, js_max, js_min, js_num, FloorKey, GatheredTower};
+use super::export_gather::{js_finite, js_max, js_min, js_num, js_truthy, FloorKey, GatheredTower};
 use super::export_parking::connected_stall_count;
 use super::export_tables::OutTenant;
 use super::format::*;
 use super::pacing::frame_for_minute_of_day;
 use super::stamp::write_format_stamp;
 use super::tables::elevator_type;
+use super::venues::{index_map, write_routing_tail, PlacedHalf};
 use super::LegacyExportError;
 use crate::facilities::{Kind, LOT_WIDTH, MAX_FLOOR, MIN_FLOOR};
 use crate::jsmath::round;
@@ -146,7 +147,7 @@ pub fn encode_tower(
     // `viewWordsFromView` keeps the default words unless both members are
     // finite numbers (`Number.isFinite`, no coercion).
     let view_words = match save.get("view") {
-        Some(view) if js_truthy_value(view) => {
+        Some(view) if js_truthy(Some(view)) => {
             match (js_finite(view.get("tile")), js_finite(view.get("floor"))) {
                 (Some(tile), Some(floor)) => view_words_from_view(tile, floor),
                 _ => (TDT_DEFAULT_VIEW_X, TDT_DEFAULT_VIEW_Y),
@@ -158,6 +159,7 @@ pub fn encode_tower(
     w.set_u16(0x28, view_words.1);
 
     let empty: Vec<OutTenant> = vec![];
+    let mut venue_halves: Vec<PlacedHalf> = vec![];
     for index in 0..TDT_FLOOR_COUNT {
         let ours = index - TDT_FLOOR_OFFSET;
         let tenants = tenants_by_tdt
@@ -179,18 +181,22 @@ pub fn encode_tower(
                 .partial_cmp(&clamp_tile(Some(b.left)))
                 .unwrap_or(std::cmp::Ordering::Equal)
         });
-        for t in ordered {
+        for (slot, t) in ordered.into_iter().enumerate() {
+            if let Some(half) = t.venue {
+                venue_halves.push((half, index as usize, slot));
+            }
             let left = clamp_tile(Some(t.left));
             w.u16(to_int32(left));
             w.u16(to_int32(left.max(clamp_tile(Some(t.right)))));
             w.u8(t.type_id);
             w.u8(t.status);
             w.u8(t.subtype_idx.unwrap_or(0));
-            w.pad(9);
+            w.pad(8);
+            w.u8(t.draw);
             w.u8(t.rent_class);
             w.u8(0);
         }
-        w.pad(TDT_FLOOR_INDEX_ENTRIES * 2);
+        w.bytes(&index_map(tenants.len()));
     }
 
     let finite_pop = if people_pop.is_finite() {
@@ -467,7 +473,7 @@ pub fn encode_tower(
         w.u16(0);
     }
 
-    w.pad_ff(TDT_ROUTING_TAIL_SIZE);
+    w.bytes(&write_routing_tail(&venue_halves));
     write_format_stamp(&mut w);
 
     let express_len = elevators
@@ -489,8 +495,4 @@ pub fn encode_tower(
             walkways_len: walkways.len() as i64,
         },
     })
-}
-
-fn js_truthy_value(v: &Value) -> bool {
-    super::export_gather::js_truthy(Some(v))
 }

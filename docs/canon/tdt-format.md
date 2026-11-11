@@ -378,6 +378,16 @@ theatres fell from draw 2 to 1 on day 18 and its line went from 480 to 320 that
 morning. Every Reddit save fits this, TOWER4's mix of draws included (2 x 120 +
 2 x 80 = 400). A hall or theatre built that day counts nothing yet (TOWER3).
 
+The draw falls as the film ages (#1932). Byte 9 of the theatre's record in the
+party hall and theatre table (section 14) counts the mornings its film has
+shown; it goes up at the morning rollover. Each night the game sets the draw
+from it: 2 while the count is under 6, 1 from 6 to 8, and 0 from 9 on. So a new
+film counts 120 for six mornings, 80 for three, then 40 until the film is
+changed. A tower played on from TOWER7 (its theatres at day 5) fell to 80 per
+theatre on the expected morning and to 40 three mornings later, and a second
+run that showed new films reset the count to 0 and the draw to 2. How a classic
+film (the cheaper one) ages is not yet observed.
+
 The 12 undecoded flag bytes and the 42 undecoded bytes after the finance block
 are written as zeros.
 
@@ -412,6 +422,17 @@ instead, which loads at every star level tried; zeros read as live routing data
 and invent a phantom population. Matching the exact 17,242 bytes needs a
 5-star-and-up load check first. The extent the game reads depends on the file's
 own content.
+
+One table in the tail is decoded: the party hall and theatre table at 7,220
+bytes past the stairs table, one 12-byte record per hall or theatre (fields in
+the byte map). The importer reads it when every filled record names two
+neighboring floors and valid unit ids, and gives each theatre its film's age
+from byte 9; otherwise it leaves the table out. Our exporter writes the table
+inside its 0xFF tail: a record for each finished hall, and for each finished
+theatre whose film has an age, with the logical ids its index map gives, the
+audience bytes as the game resets them at night, film 7 for a theatre (the
+engine does not keep which film it shows) and 0 days for a hall. The original's
+reading of our records has not been checked on a PC yet.
 
 ## 15. Named tenants and people
 
@@ -456,8 +477,10 @@ serviced-only.
   finance line. A save taken after a film's draw fell but before the morning
   census does not add up; when the line splits evenly into an audience each
   room could count, every room takes that share. Otherwise the class seeds
-  nothing, and each room counts from its first morning in the engine. The
-  engine has no film age, so a theatre keeps the count it opened or loaded with.
+  nothing, and each room counts from its first morning in the engine. Each
+  theatre takes its film's age from the party hall and theatre table
+  (section 14), so its count falls on the original's schedule; a file without
+  the table starts every film new.
 - **Widths.** A room arrives at the width its record gives. New builds of
   security, medical, housekeeping, recycling and the metro use the sizes in
   section 6.1, so a rebuilt room matches the original. The engine puts nothing
@@ -477,9 +500,12 @@ point after the first import. Known canonical forms:
 - Yesterday's venue visitors are not exported: our rows carry the floor alone,
   so a shop, fast food or restaurant reimports with a census of 0 until its
   first day passes.
-- A theatre's film draw is not exported: byte 15 is written 0. Its count still
-  reaches the finance line, so it reimports at that count (an even share), but
-  the original reads draw 0 and counts the theatre at 40 from its next morning.
+- A theatre's film draw and age are exported (#1932): byte 15 holds the draw
+  its film had last night and the party hall and theatre table holds the age,
+  so it reimports with the same age. The film itself comes back as film 7. A
+  theatre that has not seen a morning in the engine writes no record and
+  reimports with a new film, as it would have shown anyway. Exports before
+  #1932 wrote byte 15 as 0, an all-zero index map and no table.
 - A room the file's flags mark occupied but whose people the finance lines do not
   count comes back vacant and never lived in.
 - An infested hotel room is written as a dirty room (`0x20`) and comes back

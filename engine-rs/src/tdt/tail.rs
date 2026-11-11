@@ -6,7 +6,9 @@
 use super::byte_reader::ByteReader;
 use super::format::*;
 use super::resync::{empty_slots_in_gap, find_next_header, MAX_BUILT_PAYLOAD, MIN_BUILT_PAYLOAD};
-pub use super::stair_scan::{locate_stairs, stairs_in_table_at, stairs_table_starts_at};
+pub use super::stair_scan::{
+    locate_stairs, locate_stairs_at, stairs_in_table_at, stairs_table_starts_at,
+};
 use super::stamp::stamped_generation;
 use super::types::{TdtElevator, TdtRetailRow, TdtStair, TdtTail};
 
@@ -390,12 +392,11 @@ pub fn walk_tolerant_tail(r: &mut ByteReader) -> TdtTail {
 
     r.enter_block("stairs table");
     let generation = stamped_generation(raw);
-    tail.stairs = Some(locate_stairs_table(
-        raw,
-        blocks_at,
-        stairs_search_from,
-        generation,
-    ));
+    let (stairs_at, stairs) = locate_stairs_table(raw, blocks_at, stairs_search_from, generation);
+    tail.stairs = Some(stairs);
+    if let Some(at) = stairs_at {
+        tail.venues = super::venues::read_venue_table(raw, at);
+    }
 
     r.enter_block("parking block");
     // Our exports before generation 3 keep the parking count right after a
@@ -457,7 +458,7 @@ fn clinic_list_matches_header(raw: &[u8], table: usize) -> bool {
         && (0..TDT_CLINIC_MAX).all(|i| word(list + 2 + 2 * i) < CLINIC_ID_BOUND)
 }
 
-/// The stairs table. A file of ours from generation 3 on, or one whose clinic
+/// The stairs table and where it starts. A file of ours from generation 3 on, or one whose clinic
 /// list matches its header, keeps the table where the game does, and a table
 /// that fits there is taken as it stands. Anything else is found by the
 /// signature scan, which also reads the tables our older exports wrote 160
@@ -468,14 +469,14 @@ fn locate_stairs_table(
     blocks_at: usize,
     scan_from: usize,
     generation: Option<i64>,
-) -> Vec<TdtStair> {
+) -> (Option<usize>, Vec<TdtStair>) {
     let game = blocks_at + TDT_ELEVATORS_TO_STAIRS;
     let at_game_offset =
         generation == Some(TDT_STAMP_GENERATION) || clinic_list_matches_header(raw, game);
     if at_game_offset {
         if let Some(stairs) = stairs_in_table_at(raw, game) {
-            return stairs;
+            return (Some(game), stairs);
         }
     }
-    locate_stairs(raw, scan_from)
+    locate_stairs_at(raw, scan_from).map_or((None, vec![]), |(at, stairs)| (Some(at), stairs))
 }

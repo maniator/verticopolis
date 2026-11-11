@@ -16,9 +16,14 @@
 //! original wrote over a week of play show a party hall counting 50 from the
 //! morning after it opens, every day, whether or not a party was held, and a
 //! theatre counting 40 for each step of its film's draw: 120 for a new film
-//! (draw 2), then 80 as the film ages (draw 1). Byte 15 of a theatre's TDT
-//! record holds that draw. The engine books films by policy and has no film
-//! age, so a theatre keeps the count it opened or loaded with.
+//! (draw 2), then 80 and 40 as the film ages (draws 1 and 0). Byte 15 of a
+//! theatre's TDT record holds that draw.
+//!
+//! A theatre's film ages one day each morning, and its draw follows the age
+//! (#1932): a run of the original that showed a film from the day it was set
+//! until it drew nothing, then changed it, shows the draw at 2 for the film's
+//! first 6 days, at 1 for the next 3, and at 0 from its tenth day on. The
+//! census the next morning counts that draw (`film_draw`).
 
 use crate::facilities::Kind;
 use crate::rng::Rng;
@@ -54,6 +59,27 @@ pub const PARTY_HALL_AUDIENCE: i64 = 50;
 pub const THEATRE_AUDIENCE_PER_DRAW: i64 = 40;
 /// The draw of a new film, the strongest the original saves show.
 pub const NEW_FILM_DRAW: i64 = 2;
+
+/// The days a new film keeps the draw of a new film.
+pub const NEW_FILM_FULL_DRAW_DAYS: i64 = 6;
+/// The age in days from which a film draws nothing more than a theatre's
+/// least audience (draw 0).
+pub const FILM_SPENT_DAYS: i64 = 9;
+/// The draw of a film past its full draw and not yet spent.
+pub const FADING_FILM_DRAW: i64 = 1;
+/// The draw of a spent film.
+pub const SPENT_FILM_DRAW: i64 = 0;
+
+/// The draw of a film that has shown for `days_shown` days.
+pub fn film_draw(days_shown: i64) -> i64 {
+    if days_shown < NEW_FILM_FULL_DRAW_DAYS {
+        NEW_FILM_DRAW
+    } else if days_shown < FILM_SPENT_DAYS {
+        FADING_FILM_DRAW
+    } else {
+        SPENT_FILM_DRAW
+    }
+}
 
 /// Whether `kind`'s census is a set audience (party halls and theatres).
 pub fn counts_set_audience(kind: Kind) -> bool {
@@ -172,6 +198,13 @@ mod tests {
             }
         }
         assert_eq!(seen, [false, true, true, true], "every step size comes up");
+    }
+
+    #[test]
+    fn a_film_draws_two_for_six_days_one_for_three_then_nothing() {
+        let draws: Vec<i64> = (0..12).map(film_draw).collect();
+        assert_eq!(draws, [2, 2, 2, 2, 2, 2, 1, 1, 1, 0, 0, 0]);
+        assert_eq!(film_draw(255), SPENT_FILM_DRAW);
     }
 
     #[test]

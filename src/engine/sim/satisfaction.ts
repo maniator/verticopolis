@@ -12,7 +12,7 @@ import { isDormant, isOperational, VACATE_REASON_TEXT } from "../types";
 import { VACATE_NOTICE_MINUTES, VACATE_RESCIND, NOISE_CAP, OFFICE_NOISE_TILES, HOTEL_NOISE_TILES } from "./constants";
 import { buildSatisfactionContext, satisfactionStep } from "./satisfactionStep";
 import { markRoom, roomUnits, setRoomState } from "../tower/rooms";
-import { climbSteps, countsSetAudience, expectedVisitors, NEW_FILM_DRAW, servedVisitors, setAudience } from "./visitors";
+import { climbSteps, countsSetAudience, expectedVisitors, filmDraw, NEW_FILM_DRAW, servedVisitors, setAudience } from "./visitors";
 
 /** Satisfaction, noise notices, and the amenity halos for the Simulation, as
  * friend functions taking the instance. Extracted from `Simulation.ts`; the
@@ -248,9 +248,17 @@ export function rollOverRetailDay(sim: Simulation): void {
   const endedWeekend = sim.clock.isWeekendOn(endedDay);
   for (const u of roomUnits(sim.tower)) {
     if (!isOperational(u)) continue;
+    if (u.kind === "cinema") {
+      // A theatre counts the draw its film had overnight, and the film is a
+      // day older (#1932).
+      const daysShown = u.filmDays ?? 0;
+      u.visitorsYest = setAudience(u.kind, filmDraw(daysShown)) ?? 0;
+      u.filmDays = Math.min(255, daysShown + 1);
+      markRoom(sim.tower, u);
+      continue;
+    }
     if (countsSetAudience(u.kind)) {
-      // A hall or theatre counts its audience from the morning after it opens,
-      // and a theatre keeps the draw it has (#1500).
+      // A hall counts its audience from the morning after it opens (#1500).
       if (u.visitorsYest === undefined) {
         u.visitorsYest = setAudience(u.kind, NEW_FILM_DRAW) ?? 0;
         markRoom(sim.tower, u);

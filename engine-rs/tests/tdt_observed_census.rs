@@ -3,7 +3,8 @@
 //! built fresh. A loaded shop, fast food or restaurant counts the visitors its
 //! retail row says it served yesterday, so each class adds up to the file's
 //! finance block. Party halls and theatres count a set audience, 50 for a
-//! hall and 40 per step of a theatre's film draw (byte 15 of its record).
+//! hall and 40 per step of a theatre's film draw (byte 15 of its record),
+//! and a theatre's draw falls as its film ages (#1932).
 //! See `conformance/fixtures/tdt-observed/README.md`.
 
 use std::path::PathBuf;
@@ -112,7 +113,27 @@ fn a_loaded_hall_and_theatre_census_matches_the_file() {
 }
 
 #[test]
-fn a_played_hall_and_theatre_keep_their_audience() {
+fn a_loaded_theatre_keeps_the_age_of_its_film() {
+    // The venue table's days-shown byte: T7O01's films are five days old,
+    // T7O76's nine (the day their draw fell to 0).
+    for (name, days) in [("T7O01.TDT", 5), ("T7O76.TDT", 9)] {
+        let parsed = parse_tdt(&fixture(name), name).expect("imports");
+        let sim = deserialize_tdt(&parsed.save).expect("loads");
+        let ages: Vec<_> = sim
+            .tower
+            .room_units()
+            .filter(|u| u.kind == Kind::Cinema)
+            .map(|u| u.extras().film_days)
+            .collect();
+        assert_eq!(ages, [Some(days); 4], "{name}");
+    }
+}
+
+#[test]
+fn a_played_hall_keeps_its_audience_and_a_theatre_loses_it_as_its_film_ages() {
+    // T7O01's five-day-old films show a sixth night at full draw, then fade:
+    // the original's own T7O04 and T7O13, played on from it, count 40 per
+    // half (80) for each theatre.
     let name = "T7O01.TDT";
     let parsed = parse_tdt(&fixture(name), name).expect("imports");
     let mut sim = deserialize_tdt(&parsed.save).expect("loads");
@@ -123,7 +144,7 @@ fn a_played_hall_and_theatre_keep_their_audience() {
     for u in sim.tower.room_units() {
         let (slot, want) = match u.kind {
             Kind::PartyHall => (0, set_audience(Kind::PartyHall, 0)),
-            Kind::Cinema => (1, set_audience(Kind::Cinema, 2)),
+            Kind::Cinema => (1, set_audience(Kind::Cinema, 1)),
             _ => continue,
         };
         seen[slot] += 1;

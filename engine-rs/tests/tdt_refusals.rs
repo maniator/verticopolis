@@ -63,15 +63,20 @@ fn a_file_cut_after_the_floor_map_keeps_its_rooms_and_rebuilds_the_transport() {
         serde_json::from_str(&import_tdt(&bytes, "X.TDT").expect("imports").0).expect("json");
     let (json, _) = import_tdt(&bytes[..100_000], "X.TDT").expect("imports without its tail");
     let cut: Value = serde_json::from_str(&json).expect("json");
-    // The cut file lost its retail table, so its venues carry no visitors
-    // (#1500); everything else about the rooms is the same.
-    let seeded = |u: &Value| u.get("visitorsYest").is_some();
-    assert!(full["units"].as_array().expect("units").iter().any(seeded));
-    assert!(!cut["units"].as_array().expect("units").iter().any(seeded));
+    // The cut file lost its retail table and its party hall and theatre
+    // table, so its venues carry no visitors (#1500) and its theatres no film
+    // age (#1932); everything else about the rooms is the same.
+    for field in ["visitorsYest", "filmDays"] {
+        let seeded = |u: &Value| u.get(field).is_some();
+        assert!(full["units"].as_array().expect("units").iter().any(seeded));
+        assert!(!cut["units"].as_array().expect("units").iter().any(seeded));
+    }
     let without_visitors = |units: &Value| -> Vec<Value> {
         let mut units = units.as_array().expect("units").clone();
         for u in &mut units {
-            u.as_object_mut().expect("object").remove("visitorsYest");
+            let u = u.as_object_mut().expect("object");
+            u.remove("visitorsYest");
+            u.remove("filmDays");
         }
         units
     };
