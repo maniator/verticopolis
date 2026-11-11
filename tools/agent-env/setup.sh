@@ -17,7 +17,7 @@
 #   - the Playwright MCP server package, so .mcp.json starts it quickly
 #
 # Usage: bash tools/agent-env/setup.sh [--claude-user]
-#   --claude-user          also register the session hook and the Playwright MCP
+#   --claude-user          also register the session hook and the MCP servers
 #                          server with Claude Code at user scope
 #                          (tools/agent-env/claude-user.mjs) and pull the
 #                          pinned image before exiting: for a cloud
@@ -173,17 +173,23 @@ if [ -z "${PW_CHROMIUM_PATH:-}" ] && [ -x /opt/pw-browsers/chromium ]; then
   env_line 'export PW_CHROMIUM_PATH=/opt/pw-browsers/chromium'
 fi
 
-# --- Playwright MCP server package ----------------------------------------------
-# Installed once into a cache folder that playwright-mcp.mjs runs from, on the
-# host or mounted into the pinned image (which then needs no network).
-MCP_PKG="$(sed -n 's/^const MCP_PACKAGE = "\(.*\)";$/\1/p' tools/agent-env/playwright-mcp.mjs)"
-MCP_DIR="$HOME/.cache/vc-agent/${MCP_PKG//[@\/]/_}"
-if [ -n "$MCP_PKG" ] && [ ! -f "$MCP_DIR/node_modules/@playwright/mcp/cli.js" ]; then
-  say "installing $MCP_PKG"
-  mkdir -p "$MCP_DIR"
-  npm install --prefix "$MCP_DIR" --no-audit --no-fund --no-save "$MCP_PKG" > "$LOG_DIR/playwright-mcp.log" 2>&1 \
-    || warn "could not install $MCP_PKG (log: $LOG_DIR/playwright-mcp.log)"
-fi
+# --- MCP server packages ---------------------------------------------------------
+# Each launcher pins its package (MCP_PACKAGE); each is installed once into a
+# cache folder the launcher runs from. The Playwright one is also mounted into
+# the pinned image, which then needs no network.
+install_mcp() { # launcher, entry file inside the package, log name
+  local pkg dir
+  pkg="$(sed -n 's/^const MCP_PACKAGE = "\(.*\)";$/\1/p' "$1")"
+  dir="$HOME/.cache/vc-agent/${pkg//[@\/]/_}"
+  if [ -n "$pkg" ] && [ ! -f "$dir/node_modules/$2" ]; then
+    say "installing $pkg"
+    mkdir -p "$dir"
+    npm install --prefix "$dir" --no-audit --no-fund --no-save "$pkg" > "$LOG_DIR/$3.log" 2>&1 \
+      || warn "could not install $pkg (log: $LOG_DIR/$3.log)"
+  fi
+}
+install_mcp tools/agent-env/playwright-mcp.mjs @playwright/mcp/cli.js playwright-mcp
+install_mcp tools/agent-env/chrome-devtools-mcp.mjs chrome-devtools-mcp/build/src/bin/chrome-devtools-mcp.js chrome-devtools-mcp
 
 # --- Claude Code at user scope (--claude-user) ----------------------------------
 if [ -n "$CLAUDE_USER" ]; then
