@@ -43,9 +43,11 @@ ChatGPT subscription. No OpenAI organization ID or other variable is required.
   fails before it posts a details block (no credits, a model error) adds no row.
 - **Spending cap per PR (owner, 2026-11-11).** The first step of the job reads that
   running total before every command. At $2.00 or more (`PR_AGENT_COST_CAP_USD`
-  in the workflow), or at 1,000,000 input tokens (`PR_AGENT_INPUT_TOKEN_CAP`,
-  a second cap for a model whose price PR-Agent does not know), the model is
-  not called, and a "PR-Agent did not run"
+  in the workflow), at 1,000,000 input tokens (`PR_AGENT_INPUT_TOKEN_CAP`,
+  for a model whose price PR-Agent does not know), or at 20 commands
+  (`PR_AGENT_RUN_CAP`, which counts commands themselves because a committable
+  `/improve` publishes inline suggestions and no run details block, so its
+  tokens and dollars never reach the ledger), the model is not called, and a "PR-Agent did not run"
   comment says so. To allow more runs, add the `pr-agent-override` label to the
   PR (it needs write access) and comment the command again; removing the label
   restores the cap. The check runs before the call, so the last run can

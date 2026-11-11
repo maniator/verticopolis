@@ -51,6 +51,10 @@ jobs:
       # Second cap that does not depend on PR-Agent knowing the model's price:
       # an unpriced model can print a $0.00 estimate for a real bill.
       PR_AGENT_INPUT_TOKEN_CAP: '1000000'
+      # Third cap that counts commands, not what PR-Agent prints: a committable
+      # /improve publishes inline suggestions and no run details block, so its
+      # spending is invisible to the other two caps.
+      PR_AGENT_RUN_CAP: '20'
       PR_AGENT_OVERRIDE_LABEL: pr-agent-override
     steps:
       - name: Compare the running total with the cap
@@ -68,16 +72,17 @@ jobs:
           data=$(printf '%s\n' "$ledger" | sed -n 's/.*<!-- pr-agent-cost-data: \(.*\) -->.*/\1/p' | head -n1)
           total=$(jq -r '(map(.cost) | add // 0) as $t | ($t * 100 | round) / 100' <<<"${data:-[]}")
           tokens=$(jq -r 'map(.tokens_in) | add // 0' <<<"${data:-[]}")
+          runs=$(jq -r 'map(select(.kind == "run")) | length' <<<"${data:-[]}")
           override=$(jq -r --arg l "$PR_AGENT_OVERRIDE_LABEL" 'index($l) != null' <<<"$LABELS")
-          echo "Running total \$$total of \$$PR_AGENT_COST_CAP_USD, $tokens of $PR_AGENT_INPUT_TOKEN_CAP input tokens, override label present: $override"
+          echo "Running total \$$total of \$$PR_AGENT_COST_CAP_USD, $tokens of $PR_AGENT_INPUT_TOKEN_CAP input tokens, $runs of $PR_AGENT_RUN_CAP commands, override label present: $override"
           if [ "$override" = "true" ] || { awk -v t="$total" -v c="$PR_AGENT_COST_CAP_USD" 'BEGIN { exit !(t < c) }' \
-               && [ "$tokens" -lt "$PR_AGENT_INPUT_TOKEN_CAP" ]; }; then
+               && [ "$tokens" -lt "$PR_AGENT_INPUT_TOKEN_CAP" ] && [ "$runs" -lt "$PR_AGENT_RUN_CAP" ]; }; then
             echo "allowed=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           echo "allowed=false" >> "$GITHUB_OUTPUT"
           note="<!-- pr-agent-cost-cap -->
-          PR-Agent did not run: this PR's runs have added up to about \$$total and $tokens input tokens, which reaches the cap (\$$PR_AGENT_COST_CAP_USD or $PR_AGENT_INPUT_TOKEN_CAP input tokens). To allow more runs, add the \`$PR_AGENT_OVERRIDE_LABEL\` label to the PR and comment the command again. The running total is in the \"PR-Agent cost on this PR\" comment."
+          PR-Agent did not run: this PR's runs have added up to about \$$total and $tokens input tokens over $runs commands, which reaches a cap (\$$PR_AGENT_COST_CAP_USD, $PR_AGENT_INPUT_TOKEN_CAP input tokens or $PR_AGENT_RUN_CAP commands). To allow more runs, add the \`$PR_AGENT_OVERRIDE_LABEL\` label to the PR and comment the command again. The running total is in the \"PR-Agent cost on this PR\" comment."
           existing=$(jq -r 'map(select(.user.login == "github-actions[bot]" and (.body | startswith("<!-- pr-agent-cost-cap -->")))) | first | .id // empty' <<<"$all")
           if [ -n "$existing" ]; then
             gh api -X PATCH "repos/$REPO/issues/comments/$existing" -f body="$note" >/dev/null
@@ -109,6 +114,8 @@ jobs:
           REPO: ${{ github.repository }}
           PR: ${{ github.event.issue.number }}
           SINCE: ${{ github.event.comment.created_at }}
+          COMMENT_BODY: ${{ github.event.comment.body }}
+          RUN_KEY: ${{ github.run_id }}-${{ github.run_attempt }}
         run: |
           set -euo pipefail
           api="repos/$REPO/issues/$PR/comments"
@@ -122,6 +129,7 @@ jobs:
                        and .updated_at >= $since)
               | .body as $b
               | { key: "\(.id)@\(.updated_at)",
+                  kind: "usage",
                   at: .updated_at,
                   command: (if ($b | test("PR Code Suggestions")) then "improve"
                             elif ($b | test("PR Reviewer Guide")) then "review"
@@ -140,7 +148,10 @@ jobs:
             old=$(jq -r '.body' <<<"$ledger" | sed -n 's/.*<!-- pr-agent-cost-data: \(.*\) -->.*/\1/p' | head -n1)
             old=${old:-[]}
           fi
-          rows=$(jq -c --argjson old "$old" '[ .[] | select(.key as $k | $old | map(.key) | index($k) | not) ] as $add | $old + $add' <<<"$new")
+          word=${COMMENT_BODY%%[[:space:]]*}
+          run_row=$(jq -cn --arg key "run-$RUN_KEY" --arg cmd "${word:0:16}" --arg at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            '[{ key: $key, kind: "run", at: $at, command: $cmd, model: "", tokens_in: 0, tokens_out: 0, calls: 0, cost: 0 }]')
+          rows=$(jq -c --argjson old "$old" --argjson run "$run_row" '($run + .) as $cand | [ $cand[] | select(.key as $k | $old | map(.key) | index($k) | not) ] as $add | $old + $add' <<<"$new")
           if [ "$(jq 'length' <<<"$rows")" = "$(jq 'length' <<<"$old")" ]; then
             echo "No new PR-Agent run to add."
             exit 0
@@ -151,8 +162,9 @@ jobs:
             "\($m)\n<!-- pr-agent-cost-data: \(tojson) -->\n### PR-Agent cost on this PR\n\n"
             + "Every run on this PR, as PR-Agent estimates it (rounded to cents; the OpenAI usage page is the bill).\n\n"
             + "| Run | Command | Model | Calls | Tokens in | Tokens out | Est. cost |\n| --- | --- | --- | ---: | ---: | ---: | ---: |\n"
-            + (to_entries | map("| \(.key + 1) | \(.value.command) | \(.value.model) | \(.value.calls) | \(.value.tokens_in) | \(.value.tokens_out) | \(.value.cost | usd) |") | join("\n"))
+            + (map(select(.kind != "run")) | to_entries | map("| \(.key + 1) | \(.value.command) | \(.value.model) | \(.value.calls) | \(.value.tokens_in) | \(.value.tokens_out) | \(.value.cost | usd) |") | join("\n"))
             + "\n| | **Total** | | **\(map(.calls) | add)** | **\(map(.tokens_in) | add)** | **\(map(.tokens_out) | add)** | **\(map(.cost) | add | usd)** |\n"
+            + "\nCommands run: \(map(select(.kind == "run")) | length). A committable `/improve` publishes no run details, so its usage is not in the table; the command count still counts it.\n"
           ' <<<"$rows")
           if [ -n "$id" ]; then
             gh api -X PATCH "repos/$REPO/issues/comments/$id" -f body="$body" >/dev/null
