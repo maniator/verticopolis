@@ -9,7 +9,7 @@ way to a coveted **TOWER**.
 
 The simulation is a **Rust** engine (`engine-rs/`) compiled to
 **WebAssembly**, and it is the only engine the game runs (see
-[Simulation engine](#simulation-engine)). Everything around it is
+[Architecture](#architecture)). Everything around it is
 **TypeScript** on the **[Excalibur.js](https://excaliburjs.com/)** game engine
 (camera, scene, culling and the render loop). A procedural soundtrack built on
 **[Tone.js](https://tonejs.github.io/)** changes depending on which part of the
@@ -198,51 +198,18 @@ docks the tools in a column on the left (`docs/screenshots/09d-mobile-landscape-
 
 ## Architecture
 
-```
-engine-rs/     # the simulation: a deterministic Rust engine, compiled to WebAssembly
-               # (rules, caps, tuning, the catalog, saves, .TDT, the frame the renderer reads)
-src/
-  main.ts      # GameApp: the composition root, owns the game loop
-  game/        # controllers: build/editor actions, save/load, input, inspector, HUD wiring
-  simport/     # EnginePort: the one synchronous interface the game uses to talk to the engine
-  dualrun/     # the WASM binding and its type declaration (engine.d.ts)
-  wasmhost/    # loading the engine package, its build metadata and catalog checks
-  render/      # Excalibur.js scene, procedural sprites, the overview Map
-  ui/          # DOM controls: palette, status bar, editor panel, modals (lit-html templates)
-  audio/       # location-based procedural soundtrack and effects (Tone.js)
-  storage/     # localStorage slots, .vctower and .TDT import/export
-  shared/      # types and small helpers shared across the game
-  engine/      # the old TypeScript engine, kept only as a test reference while it is removed
-  tests/       # repository-wide guard tests (file sizes, prose, named flags, ...)
-conformance/   # the conformance lock and catalog digests the engine is held to
-e2e/           # Playwright end-to-end specs
-```
+The simulation is the **Rust** engine in `engine-rs/`, compiled to WebAssembly.
+It is the only engine the game runs: there is no TypeScript fallback, and if the
+engine cannot start, the game stops with a message. The TypeScript side
+(rendering on Excalibur.js, the DOM UI, audio, input and storage) talks to it
+through one synchronous interface, `EnginePort`, and never decides a game rule
+itself. The old TypeScript engine in `src/engine/` is not part of the shipped
+game and is being deleted.
 
-The **engine** has no access to the DOM, files, network or clock (enforced by
-`engine-rs/tests/independence.rs`), so it is deterministic and tested on its
-own (`cargo test` in `engine-rs/`). Rendering, the camera, panning, zooming and
-pointer input all run on **[Excalibur.js](https://excaliburjs.com/)**:
-`TowerEngine` owns the scene, drawing each facility, transport and merged
-structural "run" as an Excalibur actor whose graphic reuses our pixel-art sprite
-code. `main.ts` supplies tool semantics through the engine's controller hooks
-and steps the simulation each frame through `EnginePort`.
-
-For diagrams of the layers, the frame loop, input flow and persistence, see
-**[ARCHITECTURE.md](ARCHITECTURE.md)**.
-
-## Simulation engine
-
-The game runs on the **Rust** engine (`engine-rs/`), compiled to WebAssembly,
-which it drives directly through `EnginePort`. There is no engine choice in
-Settings and no TypeScript fallback: if the engine cannot start, the game stops
-with a message. The version line in Settings and Help names the engine that is
-running. The engine crate is versioned separately from the app; see
-[CONTRIBUTING.md](CONTRIBUTING.md) for building the engine package
-(`npm run wasm:build`) and for how versions move.
-
-The old **TypeScript** engine in `src/engine/` is not part of the shipped game.
-It is still in the repository only while its remaining tests are moved onto the
-Rust engine, and it is being deleted.
+**[ARCHITECTURE.md](ARCHITECTURE.md)** has the source layout and diagrams of
+the layers, the frame loop, the engine, input and persistence.
+[CONTRIBUTING.md](CONTRIBUTING.md) covers building the engine package
+(`npm run wasm:build`) and how the app and engine versions move.
 
 ## Screenshots
 
