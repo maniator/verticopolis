@@ -236,7 +236,7 @@ Verticopolis has **two test tiers**:
   `engineStatusRows`, `atlas`, `visual`, `perf`) and runs with one worker, as
   the `e2e` job; `chromium` holds the general browser regression suite,
   including `e2e/wasmOnly.spec.ts` (boot, failures and offline start), and CI
-  runs it as the `e2e-wasm-only` job, in two shards on two runners. The
+  runs it as the `e2e-wasm-only` job, in three shards on three runners. The
   first shard also runs the negative bundle canary, and the shard that runs
   `milestones.spec.ts` uploads the milestone screenshots
   (`milestone-screenshots`). `npm run e2e` runs both locally; pass
