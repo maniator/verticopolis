@@ -121,6 +121,14 @@ pub struct TdtVenue {
     pub days_shown: u8,
 }
 
+impl TdtVenue {
+    /// Whether the theatre shows a classic film (#1932), whose draw never
+    /// climbs past a fading film's. A hall shows none.
+    pub fn shows_classic(&self) -> bool {
+        self.film.is_some_and(super::venues::is_classic_film)
+    }
+}
+
 /// The whole file, mirrored (`TdtTower`).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct TdtTower {

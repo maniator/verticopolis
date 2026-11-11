@@ -6,6 +6,7 @@ import type { TransportDetail, UnitDetail } from "../../simport/panels";
 import type { FacilityKind, GameMode } from "../../shared/types";
 import { catalogFor } from "../../tests/catalogFixture";
 import { stopRows, transportDetail, unitDetail } from "../../tests/fixtures/detailCards";
+import { groupDigits } from "../format";
 import { renderToFragment } from "../testing/litTestUtils";
 import { transportEditorTemplate, unitEditorTemplate } from "./editor";
 
@@ -175,11 +176,30 @@ describe("unit editor row and action branches", () => {
     expect(closed.querySelector('[data-field="customers"]')!.textContent).toBe("7 (closed)");
   });
 
-  it("cinema: operational shows the film row and booking action; gutted drops the row", () => {
-    const op = renderToFragment(unitEditor(unit("cinema", { filmPolicy: "blockbuster" })));
-    expect(op.textContent).toContain("Now showing");
+  it("modern cinema: operational shows the film row and booking action; gutted drops the row", () => {
+    const modern = { mode: "modern" as const };
+    const op = renderToFragment(unitEditor(unit("cinema", { filmPolicy: "blockbuster", blockbuster: true }, "modern"), modern));
+    expect(op.querySelector('[data-field="showing"]')!.textContent).toBe("Blockbuster");
     expect(op.querySelector('[data-edit="filmPolicy"]')!.textContent).toContain("Blockbuster");
-    expect(renderToFragment(unitEditor(unit("cinema", { filmPolicy: "blockbuster", state: "gutted" }))).textContent).not.toContain("Now showing");
+    expect(op.querySelector('[data-edit="newFilm"]')).toBeNull();
+    const gutted = unit("cinema", { filmPolicy: "blockbuster", state: "gutted" }, "modern");
+    expect(renderToFragment(unitEditor(gutted, modern)).textContent).not.toContain("Now showing");
+  });
+
+  it("classic cinema: shows the film and its days, and offers a new film or a classic at the catalog's prices", () => {
+    const economy = catalogFor("classic").economy;
+    const film = (filmClassic: boolean) => renderToFragment(unitEditor(unit("cinema", { filmDays: 4, filmClassic })));
+    const fresh = film(false);
+    expect(fresh.querySelector('[data-field="showing"]')!.textContent).toBe("New film");
+    expect(fresh.querySelector('[data-field="filmDays"]')!.textContent).toBe("4");
+    expect(fresh.querySelector('[data-edit="newFilm"]')!.textContent).toBe(`New film ($${groupDigits(economy.newFilmPrice!)})`);
+    expect(fresh.querySelector('[data-edit="classicFilm"]')!.textContent).toBe(`Classic film ($${groupDigits(economy.classicFilmPrice!)})`);
+    expect(fresh.querySelector('[data-edit="filmPolicy"]')).toBeNull();
+    expect(film(true).querySelector('[data-field="showing"]')!.textContent).toBe("Classic film");
+    const gutted = renderToFragment(unitEditor(unit("cinema", { state: "gutted" })));
+    expect(gutted.textContent).not.toContain("Days showing");
+    expect(gutted.querySelector('[data-edit="newFilm"]')).toBeNull();
+    expect(gutted.querySelector('[data-edit="filmPolicy"]')).toBeNull();
   });
 });
 

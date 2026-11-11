@@ -9,6 +9,7 @@ use crate::jsmath;
 use crate::services::with_thousands;
 use crate::sim::{LogKind, Simulation};
 
+pub mod films;
 mod traffic;
 mod upkeep;
 pub mod visitors;

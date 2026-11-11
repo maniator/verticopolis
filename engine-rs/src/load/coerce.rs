@@ -88,6 +88,12 @@ pub(super) fn film_days(kind: Kind, raw: Option<&Value>) -> Option<u8> {
     Some(days.floor().clamp(0.0, f64::from(u8::MAX)) as u8)
 }
 
+/// Whether a theatre shows a classic film (#1932): `true` on a theatre, and
+/// anything else reads as a new film.
+pub(super) fn film_classic(kind: Kind, raw: Option<&Value>) -> bool {
+    kind == Kind::Cinema && raw == Some(&Value::Bool(true))
+}
+
 pub(super) fn parse_state(v: Option<&Value>) -> Option<UnitState> {
     UnitState::from_name(v?.as_str()?)
 }

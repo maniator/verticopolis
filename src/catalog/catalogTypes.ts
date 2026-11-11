@@ -10,7 +10,7 @@ import type { FacilityCategory, FacilityKind, GameMode } from "../shared/types";
 
 /** The version of the catalog's shape. It moves when a field is added,
  *  renamed or removed, so a frontend can refuse a shape it does not know. */
-export const CATALOG_VERSION = 7;
+export const CATALOG_VERSION = 8;
 
 /** Every price, size and build rule of one mode. */
 export interface Catalog {
@@ -74,7 +74,8 @@ export interface CatalogEconomy {
    *  where the mode charges none). Each period the engine charges
    *  `ceil(price * rate)`, multiplied by `maintenanceScale` and rounded. */
   readonly condoHoldTaxRate: number;
-  /** A cinema's monthly film booking, and its blockbuster booking. */
+  /** A cinema's monthly film booking, and its blockbuster booking, where the
+   *  mode books films (`newFilmPrice` is null). */
   readonly cinemaBookingMonthly: number;
   readonly cinemaBookingBlockbusterMonthly: number;
   /** A nightclub's monthly DJ booking. */
@@ -83,6 +84,11 @@ export interface CatalogEconomy {
   readonly garbageCollectHour: number;
   /** The paid exterminator's fees, or null where the mode has none. */
   readonly exterminator: { readonly calloutFee: number; readonly perRoomFee: number } | null;
+  /** Showing a new film and a classic where the player changes a theatre's
+   *  film (and books none each period), or null where the mode books films
+   *  (#1932). */
+  readonly newFilmPrice: number | null;
+  readonly classicFilmPrice: number | null;
   /** Whether the player can switch automatic bridging off. When false,
    *  bridging is always on. When true, a tower starts bridged unless it was
    *  founded unbridged, and the live setting is per tower (the engine's

@@ -58,14 +58,14 @@ fn the_frame_and_the_census_read_only_marked_fields() {
         *no_rate = !*no_rate;
         label.push('x');
         *subtype = other(*subtype);
-        // Every extra is changed from its own value, and the literal names
-        // each one, so a new field fails to compile here until it is sorted.
+        // Each extra changes from its own value, and the literal names each.
         let old = extras.as_deref().cloned().unwrap_or_default();
         *extras = Some(Box::new(Extras {
             vacate_reason: other(old.vacate_reason),
             vacate_at: Some(old.vacate_at.unwrap_or(0.0) + 1.0),
             film_policy: other(old.film_policy),
             film_days: Some(old.film_days.unwrap_or(0).wrapping_add(1)),
+            film_classic: !old.film_classic,
             patronage_today: Some(old.patronage_today.unwrap_or(0.0) + 1.0),
             patronage_yest: Some(old.patronage_yest.unwrap_or(0.0) + 1.0),
             profit_today: Some(old.profit_today.unwrap_or(0.0) + 1.0),

@@ -224,6 +224,9 @@ fn seed_film_days(units: &mut [serde_json::Value], tdt: &TdtTower) {
         if let Some(&(i, ..)) = hit {
             if let serde_json::Value::Object(m) = &mut units[i] {
                 m.insert("filmDays".into(), venue.days_shown.into());
+                if venue.shows_classic() {
+                    m.insert("filmClassic".into(), true.into());
+                }
             }
         }
     }

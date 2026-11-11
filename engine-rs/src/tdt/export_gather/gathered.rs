@@ -44,6 +44,8 @@ pub struct GatheredRoom {
     pub residents: Option<f64>,
     /// A theatre's film age in days (`filmDays`, #1932), 0 when unset.
     pub film_days: Option<i64>,
+    /// Whether a theatre shows a classic film (`filmClassic`, #1932).
+    pub film_classic: bool,
     pub emitted: bool,
     pub skip_reason: Option<SkipReason>,
 }

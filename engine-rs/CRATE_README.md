@@ -132,7 +132,7 @@ fails CI until that page and the example host follow.
 | Start a game | `sim::Simulation::new_game(seed, mode)`, `new_game_with(seed, mode, calendar, start_unbridged)` |
 | Advance time | `sim.tick(dt_minutes)`, or `fixed_step::FrameStepper::advance` to pace time from frames the way the web game does |
 | Quote a placement | `sim.can_build(kind, floor, x)`, `sim.can_build_transport(kind, x, bottom, top)` |
-| Player commands | `build`, `build_transport`, `sell_at`, `paint_brush`, `add_car`, `remove_car`, `extend_transport`, `remove_facility`, `adjust_rent`, `set_no_rate`, `price_unit`, `resolve_choice` |
+| Player commands | `build`, `build_transport`, `sell_at`, `paint_brush`, `add_car`, `remove_car`, `extend_transport`, `remove_facility`, `adjust_rent`, `set_no_rate`, `price_unit`, `change_film` (a Classic theater's new film or classic, at the catalog's `newFilmPrice` and `classicFilmPrice`), `resolve_choice` |
 | Read state | the public fields (`money`, `star`, `clock`, `tower`, `log`) and `population()`; read them, never write them |
 | Draw a frame | `view::structure_view(&sim)` and `view::ViewReader::frame`, or `frame::frame_view(&sim)`, flat number arrays read through the named slots in `view::layout` and `frame` |
 | Gameplay events | `sim.gameplay.drain()` after each frame; the names and payloads are in `gameplay::CATALOG_JSON` |

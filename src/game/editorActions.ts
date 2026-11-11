@@ -276,6 +276,8 @@ export class EditorActions {
       extendUp: "Extend",
       extendDown: "Extend",
       filmPolicy: "Film policy",
+      newFilm: "Film change",
+      classicFilm: "Film change",
       changeVariety: "Change variety",
       batchKind: "Edit",
     };
@@ -338,6 +340,23 @@ export class EditorActions {
         const next = order[(order.indexOf(u.filmPolicy ?? "auto") + 1) % order.length];
         engine.setFilm(u.id, codes.code("filmPolicies", next));
         this.deps.audio.sfx("click");
+        this.deps.refreshEditor();
+      } else if (action === "newFilm" || action === "classicFilm") {
+        // Classic's film change (#1932): the engine charges the price and
+        // starts the film; a payment is no edit, so no undo step holds it.
+        const rec = engine.changeFilm(u.id, action === "classicFilm");
+        const res = outcome(engine, rec);
+        if (!res.ok) {
+          const cost = codes.slot(rec, "changeFilm", "cost");
+          return this.refuse(
+            res.reason === "funds"
+              ? `Not enough funds to show that film ($${groupDigits(cost)}).`
+              : "That film can't be shown now.",
+          );
+        }
+        const film = action === "classicFilm" ? "A classic film" : "A new film";
+        this.deps.audio.sfx("build");
+        this.deps.announce(`${film} is showing.`);
         this.deps.refreshEditor();
       } else if (action === "changeVariety") {
         // Canon retail reroll: picks a §7 name different from the current

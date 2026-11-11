@@ -142,3 +142,53 @@ export function buildEscalatorOfficeClassic(): void {
   g.speed = 0;
   g.engine.paused = true;
 }
+
+/** #1932: the MODERN half of the theater card pair. A ground lobby, two
+ *  floors and one open theater whose card books a film each period (the
+ *  Booking button). Fail closed if the theater did not place, so the pair
+ *  always frames a real card. Body duplicated from the Classic twin (same
+ *  seed, same shape): injected page code must be self-contained. */
+export function buildCinemaModern(): void {
+  const g = (window as unknown as { game: any }).game;
+  const Sim = g.sim.constructor;
+  g.sim = Sim.newGame(4700, "modern");
+  const s = g.sim;
+  s.money = 50_000_000;
+  s.star = 3;
+  const W = g.grid.width;
+  const cx = Math.floor(W / 2);
+  for (let x = cx; x <= cx + 19; x++) s.tower.place("lobby", 1, x);
+  for (let x = cx - 1; x >= cx - 20; x--) s.tower.place("lobby", 1, x);
+  for (let f = 2; f <= 3; f++) for (let x = cx - 20; x <= cx + 19; x++) s.tower.place("floor", f, x);
+  const r = s.tower.place("cinema", 2, cx - 15);
+  if (!r.ok) throw new Error(`Modern theater did not place: ${r.reason}`);
+  const u = s.tower.getUnit(r.unitId);
+  u.state = "empty";
+  u.filmPolicy = "blockbuster";
+  u.filmDays = 4;
+  g.engine.setCamera(cx, 2.5, 1.6);
+}
+
+/** #1932: the CLASSIC twin of {@link buildCinemaModern}. Same tower; Classic
+ *  books no film, so the card shows the film's days and the two buttons that
+ *  change it (a new film or a classic, at the catalog's prices). Body
+ *  duplicated: injected page code must be self-contained. */
+export function buildCinemaClassic(): void {
+  const g = (window as unknown as { game: any }).game;
+  const Sim = g.sim.constructor;
+  g.sim = Sim.newGame(4700, "classic");
+  const s = g.sim;
+  s.money = 50_000_000;
+  s.star = 3;
+  const W = g.grid.width;
+  const cx = Math.floor(W / 2);
+  for (let x = cx; x <= cx + 19; x++) s.tower.place("lobby", 1, x);
+  for (let x = cx - 1; x >= cx - 20; x--) s.tower.place("lobby", 1, x);
+  for (let f = 2; f <= 3; f++) for (let x = cx - 20; x <= cx + 19; x++) s.tower.place("floor", f, x);
+  const r = s.tower.place("cinema", 2, cx - 15);
+  if (!r.ok) throw new Error(`Classic theater did not place: ${r.reason}`);
+  const u = s.tower.getUnit(r.unitId);
+  u.state = "empty";
+  u.filmDays = 4;
+  g.engine.setCamera(cx, 2.5, 1.6);
+}

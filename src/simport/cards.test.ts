@@ -42,9 +42,11 @@ const OFFICE = record("unitCard", {
   reachable: 1,
   floorHasLobby: 0,
   blockbuster: NaN,
+  filmDays: NaN,
+  filmClassic: NaN,
 });
 
-const CINEMA = record("unitCard", { id: 12, kindCode: code("kinds", "cinema"), rent: NaN, vacateReason: NaN, filmPolicy: code("filmPolicies", "blockbuster"), blockbuster: 1 });
+const CINEMA = record("unitCard", { id: 12, kindCode: code("kinds", "cinema"), rent: NaN, vacateReason: NaN, filmPolicy: code("filmPolicies", "blockbuster"), blockbuster: 1, filmDays: 4, filmClassic: 1 });
 
 /** A stop row: floor, then the served, lobby and endpoint flags. */
 const stop = (floor: number, served: number, lobby: number, endpoint: number) => [floor, served, lobby, endpoint];
@@ -76,16 +78,19 @@ describe("Cards.unit", () => {
       reachable: true,
       floorHasLobby: false,
       blockbuster: null,
+      filmDays: null,
+      filmClassic: null,
     });
     expect(vi.mocked(port.unitCard).mock.calls).toEqual([[10]]);
     expect(vi.mocked(port.unitLabel).mock.calls).toEqual([[10]]);
     expect(vi.mocked(port.unitSubtype).mock.calls).toEqual([[10]]);
   });
 
-  it("carries a cinema's film policy and booking, and an empty label when the engine has none", () => {
+  it("carries a cinema's film policy, booking and film, and an empty label when the engine has none", () => {
     const port = mockPort({ unitCard: () => CINEMA, unitLabel: () => undefined, unitSubtype: () => "art house" });
     const card = new Cards(port, readerAt(1, 0)).unit(12)!;
     expect([card.filmPolicy, card.blockbuster, card.rent, card.vacateReason, card.label, card.subtype]).toEqual(["blockbuster", true, null, null, "", "art house"]);
+    expect([card.filmDays, card.filmClassic]).toEqual([4, true]);
   });
 
   it("answers undefined for an id the engine has no card for, reading no text", () => {

@@ -335,6 +335,10 @@ export interface EnginePortCommands {
   setRent(id: number, target: number): PortRecord;
   rentBatch(kind: number, target: number, onlyDefault: boolean): PortRecord;
   setFilm(id: number, policyCode: number): PortRecord;
+  /** Show a new film, or a classic, at a theatre where the player changes
+   *  films (Classic): the record's `cost` slot is the price paid, or the
+   *  price wanted on a "funds" refusal. */
+  changeFilm(id: number, classic: boolean): PortRecord;
   rerollUnit(id: number): PortRecord;
   bookExterminator(): PortRecord;
   answerChoice(accept: boolean): PortRecord;

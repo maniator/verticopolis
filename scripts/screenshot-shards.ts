@@ -68,7 +68,7 @@ export const SHARDS: Record<string, string[]> = {
   // are placed-and-frozen with the sim stopped, so neither needs a drawSettle, and
   // the founder pair captures a splash over no tower at all; ~4s for the set, which
   // keeps this shard inside the same ~71s pole as the rest.
-  features: ["overlays", "cleanliness-overlay", "stats", "crash-screen", "basement", "traffic", "lobby-awnings", "update-prompt", "schedule-dialog", "schedule-dialog-express", "schedule-dialog-classic", "schedule-dialog-classic-phone", "compare-escalator-office-modern", "compare-escalator-office-classic", "boot-no-webgl", "rental-living", "founder-badge", "rental-living-mobile", "founder-badge-mobile"],
+  features: ["overlays", "cleanliness-overlay", "stats", "crash-screen", "basement", "traffic", "lobby-awnings", "update-prompt", "schedule-dialog", "schedule-dialog-express", "schedule-dialog-classic", "schedule-dialog-classic-phone", "compare-escalator-office-modern", "compare-escalator-office-classic", "compare-cinema-modern", "compare-cinema-classic", "boot-no-webgl", "rental-living", "founder-badge", "rental-living-mobile", "founder-badge-mobile"],
   // ~57s + the two light pricing-modern scenes (one small frozen tower built
   // twice, four DOM panel/dialog shots total; issue #443's Modern fork) + the
   // settings-modern dialog shot (one frozen Modern tower, one modal still),

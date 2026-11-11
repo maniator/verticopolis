@@ -32,6 +32,8 @@ pub fn catalog(mode: GameMode) -> Catalog {
                     callout_fee,
                     per_room_fee,
                 }),
+            new_film_price: mode.film_changes().map(|(new_film, _)| new_film),
+            classic_film_price: mode.film_changes().map(|(_, classic)| classic),
             auto_bridge_toggleable: mode.bridging_toggleable(),
         },
         rules: Rules {

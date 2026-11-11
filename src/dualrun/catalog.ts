@@ -91,6 +91,8 @@ const ECONOMY: Shape = {
   nightclubDjMonthly: amount,
   garbageCollectHour: count,
   exterminator: (v) => v === null || isRecord(v),
+  newFilmPrice: (v) => v === null || amount(v),
+  classicFilmPrice: (v) => v === null || amount(v),
   autoBridgeToggleable: bool,
 };
 const RULES: Shape = { variantHouseholds: bool, previewNamesRefusal: bool, scheduleAssist: bool };

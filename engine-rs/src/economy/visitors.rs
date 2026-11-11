@@ -81,6 +81,22 @@ pub fn film_draw(days_shown: i64) -> i64 {
     }
 }
 
+/// The strongest draw a classic film reaches (#1932): a run of the original
+/// that showed a classic from the day it was set held the draw at 1 while a
+/// new film set the same day held 2, and both fell to 0 together.
+pub const CLASSIC_FILM_DRAW_CAP: i64 = FADING_FILM_DRAW;
+
+/// The draw of the film a theatre shows: a new film's, held to
+/// [`CLASSIC_FILM_DRAW_CAP`] for a classic.
+pub fn showing_draw(days_shown: i64, classic: bool) -> i64 {
+    let draw = film_draw(days_shown);
+    if classic {
+        draw.min(CLASSIC_FILM_DRAW_CAP)
+    } else {
+        draw
+    }
+}
+
 /// Whether `kind`'s census is a set audience (party halls and theatres).
 pub fn counts_set_audience(kind: Kind) -> bool {
     matches!(kind, Kind::PartyHall | Kind::Cinema)

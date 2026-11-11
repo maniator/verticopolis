@@ -38,7 +38,7 @@ pub use lock::{lock_view, LOCK_FOOTPRINT_EXEMPT};
 
 /// The version of the catalog's shape. It moves when a field is added,
 /// renamed or removed, so a frontend can refuse a shape it does not know.
-pub const CATALOG_VERSION: u32 = 7;
+pub const CATALOG_VERSION: u32 = 8;
 
 /// Every price, size and build rule of one mode.
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -108,7 +108,8 @@ pub struct Economy {
     /// where the mode charges none). Each period the engine charges
     /// `ceil(price * rate)`, multiplied by `maintenanceScale` and rounded.
     pub condo_hold_tax_rate: f64,
-    /// A cinema's monthly film booking, and its blockbuster booking.
+    /// A cinema's monthly film booking, and its blockbuster booking, where
+    /// the mode books films (`new_film_price` is null).
     pub cinema_booking_monthly: f64,
     pub cinema_booking_blockbuster_monthly: f64,
     /// A nightclub's monthly DJ booking.
@@ -117,6 +118,10 @@ pub struct Economy {
     pub garbage_collect_hour: f64,
     /// The paid exterminator's fees, or null where the mode has none.
     pub exterminator: Option<ExterminatorFees>,
+    /// Showing a new film and a classic where the player changes films (and
+    /// books none each period), or null where the mode books films.
+    pub new_film_price: Option<f64>,
+    pub classic_film_price: Option<f64>,
     /// Whether the player can switch automatic bridging off. When false,
     /// bridging is always on. When true, a tower starts bridged unless it
     /// was founded unbridged, and the live setting is per tower (the

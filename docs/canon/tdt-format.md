@@ -385,8 +385,11 @@ from it: 2 while the count is under 6, 1 from 6 to 8, and 0 from 9 on. So a new
 film counts 120 for six mornings, 80 for three, then 40 until the film is
 changed. A tower played on from TOWER7 (its theatres at day 5) fell to 80 per
 theatre on the expected morning and to 40 three mornings later, and a second
-run that showed new films reset the count to 0 and the draw to 2. How a classic
-film (the cheaper one) ages is not yet observed.
+run that showed new films reset the count to 0 and the draw to 2. A classic
+film (the cheaper one) keeps the same clock with its draw held to 1: a run
+from TOWER7 that set a new film in one theatre and a classic in another on
+the same morning saw the new film hold 2 for six mornings and the classic 1,
+and both fall to 0 together. Changing either film sets the count to 0.
 
 The 12 undecoded flag bytes and the 42 undecoded bytes after the finance block
 are written as zeros.
@@ -430,9 +433,15 @@ neighboring floors and valid unit ids, and gives each theatre its film's age
 from byte 9; otherwise it leaves the table out. Our exporter writes the table
 inside its 0xFF tail: a record for each finished hall, and for each finished
 theatre whose film has an age, with the logical ids its index map gives, the
-audience bytes as the game resets them at night, film 7 for a theatre (the
-engine does not keep which film it shows) and 0 days for a hall. The original's
-reading of our records has not been checked on a PC yet.
+audience bytes as the game resets them at night, film 7 for a theatre showing
+a new film and film 3 for a classic (the engine keeps whether a film is a
+classic, not its title) and 0 days for a hall. The film number tells the two
+apart: runs of the original showed the new films The Making of a Star, Love in
+N.Y., Waikiki Moon and My Man of War, the third to sixth in the game's list,
+as 8 to 11, so the seven new films are 6 to 12, and Big Wave, the first
+classic, as 3. The importer reads a film below 6 as a classic; which numbers
+the other classics take is not yet observed. The original's reading of our
+records has not been checked on a PC yet.
 
 ## 15. Named tenants and people
 
@@ -478,9 +487,9 @@ serviced-only.
   census does not add up; when the line splits evenly into an audience each
   room could count, every room takes that share. Otherwise the class seeds
   nothing, and each room counts from its first morning in the engine. Each
-  theatre takes its film's age from the party hall and theatre table
-  (section 14), so its count falls on the original's schedule; a file without
-  the table starts every film new.
+  theatre takes its film's age, and whether it is a classic, from the party
+  hall and theatre table (section 14), so its count falls on the original's
+  schedule; a file without the table starts every film new.
 - **Widths.** A room arrives at the width its record gives. New builds of
   security, medical, housekeeping, recycling and the metro use the sizes in
   section 6.1, so a rebuilt room matches the original. The engine puts nothing
@@ -502,7 +511,8 @@ point after the first import. Known canonical forms:
   first day passes.
 - A theatre's film draw and age are exported (#1932): byte 15 holds the draw
   its film had last night and the party hall and theatre table holds the age,
-  so it reimports with the same age. The film itself comes back as film 7. A
+  so it reimports with the same age. The film itself comes back as film 7, or
+  film 3 for a classic, so a classic stays a classic. A
   theatre that has not seen a morning in the engine writes no record and
   reimports with a new film, as it would have shown anyway. Exports before
   #1932 wrote byte 15 as 0, an all-zero index map and no table.

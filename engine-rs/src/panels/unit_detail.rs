@@ -82,6 +82,9 @@ impl Simulation {
             blockbuster,
         } = self.card_flags(id)?;
         let u = self.tower.get_unit(id)?;
+        // A theatre's film: the mornings it has shown, and whether it is a
+        // classic (#1932); null on any other kind.
+        let film = (u.kind == Kind::Cinema).then(|| u.extras());
         Some(json!({
             "id": u.id,
             "kind": u.kind.as_str(),
@@ -105,6 +108,8 @@ impl Simulation {
             "reachable": reachable,
             "floorHasLobby": has_lobby,
             "blockbuster": blockbuster,
+            "filmDays": film.as_ref().map(|e| e.film_days.unwrap_or(0)),
+            "filmClassic": film.as_ref().map(|e| e.film_classic),
         }))
     }
 }

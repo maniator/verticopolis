@@ -276,7 +276,9 @@ fn the_metro_is_thirty_tiles_wide() {
 
 #[test]
 fn booked_blockbusters_survive_a_reload() {
-    let mut sim = seeded_game(3, GameMode::Classic);
+    // Modern books films each period; Classic's blockbusters are full houses
+    // (#1932), and `films_tests` carries them through a save.
+    let mut sim = seeded_game(3, GameMode::Modern);
     sim.money = 1e12;
     sim.star = 1;
     lay(&mut sim, Kind::Lobby, 1);
