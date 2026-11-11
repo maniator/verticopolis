@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { GRID } from "../engine/facilities";
+import { catalogFor } from "../tests/catalogFixture";
 import { FLOOR, TILE } from "./scale";
 import {
   regionCols,
@@ -12,6 +12,10 @@ import {
   regionRow,
   regionsOf,
 } from "./regionGrid";
+
+/** The lot's geometry, from the Rust engine's catalog (`engine-rs/src/catalog.rs` world). */
+const WORLD = catalogFor("classic").world;
+const GRID = { width: WORLD.lotWidth, minFloor: WORLD.minFloor, maxFloor: WORLD.maxFloor };
 
 /**
  * The region grid is pure math with two load-bearing contracts: every region

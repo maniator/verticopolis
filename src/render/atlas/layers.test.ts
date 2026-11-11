@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from "node:fs";
+import { keepsHours, openAt } from "../../tests/catalogKinds";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { hasBusinessHours, isOpenAt } from "../../engine/facilities";
 import type { FacilityKind } from "../../shared/types";
 import { withLayerHook } from "../pixelSprites/layers";
 import { roomJobs, roomKinds, type StillJob } from "./catalog";
@@ -40,7 +40,7 @@ const INTERIOR_KINDS = new Set<FacilityKind>(["partyHall", "aquaticCenter", "wed
 function paintsRoom(s: UnitPaint): boolean {
   if (s.state === "gutted") return false;
   if (s.state === "empty" && VACANCY_KINDS.has(s.kind)) return false;
-  if (!INTERIOR_KINDS.has(s.kind) && s.state !== "empty" && hasBusinessHours(s.kind) && !isOpenAt(s.kind, s.hour)) return false;
+  if (!INTERIOR_KINDS.has(s.kind) && s.state !== "empty" && keepsHours(s.kind) && !openAt(s.kind, s.hour)) return false;
   return true;
 }
 

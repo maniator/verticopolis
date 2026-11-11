@@ -1,5 +1,5 @@
-import { FACILITIES, facilityFloors } from "../engine/facilities";
 import type { FacilityKind, Unit } from "../shared/types";
+import { kindFacts } from "./catalogKinds";
 import { paintSettledUnit } from "../render/regionPaint";
 import { FLOOR, TILE } from "../render/scale";
 import type { DrawCtx } from "../render/sprites";
@@ -190,8 +190,8 @@ export function crop(r: Raster, ox: number, oy: number, w: number, h: number): n
 
 export function unitOf(kind: FacilityKind, over: Partial<Unit> = {}): Unit {
   return {
-    id: 9, kind, floor: 12, x: 31, width: FACILITIES[kind].width, state: "occupied",
-    satisfaction: 1, occupants: FACILITIES[kind].population ?? 0, ...over,
+    id: 9, kind, floor: 12, x: 31, width: kindFacts(kind).width, state: "occupied",
+    satisfaction: 1, occupants: kindFacts(kind).population, ...over,
   } as Unit;
 }
 
@@ -199,7 +199,7 @@ export function unitOf(kind: FacilityKind, over: Partial<Unit> = {}): Unit {
  *  that leaves the same margin on every side, cropped back to the room. */
 export function paintAt(u: Unit, ox: number, oy: number, lit: boolean, hour = 20, dead = false): number[] {
   const w = u.width * TILE;
-  const h = facilityFloors(u.kind) * FLOOR;
+  const h = kindFacts(u.kind).floors * FLOOR;
   const r = rasterCtx(w + 2 * ox, h + 2 * oy);
   const d: DrawCtx = { ctx: r.ctx, lit, anim: 0, hour };
   paintSettledUnit(d, u, ox, oy, w, h, dead);
@@ -211,7 +211,7 @@ export function paintAt(u: Unit, ox: number, oy: number, lit: boolean, hour = 20
  *  canvas holds only the part past the seam, cropped from (0, 0). */
 export function paintPastSeam(u: Unit, dx: number, dy: number, lit: boolean): number[] {
   const w = u.width * TILE;
-  const h = facilityFloors(u.kind) * FLOOR;
+  const h = kindFacts(u.kind).floors * FLOOR;
   const r = rasterCtx(w - dx, h - dy);
   const d: DrawCtx = { ctx: r.ctx, lit, anim: 0, hour: 20 };
   paintSettledUnit(d, u, -dx, -dy, w, h, false);

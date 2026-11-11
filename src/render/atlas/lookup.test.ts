@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
+import { kindFacts } from "../../tests/catalogKinds";
 import { rand } from "../sprites/common";
-import { FACILITIES } from "../../engine/facilities";
 import { RECYCLE_BREAKS } from "./catalog";
 import { lookupRoom, lookupShaft, type LiveScene, type LiveUnit } from "./lookup";
 
 /** Look up a unit at its catalog width. */
 function look(u: Omit<LiveUnit, "width">, s: LiveScene, v: number) {
-  return lookupRoom({ ...u, width: FACILITIES[u.kind].width }, s, v);
+  return lookupRoom({ ...u, width: kindFacts(u.kind).width }, s, v);
 }
 
 const DAY: LiveScene = { hour: 12, lit: false, parkingUse: 0, recycleFill: 0, dead: false };
@@ -48,7 +48,7 @@ describe("lookupRoom", () => {
     expect(bin(3)).toMatchObject({ chains: { fillExact: RECYCLE_BREAKS.length } });
     expect(bin(-1)).toMatchObject({ chains: { fillExact: 0 } });
     expect(bin(NaN)).toMatchObject({ chains: { fillExact: 0 } });
-    const eighths = (recycleFill: number) => lookupRoom({ kind: "recycling", state: "occupied", occupants: 0, id: 1, width: FACILITIES.recycling.width }, { ...DAY, recycleFill }, 0, { recyclingEighths: true });
+    const eighths = (recycleFill: number) => lookupRoom({ kind: "recycling", state: "occupied", occupants: 0, id: 1, width: kindFacts("recycling").width }, { ...DAY, recycleFill }, 0, { recyclingEighths: true });
     expect(eighths(0.49)).toMatchObject({ chains: { fill: 4 } });
     expect(eighths(3)).toMatchObject({ chains: { fill: 8 } });
     expect(eighths(NaN)).toMatchObject({ chains: { fill: 0 } });

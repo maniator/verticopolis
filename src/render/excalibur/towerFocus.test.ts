@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
+import { kindFacts } from "../../tests/catalogKinds";
 import { focus } from "./towerInputCamera";
-import { FACILITIES } from "../../engine/facilitiesData";
 import type { TowerEngine } from "./TowerEngine";
 
 /**
@@ -44,7 +44,7 @@ function stubEngine(opts: {
 
 describe("focus() crowd and hour plumbing", () => {
   it("reports the dominant kind's live fill against catalog capacity", () => {
-    const cap = FACILITIES.office.population;
+    const cap = kindFacts("office").population;
     const f = focus(
       stubEngine({
         units: [
@@ -60,7 +60,7 @@ describe("focus() crowd and hour plumbing", () => {
   it("clamps overfull venues to 1", () => {
     const f = focus(
       stubEngine({
-        units: [{ kind: "condo", floor: 5, x: 4, width: 4, occupants: FACILITIES.condo.population * 3 }],
+        units: [{ kind: "condo", floor: 5, x: 4, width: 4, occupants: kindFacts("condo").population * 3 }],
       }),
     );
     expect(f.crowd).toBe(1);
@@ -70,7 +70,7 @@ describe("focus() crowd and hour plumbing", () => {
     // The economy pass stamps an OPEN restaurant's `occupants` to the full
     // catalog population regardless of who is actually inside; the honest
     // fill for commercial kinds is the routed-customer tally `customersIn`.
-    const cap = FACILITIES.restaurant.population;
+    const cap = kindFacts("restaurant").population;
     const empty = focus(
       stubEngine({
         units: [{ kind: "restaurant", floor: 5, x: 4, width: 6, occupants: cap, customersIn: 0 }],
@@ -89,7 +89,7 @@ describe("focus() crowd and hour plumbing", () => {
   });
 
   it("uses the attendance capacity for population-0 venues", () => {
-    const att = FACILITIES.partyHall.attendance ?? 0;
+    const att = kindFacts("partyHall").attendance ?? 0;
     expect(att).toBeGreaterThan(0);
     const f = focus(
       stubEngine({
@@ -125,7 +125,7 @@ describe("focus() crowd and hour plumbing", () => {
   });
 
   it("refreshes the occupancy census at most once per second", () => {
-    const cap = FACILITIES.office.population;
+    const cap = kindFacts("office").population;
     const unit = { kind: "office", floor: 5, x: 4, width: 4, occupants: cap };
     const engine = stubEngine({ units: [unit] });
     let clock = 10_000;
@@ -143,7 +143,7 @@ describe("focus() crowd and hour plumbing", () => {
   });
 
   it("re-walks the census immediately when the dominant kind changes", () => {
-    const cap = FACILITIES.office.population;
+    const cap = kindFacts("office").population;
     const office = { kind: "office", floor: 5, x: 4, width: 2, occupants: cap };
     const shop = { kind: "shop", floor: 5, x: 6, width: 1, occupants: 0 };
     const engine = stubEngine({ units: [office, shop] });

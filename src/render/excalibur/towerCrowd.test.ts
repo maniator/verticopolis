@@ -1,8 +1,8 @@
 import { describe, it, expect, vi } from "vitest";
+import { kindFacts } from "../../tests/catalogKinds";
 import * as ex from "excalibur";
 import { FLOOR, TILE } from "../scale";
 import { carIndicator, type CarIndicator } from "../carIndicator";
-import { transportCarCapacity } from "../../engine/facilities";
 import { reap, reconcileCrowd, clearCrowd, clearMotion, updateMotion } from "./towerCrowd";
 
 /**
@@ -212,7 +212,8 @@ describe("zoom cull skips the per-frame loops (CAP-1's cost mechanism)", () => {
 
 describe("updateMotion repositions the moving actors", () => {
   it("moves each elevator car to its live shaft position and repaints on a state change", () => {
-    const cap = transportCarCapacity("elevatorStandard");
+    const cap = kindFacts("elevatorStandard").carCapacity ?? 0;
+    expect(cap, "a standard elevator car carries passengers").toBeGreaterThan(0);
     const changedInd = carIndicator(1, cap, cap); // ascending & full: differs from idle
     const changedKey = carKey(changedInd);
     const car = {

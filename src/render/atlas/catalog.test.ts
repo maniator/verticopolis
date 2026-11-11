@@ -1,8 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { kindFacts, keepsHours, openAt } from "../../tests/catalogKinds";
 import { catalogFacility } from "../../catalog/catalogTypes";
-import { FACILITIES, hasBusinessHours, isOpenAt } from "../../engine/facilities";
 import { catalogFor } from "../../tests/catalogFixture";
-import { subtypeListFor } from "../../engine/retailSubtypes";
 import type { FacilityKind } from "../../shared/types";
 import { FLOOR, TILE } from "../scale";
 import { allJobs } from "./browserEntry";
@@ -55,7 +54,7 @@ describe("room catalog", () => {
     expect(new Set(names).size).toBe(names.length);
     expect(names).toContain("room/office/occupied/-/w9/unlit/always/any/v0/home");
     expect(names).toContain("room/condo/occupied/-/w16/lit/always/late/v0/home");
-    expect(names).toContain("room/shop/occupied/Book Store/w12/lit/closed/any/v3/away".replace("w12", `w${FACILITIES.shop.width}`));
+    expect(names).toContain("room/shop/occupied/Book Store/w12/lit/closed/any/v3/away".replace("w12", `w${kindFacts("shop").width}`));
   });
   it("sizes rooms by catalog width and floors", () => {
     for (const j of stills) {
@@ -67,7 +66,7 @@ describe("room catalog", () => {
   });
   it("bakes every subtype plus the legacy no-subtype look", () => {
     for (const kind of roomKinds()) {
-      const list = subtypeListFor(kind);
+      const list = kindFacts(kind).subtypes;
       const subs = new Set(stills.filter((j) => j.keys.kind === kind).map((j) => j.keys.subtype));
       expect(subs.size).toBe((list?.length ?? 0) + 1);
     }
@@ -78,9 +77,9 @@ describe("room catalog", () => {
     expect(steps[0]).toMatchObject({ occupants: 1, outForMeal: 1 });
     expect(steps[3]).toMatchObject({ occupants: 3, outForMeal: 0 });
     expect(steps.length).toBe(occupantCap("office") + 1);
-    expect(occupantCap("cinema")).toBe(FACILITIES.cinema.attendance);
+    expect(occupantCap("cinema")).toBe(kindFacts("cinema").attendance);
     expect(occupantCap("condo")).toBe(5); // the largest Modern household
-    expect(occupantCap("office")).toBe(FACILITIES.office.population);
+    expect(occupantCap("office")).toBe(kindFacts("office").population);
     const parking = stills.find((j) => j.keys.kind === "parking")!;
     expect(Object.keys(parking.overlays!).sort()).toEqual(["car0", "car1", "car2", "car3", "car4", "car5", "car6", "dead"]);
     const recycling = stills.find((j) => j.keys.kind === "recycling")!;
@@ -89,9 +88,9 @@ describe("room catalog", () => {
   it("picks an hour that realizes the open and late bits", () => {
     for (const kind of roomKinds()) {
       for (const open of [true, false]) {
-        if (!hasBusinessHours(kind) && !open) continue;
+        if (!keepsHours(kind) && !open) continue;
         const h = hourFor(kind, open, false);
-        if (hasBusinessHours(kind)) expect(isOpenAt(kind, h)).toBe(open);
+        if (keepsHours(kind)) expect(openAt(kind, h)).toBe(open);
       }
     }
     expect(hourFor("condo", false, true)).toBe(23);

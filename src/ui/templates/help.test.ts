@@ -2,8 +2,8 @@ import { describe, it, expect, vi } from "vitest";
 import { helpTemplate } from "./help";
 import { HELP_SECTIONS, helpPrivacyBody } from "./helpContent";
 import { renderToFragment, click } from "../testing/litTestUtils";
-import { MODERN_RULES } from "../../engine/ruleSets";
-import type { GameRules } from "../../engine/gameRules";
+import type { CatalogRules } from "../../catalog/catalogTypes";
+import { catalogFor } from "../../tests/catalogFixture";
 
 /**
  * The Help / How-to-play dialog. Package: the semantic structure and a11y hooks
@@ -94,28 +94,27 @@ describe("helpTemplate structure and a11y", () => {
     expect(text).not.toContain("Game engine");
   });
 
-  // Drift guard. Every member of the GameRules seam is mapped either to a DISTINCT
-  // phrase the "Classic vs Modern" Help copy must contain, or to null when it
-  // carries no dedicated player-facing copy (a load-only sanitizer, an internal
-  // tuning knob, a UI-only affordance, or a same-direction shape difference not
-  // called out in this section). Phrases are per-rule and distinct, so deleting
-  // one bullet cannot pass on a phrase another rule happens to share.
+  // Drift guard. Each Classic vs Modern divergence the player can notice maps
+  // to a DISTINCT phrase the "Classic vs Modern" Help copy must contain.
+  // Phrases are per-rule and distinct, so deleting one bullet cannot pass on a
+  // phrase another rule happens to share.
   //
-  // The PRIMARY guard is the compile-time type: `Record<keyof GameRules, ...>`
-  // forces this literal to name every rule, so adding a Modern divergence to the
-  // GameRules interface breaks `npm run typecheck` at this line until it is
-  // classified (this is what would have caught the hotel late-checkout shipping
-  // with no copy). The runtime test below is only a PARTIAL backstop for the
-  // transpile-only test path (`npm test` does not type-check): it catches one
-  // case, a member present in MODERN_RULES but missing from RULE_TO_HELP. It does
-  // NOT detect an interface-only addition (a member added to GameRules but not to
-  // MODERN_RULES); typecheck owns that, where MODERN_RULES would itself fail to
-  // satisfy GameRules.
-  const RULE_TO_HELP: Record<keyof GameRules, string | null> = {
-    mode: null, // identity, not a divergence
-    hasVariantHouseholds: "Variant households",
+  // The mode rules the Rust engine publishes in its catalog (`CatalogRules`)
+  // are keyed by their catalog names, and the `Record<keyof CatalogRules, ...>`
+  // type makes this literal name each one, so a new catalog rule breaks
+  // `npm run typecheck` here until it is classified (a phrase, or null for a
+  // rule with no player-facing compare bullet). The runtime test below is the
+  // backstop for the transpile-only test path: it reads the catalog fixture's
+  // own rule keys. The other entries are the divergences the engine draws
+  // without a catalog rule, named as the Help copy names them.
+  const CATALOG_RULE_TO_HELP: Record<keyof CatalogRules, string | null> = {
+    variantHouseholds: "Variant households",
+    previewNamesRefusal: "Hovering an invalid spot",
+    scheduleAssist: "Smarter scheduling", // #305, presets + auto-tune + advice vs the raw grid
+  };
+  const RULE_TO_HELP: Record<string, string | null> = {
+    ...CATALOG_RULE_TO_HELP,
     sellCondo: "sets the sale price", // the 2-5 family draw scales the price
-    showsPreviewReason: "Hovering an invalid spot",
     allowsEscalatorOnOfficeFloors: "Escalators can serve office floors",
     walkwayWillingnessApplies: "Longer climbs", // Classic refuses a climb past a few flights, Modern lets people climb any number (#384/#503/#509); the "Longer climbs" compare bullet documents the divergence (#502)
     priceOptions: "Continuous pricing",
@@ -129,37 +128,17 @@ describe("helpTemplate structure and a11y", () => {
     demographicRoutines: "leave for school and return",
     rainCrowdFactor: "rain thins the crowd",
     hotelDaytimePresence: "linger past checkout", // #304, the late-checkout lunch trip
-    elevatorScheduleUX: "Smarter scheduling", // #305, presets + auto-tune + advice vs the raw grid
     quarterlyRentScale: "full 1994 rent lump", // Classic collects the full canon lump each 3-day quarter; Modern smooths per-day income across its calendar choice (spec-classic-economy-canon-cadence)
-    // No dedicated player-facing copy (folded, internal, load-only, or UI-only):
-    coerceResidents: null, // load-only household sanitizer
-    coerceNoRate: null, // load-only No-Rate sanitizer
-    churnMultiplier: null, // internal variant-household churn tuning
-    housekeepingShift: null, // internal maid-shift window
-    housekeepingTriage: null, // internal maid dispatch order
-    demandModel: null, // internal commercial-demand magnitudes
-    commercialDailyIncome: null, // internal commercial headline magnitudes (#572), same species as demandModel
-    lobbyDistanceDrain: null, // subtle band-vs-continuous shape of the lobby-distance pressure
-    fitnessHaloBonus: null, // Modern amenity halo; a subtle satisfaction nudge, no dedicated Help copy
-    nightclubNoisePenalty: null, // Modern nightclub negative halo; covered by the "new places" copy, no dedicated seam line
-    spaSerenityBonus: null, // Modern spa positive halo for hotels; covered by the "new places" copy, no dedicated seam line
-    viewPremium: null, // Modern sky bar height-scaled income; covered by the "new places" copy, no dedicated seam line
-    daycareFamilyBonus: null, // Modern daycare family-scaled condo halo; covered by the "new places" copy, no dedicated seam line
-    bridgingToggleable: null, // Modern build affordance surfaced in New Tower + Settings, not a "Classic vs Modern" compare bullet
-    roomIsPermanent: null, // the reference's copy of Rust's Classic permanent rooms; the refusal names the rule where it applies, with no compare bullet
   };
 
-  it("classifies every MODERN_RULES member for Help copy (test-path backstop only)", () => {
-    // Partial backstop for the transpile-only test path (esbuild strips the
-    // Record type): fails only when a member present in MODERN_RULES is missing
-    // from RULE_TO_HELP. An interface-only addition is caught by typecheck, not
-    // here. Enumerate the live implementation's own keys (MODERN_RULES is a plain
-    // object literal, so Object.keys sees all of them).
-    for (const member of Object.keys(MODERN_RULES)) {
-      expect(
-        RULE_TO_HELP,
-        `GameRules.${member} is unclassified: add it to RULE_TO_HELP in help.test.ts with a Help phrase, or null if it carries no player-facing "Classic vs Modern" copy.`,
-      ).toHaveProperty(member);
+  it("classifies every mode rule the engine's catalog publishes (test-path backstop)", () => {
+    for (const mode of ["classic", "modern"] as const) {
+      for (const rule of Object.keys(catalogFor(mode).rules)) {
+        expect(
+          CATALOG_RULE_TO_HELP,
+          `catalog rule ${rule} is unclassified: add it to CATALOG_RULE_TO_HELP in help.test.ts with a Help phrase, or null if it carries no player-facing "Classic vs Modern" copy.`,
+        ).toHaveProperty(rule);
+      }
     }
   });
 
@@ -178,7 +157,7 @@ describe("helpTemplate structure and a11y", () => {
     const text = sectionBySummary(frag, "Classic vs Modern")!.textContent ?? "";
     for (const [member, phrase] of Object.entries(RULE_TO_HELP)) {
       if (phrase !== null) {
-        expect(text, `Help copy is missing the phrase for GameRules.${member}: "${phrase}"`).toContain(phrase);
+        expect(text, `Help copy is missing the phrase for ${member}: "${phrase}"`).toContain(phrase);
       }
     }
     // The Classic-fidelity report call-out is not a rule, but it anchors the

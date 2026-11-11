@@ -1,12 +1,16 @@
 import { describe, it, expect } from "vitest";
 import { clampCameraY, fitZoom, FIT_SKY_FLOORS, MIN_FIT_SPAN_FLOORS, MAX_FIT_ZOOM, SKY_HEADROOM_FLOORS } from "./cameraBounds";
 import { VIEW_ZOOM_MIN } from "../shared/types";
-import { GRID } from "../engine/facilities";
+import { catalogFor } from "../tests/catalogFixture";
 import { CRANE_H } from "./sprites/structure/rooftop";
-// Pull the buildable bounds from the real GRID and FLOOR from the pure
+// Pull the buildable bounds from the engine catalog and FLOOR from the pure
 // render/scale module so the test can't drift if the tower geometry or the
 // render scale changes (the helper itself is parameterized by floorPx).
 import { FLOOR } from "./scale";
+
+/** The lot's geometry, from the Rust engine's catalog (`engine-rs/src/catalog.rs` world). */
+const WORLD = catalogFor("classic").world;
+const GRID = { width: WORLD.lotWidth, minFloor: WORLD.minFloor, maxFloor: WORLD.maxFloor };
 const MIN_FLOOR = GRID.minFloor; // deepest buildable (B10)
 const MAX_FLOOR = GRID.maxFloor;
 const VIEW_H = 800;

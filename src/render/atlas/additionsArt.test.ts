@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { FACILITIES, facilityFloors } from "../../engine/facilities";
+import { kindFacts } from "../../tests/catalogKinds";
 import type { FacilityKind } from "../../shared/types";
 import { RECYCLING_GAUGE_ROWS, RECYCLING_PILE_SLOTS, recyclingLook } from "../sprites/facilities/recyclingLook";
 import { FLOOR, TILE } from "../scale";
@@ -47,12 +47,12 @@ function recordingCtx(): { ctx: CanvasRenderingContext2D; log: string[] } {
 }
 
 function room(kind: FacilityKind, extra: Partial<UnitPaint>): UnitPaint {
-  return { p: "unit", kind, state: "occupied", floor: 5, x: 17, id: 3, width: FACILITIES[kind].width, occupants: 0, outForMeal: 0, lit: false, hour: 14, anim: 0, ...extra };
+  return { p: "unit", kind, state: "occupied", floor: 5, x: 17, id: 3, width: kindFacts(kind).width, occupants: 0, outForMeal: 0, lit: false, hour: 14, anim: 0, ...extra };
 }
 
 function calls(s: UnitPaint): string[] {
   const { ctx, log } = recordingCtx();
-  paint(ctx, s, s.width * TILE, facilityFloors(s.kind) * FLOOR);
+  paint(ctx, s, s.width * TILE, kindFacts(s.kind).floors * FLOOR);
   return log;
 }
 

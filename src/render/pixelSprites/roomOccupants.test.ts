@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { kindFacts } from "../../tests/catalogKinds";
 import type { FacilityKind, Unit } from "../../shared/types";
-import { FACILITIES } from "../../engine/facilities";
 import { drawRoom } from "../pixelSprites";
 import { lookupRoom, type LiveScene } from "../atlas/lookup";
 import { occupantCap } from "../atlas/catalog";
@@ -55,7 +55,7 @@ describe("roomOccupants agrees with the atlas reader", () => {
   const out = [undefined, -9, -0.5, 0, 1, 1.5, 9, Number.NaN, Number.POSITIVE_INFINITY];
   it.each(counts)("occupants %s", (occupants) => {
     for (const outForMeal of out) {
-      const u = { kind: "nightclub" as const, state: "occupied" as const, width: FACILITIES.nightclub.width, occupants, outForMeal, id: 1 };
+      const u = { kind: "nightclub" as const, state: "occupied" as const, width: kindFacts("nightclub").width, occupants, outForMeal, id: 1 };
       const atlas = lookupRoom(u, DAY, 0);
       const atlasCount = "chains" in atlas && atlas.chains ? (atlas.chains.occupants ?? 0) : 0;
       expect(roomOccupants(u), `outForMeal ${outForMeal}`).toBe(atlasCount);
@@ -98,7 +98,7 @@ describe("a rewired room's crowd only grows", () => {
     const hour = OPEN_HOUR[kind] ?? 12;
     const cap = occupantCap(kind);
     for (let x = 0; x < 16; x++) {
-      const base = { id: 7, floor: 12, x, kind, subtype, state: "occupied", width: FACILITIES[kind].width, satisfaction: 0.8 };
+      const base = { id: 7, floor: 12, x, kind, subtype, state: "occupied", width: kindFacts(kind).width, satisfaction: 0.8 };
       let prev = draws({ ...base, occupants: 1 } as Unit, hour);
       for (let n = 2; n <= cap; n++) {
         const next = draws({ ...base, occupants: n } as Unit, hour);
@@ -118,7 +118,7 @@ describe("a rewired room draws a fractional occupancy as the whole people the at
   it.each(CASES)("%s %s", (kind, subtype) => {
     const hour = OPEN_HOUR[kind] ?? 12;
     const cap = occupantCap(kind);
-    const base = { id: 7, floor: 12, x: 5, kind, subtype, state: "occupied", width: FACILITIES[kind].width, satisfaction: 0.8 };
+    const base = { id: 7, floor: 12, x: 5, kind, subtype, state: "occupied", width: kindFacts(kind).width, satisfaction: 0.8 };
     for (const k of [1, 2, 3, 5].filter((n) => n <= cap)) {
       const whole = draws({ ...base, occupants: k } as Unit, hour);
       for (const frac of [k - 0.5, k - 0.01]) {

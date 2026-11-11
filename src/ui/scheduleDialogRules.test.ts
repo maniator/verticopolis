@@ -1,19 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { catalogFor } from "../tests/catalogFixture";
-import { makeRules } from "../engine/gameRules";
-import { topOriginFloors } from "../engine/scheduleOrigins";
 import { HOTSPOT_FLOORS, HOTSPOT_MIN_SHARE, hotspotFloors, scheduleDialogUX } from "./scheduleDialogRules";
 
 describe("scheduleDialogUX", () => {
   it("offers Classic the raw grid alone and Modern every assisted tool", () => {
     expect(scheduleDialogUX(catalogFor("classic").rules)).toEqual({ presets: false, autoTune: false, advice: false, rawGridDefault: true });
     expect(scheduleDialogUX(catalogFor("modern").rules)).toEqual({ presets: true, autoTune: true, advice: true, rawGridDefault: false });
-  });
-
-  it("shows what the TypeScript rule set showed in each mode, while that engine exists", () => {
-    for (const mode of ["classic", "modern"] as const) {
-      expect(scheduleDialogUX(catalogFor(mode).rules), mode).toEqual(makeRules(mode).elevatorScheduleUX());
-    }
   });
 });
 
@@ -38,10 +30,7 @@ describe("hotspotFloors (#465)", () => {
 
   it("breaks count ties toward the lower floor for a stable readout", () => {
     expect(hotspotFloors(new Map([[9, 10], [3, 10]]))).toEqual([3, 9]);
-  });
-
-  it("marks the floors the TypeScript engine's ranking marked, while that engine exists", () => {
-    const slots = [new Map([[1, 10], [7, 30], [4, 2]]), new Map([[-2, 4], [12, 4], [30, 1]]), new Map([[5, 1]])];
-    for (const slot of slots) expect(hotspotFloors(slot)).toEqual(topOriginFloors(slot));
+    // A basement floor ranks like any other, and the thin top floor falls under the share.
+    expect(hotspotFloors(new Map([[-2, 4], [12, 4], [30, 1]]))).toEqual([-2, 12]);
   });
 });

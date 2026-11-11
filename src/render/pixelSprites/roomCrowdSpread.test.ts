@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { kindFacts } from "../../tests/catalogKinds";
 import type { FacilityKind, Unit } from "../../shared/types";
-import { FACILITIES } from "../../engine/facilities";
 import { drawRoom } from "../pixelSprites";
 import { FLOOR, TILE } from "../scale";
 import type { RoomCtx } from "./common";
@@ -39,7 +39,7 @@ function figures(u: Unit, hour: number): Figure[] {
 const key = (f: Figure): string => `${f.x},${f.y}`;
 
 function unitAt(kind: FacilityKind, subtype: string | undefined, x: number, occupants: number): Unit {
-  return { id: 7, floor: 12, x, kind, subtype, state: "occupied", width: FACILITIES[kind].width, satisfaction: 0.8, occupants } as Unit;
+  return { id: 7, floor: 12, x, kind, subtype, state: "occupied", width: kindFacts(kind).width, satisfaction: 0.8, occupants } as Unit;
 }
 
 const SPREAD: [FacilityKind, string | undefined, number][] = [
@@ -57,7 +57,7 @@ describe("a lone visitor is spread over the whole row", () => {
     const staff = new Set(rooms[0].map(key).filter((k) => rooms.every((r) => r.some((f) => key(f) === k))));
     const visitors = rooms.flat().filter((f) => !staff.has(key(f))).map((f) => f.x);
     // The full crowd gives the row's extent.
-    const full = figures(unitAt(kind, subtype, 3, FACILITIES[kind].population ?? 0), hour).filter((f) => !staff.has(key(f))).map((f) => f.x);
+    const full = figures(unitAt(kind, subtype, 3, kindFacts(kind).population), hour).filter((f) => !staff.has(key(f))).map((f) => f.x);
     const lo = Math.min(...full);
     const hi = Math.max(...full);
     const span = hi - lo;
@@ -71,7 +71,7 @@ describe("a lone visitor is spread over the whole row", () => {
 
 describe("the nightclub crowd", () => {
   it("dances on a 6px pitch and stops short of the booth", () => {
-    const u = unitAt("nightclub", undefined, 3, FACILITIES.nightclub.population ?? 0);
+    const u = unitAt("nightclub", undefined, 3, kindFacts("nightclub").population);
     const w = u.width * TILE;
     const all = figures(u, 22);
     const floorY = Math.max(...all.map((f) => f.y));

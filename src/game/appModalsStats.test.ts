@@ -1,6 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
 import type { GameApp } from "../main";
-import type { Simulation } from "../engine/Simulation";
 import { showStats, confirmExterminate } from "./appModals";
 import { statsTemplate } from "../ui/templates/stats";
 import { towerCatalog } from "../catalog/towerCatalog";
@@ -82,7 +81,7 @@ describe("showStats", () => {
       report: statsReport(enginePort.statsSheet.mock.results[0].value as Float64Array, app.portCodes),
       header: reader.header,
       towerName: "Fake",
-      catalog: towerCatalog(sim as unknown as Simulation),
+      catalog: towerCatalog(sim),
     });
   });
 

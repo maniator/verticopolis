@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
+import { kindFacts } from "../tests/catalogKinds";
 import { FLOOR, TILE, TRANSPORT_BAND_FLOORS } from "./scale";
-import { FACILITIES } from "../engine/facilities";
 
 /**
  * The render-scale invariants: the world holds the 1994 original's 4.5 tiles per
@@ -32,12 +32,12 @@ describe("render scale", () => {
     // the belief that the original's was square. Measurement says otherwise: the
     // original's 4-tile car is 32 x 36. The old pin locked in a car 12.5% too
     // wide for its height, and every sprite drawn against it inherited that.
-    const carWidth = FACILITIES.elevatorStandard.width * TILE;
+    const carWidth = kindFacts("elevatorStandard").width * TILE;
     expect(carWidth).toBeLessThan(FLOOR);
     expect(FLOOR / carWidth).toBeCloseTo(36 / 32, 5);
     // Canon: standard and service share the footprint (a service elevator is a
     // staff-only standard elevator), so the service car has the same shape.
-    expect(FACILITIES.elevatorService.width).toBe(FACILITIES.elevatorStandard.width);
+    expect(kindFacts("elevatorService").width).toBe(kindFacts("elevatorStandard").width);
   });
 
   it("shaft texture bands stay under the 2048px mobile GPU limit", () => {

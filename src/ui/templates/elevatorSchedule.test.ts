@@ -6,8 +6,13 @@ import {
   type SchedState,
   type SchedHandlers,
 } from "./elevatorSchedule";
-import { CLASSIC_RULES, MODERN_RULES } from "../../engine/gameRules";
+import { catalogFor } from "../../tests/catalogFixture";
+import { scheduleDialogUX } from "../scheduleDialogRules";
 import { renderToFragment, click, change } from "../testing/litTestUtils";
+
+/** What each mode's schedule dialog offers, from the Rust engine's catalog rules. */
+const CLASSIC_UX = scheduleDialogUX(catalogFor("classic").rules);
+const MODERN_UX = scheduleDialogUX(catalogFor("modern").rules);
 
 /**
  * The per-shaft elevator Schedule dialog template (elevator-scheduling #305
@@ -42,7 +47,7 @@ const noop: SchedHandlers = {
 
 const ctx = (over: Partial<SchedCtx> = {}): SchedCtx => ({
   title: "Schedule: Standard elevator (floors 1-10)",
-  ux: MODERN_RULES.elevatorScheduleUX(),
+  ux: MODERN_UX,
   isExpress: false,
   cars: 4,
   hasMeasured: true,
@@ -81,7 +86,7 @@ const state = (over: Partial<SchedState> = {}): SchedState => ({
 describe("elevatorScheduleTemplate: Classic vs Modern shape", () => {
   it("Classic shows the raw count strip with no presets, Advanced fold, or advice", () => {
     const frag = renderToFragment(
-      elevatorScheduleTemplate(ctx({ ux: CLASSIC_RULES.elevatorScheduleUX() }), state({ adviceMsg: "ignored" }), noop),
+      elevatorScheduleTemplate(ctx({ ux: CLASSIC_UX }), state({ adviceMsg: "ignored" }), noop),
     );
     expect(frag.querySelector(".es-strip")).not.toBeNull();
     expect(frag.querySelector(".es-adv")).toBeNull();
@@ -329,7 +334,7 @@ describe("elevatorScheduleTemplate: day toggle and actions", () => {
 
 describe("elevatorScheduleTemplate: run every car (#1546)", () => {
   it("offers the whole-fleet action in Classic and Modern, naming the fleet and both day types", () => {
-    for (const ux of [CLASSIC_RULES.elevatorScheduleUX(), MODERN_RULES.elevatorScheduleUX()]) {
+    for (const ux of [CLASSIC_UX, MODERN_UX]) {
       const onAllCars = vi.fn();
       const frag = renderToFragment(elevatorScheduleTemplate(ctx({ ux }), state(), { ...noop, onAllCars }));
       const btn = frag.querySelector<HTMLButtonElement>(".es-allcars")!;
