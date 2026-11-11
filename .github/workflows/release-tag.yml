@@ -7,16 +7,18 @@ name: Release tags
 # - an app version change in package.json tags v<version> on the merge commit
 #   and dispatches github-release.yml for it, which publishes the release with
 #   the version's player notes and then hands the tag to sprite-atlas.yml to
-#   attach the sprite atlas. A tag created with the
+#   attach the sprite atlas, and dispatches deploy-production.yml, which
+#   deploys production from the tag. A tag created with the
 #   workflow token does not start a tag-push workflow, so this dispatches the
-#   run itself (a workflow_dispatch from the workflow token does run);
+#   runs itself (a workflow_dispatch from the workflow token does run);
 # - a crate version change in engine-rs/Cargo.toml publishes engine-v<version>
 #   as its own release with that version's engine-rs/CHANGELOG.md section. It
 #   is never marked Latest, so the app release stays the repo's Latest. It
 #   carries the built WASM package (Node and browser builds) and its checksum,
 #   the same build goes to GitHub Packages as @<owner>/verticopolis-engine, and
 #   a frontend can depend on the crate at that tag through git. GitHub Packages
-#   has no Cargo registry; publishing to crates.io or npmjs is #893.
+#   has no Cargo registry; publishing to crates.io or npmjs is #893. When the
+#   app version did not move, the crate tag dispatches the production deploy.
 #
 # A tag or release that already exists is left alone, so a re-run is safe.
 on:
@@ -82,6 +84,8 @@ jobs:
           fi
           gh workflow run github-release.yml --ref main -f tag="$tag"
           echo "Dispatched the GitHub release for $tag."
+          gh workflow run deploy-production.yml --ref main -f tag="$tag"
+          echo "Dispatched the production deploy for $tag."
 
       # The crate release carries the built WASM package. These steps run only
       # for a crate version change, and the package usually comes from the
@@ -157,6 +161,23 @@ jobs:
           gh release upload "$tag" "$ZIP" "$ZIP.sha256"
           gh release edit "$tag" --draft=false --latest=false
           echo "Published $tag with $ZIP."
+
+      # A release that raised only the crate still changes the engine the web
+      # game ships, so it deploys too, from the crate tag the step above
+      # created. An app release already dispatched its own deploy. A failed
+      # crate release holds this deploy; re-run this workflow, or run Deploy
+      # production by hand with the crate tag once it exists.
+      - name: Deploy production for a crate-only release
+        if: ${{ steps.pack.outcome == 'success' && steps.versions.outputs.app == steps.versions.outputs.app_was }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          VERSION: ${{ steps.versions.outputs.crate }}
+        run: |
+          set -euo pipefail
+          tag="engine-v$VERSION"
+          gh workflow run deploy-production.yml --ref main -f tag="$tag"
+          echo "Dispatched the production deploy for $tag."
 
       # GitHub Packages has an npm registry but no Cargo one, so the crate
       # itself ships through the git tag; this is the built WASM package.

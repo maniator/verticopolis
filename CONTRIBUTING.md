@@ -640,6 +640,35 @@ ships everything pending as one numbered build. Production deploys only on a
 release merge: a push to `main` whose commit leaves the app and crate versions
 as its parent had them is skipped, even with no note pending.
 
+**Production deploys from the release tag.** Vercel's git integration builds
+previews only (`vercel.json` turns it off for `main`). When `release-tag.yml`
+tags a release merge it dispatches **Deploy production**
+(`.github/workflows/deploy-production.yml`) with the tag: `v<version>` for an
+app release, or `engine-v<version>` when only the crate moved. That run checks
+the tag is a release on `main`, runs the gate above against its commit, builds
+with `vercel build --prod` (which runs `scripts/vercel-build.sh`, engine
+included) and deploys the prebuilt output, then waits until the production
+domain points at that new deployment and its `/version.json` reports the tag's
+commit (a redeploy of the live release serves the same `version.json`, so the
+domain check is what proves it switched). To redeploy, run **Deploy production**
+from the Actions tab with the release tag. A run for an older release than the
+one on `main` deploys nothing unless its `rollback` box is ticked, so a slow
+automatic run never puts an older release over a newer one. Each production
+deployment carries its release tag and commit as Vercel metadata, so for an
+instant rollback without a rebuild, find the release with
+`vercel ls --prod --meta release=v<version>` and `vercel promote` its URL (the
+Deploy production run's summary prints that command for its own deployment). An
+app release also gets the deployed web build attached as
+`verticopolis-web-<version>.zip` with its SHA-256 checksum and
+`verticopolis-web-<version>.SHA256SUMS`, one checksum per file, beside the
+engine package zip a crate release carries. Before a deploy passes, it checks
+every file production serves (source maps aside, which production does not
+serve publicly) against that list, so the live site is byte for byte the
+release's build; `sha256sum -c` against the list checks a download the same
+way. It
+needs the `VERCEL_TOKEN`, `VERCEL_ORG_ID` and `VERCEL_PROJECT_ID` secrets in
+the `production` environment and fails, naming the missing one, without them.
+
 **Cutting the release.** Run the **Cut release** workflow (`release-pr.yml`)
 from the Actions tab, with an app version such as `3.0.0` for a headline
 release or empty for the levels the notes ask for. It runs `npm run release`

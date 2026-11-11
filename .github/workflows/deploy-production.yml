@@ -1,0 +1,377 @@
+name: Deploy production
+
+# Deploys production from a release tag (#1882). Vercel's git integration no
+# longer deploys `main` (vercel.json `git.deploymentEnabled`); it still builds
+# the previews for every other branch. Production moves only here:
+#
+# - release-tag.yml dispatches this run when a release PR merges, with the
+#   app tag (v<x.y.z>) it just created, or the crate tag (engine-v<x.y.z>)
+#   when a release raised only the engine crate version. A tag created with
+#   the workflow token starts no tag-push workflow, hence the dispatch;
+# - a maintainer can run it from the Actions tab with a release tag to
+#   redeploy it. A run for an older release than the one on main deploys
+#   nothing unless `rollback` is ticked, so a slow automatic dispatch can never
+#   put an older release over a newer one.
+#
+# The run checks that the tag is a release tag on `main` and that its commit
+# is a release commit by the same gate the Vercel build step uses
+# (scripts/vercel-ignore-build.sh with VERCEL_ENV=production), then builds and
+# deploys with the Vercel CLI. `vercel build` runs vercel.json's install and
+# build commands, so scripts/vercel-build.sh builds the WASM engine with its
+# pinned toolchain exactly as a Vercel build does. The run passes only once
+# the production domain points at the new deployment and its /version.json
+# reports the tag's commit.
+#
+# Secrets: VERCEL_TOKEN, VERCEL_ORG_ID and VERCEL_PROJECT_ID, held by the
+# `production` environment (limit that environment to the main branch). The
+# secrets reach only the step that checks they are set and the steps that talk
+# to Vercel; the build runs without them, and the checks run in a job that has
+# no access to them. This workflow has no push or pull request trigger, so code
+# from a fork or an open PR never runs beside the token.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to deploy: v<x.y.z> or engine-v<x.y.z>"
+        required: true
+      rollback:
+        description: "Deploy it even when main has a newer release (a rollback)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+env:
+  PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+  PRODUCTION_URL: https://verticopolis.com
+
+jobs:
+  # Decides whether to deploy, without the production environment's secrets.
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      sha: ${{ steps.tag.outputs.sha }}
+      deploy: ${{ steps.newest.outputs.deploy }}
+    steps:
+      - name: Check the tag name
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          if ! printf '%s' "$TAG" | grep -Eq '^(engine-)?v[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::$TAG is not a release tag (v<x.y.z> or engine-v<x.y.z>)."
+            exit 1
+          fi
+
+      # Depth 2: the release gate compares the commit with its first parent.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: refs/tags/${{ inputs.tag }}
+          fetch-depth: 2
+          persist-credentials: false
+
+      - name: Check the tag is a release on main
+        id: tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          sha="$(git rev-parse HEAD)"
+          tagged="$(git rev-parse --verify --quiet "refs/tags/$TAG^{commit}" || true)"
+          if [ "$sha" != "$tagged" ]; then echo "::error::HEAD $sha is not tag $TAG ($tagged)."; exit 1; fi
+          case "$TAG" in
+            engine-v*)
+              version="$(awk '/^\[package\]/ { p = 1; next } /^\[/ { p = 0 } p && /^version *=/ { gsub(/.*= *"|".*/, ""); print; exit }' engine-rs/Cargo.toml)"
+              want="engine-v$version"; file="engine-rs/Cargo.toml" ;;
+            *)
+              version="$(node -p "require('./package.json').version")"
+              want="v$version"; file="package.json" ;;
+          esac
+          if [ "$TAG" != "$want" ]; then echo "::error::Tag $TAG does not match $file version $version (expected $want)."; exit 1; fi
+          # "identical" or "ahead": main is this commit or contains it.
+          status="$(gh api "repos/$GH_REPO/compare/$sha...main" --jq .status)"
+          case "$status" in
+            identical | ahead) echo "$TAG ($sha) is on main." ;;
+            *) echo "::error::$TAG ($sha) is not on main (compare status: $status)."; exit 1 ;;
+          esac
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+
+      # The gate exits 1 to build and 0 to skip (Vercel's contract). In
+      # production it skips a commit that still holds release notes or leaves
+      # both versions as its parent had them, so only a release merge deploys.
+      - name: Check the commit is a release commit
+        run: |
+          set +e
+          VERCEL_ENV=production bash scripts/vercel-ignore-build.sh
+          gate=$?
+          set -e
+          if [ "$gate" != 1 ]; then
+            echo "::error::The release gate does not deploy this commit (exit $gate); production deploys only a release merge."
+            exit 1
+          fi
+
+      # A newer release on main means this run is stale (an automatic dispatch
+      # that was slow to arrive) or a rollback. Only a ticked `rollback`
+      # deploys it; otherwise the run ends green and deploys nothing.
+      - name: Check main has no newer release
+        id: newest
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          ROLLBACK: ${{ inputs.rollback }}
+        run: |
+          set -euo pipefail
+          crate_of() { awk '/^\[package\]/ { p = 1; next } /^\[/ { p = 0 } p && /^version *=/ { gsub(/.*= *"|".*/, ""); print; exit }'; }
+          here="$(node -p "require('./package.json').version") $(crate_of < engine-rs/Cargo.toml)"
+          main="$(gh api -H "Accept: application/vnd.github.raw" "repos/$GH_REPO/contents/package.json?ref=main" | node -e 'process.stdout.write(JSON.parse(require("fs").readFileSync(0, "utf8")).version)') $(gh api -H "Accept: application/vnd.github.raw" "repos/$GH_REPO/contents/engine-rs/Cargo.toml?ref=main" | crate_of)"
+          if [ "$here" = "$main" ]; then
+            echo "deploy=true" >> "$GITHUB_OUTPUT"
+          elif [ "$ROLLBACK" = "true" ]; then
+            echo "::notice::Rolling back: main is at app and crate $main, this release is $here."
+            echo "deploy=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::Not deploying: main has a newer release (app and crate $main) than this one ($here). Run again with rollback ticked to deploy it anyway."
+            echo "deploy=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  deploy:
+    needs: check
+    if: ${{ needs.check.outputs.deploy == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    environment: production
+    # One deploy at a time, and a running deploy is never cancelled. GitHub
+    # keeps one pending job per group and cancels the older pending one when
+    # another arrives, so the group sits here, after the check, where most
+    # stale runs have already stopped. A run that passed the check just
+    # before a newer release merged can still arrive later and displace that
+    # release's pending deploy; the Deploy step then finds itself stale and
+    # starts a fresh deploy of the newest release, so it is never lost.
+    permissions:
+      contents: read
+      actions: write
+    concurrency:
+      group: production-deploy
+      cancel-in-progress: false
+    env:
+      SHA: ${{ needs.check.outputs.sha }}
+    steps:
+      # The commit the check job approved, even if the tag moved since.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.check.outputs.sha }}
+          persist-credentials: false
+
+      - name: Check the Vercel secrets
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: |
+          missing=""
+          [ -n "$VERCEL_TOKEN" ] || missing="$missing VERCEL_TOKEN"
+          [ -n "$VERCEL_ORG_ID" ] || missing="$missing VERCEL_ORG_ID"
+          [ -n "$VERCEL_PROJECT_ID" ] || missing="$missing VERCEL_PROJECT_ID"
+          if [ -n "$missing" ]; then
+            echo "::error::Production was not deployed: the production environment is missing these secrets:$missing"
+            exit 1
+          fi
+
+      - name: Use Node.js (from .nvmrc)
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: ".nvmrc"
+          cache: "npm"
+
+      # Exact, so the CLI that holds the token changes only in a reviewed PR.
+      - name: Install the Vercel CLI
+        run: npm install --global vercel@65.4.0
+
+      - name: Pull the production settings
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: vercel pull --yes --environment=production --token "$VERCEL_TOKEN"
+
+      # Runs npm ci and scripts/vercel-build.sh (vercel.json) with the pulled
+      # production environment. No token: the build needs none.
+      - name: Build
+        run: vercel build --prod
+
+      # One SHA-256 line per file of the static build (dist/, the engine
+      # package included). The last step checks production serves exactly
+      # these bytes, and the archive job publishes the list with the release,
+      # so anyone can check the live site against a release later. It cannot
+      # go in version.json, which is one of the files it lists.
+      - name: Record the web build's checksums
+        run: (cd dist && find . -type f -printf '%P\0' | LC_ALL=C sort -z | xargs -0 sha256sum) > web-SHA256SUMS
+
+      # Kept for the release's archive job. Only an app tag gets one.
+      - name: Keep the web build for the release
+        if: ${{ startsWith(inputs.tag, 'v') }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: web-build
+          path: |
+            dist/
+            web-SHA256SUMS
+          # dist/.well-known/assetlinks.json is a hidden file, and the
+          # action leaves those out unless told otherwise.
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Deploy
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          TAG: ${{ inputs.tag }}
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          ROLLBACK: ${{ inputs.rollback }}
+        run: |
+          set -euo pipefail
+          # The check job's newer-release test, again just before going live,
+          # in case a newer release merged while this run built.
+          if [ "$ROLLBACK" != "true" ]; then
+            crate_of() { awk '/^\[package\]/ { p = 1; next } /^\[/ { p = 0 } p && /^version *=/ { gsub(/.*= *"|".*/, ""); print; exit }'; }
+            here="$(node -p "require('./package.json').version") $(crate_of < engine-rs/Cargo.toml)"
+            main="$(gh api -H "Accept: application/vnd.github.raw" "repos/$GH_REPO/contents/package.json?ref=main" | node -e 'process.stdout.write(JSON.parse(require("fs").readFileSync(0, "utf8")).version)') $(gh api -H "Accept: application/vnd.github.raw" "repos/$GH_REPO/contents/engine-rs/Cargo.toml?ref=main" | crate_of)"
+            if [ "$here" != "$main" ]; then
+              # This run may have displaced the newest release's pending
+              # deploy from the queue, so start that deploy again. Of main's
+              # app and crate tags, the newest release is the later commit.
+              read -r app crate <<< "$main"
+              newest=""
+              for t in "v$app" "engine-v$crate"; do
+                if gh api "repos/$GH_REPO/git/ref/tags/$t" > /dev/null 2>&1; then
+                  if [ -z "$newest" ] || [ "$(gh api "repos/$GH_REPO/compare/$newest...$t" --jq .status)" = "ahead" ]; then newest="$t"; fi
+                fi
+              done
+              if [ -n "$newest" ]; then
+                gh workflow run deploy-production.yml --ref main -f tag="$newest"
+                echo "::error::A newer release (app and crate $main) reached main while this run built $here; not deploying over it. Started a deploy of $newest in case this run displaced it. Run again with rollback ticked to deploy $TAG anyway."
+              else
+                echo "::error::A newer release (app and crate $main) reached main while this run built $here; not deploying over it. Neither v$app nor engine-v$crate is tagged yet, so its own deploy is still to come."
+              fi
+              exit 1
+            fi
+          fi
+          # The release tag and commit ride on the deployment as metadata, so
+          # a release is easy to find for an instant rollback that skips the
+          # rebuild: `vercel ls --prod --meta release=v<x.y.z>`, then
+          # `vercel promote <that deployment's URL>`.
+          out="$(vercel deploy --prebuilt --prod --meta release="$TAG" --meta commit="$SHA" --token "$VERCEL_TOKEN")"
+          # The CLI prints the new deployment's URL; read it whatever else it prints.
+          url="$(printf '%s\n' "$out" | grep -Eo 'https://[A-Za-z0-9.-]+\.vercel\.app' | head -n 1 || true)"
+          if [ -z "$url" ]; then echo "::error::vercel deploy printed no deployment URL: $out"; exit 1; fi
+          echo "DEPLOYMENT_HOST=${url#https://}" >> "$GITHUB_ENV"
+          echo "Deployed $TAG ($SHA) as $url."
+          {
+            echo "Deployed \`$TAG\` (\`$SHA\`) to production as $url."
+            echo ""
+            echo "Roll back to this release later without a rebuild: \`vercel promote $url\` (find it again with \`vercel ls --prod --meta release=$TAG\`)."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # Two checks, because a redeploy of the live release serves the same
+      # version.json. The production domain must point at the deployment this
+      # run made (Vercel's API), and the domain must serve this commit's
+      # version.json (no-store), so the new build is what players get.
+      - name: Check production serves this deployment
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          set -uo pipefail
+          api() { curl -fsS --max-time 15 -H "Authorization: Bearer $VERCEL_TOKEN" "https://api.vercel.com$1?teamId=$VERCEL_ORG_ID"; }
+          domain="${PRODUCTION_URL#https://}"
+          deployment="$(api "/v13/deployments/$DEPLOYMENT_HOST" | jq -r '.id // empty')"
+          if [ -z "$deployment" ]; then echo "::error::Vercel does not know the deployment $DEPLOYMENT_HOST."; exit 1; fi
+          for attempt in $(seq 1 20); do
+            aliased="$(api "/v4/aliases/$domain" | jq -r '.deploymentId // empty' || true)"
+            served="$(curl -fsS --max-time 15 "$PRODUCTION_URL/version.json?deploy=$deployment" | jq -r '.sha // empty' 2>/dev/null || true)"
+            if [ "$aliased" = "$deployment" ] && [ -n "$served" ] && [ "${SHA#"$served"}" != "$SHA" ]; then
+              echo "$domain points at $deployment and serves $TAG ($served)."
+              break
+            fi
+            if [ "$attempt" = 20 ]; then
+              echo "::error::$domain did not switch to $deployment serving $TAG ($SHA) after the deploy."
+              exit 1
+            fi
+            echo "Attempt $attempt: $domain points at ${aliased:-nothing} (want $deployment) and serves ${served:-nothing readable} (want ${SHA:0:7})."
+            sleep 15
+          done
+          # Every file of the build, byte for byte, as production serves it.
+          # Source maps are left out: production answers 403 to them (the
+          # project keeps them from the public), though the list and the
+          # release zip still carry them.
+          bad=0
+          checked=0
+          while read -r want path; do
+            case "$path" in *.map) continue ;; esac
+            checked=$((checked + 1))
+            got="$(curl -fsS --compressed --max-time 30 "$PRODUCTION_URL/$path" | sha256sum | cut -d' ' -f1 || true)"
+            if [ "$got" != "$want" ]; then echo "::error::$PRODUCTION_URL/$path does not match the build."; bad=$((bad + 1)); fi
+          done < web-SHA256SUMS
+          if [ "$checked" = 0 ]; then echo "::error::The build's checksum list names no file to check."; exit 1; fi
+          if [ "$bad" != 0 ]; then echo "::error::$bad of $checked files differ from the build."; exit 1; fi
+          echo "All $checked files production serves match the build (source maps left out)."
+
+  # Attaches the deployed web build to the app release as a zip with its
+  # checksum, plus the per-file checksum list the deploy verified production
+  # against, so every release keeps a copy of exactly what players got. Runs
+  # after a successful deploy and apart from the Vercel secrets. The release is
+  # published by github-release.yml, dispatched just before this run, so this
+  # waits for it. An archive already attached (a redeploy or a rollback) is
+  # left alone. A crate-only release has its own engine package zip
+  # (release-tag.yml) and no web zip.
+  archive:
+    needs: [check, deploy]
+    if: ${{ startsWith(inputs.tag, 'v') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: web-build
+
+      - name: Attach the web build to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          zip="verticopolis-web-${TAG#v}.zip"
+          for attempt in $(seq 1 40); do
+            if assets="$(gh release view "$TAG" --json assets --jq '.assets[].name' 2>/dev/null)"; then break; fi
+            if [ "$attempt" = 40 ]; then echo "::error::No GitHub release for $TAG after 10 minutes; re-run this job once it exists."; exit 1; fi
+            echo "Waiting for the $TAG release (attempt $attempt)."
+            sleep 15
+          done
+          if printf '%s\n' "$assets" | grep -qxF "$zip"; then
+            echo "$TAG already has $zip; leaving it."
+            exit 0
+          fi
+          # The zip must hold exactly the files the checksum list names.
+          (cd dist && sha256sum --check --quiet --strict ../web-SHA256SUMS)
+          files="$(find dist -type f | wc -l)"
+          listed="$(wc -l < web-SHA256SUMS)"
+          if [ "$files" != "$listed" ]; then
+            echo "::error::dist/ holds $files files but the checksum list names $listed."
+            exit 1
+          fi
+          sums="verticopolis-web-${TAG#v}.SHA256SUMS"
+          cp web-SHA256SUMS "$sums"
+          (cd dist && zip -qr "../$zip" .)
+          sha256sum "$zip" > "$zip.sha256"
+          gh release upload "$TAG" "$zip" "$zip.sha256" "$sums"
+          echo "Attached $zip, its checksum and the per-file $sums to $TAG."
