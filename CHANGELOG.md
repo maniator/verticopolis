@@ -25,10 +25,9 @@ are documentation only: no build that a client fetches carries them.
 
 ## 3.0.1
 
+- Refusing the bomb ransom now starts a race: Security searches floor by floor before the 1:00 PM deadline, with a countdown, a ticking clock and a red glow. If they miss it, the bomb goes off.
+- Every turn of a bomb threat now pops up on screen, phone included. In Modern, a Security office that opens during a search sends its guards to join it.
 - The update window now lists what's new in every version you skipped, newest first, and never shows the same notes twice.
-- Refusing the bomb ransom no longer settles at once with nothing to see. In both modes Security now searches the tower floor by floor against a 1:00 PM deadline: guards climb the emergency stairs and walk each floor, a countdown shows, a woodblock clock ticks, the music dips and the screen edges glow red. If they miss the bomb it goes off.
-- Every turn of a bomb threat (search started, found, exploded) now pops up on screen, phone included, not only in the log.
-- Modern: a Security office that opens during a search sends its guards to join it.
 
 ## 3.0.0
 
