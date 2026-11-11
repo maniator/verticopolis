@@ -3,7 +3,7 @@ import type { WasmEngine } from "../../dualrun/binding";
 import { readCatalog } from "../../dualrun/catalog";
 import type { EnginePort } from "../../simport/enginePort";
 import { canonicalJson } from "../conformance/canonical";
-import { hasWasmPackage, wasm, wasmRequired } from "../conformance/wasmEngine";
+import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
 import {
   EVENT_DAY_FIXTURE,
   FIRST_FRAME_CHECKPOINT,
@@ -40,7 +40,7 @@ import { FRAME_DAYS_UPDATE as UPDATE, writeAfterPassingRun } from "../goldens/up
  * the engine package is built.
  */
 
-if ((wasmRequired() || UPDATE) && !hasWasmPackage()) throw new Error("the frame-day golden needs the engine package (VC_REQUIRE_WASM=1 or VC_FRAME_DAYS_UPDATE=1), and engine-rs/pkg/ is not built; run npm run wasm:build");
+if (UPDATE && !hasWasmPackage()) throw new Error("the frame-day golden needs the engine package (VC_FRAME_DAYS_UPDATE=1), and engine-rs/pkg/ is not built; run npm run wasm:build");
 
 /** A fresh Rust engine; the case loads or founds its own tower over the
  *  placeholder it starts with. The views are hashed in canonical form, as the

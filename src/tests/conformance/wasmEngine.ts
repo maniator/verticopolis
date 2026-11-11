@@ -23,12 +23,10 @@ const WASM_MARKER = resolve(REPO_ROOT, "engine-rs/pkg/package.json");
 
 /** True once the binding has been built by the script (the glue, the module
  *  and the CommonJS marker it writes, without which the glue loads as ESM). The
- *  suite skips itself otherwise, except under `VC_REQUIRE_WASM=1`, which CI
- *  sets so a missing package fails the run instead of passing it. */
+ *  suite skips itself otherwise; the CI legs that run it put the package in
+ *  place first (`.github/actions/engine-wasm` fails the step when a file is
+ *  missing), so a skip cannot hide a missing package there. */
 export const hasWasmPackage = (): boolean => [WASM_PKG, WASM_BYTES, WASM_MARKER].every((f) => existsSync(f));
-
-/** CI's switch: the binding must be present, a skip is a failure. */
-export const wasmRequired = (): boolean => process.env.VC_REQUIRE_WASM === "1";
 
 let loaded: WasmModule | undefined;
 

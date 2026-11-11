@@ -4,15 +4,13 @@ import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { checkScenario, loadWebPackage } from "./nodeCheck";
 import { SCENARIO_NAMES, buildScenarios, loadFixtureSave } from "./scenarios";
-import { hasWasmPackage, wasm, wasmRequired } from "../conformance/wasmEngine";
+import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
 
-if (wasmRequired() && !hasWasmPackage()) throw new Error("VC_REQUIRE_WASM=1 but engine-rs/pkg is not built; run npm run wasm:build");
-const needsEngine = !hasWasmPackage() && !wasmRequired();
+const needsEngine = !hasWasmPackage();
 // The served browser package (build output, written by wasm:build), which
 // perf:compare's Node check loads.
 const WEB_PKG = resolve(import.meta.dirname, "../../public/engine");
 const hasWebPkg = ["verticopolis_engine_bg.wasm", "verticopolis_engine.js"].every((f) => existsSync(resolve(WEB_PKG, f)));
-if (wasmRequired() && !hasWebPkg) throw new Error("VC_REQUIRE_WASM=1 but src/public/engine/ is not built; run npm run wasm:build");
 
 interface SavedUnits {
   units: { kind: string; x: number; state?: string }[];
@@ -88,7 +86,7 @@ describe("the harnesses' scenarios", () => {
 
   // perf:compare's anchor: the served package's digests, which every browser
   // sample must match, are the Rust engine's own for the same save and ticks.
-  it.skipIf(needsEngine || (!hasWebPkg && !wasmRequired()))("records the served package's start and end states for the browser runs to match", async () => {
+  it.skipIf(needsEngine || !hasWebPkg)("records the served package's start and end states for the browser runs to match", async () => {
     const mod = await loadWebPackage(WEB_PKG);
     const [small] = buildScenarios(["small"]);
     const c = checkScenario(mod, small, 60, 2, 5);

@@ -11,7 +11,7 @@ import { basename, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { FX_SLOTS, type CheckpointDetail, type FxSlot } from "../conformance/checkpointDetail";
 import { CONFORMANCE_DIR, loadScenario, PAST_THE_TYPESCRIPT_REFERENCE, runScenario } from "../conformance/scenario";
-import { hasWasmPackage, startWasmEngine, wasmRequired } from "../conformance/wasmEngine";
+import { hasWasmPackage, startWasmEngine } from "../conformance/wasmEngine";
 
 type Nonzero = Partial<Record<FxSlot, number>>;
 
@@ -34,7 +34,7 @@ const asRecord = (d: CheckpointDetail): Nonzero => Object.fromEntries(Object.ent
 /** Two engines over a month or two of game time; the longest takes about half a minute on a busy runner. */
 const SLOW = 180_000;
 
-const run = hasWasmPackage() || wasmRequired();
+const run = hasWasmPackage();
 
 describe.runIf(run)("the fx sequences and emergency counters, pinned on both engines", () => {
   for (const [file, expected] of Object.entries(PINNED)) {

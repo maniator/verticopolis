@@ -15,8 +15,7 @@ import { hasWasmPackage, wasm } from "./wasmEngine";
  */
 
 /** Suites that need the codec skip themselves where the engine package is not
- *  built; the WASM lanes set `VC_REQUIRE_WASM=1`, and `engineLoad.test.ts` fails
- *  those runs when the package is missing, so a skip cannot hide there. */
+ *  built; the CI legs that run them put the package in place first. */
 export const describeWithCodec = describe.skipIf(!hasWasmPackage());
 export const itWithCodec = it.skipIf(!hasWasmPackage());
 

@@ -6,7 +6,7 @@ import type { EnginePort, PresetProposal, ScheduleFacts, SchedulePresetName } fr
 import { scheduleSlots } from "../../simport/scheduleSlots";
 import { telemetryDocument } from "../../wasmhost/telemetry";
 import { COLD, MIXED, WARM, measure, ring, tower, type Slots } from "../fixtures/scheduleTower";
-import { hasWasmPackage, wasm, wasmRequired } from "../conformance/wasmEngine";
+import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
 
 /**
  * The schedule dialog's advice, staging summary and presets live in the engine
@@ -16,7 +16,6 @@ import { hasWasmPackage, wasm, wasmRequired } from "../conformance/wasmEngine";
  * handed the reference's document the way the gallery's engine leg is.
  */
 
-if (wasmRequired() && !hasWasmPackage()) throw new Error("VC_REQUIRE_WASM=1 but the engine's WASM package was not built");
 
 type RustPort = EnginePort & { free(): void; seedElevatorTelemetry(json: string): void; serialize(): string };
 

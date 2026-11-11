@@ -4,7 +4,7 @@ import type { GameMode, UnitState } from "../../shared/types";
 import type { EnginePort, PortRecord } from "../../simport/enginePort";
 import { EVAL_TIERS, RENT_TIERS, RoomTierReader, type EvalTier, type RentTier, type RoomTiers } from "../../simport/roomTiers";
 import { ViewReader } from "../../simport/viewReader";
-import { hasWasmPackage, wasm, wasmRequired } from "../conformance/wasmEngine";
+import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
 
 /**
  * The rooms' evaluation and rent tiers through the real engine package
@@ -16,7 +16,6 @@ import { hasWasmPackage, wasm, wasmRequired } from "../conformance/wasmEngine";
  * them; the TypeScript engine has no Map views and is not involved.
  */
 
-if (wasmRequired() && !hasWasmPackage()) throw new Error("VC_REQUIRE_WASM=1 but engine-rs/pkg/ is not built; run npm run wasm:build");
 
 type RustEngine = EnginePort & { free(): void; setMoney(amount: number): void };
 const freed: RustEngine[] = [];

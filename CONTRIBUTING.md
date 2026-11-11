@@ -145,8 +145,7 @@ Verticopolis has **two test tiers**:
     modules `scripts/engine-bundle.allow.txt` lists, for the harnesses'
     hand-built tower, and fails when a listed one no longer ships (delete its
     line: the list only shrinks).
-    `?engine=` and `vc.engine` are ignored. The WASM test lanes use
-    `VC_REQUIRE_WASM=1`. See
+    `?engine=` and `vc.engine` are ignored. See
     `docs/performance/player-bundle.md` for what still ships and why. A simulation change lands in the
     Rust engine. The TypeScript engine changes only when the shared lock, a parity test or the
     catalog digest needs it (for example the catalog size and price tables both engines read), and

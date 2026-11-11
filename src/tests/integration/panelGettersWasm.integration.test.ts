@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { readdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { CONFORMANCE_DIR, loadScenario, runScenario, PAST_THE_TYPESCRIPT_REFERENCE } from "../conformance/scenario";
-import { hasWasmPackage, wasm, wasmRequired } from "../conformance/wasmEngine";
+import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
 import {
   firstDifference,
   pickIds,
@@ -20,7 +20,7 @@ import {
  * engine; at every checkpoint the probe reads the stats screen, the HUD
  * counters, a spread of unit and shaft cards, every overlay, the traffic
  * hotspot and the onboarding facts from both, and the answers must be equal.
- * Without the built package the suite skips, unless `VC_REQUIRE_WASM=1`.
+ * Without the built package the suite skips.
  */
 
 const SCENARIO_DIR = resolve(CONFORMANCE_DIR, "scenarios");
@@ -28,7 +28,6 @@ const files = readdirSync(SCENARIO_DIR)
   .filter((f) => f.endsWith(".json") && !PAST_THE_TYPESCRIPT_REFERENCE.has(f))
   .sort();
 
-if (wasmRequired() && !hasWasmPackage()) throw new Error("VC_REQUIRE_WASM=1 but engine-rs/pkg/ is not built; run npm run wasm:build");
 
 /** How much each getter was compared, summed over the corpus. */
 const compared = { checkpoints: 0, units: 0, transports: 0, heatCells: 0, strandedFloors: 0, infested: 0, twoCars: 0 };

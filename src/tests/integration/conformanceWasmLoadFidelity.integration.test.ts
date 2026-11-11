@@ -22,9 +22,8 @@ import type { Engine } from "../../dualrun/engine";
 import { Simulation } from "../../engine/Simulation";
 import type { SerializedGame } from "../../shared/types";
 import { canonicalJson } from "../conformance/canonical";
-import { hasWasmPackage, wasm, wasmRequired } from "../conformance/wasmEngine";
+import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
 
-if (wasmRequired() && !hasWasmPackage()) throw new Error("VC_REQUIRE_WASM=1 but engine-rs/pkg/ is not built; run npm run wasm:build");
 
 type RustEngine = { Engine: typeof Engine };
 const rust = (): RustEngine => wasm() as unknown as RustEngine;
@@ -65,7 +64,7 @@ function both(text: string, ticks = 0): { ts: string; rust: string } {
   }
 }
 
-const run = hasWasmPackage() || wasmRequired();
+const run = hasWasmPackage();
 
 describe.runIf(run)("a save at random state 0 reloads at state 0 in both engines (#856)", () => {
   it("the main stream", () => {

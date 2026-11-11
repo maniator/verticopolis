@@ -1,14 +1,13 @@
 // @vitest-environment node
 import { afterEach, describe, expect, it } from "vitest";
-import { hasWasmPackage, wasm, wasmRequired } from "../conformance/wasmEngine";
+import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
 import { digestStashed, stashSave } from "./page";
 import { buildScenarios, loadFixtureSave } from "./scenarios";
 
 /** The browser digest is the conformance lock's state digest, so a browser
  *  run's digests compare directly with the engine's own `stateDigest`. */
 
-if (wasmRequired() && !hasWasmPackage()) throw new Error("VC_REQUIRE_WASM=1 but engine-rs/pkg is not built; run npm run wasm:build");
-const needsEngine = !hasWasmPackage() && !wasmRequired();
+const needsEngine = !hasWasmPackage();
 
 const g = globalThis as unknown as { window?: { __perfStash?: Record<string, unknown>; __perfSaves?: Record<string, string>; __perfStoredSaves?: Record<string, string> } };
 

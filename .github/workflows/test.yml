@@ -268,8 +268,8 @@ jobs:
           git fetch --no-tags --quiet --depth=2 origin "$GITHUB_SHA"
           node scripts/version-check.ts --base HEAD^1 --branch "$HEAD_REF"
 
-  # The suites that need the Rust/WASM engine package, with the package
-  # required (VC_REQUIRE_WASM=1), so a missing one fails instead of skipping.
+  # The suites that need the Rust/WASM engine package. The engine-wasm step
+  # fails when a package file is missing, so no suite can skip for want of it.
   # The unit leg runs the unit tests, which include the engine package's own
   # (they skip in the plain unit job); the port-kit leg runs the port-kit
   # suites, and the host suites run in the engine-host job below, in three
@@ -319,7 +319,6 @@ jobs:
       - name: Unit tests with the engine package required
         if: ${{ needs.changes.outputs.code != 'false' && matrix.leg == 'unit' }}
         env:
-          VC_REQUIRE_WASM: "1"
           VC_LOG_TEST_STARTS: "1"
         run: npx vitest run --project unit
 

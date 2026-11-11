@@ -5,7 +5,7 @@ import { PLAY_SECONDS } from "../../analyticsEngagement";
 import { startEngagementWatch } from "../../game/engagementWatch";
 import type { EnginePort } from "../../simport/enginePort";
 import { kind, lobbyCenter, subject, type MakeEngine } from "../../simport/engineSubject.fixture";
-import { hasWasmPackage, wasm, wasmRequired } from "../conformance/wasmEngine";
+import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
 import { releaseDrafts } from "../portKit/drafts";
 
 /**
@@ -13,7 +13,6 @@ import { releaseDrafts } from "../portKit/drafts";
  * above the host, so a scripted session on the engine engages at the point
  * and by the branch the packet names.
  */
-if (wasmRequired() && !hasWasmPackage()) throw new Error("VC_REQUIRE_WASM=1 but engine-rs/pkg/ is not built; run npm run wasm:build");
 
 type RustEngine = EnginePort & { free(): void };
 const made: RustEngine[] = [];

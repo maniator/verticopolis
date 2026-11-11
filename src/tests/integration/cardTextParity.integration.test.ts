@@ -6,7 +6,7 @@ import { createCardKit } from "../../game/cardKit";
 import { newViewReader } from "../../game/portAccess";
 import { swapDone } from "../../game/portLifecycle";
 import type { EnginePort } from "../../simport/enginePort";
-import { hasWasmPackage, wasm, wasmRequired } from "../conformance/wasmEngine";
+import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
 import {
   CARD_TEXT_CASES,
   CARD_TEXT_DIR,
@@ -51,7 +51,7 @@ import { CARD_TEXT_WRITER, writeAfterPassingRun } from "../goldens/updateGate";
  */
 
 const WRITING = CARD_TEXT_WRITER === "rust";
-if ((wasmRequired() || WRITING) && !hasWasmPackage()) throw new Error("the card-text sweep needs the engine package (VC_REQUIRE_WASM=1 or VC_CARD_TEXT_UPDATE=rust); run npm run wasm:build");
+if (WRITING && !hasWasmPackage()) throw new Error("the card-text sweep needs the engine package (VC_CARD_TEXT_UPDATE=rust); run npm run wasm:build");
 
 const fresh: CardTextGolden[] = [];
 writeAfterPassingRun(

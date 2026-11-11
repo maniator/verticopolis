@@ -5,7 +5,6 @@ import { resolve } from "node:path";
 import { compileEngineBinary, engineBinaryUrl, initEngineGlue } from "./engineLoad";
 import { EMPTY_WASM, buildSectionWith, customSection, stampedWasm, wasmFetch, wasmWith } from "./engineLoad.fixture";
 import { ENGINE_WASM } from "./enginePackageNames";
-import { wasmRequired } from "../tests/conformance/wasmEngine";
 
 const HASH = "ab".repeat(32);
 
@@ -74,9 +73,7 @@ describe("compileEngineBinary", () => {
 
 // Like the other package tests, it runs where the engine package is built (a
 // local build, `test-engine (unit)`) and skips in the plain unit job.
-// Where the package is required (`VC_REQUIRE_WASM=1`) a missing one is a failure.
 const PACKAGE_BUILD = resolve(__dirname, "../public/engine/BUILD.json");
-if (wasmRequired() && !existsSync(PACKAGE_BUILD)) throw new Error("VC_REQUIRE_WASM=1 but src/public/engine/ is not built; run npm run wasm:build");
 
 describe.skipIf(!existsSync(PACKAGE_BUILD))("the built engine binary", () => {
   it("carries the source hash BUILD.json records, as the page reads it", async () => {

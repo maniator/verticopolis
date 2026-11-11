@@ -6,7 +6,7 @@ import { newRenderSim, newViewReader } from "../../game/portAccess";
 import { bindViewKinds, findViewKind } from "../../presentation/viewKinds";
 import { catalogFor } from "../../engine/catalog";
 import { readCatalog } from "../../dualrun/catalog";
-import { hasWasmPackage, wasm, wasmRequired } from "../conformance/wasmEngine";
+import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
 
 /**
  * The reader over the Rust engine sizes the wedding hall as the engine does:
@@ -15,7 +15,6 @@ import { hasWasmPackage, wasm, wasmRequired } from "../conformance/wasmEngine";
  * another catalog (a scene or a swapped-in tower binds them again).
  */
 
-if (wasmRequired() && !hasWasmPackage()) throw new Error("VC_REQUIRE_WASM=1 but engine-rs/pkg/ is not built; run npm run wasm:build");
 
 type RustEngine = EnginePort & { free(): void };
 const freed: RustEngine[] = [];

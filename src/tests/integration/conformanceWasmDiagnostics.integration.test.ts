@@ -15,7 +15,7 @@ import {
   type ScenarioEngine,
   PAST_THE_TYPESCRIPT_REFERENCE,
 } from "../conformance/scenario";
-import { hasWasmPackage, reloadWasmHandle, startWasmHandle, wasmEngine, wasmRequired } from "../conformance/wasmEngine";
+import { hasWasmPackage, reloadWasmHandle, startWasmHandle, wasmEngine } from "../conformance/wasmEngine";
 import type { WasmEngine } from "../../dualrun/binding";
 import { tsDiagnosticFacts, type DiagnosticFacts } from "../diagnostics/tsDiagnosticFacts";
 import { inspectorDisagreements } from "../diagnostics/inspectorAgreement";
@@ -41,7 +41,6 @@ const files = readdirSync(SCENARIO_DIR)
   .filter((f) => f.endsWith(".json") && !PAST_THE_TYPESCRIPT_REFERENCE.has(f))
   .sort();
 
-if (wasmRequired() && !hasWasmPackage()) throw new Error("VC_REQUIRE_WASM=1 but engine-rs/pkg/ is not built; run npm run wasm:build");
 
 /** One read: the ids asked about and the facts each engine gave. */
 interface Read { ids: number[]; facts: DiagnosticFacts[] }

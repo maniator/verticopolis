@@ -10,9 +10,9 @@
  */
 import { describe, expect, it } from "vitest";
 import { runScenario, type Scenario } from "../conformance/scenario";
-import { hasWasmPackage, startWasmEngine, wasmRequired } from "../conformance/wasmEngine";
+import { hasWasmPackage, startWasmEngine } from "../conformance/wasmEngine";
 
-const run = hasWasmPackage() || wasmRequired();
+const run = hasWasmPackage();
 
 const scenario = (seed: number, mode: "classic" | "modern", star?: number): Scenario => ({
   id: `star-${star ?? "none"}`,

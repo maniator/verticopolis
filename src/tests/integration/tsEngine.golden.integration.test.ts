@@ -9,7 +9,7 @@ import { VIEW_LAYOUT, VIEW_LAYOUT_TEXT, codeOf, KIND_CODES } from "../../engine/
 import { TsEngine } from "../../engine/port/tsEngine";
 import type { EnginePort } from "../../simport/enginePort";
 import { MAX_SAVE_INFLATED_BYTES, TOWER_FILE_MAGIC, toBase64 } from "../../storage/saveCompression";
-import { hasWasmPackage, wasm, wasmRequired } from "../conformance/wasmEngine";
+import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
 import { installTdtCodec } from "../conformance/tdtWasm";
 import { createPortUnitDiagnostics } from "../../game/portUnitDiagnostics";
 import { sameFloorCongestion } from "./goldenFloorCongestion";
@@ -27,7 +27,6 @@ import { sameFloorCongestion } from "./goldenFloorCongestion";
  * the ids they name.
  */
 
-if (wasmRequired() && !hasWasmPackage()) throw new Error("VC_REQUIRE_WASM=1 but engine-rs/pkg/ is not built; run npm run wasm:build");
 
 type RustEngine = EnginePort & { free(): void };
 

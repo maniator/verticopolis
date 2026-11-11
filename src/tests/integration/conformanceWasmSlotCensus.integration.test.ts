@@ -11,10 +11,10 @@ import { Simulation } from "../../engine/Simulation";
 import { SaveGame } from "../../storage/SaveGame";
 import { setSlotPopulationReader } from "../../storage/slotCensus";
 import { populationReaderFromModule } from "../../wasmhost/slotPopulation";
-import { hasWasmPackage, wasm, wasmRequired } from "../conformance/wasmEngine";
+import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
 import { saveOf, importTower } from "../fixtures/saveText";
 
-const run = hasWasmPackage() || wasmRequired();
+const run = hasWasmPackage();
 
 describe.skipIf(!run)("slot rows count their population through the engine", () => {
   beforeEach(() => {

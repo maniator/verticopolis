@@ -25,8 +25,8 @@ import { rustAssertionFreeTests } from "./testHonestyRust";
  *
  * 1. No unit test reaches a module that starts a real engine
  *    ({@link ENGINE_RUNNERS}), directly or through test-support code. Its
- *    package probes (`hasWasmPackage`, `wasmRequired`) start nothing and are
- *    allowed. The TypeScript reference engine has its own shrink-only list,
+ *    package probe (`hasWasmPackage`) starts nothing and is allowed. The
+ *    TypeScript reference engine has its own shrink-only list,
  *    `tsEngineTests.guard.test.ts`.
  * 2. No recorded engine answers: no `recordings` directory, no `*:record`
  *    script, and no module named for recordings beyond the allowlist.
@@ -56,7 +56,7 @@ const ENGINE_RUNNERS: readonly string[] = [
 
 /** Names a unit test may import from the Node engine loader: they check
  *  whether the package is built and start nothing. */
-const PACKAGE_PROBES: ReadonlySet<string> = new Set(["hasWasmPackage", "wasmRequired"]);
+const PACKAGE_PROBES: ReadonlySet<string> = new Set(["hasWasmPackage"]);
 
 /** Built engine packages, which only an integration test may load. */
 const ENGINE_PACKAGES = ["engine-rs/pkg/", "src/public/engine/"] as const;
@@ -296,7 +296,7 @@ describe("unit tests mock the engine; integration tests run it", () => {
   it("finds a unit test that runs the engine, directly or through a fixture, and lets the package probes through", () => {
     const files: Record<string, string> = {
       "src/game/a.test.ts": 'import { wasm } from "../tests/conformance/wasmEngine";',
-      "src/game/b.test.ts": 'import { hasWasmPackage, wasmRequired } from "../tests/conformance/wasmEngine";',
+      "src/game/b.test.ts": 'import { hasWasmPackage } from "../tests/conformance/wasmEngine";',
       "src/game/c.test.ts": 'import { draft } from "./c.fixture";',
       "src/game/c.fixture.ts": 'import { newDraft } from "../tests/portKit/drafts";',
       "src/game/d.test.ts": 'import { boot } from "./boot";',

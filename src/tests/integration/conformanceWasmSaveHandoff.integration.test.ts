@@ -3,7 +3,7 @@ import { Simulation } from "../../engine/Simulation";
 import type { SerializedGame } from "../../shared/types";
 import { parseSaveJson } from "../../storage/saveCompression";
 import { canonicalJson } from "../conformance/canonical";
-import { hasWasmPackage, wasm, wasmRequired } from "../conformance/wasmEngine";
+import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
 import { loadFixture } from "../conformance/fixtureSim";
 
 /**
@@ -22,7 +22,6 @@ import { loadFixture } from "../conformance/fixtureSim";
  * Skips without the WASM package, like the rest of `npm run test:wasm`.
  */
 
-if (wasmRequired() && !hasWasmPackage()) throw new Error("VC_REQUIRE_WASM=1 but engine-rs/pkg/ is not built; run npm run wasm:build");
 
 const FIXTURES = ["towerone_6.vctower", "split-tower.vctower"];
 /** One game day, played a minute at a time. */
@@ -45,7 +44,7 @@ function rustResave(save: string): string {
   }
 }
 
-describe.runIf(hasWasmPackage() || wasmRequired())("save handoff: a played tower one engine saved opens in the other unchanged", () => {
+describe.runIf(hasWasmPackage())("save handoff: a played tower one engine saved opens in the other unchanged", () => {
   it.each(FIXTURES)("%s: the Rust engine plays a day, and the TypeScript engine opens its save", (name) => {
     const engine = wasm().Engine.fromSave(JSON.stringify(loadFixture(`conformance/fixtures/${name}`).serialize()));
     let saved: string;
