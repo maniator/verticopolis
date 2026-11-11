@@ -849,7 +849,11 @@ alone.
 
 | Path | What |
 | --- | --- |
-| `src/engine/` | The TypeScript reference engine, a test referee until it is deleted (until the deletion, the shipped bundle still carries part of it, and the boot catalog check runs its `catalogFor`, #921): no DOM, deterministic, heavily unit-tested. `Simulation` orchestrates subsystems (`ElevatorDispatch`, `EventSystem`, `EconomySystem`, `Crowd`). Build caps and rule-sets live in the Rust engine (`engine-rs/src/facilities.rs`, `engine-rs/src/rules.rs`); `facilities.ts` and `gameRules.ts` keep the TypeScript copy, and the catalog digest holds what the catalog publishes equal in both. |
+| `engine-rs/` | The simulation: the Rust engine, compiled to WebAssembly, and the only engine the game runs. No host access (`engine-rs/tests/independence.rs`), deterministic, tested with `cargo test`. It owns the rules, caps and tuning (`facilities.rs`, `rules.rs`), the catalog the UI reads (`catalog.rs`), saves and `.TDT`, and undo. Its module map and how to build, test and change it: [`engine-rs/README.md`](./engine-rs/README.md). |
+| `src/simport/` | `EnginePort`, the one synchronous interface the game uses to call the engine, and the shared view reader that decodes the engine's frame. |
+| `src/dualrun/`, `src/wasmhost/` | The WASM binding and its declaration (`engine.d.ts`); loading the engine package, its build metadata and the catalog checks. |
+| `src/shared/` | Types and small helpers shared across the game. |
+| `src/engine/` | The old TypeScript engine, kept only as a test reference while it is deleted. Not part of the shipped game; do not add a runtime import of it. |
 | `src/game/` | Game controllers: the testable logic behind the composition root. |
 | `src/render/` | Canvas rendering and pixel-art sprites (`sprites.ts`, `sprites/**`, `pixelSprites.ts`). Reads engine state, never mutates it. |
 | `src/render/excalibur/` | The Excalibur/WebGL engine wrapper (unit-exempt, e2e-covered). |
@@ -857,7 +861,8 @@ alone.
 | `src/audio/` | Sound, independent of rendering: the `AudioEngine` facade (`Audio.ts`), `ToneAudioEngine` (orchestrator), `toneScenes` (data/math), `toneTracks` (music), `toneVoices` (jingles), `tonePercussion`, `toneRain`, the `toneCrowd*` ambience modules, and `audioAssets`. See [SOUNDS.md](./SOUNDS.md). |
 | `src/storage/` | Save/load, the `VCZ1:` storage container, `.vctower` file handling. Who owns what, and every path: [`docs/architecture/save-paths.md`](./docs/architecture/save-paths.md). |
 | `src/main.ts` | Composition root: wires input, engine, and the game loop. |
-| `src/tests/` | Vitest fixtures and integration suites (`*.integration.test.ts`); unit tests colocate next to their source. |
+| `src/tests/` | Vitest fixtures, integration suites (`*.integration.test.ts`) and the repository-wide guard tests; unit tests colocate next to their source. |
+| `conformance/` | The conformance lock and catalog digests the engine is held to. |
 | `e2e/` | Tier-2 Playwright end-to-end specs. |
 | `docs/` | Contributor docs, including `screenshots.md`. |
 
