@@ -2,7 +2,7 @@
 
 This page is the one checklist for reviewing algorithmic cost on the game's hot
 paths. `CLAUDE.md`, `AGENTS.md`, `CONTRIBUTING.md`,
-`_bmad-output/project-context.md`, the Copilot review overlay, the engine parity
+`_bmad-output/project-context.md`, the Copilot review overlay, the engine review
 skill and the pull request template point here and keep only a short summary.
 Rule changes go here, and the summaries follow.
 
@@ -219,7 +219,7 @@ indexed by unit, floor or segment, a reused scratch buffer, or a fast
 deterministic hasher: `FastMap` / `FastSet` in
 `engine-rs/src/crowd/fasthash.rs`, which offer no iteration at all. A map
 that is iterated keeps insertion order (`IndexMap`, `IndexSet` or a `Vec` in
-insertion order, engine parity checklist item 7), so its container stays as
+insertion order, engine review checklist item 6), so its container stays as
 it is; iterating a `HashMap` or `HashSet` is an HP-10 finding.
 
 **HP-6 Look up by id, and keep removal linear.** Use `getUnit` / `getTransport`
@@ -610,7 +610,7 @@ fixes `patch` findings as it goes, halts for the human first instead (section
   verdict. GO and CONDITIONAL GO need every row filled, and the appendix on a
   large port, rewrite, move or addition; GO also needs every finding fixed or
   deferred under section 7.
-- **`.github/skills/engine-parity-review/SKILL.md`** item 11 points here for
+- **`.github/skills/engine-review/SKILL.md`** item 10 points here for
   changes on the engine seam.
 
 The Hot-Path Auditor's prompt:

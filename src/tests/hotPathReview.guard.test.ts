@@ -36,7 +36,7 @@ import {
  *   empty base `on_complete` it replaces, the gds and bmad copies identical,
  *   and the step-file text the facts name;
  * - the `CLAUDE.md` auto-merge rule, and the owner rules `CLAUDE.md`,
- *   `CONTRIBUTING.md` and the engine parity skill restate;
+ *   `CONTRIBUTING.md` and the engine review skill restate;
  * - a few phrases that would reopen a closed exemption or HP-8's old escape
  *   hatch, kept out of the sections and files that closed them.
  *

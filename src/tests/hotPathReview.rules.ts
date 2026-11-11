@@ -203,7 +203,7 @@ export const SUMMARY_CLAUSES: Record<string, string[]> = {
     "outside the two cases HP-8 allows",
     "those get fixed unless the owner accepts the deferral in their own words",
   ],
-  ".github/skills/engine-parity-review/SKILL.md": [
+  ".github/skills/engine-review/SKILL.md": [
     "carries each one over or names the Rust structure that answers the same query at the same cost or less",
     "Anything else is a dropped cache, which is always `patch`",
     "a reason in the PR or a comment in the port does not close it",
@@ -215,7 +215,7 @@ export const SUMMARY_CLAUSES: Record<string, string[]> = {
 export const FORBIDDEN: Record<string, string[]> = {
   "## 1. When it applies": ["is exempt", "with an exemption"],
   "## 3. The checklist": ["why not"],
-  ".github/skills/engine-parity-review/SKILL.md": ["why not"],
+  ".github/skills/engine-review/SKILL.md": ["why not"],
 };
 
 /** Sentences of the Hot-Path Auditor prompt (section 9) the layer depends on. */
@@ -395,6 +395,6 @@ export const SUMMARIES = [
   "CONTRIBUTING.md",
   "_bmad-output/project-context.md",
   ".github/copilot-instructions.md",
-  ".github/skills/engine-parity-review/SKILL.md",
+  ".github/skills/engine-review/SKILL.md",
   ".github/PULL_REQUEST_TEMPLATE.md",
 ];

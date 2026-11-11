@@ -1,8 +1,9 @@
 # SimTower (1994): Gameplay Parity Checklist
 
 This is a clean-room clone of Maxis/OPeNBooK's **SimTower** (1994), built from
-scratch in TypeScript on the Excalibur.js engine. The goal is **1:1 gameplay**
-on desktop with a modernized layout on mobile. Below is the feature inventory
+scratch: a Rust simulation engine compiled to WebAssembly, under a TypeScript
+front end on the Excalibur.js engine. The goal is **1:1 gameplay** on desktop
+with a modernized layout on mobile. Below is the feature inventory
 and where each item stands. Status: ✅ implemented · ◑ implemented as a faithful
 abstraction · ⬜ not present.
 
@@ -27,10 +28,10 @@ abstraction · ⬜ not present.
 - ✅ Recycling Center **fills daily** with the tower's garbage (one center per ~2,500 population; a pre-dawn garbage truck empties them). 4★ requires demand MET, not merely built
 - ✅ Parking demand: offices want a space per ~12 workers from 3★; **every hotel suite needs a space of its own** (the VIP won't review without it); cars visibly fill the garage with real usage
 - ✅ Metro Station (whole-floor deep basement; brings visitors)
-- ✅ Wedding Hall on floor 100, 28 wide and five floors tall with a tapering steeple (religion-agnostic stand-in for the Cathedral; Rust engine, the TypeScript fallback keeps the old 16 x 1 hall)
+- ✅ Wedding Hall on floor 100, 28 wide and five floors tall with a tapering steeple (religion-agnostic stand-in for the Cathedral)
 
 ## Transport
-- ✅ Stairs, Escalators (single-flight links, animated climbers). Canon (#384, #323): the 1994 game builds only **single flights** (never multi-story units, though the TDT format has bytes for 2/3-story variants), and a person will chain at most **4 contiguous stair flights / 7 escalators** on a trip before refusing (an elevator ride resets the count). The willingness numbers live in `WALKWAY_WILLINGNESS` (`src/engine/facilityCaps.ts`) as canon but nothing reads them yet. The router has no walkway-specific limit today; it caps a whole trip at 2 legs (`MAX_RIDES` BFS edges in `src/engine/crowd/routing.ts`), and each stair flight is one such leg, so pure-stair reach is currently 2 floors (stricter than the canon 4) and stairs share that budget with elevators. Matching canon means giving walk legs their own contiguous budget (4/7, reset by an elevator ride) separate from the 2-ride elevator budget, which loosens stair reach: a gated gameplay change, Classic a hard refusal vs Modern a comfort/satisfaction penalty at the same threshold.
+- ✅ Stairs, Escalators (single-flight links, animated climbers). Canon (#384, #323): the 1994 game builds only **single flights** (never multi-story units, though the TDT format has bytes for 2/3-story variants), and a person will chain at most **4 contiguous stair flights / 7 escalators** on a trip before refusing (an elevator ride resets the count). Classic routes people with that contiguous-walk budget (the walk-budget search in `engine-rs/src/crowd/routing.rs`, limits from `Kind::walkway_willingness`); Modern routes without it.
 - ✅ Standard / Service / Express elevators with multiple cars (service elevators are staff-only: housekeepers ride them, passengers never do)
 - ✅ Per-elevator car count and **per-floor stop configuration** (express / skip); per-shift car scheduling and per-car home/waiting floors are a tracked gap (see Known parity gaps)
 - ✅ Demand-driven car dispatch (SCAN): cars serve waiting passengers, idle at the lobby when empty
@@ -99,22 +100,20 @@ abstraction · ⬜ not present.
 - Optional **rule-set** chosen when a tower is founded and fixed for its life: **Classic** is the pixel-faithful 1994 game; **Modern** adds what the original couldn't; today that means *variant households* (a condo sells to a 2–5 person family, weighted to a mean of 3 so the star ladder is unchanged, that scales its price and how demanding it is) and a *calendar choice* (the compressed 1994 calendar or a real-world-length one). Classic always runs the canon calendar. Saves with no mode load as Classic, and a Modern save with no calendar choice loads real-world-length.
 - **Housekeeping fields six time-simulated maids per unit (canon, as of 1.54)**: each unit staffs 6 maids, at most one of a unit's maids works a floor at a time, maids travel only by **service elevator or stairs** (escalators dropped from the staff network, canon), and each room takes real minutes of in-room cleaning before it turns over, so per-unit throughput is emergent from placement and staff transport instead of a fixed rooms-per-crew quota. **Classic** works the canon **noon-5 shift with a 16:30 no-new-room cutoff** and dispatches opportunistically in tower order (the original's automatic behavior); **Modern** works a longer 08:00-19:00 staffed day and adds **smart triage** (as of 1.56): dirty rooms are taken by days-dirty urgency weighted against the floor distance to the nearest staff-connected crew, so about-to-infest rooms are rescued first (rule-set divergences, like the exterminator). There is **no tower-wide staff pool and no build cap on housekeeping rooms** (as of 1.57, matching canon: the 1994 facility-limit lists cap security and medical at 10 each while housekeeping appears in none of them, and documented near-max towers run 12-16 units per hotel section with every maid working); the engine's staff-actor ceiling is simply what the built units can field. What we still deliberately do not reproduce: the 1994 pathfinding quirk (seven-plus floors degraded) that pushed players to build one service elevator per six floors; our staff routing has no such degradation.
 - **Cockroaches are visible and have a full lifecycle** (as of 1.53). A hotel room left dirty for 3 straight days breeds a roach **infestation** (a distinct sprite and room state) that housekeeping can no longer clean, exactly as in 1994. **Classic** recovers only by bulldozing and rebuilding (canon). **Modern** adds an owner-ratified paid **exterminator** (a call-out fee plus a per-room fee, landing the next day) as an alternative to the bulldozer; this is a new mechanic, gated through the rule-set, and the only divergence here. Only an **infested** room spreads roaches, horizontally into an adjacent room on the same floor (a merely dirty room does not spread, and roaches never cross floors), matching the 1994 rule that cockroach-infested rooms creep along the floor.
-- **Commercial patronage is modeled from reachable nearby population** rather than the original's opaque per-venue patron counters (which expert players suspect hide a cap). The transparent per-origin demand-pool refinement that restores the classic diminishing-returns and cross-venue behavior is tracked (#393); the opaque counter itself is not reproduced.
+- **Commercial patronage is modeled from reachable nearby population** rather than the original's opaque per-venue patron counters (which expert players suspect hide a cap). The transparent per-origin demand pools that restore the classic diminishing-returns and cross-venue behavior shipped in #393; the opaque counter itself is not reproduced.
 
-## Known parity gaps (tracked, 2026-07-15)
-
-An r/SimTower optimization-thread review (a four-lens roundtable across game
-design, systems, engineering, and UX) surfaced deeper 1994 behaviors that sit
-under the checkmarks above. They are identified, sorted, and tracked; the full
-analysis is
-`_bmad-output/planning-artifacts/design/gdd-simtower-optimization-gaps-2026-07-15.md`.
+## Known parity gaps
 
 - **Deep per-elevator scheduling**: per-shift car schedules and per-car home/waiting floors. Today we expose car count and per-floor stops only. Tracked as `elevator-scheduling` #305 (owner ruling: full parity).
-- **Per-venue demand and cross-venue patronage**: commercial income is an aggregate foot-traffic share today, so it lacks diminishing returns on venue count and the "good to best" cross-venue lift. Tracked #393, with the "leave the tower when no venue is reachable" population pressure as #395.
 - **Graduated far / very-far lobby-distance penalty for all tenants**: shipped in v1.44.0 as #394, recalibrated in v1.46.1 by owner ruling (2026-07-16). The optimization-thread analysis reports the 1994 game capping mid-block floors (6-10, 21-25, ...) even under correct play; v1.44.0 mirrored that, which left about 40 percent of a fully-lobbied tower permanently capped while the inspector prescribed a "nearer sky lobby" the placement grid refuses. The ruling favors feedback integrity over that mid-block tithe: the no-penalty edge is now derived from the lobby ladder (floor(lobbyInterval / 2)), so a tower with every legal sky lobby built feels no distance pressure, the bands land only on genuinely skipped lobbies, and the short block above the highest buildable slot caps at worst and never evicts, with the inspector naming only slots that can actually be built. A deliberate, recorded divergence. Re-keying the pressure on elevator reach and transfer depth (what the wait-time-centered reading of the original models) is the tracked follow-up.
-- **Contiguous sky-lobby transfer requirement**: express-to-standard transfers use implicit shared-stop adjacency today. Tracked #396 (Classic-gated).
-- **Condo demographics (school runs) and office sales-call trips**: today a generic household-departure model, no school entity or sales calls. Tracked #397. Weekend patronage curve: #398.
-- **UI legibility of the above** (next-star blockers, per-unit gripe reason, cleanliness/coverage overlay): #399, #400, #401.
+
+The rest of the gaps an r/SimTower optimization-thread review found on
+2026-07-15 have shipped: per-venue demand and cross-venue patronage (#393),
+the "leave the tower" pressure when no venue is reachable (#395), the
+contiguous sky-lobby transfer rule (#396), condo school runs and office
+sales calls (#397), the weekday and weekend patronage curve (#398), and the
+legibility work for them (#399, #400, #401). The review is
+`_bmad-output/planning-artifacts/design/gdd-simtower-optimization-gaps-2026-07-15.md`.
 
 ## Verification
 `npm test` runs **500+ unit/integration tests** covering placement rules,
