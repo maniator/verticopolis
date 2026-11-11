@@ -85,7 +85,7 @@ fi
 # Exported even when this shell already has it, so the env file and the
 # profile file always carry it.
 if [ -n "$NODE_WANT" ] && [ -x "$NODE_DIR/bin/node" ]; then
-  case ":$PATH:" in *":$NODE_DIR/bin:"*) ;; *) export PATH="$NODE_DIR/bin:$PATH" ;; esac
+  case "$PATH:" in "$NODE_DIR/bin:"*) ;; *) export PATH="$NODE_DIR/bin:$PATH" ;; esac  # first, ahead of any other Node
   env_line "export PATH=\"$NODE_DIR/bin:\$PATH\""
 fi
 
