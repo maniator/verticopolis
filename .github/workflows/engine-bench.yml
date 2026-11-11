@@ -1,62 +1,90 @@
 name: Engine hour-boundary bench
 
-# Tracks engine-tick cost over time by running the existing opt-in
-# RUN_HOUR_BENCH bench (src/tests/integration/hourCost.bench.integration.test.ts)
-# on a weekly schedule. The bench builds a ~20k-unit tower shaped like the
+# Tracks the Rust engine's tick cost over time: the weekly run builds the
+# bench crate (engine-bench/), which lays a ~20k-unit tower shaped like the
 # audit's noise-scan diagnosis and walks 24 in-game hours, reporting regular
-# vs hour-boundary tick cost; the audit's one-off numbers (8.6 ms regular /
-# 53 ms boundary at 25k units, 2026-07-21) become a series instead of a
-# single measurement (audit §14a commitment, #540).
+# vs hour-boundary tick cost. The audit's one-off numbers (8.6 ms regular /
+# 53 ms boundary at 25k units, TypeScript engine, 2026-07-21) began the
+# series (audit section 14a commitment, #540); the TypeScript bench this
+# replaces timed an engine the game no longer runs.
 #
-# NON-BLOCKING by design: this workflow never runs on pull requests and gates
-# nothing. Timings on shared runners are venue-noisy, so the numbers are
-# trend evidence for humans (the run's job summary and a downloadable log),
-# never assertions; the bench itself contains only a structural sanity check.
+# NON-BLOCKING by design: the bench gates nothing. Timings on shared runners
+# are venue-noisy, so the numbers are trend evidence for humans (the run's job
+# summary and a downloadable log), never assertions; the bench itself fails
+# only when its tower does not build or its walk misses an hour boundary.
+# A pull request that touches the bench or the engine gets the lint step only,
+# so an engine API change that breaks the bench shows up before Monday.
 
 on:
   schedule:
     # Mondays at 05:17 UTC (off the top of the hour to dodge scheduler load).
     - cron: "17 5 * * 1"
   workflow_dispatch:
+  pull_request:
+    paths:
+      - "engine-bench/**"
+      - "engine-rs/src/**"
+      - "engine-rs/Cargo.toml"
+      - "conformance/events/**"
+      - ".github/workflows/engine-bench.yml"
 
 # Read-only: the bench checks out and measures; it never writes to the repo.
 permissions:
   contents: read
 
+concurrency:
+  group: engine-bench-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   bench:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: bash
+    container:
+      # rust:1.97.0-bookworm, the toolchain the engine pins (rust-version).
+      image: rust:1.97.0-bookworm@sha256:8fa55b2f3ddf97471ab6a767bfa3f37e6bad0986ba823e75fea57e2a2a5c3073
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          sparse-checkout-cone-mode: false
+          # The engine compiles in files from conformance/ (the event
+          # catalog among them), so the suite comes along.
+          sparse-checkout: |
+            /engine-rs/
+            /engine-bench/
+            /conformance/
 
-      - name: Use Node.js (from .nvmrc)
-        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version-file: ".nvmrc"
-          cache: "npm"
+      - name: Rust toolchain
+        run: |
+          rustup show active-toolchain | grep -q '^1\.97\.0'
+          rustup component add rustfmt clippy
 
-      - name: Install dependencies
-        env:
-          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
-        run: npm ci
+      - name: Lint the bench
+        working-directory: engine-bench
+        run: |
+          cargo fmt --check
+          cargo clippy --locked --all-targets -- -D warnings
 
       - name: Run the hour-boundary bench
-        env:
-          RUN_HOUR_BENCH: "1"
+        if: github.event_name != 'pull_request'
+        working-directory: engine-bench
         run: |
           set -o pipefail
-          node -e "console.log('runner:', require('os').cpus()[0].model, 'x', require('os').cpus().length)" | tee bench-output.txt
-          npx vitest run src/tests/integration/hourCost.bench.integration.test.ts --disable-console-intercept 2>&1 | tee -a bench-output.txt
+          echo "runner: $(grep -m1 'model name' /proc/cpuinfo | cut -d: -f2 | sed 's/^ //') x $(nproc)" | tee bench-output.txt
+          cargo run --locked --release 2>&1 | tee -a bench-output.txt
 
       - name: Publish the numbers to the job summary
-        if: always()
+        if: always() && github.event_name != 'pull_request'
+        working-directory: engine-bench
         run: |
           {
             echo "## Engine hour-boundary bench ($(date -u +%F))"
             echo
-            echo "Commit: \`${GITHUB_SHA}\`. Shared-runner timings: read as a trend, not an absolute."
+            echo "Commit: \`${GITHUB_SHA}\`. Rust engine, native release build. Shared-runner timings: read as a trend, not an absolute."
             echo
             echo '```'
             grep -E "^(runner:|bench |regular |boundary |per hour)" bench-output.txt || echo "bench lines not found; see the uploaded log"
@@ -64,11 +92,11 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload the full bench log
-        if: always()
+        if: always() && github.event_name != 'pull_request'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           # run_attempt keeps a manual re-run from colliding with the first
           # attempt's immutable artifact name and failing an otherwise green run.
           name: engine-bench-${{ github.run_id }}-${{ github.run_attempt }}
-          path: bench-output.txt
+          path: engine-bench/bench-output.txt
           retention-days: 90

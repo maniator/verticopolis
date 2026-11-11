@@ -276,7 +276,7 @@ WASM, the test-mapping table):
 - **Types:** add a test that pins the moved types to what the binding sends.
 - **Conformance:** strip the runner's TypeScript adapters (above). WASM
   conformance runs in `engine-rs.yml` and stays.
-- **Benchmarks:** decide whether a Rust bench replaces `hourCost.bench`.
+- **Benchmarks:** decided (2026-11-11, owner): a Rust bench replaces `hourCost.bench`. `engine-bench/` is the same tower and walk on the Rust engine, and `engine-bench.yml` runs it weekly.
 - **Coverage:** re-baseline the global floors in `vite.config.ts` once
   `src/engine/` leaves `src/`.
 - **The stored choice:** make a stored `vc.engine = "ts"` and old
