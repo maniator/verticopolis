@@ -2,6 +2,7 @@ import type { LedgerCat } from "../shared/engineTypes";
 import type { HeatmapMode } from "../shared/engineTypes";
 import type { StarGateId } from "../shared/engineTypes";
 import type { FacilityKind, UnitState, VacateReason } from "../shared/types";
+import type { FilmPolicy, FilmTier } from "./commands";
 
 /**
  * What the panels ask the engine and what it answers (facade slice 4, #1211).
@@ -129,7 +130,7 @@ export interface UnitDetail {
   readonly label: string;
   readonly subtype: string | null;
   readonly vacateReason: VacateReason | null;
-  readonly filmPolicy: "auto" | "feature" | "blockbuster" | null;
+  readonly filmPolicy: FilmPolicy | null;
   /** The floor has a lobby connection (`isFloorServed`). */
   readonly served: boolean;
   /** A commuter completes the trip to the floor (`floorReachable`). */
@@ -139,8 +140,8 @@ export interface UnitDetail {
   readonly blockbuster: boolean | null;
   /** The mornings a theatre's film has shown; null off a cinema (#1932). */
   readonly filmDays: number | null;
-  /** Whether a theatre shows a classic film; null off a cinema. */
-  readonly filmClassic: boolean | null;
+  /** The film a theatre shows; null off a cinema (#1950). */
+  readonly filmTier: FilmTier | null;
 }
 
 /** One floor of an elevator's stop list, top floor first. */

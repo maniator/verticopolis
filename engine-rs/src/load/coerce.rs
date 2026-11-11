@@ -90,7 +90,7 @@ pub(super) fn film_days(kind: Kind, raw: Option<&Value>) -> Option<u8> {
 
 /// Whether a theatre shows a classic film (#1932): `true` on a theatre, and
 /// anything else reads as a new film.
-pub(super) fn film_classic(kind: Kind, raw: Option<&Value>) -> bool {
+pub(super) fn cinema_flag(kind: Kind, raw: Option<&Value>) -> bool {
     kind == Kind::Cinema && raw == Some(&Value::Bool(true))
 }
 

@@ -209,6 +209,8 @@ pub(crate) fn unit_from_value(u: &Value, modern: bool) -> Option<(Unit, Option<i
         Some("feature") => Some("feature"),
         Some("blockbuster") => Some("blockbuster"),
         Some("auto") => Some("auto"),
+        Some("revival") => Some("revival"),
+        Some("off") => Some("off"),
         _ => None,
     };
     let subtype: Option<&'static str> = match (
@@ -270,7 +272,8 @@ pub(crate) fn unit_from_value(u: &Value, modern: bool) -> Option<(Unit, Option<i
             vacate_at: u.get("vacateAt").map(|v| num(Some(v), 0.0)),
             film_policy,
             film_days: film_days(kind, u.get("filmDays")),
-            film_classic: film_classic(kind, u.get("filmClassic")),
+            film_classic: cinema_flag(kind, u.get("filmClassic")),
+            film_blockbuster: cinema_flag(kind, u.get("filmBlockbuster")),
             patronage_today: retail_field("patronageToday"),
             patronage_yest: retail_field("patronageYest"),
             profit_today: retail_field("profitToday"),

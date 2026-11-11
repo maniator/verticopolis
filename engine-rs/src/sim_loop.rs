@@ -2,7 +2,7 @@
 // weather hash.
 
 use crate::crowd::{motion, spawn, CROWD_SECONDS_PER_MINUTE};
-use crate::economy::films::draws_full_house;
+use crate::economy::films::fills_blockbuster_slot;
 use crate::facilities::Kind;
 use crate::sim::{LogKind, Simulation};
 use crate::tower::UnitState;
@@ -164,11 +164,10 @@ impl Simulation {
         self.weather = weather_for(self.clock.day());
         let period =
             (self.clock.day() as f64 / self.clock.calendar.maint_period_days as f64).floor() as i64;
-        let mut booked = Vec::new();
         if period != self.last_month {
             self.last_month = period;
             self.collect_monthly_rent();
-            booked = self.pay_maintenance();
+            self.pay_maintenance();
             self.roll_condo_relocations();
         }
         let q = self.clock.quarter();
@@ -186,8 +185,8 @@ impl Simulation {
         self.nudge_metro_platform();
         self.nudge_service_shortfalls();
         self.roll_over_retail_day();
-        // A booking's film opens tonight, after the spent one's last count.
-        self.start_booked_films(&booked);
+        // A rebooked film opens tonight, after the spent one's last count.
+        self.rebook_spent_films();
         self.ledger.end_day();
     }
 
@@ -255,11 +254,12 @@ impl Simulation {
             };
             if self.clock.minutes >= threshold {
                 let (name, floor, kind) = (u.kind.facility().name, u.floor, u.kind);
+                let mode = self.tower.mode;
                 let (u, at) = self.tower.marked_by_id(id).unwrap();
                 u.set_state(at, UnitState::Empty);
                 u.extras_mut().complete_at = None;
                 u.extras_mut().complete_at_raw = None;
-                let full_house = kind == Kind::Cinema && draws_full_house(u);
+                let full_house = kind == Kind::Cinema && fills_blockbuster_slot(mode, u);
                 self.constructing.shift_remove(&id);
                 let msg = format!(
                     "{} on {} is now open for business.",
@@ -270,13 +270,11 @@ impl Simulation {
                 if kind == Kind::Security {
                     self.join_bomb_search(floor);
                 }
-                // A Classic theater opens with a new film, which fills the
-                // house tonight (#1932), so it is a blockbuster from its
-                // first evening rather than from the next rollover.
-                if full_house
-                    && self.tower.mode.film_changes().is_some()
-                    && !self.blockbusters.contains(&(id as f64))
-                {
+                // A theater opens with its mode's first film free: a Classic
+                // new film fills the house tonight (#1932), so it is a
+                // blockbuster from its first evening rather than from the
+                // next rollover. A Modern theater opens with a feature.
+                if full_house && !self.blockbusters.contains(&(id as f64)) {
                     self.blockbusters.push(id as f64);
                 }
             }

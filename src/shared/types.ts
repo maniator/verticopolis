@@ -270,9 +270,9 @@ export interface Unit {
   /** Game-clock minute at which a `vacating` tenant actually leaves unless their
    *  satisfaction recovers first (the notice period). */
   vacateAt?: number;
-  /** Per-cinema film-booking policy. `undefined` ⇒ "auto" (the legacy 40% roll),
-   *  so old saves and demo towers behave identically. */
-  filmPolicy?: "auto" | "feature" | "blockbuster";
+  /** The film a Modern cinema books again once its film is spent, or "off"
+   *  (#1950). `undefined` and the old "auto" book a feature. */
+  filmPolicy?: "auto" | "feature" | "blockbuster" | "revival" | "off";
   /** A theatre's film age: the mornings its film has shown (#1932). Its
    *  draw falls as it ages; `undefined` is a new film. */
   filmDays?: number;

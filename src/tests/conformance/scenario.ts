@@ -4,6 +4,7 @@ import { TUNE_OPS, applyTune, expectOk, expectOutcome, type TuneCommand } from "
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { FacilityKind, GameMode } from "../../shared/types";
+import type { FilmPolicy } from "../../simport/commands";
 import { reloadChanged } from "./reloadCheck";
 import { digest } from "./canonical";
 import { check, own, type Spec } from "./scenarioSchema";
@@ -40,7 +41,7 @@ export type Command =
   | { op: "callExterminator"; expectFail?: boolean; reason?: string }
   | { op: "resolveChoice"; accept: boolean; kind?: "fireRescue" | "bombThreat" }
   | { op: "toggleAutoBridge" }
-  | ({ op: "setFilmPolicy"; policy: "auto" | "feature" | "blockbuster" } & At)
+  | ({ op: "setFilmPolicy"; policy: FilmPolicy } & At)
   | ({ op: "rerollSubtype" } & At)
   | { op: "applyRentBatch"; kind: FacilityKind; target: number | "default" | "noRate"; onlyDefaultPriced?: boolean }
   | ({ op: "resizeTransport"; bottom: number; top: number; expectFail?: boolean; reason?: string } & At)
@@ -152,7 +153,7 @@ export interface ScenarioEngine extends ChargeEngine {
   clearStops(id: number): boolean;
   setStop(id: number, floor: number, stop: boolean): boolean;
   priceUnit(id: number, target: number): number | null;
-  setFilmPolicy(id: number, policy: "auto" | "feature" | "blockbuster"): string | null;
+  setFilmPolicy(id: number, policy: FilmPolicy): string | null;
   rerollSubtype(id: number): string | null;
   /** The batch's `matched` count, or null when the batch does not apply. */
   applyRentBatch(kind: FacilityKind, target: number | "default" | "noRate", onlyDefaultPriced: boolean): number | null;

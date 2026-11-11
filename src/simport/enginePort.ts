@@ -338,7 +338,7 @@ export interface EnginePortCommands {
   /** Show a new film, or a classic, at a theatre where the player changes
    *  films (Classic): the record's `cost` slot is the price paid, or the
    *  price wanted on a "funds" refusal. */
-  changeFilm(id: number, classic: boolean): PortRecord;
+  changeFilm(id: number, tier: number): PortRecord;
   rerollUnit(id: number): PortRecord;
   bookExterminator(): PortRecord;
   answerChoice(accept: boolean): PortRecord;

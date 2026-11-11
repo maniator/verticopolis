@@ -112,14 +112,17 @@ impl EventSystem {
 }
 
 impl Simulation {
-    /// Sets what cinema `id` books: `auto` (the engine chooses), `feature` or
-    /// `blockbuster`. Returns the policy set, or `None` when `id` is not a
-    /// cinema or `policy` is none of the three.
+    /// Sets the film cinema `id` books again once its film is spent (Modern):
+    /// `auto` or `feature` (a feature), `revival`, `blockbuster`, or `off`.
+    /// Returns the policy set, or `None` when `id` is not a cinema or
+    /// `policy` is none of the five.
     pub fn set_film_policy(&mut self, id: i64, policy: &str) -> Option<&'static str> {
         let policy: &'static str = match policy {
             "auto" => "auto",
             "feature" => "feature",
             "blockbuster" => "blockbuster",
+            "revival" => "revival",
+            "off" => "off",
             _ => return None,
         };
         let u = self.tower.get_unit_mut(id)?;

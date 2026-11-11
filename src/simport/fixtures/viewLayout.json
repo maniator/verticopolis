@@ -481,7 +481,7 @@
       "floorHasLobby",
       "blockbuster",
       "filmDays",
-      "filmClassic"
+      "filmTier"
     ],
     "shaftCard": [
       "id",
@@ -711,6 +711,13 @@
   "filmPolicies": [
     "auto",
     "feature",
+    "blockbuster",
+    "revival",
+    "off"
+  ],
+  "filmTiers": [
+    "new",
+    "classic",
     "blockbuster"
   ],
   "logKinds": [

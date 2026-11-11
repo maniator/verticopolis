@@ -4,6 +4,7 @@ import { isOperational, isTenanted } from "../../shared/unitState";
 import { isCommercialKind, isHotelKind } from "../../presentation/viewKinds";
 import { catalogFacility, catalogHouseholdPrice, catalogOpenAt, catalogResidents, rungFor, type Catalog } from "../../catalog/catalogTypes";
 import type { TransportDetail, UnitDetail } from "../../simport/panels";
+import type { FilmPolicy, FilmTier } from "../../simport/commands";
 import { priceOptionsFor } from "../catalogPricing";
 import { hasAccessDiagnostic } from "../../game/cardLines";
 import { rungPickerTemplate, type RungChoice } from "./rungPicker";
@@ -39,6 +40,17 @@ const kv = (label: string, value: unknown, field?: string): TemplateResult =>
 
 /** One action row of the editor card. */
 const edRow = (inner: TemplateResult): TemplateResult => html`<div class="ed-row">${inner}</div>`;
+
+/** The film a Modern theatre's policy books again once its film is spent,
+ *  by catalog key, or null when rebooking is off (#1950). No policy and an
+ *  old save's "auto" book a feature. */
+const REBOOKED_FILM: Readonly<Record<FilmPolicy, FilmTier | null>> = {
+  auto: "new",
+  feature: "new",
+  revival: "classic",
+  blockbuster: "blockbuster",
+  off: null,
+};
 
 /** The shared editor-card frame: title bar + stat grid + an optional full-width
  *  block (the mobile diagnostics fold-in) + action rows. `key` is the selected
@@ -125,18 +137,14 @@ export function unitEditorTemplate(
       : `$${groupDigits(u.kind === "condo" ? catalogHouseholdPrice(catalog, u.price, u.residents) : u.price)}${isHotelKind(u.kind) ? "/night" : ""}`;
     rows.push(kv(label, rent, "rent"));
   }
-  // Where the player changes films (Classic), a theatre shows a new film or
-  // a classic and the player pays to change it; elsewhere it books a film
-  // each period (#1932).
-  const changesFilms = catalog.economy.newFilmPrice !== null;
+  // A theatre shows one film, and the player pays to show another; the
+  // catalog lists the mode's films and their prices (#1932, #1950).
+  const { films, filmAutoRebook } = catalog.economy;
   if (u.kind === "cinema" && isOperational(u)) {
-    // A gutted/burning/under-construction cinema books no film, omit the row.
-    if (changesFilms) {
-      rows.push(kv("Now showing", u.filmClassic ? "Classic film" : "New film", "showing"));
-      rows.push(kv("Days showing", u.filmDays ?? 0, "filmDays"));
-    } else {
-      rows.push(kv("Now showing", u.blockbuster ? "Blockbuster" : "Feature", "showing"));
-    }
+    // A gutted/burning/under-construction cinema shows no film, omit the rows.
+    const showing = films.find((film) => film.key === u.filmTier);
+    rows.push(kv("Now showing", showing?.label ?? "—", "showing"));
+    rows.push(kv("Days showing", u.filmDays ?? 0, "filmDays"));
   }
   if (u.state === "gutted") {
     rows.push(kv("Scrap value", "$0"));
@@ -198,19 +206,17 @@ export function unitEditorTemplate(
       edRow(html`<button class="btn" data-edit="batchKind">Set all ${f.name.toLowerCase()}s…</button>`),
     );
   }
-  if (u.kind === "cinema" && changesFilms) {
-    // Only an open theatre shows a film (the engine refuses the others).
-    if (isOperational(u)) {
-      const { newFilmPrice, classicFilmPrice } = catalog.economy;
-      actions.push(
-        edRow(
-          html`<button class="btn" data-edit="newFilm">New film ($${groupDigits(newFilmPrice ?? 0)})</button><button class="btn" data-edit="classicFilm">Classic film ($${groupDigits(classicFilmPrice ?? 0)})</button>`,
-        ),
-      );
-    }
-  } else if (u.kind === "cinema") {
-    const pol = { auto: "Auto", feature: "Feature", blockbuster: "Blockbuster" }[u.filmPolicy ?? "auto"];
-    actions.push(edRow(html`<button class="btn" data-edit="filmPolicy">Booking: ${pol} ▸</button>`));
+  // Only an open theatre shows a film (the engine refuses the others).
+  if (u.kind === "cinema" && isOperational(u)) {
+    actions.push(
+      edRow(html`${films.map((film) => html`<button class="btn" data-edit=${`${film.key}Film`}>${film.label} ($${groupDigits(film.price)})</button>`)}`),
+    );
+  }
+  if (u.kind === "cinema" && filmAutoRebook) {
+    // The film the theatre books again once its film is spent (#1950).
+    const rebooks = REBOOKED_FILM[u.filmPolicy ?? "auto"];
+    const label = rebooks === null ? "Off" : (films.find((film) => film.key === rebooks)?.label ?? "Off");
+    actions.push(edRow(html`<button class="btn" data-edit="filmPolicy">Auto-rebook: ${label} ▸</button>`));
   }
   // Canon retail reroll: only offer on shop / fastFood / restaurant. Legacy
   // retail units without a subtype still get the button so a player can opt

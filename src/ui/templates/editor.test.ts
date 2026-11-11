@@ -176,24 +176,41 @@ describe("unit editor row and action branches", () => {
     expect(closed.querySelector('[data-field="customers"]')!.textContent).toBe("7 (closed)");
   });
 
-  it("modern cinema: operational shows the film row and booking action; gutted drops the row", () => {
+  it("modern cinema: shows its film, offers the three films at the catalog's prices, and names the film it rebooks", () => {
     const modern = { mode: "modern" as const };
-    const op = renderToFragment(unitEditor(unit("cinema", { filmPolicy: "blockbuster", blockbuster: true }, "modern"), modern));
+    const economy = catalogFor("modern").economy;
+    const card = (over: Partial<UnitDetail>) => renderToFragment(unitEditor(unit("cinema", over, "modern"), modern));
+    const op = card({ filmPolicy: "blockbuster", filmTier: "blockbuster", filmDays: 9 });
     expect(op.querySelector('[data-field="showing"]')!.textContent).toBe("Blockbuster");
-    expect(op.querySelector('[data-edit="filmPolicy"]')!.textContent).toContain("Blockbuster");
-    expect(op.querySelector('[data-edit="newFilm"]')).toBeNull();
-    const gutted = unit("cinema", { filmPolicy: "blockbuster", state: "gutted" }, "modern");
-    expect(renderToFragment(unitEditor(gutted, modern)).textContent).not.toContain("Now showing");
+    expect(op.querySelector('[data-field="filmDays"]')!.textContent).toBe("9");
+    expect(op.querySelector('[data-edit="filmPolicy"]')!.textContent).toBe("Auto-rebook: Blockbuster ▸");
+    for (const film of economy.films) {
+      expect(op.querySelector(`[data-edit="${film.key}Film"]`)!.textContent).toBe(`${film.label} ($${groupDigits(film.price)})`);
+    }
+    expect(economy.films.map((f) => f.label)).toEqual(["Revival", "Feature", "Blockbuster"]);
+    const rebooks = (filmPolicy: UnitDetail["filmPolicy"]) => card({ filmPolicy, filmTier: "new" }).querySelector('[data-edit="filmPolicy"]')!.textContent;
+    expect([null, "auto", "feature", "revival", "off"].map((p) => rebooks(p as UnitDetail["filmPolicy"]))).toEqual([
+      "Auto-rebook: Feature ▸",
+      "Auto-rebook: Feature ▸",
+      "Auto-rebook: Feature ▸",
+      "Auto-rebook: Revival ▸",
+      "Auto-rebook: Off ▸",
+    ]);
+    const gutted = card({ filmPolicy: "blockbuster", state: "gutted" });
+    expect(gutted.textContent).not.toContain("Now showing");
+    expect(gutted.querySelector('[data-edit="newFilm"]')).toBeNull();
   });
 
   it("classic cinema: shows the film and its days, and offers a new film or a classic at the catalog's prices", () => {
     const economy = catalogFor("classic").economy;
-    const film = (filmClassic: boolean) => renderToFragment(unitEditor(unit("cinema", { filmDays: 4, filmClassic })));
+    const film = (classic: boolean) => renderToFragment(unitEditor(unit("cinema", { filmDays: 4, filmTier: classic ? "classic" : "new" })));
     const fresh = film(false);
     expect(fresh.querySelector('[data-field="showing"]')!.textContent).toBe("New film");
     expect(fresh.querySelector('[data-field="filmDays"]')!.textContent).toBe("4");
-    expect(fresh.querySelector('[data-edit="newFilm"]')!.textContent).toBe(`New film ($${groupDigits(economy.newFilmPrice!)})`);
-    expect(fresh.querySelector('[data-edit="classicFilm"]')!.textContent).toBe(`Classic film ($${groupDigits(economy.classicFilmPrice!)})`);
+    const price = (key: string) => groupDigits(economy.films.find((f) => f.key === key)!.price);
+    expect(fresh.querySelector('[data-edit="newFilm"]')!.textContent).toBe(`New film ($${price("new")})`);
+    expect(fresh.querySelector('[data-edit="classicFilm"]')!.textContent).toBe(`Classic film ($${price("classic")})`);
+    expect(fresh.querySelector('[data-edit="blockbusterFilm"]')).toBeNull();
     expect(fresh.querySelector('[data-edit="filmPolicy"]')).toBeNull();
     expect(film(true).querySelector('[data-field="showing"]')!.textContent).toBe("Classic film");
     const gutted = renderToFragment(unitEditor(unit("cinema", { state: "gutted" })));

@@ -2,11 +2,12 @@ import { it, expect } from "vitest";
 import { catalogFacts, newSeededDraft, LOT_WIDTH } from "../portKit/draftFixtures";
 import { PortSim, describeEngines, type Leg } from "../portKit/portSim";
 
-/** The cinema's two-tier film booking (FAQ), on both engines. Moved from
+/** The cinema's film booking (FAQ), on the engine. Moved from
  *  faqComplete.integration.test.ts, where it ran on the sampled v1 model to
- *  stay inside the CI timeout; the engine runs the hourly model only. Modern
- *  books films each period; Classic books none, and the player pays only to
- *  change a film (#1932). */
+ *  stay inside the CI timeout; the engine runs the hourly model only. No mode
+ *  charges a theatre each period: the player pays to show a film (#1932), and
+ *  a Modern theatre books its policy's film again once its film is spent
+ *  (#1950). */
 
 const W = LOT_WIDTH;
 const C = Math.floor(W / 2);
@@ -38,17 +39,14 @@ describeEngines("Cinema film booking (FAQ)", (leg: Leg) => {
     return charges;
   }
 
-  it("blockbuster vs average film: two-tier booking cost exists and both occur (Modern)", () => {
-    const ECONOMY = catalogFacts("modern").economy as unknown as { readonly cinemaBookingMonthly: number; readonly cinemaBookingBlockbusterMonthly: number; readonly calendars: readonly { readonly key: string; readonly maintenancePeriodDays: number }[] };
-    expect(ECONOMY.cinemaBookingBlockbusterMonthly).toBeGreaterThan(ECONOMY.cinemaBookingMonthly);
-    // Modern adds a fixed operating overhead to each period, so the two tiers
-    // show as two charges a booking's difference apart, scaled to the canon
-    // 3-day period (1/10 of a real-world 30-day charge).
+  it("Modern books no film each period: a lone cinema's tower pays the same overhead every period", () => {
+    const ECONOMY = catalogFacts("modern").economy as unknown as {
+      readonly overheadPerUnitMonthly: number;
+      readonly calendars: readonly { readonly key: string; readonly maintenancePeriodDays: number }[];
+    };
     const canon = ECONOMY.calendars.find((c) => c.key === "canon")!;
-    const scale = canon.maintenancePeriodDays / 30;
-    const charges = [...yearOfCharges("modern")];
-    const gap = Math.round((ECONOMY.cinemaBookingBlockbusterMonthly - ECONOMY.cinemaBookingMonthly) * scale);
-    expect(charges.some((c) => charges.includes(c + gap)), "a blockbuster period and an average period").toBe(true);
+    const overhead = Math.round((ECONOMY.overheadPerUnitMonthly * canon.maintenancePeriodDays) / 30);
+    expect([...yearOfCharges("modern")]).toEqual([overhead]);
   }, 60_000);
 
   it("Classic books no film: a lone cinema's tower pays no maintenance", () => {
@@ -57,14 +55,17 @@ describeEngines("Cinema film booking (FAQ)", (leg: Leg) => {
   }, 60_000);
 });
 
-/** Blockbuster as a choice (economy depth #5), on both engines. Moved from
- *  economyDepth.integration.test.ts, where it ran on the sampled v1 model. The
- *  policy is set on the draft (the save carries it) and the engine's unit card
- *  answers whether the cinema is showing a blockbuster. */
+/** Blockbuster as a choice (economy depth #5, #1950), on the engine. Moved
+ *  from economyDepth.integration.test.ts, where it ran on the sampled v1
+ *  model. The policy is set on the draft (the save carries it) and the
+ *  engine's unit card answers whether the cinema holds a blockbuster slot. */
 describeEngines("Cinema film policy (economy depth #5)", (leg: Leg) => {
   const MONTH = 60 * 24 * 31;
+  /** Past a Modern film's run: the feature a theatre opens with is spent and
+   *  booked again by the policy. */
+  const RUN = 60 * 24 * 43;
 
-  // Modern: the policy picks the booking, and Classic books none (#1932).
+  // Modern: the policy picks the film booked again once the film is spent.
   function cinemaSim(seed: number, policy: "feature" | "blockbuster"): { sim: PortSim; id: number } {
     const draft = newSeededDraft(seed, "modern");
     draft.money = 1e9;
@@ -88,9 +89,11 @@ describeEngines("Cinema film policy (economy depth #5)", (leg: Leg) => {
     }
   }, 60_000);
 
-  it("policy 'blockbuster' always books one", () => {
+  it("policy 'blockbuster' books one once the opening feature is spent", () => {
     const { sim, id } = cinemaSim(4, "blockbuster");
     sim.tick(MONTH);
+    expect(sim.unitCard(id).blockbuster, "the opening feature still runs").not.toBe(1);
+    sim.tick(RUN - MONTH);
     expect(sim.unitCard(id).blockbuster).toBe(1);
-  });
+  }, 60_000);
 });

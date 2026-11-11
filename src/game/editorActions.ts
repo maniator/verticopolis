@@ -7,6 +7,7 @@ import type { UI } from "../ui/UI";
 import type { AudioEngine } from "../audio/Audio";
 import type { BuildActions } from "./buildActions";
 import type { EnginePort } from "../simport/enginePort";
+import type { FilmTier } from "../simport/commands";
 import { outcome, type PortCodes } from "../simport/portCodes";
 import { clockOf } from "../simport/headerClock";
 import { scheduleDialogUX } from "../ui/scheduleDialogRules";
@@ -15,6 +16,9 @@ import type { ViewReader } from "../simport/viewReader";
 import { groupDigits } from "../ui/format";
 import { INVALID_COMMAND, MAX_TEXT, NOT_ENOUGH_MONEY } from "../simport/request";
 import { BATCH_COUNTERS, batchTargetCode, type CardKit } from "./cardKit";
+
+/** The card's film buttons and the film each shows (`data-edit="<key>Film"`). */
+const FILM_ACTIONS: Readonly<Record<string, FilmTier>> = { newFilm: "new", classicFilm: "classic", blockbusterFilm: "blockbuster" };
 
 /**
  * The editor-card actions: everything the selected facility's buttons can do
@@ -278,6 +282,7 @@ export class EditorActions {
       filmPolicy: "Film policy",
       newFilm: "Film change",
       classicFilm: "Film change",
+      blockbusterFilm: "Film change",
       changeVariety: "Change variety",
       batchKind: "Edit",
     };
@@ -336,15 +341,20 @@ export class EditorActions {
           this.deps.refreshEditor();
         }
       } else if (action === "filmPolicy") {
-        const order = ["auto", "feature", "blockbuster"] as const;
-        const next = order[(order.indexOf(u.filmPolicy ?? "auto") + 1) % order.length];
+        // The film a Modern theatre books again once its film is spent
+        // (#1950): off, then each film from the cheapest. No policy, or an
+        // old save's "auto", rebooks a feature.
+        const order = ["off", "revival", "feature", "blockbuster"] as const;
+        const now = u.filmPolicy === "auto" || u.filmPolicy === null || u.filmPolicy === undefined ? "feature" : u.filmPolicy;
+        const next = order[(order.indexOf(now) + 1) % order.length];
         engine.setFilm(u.id, codes.code("filmPolicies", next));
         this.deps.audio.sfx("click");
         this.deps.refreshEditor();
-      } else if (action === "newFilm" || action === "classicFilm") {
-        // Classic's film change (#1932): the engine charges the price and
+      } else if (Object.prototype.hasOwnProperty.call(FILM_ACTIONS, action)) {
+        // Showing a film (#1932, #1950): the engine charges the price and
         // starts the film; a payment is no edit, so no undo step holds it.
-        const rec = engine.changeFilm(u.id, action === "classicFilm");
+        const tier = FILM_ACTIONS[action];
+        const rec = engine.changeFilm(u.id, codes.code("filmTiers", tier));
         const res = outcome(engine, rec);
         if (!res.ok) {
           const cost = codes.slot(rec, "changeFilm", "cost");
@@ -354,9 +364,9 @@ export class EditorActions {
               : "That film can't be shown now.",
           );
         }
-        const film = action === "classicFilm" ? "A classic film" : "A new film";
+        const film = kit.catalog().economy.films.find((f) => f.key === tier)?.label ?? "film";
         this.deps.audio.sfx("build");
-        this.deps.announce(`${film} is showing.`);
+        this.deps.announce(`Now showing: a ${film.toLowerCase()}.`);
         this.deps.refreshEditor();
       } else if (action === "changeVariety") {
         // Canon retail reroll: picks a §7 name different from the current

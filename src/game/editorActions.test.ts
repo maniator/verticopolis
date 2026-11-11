@@ -183,14 +183,17 @@ describe("EditorActions: unit card", () => {
     expect(deps.refreshEditor).toHaveBeenCalledOnce();
   });
 
-  it("cycles the film policy auto, feature, blockbuster and back", async () => {
+  it("cycles the film a theatre rebooks: off, revival, feature, blockbuster and back", async () => {
     const { actions, cards, codes, port } = setup({
       setFilm: () => rec("buildAt", true),
     });
     for (const [now, next] of [
-      [undefined, "feature"],
+      [undefined, "blockbuster"],
+      ["auto", "blockbuster"],
       ["feature", "blockbuster"],
-      ["blockbuster", "auto"],
+      ["blockbuster", "off"],
+      ["off", "revival"],
+      ["revival", "feature"],
     ] as const) {
       cards.unit.mockReturnValueOnce({
         id: office.id,
@@ -205,19 +208,21 @@ describe("EditorActions: unit card", () => {
     }
   });
 
-  it("shows a new film or a classic through changeFilm, with no undo step for the payment's sake", async () => {
-    for (const [action, classic] of [
-      ["newFilm", false],
-      ["classicFilm", true],
+  it("shows each film through changeFilm by its tier code, with no undo step for the payment's sake", async () => {
+    for (const [action, tier, said] of [
+      ["newFilm", "new", "Now showing: a new film."],
+      ["classicFilm", "classic", "Now showing: a classic film."],
+      ["blockbusterFilm", "blockbuster", "Now showing: a film."],
     ] as const) {
-      const { actions, deps, port } = setup({
+      const { actions, codes, deps, port } = setup({
         changeFilm: () => rec("changeFilm", true, { cost: 1 }),
       });
       await actions.handleEditAction(action, root(""));
-      expect(port.changeFilm).toHaveBeenCalledExactlyOnceWith(office.id, classic);
+      expect(port.changeFilm).toHaveBeenCalledExactlyOnceWith(office.id, codes.code("filmTiers", tier));
       expect(deps.captureUndo).toHaveBeenCalledExactlyOnceWith("Film change");
       expect(deps.audio.sfx).toHaveBeenCalledExactlyOnceWith("build");
-      expect(deps.announce).toHaveBeenCalledExactlyOnceWith(classic ? "A classic film is showing." : "A new film is showing.");
+      // The label comes from the catalog (Classic's here, which has no blockbuster).
+      expect(deps.announce).toHaveBeenCalledExactlyOnceWith(said);
       expect(deps.refreshEditor).toHaveBeenCalledOnce();
     }
   });

@@ -2,7 +2,7 @@
 //! loop reads, as methods on the mode.
 
 use crate::clock::GameMode;
-use crate::economy::films::{CLASSIC_FILM_PRICE, NEW_FILM_PRICE};
+use crate::economy::films::{FilmRules, CLASSIC_FILMS, MODERN_FILMS};
 use crate::economy::{
     CONDO_MONTHLY_TAX_RATE, OVERHEAD_PER_LEASABLE_UNIT_MONTHLY, REAL_WORLD_QUARTER_DAYS,
 };
@@ -137,15 +137,15 @@ impl GameMode {
         }
     }
 
-    /// `filmChanges()`: what changing a theater's film costs, `(new film,
-    /// classic film)`, where the player changes films. SimTower charges
-    /// nothing each period: the player shows a new film or a classic when
-    /// ticket sales fall (#1932). Modern books a film each maintenance period
-    /// instead, and each booking starts a fresh film.
-    pub fn film_changes(self) -> Option<(f64, f64)> {
+    /// The films a theatre can show, their prices and run, and how they earn
+    /// (#1932, #1950). Neither mode charges a theatre each period: Classic
+    /// shows a new film or a classic when ticket sales fall, as SimTower
+    /// does, and Modern books a revival, a feature or a blockbuster and books
+    /// it again when it is spent.
+    pub fn films(self) -> &'static FilmRules {
         match self {
-            GameMode::Classic => Some((NEW_FILM_PRICE, CLASSIC_FILM_PRICE)),
-            GameMode::Modern => None,
+            GameMode::Classic => &CLASSIC_FILMS,
+            GameMode::Modern => &MODERN_FILMS,
         }
     }
 

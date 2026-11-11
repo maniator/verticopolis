@@ -574,16 +574,16 @@ describe.skipIf(noEngine)("EditorActions (dialogs, extend billing, per-kind butt
     expect(f.sfx).not.toContain("click"); // no feedback for a refused nudge
   });
 
-  it("filmPolicy cycles auto → feature → blockbuster → auto on a cinema", async () => {
+  it("filmPolicy cycles a cinema's rebooking from a feature to blockbuster, off, revival and back", async () => {
     sel = { type: "unit", id: cinema.id };
     render(unitEditor(sim, cinema), root);
-    await editor.handleEditAction("filmPolicy", root);
-    expect(unitOf(sim, cinema.id)!.filmPolicy).toBe("feature");
-    await editor.handleEditAction("filmPolicy", root);
-    expect(unitOf(sim, cinema.id)!.filmPolicy).toBe("blockbuster");
-    await editor.handleEditAction("filmPolicy", root);
-    expect(unitOf(sim, cinema.id)!.filmPolicy).toBe("auto");
-    expect(f.sfx).toEqual(["click", "click", "click"]);
+    const seen: (string | undefined)[] = [];
+    for (let i = 0; i < 4; i++) {
+      await editor.handleEditAction("filmPolicy", root);
+      seen.push(unitOf(sim, cinema.id)!.filmPolicy);
+    }
+    expect(seen).toEqual(["blockbuster", "off", "revival", "feature"]);
+    expect(f.sfx).toEqual(["click", "click", "click", "click"]);
   });
 
   it("the rung action applies the picked rung through the choke point and announces the pinned string", async () => {

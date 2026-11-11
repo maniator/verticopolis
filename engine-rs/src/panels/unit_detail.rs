@@ -8,6 +8,7 @@ use serde_json::{json, Value};
 
 use crate::clock::GameMode;
 use crate::econ::{classic_ladder, rent_config};
+use crate::economy::films::FilmTier;
 use crate::facilities::Kind;
 use crate::rent::AVERAGE_RUNG;
 use crate::sim::Simulation;
@@ -83,8 +84,8 @@ impl Simulation {
             blockbuster,
         } = self.card_flags(id)?;
         let u = self.tower.get_unit(id)?;
-        // A theatre's film: the mornings it has shown, and whether it is a
-        // classic (#1932); null on any other kind.
+        // A theatre's film: the mornings it has shown, and its tier (#1932,
+        // #1950); null on any other kind.
         let film = (u.kind == Kind::Cinema).then(|| u.extras());
         Some(json!({
             "id": u.id,
@@ -110,7 +111,7 @@ impl Simulation {
             "floorHasLobby": has_lobby,
             "blockbuster": blockbuster,
             "filmDays": film.as_ref().map(|e| e.film_days.unwrap_or(0)),
-            "filmClassic": film.as_ref().map(|e| e.film_classic),
+            "filmTier": film.as_ref().map(|e| FilmTier::showing(e).key()),
         }))
     }
 }

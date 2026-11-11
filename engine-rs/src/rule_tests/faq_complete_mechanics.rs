@@ -8,6 +8,7 @@
 //! and booked blockbusters survive a reload. The cinema's film booking per
 //! maintenance period is `catalog::charge_tests::film_and_dj_bookings_follow_the_quote`.
 use crate::clock::GameMode;
+use crate::economy::films::FilmTier;
 use crate::facilities::{Kind, LOT_WIDTH};
 use crate::load::deserialize;
 use crate::sim::Simulation;
@@ -276,8 +277,9 @@ fn the_metro_is_thirty_tiles_wide() {
 
 #[test]
 fn booked_blockbusters_survive_a_reload() {
-    // Modern books films each period; Classic's blockbusters are full houses
-    // (#1932), and `films_tests` carries them through a save.
+    // A Modern blockbuster at full draw holds a blockbuster slot (#1950);
+    // Classic's are full houses (#1932), and `films_tests` carries them
+    // through a save.
     let mut sim = seeded_game(3, GameMode::Modern);
     sim.money = 1e12;
     sim.star = 1;
@@ -285,12 +287,10 @@ fn booked_blockbusters_survive_a_reload() {
     lay(&mut sim, Kind::Floor, 2);
     lay(&mut sim, Kind::Floor, 3);
     assert!(sim.tower.place(Kind::Cinema, 2, 0).ok);
-    for _ in 0..48 {
-        if !sim.blockbusters.is_empty() {
-            break;
-        }
-        sim.tick(24.0 * 60.0 * 31.0);
-    }
+    sim.tick(24.0 * 60.0);
+    let cinema = sim.tower.unit_at(2, 0).expect("the theatre").id;
+    sim.change_film(cinema, FilmTier::Blockbuster)
+        .expect("a blockbuster");
     assert!(!sim.blockbusters.is_empty());
     let loaded = deserialize(&sim.serialize()).unwrap();
     assert_eq!(loaded.blockbusters, sim.blockbusters);

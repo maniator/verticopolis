@@ -22,8 +22,6 @@ pub fn catalog(mode: GameMode) -> Catalog {
             maintenance_per_car_monthly: MAINTENANCE_PER_CAR_MONTHLY,
             overhead_per_unit_monthly: mode.operating_overhead_per_unit(),
             condo_hold_tax_rate: mode.condo_hold_tax_rate(),
-            cinema_booking_monthly: CINEMA_BOOKING_MONTHLY,
-            cinema_booking_blockbuster_monthly: CINEMA_BOOKING_BLOCKBUSTER,
             nightclub_dj_monthly: NIGHTCLUB_DJ_MONTHLY,
             garbage_collect_hour: GARBAGE_COLLECT_HOUR,
             exterminator: mode
@@ -32,8 +30,8 @@ pub fn catalog(mode: GameMode) -> Catalog {
                     callout_fee,
                     per_room_fee,
                 }),
-            new_film_price: mode.film_changes().map(|(new_film, _)| new_film),
-            classic_film_price: mode.film_changes().map(|(_, classic)| classic),
+            films: mode.films().offers,
+            film_auto_rebook: mode.films().rebooks_spent,
             auto_bridge_toggleable: mode.bridging_toggleable(),
         },
         rules: Rules {

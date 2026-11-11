@@ -7,10 +7,20 @@
  */
 import type { CalendarKind } from "../shared/engineTypes";
 import type { FacilityCategory, FacilityKind, GameMode } from "../shared/types";
+import type { FilmTier } from "../simport/commands";
+
+/** A film a theatre can show, as the catalog publishes it (#1950). */
+export interface CatalogFilm {
+  readonly key: FilmTier;
+  /** What the card calls it ("New film", "Feature", ...). */
+  readonly label: string;
+  /** What showing it costs, charged once. */
+  readonly price: number;
+}
 
 /** The version of the catalog's shape. It moves when a field is added,
  *  renamed or removed, so a frontend can refuse a shape it does not know. */
-export const CATALOG_VERSION = 8;
+export const CATALOG_VERSION = 9;
 
 /** Every price, size and build rule of one mode. */
 export interface Catalog {
@@ -74,21 +84,18 @@ export interface CatalogEconomy {
    *  where the mode charges none). Each period the engine charges
    *  `ceil(price * rate)`, multiplied by `maintenanceScale` and rounded. */
   readonly condoHoldTaxRate: number;
-  /** A cinema's monthly film booking, and its blockbuster booking, where the
-   *  mode books films (`newFilmPrice` is null). */
-  readonly cinemaBookingMonthly: number;
-  readonly cinemaBookingBlockbusterMonthly: number;
   /** A nightclub's monthly DJ booking. */
   readonly nightclubDjMonthly: number;
   /** Hour of the daily garbage-truck collection that empties recycling bins. */
   readonly garbageCollectHour: number;
   /** The paid exterminator's fees, or null where the mode has none. */
   readonly exterminator: { readonly calloutFee: number; readonly perRoomFee: number } | null;
-  /** Showing a new film and a classic where the player changes a theatre's
-   *  film (and books none each period), or null where the mode books films
-   *  (#1932). */
-  readonly newFilmPrice: number | null;
-  readonly classicFilmPrice: number | null;
+  /** The films a theatre can show, with their prices, in the order the card
+   *  lists them (#1932, #1950). No theatre pays anything each period. */
+  readonly films: readonly CatalogFilm[];
+  /** Whether a theatre books its chosen film again once its film is spent
+   *  (Modern). */
+  readonly filmAutoRebook: boolean;
   /** Whether the player can switch automatic bridging off. When false,
    *  bridging is always on. When true, a tower starts bridged unless it was
    *  founded unbridged, and the live setting is per tower (the engine's

@@ -49,7 +49,11 @@ export type Command =
   /** A bulletin line; `kind` is the log kind, `info` when left out. */
   | { op: "emit"; text: string; kind?: LogEntry["kind"] };
 
-export type FilmPolicy = "auto" | "feature" | "blockbuster";
+/** A theatre's rebooking policy: the film a Modern theatre books again once
+ *  its film is spent, or "off" (#1950). "auto" is an old save's feature. */
+export type FilmPolicy = "auto" | "feature" | "blockbuster" | "revival" | "off";
+/** A film a theatre can show, by its catalog key (#1932, #1950). */
+export type FilmTier = "new" | "classic" | "blockbuster";
 
 /** The kinds the brush lays: plain floor and lobby. */
 export type BrushKind = "floor" | "lobby";

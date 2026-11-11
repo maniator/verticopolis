@@ -12,14 +12,23 @@
       }
     ],
     "carResaleRefund": 20000,
-    "cinemaBookingBlockbusterMonthly": 300000,
-    "cinemaBookingMonthly": 150000,
-    "classicFilmPrice": 150000,
     "condoHoldTaxRate": 0,
     "exterminator": null,
+    "filmAutoRebook": false,
+    "films": [
+      {
+        "key": "new",
+        "label": "New film",
+        "price": 300000
+      },
+      {
+        "key": "classic",
+        "label": "Classic film",
+        "price": 150000
+      }
+    ],
     "garbageCollectHour": 5,
     "maintenancePerCarMonthly": 600,
-    "newFilmPrice": 300000,
     "nightclubDjMonthly": 40000,
     "overheadPerUnitMonthly": 0,
     "startingMoney": 2000000,
@@ -1976,7 +1985,7 @@
     "scheduleAssist": false,
     "variantHouseholds": false
   },
-  "version": 8,
+  "version": 9,
   "world": {
     "groundFloor": 1,
     "groundFloorStructure": "lobby",
