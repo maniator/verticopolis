@@ -1,5 +1,5 @@
 import { facilityFloors } from "../../engine/facilities";
-import type { FacilityKind } from "../../engine/types";
+import type { FacilityKind } from "../../shared/types";
 import { ViewReader } from "../../simport/viewReader";
 import type { PortSim } from "./portSim";
 

@@ -7,6 +7,8 @@ import type { FacilityKind } from "../types";
 
 import { isPresent } from "../types";
 import { roomUnits } from "../tower/rooms";
+import type { StarGateId } from "../../shared/engineTypes";
+export type { StarGateId };
 
 /** The Windows Help file asks for more than one Security Office at 3 stars. */
 const SECURITY_OFFICES_FOR_THREE_STARS = 2;
@@ -121,11 +123,6 @@ export function nextStarThreshold(sim: Simulation): number | null {
   if (sim.star >= 5) return null;
   return STAR_THRESHOLDS[sim.star + 1];
 }
-
-/** A star gate's stable id: what a panel keys its copy on, and what the Rust
- *  engine's stats report answers (facade slice 6b), so the two engines name
- *  each gate the same way whatever the label says. */
-export type StarGateId = "security" | "medical" | "recycling" | "suites" | "vip" | "metro" | "weddingHall";
 
 /** One requirement toward the next star: its id, a human label and whether it
  *  is met. */

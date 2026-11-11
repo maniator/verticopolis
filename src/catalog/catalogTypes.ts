@@ -5,8 +5,8 @@
  * catalog from the WASM binding never bundles the TypeScript engine. `catalog.ts` builds a catalog of this shape;
  * `engine-rs/src/catalog.rs` serializes the same one.
  */
-import type { CalendarKind } from "../engine/calendar";
-import type { FacilityCategory, FacilityKind, GameMode } from "../engine/types";
+import type { CalendarKind } from "../shared/engineTypes";
+import type { FacilityCategory, FacilityKind, GameMode } from "../shared/types";
 
 /** The version of the catalog's shape. It moves when a field is added,
  *  renamed or removed, so a frontend can refuse a shape it does not know. */

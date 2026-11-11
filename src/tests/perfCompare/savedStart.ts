@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { Simulation } from "../../engine/Simulation";
-import type { SerializedGame } from "../../engine/serializedGame";
+import type { SerializedGame } from "../../shared/serializedGame";
 import { SaveGame } from "../../storage/SaveGame";
 import type { Scenario } from "./scenarios";
 import { saveOf, loadResultSim } from "../fixtures/saveText";

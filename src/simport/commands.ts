@@ -1,5 +1,5 @@
-import type { BatchRentResult, BatchTarget } from "../engine/sim/constants";
-import type { FacilityKind, LogEntry, SerializedView } from "../engine/types";
+import type { BatchRentResult, BatchTarget } from "../shared/engineTypes";
+import type { FacilityKind, LogEntry, SerializedView } from "../shared/types";
 
 /**
  * The player commands the game sends through the port, one member per

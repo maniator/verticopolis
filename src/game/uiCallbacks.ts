@@ -2,7 +2,7 @@ import { trackAppAction } from "../analytics";
 import { wellFormed } from "../shared/wellFormed";
 import type { UICallbacks, Tool } from "../ui/UI";
 import type { Catalog } from "../catalog/catalogTypes";
-import type { GameMode } from "../engine/types";
+import type { GameMode } from "../shared/types";
 import type { EnginePort } from "../simport/enginePort";
 import type { PortCodes } from "../simport/portCodes";
 import type { AudioEngine } from "../audio/Audio";

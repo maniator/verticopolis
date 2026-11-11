@@ -1,6 +1,6 @@
 import { html, type TemplateResult } from "lit-html";
 import type { EnginePort, PortRecord } from "../simport/enginePort";
-import type { VacateReason } from "../engine/types";
+import type { VacateReason } from "../shared/types";
 import {
   FAR_WALK_COPY,
   accessCopy,

@@ -1,5 +1,5 @@
 import type { Catalog } from "../catalog/catalogTypes";
-import type { GameMode } from "../engine/types";
+import type { GameMode } from "../shared/types";
 import { FACILITY_PRESENTATION } from "../presentation/facilityPresentation";
 import type { ViewWorld } from "../presentation/viewWorld";
 

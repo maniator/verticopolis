@@ -1,5 +1,5 @@
 import { FACILITIES, facilityFloors } from "../engine/facilities";
-import type { FacilityKind, Unit } from "../engine/types";
+import type { FacilityKind, Unit } from "../shared/types";
 import { paintSettledUnit } from "../render/regionPaint";
 import { FLOOR, TILE } from "../render/scale";
 import type { DrawCtx } from "../render/sprites";

@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { sendToRelay } from "./analyticsRelay";
 import { gameplaySession } from "./analytics";
 import { Simulation } from "./engine/Simulation";
-import type { SerializedGame } from "./engine/serializedGame";
+import type { SerializedGame } from "./shared/serializedGame";
 import { RATE_LIMIT_MAX } from "./analyticsRateLimit";
 import {
   BRIDGE_SEND_LIMIT,

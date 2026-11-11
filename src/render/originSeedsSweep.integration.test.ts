@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { FACILITIES } from "../engine/facilities";
 import { subtypeListFor } from "../engine/retailSubtypes";
-import type { Unit } from "../engine/types";
+import type { Unit } from "../shared/types";
 import { OFFSETS, paintAt, unitOf } from "../tests/originSeedsHarness";
 import { roomKinds } from "./atlas/catalog";
 

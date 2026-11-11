@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { facilityFloors } from "../engine/facilities";
 import { Simulation } from "../engine/Simulation";
-import type { HeatmapMode } from "../engine/sim/constants";
+import type { HeatmapMode } from "../shared/engineTypes";
 import { TsEngine } from "../engine/port/tsEngine";
 import { PortRenderSim } from "./portRenderSim";
 import { ViewReader } from "./viewReader";

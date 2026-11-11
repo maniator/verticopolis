@@ -2,7 +2,7 @@ import { describe, it, expect, afterAll } from "vitest";
 import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import type { Simulation } from "../../engine/Simulation";
-import type { Unit } from "../../engine/types";
+import type { Unit } from "../../shared/types";
 import {
   CONFORMANCE_DIR,
   firstDivergence,

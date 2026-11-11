@@ -3,7 +3,7 @@ import { syncAttendanceOccupants } from "../../engine/census";
 import type { WasmEngine } from "../../dualrun/binding";
 import type { TsEngine } from "../../engine/port/tsEngine";
 import { markRoom, setRoomState } from "../../engine/tower/rooms";
-import { isUnitState, isVacateReason, type UnitState, type VacateReason, type WeatherKind } from "../../engine/types";
+import { isUnitState, isVacateReason, type UnitState, type VacateReason, type WeatherKind } from "../../shared/types";
 
 /** The tooling setters (binding tier 3) a test reaches mid-run, the same on
  *  both engines. Each that can refuse answers false, changing nothing. */

@@ -4,7 +4,7 @@ import { inflateSync } from "fflate";
 import towerFile from "../../../conformance/fixtures/towerone_6.vctower?raw";
 import { SAVE_VERSION, Simulation, serializeUnit } from "../../engine/Simulation";
 import { FACILITIES } from "../../engine/facilities";
-import type { SerializedGame, SerializedUnit, Unit } from "../../engine/types";
+import type { SerializedGame, SerializedUnit, Unit } from "../../shared/types";
 
 /**
  * Sparse v3 unit serialization: `serializeUnit` omits every field whose value

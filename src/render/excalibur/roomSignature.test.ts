@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { FACILITIES } from "../../engine/facilitiesData";
 import { hasBusinessHours } from "../../engine/facilities";
 import { subtypeListFor } from "../../engine/retailSubtypes";
-import type { FacilityKind, Unit, UnitState } from "../../engine/types";
+import type { FacilityKind, Unit, UnitState } from "../../shared/types";
 import { LATE_NIGHT_KINDS } from "../lateNight";
 import { paintSettledUnit } from "../regionPaint";
 import { FLOOR, TILE } from "../scale";

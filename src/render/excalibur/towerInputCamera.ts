@@ -1,7 +1,7 @@
 import * as ex from "excalibur";
 import { viewWorld } from "../../presentation/viewWorld";
 import { findCatalogFacility } from "../../catalog/catalogTypes";
-import type { FacilityKind, SerializedView, WeatherKind } from "../../engine/types";
+import type { FacilityKind, SerializedView, WeatherKind } from "../../shared/types";
 import { VIEW_ZOOM_MAX, VIEW_ZOOM_MIN } from "../../shared/viewZoom";
 import { wheelZoomDelta } from "../../shared/inputEvents";
 import { clampCameraY, fitZoom } from "../cameraBounds";

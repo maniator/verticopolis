@@ -1,8 +1,8 @@
 import type { TemplateResult } from "lit-html";
 import type { Catalog } from "../catalog/catalogTypes";
-import type { ElevatorSchedule } from "../engine/elevatorSchedule";
-import type { BatchRentOptions, BatchRentResult, BatchTarget } from "../engine/sim/constants";
-import type { FacilityKind, UnitState } from "../engine/types";
+import type { ElevatorSchedule } from "../shared/engineTypes";
+import type { BatchRentOptions, BatchRentResult, BatchTarget } from "../shared/engineTypes";
+import type { FacilityKind, UnitState } from "../shared/types";
 import { catalogOf } from "./portAccess";
 import { Cards } from "../simport/cards";
 import { PortCodes } from "../simport/portCodes";

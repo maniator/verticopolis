@@ -1,6 +1,6 @@
 import { catalogFacility, type Catalog, type CatalogRent } from "../catalog/catalogTypes";
-import type { PriceOptions, PriceRung } from "../engine/gameRules";
-import type { FacilityKind } from "../engine/types";
+import type { PriceOptions, PriceRung } from "../shared/engineTypes";
+import type { FacilityKind } from "../shared/types";
 
 /**
  * The price controls for a kind, read from the tower's catalog (#921) in the

@@ -12,7 +12,7 @@
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { basename, resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import type { SerializedGame } from "../../src/engine/types";
+import type { SerializedGame } from "../../src/shared/types";
 import { buildTDT } from "../../src/tests/conformance/tdtWasm";
 import { decodeVctower } from "../../src/storage/vctowerContainer";
 

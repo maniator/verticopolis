@@ -12,7 +12,7 @@ import { hasWasmPackage, wasm, wasmRequired } from "../conformance/wasmEngine";
 import { placeUnit } from "../fixtures/towerFixtures";
 import { GARBAGE_COLLECT_HOUR, PARKING_WORKERS_PER_SPACE, RECYCLING_POP_PER_CENTER } from "../../engine/census";
 import type { Simulation } from "../../engine/Simulation";
-import type { GameMode, UnitState } from "../../engine/types";
+import type { GameMode, UnitState } from "../../shared/types";
 import { FACILITIES } from "../../engine/facilities";
 
 if (wasmRequired() && !hasWasmPackage()) {

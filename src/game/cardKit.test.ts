@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { facilityFloors } from "../engine/facilities";
-import { isOperational, type UnitState } from "../engine/types";
+import { isOperational, type UnitState } from "../shared/types";
 import { TsEngine } from "../engine/port/tsEngine";
 import { Simulation } from "../engine/Simulation";
 import type { EnginePort } from "../simport/enginePort";

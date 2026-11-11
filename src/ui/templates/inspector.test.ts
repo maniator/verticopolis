@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Simulation } from "../../engine/Simulation";
 import { GRID } from "../../engine/facilities";
-import type { Transport, Unit } from "../../engine/types";
+import type { Transport, Unit } from "../../shared/types";
 import { buildRefusalTemplate } from "./inspector";
 import { renderToFragment } from "../testing/litTestUtils";
 import { unitInspector, transportInspector } from "../../game/cardKit.fixture";

@@ -2,7 +2,7 @@ import { expect, it } from "vitest";
 import { newSeededGame } from "../fixtures/towerFixtures";
 import type { Simulation } from "../../engine/Simulation";
 import { GRID } from "../../engine/facilities";
-import type { WeatherKind } from "../../engine/types";
+import type { WeatherKind } from "../../shared/types";
 import { PortSim, describeEngines, type Leg } from "../portKit/portSim";
 
 /**

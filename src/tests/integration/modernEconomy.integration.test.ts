@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { Simulation } from "../../engine/Simulation";
 import { GRID } from "../../engine/facilities";
 import { rentConfig } from "../../engine/econConfig";
-import type { GameMode } from "../../engine/types";
+import type { GameMode } from "../../shared/types";
 
 /**
  * The three non-canon economy mechanics (operating overhead, condo hold-tax,

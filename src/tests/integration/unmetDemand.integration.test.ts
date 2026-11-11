@@ -1,12 +1,12 @@
 import { describe, it, expect } from "vitest";
 import { Simulation } from "../../engine/Simulation";
 import { GRID } from "../../engine/facilities";
-import type { FacilityKind } from "../../engine/types";
+import type { FacilityKind } from "../../shared/types";
 import { UNMET_DEMAND_CAP, UNMET_DEMAND_FLOOR } from "../../engine/sim/constants";
 import { computeDemandMap } from "../../engine/sim/demand";
 import { unmetCoverage, dominantGripe } from "../../engine/sim/gripe";
 import { serialize, deserialize } from "../../engine/sim/serialization";
-import { VACATE_REASON_TEXT } from "../../engine/types";
+import { VACATE_REASON_TEXT } from "../../shared/types";
 import { wontLeaseText } from "../diagnostics/gripeCopy";
 
 /**

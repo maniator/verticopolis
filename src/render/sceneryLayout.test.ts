@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { GRID } from "../engine/facilities";
-import type { Unit } from "../engine/types";
+import type { Unit } from "../shared/types";
 import {
   APRON_PAD_TILES,
   FORECOURT_TILES,

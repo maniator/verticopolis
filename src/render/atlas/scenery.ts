@@ -1,4 +1,4 @@
-import type { WeatherKind } from "../../engine/types";
+import type { WeatherKind } from "../../shared/types";
 import { FLOOR, TILE } from "../scale";
 import { viewWorld } from "../../presentation/viewWorld";
 import {

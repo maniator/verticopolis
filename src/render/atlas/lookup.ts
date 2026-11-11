@@ -1,4 +1,4 @@
-import type { FacilityKind, UnitState } from "../../engine/types";
+import type { FacilityKind, UnitState } from "../../shared/types";
 import { rand } from "../sprites/common";
 import { LATE_NIGHT_KINDS, isLateHour } from "../lateNight";
 import { OCCUPANT_FREE, PARKING_CAR_COLORS, RECYCLE_BREAKS, RECYCLE_STEPS } from "./catalog";

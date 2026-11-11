@@ -6,7 +6,7 @@ import { TsEngine } from "../engine/port/tsEngine";
 import { forgetUnitLists, roomUnits } from "../engine/tower/rooms";
 import { readFileSync } from "node:fs";
 import { decodeVctower } from "../storage/vctowerContainer";
-import type { SerializedGame } from "../engine/types";
+import type { SerializedGame } from "../shared/types";
 import { ViewReader } from "./viewReader";
 
 /**

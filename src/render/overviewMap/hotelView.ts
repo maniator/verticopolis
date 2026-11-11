@@ -16,7 +16,7 @@
  * enough to carry a pattern gets a hatch, and the legend counts the rooms in
  * words.
  */
-import type { FacilityKind, UnitState } from "../../engine/types";
+import type { FacilityKind, UnitState } from "../../shared/types";
 import type { UnitView } from "../../simport/view";
 import { floorsFor } from "./drawList";
 import { snappedBlock, type MapLayout, type MapRect } from "./geometry";

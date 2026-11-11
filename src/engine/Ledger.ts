@@ -19,15 +19,8 @@
  */
 
 import type { FacilityKind } from "./types";
-
-export type LedgerCat =
-  | "offices"
-  | "condos"
-  | "hotels"
-  | "retail"
-  | "food"
-  | "entertainment"
-  | "upkeep";
+import type { LedgerCat } from "../shared/engineTypes";
+export type { LedgerCat };
 
 /** The report category a facility's income/overhead belongs to, or null for
  *  kinds with no operational money line (structure, transport, pure services).

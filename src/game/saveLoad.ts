@@ -1,5 +1,5 @@
-import type { GameMode, SerializedView } from "../engine/types";
-import type { CalendarKind } from "../engine/calendar";
+import type { GameMode, SerializedView } from "../shared/types";
+import type { CalendarKind } from "../shared/engineTypes";
 import { SaveGame, isStorageWriteError, saveFailureMessage } from "../storage/SaveGame";
 import { trackAppAction, trackAppActionOnce } from "../analytics";
 import { exportReport, type ExportReport } from "../storage/tdtExportReport";

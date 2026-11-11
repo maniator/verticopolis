@@ -4,7 +4,7 @@ import { catalogFacility } from "../../catalog/catalogTypes";
 import { ECON } from "../../engine/econConfig";
 import { ALL_KINDS, FACILITIES } from "../../engine/facilities";
 import { subtypeListFor } from "../../engine/retailSubtypes";
-import type { Unit } from "../../engine/types";
+import type { Unit } from "../../shared/types";
 import { hasAccessDiagnostic } from "../../game/cardLines";
 
 /**

@@ -1,11 +1,11 @@
 import type { Catalog } from "../catalog/catalogTypes";
-import type { LogEntry } from "../engine/types";
+import type { LogEntry } from "../shared/types";
 import type { SlotInfo } from "../storage/SaveGame";
 import type { ExportReport } from "../storage/tdtExportReport";
 import type { ImportReport } from "../storage/tdtImportReport";
-import type { FacilityKind, GameMode } from "../engine/types";
-import type { ElevatorSchedule } from "../engine/elevatorSchedule";
-import type { CalendarKind } from "../engine/calendar";
+import type { FacilityKind, GameMode } from "../shared/types";
+import type { ElevatorSchedule } from "../shared/engineTypes";
+import type { CalendarKind } from "../shared/engineTypes";
 import type { UpdateInfo } from "../pwa";
 import { downloadFile } from "./downloadFile";
 import { render, type TemplateResult } from "lit-html";

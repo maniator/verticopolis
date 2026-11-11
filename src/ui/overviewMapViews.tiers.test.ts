@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
-import type { FacilityKind } from "../engine/types";
+import type { FacilityKind } from "../shared/types";
 import type { EvalTier, RentTier } from "../simport/roomTiers";
 import { SKY_HEADROOM_FLOORS } from "../render/cameraBounds";
 import { extentFloors, fitLayout, mapExtent } from "../render/overviewMap/geometry";

@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { createHash } from "node:crypto";
 import { Simulation } from "../../engine/Simulation";
-import type { FacilityKind, GameMode } from "../../engine/types";
+import type { FacilityKind, GameMode } from "../../shared/types";
 import { ensureStarterLobby } from "../fixtures/towerFixtures";
 import { itTypeScriptOnly } from "../parity/typescriptOnly";
 

@@ -1,6 +1,6 @@
 import { html, render } from "lit-html";
 import type { Catalog, CatalogFacility } from "./catalog/catalogTypes";
-import type { FacilityKind, Transport, Unit, UnitState } from "./engine/types";
+import type { FacilityKind, Transport, Unit, UnitState } from "./shared/types";
 import { fitAtGameScale } from "./render/catalogScale";
 import { FLOOR, TILE } from "./render/scale";
 import { drawCar, drawTransport, drawUnit, type DrawCtx } from "./render/sprites";

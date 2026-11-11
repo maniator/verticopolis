@@ -118,7 +118,6 @@ src/engine/scheduleOrigins.ts
 src/engine/census.ts
 src/engine/gameplayEventBuffer.ts
 src/engine/rng.ts
-src/engine/types.ts
 
 # The TypeScript engine port (slice 7, #1217), which the bulletin reads a
 # hand-built tower's log through

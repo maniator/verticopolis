@@ -1,6 +1,8 @@
 import { ECON, PRICED_KINDS } from "./econConfig";
 import { FACILITIES } from "./facilitiesData";
 import { rungFor } from "../catalog/catalogTypes";
+import type { PriceRung, PriceOptions } from "../shared/engineTypes";
+export type { PriceRung, PriceOptions };
 
 /**
  * The Classic/Modern pricing split's SHAPE layer (gdd-classic-modern-pricing-
@@ -12,33 +14,6 @@ import { rungFor } from "../catalog/catalogTypes";
  * rule-set objects in gameRules.ts.
  */
 // ---- The Classic/Modern pricing split (gdd-classic-modern-pricing-roadmap §1-2) --
-
-/** One rung of the Classic 4-level rent ladder. `level` doubles as the 1994
- *  TDT rent-class byte (0 Very Low … 3 High; byte 4 is the No Rate sentinel,
- *  carried by the ladder shape itself, not a fifth rung). */
-export interface PriceRung {
-  readonly level: 0 | 1 | 2 | 3;
-  readonly label: "Very Low" | "Low" | "Average" | "High";
-  readonly value: number;
-}
-
-/**
- * What a mode offers the player for pricing a rentable kind. The consumers
- * (editor, batch dialog, price choke point) switch on the SHAPE of this value,
- * never on the mode string, per the rule-set law above:
- *   - `ladder`: the Classic discrete 4-rung dropdown plus the No Rate
- *     off-market sentinel (`noRate: true` says the mode offers that state);
- *   - `band`: Modern's continuous `{min, default, max, step}` range,
- *     driving the existing stepper/range editors.
- * Both shapes are frozen module-level singletons, so reading them on a
- * per-unit path allocates nothing.
- */
-export type PriceOptions =
-  | { readonly shape: "ladder"; readonly rungs: readonly PriceRung[]; readonly noRate: true }
-  | {
-      readonly shape: "band";
-      readonly band: { readonly default: number; readonly min: number; readonly max: number; readonly step: number };
-    };
 
 /**
  * The Classic canon rent ladders, dollars per kind in rung order

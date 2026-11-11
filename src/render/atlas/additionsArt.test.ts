@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { FACILITIES, facilityFloors } from "../../engine/facilities";
-import type { FacilityKind } from "../../engine/types";
+import type { FacilityKind } from "../../shared/types";
 import { RECYCLING_GAUGE_ROWS, RECYCLING_PILE_SLOTS, recyclingLook } from "../sprites/facilities/recyclingLook";
 import { FLOOR, TILE } from "../scale";
 import { RECYCLE_BREAKS, RECYCLE_STEPS, roomJobs, type StillJob } from "./catalog";

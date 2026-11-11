@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import type { FacilityKind } from "../../engine/types";
+import type { FacilityKind } from "../../shared/types";
 import { SKY_HEADROOM_FLOORS } from "../cameraBounds";
 import { extentFloors, fitLayout, mapExtent } from "./geometry";
 import { MIN_PATTERN_SIDE, type MapPaintContext, type PatternSource } from "./paint";

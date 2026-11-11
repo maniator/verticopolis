@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { SCHEDULE_HOURS, type ElevatorSchedule } from "../../engine/elevatorSchedule";
+import { SCHEDULE_HOURS } from "../../engine/elevatorSchedule";
+import type { ElevatorSchedule } from "../../shared/engineTypes";
 import { autoTuneProposal } from "../../engine/port/queries";
 import type { AutoTuneProposal, EnginePort } from "../../simport/enginePort";
 import { scheduleSlots } from "../../simport/scheduleSlots";

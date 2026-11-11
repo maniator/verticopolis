@@ -3,7 +3,7 @@ import { Simulation } from "../../engine/Simulation";
 import { FACILITIES, GRID, maxSpanFor } from "../../engine/facilities";
 import { FASTFOOD_SUBTYPES, RESTAURANT_SUBTYPES, SHOP_SUBTYPES } from "../../engine/retailSubtypes";
 import { SAVE_VERSION } from "../../engine/saveMigration";
-import type { FacilityKind, SerializedGame } from "../../engine/types";
+import type { FacilityKind, SerializedGame } from "../../shared/types";
 import {
   TDT_HEADER_SIZE,
   TDT_MAX_FILE_BYTES,

@@ -7,7 +7,7 @@ import { FACILITIES, GRID } from "../engine/facilitiesData";
 import { MILESTONES } from "../engine/milestones";
 import { checkCatalog, checkEvent, renderGameplayEventRules, renderGameplayEventsDts, type GameplayCatalog } from "./gameplayCatalog";
 import { GAMEPLAY_EVENT_RULES } from "./gameplayEventRules";
-import type { FacilityKind, GameMode } from "../engine/types";
+import type { FacilityKind, GameMode } from "../shared/types";
 import type { GameplayFacilityKind, GameplayMilestoneId, GameplayMode } from "./gameplayEvents";
 
 /**

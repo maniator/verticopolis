@@ -23,5 +23,6 @@
 # importers the inventory counts in src/ui/, src/game/ and src/render/, less
 # the 17 that import only the catalog handle, plus src/main.ts, src/gallery.ts,
 # src/preview.ts and src/analyticsEngineBridge.ts. src/presentation/ and
-# src/audio/ import the engine for types only; the scan keeps them that way.
+# src/audio/ imported the engine for types only; those types moved to
+# src/shared/ (#1875 step 3), and the scan keeps runtime imports out.
 src/game/toolingSim.ts Simulation catalog port/tsEngine # the tooling harnesses' hand-built towers (PR 5e), swapped out of production builds (vite.config.ts); catalog came from the tower catalog's old default, which tests and these towers now set (#921)

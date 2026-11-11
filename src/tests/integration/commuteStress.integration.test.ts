@@ -5,7 +5,7 @@ import { Simulation } from "../../engine/Simulation";
 import { GRID } from "../../engine/facilities";
 import { finish } from "../../engine/crowd/motion";
 import { updateSatisfaction } from "../../engine/sim/satisfaction";
-import type { Person } from "../../engine/crowd/person";
+import type { Person } from "../../shared/engineTypes";
 
 /**
  * Per-origin commute-stress accumulator (#514): a READ-ONLY measurement of each

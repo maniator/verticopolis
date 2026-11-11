@@ -6,7 +6,7 @@ import { RNG } from "../../engine/rng";
 import { EconomySystem, HK_SHIFT_START, HK_SHIFT_END } from "../../engine/EconomySystem";
 import { ECON } from "../../engine/econConfig";
 import { mealWindowFor, staffOnShift, MEAL_WINDOWS } from "../../engine/Crowd";
-import type { FacilityKind } from "../../engine/types";
+import type { FacilityKind } from "../../shared/types";
 import type { SimContext } from "../../engine/SimContext";
 
 /**

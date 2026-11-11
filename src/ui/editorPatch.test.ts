@@ -2,7 +2,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { render } from "lit-html";
 import { Simulation } from "../engine/Simulation";
-import type { Transport, Unit } from "../engine/types";
+import type { Transport, Unit } from "../shared/types";
 import { syncRungSelects } from "./templates/rungPicker";
 import { unitEditor, transportEditor } from "../game/cardKit.fixture";
 

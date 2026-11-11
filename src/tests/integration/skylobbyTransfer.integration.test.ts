@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { Tower } from "../../engine/Tower";
 import { Crowd } from "../../engine/Crowd";
 import { CLASSIC_RULES, MODERN_RULES } from "../../engine/gameRules";
-import type { FacilityKind, GameMode } from "../../engine/types";
+import type { FacilityKind, GameMode } from "../../shared/types";
 
 /**
  * Express transfers route at any express STOP, both modes (#509 parity). The

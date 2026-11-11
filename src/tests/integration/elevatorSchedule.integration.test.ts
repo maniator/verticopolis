@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { Simulation } from "../../engine/Simulation";
 import { SAVE_VERSION, migrateSave } from "../../engine/saveMigration";
 import { SCHEDULE_HOURS } from "../../engine/elevatorSchedule";
-import type { ElevatorSchedule } from "../../engine/elevatorSchedule";
+import type { ElevatorSchedule } from "../../shared/engineTypes";
 
 /**
  * Elevator schedule persistence (elevator-scheduling, #305, Phase 1). The

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { UnitState } from "../engine/types";
+import type { UnitState } from "./types";
 import { isDormant, isOperational, isPresent, isTenanted } from "./unitState";
 
 /**

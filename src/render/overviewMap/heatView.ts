@@ -20,7 +20,7 @@
  * holds them). `HeatMarks.take` copies a read (one pass over the cells) and
  * `HeatMarks.place` finds the rectangles (one pass over the kept floors).
  */
-import type { HeatCell, HeatmapMode } from "../../engine/sim/constants";
+import type { HeatCell, HeatmapMode } from "../../shared/engineTypes";
 import { snappedBlock, type MapLayout, type MapRect } from "./geometry";
 import { MIN_PATTERN_SIDE, type MapPaintContext, type PatternSource } from "./paint";
 import type { MapKindStyle } from "./style";

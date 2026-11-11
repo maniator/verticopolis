@@ -3,7 +3,7 @@ import { newSeededGame } from "../fixtures/towerFixtures";
 import { GRID } from "../../engine/facilities";
 import { rentOf, PRICED_KINDS } from "../../engine/econConfig";
 import type { Simulation } from "../../engine/Simulation";
-import type { FacilityKind, Unit } from "../../engine/types";
+import type { FacilityKind, Unit } from "../../shared/types";
 import { PortSim, describeEngines, type Leg } from "../portKit/portSim";
 
 /** A served floor-2 tower of `mode` with `n` rooms of `kind`, `width` apart

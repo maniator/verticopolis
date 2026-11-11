@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { newSeededGame } from "../fixtures/towerFixtures";
-import type { FacilityKind, SerializedGame, Transport, Unit } from "../../engine/types";
+import type { FacilityKind, SerializedGame, Transport, Unit } from "../../shared/types";
 import { SAVE_VERSION } from "../../engine/saveMigration";
 import {
   TDT_DEFAULT_VIEW_X,

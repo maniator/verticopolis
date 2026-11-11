@@ -16,15 +16,10 @@
  * Pure helpers only; `Simulation` owns the per-shaft store and the hourly
  * fold site lives beside `sampleElevatorUtil`.
  */
+import type { OriginRings } from "../shared/engineTypes";
+export type { OriginRings };
 
 export const ORIGIN_HOURS = 24;
-
-/** One shaft's boarding-origin history: per day type, per hour-of-day, an
- *  origin-floor map of EMA'd boarding counts. Transient, like {@link HourlyByDay}. */
-export interface OriginRings {
-  weekday: Map<number, number>[];
-  weekend: Map<number, number>[];
-}
 
 export function emptyOriginRings(): OriginRings {
   return {

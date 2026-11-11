@@ -1,5 +1,5 @@
 import type { Catalog } from "../../catalog/catalogTypes";
-import type { FacilityKind } from "../../engine/types";
+import type { FacilityKind } from "../../shared/types";
 
 /**
  * The kinds whose footprint (`width` and `floors`) the catalog lock does not

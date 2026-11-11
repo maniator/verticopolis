@@ -1,10 +1,10 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { Simulation } from "../../engine/Simulation";
-import type { SerializedGame } from "../../engine/serializedGame";
+import type { SerializedGame } from "../../shared/serializedGame";
 import { decodeVctower } from "../../storage/vctowerContainer";
 import { markFounderFromLoadedFile } from "../../engine/sim/founderStatus";
-import type { HeatmapMode } from "../../engine/sim/constants";
+import type { HeatmapMode } from "../../shared/engineTypes";
 import type { WasmEngine } from "../../dualrun/binding";
 import { REPO_ROOT, tsEngine, type EngineStart, type ScenarioEngine, type Start } from "./scenario";
 import { wasm, wasmEngine, wasmFxSlots } from "./wasmEngine";

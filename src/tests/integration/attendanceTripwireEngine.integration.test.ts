@@ -1,7 +1,7 @@
 import { expect, it } from "vitest";
 import { Simulation } from "../../engine/Simulation";
-import type { Person } from "../../engine/crowd/person";
-import type { FacilityKind } from "../../engine/types";
+import type { Person } from "../../shared/engineTypes";
+import type { FacilityKind } from "../../shared/types";
 import { PortSim, describeEngines, type Leg } from "../portKit/portSim";
 import { roomTallies } from "../portKit/rooms";
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Simulation } from "../../engine/Simulation";
-import type { SerializedGame } from "../../engine/serializedGame";
+import type { SerializedGame } from "../../shared/serializedGame";
 import { stateView } from "../../engine/conformanceView";
 import { INVALID_REQUEST } from "../../engine/request";
 import { digest } from "../conformance/canonical";

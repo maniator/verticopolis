@@ -4,7 +4,7 @@ import { Simulation } from "../engine/Simulation";
 import { TsEngine } from "../engine/port/tsEngine";
 import { facilityFloors } from "../engine/facilities";
 import { decodeVctower } from "../storage/vctowerContainer";
-import type { SerializedGame } from "../engine/types";
+import type { SerializedGame } from "../shared/types";
 import { ViewReader } from "../simport/viewReader";
 import { scheduleFromSlots, scheduleSlots } from "../simport/scheduleSlots";
 import { createAppHistory } from "./appHistory";

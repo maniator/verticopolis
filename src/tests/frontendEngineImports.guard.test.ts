@@ -91,8 +91,8 @@ describe("the frontend's runtime imports of src/engine/", () => {
 
   it("reads imports the way the inventory counts them", () => {
     const sample = [
-      'import type { FacilityKind } from "../engine/types";',
-      'import { type Unit } from "../engine/types";',
+      'import type { FacilityKind } from "../shared/types";',
+      'import { type Unit } from "../shared/types";',
       'import type {\n  Person,\n} from "../engine/Crowd";',
       'export type { Tower } from "../engine/tower";',
       'export type * from "../engine/typesOnly";',

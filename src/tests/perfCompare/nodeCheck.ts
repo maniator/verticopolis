@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { posix, resolve, win32 } from "node:path";
 import { pathToFileURL } from "node:url";
 import { Simulation } from "../../engine/Simulation";
-import type { SerializedGame } from "../../engine/serializedGame";
+import type { SerializedGame } from "../../shared/serializedGame";
 import { crowdView, stateView } from "../../engine/conformanceView";
 import { checkBinding, type WasmModule } from "../../dualrun/binding";
 import { digest } from "../conformance/canonical";

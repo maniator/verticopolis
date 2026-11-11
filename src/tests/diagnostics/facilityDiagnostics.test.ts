@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { html, type TemplateResult } from "lit-html";
 import { Simulation } from "../../engine/Simulation";
-import type { Unit } from "../../engine/types";
+import type { Unit } from "../../shared/types";
 import { facilityDiagnostics } from "./facilityDiagnostics";
 import { renderToFragment } from "../../ui/testing/litTestUtils";
 

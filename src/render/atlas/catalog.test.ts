@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { FACILITIES, facilityFloors, hasBusinessHours, isOpenAt } from "../../engine/facilities";
 import { subtypeListFor } from "../../engine/retailSubtypes";
-import type { FacilityKind } from "../../engine/types";
+import type { FacilityKind } from "../../shared/types";
 import { FLOOR, TILE } from "../scale";
 import { allJobs } from "./browserEntry";
 import { UNIT_STATES, hourFor, occupantCap, roomJobs, roomKinds, variantPlacements, type StillJob } from "./catalog";

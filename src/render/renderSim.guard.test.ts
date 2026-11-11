@@ -72,6 +72,6 @@ describe("the renderer does not name the Simulation", () => {
     expect(found('type S = import("../engine/Simulation").Simulation;')).toBe(1);
     expect(found('const m = await import("../engine/Simulation");')).toBe(1);
     expect(found('import S = require("../engine/Simulation");')).toBe(1);
-    expect(found('import type { HeatmapMode } from "../engine/sim/constants";')).toBe(0);
+    expect(found('import type { HeatmapMode } from "../shared/engineTypes";')).toBe(0);
   });
 });

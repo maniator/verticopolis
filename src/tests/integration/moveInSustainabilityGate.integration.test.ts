@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Simulation } from "../../engine/Simulation";
-import type { GameMode, Unit } from "../../engine/types";
+import type { GameMode, Unit } from "../../shared/types";
 import { buildSatisfactionContext, wouldEvictFreshTenant } from "../../engine/sim/satisfactionStep";
 import { computeDemandMap } from "../../engine/sim/demand";
 import { wontLeaseText } from "../diagnostics/gripeCopy";

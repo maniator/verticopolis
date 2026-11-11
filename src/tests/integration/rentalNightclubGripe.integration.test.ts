@@ -3,7 +3,7 @@ import { html } from "lit-html";
 import { Simulation } from "../../engine/Simulation";
 import { dominantGripe, vacateCause } from "../../engine/sim/gripe";
 import { GRID } from "../../engine/facilities";
-import type { FacilityKind, Unit } from "../../engine/types";
+import type { FacilityKind, Unit } from "../../shared/types";
 import { gripeLineText } from "../diagnostics/gripeCopy";
 import { renderToFragment } from "../../ui/testing/litTestUtils";
 

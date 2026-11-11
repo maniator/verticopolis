@@ -1,6 +1,6 @@
 import { html, type TemplateResult } from "lit-html";
 import { catalogFacility, type Catalog } from "../catalog/catalogTypes";
-import type { FacilityKind } from "../engine/types";
+import type { FacilityKind } from "../shared/types";
 
 /**
  * Card lines the shipped Rust card and the TypeScript reference card share,

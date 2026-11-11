@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import type { Unit, Transport } from "../engine/types";
+import type { Unit, Transport } from "../shared/types";
 import {
   drawUnit,
   drawTransport,

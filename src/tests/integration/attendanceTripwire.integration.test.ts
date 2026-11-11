@@ -8,7 +8,7 @@ import { FACILITIES } from "../../engine/facilities";
 import { beginDwell } from "../../engine/crowd/visits";
 import { add } from "../../engine/crowd/trips";
 import { finish } from "../../engine/crowd/motion";
-import type { Unit } from "../../engine/types";
+import type { Unit } from "../../shared/types";
 
 /**
  * The attendance-tally tripwire (standing rule from the venue-people-routing

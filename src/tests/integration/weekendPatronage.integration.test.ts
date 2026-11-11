@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { newSeededGame } from "../fixtures/towerFixtures";
 import { Simulation } from "../../engine/Simulation";
-import type { GameMode } from "../../engine/types";
+import type { GameMode } from "../../shared/types";
 
 /** The x-span of the ground-lobby tiles a fresh game lays down on floor 1, read
  *  from the actual Simulation rather than hardcoded, so the fixture stays valid

@@ -21,7 +21,8 @@ import { describe, it, expect } from "vitest";
 
 // --- 1. Compile-time surface: every exported TYPE. ---
 import type { BatchRentOptions, BatchRentResult, BatchTarget, HeatCell, HeatmapMode, LogEntry } from "../engine/Simulation";
-import type { ElevatorCalls, MealWindow, Person, PersonState, StaffKind } from "../engine/Crowd";
+import type { ElevatorCalls, MealWindow, StaffKind } from "../engine/Crowd";
+import type { Person, PersonState } from "../shared/engineTypes";
 import type { ExportReport } from "../storage/tdtExportReport";
 import type { ImportReport } from "../storage/tdtImportReport";
 import type { SlotInfo } from "../storage/SaveGame";

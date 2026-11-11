@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import type { Unit } from "../../../engine/types";
+import type { Unit } from "../../../shared/types";
 import type { DrawCtx } from "../common";
 import { FACILITIES, facilityFloors } from "../../../engine/facilities";
 import { TILE, FLOOR } from "../../scale";

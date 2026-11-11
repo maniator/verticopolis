@@ -1,4 +1,4 @@
-import type { FacilityKind, Unit, UnitState } from "./engine/types";
+import type { FacilityKind, Unit, UnitState } from "./shared/types";
 import { fitAtGameScale } from "./render/catalogScale";
 import { FLOOR, TILE } from "./render/scale";
 import { drawRoom, type RoomCtx } from "./render/pixelSprites";

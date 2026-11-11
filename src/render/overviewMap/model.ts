@@ -21,7 +21,7 @@
  * leave the map stale. The caller must pass the view's own arrays, never a copy
  * made per frame, or every sync would rebuild.
  */
-import type { FacilityKind } from "../../engine/types";
+import type { FacilityKind } from "../../shared/types";
 import { buildMapDrawList, type MapMark, type MapSource } from "./drawList";
 import { bandedExtent, sameExtent, viewPlacement, type BuiltFloors, type ViewPlacement } from "./extent";
 import { fitLayout, type MapCamera, type MapLayout, type MapWorld } from "./geometry";

@@ -3,7 +3,7 @@ import { html } from "lit-html";
 import { Simulation } from "../../engine/Simulation";
 import { GRID } from "../../engine/facilities";
 import { rentConfig } from "../../engine/econConfig";
-import type { FacilityKind, Unit } from "../../engine/types";
+import type { FacilityKind, Unit } from "../../shared/types";
 import { facilityDiagnostics } from "../diagnostics/facilityDiagnostics";
 import { attemptMoveIns } from "../../engine/sim/churn";
 import { renderToFragment } from "../../ui/testing/litTestUtils";

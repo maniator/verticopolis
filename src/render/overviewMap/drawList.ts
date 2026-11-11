@@ -14,7 +14,7 @@
  * shafts and stairs over both. The unit of a rectangle is the map's device pixel
  * (see `geometry.ts`).
  */
-import type { FacilityKind } from "../../engine/types";
+import type { FacilityKind } from "../../shared/types";
 import type { StructureRunView, TransportView, UnitView } from "../../simport/view";
 import { snappedBlock, type MapLayout, type MapRect } from "./geometry";
 

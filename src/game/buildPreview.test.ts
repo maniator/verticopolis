@@ -4,7 +4,7 @@ import { Simulation } from "../engine/Simulation";
 import { FACILITIES, GRID } from "../engine/facilities";
 import { useTowerCatalogSource } from "../catalog/towerCatalog";
 import { snapX, brushTiles } from "../ui/placement";
-import type { GameMode } from "../engine/types";
+import type { GameMode } from "../shared/types";
 import type { GameApp } from "../main";
 import { portDeps } from "./portDeps.fixture";
 import {

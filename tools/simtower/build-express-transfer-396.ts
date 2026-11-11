@@ -25,7 +25,7 @@ import { fileURLToPath } from "node:url";
 import { Simulation } from "../../src/engine/Simulation";
 import { Crowd } from "../../src/engine/Crowd";
 import { buildTDT } from "../../src/tests/conformance/tdtWasm";
-import type { SerializedGame } from "../../src/engine/types";
+import type { SerializedGame } from "../../src/shared/types";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SAVES = resolve(HERE, "saves");

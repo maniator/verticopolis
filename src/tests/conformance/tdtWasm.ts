@@ -1,4 +1,4 @@
-import type { SerializedGame } from "../../engine/types";
+import type { SerializedGame } from "../../shared/types";
 import { PortCodes } from "../../simport/portCodes";
 import { exportFacts, importFacts } from "../../simport/tdtRecords";
 import { exportReport, type ExportReport } from "../../storage/tdtExportReport";

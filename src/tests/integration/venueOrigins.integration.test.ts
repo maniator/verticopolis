@@ -8,7 +8,7 @@ import {
   spawnVenueVisit,
   WEDDING_ARRIVAL_START,
 } from "../../engine/crowd/visits";
-import type { Unit } from "../../engine/types";
+import type { Unit } from "../../shared/types";
 
 /**
  * Visit-origin matrix + weekend wedding regression suite, the sibling of

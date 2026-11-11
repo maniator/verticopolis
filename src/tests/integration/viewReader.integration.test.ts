@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { facilityFloors } from "../../engine/facilities";
 import { Simulation } from "../../engine/Simulation";
-import type { SerializedGame } from "../../engine/serializedGame";
+import type { SerializedGame } from "../../shared/serializedGame";
 import { KIND_CODES, codeOf } from "../../engine/port/layout";
 import { TsEngine } from "../../engine/port/tsEngine";
 import { roomUnits, structureRuns } from "../../engine/tower/rooms";

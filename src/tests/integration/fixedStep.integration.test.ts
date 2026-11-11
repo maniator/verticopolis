@@ -5,7 +5,7 @@ import towerFile from "../../../conformance/fixtures/split-tower.vctower?raw";
 import { Simulation } from "../../engine/Simulation";
 import { drainFixedSteps, quantumFor } from "../../engine/sim/fixedStep";
 import { paceFactor } from "../../engine/timePacing";
-import type { SerializedGame } from "../../engine/types";
+import type { SerializedGame } from "../../shared/types";
 import { atEngineFrameCadence } from "../parity/typescriptOnly";
 
 /** Decode a `.vctower` container (magic line + base64 deflate-raw JSON). */

@@ -2,7 +2,7 @@
  * What the overview MAP window (`overviewMapWindow.ts`) is given: the tower
  * it draws, the camera it reads and moves, and the views with their View dropdown.
  */
-import type { FacilityKind } from "../engine/types";
+import type { FacilityKind } from "../shared/types";
 import type { MapCamera, MapCameraCenter, MapWorld } from "../render/overviewMap/geometry";
 import type { MapViewInput } from "../render/overviewMap/model";
 import type { OverviewMapViews } from "./overviewMapViews";

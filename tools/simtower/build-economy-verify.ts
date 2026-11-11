@@ -22,7 +22,7 @@ import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Simulation } from "../../src/engine/Simulation";
 import { buildTDT } from "../../src/tests/conformance/tdtWasm";
-import type { FacilityKind, SerializedGame } from "../../src/engine/types";
+import type { FacilityKind, SerializedGame } from "../../src/shared/types";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SAVES = resolve(HERE, "saves");

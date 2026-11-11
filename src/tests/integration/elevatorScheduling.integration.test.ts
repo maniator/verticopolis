@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { Tower } from "../../engine/Tower";
 import { ElevatorDispatch, type DispatchClock } from "../../engine/ElevatorDispatch";
 import type { ElevatorCalls } from "../../engine/Crowd";
-import type { ElevatorSchedule } from "../../engine/elevatorSchedule";
+import type { ElevatorSchedule } from "../../shared/engineTypes";
 
 /**
  * Elevator schedule dispatch integration (elevator-scheduling, #305, Phase 2). The

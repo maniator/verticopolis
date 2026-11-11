@@ -1,4 +1,4 @@
-import type { FacilityKind } from "../engine/types";
+import type { FacilityKind } from "../shared/types";
 
 /**
  * How each facility looks and reads in the UI: its swatch and sprite color and

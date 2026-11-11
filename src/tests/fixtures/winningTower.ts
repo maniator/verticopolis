@@ -1,6 +1,6 @@
 import { Simulation } from "../../engine/Simulation";
 import { FACILITIES, GRID } from "../../engine/facilities";
-import type { FacilityKind } from "../../engine/types";
+import type { FacilityKind } from "../../shared/types";
 
 /**
  * Deterministic E2E fixture: build a REAL, fully-served, fully-occupied tower

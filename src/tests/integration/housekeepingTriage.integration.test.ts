@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { newSeededGame } from "../fixtures/towerFixtures";
 import { Simulation } from "../../engine/Simulation";
 import { GRID } from "../../engine/facilities";
-import type { GameMode, Unit } from "../../engine/types";
+import type { GameMode, Unit } from "../../shared/types";
 
 /**
  * Modern smart dispatch (housekeeping-overhaul GDD, epic 4): dirty rooms are

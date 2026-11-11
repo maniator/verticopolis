@@ -1,5 +1,5 @@
 import type { Catalog } from "./catalogTypes";
-import type { GameMode } from "../engine/types";
+import type { GameMode } from "../shared/types";
 
 /**
  * Each tower's catalog handle (#921): where a frontend reads every price, size

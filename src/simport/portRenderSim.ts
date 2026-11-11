@@ -1,6 +1,6 @@
-import type { ElevatorQueueView, QueueLanding } from "../engine/crowd/person";
-import type { HeatCell, HeatmapMode } from "../engine/sim/constants";
-import type { GameMode, SerializedView, WeatherKind } from "../engine/types";
+import type { ElevatorQueueView, QueueLanding } from "../shared/engineTypes";
+import type { HeatCell, HeatmapMode } from "../shared/engineTypes";
+import type { GameMode, SerializedView, WeatherKind } from "../shared/types";
 import type { RenderSim, RenderTower } from "../render/renderSim";
 import { ClockReads } from "./clockView";
 import type { EnginePort } from "./enginePort";

@@ -1,4 +1,4 @@
-import type { FacilityKind, UnitState, VacateReason } from "../engine/types";
+import type { FacilityKind, UnitState, VacateReason } from "../shared/types";
 import type { EnginePort } from "./enginePort";
 import type { HourlyView, OriginsView, StopRow, TransportDetail, UnitDetail } from "./panels";
 import type { ViewReader } from "./viewReader";

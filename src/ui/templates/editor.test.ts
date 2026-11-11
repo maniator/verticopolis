@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Simulation } from "../../engine/Simulation";
 import { GRID, maxCarsFor } from "../../engine/facilities";
-import type { Transport, Unit } from "../../engine/types";
+import type { Transport, Unit } from "../../shared/types";
 import { renderToFragment } from "../testing/litTestUtils";
 import { unitEditor, transportEditor } from "../../game/cardKit.fixture";
 

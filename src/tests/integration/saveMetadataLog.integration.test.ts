@@ -2,7 +2,7 @@ import { describe, expect, it, beforeEach } from "vitest";
 import { deflateSync, inflateSync } from "fflate";
 import towerFile from "../../../conformance/fixtures/towerone_6.vctower?raw";
 import { LOG_SAVE_CAP, Simulation } from "../../engine/Simulation";
-import type { SerializedGame } from "../../engine/types";
+import type { SerializedGame } from "../../shared/types";
 import { SaveGame } from "../../storage/SaveGame";
 import { saveOf, loadResultSim, loadSlotSim, importTower } from "../fixtures/saveText";
 

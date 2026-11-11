@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { Simulation } from "../../engine/Simulation";
-import type { SerializedGame } from "../../engine/serializedGame";
+import type { SerializedGame } from "../../shared/serializedGame";
 import { isStructural } from "../../engine/tower/towerTopology";
-import type { FacilityKind, Unit } from "../../engine/types";
+import type { FacilityKind, Unit } from "../../shared/types";
 import { towerStateSig } from "../../engine/UndoHistory";
 import { hasWasmPackage, wasm, wasmRequired } from "../conformance/wasmEngine";
 

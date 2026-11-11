@@ -6,7 +6,7 @@ import { RNG } from "../../engine/rng";
 import { EconomySystem } from "../../engine/EconomySystem";
 import { MODERN_RULES } from "../../engine/gameRules";
 import { FACILITIES } from "../../engine/facilities";
-import type { FacilityKind, WeatherKind } from "../../engine/types";
+import type { FacilityKind, WeatherKind } from "../../shared/types";
 
 /**
  * Weather shapes the actual crowd (#430). Before this, weather touched commerce
