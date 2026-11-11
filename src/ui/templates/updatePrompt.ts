@@ -27,6 +27,29 @@ export interface UpdatePromptActions {
 
 const KIND_LABEL = { game: "Game update", engine: "Engine update", both: "Game and engine update" } as const;
 
+/**
+ * The notes of every version the player skipped (#1897), newest first, in a
+ * well that scrolls on its own once it is taller than its cap, so a long log
+ * never pushes the actions away. `undefined` when there is only the incoming
+ * version's notes to show, which keep the single-list look above. Shown when
+ * two or more versions are unseen, or one that is not the incoming build (an
+ * incoming build with no notes of its own).
+ */
+function skippedLog(info: UpdateInfo | null | undefined): TemplateResult | undefined {
+  const releases = info?.releases ?? [];
+  const several = releases.length >= 2 || (releases.length === 1 && releases[0].version !== info?.version);
+  if (!several) return undefined;
+  const title = info?.since ? `What's new since ${info.since}` : "What's new";
+  return html`<div class="whatsnew"><h3 class="win-title sm" id="whatsnew-title">${title}</h3><div
+      class="well whatsnew-log"
+      tabindex="0"
+      role="region"
+      aria-labelledby="whatsnew-title"
+    >${releases.map((r) => html`<h4 class="whatsnew-ver">${r.version}</h4><ul>${r.notes.map((n) => html`<li>${n}</li>`)}</ul>`)}${info?.more
+      ? html`<p class="whatsnew-more">Earlier updates are not listed here.</p>`
+      : nothing}</div></div>`;
+}
+
 export function updatePromptTemplate(
   info: UpdateInfo | null | undefined,
   actions: UpdatePromptActions,
@@ -38,9 +61,9 @@ export function updatePromptTemplate(
   const idText = [info?.version, sha].filter(Boolean).join(" · ");
   // The `.win-title.sm` strip is a GRANDCHILD of `.modal-box.win` (wrapped in
   // `.whatsnew`); a direct child would inherit the title bar's full-bleed treatment.
-  const notesBlock = notes.length
+  const notesBlock = skippedLog(info) ?? (notes.length
     ? html`<div class="whatsnew"><h3 class="win-title sm">What's new</h3><ul>${notes.map((n) => html`<li>${n}</li>`)}</ul></div>`
-    : nothing;
+    : nothing);
   const buildLine = idText ? html`<p class="build-id">Build ${idText}</p>` : nothing;
   const kind = info?.kind ? html`<p class="update-kind"><strong>${KIND_LABEL[info.kind]}</strong></p>` : nothing;
   const engineLine = info?.engineLine ? html`<p class="build-id">${info.engineLine}</p>` : nothing;

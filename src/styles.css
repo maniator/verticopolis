@@ -1106,7 +1106,8 @@ dialog.crash-card::backdrop {
    list. The wrapper is deliberate — it keeps the strip OUT of .modal-box's
    DIRECT children, so it never inherits the full-bleed (.win > .win-title) or
    sticky (.modal-box > .win-title) treatment reserved for the dialog title bar.
-   Wells are reserved for scrolling logs; this stays short (≤3 lines). */
+   Wells are reserved for scrolling logs: one version's notes stay a short
+   list (≤3 lines), and only several skipped versions get the well below. */
 .whatsnew {
   margin-top: 10px;
 }
@@ -1119,6 +1120,33 @@ dialog.crash-card::backdrop {
 .whatsnew li {
   margin-bottom: 2px;
   overflow-wrap: anywhere;
+}
+/* Several skipped versions' notes (#1897), newest first. The log scrolls on
+   its own once it is taller than its cap, so the box itself stays under its
+   82vh cap and only one scroller is live in practice (the guard in
+   modalSingleScroller.guard.test.ts names this exception). The cap leaves the
+   actions in view on a 640px-tall phone. */
+.whatsnew-log {
+  max-height: min(200px, 22vh);
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 4px 8px;
+}
+.whatsnew-log:focus-visible {
+  outline: 1px dotted var(--r-ink);
+  outline-offset: -3px;
+}
+.whatsnew-ver {
+  font-size: 12px;
+  font-weight: 700;
+  margin: 8px 0 2px;
+}
+.whatsnew-ver:first-child {
+  margin-top: 0;
+}
+.whatsnew-more {
+  font-style: italic;
+  margin: 6px 0 0;
 }
 /* Incoming build id — quiet fine print under the prompt, never the headline.
    A long unbroken sha must wrap rather than force a horizontal scroll. */

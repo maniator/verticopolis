@@ -699,6 +699,16 @@ committed file is used rather than git commit trailers because releases land on
 branch commits' trailers, so a trailer harvest would silently drop the note. The
 file is always present at the exact commit the deploy builds.
 
+The build also writes `releases`: the notes of this version and the versions
+before it, newest first, ten versions with notes at most (`recentReleaseNotes` in
+`src/changelog.ts`). The running client shows the versions newer than the one it
+runs, or than the newest version an earlier prompt already showed
+(`notesSinceRunning` in `src/pwaUpdateInfo.ts`), so a player who skipped versions
+sees all of them and nobody sees a version's notes twice. Two or more versions
+go in a "What's new since <version>" log that scrolls on its own once it is
+long. So don't repeat an earlier version's headline in a later version's notes:
+the prompt already carries it to a player who skipped it.
+
 Cadence: one curated block **per player-noticeable release** (per PR, not per
 commit). Fewer lines beat more, and a release that is a patch or internal-only
 gets none, just the build-id line. Curation is the point: the modal is a "here's

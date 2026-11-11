@@ -28,14 +28,30 @@ export interface UpdateInfo {
   version?: string;
   /** Short git SHA of the incoming build, e.g. "a1b2c3d". */
   sha?: string;
-  /** Player-facing "what's new" lines (empty until the trailer harvest ships). */
+  /** Player-facing "what's new" lines of the incoming version. */
   notes?: string[];
+  /**
+   * Recent versions' notes, newest first, as `version.json` `releases` carries
+   * them. {@link notesSinceRunning} narrows this to the versions the player has
+   * not run yet, so the prompt shows every version they skipped (#1897).
+   */
+  releases?: ReleaseNotes[];
+  /** The version the shown notes start after (set by {@link notesSinceRunning}). */
+  since?: string;
+  /** True when the player skipped more versions than `releases` carries. */
+  more?: boolean;
   /** The incoming build's parts (see {@link BuildFingerprint}). */
   fingerprint?: BuildFingerprint;
   /** What this update changes, set by {@link withUpdateKind} from the two fingerprints. */
   kind?: UpdateKind;
   /** A one-line engine summary, such as "Rust engine 0.24.0 → 0.25.0", set with `kind` when an engine changed. */
   engineLine?: string;
+}
+
+/** One version's player notes (see `recentReleaseNotes` in src/changelog.ts). */
+export interface ReleaseNotes {
+  version: string;
+  notes: string[];
 }
 
 /** A fingerprint field is a short token (a version or a hex digest). */
@@ -88,6 +104,36 @@ export function withUpdateKind(info: UpdateInfo | undefined, running: BuildFinge
 export const MAX_NOTE_LEN = 200;
 /** At most this many "what's new" lines are surfaced in the update prompt. */
 export const MAX_NOTES = 3;
+/** At most this many versions' notes travel in `version.json` `releases` and
+ *  reach the prompt: enough to cover a player who skipped a season of updates,
+ *  small enough to keep the file and the modal short. */
+export const MAX_RELEASES = 10;
+
+/** Trimmed, non-empty string notes, each clamped to {@link MAX_NOTE_LEN}, at most {@link MAX_NOTES}. */
+function sanitizeNotes(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((n): n is string => typeof n === "string")
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0)
+    .map((s) => (s.length > MAX_NOTE_LEN ? s.slice(0, MAX_NOTE_LEN) : s))
+    .slice(0, MAX_NOTES);
+}
+
+/** `releases` entries with a short version token and at least one note, at most {@link MAX_RELEASES}. */
+function sanitizeReleases(raw: unknown): ReleaseNotes[] {
+  if (!Array.isArray(raw)) return [];
+  const out: ReleaseNotes[] = [];
+  for (const r of raw) {
+    if (out.length >= MAX_RELEASES) break;
+    if (typeof r !== "object" || r === null) continue;
+    const o = r as Record<string, unknown>;
+    const version = token(o.version);
+    const notes = sanitizeNotes(o.notes);
+    if (version && notes.length > 0) out.push({ version, notes });
+  }
+  return out;
+}
 
 /**
  * Sanitize a parsed `version.json` payload into an {@link UpdateInfo}, or `null`
@@ -98,18 +144,11 @@ export const MAX_NOTES = 3;
 export function parseUpdateInfo(j: unknown): UpdateInfo | null {
   if (typeof j !== "object" || j === null) return null;
   const o = j as Record<string, unknown>;
-  const notes = Array.isArray(o.notes)
-    ? o.notes
-        .filter((n): n is string => typeof n === "string")
-        .map((s) => s.trim())
-        .filter((s) => s.length > 0)
-        .map((s) => (s.length > MAX_NOTE_LEN ? s.slice(0, MAX_NOTE_LEN) : s))
-        .slice(0, MAX_NOTES)
-    : [];
   return {
     version: typeof o.version === "string" ? o.version : undefined,
     sha: typeof o.sha === "string" ? o.sha : undefined,
-    notes,
+    notes: sanitizeNotes(o.notes),
+    releases: sanitizeReleases(o.releases),
     fingerprint: parseFingerprint(o.shell, o.engine),
   };
 }
@@ -140,4 +179,87 @@ export function isDifferentBuild(
   if (deployedSha && localSha && deployedSha !== localSha) return true;
   if (info.version && runningVersion && info.version !== runningVersion) return true;
   return false;
+}
+
+/** A plain `major.minor.patch` version as three numbers, or `null` for anything else ("dev", a prerelease). */
+function versionParts(v: string | undefined): [number, number, number] | null {
+  const m = v === undefined ? null : /^v?(\d+)\.(\d+)\.(\d+)$/.exec(v);
+  return m ? [Number(m[1]), Number(m[2]), Number(m[3])] : null;
+}
+
+/** Whether version `a` is newer than version `b`; `false` when either is not a plain version. */
+export function isNewerVersion(a: string | undefined, b: string | undefined): boolean {
+  const pa = versionParts(a);
+  const pb = versionParts(b);
+  if (!pa || !pb) return false;
+  for (let i = 0; i < 3; i++) if (pa[i] !== pb[i]) return pa[i] > pb[i];
+  return false;
+}
+
+/** Sort order for releases: the newer version first. */
+function newestFirst(a: ReleaseNotes, b: ReleaseNotes): number {
+  if (isNewerVersion(a.version, b.version)) return -1;
+  return isNewerVersion(b.version, a.version) ? 1 : 0;
+}
+
+/** localStorage key: the newest version whose notes the update prompt has
+ *  shown, so a later prompt never repeats them (#1897). */
+export const NOTES_SEEN_KEY = "vc-notes-seen-version";
+
+/** The version whose notes the player last saw in the update prompt, or `undefined` (none yet, or no storage). */
+export function readNotesSeen(): string | undefined {
+  try {
+    const v = localStorage.getItem(NOTES_SEEN_KEY) ?? undefined;
+    return versionParts(v) ? v : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Record that the prompt showed the notes up to `version`; a version older than the one recorded is ignored. */
+export function rememberNotesSeen(version: string | undefined): void {
+  if (!versionParts(version)) return;
+  try {
+    const seen = localStorage.getItem(NOTES_SEEN_KEY) ?? undefined;
+    if (!isNewerVersion(seen, version)) localStorage.setItem(NOTES_SEEN_KEY, version!);
+  } catch {
+    /* private mode or full storage: the next prompt may repeat notes, nothing else */
+  }
+}
+
+/**
+ * `info` as the prompt should show it (#1897): only the notes of versions the
+ * player has not seen, so nothing is shown twice. The floor is the running
+ * version, or `seenVersion` (the newest version an earlier prompt showed, see
+ * {@link rememberNotesSeen}) when that is newer. `releases` keeps the versions
+ * newer than the floor and no newer than the incoming one, newest first, and
+ * `since` names the floor for the prompt's heading. When the incoming build's
+ * own notes are not among them (a payload without `releases`), they lead as
+ * the incoming entry, so an older server still shows what it showed before.
+ * `more` says the player skipped more versions than the payload carries.
+ *
+ * An incoming version at or below the floor (a same-version rebuild, which
+ * carries the notes of the version the player is already on, or a build whose
+ * notes an earlier prompt already showed) shows no notes, only the build-id
+ * line. When either version is not a plain version (a dev build), only the
+ * incoming build's own notes are shown.
+ */
+export function notesSinceRunning(info: UpdateInfo, runningVersion: string, seenVersion?: string): UpdateInfo {
+  const none = { ...info, notes: [], releases: [] };
+  if (info.version === runningVersion) return none;
+  const notes = info.notes ?? [];
+  if (!versionParts(runningVersion) || !versionParts(info.version)) {
+    return { ...info, releases: info.version && notes.length > 0 ? [{ version: info.version, notes }] : [] };
+  }
+  const floor = isNewerVersion(seenVersion, runningVersion) ? seenVersion! : runningVersion;
+  if (!isNewerVersion(info.version, floor)) return none;
+  const carried = info.releases ?? [];
+  const unseen = carried.filter((r) => isNewerVersion(r.version, floor) && !isNewerVersion(r.version, info.version));
+  const releases = unseen.some((r) => r.version === info.version) ? unseen : [{ version: info.version!, notes }, ...unseen];
+  const shown = releases
+    .filter((r) => r.notes.length > 0)
+    .sort(newestFirst)
+    .slice(0, MAX_RELEASES);
+  const more = carried.length >= MAX_RELEASES && carried.every((r) => isNewerVersion(r.version, floor));
+  return { ...info, notes, releases: shown, since: floor, ...(more ? { more } : {}) };
 }

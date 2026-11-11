@@ -8,6 +8,7 @@ import {
   maybeSurfaceUpdatePrompt,
   showUpdatePrompt,
 } from "./updateFlow";
+import { NOTES_SEEN_KEY } from "../pwaUpdateInfo";
 
 /**
  * Colocated unit tests for the PWA update-prompt flow. Every function is a free
@@ -142,6 +143,16 @@ describe("maybeSurfaceUpdatePrompt", () => {
     expect(uiShowPrompt).toHaveBeenCalledTimes(1);
     expect(raw.shownUpdate).toBe(true);
     expect(raw.updatePromptShown).toBe(true);
+  });
+});
+
+describe("showUpdatePrompt remembers the notes it shows (#1897)", () => {
+  it("records the incoming version so a later prompt never repeats its notes", () => {
+    localStorage.clear();
+    const { app, raw } = clearApp();
+    raw.pendingUpdateInfo = { version: "3.0.2", notes: ["n"] };
+    showUpdatePrompt(app);
+    expect(localStorage.getItem(NOTES_SEEN_KEY)).toBe("3.0.2");
   });
 });
 
