@@ -4,8 +4,6 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { sendToRelay } from "./analyticsRelay";
 import { gameplaySession } from "./analytics";
-import { Simulation } from "./engine/Simulation";
-import type { SerializedGame } from "./shared/serializedGame";
 import { RATE_LIMIT_MAX } from "./analyticsRateLimit";
 import {
   BRIDGE_SEND_LIMIT,
@@ -308,23 +306,6 @@ describe("analytics engine bridge", () => {
     expect(sent()).toEqual([["economy_action", { action: "demolish", detail: "sell" }]]);
   });
 
-  it("counts a build the player then undid", () => {
-    // Undo swaps in the earlier save; its own events are none, and the undone
-    // build was already drained (or rides the hand-off), so it still counts.
-    const sim = Simulation.newGame(5, "classic");
-    sim.money = 1e9;
-    const before = sim.serialize();
-    for (let x = 180; x < 184; x++) expect(sim.build("lobby", 1, x).ok).toBe(true);
-    const undone = Simulation.deserialize(JSON.parse(JSON.stringify(before)) as SerializedGame);
-    undone.gameplayEvents.inherit(sim.gameplayEvents); // what adoptSim does
-    drainEngineEvents(undone);
-    gameplaySession.begin();
-    gameplaySession.end(false);
-    expect(propsFor("new_game_started")).toEqual([{ mode: "classic" }]);
-    expect(propsFor("first_build")).toEqual([{ tool: "lobby" }]);
-    expect(propsFor("session_builds")).toEqual([{ builds: 4 }]);
-  });
-
   it("is the only sender of demolish: no shell code reports a removal itself", () => {
     // A shell call next to the bridge's fold would send every removal twice.
     // Every source file but the bridge itself; tests and the type that names
@@ -343,22 +324,6 @@ describe("analytics engine bridge", () => {
     expect(senders).toEqual([]);
   });
 
-  it("counts a removal the player then undid", () => {
-    const sim = Simulation.newGame(6, "classic");
-    sim.money = 1e9;
-    for (let x = 170; x < 200; x++) expect(sim.build("lobby", 1, x).ok).toBe(true);
-    for (let x = 170; x < 200; x++) expect(sim.build("floor", 2, x).ok).toBe(true);
-    expect(sim.build("office", 2, 180).ok).toBe(true);
-    drainEngineEvents(sim);
-    vi.mocked(sendToRelay).mockReset();
-    const before = sim.serialize();
-    expect(sim.removeFacility(sim.tower.unitAt(2, 180)!.id, "bulldoze").ok).toBe(true);
-    const undone = Simulation.deserialize(JSON.parse(JSON.stringify(before)) as SerializedGame);
-    undone.gameplayEvents.inherit(sim.gameplayEvents); // what adoptSim does
-    drainEngineEvents(undone);
-    expect(sent()).toEqual([["economy_action", { action: "demolish", detail: "bulldoze" }]]);
-  });
-
   it("counts a fold that throws and folds the rest of the batch", () => {
     const spy = vi.spyOn(gameplaySession, "noteStar").mockImplementation(() => {
       throw new Error("fold bug");
@@ -372,29 +337,29 @@ describe("analytics engine bridge", () => {
     }
   });
 
-  it("folds every engine event exactly once across a swap, a page hide and a consent flip", () => {
-    // One live tower at a time, as the frame loop and the session see it.
-    let live = Simulation.newGame(7, "classic");
+  it("folds every drained event exactly once across a failed drain, a page hide and a new window", () => {
+    // The engine's own queue across an Undo and a load is checked on the Rust
+    // engine in src/tests/integration/analyticsEngineBridge.integration.test.ts.
+    const queue: unknown[] = [founded()];
+    let trap = false;
+    const live: GameplayEventSource = {
+      drainGameplayEvents: () => {
+        if (trap) throw new Error("trap");
+        return queue.splice(0) as never;
+      },
+      gameplayEventsDropped: 0,
+      gameplayEvents: { discardOnHandOff: false },
+    };
     bindEngineBridge(() => live);
     gameplaySession.begin();
-    live.money = 1e9;
     drainEngineEvents(live); // the founding
-    for (let x = 180; x < 183; x++) expect(live.build("lobby", 1, x).ok).toBe(true);
+    queue.push(placed("lobby", 1), placed("lobby", 1), placed("lobby", 1));
     // A failed drain in the middle loses and repeats nothing.
-    const real = live.drainGameplayEvents.bind(live);
-    live.drainGameplayEvents = () => {
-      throw new Error("trap");
-    };
+    trap = true;
     drainEngineEvents(live);
-    live.drainGameplayEvents = real;
-    // A swap (a load) hands the undrained builds on; the new tower adds one.
-    const next = Simulation.deserialize(JSON.parse(JSON.stringify(live.serialize())) as SerializedGame);
-    next.gameplayEvents.inherit(live.gameplayEvents);
-    live = next;
-    live.money = 1e9;
-    expect(live.build("lobby", 1, 183).ok).toBe(true);
+    trap = false;
     // A rejected event in the same batch is dropped without touching the rest.
-    live.gameplayEvents.pushEvent({ name: "tower_renamed", payload: {} } as never);
+    queue.push(placed("lobby", 1), { name: "tower_renamed", payload: {} });
     // The page hide folds what the engine still holds, once.
     gameplaySession.end(false);
     drainEngineEvents(live);
@@ -404,10 +369,11 @@ describe("analytics engine bridge", () => {
     expect(propsFor("first_build")).toEqual([{ tool: "lobby" }]);
     expect(engineBridgeStats()).toMatchObject({ rejected: 1, drainFailures: 1 });
     // A new window drops what the engine holds unsent; nothing is folded twice.
-    expect(live.build("lobby", 1, 184).ok).toBe(true);
+    queue.push(placed("lobby", 1));
     gameplaySession.startEpoch();
     drainEngineEvents(live);
     expect(engineBridgeStats().discarded).toBe(1);
+    expect(propsFor("session_builds")).toEqual([{ builds: 4 }]);
   });
 
   it("counts but sends nothing on a host where analytics is off", () => {

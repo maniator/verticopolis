@@ -1,7 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import * as ex from "excalibur";
-import { GRID } from "../../engine/facilities";
-import { Tower } from "../../engine/Tower";
+import { catalogFor } from "../../tests/catalogFixture";
 import { FLOOR, TILE } from "../scale";
 import { mapSideMarginTiles } from "../overviewMap/extent";
 import {
@@ -30,6 +29,9 @@ import {
  * numeric properties, not just no-throw. The picking tests assert z-ordering and
  * the transport-over-unit precedence, not merely that a hit was found.
  */
+
+/** The lot's width in tiles, from the engine's catalog. */
+const LOT_WIDTH = catalogFor("classic").world.lotWidth;
 
 /** A fake TowerEngine carrying just the fields the camera/coord functions read,
  *  plus the same centered-camera transform the real getters funnel through. */
@@ -104,13 +106,13 @@ describe("setCamera / viewState / applyView are exact inverses on the same devic
   it("holds a center aimed into the Map's side margins on the lot's edges (#343)", () => {
     // The overview Map's crop runs past each side of the lot, and a click
     // there moves the camera through applyView, which keeps it on the lot.
-    const margin = mapSideMarginTiles(GRID.width);
+    const margin = mapSideMarginTiles(LOT_WIDTH);
     expect(margin).toBeGreaterThan(0);
     const e = eng();
     applyView(e, { tile: -margin, floor: 20 });
     expect(viewState(e).tile).toBe(0);
-    applyView(e, { tile: GRID.width + margin, floor: 20 });
-    expect(viewState(e).tile).toBe(GRID.width);
+    applyView(e, { tile: LOT_WIDTH + margin, floor: 20 });
+    expect(viewState(e).tile).toBe(LOT_WIDTH);
   });
 });
 
@@ -127,7 +129,7 @@ describe("pan / clamp keep the camera inside the world bounds", () => {
     const e = eng();
     setCamera(e, 100, 20, 1);
     pan(e, -1e6, 0);
-    expect(e.cam.pos.x).toBe(GRID.width * TILE);
+    expect(e.cam.pos.x).toBe(LOT_WIDTH * TILE);
   });
 
   it("a plain drag moves the world opposite the pointer, scaled by zoom", () => {
@@ -187,7 +189,7 @@ describe("center / ensureVisible", () => {
   it("center parks the camera over the middle of the built height", () => {
     const e = eng({ sim: { tower: { highestFloor: 60, lowestFloor: 1 } } });
     center(e);
-    expect(e.cam.pos.x).toBeCloseTo((GRID.width / 2) * TILE, 6);
+    expect(e.cam.pos.x).toBeCloseTo((LOT_WIDTH / 2) * TILE, 6);
     expect(e.cam.pos.y).toBeCloseTo(-(60 / 2) * FLOOR, 6);
   });
 
@@ -314,29 +316,20 @@ describe("pickEntityAt: transports by collider, every unit by grid lookup", () =
     expect(pickEntityAt(tie, world)!.id).toBe(2);
   });
 
-  it("resolves rooms on a REAL tower with zero render actors, including a multi-floor unit's upper story", () => {
-    // The regression the grid-lookup switch must pin: picking reads only the
-    // sim's footprint-complete tile index, never the room actor layer (which
-    // the region-composition story retires), and Tower.register claims every
-    // story of a multi-floor unit so its upper floors resolve too.
-    const tower = new Tower();
-    for (let x = 100; x < 150; x++) {
-      expect(tower.place("lobby", 1, x).ok).toBe(true);
-      expect(tower.place("floor", 2, x).ok).toBe(true);
-      expect(tower.place("floor", 3, x).ok).toBe(true);
-    }
-    const cinema = tower.place("cinema", 2, 100); // 31 tiles wide, 2 stories
-    expect(cinema.ok).toBe(true);
-    const office = tower.place("office", 2, 140);
-    expect(office.ok).toBe(true);
-    const e = eng({ transportActors: new Map(), sim: { tower } });
+  it("resolves rooms through the tower's cell lookup with zero render actors, at exact pixel edges", () => {
+    // Picking reads only the sim's tile index (unitAt), never the room actor
+    // layer. That the index covers every story of a tall room is the engine's,
+    // checked on the Rust engine in src/tests/integration/towerPick.integration.test.ts.
+    const cells = new Map<string, { id: number; kind: string }>();
+    for (let x = 140; x < 149; x++) cells.set(`2:${x}`, { id: 7, kind: "office" });
+    cells.set("2:149", { id: 0, kind: "floor" });
+    cells.set("0:120", { id: 0, kind: "floor" });
+    const unitAt = vi.fn((floor: number, x: number) => cells.get(`${floor}:${x}`));
+    const e = eng({ transportActors: new Map(), sim: { tower: { highestFloor: 40, lowestFloor: 1, unitAt } } });
 
     const at = (tile: number, floor: number) => pickEntityAt(e, ex.vec((tile + 0.5) * TILE, -(floor - 0.5) * FLOOR));
-    expect(at(141, 2)).toEqual({ type: "unit", id: office.unitId, kind: "office", cell: { floor: 2, x: 141 } });
-    expect(at(110, 2)).toEqual({ type: "unit", id: cinema.unitId, kind: "cinema", cell: { floor: 2, x: 110 } });
-    expect(at(110, 3)).toEqual({ type: "unit", id: cinema.unitId, kind: "cinema", cell: { floor: 3, x: 110 } }); // upper story
-    expect(at(141, 3)!.kind).toBe("floor"); // bare structure above the office
-    expect(at(141, 1)!.kind).toBe("lobby");
+    expect(at(141, 2)).toEqual({ type: "unit", id: 7, kind: "office", cell: { floor: 2, x: 141 } });
+    expect(unitAt).toHaveBeenLastCalledWith(2, 141);
     expect(at(50, 20)).toBeNull(); // open sky
 
     // Exact pixel-boundary semantics (the deliberate tie-break recorded in
@@ -345,9 +338,8 @@ describe("pickEntityAt: transports by collider, every unit by grid lookup", () =
     // resolve through the same total lookup, no clamping, no throw.
     const atWorld = (x: number, y: number) => pickEntityAt(e, ex.vec(x, y));
     const midFloor2 = -(2 - 0.5) * FLOOR;
-    expect(atWorld(140 * TILE, midFloor2)!.id).toBe(office.unitId); // left edge is the office's
+    expect(atWorld(140 * TILE, midFloor2)!.id).toBe(7); // left edge is the office's
     expect(atWorld(149 * TILE, midFloor2)!.kind).toBe("floor"); // right edge is the neighbor's
-    expect(tower.place("floor", 0, 120).ok).toBe(true); // B1 under the lobby strip
     expect(atWorld(120.5 * TILE, 0)!.kind).toBe("floor"); // the ground line maps to B1 (ceil(-0) keys as floor 0)
     expect(atWorld(-5, midFloor2)).toBeNull(); // left of the lot
     expect(atWorld(400 * TILE, midFloor2)).toBeNull(); // right of the lot

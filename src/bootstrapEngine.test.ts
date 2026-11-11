@@ -1,6 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { bootGame } from "./bootstrap";
-import { saveOf } from "./tests/fixtures/saveText";
 
 // The telemetry SDKs are gated on the host and best-effort; stub them so the
 // gate and its catch can be asserted without touching the real endpoints.
@@ -37,13 +36,16 @@ import { rustBootTower } from "./wasmhost/rustEngine";
 import { sendToRelay } from "./analyticsRelay";
 import { resetEngineStatus } from "./analyticsEngineStatus";
 import * as pwa from "./pwa";
-import { Simulation } from "./engine/Simulation";
 import { SaveGame } from "./storage/SaveGame";
 import { setSlotPopulationReader, slotPopulation } from "./storage/slotCensus";
 import { setEngineWriter } from "./storage/vctowerWriter";
 import { EngineBootError } from "./wasmhost/engineBoot";
 import { engineTrapped, noteEngineThrow, watchEngineTraps } from "./game/engineFault";
 import { countRustCrash, reloadSoon } from "./engineCrash/crashReload";
+
+/** A save's text for the export calls: the writer under test is a stub that
+ *  never reads it, so a hand-written save stands in for an engine's. */
+const SAVE_TEXT = JSON.stringify({ towerName: "Boot Test Tower", mode: "classic", minutes: 0 });
 
 /** A tab whose storage keeps nothing, so a crash cannot be counted. */
 function fullTabStore(): void {
@@ -164,7 +166,7 @@ describe("bootGame engine", () => {
     await bootGame(vi.fn(() => ({ onUpdateAvailable: vi.fn() })));
     expect(rustBootTower).toHaveBeenCalled();
     expect(bootState()).toEqual({ build: "wasm-only", engine: "wasm", failure: null });
-    expect(await SaveGame.export(saveOf(new Simulation(1)))).toBe("VCTOWER1\nZW5naW5l\n");
+    expect(await SaveGame.export(SAVE_TEXT)).toBe("VCTOWER1\nZW5naW5l\n");
     expect(encodeVctower).toHaveBeenCalledTimes(1);
   });
 
@@ -191,7 +193,7 @@ describe("bootGame engine", () => {
     expect(reloadSoon).toHaveBeenCalledOnce();
     expect(setSpeed).toHaveBeenCalledWith(0);
     expect(error).toHaveBeenCalledWith(`[wasm] ${message}`);
-    await SaveGame.export(saveOf(new Simulation(1)));
+    await SaveGame.export(SAVE_TEXT);
     expect(encodeVctower).not.toHaveBeenCalled();
   });
 
@@ -222,7 +224,7 @@ describe("bootGame engine", () => {
     const error = vi.spyOn(console, "error").mockImplementation(() => {});
     const setSpeed = vi.fn();
     await bootGame(vi.fn(() => ({ onUpdateAvailable: vi.fn(), setSpeed })));
-    const file = await SaveGame.export(saveOf(new Simulation(1)));
+    const file = await SaveGame.export(SAVE_TEXT);
     // The save was written on the TypeScript writer, not lost to the trap.
     expect(file).toMatch(/^VCTOWER1\n[A-Za-z0-9+/]+={0,2}\n$/);
     expect(encodeVctower).toHaveBeenCalledTimes(1);
@@ -235,7 +237,7 @@ describe("bootGame engine", () => {
     expect(reloadSoon).toHaveBeenCalledOnce();
     expect(error).toHaveBeenCalledWith(`[wasm] ${message}`);
     // The writer is off and the engine is never asked again; a later tick's throw is not heard twice.
-    await SaveGame.export(saveOf(new Simulation(1)));
+    await SaveGame.export(SAVE_TEXT);
     expect(encodeVctower).toHaveBeenCalledTimes(1);
     expect(noteEngineThrow(new WebAssembly.RuntimeError("unreachable"))).toBe(false);
   });
@@ -251,7 +253,7 @@ describe("bootGame engine", () => {
     document.body.innerHTML = '<div id="stage"></div>';
     vi.spyOn(console, "error").mockImplementation(() => {});
     await bootGame(vi.fn(() => ({ onUpdateAvailable: vi.fn(), setSpeed: vi.fn() })));
-    await SaveGame.export(saveOf(new Simulation(1)));
+    await SaveGame.export(SAVE_TEXT);
     expect(bootState()).toEqual({ build: "wasm-only", engine: "wasm", failure: null, writerLatched: true });
     expect(published()?.status).toMatchObject({ hosted: true });
     expect(engineTrapped()).toBe(false);
@@ -360,7 +362,7 @@ describe("bootGame engine_status", () => {
     await boot();
     expect(engineRows()).toEqual([expect.objectContaining({ trigger: "settle", engine: "wasm", writer_latched: false })]);
     expect(bootState()).toEqual({ build: "wasm-only", engine: "wasm", failure: null });
-    await SaveGame.export(saveOf(new Simulation(1)));
+    await SaveGame.export(SAVE_TEXT);
     expect(lastRow(engineRows())).toMatchObject({ trigger: "writer-latch", engine: "wasm", writer_latched: true });
     expect(bootState()).toEqual({ build: "wasm-only", engine: "wasm", failure: null, writerLatched: true });
   });
