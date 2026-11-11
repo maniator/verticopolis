@@ -35,7 +35,8 @@ export function priceOptionsFromRent(rent: CatalogRent | null): PriceOptions | n
  *  market (No Rate), its stored price when the player set one, and the kind's
  *  catalog default otherwise. A Classic build stores its Average rung, so an
  *  unset Classic unit is one whose Average equals the default (an office),
- *  and both engines charge exactly this (#921). */
+ *  and the engine charges exactly this (#921, held in
+ *  `catalogPricing.integration.test.ts`). */
 export function unitPrice(catalog: Catalog, u: { kind: FacilityKind; rent?: number; noRate?: boolean }): number {
   if (u.noRate) return 0;
   return u.rent ?? catalogFacility(catalog, u.kind).rent?.default ?? 0;

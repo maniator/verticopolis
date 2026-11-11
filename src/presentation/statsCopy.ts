@@ -5,8 +5,8 @@ import type { LedgerCat } from "../shared/engineTypes";
  * key: the income ledger's categories and the optional milestones. The engine
  * answers which categories exist, their per-day averages and which milestones
  * are done; the labels and descriptions stay here, as the engine's progress
- * panel says. `statsCopy.test.ts` holds this copy to the keys the engine's
- * own tables carry until those tables are deleted.
+ * panel says. `statsCopy.test.ts` holds this copy to the keys the engine
+ * publishes in its view layout (`ledgerCats`, `milestones`).
  */
 
 /** The income categories in display order. */
