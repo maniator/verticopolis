@@ -1,32 +1,9 @@
 import { describe, expectTypeOf, it } from "vitest";
-import type { Crowd } from "../engine/Crowd";
-import type { Person } from "../shared/engineTypes";
-import type { Simulation } from "../engine/Simulation";
-import type { Tower } from "../engine/Tower";
-import type { roomUnits, StructureRun, structureRuns } from "../engine/tower/rooms";
-import type { Transport, Unit } from "../shared/types";
 import type { Command, CommandResults } from "./commands";
 import type { Query, QueryResults } from "./queries";
-import type { CrowdView, FxView, HeaderView, PersonView, SimView, StructureRunView, TowerView, TransportView, UnitView } from "./view";
+import type { CrowdView, PersonView, SimView, StructureRunView, TowerView, TransportView, UnitView } from "./view";
 
 describe("the port's types", () => {
-  it("the live TypeScript objects are views, so the adapter copies nothing", () => {
-    expectTypeOf<Tower>().toExtend<TowerView>();
-    expectTypeOf<Unit>().toExtend<UnitView>();
-    expectTypeOf<Transport>().toExtend<TransportView>();
-    expectTypeOf<Crowd>().toExtend<CrowdView>();
-    expectTypeOf<Person>().toExtend<PersonView>();
-    expectTypeOf<Simulation["pendingChoice"]>().toExtend<HeaderView["pendingChoice"]>();
-    expectTypeOf<StructureRun>().toEqualTypeOf<StructureRunView>();
-    expectTypeOf<ReturnType<typeof roomUnits>>().toExtend<SimView["rooms"]>();
-    expectTypeOf<ReturnType<typeof structureRuns>>().toExtend<SimView["structure"]>();
-    expectTypeOf<Simulation["explosionFx"]>().toExtend<FxView["explosion"]>();
-    expectTypeOf<Simulation["thiefFx"]>().toExtend<FxView["thief"]>();
-    expectTypeOf<Simulation["treasureFx"]>().toExtend<FxView["treasure"]>();
-    expectTypeOf<Simulation["view"]>().toExtend<HeaderView["camera"]>();
-    expectTypeOf<Simulation["rng"]["initialSeed"]>().toEqualTypeOf<HeaderView["sceneSeed"]>();
-  });
-
   it("the views are read-only", () => {
     expectTypeOf<TowerView["units"]>().toEqualTypeOf<ReadonlyArray<UnitView>>();
     expectTypeOf<TowerView["transports"]>().toEqualTypeOf<ReadonlyArray<TransportView>>();
@@ -39,17 +16,6 @@ describe("the port's types", () => {
   it("every command and query has a result type", () => {
     expectTypeOf<keyof CommandResults>().toEqualTypeOf<Command["op"]>();
     expectTypeOf<keyof QueryResults>().toEqualTypeOf<Query["op"]>();
-  });
-
-  it("a command's result carries every field its callers read today", () => {
-    expectTypeOf<CommandResults["extendTransport"]>().toExtend<ReturnType<Simulation["extendTransport"]>>();
-    expectTypeOf<CommandResults["addCar"]>().toExtend<ReturnType<Simulation["addCar"]>>();
-    expectTypeOf<CommandResults["removeCar"]>().toExtend<ReturnType<Simulation["removeCar"]>>();
-    expectTypeOf<CommandResults["removeFacility"]>().toExtend<ReturnType<Simulation["removeFacility"]>>();
-    expectTypeOf<CommandResults["callExterminator"]>().toExtend<ReturnType<Simulation["callExterminator"]>>();
-    expectTypeOf<CommandResults["build"]>().toExtend<ReturnType<Simulation["build"]>>();
-    expectTypeOf<CommandResults["buildTransport"]>().toExtend<ReturnType<Simulation["buildTransport"]>>();
-    expectTypeOf<QueryResults["canBuild"]>().toExtend<ReturnType<Simulation["canBuild"]>>();
   });
 
   it("is read by the type checker", () => {

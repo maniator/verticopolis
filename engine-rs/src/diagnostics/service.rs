@@ -341,10 +341,9 @@ mod tests {
 
     #[test]
     fn the_traffic_mean_keeps_todays_value() {
-        // Today's range gives 0.8 to the bit, as the TypeScript reference's
-        // mean does (`src/engine/EconomySystem.ts`). A deliberate retune moves
-        // this pin and the retail card-text goldens; the WASM parity tests
-        // hold the two engines' retail facts together.
+        // Today's range gives 0.8 to the bit, as the retired TypeScript
+        // reference's mean did. A deliberate retune moves this pin and the
+        // retail card-text goldens.
         assert_eq!(
             TRAFFIC_FACTOR_MEAN.to_bits(),
             0.8_f64.to_bits(),

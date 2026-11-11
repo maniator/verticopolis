@@ -4,9 +4,8 @@ import { inflateSync } from "fflate";
 import medium from "../../../conformance/fixtures/sixseven_2.vctower?raw";
 import ownersSave from "../../../conformance/fixtures/split-tower-4.vctower?raw";
 import starFour from "../../../conformance/fixtures/towerone-star4.vctower?raw";
-import { FACILITIES } from "../../engine/facilities";
-import { isCommercialKind } from "../../engine/facilityPredicates";
-import type { FacilityKind, SerializedGame, Unit } from "../../shared/types";
+import { catalogFor } from "../catalogFixture";
+import type { SerializedGame, Unit } from "../../shared/types";
 import { PortCodes } from "../../simport/portCodes";
 import { walkedStats } from "../fixtures/walkedStats";
 import { PortSim, describeEngines, type Leg } from "../portKit/portSim";
@@ -31,9 +30,9 @@ type Counts = ReturnType<typeof walkedStats>;
 /** The kinds whose census count is their live customer tally, which no save
  *  carries: the walk reads it from the engine's unit card instead. */
 const TALLIED_VENUES: ReadonlySet<string> = new Set(
-  (Object.keys(FACILITIES) as FacilityKind[]).filter(
-    (k) => isCommercialKind(k) && FACILITIES[k].population > 0,
-  ),
+  catalogFor("modern")
+    .facilities.filter((f) => f.commercial && f.population > 0)
+    .map((f) => f.key),
 );
 
 /** The walk over every unit in the engine's save, read as the engine wrote

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { facilityFloors } from "../engine/facilities";
+import { kindFacts } from "../tests/catalogKinds";
 import type { FacilityKind, Unit } from "../shared/types";
 import { OFFSETS, crop, paintAt, paintPastSeam, parseColor, rasterCtx, tail, unitOf } from "../tests/originSeedsHarness";
 import { skylineWindowLit } from "./pixelSprites/skyBar";
@@ -50,7 +50,7 @@ describe("room details follow the room wherever it is painted (#915)", () => {
         // The part of the room past a region seam, painted from a negative
         // origin, matches the same part of the whole room.
         const w = unit.width * TILE;
-        const h = facilityFloors(unit.kind) * FLOOR;
+        const h = kindFacts(unit.kind).floors * FLOOR;
         for (const [dx, dy] of [[3 * TILE, 0], [TILE + 3, 0], [TILE + 3, FLOOR]] as const) {
           if (dy >= h) continue;
           expect(paintPastSeam(unit, dx, dy, lit), `past a seam at ${dx},${dy}`).toEqual(tail(first, w, h, dx, dy));

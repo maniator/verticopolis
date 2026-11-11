@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
+import { subtypesOf } from "../tests/catalogKinds";
 import type { Unit } from "../shared/types";
-import { AMUSEMENTS_SUBTYPES, BOUTIQUE_SUBTYPES, CLINIC_SUBTYPES, FASTFOOD_SUBTYPES, FITNESS_SUBTYPES, RESTAURANT_SUBTYPES, SHOP_SUBTYPES } from "../engine/retailSubtypes";
 import {
   drawUnit,
   craneAnchorTile,
@@ -157,13 +157,13 @@ describe("drawUnit — state actually changes the drawing (behavioral, not just 
     // Four attractions, four interiors: the same guarantee the distinctness
     // test pins on the look table must show up in the actual drawing.
     const sigs = new Set<string>();
-    for (const name of AMUSEMENTS_SUBTYPES) {
+    for (const name of subtypesOf("amusements")) {
       const s = spyCtx();
       expect(() => drawUnit(draw({}, s.ctx), unit({ kind: "amusements", subtype: name, occupants: 3 }), 0, 0, 132, 44)).not.toThrow();
       expect(s.painted()).toBe(true);
       sigs.add(s.sig());
     }
-    expect(sigs.size, "two attractions drew identically").toBe(AMUSEMENTS_SUBTYPES.length);
+    expect(sigs.size, "two attractions drew identically").toBe(subtypesOf("amusements").length);
   });
 
   it("every Amusements attraction reads empty when empty and full when full", () => {
@@ -172,7 +172,7 @@ describe("drawUnit — state actually changes the drawing (behavioral, not just 
     // ALL four attractions: VR and mini-golf used to draw a lone figure even at
     // zero occupancy, contradicting the "empty hall reads empty" invariant.
     const occupant = "fillStyle=rgba(0,0,0,0.24)";
-    for (const name of AMUSEMENTS_SUBTYPES) {
+    for (const name of subtypesOf("amusements")) {
       const empty = spyCtx();
       const full = spyCtx();
       drawUnit(draw({}, empty.ctx), unit({ kind: "amusements", subtype: name, occupants: 0 }), 0, 0, 132, 44);
@@ -197,24 +197,24 @@ describe("drawUnit — state actually changes the drawing (behavioral, not just 
     // Seven trades, seven interiors: the same guarantee the distinctness test
     // pins on the look table must show up in the actual drawing.
     const sigs = new Set<string>();
-    for (const name of BOUTIQUE_SUBTYPES) {
+    for (const name of subtypesOf("boutiqueBay")) {
       const s = spyCtx();
       expect(() => drawUnit(draw({}, s.ctx), unit({ kind: "boutiqueBay", subtype: name, occupants: 2 }), 0, 0, 132, 44)).not.toThrow();
       expect(s.painted()).toBe(true);
       sigs.add(s.sig());
     }
-    expect(sigs.size, "two trades drew identically").toBe(BOUTIQUE_SUBTYPES.length);
+    expect(sigs.size, "two trades drew identically").toBe(subtypesOf("boutiqueBay").length);
   });
 
   it("each Fitness Club format draws its own distinct room", () => {
     const sigs = new Set<string>();
-    for (const name of FITNESS_SUBTYPES) {
+    for (const name of subtypesOf("fitnessClub")) {
       const s = spyCtx();
       expect(() => drawUnit(draw({}, s.ctx), unit({ kind: "fitnessClub", subtype: name, occupants: 3 }), 0, 0, 176, 44)).not.toThrow();
       expect(s.painted()).toBe(true);
       sigs.add(s.sig());
     }
-    expect(sigs.size, "two formats drew identically").toBe(FITNESS_SUBTYPES.length);
+    expect(sigs.size, "two formats drew identically").toBe(subtypesOf("fitnessClub").length);
   });
 
   it("an empty Fitness Club draws no member; a busy one does", () => {
@@ -265,7 +265,7 @@ describe("drawUnit — state actually changes the drawing (behavioral, not just 
   it("each Clinic practice draws its own distinct room, empty when empty", () => {
     const sigs = new Set<string>();
     const occupant = "fillStyle=rgba(0,0,0,0.24)";
-    for (const name of CLINIC_SUBTYPES) {
+    for (const name of subtypesOf("clinic")) {
       const busy = spyCtx();
       const empty = spyCtx();
       expect(() => drawUnit(draw({}, busy.ctx), unit({ kind: "clinic", subtype: name, occupants: 2 }), 0, 0, 88, 44)).not.toThrow();
@@ -275,7 +275,7 @@ describe("drawUnit — state actually changes the drawing (behavioral, not just 
       expect(empty.log, `${name} drew a patient while empty`).not.toContain(occupant);
       sigs.add(busy.sig());
     }
-    expect(sigs.size, "two practices drew identically").toBe(CLINIC_SUBTYPES.length);
+    expect(sigs.size, "two practices drew identically").toBe(subtypesOf("clinic").length);
   });
 
   // The Boutique Bay's occupancy gate and its forged-count bound moved to
@@ -410,9 +410,9 @@ describe("retail subtype looks paint distinctly (drawRoom)", () => {
   // anchor shape survives. Also exercises every fixture and interior branch
   // so the coverage gate keeps guarding this file.
   const cases: Array<[Unit["kind"], readonly string[], number]> = [
-    ["fastFood", FASTFOOD_SUBTYPES, 12],
-    ["restaurant", RESTAURANT_SUBTYPES, 19],
-    ["shop", SHOP_SUBTYPES, 14],
+    ["fastFood", subtypesOf("fastFood"), 12],
+    ["restaurant", subtypesOf("restaurant"), 19],
+    ["shop", subtypesOf("shop"), 14],
   ];
   for (const [kind, names, hour] of cases) {
     it(`${kind}: every canon variant paints, and no two variants paint identically`, () => {

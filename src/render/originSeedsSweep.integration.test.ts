@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { FACILITIES } from "../engine/facilities";
-import { subtypeListFor } from "../engine/retailSubtypes";
+import { kindFacts } from "../tests/catalogKinds";
 import type { Unit } from "../shared/types";
 import { OFFSETS, paintAt, unitOf } from "../tests/originSeedsHarness";
 import { roomKinds } from "./atlas/catalog";
@@ -42,9 +41,9 @@ describe("room details follow the room wherever it is painted (#915), every kind
   for (const kind of roomKinds()) {
     it(`every ${kind} subtype and look paints the same pixels at every region offset`, () => {
       const moved: string[] = [];
-      for (const subtype of [undefined, ...(subtypeListFor(kind) ?? [])]) {
+      for (const subtype of [undefined, ...(kindFacts(kind).subtypes ?? [])]) {
         for (const look of SWEEP) {
-          const occupants = look.occ ?? (FACILITIES[kind].population ?? 0);
+          const occupants = look.occ ?? (kindFacts(kind).population);
           // The second basement floor (floor 0 is B1, so -1 is B2), at a column
           // that keeps every raw geography seed positive (a negative one is
           // #1029).

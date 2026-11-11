@@ -1,11 +1,23 @@
 import { expect } from "vitest";
-import { facilityFloors } from "../engine/facilities";
-import { CALENDAR_CODES, KIND_CODES, MODE_CODES, VIEW_LAYOUT, codeOf } from "../engine/port/layout";
+import { floorsOfPort } from "../game/portAccess";
 import type { FacilityKind } from "../shared/types";
 import type { Draft } from "../tests/portKit/drafts";
 import { newSeededDraft } from "../tests/portKit/draftFixtures";
 import type { EnginePort, PortRecord } from "./enginePort";
 import { ViewReader } from "./viewReader";
+import layoutJson from "./fixtures/viewLayout.json";
+
+/** The engine's view layout as checked in (`portReads.integration.test.ts`
+ *  holds the fixture to the engine's `viewLayout()`). */
+export const VIEW_LAYOUT = layoutJson;
+
+/** `name`'s index in one of the layout's code tables; throws for a name the
+ *  table lacks, so a renamed code cannot read as some other one. */
+function codeIn(table: readonly string[], name: string): number {
+  const at = table.indexOf(name);
+  if (at < 0) throw new Error(`contract: the layout has no code for ${name}`);
+  return at;
+}
 
 /**
  * The engine under the port contracts (`engineContract.fixture.ts`,
@@ -27,12 +39,12 @@ export interface Subject {
  *  standing on its starter lobby (a ground-floor strip of lobby tiles). */
 export function subject(make: MakeEngine, tower: Draft = newSeededDraft(7, "modern")): Subject {
   const port = make(tower.saveText());
-  return { port, reader: new ViewReader(port, facilityFloors) };
+  return { port, reader: new ViewReader(port, floorsOfPort(port)) };
 }
 
-export const kind = (name: FacilityKind): number => codeOf(KIND_CODES, name);
-export const mode = (name: "classic" | "modern"): number => codeOf(MODE_CODES, name);
-export const calendar = (name: "canon" | "realWorld"): number => codeOf(CALENDAR_CODES, name);
+export const kind = (name: FacilityKind): number => codeIn(VIEW_LAYOUT.kinds, name);
+export const mode = (name: "classic" | "modern"): number => codeIn(VIEW_LAYOUT.modes, name);
+export const calendar = (name: "canon" | "realWorld"): number => codeIn(VIEW_LAYOUT.calendars, name);
 export const logKind = (name: string): number => VIEW_LAYOUT.logKinds.indexOf(name);
 export const filmPolicy = (name: string): number => VIEW_LAYOUT.filmPolicies.indexOf(name);
 

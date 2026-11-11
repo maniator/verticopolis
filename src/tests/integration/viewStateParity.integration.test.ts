@@ -1,11 +1,11 @@
 import { describe, expect, it, beforeEach, vi } from "vitest";
 import { inflateSync } from "fflate";
 import { FLOOR, TILE, TowerEngine } from "../../render/excalibur/TowerEngine";
-import { GRID } from "../../engine/facilities";
+import { viewWorld } from "../../presentation/viewWorld";
 import type { SerializedGame, SerializedView } from "../../shared/types";
 import { SKY_HEADROOM_FLOORS } from "../../render/cameraBounds";
 import { SaveLoad } from "../../game/saveLoad";
-import { buildTDT, installTdtCodec, parseTDT } from "../conformance/tdtWasm";
+import { buildTDT, parseTDT } from "../conformance/tdtWasm";
 import { hasWasmPackage } from "../conformance/wasmEngine";
 import { buildTdt, sampleTowerSpec } from "../fixtures/tdtBuilder";
 import { loadAuto, loadSlotSim, withPorts } from "../fixtures/saveText";
@@ -129,7 +129,6 @@ describe.skipIf(noEngine)("SaveLoad stamps the live camera onto the CURRENT towe
   });
 
   it.skipIf(!hasWasmPackage())("importLegacy: the imported sim keeps the TDT file's view, never the live camera's; the pre-adopt flush keeps the live one", async () => {
-    installTdtCodec();
     const words = WORDS_200_20;
     const buf = buildTdt({ ...sampleTowerSpec(), viewX: words.x, viewY: words.y });
     await saveLoad.importLegacy(buf.buffer as ArrayBuffer, "MOVED.TDT");
@@ -177,9 +176,9 @@ describe("TowerEngine camera restore (prototype on a fake: no canvas)", () => {
     expect(fake.engine.currentScene.camera.zoom).toBe(3); // MAX_ZOOM
     // A view over the top of the world pulls back inside the vertical bounds
     // (the sky ceiling derives from the crane height; see cameraBounds).
-    proto.applyView.call(fake, { tile: 100, floor: GRID.maxFloor, zoom: 0.3 });
+    proto.applyView.call(fake, { tile: 100, floor: viewWorld().maxFloor, zoom: 0.3 });
     const cam = fake.engine.currentScene.camera;
-    expect(cam.pos.y).toBeGreaterThanOrEqual(-(GRID.maxFloor + SKY_HEADROOM_FLOORS) * FLOOR + 600 / 2 / 0.3);
+    expect(cam.pos.y).toBeGreaterThanOrEqual(-(viewWorld().maxFloor + SKY_HEADROOM_FLOORS) * FLOOR + 600 / 2 / 0.3);
   });
 
   it("a zoomless view (TDT import) keeps the session's current zoom", () => {

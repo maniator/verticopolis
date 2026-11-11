@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import { catalogFor } from "../tests/catalogFixture";
-import { GRID } from "../engine/facilities";
 import {
   STRUCTURE_BRUSH,
   announceForPlacement,
@@ -11,7 +10,10 @@ import {
   stepCursor,
 } from "./placement";
 
+/** The lot's geometry, from the Rust engine's catalog (`engine-rs/src/catalog.rs` world). */
 const CAT = catalogFor("classic");
+const WORLD = CAT.world;
+const GRID = { width: WORLD.lotWidth, minFloor: WORLD.minFloor, maxFloor: WORLD.maxFloor };
 
 /** The placement helpers are pure functions of (kind, tile, floor) since the
  *  module split — these tests pin the geometry every gesture path (mouse,

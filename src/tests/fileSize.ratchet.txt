@@ -18,5 +18,4 @@ src/tests/integration/tdtImport.integration.test.ts
 src/tests/integration/tdtExport.integration.test.ts
 src/tests/integration/storage.integration.test.ts
 src/tests/integration/gameControllers.integration.test.ts
-src/engine/Tower.test.ts
 # engine-rs (Rust, guarded from 2026-10-14; inline test modules count)

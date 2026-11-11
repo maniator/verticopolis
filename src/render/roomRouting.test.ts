@@ -1,10 +1,8 @@
 import { describe, it, expect } from "vitest";
+import { kindFacts, kindKeys } from "../tests/catalogKinds";
 import type { Unit } from "../shared/types";
 import { drawUnit, type DrawCtx } from "./sprites";
-import { FACILITIES } from "../engine/facilities";
 import { facilityColor } from "../presentation/facilityPresentation";
-import { isElevatorKind } from "../engine/facilityPredicates";
-import { isFixedSpanTransport } from "../engine/facilityCaps";
 
 /**
  * Regression guard for the rental-living render bug: a leased Studio/Apartment
@@ -70,13 +68,13 @@ describe("no facility kind falls through to the flat facility-color fallback (sy
   // added can't slip through the same gap the two rentals did.
   // Transports (stairs/escalator/elevators) are catalog facilities but are drawn
   // by the transport renderer, never through drawUnit, so they are out of scope.
-  const kinds = (Object.keys(FACILITIES) as (keyof typeof FACILITIES)[]).filter(
-    (k) => !isElevatorKind(k) && !isFixedSpanTransport(k),
+  const kinds = kindKeys().filter(
+    (k) => kindFacts(k).maxCars === null && !kindFacts(k).fixedSpan,
   );
   it.each(kinds)("%s renders content, not a flat facility-color block", (kind) => {
     const s = spyCtx();
-    const w = Math.max(4, FACILITIES[kind].width ?? 6) * 11;
-    drawUnit(draw(s.ctx), unit({ kind, width: FACILITIES[kind].width ?? 6, state: "occupied", occupants: 2 }), 0, 0, w, 34);
+    const w = Math.max(4, kindFacts(kind).width) * 11;
+    drawUnit(draw(s.ctx), unit({ kind, width: kindFacts(kind).width, state: "occupied", occupants: 2 }), 0, 0, w, 34);
     const colors = new Set(s.log.filter((l) => l.startsWith("fillStyle=")).map((l) => l.slice("fillStyle=".length)));
     // The flat fallback sets exactly the one facility color and nothing else.
     const hitFlatFallback = colors.size <= 1 && colors.has(facilityColor(kind));

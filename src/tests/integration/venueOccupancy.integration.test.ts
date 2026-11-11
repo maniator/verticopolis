@@ -1,6 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { FACILITIES } from "../../engine/facilities";
+import { catalogFacility } from "../../catalog/catalogTypes";
+import { catalogFor } from "../catalogFixture";
+import type { FacilityKind } from "../../shared/types";
 import { PortSim, describeEngines, type Leg, type Draft, draftTower } from "../portKit/portSim";
+
+/** A facility's published facts (width, population, attendance), from the
+ *  engine's Modern catalog; both modes state the same sizes. */
+const facility = (kind: FacilityKind) => catalogFacility(catalogFor("modern"), kind);
 
 /**
  * Guards commercial venue occupant behavior:
@@ -52,21 +58,21 @@ function venueFixture(leg: Leg, kind: "fastFood" | "restaurant" | "shop", hour: 
 
 describe("commercial venue population values scale with footprint", () => {
   it("shop has population 20", () => {
-    expect(FACILITIES.shop.population).toBe(20);
+    expect(facility("shop").population).toBe(20);
   });
 
   it("fastFood has population 25", () => {
-    expect(FACILITIES.fastFood.population).toBe(25);
+    expect(facility("fastFood").population).toBe(25);
   });
 
   it("restaurant has population 35", () => {
-    expect(FACILITIES.restaurant.population).toBe(35);
+    expect(facility("restaurant").population).toBe(35);
   });
 
   it("all three are positive (gate for census inclusion)", () => {
-    expect(FACILITIES.shop.population).toBeGreaterThan(0);
-    expect(FACILITIES.fastFood.population).toBeGreaterThan(0);
-    expect(FACILITIES.restaurant.population).toBeGreaterThan(0);
+    expect(facility("shop").population).toBeGreaterThan(0);
+    expect(facility("fastFood").population).toBeGreaterThan(0);
+    expect(facility("restaurant").population).toBeGreaterThan(0);
   });
 });
 
@@ -76,19 +82,19 @@ describeEngines("occupants equals f.population while venue is open", (leg: Leg) 
   it("fast food is open at 12:00 and shows its population", () => {
     const { venue, triggerHour } = venueFixture(leg, "fastFood", 11); // positioned just before target
     triggerHour(); // fires onHour -> updatePresence at hour 12
-    expect(venue().occupants).toBe(FACILITIES.fastFood.population);
+    expect(venue().occupants).toBe(facility("fastFood").population);
   });
 
   it("restaurant is open at 12:00 (lunch window) and shows its population", () => {
     const { venue, triggerHour } = venueFixture(leg, "restaurant", 11);
     triggerHour();
-    expect(venue().occupants).toBe(FACILITIES.restaurant.population);
+    expect(venue().occupants).toBe(facility("restaurant").population);
   });
 
   it("shop is open at 14:00 and shows its population", () => {
     const { venue, triggerHour } = venueFixture(leg, "shop", 13);
     triggerHour();
-    expect(venue().occupants).toBe(FACILITIES.shop.population);
+    expect(venue().occupants).toBe(facility("shop").population);
   });
 });
 
@@ -129,7 +135,7 @@ describeEngines("occupants flips at open/close hour boundaries", (leg: Leg) => {
     // Inside open window: 21:00 (22-1)
     const { sim, venue, triggerHour } = venueFixture(leg, "fastFood", 20);
     triggerHour(); // now at hour 21
-    expect(venue().occupants).toBe(FACILITIES.fastFood.population);
+    expect(venue().occupants).toBe(facility("fastFood").population);
 
     // Past close: advance one more hour to 22:00
     triggerHour();
@@ -140,7 +146,7 @@ describeEngines("occupants flips at open/close hour boundaries", (leg: Leg) => {
     sim.tick(8 * 60);
     expect(sim.state.clock.hour).toBe(6);
     triggerHour(); // now at hour 7
-    expect(venue().occupants).toBe(FACILITIES.fastFood.population);
+    expect(venue().occupants).toBe(facility("fastFood").population);
   });
 });
 
@@ -183,6 +189,6 @@ describeEngines("a venue's first open hour shows its ambient crowd", (leg: Leg) 
     }); // shop opens at 10
     triggerHour(); // crosses into 10:00: traffic flips it occupied
     expect(venue().state).toBe("occupied");
-    expect(venue().occupants).toBe(FACILITIES.shop.population);
+    expect(venue().occupants).toBe(facility("shop").population);
   });
 });

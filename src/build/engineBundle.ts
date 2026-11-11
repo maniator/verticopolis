@@ -2,29 +2,19 @@
  * The emitted-bundle guard for the engine build.
  *
  * Every build is **wasm-only**: the Rust/WASM engine is the only engine the
- * game runs, and the TypeScript step loop is not in the bundle. A production
- * build carries none of the TypeScript engine (#921); only a `VC_TOOLING=1`
- * build does, for the harnesses' hand-built tower (`src/game/toolingSim.ts`).
- * `scripts/verify-engine-bundle.ts` runs after every build and checks the
- * emitted sourcemaps and the service-worker precache with
- * {@link checkEngineBundle}, so the result is proven from what the bundler
- * wrote rather than from source imports.
+ * game runs (the TypeScript engine's code is gone, #1875). A production build
+ * carries none of the harnesses' tower (#921); only a `VC_TOOLING=1` build
+ * does (`src/game/toolingSim.ts`). `scripts/verify-engine-bundle.ts` runs
+ * after every build and checks the emitted sourcemaps and the service-worker
+ * precache with {@link checkEngineBundle}, so the result is proven from what
+ * the bundler wrote rather than from source imports.
  *
  * Keep this file ERASABLE (no enums, namespaces or parameter properties) so
  * `node` can run the script that imports it directly.
  */
 
-/** The TypeScript engine's step loop (tick, hour and day passes). The WASM
- *  host replaces `tick` on every tower it hosts, so in a build the loop is
- *  swapped for `src/wasmhost/stepLoopAbsent.ts` and must not ship. */
-export const TS_STEP_LOOP = "src/engine/sim/loop.ts";
-
-/** The TypeScript simulation's source tree. */
-export const TS_ENGINE_DIR = "src/engine/";
-
-/** The tooling harnesses' hand-built tower, which carries the TypeScript
- *  engine; every build but a tooling one swaps it for
- *  `src/game/toolingSimAbsent.ts`. */
+/** The tooling harnesses' hand-built tower; every build but a tooling one
+ *  swaps it for `src/game/toolingSimAbsent.ts`. */
 export const TOOLING_SIM = "src/game/toolingSim.ts";
 
 /** The engine package files the precache must carry. */
@@ -49,92 +39,30 @@ export interface EngineBundleInput {
    *  `scripts/verify-precache.ts` has already allowed or stopped, so the
    *  engine's precache entries are only required when the package is there. */
   enginePackageBuilt: boolean;
-  /** The TypeScript engine modules a tooling build carries
-   *  (`scripts/engine-bundle.allow.txt`). A production build may carry none. */
-  allowed: readonly string[];
 }
 
 export interface EngineBundleResult {
   errors: string[];
-  /** The `src/engine/**` modules in the emitted JavaScript, sorted. */
-  engineModules: string[];
 }
 
 const isTestSource = (s: string): boolean =>
   s.startsWith("src/tests/") || s.startsWith("e2e/") || s.includes("/__mocks__/") || /\.(test|spec)\.[mc]?[jt]sx?$/.test(s);
-
-/** Sources no production build may carry: tests and test fixtures. */
-function forbiddenEverywhere(s: string): string | null {
-  return isTestSource(s) ? "test code" : null;
-}
-
-/** Sources no build may carry besides test code: the TypeScript step loop. */
-const FORBIDDEN: ReadonlyMap<string, string> = new Map([
-  [TS_STEP_LOOP, "the TypeScript step loop"],
-]);
 
 /** Check the emitted bundle. Pure: the script reads the files and passes them
  *  in. */
 export function checkEngineBundle(input: EngineBundleInput): EngineBundleResult {
   const errors: string[] = [];
   if (input.chunks.length === 0) errors.push("no emitted JavaScript with a sourcemap was found, so the bundle cannot be checked");
-  const engine = new Set<string>();
   for (const chunk of input.chunks) {
     for (const s of chunk.sources) {
-      if (s.startsWith(TS_ENGINE_DIR)) engine.add(s);
-      const testWhy = forbiddenEverywhere(s);
-      if (testWhy) errors.push(`${chunk.file} carries ${testWhy} (${s})`);
-      const loopWhy = FORBIDDEN.get(s);
-      if (loopWhy) errors.push(`${chunk.file} carries ${loopWhy} (${s})`);
+      if (isTestSource(s)) errors.push(`${chunk.file} carries test code (${s})`);
       if (!input.tooling && s === TOOLING_SIM) errors.push(`${chunk.file} carries the tooling harnesses' tower (${s}), which only a VC_TOOLING=1 build may ship`);
-    }
-  }
-  const engineModules = [...engine].sort();
-  if (!input.tooling) {
-    if (engineModules.length > 0) {
-      errors.push(
-        `the production bundle carries TypeScript engine modules: ${engineModules.join(", ")}. ` +
-          "The shipped game runs the Rust engine only (#921): reach it through the WASM host, the catalog or an engine query",
-      );
-    }
-  } else {
-    const allowed = new Set(input.allowed);
-    const unlisted = engineModules.filter((m) => !allowed.has(m));
-    if (unlisted.length > 0) {
-      errors.push(
-        `the tooling bundle gained TypeScript engine modules that scripts/engine-bundle.allow.txt does not list: ${unlisted.join(", ")}. ` +
-          "Reach the engine through the WASM host or the catalog instead; list a module only with the reason the harnesses need it",
-      );
-    }
-    const gone = input.allowed.filter((m) => !engine.has(m));
-    if (gone.length > 0) {
-      errors.push(`these TypeScript engine modules no longer ship in the tooling bundle; remove them from scripts/engine-bundle.allow.txt so the list only shrinks: ${gone.join(", ")}`);
     }
   }
   const pre = new Set(input.precache);
   const absent = input.enginePackageBuilt ? ENGINE_PACKAGE_FILES.filter((f) => !pre.has(f)) : [];
   if (absent.length > 0) errors.push(`the build does not precache the engine package (${absent.join(", ")}), so it could not start offline`);
-  return { errors, engineModules };
-}
-
-/** The module paths an allowlist file names: one per line, `#` comments and
- *  blank lines ignored. A duplicate or a path outside `src/engine/` is an
- *  error, so the list stays a plain inventory. */
-export function parseAllowList(text: string): { modules: string[]; errors: string[] } {
-  const modules: string[] = [];
-  const errors: string[] = [];
-  const seen = new Set<string>();
-  for (const [i, line] of text.split(/\r?\n/).entries()) {
-    const entry = line.replace(/#.*$/, "").trim();
-    if (entry === "") continue;
-    if (!entry.startsWith(TS_ENGINE_DIR)) errors.push(`line ${i + 1}: ${entry} is not under ${TS_ENGINE_DIR}`);
-    else if (seen.has(entry)) errors.push(`line ${i + 1}: ${entry} is listed twice`);
-    else {
-      seen.add(entry);
-      modules.push(entry);
-    }
-  }
-  return { modules, errors };
+  return { errors };
 }
 
 /** A sourcemap source as a repository-relative path: the query suffix a

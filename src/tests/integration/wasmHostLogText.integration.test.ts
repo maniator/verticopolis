@@ -1,67 +1,95 @@
 import { describe, expect, it } from "vitest";
-import type { Simulation } from "../../engine/Simulation";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import type { WasmEngine } from "../../dualrun/binding";
+import type { SerializedGame } from "../../shared/serializedGame";
+import { catalogFor } from "../catalogFixture";
+import { REPO_ROOT } from "../conformance/scenario";
 import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
-import { FIXTURES, loadFixture } from "../conformance/fixtureSim";
+import { FIXTURES } from "../conformance/fixtureSim";
 
 /**
- * The log's prose on both engines. The conformance view drops log text (it
- * pins each entry's minute and kind), so a line the WASM engine words or
- * formats differently (a dollar amount without its thousands separators, a
- * flattened plural) would reach a player on the WASM engine unnoticed. Each
- * fixture runs a day, then both clocks jump to just before the next quarter
- * and the next maintenance period and run across them, so the rent,
+ * The log's prose on the Rust engine. The conformance view drops log text (it
+ * pins each entry's minute and kind), so a line the engine words or formats
+ * wrongly (a dollar amount without its thousands separators, a flattened
+ * plural) would reach a player unnoticed. Each fixture opens the way the game
+ * opens a file, runs a day, then the clock jumps to just before the next
+ * quarter and the next maintenance period and runs across them, so the rent,
  * maintenance and checkout lines with their large amounts are written.
  */
 
+const MINUTES_PER_DAY = 1440;
+const MINUTES_PER_HOUR = 60;
 
-const texts = (log: { text: string }[]) => log.map((e) => e.text);
-const engineLog = (engine: WasmEngine) => texts((JSON.parse(engine.serialize()) as { log: { text: string }[] }).log);
+const engineSave = (engine: WasmEngine) => JSON.parse(engine.serialize()) as SerializedGame & { log: { text: string }[] };
 
-function run(sim: Simulation, engine: WasmEngine, hours: number): void {
-  for (let h = 0; h < hours; h++) {
-    sim.tick(60);
-    engine.tick(60);
-  }
+function run(engine: WasmEngine, hours: number): void {
+  for (let h = 0; h < hours; h++) engine.tick(MINUTES_PER_HOUR);
 }
 
-/** Move both clocks, raw, to an hour before the next multiple of `period`
- *  days that lies at least an hour ahead. */
-function jumpBefore(sim: Simulation, engine: WasmEngine, period: number): void {
-  let day = (Math.floor(sim.clock.day / period) + 1) * period;
-  while (day * 1440 - 60 <= sim.clock.minutes) day += period;
-  const delta = day * 1440 - 60 - sim.clock.minutes;
-  sim.clock.advance(delta);
-  engine.advanceClock(delta);
+/** Move the clock, raw, to an hour before the next multiple of `period` days
+ *  that lies at least an hour ahead. */
+function jumpBefore(engine: WasmEngine, period: number): void {
+  const minutes = engineSave(engine).minutes;
+  let day = (Math.floor(minutes / MINUTES_PER_DAY / period) + 1) * period;
+  while (day * MINUTES_PER_DAY - MINUTES_PER_HOUR <= minutes) day += period;
+  engine.advanceClock(day * MINUTES_PER_DAY - MINUTES_PER_HOUR - minutes);
 }
 
-/** One fixture's run; returns every line the two engines agreed on. */
-function compare(fixture: string): string[] {
-  const sim = loadFixture(fixture);
-  const engine = wasm().Engine.fromSave(JSON.stringify(sim.serialize()));
+/** The calendar the save runs: a Modern tower's own choice, else its mode's
+ *  default (the first the catalog lists). */
+function calendarOf(save: SerializedGame) {
+  const calendars = catalogFor(save.mode ?? "classic").economy.calendars;
+  return calendars.find((c) => c.key === save.modernCalendar) ?? calendars[0];
+}
+
+/** One fixture's run; returns every line the engine wrote. */
+function linesOf(fixture: string): string[] {
+  const engine = wasm().Engine.fromVctower(readFileSync(resolve(REPO_ROOT, fixture), "utf8"));
   try {
-    run(sim, engine, 24);
-    expect(engineLog(engine), `${fixture}: the first day`).toEqual(texts(sim.log));
-    const cal = sim.clock.calendar;
-    jumpBefore(sim, engine, cal.quarterDays);
-    run(sim, engine, 48);
-    expect(engineLog(engine), `${fixture}: across a quarter`).toEqual(texts(sim.log));
-    jumpBefore(sim, engine, cal.maintPeriodDays);
-    run(sim, engine, 48);
-    expect(engineLog(engine), `${fixture}: across a maintenance period`).toEqual(texts(sim.log));
-    return texts(sim.log);
+    run(engine, 24);
+    const calendar = calendarOf(engineSave(engine));
+    jumpBefore(engine, calendar.quarterDays);
+    run(engine, 48);
+    jumpBefore(engine, calendar.maintenancePeriodDays);
+    run(engine, 48);
+    return engineSave(engine).log.map((e) => e.text);
   } finally {
     engine.free();
   }
 }
 
-describe.skipIf(!hasWasmPackage())("log text on both engines", () => {
+/** A dollar amount as the log writes it: whole dollars, grouped in threes. */
+const GROUPED_DOLLARS = /^\$\d{1,3}(,\d{3})*$/;
+/** A counted noun the log pluralizes by its count. */
+const COUNTED = /(\d[\d,]*) (office|condo|clinic|club|rental|hotel room)(s?)\b(?!\()/g;
+
+/** The money lines whose wording and amount format are at stake: each line
+ *  that opens with `prefix` must read exactly as `pattern`. */
+const MONEY_LINES = [
+  { prefix: "Quarterly office rent collected:", pattern: /^Quarterly office rent collected: \$[\d,]+ \(\d[\d,]* offices?\)\.$/ },
+  { prefix: "Monthly maintenance paid:", pattern: /^Monthly maintenance paid: \$[\d,]+\.$/ },
+  { prefix: "Maintenance paid:", pattern: /^Maintenance paid: \$[\d,]+\.$/ },
+  { prefix: "Hotel guests checked out:", pattern: /^Hotel guests checked out: \$[\d,]+ earned overnight\.$/ },
+] as const;
+
+describe.skipIf(!hasWasmPackage())("log text on the Rust engine", () => {
   it("every fixture across a day, a quarter and a maintenance period", () => {
-    const lines = FIXTURES.flatMap(compare);
+    const lines = FIXTURES.flatMap(linesOf);
+    for (const line of lines) {
+      for (const [amount] of line.matchAll(/\$[\d,]*\d/g)) expect(amount, line).toMatch(GROUPED_DOLLARS);
+      for (const [, count, , plural] of line.matchAll(COUNTED)) {
+        expect(plural === "", `${line}: the noun agrees with ${count}`).toBe(count === "1");
+      }
+    }
     // The runs wrote the lines whose formatting is at stake: a grouped dollar
-    // amount, the quarterly rent and the maintenance bill.
+    // amount, the quarterly rent, the maintenance bill and the hotel checkout,
+    // each worded and formatted as a player reads it.
     expect(lines.some((t) => /\$\d{1,3}(,\d{3})+/.test(t)), "a grouped dollar amount").toBe(true);
-    expect(lines.some((t) => t.startsWith("Quarterly office rent collected:")), "a quarterly rent line").toBe(true);
-    expect(lines.some((t) => /maintenance paid:/i.test(t)), "a maintenance line").toBe(true);
+    for (const { prefix, pattern } of MONEY_LINES) {
+      const written = lines.filter((t) => t.startsWith(prefix));
+      expect(written.length, `a "${prefix}" line`).toBeGreaterThan(0);
+      for (const line of written) expect(line).toMatch(pattern);
+    }
   }, 300_000);
 });

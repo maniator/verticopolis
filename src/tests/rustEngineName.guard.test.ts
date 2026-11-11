@@ -21,7 +21,6 @@ const COPY_MODULES = [
   "src/wasmhost/hostFault.ts",
   "src/wasmhost/rustEngine.ts",
   "src/wasmhost/catalogCheck.ts",
-  "src/wasmhost/stepLoopAbsent.ts",
   "src/build/thirdPartyNotices.ts",
   "src/bootstrap.ts",
 ];

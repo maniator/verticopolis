@@ -5,12 +5,13 @@ use crate::snapshot::state_view;
 use serde_json::Value;
 
 /// `conformance/loader-cases.json`: forged and hand-edited saves whose
-/// loaded state the TypeScript `deserialize` hashed. Regenerate it with
-/// `VC_CONFORMANCE_UPDATE=1 npx vitest run --project integration loaderCases`.
+/// loaded state the retired TypeScript `deserialize` hashed. The table is
+/// fixed data now (#1875): a change that moves a digest is a change to how a
+/// save loads, reviewed against the case's input.
 const TABLE: &str = include_str!("../../../conformance/loader-cases.json");
 
 #[test]
-fn forged_saves_load_as_the_typescript_loads_them() {
+fn forged_saves_load_to_their_recorded_digests() {
     let table: Value = serde_json::from_str(TABLE).expect("loader-cases.json parses");
     let cases = table["cases"].as_array().expect("cases");
     assert!(!cases.is_empty());
@@ -45,15 +46,14 @@ fn forged_saves_load_as_the_typescript_loads_them() {
                 ));
             } else if expected == "throws" {
                 misses.push(format!(
-                    "{id}: the TypeScript throws, which the recorded divergence ({why}) does not cover"
+                    "{id}: the recorded load throws, which the recorded divergence ({why}) does not cover"
                 ));
             }
             continue;
         }
         if got != expected {
             // Leave the Rust side's canonical JSON beside the target dir so
-            // the miss can be read field by field against
-            // `npx tsx scripts/loader-case-dump.ts <id>`.
+            // the miss can be read field by field.
             if let Some(v) = view {
                 let path = concat!(env!("CARGO_MANIFEST_DIR"), "/target");
                 let _ = std::fs::create_dir_all(path);
@@ -63,7 +63,7 @@ fn forged_saves_load_as_the_typescript_loads_them() {
                 );
             }
             misses.push(format!(
-                "{id}: {got} vs {expected} (Rust view written to engine-rs/target/loader-case-{id}.rs.json; TypeScript: npx tsx scripts/loader-case-dump.ts {id})"
+                "{id}: {got} vs {expected} (Rust view written to engine-rs/target/loader-case-{id}.rs.json)"
             ));
         }
     }

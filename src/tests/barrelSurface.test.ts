@@ -20,8 +20,6 @@ import { describe, it, expect } from "vitest";
  */
 
 // --- 1. Compile-time surface: every exported TYPE. ---
-import type { BatchRentOptions, BatchRentResult, BatchTarget, HeatCell, HeatmapMode, LogEntry } from "../engine/Simulation";
-import type { ElevatorCalls, MealWindow, StaffKind } from "../engine/Crowd";
 import type { Person, PersonState } from "../shared/engineTypes";
 import type { ExportReport } from "../storage/tdtExportReport";
 import type { ImportReport } from "../storage/tdtImportReport";
@@ -33,8 +31,7 @@ import type { SfxName } from "../audio/ToneAudioEngine";
 // Reference every type once so the block is provably load-bearing (a removed
 // type becomes an unresolved reference here, failing typecheck).
 export type _TypeSurfacePins = [
-  BatchRentOptions, BatchRentResult, BatchTarget, HeatCell, HeatmapMode, LogEntry,
-  ElevatorCalls, MealWindow, Person, PersonState, StaffKind,
+  Person, PersonState,
   ImportReport, ExportReport,
   SlotInfo,
   FastFoodLook, RestaurantLook, RoomCtx, ShopLook,
@@ -43,12 +40,6 @@ export type _TypeSurfacePins = [
 ];
 
 // --- 2. Runtime surface: value bindings must resolve, not just typecheck. ---
-import * as facilities from "../engine/facilities";
-import * as simulation from "../engine/Simulation";
-import * as tower from "../engine/Tower";
-import * as crowd from "../engine/Crowd";
-import * as economy from "../engine/EconomySystem";
-import * as migration from "../engine/saveMigration";
 import * as tdtImportHelpers from "../storage/tdtImportHelpers";
 import * as tdtFilename from "../storage/tdtFilename";
 import * as saveGame from "../storage/SaveGame";
@@ -60,31 +51,6 @@ import * as toneScenes from "../audio/toneScenes";
 import * as toneVoices from "../audio/toneVoices";
 
 const RUNTIME_EXPORTS: Record<string, string[]> = {
-  facilities: [
-    "ALL_KINDS", "BUILD_CAPS", "FACILITIES", "GARBAGE_COLLECT_HOUR", "GRID", "LOT_WIDTH", "MAX_CARS",
-    "PARKING_WORKERS_PER_SPACE", "POOLED_CAPS", "RECYCLING_POP_PER_CENTER", "STAR_THRESHOLDS",
-    "TOWER_POPULATION", "TRANSPORT_CAPACITY", "buildMinutes", "censusCount", "facilityFloors",
-    "hasBusinessHours", "isCommercialKind", "isElevatorKind", "isFacilityKind", "isFixedSpanTransport",
-    "isHotelKind", "isOpenAt", "isStaffOnlyTransport", "isStaffTransportKind", "maxCarsFor", "maxSpanFor",
-    "openHoursPerDay", "residentCount", "transportCarCapacity",
-  ],
-  simulation: [
-    "CONGESTION_CHURN", "CONGESTION_GRIDLOCK", "ECON", "LOG_SAVE_CAP", "SAVE_VERSION", "Simulation",
-    "TRANSPORT_FAR_TILES", "VACATE_RESCIND", "congestionSeverity", "serializeUnit",
-  ],
-  tower: ["Tower"],
-  crowd: [
-    "CROWD_SECONDS_PER_MINUTE", "Crowd", "EAT_SECONDS_MAX", "EAT_SECONDS_MIN", "MEAL_WINDOWS",
-    "mealWindowFor", "staffOnShift", "visibleOccupants",
-  ],
-  economy: [
-    "COMMERCIAL_LOBBY_FLOORS", "EconomySystem", "HK_SHIFT_END", "HK_SHIFT_START", "TRAFFIC_FACTOR_MEAN",
-    "TRAFFIC_FACTOR_MIN", "TRAFFIC_FACTOR_SPAN",
-  ],
-  migration: [
-    "SAVE_VERSION", "floatingStructureCount", "migrateSave", "migrationLooksValid", "reflowV1toV2",
-    "upgradeV1toV2", "upgradeV2toV3", "upgradeV3toV4", "upgradeV4toV5", "widenLegacyElevatorShafts",
-  ],
   tdtImportHelpers: ["looksLikeLegacyTower"],
   tdtFilename: ["legacyFilename"],
   saveGame: ["SLOT_COUNT", "SaveGame", "TOWER_FILE_EXT"],
@@ -111,7 +77,7 @@ const RUNTIME_EXPORTS: Record<string, string[]> = {
 };
 
 const MODULES: Record<string, Record<string, unknown>> = {
-  facilities, simulation, tower, crowd, economy, migration, tdtImportHelpers, tdtFilename,
+  tdtImportHelpers, tdtFilename,
   saveGame, pixelSprites, structure, spriteFacilities, audio, toneScenes, toneVoices,
 };
 

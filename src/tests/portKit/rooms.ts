@@ -1,4 +1,4 @@
-import { facilityFloors } from "../../engine/facilities";
+import { floorsOfPort } from "../../game/portAccess";
 import type { FacilityKind } from "../../shared/types";
 import { ViewReader } from "../../simport/viewReader";
 import type { PortSim } from "./portSim";
@@ -15,7 +15,7 @@ export interface RoomTallies {
 }
 
 /** Every room's counters, from the engine's frame through the host's view
- *  reader, so both engines answer through the path the game reads. Each call
+ *  reader, the path the game reads. Each call
  *  reads a full frame with a new reader, so a counter write that skipped the
  *  frame's change marks still shows. An absent counter reads 0, as the tests
  *  that compare tallies count it.
@@ -25,7 +25,7 @@ export interface RoomTallies {
  *  counter as -1, so a negative `hotelCustomersIn` or `outForMeal` reads 0
  *  here: a check against these two cannot see a dip below 0. */
 export function roomTallies(sim: PortSim): RoomTallies[] {
-  return new ViewReader(sim.port, facilityFloors).rooms.map((r) => ({
+  return new ViewReader(sim.port, floorsOfPort(sim.port)).rooms.map((r) => ({
     id: r.id,
     kind: r.kind,
     floor: r.floor,

@@ -1,9 +1,9 @@
 import { describe, it, expect } from "vitest";
+import { subtypesOf } from "../tests/catalogKinds";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import type { Unit } from "../shared/types";
-import { SHOP_SUBTYPES } from "../engine/retailSubtypes";
 import { drawUnit, drawLobbyEntrance, type EntranceKind, type DrawCtx } from "./sprites";
 import { FLOOR, TILE } from "./scale";
 
@@ -123,7 +123,7 @@ describe("venue figures are gated on real occupancy (#552)", () => {
     // count is exactly that ghost's signature, since the hash was the only thing
     // an empty shop's population could vary on.
     const varying: string[] = [];
-    for (const subtype of SHOP_SUBTYPES) {
+    for (const subtype of subtypesOf("shop")) {
       const counts = new Set(Array.from({ length: 12 }, (_, i) => shopFigures(subtype, i + 1, 0)));
       if (counts.size > 1) varying.push(`${subtype}: ${[...counts].join("/")}`);
     }

@@ -50,13 +50,14 @@ const TEST_DIR = "tests";
  *  entry for a fixture glyph no player ever sees. The by-name `*.test.ts` rule
  *  is already location-agnostic; this matches it. */
 const TEST_LOCATION = new RegExp(`(^|/)${TEST_DIR}/`);
-/** The two roots this guard scanned before #782 widened it. The coverage check
- *  used to read their test files as well, so it keeps doing so through
- *  {@link legacyRootTests} even though tests are otherwise out of the scan.
- *  Nothing in the tree can yield this list (colocated tests live under seven
- *  top-level directories today), so it is a record of history and the test
- *  restates it to keep it from being trimmed. */
-const LEGACY_ROOTS = ["engine", "game"];
+/** The roots this guard scanned before #782 widened it that still exist: it
+ *  scanned `src/engine` too, which left with the TypeScript engine (#1875).
+ *  The coverage check used to read their test files as well, so it keeps
+ *  doing so through {@link legacyRootTests} even though tests are otherwise
+ *  out of the scan. Nothing in the tree can yield this list (colocated tests
+ *  live under several top-level directories today), so it is a record of
+ *  history and the test restates it to keep it from being trimmed. */
+const LEGACY_ROOTS = ["game"];
 
 /** Every character that is actually RENDERED as an emoji (and so tofus without a
  *  color-emoji font): either a default-emoji-presentation code point
@@ -103,7 +104,7 @@ function where(file: string): string {
  *  `.test.ts` suffix, so a `tests/` directory is skipped by LOCATION too (see
  *  {@link TEST_LOCATION}): hoisting that tower name into
  *  `tests/fixtures/towerFixtures.ts` must not start demanding an `EMOJI_ICONS`
- *  entry for it. Colocated tests (`src/engine/*.test.ts`) are still caught by
+ *  entry for it. Colocated tests (`src/game/*.test.ts`) are still caught by
  *  the suffix. */
 function isEmitterFile(abs: string, rel: string): boolean {
   if (abs === iconsPath) return false;
@@ -290,24 +291,24 @@ describe("bulletin icon coverage (issue #721)", () => {
   it("still covers the test files the pre-#782 scan reached", () => {
     // Widening the roots also moved the "skip test files" rule into the shared
     // walk, which would have QUIETLY NARROWED this half: an unmapped emoji added
-    // to a src/engine test used to fail CI. Nothing but this assertion would
+    // to a src/engine or src/game test used to fail CI. Nothing but this assertion would
     // keep that ground. It is scoped to the two old roots because that is
     // exactly what was covered before; test code elsewhere stages fixtures
     // (a "✨✨" tower name) that were never in reach and should not be.
     //
     // Two halves, because two different edits can hand that ground back. The
     // list is a record of history the tree cannot yield, so trimming it to
-    // ["engine"] would drop 37 game test files with every other assertion still
+    // [] would drop the game test files with every other assertion still
     // green: restating it here means a rename has to touch both spellings, which
-    // is the friction this pin exists for.
+    // is the friction this pin exists for. The engine root was retired with the
+    // TypeScript engine (#1875).
     expect(
       [...LEGACY_ROOTS].sort(),
-      "LEGACY_ROOTS no longer names both roots the pre-#782 scan walked, so this check " +
+      "LEGACY_ROOTS no longer names the root the pre-#782 scan walked, so this check " +
         "covers less than it did; restore the missing root or retire the pin deliberately",
-    ).toEqual(["engine", "game"]);
-    // The other half is per ROOT rather than over the union. A union count stays
-    // positive while one root goes stale, so renaming src/game would leave this
-    // reading engine alone, 29 files, still passing, and 37 files out of reach.
+    ).toEqual(["game"]);
+    // The other half is per ROOT rather than over the union, so a root that
+    // goes stale (src/game renamed) fails here instead of reading nothing.
     const legacy: Source[] = [];
     for (const root of LEGACY_ROOTS) {
       const rootTests = legacyRootTests(root);

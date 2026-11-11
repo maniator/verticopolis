@@ -1,7 +1,8 @@
 import { expect, it } from "vitest";
 import { newSeededDraft, LOT_WIDTH } from "../portKit/draftFixtures";
-import { ECON } from "../../engine/econConfig";
-import { SAVE_VERSION } from "../../engine/saveMigration";
+import { catalogFor } from "../catalogFixture";
+import { wasm } from "../conformance/wasmEngine";
+import { parseEngineIdentity, readEngineIdentity } from "../../wasmhost/engineIdentity";
 import { PortSim, describeEngines, type Leg } from "../portKit/portSim";
 
 /**
@@ -126,12 +127,12 @@ describeEngines("save fields the engine keeps across a load", (leg: Leg) => {
     // money: a forged non-finite / non-number never poisons the bank with NaN;
     // it falls back to the starting balance (pins the fallback so a mutation
     // to `: 0` is caught, not just "finite"). The expected value is the live
-    // default (ECON.startingMoney), so a retune of the starting balance can
+    // default (the classic catalog's starting money), so a retune of the starting balance can
     // never leave a stale literal passing for the wrong reason.
     for (const bad of [NaN, "1000", undefined]) {
-      expect(resave(leg, { ...data, money: bad }).money, `money ${bad}`).toBe(ECON.startingMoney);
+      expect(resave(leg, { ...data, money: bad }).money, `money ${bad}`).toBe(catalogFor("classic").economy.startingMoney);
     }
-    for (const bad of [Infinity, -Infinity]) expectInfinityHandled(leg, { ...data, money: bad }, (save) => expect(save.money, `money ${bad}`).toBe(ECON.startingMoney));
+    for (const bad of [Infinity, -Infinity]) expectInfinityHandled(leg, { ...data, money: bad }, (save) => expect(save.money, `money ${bad}`).toBe(catalogFor("classic").economy.startingMoney));
     // Legal debt (the sign) round-trips intact.
     expect(resave(leg, { ...data, money: -50_000 }).money).toBe(-50_000);
 
@@ -166,7 +167,7 @@ describeEngines("save fields the engine keeps across a load", (leg: Leg) => {
     const beforeUnits = JSON.stringify(data.units);
     const sim = load(leg, data);
     const after = JSON.parse(sim.save()) as Save;
-    expect(after.version).toBe(SAVE_VERSION);
+    expect(after.version).toBe(parseEngineIdentity(readEngineIdentity(wasm()))!.saveVersion);
     expect(after.money).toBe(data.money);
     expect(sim.state.tower.totalPopulation()).toBe(population);
     // Units survive the hop byte-for-byte (only the version stamp changed),

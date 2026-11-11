@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
+import { kindFacts } from "../tests/catalogKinds";
 import { positionPanels, selectedScreenRect } from "./panelAnchoring";
-import { facilityFloors } from "../engine/facilities";
 import type { GameApp } from "../main";
 
 /**
@@ -122,7 +122,7 @@ describe("positionPanels", () => {
     });
     positionPanels(app);
 
-    const topFloor = unit.floor + facilityFloors("cinema") - 1;
+    const topFloor = unit.floor + kindFacts("cinema").floors - 1;
     const expectedRect = {
       x: worldToScreenX(unit.x),
       y: worldToScreenY(topFloor),
@@ -216,7 +216,7 @@ describe("selectedScreenRect", () => {
     const unit = { x: 15, width: 31, floor: 10, kind: "cinema" };
     const { app } = makeApp({ selected: { type: "unit" } as GameApp["selected"], unit });
 
-    const topFloor = unit.floor + facilityFloors("cinema") - 1; // 10 + 2 - 1 = 11
+    const topFloor = unit.floor + kindFacts("cinema").floors - 1; // 10 + 2 - 1 = 11
     expect(selectedScreenRect(app)).toEqual({
       x: worldToScreenX(15), // 30
       y: worldToScreenY(topFloor), // 33

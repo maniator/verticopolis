@@ -1,6 +1,6 @@
 <!--
 Thanks for contributing to Verticopolis! Fill in the sections below.
-Keep the engine (src/engine/) free of DOM/rendering, and use American English.
+Keep the engine (engine-rs/) free of DOM/rendering, and use American English.
 -->
 
 ## What & why

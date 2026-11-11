@@ -1,20 +1,20 @@
 import { existsSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { resolve } from "node:path";
-import { rentOf } from "../../engine/econConfig";
 import { digest } from "./canonical";
 import type { CheckpointDetail, FxSlot } from "./checkpointDetail";
 import { REPO_ROOT, type EngineStart, type Outcome, type ScenarioEngine, type Start } from "./scenario";
 import type { ChargeOutcome } from "./chargeOps";
 import { decodeHeader } from "../../wasmhost/frameView";
 import { checkBinding, type WasmEngine, type WasmModule } from "../../dualrun/binding";
+import { readCatalog } from "../../dualrun/catalog";
+import type { GameMode } from "../../shared/types";
 
 /**
  * The Rust engine behind the scenario surface, through its WASM binding
  * (`engine-rs/src/wasm.rs` and `wasm/`, built by `npm run wasm:build` into
  * `engine-rs/pkg/`). Structured values cross the binding as JSON text; this
- * adapter parses them and nothing more, so a scenario drives the port exactly
- * as it drives the TypeScript engine.
+ * adapter parses them and nothing more.
  */
 
 export const WASM_PKG = resolve(REPO_ROOT, "engine-rs/pkg/verticopolis_engine.js");
@@ -96,6 +96,22 @@ export function wasmCheckpointDetail(handle: WasmEngine): Omit<CheckpointDetail,
 }
 
 interface SavedUnit { id: number; kind: string; rent?: number; noRate?: boolean }
+
+const defaultRents = new Map<GameMode, ReadonlyMap<string, number>>();
+
+/** The rent a unit charges as its save carries it: nothing when off the
+ *  market (No Rate), its own price when it has one, else the kind's default
+ *  from the engine's catalog for `mode`, and 0 for a kind with no rent. */
+function rentOf(u: SavedUnit, mode: GameMode): number {
+  if (u.noRate) return 0;
+  if (u.rent !== undefined) return u.rent;
+  let rents = defaultRents.get(mode);
+  if (!rents) {
+    rents = new Map(readCatalog(wasm(), mode).facilities.flatMap((f) => (f.rent ? [[f.key, f.rent.default] as const] : [])));
+    defaultRents.set(mode, rents);
+  }
+  return rents.get(u.kind) ?? 0;
+}
 interface SavedTransport { id: number; kind: string; cars: number }
 
 /** The `reload` command's save round trip on a binding instance; the caller
@@ -128,7 +144,7 @@ export function wasmEngine(handle: WasmEngine): ScenarioEngine {
       const text = live().unitAt(i32(floor, "floor"), i32(x, "x"));
       if (text === undefined) return null;
       const u = JSON.parse(text) as SavedUnit;
-      return { id: u.id, kind: u.kind, rent: rentOf(u) };
+      return { id: u.id, kind: u.kind, rent: rentOf(u, live().mode() as GameMode) };
     },
     transportAt: (floor, x) => {
       const text = live().transportAt(i32(floor, "floor"), i32(x, "x"));
@@ -189,8 +205,7 @@ export function wasmEngine(handle: WasmEngine): ScenarioEngine {
   };
 }
 
-/** Start the Rust engine from a scenario's `start`, the way `startTsEngine`
- *  starts the TypeScript one: a new game by seed and mode, or a `.vctower`
+/** Start the Rust engine from a scenario's `start`: a new game by seed and mode, or a `.vctower`
  *  fixture through the import path with the mode overridden when given. */
 export const startWasmEngine: EngineStart = (start) => wasmEngine(startWasmHandle(start));
 

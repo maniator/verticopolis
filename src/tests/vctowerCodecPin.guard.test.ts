@@ -81,16 +81,12 @@ const RULES: Rule[] = [
       "src/storage/SaveGame.ts": "defines the test referee (`import`, `importText`) and its checks",
       "src/storage/saveTextRead.ts": "defines `importObjection` and `looksLikeTowerSave` for that referee",
       "src/storage/vctowerContainer.ts": "defines `decodeVctower`, the referee the conformance suites read files with",
-      "src/engine/port/files.ts": "the TypeScript engine's file reader, a test referee until #1336 deletes it",
-      "src/engine/port/tsEngine.ts": "the TypeScript engine's `loadVctower`, the same referee",
     },
   },
   {
     name: "the TypeScript .vctower writer is not the player's export",
     banned: /\b(?:SaveGame\s*\??\.\s*export|SaveGame\s*\[\s*["'`]export|writeVctower)\b/,
     allowed: {
-      "src/engine/port/files.ts": "the TypeScript engine's file writer, a test referee until #1336 deletes it",
-      "src/engine/port/tsEngine.ts": "the TypeScript engine's `exportVctower`, the same referee",
       "src/game/crashReport.ts": "the crash report packs the last good save text without the engine, which may be the thing that failed",
     },
   },
@@ -127,9 +123,7 @@ describe("the Rust codec pin (#1522 item 1)", () => {
     expect(lifecycle).toContain("port.exportVctower(");
   });
 
-  it("the .TDT codec the TypeScript engine borrows is the Rust one, and nothing in src/storage parses or writes a 1994 file", () => {
-    const codec = code(FILES.find((f) => f.rel === "src/engine/port/tdtCodec.ts")!.text);
-    for (const call of ["engine.loadTdt(", "engine.tdtExport("]) expect(codec, call).toContain(call);
+  it("nothing in src/storage parses or writes a 1994 file", () => {
     // `src/storage/tdt*.ts` holds the report wording only; a parser or writer there would be a second codec.
     const codecs = FILES.filter((f) => /^src\/storage\/tdt/.test(f.rel) && /\b(?:DataView|readUint\w*|getUint\w*|setUint\w*)\b/.test(code(f.text))).map((f) => f.rel);
     expect(codecs).toEqual([]);

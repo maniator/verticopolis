@@ -1,29 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { SCHEDULE_HOURS } from "../../engine/elevatorSchedule";
 import type { ElevatorSchedule } from "../../shared/engineTypes";
-import { autoTuneProposal } from "../../engine/port/queries";
-import type { AutoTuneProposal, EnginePort } from "../../simport/enginePort";
-import { scheduleSlots } from "../../simport/scheduleSlots";
-import { telemetryDocument } from "../../wasmhost/telemetry";
-import { MIXED, WARM, COLD, measure, ring, tower, type Slots } from "../fixtures/scheduleTower";
-import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
+import { SCHEDULE_HOURS, scheduleSlots } from "../../simport/scheduleSlots";
+import { MIXED, WARM, COLD, measure, openEngine, ring, tower, type Slots } from "../fixtures/scheduleTower";
+import { hasWasmPackage } from "../conformance/wasmEngine";
 
 /**
- * Auto-tune lives in the engine (#1550): the Rust query, through the real
- * WASM binding, against the TypeScript reference it replaces, over the same
- * saved tower and the same measured telemetry. Telemetry never rides a save,
- * so the Rust engine is handed the reference's document the way the gallery's
- * engine leg is.
+ * Auto-tune lives in the engine (#1550): the Rust query through the real WASM
+ * binding. The proposal itself (the tuned rows, the seeded and kept homes, the
+ * cold-day gate) is pinned in Rust by `schedule_authoring_tests`; here the
+ * binding is shown to offer it in Modern and never in Classic, to name its
+ * refusals, and to write nothing when asked. The TypeScript reference this
+ * suite once compared it with went with the TypeScript engine (#1875).
  */
-
-
-type RustPort = EnginePort & {
-  free(): void;
-  seedElevatorTelemetry(json: string): void;
-  elevatorTelemetry(): string;
-  scheduleShaft(id: number, slots: Float64Array): Float64Array;
-  serialize(): string;
-};
 
 const DRAFTS: ReadonlyArray<readonly [string, ((cars: number) => ElevatorSchedule) | undefined]> = [
   ["no draft", undefined],
@@ -46,31 +34,35 @@ const ORIGINS = [
   ["the lobby dominates", { 1: 30, 12: 2 }, { 1: 30, 15: 2 }],
 ] as const;
 
-const asJson = (p: AutoTuneProposal) => JSON.parse(JSON.stringify(p)) as AutoTuneProposal;
+/** The fewest proposals Modern offers over the grid below; the warm shafts
+ *  alone give well over this. */
+const MODERN_MIN_AVAILABLE = 40;
+/** The fewest questions the grid asks, so the counts above are not empty. */
+const MIN_ASKED = 100;
+/** The status a successful schedule command answers with. */
+const DONE = 1;
 
-describe.skipIf(!hasWasmPackage())("the Rust Auto-tune proposal matches the TypeScript reference", () => {
+describe.skipIf(!hasWasmPackage())("the Rust Auto-tune proposal through the binding", () => {
   for (const mode of ["classic", "modern"] as const) {
     it(`${mode}: every shaft, measurement, draft and day tab`, () => {
       const f = tower(mode);
       const kinds = [f.standard, f.service, f.express] as const;
       let available = 0;
-      let compared = 0;
-      for (const [oname, wdO, weO] of ORIGINS) {
-        for (const [mname, slots] of MEASURES) {
-          kinds.forEach((id, i) => measure(f.sim, id, i === 1 ? [slots[1], slots[0]] : slots, wdO, weO));
-          const rust = wasm().Engine.fromSave(JSON.stringify(f.sim.serialize())) as unknown as RustPort;
+      let asked = 0;
+      for (const [, wdO, weO] of ORIGINS) {
+        for (const [, slots] of MEASURES) {
+          kinds.forEach((id, i) => measure(f, id, i === 1 ? [slots[1], slots[0]] : slots, wdO, weO));
+          const rust = openEngine(f);
           try {
-            rust.seedElevatorTelemetry(JSON.stringify(telemetryDocument(f.sim)));
             for (const id of kinds) {
-              const cars = f.sim.tower.getTransport(id)!.cars;
-              for (const [dname, make] of DRAFTS) {
+              const cars = Number(f.draft.tower.getTransport(id)!.cars);
+              for (const [, make] of DRAFTS) {
                 for (const weekend of [false, true]) {
                   const slots = make ? scheduleSlots(make(cars)) : new Float64Array(0);
-                  const want = autoTuneProposal(f.sim, id, slots, weekend);
-                  const got = asJson(rust.autoTuneProposal(id, slots, weekend));
-                  expect(got, `${mode} ${oname} / ${mname} / ${dname} / weekend=${weekend} / shaft ${id}`).toEqual(want);
-                  compared++;
+                  const got = rust.autoTuneProposal(id, slots, weekend);
+                  asked++;
                   if (got.status === "available") available++;
+                  else expect(got.status, `${mode} shaft ${id}`).toBe(mode === "classic" ? "unavailable-in-mode" : "insufficient-data");
                 }
               }
             }
@@ -79,55 +71,19 @@ describe.skipIf(!hasWasmPackage())("the Rust Auto-tune proposal matches the Type
           }
         }
       }
-      expect(compared).toBeGreaterThan(100);
+      expect(asked).toBeGreaterThan(MIN_ASKED);
       // Classic must never offer a proposal; Modern must offer plenty.
       if (mode === "classic") expect(available).toBe(0);
-      else expect(available).toBeGreaterThan(40);
-    });
-
-    it(`${mode}: the seed on 1, 2 and 3 cars, whichever floor is busiest`, () => {
-      const f = tower(mode);
-      const kinds = [f.standard, f.service, f.express] as const;
-      for (const cars of [1, 2, 3]) {
-        for (const id of kinds) f.sim.tower.setCars(id, cars);
-        for (const [oname, wdO, weO] of ORIGINS) {
-          for (const id of kinds) measure(f.sim, id, MEASURES[0][1], wdO, weO);
-          const rust = wasm().Engine.fromSave(JSON.stringify(f.sim.serialize())) as unknown as RustPort;
-          try {
-            rust.seedElevatorTelemetry(JSON.stringify(telemetryDocument(f.sim)));
-            for (const id of kinds) {
-              const none = new Float64Array(0);
-              const want = autoTuneProposal(f.sim, id, none, false);
-              const got = asJson(rust.autoTuneProposal(id, none, false));
-              expect(got, `${mode} ${cars} cars / ${oname} / shaft ${id}`).toEqual(want);
-            }
-          } finally {
-            rust.free();
-          }
-        }
-      }
+      else expect(available).toBeGreaterThan(MODERN_MIN_AVAILABLE);
     });
 
     it(`${mode}: stairs, missing ids and unreadable drafts`, () => {
       const f = tower(mode);
-      const rust = wasm().Engine.fromSave(JSON.stringify(f.sim.serialize())) as unknown as RustPort;
+      const rust = openEngine(f);
       try {
-        const bad = scheduleSlots({ activeCars: { weekday: Array(SCHEDULE_HOURS).fill(1) } });
-        bad[0] = 7;
-        const cases: Array<[string, number, Float64Array]> = [
-          ["stairs", f.stairs, new Float64Array(0)],
-          ["a missing id", 9999, new Float64Array(0)],
-          ["a fractional id", 1.5, new Float64Array(0)],
-          ["a short draft", f.standard, new Float64Array(3)],
-          ["a bad row flag", f.standard, bad],
-          ["stairs with a bad draft", f.stairs, bad],
-        ];
-        for (const [name, id, slots] of cases) {
-          const want = autoTuneProposal(f.sim, id, slots, false);
-          expect(asJson(rust.autoTuneProposal(id, slots, false)), name).toEqual(want);
-        }
-        expect(rust.autoTuneProposal(f.stairs, new Float64Array(0), false).status).toBe("not-an-elevator");
-        expect(rust.autoTuneProposal(9999, new Float64Array(0), false).status).toBe("missing-shaft");
+        const none = new Float64Array(0);
+        expect(rust.autoTuneProposal(f.stairs, none, false).status).toBe("not-an-elevator");
+        expect(rust.autoTuneProposal(9999, none, false).status).toBe("missing-shaft");
         expect(rust.autoTuneProposal(f.standard, new Float64Array(3), false).status).toBe("invalid-draft");
       } finally {
         rust.free();
@@ -137,10 +93,9 @@ describe.skipIf(!hasWasmPackage())("the Rust Auto-tune proposal matches the Type
 
   it("asking never writes: the save, the schedule and the undo signature stay put", () => {
     const f = tower("modern");
-    measure(f.sim, f.standard, [WARM, MIXED], { 1: 3, 12: 9 }, { 1: 2 });
-    const rust = wasm().Engine.fromSave(JSON.stringify(f.sim.serialize())) as unknown as RustPort;
+    measure(f, f.standard, [WARM, MIXED], { 1: 3, 12: 9 }, { 1: 2 });
+    const rust = openEngine(f);
     try {
-      rust.seedElevatorTelemetry(JSON.stringify(telemetryDocument(f.sim)));
       const before = rust.serialize();
       const signature = rust.undoSignature();
       const hourlyBefore = rust.elevatorTelemetry();
@@ -158,7 +113,7 @@ describe.skipIf(!hasWasmPackage())("the Rust Auto-tune proposal matches the Type
         activeCars: { weekday: [...proposal.weekday!], weekend: [...proposal.weekend!] },
         homeFloors: [...proposal.homeFloors],
       });
-      expect(rust.scheduleShaft(f.standard, slots)[0]).toBe(1);
+      expect(rust.scheduleShaft(f.standard, slots)[0]).toBe(DONE);
       expect(rust.shaftSchedule(f.standard)).toHaveLength(slots.length);
     } finally {
       rust.free();

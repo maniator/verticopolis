@@ -32,7 +32,6 @@ export const SURFACES: Record<string, string[]> = {
     "vite.config.ts",
     "src/build/",
   ],
-  "TypeScript engine": ["src/engine/"],
   "WASM binding": [
     "engine-rs/src/wasm.rs",
     "engine-rs/src/wasm/",

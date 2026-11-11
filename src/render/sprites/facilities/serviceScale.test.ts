@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
-import type { Unit } from "../../../shared/types";
+import { kindFacts } from "../../../tests/catalogKinds";
+import type { FacilityKind, Unit } from "../../../shared/types";
 import type { DrawCtx } from "../common";
-import { FACILITIES, facilityFloors } from "../../../engine/facilities";
 import { TILE, FLOOR } from "../../scale";
 import { refMap } from "./serviceKit";
 import { drawParking, drawParkingRamp } from "./garage";
@@ -205,9 +205,9 @@ describe("service sprites on the grid they are authored for", () => {
       // facility data, which the SimTower widths made wider than the art for
       // security, medical, housekeeping and recycling. The map stretches the art
       // uniformly to that box until it is redrawn.
-      const kind = name as keyof typeof FACILITIES;
-      expect(facilityFloors(kind)).toBe(sp.floors);
-      const boxW = FACILITIES[kind].width * TILE;
+      const kind = name as FacilityKind;
+      expect(kindFacts(kind).floors).toBe(sp.floors);
+      const boxW = kindFacts(kind).width * TILE;
       refMapCalls.length = 0;
       paint(sp, boxW, sp.floors * FLOOR);
       expect(refMapCalls.length).toBeGreaterThan(0);

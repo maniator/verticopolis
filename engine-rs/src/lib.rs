@@ -1,7 +1,8 @@
-//! The Verticopolis engine in Rust: a port of `src/engine` that the
-//! conformance suite in `conformance/` holds to the TypeScript engine bit
-//! for bit. Functions keep the shape of their TypeScript originals so the two
-//! can be read side by side.
+//! The Verticopolis engine in Rust: a port of the TypeScript engine that
+//! used to live in `src/engine` (removed in #1875; its rules are Rust tests
+//! now, `docs/architecture/ts-engine-retirement-map.md`). The conformance
+//! suite in `conformance/` pins its answers. Comments that name a
+//! `src/engine` file name the TypeScript original a function was ported from.
 #![allow(
     clippy::too_many_arguments,
     clippy::type_complexity,

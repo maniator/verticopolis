@@ -104,11 +104,10 @@ Verticopolis has **two test tiers**:
     purpose, in the same PR. See
     [conformance/README.md](./conformance/README.md).
 
-    **One engine, with a TypeScript reference.** `engine-rs/` is the engine the
-    game runs (app 2.66.0, engine crate 1.0.0). It is a Rust port of
-    `src/engine/`, which the shipped game no longer runs: the TypeScript engine
-    stays only for the tests that still run it, until its code is deleted
-    (#1875). The conformance lock, the goldens and the fuzz corpus are the
+    **One engine.** `engine-rs/` is the engine the game runs (app 2.66.0,
+    engine crate 1.0.0). It began as a Rust port of a TypeScript engine, which
+    was deleted in #1875; the rules its tests held are Rust tests now
+    (`docs/architecture/ts-engine-retirement-map.md`). The conformance lock, the goldens and the fuzz corpus are the
     Rust engine's own regression records, written by the Rust run and checked
     natively (`cargo run --release --features conformance --bin conformance`)
     and through the WASM binding from Node with
@@ -116,9 +115,7 @@ Verticopolis has **two test tiers**:
     the frame-day golden: a day on every fixture at every speed, played
     through the engine's own step driver, pinned every hour.
     The `.TDT` codec has one
-    implementation, `engine-rs/src/tdt/`, and the TypeScript engine reads and
-    writes `.TDT` files through the WASM package
-    (`src/engine/port/tdtCodec.ts`). The same command runs the `.vctower`
+    implementation, `engine-rs/src/tdt/`. The same command runs the `.vctower`
     writer's test, `conformanceWasmVctower.integration.test.ts`, which writes
     every fixture with the engine and reads it back through the web game's
     readers. Every build runs the WASM engine alone
@@ -136,20 +133,15 @@ Verticopolis has **two test tiers**:
     Actions cache, keyed on the engine's source hash, and builds it once per
     engine change (`.github/actions/engine-wasm`); Vercel builds it on every
     deploy through `scripts/vercel-build.sh`. Every build (`npm run build`, a dev serve and the
-    deploy alike) is the Rust-only build: the WASM engine is the only engine, the
-    TypeScript step loop is swapped out (Vitest keeps the real loop), and an
-    engine that cannot start stops the game with a message instead of
+    deploy alike) is the Rust-only build: the WASM engine is the only engine, and
+    an engine that cannot start stops the game with a message instead of
     falling back. Its postbuild check (`scripts/verify-engine-bundle.ts`)
-    reads the emitted sourcemaps and fails a production build that ships any
-    TypeScript engine module (#921). A `VC_TOOLING=1` build may ship only the
-    modules `scripts/engine-bundle.allow.txt` lists, for the harnesses'
-    hand-built tower, and fails when a listed one no longer ships (delete its
-    line: the list only shrinks).
+    reads the emitted sourcemaps and fails a build that ships test code, a
+    production build that ships the harnesses' tower (#921), and a build that
+    does not precache the engine package.
     `?engine=` and `vc.engine` are ignored. See
     `docs/performance/player-bundle.md` for what still ships and why. A simulation change lands in the
-    Rust engine. The TypeScript engine changes only when the shared lock, a parity test or the
-    catalog digest needs it (for example the catalog size and price tables both engines read), and
-    the PR says why; no feature or fix is ported to it for its own sake. An engine PR that adds a branch adds a scenario that reaches it;
+    Rust engine. An engine PR that adds a branch adds a scenario that reaches it;
     the `rust-coverage` job (`cargo llvm-cov`, line floor in
     `engine-rs.yml`) is how review checks that, and the floor only moves up.
     The catalog every frontend reads (prices, sizes and build rules,
@@ -158,10 +150,10 @@ Verticopolis has **two test tiers**:
     `conformanceWasm.integration.test.ts`, writes it with the same
     regeneration switch; a Rust test, the referee and the WASM suite check
     it), so a changed price or size moves that digest in the PR that changes
-    it. The TypeScript reference's catalog is not pinned.
+    it.
     Forged-save handling is pinned the same way by
-    `conformance/loader-cases.json` (`loaderCases.integration.test.ts` writes
-    it, a Rust test replays it), and the `.TDT` codec by
+    `conformance/loader-cases.json` (written by the retired TypeScript loader
+    and frozen since #1875; a Rust test replays it), and the `.TDT` codec by
     `conformance/tdt-cases.json` (frozen; `cargo run --release --features conformance --bin tdt`
     and a Rust test replay it, and a changed `.TDT` byte moves a hash in the PR that changes it).
     The codec also has a Rust-only fuzz (`engine-rs/tests/tdt_fuzz.rs`):
@@ -203,8 +195,7 @@ Verticopolis has **two test tiers**:
     read-only copy of the engine's own save. A fixture's raw tower edits go
     through `sim.setup(draft => ...)`, which opens the save as a draft, edits
     it and loads it back, and works only before the first tick since a load.
-    The same body runs on the Rust engine and on `TsEngine`, so the Rust
-    engine is the authority and the TypeScript reference keeps its coverage.
+    The body runs on the Rust engine.
     List a converted file in `src/tests/portKit/converted.txt` (a guard checks
     the list), and `npm run test:port` (part of `npm run test:wasm`) runs it
     with the Rust leg required. Without the engine package the Rust leg skips.
@@ -246,7 +237,7 @@ Verticopolis has **two test tiers**:
   (`milestone-screenshots`). `npm run e2e` runs both locally; pass
   `--project=chromium` or `--project=chromium-serial` for one.
   The suite runs on the Rust engine only, and so does the perf gate, whose
-  baseline is the Rust engine's. Nothing runs the TypeScript engine end to end.
+  baseline is the Rust engine's.
   Specs cover boot/integration, milestones, a full win, and visual baselines.
   See [`playwright.config.ts`](./playwright.config.ts) for how visual baselines
   are minted by CI (local runs smoke the flows but skip pixel comparison unless
@@ -365,7 +356,7 @@ the code under test did. The rules:
   canned answers those spies return. The test asserts the calls the code made
   (`toHaveBeenCalledWith`) and what the code did with the answers: the state
   it left, the value it returned, the DOM it drew. It never starts the Rust
-  engine or the TypeScript reference engine.
+  engine.
 - **A check that needs the real engine is an integration test**
   (`*.integration.test.ts`, listed in `test:wasm:host` when it needs the
   package) **or a Rust test** in `engine-rs/`.
@@ -388,8 +379,7 @@ fixtures), no `recordings` directory or `*:record` script, and no `it`/`test`
 in the unit, integration or e2e tiers and no Rust `#[test]` without an
 assertion. Its allowlist,
 `src/tests/testHonesty.allow.txt`, only shrinks, and each line carries its
-reason. `tsEngineTests.guard.test.ts` separately holds the tests that still run
-the TypeScript reference engine to a shrink-only list. The rest is review work:
+reason. The rest is review work:
 the review skills, Copilot and PR-Agent check it on every PR.
 
 ### Coverage floors
@@ -460,19 +450,6 @@ For a visual tour (layer diagram, the frame loop, the engine subsystems, input
 flow, and persistence) see **[ARCHITECTURE.md](./ARCHITECTURE.md)** (Mermaid
 diagrams). The prose conventions below are the source of truth.
 
-- **`src/engine/`**: the TypeScript reference engine (no DOM), kept as a test
-  referee until it is deleted; the game runs the Rust engine. Until the deletion,
-  the shipped bundle still carries part of it, and the boot catalog check
-  (`src/wasmhost/catalogCheck.ts`) runs its `catalogFor` (#921). Deterministic and
-  heavily unit-tested. `Simulation` is the orchestrator; cohesive subsystems live in
-  their own modules (`ElevatorDispatch`, `EventSystem`, `EconomySystem`, `Crowd`).
-  The extracted `EventSystem` and `EconomySystem` depend only on the narrow
-  `SimContext` interface, so each is testable on its own; `ElevatorDispatch` and
-  `Crowd` operate on `Tower` directly. Per-tower build caps and rule-sets live
-  in the Rust engine (`engine-rs/src/facilities.rs`, `engine-rs/src/rules.rs`),
-  the source of truth for gameplay rules, caps and tuning; `facilities.ts` and
-  `gameRules.ts` here keep the TypeScript copy, and the catalog digest holds
-  what the catalog publishes equal in both.
 - **`src/render/`**: canvas rendering and pixel-art sprites. Reads engine state,
   never mutates it.
 - **`src/ui/`**: DOM controls (palette, status bar, dialogs), using native
@@ -492,23 +469,9 @@ diagrams). The prose conventions below are the source of truth.
 - **`src/main.ts`**: the composition root that wires input, engine, and the
   game loop together.
 
-No shipped file imports `src/engine/` at run time (#921): an ESLint rule
-(`eslint.config.js`) refuses it everywhere outside the engine, the tests and
-the tooling files it names, because the shipped game runs the Rust engine only
-and retiring the TypeScript engine deletes that directory. Code reads the
-catalog through the
-catalog handle (`towerCatalog`, `catalogTypes`, which live in `src/catalog/` and
-are not counted), the frame view (`src/wasmhost/frameView.ts`) or an
-engine query (#868) instead. `src/tests/frontendEngineImports.guard.test.ts`
-scans every non-test file under `src/` except the engine, the tests, and the
-host and save code (`src/wasmhost/`, `src/dualrun/`, `src/storage/`), and pins
-each file's other runtime engine imports in `frontendEngineImports.ratchet.txt`,
-which holds only the tooling files the lint exempts; it also sees what the lint
-cannot (a dynamic `import()`, a URL, a glob). The list shrinks: delete a module
-from a file's line when the file stops importing it. It grows only with a
-reason the PR states and a reviewer accepts.
-A type-only import is not counted, so import a name you use only as a type with
-`import type`.
+Code reads the catalog through the catalog handle (`towerCatalog`,
+`catalogTypes`, in `src/catalog/`), the frame view
+(`src/wasmhost/frameView.ts`) or an engine query (#868).
 
 The tower grid is **two-layered**: a structural layer (floor/lobby) with a room
 layer sitting on top, exactly like the original SimTower corridor model.
@@ -521,12 +484,10 @@ behind the mode's rule methods in the Rust engine (`impl GameMode` in
 `engine-rs/src/rules.rs`), which the simulation calls (`self.mode.<x>()`). Some
 older Rust subsystems still test the mode inline (`self.mode.is_modern()`, a
 comparison with `GameMode::Classic`); move such a test behind a rule method
-when you change that code. The TypeScript reference engine keeps its copy
-behind the `GameRules` strategy object (`src/engine/gameRules.ts`,
-`CLASSIC_RULES` / `MODERN_RULES`) until it is deleted.
+when you change that code.
 
 **Tripwire: don't let mode logic smear.** Map the mode to behavior in one
-place, a rule method (`makeRules` in the TypeScript copy). Never write
+place, a rule method. Never write
 mode-specific *logic* inline (an `if` on the mode that computes something) in a
 subsystem. Add a rule method instead. The web UI does not decide a mode rule
 from the mode's name either: when it needs one (whether the stats panel shows
@@ -793,9 +754,8 @@ the crate entry.
 The update prompt also labels each update **Game update**, **Engine update** or
 **Game and engine update**, with a line such as "Rust engine 0.24.0 → 0.25.0"
 when an engine changed. Nobody writes the label. The build hashes the shell (all
-of `src` outside the engines, tests and the engine package) and records the
-Rust crate version, the Rust sources hash and the TypeScript engine's sources
-hash. `dist/version.json` carries them (`shell`, `engine`), the running client
+of `src` outside tests and the engine package) and records the Rust crate
+version and the Rust sources hash. `dist/version.json` carries them (`shell`, `engine`), the running client
 compares its own (`__BUILD_FINGERPRINT__`), and `classifyUpdate` in
 `src/pwaUpdateInfo.ts` picks the label. An older build with no fingerprint shows
 the plain prompt.
@@ -931,8 +891,6 @@ alone.
   boundary rules to `engine-rs/tests/independence.rs`, which keeps the simulation
   free of host access (files, network, console, clock; a few named referee
   functions may read fixtures) and the JavaScript binding inside `src/wasm.rs` and `src/wasm/`.
-- **Keep `src/engine/` free of DOM/rendering** so the simulation stays
-  deterministic and unit-testable.
 - **Show visual/gameplay changes with real screenshots** in the PR's
   *Screenshots / recordings* section: committed images, not prose descriptions.
   See [docs/screenshots.md](./docs/screenshots.md) for how to capture, commit,
@@ -964,7 +922,6 @@ alone.
 | `src/simport/` | `EnginePort`, the one synchronous interface the game uses to call the engine, and the shared view reader that decodes the engine's frame. |
 | `src/dualrun/`, `src/wasmhost/` | The WASM binding and its declaration (`engine.d.ts`); loading the engine package, its build metadata and the catalog checks. |
 | `src/shared/` | Types and small helpers shared across the game. |
-| `src/engine/` | The old TypeScript engine, kept only as a test reference while it is deleted. Not part of the shipped game; do not add a runtime import of it. |
 | `src/game/` | Game controllers: the testable logic behind the composition root. |
 | `src/render/` | Canvas rendering and pixel-art sprites (`sprites.ts`, `sprites/**`, `pixelSprites.ts`). Reads engine state, never mutates it. |
 | `src/render/excalibur/` | The Excalibur/WebGL engine wrapper (unit-exempt, e2e-covered). |

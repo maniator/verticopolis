@@ -29,15 +29,10 @@ import { portDeps } from "../../game/portDeps.fixture";
 import { INVALID_COMMAND, MAX_TEXT } from "../../simport/request";
 import { PortEvents } from "../../simport/portEvents";
 import { hasWasmPackage } from "../conformance/wasmEngine";
-import { installTdtCodec } from "../conformance/tdtWasm";
 
 /** The `.TDT` tests read and write files through the Rust package, so they run
  *  where it is built (CI builds it for every project). */
-const itTdt = (name: string, body: () => Promise<void>) =>
-  it.skipIf(!hasWasmPackage())(name, async () => {
-    installTdtCodec();
-    await body();
-  });
+const itTdt = (name: string, body: () => Promise<void>) => it.skipIf(!hasWasmPackage())(name, body);
 import { saveOf, loadAuto, loadSlotSim, withPorts } from "../fixtures/saveText";
 
 /** Coverage companion to gameControllers.integration.test.ts: the same harness idioms

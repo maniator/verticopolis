@@ -94,7 +94,7 @@ affects_deploy() {
     # Standalone dev scripts that no build step imports or runs.
     scripts/screenshot* | scripts/scenes/*) return 1 ;;
     scripts/perf-* | scripts/fuzz-* | scripts/posthog-* | scripts/rollback-*) return 1 ;;
-    scripts/test-port.ts | scripts/derive-fixture.ts | scripts/loader-case-dump.ts) return 1 ;;
+    scripts/test-port.ts | scripts/derive-fixture.ts) return 1 ;;
     scripts/release.ts | scripts/version-check.ts) return 1 ;;
     scripts/engine-bundle-size.ts | scripts/engine-compat.ts | scripts/export-atlas.ts | scripts/atlas-bundle.ts) return 1 ;;
     scripts/persistence-failures.* | scripts/reliability-coverage.* | scripts/engine-reliability.* | scripts/backlog-priority-labels.*) return 1 ;;

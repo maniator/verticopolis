@@ -12,8 +12,7 @@
 import { writeFileSync, mkdirSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { Simulation } from "../../src/engine/Simulation";
-import { Crowd } from "../../src/engine/Crowd";
+import { draftTower } from "../../src/tests/portKit/drafts";
 import { buildTDT } from "../../src/tests/conformance/tdtWasm";
 import type { SerializedGame } from "../../src/shared/types";
 
@@ -33,7 +32,7 @@ const BANDS = Array.from({ length: ZONES }, (_, i) => {
 
 function must(ok: boolean, m: string): void { if (!ok) throw new Error(m); }
 
-const sim = new Simulation(777, "classic");
+const sim = draftTower(777, "classic");
 const t = sim.tower;
 for (let x = 0; x < TOWER_W; x++) must(t.place("lobby", 1, x).ok, `lobby 1,${x}`);
 for (let f = 2; f <= TOP; f++) for (let x = 0; x < TOWER_W; x++) must(t.place("floor", f, x).ok, `floor ${f},${x}`);
@@ -43,10 +42,6 @@ for (let k = 0; k < ZONES; k++) {
 }
 const officeFloors = new Set<number>();
 for (const b of BANDS) { must(t.place("office", b.floor, OFFICE_X).ok, `office ${b.name}`); officeFloors.add(b.floor); }
-
-const crowd = new Crowd();
-console.log("OUR ROUTER (Classic, current ride budget) from floor 1:");
-for (const b of BANDS) console.log(`  ${b.name} floor ${b.floor} (${b.rides} rides): ${crowd.reachable(t, 1, b.floor) ? "REACHABLE" : "REFUSED"}`);
 
 const save: SerializedGame = sim.serialize();
 const seedFloors = new Set(BANDS.filter((b) => b.seed).map((b) => b.floor));

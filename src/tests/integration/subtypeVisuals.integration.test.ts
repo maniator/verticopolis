@@ -1,10 +1,22 @@
 import { describe, it, expect } from "vitest";
 import { LOT_WIDTH, newSeededDraft } from "../portKit/draftFixtures";
 import type { Draft } from "../portKit/drafts";
-import { AMUSEMENTS_SUBTYPES, BOUTIQUE_SUBTYPES, CLINIC_SUBTYPES, FASTFOOD_SUBTYPES, FITNESS_SUBTYPES, FOODHALL_SUBTYPES, RESTAURANT_SUBTYPES, SHOP_SUBTYPES } from "../../engine/retailSubtypes";
+import { catalogFor } from "../catalogFixture";
+import { catalogFacility } from "../../catalog/catalogTypes";
 import { AMUSEMENTS_LOOKS, BOUTIQUE_LOOKS, CLINIC_LOOKS, FASTFOOD_LOOKS, FITNESS_LOOKS, FOODHALL_LOOKS, RESTAURANT_LOOKS, SHOP_LOOKS } from "../../render/pixelSprites";
 import { buildTDT, describeWithCodec, parseTDT } from "../conformance/tdtWasm";
 import type { FacilityKind } from "../../shared/types";
+
+/** `kind`'s subtypes as the engine's Modern catalog lists them. */
+const subtypes = (kind: FacilityKind): readonly string[] => catalogFacility(catalogFor("modern"), kind).subtypes ?? [];
+const FASTFOOD_SUBTYPES = subtypes("fastFood");
+const RESTAURANT_SUBTYPES = subtypes("restaurant");
+const SHOP_SUBTYPES = subtypes("shop");
+const FOODHALL_SUBTYPES = subtypes("foodHall");
+const AMUSEMENTS_SUBTYPES = subtypes("amusements");
+const BOUTIQUE_SUBTYPES = subtypes("boutiqueBay");
+const FITNESS_SUBTYPES = subtypes("fitnessClub");
+const CLINIC_SUBTYPES = subtypes("clinic");
 
 /**
  * Guards the retail-subtype visual system:

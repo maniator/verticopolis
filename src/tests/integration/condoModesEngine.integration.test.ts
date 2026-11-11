@@ -1,6 +1,7 @@
 import { it, expect } from "vitest";
 import { newSeededDraft, lay, mustBuild, placeUnit, LOT_WIDTH } from "../portKit/draftFixtures";
-import { ECON } from "../../engine/econConfig";
+import { catalogFacility } from "../../catalog/catalogTypes";
+import { catalogFor } from "../catalogFixture";
 import type { SerializedGame } from "../../shared/types";
 import { PortSim, describeEngines, type Leg } from "../portKit/portSim";
 
@@ -11,6 +12,14 @@ import { PortSim, describeEngines, type Leg } from "../portKit/portSim";
  *  ladder first. */
 
 const C = Math.floor(LOT_WIDTH / 2);
+/** The price an unpriced condo reads: the engine's band default
+ *  (`rent_config` in engine-rs/src/econ.rs), which the Modern catalog
+ *  publishes as its condo band. */
+function bandDefaultCondoPrice(): number {
+  const rent = catalogFacility(catalogFor("modern"), "condo").rent;
+  if (rent?.shape !== "band") throw new Error("the Modern condo is priced on a band");
+  return rent.default;
+}
 /** The most hours a sale or a buy-back is given to happen. */
 const MAX_HOURS = 24 * 40;
 
@@ -90,6 +99,6 @@ describeEngines("Classic condo prices written mid-run", (leg: Leg) => {
     );
     // The sale records its asking price on the unit, so the price no longer
     // depends on the kind default (which a future build could move).
-    expect(condoIn(sim, id).rent).toBe(ECON.rent.condo.default);
+    expect(condoIn(sim, id).rent).toBe(bandDefaultCondoPrice());
   });
 });

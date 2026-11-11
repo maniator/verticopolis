@@ -1,116 +1,89 @@
 import { describe, it, expect, afterAll } from "vitest";
 import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
-import type { Simulation } from "../../engine/Simulation";
-import type { Unit } from "../../shared/types";
+import type { SerializedGame, Unit, VacateReason } from "../../shared/types";
 import {
   CONFORMANCE_DIR,
   firstDivergence,
   loadScenario,
-  reloadTsSim,
   runScenario,
-  startTsSim,
-  tsEngine,
   type Checkpoint,
   type ScenarioEngine,
-  PAST_THE_TYPESCRIPT_REFERENCE,
 } from "../conformance/scenario";
 import { hasWasmPackage, reloadWasmHandle, startWasmHandle, wasmEngine } from "../conformance/wasmEngine";
 import type { WasmEngine } from "../../dualrun/binding";
-import { tsDiagnosticFacts, type DiagnosticFacts } from "../diagnostics/tsDiagnosticFacts";
-import { inspectorDisagreements } from "../diagnostics/inspectorAgreement";
 
 /**
- * The diagnostics facts (#1215, facade slice 6c) against the TypeScript
- * reference, over the whole conformance corpus: every scenario runs on each
- * engine, and at every checkpoint (and each side of a reload) the facts of
- * every room are read before the state is hashed. The two runs must agree
- * fact for fact, and both must still reproduce the pinned checkpoints, which
- * is the proof that asking moves no hash on either engine. A third run, on
- * the TypeScript engine alone, renders the inspector card beside each read
- * and checks the reference against it (`inspectorAgreement`); it runs apart
- * because the card fills the demand memo for lines this family does not
- * read, which would shift the reference's later reads off the Rust ones.
+ * The diagnostics facts (#1215, facade slice 6c) over the whole conformance
+ * corpus on the Rust engine: every scenario runs, and at every checkpoint
+ * (and each side of a reload) the facts of every room are read before the
+ * state is hashed. The run must still reproduce the pinned checkpoints, which
+ * is the proof that asking moves no hash, and every room must answer facts
+ * about itself. What the facts say is held by the Rust tests
+ * (`diagnostics::tenant_tests`, `diagnostics::memo_tests`,
+ * `rule_tests::diagnostics_towers`); the TypeScript reference they were once
+ * compared with, and the inspector card it was checked against, are gone.
  * Floor and lobby tiles carry no tenant section; the first of each per read
- * is compared, the rest are skipped for time.
+ * is asked, the rest are skipped for time.
  */
 
 const SCENARIO_DIR = resolve(CONFORMANCE_DIR, "scenarios");
 const lock = JSON.parse(readFileSync(resolve(CONFORMANCE_DIR, "expected.json"), "utf8")) as { scenarios: Record<string, Checkpoint[]> };
 const files = readdirSync(SCENARIO_DIR)
-  .filter((f) => f.endsWith(".json") && !PAST_THE_TYPESCRIPT_REFERENCE.has(f))
+  .filter((f) => f.endsWith(".json"))
   .sort();
 
-
-/** One read: the ids asked about and the facts each engine gave. */
-interface Read { ids: number[]; facts: DiagnosticFacts[] }
+/** The parts of `diagnosticFacts(id)` this run tallies (the full shape is
+ *  `DiagnosticFacts` in engine-rs/src/diagnostics/mod.rs). */
+interface DiagnosticFacts {
+  id: number;
+  kind: string;
+  access?: string;
+  noRate?: string;
+  farWalk?: true;
+  lobby?: { slot: { needsSupport: boolean; clearFirst: boolean } | null };
+  gripe?: { cause: VacateReason; binding?: string };
+  wontLease?: { gripe?: { cause: VacateReason } };
+  notice?: { reason: VacateReason };
+}
 
 /** Every room, plus the first floor tile and the first lobby tile, in tower
  *  order. */
-function idsOf(units: readonly Unit[]): number[] {
+function unitsAsked(units: readonly Pick<Unit, "id" | "kind">[]): Pick<Unit, "id" | "kind">[] {
   const floor = units.find((u) => u.kind === "floor");
   const lobby = units.find((u) => u.kind === "lobby");
-  return units.filter((u) => (u.kind !== "floor" && u.kind !== "lobby") || u === floor || u === lobby).map((u) => u.id);
+  return units.filter((u) => (u.kind !== "floor" && u.kind !== "lobby") || u === floor || u === lobby);
 }
 
-/** The TypeScript engine with a read before each hash. */
-function tsWithFacts(sim: Simulation, reads: Read[]): ScenarioEngine {
-  const base = tsEngine(sim);
-  return {
-    ...base,
-    stateDigest: () => {
-      const ids = idsOf(sim.tower.units);
-      reads.push({ ids, facts: ids.map((id) => tsDiagnosticFacts(sim, sim.tower.getUnit(id)!)) });
-      return base.stateDigest();
-    },
-    reload: () => tsWithFacts(reloadTsSim(sim), reads),
-  };
-}
-
-/** The TypeScript engine with the card rendered beside each read; collects
- *  every line the two disagree on. */
-function tsWithCard(sim: Simulation, out: string[]): ScenarioEngine {
-  const base = tsEngine(sim);
-  return {
-    ...base,
-    stateDigest: () => {
-      for (const id of idsOf(sim.tower.units)) {
-        const u = sim.tower.getUnit(id)!;
-        for (const d of inspectorDisagreements(sim, u, tsDiagnosticFacts(sim, u))) out.push(`day ${sim.clock.day}, unit ${id} (${u.kind}): ${d}`);
-      }
-      return base.stateDigest();
-    },
-    reload: () => tsWithCard(reloadTsSim(sim), out),
-  };
-}
-
-/** The Rust engine with the same reads, asked about the ids the TypeScript
- *  run read at the same point (the pinned hashes hold the two towers equal). */
-function wasmWithFacts(handle: WasmEngine, want: readonly Read[], reads: Read[]): ScenarioEngine {
+/** The Rust engine with a read of every room's facts before each hash. */
+function wasmWithFacts(handle: WasmEngine, reads: DiagnosticFacts[][]): ScenarioEngine {
   const base = wasmEngine(handle);
   return {
     ...base,
     stateDigest: () => {
-      const ids = want[reads.length]?.ids ?? [];
-      const facts = ids.map((id) => {
-        const text = handle.diagnosticFacts(id);
-        if (text === undefined) throw new Error(`diagnosticFacts(${id}) answered nothing for a unit`);
-        return JSON.parse(text) as DiagnosticFacts;
-      });
-      reads.push({ ids, facts });
+      const save = JSON.parse(handle.serialize()) as SerializedGame;
+      reads.push(
+        unitsAsked(save.units).map((u) => {
+          const text = handle.diagnosticFacts(u.id);
+          if (text === undefined) throw new Error(`diagnosticFacts(${u.id}) answered nothing for a unit`);
+          const facts = JSON.parse(text) as DiagnosticFacts;
+          if (facts.id !== u.id || facts.kind !== u.kind) throw new Error(`diagnosticFacts(${u.id}) answered about ${facts.kind} ${facts.id}, not ${u.kind} ${u.id}`);
+          return facts;
+        }),
+      );
       return base.stateDigest();
     },
     reload: () => {
       const loaded = reloadWasmHandle(handle);
       base.free?.();
-      return wasmWithFacts(loaded, want, reads);
+      return wasmWithFacts(loaded, reads);
     },
   };
 }
 
 /** The sections the corpus reached when PR 1 was recorded; a corpus or
  *  engine change that stops reaching one fails the last test, so a section
- *  cannot drop out of the comparison unseen. */
+ *  cannot drop out of the run unseen. */
 const CORPUS_SECTIONS = [
   "access:cutOff", "access:notConnected", "access:reachable", "farWalk",
   "gripe:access", "gripe:lobbyFar", "gripe:noTransport", "gripe:noise", "gripe:rent", "gripe:transportFar",
@@ -119,8 +92,8 @@ const CORPUS_SECTIONS = [
   "wontLease:noise", "wontLease:rent", "wontLease:transportFar",
 ];
 
-/** Which sections the corpus exercised, so a gap in the comparison shows,
- *  and how many scenarios finished the comparison. */
+/** Which sections the corpus exercised, so a gap in the run shows,
+ *  and how many scenarios finished. */
 const seen = new Map<string, number>();
 let compared = 0;
 function tally(f: DiagnosticFacts): void {
@@ -137,23 +110,13 @@ function tally(f: DiagnosticFacts): void {
 describe.skipIf(!hasWasmPackage())("diagnostics facts through the WASM binding", () => {
   for (const file of files) {
     const scenario = loadScenario(resolve(SCENARIO_DIR, file));
-    it(`${scenario.id}: every room's facts match the TypeScript reference`, () => {
+    it(`${scenario.id}: every room answers its facts without moving a hash`, () => {
       const pinned = lock.scenarios[scenario.id];
-      if (!pinned) throw new Error(`${scenario.id} is not in the lock; regenerate it with the TypeScript run first`);
-      const tsReads: Read[] = [];
-      expect(firstDivergence(runScenario(scenario, (start) => tsWithFacts(startTsSim(start), tsReads)), pinned)).toBeNull();
-      const rsReads: Read[] = [];
-      expect(firstDivergence(runScenario(scenario, (start) => wasmWithFacts(startWasmHandle(start), tsReads, rsReads)), pinned)).toBeNull();
-      expect(rsReads.length).toBe(tsReads.length);
-      tsReads.forEach((want, i) => {
-        want.facts.forEach(tally);
-        want.ids.forEach((id, j) => {
-          expect(rsReads[i]!.facts[j], `${scenario.id}, read ${i}, unit ${id}`).toEqual(want.facts[j]);
-        });
-      });
-      const disagreements: string[] = [];
-      expect(firstDivergence(runScenario(scenario, (start) => tsWithCard(startTsSim(start), disagreements)), pinned)).toBeNull();
-      expect(disagreements.slice(0, 20)).toEqual([]);
+      if (!pinned) throw new Error(`${scenario.id} is not in the lock; regenerate it with the Rust run first`);
+      const reads: DiagnosticFacts[][] = [];
+      expect(firstDivergence(runScenario(scenario, (start) => wasmWithFacts(startWasmHandle(start), reads)), pinned)).toBeNull();
+      expect(reads.length, `${scenario.id}: one read per checkpoint`).toBe(pinned.length);
+      reads.forEach((read) => read.forEach(tally));
       compared += 1;
     }, 300_000);
   }
@@ -168,6 +131,6 @@ describe.skipIf(!hasWasmPackage())("diagnostics facts through the WASM binding",
   });
 
   afterAll(() => {
-    if (seen.size > 0) console.info(`diagnostics facts compared, by section: ${JSON.stringify(Object.fromEntries([...seen].sort()))}`);
+    if (seen.size > 0) console.info(`diagnostics facts read, by section: ${JSON.stringify(Object.fromEntries([...seen].sort()))}`);
   });
 });

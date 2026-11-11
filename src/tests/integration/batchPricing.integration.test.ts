@@ -1,8 +1,28 @@
-import { describe, it, expect } from "vitest";
+import { it, expect } from "vitest";
 import { newSeededDraft, LOT_WIDTH } from "../portKit/draftFixtures";
-import { rentOf, PRICED_KINDS } from "../../engine/econConfig";
-import type { FacilityKind, Unit } from "../../shared/types";
+import { catalogFacility } from "../../catalog/catalogTypes";
+import { catalogFor } from "../catalogFixture";
+import type { FacilityKind, GameMode, Unit } from "../../shared/types";
 import { PortSim, describeEngines, type Leg, type Draft } from "../portKit/portSim";
+
+/** Every kind the player prices, as the engine's Modern catalog publishes it
+ *  (Classic prices a subset of these). */
+const PRICED_KINDS = catalogFor("modern")
+  .facilities.filter((f) => f.rent !== null)
+  .map((f) => f.key);
+
+/** The price a room charges, read from the save the engine wrote: nothing while
+ *  it is off the market (No Rate), else its own price or, when it has none, the
+ *  default the catalog of `mode` publishes for its kind. Without a mode, the
+ *  kind must have one default in both modes (the office does). */
+function rentOf(u: Pick<Unit, "kind" | "rent" | "noRate">, mode?: GameMode): number {
+  if (u.noRate) return 0;
+  if (u.rent !== undefined) return u.rent;
+  const defaultIn = (m: GameMode) => catalogFacility(catalogFor(m), u.kind).rent?.default ?? 0;
+  if (mode) return defaultIn(mode);
+  if (defaultIn("classic") !== defaultIn("modern")) throw new Error(`${u.kind}'s default price differs by mode; pass the mode`);
+  return defaultIn("modern");
+}
 
 /** A served floor-2 tower of `mode` with `n` rooms of `kind`, `width` apart
  *  (all still on the default price). The fixture asserts its own
@@ -91,7 +111,7 @@ describeEngines("Batch pricing", (leg) => {
     expect(res.skippedSold).toBe(1);
     expect(res.matched).toBe(2);
     expect(res.eligible).toBe(1);
-    const rent = (id: number) => rentOf(rooms().find((u) => u.id === id)!);
+    const rent = (id: number) => rentOf(rooms().find((u) => u.id === id)!, "modern");
     expect(rent(soldId)).toBe(160_000); // sold one untouched (still the canon 2×-cost default)
     expect(rent(openId)).toBe(200_000);
   });
@@ -151,19 +171,6 @@ describeEngines("Batch pricing", (leg) => {
     const res = sim.rentBatch("office", 15_000, { onlyDefaultPriced: true })!;
     expect(res.skippedCustom).toBe(0);
     expect(res.changed).toBe(3);
-  });
-});
-
-describe("No-Rate units earn nothing until repriced (rentOf)", () => {
-  it("rentOf returns 0 for a No-Rate unit of every priced kind, ignoring any stored rent", () => {
-    for (const kind of PRICED_KINDS) {
-      expect(rentOf({ kind, noRate: true })).toBe(0);
-      // An override is inert while the unit is off the market.
-      expect(rentOf({ kind, rent: 99_999, noRate: true })).toBe(0);
-    }
-    // Flag clear (undefined/false) reads the price normally.
-    expect(rentOf({ kind: "office", rent: 12_000 })).toBe(12_000);
-    expect(rentOf({ kind: "office", rent: 12_000, noRate: false })).toBe(12_000);
   });
 });
 

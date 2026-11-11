@@ -4,16 +4,12 @@ import { APP_VERSION } from "../appVersion";
 import { IDENTITY_FIXTURE } from "./engineIdentity.fixture";
 import { deferEngineIdentity, publishBootState, type EngineBootState } from "./engineBoot";
 import { shortId } from "./enginePackageRecord";
-import { TS_ENGINE_SOURCES, TS_ENGINE_VERSION } from "./tsEngineIdentity";
-
-const ts = ` · TypeScript engine ${TS_ENGINE_VERSION} (${shortId(TS_ENGINE_SOURCES)})`;
 
 describe("engine label", () => {
-  it("names the TypeScript engine by default, with its pinned version and source hash", () => {
+  it("names the Rust engine before it reports anything, since it is the only engine", () => {
     expect(activeEngine({})).toBe("ts");
-    expect(engineSuffix({})).toBe(ts);
-    expect(versionLine("2.29.0", {})).toBe(`v2.29.0${ts}`);
-    expect(TS_ENGINE_SOURCES).toMatch(/^[0-9a-f]{64}$/);
+    expect(engineSuffix({})).toBe(" · Rust engine");
+    expect(versionLine("2.29.0", {})).toBe("v2.29.0 · Rust engine");
   });
 
   it("names the Rust engine's crate version and binary hash when its package reported them", () => {
@@ -25,7 +21,7 @@ describe("engine label", () => {
     expect(engineSuffix({ __vcEngine: { status: { hosted: true } }, __vcEngineBoot: { binary: { state: "missing" } } })).toBe(" · Rust engine");
   });
 
-  it("never names the TypeScript engine where none runs: a wasm-only build, or a Rust engine that stopped", () => {
+  it("never names the TypeScript engine, which no build carries (#1875), and says when the Rust engine stopped", () => {
     const hash = "cd".repeat(32);
     const v = IDENTITY_FIXTURE.crate.version;
     const identity = JSON.stringify(IDENTITY_FIXTURE);
@@ -38,11 +34,11 @@ describe("engine label", () => {
     expect(engineSuffix({ __vcEngine: idle, __vcEngineBoot: { build: "wasm-only", engine: "none" } })).toBe(" · Rust engine (stopped)");
     // A switchable build starting Rust, before the host attaches.
     expect(engineSuffix({ __vcEngineBoot: { build: "switchable", engine: "wasm" } })).toBe(" · Rust engine");
-    // A later tower the host would not take runs on TypeScript.
-    expect(engineSuffix({ __vcEngine: idle, __vcEngineBoot: { build: "switchable", engine: "wasm" } })).toBe(ts);
+    // A later tower the host would not take.
+    expect(engineSuffix({ __vcEngine: idle, __vcEngineBoot: { build: "switchable", engine: "wasm" } })).toBe(" · Rust engine");
     expect(engineSuffix({ __vcEngine: { status: { hosted: true } }, __vcEngineBoot: { build: "wasm-only", engine: "wasm", identity } })).toBe(` · Rust engine ${v}`);
-    // A switchable build back on TypeScript names it.
-    expect(engineSuffix({ __vcEngineBoot: { build: "switchable", engine: "ts" } })).toBe(ts);
+    // An old switchable boot state that chose TypeScript.
+    expect(engineSuffix({ __vcEngineBoot: { build: "switchable", engine: "ts" } })).toBe(" · Rust engine");
   });
 
   it("names the WASM engine only while a tower is hosted", () => {
@@ -51,7 +47,7 @@ describe("engine label", () => {
     expect(activeEngine(hosted)).toBe("wasm");
     expect(activeEngine(idle)).toBe("ts");
     expect(versionLine("2.29.0", hosted)).toBe("v2.29.0 · Rust engine");
-    expect(versionLine("2.29.0", idle)).toBe(`v2.29.0${ts}`);
+    expect(versionLine("2.29.0", idle)).toBe("v2.29.0 · Rust engine");
   });
 
   describe("on the page, with the identity record left for after boot (#1254)", () => {
@@ -79,7 +75,7 @@ describe("engine label", () => {
   it("rewrites a mounted splash version line and ignores a page without one", () => {
     const el = { textContent: "v0.0.0" } as HTMLElement;
     refreshSplashVersion({ querySelector: () => el } as unknown as Document);
-    expect(el.textContent).toBe(`v${APP_VERSION}${ts}`);
+    expect(el.textContent).toBe(`v${APP_VERSION} · Rust engine`);
     expect(() => refreshSplashVersion({ querySelector: () => null } as unknown as Document)).not.toThrow();
   });
 });

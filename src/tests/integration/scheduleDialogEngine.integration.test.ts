@@ -1,9 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mountAppDom, makeUI } from "../uiFixture";
-import { CLASSIC_RULES, MODERN_RULES } from "../../engine/gameRules";
+import { catalogFor } from "../catalogFixture";
+import { scheduleDialogUX } from "../../ui/scheduleDialogRules";
 import type { ScheduleDialogCtx } from "../../ui/uiElevatorSchedule";
 import type { PresetProposal, ScheduleFacts } from "../../simport/enginePort";
-import { referenceEngine } from "../fixtures/autoTuneDouble";
+import { rustScheduleEngine } from "../fixtures/autoTuneDouble";
+import { noEngine } from "../portKit/rustEngine";
 
 /**
  * What the schedule dialog does with the engine's advice, staging and preset
@@ -56,9 +58,9 @@ function ctx(over: Partial<ScheduleDialogCtx> = {}): ScheduleDialogCtx {
   const base = { cars: 4, bottom: 1, top: 4, stops: stops(), isExpress: false };
   return {
     title: "Schedule: Standard elevator (floors 1-4)",
-    ux: MODERN_RULES.elevatorScheduleUX(),
+    ux: scheduleDialogUX(catalogFor("modern").rules),
     ...base,
-    ...referenceEngine(base, true),
+    ...rustScheduleEngine(base, true),
     facts: echoHomes(),
     preset: () => PRESET,
     initialWeekend: false,
@@ -76,7 +78,7 @@ function open(over: Partial<ScheduleDialogCtx> = {}) {
 
 beforeEach(() => mountAppDom());
 
-describe("the dialog's advice comes from the engine's facts", () => {
+describe.skipIf(noEngine)("the dialog's advice comes from the engine's facts", () => {
   it("words the over and short hours and unfolds the strip", () => {
     open({ facts: () => ({ ...FACTS, advice: { status: "ready", over: [9, 10], short: [8] } }) });
     expect(text(".es-advice")).toBe("This shaft is over-staffed 09:00–10:00 and short at 08:00 on weekdays.");
@@ -93,7 +95,7 @@ describe("the dialog's advice comes from the engine's facts", () => {
   });
 
   it("shows no advice where the mode withholds it, whatever the engine says", () => {
-    open({ ux: CLASSIC_RULES.elevatorScheduleUX(), facts: () => ({ ...FACTS, advice: { status: "ready", over: [9], short: [] } }) });
+    open({ ux: scheduleDialogUX(catalogFor("classic").rules), facts: () => ({ ...FACTS, advice: { status: "ready", over: [9], short: [] } }) });
     expect(dialog().querySelector(".es-advice")).toBeNull();
   });
 
@@ -110,7 +112,7 @@ describe("the dialog's advice comes from the engine's facts", () => {
   });
 });
 
-describe("the dialog's staging sentence comes from the engine's summary", () => {
+describe.skipIf(noEngine)("the dialog's staging sentence comes from the engine's summary", () => {
   it("leads with the measured busiest hour and the engine's counts", () => {
     open();
     expect(text(".es-sim")).toBe("Busiest weekday hour 08:00: 1 staged up-tower, 3 at the lobby, 4 of 4 cars on shift.");
@@ -127,7 +129,7 @@ describe("the dialog's staging sentence comes from the engine's summary", () => 
   });
 });
 
-describe("the dialog's presets come from the engine", () => {
+describe.skipIf(noEngine)("the dialog's presets come from the engine", () => {
   it("highlights the engine's recommendation", () => {
     open({ facts: () => ({ ...FACTS, recommended: "feeder" }) });
     expect(dialog().querySelector(".es-presets .es-rec")?.textContent).toBe("Feeder");
@@ -163,7 +165,7 @@ describe("the dialog's presets come from the engine", () => {
 
   it("stages up-tower from the engine's staging play, in either mode", () => {
     const preset = vi.fn((): PresetProposal => ({ status: "available", weekday: null, weekend: null, homeFloors: [1, 1, 4, 4] }));
-    const { apply } = open({ ux: CLASSIC_RULES.elevatorScheduleUX(), preset });
+    const { apply } = open({ ux: scheduleDialogUX(catalogFor("classic").rules), preset });
     byLabel("button", "Stage upper half up-tower").click();
     expect(preset).toHaveBeenCalledWith("stage-up-tower");
     press('[data-act="apply"]');
@@ -178,7 +180,7 @@ describe("the dialog's presets come from the engine", () => {
   });
 });
 
-describe("the dialog's staging comes from the engine's homes and base", () => {
+describe.skipIf(noEngine)("the dialog's staging comes from the engine's homes and base", () => {
   it("opens on the homes the engine answers for the saved schedule", () => {
     const facts = vi.fn((draft: { homeFloors?: number[] }) => ({ ...FACTS, homeFloors: draft.homeFloors ? [2, 2, 3, 4] : [1, 1, 1, 1] }));
     const { apply } = open({ current: { homeFloors: [9, 9, 9, 9] }, facts: facts as unknown as ScheduleDialogCtx["facts"] });

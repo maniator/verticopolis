@@ -1,7 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { FACILITIES } from "../../engine/facilitiesData";
-import { hasBusinessHours } from "../../engine/facilities";
-import { subtypeListFor } from "../../engine/retailSubtypes";
+import { kindFacts, kindKeys, keepsHours } from "../../tests/catalogKinds";
 import type { FacilityKind, Unit, UnitState } from "../../shared/types";
 import { LATE_NIGHT_KINDS } from "../lateNight";
 import { paintSettledUnit } from "../regionPaint";
@@ -66,7 +64,7 @@ function spyCtx(): { ctx: CanvasRenderingContext2D; log: string[] } {
 let nextId = 1;
 function unit(kind: FacilityKind, over: Partial<Unit> = {}): Unit {
   return {
-    id: nextId++, kind, floor: 10, x: 20, width: FACILITIES[kind].width, state: "occupied",
+    id: nextId++, kind, floor: 10, x: 20, width: kindFacts(kind).width, state: "occupied",
     satisfaction: 0.8, occupants: 3, ...over,
   } as Unit;
 }
@@ -156,9 +154,9 @@ const CROWDS: Partial<Unit>[] = [{ occupants: 0 }, { occupants: 3 }, { occupants
 const HOURS_WITHOUT_CLOSED_ART: ReadonlySet<FacilityKind> = new Set<FacilityKind>(["partyHall", "aquaticCenter"]);
 const CONTROLS: ReadonlySet<FacilityKind> = new Set<FacilityKind>([
   ...LATE_NIGHT_KINDS,
-  ...(Object.keys(FACILITIES) as FacilityKind[]).filter((k) => hasBusinessHours(k) && !HOURS_WITHOUT_CLOSED_ART.has(k)),
+  ...kindKeys().filter((k) => keepsHours(k) && !HOURS_WITHOUT_CLOSED_ART.has(k)),
 ]);
-const ROOM_KINDS = (Object.keys(FACILITIES) as FacilityKind[]).filter((k) => k !== "floor" && k !== "lobby");
+const ROOM_KINDS = kindKeys().filter((k) => k !== "floor" && k !== "lobby");
 
 // The general guard: for every room kind (the reconcile loop bakes everything
 // but floor and lobby tiles), every settled state, both lighting states,
@@ -170,7 +168,7 @@ describe("roomSignature hour bits", () => {
   it.each(ROOM_KINDS)("%s: change whenever a settled room's art changes from one hour to the next", (kind) => {
     const misses: string[] = [];
     let changes = 0;
-    for (const subtype of [undefined, ...(subtypeListFor(kind) ?? [])]) {
+    for (const subtype of [undefined, ...(kindFacts(kind).subtypes ?? [])]) {
       for (const state of SETTLED) {
         for (const crowd of CROWDS) {
           for (const at of SPOTS) {

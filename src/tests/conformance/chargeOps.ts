@@ -1,11 +1,10 @@
-import type { Simulation } from "../../engine/Simulation";
 import type { At, Outcome, ScenarioEngine, Spec } from "./scenario";
 
 /**
  * The scenario ops for the engine-owned charges (#914): `addCar`,
  * `removeCar`, `extendTransport` and `removeFacility`. Each must land, or,
  * when the scenario names a `reason`, be refused with exactly that copy, so
- * both engines' refusal wording is pinned along with their money. Either
+ * the engine's refusal wording is pinned along with their money. Either
  * way the balance must move by exactly the `delta` the command reports.
  * `beginExtend` and `endExtend` open and close the engine-held gesture mark
  * a drag of `extendTransport` bills against (#990); `beginExtend` must open.
@@ -42,21 +41,6 @@ export interface ChargeEngine {
   extendTransport(id: number, end: "up" | "down", targetFloor: number): ChargeOutcome;
   endExtend(): void;
   removeFacility(id: number, method: "sell" | "bulldoze"): ChargeOutcome;
-}
-
-/** A command result narrowed to `{ ok, reason?, delta }`. */
-export const chargeOf = (r: { ok: boolean; reason?: string; delta: number }): ChargeOutcome => (r.ok ? { ok: true, delta: r.delta } : { ok: false, reason: r.reason, delta: r.delta });
-
-/** The TypeScript engine's charge commands, as a scenario engine runs them. */
-export function tsCharges(sim: Simulation): ChargeEngine {
-  return {
-    addCar: (id) => chargeOf(sim.addCar(id)),
-    removeCar: (id) => chargeOf(sim.removeCar(id)),
-    beginExtend: (id) => sim.beginExtend(id),
-    extendTransport: (id, end, targetFloor) => chargeOf(sim.extendTransport(id, end, targetFloor)),
-    endExtend: () => sim.endExtend(),
-    removeFacility: (id, method) => chargeOf(sim.removeFacility(id, method)),
-  };
 }
 
 function expectCharge(r: Outcome, reason: string | undefined, what: string): void {

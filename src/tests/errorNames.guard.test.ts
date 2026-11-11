@@ -15,12 +15,11 @@ import { isTestFile } from "./importScan";
  * renamed it to. A string literal survives both, which is what the second test
  * below proves on a minified bundle of the real classes.
  *
- * Scope: non-test TypeScript under `src/`, minus the TypeScript reference
- * engine (`src/engine/`, out of the shipped bundle and not edited for features)
- * and the test tree (`src/tests/`, whose helpers never ship).
+ * Scope: non-test TypeScript under `src/`, minus the test tree (`src/tests/`,
+ * whose helpers never ship).
  */
 
-const SKIPPED_DIRS = ["src/engine/", "src/tests/"] as const;
+const SKIPPED_DIRS = ["src/tests/"] as const;
 
 interface ErrorClass {
   name: string;

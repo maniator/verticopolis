@@ -3,9 +3,7 @@ import { groupDigits } from "../ui/format";
 
 /**
  * The recycling card's lines: current fill and the capacity/demand verdict.
- * The card kit builds them from what the Rust engine's port reports, and the
- * TypeScript reference card in `src/tests/diagnostics/` builds its lines with
- * the same function, so the two cards cannot drift on the wording.
+ * The card kit builds them from what the Rust engine's port reports.
  */
 
 /** The lines for `pop` population against `cap` processed, with the bins

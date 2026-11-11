@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { facilityFloors } from "../../engine/facilities";
+import { floorsOfPort } from "../../game/portAccess";
 import type { GameMode, UnitState } from "../../shared/types";
 import type { EnginePort, PortRecord } from "../../simport/enginePort";
 import { EVAL_TIERS, RENT_TIERS, RoomTierReader, type EvalTier, type RentTier, type RoomTiers } from "../../simport/roomTiers";
@@ -161,7 +161,7 @@ describe.skipIf(!hasWasmPackage())("roomTiers on the Rust engine", () => {
       { kind: "office", floor: 2, x: 220 },
     ]);
     const all = rows(new RoomTierReader(rust).read());
-    const view = new ViewReader(rust, facilityFloors);
+    const view = new ViewReader(rust, floorsOfPort(rust));
     const byId = new Map(view.rooms.map((u, i) => [u.id, { u, i }]));
     let last = -1;
     for (const r of all) {

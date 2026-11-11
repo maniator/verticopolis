@@ -12,8 +12,10 @@ use crate::tower::UnitState;
 #[path = "attendance.rs"]
 mod attendance;
 mod calendar;
+mod canon;
 mod capacity;
 mod commute;
+mod condo_relocation;
 mod condos;
 mod congestion_gripe_copy;
 mod crowd;
@@ -60,6 +62,7 @@ mod pricing_split;
 mod pricing_split_snap;
 mod reflow_migration;
 mod rental_nightclub_gripe;
+mod retail_yardstick;
 mod review_fixes;
 mod save_hardening;
 mod save_log;

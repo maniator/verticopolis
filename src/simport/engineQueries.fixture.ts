@@ -1,8 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { VIEW_LAYOUT } from "../engine/port/layout";
 import { newSeededDraft } from "../tests/portKit/draftFixtures";
 import { Cards } from "./cards";
-import { type MakeEngine, type Subject, kind, lobbyCenter, must, subject } from "./engineSubject.fixture";
+import { type MakeEngine, type Subject, VIEW_LAYOUT, kind, lobbyCenter, must, subject } from "./engineSubject.fixture";
 import { PortCodes } from "./portCodes";
 import { statsReport } from "./statsSheet";
 

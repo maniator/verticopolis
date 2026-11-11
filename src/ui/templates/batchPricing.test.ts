@@ -12,9 +12,9 @@ import {
   type BatchRungState,
   type BatchRungHandlers,
 } from "./batchPricing";
-import { CLASSIC_RULES } from "../../engine/gameRules";
-import type { PriceRung } from "../../shared/engineTypes";
-import type { BatchRentResult } from "../../engine/Simulation";
+import type { BatchRentResult, PriceRung } from "../../shared/engineTypes";
+import { catalogFor } from "../../tests/catalogFixture";
+import { priceOptionsFor } from "../catalogPricing";
 import { renderToFragment, click, change, input } from "../testing/litTestUtils";
 
 /**
@@ -118,6 +118,13 @@ describe("batchPricingTemplate wires its actions inline", () => {
   });
 });
 
+/** The Classic ladder for `kind`, from the Rust engine's catalog. */
+function classicRungs(kind: "office" | "condo"): readonly PriceRung[] {
+  const options = priceOptionsFor(catalogFor("classic"), kind);
+  if (options?.shape !== "ladder") throw new Error(`Classic prices ${kind} on a ladder`);
+  return options.rungs;
+}
+
 const baseResult = (over: Partial<BatchRentResult> = {}): BatchRentResult => ({
   matched: 5, eligible: 5, changed: 3, skippedSold: 0, skippedCustom: 0, customOverwritten: 0, clampedLow: 0, clampedHigh: 0, ...over,
 });
@@ -148,7 +155,7 @@ describe("batchPreviewMessage reproduces the honest count sentence", () => {
 });
 
 describe("batchRungTemplate (the Classic ladder variant, ux-pricing-split-editor §1.7)", () => {
-  const RUNGS = (CLASSIC_RULES.priceOptions("office") as { rungs: readonly PriceRung[] }).rungs;
+  const RUNGS = classicRungs("office");
   const RCTX: BatchRungCtx = { noun: "offices", single: "office", rungs: RUNGS };
   const rnoop: BatchRungHandlers = {
     onChoiceChange: () => {},
@@ -205,7 +212,7 @@ describe("batchRungTemplate (the Classic ladder variant, ux-pricing-split-editor
     const condoCtx: BatchRungCtx = {
       noun: "condos",
       single: "condo",
-      rungs: (CLASSIC_RULES.priceOptions("condo") as { rungs: readonly PriceRung[] }).rungs,
+      rungs: classicRungs("condo"),
     };
     expect(batchRungPreviewMessage(condoCtx, 3, r({ matched: 6, changed: 4, skippedSold: 2 }))).toBe(
       "Set 4 of 6 condos to High ($200,000). 2 sold skipped.",

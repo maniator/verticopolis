@@ -3,9 +3,6 @@ import { draftFromSave, type Draft } from "../portKit/drafts";
 import type { Unit, Transport } from "../../shared/types";
 import { portOf } from "../../game/cardKit.fixture";
 import { PortCodes } from "../../simport/portCodes";
-import { FACILITIES, GRID, maxSpanFor } from "../../engine/facilities";
-import { FASTFOOD_SUBTYPES, RESTAURANT_SUBTYPES, SHOP_SUBTYPES } from "../../engine/retailSubtypes";
-import { SAVE_VERSION } from "../../engine/saveMigration";
 import type { FacilityKind, SerializedGame } from "../../shared/types";
 import {
   TDT_HEADER_SIZE,
@@ -18,6 +15,20 @@ import { LegacyImportError, describeWithCodec, parseTDT, parseTdtBinary } from "
 import { looksLikeLegacyTower } from "../../storage/tdtImportHelpers";
 import type { TdtSpec } from "../fixtures/tdtBuilder";
 import { buildTdt, sampleTowerSpec } from "../fixtures/tdtBuilder";
+import { catalogFacility } from "../../catalog/catalogTypes";
+import { catalogFor } from "../catalogFixture";
+import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
+import { parseEngineIdentity, readEngineIdentity } from "../../wasmhost/engineIdentity";
+
+/** The Classic catalog, the engine's published table for the 1994 mode. */
+const CATALOG = catalogFor("classic");
+const facts = (kind: FacilityKind) => catalogFacility(CATALOG, kind);
+const SHOP_SUBTYPES = facts("shop").subtypes ?? [];
+const FASTFOOD_SUBTYPES = facts("fastFood").subtypes ?? [];
+const RESTAURANT_SUBTYPES = facts("restaurant").subtypes ?? [];
+/** The save version the engine writes, from its identity record (0 without
+ *  the package, where the codec suites skip). */
+const SAVE_VERSION = hasWasmPackage() ? parseEngineIdentity(readEngineIdentity(wasm()))!.saveVersion : 0;
 
 /** Parse a spec through the whole importer (builder → parseTDT). */
 function parse(spec: TdtSpec = {}, filename = "TOWER.TDT") {
@@ -407,7 +418,7 @@ describeWithCodec("parseTDT: golden mappings", () => {
     const centers = save.units.filter((u) => u.kind === "recycling");
     expect(centers).toHaveLength(3);
     expect(centers.map((u) => u.x).sort((a, b) => a - b)).toEqual([92, 107, 117]);
-    expect(centers.every((u) => u.width === FACILITIES.recycling.width)).toBe(true);
+    expect(centers.every((u) => u.width === facts("recycling").width)).toBe(true);
     // Each center must also land on its OWN base floor: a unit is anchored at
     // its lowest story, and a split that got the width right while anchoring a
     // building one floor off would otherwise pass unnoticed.
@@ -586,11 +597,11 @@ describeWithCodec("parseTDT: golden mappings", () => {
     const office = rooms(oneTenant(7, 100, 109, 1))[0];
     expect(office.state).toBe("occupied");
     expect(office.everOccupied).toBe(true);
-    expect(office.occupants).toBe(FACILITIES.office.population);
+    expect(office.occupants).toBe(facts("office").population);
     const condo = rooms(oneTenant(9, 100, 113, 1))[0];
     expect(condo.state).toBe("occupied");
     expect(condo.everOccupied).toBe(true);
-    expect(condo.occupants).toBe(FACILITIES.condo.population);
+    expect(condo.occupants).toBe(facts("condo").population);
     const vacantOffice = rooms(oneTenant(7, 100, 109, 0))[0];
     expect(vacantOffice.state).toBe("empty");
     expect(vacantOffice.everOccupied).toBe(false);
@@ -840,8 +851,8 @@ describeWithCodec("transport decode: the save's own shafts and flights", () => {
     // Canon footprint: the real game's shaft occupies 4 tiles, and import maps
     // width from the catalog - a narrower catalog would shrink every imported
     // shaft one tile and leave a gap the source save does not have.
-    expect(t.width).toBe(FACILITIES.elevatorStandard.width);
-    expect(FACILITIES.elevatorStandard.width).toBe(4);
+    expect(t.width).toBe(facts("elevatorStandard").width);
+    expect(facts("elevatorStandard").width).toBe(4);
     expect(t.bottom).toBe(0); // TDT 9 = B1
     expect(t.top).toBe(30);
     expect(t.cars).toBe(3);
@@ -1430,7 +1441,7 @@ describeWithCodec("transport decode: the save's own shafts and flights", () => {
     expect(kinds).toContain("elevatorService");
     expect(save.transports).toHaveLength(2);
     for (const t of save.transports) {
-      expect(t.x + t.width).toBeLessThanOrEqual(GRID.width);
+      expect(t.x + t.width).toBeLessThanOrEqual(CATALOG.world.lotWidth);
       expect(t.top).toBeGreaterThan(t.bottom);
     }
   });
@@ -1466,7 +1477,7 @@ describeWithCodec("transport decode: the save's own shafts and flights", () => {
     expect(save.transports).toHaveLength(1);
     const trimmed = save.transports[0];
     expect(trimmed.x).toBe(200);
-    expect(trimmed.top - trimmed.bottom).toBe(maxSpanFor("elevatorStandard"));
+    expect(trimmed.top - trimmed.bottom).toBe(facts("elevatorStandard").maxSpan);
     expect(report.couldNotBring.join(" ")).toMatch(/corrupt \(impossible position\)/);
     expect(report.couldNotBring.join(" ")).toMatch(/trimmed to fit the buildable range/);
   });

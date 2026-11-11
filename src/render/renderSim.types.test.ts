@@ -1,9 +1,9 @@
 import { describe, expectTypeOf, it } from "vitest";
-import type { Simulation } from "../engine/Simulation";
+import type { PortRenderSim } from "../simport/portRenderSim";
 import type { RenderSim } from "./renderSim";
 
 describe("RenderSim", () => {
-  it("the live TypeScript Simulation satisfies it, so main.ts passes the instance it always did", () => {
-    expectTypeOf<Simulation>().toExtend<RenderSim>();
+  it("the port's render adapter satisfies it, so main.ts hands the renderer the Rust engine's reads", () => {
+    expectTypeOf<PortRenderSim>().toExtend<RenderSim>();
   });
 });

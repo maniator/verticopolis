@@ -23,7 +23,7 @@
 //! - ids that name no unit: `unknown_and_malformed_ids_answer_nothing`
 //!
 //! The card-check cases (the inspector card shows every fact it is handed)
-//! test the TypeScript reference card, which goes with `src/engine/`; the
+//! tested the TypeScript reference card, which went with `src/engine/`; the
 //! shipped card's text is held by `cardTextParity.integration.test.ts`.
 use crate::clock::GameMode;
 use crate::diagnostics::DiagnosticFacts;

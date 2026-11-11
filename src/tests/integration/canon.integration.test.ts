@@ -1,118 +1,94 @@
 import { describe, it, expect } from "vitest";
-import {
-  FACILITIES,
-  GRID,
-  LOT_WIDTH,
-  MAX_CARS,
-  POOLED_CAPS,
-  STAR_THRESHOLDS,
-  TOWER_POPULATION,
-  TRANSPORT_CAPACITY,
-  WALKWAY_WILLINGNESS,
-  maxSpanFor,
-} from "../../engine/facilities";
-import { ECON } from "../../engine/econConfig";
-import { FASTFOOD_SUBTYPES, RESTAURANT_SUBTYPES, SHOP_SUBTYPES, subtypeListFor } from "../../engine/retailSubtypes";
+import { catalogFacility } from "../../catalog/catalogTypes";
+import type { FacilityKind } from "../../shared/types";
+import { catalogFor } from "../catalogFixture";
+
+/** The Classic catalog: the engine's published rule table, which is what the
+ *  1994 canon below binds (`portReads.integration.test.ts` holds the fixture
+ *  to the engine's answer). */
+const CATALOG = catalogFor("classic");
+const facility = (kind: FacilityKind) => catalogFacility(CATALOG, kind);
+const pool = (key: "elevators" | "walkways") => CATALOG.pools.find((p) => p.key === key);
+const RESTAURANT_SUBTYPES = facility("restaurant").subtypes;
+const FASTFOOD_SUBTYPES = facility("fastFood").subtypes;
+const SHOP_SUBTYPES = facility("shop").subtypes;
 
 /**
- * Canon tripwire — engine constants asserted against the 1994 original's
- * ground truth. Each block cites its source: a docs/canon/tdt-format.md
- * section where the .TDT save format documents the fact, or the FAQ-derived
- * canon (CLAUDE.md "Canon reference" / PARITY.md / the constant's own sourced
- * comment in facilities.ts) where the save format doesn't carry it. If a test
- * here fails, either the change broke canon (fix the change) or canon itself
- * was re-derived from a better source (update the cited canon page first,
- * then this table — never the other way around).
+ * Canon tripwire: the engine catalog's values asserted against the 1994
+ * original's ground truth. Each block cites its source: a
+ * docs/canon/tdt-format.md section where the .TDT save format documents the
+ * fact, or the FAQ-derived canon (CLAUDE.md "Canon reference", PARITY.md, or
+ * the sourced comment in engine-rs/src/facilities.rs) where the save format
+ * doesn't carry it. If a test here fails, either the change broke canon (fix
+ * the change) or canon itself was re-derived from a better source (update the
+ * cited canon page first, then this table, never the other way around).
  */
 
 describe("canon: transport pools (tdt-format.md §8)", () => {
   it("all three elevator kinds share one 24-shaft pool", () => {
-    const pool = POOLED_CAPS.find((p) => p.kinds.includes("elevatorStandard"));
-    expect(pool).toBeDefined();
-    expect(pool!.cap).toBe(24);
-    expect([...pool!.kinds].sort()).toEqual(
+    const elevators = pool("elevators");
+    expect(elevators).toBeDefined();
+    expect(elevators!.cap).toBe(24);
+    expect([...elevators!.kinds].sort()).toEqual(
       ["elevatorExpress", "elevatorService", "elevatorStandard"].sort(),
     );
   });
 
   it("stairs and escalators share one 64-link pool", () => {
-    const pool = POOLED_CAPS.find((p) => p.kinds.includes("stairs"));
-    expect(pool).toBeDefined();
-    expect(pool!.cap).toBe(64);
-    expect([...pool!.kinds].sort()).toEqual(["escalator", "stairs"].sort());
+    const walkways = pool("walkways");
+    expect(walkways).toBeDefined();
+    expect(walkways!.cap).toBe(64);
+    expect([...walkways!.kinds].sort()).toEqual(["escalator", "stairs"].sort());
   });
 
   // Cars-per-shaft and spans are FAQ canon (CLAUDE.md "Canon reference"),
   // not carried by the save format — the TDT elevator block merely varies
   // with car count, consistent with these caps.
   it("every elevator kind supports 8 cars per shaft — service included (FAQ canon)", () => {
-    expect(MAX_CARS.elevatorStandard).toBe(8);
-    expect(MAX_CARS.elevatorService).toBe(8);
-    expect(MAX_CARS.elevatorExpress).toBe(8);
+    expect(facility("elevatorStandard").maxCars).toBe(8);
+    expect(facility("elevatorService").maxCars).toBe(8);
+    expect(facility("elevatorExpress").maxCars).toBe(8);
   });
 
   it("spans (in floor GAPS, floors served = span + 1): standard/service 30, express the whole tower, walkways one gap = a fixed two-floor link (FAQ canon)", () => {
-    expect(maxSpanFor("elevatorStandard")).toBe(30);
-    expect(maxSpanFor("elevatorService")).toBe(30);
-    expect(maxSpanFor("elevatorExpress")).toBe(GRID.maxFloor - GRID.minFloor);
-    expect(maxSpanFor("stairs")).toBe(1);
-    expect(maxSpanFor("escalator")).toBe(1);
+    expect(facility("elevatorStandard").maxSpan).toBe(30);
+    expect(facility("elevatorService").maxSpan).toBe(30);
+    expect(facility("elevatorExpress").maxSpan).toBe(CATALOG.world.maxFloor - CATALOG.world.minFloor);
+    expect(facility("stairs").maxSpan).toBe(1);
+    expect(facility("escalator").maxSpan).toBe(1);
   });
 
   // Per-car passenger capacity from the Windows Help file: express 42,
   // standard 21, service 17.
   it("car capacities match the Windows Help file (express 42 / standard 21 / service 17)", () => {
-    expect(TRANSPORT_CAPACITY.elevatorExpress).toBe(42);
-    expect(TRANSPORT_CAPACITY.elevatorStandard).toBe(21);
-    expect(TRANSPORT_CAPACITY.elevatorService).toBe(17);
+    expect(facility("elevatorExpress").carCapacity).toBe(42);
+    expect(facility("elevatorStandard").carCapacity).toBe(21);
+    expect(facility("elevatorService").carCapacity).toBe(17);
   });
 });
 
-describe("canon: walkway willingness (guide-derived; #384)", () => {
-  // Cumulative-walk willingness: the 1994 game lets a person chain at most 4
-  // contiguous stair flights / 7 escalators before refusing (roadwolf /
-  // relentlessoptimizer / GameFAQs; the "5" some guides cite counts the origin
-  // floor). Canon value only; the router does not enforce it yet.
-  it("is stairs 4 / escalators 7 (canon)", () => {
-    expect(WALKWAY_WILLINGNESS.stairs).toBe(4);
-    expect(WALKWAY_WILLINGNESS.escalator).toBe(7);
-  });
-});
+// Walkway willingness (stairs 4, escalators 7) is not a catalog fact; it is
+// pinned in Rust by `crowd::graph::tests::{the_classic_walk_budget_bounds_the_reach,
+// a_walk_keeps_the_lowest_budget_it_has_met}` and `rule_tests::walkway_willingness`.
 
 describe("canon: tower geometry (tdt-format.md §4)", () => {
   it("floors run B10 (−9) through 100, matching the TDT floor map", () => {
-    expect(GRID.maxFloor).toBe(100);
-    expect(GRID.minFloor).toBe(-9); // floor 0 = B1, so −9 = B10
+    expect(CATALOG.world.maxFloor).toBe(100);
+    expect(CATALOG.world.minFloor).toBe(-9); // floor 0 = B1, so −9 = B10
   });
 
   it("the buildable lot is the canon 375 segments wide (FAQ canon; tenant extents in the save are in the same segment unit, §4)", () => {
-    expect(LOT_WIDTH).toBe(375);
-    // GRID.width is defined as LOT_WIDTH, so pin it to the literal too —
-    // asserting it against LOT_WIDTH would be a tautology.
-    expect(GRID.width).toBe(375);
+    expect(CATALOG.world.lotWidth).toBe(375);
   });
 });
 
-// The numeric thresholds are FAQ canon (see STAR_THRESHOLDS' sourced comment
-// in facilities.ts); the save format contributes only the level field's shape
-// (1–5 stars, 6 = TOWER — tdt-format.md §1).
-describe("canon: star ladder (FAQ canon; level 6 = TOWER per tdt-format.md §1)", () => {
-  it("population thresholds are the 1994 ladder", () => {
-    expect(STAR_THRESHOLDS[2]).toBe(300);
-    expect(STAR_THRESHOLDS[3]).toBe(1000);
-    expect(STAR_THRESHOLDS[4]).toBe(5000);
-    expect(STAR_THRESHOLDS[5]).toBe(10000);
-  });
-
-  it("TOWER is the canonical 15,000 occupants (the level-6 rating)", () => {
-    expect(TOWER_POPULATION).toBe(15000);
-  });
-});
+// The star ladder (300 / 1000 / 5000 / 10000, TOWER at 15,000) is not a
+// catalog fact; it is pinned in Rust by `rule_tests::canon::the_star_ladder_is_the_1994_ladder`.
 
 describe("canon: tenant populations (tdt-format.md §6)", () => {
   it("an office holds 6 workers and a condo 3 residents", () => {
-    expect(FACILITIES.office.population).toBe(6);
-    expect(FACILITIES.condo.population).toBe(3);
+    expect(facility("office").population).toBe(6);
+    expect(facility("condo").population).toBe(3);
   });
 
   it("commercial venue populations scale with footprint (shop 20, fastFood 25, restaurant 35)", () => {
@@ -123,19 +99,19 @@ describe("canon: tenant populations (tdt-format.md §6)", () => {
     // shop (12 tiles) = 20, fastFood (16 tiles) = 25, restaurant (24 tiles) = 35.
     // All three are positive so the census gate (population > 0) is preserved; the
     // live population census uses u.customersIn (meal round-trippers), not this field.
-    expect(FACILITIES.shop.population).toBe(20);
-    expect(FACILITIES.fastFood.population).toBe(25);
-    expect(FACILITIES.restaurant.population).toBe(35);
+    expect(facility("shop").population).toBe(20);
+    expect(facility("fastFood").population).toBe(25);
+    expect(facility("restaurant").population).toBe(35);
     // Gate invariant: all are positive so isCommercialKind population > 0 check holds.
-    expect(FACILITIES.shop.population).toBeGreaterThan(0);
-    expect(FACILITIES.fastFood.population).toBeGreaterThan(0);
-    expect(FACILITIES.restaurant.population).toBeGreaterThan(0);
+    expect(facility("shop").population).toBeGreaterThan(0);
+    expect(facility("fastFood").population).toBeGreaterThan(0);
+    expect(facility("restaurant").population).toBeGreaterThan(0);
   });
 });
 
 describe("canon: economy anchors (tdt-format.md §2)", () => {
   it("a tower is founded with $2,000,000 (display dollars, never ×100 storage)", () => {
-    expect(ECON.startingMoney).toBe(2_000_000);
+    expect(CATALOG.economy.startingMoney).toBe(2_000_000);
   });
 });
 
@@ -144,7 +120,7 @@ describe("canon: retail subtypes (tdt-format.md §7)", () => {
   // string, so an index change here would silently reinterpret every legacy
   // save's variants. Match the canon doc §7 lists verbatim.
   it("has 5 restaurant variants in §7 order", () => {
-    expect([...RESTAURANT_SUBTYPES]).toEqual([
+    expect(RESTAURANT_SUBTYPES).toEqual([
       "English Pub",
       "French",
       "Chinese",
@@ -154,7 +130,7 @@ describe("canon: retail subtypes (tdt-format.md §7)", () => {
   });
 
   it("has 5 fast-food variants in §7 order", () => {
-    expect([...FASTFOOD_SUBTYPES]).toEqual([
+    expect(FASTFOOD_SUBTYPES).toEqual([
       "Japanese Soba",
       "Chinese Cafe",
       "Hamburger Stand",
@@ -164,7 +140,7 @@ describe("canon: retail subtypes (tdt-format.md §7)", () => {
   });
 
   it("has 11 shop variants in §7 order", () => {
-    expect([...SHOP_SUBTYPES]).toEqual([
+    expect(SHOP_SUBTYPES).toEqual([
       "Men's Clothing",
       "Pet Store",
       "Flower Shop",
@@ -180,15 +156,15 @@ describe("canon: retail subtypes (tdt-format.md §7)", () => {
   });
 
   // The commercial-venue inspector converts a venue's traffic income into a
-  // customer estimate via `ECON.retailSpendPerCustomer[kind]`. Every kind that
+  // customer estimate via the catalog's `spendPerCustomer`. Every kind that
   // carries a canon subtype list MUST be tabled there, or that venue's whole
   // inspector block silently disappears (the guard returns "" on an undefined
   // spend). This pins the coupling so a new retail kind can't ship half-wired.
   it("tables a positive spend-per-customer for every retail subtype kind", () => {
     for (const kind of ["shop", "fastFood", "restaurant"] as const) {
-      expect(subtypeListFor(kind)).not.toBeNull();
-      const spend = ECON.retailSpendPerCustomer[kind];
-      expect(spend).toBeDefined();
+      expect(facility(kind).subtypes).not.toBeNull();
+      const spend = facility(kind).spendPerCustomer;
+      expect(spend).not.toBeNull();
       expect(spend!).toBeGreaterThan(0);
     }
   });

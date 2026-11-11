@@ -3,19 +3,20 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { FACILITIES, GRID } from "../engine/facilitiesData";
-import { MILESTONES } from "../engine/milestones";
+import { MILESTONE_COPY } from "../presentation/statsCopy";
+import { catalogFor } from "../tests/catalogFixture";
 import { checkCatalog, checkEvent, renderGameplayEventRules, renderGameplayEventsDts, type GameplayCatalog } from "./gameplayCatalog";
 import { GAMEPLAY_EVENT_RULES } from "./gameplayEventRules";
 import type { FacilityKind, GameMode } from "../shared/types";
-import type { GameplayFacilityKind, GameplayMilestoneId, GameplayMode } from "./gameplayEvents";
+import type { GameplayFacilityKind, GameplayMode } from "./gameplayEvents";
 
 /**
  * The gameplay event catalog (`conformance/events/catalog.json`) is the
  * contract both engines emit against. These tests hold the catalog to its
  * payload rule, the generated `gameplayEvents.d.ts` to the catalog, and the
- * catalog's closed sets to the engine's own tables. The Rust side runs the
- * same checks in `engine-rs/src/gameplay.rs`.
+ * catalog's closed sets to the engine's published catalog and to the stats
+ * copy the frontend keeps per milestone. The Rust side holds the closed sets
+ * to the engine's own tables in `engine-rs/src/gameplay/tests.rs`.
  */
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
@@ -33,7 +34,6 @@ function withField(field: string, spec: unknown): Record<string, unknown> {
 type Same<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
 const sameKinds: Same<FacilityKind, GameplayFacilityKind> = true;
 const sameModes: Same<GameMode, GameplayMode> = true;
-const sameMilestones: Same<(typeof MILESTONES)[number]["id"], GameplayMilestoneId> = true;
 
 describe("gameplay event catalog", () => {
   it("passes its own payload rule", () => {
@@ -51,7 +51,7 @@ describe("gameplay event catalog", () => {
       "milestone_reached",
       "bomb_found",
     ]);
-    expect([sameKinds, sameModes, sameMilestones]).toEqual([true, true, true]);
+    expect([sameKinds, sameModes]).toEqual([true, true]);
   });
 
   it("refuses a string payload field that is not a catalog enum", () => {
@@ -100,11 +100,13 @@ describe("gameplay event catalog", () => {
   });
 
   it("names the engine's own closed sets", () => {
-    expect(catalog.enums.facilityKind).toEqual(Object.keys(FACILITIES));
-    expect(catalog.enums.milestoneId).toEqual(MILESTONES.map((m) => m.id));
+    const engine = catalogFor("classic");
+    expect(catalog.enums.facilityKind).toEqual(engine.facilities.map((f) => f.key));
+    // Every milestone an event can name has the stats screen's copy, in the engine's order.
+    expect(catalog.enums.milestoneId).toEqual([...MILESTONE_COPY.keys()]);
     expect(catalog.enums.mode).toEqual(["classic", "modern"]);
     const floor = catalog.events.find((e) => e.name === "facility_placed")!.payload.floor;
-    expect(floor).toEqual({ type: "integer", min: GRID.minFloor, max: GRID.maxFloor });
+    expect(floor).toEqual({ type: "integer", min: engine.world.minFloor, max: engine.world.maxFloor });
   });
 
   it("checks a drained event against its entry", () => {
