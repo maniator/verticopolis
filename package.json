@@ -44,7 +44,7 @@
     "release": "node scripts/release.ts",
     "version:check": "node scripts/version-check.ts",
     "test:wasm": "npm run test:wasm:host && npm run test:port",
-    "test:wasm:host": "cross-env VC_REQUIRE_WASM=1 vitest run --project integration conformanceWasm cardTextParity wasmHost chargeBindingRaw panelGettersWasm panelGettersCost engineView perfCompare/scenarios.integration perfCompare/page.integration tsEngine.golden viewReader.integration viewReaderHall.integration portSaves portReads portReader viewLayoutJson engineContract.integration fuzzWasmLeg fxSequences autoTuneProposal bombSearchWasm engagementParity engineIdentity.integration enginePackageSurface gameControllersCoverage lobbyFloorCharge portServiceDiagnostics relayedCommandRaw rollbackRehearsal roomTiersWasm scheduleAuthoring.integration undoStepRevision viewStateParity",
+    "test:wasm:host": "cross-env VC_REQUIRE_WASM=1 vitest run --project integration conformanceWasm cardTextParity wasmHost chargeBindingRaw panelGettersWasm panelGettersCost engineView perfCompare/scenarios.integration perfCompare/page.integration toolingSim.integration tsEngine.golden viewReader.integration viewReaderHall.integration portSaves portReads portReader viewLayoutJson engineContract.integration fuzzWasmLeg fxSequences autoTuneProposal bombSearchWasm engagementParity engineIdentity.integration enginePackageSurface gameControllersCoverage lobbyFloorCharge portServiceDiagnostics relayedCommandRaw rollbackRehearsal roomTiersWasm scheduleAuthoring.integration undoStepRevision viewStateParity",
     "test:port": "node scripts/test-port.ts"
   },
   "devDependencies": {
