@@ -32,12 +32,23 @@ permissions:
   contents: read
 
 jobs:
-  # Two tiers: the WASM/browser checks need application inputs (code), while
-  # lint/unit/build also cover README, changelog and backlog inputs (tests).
-  # CI-only automation/config/docs do not need either tier. The required job
-  # names remain visible via no-op successes, never missing statuses.
-  # Unknown paths, main pushes, and failed file lookups run full validation.
-  # Process old rename paths too, so moving code cannot bypass these gates.
+  # Which jobs a change needs, from the paths it changes (src/build/prLane.ts
+  # holds the rules and their tests). `code` is whether application inputs
+  # changed (the WASM, browser and parity checks need them); `tests` is
+  # whether the test job has anything to run; `lane` narrows the test job:
+  #   full:  everything (any shared, UI or tooling path).
+  #   rust:  only engine-rs/ sources and prose. The Rust engine workflow tests
+  #          the crate, and the browser, parity and integration checks still
+  #          run here; the plain unit run (the unitWasm leg repeats it with the
+  #          engine package), lint, typecheck and the build are skipped.
+  #   prose: docs, planning files and .changes notes only. The guard tests
+  #          and the build still run, without coverage, lint or typecheck.
+  # Cargo files, the binding (engine-rs/src/wasm*), package and lock files,
+  # the conformance suite and this workflow always take the full lane.
+  # The required job names keep reporting via no-op successes, never missing
+  # statuses. Main pushes, release branches, unknown paths and failed file
+  # lookups run full validation. Old rename paths count too,
+  # so moving code cannot bypass these gates.
   changes:
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -47,66 +58,65 @@ jobs:
     outputs:
       code: ${{ steps.filter.outputs.code }}
       tests: ${{ steps.filter.outputs.tests }}
+      lane: ${{ steps.filter.outputs.lane }}
     steps:
+      # Only the classifier is needed; a full checkout is not.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
+        with:
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /.nvmrc
+            /scripts/pr-lane.ts
+            /src/build/prLane.ts
+
+      - name: Use Node.js (from .nvmrc)
+        if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: ".nvmrc"
+
       - id: filter
         env:
           EVENT: ${{ github.event_name }}
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_REF: ${{ github.head_ref }}
           QUEUE_BASE: ${{ github.event.merge_group.base_sha }}
           QUEUE_HEAD: ${{ github.event.merge_group.head_sha }}
         run: |
+          full() {
+            printf 'code=true\ntests=true\nlane=full\n' >> "$GITHUB_OUTPUT"
+            echo "lane: full ($1)"
+            exit 0
+          }
+          # A release PR runs everything, whatever it touches.
+          case "$HEAD_REF" in release/*) full "release branch" ;; esac
           # Each line is "F <path>" for a changed file or "P <path>" for the old
           # path of a rename, so a file moved out of a code path still counts.
           # A pull request lists its own files; a merge queue entry lists what
-          # it adds to main (the compare API, which stops at 300 files).
+          # it adds to main (the compare API, which stops at 300 files). A main
+          # push runs everything.
           list="$RUNNER_TEMP/changed-files"
+          entry='"F " + .filename, (if .previous_filename then "P " + .previous_filename else empty end)'
           if [ "$EVENT" = "pull_request" ] && [ -n "$PR_NUMBER" ]; then
             limit=3000
-            listed() { gh api --paginate "repos/$REPO/pulls/$PR_NUMBER/files?per_page=100" --jq ".[] | $1"; }
+            listed() { gh api --paginate "repos/$REPO/pulls/$PR_NUMBER/files?per_page=100" --jq ".[] | $entry"; }
           elif [ "$EVENT" = "merge_group" ] && [ -n "$QUEUE_BASE" ] && [ -n "$QUEUE_HEAD" ]; then
             limit=300
-            listed() { gh api "repos/$REPO/compare/$QUEUE_BASE...$QUEUE_HEAD" --jq ".files[]? | $1"; }
+            listed() { gh api "repos/$REPO/compare/$QUEUE_BASE...$QUEUE_HEAD" --jq ".files[]? | $entry"; }
           else
-            echo "code=true" >> "$GITHUB_OUTPUT"
-            echo "tests=true" >> "$GITHUB_OUTPUT"
-            exit 0
+            full "$EVENT"
           fi
-          if ! listed '"F " + .filename, (if .previous_filename then "P " + .previous_filename else empty end)' > "$list"; then
+          if ! listed > "$list"; then
             echo "::warning::could not list the changed files; running every job"
-            echo "code=true" >> "$GITHUB_OUTPUT"
-            echo "tests=true" >> "$GITHUB_OUTPUT"
-            exit 0
+            full "file listing failed"
           fi
           # Past the API's listing limit, the change runs everything.
-          if [ "$(grep -c '^F ' "$list" || true)" -ge "$limit" ]; then
-            echo "code=true" >> "$GITHUB_OUTPUT"
-            echo "tests=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          code=false
-          tests=false
-          while IFS= read -r f; do
-            [ -z "$f" ] && continue
-            case "$f" in
-              docs/screenshots/*) code=true ;; # the help media the app builds in
-              docs/* | _bmad-output/*) ;;
-              .github/workflows/test.yml) code=true ;; # exercise changes to this CI gate
-              .github/workflows/* | .github/ISSUE_TEMPLATE/* | .github/dependabot.yml | .pr_agent.toml) ;;
-              */*) code=true ;;
-              *.md) ;;
-              *) code=true ;;
-            esac
-            case "$f" in
-              .github/workflows/test.yml) tests=true ;;
-              .github/workflows/* | .github/ISSUE_TEMPLATE/* | .github/dependabot.yml | .pr_agent.toml | docs/ci/*) ;;
-              *) tests=true ;;
-            esac
-          done < <(sed 's/^[FP] //' "$list")
-          echo "code=$code" >> "$GITHUB_OUTPUT"
-          echo "tests=$tests" >> "$GITHUB_OUTPUT"
-          echo "application paths changed: $code; lint/unit/build inputs changed: $tests"
+          [ "$(grep -c '^F ' "$list" || true)" -lt "$limit" ] || full "listing limit reached"
+          node scripts/pr-lane.ts "$list" || full "classifier failed"
 
   # The Rust engine's WASM package (src/public/engine/, engine-rs/pkg/) is build
   # output and is not checked in. This job restores it from the Actions cache,
@@ -195,12 +205,14 @@ jobs:
         if: ${{ needs.changes.outputs.tests != 'false' }}
         run: npm ci
 
+      # Lint and typecheck read only TypeScript, which the rust and prose
+      # lanes leave unchanged. An empty lane (a failed classifier) runs them.
       - name: Lint
-        if: ${{ needs.changes.outputs.tests != 'false' }}
+        if: ${{ needs.changes.outputs.tests != 'false' && needs.changes.outputs.lane != 'rust' && needs.changes.outputs.lane != 'prose' }}
         run: npm run lint
 
       - name: Typecheck
-        if: ${{ needs.changes.outputs.tests != 'false' }}
+        if: ${{ needs.changes.outputs.tests != 'false' && needs.changes.outputs.lane != 'rust' && needs.changes.outputs.lane != 'prose' }}
         run: npm run typecheck
 
       # engine conformance (holidays-classic runs 720 in-game hours of a large
@@ -214,17 +226,35 @@ jobs:
       # 300 s limit) and roomCountsEngine (a check after every step on three
       # conformance towers, 225 s under coverage against 300 s).
       - name: Run tests
-        if: ${{ needs.changes.outputs.tests != 'false' }}
+        if: ${{ needs.changes.outputs.tests != 'false' && needs.changes.outputs.lane != 'rust' && needs.changes.outputs.lane != 'prose' }}
         run: npm run test:coverage -- --run --exclude '**/conformance.integration.test.ts' --exclude '**/condoRelocationEngine.integration.test.ts' --exclude '**/roomCountsEngine.integration.test.ts'
+
+      # A Rust-only change (src/build/prLane.ts): no TypeScript changed, so
+      # coverage cannot move, and the unitWasm leg runs the unit project with
+      # the engine package. The integration project still runs here, minus the
+      # three suites that leg runs.
+      - name: Integration tests (Rust-only change, no coverage)
+        if: ${{ needs.changes.outputs.tests != 'false' && needs.changes.outputs.lane == 'rust' }}
+        run: npx vitest run --project integration --exclude '**/conformance.integration.test.ts' --exclude '**/condoRelocationEngine.integration.test.ts' --exclude '**/roomCountsEngine.integration.test.ts'
+
+      # Docs, planning files and .changes notes only: the guard tests that read
+      # them (the backlog mirror, the changelog, the change notes) are unit
+      # tests, and no integration test reads them.
+      - name: Unit tests (docs or notes only, no coverage)
+        if: ${{ needs.changes.outputs.tests != 'false' && needs.changes.outputs.lane == 'prose' }}
+        run: npx vitest run --project unit
 
       # The three excluded suites run without coverage on the unitWasm leg of
       # test-wasm-parity, beside this job instead of after it.
 
       # This job only proves the bundle builds, with no engine package (the e2e
       # job below builds with one), so it opts out of the engine requirement
-      # scripts/verify-precache.ts puts on every build.
+      # scripts/verify-precache.ts puts on every build. The build reads
+      # CHANGELOG.md, so the prose lane builds too; the rust lane does not,
+      # since the bundle reads nothing under engine-rs/ (the e2e-wasm-only
+      # job's player build covers the engine package).
       - name: Build
-        if: ${{ needs.changes.outputs.tests != 'false' }}
+        if: ${{ needs.changes.outputs.tests != 'false' && needs.changes.outputs.lane != 'rust' }}
         run: npm run build
         env:
           VC_ALLOW_NO_ENGINE: "1"
