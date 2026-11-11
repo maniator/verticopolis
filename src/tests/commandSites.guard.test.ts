@@ -29,7 +29,7 @@ import { NOT_FRONTEND as SHARED_NOT_FRONTEND } from "./frontendFiles";
  * holds. The list only shrinks: a stale entry fails too, so it goes with the
  * write.
  */
-/** The frontend the engine-import guard reads, less the port (`src/simport/`). */
+/** What the engine-import guard skips, plus the port (`src/simport/`). */
 const NOT_FRONTEND = [...SHARED_NOT_FRONTEND, "src/simport/"] as const;
 
 /** The instance's command methods, the port's commands and the raw edits
