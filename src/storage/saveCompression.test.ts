@@ -12,9 +12,8 @@ import {
   inflateCapped,
 } from "./saveCompression";
 import { toTowerFile } from "./towerFileCodec";
-import { Simulation } from "../engine/Simulation";
 import { SaveGame } from "./SaveGame";
-import { saveOf } from "../tests/fixtures/saveText";
+import { SMALL_TOWER_SAVE } from "../tests/fixtures/handSaves";
 
 /**
  * The cap on a decompressed save can only be enforced BETWEEN pushes to the
@@ -99,18 +98,13 @@ describe("parseSaveJson", () => {
   it("repairs every string and key, keeps pairs and everything else", () => {
     const v = parseSaveJson(text) as Record<string, unknown>;
     expect(v.towerName).toBe("Sky \uFFFD");
+    // The Rust loader then keeps one of the two: saveRepair.integration.test.ts.
     expect(v.excavated).toEqual(["\uFFFD", "\uFFFD"]);
     expect(v["k\uFFFD"]).toBe(1);
     expect(Object.keys(v).some((k) => k.startsWith("k") && k !== "k\uFFFD")).toBe(false);
     expect(v.units).toEqual([{ label: "\ud83c\udfe2" }]);
     expect(v.n).toBe(1.5);
     expect(parseSaveJson('{"a":"plain"}')).toEqual(JSON.parse('{"a":"plain"}'));
-  });
-
-  it("collapses two halves that repair to one excavated entry, as the Rust loader dedupes", () => {
-    const save = { ...JSON.parse(JSON.stringify(new Simulation(1).serialize())), excavated: ["\ud800", "\udc00"] };
-    const sim = Simulation.deserialize(parseSaveJson(JSON.stringify(save)) as typeof save);
-    expect([...sim.excavated]).toEqual(["\uFFFD"]);
   });
 
   it("keeps a __proto__ key an own key when the object around it is rebuilt", () => {
@@ -145,16 +139,11 @@ describe("parseSaveJson", () => {
 
 /** Every web writer goes through encodeSaveJson, so none writes past the cap. */
 describe("the save writers refuse a save past the cap", () => {
-  const oversized = (): Simulation => {
-    const sim = new Simulation(1);
-    const real = sim.serialize.bind(sim);
-    sim.serialize = () => ({ ...real(), towerName: "x".repeat(MAX_SAVE_INFLATED_BYTES) });
-    return sim;
-  };
+  const oversized = JSON.stringify({ ...(JSON.parse(SMALL_TOWER_SAVE) as object), towerName: "x".repeat(MAX_SAVE_INFLATED_BYTES) });
 
   it("packSync and export throw SaveTooLargeError", async () => {
-    expect(() => SaveGame.packSync(saveOf(oversized()))).toThrow(SaveTooLargeError);
-    await expect(SaveGame.export(saveOf(oversized()))).rejects.toThrow(SaveTooLargeError);
+    expect(() => SaveGame.packSync(oversized)).toThrow(SaveTooLargeError);
+    await expect(SaveGame.export(oversized)).rejects.toThrow(SaveTooLargeError);
   });
 });
 

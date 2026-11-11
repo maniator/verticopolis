@@ -1,8 +1,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { Simulation } from "../engine/Simulation";
-import { TsEngine } from "../engine/port/tsEngine";
 import type { SerializedGame } from "../shared/types";
+import { SMALL_TOWER_SAVE } from "../tests/fixtures/handSaves";
 import { decodeVctower } from "./vctowerContainer";
 import { engineSaveText, importObjection, looksLikeTowerSave, readSavedAt } from "./saveTextRead";
 import { stampText } from "./saveStamp";
@@ -23,8 +22,7 @@ describe("stampText", () => {
   it("writes the same text as stamping the parsed save, for every conformance tower", () => {
     vi.useFakeTimers({ now: 1_760_000_000_000 });
     for (const name of readdirSync(FIXTURES).filter((f) => f.endsWith(".vctower"))) {
-      const sim = Simulation.deserialize(decodeVctower(readFileSync(`${FIXTURES}/${name}`, "utf8")) as SerializedGame);
-      const text = new TsEngine(sim).serialize();
+      const text = JSON.stringify(decodeVctower(readFileSync(`${FIXTURES}/${name}`, "utf8")));
       const { json, stamp } = stampText(text);
       expect(stamp.savedAt).toBe(1_760_000_000_000);
       expect(json, name).toBe(parsedStamp(text, stamp.savedAt, stamp.appVersion));
@@ -56,7 +54,7 @@ describe("the save text reads", () => {
 
   it("reads the write time as a parse would, from the stamp the writers print", () => {
     vi.useFakeTimers({ now: 1_760_000_000_123 });
-    const { json } = stampText(new TsEngine(Simulation.newGame(1)).serialize());
+    const { json } = stampText(SMALL_TOWER_SAVE);
     expect(readSavedAt(json)).toBe((JSON.parse(json) as SerializedGame).savedAt);
     expect(readSavedAt('{"savedAt":1,"x":{"savedAt":2.5e3}}')).toBe(2500);
     expect(readSavedAt('{"name":"\\"savedAt\\":9"}')).toBeUndefined();
@@ -64,7 +62,7 @@ describe("the save text reads", () => {
   });
 
   it("tells a damaged or foreign save apart, and holds nothing against a tower", () => {
-    const tower = new TsEngine(Simulation.newGame(1)).serialize();
+    const tower = SMALL_TOWER_SAVE;
     expect([looksLikeTowerSave(tower), importObjection(tower)]).toEqual([true, undefined]);
     expect(importObjection('{"minutes": 5, "units": []}')).toBeUndefined();
     expect(looksLikeTowerSave('{"minutes": 5, "units": []}')).toBe(false);

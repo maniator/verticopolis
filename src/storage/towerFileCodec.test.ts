@@ -1,6 +1,5 @@
 import { describe, it, expect } from "vitest";
 import { deflateSync, zlibSync } from "fflate";
-import { markFounderFromLoadedFile } from "../engine/sim/founderStatus";
 import { fromBase64, inflate, inflateCapped, STORE_MAGIC, toBase64, TOWER_FILE_MAGIC } from "./saveCompression";
 import { toTowerFile } from "./towerFileCodec";
 
@@ -53,24 +52,18 @@ describe("toTowerFile (the byte-fidelity codec)", () => {
     const decoded = decodeTowerFile(result.text);
     expect(decoded.appVersion).toBeUndefined();
     expect(decoded).toEqual(PRE_2_0_SAVE);
-
-    // And the badge really does follow from that field being absent.
-    const sim = { founder: false };
-    markFounderFromLoadedFile(sim, decoded);
-    expect(sim.founder).toBe(true);
+    // The badge following from that absence is the engine's rule, checked on
+    // the Rust engine in saveRepair.integration.test.ts.
   });
 
   it("NEGATIVE CONTROL: a stamped tower does not earn Founder", () => {
-    // Without this, the assertion above would pass even if
-    // markFounderFromLoadedFile granted the badge unconditionally, and the test
-    // would be proving nothing about the codec at all.
+    // Without this, the assertion above would pass even if the codec dropped
+    // every appVersion, and the test would be proving nothing about it.
     const stamped = { ...PRE_2_0_SAVE, appVersion: "2.4.0" };
     const result = toTowerFile(storeValue(stamped));
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    const sim = { founder: false };
-    markFounderFromLoadedFile(sim, decodeTowerFile(result.text));
-    expect(sim.founder).toBe(false);
+    expect(decodeTowerFile(result.text)).toEqual(stamped);
   });
 
   it("compresses a pre-compression raw-JSON save without re-serializing it", () => {

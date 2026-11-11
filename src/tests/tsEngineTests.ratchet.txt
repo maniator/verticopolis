@@ -36,11 +36,6 @@ src/render/excalibur/towerInputCamera.test.ts Tower
 src/render/excalibur/towerScenery.test.ts Simulation
 src/render/excalibur/towerWalkerBuild.test.ts Tower tower/segments tower/towerTopology
 src/simport/tsPanels.test.ts Simulation port/tsEngine sim/star
-src/storage/saveCompression.test.ts Simulation
-src/storage/saveRehydrate.test.ts Simulation sim/founderStatus
-src/storage/saveText.test.ts Simulation port/tsEngine
-src/storage/towerFileCodec.test.ts sim/founderStatus
-src/storage/vctowerWriter.test.ts Simulation
 src/tests/barrelSurface.test.ts Crowd EconomySystem Simulation Tower
 src/tests/conformance/checkpointDetail.test.ts Simulation
 src/tests/conformance/fixedStepCases.ts sim/frameStep # writes the fixed-step cases the Rust step driver replays; reached through the shipped frameLoop re-export until #921 took it out of the game
