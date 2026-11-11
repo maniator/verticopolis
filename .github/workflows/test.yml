@@ -221,7 +221,7 @@ jobs:
       # against its 300 s limit) and roomCountsEngine (a check after every step
       # on three conformance towers, 225 s under coverage against 300 s). The
       # engine conformance suite runs on the Rust engine (conformanceWasm, in
-      # test:wasm:host on the integrationWasm leg).
+      # test:wasm:host on the integrationWasm shards).
       - name: Run tests
         if: ${{ needs.changes.outputs.tests != 'false' && needs.changes.outputs.lane != 'rust' && needs.changes.outputs.lane != 'prose' }}
         run: npm run test:coverage -- --run --exclude '**/condoRelocationEngine.integration.test.ts' --exclude '**/roomCountsEngine.integration.test.ts'
@@ -275,8 +275,8 @@ jobs:
   # Vitest projects); the legs keep those names because the two checks are
   # required for merging. The unitWasm leg runs the unit tests, which include
   # the engine package's own (they skip in the plain unit job); the
-  # integrationWasm leg runs the host suites below, and the portKit leg (not
-  # yet a required check) runs the port-kit suites.
+  # integrationWasm check runs the host suites (the integration-wasm job
+  # below, in three shards), and the portKit leg runs the port-kit suites.
   test-wasm-parity:
     # The legs restore the engine package from the Actions cache themselves
     # (and build it on a miss, which fails the leg if the build fails), so
@@ -293,8 +293,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # portKit is the third leg, so no leg runs two long suites in a row.
-        project: [unitWasm, integrationWasm, portKit]
+        project: [unitWasm, portKit]
     steps:
       - name: No code changed, nothing to run
         if: ${{ needs.changes.outputs.code == 'false' }}
@@ -326,11 +325,9 @@ jobs:
           VC_LOG_TEST_STARTS: "1"
         run: npx vitest run --project unit
 
-      # The two halves of `npm run test:wasm` used to run one after the other
-      # on the integrationWasm leg. The port-kit suites run on their own
-      # portKit leg, and the two long ones the test job leaves out run here
-      # without coverage after the unit tests, so the three legs finish at
-      # about the same time.
+      # The port-kit suites run on their own portKit leg, and the two long ones
+      # the test job leaves out run on the unitWasm leg, without coverage,
+      # after the unit tests, so the legs finish at about the same time.
       - name: Port-kit suites
         if: ${{ needs.changes.outputs.code != 'false' && matrix.project == 'portKit' }}
         run: npm run test:port
@@ -339,20 +336,70 @@ jobs:
         if: ${{ !cancelled() && needs.changes.outputs.code != 'false' && needs.changes.outputs.tests != 'false' && matrix.project == 'unitWasm' }}
         run: npm exec --no -- vitest run --project integration condoRelocationEngine roomCountsEngine
 
-      # The suites that start the Rust engine themselves (conformance, the
-      # goldens, perf comparison), run once, on the integrationWasm leg; the
-      # Rust workflow does not repeat this test:wasm script. The script's
-      # test:port half runs on the portKit leg.
-      # This step has its own timeout and logs each test start (#1152). With
-      # both diagnostics corpus differentials in it (#1811), the step takes
-      # 4.5 to 8.5 minutes, depending on the runner, so the timeout leaves
-      # room above the slowest run seen and for the next corpus differential.
+  # The suites that start the Rust engine themselves (conformance, the
+  # goldens, perf comparison), run once per PR; the Rust workflow does not
+  # repeat this test:wasm script, and its test:port half runs on the portKit
+  # leg. Vitest splits the files across three shards, so a slow runner no
+  # longer pushes the whole set past its timeout, and the
+  # integration-wasm-result job reports them as the one required
+  # test-wasm-parity (integrationWasm) check. Like the parity legs, the
+  # shards always run and skip their steps on a prose-only change.
+  integration-wasm:
+    name: test-wasm-parity (integrationWasm, shard ${{ matrix.shard }} of 3)
+    needs: changes
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
+    steps:
+      - name: No code changed, nothing to run
+        if: ${{ needs.changes.outputs.code == 'false' }}
+        run: echo "Only prose changed; the WASM engine suites are skipped."
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: ${{ needs.changes.outputs.code != 'false' }}
+        with:
+          persist-credentials: false
+
+      - name: Use Node.js (from .nvmrc)
+        if: ${{ needs.changes.outputs.code != 'false' }}
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: ".nvmrc"
+          cache: "npm"
+
+      - name: Install dependencies
+        if: ${{ needs.changes.outputs.code != 'false' }}
+        run: npm ci
+
+      - uses: ./.github/actions/engine-wasm
+        if: ${{ needs.changes.outputs.code != 'false' }}
+
+      # Logs each test start (#1152), so a step that hits its timeout names
+      # the test it was in.
       - name: Host suites on the WASM engine
-        if: ${{ needs.changes.outputs.code != 'false' && matrix.project == 'integrationWasm' }}
-        timeout-minutes: 18
+        if: ${{ needs.changes.outputs.code != 'false' }}
+        timeout-minutes: 15
         env:
           VC_LOG_TEST_STARTS: "1"
-        run: npm run test:wasm:host
+        run: npm run test:wasm:host -- --shard=${{ matrix.shard }}/3
+
+  integration-wasm-result:
+    name: test-wasm-parity (integrationWasm)
+    needs: integration-wasm
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Every shard passed
+        env:
+          SHARDS: ${{ needs.integration-wasm.result }}
+        run: |
+          echo "integrationWasm shards: $SHARDS"
+          test "$SHARDS" = success
 
   # Resolve the Playwright container tag from the repo's own Playwright version so
   # the e2e jobs' browser can never drift from the one baselines were minted with
