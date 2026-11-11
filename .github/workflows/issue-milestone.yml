@@ -108,5 +108,5 @@ jobs:
           fi
           gh api -X POST "repos/${GH_REPO}/issues/${ISSUE}/labels" -f "labels[]=needs-triage" --silent
           gh api -X POST "repos/${GH_REPO}/issues/${ISSUE}/comments" \
-            -f body="Closed without a decided milestone and no merged pull request with a milestone to copy, so it stays in Triage and is flagged needs-triage. Please give it the milestone it would have belonged to (never Backlog): 3.0.0 or 3.x for finished Rust-cycle work, 1.x or 2.x for older closed work." --silent
+            -f body="Closed without a decided milestone and no merged pull request with a milestone to copy, so it stays in Triage and is flagged needs-triage. Please give it the milestone it would have belonged to (never Backlog): 3.0.0 or 4.0.0 for finished Rust-cycle work, 1.x or 2.x for older closed work." --silent
           echo "Issue #${ISSUE} closed with no decidable milestone; left in Triage and flagged."

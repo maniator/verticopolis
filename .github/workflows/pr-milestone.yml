@@ -42,7 +42,7 @@ jobs:
       GH_REPO: ${{ github.repository }}
       PR: ${{ github.event.pull_request.number }}
       PR_BODY: ${{ github.event.pull_request.body }}
-      CURRENT_RELEASE: "3.x"
+      CURRENT_RELEASE: "4.0.0"
     steps:
       - name: Give the pull request a milestone
         run: |
