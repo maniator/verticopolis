@@ -80,13 +80,16 @@ describe("parseMarker", () => {
 });
 
 describe("the repository's marker", () => {
-  it("parses, and holds the 3.0.0 window the owner opened at the freeze (2026-11-10), reset once for #1877", () => {
+  it("parses, and holds the 3.0.0 window the owner opened at the freeze (2026-11-10), reset for #1877 and for the 3.0.1 bomb search (#1886)", () => {
     const marker = parseMarker(readFileSync(resolve(REPO_ROOT, FREEZE_MARKER_PATH), "utf8"));
     // A reset or a closed window changes this on purpose, in the same PR.
     expect(marker).toEqual({
       open: true,
-      key: "429e7e2cd4a3d3a10cac1655b45660febc2ec79276da817d117a761222b3cb65",
-      resets: [{ from: "ecadbdf6ab8149c42c0ba567d3a7e56ef0e48ab9bcca5f0b9e2a99dd1bd6bc56", to: "429e7e2cd4a3d3a10cac1655b45660febc2ec79276da817d117a761222b3cb65", approval: "https://github.com/maniator/verticopolis/issues/945#issuecomment-6781559256" }],
+      key: "e6e86f4380cc99c8d57a0ce6643e2c30ec2edd192a74f86693dc85bd600f7356",
+      resets: [
+        { from: "ecadbdf6ab8149c42c0ba567d3a7e56ef0e48ab9bcca5f0b9e2a99dd1bd6bc56", to: "429e7e2cd4a3d3a10cac1655b45660febc2ec79276da817d117a761222b3cb65", approval: "https://github.com/maniator/verticopolis/issues/945#issuecomment-6781559256" },
+        { from: "429e7e2cd4a3d3a10cac1655b45660febc2ec79276da817d117a761222b3cb65", to: "e6e86f4380cc99c8d57a0ce6643e2c30ec2edd192a74f86693dc85bd600f7356", approval: "https://github.com/maniator/verticopolis/pull/1886#issuecomment-6787552594" },
+      ],
     });
   });
 

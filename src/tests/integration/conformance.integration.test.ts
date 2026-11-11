@@ -1,7 +1,14 @@
 import { afterAll, afterEach, describe, it, expect } from "vitest";
 import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { CONFORMANCE_DIR, firstDivergence, loadScenario, runScenario, type Checkpoint } from "../conformance/scenario";
+import {
+  CONFORMANCE_DIR,
+  PAST_THE_TYPESCRIPT_REFERENCE,
+  firstDivergence,
+  loadScenario,
+  runScenario,
+  type Checkpoint,
+} from "../conformance/scenario";
 
 /**
  * Engine conformance suite (conformance/README.md). Every scenario runs on the
@@ -9,6 +16,12 @@ import { CONFORMANCE_DIR, firstDivergence, loadScenario, runScenario, type Check
  * conformance/expected.json exactly. Any engine change that moves a hash is a
  * simulation change: regenerate with `VC_CONFORMANCE_UPDATE=1 npx vitest run
  * --project integration conformance` and commit the new lock with intent.
+ *
+ * The scenarios in PAST_THE_TYPESCRIPT_REFERENCE are pinned by the Rust engine
+ * alone (conformanceWasm checks them): the reference answers a refused bomb
+ * ransom at once, and it is being deleted (#1875), so it neither plays them
+ * here nor rewrites their entries. The owner granted this exception for 3.0.1
+ * on 2026-11-11 (#1886).
  */
 
 const SCENARIO_DIR = resolve(CONFORMANCE_DIR, "scenarios");
@@ -20,6 +33,7 @@ type Lock = { scenarios: Record<string, Checkpoint[]> };
 
 const files = readdirSync(SCENARIO_DIR).filter((f) => f.endsWith(".json")).sort();
 const lock: Lock = existsSync(LOCK) ? (JSON.parse(readFileSync(LOCK, "utf8")) as Lock) : { scenarios: {} };
+const played = files.filter((f) => !PAST_THE_TYPESCRIPT_REFERENCE.has(f));
 const fresh: Lock = { scenarios: {} };
 
 function writeLock(l: Lock): void {
@@ -41,6 +55,11 @@ describe("engine conformance", () => {
   afterAll(() => {
     if (!UPDATE) return;
     if (failed) throw new Error("conformance lock NOT written; a test in this run failed");
+    for (const f of files.filter((f) => PAST_THE_TYPESCRIPT_REFERENCE.has(f))) {
+      const id = f.replace(/\.json$/, "");
+      if (!lock.scenarios[id]) throw new Error(`conformance lock NOT written; ${id} has no Rust entry to keep`);
+      fresh.scenarios[id] = lock.scenarios[id];
+    }
     const missing = files.map((f) => f.replace(/\.json$/, "")).filter((id) => !fresh.scenarios[id]);
     if (missing.length) throw new Error(`conformance lock NOT written; these scenarios did not finish: ${missing.join(", ")}`);
     writeLock(fresh);
@@ -52,7 +71,7 @@ describe("engine conformance", () => {
     if (!UPDATE) expect(Object.keys(lock.scenarios).sort()).toEqual([...ids].sort());
   });
 
-  for (const file of files) {
+  for (const file of played) {
     const scenario = loadScenario(resolve(SCENARIO_DIR, file));
     it(`${scenario.id} matches its pinned checkpoints`, () => {
       const got = runScenario(scenario);
