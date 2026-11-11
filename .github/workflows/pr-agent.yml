@@ -14,13 +14,8 @@ permissions:
   pull-requests: write
 
 jobs:
-  # Spending cap (owner, 2026-11-11): once the PR's running total in the cost
-  # comment reaches PR_AGENT_COST_CAP_USD, no further PR-Agent run starts on it
-  # until someone with write access adds the `pr-agent-override` label. The
-  # check runs before the model is called, so a run in flight can overshoot
-  # the cap by that run's own cost.
-  cost-gate:
-    name: Check the PR's PR-Agent spending cap
+  pr-agent:
+    name: Review and requested code suggestions
     if: >-
       github.event.sender.type != 'Bot' &&
       github.event.issue.pull_request &&
@@ -33,10 +28,21 @@ jobs:
         startsWith(github.event.comment.body, '/help') ||
         startsWith(github.event.comment.body, '/config')
       )
+    # One job per PR, run one after another: the spending check, the model
+    # run and the cost ledger update all happen inside it, so a second command
+    # cannot read the total before the first one has been added to it, and a
+    # second run cannot overwrite PR-Agent's edited comment before its cost is
+    # captured. GitHub keeps one waiting run per group, so a command that
+    # arrives while two others are already queued is dropped: comment it again.
+    concurrency:
+      group: pr-agent-${{ github.event.issue.number }}
+      cancel-in-progress: false
     runs-on: ubuntu-latest
-    timeout-minutes: 5
-    outputs:
-      allowed: ${{ steps.gate.outputs.allowed }}
+    timeout-minutes: 25
+    # Spending cap (owner, 2026-11-11): once the PR's running total in the cost
+    # comment reaches a cap, no further run starts on it until someone with
+    # write access adds the override label. Checked before the model is
+    # called, so the run in flight can overshoot by its own cost.
     env:
       PR_AGENT_COST_CAP_USD: '2.00'
       # Second cap that does not depend on PR-Agent knowing the model's price:
@@ -76,22 +82,9 @@ jobs:
             gh api -X POST "$api" -f body="$note" >/dev/null
           fi
 
-  pr-agent:
-    name: Review and requested code suggestions
-    needs: cost-gate
-    if: needs.cost-gate.outputs.allowed == 'true'
-    # Job-level concurrency is evaluated only for an eligible command/PR.
-    # Ordinary or unauthorized issue comments must never cancel a review.
-    # Each command comment gets its own group, so `/review` and `/improve`
-    # posted together both finish.
-    concurrency:
-      group: pr-agent-${{ github.event.issue.number }}-${{ github.event.comment.id }}
-      cancel-in-progress: true
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
       # v0.49.0 GitHub Actions runtime: immutable versioned Docker image.
       - name: PR-Agent
+        if: steps.gate.outputs.allowed == 'true'
         uses: docker://pragent/pr-agent:0.49.0-github_action
         env:
           OPENAI_KEY: ${{ secrets.OPENAI_KEY }}
@@ -101,22 +94,13 @@ jobs:
           github_action_config.auto_improve: 'false'
           config.restricted_mode: 'true'
 
-  # PR-Agent edits its review and suggestion comments in place, so each one
-  # shows only its latest run. This job keeps one running comment per PR that
-  # adds up every run's own cost line (PR-Agent's estimate, rounded to cents;
-  # OpenAI's usage page is the bill). It reads comments through the API and
-  # never checks out or executes PR code.
-  cost-ledger:
-    name: Running cost of PR-Agent on this PR
-    needs: pr-agent
-    if: ${{ !cancelled() && needs.pr-agent.result != 'skipped' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    concurrency:
-      group: pr-agent-ledger-${{ github.event.issue.number }}
-      cancel-in-progress: false
-    steps:
+      # PR-Agent edits its review and suggestion comments in place, so each one
+      # shows only its latest run. This step keeps one running comment per PR
+      # that adds up every run's own cost line (PR-Agent's estimate, rounded to
+      # cents; OpenAI's usage page is the bill). It reads comments through the
+      # API and never checks out or executes PR code.
       - name: Add this run to the cost comment
+        if: ${{ !cancelled() && steps.gate.outputs.allowed == 'true' }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}

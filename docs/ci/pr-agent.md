@@ -32,12 +32,12 @@ ChatGPT subscription. No OpenAI organization ID or other variable is required.
   (`max_number_of_calls`). Each run's comment ends with an "Agent run details"
   block that shows its tokens and estimated cost, but PR-Agent edits that
   comment in place, so it shows only the latest run.
-- The `cost-ledger` job in the workflow keeps one comment per PR, "PR-Agent
+- The last step of the job keeps one comment per PR, "PR-Agent
   cost on this PR", that adds up every run's details block (tokens, calls and
   PR-Agent's estimate, rounded to cents). It reads comments through the API
   only. The estimate is not the bill: the OpenAI usage page is. A run that
   fails before it posts a details block (no credits, a model error) adds no row.
-- **Spending cap per PR (owner, 2026-11-11).** The `cost-gate` job reads that
+- **Spending cap per PR (owner, 2026-11-11).** The first step of the job reads that
   running total before every command. At $2.00 or more (`PR_AGENT_COST_CAP_USD`
   in the workflow), or at 1,000,000 input tokens (`PR_AGENT_INPUT_TOKEN_CAP`,
   a second cap for a model whose price PR-Agent does not know), the model is
@@ -45,7 +45,11 @@ ChatGPT subscription. No OpenAI organization ID or other variable is required.
   comment says so. To allow more runs, add the `pr-agent-override` label to the
   PR (it needs write access) and comment the command again; removing the label
   restores the cap. The check runs before the call, so the last run can
-  overshoot the cap by its own cost. Raising the cap is a one-line workflow
+  overshoot the cap by its own cost. Because the check, the run and the
+  ledger update are one job per PR, a second command cannot read the total
+  before the first has been added to it. GitHub keeps one waiting run per
+  group, so a command that arrives while two others are queued is dropped;
+  comment it again. Raising the cap is a one-line workflow
   change in a reviewed PR.
 - PR-Agent complements, and does not replace, Rust/test/coverage CI,
   independent reviews, Copilot or Codex.
@@ -54,8 +58,8 @@ ChatGPT subscription. No OpenAI organization ID or other variable is required.
 
 PR-Agent carries the heavy review pass, so Claude sessions spend fewer tokens
 on it (owner, 2026-11-10). For a non-trivial PR, the author or reviewer
-comments `/review` and `/improve` on the PR as two separate comments. Each
-command runs in its own concurrency group, so both finish. Nothing runs
+comments `/review` and `/improve` on the PR as two separate comments. The
+runs of one PR go one after another (one job per PR), so both finish. Nothing runs
 automatically, so the author requests the pair themselves, once per review
 round, when the branch is ready for review. The review skill then runs one lean pass
 of its layers in the same session, without a subagent per layer, and triages
