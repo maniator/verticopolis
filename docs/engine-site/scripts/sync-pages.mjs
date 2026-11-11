@@ -50,7 +50,7 @@ export function rewriteTarget(target, source) {
   const anchor = hash === -1 ? "" : target.slice(hash);
   if (path === "") return target;
   const ours = path.match(/^https:\/\/github\.com\/maniator\/verticopolis\/(?:blob|tree)\/main\/(.+)$/);
-  if (ours) return siteLink(unalias(ours[1]), anchor) ?? target;
+  if (ours) return siteLink(unalias(ours[1]), anchor) ?? githubLink(unalias(ours[1]), anchor);
   if (/^[a-z][a-z0-9+.-]*:/i.test(path) || path.startsWith("/")) return target;
   const repoPath = unalias(posix.normalize(posix.join(posix.dirname(source), path)));
   return siteLink(repoPath, anchor) ?? githubLink(repoPath, anchor);
