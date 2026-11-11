@@ -272,6 +272,17 @@ export const BINDING_EXPORT_TIERS = {
   viewFrame: LOOP,
   free: LOOP,
 
+  // The tooling harnesses' reads (src/game/toolingTower.ts, #1875 step 4): a
+  // unit or a shaft as the save holds it, and the tower lookups a harness
+  // builds and checks a tower with.
+  unitRecord: T2,
+  transportRecord: T2,
+  roomAt: T2,
+  structureKindAt: T2,
+  floorHasLobby: T2,
+  isFloorServed: T2,
+  highestFloor: T2,
+
   // Tier 3: relay, test and seed ops.
   setMoney: T3,
   setCars: T3,
@@ -292,6 +303,9 @@ export const BINDING_EXPORT_TIERS = {
   advanceClock: T3,
   seedLoopMemos: T3,
   seedElevatorTelemetry: T3,
+  // The tooling harnesses' bare placements (src/game/toolingTower.ts, #1875 step 4).
+  placeBare: T3,
+  placeTransportBare: T3,
 } as const satisfies Record<BindingExport, TierEntry>;
 
 /** The exports wasm-bindgen writes itself, which the Rust sources never name. */
