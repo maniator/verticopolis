@@ -93,9 +93,8 @@ jobs:
             [ "$seeds" -le $(( 100000 - offset )) ] || { echo "seeds must fit in one block: at most $(( 100000 - offset )) from seed_offset $offset"; exit 2; }
             [ "$last" -le 4294967295 ] || { echo "seeds $first to $last do not fit in 32 bits (seed_block at most 42948)"; exit 2; }
           fi
-          # The window key (scripts/fuzz-key.ts): a night counts toward the
-          # window only on one unchanged key, from a scheduled run on main. A key
-          # that cannot be computed, or that is not a 64-digit hex string, is
+          # The window key (scripts/fuzz-key.ts): two nights on one key ran the
+          # same engine with the same pins. A key that cannot be computed, or that is not a 64-digit hex string, is
           # recorded as unavailable. The key and the run's event and ref are also
           # written to fuzz-out/window-key.txt, so the scenarios artifact carries them,
           # with the runner image version (ImageVersion), which the key cannot see: a
