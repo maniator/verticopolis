@@ -61,7 +61,11 @@ node_mount=()
 env_args=(-e PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 -e CI=1)
 for kv in "$@"; do env_args+=(-e "$kv"); done
 
-exec docker run --rm --name "vc-pinned-$$" --network host --ipc host \
+# Run as the calling user, so dist/, screenshots and baselines stay theirs.
+user_args=()
+[ "$(id -u)" != "0" ] && user_args=(-u "$(id -u):$(id -g)" -e HOME=/tmp)
+
+exec docker run --rm --name "vc-pinned-$$" --network host --ipc host "${user_args[@]}" \
   -v "$ROOT:$ROOT" -w "$ROOT" "${node_mount[@]}" "${env_args[@]}" "$IMAGE" \
   bash -c 'set -e
     [ -x /opt/vc-node/bin/node ] && export PATH="/opt/vc-node/bin:$PATH"
