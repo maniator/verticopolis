@@ -1,10 +1,18 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
+import { existsSync } from "node:fs";
+import { resolve } from "node:path";
+import { checkScenario, loadWebPackage } from "./nodeCheck";
 import { SCENARIO_NAMES, buildScenarios, loadFixtureSave } from "./scenarios";
 import { hasWasmPackage, wasm, wasmRequired } from "../conformance/wasmEngine";
 
 if (wasmRequired() && !hasWasmPackage()) throw new Error("VC_REQUIRE_WASM=1 but engine-rs/pkg is not built; run npm run wasm:build");
 const needsEngine = !hasWasmPackage() && !wasmRequired();
+// The served browser package (build output, written by wasm:build), which
+// perf:compare's Node check loads.
+const WEB_PKG = resolve(import.meta.dirname, "../../public/engine");
+const hasWebPkg = ["verticopolis_engine_bg.wasm", "verticopolis_engine.js"].every((f) => existsSync(resolve(WEB_PKG, f)));
+if (wasmRequired() && !hasWebPkg) throw new Error("VC_REQUIRE_WASM=1 but src/public/engine/ is not built; run npm run wasm:build");
 
 interface SavedUnits {
   units: { kind: string; x: number; state?: string }[];
@@ -77,4 +85,23 @@ describe("the harnesses' scenarios", () => {
     expect(wing.length).toBeGreaterThan(100);
     expect(dirty(wing).length).toBeGreaterThan(wing.length / 2);
   }, 240_000);
+
+  // perf:compare's anchor: the served package's digests, which every browser
+  // sample must match, are the Rust engine's own for the same save and ticks.
+  it.skipIf(needsEngine || (!hasWebPkg && !wasmRequired()))("records the served package's start and end states for the browser runs to match", async () => {
+    const mod = await loadWebPackage(WEB_PKG);
+    const [small] = buildScenarios(["small"]);
+    const c = checkScenario(mod, small, 60, 2, 5);
+    const engine = wasm().Engine.fromSave(small.save);
+    try {
+      expect(c.start).toEqual({ state: engine.stateDigest(), crowd: engine.crowdDigest() });
+      // The warmup ran on a throwaway copy, so the check's end is 60 ticks on.
+      for (let i = 0; i < 60; i++) engine.tick(2);
+      expect(c.end).toEqual({ state: engine.stateDigest(), crowd: engine.crowdDigest() });
+    } finally {
+      engine.free();
+    }
+    expect(c.end.state).not.toBe(c.start.state);
+    expect([c.scenario, c.steps, c.dt]).toEqual(["small", 60, 2]);
+  }, 120_000);
 });

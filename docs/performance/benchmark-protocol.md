@@ -616,8 +616,9 @@ both modes. An `--aa ts` pass still runs that probe, on the verdict run's
 schedule, so the page lifecycle matches. Boot order differs only when the two
 slots run different engines, so DOMContentLoaded and the load event are
 compared in an A/A folder. An `--aa ts` pass still needs the WASM package
-and the Node check of both engines to pass, because the harness validates the
-whole setup.
+and the Node check to pass, because the harness validates the whole setup.
+Since #1875 the Node check runs the WASM package alone: every browser sample
+must start and end in the state it records.
 
 `npm run perf:calibrate -- <A/A folder>... --out <dir>` (`npm.cmd run
 perf:calibrate` in PowerShell) applies steps 1 to 4 to a set of

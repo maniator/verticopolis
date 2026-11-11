@@ -3,14 +3,12 @@ import { config, processRun, step } from "./fixtures";
 import type { NodeCheck } from "./nodeCheck";
 import { validateResults } from "./validate";
 
-const node = (match = true): NodeCheck => ({
+const node = (): NodeCheck => ({
   scenario: "small",
   steps: 10,
   dt: 2,
-  start: { tsState: "a", wasmState: "a", tsCrowd: "c", wasmCrowd: "c" },
-  end: { tsState: "b", wasmState: match ? "b" : "x", tsCrowd: "d", wasmCrowd: "d" },
-  match,
-  nodeTsMs: 1,
+  start: { state: "a", crowd: "c" },
+  end: { state: "b", crowd: "d" },
   nodeWasmMs: 1,
 });
 
@@ -143,8 +141,7 @@ describe("validateResults", () => {
     expect(validateResults(config(), resumed, [node()]).warnings).toContain("small: the saved-tower starts booted 2 different autosave seeds (a resumed run packs the seed again, with a new write time), and their rows pool them");
   });
 
-  it("fails on a Node mismatch or a missing Node check", () => {
-    expect(validateResults(config(), good(), [node(false)]).errors[0]).toMatch(/Node conformance check found the engines disagree/);
+  it("fails on a missing Node check", () => {
     expect(validateResults(config(), good(), []).errors).toContain("small: no Node conformance check ran");
   });
 
@@ -182,12 +179,10 @@ describe("validateResults", () => {
 
   it("fails when the browser runs and the Node check disagree on the state", () => {
     const n = node();
-    n.end.tsState = "z";
-    n.end.wasmState = "z";
+    n.end.state = "z";
     expect(validateResults(config(), good(), [n]).errors).toContain("small: the browser runs ended in b, not the Node check's z");
     const m = node();
-    m.start.tsState = "y";
-    m.start.wasmState = "y";
+    m.start.state = "y";
     expect(validateResults(config(), good(), [m]).errors).toContain("small: the browser runs started from a, not the Node check's y");
   });
 
