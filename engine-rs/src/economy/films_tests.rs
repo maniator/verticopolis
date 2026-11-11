@@ -233,3 +233,23 @@ fn a_film_change_is_a_payment_and_leaves_no_undo_step() {
     assert!(sim.end_undo_journal().is_none(), "no step");
     assert_eq!(sim.money, money - NEW_FILM_PRICE);
 }
+
+#[test]
+fn a_classic_theater_is_a_blockbuster_from_the_evening_it_opens() {
+    for mode in [GameMode::Classic, GameMode::Modern] {
+        let (mut sim, cinema, _) = theatre(mode);
+        // Put it back under construction, due now, so it opens through the
+        // game's own path.
+        let (u, at) = sim.tower.marked_by_id(cinema).unwrap();
+        u.set_state(at, UnitState::Construction);
+        u.extras_mut().complete_at = Some(sim.clock.minutes);
+        sim.constructing.insert(cinema);
+        sim.blockbusters.clear();
+        sim.finish_construction();
+        assert_eq!(
+            sim.blockbusters.contains(&(cinema as f64)),
+            mode == GameMode::Classic,
+            "{mode:?}: Modern's blockbusters come from its booking"
+        );
+    }
+}

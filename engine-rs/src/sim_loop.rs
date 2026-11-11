@@ -1,6 +1,7 @@
 //! Port of `src/engine/sim/loop.ts` and the weather hash from `sim/build.ts`.
 
 use crate::crowd::{motion, spawn, CROWD_SECONDS_PER_MINUTE};
+use crate::economy::films::draws_full_house;
 use crate::facilities::Kind;
 use crate::sim::{LogKind, Simulation};
 use crate::tower::UnitState;
@@ -236,6 +237,7 @@ impl Simulation {
                 u.set_state(at, UnitState::Empty);
                 u.extras_mut().complete_at = None;
                 u.extras_mut().complete_at_raw = None;
+                let full_house = kind == Kind::Cinema && draws_full_house(u);
                 self.constructing.shift_remove(&id);
                 let msg = format!(
                     "{} on {} is now open for business.",
@@ -245,6 +247,15 @@ impl Simulation {
                 self.emit(&msg, LogKind::Good);
                 if kind == Kind::Security {
                     self.join_bomb_search(floor);
+                }
+                // A Classic theater opens with a new film, which fills the
+                // house tonight (#1932), so it is a blockbuster from its
+                // first evening rather than from the next rollover.
+                if full_house
+                    && self.tower.mode.film_changes().is_some()
+                    && !self.blockbusters.contains(&(id as f64))
+                {
+                    self.blockbusters.push(id as f64);
                 }
             }
         }
