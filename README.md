@@ -206,6 +206,11 @@ through one synchronous interface, `EnginePort`, and never decides a game rule
 itself. The old TypeScript engine in `src/engine/` is not part of the shipped
 game and is being deleted.
 
+**Want to work on the simulation?** The engine takes contributions like the
+rest of the game. [engine-rs/README.md](engine-rs/README.md) maps its modules
+and covers building (`npm run wasm:build`), testing (`cargo test`, the
+conformance referee) and the rules a gameplay change follows.
+
 **[ARCHITECTURE.md](ARCHITECTURE.md)** has the source layout and diagrams of
 the layers, the frame loop, the engine, input and persistence.
 [CONTRIBUTING.md](CONTRIBUTING.md) covers building the engine package

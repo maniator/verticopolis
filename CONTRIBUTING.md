@@ -857,7 +857,7 @@ alone.
 
 | Path | What |
 | --- | --- |
-| `engine-rs/` | The simulation: the Rust engine, compiled to WebAssembly, and the only engine the game runs. No host access (`engine-rs/tests/independence.rs`), deterministic, tested with `cargo test`. It owns the rules, caps and tuning (`facilities.rs`, `rules.rs`), the catalog the UI reads (`catalog.rs`), saves and `.TDT`, and undo. |
+| `engine-rs/` | The simulation: the Rust engine, compiled to WebAssembly, and the only engine the game runs. No host access (`engine-rs/tests/independence.rs`), deterministic, tested with `cargo test`. It owns the rules, caps and tuning (`facilities.rs`, `rules.rs`), the catalog the UI reads (`catalog.rs`), saves and `.TDT`, and undo. Its module map and how to build, test and change it: [`engine-rs/README.md`](./engine-rs/README.md). |
 | `src/simport/` | `EnginePort`, the one synchronous interface the game uses to call the engine, and the shared view reader that decodes the engine's frame. |
 | `src/dualrun/`, `src/wasmhost/` | The WASM binding and its declaration (`engine.d.ts`); loading the engine package, its build metadata and the catalog checks. |
 | `src/shared/` | Types and small helpers shared across the game. |

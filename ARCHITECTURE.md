@@ -14,7 +14,22 @@ inline.
 
 ```
 engine-rs/     # the simulation: a deterministic Rust engine, compiled to WebAssembly
-               # (rules, caps, tuning, the catalog, saves, .TDT, the frame the renderer reads)
+  src/
+    sim.rs, sim_loop.rs   # Simulation and its tick
+    rules.rs              # Classic vs Modern (impl GameMode)
+    facilities.rs         # sizes, prices, build caps, transport pooling
+    catalog.rs            # everything a frontend shows
+    tower.rs, tower/      # placement and transports
+    crowd/, dispatch.rs   # people, routing, elevator cars
+    economy.rs, events*.rs, satisfaction.rs, star.rs   # money, events, mood, ratings
+    undo.rs, sim_undo*.rs # the undo history
+    sim_save.rs, load/    # saves, the loader and migrations
+    tdt/                  # the 1994 .TDT codec
+    frame.rs, view/, panels/   # what a host reads
+    wasm.rs, wasm_port*.rs     # the WASM binding and EnginePort
+    bin/                  # the conformance referee and tools
+  tests/       # integration tests (independence, read boundary, API, .TDT)
+  consumer/    # a small frontend-free host
 src/
   main.ts      # GameApp: the composition root, owns the game loop
   game/        # controllers: build/editor actions, save/load, input, inspector, HUD wiring
@@ -33,7 +48,8 @@ e2e/           # Playwright end-to-end specs
 ```
 
 CONTRIBUTING.md → **Where things live** is the full index of every `src/`
-directory.
+directory, and [engine-rs/README.md](engine-rs/README.md) maps every engine
+module and how to build, test and change the engine.
 
 ## The big picture: layers
 
