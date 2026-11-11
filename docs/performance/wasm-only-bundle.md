@@ -5,8 +5,10 @@
 > reads what the UI draws, saves are read through the engine, and the tooling
 > harnesses' hand-built tower (`src/game/toolingSim.ts`) is swapped for a
 > stand-in in every build but a `VC_TOOLING=1` one. The postbuild guard fails a
-> production build that carries any engine module, and
-> `scripts/engine-bundle.allow.txt` now lists what a tooling build carries.
+> production build that carries any engine module. Since #1875's tooling step
+> the harnesses' tower drives the app's Rust engine
+> (`src/game/toolingTower.ts`), so a tooling build carries none either and
+> `scripts/engine-bundle.allow.txt` lists nothing.
 > The module counts and byte figures below are the 2026-10-14 snapshot.
 
 > **The switchable build described below no longer exists.** Slice 4b of the
@@ -151,9 +153,9 @@ every build:
   - The bundle has no step loop.
   - The engine glue and binary are precached (when `dist/` holds the engine package; a `VC_ALLOW_NO_ENGINE=1` build has none, and `scripts/verify-precache.ts` allows that only off a deploy).
   - A production build ships no `src/engine/` module and not the
-    harnesses' tower (`src/game/toolingSim.ts`). In a `VC_TOOLING=1` build,
-    every `src/engine/` module that ships is listed in
-    `scripts/engine-bundle.allow.txt`, and every listed module ships.
+    harnesses' tower (`src/game/toolingSim.ts`). A `VC_TOOLING=1` build
+    ships the harnesses' tower, which drives the Rust engine, and no
+    `src/engine/` module either: `scripts/engine-bundle.allow.txt` is empty.
 
 When this was written, a one-off comparison (not part of the guard) found
 the sourcemaps list the same 85 engine modules as Rollup's own metadata for

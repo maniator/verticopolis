@@ -25,4 +25,3 @@
 # src/preview.ts and src/analyticsEngineBridge.ts. src/presentation/ and
 # src/audio/ imported the engine for types only; those types moved to
 # src/shared/ (#1875 step 3), and the scan keeps runtime imports out.
-src/game/toolingSim.ts Simulation catalog port/tsEngine # the tooling harnesses' hand-built towers (PR 5e), swapped out of production builds (vite.config.ts); catalog came from the tower catalog's old default, which tests and these towers now set (#921)

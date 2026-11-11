@@ -170,22 +170,22 @@ describe("the parity register audit catches a stale register", () => {
   });
 
   it("a made-up disposition, a duplicate row and a 2a row for a file that is gone", () => {
-    // Use a real importer from the current ratchet rather than pinning a
-    // particular file: the runtime-import inventory should be able to shrink.
-    const importer = base.ratchet.find((f) => base.register.includes(`| \`${f}\` |`));
-    if (!importer) throw new Error("no frontend import row to mutate");
-    const row = base.register.split("\n").find((line) => line.startsWith(`| \`${importer}\` |`));
-    if (!row) throw new Error(`missing frontend import row for ${importer}`);
+    // The import ratchet is empty since the harnesses' tower left the
+    // TypeScript engine, so the case adds a row of its own to section 2a, with
+    // its file on the ratchet.
+    const importer = "src/game/toolingSim.ts";
+    const header = "| File | Runs in the shipped game | Decides gameplay | Disposition | Owner |\n| --- | --- | --- | --- | --- |\n";
+    expect(base.register).toContain(header);
+    const row = `| \`${importer}\` | no | no | tooling only | #1875 |`;
+    const register = base.register.replace(header, `${header}${row}\n`);
+    const ratchet = [...base.ratchet, importer];
+    expect(problems({ register, ratchet })).toEqual(problems({}));
     const cells = row.split("|");
     cells[4] = " maybe later ";
-    expect(problems({ register: base.register.replace(row, cells.join("|")) }).join("\n")).toContain(
-      'disposition "maybe later"',
-    );
+    expect(problems({ register: register.replace(row, cells.join("|")), ratchet }).join("\n")).toContain('disposition "maybe later"');
     const tickRow = /\| `tick` \| lifecycle \| proven same \|[^\n]*/.exec(base.register)![0];
     expect(problems({ register: base.register.replace(tickRow, `${tickRow}\n${tickRow}`) })).toContain("section 3: tick has more than one row");
-    expect(problems({ ratchet: base.ratchet.filter((f) => f !== importer) })).toContain(
-      `section 2a: a row for ${importer}, which is gone`,
-    );
+    expect(problems({ register })).toContain(`section 2a: a row for ${importer}, which is gone`);
   });
 
   it("a table that loses its Class, Evidence or Disposition column, a proven same row with nowhere to cite, and a section with two tables", () => {

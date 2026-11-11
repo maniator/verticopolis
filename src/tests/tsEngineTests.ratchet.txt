@@ -31,7 +31,6 @@ src/game/portLifecycle.test.ts Simulation port/tsEngine
 src/game/scheduleRecovery.test.ts Simulation port/tsEngine
 src/game/scheduleReview.test.ts Simulation port/tsEngine
 src/game/serviceDiagnosticsCards.test.ts port/tsEngine
-src/game/toolingSim.test.ts Simulation port/tsEngine
 src/game/trafficHud.test.ts Simulation port/tsEngine
 src/game/trafficHudPort.test.ts Simulation port/tsEngine
 src/game/uiCallbacks.test.ts Simulation port/tsEngine

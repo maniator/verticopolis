@@ -34,7 +34,6 @@ function makeApp(hadReadableSave: boolean): GameApp {
     audio: { sfx: vi.fn(), setProgram: vi.fn() },
     setSpeed: vi.fn(),
     ui: { toast: vi.fn(), newTowerModal: vi.fn(), showHelp: vi.fn() },
-    sim: enginePort.sim,
     enginePort,
     events: new PortEvents(enginePort),
     saveLoad: { autosave: vi.fn(), newGame: vi.fn() },
@@ -66,7 +65,7 @@ describe("runBootFlow: the boot backdrop's events", () => {
   it("stay behind when the player founds a tower, even ones emitted after the splash", () => {
     const app = makeApp(false);
     runBootFlow(app);
-    app.sim!.gameplayEvents.push("fire_started", {}); // the backdrop, still running behind the title
+    (app.enginePort as TsEngine).sim.gameplayEvents.push("fire_started", {}); // the backdrop, still running behind the title
     const events = foundNewTower(app);
     expect(events).toEqual([{ name: "tower_founded", payload: { mode: "modern" } }]);
   });

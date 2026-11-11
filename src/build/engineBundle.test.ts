@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { existsSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { checkEngineBundle, ENGINE_PACKAGE_FILES, parseAllowList, precacheManifest, repoRelativeSource, TOOLING_SIM, TS_STEP_LOOP, type EngineBundleInput } from "./engineBundle";
 
@@ -85,12 +85,10 @@ describe("parseAllowList", () => {
     expect(parseAllowList("src/engine/Tower.ts\nsrc/engine/Tower.ts\nsrc/ui/UI.ts").errors).toEqual(["line 2: src/engine/Tower.ts is listed twice", "line 3: src/ui/UI.ts is not under src/engine/"]);
   });
 
-  it("the committed list parses cleanly, names files that exist, and leaves out the step loop", () => {
+  it("the committed list parses cleanly and is empty: a tooling build ships no engine module either (#1875 step 4)", () => {
     const { modules, errors } = parseAllowList(readFileSync(resolve(ROOT, "scripts", "engine-bundle.allow.txt"), "utf8"));
     expect(errors).toEqual([]);
-    expect(modules.length).toBeGreaterThan(0);
-    expect(modules.filter((m) => !existsSync(resolve(ROOT, m)))).toEqual([]);
-    expect(modules).not.toContain(TS_STEP_LOOP);
+    expect(modules).toEqual([]);
   });
 });
 

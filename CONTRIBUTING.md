@@ -391,7 +391,10 @@ e2e specs (e.g. `e2e/integration.spec.ts` boots it in a real browser):
 
 Also excluded are non-product tooling entry points that are build/dev plumbing,
 not game logic: the gallery/preview pages (`src/gallery.ts`,
-`src/preview.ts`) and the PWA bootstrap (`src/pwa.ts`),
+`src/preview.ts`), the PWA bootstrap (`src/pwa.ts`), the harnesses' tower
+(`src/game/toolingTower.ts` and `toolingSim.ts`, which drive the Rust engine
+package the coverage run does not build; their tests run on the unitWasm leg,
+and the e2e specs and the screenshot gallery drive them),
 plus the usual non-code (`*.d.ts`, `*.config.*`) and the tests themselves.
 
 ### What you might assume is untestable but ISN'T
