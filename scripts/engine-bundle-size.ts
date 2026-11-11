@@ -1,6 +1,6 @@
 /**
  * Size report for one production build directory, for comparing engine build
- * modes (docs/performance/wasm-only-bundle.md). It reuses the #979 size
+ * modes (docs/performance/player-bundle.md). It reuses the #979 size
  * analysis (src/tests/perfCompare/bundle.ts: raw, gzip level 9 and Brotli
  * quality 11 for every file, the precache list, the categories) and adds what
  * a first visit fetches before the game runs: the entry script and the

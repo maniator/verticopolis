@@ -147,7 +147,7 @@ Verticopolis has **two test tiers**:
     line: the list only shrinks).
     `?engine=` and `vc.engine` are ignored. The WASM test lanes use
     `VC_REQUIRE_WASM=1`. See
-    `docs/performance/wasm-only-bundle.md` for what still ships and why. A simulation change lands in the
+    `docs/performance/player-bundle.md` for what still ships and why. A simulation change lands in the
     Rust engine. The TypeScript engine changes only when the shared lock, a parity test or the
     catalog digest needs it (for example the catalog size and price tables both engines read), and
     the PR says why; no feature or fix is ported to it for its own sake. An engine PR that adds a branch adds a scenario that reaches it;
@@ -249,9 +249,9 @@ Verticopolis has **two test tiers**:
   the machine (see [`playwright.config.ts`](./playwright.config.ts)):
   `chromium-serial` holds the pinned visual/perf checks (`engineIdentity`,
   `engineStatusRows`, `atlas`, `visual`, `perf`) and runs with one worker, as
-  the `e2e` job; `chromium` holds the general browser regression suite,
-  including `e2e/wasmOnly.spec.ts` (boot, failures and offline start), and CI
-  runs it as the `e2e-wasm-only` job, in three shards on three runners. The
+  the `e2e-serial` job; `chromium` holds the general browser regression suite,
+  including `e2e/engineBoot.spec.ts` (boot, failures and offline start), and CI
+  runs it as the `e2e-general` job, in three shards on three runners. The
   first shard also runs the negative bundle canary, and the shard that runs
   `milestones.spec.ts` uploads the milestone screenshots
   (`milestone-screenshots`). `npm run e2e` runs both locally; pass
@@ -849,10 +849,8 @@ alone.
   latest `main` and lands it with a merge commit only when the required checks
   pass there, so one merge cannot turn `main` red for every open PR. The
   required checks run on the queue's `merge_group` event too. To save
-  minutes, a queue run skips the two costliest jobs that the PR's own run
-  already passed: `e2e-wasm-only`, which is not a required check, and the
-  screenshot capture behind `drift-gate`, whose queue run passes on the PR
-  run's result. The path filters in `test.yml` and `engine-rs.yml` read the
+  minutes, a queue run skips the screenshot capture behind `drift-gate`,
+  whose queue run passes on the PR run's result. The path filters in `test.yml` and `engine-rs.yml` read the
   queued change from the compare API.
 
 ## Where things live

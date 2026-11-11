@@ -211,7 +211,7 @@ evidence is one the golden does not cover, or covers only in part.
 | Member | Group | Class | Evidence |
 | --- | --- | --- | --- |
 | `tick` | lifecycle | proven same | `src/tests/integration/tsEngine.golden.integration.test.ts`, browser `e2e/crowdCull.spec.ts` |
-| `advance` | lifecycle | proven same | `src/tests/integration/tsEngine.golden.integration.test.ts`, browser `e2e/wasmOnly.spec.ts` |
+| `advance` | lifecycle | proven same | `src/tests/integration/tsEngine.golden.integration.test.ts`, browser `e2e/engineBoot.spec.ts` |
 | `serialize` | lifecycle | proven same | `src/tests/integration/tsEngine.golden.integration.test.ts`, `src/tests/integration/conformanceWasmSaves.integration.test.ts`, browser `e2e/saveRoundTrip.spec.ts` |
 | `loadSave` | lifecycle | proven same | `src/tests/integration/tsEngine.golden.integration.test.ts`, `src/tests/integration/conformanceWasmLoadFidelity.integration.test.ts` |
 | `restore` | lifecycle | proven same | `src/tests/integration/tsEngine.golden.integration.test.ts`, `src/tests/integration/conformanceWasmLoadFidelity.integration.test.ts`, browser `e2e/serviceDiagnostics.spec.ts` |
@@ -325,8 +325,8 @@ evidence is one the golden does not cover, or covers only in part.
 | Crash report from the engine-failure screen | proven same | `src/bootstrapEngineSecure.test.ts` (the report offered while the Rust engine is stopped, with download feedback) | #1515 |
 | Recovery from a lost graphics context, and the crash screen on a repeat | proven same | browser `e2e/contextRecovery.spec.ts`; the report's contents in `src/tests/integration/crashReport.integration.test.ts` and `src/tests/integration/crashScreen.integration.test.ts` (on the TypeScript port) | |
 | Engine identity, fallback reason and UI build in diagnostics | proven same | browser `e2e/engineIdentity.spec.ts`, browser `e2e/engineStatusRows.spec.ts` | |
-| Falling back to the TypeScript engine when WASM fails | retired | browser `e2e/wasmOnly.spec.ts` | the Rust-only decision, [`release-3.0-rust-only-2026-10-30.md`](release-3.0-rust-only-2026-10-30.md): a package that cannot start stops the game with a message |
-| Settings engine choice and `?engine=` | retired | browser `e2e/wasmOnly.spec.ts` | same decision |
+| Falling back to the TypeScript engine when WASM fails | retired | browser `e2e/engineBoot.spec.ts` | the Rust-only decision, [`release-3.0-rust-only-2026-10-30.md`](release-3.0-rust-only-2026-10-30.md): a package that cannot start stops the game with a message |
+| Settings engine choice and `?engine=` | retired | browser `e2e/engineBoot.spec.ts` | same decision |
 
 ## 5. Panels, dialogs, controls, events, audio and analytics
 
@@ -355,7 +355,7 @@ comparison, settings) has no row: the engine switch cannot change it.
 | Report dialogs and their order against other dialogs | proven same | browser `e2e/modalPrecedence.spec.ts` | |
 | `.TDT` import and export reports | proven same | `src/storage/tdtImportReport.test.ts`, `src/storage/tdtExportReport.test.ts` | built from the codec's records (`src/simport/tdtRecords.ts`), which are Rust's on either engine |
 | Overview map | proven same | browser `e2e/overviewMap.spec.ts` | drawn from the engine's view; desktop opens it, a phone starts closed |
-| Speed and pause | proven same | browser `e2e/wasmOnly.spec.ts` (only the engine advances a tower) | |
+| Speed and pause | proven same | browser `e2e/engineBoot.spec.ts` (only the engine advances a tower) | |
 | The crowd drawn from the engine's people | proven same | browser `e2e/crowdCull.spec.ts` | |
 
 ## 6. Classic and Modern
