@@ -215,6 +215,9 @@ jobs:
           path: |
             dist/
             web-SHA256SUMS
+          # dist/.well-known/assetlinks.json is a hidden file, and the
+          # action leaves those out unless told otherwise.
+          include-hidden-files: true
           if-no-files-found: error
           retention-days: 7
 
@@ -338,6 +341,14 @@ jobs:
           if printf '%s\n' "$assets" | grep -qxF "$zip"; then
             echo "$TAG already has $zip; leaving it."
             exit 0
+          fi
+          # The zip must hold exactly the files the checksum list names.
+          (cd dist && sha256sum --check --quiet --strict ../web-SHA256SUMS)
+          files="$(find dist -type f | wc -l)"
+          listed="$(wc -l < web-SHA256SUMS)"
+          if [ "$files" != "$listed" ]; then
+            echo "::error::dist/ holds $files files but the checksum list names $listed."
+            exit 1
           fi
           sums="verticopolis-web-${TAG#v}.SHA256SUMS"
           cp web-SHA256SUMS "$sums"
