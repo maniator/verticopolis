@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { strFromU8, unzipSync } from "fflate";
 import { Simulation } from "../../engine/Simulation";
 import { SaveGame } from "../../storage/SaveGame";
-import { importTower } from "../fixtures/saveText";
+import { readImport } from "../fixtures/saveText";
 import { buildCrashDetails, buildCrashReportZip, bugReportUrl } from "../../game/crashReport";
 import type { CrashDescription, CrashTower } from "../../game/crashReport";
 import { facilityFloors } from "../../engine/facilities";
@@ -40,7 +40,7 @@ describe("crash report packaging", () => {
     expect(new Date(details.createdAt).toISOString()).toBe(details.createdAt);
   });
 
-  it("the zip holds crash-report.json and a .vctower save that re-imports to the same tower", async () => {
+  it("the zip holds crash-report.json and a .vctower save the import path reads back", async () => {
     const sim = new Simulation();
     sim.money = 314_159;
     const tower = towerOf(sim);
@@ -53,8 +53,8 @@ describe("crash report packaging", () => {
     expect(report.version).toBe("1.2.3");
     expect(report.tower.money).toBe(314_159);
     // The save inside the zip is a first-class .vctower: the normal import
-    // path must accept it and reproduce the tower.
-    const imported = await importTower(strFromU8(files["tower.vctower"]));
+    // path must accept it and read back the tower's save.
+    const imported = await readImport(strFromU8(files["tower.vctower"]));
     expect(imported.money).toBe(314_159);
   });
 

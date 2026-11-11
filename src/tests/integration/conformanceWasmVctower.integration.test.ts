@@ -30,9 +30,9 @@ import { fromBase64, inflateCapped, parseSaveJson, STORE_MAGIC } from "../../sto
 import { fromTowerFile, toTowerFile } from "../../storage/towerFileCodec";
 import { setEngineWriter } from "../../storage/vctowerWriter";
 import { decodeVctower } from "../../storage/vctowerContainer";
-import { tsEngine } from "../conformance/scenario";
 import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
 import { saveOf, importTower } from "../fixtures/saveText";
+import type { Draft } from "../portKit/drafts";
 
 const FIXTURES = resolve(__dirname, "../../../conformance/fixtures");
 const fixtures = readdirSync(FIXTURES)
@@ -52,6 +52,12 @@ function payloadText(text: string): string {
   expect(stored.ok).toBe(true);
   if (!stored.ok) throw new Error("fromTowerFile refused the engine's file");
   return new TextDecoder("utf-8", { fatal: true }).decode(inflateCapped(fromBase64(stored.value.slice(STORE_MAGIC.length))));
+}
+
+/** The state hash of the tower a draft's engine holds. */
+function digest(sim: Draft): string {
+  sim.settle();
+  return (sim.port as unknown as Engine).stateDigest();
 }
 
 const run = hasWasmPackage();
@@ -80,7 +86,7 @@ describe.runIf(run)("the engine's .vctower writer opens in the web game", () => 
 
     const fromEngine = await importTower(text);
     expect(fromEngine.founder).toBe(fromWeb.founder);
-    expect(tsEngine(fromEngine).stateDigest()).toBe(tsEngine(fromWeb).stateDigest());
+    expect(digest(fromEngine)).toBe(digest(fromWeb));
   });
 
   // SaveGame.export stamps with the build and the clock; pin both and the
@@ -169,7 +175,7 @@ describe.runIf(run)("the engine's .vctower writer opens in the web game", () => 
       const sim = await importTower(text);
       expect(sim.founder).toBe(false);
       expect(payloadText(text)).toBe(JSON.stringify({ ...JSON.parse(json), savedAt: SAVED_AT, appVersion: VERSION }));
-      expect(tsEngine(sim).stateDigest()).toBe(engine.stateDigest());
+      expect(digest(sim)).toBe(engine.stateDigest());
       // The engine's stamp adds exactly the fields SaveGame.export's does.
       const webKeys = Object.keys(decodeVctower(await SaveGame.export(saveOf(sim))) as object).sort();
       const engineKeys = Object.keys(decodeVctower(text) as object).sort();
@@ -196,7 +202,7 @@ describe.runIf(run)("the engine's .vctower writer opens in the web game", () => 
     const text = rust().encodeVctower(JSON.stringify(fromWeb.serialize()), VERSION, SAVED_AT);
     const fromEngine = await importTower(text);
     expect(fromEngine.founder).toBe(false);
-    expect(tsEngine(fromEngine).stateDigest()).toBe(tsEngine(fromWeb).stateDigest());
+    expect(digest(fromEngine)).toBe(digest(fromWeb));
   });
 
   // A build name that is not a number reads as no founder's tower in the
@@ -230,10 +236,11 @@ describe.runIf(run)("the engine's .vctower writer opens in the web game", () => 
     const first = fixtures[0];
     expect(first).toBeDefined();
     if (first === undefined) return;
-    const sim = await importTower(readFileSync(resolve(FIXTURES, first), "utf8"));
-    sim.tower.towerName = "Sky \ud83c";
-    const webFile = await SaveGame.export(saveOf(sim));
-    const json = JSON.stringify(sim.serialize());
+    // The engine cannot hold half a character, so the save is the one an
+    // older web game wrote: a fixture's save with the cut name in it.
+    const raw = decodeVctower(readFileSync(resolve(FIXTURES, first), "utf8"), first) as Record<string, unknown>;
+    const json = JSON.stringify({ ...raw, towerName: "Sky \ud83c" });
+    const webFile = await SaveGame.export(json);
     expect(json).toContain("\\ud83c");
     // The file the web writer made carries the escape itself.
     expect(payloadText(webFile)).toContain("\\ud83c");
@@ -250,18 +257,18 @@ describe.runIf(run)("the engine's .vctower writer opens in the web game", () => 
     // The web loader repairs the same string the same way, so both engines
     // hold one tower and the dual run sees no divergence (#936).
     const webLoaded = await importTower(webFile);
-    expect(webLoaded.tower.towerName).toBe("Sky \uFFFD");
+    expect(webLoaded.serialize().towerName).toBe("Sky \uFFFD");
     // The Node decoder the dual-run and conformance harnesses load with too.
     expect((decodeVctower(webFile) as { towerName?: unknown }).towerName).toBe("Sky \uFFFD");
     const fromWebFile = rust().Engine.fromVctower(webFile);
     try {
-      expect(tsEngine(webLoaded).stateDigest()).toBe(fromWebFile.stateDigest());
+      expect(digest(webLoaded)).toBe(fromWebFile.stateDigest());
     } finally {
       fromWebFile.free();
     }
 
     const written = rust().encodeVctower(json, VERSION, SAVED_AT);
-    expect((await importTower(written)).tower.towerName).toBe("Sky \uFFFD");
+    expect((await importTower(written)).serialize().towerName).toBe("Sky \uFFFD");
     expect(rust().exportTdt(json).length).toBeGreaterThan(0);
   });
 

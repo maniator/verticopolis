@@ -230,6 +230,41 @@ fn the_log_and_the_text_getters() {
 }
 
 #[test]
+fn the_log_ring_keeps_the_newest_lines_and_counts_them_all() {
+    let mut e = engine();
+    let start = e.sim.log_seq;
+    let extra = 20;
+    for i in 1..=crate::sim::LOG_RING_CAP + extra {
+        assert_eq!(e.port_log_line(&format!("event {i}"), 1.0)[0], 1.0);
+    }
+    assert_eq!(
+        e.sim.log.len(),
+        crate::sim::LOG_RING_CAP,
+        "the ring holds its cap"
+    );
+    let added = (crate::sim::LOG_RING_CAP + extra) as f64;
+    assert_eq!(
+        e.sim.log_seq as f64 - start as f64,
+        added,
+        "the number counts every line"
+    );
+    let after = e.port_log_after(start as f64);
+    assert_eq!(
+        after.len() / 3,
+        crate::sim::LOG_RING_CAP,
+        "only kept lines answer"
+    );
+    let newest = after[after.len() - 3];
+    let oldest = after[0];
+    let last = format!("event {}", crate::sim::LOG_RING_CAP + extra);
+    assert_eq!(e.port_log_text(newest).as_deref(), Some(last.as_str()));
+    assert_eq!(
+        e.port_log_text(oldest).as_deref(),
+        Some(format!("event {}", extra + 1).as_str())
+    );
+}
+
+#[test]
 fn the_unit_text_and_the_undo_signature() {
     let mut e = engine();
     e.port_build(code(Kind::Lobby), 1.0, 100.0);

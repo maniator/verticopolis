@@ -1,9 +1,8 @@
 import { vi } from "vitest";
 import type { GameApp } from "../main";
-import { Simulation } from "../engine/Simulation";
-import { TsEngine } from "../engine/port/tsEngine";
 import { PortCodes } from "../simport/portCodes";
 import { catalogFor } from "../tests/catalogFixture";
+import { mockPort } from "../tests/portKit/mockPort";
 import { catalogOn, useTowerCatalogSource } from "../catalog/towerCatalog";
 import type { CatalogEconomy } from "../catalog/catalogTypes";
 
@@ -92,17 +91,17 @@ export function makeApp(sim: SimShape) {
   const coverage = () => (current().housekeepingCoverage as () => { infested: number })();
   let reason: string | undefined;
   let generation = 1;
-  const real = new TsEngine(Simulation.newGame(1, "modern"));
-  const portCodes = new PortCodes(real);
+  const portCodes = new PortCodes(mockPort());
   const logKinds = ["info", "good", "bad", "money"];
   const enginePort = {
     generation: () => generation,
     crewCoverage: vi.fn(() => Float64Array.of(0, 0, 0, 0, 0, 0, coverage().infested)),
-    /** A fresh Modern tower's sheet with the fake tower's infested rooms and
-     *  booking written in. */
+    /** A sheet with no star to chase and no rows (every count 0), carrying the
+     *  fake tower's infested rooms and booking. */
     statsSheet: vi.fn(() => {
-      const rec = real.statsSheet();
       const head = portCodes.fields("statsSheet");
+      const width = head.length + portCodes.fields("statsStrip").length + portCodes.fields("crewCoverage").length + portCodes.names("ledgerCats").length;
+      const rec = new Float64Array(width);
       rec[head.indexOf("exterminationDueDay")] = current().exterminationDueDay ?? NaN;
       const infested = head.length + portCodes.fields("statsStrip").length + portCodes.fields("crewCoverage").indexOf("infested");
       rec[infested] = coverage().infested;

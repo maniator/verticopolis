@@ -6,7 +6,12 @@ import { SaveGame } from "../../storage/SaveGame";
 import { toBase64, deflate } from "../../storage/saveCompression";
 import { FACILITIES, GRID } from "../../engine/facilities";
 import { UNIT_CAP } from "../../engine/sim/deserializeGuards";
-import { saveOf, loadAuto, loadResultSim, loadSlotSim, importTower } from "../fixtures/saveText";
+import { saveOf, loadAuto, importTower, readAuto, readImport, readResult, readSlot } from "../fixtures/saveText";
+import { noEngine } from "../portKit/rustEngine";
+
+/** A check of the engine's load of the stored save, skipped where no engine package is built. */
+const itEngine = it.skipIf(noEngine);
+import type { Draft } from "../portKit/drafts";
 
 describe("SaveGame", () => {
   beforeEach(() => localStorage.clear());
@@ -305,7 +310,7 @@ describe("SaveGame", () => {
     }
   });
 
-  it("round-trips through localStorage", () => {
+  itEngine("round-trips through localStorage into the engine", () => {
     const sim = sampleGame();
     SaveGame.save(saveOf(sim));
     expect(SaveGame.hasSave()).toBe(true);
@@ -317,7 +322,7 @@ describe("SaveGame", () => {
     expect(loaded.tower.transports.length).toBe(sim.tower.transports.length);
   });
 
-  it("preserves occupancy lookups after load", () => {
+  itEngine("preserves occupancy lookups after load", () => {
     const sim = sampleGame();
     SaveGame.save(saveOf(sim));
     const loaded = loadAuto()!;
@@ -338,7 +343,7 @@ describe("SaveGame", () => {
     expect(raw.startsWith("{")).toBe(false);
     expect(raw.length).toBeLessThan(JSON.stringify(sim.serialize()).length);
     // …and it still round-trips back to the same tower.
-    expect(loadAuto()!.money).toBe(sim.money);
+    expect(readAuto()!.money).toBe(sim.money);
   });
 
   it("async autosave writes the same compressed localStorage format", async () => {
@@ -347,7 +352,7 @@ describe("SaveGame", () => {
     await SaveGame.saveAsync(saveOf(sim));
     const raw = localStorage.getItem(AUTO_KEY)!;
     expect(raw.startsWith("VCZ1:")).toBe(true);
-    expect(loadAuto()!.money).toBe(765_432);
+    expect(readAuto()!.money).toBe(765_432);
   });
 
   it("async autosave falls back to the synchronous writer when native compression is unavailable", async () => {
@@ -363,7 +368,7 @@ describe("SaveGame", () => {
     sim.money = 246_810;
     await SaveGame.saveAsync(saveOf(sim));
     expect(localStorage.getItem(AUTO_KEY)!.startsWith("VCZ1:")).toBe(true);
-    expect(loadAuto()!.money).toBe(246_810);
+    expect(readAuto()!.money).toBe(246_810);
   });
 
   it("async autosave only requires native compression, not native decompression", async () => {
@@ -378,7 +383,7 @@ describe("SaveGame", () => {
     const sim = sampleGame();
     sim.money = 135_790;
     await SaveGame.saveAsync(saveOf(sim));
-    expect(loadAuto()!.money).toBe(135_790);
+    expect(readAuto()!.money).toBe(135_790);
   });
 
   it("does not let an older async autosave overwrite a newer synchronous save", async () => {
@@ -417,7 +422,7 @@ describe("SaveGame", () => {
     release();
     await pending;
 
-    expect(loadAuto()!.money).toBe(200);
+    expect(readAuto()!.money).toBe(200);
   });
 
   it("a manual SLOT save does not cancel an in-flight async autosave commit", async () => {
@@ -457,8 +462,8 @@ describe("SaveGame", () => {
     release();
     await pending;
 
-    expect(loadAuto()!.money).toBe(111); // autosave landed, not cancelled
-    expect(loadSlotSim(1)!.money).toBe(222); // slot save intact
+    expect(readAuto()!.money).toBe(111); // autosave landed, not cancelled
+    expect(readSlot(1)!.money).toBe(222); // slot save intact
   });
 
   it("propagates direct async save failures to callers", async () => {
@@ -487,7 +492,7 @@ describe("SaveGame", () => {
     const data = { ...sim.serialize(), savedAt: 1, filler: "x".repeat(33 * 1024 * 1024) }; // > 32MB inflated
     const packed = deflateSync(new TextEncoder().encode(JSON.stringify(data)));
     localStorage.setItem(AUTO_KEY, "VCZ1:" + b64(packed));
-    expect(loadAuto()).toBeNull(); // the cap fired (the payload alone is valid + loadable)
+    expect(readAuto()).toBeNull(); // the cap fired (the payload alone is valid + loadable)
   });
 
   it("degrades a truncated / garbage compressed save to null — no crash, no partial tower", () => {
@@ -498,28 +503,28 @@ describe("SaveGame", () => {
     SaveGame.save(saveOf(sim));
     const body = localStorage.getItem(AUTO_KEY)!.slice("VCZ1:".length);
     localStorage.setItem(AUTO_KEY, "VCZ1:" + body.slice(0, Math.floor(body.length / 2))); // truncated payload
-    expect(loadAuto()).toBeNull();
+    expect(readAuto()).toBeNull();
     localStorage.setItem(AUTO_KEY, "VCZ1:" + btoa("not a deflate stream at all")); // outright garbage
-    expect(loadAuto()).toBeNull();
+    expect(readAuto()).toBeNull();
   });
 
   it("loadResult distinguishes an absent save from a present-but-unreadable one (for an honest boot)", () => {
     // Absent → not corrupt, no sim, no write time.
-    expect(loadResultSim()).toEqual({ sim: null, corrupt: false, savedAt: undefined });
+    expect(readResult()).toEqual({ save: null, corrupt: false, savedAt: undefined });
 
     // A real save → readable, not corrupt, and its write time comes back for the
     // boot recency bucket (no second decode of the slot).
     const sim = sampleGame();
     const before = Date.now();
     SaveGame.save(saveOf(sim));
-    const ok = loadResultSim();
+    const ok = readResult();
     expect(ok.corrupt).toBe(false);
-    expect(ok.sim?.money).toBe(sim.money);
+    expect(ok.save?.money).toBe(sim.money);
     expect(ok.savedAt).toBeGreaterThanOrEqual(before);
 
     // Present but undecodable → corrupt (so boot warns instead of a silent fresh start).
     localStorage.setItem(AUTO_KEY, "VCZ1:" + btoa("not a deflate stream at all"));
-    expect(loadResultSim()).toEqual({ sim: null, corrupt: true, savedAt: undefined });
+    expect(readResult()).toEqual({ save: null, corrupt: true, savedAt: undefined });
     expect(SaveGame.hasSave()).toBe(true); // …yet the key IS present — the exact trap this guards
   });
 
@@ -582,7 +587,7 @@ describe("SaveGame", () => {
     const file = SaveGame.unreadableBackup()!;
     expect(file.startsWith("VCTOWER1\n")).toBe(true);
     expect(file.endsWith("\n")).toBe(true);
-    expect((await importTower(file)).money).toBe(424_242);
+    expect((await readImport(file)).money).toBe(424_242);
     // Text that is not a compressed store value comes back as stored.
     localStorage.setItem("simtower-clone-unreadable", "plain text");
     expect(SaveGame.unreadableBackup()).toBe("plain text");
@@ -593,9 +598,9 @@ describe("SaveGame", () => {
     sim.money = 555_555;
     localStorage.setItem(LEGACY_AUTO_KEY, JSON.stringify({ ...sim.serialize(), savedAt: 123 }));
     localStorage.setItem(AUTO_KEY, "VCZ1:not-actually-deflate");
-    const boot = loadResultSim();
-    expect(boot.sim).not.toBeNull(); // the legacy tower is rescued...
-    expect(boot.sim!.money).toBe(555_555);
+    const boot = readResult();
+    expect(boot.save).not.toBeNull(); // the legacy tower is rescued...
+    expect(boot.save!.money).toBe(555_555);
     expect(boot.corrupt).toBe(true); // ...while boot still preserves + warns
     // The write time comes from the tower that ACTUALLY loaded (the legacy key),
     // not the unreadable primary, so the boot recency bucket stays honest.
@@ -607,8 +612,8 @@ describe("SaveGame", () => {
     sim.money = 777_777;
     SaveGame.save(saveOf(sim));
     localStorage.setItem(LEGACY_AUTO_KEY, "VCZ1:garbage-stale-legacy");
-    const boot = loadResultSim();
-    expect(boot.sim!.money).toBe(777_777);
+    const boot = readResult();
+    expect(boot.save!.money).toBe(777_777);
     expect(boot.corrupt).toBe(false);
   });
 
@@ -637,13 +642,13 @@ describe("SaveGame", () => {
     const sim = sampleGame();
     localStorage.setItem(LEGACY_AUTO_KEY, JSON.stringify({ ...sim.serialize(), savedAt: 123 }));
     expect(SaveGame.hasSave()).toBe(true);
-    expect(loadAuto()!.money).toBe(sim.money);
+    expect(readAuto()!.money).toBe(sim.money);
 
-    const loaded = loadAuto()!;
+    const loaded = readAuto()!;
     loaded.money = 333_333;
-    SaveGame.save(saveOf(loaded));
+    SaveGame.save(JSON.stringify(loaded));
     expect(localStorage.getItem(AUTO_KEY)).not.toBeNull();
-    expect(loadAuto()!.money).toBe(333_333);
+    expect(readAuto()!.money).toBe(333_333);
   });
 
   it("removes the legacy autosave key before migrating so quota can be reclaimed", () => {
@@ -683,7 +688,7 @@ describe("SaveGame", () => {
       sim.money = 424_242;
       expect(() => SaveGame.save(saveOf(sim))).not.toThrow();
       expect(localStorage.getItem(LEGACY_AUTO_KEY)).toBeNull();
-      expect(loadAuto()!.money).toBe(424_242);
+      expect(readAuto()!.money).toBe(424_242);
     } finally {
       setSpy.mockRestore();
     }
@@ -694,10 +699,10 @@ describe("SaveGame", () => {
     localStorage.setItem(AUTO_KEY, JSON.stringify({ ...sim.serialize(), savedAt: 123 }));
     expect(localStorage.getItem(AUTO_KEY)!.startsWith("{")).toBe(true); // legacy: raw JSON, no marker
 
-    const loaded = loadAuto()!;
+    const loaded = readAuto()!;
     expect(loaded.money).toBe(sim.money); // old save still readable
 
-    SaveGame.save(saveOf(loaded)); // re-saving migrates it forward
+    SaveGame.save(JSON.stringify(loaded)); // re-saving migrates it forward
     expect(localStorage.getItem(AUTO_KEY)!.startsWith("VCZ1:")).toBe(true);
   });
 
@@ -742,7 +747,7 @@ describe("SaveGame", () => {
     localStorage.setItem("simtower-clone-save", localStorage.getItem("verticopolis-save")!);
     localStorage.setItem("verticopolis-save", "VCZ1:not-actually-base64-deflate");
 
-    expect(loadAuto()!.tower.towerName).toBe("Legacy Rescue"); // the fallback works
+    expect(readAuto()!.towerName).toBe("Legacy Rescue"); // the fallback works
     const auto = SaveGame.listSlots().find((s) => s.slot === "auto")!;
     expect(auto).toMatchObject({ exists: true, present: true, towerName: "Legacy Rescue" });
   });
@@ -761,7 +766,7 @@ describe("SaveGame", () => {
     // copy-paste JSON anymore.
     expect(file.startsWith("VCTOWER1\n")).toBe(true);
     expect(() => JSON.parse(file)).toThrow();
-    const loaded = await importTower(file);
+    const loaded = await readImport(file);
     expect(loaded.money).toBe(sim.money);
     expect(loaded.star).toBe(sim.star);
   });
@@ -785,28 +790,28 @@ describe("SaveGame", () => {
 
   it("rejects a raw-JSON tower export — only .vctower containers import now", async () => {
     const sim = sampleGame();
-    await expect(importTower(JSON.stringify(sim.serialize(), null, 2))).rejects.toThrow(/not a verticopolis tower file/i);
+    await expect(readImport(JSON.stringify(sim.serialize(), null, 2))).rejects.toThrow(/not a verticopolis tower file/i);
   });
 
   it("rejects malformed imports", async () => {
-    await expect(importTower("{}")).rejects.toThrow();
-    await expect(importTower("not json")).rejects.toThrow();
-    await expect(importTower("[1,2,3]")).rejects.toThrow(); // no VCTOWER magic → not a tower file
+    await expect(readImport("{}")).rejects.toThrow();
+    await expect(readImport("not json")).rejects.toThrow();
+    await expect(readImport("[1,2,3]")).rejects.toThrow(); // no VCTOWER magic → not a tower file
     // A magic line over a garbage body must fail loudly, not half-load.
-    await expect(importTower("VCTOWER1\n@@not base64@@")).rejects.toThrow();
-    await expect(importTower("VCTOWER1\n" + btoa("[1,2,3]"))).rejects.toThrow();
+    await expect(readImport("VCTOWER1\n@@not base64@@")).rejects.toThrow();
+    await expect(readImport("VCTOWER1\n" + btoa("[1,2,3]"))).rejects.toThrow();
   });
 
   it("reports a recognized-but-broken tower file as damaged, not as 'not a tower file'", async () => {
     // Valid base64 over bytes that are not a deflate stream.
-    await expect(importTower("VCTOWER1\n" + btoa('{"minutes":'))).rejects.toThrow(/damaged/);
+    await expect(readImport("VCTOWER1\n" + btoa('{"minutes":'))).rejects.toThrow(/damaged/);
     // A truncated real export: recognized container, broken payload.
     const file = await SaveGame.export(saveOf(sampleGame()));
-    await expect(importTower(file.slice(0, Math.floor(file.length / 2)))).rejects.toThrow(/damaged/);
+    await expect(readImport(file.slice(0, Math.floor(file.length / 2)))).rejects.toThrow(/damaged/);
   });
 
   it("tells the player to update when the file comes from a newer container version", async () => {
-    await expect(importTower("VCTOWER2\n" + btoa("{}"))).rejects.toThrow(/newer version/);
+    await expect(readImport("VCTOWER2\n" + btoa("{}"))).rejects.toThrow(/newer version/);
   });
 
   it("rejects a decompression bomb with a 'too large' message, not 'damaged'", async () => {
@@ -830,7 +835,7 @@ describe("SaveGame", () => {
     // Chunked btoa (matches SaveGame's own encoder — no node Buffer in the browser).
     let bin = "";
     for (let i = 0; i < packed.length; i += 0x8000) bin += String.fromCharCode(...packed.subarray(i, i + 0x8000));
-    await expect(importTower("VCTOWER1\n" + btoa(bin))).rejects.toThrow(/too large/);
+    await expect(readImport("VCTOWER1\n" + btoa(bin))).rejects.toThrow(/too large/);
   });
 
   describe("when the browser lacks the compression API", () => {
@@ -853,20 +858,20 @@ describe("SaveGame", () => {
       breakDecode();
       const file = await SaveGame.export(saveOf(sampleGame()));
       vi.unstubAllGlobals();
-      expect((await importTower(file)).money).toBe(sampleGame().money);
+      expect((await readImport(file)).money).toBe(sampleGame().money);
     });
 
     it("importing a compressed file reports the browser is too old, not 'damaged'", async () => {
       // A real, healthy container built while compression WAS available.
       const file = await SaveGame.export(saveOf(sampleGame()));
       breakDecode();
-      await expect(importTower(file)).rejects.toThrow(/too old to open/);
+      await expect(readImport(file)).rejects.toThrow(/too old to open/);
     });
 
     it("a decoder-only browser can still import, and an encoder-only browser can still export", async () => {
       const file = await SaveGame.export(saveOf(sampleGame()));
       breakEncode(); // decoder-only browser
-      expect((await importTower(file)).money).toBe(sampleGame().money);
+      expect((await readImport(file)).money).toBe(sampleGame().money);
       vi.unstubAllGlobals();
       breakDecode(); // encoder-only browser
       await expect(SaveGame.export(saveOf(sampleGame()))).resolves.toMatch(/^VCTOWER1\n/);
@@ -874,7 +879,7 @@ describe("SaveGame", () => {
   });
 
   it("returns null when no save exists", () => {
-    expect(loadAuto()).toBeNull();
+    expect(readAuto()).toBeNull();
     expect(SaveGame.hasSave()).toBe(false);
   });
 
@@ -989,18 +994,18 @@ describe("SaveGame", () => {
     });
   });
 
-  describe("Ground-floor recognition through the real file-load path", () => {
+  describe.skipIf(noEngine)("Ground-floor recognition through the real file-load path", () => {
     // Build a genuine .vctower container (magic + base64 of the async-deflated
     // JSON, the exact shape SaveGame.importText parses) with a chosen appVersion, so
     // the provenance-stamp -> detection wiring is exercised end-to-end via the
     // real import path (which calls markFounderFromLoadedFile), not a hand-stamped
     // object handed straight to deserialize().
-    async function importWith(sim: Simulation, appVersion?: string, fields: Record<string, unknown> = {}): Promise<Simulation> {
+    async function importWith(sim: Simulation, appVersion?: string, fields: Record<string, unknown> = {}): Promise<Draft> {
       const data = { ...(sim.serialize() as unknown as Record<string, unknown>), ...fields };
       if (appVersion === undefined) delete data.appVersion;
       else data.appVersion = appVersion;
       const text = "VCTOWER1\n" + toBase64(await deflate(new TextEncoder().encode(JSON.stringify(data)))) + "\n";
-      return importTower(text);
+      return importTower(text); // the engine applies the founder rule
     }
 
     it("recognizes a genuine pre-stamp save (no appVersion) as a Founder on import", async () => {

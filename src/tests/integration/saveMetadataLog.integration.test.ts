@@ -4,7 +4,7 @@ import towerFile from "../../../conformance/fixtures/towerone_6.vctower?raw";
 import { LOG_SAVE_CAP, Simulation } from "../../engine/Simulation";
 import type { SerializedGame } from "../../shared/types";
 import { SaveGame } from "../../storage/SaveGame";
-import { saveOf, loadResultSim, loadSlotSim, importTower } from "../fixtures/saveText";
+import { saveOf, readImport, readResult, readSlot } from "../fixtures/saveText";
 
 /**
  * Save metadata stamps (savedAt + appVersion on every write, including
@@ -115,7 +115,7 @@ describe("write-time provenance stamps (savedAt + appVersion)", () => {
   it("loadResult surfaces the autosave's write time for the boot return-recency bucket", () => {
     const before = Date.now();
     SaveGame.save(saveOf(new Simulation())); // writes the autosave slot
-    const stamp = loadResultSim().savedAt;
+    const stamp = readResult().savedAt;
     expect(stamp).toBeGreaterThanOrEqual(before);
     // It agrees with the raw stamp the writer laid down.
     expect(stamp).toBe(decodeSlot("verticopolis-save").savedAt);
@@ -126,10 +126,10 @@ describe("write-time provenance stamps (savedAt + appVersion)", () => {
     const data = decodeSlot("verticopolis-save") as Omit<SerializedGame, "savedAt"> & { savedAt: unknown };
     data.savedAt = "yesterday";
     localStorage.setItem("verticopolis-save", repackSlot(data as unknown as SerializedGame));
-    expect(loadResultSim().savedAt).toBeUndefined();
+    expect(readResult().savedAt).toBeUndefined();
     data.savedAt = 1e20; // finite but beyond Date's range
     localStorage.setItem("verticopolis-save", repackSlot(data as unknown as SerializedGame));
-    expect(loadResultSim().savedAt).toBeUndefined();
+    expect(readResult().savedAt).toBeUndefined();
   });
 
   it("the stamps are file provenance, not live state: deserialize does not carry them", () => {
@@ -177,13 +177,13 @@ describe("bulletin-log persistence", () => {
     sim.emit("Metro line opened.", "good");
     sim.emit("Recycling is overdue.", "bad");
     SaveGame.saveSlot(2, saveOf(sim));
-    expect(loadSlotSim(2)!.log.map((e) => e.text)).toEqual([
+    expect(readSlot(2)!.log!.map((e) => e.text)).toEqual([
       "Metro line opened.",
       "Recycling is overdue.",
     ]);
     const file = await SaveGame.export(saveOf(sim));
-    const imported = await importTower(file);
-    expect(imported.log.map((e) => `${e.kind}:${e.text}`)).toEqual([
+    const imported = await readImport(file);
+    expect(imported.log!.map((e) => `${e.kind}:${e.text}`)).toEqual([
       "good:Metro line opened.",
       "bad:Recycling is overdue.",
     ]);
