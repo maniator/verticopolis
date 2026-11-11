@@ -1,0 +1,105 @@
+name: Engine docs
+
+# Builds the engine's developer docs (docs/engine-site/, an mdBook over the
+# READMEs and guides the repository keeps) with the crate's Rust API reference
+# under /rust/, and deploys them to GitHub Pages at docs.verticopolis.com.
+#
+# The site shows an engine release: release-tag.yml dispatches this workflow
+# with the new engine-v<version> tag after it publishes the crate release (a
+# tag created with the workflow token does not start a tag-push run), and a
+# maintainer can run it by hand for any existing engine tag. A pull request
+# that touches the site or a page it includes builds it without deploying, so
+# a broken include or a book error fails there first.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing engine tag (engine-v<version>) to publish"
+        required: true
+  pull_request:
+    paths:
+      - "docs/engine-site/**"
+      - "packages/verticopolis-engine/README.md"
+      - "engine-rs/CRATE_README.md"
+      - "engine-rs/API.md"
+      - "engine-rs/CHANGELOG.md"
+      - "conformance/README.md"
+      - ".github/workflows/engine-docs.yml"
+
+permissions:
+  contents: read
+
+# One deploy at a time; a newer run replaces a queued one, and a running
+# deploy finishes.
+concurrency:
+  group: engine-docs-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  # mdBook from crates.io at an exact version, built with --locked.
+  MDBOOK_VERSION: "0.5.4"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check the tag
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          if ! printf '%s' "$TAG" | grep -Eq '^engine-v[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::$TAG is not an engine-v<x.y.z> tag."; exit 1
+          fi
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/{0}', inputs.tag) || '' }}
+          persist-credentials: false
+
+      # The toolchain the crate pins (rust-version), as engine-rs.yml installs it.
+      - name: Rust toolchain
+        run: |
+          rustup toolchain install 1.97.0 --profile minimal
+          rustup default 1.97.0
+
+      - name: mdBook
+        run: cargo install mdbook --locked --version "$MDBOOK_VERSION"
+
+      - name: Build the site
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          version="${TAG#engine-v}"
+          if [ -n "$version" ]; then export MDBOOK_BOOK__TITLE="Verticopolis engine $version"; fi
+          mdbook build docs/engine-site
+          cargo doc --locked --no-deps --manifest-path engine-rs/Cargo.toml
+          mkdir -p docs/engine-site/book/rust
+          cp -R engine-rs/target/doc/. docs/engine-site/book/rust/
+          printf '<!doctype html><meta charset="utf-8"><meta http-equiv="refresh" content="0; url=verticopolis_engine/index.html"><title>Rust API reference</title><a href="verticopolis_engine/index.html">Rust API reference</a>\n' > docs/engine-site/book/rust/index.html
+          test -f docs/engine-site/book/index.html
+          test -f docs/engine-site/book/rust/verticopolis_engine/index.html
+
+      - name: Upload the site
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: docs/engine-site/book
+
+  deploy:
+    if: ${{ github.event_name == 'workflow_dispatch' }}
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deploy
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1

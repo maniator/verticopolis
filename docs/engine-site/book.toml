@@ -1,0 +1,18 @@
+# The engine's developer docs, served at docs.verticopolis.com. Every page but
+# the front page includes a file the repository already keeps (the package
+# and crate READMEs, the host API guide, the conformance guide, the engine
+# changelog), so the site never holds a second copy to drift.
+# `.github/workflows/engine-docs.yml` builds it with the Rust API reference
+# under /rust/ and deploys it to GitHub Pages.
+[book]
+title = "Verticopolis engine"
+language = "en"
+src = "src"
+
+[build]
+build-dir = "book"
+create-missing = false
+
+[output.html]
+git-repository-url = "https://github.com/maniator/verticopolis"
+site-url = "/"

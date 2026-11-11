@@ -71,6 +71,8 @@ Every rule in [CONTRIBUTING.md](../CONTRIBUTING.md) applies here, plus:
 build on it, the page a registry release will show (#893; that PR points
 `readme` in `Cargo.toml` at it), and its quick start is
 `consumer/examples/quick_start.rs`, which the `consumer` job compiles.
+Both READMEs and `API.md` are also published at docs.verticopolis.com
+(`docs/engine-site/`, built from each engine release).
 [`API.md`](API.md) is the page for a host that is not the web game: how to
 depend on the crate, the calls a frontend makes, and what is stable.
 [`packages/verticopolis-engine/README.md`](../packages/verticopolis-engine/README.md)

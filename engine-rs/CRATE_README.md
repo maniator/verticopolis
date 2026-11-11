@@ -93,6 +93,9 @@ fn main() -> Result<(), String> {
 }
 ```
 
+These pages and the Rust API reference are also at
+[docs.verticopolis.com](https://docs.verticopolis.com).
+
 A fuller host, which every CI run builds and runs from outside the engine,
 is [`engine-rs/consumer/`](https://github.com/maniator/verticopolis/tree/main/engine-rs/consumer).
 

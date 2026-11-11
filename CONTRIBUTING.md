@@ -732,6 +732,17 @@ exist (`src/tests/enginePackageReadme.guard.test.ts`), and the crate README's
 quick start must match the compiled example
 (`src/tests/engineCrateReadme.guard.test.ts`).
 
+**The docs site.** docs.verticopolis.com is an mdBook in `docs/engine-site/`
+whose pages include both READMEs, `engine-rs/API.md`, `conformance/README.md`
+and `engine-rs/CHANGELOG.md`, with the crate's `cargo doc` output under
+`/rust/`. `.github/workflows/engine-docs.yml` builds it on a pull request that
+touches any of those files and deploys it to GitHub Pages when
+`release-tag.yml` dispatches it for a new `engine-v<version>` tag, so the site
+shows the latest engine release. Run it by hand from the Actions tab to
+republish a tag. Locally: `cargo install mdbook --locked --version 0.5.4`, then
+`mdbook serve docs/engine-site`. `src/tests/engineDocsSite.guard.test.ts` keeps
+the includes, the workflow's paths and the release dispatch in step.
+
 ### Two changelogs, and the update label
 
 Two files, by audience. `CHANGELOG.md` is for players, one section per app
