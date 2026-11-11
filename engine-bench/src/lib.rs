@@ -3,7 +3,7 @@
 //! the regular ticks and the ticks that cross an hour boundary.
 //!
 //! This is the Rust engine's copy of the bench the TypeScript engine had
-//! (`hourCost.bench.integration.test.ts`, spec-onhour-boundary-cost). It builds
+//! (spec-onhour-boundary-cost). It builds
 //! the same tower and walks the same day, so the series carries on across the
 //! port. Timings are venue-noisy, so they are evidence for a trend, never an
 //! assertion. The checks here are structural: the tower built as planned and

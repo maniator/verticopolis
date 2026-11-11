@@ -10,9 +10,8 @@ cd engine-bench
 cargo run --release
 ```
 
-It is the same tower and walk as the TypeScript engine's bench it replaces
-(`hourCost.bench.integration.test.ts`), so the series the audit started in
-July 2026 carries on. `.github/workflows/engine-bench.yml` runs it every Monday
+It is the same tower and walk as the TypeScript engine's bench it replaced,
+so the series the audit started in July 2026 carries on. `.github/workflows/engine-bench.yml` runs it every Monday
 and puts the numbers in the job summary.
 
 Timings are report-only. Shared runners are noisy, so read the series as a

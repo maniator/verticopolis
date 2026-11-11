@@ -62,13 +62,11 @@ Temporary code this story also removes that the roadmap's section does not
 list, such as anything merged or opened after its snapshot (each PR adds its
 own line: the PR, the files, and why the fallback needs them):
 
-- **Benchmark parity tooling that runs the TypeScript engine** (#1124, the cost-split, churn and calibration PR, with #1108's A/A mode): `perf:compare --aa ts` and the TypeScript slot of every `perf:compare` run (`src/tests/perfCompare/{runner,validate,metrics,limitations}.ts`), the TypeScript side of the Node check (`nodeCheck.ts`), `perf:calibrate`'s `ts` passes and cold-start cap, and the `perf:worker` `ts` mode and its gate column (`src/tests/perfWorker/`). The WASM-only parts (the export cost split, hourly churn, the working-tree record, calibration of WASM A/A passes) stay as permanent benchmark infrastructure. Removing the TypeScript engine retires the comparison, so these go with it or collapse to WASM-only runs.
+- **Benchmark parity tooling that runs the TypeScript engine** (#1124, the cost-split, churn and calibration PR, with #1108's A/A mode): `perf:compare --aa ts` and the TypeScript slot of every `perf:compare` run (`src/tests/perfCompare/{runner,validate,metrics,limitations}.ts`), the TypeScript side of the Node check (`nodeCheck.ts`), `perf:calibrate`'s `ts` passes and cold-start cap, and the `perf:worker` `ts` mode and its gate column (`src/tests/perfWorker/`). The WASM-only parts (the export cost split, hourly churn, the working-tree record, calibration of WASM A/A passes) stay as permanent benchmark infrastructure. The owner kept the comparison (2026-11-11): its TypeScript slot serves a pinned pre-cutover build, not `src/engine/`, so it stays as the M1, M2, M3 and M5 tool. Only the Node check's TypeScript side reads `src/engine/`, and #1906 runs that check on the WASM package alone.
 - **#985 slice 2a (the verified engine load, PR linked on #985).** The switchable build's branch that leaves the game on the TypeScript engine after a refused engine package: `loadBootEngine`'s `!wasmOnly` path in `src/wasmhost/engineBoot.ts` (the `engine: "ts"` result for a refused package, with its tests in `engineBoot.test.ts` and `bootstrapEngine.test.ts`) and the `chromium-wasm` assertions in `e2e/engineIntegrity.spec.ts` that expect the game on TypeScript (`expectRefused`'s non-wasm-only branch), plus the `!__WASM_ONLY__` worker-host branch in `src/bootstrap.ts` that gives a refused first tower its catalog verdict with its `workerCatalogs` cases in `src/bootstrapEngine.test.ts` (`catalogVerdict` itself stays: the main-thread host uses it too). Nothing else in the slice depends on the TypeScript engine: the loader (`loadEngineModule.ts`), the failure detail, the shell id check and the loading line stay.
 - PR #831 (room occupant seats): `roomOccupants` in `src/render/pixelSprites/common.ts` imports `visibleOccupants` from the TypeScript engine (through `engine/Crowd`), and `residential.ts`, `food.ts`, `clinic.ts` and `sprites/facilities/venue.ts` import it directly. After the removal, each reads the engine read model's visible-occupant count instead (backlog row `room-painters-read-ts-engine`, #1106). The PR cuts the render importers of `visibleOccupants` from 11 files on main to these five.
 - **#1809 (the dual run's Rust goldens, #945 Dual run row, #1806).** The two
-  TypeScript referees go with the engine: `frameDaysReferee.integration.test.ts`
-  and `cardTextReferee.integration.test.ts`, with their lines in
-  `src/tests/tsEngineTests.ratchet.txt`. The goldens they referee
+  TypeScript referees are gone (#1875's first step, #1883). The goldens they refereed
   (`src/tests/goldens/`) and their Rust suites stay, and need these moved out of
   the deleted code first:
   - the `canonicalJson` that `src/tests/conformance/canonical.ts` re-exports;
@@ -88,9 +86,7 @@ own line: the PR, the files, and why the fallback needs them):
   frontend ratchet's. With the referee gone, `VC_CARD_TEXT_UPDATE`
   (`src/tests/goldens/updateGate.ts`) drops its `typescript` value.
 - **#1421's edit golden (the port-edit golden, #945 Dual run row).** Its
-  TypeScript referee goes with the engine:
-  `portEditsReferee.integration.test.ts`, with its line in
-  `src/tests/tsEngineTests.ratchet.txt`. The golden
+  TypeScript referee is gone (#1883). The golden
   (`src/tests/goldens/port-edits.json`, `portEdits.ts`, `portEditLines.ts`,
   `portEditCrowd.ts`, `portEditCases.ts`) and its Rust suite stay, and import
   the same code due for deletion as the frame-day golden above, plus the
