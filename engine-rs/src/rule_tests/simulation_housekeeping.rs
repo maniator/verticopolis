@@ -23,7 +23,7 @@ use super::simulation_economy::{hours, X0};
 fn hotel_tower(seed: u32) -> Simulation {
     let mut sim = seeded_game(seed, GameMode::Classic);
     for i in 0..24 {
-        sim.tower.place(Kind::Floor, 2, X0 + i);
+        assert!(sim.tower.place(Kind::Floor, 2, X0 + i).ok, "floor 2 slab");
     }
     assert!(sim.build_transport(Kind::ElevatorStandard, X0, 1, 2).ok);
     sim.star = 2;
@@ -33,13 +33,18 @@ fn hotel_tower(seed: u32) -> Simulation {
 fn floors(sim: &mut Simulation, range: std::ops::RangeInclusive<i64>) {
     for floor in range {
         for i in 0..24 {
-            sim.tower.place(Kind::Floor, floor, X0 + i);
+            assert!(
+                sim.tower.place(Kind::Floor, floor, X0 + i).ok,
+                "floor {floor} slab"
+            );
         }
     }
 }
 
 fn room(sim: &mut Simulation, kind: Kind, floor: i64, x: i64, state: UnitState) -> i64 {
-    let id = sim.tower.place(kind, floor, x).unit_id.unwrap();
+    let r = sim.tower.place(kind, floor, x);
+    assert!(r.ok, "{kind:?} at {floor}/{x}: {:?}", r.reason);
+    let id = r.unit_id.unwrap();
     sim.tower.get_unit_mut(id).unwrap().state = state;
     id
 }
@@ -121,7 +126,7 @@ fn maids_need_a_staff_route_and_a_passenger_car_is_not_one() {
 #[test]
 fn a_long_stair_chain_is_a_staff_route_with_no_leg_cap() {
     let mut sim = hotel_tower(23);
-    floors(&mut sim, 2..=14);
+    floors(&mut sim, 3..=14);
     for floor in 1..=13 {
         assert!(
             sim.tower
