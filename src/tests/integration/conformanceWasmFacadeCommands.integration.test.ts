@@ -1,32 +1,31 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { isDeepStrictEqual } from "node:util";
-import { Simulation } from "../../engine/Simulation";
-import { FACILITIES } from "../../engine/facilitiesData";
-import { PRICED_KINDS } from "../../engine/econConfig";
-import type { FacilityKind, GameMode } from "../../shared/types";
-import type { SerializedGame } from "../../shared/serializedGame";
-import { decodeVctower } from "../../storage/vctowerContainer";
-import { markFounderFromLoadedFile } from "../../engine/sim/founderStatus";
+import { readCatalog } from "../../dualrun/catalog";
+import type { GameMode } from "../../shared/types";
 import { REPO_ROOT } from "../conformance/scenario";
 import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
 import type { WasmEngine } from "../../dualrun/binding";
 
 /**
  * The command answers the Rust-backed facade reads (slice 6d, #1216), through
- * the WASM binding against the TypeScript engine on the same tower: the
- * exterminator booking with its `cost` and `rooms`, `previewRentBatch`, an
- * unknown facility kind refused instead of thrown, and `validateTransport`
- * with `placeTransportDryRun`. Each answer has to equal the TypeScript's,
- * field for field, and the previews have to write nothing.
+ * the WASM binding: the exterminator booking with its `cost` and `rooms`,
+ * `previewRentBatch`, an unknown facility kind refused instead of thrown, and
+ * `validateTransport` with `placeTransportDryRun`. Until #1875 each answer was
+ * compared with the TypeScript engine's; now each is held to the answer the
+ * binding documents (`src/dualrun/engine.d.ts`) and to the command it previews.
+ * The engine's own rules behind them are pinned in Rust by
+ * `wasm_facade_commands.rs` (exterminator answers, unknown kinds, batch
+ * targets), `wasm_port_tests.rs` (`the_rent_batch_quote_is_the_batch_without_the_write`)
+ * and `catalog/charge_tests.rs` (`the_exterminator_bills_the_quoted_fees`).
  */
 
-
-const KINDS = Object.keys(FACILITIES) as FacilityKind[];
-const TRANSPORTS = KINDS.filter((k) => FACILITIES[k].transport);
 /** Strings that are not catalog keys, including names an object lookup would find on its prototype. */
 const UNKNOWN_KINDS = ["", "ofice", "OFFICE", " office", "office ", "__proto__", "constructor", "toString", "hasOwnProperty", "0"];
+const UNKNOWN = { ok: false, reason: "Unknown facility." };
+const NOT_VALID = { ok: false, reason: "That request is not valid." };
+/** The kinds a rent batch prices (office, condo, hotel rooms, the leased venues, rentals). */
+const PRICED_KINDS = ["office", "condo", "hotelSingle", "hotelDouble", "hotelSuite", "fitnessClub", "clinic", "rentalStudio", "rentalApartment"];
 
 type Start = { label: string; seed?: number; fixture?: string; mode: GameMode };
 const STARTS: Start[] = [
@@ -37,32 +36,34 @@ const STARTS: Start[] = [
   { label: "towerone-star4 in Modern", fixture: "conformance/fixtures/towerone-star4.vctower", mode: "modern" },
 ];
 
-/** The TypeScript engine and the Rust engine on one save text. `tweak` edits
- *  the TypeScript tower before the text is written, so the two start equal. */
-function pair(start: Start, tweak?: (sim: Simulation) => void): { sim: Simulation; engine: WasmEngine; text: string } {
+type SaveUnit = { id: number; kind: string; state?: string; rent?: number; noRate?: boolean; everOccupied?: boolean };
+type Save = { money: number; star: number; units: SaveUnit[]; transports: { id: number }[]; exterminationDueDay?: number; exterminationRoomIds?: number[] };
+
+function open(start: Start): WasmEngine {
   const { Engine } = wasm();
-  let base: Simulation;
-  if (start.seed !== undefined) {
-    base = Simulation.newGame(start.seed, start.mode);
-  } else {
-    const raw = decodeVctower(readFileSync(resolve(REPO_ROOT, start.fixture!), "utf8"), start.fixture!) as SerializedGame;
-    raw.mode = start.mode;
-    base = Simulation.deserialize(raw);
-    markFounderFromLoadedFile(base, raw);
-  }
-  tweak?.(base);
-  const text = JSON.stringify(base.serialize());
-  return { sim: Simulation.deserialize(JSON.parse(text) as SerializedGame), engine: Engine.fromSave(text), text };
+  if (start.seed !== undefined) return Engine.newGame(start.seed, start.mode);
+  return Engine.fromVctower(readFileSync(resolve(REPO_ROOT, start.fixture!), "utf8"), start.mode);
 }
 
+/** Frees `engine` and reopens its save after `edit` changed it; `text` is the reopened save. */
+function reload(engine: WasmEngine, edit: (save: Save) => void): { engine: WasmEngine; text: string } {
+  const save = JSON.parse(engine.serialize()) as Save;
+  engine.free();
+  edit(save);
+  const text = JSON.stringify(save);
+  return { engine: wasm().Engine.fromSave(text), text };
+}
+
+const ok = (answer: string): void => expect((JSON.parse(answer) as { ok: boolean }).ok).toBe(true);
+
 /** A priced tower mix: some units on a custom price, some sold or off the market. */
-function variedPrices(sim: Simulation): void {
-  sim.money = 1e9;
+function variedPrices(save: Save): void {
+  save.money = 1e9;
   let i = 0;
-  for (const u of sim.tower.units) {
-    if (!(PRICED_KINDS as readonly string[]).includes(u.kind)) continue;
-    if (i % 3 === 0) sim.adjustRent(u.id, 1);
-    if (i % 5 === 0) sim.setNoRate(u.id);
+  for (const u of save.units) {
+    if (!PRICED_KINDS.includes(u.kind)) continue;
+    if (i % 3 === 0) u.rent = 1;
+    if (i % 5 === 0) u.noRate = true;
     if (u.kind === "condo" && i % 4 === 0) u.everOccupied = true;
     i++;
   }
@@ -70,157 +71,127 @@ function variedPrices(sim: Simulation): void {
 
 const parse = <T>(text: string | undefined): T | null => (text === undefined ? null : (JSON.parse(text) as T));
 
-describe.skipIf(!hasWasmPackage())("the facade's command answers match the TypeScript engine", () => {
+describe.skipIf(!hasWasmPackage())("the facade's command answers through the WASM binding", () => {
   describe("callExterminator", () => {
-    /** A Modern tower with `rooms` infested hotel rooms. */
-    const infested = (rooms: number, money: number) => (sim: Simulation) => {
-      sim.money = 1e9;
-      for (let x = 170; x < 230; x++) {
-        expect(sim.tower.place("lobby", 1, x).ok).toBe(true);
-        expect(sim.tower.place("floor", 2, x).ok).toBe(true);
-      }
-      for (let i = 0; i < rooms; i++) {
-        const r = sim.tower.place("hotelSingle", 2, 170 + i * 4);
-        expect(r.ok).toBe(true);
-        sim.tower.getUnit(r.unitId!)!.state = "infested";
-      }
-      sim.money = money;
-    };
     const fee = (rooms: number) => 5_000 + 2_000 * rooms;
+    /** A tower with `rooms` infested hotel rooms: built through the binding at
+     *  a rating that allows hotels, then marked infested in the save. */
+    const infested = (mode: GameMode, rooms: number, money: number) => {
+      const engine = wasm().Engine.newGame(3, mode);
+      engine.setMoney(1e9);
+      for (let x = 170; x < 230; x++) {
+        ok(engine.build("lobby", 1, x));
+        ok(engine.build("floor", 2, x));
+      }
+      const rated = reload(engine, (save) => {
+        save.star = 3;
+      }).engine;
+      for (let i = 0; i < rooms; i++) ok(rated.build("hotelSingle", 2, 170 + i * 4));
+      return reload(rated, (save) => {
+        for (const u of save.units) if (u.kind === "hotelSingle") u.state = "infested";
+        save.money = money;
+      });
+    };
 
-    const book = (label: string, start: Start, tweak: (sim: Simulation) => void, expected: object, repeat = 1) =>
+    const book = (label: string, mode: GameMode, rooms: number, money: number, expected: object, repeat = 1) =>
       it(label, () => {
-        const { sim, engine } = pair(start, tweak);
+        const { engine } = infested(mode, rooms, money);
         try {
-          let want: unknown;
-          for (let i = 0; i < repeat; i++) {
-            want = sim.callExterminator();
-            const got = JSON.parse(engine.callExterminator()) as unknown;
-            expect(got).toEqual(want);
-            expect(isDeepStrictEqual(got, want)).toBe(true);
-          }
-          // The answer is the one the case names, so a drifted fee or mode shows here.
-          expect(want).toEqual(expected);
-          // The booking is the same money and the same pending treatment.
-          const saved = JSON.parse(engine.serialize()) as { money: number; exterminationDueDay?: number; exterminationRoomIds?: number[] };
-          const ts = sim.serialize() as unknown as typeof saved;
-          expect(saved.money).toBe(ts.money);
-          expect(saved.exterminationDueDay).toBe(ts.exterminationDueDay);
-          expect(saved.exterminationRoomIds).toEqual(ts.exterminationRoomIds);
+          let got: unknown;
+          for (let i = 0; i < repeat; i++) got = JSON.parse(engine.callExterminator());
+          expect(got).toEqual(expected);
+          const saved = JSON.parse(engine.serialize()) as Save;
+          const booked = (expected as { ok: boolean }).ok || repeat > 1;
+          // A booking charges the quoted fee once and names every infested room; a refusal writes nothing.
+          expect(saved.money).toBe(booked ? money - fee(rooms) : money);
+          expect(saved.exterminationRoomIds?.length ?? 0).toBe(booked ? rooms : 0);
+          expect(saved.exterminationDueDay !== undefined).toBe(booked);
         } finally {
           engine.free();
         }
       });
 
-    const modern: Start = { label: "new Modern game", seed: 3, mode: "modern" };
-    const classic: Start = { label: "new Classic game", seed: 3, mode: "classic" };
-    book("books three rooms and carries cost and rooms", modern, infested(3, 1e9), { ok: true, cost: fee(3), rooms: 3 });
-    book("a second call is pending", modern, infested(3, 1e9), { ok: false, reason: "pending" }, 2);
-    book("refuses short of funds with the price and the rooms", modern, infested(3, fee(3) - 1), { ok: false, reason: "funds", cost: fee(3), rooms: 3 });
-    book("books at exactly the price", modern, infested(3, fee(3)), { ok: true, cost: fee(3), rooms: 3 });
-    book("refuses when no room is infested", modern, infested(0, 1e9), { ok: false, reason: "none" });
-    book(
-      "is unavailable in Classic",
-      classic,
-      (sim) => {
-        sim.money = 1e9;
-        for (let x = 170; x < 190; x++) {
-          expect(sim.tower.place("lobby", 1, x).ok).toBe(true);
-          expect(sim.tower.place("floor", 2, x).ok).toBe(true);
-        }
-        const r = sim.tower.place("hotelSingle", 2, 170);
-        expect(r.ok).toBe(true);
-        sim.tower.getUnit(r.unitId!)!.state = "infested";
-      },
-      { ok: false, reason: "unavailable" },
-    );
+    book("books three rooms and carries cost and rooms", "modern", 3, 1e9, { ok: true, cost: fee(3), rooms: 3 });
+    book("a second call is pending", "modern", 3, 1e9, { ok: false, reason: "pending" }, 2);
+    book("refuses short of funds with the price and the rooms", "modern", 3, fee(3) - 1, { ok: false, reason: "funds", cost: fee(3), rooms: 3 });
+    book("books at exactly the price", "modern", 3, fee(3), { ok: true, cost: fee(3), rooms: 3 });
+    book("refuses when no room is infested", "modern", 0, 1e9, { ok: false, reason: "none" });
+    book("is unavailable in Classic", "classic", 1, 1e9, { ok: false, reason: "unavailable" });
   });
 
   describe("previewRentBatch", () => {
     const TARGETS: unknown[] = ["default", "noRate", 0, 1, 50, 200, 800, 5_000, 1e9, -5, 12.5, Number.NaN, Number.POSITIVE_INFINITY, "cheap", null, undefined, {}, true];
-    const run = (engine: WasmEngine, kind: string, target: unknown, only: boolean) => parse<unknown>(engine.previewRentBatch(kind, JSON.stringify(target) ?? "null", only));
+    const target = (t: unknown): string => JSON.stringify(t) ?? "null";
 
     for (const start of STARTS) {
-      it(`${start.label}: every priced kind and target, nothing written`, () => {
-        const { sim, engine, text } = pair(start, variedPrices);
-        const before = engine.serialize();
-        try {
-          let answered = 0;
-          for (const kind of KINDS) {
-            for (const target of TARGETS) {
-              for (const only of [false, true]) {
-                const want = sim.previewRentBatch(kind, target as never, { onlyDefaultPriced: only });
-                const got = run(engine, kind, target, only);
-                if (want) answered++;
-                expect(got, `${kind} ${String(target)} only=${only}`).toEqual(want);
-              }
-            }
-          }
-          // The grid reached real batches, not only refusals.
-          expect(answered).toBeGreaterThan(0);
-          expect(engine.serialize()).toBe(before);
-          expect(JSON.stringify(sim.serialize())).toBe(text);
-        } finally {
-          engine.free();
-        }
-      }, 120_000);
-
-      it(`${start.label}: a preview is what the apply then reports`, () => {
+      it(`${start.label}: every kind and target previews what the apply then reports, and the preview writes nothing`, () => {
         const { Engine } = wasm();
-        const { engine, text } = pair(start, variedPrices);
+        const { engine, text } = reload(open(start), variedPrices);
+        const before = engine.serialize();
+        const kinds = readCatalog(wasm(), start.mode).facilities.map((f) => f.key);
         let reported = 0;
         try {
-          for (const kind of PRICED_KINDS) {
-            for (const target of ["default", "noRate", 1, 9_999]) {
+          for (const kind of kinds) {
+            for (const t of TARGETS) {
               for (const only of [false, true]) {
-                const preview = engine.previewRentBatch(kind, JSON.stringify(target), only);
+                const preview = engine.previewRentBatch(kind, target(t), only);
+                const label = `${kind} ${String(t)} only=${only}`;
+                // Only a priced kind has a batch to preview.
+                if (!PRICED_KINDS.includes(kind)) {
+                  expect(preview, label).toBeUndefined();
+                  continue;
+                }
                 const fresh = Engine.fromSave(text);
                 try {
-                  const applied = fresh.applyRentBatch(kind, JSON.stringify(target), only);
-                  expect(applied).toBe(preview);
-                  if (applied !== undefined) {
-                    reported++;
-                    // An apply that reports a change wrote it.
-                    if ((JSON.parse(applied) as { changed: number }).changed > 0) expect(fresh.serialize()).not.toBe(text);
-                  }
+                  const applied = fresh.applyRentBatch(kind, target(t), only);
+                  expect(applied, label).toBe(preview);
+                  if (applied === undefined) continue;
+                  reported++;
+                  // An apply that reports a change wrote it.
+                  if ((JSON.parse(applied) as { changed: number }).changed > 0) expect(fresh.serialize(), label).not.toBe(text);
                 } finally {
                   fresh.free();
                 }
               }
             }
           }
+          // The grid reached real batches, not only refusals.
           expect(reported).toBeGreaterThan(0);
+          expect(engine.serialize()).toBe(before);
         } finally {
           engine.free();
         }
       }, 120_000);
     }
 
-    it("reads the flag by truthiness and a kind that is not a string as unknown, as TypeScript does", () => {
-      const { sim, engine } = pair(STARTS[1], (s) => {
-        s.money = 1e9;
-        for (let x = 150; x < 200; x++) {
-          expect(s.tower.place("lobby", 1, x).ok).toBe(true);
-          expect(s.tower.place("floor", 2, x).ok).toBe(true);
-        }
-        expect(s.tower.place("office", 2, 150).ok).toBe(true);
-        const second = s.tower.place("office", 2, 160);
-        expect(second.ok).toBe(true);
-        s.tower.getUnit(second.unitId!)!.rent = 1_234;
+    it("reads the flag by truthiness and a kind that is not a string as unknown", () => {
+      const built = open(STARTS[1]!);
+      built.setMoney(1e9);
+      for (let x = 150; x < 200; x++) {
+        ok(built.build("lobby", 1, x));
+        ok(built.build("floor", 2, x));
+      }
+      ok(built.build("office", 2, 150));
+      ok(built.build("office", 2, 160));
+      // The second office goes on a custom price.
+      const { engine } = reload(built, (save) => {
+        save.units.filter((u) => u.kind === "office")[1]!.rent = 1_234;
       });
       const raw = engine as unknown as { previewRentBatch(kind: unknown, target: string, only: unknown): string | undefined };
       try {
-        for (const only of [true, false, "yes", "", "0", 0, 0.5, 2 ** 32, {}, [], null, undefined]) {
-          const want = sim.previewRentBatch("office", 5_000, { onlyDefaultPriced: only as boolean });
-          expect(parse(raw.previewRentBatch("office", "5000", only)), `only=${String(only)}`).toEqual(want);
-        }
+        const onlyDefault = raw.previewRentBatch("office", "5000", true);
+        const every = raw.previewRentBatch("office", "5000", false);
+        // The custom-priced office makes the two flags differ, so a misread flag shows.
+        expect(onlyDefault).not.toEqual(every);
+        for (const only of ["yes", "0", 0.5, 2 ** 32, {}, []]) expect(raw.previewRentBatch("office", "5000", only), `only=${String(only)}`).toEqual(onlyDefault);
+        for (const only of ["", 0, null, undefined]) expect(raw.previewRentBatch("office", "5000", only), `only=${String(only)}`).toEqual(every);
         for (const kind of [null, undefined, 5, {}, [], Symbol("k")]) {
           expect(raw.previewRentBatch(kind, '"default"', false)).toBeUndefined();
-          expect(JSON.parse(engine.validateTransport(kind as never, 150, 1, 3))).toEqual({ ok: false, reason: "Unknown facility." });
+          expect(JSON.parse(engine.validateTransport(kind as never, 150, 1, 3))).toEqual(UNKNOWN);
           expect(engine.placeTransportDryRun(kind as never, 150, 1, 3)).toBe(false);
-          expect(JSON.parse(engine.canBuild(kind as never, 2, 150))).toEqual({ ok: false, reason: "Unknown facility.", cost: 0 });
-          expect(JSON.parse(engine.build(kind as never, 2, 150))).toEqual({ ok: false, reason: "Unknown facility." });
-          expect(JSON.parse(engine.buildTransport(kind as never, 150, 1, 3))).toEqual({ ok: false, reason: "Unknown facility." });
+          expect(JSON.parse(engine.canBuild(kind as never, 2, 150))).toEqual({ ...UNKNOWN, cost: 0 });
+          expect(JSON.parse(engine.build(kind as never, 2, 150))).toEqual(UNKNOWN);
+          expect(JSON.parse(engine.buildTransport(kind as never, 150, 1, 3))).toEqual(UNKNOWN);
         }
       } finally {
         engine.free();
@@ -231,22 +202,19 @@ describe.skipIf(!hasWasmPackage())("the facade's command answers match the TypeS
   describe("an unknown facility kind is refused, never thrown", () => {
     for (const start of STARTS) {
       it(`${start.label}`, () => {
-        const { sim, engine } = pair(start);
+        const engine = open(start);
         const before = engine.serialize();
         try {
           for (const kind of UNKNOWN_KINDS) {
-            const k = kind as FacilityKind;
             const label = JSON.stringify(kind);
-            expect(JSON.parse(engine.build(kind, 2, 150)), `build ${label}`).toEqual(sim.build(k, 2, 150));
-            expect(JSON.parse(engine.canBuild(kind, 2, 150)), `canBuild ${label}`).toEqual(sim.canBuild(k, 2, 150));
-            expect(JSON.parse(engine.buildTransport(kind, 150, 1, 3)), `buildTransport ${label}`).toEqual(sim.buildTransport(k, 150, 1, 3));
-            expect(JSON.parse(engine.validateTransport(kind, 150, 1, 3)), `validateTransport ${label}`).toEqual(sim.tower.validateTransport(k, 150, 1, 3));
-            expect(engine.placeTransportDryRun(kind, 150, 1, 3), `placeTransportDryRun ${label}`).toBe(sim.tower.placeTransportDryRun(k, 150, 1, 3));
-            expect(parse(engine.applyRentBatch(kind, '"default"', false)), `applyRentBatch ${label}`).toEqual(sim.applyRentBatch(k, "default"));
-            expect(parse(engine.previewRentBatch(kind, '"default"', false)), `previewRentBatch ${label}`).toEqual(sim.previewRentBatch(k, "default"));
+            expect(JSON.parse(engine.build(kind, 2, 150)), `build ${label}`).toEqual(UNKNOWN);
+            expect(JSON.parse(engine.canBuild(kind, 2, 150)), `canBuild ${label}`).toEqual({ ...UNKNOWN, cost: 0 });
+            expect(JSON.parse(engine.buildTransport(kind, 150, 1, 3)), `buildTransport ${label}`).toEqual(UNKNOWN);
+            expect(JSON.parse(engine.validateTransport(kind, 150, 1, 3)), `validateTransport ${label}`).toEqual(UNKNOWN);
+            expect(engine.placeTransportDryRun(kind, 150, 1, 3), `placeTransportDryRun ${label}`).toBe(false);
+            expect(parse(engine.applyRentBatch(kind, '"default"', false)), `applyRentBatch ${label}`).toBeNull();
+            expect(parse(engine.previewRentBatch(kind, '"default"', false)), `previewRentBatch ${label}`).toBeNull();
           }
-          expect(JSON.parse(engine.build("ofice", 2, 150))).toEqual({ ok: false, reason: "Unknown facility." });
-          expect(JSON.parse(engine.buildTransport("ofice", 150, 1, 3))).toEqual({ ok: false, reason: "Unknown facility." });
           // Refused means nothing moved.
           expect(engine.serialize()).toBe(before);
         } finally {
@@ -258,16 +226,16 @@ describe.skipIf(!hasWasmPackage())("the facade's command answers match the TypeS
 
   describe("setExpressStops", () => {
     for (const start of STARTS.filter((s) => s.fixture)) {
-      it(`${start.label}: answers whether the id names a shaft, like TypeScript`, () => {
-        const { sim, engine } = pair(start);
+      it(`${start.label}: answers whether the id names a shaft`, () => {
+        const engine = open(start);
         try {
-          const ids = sim.tower.transports.map((t) => t.id);
+          const ids = (JSON.parse(engine.serialize()) as Save).transports.map((t) => t.id);
           expect(ids.length).toBeGreaterThan(0);
-          for (const id of [...ids, 0, -1, 999_999]) {
-            const want = sim.tower.setExpressStops(id);
-            expect(engine.setExpressStops(id), `id ${id}`).toBe(want);
-          }
-          expect(engine.setExpressStops(999_999)).toBe(false);
+          for (const id of ids) expect(engine.setExpressStops(id), `id ${id}`).toBe(true);
+          const after = engine.serialize();
+          for (const id of [0, -1, 999_999]) expect(engine.setExpressStops(id), `id ${id}`).toBe(false);
+          // An unknown id changes nothing.
+          expect(engine.serialize()).toBe(after);
         } finally {
           engine.free();
         }
@@ -278,35 +246,49 @@ describe.skipIf(!hasWasmPackage())("the facade's command answers match the TypeS
   describe("validateTransport and placeTransportDryRun", () => {
     const FLOORS = [-3, -1, 0, 1, 2, 3, 6, 10, 31, 60, 120];
     const XS = [-2, 0, 10, 88, 150, 160, 175, 199, 370, 371, 372, 1000];
-    /** What a shaft is asked: every kind that is a transport, plus two that are not. */
-    const ASKED = [...TRANSPORTS, "office", "floor"] as FacilityKind[];
 
     for (const start of STARTS) {
       it(`${start.label}: every shaft kind over a grid of columns and floors`, () => {
-        const { sim, engine } = pair(start);
+        const { Engine } = wasm();
+        const engine = open(start);
+        engine.setMoney(1e9);
         const before = engine.serialize();
+        const catalog = readCatalog(wasm(), start.mode).facilities;
+        const transports = catalog.filter((f) => f.transport).map((f) => f.key);
         try {
           let accepted = 0;
           let refused = 0;
+          const built = new Set<string>();
           const diffs: string[] = [];
-          for (const kind of ASKED) {
+          for (const kind of [...transports, "office", "floor"]) {
             for (const x of XS) {
               for (const bottom of FLOORS) {
                 for (const top of FLOORS) {
-                  const want = sim.tower.validateTransport(kind, x, bottom, top);
                   const got = JSON.parse(engine.validateTransport(kind, x, bottom, top)) as { ok: boolean; reason?: string };
                   const dry = engine.placeTransportDryRun(kind, x, bottom, top);
-                  if (want.ok) accepted++;
-                  else refused++;
-                  if (!isDeepStrictEqual(got, want) || dry !== sim.tower.placeTransportDryRun(kind, x, bottom, top)) {
-                    diffs.push(`${kind} x${x} ${bottom}..${top}: rust ${JSON.stringify(got)}/${dry} ts ${JSON.stringify(want)}`);
+                  const at = `${kind} x${x} ${bottom}..${top}`;
+                  // The dry run agrees with the validation, and only a transport kind is ever accepted.
+                  if (dry !== got.ok || (got.ok && !(transports as readonly string[]).includes(kind))) diffs.push(`${at}: ${JSON.stringify(got)}/${dry}`);
+                  if (!got.ok) {
+                    refused++;
+                    continue;
+                  }
+                  accepted++;
+                  if (built.has(kind)) continue;
+                  // The first accepted shaft of each kind builds on a copy of the tower.
+                  built.add(kind);
+                  const copy = Engine.fromSave(before);
+                  try {
+                    if (!(JSON.parse(copy.buildTransport(kind, x, bottom, top)) as { ok: boolean }).ok) diffs.push(`${at}: accepted but not built`);
+                  } finally {
+                    copy.free();
                   }
                 }
               }
             }
           }
           expect(diffs.slice(0, 10)).toEqual([]);
-          // The grid reaches accepted shafts as well as every kind of refusal.
+          // The grid reaches accepted shafts as well as refusals.
           if (start.fixture) expect(accepted).toBeGreaterThan(0);
           expect(refused).toBeGreaterThan(0);
           expect(engine.serialize()).toBe(before);
@@ -316,33 +298,29 @@ describe.skipIf(!hasWasmPackage())("the facade's command answers match the TypeS
       }, 120_000);
 
       it(`${start.label}: a coordinate that is not a whole number is refused`, () => {
-        const { sim, engine } = pair(start);
+        const engine = open(start);
         try {
           const bad: unknown[] = [0.5, Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY, 2 ** 53, -(2 ** 53), "3", null, undefined, true, 1n, {}, []];
           for (const v of bad) {
             for (const args of [[v, 1, 3], [150, v, 3], [150, 1, v]]) {
               const label = `${String(v)} in ${args.map(String).join(",")}`;
               const [x, b, t] = args as [number, number, number];
-              const want = sim.tower.validateTransport("elevatorStandard", x, b, t);
-              expect(want, label).toEqual({ ok: false, reason: "That request is not valid." });
-              expect(JSON.parse(engine.validateTransport("elevatorStandard", x, b, t)), label).toEqual(want);
+              expect(JSON.parse(engine.validateTransport("elevatorStandard", x, b, t)), label).toEqual(NOT_VALID);
               expect(engine.placeTransportDryRun("elevatorStandard", x, b, t), label).toBe(false);
-              expect(sim.tower.placeTransportDryRun("elevatorStandard", x, b, t), label).toBe(false);
             }
           }
-          // The last safe integer is a whole number: both engines read it and the
+          // The last safe integer is a whole number: the engine reads it and the
           // tower, not the number rule, refuses the shaft off the lot.
           const edge = 2 ** 53 - 1;
           for (const args of [[edge, 1, 3], [-edge, 1, 3], [150, -edge, 3], [150, 1, edge]]) {
             const [x, b, t] = args as [number, number, number];
-            const want = sim.tower.validateTransport("elevatorStandard", x, b, t);
-            expect(want.ok).toBe(false);
-            expect(want.reason, args.join(",")).not.toBe("That request is not valid.");
-            expect(JSON.parse(engine.validateTransport("elevatorStandard", x, b, t))).toEqual(want);
+            const got = JSON.parse(engine.validateTransport("elevatorStandard", x, b, t)) as { ok: boolean; reason?: string };
+            expect(got.ok).toBe(false);
+            expect(got.reason, args.join(",")).not.toBe(NOT_VALID.reason);
           }
           // An argument missing altogether is refused the same way.
           const raw = engine as unknown as { validateTransport(kind: string): string };
-          expect(JSON.parse(raw.validateTransport("elevatorStandard"))).toEqual({ ok: false, reason: "That request is not valid." });
+          expect(JSON.parse(raw.validateTransport("elevatorStandard"))).toEqual(NOT_VALID);
         } finally {
           engine.free();
         }

@@ -1,14 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { newSeededGame } from "../fixtures/towerFixtures";
 import { drawSanta, drawExplosion, drawThief, drawTreasure, drawVipLimo } from "../../render/sprites/events";
-import { Simulation } from "../../engine/Simulation";
-import { GRID } from "../../engine/facilities";
 
 /**
  * Smoke coverage for the event visuals added for parity: they are immediate-mode
  * canvas draws (no Excalibur actors), so the meaningful checks are (a) they issue
  * draw calls without throwing on a bare 2D context, and (b) the engine-facing
- * signals the renderer polls are transients that never leak into the save.
+ * signals the renderer polls are transients that never leak into the save (a
+ * Rust test since #1875: engine-rs/src/rule_tests/event_fx.rs).
  */
 
 /** A recording stand-in for CanvasRenderingContext2D (mirrors renderTransport.test.ts). */
@@ -89,62 +87,5 @@ describe("event sprites", () => {
     expect(() => drawVipLimo(limo.ctx, 300, 400, 1)).not.toThrow();
     expect(limo.calls).toContain("fillRect");
     expect(limo.calls.filter((c) => c === "restore")).toHaveLength(1);
-  });
-});
-
-describe("event fx signals on the Simulation (cosmetic, transient)", () => {
-  it("each trigger bumps the counter the renderer polls", () => {
-    const sim = newSeededGame(1);
-    expect(sim.santaFxSeq).toBe(0);
-    sim.triggerSanta();
-    sim.triggerSanta();
-    expect(sim.santaFxSeq).toBe(2);
-
-    sim.triggerExplosion(7, 42);
-    expect(sim.explosionFx).toEqual({ floor: 7, x: 42, seq: 1 });
-
-    sim.triggerThief(true, 5);
-    expect(sim.thiefFx).toEqual({ caught: true, floor: 5, seq: 1 });
-
-    sim.triggerTreasure(-3, 12);
-    expect(sim.treasureFx).toEqual({ floor: -3, x: 12, seq: 1 });
-
-    sim.triggerVip();
-    expect(sim.vipFxSeq).toBe(1);
-  });
-
-  it("unearthing buried treasure fires the sparkle trigger at the dig site", () => {
-    // Mirrors simulation.integration.test's deterministic treasure dig (seed 42): digging
-    // parking into a fresh B1 slab turns up treasure, which must also bump the
-    // cosmetic treasureFx the renderer polls.
-    const sim = newSeededGame(42);
-    sim.star = 3;
-    sim.money = 10_000_000;
-    const x0 = Math.floor(GRID.width / 2) - 20;
-    for (let i = 0; i < 120 && x0 + i < GRID.width; i++) sim.tower.place("floor", 0, x0 + i);
-    for (let i = 0; i + 6 <= 120 && x0 + i + 6 <= GRID.width; i += 6) sim.build("parking", 0, x0 + i);
-    expect(sim.log.some((e) => e.text.toLowerCase().includes("treasure"))).toBe(true);
-    expect(sim.treasureFx.seq).toBeGreaterThan(0); // the visual fired
-    expect(sim.treasureFx.floor).toBe(0); // at the dug B1 slab
-  });
-
-  it("the fx signals are NOT serialized — they never ride along in a save", () => {
-    const sim = newSeededGame(1);
-    sim.triggerSanta();
-    sim.triggerExplosion(9, 30);
-    sim.triggerThief(false, 3);
-    sim.triggerTreasure(-1, 5);
-    sim.triggerVip();
-    const data = sim.serialize() as unknown as Record<string, unknown>;
-    for (const k of ["santaFxSeq", "explosionFx", "thiefFx", "treasureFx", "vipFxSeq"]) {
-      expect(data[k]).toBeUndefined();
-    }
-    // A reload starts the visual counters clean.
-    const reloaded = Simulation.deserialize(sim.serialize());
-    expect(reloaded.santaFxSeq).toBe(0);
-    expect(reloaded.explosionFx.seq).toBe(0);
-    expect(reloaded.thiefFx.seq).toBe(0);
-    expect(reloaded.treasureFx.seq).toBe(0);
-    expect(reloaded.vipFxSeq).toBe(0);
   });
 });

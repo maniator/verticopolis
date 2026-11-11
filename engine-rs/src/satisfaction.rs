@@ -317,8 +317,8 @@ impl Simulation {
 /// `VACATE_REASON_TEXT`: the player-facing phrase for a departure cause, as
 /// the toasts and the inspector word it. The cause keys themselves are what
 /// the save carries (`vacateReason`); the log carries this text. Log text is
-/// outside the conformance hash, so the parity suites (#878) are what pin
-/// it: `simulation.integration.test.ts` reads the eviction line.
+/// outside the conformance hash, so a rule test pins it:
+/// `rule_tests::simulation_economy` reads the eviction line.
 pub fn vacate_reason_text(reason: &'static str) -> &'static str {
     match reason {
         "access" => "no route to the lobby",

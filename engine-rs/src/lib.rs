@@ -40,6 +40,8 @@ mod load_fidelity_tests;
 #[cfg(test)]
 mod load_newer_save_tests;
 #[cfg(test)]
+mod rule_tests;
+#[cfg(test)]
 mod wedding_hall_tests;
 // The binding's save reader (#1225): `wasm.rs` loads through it, and the
 // crate's tests check it against `load::deserialize`.

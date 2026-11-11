@@ -669,6 +669,11 @@ export default defineConfig(({ command }) => ({
         // the screenshot gallery drive it. No production build ships it.
         "src/game/toolingTower.ts",
         "src/game/toolingSim.ts",
+        // The retired TypeScript reference engine: no build ships it, its
+        // rules are Rust tests now (docs/architecture/ts-engine-retirement-map.md),
+        // and the suites that ran it are gone, so it is not measured. #1875
+        // deletes the folder.
+        "src/engine/**",
       ],
       // Enforced floors (a ratchet, not a vanity ceiling). Global floor holds the
       // logic layers; per-file globs stop a weak painter/synth file hiding behind

@@ -1,12 +1,14 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { test, expect, type Page } from "@playwright/test";
-import { Simulation } from "../src/engine/Simulation";
-import { serviceDiagnosticsFixture, retailServiceFixture, underServedRetailFixture, setFixtureHotelState } from "../src/tests/fixtures/serviceDiagnostics.fixture";
-import { expectEngineHosted } from "./helpers";
+import {
+  serviceDiagnosticsFixture, retailServiceFixture, underServedRetailFixture, withHotelState, type FixtureBuilder,
+} from "../src/tests/fixtures/serviceDiagnostics.fixture";
+import type { SerializedGame } from "../src/shared/types";
+import { buildInPage, expectEngineHosted } from "./helpers";
 
 /**
  * Browser-level smoke test for the actual WASM-hosted inspector. The same
- * asserted deterministic fixture also drives Rust/TS differential tests.
+ * asserted deterministic fixture also drives the Rust/WASM integration suite.
  * No simulation logic or mocked diagnostics are used inside the browser.
  */
 test.describe("Rust service diagnostics in the real browser", () => {
@@ -40,34 +42,37 @@ test.describe("Rust service diagnostics in the real browser", () => {
     expect(status).toEqual({ wasm: true, hasStructuredPort: true });
   }
 
-  function buildUtilizedPassengerLiftFixture(): { save: string; id: number; kind: "elevatorStandard" } {
-    const sim = Simulation.newGame(11, "modern");
+  /** Fifteen floors of occupied offices on one single-car shaft at 7 AM, so
+   *  the morning rush loads the car. Self-contained: it runs in the page. */
+  const utilizedPassengerLift: FixtureBuilder<{ readonly shaftId: number }> = (start, mode) => {
+    const sim = start(11, mode);
     sim.money = 1e9;
     sim.star = 5;
     sim.clock.minutes = 7 * 60;
     for (let x = 150; x < 240; x++) {
-      expect(sim.tower.place("lobby", 1, x).ok).toBe(true);
+      if (!sim.tower.place("lobby", 1, x).ok) throw new Error(`fixture lobby at ${x}`);
       for (let floor = 2; floor <= 16; floor++) {
-        expect(sim.tower.place("floor", floor, x).ok).toBe(true);
+        if (!sim.tower.place("floor", floor, x).ok) throw new Error(`fixture floor ${floor} at ${x}`);
       }
     }
     const shaft = sim.tower.placeTransport("elevatorStandard", 165, 1, 16);
     if (!shaft.ok || shaft.transportId === undefined) throw new Error("fixture failed to build the passenger shaft");
-    expect(sim.tower.setCars(shaft.transportId, 1)).toBe(true);
+    if (!sim.tower.setCars(shaft.transportId, 1)) throw new Error("fixture failed to set the shaft to one car");
     for (let floor = 2; floor <= 16; floor++) {
       for (let x = 150; x < 240; x += 9) {
         const room = sim.tower.place("office", floor, x);
         if (!room.ok || room.unitId === undefined) throw new Error(`fixture failed to build office at ${floor}/${x}`);
-        const unit = sim.tower.getUnit(room.unitId);
+        const unit = sim.tower.getUnit(room.unitId) as { state: string } | undefined;
         if (!unit) throw new Error(`fixture lost office at ${floor}/${x}`);
         unit.state = "occupied";
       }
     }
-    return { save: JSON.stringify(sim.serialize()), id: shaft.transportId, kind: "elevatorStandard" };
-  }
+    return { sim, shaftId: shaft.transportId };
+  };
 
   test("desktop inspector and the mobile editor show the real Rust passenger-elevator load warning", async ({ page }) => {
-    const fixture = buildUtilizedPassengerLiftFixture();
+    const built = await buildInPage(page, utilizedPassengerLift, "modern");
+    const fixture = { save: built.save, id: built.shaftId, kind: "elevatorStandard" };
     await loadFixture(page, fixture.save);
     const readout = await page.evaluate(({ id }) => {
       const g = (window as any).game;
@@ -118,10 +123,12 @@ test.describe("Rust service diagnostics in the real browser", () => {
   });
 
   test("desktop inspector renders Rust hotel and connected/disconnected garage verdicts", async ({ page }) => {
-    const f = serviceDiagnosticsFixture("modern");
-    f.sim.star = 4;
-    setFixtureHotelState(f, "dirty");
-    await loadFixture(page, JSON.stringify(f.sim.serialize()));
+    const f = await buildInPage(page, serviceDiagnosticsFixture, "modern", (built) => {
+      built.sim.star = 4;
+      return {};
+    });
+    const dirty = withHotelState(JSON.parse(f.save) as SerializedGame, f.hotel.id, "dirty");
+    await loadFixture(page, JSON.stringify(dirty));
 
     await page.evaluate(({ id, kind }) => {
       (window as any).game.inspector.inspectPicked({ type: "unit", id, kind });
@@ -143,8 +150,8 @@ test.describe("Rust service diagnostics in the real browser", () => {
   });
 
   test("real Rust retail copy appears on desktop and the mobile editor", async ({ page }) => {
-    const f = retailServiceFixture("modern");
-    await loadFixture(page, JSON.stringify(f.sim.serialize()));
+    const f = await buildInPage(page, retailServiceFixture, "modern");
+    await loadFixture(page, f.save);
     await page.evaluate(({ id, kind }) => {
       (window as any).game.inspector.inspectPicked({ type: "unit", id, kind });
     }, { id: f.shop.id, kind: f.shop.kind });
@@ -163,8 +170,8 @@ test.describe("Rust service diagnostics in the real browser", () => {
   });
 
   test("real Rust under-served retail advice appears on desktop and the mobile editor", async ({ page }) => {
-    const f = underServedRetailFixture("modern");
-    await loadFixture(page, JSON.stringify(f.sim.serialize()));
+    const f = await buildInPage(page, underServedRetailFixture, "modern");
+    await loadFixture(page, f.save);
     await page.evaluate(({ id, kind }) => {
       (window as any).game.inspector.inspectPicked({ type: "unit", id, kind });
     }, { id: f.shop.id, kind: f.shop.kind });
@@ -180,16 +187,16 @@ test.describe("Rust service diagnostics in the real browser", () => {
 
   test("mobile editor folds in Rust housekeeping and infested-hotel warnings", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 700 });
-    const f = serviceDiagnosticsFixture("modern");
-    await loadFixture(page, JSON.stringify(f.sim.serialize()));
+    const f = await buildInPage(page, serviceDiagnosticsFixture, "modern");
+    await loadFixture(page, f.save);
     await page.evaluate(({ id, kind }) => {
       (window as any).game.selectPicked({ type: "unit", id, kind });
     }, { id: f.housekeeping.id, kind: f.housekeeping.kind });
     await expect(page.locator("#editor .ed-diagnostics")).toContainText("Fields 6 maids");
     await expect(page.locator("#editor .ed-diagnostics")).toContainText("hotel room(s)");
 
-    setFixtureHotelState(f, "infested");
-    await loadFixture(page, JSON.stringify(f.sim.serialize()));
+    const infested = withHotelState(JSON.parse(f.save) as SerializedGame, f.hotel.id, "infested");
+    await loadFixture(page, JSON.stringify(infested));
     await page.evaluate(({ id, kind }) => {
       (window as any).game.selectPicked({ type: "unit", id, kind });
     }, { id: f.hotel.id, kind: f.hotel.kind });

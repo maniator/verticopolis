@@ -1,72 +1,51 @@
 import { describe, expect, it } from "vitest";
-import { Simulation } from "../../engine/Simulation";
-import type { SerializedGame } from "../../shared/serializedGame";
-import { stateView } from "../../engine/conformanceView";
-import { INVALID_REQUEST } from "../../engine/request";
-import { digest } from "../conformance/canonical";
+import { INVALID_COMMAND } from "../../simport/request";
 import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
+import { draftTower } from "../portKit/portSim";
 
 /**
  * The relayed edit commands' malformed-input boundary (#996), called raw:
  * straight into the wasm-bindgen glue, with no mirror in between, as
  * `chargeBindingRaw.integration.test.ts` does for the charge commands (#923).
  * `sellAt`, `setCars`, `resizeTransport`, `setStop`, `setSchedule` (its id),
- * `adjustRent` and `setNoRate` must each answer a malformed argument exactly as the TypeScript
- * engine does (`false`, `null`, or `{ ok: false, reason: INVALID_REQUEST }`
+ * `adjustRent` and `setNoRate` must each answer a malformed argument with
+ * their refusal (`false`, `null`, or `{ ok: false, reason: INVALID_COMMAND }`
  * for the resize), move nothing and emit no gameplay event, instead of
  * coercing a value (`"5"` to 5, `null` to 0, `true` to 1) or truncating it to
- * 32 bits.
+ * 32 bits. Until #1875 the TypeScript engine answered every case alongside
+ * it, with the same answers.
  *
  * Out of scope: `setSchedule`'s payload stays JSON text read by the glue as a
- * string, so it is always passed well formed here (its TypeScript twin gets
- * `null`, the value that text spells).
+ * string, so it is always passed well formed here.
  */
 
 
 type Raw = (...args: unknown[]) => unknown;
-type Engine = Record<string, Raw> & { stateDigest(): string; drainGameplayEvents(): string; free(): void };
-type Call = { name: string; ts: (sim: Simulation) => unknown; rust: (engine: Engine) => unknown };
+type Engine = Record<string, Raw> & { stateDigest(): string; drainGameplayEvents(): string; serialize(): string; free(): void };
+type Call = { name: string; rust: (engine: Engine) => unknown };
 
 const loose = <T>(v: unknown) => v as T;
 
 /** A lobby, floors 2 and 3, an elevator on floors 1 to 3 and an office on 2,
  *  with money to spend: the same tower in both engines, through one save. */
-function tower(): { sim: Simulation; engine: Engine; lift: number; office: number } {
-  const built = Simulation.newGame(7, "classic");
+function tower(): { engine: Engine; lift: number; office: number } {
+  const built = draftTower(7, "classic");
   built.money = 1e7;
   for (let x = 170; x < 200; x++) expect(built.build("lobby", 1, x).ok).toBe(true);
   for (const floor of [2, 3]) for (let x = 170; x < 200; x++) expect(built.build("floor", floor, x).ok).toBe(true);
   expect(built.buildTransport("elevatorStandard", 172, 1, 3).ok).toBe(true);
   expect(built.build("office", 2, 180).ok).toBe(true);
-  const save = JSON.stringify(built.serialize());
-  const sim = Simulation.deserialize(JSON.parse(save) as SerializedGame);
-  const engine = loose<Engine>(wasm().Engine.fromSave(save));
-  const lift = sim.tower.transportAt(1, 172)!.id;
-  const office = sim.tower.unitAt(2, 180)!.id;
+  const engine = loose<Engine>(wasm().Engine.fromSave(built.saveText()));
+  const lift = built.tower.transportAt(1, 172)!.id as number;
+  const office = built.tower.unitAt(2, 180)!.id as number;
   // The accepted edges send -0, which names id 0: neither fixture id may be it.
   expect([lift, office]).not.toContain(0);
-  return { sim, engine, lift, office };
+  return { engine, lift, office };
 }
 
-const call = (f: unknown, self: unknown, ...args: unknown[]) => loose<(...a: unknown[]) => unknown>(f).call(self, ...args);
-/** The binding's answers as TypeScript spells them: a resize's JSON parsed,
- *  and adjustRent's missing rent (`undefined` from the glue) as null. */
 const parsed = (v: unknown) => JSON.parse(v as string) as unknown;
 const rent = (v: unknown) => v ?? null;
 
-/** One relayed command, by name, with the arguments given in both engines. */
-function command(name: string, sim: Simulation, args: unknown[]): unknown {
-  switch (name) {
-    case "sellAt": return call(sim.sellAt, sim, ...args);
-    case "setCars": return call(sim.setCars, sim, ...args);
-    case "resizeTransport": return call(sim.resizeTransport, sim, ...args);
-    case "setStop": return call(sim.tower.setStop, sim.tower, ...args);
-    case "setSchedule": return call(sim.tower.setSchedule, sim.tower, args[0], null);
-    case "adjustRent": return call(sim.adjustRent, sim, ...args);
-    case "setNoRate": return call(sim.setNoRate, sim, ...args);
-    default: throw new Error(`no command ${name}`);
-  }
-}
 function binding(name: string, e: Engine, args: unknown[]): unknown {
   if (name === "setSchedule") return e.setSchedule(args[0], "null");
   const out = e[name](...args);
@@ -75,13 +54,12 @@ function binding(name: string, e: Engine, args: unknown[]): unknown {
 }
 const both = (name: string, label: string, args: unknown[]): Call => ({
   name: `${name}(${label})`,
-  ts: (s) => command(name, s, args),
   rust: (e) => binding(name, e, args),
 });
 
 /** What each command answers a malformed request with. */
 function refusal(name: string): unknown {
-  if (name === "resizeTransport") return { ok: false, reason: INVALID_REQUEST };
+  if (name === "resizeTransport") return { ok: false, reason: INVALID_COMMAND };
   return name === "adjustRent" ? null : false;
 }
 
@@ -160,7 +138,7 @@ function cases(lift: number, office: number): Call[] {
 
 /** Whole numbers the boundary accepts that name nothing in the tower, or a
  *  floor or count at the edge of the safe range, where the command moves
- *  nothing: the engines answer with their own refusal and must agree on it. */
+ *  nothing: the engine answers with its own refusal, not as malformed. */
 function acceptedEdges(lift: number, office: number): Call[] {
   const max = Number.MAX_SAFE_INTEGER;
   const far = 2 ** 32;
@@ -178,7 +156,7 @@ function acceptedEdges(lift: number, office: number): Call[] {
     both("setCars", "cars -(2^53 - 1)", [lift, -max]),
   ];
   // An id plus or minus 2^32 named the same facility when the binding
-  // truncated to i32; now each names nothing, in both engines.
+  // truncated to i32; now each names nothing.
   const ids = (base: number) => [["-0", -0], ["-1", -1], ["2^53 - 1", max], ["-(2^53 - 1)", -max], ["the id + 2^32", base + far], ["the id - 2^32", base - far]] as const;
   for (const [what, id] of ids(lift)) {
     list.push(both("setCars", `id ${what}`, [id, 2]));
@@ -193,36 +171,28 @@ function acceptedEdges(lift: number, office: number): Call[] {
   return list;
 }
 
-const drained = (sim: Simulation, engine: Engine) => ({ ts: JSON.parse(JSON.stringify(sim.drainGameplayEvents())) as unknown, rust: JSON.parse(engine.drainGameplayEvents()) as unknown });
+const events = (engine: Engine) => JSON.parse(engine.drainGameplayEvents() as string) as unknown[];
 const command0 = (name: string) => name.slice(0, name.indexOf("("));
 
 describe.skipIf(!hasWasmPackage())("relayed commands called raw through the binding (#996)", () => {
-  it("refuse every malformed argument exactly as TypeScript does, moving nothing", () => {
-    const { sim, engine, lift, office } = tower();
+  it("refuses every malformed argument, moving nothing", () => {
+    const { engine, lift, office } = tower();
     try {
-      const tsDigest = () => digest(stateView(sim));
-      const start = tsDigest();
-      expect(engine.stateDigest(), "the engines start equal").toBe(start);
-      drained(sim, engine);
+      const start = engine.stateDigest();
+      events(engine);
       const run = (list: Call[], malformedRun: boolean) => {
         for (const c of list) {
-          let ts: unknown;
           let rust: unknown;
-          expect(() => { ts = c.ts(sim); }, `${c.name}: TypeScript threw`).not.toThrow();
           expect(() => { rust = c.rust(engine); }, `${c.name}: the binding threw`).not.toThrow();
           const name = command0(c.name);
-          if (malformedRun) {
-            expect(ts, `${c.name}: TypeScript's answer`).toEqual(refusal(name));
-          } else if (name === "resizeTransport") {
-            const r = ts as { ok: boolean; reason?: string };
-            expect(r.ok, `${c.name}: TypeScript accepted it`).toBe(false);
-            expect(r.reason, `${c.name}: refused as malformed`).not.toBe(INVALID_REQUEST);
+          if (!malformedRun && name === "resizeTransport") {
+            const r = rust as { ok: boolean; reason?: string };
+            expect(r.ok, `${c.name}: accepted`).toBe(false);
+            expect(r.reason, `${c.name}: refused as malformed`).not.toBe(INVALID_COMMAND);
           } else {
-            expect(ts, `${c.name}: TypeScript accepted it`).toEqual(refusal(name));
+            expect(rust, c.name).toEqual(refusal(name));
           }
-          expect(rust, c.name).toEqual(ts);
-          expect(tsDigest(), `${c.name}: TypeScript moved`).toBe(start);
-          expect(engine.stateDigest(), `${c.name}: Rust moved`).toBe(start);
+          expect(engine.stateDigest(), `${c.name}: the tower moved`).toBe(start);
         }
       };
       const list = cases(lift, office);
@@ -233,10 +203,9 @@ describe.skipIf(!hasWasmPackage())("relayed commands called raw through the bind
       // 9 floor and count edges + 6 ids x 4 shaft commands + 6 ids x 2 unit commands.
       expect(edges).toHaveLength(9 + 24 + 12);
       run(edges, false);
-      expect(drained(sim, engine), "a refusal emitted an event").toEqual({ ts: [], rust: [] });
+      expect(events(engine), "a refusal emitted an event").toEqual([]);
 
-      // Well-formed calls still land in both, with the same answers, events
-      // and state.
+      // Well-formed calls still land, and each moves the tower.
       const good: Call[] = [
         both("setCars", "lift, 2", [lift, 2]),
         both("setStop", "lift, 2, false", [lift, 2, false]),
@@ -249,15 +218,13 @@ describe.skipIf(!hasWasmPackage())("relayed commands called raw through the bind
         both("sellAt", "2, 180", [2, 180]),
       ];
       for (const c of good) {
-        const ts = c.ts(sim);
-        expect(ts, c.name).not.toEqual(refusal(command0(c.name)));
-        expect(c.rust(engine), c.name).toEqual(ts);
-        expect(engine.stateDigest(), `${c.name}: the engines split`).toBe(tsDigest());
+        const before = engine.stateDigest();
+        expect(c.rust(engine), c.name).not.toEqual(refusal(command0(c.name)));
+        if (c.name !== "setSchedule(lift, null)") expect(engine.stateDigest(), `${c.name}: the tower did not move`).not.toBe(before);
       }
-      expect(sim.tower.getUnit(office), "the office sold").toBeUndefined();
-      const events = drained(sim, engine);
-      expect(events.rust).toEqual(events.ts);
-      expect(events.ts, "the landed edits reported nothing").not.toEqual([]);
+      const save = JSON.parse(engine.serialize()) as { units: { id: number }[] };
+      expect(save.units.map((u) => u.id), "the office sold").not.toContain(office);
+      expect(events(engine), "the landed edits reported nothing").not.toEqual([]);
     } finally {
       engine.free();
     }
