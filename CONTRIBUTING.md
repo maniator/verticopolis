@@ -37,7 +37,7 @@ cannot reach (`src/build/prLane.ts` holds the rules): a PR that changes only
 (the Rust workflow tests the crate, and the browser, parity and integration
 checks still run), and a PR that changes only docs, planning files or
 `.changes` notes runs the unit tests and the build without coverage. Cargo
-files, the binding (`engine-rs/src/wasm*`), package and lock files, the
+files, the binding (`engine-rs/src/wasm*`, `frame.rs`), package and lock files, the
 conformance suite and `test.yml` always run everything, and a PR that touches
 no engine path already skips the Rust workflow's jobs. Every required check
 still reports a result on a skipped lane.

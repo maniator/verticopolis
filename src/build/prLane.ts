@@ -6,7 +6,7 @@
  *
  * - `shared`: anything the web game, its tests or its tooling build from,
  *   plus the files both sides share (package and lock files, the Cargo
- *   files, the JavaScript binding in `engine-rs/src/wasm*`, the
+ *   files, the JavaScript binding (`engine-rs/src/wasm*`, `frame.rs`), the
  *   conformance suite, this workflow). One shared path runs everything.
  * - `rust`: the rest of `engine-rs/`. The Rust engine workflow tests it,
  *   and Test CI still runs its browser, parity and integration checks, so
@@ -42,8 +42,10 @@ export const FULL_LANE: PrLane = { code: true, tests: true, lane: "full" };
 function isSharedEnginePath(path: string): boolean {
   return (
     /^engine-rs\/(consumer\/)?Cargo\.(toml|lock)$/.test(path) ||
-    // The JavaScript binding: src/wasm.rs, src/wasm/ and the wasm_* port surface.
-    path.startsWith("engine-rs/src/wasm")
+    // The JavaScript binding: src/wasm.rs, src/wasm/ and the wasm_* port
+    // surface, plus the frame layout the hosts read (src/frame.rs).
+    path.startsWith("engine-rs/src/wasm") ||
+    path === "engine-rs/src/frame.rs"
   );
 }
 

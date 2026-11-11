@@ -43,7 +43,7 @@ jobs:
   #          engine package), lint, typecheck and the build are skipped.
   #   prose: docs, planning files and .changes notes only. The guard tests
   #          and the build still run, without coverage, lint or typecheck.
-  # Cargo files, the binding (engine-rs/src/wasm*), package and lock files,
+  # Cargo files, the binding (engine-rs/src/wasm*, frame.rs), package and lock files,
   # the conformance suite and this workflow always take the full lane.
   # The required job names keep reporting via no-op successes, never missing
   # statuses. Main pushes, release branches, unknown paths and failed file

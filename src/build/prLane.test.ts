@@ -23,6 +23,8 @@ describe("pathKind", () => {
     ["engine-rs/src/wasm.rs", "shared"],
     ["engine-rs/src/wasm/exports_port.rs", "shared"],
     ["engine-rs/src/wasm_port_panels.rs", "shared"],
+    ["engine-rs/src/frame.rs", "shared"],
+    ["engine-rs/src/frame_tests.rs", "rust"],
     ["engine-rs/src/events_bomb.rs", "rust"],
     ["engine-rs/tests/independence.rs", "rust"],
     ["engine-rs/consumer/src/main.rs", "rust"],
