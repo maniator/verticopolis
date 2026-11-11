@@ -79,7 +79,10 @@ export const SHARDS: Record<string, string[]> = {
   // and open one DOM dialog). They go here rather than beside their first-run
   // siblings in `engine` precisely because this is the lightest shard, so the gate
   // stays bounded by the same ~71s pole.
-  showcase: ["showcase", "milestones", "sprite-gallery", "pricing-modern", "pricing-modern-batch", "settings-modern", "returning-player", "returning-player-mobile"],
+  // ...plus the four Security scenes (#1886's bomb search and a quiet day):
+  // one small frozen tower each, the search run by the engine's own ticks;
+  // only the quiet-day lunch crowd settles for a few seconds.
+  showcase: ["showcase", "milestones", "sprite-gallery", "pricing-modern", "pricing-modern-batch", "settings-modern", "returning-player", "returning-player-mobile", "security-search-classic", "security-search-modern", "security-search-joins", "security-quiet-day"],
   // ~67s: the live-engine scene (its demo shot is drawSettle) + the now-cheap metro
   // + onboarding + the desktop install-affordance shot (a live engine tower with
   // the topbar Install chip surfaced, drawSettle; SPEC-pwa-install).

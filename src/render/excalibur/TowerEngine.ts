@@ -29,6 +29,12 @@ export { FLOOR, TILE };
 export { MIN_ZOOM, MAX_ZOOM } from "./towerInputCamera";
 export type { ViewFocus, Picked } from "./towerInputCamera";
 
+/** The tile span of a floor's rooms: left edge, right edge (exclusive). */
+export interface ThiefSpan {
+  readonly left: number;
+  readonly right: number;
+}
+
 /**
  * The Excalibur-powered tower renderer. Excalibur owns the game loop, scene,
  * camera, off-screen culling, collision/hit-testing and drawing. Structural
@@ -60,6 +66,8 @@ export class TowerEngine {
   thiefStart: number | null = null;
   thiefCaught = false;
   thiefFloor = 1;
+  /** The tile span of the rooms the thief runs, set when he appears. */
+  thiefSpan: ThiefSpan | null = null;
   lastThiefSeq = 0;
   /** Sparkles at unearthed-treasure dig sites (world tile/floor). */
   treasures: { x: number; floor: number; start: number }[] = [];
