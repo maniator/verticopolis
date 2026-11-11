@@ -1,5 +1,7 @@
 # Retiring the TypeScript engine's rule suites (#1875)
 
+PR 2 then deleted `src/engine/` itself; what each remaining importer reads or runs now is in [ts-engine-deletion-map.md](./ts-engine-deletion-map.md).
+
 The TypeScript reference engine (`src/engine/`) is being deleted. Each integration suite that tested a rule on it alone was retired with this map: every rule (one row per `describe` block) names the Rust test that now holds it. A `NEW` entry is a test written for the retirement, in `engine-rs/src/rule_tests/<suite>.rs`; every other entry is a test that already covered the rule. Each rule test file opens with the same list for its suite.
 
 A break-check, listed in the notes, means the engine rule was broken on purpose and the named test was seen to fail before the rule was restored.
