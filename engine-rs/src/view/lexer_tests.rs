@@ -41,7 +41,10 @@ pub(super) fn engine_sources() -> Vec<Source> {
                 .to_string_lossy()
                 .replace('\\', "/");
             let name = rel.rsplit('/').next().unwrap();
-            let test = name.ends_with("_tests.rs") || name.starts_with("tests");
+            // `rule_tests/` is a test-only tree (`#[cfg(test)]` in lib.rs).
+            let test = name.ends_with("_tests.rs")
+                || name.starts_with("tests")
+                || rel.starts_with("rule_tests/");
             if !rel.ends_with(".rs") || test {
                 continue;
             }
