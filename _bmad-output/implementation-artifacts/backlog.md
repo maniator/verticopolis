@@ -74,8 +74,9 @@ How items flow:
    it stays in `Triage` with `needs-triage` until a person picks the milestone it
    would have belonged to (never `Backlog`).
    A pull request gets a milestone too, through `.github/workflows/pr-milestone.yml`:
-   the milestone of the issue it closes (not `Triage` or `Backlog`), or the current
-   release milestone when it closes none (change `CURRENT_RELEASE` there when a release ships).
+   the milestone of the issue it closes (not `Triage`, `Backlog` or a closed milestone), or the
+   current release milestone when it closes none (change `CURRENT_RELEASE` there when a release
+   ships; the job fails rather than use a closed milestone).
    When a row finishes, close the issue (completed or not planned) and set the
    `GH` cell to `—`; when an issue is closed on GitHub first, true up the row
    the same way in the next session that touches this file.
