@@ -1,15 +1,11 @@
-//! Port of `src/engine/sim/charges.ts`: the engine-owned charges for the
-//! editor and the bulldozer (#914). Adding and removing elevator cars, the
-//! billed shaft extension, and the one player removal command that pays the
-//! resale refund each check, move the tower and move the money in one step,
-//! so a frontend relays the command and never writes money for them. The raw
-//! `Tower::set_cars`, `Tower::resize_transport`, `Tower::remove_unit` and
-//! `Tower::remove_transport` stay free of charge for loaders and tests.
+//! Commands that cost or refund money after a build: elevator cars
+//! ([`Simulation::add_car`], [`Simulation::remove_car`]), stretching a shaft
+//! ([`Simulation::extend_transport`]) and removing a room or a shaft
+//! ([`Simulation::remove_facility`]).
 //!
-//! The car and span edits go through `Simulation::set_cars` and
-//! `Simulation::resize_transport`, so a charged edit reports
-//! `capacity_changed` like the raw one, and `remove_facility` reports
-//! `facility_removed` with its method.
+//! Each one checks, changes the tower and moves the money in one step and
+//! reports the amount, so a frontend sends the command and never writes
+//! money itself.
 
 use crate::churn::household_price;
 use crate::econ::rent_config;
@@ -19,26 +15,38 @@ use crate::services::with_thousands;
 use crate::sim::{LogKind, Simulation};
 use crate::tower::UnitState;
 
-/// `ECON.addCarCost`.
+/// The price of one more elevator car.
 pub const ADD_CAR_COST: f64 = 40_000.0;
-/// `ECON.transportFloorCost`: one floor of a shaft extension.
+/// The price of each floor an elevator is built or extended past its first.
 pub const TRANSPORT_FLOOR_COST: f64 = 5_000.0;
 
+#[doc(hidden)]
 pub const NOT_ENOUGH_MONEY: &str = "Not enough money.";
+#[doc(hidden)]
 pub const ELEVATOR_GONE: &str = "That elevator is gone.";
+#[doc(hidden)]
 pub const ONLY_ELEVATOR_CARS: &str = "Only elevators have cars.";
+#[doc(hidden)]
 pub const ONLY_ELEVATOR_EXTEND: &str = "Only elevators can be extended.";
+#[doc(hidden)]
 pub const CAR_LIMIT: &str = "This elevator has all the cars it can hold.";
+#[doc(hidden)]
 pub const LAST_CAR: &str = "An elevator needs at least one car.";
+#[doc(hidden)]
 pub const FACILITY_GONE: &str = "That facility is gone.";
+#[doc(hidden)]
 pub const HOUSEKEEPING_PERMANENT: &str =
     "Housekeeping rooms are permanent. The 1994 game does not let you remove them.";
+#[doc(hidden)]
 /// Classic never lets the wedding hall be sold or bulldozed.
 pub const CLASSIC_WEDDING_HALL_KEPT: &str = "The wedding hall can't be removed.";
+#[doc(hidden)]
 pub const SECURITY_PERMANENT: &str =
     "Security offices are permanent. The 1994 game does not let you remove them.";
+#[doc(hidden)]
 pub const RECYCLING_PERMANENT: &str =
     "Recycling centers are permanent. The 1994 game does not let you remove them.";
+#[doc(hidden)]
 pub const CINEMA_PERMANENT: &str =
     "Movie theaters are permanent. The 1994 game does not let you remove them.";
 
@@ -52,33 +60,34 @@ fn permanent_room_refusal(kind: Kind) -> &'static str {
         _ => HOUSEKEEPING_PERMANENT,
     }
 }
-/// `INVALID_REQUEST`: the one refusal for a malformed command (#923), an id or
-/// floor that is not a whole number, or an unknown `end` or `method`.
-/// The typed engine API takes `i64` ids and floors and parsed enums, so it
-/// cannot see a fraction or an unknown string; the WASM binding checks its raw
-/// arguments (ids and floors with [`whole`], enums with their `parse`) and
-/// refuses with this before calling the engine.
-/// A native Rust host gets no such check and must pass values in range.
+/// The refusal for a malformed command, such as a brush with too many tiles.
+/// The JavaScript binding also gives it for an id or floor that is not a
+/// whole number, or an unknown name; a Rust host passes typed values and
+/// never sees those cases.
 pub const INVALID_REQUEST: &str = "That request is not valid.";
 
+#[doc(hidden)]
 /// A whole number a command may take, as TypeScript's `Number.isSafeInteger`
 /// reads it: finite, no fraction, within 2^53 - 1. NaN and infinities fail.
 pub fn whole(x: f64) -> Option<i64> {
     (x.fract() == 0.0 && x.abs() <= 9_007_199_254_740_991.0).then_some(x as i64)
 }
 
+#[doc(hidden)]
 /// `carResaleRefund()`: half the add-car cost.
 pub fn car_resale_refund() -> f64 {
     (ADD_CAR_COST * 0.5).floor()
 }
 
-/// `ChargeResult`: whether the command landed, the refusal copy, and the
-/// signed change it made to the balance (negative for a charge, positive for
-/// a refund, 0 on a refusal).
+/// What a charged command did.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ChargeResult {
+    /// Whether it was carried out.
     pub ok: bool,
+    /// Why it was refused, ready to show a player. `None` when carried out.
     pub reason: Option<String>,
+    /// The change to the player's money: negative for a charge, positive for
+    /// a refund, 0 when refused.
     pub delta: f64,
 }
 
@@ -100,24 +109,30 @@ impl ChargeResult {
     }
 }
 
-/// `ExtendResult`: a charge plus the shaft's ends afterwards and the floors
-/// billed.
+/// What an extension did: the charge, and the shaft's span afterwards.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExtendResult {
+    /// The money moved, or the refusal.
     pub charge: ChargeResult,
+    /// The shaft's lowest floor afterwards.
     pub bottom: i64,
+    /// The shaft's highest floor afterwards.
     pub top: i64,
+    /// How many floors this call billed.
     pub added: i64,
 }
 
 /// Which end of a shaft an extension moves.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ExtendEnd {
+    /// Move the top floor.
     Up,
+    /// Move the bottom floor.
     Down,
 }
 
 impl ExtendEnd {
+    /// `up` or `down`.
     pub fn parse(s: &str) -> Option<ExtendEnd> {
         match s {
             "up" => Some(ExtendEnd::Up),
@@ -127,6 +142,7 @@ impl ExtendEnd {
     }
 }
 
+#[doc(hidden)]
 /// `extendBill`: one step of budget-clamped billing for an elevator extend.
 /// Returns the new ends and the count of floors past the high-water mark.
 pub fn extend_bill(
@@ -173,8 +189,8 @@ impl Simulation {
         Ok((t.kind, t.cars, t.bottom, t.top))
     }
 
-    /// `addCar(id)`: buy one more car at the add-car cost. Refused at the
-    /// kind's car limit (checked first) and when the balance is short.
+    /// Buys one more car for elevator `id` at [`ADD_CAR_COST`]. Refused at the
+    /// elevator's car limit and when the money is short.
     pub fn add_car(&mut self, id: i64) -> ChargeResult {
         let (kind, cars, _, _) = match self.elevator(id, ONLY_ELEVATOR_CARS) {
             Ok(t) => t,
@@ -194,8 +210,8 @@ impl Simulation {
         ChargeResult::paid(-ADD_CAR_COST)
     }
 
-    /// `removeCar(id)`: sell one car back for half the add-car cost. Refused
-    /// on the last car.
+    /// Sells one car of elevator `id` back for half of [`ADD_CAR_COST`].
+    /// Refused on the last car.
     pub fn remove_car(&mut self, id: i64) -> ChargeResult {
         let (_, cars, _, _) = match self.elevator(id, ONLY_ELEVATOR_CARS) {
             Ok(t) => t,
@@ -210,10 +226,11 @@ impl Simulation {
         ChargeResult::paid(refund)
     }
 
-    /// `beginExtend(id)`: open an extend gesture on an elevator, its
-    /// high-water mark starting at the shaft's current span. Any gesture
-    /// already open is dropped first. False, with no gesture open, when `id`
-    /// names no elevator.
+    /// Starts a drag that stretches elevator `id`. Until
+    /// [`end_extend`](Simulation::end_extend), the
+    /// [`extend_transport`](Simulation::extend_transport) calls bill each floor
+    /// once, however far the player drags back and forth. Returns `false`
+    /// when `id` is not an elevator.
     pub fn begin_extend(&mut self, id: i64) -> bool {
         self.extend_gesture = None;
         match self.elevator(id, ONLY_ELEVATOR_EXTEND) {
@@ -237,16 +254,37 @@ impl Simulation {
             .map(|_| (id, bottom, top));
     }
 
-    /// `endExtend()`: close the open extend gesture, if any.
+    /// Ends the drag [`begin_extend`](Simulation::begin_extend) started.
     pub fn end_extend(&mut self) {
         self.extend_gesture = None;
     }
 
-    /// `extendTransport(id, end, targetFloor)`: move one end of an elevator,
-    /// billing each floor past the high-water mark and growing only as far as
-    /// the balance pays. The mark is the open gesture's when `begin_extend`
-    /// opened one on this shaft, the current span otherwise, and never
-    /// reaches inside the current span.
+    /// Moves one end of elevator `id` toward `target_floor`, charging
+    /// [`TRANSPORT_FLOOR_COST`] for each new floor. It grows only as far as
+    /// the money pays for. During a drag, a floor already paid for is not
+    /// billed again.
+    ///
+    /// ```
+    /// use verticopolis_engine::charges::ExtendEnd;
+    /// use verticopolis_engine::clock::GameMode;
+    /// use verticopolis_engine::facilities::Kind;
+    /// use verticopolis_engine::sim::Simulation;
+    ///
+    /// let mut sim = Simulation::new_game(1, GameMode::Classic);
+    /// for floor in 1..=6 {
+    ///     let kind = if floor == 1 { Kind::Lobby } else { Kind::Floor };
+    ///     for x in 100..124 {
+    ///         sim.build(kind, floor, x);
+    ///     }
+    /// }
+    /// sim.build_transport(Kind::ElevatorStandard, 110, 1, 3);
+    /// let id = sim.tower.transports[0].id;
+    ///
+    /// sim.begin_extend(id);
+    /// let grown = sim.extend_transport(id, ExtendEnd::Up, 6);
+    /// sim.end_extend();
+    /// assert_eq!((grown.bottom, grown.top, grown.added), (1, 6, 3));
+    /// ```
     pub fn extend_transport(&mut self, id: i64, end: ExtendEnd, target_floor: i64) -> ExtendResult {
         let (_, _, bottom, top) = match self.elevator(id, ONLY_ELEVATOR_EXTEND) {
             Ok(t) => t,
@@ -316,12 +354,11 @@ impl Simulation {
         }
     }
 
-    /// `removeFacility(id, method)`: the player's removal of a unit or a
-    /// shaft, paying half the build cost back (nothing for a gutted unit).
-    /// Refused for a burning unit and for structure the tower keeps; the last
-    /// Wedding Hall gone before the VIP's inspection cancels the visit. Units
-    /// and shafts take ids from the tower's one `next_id`, so `id` names
-    /// exactly one of them.
+    /// Removes room or shaft `id` and refunds half its build price (nothing
+    /// for a room a fire gutted). `method` says whether the player sold it or
+    /// bulldozed it, for the gameplay event. Refused for a burning room and
+    /// for a room the mode keeps for good. Rooms and shafts share one id
+    /// sequence, so `id` names exactly one thing.
     pub fn remove_facility(&mut self, id: i64, method: RemovalMethod) -> ChargeResult {
         if let Some(u) = self.tower.get_unit(id) {
             let (kind, state) = (u.kind, u.state);

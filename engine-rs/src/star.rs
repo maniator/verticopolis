@@ -18,6 +18,7 @@ pub fn is_tenant_floor_unit(u: &Unit) -> bool {
         && u.kind.facility().population > 0
 }
 
+#[doc(hidden)]
 impl Simulation {
     /// `occupantPopulation`.
     pub fn occupant_population(&self) -> i64 {

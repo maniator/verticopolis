@@ -178,17 +178,16 @@ unavailable, never as a failure of the engine.
 - **The conformance harness** (`scenario`, `suite`, `tdt::referee` and
   `src/bin/`) is tier 2, behind the `conformance` feature: usable to replay
   the lock, and changed only with the suite it replays.
-- **Everything else is internal** (tier 3), even where it is `pub`. Modules
-  and fields are public so the port reads side by side with the TypeScript
-  engine and so the tests can reach them. Calling a per-phase step
-  (`collect_rent`, `pay_maintenance`, `start_fire`, `maybe_random_event`, and
-  the like), a raw edit (`set_cars` and `resize_transport` change a shaft
-  without charging; they exist to replay another engine's edits) or writing
-  a field skips the rules a command applies, and any of them can change in
-  any commit.
+- **Everything else is internal** (tier 3), even where it is `pub`, and the
+  Rust API reference hides it (`#[doc(hidden)]`). It is public so the tests
+  can reach it. Calling a per-phase step (`collect_rent`, `pay_maintenance`,
+  `start_fire`, `maybe_random_event`, and the like), a raw edit (`set_cars`
+  and `resize_transport` change a shaft without charging; they exist to
+  replay another engine's edits) or writing a field skips the rules a
+  command applies, and any of them can change in any commit.
 - **Not covered yet** (stages in #980): tier 2 is behind its feature and
-  tier 1 is pinned by name, but tier 3 is still `pub` (narrowing it to
-  `pub(crate)` or hiding it, and getters for the fields a host reads, are
-  the rest of stage 4), and the web host still runs its own TypeScript fixed-step driver (the Rust
+  tier 1 is pinned by name, but tier 3 is still `pub`, hidden from the
+  reference but not from the compiler (narrowing it to `pub(crate)`, and
+  getters for the fields a host reads, are the rest of stage 4), and the web host still runs its own TypeScript fixed-step driver (the Rust
   one in `fixed_step` is matched to it by recorded frame sequences, and the web
   host does not call it yet; #867).

@@ -188,6 +188,7 @@ struct CommercialServiceFacts {
     lobby_far: Option<bool>,
 }
 
+#[doc(hidden)]
 impl Simulation {
     /// Read-only, keyed service diagnostics. Only the inspector demand memo
     /// can change, not simulation/gameplay state.

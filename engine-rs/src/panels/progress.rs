@@ -40,6 +40,7 @@ pub struct NextStar {
     pub all_met: bool,
 }
 
+#[doc(hidden)]
 impl Simulation {
     /// `nextStarThreshold`: the population the next rung needs, `None` from
     /// 5 stars up.

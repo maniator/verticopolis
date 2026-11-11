@@ -148,6 +148,7 @@ pub(super) fn nearest_buildable_lobby_slot(tower: &Tower, floor: i64) -> Option<
     best
 }
 
+#[doc(hidden)]
 impl Simulation {
     /// The tenant sections, in card order.
     pub(super) fn tenant_facts(&mut self, u: &Unit, f: &mut DiagnosticFacts) {

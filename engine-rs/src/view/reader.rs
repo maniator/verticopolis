@@ -12,14 +12,9 @@ use crate::frame::{person_state_code, push_transports, transports_len, unit_fiel
 use crate::sim::Simulation;
 use crate::tower::Unit;
 
-/// What a reader last sent, by slot: each room's frame fields (as bits) and
-/// its census share, with their sum, the population. Also what they were
-/// sent against (the mark log's id, and the tower revision and unit count
-/// the rooms index is keyed on), how far it has read the mark log, the
-/// frames it has written, and buffers it reuses. A reader belongs to one
-/// simulation: a host that loads another starts a new reader (the binding's
-/// lives on the tower, which every load builds afresh); one handed another
-/// tower sends a full frame, since the new tower's log has another id.
+/// Reads the view's frame for one game, sending only what changed since its
+/// last frame. Keep one per game: a host that loads another game starts a
+/// new reader. A reader handed another game sends a full frame.
 #[derive(Default)]
 pub struct ViewReader {
     sent: Option<(u64, i64, usize)>,
@@ -51,11 +46,11 @@ impl ViewReader {
     /// and transport counts.
     ///
     /// Then `people` records of `PERSON_RECORD`, every person in the crowd
-    /// as `frameView` sends them: id, seed, staff (0 or 1), state, floor, x,
+    /// as [`crate::frame::frame_view`] sends them: id, seed, staff (0 or 1), state, floor, x,
     /// fy, wait. Then `units` room records of `UNIT_RECORD`:
     /// the room's slot (its position in the structural snapshot's room list),
     /// then state, occupants, customersIn, hotelCustomersIn, outForMeal (an
-    /// absent counter is -1). Then every transport as `frameView` writes it.
+    /// absent counter is -1). Then every transport as [`crate::frame::frame_view`] writes it.
     ///
     /// The room records are every room, in slot order, with the full flag
     /// set, when `full` is true, on this reader's first frame, or when the

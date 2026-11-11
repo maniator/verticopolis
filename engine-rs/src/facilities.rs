@@ -1,56 +1,109 @@
-//! Port of `src/engine/facilitiesData.ts`, `residentialRentals.ts`,
-//! `facilityCaps.ts`, `facilityPredicates.ts` and `tower/towerTopology.ts`.
+//! What can be built: [`Kind`] names every floor tile, room and transport,
+//! and the constants here give the lot's size.
+//!
+//! Prices, sizes, star requirements and build limits for a mode come from
+//! [`crate::catalog::catalog`], which a frontend reads instead of keeping
+//! tables of its own.
 
+/// The lot's width in tiles. A tile column `x` runs from 0 to `LOT_WIDTH - 1`.
 pub const LOT_WIDTH: i64 = 375;
+/// The top floor.
 pub const MAX_FLOOR: i64 = 100;
+/// The lowest basement floor. Floor 1 is the ground floor and floor 0 the
+/// first basement.
 pub const MIN_FLOOR: i64 = -9;
+/// Sky lobbies go every this many floors above the ground floor.
 pub const LOBBY_INTERVAL: i64 = 15;
+#[doc(hidden)]
 /// The wedding hall stands on floor `MAX_FLOOR` and rises four stories above it,
 /// the only facility that does. Grids that hold every story of every unit size
 /// to this.
 pub const WEDDING_HALL_TOP_FLOOR: i64 = MAX_FLOOR + 4;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+/// Everything a player can build.
+///
+/// [`Kind::as_str`] and [`Kind::parse`] convert to and from the names the
+/// save, the catalog and the JavaScript binding use (`lobby`, `hotelSingle`,
+/// `elevatorExpress`, ...).
 pub enum Kind {
+    /// Lobby. Floor 1 is all lobby; a lobby every fifteenth floor above it is a sky lobby.
     Lobby,
+    /// Floor. An empty floor tile, which rooms stand on.
     Floor,
+    /// Office.
     Office,
+    /// Condominium.
     Condo,
+    /// Single Room.
     HotelSingle,
+    /// Double Room.
     HotelDouble,
+    /// Suite.
     HotelSuite,
+    /// Fast Food.
     FastFood,
+    /// Restaurant.
     Restaurant,
+    /// Food Hall. Modern only.
     FoodHall,
+    /// Retail Shop.
     Shop,
+    /// Cinema.
     Cinema,
+    /// Party Hall.
     PartyHall,
+    /// Amusements. Modern only.
     Amusements,
+    /// Boutique Bay. Modern only.
     BoutiqueBay,
+    /// Fitness Club. Modern only.
     FitnessClub,
+    /// Clinic. Modern only.
     Clinic,
+    /// Nightclub. Modern only.
     Nightclub,
+    /// Spa. Modern only.
     Spa,
+    /// Sky Bar. Modern only.
     SkyBar,
+    /// Aquatic Center. Modern only.
     AquaticCenter,
+    /// Daycare. Modern only.
     Daycare,
+    /// Stairway. Spans two floors.
     Stairs,
+    /// Escalator. Spans two floors.
     Escalator,
+    /// Standard Elevator.
     ElevatorStandard,
+    /// Service Elevator. Staff only.
     ElevatorService,
+    /// Express Elevator. Stops only at lobbies and the floors it is set to serve, and spans the whole tower.
     ElevatorExpress,
+    /// Parking Ramp.
     ParkingRamp,
+    /// Parking Space.
     Parking,
+    /// Security.
     Security,
+    /// Medical Center.
     Medical,
+    /// Housekeeping.
     Housekeeping,
+    /// Recycling Center.
     Recycling,
+    /// Metro Station.
     Metro,
+    /// Wedding Hall. Stands on the top floor.
     WeddingHall,
+    /// Studio. A rental home. Modern only.
     RentalStudio,
+    /// Apartment. A rental home. Modern only.
     RentalApartment,
 }
 
+#[doc(hidden)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Category {
     Structure,
@@ -65,6 +118,7 @@ pub enum Category {
     Special,
 }
 
+#[doc(hidden)]
 #[derive(Clone, Copy, Debug)]
 pub struct Facility {
     pub kind: Kind,
@@ -84,6 +138,7 @@ pub struct Facility {
 }
 
 impl Facility {
+    #[doc(hidden)]
     /// Whether a tower of `mode` builds this kind at all, the star gate
     /// aside: a Modern-only kind is built only where the mode's rule
     /// (`GameMode::builds_modern_only_kinds`) allows it. The build gate
@@ -93,32 +148,47 @@ impl Facility {
     }
 }
 
+mod predicates;
 mod table;
+#[doc(hidden)]
 pub use table::FACILITIES;
 
 impl Kind {
+    #[doc(hidden)]
     /// The catalog row. `FACILITIES` is laid out in `Kind` order, which the
     /// `catalog_order` test pins, so the lookup is an index.
     pub fn facility(self) -> &'static Facility {
         &FACILITIES[self as usize]
     }
 
+    /// The kind's name in saves and the catalog, such as `fastFood`.
     pub fn as_str(self) -> &'static str {
         self.facility().key
     }
 
+    /// The kind with this name, as [`as_str`](Kind::as_str) writes it.
+    ///
+    /// ```
+    /// use verticopolis_engine::facilities::Kind;
+    ///
+    /// assert_eq!(Kind::parse("hotelSuite"), Some(Kind::HotelSuite));
+    /// assert_eq!(Kind::HotelSuite.as_str(), "hotelSuite");
+    /// ```
     pub fn parse(s: &str) -> Option<Kind> {
         FACILITIES.iter().find(|f| f.key == s).map(|f| f.kind)
     }
 
+    /// A floor or lobby tile.
     pub fn is_structural(self) -> bool {
         matches!(self, Kind::Floor | Kind::Lobby)
     }
 
+    /// An elevator, stairs or an escalator.
     pub fn is_transport(self) -> bool {
         self.facility().transport
     }
 
+    /// One of the three elevator kinds.
     pub fn is_elevator(self) -> bool {
         matches!(
             self,
@@ -126,6 +196,7 @@ impl Kind {
         )
     }
 
+    #[doc(hidden)]
     pub fn is_hotel(self) -> bool {
         matches!(
             self,
@@ -133,19 +204,23 @@ impl Kind {
         )
     }
 
+    #[doc(hidden)]
     pub fn is_rental(self) -> bool {
         matches!(self, Kind::RentalStudio | Kind::RentalApartment)
     }
 
+    /// Anything that is neither a floor tile nor a transport.
     pub fn is_room(self) -> bool {
         !self.is_structural() && !self.is_transport()
     }
 
+    #[doc(hidden)]
     /// `facilityFloors`.
     pub fn floors(self) -> i64 {
         self.facility().floors.unwrap_or(1)
     }
 
+    #[doc(hidden)]
     /// The highest story a unit of this kind may occupy: `MAX_FLOOR`, except the
     /// wedding hall, which stands on floor `MAX_FLOOR` and rises above it.
     pub fn highest_story(self) -> i64 {
@@ -156,11 +231,13 @@ impl Kind {
         }
     }
 
+    #[doc(hidden)]
     /// The highest floor a unit of this kind may stand on (its bottom story).
     pub fn highest_base_floor(self) -> i64 {
         self.highest_story() - (self.floors() - 1)
     }
 
+    #[doc(hidden)]
     /// `maxSpanFor`.
     pub fn max_span(self) -> i64 {
         match self {
@@ -170,14 +247,17 @@ impl Kind {
         }
     }
 
+    #[doc(hidden)]
     pub fn is_fixed_span(self) -> bool {
         self.is_transport() && self.max_span() == 1
     }
 
+    #[doc(hidden)]
     pub fn max_cars(self) -> i64 {
         8
     }
 
+    #[doc(hidden)]
     /// `buildMinutes`.
     pub fn build_minutes(self) -> f64 {
         if self.is_structural() {
@@ -189,11 +269,13 @@ impl Kind {
         ))
     }
 
+    #[doc(hidden)]
     /// `resaleRefund`.
     pub fn resale_refund(self) -> f64 {
         (self.facility().cost * 0.5).floor()
     }
 
+    #[doc(hidden)]
     /// `subtypeListFor`.
     pub fn subtype_list(self) -> Option<&'static [&'static str]> {
         Some(match self {
@@ -256,6 +338,7 @@ impl Kind {
 }
 
 impl Category {
+    #[doc(hidden)]
     /// The category as the TypeScript engine spells it.
     pub fn as_str(self) -> &'static str {
         match self {
@@ -273,6 +356,7 @@ impl Category {
     }
 }
 
+#[doc(hidden)]
 /// `BUILD_CAPS`.
 pub fn build_cap(kind: Kind) -> Option<i64> {
     match kind {
@@ -287,12 +371,14 @@ pub fn build_cap(kind: Kind) -> Option<i64> {
     }
 }
 
+#[doc(hidden)]
 pub struct Pool {
     pub kinds: &'static [Kind],
     pub cap: i64,
     pub label: &'static str,
 }
 
+#[doc(hidden)]
 /// `POOLED_CAPS`.
 pub static POOLED_CAPS: [Pool; 2] = [
     Pool {
@@ -311,14 +397,17 @@ pub static POOLED_CAPS: [Pool; 2] = [
     },
 ];
 
+#[doc(hidden)]
 pub fn is_lobby_floor(floor: i64) -> bool {
     floor == 1 || (floor > 1 && floor % LOBBY_INTERVAL == 0)
 }
 
+#[doc(hidden)]
 pub fn is_sky_lobby_floor(floor: i64) -> bool {
     floor >= 2 && floor % LOBBY_INTERVAL == 0
 }
 
+#[doc(hidden)]
 pub fn ground_floor_structure_kind(kind: Kind, floor: i64) -> Kind {
     if kind == Kind::Floor && floor == 1 {
         Kind::Lobby
@@ -327,6 +416,7 @@ pub fn ground_floor_structure_kind(kind: Kind, floor: i64) -> Kind {
     }
 }
 
+#[doc(hidden)]
 /// `NO_BASEMENT_KINDS`.
 pub fn no_basement(kind: Kind) -> bool {
     matches!(
@@ -340,157 +430,15 @@ pub fn no_basement(kind: Kind) -> bool {
     )
 }
 
+#[doc(hidden)]
 pub fn covers_ground_floor(floor: i64, hgt: i64) -> bool {
     floor <= 1 && floor + hgt > 1
 }
 
+#[doc(hidden)]
 pub const NEEDS_FLOORS: &str = "Transport must run through built floors. Lay floors first.";
+#[doc(hidden)]
 pub const SHAFT_OVERLAP: &str = "Transport shafts cannot overlap.";
-
-// ---- predicates from facilityPredicates.ts / facilityCaps.ts -------------
-
-impl Kind {
-    /// `transportCarCapacity`.
-    pub fn car_capacity(self) -> f64 {
-        match self {
-            Kind::ElevatorStandard => 21.0,
-            Kind::ElevatorService => 17.0,
-            Kind::ElevatorExpress => 42.0,
-            Kind::Escalator => 30.0,
-            Kind::Stairs => 8.0,
-            _ => 0.0,
-        }
-    }
-
-    /// The capacity byte the `.TDT` exporter writes in an elevator header. The
-    /// byte is unreliable (a real save's service shaft carried 21), so the
-    /// service value the exporter always wrote stays: the referee pins it.
-    pub fn tdt_header_capacity(self) -> i64 {
-        match self {
-            Kind::ElevatorService => 10,
-            other => other.car_capacity() as i64,
-        }
-    }
-
-    /// `isStaffOnlyTransport`.
-    pub fn is_staff_only_transport(self) -> bool {
-        self.facility().staff_only
-    }
-
-    /// `isStaffTransportKind`: staff-only elevators plus stairs.
-    pub fn is_staff_transport(self) -> bool {
-        self.is_staff_only_transport() || self == Kind::Stairs
-    }
-
-    pub fn is_walkway(self) -> bool {
-        matches!(self, Kind::Stairs | Kind::Escalator)
-    }
-
-    /// `WALKWAY_WILLINGNESS`.
-    pub fn walkway_willingness(self) -> Option<i64> {
-        match self {
-            Kind::Stairs => Some(4),
-            Kind::Escalator => Some(7),
-            _ => None,
-        }
-    }
-
-    /// `attendanceCap`.
-    pub fn attendance_cap(self) -> Option<i64> {
-        self.facility().attendance
-    }
-
-    /// `isCommercialKind`.
-    pub fn is_commercial(self) -> bool {
-        matches!(
-            self,
-            Kind::FastFood
-                | Kind::Restaurant
-                | Kind::FoodHall
-                | Kind::Amusements
-                | Kind::BoutiqueBay
-                | Kind::Nightclub
-                | Kind::Spa
-                | Kind::SkyBar
-                | Kind::Daycare
-                | Kind::Shop
-                | Kind::Cinema
-        )
-    }
-
-    /// `hasBusinessHours`.
-    pub fn has_business_hours(self) -> bool {
-        self.is_commercial() || matches!(self, Kind::PartyHall | Kind::AquaticCenter)
-    }
-
-    /// `isOpenAt`.
-    pub fn is_open_at(self, hour: i64) -> bool {
-        match self {
-            Kind::FastFood => (7..22).contains(&hour),
-            Kind::Restaurant => (11..14).contains(&hour) || (17..23).contains(&hour),
-            Kind::FoodHall => (10..22).contains(&hour),
-            Kind::Shop => (10..21).contains(&hour),
-            Kind::Amusements => (10..24).contains(&hour),
-            Kind::Nightclub => !(2..20).contains(&hour),
-            Kind::BoutiqueBay => (10..21).contains(&hour),
-            Kind::Spa => (9..21).contains(&hour),
-            Kind::SkyBar => (16..24).contains(&hour),
-            Kind::Daycare => (7..19).contains(&hour),
-            Kind::Cinema => (12..24).contains(&hour),
-            Kind::PartyHall => (17..24).contains(&hour),
-            Kind::AquaticCenter => (8..22).contains(&hour),
-            _ => true,
-        }
-    }
-
-    /// `openHoursPerDay`.
-    pub fn open_hours_per_day(self) -> i64 {
-        let h = (0..24).filter(|&hr| self.is_open_at(hr)).count() as i64;
-        if h == 0 {
-            1
-        } else {
-            h
-        }
-    }
-
-    /// `isUnmetDemandKind`.
-    pub fn is_unmet_demand_kind(self) -> bool {
-        matches!(self, Kind::Office | Kind::Condo | Kind::RentalApartment) || self.is_hotel()
-    }
-
-    /// `isLeaseAmenityKind`.
-    pub fn is_lease_amenity(self) -> bool {
-        matches!(self, Kind::FitnessClub | Kind::Clinic)
-    }
-
-    /// `hasHousehold`.
-    pub fn has_household(self) -> bool {
-        matches!(self, Kind::Condo | Kind::RentalApartment)
-    }
-
-    pub fn is_staff_kind(self) -> bool {
-        matches!(
-            self,
-            Kind::Security | Kind::Medical | Kind::Housekeeping | Kind::Recycling
-        )
-    }
-
-    /// The one-way ambient venue pool in `spawnFloors`.
-    pub fn is_ambient_venue(self) -> bool {
-        matches!(
-            self,
-            Kind::Shop
-                | Kind::Restaurant
-                | Kind::FastFood
-                | Kind::Amusements
-                | Kind::BoutiqueBay
-                | Kind::Nightclub
-                | Kind::Spa
-                | Kind::SkyBar
-                | Kind::Daycare
-        )
-    }
-}
 
 #[cfg(test)]
 mod tests;

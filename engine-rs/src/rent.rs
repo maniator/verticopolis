@@ -1,4 +1,12 @@
-//! Port of `sim/rent.ts` and the ladder helpers of `pricing.ts`.
+//! Setting what rooms charge: one room at a time
+//! ([`Simulation::adjust_rent`], [`Simulation::price_unit`],
+//! [`Simulation::set_no_rate`]) or every room of a kind at once
+//! ([`Simulation::apply_rent_batch`]).
+//!
+//! In Classic a priced room picks one of four rungs (very low, low, average,
+//! high), as in the original. In Modern it takes any price inside its kind's
+//! band, in steps. [`crate::catalog::catalog`] publishes the rungs, bands and
+//! defaults for each kind. A condo that has been sold keeps its price.
 
 use crate::clock::GameMode;
 use crate::econ::{classic_ladder, rent_config, rent_of};
@@ -13,7 +21,7 @@ use crate::tower::Unit;
 /// is not a finite number.
 pub(crate) const AVERAGE_RUNG: usize = 2;
 
-/// `snapToLadder`: ties go to the later rung.
+#[doc(hidden)]
 pub fn snap_to_ladder(rungs: &[f64; 4], value: f64) -> f64 {
     if !value.is_finite() {
         return rungs[AVERAGE_RUNG];
@@ -62,29 +70,58 @@ pub(crate) fn is_neutral_price(price: f64, neutral: f64) -> bool {
     price == neutral
 }
 
-/// `BatchTarget`: a price, the mode's neutral anchor, or off the market.
+/// The price [`Simulation::apply_rent_batch`] sets.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum BatchTarget {
+    /// The kind's default price: the average rung in Classic.
     Default,
+    /// Off the market: the rooms take no new tenants (Classic only).
     NoRate,
+    /// This price, snapped to a rung in Classic or kept inside the band in
+    /// Modern.
     Price(f64),
 }
 
-/// `BatchRentResult`, the counters a batch reprice reports.
+/// What a batch reprice did, counted in rooms.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct BatchRentResult {
+    /// Rooms of the kind.
     pub matched: i64,
+    /// Rooms the batch applied to (`matched` less the two skips).
     pub eligible: i64,
+    /// Rooms whose price actually moved.
     pub changed: i64,
+    /// Sold condos, which keep their price.
     pub skipped_sold: i64,
+    /// Rooms skipped for having a price of their own, when the batch asked
+    /// for default-priced rooms only.
     pub skipped_custom: i64,
+    /// Rooms that had a price of their own and now have the batch's.
     pub custom_overwritten: i64,
+    /// Rooms whose price was raised to the bottom of the band (Modern).
     pub clamped_low: i64,
+    /// Rooms whose price was lowered to the top of the band (Modern).
     pub clamped_high: i64,
 }
 
 impl Simulation {
-    /// `applyRentBatch(kind, target, { onlyDefaultPriced })`.
+    /// Sets the price of every room of `kind` to `target`. With
+    /// `only_default_priced`, rooms the player priced themselves keep their
+    /// price. Returns `None`, changing nothing, for a kind that has no price,
+    /// for [`BatchTarget::NoRate`] in Modern, or for a price that is not a
+    /// finite number.
+    ///
+    /// ```
+    /// use verticopolis_engine::clock::GameMode;
+    /// use verticopolis_engine::facilities::Kind;
+    /// use verticopolis_engine::rent::BatchTarget;
+    /// use verticopolis_engine::sim::Simulation;
+    ///
+    /// let mut sim = Simulation::new_game(1, GameMode::Modern);
+    /// let none = sim.apply_rent_batch(Kind::Office, BatchTarget::Default, false).unwrap();
+    /// assert_eq!(none.matched, 0);
+    /// assert!(sim.apply_rent_batch(Kind::Lobby, BatchTarget::Default, false).is_none());
+    /// ```
     pub fn apply_rent_batch(
         &mut self,
         kind: Kind,
@@ -98,6 +135,7 @@ impl Simulation {
         r
     }
 
+    #[doc(hidden)]
     /// `computeBatch(kind, target, opts, mutate)`: `None` for an unpriced
     /// kind, a No Rate target off the ladder, or a non-finite price.
     pub fn compute_batch(
@@ -191,6 +229,7 @@ impl Simulation {
         Some(r)
     }
 
+    #[doc(hidden)]
     /// `demandFactor(u)`.
     pub fn demand_factor(&self, u: &Unit) -> f64 {
         let Some(neutral) = price_neutral(self.mode, u.kind) else {
@@ -203,7 +242,10 @@ impl Simulation {
         (2.0 - ratio).min(1.6).max(0.15)
     }
 
-    /// `priceUnit(u, target)`: the new price, or `None` when not repriceable.
+    /// Sets room `id`'s price to `target` (snapped to a rung in Classic, kept
+    /// inside the band in Modern) and puts it back on the market. Returns the
+    /// price it set, or `None` for a room with no price, a sold condo or a
+    /// `target` that is not a finite number.
     pub fn price_unit(&mut self, id: i64, target: f64) -> Option<f64> {
         let mode = self.mode;
         let u = self.tower.get_unit_mut(id)?;
@@ -235,7 +277,9 @@ impl Simulation {
         Some(applied)
     }
 
-    /// `setNoRate(id)`.
+    /// Takes room `id` off the market, so it takes no new tenants. Classic
+    /// only, as in the original. Returns `false` for a room that cannot be,
+    /// such as a sold condo or any room in Modern.
     pub fn set_no_rate(&mut self, id: i64) -> bool {
         let mode = self.mode;
         let Some(u) = self.tower.get_unit_mut(id) else {
@@ -256,7 +300,9 @@ impl Simulation {
         true
     }
 
-    /// `adjustRent(id, dir)`.
+    /// Moves room `id`'s price up (`dir` 1) or down (`dir` -1) by one rung in
+    /// Classic or one step in Modern. Returns the new price, or `None` as
+    /// [`price_unit`](Simulation::price_unit) does.
     pub fn adjust_rent(&mut self, id: i64, dir: i64) -> Option<f64> {
         let mode = self.mode;
         let (kind, rent, no_rate) = {

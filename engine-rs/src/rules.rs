@@ -59,6 +59,7 @@ pub const SKY_BAR_VIEW_BASE_FLOOR: f64 = 10.0;
 pub const SKY_BAR_VIEW_PER_FLOOR: f64 = 0.02;
 pub const SKY_BAR_VIEW_MAX: f64 = 1.0;
 
+#[doc(hidden)]
 impl GameMode {
     pub fn is_modern(self) -> bool {
         self == GameMode::Modern

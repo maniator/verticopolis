@@ -1,15 +1,34 @@
-//! Gameplay events: the provider-agnostic facts the engine emits at the
-//! moment a transition happens, for the host to drain and forward
-//! (`_bmad-output/party-mode/analytics-engine-events-party-findings-2026-10-09.md`).
-//! `conformance/events/catalog.json` is the contract; the tests below hold
-//! `GameplayEvent` to it. A port of `src/engine/gameplayEventBuffer.ts`.
+//! Gameplay events: facts the engine reports the moment something happens,
+//! such as a room placed, a star reached or a fire started, for a host to
+//! feed achievements, analytics or sound.
 //!
-//! Emission reads state after a transition and writes only to the buffer:
-//! never the rng, the save, the clock or the hashed views. The buffer is a
-//! bounded ring, so a run that never drains cannot grow memory; when it is
-//! full the oldest event goes and `dropped` counts it.
+//! The engine pushes each event into [`Simulation::gameplay`](crate::sim::Simulation::gameplay),
+//! a ring of at most [`GAMEPLAY_RING_CAP`]. Drain it after each frame. If a
+//! host never drains, the oldest events go and
+//! [`GameplayEvents::dropped`] counts them. Events carry only enums and
+//! bounded integers: no names, money or free text.
+//!
+//! [`CATALOG_JSON`] is the contract: every event's name, payload fields and
+//! meaning, versioned. [`check_event`] checks a drained event against it.
+//!
+//! ```
+//! use verticopolis_engine::clock::GameMode;
+//! use verticopolis_engine::facilities::Kind;
+//! use verticopolis_engine::gameplay::GameplayEvent;
+//! use verticopolis_engine::sim::Simulation;
+//!
+//! let mut sim = Simulation::new_game(1, GameMode::Classic);
+//! sim.build(Kind::Lobby, 1, 100);
+//! let events = sim.gameplay.drain();
+//! assert_eq!(events[0], GameplayEvent::TowerFounded { mode: GameMode::Classic });
+//! assert_eq!(events[1].name(), "facility_placed");
+//! println!("{}", events[1].to_json());
+//! ```
 
 use std::collections::VecDeque;
+
+mod check;
+pub use check::{check_catalog, check_event};
 
 use serde_json::{json, Value};
 
@@ -19,15 +38,18 @@ use crate::facilities::Kind;
 /// The most events the ring holds between two drains.
 pub const GAMEPLAY_RING_CAP: usize = 1024;
 
-/// `removalMethod`.
+/// How a player removed something, in [`GameplayEvent::FacilityRemoved`]
+/// and [`Simulation::remove_facility`](crate::sim::Simulation::remove_facility).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RemovalMethod {
+    /// Sold with the sell tool.
     Sell,
+    /// Cleared with the bulldozer.
     Bulldoze,
 }
 
 impl RemovalMethod {
-    /// The method a command names, as the binding and the referee spell it.
+    /// `sell` or `bulldoze`.
     pub fn parse(s: &str) -> Option<RemovalMethod> {
         match s {
             "sell" => Some(RemovalMethod::Sell),
@@ -36,6 +58,7 @@ impl RemovalMethod {
         }
     }
 
+    /// `sell` or `bulldoze`.
     pub fn as_str(self) -> &'static str {
         match self {
             RemovalMethod::Sell => "sell",
@@ -44,14 +67,17 @@ impl RemovalMethod {
     }
 }
 
-/// `emergencyKind`: the pending choice a resolution answered.
+/// Which offer an [`GameplayEvent::EmergencyResolved`] answered.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum EmergencyKind {
+    /// Pay to stop a fire spreading.
     FireRescue,
+    /// Pay a bomb threat's ransom.
     BombThreat,
 }
 
 impl EmergencyKind {
+    /// `fireRescue` or `bombThreat`.
     pub fn as_str(self) -> &'static str {
         match self {
             EmergencyKind::FireRescue => "fireRescue",
@@ -59,7 +85,7 @@ impl EmergencyKind {
         }
     }
 
-    /// The pending choice's kind as the save spells it.
+    /// `fireRescue` or `bombThreat`.
     pub fn parse(s: &str) -> Option<EmergencyKind> {
         match s {
             "fireRescue" => Some(EmergencyKind::FireRescue),
@@ -69,14 +95,17 @@ impl EmergencyKind {
     }
 }
 
-/// `emergencyDecision`.
+/// What took effect when an offer was answered.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum EmergencyDecision {
+    /// Paid.
     Accept,
+    /// Declined, or accepted without the money to pay.
     Decline,
 }
 
 impl EmergencyDecision {
+    /// `accept` or `decline`.
     pub fn as_str(self) -> &'static str {
         match self {
             EmergencyDecision::Accept => "accept",
@@ -85,14 +114,17 @@ impl EmergencyDecision {
     }
 }
 
-/// `emergencySource`: the resolve command, or the daily roll's auto-decline.
+/// Who answered an offer.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum EmergencySource {
+    /// The player, with [`Simulation::resolve_choice`](crate::sim::Simulation::resolve_choice).
     Player,
+    /// Nobody answered by the next day, so the engine declined.
     Timeout,
 }
 
 impl EmergencySource {
+    /// `player` or `timeout`.
     pub fn as_str(self) -> &'static str {
         match self {
             EmergencySource::Player => "player",
@@ -101,53 +133,84 @@ impl EmergencySource {
     }
 }
 
-/// One gameplay event, as the catalog names it.
+/// One gameplay event. [`CATALOG_JSON`] holds the full meaning of each, under
+/// its [`name`](GameplayEvent::name).
 #[derive(Clone, Debug, PartialEq)]
 pub enum GameplayEvent {
+    /// `tower_founded`: a new game started. A load never emits it.
     TowerFounded {
+        /// The game's mode.
         mode: GameMode,
     },
+    /// `facility_placed`: a build was placed and charged.
     FacilityPlaced {
+        /// The kind placed.
         kind: Kind,
+        /// The top floor it reaches.
         floor: i64,
+        /// How many of `kind` it placed (more than one for a floor run).
         count: i64,
     },
+    /// `facility_removed`: a player sold or bulldozed a room or a shaft.
     FacilityRemoved {
+        /// The kind removed.
         kind: Kind,
+        /// How it was removed.
         method: RemovalMethod,
     },
+    /// `pricing_changed`: a price moved, once per command.
     PricingChanged {
+        /// The kind repriced.
         kind: Kind,
     },
+    /// `capacity_changed`: an elevator's cars or span changed.
     CapacityChanged {
+        /// The shaft's kind.
         kind: Kind,
     },
+    /// `star_reached`: the rating rose to `star` (6 is TOWER), one event per
+    /// star gained.
     StarReached {
+        /// The new rating.
         star: i64,
     },
+    /// `fire_started`: a room caught fire. A fire spreading is the same fire.
     FireStarted,
+    /// `fire_gutted`: a fire burned rooms down to empty shells.
     FireGutted {
+        /// How many rooms, at least 1.
         rooms: i64,
     },
+    /// `bomb_detonated`: a bomb went off before Security found it.
     BombDetonated {
+        /// How many rooms the blast destroyed.
         rooms: i64,
     },
+    /// `bomb_found`: Security found the bomb in time.
     BombFound,
+    /// `emergency_resolved`: an offer was answered.
     EmergencyResolved {
+        /// Which offer.
         kind: EmergencyKind,
+        /// What took effect.
         decision: EmergencyDecision,
+        /// Who answered.
         source: EmergencySource,
     },
+    /// `milestone_reached`: the tower reached a milestone. A load never
+    /// emits it.
     MilestoneReached {
-        /// A milestone id from the MILESTONES table.
+        /// The milestone's id, stable across versions.
         id: &'static str,
     },
 }
 
 impl GameplayEvent {
+    #[doc(hidden)]
     /// How many variants there are: one more than the highest `ordinal`.
     pub const VARIANTS: usize = 12;
 
+    #[doc(hidden)]
     /// The event's position in the catalog. Exhaustive, so a new variant
     /// cannot compile without a place; `VARIANTS` and the catalog test then
     /// hold the count, `one_of_each` and the catalog to it.
@@ -168,6 +231,7 @@ impl GameplayEvent {
         }
     }
 
+    /// The event's name in the catalog, such as `facility_placed`.
     pub fn name(&self) -> &'static str {
         match self {
             GameplayEvent::TowerFounded { .. } => "tower_founded",
@@ -185,6 +249,7 @@ impl GameplayEvent {
         }
     }
 
+    /// The event's payload fields as a JSON object.
     pub fn payload(&self) -> Value {
         match self {
             GameplayEvent::TowerFounded { mode } => json!({ "mode": mode.as_str() }),
@@ -213,13 +278,14 @@ impl GameplayEvent {
         }
     }
 
-    /// `{ name, payload }`, the shape a drain hands the host.
+    /// The event as `{ "name": ..., "payload": {...} }`, the shape
+    /// [`CATALOG_JSON`] describes.
     pub fn to_json(&self) -> Value {
         json!({ "name": self.name(), "payload": self.payload() })
     }
 }
 
-/// The drain buffer: a bounded ring outside the save and the hashed views.
+/// The events waiting for the host to drain them. Never saved.
 #[derive(Clone, Debug, Default)]
 pub struct GameplayEvents {
     ring: VecDeque<GameplayEvent>,
@@ -228,6 +294,7 @@ pub struct GameplayEvents {
 }
 
 impl GameplayEvents {
+    #[doc(hidden)]
     pub fn push(&mut self, e: GameplayEvent) {
         if self.ring.len() >= GAMEPLAY_RING_CAP {
             self.ring.pop_front();
@@ -241,6 +308,7 @@ impl GameplayEvents {
         self.ring.drain(..).collect()
     }
 
+    /// How many events are waiting.
     pub fn len(&self) -> usize {
         self.ring.len()
     }
@@ -250,240 +318,21 @@ impl GameplayEvents {
         self.ring.iter()
     }
 
+    /// Whether no events are waiting.
     pub fn is_empty(&self) -> bool {
         self.ring.is_empty()
     }
 }
 
+#[doc(hidden)]
 /// The drained batch as the JSON array the binding returns and the
 /// conformance lock hashes.
 pub fn batch_json(events: &[GameplayEvent]) -> Value {
     Value::Array(events.iter().map(GameplayEvent::to_json).collect())
 }
 
-/// A JSON number that is a whole number JavaScript holds exactly, as
-/// `Number.isSafeInteger` reads it: `3` and `3.0` alike (the parsed text
-/// cannot tell them apart in TypeScript, so neither side may either), and
-/// nothing past 2^53 - 1 in magnitude.
-fn whole(v: &Value) -> Option<i64> {
-    const SAFE: i64 = 9_007_199_254_740_991;
-    v.as_i64()
-        .or_else(|| {
-            v.as_f64()
-                .filter(|f| f.fract() == 0.0 && f.abs() <= SAFE as f64)
-                .map(|f| f as i64)
-        })
-        .filter(|n| n.unsigned_abs() <= SAFE as u64)
-}
-
-/// `snake_case` from a lowercase letter: an event name.
-fn is_event_name(s: &str) -> bool {
-    s.starts_with(|c: char| c.is_ascii_lowercase())
-        && s.chars()
-            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
-}
-
-/// Enum set names whose generated type would collide with one the
-/// declaration already exports.
-const RESERVED_SETS: [&str; 5] = [
-    "catalogVersion",
-    "event",
-    "eventName",
-    "eventPayloads",
-    "eventVersions",
-];
-
-/// `camelCase` from a lowercase letter: an enum set or a payload field, both
-/// of which become TypeScript identifiers in the generated declaration.
-fn is_camel_name(s: &str) -> bool {
-    s.starts_with(|c: char| c.is_ascii_lowercase()) && s.chars().all(|c| c.is_ascii_alphanumeric())
-}
-
-/// Prose the generated declaration carries in a doc comment: non-empty and
-/// unable to close that comment early.
-fn prose(v: Option<&Value>) -> bool {
-    v.and_then(Value::as_str)
-        .is_some_and(|s| !s.is_empty() && !s.contains("*/"))
-}
-
-/// Check a catalog's shape and its payload rule: every field is a closed
-/// enum the catalog defines or a bounded integer, so a free-text, money or
-/// name field cannot enter the contract. The twin of `checkCatalog` in
-/// `src/engine/gameplayCatalog.ts`; both refuse the same catalogs.
-pub fn check_catalog(catalog: &Value) -> Result<(), String> {
-    if !catalog.is_object() {
-        return Err("catalog: must be an object".into());
-    }
-    if !catalog
-        .get("catalogVersion")
-        .and_then(whole)
-        .is_some_and(|v| v >= 1)
-    {
-        return Err("catalog: catalogVersion must be a whole number from 1".into());
-    }
-    if !prose(catalog.get("about")) {
-        return Err("catalog: about must be a non-empty string without */".into());
-    }
-    let enums = catalog
-        .get("enums")
-        .and_then(Value::as_object)
-        .ok_or("catalog: enums must be an object")?;
-    for (name, values) in enums {
-        if !is_camel_name(name) {
-            return Err(format!("enum {name}: name must be camelCase"));
-        }
-        if RESERVED_SETS.contains(&name.as_str()) {
-            return Err(format!(
-                "enum {name}: name is reserved by the generated declaration"
-            ));
-        }
-        let values = values
-            .as_array()
-            .filter(|v| !v.is_empty())
-            .ok_or_else(|| format!("enum {name}: must be a non-empty array"))?;
-        let mut seen = std::collections::HashSet::new();
-        for v in values {
-            let s = v
-                .as_str()
-                .filter(|s| !s.is_empty())
-                .ok_or_else(|| format!("enum {name}: values must be non-empty strings"))?;
-            if !seen.insert(s) {
-                return Err(format!("enum {name}: {s} is listed twice"));
-            }
-        }
-    }
-    let events = catalog
-        .get("events")
-        .and_then(Value::as_array)
-        .ok_or("catalog: events must be an array")?;
-    let mut names = std::collections::HashSet::new();
-    for e in events {
-        let name = e
-            .get("name")
-            .and_then(Value::as_str)
-            .filter(|s| is_event_name(s))
-            .ok_or("event: name must be snake_case")?;
-        if !names.insert(name) {
-            return Err(format!("event {name}: listed twice"));
-        }
-        if !e.get("version").and_then(whole).is_some_and(|v| v >= 1) {
-            return Err(format!(
-                "event {name}: version must be a whole number from 1"
-            ));
-        }
-        if !matches!(
-            e.get("cardinality").and_then(Value::as_str),
-            Some("per_occurrence") | Some("per_tower")
-        ) {
-            return Err(format!(
-                "event {name}: cardinality must be per_occurrence or per_tower"
-            ));
-        }
-        for key in ["semantics", "history"] {
-            if !prose(e.get(key)) {
-                return Err(format!(
-                    "event {name}: {key} must be a non-empty string without */"
-                ));
-            }
-        }
-        let payload = e
-            .get("payload")
-            .and_then(Value::as_object)
-            .ok_or_else(|| format!("event {name}: payload must be an object"))?;
-        for (field, spec) in payload {
-            let where_ = format!("event {name} field {field}");
-            if !is_camel_name(field) {
-                return Err(format!("{where_}: name must be camelCase"));
-            }
-            match spec.get("type").and_then(Value::as_str) {
-                Some("enum") => {
-                    let set = spec
-                        .get("enum")
-                        .and_then(Value::as_str)
-                        .ok_or_else(|| format!("{where_}: enum must name a catalog enum"))?;
-                    if !enums.contains_key(set) {
-                        return Err(format!("{where_}: enum {set} is not in the catalog"));
-                    }
-                }
-                Some("integer") => {
-                    let min = spec.get("min").and_then(whole);
-                    let max = spec.get("max").and_then(whole);
-                    match (min, max) {
-                        (Some(lo), Some(hi))
-                            if lo <= hi && lo.unsigned_abs() <= 100_000 && hi.unsigned_abs() <= 100_000 => {}
-                        _ => {
-                            return Err(format!(
-                                "{where_}: an integer needs whole min and max within 100000"
-                            ))
-                        }
-                    }
-                }
-                other => {
-                    return Err(format!(
-                        "{where_}: type {} is not allowed; payloads carry closed enums and small integers only",
-                        other.unwrap_or("(none)")
-                    ))
-                }
-            }
-        }
-    }
-    Ok(())
-}
-
-/// Check one drained event against a checked catalog: a known name, exactly
-/// `{ name, payload }`, exactly the catalog's fields, each enum value listed
-/// and each integer in range.
-pub fn check_event(catalog: &Value, event: &Value) -> Result<(), String> {
-    let name = event
-        .get("name")
-        .and_then(Value::as_str)
-        .ok_or("event: name must be a string")?;
-    let entry = catalog["events"]
-        .as_array()
-        .and_then(|a| a.iter().find(|e| e["name"] == name))
-        .ok_or_else(|| format!("event {name}: not in the catalog"))?;
-    let spec = entry["payload"]
-        .as_object()
-        .ok_or_else(|| format!("event {name}: the catalog entry has no payload"))?;
-    let payload = match (event.as_object().map(|o| o.len()), event.get("payload")) {
-        (Some(2), Some(Value::Object(p))) => p,
-        _ => return Err(format!("event {name}: must be exactly {{ name, payload }}")),
-    };
-    for k in payload.keys() {
-        if !spec.contains_key(k) {
-            return Err(format!("event {name}: field {k} is not in the catalog"));
-        }
-    }
-    for (field, s) in spec {
-        let v = payload
-            .get(field)
-            .ok_or_else(|| format!("event {name}: field {field} is missing"))?;
-        let ok = match s["type"].as_str() {
-            Some("enum") => {
-                let set = s["enum"].as_str().unwrap_or_default();
-                v.as_str().is_some_and(|x| {
-                    catalog["enums"][set]
-                        .as_array()
-                        .is_some_and(|vals| vals.iter().any(|y| y == x))
-                })
-            }
-            Some("integer") => whole(v).is_some_and(|n| {
-                whole(&s["min"]).is_some_and(|lo| n >= lo)
-                    && whole(&s["max"]).is_some_and(|hi| n <= hi)
-            }),
-            _ => false,
-        };
-        if !ok {
-            return Err(format!(
-                "event {name}: field {field} = {v} is outside the catalog"
-            ));
-        }
-    }
-    Ok(())
-}
-
-/// The catalog both engines are held to, compiled in so the referee can
-/// check every drained event without a file path.
+/// The gameplay event catalog as JSON: every event's name, cardinality,
+/// payload fields and meaning. The conformance suite holds the engine to it.
 pub const CATALOG_JSON: &str = include_str!("../../conformance/events/catalog.json");
 
 #[cfg(test)]

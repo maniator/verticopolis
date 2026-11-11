@@ -1,34 +1,53 @@
-//! The engine-owned fixed time step and the host half that feeds it, ported
-//! from the TypeScript reference (`src/engine/sim/fixedStep.ts`, and
-//! `advanceOwedMinutes` in `src/engine/sim/frameStep.ts`). The shipped game
-//! runs this one: its frame loop calls `EnginePort.advance`, which lands in
-//! `FrameStepper::advance` through `port_advance` in `src/wasm_port_life.rs`.
+//! Driving the game from display frames. A host owes the game some game
+//! minutes each frame, set by the game speed it shows; [`FrameStepper`] cuts
+//! them into whole steps sized from the game's own clock, so the tower comes
+//! out the same at any frame rate. The web game runs this same stepper, so a
+//! host that uses it matches the browser at the same speed.
 //!
-//! A host owes the sim some game minutes each frame; this cuts them into whole
-//! quanta sized from the sim's own clock, so a tower comes out the same at any
-//! frame rate. A Rust host that drives the engine itself cuts its minutes the
-//! same way as the browser or its tower differs at the same speed. Every
-//! rounding and tolerance below matches the TypeScript, and
-//! `tests/fixed_step.rs` replays `engine-rs/tests/data/fixed-step-cases.json`, which the
-//! TypeScript wrote, bit for bit.
+//! ```
+//! use verticopolis_engine::clock::GameMode;
+//! use verticopolis_engine::fixed_step::FrameStepper;
+//! use verticopolis_engine::sim::Simulation;
+//!
+//! let mut sim = Simulation::new_game(1, GameMode::Classic);
+//! let mut stepper = FrameStepper::default();
+//! let start = sim.clock.minutes;
+//! // One second of 60 Hz frames at 10 game minutes per real second, with
+//! // the canon day curve (steady_clock false).
+//! for _ in 0..60 {
+//!     stepper.advance(&mut sim, 1000.0 / 60.0, 10.0, false, true);
+//! }
+//! assert!(sim.clock.minutes > start);
+//! ```
+//!
+//! Two rules sit outside the stepper, in the host. Clamp a frame longer than
+//! 200 ms to 1 ms before passing it in (a tab coming back from the
+//! background), and set `stepper.acc_minutes = 0.0` when the player changes
+//! speed or the steady clock, while a blocking dialog is open, and once the
+//! game has stopped.
 
 use crate::sim::Simulation;
 use crate::tdt::pacing::pace_factor;
 
+#[doc(hidden)]
 /// The frame rate the quantum is sized for: about one step per frame.
 pub const REFERENCE_HZ: f64 = 60.0;
 /// At most this many steps run in one frame.
 pub const MAX_STEPS_PER_FRAME: f64 = 4.0;
+#[doc(hidden)]
 /// The largest step, in game minutes, below the host's 30-minute catch-up cap.
 pub const MAX_QUANTUM_MINUTES: f64 = 20.0;
+#[doc(hidden)]
 /// Float dust tolerated when deciding a whole quantum is owed.
 pub const OWED_EPSILON: f64 = 1e-6;
 /// Hard cap on owed minutes carried between frames (the host half).
 pub const MAX_CATCHUP_MINUTES: f64 = 30.0;
 
-/// What a driven sim needs: a step, and the minute of its day.
+/// What the stepper drives: [`Simulation`] implements it.
 pub trait StepSim {
+    /// Advances the game by `dt_minutes`.
     fn step(&mut self, dt_minutes: f64);
+    /// The game clock's minute of the day, 0 up to 1,440.
     fn minute_of_day(&self) -> f64;
 }
 
@@ -41,6 +60,7 @@ impl StepSim for Simulation {
     }
 }
 
+#[doc(hidden)]
 /// Minutes the host still owes the sim, and the step mode (speed and pacing)
 /// they were owed under.
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -65,8 +85,8 @@ fn same_mode(a: (f64, bool), b: (f64, bool)) -> bool {
     (a.0 == b.0 || (a.0.is_nan() && b.0.is_nan())) && a.1 == b.1
 }
 
-/// `quantumFor`: the step size, in whole game minutes, for a host at
-/// `minutes_per_second` when the sim clock reads `minute_of_day`.
+/// The step size, in whole game minutes, for a host running at
+/// `minutes_per_second` when the game clock reads `minute_of_day`.
 pub fn quantum_for(minutes_per_second: f64, minute_of_day: f64, steady_clock: bool) -> f64 {
     let pace = if steady_clock {
         1.0
@@ -80,6 +100,7 @@ pub fn quantum_for(minutes_per_second: f64, minute_of_day: f64, steady_clock: bo
     MAX_QUANTUM_MINUTES.min(per_frame.floor())
 }
 
+#[doc(hidden)]
 /// `syncStepMode`: record the mode the host is about to owe minutes under,
 /// dropping any owed under a different one.
 pub fn sync_step_mode(debt: &mut StepDebt, minutes_per_second: f64, steady_clock: bool) {
@@ -92,6 +113,7 @@ pub fn sync_step_mode(debt: &mut StepDebt, minutes_per_second: f64, steady_clock
     debt.mode = Some(mode);
 }
 
+#[doc(hidden)]
 /// `drainFixedSteps`: advance `sim` by whole quanta out of `debt.minutes`, at
 /// most `max_steps` of them (a value that is not a finite number of at least
 /// one falls back to [`MAX_STEPS_PER_FRAME`]). Returns the steps run.
@@ -126,20 +148,26 @@ pub fn drain_fixed_steps<S: StepSim>(
     steps
 }
 
-/// A host's per-session step state: the owed minutes it carries between
-/// frames, and the debt the engine reads them through.
+/// A host's frame-to-steps state. Keep one per game and call
+/// [`advance`](FrameStepper::advance) once per display frame.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct FrameStepper {
+    /// The game minutes owed and not yet stepped, carried to the next frame.
     pub acc_minutes: f64,
+    #[doc(hidden)]
     pub debt: StepDebt,
 }
 
 impl FrameStepper {
-    /// `advanceOwedMinutes`: owe this frame's minutes (paced by the canon
-    /// curve, or flat with the steady clock), cap the carry at
-    /// [`MAX_CATCHUP_MINUTES`], and step what is owed. `step` false owes the
-    /// minutes without stepping them (a host still busy with its last batch).
-    /// Returns the steps run.
+    /// Owes this frame's game minutes and steps what is owed. `dt_ms` is the
+    /// frame's real length and `minutes_per_second` the game speed. Without
+    /// `steady_clock`, time follows the canon day curve, whose pace changes
+    /// through the day as the 1994 game's clock does; with it, the rate is
+    /// flat. The carry never exceeds
+    /// [`MAX_CATCHUP_MINUTES`], and no frame runs more than
+    /// [`MAX_STEPS_PER_FRAME`] steps. With `step` false the minutes are owed
+    /// but not stepped (a host still busy with its last batch). Returns the
+    /// steps run.
     pub fn advance<S: StepSim>(
         &mut self,
         sim: &mut S,

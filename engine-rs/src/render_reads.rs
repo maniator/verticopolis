@@ -39,6 +39,7 @@ fn wait_tier(wait: f64) -> i64 {
     }
 }
 
+#[doc(hidden)]
 impl Simulation {
     /// `recyclingFill`: how full the bins are, 0 to 1, from the population
     /// against the capacity and the time since the morning collection.

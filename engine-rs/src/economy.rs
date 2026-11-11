@@ -162,6 +162,7 @@ fn is_overhead_kind(kind: Kind) -> bool {
     rent_config(kind).is_some() || daily_traffic_income(kind).is_some()
 }
 
+#[doc(hidden)]
 impl Simulation {
     pub fn has_operational(&self, kind: Kind) -> bool {
         self.tower.units_of_kind(kind).any(|u| u.is_operational())

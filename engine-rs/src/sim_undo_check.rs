@@ -196,6 +196,7 @@ impl Found {
     }
 }
 
+#[doc(hidden)]
 impl Simulation {
     /// Refuse `step` unless the tower is the one it expects and the balance
     /// can pay for it.

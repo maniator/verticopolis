@@ -1,4 +1,5 @@
-//! Port of `src/engine/sim/loop.ts` and the weather hash from `sim/build.ts`.
+// The time step (from the TypeScript reference's `sim/loop.ts`) and the
+// weather hash.
 
 use crate::crowd::{motion, spawn, CROWD_SECONDS_PER_MINUTE};
 use crate::economy::films::draws_full_house;
@@ -31,7 +32,24 @@ pub fn weather_for(day: i64) -> Weather {
 }
 
 impl Simulation {
-    /// `tick(dtMinutes)`: the v2 loop of sub-steps that never skip an hour.
+    /// Advances the game by `dt_minutes` game minutes.
+    ///
+    /// Any `dt` works: the engine splits it into steps of at most 30 minutes
+    /// that never cross an hour, so hourly rules always run. The same seed,
+    /// the same commands and the same sequence of `dt` give the same game.
+    /// A host that runs on display frames should let
+    /// [`FrameStepper`](crate::fixed_step::FrameStepper) choose the `dt`, so
+    /// the tower comes out the same at any frame rate.
+    ///
+    /// ```
+    /// use verticopolis_engine::clock::GameMode;
+    /// use verticopolis_engine::sim::Simulation;
+    ///
+    /// let mut sim = Simulation::new_game(1, GameMode::Classic);
+    /// let day = sim.clock.day();
+    /// sim.tick(24.0 * 60.0);
+    /// assert_eq!(sim.clock.day(), day + 1);
+    /// ```
     pub fn tick(&mut self, dt_minutes: f64) {
         const EPS: f64 = 1e-6;
         let mut remaining = dt_minutes;
@@ -48,6 +66,7 @@ impl Simulation {
         }
     }
 
+    #[doc(hidden)]
     /// One simulation step. An open undo gesture is paused around it, so
     /// what time does to the tower is never part of an undo step.
     pub fn advance_step(&mut self, dt_minutes: f64) {
@@ -117,6 +136,7 @@ impl Simulation {
         }
     }
 
+    #[doc(hidden)]
     pub fn on_hour(&mut self) {
         self.on_hour_runs += 1;
         self.update_presence();
@@ -139,6 +159,7 @@ impl Simulation {
         self.evaluate_star();
     }
 
+    #[doc(hidden)]
     pub fn on_day(&mut self) {
         self.weather = weather_for(self.clock.day());
         let period =
@@ -210,6 +231,7 @@ impl Simulation {
         at
     }
 
+    #[doc(hidden)]
     pub fn finish_construction(&mut self) {
         if self.constructing.is_empty() {
             return;
@@ -261,6 +283,7 @@ impl Simulation {
         }
     }
 
+    #[doc(hidden)]
     /// `floorLabel`: "floor N" above ground, "B{n}" below.
     pub fn floor_label(&self, floor: i64) -> String {
         if floor >= 1 {

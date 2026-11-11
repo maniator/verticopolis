@@ -46,6 +46,7 @@ pub(crate) struct CardFlags {
     pub blockbuster: Option<bool>,
 }
 
+#[doc(hidden)]
 impl Simulation {
     /// The derived flags of unit `id`'s card, or `None` for an id that is not
     /// a unit. `served` is the tower's lobby connection for the floor,

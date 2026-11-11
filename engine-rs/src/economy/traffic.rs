@@ -14,6 +14,7 @@ use crate::sim::{LogKind, Simulation};
 use crate::sim_loop::Weather;
 use crate::tower::UnitState;
 
+#[doc(hidden)]
 impl Simulation {
     /// `collectTrafficIncome`: hourly venue takings.
     pub fn collect_traffic_income(&mut self) {

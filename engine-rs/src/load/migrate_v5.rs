@@ -2,6 +2,7 @@
 
 use super::*;
 
+#[doc(hidden)]
 /// `expandLegacyPartyHalls`.
 pub fn expand_legacy_party_halls(data: &Value) -> Value {
     let src = units_of(data);

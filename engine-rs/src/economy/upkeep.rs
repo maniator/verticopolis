@@ -19,6 +19,7 @@ use crate::services::with_thousands;
 use crate::sim::{LogKind, Simulation};
 use crate::tower::UnitState;
 
+#[doc(hidden)]
 impl Simulation {
     /// `payMaintenance`: the per-period upkeep and, where the mode books
     /// films (Modern), each theatre's booking. Answers the booked theatres:

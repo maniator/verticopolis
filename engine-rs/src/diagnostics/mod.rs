@@ -62,6 +62,7 @@ pub struct DiagnosticFacts {
     pub notice: Option<NoticeFacts>,
 }
 
+#[doc(hidden)]
 impl Simulation {
     /// The diagnostics facts for the unit `id`, or `None` when no unit has
     /// it (a transport's id included). It changes no game state: it fills

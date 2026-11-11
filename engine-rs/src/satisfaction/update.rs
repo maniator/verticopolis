@@ -6,6 +6,7 @@ use crate::facilities::Kind;
 use crate::sim::{LogKind, Simulation};
 use crate::tower::UnitState;
 
+#[doc(hidden)]
 impl Simulation {
     /// `updateSatisfaction`.
     pub fn update_satisfaction(&mut self) {

@@ -43,6 +43,7 @@ fn ring_json(slots: &[IndexMap<i64, f64>]) -> Value {
     )
 }
 
+#[doc(hidden)]
 impl Simulation {
     /// `elevatorStats()` as typed rows: each passenger elevator's served
     /// range, cars, capacity per trip and average fullness, busiest first (a

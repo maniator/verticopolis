@@ -76,6 +76,7 @@ pub fn noise_base_erosion_for(kind: Kind, ever_occupied: bool) -> f64 {
     NOISE_EROSION
 }
 
+#[doc(hidden)]
 impl Simulation {
     /// `buildSatisfactionContext`.
     pub fn build_satisfaction_context(&self, neutralize_congestion: bool) -> SatisfactionContext {

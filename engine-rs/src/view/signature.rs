@@ -1,29 +1,29 @@
-//! The tower signature: undo's per-command fingerprint. Today undo
-//! fingerprints the TypeScript instance with `towerStateSig`
-//! (`src/engine/UndoHistory.ts`) at a gesture's capture and commit, and
-//! drops the step when the two match. The signature answers the same
-//! question for the tower half of that string, as a number: it is a pure
-//! read of the fields `towerStateSig` reads, so a capture and a commit
-//! compare equal when those fields are equal, whatever was read in between.
-//! Money, the other half, stays a value compare beside it, since income
-//! moves it every tick and the view's header carries it (compare it as the
-//! string prints it: `Object.is`, so a NaN equals a NaN). `stateDigest` would
-//! answer too, but it costs about 108 ms on the large tower.
+// The tower signature: undo's per-command fingerprint. It reads the fields
+// the web game's undo signature string reads (`towerStateSig`), so a capture
+// and a commit compare equal when those fields are equal, whatever was read
+// in between. Money, the other half of undo's check, stays a value compare
+// beside it. A full state digest would answer too, but costs about 108 ms on
+// the large tower.
 use crate::sim::Simulation;
 use crate::tower::Tower;
 
 impl Simulation {
-    /// The tower signature (see the module docs): read it at a gesture's
-    /// capture and at its commit, beside money, and the step changed the
-    /// tower if and only if the two differ. Equal fields always give equal
-    /// signatures, and different fields give different ones but for a
-    /// 64-bit collision. It keeps apart a few states the `towerStateSig`
-    /// string runs together (a label holding the string's `:` or `;`
-    /// separators, an empty film policy or subtype beside a missing one), so
-    /// there it can see a change the string would not; where the string
-    /// sees one, so does the signature, a collision aside. One pass over units and transports
-    /// per read: a read for each command (undo's capture and commit), too
-    /// slow for each frame.
+    /// A fingerprint of the tower, for undo: read it before and after a
+    /// command, and the command changed the tower exactly when the two differ
+    /// (barring a 64-bit collision). Money is not part of it; compare that
+    /// beside it. It walks every room and shaft, so read it once per
+    /// command; it is too slow to read every frame.
+    ///
+    /// ```
+    /// use verticopolis_engine::clock::GameMode;
+    /// use verticopolis_engine::facilities::Kind;
+    /// use verticopolis_engine::sim::Simulation;
+    ///
+    /// let mut sim = Simulation::new_game(1, GameMode::Classic);
+    /// let before = sim.tower_signature();
+    /// sim.build(Kind::Lobby, 1, 100);
+    /// assert_ne!(sim.tower_signature(), before);
+    /// ```
     pub fn tower_signature(&self) -> u64 {
         fingerprint(&self.tower)
     }

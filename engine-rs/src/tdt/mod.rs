@@ -55,19 +55,32 @@ impl std::fmt::Display for LegacyExportError {
     }
 }
 
-/// Import a `.TDT` file: the serialized game as JSON text (what
-/// `Simulation::deserialize` takes) plus the binary walk's warnings. The
-/// error is the player-readable refusal.
+/// Reads a 1994 SimTower `.TDT` save into this engine's save JSON, plus
+/// warnings about anything it could not carry over. Load the JSON with
+/// [`deserialize_tdt`](crate::load::deserialize_tdt) after parsing it. The
+/// error is a sentence a player can read.
+///
+/// ```
+/// use verticopolis_engine::clock::GameMode;
+/// use verticopolis_engine::sim::Simulation;
+/// use verticopolis_engine::{export_tdt, import_tdt};
+///
+/// let sim = Simulation::new_game(1, GameMode::Classic);
+/// let bytes = export_tdt(&sim.serialize().to_string()).unwrap();
+/// let (json, _warnings) = import_tdt(&bytes, "TOWER.TDT").unwrap();
+/// let save: serde_json::Value = serde_json::from_str(&json).unwrap();
+/// let tower = verticopolis_engine::load::deserialize_tdt(&save).unwrap();
+/// assert_eq!(tower.mode, GameMode::Classic);
+/// ```
 pub fn import_tdt(bytes: &[u8], filename: &str) -> Result<(String, Vec<String>), String> {
     let parsed = parse::parse_tdt(bytes, filename).map_err(|e| e.0)?;
     Ok((parsed.save.to_string(), parsed.warnings))
 }
 
-/// Export a serialized game (JSON text, what `Simulation::serialize` writes)
-/// as `.TDT` bytes. The error is the player-readable refusal, or what made
-/// the JSON unusable. The input is `JSON.stringify` output: a number JSON
-/// cannot carry (NaN, Infinity) arrives as `null`, and a literal like `1e400`
-/// (which serde_json refuses and `JSON.parse` reads as Infinity) cannot.
+/// Writes a Classic game's save JSON (the text of
+/// [`Simulation::serialize`](crate::sim::Simulation::serialize)) as a 1994
+/// SimTower `.TDT` file. The error is a sentence a player can read, or says
+/// what made the JSON unusable.
 pub fn export_tdt(save_json: &str) -> Result<Vec<u8>, String> {
     let save: serde_json::Value =
         crate::load::parse_save_json(save_json.as_bytes()).map_err(|e| format!("save: {e}"))?;

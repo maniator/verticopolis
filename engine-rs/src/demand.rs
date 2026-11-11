@@ -40,6 +40,7 @@ fn origin_weight(kind: Kind) -> Option<f64> {
     None
 }
 
+#[doc(hidden)]
 impl Simulation {
     /// Whether an operating metro station is helping business: in Classic its
     /// platform floor must also have transport, as in SimTower.

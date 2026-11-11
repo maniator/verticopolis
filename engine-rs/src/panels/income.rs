@@ -38,6 +38,7 @@ impl Ledger {
     }
 }
 
+#[doc(hidden)]
 impl Simulation {
     /// `incomeBreakdown()`: `{ averages: { <category>: dollars/day }, hasData }`.
     pub fn income_breakdown(&self) -> Value {

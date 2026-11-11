@@ -4,17 +4,25 @@
 //!
 //! [`catalog`] returns a [`Catalog`]: world geometry, economy constants, pooled
 //! caps and one [`FacilityEntry`] per facility kind. It serializes to JSON
-//! with camelCase keys, and the WASM binding returns the same text.
+//! with camelCase keys, the same JSON the JavaScript package returns.
 //!
-//! `conformance/catalog-digests.json` pins each mode's canonical hash, written
-//! from this catalog, so a catalog change is a deliberate lock change.
+//! ```
+//! use verticopolis_engine::catalog::{catalog, CATALOG_VERSION};
+//! use verticopolis_engine::clock::GameMode;
+//! use verticopolis_engine::facilities::Kind;
+//!
+//! let classic = catalog(GameMode::Classic);
+//! assert_eq!(classic.version, CATALOG_VERSION);
+//! let office = classic.facilities.iter().find(|f| f.key == Kind::Office.as_str()).unwrap();
+//! println!("{} costs ${} and opens at {} star", office.name, office.cost, office.min_star);
+//! ```
+//!
+//! The conformance suite pins each mode's catalog by hash, so a change to a
+//! price or a rule shows up as a deliberate change to the lock.
 
 use serde::Serialize;
-use serde_json::Value;
-use std::sync::OnceLock;
 
 use crate::build::pays_for_floor;
-use crate::canonical::{canonical_json, digest};
 use crate::charges::{car_resale_refund, ADD_CAR_COST, TRANSPORT_FLOOR_COST};
 use crate::clock::{resolve_calendar, CalendarKind, GameMode};
 use crate::econ::{classic_ladder, rent_config};
@@ -31,9 +39,12 @@ use crate::rules::MAX_HOUSEHOLD;
 use crate::services::GARBAGE_COLLECT_HOUR;
 use crate::sim::STARTING_MONEY;
 mod build;
+mod json;
 mod lock;
 
 pub use build::catalog;
+pub use json::{catalog_digest, catalog_json, catalog_value};
+#[doc(hidden)]
 pub use lock::{lock_view, LOCK_FOOTPRINT_EXEMPT};
 
 /// The version of the catalog's shape. It moves when a field is added,
@@ -48,8 +59,11 @@ pub struct Catalog {
     pub version: u32,
     /// The mode the values are resolved for: `classic` or `modern`.
     pub mode: &'static str,
+    /// The lot and floor limits.
     pub world: World,
+    /// Money figures a UI shows.
     pub economy: Economy,
+    /// The mode's rules a UI shows.
     pub rules: Rules,
     /// The caps several kinds share, in the engine's order.
     pub pools: Vec<PoolEntry>,
@@ -111,6 +125,7 @@ pub struct Economy {
     /// A cinema's monthly film booking, and its blockbuster booking, where
     /// the mode books films (`new_film_price` is null).
     pub cinema_booking_monthly: f64,
+    /// A cinema's monthly booking for a blockbuster.
     pub cinema_booking_blockbuster_monthly: f64,
     /// A nightclub's monthly DJ booking.
     pub nightclub_dj_monthly: f64,
@@ -167,6 +182,7 @@ pub struct CalendarEntry {
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
+/// What the exterminator charges, where the mode has one.
 pub struct ExterminatorFees {
     /// The flat fee of one call.
     pub callout_fee: f64,
@@ -194,6 +210,7 @@ pub struct PoolEntry {
 pub struct FacilityEntry {
     /// The key saves and commands name the kind by.
     pub key: &'static str,
+    /// The name a player sees, such as `Fast Food`.
     pub name: &'static str,
     /// `structure`, `transport`, `office`, `residential`, `hotel`, `food`,
     /// `retail`, `entertainment`, `service` or `special`.
@@ -223,7 +240,9 @@ pub struct FacilityEntry {
     pub max_household: Option<i64>,
     /// The audience an attendance venue seats, or null.
     pub attendance: Option<i64>,
+    /// Only Modern games build it.
     pub modern_only: bool,
+    /// An elevator, stairs or an escalator.
     pub transport: bool,
     /// A staff-only transport (the service elevator).
     pub staff_only: bool,
@@ -301,6 +320,7 @@ pub enum Rent {
         cadence: &'static str,
         /// The price a new unit starts at (the Average rung).
         default: f64,
+        /// The four rungs, Very Low to High.
         rungs: Vec<Rung>,
         /// Whether the mode offers No Rate (always true on a ladder).
         no_rate: bool,
@@ -311,8 +331,11 @@ pub enum Rent {
         cadence: &'static str,
         /// The price a new unit starts at.
         default: f64,
+        /// The lowest price.
         min: f64,
+        /// The highest price.
         max: f64,
+        /// How far one step up or down moves the price.
         step: f64,
         /// Whether the mode offers No Rate (always false on a band).
         no_rate: bool,
@@ -325,7 +348,9 @@ pub enum Rent {
 pub struct Rung {
     /// 0 (Very Low) to 3 (High).
     pub level: i64,
+    /// `Very Low`, `Low`, `Average` or `High`.
     pub label: &'static str,
+    /// The price.
     pub value: f64,
 }
 
@@ -455,37 +480,6 @@ fn facility_entry(mode: GameMode, kind: Kind) -> FacilityEntry {
         lease_amenity: kind.is_lease_amenity(),
         unmet_demand: kind.is_unmet_demand_kind(),
     }
-}
-
-/// The catalog for `mode` as a JSON value, built once per mode (#1254): a
-/// boot reads both catalogs through the binding and hashes both for the
-/// engine's identity, and the catalog depends on nothing but the mode.
-fn shared_catalog_value(mode: GameMode) -> &'static Value {
-    static CLASSIC: OnceLock<Value> = OnceLock::new();
-    static MODERN: OnceLock<Value> = OnceLock::new();
-    let cell = match mode {
-        GameMode::Classic => &CLASSIC,
-        GameMode::Modern => &MODERN,
-    };
-    cell.get_or_init(|| serde_json::to_value(catalog(mode)).expect("the catalog serializes"))
-}
-
-/// The catalog for `mode` as a JSON value.
-pub fn catalog_value(mode: GameMode) -> Value {
-    shared_catalog_value(mode).clone()
-}
-
-/// The catalog for `mode` as canonical JSON text: the bytes the lock hashes,
-/// and what the WASM binding returns.
-pub fn catalog_json(mode: GameMode) -> String {
-    canonical_json(shared_catalog_value(mode))
-}
-
-/// The canonical hash of the catalog for `mode`, as
-/// `conformance/catalog-digests.json` records it: the lock view, so the
-/// exempt footprints do not move it.
-pub fn catalog_digest(mode: GameMode) -> String {
-    digest(&lock_view(shared_catalog_value(mode)))
 }
 
 #[cfg(test)]

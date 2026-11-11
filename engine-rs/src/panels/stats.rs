@@ -41,6 +41,7 @@ pub const TOWER_STATS: [&str; 20] = [
     "fires",
 ];
 
+#[doc(hidden)]
 impl Simulation {
     /// `stats()`: the cheap counters the HUD strip and the stats screen share.
     pub fn tower_stats(&self) -> Value {

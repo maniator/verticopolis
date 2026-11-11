@@ -1,7 +1,9 @@
 use super::*;
+use crate::canonical::{canonical_json, digest};
 use crate::charges::ExtendEnd;
 use crate::services::GARBAGE_COLLECT_HOUR;
 use crate::sim::Simulation;
+use serde_json::Value;
 
 /// `conformance/catalog-digests.json`, which the WASM suite writes from this
 /// catalog (`conformanceWasm.integration.test.ts`).

@@ -213,6 +213,7 @@ impl Tower {
     }
 }
 
+#[doc(hidden)]
 impl Simulation {
     /// `withLobbyUpgrades`: run `run` (the lobby brush) with each lobby it
     /// lays over plain floor taking the floor tile's place in the list.

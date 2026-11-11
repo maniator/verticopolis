@@ -18,6 +18,7 @@ pub(crate) fn parse_int(s: &str) -> Option<f64> {
     Some(if neg { -v } else { v })
 }
 
+#[doc(hidden)]
 /// `detectFounder(raw)`.
 pub fn detect_founder(raw: &Value) -> bool {
     if raw.get("founder") == Some(&Value::Bool(true)) {
@@ -29,7 +30,9 @@ pub fn detect_founder(raw: &Value) -> bool {
         .is_some_and(|v| v < 2.0)
 }
 
-/// `markFounderFromLoadedFile(sim, raw)`.
+/// Marks a freshly loaded game as a founder's tower when its file carries no
+/// build stamp, as the web game does. Call it after [`deserialize`] on a file
+/// the player opened; skip it and the next save drops the status.
 pub fn mark_founder_from_loaded_file(sim: &mut Simulation, raw: &Value) {
     if !sim.founder && raw.get("appVersion").is_none() {
         sim.founder = true;

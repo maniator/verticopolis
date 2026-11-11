@@ -7,6 +7,7 @@ use super::*;
 use crate::schedule_authoring::{tests::tower, ProposalStatus};
 use crate::schedule_facts::AdviceStatus;
 use crate::schedule_presets::PresetStatus;
+use serde_json::Value;
 
 const MODES: [GameMode; 2] = [GameMode::Classic, GameMode::Modern];
 

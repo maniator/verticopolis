@@ -6,7 +6,9 @@ use super::*;
 pub(crate) const EXPANDS_TOO_FAR: &str =
     "this .vctower expands to more data than we will hold; it looks crafted rather than saved";
 
-/// `decodeVctower(text)`: the VCTOWER1 container (base64 of raw deflate).
+/// Reads a `.vctower` file's text into its save JSON, ready for
+/// [`deserialize`]. Refuses text that is not a `.vctower` file, and one that
+/// would inflate past 32 MiB.
 pub fn decode_vctower(text: &str) -> Result<Value, String> {
     parse_save_json(&inflate_vctower(text)?).map_err(|e| format!("json: {e}"))
 }
@@ -54,6 +56,7 @@ pub(crate) fn inflate_container(text: &str) -> Result<Vec<u8>, InflateError> {
     Ok(out)
 }
 
+#[doc(hidden)]
 /// `JSON.parse` for save text that a JavaScript host wrote. A JavaScript
 /// string can hold half of a surrogate pair (a name cut at a UTF-16 length,
 /// for one), and `JSON.stringify` writes it as a `\udxxx` escape that
@@ -135,44 +138,14 @@ pub(crate) fn repair_lone_surrogates(text: &[u8]) -> Option<Vec<u8>> {
     })
 }
 
-/// The `.vctower` magic: the first line of every file, naming the format and
-/// its version (`TOWER_FILE_MAGIC` in saveCompression.ts).
+/// The first line of every `.vctower` file, naming the format and its
+/// version.
 pub const TOWER_FILE_MAGIC: &str = "VCTOWER1";
 
-/// The inverse of [`decode_vctower`]: a serialized save in the `.vctower`
-/// container, as bytes. The framing and the base64 alphabet match the
-/// TypeScript writers (`SaveGame.export`, and `toTowerFile` for the desktop
-/// store) byte for byte: the magic, a newline, one line of standard base64
-/// with `=` padding, and a closing newline. The payload is raw DEFLATE (no
-/// zlib or gzip framing) of the save's JSON text in UTF-8.
-///
-/// The bytes are the web game's own: for the same save, stamp and time, the
-/// file equals the one `SaveGame.export` (or `toTowerFile`) writes. The JSON
-/// text is what `JSON.stringify` writes for the save as JavaScript holds it
-/// ([`js_json`]: every map in insertion order, array-index keys first), so a
-/// save parsed from the web game's JSON keeps the web game's key order. (A
-/// save built by [`Simulation::serialize`] has the engine's own key order,
-/// which every reader takes; the web game's order for a loaded tower follows
-/// the file it was loaded from, which the engine does not keep. A string
-/// holding half a surrogate pair is written as U+FFFD, where `JSON.stringify`
-/// writes the escape; the web game repairs such strings on load and on input,
-/// so its saves hold none.) The
-/// payload is compressed by a port of the web's compressor, fflate's
-/// `deflateSync` at level 1 ([`crate::fflate`]), which is the level
-/// `SaveGame.saveTo` chose: within 0.8% of level 6 on a sparse save at a
-/// third of the cost.
-///
-/// The save is written as given, the way `toTowerFile` carries a stored
-/// value. A save written as a player's tower needs the stamp
-/// [`encode_simulation_vctower`] and [`stamp_save`] add: one without
-/// `appVersion` loads as a founder's tower.
-///
-/// A save whose JSON text is longer than the strictest reader holds
-/// (`MAX_SAVE_INFLATED_BYTES`, 32 MiB, the cap of `inflateCapped` and of
-/// [`decode_vctower`]) is refused: written, it would only fail to load as a
-/// file that looks crafted. A real tower is about 2 MB.
-///
-/// [`js_json`]: crate::canonical::js_json
+/// Writes save JSON as `.vctower` file bytes, as given. To write a player's
+/// tower, stamp it first with [`stamp_save`], or use
+/// [`encode_simulation_vctower`], which does both: a save with no stamp loads
+/// as a founder's tower. Refuses a save larger than a loader accepts.
 pub fn encode_vctower(save: &Value) -> Result<Vec<u8>, String> {
     pack_json(&crate::canonical::js_json(save))
 }
@@ -197,23 +170,11 @@ pub(crate) fn pack_json(json: &str) -> Result<Vec<u8>, String> {
     Ok(out)
 }
 
-/// `stamp(data)` in SaveGame.ts: set `savedAt` (milliseconds since the
-/// epoch) and `appVersion` (the build that wrote the save) on a serialized
-/// game, after the checks `SaveGame.import` and the Founder rule need. The
-/// save must be a tower (an object with a numeric `minutes` and a `units`
-/// array, the shape the web import accepts), `saved_at_ms` must be a time
-/// a JavaScript `Date` holds, and `app_version` must not read as a build
-/// before 2.0, since the web game takes such a stamp as a founder's tower
-/// (`detectFounder`). A non-numeric name such as `"dev"` is fine.
-///
-/// One step goes past the TypeScript `stamp`, which only ever sees a loaded
-/// tower's serialization. The save is meant to be what `serialize` returns,
-/// which carries Founder status as `founder: true`. A save that instead
-/// still holds an older stamp reading as a founder's (a `.vctower` decoded
-/// but never loaded) keeps that status as `founder: true` before the new
-/// stamp replaces the old one. A save with no stamp at all cannot be told
-/// apart from a fresh serialization, so load an unstamped file
-/// (`mark_founder_from_loaded_file`) before writing it again.
+/// Stamps save JSON with the app that wrote it and when, as the web game does
+/// before writing a file. `app_version` names your host and its version (it
+/// must not read as a build older than 2.0, which the web game takes for a
+/// founder's tower); `saved_at_ms` is the time in milliseconds since the Unix
+/// epoch. Refuses JSON that is not a tower.
 pub fn stamp_save(save: &mut Value, app_version: &str, saved_at_ms: f64) -> Result<(), String> {
     let carries_founder = detect_founder(save);
     let Value::Object(m) = save else {
@@ -247,12 +208,11 @@ pub(crate) fn check_stamp(app_version: &str, saved_at_ms: f64) -> Result<(), Str
     Ok(())
 }
 
-/// `SaveGame.export(sim)`: serialize the game, stamp it ([`stamp_save`]) and
-/// encode it ([`encode_vctower`]). The engine has no clock and no build
-/// identity of its own, so the host passes both. The game is written as
-/// text and the file built from that text, one top-level key at a time
-/// (`export_stream`), so the save is never held whole as a `Value` tree
-/// (#1338); the bytes are the tree path's.
+/// Writes a game as `.vctower` file bytes: [`Simulation::serialize`],
+/// [`stamp_save`] and [`encode_vctower`] in one call, without holding the
+/// whole save in memory at once. The engine has no clock or version of its
+/// own, so pass your host's name and version and the time in milliseconds
+/// since the Unix epoch.
 pub fn encode_simulation_vctower(
     sim: &Simulation,
     app_version: &str,
@@ -293,6 +253,7 @@ pub(super) fn lenient_base64(text: &str) -> Vec<u8> {
     .unwrap_or_default()
 }
 
+#[doc(hidden)]
 /// `String.prototype.trim`: strips WhiteSpace and LineTerminator. Compared
 /// with Rust's `is_whitespace`, JavaScript also counts U+FEFF and does not
 /// count U+0085 (NEL).

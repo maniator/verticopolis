@@ -17,6 +17,7 @@ pub(crate) struct ShaftGeometry {
     pub lobbies: Vec<i64>,
 }
 
+#[doc(hidden)]
 impl Simulation {
     pub(crate) fn shaft_geometry(&self, t: &Transport) -> ShaftGeometry {
         // Both lists come from the tower's per-revision caches.

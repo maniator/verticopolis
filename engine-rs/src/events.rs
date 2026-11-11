@@ -1,4 +1,10 @@
-//! Port of `src/engine/EventSystem.ts`.
+//! Emergencies and the choices they put to the player.
+//!
+//! When a fire breaks out or a bomb threat arrives, the engine sets
+//! [`EventSystem::pending`] on [`Simulation::events`] and writes the offer to
+//! the log; the frame's header flags it too. The game keeps running. A host
+//! shows the offer and sends the player's answer with
+//! [`Simulation::resolve_choice`].
 
 use indexmap::IndexSet;
 use serde_json::{json, Value};
@@ -14,31 +20,48 @@ use crate::tower::UnitState;
 mod fire;
 
 #[path = "events_bomb.rs"]
+#[doc(hidden)]
 pub mod bomb;
+#[doc(hidden)]
 pub use bomb::{BombSearch, Guard};
 
+/// An offer waiting for the player's answer.
 #[derive(Clone, Debug)]
 pub struct PendingChoice {
+    /// `fireRescue` (pay to stop a fire spreading) or `bombThreat` (pay the
+    /// ransom, or let the search for the bomb begin).
     pub kind: &'static str,
+    /// What accepting costs, in dollars.
     pub cost: f64,
+    /// The offer, ready to show a player.
     pub message: String,
 }
 
+/// The tower's emergencies. A host reads [`pending`](EventSystem::pending);
+/// the rest is the engine's own state.
 pub struct EventSystem {
+    #[doc(hidden)]
     /// Units currently ablaze, in insertion order.
     pub active: IndexSet<i64>,
+    #[doc(hidden)]
     /// `counts`: emergency tallies for this tower instance (read by the
     /// shell; never saved). A spreading blaze is the same fire, so only the
     /// ignition counts; bomb losses are not fire losses.
     pub fires_started: i64,
+    #[doc(hidden)]
     pub fires_gut_rooms: i64,
+    #[doc(hidden)]
     pub bombs_detonated: i64,
+    #[doc(hidden)]
     /// The seasonal and visitor stream, separate from the main one.
     pub extra: Rng,
+    #[doc(hidden)]
     /// The year Santa last came, as the save carries it (a forged save may
     /// hold a fraction, which then never equals a year).
     pub last_santa_year: f64,
+    /// The offer waiting for the player's answer, if any.
     pub pending: Option<PendingChoice>,
+    #[doc(hidden)]
     /// Classic's bomb search while one runs (`events_bomb.rs`).
     pub bomb: Option<BombSearch>,
 }
@@ -48,6 +71,7 @@ const MEDICAL_RADIUS: i64 = 12;
 const THIEF_DAILY_CHANCE: f64 = 0.025;
 
 impl EventSystem {
+    #[doc(hidden)]
     pub fn new(seed: u32) -> EventSystem {
         EventSystem {
             active: IndexSet::new(),
@@ -61,6 +85,7 @@ impl EventSystem {
         }
     }
 
+    #[doc(hidden)]
     /// `saveState()`: `pending` is a literal null when there is no choice.
     /// `sim_save.rs` writes this object itself too (#1242), with the pending
     /// choice's message from the borrow; its tests hold the two to the same
@@ -77,15 +102,16 @@ impl EventSystem {
         state
     }
 
+    #[doc(hidden)]
     pub fn count(&self) -> usize {
         self.active.len()
     }
 }
 
 impl Simulation {
-    /// `setFilmPolicy(id, policy)`: the policy as stored, or `None` when the
-    /// unit is not a cinema. A policy outside the three the type allows is
-    /// refused the same way, since the TypeScript cannot be called with one.
+    /// Sets what cinema `id` books: `auto` (the engine chooses), `feature` or
+    /// `blockbuster`. Returns the policy set, or `None` when `id` is not a
+    /// cinema or `policy` is none of the three.
     pub fn set_film_policy(&mut self, id: i64, policy: &str) -> Option<&'static str> {
         let policy: &'static str = match policy {
             "auto" => "auto",
@@ -101,6 +127,7 @@ impl Simulation {
         Some(policy)
     }
 
+    #[doc(hidden)]
     /// `maybeRandomEvent`: the daily roll.
     pub fn maybe_random_event(&mut self) {
         if self.events.pending.is_some() {
@@ -145,13 +172,15 @@ impl Simulation {
         }
     }
 
-    /// `resolveChoice(option)`: `accept` is true. The player's answer, which
-    /// is no edit: a fire or a bomb it lets loose is time's doing, so it runs
-    /// outside a gesture the player has open (`sim_undo.rs`).
+    /// Answers the [pending choice](EventSystem::pending): `true` pays, `false`
+    /// declines. Accepting without the money to pay counts as declining. Does
+    /// nothing when no choice is pending. A declined fire spreads until it
+    /// burns out; a declined bomb threat starts the search for the bomb.
     pub fn resolve_choice(&mut self, accept: bool) {
         self.outside_the_gesture(|s| s.resolve_choice_from(accept, EmergencySource::Player));
     }
 
+    #[doc(hidden)]
     /// `EventSystem.resolveChoice(option, source)`: the daily roll's
     /// auto-decline comes through here as a timeout.
     pub fn resolve_choice_from(&mut self, accept: bool, source: EmergencySource) {
@@ -243,6 +272,7 @@ impl Simulation {
         }
     }
 
+    #[doc(hidden)]
     pub fn fire_chance(&self) -> f64 {
         let mut chance = 0.025;
         if self.has_operational(Kind::Security) {
@@ -271,6 +301,7 @@ impl Simulation {
             .collect()
     }
 
+    #[doc(hidden)]
     /// `startFire`.
     pub fn start_fire(&mut self) {
         let candidates = self.flammable_units();
@@ -288,6 +319,7 @@ impl Simulation {
             .any(|u| u.kind == kind && u.is_operational() && (u.floor - floor).abs() <= radius)
     }
 
+    #[doc(hidden)]
     pub fn control_chance(&self, floor: i64) -> f64 {
         let sec = self.service_within(Kind::Security, floor, SECURITY_RADIUS);
         let med = self.service_within(Kind::Medical, floor, MEDICAL_RADIUS);
@@ -449,25 +481,5 @@ impl Simulation {
         }
         let v: Vec<i64> = floors.into_iter().collect();
         *self.events.extra.pick(&v)
-    }
-
-    /// `bombThreat`.
-    pub fn bomb_threat(&mut self) {
-        if self.has_any(Kind::Security) {
-            let cost = 2_000.0 + self.rng.int(0, 3_000) as f64;
-            self.money -= cost;
-            self.emit(&format!("💣 A bomb threat was called in. Security swept the tower and found nothing. The evacuation cost ${}.", with_thousands(cost)), LogKind::Info);
-            return;
-        }
-        let fine = 15_000.0 + self.rng.int(0, 15_000) as f64;
-        let targets = self.flammable_units();
-        let epicenter = if targets.is_empty() {
-            None
-        } else {
-            let ground = &self.tower.units[*self.rng.pick(&targets)];
-            Some((ground.floor, ground.x as f64 + ground.width as f64 / 2.0))
-        };
-        let destroyed = self.blast(fine, epicenter);
-        self.emit(&format!("💣 A bomb detonated with no security to stop it. {destroyed} room(s) across ~5 floors were gutted, plus a ${} fine. Build Security!", with_thousands(fine)), LogKind::Bad);
     }
 }

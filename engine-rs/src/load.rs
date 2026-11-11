@@ -1,15 +1,36 @@
-//! Port of `src/storage/vctowerContainer.ts` (and the `.vctower` writer in
-//! `src/storage/SaveGame.ts`), `src/engine/saveMigration.ts`
-//! (with its `migrations/*`), `sim/serialization.ts` (`deserialize`),
-//! `sim/coerce.ts`, `sim/deserializeGuards.ts` and `sim/founderStatus.ts`.
+//! Saves: writing a game to a `.vctower` file and reading one back.
 //!
-//! This file holds the shared imports and constants; the code lives in the
-//! child modules under `load/`, one per source file it ports: `container`
-//! (the `.vctower` framing), `helpers`, `migrate_v1`, `migrate_v4`,
-//! `migrate_v5` and `migrate` (the migrations and their driver), `guards`,
-//! `coerce`, `founder`, `reader` (the `deserialize` entry points and the
-//! per-unit reader) and `assemble` (the rest of a load). Every public path
-//! stays `crate::load::<name>`.
+//! A `.vctower` file is the web game's save format: a first line naming the
+//! format ([`TOWER_FILE_MAGIC`]), then the save JSON, compressed. A save from
+//! any older version loads; the loader upgrades it first. A save from a newer
+//! version is refused.
+//!
+//! ```
+//! use verticopolis_engine::clock::GameMode;
+//! use verticopolis_engine::load::{
+//!     decode_vctower, deserialize, encode_simulation_vctower, mark_founder_from_loaded_file,
+//! };
+//! use verticopolis_engine::sim::Simulation;
+//!
+//! let sim = Simulation::new_game(5, GameMode::Classic);
+//! let bytes = encode_simulation_vctower(&sim, "my-host 1.0.0", 1_791_849_600_000.0).unwrap();
+//!
+//! let text = String::from_utf8(bytes).unwrap();
+//! let save = decode_vctower(&text).unwrap();
+//! let mut loaded = deserialize(&save).unwrap();
+//! mark_founder_from_loaded_file(&mut loaded, &save);
+//! assert_eq!(loaded.money, sim.money);
+//! ```
+//!
+//! A save holds the tower and leaves out the people walking around and the
+//! elevators' dispatch state, so a loaded game restarts both and does not
+//! track the game that wrote it. Two loads of the same save do track each
+//! other exactly.
+//!
+//! The loader repairs: [`deserialize`] corrects damaged or edited fields the
+//! way the web game's loader does, and refuses only a file it cannot read.
+//! The JSON inside the file is what
+//! [`Simulation::serialize`](crate::sim::Simulation::serialize) returns.
 
 use std::collections::{HashMap, HashSet};
 
