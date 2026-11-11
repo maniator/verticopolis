@@ -17,12 +17,12 @@ import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { spawnPlan } from "./spawn-plan.mjs";
 
 const MCP_PACKAGE = "chrome-devtools-mcp@1.12.0";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const extra = process.argv.slice(2);
-const isWindows = process.platform === "win32";
 
 // tools/agent-env/setup.sh installs the package here (the same name rule).
 const installDir = join(homedir(), ".cache", "vc-agent", MCP_PACKAGE.replace(/[@/]/g, "_"));
@@ -44,6 +44,7 @@ if (process.getuid?.() === 0) args.push("--chrome-arg=--no-sandbox");
 const [command, commandArgs] = existsSync(installedCli)
   ? [process.execPath, [installedCli, ...args, ...extra]]
   : ["npx", ["-y", MCP_PACKAGE, ...args, ...extra]];
-const child = spawn(command, commandArgs, { stdio: "inherit", env, cwd: root, shell: isWindows });
+const plan = spawnPlan(command, commandArgs);
+const child = spawn(plan.command, plan.args, { stdio: "inherit", env, cwd: root, shell: plan.shell });
 child.on("exit", (code, signal) => process.exit(signal ? 1 : (code ?? 1)));
 for (const sig of ["SIGINT", "SIGTERM"]) process.on(sig, () => child.kill(sig));

@@ -25,12 +25,12 @@ import { createRequire } from "node:module";
 import { homedir, tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { spawnPlan } from "./spawn-plan.mjs";
 
 const MCP_PACKAGE = "@playwright/mcp@0.0.85";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const extra = process.argv.slice(2);
-const isWindows = process.platform === "win32";
 
 function pinnedImage() {
   try {
@@ -75,7 +75,8 @@ function dockerHasImage(image) {
 }
 
 function run(command, args) {
-  const child = spawn(command, args, { stdio: "inherit", shell: isWindows });
+  const plan = spawnPlan(command, args);
+  const child = spawn(plan.command, plan.args, { stdio: "inherit", shell: plan.shell });
   child.on("exit", (code, signal) => process.exit(signal ? 1 : (code ?? 1)));
   for (const sig of ["SIGINT", "SIGTERM"]) process.on(sig, () => child.kill(sig));
 }
