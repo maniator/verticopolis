@@ -29,3 +29,4 @@ export * from "./screenshot-tower-builders.ts";
 export * from "./screenshot-crown-builder.ts";
 export * from "./screenshot-compare-builders.ts";
 export * from "./screenshot-scene-builders.ts";
+export * from "./screenshot-security-builders.ts";
