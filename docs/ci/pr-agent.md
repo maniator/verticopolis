@@ -30,7 +30,13 @@ ChatGPT subscription. No OpenAI organization ID or other variable is required.
   before as a cache write, so the bill is the diff size times the number of
   calls times the model's price. A chunked review is capped at 3 calls
   (`max_number_of_calls`). Each run's comment ends with an "Agent run details"
-  block that shows its tokens and estimated cost.
+  block that shows its tokens and estimated cost, but PR-Agent edits that
+  comment in place, so it shows only the latest run.
+- The `cost-ledger` job in the workflow keeps one comment per PR, "PR-Agent
+  cost on this PR", that adds up every run's details block (tokens, calls and
+  PR-Agent's estimate, rounded to cents). It reads comments through the API
+  only. The estimate is not the bill: the OpenAI usage page is. A run that
+  fails before it posts a details block (no credits, a model error) adds no row.
 - PR-Agent complements, and does not replace, Rust/test/coverage CI,
   independent reviews, Copilot or Codex.
 

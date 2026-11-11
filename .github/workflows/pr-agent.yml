@@ -48,3 +48,75 @@ jobs:
           github_action_config.auto_describe: 'false'
           github_action_config.auto_improve: 'false'
           config.restricted_mode: 'true'
+
+  # PR-Agent edits its review and suggestion comments in place, so each one
+  # shows only its latest run. This job keeps one running comment per PR that
+  # adds up every run's own cost line (PR-Agent's estimate, rounded to cents;
+  # OpenAI's usage page is the bill). It reads comments through the API and
+  # never checks out or executes PR code.
+  cost-ledger:
+    name: Running cost of PR-Agent on this PR
+    needs: pr-agent
+    if: ${{ !cancelled() && needs.pr-agent.result != 'skipped' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    concurrency:
+      group: pr-agent-ledger-${{ github.event.issue.number }}
+      cancel-in-progress: false
+    steps:
+      - name: Add this run to the cost comment
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.issue.number }}
+          SINCE: ${{ github.event.comment.created_at }}
+        run: |
+          set -euo pipefail
+          api="repos/$REPO/issues/$PR/comments"
+          marker='<!-- pr-agent-cost-ledger -->'
+          all=$(gh api --paginate "$api?per_page=100" | jq -s '[.[][]]')
+          new=$(jq -c --arg since "$SINCE" '
+            def num($re): (capture($re).n | gsub(","; "") | tonumber) // 0;
+            [ .[]
+              | select(.user.login == "github-actions[bot]"
+                       and (.body | contains("Agent run details"))
+                       and .updated_at >= $since)
+              | .body as $b
+              | { key: "\(.id)@\(.updated_at)",
+                  at: .updated_at,
+                  command: (if ($b | test("PR Code Suggestions")) then "improve"
+                            elif ($b | test("PR Reviewer Guide")) then "review"
+                            else "other" end),
+                  model: (($b | capture("- Model: (?<m>[^\n]+)").m) // "unknown"),
+                  tokens_in: ($b | num("- Tokens: (?<n>[0-9,]+) in")),
+                  tokens_out: ($b | num("/ (?<n>[0-9,]+) out")),
+                  calls: ($b | num("- AI calls: (?<n>[0-9]+)")),
+                  cost: (($b | capture("Estimated API cost: \\$(?<n>[0-9.]+)").n | tonumber) // 0) } ]
+            ' <<<"$all")
+          ledger=$(jq -c --arg m "$marker" 'map(select(.user.login == "github-actions[bot]" and (.body | contains($m)))) | first // empty' <<<"$all")
+          old='[]'
+          id=''
+          if [ -n "$ledger" ]; then
+            id=$(jq -r '.id' <<<"$ledger")
+            old=$(jq -r '.body' <<<"$ledger" | sed -n 's/.*<!-- pr-agent-cost-data: \(.*\) -->.*/\1/p' | head -n1)
+            old=${old:-[]}
+          fi
+          rows=$(jq -c --argjson old "$old" '[ .[] | select(.key as $k | $old | map(.key) | index($k) | not) ] as $add | $old + $add' <<<"$new")
+          if [ "$(jq 'length' <<<"$rows")" = "$(jq 'length' <<<"$old")" ]; then
+            echo "No new PR-Agent run to add."
+            exit 0
+          fi
+          body=$(jq -r --arg m "$marker" '
+            def usd: (. * 100 | round) as $c
+              | "$\($c / 100 | floor).\($c % 100 | tostring | if length < 2 then "0" + . else . end)";
+            "\($m)\n<!-- pr-agent-cost-data: \(tojson) -->\n### PR-Agent cost on this PR\n\n"
+            + "Every run on this PR, as PR-Agent estimates it (rounded to cents; the OpenAI usage page is the bill).\n\n"
+            + "| Run | Command | Model | Calls | Tokens in | Tokens out | Est. cost |\n| --- | --- | --- | ---: | ---: | ---: | ---: |\n"
+            + (to_entries | map("| \(.key + 1) | \(.value.command) | \(.value.model) | \(.value.calls) | \(.value.tokens_in) | \(.value.tokens_out) | \(.value.cost | usd) |") | join("\n"))
+            + "\n| | **Total** | | **\(map(.calls) | add)** | **\(map(.tokens_in) | add)** | **\(map(.tokens_out) | add)** | **\(map(.cost) | add | usd)** |\n"
+          ' <<<"$rows")
+          if [ -n "$id" ]; then
+            gh api -X PATCH "repos/$REPO/issues/comments/$id" -f body="$body" >/dev/null
+          else
+            gh api -X POST "$api" -f body="$body" >/dev/null
+          fi
