@@ -1,16 +1,15 @@
 import { it, expect } from "vitest";
-import { Simulation } from "../../engine/Simulation";
 import { MILESTONES } from "../../engine/milestones";
-import { GRID, FACILITIES } from "../../engine/facilities";
-import { PortSim, describeEngines, type Leg } from "../portKit/portSim";
+import { FACILITIES } from "../../engine/facilities";
+import { LOT_WIDTH } from "../portKit/draftFixtures";
+import { PortSim, describeEngines, type Leg, draftTower, type Draft } from "../portKit/portSim";
 
-const predicate = (id: string) => MILESTONES.find((m) => m.id === id)!.test;
 
-const W = GRID.width;
+const W = LOT_WIDTH;
 const C = Math.floor(W / 2);
 const DAY = 60 * 24;
 
-function layFull(sim: Simulation, kind: "floor" | "lobby", floor: number): void {
+function layFull(sim: Draft, kind: "floor" | "lobby", floor: number): void {
   for (let x = C; x < W; x++) sim.tower.place(kind, floor, x);
   for (let x = C - 1; x >= 0; x--) sim.tower.place(kind, floor, x);
 }
@@ -18,7 +17,7 @@ function layFull(sim: Simulation, kind: "floor" | "lobby", floor: number): void 
 /** Fill a floor with offices from x=0, leaving `rightClear` tiles free. They
  *  are stamped occupied unless `occupy` is false, which leaves them for the
  *  engine's own move-ins. */
-function fillOffices(sim: Simulation, floor: number, rightClear = 0, occupy = true): number {
+function fillOffices(sim: Draft, floor: number, rightClear = 0, occupy = true): number {
   const w = FACILITIES.office.width;
   let n = 0;
   for (let x = 0; x + w <= W - rightClear; x += w) {
@@ -44,8 +43,8 @@ const done = (sim: PortSim, label: string): boolean => awarded(sim).includes(MIL
  *  milestone it already satisfies, so a test that watches a milestone fire
  *  starts below the bar and lets the engine's move-ins cross it. The draft is
  *  the fixture's authoring copy; the engine starts from its save. */
-function startedTower(vacantFloors = 0): Simulation {
-  const draft = Simulation.newGame(1);
+function startedTower(vacantFloors = 0): Draft {
+  const draft = draftTower(1);
   draft.money = 1_000_000_000;
   layFull(draft, "lobby", 1);
   for (const f of [2, 3, 4]) {
@@ -86,7 +85,7 @@ describeEngines("Milestones (optional goals)", (leg: Leg) => {
   });
 
   it("well-served fires for a large, fully-reachable tower", () => {
-    const draft = Simulation.newGame(2);
+    const draft = draftTower(2);
     draft.money = 1_000_000_000;
     layFull(draft, "lobby", 1);
     for (let f = 2; f <= 25; f++) {
@@ -111,10 +110,11 @@ describeEngines("Milestones (optional goals)", (leg: Leg) => {
 
 describeEngines("Milestone review follow-ups", (leg: Leg) => {
   it("full-house counts vacant condos/hotels, not just offices (M1)", () => {
-    // Test the predicate directly — no tick — so under-provisioned transport can't
-    // evict offices and confound the vacancy check. This is purely M1's logic:
-    // an empty condo/hotel is a vacancy too, not only empty offices.
-    const draft = Simulation.newGame(3);
+    // Read the rule at a load, which adopts every milestone already met, with
+    // no tick, so under-provisioned transport can't evict offices and confound
+    // the vacancy check. This is purely M1's logic: an empty condo/hotel is a
+    // vacancy too, not only empty offices.
+    const draft = draftTower(3);
     draft.money = 1_000_000_000;
     layFull(draft, "lobby", 1);
     for (let f = 2; f <= 12; f++) {
@@ -127,10 +127,9 @@ describeEngines("Milestone review follow-ups", (leg: Leg) => {
     const sim = new PortSim(leg, draft);
     expect(sim.state.population).toBeGreaterThanOrEqual(2000);
 
-    const fullHouse = predicate("full-house");
-    expect(fullHouse(sim.readOnlySimulation)).toBe(false); // the empty condo is a vacancy (office-only vacant would miss it)
+    expect(sim.state.milestones).not.toContain("full-house"); // the empty condo is a vacancy (office-only vacant would miss it)
     expect(sim.demolish(condo.unitId!)).toBe(true); // remove the only vacant leasable unit
-    expect(fullHouse(sim.readOnlySimulation)).toBe(true);
+    expect(new PortSim(leg, sim.save()).state.milestones).toContain("full-house");
   });
 
   it("adopts already-satisfied milestones silently on load, without a burst (I2)", () => {

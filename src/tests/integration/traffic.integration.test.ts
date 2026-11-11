@@ -1,16 +1,15 @@
 import { describe, it, expect } from "vitest";
 import { trafficTier, TRAFFIC_LABELS, trafficLevel } from "../../presentation/traffic";
-import { Simulation } from "../../engine/Simulation";
-import { GRID } from "../../engine/facilities";
-import { PortSim, describeEngines, type Leg } from "../portKit/portSim";
+import { LOT_WIDTH } from "../portKit/draftFixtures";
+import { PortSim, describeEngines, type Leg, draftTower, type Draft } from "../portKit/portSim";
 
-const W = GRID.width;
+const W = LOT_WIDTH;
 const C = Math.floor(W / 2);
-function lay(sim: Simulation, kind: "floor" | "lobby", floor: number): void {
+function lay(sim: Draft, kind: "floor" | "lobby", floor: number): void {
   for (let x = C; x < W; x++) sim.tower.place(kind, floor, x);
   for (let x = C - 1; x >= 0; x--) sim.tower.place(kind, floor, x);
 }
-function fillFloor(sim: Simulation, floor: number, count: number): void {
+function fillFloor(sim: Draft, floor: number, count: number): void {
   let placed = 0;
   for (let x = 0; x + 9 <= W && placed < count; x += 9) {
     const r = sim.tower.place("office", floor, x);
@@ -49,8 +48,7 @@ describeEngines("Traffic signal is peak-driven and points at the hotspot", (leg:
    *  Zone B is a real jam; zone A dilutes the average but not the peak. The
    *  draft is the fixture's authoring copy; the engine starts from its save. */
   function hotspotTower(): PortSim {
-    const sim = Simulation.newGame(1);
-    sim.simModel = "v2";
+    const sim = draftTower(1);
     sim.money = 1e12;
     lay(sim, "lobby", 1);
     for (let f = 2; f <= 20; f++) lay(sim, "floor", f);
@@ -87,8 +85,7 @@ describeEngines("Traffic signal is peak-driven and points at the hotspot", (leg:
     // from the lobby. Every floor it serves shares that one bottleneck, so they
     // all tie, and the lobby is where riders board it. The hotspot must be floor
     // 1 (the "1F" the player sees backed up), not the first office floor above.
-    const draft = Simulation.newGame(7);
-    draft.simModel = "v2";
+    const draft = draftTower(7);
     draft.money = 1e12;
     lay(draft, "lobby", 1);
     for (let f = 2; f <= 10; f++) lay(draft, "floor", f);
@@ -105,8 +102,7 @@ describeEngines("Traffic signal is peak-driven and points at the hotspot", (leg:
   });
 
   it("a well-built tower stays Smooth and names no floor (peak below the first boundary)", () => {
-    const draft = Simulation.newGame(2);
-    draft.simModel = "v2";
+    const draft = draftTower(2);
     draft.money = 1e12;
     lay(draft, "lobby", 1);
     for (let f = 2; f <= 12; f++) lay(draft, "floor", f);
@@ -119,8 +115,7 @@ describeEngines("Traffic signal is peak-driven and points at the hotspot", (leg:
   });
 
   it("the hotspot names no floor (not 0, a real floor) when nothing is congested", () => {
-    const draft = Simulation.newGame(3);
-    draft.simModel = "v2";
+    const draft = draftTower(3);
     draft.money = 1e12;
     lay(draft, "lobby", 1);
     const { ratio, floor } = new PortSim(leg, draft).hotspot();

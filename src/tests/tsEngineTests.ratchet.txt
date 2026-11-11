@@ -9,9 +9,6 @@
 # its file no longer imports. The list only shrinks: convert the test to the
 # port kit (src/tests/portKit/) or retire it on evidence, then delete its line.
 # Adding a line needs a reason the PR states and a reviewer accepts.
-#
-# src/tests/portKit/portSim.ts is the kit itself: it builds the TypeScript leg on
-# purpose and stays until src/engine/ is deleted.
 
 src/analyticsEngineBridge.test.ts Simulation
 src/bootstrapEngine.test.ts Simulation
@@ -72,7 +69,6 @@ src/tests/fixtures/serviceDiagnostics.fixture.ts Simulation
 src/tests/fixtures/towerFixtures.ts Simulation
 src/tests/fixtures/winningTower.ts Simulation
 src/tests/integration/attendanceTripwire.integration.test.ts Clock Simulation crowd/motion crowd/trips crowd/visits
-src/tests/integration/attendanceTripwireEngine.integration.test.ts Simulation # kit suite: authors its draft on a Simulation
 src/tests/integration/calendar.integration.test.ts Clock EconomySystem Simulation Tower rng
 src/tests/integration/capacityEventMatrix.integration.test.ts Simulation
 src/tests/integration/chargeBindingRaw.integration.test.ts Simulation sim/charges
@@ -98,7 +94,6 @@ src/tests/integration/economyDepth.integration.test.ts Simulation
 src/tests/integration/elevatorDispatchBalancing.integration.test.ts Crowd Tower crowd/routing tower/segments
 src/tests/integration/elevatorSchedule.integration.test.ts Simulation
 src/tests/integration/elevatorScheduling.integration.test.ts ElevatorDispatch Tower
-src/tests/integration/elevatorStats.integration.test.ts Simulation
 src/tests/integration/elevatorWidthMigration.integration.test.ts Simulation
 src/tests/integration/engagementParity.integration.test.ts port/tsEngine
 src/tests/integration/engineView.integration.test.ts Simulation UndoHistory tower/towerTopology
@@ -111,30 +106,26 @@ src/tests/integration/gameEvents.integration.test.ts Clock EventSystem Tower rng
 src/tests/integration/goldenMaster.integration.test.ts Simulation
 src/tests/integration/heatmap.integration.test.ts Simulation
 src/tests/integration/hotelLateCheckout.integration.test.ts Clock EconomySystem Simulation
-src/tests/integration/hotelLateCheckoutEngine.integration.test.ts EconomySystem Simulation # kit suite: authors its draft on a Simulation and reads the checkout hours
+src/tests/integration/hotelLateCheckoutEngine.integration.test.ts EconomySystem # kit suite: authors its draft on a Simulation and reads the checkout hours
 src/tests/integration/housekeepingLegibility.integration.test.ts Simulation economy/housekeeping
 src/tests/integration/housekeepingMaids.integration.test.ts Crowd Simulation crowd/spawn economy/housekeeping
 src/tests/integration/housekeepingTriage.integration.test.ts Simulation
 src/tests/integration/leaseAmenityGripe.integration.test.ts Simulation sim/churn
-src/tests/integration/ledger.integration.test.ts Ledger Simulation
+src/tests/integration/ledger.integration.test.ts Ledger
 src/tests/integration/legibility.integration.test.ts Simulation
 src/tests/integration/loaderCases.integration.test.ts Simulation
 src/tests/integration/mealCadence.integration.test.ts Clock Crowd EconomySystem Simulation Tower rng
-src/tests/integration/milestones.integration.test.ts Simulation
 src/tests/integration/modernEconomy.integration.test.ts Simulation
 src/tests/integration/moveInGateHelpers.ts Simulation
 src/tests/integration/moveInGateLegibility.integration.test.ts Simulation sim/churn sim/satisfactionStep
 src/tests/integration/moveInGateRentals.integration.test.ts Simulation sim/gripe sim/satisfactionStep
 src/tests/integration/moveInSustainabilityGate.integration.test.ts Simulation sim/demand sim/satisfactionStep
-src/tests/integration/nextStarRequirements.integration.test.ts Simulation
 src/tests/integration/noiseMemo.integration.test.ts Simulation UndoHistory sim/constants sim/satisfaction
-src/tests/integration/onboarding.integration.test.ts Simulation
 src/tests/integration/paintPersistence.integration.test.ts Simulation
 src/tests/integration/parity.integration.test.ts Simulation
 src/tests/integration/partyHallTwoFloor.integration.test.ts Simulation
 src/tests/integration/personCensus.integration.test.ts Clock Simulation
 src/tests/integration/personRoundTrip.integration.test.ts Clock Crowd Simulation
-src/tests/integration/personRoundTripVenueCap.integration.test.ts Simulation # kit suite: authors its draft on a Simulation
 src/tests/integration/phase2.integration.test.ts Simulation
 src/tests/integration/playthrough.integration.test.ts Simulation
 src/tests/integration/portServiceDiagnostics.integration.test.ts port/tsEngine
@@ -145,7 +136,6 @@ src/tests/integration/rentalNightclubGripe.integration.test.ts Simulation sim/gr
 src/tests/integration/reviewFixes.integration.test.ts Clock EconomySystem Simulation Tower rng
 src/tests/integration/saveMetadataLog.integration.test.ts Simulation
 src/tests/integration/segmentRouting.integration.test.ts Crowd Simulation Tower sim/gripe
-src/tests/integration/segmentRoutingMealRush.integration.test.ts Simulation # kit suite: authors its draft on a Simulation
 src/tests/integration/segmentRoutingReachable.integration.test.ts Clock Crowd EconomySystem Simulation Tower sim/demand
 src/tests/integration/simulation.integration.test.ts ElevatorDispatch Simulation
 src/tests/integration/skylobbyTransfer.integration.test.ts Crowd Tower
@@ -156,14 +146,11 @@ src/tests/integration/subtypeVisuals.integration.test.ts Simulation
 src/tests/integration/tdtImport.integration.test.ts Simulation
 src/tests/integration/towerCongratsDialogs.integration.test.ts Simulation port/tsEngine
 src/tests/integration/towerStateSig.integration.test.ts UndoHistory
-src/tests/integration/traffic.integration.test.ts Simulation
-src/tests/integration/trafficTeeth.integration.test.ts Simulation
 src/tests/integration/tsEngine.golden.integration.test.ts Simulation port/tsEngine
 src/tests/integration/uiDialogs.integration.test.ts Simulation
 src/tests/integration/undoHistory.integration.test.ts Simulation UndoHistory port/tsEngine
 src/tests/integration/unmetDemand.integration.test.ts Simulation sim/constants sim/demand sim/gripe sim/serialization
 src/tests/integration/venueAttendance.integration.test.ts Clock Crowd Simulation crowd/person crowd/spawn crowd/visits
-src/tests/integration/venueOccupancy.integration.test.ts Clock Simulation
 src/tests/integration/venueOrigins.integration.test.ts Clock Simulation crowd/spawn crowd/visits
 src/tests/integration/viewReader.integration.test.ts Simulation port/tsEngine tower/rooms
 src/tests/integration/viewReaderHall.integration.test.ts Simulation
@@ -174,8 +161,6 @@ src/tests/integration/wasteAndParking.integration.test.ts Simulation
 src/tests/integration/weatherCrowd.integration.test.ts Clock EconomySystem Simulation Tower rng
 src/tests/integration/weatherEvents.integration.test.ts Clock EventSystem Simulation Tower rng
 src/tests/integration/weekendPatronage.integration.test.ts Simulation
-src/tests/portKit/portSim.ts Simulation port/tsEngine # the kit builds the TypeScript leg on purpose
-src/tests/portKit/tsTooling.ts Clock tower/rooms # the kit's TypeScript leg: its tooling setters
 src/tests/roomCountsWriters.guard.test.ts tower/rooms
 src/ui/catalogPricing.test.ts Simulation
 src/ui/editorPatch.test.ts Simulation

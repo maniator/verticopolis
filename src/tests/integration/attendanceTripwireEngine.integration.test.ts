@@ -1,8 +1,7 @@
 import { expect, it } from "vitest";
-import { Simulation } from "../../engine/Simulation";
 import type { Person } from "../../shared/engineTypes";
 import type { FacilityKind } from "../../shared/types";
-import { PortSim, describeEngines, type Leg } from "../portKit/portSim";
+import { PortSim, describeEngines, type Leg, draftTower } from "../portKit/portSim";
 import { roomTallies } from "../portKit/rooms";
 
 /**
@@ -36,7 +35,7 @@ const BULLDOZE = true;
  *  occupied (asleep) hotel single on 5: every tally kind (attendance, census,
  *  outForMeal and the hotel-origin split) is reachable in one fixture. */
 function mixedTower(leg: Leg): PortSim {
-  const draft = new Simulation(2024, "modern", "realWorld");
+  const draft = draftTower(2024, "modern", "realWorld");
   draft.money = 10_000_000;
   draft.star = 1; // gate random fires out of multi-hour loops
   for (let x = 0; x < 40; x++) expect(draft.tower.place("lobby", 1, x).ok).toBe(true);

@@ -1,12 +1,6 @@
 import { it, expect } from "vitest";
-import {
-  newSeededGame,
-  lay,
-  mustBuild,
-  placeUnit,
-} from "../fixtures/towerFixtures";
+import { newSeededDraft, lay, mustBuild, placeUnit, LOT_WIDTH } from "../portKit/draftFixtures";
 import { ECON } from "../../engine/econConfig";
-import { GRID } from "../../engine/facilities";
 import type { SerializedGame } from "../../shared/types";
 import { PortSim, describeEngines, type Leg } from "../portKit/portSim";
 
@@ -16,7 +10,7 @@ import { PortSim, describeEngines, type Leg } from "../portKit/portSim";
  *  makes the same write here, with no reload to snap the price onto the
  *  ladder first. */
 
-const C = Math.floor(GRID.width / 2);
+const C = Math.floor(LOT_WIDTH / 2);
 /** The most hours a sale or a buy-back is given to happen. */
 const MAX_HOURS = 24 * 40;
 
@@ -25,7 +19,7 @@ const MAX_HOURS = 24 * 40;
  *  command, which stamps the ladder's asking price; otherwise it is placed
  *  and opened unpriced. */
 function servedCondo(leg: Leg, priced: boolean): { sim: PortSim; id: number } {
-  const draft = newSeededGame(3, "classic");
+  const draft = newSeededDraft(3, "classic");
   draft.money = 1e9;
   draft.star = 1; // no random fire/bomb events to perturb the run
   lay(draft, "lobby", 1);

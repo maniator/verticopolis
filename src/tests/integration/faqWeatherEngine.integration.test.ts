@@ -1,9 +1,7 @@
 import { expect, it } from "vitest";
-import { newSeededGame } from "../fixtures/towerFixtures";
-import type { Simulation } from "../../engine/Simulation";
-import { GRID } from "../../engine/facilities";
+import { newSeededDraft, LOT_WIDTH } from "../portKit/draftFixtures";
 import type { WeatherKind } from "../../shared/types";
-import { PortSim, describeEngines, type Leg } from "../portKit/portSim";
+import { PortSim, describeEngines, type Leg, type Draft } from "../portKit/portSim";
 
 /**
  * FAQ Cluster B's rain case on both engines: rain depresses commercial income
@@ -16,10 +14,10 @@ import { PortSim, describeEngines, type Leg } from "../portKit/portSim";
  * stays as set.
  */
 
-const W = GRID.width;
+const W = LOT_WIDTH;
 const C = Math.floor(W / 2);
 
-function lay(sim: Simulation, kind: "floor" | "lobby", floor: number): void {
+function lay(sim: Draft, kind: "floor" | "lobby", floor: number): void {
   for (let x = C; x < W; x++) sim.tower.place(kind, floor, x);
   for (let x = C - 1; x >= 0; x--) sim.tower.place(kind, floor, x);
 }
@@ -27,7 +25,7 @@ function lay(sim: Simulation, kind: "floor" | "lobby", floor: number): void {
 describeEngines("Events & amounts (FAQ Cluster B)", (leg: Leg) => {
   it("rain depresses commercial income vs a clear day", () => {
     function dayIncome(weather: WeatherKind): number {
-      const draft = newSeededGame(7);
+      const draft = newSeededDraft(7);
       draft.money = 1e12;
       draft.star = 3;
       lay(draft, "lobby", 1);
@@ -62,7 +60,7 @@ describeEngines("Events & amounts (FAQ Cluster B)", (leg: Leg) => {
   });
 
   it("a setup after setWeather throws, since its reload would drop the weather", () => {
-    const draft = newSeededGame(7);
+    const draft = newSeededDraft(7);
     lay(draft, "lobby", 1);
     const sim = new PortSim(leg, draft);
     sim.setWeather("rain");

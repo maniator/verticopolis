@@ -1,16 +1,15 @@
 import { it, expect } from "vitest";
-import { Simulation } from "../../engine/Simulation";
-import { GRID } from "../../engine/facilities";
-import { PortSim, describeEngines, type Leg } from "../portKit/portSim";
+import { LOT_WIDTH } from "../portKit/draftFixtures";
+import { PortSim, describeEngines, type Leg, draftTower, type Draft } from "../portKit/portSim";
 
-const C = Math.floor(GRID.width / 2);
+const C = Math.floor(LOT_WIDTH / 2);
 const DAY = 60 * 24;
 // A narrow strip that still spans every column the shafts (C-10 … C+12) and the
 // width-12 shop at C+30 (…C+41) need — keeps the tower small so the multi-day
 // tick stays well within the CI test timeout (a full-width tower is ~5× larger).
 const X0 = C - 15;
 const X1 = C + 45;
-function layStrip(sim: Simulation, kind: "floor" | "lobby", floor: number): void {
+function layStrip(sim: Draft, kind: "floor" | "lobby", floor: number): void {
   for (let x = X0; x <= X1; x++) sim.tower.place(kind, floor, x);
 }
 
@@ -22,8 +21,8 @@ function layStrip(sim: Simulation, kind: "floor" | "lobby", floor: number): void
  * is uncapped now (#503), so a too-long stair climb is what strands it. A shop
  * sits on floor 40. Narrow, tick-cheap footprint.
  */
-function strandedShopTower(seed: number, mode: "classic" | "modern" = "classic"): { draft: Simulation; shopId: number } {
-  const sim = Simulation.newGame(seed, mode);
+function strandedShopTower(seed: number, mode: "classic" | "modern" = "classic"): { draft: Draft; shopId: number } {
+  const sim = draftTower(seed, mode);
   sim.money = 1e12;
   layStrip(sim, "lobby", 1);
   for (let f = 2; f <= 45; f++) layStrip(sim, "floor", f);

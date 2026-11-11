@@ -1,8 +1,7 @@
 import { expect, it } from "vitest";
-import { Simulation } from "../../engine/Simulation";
 import { FACILITIES } from "../../engine/facilities";
 import type { Person } from "../../shared/engineTypes";
-import { PortSim, describeEngines, type Leg } from "../portKit/portSim";
+import { PortSim, describeEngines, type Leg, draftTower } from "../portKit/portSim";
 
 /**
  * The two venue-capacity cases of `personRoundTrip.integration.test.ts` that
@@ -14,7 +13,7 @@ import { PortSim, describeEngines, type Leg } from "../portKit/portSim";
 /** One served office (6 workers) on floor 2 and a fastFood on floor 5, both
  *  occupied, loaded into the engine on `leg`. Returns the sim and the venue. */
 function officeAndFastFood(leg: Leg): { sim: PortSim; ff: number } {
-  const draft = new Simulation(2024, "modern", "realWorld");
+  const draft = draftTower(2024, "modern", "realWorld");
   draft.money = 1_000_000;
   draft.star = 1; // gate fires
   for (let x = 0; x < 40; x++) expect(draft.tower.place("lobby", 1, x).ok).toBe(true);
@@ -108,7 +107,7 @@ describeEngines("venue customer capacity: the cap holds against a stamped-full v
  *  occupied fast food on floor 2. The hall keeps attendance, so a stamp
  *  mirrors into its occupants; the fast food keeps none. */
 function withPartyHall(leg: Leg): { sim: PortSim; hall: number; ff: number } {
-  const draft = new Simulation(2024, "modern", "realWorld");
+  const draft = draftTower(2024, "modern", "realWorld");
   draft.money = 1_000_000;
   for (let x = 0; x < 40; x++) expect(draft.tower.place("lobby", 1, x).ok).toBe(true);
   for (let f = 2; f <= 4; f++) for (let x = 0; x < 40; x++) expect(draft.tower.place("floor", f, x).ok).toBe(true);

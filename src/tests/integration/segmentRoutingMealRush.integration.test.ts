@@ -1,8 +1,7 @@
 import { expect, it } from "vitest";
-import { Simulation } from "../../engine/Simulation";
 import { FACILITIES } from "../../engine/facilities";
 import type { Person } from "../../shared/engineTypes";
-import { PortSim, describeEngines, type Leg } from "../portKit/portSim";
+import { PortSim, describeEngines, type Leg, type Draft, draftTower } from "../portKit/portSim";
 
 /**
  * Meal trips on a REACHABLE split floor (#647 fix round), on both engines.
@@ -30,7 +29,7 @@ interface MealTower {
 }
 
 /** The draft's condo and venue, occupied, loaded into the engine on `leg`. */
-function mealTower(leg: Leg, draft: Simulation, condoAt: number, venueAt: number): MealTower {
+function mealTower(leg: Leg, draft: Draft, condoAt: number, venueAt: number): MealTower {
   const condoRes = draft.tower.place("condo", 2, condoAt);
   const venueRes = draft.tower.place("fastFood", 2, venueAt);
   expect(condoRes.ok, `condo placed: ${condoRes.reason}`).toBe(true);
@@ -45,8 +44,8 @@ function mealTower(leg: Leg, draft: Simulation, condoAt: number, venueAt: number
 }
 
 /** A draft with the lobby [0..59], money and the first star. */
-function splitDraft(seed: number): Simulation {
-  const draft = new Simulation(seed, "modern", "realWorld");
+function splitDraft(seed: number): Draft {
+  const draft = draftTower(seed, "modern", "realWorld");
   draft.money = 5_000_000;
   draft.star = 1;
   for (let x = 0; x <= 59; x++) expect(draft.tower.place("lobby", 1, x).ok).toBe(true);

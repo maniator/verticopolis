@@ -1,17 +1,16 @@
 import { describe, it, expect } from "vitest";
 import {
-  Simulation,
   congestionSeverity,
   CONGESTION_CHURN,
   CONGESTION_GRIDLOCK,
   type HeatCell,
 } from "../../engine/Simulation";
-import { GRID } from "../../engine/facilities";
-import { PortSim, describeEngines, type Leg } from "../portKit/portSim";
+import { LOT_WIDTH } from "../portKit/draftFixtures";
+import { PortSim, describeEngines, type Leg, draftTower, type Draft } from "../portKit/portSim";
 
-const W = GRID.width;
+const W = LOT_WIDTH;
 const C = Math.floor(W / 2);
-function lay(sim: Simulation, kind: "floor" | "lobby", floor: number): void {
+function lay(sim: Draft, kind: "floor" | "lobby", floor: number): void {
   for (let x = C; x < W; x++) sim.tower.place(kind, floor, x);
   for (let x = C - 1; x >= 0; x--) sim.tower.place(kind, floor, x);
 }
@@ -27,8 +26,8 @@ function cellOn(map: HeatCell[], floor: number): HeatCell | undefined {
 
 /** The engine on `leg`, loaded once per draft from the draft's save; the
  *  draft is the fixture's authoring copy, read only after it is built. */
-function loader(leg: Leg): (draft: Simulation) => PortSim {
-  const engines = new WeakMap<Simulation, PortSim>();
+function loader(leg: Leg): (draft: Draft) => PortSim {
+  const engines = new WeakMap<Draft, PortSim>();
   return (draft) => {
     let e = engines.get(draft);
     if (!e) engines.set(draft, (e = new PortSim(leg, draft)));
@@ -39,7 +38,7 @@ function loader(leg: Leg): (draft: Simulation) => PortSim {
 describeEngines("floorHeatmap (stats overlay data)", (leg: Leg) => {
   const loaded = loader(leg);
   it("occupancy: a fully-vacant office floor is redder than a fully-leased one", () => {
-    const sim = Simulation.newGame(51);
+    const sim = draftTower(51);
     sim.money = 1e12;
     lay(sim, "lobby", 1);
     lay(sim, "floor", 2);
@@ -57,7 +56,7 @@ describeEngines("floorHeatmap (stats overlay data)", (leg: Leg) => {
   });
 
   it("reports each tinted floor's built column extent", () => {
-    const sim = Simulation.newGame(52);
+    const sim = draftTower(52);
     sim.money = 1e12;
     lay(sim, "lobby", 1);
     lay(sim, "floor", 2);
@@ -69,7 +68,7 @@ describeEngines("floorHeatmap (stats overlay data)", (leg: Leg) => {
   });
 
   it("satisfaction: an unhappy tenant floor reads redder than a content one", () => {
-    const sim = Simulation.newGame(53);
+    const sim = draftTower(53);
     sim.money = 1e12;
     lay(sim, "lobby", 1);
     lay(sim, "floor", 2);
@@ -91,7 +90,7 @@ describeEngines("floorHeatmap (stats overlay data)", (leg: Leg) => {
     // with several content condos used to read green because the floor's
     // average happiness stayed high. Each present unit must now tint by its own
     // unhappiness.
-    const sim = Simulation.newGame(56);
+    const sim = draftTower(56);
     sim.money = 1e12;
     lay(sim, "lobby", 1);
     lay(sim, "floor", 2);
@@ -119,7 +118,7 @@ describeEngines("floorHeatmap (stats overlay data)", (leg: Leg) => {
   });
 
   it("occupancy/satisfaction skip floors with no tenancy; congestion covers built floors", () => {
-    const sim = Simulation.newGame(54);
+    const sim = draftTower(54);
     sim.money = 1e12;
     lay(sim, "lobby", 1); // structural only, no rentable units
     expect(cellOn(loaded(sim).heatCells("occupancy"), 1)).toBeUndefined(); // no tenancy → untinted
@@ -127,7 +126,7 @@ describeEngines("floorHeatmap (stats overlay data)", (leg: Leg) => {
   });
 
   it("satisfaction skips a leased-but-empty floor (no one present to judge), occupancy flags it", () => {
-    const sim = Simulation.newGame(55);
+    const sim = draftTower(55);
     sim.money = 1e12;
     lay(sim, "lobby", 1);
     lay(sim, "floor", 2);
@@ -139,7 +138,7 @@ describeEngines("floorHeatmap (stats overlay data)", (leg: Leg) => {
   });
 
   it("cleanliness: tints hotel rooms by staff reach and dirty state; offices emit nothing, condos read n/a", () => {
-    const sim = Simulation.newGame(57);
+    const sim = draftTower(57);
     sim.money = 1e12;
     lay(sim, "lobby", 1);
     for (let f = 2; f <= 6; f++) lay(sim, "floor", f);
@@ -197,7 +196,7 @@ describeEngines("floorHeatmap (stats overlay data)", (leg: Leg) => {
   });
 
   it("cleanliness: every hotel room reads unreached when there is no housekeeping crew", () => {
-    const sim = Simulation.newGame(58);
+    const sim = draftTower(58);
     sim.money = 1e12;
     lay(sim, "lobby", 1);
     lay(sim, "floor", 2);
@@ -267,7 +266,7 @@ describeEngines("congestion overlay reads the engine's per-floor congestion", (l
   const loaded = loader(leg);
 
   it("the hotspot ratio reports the busiest floor's ratio for the legend", () => {
-    const sim = Simulation.newGame(60);
+    const sim = draftTower(60);
     sim.money = 1e12;
     lay(sim, "lobby", 1);
     for (let f = 2; f <= 6; f++) lay(sim, "floor", f);
@@ -290,7 +289,7 @@ describeEngines("congestion overlay reads the engine's per-floor congestion", (l
     // The overlay builds the spatial map once and reads each floor from it; that
     // must give exactly what the per-floor read (which rebuilds the map) gives,
     // put through the severity ramp. Same values, no drift.
-    const sim = Simulation.newGame(61);
+    const sim = draftTower(61);
     sim.money = 1e12;
     lay(sim, "lobby", 1);
     for (let f = 2; f <= 8; f++) lay(sim, "floor", f);

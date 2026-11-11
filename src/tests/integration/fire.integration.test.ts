@@ -1,14 +1,13 @@
 import { it, expect } from "vitest";
-import { newSeededGame } from "../fixtures/towerFixtures";
-import { GRID } from "../../engine/facilities";
+import { newSeededDraft, LOT_WIDTH } from "../portKit/draftFixtures";
 import { isOperational } from "../../shared/types";
 import { PortSim, describeEngines, type Leg } from "../portKit/portSim";
 
 /** A floor-2 tower served by an elevator, with `n` occupied offices — the only
  *  flammable rooms, so `startFire()` ignites an office deterministically. */
 function firePrep(leg: Leg, seed: number, n = 1) {
-  const draft = newSeededGame(seed);
-  const x0 = Math.floor(GRID.width / 2) - 20;
+  const draft = newSeededDraft(seed);
+  const x0 = Math.floor(LOT_WIDTH / 2) - 20;
   for (let i = 0; i < 70; i++) draft.tower.place("floor", 2, x0 + i);
   const sim = new PortSim(leg, draft);
   sim.mustBuildTransport("elevatorStandard", x0, 1, 2);
@@ -113,8 +112,8 @@ describeEngines("Fire aftermath — gutted shells (canon), not auto-repair", (le
   it("a gutted COMMERCIAL venue stays gutted and is never revived to earn income", () => {
     // Regression: collectTrafficIncome() force-set commercial rooms to "occupied"
     // each hour, resurrecting a gutted shop/restaurant/cinema and defeating the fix.
-    const draft = newSeededGame(11);
-    const x0 = Math.floor(GRID.width / 2) - 20;
+    const draft = newSeededDraft(11);
+    const x0 = Math.floor(LOT_WIDTH / 2) - 20;
     for (let i = 0; i < 40; i++) draft.tower.place("floor", 2, x0 + i);
     const sim = new PortSim(leg, draft);
     sim.mustBuildTransport("elevatorStandard", x0, 1, 2); // served floor

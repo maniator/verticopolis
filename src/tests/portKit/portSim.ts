@@ -1,11 +1,6 @@
 import { afterEach, describe } from "vitest";
-import { KIND_CODES, VIEW_LAYOUT, codeOf } from "../../engine/port/layout";
-import { TsEngine } from "../../engine/port/tsEngine";
-import { Simulation } from "../../engine/Simulation";
-import { crowdView } from "../../engine/conformanceView";
 import type { Person } from "../../shared/engineTypes";
-import type { Tower } from "../../engine/Tower";
-import type { FacilityKind, SerializedGame, Transport, Unit, UnitState, VacateReason, WeatherKind } from "../../shared/types";
+import type { FacilityKind, UnitState, VacateReason, WeatherKind } from "../../shared/types";
 import type { HeatCell, HeatmapMode } from "../../shared/engineTypes";
 import type { EnginePort } from "../../simport/enginePort";
 import type { StatsReport } from "../../simport/panels";
@@ -13,48 +8,31 @@ import { PortCodes } from "../../simport/portCodes";
 import { statsReport } from "../../simport/statsSheet";
 import { hasWasmPackage, wasm, wasmRequired } from "../conformance/wasmEngine";
 import type { WasmEngine } from "../../dualrun/binding";
-import { rustTooling, tsTooling, type ToolingSetters } from "./tsTooling";
+import { rustTooling, type ToolingSetters } from "./tooling";
+import { Snapshot, draftFromSave, releaseDrafts, type Draft, type Leg } from "./drafts";
+
+export { Snapshot, draftFromSave, draftTower, type Draft, type Leg, type PendingChoiceRecord, type SnapshotSource, type UnitRecord } from "./drafts";
 
 /**
  * The test kit for suites that run on the engine port (#878, #1421; PR 7 of
- * the engine port contract). A suite names its engines with
- * {@link describeEngines} and drives one {@link PortSim} per test: the Rust
- * `Engine` (the authority the release ships) and `TsEngine` (the fallback,
- * kept working through 3.0) run the same test body.
+ * the engine port contract). A suite names its engine with
+ * {@link describeEngines} and drives one {@link PortSim} per test on the Rust
+ * `Engine`, the engine the game ships. Until #1875 the same bodies also ran on
+ * the TypeScript engine; that leg is gone with it.
  *
  * The engine is the authority. A test acts on it through port commands
  * ({@link PortSim.build}, {@link PortSim.buildTransport}, `tick`) and the
  * tooling-only members ({@link PortSim.startFire}, `bombThreat`,
- * `setMoney`), and reads it through {@link PortSim.state}, a read-only copy
+ * `setMoney`), and reads it through {@link PortSim.state}, a read-only view
  * of the engine's own save. A fixture's raw tower edits (`tower.place`, a
- * unit's state, the star) go through {@link PortSim.setup}: the engine's save
- * is opened as a draft, the edit is made, and the engine loads the result,
- * the same path a saved tower takes into the game. That is allowed only
- * before the engine's first tick after a load; once a crowd exists a test
- * needs a tooling-only member instead, and `setup` says so.
+ * unit's state, the star) go through {@link PortSim.setup} or a
+ * {@link draftTower}: a tooling tower (`src/game/toolingTower.ts`) on an
+ * engine of its own takes the edits, and the engine loads its save, the same
+ * path a saved tower takes into the game. `setup` is allowed only before the
+ * engine's first tick after a load; once a crowd exists a test needs a
+ * tooling-only member instead, and `setup` says so.
  */
 
-export type Leg = "ts" | "rust";
-
-/** A `Simulation` method that moves the tower. They are absent from
- *  {@link Snapshot}, so a write to the read-only copy fails to compile
- *  instead of being lost. */
-type SimulationWrites =
-  | "tick" | "build" | "paintBrush" | "buildTransport" | "sellAt" | "setCars" | "resizeTransport" | "addCar" | "removeCar"
-  | "beginExtend" | "extendTransport" | "endExtend" | "removeFacility" | "emit" | "startFire" | "bombThreat" | "evaluateStar"
-  | "callExterminator" | "resolveChoice" | "adjustRent" | "setNoRate" | "priceUnit" | "applyRentBatch" | "setFilmPolicy"
-  | "rerollSubtype" | "moveIn" | "toggleAutoBridge";
-type TowerWrites =
-  | "place" | "placeTransport" | "placeStructureRun" | "removeUnit" | "removeTransport" | "setLabel" | "resizeTransport"
-  | "setCars" | "setSchedule" | "setStop" | "setExpressStops" | "clearStops" | "setNextId";
-
-/** What a test may read of the tower. */
-export type TowerView = Readonly<Omit<Tower, TowerWrites | "units" | "transports">> & {
-  readonly units: readonly Readonly<Unit>[];
-  readonly transports: readonly Readonly<Transport>[];
-};
-/** A read-only copy of the engine's save, as a `Simulation`. */
-export type Snapshot = Readonly<Omit<Simulation, SimulationWrites | "tower">> & { readonly tower: TowerView };
 
 interface Leaf extends ToolingSetters {
   readonly port: EnginePort;
@@ -70,23 +48,7 @@ interface Leaf extends ToolingSetters {
   free(): void;
 }
 
-function makeLeaf(leg: Leg, save: string): Leaf {
-  if (leg === "ts") {
-    const engine = new TsEngine(Simulation.deserialize(JSON.parse(save) as SerializedGame));
-    return {
-      port: engine,
-      startFire: () => engine.sim.startFire(),
-      bombThreat: () => engine.sim.bombThreat(),
-      evaluateStar: () => engine.sim.evaluateStar(),
-      setMoney: (amount) => {
-        engine.sim.money = amount;
-      },
-      ...tsTooling(engine),
-      crowdView: () => JSON.parse(JSON.stringify(crowdView(engine.sim))) as { people: Person[] },
-      elevatorUtilization: (id) => engine.sim.elevatorUtilization(id),
-      free: () => undefined,
-    };
-  }
+function makeLeaf(save: string): Leaf {
   const engine: WasmEngine = wasm().Engine.fromSave(save);
   return {
     port: engine as unknown as EnginePort,
@@ -152,14 +114,17 @@ export class PortSim {
   /** A write the save does not carry, which a later `setup` would drop. */
   private unsavedWrite = false;
 
-  /** A simulation on `leg` that starts from `source`: a draft `Simulation`
-   *  (a fixture's authoring copy; nothing reads it afterwards) or save text
-   *  the engine loads itself, such as an edited or forged save. */
+  private readonly codes: PortCodes;
+
+  /** A simulation on `leg` that starts from `source`: a {@link Draft} (a
+   *  fixture's authoring copy; nothing reads it afterwards) or save text the
+   *  engine loads itself, such as an edited or forged save. */
   constructor(
     readonly leg: Leg,
-    source: Simulation | string,
+    source: Draft | string,
   ) {
-    this.leaf = makeLeaf(leg, typeof source === "string" ? source : JSON.stringify(source.serialize()));
+    this.leaf = makeLeaf(typeof source === "string" ? source : source.saveText());
+    this.codes = new PortCodes(this.leaf.port);
     live.add(this);
   }
 
@@ -170,16 +135,10 @@ export class PortSim {
     return this.leaf.port;
   }
 
-  /** A read-only copy of the engine's save, rebuilt after any write. */
+  /** A read-only view of the engine's save, read again after any write. */
   get state(): Snapshot {
-    this.cached ??= Simulation.deserialize(JSON.parse(this.leaf.port.serialize()) as SerializedGame) as unknown as Snapshot;
+    this.cached ??= new Snapshot(this);
     return this.cached;
-  }
-
-  /** The read-only copy as a `Simulation`, for a rule that takes one and only
-   *  reads (a milestone's test, say). */
-  get readOnlySimulation(): Simulation {
-    return this.state as unknown as Simulation;
   }
 
   /** A slot of the frame header by its layout name, read from the engine now
@@ -270,18 +229,18 @@ export class PortSim {
     this.cached = undefined;
   }
 
-  /** Edit the tower as a fixture: `edit` gets a draft `Simulation` opened on
-   *  the engine's save, and the engine loads the result. Only before the
-   *  first tick since the last load; take ids out of the draft, since its
-   *  objects are not the engine's. */
-  setup<T = void>(edit: (draft: Simulation) => T): T {
+  /** Edit the tower as a fixture: `edit` gets a {@link Draft} opened on the
+   *  engine's save, and the engine loads the result. Only before the first
+   *  tick since the last load; take ids out of the draft, since its records
+   *  are not the engine's. */
+  setup<T = void>(edit: (draft: Draft) => T): T {
     if (this.ticked) {
       throw new Error("PortSim.setup runs before the engine's first tick; a mid-run write needs a tooling-only member on the engine");
     }
     if (this.unsavedWrite) throw new Error("PortSim.setup reloads the engine from its save, which would drop an earlier setCustomersIn or setWeather; call setup first");
-    const draft = Simulation.deserialize(JSON.parse(this.leaf.port.serialize()) as SerializedGame);
+    const draft = draftFromSave(this.leaf.port.serialize());
     const out = edit(draft);
-    const answer = this.leaf.port.loadSave(JSON.stringify(draft.serialize()));
+    const answer = this.leaf.port.loadSave(draft.saveText());
     if (answer[0] !== 1) throw new Error(`PortSim.setup: the engine refused the edited save: ${this.leaf.port.lastReason() ?? "no reason"}`);
     this.changed();
     return out;
@@ -300,11 +259,11 @@ export class PortSim {
   }
 
   build(kind: FacilityKind, floor: number, x: number): CommandResult {
-    return this.result(this.leaf.port.buildAt(codeOf(KIND_CODES, kind), floor, x));
+    return this.result(this.leaf.port.buildAt(this.codes.kind(kind), floor, x));
   }
 
   buildTransport(kind: FacilityKind, x: number, bottom: number, top: number): CommandResult {
-    return this.result(this.leaf.port.buildShaft(codeOf(KIND_CODES, kind), x, bottom, top));
+    return this.result(this.leaf.port.buildShaft(this.codes.kind(kind), x, bottom, top));
   }
 
   /** {@link build}, which throws when the engine refuses: a fixture asserts its
@@ -351,15 +310,15 @@ export class PortSim {
   /** Apply a price target to every unit of `kind`; null when the engine
    *  refused (an unpriced kind, or No Rate in Modern). */
   rentBatch(kind: FacilityKind, target: BatchTarget, options: { onlyDefaultPriced?: boolean } = {}): BatchResult | null {
-    const rec = this.leaf.port.rentBatch(codeOf(KIND_CODES, kind), batchCode(target), options.onlyDefaultPriced === true);
+    const rec = this.leaf.port.rentBatch(this.codes.kind(kind), batchCode(target), options.onlyDefaultPriced === true);
     this.changed();
-    return rec[0] === 1 ? batchResult(VIEW_LAYOUT.records.rentBatch, rec) : null;
+    return rec[0] === 1 ? batchResult(this.codes.fields("rentBatch"), rec) : null;
   }
 
   /** What {@link rentBatch} would do, with nothing written; null when refused. */
   quoteRentBatch(kind: FacilityKind, target: BatchTarget, options: { onlyDefaultPriced?: boolean } = {}): BatchResult | null {
-    const rec = this.leaf.port.quoteRentBatch(codeOf(KIND_CODES, kind), batchCode(target), options.onlyDefaultPriced === true);
-    return rec[0] === 1 ? batchResult(VIEW_LAYOUT.records.quoteRentBatch, rec) : null;
+    const rec = this.leaf.port.quoteRentBatch(this.codes.kind(kind), batchCode(target), options.onlyDefaultPriced === true);
+    return rec[0] === 1 ? batchResult(this.codes.fields("quoteRentBatch"), rec) : null;
   }
 
   evaluateStar(): void {
@@ -467,34 +426,30 @@ export class PortSim {
   }
 }
 
-/** Run `body` once per engine: `ts` always, `rust` when the engine package is
- *  built. `VC_REQUIRE_WASM=1` (CI's switch) makes a missing package an
- *  error instead of a skip. */
+/** Run `body` on the Rust engine when the package is built.
+ *  `VC_REQUIRE_WASM=1` (CI's switch) makes a missing package an error
+ *  instead of a skip. */
 export function describeEngines(name: string, body: (leg: Leg) => void): void {
-  describe(`${name} [ts]`, () => {
-    afterEach(releaseAll);
-    body("ts");
-  });
   if (hasWasmPackage()) {
     describe(`${name} [rust]`, () => {
       afterEach(releaseAll);
       body("rust");
     });
   } else if (wasmRequired()) {
-    throw new Error(`${name}: the Rust leg needs engine-rs/pkg/; run npm run wasm:build`);
+    throw new Error(`${name}: the Rust engine needs engine-rs/pkg/; run npm run wasm:build`);
   } else {
     describe.skip(`${name} [rust: no engine package]`, () => undefined);
   }
 }
 
-/** The engine a test that does not compare engines uses: Rust when the
- *  package is built, else the TypeScript fallback. */
+/** The engine a test that names none uses. */
 export function defaultLeg(): Leg {
-  return hasWasmPackage() ? "rust" : "ts";
+  return "rust";
 }
 
 /** Free every engine the kit started. A test that makes engines outside
  *  {@link describeEngines} calls it from an `afterEach`. */
 export function releaseAll(): void {
   for (const sim of [...live]) sim.release();
+  releaseDrafts();
 }

@@ -430,8 +430,8 @@ this order under #878:
   relocation tests
   (`src/tests/integration/condoRelocationEngine.integration.test.ts`).
 
-`src/tests/tsEngineTests.ratchet.txt` lists 173 files that still drive the
-TypeScript engine directly (148 test files and 25 fixtures and helpers; the
+`src/tests/tsEngineTests.ratchet.txt` lists 161 files that still drive the
+TypeScript engine directly (138 test files and 23 fixtures and helpers; the
 list shrinks as tests convert and grows only with a reason the PR states, as
 when #1792, #1795, #1797 and #1800 added
 `src/tests/integration/segmentRoutingMealRush.integration.test.ts`,
@@ -439,11 +439,11 @@ when #1792, #1795, #1797 and #1800 added
 `src/tests/integration/attendanceTripwireEngine.integration.test.ts` and
 `src/tests/integration/hotelLateCheckoutEngine.integration.test.ts`, port kit
 suites that author their towers on a `Simulation`, #1805 the port kit's
-TypeScript tooling, `src/tests/portKit/tsTooling.ts`, #1809 the two
+TypeScript tooling (gone again with #1875's port kit step), #1809 the two
 golden referees (gone again with #1421's in #1875's first step), and #1421 the fixture loader `src/tests/conformance/fixtureSim.ts`,
 moved out of the deleted dual-run harness; #1875's test conversions then
 shrink it, the first by pinning the perf harnesses' towers as saves under
-`src/tests/perfCompare/towers/`), and `src/tests/portKit/converted.txt` lists 24 suites
+`src/tests/perfCompare/towers/`, the second by running the port kit on the Rust engine alone), and `src/tests/portKit/converted.txt` lists 24 suites
 already on the port kit. #1421 deleted the hosted WASM projects
 (`integrationWasm` and `unitWasm`), so no suite runs on a hosted `Simulation`
 any more; the suites that start the Rust engine themselves run in

@@ -1,9 +1,8 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { Simulation } from "../../engine/Simulation";
 import { VIEW_LAYOUT } from "../../engine/port/layout";
-import { newSeededGame } from "../fixtures/towerFixtures";
-import { PortSim, describeEngines, defaultLeg, releaseAll, type Leg } from "../portKit/portSim";
-import { GRID } from "../../engine/facilities";
+import { newSeededDraft, LOT_WIDTH } from "../portKit/draftFixtures";
+import { PortSim, describeEngines, defaultLeg, releaseAll, type Leg, draftTower } from "../portKit/portSim";
+import { hasWasmPackage, wasmRequired } from "../conformance/wasmEngine";
 import {
   ONBOARD_STEPS,
   ONBOARDING_FLAG,
@@ -14,7 +13,11 @@ import {
   clearOnboarded,
 } from "../../ui/Onboarding";
 
-const C = Math.floor(GRID.width / 2);
+const C = Math.floor(LOT_WIDTH / 2);
+
+/** The splash tests that adopt a tower need the engine package; they skip
+ *  without it, as {@link describeEngines} does (and fail under VC_REQUIRE_WASM). */
+const noEngine = !hasWasmPackage() && !wasmRequired();
 
 describe("Onboarding — flag persistence", () => {
   beforeEach(() => clearOnboarded());
@@ -39,7 +42,7 @@ describe("Onboarding — arm gating", () => {
 
 describeEngines("Onboarding — steps advance on real progress", (leg: Leg) => {
   it("firstIncompleteStep walks lobby → floor → office → connect → occupied", () => {
-    const draft = newSeededGame(1); // the ensured ground lobby satisfies step one
+    const draft = newSeededDraft(1); // the ensured ground lobby satisfies step one
     draft.money = 1e9;
     const sim = new PortSim(leg, draft);
     expect(firstIncompleteStep(sim.port)).toBe(1); // lobby done, nothing built above it
@@ -64,7 +67,7 @@ describeEngines("Onboarding — steps advance on real progress", (leg: Leg) => {
   });
 
   it("founding is lobby-first in both modes: an empty lot teaches the lobby", () => {
-    const founded = (mode: "classic" | "modern") => new PortSim(leg, Simulation.newGame(1, mode));
+    const founded = (mode: "classic" | "modern") => new PortSim(leg, draftTower(1, mode));
     const classic = founded("classic");
     expect(ONBOARD_STEPS[0].id).toBe("lobby");
     expect(classic.state.tower.units.length).toBe(0); // canon-zero founding
@@ -72,13 +75,13 @@ describeEngines("Onboarding — steps advance on real progress", (leg: Leg) => {
     // The first lobby goes anywhere on the ground line, 1994-style: either
     // lot edge is as legal as the center.
     expect(founded("classic").build("lobby", 1, 0).ok).toBe(true);
-    expect(founded("classic").build("lobby", 1, GRID.width - 1).ok).toBe(true);
+    expect(founded("classic").build("lobby", 1, LOT_WIDTH - 1).ok).toBe(true);
     // And it must BE a lobby: founding is lobby-first, as in 1994. Any other
     // kind is refused with the actionable reason until the lobby exists. The
     // raw refusal text belongs to the TypeScript tower's placement rule; the
     // build command is stricter (it turns a floor laid on the empty ground line
     // into the lobby tile), so the engine's answer is asserted beside it.
-    const floorFirst = Simulation.newGame(1, "classic").tower.place("floor", 1, 0);
+    const floorFirst = draftTower(1, "classic").tower.place("floor", 1, 0);
     expect(floorFirst.ok).toBe(false);
     expect(floorFirst.reason).toContain("Lay a lobby");
     expect(founded("classic").build("office", 2, 0).ok).toBe(false);
@@ -135,7 +138,7 @@ describeEngines("Onboarding — controller lifecycle", (leg: Leg) => {
   });
 
   it("arm() is re-entrant — re-arming never stacks a second panel", () => {
-    const sim = new PortSim(leg, newSeededGame(1));
+    const sim = new PortSim(leg, newSeededDraft(1));
     const c = makeController();
     expect(c.arm(sim.port)).toBe(true);
     c.arm(sim.port); // e.g. Replay while active
@@ -144,7 +147,7 @@ describeEngines("Onboarding — controller lifecycle", (leg: Leg) => {
   });
 
   it("Skip marks onboarding done (once-only) and removes the panel", () => {
-    const sim = new PortSim(leg, newSeededGame(1));
+    const sim = new PortSim(leg, newSeededDraft(1));
     const c = makeController();
     c.arm(sim.port);
     document.querySelector<HTMLElement>('[data-onboard="skip"]')!.click();
@@ -154,9 +157,9 @@ describeEngines("Onboarding — controller lifecycle", (leg: Leg) => {
   });
 
   it("resumes at the first uncompleted step when re-armed on a progressed tower", () => {
-    const draft = newSeededGame(2);
+    const draft = newSeededDraft(2);
     draft.money = 1e9;
-    const cX = Math.floor(GRID.width / 2);
+    const cX = Math.floor(LOT_WIDTH / 2);
     for (let x = cX - 6; x < cX + 6; x++) draft.tower.place("floor", 2, x); // step 1
     draft.tower.place("office", 2, cX - 4); // step 2
     const sim = new PortSim(leg, draft);
@@ -166,9 +169,9 @@ describeEngines("Onboarding — controller lifecycle", (leg: Leg) => {
   });
 
   it("arm() returns false and shows no panel on an already-complete tower", () => {
-    const draft = newSeededGame(3);
+    const draft = newSeededDraft(3);
     draft.money = 1e9;
-    const cX = Math.floor(GRID.width / 2);
+    const cX = Math.floor(LOT_WIDTH / 2);
     for (let x = cX - 6; x < cX + 6; x++) draft.tower.place("floor", 2, x);
     const r = draft.tower.place("office", 2, cX - 4);
     draft.tower.units.find((u) => u.id === r.unitId)!.state = "occupied";
@@ -278,13 +281,13 @@ describe("Onboarding — splash / title screen", () => {
     expect(c.dismissSplash()).toBe(false); // idempotent
   });
 
-  it("a tower ARRIVING dismisses the splash and hands the host the re-pause (CAP-5/CAP-6)", () => {
+  it.skipIf(noEngine)("a tower ARRIVING dismisses the splash and hands the host the re-pause (CAP-5/CAP-6)", () => {
     // adoptSim is the one junction every arrival passes through: a loaded slot,
     // a .vctower, a 1994 .TDT. The host re-pauses there, so a tower the player
     // has not opened in weeks never starts running under them.
     const { c, opts } = makeSpyController();
     c.showSplash({ hasSave: true, onContinue: vi.fn(), onLoadTower: vi.fn(), onNewTower: vi.fn() });
-    c.adoptSim(new PortSim(defaultLeg(), newSeededGame(9)).port);
+    c.adoptSim(new PortSim(defaultLeg(), newSeededDraft(9)).port);
     expect(document.getElementById("splash")).toBeNull();
     expect(opts.onEnterTower).toHaveBeenCalledOnce();
     // The re-pause runs through the REQUIRED pauseForSplash port, not the
@@ -314,12 +317,12 @@ describe("Onboarding — splash / title screen", () => {
     expect(document.body.classList.contains("splash-up")).toBe(true);
   });
 
-  it("a mid-game tower swap does not claim a splash that was never up", () => {
+  it.skipIf(noEngine)("a mid-game tower swap does not claim a splash that was never up", () => {
     // The New Tower path dismisses before founding, and Load from inside a
     // running game has no splash at all. Neither may fire the welcome-back
     // re-pause, which would silently stop the clock on a playing tower.
     const { c, opts } = makeSpyController();
-    c.adoptSim(new PortSim(defaultLeg(), newSeededGame(9)).port);
+    c.adoptSim(new PortSim(defaultLeg(), newSeededDraft(9)).port);
     expect(opts.onEnterTower).not.toHaveBeenCalled();
   });
 
@@ -399,8 +402,8 @@ describeEngines("Onboarding — tick advances and finishes on real progress", (l
     // must follow the live sim, or ticks keep reading the abandoned one and the
     // card teaches that tower's next step.
     const { c } = makeSpyController();
-    c.arm(new PortSim(leg, newSeededGame(1)).port); // seeded: armed at step 1 (add a floor)
-    const empty = new PortSim(leg, Simulation.newGame(2, "classic"));
+    c.arm(new PortSim(leg, newSeededDraft(1)).port); // seeded: armed at step 1 (add a floor)
+    const empty = new PortSim(leg, draftTower(2, "classic"));
     expect(empty.state.tower.units.length).toBe(0);
     c.adoptSim(empty.port);
     // The panel now shows the empty lot's first step: the lobby.
@@ -412,7 +415,7 @@ describeEngines("Onboarding — tick advances and finishes on real progress", (l
   });
 
   it("advancing a step chimes and re-renders the new current step", () => {
-    const draft = newSeededGame(1);
+    const draft = newSeededDraft(1);
     draft.money = 1e9;
     const sim = new PortSim(leg, draft);
     const { c, opts } = makeSpyController();
@@ -425,7 +428,7 @@ describeEngines("Onboarding — tick advances and finishes on real progress", (l
   });
 
   it("tick is a no-op when the current step hasn't changed", () => {
-    const sim = new PortSim(leg, newSeededGame(1));
+    const sim = new PortSim(leg, newSeededDraft(1));
     const { c, opts } = makeSpyController();
     c.arm(sim.port);
     c.tick(); // no progress since arm
@@ -435,7 +438,7 @@ describeEngines("Onboarding — tick advances and finishes on real progress", (l
   it("completing every step finishes: marks onboarded, drops pulses, shows the send-off", () => {
     vi.useFakeTimers();
     try {
-      const draft = newSeededGame(1);
+      const draft = newSeededDraft(1);
       draft.money = 1e9;
       const sim = new PortSim(leg, draft);
       const { c } = makeSpyController();
@@ -462,7 +465,7 @@ describeEngines("Onboarding — tick advances and finishes on real progress", (l
       '</div><div id="speed"></div>';
     const mq = { matches: false, addEventListener() {}, removeEventListener() {} } as unknown as MediaQueryList;
     const c = new OnboardingController({ mq, showHelp() {}, pauseForSplash() {}, chime() {} });
-    c.arm(new PortSim(leg, newSeededGame(1)).port); // seeded: arms at step 1, which pulses the Floor palette item
+    c.arm(new PortSim(leg, newSeededDraft(1)).port); // seeded: arms at step 1, which pulses the Floor palette item
     expect(document.querySelector('.pal-item[data-kind="floor"]')!.classList.contains("tt-pulse")).toBe(true);
     expect(document.querySelector('.pal-item[data-kind="office"]')!.classList.contains("tt-pulse")).toBe(false);
   });
