@@ -741,10 +741,10 @@ points their repository links at the site or at GitHub. The palette, logo and
 favicon are copied from the game (`src/styles/retro-tokens.css`,
 `src/public/`), and the crate's `cargo doc` output goes under `/rust/`.
 `.github/workflows/engine-docs.yml` builds it on a pull request that touches
-any of those files and deploys it to GitHub Pages when `release-tag.yml`
-dispatches it for a new `engine-v<version>` tag, so the site shows the latest
-engine release. Run it by hand from the Actions tab to republish a tag, or
-with `main` to publish the unreleased docs. Locally: `npm ci --prefix
+any of those files and deploys it to GitHub Pages on every push to `main` that
+does, so the site shows `main`, as the READMEs do. Run it by hand from the
+Actions tab to redeploy `main`, or to show a release tag instead until the
+next push. Locally: `npm ci --prefix
 docs/engine-site`, then `npm run dev --prefix docs/engine-site`. Edit the
 source files, never the copies under `src/content/docs/`.
 `src/tests/engineDocsSite.guard.test.ts` checks that every listed page names a

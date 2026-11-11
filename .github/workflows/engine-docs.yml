@@ -5,20 +5,32 @@ name: Engine docs
 # the crate's Rust API reference under /rust/, and deploys them to GitHub Pages
 # at docs.verticopolis.com.
 #
-# The site shows an engine release: release-tag.yml dispatches this workflow
-# with the new engine-v<version> tag after it publishes the crate release (a
-# tag created with the workflow token does not start a tag-push run), and a
-# maintainer can run it by hand for an engine tag made after the site existed,
-# or for main, which publishes the unreleased docs (the first deploy, before
-# the next engine release). A pull request that touches the site or a page it
-# shows builds it without deploying, so a missing page or a build error fails
-# there first.
+# The site shows main, as the engine READMEs do: a push to main that touches
+# the site or a page it shows deploys it, and so does the release merge that
+# writes the engine changelog. A maintainer can run it by hand for main, or
+# for an engine tag made after the site existed to show that release instead
+# (until the next push to main). A pull request that touches the same files
+# builds it without deploying, so a missing page or a build error fails there
+# first.
 on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Existing engine tag (engine-v<version>) to publish, or main for the unreleased docs"
+        description: "main, or an existing engine tag (engine-v<version>) to publish instead"
         required: true
+  push:
+    branches: [main]
+    paths:
+      - "docs/engine-site/**"
+      - "src/styles/retro-tokens.css"
+      - "src/public/favicon.png"
+      - "src/public/icon-1024x1024.png"
+      - "packages/verticopolis-engine/README.md"
+      - "engine-rs/CRATE_README.md"
+      - "engine-rs/API.md"
+      - "engine-rs/CHANGELOG.md"
+      - "conformance/README.md"
+      - ".github/workflows/engine-docs.yml"
   pull_request:
     paths:
       - "docs/engine-site/**"
@@ -35,10 +47,10 @@ on:
 permissions:
   contents: read
 
-# One deploy at a time; a newer run replaces a queued one, and a running
-# deploy finishes.
+# One deploy at a time, whatever started it; a newer run replaces a queued one,
+# and a running deploy finishes. Pull request builds queue per branch.
 concurrency:
-  group: engine-docs-${{ github.event_name }}-${{ github.ref }}
+  group: engine-docs-${{ github.event_name == 'pull_request' && github.ref || 'deploy' }}
   cancel-in-progress: false
 
 jobs:
@@ -89,8 +101,9 @@ jobs:
           TAG: ${{ inputs.tag }}
         run: |
           set -euo pipefail
-          # DOCS_REF names the release in the title and points the pages'
-          # repository links at the same commit; a pull request builds as main.
+          # DOCS_REF names a release in the title and points the pages'
+          # repository links at the same commit; a push or a pull request
+          # builds as main.
           export DOCS_REF="${TAG:-main}"
           npm run build --prefix docs/engine-site
           cargo doc --locked --no-deps --manifest-path engine-rs/Cargo.toml
@@ -102,14 +115,14 @@ jobs:
           test -f docs/engine-site/dist/rust/verticopolis_engine/index.html
 
       - name: Upload the site
-        if: ${{ github.event_name == 'workflow_dispatch' }}
+        if: ${{ github.event_name != 'pull_request' }}
         uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: docs/engine-site/dist
 
   deploy:
     name: engine-docs (deploy)
-    if: ${{ github.event_name == 'workflow_dispatch' }}
+    if: ${{ github.event_name != 'pull_request' }}
     needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 10

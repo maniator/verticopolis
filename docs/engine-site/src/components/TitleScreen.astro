@@ -1,0 +1,36 @@
+---
+// The landing page's hero, drawn as the game's title screen ("Metropolis
+// Dusk"): the dusk sky, the setting sun, the skyline and the VERTICO/POLIS
+// wordmark. Starlight renders it in place of its own hero (astro.config.mjs,
+// components.Hero) from the page's `hero` front matter. The skyline (a
+// background in theme.css), the sky gradient and the splash colors are copied
+// from the game's src/ui/splashTemplate.ts and src/styles.css, where they are
+// literals, not tokens; keep them in step until they move into
+// retro-tokens.css.
+const { data } = Astro.locals.starlightRoute.entry;
+const { tagline, actions = [] } = data.hero || {};
+---
+
+<section class="title-screen not-content">
+  <div class="ts-stars" aria-hidden="true"></div>
+  <div class="ts-sun" aria-hidden="true"></div>
+  <div class="ts-skyline" aria-hidden="true"></div>
+  <div class="ts-brand">
+    <h1 id="_top" data-page-title>
+      <svg class="ts-word" viewBox="0 0 400 66" role="img" aria-label="Verticopolis engine">
+        <text x="200" y="52" text-anchor="middle" textLength="392" lengthAdjust="spacingAndGlyphs"><tspan class="a">VERTICO</tspan><tspan class="b">POLIS</tspan></text>
+      </svg>
+    </h1>
+    <svg class="ts-tag" viewBox="0 0 360 20" aria-hidden="true">
+      <text x="180" y="15" text-anchor="middle" textLength="330" lengthAdjust="spacingAndGlyphs">THE ENGINE DEVELOPER DOCS</text>
+    </svg>
+    {tagline && <p class="ts-premise">{tagline}</p>}
+    <div class="ts-actions">
+      {actions.map((action) => (
+        <a class:list={["ts-btn", { primary: action.variant === "primary" }]} href={action.link}>
+          {action.text}
+        </a>
+      ))}
+    </div>
+  </div>
+</section>

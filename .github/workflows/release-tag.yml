@@ -177,16 +177,3 @@ jobs:
           fi
           npm publish --registry https://npm.pkg.github.com
           echo "Published $NPM_NAME@$VERSION."
-
-      # The developer docs at docs.verticopolis.com show the latest engine
-      # release, so each crate release rebuilds them from its tag
-      # (engine-docs.yml; a tag made with the workflow token starts no run).
-      - name: Publish the engine docs
-        if: ${{ steps.pack.outcome == 'success' }}
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          VERSION: ${{ steps.versions.outputs.crate }}
-        run: |
-          gh workflow run engine-docs.yml --ref main -f tag="engine-v$VERSION"
-          echo "Dispatched the engine docs for engine-v$VERSION."

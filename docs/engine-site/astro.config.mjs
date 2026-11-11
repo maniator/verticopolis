@@ -6,11 +6,11 @@
 import { defineConfig } from "astro/config";
 import starlight from "@astrojs/starlight";
 
-// DOCS_REF is the engine tag the site shows (engine-v1.24.0), or main for the
-// unreleased docs; the workflow sets it.
+// DOCS_REF is main, or an engine tag (engine-v1.24.0) when a maintainer
+// publishes a release instead; the workflow sets it.
 const ref = process.env.DOCS_REF ?? "";
 const release = ref.match(/^engine-v(.+)$/)?.[1];
-const title = release ? `Verticopolis engine ${release}` : ref === "main" ? "Verticopolis engine (unreleased)" : "Verticopolis engine";
+const title = release ? `Verticopolis engine ${release}` : "Verticopolis engine";
 
 export default defineConfig({
   site: "https://docs.verticopolis.com",
@@ -21,6 +21,7 @@ export default defineConfig({
       logo: { src: "./src/assets/logo.png", alt: "Verticopolis" },
       favicon: "/favicon.png",
       social: [{ icon: "github", label: "GitHub", href: "https://github.com/maniator/verticopolis" }],
+      components: { Hero: "./src/components/TitleScreen.astro" },
       customCss: ["./src/styles/retro-tokens.css", "./src/styles/theme.css"],
       sidebar: [
         { label: "Overview", link: "/" },
