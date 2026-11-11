@@ -27,8 +27,9 @@ ChatGPT subscription. No OpenAI organization ID or other variable is required.
 - `/improve` **proposes changes for a human to apply**; it does not push
   changes to the branch. This workflow runs in restricted mode and never
   checks out, installs or executes untrusted PR code.
-- The default model is `gpt-6-luna`. For a hard Rust or hot-path PR, name the
-  larger model on that one comment: `/review --config.model=gpt-6.1-sol`.
+- The default model is `gpt-6.1-sol`. For a cheap re-check, name the smaller
+  model on that one comment: `/review --config.model=gpt-6-luna`. Luna has not
+  been run through this workflow yet, so check its first run's details block.
 - Cost follows input tokens: OpenAI bills every input token it has not seen
   before as a cache write, so the bill is the diff size times the number of
   calls times the model's price. A chunked review is capped at 3 calls

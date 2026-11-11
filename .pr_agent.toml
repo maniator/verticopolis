@@ -1,11 +1,12 @@
 # Repository-specific PR-Agent policy. Credentials belong in Actions secrets.
 [config]
-# Luna is the cheap default (owner, 2026-11-11). For a hard Rust or hot-path
-# PR, ask for the larger model on that one comment:
-#   /review --config.model=gpt-6.1-sol
-model = "gpt-6-luna"
-# Retry on the same model: a fallback to a dearer one would raise the cost.
-fallback_models = ["gpt-6-luna"]
+# Sol is the default (owner, 2026-11-11): the cost came from automatic reviews
+# on every push, which are gone, and the per-PR spending cap limits the rest.
+# For a cheap re-check, name the smaller model on that one comment:
+#   /review --config.model=gpt-6-luna
+model = "gpt-6.1-sol"
+# Retry on the same model: a fallback to another one would change the cost.
+fallback_models = ["gpt-6.1-sol"]
 # Allow larger per-call review context.
 max_model_tokens = 64000
 # Include token usage and estimated API cost in review comments.
