@@ -75,7 +75,7 @@ affects_deploy() {
     # The engine crate's Rust tests, consumer crate and markdown. Its src/,
     # Cargo.toml and Cargo.lock build.
     engine-rs/tests/* | engine-rs/consumer/*) return 1 ;;
-    engine-rs/README.md | engine-rs/API.md | engine-rs/CHANGELOG.md) return 1 ;;
+    engine-rs/README.md | engine-rs/CRATE_README.md | engine-rs/API.md | engine-rs/CHANGELOG.md) return 1 ;;
     # The weekly hour-boundary bench, a crate of its own that no build reads.
     engine-bench/*) return 1 ;;
 

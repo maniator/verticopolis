@@ -58,11 +58,19 @@ Every rule in [CONTRIBUTING.md](../CONTRIBUTING.md) applies here, plus:
   repository root, or `bash scripts/build-engine-wasm.sh`, which also installs
   the pinned toolchain on x86_64 Linux. `npm run test:wasm` runs the web
   suites that drive the engine through its package.
+- **The READMEs follow the engine.** A change to the library source or the
+  binding updates `CRATE_README.md` and the WASM package's README where they
+  went stale, or says `readmes: unchanged` in its change note
+  (CONTRIBUTING.md, The engine READMEs).
 - **Review:** gameplay and engine work gets `/gds-code-review`, and engine hot
   paths get the checklist in `docs/performance/hot-path-review.md`.
 
 ## Using it from another frontend
 
+[`CRATE_README.md`](CRATE_README.md) is the crate's README for people who
+build on it, the page a registry release will show (#893; that PR points
+`readme` in `Cargo.toml` at it), and its quick start is
+`consumer/examples/quick_start.rs`, which the `consumer` job compiles.
 [`API.md`](API.md) is the page for a host that is not the web game: how to
 depend on the crate, the calls a frontend makes, and what is stable.
 [`packages/verticopolis-engine/README.md`](../packages/verticopolis-engine/README.md)

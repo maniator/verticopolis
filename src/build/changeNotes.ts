@@ -5,6 +5,7 @@
  *     ---
  *     app: minor
  *     crate: none
+ *     readmes: unchanged   (optional, see below)
  *     ---
  *     ## Player
  *     - Elevators now skip floors with nobody waiting.
@@ -12,7 +13,10 @@
  *     - (only when `crate` is not none) what changed in the engine's contract.
  *
  * `app` and `crate` take `major`, `minor`, `patch` or `none`, by the tier rules
- * in CONTRIBUTING.md "Versioning". The release driver runs `npm run release`
+ * in CONTRIBUTING.md "Versioning". `readmes: unchanged` says the PR changes the
+ * engine and its author checked that both engine READMEs (the WASM package's
+ * and the crate's) still describe it; `scripts/version-check.ts` asks for that
+ * line or a README edit on every engine change. The release driver runs `npm run release`
  * (`scripts/release.ts`) on a `release/` branch: it raises each version by the
  * highest pending level, writes the changelog sections from the notes and
  * deletes them. `scripts/version-check.ts` (run in CI) keeps feature PRs off
@@ -43,6 +47,8 @@ export interface ChangeNote {
   player: string[];
   /** Lines for `engine-rs/CHANGELOG.md`. */
   engine: string[];
+  /** `readmes: unchanged`: the engine READMEs were checked and still hold. */
+  readmesUnchanged?: boolean;
 }
 
 /** A note's file name: a branch slug, lower case, ending in `.md`. */
@@ -68,11 +74,19 @@ export function parseNote(text: string, file: string): ChangeNote {
   const close = lines.indexOf("---", 1);
   if (close < 0) fail('the front matter has no closing "---"');
   const levels: Partial<Record<"app" | "crate", Level>> = {};
+  let readmesUnchanged = false;
   for (const raw of lines.slice(1, close)) {
     const line = raw.replace(/#.*$/, "").trim();
     if (line === "") continue;
+    const readmes = /^readmes:\s*(\S+)$/.exec(line);
+    if (readmes) {
+      if (readmesUnchanged) fail("readmes is set twice");
+      if (readmes[1] !== "unchanged") fail(`readmes: ${readmes[1]} is not "unchanged" (leave the line out when the PR updates a README)`);
+      readmesUnchanged = true;
+      continue;
+    }
     const m = /^(app|crate):\s*(\S+)$/.exec(line);
-    if (!m) fail(`"${raw}" is not "app: <level>" or "crate: <level>"`);
+    if (!m) fail(`"${raw}" is not "app: <level>", "crate: <level>" or "readmes: unchanged"`);
     const [, key, value] = m as RegExpExecArray;
     const k = key as "app" | "crate";
     if (levels[k] !== undefined) fail(`${k} is set twice`);
@@ -82,6 +96,7 @@ export function parseNote(text: string, file: string): ChangeNote {
   if (levels.app === undefined) fail("the front matter has no app level");
   if (levels.crate === undefined) fail("the front matter has no crate level");
   const note: ChangeNote = { file, app: levels.app as Level, crate: levels.crate as Level, player: [], engine: [] };
+  if (readmesUnchanged) note.readmesUnchanged = true;
   let section: "player" | "engine" | null = null;
   const seen = new Set<string>();
   for (const raw of lines.slice(close + 1)) {

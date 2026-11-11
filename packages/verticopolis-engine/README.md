@@ -280,8 +280,10 @@ directly instead of on this package:
 verticopolis-engine = { git = "https://github.com/maniator/verticopolis", tag = "engine-v1.24.0" }
 ```
 
+[`engine-rs/CRATE_README.md`](https://github.com/maniator/verticopolis/blob/main/engine-rs/CRATE_README.md)
+is the crate's README, with a Rust quick start, and
 [`engine-rs/API.md`](https://github.com/maniator/verticopolis/blob/main/engine-rs/API.md)
-is the guide for that: the Rust calls, the conformance harness a host uses to
+is the full guide: the Rust calls, the conformance harness a host uses to
 prove it runs the real simulation, and the build metadata.
 
 ## License

@@ -113,6 +113,38 @@ describe("a feature PR", () => {
   });
 });
 
+describe("the engine READMEs on an engine change", () => {
+  const engine = { "engine-rs/src/sim.rs": "changed", "src/a.ts": "b" };
+  const readmesNote = "---\napp: none\ncrate: none\nreadmes: unchanged\n---\n";
+  const deployed = ["src/a.ts", "engine-rs/src/sim.rs"];
+
+  it("needs a README edit or the note's readmes line", () => {
+    const errors = feature(main(), main({ ...engine, ".changes/topic.md": note("none", "none") }), deployed);
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toMatch(/changes the engine \(engine-rs\/src\/sim\.rs\) and neither engine README.*readmes: unchanged/);
+    expect(feature(main(), main({ ...engine, ".changes/topic.md": readmesNote }), deployed)).toEqual([]);
+    for (const readme of ["packages/verticopolis-engine/README.md", "engine-rs/CRATE_README.md"]) {
+      expect(feature(main(), main({ ...engine, [readme]: "new", ".changes/topic.md": note("none", "none") }), deployed)).toEqual([]);
+    }
+  });
+
+  it("counts the binding declaration and leaves tests, tools and other files alone", () => {
+    expect(feature(main(), main({ "src/dualrun/engine.d.ts": "x", ".changes/topic.md": note("none", "none") }), ["src/dualrun/engine.d.ts"])[0]).toMatch(/src\/dualrun\/engine\.d\.ts/);
+    for (const path of ["engine-rs/src/sim_tests.rs", "engine-rs/src/crowd/tests.rs", "engine-rs/src/bin/dump.rs", "engine-rs/tests/api.rs", "engine-rs/README.md"]) {
+      expect(feature(main(), main({ [path]: "x", ".changes/topic.md": note("none", "none") }), [path]), path).toEqual([]);
+    }
+  });
+
+  it("refuses the readmes line beside a README edit, reads only this PR's note, and spares Dependabot", () => {
+    const both = main({ ...engine, "engine-rs/CRATE_README.md": "new", ".changes/topic.md": readmesNote });
+    expect(feature(main(), both, deployed)[0]).toMatch(/says readmes: unchanged, but this PR edits engine-rs\/CRATE_README\.md/);
+    const pending = main({ ".changes/other.md": readmesNote });
+    expect(feature(pending, { ...pending, ...engine, ".changes/topic.md": note("none", "none") }, deployed)).toHaveLength(1);
+    const head = main(engine);
+    expect(checkFeature(tree(main()), tree(head), diff(main(), head), new Set(deployed), true)).toEqual([]);
+  });
+});
+
 describe("a release PR", () => {
   const pending = main({ ".changes/a.md": note("patch", "none"), ".changes/b.md": note("minor", "patch") });
   const cut = (app: string, crate: string, extra: Files = {}): Files => {
