@@ -42,16 +42,19 @@ older tag**.
    `vercel build --prod`, `vercel deploy --prebuilt --prod`. The build runs
    `vercel.json`'s `buildCommand`, so `scripts/vercel-build.sh` builds the WASM
    engine as the current deploy does.
-7. After the deploy it reads `https://verticopolis.com/version.json` until its
-   `sha` is the tag commit, and fails the job if that does not happen within a
-   few minutes.
+7. After the deploy it waits until the production domain's alias points at the
+   deployment this run made (Vercel API) and `https://verticopolis.com/version.json`
+   reports the tag commit, and fails the job if that does not happen within a
+   few minutes. The alias check matters for a redeploy of the live release,
+   whose `version.json` does not change (owner, 2026-11-11).
 8. The job runs in the `production` environment with a `production-deploy`
    concurrency group that does not cancel a running deploy. Checkout keeps no
    credentials and the token reaches only the Vercel steps.
 9. `release-tag.yml` dispatches the deploy after it tags a new app version, and
    after the crate release when a release raised only the crate version.
-10. A guard test pins AC 1, 2, 6 (exact CLI pin), 8 and 9, and fails when any
-    is undone.
+10. No config-text guard test (CONTRIBUTING.md forbids tests that match
+    workflow text). Verify by running the step scripts: bash syntax checks and
+    the gate handler against fake gates that exit 0, 1 and 2.
 11. CONTRIBUTING.md "Production waits for the release PR" and the
     `vercel-ignore-build.sh` header describe the new path. A change note with
     `app: none` (players see nothing different).
@@ -61,7 +64,7 @@ older tag**.
 - [x] `vercel.json` git setting (AC 1)
 - [x] `deploy-production.yml` (AC 2-8)
 - [x] `release-tag.yml` dispatches (AC 9)
-- [x] Guard test `src/tests/productionDeploy.guard.test.ts` (AC 10)
+- [x] Verify the step scripts by running them (AC 10)
 - [x] Docs and change note (AC 11)
 - [x] Quality gates, `/bmad-code-review`, PR naming the owner's secret step
 
@@ -109,6 +112,13 @@ older tag**.
   two patch findings fixed (the workflow header understated which steps see
   the secrets; the crate-only dispatch did not say how to recover from a
   failed crate release), one prose fix in the party record. No defer findings.
+- Review round 2 (PR-Agent on #1939, and the owner): the config-text guard
+  test broke the CONTRIBUTING.md workflow-test rule, so it was removed and the
+  step scripts were exercised instead (gate exits 0 and 2 stop the job, 1
+  goes ahead; the deploy URL is read from plain and JSON CLI output; tag forms
+  are accepted and refused as intended). The owner noted a redeploy leaves
+  `version.json` unchanged, so the final check now also requires the
+  production alias to point at the new deployment.
 
 ### File List
 
@@ -117,7 +127,6 @@ older tag**.
 - `vercel.json`
 - `scripts/vercel-ignore-build.sh`
 - `CONTRIBUTING.md`
-- `src/tests/productionDeploy.guard.test.ts` (new)
 - `.changes/claude-project-thread-kq7q2i.md` (new)
 - `_bmad-output/party-mode/tag-deploy-party-2026-11-11.md` (new)
 - `_bmad-output/party-mode/memories/installed/.memlog.md`

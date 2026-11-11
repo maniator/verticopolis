@@ -79,6 +79,7 @@ without a red test.
    crate release when only the crate moved.
 7. `vercel.json`: `git.deploymentEnabled.main = false`; previews unchanged.
 8. Keep the version gate; it now runs inside the deploy job.
-9. A guard test pins the security invariants.
+9. (Dropped in review: CONTRIBUTING.md forbids config-text guard tests; the
+   step scripts are exercised directly instead.)
 10. Owner action before merge: add the three secrets (a `production`
     environment limited to `main` is recommended).

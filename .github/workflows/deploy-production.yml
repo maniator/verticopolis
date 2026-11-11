@@ -17,12 +17,13 @@ name: Deploy production
 # deploys with the Vercel CLI. `vercel build` runs vercel.json's install and
 # build commands, so scripts/vercel-build.sh builds the WASM engine with its
 # pinned toolchain exactly as a Vercel build does. The run passes only once
-# production's /version.json reports the tag's commit.
+# the production domain points at the new deployment and its /version.json
+# reports the tag's commit.
 #
 # Secrets: VERCEL_TOKEN, VERCEL_ORG_ID and VERCEL_PROJECT_ID, held by the
 # `production` environment (limit that environment to the main branch). The
-# secrets reach only the step that checks they are set and the two steps that
-# talk to Vercel; the build runs without them. This workflow has no push or pull request trigger, so code from a fork or
+# secrets reach only the step that checks they are set and the steps that talk
+# to Vercel; the build runs without them. This workflow has no push or pull request trigger, so code from a fork or
 # an open PR never runs beside the token.
 on:
   workflow_dispatch:
@@ -153,23 +154,38 @@ jobs:
           TAG: ${{ inputs.tag }}
         run: |
           set -euo pipefail
-          url="$(vercel deploy --prebuilt --prod --token "$VERCEL_TOKEN")"
+          out="$(vercel deploy --prebuilt --prod --token "$VERCEL_TOKEN")"
+          # The CLI prints the new deployment's URL; read it whatever else it prints.
+          url="$(printf '%s\n' "$out" | grep -Eo 'https://[A-Za-z0-9.-]+\.vercel\.app' | head -n 1 || true)"
+          if [ -z "$url" ]; then echo "::error::vercel deploy printed no deployment URL: $out"; exit 1; fi
+          echo "DEPLOYMENT_HOST=${url#https://}" >> "$GITHUB_ENV"
           echo "Deployed $TAG ($SHA) as $url."
           echo "Deployed \`$TAG\` (\`$SHA\`) to production as $url." >> "$GITHUB_STEP_SUMMARY"
 
-      # version.json carries the build's short SHA and is served no-store.
-      - name: Check production serves the tag
+      # Two checks, because a redeploy of the live release serves the same
+      # version.json. The production domain must point at the deployment this
+      # run made (Vercel's API), and the domain must serve this commit's
+      # version.json (no-store), so the new build is what players get.
+      - name: Check production serves this deployment
         env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           TAG: ${{ inputs.tag }}
         run: |
+          set -uo pipefail
+          api() { curl -fsS --max-time 15 -H "Authorization: Bearer $VERCEL_TOKEN" "https://api.vercel.com$1?teamId=$VERCEL_ORG_ID"; }
+          domain="${PRODUCTION_URL#https://}"
+          deployment="$(api "/v13/deployments/$DEPLOYMENT_HOST" | jq -r '.id // empty')"
+          if [ -z "$deployment" ]; then echo "::error::Vercel does not know the deployment $DEPLOYMENT_HOST."; exit 1; fi
           for attempt in $(seq 1 20); do
-            served="$(curl -fsS --max-time 15 "$PRODUCTION_URL/version.json?deploy=$SHA" | node -e 'let s = ""; process.stdin.on("data", (d) => (s += d)).on("end", () => { try { process.stdout.write(String(JSON.parse(s).sha ?? "")); } catch {} })' || true)"
-            if [ -n "$served" ] && [ "${SHA#"$served"}" != "$SHA" ]; then
-              echo "$PRODUCTION_URL serves $TAG ($served)."
+            aliased="$(api "/v4/aliases/$domain" | jq -r '.deploymentId // empty' || true)"
+            served="$(curl -fsS --max-time 15 "$PRODUCTION_URL/version.json?deploy=$deployment" | jq -r '.sha // empty' 2>/dev/null || true)"
+            if [ "$aliased" = "$deployment" ] && [ -n "$served" ] && [ "${SHA#"$served"}" != "$SHA" ]; then
+              echo "$domain points at $deployment and serves $TAG ($served)."
               exit 0
             fi
-            echo "Attempt $attempt: $PRODUCTION_URL serves ${served:-nothing readable}, waiting for ${SHA:0:7}."
+            echo "Attempt $attempt: $domain points at ${aliased:-nothing} (want $deployment) and serves ${served:-nothing readable} (want ${SHA:0:7})."
             sleep 15
           done
-          echo "::error::$PRODUCTION_URL/version.json never reported $TAG ($SHA) after the deploy."
+          echo "::error::$domain did not switch to $deployment serving $TAG ($SHA) after the deploy."
           exit 1
