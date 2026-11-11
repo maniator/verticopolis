@@ -4,7 +4,8 @@
 //! `catalog::charge_tests::{overhead_and_the_condo_hold_tax_follow_the_quote,
 //! film_and_dj_bookings_follow_the_quote}`. This file holds the kind list,
 //! the refusal on a non-cinema and the policy's trip through a save.
-use crate::clock::{CalendarKind, GameMode};
+use crate::clock::{CalendarKind, GameMode, CANON};
+use crate::economy::CINEMA_BOOKING_MONTHLY;
 use crate::facilities::Kind;
 use crate::load::deserialize;
 use crate::sim::Simulation;
@@ -44,9 +45,17 @@ fn upkeep_with(mode: GameMode, kind: Option<Kind>) -> f64 {
 }
 
 /// The Modern charge over the Classic one: the overhead alone, since
-/// nothing else in these towers differs by mode.
+/// nothing else in these towers differs by mode but a cinema's film, which
+/// Modern books each period and Classic changes only when the player pays
+/// (#1932), so its feature booking (scaled to the canon 3-day period) is
+/// taken off.
 fn overhead_of(kind: Option<Kind>) -> f64 {
-    upkeep_with(GameMode::Modern, kind) - upkeep_with(GameMode::Classic, kind)
+    let modern_booking = if kind == Some(Kind::Cinema) {
+        CINEMA_BOOKING_MONTHLY * CANON.maint_period_days as f64 / 30.0
+    } else {
+        0.0
+    };
+    upkeep_with(GameMode::Modern, kind) - upkeep_with(GameMode::Classic, kind) - modern_booking
 }
 
 #[test]
