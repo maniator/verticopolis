@@ -125,8 +125,9 @@ export function runFrame(app: GameApp, dtMs: number): void {
       app.lastStar = header.star;
       if (header.star < 6) app.audio.sfx("promote");
     }
-    // The bomb's clock ticks once a real second while Classic's search runs
-    // and the game is not paused.
+    // The bomb's clock ticks once a real second while a search runs and the
+    // game is not paused, and the music dips for the whole countdown.
+    app.audio.setMusicDucked(header.bombSearch !== null);
     if (header.bombSearch !== null && minutesPerSecond > 0 && now - lastBombTickAt >= BOMB_TICK_MS) {
       lastBombTickAt = now;
       app.audio.sfx("tick");

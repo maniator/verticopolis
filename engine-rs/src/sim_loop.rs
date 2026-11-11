@@ -1,6 +1,7 @@
 //! Port of `src/engine/sim/loop.ts` and the weather hash from `sim/build.ts`.
 
 use crate::crowd::{motion, spawn, CROWD_SECONDS_PER_MINUTE};
+use crate::facilities::Kind;
 use crate::sim::{LogKind, Simulation};
 use crate::tower::UnitState;
 
@@ -188,7 +189,7 @@ impl Simulation {
                 (None, None) => 0.0,
             };
             if self.clock.minutes >= threshold {
-                let (name, floor) = (u.kind.facility().name, u.floor);
+                let (name, floor, kind) = (u.kind.facility().name, u.floor, u.kind);
                 let (u, at) = self.tower.marked_by_id(id).unwrap();
                 u.set_state(at, UnitState::Empty);
                 u.extras_mut().complete_at = None;
@@ -200,6 +201,9 @@ impl Simulation {
                     self.floor_label(floor)
                 );
                 self.emit(&msg, LogKind::Good);
+                if kind == Kind::Security {
+                    self.join_bomb_search(floor);
+                }
             }
         }
     }

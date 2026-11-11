@@ -197,14 +197,14 @@ export interface GameplayEventPayloads {
     rooms: number;
   };
   /**
-   * A bomb went off: in Classic because Security did not find it by the search
-   * deadline, in Modern because the tower had no Security. rooms is the number
-   * of rooms the blast gutted (0 when the tower had nothing to destroy). A
-   * search that finds the bomb emits bomb_found instead. Version 1, per
-   * occurrence. New. Takes over from the bombs counter that session_emergencies
-   * samples, in phase 2. Since the timed bomb search (#349) a declined Classic
-   * ransom emits it at the deadline rather than at once; the payload and the
-   * version are unchanged.
+   * A bomb went off because Security did not find it by the search deadline
+   * (or, through the bombThreat command, because the tower had no Security).
+   * rooms is the number of rooms the blast gutted (0 when the tower had nothing
+   * to destroy). A search that finds the bomb emits bomb_found instead. Version
+   * 1, per occurrence. New. Takes over from the bombs counter that
+   * session_emergencies samples, in phase 2. Since the timed bomb search (#349)
+   * a declined ransom emits it at the deadline rather than at once; the payload
+   * and the version are unchanged.
    */
   bomb_detonated: {
     /** A whole number from 0 to 10000. */
@@ -237,10 +237,9 @@ export interface GameplayEventPayloads {
   };
   /**
    * Security found the bomb of a declined ransom before the search deadline and
-   * defused it (Classic). A Modern sweep that finds nothing emits nothing. With
-   * emergency_resolved's accept (the ransom paid) and bomb_detonated, it closes
-   * every bomb threat one way. Version 1, per occurrence. New with the timed
-   * bomb search (#349).
+   * defused it. With emergency_resolved's accept (the ransom paid) and
+   * bomb_detonated, it closes every bomb threat one way. Version 1, per
+   * occurrence. New with the timed bomb search (#349).
    */
   bomb_found: Record<string, never>;
 }

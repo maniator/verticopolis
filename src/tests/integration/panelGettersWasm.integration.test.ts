@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { CONFORMANCE_DIR, loadScenario, runScenario } from "../conformance/scenario";
+import { CONFORMANCE_DIR, loadScenario, runScenario, PAST_THE_TYPESCRIPT_REFERENCE } from "../conformance/scenario";
 import { hasWasmPackage, wasm, wasmRequired } from "../conformance/wasmEngine";
 import {
   firstDifference,
@@ -24,7 +24,9 @@ import {
  */
 
 const SCENARIO_DIR = resolve(CONFORMANCE_DIR, "scenarios");
-const files = readdirSync(SCENARIO_DIR).filter((f) => f.endsWith(".json")).sort();
+const files = readdirSync(SCENARIO_DIR)
+  .filter((f) => f.endsWith(".json") && !PAST_THE_TYPESCRIPT_REFERENCE.has(f))
+  .sort();
 
 if (wasmRequired() && !hasWasmPackage()) throw new Error("VC_REQUIRE_WASM=1 but engine-rs/pkg/ is not built; run npm run wasm:build");
 

@@ -190,10 +190,8 @@ impl Simulation {
                 ),
                 LogKind::Money,
             );
-        } else if self.mode.bomb_search_is_timed() {
-            self.start_bomb_search();
         } else {
-            self.bomb_threat();
+            self.start_bomb_search();
         }
     }
 

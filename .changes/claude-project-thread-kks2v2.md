@@ -1,5 +1,5 @@
 ---
-app: minor
+app: patch
 crate: minor
 ---
 ## Player

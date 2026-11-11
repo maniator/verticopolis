@@ -27,6 +27,18 @@ import { drainChecked } from "./gameplayEvents";
 export const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 export const CONFORMANCE_DIR = resolve(REPO_ROOT, "conformance");
 
+/** Scenarios the TypeScript reference can no longer play: a refused bomb
+ *  ransom starts the Rust engine's timed search (#349), which the reference,
+ *  slated for deletion (#1875), answers at once instead. The Rust engine's
+ *  lock pins them; the room-fact suites that replay each scenario on both
+ *  engines leave them out. */
+export const PAST_THE_TYPESCRIPT_REFERENCE: ReadonlySet<string> = new Set([
+  "amenities-modern.json",
+  "ransom-declined-classic.json",
+  "ransom-declined-modern.json",
+  "ransom-ignored-modern.json",
+]);
+
 export type Start =
   | { newGame: { seed: number; mode: GameMode; star?: number } }
   | { fixture: string; mode?: GameMode };

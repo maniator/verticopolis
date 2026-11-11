@@ -7,10 +7,10 @@
  * scenarios that reach each site, on the TypeScript engine and on the shipped
  * build: an off-by-one at any site, on either engine, changes a pinned value.
  */
-import { resolve } from "node:path";
+import { basename, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { FX_SLOTS, type CheckpointDetail, type FxSlot } from "../conformance/checkpointDetail";
-import { CONFORMANCE_DIR, loadScenario, runScenario } from "../conformance/scenario";
+import { CONFORMANCE_DIR, loadScenario, PAST_THE_TYPESCRIPT_REFERENCE, runScenario } from "../conformance/scenario";
 import { hasWasmPackage, startWasmEngine, wasmRequired } from "../conformance/wasmEngine";
 
 type Nonzero = Partial<Record<FxSlot, number>>;
@@ -42,11 +42,13 @@ describe.runIf(run)("the fx sequences and emergency counters, pinned on both eng
       const scenario = loadScenario(resolve(CONFORMANCE_DIR, file));
       const ts: CheckpointDetail[] = [];
       const wasm: CheckpointDetail[] = [];
-      runScenario(scenario, undefined, ts);
       runScenario(scenario, startWasmEngine, wasm);
+      expect(asRecord(wasm[wasm.length - 1])).toEqual(expected);
+      // The reference cannot play a refused ransom's search; the shipped build alone is pinned there.
+      if (PAST_THE_TYPESCRIPT_REFERENCE.has(basename(file))) return;
+      runScenario(scenario, undefined, ts);
       expect(wasm.map((d) => d.fx)).toEqual(ts.map((d) => d.fx));
       expect(asRecord(ts[ts.length - 1])).toEqual(expected);
-      expect(asRecord(wasm[wasm.length - 1])).toEqual(expected);
     }, SLOW);
   }
 

@@ -147,9 +147,21 @@ export function bombCountdownText(minutesLeft: number): string {
   return `💣 Bomb search: ${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")} left`;
 }
 
-/** Classic's bomb search: a guard pacing each floor being swept, and the
- *  time left before the deadline. Under reduced motion the guards stand at
- *  their floor's middle. */
+/** How strong the red glow at the screen's edges is during a bomb search:
+ *  one slow beat a second (in step with the tick), stronger in the last game
+ *  hour. Under reduced motion it holds steady, never beating. Far below any
+ *  flash threshold: one soft beat a second at low contrast. */
+export function bombPulseAlpha(animSeconds: number, minutesLeft: number, reducedMotion: boolean): number {
+  const peak = minutesLeft <= 60 ? 0.28 : 0.16;
+  if (reducedMotion) return peak * 0.6;
+  const beat = 0.5 + 0.5 * Math.cos(2 * Math.PI * animSeconds);
+  return peak * (0.35 + 0.65 * beat * beat);
+}
+
+/** The bomb search: a guard pacing each floor being swept, the time left
+ *  before the deadline, and a red glow beating at the screen's edges. Under
+ *  reduced motion the guards stand at their floor's middle and the glow holds
+ *  still. */
 function renderBombSearch(engine: TowerEngine, ctx: CanvasRenderingContext2D): void {
   const search = engine.sim.bombSearch;
   if (!search) return;
@@ -160,7 +172,9 @@ function renderBombSearch(engine: TowerEngine, ctx: CanvasRenderingContext2D): v
     const y = engine.worldToScreenY(floor) + FLOOR * engine.cam.zoom;
     drawSearchGuard(ctx, x, y, scale);
   }
-  const text = bombCountdownText(search.deadline - engine.sim.clock.minutes);
+  const minutesLeft = search.deadline - engine.sim.clock.minutes;
+  drawEdgeGlow(ctx, engine.viewWidth, engine.viewHeight, bombPulseAlpha(engine.d.anim, minutesLeft, engine.reducedMotion));
+  const text = bombCountdownText(minutesLeft);
   ctx.save();
   ctx.font = "bold 14px sans-serif";
   const w = ctx.measureText(text).width + 16;
@@ -170,6 +184,26 @@ function renderBombSearch(engine: TowerEngine, ctx: CanvasRenderingContext2D): v
   ctx.fillStyle = "#ffffff";
   ctx.textBaseline = "middle";
   ctx.fillText(text, x + 8, 20);
+  ctx.restore();
+}
+
+/** A red glow fading in from the four screen edges. */
+function drawEdgeGlow(ctx: CanvasRenderingContext2D, w: number, h: number, alpha: number): void {
+  const depth = Math.min(w, h) * 0.12;
+  const red = (a: number): string => `rgba(200,20,20,${a})`;
+  ctx.save();
+  for (const [x0, y0, x1, y1, rx, ry, rw, rh] of [
+    [0, 0, 0, depth, 0, 0, w, depth],
+    [0, h, 0, h - depth, 0, h - depth, w, depth],
+    [0, 0, depth, 0, 0, 0, depth, h],
+    [w, 0, w - depth, 0, w - depth, 0, depth, h],
+  ] as const) {
+    const g = ctx.createLinearGradient(x0, y0, x1, y1);
+    g.addColorStop(0, red(alpha));
+    g.addColorStop(1, red(0));
+    ctx.fillStyle = g;
+    ctx.fillRect(rx, ry, rw, rh);
+  }
   ctx.restore();
 }
 

@@ -154,13 +154,77 @@ fn a_malformed_bomb_loads_as_none() {
     }
 }
 
+/// The regression this file exists for: a refused ransom used to settle on
+/// the spot in both modes ("found nothing", or an instant blast). In either
+/// mode it has to start a search that nothing settles before the clock moves.
 #[test]
-fn modern_still_answers_at_once() {
+fn a_refused_ransom_never_settles_at_once_in_either_mode() {
+    for mode in [GameMode::Classic, GameMode::Modern] {
+        for offices in [0, 1] {
+            let mut sim = tower(6, offices);
+            sim.mode = mode;
+            let money = sim.money;
+            decline(&mut sim);
+            assert!(sim.events.bomb.is_some(), "{mode:?}, {offices} office(s)");
+            assert_eq!(sim.money, money, "{mode:?}: nothing charged yet");
+            assert_eq!(sim.events.bombs_detonated, 0, "{mode:?}: no blast yet");
+            assert!(
+                !sim.log.iter().any(|e| e.text.contains("found nothing")),
+                "{mode:?}: no instant sweep"
+            );
+            sim.advance_bomb_search();
+            assert!(sim.events.bomb.is_some(), "{mode:?}: still searching");
+        }
+    }
+}
+
+#[test]
+fn modern_searches_on_the_clock_too() {
     let mut sim = tower(6, 1);
     sim.mode = GameMode::Modern;
     decline(&mut sim);
+    run(&mut sim, 1500);
     assert!(sim.events.bomb.is_none());
-    assert!(sim.log.iter().any(|e| e.text.contains("found nothing")));
+    assert_eq!(sim.events.bombs_detonated, 0);
+}
+
+#[test]
+fn in_modern_a_security_office_that_opens_mid_search_joins_it() {
+    let mut sim = tower(6, 0);
+    sim.mode = GameMode::Modern;
+    decline(&mut sim);
+    assert!(sim.events.bomb.as_ref().unwrap().guards.is_empty());
+    sim.join_bomb_search(2);
+    let b = sim.events.bomb.as_ref().unwrap();
+    assert_eq!(b.guards.len(), GUARDS_PER_OFFICE);
+    assert!(
+        b.guards.iter().any(|g| g.floor.is_some()),
+        "they set out at once"
+    );
+    run(&mut sim, 1500);
+    assert_eq!(sim.events.bombs_detonated, 0);
+}
+
+#[test]
+fn a_new_office_joins_through_finished_construction() {
+    let mut sim = tower(6, 0);
+    sim.mode = GameMode::Modern;
+    decline(&mut sim);
+    assert!(sim.build(Kind::Security, 3, 185).ok);
+    sim.clock.advance(24.0 * 60.0);
+    sim.finish_construction();
+    assert_eq!(
+        sim.events.bomb.as_ref().map(|b| b.guards.len()),
+        Some(GUARDS_PER_OFFICE)
+    );
+}
+
+#[test]
+fn in_classic_a_late_office_stays_out_of_the_search() {
+    let mut sim = tower(6, 0);
+    decline(&mut sim);
+    sim.join_bomb_search(2);
+    assert!(sim.events.bomb.as_ref().unwrap().guards.is_empty());
 }
 
 #[test]
@@ -260,4 +324,34 @@ fn one_long_step_still_finds_a_bomb_a_guard_reached_in_time() {
     sim.advance_bomb_search();
     assert!(sim.events.bomb.is_none());
     assert_eq!(sim.events.bombs_detonated, 0);
+}
+
+/// The log is tucked away on a phone, so every turn of a bomb threat has to
+/// be a kind the game toasts on screen (good or bad), never a quiet info line.
+#[test]
+fn every_turn_of_a_bomb_threat_is_a_line_the_game_toasts() {
+    use crate::sim::LogKind;
+    let toasts = |sim: &Simulation, from: usize| {
+        sim.log[from..]
+            .iter()
+            .filter(|e| e.text.contains('💣'))
+            .all(|e| matches!(e.kind, LogKind::Good | LogKind::Bad))
+    };
+    for (offices, mode) in [(1, GameMode::Classic), (0, GameMode::Modern)] {
+        let mut sim = tower(6, offices);
+        sim.mode = mode;
+        let from = sim.log.len();
+        decline(&mut sim);
+        sim.join_bomb_search(2);
+        run(&mut sim, 1500);
+        assert!(sim.events.bomb.is_none(), "{mode:?}: the search ended");
+        assert!(
+            sim.log[from..]
+                .iter()
+                .filter(|e| e.text.contains('💣'))
+                .count()
+                >= 2
+        );
+        assert!(toasts(&sim, from), "{mode:?}");
+    }
 }

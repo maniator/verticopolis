@@ -181,7 +181,7 @@ impl Simulation {
         destroyed
     }
 
-    /// Classic's answer to a declined ransom: hide the bomb in a random room
+    /// The answer to a declined ransom in both modes: hide the bomb in a random room
     /// and send Security out. With no room to hide it in, the threat was
     /// empty; with no Security, nobody searches and it simply waits for the
     /// deadline.
@@ -190,7 +190,7 @@ impl Simulation {
         if targets.is_empty() {
             self.emit(
                 "💣 The bomb threat was a hoax: there was nowhere to hide a bomb.",
-                LogKind::Info,
+                LogKind::Good,
             );
             return;
         }
@@ -232,6 +232,29 @@ impl Simulation {
             let n = offices.len() * GUARDS_PER_OFFICE;
             self.emit(&format!("💣 You refused the ransom. {n} Security guards are searching the tower; the bomb goes off at {when}."), LogKind::Bad);
         }
+    }
+
+    /// A Security office on `office` just opened. In a mode where late
+    /// offices join, its guards set out from there now.
+    pub(crate) fn join_bomb_search(&mut self, office: i64) {
+        if self.events.bomb.is_none() || !self.mode.security_joins_bomb_search() {
+            return;
+        }
+        let now = self.clock.minutes;
+        let spans = self.floor_spans();
+        let mut fresh = Vec::with_capacity(GUARDS_PER_OFFICE);
+        for _ in 0..GUARDS_PER_OFFICE {
+            let next = self.next_floor_to_sweep(office, &fresh, &spans);
+            fresh.push(sweep(next, office, now));
+        }
+        if let Some(b) = self.events.bomb.as_mut() {
+            b.guards.extend(fresh);
+            b.seq += 1;
+        }
+        self.emit(
+            &format!("💣 {GUARDS_PER_OFFICE} more Security guards joined the bomb search."),
+            LogKind::Good,
+        );
     }
 
     /// Each floor with a room a bomb can hide in, with the tile span of

@@ -158,11 +158,12 @@ impl GameMode {
             )
     }
 
-    /// Whether a declined bomb ransom starts a timed search (SimTower's
-    /// guards against a deadline, `events_bomb.rs`). Modern answers it at
-    /// once: defused when the tower has Security, a blast when it has none.
-    pub fn bomb_search_is_timed(self) -> bool {
-        self == GameMode::Classic
+    /// Whether a Security office that opens during a bomb search sends its
+    /// guards to join it. Modern lets the player answer the countdown by
+    /// building; Classic searches with the guards it had when the call came
+    /// (the Mac FAQ has no Security built during a threat).
+    pub fn security_joins_bomb_search(self) -> bool {
+        self == GameMode::Modern
     }
 
     /// Whether the ransom call needs a Security office in the tower first:

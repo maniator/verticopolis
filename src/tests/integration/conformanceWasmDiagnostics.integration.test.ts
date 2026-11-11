@@ -13,6 +13,7 @@ import {
   tsEngine,
   type Checkpoint,
   type ScenarioEngine,
+  PAST_THE_TYPESCRIPT_REFERENCE,
 } from "../conformance/scenario";
 import { hasWasmPackage, reloadWasmHandle, startWasmHandle, wasmEngine, wasmRequired } from "../conformance/wasmEngine";
 import type { WasmEngine } from "../../dualrun/binding";
@@ -36,7 +37,9 @@ import { inspectorDisagreements } from "../diagnostics/inspectorAgreement";
 
 const SCENARIO_DIR = resolve(CONFORMANCE_DIR, "scenarios");
 const lock = JSON.parse(readFileSync(resolve(CONFORMANCE_DIR, "expected.json"), "utf8")) as { scenarios: Record<string, Checkpoint[]> };
-const files = readdirSync(SCENARIO_DIR).filter((f) => f.endsWith(".json")).sort();
+const files = readdirSync(SCENARIO_DIR)
+  .filter((f) => f.endsWith(".json") && !PAST_THE_TYPESCRIPT_REFERENCE.has(f))
+  .sort();
 
 if (wasmRequired() && !hasWasmPackage()) throw new Error("VC_REQUIRE_WASM=1 but engine-rs/pkg/ is not built; run npm run wasm:build");
 

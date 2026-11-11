@@ -150,6 +150,20 @@ describe("AudioEngine facade lazy loading", () => {
     expect(built[0].sfxVol).toBe(0.2);
   });
 
+  it("halves the music, and only the music, while ducked, and restores the player's level after", async () => {
+    const audio = new AudioEngine(loader);
+    audio.setVolumes(0.8, 0.4, 0.2);
+    audio.setMusicDucked(true); // a search already running when the engine loads
+    audio.start();
+    await vi.waitFor(() => expect(audio.started).toBe(true));
+    expect([built[0].music, built[0].amb, built[0].sfxVol]).toEqual([0.4, 0.4, 0.2]);
+    audio.setVolumes(0.6, 0.4, 0.2); // the player moves the slider mid-search
+    expect(built[0].music).toBe(0.3);
+    expect(audio.musicVolume).toBe(0.6);
+    audio.setMusicDucked(false);
+    expect(built[0].music).toBe(0.6);
+  });
+
   it("ignores non-finite volume inputs, keeping that channel's current level", () => {
     const audio = new AudioEngine(loader);
     audio.setVolumes(NaN, NaN, 0.5); // NaN must not poison the stored state
