@@ -1,5 +1,5 @@
 {
-  "enabledMcpjsonServers": ["playwright"],
+  "enabledMcpjsonServers": ["playwright", "chrome-devtools"],
   "hooks": {
     "SessionStart": [
       {

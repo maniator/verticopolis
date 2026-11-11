@@ -8,8 +8,8 @@
 //   ~/.claude/settings.json  a SessionStart hook that runs
 //                            .claude/hooks/session-start.sh --user (Node on
 //                            PATH, dockerd, the Playwright variables)
-//   ~/.claude.json           the Playwright MCP server (user-scope servers
-//                            need no approval)
+//   ~/.claude.json           the Playwright and Chrome DevTools MCP servers
+//                            (user-scope servers need no approval)
 //
 // tools/agent-env/setup.sh --claude-user runs it. Rerunning changes nothing;
 // other settings and servers in both files are kept.
@@ -20,7 +20,10 @@ import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const hookScript = join(root, ".claude", "hooks", "session-start.sh");
-const mcpScript = join(root, "tools", "agent-env", "playwright-mcp.mjs");
+const mcpScripts = {
+  playwright: join(root, "tools", "agent-env", "playwright-mcp.mjs"),
+  "chrome-devtools": join(root, "tools", "agent-env", "chrome-devtools-mcp.mjs"),
+};
 
 function readJson(file) {
   if (!existsSync(file)) return {};
@@ -52,13 +55,15 @@ const others = (settings.hooks.SessionStart ?? []).flatMap((group) => {
 settings.hooks.SessionStart = [...others, { hooks: [{ type: "command", command, timeout: 900 }] }];
 writeJson(settingsFile, settings);
 
-// The Playwright MCP server, named like the checkout's .mcp.json entry, so a
-// session that starts inside the checkout still sees a single server. The
-// launcher runs on the Node that ran this script (setup.sh's .nvmrc Node).
+// The MCP servers, named like the checkout's .mcp.json entries, so a session
+// that starts inside the checkout still sees one server of each. The
+// launchers run on the Node that ran this script (setup.sh's .nvmrc Node).
 const configFile = join(homedir(), ".claude.json");
 const config = readJson(configFile);
 config.mcpServers ??= {};
-config.mcpServers.playwright = { type: "stdio", command: process.execPath, args: [mcpScript], env: {} };
+for (const [name, script] of Object.entries(mcpScripts)) {
+  config.mcpServers[name] = { type: "stdio", command: process.execPath, args: [script], env: {} };
+}
 writeJson(configFile, config);
 
-console.error(`agent-setup: registered the session hook in ${settingsFile} and the Playwright MCP server in ${configFile}`);
+console.error(`agent-setup: registered the session hook in ${settingsFile} and the MCP servers in ${configFile}`);

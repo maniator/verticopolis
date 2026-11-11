@@ -3,6 +3,10 @@
     "playwright": {
       "command": "node",
       "args": ["tools/agent-env/playwright-mcp.mjs"]
+    },
+    "chrome-devtools": {
+      "command": "node",
+      "args": ["tools/agent-env/chrome-devtools-mcp.mjs"]
     }
   }
 }
