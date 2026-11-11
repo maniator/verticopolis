@@ -12,8 +12,8 @@ approves an exception.
 ## EX-1: a rollback past #902 treats every infested room of a pending booking
 
 - **Source:** S5, #902 (`exterminationRoomIds` in the save).
-- **Status:** proposed (2026-10-20, with the #902 change). Awaiting the
-  owner's decision at the #945 sign-off.
+- **Status:** accepted (owner, 2026-11-11, at the #945 sign-off:
+  issuecomment-6786245598). Proposed 2026-10-20 with the #902 change.
 - **What is lost:** a Modern tower saved while an exterminator booking is
   pending carries the ids of the rooms the booking billed. A build from
   before #902 ignores that field, so when the booking lands it clears every
@@ -42,8 +42,9 @@ approves an exception.
 ## EX-2: the engine's raw save text differs from the TypeScript writer's in number form and in a transport's key order
 
 - **Source:** the Saves audit (#1236), `conformanceWasmSaves.integration.test.ts`.
-- **Status:** proposed (2026-10-21). Awaiting the owner's decision at the
-  #945 sign-off, together with the question below.
+- **Status:** accepted (owner, 2026-11-11, at the #945 sign-off:
+  issuecomment-6786245598). Proposed 2026-10-21; canonical equality was
+  accepted as the pass rule on 2026-10-29.
 - **What differs:** the Saves row of #945 says "byte for byte through the
   engine". The audit compares canonical JSON (keys sorted), where every
   fixture and loader case matches, and the file the engine writes, which is
@@ -92,8 +93,8 @@ approves an exception.
 
 - **Source:** the loader fidelity fixes for #858
   (`spec-gh-858-856-loader-fidelity.md`, D3).
-- **Status:** proposed (2026-10-21). Awaiting the owner's decision at the
-  #945 sign-off.
+- **Status:** accepted (owner, 2026-11-11, at the #945 sign-off:
+  issuecomment-6786245598). Proposed 2026-10-21.
 - **What is lost:** a save whose JSON holds a number literal too large for a
   double (`1e400`, say) opens in the TypeScript engine, where `JSON.parse`
   reads it as Infinity and the loader treats it as it treats any non-finite
