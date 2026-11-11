@@ -36,6 +36,10 @@ export interface Change {
   path: string;
 }
 
+/** Every lockfile that pins the engine crate by path, each built with
+ *  `--locked` in CI, so each carries the crate's version. */
+export const ENGINE_LOCKS = ["engine-rs/Cargo.lock", "engine-rs/consumer/Cargo.lock", "engine-bench/Cargo.lock"] as const;
+
 /** The files a release PR writes, and a feature PR leaves at main's versions. */
 export const RELEASE_FILES = [
   "package.json",
@@ -44,6 +48,7 @@ export const RELEASE_FILES = [
   "engine-rs/Cargo.toml",
   "engine-rs/Cargo.lock",
   "engine-rs/consumer/Cargo.lock",
+  "engine-bench/Cargo.lock",
   "engine-rs/CHANGELOG.md",
   COMPAT_RECORD_PATH,
 ] as const;
@@ -61,6 +66,7 @@ export interface Versions {
   crate: string;
   "engine-rs/Cargo.lock crate version": string;
   "engine-rs/consumer/Cargo.lock crate version": string;
+  "engine-bench/Cargo.lock crate version": string;
   "compat record crateVersion": string;
   "CHANGELOG.md sections": string;
   "engine-rs/CHANGELOG.md sections": string;
@@ -88,6 +94,7 @@ export function versionsOf(tree: Tree): Versions {
     crate: crate.version,
     "engine-rs/Cargo.lock crate version": lockVersion(need(tree, "engine-rs/Cargo.lock"), crate.name),
     "engine-rs/consumer/Cargo.lock crate version": lockVersion(need(tree, "engine-rs/consumer/Cargo.lock"), crate.name),
+    "engine-bench/Cargo.lock crate version": lockVersion(need(tree, "engine-bench/Cargo.lock"), crate.name),
     "compat record crateVersion": record.crateVersion,
     "CHANGELOG.md sections": changelogVersions(need(tree, "CHANGELOG.md")).join(", "),
     "engine-rs/CHANGELOG.md sections": changelogVersions(need(tree, "engine-rs/CHANGELOG.md")).join(", "),
@@ -129,7 +136,10 @@ export function checkFeature(base: Tree, head: Tree, changes: readonly Change[],
   const was = versionsOf(base);
   const now = versionsOf(head);
   for (const key of Object.keys(now) as (keyof Versions)[]) {
-    if (was[key] !== now[key]) errors.push(`${key} moved from "${was[key]}" to "${now[key]}": ${RELEASE_HOW}.`);
+    // A lockfile main left behind the crate may catch up to it: that repairs a
+    // --locked build and moves no version a release owns.
+    const catchUp = key.endsWith("Cargo.lock crate version") && was[key] !== was.crate && now[key] === now.crate && now.crate === was.crate;
+    if (was[key] !== now[key] && !catchUp) errors.push(`${key} moved from "${was[key]}" to "${now[key]}": ${RELEASE_HOW}.`);
   }
   for (const c of changes) {
     if (c.status === "D" && isNotePath(c.path)) errors.push(`${c.path} was deleted: only a release PR consumes notes.`);
@@ -183,6 +193,7 @@ const VERSION_FREE: Partial<Record<string, (text: string) => string>> = {
   "engine-rs/Cargo.toml": blank(/(\[package\][^[]*?\nversion = )"[^"]*"/),
   "engine-rs/Cargo.lock": blank(CRATE_LOCK),
   "engine-rs/consumer/Cargo.lock": blank(CRATE_LOCK),
+  "engine-bench/Cargo.lock": blank(CRATE_LOCK),
   [COMPAT_RECORD_PATH]: (t) => JSON.stringify({ ...JSON.parse(t), crateVersion: null }),
 };
 
@@ -205,6 +216,7 @@ export function checkRelease(base: Tree, head: Tree, changes: readonly Change[])
   same("package-lock.json root package version", now.app);
   same("engine-rs/Cargo.lock crate version", now.crate);
   same("engine-rs/consumer/Cargo.lock crate version", now.crate);
+  same("engine-bench/Cargo.lock crate version", now.crate);
   same("compat record crateVersion", now.crate);
   if (now.app !== was.app && now["CHANGELOG.md sections"].split(", ")[0] !== now.app) errors.push(`CHANGELOG.md has no ${now.app} section at the top.`);
   if (now.crate !== was.crate && now["engine-rs/CHANGELOG.md sections"].split(", ")[0] !== now.crate) errors.push(`engine-rs/CHANGELOG.md has no ${now.crate} section at the top.`);

@@ -10,8 +10,8 @@
  * It raises the app version with `npm version` (package.json and the lockfile
  * together) and writes the `CHANGELOG.md` section from the notes' Player lines;
  * when a note has a crate level it raises the crate in `engine-rs/Cargo.toml`
- * and both `Cargo.lock` files, writes the `engine-rs/CHANGELOG.md` section from
- * the Engine lines and runs `npm run engine:compat`. Then it deletes the notes.
+ * and every engine `Cargo.lock` (ENGINE_LOCKS), writes the `engine-rs/CHANGELOG.md`
+ * section from the Engine lines and runs `npm run engine:compat`. Then it deletes the notes.
  * The rules are in `src/build/changeNotes.ts`; CI checks the result with
  * `scripts/version-check.ts`.
  *
@@ -31,6 +31,7 @@ import {
   setLockVersion,
 } from "../src/build/changeNotes.ts";
 import { cargoPackage, isSemverIncrease } from "../src/build/engineCompat.ts";
+import { ENGINE_LOCKS } from "../src/build/versionCheck.ts";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const path = (rel: string) => join(root, rel);
@@ -89,7 +90,7 @@ if (crateNow !== crate.version) {
   const date = arg("--date") ?? new Date().toISOString().slice(0, 10);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) refuse(`--date ${date} is not YYYY-MM-DD`);
   write("engine-rs/Cargo.toml", setCargoVersion(read("engine-rs/Cargo.toml"), crateNow));
-  for (const lock of ["engine-rs/Cargo.lock", "engine-rs/consumer/Cargo.lock"]) write(lock, setLockVersion(read(lock), crate.name, crateNow));
+  for (const lock of ENGINE_LOCKS) write(lock, setLockVersion(read(lock), crate.name, crateNow));
   const changelog = "engine-rs/CHANGELOG.md";
   write(changelog, insertSection(read(changelog), `${crateNow} (${date})`, pending.flatMap((n) => n.engine)));
   node(["scripts/engine-compat.ts"]);

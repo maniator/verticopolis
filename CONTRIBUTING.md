@@ -567,8 +567,8 @@ The release driver cuts a release:
 2. Run `npm run release` (or `npm run release -- --app 3.0.0` for a headline
    release). It raises the app version by the highest pending `app` level,
    writes the `CHANGELOG.md` section from the Player lines, and, when a note
-   has a crate level, raises the crate in `engine-rs/Cargo.toml` and both
-   `Cargo.lock` files, writes the `engine-rs/CHANGELOG.md` section from the
+   has a crate level, raises the crate in `engine-rs/Cargo.toml` and every
+   engine `Cargo.lock` (`ENGINE_LOCKS` in `src/build/versionCheck.ts`), writes the `engine-rs/CHANGELOG.md` section from the
    Engine lines and runs `npm run engine:compat`. It deletes the notes.
 3. Trim the player lines to the few that matter (the prompt shows three),
    commit, and open the PR. It merges like any other PR, and its merge tags
@@ -643,8 +643,9 @@ record under an unchanged version unless a pending note declares a crate
 level, a version that is not a later `x.y.z` release, or a main record it
 cannot read. The record keeps the crate version main has, and the Rust identity
 test still checks the recorded version constants against the code. The release
-PR raises `version` in `engine-rs/Cargo.toml`, `engine-rs/Cargo.lock` and
-`engine-rs/consumer/Cargo.lock` (CI builds the consumer with `--locked`) and
+PR raises `version` in `engine-rs/Cargo.toml`, `engine-rs/Cargo.lock`,
+`engine-rs/consumer/Cargo.lock` and `engine-bench/Cargo.lock` (CI builds the
+consumer and the bench with `--locked`) and
 re-records, so `engineIdentity()` reports the new version. Two PRs that both
 move the lock still meet in the record's `lockDigest`; whoever merges second
 merges main in and re-records.

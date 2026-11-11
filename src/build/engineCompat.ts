@@ -9,7 +9,7 @@
  * comments and spacing aside).
  * `src/tests/engineCompat.guard.test.ts` recomputes all of it from the tree and
  * fails when a pin moved and the record did not. After a deliberate change,
- * bump `version` in `engine-rs/Cargo.toml` (and the two `Cargo.lock` files)
+ * bump `version` in `engine-rs/Cargo.toml` (and every engine `Cargo.lock`)
  * and run `npm run engine:compat`, which rewrites the record from the tree and
  * refuses when a pin differs from `origin/main`'s record under the same crate
  * version (`unbumpedPins`), when the version is not a later `x.y.z`

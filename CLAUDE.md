@@ -233,7 +233,7 @@ review skill. The BMAD agent rules live in `_bmad-output/project-context.md`.
   binding declaration `src/dualrun/engine.d.ts`.** The PR that moves one sets
   `crate:` in its change note, adds an Engine line and runs
   `npm run engine:compat`; the release PR raises the version in `Cargo.toml`
-  and both `Cargo.lock` files. Steps and limits are in CONTRIBUTING.md →
+  and the three engine `Cargo.lock` files. Steps and limits are in CONTRIBUTING.md →
   Versioning → The engine crate version.
 
 - **The Rust engine (`engine-rs/`) is the source of truth for gameplay rules,

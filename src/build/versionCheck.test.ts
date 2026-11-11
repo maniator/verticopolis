@@ -20,6 +20,7 @@ function main(extra: Files = {}): Files {
     "engine-rs/Cargo.toml": toml("1.22.0"),
     "engine-rs/Cargo.lock": cargoLock("1.22.0"),
     "engine-rs/consumer/Cargo.lock": cargoLock("1.22.0"),
+    "engine-bench/Cargo.lock": cargoLock("1.22.0"),
     "engine-rs/CHANGELOG.md": "# Engine changelog\n\n## 1.22.0 (2026-11-10)\n\n- Old.\n",
     "engine-rs/src/compat-record.json": record("1.22.0"),
     "src/a.ts": "a",
@@ -77,13 +78,20 @@ describe("a feature PR", () => {
       "engine-rs/Cargo.toml": toml("1.23.0"),
       "engine-rs/Cargo.lock": cargoLock("1.23.0"),
       "engine-rs/consumer/Cargo.lock": cargoLock("1.23.0"),
+      "engine-bench/Cargo.lock": cargoLock("1.23.0"),
       "engine-rs/CHANGELOG.md": "## 1.23.0 (2026-11-11)\n\n- New.\n\n## 1.22.0 (2026-11-10)\n",
       "engine-rs/src/compat-record.json": record("1.23.0"),
       ".changes/topic.md": note("minor", "minor"),
     });
     const errors = feature(main(), head);
-    expect(errors).toHaveLength(9);
+    expect(errors).toHaveLength(10);
     for (const e of errors) expect(e).toMatch(/moved from .*release PR/);
+  });
+
+  it("lets a lockfile main left behind catch up to the crate", () => {
+    const behind = main({ "engine-bench/Cargo.lock": cargoLock("1.21.0") });
+    expect(feature(behind, main())).toEqual([]);
+    expect(feature(main(), main({ "engine-bench/Cargo.lock": cargoLock("1.21.0") }))).toHaveLength(1);
   });
 
   it("leaves a merged PR's pending note alone on a reused branch", () => {
@@ -124,6 +132,7 @@ describe("a release PR", () => {
       "engine-rs/Cargo.toml": toml(crate),
       "engine-rs/Cargo.lock": cargoLock(crate),
       "engine-rs/consumer/Cargo.lock": cargoLock(crate),
+      "engine-bench/Cargo.lock": cargoLock(crate),
       "engine-rs/CHANGELOG.md": `## ${crate} (2026-11-11)\n\n- New.\n\n## 1.22.0 (2026-11-10)\n`,
       "engine-rs/src/compat-record.json": record(crate),
       ...extra,
@@ -142,6 +151,12 @@ describe("a release PR", () => {
     expect(release(noApp, cut("3.0.0", "1.22.1"))[0]).toMatch(/app is 3\.0\.0.*\(none\)/);
     // The crate takes exactly its level: a patch note cannot carry a minor release.
     expect(release(pending, cut("2.90.0", "1.23.0"))).toEqual(["crate is 1.23.0, but main's 1.22.0 raised by the highest pending crate level (patch) is 1.22.1."]);
+  });
+
+  it("needs the engine bench's lockfile raised with the crate", () => {
+    expect(release(pending, cut("2.90.0", "1.22.1", { "engine-bench/Cargo.lock": cargoLock("1.22.0") }))).toEqual([
+      'engine-bench/Cargo.lock crate version is "1.22.0" and should be "1.22.1".',
+    ]);
   });
 
   it("refuses leftover notes, mismatched locks, a missing section and unrelated files", () => {
