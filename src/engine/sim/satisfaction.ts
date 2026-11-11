@@ -12,7 +12,7 @@ import { isDormant, isOperational, VACATE_REASON_TEXT } from "../types";
 import { VACATE_NOTICE_MINUTES, VACATE_RESCIND, NOISE_CAP, OFFICE_NOISE_TILES, HOTEL_NOISE_TILES } from "./constants";
 import { buildSatisfactionContext, satisfactionStep } from "./satisfactionStep";
 import { markRoom, roomUnits, setRoomState } from "../tower/rooms";
-import { climbSteps, expectedVisitors, servedVisitors } from "./visitors";
+import { climbSteps, countsSetAudience, expectedVisitors, NEW_FILM_DRAW, servedVisitors, setAudience } from "./visitors";
 
 /** Satisfaction, noise notices, and the amenity halos for the Simulation, as
  * friend functions taking the instance. Extracted from `Simulation.ts`; the
@@ -247,8 +247,17 @@ export function rollOverRetailDay(sim: Simulation): void {
   const endedDay = sim.clock.day - 1;
   const endedWeekend = sim.clock.isWeekendOn(endedDay);
   for (const u of roomUnits(sim.tower)) {
-    if (subtypeListFor(u.kind) === null) continue;
     if (!isOperational(u)) continue;
+    if (countsSetAudience(u.kind)) {
+      // A hall or theatre counts its audience from the morning after it opens,
+      // and a theatre keeps the draw it has (#1500).
+      if (u.visitorsYest === undefined) {
+        u.visitorsYest = setAudience(u.kind, NEW_FILM_DRAW) ?? 0;
+        markRoom(sim.tower, u);
+      }
+      continue;
+    }
+    if (subtypeListFor(u.kind) === null) continue;
     const hasData =
       u.patronageToday !== undefined ||
       u.patronageYest !== undefined ||

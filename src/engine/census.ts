@@ -2,7 +2,7 @@ import type { FacilityKind, Unit } from "./types";
 import { isOperational } from "./types";
 import { FACILITIES } from "./facilitiesData";
 import { isCommercialKind } from "./facilityPredicates";
-import { countsDailyVisitors } from "./sim/visitors";
+import { censusFollowsTheDay } from "./sim/visitors";
 
 /** The kinds whose units may carry their own household size: a condo and a
  *  rental apartment. */
@@ -42,8 +42,9 @@ export function residentCount(u: Pick<Unit, "kind"> & { residents?: number }): n
 export function censusCount(
   u: Pick<Unit, "kind"> & { residents?: number; customersIn?: number; visitorsYest?: number },
 ): number {
-  // Shops, fast food and restaurants count yesterday's served visitors (#1500).
-  if (countsDailyVisitors(u.kind)) return u.visitorsYest ?? 0;
+  // Shops, fast food and restaurants count yesterday's served visitors, and
+  // party halls and theatres their set audience (#1500).
+  if (censusFollowsTheDay(u.kind)) return u.visitorsYest ?? 0;
   return liveLoad(u);
 }
 

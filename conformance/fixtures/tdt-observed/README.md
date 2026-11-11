@@ -17,9 +17,13 @@ as test files. The starting towers are u/invokes's, credited in
 
 What they pin: each retail row's byte 8 is the visitors the room served
 yesterday, and the finance block's shop, fast food and restaurant counts are
-the sums of those bytes. `engine-rs/tests/tdt_observed_census.rs` loads every
-file and checks that the engine's census matches the finance block class by
-class, and that a played venue never counts more than its cap.
+the sums of those bytes. The TOWER7 pair also pins the party hall and theatre
+census: 50 a hall, and 40 a theatre for each step of its film's draw plus 40.
+`T7O76.TDT` was saved after its theatres' draws fell and before the morning
+census caught up. `engine-rs/tests/tdt_observed_census.rs` loads every file
+and checks that the engine's census matches the finance block class by class,
+that a played venue never counts more than its cap, and that a played hall and
+theatre keep their audience.
 
 The files are the originals as the game wrote them. Do not add them to the
 conformance lock (`conformance/tdt-cases.json`): its cases are synthetic.

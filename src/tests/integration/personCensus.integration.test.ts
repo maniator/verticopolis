@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Simulation, SAVE_VERSION } from "../../engine/Simulation";
 import { Clock } from "../../engine/Clock";
+import type { Unit } from "../../engine/types";
 
 /**
  * Venue-population census regression suite.
@@ -312,7 +313,32 @@ describe("commercial venues (fastFood/restaurant/shop) count toward totalPopulat
     const u = sim.tower.units.find((u) => u.id === r.unitId)!;
     u.state = "occupied";
     u.customersIn = 10; // simulate late-night cinema-goers
-    expect(sim.tower.totalPopulation()).toBe(0); // cinema excluded from census
+    expect(sim.tower.totalPopulation()).toBe(0); // live cinema-goers are not the census
+    u.visitorsYest = 80; // its set audience is (#1500)
+    expect(sim.tower.totalPopulation()).toBe(80);
+  });
+});
+
+describe("party halls and theatres count a set audience (#1500)", () => {
+  it("an open hall and theatre add the audience they carry, and a vacant one adds nothing", () => {
+    const sim = new Simulation(2024, "classic", "realWorld");
+    sim.money = 10_000_000;
+    sim.star = 5;
+    for (let x = 0; x < 80; x++) sim.tower.place("lobby", 1, x);
+    for (let f = 2; f <= 3; f++) for (let x = 0; x < 80; x++) sim.tower.place("floor", f, x);
+    const h = sim.tower.place("partyHall", 2, 0);
+    const t = sim.tower.place("cinema", 2, 30);
+    expect(h.ok && t.ok).toBe(true);
+    const hall = sim.tower.units.find((u: Unit) => u.id === h.unitId)!;
+    const theatre = sim.tower.units.find((u: Unit) => u.id === t.unitId)!;
+    hall.state = "occupied";
+    theatre.state = "occupied";
+    expect(sim.tower.totalPopulation()).toBe(0);
+    hall.visitorsYest = 50;
+    theatre.visitorsYest = 80;
+    expect(sim.tower.totalPopulation()).toBe(130);
+    theatre.state = "empty";
+    expect(sim.tower.totalPopulation()).toBe(50);
   });
 });
 

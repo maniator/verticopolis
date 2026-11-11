@@ -14,6 +14,7 @@ use super::tables::*;
 use super::transports::{transports_from_decoded, BuiltExtents, OutTransport};
 use super::types::{TdtTenant, TdtTower};
 use super::LegacyImportError;
+use crate::economy::visitors::counts_set_audience;
 use crate::facilities::{is_lobby_floor, Kind, LOT_WIDTH, MAX_FLOOR};
 use crate::sim::SAVE_VERSION;
 
@@ -344,10 +345,10 @@ pub fn parse_tdt(bytes: &[u8], filename: &str) -> Result<ParsedLegacyTower, Lega
             floor,
             x: m.left,
             width: m.right - m.left,
-            state: if m.construction {
-                "construction"
-            } else {
-                "empty"
+            state: match (m.construction, counts_set_audience(m.kind)) {
+                (true, _) => "construction",
+                (false, true) => "occupied", // an open hall or theatre (#1500)
+                (false, false) => "empty",
             },
             occupants: 0,
             ever_occupied: false,
@@ -372,6 +373,7 @@ pub fn parse_tdt(bytes: &[u8], filename: &str) -> Result<ParsedLegacyTower, Lega
     // The paving pass: width-1 tiles, lobby on lobby floors.
     let mut unit_values: Vec<Value> = units.iter().map(OutUnit::to_json).collect();
     seed::seed_visitors(&mut unit_values, &tdt);
+    seed::seed_audiences(&mut unit_values, &tdt);
     let mut built_extents: BuiltExtents = BTreeMap::new();
     for (&floor, row) in &paved {
         let kind = if is_lobby_floor(floor) {

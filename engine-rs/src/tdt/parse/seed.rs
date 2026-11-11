@@ -4,11 +4,14 @@ use std::collections::HashMap;
 
 use super::OutUnit;
 use crate::crowd::fasthash::FastMap;
-use crate::economy::visitors::counts_daily_visitors;
+use crate::economy::visitors::{
+    counts_daily_visitors, counts_set_audience, set_audience, NEW_FILM_DRAW,
+};
 use crate::facilities::Kind;
-use crate::tdt::format::TDT_FLOOR_OFFSET;
+use crate::tdt::format::{population_class, TDT_FLOOR_OFFSET};
 use crate::tdt::format::{POP_CONDO, POP_OFFICE, TDT_POPULATION_CLASSES};
 use crate::tdt::import_report::ImportCounts;
+use crate::tdt::tables::part_family;
 use crate::tdt::types::{TdtFloor, TdtTower};
 
 /// The classes whose people the finance block counts and the load seeds: the
@@ -16,8 +19,7 @@ use crate::tdt::types::{TdtFloor, TdtTower};
 /// Hotels keep the states their own flags decode to, since a guest count cannot
 /// say which double room holds one guest or two. Shops, restaurants and fast
 /// food are seeded from their retail rows instead (`seed_visitors`), and
-/// theatres are left out: their customers are runtime state and arrive as the
-/// tower runs.
+/// party halls and theatres from their own records instead (`seed_audiences`).
 const SEEDED_CLASSES: [(Kind, usize, &str); 2] = [
     (Kind::Office, POP_OFFICE, "occupied"),
     (Kind::Condo, POP_CONDO, "occupied"),
@@ -161,4 +163,91 @@ pub(super) fn seed_visitors(units: &mut [serde_json::Value], tdt: &TdtTower) {
             }
         }
     }
+}
+
+/// Give each open party hall and theatre the audience the census counts for
+/// it (#1500): 50 for a hall, and for a theatre 40 for each step of the film
+/// draw its record's byte 15 holds. The finance block decides: a class whose
+/// rooms add up to its count is seeded room by room. Otherwise, when the count
+/// splits evenly into an audience each room could hold, every room gets that
+/// share; a save taken after a film's draw fell but before the census caught
+/// up counts the old draw. Anything else seeds nothing, since a hall or
+/// theatre opened that day counts nothing yet and the file does not say which.
+pub(super) fn seed_audiences(units: &mut [serde_json::Value], tdt: &TdtTower) {
+    let Some(file) = tdt.tail.finance_population else {
+        return;
+    };
+    let field = |u: &serde_json::Value, k: &str| u.get(k).and_then(serde_json::Value::as_i64);
+    // The few halls and theatres the import placed: index, kind, floors, span.
+    let mut venues: Vec<(usize, Kind, i64, i64, i64, i64)> = vec![];
+    for (i, u) in units.iter().enumerate() {
+        let Some(kind) = u
+            .get("kind")
+            .and_then(serde_json::Value::as_str)
+            .and_then(Kind::parse)
+            .filter(|&k| counts_set_audience(k))
+        else {
+            continue;
+        };
+        if u.get("state").and_then(serde_json::Value::as_str) == Some("construction") {
+            continue;
+        }
+        if let (Some(f), Some(x), Some(w)) = (field(u, "floor"), field(u, "x"), field(u, "width")) {
+            venues.push((i, kind, f, f + kind.floors() - 1, x, x + w));
+        }
+    }
+    if venues.is_empty() {
+        return;
+    }
+    // Each venue's audience, from the first of its parts the floors list.
+    let mut audience: Vec<Option<i64>> = vec![None; venues.len()];
+    for floor in &tdt.floors {
+        let at = floor.index - TDT_FLOOR_OFFSET;
+        for t in &floor.tenants {
+            let Some(kind) = part_family(t.type_id).filter(|&k| counts_set_audience(k)) else {
+                continue;
+            };
+            let hit = venues.iter().position(|&(_, k, bottom, top, left, right)| {
+                k == kind && (bottom..=top).contains(&at) && left < t.right && t.left < right
+            });
+            if let Some(v) = hit {
+                audience[v] = audience[v].or_else(|| set_audience(kind, t.draw));
+            }
+        }
+    }
+    let mut sums = [0i64; TDT_POPULATION_CLASSES];
+    let mut rooms = [0i64; TDT_POPULATION_CLASSES];
+    for (v, &(_, kind, ..)) in venues.iter().enumerate() {
+        if let Some(class) = population_class(kind) {
+            sums[class] += audience[v].unwrap_or(0);
+            rooms[class] += 1;
+        }
+    }
+    for (v, &(i, kind, ..)) in venues.iter().enumerate() {
+        let Some(class) = population_class(kind) else {
+            continue;
+        };
+        let count = if file[class] <= 0 {
+            None
+        } else if sums[class] == file[class] {
+            audience[v]
+        } else {
+            even_share(kind, file[class], rooms[class])
+        };
+        if let (Some(count), serde_json::Value::Object(m)) = (count, &mut units[i]) {
+            m.insert("visitorsYest".into(), count.into());
+        }
+    }
+}
+
+/// `total` split evenly over `rooms` of `kind`, when the share is an audience
+/// one of them could count at some film draw.
+fn even_share(kind: Kind, total: i64, rooms: i64) -> Option<i64> {
+    if rooms <= 0 || total % rooms != 0 {
+        return None;
+    }
+    let share = total / rooms;
+    (0..=NEW_FILM_DRAW)
+        .any(|draw| set_audience(kind, draw) == Some(share))
+        .then_some(share)
 }

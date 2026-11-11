@@ -24,6 +24,29 @@ export function countsDailyVisitors(kind: FacilityKind): boolean {
   return dailyVisitorCap(kind, false) !== null;
 }
 
+/** What an open party hall counts in the census, and a theatre for each step
+ *  of its film's draw (2 for a new film), #1500. */
+export const PARTY_HALL_AUDIENCE = 50;
+export const THEATRE_AUDIENCE_PER_DRAW = 40;
+export const NEW_FILM_DRAW = 2;
+
+/** Whether `kind`'s census is a set audience (party halls and theatres). */
+export function countsSetAudience(kind: FacilityKind): boolean {
+  return kind === "partyHall" || kind === "cinema";
+}
+
+/** Whether `kind`'s census is the count its room carries from the day before. */
+export function censusFollowsTheDay(kind: FacilityKind): boolean {
+  return countsDailyVisitors(kind) || countsSetAudience(kind);
+}
+
+/** The audience `kind` counts at film draw `filmDraw` (held to 0..2), or null. */
+export function setAudience(kind: FacilityKind, filmDraw: number): number | null {
+  if (kind === "partyHall") return PARTY_HALL_AUDIENCE;
+  if (kind === "cinema") return THEATRE_AUDIENCE_PER_DRAW * (Math.min(NEW_FILM_DRAW, Math.max(0, filmDraw)) + 1);
+  return null;
+}
+
 /** What a venue expects on a day, from yesterday's served visitors
  *  (undefined before its first day) and the day's climb in steps of 5. */
 export function expectedVisitors(kind: FacilityKind, weekend: boolean, servedBefore: number | undefined, steps: number): number | null {

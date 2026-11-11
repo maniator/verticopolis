@@ -18,6 +18,9 @@ pub struct TdtTenant {
     pub status_at: usize,
     /// Retail variant ordinal at offset 6.
     pub variant: i64,
+    /// Byte 15: a theatre's film draw (2 for a new film, then 1 and 0 as it
+    /// ages); other kinds carry their own values here.
+    pub draw: i64,
     /// Rent/lease rate byte at offset 16.
     pub rent_rate: i64,
     /// Byte 17 (unused in v1).

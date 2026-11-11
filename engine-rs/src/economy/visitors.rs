@@ -11,6 +11,14 @@
 //! predicts the step, so it is a roll seeded by the tower's founding seed,
 //! the day and the room (`climb_steps`). It draws nothing from the tower's
 //! own generator, so random events keep their timing.
+//!
+//! Party halls and theatres count a set audience instead (#1500). Saves the
+//! original wrote over a week of play show a party hall counting 50 from the
+//! morning after it opens, every day, whether or not a party was held, and a
+//! theatre counting 40 for each step of its film's draw: 120 for a new film
+//! (draw 2), then 80 as the film ages (draw 1). Byte 15 of a theatre's TDT
+//! record holds that draw. The engine books films by policy and has no film
+//! age, so a theatre keeps the count it opened or loaded with.
 
 use crate::facilities::Kind;
 use crate::rng::Rng;
@@ -38,6 +46,34 @@ pub fn daily_visitor_cap(kind: Kind, weekend: bool) -> Option<i64> {
 /// Whether `kind`'s census is its daily visitors.
 pub fn counts_daily_visitors(kind: Kind) -> bool {
     daily_visitor_cap(kind, false).is_some()
+}
+
+/// What an open party hall counts in the census.
+pub const PARTY_HALL_AUDIENCE: i64 = 50;
+/// What a theatre counts for each step of its film's draw.
+pub const THEATRE_AUDIENCE_PER_DRAW: i64 = 40;
+/// The draw of a new film, the strongest the original saves show.
+pub const NEW_FILM_DRAW: i64 = 2;
+
+/// Whether `kind`'s census is a set audience (party halls and theatres).
+pub fn counts_set_audience(kind: Kind) -> bool {
+    matches!(kind, Kind::PartyHall | Kind::Cinema)
+}
+
+/// Whether `kind`'s census is the count its room carries from the day
+/// before (`visitors_yest`): daily visitors or a set audience.
+pub fn census_follows_the_day(kind: Kind) -> bool {
+    counts_daily_visitors(kind) || counts_set_audience(kind)
+}
+
+/// The audience `kind` counts, for a theatre at film draw `film_draw` (held to
+/// 0 through `NEW_FILM_DRAW`), or `None` for a room without a set audience.
+pub fn set_audience(kind: Kind, film_draw: i64) -> Option<i64> {
+    match kind {
+        Kind::PartyHall => Some(PARTY_HALL_AUDIENCE),
+        Kind::Cinema => Some(THEATRE_AUDIENCE_PER_DRAW * (film_draw.clamp(0, NEW_FILM_DRAW) + 1)),
+        _ => None,
+    }
 }
 
 /// The visitors `kind` expects on a day, from the visitors it served the
@@ -136,6 +172,32 @@ mod tests {
             }
         }
         assert_eq!(seen, [false, true, true, true], "every step size comes up");
+    }
+
+    #[test]
+    fn a_set_audience_is_fifty_for_a_hall_and_forty_per_film_draw_for_a_theatre() {
+        assert_eq!(set_audience(Kind::PartyHall, 0), Some(50));
+        assert_eq!(set_audience(Kind::PartyHall, NEW_FILM_DRAW), Some(50));
+        assert_eq!(set_audience(Kind::Cinema, 2), Some(120));
+        assert_eq!(set_audience(Kind::Cinema, 1), Some(80));
+        assert_eq!(set_audience(Kind::Cinema, 0), Some(40));
+        // A byte past the draws the saves show is held to them.
+        assert_eq!(set_audience(Kind::Cinema, 3), Some(120));
+        assert_eq!(set_audience(Kind::Cinema, -1), Some(40));
+        for kind in [Kind::Shop, Kind::Restaurant, Kind::Office, Kind::FoodHall] {
+            assert_eq!(set_audience(kind, NEW_FILM_DRAW), None);
+            assert!(!counts_set_audience(kind));
+        }
+        for kind in [
+            Kind::Shop,
+            Kind::FastFood,
+            Kind::Restaurant,
+            Kind::PartyHall,
+            Kind::Cinema,
+        ] {
+            assert!(census_follows_the_day(kind));
+        }
+        assert!(!census_follows_the_day(Kind::Office));
     }
 
     #[test]
