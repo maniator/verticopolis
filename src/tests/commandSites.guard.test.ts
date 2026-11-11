@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import ts from "typescript";
 import { repoRel, sourceFiles } from "./guardFiles";
 import { isTestFile } from "./importScan";
+import { NOT_FRONTEND as SHARED_NOT_FRONTEND } from "./frontendFiles";
 
 /**
  * Player commands reach the engine through the port (AD-9, facade slice 2):
@@ -28,7 +29,8 @@ import { isTestFile } from "./importScan";
  * holds. The list only shrinks: a stale entry fails too, so it goes with the
  * write.
  */
-const NOT_FRONTEND = ["src/engine/", "src/simport/", "src/tests/", "src/wasmhost/", "src/dualrun/", "src/storage/"] as const;
+/** What the engine-import guard skips, plus the port (`src/simport/`). */
+const NOT_FRONTEND = [...SHARED_NOT_FRONTEND, "src/simport/"] as const;
 
 /** The instance's command methods, the port's commands and the raw edits
  *  behind them (tests and tooling only). */

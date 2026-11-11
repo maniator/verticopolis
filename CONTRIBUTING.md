@@ -219,10 +219,7 @@ Verticopolis has **two test tiers**:
     required, so the package's own tests run instead of skipping. Until
     #1421 those legs also ran every suite with each `Simulation` hosted on
     the engine (story-engine-test-parity, #878); the hosted projects and the
-    mirror host behind them are gone, and a test that still marks itself
-    `itTypeScriptOnly(reason)` or calls `atEngineFrameCadence(reason)` runs
-    as a plain test (`src/tests/parity/exclusions.ratchet.txt` still pins the
-    marks until the marked suites go with the TypeScript engine). The Rust
+    mirror host behind them are gone, and so are their per-test markers. The Rust
     workflow uses its own `on.push.paths` list to select PR engine jobs, so
     there is no second independent list or YAML snapshot test.
 

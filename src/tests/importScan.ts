@@ -192,9 +192,3 @@ export function globRegex(glob: string): RegExp {
 
 /** Test files and fixtures, which no guard of the shipped code scans. */
 export const isTestFile = (rel: string): boolean => /\.(test|spec|fixture)\.tsx?$/.test(rel);
-
-/** What under `src/` is not frontend: the engine itself, the test tree, and
- *  the host and save code (`src/wasmhost/`, `src/dualrun/`, `src/storage/`),
- *  whose engine imports the retirement inventory's own tables cover. The
- *  frontend import guard skips these. */
-export const NOT_FRONTEND = ["src/engine/", "src/tests/", "src/wasmhost/", "src/dualrun/", "src/storage/"] as const;
