@@ -87,6 +87,66 @@ async function fetchUpdateInfo(): Promise<UpdateInfo | null> {
  */
 const UPDATE_POLL_MS = 60 * 60 * 1000;
 
+/**
+ * The first check after registration. The browser's own launch-time update
+ * check usually settles by then, so a launch that found nothing new, or whose
+ * new worker failed to install, is caught without waiting an hour or for the
+ * tab to lose and regain focus.
+ */
+const FIRST_CHECK_MS = 15 * 1000;
+
+/** How long a check waits for a worker it found installing to finish or fail. */
+const INSTALL_SETTLE_MS = 60 * 1000;
+
+/**
+ * Resolve once `worker` has left the "installing" state (installed, or
+ * redundant after a failed install) or `ms` has passed. A check has to wait:
+ * each `registration.update()` against a deploy whose install keeps failing
+ * starts a fresh attempt, so "installing" is what a stuck app reports at the
+ * moment of every check.
+ */
+function installSettled(worker: ServiceWorker, ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    const done = () => {
+      clearTimeout(timer);
+      worker.removeEventListener("statechange", onChange);
+      resolve();
+    };
+    const onChange = () => {
+      if (worker.state !== "installing") done();
+    };
+    const timer = setTimeout(done, ms);
+    worker.addEventListener("statechange", onChange);
+    onChange();
+  });
+}
+
+/**
+ * The way out when a newer build is live but no new worker could install.
+ *
+ * A worker whose install fails (one precached file that fails its integrity
+ * check or does not arrive, a script that throws) is dropped by the browser
+ * without any event the page sees, and the old worker keeps serving the old
+ * build from its cache. With no waiting worker there is nothing for
+ * `updateSW(true)` to skip to, so the installed app would stay on the old
+ * build forever and never prompt (an installed copy sat on 2.33.0 through
+ * 3.0.1 that way). Unregistering hands the next load to the network, which
+ * serves the live build, and that build registers its own worker. Only the
+ * precache is cleared: towers live in IndexedDB and local storage, which this
+ * never touches.
+ */
+async function reloadFromNetwork(registration: ServiceWorkerRegistration): Promise<void> {
+  await registration.unregister().catch(() => false);
+  try {
+    const names = await caches.keys();
+    await Promise.all(names.filter((name) => name.startsWith("workbox-precache")).map((name) => caches.delete(name)));
+  } catch {
+    // Cache Storage can be missing or locked; the unregister alone still lets
+    // the reload reach the network.
+  }
+  window.location.reload();
+}
+
 export function registerPWA(handlers: PwaHandlers): void {
   // Service workers only work in a secure context with SW support. Bail cleanly
   // otherwise — a non-browser environment, insecure `http://`, or a page opened
@@ -144,6 +204,12 @@ export function registerPWA(handlers: PwaHandlers): void {
       // Both network calls are best-effort (offline / transient failure), and a
       // simple in-flight guard stops the interval and a visibilitychange that
       // land together from running two overlapping checks.
+      //   3. Stuck install: once any install the check started has finished
+      //      or failed, no worker is waiting, yet the live version.json names a
+      //      different build. The new worker failed to install, so offer the
+      //      update anyway and make "Update" reload from the network (see
+      //      reloadFromNetwork). An install still running when the wait runs
+      //      out is left for the next check.
       if (!registration) return;
       let checking = false;
       const check = async () => {
@@ -151,15 +217,17 @@ export function registerPWA(handlers: PwaHandlers): void {
         checking = true;
         try {
           await registration.update().catch(() => {});
-          if (!registration.waiting) return;
+          if (registration.installing) await installSettled(registration.installing, INSTALL_SETTLE_MS);
+          if (registration.installing) return;
+          const waiting = registration.waiting !== null && registration.waiting !== undefined;
           const info = await fetchUpdateInfo();
-          if (isDifferentBuild(info, __APP_VERSION__, __APP_SHA__)) {
-            surface(info ?? undefined, () => updateSW(true));
-          }
+          if (!isDifferentBuild(info, __APP_VERSION__, __APP_SHA__)) return;
+          surface(info ?? undefined, waiting ? () => updateSW(true) : () => reloadFromNetwork(registration));
         } finally {
           checking = false;
         }
       };
+      window.setTimeout(() => void check(), FIRST_CHECK_MS);
       window.setInterval(() => void check(), UPDATE_POLL_MS);
       document.addEventListener("visibilitychange", () => {
         if (document.visibilityState === "visible") void check();

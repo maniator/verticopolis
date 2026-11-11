@@ -257,3 +257,158 @@ describe("registerPWA: offline", () => {
     });
   });
 });
+
+describe("registerPWA: a newer build whose worker never installed", () => {
+  afterEach(() => {
+    registerSW.mockClear();
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+    vi.useRealTimers();
+  });
+
+  /** A registration the check can drive, with spies for the calls it may make. */
+  function fakeRegistration(state: { waiting?: object | null; installing?: object | null }) {
+    return {
+      update: vi.fn(async () => undefined),
+      unregister: vi.fn(async () => true),
+      waiting: state.waiting ?? null,
+      installing: (state.installing ?? null) as object | null,
+    };
+  }
+
+  /** Register, hand the plugin `registration`, and fire the focus check. */
+  async function runFocusCheck(registration: ReturnType<typeof fakeRegistration>): Promise<ReturnType<typeof vi.fn>> {
+    const { registerPWA } = await importPwa();
+    const onUpdateAvailable = vi.fn();
+    registerPWA({ onUpdateAvailable });
+    const opts = registerSW.mock.calls[0][0] as { onRegisteredSW: (url: string, registration: unknown) => void };
+    opts.onRegisteredSW("sw.js", registration);
+    document.dispatchEvent(new Event("visibilitychange"));
+    await vi.waitFor(() => expect(registration.update).toHaveBeenCalled());
+    return onUpdateAvailable;
+  }
+
+  const live = (version: string) => async () => new Response(JSON.stringify({ version, sha: "f00dcafe" }), { status: 200 });
+
+  it("offers the update when the live build differs and no worker is waiting, and Update reloads from the network", async () => {
+    const restore = makeBrowserBranchReachable();
+    vi.spyOn(globalThis, "fetch").mockImplementation(live("99.0.0"));
+    const cacheDelete = vi.fn(async () => true);
+    vi.stubGlobal("caches", { keys: vi.fn(async () => ["workbox-precache-v2-https://example.test/", "posthog-other"]), delete: cacheDelete });
+    const reload = vi.fn();
+    const originalLocation = Object.getOwnPropertyDescriptor(window, "location");
+    Object.defineProperty(window, "location", { configurable: true, value: { ...window.location, reload } });
+    try {
+      const registration = fakeRegistration({});
+      const onUpdateAvailable = await runFocusCheck(registration);
+      await vi.waitFor(() => expect(onUpdateAvailable).toHaveBeenCalledTimes(1));
+      expect(onUpdateAvailable.mock.calls[0][1]).toMatchObject({ version: "99.0.0" });
+      const activate = onUpdateAvailable.mock.calls[0][0] as () => Promise<void>;
+      await activate();
+      expect(registration.unregister).toHaveBeenCalledTimes(1);
+      expect(cacheDelete.mock.calls).toEqual([["workbox-precache-v2-https://example.test/"]]);
+      expect(reload).toHaveBeenCalledTimes(1);
+      const updateSW = registerSW.mock.results[0].value as ReturnType<typeof vi.fn>;
+      expect(updateSW, "no waiting worker to skip to").not.toHaveBeenCalled();
+    } finally {
+      if (originalLocation) Object.defineProperty(window, "location", originalLocation);
+      restore();
+    }
+  });
+
+  it("still uses the waiting worker when one is there", async () => {
+    const restore = makeBrowserBranchReachable();
+    vi.spyOn(globalThis, "fetch").mockImplementation(live("99.0.0"));
+    try {
+      const registration = fakeRegistration({ waiting: {} });
+      const onUpdateAvailable = await runFocusCheck(registration);
+      await vi.waitFor(() => expect(onUpdateAvailable).toHaveBeenCalledTimes(1));
+      await (onUpdateAvailable.mock.calls[0][0] as () => Promise<void>)();
+      const updateSW = registerSW.mock.results[0].value as ReturnType<typeof vi.fn>;
+      expect(updateSW).toHaveBeenCalledWith(true);
+      expect(registration.unregister).not.toHaveBeenCalled();
+    } finally {
+      restore();
+    }
+  });
+
+  /** A worker in the "installing" state that the test moves on by hand. */
+  function installingWorker() {
+    const target = new EventTarget();
+    const worker = Object.assign(target, { state: "installing" as string });
+    const settle = (state: "installed" | "redundant") => {
+      worker.state = state;
+      worker.dispatchEvent(new Event("statechange"));
+    };
+    return { worker, settle };
+  }
+
+  it("waits for an install the check started, and offers the reload when that install fails", async () => {
+    const restore = makeBrowserBranchReachable();
+    vi.spyOn(globalThis, "fetch").mockImplementation(live("99.0.0"));
+    try {
+      // Every update() against a deploy whose install keeps failing starts a new
+      // attempt, so the check always sees "installing" first.
+      const { worker, settle } = installingWorker();
+      const registration = fakeRegistration({ installing: worker });
+      const onUpdateAvailable = await runFocusCheck(registration);
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(onUpdateAvailable, "nothing while the install runs").not.toHaveBeenCalled();
+      registration.installing = null;
+      settle("redundant");
+      await vi.waitFor(() => expect(onUpdateAvailable).toHaveBeenCalledTimes(1));
+      expect(onUpdateAvailable.mock.calls[0][1]).toMatchObject({ version: "99.0.0" });
+    } finally {
+      restore();
+    }
+  });
+
+  it("leaves an install that is still running after a minute for the next check", async () => {
+    vi.useFakeTimers();
+    const restore = makeBrowserBranchReachable();
+    vi.spyOn(globalThis, "fetch").mockImplementation(live("99.0.0"));
+    try {
+      const { registerPWA } = await importPwa();
+      const onUpdateAvailable = vi.fn();
+      registerPWA({ onUpdateAvailable });
+      const registration = fakeRegistration({ installing: installingWorker().worker });
+      (registerSW.mock.calls[0][0] as { onRegisteredSW: (url: string, registration: unknown) => void }).onRegisteredSW("sw.js", registration);
+      await vi.advanceTimersByTimeAsync(15_000 + 60_000 + 1);
+      expect(registration.update).toHaveBeenCalledTimes(1);
+      expect(onUpdateAvailable).not.toHaveBeenCalled();
+    } finally {
+      restore();
+    }
+  });
+
+  it("does not offer anything when the live build is the one running", async () => {
+    const restore = makeBrowserBranchReachable();
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async () => new Response(JSON.stringify({ version: __APP_VERSION__, sha: __APP_SHA__ }), { status: 200 }));
+    try {
+      const onUpdateAvailable = await runFocusCheck(fakeRegistration({}));
+      await vi.waitFor(() => expect(fetchSpy).toHaveBeenCalled());
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(onUpdateAvailable).not.toHaveBeenCalled();
+    } finally {
+      restore();
+    }
+  });
+
+  it("runs the first check fifteen seconds after registration, without waiting for the hourly poll", async () => {
+    vi.useFakeTimers();
+    const restore = makeBrowserBranchReachable();
+    vi.spyOn(globalThis, "fetch").mockImplementation(live("99.0.0"));
+    try {
+      const { registerPWA } = await importPwa();
+      registerPWA({ onUpdateAvailable: vi.fn() });
+      const registration = fakeRegistration({});
+      (registerSW.mock.calls[0][0] as { onRegisteredSW: (url: string, registration: unknown) => void }).onRegisteredSW("sw.js", registration);
+      await vi.advanceTimersByTimeAsync(14_999);
+      expect(registration.update).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(2);
+      expect(registration.update).toHaveBeenCalledTimes(1);
+    } finally {
+      restore();
+    }
+  });
+});

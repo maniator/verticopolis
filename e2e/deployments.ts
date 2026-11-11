@@ -46,6 +46,8 @@ export interface Deployments {
   engineFrom(which: Deployment | null): void;
   /** Cut the connection on requests the way a dropped network does (the worker's own requests too, which Playwright's offline flag does not cut): the engine files only, or everything; `null` ends it. */
   failNetwork(scope: "engine" | "all" | null): void;
+  /** Append a script tag to the HTML page, as the Vercel toolbar does for a signed-in team member and as an antivirus web shield does. */
+  rewritePage(on: boolean): void;
   /** Make `version.json` answer 404, as it does when the host or the network drops it. */
   failVersionJson(failing: boolean): void;
   /** Every path requested so far, in order, with the deployment that answered. */
@@ -187,6 +189,7 @@ export async function startDeployments(distDir = fileURLToPath(new URL("../dist"
   let current: Deployment = "A";
   let versionJsonFails = false;
   let workerReissued = false;
+  let pageRewritten = false;
   let engineOverride: Deployment | null = null;
   let networkFails: "engine" | "all" | null = null;
   const requests: Deployments["requests"] = [];
@@ -222,6 +225,7 @@ export async function startDeployments(distDir = fileURLToPath(new URL("../dist"
     try {
       let body = readFileSync(file);
       if (workerReissued && from === "A" && path === "/sw.js") body = Buffer.concat([body, Buffer.from("\n// reissued\n")]);
+      if (pageRewritten && extname(file) === ".html") body = Buffer.concat([body, Buffer.from('<script async data-host-toolbar="true"></script>')]);
       res.writeHead(200, {
         "content-type": TYPES[extname(file)] ?? "application/octet-stream",
         "content-length": body.length,
@@ -248,6 +252,9 @@ export async function startDeployments(distDir = fileURLToPath(new URL("../dist"
     },
     failNetwork: (scope) => {
       networkFails = scope;
+    },
+    rewritePage: (on) => {
+      pageRewritten = on;
     },
     failVersionJson: (failing) => {
       versionJsonFails = failing;
