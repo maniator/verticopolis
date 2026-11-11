@@ -173,13 +173,52 @@ fn modern_books_a_film_each_period_and_each_booking_starts_it_again() {
     );
     sim.tower.get_unit_mut(cinema).unwrap().state = UnitState::Empty;
     let before = sim.money;
-    sim.pay_maintenance();
+    let booked = sim.pay_maintenance();
     assert!(
         before - sim.money > without_booking,
         "the booking is charged"
     );
+    assert_eq!(booked, [cinema]);
+    // The day's rollover counts the spent film's last night, then the
+    // booked film opens.
+    assert_eq!(counts(&mut sim, cinema, 1), [40], "the spent film");
+    sim.start_booked_films(&booked);
     assert_eq!(film_days(&sim, cinema), Some(0), "the booking's fresh film");
-    assert_eq!(counts(&mut sim, cinema, 1), [120]);
+    assert_eq!(
+        counts(&mut sim, cinema, 7),
+        [120, 120, 120, 120, 120, 120, 80]
+    );
+}
+
+#[test]
+fn a_modern_booking_opens_after_the_night_the_spent_film_showed() {
+    // Through the day loop: maintenance comes before the rollover, and the
+    // booked film still starts only once the rollover has counted.
+    let (mut sim, cinema, _) = theatre(GameMode::Modern);
+    sim.star = 1; // no fires: the theatre stays open through the period
+    let mut boundary = None;
+    let mut nights: Vec<u8> = Vec::new();
+    for day in 0..40 {
+        let month = sim.last_month;
+        sim.tick(60.0 * 24.0);
+        if day > 0 && sim.last_month != month && boundary.is_none() {
+            boundary = Some(nights.len());
+        }
+        nights.push(
+            sim.tower
+                .get_unit(cinema)
+                .unwrap()
+                .visitors_yest
+                .unwrap_or(0),
+        );
+    }
+    let at = boundary.expect("a maintenance period ended");
+    assert_eq!(nights[at], 40, "the spent film's last night: {nights:?}");
+    assert_eq!(
+        &nights[at + 1..at + 7],
+        [120; 6],
+        "the new film: {nights:?}"
+    );
 }
 
 #[test]

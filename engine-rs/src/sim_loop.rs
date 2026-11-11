@@ -142,10 +142,11 @@ impl Simulation {
         self.weather = weather_for(self.clock.day());
         let period =
             (self.clock.day() as f64 / self.clock.calendar.maint_period_days as f64).floor() as i64;
+        let mut booked = Vec::new();
         if period != self.last_month {
             self.last_month = period;
             self.collect_monthly_rent();
-            self.pay_maintenance();
+            booked = self.pay_maintenance();
             self.roll_condo_relocations();
         }
         let q = self.clock.quarter();
@@ -163,6 +164,8 @@ impl Simulation {
         self.nudge_metro_platform();
         self.nudge_service_shortfalls();
         self.roll_over_retail_day();
+        // A booking's film opens tonight, after the spent one's last count.
+        self.start_booked_films(&booked);
         self.ledger.end_day();
     }
 

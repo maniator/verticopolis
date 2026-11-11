@@ -21,9 +21,11 @@ use crate::tower::UnitState;
 
 impl Simulation {
     /// `payMaintenance`: the per-period upkeep and, where the mode books
-    /// films (Modern), each theatre's booking, which starts a fresh film.
+    /// films (Modern), each theatre's booking. Answers the booked theatres:
+    /// the day's rollover still counts the night their spent film showed, and
+    /// [`Simulation::start_booked_films`] starts the new film after it.
     /// Classic charges for a film only when the player changes it.
-    pub fn pay_maintenance(&mut self) {
+    pub fn pay_maintenance(&mut self) -> Vec<i64> {
         let mut cost = 0.0;
         let books_films = self.tower.mode.film_changes().is_none();
         if books_films {
@@ -45,7 +47,7 @@ impl Simulation {
         let overhead = self.mode.operating_overhead_per_unit();
         let mut new_blockbusters: Vec<f64> = Vec::new();
         // The theatres booked this period, each starting a fresh film.
-        let mut booked: Vec<usize> = Vec::new();
+        let mut booked: Vec<i64> = Vec::new();
         for i in 0..self.tower.units.len() {
             let u = &self.tower.units[i];
             if let Some(m) = service_maintenance_monthly(u.kind) {
@@ -82,7 +84,7 @@ impl Simulation {
                     new_blockbusters.push(u.id as f64);
                 }
                 charge("entertainment", booking);
-                booked.push(i);
+                booked.push(u.id);
             }
             if u.kind == Kind::Nightclub && operational {
                 charge("entertainment", NIGHTCLUB_DJ_MONTHLY);
@@ -90,11 +92,6 @@ impl Simulation {
         }
         if books_films {
             self.blockbusters = new_blockbusters;
-        }
-        for i in booked {
-            let mut extras = self.tower.units[i].extras_mut();
-            extras.film_days = Some(0);
-            extras.film_classic = false;
         }
         for (cat, a) in charges {
             self.record_money(cat, a);
@@ -113,6 +110,24 @@ impl Simulation {
                 with_thousands(cost)
             );
             self.emit(&msg, LogKind::Money);
+        }
+        booked
+    }
+
+    /// Start the fresh film each theatre in `booked` paid for this period,
+    /// once the day's rollover has counted the spent film's last night. A
+    /// theatre that closed since keeps the film it had.
+    pub fn start_booked_films(&mut self, booked: &[i64]) {
+        for &id in booked {
+            let Some(&i) = self.tower.by_id.get(&id) else {
+                continue;
+            };
+            let u = &mut self.tower.units[i];
+            if u.is_operational() {
+                let mut extras = u.extras_mut();
+                extras.film_days = Some(0);
+                extras.film_classic = false;
+            }
         }
     }
 

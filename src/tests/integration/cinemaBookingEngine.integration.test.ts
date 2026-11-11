@@ -23,7 +23,7 @@ describeEngines("Cinema film booking (FAQ)", (leg: Leg) => {
       for (let x = C; x < W; x++) draft.tower.place(kind, floor, x);
       for (let x = C - 1; x >= 0; x--) draft.tower.place(kind, floor, x);
     }
-    draft.tower.place("cinema", 2, 0);
+    expect(draft.tower.place("cinema", 2, 0).unitId, "the cinema stands").toBeDefined();
     const sim = new PortSim(leg, draft);
     // The log reads "Monthly maintenance paid" under real-world and
     // "Maintenance paid" under canon; match either. Read each day, since the
