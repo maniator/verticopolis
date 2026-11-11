@@ -650,8 +650,10 @@ with `vercel build --prod` (which runs `scripts/vercel-build.sh`, engine
 included) and deploys the prebuilt output, then waits until the production
 domain points at that new deployment and its `/version.json` reports the tag's
 commit (a redeploy of the live release serves the same `version.json`, so the
-domain check is what proves it switched). To redeploy or roll back, run
-**Deploy production** from the Actions tab with the release tag you want. It
+domain check is what proves it switched). To redeploy, run **Deploy production**
+from the Actions tab with the release tag. A run for an older release than the
+one on `main` deploys nothing unless its `rollback` box is ticked, so a slow
+automatic run never puts an older release over a newer one. It
 needs the `VERCEL_TOKEN`, `VERCEL_ORG_ID` and `VERCEL_PROJECT_ID` secrets in
 the `production` environment and fails, naming the missing one, without them.
 

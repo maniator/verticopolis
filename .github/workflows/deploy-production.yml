@@ -8,8 +8,10 @@ name: Deploy production
 #   app tag (v<x.y.z>) it just created, or the crate tag (engine-v<x.y.z>)
 #   when a release raised only the engine crate version. A tag created with
 #   the workflow token starts no tag-push workflow, hence the dispatch;
-# - a maintainer can run it from the Actions tab with any release tag, which
-#   is also how a rollback to an older release goes out.
+# - a maintainer can run it from the Actions tab with a release tag to
+#   redeploy it. A run for an older release than the one on main deploys
+#   nothing unless `rollback` is ticked, so a slow automatic dispatch can never
+#   put an older release over a newer one.
 #
 # The run checks that the tag is a release tag on `main` and that its commit
 # is a release commit by the same gate the Vercel build step uses
@@ -23,21 +25,27 @@ name: Deploy production
 # Secrets: VERCEL_TOKEN, VERCEL_ORG_ID and VERCEL_PROJECT_ID, held by the
 # `production` environment (limit that environment to the main branch). The
 # secrets reach only the step that checks they are set and the steps that talk
-# to Vercel; the build runs without them. This workflow has no push or pull request trigger, so code from a fork or
-# an open PR never runs beside the token.
+# to Vercel; the build runs without them, and the checks run in a job that has
+# no access to them. This workflow has no push or pull request trigger, so code
+# from a fork or an open PR never runs beside the token.
 on:
   workflow_dispatch:
     inputs:
       tag:
         description: "Release tag to deploy: v<x.y.z> or engine-v<x.y.z>"
         required: true
+      rollback:
+        description: "Deploy it even when main has a newer release (a rollback)"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
 # One deploy at a time, and a running deploy is never cancelled. GitHub keeps
 # one pending run per group, so of two releases queued behind a running deploy
-# only the newer goes out, which is the one production should end on.
+# only the newer goes out; a run that starts after a newer release merged
+# deploys nothing (see the check job).
 concurrency:
   group: production-deploy
   cancel-in-progress: false
@@ -47,10 +55,13 @@ env:
   PRODUCTION_URL: https://verticopolis.com
 
 jobs:
-  deploy:
+  # Decides whether to deploy, without the production environment's secrets.
+  check:
     runs-on: ubuntu-latest
-    timeout-minutes: 40
-    environment: production
+    timeout-minutes: 10
+    outputs:
+      sha: ${{ steps.tag.outputs.sha }}
+      deploy: ${{ steps.newest.outputs.deploy }}
     steps:
       - name: Check the tag name
         env:
@@ -69,6 +80,7 @@ jobs:
           persist-credentials: false
 
       - name: Check the tag is a release on main
+        id: tag
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
@@ -93,7 +105,7 @@ jobs:
             identical | ahead) echo "$TAG ($sha) is on main." ;;
             *) echo "::error::$TAG ($sha) is not on main (compare status: $status)."; exit 1 ;;
           esac
-          echo "SHA=$sha" >> "$GITHUB_ENV"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
 
       # The gate exits 1 to build and 0 to skip (Vercel's contract). In
       # production it skips a commit that still holds release notes or leaves
@@ -108,6 +120,45 @@ jobs:
             echo "::error::The release gate does not deploy this commit (exit $gate); production deploys only a release merge."
             exit 1
           fi
+
+      # A newer release on main means this run is stale (an automatic dispatch
+      # that was slow to arrive) or a rollback. Only a ticked `rollback`
+      # deploys it; otherwise the run ends green and deploys nothing.
+      - name: Check main has no newer release
+        id: newest
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          ROLLBACK: ${{ inputs.rollback }}
+        run: |
+          set -euo pipefail
+          crate_of() { awk '/^\[package\]/ { p = 1; next } /^\[/ { p = 0 } p && /^version *=/ { gsub(/.*= *"|".*/, ""); print; exit }'; }
+          here="$(node -p "require('./package.json').version") $(crate_of < engine-rs/Cargo.toml)"
+          main="$(gh api -H "Accept: application/vnd.github.raw" "repos/$GH_REPO/contents/package.json?ref=main" | node -e 'process.stdout.write(JSON.parse(require("fs").readFileSync(0, "utf8")).version)') $(gh api -H "Accept: application/vnd.github.raw" "repos/$GH_REPO/contents/engine-rs/Cargo.toml?ref=main" | crate_of)"
+          if [ "$here" = "$main" ]; then
+            echo "deploy=true" >> "$GITHUB_OUTPUT"
+          elif [ "$ROLLBACK" = "true" ]; then
+            echo "::notice::Rolling back: main is at app and crate $main, this release is $here."
+            echo "deploy=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::Not deploying: main has a newer release (app and crate $main) than this one ($here). Run again with rollback ticked to deploy it anyway."
+            echo "deploy=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  deploy:
+    needs: check
+    if: ${{ needs.check.outputs.deploy == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    environment: production
+    env:
+      SHA: ${{ needs.check.outputs.sha }}
+    steps:
+      # The commit the check job approved, even if the tag moved since.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.check.outputs.sha }}
+          persist-credentials: false
 
       - name: Check the Vercel secrets
         env:

@@ -119,6 +119,12 @@ older tag**.
   are accepted and refused as intended). The owner noted a redeploy leaves
   `version.json` unchanged, so the final check now also requires the
   production alias to point at the new deployment.
+- Codex (P2): a slow automatic dispatch for an older release could land after
+  a newer one. The workflow now has a `check` job (no secrets) that ends green
+  without deploying when main's app and crate versions differ from the tag's,
+  unless the `rollback` input is ticked; the `deploy` job checks out the exact
+  commit the check approved. Exercised: current release deploys, v3.0.0
+  without rollback does not.
 
 ### File List
 
