@@ -13,7 +13,7 @@ This file is the review method. Do these steps on every PR, in order:
 
 1. **Activate one review skill first, before any other tool call.** Use
    `gds-code-review` when the diff touches gameplay or engine code
-   (`engine-rs/`, `src/engine/`, `src/render/`, `conformance/`, `src/storage/tdt*`,
+   (`engine-rs/`, `src/render/`, `conformance/`, `src/storage/tdt*`,
    economy, ratings, events, elevators, facilities, RNG). Use `bmad-code-review`
    for everything else (other storage, tooling, build/CI, UI plumbing, docs). A mixed
    diff uses `gds-code-review`. Both are in `.agents/skills/`.
@@ -51,8 +51,7 @@ All four pass before pushing. `npm run build` needs the engine package
 game. Copilot reviews are one-shot snapshots, so re-request one after pushing
 fixes for its findings.
 
-- Flag any unit test (`*.test.ts`) that starts a real engine (Rust or the
-  TypeScript reference) or replays recorded engine answers: unit tests mock the
+- Flag any unit test (`*.test.ts`) that starts a real engine or replays recorded engine answers: unit tests mock the
   engine port with `vi.fn` spies, use JSON fixtures only as canned answers, and
   assert the calls made and what the code did with the answers. Real-engine
   checks belong in `*.integration.test.ts` or Rust tests. Also flag a test
@@ -72,6 +71,4 @@ fixes for its findings.
   code bound to one (`CLAUDE.md` non-negotiables).
 - A new facility starts in the Rust engine (`engine-rs/src/facilities.rs` and
   its catalog), never as a render-layer special case. The Rust engine is the
-  source of truth for gameplay rules, caps and tuning; until the TypeScript
-  reference engine is deleted, `src/engine/facilities.ts` follows it under the
-  catalog digest.
+  source of truth for gameplay rules, caps and tuning.

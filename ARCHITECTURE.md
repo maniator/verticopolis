@@ -41,7 +41,6 @@ src/
   audio/       # location-based procedural soundtrack and effects (Tone.js)
   storage/     # localStorage slots, .vctower and .TDT import/export
   shared/      # types and small helpers shared across the game
-  engine/      # the old TypeScript engine, kept only as a test reference while it is removed
   tests/       # repository-wide guard tests (file sizes, prose, named flags, ...)
 conformance/   # the conformance lock and catalog digests the engine is held to
 e2e/           # Playwright end-to-end specs
@@ -286,9 +285,8 @@ host refuses, stops the game with the message in `src/wasmhost/engineBoot.ts`.
 `window.__vcEngineBoot` names the build, the engine and any failure.
 
 `scripts/verify-engine-bundle.ts` checks every build's output from the emitted
-sourcemaps: no build ships test code or a TypeScript step loop, a production
-build carries no TypeScript engine module, and a `VC_TOOLING=1` build carries
-only the modules `scripts/engine-bundle.allow.txt` lists. [The bundle report](docs/performance/player-bundle.md)
+sourcemaps: no build ships test code, a production build does not carry the
+harnesses' tower, and every build with the engine package precaches it. [The bundle report](docs/performance/player-bundle.md)
 measures what a build ships.
 
 ## The engine port
@@ -319,10 +317,6 @@ flowchart LR
 - **Workers wrap the port on their own side.** A worker host, if one ships,
   runs an `EnginePort` inside the worker behind a separate async gateway;
   the main-thread port stays synchronous.
-
-The old TypeScript engine's `TsEngine` (`src/engine/port/tsEngine.ts`) still
-implements the same interface for the tests that have not yet moved to the Rust
-engine. It is not part of the shipped game and is being deleted.
 
 The full contract (every member, the input rules, the exceptions) is
 [`engine-port-contract.md`](_bmad-output/planning-artifacts/architecture/architecture-rust-facade-2026-10-20/engine-port-contract.md).

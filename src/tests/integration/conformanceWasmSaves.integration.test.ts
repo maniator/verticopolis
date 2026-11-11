@@ -15,7 +15,7 @@
  *   against `SaveGame.importText` and the engine's `loadSave`).
  * - The loader table (`conformance/loader-cases.json`: forged and
  *   hand-edited saves) is replayed by the Rust test
- *   `forged_saves_load_as_the_typescript_loads_them`; here only its
+ *   `forged_saves_load_to_their_recorded_digests`; here only its
  *   no-known-divergence state is pinned.
  * - Text that is not plain ASCII (astral characters, combining marks, a lone
  *   surrogate) in the tower name, read the way the web reads save text
@@ -144,7 +144,7 @@ describe.runIf(run)("saves audit: the Rust engine loads what the web loads, byte
 
   // The loader table's cases (forged and hand-edited saves) are replayed
   // against their recorded state hashes by the Rust test
-  // `forged_saves_load_as_the_typescript_loads_them` (engine-rs/src/load/loader_cases.rs).
+  // `forged_saves_load_to_their_recorded_digests` (engine-rs/src/load/loader_cases.rs).
   it("has no loader case still marked as a known divergence", () => {
     expect(cases.filter((c) => c.knownDivergence !== undefined).map((c) => c.id)).toEqual([]);
   });

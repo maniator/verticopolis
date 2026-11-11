@@ -293,9 +293,6 @@ export default defineConfig(({ command }) => ({
     // This build's game and engine parts, for the update prompt's label
     // (src/pwaUpdateInfo.ts `classifyUpdate`); version.json carries the same.
     __BUILD_FINGERPRINT__: JSON.stringify(fingerprintOf(command)),
-    // The TypeScript engine's source hash (#1422), shown with its pinned
-    // version (src/wasmhost/tsEngineIdentity.ts) on the version line and in
-    // the diagnostics, as the Rust binary's source hash is.
   },
   plugins: [
     captureOutDir((dir) => {

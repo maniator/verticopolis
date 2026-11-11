@@ -173,8 +173,8 @@ impl Clock {
 mod tests {
     use super::*;
 
-    /// One reading of the clock on a calendar. The web holds the same rows in
-    /// `src/engine/clockReadings.test.ts`. Keep the two tables identical.
+    /// One reading of the clock on a calendar. The retired TypeScript engine
+    /// held the same rows (`clockReadings.test.ts`, #1875).
     struct Row {
         name: &'static str,
         calendar: Calendar,

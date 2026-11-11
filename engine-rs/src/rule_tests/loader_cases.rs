@@ -2,7 +2,7 @@
 //! `loaderCases.integration.test.ts`. That suite generated
 //! `conformance/loader-cases.json` from the TypeScript loader and checked
 //! that the table held its own inputs; with the TypeScript engine gone the
-//! table is fixed data, and `load::loader_cases::forged_saves_load_as_the_typescript_loads_them`
+//! table is fixed data, and `load::loader_cases::forged_saves_load_to_their_recorded_digests`
 //! replays every case against its hash. The two tests here hold what the
 //! hashes must say about each other, read from the Rust loader itself, so two
 //! cases cannot agree or differ for the wrong reason.

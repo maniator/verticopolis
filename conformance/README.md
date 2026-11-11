@@ -110,12 +110,10 @@ to commit it on 2026-10-20.
 
 `loader-cases.json` is the referee for `deserialize` on saves no engine writes:
 forged keys, mistyped numbers, overlapping units, inverted shafts, garbage
-schedules. `src/tests/integration/loaderCases.integration.test.ts` builds the
-cases from code, hashes the loaded state of each through the TypeScript
-loader, and writes them with the same regeneration switch as the lock
-(`VC_CONFORMANCE_UPDATE=1 npx vitest run --project integration loaderCases`);
-a Rust unit test replays every case. Add a case for any coercion rule you
-touch.
+schedules. The retired TypeScript loader hashed the loaded state of each
+case; since #1875 the table is fixed data, and a Rust unit test
+(`load::loader_cases`) replays every case. A change that moves a case's hash
+changes how that save loads, and is reviewed against the case's input.
 
 ## The catalog lock
 
@@ -267,7 +265,7 @@ ill-typed:
 - a `policy` is `auto`, `feature` or `blockbuster`; a batch `target` is a
   finite number, `default` or `noRate`; `stopFloor` is a whole number,
   `stop` a boolean, a `priceUnit` `target` a finite number.
-- `kind` is a key of `FACILITIES` in `src/engine/facilitiesData.ts`: one
+- `kind` is a facility key of the engine's catalog (`engine-rs/src/catalog.rs`): one
   without the `transport` flag for `build` and `buildRow`, one with it for
   `buildTransport`.
 - `mode` is `classic` or `modern`.
@@ -360,8 +358,8 @@ Labels are unique within a scenario. Each checkpoint records three hashes:
   emitting them draws no randomness, so adding an event moves only this hash.
 
 The shapes are the TypeScript types: `SerializedGame` in
-`src/engine/serializedGame.ts` for the state and `Person` in
-`src/engine/crowd/person.ts` for each person, with the fields each one
+`src/shared/serializedGame.ts` for the state and `Person` in
+`src/shared/engineTypes.ts` for each person, with the fields each one
 actually carries (an optional field that is not set is absent). Changing
 either shape moves the hashes and is a contract change.
 

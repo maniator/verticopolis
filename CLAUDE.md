@@ -66,7 +66,7 @@ review skill. The BMAD agent rules live in `_bmad-output/project-context.md`.
   `npm test`, `npm run build`. All four must be green. The build needs the
   engine package (`npm run wasm:build`), or `VC_ALLOW_NO_ENGINE=1` for a
   deliberate build without the engine (it cannot run the game); see CONTRIBUTING.md.
-- **American English everywhere;** keep `src/engine/` free of DOM/rendering.
+- **American English everywhere;** keep `engine-rs/` free of DOM/rendering.
 - **Preserve readable intent at call sites.** Never obscure gameplay or UI
   rules behind positional shorthand like `done: bit(0)` or an unexplained
   numeric mask. Use named facts/predicates and keep bit offsets at the
@@ -245,11 +245,8 @@ review skill. The BMAD agent rules live in `_bmad-output/project-context.md`.
 
 - **The Rust engine is the only engine the shipped game runs** (app 2.66.0,
   engine crate 1.0.0; every build is the Rust-only build). A simulation change
-  lands in `engine-rs/`. The TypeScript engine (`src/engine/`) is a reference
-  that stays until its code is deleted: touch it only when the shared
-  conformance lock, a parity test or the catalog digest needs it, and say why
-  in the PR. Do not port features or fixes to it, and do not add a runtime
-  import of it to frontend code.
+  lands in `engine-rs/`. The TypeScript reference engine was deleted (#1875);
+  its rules are Rust tests now (`docs/architecture/ts-engine-retirement-map.md`).
 - **The engine crate version (`engine-rs/Cargo.toml`) goes up with the
   conformance lock, the save/frame layout/catalog/identity versions and the
   binding declaration `src/dualrun/engine.d.ts`.** The PR that moves one sets
@@ -268,8 +265,7 @@ review skill. The BMAD agent rules live in `_bmad-output/project-context.md`.
   catalog and no TypeScript table (the mode-name choices the UI still makes
   are tracked on #1621). `conformance/catalog-digests.json` is written from
   the Rust catalog alone, so a changed cap moves that digest in the PR that
-  changes it. The TypeScript reference's tables (`src/engine/facilities.ts`)
-  are no longer pinned and need no matching edit.
+  changes it.
 - **Transport pooling matches the original and is deliberate:** all three
   elevator kinds (standard + service + express) share **one 24-shaft pool**, and
   express is **not** counted separately. Stairs + escalators share a separate

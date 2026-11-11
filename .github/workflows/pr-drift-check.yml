@@ -63,10 +63,9 @@ jobs:
   # replaces the old top-level `paths:` filter so the workflow still runs (and
   # `drift-gate` still reports) on every PR, which is what lets `drift-gate` be a
   # required check. The rules mirror the old filter exactly:
-  #   Committed pixels can change from almost any app code: the engine sim state
-  #   that gets rendered (src/engine/** is the "engine render path" blind spot the
-  #   guard watches), the render path (src/render/**), DOM chrome (src/ui/**,
-  #   src/main.ts, styles, index.html), and the save-loading scenes (src/storage/**).
+  #   Committed pixels can change from almost any app code: the render path
+  #   (src/render/**), DOM chrome (src/ui/**, src/main.ts, styles, index.html),
+  #   and the save-loading scenes (src/storage/**).
   #   So match all of src/, minus tests (the legacy src/tests/** home and the
   #   colocated *.test.ts files), but re-include the test fixtures
   #   (src/tests/fixtures/**) and the saved towers (conformance/fixtures/**). No

@@ -203,8 +203,7 @@ It is the only engine the game runs: there is no TypeScript fallback, and if the
 engine cannot start, the game stops with a message. The TypeScript side
 (rendering on Excalibur.js, the DOM UI, audio, input and storage) talks to it
 through one synchronous interface, `EnginePort`, and never decides a game rule
-itself. The old TypeScript engine in `src/engine/` is not part of the shipped
-game and is being deleted.
+itself.
 
 **Want to work on the simulation?** The engine takes contributions like the
 rest of the game. [engine-rs/README.md](engine-rs/README.md) maps its modules
