@@ -136,10 +136,19 @@ function installSettled(worker: ServiceWorker, ms: number): Promise<void> {
  * never touches.
  */
 async function reloadFromNetwork(registration: ServiceWorkerRegistration): Promise<void> {
+  // The prompt can sit open for a long time. Confirm the network still serves
+  // the other build before giving up the worker and its offline copy: a player
+  // who went offline keeps both, and the throw lets the prompt say the update
+  // could not be applied, so they can try again later.
+  if (!isDifferentBuild(await fetchUpdateInfo(), __APP_VERSION__, __APP_SHA__)) {
+    throw new Error("the new build is not reachable right now");
+  }
   await registration.unregister().catch(() => false);
   try {
+    // Workbox names its precache after the registration's scope; only this
+    // app's precache goes.
     const names = await caches.keys();
-    await Promise.all(names.filter((name) => name.startsWith("workbox-precache")).map((name) => caches.delete(name)));
+    await Promise.all(names.filter((name) => name.startsWith("workbox-precache") && name.endsWith(registration.scope)).map((name) => caches.delete(name)));
   } catch {
     // Cache Storage can be missing or locked; the unregister alone still lets
     // the reload reach the network.

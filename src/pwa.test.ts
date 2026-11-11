@@ -269,6 +269,7 @@ describe("registerPWA: a newer build whose worker never installed", () => {
   /** A registration the check can drive, with spies for the calls it may make. */
   function fakeRegistration(state: { waiting?: object | null; installing?: object | null }) {
     return {
+      scope: "https://example.test/",
       update: vi.fn(async () => undefined),
       unregister: vi.fn(async () => true),
       waiting: state.waiting ?? null,
@@ -294,7 +295,10 @@ describe("registerPWA: a newer build whose worker never installed", () => {
     const restore = makeBrowserBranchReachable();
     vi.spyOn(globalThis, "fetch").mockImplementation(live("99.0.0"));
     const cacheDelete = vi.fn(async () => true);
-    vi.stubGlobal("caches", { keys: vi.fn(async () => ["workbox-precache-v2-https://example.test/", "posthog-other"]), delete: cacheDelete });
+    vi.stubGlobal("caches", {
+      keys: vi.fn(async () => ["workbox-precache-v2-https://example.test/", "workbox-precache-v2-https://example.test/other-app/", "posthog-other"]),
+      delete: cacheDelete,
+    });
     const reload = vi.fn();
     const originalLocation = Object.getOwnPropertyDescriptor(window, "location");
     Object.defineProperty(window, "location", { configurable: true, value: { ...window.location, reload } });
@@ -312,6 +316,25 @@ describe("registerPWA: a newer build whose worker never installed", () => {
       expect(updateSW, "no waiting worker to skip to").not.toHaveBeenCalled();
     } finally {
       if (originalLocation) Object.defineProperty(window, "location", originalLocation);
+      restore();
+    }
+  });
+
+  it("keeps the worker and its offline copy when the network is gone by the time the player picks Update", async () => {
+    const restore = makeBrowserBranchReachable();
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(live("99.0.0"));
+    const cacheDelete = vi.fn(async () => true);
+    vi.stubGlobal("caches", { keys: vi.fn(async () => ["workbox-precache-v2-https://example.test/"]), delete: cacheDelete });
+    try {
+      const registration = fakeRegistration({});
+      const onUpdateAvailable = await runFocusCheck(registration);
+      await vi.waitFor(() => expect(onUpdateAvailable).toHaveBeenCalledTimes(1));
+      fetchSpy.mockRejectedValue(new TypeError("Failed to fetch"));
+      const activate = onUpdateAvailable.mock.calls[0][0] as () => Promise<void>;
+      await expect(activate(), "the prompt is told the update did not apply").rejects.toThrow(/not reachable/);
+      expect(registration.unregister).not.toHaveBeenCalled();
+      expect(cacheDelete).not.toHaveBeenCalled();
+    } finally {
       restore();
     }
   });
