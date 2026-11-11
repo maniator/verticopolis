@@ -7,6 +7,7 @@ on:
   push:
     paths:
       - .github/workflows/copilot-setup-steps.yml
+      - tools/agent-env/pinned.sh
       - .github/actions/engine-wasm/**
       - scripts/build-engine-wasm.sh
       - scripts/wasm-build.ts
@@ -18,6 +19,7 @@ on:
   pull_request:
     paths:
       - .github/workflows/copilot-setup-steps.yml
+      - tools/agent-env/pinned.sh
       - .github/actions/engine-wasm/**
       - scripts/build-engine-wasm.sh
       - scripts/wasm-build.ts
@@ -88,6 +90,14 @@ jobs:
         run: npm run build
         env:
           VC_TOOLING: "1"
+
+      # The pinned Playwright image, so the agent can render the screenshot
+      # gallery and the visual baselines the way CI does with
+      # tools/agent-env/pinned.sh. continue-on-error: a registry hiccup must not
+      # keep the agent from starting.
+      - name: Pull the pinned Playwright image
+        continue-on-error: true
+        run: docker pull "$(bash tools/agent-env/pinned.sh --image)"
 
       # The Rust engine (engine-rs/) builds on the same toolchain engine-rs.yml
       # pins, with the conformance referee compiled in release so an agent can

@@ -20,6 +20,28 @@ human, and grammatically correct.
 The Rust engine in `engine-rs/` follows these rules with no grandfathered
 comments, plus the 500-line file ceiling (see CONTRIBUTING "Conventions").
 
+## Agent environment: one setup for every agent
+
+`tools/agent-env/setup.sh` installs what CI uses on a Linux x64 sandbox: Node
+at the `.nvmrc` version, `npm ci`, Rust at the engine's `rust-version` with
+rustfmt, clippy and wasm32, the engine WASM package (with the pinned
+wasm-bindgen), Docker with the pinned Playwright image, and the Playwright MCP
+server. It skips what is already done, so it is safe to run at every start.
+
+- **Claude Code cloud sessions** run it from `.claude/hooks/session-start.sh`
+  and get the Playwright MCP server from `.mcp.json`.
+- **Codex** and other sandboxes: make `bash tools/agent-env/setup.sh` the
+  environment's setup script.
+- **Copilot coding agent** uses `.github/workflows/copilot-setup-steps.yml`,
+  which builds the same pieces with the Actions cache.
+
+Render the screenshot gallery or the visual baselines with
+`bash tools/agent-env/pinned.sh screenshots` or `... baselines`: it runs the
+pinned image with the checkout mounted at its own path, the way CI does.
+[`tools/agent-env/README.md`](./tools/agent-env/README.md) has the details,
+the environment settings that cannot live in the repository, and the fallbacks
+when Docker is not available.
+
 ## Intent-revealing gameplay and UI conditions
 
 Agent-authored code must make **what a condition means** clear where it is
