@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { Simulation } from "../../engine/Simulation";
+import { draftFromSave, type Draft } from "../portKit/drafts";
+import type { Unit, Transport } from "../../shared/types";
+import { portOf } from "../../game/cardKit.fixture";
+import { PortCodes } from "../../simport/portCodes";
 import { FACILITIES, GRID, maxSpanFor } from "../../engine/facilities";
 import { FASTFOOD_SUBTYPES, RESTAURANT_SUBTYPES, SHOP_SUBTYPES } from "../../engine/retailSubtypes";
 import { SAVE_VERSION } from "../../engine/saveMigration";
@@ -141,8 +144,8 @@ describeWithCodec("tdtFormat: hostile-file hardening (typed errors, never hangs)
       } catch (err) {
         expect(err).toBeInstanceOf(LegacyImportError);
       }
-      // A surviving parse must still deserialize; the second hardening layer.
-      if (save) Simulation.deserialize(save);
+      // A surviving parse must still load into the engine; the second hardening layer.
+      if (save) draftFromSave(save);
     }
   });
 });
@@ -1498,34 +1501,40 @@ describeWithCodec("transport decode: the save's own shafts and flights", () => {
   });
 });
 
-describeWithCodec("end-to-end: import → deserialize → live simulation", () => {
+/** What the engine holds now: a tick moves it past the draft's read. */
+const unitsOf = (sim: Draft) => (sim.settle(), sim.tower.units as unknown as Unit[]);
+const shaftsOf = (sim: Draft) => (sim.settle(), sim.tower.transports as unknown as Transport[]);
+
+describeWithCodec("end-to-end: import → load → the live engine", () => {
   it("the sample tower deserializes and ticks several game-hours without throwing", () => {
     const { save } = parse(sampleTowerSpec(), "ROUNDTRIP.TDT");
-    const sim = Simulation.deserialize(save);
+    const sim = draftFromSave(save);
+    const units = () => unitsOf(sim);
     expect(sim.money).toBe(1_500_000);
     expect(sim.star).toBe(2);
-    expect(sim.tower.towerName).toBe("ROUNDTRIP");
+    expect(sim.serialize().towerName).toBe("ROUNDTRIP");
     expect(sim.mode).toBe("classic");
     // The sold condo, tenanted office, decoded shaft, and hotel states all
     // survived the trust boundary.
-    expect(sim.tower.units.some((u) => u.kind === "condo" && u.everOccupied)).toBe(true);
-    expect(sim.tower.units.some((u) => u.kind === "office" && u.state === "occupied")).toBe(true);
-    expect(sim.tower.transports.some((t) => t.kind === "elevatorStandard")).toBe(true);
-    expect(sim.tower.transports.some((t) => t.kind === "stairs")).toBe(true);
-    expect(sim.tower.units.some((u) => u.state === "asleep")).toBe(true);
-    expect(sim.tower.units.some((u) => u.state === "dirty")).toBe(true);
+    expect(units().some((u) => u.kind === "condo" && u.everOccupied)).toBe(true);
+    expect(units().some((u) => u.kind === "office" && u.state === "occupied")).toBe(true);
+    expect(shaftsOf(sim).some((t) => t.kind === "elevatorStandard")).toBe(true);
+    expect(shaftsOf(sim).some((t) => t.kind === "stairs")).toBe(true);
+    expect(units().some((u) => u.state === "asleep")).toBe(true);
+    expect(units().some((u) => u.state === "dirty")).toBe(true);
     // An imported High rent survived onto the unit (class 3 = the $15k rung).
-    expect(sim.tower.units.some((u) => u.kind === "office" && u.rent === 15_000)).toBe(true);
+    expect(units().some((u) => u.kind === "office" && u.rent === 15_000)).toBe(true);
     // Six game-hours, minute ticks; crosses the morning rush and lunch.
     for (let i = 0; i < 6 * 60; i++) sim.tick(1);
     expect(Number.isFinite(sim.money)).toBe(true);
-    expect(sim.population).toBeGreaterThanOrEqual(0);
+    const port = portOf(sim);
+    expect(new PortCodes(port).slot(port.statsStrip(), "statsStrip", "population")).toBeGreaterThanOrEqual(0);
   });
 
   it("under-construction rooms finish after import (the timer restarts honestly)", () => {
     const { save } = parse(oneTenant(-7));
-    const sim = Simulation.deserialize(save);
-    const office = () => sim.tower.units.find((u) => u.kind === "office")!;
+    const sim = draftFromSave(save);
+    const office = () => unitsOf(sim).find((u) => u.kind === "office")!;
     expect(office().state).toBe("construction");
     for (let i = 0; i < 12 * 60 && office().state === "construction"; i += 30) sim.tick(30);
     expect(office().state).not.toBe("construction");

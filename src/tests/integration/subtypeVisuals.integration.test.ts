@@ -1,7 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { newSeededGame } from "../fixtures/towerFixtures";
-import { Simulation } from "../../engine/Simulation";
-import { GRID } from "../../engine/facilities";
+import { LOT_WIDTH, newSeededDraft } from "../portKit/draftFixtures";
+import type { Draft } from "../portKit/drafts";
 import { AMUSEMENTS_SUBTYPES, BOUTIQUE_SUBTYPES, CLINIC_SUBTYPES, FASTFOOD_SUBTYPES, FITNESS_SUBTYPES, FOODHALL_SUBTYPES, RESTAURANT_SUBTYPES, SHOP_SUBTYPES } from "../../engine/retailSubtypes";
 import { AMUSEMENTS_LOOKS, BOUTIQUE_LOOKS, CLINIC_LOOKS, FASTFOOD_LOOKS, FITNESS_LOOKS, FOODHALL_LOOKS, RESTAURANT_LOOKS, SHOP_LOOKS } from "../../render/pixelSprites";
 import { buildTDT, describeWithCodec, parseTDT } from "../conformance/tdtWasm";
@@ -187,10 +186,10 @@ describe("Modern Clinic practice looks", () => {
 
 describeWithCodec("every canon subtype survives the TDT round-trip (visuals carry over)", () => {
   /** One Classic tower with a single retail unit of `kind`, ready to export. */
-  function fixture(kind: FacilityKind): { sim: Simulation; unitId: number } {
-    const sim = newSeededGame(3);
+  function fixture(kind: FacilityKind): { sim: Draft; unitId: number } {
+    const sim = newSeededDraft(3);
     sim.money = 1e12;
-    const x0 = Math.floor(GRID.width / 2) - 20;
+    const x0 = Math.floor(LOT_WIDTH / 2) - 20;
     for (let i = 0; i < 40; i++) sim.tower.place("floor", 2, x0 + i);
     sim.buildTransport("elevatorStandard", x0 + 30, 1, 2);
     const r = sim.tower.place(kind, 2, x0)!;
@@ -201,7 +200,8 @@ describeWithCodec("every canon subtype survives the TDT round-trip (visuals carr
     it(`${kind}: all ${names.length} canon variants round-trip through export and import`, () => {
       const { sim, unitId } = fixture(kind);
       for (const name of names) {
-        sim.tower.getUnit(unitId)!.subtype = name;
+        (sim.tower.getUnit(unitId) as unknown as { subtype?: string }).subtype = name;
+        sim.settle(); // the engine holds the variant the file is written from
         const { bytes } = buildTDT(sim.serialize());
         const back = parseTDT(bytes.buffer as ArrayBuffer, "R.TDT").save;
         const unit = back.units.find((u) => u.kind === kind);

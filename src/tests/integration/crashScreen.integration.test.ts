@@ -1,11 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { Simulation } from "../../engine/Simulation";
 import { showCrashScreen } from "../../ui/crashScreen";
 import type { CrashScreenOptions } from "../../ui/crashScreen";
-import type { CrashTower } from "../../game/crashReport";
-import { facilityFloors } from "../../engine/facilities";
-import { TsEngine } from "../../engine/port/tsEngine";
-import { ViewReader } from "../../simport/viewReader";
+import { crashTower } from "../../game/crashReport.fixture";
 import { downloadFile } from "../../ui/downloadFile";
 
 vi.mock("../../ui/downloadFile", () => ({ downloadFile: vi.fn() }));
@@ -15,10 +11,6 @@ vi.mock("../../ui/downloadFile", () => ({ downloadFile: vi.fn() }));
  *  file pins the sentences each flag combination renders, so a wording change
  *  is a deliberate edit here rather than an accident. */
 
-function towerOf(sim: Simulation): CrashTower {
-  const port = new TsEngine(sim);
-  return { port, view: new ViewReader(port, facilityFloors) };
-}
 
 function show(overrides: Partial<CrashScreenOptions> = {}, save: Partial<CrashScreenOptions["save"]> = {}) {
   const opts: CrashScreenOptions = {
@@ -26,7 +18,7 @@ function show(overrides: Partial<CrashScreenOptions> = {}, save: Partial<CrashSc
     save: { flushed: true, behindSplash: false, storageBlame: false, hadPriorSave: false, ...save },
     version: "1.20.0",
     speed: 3,
-    tower: () => towerOf(new Simulation()),
+    tower: () => crashTower(),
     frameErrors: [],
     onReload: vi.fn(),
     ...overrides,

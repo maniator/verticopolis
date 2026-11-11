@@ -39,12 +39,7 @@ src/tests/integration/conformanceWasmCanBuild.integration.test.ts Simulation sim
 src/tests/integration/conformanceWasmDiagnosticsTowers.integration.test.ts Simulation
 src/tests/integration/conformanceWasmFacadeCommands.integration.test.ts Simulation sim/founderStatus
 src/tests/integration/conformanceWasmLoadFidelity.integration.test.ts Simulation
-src/tests/integration/conformanceWasmSaveHandoff.integration.test.ts Simulation
-src/tests/integration/conformanceWasmSaves.integration.test.ts Simulation
-src/tests/integration/conformanceWasmSlotCensus.integration.test.ts Simulation
 src/tests/integration/congestionGripeCopy.integration.test.ts Simulation sim/congestion
-src/tests/integration/crashReport.integration.test.ts Simulation port/tsEngine
-src/tests/integration/crashScreen.integration.test.ts Simulation port/tsEngine
 src/tests/integration/crowd.integration.test.ts Clock Crowd ElevatorDispatch Simulation Tower
 src/tests/integration/demographicRoutines.integration.test.ts Clock Crowd Simulation sim/constants
 src/tests/integration/dominantGripe.integration.test.ts Simulation sim/constants sim/gripe
@@ -76,7 +71,6 @@ src/tests/integration/moveInGateLegibility.integration.test.ts Simulation sim/ch
 src/tests/integration/moveInGateRentals.integration.test.ts Simulation sim/gripe sim/satisfactionStep
 src/tests/integration/moveInSustainabilityGate.integration.test.ts Simulation sim/demand sim/satisfactionStep
 src/tests/integration/noiseMemo.integration.test.ts Simulation UndoHistory sim/constants sim/satisfaction
-src/tests/integration/paintPersistence.integration.test.ts Simulation
 src/tests/integration/partyHallTwoFloor.integration.test.ts Simulation
 src/tests/integration/personCensus.integration.test.ts Clock Simulation
 src/tests/integration/personRoundTrip.integration.test.ts Clock Crowd Simulation
@@ -96,17 +90,12 @@ src/tests/integration/skylobbyTransfer.integration.test.ts Crowd Tower
 src/tests/integration/sparseSave.integration.test.ts Simulation
 src/tests/integration/storage.integration.test.ts Simulation sim/deserializeGuards
 src/tests/integration/subsystems.integration.test.ts Clock EconomySystem ElevatorDispatch Tower rng
-src/tests/integration/subtypeVisuals.integration.test.ts Simulation
-src/tests/integration/tdtImport.integration.test.ts Simulation
-src/tests/integration/towerCongratsDialogs.integration.test.ts Simulation port/tsEngine
 src/tests/integration/towerStateSig.integration.test.ts UndoHistory
 src/tests/integration/tsEngine.golden.integration.test.ts Simulation port/tsEngine
-src/tests/integration/undoHistory.integration.test.ts Simulation UndoHistory port/tsEngine
+src/tests/integration/undoHistory.integration.test.ts UndoHistory
 src/tests/integration/unmetDemand.integration.test.ts Simulation sim/constants sim/demand sim/gripe sim/serialization
 src/tests/integration/venueAttendance.integration.test.ts Clock Crowd Simulation crowd/person crowd/spawn crowd/visits
 src/tests/integration/venueOrigins.integration.test.ts Clock Simulation crowd/spawn crowd/visits
-src/tests/integration/viewReader.integration.test.ts Simulation port/tsEngine tower/rooms
-src/tests/integration/viewReaderHall.integration.test.ts Simulation
 src/tests/integration/walkingPenalties.integration.test.ts Simulation sim/constants
 src/tests/integration/walkwayWillingness.integration.test.ts Crowd Tower
 src/tests/integration/wasteAndParking.integration.test.ts Simulation

@@ -23,14 +23,38 @@ const CENTER = 11;
 const OFFICE = 12;
 const SHAFT = 73;
 
-const layoutCode = (table: "accessLines", name: string) => (LAYOUT as unknown as Record<string, string[]>)[table].indexOf(name);
+const layoutCode = (table: "accessLines", name: string) =>
+  (LAYOUT as unknown as Record<string, string[]>)[table].indexOf(name);
 
 /** One room's card record, as the engine answers `unitCard`. */
-const card = (id: number, kind: string, floor: number, over: Record<string, number> = {}) =>
-  record("unitCard", { id, kindCode: code("kinds", kind), floor, x: 180, width: 9, stateCode: code("unitStates", "occupied"), rent: NaN, price: 0, vacateReason: NaN, filmPolicy: NaN, blockbuster: NaN, served: 1, reachable: 1, floorHasLobby: 0, satisfaction: 0.5, ...over });
+const card = (
+  id: number,
+  kind: string,
+  floor: number,
+  over: Record<string, number> = {},
+) =>
+  record("unitCard", {
+    id,
+    kindCode: code("kinds", kind),
+    floor,
+    x: 180,
+    width: 9,
+    stateCode: code("unitStates", "occupied"),
+    rent: NaN,
+    price: 0,
+    vacateReason: NaN,
+    filmPolicy: NaN,
+    blockbuster: NaN,
+    served: 1,
+    reachable: 1,
+    floorHasLobby: 0,
+    satisfaction: 0.5,
+    ...over,
+  });
 
 /** A room's engine facts (`unitFacts`): no access or No Rate line unless set. */
-const facts = (id: number, over: Record<string, number> = {}) => record("unitFacts", { id, access: NaN, noRate: NaN, ...over });
+const facts = (id: number, over: Record<string, number> = {}) =>
+  record("unitFacts", { id, access: NaN, noRate: NaN, ...over });
 
 /** A tower with a recycling center in the basement and an occupied office on
  *  floor 2 that no elevator reaches; each answer can be changed by the test. */
@@ -38,34 +62,71 @@ function tower() {
   const state = {
     center: card(CENTER, "recycling", -1),
     office: card(OFFICE, "office", 2, { served: 0, reachable: 0 }),
-    officeFacts: { access: layoutCode("accessLines", "notConnected") } as Record<string, number>,
+    officeFacts: {
+      access: layoutCode("accessLines", "notConnected"),
+    } as Record<string, number>,
     generation: 1,
     utilization: 0.91,
     nearCapacity: 1,
   };
   const port = mockPort({
-    unitCard: (id: number) => ({ [CENTER]: state.center, [OFFICE]: state.office })[id] ?? new Float64Array(0),
+    unitCard: (id: number) =>
+      ({ [CENTER]: state.center, [OFFICE]: state.office })[id] ??
+      new Float64Array(0),
     unitLabel: () => undefined,
     unitSubtype: () => undefined,
-    unitFacts: (id: number) => facts(id, id === OFFICE ? state.officeFacts : {}),
+    unitFacts: (id: number) =>
+      facts(id, id === OFFICE ? state.officeFacts : {}),
     serviceDiagnostics: () => undefined,
     recyclingCapacity: () => 2500,
     recyclingFill: () => 0.4,
     recyclingDemandMet: () => true,
-    shaftCard: (id: number) => (id === SHAFT ? record("shaftCard", { id, kindCode: code("kinds", "elevatorStandard"), utilization: state.utilization, nearCapacity: state.nearCapacity }) : new Float64Array(0)),
+    shaftCard: (id: number) =>
+      id === SHAFT
+        ? record("shaftCard", {
+            id,
+            kindCode: code("kinds", "elevatorStandard"),
+            utilization: state.utilization,
+            nearCapacity: state.nearCapacity,
+          })
+        : new Float64Array(0),
     generation: () => state.generation,
   });
   const reader = {
-    header: { revision: 1, minutes: 7 * 60, minuteOfDay: 7 * 60, day: 0, dayOfWeek: 0, isWeekend: false, quarter: 0, year: 0, weekDays: 7, weekendDays: 2, population: 40, star: 2, mode: "classic" },
+    header: {
+      revision: 1,
+      minutes: 7 * 60,
+      minuteOfDay: 7 * 60,
+      day: 0,
+      dayOfWeek: 0,
+      isWeekend: false,
+      quarter: 0,
+      year: 0,
+      weekDays: 7,
+      weekendDays: 2,
+      population: 40,
+      star: 2,
+      mode: "classic",
+    },
     tower: { revision: 1 },
-  } as unknown as ViewReader & { header: { minutes: number; population: number; revision: number } };
+  } as unknown as ViewReader & {
+    header: { minutes: number; population: number; revision: number };
+  };
   const kit = createCardKit({ enginePort: port, reader });
   return { state, port, reader, kit };
 }
 
 /** A line list as the text it renders. */
-const text = (lines: ReturnType<ReturnType<typeof tower>["kit"]["diagnostics"]["unit"]>) =>
-  lines.map((l) => l.strings.map((s, i) => s + (i < l.values.length ? String(l.values[i]) : "")).join("")).join("\n");
+const text = (
+  lines: ReturnType<ReturnType<typeof tower>["kit"]["diagnostics"]["unit"]>,
+) =>
+  lines
+    .map((l) =>
+      l.strings
+        .map((s, i) => s + (i < l.values.length ? String(l.values[i]) : ""))
+        .join(""),
+    )
+    .join("\n");
 
 describe("the card kit's unit and shaft lines over the port", () => {
   it("show a recycling center's fill and capacity lines from the port's recycling reads", () => {
@@ -73,15 +134,23 @@ describe("the card kit's unit and shaft lines over the port", () => {
     const center = kit.diagnostics.unit(CENTER);
     expect(center).toHaveLength(2);
     expect(text(center)).toContain("Fill: 40%");
-    expect(text(center)).toContain(`${groupDigits(40)}/${groupDigits(2500)} population; demand met`);
-    expect([port.recyclingCapacity, port.recyclingFill, port.recyclingDemandMet].map((f) => vi.mocked(f).mock.calls.length)).toEqual([1, 1, 1]);
+    expect(text(center)).toContain(
+      `${groupDigits(40)}/${groupDigits(2500)} population; demand met`,
+    );
+    expect(
+      [port.recyclingCapacity, port.recyclingFill, port.recyclingDemandMet].map(
+        (f) => vi.mocked(f).mock.calls.length,
+      ),
+    ).toEqual([1, 1, 1]);
     expect(kit.diagnostics.unit(OFFICE).length).toBeGreaterThan(0);
   });
 
   it("shows the shaft's average load warning from its port record, with the engine's verdict", () => {
     const { state, kit } = tower();
     const copy = (id: number) => text(kit.diagnostics.transport(id));
-    expect(copy(SHAFT)).toContain("Avg load: 91% full. Near capacity; consider more cars or a parallel shaft.");
+    expect(copy(SHAFT)).toContain(
+      "Avg load: 91% full. Near capacity; consider more cars or a parallel shaft.",
+    );
     expect(copy(SHAFT)).toContain("var(--bad)");
     expect(copy(9999)).toBe("");
 
@@ -113,22 +182,52 @@ describe("the card kit's unit and shaft lines over the port", () => {
     const officeText = text(kit.diagnostics.unit(OFFICE));
     expect(officeText).toContain("Access:");
     expect(officeText).toContain("No elevator or stair reaches this floor.");
-    expect(port.recyclingCapacity, "an office reads no recycling").not.toHaveBeenCalled();
-    state.center = card(CENTER, "recycling", -1, { stateCode: code("unitStates", "construction") });
+    expect(
+      port.recyclingCapacity,
+      "an office reads no recycling",
+    ).not.toHaveBeenCalled();
+    state.center = card(CENTER, "recycling", -1, {
+      stateCode: code("unitStates", "construction"),
+    });
     kit.cards.forget();
     expect(kit.diagnostics.unit(CENTER)).toEqual([]);
-    expect(port.recyclingCapacity, "an inert center reads no recycling").not.toHaveBeenCalled();
+    expect(
+      port.recyclingCapacity,
+      "an inert center reads no recycling",
+    ).not.toHaveBeenCalled();
   });
 
   it("shows the engine-reported Main gripe on both mobile and desktop", () => {
     const { state, kit } = tower();
     state.office = card(OFFICE, "office", 2, { satisfaction: 0.01 });
-    state.officeFacts = { access: layoutCode("accessLines", "reachable"), gripe: 1, gripeCause: code("vacateReasons", "rent") };
+    state.officeFacts = {
+      access: layoutCode("accessLines", "reachable"),
+      gripe: 1,
+      gripeCause: code("vacateReasons", "rent"),
+    };
     const unit = kit.cards.unit(OFFICE)!;
-    const copy = "Main gripe: the rent is above the going rate. Lower it to keep them.";
-    const mobile = renderToFragment(unitEditorTemplate(unit, kit.catalog(), 12, true, kit.diagnostics.unit(OFFICE)));
-    const desktop = renderToFragment(unitInspectorTemplate(unit, kit.catalog(), 12, kit.diagnostics.unit(OFFICE)));
-    expect(mobile.querySelector(".ed-diagnostics")?.textContent).toContain(copy);
+    const copy =
+      "Main gripe: the rent is above the going rate. Lower it to keep them.";
+    const mobile = renderToFragment(
+      unitEditorTemplate(
+        unit,
+        kit.catalog(),
+        12,
+        true,
+        kit.diagnostics.unit(OFFICE),
+      ),
+    );
+    const desktop = renderToFragment(
+      unitInspectorTemplate(
+        unit,
+        kit.catalog(),
+        12,
+        kit.diagnostics.unit(OFFICE),
+      ),
+    );
+    expect(mobile.querySelector(".ed-diagnostics")?.textContent).toContain(
+      copy,
+    );
     expect(desktop.textContent).toContain(copy);
   });
 
@@ -151,11 +250,20 @@ describe("the card kit's unit and shaft lines over the port", () => {
     kit.diagnostics.unit(OFFICE);
     expect(reads()).toBe(2);
     // Selected unit state and price change without a structural revision.
-    state.office = card(OFFICE, "office", 2, { served: 0, reachable: 0, satisfaction: 0.02 });
+    state.office = card(OFFICE, "office", 2, {
+      served: 0,
+      reachable: 0,
+      satisfaction: 0.02,
+    });
     kit.cards.forget();
     kit.diagnostics.unit(OFFICE);
     expect(reads()).toBe(3);
-    state.office = card(OFFICE, "office", 2, { served: 0, reachable: 0, satisfaction: 0.02, rent: 10_050 });
+    state.office = card(OFFICE, "office", 2, {
+      served: 0,
+      reachable: 0,
+      satisfaction: 0.02,
+      rent: 10_050,
+    });
     kit.cards.forget();
     kit.diagnostics.unit(OFFICE);
     expect(reads()).toBe(4);
@@ -168,7 +276,10 @@ describe("the card kit's unit and shaft lines over the port", () => {
     kit.diagnostics.unit(OFFICE);
     expect(reads()).toBe(6);
 
-    reader.header = { ...reader.header, population: reader.header.population + 1 };
+    reader.header = {
+      ...reader.header,
+      population: reader.header.population + 1,
+    };
     kit.diagnostics.unit(OFFICE);
     expect(reads()).toBe(7);
     reader.header = { ...reader.header, revision: reader.header.revision + 1 };
@@ -211,7 +322,10 @@ describe("the card kit's unit and shaft lines over the port", () => {
 
   it("keeps a tenant's on-notice countdown live instead of caching it per hour", () => {
     const { state, port, reader, kit } = tower();
-    state.office = card(OFFICE, "office", 2, { stateCode: code("unitStates", "vacating"), vacateReason: code("vacateReasons", "noise") });
+    state.office = card(OFFICE, "office", 2, {
+      stateCode: code("unitStates", "vacating"),
+      vacateReason: code("vacateReasons", "noise"),
+    });
     kit.diagnostics.unit(OFFICE);
     reader.header = { ...reader.header, minutes: reader.header.minutes + 5 };
     kit.diagnostics.unit(OFFICE);
@@ -219,16 +333,74 @@ describe("the card kit's unit and shaft lines over the port", () => {
   });
 
   it("treat a room as inert in exactly the states the engine does", () => {
-    const all: UnitState[] = ["construction", "empty", "occupied", "moving_in", "vacating", "asleep", "dirty", "infested", "fire", "gutted"];
-    for (const state of all) expect(INERT_STATES.has(state), state).toBe(!isOperational({ state }));
+    const all: UnitState[] = [
+      "construction",
+      "empty",
+      "occupied",
+      "moving_in",
+      "vacating",
+      "asleep",
+      "dirty",
+      "infested",
+      "fire",
+      "gutted",
+    ];
+    for (const state of all)
+      expect(INERT_STATES.has(state), state).toBe(!isOperational({ state }));
     // The game runs the Rust engine, so its predicate is the one to match,
     // and this pin outlives the TypeScript one above.
-    const rust = readFileSync(resolve(repoRoot, "engine-rs/src/tower_query_state.rs"), "utf8");
+    const rust = readFileSync(
+      resolve(repoRoot, "engine-rs/src/tower_query_state.rs"),
+      "utf8",
+    );
     // The body must be the one `matches!` over the state, with nothing after
     // it and no arm guard, so no other condition can hide beside the states.
-    const inert = /fn is_operational\(&self\) -> bool \{\s*!matches!\(\s*self\.state,\s*((?:UnitState::\w+\s*\|\s*)*UnitState::\w+),?\s*\)\s*\}/.exec(rust)?.[1];
-    expect(inert, "is_operational's shape changed; read its states again").toBeDefined();
-    const names = [...(inert ?? "").matchAll(/UnitState::(\w+)/g)].map((m) => m[1].replace(/[A-Z]/g, (c, at: number) => (at ? "_" : "") + c.toLowerCase()));
+    const inert =
+      /fn is_operational\(&self\) -> bool \{\s*!matches!\(\s*self\.state,\s*((?:UnitState::\w+\s*\|\s*)*UnitState::\w+),?\s*\)\s*\}/.exec(
+        rust,
+      )?.[1];
+    expect(
+      inert,
+      "is_operational's shape changed; read its states again",
+    ).toBeDefined();
+    const names = [...(inert ?? "").matchAll(/UnitState::(\w+)/g)].map((m) =>
+      m[1].replace(
+        /[A-Z]/g,
+        (c, at: number) => (at ? "_" : "") + c.toLowerCase(),
+      ),
+    );
     expect(new Set(names)).toEqual(INERT_STATES);
+  });
+});
+
+describe("the card kit's batch price preview", () => {
+  it("quotes the batch by kind and target code, and answers the engine's counts", () => {
+    const quote = vi
+      .fn()
+      .mockReturnValueOnce(
+        record("quoteRentBatch", {
+          ok: 1,
+          matched: 5,
+          eligible: 4,
+          changed: 3,
+        }),
+      )
+      .mockReturnValueOnce(record("quoteRentBatch", { ok: 0 }));
+    const port = mockPort({ quoteRentBatch: quote });
+    const reader = { header: { mode: "classic" } } as unknown as ViewReader;
+    const kit = createCardKit({ enginePort: port, reader });
+    expect(
+      kit.previewRentBatch("office", "noRate", { onlyDefaultPriced: true }),
+    ).toMatchObject({ matched: 5, eligible: 4, changed: 3 });
+    expect(quote).toHaveBeenCalledExactlyOnceWith(
+      code("kinds", "office"),
+      -1,
+      true,
+    );
+    expect(
+      kit.previewRentBatch("office", 2, {}),
+      "a quote the engine refuses previews nothing",
+    ).toBeNull();
+    expect(quote).toHaveBeenLastCalledWith(code("kinds", "office"), 2, false);
   });
 });
