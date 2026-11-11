@@ -145,10 +145,14 @@ jobs:
     environment: production
     # One deploy at a time, and a running deploy is never cancelled. GitHub
     # keeps one pending job per group and cancels the older pending one when
-    # another arrives, so the group sits here, after the check: a stale run
-    # has already stopped in the check job and can never displace a pending
-    # deploy of the newest release. Of two current deploys queued behind a
-    # running one, the newer goes out.
+    # another arrives, so the group sits here, after the check, where most
+    # stale runs have already stopped. A run that passed the check just
+    # before a newer release merged can still arrive later and displace that
+    # release's pending deploy; the Deploy step then finds itself stale and
+    # starts a fresh deploy of the newest release, so it is never lost.
+    permissions:
+      contents: read
+      actions: write
     concurrency:
       group: production-deploy
       cancel-in-progress: false
@@ -239,7 +243,22 @@ jobs:
             here="$(node -p "require('./package.json').version") $(crate_of < engine-rs/Cargo.toml)"
             main="$(gh api -H "Accept: application/vnd.github.raw" "repos/$GH_REPO/contents/package.json?ref=main" | node -e 'process.stdout.write(JSON.parse(require("fs").readFileSync(0, "utf8")).version)') $(gh api -H "Accept: application/vnd.github.raw" "repos/$GH_REPO/contents/engine-rs/Cargo.toml?ref=main" | crate_of)"
             if [ "$here" != "$main" ]; then
-              echo "::error::A newer release (app and crate $main) reached main while this run built $here; not deploying over it. Run again with rollback ticked to deploy this release anyway."
+              # This run may have displaced the newest release's pending
+              # deploy from the queue, so start that deploy again. Of main's
+              # app and crate tags, the newest release is the later commit.
+              read -r app crate <<< "$main"
+              newest=""
+              for t in "v$app" "engine-v$crate"; do
+                if gh api "repos/$GH_REPO/git/ref/tags/$t" > /dev/null 2>&1; then
+                  if [ -z "$newest" ] || [ "$(gh api "repos/$GH_REPO/compare/$newest...$t" --jq .status)" = "ahead" ]; then newest="$t"; fi
+                fi
+              done
+              if [ -n "$newest" ]; then
+                gh workflow run deploy-production.yml --ref main -f tag="$newest"
+                echo "::error::A newer release (app and crate $main) reached main while this run built $here; not deploying over it. Started a deploy of $newest in case this run displaced it. Run again with rollback ticked to deploy $TAG anyway."
+              else
+                echo "::error::A newer release (app and crate $main) reached main while this run built $here; not deploying over it. Neither v$app nor engine-v$crate is tagged yet, so its own deploy is still to come."
+              fi
               exit 1
             fi
           fi
