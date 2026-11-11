@@ -732,16 +732,23 @@ exist (`src/tests/enginePackageReadme.guard.test.ts`), and the crate README's
 quick start must match the compiled example
 (`src/tests/engineCrateReadme.guard.test.ts`).
 
-**The docs site.** docs.verticopolis.com is an mdBook in `docs/engine-site/`
-whose pages include both READMEs, `engine-rs/API.md`, `conformance/README.md`
-and `engine-rs/CHANGELOG.md`, with the crate's `cargo doc` output under
-`/rust/`. `.github/workflows/engine-docs.yml` builds it on a pull request that
-touches any of those files and deploys it to GitHub Pages when
-`release-tag.yml` dispatches it for a new `engine-v<version>` tag, so the site
-shows the latest engine release. Run it by hand from the Actions tab to
-republish a tag. Locally: `cargo install mdbook --locked --version 0.5.4`, then
-`mdbook serve docs/engine-site`. `src/tests/engineDocsSite.guard.test.ts` checks
-that every include names a real file; the workflow's own pull request run checks
+**The docs site.** docs.verticopolis.com is a Starlight site in
+`docs/engine-site/`, its own small npm project, dressed in the game's Windows
+3.1 palette. Its pages are both READMEs, `engine-rs/API.md`,
+`conformance/README.md` and `engine-rs/CHANGELOG.md`, listed in its
+`pages.json`; `scripts/sync-pages.mjs` copies them in before each build and
+points their repository links at the site or at GitHub. The palette, logo and
+favicon are copied from the game (`src/styles/retro-tokens.css`,
+`src/public/`), and the crate's `cargo doc` output goes under `/rust/`.
+`.github/workflows/engine-docs.yml` builds it on a pull request that touches
+any of those files and deploys it to GitHub Pages when `release-tag.yml`
+dispatches it for a new `engine-v<version>` tag, so the site shows the latest
+engine release. Run it by hand from the Actions tab to republish a tag, or
+with `main` to publish the unreleased docs. Locally: `npm ci --prefix
+docs/engine-site`, then `npm run dev --prefix docs/engine-site`. Edit the
+source files, never the copies under `src/content/docs/`.
+`src/tests/engineDocsSite.guard.test.ts` checks that every listed page names a
+real file and is in the sidebar; the workflow's own pull request run checks
 the build.
 
 ### Two changelogs, and the update label

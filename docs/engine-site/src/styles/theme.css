@@ -1,0 +1,179 @@
+/* The docs site in the game's own look: the Windows 3.1 chrome of the game
+   and its /help page. The palette, font and bevels come from the game's
+   retro-tokens.css, copied in beside this file by scripts/sync-pages.mjs, so
+   the docs re-theme when the game does. As on the /help page, a dark viewer
+   gets a darker ground while the window chrome stays period silver. */
+
+:root {
+  --sl-font: var(--r-font);
+  --sl-color-accent-low: #c8c8f0;
+  --sl-color-accent: var(--r-title);
+  --sl-color-accent-high: var(--r-title);
+  --sl-color-text-accent: var(--r-title);
+  --sl-color-bg-accent: var(--r-title);
+  --sl-color-text-invert: var(--r-title-fg);
+  --sl-color-bg-nav: var(--r-title);
+  --sl-color-hairline-shade: var(--r-shadow);
+}
+
+:root[data-theme="light"] {
+  --sl-color-bg: var(--r-hi);
+  --sl-color-bg-sidebar: var(--r-face);
+  --sl-color-bg-inline-code: #e8e8e8;
+  --sl-color-hairline: var(--r-shadow);
+  --sl-color-hairline-light: #b0b0b0;
+  --sl-color-text: var(--r-ink);
+  --sl-color-white: var(--r-ink);
+  --sl-color-gray-2: #1c1c22;
+  --sl-color-gray-3: var(--muted);
+}
+
+:root[data-theme="dark"] {
+  --sl-color-accent-low: #12305a;
+  --sl-color-accent: #7fe0e0;
+  --sl-color-accent-high: #bff3f3;
+  --sl-color-text-accent: #7fe0e0;
+  --sl-color-bg: #0a1f1f;
+  --sl-color-bg-sidebar: #05403f;
+  --sl-color-bg-inline-code: #163636;
+  --sl-color-hairline: #1d4a49;
+  --sl-color-hairline-light: #2b5e5d;
+  --sl-color-text: #eafcfb;
+}
+
+/* The header is a title bar: navy with white text, in both themes. */
+.header {
+  --sl-color-white: var(--r-title-fg);
+  --sl-color-gray-1: var(--r-title-fg);
+  --sl-color-gray-2: var(--r-light);
+  --sl-color-gray-3: var(--r-light);
+  --sl-color-gray-5: var(--r-shadow);
+  --sl-color-text-accent: var(--r-title-fg);
+  border-bottom: 2px solid var(--r-dark);
+}
+.header .site-title {
+  font-weight: 700;
+}
+.header .site-title img {
+  image-rendering: pixelated;
+  box-shadow: var(--bevel-out);
+}
+/* The search box is a sunken white field on the title bar. */
+.header site-search button[data-open-modal] {
+  background: var(--r-hi);
+  color: var(--r-ink);
+  border: 0;
+  border-radius: 0;
+  box-shadow: var(--bevel-in);
+}
+.header site-search button[data-open-modal] kbd {
+  background: var(--r-face);
+  color: var(--r-ink);
+  border-radius: 0;
+}
+
+/* The sidebar is a silver panel; the current page is a selected list row. */
+.sidebar-pane {
+  border-inline-end: 2px solid var(--r-shadow);
+}
+.sidebar-content a[aria-current="page"],
+.sidebar-content a[aria-current="page"]:hover {
+  background: var(--r-title);
+  color: var(--r-title-fg);
+  border-radius: 0;
+}
+:root[data-theme="light"] .sidebar-content summary .group-label .large {
+  color: var(--r-title);
+}
+
+/* Buttons, cards and code frames wear the game's bevels, with no rounding. */
+.sl-link-button,
+.card,
+.expressive-code .frame,
+.expressive-code .frame pre,
+starlight-tabs [role="tab"],
+.starlight-aside,
+dialog {
+  border-radius: 0 !important;
+}
+.sl-link-button {
+  border: 0;
+  box-shadow: var(--bevel-out);
+  font-weight: 700;
+}
+.sl-link-button.primary {
+  background: var(--r-face);
+  color: var(--r-ink);
+}
+.sl-link-button.secondary {
+  background: var(--r-title);
+  color: var(--r-title-fg);
+}
+.sl-link-button:active {
+  box-shadow: var(--bevel-in);
+}
+
+.card {
+  background: var(--r-face);
+  color: var(--r-ink);
+  border: 0;
+  box-shadow: var(--bevel-out), var(--win-shadow);
+  --sl-card-border: transparent;
+  --sl-card-bg: var(--r-face);
+}
+.card .title {
+  color: var(--r-ink);
+}
+.card .body,
+.card .body a {
+  color: var(--r-ink);
+}
+.card .icon {
+  color: var(--r-title);
+  background: var(--r-hi);
+  border: 0;
+  border-radius: 0;
+  box-shadow: var(--bevel-in);
+}
+
+/* The landing page sits on the game's teal desktop, with its dotted weave. */
+[data-has-hero] .main-frame {
+  background-color: var(--r-desktop);
+  background-image: radial-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px);
+  background-size: 3px 3px;
+  --sl-color-white: var(--r-title-fg);
+  --sl-color-gray-2: #eafcfb;
+  --sl-color-text: #eafcfb;
+  --sl-color-text-accent: var(--r-title-fg);
+}
+:root[data-theme="dark"] [data-has-hero] .main-frame {
+  background-color: #05403f;
+}
+[data-has-hero] .main-frame .sl-markdown-content > p a {
+  color: var(--r-title-fg);
+}
+[data-has-hero] .hero img {
+  image-rendering: pixelated;
+  box-shadow: var(--bevel-out), var(--win-shadow);
+}
+.sl-link-button.minimal {
+  padding-inline: 1.25rem;
+  background: var(--r-hi);
+  color: var(--r-title);
+}
+
+/* The phone menu button and "On this page" bar are bevelled buttons too. */
+.sl-menu-button,
+mobile-starlight-toc .toggle {
+  background: var(--r-face);
+  color: var(--r-ink);
+  border: 0;
+  border-radius: 0;
+  box-shadow: var(--bevel-out);
+}
+
+/* Inline code on a silver card reads as a white field in both themes. */
+.card code {
+  background: var(--r-hi);
+  color: var(--r-ink);
+}

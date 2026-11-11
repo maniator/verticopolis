@@ -1,0 +1,40 @@
+---
+title: Verticopolis engine
+description: Developer docs for the Verticopolis simulation engine, the same engine the web game runs.
+template: splash
+hero:
+  tagline: The simulation behind Verticopolis, the tower building game. Every rule, price, command, save format and gameplay event, for your own frontend.
+  image:
+    file: ../../assets/logo.png
+  actions:
+    - text: Use it from JavaScript
+      link: /javascript/
+      icon: right-arrow
+    - text: Use it from Rust
+      link: /crate/
+      icon: right-arrow
+      variant: secondary
+    - text: Rust API reference
+      link: /rust/verticopolis_engine/
+      icon: open-book
+      variant: minimal
+---
+
+import { Card, CardGrid } from "@astrojs/starlight/components";
+
+<CardGrid>
+  <Card title="JavaScript package" icon="seti:javascript">
+    The WebAssembly build as `@maniator/verticopolis-engine`, for Node and the browser. [Install and call it](/javascript/).
+  </Card>
+  <Card title="Rust crate" icon="seti:rust">
+    The `verticopolis-engine` crate, linked as a plain Rust library. [Add it to a host](/crate/), then read the [host API guide](/api/).
+  </Card>
+  <Card title="Conformance suite" icon="approve-check">
+    Scripted games with the state hash pinned at each checkpoint. [Prove your host runs the real simulation](/conformance/).
+  </Card>
+  <Card title="What changed" icon="list-format">
+    Each engine release is tagged `engine-v<version>`. Read the [changelog](/changelog/) before you move your pin.
+  </Card>
+</CardGrid>
+
+Your code owns everything a player sees and hears. The engine owns what happens in the tower. Frontends may differ; simulations may not.

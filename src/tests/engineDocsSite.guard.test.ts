@@ -1,35 +1,35 @@
 import { describe, expect, it } from "vitest";
-import { existsSync, readFileSync, readdirSync } from "node:fs";
-import { dirname, relative, resolve } from "node:path";
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import site from "../../docs/engine-site/pages.json";
 
 /**
  * The engine docs site (`docs/engine-site/`, served at docs.verticopolis.com)
- * is an mdBook whose pages include files the repository already keeps.
+ * is a Starlight site whose pages are files the repository already keeps,
+ * listed in its pages.json and copied in by its sync script before a build.
  * `.github/workflows/engine-docs.yml` builds and deploys it; that workflow's
- * own pull request run is the check on its wiring (AGENTS.md: no tests that
- * mirror CI config text). This guard checks the book's own sources: every
- * include names a real file, and every page is in the summary.
+ * own pull request run is the check on the build (AGENTS.md: no tests that
+ * mirror CI config text). This guard checks the list: every page and every
+ * alias names a real file, and every page is in the sidebar.
  */
 const root = resolve(__dirname, "..", "..");
-const site = resolve(root, "docs/engine-site/src");
-const read = (path: string) => readFileSync(resolve(root, path), "utf8");
-const pages = readdirSync(site).filter((name) => name.endsWith(".md") && name !== "SUMMARY.md");
-
-/** Every `{{#include path}}` in the site's pages, as repository paths. */
-const included = pages.flatMap((page) =>
-  [...readFileSync(resolve(site, page), "utf8").matchAll(/\{\{#include ([^}\s]+)\}\}/g)].map((m) => relative(root, resolve(dirname(resolve(site, page)), m[1]!)).replace(/\\/g, "/")),
-);
 
 describe("engine docs site", () => {
-  it("includes only files that exist", () => {
-    expect(included.length).toBeGreaterThanOrEqual(5);
-    for (const path of included) expect(existsSync(resolve(root, path)), `${path} exists`).toBe(true);
-    expect(included).toContain("packages/verticopolis-engine/README.md");
-    expect(included).toContain("engine-rs/CRATE_README.md");
+  it("builds its pages from files that exist", () => {
+    const sources = site.pages.map((page) => page.source);
+    expect(sources).toContain("packages/verticopolis-engine/README.md");
+    expect(sources).toContain("engine-rs/CRATE_README.md");
+    for (const path of sources) expect(existsSync(resolve(root, path)), `${path} exists`).toBe(true);
   });
 
-  it("lists every page in the summary", () => {
-    const summary = read("docs/engine-site/src/SUMMARY.md");
-    for (const page of pages) expect(summary, `SUMMARY.md links ${page}`).toContain(`(${page})`);
+  it("points each alias at a file that exists", () => {
+    const targets = Object.entries(site.aliases).filter(([key]) => key !== "$comment");
+    expect(targets.length).toBeGreaterThan(0);
+    for (const [, path] of targets) expect(existsSync(resolve(root, path)), `${path} exists`).toBe(true);
+  });
+
+  it("lists every page in the sidebar", () => {
+    const config = readFileSync(resolve(root, "docs/engine-site/astro.config.mjs"), "utf8");
+    for (const page of site.pages) expect(config, `the sidebar lists ${page.slug}`).toContain(`slug: "${page.slug}"`);
   });
 });

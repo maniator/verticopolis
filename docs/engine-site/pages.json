@@ -1,0 +1,40 @@
+{
+  "$comment": "The pages the engine docs site builds from files the repository already keeps. scripts/sync-pages.mjs copies each source into src/content/docs/<slug>.md before a build; src/tests/engineDocsSite.guard.test.ts checks every source exists.",
+  "aliases": {
+    "$comment": "Files the npm package gets copied in when it is packed (scripts/engine-package-files.sh), so the package README links them beside itself. A link to one goes to the file it is copied from.",
+    "packages/verticopolis-engine/CHANGELOG.md": "engine-rs/CHANGELOG.md",
+    "packages/verticopolis-engine/LICENSE": "LICENSE"
+  },
+  "pages": [
+    {
+      "source": "packages/verticopolis-engine/README.md",
+      "slug": "javascript",
+      "title": "JavaScript package",
+      "description": "Install and call the engine's WebAssembly build from Node or the browser."
+    },
+    {
+      "source": "engine-rs/CRATE_README.md",
+      "slug": "crate",
+      "title": "Rust crate",
+      "description": "Depend on the verticopolis-engine crate from a native Rust host."
+    },
+    {
+      "source": "engine-rs/API.md",
+      "slug": "api",
+      "title": "Host API guide",
+      "description": "Every call a Rust frontend makes, in full."
+    },
+    {
+      "source": "conformance/README.md",
+      "slug": "conformance",
+      "title": "Conformance suite",
+      "description": "The scripted games and pinned state hashes that prove a host runs the real engine."
+    },
+    {
+      "source": "engine-rs/CHANGELOG.md",
+      "slug": "changelog",
+      "title": "Engine changelog",
+      "description": "What changed in each engine release."
+    }
+  ]
+}

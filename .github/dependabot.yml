@@ -19,6 +19,20 @@ updates:
         patterns:
           - "*"
 
+  # The docs site (docs/engine-site/) is its own npm project; the same
+  # security-only rule covers its lockfile.
+  - package-ecosystem: npm
+    directory: /docs/engine-site
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 0
+    rebase-strategy: auto
+    groups:
+      docs-site-security:
+        applies-to: security-updates
+        patterns:
+          - "*"
+
   # Actions, unlike npm above, DO get routine version-update PRs. The pins in
   # .github/workflows are SHAs maintained by hand, and nothing else watches
   # them: they sat three and four majors behind through the whole Node 20
