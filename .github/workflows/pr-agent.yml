@@ -39,6 +39,9 @@ jobs:
       allowed: ${{ steps.gate.outputs.allowed }}
     env:
       PR_AGENT_COST_CAP_USD: '2.00'
+      # Second cap that does not depend on PR-Agent knowing the model's price:
+      # an unpriced model can print a $0.00 estimate for a real bill.
+      PR_AGENT_INPUT_TOKEN_CAP: '1000000'
       PR_AGENT_OVERRIDE_LABEL: pr-agent-override
     steps:
       - name: Compare the running total with the cap
@@ -47,23 +50,26 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
           PR: ${{ github.event.issue.number }}
-          OVERRIDE: ${{ contains(github.event.issue.labels.*.name, 'pr-agent-override') }}
+          LABELS: ${{ toJSON(github.event.issue.labels.*.name) }}
         run: |
           set -euo pipefail
           api="repos/$REPO/issues/$PR/comments"
           all=$(gh api --paginate "$api?per_page=100" | jq -s '[.[][]]')
-          ledger=$(jq -r 'map(select(.user.login == "github-actions[bot]" and (.body | contains("<!-- pr-agent-cost-ledger -->")))) | first | .body // ""' <<<"$all")
+          ledger=$(jq -r 'map(select(.user.login == "github-actions[bot]" and (.body | startswith("<!-- pr-agent-cost-ledger -->")))) | first | .body // ""' <<<"$all")
           data=$(printf '%s\n' "$ledger" | sed -n 's/.*<!-- pr-agent-cost-data: \(.*\) -->.*/\1/p' | head -n1)
           total=$(jq -r '(map(.cost) | add // 0) as $t | ($t * 100 | round) / 100' <<<"${data:-[]}")
-          echo "Running total \$$total, cap \$$PR_AGENT_COST_CAP_USD, override label present: $OVERRIDE"
-          if [ "$OVERRIDE" = "true" ] || awk -v t="$total" -v c="$PR_AGENT_COST_CAP_USD" 'BEGIN { exit !(t < c) }'; then
+          tokens=$(jq -r 'map(.tokens_in) | add // 0' <<<"${data:-[]}")
+          override=$(jq -r --arg l "$PR_AGENT_OVERRIDE_LABEL" 'index($l) != null' <<<"$LABELS")
+          echo "Running total \$$total of \$$PR_AGENT_COST_CAP_USD, $tokens of $PR_AGENT_INPUT_TOKEN_CAP input tokens, override label present: $override"
+          if [ "$override" = "true" ] || { awk -v t="$total" -v c="$PR_AGENT_COST_CAP_USD" 'BEGIN { exit !(t < c) }' \
+               && [ "$tokens" -lt "$PR_AGENT_INPUT_TOKEN_CAP" ]; }; then
             echo "allowed=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           echo "allowed=false" >> "$GITHUB_OUTPUT"
           note="<!-- pr-agent-cost-cap -->
-          PR-Agent did not run: this PR's runs have added up to about \$$total, which reaches the \$$PR_AGENT_COST_CAP_USD cap. To allow more runs, add the \`$PR_AGENT_OVERRIDE_LABEL\` label to the PR and comment the command again. The running total is in the \"PR-Agent cost on this PR\" comment."
-          existing=$(jq -r 'map(select(.user.login == "github-actions[bot]" and (.body | contains("<!-- pr-agent-cost-cap -->")))) | first | .id // empty' <<<"$all")
+          PR-Agent did not run: this PR's runs have added up to about \$$total and $tokens input tokens, which reaches the cap (\$$PR_AGENT_COST_CAP_USD or $PR_AGENT_INPUT_TOKEN_CAP input tokens). To allow more runs, add the \`$PR_AGENT_OVERRIDE_LABEL\` label to the PR and comment the command again. The running total is in the \"PR-Agent cost on this PR\" comment."
+          existing=$(jq -r 'map(select(.user.login == "github-actions[bot]" and (.body | startswith("<!-- pr-agent-cost-cap -->")))) | first | .id // empty' <<<"$all")
           if [ -n "$existing" ]; then
             gh api -X PATCH "repos/$REPO/issues/comments/$existing" -f body="$note" >/dev/null
           else
@@ -139,7 +145,7 @@ jobs:
                   calls: ($b | num("- AI calls: (?<n>[0-9]+)")),
                   cost: (($b | capture("Estimated API cost: \\$(?<n>[0-9.]+)").n | tonumber) // 0) } ]
             ' <<<"$all")
-          ledger=$(jq -c --arg m "$marker" 'map(select(.user.login == "github-actions[bot]" and (.body | contains($m)))) | first // empty' <<<"$all")
+          ledger=$(jq -c --arg m "$marker" 'map(select(.user.login == "github-actions[bot]" and (.body | startswith($m)))) | first // empty' <<<"$all")
           old='[]'
           id=''
           if [ -n "$ledger" ]; then
