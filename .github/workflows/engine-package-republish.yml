@@ -79,13 +79,23 @@ jobs:
           printf '//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}\n' > .npmrc
           versions="/users/$OWNER/packages/npm/verticopolis-engine/versions"
           id="$(gh api --paginate "$versions" --jq ".[] | select(.name == \"$VERSION\") | .id")"
+          # npm refuses to move "latest" back to an older version, so an older
+          # version goes up under its own dist-tag and "latest" stays put.
+          # Read before the delete, so a failed request cannot strand a deleted version.
+          newest="$(gh api --paginate "$versions" --jq '.[].name' | sort -V | tail -n 1)"
+          tag_args=""
+          if [ -n "$newest" ] && [ "$(printf '%s\n%s\n' "$newest" "$VERSION" | sort -V | tail -n 1)" != "$VERSION" ]; then
+            tag_args="--tag release-$VERSION"
+            echo "$newest is newer, so $VERSION is published under the dist-tag release-$VERSION (npm refuses a tag that reads as a version range)."
+          fi
           if [ -n "$id" ]; then
             gh api -X DELETE "$versions/$id"
             echo "Deleted $NPM_NAME@$VERSION (package version $id)."
           else
             echo "$NPM_NAME@$VERSION is not published; publishing it."
           fi
-          if ! npm publish --registry https://npm.pkg.github.com; then
+          # shellcheck disable=SC2086
+          if ! npm publish --registry https://npm.pkg.github.com $tag_args; then
             if [ -n "$id" ]; then
               gh api -X POST "$versions/$id/restore"
               echo "::error::Publishing failed, so the deleted $NPM_NAME@$VERSION was restored as it was."
