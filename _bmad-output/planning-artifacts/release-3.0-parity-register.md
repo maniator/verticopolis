@@ -156,13 +156,13 @@ catalog handle (`src/catalog/towerCatalog.ts`) lost its TypeScript default
 (`src/preview.ts`) reads the engine's catalog as the sprite gallery does, and
 the TypeScript panel adapter moved to `src/tests/conformance/tsPanels.ts`. An
 ESLint rule (`eslint.config.js`) now refuses a runtime import of the engine in
-any shipped file, so the files left are tooling.
+any shipped file, so the files left are tooling. The sprite atlas bake
+(`src/render/atlas/archive.ts`, `src/render/atlas/browserEntry.ts`) left the list in #1875's
+catalog step: it reads the engine's own catalog from the engine package.
 
 | File | Runs in the shipped game | Decides gameplay | Disposition | Owner |
 | --- | --- | --- | --- | --- |
 | `src/game/toolingSim.ts` | no: `vite.config.ts` swaps it for `src/game/toolingSimAbsent.ts` in every build but a `VC_TOOLING=1` one (#921) | no | tooling only | #1875 (it constructs the TypeScript port, 2b) |
-| `src/render/atlas/archive.ts` | only when the sprite atlas is built | no | tooling only | #1875 |
-| `src/render/atlas/browserEntry.ts` | only on the atlas page | no | tooling only | #1875 |
 
 ### 2b. The shipped bundle
 

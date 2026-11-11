@@ -8,8 +8,9 @@ import { refuseForeignCatalogs } from "./catalogCheck";
  * (`rustEngine.ts`): a catalog that lists other facility kinds than this build
  * draws, or lays the ground floor with one it does not, is refused, and so are
  * two modes that state different worlds, naming what differs. The catalogs here
- * are the TypeScript engine's, which the catalog digests pin to the Rust
- * engine's (`conformance/catalog-digests.json`). Reading a catalog the build
+ * are the TypeScript reference engine's, used only as sample input; the game
+ * reads the Rust engine's, which `conformance/catalog-digests.json` pins.
+ * Reading a catalog the build
  * cannot parse (its version, a kind listed twice) is `readCatalog`'s, in
  * `src/dualrun/catalog.test.ts`.
  */

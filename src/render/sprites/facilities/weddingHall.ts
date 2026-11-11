@@ -400,6 +400,16 @@ export function drawWeddingHall(d: DrawCtx, u: UnitView, x: number, y: number, w
   if (stories < 2) return drawWeddingNave(d, u, x, y, w, h);
   const story = Math.max(1, Math.round(h / stories));
   const crownH = Math.max(1, Math.round(h) - story);
-  drawWeddingGarden(d, x, y, w, crownH, story);
-  drawWeddingNave(d, u, x, y + crownH, w, story);
+  // The garden picks hedge and bloom colors from pixel columns, so it draws
+  // from the hall's own origin: the same hall then looks the same wherever it
+  // falls on the shared region canvas, and the atlas can bake it once.
+  const ctx = d.ctx;
+  ctx.save();
+  ctx.translate(x, y);
+  try {
+    drawWeddingGarden(d, 0, 0, w, crownH, story);
+    drawWeddingNave(d, u, 0, crownH, w, story);
+  } finally {
+    ctx.restore();
+  }
 }

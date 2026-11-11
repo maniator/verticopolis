@@ -244,10 +244,10 @@ review skill. The BMAD agent rules live in `_bmad-output/project-context.md`.
   publishes them, with every price, size and mode rule a frontend shows,
   through the catalog (`engine-rs/src/catalog.rs`); the web UI reads that
   catalog and no TypeScript table (the mode-name choices the UI still makes
-  are tracked on #1621). Until the TypeScript reference engine is deleted,
-  `src/engine/facilities.ts` keeps a copy that
-  `conformance/catalog-digests.json` pins to the Rust one, so a changed cap
-  moves the digest in both: change the Rust side first, then the copy.
+  are tracked on #1621). `conformance/catalog-digests.json` is written from
+  the Rust catalog alone, so a changed cap moves that digest in the PR that
+  changes it. The TypeScript reference's tables (`src/engine/facilities.ts`)
+  are no longer pinned and need no matching edit.
 - **Transport pooling matches the original and is deliberate:** all three
   elevator kinds (standard + service + express) share **one 24-shaft pool**, and
   express is **not** counted separately. Stairs + escalators share a separate

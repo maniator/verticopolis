@@ -174,7 +174,7 @@ fn main() {
 }
 
 /// Each mode's catalog digest against `catalog-digests.json`, the lock the
-/// TypeScript engine writes from its own tables.
+/// WASM suite writes from this catalog.
 fn check_catalogs(root: &std::path::Path) -> Result<(), String> {
     use verticopolis_engine::catalog::catalog_digest;
     use verticopolis_engine::clock::GameMode;

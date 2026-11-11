@@ -23,7 +23,7 @@ import {
 import { FLOOR, TILE } from "../scale";
 import { skyColor } from "../sprites/sky";
 import { SHIRTS } from "../pixelSprites/common";
-import { catalogFor } from "../../engine/catalog";
+import type { Catalog } from "../../catalog/catalogTypes";
 import { bindViewWorld } from "../../presentation/viewWorld";
 import { bindViewKinds } from "../../presentation/viewKinds";
 
@@ -43,6 +43,10 @@ export interface ArchiveInfo {
   licenseText: string;
   /** The app icon files, shipped under `icon/` by name. */
   icons?: Record<string, Uint8Array>;
+  /** The engine's Modern catalog the art was drawn with. The archive reads
+   *  room and scenery facts through the view, and Node's archive builder runs
+   *  apart from the page that baked the art, so it binds its own view to this. */
+  catalog: Catalog;
 }
 
 export const ARCHIVE_ROOT = "verticopolis-atlas";
@@ -146,12 +150,8 @@ export function buildArchive(
   onProgress?: (msg: string) => void,
   pageSize: number = ATLAS_PAGE_BASE,
 ): Archive {
-  // Node's archive builder runs in a separate realm from browserEntry's atlas
-  // bake, so it must bind its own catalog before reading room/scenery data.
-  // Offline atlas tooling deliberately uses the parity-locked TS catalog.
-  const atlasCatalog = catalogFor("modern");
-  bindViewWorld(atlasCatalog.world);
-  bindViewKinds(atlasCatalog);
+  bindViewWorld(info.catalog.world);
+  bindViewKinds(info.catalog);
   const packed = packGroups(bake, pageSize);
   onProgress?.(`packed ${bake.images.length} images into ${packed.pages} pages`);
   const pages: Image[] = Array.from({ length: packed.pages }, () => blank(pageSize, pageSize));

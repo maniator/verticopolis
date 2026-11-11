@@ -3,10 +3,10 @@
  * or a placement ghost from, resolved for one mode so a frontend never applies
  * a rule itself. The Rust engine owns the same catalog (`engine-rs/src/catalog.rs`,
  * exported through the WASM binding as `catalog(mode)`); this module builds it
- * from the TypeScript engine's own tables, and
- * `conformance/catalog-digests.json` pins the canonical hash of each mode's
- * catalog (`src/tests/integration/catalog.integration.test.ts`), so the two
- * engines cannot quote a different price or size while both exist.
+ * from the TypeScript engine's own tables for the tests that still run this
+ * engine. It is not pinned: `conformance/catalog-digests.json` is written from
+ * the Rust catalog alone, so these tables can trail it until this folder is
+ * deleted (#1875).
  *
  * The shape is the contract: keys are camelCase, a value a kind does not have
  * is present as `null`, and facilities come in the engine's catalog order.

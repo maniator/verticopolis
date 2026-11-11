@@ -121,10 +121,10 @@ touch.
 
 `catalog-digests.json` pins the canonical hash of each mode's catalog: the
 prices, sizes and build rules a frontend reads from the engine
-(`src/engine/catalog.ts`, `engine-rs/src/catalog.rs`). The TypeScript run
-writes it (`src/tests/integration/catalog.integration.test.ts`, regenerated
-with `VC_CONFORMANCE_UPDATE=1 npx vitest run --project integration catalog`);
-a Rust crate test, `cargo run --release --features conformance --bin conformance` and the WASM suite
+(`engine-rs/src/catalog.rs`). The WASM suite writes it from the binding's
+`catalog(mode)` (`src/tests/integration/conformanceWasm.integration.test.ts`,
+regenerated with `VC_CONFORMANCE_UPDATE=1 npx vitest run --project integration
+conformanceWasm`, the engine package built); a Rust crate test, `cargo run --release --features conformance --bin conformance` and the WASM suite
 check against it. A moved digest means a price, a size or a build rule some
 frontend shows has changed: regenerate it on purpose only, in the same pull
 request, saying why.

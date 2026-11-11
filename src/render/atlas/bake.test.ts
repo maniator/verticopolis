@@ -1,3 +1,4 @@
+import { catalogFor } from "../../engine/catalog";
 import { strFromU8, strToU8, unzipSync } from "fflate";
 import { describe, expect, it } from "vitest";
 import { buildArchive, checkLayers, checkPages, kindsWithoutFurniture, signature, softLayerDrift, ARCHIVE_ROOT } from "./archive";
@@ -99,6 +100,7 @@ describe("bake", () => {
       commit: "abc",
       attribution: "Art by someone, CC BY 4.0.",
       licenseText: "# License\n",
+      catalog: catalogFor("modern"),
       icons: { "icon.svg": strToU8("<svg/>\n") },
     };
     // Simulate a fresh standalone Node atlas exporter: it has not imported
@@ -128,7 +130,7 @@ describe("bake", () => {
     expect(m.pageSize).toBe(32);
   });
   it("the packed pages and the manifest give back every frame and layer pixel for pixel", () => {
-    const info = { version: "1", commit: "x", attribution: "a", licenseText: "" };
+    const info = { version: "1", commit: "x", attribution: "a", licenseText: "", catalog: catalogFor("modern") };
     const wide: Job = { type: "still", name: "wide", w: 70, h: 1, anchor: { x: 0, y: 0 }, keys: {}, paint: solid("7") };
     const r2 = bake([...jobs, wide], fake);
     const a = buildArchive(r2, info, undefined, 32);
@@ -184,7 +186,7 @@ describe("bake", () => {
   });
   it("refuses a layer too wide for one page", () => {
     const wide: Job = { type: "still", name: "w", w: 60, h: 1, anchor: { x: 0, y: 0 }, keys: {}, paint: car(0), overlays: { o: car(60) } };
-    const info = { version: "1", commit: "x", attribution: "a", licenseText: "" };
+    const info = { version: "1", commit: "x", attribution: "a", licenseText: "", catalog: catalogFor("modern") };
     expect(() => buildArchive(bake([wide], fake), info, undefined, 32)).toThrow(/layers must fit one page/);
   });
 });
@@ -229,7 +231,7 @@ describe("depth layers", () => {
   ];
   const layered = bake(jobs, layeredFake);
   const flat = bake(jobs, flatFake);
-  const info = { version: "1", commit: "x", attribution: "a", licenseText: "" };
+  const info = { version: "1", commit: "x", attribution: "a", licenseText: "", catalog: catalogFor("modern") };
   const byName = (r: typeof layered, n: string) => r.frames.find((f) => f.name === n)!;
 
   it("splits only frames that ask for it and whose paint marks a break", () => {
@@ -369,7 +371,7 @@ describe("depth layers on occupant steps", () => {
   });
   const stats = { softDropped: [] as string[] };
   const r = bake([room("lit"), room("fading", true)], litFake, undefined, stats);
-  const info = { version: "1", commit: "x", attribution: "a", licenseText: "" };
+  const info = { version: "1", commit: "x", attribution: "a", licenseText: "", catalog: catalogFor("modern") };
   const lit0 = r.frames.find((f) => f.name === "lit")!;
 
   it("puts a light that switches on with the first occupant on the shell, and the occupants in front", () => {

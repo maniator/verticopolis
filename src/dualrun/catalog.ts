@@ -7,8 +7,8 @@ import type { WasmModule } from "./binding";
  * canonical JSON in the shape of {@link Catalog} (declared in
  * `src/catalog/catalogTypes.ts`, which carries no engine tables), so a
  * frontend reads every price, size and build rule from the engine instead of
- * from the TypeScript tables. `conformance/catalog-digests.json` holds the
- * two engines to the same text.
+ * from TypeScript tables. `conformance/catalog-digests.json` pins its
+ * canonical text.
  */
 export { CATALOG_VERSION } from "../catalog/catalogTypes";
 export type {
@@ -29,8 +29,8 @@ export type {
  *  against), another mode's catalog, and a reply whose shape is not
  *  {@link Catalog}: every field present with its type, amounts finite and not
  *  negative, sizes whole and positive, and the cross references (pool keys and
- *  kinds, the ground floor structure) naming a listed facility. The lock holds
- *  the two engines to one text; this check stops a stale or damaged binding of
+ *  kinds, the ground floor structure) naming a listed facility. The lock pins
+ *  the engine's text; this check stops a stale or damaged binding of
  *  the same version from handing a frontend a wrong price or a missing field. */
 export function readCatalog(mod: Pick<WasmModule, "catalog">, mode: GameMode, version: number = CATALOG_VERSION): Catalog {
   if (typeof mod.catalog !== "function") throw new Error("the WASM binding exports no catalog; rebuild it");

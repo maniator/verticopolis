@@ -65,8 +65,32 @@ jobs:
           echo "sha=$sha" >> "$GITHUB_OUTPUT"
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
-  build:
+  # The bake draws with the engine's own catalog, read from the engine WASM
+  # package (scripts/atlas-catalog.ts). The pinned Playwright image has no Rust
+  # toolchain, so the package is built (or restored from cache) here and the
+  # build job downloads it.
+  engine-wasm:
     needs: resolve
+    runs-on: ubuntu-latest
+    # A cache miss compiles the crate (a few minutes); anything near this is a hang.
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.resolve.outputs.sha }}
+          persist-credentials: false
+
+      - name: Use Node.js (from .nvmrc)
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: ".nvmrc"
+
+      - uses: ./.github/actions/engine-wasm
+        with:
+          artifact-name: atlas-engine-wasm
+
+  build:
+    needs: [resolve, engine-wasm]
     runs-on: ubuntu-latest
     # A full bake takes about eight minutes; anything near this is a hang.
     timeout-minutes: 45
@@ -91,6 +115,10 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - uses: ./.github/actions/engine-wasm-download
+        with:
+          artifact-name: atlas-engine-wasm
 
       # The export launches Playwright's own Chromium from the image (the
       # binary the e2e comparison uses), checks the atlas against the game's

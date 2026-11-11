@@ -4,15 +4,16 @@ use serde_json::Value;
 
 use crate::facilities::Kind;
 
-/// The kinds whose footprint (`width` and `floors`) the shared lock does not
-/// pin. Only the Rust engine builds the wedding hall as the 28 wide, five story
-/// cathedral; the TypeScript engine keeps its one story hall, so the lock holds
-/// both engines to every other number in the entry and leaves the footprint out.
+/// The kinds whose footprint (`width` and `floors`) the lock does not pin. The
+/// exemption dates from when the lock also pinned the TypeScript engine, which
+/// keeps a one story wedding hall where this engine builds the 28 wide, five
+/// story cathedral. The WASM suite pins the hall's footprint directly; dropping
+/// the exemption moves the lock.
 pub const LOCK_FOOTPRINT_EXEMPT: [Kind; 1] = [Kind::WeddingHall];
 
 /// `catalog` with the footprint of each `LOCK_FOOTPRINT_EXEMPT` kind set to
-/// `null`: the text `conformance/catalog-digests.json` hashes. The TypeScript
-/// side does the same in `src/engine/catalogLockView.ts`.
+/// `null`: the text `conformance/catalog-digests.json` hashes. The WASM suite
+/// does the same in `src/tests/conformance/catalogLockView.ts`.
 pub fn lock_view(catalog: &Value) -> Value {
     let mut view = catalog.clone();
     if let Some(entries) = view["facilities"].as_array_mut() {

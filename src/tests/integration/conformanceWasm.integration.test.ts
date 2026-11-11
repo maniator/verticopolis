@@ -3,9 +3,8 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { CONFORMANCE_DIR, firstDivergence, loadScenario, runScenario, type Checkpoint, type EngineStart } from "../conformance/scenario";
 import { hasWasmPackage, startWasmEngine, startWasmHandle, wasm, wasmEngine, wasmRequired } from "../conformance/wasmEngine";
-import { CATALOG_VERSION, catalogFor } from "../../engine/catalog";
-import { readCatalog } from "../../dualrun/catalog";
-import { catalogLockView } from "../../engine/catalogLockView";
+import { CATALOG_VERSION, readCatalog } from "../../dualrun/catalog";
+import { catalogLockView } from "../conformance/catalogLockView";
 import { canonicalJson, digest } from "../conformance/canonical";
 import { done } from "../../simport/engineSubject.fixture";
 import { writeAfterPassingRun, writeGoldenFile } from "../goldens/updateGate";
@@ -18,13 +17,17 @@ import { writeAfterPassingRun, writeGoldenFile } from "../goldens/updateGate";
  * with `VC_CONFORMANCE_UPDATE=1 npx vitest run --project integration
  * conformanceWasm` (the engine package built) and commit it with intent. The
  * native Rust runner (`cargo run --features conformance --bin conformance`)
- * checks the same lock and never writes it. The binding is built by
+ * checks the same lock and never writes it. The catalog lock
+ * (`conformance/catalog-digests.json`) is written by the same run from the
+ * binding's `catalog(mode)`, the only catalog the game reads. The binding is built by
  * `npm run wasm:build`; without it the suite skips, unless `VC_REQUIRE_WASM=1`
  * (CI builds it and sets the switch, so a missing package fails there).
  */
 
 const SCENARIO_DIR = resolve(CONFORMANCE_DIR, "scenarios");
 const LOCK = resolve(CONFORMANCE_DIR, "expected.json");
+const CATALOG_LOCK = resolve(CONFORMANCE_DIR, "catalog-digests.json");
+const CATALOG_MODES = ["classic", "modern"] as const;
 const UPDATE = process.env.VC_CONFORMANCE_UPDATE === "1";
 if (UPDATE && process.env.CI) throw new Error("VC_CONFORMANCE_UPDATE is a local regeneration switch and never runs in CI");
 
@@ -57,6 +60,16 @@ writeAfterPassingRun(
   UPDATE,
   () => files.map((f) => f.replace(/\.json$/, "")).filter((id) => !fresh.scenarios[id]),
   () => writeLock(fresh),
+);
+
+type CatalogLock = { catalogs: Record<string, string> };
+const catalogLock = JSON.parse(readFileSync(CATALOG_LOCK, "utf8")) as CatalogLock;
+const freshCatalogs: CatalogLock = { catalogs: {} };
+writeAfterPassingRun(
+  "catalog lock",
+  UPDATE,
+  () => CATALOG_MODES.filter((mode) => !freshCatalogs.catalogs[mode]),
+  () => writeGoldenFile(CATALOG_LOCK, `${JSON.stringify({ catalogs: Object.fromEntries(CATALOG_MODES.map((m) => [m, freshCatalogs.catalogs[m]])) }, null, 2)}\n`),
 );
 
 describe.skipIf(!hasWasmPackage())("engine conformance through the WASM binding", () => {
@@ -115,22 +128,20 @@ describe.skipIf(!hasWasmPackage())("engine conformance through the WASM binding"
     }, 60_000);
   }
 
-  // The catalog the binding hands a frontend is the TypeScript engine's, field
-  // for field, and its text is the canonical form the lock hashes. The one
-  // exception is the wedding hall's footprint (28 wide, five stories here, one
-  // story in the TypeScript engine), which the lock view leaves out.
-  const catalogLock = JSON.parse(readFileSync(resolve(CONFORMANCE_DIR, "catalog-digests.json"), "utf8")) as { catalogs: Record<string, string> };
-  for (const mode of ["classic", "modern"] as const) {
-    it(`catalog(${mode}) matches the TypeScript catalog and the lock`, () => {
+  // The catalog the binding hands a frontend is the one the lock pins, and its
+  // text is the canonical form the lock hashes. The Rust catalog is the only
+  // source: the lock is written from it, never from a TypeScript table. The
+  // lock view leaves out the wedding hall's footprint, so it is pinned here.
+  for (const mode of CATALOG_MODES) {
+    it(`catalog(${mode}) is canonical and matches the lock`, () => {
       const { catalog } = wasm();
       if (typeof catalog !== "function") throw new Error("the WASM package predates catalog(mode); run npm run wasm:build");
       const text = catalog(mode);
       const got = readCatalog(wasm(), mode);
-      const want = catalogFor(mode);
-      expect(catalogLockView(got)).toEqual(catalogLockView(want));
-      expect(canonicalJson(catalogLockView(JSON.parse(text)))).toBe(canonicalJson(catalogLockView(want)));
-      expect(digest(catalogLockView(JSON.parse(text)))).toBe(catalogLock.catalogs[mode]);
-      // Outside the exempt footprint the engines agree; inside it the Rust hall is the cathedral.
+      expect(canonicalJson(catalogLockView(JSON.parse(text)))).toBe(canonicalJson(catalogLockView(got)));
+      const hash = digest(catalogLockView(got));
+      if (UPDATE) freshCatalogs.catalogs[mode] = hash;
+      else expect(hash).toBe(catalogLock.catalogs[mode]);
       const hall = got.facilities.find((f) => f.key === "weddingHall");
       expect(hall).toMatchObject({ width: 28, floors: 5 });
     });

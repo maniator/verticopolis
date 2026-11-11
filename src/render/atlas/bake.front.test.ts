@@ -1,3 +1,4 @@
+import { catalogFor } from "../../engine/catalog";
 import { describe, expect, it } from "vitest";
 import { buildArchive, checkLayers } from "./archive";
 import { bake, type Renderer } from "./bake";
@@ -59,7 +60,7 @@ describe("a vehicle's front picture", () => {
   });
   it("composes back, riders and front to the flat frame at every rider count", () => {
     for (let n = 0; n <= 4; n++) expect(sameImage(composeLayered(r, f, { riders: n }), composeFrame(r, f, { riders: n })), `n=${n}`).toBe(true);
-    const info = { version: "1", commit: "x", attribution: "a", licenseText: "" };
+    const info = { version: "1", commit: "x", attribution: "a", licenseText: "", catalog: catalogFor("modern") };
     expect(checkLayers(buildArchive(r, info, undefined, 32))).toEqual([]);
   });
   it("puts the riders, and only the riders, between the interior and the front", () => {
@@ -71,7 +72,7 @@ describe("a vehicle's front picture", () => {
     expect(red(only("front"))).toEqual([90, 0, 0, 90, 0, 90]);
   });
   it("flags front steps without a front, and a front with soft furniture", () => {
-    const info = { version: "1", commit: "x", attribution: "a", licenseText: "" };
+    const info = { version: "1", commit: "x", attribution: "a", licenseText: "", catalog: catalogFor("modern") };
     const a = buildArchive(r, info, undefined, 32);
     const rec = a.manifest.frames.bus;
     const orphan = { ...rec, layers: { ...rec.layers!, front: undefined } };
