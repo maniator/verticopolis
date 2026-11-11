@@ -1,5 +1,5 @@
 {
-  "version": 12,
+  "version": 13,
   "header": {
     "minutes": 0,
     "towerRevision": 1,
@@ -39,9 +39,10 @@
     "quarter": 35,
     "year": 36,
     "weekDays": 37,
-    "weekendDays": 38
+    "weekendDays": 38,
+    "bombSearchSeq": 39
   },
-  "headerWidth": 39,
+  "headerWidth": 40,
   "person": {
     "id": 0,
     "seed": 1,

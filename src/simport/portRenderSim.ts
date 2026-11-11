@@ -71,6 +71,9 @@ export class PortRenderSim implements RenderSim {
   get treasureFx() {
     return this.reader.header.fx.treasure;
   }
+  get bombSearch() {
+    return this.reader.header.bombSearch;
+  }
 
   /** The reader's clock, set from its header on each read without allocating. */
   get clock(): ClockReads {

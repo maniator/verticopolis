@@ -247,6 +247,7 @@ evidence is one the golden does not cover, or covers only in part.
 | `logText` | view | proven same | `src/tests/integration/tsEngine.golden.integration.test.ts` |
 | `view` | view | proven same | `src/tests/integration/tsEngine.golden.integration.test.ts` |
 | `pendingChoice` | view | proven same | `src/tests/integration/conformanceWasm.integration.test.ts` (the ransom and fire-rescue scenarios, through `src/tests/conformance/wasmEngine.ts`), browser `e2e/integration.spec.ts` |
+| `bombSearch` | view | intentionally different (approved) | native `engine-rs/src/events_bomb_tests.rs`; Classic's timed bomb search runs in the Rust engine only (#349, which the owner made a 3.x P1 on 2026-11-11). The TypeScript reference answers a ransom at once and has no such member (the member is optional on the interface) |
 | `buildAt` | command | proven same | `src/tests/integration/tsEngine.golden.integration.test.ts` |
 | `paintTiles` | command | proven same | `src/tests/integration/tsEngine.golden.integration.test.ts` |
 | `buildShaft` | command | proven same | `src/tests/integration/tsEngine.golden.integration.test.ts` |

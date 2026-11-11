@@ -66,6 +66,8 @@ export interface HeaderView {
   /** The bulletin log's monotonic cursor. */
   readonly logSeq: number;
   readonly pendingChoice: PendingChoiceView | null;
+  /** Classic's bomb search while one runs, else null. */
+  readonly bombSearch: BombSearchView | null;
   /** The game clock in minutes since the start. */
   readonly minutes: number;
   readonly minuteOfDay: number;
@@ -120,6 +122,17 @@ export interface FxView {
   readonly explosion: { readonly floor: number; readonly x: number; readonly seq: number };
   readonly thief: { readonly caught: boolean; readonly floor: number; readonly seq: number };
   readonly treasure: { readonly floor: number; readonly x: number; readonly seq: number };
+}
+
+/** Classic's bomb search: the minute the bomb goes off, the floors guards
+ *  are sweeping now and the floors already clear. The engine keeps the
+ *  bomb's hiding place to itself. */
+export interface BombSearchView {
+  readonly deadline: number;
+  /** Each floor a guard is on, with the tile span of its rooms. */
+  readonly sweeping: readonly { readonly floor: number; readonly left: number; readonly right: number }[];
+  readonly searched: readonly number[];
+  readonly seq: number;
 }
 
 /** An emergency waiting on the player's answer. */

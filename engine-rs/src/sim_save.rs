@@ -92,12 +92,17 @@ impl Serialize for Field<'_> {
             // `EventSystem::save_state`'s object; `pending` is a literal null
             // when there is no choice.
             Field::Events(e) => {
-                let mut m = s.serialize_map(Some(3))?;
+                let mut m = s.serialize_map(Some(3 + usize::from(e.bomb.is_some())))?;
                 m.serialize_entry("lastSantaYear", &json!(e.last_santa_year))?;
                 m.serialize_entry("rngState", &json!(e.extra.seed()))?;
                 match &e.pending {
                     Some(p) => m.serialize_entry("pending", &Pending(p))?,
                     None => m.serialize_entry("pending", &Value::Null)?,
+                }
+                // Written only while a search runs, so a save without one
+                // keeps its exact shape.
+                if let Some(b) = &e.bomb {
+                    m.serialize_entry("bomb", &b.save_state())?;
                 }
                 m.end()
             }

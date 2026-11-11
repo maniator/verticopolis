@@ -102,6 +102,7 @@ impl Simulation {
             self.dispatch_housekeepers();
         }
         self.finish_construction();
+        self.advance_bomb_search();
 
         let hour = self.clock.hour();
         if hour != self.last_hour {

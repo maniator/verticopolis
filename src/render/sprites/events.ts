@@ -225,6 +225,14 @@ function drawGuardFigure(ctx: CanvasRenderingContext2D, x: number, footY: number
   px(2, -29, 2, 2, "rgba(255,64,64,0.92)"); // alert beacon
 }
 
+/** A guard sweeping a floor for Classic's bomb, feet at (x, footY), sized by
+ *  `s`: the same figure that trails a caught thief. */
+export function drawSearchGuard(ctx: CanvasRenderingContext2D, x: number, footY: number, s: number): void {
+  ctx.save();
+  drawGuardFigure(ctx, x, footY, s);
+  ctx.restore();
+}
+
 /**
  * A masked thief slinking rightward with a swag sack, feet at (x, y). When
  * `caught`, a security guard trails close behind with an alert light. Drawn in

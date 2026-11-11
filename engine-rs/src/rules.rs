@@ -158,6 +158,20 @@ impl GameMode {
             )
     }
 
+    /// Whether a declined bomb ransom starts a timed search (SimTower's
+    /// guards against a deadline, `events_bomb.rs`). Modern answers it at
+    /// once: defused when the tower has Security, a blast when it has none.
+    pub fn bomb_search_is_timed(self) -> bool {
+        self == GameMode::Classic
+    }
+
+    /// Whether the ransom call needs a Security office in the tower first:
+    /// the SimTower manual has terrorists strike only a tower with security
+    /// personnel. Modern rolls it at four stars either way.
+    pub fn ransom_needs_security(self) -> bool {
+        self == GameMode::Classic
+    }
+
     pub fn walkway_willingness_applies(self) -> bool {
         self == GameMode::Classic
     }

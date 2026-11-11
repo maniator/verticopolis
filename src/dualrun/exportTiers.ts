@@ -122,6 +122,7 @@ export const BINDING_EXPORT_TIERS = {
   unitAt: T2,
   transportAt: T2,
   pendingChoice: T2,
+  bombSearch: T2,
   elevatorTelemetry: T2,
   housekeepingReport: T2,
   loopMemos: T2,

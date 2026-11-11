@@ -4,7 +4,7 @@ import { catalogFacility } from "../../catalog/catalogTypes";
 import { towerCatalog } from "../../catalog/towerCatalog";
 import { viewWorld } from "../../presentation/viewWorld";
 import type { TransportView } from "../../simport/view";
-import { drawExplosion, drawThief, drawTreasure, drawVipLimo } from "../sprites/events";
+import { drawExplosion, drawSearchGuard, drawThief, drawTreasure, drawVipLimo } from "../sprites/events";
 import { FLOOR, TILE } from "../scale";
 import type { ScreenRect } from "./towerInputCamera";
 import type { TowerEngine } from "./TowerEngine";
@@ -131,6 +131,7 @@ export function drawOverlay(engine: TowerEngine, ctx: CanvasRenderingContext2D):
   ctx.clearRect(0, 0, engine.viewWidth, engine.viewHeight);
   drawShaftNumbers(engine, ctx);
   drawRain(engine, ctx);
+  renderBombSearch(engine, ctx);
   renderExplosions(engine, ctx);
   renderTreasures(engine, ctx);
   renderVip(engine, ctx);
@@ -138,6 +139,38 @@ export function drawOverlay(engine: TowerEngine, ctx: CanvasRenderingContext2D):
   drawPreview(engine, ctx);
   drawSelection(engine, ctx);
   drawRuler(engine, ctx);
+}
+
+/** The countdown text: hours and minutes of game time left. */
+export function bombCountdownText(minutesLeft: number): string {
+  const left = Math.max(0, Math.ceil(minutesLeft));
+  return `💣 Bomb search: ${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")} left`;
+}
+
+/** Classic's bomb search: a guard pacing each floor being swept, and the
+ *  time left before the deadline. Under reduced motion the guards stand at
+ *  their floor's middle. */
+function renderBombSearch(engine: TowerEngine, ctx: CanvasRenderingContext2D): void {
+  const search = engine.sim.bombSearch;
+  if (!search) return;
+  const scale = Math.max(0.9, engine.cam.zoom);
+  for (const { floor, left, right } of search.sweeping) {
+    const phase = engine.reducedMotion ? 0.5 : 0.5 + 0.5 * Math.sin(engine.d.anim * 0.8 + floor);
+    const x = engine.worldToScreenX(left + (right - left) * phase);
+    const y = engine.worldToScreenY(floor) + FLOOR * engine.cam.zoom;
+    drawSearchGuard(ctx, x, y, scale);
+  }
+  const text = bombCountdownText(search.deadline - engine.sim.clock.minutes);
+  ctx.save();
+  ctx.font = "bold 14px sans-serif";
+  const w = ctx.measureText(text).width + 16;
+  const x = (engine.viewWidth - w) / 2;
+  ctx.fillStyle = "rgba(120,16,16,0.85)";
+  ctx.fillRect(x, 8, w, 24);
+  ctx.fillStyle = "#ffffff";
+  ctx.textBaseline = "middle";
+  ctx.fillText(text, x + 8, 20);
+  ctx.restore();
 }
 
 /** Bomb-blast flashes at their epicenters, projected to screen (see syncEventFx). */

@@ -60,6 +60,13 @@ export class Engine {
      */
     beginExtend(id: number): boolean;
     /**
+     * Classic's bomb search while one runs, as JSON `{ deadline, sweeping,
+     * searched, seq }` (`sweeping` holds `{ floor, left, right }` for each
+     * floor a guard is on, `searched` the floors already clear), or null. The bomb's hiding place stays out. A host reads it
+     * when the frame's `bombSearchSeq` moves.
+     */
+    bombSearch(): string | undefined;
+    /**
      * Tooling: a bomb threat, outside an open gesture as a fire is.
      */
     bombThreat(): void;

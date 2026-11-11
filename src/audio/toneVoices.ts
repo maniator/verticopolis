@@ -212,5 +212,10 @@ export function playSfx(voices: SfxVoices, name: SfxName): void {
       // A single ping on G4: the onboarding step chime and other small nudges.
       strikeBell(voices, 67, t, 0.7);
       break;
+    case "tick":
+      // The bomb's clock: a dry, very short high blip, once a second while
+      // Classic's bomb search runs.
+      swoopBloop(voices.bloop2, voices, 1400, 1100, 0.02, t, 0.35, 0.03);
+      break;
   }
 }
