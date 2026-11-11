@@ -170,9 +170,40 @@ impl Simulation {
     /// joins it, so guards already out move on from the minutes they
     /// finished, and an office opening late in a long step cannot take a
     /// floor they reached first (or join a search that already ended).
+    /// A Security office that opens inside the step joins at the minute it
+    /// opened (Modern), after the search has run up to that minute, so a
+    /// long step plays out as shorter ones would. The clock is set back to
+    /// each opening only for that catch-up, then restored.
     pub(crate) fn finish_construction_and_search(&mut self) {
+        if self.events.bomb.is_some() && self.mode.security_joins_bomb_search() {
+            let now = self.clock.minutes;
+            for at in self.security_openings_by(now) {
+                self.clock.minutes = at;
+                self.advance_bomb_search();
+                self.finish_construction();
+                self.clock.minutes = now;
+                if self.events.bomb.is_none() {
+                    break;
+                }
+            }
+        }
         self.advance_bomb_search();
         self.finish_construction();
+    }
+
+    /// The minutes at which Security offices still under construction open
+    /// by `now`, earliest first. Empty when nothing is being built.
+    fn security_openings_by(&self, now: f64) -> Vec<f64> {
+        let mut at: Vec<f64> = self
+            .constructing
+            .iter()
+            .filter_map(|id| self.tower.get_unit(*id))
+            .filter(|u| u.kind == Kind::Security && u.state == UnitState::Construction)
+            .filter_map(|u| u.extras().complete_at)
+            .filter(|t| *t <= now)
+            .collect();
+        at.sort_by(f64::total_cmp);
+        at
     }
 
     pub fn finish_construction(&mut self) {

@@ -330,6 +330,44 @@ fn an_office_opening_in_a_long_step_cannot_take_a_floor_a_guard_reached_first() 
 }
 
 #[test]
+fn an_office_opening_mid_step_joins_from_the_minute_it_opened() {
+    // Modern, no Security yet: an office on the bomb's floor opens 25
+    // minutes before the deadline. Minute steps and one 30-minute step
+    // must end the same way.
+    let outcome = |long: bool| {
+        let mut sim = tower(30, 0);
+        sim.mode = GameMode::Modern;
+        decline(&mut sim);
+        assert!(sim.build(Kind::Security, 9, 185).ok);
+        let b = sim.events.bomb.as_mut().unwrap();
+        b.floor = 9;
+        let deadline = b.deadline;
+        let id = sim
+            .tower
+            .units
+            .iter()
+            .find(|u| u.kind == Kind::Security)
+            .unwrap()
+            .id;
+        let (u, _) = sim.tower.marked_by_id(id).unwrap();
+        u.extras_mut().complete_at = Some(deadline - 25.0);
+        sim.clock.minutes = deadline - 30.0;
+        if long {
+            sim.clock.minutes = deadline;
+            sim.finish_construction_and_search();
+        } else {
+            while sim.events.bomb.is_some() && sim.clock.minutes < deadline {
+                sim.clock.advance(1.0);
+                sim.finish_construction_and_search();
+            }
+        }
+        (sim.events.bomb.is_none(), sim.events.bombs_detonated)
+    };
+    assert_eq!(outcome(false), (true, 0), "minute steps find it");
+    assert_eq!(outcome(true), outcome(false));
+}
+
+#[test]
 fn one_long_step_still_finds_a_bomb_a_guard_reached_in_time() {
     // A guard that clears floors in a row inside one big step reaches the
     // bomb's floor before the deadline: found, though the step ends after it.

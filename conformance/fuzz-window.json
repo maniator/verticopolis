@@ -1,6 +1,6 @@
 {
   "open": true,
-  "key": "7f22e38cf30e60e5bf8ada216b2ec45db15ddaedfa924d86b49b4283a1dd87d4",
+  "key": "bec79845c33f67ee99f2722c361ba31864f5d792591cdaf83471a11a6eef3f22",
   "resets": [
     {
       "from": "ecadbdf6ab8149c42c0ba567d3a7e56ef0e48ab9bcca5f0b9e2a99dd1bd6bc56",
@@ -9,7 +9,7 @@
     },
     {
       "from": "429e7e2cd4a3d3a10cac1655b45660febc2ec79276da817d117a761222b3cb65",
-      "to": "7f22e38cf30e60e5bf8ada216b2ec45db15ddaedfa924d86b49b4283a1dd87d4",
+      "to": "bec79845c33f67ee99f2722c361ba31864f5d792591cdaf83471a11a6eef3f22",
       "approval": "https://github.com/maniator/verticopolis/pull/1886#issuecomment-6787552594"
     }
   ]
