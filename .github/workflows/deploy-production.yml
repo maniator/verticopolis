@@ -1,0 +1,175 @@
+name: Deploy production
+
+# Deploys production from a release tag (#1882). Vercel's git integration no
+# longer deploys `main` (vercel.json `git.deploymentEnabled`); it still builds
+# the previews for every other branch. Production moves only here:
+#
+# - release-tag.yml dispatches this run when a release PR merges, with the
+#   app tag (v<x.y.z>) it just created, or the crate tag (engine-v<x.y.z>)
+#   when a release raised only the engine crate version. A tag created with
+#   the workflow token starts no tag-push workflow, hence the dispatch;
+# - a maintainer can run it from the Actions tab with any release tag, which
+#   is also how a rollback to an older release goes out.
+#
+# The run checks that the tag is a release tag on `main` and that its commit
+# is a release commit by the same gate the Vercel build step uses
+# (scripts/vercel-ignore-build.sh with VERCEL_ENV=production), then builds and
+# deploys with the Vercel CLI. `vercel build` runs vercel.json's install and
+# build commands, so scripts/vercel-build.sh builds the WASM engine with its
+# pinned toolchain exactly as a Vercel build does. The run passes only once
+# production's /version.json reports the tag's commit.
+#
+# Secrets: VERCEL_TOKEN, VERCEL_ORG_ID and VERCEL_PROJECT_ID, held by the
+# `production` environment (limit that environment to the main branch). The
+# secrets reach only the step that checks they are set and the two steps that
+# talk to Vercel; the build runs without them. This workflow has no push or pull request trigger, so code from a fork or
+# an open PR never runs beside the token.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to deploy: v<x.y.z> or engine-v<x.y.z>"
+        required: true
+
+permissions:
+  contents: read
+
+# One deploy at a time, and a running deploy is never cancelled. GitHub keeps
+# one pending run per group, so of two releases queued behind a running deploy
+# only the newer goes out, which is the one production should end on.
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+env:
+  PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+  PRODUCTION_URL: https://verticopolis.com
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    environment: production
+    steps:
+      - name: Check the tag name
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          if ! printf '%s' "$TAG" | grep -Eq '^(engine-)?v[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::$TAG is not a release tag (v<x.y.z> or engine-v<x.y.z>)."
+            exit 1
+          fi
+
+      # Depth 2: the release gate compares the commit with its first parent.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: refs/tags/${{ inputs.tag }}
+          fetch-depth: 2
+          persist-credentials: false
+
+      - name: Check the tag is a release on main
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          sha="$(git rev-parse HEAD)"
+          tagged="$(git rev-parse --verify --quiet "refs/tags/$TAG^{commit}" || true)"
+          if [ "$sha" != "$tagged" ]; then echo "::error::HEAD $sha is not tag $TAG ($tagged)."; exit 1; fi
+          case "$TAG" in
+            engine-v*)
+              version="$(awk '/^\[package\]/ { p = 1; next } /^\[/ { p = 0 } p && /^version *=/ { gsub(/.*= *"|".*/, ""); print; exit }' engine-rs/Cargo.toml)"
+              want="engine-v$version"; file="engine-rs/Cargo.toml" ;;
+            *)
+              version="$(node -p "require('./package.json').version")"
+              want="v$version"; file="package.json" ;;
+          esac
+          if [ "$TAG" != "$want" ]; then echo "::error::Tag $TAG does not match $file version $version (expected $want)."; exit 1; fi
+          # "identical" or "ahead": main is this commit or contains it.
+          status="$(gh api "repos/$GH_REPO/compare/$sha...main" --jq .status)"
+          case "$status" in
+            identical | ahead) echo "$TAG ($sha) is on main." ;;
+            *) echo "::error::$TAG ($sha) is not on main (compare status: $status)."; exit 1 ;;
+          esac
+          echo "SHA=$sha" >> "$GITHUB_ENV"
+
+      # The gate exits 1 to build and 0 to skip (Vercel's contract). In
+      # production it skips a commit that still holds release notes or leaves
+      # both versions as its parent had them, so only a release merge deploys.
+      - name: Check the commit is a release commit
+        run: |
+          set +e
+          VERCEL_ENV=production bash scripts/vercel-ignore-build.sh
+          gate=$?
+          set -e
+          if [ "$gate" != 1 ]; then
+            echo "::error::The release gate does not deploy this commit (exit $gate); production deploys only a release merge."
+            exit 1
+          fi
+
+      - name: Check the Vercel secrets
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: |
+          missing=""
+          [ -n "$VERCEL_TOKEN" ] || missing="$missing VERCEL_TOKEN"
+          [ -n "$VERCEL_ORG_ID" ] || missing="$missing VERCEL_ORG_ID"
+          [ -n "$VERCEL_PROJECT_ID" ] || missing="$missing VERCEL_PROJECT_ID"
+          if [ -n "$missing" ]; then
+            echo "::error::Production was not deployed: the production environment is missing these secrets:$missing"
+            exit 1
+          fi
+
+      - name: Use Node.js (from .nvmrc)
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: ".nvmrc"
+          cache: "npm"
+
+      # Exact, so the CLI that holds the token changes only in a reviewed PR.
+      - name: Install the Vercel CLI
+        run: npm install --global vercel@65.4.0
+
+      - name: Pull the production settings
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: vercel pull --yes --environment=production --token "$VERCEL_TOKEN"
+
+      # Runs npm ci and scripts/vercel-build.sh (vercel.json) with the pulled
+      # production environment. No token: the build needs none.
+      - name: Build
+        run: vercel build --prod
+
+      - name: Deploy
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          url="$(vercel deploy --prebuilt --prod --token "$VERCEL_TOKEN")"
+          echo "Deployed $TAG ($SHA) as $url."
+          echo "Deployed \`$TAG\` (\`$SHA\`) to production as $url." >> "$GITHUB_STEP_SUMMARY"
+
+      # version.json carries the build's short SHA and is served no-store.
+      - name: Check production serves the tag
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          for attempt in $(seq 1 20); do
+            served="$(curl -fsS --max-time 15 "$PRODUCTION_URL/version.json?deploy=$SHA" | node -e 'let s = ""; process.stdin.on("data", (d) => (s += d)).on("end", () => { try { process.stdout.write(String(JSON.parse(s).sha ?? "")); } catch {} })' || true)"
+            if [ -n "$served" ] && [ "${SHA#"$served"}" != "$SHA" ]; then
+              echo "$PRODUCTION_URL serves $TAG ($served)."
+              exit 0
+            fi
+            echo "Attempt $attempt: $PRODUCTION_URL serves ${served:-nothing readable}, waiting for ${SHA:0:7}."
+            sleep 15
+          done
+          echo "::error::$PRODUCTION_URL/version.json never reported $TAG ($SHA) after the deploy."
+          exit 1

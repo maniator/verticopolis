@@ -640,6 +640,19 @@ ships everything pending as one numbered build. Production deploys only on a
 release merge: a push to `main` whose commit leaves the app and crate versions
 as its parent had them is skipped, even with no note pending.
 
+**Production deploys from the release tag.** Vercel's git integration builds
+previews only (`vercel.json` turns it off for `main`). When `release-tag.yml`
+tags a release merge it dispatches **Deploy production**
+(`.github/workflows/deploy-production.yml`) with the tag: `v<version>` for an
+app release, or `engine-v<version>` when only the crate moved. That run checks
+the tag is a release on `main`, runs the gate above against its commit, builds
+with `vercel build --prod` (which runs `scripts/vercel-build.sh`, engine
+included) and deploys the prebuilt output, then waits until production's
+`/version.json` reports the tag's commit. To redeploy or roll back, run
+**Deploy production** from the Actions tab with the release tag you want. It
+needs the `VERCEL_TOKEN`, `VERCEL_ORG_ID` and `VERCEL_PROJECT_ID` secrets in
+the `production` environment and fails, naming the missing one, without them.
+
 **Cutting the release.** Run the **Cut release** workflow (`release-pr.yml`)
 from the Actions tab, with an app version such as `3.0.0` for a headline
 release or empty for the levels the notes ask for. It runs `npm run release`

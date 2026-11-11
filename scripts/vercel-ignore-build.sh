@@ -12,7 +12,11 @@
 # A production deploy is also held (skipped) while a pending change note in
 # .changes/ asks for an app or crate release (see held_notes below), and it
 # builds only for a commit that changes the app or crate version, so production
-# moves only on a release merge.
+# moves only on a release merge. Vercel's git integration no longer deploys
+# production (vercel.json turns it off for main); the production deploy
+# workflow (.github/workflows/deploy-production.yml) runs this script with
+# VERCEL_ENV=production against the release tag's commit and deploys only when
+# it exits 1, so this production branch is still the release gate.
 #
 # A deploy is skipped when every changed file is one that never reaches the
 # deployed app, its WASM engine package or the build checks that gate them.

@@ -5,6 +5,7 @@
   "installCommand": "npm ci",
   "devCommand": "npm run dev -- --port $PORT --strictPort",
   "outputDirectory": "dist",
+  "git": { "deploymentEnabled": { "main": false } },
   "redirects": [
     { "source": "/help/", "destination": "/help", "permanent": true },
     { "source": "/gallery/", "destination": "/gallery", "permanent": true }
