@@ -14,16 +14,23 @@ ChatGPT subscription. No OpenAI organization ID or other variable is required.
 
 ## How to use
 
-- Automatic review on PR opened, reopened, ready-for-review, or updated
-  (including fork PRs). Drafts and bot-originated events are skipped.
-- Trusted repo owners, members and collaborators can comment `/review` to
-  request another review, `/improve` for **committable inline suggestions**,
+- PR-Agent runs **only on request** (owner, 2026-11-11). The automatic review
+  on every push cost about $27 of API credit in two days (about 250 automatic
+  runs against 80 requested ones), so the workflow no longer listens to
+  pull request events at all.
+- Trusted repo owners, members and collaborators comment `/review` for a
+  review, `/improve` for **committable inline suggestions**,
   `/ask "question"` for focused PR analysis, and `/describe` on demand.
 - `/improve` **proposes changes for a human to apply**; it does not push
   changes to the branch. This workflow runs in restricted mode and never
   checks out, installs or executes untrusted PR code.
-- Auto-describe and auto-improve are deliberately disabled to minimize
-  cost and avoid rewriting manually maintained PR descriptions.
+- The default model is `gpt-6-luna`. For a hard Rust or hot-path PR, name the
+  larger model on that one comment: `/review --config.model=gpt-6.1-sol`.
+- Cost follows input tokens: OpenAI bills every input token it has not seen
+  before as a cache write, so the bill is the diff size times the number of
+  calls times the model's price. A chunked review is capped at 3 calls
+  (`max_number_of_calls`). Each run's comment ends with an "Agent run details"
+  block that shows its tokens and estimated cost.
 - PR-Agent complements, and does not replace, Rust/test/coverage CI,
   independent reviews, Copilot or Codex.
 
@@ -32,8 +39,9 @@ ChatGPT subscription. No OpenAI organization ID or other variable is required.
 PR-Agent carries the heavy review pass, so Claude sessions spend fewer tokens
 on it (owner, 2026-11-10). For a non-trivial PR, the author or reviewer
 comments `/review` and `/improve` on the PR as two separate comments. Each
-command runs in its own concurrency group, so both finish, and a later push
-cancels only the automatic review. The review skill then runs one lean pass
+command runs in its own concurrency group, so both finish. Nothing runs
+automatically, so the author requests the pair themselves, once per review
+round, when the branch is ready for review. The review skill then runs one lean pass
 of its layers in the same session, without a subagent per layer, and triages
 PR-Agent's findings with its own: `patch` findings get fixed and `defer`
 findings go to the backlog, as before. Request the pair once per review round,
@@ -67,7 +75,7 @@ The settings in `.pr_agent.toml` address this without disabling code review:
   tests** have priority. These files remain in GitHub, and their committed
   values remain checked by CI. Model review does **not** validate the
   excluded serialized values; intentional golden changes need human review.
-- Large diffs may be split across **up to five model calls**, which can cost
+- Large diffs may be split across **up to three model calls**, which can cost
   more. The coverage footer should report files the model could not inspect.
   An uninspected file is not a missing file. Compare with GitHub's changed-file
   list rather than relying on an individual chunk's omissions.
@@ -86,9 +94,9 @@ actual Action result instead.
 
 ## Verification
 
-Merge the setup PR, then open or update a non-draft PR and inspect the
-`PR Agent (OpenAI)` workflow and its GitHub comments. For an existing PR,
-post `/review` as a trusted collaborator to request a fresh run.
+Post `/review` on a PR as a trusted collaborator, then inspect the
+`PR Agent (OpenAI)` workflow run and its GitHub comments. The first run after
+a model change shows whether the configured model is accepted.
 If the secret is absent/misnamed or its API project lacks model access
 or billing, the Action will fail. Check the run logs without sharing keys.
 PR-Agent is currently pinned to Docker image `0.49.0-github_action`;

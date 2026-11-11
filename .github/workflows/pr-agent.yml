@@ -1,10 +1,10 @@
 # PR-Agent uses the GitHub API. Never checkout or execute PR code in this
-# secrets-bearing pull_request_target / issue_comment workflow.
+# secrets-bearing issue_comment workflow.
+# It runs only when a trusted collaborator comments a command (owner,
+# 2026-11-11): the automatic review on every push cost about $27 in two days.
 name: PR Agent (OpenAI)
 
 on:
-  pull_request_target:
-    types: [opened, reopened, ready_for_review, synchronize]
   issue_comment:
     types: [created]
 
@@ -18,29 +18,22 @@ jobs:
     name: Review and requested code suggestions
     if: >-
       github.event.sender.type != 'Bot' &&
+      github.event.issue.pull_request &&
+      contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association) &&
       (
-        (github.event_name == 'pull_request_target' && github.event.pull_request.draft == false) ||
-        (
-          github.event_name == 'issue_comment' &&
-          github.event.issue.pull_request &&
-          contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association) &&
-          (
-            startsWith(github.event.comment.body, '/review') ||
-            startsWith(github.event.comment.body, '/improve') ||
-            startsWith(github.event.comment.body, '/ask') ||
-            startsWith(github.event.comment.body, '/describe') ||
-            startsWith(github.event.comment.body, '/help') ||
-            startsWith(github.event.comment.body, '/config')
-          )
-        )
+        startsWith(github.event.comment.body, '/review') ||
+        startsWith(github.event.comment.body, '/improve') ||
+        startsWith(github.event.comment.body, '/ask') ||
+        startsWith(github.event.comment.body, '/describe') ||
+        startsWith(github.event.comment.body, '/help') ||
+        startsWith(github.event.comment.body, '/config')
       )
     # Job-level concurrency is evaluated only for an eligible command/PR.
     # Ordinary or unauthorized issue comments must never cancel a review.
-    # A push cancels the PR's older automatic review only. Each command
-    # comment gets its own group, so `/review` and `/improve` posted together
-    # both finish, and a later push never cancels a requested review.
+    # Each command comment gets its own group, so `/review` and `/improve`
+    # posted together both finish.
     concurrency:
-      group: pr-agent-${{ github.event.pull_request.number || github.event.issue.number }}-${{ github.event.comment.id || 'auto' }}
+      group: pr-agent-${{ github.event.issue.number }}-${{ github.event.comment.id }}
       cancel-in-progress: true
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -51,8 +44,7 @@ jobs:
         env:
           OPENAI_KEY: ${{ secrets.OPENAI_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          github_action_config.auto_review: 'true'
+          github_action_config.auto_review: 'false'
           github_action_config.auto_describe: 'false'
           github_action_config.auto_improve: 'false'
-          github_action_config.pr_actions: '["opened", "reopened", "ready_for_review", "synchronize"]'
           config.restricted_mode: 'true'

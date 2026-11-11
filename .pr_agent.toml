@@ -1,6 +1,10 @@
 # Repository-specific PR-Agent policy. Credentials belong in Actions secrets.
 [config]
-model = "gpt-6.1-sol"
+# Luna is the cheap default (owner, 2026-11-11). For a hard Rust or hot-path
+# PR, ask for the larger model on that one comment:
+#   /review --config.model=gpt-6.1-sol
+model = "gpt-6-luna"
+# Retry on the same model: a fallback to a dearer one would raise the cost.
 fallback_models = ["gpt-6-luna"]
 # Allow larger per-call review context.
 max_model_tokens = 64000
@@ -19,9 +23,10 @@ description_issue_regex = '(?i)(?:fixes|closes|resolves)\s+#(\d+)'
 extract_issue_from_branch = false
 
 [pr_reviewer]
-# Allow more chunks to review large source/test diffs; this can cost more.
+# Large source/test diffs are split into chunks; each chunk is one model call
+# and the input volume is what the bill follows, so the cap is 3.
 enable_large_pr_chunking = true
-max_number_of_calls = 5
+max_number_of_calls = 3
 enable_review_coverage_footer = true
 # Staged PRs often link a parent ticket without completing it. The automatic
 # ticket-grade compares the entire issue and mislabels legitimate slices.
