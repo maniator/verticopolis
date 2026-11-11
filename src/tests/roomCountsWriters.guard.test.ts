@@ -191,9 +191,8 @@ const OPAQUE_WRITES: Record<string, OpaqueWrites> = {
   // patches laid over the engine's save and the nested save values a
   // harness edits in place (tracked), no live unit.
   "src/game/toolingTower.ts": { bulk: 5 },
-  // Array slots: the section builder's output and the telemetry's tables.
+  // Array slots: the section builder's output.
   "src/wasmhost/buildSection.ts": { keyed: 1 },
-  "src/wasmhost/telemetry.ts": { keyed: 2 },
   // The shared reader's tower handle (its getters) and its decoded rooms,
   // people and cars, written into its own objects: no engine unit.
   "src/simport/viewReader.ts": { bulk: 2, keyed: 5 },
