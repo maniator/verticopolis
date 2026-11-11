@@ -378,6 +378,7 @@ mod exports_edits;
 mod exports_port;
 mod exports_port_more;
 mod exports_state;
+mod exports_tooling;
 
 #[cfg(test)]
 mod tests;

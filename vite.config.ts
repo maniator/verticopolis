@@ -663,6 +663,12 @@ export default defineConfig(({ command }) => ({
         "src/render/atlas/browserEntry.ts",
         "src/render/atlas/verify.ts",
         "src/render/atlas/verifyExtras.ts",
+        // The harnesses' tower (game.sim in a tooling build): it drives the
+        // Rust engine package, which the coverage run does not build, so its
+        // tests skip here and run on the unitWasm leg, and every e2e spec and
+        // the screenshot gallery drive it. No production build ships it.
+        "src/game/toolingTower.ts",
+        "src/game/toolingSim.ts",
       ],
       // Enforced floors (a ratchet, not a vanity ceiling). Global floor holds the
       // logic layers; per-file globs stop a weak painter/synth file hiding behind

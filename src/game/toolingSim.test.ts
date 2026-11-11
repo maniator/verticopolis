@@ -1,248 +1,298 @@
 import { describe, expect, it, vi } from "vitest";
-import { Simulation } from "../engine/Simulation";
-import { TsEngine } from "../engine/port/tsEngine";
 import type { EnginePort } from "../simport/enginePort";
 import type { HudSource } from "../ui/uiStatus";
+import { hasWasmPackage, wasm, wasmRequired } from "../tests/conformance/wasmEngine";
 import { adoptToolingSim, syncToolingSim, toolingSim } from "./toolingSim";
+import type { ToolingEngine, ToolingTowerClass } from "./toolingTower";
 
-/** The app the harness's tower follows, on `port`. */
-function appOn(port: EnginePort) {
+// The tower drives the Rust engine, so it runs where the engine package is
+// built (a local build, `test-wasm-parity (unitWasm)`) and skips in the plain
+// unit job. Where the package is required a missing one is a failure.
+if (wasmRequired() && !hasWasmPackage()) throw new Error("VC_REQUIRE_WASM=1 but engine-rs/pkg is not built; run npm run wasm:build");
+
+interface Unit {
+  id: number;
+  kind: string;
+  state?: string;
+  everOccupied?: boolean;
+}
+
+/** The app the harness's tower follows, on a real engine. */
+function app(seed = 5) {
+  const engine = wasm().Engine.newGame(seed, "classic") as unknown as ToolingEngine;
+  engine.setMoney(1e9);
+  const restore = vi.spyOn(engine, "restore");
   const update = vi.fn<() => void>();
   const reader = Object.assign({ header: { logSeq: 0 }, tower: {} } as unknown as HudSource["reader"], { update });
-  const portCodes = { kind: () => 4, code: () => 0, slot: () => 0 };
-  return { enginePort: port, reader, portCodes, ui: { lastLogSeq: 0, resetLog: vi.fn(), update: vi.fn() }, followSwap: vi.fn(), followEdit: vi.fn() };
-}
-
-/** A stand-in for the Rust engine: it holds a save, restores one, and is not
- *  the TypeScript engine. */
-function rustLike(seed = 5) {
-  let text = JSON.stringify(Simulation.newGame(seed).serialize());
-  const port = {
-    serialize: vi.fn(() => text),
-    stateDigest: () => text,
-    restore: vi.fn((next: string) => {
-      text = next;
-      return Float64Array.of(1, 2);
-    }),
-    tick: vi.fn((dt: number) => {
-      const save = JSON.parse(text) as { minutes: number };
-      save.minutes += dt;
-      text = JSON.stringify(save);
-    }),
-    buildAt: vi.fn((_kind: number, _floor: number, _x: number) => Float64Array.of(1, 0)),
-    lastReason: () => "refused",
+  const events: string[] = [];
+  const ui = {
+    lastLogSeq: 0,
+    resetLog: vi.fn(),
+    update: vi.fn(() => events.push("bulletin")),
   };
-  const app = appOn(port as unknown as EnginePort);
-  return { app, port, saved: () => JSON.parse(text) as { money: number } };
+  const a = {
+    enginePort: engine as unknown as EnginePort,
+    reader,
+    portCodes: { kind: () => 4, code: () => 0, slot: () => 0 } as unknown as HudSource["codes"],
+    ui,
+    followSwap: vi.fn(),
+    followEdit: vi.fn(() => events.push("followEdit")),
+  };
+  const saved = () => JSON.parse(engine.serialize()) as { money: number; star: number; minutes: number; units: Unit[] };
+  return { app: a, engine, restore, events, saved };
 }
 
-describe("the tooling harnesses' tower", () => {
-  it("is the TypeScript engine's own tower on that engine", () => {
-    const sim = Simulation.newGame(3);
-    const app = appOn(new TsEngine(sim));
-    expect(toolingSim(app)).toBe(sim);
-    syncToolingSim(app);
-    expect(app.followSwap).not.toHaveBeenCalled();
-  });
+/** The bulletin's text, as resetLog reads it from a port. */
+function bulletin(port: HudSource["port"]): (string | undefined)[] {
+  const rec = port.logAfter(0);
+  const out: (string | undefined)[] = [];
+  for (let i = 0; i + 2 < rec.length; i += 3) out.push(port.logText(rec[i]));
+  return out;
+}
 
-  it("is a copy of the Rust engine's save that hands a field write to the engine at once", () => {
-    const { app, port, saved } = rustLike();
-    const sim = toolingSim(app)!;
-    expect(toolingSim(app)).toBe(sim); // kept while the engine is unchanged
-    sim.vipFavorable = true;
-    expect((saved() as unknown as { vipFavorable: boolean }).vipFavorable).toBe(true);
-    expect(port.restore).toHaveBeenCalledTimes(1);
-    expect(app.followEdit).toHaveBeenCalledOnce();
-    expect(app.ui.update).toHaveBeenCalledOnce(); // before the load, so no line is lost to it
-    expect(app.followSwap).not.toHaveBeenCalled();
-    expect(toolingSim(app)).toBe(sim);
-  });
+/** A ground lobby and one floor, through the tower's bare edits. */
+function floorOn(sim: NonNullable<ReturnType<typeof toolingSim>>): void {
+  for (let x = 150; x < 200; x++) {
+    expect(sim.tower.place("lobby", 1, x), `lobby at ${x}`).toMatchObject({ ok: true });
+    expect(sim.tower.place("floor", 2, x), `floor at ${x}`).toMatchObject({ ok: true });
+  }
+}
 
-  it("hands the lines the copy logged on to the bulletin with the edit, and only those", () => {
-    const { app } = rustLike();
-    const sim = toolingSim(app)!;
-    sim.vipFavorable = true;
-    expect(app.followEdit).toHaveBeenLastCalledWith(undefined);
-    sim.emit("Congratulations! Your tower reached 2 stars.", "good");
-    expect(app.followEdit).toHaveBeenCalledTimes(2);
-    const shown = app.followEdit.mock.lastCall![0] as Simulation;
-    expect(shown.log[shown.log.length - 1]?.text).toBe("Congratulations! Your tower reached 2 stars.");
-    // The bulletin reads the whole log from nothing: the saved tail and the new line.
-    expect(new TsEngine(shown).logAfter(0)).toHaveLength(2 * 3);
-    sim.vipFavorable = false;
-    expect(app.followEdit).toHaveBeenLastCalledWith(undefined);
-  });
-
-  it("sends a build and a money write to the engine as its own commands, beside the copy's", () => {
-    const { app, port } = rustLike();
-    const setMoney = vi.fn();
-    Object.assign(port, { setMoney });
-    const sim = toolingSim(app)!;
-    sim.money = 1e9;
-    expect(setMoney).toHaveBeenCalledExactlyOnceWith(1e9);
-    expect(sim.build("lobby", 1, 160).ok).toBe(true);
-    expect(port.buildAt).toHaveBeenCalledExactlyOnceWith(4, 1, 160);
-    expect(sim.tower.unitAt(1, 160)?.kind).toBe("lobby");
-    // Neither is a restore, which would start the crowd empty.
-    expect(port.restore).not.toHaveBeenCalled();
-    port.buildAt.mockReturnValueOnce(Float64Array.of(0, 0));
-    expect(() => sim.build("lobby", 1, 161)).toThrow(/the engines disagree on build: the Rust engine refused it \(refused\)/);
-  });
-
-  it("runs a string of builds without reading the copy's whole state", () => {
-    const { app, port } = rustLike();
-    const sim = toolingSim(app)!;
-    const serialize = vi.spyOn(Simulation.prototype, "serialize");
-    for (let x = 150; x < 160; x++) expect(sim.build("lobby", 1, x).ok).toBe(true);
-    expect(serialize).not.toHaveBeenCalled();
-    expect(port.buildAt).toHaveBeenCalledTimes(10);
-    serialize.mockRestore();
-  });
-
-  it("still hands on a write to a part a method handed out before a build", async () => {
-    const { app, saved } = rustLike();
-    const sim = toolingSim(app)!;
-    sim.tower.place("lobby", 1, 160);
-    syncToolingSim(app);
-    const unit = sim.tower.unitAt(1, 160) as unknown as { x: number };
-    expect(sim.build("lobby", 1, 161).ok).toBe(true);
-    unit.x = 170;
+describe.skipIf(!hasWasmPackage())("the tooling harnesses' tower", () => {
+  it("places bare on the engine and loads the tower when the task ends", async () => {
+    const { app: a, engine, restore, events, saved } = app();
+    const sim = toolingSim(a)!;
+    expect(toolingSim(a)).toBe(sim);
+    floorOn(sim);
+    const money = sim.money;
+    const r = sim.tower.place("office", 2, 160);
+    expect(r).toMatchObject({ ok: true });
+    // Bare: no charge, and no load yet.
+    expect(sim.money).toBe(money);
+    expect(restore).not.toHaveBeenCalled();
+    const u = sim.tower.getUnit(r.unitId!)!;
+    u.state = "occupied";
+    u.everOccupied = true;
+    // The write reads back before the engine has it.
+    expect(sim.tower.getUnit(r.unitId!)).toMatchObject({ state: "occupied", everOccupied: true });
+    expect(sim.tower.units.find((x) => x.id === r.unitId)).toMatchObject({ state: "occupied" });
+    expect(JSON.parse(engine.unitRecord(r.unitId!)!)).not.toMatchObject({ state: "occupied" });
     await Promise.resolve();
-    const units = (saved() as unknown as { units: { x: number }[] }).units;
-    expect(units.some((u) => u.x === 170)).toBe(true);
+    expect(restore).toHaveBeenCalledOnce();
+    expect(saved().units.find((x) => x.id === r.unitId)).toMatchObject({ state: "occupied", everOccupied: true });
+    // The bulletin reads the engine's lines before the load drops them.
+    expect(events).toEqual(["bulletin", "followEdit"]);
   });
 
-  it("hands a deeper edit on at the end of the task, or at once when synced", async () => {
-    const { app, port, saved } = rustLike();
-    const units = () => (saved() as unknown as { units: unknown[] }).units.length;
-    const before = units();
-    toolingSim(app)!.tower.place("lobby", 1, 160);
-    expect(units()).toBe(before);
-    await Promise.resolve();
-    expect(units()).toBe(before + 1);
-    toolingSim(app)!.tower.place("lobby", 1, 161);
-    syncToolingSim(app);
-    expect(units()).toBe(before + 2);
-    expect(port.restore).toHaveBeenCalledTimes(2);
-  });
-
-  it("drops a copy nobody changed without a restore", async () => {
-    const { app, port } = rustLike();
-    void toolingSim(app)!.money;
-    void toolingSim(app)!.serialize();
-    syncToolingSim(app);
-    await Promise.resolve();
-    expect(port.restore).not.toHaveBeenCalled();
-    expect(app.followEdit).not.toHaveBeenCalled();
-  });
-
-  it("ticks the engine itself, and reads a fresh copy after", () => {
-    const { app, port, saved } = rustLike();
-    const sim = toolingSim(app)!;
+  it("runs a command, a tick and a money write on the engine, with no load", () => {
+    const { app: a, restore, saved } = app();
+    const sim = toolingSim(a)!;
+    sim.money = 424_242;
+    expect(saved().money).toBe(424_242);
+    expect(sim.build("lobby", 1, 150)).toEqual({ ok: true });
+    expect(sim.money).toBeLessThan(424_242);
     const minutes = sim.clock.minutes;
-    sim.tick(30);
-    expect(port.tick).toHaveBeenCalledExactlyOnceWith(30);
-    expect(app.reader.update).toHaveBeenCalled();
-    expect((saved() as unknown as { minutes: number }).minutes).toBe(minutes + 30);
-    expect(toolingSim(app)!.clock.minutes).toBe(minutes + 30);
+    sim.tick(5);
+    expect(sim.clock.minutes).toBe(minutes + 5);
+    expect(restore).not.toHaveBeenCalled();
+    expect(a.reader.update).toHaveBeenCalledTimes(3);
   });
 
-  it("keeps one view that reads the engine's tower as it is now", async () => {
-    const { app, port } = rustLike();
-    const sim = toolingSim(app)!;
-    const minutes = sim.clock.minutes;
-    port.tick(60); // the frame loop runs between tasks
+  it("loads pending edits before a command, so the command reads them", () => {
+    const { app: a, restore, saved } = app();
+    const sim = toolingSim(a)!;
+    floorOn(sim);
+    sim.star = 3;
+    sim.evaluateStar();
+    expect(restore).toHaveBeenCalledOnce();
+    expect(saved().star).toBeGreaterThanOrEqual(1);
+  });
+
+  it("loads a patch that moves a room before the next placement", () => {
+    const { app: a, restore } = app();
+    const sim = toolingSim(a)!;
+    floorOn(sim);
+    const r = sim.tower.place("office", 2, 160);
+    sim.tower.getUnit(r.unitId!)!.state = "occupied";
+    sim.tower.place("office", 2, 170);
+    expect(restore).not.toHaveBeenCalled();
+    (sim.tower.getUnit(r.unitId!) as unknown as { x: number }).x = 180;
+    sim.tower.place("office", 2, 160);
+    expect(restore).toHaveBeenCalledOnce();
+  });
+
+  it("hands its edits on at once through syncSim, and writes the clock and the pending choice", () => {
+    const { app: a, saved } = app();
+    const sim = toolingSim(a)!;
+    sim.clock.minutes = 3 * 1440 + 600;
+    expect([sim.clock.day, sim.clock.minuteOfDay]).toEqual([3, 600]);
+    sim.events.pending = { kind: "bombThreat", cost: 5, message: "m" };
+    expect(sim.pendingChoice).toEqual({ kind: "bombThreat", cost: 5, message: "m" });
+    syncToolingSim(a);
+    expect(saved().minutes).toBe(3 * 1440 + 600);
+    expect(sim.pendingChoice).toMatchObject({ kind: "bombThreat", cost: 5 });
+    // An edit in place on the loaded choice is a patch too.
+    (sim.events.pending as { cost: number }).cost = 10;
+    syncToolingSim(a);
+    expect(sim.pendingChoice).toMatchObject({ kind: "bombThreat", cost: 10 });
+  });
+
+  it("loads its patches over what the engine holds now, and loads nothing after a refused edit", async () => {
+    const { app: a, engine, restore, saved } = app();
+    const sim = toolingSim(a)!;
+    sim.star = 2;
+    const minutes = sim.serialize().minutes;
+    // The engine moves under the tower's read, in the same task.
+    engine.tick(60);
+    syncToolingSim(a);
+    expect(saved()).toMatchObject({ star: 2, minutes: minutes + 60 });
+    restore.mockClear();
+    expect(sim.tower.place("castle", 1, 150)).toMatchObject({ ok: false });
+    expect(sim.tower.place("office", 9, 150)).toMatchObject({ ok: false });
+    expect(sim.tower.removeUnit(-1)).toBeUndefined();
     await Promise.resolve();
-    expect(toolingSim(app)).toBe(sim);
-    expect(sim.clock.minutes).toBe(minutes + 60);
-    expect(sim).toBeInstanceOf(Simulation);
-    expect("tower" in sim).toBe(true);
-    expect(Object.keys(sim)).toContain("money");
+    expect(restore).not.toHaveBeenCalled();
   });
 
-  it("keeps a held part of the tower reading the engine's tower as it is now", async () => {
-    const { app, port, saved } = rustLike();
-    const sim = toolingSim(app)!;
-    const tower = sim.tower;
-    expect(sim.tower).toBe(tower);
-    expect(tower.unitAt(1, 160)).toBeUndefined();
-    // The engine takes a lobby the copy never saw, as a build through the game does.
-    const save = saved() as unknown as Record<string, unknown>;
-    const built = Simulation.deserialize(save as never);
-    built.tower.place("lobby", 1, 160);
-    port.restore(JSON.stringify(built.serialize()));
-    syncToolingSim(app);
-    expect(tower.unitAt(1, 160)?.kind).toBe("lobby");
-    // An edit through the held part reaches the engine.
-    const units = () => (saved() as unknown as { units: unknown[] }).units.length;
-    const before = units();
-    tower.place("lobby", 1, 161);
-    await Promise.resolve();
-    expect(units()).toBe(before + 1);
-    expect(Array.isArray(sim.crowd.people)).toBe(true);
+  it("finds a moved room where its record says, and keeps a setter's write over an earlier patch", () => {
+    const { app: a, saved } = app();
+    const sim = toolingSim(a)!;
+    floorOn(sim);
+    const r = sim.tower.place("office", 2, 160);
+    expect(r).toMatchObject({ ok: true });
+    (sim.tower.getUnit(r.unitId!) as unknown as { x: number }).x = 180;
+    expect(sim.tower.roomAt(2, 181)).toMatchObject({ id: r.unitId, x: 180 });
+    expect(sim.tower.roomAt(2, 161)).toBeUndefined();
+    const shaft = sim.tower.placeTransport("elevatorStandard", 152, 1, 2);
+    expect(shaft).toMatchObject({ ok: true });
+    (sim.tower.getTransport(shaft.transportId!) as unknown as { cars: number }).cars = 2;
+    expect(sim.tower.setCars(shaft.transportId!, 3)).toBe(true);
+    syncToolingSim(a);
+    expect((saved() as unknown as { transports: { id: number; cars: number }[] }).transports.find((t) => t.id === shaft.transportId)?.cars).toBe(3);
   });
 
-  it("drops loudly an edit the engine moved on from before it got it", () => {
-    const { app, port } = rustLike();
-    const sim = toolingSim(app)!;
-    sim.tower.place("lobby", 1, 160);
-    port.tick(60);
-    expect(() => syncToolingSim(app)).toThrow(/game.sim has an edit the engine never got/);
-    expect(port.restore).not.toHaveBeenCalled();
-    expect(sim.tower.unitAt(1, 160)).toBeUndefined();
+  it("keeps the edits two views of the same shaft make, whichever was read first", () => {
+    const { app: a, saved } = app();
+    const sim = toolingSim(a)!;
+    floorOn(sim);
+    const shaft = sim.tower.placeTransport("elevatorStandard", 152, 1, 2);
+    expect(shaft).toMatchObject({ ok: true });
+    expect(sim.tower.setSchedule(shaft.transportId!, { waitingCarResponse: 2, standardFloorDeparture: 10 })).toBe(true);
+    syncToolingSim(a);
+    type View = { cars: number; schedule: { waitingCarResponse: number; standardFloorDeparture: number } };
+    const first = sim.tower.getTransport(shaft.transportId!) as unknown as View;
+    const second = sim.tower.getTransport(shaft.transportId!) as unknown as View;
+    first.cars = 2;
+    expect(second.cars).toBe(2);
+    first.schedule.waitingCarResponse = 3;
+    second.schedule.standardFloorDeparture = 20;
+    syncToolingSim(a);
+    const t = (saved() as unknown as { transports: ({ id: number } & View)[] }).transports.find((x) => x.id === shaft.transportId);
+    expect(t).toMatchObject({ cars: 2, schedule: { waitingCarResponse: 3, standardFloorDeparture: 20 } });
   });
 
-  it("checks the copy against the engine once a task, and again after a sync", async () => {
-    const { app } = rustLike();
-    const digest = vi.fn(() => (app.enginePort as unknown as { serialize(): string }).serialize());
-    Object.assign(app.enginePort, { stateDigest: digest });
-    const sim = toolingSim(app)!;
-    for (let i = 0; i < 5; i++) void sim.tower.units.length;
-    expect(digest).toHaveBeenCalledOnce();
-    syncToolingSim(app);
-    void sim.money;
-    expect(digest).toHaveBeenCalledTimes(2);
-    await Promise.resolve();
-    void sim.money;
-    expect(digest).toHaveBeenCalledTimes(3);
+  it("carries the telemetry and the loop memos across its loads", () => {
+    const { app: a, engine } = app();
+    const sim = toolingSim(a)!;
+    floorOn(sim);
+    const shaft = sim.tower.placeTransport("elevatorStandard", 152, 1, 2);
+    sim.elevatorHourly.set(shaft.transportId!, { weekday: Array<number>(24).fill(0.5), weekend: Array<number>(24).fill(0.25) });
+    engine.seedLoopMemos(7, 1, 0, 0);
+    const telemetry = engine.elevatorTelemetry();
+    syncToolingSim(a);
+    expect(engine.elevatorTelemetry()).toBe(telemetry);
+    expect([...engine.loopMemos()]).toEqual([7, 1, 0, 0]);
   });
 
-  it("carries the telemetry and the loop memos, which the save does not, both ways", () => {
-    const { app, port } = rustLike();
-    const doc = { util: [[3, 0.5]], hourly: [], origins: [] };
-    let memos = Float64Array.of(7, 1, 0, 0);
-    const tooling = Object.assign(port, {
-      elevatorTelemetry: () => JSON.stringify(doc),
-      loopMemos: () => memos,
-      seedElevatorTelemetry: vi.fn(),
-      seedLoopMemos: vi.fn((...m: number[]) => {
-        memos = Float64Array.from(m);
-      }),
-    });
-    const sim = toolingSim(app)!;
-    expect([...sim.elevatorUtil]).toEqual([[3, 0.5]]);
-    expect(sim.lastHour).toBe(7);
-    sim.lastHour = 8;
-    expect(tooling.seedLoopMemos).toHaveBeenCalledExactlyOnceWith(8, 1, 0, 0);
-    expect(JSON.parse(tooling.seedElevatorTelemetry.mock.calls[0][0] as string)).toEqual(doc);
-  });
-
-  it("swaps in a hand-built tower on either engine", () => {
-    const { app, saved } = rustLike();
-    const built = Simulation.newGame(9);
+  it("swaps in a tower built off the app, with the lines it logged", () => {
+    const { app: a, saved } = app();
+    const live = toolingSim(a)!;
+    const built = (live.constructor as unknown as ToolingTowerClass).newGame(9, "classic");
     built.money = 4242;
-    adoptToolingSim(app, built, false);
+    for (let x = 150; x < 160; x++) built.tower.place("lobby", 1, x);
+    const lines = bulletin(built.port as unknown as HudSource["port"]);
+    adoptToolingSim(a, built, false);
     expect(saved().money).toBe(4242);
-    // A view handed back is read as its copy.
-    adoptToolingSim(app, toolingSim(app)!, true);
-    expect(saved().money).toBe(4242);
-    expect(app.followSwap.mock.calls).toEqual([["swap"], ["restore"]]);
-    // The bulletin reads the swapped-in tower's own log, which a load numbers from nothing.
-    expect(app.ui.resetLog).toHaveBeenCalledTimes(2);
-    const ts = appOn(new TsEngine(Simulation.newGame(1)));
-    adoptToolingSim(ts, built, true);
-    expect((ts.enginePort as TsEngine).sim).toBe(built);
-    expect(ts.followSwap).toHaveBeenCalledExactlyOnceWith("restore");
-    expect(ts.ui.resetLog).not.toHaveBeenCalled();
+    expect(saved().units).toHaveLength(10);
+    expect(a.followSwap).toHaveBeenCalledExactlyOnceWith("swap");
+    // The bulletin reads the lines the built tower's own engine logged.
+    expect(bulletin(a.ui.resetLog.mock.calls[0][0].port)).toEqual(lines);
+    // A copy of the save, and the live tower handed back, load as themselves.
+    const copy = (live.constructor as unknown as ToolingTowerClass).deserialize(live.serialize());
+    copy.star = 2;
+    adoptToolingSim(a, copy, true);
+    expect(saved().star).toBe(2);
+    adoptToolingSim(a, live, true);
+    expect(saved().star).toBe(2);
+    expect(a.followSwap.mock.calls).toEqual([["swap"], ["restore"], ["restore"]]);
+    expect(() => adoptToolingSim(a, {} as typeof live, true)).toThrow("adoptSim takes a tower");
+  });
+
+  it("keeps the lines a swapped-in tower logged before the load of its own pending edits", () => {
+    const { app: a } = app();
+    const live = toolingSim(a)!;
+    const built = (live.constructor as unknown as ToolingTowerClass).newGame(9, "classic");
+    for (let x = 150; x < 160; x++) expect(built.build("lobby", 1, x)).toMatchObject({ ok: true });
+    const lines = bulletin(built.port as unknown as HudSource["port"]);
+    expect(lines.length).toBeGreaterThan(0);
+    // A bare edit is pending, so the swap loads it into the built tower's own
+    // engine first, which numbers that engine's log from nothing.
+    expect(built.tower.place("floor", 2, 150)).toMatchObject({ ok: true });
+    adoptToolingSim(a, built, false);
+    expect(bulletin(a.ui.resetLog.mock.calls[0][0].port)).toEqual(lines);
+  });
+
+  it("keeps the bulletin when the app's own tower is handed back to it", () => {
+    const { app: a } = app();
+    const live = toolingSim(a)!;
+    const held = bulletin(a.enginePort as unknown as HudSource["port"]);
+    expect(held.length).toBeGreaterThan(0);
+    // The load numbers the engine's log from nothing; the lines read before it stay.
+    adoptToolingSim(a, live, true);
+    expect(bulletin(a.enginePort as unknown as HudSource["port"])).toEqual([]);
+    expect(bulletin(a.ui.resetLog.mock.calls[0][0].port)).toEqual(held);
+  });
+
+  it("keeps the lines an earlier load dropped when the app's own tower is handed back to it", async () => {
+    const { app: a } = app();
+    const live = toolingSim(a)!;
+    const held = bulletin(a.enginePort as unknown as HudSource["port"]);
+    expect(held.length).toBeGreaterThan(0);
+    // An edit loads at the end of the task, which numbers the engine's log from nothing.
+    live.star = 2;
+    await Promise.resolve();
+    expect(bulletin(a.enginePort as unknown as HudSource["port"])).toEqual([]);
+    adoptToolingSim(a, live, true);
+    expect(bulletin(a.ui.resetLog.mock.calls[0][0].port)).toEqual(held);
+    // A second hand-back still shows them.
+    adoptToolingSim(a, live, true);
+    expect(bulletin(a.ui.resetLog.mock.calls[1][0].port)).toEqual(held);
+  });
+
+  it("reads the engine again at syncSim with nothing pending", () => {
+    const { app: a, engine } = app();
+    const sim = toolingSim(a)!;
+    const minutes = sim.clock.minutes;
+    engine.tick(60);
+    syncToolingSim(a);
+    expect(sim.clock.minutes).toBe(minutes + 60);
+  });
+
+  it("keeps a swapped-in tower's edits on its own engine, and drops what the app's tower had pending", async () => {
+    const { app: a, saved } = app();
+    const live = toolingSim(a)!;
+    live.star = 4;
+    expect(live.serialize().star).toBe(4);
+    const built = (live.constructor as unknown as ToolingTowerClass).newGame(9, "classic");
+    built.star = 2;
+    adoptToolingSim(a, built, false);
+    expect(saved().star).toBe(2);
+    // The built tower reads its own edit after the swap.
+    expect(built.star).toBe(2);
+    expect(built.serialize().star).toBe(2);
+    // The app's tower forgot its edit: the end of the task loads nothing over the swap.
+    await Promise.resolve();
+    expect(saved().star).toBe(2);
+    expect(live.star).toBe(2);
   });
 });

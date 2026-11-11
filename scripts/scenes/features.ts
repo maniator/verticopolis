@@ -210,9 +210,8 @@ export const FEATURE_SCENES: Scene[] = [
               u.occupants = 0;
               if (i < 2) u.noRate = true;
             }
-            // The writes above mark no room, so a new revision makes the HUD
-            // and the report count the rooms again.
-            g.sim.tower.revision++;
+            // The writes reach the engine as a load when this task ends,
+            // which makes the HUD and the report count the rooms again.
           });
           await page.evaluate(() => document.getElementById("btn-stats")?.click());
           await page.waitForSelector("#modal .stats-grid", { timeout: 4000 });

@@ -1,4 +1,3 @@
-import type { Simulation } from "./engine/Simulation";
 import { createAppHistory, type AppHistory } from "./game/appHistory";
 import type { FacilityKind } from "./shared/types";
 import type { TransportView, UnitView } from "./simport/view";
@@ -36,6 +35,7 @@ import { onUpdateAvailable } from "./game/updateFlow";
 import { bootGame } from "./bootstrap";
 import { gameplaySession } from "./analytics";
 import { adoptToolingSim, followToolingEdit, syncToolingSim, toolingSim } from "./game/toolingSim";
+import type { ToolingTower } from "./game/toolingTower";
 import { followEngineTower, type TowerFollow } from "./game/towerFollow";
 import { ViewReader } from "./simport/viewReader";
 import { PortCodes } from "./simport/portCodes";
@@ -79,8 +79,8 @@ class GameApp implements GameAppPorts {
   /** The editor and inspector cards, and the reads the port lacks. @internal */ cardKit!: CardKit;
   /** The elevator schedule review for older towers (#1548). @internal */ scheduleReview!: ScheduleReview;
   /** The tower the tooling harnesses edit by hand (`toolingSim.ts`); undefined on the Rust engine in production. */
-  get sim(): Simulation | undefined { return toolingSim(this); }
-  set sim(sim: Simulation) { this.adoptSim(sim); }
+  get sim(): ToolingTower | undefined { return toolingSim(this); }
+  set sim(sim: ToolingTower) { this.adoptSim(sim); }
   engine: TowerEngine;
   audio = new AudioEngine();
   ui: UI;
@@ -431,11 +431,11 @@ class GameApp implements GameAppPorts {
   followSwap(follow: TowerFollow = "swap"): void { followEngineTower(this, follow); }
 
   /** Swap in a tower a tooling harness built by hand, on either engine. @internal */
-  adoptSim(sim: Simulation, keepCamera = false): void { adoptToolingSim(this, sim, keepCamera); }
+  adoptSim(sim: ToolingTower, keepCamera = false): void { adoptToolingSim(this, sim, keepCamera); }
   /** Hand a harness's edits of `sim` to the engine now. @internal */
   syncSim(): void { syncToolingSim(this); }
   /** Tooling: draw the engine again after a hand edit on `sim` reached it. */
-  followEdit(shown?: Simulation): void { followToolingEdit(this, shown); }
+  followEdit(): void { followToolingEdit(this); }
 
   // ---- Undo / redo (the steps live in the engine; see game/appHistory) ----
   // Thin delegators kept so the many gesture call sites read unchanged.

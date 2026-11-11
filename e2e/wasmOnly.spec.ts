@@ -87,23 +87,17 @@ test.describe("starts on the WASM engine", () => {
     const result = await page.evaluate(() => {
       const sim = (window as any).game.sim;
       (window as any).game.setSpeed(0);
-      const proto = Object.getPrototypeOf(sim);
-      const tries: Record<string, string> = {};
-      for (const step of ["tick", "advanceStep", "onHour", "onDay", "finishConstruction"]) {
-        try {
-          proto[step].call(sim, 1);
-          tries[step] = "ran";
-        } catch (e) {
-          tries[step] = (e as Error).name;
-        }
-      }
+      // The harness's tower is a view over the Rust engine: it carries none
+      // of the TypeScript step loop's passes.
+      const steps: Record<string, string> = {};
+      for (const step of ["advanceStep", "onHour", "onDay", "finishConstruction"]) steps[step] = typeof sim[step];
       // `game.sim.tick` runs the engine itself: it still advances.
       const g = (window as any).game;
       const before = g.sim.clock.minutes;
       g.sim.tick(30);
-      return { tries, advanced: g.sim.clock.minutes - before };
+      return { steps, advanced: g.sim.clock.minutes - before };
     });
-    for (const step of Object.keys(result.tries)) expect(result.tries[step], step).toBe("StepLoopAbsentError");
+    for (const step of Object.keys(result.steps)) expect(result.steps[step], step).toBe("undefined");
     expect(result.advanced).toBe(30);
   });
 

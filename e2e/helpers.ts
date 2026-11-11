@@ -239,9 +239,11 @@ export function buildToStar(target: number): number {
   }
   if (target >= 5) t.place("metro", -9, c - 15); // 30 wide, under the tower
 
+  // Rate the scratch tower on its own engine, as the screenshot builders do,
+  // so the app's engine raises no star-up toast for a scripted setup.
+  s.evaluateStar();
   g.adoptSim(s, true);
   g.speed = 0; // adopting the tower can dismiss a lingering title screen, whose teardown resumes play
-  g.sim.evaluateStar();
   sync();
 
   if (target === 6) {

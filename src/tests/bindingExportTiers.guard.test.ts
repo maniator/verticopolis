@@ -159,6 +159,7 @@ function scannedSources(): string[] {
  *  carries the telemetry and memos a load starts empty. */
 const ALLOWED_FILES = [
   "src/game/toolingSim.ts",
+  "src/game/toolingTower.ts",
   // The rollback rehearsal (#1221): offline tooling that loads two builds' Node engine packages and plays them, never shipped to the browser.
   "src/build/rollbackRehearsal.ts",
   "src/build/rollbackRehearsalNode.ts",

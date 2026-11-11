@@ -183,10 +183,11 @@ const OPAQUE_WRITES: Record<string, OpaqueWrites> = {
   "src/simport/engineLifecycle.fixture.ts": { bulk: 5 },
   // `buildTDT`'s reviver deletes a `toString` key from the export's own
   // `JSON.parse` copy of the save: parsed data that reaches no room.
-  // A harness's field write on the tooling copy of the Rust engine's tower,
-  // which reaches the engine as a load (the engine counts its own rooms): the
-  // copy's own fields and the parts of it a harness holds (liveOf), no live unit.
-  "src/game/toolingSim.ts": { bulk: 3 },
+  // A harness's field write on the tooling tower over the Rust engine, which
+  // reaches the engine as a load (the engine counts its own rooms): the
+  // patches laid over the engine's save and the nested save values a
+  // harness edits in place (tracked), no live unit.
+  "src/game/toolingTower.ts": { bulk: 5 },
   // Array slots: the section builder's output and the telemetry's tables.
   "src/wasmhost/buildSection.ts": { keyed: 1 },
   "src/wasmhost/telemetry.ts": { keyed: 2 },

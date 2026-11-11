@@ -459,7 +459,7 @@ export function pgGrowToStar(target: number): number {
     // a game build gives them: unpriced, the settle's load snaps them and says so over the star line.
     for (let i = 0; i < 2; i++) {
       const r = s.tower.place("hotelSuite", amenityFloor, left + 48 + i * 12);
-      if (r.ok) Object.assign(s.tower.getUnit(r.unitId), { state: "asleep", rent: s.rules.priceOptions("hotelSuite").rungs[2].value });
+      if (r.ok) Object.assign(s.tower.getUnit(r.unitId), { state: "asleep", rent: g.getCatalog().facilities.find((f: any) => f.key === "hotelSuite").rent.rungs[2].value });
     }
     s.vipFavorable = true; // stands in for a favorable VIP review
     // A basement stack, laid top-down so each deck rests on the one above:

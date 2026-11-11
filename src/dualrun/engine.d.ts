@@ -191,6 +191,10 @@ export class Engine {
      */
     floorCongestion(floor: number): number;
     /**
+     * Tooling only: whether `floor` carries a lobby.
+     */
+    floorHasLobby(floor: number): boolean;
+    /**
      * `floorHeatmap(mode)`'s cells as JSON; a mode that is not one of the
      * four overlays is an error.
      */
@@ -236,6 +240,10 @@ export class Engine {
     gameplayEventsPending(): number;
     generation(): number;
     heatCells(mode: number): Float64Array;
+    /**
+     * Tooling only: the highest floor anything stands on.
+     */
+    highestFloor(): number;
     hotspot(): Float64Array;
     /**
      * `housekeepingCoverage()`, as JSON.
@@ -247,6 +255,11 @@ export class Engine {
      * morning checkout.
      */
     housekeepingReport(): string | undefined;
+    /**
+     * Tooling only: whether a shaft or a stair reaches `floor` from the
+     * ground lobby.
+     */
+    isFloorServed(floor: number): boolean;
     labelUnit(id: number, text: string): Float64Array;
     lastReason(): string | undefined;
     loadSave(text: string): Float64Array;
@@ -302,6 +315,17 @@ export class Engine {
      * The pending player choice as JSON `{ kind, cost, message }`, or null.
      */
     pendingChoice(): string | undefined;
+    /**
+     * Tooling only: `placeBare(kind, floor, x)`, the TypeScript `tower.place`, the bare placement with
+     * no charge, star gate or log line. JSON `{ ok, reason?, unitId? }`.
+     */
+    placeBare(kind: string, floor: number, x: number): string;
+    /**
+     * Tooling only: `placeTransportBare(kind, x, bottom, top)`, the
+     * TypeScript `tower.placeTransport`, the bare
+     * shaft placement. JSON `{ ok, reason?, transportId? }`.
+     */
+    placeTransportBare(kind: string, x: number, bottom: number, top: number): string;
     /**
      * `tower.placeTransportDryRun(kind, x, bottom, top)`: whether
      * `validateTransport` accepts the shaft, read the same way.
@@ -367,6 +391,11 @@ export class Engine {
      */
     resolveChoice(accept: boolean): void;
     restore(text: string): Float64Array;
+    /**
+     * Tooling only: the room covering a tile (structure excluded),
+     * serialized as the save would, or null.
+     */
+    roomAt(floor: number, x: number): string | undefined;
     /**
      * The Map's Eval and Pricing read (#343 S7): one `roomTier` row (`id`,
      * `floor`, `x`, `evalTier`, `rentTier`) for each room that carries an
@@ -556,6 +585,11 @@ export class Engine {
     statsStrip(): Float64Array;
     stepRent(id: number, dir: number): Float64Array;
     stopExtend(): Float64Array;
+    /**
+     * Tooling only: the kind of the structure tile (a floor or a lobby) at
+     * a tile, or null.
+     */
+    structureKindAt(floor: number, x: number): string | undefined;
     tdtExport(): Float64Array;
     tdtFile(): Uint8Array | undefined;
     tdtNote(i: number): string | undefined;
@@ -583,6 +617,10 @@ export class Engine {
      * The transport inspector and editor card for shaft `id`, as JSON, or null.
      */
     transportDetail(id: number): string | undefined;
+    /**
+     * Tooling only: shaft `id` serialized as the save would, or null.
+     */
+    transportRecord(id: number): string | undefined;
     undoCapture(label: string): void;
     undoClear(): void;
     undoCommit(): boolean;
@@ -604,6 +642,10 @@ export class Engine {
     unitLabel(id: number): string | undefined;
     unitMetaChanged(since: number): Float64Array;
     unitMetaSince(since: number): string;
+    /**
+     * Tooling only: unit `id` serialized as the save would, or null.
+     */
+    unitRecord(id: number): string | undefined;
     unitSubtype(id: number): string | undefined;
     /**
      * Tooling only: a tenant leaves unit `id` for `reason` (a departure

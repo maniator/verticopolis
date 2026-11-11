@@ -158,30 +158,25 @@ the TypeScript panel adapter moved to `src/tests/conformance/tsPanels.ts`. An
 ESLint rule (`eslint.config.js`) now refuses a runtime import of the engine in
 any shipped file, so the files left are tooling. The sprite atlas bake
 (`src/render/atlas/archive.ts`, `src/render/atlas/browserEntry.ts`) left the list in #1875's
-catalog step: it reads the engine's own catalog from the engine package.
+catalog step: it reads the engine's own catalog from the engine package. The harnesses'
+tower (`src/game/toolingSim.ts`) left it in #1875's tooling step: `game.sim`
+is now a view over the app's Rust engine (`src/game/toolingTower.ts`), so the
+ratchet is empty and the table has no rows.
 
 | File | Runs in the shipped game | Decides gameplay | Disposition | Owner |
 | --- | --- | --- | --- | --- |
-| `src/game/toolingSim.ts` | no: `vite.config.ts` swaps it for `src/game/toolingSimAbsent.ts` in every build but a `VC_TOOLING=1` one (#921) | no | tooling only | #1875 (it constructs the TypeScript port, 2b) |
 
 ### 2b. The shipped bundle
 
 `scripts/verify-engine-bundle.ts` reads every emitted sourcemap after each
-build. A production build carries no `src/engine/` module (#921), and the guard
-fails one that does. A `VC_TOOLING=1` build carries the modules
-`scripts/engine-bundle.allow.txt` lists (93 on this commit, shrink-only), all
-for the harnesses' hand-built tower (`src/game/toolingSim.ts`), which is a
-TypeScript `Simulation` with the `TsEngine` port over it. The step loop
-(`src/engine/sim/loop.ts`) is absent from both, and the CI step "The bundle
-guard catches a TypeScript step loop import" (`.github/workflows/test.yml`)
-proves the check would catch it. Grouped by what the tooling build carries:
-
-| Group | Modules | Why it ships | Runs in the shipped game | Owner |
-| --- | --- | --- | --- | --- |
-| The simulation (`Simulation`, `Tower`, `Crowd`, `EconomySystem`, `EventSystem`, `sim/*`, `tower/*`, migrations, `elevatorSchedule`, `scheduleOrigins`) | most of the list | the harnesses' tower is a `Simulation` | no: tooling builds only | #1875 |
-| The TypeScript port and step driver (`port/*`, `sim/frameStep`, `sim/fixedStep`, `timePacing`, `scheduleAuthoring`) | 15 | `src/game/toolingSim.ts` constructs a `TsEngine` | no: tooling builds only | #1875 |
-| `UndoHistory` | 1 | the TypeScript port's own undo (`UndoSteps`, from `src/engine/port/tsEngine.ts`) | no: tooling builds only | #1875 |
-| Rules and reference tables (`catalog`, `facilitiesData`, `pricing`, `ruleSets`, `gameRules`, `households`, `census`, `residentialRentals`, `retailSubtypes`, `calendar`, `econConfig`, `facilityCaps`, `facilityPredicates`, `sim/constants`, `tower/rooms`, `tower/towerTopology`, `types`) | 17 | the tooling tower's catalog source and the TypeScript engine's own reads | no: tooling builds only | #1875 |
+build. No build carries a `src/engine/` module: production has not since #921,
+and a `VC_TOOLING=1` build has not since #1875's tooling step, which put the
+harnesses' tower (`src/game/toolingSim.ts`, `src/game/toolingTower.ts`) on the
+app's Rust engine. `scripts/engine-bundle.allow.txt` lists nothing, and the
+guard fails a build of either kind that carries any engine module. The step
+loop (`src/engine/sim/loop.ts`) is absent from both, and the CI step "The
+bundle guard catches a TypeScript step loop import" (`.github/workflows/test.yml`)
+proves the check would catch it.
 
 ### 2c. Host and save code
 
@@ -435,8 +430,8 @@ this order under #878:
   relocation tests
   (`src/tests/integration/condoRelocationEngine.integration.test.ts`).
 
-`src/tests/tsEngineTests.ratchet.txt` lists 183 files that still drive the
-TypeScript engine directly (153 test files and 30 fixtures and helpers; the
+`src/tests/tsEngineTests.ratchet.txt` lists 182 files that still drive the
+TypeScript engine directly (152 test files and 30 fixtures and helpers; the
 list shrinks as tests convert and grows only with a reason the PR states, as
 when #1792, #1795, #1797 and #1800 added
 `src/tests/integration/segmentRoutingMealRush.integration.test.ts`,

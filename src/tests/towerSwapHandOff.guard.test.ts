@@ -46,7 +46,8 @@ describe("a tower swap hands the replaced tower's gameplay events on", () => {
   it("assigns the app's engine once, and takes a tower by hand only in the tooling-only adoptToolingSim", () => {
     expect(main.match(/this\.enginePort\s*=(?!=)/g) ?? []).toHaveLength(1);
     expect(main.match(/\.take\(/g) ?? []).toHaveLength(0);
-    expect(tooling.match(/\.take\(/g) ?? []).toHaveLength(1);
+    // The harnesses' tower reaches the engine as a load of its save, never a take.
+    expect(tooling.match(/\.take\(/g) ?? []).toHaveLength(0);
     expect(tooling).toMatch(/^ {2}if \(!\(import\.meta\.env\.DEV \|\| __TOOLING_BUILD__\)\) throw new Error\("adoptSim is for tooling builds only"\);$/m);
     // No other module swaps the app's tower behind the engine's back.
     const elsewhere = shellFiles(src)

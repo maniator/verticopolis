@@ -76,6 +76,9 @@ export const INSTANCE_METHODS = [
   "recyclingCapacity", "recyclingDemandMet",
   // The rooms' evaluation and rent tiers for the Map's Eval and Pricing views (#343 S7).
   "roomTiers",
+  // The tooling harnesses' bare edits and reads (src/game/toolingTower.ts, #1875 step 4).
+  "placeBare", "placeTransportBare", "unitRecord", "transportRecord", "roomAt",
+  "structureKindAt", "floorHasLobby", "isFloorServed", "highestFloor",
 ] as const satisfies readonly (keyof WasmEngine)[];
 export const STATIC_METHODS = ["newGame", "fromSave", "fromVctower"] as const satisfies readonly (keyof typeof Engine)[];
 

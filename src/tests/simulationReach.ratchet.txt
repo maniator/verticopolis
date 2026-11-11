@@ -4,4 +4,3 @@
 # file per line: `<file> <module> ... # reason`. The list shrinks as the
 # facade's slices (#1207) move each consumer behind the port; a new line needs
 # a reason the PR states and a reviewer accepts.
-src/game/toolingSim.ts Simulation port/tsEngine # the tooling harnesses' hand-built towers on either engine, moved from src/main.ts (PR 5e); tooling builds only past the TsEngine check
