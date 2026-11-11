@@ -657,7 +657,10 @@ automatic run never puts an older release over a newer one. Each production
 deployment carries its release tag and commit as Vercel metadata, so for an
 instant rollback without a rebuild, find the release with
 `vercel ls --prod --meta release=v<version>` and `vercel promote` its URL (the
-Deploy production run's summary prints that command for its own deployment). It
+Deploy production run's summary prints that command for its own deployment). An
+app release also gets the deployed web build attached as
+`verticopolis-web-<version>.zip` with its SHA-256 checksum, beside the engine
+package zip a crate release carries. It
 needs the `VERCEL_TOKEN`, `VERCEL_ORG_ID` and `VERCEL_PROJECT_ID` secrets in
 the `production` environment and fails, naming the missing one, without them.
 

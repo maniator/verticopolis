@@ -128,6 +128,12 @@ older tag**.
 - Owner ask: tag deploys on Vercel for easy rollbacks. Each deployment now
   carries `release` and `commit` metadata (`--meta`, checked in the pinned
   CLI's help), and the run summary prints the `vercel promote` command.
+- Owner ask: a zip of the build on each release. The engine already ships as
+  a zip on `engine-v` releases. An `archive` job (contents: write, no Vercel
+  secrets) now attaches the deployed `dist/` as `verticopolis-web-<version>.zip`
+  plus checksum to the app release, waiting for github-release.yml to publish
+  it and leaving an existing archive alone. Exercised with a stubbed `gh`:
+  uploads when missing, skips when present.
 
 ### File List
 

@@ -197,6 +197,17 @@ jobs:
       - name: Build
         run: vercel build --prod
 
+      # The static web build this run deploys (dist/, the engine package
+      # included), kept for the release's archive job. Only an app tag gets one.
+      - name: Keep the web build for the release
+        if: ${{ startsWith(inputs.tag, 'v') }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: web-build
+          path: dist/
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Deploy
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
@@ -248,3 +259,46 @@ jobs:
           done
           echo "::error::$domain did not switch to $deployment serving $TAG ($SHA) after the deploy."
           exit 1
+
+  # Attaches the deployed web build to the app release as a zip with its
+  # checksum, so every release keeps a copy of exactly what players got. Runs
+  # after a successful deploy and apart from the Vercel secrets. The release is
+  # published by github-release.yml, dispatched just before this run, so this
+  # waits for it. An archive already attached (a redeploy or a rollback) is
+  # left alone. A crate-only release has its own engine package zip
+  # (release-tag.yml) and no web zip.
+  archive:
+    needs: [check, deploy]
+    if: ${{ startsWith(inputs.tag, 'v') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: web-build
+          path: dist/
+
+      - name: Attach the web build to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          zip="verticopolis-web-${TAG#v}.zip"
+          for attempt in $(seq 1 40); do
+            if assets="$(gh release view "$TAG" --json assets --jq '.assets[].name' 2>/dev/null)"; then break; fi
+            if [ "$attempt" = 40 ]; then echo "::error::No GitHub release for $TAG after 10 minutes; re-run this job once it exists."; exit 1; fi
+            echo "Waiting for the $TAG release (attempt $attempt)."
+            sleep 15
+          done
+          if printf '%s\n' "$assets" | grep -qxF "$zip"; then
+            echo "$TAG already has $zip; leaving it."
+            exit 0
+          fi
+          (cd dist && zip -qr "../$zip" .)
+          sha256sum "$zip" > "$zip.sha256"
+          gh release upload "$TAG" "$zip" "$zip.sha256"
+          echo "Attached $zip to $TAG."
