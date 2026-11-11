@@ -97,6 +97,11 @@ pub fn write_routing_tail(placed: &[PlacedHalf]) -> Vec<u8> {
         let Some(&(_, upper_floor, upper_slot)) = upper else {
             continue;
         };
+        // A half past the index map's 94 ids has no logical id to name, and
+        // one bad record would make the reader drop the whole table.
+        if slot >= TDT_FLOOR_INDEX_ENTRIES || upper_slot >= TDT_FLOOR_INDEX_ENTRIES {
+            continue;
+        }
         let mut record = [0u8; TDT_VENUE_RECORD_SIZE];
         record[0] = upper_floor as u8;
         record[1] = floor as u8;
@@ -237,6 +242,11 @@ mod tests {
             upper,
             film_days: None,
         };
+        let theatre_far = |upper| OutVenueHalf {
+            room: 7,
+            upper,
+            film_days: Some(2),
+        };
         // A lone half (a room cut at the roof) writes no record.
         let stray = OutVenueHalf {
             room: 9,
@@ -247,6 +257,9 @@ mod tests {
             (hall(false), 20, 6),
             (theatre(false, Some(7)), 20, 4),
             (stray, 30, 0),
+            // A theatre whose lower half sits past the index map writes none.
+            (theatre_far(false), 40, TDT_FLOOR_INDEX_ENTRIES),
+            (theatre_far(true), 41, 0),
             (theatre(true, Some(7)), 21, 2),
             (hall(true), 21, 5),
         ];

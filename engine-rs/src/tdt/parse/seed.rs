@@ -197,22 +197,30 @@ fn seed_film_days(units: &mut [serde_json::Value], tdt: &TdtTower) {
             Some((i, f, x, x + w))
         })
         .collect();
+    // The tenant a record names on a floor: the first floor with that index
+    // wins, as a search would find it.
+    let named = |index: i64, slot: u8| {
+        let floor = tdt.floors.iter().find(|f| f.index == index)?;
+        let &t = floor.index_map.get(usize::from(slot))?;
+        floor.tenants.get(usize::from(t))
+    };
     for venue in tdt.tail.venues.iter().filter(|v| v.film.is_some()) {
-        // The first floor with an index wins, as a search would find it.
-        let Some(floor) = tdt.floors.iter().find(|f| f.index == venue.lower_floor) else {
+        let (Some(lower), Some(upper)) = (
+            named(venue.lower_floor, venue.lower_slot),
+            named(venue.upper_floor, venue.upper_slot),
+        ) else {
             continue;
         };
-        let Some(tenant) = floor
-            .index_map
-            .get(usize::from(venue.lower_slot))
-            .and_then(|&t| floor.tenants.get(usize::from(t)))
-        else {
-            continue;
-        };
-        let at = floor.index - TDT_FLOOR_OFFSET;
-        let hit = theatres
-            .iter()
-            .find(|&&(_, f, left, right)| f == at && left < tenant.right && tenant.left < right);
+        // Both halves must lie over the same theatre, or the record is left
+        // unseeded.
+        let at = venue.lower_floor - TDT_FLOOR_OFFSET;
+        let hit = theatres.iter().find(|&&(_, f, left, right)| {
+            f == at
+                && left < lower.right
+                && lower.left < right
+                && left < upper.right
+                && upper.left < right
+        });
         if let Some(&(i, ..)) = hit {
             if let serde_json::Value::Object(m) = &mut units[i] {
                 m.insert("filmDays".into(), venue.days_shown.into());
