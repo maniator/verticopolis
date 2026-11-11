@@ -8,7 +8,8 @@ gallery in the pinned Playwright image without waiting on CI.
 | --- | --- |
 | `setup.sh` | Installs Node at the `.nvmrc` version, runs `npm ci`, installs Rust at the engine's `rust-version` (rustfmt, clippy, wasm32) as the default, builds the engine WASM package through `scripts/build-engine-wasm.sh` (pinned, checksummed wasm-bindgen), installs the Playwright MCP server, starts `dockerd` and pulls the pinned Playwright image in the background. Each step skips work already done. |
 | `pinned.sh` | Runs the screenshot gallery (`screenshots`), the visual baselines (`baselines`) or any command (`run '<cmd>'`) inside the pinned image, the way CI does. |
-| `playwright-mcp.mjs` | Starts the Playwright MCP server for `.mcp.json`: inside the pinned image with its Chromium when Docker has the image, otherwise on the host. |
+| `playwright-mcp.mjs` | Starts the Playwright MCP server for `.mcp.json`: inside the pinned image with its Chromium when Docker has the image (starting `dockerd` first when it is down), otherwise on the host. |
+| `claude-user.mjs` | Registers the session hook and the Playwright MCP server with Claude Code at user scope (`~/.claude/settings.json`, `~/.claude.json`), for sessions that start above the checkout. `setup.sh --claude-user` runs it. |
 
 `setup.sh` writes `export` lines to `$AGENT_ENV_FILE` when that is set:
 `PATH` (the Node it installed), `PW_CHROMIUM_PATH` (a preinstalled Chromium
@@ -23,11 +24,25 @@ Logs go to `$TMPDIR/vc-agent-setup/`.
   It does nothing in a local session. `.mcp.json` adds the Playwright MCP
   server, and `enabledMcpjsonServers` in the same settings file approves it.
   The first start in a fresh container takes two to four minutes (most of it
-  the engine build); a resume takes about a second. Both start only once this
-  is merged to `main`, or on a session that checks out this branch. If a
-  session that starts above the checkout (a project thread with several
-  repositories) does not run the hook, set the environment's setup script to
-  `if [ -d verticopolis ]; then AGENT_ENV_FILE=$HOME/.bashrc bash verticopolis/tools/agent-env/setup.sh; fi`.
+  the engine build); a resume takes about a second.
+- **Claude Code project threads** start in the folder above the checkouts, so
+  they never read this repository's `.claude/` or `.mcp.json`. Set the
+  environment's setup script (Project settings, Cloud environment) to
+
+  ```sh
+  if [ -d verticopolis ]; then bash verticopolis/tools/agent-env/setup.sh --claude-user; fi
+  ```
+
+  It does everything above while the container is built, waits for the pinned
+  image, and registers the same hook (as `.claude/hooks/session-start.sh
+  --user`) and the Playwright MCP server at user scope, so every session in
+  that container gets Node 26 on `PATH`, `dockerd` and the server. Its
+  exports also go to `/etc/profile.d/vc-agent-env.sh`, which the first line of
+  `~/.bashrc` sources: Debian's `~/.bashrc` returns early outside an
+  interactive shell, so a line appended there misses scripts. The user
+  hook steps aside when a session starts inside the checkout, where the
+  repository's own hook runs. `setup.sh` takes a lock, so two hooks never
+  race.
 - **Codex** (and any other Linux sandbox with a setup-script field): set the
   environment's setup script to
   `AGENT_ENV_FILE=$HOME/.bashrc bash tools/agent-env/setup.sh`, so later
