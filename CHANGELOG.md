@@ -23,6 +23,12 @@ prompt already tells players it is an engine update and shows the new version.
 Entries below 1.51.1 were curated from the commit history after the fact, so they
 are documentation only: no build that a client fetches carries them.
 
+## 3.0.1
+
+- Refusing the bomb ransom now starts a race: Security searches floor by floor before the 1:00 PM deadline, with a countdown, a ticking clock and a red glow. If they miss it, the bomb goes off.
+- Every turn of a bomb threat now pops up on screen, phone included. In Modern, a Security office that opens during a search sends its guards to join it.
+- The update window now lists what's new in every version you skipped, newest first, and never shows the same notes twice.
+
 ## 3.0.0
 
 - Verticopolis 3.0: the whole game now runs on its new engine, checked against hundreds of replayed games and the 1994 original's rules.
