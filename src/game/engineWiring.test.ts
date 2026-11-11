@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { GameApp } from "../main";
-import { Simulation } from "../engine/Simulation";
 import { wireEngine } from "./engineWiring";
-import { portDeps } from "./portDeps.fixture";
+import { PortCodes } from "../simport/portCodes";
+import { code, mockPort, record } from "../tests/portKit/mockPort";
 import { placeSimpleBuild, isTransportTool, isPaintTool, updateBuildPreview, touchBuildLiftFloors } from "./buildPreview";
 import { runFrame } from "./frameLoop";
 import { noteEngineThrow, watchEngineTraps } from "./engineFault";
@@ -57,7 +57,10 @@ const flush = () => new Promise((r) => setTimeout(r, 0));
 function makeApp(toolOver: Record<string, unknown> = {}) {
   const engine: FakeEngine = {};
   const canvas = document.createElement("canvas");
-  const { engine: enginePort, codes: portCodes, reader } = portDeps(new Simulation());
+  // A drag latch (generation) and a shaft quote; the real answers: shaftPreview.integration.test.ts.
+  const enginePort = mockPort({ generation: () => 1, quoteShaft: () => record("quoteShaft", { ok: 1 }), lastReason: () => undefined });
+  const portCodes = new PortCodes(mockPort());
+  const reader = { unlocked: vi.fn(() => true), header: { mode: "classic" } };
   const app = {
     engine,
     enginePort,
@@ -476,20 +479,20 @@ describe("touch room-build offset-ghost flow", () => {
 describe("the shaft drag preview", () => {
   it("asks the engine port whether the dragged span fits, and the star gate", () => {
     const app = makeApp({ type: "build", kind: "elevatorStandard" });
-    const sim = new Simulation(1, "classic");
-    for (let x = 10; x < 30; x++) expect(sim.tower.place("lobby", 1, x).ok).toBe(true);
-    for (let x = 10; x < 30; x++) expect(sim.tower.place("floor", 2, x).ok).toBe(true);
-    const { engine, codes, reader } = portDeps(sim);
-    Object.assign(app, { sim, enginePort: engine, portCodes: codes, reader });
     mockIsTransportTool.mockReturnValue(true);
     wireEngine(app);
     app.transportStart = { x: 10, floor: 1 };
     app.engine.onActionMove!(10, 2, null);
+    expect(app.enginePort.quoteShaft).toHaveBeenLastCalledWith(code("kinds", "elevatorStandard"), 10, 1, 2);
+    expect(app.reader.unlocked).toHaveBeenLastCalledWith("elevatorStandard");
     expect(app.engine.transportPreview).toEqual({ kind: "elevatorStandard", x: 10, bottom: 1, top: 2, valid: true });
-    // Floor 5 has no structure at the column: the engine refuses the span.
-    app.engine.onActionMove!(10, 5, null);
-    expect(app.engine.transportPreview).toMatchObject({ bottom: 1, top: 5, valid: false });
+    // A drag below the start orders the span bottom-up; the engine refuses it.
+    vi.mocked(app.enginePort.quoteShaft).mockReturnValueOnce(record("quoteShaft", { ok: 0 }));
+    app.engine.onActionMove!(10, 0, null);
+    expect(app.enginePort.quoteShaft).toHaveBeenLastCalledWith(code("kinds", "elevatorStandard"), 10, 0, 1);
+    expect(app.engine.transportPreview).toMatchObject({ bottom: 0, top: 1, valid: false });
     // A kind the star rating has not unlocked is invalid on a fitting span.
+    app.reader.unlocked.mockReturnValueOnce(false);
     app.tool = { type: "build", kind: "elevatorExpress" } as never;
     app.engine.onActionMove!(10, 2, null);
     expect(app.engine.transportPreview).toMatchObject({ kind: "elevatorExpress", valid: false });

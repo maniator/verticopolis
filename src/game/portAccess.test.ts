@@ -1,65 +1,86 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { catalogFacility } from "../catalog/catalogTypes";
-import { Simulation } from "../engine/Simulation";
 import { catalogFor } from "../tests/catalogFixture";
 import { towerCatalog, useTowerCatalogSource } from "../catalog/towerCatalog";
+import { PortCodes } from "../simport/portCodes";
 import { PortRenderSim } from "../simport/portRenderSim";
+import type { SimView } from "../simport/view";
+import type { ViewReader } from "../simport/viewReader";
 import { catalogOf, floorsOfPort, isUnlocked, newRenderSim, newViewReader, quoteBuild, quoteShaft } from "./portAccess";
 import { bindViewKinds, isHotelKind, resetViewKindsForTests } from "../presentation/viewKinds";
-import { portDeps } from "./portDeps.fixture";
-import { KINDS } from "../engine/port/layout";
+import { code, frame, mockPort, record, structure } from "../tests/portKit/mockPort";
 
-function tower() {
-  const sim = new Simulation(7, "classic");
-  for (let x = 10; x < 30; x++) expect(sim.tower.place("lobby", 1, x).ok).toBe(true);
-  return sim;
+/**
+ * The port's read helpers over a mock port: the calls they make and what
+ * they make of the answers. The engine's own answers (a build quote and its
+ * refusal text, a shaft check, the unlocked mask) are its tests:
+ * `lobbyFloorCharge.integration.test.ts` quotes builds on the Rust engine, and
+ * `the_unlocked_mask_follows_the_star` (engine-rs/src/view/frame_tests.rs)
+ * pins the mask the reader decodes.
+ */
+
+const REFUSAL = "Needs a floor below.";
+
+/** A port whose view holds one office, which the reader's first update sizes. */
+function viewPort() {
+  return mockPort({
+    generation: () => 1,
+    view: () => undefined,
+    towerName: () => "Tower One",
+    unitLabel: () => undefined,
+    unitSubtype: () => undefined,
+    unitMetaChanged: () => Float64Array.of(0, 0),
+    viewStructure: () => structure({ header: { revision: 1, highestFloor: 1, lowestFloor: 1 }, rooms: [{ id: 10, kind: "office", floor: 1, x: 12, width: 9 }] }),
+    viewFrame: (full: boolean) => frame({ header: { frameSeq: 1, full: full ? 1 : 0, rooms: 1, towerRevision: 1, metaRevision: 0 }, units: [{ slot: 0, state: code("unitStates", "occupied") }] }),
+  });
 }
 
 describe("quoteBuild", () => {
-  it("answers what canBuild answers, with the engine's own refusal text", () => {
-    const sim = tower();
-    const { engine, codes } = portDeps(sim);
-    const ok = quoteBuild(engine, codes, "floor", 2, 12);
-    const want = sim.canBuild("floor", 2, 12);
-    expect(ok).toEqual({ ok: want.ok, cost: want.cost, reason: undefined });
-    const refused = quoteBuild(engine, codes, "office", 9, 12);
-    const wantRefused = sim.canBuild("office", 9, 12);
-    expect(refused.ok).toBe(false);
-    expect(refused.reason).toBe(wantRefused.reason);
-    expect(refused.cost).toBe(wantRefused.cost);
+  it("passes the kind's code and the spot, and reads the cost and the ok flag", () => {
+    const port = mockPort({ quoteBuild: () => record("quoteBuild", { ok: 1, cost: 5_000 }), lastReason: () => REFUSAL });
+    expect(quoteBuild(port, new PortCodes(port), "floor", 2, 12)).toEqual({ ok: true, cost: 5_000, reason: undefined });
+    expect(port.quoteBuild).toHaveBeenCalledExactlyOnceWith(code("kinds", "floor"), 2, 12);
+    expect(port.lastReason, "an accepted quote reads no reason").not.toHaveBeenCalled();
+  });
+
+  it("carries the engine's own refusal text with the cost it quoted", () => {
+    const port = mockPort({ quoteBuild: () => record("quoteBuild", { ok: 0, cost: 40_000 }), lastReason: () => REFUSAL });
+    expect(quoteBuild(port, new PortCodes(port), "office", 9, 12)).toEqual({ ok: false, cost: 40_000, reason: REFUSAL });
+    expect(port.lastReason).toHaveBeenCalledOnce();
   });
 });
 
 describe("quoteShaft", () => {
   it("answers the placement check, and a refusal carries its reason", () => {
-    const sim = tower();
-    for (let x = 10; x < 30; x++) expect(sim.tower.place("floor", 2, x).ok).toBe(true);
-    const { engine, codes } = portDeps(sim);
-    expect(quoteShaft(engine, codes, "elevatorStandard", 12, 1, 2)).toEqual({ ok: true, reason: undefined });
-    const refused = quoteShaft(engine, codes, "elevatorStandard", 12, 1, 6);
-    expect(refused.ok).toBe(false);
-    expect(refused.reason).toBe(sim.tower.validateTransport("elevatorStandard", 12, 1, 6).reason);
+    let ok = 1;
+    const port = mockPort({ quoteShaft: () => record("quoteShaft", { ok }), lastReason: () => REFUSAL });
+    const codes = new PortCodes(port);
+    expect(quoteShaft(port, codes, "elevatorStandard", 12, 1, 2)).toEqual({ ok: true, reason: undefined });
+    expect(port.quoteShaft).toHaveBeenLastCalledWith(code("kinds", "elevatorStandard"), 12, 1, 2);
+    expect(port.lastReason).not.toHaveBeenCalled();
+    ok = 0;
+    expect(quoteShaft(port, codes, "elevatorStandard", 12, 1, 6)).toEqual({ ok: false, reason: REFUSAL });
+    expect(port.quoteShaft).toHaveBeenLastCalledWith(code("kinds", "elevatorStandard"), 12, 1, 6);
   });
 });
 
+/** A reader as `catalogOf` reads it: the header's mode. */
+const readerIn = (mode: "classic" | "modern") => ({ header: { mode } }) as unknown as Pick<SimView, "header">;
+
 describe("catalogOf", () => {
   it("is the catalog of the reader's mode, kept across header updates", () => {
-    const classic = new Simulation(1, "classic");
-    const modern = new Simulation(1, "modern");
-    const cd = portDeps(classic);
-    const md = portDeps(modern);
-    const c = { enginePort: cd.engine, reader: cd.reader };
-    const m = { enginePort: md.engine, reader: md.reader };
+    const c = { enginePort: {}, reader: readerIn("classic") };
+    const m = { enginePort: {}, reader: readerIn("modern") };
     expect(catalogOf(c).mode).toBe("classic");
     expect(catalogOf(m).mode).toBe("modern");
     const first = catalogOf(c);
-    c.reader.update();
+    c.reader = readerIn("classic");
     expect(catalogOf(c)).toBe(first);
   });
 
   it("follows the catalog source installed on the engine port", () => {
-    const sim = new Simulation(1, "classic");
-    const { engine: enginePort, reader } = portDeps(sim);
+    const enginePort = {};
+    const reader = readerIn("classic");
     const base = catalogOf({ enginePort, reader });
     const office = catalogFacility(base, "office");
     const hosted = {
@@ -76,32 +97,19 @@ describe("catalogOf", () => {
 });
 
 describe("isUnlocked", () => {
-  it("answers what the simulation answers for every kind, from the reader's header", () => {
-    for (const mode of ["classic", "modern"] as const) {
-      const sim = new Simulation(7, mode);
-      const { reader } = portDeps(sim);
-      for (const star of [1, 3, 5, 6]) {
-        sim.star = star;
-        reader.update();
-        for (const kind of KINDS) expect(isUnlocked({ reader }, kind), `${mode} ${star} ${kind}`).toBe(sim.isUnlocked(kind));
-      }
-    }
-  });
-
-  it("answers as of the reader's last update", () => {
-    const sim = tower();
-    const { reader } = portDeps(sim);
+  it("answers what the reader decodes for the kind, as of its last update", () => {
+    const unlocked = vi.fn((kind: string) => kind === "office");
+    const reader = { unlocked } as unknown as Pick<ViewReader, "unlocked">;
+    expect(isUnlocked({ reader }, "office")).toBe(true);
     expect(isUnlocked({ reader }, "elevatorExpress")).toBe(false);
-    sim.star = 5;
-    expect(isUnlocked({ reader }, "elevatorExpress")).toBe(false);
-    reader.update();
-    expect(isUnlocked({ reader }, "elevatorExpress")).toBe(sim.isUnlocked("elevatorExpress"));
+    expect(unlocked.mock.calls).toEqual([["office"], ["elevatorExpress"]]);
   });
 });
 
 describe("newRenderSim", () => {
   it("reads its catalog from the engine's source, so the renderer sizes rooms as the engine does", () => {
-    const { engine, reader } = portDeps(tower());
+    const engine = viewPort();
+    const reader = newViewReader(engine);
     // A source whose wedding hall no catalog states: seven stories.
     const marked = (mode: "classic" | "modern") => {
       const c = catalogFor(mode);
@@ -120,9 +128,7 @@ afterEach(() => bindViewKinds(catalogFor("modern")));
 
 describe("newViewReader", () => {
   it("binds the view's kind facts before the reader's first update asks a kind's height", () => {
-    const sim = tower();
-    sim.tower.place("office", 1, 12);
-    const { engine } = portDeps(sim);
+    const engine = viewPort();
     resetViewKindsForTests();
     expect(() => newViewReader(engine)).not.toThrow();
     expect(isHotelKind("hotelSingle")).toBe(true);
@@ -137,7 +143,7 @@ describe("floorsOfPort", () => {
   };
 
   it("answers from the port's own catalog, whatever the view's kind facts were last bound to", () => {
-    const { engine } = portDeps(tower());
+    const engine = mockPort();
     const floors = floorsOfPort(engine);
     useTowerCatalogSource(engine, tallHall);
     expect(floors("weddingHall")).toBe(7);

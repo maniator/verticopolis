@@ -15,8 +15,10 @@ import { makeApp, makeSim } from "./frameLoop.fixture";
  *     spies (their behavior is pinned by their own colocated tests).
  *   - `decideMealRush` is a controllable spy so the meal-rush emission can be
  *     forced without restating its pure crossing math.
- * `paceFactor` stays the REAL function; `steadyClock: true` pins pace to 1 so
- * the accumulation math is exact and deterministic.
+ * The engine port is a fake whose `advance` hands back the carry it was given
+ * unless a test says otherwise: how the engine cuts owed minutes into steps
+ * (the pace curve, the quantum, the catch-up cap, a bad amount, a mode
+ * change) is the Rust engine's, checked in `engine-rs/tests/fixed_step.rs`.
  */
 
 vi.mock("./trafficHud", () => ({ updateTraffic: vi.fn() }));
@@ -35,29 +37,29 @@ describe("SPEEDS", () => {
 });
 
 describe("runFrame freeze path", () => {
-  it("freezes time (accMinutes -> 0, no tick) while an emergency choice modal is up", () => {
-    const { app, raw, sim } = makeApp({ shownChoice: true, accMinutes: 12 });
+  it("freezes time (accMinutes -> 0, no step) while an emergency choice modal is up", () => {
+    const { app, raw } = makeApp({ shownChoice: true, accMinutes: 12 });
     runFrame(app, 1000);
     expect(raw.accMinutes).toBe(0);
-    expect(sim.tick).not.toHaveBeenCalled();
+    expect(raw.enginePort.advance).not.toHaveBeenCalled();
   });
 
   it("freezes time while the update prompt is up", () => {
-    const { app, raw, sim } = makeApp({ shownUpdate: true, accMinutes: 9 });
+    const { app, raw } = makeApp({ shownUpdate: true, accMinutes: 9 });
     runFrame(app, 1000);
     expect(raw.accMinutes).toBe(0);
-    expect(sim.tick).not.toHaveBeenCalled();
+    expect(raw.enginePort.advance).not.toHaveBeenCalled();
   });
 
   it("stops time for good once a wasm-only build has stopped on its engine, whatever the speed", () => {
-    const { app, raw, sim } = makeApp({ accMinutes: 7 });
+    const { app, raw } = makeApp({ accMinutes: 7 });
     const stop = document.createElement("div");
     stop.id = "engine-failure";
     document.body.appendChild(stop);
     try {
       runFrame(app, 1000);
       expect(raw.accMinutes).toBe(0);
-      expect(sim.tick).not.toHaveBeenCalled();
+      expect(raw.enginePort.advance).not.toHaveBeenCalled();
     } finally {
       stop.remove();
     }
@@ -69,140 +71,87 @@ describe("runFrame freeze path", () => {
     // moving the noteFrame call below the freeze return would silently drop fps
     // sampling whenever a modal is open.
     const spy = vi.spyOn(gameplaySession, "noteFrame").mockImplementation(() => {});
-    const { app, sim } = makeApp({ shownChoice: true, accMinutes: 12 });
+    const { app, raw } = makeApp({ shownChoice: true, accMinutes: 12 });
     runFrame(app, 1000);
     expect(spy).toHaveBeenCalledTimes(1); // sampled despite the frozen frame
-    expect(sim.tick).not.toHaveBeenCalled(); // and the freeze still held
+    expect(raw.enginePort.advance).not.toHaveBeenCalled(); // and the freeze still held
     spy.mockRestore();
   });
 });
 
 describe("runFrame simulation stepping", () => {
-  // makeApp turns the steady clock on, so owed minutes are exact (pace 1) and the
-  // engine sizes its step from a flat pace too: 2 minutes at the fastest speed,
-  // 1 at speed 1.
-  it("steps one fixed 2-minute quantum per 60 fps frame at the fastest speed", () => {
-    // 1/60 s at speed 3 (120 min/s), steady pace -> 2 owed minutes -> one
-    // 2-minute step, fully drained: the same sim work per frame as before.
-    const { app, raw, sim } = makeApp({ speed: 3, accMinutes: 0 });
-    runFrame(app, 1000 / 60);
-    const steps = sim.tick.mock.calls.map((c) => c[0] as number);
-    expect(steps).toEqual([2]);
-    expect(raw.accMinutes).toBeCloseTo(0, 9);
-  });
-
-  it("steps 1-minute quanta at the slow speeds and carries the remainder", () => {
-    // 0.25s at speed 1 (10 min/s) -> 2.5 owed minutes -> two 1-minute steps,
-    // 0.5 carried to the next frame.
-    const { app, raw, sim } = makeApp({ speed: 1, accMinutes: 0 });
+  it("hands the engine the carry, the frame, the speed's pace and the steady clock, and keeps the carry it answers", () => {
+    const { app, raw } = makeApp({ speed: 1, accMinutes: 0.5, prefs: { steadyClock: false } });
+    raw.enginePort.advance.mockReturnValueOnce(Float64Array.of(2, 0.75));
     runFrame(app, 250);
-    const steps = sim.tick.mock.calls.map((c) => c[0] as number);
-    expect(steps).toEqual([1, 1]);
-    expect(raw.accMinutes).toBeCloseTo(0.5, 9);
+    expect(raw.enginePort.advance).toHaveBeenCalledExactlyOnceWith(0.5, 250, SPEEDS[1], false, true);
+    expect(raw.accMinutes).toBe(0.75);
   });
 
-  it("bounds a slow frame to the step budget and carries the rest as debt", () => {
-    // 0.2s at speed 3 -> 24 owed minutes; four 2-minute steps run (8 minutes)
-    // and the other 16 stay owed for the next frame.
-    const { app, raw, sim } = makeApp({ speed: 3, accMinutes: 0 });
-    runFrame(app, 200);
-    const steps = sim.tick.mock.calls.map((c) => c[0] as number);
-    expect(steps).toEqual([2, 2, 2, 2]);
-    expect(raw.accMinutes).toBe(16);
-  });
-
-  it("clamps a huge frame to MAX_CATCHUP (30 min) before the step budget applies", () => {
-    // A 100s frame at speed 3 would owe 12000 minutes. The cap drops it to 30,
-    // four 2-minute steps run, and the other 22 carry: 30 in total, no more.
-    const { app, raw, sim } = makeApp({ speed: 3, accMinutes: 0 });
-    runFrame(app, 100_000);
-    const steps = sim.tick.mock.calls.map((c) => c[0] as number);
-    expect(steps).toEqual([2, 2, 2, 2]);
-    expect(steps.reduce((a, b) => a + b, 0) + raw.accMinutes).toBe(30);
-  });
-
-  it("sizes the step from the steady clock when the player turned it on", () => {
-    // Lunch on the canon curve would take 1-minute steps; with the steady clock
-    // the pace is flat, so a 30 Hz frame at speed 3 (4 owed) runs two 2-minute steps.
-    const sim = makeSim({ clock: { minuteOfDay: 720, minutes: 720, calendar: { weekDays: 7, weekendDays: 2 } } });
-    const { app, raw } = makeApp({ sim, speed: 3, accMinutes: 0 });
-    runFrame(app, 1000 / 30);
-    expect(sim.tick.mock.calls.map((c) => c[0] as number)).toEqual([2, 2]);
-    expect(raw.accMinutes).toBeCloseTo(0, 9);
-  });
-
-  it("sizes the step from the canon curve when the steady clock is off", () => {
-    // Night sprint (minute 180, pace 3.25): a 60 Hz frame at speed 3 owes 6.5
-    // minutes and the engine's step is 6 (rounded down), so every frame steps
-    // once and the half minute carries until it adds up to a second step.
-    const sim = makeSim({ clock: { minuteOfDay: 180, minutes: 180, calendar: { weekDays: 7, weekendDays: 2 } } });
-    const { app, raw } = makeApp({ sim, speed: 3, accMinutes: 0, prefs: { steadyClock: false } });
+  it("passes the steady clock when the player turned it on, and the fastest speed's pace", () => {
+    const { app, raw } = makeApp({ speed: 3, accMinutes: 0 });
     runFrame(app, 1000 / 60);
-    expect(sim.tick.mock.calls.map((c) => c[0] as number)).toEqual([6]);
-    expect(raw.accMinutes).toBeCloseTo(0.5, 9);
+    expect(raw.enginePort.advance).toHaveBeenCalledExactlyOnceWith(0, 1000 / 60, 120, true, true);
+  });
+
+  it("hands a paused game's carry over at no pace, and the engine's answer stands", () => {
+    const { app, raw } = makeApp({ speed: 0, accMinutes: 5.5 });
+    raw.enginePort.advance.mockReturnValueOnce(Float64Array.of(0, 0));
     runFrame(app, 1000 / 60);
-    expect(sim.tick.mock.calls.map((c) => c[0] as number)).toEqual([6, 6]);
-    expect(raw.accMinutes).toBeCloseTo(1, 9);
+    expect(raw.enginePort.advance).toHaveBeenCalledExactlyOnceWith(5.5, 1000 / 60, 0, true, true);
+    expect(raw.accMinutes).toBe(0);
   });
 
   it("drops the carry when a step throws mid-frame, so steps that ran are never owed again", () => {
-    const sim = makeSim();
-    sim.tick.mockImplementationOnce(() => {}).mockImplementationOnce(() => {
+    const { app, raw } = makeApp({ speed: 3, accMinutes: 4 });
+    raw.enginePort.advance.mockImplementationOnce(() => {
       throw new Error("boom");
     });
-    const { app, raw } = makeApp({ sim, speed: 3, accMinutes: 0 });
     expect(() => runFrame(app, 100)).toThrow("boom");
-    // 12 owed, one 2-minute step ran before the throw: nothing stays owed.
     expect(raw.accMinutes).toBe(0);
+    expect(raw.reader.update, "no view is read after a failed step").not.toHaveBeenCalled();
   });
 
   it("drops minutes carried at one speed when the speed changes", () => {
-    const { app, raw, sim } = makeApp({ speed: 3, accMinutes: 0 });
-    runFrame(app, 200); // 24 owed at speed 3: four steps run, 16 carried
-    expect(raw.accMinutes).toBe(16);
-    sim.tick.mockClear();
-    raw.speed = 1;
-    runFrame(app, 100); // the carry is dropped; only 1 minute is owed at speed 1
-    expect(sim.tick.mock.calls.map((c) => c[0] as number)).toEqual([1]);
-    expect(raw.accMinutes).toBeCloseTo(0, 9);
+    const { app, raw } = makeApp({ speed: 3, accMinutes: 16 });
+    applySpeed(app, 1);
+    expect(raw.accMinutes).toBe(0);
+    runFrame(app, 100);
+    expect(raw.enginePort.advance).toHaveBeenCalledExactlyOnceWith(0, 100, SPEEDS[1], true, true);
   });
 
   it("drops the carry on a speed change undone before the next frame (fastest, pause, fastest)", () => {
-    const { app, raw, sim } = makeApp({ speed: 3, accMinutes: 0 });
-    runFrame(app, 200);
-    expect(raw.accMinutes).toBe(16);
-    sim.tick.mockClear();
+    const { app, raw } = makeApp({ speed: 3, accMinutes: 16 });
     applySpeed(app, 0);
     applySpeed(app, 3);
-    runFrame(app, 0); // the frame loop sees speed 3 again; the seam already dropped the carry
-    expect(sim.tick).not.toHaveBeenCalled();
     expect(raw.accMinutes).toBe(0);
+    runFrame(app, 0);
+    expect(raw.enginePort.advance, "the seam already dropped the carry").toHaveBeenCalledExactlyOnceWith(0, 0, 120, true, true);
   });
 
   it("keeps the carry when the speed is set to the one already running", () => {
-    const { app, raw } = makeApp({ speed: 3, accMinutes: 0 });
-    runFrame(app, 200);
+    const { app, raw } = makeApp({ speed: 3, accMinutes: 16 });
     applySpeed(app, 3);
     expect(raw.accMinutes).toBe(16);
+    expect(raw.speed).toBe(3);
   });
 
-  it("drops the carry when the steady clock is toggled", () => {
-    const { app, raw, sim } = makeApp({ speed: 3, accMinutes: 0 });
-    runFrame(app, 200);
-    expect(raw.accMinutes).toBe(16);
-    sim.tick.mockClear();
+  it("hands the engine a steady clock the player toggled, which drops the old mode's carry", () => {
+    const { app, raw } = makeApp({ speed: 3, accMinutes: 16 });
     raw.prefs.steadyClock = false;
+    raw.enginePort.advance.mockReturnValueOnce(Float64Array.of(0, 0));
     runFrame(app, 0);
-    expect(sim.tick).not.toHaveBeenCalled();
+    expect(raw.enginePort.advance).toHaveBeenCalledExactlyOnceWith(16, 0, 120, false, true);
     expect(raw.accMinutes).toBe(0);
   });
 
-  it("steps through the port and reads the view once per frame", () => {
+  it("steps through the port and reads the view once per frame, after the step", () => {
     const { app, raw } = makeApp({ speed: 3, accMinutes: 0, lastUiUpdate: Infinity });
     runFrame(app, 1000 / 60);
     runFrame(app, 1000 / 60);
     expect(raw.enginePort.advance).toHaveBeenCalledTimes(2);
     expect(raw.reader.update).toHaveBeenCalledTimes(2);
+    expect(raw.reader.update.mock.invocationCallOrder[0]).toBeGreaterThan(raw.enginePort.advance.mock.invocationCallOrder[0]);
   });
 
   it("judges no meal rush across a swap since the last frame", () => {
@@ -215,36 +164,16 @@ describe("runFrame simulation stepping", () => {
     expect(decideMealRush).not.toHaveBeenCalled();
   });
 
-  it("spends no carried time once paused (speed 0)", () => {
-    const { app, raw, sim } = makeApp({ speed: 0, accMinutes: 5.5 });
-    runFrame(app, 1000 / 60);
-    expect(sim.tick).not.toHaveBeenCalled();
-    expect(raw.accMinutes).toBe(0);
-  });
-
-  it("does not tick at speed 0", () => {
-    const { app, sim } = makeApp({ speed: 0 });
-    runFrame(app, 1000);
-    expect(sim.tick).not.toHaveBeenCalled();
-  });
-
-  it("survives a non-finite dtMs: one NaN frame cannot freeze the sim forever (#541)", () => {
-    const { app, raw, sim } = makeApp({ speed: 3, accMinutes: 0 });
-    // Without the guard, accMinutes becomes NaN and every comparison below fails
-    // forever, so the sim would stop ticking permanently. The guard resets it.
-    runFrame(app, NaN);
-    expect(Number.isFinite(raw.accMinutes)).toBe(true);
-    expect(raw.accMinutes).toBe(0);
-    expect(sim.tick).not.toHaveBeenCalled(); // the poisoned frame simply does nothing
-    // The very next finite frame ticks normally: the sim recovered.
-    runFrame(app, 1000);
-    expect(sim.tick).toHaveBeenCalled();
-  });
-
-  it("survives an Infinity dtMs the same way (#541)", () => {
-    const { app, raw } = makeApp({ speed: 3, accMinutes: 0 });
-    runFrame(app, Number.POSITIVE_INFINITY);
-    expect(Number.isFinite(raw.accMinutes)).toBe(true);
+  it("hands the engine a non-finite frame as it came, and keeps the carry it answers (#541)", () => {
+    // The engine owes nothing for a bad amount (a_bad_amount_or_rate_steps_nothing_and_owes_nothing),
+    // so one NaN or Infinity frame cannot freeze the sim.
+    for (const dt of [NaN, Number.POSITIVE_INFINITY]) {
+      const { app, raw } = makeApp({ speed: 3, accMinutes: 0 });
+      raw.enginePort.advance.mockReturnValueOnce(Float64Array.of(0, 0));
+      runFrame(app, dt);
+      expect(raw.enginePort.advance).toHaveBeenCalledExactlyOnceWith(0, dt, 120, true, true);
+      expect(raw.accMinutes).toBe(0);
+    }
   });
 });
 

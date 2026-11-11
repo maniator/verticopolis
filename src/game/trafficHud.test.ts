@@ -1,8 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { refreshTraffic } from "./trafficHud";
 import { TRAFFIC_LABELS } from "../presentation/traffic";
-import { Simulation } from "../engine/Simulation";
-import { TsEngine } from "../engine/port/tsEngine";
+import { mockPort } from "../tests/portKit/mockPort";
 import { PortCodes } from "../simport/portCodes";
 import type { GameApp } from "../main";
 
@@ -23,7 +22,7 @@ import type { GameApp } from "../main";
 function fakeApp(cong: number, hotspotFloor: number, lastTier: number): GameApp {
   const app = {
     enginePort: { hotspot: () => Float64Array.of(cong, hotspotFloor) },
-    portCodes: new PortCodes(new TsEngine(Simulation.newGame(1))),
+    portCodes: new PortCodes(mockPort()),
     lastTrafficTier: lastTier,
     frameErrors: [],
   };

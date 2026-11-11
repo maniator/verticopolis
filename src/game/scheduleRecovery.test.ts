@@ -1,13 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
-import { Simulation } from "../engine/Simulation";
-import { towerCatalog } from "../catalog/towerCatalog";
-import { isElevatorKind } from "../engine/facilityPredicates";
-import { SCHEDULE_HOURS } from "../engine/elevatorSchedule";
-import { TsEngine } from "../engine/port/tsEngine";
-import { decodeVctower } from "../storage/vctowerContainer";
-import type { SerializedGame } from "../shared/types";
-import { scheduleFromSlots } from "../simport/scheduleSlots";
+import { catalogFor } from "../tests/catalogFixture";
+import { SCHEDULE_HOURS, scheduleSlots } from "../simport/scheduleSlots";
+import { LAYOUT } from "../tests/portKit/mockPort";
 import type { ElevatorSchedule } from "../shared/engineTypes";
 import {
   acknowledgementKey,
@@ -17,25 +11,12 @@ import {
   type ShaftFacts,
 } from "./scheduleRecovery";
 
-const load = (name: string) => decodeVctower(readFileSync(`conformance/fixtures/${name}.vctower`, "utf8")) as SerializedGame;
-
-function reviewOf(raw: SerializedGame) {
-  const sim = Simulation.deserialize(raw);
-  const port = new TsEngine(sim);
-  const shafts = sim.tower.transports.map((t) => ({
-    id: t.id,
-    kind: t.kind,
-    x: t.x,
-    bottom: t.bottom,
-    top: t.top,
-    cars: t.cars,
-  }));
-  return {
-    sim,
-    shafts,
-    found: shortFleets(shafts, (id) => scheduleFromSlots(port.shaftSchedule(id))),
-  };
-}
+/**
+ * The schedule review's rules on hand-built shafts and schedules. The review
+ * over the repository's saves on the Rust engine (which shafts of split-tower
+ * it flags, and a key that survives a save and reload) is
+ * `scheduleRecovery.integration.test.ts`.
+ */
 
 const shaft = (cars: number, over: Partial<ShaftFacts> = {}): ShaftFacts => ({
   id: 7,
@@ -48,33 +29,6 @@ const shaft = (cars: number, over: Partial<ShaftFacts> = {}): ShaftFacts => ({
 });
 const flat = (n: number) => Array<number>(24).fill(n);
 const only = (s: ShaftFacts, activeCars: ElevatorSchedule["activeCars"]) => shortFleets([s], () => ({ activeCars }))[0];
-
-describe("shortFleets on the repository fixtures (#1548)", () => {
-  it("flags the underscheduled shafts of split-tower and nothing else", () => {
-    const { found } = reviewOf(load("split-tower"));
-    expect(found.map((f) => [f.shaft.id, f.shaft.cars, f.flatAt])).toEqual([[1139, 5, 3]]);
-  });
-
-  it("flags exactly the three flat shafts of split-tower-4, and leaves its full-fleet shafts alone", () => {
-    const { found, shafts } = reviewOf(load("split-tower-4"));
-    expect(found.map((f) => [f.shaft.id, f.shaft.cars, f.flatAt])).toEqual([
-      [1139, 8, 3],
-      [1735, 8, 3],
-      [9281, 8, 2],
-    ]);
-    expect(shafts.length).toBeGreaterThan(found.length); // 4325, 5675 and the express shafts run 8 of 8
-  });
-
-  it("says nothing about the fixtures that carry no authored schedule", () => {
-    for (const name of ["sixseven_2", "sixseven-december", "towerone_6"]) expect(reviewOf(load(name)).found, name).toEqual([]);
-  });
-
-  it("never edits the fixture bytes", () => {
-    const before = readFileSync("conformance/fixtures/split-tower-4.vctower");
-    reviewOf(load("split-tower-4"));
-    expect(readFileSync("conformance/fixtures/split-tower-4.vctower").equals(before)).toBe(true);
-  });
-});
 
 describe("shortFleets keeps detection conservative", () => {
   it("offers the one-click recovery only to a flat, nonzero, short schedule on both day types", () => {
@@ -146,26 +100,6 @@ describe("recoveredSchedule", () => {
 });
 
 describe("acknowledgementKey", () => {
-  it("names the tower and the shaft, and survives a save and reload", () => {
-    const raw = load("split-tower-4");
-    const header = (sim: Simulation) => ({
-      seed: sim.rng.initialSeed,
-      mode: sim.mode,
-    });
-    const a = Simulation.deserialize(raw);
-    const b = Simulation.deserialize(JSON.parse(JSON.stringify(a.serialize())) as SerializedGame);
-    const t = a.tower.transports.find((x) => x.id === 1139)!;
-    const facts = {
-      id: t.id,
-      kind: t.kind,
-      x: t.x,
-      bottom: t.bottom,
-      top: t.top,
-      cars: t.cars,
-    };
-    expect(acknowledgementKey(header(b), facts)).toBe(acknowledgementKey(header(a), facts));
-  });
-
   it("differs between towers and between shafts, and ignores mutable span geometry", () => {
     const one = acknowledgementKey({ seed: 1, mode: "classic" }, shaft(8));
     expect(acknowledgementKey({ seed: 2, mode: "classic" }, shaft(8))).not.toBe(one);
@@ -176,33 +110,17 @@ describe("acknowledgementKey", () => {
     expect(acknowledgementKey({ seed: 1, mode: "classic" }, shaft(8, { top: 12 }))).toBe(one);
     expect(acknowledgementKey({ seed: 1, mode: "classic" }, shaft(8, { cars: 3 }))).toBe(one); // buying a car is not a new shaft
   });
-
-  it("treats the two split-tower saves as one tower, and a tower with another founding seed as another", () => {
-    // split-tower-4 is a later save of the same Split Tower: shaft 1139 keeps its key as cars are bought.
-    const keyOf = (name: string, id: number, seed?: number) => {
-      const sim = Simulation.deserialize(load(name));
-      const t = sim.tower.transports.find((x) => x.id === id)!;
-      const facts = {
-        id: t.id,
-        kind: t.kind,
-        x: t.x,
-        bottom: t.bottom,
-        top: t.top,
-        cars: t.cars,
-      };
-      return acknowledgementKey({ seed: seed ?? sim.rng.initialSeed, mode: sim.mode }, facts);
-    };
-    expect(keyOf("split-tower", 1139)).toBe(keyOf("split-tower-4", 1139));
-    expect(keyOf("split-tower", 1139)).not.toBe(keyOf("split-tower", 1139, 99));
-    expect(keyOf("split-tower-4", 1139)).not.toBe(keyOf("split-tower-4", 1735));
-  });
 });
 
 describe("the constants kept here instead of imported from the engine", () => {
-  it("name the same elevator kinds as the engine, and a row of the same length", () => {
-    const kinds = towerCatalog(Simulation.newGame(1)).facilities.map((f) => f.key);
-    expect(kinds.length).toBeGreaterThan(20);
-    for (const kind of kinds) expect(isElevator(kind), kind).toBe(isElevatorKind(kind));
+  it("name the elevators the engine's catalog pools as elevators, and a row of the schedule's length", () => {
+    for (const mode of ["classic", "modern"] as const) {
+      const facilities = catalogFor(mode).facilities;
+      expect(facilities.length).toBeGreaterThan(20);
+      for (const f of facilities) expect(isElevator(f.key), `${mode} ${f.key}`).toBe(f.pool === "elevators");
+    }
     expect(flat(1)).toHaveLength(SCHEDULE_HOURS);
+    // The hours sit in the schedule record the engine's layout publishes.
+    expect(scheduleSlots({ activeCars: { weekday: flat(1) } })).toHaveLength((LAYOUT as unknown as { scheduleSlots: number }).scheduleSlots);
   });
 });

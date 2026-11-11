@@ -1,261 +1,191 @@
 import { describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { facilityFloors } from "../engine/facilities";
 import { isOperational, type UnitState } from "../shared/types";
-import { TsEngine } from "../engine/port/tsEngine";
-import { Simulation } from "../engine/Simulation";
-import type { EnginePort } from "../simport/enginePort";
-import { ViewReader } from "../simport/viewReader";
+import type { ViewReader } from "../simport/viewReader";
 import { createCardKit, INERT_STATES } from "./cardKit";
 import { refreshEditorCard, type EditorCardApp } from "./editorCard";
-import { VIEW_LAYOUT } from "../engine/port/layout";
+import { LAYOUT, code, mockPort, record } from "../tests/portKit/mockPort";
 import { renderToFragment } from "../ui/testing/litTestUtils";
 import { unitEditorTemplate } from "../ui/templates/editor";
 import { repoRoot } from "../tests/guardFiles";
 import { unitInspectorTemplate } from "../ui/templates/inspector";
 import { groupDigits } from "../ui/format";
 
-/** A tower with a recycling center in the basement and an occupied office. */
-function tower(): { sim: Simulation; centerId: number; officeId: number } {
-  const sim = Simulation.newGame(3, "classic");
-  sim.money = 1e9;
-  sim.star = 5;
-  for (let x = 170; x < 230; x++) sim.tower.place("lobby", 1, x);
-  for (const f of [0, -1, 2]) for (let x = 170; x < 230; x++) sim.tower.place("floor", f, x);
-  const center = sim.tower.place("recycling", -1, 180);
-  const office = sim.tower.place("office", 2, 180);
-  if (!center.ok || center.unitId === undefined || !office.ok || office.unitId === undefined) throw new Error("the test tower did not build");
-  const c = sim.tower.getUnit(center.unitId);
-  const o = sim.tower.getUnit(office.unitId);
-  if (!c || !o) throw new Error("the test tower lost a room");
-  c.state = "occupied";
-  o.state = "occupied";
-  o.occupants = 6;
-  return { sim, centerId: center.unitId, officeId: office.unitId };
+/**
+ * The card kit's unit and shaft lines over a mock port: the engine facts it
+ * reads, the lines it makes of them and when it reads them again. The facts
+ * on the Rust engine are decoded in `portReader.integration.test.ts`; the
+ * lines' wording in `portUnitDiagnostics.test.ts`.
+ */
+
+const CENTER = 11;
+const OFFICE = 12;
+const SHAFT = 73;
+
+const layoutCode = (table: "accessLines", name: string) => (LAYOUT as unknown as Record<string, string[]>)[table].indexOf(name);
+
+/** One room's card record, as the engine answers `unitCard`. */
+const card = (id: number, kind: string, floor: number, over: Record<string, number> = {}) =>
+  record("unitCard", { id, kindCode: code("kinds", kind), floor, x: 180, width: 9, stateCode: code("unitStates", "occupied"), rent: NaN, price: 0, vacateReason: NaN, filmPolicy: NaN, blockbuster: NaN, served: 1, reachable: 1, floorHasLobby: 0, satisfaction: 0.5, ...over });
+
+/** A room's engine facts (`unitFacts`): no access or No Rate line unless set. */
+const facts = (id: number, over: Record<string, number> = {}) => record("unitFacts", { id, access: NaN, noRate: NaN, ...over });
+
+/** A tower with a recycling center in the basement and an occupied office on
+ *  floor 2 that no elevator reaches; each answer can be changed by the test. */
+function tower() {
+  const state = {
+    center: card(CENTER, "recycling", -1),
+    office: card(OFFICE, "office", 2, { served: 0, reachable: 0 }),
+    officeFacts: { access: layoutCode("accessLines", "notConnected") } as Record<string, number>,
+    generation: 1,
+    utilization: 0.91,
+    nearCapacity: 1,
+  };
+  const port = mockPort({
+    unitCard: (id: number) => ({ [CENTER]: state.center, [OFFICE]: state.office })[id] ?? new Float64Array(0),
+    unitLabel: () => undefined,
+    unitSubtype: () => undefined,
+    unitFacts: (id: number) => facts(id, id === OFFICE ? state.officeFacts : {}),
+    serviceDiagnostics: () => undefined,
+    recyclingCapacity: () => 2500,
+    recyclingFill: () => 0.4,
+    recyclingDemandMet: () => true,
+    shaftCard: (id: number) => (id === SHAFT ? record("shaftCard", { id, kindCode: code("kinds", "elevatorStandard"), utilization: state.utilization, nearCapacity: state.nearCapacity }) : new Float64Array(0)),
+    generation: () => state.generation,
+  });
+  const reader = {
+    header: { revision: 1, minutes: 7 * 60, minuteOfDay: 7 * 60, day: 0, dayOfWeek: 0, isWeekend: false, quarter: 0, year: 0, weekDays: 7, weekendDays: 2, population: 40, star: 2, mode: "classic" },
+    tower: { revision: 1 },
+  } as unknown as ViewReader & { header: { minutes: number; population: number; revision: number } };
+  const kit = createCardKit({ enginePort: port, reader });
+  return { state, port, reader, kit };
 }
 
-/** The engine as the Rust engine presents it to the cards: the same reads, and
- *  no TypeScript tower behind them. */
-function withoutTower(engine: TsEngine): EnginePort {
-  return new Proxy(engine, { get: (target, key) => (key === "sim" ? undefined : Reflect.get(target, key, target)) }) as unknown as EnginePort;
-}
+/** A line list as the text it renders. */
+const text = (lines: ReturnType<ReturnType<typeof tower>["kit"]["diagnostics"]["unit"]>) =>
+  lines.map((l) => l.strings.map((s, i) => s + (i < l.values.length ? String(l.values[i]) : "")).join("")).join("\n");
 
-describe("the card kit's unit lines on an engine with no TypeScript tower", () => {
-  it("show a recycling center's fill and capacity lines without ever reading a TypeScript tower", () => {
-    const { sim, centerId, officeId } = tower();
-    const engine = new TsEngine(sim);
-    const sealed = new Proxy(engine, {
-      get: (target, key) => {
-        if (key === "sim") throw new Error("the card kit read the TypeScript tower");
-        return Reflect.get(target, key, target);
-      },
-    }) as unknown as EnginePort;
-    // The reader decodes from the same sealed port, so neither the kit nor
-    // the view it reads can reach the TypeScript tower.
-    const reader = new ViewReader(sealed, facilityFloors);
-    const kit = createCardKit({ enginePort: sealed, reader });
-    const center = kit.diagnostics.unit(centerId);
+describe("the card kit's unit and shaft lines over the port", () => {
+  it("show a recycling center's fill and capacity lines from the port's recycling reads", () => {
+    const { port, kit } = tower();
+    const center = kit.diagnostics.unit(CENTER);
     expect(center).toHaveLength(2);
-    expect(center.map((l) => l.values.join("|")).join("\n")).toContain(groupDigits(2500));
-    expect(kit.diagnostics.unit(officeId).length).toBeGreaterThan(0);
+    expect(text(center)).toContain("Fill: 40%");
+    expect(text(center)).toContain(`${groupDigits(40)}/${groupDigits(2500)} population; demand met`);
+    expect([port.recyclingCapacity, port.recyclingFill, port.recyclingDemandMet].map((f) => vi.mocked(f).mock.calls.length)).toEqual([1, 1, 1]);
+    expect(kit.diagnostics.unit(OFFICE).length).toBeGreaterThan(0);
   });
 
-  it("read the capacity from the port", () => {
-    const { sim, centerId } = tower();
-    const engine = new TsEngine(sim);
-    expect(engine.recyclingCapacity()).toBe(2500);
-    const reader = new ViewReader(engine, facilityFloors);
-    const lines = createCardKit({ enginePort: withoutTower(engine), reader }).diagnostics.unit(centerId);
-    expect(lines.map((l) => l.values.join("|")).join("\n")).toContain("2,500");
-  });
-
-  it("shows the Rust shaft's average load warning using its port record", () => {
-    const { sim } = tower();
-    const engine = new TsEngine(sim);
-    const reader = new ViewReader(engine, facilityFloors);
-    const slots = VIEW_LAYOUT.records.shaftCard;
-    const slot = (name: string): number => {
-      const index = slots.indexOf(name as (typeof slots)[number]);
-      if (index < 0) throw new Error(`Missing shaftCard slot: ${name}`);
-      return index;
-    };
-    let utilization = 0.91;
-    let nearCapacity = 1;
-    const port = new Proxy(engine, {
-      get(target, key) {
-        if (key === "sim") return undefined;
-        if (key === "shaftCard") return (id: number) => {
-          if (id !== 73) return new Float64Array(0);
-          const record = new Float64Array(slots.length);
-          record[slot("id")] = id;
-          record[slot("kindCode")] = VIEW_LAYOUT.kinds.indexOf("elevator");
-          record[slot("utilization")] = utilization;
-          record[slot("nearCapacity")] = nearCapacity;
-          return record;
-        };
-        return Reflect.get(target, key, target);
-      },
-    }) as unknown as EnginePort;
-    const kit = createCardKit({ enginePort: port, reader });
-    const copy = (id: number) => kit.diagnostics.transport(id)
-      .map((line) => line.strings.map((s, i) => s + (i < line.values.length ? String(line.values[i]) : "")).join(""))
-      .join("\n");
-
-    expect(copy(73)).toContain("Avg load: 91% full. Near capacity; consider more cars or a parallel shaft.");
-    expect(copy(73)).toContain("var(--bad)");
+  it("shows the shaft's average load warning from its port record, with the engine's verdict", () => {
+    const { state, kit } = tower();
+    const copy = (id: number) => text(kit.diagnostics.transport(id));
+    expect(copy(SHAFT)).toContain("Avg load: 91% full. Near capacity; consider more cars or a parallel shaft.");
+    expect(copy(SHAFT)).toContain("var(--bad)");
     expect(copy(9999)).toBe("");
 
-    utilization = 0.85;
-    nearCapacity = 0;
+    state.utilization = 0.85;
+    state.nearCapacity = 0;
     kit.cards.forget();
-    expect(copy(73)).toContain("Avg load: 85% full");
-    expect(copy(73)).not.toContain("Near capacity");
-    expect(copy(73)).toContain("var(--good)");
+    expect(copy(SHAFT)).toContain("Avg load: 85% full");
+    expect(copy(SHAFT)).not.toContain("Near capacity");
+    expect(copy(SHAFT)).toContain("var(--good)");
 
     // The engine owns the verdict: a high load it does not call near capacity
     // shows no warning, and a low load it does call near capacity shows one.
-    utilization = 0.97;
-    nearCapacity = 0;
+    state.utilization = 0.97;
+    state.nearCapacity = 0;
     kit.cards.forget();
-    expect(copy(73)).not.toContain("Near capacity");
-    utilization = 0.4;
-    nearCapacity = 1;
+    expect(copy(SHAFT)).not.toContain("Near capacity");
+    state.utilization = 0.4;
+    state.nearCapacity = 1;
     kit.cards.forget();
-    expect(copy(73)).toContain("Avg load: 40% full. Near capacity");
+    expect(copy(SHAFT)).toContain("Avg load: 40% full. Near capacity");
 
-    utilization = NaN;
+    state.utilization = NaN;
     kit.cards.forget();
-    expect(copy(73)).toBe("");
+    expect(copy(SHAFT)).toBe("");
   });
 
   it("show tenant access from port facts, without recycling lines for another kind or a center under construction", () => {
-    const { sim, centerId, officeId } = tower();
-    const engine = new TsEngine(sim);
-    const reader = new ViewReader(engine, facilityFloors);
-    const kit = createCardKit({ enginePort: withoutTower(engine), reader });
-    const officeLines = kit.diagnostics.unit(officeId);
-    const officeText = officeLines.map((l) => l.strings.map((s, i) => s + (i < l.values.length ? String(l.values[i]) : "")).join("")).join("\n");
+    const { state, port, kit } = tower();
+    const officeText = text(kit.diagnostics.unit(OFFICE));
     expect(officeText).toContain("Access:");
-    // Rust has no TypeScript tower; it still renders the existing engine facts.
     expect(officeText).toContain("No elevator or stair reaches this floor.");
-    const center = sim.tower.getUnit(centerId);
-    if (!center) throw new Error("the center is gone");
-    center.state = "construction";
-    expect(kit.diagnostics.unit(centerId)).toEqual([]);
+    expect(port.recyclingCapacity, "an office reads no recycling").not.toHaveBeenCalled();
+    state.center = card(CENTER, "recycling", -1, { stateCode: code("unitStates", "construction") });
+    kit.cards.forget();
+    expect(kit.diagnostics.unit(CENTER)).toEqual([]);
+    expect(port.recyclingCapacity, "an inert center reads no recycling").not.toHaveBeenCalled();
   });
 
-  it("shows the engine-reported Main gripe on both mobile and desktop without a TypeScript mirror", () => {
-    const { sim, officeId } = tower();
-    sim.tower.getUnit(officeId)!.satisfaction = 0.01;
-    const engine = new TsEngine(sim);
-    const fields = VIEW_LAYOUT.records.unitFacts;
-    const port = new Proxy(engine, {
-      get(target, key) {
-        if (key === "sim") return undefined;
-        if (key === "unitFacts") return (id: number) => {
-          const record = target.unitFacts(id);
-          if (id === officeId) {
-            record[fields.indexOf("gripe")] = 1;
-            record[fields.indexOf("gripeCause")] = VIEW_LAYOUT.vacateReasons.indexOf("rent");
-          }
-          return record;
-        };
-        return Reflect.get(target, key, target);
-      },
-    }) as unknown as EnginePort;
-    const reader = new ViewReader(port, facilityFloors);
-    const kit = createCardKit({ enginePort: port, reader });
-    const unit = kit.cards.unit(officeId)!;
+  it("shows the engine-reported Main gripe on both mobile and desktop", () => {
+    const { state, kit } = tower();
+    state.office = card(OFFICE, "office", 2, { satisfaction: 0.01 });
+    state.officeFacts = { access: layoutCode("accessLines", "reachable"), gripe: 1, gripeCause: code("vacateReasons", "rent") };
+    const unit = kit.cards.unit(OFFICE)!;
     const copy = "Main gripe: the rent is above the going rate. Lower it to keep them.";
-    const mobile = renderToFragment(unitEditorTemplate(unit, kit.catalog(), 12, true, kit.diagnostics.unit(officeId)));
-    const desktop = renderToFragment(unitInspectorTemplate(unit, kit.catalog(), 12, kit.diagnostics.unit(officeId)));
+    const mobile = renderToFragment(unitEditorTemplate(unit, kit.catalog(), 12, true, kit.diagnostics.unit(OFFICE)));
+    const desktop = renderToFragment(unitInspectorTemplate(unit, kit.catalog(), 12, kit.diagnostics.unit(OFFICE)));
     expect(mobile.querySelector(".ed-diagnostics")?.textContent).toContain(copy);
     expect(desktop.textContent).toContain(copy);
   });
 
-  it("does not recalculate Rust grievance facts on every 160ms editor refresh", () => {
-    const { sim, officeId } = tower();
-    sim.tower.getUnit(officeId)!.satisfaction = 0.01;
-    const engine = new TsEngine(sim);
-    let reads = 0;
-    let generation = engine.generation();
-    const port = new Proxy(engine, {
-      get(target, key) {
-        if (key === "sim") return undefined;
-        if (key === "generation") return () => generation;
-        if (key === "unitFacts") return (id: number) => {
-          reads++;
-          return target.unitFacts(id);
-        };
-        return Reflect.get(target, key, target);
-      },
-    }) as unknown as EnginePort;
-    const reader = new ViewReader(port, facilityFloors);
-    const kit = createCardKit({ enginePort: port, reader });
-    const office = sim.tower.getUnit(officeId)!;
+  it("does not recalculate the engine's grievance facts on every 160ms editor refresh", () => {
+    const { state, port, reader, kit } = tower();
+    const reads = () => vi.mocked(port.unitFacts).mock.calls.length;
     reader.header = { ...reader.header, minutes: 23 * 60 + 50 };
-    // Opening a card asks Rust once. A frame pump only changes the clock
+    // Opening a card asks the engine once. A frame pump only changes the clock
     // within an hour, so it reuses the same engine-authored explanation.
-    kit.diagnostics.unit(officeId, true);
-    expect(reads).toBe(1);
-    for (let i = 0; i < 12; i++) kit.diagnostics.unit(officeId);
-    expect(reads).toBe(1);
+    kit.diagnostics.unit(OFFICE, true);
+    expect(reads()).toBe(1);
+    for (let i = 0; i < 12; i++) kit.diagnostics.unit(OFFICE);
+    expect(reads()).toBe(1);
     reader.header = { ...reader.header, minutes: reader.header.minutes + 5 };
-    kit.diagnostics.unit(officeId);
-    expect(reads).toBe(1);
+    kit.diagnostics.unit(OFFICE);
+    expect(reads()).toBe(1);
 
     // Game hour (also across midnight) invalidates the inspector demand memo.
     reader.header = { ...reader.header, minutes: reader.header.minutes + 60 };
-    kit.diagnostics.unit(officeId);
-    expect(reads).toBe(2);
+    kit.diagnostics.unit(OFFICE);
+    expect(reads()).toBe(2);
     // Selected unit state and price change without a structural revision.
-    office.satisfaction = 0.02;
-    kit.diagnostics.unit(officeId);
-    expect(reads).toBe(3);
-    office.rent = (office.rent ?? 0) + 50;
-    kit.diagnostics.unit(officeId);
-    expect(reads).toBe(4);
+    state.office = card(OFFICE, "office", 2, { served: 0, reachable: 0, satisfaction: 0.02 });
+    kit.cards.forget();
+    kit.diagnostics.unit(OFFICE);
+    expect(reads()).toBe(3);
+    state.office = card(OFFICE, "office", 2, { served: 0, reachable: 0, satisfaction: 0.02, rent: 10_050 });
+    kit.cards.forget();
+    kit.diagnostics.unit(OFFICE);
+    expect(reads()).toBe(4);
     // A direct command re-reads even if an unrelated room's rent changed.
-    kit.diagnostics.unit(officeId, true);
-    expect(reads).toBe(5);
+    kit.diagnostics.unit(OFFICE, true);
+    expect(reads()).toBe(5);
     // A command elsewhere in the tower may leave every selected-unit field
     // unchanged; explicit mutation invalidation still forces a fresh cause.
     kit.diagnostics.invalidate();
-    kit.diagnostics.unit(officeId);
-    expect(reads).toBe(6);
+    kit.diagnostics.unit(OFFICE);
+    expect(reads()).toBe(6);
 
     reader.header = { ...reader.header, population: reader.header.population + 1 };
-    kit.diagnostics.unit(officeId);
-    expect(reads).toBe(7);
+    kit.diagnostics.unit(OFFICE);
+    expect(reads()).toBe(7);
     reader.header = { ...reader.header, revision: reader.header.revision + 1 };
-    kit.diagnostics.unit(officeId);
-    expect(reads).toBe(8);
+    kit.diagnostics.unit(OFFICE);
+    expect(reads()).toBe(8);
     // A load or undo can reuse the same room id and clock; generation must
     // keep those tower identities apart.
-    generation++;
-    kit.diagnostics.unit(officeId);
-    expect(reads).toBe(9);
+    state.generation++;
+    kit.diagnostics.unit(OFFICE);
+    expect(reads()).toBe(9);
   });
 
   it("wires cached refreshes through the real mobile editor and invalidates after explicit edits", () => {
-    const { sim, officeId } = tower();
-    const engine = new TsEngine(sim);
-    let reads = 0;
-    const port = new Proxy(engine, {
-      get(target, key) {
-        if (key === "sim") return undefined;
-        if (key === "unitFacts") return (id: number) => {
-          reads++;
-          return target.unitFacts(id);
-        };
-        return Reflect.get(target, key, target);
-      },
-    }) as unknown as EnginePort;
-    const reader = new ViewReader(port, facilityFloors);
-    const kit = createCardKit({ enginePort: port, reader });
+    const { port, reader, kit } = tower();
+    const reads = () => vi.mocked(port.unitFacts).mock.calls.length;
     const editor = {
-      selected: { type: "unit", id: officeId },
+      selected: { type: "unit", id: OFFICE },
       engine: { selectedId: null },
       ui: { renderEditor: vi.fn() },
       mobileMq: { matches: true },
@@ -264,44 +194,28 @@ describe("the card kit's unit lines on an engine with no TypeScript tower", () =
       clearSelection: vi.fn(),
     } as unknown as EditorCardApp;
     refreshEditorCard(editor);
-    expect(reads).toBe(1);
+    expect(reads()).toBe(1);
     for (let i = 0; i < 10; i++) refreshEditorCard(editor, false);
-    expect(reads).toBe(1);
+    expect(reads()).toBe(1);
     refreshEditorCard(editor);
-    expect(reads).toBe(2);
+    expect(reads()).toBe(2);
 
     // An edit while the card is on desktop invalidates a mobile snapshot,
     // even though desktop doesn't fold diagnostic text into its editor.
     const desktop = { ...editor, mobileMq: { matches: false } };
     refreshEditorCard(desktop);
-    expect(reads).toBe(2);
-    kit.diagnostics.unit(officeId);
-    expect(reads).toBe(3);
+    expect(reads()).toBe(2);
+    kit.diagnostics.unit(OFFICE);
+    expect(reads()).toBe(3);
   });
 
-  it("keeps a Rust tenant's on-notice countdown live instead of caching it per hour", () => {
-    const { sim, officeId } = tower();
-    const office = sim.tower.getUnit(officeId)!;
-    office.state = "vacating";
-    office.vacateReason = "noise";
-    office.vacateAt = sim.clock.minutes + 180;
-    const engine = new TsEngine(sim);
-    let reads = 0;
-    const port = new Proxy(engine, {
-      get(target, key) {
-        if (key === "sim") return undefined;
-        if (key === "unitFacts") return (id: number) => {
-          reads++;
-          return target.unitFacts(id);
-        };
-        return Reflect.get(target, key, target);
-      },
-    }) as unknown as EnginePort;
-    const kit = createCardKit({ enginePort: port, reader: new ViewReader(port, facilityFloors) });
-    kit.diagnostics.unit(officeId);
-    sim.clock.minutes += 5;
-    kit.diagnostics.unit(officeId);
-    expect(reads).toBe(2);
+  it("keeps a tenant's on-notice countdown live instead of caching it per hour", () => {
+    const { state, port, reader, kit } = tower();
+    state.office = card(OFFICE, "office", 2, { stateCode: code("unitStates", "vacating"), vacateReason: code("vacateReasons", "noise") });
+    kit.diagnostics.unit(OFFICE);
+    reader.header = { ...reader.header, minutes: reader.header.minutes + 5 };
+    kit.diagnostics.unit(OFFICE);
+    expect(port.unitFacts).toHaveBeenCalledTimes(2);
   });
 
   it("treat a room as inert in exactly the states the engine does", () => {
