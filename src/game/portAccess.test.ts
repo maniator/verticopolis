@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { catalogFacility } from "../catalog/catalogTypes";
 import { Simulation } from "../engine/Simulation";
-import { catalogFor } from "../engine/catalog";
+import { catalogFor } from "../tests/catalogFixture";
 import { towerCatalog, useTowerCatalogSource } from "../catalog/towerCatalog";
 import { PortRenderSim } from "../simport/portRenderSim";
 import { catalogOf, floorsOfPort, isUnlocked, newRenderSim, newViewReader, quoteBuild, quoteShaft } from "./portAccess";
@@ -102,14 +102,16 @@ describe("isUnlocked", () => {
 describe("newRenderSim", () => {
   it("reads its catalog from the engine's source, so the renderer sizes rooms as the engine does", () => {
     const { engine, reader } = portDeps(tower());
-    const rustLike = (mode: "classic" | "modern") => {
+    // A source whose wedding hall no catalog states: seven stories.
+    const marked = (mode: "classic" | "modern") => {
       const c = catalogFor(mode);
-      return { ...c, facilities: c.facilities.map((f) => (f.key === "weddingHall" ? { ...f, floors: 5, width: 28 } : f)) };
+      return { ...c, facilities: c.facilities.map((f) => (f.key === "weddingHall" ? { ...f, floors: 7 } : f)) };
     };
-    useTowerCatalogSource(engine, rustLike);
+    useTowerCatalogSource(engine, marked);
     const hall = (sim: object) => towerCatalog(sim as { mode: "classic" | "modern" }).facilities.find((f) => f.key === "weddingHall")?.floors;
-    expect(hall(newRenderSim(engine, reader))).toBe(5);
-    expect(hall(new PortRenderSim(engine, reader))).toBe(1);
+    expect(hall(newRenderSim(engine, reader))).toBe(7);
+    // A render sim built bare reads the fallback, not the engine's source.
+    expect(hall(new PortRenderSim(engine, reader))).toBe(catalogFacility(catalogFor("classic"), "weddingHall").floors);
   });
 });
 
@@ -128,22 +130,22 @@ describe("newViewReader", () => {
 });
 
 describe("floorsOfPort", () => {
-  /** The catalog a Rust engine states: the wedding hall five stories tall. */
+  /** A source whose wedding hall no catalog states: seven stories. */
   const tallHall = (mode: "classic" | "modern") => {
     const c = catalogFor(mode);
-    return { ...c, facilities: c.facilities.map((f) => (f.key === "weddingHall" ? { ...f, floors: 5 } : f)) };
+    return { ...c, facilities: c.facilities.map((f) => (f.key === "weddingHall" ? { ...f, floors: 7 } : f)) };
   };
 
   it("answers from the port's own catalog, whatever the view's kind facts were last bound to", () => {
     const { engine } = portDeps(tower());
     const floors = floorsOfPort(engine);
     useTowerCatalogSource(engine, tallHall);
-    expect(floors("weddingHall")).toBe(5);
+    expect(floors("weddingHall")).toBe(7);
     expect(floors("office")).toBe(1);
     // Something else rebinds the view's facts to another catalog: this port's heights stay.
     bindViewKinds(catalogFor("classic"));
-    expect(floors("weddingHall")).toBe(5);
-    // The port is pointed back at the TypeScript tables, as a swapped-in tower would be.
+    expect(floors("weddingHall")).toBe(7);
+    // The port is pointed back at the fallback, as a swapped-in tower would be.
     useTowerCatalogSource(engine, null);
     expect(floors("weddingHall")).toBe(catalogFor("modern").facilities.find((f) => f.key === "weddingHall")!.floors);
   });

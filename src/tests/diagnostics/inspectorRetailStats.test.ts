@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { catalogFor } from "../../engine/catalog";
+import { catalogFor } from "../catalogFixture";
 import { html, type TemplateResult } from "lit-html";
 import { retailStatsLines } from "./facilityDiagnostics";
 import { retailDisplayLines } from "../../game/portServiceDiagnostics";

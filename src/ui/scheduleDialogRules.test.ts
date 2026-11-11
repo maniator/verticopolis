@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { catalogFor } from "../engine/catalog";
+import { catalogFor } from "../tests/catalogFixture";
 import { makeRules } from "../engine/gameRules";
 import { topOriginFloors } from "../engine/scheduleOrigins";
 import { HOTSPOT_FLOORS, HOTSPOT_MIN_SHARE, hotspotFloors, scheduleDialogUX } from "./scheduleDialogRules";

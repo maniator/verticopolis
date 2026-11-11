@@ -1,4 +1,4 @@
-import { catalogFor } from "../../engine/catalog";
+import { catalogFor } from "../../tests/catalogFixture";
 import { describe, expect, it } from "vitest";
 import { buildArchive, checkLayers } from "./archive";
 import { bake, type Renderer } from "./bake";

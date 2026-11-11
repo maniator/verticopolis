@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { catalogFor } from "../engine/catalog";
+import { catalogFor } from "../tests/catalogFixture";
 import type { GameMode } from "../shared/types";
 import { createUICallbacks, type GameAppPorts } from "./uiCallbacks";
 import { NO_GESTURE } from "./appHistory";

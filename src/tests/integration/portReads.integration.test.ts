@@ -7,12 +7,15 @@ import { calendarOf, clockOf, type ClockView } from "../../simport/headerClock";
 import { PortCodes, outcome } from "../../simport/portCodes";
 import { PortEvents } from "../../simport/portEvents";
 import { draftTower } from "../portKit/drafts";
+import { catalogFixturePath } from "../catalogFixture";
+import { wasm } from "../conformance/wasmEngine";
 import { FIXTURES } from "../portKit/mockPort";
 import { engineFromSave, must, newEngine, noEngine, smallTower } from "../portKit/rustEngine";
 
 /**
- * The port's units on the Rust engine: the layout fixture the unit tests
- * (`src/simport/`) build their mock ports from, held to the engine's answer,
+ * The port's units on the Rust engine: the engine-pinned fixtures the unit
+ * tests read (the layout their mock ports are built from, the catalogs), held
+ * to the engine's answers,
  * and the engine behavior those tests used to check through it (events, a
  * refusal's reason, the header's clock, the renderer's reads through play).
  * `VC_UPDATE_PORT_FIXTURES=1` rewrites a fixture the engine has moved past.
@@ -20,13 +23,22 @@ import { engineFromSave, must, newEngine, noEngine, smallTower } from "../portKi
 
 const UPDATE = process.env.VC_UPDATE_PORT_FIXTURES === "1";
 
+/** Each engine-pinned fixture (the engine's published tables, the layout and
+ *  the catalogs) and the engine answer it holds. */
+const PINNED = [
+  [resolve(FIXTURES, "viewLayout.json"), "the engine's view layout", () => newEngine(1).viewLayout()],
+  [catalogFixturePath("classic"), "the engine's Classic catalog", () => wasm().catalog!("classic")],
+  [catalogFixturePath("modern"), "the engine's Modern catalog", () => wasm().catalog!("modern")],
+] as const;
+
 describe.skipIf(noEngine)("the port's fixtures", () => {
-  it("holds the engine's view layout", () => {
-    const path = resolve(FIXTURES, "viewLayout.json");
-    const fresh = JSON.parse(newEngine(1).viewLayout()) as unknown;
-    if (UPDATE) writeFileSync(path, `${JSON.stringify(fresh, null, 2)}\n`);
-    expect(JSON.parse(readFileSync(path, "utf8")), "run with VC_UPDATE_PORT_FIXTURES=1 to rewrite it").toEqual(fresh);
-  });
+  for (const [path, what, answer] of PINNED) {
+    it(`holds ${what}`, () => {
+      const fresh = JSON.parse(answer()) as unknown;
+      if (UPDATE) writeFileSync(path, `${JSON.stringify(fresh, null, 2)}\n`);
+      expect(JSON.parse(readFileSync(path, "utf8")), "run with VC_UPDATE_PORT_FIXTURES=1 to rewrite it").toEqual(fresh);
+    });
+  }
 });
 
 describe.skipIf(noEngine)("PortEvents on the engine", () => {

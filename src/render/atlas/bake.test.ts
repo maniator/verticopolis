@@ -1,4 +1,4 @@
-import { catalogFor } from "../../engine/catalog";
+import { catalogFor } from "../../tests/catalogFixture";
 import { strFromU8, strToU8, unzipSync } from "fflate";
 import { describe, expect, it } from "vitest";
 import { buildArchive, checkLayers, checkPages, kindsWithoutFurniture, signature, softLayerDrift, ARCHIVE_ROOT } from "./archive";

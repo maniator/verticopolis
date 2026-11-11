@@ -1,6 +1,6 @@
 import { describe, expect, it, beforeEach, vi } from "vitest";
 import { withPorts } from "../fixtures/saveText";
-import { catalogFor } from "../../engine/catalog";
+import { catalogFor } from "../catalogFixture";
 import { Simulation } from "../../engine/Simulation";
 import { FACILITIES, GRID, isFixedSpanTransport } from "../../engine/facilities";
 import { ECON, rentOf, carResaleRefund, resaleRefund } from "../../engine/econConfig";

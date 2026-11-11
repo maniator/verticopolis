@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { FACILITIES, facilityFloors, hasBusinessHours, isOpenAt } from "../../engine/facilities";
+import { catalogFacility } from "../../catalog/catalogTypes";
+import { FACILITIES, hasBusinessHours, isOpenAt } from "../../engine/facilities";
+import { catalogFor } from "../../tests/catalogFixture";
 import { subtypeListFor } from "../../engine/retailSubtypes";
 import type { FacilityKind } from "../../shared/types";
 import { FLOOR, TILE } from "../scale";
@@ -58,8 +60,9 @@ describe("room catalog", () => {
   it("sizes rooms by catalog width and floors", () => {
     for (const j of stills) {
       const k = j.keys.kind as FacilityKind;
-      expect(j.w).toBe(FACILITIES[k].width * TILE);
-      expect(j.h).toBe(facilityFloors(k) * FLOOR);
+      const f = catalogFacility(catalogFor("modern"), k);
+      expect(j.w).toBe(f.width * TILE);
+      expect(j.h).toBe(f.floors * FLOOR);
     }
   });
   it("bakes every subtype plus the legacy no-subtype look", () => {

@@ -3,7 +3,7 @@ import { referenceEngine } from "../fixtures/autoTuneDouble";
 import { describe, it, expect, vi, beforeEach, afterEach, afterAll } from "vitest";
 import { pump, rebaseLog } from "../../ui/hud.fixture";
 import { towerCatalog, useTowerCatalogSource } from "../../catalog/towerCatalog";
-import { catalogFor } from "../../engine/catalog";
+import { catalogFor } from "../catalogFixture";
 import { html, type TemplateResult } from "lit-html";
 import { finishModal, MODAL_TITLE_ID } from "../../ui/uiModal";
 import type { UI } from "../../ui/UI";

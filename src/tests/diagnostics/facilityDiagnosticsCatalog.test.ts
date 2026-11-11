@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { catalogFor } from "../../engine/catalog";
+import { catalogFor } from "../catalogFixture";
 import { catalogFacility } from "../../catalog/catalogTypes";
 import { ECON } from "../../engine/econConfig";
 import { ALL_KINDS, FACILITIES } from "../../engine/facilities";

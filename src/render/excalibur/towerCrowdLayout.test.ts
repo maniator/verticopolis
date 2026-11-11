@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { coveredUpperStories, lotCovered, lobbyLaneSpan } from "./towerCrowdLayout";
 import type { Unit } from "../../shared/types";
-import { catalogFor } from "../../engine/catalog";
+import { catalogFor } from "../../tests/catalogFixture";
 
 const MODERN = catalogFor("modern");
 

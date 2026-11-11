@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { catalogFor } from "../engine/catalog";
-import { ALL_KINDS, FACILITIES, facilityFloors, hasBusinessHours as tableHasHours, isCommercialKind as tableCommercial, isElevatorKind as tableElevator, isHotelKind as tableHotel, isLeaseAmenityKind as tableLease, isOpenAt as tableOpenAt, isUnmetDemandKind as tableUnmet } from "../engine/facilities";
+import { catalogFor } from "../tests/catalogFixture";
+import { catalogFacility } from "../catalog/catalogTypes";
+import { ALL_KINDS, hasBusinessHours as tableHasHours, isCommercialKind as tableCommercial, isElevatorKind as tableElevator, isHotelKind as tableHotel, isLeaseAmenityKind as tableLease, isOpenAt as tableOpenAt, isUnmetDemandKind as tableUnmet } from "../engine/facilities";
 import { bindViewKinds, hasBusinessHours, isCommercialKind, isElevatorKind, isHotelKind, isLeaseAmenityKind, isOpenAt, isUnmetDemandKind, kindFloors, kindWidth, resetViewKindsForTests } from "./viewKinds";
 
 describe("the view's kind facts", () => {
@@ -25,12 +26,14 @@ describe("the view's kind facts", () => {
     }
   });
 
-  it("state each kind's footprint as the Modern table does", () => {
+  it("state each kind's footprint as the Modern catalog does", () => {
     // The atlas verifiers bake and compare against the Modern catalog.
-    bindViewKinds(catalogFor("modern"));
+    const modern = catalogFor("modern");
+    bindViewKinds(modern);
     for (const kind of ALL_KINDS) {
-      expect(kindWidth(kind), `${kind} width`).toBe(FACILITIES[kind].width);
-      expect(kindFloors(kind), `${kind} floors`).toBe(facilityFloors(kind));
+      const f = catalogFacility(modern, kind);
+      expect(kindWidth(kind), `${kind} width`).toBe(f.width);
+      expect(kindFloors(kind), `${kind} floors`).toBe(f.floors);
     }
   });
 

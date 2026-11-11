@@ -4,7 +4,7 @@ import { towerCatalog, useTowerCatalogSource } from "../../catalog/towerCatalog"
 import type { EnginePort } from "../../simport/enginePort";
 import { newRenderSim, newViewReader } from "../../game/portAccess";
 import { bindViewKinds, findViewKind } from "../../presentation/viewKinds";
-import { catalogFor } from "../../engine/catalog";
+import { catalogFor } from "../catalogFixture";
 import { readCatalog } from "../../dualrun/catalog";
 import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
 
@@ -50,10 +50,8 @@ describe.skipIf(!hasWasmPackage())("the reader over the Rust engine's wedding ha
     const rust = towerWithHall();
     const reader = newViewReader(rust);
     const hall = reader.rooms.find((u) => u.kind === "weddingHall")!;
-    // The frontend kind facts must be bound from the live Rust source, not the
-    // TypeScript reference (which still gives this hall a 16-tile footprint).
+    // The frontend kind facts are bound from the live Rust source.
     expect(findViewKind("weddingHall")).toMatchObject({ width: 28, floors: 5 });
-    expect(findViewKind("weddingHall")?.width).not.toBe(catalogFor("modern").facilities.find((f) => f.key === "weddingHall")!.width);
     const renderSim = newRenderSim(rust, reader);
     expect(towerCatalog(renderSim).economy.garbageCollectHour).toBe(readCatalog(wasm(), "modern").economy.garbageCollectHour);
     expect(hall.floor).toBe(100);
@@ -65,8 +63,11 @@ describe.skipIf(!hasWasmPackage())("the reader over the Rust engine's wedding ha
       for (const x of [hall.x - 1, hall.x + hall.width]) expect(reader.tower.unitAt(102, x), `beside ${x}`).not.toBe(hall);
     };
     check();
-    // The scene, the UI or another tower binds the view's facts to the TypeScript tables' catalog.
-    bindViewKinds(catalogFor("classic"));
+    // The scene, the UI or another tower binds the view's facts to another
+    // catalog, here one whose hall is a single 16-tile story.
+    const classic = catalogFor("classic");
+    bindViewKinds({ ...classic, facilities: classic.facilities.map((f) => (f.key === "weddingHall" ? { ...f, floors: 1, width: 16 } : f)) });
+    expect(findViewKind("weddingHall")).toMatchObject({ width: 16, floors: 1 });
     reader.update();
     check();
   }, 60_000);

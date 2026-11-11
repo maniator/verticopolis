@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { catalogFor } from "../engine/catalog";
+import { catalogFor } from "../tests/catalogFixture";
 import { ALL_KINDS } from "../engine/facilities";
 import { makeRules } from "../engine/gameRules";
 import { priceOptionsFor, priceOptionsFromRent, unitPrice } from "./catalogPricing";
