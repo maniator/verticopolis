@@ -4,7 +4,7 @@ import { resolve } from "node:path";
 import type { WasmEngine } from "../../dualrun/binding";
 import type { CalendarKind } from "../../shared/engineTypes";
 import type { SerializedGame } from "../../shared/serializedGame";
-import { isTelemetryDocument, type TelemetryDocument } from "../../wasmhost/telemetry";
+import type { TelemetryDocument } from "../../wasmhost/telemetry";
 import { REPO_ROOT } from "../conformance/scenario";
 import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
 import { FIXTURES } from "../conformance/fixtureSim";
@@ -41,6 +41,25 @@ interface Seen {
 }
 
 const saveOf = (engine: WasmEngine) => JSON.parse(engine.serialize()) as SerializedGame;
+
+const isNum = (v: unknown): v is number => typeof v === "number";
+const isPairs = (v: unknown): boolean => Array.isArray(v) && v.every((p) => Array.isArray(p) && p.length === 2 && isNum(p[0]) && isNum(p[1]));
+const isDays = (v: unknown, slot: (x: unknown) => boolean): boolean => {
+  if (typeof v !== "object" || v === null) return false;
+  const { weekday, weekend } = v as { weekday?: unknown; weekend?: unknown };
+  return Array.isArray(weekday) && Array.isArray(weekend) && weekday.every(slot) && weekend.every(slot);
+};
+const isEntries = (v: unknown, value: (x: unknown) => boolean): boolean => Array.isArray(v) && v.every((e) => Array.isArray(e) && e.length === 2 && isNum(e[0]) && value(e[1]));
+
+/** Whether a parsed document is the shape `seedElevatorTelemetry` takes, all
+ *  the way down: `[shaft, value]` entries for the utilization, the demand
+ *  curves (a weekday and a weekend ring of numbers) and the origin rings
+ *  (rings of `[floor, count]` pairs). */
+function isTelemetryDocument(v: unknown): v is TelemetryDocument {
+  if (typeof v !== "object" || v === null) return false;
+  const d = v as Record<string, unknown>;
+  return isEntries(d.util, isNum) && isEntries(d.hourly, (x) => isDays(x, isNum)) && isEntries(d.origins, (x) => isDays(x, isPairs));
+}
 
 function telemetryOf(engine: WasmEngine): TelemetryDocument {
   const doc: unknown = JSON.parse(engine.elevatorTelemetry());
