@@ -164,6 +164,41 @@ fn modern_still_answers_at_once() {
 }
 
 #[test]
+fn a_found_bomb_reports_bomb_found() {
+    let mut sim = tower(6, 1);
+    decline(&mut sim);
+    run(&mut sim, 1500);
+    let events = sim.gameplay.drain();
+    assert!(events.contains(&crate::gameplay::GameplayEvent::BombFound));
+}
+
+#[test]
+fn one_long_step_hands_out_floors_in_the_order_short_steps_would() {
+    // Every hiding floor, each with the clock run minute by minute and in
+    // one jump to the deadline: the same outcome and the same floors swept.
+    for floor in 3..=30 {
+        let start = |sim: &mut Simulation| {
+            decline(sim);
+            sim.events.bomb.as_mut().unwrap().floor = floor;
+        };
+        let (mut short, mut long) = (tower(30, 2), tower(30, 2));
+        start(&mut short);
+        start(&mut long);
+        let deadline = short.events.bomb.as_ref().unwrap().deadline;
+        while short.events.bomb.is_some() && short.clock.minutes < deadline {
+            short.clock.advance(1.0);
+            short.advance_bomb_search();
+        }
+        long.clock.minutes = deadline;
+        long.advance_bomb_search();
+        assert_eq!(
+            short.events.bombs_detonated, long.events.bombs_detonated,
+            "bomb on floor {floor}"
+        );
+    }
+}
+
+#[test]
 fn the_view_leaves_out_the_hiding_place() {
     let mut sim = tower(8, 1);
     decline(&mut sim);

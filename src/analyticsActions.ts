@@ -1,6 +1,7 @@
 import {
   trackEvent,
   type AppActionName,
+  type BombOutcome,
   type EconomyActionName,
   type EmergencyKind,
   type EmergencyDecision,
@@ -69,6 +70,12 @@ export function trackEconomyActionOnce(action: EconomyActionName, detail?: strin
  *  never-throw. */
 export function trackEmergencyChoice(kind: EmergencyKind, decision: EmergencyDecision): void {
   trackEvent("emergency_choice", { kind, decision });
+}
+
+/** Report how a bomb threat ended (see `bomb_outcome`). Called only by the
+ *  analytics bridge. Host-gated and never-throw. */
+export function trackBombOutcome(outcome: BombOutcome): void {
+  trackEvent("bomb_outcome", { outcome });
 }
 
 /** Clear the once-per-session action latches, so the next call to each `*Once`

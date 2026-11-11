@@ -41,6 +41,7 @@ fn one_of_each() -> Vec<GameplayEvent> {
             source: EmergencySource::Timeout,
         },
         GameplayEvent::MilestoneReached { id: "full-house" },
+        GameplayEvent::BombFound,
     ]
 }
 

@@ -275,7 +275,8 @@ impl Simulation {
         let Some(b) = self.events.bomb.as_ref() else {
             return;
         };
-        let now = self.clock.minutes;
+        // Nothing after the deadline can change the outcome.
+        let now = self.clock.minutes.min(b.deadline);
         let moved = b
             .guards
             .iter()
@@ -290,15 +291,16 @@ impl Simulation {
         let found = b
             .guards
             .iter()
-            .any(|g| g.floor == Some(b.floor) && g.done_at <= now && g.done_at <= deadline);
+            .any(|g| g.floor == Some(b.floor) && g.done_at <= now);
         if found {
             let floor = b.floor;
             self.events.bomb = None;
             let cost = 2_000.0 + self.rng.int(0, 3_000) as f64;
             self.money -= cost;
+            self.gameplay.push(GameplayEvent::BombFound);
             let at = self.floor_label(floor);
             self.emit(&format!("💣 Security found the bomb on {at} and defused it in time. The evacuation cost ${}.", with_thousands(cost)), LogKind::Good);
-        } else if now >= deadline {
+        } else if self.clock.minutes >= deadline {
             let (floor, x) = (b.floor, b.x);
             self.events.bomb = None;
             let fine = 15_000.0 + self.rng.int(0, 15_000) as f64;
@@ -317,10 +319,15 @@ impl Simulation {
                 return;
             };
             let bomb_floor = b.floor;
+            // The earliest finish goes first (the lowest index on a tie), so
+            // one long step hands out floors in the order short steps would.
             let Some(i) = b
                 .guards
                 .iter()
-                .position(|g| g.floor.is_some_and(|f| f != bomb_floor) && g.done_at <= now)
+                .enumerate()
+                .filter(|(_, g)| g.floor.is_some_and(|f| f != bomb_floor) && g.done_at <= now)
+                .min_by(|(_, a), (_, b)| a.done_at.total_cmp(&b.done_at))
+                .map(|(i, _)| i)
             else {
                 break;
             };

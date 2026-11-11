@@ -132,6 +132,7 @@ pub enum GameplayEvent {
     BombDetonated {
         rooms: i64,
     },
+    BombFound,
     EmergencyResolved {
         kind: EmergencyKind,
         decision: EmergencyDecision,
@@ -145,7 +146,7 @@ pub enum GameplayEvent {
 
 impl GameplayEvent {
     /// How many variants there are: one more than the highest `ordinal`.
-    pub const VARIANTS: usize = 11;
+    pub const VARIANTS: usize = 12;
 
     /// The event's position in the catalog. Exhaustive, so a new variant
     /// cannot compile without a place; `VARIANTS` and the catalog test then
@@ -163,6 +164,7 @@ impl GameplayEvent {
             GameplayEvent::BombDetonated { .. } => 8,
             GameplayEvent::EmergencyResolved { .. } => 9,
             GameplayEvent::MilestoneReached { .. } => 10,
+            GameplayEvent::BombFound => 11,
         }
     }
 
@@ -179,6 +181,7 @@ impl GameplayEvent {
             GameplayEvent::BombDetonated { .. } => "bomb_detonated",
             GameplayEvent::EmergencyResolved { .. } => "emergency_resolved",
             GameplayEvent::MilestoneReached { .. } => "milestone_reached",
+            GameplayEvent::BombFound => "bomb_found",
         }
     }
 
@@ -195,7 +198,7 @@ impl GameplayEvent {
                 json!({ "kind": kind.as_str() })
             }
             GameplayEvent::StarReached { star } => json!({ "star": star }),
-            GameplayEvent::FireStarted => json!({}),
+            GameplayEvent::FireStarted | GameplayEvent::BombFound => json!({}),
             GameplayEvent::FireGutted { rooms } | GameplayEvent::BombDetonated { rooms } => {
                 json!({ "rooms": rooms })
             }

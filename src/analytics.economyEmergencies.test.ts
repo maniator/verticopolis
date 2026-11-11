@@ -116,6 +116,15 @@ describe("session_emergencies telemetry", () => {
     window.location.href = localhost;
   });
 
+  it("reports how each bomb threat ended: paid, found or exploded", () => {
+    const resolved = (decision: "accept" | "decline") => ({
+      name: "emergency_resolved",
+      payload: { kind: "bombThreat", decision, source: "player" },
+    });
+    forwardGameplayEvents([resolved("accept"), resolved("decline"), { name: "bomb_found", payload: {} }, bomb(2)]);
+    expect(propsFor("bomb_outcome")).toEqual([{ outcome: "paid" }, { outcome: "found" }, { outcome: "exploded" }]);
+  });
+
   it("emits once at the terminal end EVEN WHEN ALL ZERO (for the denominator)", () => {
     played(); // the frame loop ran: a real play session
     gameplaySession.end(true); // pagehide (terminal)

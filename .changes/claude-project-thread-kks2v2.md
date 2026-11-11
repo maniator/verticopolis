@@ -7,3 +7,4 @@ crate: minor
 ## Engine
 - Classic answers a declined ransom with a timed bomb search (a hidden bomb, guards sweeping floors, a deadline) that the save keeps as `events.bomb` while it runs; Modern still answers at once.
 - `bombSearch()` reads the search, and the view's header adds `bombSearchSeq` (view layout 13).
+- New gameplay event `bomb_found`; the web build reports `bomb_outcome` (paid, found or exploded).
