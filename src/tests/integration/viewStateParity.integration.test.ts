@@ -1,11 +1,9 @@
 import { describe, expect, it, beforeEach, vi } from "vitest";
 import { inflateSync } from "fflate";
-import towerFile from "../../../conformance/fixtures/towerone_6.vctower?raw";
 import { Simulation } from "../../engine/Simulation";
 import { FLOOR, TILE, TowerEngine } from "../../render/excalibur/TowerEngine";
 import { GRID } from "../../engine/facilities";
 import type { SerializedGame, SerializedView } from "../../shared/types";
-import { VIEW_ZOOM_MAX, VIEW_ZOOM_MIN } from "../../shared/types";
 import { SKY_HEADROOM_FLOORS } from "../../render/cameraBounds";
 import { SaveLoad } from "../../game/saveLoad";
 import { buildTDT, installTdtCodec, parseTDT } from "../conformance/tdtWasm";
@@ -18,6 +16,9 @@ import { loadAuto, loadSlotSim, withPorts } from "../fixtures/saveText";
  * save so a tower moved between devices reopens where its player was
  * standing, matching what the 1994 TDT header already carries at 0x26/0x28.
  * See _bmad-output/implementation-artifacts/story-view-state-save-parity.md.
+ * How a loaded view is checked (kept as written, dropped when malformed,
+ * clamped onto the lot) is pinned by the engine's own tests in
+ * engine-rs/src/load/coerce.rs.
  */
 
 /** Decode a `.vctower` container without DecompressionStream (env-agnostic). */
@@ -36,67 +37,6 @@ const TDT_DEFAULT_VIEW_Y = 3491;
 const WORDS_200_20 = { x: 1280, y: 3024 };
 
 const readHdrU16 = (bytes: Uint8Array, off: number): number => bytes[off] | (bytes[off + 1] << 8);
-
-describe("SerializedView through Simulation serialize/deserialize (trust boundary)", () => {
-  it("round-trips a stamped view exactly, and an unstamped sim writes no view key at all", () => {
-    const sim = new Simulation();
-    expect(sim.view).toBeNull();
-    expect("view" in sim.serialize()).toBe(false); // undo snapshots must not grow a null field
-
-    sim.view = { tile: 123.5, floor: 42.25, zoom: 1.7 };
-    const data = sim.serialize();
-    expect(data.view).toEqual({ tile: 123.5, floor: 42.25, zoom: 1.7 });
-    expect(Simulation.deserialize(data).view).toEqual({ tile: 123.5, floor: 42.25, zoom: 1.7 });
-  });
-
-  it("keeps a zoomless view (a TDT import has no zoom to carry)", () => {
-    const data = { ...new Simulation().serialize(), view: { tile: 10, floor: 5 } };
-    expect(Simulation.deserialize(data).view).toEqual({ tile: 10, floor: 5 });
-  });
-
-  it("tolerates zoom: null as absent (a common JSON encoding of a missing optional)", () => {
-    const data = { ...new Simulation().serialize(), view: { tile: 10, floor: 5, zoom: null } };
-    expect(Simulation.deserialize(data as unknown as SerializedGame).view).toEqual({ tile: 10, floor: 5 });
-  });
-
-  it("drops a malformed view whole: wrong container, wrong member types, non-finite members", () => {
-    const base = new Simulation().serialize();
-    const forged = (view: unknown) =>
-      Simulation.deserialize({ ...base, view } as SerializedGame).view;
-    expect(forged("over there")).toBeNull();
-    expect(forged(42)).toBeNull();
-    expect(forged({})).toBeNull();
-    expect(forged({ tile: "12", floor: 5 })).toBeNull();
-    expect(forged({ tile: NaN, floor: 5 })).toBeNull();
-    expect(forged({ tile: 12, floor: Infinity })).toBeNull();
-    expect(forged({ tile: 12, floor: 5, zoom: NaN })).toBeNull();
-    expect(forged({ tile: 12, floor: 5, zoom: "big" })).toBeNull();
-  });
-
-  it("clamps out-of-range finite values into the grid and the zoom range", () => {
-    const base = new Simulation().serialize();
-    const view = Simulation.deserialize({
-      ...base,
-      view: { tile: 1e9, floor: -1e9, zoom: 1e308 },
-    } as SerializedGame).view!;
-    expect(view.tile).toBe(GRID.width);
-    expect(view.floor).toBe(GRID.minFloor);
-    expect(view.zoom).toBe(VIEW_ZOOM_MAX);
-    const low = Simulation.deserialize({
-      ...base,
-      view: { tile: -5, floor: 1e9, zoom: 0 },
-    } as SerializedGame).view!;
-    expect(low.tile).toBe(0);
-    expect(low.floor).toBe(GRID.maxFloor);
-    expect(low.zoom).toBe(VIEW_ZOOM_MIN);
-  });
-
-  it("the committed pre-view fixture still loads, viewless (center fallback)", () => {
-    const data = decodeVctower(towerFile);
-    expect("view" in data).toBe(false);
-    expect(Simulation.deserialize(data).view).toBeNull();
-  });
-});
 
 describe("SaveLoad stamps the live camera onto the CURRENT tower's saves", () => {
   const camera: SerializedView = { tile: 42, floor: 3, zoom: 1.5 };
@@ -355,18 +295,5 @@ describe.skipIf(!hasWasmPackage())("TDT export/import carry the view words", () 
     const back = parseTDT(buildTDT(save).bytes.buffer as ArrayBuffer, "ROUND.TDT").save;
     expect(Math.abs(back.view!.tile - 178)).toBeLessThanOrEqual(1);
     expect(Math.abs(back.view!.floor - 7)).toBeLessThanOrEqual(1);
-  });
-
-  it("an out-of-grid word pair clamps at the deserialize trust boundary", () => {
-    // viewY = 1 decodes to a floor above our grid (the 1994 sky); the second
-    // hardening layer (Simulation.deserialize) clamps it onto the lot.
-    const save = parseTDT(
-      buildTdt({ ...sampleTowerSpec(), viewX: 8, viewY: 1 }).buffer as ArrayBuffer,
-      "SKY.TDT",
-    ).save;
-    expect(save.view!.floor).toBeGreaterThan(GRID.maxFloor); // raw decode is out of grid
-    const sim = Simulation.deserialize(save);
-    expect(sim.view!.floor).toBe(GRID.maxFloor);
-    expect(sim.view!.tile).toBeGreaterThanOrEqual(0);
   });
 });

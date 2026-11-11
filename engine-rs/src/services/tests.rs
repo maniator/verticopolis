@@ -1,5 +1,7 @@
 use super::*;
 use crate::clock::{CalendarKind, GameMode};
+use crate::facilities::{LOT_WIDTH, MAX_FLOOR};
+use crate::star::TOWER_POPULATION;
 
 #[test]
 fn the_advisories_word_their_counts_as_typescript_does() {
@@ -136,4 +138,89 @@ fn booking_mirrors_call_exterminator() {
         classic.call_exterminator(),
         Err(ExterminatorRefusal::Unavailable)
     );
+}
+
+/// A Classic tower with `office_floors` floors of occupied offices above the
+/// lobby, slabs up to floor 100, three basement floors, and a star rating of
+/// five: everything the VIP checks apart from the hall and the Metro.
+fn finished_tower(office_floors: i64) -> Simulation {
+    let mut sim = Simulation::new(1, GameMode::Classic, CalendarKind::RealWorld, false);
+    sim.money = 1.0e9;
+    for x in 0..LOT_WIDTH {
+        assert!(sim.tower.place(Kind::Lobby, 1, x).ok);
+    }
+    for floor in (-2..=0).rev().chain(2..=MAX_FLOOR) {
+        for x in 0..LOT_WIDTH {
+            assert!(
+                sim.tower.place(Kind::Floor, floor, x).ok,
+                "floor {floor},{x}"
+            );
+        }
+    }
+    let width = Kind::Office.facility().width;
+    for floor in 2..2 + office_floors {
+        for x in (0..=LOT_WIDTH - width).step_by(width as usize) {
+            let id = sim.tower.place(Kind::Office, floor, x).unit_id.unwrap();
+            sim.tower.get_unit_mut(id).unwrap().state = UnitState::Occupied;
+        }
+    }
+    sim.star = 5;
+    sim
+}
+
+/// The VIP's visit today.
+fn vip_visits_today(sim: &mut Simulation) {
+    sim.vip_visit_day = sim.clock.day() as f64;
+    sim.check_vip();
+}
+
+/// The TOWER rating (the win): a five-star tower with the population, the
+/// Wedding Hall crowning floor 100 and a Metro station impresses the VIP and
+/// becomes a TOWER. Short of the population, the VIP leaves unimpressed and
+/// comes back in five days.
+#[test]
+fn the_vip_crowns_a_finished_tower_and_returns_to_a_short_one() {
+    let per_floor = LOT_WIDTH / Kind::Office.facility().width;
+    let floors_needed = (TOWER_POPULATION + per_floor * Kind::Office.facility().population - 1)
+        / (per_floor * Kind::Office.facility().population);
+    for (office_floors, crowned) in [(floors_needed - 1, false), (floors_needed, true)] {
+        let mut sim = finished_tower(office_floors);
+        assert!(sim.tower.place(Kind::Metro, -2, 0).ok, "metro");
+        assert!(
+            sim.build(Kind::WeddingHall, MAX_FLOOR, LOT_WIDTH / 2).ok,
+            "wedding hall"
+        );
+        assert_eq!(sim.tower.built_wedding_hall, Some(true));
+        for kind in [Kind::WeddingHall, Kind::Metro] {
+            for id in sim
+                .tower
+                .units_of_kind(kind)
+                .map(|u| u.id)
+                .collect::<Vec<_>>()
+            {
+                sim.tower.get_unit_mut(id).unwrap().state = UnitState::Occupied;
+            }
+        }
+        assert_eq!(
+            sim.rating_population() >= TOWER_POPULATION,
+            crowned,
+            "population {}",
+            sim.rating_population()
+        );
+
+        vip_visits_today(&mut sim);
+        if crowned {
+            assert_eq!(sim.star, 6, "a TOWER");
+            assert_eq!(sim.evaluated_tower, Some(true));
+            assert_eq!(sim.vip_visit_day, -1.0, "no further visit");
+        } else {
+            assert_eq!(sim.star, 5);
+            assert_ne!(sim.evaluated_tower, Some(true));
+            assert_eq!(
+                sim.vip_visit_day,
+                (sim.clock.day() + 5) as f64,
+                "back in five days"
+            );
+        }
+    }
 }

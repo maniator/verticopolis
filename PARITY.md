@@ -116,8 +116,10 @@ legibility work for them (#399, #400, #401). The review is
 `_bmad-output/planning-artifacts/design/gdd-simtower-optimization-gaps-2026-07-15.md`.
 
 ## Verification
-`npm test` runs **500+ unit/integration tests** covering placement rules,
-economy, ratings gates, the housekeeping/fire/bomb events, elevator dispatch,
-the individually-routed **crowd's BFS routing and movement**
-(`src/tests/integration/crowd.integration.test.ts`), save/load, and an
-**end-to-end run to the TOWER victory** (`src/tests/integration/parity.integration.test.ts`).
+`npm test` runs the web game's unit and integration tests, and `cargo test`
+in `engine-rs/` runs the engine's own, covering placement rules, economy,
+rating gates, the housekeeping/fire/bomb events, elevator dispatch, the
+individually-routed **crowd's routing and movement**, save/load, and the
+VIP's **TOWER award** (`engine-rs/src/services/tests.rs`). The conformance
+suite replays every scenario in `conformance/scenarios/` on the engine and
+checks each checkpoint hash against `conformance/expected.json`.
