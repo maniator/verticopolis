@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { VIEW_LAYOUT } from "../../engine/port/layout";
+import { LAYOUT_TEXT } from "../portKit/mockPort";
 import { newSeededDraft, LOT_WIDTH } from "../portKit/draftFixtures";
 import { PortSim, describeEngines, defaultLeg, releaseAll, type Leg, draftTower } from "../portKit/portSim";
 import { hasWasmPackage } from "../conformance/wasmEngine";
@@ -14,6 +14,10 @@ import {
 } from "../../ui/Onboarding";
 
 const C = Math.floor(LOT_WIDTH / 2);
+
+/** The onboarding bits' order, from the engine layout the port fixture holds
+ *  (`portReads.integration.test.ts` keeps the fixture on the engine's answer). */
+const LAYOUT_ONBOARDING = (JSON.parse(LAYOUT_TEXT) as { onboarding: string[] }).onboarding;
 
 /** The splash tests that adopt a tower need the engine package; they skip
  *  without it, as {@link describeEngines} does. */
@@ -103,8 +107,8 @@ describeEngines("Onboarding — steps advance on real progress", (leg: Leg) => {
 
 describe("Onboarding: step copy", () => {
   it("lists the steps in the order of the layout's onboarding bits", () => {
-    expect(ONBOARD_STEPS.map((s) => s.id)).toEqual(VIEW_LAYOUT.onboarding);
-    expect(VIEW_LAYOUT.onboarding.map((id) => ONBOARDING_FLAG[id as keyof typeof ONBOARDING_FLAG])).toEqual([1, 2, 4, 8, 16]);
+    expect(ONBOARD_STEPS.map((s) => s.id)).toEqual(LAYOUT_ONBOARDING);
+    expect(LAYOUT_ONBOARDING.map((id) => ONBOARDING_FLAG[id as keyof typeof ONBOARDING_FLAG])).toEqual([1, 2, 4, 8, 16]);
   });
 
   it("each step has distinct desktop and mobile hint copy and a pulse target", () => {

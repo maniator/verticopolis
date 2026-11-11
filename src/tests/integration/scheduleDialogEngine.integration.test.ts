@@ -1,9 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mountAppDom, makeUI } from "../uiFixture";
-import { CLASSIC_RULES, MODERN_RULES } from "../../engine/gameRules";
+import { catalogFor } from "../catalogFixture";
+import { scheduleDialogUX } from "../../ui/scheduleDialogRules";
 import type { ScheduleDialogCtx } from "../../ui/uiElevatorSchedule";
 import type { PresetProposal, ScheduleFacts } from "../../simport/enginePort";
-import { referenceEngine } from "../fixtures/autoTuneDouble";
+import { rustScheduleEngine } from "../fixtures/autoTuneDouble";
 
 /**
  * What the schedule dialog does with the engine's advice, staging and preset
@@ -56,9 +57,9 @@ function ctx(over: Partial<ScheduleDialogCtx> = {}): ScheduleDialogCtx {
   const base = { cars: 4, bottom: 1, top: 4, stops: stops(), isExpress: false };
   return {
     title: "Schedule: Standard elevator (floors 1-4)",
-    ux: MODERN_RULES.elevatorScheduleUX(),
+    ux: scheduleDialogUX(catalogFor("modern").rules),
     ...base,
-    ...referenceEngine(base, true),
+    ...rustScheduleEngine(base, true),
     facts: echoHomes(),
     preset: () => PRESET,
     initialWeekend: false,
@@ -93,7 +94,7 @@ describe("the dialog's advice comes from the engine's facts", () => {
   });
 
   it("shows no advice where the mode withholds it, whatever the engine says", () => {
-    open({ ux: CLASSIC_RULES.elevatorScheduleUX(), facts: () => ({ ...FACTS, advice: { status: "ready", over: [9], short: [] } }) });
+    open({ ux: scheduleDialogUX(catalogFor("classic").rules), facts: () => ({ ...FACTS, advice: { status: "ready", over: [9], short: [] } }) });
     expect(dialog().querySelector(".es-advice")).toBeNull();
   });
 
@@ -163,7 +164,7 @@ describe("the dialog's presets come from the engine", () => {
 
   it("stages up-tower from the engine's staging play, in either mode", () => {
     const preset = vi.fn((): PresetProposal => ({ status: "available", weekday: null, weekend: null, homeFloors: [1, 1, 4, 4] }));
-    const { apply } = open({ ux: CLASSIC_RULES.elevatorScheduleUX(), preset });
+    const { apply } = open({ ux: scheduleDialogUX(catalogFor("classic").rules), preset });
     byLabel("button", "Stage upper half up-tower").click();
     expect(preset).toHaveBeenCalledWith("stage-up-tower");
     press('[data-act="apply"]');

@@ -12,6 +12,7 @@ use crate::tower::UnitState;
 #[path = "attendance.rs"]
 mod attendance;
 mod calendar;
+mod canon;
 mod capacity;
 mod commute;
 mod condos;

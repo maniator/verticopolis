@@ -8,14 +8,59 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { expect, it } from "vitest";
-import { describeWithCodec, installTdtCodec, parseTDT } from "../conformance/tdtWasm";
-import { deserializeSave, readVctower, stageTdt, writeVctower } from "../../engine/port/files";
+import { describeWithCodec, parseTDT } from "../conformance/tdtWasm";
+import { wasm } from "../conformance/wasmEngine";
+import type { SerializedGame } from "../../shared/types";
 
 const DIR = resolve(__dirname, "../../../conformance/fixtures/tdt-reddit");
 const load = (name: string) => {
   const bytes = readFileSync(resolve(DIR, name));
   return parseTDT(bytes, name);
 };
+
+/** The app version and save time a test `.vctower` is stamped with. */
+const APP_VERSION = "3.0.0";
+const SAVED_AT_MS = 0;
+
+/** A save loaded on the Rust engine and written back, as the game keeps it. */
+function loaded(save: SerializedGame): SerializedGame {
+  const engine = wasm().Engine.fromSave(JSON.stringify(save));
+  try {
+    return JSON.parse(engine.serialize()) as SerializedGame;
+  } finally {
+    engine.free();
+  }
+}
+
+/** The record status the engine's commands answer with when they succeed. */
+const DONE = 1;
+
+/** A `.TDT` file imported the way the game does it: the engine reads the file
+ *  (`loadTdt`), then adopts the tower (`adoptTdt`). */
+function imported(name: string): SerializedGame {
+  const engine = wasm().Engine.newGame(1, "classic");
+  try {
+    expect(engine.loadTdt(readFileSync(resolve(DIR, name)), name)[0], engine.lastReason()).toBe(DONE);
+    expect(engine.adoptTdt()[0], engine.lastReason()).toBe(DONE);
+    return JSON.parse(engine.serialize()) as SerializedGame;
+  } finally {
+    engine.free();
+  }
+}
+
+/** A save through a `.vctower` file and back: the Rust engine writes it and
+ *  opens the file again. */
+function throughVctower(save: SerializedGame): SerializedGame {
+  const encode = wasm().encodeVctower;
+  if (!encode) throw new Error("the WASM binding exports no encodeVctower; rebuild it");
+  const file = encode(JSON.stringify(loaded(save)), APP_VERSION, SAVED_AT_MS);
+  const engine = wasm().Engine.fromVctower(file);
+  try {
+    return JSON.parse(engine.serialize()) as SerializedGame;
+  } finally {
+    engine.free();
+  }
+}
 
 /** Shafts and walkway flights each save carries. Every file reads straight
  *  through its elevator table, express shafts included (#1491, #1497). */
@@ -58,8 +103,7 @@ describeWithCodec("real 1997 saves keep their shop, restaurant and fast-food sty
     it(`${name}: import .TDT, save .vctower, reload`, () => {
       const imported = load(name).save;
       const before = styles(imported.units);
-      const sim = deserializeSave(imported);
-      const reloaded = readVctower(writeVctower(sim, "3.0.0", 0)).serialize();
+      const reloaded = throughVctower(imported);
       expect(styles(reloaded.units)).toEqual(before);
       // Every styled room has a style, so the comparison above is not empty names.
       expect(before.every((line) => !line.endsWith("=undefined"))).toBe(true);
@@ -71,23 +115,20 @@ describeWithCodec("real 1997 saves keep their shop, restaurant and fast-food sty
 describeWithCodec("imported TDT basement express stop persistence", () => {
   it("marks real TDT basement express stops and keeps them on ordinary .vctower reload", () => {
     const source = load("TOWER7.TDT").save;
-    // Production boot installs the codec before stageTdt; this isolated WASM
-    // integration suite must do the same instead of treating it as unavailable.
-    installTdtCodec();
-    const imported = stageTdt(readFileSync(resolve(DIR, "TOWER7.TDT")), "TOWER7.TDT").sim;
+    const fromGame = imported("TOWER7.TDT");
     const shafts = source.transports.filter((t) => t.kind === "elevatorExpress" && t.bottom < 0 && Array.isArray(t.skipFloors));
     expect(shafts.length).toBeGreaterThan(0);
     for (const fromFile of shafts) {
-      const actual = imported.tower.transports.find((t) =>
+      const actual = fromGame.transports.find((t) =>
         t.kind === fromFile.kind && t.x === fromFile.x && t.bottom === fromFile.bottom && t.top === fromFile.top);
       expect(actual?.preserveBasementStops).toBe(true);
       for (let floor = fromFile.bottom + 1; floor <= 0; floor++) {
         expect(actual?.skipFloors?.includes(floor)).toBe(fromFile.skipFloors!.includes(floor));
       }
     }
-    const reloaded = readVctower(writeVctower(imported, "3.0.0", 0));
-    for (const t of imported.tower.transports.filter((t) => t.preserveBasementStops)) {
-      const again = reloaded.tower.transports.find((s) => s.id === t.id);
+    const reloaded = throughVctower(fromGame);
+    for (const t of fromGame.transports.filter((t) => t.preserveBasementStops)) {
+      const again = reloaded.transports.find((s) => s.id === t.id);
       expect(again?.preserveBasementStops).toBe(true);
       expect(again?.skipFloors).toEqual(t.skipFloors);
     }
@@ -105,28 +146,28 @@ describeWithCodec("imported TDT basement express stop persistence", () => {
       const raw = structuredClone(source);
       raw.transports[index].skipFloors = skips;
       raw.transports[index].preserveBasementStops = true;
-      const sim = deserializeSave(raw);
-      const before = sim.tower.transports.find((t) => t.id === original.id);
+      const sim = loaded(raw);
+      const before = sim.transports.find((t) => t.id === original.id);
       expect(before?.preserveBasementStops).toBe(true);
       for (let fl = original.bottom + 1; fl <= 0; fl++) {
         expect(before?.skipFloors?.includes(fl)).toBe(skips.includes(fl));
       }
-      const first = readVctower(writeVctower(sim, "3.0.0", 0));
-      const second = readVctower(writeVctower(first, "3.0.0", 0));
+      const first = throughVctower(sim);
+      const second = throughVctower(first);
       for (const roundTrip of [first, second]) {
-        const after = roundTrip.tower.transports.find((t) => t.id === original.id);
+        const after = roundTrip.transports.find((t) => t.id === original.id);
         expect(after?.skipFloors).toEqual(before?.skipFloors);
         expect(after?.preserveBasementStops).toBe(true);
       }
     }
     const legacy = structuredClone(source);
     legacy.transports[index].skipFloors = [sky];
-    const oldShaft = deserializeSave(legacy).tower.transports.find((t) => t.id === original.id);
+    const oldShaft = loaded(legacy).transports.find((t) => t.id === original.id);
     expect(oldShaft?.preserveBasementStops).toBeUndefined();
     expect(oldShaft?.skipFloors).toContain(baseline);
     legacy.mode = "modern";
     legacy.transports[index].preserveBasementStops = true;
-    const modern = deserializeSave(legacy).tower.transports.find((t) => t.id === original.id);
+    const modern = loaded(legacy).transports.find((t) => t.id === original.id);
     expect(modern?.preserveBasementStops).toBeUndefined();
     expect(modern?.skipFloors).toContain(baseline);
   });

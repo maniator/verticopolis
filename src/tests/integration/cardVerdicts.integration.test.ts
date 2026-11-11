@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { VIEW_LAYOUT } from "../../engine/port/layout";
+import { LAYOUT } from "../portKit/mockPort";
 import type { FacilityKind, GameMode } from "../../shared/types";
 import { PortSim, describeEngines, draftTower, type Leg, type Draft } from "../portKit/portSim";
 
@@ -12,7 +12,8 @@ import { PortSim, describeEngines, draftTower, type Leg, type Draft } from "../p
 /** The engine's own cutoff: a shaft is near capacity strictly above it. */
 const CUTOFF = 0.85;
 const LOADS = [undefined, 0, 0.5, CUTOFF, 0.8501, 0.97, 1] as const;
-const slot = (name: (typeof VIEW_LAYOUT.records.shaftCard)[number]): number => VIEW_LAYOUT.records.shaftCard.indexOf(name);
+/** A shaft card slot by name, from the engine layout the port fixture holds. */
+const slot = (name: string): number => LAYOUT.records.shaftCard.indexOf(name);
 
 type SeededPort = { seedElevatorTelemetry(json: string): void };
 

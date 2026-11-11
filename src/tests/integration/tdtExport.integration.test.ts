@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { newSeededGame } from "../fixtures/towerFixtures";
+import { newSeededDraft } from "../portKit/draftFixtures";
 import type { FacilityKind, SerializedGame, Transport, Unit } from "../../shared/types";
-import { SAVE_VERSION } from "../../engine/saveMigration";
 import {
   TDT_DEFAULT_VIEW_X,
   TDT_DEFAULT_VIEW_Y,
@@ -21,10 +20,22 @@ import {
 } from "../fixtures/tdtLayout";
 import { LegacyExportError, buildTDT, describeWithCodec, parseTDT, parseTdtBinary } from "../conformance/tdtWasm";
 import { legacyFilename } from "../../storage/tdtFilename";
-import { FACILITIES, GRID } from "../../engine/facilities";
-import { rentConfig } from "../../engine/econConfig";
-import { FASTFOOD_SUBTYPES, RESTAURANT_SUBTYPES, SHOP_SUBTYPES } from "../../engine/retailSubtypes";
 import { buildTdt, sampleTowerSpec } from "../fixtures/tdtBuilder";
+import { catalogFacility } from "../../catalog/catalogTypes";
+import { catalogFor } from "../catalogFixture";
+import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
+import { parseEngineIdentity, readEngineIdentity } from "../../wasmhost/engineIdentity";
+
+/** The Classic catalog, the engine's published table for the 1994 mode. */
+const CATALOG = catalogFor("classic");
+const facts = (kind: FacilityKind) => catalogFacility(CATALOG, kind);
+const LOT_WIDTH = CATALOG.world.lotWidth;
+const SHOP_SUBTYPES = facts("shop").subtypes ?? [];
+const FASTFOOD_SUBTYPES = facts("fastFood").subtypes ?? [];
+const RESTAURANT_SUBTYPES = facts("restaurant").subtypes ?? [];
+/** The save version the engine writes, from its identity record (0 without
+ *  the package, where the codec suites skip). */
+const SAVE_VERSION = hasWasmPackage() ? parseEngineIdentity(readEngineIdentity(wasm()))!.saveVersion : 0;
 
 /** A bare room unit for hand-built saves. */
 function unit(partial: Partial<Unit> & Pick<Unit, "id" | "kind" | "floor" | "x" | "width">): Unit {
@@ -347,10 +358,10 @@ describeWithCodec("buildTDT: export → import round trip", () => {
     // Build a real Simulation, populate three retail units with distinct
     // canon subtypes, serialize, export, and re-import through parseTDT.
     // The resulting units must carry the same variant names on both sides.
-    const sim = newSeededGame(3);
+    const sim = newSeededDraft(3);
     sim.money = 1e12;
     sim.star = 5;
-    const x0 = Math.floor(GRID.width / 2) - 20;
+    const x0 = Math.floor(LOT_WIDTH / 2) - 20;
     for (let i = 0; i < 40; i++) sim.tower.place("floor", 2, x0 + i);
     sim.buildTransport("elevatorStandard", x0, 1, 2);
     // Distinct kinds, distinct floors so the retail-table row order is stable.
@@ -362,9 +373,10 @@ describeWithCodec("buildTDT: export → import round trip", () => {
     const s = sim.tower.place("shop", 2, x0)!;
     const f = sim.tower.place("fastFood", 3, x0)!;
     const r = sim.tower.place("restaurant", 4, x0)!;
-    sim.tower.getUnit(s.unitId!)!.subtype = SHOP_SUBTYPES[3]; // Book Store
-    sim.tower.getUnit(f.unitId!)!.subtype = FASTFOOD_SUBTYPES[1]; // Chinese Cafe
-    sim.tower.getUnit(r.unitId!)!.subtype = RESTAURANT_SUBTYPES[4]; // Steak House
+    const styled = (id: number) => sim.tower.getUnit(id) as unknown as { subtype?: string };
+    styled(s.unitId!).subtype = SHOP_SUBTYPES[3]; // Book Store
+    styled(f.unitId!).subtype = FASTFOOD_SUBTYPES[1]; // Chinese Cafe
+    styled(r.unitId!).subtype = RESTAURANT_SUBTYPES[4]; // Steak House
 
     const wire = sim.serialize();
     const { bytes } = buildTDT(wire);
@@ -589,7 +601,7 @@ describeWithCodec("buildTDT: export → import round trip", () => {
   // sky story renders as a sky lobby (the game draws lobby arches); feeding raw
   // type-0 there would draw bare floor, but the exporter never emits that.
   it("a plain floor on a sky-lobby story exports as a lobby, byte-identical (gh-319)", () => {
-    const SKY = GRID.lobbyInterval * 2; // a multiple of the interval -> a sky-lobby story
+    const SKY = CATALOG.world.lobbyInterval * 2; // a multiple of the interval -> a sky-lobby story
     const towerWith = (kind: "floor" | "lobby"): SerializedGame => ({
       version: SAVE_VERSION,
       seed: 1,
@@ -773,7 +785,7 @@ describeWithCodec("buildTDT: No-Rate rent class + lastQuarterMoney header", () =
       const rents = back.units
         .filter((u) => u.kind === kind && !u.noRate)
         .sort((a, b) => a.x - b.x)
-        .map((u) => u.rent ?? rentConfig(kind)?.default);
+        .map((u) => u.rent ?? facts(kind).rent?.default);
       expect(rents, kind).toEqual(values);
     }
     expect(back.units.some((u) => u.kind === "office" && u.noRate === true)).toBe(true);
@@ -825,7 +837,7 @@ describeWithCodec("buildTDT: review hardening (states, collisions, caps, hostile
       if (r.type !== 0 && r.type !== 24) continue;
       for (let x = r.left; x < r.right; x++) paved.add(x);
     }
-    const width = office.width ?? FACILITIES.office.width;
+    const width = office.width ?? facts("office").width;
     for (let x = office.x; x < office.x + width; x++) {
       expect(paved.has(x)).toBe(true);
     }
@@ -859,14 +871,14 @@ describeWithCodec("buildTDT: review hardening (states, collisions, caps, hostile
 
   it("a burned room hanging off the lot edge claims no extent it cannot fill", () => {
     // A forged/legacy unit whose footprint runs past the lot: the paving pass
-    // clamps its runs into [0, GRID.width], so the floor's advertised extent
+    // clamps its runs into [0, LOT_WIDTH], so the floor's advertised extent
     // must be clamped the same way. An unclamped extent leaves a tail of the
     // row with no record behind it.
     const save = sampleSave();
     const floor = 8;
     save.units = save.units.filter((u) => u.floor !== floor);
     save.units.push(
-      unit({ id: 9_401, kind: "office", floor, x: GRID.width - 4, width: 9, state: "gutted" }),
+      unit({ id: 9_401, kind: "office", floor, x: LOT_WIDTH - 4, width: 9, state: "gutted" }),
     );
     const { bytes } = buildTDT(save);
     const spans = recordSpans(bytes, floor + TDT_FLOOR_OFFSET);
@@ -874,11 +886,11 @@ describeWithCodec("buildTDT: review hardening (states, collisions, caps, hostile
     // below vacuously) and its paving must reach the lot edge.
     expect(spans.length).toBeGreaterThan(0);
     const right = Math.max(...spans.map((r) => r.right));
-    expect(right).toBe(GRID.width);
+    expect(right).toBe(LOT_WIDTH);
     // The header extent is the assertion with teeth: `w.u16` masks rather than
     // clamps, so an unclamped extent wraps instead of saturating.
     const extent = floorExtent(bytes, floor + TDT_FLOOR_OFFSET);
-    expect(extent.right).toBe(GRID.width);
+    expect(extent.right).toBe(LOT_WIDTH);
     expect(extent.right).toBeGreaterThanOrEqual(extent.left);
     expect(parseTdtBinary(bytes).warnings).toEqual([]);
   });
@@ -917,7 +929,7 @@ describeWithCodec("buildTDT: review hardening (states, collisions, caps, hostile
       const { bytes } = buildTDT(save);
       const spans = recordSpans(bytes, floor + TDT_FLOOR_OFFSET);
       const extent = floorExtent(bytes, floor + TDT_FLOOR_OFFSET);
-      expect(extent.right).toBeLessThanOrEqual(GRID.width);
+      expect(extent.right).toBeLessThanOrEqual(LOT_WIDTH);
       expect(extent.right).toBeGreaterThanOrEqual(extent.left);
       for (const r of spans) {
         expect(r.left).toBeGreaterThanOrEqual(extent.left);
@@ -1322,7 +1334,7 @@ describeWithCodec("buildTDT: lobby (type 24) and empty-floor (type 0) paving rec
   it("a forged floor width (Infinity) can't hang the export, and paving stays within the grid", () => {
     // floor/lobby units arrive unclamped from serialized input; a forged width
     // widens the extent to Infinity. The paving loop must clamp to finite tiles
-    // in [0, GRID.width] and return promptly, not spin forever.
+    // in [0, LOT_WIDTH] and return promptly, not spin forever.
     const started = Date.now();
     const { bytes } = buildTDT(
       tower([
@@ -1334,7 +1346,7 @@ describeWithCodec("buildTDT: lobby (type 24) and empty-floor (type 0) paving rec
     // No emitted record on any floor extends past the grid's right edge.
     for (let idx = 0; idx < 120; idx++) {
       for (const t of floorTenants(bytes, idx)) {
-        expect(t.right).toBeLessThanOrEqual(GRID.width);
+        expect(t.right).toBeLessThanOrEqual(LOT_WIDTH);
         expect(t.left).toBeGreaterThanOrEqual(0);
       }
     }

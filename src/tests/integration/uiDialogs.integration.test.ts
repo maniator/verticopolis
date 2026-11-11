@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { referenceEngine } from "../fixtures/autoTuneDouble";
+import { rustScheduleEngine } from "../fixtures/autoTuneDouble";
 import { describe, it, expect, vi, beforeEach, afterEach, afterAll } from "vitest";
 import { HudTower, pump, rebaseLog } from "../../ui/hud.fixture";
 import { towerCatalog, useTowerCatalogSource } from "../../catalog/towerCatalog";
@@ -9,7 +9,9 @@ import { finishModal, MODAL_TITLE_ID } from "../../ui/uiModal";
 import type { UI } from "../../ui/UI";
 import { mountAppDom, makeUI } from "../uiFixture";
 import { setMode } from "../../ui/uiStatus";
-import { CLASSIC_RULES, MODERN_RULES } from "../../engine/gameRules";
+import { priceOptionsFor } from "../../ui/catalogPricing";
+import { scheduleDialogUX } from "../../ui/scheduleDialogRules";
+import type { OriginRings } from "../../shared/engineTypes";
 import type { ScheduleDialogCtx } from "../../ui/uiElevatorSchedule";
 import type { GameMode } from "../../shared/types";
 import type { UnitDetail } from "../../simport/panels";
@@ -17,6 +19,18 @@ import { unitDetail } from "../fixtures/detailCards";
 import { unitEditorTemplate } from "../../ui/templates/editor";
 import { toggleMute } from "../../game/audioPrefs";
 import { loadPrefs } from "../../storage/Prefs";
+
+/** Each mode's schedule dialog options, from the engine catalog's rules as the
+ *  game reads them (`editorActions.ts`). */
+const CLASSIC_SCHEDULE_UX = scheduleDialogUX(catalogFor("classic").rules);
+const MODERN_SCHEDULE_UX = scheduleDialogUX(catalogFor("modern").rules);
+/** The hours an origin ring holds, one slot per hour of the day. */
+const ORIGIN_HOURS = 24;
+/** Empty boarding-floor rings for both day types. */
+const emptyOriginRings = (): OriginRings => ({
+  weekday: Array.from({ length: ORIGIN_HOURS }, () => new Map<number, number>()),
+  weekend: Array.from({ length: ORIGIN_HOURS }, () => new Map<number, number>()),
+});
 
 // Every toast in this file passes through here; see the hooks below the
 // file-level beforeEach for why a toast on the real clock fails its test.
@@ -2474,7 +2488,7 @@ describe("showBatchPricingDialog — the Classic ladder variant (rung picker + a
   const result = { matched: 12, eligible: 9, changed: 9, skippedSold: 0, skippedCustom: 0, customOverwritten: 0, clampedLow: 0, clampedHigh: 0 };
   function openLadder() {
     const { ui } = makeUI();
-    const options = CLASSIC_RULES.priceOptions("office")!;
+    const options = priceOptionsFor(catalogFor("classic"), "office")!;
     const preview = vi.fn(() => ({ ...result }));
     const apply = vi.fn(async () => ({ ...result }));
     const onApplied = vi.fn();
@@ -2612,7 +2626,7 @@ describe("showElevatorScheduleDialog — the per-shaft Schedule dialog", () => {
     const { hourly, ...dialogOver } = over;
     const ctx = {
       title: "Schedule: Standard elevator (floors 1-10)",
-      ux: MODERN_RULES.elevatorScheduleUX(),
+      ux: MODERN_SCHEDULE_UX,
       isExpress: false,
       cars: 4,
       bottom: 1,
@@ -2624,9 +2638,14 @@ describe("showElevatorScheduleDialog — the per-shaft Schedule dialog", () => {
     // The dialog asks the engine for readiness, the warm curves and the tuned
     // rows; these tests answer from their fake curves through the TypeScript
     // reference.
-    const engine = referenceEngine({ ...ctx, hourly });
+    const engine = rustScheduleEngine({ ...ctx, hourly });
     return { ...ctx, autoTune: over.autoTune ?? engine.autoTune, facts: over.facts ?? engine.facts, preset: over.preset ?? engine.preset };
   }
+  /** The engine stages up-tower cars at a sky lobby, and a lobby stands only
+   *  on the ground floor and every 15th: these cases run a 16-story shaft with
+   *  its sky lobby at 15, where the engine answering them can build one. */
+  const SKY_LOBBY = 15;
+  const skyLobbyShaft = (): TestCtx => ({ top: SKY_LOBBY + 1, stops: fakeStops(SKY_LOBBY + 1, [1, SKY_LOBBY]) });
   function open(over: TestCtx = {}) {
     const { ui } = makeUI();
     const apply = vi.fn(async (_schedule: any) => {});
@@ -2846,17 +2865,17 @@ describe("showElevatorScheduleDialog — the per-shaft Schedule dialog", () => {
   });
 
   it("a Modern preset rewrites both day rows and the staging", () => {
-    const { apply } = open();
+    const { apply } = open(skyLobbyShaft());
     const feeder = Array.from(dialog().querySelectorAll<HTMLButtonElement>(".es-presets .btn")).find((b) => b.textContent === "Feeder")!;
     feeder.click();
     okBtn().click();
     const s = apply.mock.calls[0][0];
     expect(s.activeCars.weekday).toHaveLength(24);
-    expect(s.homeFloors.filter((f: number) => f === 8).length).toBeGreaterThan(0); // half the fleet at the top lobby
+    expect(s.homeFloors.filter((f: number) => f === SKY_LOBBY).length).toBeGreaterThan(0); // half the fleet at the top lobby
   });
 
   it("Classic renders the raw strip and edits hours through the docked stepper", () => {
-    const { apply } = open({ ux: CLASSIC_RULES.elevatorScheduleUX() });
+    const { apply } = open({ ux: CLASSIC_SCHEDULE_UX });
     expect(dialog().querySelector(".es-presets")).toBeNull();
     expect(dialog().querySelector(".es-adv")).toBeNull();
     const bars = dialog().querySelectorAll<HTMLButtonElement>(".es-bar");
@@ -2942,10 +2961,10 @@ describe("showElevatorScheduleDialog — the per-shaft Schedule dialog", () => {
 
   it("Auto-tune seeds split staging on an untouched shaft", () => {
     const hourly = Array(24).fill(0.5);
-    const { apply } = open({ hourly: { weekday: hourly } }); // no stored schedule, staging never edited
+    const { apply } = open({ ...skyLobbyShaft(), hourly: { weekday: hourly } }); // no stored schedule, staging never edited
     dialog().querySelector<HTMLButtonElement>(".es-autotune")!.click();
     okBtn().click();
-    expect(apply.mock.calls[0][0].homeFloors).toEqual([1, 1, 8, 8]); // the split
+    expect(apply.mock.calls[0][0].homeFloors).toEqual([1, 1, SKY_LOBBY, SKY_LOBBY]); // the split
   });
 
   it("Auto-tune never overwrites hand-set homes", () => {
@@ -2959,7 +2978,7 @@ describe("showElevatorScheduleDialog — the per-shaft Schedule dialog", () => {
 
   it("asks the engine with the working copy: homes only once the player has staged by hand", () => {
     const hourly = Array(24).fill(0.5);
-    const base = baseCtx({ hourly: { weekday: hourly } });
+    const base = baseCtx({ ...skyLobbyShaft(), hourly: { weekday: hourly } });
     const autoTune = vi.fn(base.autoTune);
     const { ui } = makeUI();
     ui.showElevatorScheduleDialog({ ...base, autoTune }, { apply: vi.fn(async () => {}) });
@@ -2969,7 +2988,7 @@ describe("showElevatorScheduleDialog — the per-shaft Schedule dialog", () => {
     expect(lastDraft().activeCars?.weekday).toHaveLength(24);
     chipAt(5, 1).click();
     dialog().querySelector<HTMLButtonElement>(".es-autotune")!.click();
-    expect(lastDraft().homeFloors).toEqual([5, 1, 8, 8]);
+    expect(lastDraft().homeFloors).toEqual([5, 1, SKY_LOBBY, SKY_LOBBY]);
     expect(autoTune.mock.calls.every(([, weekend]) => weekend === false)).toBe(true);
   });
 
@@ -3067,7 +3086,6 @@ describe("showElevatorScheduleDialog — the per-shaft Schedule dialog", () => {
   });
 
   it("marks measured boarding hotspots in the grid and names them in Simulate (#465)", async () => {
-    const { emptyOriginRings } = await import("../../engine/scheduleOrigins");
     // Weekday demand peaks at 08:00; origins say that hour's riders board on
     // floors 7 (mostly) and 1.
     const hourly = Array(24).fill(0.2);
@@ -3094,7 +3112,6 @@ describe("showElevatorScheduleDialog — the per-shaft Schedule dialog", () => {
     // The inverse of the cold-origins case: the weekend ORIGIN map carries mass
     // but the weekend demand curve never warmed. Deleting the dayWarmed() gate
     // in dayOriginsAt would light these markers; pin that they stay dark.
-    const { emptyOriginRings } = await import("../../engine/scheduleOrigins");
     const origins = emptyOriginRings();
     origins.weekend[12] = new Map([[7, 30]]);
     const hourly = Array(24).fill(0.5);
@@ -3106,7 +3123,6 @@ describe("showElevatorScheduleDialog — the per-shaft Schedule dialog", () => {
   it("drops the hotspot mark and the named floor once the floor is skipped (#465)", async () => {
     // EMA'd origin history outlives a stop edit; the readouts must not claim
     // boardings on a floor the shaft no longer serves.
-    const { emptyOriginRings } = await import("../../engine/scheduleOrigins");
     const hourly = Array(24).fill(0.2);
     hourly[8] = 0.9;
     const origins = emptyOriginRings();
@@ -3124,7 +3140,6 @@ describe("showElevatorScheduleDialog — the per-shaft Schedule dialog", () => {
     // the slot's historical mass but is skipped, so filtering it out AFTER the
     // ranking would leave floor 3 below threshold and blank all markers. With
     // the slot filtered to served floors first, floor 3 still marks.
-    const { emptyOriginRings } = await import("../../engine/scheduleOrigins");
     const hourly = Array(24).fill(0.2);
     hourly[8] = 0.9;
     const origins = emptyOriginRings();
@@ -3149,7 +3164,7 @@ describe("showElevatorScheduleDialog — the per-shaft Schedule dialog", () => {
   });
 
   it("shift-click extends the selection and the docked stepper edits the whole span", () => {
-    const { apply } = open({ ux: CLASSIC_RULES.elevatorScheduleUX() });
+    const { apply } = open({ ux: CLASSIC_SCHEDULE_UX });
     const bars = () => dialog().querySelectorAll<HTMLButtonElement>(".es-bar");
     bars()[6].click();
     bars()[9].dispatchEvent(new MouseEvent("click", { bubbles: true, shiftKey: true }));
@@ -3163,7 +3178,7 @@ describe("showElevatorScheduleDialog — the per-shaft Schedule dialog", () => {
   });
 
   it("arrow keys adjust a bar's count and move between hours", () => {
-    const { apply } = open({ ux: CLASSIC_RULES.elevatorScheduleUX() });
+    const { apply } = open({ ux: CLASSIC_SCHEDULE_UX });
     const bars = () => dialog().querySelectorAll<HTMLButtonElement>(".es-bar");
     bars()[9].dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true, cancelable: true }));
     bars()[9].dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true, cancelable: true }));
@@ -3229,7 +3244,7 @@ describe("showElevatorScheduleDialog — the per-shaft Schedule dialog", () => {
     window.matchMedia = ((q: string) =>
       ({ matches: q === "(pointer: coarse)", media: q, addEventListener: () => {}, removeEventListener: () => {} }) as unknown as MediaQueryList) as typeof window.matchMedia;
     try {
-      const { apply } = open({ ux: CLASSIC_RULES.elevatorScheduleUX() });
+      const { apply } = open({ ux: CLASSIC_SCHEDULE_UX });
       const bars = () => dialog().querySelectorAll<HTMLButtonElement>(".es-bar");
       bars()[6].click(); // FIRST tap: selects, must not span from the seeded 17
       expect(dialog().textContent).toContain("Hour 06:00");
@@ -3251,7 +3266,7 @@ describe("showElevatorScheduleDialog — the per-shaft Schedule dialog", () => {
   it("a held stepper auto-repeats and stops when the button detaches (F3)", () => {
     vi.useFakeTimers();
     try {
-      const { apply } = open({ ux: CLASSIC_RULES.elevatorScheduleUX() });
+      const { apply } = open({ ux: CLASSIC_SCHEDULE_UX });
       const minus = () => dialog().querySelector<HTMLButtonElement>('.es-strip-step [aria-label="fewer cars"]')!;
       minus().dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
       vi.advanceTimersByTime(400 + 150 * 3 + 10); // hold: ~3 repeats
@@ -3270,7 +3285,7 @@ describe("showElevatorScheduleDialog — the per-shaft Schedule dialog", () => {
     vi.useFakeTimers();
     try {
       const announce = vi.fn();
-      open({ ux: CLASSIC_RULES.elevatorScheduleUX(), announce });
+      open({ ux: CLASSIC_SCHEDULE_UX, announce });
       const steppers = dialog().querySelectorAll(".es-spread .es-stepper");
       const up = steppers[0].querySelector<HTMLButtonElement>('[aria-label="raise"]')!;
       up.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));

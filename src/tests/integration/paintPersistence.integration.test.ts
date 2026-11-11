@@ -2,11 +2,17 @@ import { describe, it, expect } from "vitest";
 import { LOT_WIDTH, newSeededDraft } from "../portKit/draftFixtures";
 import { draftFromSave, draftTower, type Draft } from "../portKit/drafts";
 import { noEngine } from "../portKit/rustEngine";
-import { attendanceCap } from "../../engine/facilities";
-import { FASTFOOD_SUBTYPES, RESTAURANT_SUBTYPES, SHOP_SUBTYPES } from "../../engine/retailSubtypes";
+import { catalogFor } from "../catalogFixture";
+import { catalogFacility } from "../../catalog/catalogTypes";
 import { drawRoom, type RoomCtx } from "../../render/pixelSprites";
 import { buildTDT, describeWithCodec, parseTDT } from "../conformance/tdtWasm";
 import type { FacilityKind, Unit } from "../../shared/types";
+
+/** The engine catalog's facts for `kind` (the subtypes match in both modes). */
+const facts = (kind: FacilityKind) => catalogFacility(catalogFor("classic"), kind);
+const FASTFOOD_SUBTYPES = facts("fastFood").subtypes ?? [];
+const RESTAURANT_SUBTYPES = facts("restaurant").subtypes ?? [];
+const SHOP_SUBTYPES = facts("shop").subtypes ?? [];
 
 /**
  * Shift-left contract for the visual variety system: EVERYTHING a room's art
@@ -104,7 +110,7 @@ describe.skipIf(noEngine)("save round-trip paints identical pixels (.vctower ser
     for (const u of sim.tower.units as unknown as Unit[]) {
       if (u.kind === "floor" || u.kind === "lobby") continue;
       if (u.state === "empty" || u.state === "construction") u.state = "occupied";
-      if (u.occupants === 0 && attendanceCap(u.kind) === undefined) u.occupants = 3;
+      if (u.occupants === 0 && facts(u.kind).attendance === null) u.occupants = 3;
     }
     sim.settle(); // the engine holds the tower as painted below
     return sim;

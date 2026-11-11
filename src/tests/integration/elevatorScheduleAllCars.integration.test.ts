@@ -1,7 +1,8 @@
-import { referenceEngine } from "../fixtures/autoTuneDouble";
+import { rustScheduleEngine } from "../fixtures/autoTuneDouble";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mountAppDom, makeUI } from "../uiFixture";
-import { CLASSIC_RULES } from "../../engine/gameRules";
+import { catalogFor } from "../catalogFixture";
+import { scheduleDialogUX } from "../../ui/scheduleDialogRules";
 import type { ScheduleDialogCtx } from "../../ui/uiElevatorSchedule";
 
 /**
@@ -26,10 +27,10 @@ const ctx = (current?: ScheduleDialogCtx["current"]): ScheduleDialogCtx => {
   const base = { cars: 4, bottom: 1, top: 4, stops: stops() };
   return {
     title: "Schedule: Service elevator (floors 1-4)",
-    ux: CLASSIC_RULES.elevatorScheduleUX(),
+    ux: scheduleDialogUX(catalogFor("classic").rules),
     isExpress: false,
     ...base,
-    ...referenceEngine({ ...base, isExpress: false }, false),
+    ...rustScheduleEngine({ ...base, isExpress: false }, false),
     initialWeekend: false,
     current,
   };
