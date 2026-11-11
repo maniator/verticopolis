@@ -5,7 +5,7 @@ import { viewWorld } from "../../presentation/viewWorld";
 import type { SerializedGame, SerializedView } from "../../shared/types";
 import { SKY_HEADROOM_FLOORS } from "../../render/cameraBounds";
 import { SaveLoad } from "../../game/saveLoad";
-import { buildTDT, installTdtCodec, parseTDT } from "../conformance/tdtWasm";
+import { buildTDT, parseTDT } from "../conformance/tdtWasm";
 import { hasWasmPackage } from "../conformance/wasmEngine";
 import { buildTdt, sampleTowerSpec } from "../fixtures/tdtBuilder";
 import { loadAuto, loadSlotSim, withPorts } from "../fixtures/saveText";
@@ -129,7 +129,6 @@ describe.skipIf(noEngine)("SaveLoad stamps the live camera onto the CURRENT towe
   });
 
   it.skipIf(!hasWasmPackage())("importLegacy: the imported sim keeps the TDT file's view, never the live camera's; the pre-adopt flush keeps the live one", async () => {
-    installTdtCodec();
     const words = WORDS_200_20;
     const buf = buildTdt({ ...sampleTowerSpec(), viewX: words.x, viewY: words.y });
     await saveLoad.importLegacy(buf.buffer as ArrayBuffer, "MOVED.TDT");

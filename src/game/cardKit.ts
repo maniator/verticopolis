@@ -17,9 +17,7 @@ import { portServiceSections } from "./portServiceDiagnostics";
 /**
  * Shared card data for the inspector and editor, read from the engine port:
  * the unit facts, the elevator load and the recycling records the engine
- * reports, worded by the frontend. The same lines come from either engine's
- * port, and no TypeScript tower or rule is read. The TypeScript reference
- * card the Rust card is checked against lives in `src/tests/diagnostics/`.
+ * reports, worded by the frontend. No TypeScript tower or rule is read.
  * Additional report categories without port reads are tracked by #1420.
  */
 export interface CardKit {
