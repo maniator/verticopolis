@@ -36,7 +36,9 @@ level, writes both changelogs from the notes, runs `npm run engine:compat`
 when the crate moves, and deletes the notes. Production deploys wait while a
 note with a level other than `none` is pending
 (`scripts/vercel-ignore-build.sh`), so a player never gets new behavior under
-the old version number. The release merge tags `v<version>` (and
+the old version number, and production builds only for a commit that changes
+a version, so it moves only on a release merge. The **Cut release** workflow
+(`release-pr.yml`) runs `npm run release` and opens the PR for you. The release merge tags `v<version>` (and
 `engine-v<version>` for a crate release) and publishes the GitHub releases.
 
 `npm run version:check` runs the CI check on your committed branch. The rules

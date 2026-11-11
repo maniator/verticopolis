@@ -588,7 +588,17 @@ nothing but the release files.
 than `none`, `scripts/vercel-ignore-build.sh` skips the production deploy, so a
 player never gets new behavior under the old version and the old "What's new"
 notes. Previews still build. The release merge deletes the notes, builds, and
-ships everything pending as one numbered build.
+ships everything pending as one numbered build. Production deploys only on a
+release merge: a push to `main` whose commit leaves the app and crate versions
+as its parent had them is skipped, even with no note pending.
+
+**Cutting the release.** Run the **Cut release** workflow (`release-pr.yml`)
+from the Actions tab, with an app version such as `3.0.0` for a headline
+release or empty for the levels the notes ask for. It runs `npm run release`
+and opens the release PR with the workflow token, which starts no checks on
+its own, so start them with the run button on that PR when GitHub shows one,
+or else close and reopen the PR. `npm run release` on a local
+`release/<version>` branch still works the same way.
 
 ### The engine crate version
 

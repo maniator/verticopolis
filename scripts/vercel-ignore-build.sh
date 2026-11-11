@@ -10,7 +10,9 @@
 #   exit 0  -> SKIP   (nothing that reaches the deployed app changed)
 #
 # A production deploy is also held (skipped) while a pending change note in
-# .changes/ asks for an app or crate release; see held_notes below.
+# .changes/ asks for an app or crate release (see held_notes below), and it
+# builds only for a commit that changes the app or crate version, so production
+# moves only on a release merge.
 #
 # A deploy is skipped when every changed file is one that never reaches the
 # deployed app, its WASM engine package or the build checks that gate them.
@@ -137,6 +139,25 @@ fi
 # partial clone (it registers the URL as a promisor remote and adds a shallow
 # boundary); the build only runs `git rev-parse HEAD`, which that does not
 # affect. Prints why and returns non-zero when it cannot fetch.
+# Production deploys only on a release merge (owner, 2026-11-11): a push to main
+# whose commit leaves the app version (package.json) and the engine crate
+# version (engine-rs/Cargo.toml) as its first parent had them is skipped,
+# however much else changed. The release PR raises one or both, so its merge
+# commit is the deploy. This reads the push's own commit and its first parent,
+# which every clone has, and not the previous deploy, which can arrive without
+# its file contents or fail to fetch; it runs before the previous deploy is
+# resolved, so neither can bypass it. With no parent to read, it falls through
+# to the per-path diff below. Previews build per change below.
+app_version() { git show "$1:package.json" 2>/dev/null | sed -n 's/^  "version": "\(.*\)",$/\1/p' | head -n 1; }
+crate_version() { git show "$1:engine-rs/Cargo.toml" 2>/dev/null | awk '/^\[package\]/ { p = 1; next } /^\[/ { p = 0 } p && /^version *=/ { gsub(/.*= *"|".*/, ""); print; exit }'; }
+if [ "${VERCEL_ENV:-}" = "production" ]; then
+  parent="$(git rev-parse --verify --quiet 'HEAD^1' || true)"
+  if [ -n "$parent" ] && [ "$(app_version "$parent")" = "$(app_version HEAD)" ] && [ "$(crate_version "$parent")" = "$(crate_version HEAD)" ]; then
+    echo "vercel-ignore-build: production deploys only on a release merge, and this commit changes no version; skipping."
+    exit 0
+  fi
+fi
+
 fetch_commit() {
   if [ "${VERCEL_GIT_PROVIDER:-}" != "github" ] || [ -z "${VERCEL_GIT_REPO_OWNER:-}" ] || [ -z "${VERCEL_GIT_REPO_SLUG:-}" ]; then
     echo "vercel-ignore-build: no GitHub repo to fetch from."
