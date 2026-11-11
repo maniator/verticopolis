@@ -653,7 +653,11 @@ commit (a redeploy of the live release serves the same `version.json`, so the
 domain check is what proves it switched). To redeploy, run **Deploy production**
 from the Actions tab with the release tag. A run for an older release than the
 one on `main` deploys nothing unless its `rollback` box is ticked, so a slow
-automatic run never puts an older release over a newer one. It
+automatic run never puts an older release over a newer one. Each production
+deployment carries its release tag and commit as Vercel metadata, so for an
+instant rollback without a rebuild, find the release with
+`vercel ls --prod --meta release=v<version>` and `vercel promote` its URL (the
+Deploy production run's summary prints that command for its own deployment). It
 needs the `VERCEL_TOKEN`, `VERCEL_ORG_ID` and `VERCEL_PROJECT_ID` secrets in
 the `production` environment and fails, naming the missing one, without them.
 

@@ -205,13 +205,21 @@ jobs:
           TAG: ${{ inputs.tag }}
         run: |
           set -euo pipefail
-          out="$(vercel deploy --prebuilt --prod --token "$VERCEL_TOKEN")"
+          # The release tag and commit ride on the deployment as metadata, so
+          # a release is easy to find for an instant rollback that skips the
+          # rebuild: `vercel ls --prod --meta release=v<x.y.z>`, then
+          # `vercel promote <that deployment's URL>`.
+          out="$(vercel deploy --prebuilt --prod --meta release="$TAG" --meta commit="$SHA" --token "$VERCEL_TOKEN")"
           # The CLI prints the new deployment's URL; read it whatever else it prints.
           url="$(printf '%s\n' "$out" | grep -Eo 'https://[A-Za-z0-9.-]+\.vercel\.app' | head -n 1 || true)"
           if [ -z "$url" ]; then echo "::error::vercel deploy printed no deployment URL: $out"; exit 1; fi
           echo "DEPLOYMENT_HOST=${url#https://}" >> "$GITHUB_ENV"
           echo "Deployed $TAG ($SHA) as $url."
-          echo "Deployed \`$TAG\` (\`$SHA\`) to production as $url." >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo "Deployed \`$TAG\` (\`$SHA\`) to production as $url."
+            echo ""
+            echo "Roll back to this release later without a rebuild: \`vercel promote $url\` (find it again with \`vercel ls --prod --meta release=$TAG\`)."
+          } >> "$GITHUB_STEP_SUMMARY"
 
       # Two checks, because a redeploy of the live release serves the same
       # version.json. The production domain must point at the deployment this

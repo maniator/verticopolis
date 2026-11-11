@@ -125,6 +125,9 @@ older tag**.
   unless the `rollback` input is ticked; the `deploy` job checks out the exact
   commit the check approved. Exercised: current release deploys, v3.0.0
   without rollback does not.
+- Owner ask: tag deploys on Vercel for easy rollbacks. Each deployment now
+  carries `release` and `commit` metadata (`--meta`, checked in the pinned
+  CLI's help), and the run summary prints the `vercel promote` command.
 
 ### File List
 
