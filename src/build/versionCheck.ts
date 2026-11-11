@@ -44,6 +44,7 @@ export const RELEASE_FILES = [
   "engine-rs/Cargo.toml",
   "engine-rs/Cargo.lock",
   "engine-rs/consumer/Cargo.lock",
+  "engine-bench/Cargo.lock",
   "engine-rs/CHANGELOG.md",
   COMPAT_RECORD_PATH,
 ] as const;
@@ -183,6 +184,7 @@ const VERSION_FREE: Partial<Record<string, (text: string) => string>> = {
   "engine-rs/Cargo.toml": blank(/(\[package\][^[]*?\nversion = )"[^"]*"/),
   "engine-rs/Cargo.lock": blank(CRATE_LOCK),
   "engine-rs/consumer/Cargo.lock": blank(CRATE_LOCK),
+  "engine-bench/Cargo.lock": blank(CRATE_LOCK),
   [COMPAT_RECORD_PATH]: (t) => JSON.stringify({ ...JSON.parse(t), crateVersion: null }),
 };
 
