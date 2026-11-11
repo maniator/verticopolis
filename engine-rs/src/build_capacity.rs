@@ -24,13 +24,7 @@ impl Simulation {
     /// `tower.resizeTransport(id, bottom, top)` with its `capacity_changed`,
     /// when the span actually moved.
     pub fn resize_transport(&mut self, id: i64, bottom: i64, top: i64) -> ResizeResult {
-        let span = |sim: &Simulation| {
-            sim.tower
-                .transports
-                .iter()
-                .find(|t| t.id == id)
-                .map(|t| (t.bottom, t.top))
-        };
+        let span = |sim: &Simulation| sim.tower.get_transport(id).map(|t| (t.bottom, t.top));
         let before = span(self);
         let r = self.tower.resize_transport(id, bottom, top);
         if r.ok && span(self) != before {
@@ -40,13 +34,7 @@ impl Simulation {
     }
 
     fn note_capacity(&mut self, id: i64) {
-        if let Some(kind) = self
-            .tower
-            .transports
-            .iter()
-            .find(|t| t.id == id)
-            .map(|t| t.kind)
-        {
+        if let Some(kind) = self.tower.get_transport(id).map(|t| t.kind) {
             self.gameplay.push(GameplayEvent::CapacityChanged { kind });
         }
     }
