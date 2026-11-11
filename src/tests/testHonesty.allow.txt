@@ -1,7 +1,6 @@
 # The exceptions testHonesty.guard.test.ts accepts, one per line with its
 # reason after " # ". The list only shrinks: a new entry needs a reason the PR
 # states and a reviewer accepts.
-src/tests/conformance/fuzzReplay.test.ts # tests the replay harness with the TypeScript reference engine as its stand-in; on the tsEngineTests ratchet, converted or retired by #1875 step 5
 src/audio/toneRecordingMock.ts # a spy: it records the Tone calls the audio engine makes so tests assert the graph, it holds no engine answers
 src/tests/integration/gameControllersCoverage.integration.test.ts > name # itTdt wraps each .TDT test and forwards its body, which asserts
 engine-rs/src/gameplay/tests.rs > the_catalog_passes_its_own_rules # check_catalog returns the rule it broke as an Err, and .expect fails the test on it

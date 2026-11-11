@@ -9,13 +9,13 @@
 // byte-diffs it against the first input (a real empty SimTower save), to find
 // what our exporter emits differently.
 //
-// Imports the engine directly (run via tsx, which strips the TypeScript
-// in-process), so it exercises the exact parseTDT/buildTDT the app ships.
+// Runs the Rust engine package (`npm run wasm:build` first) under tsx, so it
+// exercises the codec the app ships.
 import { readFileSync, writeFileSync } from "node:fs";
 import { basename } from "node:path";
 import { deflateSync } from "fflate";
 import { buildTDT, parseTDT } from "../../src/tests/conformance/tdtWasm";
-import { SAVE_VERSION } from "../../src/engine/saveMigration";
+import { draftTower } from "../../src/tests/portKit/drafts";
 import type { SerializedGame } from "../../src/shared/types";
 
 function toVctower(save: unknown) {
@@ -59,12 +59,14 @@ function main() {
 
   if (diffEmpty) {
     console.log(`\n== DIFF: our empty-tower export vs ${basename(inputs[0])} (real empty save) ==`);
-    const emptySave = {
-      version: SAVE_VERSION, seed: 1, money: 2_000_000, star: 1, minutes: 0,
-      mode: "classic", units: [], transports: [], nextId: 1,
+    // A fresh Classic tower from the Rust engine, so the save carries the
+    // engine's current version and defaults, with a starter's fields pinned.
+    const emptySave: SerializedGame = {
+      ...draftTower(1, "classic").serialize(),
+      money: 2_000_000, star: 1, minutes: 0, units: [], transports: [], nextId: 1,
       towerName: "Empty", builtWeddingHall: false, evaluatedTower: false,
     };
-    const ours = buildTDT(emptySave as SerializedGame).bytes;
+    const ours = buildTDT(emptySave).bytes;
     const real = new Uint8Array(readFileSync(inputs[0]));
     console.log(`  our export: ${ours.length} bytes | real: ${real.length} bytes | delta: ${ours.length - real.length}`);
     const n = Math.min(ours.length, real.length);

@@ -22,8 +22,7 @@
 import { writeFileSync, mkdirSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { Simulation } from "../../src/engine/Simulation";
-import { Crowd } from "../../src/engine/Crowd";
+import { draftTower } from "../../src/tests/portKit/drafts";
 import { buildTDT } from "../../src/tests/conformance/tdtWasm";
 import type { SerializedGame } from "../../src/shared/types";
 
@@ -38,7 +37,7 @@ function must(ok: boolean, msg: string): void {
   if (!ok) throw new Error(msg);
 }
 
-const sim = new Simulation(4242, "classic");
+const sim = draftTower(4242, "classic");
 const t = sim.tower;
 for (let x = 0; x < TOWER_W; x++) must(t.place("lobby", 1, x).ok, `lobby 1,${x}`);
 for (let f = 2; f <= TOP; f++) {
@@ -56,13 +55,6 @@ const officeFloors = new Set<number>();
 for (const o of [CONTROL, TEST]) {
   must(t.place("office", o.floor, o.x).ok, `office ${o.name}`);
   officeFloors.add(o.floor);
-}
-
-const crowd = new Crowd();
-console.log("OUR ROUTER (Classic, express-transfer-needs-lobby) from floor 1:");
-for (const o of [CONTROL, TEST]) {
-  const ok = crowd.reachable(t, 1, o.floor);
-  console.log(`  ${o.name} floor ${o.floor}: ${ok ? "REACHABLE" : "REFUSED"}`);
 }
 
 const save: SerializedGame = sim.serialize();

@@ -6,12 +6,10 @@ import type { BombSearchView, CrowdView, TowerView } from "../simport/view";
 /**
  * Everything the renderer reads from the simulation, and nothing else (facade
  * slice 3, #1210). `TowerEngine.sim` and the scene modules are typed by this
- * interface, so the compiler lists the read surface and no `src/render` module
- * names `Simulation` (`src/render/renderSim.guard.test.ts` pins that).
+ * interface, so the compiler lists the read surface.
  *
- * The live TypeScript `Simulation` satisfies it as it is (`renderSim.types.test.ts`
- * assigns one), so `main.ts` passes the same instance it always did. A Rust
- * adapter fills the same members from the engine's frame.
+ * The port's adapter (`PortRenderSim`) fills these members from the Rust
+ * engine's frame (`renderSim.types.test.ts` holds it to the interface).
  *
  * Reads are grouped by how often they happen:
  *
@@ -37,7 +35,7 @@ export interface RenderSim {
 
   /** View: `header.weather`. */
   readonly weather: WeatherKind;
-  /** View: `header.population`. O(R) on the TypeScript engine. */
+  /** View: `header.population`. */
   readonly population: number;
   /** The clock the renderer reads; `clockView.ts` derives the same answers from `header.minutes`. */
   readonly clock: RenderClock;

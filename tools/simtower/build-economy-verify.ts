@@ -20,7 +20,7 @@
 import { writeFileSync, mkdirSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { Simulation } from "../../src/engine/Simulation";
+import { draftTower } from "../../src/tests/portKit/drafts";
 import { buildTDT } from "../../src/tests/conformance/tdtWasm";
 import type { FacilityKind, SerializedGame } from "../../src/shared/types";
 
@@ -34,7 +34,7 @@ function must(ok: boolean, msg: string): void {
   if (!ok) throw new Error(msg);
 }
 
-const sim = new Simulation(4242, "classic");
+const sim = draftTower(4242, "classic");
 const t = sim.tower;
 sim.star = 3; // so hotel double/suite behave as established units
 

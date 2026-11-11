@@ -10,10 +10,9 @@
 //   - band 2 (floor 6): 2 rides (reachable whenever the ride budget is >= 2)
 //   - band 3 (floor 9): 3 rides (the test; reachable only if the budget is >= 3)
 //
-// It prints OUR router's verdict for each band (a fast, Docker-free check that
-// the tower is a real discriminator: with a ride budget of 2, bands 1/2 are
-// reachable and band 3 is refused), then exports a .TDT for the Wine harness to load in
-// the real 1994 game. The saved camera view centers on the bands so the game
+// It exports a .TDT for the Wine harness to load in the real 1994 game. (It
+// used to print the TypeScript engine's router verdict for each band; that
+// engine is gone, and #503 settled the budget as uncapped.) The saved camera view centers on the bands so the game
 // opens framed on them. Offices are marked occupied by default so the real game
 // has commuters to route; EMPTY_OFFICES=1 leaves them vacant for the
 // assumption-free "which bands rent out" read. Whether band 3 stays populated /
@@ -24,8 +23,7 @@
 import { writeFileSync, mkdirSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { Simulation } from "../../src/engine/Simulation";
-import { Crowd } from "../../src/engine/Crowd";
+import { draftTower } from "../../src/tests/portKit/drafts";
 import { buildTDT } from "../../src/tests/conformance/tdtWasm";
 import type { SerializedGame } from "../../src/shared/types";
 
@@ -46,7 +44,7 @@ function must(ok: boolean, msg: string): void {
   if (!ok) throw new Error(msg);
 }
 
-const sim = new Simulation(12345, "classic");
+const sim = draftTower(12345, "classic");
 const t = sim.tower;
 
 // Floors: lobby on 1 and every sky story, plain floor everywhere else, full width.
@@ -72,14 +70,6 @@ for (const b of BANDS) {
     must(r.ok, `office ${b.name} ${b.floor},${x}: ${r.reason}`);
   }
   officeFloors.add(b.floor);
-}
-
-// --- Discriminator check: OUR router's verdict for each band (no Docker). ---
-const crowd = new Crowd();
-console.log("OUR ROUTER (Classic, current ride budget) reachability from floor 1:");
-for (const b of BANDS) {
-  const ok = crowd.reachable(t, 1, b.floor);
-  console.log(`  ${b.name} (floor ${b.floor}, needs ${b.rides} ride(s)): ${ok ? "REACHABLE" : "REFUSED"}`);
 }
 
 // Serialize, then mark the offices occupied so the real game has commuters.
