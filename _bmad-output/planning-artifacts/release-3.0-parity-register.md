@@ -1,9 +1,11 @@
 # Release 3.0 feature parity register (#1561)
 
 > **Snapshot, audited 2026-11-04 against `main` at `837575f` with #1780's
-> changes on top, and trued up on `d7bc12c` (app 2.84.0, engine crate
-> 1.19.0). Not live.** The live state is #1561 and the guards this page
-> names. `src/tests/parityRegister.guard.test.ts` keeps parts of it tied to
+> changes on top, trued up on `d7bc12c` (app 2.84.0, engine crate 1.19.0),
+> and re-audited on 2026-11-11 against the release candidate's code, `main`
+> at `5ab3ad9d` (app 2.90.0, engine crate 1.23.0). Not live.** The live
+> state is #1561 and the guards this page names.
+> `src/tests/parityRegister.guard.test.ts` keeps parts of it tied to
 > the code: every `EnginePort` member has a row in section 3, every file on
 > `src/tests/frontendEngineImports.ratchet.txt` has a row in section 2a, every
 > host or save file that imports the TypeScript engine at run time is named in
@@ -54,7 +56,7 @@ the package required; `e2e` (Playwright on the Rust engine), the `engine-rs`
 workflow (native Rust tests, clippy, fmt) and the build job's
 `verify-engine-bundle` step. Until #1421 the two `test-wasm-parity` legs also
 ran the unit and integration suites with every `Simulation` hosted on the Rust
-engine. #1421 waits for #878, whose test-mapping table
+engine. #878 and #1421 are closed, and #878's test-mapping table
 (`_bmad-output/implementation-artifacts/story-engine-test-parity.md`) records
 where each of those suites' Rust evidence lives now.
 "Browser" means a Playwright spec; "native" means a Rust `#[test]`.
@@ -159,9 +161,9 @@ any shipped file, so the files left are tooling.
 
 | File | Runs in the shipped game | Decides gameplay | Disposition | Owner |
 | --- | --- | --- | --- | --- |
-| `src/game/toolingSim.ts` | no: `vite.config.ts` swaps it for `src/game/toolingSimAbsent.ts` in every build but a `VC_TOOLING=1` one (#921) | no | tooling only | #1421 (it constructs the TypeScript port, 2b) |
-| `src/render/atlas/archive.ts` | only when the sprite atlas is built | no | tooling only | #921 |
-| `src/render/atlas/browserEntry.ts` | only on the atlas page | no | tooling only | #921 |
+| `src/game/toolingSim.ts` | no: `vite.config.ts` swaps it for `src/game/toolingSimAbsent.ts` in every build but a `VC_TOOLING=1` one (#921) | no | tooling only | #1875 (it constructs the TypeScript port, 2b) |
+| `src/render/atlas/archive.ts` | only when the sprite atlas is built | no | tooling only | #1875 |
+| `src/render/atlas/browserEntry.ts` | only on the atlas page | no | tooling only | #1875 |
 
 ### 2b. The shipped bundle
 
@@ -177,10 +179,10 @@ proves the check would catch it. Grouped by what the tooling build carries:
 
 | Group | Modules | Why it ships | Runs in the shipped game | Owner |
 | --- | --- | --- | --- | --- |
-| The simulation (`Simulation`, `Tower`, `Crowd`, `EconomySystem`, `EventSystem`, `sim/*`, `tower/*`, migrations, `elevatorSchedule`, `scheduleOrigins`) | most of the list | the harnesses' tower is a `Simulation` | no: tooling builds only | #1421 |
-| The TypeScript port and step driver (`port/*`, `sim/frameStep`, `sim/fixedStep`, `timePacing`, `scheduleAuthoring`) | 15 | `src/game/toolingSim.ts` constructs a `TsEngine` | no: tooling builds only | #1421 |
-| `UndoHistory` | 1 | the TypeScript port's own undo (`UndoSteps`, from `src/engine/port/tsEngine.ts`) | no: tooling builds only | #1421 |
-| Rules and reference tables (`catalog`, `facilitiesData`, `pricing`, `ruleSets`, `gameRules`, `households`, `census`, `residentialRentals`, `retailSubtypes`, `calendar`, `econConfig`, `facilityCaps`, `facilityPredicates`, `sim/constants`, `tower/rooms`, `tower/towerTopology`, `types`) | 17 | the tooling tower's catalog source and the TypeScript engine's own reads | no: tooling builds only | #1421 |
+| The simulation (`Simulation`, `Tower`, `Crowd`, `EconomySystem`, `EventSystem`, `sim/*`, `tower/*`, migrations, `elevatorSchedule`, `scheduleOrigins`) | most of the list | the harnesses' tower is a `Simulation` | no: tooling builds only | #1875 |
+| The TypeScript port and step driver (`port/*`, `sim/frameStep`, `sim/fixedStep`, `timePacing`, `scheduleAuthoring`) | 15 | `src/game/toolingSim.ts` constructs a `TsEngine` | no: tooling builds only | #1875 |
+| `UndoHistory` | 1 | the TypeScript port's own undo (`UndoSteps`, from `src/engine/port/tsEngine.ts`) | no: tooling builds only | #1875 |
+| Rules and reference tables (`catalog`, `facilitiesData`, `pricing`, `ruleSets`, `gameRules`, `households`, `census`, `residentialRentals`, `retailSubtypes`, `calendar`, `econConfig`, `facilityCaps`, `facilityPredicates`, `sim/constants`, `tower/rooms`, `tower/towerTopology`, `types`) | 17 | the tooling tower's catalog source and the TypeScript engine's own reads | no: tooling builds only | #1875 |
 
 ### 2c. Host and save code
 
@@ -200,7 +202,7 @@ runtime import and this table does not name it.
 nothing remains. #1754 moved undo and redo into the engine, and #921 took the
 TypeScript engine out of the production bundle, which the postbuild guard
 proves on every build. What is left of it ships only in tooling builds (2b)
-and leaves with #1421.
+and leaves when the TypeScript reference is deleted after 3.0.0 (#1875, 3.x).
 
 ## 3. Engine reads and commands
 
@@ -346,7 +348,7 @@ comparison, settings) has no row: the engine switch cannot change it.
 | Event log text and order | proven same | `src/tests/integration/tsEngine.golden.integration.test.ts` | `logAfter`, `logText` |
 | Visual effects and emergency counters from engine events | proven same | `src/tests/integration/fxSequences.integration.test.ts` | the effect sequences and counters, pinned (#879) |
 | Sound effects, music and ambience | untested | `src/game/frameLoop.test.ts` (which port fact plays which cue, on a stub port); none on Rust | the game plays them from host code on port facts and command results, and the Tone engine (`src/game/frameLoop.ts`, `src/game/buildActions.ts`, `src/game/appBoot.ts`); presentation only, nothing in it reaches the engine |
-| Gameplay analytics events from the engine | untested | none yet | #873 is open in 3.0.0 |
+| Gameplay analytics events from the engine | untested | none yet | #873 (3.x) |
 | Schedule dialog: presets, auto-tune, advice, staging | proven same | `src/tests/integration/scheduleAuthoring.integration.test.ts`, `src/tests/integration/autoTuneProposal.integration.test.ts` | authored in Rust since #1550 and #1552 |
 | Schedule review for older underscheduled towers | proven same | browser `e2e/elevatorScheduleReview.spec.ts` | #1548 |
 | Batch pricing preview and apply | proven same | `src/tests/integration/batchPricing.integration.test.ts` | |
@@ -463,19 +465,17 @@ TypeScript card while that engine exists, so the canary outlives the referee.
 | A number past the double range in a save | known divergence | EX-3 |
 | Undo and redo keep change-only steps, where the reference restores the whole save | intentionally different (approved) | section 4; #1754 |
 | Sound effects, music and ambience | untested | the host picks each cue from a port fact that section 3 compares (section 5), and no test plays the cues on both engines; #965 (4.x) moves the cues onto engine events, where that check belongs, and new cues are #967 |
-| Real Safari and a phone, the OS-installed app window, the WebKit offline start and update, and Firefox's manual half (the nine real 1997 saves and five hand-played game days), on the Rust build | untested | #1522, release checks for the candidate: the 2026-11-04 run found the state and crowd digests the same in Chromium, Firefox and WebKit, and the update rehearsal passing in Chrome ([summary](../../docs/performance/results/2026-11-04-55052113-cross-browser-1522.md)); #1815 then made the specs pass in Firefox (35 of 35 on the Windows PC), and WebKit's four failures left are its offline reloads, so this row's WebKit offline start and update stay unverified |
+| Real Safari and a phone, the OS-installed app window, the WebKit offline start and update, and Firefox's manual half (the nine real 1997 saves and five hand-played game days), on the Rust build | untested | The owner chose to ship on Playwright WebKit coverage, with real Safari and iOS listed as untested in the 3.0.0 release notes (#945, decision 6, 2026-11-10). #1522, release checks for the candidate: the 2026-11-04 run found the state and crowd digests the same in Chromium, Firefox and WebKit, and the update rehearsal passing in Chrome ([summary](../../docs/performance/results/2026-11-04-55052113-cross-browser-1522.md)); #1815 then made the specs pass in Firefox (35 of 35 on the Windows PC), and WebKit's four failures left are its offline reloads, so this row's WebKit offline start and update stay unverified |
 | 14 report-only screenshots where the Rust leg differed from the TypeScript leg | known divergence | #1425: 13 are put down to the harness and no player path reaches them. For 4 (the star bulletins) #1425 traces the cause, the bulletin's cursor skipping the tooling copy's lines; for the other 9 it gives a working explanation, not yet confirmed shot by shot (a hand edit through the tooling handle reaches the engine as a load, which starts the crowd afresh); the 14th, `features/inspector-recycling`, was the card's missing recycling lines, which #1441 fixed. The comparison leg no longer runs in CI |
 | A guard against TypeScript rule ownership spreading through re-exports or client-side calculations | untested | #1551 (3.x); this register's guard and the bundle guard cover the imports on this commit (sections 2a to 2c) |
 | A service card or shaft card asked for a non-number id (`"252"`, `" 252 "`, `"252.0"`, `[252]` or `true`) | known divergence | The binding turns any JavaScript value into a number first, so the Rust engine reads the unit or shaft that number names, where the reference answers `undefined` or an empty shaft card. The port declares the id a number (`src/dualrun/engine.d.ts`), so a typed caller cannot pass one, and `src/tests/integration/portServiceDiagnostics.integration.test.ts` compares the number ids a caller can pass. The owner accepted the difference on 2026-11-10, with no binding change (#1215) |
 | Gameplay analytics events from the engine | untested | #873 |
 
-Not divergences, and so not classed here: the TypeScript tables still ship as
-the catalog handle's default, which no gameplay read reaches, and one
-boot-time package check reads them (2c; #921, #926); and the TypeScript simulation ships
-in the bundle without running (2b; the Rust-only lane's bundle slice, then
-#1421). The long walk, the lobby distance and the recycling lines
-have no browser spec; each is compared on real WASM against the reference
-(section 1).
+Not divergences, and so not classed here: the TypeScript engine's modules
+that a `VC_TOOLING=1` build carries for the harnesses' tower, which a
+production build does not (2b; #921, then #1875). The long walk, the lobby
+distance and the recycling lines have no browser spec; each is compared on
+real WASM against the reference (section 1).
 
 ## 9. Against #1561's "done when"
 
@@ -496,11 +496,15 @@ have no browser spec; each is compared on real WASM against the reference
   loaded one; since #1809 both engines load the case's tower from the same
   file and play the same minutes before the cards are read.
 - **TypeScript supplies no gameplay decision in production:** met. Undo was
-  the last, and #1754 moved it into the engine. The catalog's TypeScript
-  tables answer no gameplay read; one boot-time package check reads them, and
-  it only accepts or refuses a package.
+  the last, and #1754 moved it into the engine. Since #921 a production
+  build carries no TypeScript engine module, and the postbuild guard fails
+  one that does (2b).
 - **Both modes, real saves, edge cases:** the card-text sweep's 19 cases per
   mode, the conformance scenarios, the real-save `.TDT` suite, and
   `conformance/fixtures/split-tower-4.vctower` imported in the browser.
-- **CI and release gates on the last audited commit:** the checks on the pull
-  request that lands this page (#1780); #945 re-checks them on the candidate.
+- **CI and release gates on the last audited commit:** every check passed on
+  `5ab3ad9d`, the release candidate's code, on 2026-11-11, including `test`
+  (which runs this page's guard), both `test-wasm-parity` legs, `e2e`, the
+  `engine-rs` workflow and `rust-coverage`. The candidate is that code with
+  the release's version raise; #945 holds the owner's sign-off and the
+  exception register (EX-1 to EX-3).
