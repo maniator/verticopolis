@@ -9,14 +9,9 @@ import { withLayerHook } from "../pixelSprites/layers";
 import { SAMPLES, type Sample } from "./samples";
 import { verifySample, type SampleResult } from "./verify";
 import { verifyExtras } from "./verifyExtras";
-import { catalogFor } from "../../engine/catalog";
+import type { Catalog } from "../../catalog/catalogTypes";
 import { bindViewWorld } from "../../presentation/viewWorld";
 import { bindViewKinds } from "../../presentation/viewKinds";
-
-// A tooling page draws sprites without a tower, so it binds the Modern
-// catalog's world for the view (the lot geometry the sprites hash on).
-bindViewWorld(catalogFor("modern").world);
-bindViewKinds(catalogFor("modern"));
 
 /**
  * The atlas bake's browser half, bundled by `scripts/export-atlas.ts` and run
@@ -191,6 +186,10 @@ function toBase64(bytes: Uint8ClampedArray): string {
 }
 
 interface AtlasPage {
+  /** Binds the view to the engine's Modern catalog before anything draws:
+   *  the page draws sprites without a tower, so Node hands it the catalog it
+   *  read from the engine package (`scripts/atlas-catalog.ts`). */
+  bind(catalog: Catalog): void;
   run(filter?: string): { images: number; frames: number; animations: number; softDropped: string[] };
   records(): Omit<BakeResult, "images" | "normals">;
   /** Images from `from` on, at least one, until about `maxBytes` of base64. */
@@ -200,6 +199,10 @@ interface AtlasPage {
 
 let result: BakeResult | null = null;
 const api: AtlasPage = {
+  bind(catalog) {
+    bindViewWorld(catalog.world);
+    bindViewKinds(catalog);
+  },
   run(filter) {
     const jobs = filter ? allJobs().filter((j) => j.name.startsWith(filter)) : allJobs();
     const stats = { softDropped: [] as string[] };

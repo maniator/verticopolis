@@ -1,3 +1,4 @@
+import { catalogFor } from "../../engine/catalog";
 import { describe, expect, it } from "vitest";
 import { buildArchive, checkLayers, checkPages } from "./archive";
 import { bake, type BakeResult, type Renderer } from "./bake";
@@ -54,7 +55,7 @@ const added: StillJob = {
   cycles: { m: { rate: 4, steps: [spec(0), spec(0, 1)] }, s: { rate: 2.5, steps: [0, 1, 2].map((s) => spec(0, 0, s)) } },
   cycleChecks: checks,
 };
-const info = { version: "1", commit: "x", attribution: "a", licenseText: "" };
+const info = { version: "1", commit: "x", attribution: "a", licenseText: "", catalog: catalogFor("modern") };
 
 describe("data added to frames that already shipped", () => {
   const before = bake([older, other], renderer);

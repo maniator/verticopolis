@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { bundleBake } from "../scripts/atlas-bundle.ts";
+import { atlasCatalog } from "../scripts/atlas-catalog.ts";
 
 /**
  * The sprite atlas (issue #909, `scripts/export-atlas.ts`) must reproduce the
@@ -13,7 +14,8 @@ import { bundleBake } from "../scripts/atlas-bundle.ts";
  * region offsets; burning and unbuilt rooms at the per-unit origin. The
  * non-room families are checked the same way (`verifyExtras.ts`), and a control
  * case must report a mismatch. The export runs the same check before it writes
- * an archive.
+ * an archive. The page binds the engine's Modern catalog first, read from the
+ * engine package as the export reads it (`scripts/atlas-catalog.ts`).
  */
 
 test.describe("sprite atlas matches the web bake", () => {
@@ -21,6 +23,8 @@ test.describe("sprite atlas matches the web bake", () => {
     test.setTimeout(180_000);
     await page.setContent("<!doctype html><html><body></body></html>");
     await page.addScriptTag({ content: await bundleBake() });
+    const catalog = await atlasCatalog(process.cwd());
+    await page.evaluate((c) => (globalThis as any).__vcAtlas.bind(c), catalog);
     const results: { label: string; mismatches: number; control?: boolean }[] = await page.evaluate(() => (globalThis as any).__vcAtlas.verify());
     // A control compares two different pictures and must report a mismatch.
     const controls = results.filter((r) => r.control);

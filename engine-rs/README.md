@@ -244,12 +244,13 @@ The WASM binding returns the same JSON from `catalog(mode)`, typed by
 `Catalog` in `src/catalog/catalogTypes.ts` and read through `readCatalog` in
 `src/dualrun/catalog.ts`, which refuses a reply whose shape is not `Catalog`
 (a missing or mistyped field, a negative price, a pool or ground floor
-structure naming no listed kind). The TypeScript engine builds the same catalog from
-its own tables (`catalogFor`), and `conformance/catalog-digests.json` pins
-each mode's canonical hash: the TypeScript run writes it
-(`catalog.integration.test.ts`, regenerated with the conformance switch),
-and a crate test, the referee binary and the WASM suite check against it,
-so the two engines cannot quote a different price or size while both exist (each also has a test that the prices it quotes are the ones its build and sell paths charge, and the TypeScript one charges a maintenance period against the quoted car and service upkeep).
+structure naming no listed kind). `conformance/catalog-digests.json` pins
+each mode's canonical hash: the WASM suite writes it from this catalog
+(`conformanceWasm.integration.test.ts`, regenerated with the conformance
+switch), and a crate test, the referee binary and the WASM suite check
+against it, so a changed price or size moves the digest in the PR that
+changes it. A crate test also checks that the prices the catalog quotes are
+the ones the build and sell paths charge.
 Presentation (display copy beyond the name, icons, pixel sizes, colors)
 stays with the frontend.
 

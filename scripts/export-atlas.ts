@@ -24,12 +24,17 @@
  * sample check).
  * Nothing it writes is committed. The archive layout and manifest schema are
  * documented in docs/atlas.md.
+ *
+ * The sizes and kind facts the art is drawn with come from the engine's own
+ * catalog, read from the engine package (`npm run wasm:build` first; see
+ * `scripts/atlas-catalog.ts`).
  */
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { chromium } from "playwright";
+import { atlasCatalog } from "./atlas-catalog.ts";
 import { bundleBake } from "./atlas-bundle.ts";
 import { iconSvg } from "./app-icon-svg.mjs";
 import { LOBBY_VARIANTS } from "../src/render/sprites";
@@ -121,6 +126,9 @@ async function main(): Promise<void> {
   if (label !== undefined && !/[A-Za-z0-9]/.test(label)) throw new Error(`--label ${label} names nothing`);
   if (label !== undefined && filter !== undefined) throw new Error("--label names a release archive; a --filter run is a preview");
   const t0 = Date.now();
+  // The page draws with the engine's catalog, and the archive builder binds
+  // the same one in Node (ArchiveInfo.catalog).
+  const catalog = await atlasCatalog(root);
   const code = await bundleBake();
   console.log(`bundled the bake (${(code.length / 1024).toFixed(0)} KiB)`);
   const browser = await chromium.launch({ executablePath: process.env.PW_CHROME || undefined });
@@ -129,6 +137,7 @@ async function main(): Promise<void> {
     const page = await browser.newPage();
     await page.setContent("<!doctype html><html><body></body></html>");
     await page.addScriptTag({ content: code });
+    await page.evaluate((c) => (globalThis as any).__vcAtlas.bind(c), catalog);
     // Pre-flight: the atlas must reproduce the game's paint for every sample
     // signature before anything is written.
     // A filtered preview skips it and is named as a preview.
@@ -170,7 +179,7 @@ async function main(): Promise<void> {
   const licenseText = readFileSync(join(root, "ASSETS-LICENSE.md"), "utf8");
   const archive = buildArchive(
     bakeResult,
-    { version: pkg.version, commit: gitCommit(), attribution: attributionLine(licenseText), licenseText, icons: appIcons(root) },
+    { version: pkg.version, commit: gitCommit(), attribution: attributionLine(licenseText), licenseText, icons: appIcons(root), catalog },
     (msg) => console.log(msg),
   );
   // Every image must come back out of the pages it was packed into.

@@ -3,8 +3,8 @@ use crate::charges::ExtendEnd;
 use crate::services::GARBAGE_COLLECT_HOUR;
 use crate::sim::Simulation;
 
-/// `conformance/catalog-digests.json`, which the TypeScript engine writes
-/// from its own tables (`catalog.integration.test.ts`).
+/// `conformance/catalog-digests.json`, which the WASM suite writes from this
+/// catalog (`conformanceWasm.integration.test.ts`).
 const LOCK: &str = include_str!("../../../conformance/catalog-digests.json");
 
 const MODES: [GameMode; 2] = [GameMode::Classic, GameMode::Modern];

@@ -144,11 +144,12 @@ Verticopolis has **two test tiers**:
     the `rust-coverage` job (`cargo llvm-cov`, line floor in
     `engine-rs.yml`) is how review checks that, and the floor only moves up.
     The catalog every frontend reads (prices, sizes and build rules,
-    `src/engine/catalog.ts` and `engine-rs/src/catalog.rs`) is pinned the
-    same way by `conformance/catalog-digests.json`
-    (`catalog.integration.test.ts` writes it with the same regeneration
-    switch; a Rust test, the referee and the WASM suite check it), so a
-    changed price or size moves that digest in the PR that changes it.
+    `engine-rs/src/catalog.rs`) is pinned the same way by
+    `conformance/catalog-digests.json` (the WASM suite,
+    `conformanceWasm.integration.test.ts`, writes it with the same
+    regeneration switch; a Rust test, the referee and the WASM suite check
+    it), so a changed price or size moves that digest in the PR that changes
+    it. The TypeScript reference's catalog is not pinned.
     Forged-save handling is pinned the same way by
     `conformance/loader-cases.json` (`loaderCases.integration.test.ts` writes
     it, a Rust test replays it), and the `.TDT` codec by

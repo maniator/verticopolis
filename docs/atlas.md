@@ -47,6 +47,7 @@ To build it yourself:
 
 ```bash
 npm ci
+npm run wasm:build                           # the bake reads the engine's catalog from this package
 npm run atlas -- --out dist-atlas            # whole catalog
 npm run atlas -- --out dist-atlas --filter room/office   # a slice, written as verticopolis-atlas-preview.zip
 ```

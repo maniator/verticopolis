@@ -6,9 +6,8 @@
 //! caps and one [`FacilityEntry`] per facility kind. It serializes to JSON
 //! with camelCase keys, and the WASM binding returns the same text.
 //!
-//! The TypeScript engine builds the same catalog from its own tables and
-//! `conformance/catalog-digests.json` pins each mode's canonical hash, so a
-//! catalog change is a deliberate lock change.
+//! `conformance/catalog-digests.json` pins each mode's canonical hash, written
+//! from this catalog, so a catalog change is a deliberate lock change.
 
 use serde::Serialize;
 use serde_json::Value;
