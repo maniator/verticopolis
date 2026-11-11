@@ -215,22 +215,61 @@ fn housekeepers_go_out_for_a_meal_inside_their_shift_only() {
     assert_eq!(housekeeping_origins(21), 0, "off shift at 21:00");
 }
 
+/// Offices per floor in the lunch-peak tower: a wide strip filled from
+/// `LUNCH_FIRST_X` at the office width, with no overlap.
+const LUNCH_OFFICES_PER_FLOOR: i64 = 11;
+const LUNCH_FIRST_X: i64 = 10;
+const LUNCH_STRIP_WIDTH: i64 = 120;
+const OFFICE_WIDTH: i64 = 9;
+const OFFICE_STAFF: i64 = 6;
+
 #[test]
 fn the_crowd_cap_holds_through_a_lunch_peak() {
-    let mut sim = mixed_tower();
-    for floor in 2..=5 {
-        let kind = match floor {
-            CONDO_FLOOR => Kind::Condo,
-            HOTEL_FLOOR => Kind::HotelSingle,
-            _ => Kind::Office,
-        };
-        for i in 0..8 {
-            if sim.tower.place(kind, floor, i * 4).ok {
-                let u = sim.tower.unit_at(floor, i * 4).unwrap().id;
-                sim.tower.get_unit_mut(u).unwrap().state = UnitState::Occupied;
-            }
+    let mut sim = strip_tower(2024, GameMode::Modern, LUNCH_STRIP_WIDTH, VENUE_FLOOR);
+    shaft(&mut sim, Kind::ElevatorStandard, 4, 1, VENUE_FLOOR);
+    place_seated(
+        &mut sim,
+        Kind::FastFood,
+        VENUE_FLOOR,
+        LUNCH_FIRST_X,
+        UnitState::Occupied,
+        0,
+    );
+    place_seated(
+        &mut sim,
+        Kind::Restaurant,
+        VENUE_FLOOR,
+        LUNCH_FIRST_X + 30,
+        UnitState::Occupied,
+        0,
+    );
+    for floor in OFFICE_FLOOR..VENUE_FLOOR {
+        for i in 0..LUNCH_OFFICES_PER_FLOOR {
+            let x = LUNCH_FIRST_X + i * OFFICE_WIDTH;
+            place_seated(
+                &mut sim,
+                Kind::Office,
+                floor,
+                x,
+                UnitState::Occupied,
+                OFFICE_STAFF,
+            );
         }
     }
+    let offices = sim
+        .tower
+        .units
+        .iter()
+        .filter(|u| u.kind == Kind::Office)
+        .count() as i64;
+    assert_eq!(
+        offices,
+        LUNCH_OFFICES_PER_FLOOR * (VENUE_FLOOR - OFFICE_FLOOR)
+    );
+    assert!(
+        (offices * OFFICE_STAFF) as usize > MAX_PEOPLE,
+        "the staff outnumber the cap, so lunch can press against it"
+    );
     at_time(&mut sim, 0, 12);
     let mut peak = 0;
     for _ in 0..180 {
@@ -238,7 +277,7 @@ fn the_crowd_cap_holds_through_a_lunch_peak() {
         peak = peak.max(sim.crowd.people.len());
         assert!(sim.crowd.people.len() <= MAX_PEOPLE);
     }
-    assert!(peak > 0, "the lunch drew a crowd");
+    assert_eq!(peak, MAX_PEOPLE, "the lunch filled the crowd to its cap");
 }
 
 /// The meal cadence adds no income source: two identical fast food towers
