@@ -18,6 +18,11 @@ crate: none   # major | minor | patch | none
 - `app` is the tier from CONTRIBUTING.md "Versioning": would a player notice
   anything different? `crate` follows "The engine crate version": a move in
   the conformance lock, a version constant or `engine.d.ts`.
+- `readmes: unchanged` (optional) is for a PR that changes the engine: it
+  says you read both engine READMEs (`packages/verticopolis-engine/README.md`
+  and `engine-rs/CRATE_README.md`) and neither needs a word. Without it, an
+  engine change must edit one of them. See CONTRIBUTING.md "The engine
+  READMEs".
 - `## Player` lines go into `CHANGELOG.md` and the update prompt, in the house
   style of CONTRIBUTING.md "Player notes". `## Engine` lines go into
   `engine-rs/CHANGELOG.md` and are required when `crate` is not `none`.

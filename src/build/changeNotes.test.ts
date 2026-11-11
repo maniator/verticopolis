@@ -26,6 +26,13 @@ describe("change notes", () => {
     expect(n).toEqual({ file: "my-branch.md", app: "minor", crate: "patch", player: ["Elevators skip empty floors."], engine: ["`frame()` adds a count."] });
   });
 
+  it("reads the optional readmes line, and only as unchanged", () => {
+    expect(parseNote(note("app: none\ncrate: none\nreadmes: unchanged   # checked both"), "x.md").readmesUnchanged).toBe(true);
+    expect(parseNote(note("app: none\ncrate: none"), "x.md")).not.toHaveProperty("readmesUnchanged");
+    expect(() => parseNote(note("app: none\ncrate: none\nreadmes: updated"), "x.md")).toThrow(/not "unchanged"/);
+    expect(() => parseNote(note("app: none\ncrate: none\nreadmes: unchanged\nreadmes: unchanged"), "x.md")).toThrow(/readmes is set twice/);
+  });
+
   it("reads a CRLF checkout and a note with no sections", () => {
     expect(parseNote("---\r\napp: none\r\ncrate: none\r\n---\r\n", "x.md")).toMatchObject({ app: "none", crate: "none", player: [], engine: [] });
   });

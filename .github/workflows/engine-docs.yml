@@ -1,0 +1,138 @@
+name: Engine docs
+
+# Builds the engine's developer docs (docs/engine-site/, a Starlight site over
+# the READMEs and guides the repository keeps, in the game's own palette) with
+# the crate's Rust API reference under /rust/, and deploys them to GitHub Pages
+# at docs.verticopolis.com.
+#
+# The site shows main, as the engine READMEs do: a push to main that touches
+# the site or a page it shows deploys it, and so does the release merge that
+# writes the engine changelog. A maintainer can run it by hand for main, or
+# for an engine tag made after the site existed to show that release instead
+# (until the next push to main). A pull request that touches the same files
+# builds it without deploying, so a missing page or a build error fails there
+# first.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "main, or an existing engine tag (engine-v<version>) to publish instead"
+        required: true
+  push:
+    branches: [main]
+    paths:
+      - "docs/engine-site/**"
+      - "src/styles/retro-tokens.css"
+      - "src/public/favicon.png"
+      - "src/public/icon-1024x1024.png"
+      - "packages/verticopolis-engine/README.md"
+      - "engine-rs/CRATE_README.md"
+      - "engine-rs/API.md"
+      - "engine-rs/CHANGELOG.md"
+      - "conformance/README.md"
+      - ".github/workflows/engine-docs.yml"
+  pull_request:
+    paths:
+      - "docs/engine-site/**"
+      - "src/styles/retro-tokens.css"
+      - "src/public/favicon.png"
+      - "src/public/icon-1024x1024.png"
+      - "packages/verticopolis-engine/README.md"
+      - "engine-rs/CRATE_README.md"
+      - "engine-rs/API.md"
+      - "engine-rs/CHANGELOG.md"
+      - "conformance/README.md"
+      - ".github/workflows/engine-docs.yml"
+
+permissions:
+  contents: read
+
+# One deploy at a time, whatever started it; a newer run replaces a queued one,
+# and a running deploy finishes. Pull request builds queue per branch.
+concurrency:
+  group: engine-docs-${{ github.event_name == 'pull_request' && github.ref || 'deploy' }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: engine-docs (build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check the tag
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          if [ "$TAG" != main ] && ! printf '%s' "$TAG" | grep -Eq '^engine-v[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::$TAG is neither an engine-v<x.y.z> tag nor main."; exit 1
+          fi
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && (inputs.tag == 'main' && 'refs/heads/main' || format('refs/tags/{0}', inputs.tag)) || '' }}
+          persist-credentials: false
+
+      # The toolchain the crate pins (rust-version), as engine-rs.yml installs it.
+      - name: Rust toolchain
+        run: |
+          rustup toolchain install 1.97.0 --profile minimal
+          rustup default 1.97.0
+
+      # A tag from before the site existed has nothing to build.
+      - name: Check the site exists
+        run: |
+          if [ ! -f docs/engine-site/package.json ]; then
+            echo "::error::This checkout predates the docs site. Publish a later engine tag, or main."; exit 1
+          fi
+
+      # The site's own npm project, installed from its lockfile.
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: ".nvmrc"
+          cache: npm
+          cache-dependency-path: docs/engine-site/package-lock.json
+
+      - name: Site dependencies
+        run: npm ci --prefix docs/engine-site --no-audit --no-fund
+
+      - name: Build the site
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          # DOCS_REF names a release in the title and points the pages'
+          # repository links at the same commit; a push or a pull request
+          # builds as main.
+          export DOCS_REF="${TAG:-main}"
+          npm run build --prefix docs/engine-site
+          cargo doc --locked --no-deps --manifest-path engine-rs/Cargo.toml
+          mkdir -p docs/engine-site/dist/rust
+          cp -R engine-rs/target/doc/. docs/engine-site/dist/rust/
+          printf '<!doctype html><meta charset="utf-8"><meta http-equiv="refresh" content="0; url=verticopolis_engine/index.html"><title>Rust API reference</title><a href="verticopolis_engine/index.html">Rust API reference</a>\n' > docs/engine-site/dist/rust/index.html
+          test -f docs/engine-site/dist/index.html
+          test -f docs/engine-site/dist/crate/index.html
+          test -f docs/engine-site/dist/rust/verticopolis_engine/index.html
+
+      - name: Upload the site
+        if: ${{ github.event_name != 'pull_request' }}
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: docs/engine-site/dist
+
+  deploy:
+    name: engine-docs (deploy)
+    if: ${{ github.event_name != 'pull_request' }}
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deploy
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1

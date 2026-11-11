@@ -1,0 +1,15 @@
+{
+  "name": "verticopolis-engine-docs",
+  "private": true,
+  "description": "The engine developer docs at docs.verticopolis.com, a Starlight site over the engine's READMEs and guides",
+  "type": "module",
+  "scripts": {
+    "sync": "node scripts/sync-pages.mjs",
+    "dev": "node scripts/sync-pages.mjs && astro dev",
+    "build": "node scripts/sync-pages.mjs && astro build"
+  },
+  "dependencies": {
+    "@astrojs/starlight": "0.42.7",
+    "astro": "7.4.2"
+  }
+}

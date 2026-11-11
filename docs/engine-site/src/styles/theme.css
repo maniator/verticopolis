@@ -1,0 +1,351 @@
+/* The docs site in the game's own look, split the way the game splits it
+   (party findings, _bmad-output/party-mode/docs-site-design-party-findings-2026-11-11.md):
+   - every page is the game's How to Play window: a navy title bar, a silver
+     sidebar with the Tools panel's section labels, a navy selected row, and
+     reading text on a white well;
+   - the landing page is the title screen (src/components/TitleScreen.astro),
+     with the cards as small game windows over the skyline.
+   The chrome tokens (--r-*) come from the game's retro-tokens.css, copied in
+   beside this file by scripts/sync-pages.mjs. The splash colors are literals
+   in the game's src/styles.css, copied here under --ts-*. */
+
+:root {
+  --ts-sky: linear-gradient(#161634 0%, #241f4c 34%, #5b3560 62%, #c65a63 86%, #ef8560 100%);
+  --ts-building: #201643;
+  --ts-amber: #ffc94a;
+  --ts-cream: #e6dcc0;
+  --ts-plate-ink: #20204a;
+  --ts-border: #0d0d10;
+  --ts-premise: #e7ddf5;
+  --ts-skyline-height: clamp(10rem, 20vw, 15rem);
+
+  --sl-font: var(--r-font);
+  --sl-color-accent-low: #c8c8f0;
+  --sl-color-accent: var(--r-title);
+  --sl-color-accent-high: var(--r-title);
+  --sl-color-text-accent: var(--r-title);
+  --sl-color-bg-accent: var(--r-title);
+  --sl-color-text-invert: var(--r-title-fg);
+  --sl-color-bg-nav: var(--r-title);
+}
+
+:root[data-theme="light"] {
+  --sl-color-bg: var(--r-hi);
+  --sl-color-bg-sidebar: var(--r-face);
+  --sl-color-bg-inline-code: #e8e8e8;
+  --sl-color-hairline: var(--r-shadow);
+  --sl-color-hairline-light: #b0b0b0;
+  --sl-color-hairline-shade: var(--r-shadow);
+  --sl-color-text: var(--r-ink);
+  --sl-color-white: var(--r-ink);
+  --sl-color-gray-2: #1c1c22;
+  --sl-color-gray-3: var(--muted);
+}
+
+/* The game has no dark mode; a dark viewer gets a dark well and sidebar, and
+   the controls keep their silver chrome, as on the game's /help page. */
+:root[data-theme="dark"] {
+  --sl-color-accent-low: #12305a;
+  --sl-color-accent: #7fe0e0;
+  --sl-color-accent-high: #bff3f3;
+  --sl-color-text-accent: #7fe0e0;
+  --sl-color-bg: #0a1f1f;
+  --sl-color-bg-sidebar: #05403f;
+  --sl-color-bg-inline-code: #163636;
+  --sl-color-hairline: #1d4a49;
+  --sl-color-hairline-light: #2b5e5d;
+  --sl-color-hairline-shade: #1d4a49;
+  --sl-color-text: #eafcfb;
+}
+
+/* Focus: the game's 2px ring, navy on the light well and teal on the dark. */
+:focus-visible {
+  outline: 2px solid var(--sl-color-accent);
+  outline-offset: 1px;
+}
+
+/* ---- The title bar ---------------------------------------------------- */
+
+/* Navy with white text in both themes, and nothing drawn under it: a Win 3.1
+   title bar ends where the navy ends. */
+.header {
+  --sl-color-white: var(--r-title-fg);
+  --sl-color-gray-1: var(--r-title-fg);
+  --sl-color-gray-2: var(--r-light);
+  --sl-color-gray-3: var(--r-light);
+  --sl-color-gray-5: var(--r-shadow);
+  --sl-color-text-accent: var(--r-title-fg);
+  border-bottom-color: var(--r-title);
+}
+.header :focus-visible {
+  outline-color: var(--ts-amber);
+}
+.header .site-title {
+  font-weight: 700;
+}
+.header .site-title img {
+  image-rendering: pixelated;
+  box-shadow: var(--bevel-out);
+}
+/* The search box is a sunken white field. */
+.header site-search button[data-open-modal] {
+  background: var(--r-hi);
+  color: var(--r-ink);
+  border: 0;
+  border-radius: 0;
+  box-shadow: var(--bevel-in);
+}
+.header site-search button[data-open-modal] kbd {
+  background: var(--r-face);
+  color: var(--r-ink);
+  border-radius: 0;
+}
+
+/* ---- The sidebar: the game's Tools panel ------------------------------ */
+
+.sidebar-pane {
+  border-inline-end: 2px solid var(--r-shadow);
+}
+/* Section labels as the Tools panel draws them: small, uppercase, spaced. */
+.sidebar-content .group-label .large {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+:root[data-theme="light"] .sidebar-content .group-label .large {
+  color: var(--r-title);
+}
+/* The current page is the selected row: navy, white text, square. */
+.sidebar-content a[aria-current="page"],
+.sidebar-content a[aria-current="page"]:hover {
+  background: var(--r-title);
+  color: var(--r-title-fg);
+  border-radius: 0;
+}
+
+/* ---- Controls: the game's bevelled buttons ---------------------------- */
+
+.expressive-code .frame,
+.expressive-code .frame pre,
+starlight-tabs [role="tab"],
+.starlight-aside,
+dialog {
+  border-radius: 0 !important;
+}
+.sl-menu-button,
+mobile-starlight-toc .toggle,
+.pagination-links a {
+  background: var(--r-face);
+  color: var(--r-ink);
+  border: 0;
+  border-radius: 0;
+  box-shadow: var(--bevel-out);
+}
+.sl-menu-button:active,
+.pagination-links a:active {
+  box-shadow: var(--bevel-in);
+}
+.pagination-links a {
+  min-height: 44px;
+  --sl-color-gray-3: var(--r-ink);
+}
+.pagination-links a .link-title {
+  color: var(--r-ink);
+}
+.pagination-links a svg {
+  color: var(--r-title);
+}
+
+/* ---- The landing page: the title screen ------------------------------ */
+
+/* Below the skyline the page is the buildings' own color, and the content
+   panel lets the title screen run edge to edge. */
+[data-has-hero] .main-frame {
+  background: var(--ts-building);
+  overflow-x: clip;
+  --sl-color-text: var(--ts-premise);
+  --sl-color-white: var(--r-title-fg);
+}
+[data-has-hero] :focus-visible {
+  outline-color: var(--ts-amber);
+  outline-offset: 2px;
+}
+[data-has-hero] .content-panel {
+  padding-top: 0;
+}
+[data-has-hero] .sl-markdown-content > p {
+  color: var(--ts-premise);
+  text-align: center;
+}
+
+.title-screen {
+  position: relative;
+  isolation: isolate;
+  width: 100vw;
+  margin-inline: calc(50% - 50vw);
+  overflow: hidden;
+  padding: clamp(3rem, 9vh, 6rem) 1rem calc(var(--ts-skyline-height) + 1.5rem);
+  text-align: center;
+  background: var(--ts-sky);
+  color: var(--ts-premise);
+}
+.ts-stars {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background-image:
+    radial-gradient(1.5px 1.5px at 18% 14%, rgba(255, 255, 255, 0.8) 40%, transparent),
+    radial-gradient(1.5px 1.5px at 70% 9%, rgba(255, 255, 255, 0.6) 40%, transparent),
+    radial-gradient(1.5px 1.5px at 86% 22%, rgba(255, 255, 255, 0.7) 40%, transparent),
+    radial-gradient(1.5px 1.5px at 40% 7%, rgba(255, 255, 255, 0.55) 40%, transparent);
+}
+.ts-sun {
+  position: absolute;
+  z-index: -1;
+  bottom: 0;
+  left: 50%;
+  transform: translate(-50%, 15%);
+  width: min(40vmin, 210px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle, #ffe6a0 0%, #ffc94a 52%, #f18f4b 100%);
+  box-shadow: 0 0 60px 16px rgba(255, 179, 87, 0.26);
+}
+.ts-skyline {
+  position: absolute;
+  z-index: -1;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: var(--ts-skyline-height);
+  /* The title screen's skyline at its own proportions, repeated across a
+     wide screen instead of stretched, so the rooftops always show. */
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 460 200'%3E%3Cg fill='%23201643' stroke='%230d0d10' stroke-width='1'%3E%3Cpath d='M-5 200 V120 h34 V98 h16 V120 h40 V200 z'/%3E%3Cpath d='M95 200 V80 h26 V56 h12 V80 h26 V200 z'/%3E%3Cpath d='M200 200 V54 h20 V30 h9 V10 h9 V30 h9 V54 h20 V200 z'/%3E%3Cpath d='M310 200 V92 h30 V68 h15 V92 h30 V200 z'/%3E%3Cpath d='M410 200 V60 h20 V36 h11 V60 h34 V200 z'/%3E%3C/g%3E%3Cg fill='%23ffdca0'%3E%3Crect x='8' y='130' width='3' height='4'/%3E%3Crect x='8' y='146' width='3' height='4'/%3E%3Crect x='104' y='92' width='3' height='4'/%3E%3Crect x='104' y='112' width='3' height='4'/%3E%3Crect x='214' y='66' width='3' height='4'/%3E%3Crect x='214' y='90' width='3' height='4'/%3E%3Crect x='320' y='100' width='3' height='4'/%3E%3Crect x='424' y='72' width='3' height='4'/%3E%3C/g%3E%3C/svg%3E") repeat-x center bottom / auto 100%;
+}
+.ts-brand h1 {
+  margin: 0;
+  line-height: 0;
+}
+.ts-word {
+  display: block;
+  width: min(86vw, 520px);
+  margin: 0 auto;
+}
+.ts-word text,
+.ts-tag text {
+  font-family: "Century Gothic", "Twentieth Century", "URW Gothic", "Futura", system-ui, sans-serif;
+}
+.ts-word text {
+  font-size: 56px;
+  letter-spacing: 2px;
+  paint-order: stroke;
+  stroke: rgba(0, 0, 0, 0.35);
+  stroke-width: 2px;
+}
+.ts-word .a {
+  fill: #f7f1e4;
+}
+.ts-word .b {
+  fill: var(--ts-amber);
+}
+.ts-tag {
+  display: block;
+  width: min(78vw, 380px);
+  margin: 0.75rem auto 0;
+}
+.ts-tag text {
+  font-size: 15px;
+  fill: #ffd9a8;
+}
+.ts-premise {
+  max-width: 46ch;
+  margin: 1.25rem auto 0;
+  font-size: 1.0625rem;
+  line-height: 1.5;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.55);
+}
+.ts-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: center;
+  margin-top: 1.75rem;
+}
+/* The splash's button: a cream plate with an ink border, a bevel and a hard
+   shadow; the one primary is amber. */
+.ts-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 9px 20px;
+  font-family: var(--r-font);
+  font-size: 1rem;
+  color: var(--ts-plate-ink);
+  text-decoration: none;
+  background: var(--ts-cream);
+  border: 2px solid var(--ts-border);
+  box-shadow: inset 2px 2px 0 rgba(255, 255, 255, 0.75), inset -2px -2px 0 rgba(0, 0, 0, 0.2), 3px 3px 0 rgba(0, 0, 0, 0.4);
+}
+.ts-btn:hover {
+  color: var(--ts-plate-ink);
+  filter: brightness(1.05);
+}
+.ts-btn:active {
+  box-shadow: inset 2px 2px 0 rgba(0, 0, 0, 0.3);
+}
+.ts-btn.primary {
+  background: var(--ts-amber);
+  font-weight: 700;
+}
+@media (max-width: 40rem) {
+  .ts-actions {
+    flex-direction: column;
+    align-items: stretch;
+    max-width: 20rem;
+    margin-inline: auto;
+  }
+}
+
+/* The cards are small game windows: a navy title strip over a silver body,
+   with the window's hard shadow. */
+[data-has-hero] .card {
+  padding: 0;
+  gap: 0;
+  border: 0;
+  border-radius: 0;
+  background: var(--r-face);
+  color: var(--r-ink);
+  box-shadow: var(--bevel-out), var(--win-shadow);
+}
+[data-has-hero] .card .title {
+  gap: 0.5rem;
+  margin: 3px 3px 0;
+  padding: 4px 8px;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--r-title-fg);
+  background: var(--r-title);
+}
+[data-has-hero] .card .icon {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: var(--r-title-fg);
+}
+[data-has-hero] .card .body {
+  padding: 0.75rem 1rem 1rem;
+  color: var(--r-ink);
+}
+[data-has-hero] .card .body a {
+  color: var(--r-title);
+}
+[data-has-hero] .card :focus-visible {
+  outline-color: var(--r-title);
+}
+[data-has-hero] .card code {
+  background: var(--r-hi);
+  color: var(--r-ink);
+}

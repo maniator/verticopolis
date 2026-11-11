@@ -627,7 +627,9 @@ CI's "Versions and change notes" step in the test job (`npm run
 version:check` locally, after committing) holds both sides to this: a feature
 PR keeps every version line and changelog heading as `main` has them, keeps
 `main`'s pending notes, adds a note when it changes a deployed path, and sets
-`crate:` in its own note when it moves a pin in the compatibility record. A
+`crate:` in its own note when it moves a pin in the compatibility record, and
+edits an engine README or says `readmes: unchanged` when it changes the engine
+(see The engine READMEs below). A
 release PR raises each version by exactly its notes' highest level (the app may
 go to a later version the driver names), consumes every note and changes
 nothing but the release files.
@@ -733,6 +735,50 @@ arguments, for example), or a field added through the save loader's optional
 seam. A change like that still needs a bump; review owns it, and the backlog row
 `engine-compat-coverage` tracks closing the gap. A record edited by hand in the
 same PR also skips the main comparison, so a reviewer reads the record's diff.
+
+### The engine READMEs
+
+Two READMEs are written for people who build on the engine, and both describe
+the engine as it is on `main`:
+
+- [`packages/verticopolis-engine/README.md`](./packages/verticopolis-engine/README.md),
+  the README of the WASM package each crate release publishes (the npm package
+  page shows it);
+- [`engine-rs/CRATE_README.md`](./engine-rs/CRATE_README.md), the README the
+  crate will show on a registry (#893). Its quick start is
+  `engine-rs/consumer/examples/quick_start.rs`, which CI compiles.
+
+**Every engine change updates them.** A PR that changes the engine (the
+library source under `engine-rs/src/`, its tests and `src/bin/` aside, or the
+binding declaration `src/dualrun/engine.d.ts`) edits whichever README no longer
+describes the engine: a call added, renamed or removed, a changed answer shape,
+a rule, a save behavior, a feature or a limit. When neither needs a word, the
+PR's note says so with `readmes: unchanged` in its front matter, written only
+after you read both. The "Versions and change notes" step fails an engine
+change that does neither, and fails the line beside a README edit. Guards
+check the rest mechanically: every binding call the package README names must
+exist (`src/tests/enginePackageReadme.guard.test.ts`), and the crate README's
+quick start must match the compiled example
+(`src/tests/engineCrateReadme.guard.test.ts`).
+
+**The docs site.** docs.verticopolis.com is a Starlight site in
+`docs/engine-site/`, its own small npm project, dressed in the game's Windows
+3.1 palette. Its pages are both READMEs, `engine-rs/API.md`,
+`conformance/README.md` and `engine-rs/CHANGELOG.md`, listed in its
+`pages.json`; `scripts/sync-pages.mjs` copies them in before each build and
+points their repository links at the site or at GitHub. The palette, logo and
+favicon are copied from the game (`src/styles/retro-tokens.css`,
+`src/public/`), and the crate's `cargo doc` output goes under `/rust/`.
+`.github/workflows/engine-docs.yml` builds it on a pull request that touches
+any of those files and deploys it to GitHub Pages on every push to `main` that
+does, so the site shows `main`, as the READMEs do. Run it by hand from the
+Actions tab to redeploy `main`, or to show a release tag instead until the
+next push. Locally: `npm ci --prefix
+docs/engine-site`, then `npm run dev --prefix docs/engine-site`. Edit the
+source files, never the copies under `src/content/docs/`.
+`src/tests/engineDocsSite.guard.test.ts` checks that every listed page names a
+real file and is in the sidebar; the workflow's own pull request run checks
+the build.
 
 ### Two changelogs, and the update label
 

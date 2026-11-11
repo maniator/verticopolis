@@ -52,6 +52,7 @@ raises the versions. See .changes/README.md.
 -->
 
 - [ ] Added a `.changes` note with the right `app:` and `crate:` levels, **or** this PR changes no deployed path
+- [ ] Engine change: updated `packages/verticopolis-engine/README.md` and/or `engine-rs/CRATE_README.md`, **or** read both and put `readmes: unchanged` in the note, **or** this PR changes no engine source
 
 ## Complexity
 

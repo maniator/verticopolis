@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.astro/
+# Written by scripts/sync-pages.mjs from the repository's own files.
+/src/content/docs/*.md
+/src/assets/
+/src/styles/retro-tokens.css
+/public/
