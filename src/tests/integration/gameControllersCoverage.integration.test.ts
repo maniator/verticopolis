@@ -849,7 +849,7 @@ describe.skipIf(noEngine)("EditorActions (dialogs, extend billing, per-kind butt
     forged.skipFloors = [];
     const ex = shaftsOf(draftFromSave(data)).find((t) => t.kind === "elevatorExpress")!;
     // The trust-boundary coercion re-skips the non-lobby middles after load.
-    expect(shaftOf(sim, ex.id)!.skipFloors).toEqual([2, 3]);
+    expect(ex.skipFloors).toEqual([2, 3]);
   });
 
   it("coercion scrubs a forged endpoint out of an express skip list (endpoints always stop)", () => {
@@ -861,7 +861,7 @@ describe.skipIf(noEngine)("EditorActions (dialogs, extend billing, per-kind butt
     // middles.
     (data.transports as unknown as Transport[]).find((t) => t.id === r.transportId)!.skipFloors = [4];
     const ex = shaftsOf(draftFromSave(data)).find((t) => t.kind === "elevatorExpress")!;
-    expect(shaftOf(sim, ex.id)!.skipFloors).toEqual([2, 3]);
+    expect(ex.skipFloors).toEqual([2, 3]);
   });
 
   it("no card carries stop-config buttons anymore: Schedule… is the one config surface (#464)", () => {
