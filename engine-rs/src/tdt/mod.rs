@@ -33,6 +33,7 @@ pub mod tables;
 pub mod tail;
 pub mod transports;
 pub mod types;
+pub mod venues;
 
 /// A `.TDT` file that cannot be read; the message is player-readable.
 #[derive(Clone, Debug, PartialEq, Eq)]

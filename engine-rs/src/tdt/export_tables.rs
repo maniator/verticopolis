@@ -3,6 +3,7 @@
 //! filename rule and the pre-encoding tenant shape.
 
 use super::tables::{rent_from_class, tenant_kind, TENANT_IDS};
+use super::venues::OutVenueHalf;
 use crate::facilities::Kind;
 
 /// Kind to canonical single-story tenant ID (`KIND_TENANT`): `TENANT_KIND`
@@ -83,6 +84,10 @@ pub struct OutTenant {
     pub rent_class: i64,
     /// Canon variant byte for retail; `None` for every other kind.
     pub subtype_idx: Option<i64>,
+    /// Byte 15: a theatre's film draw (#1932), 0 for every other record.
+    pub draw: i64,
+    /// The hall or theatre half this record is, for the venue table (#1932).
+    pub venue: Option<OutVenueHalf>,
 }
 
 #[cfg(test)]

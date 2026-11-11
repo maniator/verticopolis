@@ -42,6 +42,8 @@ pub struct GatheredRoom {
     /// reads it (a `null` or a string reads as NaN, which the census then
     /// skips; `residentCount` returns the raw household without coercing).
     pub residents: Option<f64>,
+    /// A theatre's film age in days (`filmDays`, #1932), 0 when unset.
+    pub film_days: Option<i64>,
     pub emitted: bool,
     pub skip_reason: Option<SkipReason>,
 }

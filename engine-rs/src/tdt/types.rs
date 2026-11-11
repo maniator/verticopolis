@@ -100,10 +100,25 @@ pub struct TdtTail {
     pub elevators: Option<Vec<TdtElevator>>,
     pub stairs: Option<Vec<TdtStair>>,
     pub parking_connected: Option<i64>,
+    /// The party hall and theatre table's filled records (#1932).
+    pub venues: Vec<TdtVenue>,
     /// The people of each class the finance block counts (`POP_*` order), when
     /// the block holds a count that adds up to its total.
     pub finance_population: Option<[i64; TDT_POPULATION_CLASSES]>,
     pub warnings: Vec<String>,
+}
+
+/// One record of the party hall and theatre table (#1932): the floor records
+/// of the venue's upper and lower halves, its logical unit id on each, its
+/// film (`None` for a hall) and the days the film has shown.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct TdtVenue {
+    pub upper_floor: i64,
+    pub lower_floor: i64,
+    pub upper_slot: u8,
+    pub lower_slot: u8,
+    pub film: Option<u8>,
+    pub days_shown: u8,
 }
 
 /// The whole file, mirrored (`TdtTower`).

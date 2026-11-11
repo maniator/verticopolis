@@ -11,13 +11,12 @@ use super::write_cases_tests::{MORE_WRITES, WRITES};
 use crate::frame::unit_fields;
 use crate::tower::{Extras, Unit};
 
-/// The frame fields, the census share and `is_operational` read no field but
-/// the six the setters mark and the kind, which no engine code writes in place
-/// (`no_engine_code_writes_a_kind`). Every other field is bound by name and
-/// changed from its own value through its binding, so a new `Unit` field
-/// fails to compile here until it is named, and an unused binding fails
-/// `cargo clippy --all-targets -- -D warnings` (`engine-rs.yml`), until it is
-/// sorted into one side or the other. The pattern's own text is checked
+/// The frame fields, the census share and `is_operational` read no field but the six the
+/// setters mark and the kind, which no engine code writes in place
+/// (`no_engine_code_writes_a_kind`). Every other field is bound by name and changed from its
+/// own value through its binding, so a new `Unit` field fails to compile here until it is
+/// named, and an unused binding fails `cargo clippy --all-targets -- -D warnings` (`engine-
+/// rs.yml`), until it is sorted into one side or the other. The pattern's own text is checked
 /// below: no `..`, the six and the kind as `_`, every other field written.
 #[test]
 fn the_frame_and_the_census_read_only_marked_fields() {
@@ -66,6 +65,7 @@ fn the_frame_and_the_census_read_only_marked_fields() {
             vacate_reason: other(old.vacate_reason),
             vacate_at: Some(old.vacate_at.unwrap_or(0.0) + 1.0),
             film_policy: other(old.film_policy),
+            film_days: Some(old.film_days.unwrap_or(0).wrapping_add(1)),
             patronage_today: Some(old.patronage_today.unwrap_or(0.0) + 1.0),
             patronage_yest: Some(old.patronage_yest.unwrap_or(0.0) + 1.0),
             profit_today: Some(old.profit_today.unwrap_or(0.0) + 1.0),

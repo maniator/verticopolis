@@ -168,15 +168,15 @@ export class EventSystem {
     u.residents = undefined;
     u.satisfaction = 0;
     u.pendingIncome = 0;
-    // A gutted retail unit earned nothing today and its stats walked out with the
-    // flames: drop the slot ("no data yet"); it reopens as a new venue (#1500).
+    // A gutted venue's stats walked out with the flames: drop the slot ("no data
+    // yet"); it reopens as a new venue (#1500), a theatre with a new film (#1932).
     u.patronageToday = undefined;
     u.patronageYest = undefined;
     u.profitToday = undefined;
     u.profitYest = undefined;
     u.visitorsYest = undefined;
-    // A burned hotel room carries no dirty-day clock into its gutted shell.
-    u.dirtyDays = undefined;
+    u.filmDays = undefined;
+    u.dirtyDays = undefined; // a burned hotel room keeps no dirty-day clock
     u.label = FACILITIES[u.kind].name;
   }
 

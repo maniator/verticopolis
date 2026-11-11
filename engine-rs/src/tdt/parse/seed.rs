@@ -165,6 +165,70 @@ pub(super) fn seed_visitors(units: &mut [serde_json::Value], tdt: &TdtTower) {
     }
 }
 
+/// Seed what the file says of its party halls and theatres: each theatre's
+/// film age (#1932) and each venue's audience (#1500).
+pub(super) fn seed_halls_and_theatres(units: &mut [serde_json::Value], tdt: &TdtTower) {
+    seed_film_days(units, tdt);
+    seed_audiences(units, tdt);
+}
+
+/// Give each theatre the days its film has shown, from the file's party hall
+/// and theatre table (#1932). A record names its venue by the lower half's
+/// floor and a slot the floor's index map turns into a tenant; the unit is the
+/// theatre on that floor that covers the tenant. A theatre the table leaves
+/// out starts a fresh film.
+fn seed_film_days(units: &mut [serde_json::Value], tdt: &TdtTower) {
+    if tdt.tail.venues.is_empty() {
+        return;
+    }
+    let field = |u: &serde_json::Value, k: &str| u.get(k).and_then(serde_json::Value::as_i64);
+    // The few theatres the import placed: index, floor, span.
+    let theatres: Vec<(usize, i64, i64, i64)> = units
+        .iter()
+        .enumerate()
+        .filter(|(_, u)| {
+            u.get("kind")
+                .and_then(serde_json::Value::as_str)
+                .and_then(Kind::parse)
+                == Some(Kind::Cinema)
+        })
+        .filter_map(|(i, u)| {
+            let (f, x, w) = (field(u, "floor")?, field(u, "x")?, field(u, "width")?);
+            Some((i, f, x, x + w))
+        })
+        .collect();
+    // The tenant a record names on a floor: the first floor with that index
+    // wins, as a search would find it.
+    let named = |index: i64, slot: u8| {
+        let floor = tdt.floors.iter().find(|f| f.index == index)?;
+        let &t = floor.index_map.get(usize::from(slot))?;
+        floor.tenants.get(usize::from(t))
+    };
+    for venue in tdt.tail.venues.iter().filter(|v| v.film.is_some()) {
+        let (Some(lower), Some(upper)) = (
+            named(venue.lower_floor, venue.lower_slot),
+            named(venue.upper_floor, venue.upper_slot),
+        ) else {
+            continue;
+        };
+        // Both halves must lie over the same theatre, or the record is left
+        // unseeded.
+        let at = venue.lower_floor - TDT_FLOOR_OFFSET;
+        let hit = theatres.iter().find(|&&(_, f, left, right)| {
+            f == at
+                && left < lower.right
+                && lower.left < right
+                && left < upper.right
+                && upper.left < right
+        });
+        if let Some(&(i, ..)) = hit {
+            if let serde_json::Value::Object(m) = &mut units[i] {
+                m.insert("filmDays".into(), venue.days_shown.into());
+            }
+        }
+    }
+}
+
 /// Give each open party hall and theatre the audience the census counts for
 /// it (#1500): 50 for a hall, and for a theatre 40 for each step of the film
 /// draw its record's byte 15 holds. The finance block decides: a class whose
@@ -173,7 +237,7 @@ pub(super) fn seed_visitors(units: &mut [serde_json::Value], tdt: &TdtTower) {
 /// share; a save taken after a film's draw fell but before the census caught
 /// up counts the old draw. Anything else seeds nothing, since a hall or
 /// theatre opened that day counts nothing yet and the file does not say which.
-pub(super) fn seed_audiences(units: &mut [serde_json::Value], tdt: &TdtTower) {
+fn seed_audiences(units: &mut [serde_json::Value], tdt: &TdtTower) {
     let Some(file) = tdt.tail.finance_population else {
         return;
     };

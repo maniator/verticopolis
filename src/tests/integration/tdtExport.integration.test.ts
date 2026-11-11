@@ -1532,7 +1532,15 @@ describeWithCodec("buildTDT: real-game loadability (people, routing tail, schedu
     // the 0xFF run ends where the stamp begins, not at EOF.
     const tail = bytes.subarray(bytes.length - TDT_STAMP_SIZE - TDT_ROUTING_TAIL_SIZE, bytes.length - TDT_STAMP_SIZE);
     expect(tail).toHaveLength(TDT_ROUTING_TAIL_SIZE);
-    expect(tail.every((x) => x === 0xff)).toBe(true);
+    // All 0xFF but the party hall and theatre table (#1932), whose 16 empty
+    // 12-byte records read FE FE then zeros.
+    const table = 7_220;
+    const records = tail.subarray(table, table + 16 * 12);
+    for (let r = 0; r < 16; r++) {
+      expect(Array.from(records.subarray(r * 12, r * 12 + 12))).toEqual([0xfe, 0xfe, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+    }
+    const rest = [...tail.subarray(0, table), ...tail.subarray(table + 16 * 12)];
+    expect(rest.every((x) => x === 0xff)).toBe(true);
   });
 
   it("stamps the file with our format generation, after everything the game reads", () => {

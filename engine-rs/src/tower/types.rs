@@ -86,7 +86,7 @@ pub struct Unit {
 }
 
 /// The facts a unit rarely carries, each unset until something sets it: a
-/// move-out notice (`vacate_*`), the cinema's film policy, a retail room's four
+/// move-out notice (`vacate_*`), the cinema's film policy and its film's age, a retail room's four
 /// daily tallies, a room's opening time (`complete_at*`) and a hotel room's
 /// dirty days.
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -94,6 +94,9 @@ pub struct Extras {
     pub vacate_reason: Option<&'static str>,
     pub vacate_at: Option<f64>,
     pub film_policy: Option<&'static str>,
+    /// The days a theatre's film has shown, counted each morning (#1932); a
+    /// theatre that has not seen a morning yet reads it as 0.
+    pub film_days: Option<u8>,
     pub patronage_today: Option<f64>,
     pub patronage_yest: Option<f64>,
     pub profit_today: Option<f64>,
@@ -114,6 +117,7 @@ static NO_EXTRAS: Extras = Extras {
     vacate_reason: None,
     vacate_at: None,
     film_policy: None,
+    film_days: None,
     patronage_today: None,
     patronage_yest: None,
     profit_today: None,
@@ -217,6 +221,9 @@ impl Unit {
         }
         if let Some(v) = extras.film_policy {
             m.insert("filmPolicy".into(), json!(v));
+        }
+        if let Some(v) = extras.film_days {
+            m.insert("filmDays".into(), json!(v));
         }
         if let Some(v) = self.subtype {
             m.insert("subtype".into(), json!(v));

@@ -121,7 +121,7 @@ const RAW_WRITES: Record<string, Record<string, number>> = {
   "src/engine/sim/services.ts": { occupants: 1 },
   // rollOverRetailDay(): markRoom after a venue's visitors or a hall's or
   // theatre's first audience is set (#1500).
-  "src/engine/sim/satisfaction.ts": { visitorsYest: 2 },
+  "src/engine/sim/satisfaction.ts": { visitorsYest: 3 },
   // setRoomState itself.
   "src/engine/tower/rooms.ts": { state: 1 },
   // The shared reader's own decoded rooms, never an engine unit: it keeps

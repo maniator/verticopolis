@@ -3,7 +3,7 @@
 use indexmap::IndexMap;
 
 use super::visitors::{
-    climb_steps, counts_set_audience, expected_visitors, served_visitors, set_audience,
+    climb_steps, counts_set_audience, expected_visitors, film_draw, served_visitors, set_audience,
     NEW_FILM_DRAW,
 };
 use super::{
@@ -143,10 +143,18 @@ impl Simulation {
             if !u.is_operational() {
                 continue;
             }
+            if u.kind == Kind::Cinema {
+                // A theatre counts the draw its film had overnight, and the
+                // film is a day older (#1932).
+                let days_shown = u.extras().film_days.unwrap_or(0);
+                let audience = set_audience(u.kind, film_draw(i64::from(days_shown))).unwrap_or(0);
+                let (u, at) = self.tower.marked(i);
+                u.set_visitors_yest(at, Some(u8::try_from(audience).unwrap_or(u8::MAX)));
+                u.extras_mut().film_days = Some(days_shown.saturating_add(1));
+                continue;
+            }
             if counts_set_audience(u.kind) {
-                // A hall or theatre counts its audience from the morning after
-                // it opens. A theatre keeps the draw it has: the engine has no
-                // film age to wear it down.
+                // A hall counts its audience from the morning after it opens.
                 if u.visitors_yest.is_none() {
                     let audience = set_audience(u.kind, NEW_FILM_DRAW).unwrap_or(0);
                     let (u, at) = self.tower.marked(i);
