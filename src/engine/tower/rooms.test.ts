@@ -4,7 +4,6 @@ import { rampUnits, roomUnits } from "./rooms";
 import type { FacilityKind } from "../types";
 import { isStructural } from "./towerTopology";
 import { ensureStarterLobby, lay, layTile, placeUnit, MID } from "../../tests/fixtures/towerFixtures";
-import { atEngineFrameCadence, refreshFromEngine } from "../../tests/parity/typescriptOnly";
 
 function towerWithRooms(): Simulation {
   const sim = Simulation.newGame(7, "classic");
@@ -170,7 +169,6 @@ describe("rampUnits", () => {
 
 describe("roomUnits on a real tower", () => {
   it("leaves the census unchanged: totalPopulation equals a full scan of every unit", async () => {
-    atEngineFrameCadence("360 ticks on a 12,000-unit fixture, with a merge before each census check");
     const { inflateSync } = await import("fflate");
     const { default: text } = await import("../../../conformance/fixtures/sixseven_2.vctower?raw");
     const { censusCount } = await import("../facilities");
@@ -185,7 +183,6 @@ describe("roomUnits on a real tower", () => {
     expect(sim.tower.units.filter((u) => isStructural(u.kind)).every((u) => u.state === "empty")).toBe(true);
     for (let i = 0; i < 6; i++) {
       for (let m = 0; m < 60; m++) sim.tick(2);
-      refreshFromEngine(sim);
       let full = 0;
       for (const u of sim.tower.units) if (isPresent(u)) full += censusCount(u);
       expect(sim.tower.totalPopulation()).toBe(full);
