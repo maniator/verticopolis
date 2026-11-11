@@ -240,6 +240,15 @@ impl GameMode {
         }
     }
 
+    /// Whether cinemas, party halls and other attendance venues count as
+    /// amenities when a tenant's unmet-demand coverage is read (#705). Modern
+    /// counts their seats so an entertainment-led tower does not shed tenants
+    /// over a short shop row; Classic keeps the 1994 rule, which read commerce
+    /// only (and never evicts on coverage).
+    pub fn attendance_counts_toward_coverage(self) -> bool {
+        matches!(self, GameMode::Modern)
+    }
+
     /// `demandModel()`: `(perCapita, floor)`.
     pub fn demand_model(self) -> (f64, f64) {
         match self {
