@@ -13,7 +13,7 @@
 //
 // tools/agent-env/setup.sh --claude-user runs it. Rerunning changes nothing;
 // other settings and servers in both files are kept.
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -31,19 +31,24 @@ function readJson(file) {
 function writeJson(file, value) {
   mkdirSync(dirname(file), { recursive: true });
   const tmp = `${file}.vc-agent-${process.pid}`;
-  writeFileSync(tmp, `${JSON.stringify(value, null, 2)}\n`);
+  // Keep the file's mode (~/.claude.json is private to its owner); a new file
+  // gets owner-only access too.
+  const mode = existsSync(file) ? statSync(file).mode & 0o777 : 0o600;
+  writeFileSync(tmp, `${JSON.stringify(value, null, 2)}\n`, { mode });
   renameSync(tmp, file);
 }
 
-// The SessionStart hook. An entry that already names this checkout's hook
-// script is replaced, so a moved Node or a changed timeout is picked up.
+// The SessionStart hook. A hook that already names this checkout's hook
+// script is replaced, so a changed timeout is picked up; other hooks in its
+// group, and the group's other settings, stay.
 const settingsFile = join(homedir(), ".claude", "settings.json");
 const settings = readJson(settingsFile);
 const command = `bash "${hookScript}" --user`;
 settings.hooks ??= {};
-const others = (settings.hooks.SessionStart ?? []).filter(
-  (group) => !(group.hooks ?? []).some((hook) => String(hook.command ?? "").includes(hookScript)),
-);
+const others = (settings.hooks.SessionStart ?? []).flatMap((group) => {
+  const hooks = (group.hooks ?? []).filter((hook) => !String(hook.command ?? "").includes(hookScript));
+  return hooks.length > 0 ? [{ ...group, hooks }] : [];
+});
 settings.hooks.SessionStart = [...others, { hooks: [{ type: "command", command, timeout: 900 }] }];
 writeJson(settingsFile, settings);
 

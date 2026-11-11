@@ -39,7 +39,12 @@ Logs go to `$TMPDIR/vc-agent-setup/`.
   that container gets Node 26 on `PATH`, `dockerd` and the server. Its
   exports also go to `/etc/profile.d/vc-agent-env.sh`, which the first line of
   `~/.bashrc` sources: Debian's `~/.bashrc` returns early outside an
-  interactive shell, so a line appended there misses scripts. The user
+  interactive shell, so a line appended there misses scripts. An agent's tool
+  shell reads no profile at all and finds the container's own Node first
+  (`/opt/node22/bin`), so `--claude-user` also points the `node`, `npm` and
+  `npx` in a `/opt/<name>/bin` folder on `PATH` at the `.nvmrc` Node, keeping
+  each original as `<name>.vc-agent-orig`. Claude Code itself is a native
+  binary and does not use them. The user
   hook steps aside when a session starts inside the checkout, where the
   repository's own hook runs. `setup.sh` takes a lock, so two hooks never
   race.

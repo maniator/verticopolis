@@ -89,6 +89,26 @@ if [ -n "$NODE_WANT" ] && [ -x "$NODE_DIR/bin/node" ]; then
   env_line "export PATH=\"$NODE_DIR/bin:\$PATH\""
 fi
 
+# A cloud container ships its own Node in /opt (Claude Code's: /opt/node22/bin),
+# early on the PATH of agent shells that read no profile file. In an
+# environment's setup script, point that copy's node, npm, npx and corepack at
+# the .nvmrc Node, keeping each original beside it as <name>.vc-agent-orig.
+if [ -n "$CLAUDE_USER" ] && [ -x "$NODE_DIR/bin/node" ]; then
+  for other in $(type -ap node); do
+    dir="$(dirname "$other")"
+    case "$dir" in "$NODE_DIR/bin" | /opt/*/*/* ) continue ;; /opt/*/bin) ;; *) continue ;; esac
+    [ -w "$dir" ] || continue
+    linked=""
+    for tool in node npm npx corepack; do
+      [ -e "$NODE_DIR/bin/$tool" ] || continue
+      [ "$(readlink "$dir/$tool" 2>/dev/null)" = "$NODE_DIR/bin/$tool" ] && continue
+      if [ -e "$dir/$tool" ] || [ -L "$dir/$tool" ]; then mv -f "$dir/$tool" "$dir/$tool.vc-agent-orig"; fi
+      ln -s "$NODE_DIR/bin/$tool" "$dir/$tool" && linked=1
+    done
+    if [ -n "$linked" ]; then say "$dir/node now runs Node.js ${NODE_WANT} (originals kept as *.vc-agent-orig)"; fi
+  done
+fi
+
 # --- npm dependencies -----------------------------------------------------------
 hashes=node_modules/.agent-setup.sha256
 if ! sha256sum --check --status "$hashes" 2>/dev/null; then
@@ -173,7 +193,9 @@ if [ -n "$CLAUDE_USER" ]; then
   # profile file from its first line instead.
   source_line="[ -f $PROFILE_FILE ] && . $PROFILE_FILE  # vc-agent-env"
   if [ -f "$PROFILE_FILE" ] && ! grep -qF "# vc-agent-env" "$HOME/.bashrc" 2>/dev/null; then
-    { echo "$source_line"; cat "$HOME/.bashrc" 2>/dev/null; } > "$HOME/.bashrc.vc-agent" && mv "$HOME/.bashrc.vc-agent" "$HOME/.bashrc"
+    # Rewritten in place, so a symlinked ~/.bashrc and its mode survive.
+    { echo "$source_line"; cat "$HOME/.bashrc" 2>/dev/null; } > "$LOG_DIR/bashrc.new" \
+      && cat "$LOG_DIR/bashrc.new" > "$HOME/.bashrc"
   fi
 fi
 
