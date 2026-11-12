@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { NOT_FOUND_LINKS, notFoundPageTemplate } from "./notFoundPage";
@@ -32,6 +32,21 @@ describe("notFoundPageTemplate", () => {
     const back = [...frag.querySelectorAll('[data-act="back-to-game"]')];
     expect(back.length).toBeGreaterThan(0);
     for (const a of back) expect(a.getAttribute("href")).toBe("/");
+    expect(frag.querySelector("#back-note")).toBeNull();
+  });
+
+  it("closes the tab on Back to game when the game opened it", () => {
+    const frag = renderToFragment(notFoundPageTemplate("/x", true));
+    expect(frag.querySelector("#back-note")).not.toBeNull();
+    const close = vi.spyOn(window, "close").mockImplementation(() => {});
+    try {
+      const click = new MouseEvent("click", { cancelable: true, bubbles: true });
+      frag.querySelector('a[data-act="back-to-game"]')!.dispatchEvent(click);
+      expect(click.defaultPrevented).toBe(true);
+      expect(close).toHaveBeenCalledTimes(1);
+    } finally {
+      close.mockRestore();
+    }
   });
 });
 

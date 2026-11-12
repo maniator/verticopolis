@@ -1,6 +1,7 @@
 import { html, render, type TemplateResult } from "lit-html";
 import { pageShell } from "./ui/templates/pageShell";
 import { injectVercelTelemetry } from "./telemetry";
+import { takeFromGameFlag } from "./ui/fromGame";
 
 /**
  * Entry for the site's "page not found" page, `404.html`. The host serves it,
@@ -18,9 +19,11 @@ export const NOT_FOUND_LINKS: readonly { href: string; label: string }[] = [
 ];
 
 /** The page body inside the retro page shell. `path` is the address that was
- *  not found, shown as plain text (lit escapes it). Pure, so the test renders
- *  it directly. */
-export function notFoundPageTemplate(path: string): TemplateResult {
+ *  not found, shown as plain text (lit escapes it). `fromGame` makes "Back to
+ *  game" close this tab, as on /help, when the game opened it (a sibling page
+ *  reached from a game-opened tab carries that in session storage). Pure, so
+ *  the test renders it directly. */
+export function notFoundPageTemplate(path: string, fromGame = false): TemplateResult {
   const body = html`
     <div class="page-lede">
       <h1>Page not found</h1>
@@ -39,6 +42,7 @@ export function notFoundPageTemplate(path: string): TemplateResult {
     backHref: "/",
     main: body,
     links: [...NOT_FOUND_LINKS],
+    fromGame,
   });
 }
 
@@ -47,7 +51,7 @@ function main(): void {
   const root = document.getElementById("app");
   if (!root) return;
   const fallback = [...root.childNodes];
-  render(notFoundPageTemplate(location.pathname), root);
+  render(notFoundPageTemplate(location.pathname, takeFromGameFlag(location, history)), root);
   for (const node of fallback) node.remove();
 }
 
