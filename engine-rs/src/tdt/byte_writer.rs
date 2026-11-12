@@ -68,6 +68,17 @@ impl ByteWriter {
         self.chunks[off + 1] = ((v >> 8) & 0xff) as u8;
     }
 
+    /// Back-patch one byte (masked to 8 bits) at an absolute offset already
+    /// written.
+    pub fn set_u8(&mut self, off: usize, v: i64) {
+        assert!(
+            off < self.chunks.len(),
+            "ByteWriter.set_u8 offset {off} is out of range for a {}-byte buffer; it only back-patches bytes already written",
+            self.chunks.len()
+        );
+        self.chunks[off] = (v & 0xff) as u8;
+    }
+
     pub fn len(&self) -> usize {
         self.chunks.len()
     }
@@ -103,5 +114,19 @@ mod tests {
         w.u16(0x12345);
         w.i32(-2);
         assert_eq!(w.to_bytes(), vec![0xf9, 0x45, 0x23, 0xfe, 0xff, 0xff, 0xff]);
+    }
+
+    #[test]
+    fn set_u8_patches_one_written_byte() {
+        let mut w = ByteWriter::new();
+        w.pad(3);
+        w.set_u8(1, 0x1ff);
+        assert_eq!(w.to_bytes(), vec![0, 0xff, 0]);
+    }
+
+    #[test]
+    #[should_panic(expected = "only back-patches bytes already written")]
+    fn set_u8_refuses_a_byte_not_yet_written() {
+        ByteWriter::new().set_u8(0, 1);
     }
 }

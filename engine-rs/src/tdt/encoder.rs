@@ -12,7 +12,9 @@ use super::format::*;
 use super::pacing::frame_for_minute_of_day;
 use super::stamp::write_format_stamp;
 use super::tables::elevator_type;
-use super::venues::{index_map, write_routing_tail, PlacedHalf};
+use super::venue_export::{
+    index_map, logical_ids, middle_bytes, write_people, write_venue_tail, PlacedHalf,
+};
 use super::LegacyExportError;
 use crate::facilities::{Kind, LOT_WIDTH, MAX_FLOOR, MIN_FLOOR};
 use crate::jsmath::round;
@@ -181,9 +183,10 @@ pub fn encode_tower(
                 .partial_cmp(&clamp_tile(Some(b.left)))
                 .unwrap_or(std::cmp::Ordering::Equal)
         });
-        for (slot, t) in ordered.into_iter().enumerate() {
-            if let Some(half) = t.venue {
-                venue_halves.push((half, index as usize, slot));
+        let ids = logical_ids(&ordered.iter().map(|t| t.type_id).collect::<Vec<_>>());
+        for (t, &id) in ordered.into_iter().zip(&ids) {
+            if let (Some(half), Some(id)) = (t.venue, id) {
+                venue_halves.push(PlacedHalf::new(half, index as usize, id, w.len()));
             }
             let left = clamp_tile(Some(t.left));
             w.u16(to_int32(left));
@@ -191,12 +194,12 @@ pub fn encode_tower(
             w.u8(t.type_id);
             w.u8(t.status);
             w.u8(t.subtype_idx.unwrap_or(0));
-            w.pad(8);
+            w.bytes(&middle_bytes(id));
             w.u8(t.draw);
             w.u8(t.rent_class);
             w.u8(0);
         }
-        w.bytes(&index_map(tenants.len()));
+        w.bytes(&index_map(&ids));
     }
 
     let finite_pop = if people_pop.is_finite() {
@@ -204,9 +207,8 @@ pub fn encode_tower(
     } else {
         0.0
     };
-    let people_count = js_max(0.0, js_min(finite_pop, TDT_MAX_CENSUS)) as i64;
-    w.i32(people_count);
-    w.pad(people_count as usize * TDT_PERSON_RECORD_SIZE);
+    let census = js_max(0.0, js_min(finite_pop, TDT_MAX_CENSUS)) as usize;
+    write_people(&mut w, census, &venue_halves);
 
     for slot in 0..TDT_RETAIL_SLOTS {
         match retail_rows.get(slot) {
@@ -473,7 +475,7 @@ pub fn encode_tower(
         w.u16(0);
     }
 
-    w.bytes(&write_routing_tail(&venue_halves));
+    write_venue_tail(&mut w, &venue_halves);
     write_format_stamp(&mut w);
 
     let express_len = elevators
