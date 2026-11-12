@@ -23,7 +23,7 @@ type Candidate = (i64, i64, i64, i64, i64);
 /// load builds a fresh `Housekeeping`.
 struct CrewOrders {
     revision: i64,
-    modern: bool,
+    nearest_crew_first: bool,
     crews: Vec<Crew>,
     /// `comps[i]` is the staff component of `crews[i]`'s floor.
     comps: Vec<Option<i64>>,
@@ -31,19 +31,21 @@ struct CrewOrders {
 }
 
 impl CrewOrders {
-    fn new(tower: &Tower, modern: bool, crews: Vec<Crew>) -> Self {
+    fn new(tower: &Tower, nearest_crew_first: bool, crews: Vec<Crew>) -> Self {
         let comps = crews.iter().map(|c| tower.staff_component(c.1)).collect();
         CrewOrders {
             revision: tower.revision,
-            modern,
+            nearest_crew_first,
             crews,
             comps,
             by_floor: FastMap::default(),
         }
     }
 
-    fn holds(&self, tower: &Tower, modern: bool, crews: &[Crew]) -> bool {
-        self.revision == tower.revision && self.modern == modern && self.crews == crews
+    fn holds(&self, tower: &Tower, nearest_crew_first: bool, crews: &[Crew]) -> bool {
+        self.revision == tower.revision
+            && self.nearest_crew_first == nearest_crew_first
+            && self.crews == crews
     }
 
     /// The crews that can reach `floor` by staff transport, in the order
@@ -57,7 +59,8 @@ impl CrewOrders {
     /// used to clone the crews for every dirty room and, in Modern, sort them.
     fn for_floor(&mut self, tower: &Tower, floor: i64) -> &[Crew] {
         debug_assert_eq!(self.revision, tower.revision, "orders kept past an edit");
-        let (crews, comps, modern) = (&self.crews, &self.comps, self.modern);
+        let (crews, comps, nearest_crew_first) =
+            (&self.crews, &self.comps, self.nearest_crew_first);
         self.by_floor.get_or_insert_with(floor, || {
             let here = tower.staff_component(floor);
             let mut order: Vec<Crew> = crews
@@ -66,7 +69,7 @@ impl CrewOrders {
                 .filter(|&(c, cc)| c.1 == floor || (cc.is_some() && *cc == here))
                 .map(|(c, _)| *c)
                 .collect();
-            if modern {
+            if nearest_crew_first {
                 order.sort_by(|c1, c2| {
                     ((c1.1 - floor).abs())
                         .cmp(&(c2.1 - floor).abs())
@@ -233,7 +236,7 @@ impl Simulation {
             }
         }
         if !floors.is_empty() {
-            let fix = if self.mode.is_modern() {
+            let fix = if self.mode.infestation_recovery().is_some() {
                 "Call an exterminator, or bulldoze and rebuild."
             } else {
                 "Bulldoze and rebuild to clear them."
@@ -306,14 +309,14 @@ impl Simulation {
         if crews.is_empty() || candidates.is_empty() {
             return;
         }
-        let modern = self.mode.is_modern();
+        let nearest_crew_first = self.mode.housekeeping_sends_nearest_crew();
         // Taken out for the pass and put back after the room loop, which has
         // no early return.
         let mut orders = match self.housekeeping.crew_orders.take() {
-            Some(o) if o.holds(&self.tower, modern, &crews) => o,
-            _ => CrewOrders::new(&self.tower, modern, crews),
+            Some(o) if o.holds(&self.tower, nearest_crew_first, &crews) => o,
+            _ => CrewOrders::new(&self.tower, nearest_crew_first, crews),
         };
-        if modern {
+        if nearest_crew_first {
             // The nearest staff-connected crew heads its floor's order.
             let mut scored: Vec<(Option<f64>, Candidate)> = candidates
                 .into_iter()

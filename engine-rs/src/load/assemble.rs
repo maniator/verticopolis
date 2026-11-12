@@ -13,10 +13,12 @@ pub(crate) fn assemble(
     mut unit_ids: Vec<Option<i64>>,
     raw: &Value,
 ) -> Simulation {
-    let mode = match data.get("mode").and_then(Value::as_str) {
-        Some("modern") => GameMode::Modern,
-        _ => GameMode::Classic,
-    };
+    // An unknown or missing mode name loads as Classic.
+    let mode = data
+        .get("mode")
+        .and_then(Value::as_str)
+        .and_then(GameMode::parse)
+        .unwrap_or(GameMode::Classic);
     let calendar = match data.get("modernCalendar").and_then(Value::as_str) {
         Some("canon") => CalendarKind::Canon,
         _ => CalendarKind::RealWorld,
@@ -77,7 +79,8 @@ pub(crate) fn assemble(
     })
     .min(sim.clock.day());
     sim.treasures_found = num(data.get("treasuresFound"), 0.0).max(0.0);
-    sim.extermination_due_day = if modern {
+    // A pending exterminator visit exists only where the mode has one.
+    sim.extermination_due_day = if mode.infestation_recovery().is_some() {
         finite_num(data.get("exterminationDueDay")).map(|d| {
             let day = sim.clock.day() as f64;
             d.floor().max(day).min(day + 1.0)
@@ -248,7 +251,7 @@ pub(crate) fn assemble(
                     .unwrap_or(0.0)
                     .clamp(-MAX_SAFE_INTEGER, MAX_SAFE_INTEGER) as i64,
                 skip_floors,
-                preserve_basement_stops: mode == GameMode::Classic
+                preserve_basement_stops: mode.keeps_preserved_basement_stops()
                     && kind == Kind::ElevatorExpress
                     && bottom < 0
                     && t.get("preserveBasementStops").and_then(Value::as_bool) == Some(true),

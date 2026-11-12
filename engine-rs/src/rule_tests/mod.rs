@@ -48,6 +48,7 @@ mod legibility_move_ins;
 mod loader_cases;
 mod lobby_distance;
 mod meal_cadence;
+mod mode_rules;
 mod modern_economy;
 mod move_in_gate_legibility;
 mod move_in_gate_rentals;

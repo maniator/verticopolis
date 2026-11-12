@@ -113,6 +113,47 @@ impl GameMode {
         self == GameMode::Modern
     }
 
+    /// Whether the top floor is kept for the wedding hall: in Classic only
+    /// the wedding hall (the 1994 cathedral) may reach floor 100, so any
+    /// other room that would touch it is refused. Modern builds there freely.
+    pub fn reserves_top_floor_for_wedding_hall(self) -> bool {
+        self == GameMode::Classic
+    }
+
+    /// Whether a new game lets the player pick its calendar: Modern offers
+    /// the real-world calendar and the canon one; Classic always runs canon
+    /// (see `clock::resolve_calendar`).
+    pub fn lets_player_choose_calendar(self) -> bool {
+        self == GameMode::Modern
+    }
+
+    /// Whether an escalator may serve office floors. Modern allows it;
+    /// Classic refuses an escalator that would reach an office floor.
+    pub fn escalators_on_office_floors(self) -> bool {
+        self == GameMode::Modern
+    }
+
+    /// Whether an express elevator keeps the below-lobby stops a loaded
+    /// tower asked it to keep (`preserveBasementStops`, set by a PC TDT
+    /// import). Classic honors it; Modern ignores the flag.
+    pub fn keeps_preserved_basement_stops(self) -> bool {
+        self == GameMode::Classic
+    }
+
+    /// Whether housekeeping sends the nearest staff-connected crew to a room:
+    /// Modern orders each floor's crews by distance and scores rooms by it;
+    /// Classic tries the crews in tower order.
+    pub fn housekeeping_sends_nearest_crew(self) -> bool {
+        self == GameMode::Modern
+    }
+
+    /// Whether the shop inspector turns the local demand share into advice
+    /// (under-served or over-built). Modern does; Classic shows the figures
+    /// and leaves the reading to the player.
+    pub fn advises_on_retail_demand(self) -> bool {
+        self == GameMode::Modern
+    }
+
     /// `operatingOverheadPerUnit()`: Classic charges none.
     pub fn operating_overhead_per_unit(self) -> f64 {
         match self {

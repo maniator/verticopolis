@@ -105,7 +105,7 @@ fn retail_tier(yesterday: Option<f64>, baseline: f64) -> RetailTier {
 }
 
 fn retail_advice(mode: GameMode, share: f64) -> RetailAdvice {
-    if mode != GameMode::Modern {
+    if !mode.advises_on_retail_demand() {
         RetailAdvice::None
     } else if share >= 1.0 {
         RetailAdvice::UnderServed

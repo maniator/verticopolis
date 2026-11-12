@@ -314,7 +314,7 @@ impl Tower {
             let mut skip: Vec<f64> = self.transports[i].skip_floors.clone().unwrap_or_default();
             // Never infer PC TDT provenance from skip-list signs. An authentic
             // file can skip none, some, or all underground floors.
-            let keep_basement_stops = matches!(self.mode, GameMode::Classic)
+            let keep_basement_stops = self.mode.keeps_preserved_basement_stops()
                 && bottom < 0
                 && self.transports[i].preserve_basement_stops;
             for fl in bottom + 1..top {
