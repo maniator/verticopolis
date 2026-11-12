@@ -15,6 +15,22 @@ raised the version, so they are documentation only.
 There is no entry for 0.17.0, which only
 existed as a step inside a stacked branch.
 
+## 1.25.0 (2026-11-11)
+
+- `remove_facility` on a sold condo charges the household's buy-back price (`household_price` of its sale price) before the resale refund, refuses when the money cannot cover it, and logs the buy-back; unsold and gutted condos are unchanged.
+- New `economy::visitors` module: each venue's expected visitors are set at the daily rollover from yesterday's served count and a climb of 1 to 3 steps of 5, rolled from the tower's founding seed, the day and the room, so the main RNG stream is untouched. `census_count` for shops, fast food and restaurants returns `Unit::visitors_yest` (saved as `visitorsYest`), the star census no longer subtracts hotel guests from them, and a gutted venue clears it. The conformance lock moves on every scenario.
+- The TDT importer reads each floor's remap and each retail row's byte 8 to seed `visitorsYest`; `TdtTower` gains `TdtFloor::index_map` and `TdtTail::retail`.
+- `economy::visitors` gains the set audience: `set_audience`, `counts_set_audience` and `census_follows_the_day`. `census_count` for party halls and cinemas returns `Unit::visitors_yest`, which the daily rollover sets to the audience on a room's first night open (a cinema keeps the count it has), and the save loader keeps it for those kinds. The conformance lock moves.
+- `TdtTenant` gains `draw` (byte 15, a theatre's film draw). The TDT importer seeds party halls and theatres from it when a class adds up to the finance line, or with an even share when the line splits into a valid audience.
+- `economy::visitors` gains `film_draw` and the aging constants. `Extras` gains `film_days` (saved as `filmDays`, cinemas only); the daily rollover counts a cinema at the draw of its film's age and then ages the film. A gutted cinema starts a new film. The conformance lock moves; the ransom-declined-classic scenario's threat now comes at hour 352.
+- `tdt::venues` reads and writes the original's party hall and theatre table (`read_venue_table`, `write_routing_tail`), and `TdtTail` gains `venues`. The importer seeds each theatre's `filmDays` from it. The exporter writes byte 15 (the film's draw), the table, and an index map from logical unit id to tenant; every TDT export hash moves.
+- `Simulation::change_film(id, classic)` and the port command `changeFilm(id, classic)` (a `cost` slot; refusals `unavailable`, `notTheater`, `closed` and `funds`) change a Classic theatre's film. `GameMode::film_changes` gives the prices, and the catalog adds `newFilmPrice` and `classicFilmPrice` (null in Modern); `CATALOG_VERSION` is 8.
+- `Extras` gains `film_classic` (saved as `filmClassic`, cinemas only), and `visitors::showing_draw` holds a classic's draw to 1. Classic's `pay_maintenance` books no films, and its blockbusters are the theatres whose film draws a full house, set at the morning rollover, on a change and when a theater opens. Modern's booking resets the film after the day's rollover has counted the spent one (`pay_maintenance` now answers the booked theatres, and `start_booked_films` opens their films). The conformance lock moves.
+- `unitCard` adds the `filmDays` and `filmClassic` slots, and the frame layout's `VIEW_LAYOUT_VERSION` is 14.
+- The TDT importer reads a film number below 6 as a classic and the exporter writes film 3 for one (`venues::is_classic_film`, `TdtVenue::shows_classic`).
+- Modern: the unmet-demand coverage adds the daily income capacity of reachable attendance venues to the retail capacity; the income share still reads retail only, and Classic is unchanged (#705).
+- The binding gains tooling members for the screenshot and test harnesses: bare placements (`placeBare`, `placeTransportBare`) and reads of a unit, a shaft, a tile, a floor's lobby and service, and the highest floor. No game command reaches them.
+
 ## 1.24.0 (2026-11-11)
 
 - A declined ransom starts a timed bomb search in both modes (a hidden bomb, guards sweeping floors from the emergency stairs, a deadline) that the save keeps as `events.bomb` while it runs; Classic still calls only on a tower with Security.

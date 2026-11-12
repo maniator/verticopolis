@@ -23,6 +23,12 @@ prompt already tells players it is an engine update and shows the new version.
 Entries below 1.51.1 were curated from the commit history after the fact, so they
 are documentation only: no build that a client fetches carries them.
 
+## 3.1.0
+
+- In Classic, a movie theater's film now ages and draws a smaller audience over time, and its card lets you show a new film ($300,000) or a cheaper classic ($150,000), as in the original game.
+- Shops, restaurants, party halls and movie theaters now count toward the tower's population the way the original game does, and an imported SimTower tower keeps those counts.
+- An installed copy now updates even when an antivirus web shield changes the page on its way in, and the update prompt appears even when the new version could not get ready in the background.
+
 ## 3.0.1
 
 - Refusing the bomb ransom now starts a race: Security searches floor by floor before the 1:00 PM deadline, with a countdown, a ticking clock and a red glow. If they miss it, the bomb goes off.
