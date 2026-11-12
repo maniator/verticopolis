@@ -212,18 +212,23 @@ const nearCapacity = (card: Card): boolean => card.slots[CARD_NEAR_CAPACITY] ===
  *  rejoined the run when the reference was retired. A standard elevator near
  *  capacity left when venues began counting yesterday's visitors (#1500):
  *  the slower star pace thins the corpus's crowds below the cutoff, and
- *  `cardVerdicts.integration.test.ts` still pins the flag on both sides of it. */
+ *  `cardVerdicts.integration.test.ts` still pins the flag on both sides of it.
+ *  When riders began boarding only a car stopped at their floor (#2051) the
+ *  corpus moved twice more: an express elevator near capacity left, and an
+ *  inert parking floor arrived, with the Classic ransom scenario now running
+ *  544 hours to its threat instead of 352. The flag stays pinned on both
+ *  sides by `cardVerdicts.integration.test.ts`. */
 const CORPUS_SECTIONS: readonly string[] = [
   "commercial:lobbyFar:false", "commercial:lobbyFar:true",
   "hotel:counts:dirty", "hotel:counts:infested", "hotel:counts:other", "hotel:excluded:dirty", "hotel:excluded:other",
   "housekeeping:adequate", "housekeeping:nominalShortfall", "housekeeping:observedShortfall",
   "inert:amusements", "inert:boutiqueBay", "inert:daycare", "inert:fastFood", "inert:foodHall", "inert:housekeeping",
-  "inert:nightclub", "inert:skyBar", "inert:spa",
+  "inert:nightclub", "inert:parking", "inert:skyBar", "inert:spa",
   "parking:connected", "parking:connected:short", "parking:disconnected", "parking:ramp", "parking:ramp:short",
   "recycling:met:filling",
   "retail:advice:none", "retail:advice:overBuilt", "retail:advice:underServed", "retail:rain",
   "retail:tier:average", "retail:tier:booming", "retail:tier:low", "retail:tier:noData",
-  "shaft:idle:elevatorStandard", "shaft:load:elevatorExpress", "shaft:load:elevatorStandard", "shaft:nearCapacity:elevatorExpress",
+  "shaft:idle:elevatorStandard", "shaft:load:elevatorExpress", "shaft:load:elevatorStandard",
   "shaft:noReading:elevatorExpress", "shaft:noReading:elevatorService", "shaft:noReading:elevatorStandard",
   "shaft:noReading:escalator", "shaft:noReading:stairs",
 ];
