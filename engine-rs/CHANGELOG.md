@@ -15,6 +15,18 @@ raised the version, so they are documentation only.
 There is no entry for 0.17.0, which only
 existed as a step inside a stacked branch.
 
+## 1.27.0 (2026-11-12)
+
+- The Modern halo table gains the aquatic center (6 floors, +0.035) and the party hall (3 floors, +0.02), both felt by homes and hotel rooms at every hour, with `AQUATIC_HALO_FLOORS`, `AQUATIC_HALO_MAX`, `PARTY_HALL_HALO_FLOORS` and `PARTY_HALL_HALO_MAX`. A two-story venue's halo counts from its nearer story (`Halo::distance`), and the hourly satisfaction step now reads the table row by row (`Halo::is_felt_at`), so `SatisfactionContext` holds `halo_floors` and `hour` in place of one floor list per venue. The catalog digests move.
+- A bomb blast guts, on each floor within `BLAST_FLOORS` of the bomb, only the runs of floor tiles that overlap the run holding the bomb, so a tower standing apart on the same lot is spared.
+- The bomb search sweeps stretches of floor (one run of floor tiles each, `events::stairs`) and routes guards over the emergency stairs between overlapping stretches. A guard's save entry adds `x`, `route` (the corners of its walk on the stairs, as floor and stairs tile) and `arrive`, the bomb adds `swept`, and `bombSearch()` adds `route` to each sweeping guard. Older saves load with whole-floor sweeps.
+- A thief lands on a stretch of floor (one draw over each floor's stretches, the same draw as before when a tower fills its floors) and is caught only when a Security office reaches it by the stairs. `VIEW_LAYOUT_VERSION` is 22: the frame header appends `thiefFxX`, a tile of his stretch.
+- The conformance lock moves: the three ransom scenarios change their state hash only, because the bomb search saves the new keys. Every other hash stays.
+- Classic adds a third pooled cap, `venues` (party halls and theaters, 16), checked by `Tower::cap_reason` and the undo cap check through `facilities::pools_for(mode)`; Modern keeps 16 of each.
+- The catalog's `pools` and each facility's `pool` follow the mode, and `CATALOG_VERSION` is 15.
+- The `.TDT` exporter numbers each floor's units the way the original does (plain floor tiles get no logical id: `FF` in byte 12 and no index map entry), and each party hall or theater record names its venue table row in byte 6 (`tdt::venue_export`). Every export case hash in `conformance/tdt-cases.json` moves; imports are unchanged.
+- Each party hall half now writes its 40 people into the people block, with its tenant record's bytes 8 and 9 naming the first (`tdt::venue_export::write_people`); without them the original crashed on load.
+
 ## 1.26.0 (2026-11-12)
 
 - `satisfaction_step` reads congestion as the larger of the aggregate estimate and the floor's real commute wait over the mode's limit (`GameMode::commute_wait_congestion`, `CLASSIC_WAIT_LIMIT` = `GIVE_UP`, `MODERN_WAIT_LIMIT` = 1.5 x `GIVE_UP`). A trip that starts in a lobby or off a Metro train (`Person::from_metro`, set only by a Metro arrival) counts on the tenant floor it serves. The conformance lock, frame-day and port-edit goldens move.
