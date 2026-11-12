@@ -1,0 +1,78 @@
+name: Issue form
+
+# An issue body follows the issue form its type label calls for
+# (.github/ISSUE_TEMPLATE/). GitHub applies a form only on its "New issue"
+# page; an issue filed through the API gets exactly the body it sends, which is
+# how agent-filed issues drifted off the forms. The rules are in
+# src/build/issueForms.ts (with its tests); scripts/issue-form-check.ts picks
+# the form from the labels. An issue that does not follow its form gets the
+# needs-form label, and loses it once the body or labels are fixed. An issue
+# with no type label is left alone, and so is one filed before FORMS_SINCE:
+# the older issues were never written from a form, and relabeling them all
+# whenever a label changes would only bury the new ones.
+#
+# Issue events run this file from the default branch, with no code from the
+# issue. The body and labels are read as data through environment variables,
+# never interpolated into the script.
+on:
+  issues:
+    types: [opened, edited, reopened, labeled, unlabeled]
+
+concurrency:
+  group: issue-form-${{ github.event.issue.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  form:
+    name: Issue form
+    # Its own label change would only re-run the same check.
+    if: ${{ github.event.issue.state == 'open' && github.event.label.name != 'needs-form' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      ISSUE: ${{ github.event.issue.number }}
+      ISSUE_BODY: ${{ github.event.issue.body }}
+      LABELS: ${{ join(github.event.issue.labels.*.name, ',') }}
+      CREATED: ${{ github.event.issue.created_at }}
+      FORMS_SINCE: "2026-11-12T05:00:00Z"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: ".nvmrc"
+
+      - name: Check the body against its form and label the issue
+        run: |
+          set -uo pipefail
+          # ISO 8601 UTC times sort as strings.
+          if [[ "$CREATED" < "$FORMS_SINCE" ]]; then
+            echo "Issue #$ISSUE was filed before $FORMS_SINCE; not checked."
+            exit 0
+          fi
+          node scripts/issue-form-check.ts --labels "$LABELS"
+          status=$?
+          set -e
+          case "$status" in
+            0)
+              if printf '%s\n' "$LABELS" | tr ',' '\n' | grep -qx needs-form; then
+                gh issue edit "$ISSUE" --remove-label needs-form
+              fi
+              ;;
+            1)
+              gh label create needs-form --color e4e669 \
+                --description "The body does not follow its issue form (set by issue-form.yml)" 2>/dev/null || true
+              gh issue edit "$ISSUE" --add-label needs-form
+              ;;
+            3) ;;
+            *) exit "$status" ;;
+          esac

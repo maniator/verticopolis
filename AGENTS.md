@@ -238,6 +238,44 @@ The `PR template` workflow (`.github/workflows/pr-template.yml`) runs the same
 check on every PR and again when its description is edited. Release PRs,
 Dependabot and other bots are skipped.
 
+## Filing issues
+
+An issue an agent files follows the issue form for its type, in
+[`.github/ISSUE_TEMPLATE/`](./.github/ISSUE_TEMPLATE/). GitHub applies a form
+only on its "New issue" page. An issue filed through the GitHub MCP
+`issue_write` tool, the REST API or `gh issue create --body` gets exactly the
+body it sends, so write it from the form:
+
+- Pick the form from the issue's type label: `parity_report.yml` for a
+  `parity` issue, `bug_report.yml` for `bug`, `documentation.yml` for
+  `documentation`, `feature_request.yml` for `enhancement`, and `task.yml` for
+  internal work (`task`, `chore`, `tests`, `build`, `tooling`, `perf`,
+  `review-deferral`). A parity bug follows the parity form.
+- Write one `### <label>` section per field, in the form's order, using each
+  field's `label` exactly, the way GitHub renders a submitted form. Answer
+  every required field; write `_No response_` under an optional one you leave
+  empty, and pick a dropdown answer from its options. Tick each required
+  checkbox as `- [x] <option text>` once it is true (search for a duplicate
+  before you tick that one).
+- Fields written for players still get an honest answer. A bug found in the
+  engine's tests has no browser, so write `n/a: found in <test or tool>`
+  rather than inventing one. Put code detail (files, functions, the backlog
+  story id) in the fields; the forms' intro text stays in plain language for
+  players. A parity issue names where the canon value lives, such as
+  `engine-rs/src/facilities.rs` (build caps), `engine-rs/src/econ.rs`
+  (economy) or `engine-rs/src/rules.rs` (mode rules), and whether `PARITY.md`
+  lists it.
+- Apply the form's own labels except `needs-triage` when a backlog row gives
+  the priority (the P label replaces it), plus the area labels. Use a plain
+  title with no `[Bug]:` style prefix.
+- Check the body before filing: save it to a file and run
+  `npm run issue:check -- --form <form file name without .yml> --body-file <file>`.
+
+The `Issue form` workflow (`.github/workflows/issue-form.yml`) runs the same
+check whenever an issue filed since 2026-11-12 is opened, edited or
+relabeled, and adds the `needs-form` label to one that does not follow its
+form (and removes it once the issue is fixed).
+
 ## Review guidelines
 
 For any reviewer that reads this file, Codex included: on a diff that touches a
