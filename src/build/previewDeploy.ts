@@ -17,10 +17,11 @@
  *   - The preview's `sw.js` is replaced by {@link RETIRING_SERVICE_WORKER}
  *     (scripts/preview-service-worker.ts, run by scripts/vercel-build.sh). A
  *     tab still controlled by an old worker runs the old page code, which
- *     knows nothing of the rule above, but the browser re-fetches `sw.js` on
- *     each navigation (vercel.json serves it with no caching), installs this
- *     one, and this one unregisters itself and reloads the tab from the
- *     network.
+ *     knows nothing of the rule above. Its next update check fetches this
+ *     `sw.js` (vercel.json serves it with no caching): the old page's own
+ *     check 15 seconds after load, on focus or hourly (src/pwa.ts), or the
+ *     browser's after a navigation. The browser installs this worker, which
+ *     unregisters itself and reloads the tab from the network.
  *
  * The production `sw.js` is still generated and checked by `npm run build`
  * first, so a preview proves the precache guards the same as any build.
