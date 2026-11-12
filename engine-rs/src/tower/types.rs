@@ -336,6 +336,35 @@ impl Transport {
         Value::Object(m)
     }
 
+    /// Every floor from `bottom` to `top` the shaft stops at, lowest first:
+    /// the floors [`Transport::stops_at`] answers true for. It marks the
+    /// skipped floors once and then walks the span, so a shaft with `s`
+    /// skips over a span of `n` floors costs `n + s` rather than the `n * s`
+    /// of asking `stops_at` floor by floor. A skip that is not a whole
+    /// floor inside the span matches nothing, as in `stops_at`.
+    pub(crate) fn stop_floors(&self) -> Vec<i64> {
+        if self.top < self.bottom {
+            return Vec::new();
+        }
+        let skips = self.skip_floors.as_deref().unwrap_or(&[]);
+        if skips.is_empty() {
+            return (self.bottom..=self.top).collect();
+        }
+        let span = (self.top - self.bottom + 1) as usize;
+        let mut skipped = vec![false; span];
+        for &s in skips {
+            let whole_floor_in_span =
+                s.fract() == 0.0 && s >= self.bottom as f64 && s <= self.top as f64;
+            if whole_floor_in_span {
+                skipped[(s as i64 - self.bottom) as usize] = true;
+            }
+        }
+        (self.bottom..=self.top)
+            .zip(skipped)
+            .filter_map(|(fl, skip)| (!skip).then_some(fl))
+            .collect()
+    }
+
     pub fn stops_at(&self, fl: i64) -> bool {
         fl >= self.bottom
             && fl <= self.top

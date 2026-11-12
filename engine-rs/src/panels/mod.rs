@@ -36,3 +36,5 @@ mod tests_gates;
 mod tests_overlays;
 #[cfg(test)]
 mod tests_room_tiers;
+#[cfg(test)]
+mod tests_stop_flags;
