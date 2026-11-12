@@ -158,3 +158,10 @@ export function noticeCopy(f: {
     `Fix the cause and get satisfaction to ${Math.round(f.keepAt * 100)}% to keep them (now ${Math.round(f.satisfaction * 100)}%).`,
   ];
 }
+
+/** The amenity line (#1980): `name` is the venue whose halo lifts this room
+ *  most (the catalog's name), `lift` how far it raises the ceiling a capped
+ *  room is held to, from 0 to 1. */
+export function amenityCopy(name: string, lift: number): string {
+  return `Helped by a nearby ${name.toLowerCase()}: when noise, a far lobby or too few shops hold this room back, it can still be up to ${Math.round(lift * 100)}% happier.`;
+}

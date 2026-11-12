@@ -5,6 +5,7 @@ import type { VacateReason } from "../shared/types";
 import {
   FAR_WALK_COPY,
   accessCopy,
+  amenityCopy,
   gripeCopy,
   lobbyWarningCopy,
   noRateCopy,
@@ -21,6 +22,7 @@ import {
  */
 interface Layout {
   records: { unitFacts: string[] };
+  kinds: string[];
   accessLines: string[];
   noRateLines: string[];
   bindings: string[];
@@ -70,12 +72,17 @@ export function joinParts(parts: PortUnitParts, between?: () => readonly Templat
 /** The catalog rules the card's copy follows, read when a card renders. */
 export type DiagnosticRules = () => Pick<CatalogRules, "quotesLobbyDistance">;
 
+/** A facility's display name by kind key (the catalog's `name`), or
+ *  undefined for a kind the catalog does not list. */
+export type FacilityName = (kind: string) => string | undefined;
+
 export function createPortUnitDiagnostics(
   port: Pick<EnginePort, "viewLayout" | "unitFacts">,
   rules: DiagnosticRules,
   supplemental?: (id: number) => SupplementalLines,
+  facilityName?: FacilityName,
 ): PortUnitLines {
-  const parts = createPortUnitParts(port, rules, supplemental);
+  const parts = createPortUnitParts(port, rules, supplemental, facilityName);
   return (id, beforeComplaints) => joinParts(parts(id), beforeComplaints);
 }
 
@@ -83,6 +90,7 @@ export function createPortUnitParts(
   port: Pick<EnginePort, "viewLayout" | "unitFacts">,
   rules: DiagnosticRules,
   supplemental?: (id: number) => SupplementalLines,
+  facilityName?: FacilityName,
 ): (id: number) => PortUnitParts {
   const layout = JSON.parse(port.viewLayout()) as Layout;
   const slots = new Map(layout.records.unitFacts.map((name, i) => [name, i]));
@@ -158,6 +166,11 @@ export function createPortUnitParts(
         lines.forEach((copy, index) => out.push(line(copy, index === 0 ? bad : undefined)));
       }
     }
+    // The amenity helping the room (#1980), named as the catalog names it.
+    const amenity = named(layout.kinds, at(r, "amenity"));
+    const lift = at(r, "amenityLift");
+    if (amenity && lift > 0) out.push(line(amenityCopy(facilityName?.(amenity) ?? "amenity", lift), good));
+
     // The business block closes the card, below any notice.
     if (extra) out.push(...extra.trailing);
     return { head, tail, lines: [...head, ...tail] };

@@ -1,5 +1,5 @@
 import type { TemplateResult } from "lit-html";
-import type { Catalog } from "../catalog/catalogTypes";
+import { findCatalogFacility, type Catalog } from "../catalog/catalogTypes";
 import type { ElevatorSchedule } from "../shared/engineTypes";
 import type { BatchRentOptions, BatchRentResult, BatchTarget } from "../shared/engineTypes";
 import type { FacilityKind, UnitState } from "../shared/types";
@@ -63,10 +63,15 @@ export function createCardKit(app: { readonly enginePort: EnginePort; readonly r
   const port = app.enginePort;
   const codes = new PortCodes(port);
   const cards = new Cards(app.enginePort, app.reader);
-  const tenantParts = createPortUnitParts(port, () => catalogOf(app).rules, (id) => {
-    const facts = port.serviceDiagnostics(id);
-    return facts ? portServiceSections(facts) : NO_SERVICE_LINES;
-  });
+  const tenantParts = createPortUnitParts(
+    port,
+    () => catalogOf(app).rules,
+    (id) => {
+      const facts = port.serviceDiagnostics(id);
+      return facts ? portServiceSections(facts) : NO_SERVICE_LINES;
+    },
+    (kind) => findCatalogFacility(catalogOf(app), kind as FacilityKind)?.name,
+  );
   // The editor's 160ms UI refresh must not run the Rust engine's full
   // congestion attribution each time. This keeps only the last unit's
   // engine-authored explanation. Its key follows the same per-hour and

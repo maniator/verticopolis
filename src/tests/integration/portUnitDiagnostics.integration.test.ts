@@ -36,4 +36,21 @@ describe.skipIf(!hasWasmPackage())("the unit diagnostics adapter on the Rust eng
     expect(gripes.length, "a real Rust save must reach a player-visible Main gripe").toBeGreaterThan(0);
     for (const text of gripes) expect(text).toMatch(/Main gripe: (a noisy|a nightclub|crowded|overcrowded|the rent|too few|shops)/);
   });
+
+  it("names the amenity helping a room on a real saved tower, by the catalog's name (#1980)", () => {
+    const rust = wasm().Engine.newGame(1, "modern") as unknown as RustEngine;
+    freed.push(rust);
+    const saved = readFileSync(resolve(FIXTURES, "split-tower-4.vctower"), "utf8");
+    expect(rust.loadVctower(saved)[0]).toBe(1);
+    const catalog = JSON.parse(wasm().catalog!("modern")) as { facilities: { key: string; name: string; halo: unknown }[] };
+    const names = new Map(catalog.facilities.map((f) => [f.key, f.name]));
+    const diagnostic = createPortUnitDiagnostics(rust, () => readCatalog(wasm(), "modern").rules, undefined, (kind) => names.get(kind));
+    const ids = (JSON.parse(rust.serialize()) as { units: { id: number }[] }).units.map((u) => u.id);
+    const helped = ids
+      .flatMap((id) => diagnostic(id).map((line) => line.strings.map((part, i) => part + (i < line.values.length ? String(line.values[i]) : "")).join("")))
+      .filter((text) => text.includes("Helped by a nearby"));
+    const lifts = catalog.facilities.filter((f) => (f.halo as { effect?: string } | null)?.effect === "lift").map((f) => f.name.toLowerCase());
+    expect(helped.length, "split-tower-4's homes and hotels sit near its amenities").toBeGreaterThan(0);
+    for (const text of helped) expect(lifts.some((name) => text.includes(`Helped by a nearby ${name}:`)), text).toBe(true);
+  });
 });
