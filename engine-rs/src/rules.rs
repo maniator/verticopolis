@@ -9,6 +9,7 @@ mod amenities;
 mod commute;
 mod construction;
 mod economy;
+mod elevators;
 mod films;
 mod halos;
 mod households;

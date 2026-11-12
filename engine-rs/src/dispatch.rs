@@ -11,6 +11,10 @@ use crate::schedule::Schedule;
 use crate::tower::Tower;
 use demand::{fill_cab_stops, has_bit, set_bit, Demand};
 
+#[path = "dispatch_classic.rs"]
+mod classic;
+use classic::{moving_car_covers, Boarding};
+
 pub const CAR_FLOORS_PER_MINUTE: f64 = 0.8;
 const DWELL_MINUTES: f64 = 0.8;
 /// How close, in floors, a car counts as standing at a stop: the stop
@@ -173,6 +177,8 @@ impl ElevatorDispatch {
     ) {
         let floors = tower.dispatch_floors();
         let n = tower.transports.len();
+        let watch_moving = tower.mode.waiting_car_response_watches_moving_cars();
+        let restart_departure = tower.mode.departure_wait_restarts_on_arrival();
         self.closed_cars.clear();
         self.open_cars.clear();
         for ti in 0..n {
@@ -271,6 +277,23 @@ impl ElevatorDispatch {
                     continue;
                 }
                 let mut car_dt = dt;
+                if dwell[i] > 0.0 && restart_departure && !stood_down {
+                    // Standard Floor Departure (Classic): whoever arrives
+                    // while the car waits boards and starts the wait over.
+                    let fl = jsmath::round(t.car_positions[i]) as i64;
+                    if let Some(k) = stop_index(fl) {
+                        let mut b = Boarding {
+                            waiting: &mut self.waiting,
+                            tally: &mut self.board_tally,
+                        };
+                        let (room, live) = (cap - car_load[i], has_bit(call_bits, k));
+                        let got = b.arrivals(id, fl, hall_at(fl), room, staff_only, live);
+                        if got > 0.0 {
+                            car_load[i] += got;
+                            dwell[i] = shaft_dwell;
+                        }
+                    }
+                }
                 if dwell[i] > 0.0 {
                     let pause = dwell[i].min(car_dt);
                     dwell[i] -= pause;
@@ -294,8 +317,17 @@ impl ElevatorDispatch {
                     .filter(|c| !c.is_empty())
                     .map(|c| fill_cab_stops(&stops, c, &mut self.cab_stops));
                 let reach = match response {
-                    Some(r) if was_parked => (span - r).max(0.0),
+                    Some(r) if was_parked && !watch_moving => (span - r).max(0.0),
                     _ => f64::INFINITY,
+                };
+                // Waiting Car Response (Classic): a parked car leaves a call
+                // to a car already heading there within that many floors.
+                let covered = |k: usize| {
+                    let r = response.filter(|_| watch_moving && was_parked);
+                    r.is_some_and(|r| {
+                        let floor = stops[k] as f64;
+                        moving_car_covers(&t.car_positions, &t.car_dir, i, active_count, floor, r)
+                    })
                 };
                 let demand = Demand {
                     stops: &stops,
@@ -312,7 +344,9 @@ impl ElevatorDispatch {
                 // finite distance and `reach` is never NaN, so `<=` is the
                 // TypeScript's `!(dist > reach)`.
                 let held = |k: Option<usize>| {
-                    k.filter(|&k| demand.is_cab(k) || (stops[k] as f64 - pos).abs() <= reach)
+                    k.filter(|&k| {
+                        demand.is_cab(k) || ((stops[k] as f64 - pos).abs() <= reach && !covered(k))
+                    })
                 };
                 let mut target = held(demand.next_stop(pos, dir));
                 if target.is_none() {
@@ -354,27 +388,16 @@ impl ElevatorDispatch {
                         self.waiting.get(&tf).copied().unwrap_or(0.0)
                     };
                     // A stood-down car lets nobody on.
-                    let board = if stood_down {
-                        0.0
-                    } else {
-                        (cap - car_load[i]).min(w).max(0.0)
+                    let room = if stood_down { 0.0 } else { cap - car_load[i] };
+                    let live = stop_index(tf).is_some_and(|k| has_bit(call_bits, k));
+                    let mut b = Boarding {
+                        waiting: &mut self.waiting,
+                        tally: &mut self.board_tally,
                     };
+                    let board = b.board(id, tf, w, room, staff_only, live);
                     if board > 0.0 {
                         car_load[i] += board;
                         t.rides += 1;
-                        if !staff_only {
-                            self.waiting.insert(tf, (w - board).max(0.0));
-                        }
-                        // Origin tally (#465), only at a stop with a live call.
-                        if stop_index(tf).is_some_and(|k| has_bit(call_bits, k)) {
-                            let n = self
-                                .board_tally
-                                .entry(id)
-                                .or_default()
-                                .entry(tf)
-                                .or_insert(0.0);
-                            *n = (*n + board).min(5000.0);
-                        }
                     }
                     if pos >= t.top as f64 {
                         dir = -1;

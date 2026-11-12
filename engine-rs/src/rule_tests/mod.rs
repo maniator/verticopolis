@@ -14,6 +14,7 @@ mod attendance;
 mod calendar;
 mod canon;
 mod capacity;
+mod classic_elevator_dispatch;
 mod commute;
 mod condo_relocation;
 mod condos;
