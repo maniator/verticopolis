@@ -246,3 +246,17 @@ fn the_inspector_names_home_parking_and_its_coverage() {
     let coverage = g.coverage.unwrap();
     assert!((coverage - 0.25).abs() < 1e-9, "{coverage}");
 }
+
+#[test]
+fn the_spaces_run_out_partway_along_a_floor_left_to_right() {
+    let mut sim = bare_tower(GameMode::Modern, 3, 4);
+    let studios = occupied_row(&mut sim, Kind::RentalStudio, 2, 6);
+    let condos = occupied_row(&mut sim, Kind::Condo, 3, 4);
+    // Six studios take one space below; the second parks the first two
+    // condos (half a space each) and leaves the third and fourth short.
+    park(&mut sim, 2);
+    assert_eq!(binding(&sim, studios[5]), None);
+    assert_eq!(binding(&sim, condos[1]), None);
+    assert_eq!(binding(&sim, condos[2]), Some((HOME_PARKING_CAUSE, false)));
+    assert_eq!(binding(&sim, condos[3]), Some((HOME_PARKING_CAUSE, false)));
+}

@@ -39,7 +39,7 @@
 
 use crate::clock::GameMode;
 use crate::demand::RECYCLING_POP_PER_CENTER;
-use crate::facilities::Kind;
+use crate::facilities::{Kind, MAX_FLOOR, MIN_FLOOR};
 use crate::rules::{Drain, OfficeParking};
 use crate::satisfaction::GRIPE_WARN;
 use crate::services::{is_parked_home, modern_spaces_for, recycling_capacity_of, SHARE_EPSILON};
@@ -322,26 +322,45 @@ impl Simulation {
 
     /// Modern: the first tenanted office or home, in parking order, whose
     /// share would overrun the `spare` spaces. Shares differ by kind, so the
-    /// rooms are walked in order; this runs only while parking falls short.
+    /// boundary is found in two linear passes instead of a sort of every
+    /// room: one sums each floor's shares and finds the floor the spaces run
+    /// out on, and only that floor's rooms are put in order and walked.
     fn first_unparked_room(&self, spare: f64, share: f64) -> Option<RoomOrder> {
-        let mut rooms: Vec<(RoomOrder, f64)> = self
-            .tower
-            .room_units()
-            .filter(|u| u.is_tenanted())
-            .filter_map(|u| {
-                let spaces = match u.kind {
-                    Kind::Office => modern_spaces_for(u.kind),
-                    kind if is_parked_home(kind) => modern_spaces_for(kind),
-                    _ => None,
-                }?;
-                Some((room_order(u), spaces * share))
-            })
+        let shares = || {
+            self.tower
+                .room_units()
+                .filter(|u| u.is_tenanted())
+                .filter_map(move |u| Some((u, modern_spaces_for(u.kind)? * share)))
+        };
+        let mut per_floor = [0.0_f64; (MAX_FLOOR - MIN_FLOOR + 1) as usize];
+        for (u, spaces) in shares() {
+            per_floor[(u.floor - MIN_FLOOR) as usize] += spaces;
+        }
+        let limit = spare + SHARE_EPSILON;
+        let mut used = 0.0;
+        let mut boundary = None;
+        for (i, &spaces) in per_floor.iter().enumerate() {
+            if used + spaces > limit {
+                boundary = Some(i as i64 + MIN_FLOOR);
+                break;
+            }
+            used += spaces;
+        }
+        let floor = boundary?;
+        let mut rooms: Vec<(RoomOrder, f64)> = shares()
+            .filter(|(u, _)| u.floor == floor)
+            .map(|(u, spaces)| (room_order(u), spaces))
             .collect();
         rooms.sort_unstable_by_key(|&(order, _)| order);
-        let mut used = 0.0;
-        rooms.into_iter().find_map(|(order, spaces)| {
-            used += spaces;
-            (used > spare + SHARE_EPSILON).then_some(order)
-        })
+        let last = rooms.last().map(|&(order, _)| order);
+        // The floor's sum overran the spaces, so one of its rooms does; the
+        // last stands in should rounding in a different order say otherwise.
+        rooms
+            .into_iter()
+            .find_map(|(order, spaces)| {
+                used += spaces;
+                (used > limit).then_some(order)
+            })
+            .or(last)
     }
 }
