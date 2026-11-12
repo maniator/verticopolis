@@ -25,6 +25,12 @@ prompt already tells players it is an engine update and shows the new version.
 Entries below 1.51.1 were curated from the commit history after the fact, so they
 are documentation only: no build that a client fetches carries them.
 
+## 3.4.0
+
+- The help at /help is now a full player's manual: a page for every kind of room with its price, size, earnings and picture, how building and the tower work, saving, importing and exporting, settings, controls and a walk through your first tower. Every number comes from the game, and Classic and Modern rules are marked where they differ.
+- Help in the game opens the manual in a new tab and pauses your tower until you come back; Back to game closes the tab. The old in-game guide window is gone, and What's new, the release notes, Report a problem and About this game now sit under a new About… button.
+- The release notes at /help/changelog are part of the help site, with the same menu, search and Back to game button. Old /help links and /gallery still land on the right page.
+
 ## 3.3.0
 
 - A link to a page that does not exist, such as a mistyped help address, now opens a "Page not found" page with links to the game, How to Play, the release notes and the sprite gallery.
