@@ -23,3 +23,17 @@ declare const __RELEASE_NOTES__: import("./changelog").ReleaseNotes[];
  *  new (src/whatsNewData.ts). */
 declare const __WHATS_NEW__: import("./changelog").ReleaseNotes[];
 declare const __ENGINE_PACKAGE__: import("./wasmhost/enginePackageRecord").ExpectedEnginePackage | null;
+
+/** A help page from help-site/src/content/docs/, compiled at build time by
+ *  src/build/helpMarkdown.ts: its front matter and its body as lit templates. */
+declare module "*.md" {
+  import type { TemplateResult } from "lit-html";
+  export const title: string;
+  export const description: string;
+  /** The page's old `/help#id` anchor, or null. */
+  export const helpId: string | null;
+  /** The whole page body. */
+  export const body: () => TemplateResult;
+  /** The body before its first second-level heading. */
+  export const intro: () => TemplateResult;
+}

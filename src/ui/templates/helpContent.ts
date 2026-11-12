@@ -1,9 +1,18 @@
 import { html, type TemplateResult } from "lit-html";
 import { compareTemplate } from "./compare";
+import * as helpIndex from "../../../help-site/src/content/docs/index.md";
+import * as basics from "../../../help-site/src/content/docs/getting-started.md";
+import * as goingFurther from "../../../help-site/src/content/docs/going-further.md";
+import * as classicVsModern from "../../../help-site/src/content/docs/classic-vs-modern.md";
+import * as phones from "../../../help-site/src/content/docs/phones.md";
+import * as keyboard from "../../../help-site/src/content/docs/keyboard.md";
+import * as privacy from "../../../help-site/src/content/docs/privacy.md";
 
 /**
- * The How-to-play guide content, as the single source shared by BOTH the in-game
- * Help modal (`help.ts`) and the standalone `/help` page (`helpPage.ts`). The
+ * The How-to-play guide content, shared by BOTH the in-game Help modal
+ * (`help.ts`) and the standalone `/help` page (`helpPage.ts`). The copy itself
+ * lives in the Help site's Markdown pages (`help-site/src/content/docs/`),
+ * compiled into lit templates at build time (`src/build/helpMarkdown.ts`). The
  * modal wraps each section in a collapsible `<details class="help-modes">`; the
  * page renders the same sections expanded under headings. Keeping the bodies here
  * means the guide copy has one home and cannot drift between the two surfaces,
@@ -25,87 +34,27 @@ export interface HelpSection {
   body: () => TemplateResult;
 }
 
-/** The lead paragraphs under the "How to play" heading (premise + mouse/touch lines). */
+/** The lead paragraphs under the "How to play" heading (premise + mouse/touch
+ *  lines): the Help site's front page before its first section. */
 export function helpLede(): TemplateResult {
-  return html`
-    <p>Build a thriving high-rise and earn your way to a coveted <b>TOWER</b> rating.</p>
-    <p style="color:var(--muted)">Mouse: drag to pan with the Inspect tool; with a build tool, hold <b>Shift</b> (or Space) and drag to pan, and a middle-button drag pans too. Scroll to zoom, click to build, right-click or the Inspect tool to edit a room. Made a mistake? <b>Undo with Ctrl+Z</b> (or the Undo button). Redo with Ctrl+Shift+Z. Music changes with whatever part of the tower you're viewing. Try scrolling around!</p>
-    <p style="color:var(--muted)">Touch: press and drag on the tower to build (a ghost shows where the room lands), two fingers to pan, pinch to zoom, tap a room with Inspect to edit it. Full guide under <b>Playing on a phone</b> below.</p>
-  `;
+  return html`<div class="help-md help-lede">${helpIndex.intro()}</div>`;
+}
+
+/** One guide page as a Help section. The `help-md` wrapper carries the Help
+ *  window's Markdown styling (muted paragraphs, key caps on the keyboard page). */
+function section(page: typeof basics, id: string): HelpSection {
+  return { id, title: page.title, body: () => html`<div class="help-md" data-help=${id}>${page.body()}</div>` };
 }
 
 /** The how-to-play sections, in order. "The basics" is the essentials section the
  *  modal opens on first paint; the rest are reference. Classic vs Modern renders
- *  the shared `compareTemplate()`. */
+ *  the shared `compareTemplate()`, which reads the same Classic vs Modern page. */
 export const HELP_SECTIONS: readonly HelpSection[] = [
-  {
-    id: "basics",
-    title: "The basics",
-    body: () => html`
-      <ul>
-        <li><b>Floors first.</b> Lay <b>Floor</b> tiles, then place rooms on them.</li>
-        <li><b>Move people.</b> Every floor needs an <b>elevator</b> or <b>stairs</b> chain back to the ground lobby, or tenants leave.</li>
-        <li><b>Make money.</b> Offices pay quarterly rent, condos sell once, hotels earn nightly, shops &amp; restaurants earn from foot traffic.</li>
-        <li><b>Grow your rating.</b> 2★ at 300 pop, 3★ at 1,000 (needs Security), 4★ at 5,000 (needs Medical, enough Recycling, suites &amp; a VIP), 5★ at 10,000 (needs a Metro). At 5★ a floor-100 payoff wins the game (under Going further).</li>
-        <li><b>Keep it moving.</b> People will ride as many elevators as it takes to reach a floor, but every transfer is another wait. Add <b>sky lobbies</b> (every ~15 floors) and <b>express</b> elevators so long trips stay quick; a tower that makes people transfer over and over crawls, and they give up.</li>
-      </ul>
-    `,
-  },
-  {
-    id: "going-further",
-    title: "Going further",
-    body: () => html`
-      <ul>
-        <li><b>Take out the trash.</b> One <b>Recycling Center</b> processes ~2,500 population. It visibly fills through the day and a garbage truck empties it each morning. Outgrow your centers and 4★ locks until you build more.</li>
-        <li><b>Win.</b> At 5★ with a Metro station, build the <b>Wedding Hall</b> (28 tiles wide and five floors tall) on floor 100 and pass the VIP inspection. The <b>TOWER</b> rank needs 15,000 occupants: office workers, residents, and venue customers. Hotel guests don't count at this stage, even when dining.</li>
-        <li><b>Parking</b> spaces only work when they touch a <b>Parking Ramp</b> or a connected space. Chain them off a ramp, or they sit empty. Offices want a space per ~24 workers (one per four offices) from 3★, and every hotel suite needs one of its own (the VIP drives).</li>
-        <li><b>Keep the films fresh.</b> A theater's audience falls as its film gets older. In Classic, inspect the theater and show a <b>New film</b> to fill it again, or a cheaper <b>Classic film</b> that never draws a full house. In Modern, pay once for a <b>Revival</b>, a <b>Feature</b> or a <b>Blockbuster</b>. A film draws for four weeks, fades for two, and then the theater books its <b>Auto-rebook</b> film again. A blockbuster costs the most but earns far more (great in a busy tower, a money-loser in a quiet one), and a revival is the cheap, safe pick for a small tower. A Modern theater has two screens, each with half the seats, its own film and its own Auto-rebook choice, and each pays for its own films: book them on different days so one screen always has a fresh film, or pair a blockbuster with a cheap revival. A Modern theater's <b>Ticket price</b> runs from Low to Premium: raise it while the theater sells out, and lower it when seats sit empty.</li>
-        <li><b>Place venues with care (Modern).</b> While you place a <b>Fitness Club</b>, <b>Spa</b>, <b>Daycare</b>, <b>Aquatic Center</b> or <b>Party Hall</b>, green bands mark the floors it helps, strongest nearest. A <b>Nightclub</b> shows violet bands for the floors its noise reaches at night. Shops, restaurants, other noisy venues and offices also bother rooms beside them on the same floor: while you place one, a violet band along its floor shows how far its noise carries, and while you place an office, condo, apartment or hotel room, an amber band shows the stretch that should stay clear of noisy neighbors. A lobby stops the noise. Inspect a condo, apartment or hotel room to see which amenity is helping it.</li>
-        <li><b>Find your way.</b> The <b>Map</b> window shows the whole tower, with a box around the part you're looking at. Click a spot on it to move the view there, or drag anywhere on it to slide the view. Close it with its ✕ and bring it back with the <b>Map</b> button.</li>
-        <li><b>Map views.</b> The <b>View</b> menu at the top of the Map changes what it shows. <b>Edit</b> is the plain tower. <b>Hotel</b> marks in red the hotel rooms that need cleaning or have cockroaches, with a count of each, and refreshes once per game hour. <b>Eval</b> colors each rated room Excellent, Good or Terrible by how its tenants or guests rate it, and <b>Pricing</b> colors each priced room High, Average, Low or Very Low by its rent. Both count their rooms, follow a price change at once and update their ratings once per game hour. <b>Traffic</b> colors each floor Clear, Busy or Jammed by how crowded its walkways and elevators are (a jammed floor is one where tenants start to leave), and <b>Occupancy</b> colors each floor with tenants or guests Mostly full, Half full or Mostly empty. Both count their floors and refresh once per game hour and after you build.</li>
-        <li><b>Price in bulk.</b> Inspect any office, condo or hotel room and use <b>“Set all …”</b> to re-price every unit of that kind at once (or reset them to the default). No need to edit each room. A preview shows how many change before you apply.</li>
-        <li><b>The clock breathes.</b> As in 1994, real time isn't spent evenly: the clock crawls through the lunch crush (watch your elevators earn their keep) and races through the small hours. A full day still takes the same real time, and the speed buttons still multiply it. Prefer an even pace? Toggle <b>Steady clock</b> in Settings.</li>
-        <li><b>If the game stops.</b> If the game engine crashes, the game reloads your tower from its last autosave. If it crashes again, the game stops and says so. Your saves stay on your device, and Reload tries again.</li>
-      </ul>
-    `,
-  },
-  {
-    id: "classic-vs-modern",
-    title: "Classic vs Modern",
-    body: () => compareTemplate(),
-  },
-  {
-    id: "touch",
-    title: "Playing on a phone",
-    body: () => html`
-      <p style="color:var(--muted)">Everything works by touch. With a build tool chosen from the bottom menu:</p>
-      <ul>
-        <li><b>Place a room.</b> Press the tower and drag: a ghost floats just above your finger so you can see where it lands, gold where it fits, red where it will not. Lift to place, or slide to a valid spot first. A quick tap drops one too.</li>
-        <li><b>Lay a run.</b> Drag with <b>Floor</b>, <b>Lobby</b>, or a <b>Parking</b> space to lay a whole strip at once.</li>
-        <li><b>Size an elevator.</b> Drag up or down to set a shaft's height. Stairs and escalators place with a single tap.</li>
-        <li><b>Move around.</b> Drag with <b>two fingers</b> to pan (or one finger with <b>Inspect</b> selected), and <b>pinch</b> to zoom.</li>
-        <li><b>Peek at a room.</b> Press and hold a room (any tool) to read its card without opening it, the way a mouse hover does. Lift to close. A quick tap still does the armed tool's action: with <b>Inspect</b> it opens the full panel.</li>
-        <li><b>See the whole tower.</b> Tap the <b>Map</b> pill (bottom right) for a small map of the tower. Tap a spot on it to jump there, or drag anywhere on it to slide the view. The <b>View</b> menu above it (Edit, Eval, Pricing, Hotel, Traffic, Occupancy) changes what it shows. Close it with its ✕.</li>
-        <li><b>Edit or remove.</b> Tap a room with <b>Inspect</b> to open its panel; tap with <b>Bulldoze</b> to demolish it.</li>
-        <li><b>Menus.</b> The build menu groups tools under category tabs, and a tab with a dot just gained new tools. The <b>menu</b> button (top bar) opens stats and the game menu, and the <b>Undo</b> button steps a change back.</li>
-      </ul>
-    `,
-  },
-  {
-    id: "keyboard",
-    title: "Keyboard play",
-    body: () => html`
-      <p style="color:var(--muted)">Play entirely without a mouse. Pick a tool in the palette (Tab to it, Enter to select), then:</p>
-      <ul class="help-keys">
-        <li><kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd> (or <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd>) move the build cursor. Hold <kbd>Shift</kbd> for ×10</li>
-        <li><kbd>Enter</kbd> / <kbd>Space</kbd> build (or inspect) at the cursor. For an elevator or stairway, press once to anchor and again at the far end to size the shaft</li>
-        <li><kbd>Delete</kbd> / <kbd>Backspace</kbd> / <kbd>X</kbd> bulldoze at the cursor · <kbd>Esc</kbd> cancel</li>
-        <li><kbd>+</kbd> / <kbd>−</kbd> zoom · <kbd>C</kbd> re-center · <kbd>0</kbd>–<kbd>3</kbd> game speed · <kbd>Ctrl</kbd>+<kbd>Z</kbd> undo</li>
-        <li>On the <b>Map</b> (Tab to it): <kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd> move the view (hold <kbd>Shift</kbd> for a whole screen) · <kbd>Home</kbd> / <kbd>End</kbd> jump to the top or the bottom · <kbd>Esc</kbd> close</li>
-        <li>On the <b>Map</b>'s <b>View</b> menu (Tab to it): <kbd>↑</kbd><kbd>↓</kbd> pick the previous or the next view · <kbd>Home</kbd> / <kbd>End</kbd> the first or the last</li>
-      </ul>
-    `,
-  },
+  section(basics, "basics"),
+  section(goingFurther, "going-further"),
+  { id: "classic-vs-modern", title: classicVsModern.title, body: () => compareTemplate() },
+  section(phones, "touch"),
+  section(keyboard, "keyboard"),
 ];
 
 /** The About section body (attribution, the interpolated app version and a
@@ -134,28 +83,7 @@ export function helpAboutBody(version: string, engine = "", licensesHref = "thir
  *  copy says, is that none of it identifies you or points back to you across
  *  visits. Keep any future edit on that side of the line. */
 export function helpPrivacyBody(): TemplateResult {
-  return html`<p style="color:var(--muted)">
-      Verticopolis keeps a small, anonymous read on how the game is going: whether new players place their first
-      facility, how far towers climb the star ladder, which tools get used, and whether returning players get further
-      than first-timers. Those signals are worked out on your own device and sent as coarse, anonymous counts to our
-      own site, with no cookie and nothing that could point back to you across visits. The page also sends anonymous
-      page-visit counts and page performance metrics.
-    </p>
-    <p style="color:var(--muted)">
-      To see whether the game engine runs reliably, the game reports which engine started, whether you started
-      playing, and a short code if the engine stopped. None of it identifies you.
-    </p>
-    <p style="color:var(--muted)">
-      Crash reports are the one place your own words can travel. They carry the technical details of the error and the
-      same kind of anonymous totals, and an error message can occasionally quote a bit of game text, such as a tower's
-      name.
-    </p>
-    <p style="color:var(--muted)">
-      There are no accounts and no ads: the game never asks for your name or email, keeps no profile, and nothing
-      recognizes you from one day to the next. There is no consent banner, because nothing that identifies you is kept.
-      Saves live in your own storage and leave your device only when you export them. The counts help decide what to
-      improve; they are never sold or shared.
-    </p>`;
+  return html`<div class="help-md">${privacy.body()}</div>`;
 }
 
 /** The "Found a bug?" report call to action (heading + blurb + external link).
