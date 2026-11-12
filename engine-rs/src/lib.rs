@@ -61,6 +61,10 @@
 //! - **No I/O.** The engine reads no file, clock, environment or network and
 //!   starts no thread. You pass in time, file contents and timestamps, and get
 //!   bytes back to store where you like.
+//! - **Threads are the host's choice.** A [`Simulation`](sim::Simulation)
+//!   is `Send`, so a native host can run a game on a worker thread and send
+//!   it commands. It is not `Sync`: one thread drives a game at a time. A
+//!   game played on another thread ends in the same state.
 //! - **Deterministic.** The same seed, commands and sequence of `tick` calls
 //!   give the same game on any machine, here and in the WebAssembly build.
 //!   The conformance suite in the repository is how a host proves it.
