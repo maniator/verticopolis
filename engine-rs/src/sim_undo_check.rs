@@ -219,7 +219,12 @@ impl Simulation {
             match (&img.change, self.tower.get_unit(img.id)) {
                 (UnitChange::TakeOut(held), Some(now)) if now.kind.is_structural() => {
                     let hangs = !ground.leaves_nothing_hanging_from(now);
-                    sale.note(|| !hangs && !ground.lays_again(now) && self.sells(now));
+                    sale.note(|| {
+                        !hangs
+                            && !ground.lays_again(now)
+                            && self.sells(now)
+                            && ground.sells_from_an_end(now)
+                    });
                     if now.state == UnitState::Fire {
                         found.add(StepRefused::OnFire);
                     } else if !img.built {

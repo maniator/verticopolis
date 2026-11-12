@@ -406,3 +406,67 @@ fn a_dig_is_reported_before_what_time_did_since() {
         StepRefused::SearchedForTreasure { sellable: true },
     );
 }
+
+#[test]
+fn a_classic_tile_with_floor_on_both_sides_is_never_offered_for_sale() {
+    // A saved Classic gap filled with the Floor tool: once the hour passes
+    // the sale refuses that tile (`MID_FLOOR_GAP`), so the undo does not
+    // send the player there.
+    // A gap of three tiles, so the run's first tile answers for the rest.
+    let mut sim = tower_in(GameMode::Classic);
+    for x in 40..43 {
+        let gap = sim.tower.unit_at(4, x).unwrap().id;
+        sim.tower.remove_unit(gap);
+    }
+    // Classic bridges the gap from its first tile.
+    let fill = gesture(&mut sim, |s| {
+        assert!(s.build(Kind::Floor, 4, 40).ok);
+    })
+    .unwrap();
+    assert!((40..43).all(|x| sim.tower.unit_at(4, x).is_some()));
+    an_hour_passes(&mut sim);
+    refused(&mut sim, &fill, StepRefused::GroundUsed { sellable: false });
+    let id = sim.tower.unit_at(4, 40).unwrap().id;
+    assert!(
+        !sim.remove_facility(id, crate::gameplay::RemovalMethod::Sell)
+            .ok
+    );
+}
+
+#[test]
+fn a_floor_run_that_reaches_an_end_is_still_offered_for_sale() {
+    // The same fill in Modern, and a Classic run laid out to the floor's
+    // end, can each be sold tile by tile, so the advice stands.
+    let mut modern = tower_in(GameMode::Modern);
+    let gap = modern.tower.unit_at(4, 40).unwrap().id;
+    modern.tower.remove_unit(gap);
+    let fill = gesture(&mut modern, |s| {
+        assert!(s.build(Kind::Floor, 4, 40).ok);
+    })
+    .unwrap();
+    an_hour_passes(&mut modern);
+    refused(
+        &mut modern,
+        &fill,
+        StepRefused::GroundUsed { sellable: true },
+    );
+
+    // Floor 4 runs from x 10 to 69; the run laid again is its last 4 tiles.
+    let mut classic = tower_in(GameMode::Classic);
+    for x in 66..70 {
+        let id = classic.tower.unit_at(4, x).unwrap().id;
+        classic.tower.remove_unit(id);
+    }
+    let run = gesture(&mut classic, |s| {
+        for x in 66..70 {
+            assert!(s.build(Kind::Floor, 4, x).ok);
+        }
+    })
+    .unwrap();
+    an_hour_passes(&mut classic);
+    refused(
+        &mut classic,
+        &run,
+        StepRefused::GroundUsed { sellable: true },
+    );
+}
