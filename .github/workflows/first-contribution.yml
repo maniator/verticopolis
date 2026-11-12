@@ -1,0 +1,54 @@
+name: Welcome first-time contributors
+
+# Thanks a person on their first pull request or first issue in this
+# repository, and points them at CONTRIBUTING.md and the "good first issue"
+# and "help wanted" lists so they can find something else to work on. The
+# rules are in src/build/firstContribution.ts (with its tests), and the
+# messages are in .github/welcome/.
+#
+# pull_request_target runs from the base branch with a write token, so the
+# checkout below takes the base branch's own commit (actions/checkout's
+# default for this event), never the pull request's head, and nothing from
+# the pull request runs. Event values reach the script only through
+# environment variables, never interpolated into it.
+on:
+  pull_request_target:
+    types: [opened]
+  issues:
+    types: [opened]
+
+concurrency:
+  group: first-contribution-${{ github.event.pull_request.number || github.event.issue.number }}
+  cancel-in-progress: false
+
+# Commenting on a pull request goes through the issues endpoint, but GitHub
+# checks pull requests against the pull-requests permission there.
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  welcome:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: ".nvmrc"
+
+      - name: Welcome the author if this is their first
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          EVENT: ${{ github.event_name }}
+          NUMBER: ${{ github.event.pull_request.number || github.event.issue.number }}
+          AUTHOR: ${{ github.event.pull_request.user.login || github.event.issue.user.login }}
+          AUTHOR_TYPE: ${{ github.event.pull_request.user.type || github.event.issue.user.type }}
+          ASSOCIATION: ${{ github.event.pull_request.author_association || github.event.issue.author_association }}
+        run: node scripts/first-contribution.ts
