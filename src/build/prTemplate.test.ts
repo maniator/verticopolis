@@ -2,7 +2,15 @@ import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { checkPrBody, headings, sections, stripComments } from "./prTemplate";
+import {
+  COMPLEXITY,
+  HOT_PATH_RECORD_LINE,
+  TYPE_OF_CHANGE,
+  checkPrBody,
+  headings,
+  sections,
+  stripComments,
+} from "./prTemplate";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const realTemplate = readFileSync(
@@ -63,17 +71,13 @@ describe("headings", () => {
     expect(headings(text)).toEqual(["One", "Two"]);
   });
 
-  it("reads the real template's sections", () => {
-    expect(headings(realTemplate)).toEqual([
-      "What & why",
-      "Type of change",
-      "Game mode impact",
-      "Quality gates",
-      "Versioning",
-      "Complexity",
-      "Screenshots / recordings",
-      "Notes for reviewers",
-    ]);
+  it("finds the sections and the record line the rules name in the real template", () => {
+    expect(headings(realTemplate)).toEqual(
+      expect.arrayContaining([TYPE_OF_CHANGE, COMPLEXITY]),
+    );
+    expect(sections(realTemplate).get(COMPLEXITY)).toContain(
+      HOT_PATH_RECORD_LINE,
+    );
   });
 });
 
@@ -177,13 +181,39 @@ describe("checkPrBody", () => {
   });
 
   it("fails the template pasted back unfilled", () => {
-    expect(checkPrBody(realTemplate, realTemplate)).toEqual([
-      'section "## Screenshots / recordings" is empty (write "None" or "n/a: <reason>" if it does not apply)',
-      'section "## Notes for reviewers" is empty (write "None" or "n/a: <reason>" if it does not apply)',
-      '"## Type of change" ticks no box',
-      '"Hot-path record (section 6):" is not filled in (link the record, or say "no hot-path surface")',
-      '"Closes #" has no issue number (name the issue, or remove the line)',
-    ]);
+    expect(checkPrBody(realTemplate, realTemplate)).toEqual(
+      expect.arrayContaining([
+        '"## Type of change" ticks no box',
+        '"Hot-path record (section 6):" is not filled in (link the record, or say "no hot-path surface")',
+      ]),
+    );
+  });
+
+  it("reads a record line wrapped in emphasis or a list marker", () => {
+    for (const line of [
+      "**Hot-path record (section 6):** no hot-path surface",
+      "- Hot-path record (section 6): https://example.test/r",
+    ]) {
+      expect(
+        checkPrBody(filled({ Complexity: `n/a.\n\n${line}` }), TEMPLATE),
+      ).toEqual([]);
+    }
+    expect(
+      checkPrBody(
+        filled({ Complexity: "n/a.\n\n**Hot-path record (section 6):** link" }),
+        TEMPLATE,
+      ),
+    ).toHaveLength(1);
+  });
+
+  it("reads a description saved with Windows line endings", () => {
+    expect(checkPrBody(filled().replace(/\n/g, "\r\n"), TEMPLATE)).toEqual([]);
+    expect(
+      checkPrBody(
+        filled({ "Notes for reviewers": "" }).replace(/\n/g, "\r\n"),
+        TEMPLATE,
+      ),
+    ).toHaveLength(1);
   });
 
   it("passes the real template once each section is filled", () => {

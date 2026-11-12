@@ -106,8 +106,15 @@ export function checkPrBody(body: string, template: string): string[] {
   if (want.includes(COMPLEXITY) && complexity?.trim()) {
     const record = complexity
       .split(/\r?\n/)
-      .find((line) => line.trim().startsWith(HOT_PATH_RECORD_LINE));
-    const value = record?.trim().slice(HOT_PATH_RECORD_LINE.length).trim();
+      .find((line) => line.includes(HOT_PATH_RECORD_LINE));
+    // The value is what follows the label, without the emphasis or list
+    // marker an author may wrap the label in ("**Hot-path record ...:** x").
+    const value = record
+      ?.slice(
+        record.indexOf(HOT_PATH_RECORD_LINE) + HOT_PATH_RECORD_LINE.length,
+      )
+      .replace(/^[\s*_]+/, "")
+      .trim();
     if (record === undefined) {
       problems.push(`"## ${COMPLEXITY}" has no "${HOT_PATH_RECORD_LINE}" line`);
     } else if (!value || value === "link") {
