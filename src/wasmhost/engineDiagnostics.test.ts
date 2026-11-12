@@ -20,7 +20,7 @@ const withSources = (sources = SRC): ExpectedEnginePackage => ({
 });
 const stamped = { state: "ok", sourceHash: SRC } as const;
 const wasmBoot = (extra: Partial<EngineBootState> = {}): EngineBootState => ({
-  build: "switchable",
+  build: "wasm-only",
   engine: "wasm",
   failure: null,
   identity,
@@ -33,26 +33,19 @@ const row = (r: ReturnType<typeof buildDiagnostics>, label: string) =>
 describe("buildDiagnostics", () => {
   it("builds from nothing at all: the page never published a boot state", () => {
     const r = buildDiagnostics({ appVersion: "dev" });
-    expect(r.state).toBe("typescript");
+    expect(r.state).toBe("not-running");
+    expect(r.summary).toBe("The Rust engine is not running this tower.");
+    expect(row(r, "Engine in use")).toEqual(["none"]);
     expect(r.rows[0]).toEqual({ label: "App", value: "vdev" });
     expect(r.text).toContain("Verticopolis diagnostics");
   });
 
-  it("reports the TypeScript engine", () => {
-    const r = buildDiagnostics({
-      ...base,
-      boot: { build: "switchable", engine: "ts", failure: null },
-    });
-    expect(r.state).toBe("typescript");
-    expect(row(r, "Engine in use")).toEqual(["TypeScript engine"]);
-    expect(row(r, "App")).toEqual(["v1.2.3 (abc1234)"]);
-    // No build carries the TypeScript engine any more (#1875), so it has no identity row.
-    expect(row(r, "TypeScript engine")).toEqual([]);
-  });
-
-  it("names no TypeScript engine on a wasm-only build, which has none", () => {
+  it("names no engine, and no TypeScript engine, when the Rust engine is not running (#1875)", () => {
     const r = buildDiagnostics({ ...base, boot: { build: "wasm-only", engine: "none", failure: null } });
-    expect(row(r, "TypeScript engine")).toEqual([]);
+    expect(r.state).toBe("not-running");
+    expect(row(r, "Engine in use")).toEqual(["none"]);
+    expect(row(r, "App")).toEqual(["v1.2.3 (abc1234)"]);
+    expect(r.text).not.toMatch(/TypeScript|fallback/i);
   });
 
   it("reports a healthy WASM engine with every field of its record", () => {
@@ -129,10 +122,10 @@ describe("buildDiagnostics", () => {
     expect(row(r, "Crate this page expects")).toEqual([]);
   });
 
-  it("reports an engine that never loaded in a switchable build, with the reason and the crate the page expects", () => {
+  it("reports an engine that never loaded, with the reason and the crate the page expects", () => {
     const boot: EngineBootState = {
-      build: "switchable",
-      engine: "ts",
+      build: "wasm-only",
+      engine: "none",
       failure: {
         stage: "load",
         reason: "boot-timeout",
@@ -141,7 +134,8 @@ describe("buildDiagnostics", () => {
     };
     const r = buildDiagnostics({ ...base, boot, expected: expected() });
     expect(r.state).toBe("not-loaded");
-    expect(r.summary).toContain("TypeScript engine");
+    expect(r.summary).toBe("The Rust engine did not load, and this build has no other engine.");
+    expect(row(r, "Engine in use")).toEqual(["none"]);
     expect(row(r, "Failed at")).toEqual(["load"]);
     expect(row(r, "Reason")).toEqual(["boot-timeout"]);
     expect(row(r, "Detail")).toEqual(["no answer in 90 seconds"]);
@@ -165,7 +159,7 @@ describe("buildDiagnostics", () => {
     const r = buildDiagnostics({
       ...base,
       boot: wasmBoot({
-        engine: "ts",
+        engine: "none",
         failure: {
           stage: "start",
           reason: "attach-refused",
@@ -188,8 +182,8 @@ describe("buildDiagnostics", () => {
 
   it("keeps the start of a long message", () => {
     const boot: EngineBootState = {
-      build: "switchable",
-      engine: "ts",
+      build: "wasm-only",
+      engine: "none",
       failure: {
         stage: "load",
         reason: "boot-error",
@@ -203,8 +197,8 @@ describe("buildDiagnostics", () => {
 
   it("folds a message that spans lines onto its row in the copied text", () => {
     const boot: EngineBootState = {
-      build: "switchable",
-      engine: "ts",
+      build: "wasm-only",
+      engine: "none",
       failure: { stage: "load", reason: "boot-error", message: "first line\r\n   at second\nthird" },
     };
     const r = buildDiagnostics({ ...base, boot });
@@ -289,8 +283,8 @@ describe("the source hash stamped in the engine binary", () => {
 
   it("reports the failed binary's hash when the engine then did not load", () => {
     const boot: EngineBootState = {
-      build: "switchable",
-      engine: "ts",
+      build: "wasm-only",
+      engine: "none",
       failure: { stage: "load", reason: "package-mismatch", message: "link failed" },
       binary: stamped,
     };
@@ -334,17 +328,17 @@ describe("identityMismatches", () => {
 describe("which engine is running, by the host's status", () => {
   const sourceExpected = (): ExpectedEnginePackage => ({ ...expected(), sources: SRC });
 
-  it("calls a tower the host refused TypeScript even though boot recorded no failure", () => {
+  it("says the Rust engine is not running a tower the host dropped, even though boot recorded no failure", () => {
     const r = buildDiagnostics({
       ...base,
       boot: wasmBoot(),
-      host: { hosted: false, lastFallback: { reason: "attach-refused", stage: "adopt" } },
+      host: { hosted: false },
       expected: expected(),
     });
-    expect(r.state).toBe("typescript");
-    expect(r.summary).toContain("fell back to the TypeScript engine");
-    expect(row(r, "Engine in use")).toEqual(["TypeScript engine"]);
-    expect(row(r, "Last fallback")).toEqual(["attach-refused at adopt"]);
+    expect(r.state).toBe("not-running");
+    expect(r.summary).toBe("The Rust engine is not running this tower.");
+    expect(row(r, "Engine in use")).toEqual(["none"]);
+    expect(r.text).not.toMatch(/TypeScript|fallback/i);
   });
 
   it("follows the host when a later tower is hosted after the first was refused", () => {
@@ -364,11 +358,12 @@ describe("which engine is running, by the host's status", () => {
     ["start", "did not take the first tower"],
     ["host", "stopped after a fault"],
   ] as const)("words a %s failure as '%s'", (stage, words) => {
-    const boot: EngineBootState = { build: "switchable", engine: "ts", failure: { stage, reason: "boot-error", message: "x" } };
+    const boot: EngineBootState = { build: "wasm-only", engine: "none", failure: { stage, reason: "boot-error", message: "x" } };
     const r = buildDiagnostics({ ...base, boot, host: { hosted: false } });
     expect(r.state).toBe("not-loaded");
     expect(r.summary).toContain(words);
-    expect(r.summary).toContain("TypeScript engine");
+    expect(r.summary).toContain("this build has no other engine");
+    expect(r.summary).not.toContain("TypeScript");
   });
 
   it("says a wasm-only build has no other engine after a fault", () => {
@@ -386,8 +381,8 @@ describe("which engine is running, by the host's status", () => {
 
   it("reports a source hash mismatch for a binary that failed to link", () => {
     const boot: EngineBootState = {
-      build: "switchable",
-      engine: "ts",
+      build: "wasm-only",
+      engine: "none",
       failure: { stage: "load", reason: "package-mismatch", message: "import mismatch" },
       binary: { state: "ok", sourceHash: OTHER_SRC },
     };

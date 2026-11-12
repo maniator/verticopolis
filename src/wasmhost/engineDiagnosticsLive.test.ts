@@ -6,14 +6,14 @@ import { deferEngineIdentity, publishBootState, type EngineBootState } from "./e
 describe("liveDiagnostics", () => {
   it("builds from a page that published nothing", () => {
     const r = liveDiagnostics({});
-    expect(r.state).toBe("typescript");
+    expect(r.state).toBe("not-running");
     expect(r.text).toContain("App: v");
   });
 
   it("reads the boot state and the host's status from the page globals", () => {
     const r = liveDiagnostics({
       __vcEngineBoot: {
-        build: "switchable",
+        build: "wasm-only",
         engine: "wasm",
         failure: null,
         identity: JSON.stringify(IDENTITY_FIXTURE),
