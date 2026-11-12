@@ -147,30 +147,34 @@ describe("maybeSurfaceUpdatePrompt", () => {
   });
 });
 
+/** A release ahead of this build (`__APP_VERSION__`), by patch number, so the
+ *  notes stay unseen whatever version the build is at. */
+const ahead = (patch: number) => `${Number(__APP_VERSION__.split(".")[0]) + 1}.0.${patch}`;
+
 describe("showUpdatePrompt remembers the notes it shows (#1897)", () => {
   it("records the incoming version so a later prompt never repeats its notes", () => {
     localStorage.clear();
     const { app, raw } = clearApp();
-    raw.pendingUpdateInfo = { version: "3.0.2", notes: ["n"] };
+    raw.pendingUpdateInfo = { version: ahead(2), notes: ["n"] };
     showUpdatePrompt(app);
-    expect(localStorage.getItem(NOTES_SEEN_KEY)).toBe("3.0.2");
+    expect(localStorage.getItem(NOTES_SEEN_KEY)).toBe(ahead(2));
   });
   it("drops notes another tab showed after the build was detected", () => {
     localStorage.clear();
     const { app, raw, captured } = clearApp();
     raw.pendingUpdateInfo = {
-      version: "3.0.3",
+      version: ahead(3),
       notes: ["c"],
-      since: "3.0.0",
+      since: ahead(0),
       releases: [
-        { version: "3.0.3", notes: ["c"] },
-        { version: "3.0.2", notes: ["b"] },
+        { version: ahead(3), notes: ["c"] },
+        { version: ahead(2), notes: ["b"] },
       ],
     };
-    localStorage.setItem(NOTES_SEEN_KEY, "3.0.2"); // the other tab's prompt
+    localStorage.setItem(NOTES_SEEN_KEY, ahead(2)); // the other tab's prompt
     showUpdatePrompt(app);
-    expect((captured.last?.info as { releases: { version: string }[] }).releases.map((r) => r.version)).toEqual(["3.0.3"]);
-    expect(localStorage.getItem(NOTES_SEEN_KEY)).toBe("3.0.3");
+    expect((captured.last?.info as { releases: { version: string }[] }).releases.map((r) => r.version)).toEqual([ahead(3)]);
+    expect(localStorage.getItem(NOTES_SEEN_KEY)).toBe(ahead(3));
   });
 });
 
