@@ -21,8 +21,9 @@ describe("notFoundPageTemplate", () => {
 
   it("links to the game and to each standalone page", () => {
     const frag = renderToFragment(notFoundPageTemplate("/x"));
-    const hrefs = [...frag.querySelectorAll(".help-section a")].map((a) => a.getAttribute("href"));
-    expect(hrefs).toEqual(["/", "/help", "/help/changelog", "/gallery"]);
+    const links = [...frag.querySelectorAll<HTMLAnchorElement>(".page-links a.btn")];
+    expect(links.map((a) => a.getAttribute("href"))).toEqual(["/", "/help", "/help/changelog", "/gallery"]);
+    expect(links[0].classList.contains("primary")).toBe(true);
     expect(NOT_FOUND_LINKS.map((l) => l.href)).toEqual(["/help", "/help/changelog", "/gallery"]);
   });
 
@@ -33,6 +34,8 @@ describe("notFoundPageTemplate", () => {
     expect(back.length).toBeGreaterThan(0);
     for (const a of back) expect(a.getAttribute("href")).toBe("/");
     expect(frag.querySelector("#back-note")).toBeNull();
+    // The title bar holds only Back to game, so it fits a phone screen.
+    expect([...frag.querySelectorAll(".page-nav a")].map((a) => a.getAttribute("href"))).toEqual(["/"]);
   });
 
   it("closes the tab on Back to game when the game opened it", () => {
