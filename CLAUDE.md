@@ -151,6 +151,13 @@ review skill. The BMAD agent rules live in `_bmad-output/project-context.md`.
   "tracked in the backlog" only when a real row exists. The full rule lives in
   the backlog's "How items flow"; `src/tests/backlogIssueMirror.test.ts`
   enforces the row half in CI.
+- **PR descriptions follow `.github/PULL_REQUEST_TEMPLATE.md`.** A PR opened
+  through the API, the GitHub MCP tool or `gh pr create --body` skips the
+  template, so start the body from it: keep every `## ` heading, fill each one
+  ("None" or "n/a: <reason>" where it does not apply), and check it with
+  `npm run pr:check -- --body-file <file>`. The `PR template` workflow fails a
+  description that drops a section. See `AGENTS.md` → "Pull request
+  descriptions".
 - **Merge commits only** to `main` (never squash). Commit/push only when asked.
 - **Keep a branch's own history readable before it merges.** A tidy branch is
   a handful of commits that each state a real step. When review nitpicks pile

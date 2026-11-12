@@ -1,6 +1,11 @@
 <!--
 Thanks for contributing to Verticopolis! Fill in the sections below.
 Keep the engine (engine-rs/) free of DOM/rendering, and use American English.
+Keep every ## heading and write something under each one: "None" or
+"n/a: <reason>" where a section does not apply. The PR template check
+(.github/workflows/pr-template.yml) fails a description that drops a heading.
+Opening a PR through the API or `gh pr create --body` skips this template, so
+start that body from this file (see AGENTS.md, "Pull request descriptions").
 -->
 
 ## What & why
@@ -26,7 +31,8 @@ Classic must stay faithful to SimTower 1994; Modern is the opt-in "what the orig
 couldn't do" layer. Keep behavior the two modes disagree on in a single mode-resolved
 rule-set (resolved once at founding) rather than branching on the mode ad hoc or
 smearing mode checks through the simulation.
-Delete this section only if the change cannot affect gameplay (e.g. docs/tooling).
+If the change cannot affect gameplay (e.g. docs/tooling), write "n/a: <reason>"
+instead of ticking a box.
 -->
 
 - [ ] This change is **classic-canon** (affects all towers, stays faithful to the 1994 original)
@@ -79,10 +85,10 @@ Hot-path record (section 6): link
 <!--
 For any visual or gameplay change, embed actual before/after images here, not a
 prose description of what a screenshot would show. See docs/screenshots.md for how
-to capture, commit, and embed them. Delete this section only if the change has no
-visual or gameplay surface.
+to capture, commit, and embed them. If the change has no visual or gameplay
+surface, write "None: <reason>".
 -->
 
 ## Notes for reviewers
 
-<!-- Canon references, trade-offs, follow-ups, anything that helps the review. -->
+<!-- Canon references, trade-offs, follow-ups, anything that helps the review. "None" if nothing. -->

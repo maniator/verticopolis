@@ -1,0 +1,47 @@
+name: PR template
+
+# A pull request description keeps the sections of
+# .github/PULL_REQUEST_TEMPLATE.md. GitHub fills the template in only when a PR
+# is opened from the website; a body sent through the API or
+# `gh pr create --body` replaces it, which is how agent PRs drifted off it. The
+# rules are in src/build/prTemplate.ts (with its tests); release PRs,
+# Dependabot and other bots are skipped by scripts/pr-template-check.ts.
+#
+# It runs again when the description is edited, so fixing the body turns the
+# check green without a push. The description is read as data through an
+# environment variable, never interpolated into the script. The checkout is
+# read-only and the script needs no npm install (it imports Node built-ins and
+# two files under src/build only).
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, edited, reopened, synchronize, ready_for_review]
+
+concurrency:
+  group: pr-template-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  description:
+    name: PR template
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: ".nvmrc"
+
+      - name: Check the description against the template
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+          HEAD_REF: ${{ github.head_ref }}
+          AUTHOR: ${{ github.event.pull_request.user.login }}
+        run: node scripts/pr-template-check.ts --branch "$HEAD_REF" --author "$AUTHOR"

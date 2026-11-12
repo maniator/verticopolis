@@ -213,6 +213,31 @@ resolving review threads). On top of that, in an agent session:
   needs it. The surrounding canon lives in
   `_bmad-output/project-context.md` (Performance section).
 
+## Pull request descriptions
+
+Every PR description follows
+[`.github/PULL_REQUEST_TEMPLATE.md`](./.github/PULL_REQUEST_TEMPLATE.md).
+GitHub fills that template in only for a PR opened on the website. A PR an
+agent opens through the GitHub MCP `create_pull_request` tool, the REST API or
+`gh pr create --body` gets exactly the body it sends, so the template is
+skipped unless you start from it:
+
+- Read the template, keep every `## ` heading in its order, and write something
+  under each one. Where a section does not apply, write "None" or
+  "n/a: <reason>" instead of deleting it.
+- Tick at least one "Type of change" box, fill the
+  "Hot-path record (section 6):" line (a link, or "no hot-path surface"), and
+  put a real issue number after `Closes #` or drop that line.
+- Put the attribution lines your session asks for above the first heading, and
+  the generated-by footer after the last section.
+- Check the body before opening the PR: save it to a file and run
+  `npm run pr:check -- --body-file <file>`. When you edit a body later, start
+  from the current one so no section is lost.
+
+The `PR template` workflow (`.github/workflows/pr-template.yml`) runs the same
+check on every PR and again when its description is edited. Release PRs,
+Dependabot and other bots are skipped.
+
 ## Review guidelines
 
 For any reviewer that reads this file, Codex included: on a diff that touches a
