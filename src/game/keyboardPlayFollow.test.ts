@@ -29,6 +29,7 @@ function keyboardUnder(tool: "office" | "elevator") {
     tool: () => ({ type: "build", kind: tool }),
     isTransportTool: () => tool === "elevator",
     updateBuildPreview: vi.fn(),
+    refusePausedPlacement: () => false,
     placeSimpleBuild: () => null,
     pickedAt: () => null,
     announce: vi.fn(),

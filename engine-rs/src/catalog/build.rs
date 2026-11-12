@@ -39,6 +39,7 @@ pub fn catalog(mode: GameMode) -> Catalog {
             variant_households: mode.variant_households(),
             preview_names_refusal: mode.preview_names_refusal(),
             schedule_assist: mode.schedule_assist(),
+            builds_while_paused: mode.builds_while_paused(),
         },
         pools: POOLED_CAPS
             .iter()

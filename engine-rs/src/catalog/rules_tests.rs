@@ -55,12 +55,17 @@ fn each_mode_states_its_rules() {
     assert!(!classic.variant_households);
     assert!(!classic.preview_names_refusal);
     assert!(!classic.schedule_assist);
+    assert!(!classic.builds_while_paused);
     let modern = catalog(GameMode::Modern).rules;
     assert!(modern.variant_households);
     assert!(modern.preview_names_refusal);
     assert!(modern.schedule_assist);
+    assert!(modern.builds_while_paused);
     let v = catalog_value(GameMode::Modern);
     assert_eq!(v["rules"]["variantHouseholds"], Value::Bool(true));
     assert_eq!(v["rules"]["previewNamesRefusal"], Value::Bool(true));
     assert_eq!(v["rules"]["scheduleAssist"], Value::Bool(true));
+    assert_eq!(v["rules"]["buildsWhilePaused"], Value::Bool(true));
+    let c = catalog_value(GameMode::Classic);
+    assert_eq!(c["rules"]["buildsWhilePaused"], Value::Bool(false));
 }

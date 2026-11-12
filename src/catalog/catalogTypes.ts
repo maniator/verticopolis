@@ -28,7 +28,7 @@ export interface CatalogFilmRebook {
 
 /** The version of the catalog's shape. It moves when a field is added,
  *  renamed or removed, so a frontend can refuse a shape it does not know. */
-export const CATALOG_VERSION = 9;
+export const CATALOG_VERSION = 10;
 
 /** Every price, size and build rule of one mode. */
 export interface Catalog {
@@ -129,6 +129,10 @@ export interface CatalogRules {
    *  presets, auto-tune and the staffing advice. When false the schedule is
    *  the manual grid only and each assisted query is refused. */
   readonly scheduleAssist: boolean;
+  /** Whether the player may place new construction while the game is
+   *  paused. When false a placement at speed 0 is refused with a note to
+   *  unpause; the engine itself has no paused state. */
+  readonly buildsWhilePaused: boolean;
 }
 
 /** One calendar a tower can run and how it scales the quoted figures. */

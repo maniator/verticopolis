@@ -23,6 +23,9 @@ async function boot(page: Page): Promise<void> {
     return Boolean((window as any).game?.engine && canvas && canvas.width > 0);
   });
   await page.evaluate(() => document.getElementById("splash")?.remove());
+  // Classic builds only while the clock runs (#1936): run it, so a stray
+  // build would land and the builds these taps expect do.
+  await page.evaluate(() => (window as any).game.setSpeed(1));
 }
 
 /** What a stray build would change: the tower's rooms, the keyboard cursor

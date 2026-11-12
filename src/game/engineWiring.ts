@@ -9,6 +9,7 @@ import { applyReducedMotion } from "./audioPrefs";
 import { catalogOf, isUnlocked, quoteShaft } from "./portAccess";
 import { noteFrameError } from "./frameErrors";
 import { engineTrapped, noteEngineThrow } from "./engineFault";
+import { appPlacementPaused, refuseAppPlacementWhilePaused } from "./pausedBuild";
 
 /**
  * Engine wiring and post-context-loss engine rebuild, split out of the `GameApp`
@@ -38,6 +39,9 @@ function commitAfter(app: GameApp, pending: Promise<unknown> | null): Promise<vo
 interface DragGesture {
   gesture: number;
   generation: number;
+  /** The drag's paint run stopped because the game paused in a mode that
+   *  refuses building while paused (#1936), and said so once. */
+  pausedNoted?: boolean;
 }
 
 export function wireEngine(app: GameApp): void {
@@ -75,6 +79,8 @@ export function wireEngine(app: GameApp): void {
       return;
     }
     if (!touch) return; // mouse pan-taps with a build/bulldoze tool do nothing
+    // A mode that refuses building while paused (Classic, #1936) places nothing.
+    if (app.tool.type === "build" && refuseAppPlacementWhilePaused(app)) return;
     app.captureUndo(app.tool.type === "bulldoze" ? "Bulldoze" : `Build ${catalogFacility(catalogOf(app), app.tool.kind).name}`);
     if (app.tool.type === "bulldoze") app.build.bulldozePicked(picked);
     else if (app.tool.type === "build") {
@@ -98,6 +104,10 @@ export function wireEngine(app: GameApp): void {
     app.buildAnchor = null;
     app.build.clearPaint();
     drag = null;
+    // A mode that refuses building while paused (Classic, #1936) places
+    // nothing and opens no step; with no drag, the moves and the release that
+    // follow place nothing either.
+    if (app.tool.type === "build" && refuseAppPlacementWhilePaused(app)) return;
     if (app.tool.type === "bulldoze" || app.tool.type === "build") {
       app.captureUndo(app.tool.type === "bulldoze" ? "Bulldoze" : `Build ${catalogFacility(catalogOf(app), app.tool.kind).name}`);
       drag = { gesture: app.undoGesture(), generation: app.enginePort.generation() };
@@ -157,6 +167,14 @@ export function wireEngine(app: GameApp): void {
       app.engine.preview = null;
     } else if (isPaintKind(kind)) {
       if (!dragActs()) return;
+      // A run begun while the clock ran stops laying once the game pauses
+      // in a mode that refuses building while paused (#1936), and says why
+      // once for the drag.
+      if (drag && appPlacementPaused(app)) {
+        if (!drag.pausedNoted) refuseAppPlacementWhilePaused(app);
+        drag.pausedNoted = true;
+        return;
+      }
       if (app.paintAnchor) {
         // First move of a deferred touch paint: stamp the same brush strip a
         // desktop press lays at the press point, then extend from it.
@@ -180,7 +198,13 @@ export function wireEngine(app: GameApp): void {
   };
 
   app.engine.onActionUp = () => {
-    const acts = dragActs();
+    // A drag begun while the clock ran and released after a pause commits
+    // nothing in a mode that refuses building while paused (#1936); the
+    // release says why once.
+    const pending = app.tool.type === "build" && (app.paintAnchor !== null || app.buildAnchor !== null || app.transportStart !== null);
+    // A drag whose moves already said why stays refused without a second note.
+    const refused = pending && dragActs() && (drag?.pausedNoted ? appPlacementPaused(app) : refuseAppPlacementWhilePaused(app));
+    const acts = dragActs() && !refused;
     // Another gesture opened over the drag is that gesture's to close.
     const closes = drag === null || app.undoGesture() === drag.gesture;
     drag = null;
@@ -213,7 +237,7 @@ export function wireEngine(app: GameApp): void {
         // instead of failing silently.
         if (acts) app.build.tryBuildTransport(tp.kind, tp.x, tp.bottom, tp.top);
         app.engine.transportPreview = null;
-      } else if (app.transportStart) {
+      } else if (app.transportStart && !refused) {
         // Pressed without dragging, teach the drag-to-size gesture.
         app.ui.toast(`Drag up or down to set the ${catalogFacility(catalogOf(app), app.tool.kind).name.toLowerCase()}'s height.`, "info");
       }

@@ -63,6 +63,9 @@ export interface KeyboardPlayDeps {
    *  a drag-sized shaft, otherwise the engine's outcome. */
   placeSimpleBuild(kind: FacilityKind, tile: number, floor: number): PlaceOutcome | null;
   updateBuildPreview(tile: number, floor: number): void;
+  /** Refuse a new placement while paused where the mode says so
+   *  (`pausedBuild.ts`, #1936): true when refused, with its feedback shown. */
+  refusePausedPlacement(): boolean;
 }
 
 export class KeyboardPlay {
@@ -171,6 +174,9 @@ export class KeyboardPlay {
       return;
     }
     if (tool.type !== "build") return;
+    // A mode that refuses building while paused (Classic, #1936) places
+    // nothing; a shaft's first end stays anchored for when play resumes.
+    if (this.deps.refusePausedPlacement()) return;
     const kind = tool.kind;
     // Undo parity with the mouse path (onActionDown captures, onActionUp
     // commits): without this, Ctrl+Z fused a keyboard build into the previous
