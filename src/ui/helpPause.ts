@@ -89,6 +89,17 @@ export class HelpPause {
     this.ports.announce(backAt(prev));
   }
 
+  /** The player picked a speed while Help held the pause (the toolbar or a
+   *  speed key, with Help in another tab that never took focus): Help lets go
+   *  and keeps their speed. */
+  release(): void {
+    this.clearWatch();
+    if (this.prev === null) return;
+    const wasRunning = this.prev !== PAUSED;
+    this.prev = null;
+    if (wasRunning) this.ports.markToolbar(false);
+  }
+
   /** Run `open`, which replaces one Help dialog with another, keeping the pause. */
   swap(open: () => void): void {
     this.swapping = true;

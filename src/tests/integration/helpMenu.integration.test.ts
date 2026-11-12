@@ -160,6 +160,17 @@ describe("the Help menu", () => {
     expect(speed.now()).toBe(1);
   });
 
+  it("lets go of the pause, and clears the toolbar mark, when the player picks a speed with Help in another tab", async () => {
+    const { speed } = openMenu(3);
+    pauseButton().classList.add("active"); // the game marks the speed it set
+    followNewTab('a[data-act="how-to-play"]');
+    (document.querySelector('#speed button[data-speed="1"]') as HTMLButtonElement).click();
+    await vi.waitFor(() => expect(pauseButton().getAttribute("aria-label")).toBe("Pause"));
+    speed.playerSets(1);
+    leaveAndReturn();
+    expect(speed.now()).toBe(1);
+  });
+
   it("marks the page links as opened by the game", () => {
     openMenu();
     expect(inDialog('a[data-act="release-notes"]').getAttribute("href")).toBe("/help/changelog?from=game");

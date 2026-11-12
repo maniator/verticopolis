@@ -177,6 +177,22 @@ describe("HelpPause for Help in a new tab", () => {
     expect(pause.held).toBe(false);
   });
 
+  it("lets go when the player picks a speed before coming back, keeping that speed", () => {
+    const { p, playerSets, speed } = ports(3);
+    const pause = new HelpPause(p);
+    const t = tab();
+    pause.begin();
+    pause.untilReturn(t.target);
+    playerSets(1);
+    pause.release();
+    expect(pause.held).toBe(false);
+    expect(t.count()).toBe(0);
+    expect(p.markToolbar).toHaveBeenLastCalledWith(false);
+    t.leave();
+    t.comeBack();
+    expect(speed()).toBe(1);
+  });
+
   it("arms nothing when no pause is held", () => {
     const { p } = ports(0);
     const pause = new HelpPause(p);

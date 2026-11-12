@@ -50,8 +50,21 @@ export function helpPause(ui: UI): HelpPause {
       },
     });
     pauses.set(ui, pause);
+    watchPlayerSpeed(pause);
   }
   return pause;
+}
+
+/** The game marks the active speed button; when the Pause button stops being
+ *  the active one while Help holds the pause, the player chose a speed (a
+ *  click or a speed key), so Help lets go ({@link HelpPause.release}). One
+ *  observer on one attribute of one button. */
+function watchPlayerSpeed(pause: HelpPause): void {
+  const button = document.querySelector<HTMLElement>('#speed button[data-speed="0"]');
+  if (!button || typeof MutationObserver === "undefined") return;
+  new MutationObserver(() => {
+    if (pause.held && !button.classList.contains("active")) pause.release();
+  }).observe(button, { attributes: true, attributeFilter: ["class"] });
 }
 
 interface HelpDialogOpts {
