@@ -76,9 +76,18 @@ fn classic_has_no_halos() {
 /// A content condo of five on floor 3 with each `(venue, floor)` built and
 /// open: its inspector's amenity fact.
 fn amenity_near(mode: GameMode, venues: &[(Kind, i64)]) -> Option<(&'static str, f64)> {
+    amenity_in(mode, UnitState::Occupied, venues)
+}
+
+/// As [`amenity_near`], with the condo in `state`.
+fn amenity_in(
+    mode: GameMode,
+    state: UnitState,
+    venues: &[(Kind, i64)],
+) -> Option<(&'static str, f64)> {
     let mut sim = lot_tower(5, mode, 12);
     let condo = put(&mut sim, Kind::Condo, 3, C);
-    seat(&mut sim, condo, UnitState::Occupied, 1.0);
+    seat(&mut sim, condo, state, 1.0);
     sim.tower.get_unit_mut(condo).unwrap().residents = Some(5);
     for &(kind, floor) in venues {
         // A venue on the condo's own floor stands further along it.
@@ -122,4 +131,6 @@ fn the_inspector_names_the_amenity_that_lifts_a_room_most() {
         "a drain"
     );
     assert_eq!(amenity_near(GameMode::Classic, &[]), None);
+    let gutted = amenity_in(modern, UnitState::Gutted, &[(Kind::FitnessClub, 4)]);
+    assert_eq!(gutted, None, "a gutted room has no tenant to help");
 }

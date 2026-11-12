@@ -21,12 +21,14 @@ pub struct AmenityFacts {
 
 impl Simulation {
     /// The amenity whose halo lifts `u` most, or `None` in Classic, for a
-    /// room no amenity reaches, and for one cut off from the lobby (the step
-    /// gives an unserved room no halo). A tie goes to the earlier halo.
+    /// room no amenity reaches, for one cut off from the lobby (the step
+    /// gives an unserved room no halo), and for one that is not operating
+    /// (under construction, on fire or gutted). A tie goes to the earlier
+    /// halo.
     pub(super) fn amenity_facts(&mut self, u: &Unit) -> Option<AmenityFacts> {
         let mode = self.mode;
         let felt = |h: &&crate::rules::Halo| h.effect == HaloEffect::Lift && h.felt_by(u.kind);
-        if !mode.halos().iter().any(|h| felt(&h)) || !self.reaches_lobby(u) {
+        if !u.is_operational() || !mode.halos().iter().any(|h| felt(&h)) || !self.reaches_lobby(u) {
             return None;
         }
         let family = u.residents.unwrap_or(0) as f64;
