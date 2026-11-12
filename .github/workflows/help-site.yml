@@ -17,6 +17,7 @@ on:
       - "src/ui/fromGame.ts"
       - "src/telemetry.ts"
       - "src/analytics*.ts"
+      - "src/appVersion.ts"
       - "package.json"
       - ".github/workflows/help-site.yml"
 
@@ -54,10 +55,13 @@ jobs:
       - name: Build the site
         run: npm run build --prefix help-site
 
-      - name: Check the pages are there
+      # Every page is there, and only the front page draws the title screen
+      # (Starlight shows the hero only where a page's front matter sets one).
+      - name: Check the pages
         run: |
-          for page in index getting-started going-further classic-vs-modern phones keyboard privacy; do
-            file="dist/help/index.html"
-            [ "$page" = index ] || file="dist/help/$page/index.html"
+          grep -q 'class="title-screen' dist/help/index.html || { echo "::error::the front page has no title screen"; exit 1; }
+          for page in getting-started going-further classic-vs-modern phones keyboard privacy; do
+            file="dist/help/$page/index.html"
             test -s "$file" || { echo "::error::missing $file"; exit 1; }
+            if grep -q 'class="title-screen' "$file"; then echo "::error::$file draws the title screen"; exit 1; fi
           done
