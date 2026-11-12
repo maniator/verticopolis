@@ -13,7 +13,12 @@ const JSON_BYTES: &[u8] = b"{}[],:\"0-.e\\ ";
 /// How many of the 400 seeded edits below stream. The edits and the saves
 /// are fixed, so the count is too; a new count means an edit changed sides,
 /// which wants a look at which one before the count is moved.
-const STREAMED: usize = 151;
+///
+/// 151 became 144 when a car stopped landing a hair short of its stop: the
+/// base saves' one car now ends at 1.0 (was 1.04), with a different load and
+/// direction, so the seeded edits fall on different bytes. No reader
+/// disagreement came with it.
+const STREAMED: usize = 144;
 
 /// Seeded edits of engine saves, a few bytes each: dropped, inserted,
 /// changed or copied, or the text cut short. Whatever comes out, both

@@ -29,10 +29,27 @@ fn tower_with_elevator(top: i64) -> (Simulation, i64) {
     (sim, id)
 }
 
+/// Opens the doors of every elevator car standing on a floor, as the
+/// dispatch does for a parked car. `pump` moves no cars, so it opens them
+/// itself, or nobody could board.
+fn open_standing_cars(sim: &mut Simulation) {
+    let mut open = Vec::new();
+    for t in sim.tower.transports.iter().filter(|t| t.kind.is_elevator()) {
+        for (i, &pos) in t.car_positions.iter().enumerate() {
+            if pos.fract() == 0.0 {
+                open.push((t.id, i as i64, pos as i64));
+            }
+        }
+    }
+    open.sort_unstable();
+    sim.crowd.open_cars = open;
+}
+
 /// `crowd.update(dt, tower, clock)`: one spawn step and one motion step on
-/// a clear day, with no cars moved.
+/// a clear day, with no cars moved (the ones standing on a floor open).
 fn pump(sim: &mut Simulation, dt_sec: f64, steps: usize) {
     for _ in 0..steps {
+        open_standing_cars(sim);
         let population = sim.tower.total_population();
         spawn_step(
             &mut sim.crowd,
@@ -106,6 +123,8 @@ fn a_rider_reaches_a_floor_the_demand_model_never_calls() {
         let calls = sim.crowd.elevator_calls(&sim.tower);
         sim.elevators
             .move_cars(&mut sim.tower, 1.0, &calls, 12, false);
+        sim.elevators.swap_closed_cars(&mut sim.crowd.closed_cars);
+        sim.elevators.swap_open_cars(&mut sim.crowd.open_cars);
         advance(&mut sim.crowd, CROWD_SECONDS_PER_MINUTE, &mut sim.tower);
         let Some(p) = sim.crowd.people.first() else {
             break;

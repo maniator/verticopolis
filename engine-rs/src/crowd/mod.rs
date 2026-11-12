@@ -231,12 +231,22 @@ pub struct Crowd {
     /// still finishing the riders it carries.
     /// Swapped in from the dispatch each step; never saved.
     pub closed_cars: Vec<(i64, i64)>,
+    /// The cars standing at a stop with their doors open, as (shaft id, car
+    /// index, floor), ascending: the only cars a person boards or leaves.
+    /// Swapped in from the dispatch each step; never saved.
+    pub open_cars: Vec<(i64, i64, i64)>,
     /// The queue projection and the (step, tower revision) it was built
     /// for (`queue_view`, `render_reads.rs`). Never saved.
     pub queue_cache: Option<((i64, i64), crate::render_reads::QueueView)>,
 }
 
 impl Crowd {
+    /// Whether car `car` of shaft `shaft` stands at `floor` with its doors
+    /// open this step, so a person there may step on or off.
+    pub fn door_open(&self, shaft: i64, car: i64, floor: i64) -> bool {
+        self.open_cars.binary_search(&(shaft, car, floor)).is_ok()
+    }
+
     pub fn new(seed: u32) -> Crowd {
         Crowd {
             people: Vec::new(),
@@ -257,6 +267,7 @@ impl Crowd {
             staff_count: 0,
             step: 0,
             closed_cars: Default::default(),
+            open_cars: Default::default(),
             queue_cache: None,
         }
     }

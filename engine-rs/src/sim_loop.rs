@@ -108,6 +108,7 @@ impl Simulation {
             self.elevators
                 .move_cars(&mut self.tower, chunk, &calls, hour, weekend);
             self.elevators.swap_closed_cars(&mut self.crowd.closed_cars);
+            self.elevators.swap_open_cars(&mut self.crowd.open_cars);
             motion::advance(
                 &mut self.crowd,
                 chunk * CROWD_SECONDS_PER_MINUTE,

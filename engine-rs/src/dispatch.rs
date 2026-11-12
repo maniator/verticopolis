@@ -12,6 +12,10 @@ use crate::tower::Tower;
 
 pub const CAR_FLOORS_PER_MINUTE: f64 = 0.8;
 const DWELL_MINUTES: f64 = 0.8;
+/// How close, in floors, a car counts as standing at a stop: the stop
+/// search looks past a stop this near, so a car that ends a move this near
+/// its target lands on it instead of skipping it.
+const AT_STOP_FLOORS: f64 = 0.05;
 
 /// Stops per word of a stop bit set: stop `k` of the shaft in hand is bit
 /// `k % 64` of word `k / 64`.
@@ -45,6 +49,12 @@ pub struct ElevatorDispatch {
     /// car outside this set, so nobody boards a car that is parked or about
     /// to park (the crowd keeps its own copy).
     closed_cars: Vec<(i64, i64)>,
+    /// The cars standing at a stop with their doors open after this
+    /// `move_cars`, as (shaft id, car index, floor), ascending: a car that
+    /// arrived, one still dwelling, or one parked at its home floor. People
+    /// step on and off only these cars, so nobody boards or leaves a car
+    /// that is passing a floor.
+    open_cars: Vec<(i64, i64, i64)>,
     /// Scratch of zero words, the calls a stood-down car answers: none.
     no_calls: Vec<u64>,
 }
@@ -71,6 +81,18 @@ impl ElevatorDispatch {
     /// no step allocates. `move_cars` clears the list it gets back.
     pub fn swap_closed_cars(&mut self, crowd_list: &mut Vec<(i64, i64)>) {
         std::mem::swap(&mut self.closed_cars, crowd_list);
+    }
+
+    /// The cars standing at a stop with their doors open, as (shaft id, car
+    /// index, floor), ascending, so a binary search finds a car at a floor.
+    pub fn open_cars(&self) -> &[(i64, i64, i64)] {
+        &self.open_cars
+    }
+
+    /// Hands the crowd this step's open cars by swapping the two lists, as
+    /// `swap_closed_cars` does. `move_cars` clears the list it gets back.
+    pub fn swap_open_cars(&mut self, crowd_list: &mut Vec<(i64, i64, i64)>) {
+        std::mem::swap(&mut self.open_cars, crowd_list);
     }
 
     pub fn waiting_at(&self, floor: i64) -> f64 {
@@ -151,6 +173,7 @@ impl ElevatorDispatch {
         let floors = tower.dispatch_floors();
         let n = tower.transports.len();
         self.closed_cars.clear();
+        self.open_cars.clear();
         for ti in 0..n {
             let (kind, id) = {
                 let t = &tower.transports[ti];
@@ -252,9 +275,12 @@ impl ElevatorDispatch {
                     dwell[i] -= pause;
                     car_dt -= pause;
                     if car_dt <= 0.0 {
-                        if let Some(k) = stop_index(jsmath::round(t.car_positions[i]) as i64) {
+                        let floor = jsmath::round(t.car_positions[i]) as i64;
+                        if let Some(k) = stop_index(floor) {
                             set_bit(claimed, k);
                         }
+                        // Still dwelling: the doors stay open all step.
+                        self.open_cars.push((id, i as i64, floor));
                         continue;
                     }
                 }
@@ -302,14 +328,23 @@ impl ElevatorDispatch {
                         if (pos - tg).abs() < 0.05 {
                             t.car_dir[i] = 0;
                             car_load[i] = 0.0;
+                            // Parked at home: it settles on the floor and
+                            // opens for whoever waits there.
+                            t.car_positions[i] = tg;
+                            self.open_cars.push((id, i as i64, car_home));
                             continue;
                         }
                         tg
                     }
                 };
-                if (target - pos).abs() <= v {
+                // A car that would end this move within `AT_STOP_FLOORS` of
+                // its target lands on it now: left short, the next search
+                // would look past the stop and the car would glide by it.
+                if (target - pos).abs() <= v + AT_STOP_FLOORS {
                     pos = target;
                     dwell[i] = shaft_dwell;
+                    // Arrived: the doors open for the rest of the step.
+                    self.open_cars.push((id, i as i64, target as i64));
                     car_load[i] = (car_load[i] - (car_load[i] * 0.45).ceil()).max(0.0);
                     let tf = target as i64;
                     let w = if staff_only {
@@ -356,6 +391,7 @@ impl ElevatorDispatch {
         // The crowd searches the list, and the shafts come in saved order,
         // which need not be id order.
         self.closed_cars.sort_unstable();
+        self.open_cars.sort_unstable();
     }
 }
 
@@ -449,9 +485,9 @@ impl Demand<'_> {
         let stops = self.stops;
         let dist = |k: usize| (stops[k] as f64 - pos).abs();
         let k = if dir > 0 {
-            self.first_from(stops.partition_point(|&s| s as f64 <= pos + 0.05))?
+            self.first_from(stops.partition_point(|&s| s as f64 <= pos + AT_STOP_FLOORS))?
         } else {
-            self.last_below(stops.partition_point(|&s| (s as f64) < pos - 0.05))?
+            self.last_below(stops.partition_point(|&s| (s as f64) < pos - AT_STOP_FLOORS))?
         };
         let d = dist(k);
         // Going down, a lower stop at the same distance wins. Only a finite

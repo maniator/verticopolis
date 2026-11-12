@@ -174,7 +174,11 @@ fn bulldozing_the_origin_on_the_return_leg_strands_nobody() {
     let (mut sim, _, _) = office_and_fast_food();
     let origin = origin_of(&mut sim, 90, |p| p.returning && p.state != PState::Done);
     assert!(sim.tower.remove_unit(origin).is_some());
-    for _ in 0..30 {
+    // Long enough for the returner's ride and for any diner from the same
+    // office still at the meal to finish it: a diner mid-meal is not
+    // stranded, and leaves when the meal ends.
+    let window = MEAL_DWELL_MINUTES.1 as usize + 30;
+    for _ in 0..window {
         sim.tick(1.0);
     }
     assert_eq!(stranded_from(&sim, origin), 0);

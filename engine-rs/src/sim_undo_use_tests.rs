@@ -281,7 +281,8 @@ fn the_dispatch_counts_the_riders_it_takes_on() {
 }
 
 /// A rider in the crowd, with the dispatch standing still: a person waiting
-/// on floor 1, where the car stands, gets on and rides it.
+/// on floor 1, where the car stands with its doors open, gets on and rides
+/// it.
 #[test]
 fn the_crowd_counts_the_riders_who_get_on() {
     let mut sim = tower();
@@ -293,6 +294,7 @@ fn the_crowd_counts_the_riders_who_get_on() {
     let i = make_person(&mut sim.crowd, &sim.tower, route, 30.0, None);
     let p = &mut sim.crowd.people[i];
     (p.state, p.x) = (PState::Waiting, 16.0);
+    sim.crowd.open_cars = vec![(id, 0, 1)];
     motion::advance(&mut sim.crowd, 0.1, &mut sim.tower);
     assert_eq!(sim.crowd.people[i].state, PState::Riding);
     assert_eq!(sim.tower.get_transport(id).unwrap().rides, 1);
