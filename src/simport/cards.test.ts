@@ -45,9 +45,12 @@ const OFFICE = record("unitCard", {
   filmDays: NaN,
   filmTier: NaN,
   ticketPrice: NaN,
+  screen2Policy: NaN,
+  screen2Days: NaN,
+  screen2Tier: NaN,
 });
 
-const CINEMA = record("unitCard", { id: 12, kindCode: code("kinds", "cinema"), rent: NaN, vacateReason: NaN, filmPolicy: code("filmPolicies", "blockbuster"), blockbuster: 1, filmDays: 4, filmTier: code("filmTiers", "classic"), ticketPrice: code("ticketPrices", "premium") });
+const CINEMA = record("unitCard", { id: 12, kindCode: code("kinds", "cinema"), rent: NaN, vacateReason: NaN, filmPolicy: code("filmPolicies", "blockbuster"), blockbuster: 1, filmDays: 4, filmTier: code("filmTiers", "classic"), ticketPrice: code("ticketPrices", "premium"), screen2Policy: NaN, screen2Days: 0, screen2Tier: code("filmTiers", "blockbuster") });
 
 /** A stop row: floor, then the served, lobby and endpoint flags. */
 const stop = (floor: number, served: number, lobby: number, endpoint: number) => [floor, served, lobby, endpoint];
@@ -82,6 +85,7 @@ describe("Cards.unit", () => {
       filmDays: null,
       filmTier: null,
       ticketPrice: null,
+      screen2: null,
     });
     expect(vi.mocked(port.unitCard).mock.calls).toEqual([[10]]);
     expect(vi.mocked(port.unitLabel).mock.calls).toEqual([[10]]);
@@ -93,6 +97,8 @@ describe("Cards.unit", () => {
     const card = new Cards(port, readerAt(1, 0)).unit(12)!;
     expect([card.filmPolicy, card.blockbuster, card.rent, card.vacateReason, card.label, card.subtype]).toEqual(["blockbuster", true, null, null, "", "art house"]);
     expect([card.filmDays, card.filmTier, card.ticketPrice]).toEqual([4, "classic", "premium"]);
+    // A second screen that has shown its film no night yet, with no choice of its own (#1950).
+    expect(card.screen2).toEqual({ filmPolicy: null, filmDays: 0, filmTier: "blockbuster" });
   });
 
   it("answers undefined for an id the engine has no card for, reading no text", () => {

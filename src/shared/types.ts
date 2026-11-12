@@ -282,6 +282,15 @@ export interface Unit {
   filmDays?: number;
   /** A Modern theater's ticket price step (#1950); `undefined` is Normal. */
   ticketPrice?: "low" | "high" | "premium";
+  /** A Modern theater's second screen, with the keys of the first, saved
+   *  only while it shows something other than the first (#1950).
+   *  `undefined` shows the first screen's film on both. */
+  screen2?: {
+    filmPolicy?: "auto" | "feature" | "blockbuster" | "revival" | "off";
+    filmDays?: number;
+    filmClassic?: true;
+    filmBlockbuster?: true;
+  };
   /** Canon retail variant name for shop / fastFood / restaurant only (per
    *  `docs/canon/tdt-format.md` §7 lists). `undefined` on every other kind,
    *  and on legacy retail units from saves that predate this field, so they

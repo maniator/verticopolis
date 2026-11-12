@@ -19,6 +19,7 @@
       }
     ],
     "carResaleRefund": 20000,
+    "cinemaScreens": 2,
     "condoHoldTaxRate": 0.015,
     "exterminator": {
       "calloutFee": 5000,
@@ -1985,7 +1986,7 @@
     "scheduleAssist": true,
     "variantHouseholds": true
   },
-  "version": 12,
+  "version": 13,
   "world": {
     "groundFloor": 1,
     "groundFloorStructure": "lobby",

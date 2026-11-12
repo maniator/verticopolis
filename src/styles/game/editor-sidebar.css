@@ -29,6 +29,11 @@
   padding: 5px;
   font-size: 11px;
 }
+/* A theater screen's heading above its film buttons (#1950). */
+#editor .ed-screen {
+  margin-top: 8px;
+  font-size: 11px;
+}
 #editor .ed-row .field {
   flex: 2;
   padding: 4px 6px;

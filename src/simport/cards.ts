@@ -1,7 +1,7 @@
 import type { FacilityKind, UnitState, VacateReason } from "../shared/types";
 import type { FilmPolicy, FilmTier, TicketPrice } from "./commands";
-import type { EnginePort } from "./enginePort";
-import type { HourlyView, OriginsView, StopRow, TransportDetail, UnitDetail } from "./panels";
+import type { EnginePort, PortRecord } from "./enginePort";
+import type { HourlyView, OriginsView, ScreenDetail, StopRow, TransportDetail, UnitDetail } from "./panels";
 import type { ViewReader } from "./viewReader";
 
 /**
@@ -92,6 +92,19 @@ export class Cards {
       filmDays: nullable(r[at.filmDays]),
       filmTier: named<FilmTier>(l.filmTiers, r[at.filmTier]),
       ticketPrice: named<TicketPrice>(l.ticketPrices, r[at.ticketPrice]),
+      screen2: this.secondScreen(r),
+    };
+  }
+
+  /** A theater's second screen from its card, or null where it runs one. */
+  private secondScreen(r: PortRecord): ScreenDetail | null {
+    const at = this.unitAt;
+    const days = r[at.screen2Days];
+    if (Number.isNaN(days)) return null;
+    return {
+      filmPolicy: named<FilmPolicy>(this.layout.filmPolicies, r[at.screen2Policy]),
+      filmDays: days,
+      filmTier: named<FilmTier>(this.layout.filmTiers, r[at.screen2Tier]) ?? "new",
     };
   }
 

@@ -69,7 +69,7 @@ function fourStarEdits(s: PortEditSession): void {
   s.done("build an office at floor 58, x 120", "buildAt", s.kind("office"), 58, 120);
   buildRow(s, "floor", 58, span(129, 136));
   s.done("build stairs at x 130 from floor 57 to 58", "buildShaft", s.kind("stairs"), 130, 57, 58);
-  s.done("show blockbusters at the cinema", "setFilm", s.unitAt(10, 240), s.code("filmPolicies", "blockbuster"));
+  s.done("show blockbusters at the cinema", "setFilm", s.unitAt(10, 240), s.code("filmPolicies", "blockbuster"), 0);
   s.done("reroll the shop", "rerollUnit", s.unitAt(13, 238));
   const office = s.unitAt(2, 150);
   s.done("set the office's rent to 10000", "setRent", office, 10000);

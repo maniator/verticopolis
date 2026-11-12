@@ -1,5 +1,5 @@
 {
-  "version": 18,
+  "version": 19,
   "header": {
     "minutes": 0,
     "towerRevision": 1,
@@ -487,7 +487,10 @@
       "blockbuster",
       "filmDays",
       "filmTier",
-      "ticketPrice"
+      "ticketPrice",
+      "screen2Policy",
+      "screen2Days",
+      "screen2Tier"
     ],
     "shaftCard": [
       "id",

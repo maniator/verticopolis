@@ -2,8 +2,8 @@ import { html, nothing, type TemplateResult } from "lit-html";
 import { keyed } from "lit-html/directives/keyed.js";
 import { isOperational, isTenanted } from "../../shared/unitState";
 import { isCommercialKind, isHotelKind } from "../../presentation/viewKinds";
-import { catalogFacility, catalogFilmRebook, catalogTicketPrice, filmEditAction, catalogHouseholdPrice, catalogOpenAt, catalogResidents, rungFor, type Catalog } from "../../catalog/catalogTypes";
-import type { TransportDetail, UnitDetail } from "../../simport/panels";
+import { catalogFacility, catalogFilmRebook, catalogTicketPrice, filmEditAction, filmPolicyEditAction, catalogHouseholdPrice, catalogOpenAt, catalogResidents, rungFor, type Catalog } from "../../catalog/catalogTypes";
+import type { ScreenDetail, TransportDetail, UnitDetail } from "../../simport/panels";
 import { priceOptionsFor } from "../catalogPricing";
 import { hasAccessDiagnostic } from "../../game/cardLines";
 import { rungPickerTemplate, type RungChoice } from "./rungPicker";
@@ -36,6 +36,14 @@ const titleBar = (name: string): TemplateResult =>
 /** One key/value stat row. `field` marks the cells that carry live values. */
 const kv = (label: string, value: unknown, field?: string): TemplateResult =>
   html`<span class="k">${label}</span><span class="v" data-field=${field ?? nothing}>${value}</span>`;
+
+/** A theater's screens, the first from its own fields: none off a cinema,
+ *  and a second only where it runs two (#1950). */
+function cinemaScreens(u: UnitDetail): ScreenDetail[] {
+  if (u.kind !== "cinema") return [];
+  const first: ScreenDetail = { filmPolicy: u.filmPolicy, filmDays: u.filmDays ?? 0, filmTier: u.filmTier ?? "new" };
+  return u.screen2 ? [first, u.screen2] : [first];
+}
 
 /** One action row of the editor card. */
 const edRow = (inner: TemplateResult): TemplateResult => html`<div class="ed-row">${inner}</div>`;
@@ -125,14 +133,23 @@ export function unitEditorTemplate(
       : `$${groupDigits(u.kind === "condo" ? catalogHouseholdPrice(catalog, u.price, u.residents) : u.price)}${isHotelKind(u.kind) ? "/night" : ""}`;
     rows.push(kv(label, rent, "rent"));
   }
-  // A theater shows one film, and the player pays to show another; the
-  // catalog lists the mode's films and their prices (#1932, #1950).
+  // A theater shows a film on each screen, and the player pays to show
+  // another; the catalog lists the mode's films and their prices (#1932,
+  // #1950). A Modern theater runs two screens, each with its own row.
   const { films } = catalog.economy;
+  const filmLabel = (tier: string | null) => films.find((film) => film.key === tier)?.label ?? "—";
+  const screens = cinemaScreens(u);
   if (u.kind === "cinema" && isOperational(u)) {
     // A gutted/burning/under-construction cinema shows no film, omit the rows.
-    const showing = films.find((film) => film.key === u.filmTier);
-    rows.push(kv("Now showing", showing?.label ?? "—", "showing"));
-    rows.push(kv("Days showing", u.filmDays ?? 0, "filmDays"));
+    if (screens.length > 1) {
+      screens.forEach((screen, i) => {
+        const days = screen.filmDays === 1 ? "1 day" : `${screen.filmDays} days`;
+        rows.push(kv(`Screen ${i + 1}`, `${filmLabel(screen.filmTier)}, ${days}`, i === 0 ? "showing" : `showing${i + 1}`));
+      });
+    } else {
+      rows.push(kv("Now showing", filmLabel(u.filmTier), "showing"));
+      rows.push(kv("Days showing", u.filmDays ?? 0, "filmDays"));
+    }
   }
   if (u.state === "gutted") {
     rows.push(kv("Scrap value", "$0"));
@@ -194,19 +211,25 @@ export function unitEditorTemplate(
       edRow(html`<button class="btn" data-edit="batchKind">Set all ${f.name.toLowerCase()}s…</button>`),
     );
   }
-  // Only an open theater shows a film (the engine refuses the others).
-  if (u.kind === "cinema" && isOperational(u)) {
-    actions.push(
-      edRow(html`${films.map((film) => html`<button class="btn" data-edit=${filmEditAction(film.key)}>${film.label} ($${groupDigits(film.price)})</button>`)}`),
-    );
-  }
-  // The film the theater books again once its film is spent (#1950), where
-  // the mode rebooks.
-  const rebook = u.kind === "cinema" ? catalogFilmRebook(catalog, u.filmPolicy) : null;
-  if (rebook) {
-    const label = films.find((film) => film.key === rebook.film)?.label ?? "Off";
-    actions.push(edRow(html`<button class="btn" data-edit="filmPolicy">Auto-rebook: ${label} ▸</button>`));
-  }
+  // Each screen's films to book, then the film it books again once its film
+  // is spent, where the mode rebooks (#1950). Only an open theater shows a
+  // film (the engine refuses the others); with two screens each names itself.
+  screens.forEach((screen, i) => {
+    const named = screens.length > 1;
+    if (isOperational(u)) {
+      const book = films.map(
+        (film) => html`<button class="btn" data-edit=${filmEditAction(film.key, i)}>${film.label} ($${groupDigits(film.price)})</button>`,
+      );
+      if (named) actions.push(html`<div class="ed-screen">Book a film on screen ${i + 1}</div>`);
+      actions.push(edRow(html`${book}`));
+    }
+    const rebook = catalogFilmRebook(catalog, screen.filmPolicy);
+    if (rebook) {
+      const label = rebook.film === null ? "Off" : filmLabel(rebook.film);
+      const what = named ? `Screen ${i + 1} auto-rebook` : "Auto-rebook";
+      actions.push(edRow(html`<button class="btn" data-edit=${filmPolicyEditAction(i)}>${what}: ${label} ▸</button>`));
+    }
+  });
   // The theater's ticket price (#1950), where the mode has one.
   const ticket = u.kind === "cinema" ? catalogTicketPrice(catalog, u.ticketPrice) : null;
   if (ticket) {

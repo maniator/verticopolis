@@ -272,7 +272,7 @@ export function describeEngineContract(name: string, make: MakeEngine): void {
         ["No Rate on Modern", (p) => p.noRate(t.office)],
         ["price nobody", (p) => p.setRent(-1, 3000)],
         ["batch floor tiles", (p) => p.rentBatch(kind("floor"), NaN, false)],
-        ["a film for an office", (p) => p.setFilm(t.office, 1)],
+        ["a film for an office", (p) => p.setFilm(t.office, 1, 0)],
         ["reroll an office", (p) => p.rerollUnit(t.office)],
         ["the exterminator, with nothing to treat", (p) => p.bookExterminator(), "none"],
         ["an answer with no emergency", (p) => p.answerChoice(true)],

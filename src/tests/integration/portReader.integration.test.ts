@@ -180,7 +180,7 @@ describe.skipIf(noEngine)("Cards.unit on the engine", () => {
     const codes = new PortCodes(e);
     const cinema = unitOf(e, "cinema") as { id: number };
     expect(cards.unit(cinema.id)!.blockbuster).toBe(false);
-    expect(e.setFilm(cinema.id, codes.code("filmPolicies", "blockbuster"))[0]).toBe(1);
+    expect(e.setFilm(cinema.id, codes.code("filmPolicies", "blockbuster"), 0)[0]).toBe(1);
     expect(cards.unit(cinema.id)!.filmPolicy).toBe("blockbuster");
     expect(e.labelUnit(cinema.id, "Odeon")[0]).toBe(1);
     expect(cards.unit(cinema.id)!.label).toBe("Odeon");

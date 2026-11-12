@@ -12,6 +12,7 @@
       }
     ],
     "carResaleRefund": 20000,
+    "cinemaScreens": 1,
     "condoHoldTaxRate": 0,
     "exterminator": null,
     "filmRebookDefault": null,
@@ -1991,7 +1992,7 @@
     "scheduleAssist": false,
     "variantHouseholds": false
   },
-  "version": 12,
+  "version": 13,
   "world": {
     "groundFloor": 1,
     "groundFloorStructure": "lobby",
