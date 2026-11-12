@@ -1,5 +1,4 @@
 import type * as ex from "excalibur";
-import { viewWorld } from "../../presentation/viewWorld";
 import type { RenderSim } from "../renderSim";
 import type { UnitView } from "../../simport/view";
 import { lobbyVariant } from "../sprites";
@@ -50,7 +49,7 @@ export function syncStructureTiles(engine: TowerEngine): readonly UnitView[] {
     }
     return pass.rooms;
   }
-  const maxFloor = viewWorld().maxFloor;
+  const topFloor = engine.structTopFloor;
   const rooms: UnitView[] = [];
   const lobbies: [ex.Tile, UnitView][] = [];
   const floor1Lobbies: UnitView[] = [];
@@ -62,7 +61,7 @@ export function syncStructureTiles(engine: TowerEngine): readonly UnitView[] {
     }
     if (u.kind === "lobby" && u.floor === 1) floor1Lobbies.push(u);
     // Floor/lobby units are one tile wide, so a unit maps to one cell.
-    const cell = engine.structTileMap.getTile(u.x, maxFloor - u.floor);
+    const cell = engine.structTileMap.getTile(u.x, topFloor - u.floor);
     if (!cell) continue; // outside the grid; the engine never places there
     seenS.add(cell);
     engine.structTiles.add(cell);

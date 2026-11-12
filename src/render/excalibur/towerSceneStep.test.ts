@@ -4,6 +4,7 @@ import { syncFacade, syncScene } from "./towerReconcile";
 import { followStep, setSim } from "./towerScene";
 import { runSceneSync } from "./towerSyncSchedule";
 import { NOT_BAKED } from "./sceneBake";
+import { bindViewWorld, viewWorld } from "../../presentation/viewWorld";
 import type { RenderSim } from "../renderSim";
 import type { TowerEngine } from "./TowerEngine";
 
@@ -231,5 +232,59 @@ describe("a swap to another tower", () => {
     };
     expect(queued("swap"), "flagged at once, nothing left queued").toEqual([[], 1]);
     expect(queued("step"), "still queued for the drain").toEqual([["r"], 0]);
+  });
+});
+
+/** The scene of {@link sceneUnderSwap} with a structure map whose row 0 is
+ *  `topFloor`, and an Excalibur engine that records what enters and leaves. */
+function sceneWithStructMap(topFloor: number) {
+  const { scene, tower } = sceneUnderSwap();
+  const oldMap = { kind: "the map built for the old tower" };
+  const withMap = Object.assign(scene, {
+    structTileMap: oldMap,
+    structTopFloor: topFloor,
+    engine: { add: vi.fn(), remove: vi.fn() },
+    worldYTop: (floor: number) => -floor * 10,
+  });
+  return { scene: withMap, tower, oldMap };
+}
+
+describe("a swap to a tower with another top floor (#1985)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+  });
+  afterEach(() => vi.useRealTimers());
+
+  it("builds a structure map of the new tower's height and drops the old one", () => {
+    const world = viewWorld();
+    const { scene, tower, oldMap } = sceneWithStructMap(world.maxFloor - 20);
+    setSim(scene as unknown as TowerEngine, tower(42));
+    const map = scene.structTileMap as unknown as { rows: number; columns: number };
+    expect(scene.engine.remove, "the old map leaves the scene").toHaveBeenCalledWith(oldMap);
+    expect(scene.engine.add, "the new one enters it").toHaveBeenCalledWith(map);
+    expect(map).not.toBe(oldMap);
+    expect([map.rows, map.columns], "one row per floor of the bound world").toEqual([world.maxFloor - world.minFloor + 1, world.lotWidth]);
+    expect(scene.structTopFloor, "the tile pass now maps floors against this map").toBe(world.maxFloor);
+  });
+
+  it("keeps the structure map for a tower with the same top floor", () => {
+    const { scene, tower, oldMap } = sceneWithStructMap(viewWorld().maxFloor);
+    setSim(scene as unknown as TowerEngine, tower(42));
+    expect(scene.structTileMap).toBe(oldMap);
+    expect([scene.engine.remove, scene.engine.add].map((f) => f.mock.calls.length)).toEqual([0, 0]);
+  });
+
+  it("leaves the scene as it was when the swapped-in tower's lot is refused", () => {
+    const { scene, tower, oldMap } = sceneWithStructMap(viewWorld().maxFloor - 20);
+    const cell = { clearGraphics: vi.fn() };
+    scene.structTiles.add(cell);
+    vi.mocked(bindViewWorld).mockImplementationOnce(() => {
+      throw new Error("the catalog's lot differs from the one the view was built for");
+    });
+    expect(() => setSim(scene as unknown as TowerEngine, tower(42))).toThrow(/differs/);
+    expect(scene.structTileMap, "no map was rebuilt").toBe(oldMap);
+    expect(cell.clearGraphics, "no cell was cleared").not.toHaveBeenCalled();
+    expect(scene.builtRev, "the old tower's bake stands").toBe(42);
   });
 });
