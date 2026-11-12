@@ -2,7 +2,7 @@ import type { LedgerCat } from "../shared/engineTypes";
 import type { HeatmapMode } from "../shared/engineTypes";
 import type { StarGateId } from "../shared/engineTypes";
 import type { FacilityKind, UnitState, VacateReason } from "../shared/types";
-import type { FilmPolicy, FilmTier } from "./commands";
+import type { FilmPolicy, FilmTier, TicketPrice } from "./commands";
 
 /**
  * What the panels ask the engine and what it answers (facade slice 4, #1211).
@@ -142,6 +142,9 @@ export interface UnitDetail {
   readonly filmDays: number | null;
   /** The film a theater shows; null off a cinema (#1950). */
   readonly filmTier: FilmTier | null;
+  /** A Modern theater's ticket price step; null off a cinema and in Classic
+   *  (#1950). */
+  readonly ticketPrice: TicketPrice | null;
 }
 
 /** One floor of an elevator's stop list, top floor first. */

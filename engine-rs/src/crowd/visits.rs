@@ -1,9 +1,10 @@
 //! Port of `crowd/visits.ts`: attendance round trips and the dwell entry.
 
 use super::meals::matches_meal_origin_kind;
-use super::spawn::{add, inside_x, venue_has_room, Options, SpawnFloors};
+use super::spawn::{add, inside_x, venue_has_room, weighted_index, Options, SpawnFloors};
 use super::{dwell_seconds_range, Crowd, PState};
 use crate::clock::Clock;
+use crate::economy::tickets::ticket_pick_mult;
 use crate::facilities::Kind;
 use crate::tower::Tower;
 
@@ -54,48 +55,57 @@ fn meal_origin_of(origin: VisitOrigin) -> super::meals::MealOrigin {
 
 pub fn push_venue_visit_options(
     crowd: &mut Crowd,
-    _tower: &Tower,
+    tower: &Tower,
     clock: &Clock,
     floors: &SpawnFloors,
     options: &mut Options,
 ) {
     let hour = clock.hour();
-    let mut push_visits = |kind: Kind, venue_floors: &[i64]| {
+    let mut push_visits = |kind: Kind, venue_floors: &[i64], weight: f64| {
         for &origin in visit_origins(kind).unwrap() {
             if origin != VisitOrigin::Outside && origin_floors_for(origin, floors).is_empty() {
                 continue;
             }
-            options.push_venue_visit(kind, venue_floors.to_vec(), origin);
+            options.push_venue_visit(kind, venue_floors.to_vec(), origin, weight);
         }
     };
     if let Some(cinemas) = floors.venues_by_kind.get(&Kind::Cinema) {
         if !cinemas.is_empty() {
-            push_visits(Kind::Cinema, cinemas);
+            // Ticket prices move the theaters' whole share of the crowd by
+            // their mean pick multiplier (#1950); at Normal it is 1.
+            push_visits(Kind::Cinema, cinemas, floors.cinema_picks.unwrap_or(1.0));
             if !crowd.blockbusters.is_empty() {
                 let mut bb: Vec<i64> = Vec::new();
+                let mut bb_picks = 0.0;
                 for &f in cinemas {
                     for &id in floors.units_on(f) {
-                        let u = _tower.get_unit(id).unwrap();
+                        let u = tower.get_unit(id).unwrap();
                         if u.kind == Kind::Cinema && crowd.blockbusters.contains(&u.id) {
                             bb.push(f);
+                            bb_picks += ticket_pick_mult(tower.mode, u);
                             break;
                         }
                     }
                 }
                 if !bb.is_empty() {
-                    push_visits(Kind::Cinema, &bb);
+                    let weight = if floors.cinema_picks.is_some() {
+                        bb_picks / bb.len() as f64
+                    } else {
+                        1.0
+                    };
+                    push_visits(Kind::Cinema, &bb, weight);
                 }
             }
         }
     }
     if let Some(halls) = floors.venues_by_kind.get(&Kind::PartyHall) {
         if !halls.is_empty() {
-            push_visits(Kind::PartyHall, halls);
+            push_visits(Kind::PartyHall, halls, 1.0);
         }
     }
     if let Some(pools) = floors.venues_by_kind.get(&Kind::AquaticCenter) {
         if !pools.is_empty() {
-            push_visits(Kind::AquaticCenter, pools);
+            push_visits(Kind::AquaticCenter, pools, 1.0);
         }
     }
     if let Some(weddings) = floors.venues_by_kind.get(&Kind::WeddingHall) {
@@ -103,7 +113,7 @@ pub fn push_venue_visit_options(
             && clock.is_weekend()
             && (WEDDING_ARRIVAL_START..WEDDING_ARRIVAL_END).contains(&hour)
         {
-            push_visits(Kind::WeddingHall, weddings);
+            push_visits(Kind::WeddingHall, weddings, 1.0);
         }
     }
 }
@@ -154,7 +164,16 @@ pub fn spawn_venue_visit(
     if !rows.contains(&origin) {
         return;
     }
-    let venue_floor = *crowd.rng.pick(venue_floors);
+    // A theater's ticket price weighs its floor and its seat in the draw
+    // (#1950); with every theater at Normal the draws are the uniform ones
+    // they always were.
+    let priced = kind == Kind::Cinema && floors.cinema_picks.is_some();
+    let venue_floor = if priced {
+        let weights = venue_floors.iter().map(|&f| floors.cinema_floor_pick(f));
+        venue_floors[weighted_index(crowd.rng.next(), weights)]
+    } else {
+        *crowd.rng.pick(venue_floors)
+    };
     let candidates: Vec<i64> = floors
         .units_on(venue_floor)
         .iter()
@@ -173,21 +192,19 @@ pub fn spawn_venue_visit(
     if candidates.is_empty() {
         return;
     }
-    let pool: Vec<i64> = if kind == Kind::Cinema && !crowd.blockbusters.is_empty() {
-        candidates
-            .iter()
-            .flat_map(|&id| {
-                if crowd.blockbusters.contains(&id) {
-                    vec![id, id]
-                } else {
-                    vec![id]
-                }
-            })
-            .collect()
+    // A blockbuster weighs 2 against a film's 1, times the theater's ticket
+    // price pick multiplier where some theater charges other than Normal.
+    let venue_id = if kind == Kind::Cinema && (priced || !crowd.blockbusters.is_empty()) {
+        let blockbusters = &crowd.blockbusters;
+        let weights = candidates.iter().map(|&id| {
+            let slot = if blockbusters.contains(&id) { 2.0 } else { 1.0 };
+            slot * ticket_pick_mult(tower.mode, tower.get_unit(id).unwrap())
+        });
+        let r = crowd.rng.next();
+        candidates[weighted_index(r, weights)]
     } else {
-        candidates
+        *crowd.rng.pick(&candidates)
     };
-    let venue_id = *crowd.rng.pick(&pool);
     let origin_floor;
     let mut origin_room: Option<i64> = None;
     let mut origin_station: Option<i64> = None;

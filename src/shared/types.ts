@@ -276,6 +276,8 @@ export interface Unit {
   /** A theatre's film age: the mornings its film has shown (#1932). Its
    *  draw falls as it ages; `undefined` is a new film. */
   filmDays?: number;
+  /** A Modern theater's ticket price step (#1950); `undefined` is Normal. */
+  ticketPrice?: "low" | "high" | "premium";
   /** Canon retail variant name for shop / fastFood / restaurant only (per
    *  `docs/canon/tdt-format.md` §7 lists). `undefined` on every other kind,
    *  and on legacy retail units from saves that predate this field, so they

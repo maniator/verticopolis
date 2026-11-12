@@ -446,7 +446,7 @@ impl Simulation {
 
 #[cfg(test)]
 #[path = "films_tests.rs"]
-mod films_tests;
+pub(crate) mod films_tests;
 
 #[cfg(test)]
 #[path = "films_modern_tests.rs"]

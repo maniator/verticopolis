@@ -35,6 +35,10 @@ pub(crate) const DELTA: usize = 1;
 /// theater books again once its film is spent, or "off" (#1950).
 pub(crate) const FILM_POLICIES: [&str; 5] = ["auto", "feature", "blockbuster", "revival", "off"];
 
+/// The ticket price steps by code, as `setTicketPrice` takes them and the
+/// unit card reports them (#1950).
+pub(crate) const TICKET_PRICES: [&str; 4] = ["low", "normal", "high", "premium"];
+
 /// The onboarding facts by bit, as `onboarding()` packs them.
 pub(crate) const ONBOARDING: [&str; 5] = ["lobby", "floor", "office", "connect", "play"];
 
@@ -53,7 +57,7 @@ pub(crate) const ONBOARDING_FLAGS: [u8; 5] = [
 ];
 
 /// Each command's own slots after [`DELTA`], for the view layout.
-pub(crate) const COMMAND_RECORDS: [(&str, &[&str]); 28] = [
+pub(crate) const COMMAND_RECORDS: [(&str, &[&str]); 29] = [
     ("buildAt", &[]),
     ("paintTiles", &["placed"]),
     ("buildShaft", &[]),
@@ -65,6 +69,7 @@ pub(crate) const COMMAND_RECORDS: [(&str, &[&str]); 28] = [
     ("setCamera", &[]),
     ("setFilm", &["policyCode"]),
     ("changeFilm", &["cost"]),
+    ("setTicketPrice", &["priceCode"]),
     ("markStop", &[]),
     ("expressStops", &[]),
     ("dropStops", &[]),
@@ -103,8 +108,8 @@ const QUERY_RECORDS: [(&str, &[&str]); 11] = [
 
 /// The port's records and codes in the view layout, under `records`: each
 /// command's slots (`status`, `delta`, then its own), each query record's
-/// slots and the HUD strip's counters; then the onboarding bits and the film
-/// policies.
+/// slots and the HUD strip's counters; then the onboarding bits, the film
+/// policies and tiers, and the ticket prices.
 pub(crate) fn add_records(layout: &mut serde_json::Value) {
     let mut records: serde_json::Map<String, serde_json::Value> = COMMAND_RECORDS
         .iter()
@@ -128,6 +133,7 @@ pub(crate) fn add_records(layout: &mut serde_json::Value) {
     layout["onboarding"] = serde_json::json!(ONBOARDING);
     layout["filmPolicies"] = serde_json::json!(FILM_POLICIES);
     layout["filmTiers"] = serde_json::json!(FilmTier::ALL.map(FilmTier::key));
+    layout["ticketPrices"] = serde_json::json!(TICKET_PRICES);
     layout["logKinds"] = serde_json::json!(super::port_life::LOG_KINDS);
     layout["scheduleSlots"] = serde_json::json!(super::port_life::SCHEDULE_LEN);
     super::port_panels::add_panel_records(layout);
@@ -376,6 +382,22 @@ impl Engine {
             return self.refuse(INVALID_REQUEST, &[f64::NAN]);
         };
         match self.sim.set_film_policy(id, FILM_POLICIES[code]) {
+            Some(_) => record(true, 0.0, &[code as f64]),
+            None => self.refuse(INVALID_REQUEST, &[f64::NAN]),
+        }
+    }
+
+    /// A Modern theater's ticket price by code ([`TICKET_PRICES`]), with the
+    /// code stored. A step the mode does not list is refused.
+    pub(crate) fn port_set_ticket_price(&mut self, id: f64, price: f64) -> Vec<f64> {
+        self.reason = None;
+        let code = whole(price)
+            .and_then(|p| usize::try_from(p).ok())
+            .filter(|&p| p < TICKET_PRICES.len());
+        let (Some(id), Some(code)) = (whole(id), code) else {
+            return self.refuse(INVALID_REQUEST, &[f64::NAN]);
+        };
+        match self.sim.set_ticket_price(id, TICKET_PRICES[code]) {
             Some(_) => record(true, 0.0, &[code as f64]),
             None => self.refuse(INVALID_REQUEST, &[f64::NAN]),
         }

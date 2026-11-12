@@ -44,9 +44,10 @@ const OFFICE = record("unitCard", {
   blockbuster: NaN,
   filmDays: NaN,
   filmTier: NaN,
+  ticketPrice: NaN,
 });
 
-const CINEMA = record("unitCard", { id: 12, kindCode: code("kinds", "cinema"), rent: NaN, vacateReason: NaN, filmPolicy: code("filmPolicies", "blockbuster"), blockbuster: 1, filmDays: 4, filmTier: code("filmTiers", "classic") });
+const CINEMA = record("unitCard", { id: 12, kindCode: code("kinds", "cinema"), rent: NaN, vacateReason: NaN, filmPolicy: code("filmPolicies", "blockbuster"), blockbuster: 1, filmDays: 4, filmTier: code("filmTiers", "classic"), ticketPrice: code("ticketPrices", "premium") });
 
 /** A stop row: floor, then the served, lobby and endpoint flags. */
 const stop = (floor: number, served: number, lobby: number, endpoint: number) => [floor, served, lobby, endpoint];
@@ -80,17 +81,18 @@ describe("Cards.unit", () => {
       blockbuster: null,
       filmDays: null,
       filmTier: null,
+      ticketPrice: null,
     });
     expect(vi.mocked(port.unitCard).mock.calls).toEqual([[10]]);
     expect(vi.mocked(port.unitLabel).mock.calls).toEqual([[10]]);
     expect(vi.mocked(port.unitSubtype).mock.calls).toEqual([[10]]);
   });
 
-  it("carries a cinema's film policy, booking and film, and an empty label when the engine has none", () => {
+  it("carries a cinema's film policy, booking, film and ticket price, and an empty label when the engine has none", () => {
     const port = mockPort({ unitCard: () => CINEMA, unitLabel: () => undefined, unitSubtype: () => "art house" });
     const card = new Cards(port, readerAt(1, 0)).unit(12)!;
     expect([card.filmPolicy, card.blockbuster, card.rent, card.vacateReason, card.label, card.subtype]).toEqual(["blockbuster", true, null, null, "", "art house"]);
-    expect([card.filmDays, card.filmTier]).toEqual([4, "classic"]);
+    expect([card.filmDays, card.filmTier, card.ticketPrice]).toEqual([4, "classic", "premium"]);
   });
 
   it("answers undefined for an id the engine has no card for, reading no text", () => {

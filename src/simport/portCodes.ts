@@ -3,7 +3,7 @@ import type { EnginePort, PortRecord } from "./enginePort";
 
 /** The code tables a caller passes names through, as `viewLayout()` names
  *  them. */
-export type CodeTable = "kinds" | "modes" | "calendars" | "filmPolicies" | "filmTiers" | "logKinds" | "heatModes";
+export type CodeTable = "kinds" | "modes" | "calendars" | "filmPolicies" | "filmTiers" | "ticketPrices" | "logKinds" | "heatModes";
 
 /** What a command's record says, in the shape the game's callers check. */
 export interface PortOutcome {
@@ -34,7 +34,7 @@ export class PortCodes {
 
   constructor(port: Pick<EnginePort, "viewLayout">) {
     const l = JSON.parse(port.viewLayout()) as Tables;
-    for (const t of ["kinds", "modes", "calendars", "filmPolicies", "filmTiers", "logKinds", "heatModes"] as const) {
+    for (const t of ["kinds", "modes", "calendars", "filmPolicies", "filmTiers", "ticketPrices", "logKinds", "heatModes"] as const) {
       this.maps.set(t, new Map(l[t].map((n, i) => [n, i])));
     }
     this.records = l.records;

@@ -339,6 +339,9 @@ export interface EnginePortCommands {
    *  films (Classic): the record's `cost` slot is the price paid, or the
    *  price wanted on a "funds" refusal. */
   changeFilm(id: number, tier: number): PortRecord;
+  /** Set a Modern theater's ticket price step by code (`ticketPrices`); the
+   *  record's `priceCode` slot is the code stored (#1950). */
+  setTicketPrice(id: number, priceCode: number): PortRecord;
   rerollUnit(id: number): PortRecord;
   bookExterminator(): PortRecord;
   answerChoice(accept: boolean): PortRecord;

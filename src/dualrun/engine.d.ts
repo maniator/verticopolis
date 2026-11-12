@@ -520,6 +520,7 @@ export class Engine {
      * refused with `false`.
      */
     setStop(id: number, floor: number, stop: boolean): boolean;
+    setTicketPrice(id: number, price: number): Float64Array;
     /**
      * `tower.towerName = name`; null clears it, as the host's `undefined`
      * leaves the key out of the save.

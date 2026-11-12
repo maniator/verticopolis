@@ -86,8 +86,8 @@ pub struct Unit {
 }
 
 /// The facts a unit rarely carries, each unset until something sets it: a
-/// move-out notice (`vacate_*`), the cinema's film policy and its film's age, a retail room's four
-/// daily tallies, a room's opening time (`complete_at*`) and a hotel room's
+/// move-out notice (`vacate_*`), the cinema's film policy, its film's age and
+/// its ticket price, a retail room's four daily tallies, a room's opening time (`complete_at*`) and a hotel room's
 /// dirty days.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Extras {
@@ -102,6 +102,8 @@ pub struct Extras {
     pub film_classic: bool,
     /// Whether a Modern theater shows a blockbuster (#1950).
     pub film_blockbuster: bool,
+    /// A Modern theater's ticket price step, unset at Normal (#1950).
+    pub ticket_price: Option<&'static str>,
     pub patronage_today: Option<f64>,
     pub patronage_yest: Option<f64>,
     pub profit_today: Option<f64>,
@@ -125,6 +127,7 @@ static NO_EXTRAS: Extras = Extras {
     film_days: None,
     film_classic: false,
     film_blockbuster: false,
+    ticket_price: None,
     patronage_today: None,
     patronage_yest: None,
     profit_today: None,
@@ -237,6 +240,9 @@ impl Unit {
         }
         if extras.film_blockbuster {
             m.insert("filmBlockbuster".into(), json!(true));
+        }
+        if let Some(v) = extras.ticket_price {
+            m.insert("ticketPrice".into(), json!(v));
         }
         if let Some(v) = self.subtype {
             m.insert("subtype".into(), json!(v));

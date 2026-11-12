@@ -27,6 +27,7 @@ use crate::charges::{car_resale_refund, ADD_CAR_COST, TRANSPORT_FLOOR_COST};
 use crate::clock::{resolve_calendar, CalendarKind, GameMode};
 use crate::econ::{classic_ladder, rent_config};
 use crate::economy::films::{FilmOffer, FilmRebook};
+use crate::economy::tickets::TicketPrice;
 use crate::economy::{
     catalog_spend_per_customer, commercial_daily_income, service_maintenance_monthly,
     MAINTENANCE_PER_CAR_MONTHLY, NIGHTCLUB_DJ_MONTHLY, REAL_WORLD_MAINT_PERIOD_DAYS,
@@ -49,7 +50,7 @@ pub use lock::{lock_view, LOCK_FOOTPRINT_EXEMPT};
 
 /// The version of the catalog's shape. It moves when a field is added,
 /// renamed or removed, so a frontend can refuse a shape it does not know.
-pub const CATALOG_VERSION: u32 = 10;
+pub const CATALOG_VERSION: u32 = 11;
 
 /// Every price, size and build rule of one mode.
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -131,13 +132,15 @@ pub struct Economy {
     /// The films a theater can show, with their prices, in the order the
     /// card lists them (#1932, #1950). No theater pays anything each period.
     pub films: &'static [FilmOffer],
-    /// The Auto-rebook choices, in the order the card's button cycles
-    /// through them: each policy and the film a theater with it books again
-    /// once its film is spent (#1950). Empty where no theater rebooks.
+    /// The Auto-rebook choices in the card button's order: each policy and
+    /// the film it books once a theater's film is spent; empty if none (#1950).
     pub film_rebooks: &'static [FilmRebook],
-    /// The policy a theater with none, or an old save's "auto", rebooks by,
-    /// or null where no theater rebooks.
+    /// The policy a theater with none (or an old save's "auto") rebooks by.
     pub film_rebook_default: Option<&'static str>,
+    /// A theater's ticket price steps, cheapest first, against Normal's 1.
+    pub ticket_prices: &'static [TicketPrice],
+    /// The step a theater with none set charges, or null (#1950).
+    pub ticket_price_default: Option<&'static str>,
     /// Whether the player can switch automatic bridging off. When false,
     /// bridging is always on. When true, a tower starts bridged unless it
     /// was founded unbridged, and the live setting is per tower (the

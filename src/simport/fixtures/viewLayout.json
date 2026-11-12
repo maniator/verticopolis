@@ -1,5 +1,5 @@
 {
-  "version": 15,
+  "version": 16,
   "header": {
     "minutes": 0,
     "towerRevision": 1,
@@ -289,6 +289,11 @@
       "delta",
       "cost"
     ],
+    "setTicketPrice": [
+      "status",
+      "delta",
+      "priceCode"
+    ],
     "markStop": [
       "status",
       "delta"
@@ -481,7 +486,8 @@
       "floorHasLobby",
       "blockbuster",
       "filmDays",
-      "filmTier"
+      "filmTier",
+      "ticketPrice"
     ],
     "shaftCard": [
       "id",
@@ -719,6 +725,12 @@
     "new",
     "classic",
     "blockbuster"
+  ],
+  "ticketPrices": [
+    "low",
+    "normal",
+    "high",
+    "premium"
   ],
   "logKinds": [
     "info",

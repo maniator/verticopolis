@@ -1,5 +1,5 @@
 import { isElevatorKind, isHotelKind } from "../presentation/viewKinds";
-import { catalogFacility, catalogFilmRebook, filmEditAction } from "../catalog/catalogTypes";
+import { catalogFacility, catalogFilmRebook, catalogTicketPrice, filmEditAction } from "../catalog/catalogTypes";
 import { priceOptionsFor } from "../ui/catalogPricing";
 import type { FacilityKind } from "../shared/types";
 import type { BatchRentResult } from "../shared/engineTypes";
@@ -277,6 +277,7 @@ export class EditorActions {
       extendUp: "Extend",
       extendDown: "Extend",
       filmPolicy: "Film policy",
+      ticketPrice: "Ticket price",
       changeVariety: "Change variety",
       batchKind: "Edit",
     };
@@ -347,6 +348,20 @@ export class EditorActions {
           const next = order[(order.indexOf(now) + 1) % order.length].policy;
           engine.setFilm(u.id, codes.code("filmPolicies", next));
           this.deps.audio.sfx("click");
+          this.deps.refreshEditor();
+        }
+      } else if (action === "ticketPrice") {
+        // A Modern theater's ticket price (#1950): the button steps through
+        // the catalog's steps, cheapest first, from the one it charges now.
+        const catalog = kit.catalog();
+        const order = catalog.economy.ticketPrices;
+        const now = catalogTicketPrice(catalog, u.ticketPrice);
+        if (now) {
+          const next = order[(order.indexOf(now) + 1) % order.length];
+          if (outcome(engine, engine.setTicketPrice(u.id, codes.code("ticketPrices", next.key))).ok) {
+            this.deps.audio.sfx("click");
+            this.deps.announce(`Ticket price set to ${next.label}.`);
+          }
           this.deps.refreshEditor();
         }
       } else if (film) {

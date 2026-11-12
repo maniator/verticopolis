@@ -9,6 +9,7 @@ use serde_json::{json, Value};
 use crate::clock::GameMode;
 use crate::econ::{classic_ladder, rent_config};
 use crate::economy::films::FilmTier;
+use crate::economy::tickets::shown_ticket_price;
 use crate::facilities::Kind;
 use crate::rent::AVERAGE_RUNG;
 use crate::sim::Simulation;
@@ -112,6 +113,7 @@ impl Simulation {
             "blockbuster": blockbuster,
             "filmDays": film.as_ref().map(|e| e.film_days.unwrap_or(0)),
             "filmTier": film.as_ref().map(|e| FilmTier::showing(e).key()),
+            "ticketPrice": shown_ticket_price(self.mode, u),
         }))
     }
 }

@@ -165,6 +165,7 @@ export const BINDING_EXPORT_TIERS = {
   setCamera: T1,
   setFilm: T1,
   changeFilm: T1,
+  setTicketPrice: T1,
   markStop: T1,
   expressStops: T1,
   dropStops: T1,

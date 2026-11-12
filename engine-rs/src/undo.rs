@@ -72,7 +72,7 @@ pub(crate) enum UnitChange {
 }
 
 /// The facts of a unit an edit owns: the price, the market flag, the name,
-/// the variety and the film policy (`Unit::config_eq`).
+/// the variety, the film policy and the ticket price (`Unit::config_eq`).
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct UnitFacts {
     pub(crate) rent: Option<f64>,
@@ -80,6 +80,7 @@ pub(crate) struct UnitFacts {
     pub(crate) label: String,
     pub(crate) subtype: Option<&'static str>,
     pub(crate) film_policy: Option<&'static str>,
+    pub(crate) ticket_price: Option<&'static str>,
 }
 
 impl UnitFacts {
@@ -90,6 +91,7 @@ impl UnitFacts {
             label: u.label.clone(),
             subtype: u.subtype,
             film_policy: u.extras().film_policy,
+            ticket_price: u.extras().ticket_price,
         }
     }
 }

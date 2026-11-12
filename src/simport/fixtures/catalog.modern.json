@@ -65,6 +65,33 @@
     "nightclubDjMonthly": 40000,
     "overheadPerUnitMonthly": 700,
     "startingMoney": 2000000,
+    "ticketPriceDefault": "normal",
+    "ticketPrices": [
+      {
+        "incomeMult": 0.75,
+        "key": "low",
+        "label": "Low",
+        "pickMult": 1.25
+      },
+      {
+        "incomeMult": 1,
+        "key": "normal",
+        "label": "Normal",
+        "pickMult": 1
+      },
+      {
+        "incomeMult": 1.3,
+        "key": "high",
+        "label": "High",
+        "pickMult": 0.75
+      },
+      {
+        "incomeMult": 1.6,
+        "key": "premium",
+        "label": "Premium",
+        "pickMult": 0.55
+      }
+    ],
     "transportFloorCost": 5000
   },
   "facilities": [
@@ -1956,7 +1983,7 @@
     "scheduleAssist": true,
     "variantHouseholds": true
   },
-  "version": 10,
+  "version": 11,
   "world": {
     "groundFloor": 1,
     "groundFloorStructure": "lobby",

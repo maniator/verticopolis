@@ -352,8 +352,9 @@ fn matinee_visitors_fill_the_cinema_and_the_mirror_follows() {
 
 /// The cinema-bound visitors 1000 spawn draws send at 14:00, with an open
 /// shop on floor 2 as the competing daytime trip, the crowd and the house
-/// emptied after each draw so neither cap binds.
-fn cinema_draws(blockbuster: bool) -> usize {
+/// emptied after each draw so neither cap binds. The cinema charges ticket
+/// price `price` (#1950).
+fn cinema_draws(blockbuster: bool, price: &str) -> usize {
     let (mut sim, cinema) = cinema_tower();
     for x in 40..60 {
         for floor in 1..=3 {
@@ -370,6 +371,7 @@ fn cinema_draws(blockbuster: bool) -> usize {
     if blockbuster {
         sim.crowd.blockbusters.insert(cinema);
     }
+    assert_eq!(sim.set_ticket_price(cinema, price), Some(price));
     let floors = spawn_floors(&sim.tower, &sim.clock);
     let mut sent = 0;
     for _ in 0..1000 {
@@ -390,8 +392,42 @@ fn cinema_draws(blockbuster: bool) -> usize {
 /// against the shop's one trip, two thirds of the draws instead of half.
 #[test]
 fn a_blockbuster_draws_more_visits_than_an_ordinary_film() {
-    let (plain, boosted) = (cinema_draws(false), cinema_draws(true));
+    let (plain, boosted) = (cinema_draws(false, "normal"), cinema_draws(true, "normal"));
     assert!(plain > 0);
     let lift = boosted as f64 / plain as f64;
     assert!(lift > 1.15, "{boosted} blockbuster visits against {plain}");
+}
+
+/// A theater's ticket price moves its share of the crowd (#1950): a Low
+/// price draws more visits than Normal, and each step up draws fewer.
+#[test]
+fn a_cheaper_ticket_draws_more_visits_and_a_dearer_one_fewer() {
+    let draws: Vec<usize> = ["low", "normal", "high", "premium"]
+        .iter()
+        .map(|price| cinema_draws(false, price))
+        .collect();
+    assert!(
+        draws.windows(2).all(|w| w[0] > w[1]),
+        "visits by step, cheapest first: {draws:?}"
+    );
+}
+
+/// Only open theaters weigh in (#1950): an empty Premium theater beside an
+/// open Low one leaves floor 2 drawing as Low, and each floor keeps its own
+/// mean while the tower's share takes the mean of every open theater.
+#[test]
+fn the_crowd_weighs_each_floor_by_its_open_theaters_only() {
+    let mut sim = strip_tower(2024, GameMode::Modern, 80, 5);
+    let low = place_seated(&mut sim, Kind::Cinema, 2, 0, UnitState::Occupied, 0);
+    let empty = place_seated(&mut sim, Kind::Cinema, 2, 40, UnitState::Empty, 0);
+    let high = place_seated(&mut sim, Kind::Cinema, 4, 0, UnitState::Occupied, 0);
+    for (id, price) in [(low, "low"), (empty, "premium"), (high, "high")] {
+        assert_eq!(sim.set_ticket_price(id, price), Some(price));
+    }
+    at_time(&mut sim, 0, 14);
+    let floors = spawn_floors(&sim.tower, &sim.clock);
+    assert_eq!(floors.cinema_floor_pick(2), 1.25);
+    assert_eq!(floors.cinema_floor_pick(4), 0.75);
+    assert_eq!(floors.cinema_floor_pick(3), 1.0);
+    assert_eq!(floors.cinema_picks, Some(1.0));
 }

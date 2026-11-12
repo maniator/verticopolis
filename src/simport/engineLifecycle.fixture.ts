@@ -18,6 +18,7 @@ import {
   run,
   saved,
   slot,
+  ticketPrice,
   subject,
 } from "./engineSubject.fixture";
 import { scheduleSlots } from "./scheduleSlots";
@@ -305,6 +306,32 @@ export function describeEngineLifecycle(name: string, make: MakeEngine): void {
       expect([delta(set), slot("setFilm", set, "policyCode")]).toEqual([0, filmPolicy("blockbuster")]);
       expect(mustFind(saved(s).units, (u) => u.id === cinema).filmPolicy).toBe("blockbuster");
       expect(done(run(s, (p) => p.setFilm(office, filmPolicy("auto")), "a film for an office"))).toBe(false);
+    });
+
+    it("sets a Modern theater's ticket price as an undoable edit, and refuses it on an office and in Classic", () => {
+      const subjectIn = (m: "classic" | "modern") => {
+        const tower = newSeededDraft(7, m);
+        Object.assign(tower, { star: 3, money: 10_000_000 });
+        const s = subject(make, tower);
+        must(s, (p) => p.buildAt(kind("cinema"), 2, MID - 20), "cinema");
+        must(s, (p) => p.buildAt(kind("office"), 2, MID + 11), "office");
+        return s;
+      };
+      const s = subjectIn("modern");
+      const cinema = mustFind(s.reader.tower.units, (u) => u.kind === "cinema").id;
+      const office = mustFind(s.reader.tower.units, (u) => u.kind === "office").id;
+      const before = s.port.undoSignature();
+      const set = must(s, (p) => p.setTicketPrice(cinema, ticketPrice("premium")), "Premium");
+      expect([delta(set), slot("setTicketPrice", set, "priceCode")]).toEqual([0, ticketPrice("premium")]);
+      expect(s.port.undoSignature()).not.toBe(before);
+      expect(mustFind(saved(s).units, (u) => u.id === cinema).ticketPrice).toBe("premium");
+      must(s, (p) => p.setTicketPrice(cinema, ticketPrice("normal")), "Normal");
+      expect(mustFind(saved(s).units, (u) => u.id === cinema).ticketPrice).toBeUndefined();
+      expect(done(run(s, (p) => p.setTicketPrice(office, ticketPrice("low")), "a price for an office"))).toBe(false);
+      expect(done(run(s, (p) => p.setTicketPrice(cinema, 99), "an unknown step"))).toBe(false);
+      const classic = subjectIn("classic");
+      const theater = mustFind(classic.reader.tower.units, (u) => u.kind === "cinema").id;
+      expect(done(run(classic, (p) => p.setTicketPrice(theater, ticketPrice("low")), "a Classic price"))).toBe(false);
     });
 
     it("answers a stop the engine keeps (an endpoint, an express non-lobby floor) and changes nothing", () => {

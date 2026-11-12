@@ -78,6 +78,10 @@ impl Engine {
     pub fn change_film(&mut self, id: f64, tier: f64) -> Vec<f64> {
         self.port_change_film(id, tier)
     }
+    #[wasm_bindgen(js_name = setTicketPrice)]
+    pub fn set_ticket_price(&mut self, id: f64, price: f64) -> Vec<f64> {
+        self.port_set_ticket_price(id, price)
+    }
     #[wasm_bindgen(js_name = quoteBuild)]
     pub fn quote_build(&mut self, kind: f64, floor: f64, x: f64) -> Vec<f64> {
         self.port_quote_build(kind, floor, x).to_vec()

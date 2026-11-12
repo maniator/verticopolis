@@ -8,13 +8,14 @@ use crate::undo::{puts_back, UnitFacts};
 
 impl Unit {
     /// Whether the facts an edit owns are the same: the price, the market
-    /// flag, the name, the variety and the film policy.
+    /// flag, the name, the variety, the film policy and the ticket price.
     pub(crate) fn config_eq(&self, other: &Unit) -> bool {
         self.rent == other.rent
             && self.no_rate == other.no_rate
             && self.label == other.label
             && self.subtype == other.subtype
             && self.extras().film_policy == other.extras().film_policy
+            && self.extras().ticket_price == other.extras().ticket_price
     }
 
     /// The unit as a step puts it back: its record, less the people counts
@@ -33,9 +34,9 @@ impl Unit {
     }
 
     /// This unit, with the facts an edit owns (the price, the market flag,
-    /// the name, the variety and the film policy) taken from `found`: the
-    /// unit as it leaves a gesture that changed those facts first, which an
-    /// undo of the gesture puts back.
+    /// the name, the variety, the film policy and the ticket price) taken
+    /// from `found`: the unit as it leaves a gesture that changed those facts
+    /// first, which an undo of the gesture puts back.
     pub(crate) fn with_edit_facts_of(&self, found: &Unit) -> Unit {
         let mut u = Unit {
             label: found.label.clone(),
@@ -51,7 +52,8 @@ impl Unit {
         u
     }
 
-    /// Put the price, the market flag and the film policy back from `other`.
+    /// Put the price, the market flag, the film policy and the ticket price
+    /// back from `other`.
     /// The name and the variety go through the tower's setters
     /// ([`Tower::put_unit_config`]), which log a change.
     fn take_price_and_policy_from(&mut self, other: &Unit) {
@@ -60,6 +62,10 @@ impl Unit {
         let policy = other.extras().film_policy;
         if self.extras().film_policy != policy {
             self.extras_mut().film_policy = policy;
+        }
+        let price = other.extras().ticket_price;
+        if self.extras().ticket_price != price {
+            self.extras_mut().ticket_price = price;
         }
     }
 }
@@ -160,6 +166,13 @@ impl Tower {
             &u.extras().film_policy,
         ) {
             u.extras_mut().film_policy = want.film_policy;
+        }
+        if puts_back(
+            &want.ticket_price,
+            &left.ticket_price,
+            &u.extras().ticket_price,
+        ) {
+            u.extras_mut().ticket_price = want.ticket_price;
         }
         if puts_back(&want.label, &left.label, &self.units[i].label) {
             self.set_unit_label_at(i, want.label.clone());
