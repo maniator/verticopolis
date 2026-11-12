@@ -160,9 +160,12 @@ fn a_weighted_draw_over_whole_weights_matches_the_uniform_pick() {
     let pool = [0, 1, 1, 2];
     for _ in 0..5000 {
         let r = rng.next();
-        assert_eq!(weighted_index(r, &ones), (r * 5.0).floor() as usize);
         assert_eq!(
-            weighted_index(r, &slots),
+            weighted_index(r, ones.iter().copied()),
+            (r * 5.0).floor() as usize
+        );
+        assert_eq!(
+            weighted_index(r, slots.iter().copied()),
             pool[(r * pool.len() as f64).floor() as usize]
         );
     }
@@ -174,7 +177,7 @@ fn a_weighted_draw_follows_fractional_weights() {
     let weights = [1.25, 0.55];
     let mut hits = [0_u32; 2];
     for _ in 0..20_000 {
-        hits[weighted_index(rng.next(), &weights)] += 1;
+        hits[weighted_index(rng.next(), weights.iter().copied())] += 1;
     }
     let share = f64::from(hits[0]) / 20_000.0;
     assert!((share - 1.25 / 1.8).abs() < 0.02, "{hits:?}");

@@ -44,13 +44,13 @@ fn origin_floors_for(origin: VisitOrigin, floors: &SpawnFloors) -> &[i64] {
     }
 }
 
-/// The mean ticket price pick multiplier of the theaters on `floor`, 1 where
-/// it holds none.
+/// The mean ticket price pick multiplier of the open theaters on `floor`
+/// (the ones a visitor can be seated in), 1 where it holds none.
 fn floor_pick_mult(tower: &Tower, floors: &SpawnFloors, floor: i64) -> f64 {
     let (mut n, mut sum) = (0_u32, 0.0);
     for &id in floors.units_on(floor) {
         let u = tower.get_unit(id).unwrap();
-        if u.kind == Kind::Cinema {
+        if u.kind == Kind::Cinema && u.is_tenanted() {
             n += 1;
             sum += ticket_pick_mult(tower.mode, u);
         }
@@ -187,11 +187,10 @@ pub fn spawn_venue_visit(
     // they always were.
     let priced = kind == Kind::Cinema && floors.cinema_picks.is_some();
     let venue_floor = if priced {
-        let weights: Vec<f64> = venue_floors
+        let weights = venue_floors
             .iter()
-            .map(|&f| floor_pick_mult(tower, floors, f))
-            .collect();
-        venue_floors[weighted_index(crowd.rng.next(), &weights)]
+            .map(|&f| floor_pick_mult(tower, floors, f));
+        venue_floors[weighted_index(crowd.rng.next(), weights)]
     } else {
         *crowd.rng.pick(venue_floors)
     };
@@ -216,18 +215,13 @@ pub fn spawn_venue_visit(
     // A blockbuster weighs 2 against a film's 1, times the theater's ticket
     // price pick multiplier where some theater charges other than Normal.
     let venue_id = if kind == Kind::Cinema && (priced || !crowd.blockbusters.is_empty()) {
-        let weights: Vec<f64> = candidates
-            .iter()
-            .map(|&id| {
-                let slot = if crowd.blockbusters.contains(&id) {
-                    2.0
-                } else {
-                    1.0
-                };
-                slot * ticket_pick_mult(tower.mode, tower.get_unit(id).unwrap())
-            })
-            .collect();
-        candidates[weighted_index(crowd.rng.next(), &weights)]
+        let blockbusters = &crowd.blockbusters;
+        let weights = candidates.iter().map(|&id| {
+            let slot = if blockbusters.contains(&id) { 2.0 } else { 1.0 };
+            slot * ticket_pick_mult(tower.mode, tower.get_unit(id).unwrap())
+        });
+        let r = crowd.rng.next();
+        candidates[weighted_index(r, weights)]
     } else {
         *crowd.rng.pick(&candidates)
     };

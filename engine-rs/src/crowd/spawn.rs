@@ -254,15 +254,13 @@ impl Options {
         if !self.weighted {
             return (r * self.opts.len() as f64).floor() as usize;
         }
-        let weights: Vec<f64> = self
-            .opts
-            .iter()
-            .map(|o| match o {
+        weighted_index(
+            r,
+            self.opts.iter().map(|o| match o {
                 Opt::VenueVisit(_, _, _, w) => *w,
                 _ => 1.0,
-            })
-            .collect();
-        weighted_index(r, &weights)
+            }),
+        )
     }
     pub fn push_school_departure(&mut self) {
         self.opts.push(Opt::SchoolDeparture);
@@ -281,17 +279,21 @@ impl Options {
 /// each entry `weight` times, so all ones pick as `Rng::pick` does and a
 /// tower whose theaters all charge Normal draws as it did before ticket
 /// prices (#1950).
-pub(crate) fn weighted_index(r: f64, weights: &[f64]) -> usize {
-    let total: f64 = weights.iter().sum();
+/// The weights are walked twice (the total, then the draw) and never
+/// collected, so a draw allocates nothing.
+pub(crate) fn weighted_index(r: f64, weights: impl Iterator<Item = f64> + Clone) -> usize {
+    let total: f64 = weights.clone().sum();
     let target = r * total;
     let mut sum = 0.0;
-    for (i, w) in weights.iter().enumerate() {
+    let mut last = 0;
+    for (i, w) in weights.enumerate() {
         sum += w;
         if target < sum {
             return i;
         }
+        last = i;
     }
-    weights.len().saturating_sub(1)
+    last
 }
 
 fn list_of(floors: &SpawnFloors, l: List) -> &[i64] {
