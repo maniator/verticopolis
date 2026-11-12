@@ -182,3 +182,65 @@ fn a_weighted_draw_follows_fractional_weights() {
     let share = f64::from(hits[0]) / 20_000.0;
     assert!((share - 1.25 / 1.8).abs() < 0.02, "{hits:?}");
 }
+
+/// The steps a player cycles through stay ordered, so a tuning change that
+/// breaks the trade shows here before any crowd test runs (#1950): each
+/// step up earns more per seat and draws fewer visits, Normal is 1 and 1,
+/// and the catalog's default is a listed step.
+#[test]
+fn each_step_up_earns_more_per_seat_and_draws_fewer_visits() {
+    let steps = GameMode::Modern.ticket_prices();
+    assert!(steps
+        .windows(2)
+        .all(|w| w[0].income_mult < w[1].income_mult && w[0].pick_mult > w[1].pick_mult));
+    assert!(steps
+        .iter()
+        .all(|p| p.income_mult > 0.0 && p.pick_mult > 0.0));
+    let normal = GameMode::Modern
+        .ticket_price(GameMode::Modern.ticket_price_default().unwrap())
+        .unwrap();
+    assert_eq!((normal.income_mult, normal.pick_mult), (1.0, 1.0));
+}
+
+/// The blockbuster option's weight is the same to the last bit however the
+/// booked set orders its ids (#1982 review): the set's order changes from
+/// run to run, and a sum in that order could round differently and move a
+/// seeded draw.
+#[test]
+fn the_blockbuster_weight_does_not_depend_on_the_booked_set_order() {
+    use crate::crowd::spawn_floors::spawn_floors;
+    use crate::crowd::visits::booked_cinema_floors;
+    use crate::facilities::Kind;
+    use crate::rule_tests::{at_time, place_seated, strip_tower};
+    use crate::tower::UnitState;
+    use std::collections::HashSet;
+
+    // Three Low and three Premium theaters: summed in some orders their
+    // picks come to 5.4, in others to 5.3999999999999995.
+    let mut sim = strip_tower(2024, GameMode::Modern, 80, 7);
+    let mut ids = Vec::new();
+    for floor in [2, 4, 6] {
+        for (x, price) in [(0, "low"), (40, "premium")] {
+            let id = place_seated(&mut sim, Kind::Cinema, floor, x, UnitState::Occupied, 0);
+            sim.set_ticket_price(id, price);
+            ids.push(id);
+        }
+    }
+    at_time(&mut sim, 0, 14);
+    let floors = spawn_floors(&sim.tower, &sim.clock);
+    let cinemas = floors.venues_by_kind.get(&Kind::Cinema).unwrap().to_vec();
+    let mut weights = HashSet::new();
+    for turn in 0..ids.len() * 8 {
+        ids.rotate_left(1);
+        if turn % 2 == 1 {
+            ids.reverse();
+        }
+        sim.crowd.blockbusters = ids.iter().copied().collect();
+        let (bb, weight) = booked_cinema_floors(&sim.crowd, &sim.tower, &cinemas, &floors).unwrap();
+        assert_eq!(bb, vec![2, 4, 6]);
+        weights.insert(weight.to_bits());
+    }
+    let mean = 0.9;
+    assert_eq!(weights.len(), 1, "the weight moved with the set's order");
+    assert!((f64::from_bits(*weights.iter().next().unwrap()) - mean).abs() < 1e-12);
+}
