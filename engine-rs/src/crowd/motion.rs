@@ -301,8 +301,14 @@ pub fn finish(crowd: &mut Crowd, i: usize, tower: &mut Tower) {
             crowd.staff_done.push(StaffResult { unit_id: uid, ok });
         }
     } else {
-        let (of, w) = (p.origin_floor, p.trip_wait + p.wait);
-        crowd.record_commute(of, w);
+        // A trip from a lobby or a Metro platform belongs to the tenant at
+        // its other end (#1971): the morning commuter's wait lands on the
+        // office floor, not the lobby or the platform.
+        let tenant_floor = match p.floors.last() {
+            Some(&dest) if p.from_metro || tower.floor_has_lobby(p.origin_floor) => dest,
+            _ => p.origin_floor,
+        };
+        crowd.record_commute(tenant_floor, p.trip_wait + p.wait);
     }
     let p = &crowd.people[i];
     if let Some(oid) = p.origin_unit_id {

@@ -75,6 +75,7 @@ fn waiter(id: i64, shaft: i64, floor: i64, wait: f64, staff: bool) -> Person {
         returning: false,
         routine: None,
         linger_for: None,
+        from_metro: false,
     }
 }
 

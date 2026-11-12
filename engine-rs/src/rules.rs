@@ -6,6 +6,7 @@
 use crate::clock::GameMode;
 
 mod amenities;
+mod commute;
 mod construction;
 mod economy;
 mod films;
@@ -18,6 +19,7 @@ mod satisfaction;
 mod services;
 
 pub use amenities::*;
+pub use commute::{CLASSIC_WAIT_LIMIT, MODERN_WAIT_LIMIT};
 pub use economy::*;
 pub use households::*;
 pub use parking::OfficeParking;
