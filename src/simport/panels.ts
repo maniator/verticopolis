@@ -78,7 +78,7 @@ export interface StatsReport {
   readonly hotelsCountTowardRating: boolean;
   /** How many parking spaces a car can actually reach. */
   readonly functionalParking: number;
-  readonly parkingDemand: { readonly officePop: number; readonly offices: number; readonly suites: number; readonly homes: number; readonly total: number };
+  readonly parkingDemand: { readonly officePop: number; readonly offices: number; readonly suites: number; readonly homes: number; readonly total: number; readonly coverage: number | null };
   readonly housekeeping: HousekeepingCoverageView;
   /** Yesterday's shift, or null before the first one. */
   readonly housekeepingReport: { readonly cleaned: number; readonly leftover: number } | null;

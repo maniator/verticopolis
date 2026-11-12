@@ -526,6 +526,7 @@
       "parkingSuites",
       "parkingHomes",
       "parkingTotal",
+      "parkingCoverage",
       "cleaned",
       "leftover",
       "recyclingCapacity",

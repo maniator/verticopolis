@@ -29,14 +29,12 @@ fn the_stats_sheet_matches_the_json_report() {
     let json = e.sim.stats_report();
     let r = e.port_stats_sheet();
     let h = |name: &str| r[STATS_SHEET.iter().position(|n| *n == name).unwrap()];
-    assert_eq!(
-        h("ratingPopulation"),
-        json["ratingPopulation"].as_f64().unwrap()
-    );
-    assert_eq!(
-        h("parkingTotal"),
-        json["parkingDemand"]["total"].as_f64().unwrap()
-    );
+    for (slot, v) in [
+        ("ratingPopulation", &json["ratingPopulation"]),
+        ("parkingTotal", &json["parkingDemand"]["total"]),
+    ] {
+        assert_eq!(h(slot), v.as_f64().unwrap(), "{slot}");
+    }
     assert!(h("cleaned").is_nan());
     assert_eq!(h("milestones"), MILESTONE_IDS.len() as f64);
     assert_eq!(h("nextStar"), 1.0);
@@ -320,6 +318,7 @@ fn check_stats_sheet(e: &mut Engine) {
         num(&j["parkingDemand"]["suites"]),
         num(&j["parkingDemand"]["homes"]),
         num(&j["parkingDemand"]["total"]),
+        num(&j["parkingDemand"]["coverage"]),
         num(&j["housekeepingReport"]["cleaned"]),
         num(&j["housekeepingReport"]["leftover"]),
         num(&j["recycling"]["capacity"]),

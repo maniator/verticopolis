@@ -260,3 +260,18 @@ fn the_spaces_run_out_partway_along_a_floor_left_to_right() {
     assert_eq!(binding(&sim, condos[2]), Some((HOME_PARKING_CAUSE, false)));
     assert_eq!(binding(&sim, condos[3]), Some((HOME_PARKING_CAUSE, false)));
 }
+
+#[test]
+fn the_stats_screen_reads_the_parking_coverage_while_short() {
+    let mut sim = bare_tower(GameMode::Modern, 3, 5);
+    homes(&mut sim);
+    park(&mut sim, 1);
+    let coverage = sim.stats_report()["parkingDemand"]["coverage"]
+        .as_f64()
+        .unwrap();
+    assert!((coverage - 0.25).abs() < 1e-9, "{coverage}");
+    for i in 1..4 {
+        assert!(sim.tower.place(Kind::Parking, 0, 16 + i * 4).ok);
+    }
+    assert!(sim.stats_report()["parkingDemand"]["coverage"].is_null());
+}

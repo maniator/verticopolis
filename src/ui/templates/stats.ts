@@ -194,7 +194,7 @@ export function statsTemplate(screen: StatsScreen): TemplateResult {
         }
         ${
           s.parkingSpaces > 0 || parkingDemand.total > 0
-            ? html`<span class="k">Parking demand</span><span class="v" style="color:${parkingWorking < parkingDemand.total ? "var(--bad)" : "var(--good)"}">${fmt(parkingDemand.total)} needed (${fmt(parkingDemand.offices)} offices + ${fmt(parkingDemand.suites)} suites${parkingDemand.homes > 0 ? ` + ${fmt(parkingDemand.homes)} homes` : ""})</span>`
+            ? html`<span class="k">Parking demand</span><span class="v" style="color:${parkingWorking < parkingDemand.total ? "var(--bad)" : "var(--good)"}">${fmt(parkingDemand.total)} needed (${fmt(parkingDemand.offices)} offices + ${fmt(parkingDemand.suites)} suites${parkingDemand.homes > 0 ? ` + ${fmt(parkingDemand.homes)} homes` : ""})${parkingDemand.coverage !== null ? ` · ${Math.round(parkingDemand.coverage * 100)}% covered` : ""}</span>`
             : nothing
         }
         ${
