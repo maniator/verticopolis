@@ -51,7 +51,9 @@ export interface RenderSim {
   readonly santaFxSeq: number;
   readonly vipFxSeq: number;
   readonly explosionFx: { readonly floor: number; readonly x: number; readonly seq: number };
-  readonly thiefFx: { readonly caught: boolean; readonly floor: number; readonly seq: number };
+  /** `x`, when the host has it, is a tile of the stretch of floor the thief
+   *  prowled, so he runs that tower's rooms on a lot with several. */
+  readonly thiefFx: { readonly caught: boolean; readonly floor: number; readonly x?: number; readonly seq: number };
   readonly treasureFx: { readonly floor: number; readonly x: number; readonly seq: number };
   /** Classic's bomb search while one runs, else null. View: `header.bombSearch`. */
   readonly bombSearch?: BombSearchView | null;

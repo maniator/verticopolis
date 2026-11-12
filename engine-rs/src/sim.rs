@@ -105,6 +105,9 @@ pub struct PointFx {
 pub struct ThiefFx {
     pub caught: bool,
     pub floor: i64,
+    /// A tile of the stretch of floor (one tower's part of it, on a lot with
+    /// several) the thief prowls.
+    pub x: i64,
     pub seq: i64,
 }
 
@@ -126,6 +129,7 @@ impl Default for FxState {
             thief: ThiefFx {
                 caught: false,
                 floor: 1,
+                x: 0,
                 seq: 0,
             },
             treasure: PointFx::default(),

@@ -3,7 +3,7 @@ import { isElevatorKind } from "../../presentation/viewKinds";
 import { catalogFacility } from "../../catalog/catalogTypes";
 import { towerCatalog } from "../../catalog/towerCatalog";
 import { viewWorld } from "../../presentation/viewWorld";
-import type { BombSearchGuard, TransportView, UnitView } from "../../simport/view";
+import type { TransportView, UnitView } from "../../simport/view";
 import { drawExplosion, drawSearchGuard, drawThief, drawTreasure, drawVipLimo } from "../sprites/events";
 import { FLOOR, TILE } from "../scale";
 import type { ScreenRect } from "./towerInputCamera";
@@ -11,6 +11,9 @@ import type { ThiefSpan, TowerEngine } from "./TowerEngine";
 import { drawShaftNumbers } from "./towerShaftNumbers";
 import { drawHaloRings } from "./towerHaloRings";
 import { drawNoiseReach } from "./towerNoiseReach";
+import { guardPosition } from "./guardPosition";
+
+export { guardPosition };
 
 /**
  * The 2D canvas overlay and sky painters for {@link TowerEngine}, plus the
@@ -94,7 +97,7 @@ export function syncEventFx(engine: TowerEngine, animating: boolean): void {
   if (engine.sim.thiefFx.seq !== engine.lastThiefSeq) {
     engine.lastThiefSeq = engine.sim.thiefFx.seq;
     // He runs the floor's rooms; a floor with none has nowhere to prowl.
-    const span = animating ? floorRoomSpan(engine.sim.tower.units, engine.sim.thiefFx.floor) : null;
+    const span = animating ? floorRoomSpan(engine.sim.tower.units, engine.sim.thiefFx.floor, engine.sim.thiefFx.x) : null;
     if (span) {
       engine.thiefStart = engine.d.anim;
       engine.thiefCaught = engine.sim.thiefFx.caught;
@@ -153,18 +156,6 @@ export function bombCountdownText(minutesLeft: number): string {
   return `💣 Bomb search: ${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")} left`;
 }
 
-/** Where a guard is at minute `now`: climbing the emergency stairs at the
- *  left edge of its floor's rooms from `from` to `floor` until `arrive`, then
- *  walking the rooms left to right until `done`. `floor` may be fractional
- *  on the stairs; `x` is in tiles. */
-export function guardPosition(g: BombSearchGuard, now: number): { floor: number; x: number; climbing: boolean } {
-  const part = (a: number, b: number): number => (b > a ? Math.min(1, Math.max(0, (now - a) / (b - a))) : 1);
-  if (now < g.arrive) {
-    return { floor: g.from + (g.floor - g.from) * part(g.start, g.arrive), x: g.left - 1, climbing: true };
-  }
-  return { floor: g.floor, x: g.left + (g.right - g.left) * part(g.arrive, g.done), climbing: false };
-}
-
 /** How strong the red glow at the screen's edges is during a bomb search:
  *  one slow beat a second (in step with the tick), stronger in the last game
  *  hour. Under reduced motion it holds steady, never beating. Far below any
@@ -176,6 +167,14 @@ export function bombPulseAlpha(animSeconds: number, minutesLeft: number, reduced
   return peak * (0.35 + 0.65 * beat * beat);
 }
 
+/** The size a figure walking a floor (a search guard, a thief) is drawn at:
+ *  the camera zoom, as the crowd is. A {@link FLOOR}-pixel floor is taller
+ *  than the figure (`FIGURE_HEIGHT` in the sprites), so it stays inside its
+ *  floor at every zoom; a fixed minimum once drew guards floors tall. */
+export function floorFigureScale(zoom: number): number {
+  return zoom;
+}
+
 /** The bomb search: each guard climbing the emergency stairs or walking a
  *  floor's rooms (where the engine's timing says it is), the time left
  *  before the deadline, and a red glow beating at the screen's edges. Under
@@ -183,7 +182,7 @@ export function bombPulseAlpha(animSeconds: number, minutesLeft: number, reduced
 function renderBombSearch(engine: TowerEngine, ctx: CanvasRenderingContext2D): void {
   const search = engine.sim.bombSearch;
   if (!search) return;
-  const scale = Math.max(0.9, engine.cam.zoom);
+  const scale = floorFigureScale(engine.cam.zoom);
   for (const g of search.sweeping) {
     const at = guardPosition(g, engine.sim.clock.minutes);
     const x = engine.worldToScreenX(at.x);
@@ -268,16 +267,45 @@ function renderVip(engine: TowerEngine, ctx: CanvasRenderingContext2D): void {
 
 /** The tile span of the rooms on `floor` (left edge, right edge), or null
  *  when it has none. Bare floor and lobby tiles do not count, the same span
- *  the bomb search's guards walk. One pass over the units, made once when a
+ *  the bomb search's guards walk. Given `x`, only the rooms on the run of
+ *  floor and lobby tiles holding that tile count: one tower's part of the
+ *  floor on a lot with several. One pass over the units, made once when a
  *  thief appears (at most once a game day), never per frame. */
-export function floorRoomSpan(units: ReadonlyArray<Pick<UnitView, "kind" | "floor" | "x" | "width">>, floor: number): ThiefSpan | null {
+export function floorRoomSpan(
+  units: ReadonlyArray<Pick<UnitView, "kind" | "floor" | "x" | "width">>,
+  floor: number,
+  x?: number,
+): ThiefSpan | null {
+  const run = x === undefined || !Number.isFinite(x) ? null : structuralRun(units, floor, x);
   let span: ThiefSpan | null = null;
   for (const u of units) {
     if (u.floor !== floor || u.kind === "floor" || u.kind === "lobby") continue;
+    if (run && (u.x > run.right || u.x + u.width <= run.left)) continue;
     if (!span) span = { left: u.x, right: u.x + u.width };
     else span = { left: Math.min(span.left, u.x), right: Math.max(span.right, u.x + u.width) };
   }
   return span;
+}
+
+/** The run of floor and lobby tiles on `floor` that holds tile `x`, as its
+ *  first and last tiles, or null when no such tile is there. */
+function structuralRun(
+  units: ReadonlyArray<Pick<UnitView, "kind" | "floor" | "x" | "width">>,
+  floor: number,
+  x: number,
+): ThiefSpan | null {
+  const pieces: Array<[number, number]> = [];
+  for (const u of units) {
+    if (u.floor === floor && (u.kind === "floor" || u.kind === "lobby")) pieces.push([u.x, u.x + u.width - 1]);
+  }
+  pieces.sort((a, b) => a[0] - b[0]);
+  let run: ThiefSpan | null = null;
+  for (const [first, last] of pieces) {
+    if (run && first <= run.right + 1) run = { left: run.left, right: Math.max(run.right, last) };
+    else if (run && run.left <= x && x <= run.right) return run;
+    else run = { left: first, right: last };
+  }
+  return run && run.left <= x && x <= run.right ? run : null;
 }
 
 /** Where the thief is, in tiles, a fraction `p` of the way through his run:
@@ -297,7 +325,7 @@ function renderThief(engine: TowerEngine, ctx: CanvasRenderingContext2D): void {
   if (p < 0 || p > 1) return;
   const x = engine.worldToScreenX(thiefX(engine.thiefSpan, p));
   const y = engine.worldToScreenY(engine.thiefFloor) + FLOOR * engine.cam.zoom;
-  drawThief(ctx, x, y, Math.max(0.9, engine.cam.zoom), engine.thiefCaught);
+  drawThief(ctx, x, y, floorFigureScale(engine.cam.zoom), engine.thiefCaught);
 }
 
 /** Rain falls in front of the tower on rainy days (overlay layer). */

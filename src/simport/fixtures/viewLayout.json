@@ -1,5 +1,5 @@
 {
-  "version": 21,
+  "version": 22,
   "header": {
     "minutes": 0,
     "towerRevision": 1,
@@ -40,9 +40,10 @@
     "year": 36,
     "weekDays": 37,
     "weekendDays": 38,
-    "bombSearchSeq": 39
+    "bombSearchSeq": 39,
+    "thiefFxX": 40
   },
-  "headerWidth": 40,
+  "headerWidth": 41,
   "person": {
     "id": 0,
     "seed": 1,

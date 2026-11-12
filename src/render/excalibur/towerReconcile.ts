@@ -184,17 +184,21 @@ export function syncFacade(engine: TowerEngine): void {
   // built columns. (Every story of a multi-floor room counts, so a two-story
   // cinema at the edge still gets stairs on its upper row.)
   const hi = engine.sim.tower.highestFloor;
-  const { edges, topTiles } = facadeGeometry(engine.sim.tower.units, hi, towerCatalog(engine.sim));
-  syncEscapes(engine, edges);
+  const { runs, topTiles } = facadeGeometry(engine.sim.tower.units, hi, towerCatalog(engine.sim));
+  syncEscapes(engine, runs);
   syncCrane(engine, hi, topTiles);
 }
 
-/** Reconcile the exterior facade segments hung off each above-ground floor's
- *  left and right edges: fire-escape stairs on floors 2 and up, and the
- *  ground-floor entrance awnings that stand in for them on floor 1. One left +
- *  one right actor per row, slid in place when the row's edge moves. */
-function syncEscapes(engine: TowerEngine, edges: Map<number, FloorEdge>): void {
-  for (const [floor, e] of edges) {
+/** Reconcile the exterior facade segments hung off both sides of each run of
+ *  an above-ground floor (one run per tower when towers stand apart on the
+ *  lot): fire-escape stairs on floors 2 and up, and the ground-floor entrance
+ *  awnings that stand in for them on floor 1. One left + one right actor per
+ *  run, slid in place when the run's edges move. */
+function syncEscapes(engine: TowerEngine, runs: Map<number, FloorEdge[]>): void {
+  const kept = new Set<string>();
+  for (const [floor, row] of runs) row.forEach((e, i) => {
+    const key = `${floor}:${i}`;
+    kept.add(key);
     // Floor 1 wears awnings over its frontage instead of the fire escape;
     // they are wider than an escape segment, so the outer offset differs.
     const ground = floor === 1;
@@ -203,7 +207,7 @@ function syncEscapes(engine: TowerEngine, edges: Map<number, FloorEdge>): void {
     const y = engine.worldYTop(floor);
     const lx = e.min * TILE - segW;
     const rx = e.max * TILE;
-    const rec = engine.escapeActors.get(floor);
+    const rec = engine.escapeActors.get(key);
     if (rec) {
       // Same graphic (parity/style is fixed per floor), just follow the edge.
       if (rec.sig !== sig) {
@@ -211,7 +215,7 @@ function syncEscapes(engine: TowerEngine, edges: Map<number, FloorEdge>): void {
         rec.r.pos = ex.vec(rx, y);
         rec.sig = sig;
       }
-      continue;
+      return;
     }
     const parity = (floor % 2) as 0 | 1;
     const hang = (x: number, side: "left" | "right"): ex.Actor => {
@@ -220,9 +224,9 @@ function syncEscapes(engine: TowerEngine, edges: Map<number, FloorEdge>): void {
       engine.engine.add(a);
       return a;
     };
-    engine.escapeActors.set(floor, { l: hang(lx, "left"), r: hang(rx, "right"), sig });
-  }
-  reap(engine.escapeActors, new Set(edges.keys()), (rec) => {
+    engine.escapeActors.set(key, { l: hang(lx, "left"), r: hang(rx, "right"), sig });
+  });
+  reap(engine.escapeActors, kept, (rec) => {
     rec.l.kill();
     rec.r.kill();
   });

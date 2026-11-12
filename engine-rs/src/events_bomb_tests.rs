@@ -5,7 +5,7 @@ use crate::tower::UnitState;
 
 /// A Classic tower with offices on floors 2 to `top`, a lobby on 1, and
 /// `offices` Security offices on floor 1, every room open.
-fn tower(top: i64, offices: usize) -> Simulation {
+pub(super) fn tower(top: i64, offices: usize) -> Simulation {
     let mut sim = Simulation::new_game(11, GameMode::Classic);
     sim.money = 1e9;
     for x in 160..220 {
@@ -31,7 +31,7 @@ fn tower(top: i64, offices: usize) -> Simulation {
     sim
 }
 
-fn decline(sim: &mut Simulation) {
+pub(super) fn decline(sim: &mut Simulation) {
     sim.events.pending = Some(PendingChoice {
         kind: "bombThreat",
         cost: 300_000.0,
@@ -41,7 +41,7 @@ fn decline(sim: &mut Simulation) {
 }
 
 /// Steps the search minute by minute until it ends or `limit` minutes pass.
-fn run(sim: &mut Simulation, limit: i64) {
+pub(super) fn run(sim: &mut Simulation, limit: i64) {
     for _ in 0..limit {
         if sim.events.bomb.is_none() {
             return;
@@ -194,7 +194,7 @@ fn in_modern_a_security_office_that_opens_mid_search_joins_it() {
     sim.mode = GameMode::Modern;
     decline(&mut sim);
     assert!(sim.events.bomb.as_ref().unwrap().guards.is_empty());
-    sim.join_bomb_search(2);
+    sim.join_bomb_search(2, 185);
     let b = sim.events.bomb.as_ref().unwrap();
     assert_eq!(b.guards.len(), GUARDS_PER_OFFICE);
     assert!(
@@ -223,7 +223,7 @@ fn a_new_office_joins_through_finished_construction() {
 fn in_classic_a_late_office_stays_out_of_the_search() {
     let mut sim = tower(6, 0);
     decline(&mut sim);
-    sim.join_bomb_search(2);
+    sim.join_bomb_search(2, 185);
     assert!(sim.events.bomb.as_ref().unwrap().guards.is_empty());
 }
 
@@ -398,7 +398,7 @@ fn every_turn_of_a_bomb_threat_is_a_line_the_game_toasts() {
         sim.mode = mode;
         let from = sim.log.len();
         decline(&mut sim);
-        sim.join_bomb_search(2);
+        sim.join_bomb_search(2, 185);
         run(&mut sim, 1500);
         assert!(sim.events.bomb.is_none(), "{mode:?}: the search ended");
         assert!(

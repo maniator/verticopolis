@@ -205,6 +205,10 @@ function drawThiefFigure(ctx: CanvasRenderingContext2D, x: number, footY: number
   px(-3, -5, 2, 1, "#5A6472");
 }
 
+/** How tall the guard and thief figures are at size 1, from the guard's
+ *  alert beacon (29 above the feet) to the contact shadow under them. */
+export const FIGURE_HEIGHT = 30;
+
 /** The security guard trailing a caught thief, feet at (x, footY), sized by `s`:
  *  a bespoke integer-rect figure in a navy uniform with a peaked cap and a
  *  static red alert beacon (a functional caught-state cue, not decoration). */
