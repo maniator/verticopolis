@@ -1,0 +1,211 @@
+/* The New Tower rule-set picker and the update prompt.
+   Part of the game's stylesheet: src/styles.css imports the parts in order. */
+
+/* ---- New Tower rule-set picker ----
+ * Two selectable mode cards. The chosen rule-set is permanent for the tower, so
+ * the lede spells that out and the cards read as a deliberate, one-time choice. */
+.nt-lede {
+  color: var(--muted);
+}
+.nt-choice {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 12px 0 0;
+}
+.nt-modes {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+/* The Modern-only reveal: the "Modern adds" label and the calendar pace picker.
+   Shown by default and HIDDEN under Classic via `:has()`. Written this way round
+   deliberately: a browser without `:has()` support simply keeps the block visible
+   in both modes (the old always-rendered calendar), so a Modern player can always
+   reach the calendar choice. With `:has()` (all current targets) Classic collapses
+   it, which also drops the calendar radios out of the tab order, correct because
+   the calendar only applies to Modern. */
+.nt-modern-only {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-left: 12px;
+  border-left: 2px solid var(--line);
+}
+.nt-choice:has(input[name="nt-mode"][value="classic"]:checked) .nt-modern-only {
+  display: none;
+}
+.nt-adds {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+/* Small section caption inside the Modern-only reveal ("Modern adds", "Calendar
+   pace"): a quiet uppercase label, one clear step below the mode-card names, so
+   the grouped features and the calendar radios each read as a labeled set. */
+.nt-sublabel {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+/* Founding-screen full comparison: the shared compareTemplate in a collapsed
+   <details>, so the dialog stays a commitment by default while the whole
+   comparison is one click away before founding. Reuses the Help caret grammar
+   (no motion, so it respects reduced-motion) but pitched one step quieter than
+   the mode cards: it is optional reference, not the decision. A hairline rule
+   above sets it apart from the Modern card. It is deliberately NOT a .well: a
+   sunken white box would read as a stray empty text field. */
+.nt-compare {
+  margin: 14px 0 2px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+.nt-compare > summary {
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  list-style: none;
+}
+.nt-compare > summary::-webkit-details-marker {
+  display: none;
+}
+.nt-compare > summary::before {
+  content: "▸ ";
+}
+.nt-compare[open] > summary::before {
+  content: "▾ ";
+}
+/* Open: a little air below the summary so the first paragraph doesn't hug the
+   caret. The modal itself scrolls (.modal-box overflow-y:auto), so the long
+   shared list just flows; no inner scroller (which would fight that scroll). */
+.nt-compare[open] > summary {
+  margin-bottom: 8px;
+}
+.nt-mode {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 10px 12px;
+  background: var(--r-face);
+  box-shadow: var(--bevel-out);
+  cursor: pointer;
+}
+/* The chosen card presses in (raised bevel flips to sunken) and its name turns
+   navy, the same selected-state grammar the rest of the retro chrome uses. */
+.nt-mode:has(input:checked) {
+  box-shadow: var(--bevel-in);
+}
+.nt-mode:has(input:checked) .nt-mode-name {
+  color: var(--accent);
+}
+.nt-mode input {
+  margin-top: 3px;
+}
+.nt-mode-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.nt-mode-name {
+  font-weight: 600;
+}
+.nt-mode-desc,
+.nt-feature {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+/* Calendar pace picker: the two radios grouped under the "Calendar pace"
+   sublabel. It lives inside the Modern-only reveal, so the parent's flex gap
+   handles spacing and the reveal's left rail already sets it apart; the picker
+   itself is just the labeled radio group, no card of its own. */
+.nt-calendar {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.nt-cal-opt {
+  display: block;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--muted);
+  cursor: pointer;
+}
+.nt-cal-opt input {
+  margin-right: 6px;
+}
+.nt-badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 0;
+  vertical-align: middle;
+  background: var(--muted);
+  color: #fff;
+}
+.nt-badge.alt {
+  background: var(--good);
+}
+.nt-abandon {
+  color: var(--bad);
+  font-weight: 600;
+}
+
+/* The update prompt's "What's new" section: a small navy section strip (the
+   .win-title.sm idiom, same as the Statistics dialog) over a compact bullet
+   list. The wrapper is deliberate — it keeps the strip OUT of .modal-box's
+   DIRECT children, so it never inherits the full-bleed (.win > .win-title) or
+   sticky (.modal-box > .win-title) treatment reserved for the dialog title bar.
+   Wells are reserved for scrolling logs: one version's notes stay a short
+   list (≤3 lines), and only several skipped versions get the well below. */
+.whatsnew {
+  margin-top: 10px;
+}
+.whatsnew > .win-title.sm {
+  margin-bottom: 6px;
+}
+.whatsnew ul {
+  margin: 0 0 0 18px;
+}
+.whatsnew li {
+  margin-bottom: 2px;
+  overflow-wrap: anywhere;
+}
+/* Several skipped versions' notes (#1897), newest first. The log scrolls on
+   its own once it is taller than its cap, so the box itself stays under its
+   82vh cap and only one scroller is live in practice (the guard in
+   modalSingleScroller.guard.test.ts names this exception). The cap leaves the
+   actions in view on a 640px-tall phone. */
+.whatsnew-log {
+  max-height: min(200px, 22vh);
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 4px 8px;
+}
+.whatsnew-log:focus-visible {
+  outline: 1px dotted var(--r-ink);
+  outline-offset: -3px;
+}
+.whatsnew-ver {
+  font-size: 12px;
+  font-weight: 700;
+  margin: 8px 0 2px;
+}
+.whatsnew-ver:first-child {
+  margin-top: 0;
+}
+.whatsnew-more {
+  font-style: italic;
+  margin: 6px 0 0;
+}
+/* Incoming build id — quiet fine print under the prompt, never the headline.
+   A long unbroken sha must wrap rather than force a horizontal scroll. */
+.build-id {
+  font-size: 11px;
+  color: var(--muted);
+  margin: 6px 0 0;
+  overflow-wrap: anywhere;
+}

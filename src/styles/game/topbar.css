@@ -1,0 +1,175 @@
+/* Layer 4 begins: the top Information bar, its meters and the pixel icons.
+   Part of the game's stylesheet: src/styles.css imports the parts in order. */
+
+/* ---- 4. LAYOUT + SURFACES -------------------------------------------- */
+
+#app {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---- Top "Information" bar ----
+   (deliberate one-off ID paint: the raised strip under the whole bar) */
+#topbar {
+  display: flex;
+  align-items: center;
+  z-index: 5;
+  background: var(--r-face);
+  border: 0;
+  box-shadow: inset 0 1px var(--r-hi), 0 2px 0 var(--r-shadow), 0 3px 0 var(--r-dark);
+  gap: 6px;
+  padding: 4px 8px;
+}
+.brand {
+  background: var(--r-title);
+  color: var(--r-title-fg);
+  font-size: 13px;
+  font-weight: 700;
+  padding: 2px 8px;
+  box-shadow: var(--bevel-out);
+}
+.brand span {
+  color: var(--r-title-fg);
+}
+.brand b {
+  color: #ffd24a; /* window-gold POLIS */
+  font-weight: 700;
+}
+#status {
+  display: flex;
+  flex: 1;
+  gap: 5px;
+}
+.stat {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.1;
+  min-width: 0;
+  background: var(--r-face);
+  box-shadow: var(--bevel-in);
+  padding: 2px 8px;
+  color: var(--r-ink);
+}
+.stat .label {
+  font-size: 9px;
+  letter-spacing: 1px;
+  color: var(--r-title);
+  font-weight: 700;
+}
+.stat .value {
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--r-ink);
+}
+.value.money {
+  /* The effective color is set every frame as an inline style in uiStatus.update
+     (`var(--money)` for positive, `var(--bad)` for negative), so THIS rule is only
+     the pre-first-frame default; keep it on the same token so both agree. The AA
+     contrast fix lives on --money itself (retro-tokens.css). */
+  color: var(--money);
+}
+.value.stars {
+  letter-spacing: 2px;
+  color: #a07000;
+  text-shadow: 0 0 0 #000;
+}
+#stat-date,
+#stat-time {
+  white-space: nowrap;
+}
+/* Color-blind-safe traffic cue: the meter carries the level in how many bars
+   are filled, so it reads in grayscale; the warn color is a redundant extra,
+   never the only cue. The meter is four rising bars drawn here, dark up to the
+   tier (data-level, set by the traffic HUD) and pale after it, so it never
+   depends on a font: Android's fallback drew the old "▮▯▯▯" text glyphs as
+   boxes that read as missing characters. The span is empty. Filled bars take
+   the chip's color, so the warn state turns them red as well; the pale bars
+   are the bevel's light tone, far from both the ink and the red. */
+#traffic-glyph {
+  --bar-on: currentColor;
+  --bar-off: rgba(255, 255, 255, 0.7);
+  --bar-1: var(--bar-on);
+  --bar-2: var(--bar-off);
+  --bar-3: var(--bar-off);
+  --bar-4: var(--bar-off);
+  display: inline-block;
+  width: 18px;
+  height: 11px;
+  /* An empty inline-block's bottom edge is its baseline, so the meter sits
+     on the text line beside the tier word. */
+  background:
+    linear-gradient(var(--bar-1), var(--bar-1)) 0 100% / 3px 5px no-repeat,
+    linear-gradient(var(--bar-2), var(--bar-2)) 5px 100% / 3px 7px no-repeat,
+    linear-gradient(var(--bar-3), var(--bar-3)) 10px 100% / 3px 9px no-repeat,
+    linear-gradient(var(--bar-4), var(--bar-4)) 15px 100% / 3px 11px no-repeat;
+}
+#traffic-glyph:is([data-level="busy"], [data-level="backed-up"], [data-level="gridlock"]) { --bar-2: var(--bar-on); }
+#traffic-glyph:is([data-level="backed-up"], [data-level="gridlock"]) { --bar-3: var(--bar-on); }
+#traffic-glyph[data-level="gridlock"] { --bar-4: var(--bar-on); }
+/* Forced colors would drop the bars (background images): keep them, in the
+   system's text and gray colors. */
+@media (forced-colors: active) {
+  #traffic-glyph {
+    forced-color-adjust: none;
+    --bar-on: CanvasText;
+    --bar-off: GrayText;
+  }
+}
+/* One line always: the value carries a glyph + tier word + optional floor suffix;
+   letting it wrap would make this stat taller than its neighbors and break the
+   bar's vertical centering. */
+#traffic { white-space: nowrap; }
+/* The old text meter set this line's height with Courier's metrics, a pixel
+   taller than the chip font alone. A zero-width space in the same face keeps
+   that line box, so the top bar and everything under it stay where they were. */
+#traffic::before { content: "\200B"; font-family: "Courier New", monospace; }
+/* The hotspot floor is a footnote to the tier word — smaller and lighter so it
+   reads as "…and it's on floor N" without competing with the tier or widening the
+   cell. It inherits the value's color (incl. the red warn state), so it stays
+   legible, never ghosted. */
+#traffic-floor { font-size: 0.82em; font-weight: 500; }
+#status .traffic-warn { color: var(--bad); font-weight: 700; }
+
+/* Inline pixel icons (#721): baseline-aligned, ink by default, currentColor so a
+   bulletin line's severity color carries into the icon. A small gap sits before
+   any following text; icon-only toolbar buttons drop it so the glyph centers. */
+.vc-icon {
+  display: inline-block;
+  vertical-align: -2px;
+  margin-right: 5px;
+}
+.vc-icon-inline {
+  margin-right: 4px;
+}
+/* Icon-only buttons drop the trailing 5px so the glyph centers, and flex
+   buttons that space with `gap` drop it too so it does not stack on the gap.
+   Every other icon keeps the base 5px before its label (brand, stats, settings,
+   map, the update/install toolbar buttons, and the labeled .splash-btn stack,
+   which have text right after the icon). .splash-mute is a bare glyph;
+   .splash-install spaces its icon and "Install" label with `gap`. */
+#speed button[data-speed] .vc-icon,
+#btn-undo .vc-icon,
+#btn-redo .vc-icon,
+#panel-toggle .vc-icon,
+#btn-save-top .vc-icon,
+#audio-toggle .vc-icon,
+.splash-mute .vc-icon,
+.splash-install .vc-icon {
+  margin-right: 0;
+}
+
+#speed {
+  display: flex;
+  gap: 4px;
+}
+#speed .btn {
+  font-size: 13px; /* padding stays the .btn default (3px 9px), as shipped */
+}
+#speed .btn.active {
+  font-weight: 700;
+  box-shadow: var(--bevel-in);
+}
+#panel-toggle {
+  display: none;
+}

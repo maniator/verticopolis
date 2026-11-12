@@ -1,10 +1,6 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
-import { dirname, resolve } from "node:path";
 import { OnboardingController } from "./Onboarding";
-
-const STYLES_CSS = resolve(dirname(fileURLToPath(import.meta.url)), "..", "styles.css");
+import { gameStylesheet } from "../tests/gameStylesheet.ts";
 
 /**
  * Splash-mute contract (SPEC-splash-mute, `_bmad-output/specs/spec-splash-mute/`):
@@ -122,7 +118,7 @@ describe("splash mute toggle (CAP-1)", () => {
     // happy-dom applies no stylesheet, so read the shipped CSS rule directly:
     // the 44px WCAG floor is the spec requirement, and no unit DOM can measure
     // layout. Pins the rule against a future value trim below the floor.
-    const css = readFileSync(STYLES_CSS, "utf8");
+    const css = gameStylesheet();
     const rule = css.match(/\.splash-mute\s*\{([^}]*)\}/)?.[1] ?? "";
     const px = (prop: string) => Number(rule.match(new RegExp(`${prop}\\s*:\\s*(\\d+)px`))?.[1] ?? "0");
     expect(px("min-width")).toBeGreaterThanOrEqual(44);
@@ -224,7 +220,7 @@ describe("splash install button (SPEC-pwa-install CAP-5)", () => {
   });
 
   it("carries a comfortable touch target: the .splash-install rule floors both dimensions at >= 44px", () => {
-    const css = readFileSync(STYLES_CSS, "utf8");
+    const css = gameStylesheet();
     const rule = css.match(/\.splash-install\s*\{([^}]*)\}/)?.[1] ?? "";
     const px = (prop: string) => Number(rule.match(new RegExp(`${prop}\\s*:\\s*(\\d+)px`))?.[1] ?? "0");
     expect(px("min-width")).toBeGreaterThanOrEqual(44);

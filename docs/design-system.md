@@ -5,7 +5,12 @@ two-pixel bevels, navy title bars, press-only feedback. This document is the
 contract for anyone (human or agent) touching `src/styles.css` or UI markup.
 
 The stylesheet (`src/styles.css`) is organized as **one generation of CSS in
-five layers**: tokens → base → components → layout/surfaces → media. There is
+five layers**: tokens → base → components → layout/surfaces → media. It is a
+list of imports: the shared chrome under `src/styles/`, then the game's own
+parts under `src/styles/game/` (base, components, one file per screen region,
+the media blocks), in cascade order. The build inlines them into one sheet, so
+a rule's place in that list is its place in the cascade. Put a new rule in the
+part for its region, and keep a media rule in its media part. There is
 no "skin layer" that overrides earlier rules; if you find yourself out-specifying
 an existing rule instead of editing it, you are recreating the archaeology this
 system replaced.

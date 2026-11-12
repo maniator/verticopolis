@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
+import { gameStylesheet } from "./gameStylesheet.ts";
 
 /**
  * Shift-left guard: ONE scroll container per dialog (GH #717).
@@ -33,14 +34,17 @@ import { dirname, resolve } from "node:path";
 const HERE = dirname(fileURLToPath(import.meta.url));
 
 /** Comments carry braces and selector-shaped prose, so strip them first. */
+function stripComments(css: string): string {
+  return css.replace(/\/\*[\s\S]*?\*\//g, "");
+}
 function readCss(rel: string): string {
-  return readFileSync(resolve(HERE, "..", rel), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+  return stripComments(readFileSync(resolve(HERE, "..", rel), "utf8"));
 }
 
 /* The game page's whole cascade: styles.css plus the shared-chrome imports the
    dialog box actually wears (.win lives in retro-components). retro-page.css
    is standalone-page chrome and never loads in the game document. */
-const SHEETS = [readCss("styles.css"), readCss("styles/retro-components.css"), readCss("styles/retro-tokens.css")];
+const SHEETS = [stripComments(gameStylesheet()), readCss("styles/retro-components.css"), readCss("styles/retro-tokens.css")];
 
 interface Rule {
   selector: string;

@@ -1,0 +1,176 @@
+/* The main layout, the Tools window, the stage, the inspector card and toasts.
+   Part of the game's stylesheet: src/styles.css imports the parts in order. */
+
+/* ---- Main layout ---- */
+#main {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+  background: var(--r-desktop);
+}
+
+/* ---- Tool palette ("Tools" window) ---- */
+#palette {
+  width: 176px;
+  overflow-y: auto;
+  margin: 6px 0 6px 6px;
+}
+.palette-scroll {
+  padding: 6px;
+}
+/* Category tabs are a phone-only affordance; desktop shows every group stacked. */
+#palette-tabs {
+  display: none;
+}
+.pal-group-title {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin: 10px 4px 4px;
+  color: var(--r-title);
+  font-weight: 700;
+  /* Sticky so the band you are scrolling through stays labeled. */
+  position: sticky;
+  top: 0;
+  background: var(--r-face);
+  z-index: 1;
+}
+/* Modern venues sit under their own lighter sub-header inside a category. It
+ * scrolls with the content (only the category header pins), so it never stacks
+ * on top of the sticky category title. */
+.pal-sub {
+  color: #6a5a2a;
+  font-size: 9px;
+  margin: 6px 4px 3px;
+  position: static;
+}
+/* A category with no unlocked members (its section, its tab), and a Modern
+ * sub-band with none unlocked yet, drop out of layout entirely. */
+.pal-group[hidden],
+.pal-tab[hidden] {
+  display: none;
+}
+.pal-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 6px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  font-size: 12px;
+  color: var(--r-ink);
+}
+.pal-item:hover {
+  background: #d8d8d8; /* list rows may hover; buttons may not */
+}
+.pal-item.active {
+  background: var(--r-title);
+  color: var(--r-title-fg);
+}
+/* Palette state (single source of truth; toggled by classes in UI.ts).
+ * Locked facilities — and any group header left with no unlocked members — are
+ * removed from the palette entirely, matching the original: the toolbar grows
+ * as stars are earned rather than showing a menu of dimmed, unbuildable tools. */
+.pal-item.locked,
+.pal-group-title[hidden] {
+  display: none;
+}
+/* Unlocked but currently unaffordable: dimmed, still visible and selectable.
+ * (Placement is still gated by the engine build guard, which rejects a buy the
+ * player can't afford — the dimming is only a hint, not a hard block.) */
+.pal-item.unaffordable {
+  opacity: 0.85;
+}
+.pal-swatch {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  box-shadow: var(--bevel-in);
+}
+.pal-name {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pal-cost {
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  color: #333;
+}
+/* On the navy selection highlight, name AND cost must read light, not dark. */
+.pal-item.active .pal-name,
+.pal-item.active .pal-cost {
+  color: #eef2ff;
+}
+
+/* ---- Stage / canvas ----
+   (deliberate one-off ID paint: the sunken sky-blue viewport) */
+#stage {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  background: #9aa6bd;
+  margin: 6px;
+  box-shadow: var(--bevel-in);
+}
+#view {
+  width: 100%;
+  height: 100%;
+  display: block;
+  cursor: crosshair;
+  touch-action: none; /* we handle pan/zoom ourselves */
+  image-rendering: pixelated; /* crisp retro pixels, no blur */
+}
+#hint {
+  position: absolute;
+  bottom: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 4px 10px;
+  font-size: 11px;
+  pointer-events: none;
+}
+
+/* ---- Inspector (hover/tap facility card) ---- */
+#inspector {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  --pad-y: 8px;
+  --pad-x: 10px;
+  --title-gap: 6px;
+  padding: var(--pad-y) var(--pad-x);
+  font-size: 12px;
+  max-width: 240px;
+  /* Containment for short (landscape-phone) viewports: the card is absolutely
+     positioned in #stage (overflow: hidden), so without a height cap a long
+     diagnostics card would be clipped invisibly at the stage's bottom edge.
+     Cap it to the stage minus the 8px anchor margins and let the body scroll,
+     so truncation is visible (scrollbar) instead of silent. */
+  max-height: calc(100% - 16px);
+  overflow-y: auto;
+  pointer-events: none;
+}
+/* The card is click-through, so only the ✕ is interactive. Hidden on
+   desktop, where hover-away already dismisses. Right-pinning comes from
+   .win-title .btn (the bar is flex; float would be ignored). */
+#inspector .insp-close {
+  display: none;
+  pointer-events: auto;
+}
+/* The build-refusal card's hover-tier translucency lives with the other
+   capability/tier rules in section 5 MEDIA (the block after the coarse-pointer
+   rules), because its gate is the complement of the phone block's query. */
+
+/* ---- Toasts ---- */
+#toast-wrap {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-end;
+}

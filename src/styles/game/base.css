@@ -1,0 +1,68 @@
+/* Layer 2, base: the document, accessibility and reduced motion.
+   Part of the game's stylesheet: src/styles.css imports the parts in order. */
+
+/* ---- 2. BASE --------------------------------------------------------- */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  width: 100%;
+}
+
+body {
+  overflow: hidden;
+  user-select: none;
+  font-family: var(--r-font);
+  font-size: 12px;
+  background: var(--r-desktop);
+  color: var(--r-ink);
+  -webkit-font-smoothing: none;
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* Screen-reader-only live region + visible keyboard focus. */
+.visually-hidden {
+  position: absolute !important;
+  width: 1px; height: 1px;
+  margin: -1px; padding: 0; border: 0;
+  overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%);
+  white-space: nowrap;
+}
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* F49: respect the OS "reduce motion" preference — kill the always-on ambient
+   animation (clouds, rain, walkers, sky transitions, toast slides, crossfades)
+   for users who get motion sick or simply prefer a still UI. The game stays
+   fully playable; only decorative motion is removed. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+/* User-toggled reduced motion (mirrors the OS rule so it also applies when the
+   OS preference is off). Canvas ambient motion is frozen by the engine. */
+html.reduce-motion *,
+html.reduce-motion *::before,
+html.reduce-motion *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+  scroll-behavior: auto !important;
+}

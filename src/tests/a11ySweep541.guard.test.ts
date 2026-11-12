@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
+import { gameStylesheet } from "./gameStylesheet.ts";
 
 /**
  * Static guards for the markup/CSS half of the #541 a11y/UX sweep: the toast
@@ -16,7 +17,7 @@ const srcRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const read = (rel: string): string => readFileSync(resolve(srcRoot, rel), "utf8");
 
 const indexHtml = read("index.html");
-const stylesCss = read("styles.css");
+const stylesCss = gameStylesheet();
 const tokensCss = read("styles/retro-tokens.css");
 /** The shared window grammar, including the modal ✕, lives beside UI.ts. */
 const uiModalTs = read("ui/uiModal.ts");

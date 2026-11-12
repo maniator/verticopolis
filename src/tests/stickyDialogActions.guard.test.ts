@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
+import { gameStylesheet } from "./gameStylesheet.ts";
 
 /**
  * Shift-left guard for the pinned dialog action strip.
@@ -18,10 +19,7 @@ import { dirname, resolve } from "node:path";
  * `a11ySweep541.guard.test.ts`. It is deliberately about the RULE, not about
  * pixels; the gallery's mid-scroll shots carry the visual proof.
  */
-const RAW = readFileSync(
-  resolve(dirname(fileURLToPath(import.meta.url)), "..", "styles.css"),
-  "utf8",
-);
+const RAW = gameStylesheet();
 /** Comments carry braces and selector-shaped prose, so strip them first. */
 const CSS = RAW.replace(/\/\*[\s\S]*?\*\//g, "");
 

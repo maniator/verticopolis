@@ -1,0 +1,49 @@
+/* Layer 3, components: the reusable game classes beyond the shared chrome.
+   Part of the game's stylesheet: src/styles.css imports the parts in order. */
+
+/* ---- 3. COMPONENTS --------------------------------------------------- */
+
+
+/* .toast — a little gray alert box; the left edge carries the kind. */
+.toast {
+  background: var(--r-face);
+  color: var(--r-ink);
+  border-left: 3px solid var(--accent);
+  border-radius: 0;
+  box-shadow: var(--bevel-out), var(--win-shadow);
+  padding: 6px 10px;
+  font-size: 12px;
+  animation: slidein 0.2s ease;
+  max-width: 280px;
+}
+.toast.good {
+  border-color: var(--good);
+}
+.toast.bad {
+  border-color: var(--bad);
+}
+.toast.money {
+  border-color: var(--money);
+}
+@keyframes slidein {
+  from {
+    transform: translateX(20px);
+    opacity: 0;
+  }
+}
+
+/* .evalbar — the original-style sunken satisfaction gauge. */
+.evalbar {
+  display: inline-block;
+  width: 54px;
+  height: 9px;
+  vertical-align: middle;
+  background: var(--r-hi);
+  box-shadow: var(--bevel-in);
+  overflow: hidden;
+}
+.evalbar > span {
+  display: block;
+  height: 100%;
+  background: var(--good);
+}

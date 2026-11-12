@@ -1,0 +1,304 @@
+/* Layer 5, media: short viewports and the phone block.
+   Part of the game's stylesheet: src/styles.css imports the parts in order. */
+
+/* ---- 5. MEDIA -------------------------------------------------------- */
+
+/* Short viewports (e.g. a phone held landscape): wide enough to keep the
+   desktop side-panel layout, but too short for it — let every panel take
+   its natural height and cap the log, so #sidebar scrolls to all of them. */
+@media (max-height: 560px) {
+  .panel.grow {
+    flex: 0 0 auto;
+  }
+  #log {
+    max-height: 120px;
+  }
+}
+
+/* Phone block: true phones (≤767px) plus short landscape phones (wide but under
+   600px tall). Portrait tablets (≥768px wide AND ≥600px tall) fall through to the
+   tablet block below. A landscape phone has no vertical room for docked panels, so
+   it keeps the drawer here, and the landscape phone block after this one moves
+   its tools from the bottom strip to a column on the left. Mirrored by GameApp.mobileMq, and
+   the refusal-card opacity gate (end of this section) encodes its COMPLEMENT:
+   a breakpoint change here must land in both. */
+@media (max-width: 767px), (max-width: 1023px) and (max-height: 599px) {
+  #topbar {
+    gap: 8px;
+    padding: 5px 8px;
+    flex-wrap: wrap;
+  }
+  .brand {
+    font-size: 13px;
+  }
+  #status {
+    gap: 6px;
+    order: 3;
+    flex-basis: 100%;
+    /* Wrap the stats onto a second row instead of scrolling sideways — the bar
+     * shouldn't scroll, and every value stays visible. */
+    flex-wrap: wrap;
+  }
+  .stat {
+    /* Each box keeps its content width (no shrink → no clipping); wrapping in
+     * #status handles overflow rather than a horizontal scroll. */
+    flex: none;
+    padding: 2px 6px;
+  }
+  .stat .value {
+    font-size: 13px;
+    white-space: nowrap;
+  }
+  #panel-toggle {
+    display: inline-block;
+  }
+  /* The control row is crowded on a phone: 9 fixed buttons plus the conditional
+     Update / Install chips. Let it wrap instead of overflowing off-screen, and
+     drop the two chips' text labels so they read as compact icons like every
+     other topbar button (the title / aria-label still name them; the splash
+     button and the Game-panel entry carry the full "Install" wording). Together
+     these keep the bar tidy at 390px instead of squished and clipped. */
+  #speed {
+    flex-wrap: wrap;
+  }
+  #speed .btn-label {
+    display: none;
+  }
+  /* With the label hidden the update/install chips are icon-only, so drop the
+     icon's trailing margin too or the glyph sits off-center (as on every other
+     icon-only button above). */
+  #btn-update .vc-icon,
+  #btn-install .vc-icon {
+    margin-right: 0;
+  }
+
+  /* Stats/milestones: stack the two columns into one so each row gets the full
+     width. */
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+  .stats-grid .col.ms,
+  .stats-grid .col.nsr {
+    grid-template-columns: auto 1fr;
+  }
+  .stats-grid .col.ms .v,
+  .stats-grid .col.nsr .v {
+    text-align: left;
+  }
+
+  /* Palette becomes a bottom bar: a category tab row over a content row, so
+     reaching a far venue is a tab tap, not a long sideways scroll of everything. */
+  #main {
+    flex-direction: column;
+  }
+  #palette {
+    order: 3;
+    width: 100%;
+    height: 118px;
+    margin: 0;
+    box-shadow: none;
+    border-top: 2px solid var(--r-shadow);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  #palette > .win-title {
+    display: none; /* no floating "Tools" title bar in the bottom strip */
+  }
+  /* Category tab row (phone only). Scrolls a little if the chips overflow, but the
+     chips are short; the tiles no longer scroll across every group. */
+  #palette-tabs {
+    display: flex;
+    flex: none;
+    gap: 3px;
+    padding: 4px 5px 3px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    border-bottom: 1px solid var(--r-shadow);
+    scrollbar-width: none;
+  }
+  #palette-tabs::-webkit-scrollbar {
+    display: none;
+  }
+  .pal-tab {
+    flex: none;
+    font: inherit;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 9px;
+    cursor: pointer;
+    white-space: nowrap;
+    position: relative;
+    color: #1a1a1a;
+    background: #b7b7b7;
+    border: 1px solid #fff;
+    box-shadow: 1px 1px 0 var(--r-shadow);
+  }
+  .pal-tab[aria-selected="true"] {
+    background: var(--r-title);
+    color: var(--r-title-fg);
+    box-shadow: inset 0 -2px #ffd23f;
+  }
+  /* The "new tools unlocked here" pip. */
+  .pal-tab.has-new::after {
+    content: "";
+    position: absolute;
+    top: -3px;
+    right: -3px;
+    width: 8px;
+    height: 8px;
+    background: #ff5b4a;
+    border: 1px solid #fff;
+    border-radius: 50%;
+  }
+  /* Content row: pinned tools (always visible) beside the active group (scrolls). */
+  .palette-scroll {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+    align-items: stretch;
+    overflow: hidden;
+    padding: 0;
+  }
+  .pal-pinned {
+    display: flex;
+    flex: none;
+    align-items: stretch;
+    gap: 2px;
+    padding: 4px;
+    border-right: 1px solid var(--r-shadow);
+  }
+  .pal-pinned .pal-group-title {
+    display: none; /* the pinned Inspect/Bulldoze cluster needs no label here */
+  }
+  .pal-groups {
+    display: flex;
+    flex: 1;
+    min-width: 0;
+    align-items: stretch;
+    gap: 2px;
+    padding: 4px;
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+  /* Only the selected category shows on a phone. */
+  .pal-groups .pal-group {
+    display: none;
+  }
+  .pal-groups .pal-group.tab-active {
+    display: flex;
+    align-items: stretch;
+    gap: 2px;
+  }
+  .pal-groups .pal-group[hidden] {
+    display: none; /* an emptied group never shows even if it were still marked active */
+  }
+  /* The category name lives on its tab; drop the in-strip title, keep the Modern
+     sub-band as a slim vertical divider between classic and Modern tiles. */
+  .pal-group-title {
+    position: static;
+    background: none;
+    margin: 0 2px;
+  }
+  .pal-group.tab-active > .pal-group-title:not(.pal-sub) {
+    display: none;
+  }
+  .pal-group.tab-active > .pal-sub {
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+    align-self: center;
+    font-size: 8px;
+    padding: 0;
+  }
+  .pal-item {
+    flex-direction: column;
+    width: 72px;
+    flex: none;
+    gap: 3px;
+    padding: 5px 3px;
+    text-align: center;
+    align-items: center;
+    justify-content: flex-start;
+  }
+  .pal-swatch {
+    width: 20px;
+    height: 20px;
+  }
+  .pal-name {
+    white-space: normal;
+    line-height: 1.15;
+    font-size: 11px;
+    max-height: 2.4em;
+    overflow: hidden;
+  }
+  .pal-cost {
+    display: block;
+    font-size: 11px;
+  }
+
+  /* Sidebar slides in as a drawer toggled by the ☰ button. */
+  #sidebar {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: min(290px, 86vw);
+    margin: 0;
+    transform: translateX(100%);
+    transition: transform 0.2s ease;
+    z-index: 40;
+    box-shadow: -8px 0 24px rgba(0, 0, 0, 0.5);
+    padding-top: 4px;
+  }
+  body.panels-open #sidebar {
+    transform: translateX(0);
+  }
+  /* Tap-anywhere scrim behind the drawer. */
+  #scrim {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 35;
+    background: rgba(0, 0, 0, 0.45);
+  }
+  body.panels-open #scrim {
+    display: block;
+  }
+  /* Explicit close button in the drawer (the ☰ toggle also still works). */
+  #panel-close {
+    display: block;
+    position: absolute;
+    top: 6px;
+    right: 8px;
+    z-index: 2;
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    font-size: 15px;
+    line-height: 1;
+  }
+
+  #stage {
+    order: 1;
+    flex: 1;
+  }
+  #hint {
+    display: none;
+  }
+  #editor {
+    width: min(250px, 80vw);
+  }
+  /* The schedule floors grid keeps its 200px well on small screens (#513):
+     the cap keeps the steppers and the OK button within reach on a long span
+     when vertical space is scarce. The head sticks inside the grid's own
+     scroller again. A narrow desktop window matches this block too and can
+     show the well's scrollbar next to the box's; accepted so small-screen
+     reachability wins. */
+  .es-grid {
+    max-height: 200px;
+    overflow-y: auto;
+  }
+  .es-grid-head {
+    top: 0;
+  }
+}

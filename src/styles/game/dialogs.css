@@ -1,0 +1,295 @@
+/* The modal dialog frame, the Settings dialog and the crash screen.
+   Part of the game's stylesheet: src/styles.css imports the parts in order. */
+
+/* ---- Modal (native <dialog>) ---- */
+#modal {
+  border: none;
+  background: transparent;
+  padding: 0;
+  max-width: min(560px, 94vw);
+  color: var(--ink);
+  margin: auto; /* center the dialog over its backdrop instead of top-left */
+  /* One scroll container per dialog (#717): current Chromium's UA stylesheet
+     makes an open <dialog> `overflow: auto`, so relying on the old `visible`
+     default silently stacked a second live vertical scrollbar on the dialog
+     element, outside .modal-box's own, on every dialog tall enough to hit the
+     box's 82vh cap (Help was the reported one). It also clipped the box's
+     .win drop shadow, since the box fills the dialog exactly. The box owns
+     ALL of a dialog's scrolling; the dialog element itself must never scroll
+     or clip. Guarded by modalSingleScroller.guard.test.ts. */
+  overflow: visible;
+}
+#modal::backdrop {
+  background: rgba(0, 0, 0, 0.62);
+  backdrop-filter: blur(1px);
+}
+.modal-box {
+  --pad-y: 18px;
+  --pad-x: 20px;
+  --title-gap: 12px;
+  /* The dialog title bar's rendered height (13px font + 3px vertical padding,
+     .win-title in retro-components.css). Not set ON the title (its height
+     stays font-driven); this mirrors it for in-body sticky bars that pin flush
+     under the stuck title (the schedule grid head). Update in step with any
+     .win-title metric change. */
+  --title-h: 21px;
+  padding: var(--pad-y) var(--pad-x);
+  max-height: 82vh;
+  overflow-y: auto;
+  /* Dialog grammar invariant: a window never pans sideways. overflow-y alone
+     computes overflow-x to auto, so a child's min-content leak (the schedule
+     strip's 36px touch bars were the first) would silently turn the WHOLE
+     dialog into a horizontal scroller on phones. Wide content scrolls inside
+     its own well or not at all. */
+  overflow-x: hidden;
+}
+/* The dialog title bar is additionally sticky, so the ✕ stays reachable when
+   a long dialog (help, export) scrolls. Full-bleed comes from .win > .win-title.
+   Direct child ONLY — nested .win-title section headers (Tower Statistics)
+   must not become sticky full-bleed bars. */
+.modal-box > .win-title {
+  position: sticky;
+  top: calc(-1 * var(--pad-y));
+  /* Above any in-body sticky bar (the schedule dialog's day toggle), so the
+     two stuck strips layer cleanly instead of slitting. */
+  z-index: 2;
+}
+.modal-box p,
+.modal-box li {
+  font-size: 13px;
+  line-height: 1.5;
+  margin-bottom: 6px;
+}
+.modal-box ul {
+  margin-left: 18px;
+}
+.modal-box textarea {
+  width: 100%;
+  height: 160px;
+  font-family: monospace;
+  font-size: 11px;
+  padding: 6px;
+}
+/* The dialog's action row is pinned to the bottom of the scrolling box,
+   mirroring the sticky title bar above it. `.modal-box` scrolls at 82vh, so on
+   a tall dialog (the elevator schedule's 24-hour grid) the actions used to sit
+   below the fold: the player could not see Save, pressed Esc instead, and on
+   the schedule dialog the dirty guard's whole response was renaming a Cancel
+   button they were not looking at. Two Esc presses then discarded the edits
+   with the warning off-screen at every step.
+
+   The selector is load-bearing twice over. `.modal-box >` excludes the action
+   rows that are not a dialog footer at all: Tower Statistics renders one
+   mid-body for the exterminator, and pinning that would park a button on an
+   opaque band over the sections the player is scrolling through. The
+   `:nth-last-child(2)` arm is for a dialog that renders one trailing line
+   after the actions. Settings used to be that dialog; it now keeps its
+   version line above the Close row, because the band under an upward-only
+   strip shows scrolled content on a phone. Prefer `:last-child`.
+
+   DELIBERATELY MINIMAL. Only `position`, `bottom`, `z-index` and paint, all of
+   which are inert on a box that is not overflowing. Three earlier cuts added
+   box, and each one moved dialogs that have nothing to do with this fix: plain
+   padding shifted every dialog in the app (23 gallery shots and the visual
+   baselines caught it), full-bleed negative margins then pushed this strip's
+   background out over `.modal-box`'s own inset bevel, flattening the Win3.1
+   edge on every dialog, and trading the row's margin for equal padding added
+   6px to eight of them (see the collapsing note below). The strip must stay
+   INSIDE the padding box and must not grow. It
+   does not need to full-bleed: `.modal-box`'s horizontal padding is empty
+   gutter that content never renders into, so there is nothing to leak through
+   beside the strip.
+
+   The 12px gap above the buttons is the row's own `margin-top`, and margin is
+   transparent: scrolled content used to show through it, cut mid-glyph. It is
+   covered by an offset box-shadow rather than by padding. Swapping the margin
+   for equal padding LOOKS neutral and is not, because margins collapse and
+   padding does not: `margin-top: 12px` collapses with the preceding sibling's
+   `margin-bottom` (12px wins over a paragraph's 6px), while `padding-top: 12px`
+   stacks on top of that 6px and pushes every such dialog 6px taller. A shadow
+   cannot move anything at all, which is the property this rule wants. It is
+   offset up by exactly the collapsed gap; every element that can precede a
+   dialog footer here has a bottom margin of 12px or less, so the cover is exact
+   and can never reach past the gap onto the content above. The color must be
+   opaque and match the box face; `--panel` aliases `--r-face`, which is exactly
+   that, so the band is invisible unstuck.
+
+   The SECOND shadow covers the same kind of gap below. A sticky `bottom: 0`
+   stops at the scroll container's bottom PADDING, not at its visible edge, so
+   the strip parks 18px up and that 18px is a live window onto whatever has not
+   scrolled past yet: on a phone the schedule dialog showed two lines of the
+   Simulate readout under the buttons, sliced through the middle.
+
+   That band ends at the dialog's bevel, and the bevel is why the downward
+   cover is four values rather than one. `.win`'s bevel is an INSET shadow
+   living in the innermost 2px of the padding box, and a descendant paints over
+   a parent's inset shadow, so the two obvious cuts are both wrong: a cover
+   reaching the padding edge flattens the Win3.1 bottom edge on every dialog (a
+   shadow paints whether or not the strip is stuck, so this is not limited to
+   scrolling ones), and a cover stopping 2px short leaves scrolled text sliced
+   in the gap the bevel occupies, which is the reported defect at 2px instead of
+   18px. So the cover runs the full 18px and then REDRAWS the bevel's bottom
+   edge on top of itself. Earlier shadows paint over later ones, so they read
+   outward: panel to 16px, then the bevel's two colors in the 1px each they
+   occupy, outermost last. The result is pixel-identical to the bevel the box
+   draws for itself, which is the point: the strip is invisible until it has
+   something to hide.
+
+   The downward cover belongs ONLY to the `:last-child` arm, and that split is
+   load-bearing. It assumes the space below the strip is the container's
+   padding, which is true only when the strip really is the last child. Under
+   the `:nth-last-child(2)` arm that space is the dialog's own trailing content:
+   applying it to Settings painted the redrawn bevel across the dialog, as a
+   heavy double rule above the build-id line, on a dialog that does not even
+   scroll. Giving that trailing element a higher z-index does not save it, since
+   the element's own box is transparent and the lines show around its text. So
+   the second arm pins and covers upward only, and the band below it shows what
+   the dialog itself put there.
+
+   Every offset is a literal. An unresolved custom property invalidates the
+   whole declaration and would silently take the covers with it, which is why
+   `--pad-y` is not read here even though it would resolve.
+   `stickyDialogActions.guard.test.ts` ties these numbers to `--pad-y` and to
+   the bevel's width and colors in the token file, so they cannot drift apart
+   unnoticed. */
+.modal-box > .modal-actions:last-child,
+.modal-box > .modal-actions:nth-last-child(2) {
+  position: sticky;
+  bottom: 0;
+  /* Under the title bar's z-index 2 so the two stuck strips layer cleanly. */
+  z-index: 1;
+  background: var(--panel);
+  box-shadow: 0 -12px 0 var(--panel);
+}
+/* Only a true last child sits over the container's padding, so only it may
+   paint downward. See the note above for what this cost Settings. */
+.modal-box > .modal-actions:last-child {
+  box-shadow:
+    0 -12px 0 var(--panel),
+    0 16px 0 var(--panel),
+    0 17px 0 var(--r-shadow),
+    0 18px 0 var(--r-dark);
+}
+.modal-actions {
+  display: flex;
+  /* Wrap the action row when it holds more buttons than fit (e.g. the Help
+     footer's four) so they drop to a second line as whole buttons on narrow
+     screens, rather than compressing into multi-line labels. */
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+  justify-content: flex-end;
+}
+/* A line the app has to say from inside a dialog, because saying it anywhere
+   else would be saying it where nobody can read it. The `<dialog>` top layer
+   paints over the toast rail at any z-index, so a message raised while a dialog
+   is up has exactly one honest home: the dialog in front of the player. Sits
+   directly under the title bar, where the eye lands first. */
+.modal-notice {
+  margin: 0 0 10px;
+  padding: 8px 10px;
+  background: var(--r-hi);
+  box-shadow: var(--bevel-in);
+  color: var(--bad-ink);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+/* The unsaved-work warning, shown in the pinned strip itself rather than by
+   renaming a button. Esc leaves the player looking at the dialog, not at the
+   action row, so the state has to announce itself as text where their eyes
+   already are. `margin-right: auto` pushes it to the strip's left edge so it
+   reads as a sentence about the dialog rather than as another control.
+   `align-self` is set HERE rather than `align-items` on the strip, so every
+   other dialog's button alignment is left exactly as it was. */
+.modal-warn {
+  margin-right: auto;
+  align-self: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--bad-ink);
+}
+.modal-actions .btn {
+  padding: 7px 14px;
+}
+
+/* ---- Volume sliders (Settings dialog's Sound section) ----
+ * Native range inputs painted with the theme accent; label / slider / percent
+ * readout share one row. */
+.vol-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0;
+}
+.vol-row label {
+  min-width: 64px;
+}
+.vol-row input[type="range"] {
+  flex: 1;
+  min-width: 0;
+  accent-color: var(--accent);
+}
+.vol-row .vol-val {
+  min-width: 40px;
+  text-align: right;
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- Settings dialog boolean rows ----
+ * A switch-style checkbox with its name, and a muted explanatory note
+ * underneath, indented to align with the name. */
+.set-row {
+  margin: 8px 0;
+}
+.set-switch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.set-switch input[type="checkbox"] {
+  accent-color: var(--accent);
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  flex: none;
+}
+/* Scoped under .set-row so the 12px wins over the broader .modal-box p rule. */
+.set-row .set-note {
+  margin: 2px 0 0 23px;
+  color: var(--muted);
+  font-size: 12px;
+}
+/* Read-only build echo at the foot of Settings: muted, small, centered, and set
+   apart by a hairline so it never reads as a control. Sourced from the same
+   __APP_VERSION__ as the splash and Help's About line. */
+.set-version {
+  margin: 10px 0 0;
+  padding-top: 8px;
+  border-top: 1px solid var(--line, #7a7a7a);
+  color: var(--muted);
+  font-size: 11px;
+  text-align: center;
+}
+
+/* ---- Crash screen ----
+   The card shown when the GPU drops the WebGL context (see
+   src/ui/crashScreen.ts). A real dialog opened with showModal(), so it wins
+   the top layer even when another dialog was open at crash time; the canvas
+   is dead, so everything here must render without it. */
+.crash-card {
+  max-width: 440px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+dialog.crash-card::backdrop {
+  background: rgba(0, 0, 0, 0.55);
+}
+.crash-card .crash-status {
+  min-height: 1.2em;
+  color: var(--muted);
+}

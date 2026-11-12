@@ -1,0 +1,88 @@
+/* The Help dialog.
+   Part of the game's stylesheet: src/styles.css imports the parts in order. */
+
+/* ---- Help dialog: keyboard-play key hints ---- */
+.help-keys { line-height: 1.9; }
+.help-keys kbd {
+  display: inline-block;
+  min-width: 1.1em;
+  padding: 0 5px;
+  margin: 0 1px;
+  font: 600 0.85em "Courier New", monospace;
+  text-align: center;
+  color: var(--ink, #1a1a1a);
+  background: #f4f4f4;
+  border: 1px solid #b5b5b5;
+  border-bottom-width: 2px;
+  border-radius: 3px;
+}
+/* Collapsible Help sections (The basics, Going further, Classic vs Modern,
+   Keyboard play, About). Each summary reads like the dialog's other <h3> section
+   headings (bold, same size), with a caret that swaps on open (no motion, so it
+   respects reduced-motion). The body keeps a real heading inside the summary for
+   screen-reader heading navigation. All but "The basics" are collapsed, so Help
+   opens short; the New Tower dialog points at the Classic vs Modern section. */
+.help-modes > summary {
+  cursor: pointer;
+  font-size: 1.17em; /* match the default <h3> the other Help sections use */
+  font-weight: 700;
+  margin: 16px 0 8px;
+  list-style: none; /* drop the native marker; we draw our own caret */
+}
+.help-modes > summary::-webkit-details-marker {
+  display: none;
+}
+.help-modes > summary::before {
+  content: "▸ ";
+  color: var(--muted);
+}
+.help-modes[open] > summary::before {
+  content: "▾ ";
+}
+
+/* Engine diagnostics in Help's About section (#963): a compact label and value
+   list the player can read and copy. */
+.help-diagnostics {
+  margin: 8px 0;
+}
+.help-diagnostics-summary {
+  margin: 0 0 6px;
+}
+.help-diagnostics-rows {
+  margin: 0 0 8px;
+  font-size: 0.9em;
+  color: var(--muted);
+}
+.help-diagnostics-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 8px;
+}
+.help-diagnostics-row dt {
+  font-weight: 700;
+}
+.help-diagnostics-row dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.help-diagnostics-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+
+/* Help "Report an issue" row — a plain flex row so the link keeps its natural
+   button width and would sit beside any future sibling link. */
+.help-report {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* ── First-run splash + onboarding ─────────────────────────────────────
+   The splash is BOX ART, not UI (ratified exception): it keeps its dusk
+   palette and cream/amber buttons, sharing only the interaction grammar
+   (bevel press states, focus visibility). Everything below the splash —
+   the coach card — is regular chrome. */

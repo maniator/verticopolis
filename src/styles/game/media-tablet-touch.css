@@ -1,0 +1,185 @@
+/* The tablet block, touch targets and the desktop-only rules that close the sheet.
+   Part of the game's stylesheet: src/styles.css imports the parts in order. */
+
+/* Tablet block: portrait tablets and the compact 861–1023 band (wide enough to
+   dock both columns, tall enough for panels). It keeps the desktop 3-column
+   layout — palette and sidebar stay DOCKED, not the phone strip/drawer — but wraps
+   the top bar so nothing clips and tightens the columns so the canvas keeps room.
+   The base desktop rules apply here except these tweaks. */
+@media (min-width: 768px) and (max-width: 1023px) and (min-height: 600px) {
+  /* Top bar wraps: brand + speed buttons stay on row one; the stat chips drop to
+     a full-width second row (same approach as phone), so a long "Gridlock · 42F"
+     traffic chip or the trillion-safe FUND can't cram the bar. */
+  #topbar {
+    flex-wrap: wrap;
+  }
+  #status {
+    order: 3;
+    flex-basis: 100%;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .stat {
+    flex: none;
+  }
+  .stat .value {
+    white-space: nowrap;
+  }
+
+  /* Both columns stay docked, just tighter, so the canvas keeps ~400px+ at 768px
+     and ~665px at 1023px. No drawer toggle is needed (panels are always visible);
+     #panel-toggle keeps its hidden base default since only the phone block shows it. */
+  #palette {
+    width: 150px;
+  }
+  #sidebar {
+    width: 200px;
+  }
+
+  /* Finger-friendly tool rows (the palette is a touch target here, not a
+     hover list); other retro sizing is unchanged. */
+  .pal-item {
+    min-height: 40px;
+  }
+}
+
+/* On touch devices dialog/card ACTION buttons grow to a comfortable target;
+   the compact desktop sizing stays for mouse pointers. Title-bar ✕ buttons
+   (.xs) are exempt — 36px squares inflate every navy bar (the production
+   "giant close button" bug); Esc/backdrop/hover-away still dismiss. */
+@media (pointer: coarse) {
+  ul.slots .slot-actions .btn {
+    min-height: 48px;
+  }
+  .modal-actions .btn,
+  .modal-box .btn:not(.xs),
+  #editor .ed-row .btn,
+  /* The rung picker's select is a tap target too (editor card and the batch
+     dialog variant); the rename text input keeps its natural height. */
+  #editor .ed-row select.field,
+  .bp-rung select.field {
+    min-height: 36px;
+  }
+  /* The count strip on touch: every bar grows to the 36px target and the strip
+     scrolls horizontally inside its own well (spec section 8), so the page never
+     pans sideways. The docked stepper below stays the precise editing path. */
+  .es-strip {
+    overflow-x: auto;
+  }
+  .es-bar {
+    min-width: 36px;
+  }
+  .es-sq {
+    min-width: 36px;
+  }
+  /* The tap-then-stepper flow is invisible without a hint (owner report); one
+     line names it, coarse pointers only. */
+  .es-touch-hint {
+    display: block;
+  }
+  /* The day toggle stays reachable while the tall dialog scrolls. */
+  .es-day {
+    position: sticky;
+    top: 24px;
+    z-index: 1;
+    background: var(--r-face);
+    padding: 2px 0;
+  }
+  /* Coarse pointers keep the capped grid well (#513's uncapped-grid fix
+     applies to fine pointers only), for two behavioral reasons: the cap keeps
+     the steppers and OK button within a swipe on a long span, and it keeps
+     the grid head pinning inside the grid's own scrollport, where it cannot
+     collide with the sticky day toggle above (uncapped, a box-pinned head
+     overlapped the toggle's buttons on tablet-width touch screens). Coarse
+     devices also typically draw overlay scrollbars, so the well's second bar
+     rarely shows. Mirrors the phone block; on phones both blocks apply with
+     identical values. */
+  .es-grid {
+    max-height: 200px;
+    overflow-y: auto;
+  }
+  .es-grid-head {
+    top: 0;
+  }
+  /* Touch breathing room (owner's phone feedback): the 36px controls need more
+     air between sections than the desktop's 8px, the quick actions must not
+     crowd the car list, and the docked stepper and Simulate line want space
+     before the actions row. Coarse-only, so desktop pixels stay untouched. */
+  .es-body {
+    gap: 12px;
+  }
+  /* The car chips and Serve checkboxes are the grid's primary touch targets:
+     every one clears ~36px (spec section 8's MUST; the chips are the reason the
+     per-car selects retired). */
+  .es-chip {
+    min-width: 34px;
+    height: 34px;
+    font-size: 12px;
+  }
+  .es-cell-serve input {
+    width: 22px;
+    height: 22px;
+  }
+  .es-grid-row {
+    min-height: 40px;
+  }
+  .es-quick {
+    gap: 8px;
+    margin-bottom: 4px;
+  }
+  .es-strip-step {
+    margin-top: 6px;
+  }
+  .es-sim {
+    margin-top: 4px;
+  }
+  /* Title-bar ✕s keep their exact desktop look — stretching them reads
+     wrong in the bar — and instead grow an invisible tap halo, so the
+     effective target is ~34px without a pixel of visual change. */
+  .btn.xs {
+    position: relative;
+  }
+  .btn.xs::after {
+    content: "";
+    position: absolute;
+    inset: -8px;
+  }
+  /* The inspector card is dismissed by hover-away on a mouse; a coarse (touch)
+     pointer has no reliable hover-off, so reveal its explicit ✕ on every touch
+     tier — phone, tablet, and touch-desktop alike. Gating this on the pointer,
+     not a width breakpoint, is why a new width tier can't silently lose it.
+     The one exception is the long-press "peek" card (.peek): lifting the
+     finger dismisses it, so it never wants the ✕. The exception lives HERE,
+     on the owning rule, not as a later higher-specificity override. */
+  #inspector:not(.peek) .insp-close {
+    display: inline-block;
+  }
+  /* The same non-peek card takes pointer input on the coarse tier: it already
+     carries the interactive ✕ above, and taking input lets a height-capped
+     card actually scroll by touch instead of only showing a scrollbar. The
+     transient peek stays click-through (the finger is on the tower and the
+     lift dismisses it), as does the desktop hover card (hover-away dismissal
+     needs the canvas to keep receiving the pointer). */
+  #inspector:not(.peek) {
+    pointer-events: auto;
+  }
+}
+
+/* The Modern build-refusal card anchors a row BELOW the invalid preview strip
+   (see panelAnchoring), but viewport clamping can still push it back over the
+   strip near the bottom edge. On hover devices the card goes slightly
+   translucent as insurance for that case: 0.85 keeps the gray face and navy
+   title fully legible while the red strip underneath still reads through.
+   Hover devices only, and only on the world-anchored tier: the two width
+   branches are the EXACT complement (range syntax, so fractional viewport
+   sizes cannot fall between the queries) of the phone block above and of
+   GameApp.mobileMq, which both name this rule; a breakpoint change must land
+   in all three places. A hover-capable browser narrowed into the docked
+   layout keeps the pinned card (dismissed via ✕) fully opaque, and the
+   inspect-tool hover card carries no .preview-refuse, so it is untouched. */
+@media (hover: hover) and (pointer: fine) and (width > 767px) and (height > 599px),
+  (hover: hover) and (pointer: fine) and (width > 1023px) {
+  #inspector:has(.preview-refuse) {
+    opacity: 0.85;
+  }
+}

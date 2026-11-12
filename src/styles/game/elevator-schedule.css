@@ -1,0 +1,215 @@
+/* The Elevator Schedule dialog.
+   Part of the game's stylesheet: src/styles.css imports the parts in order. */
+
+/* ---- Elevator Schedule dialog (elevator-scheduling #305 Phase 3) ----
+   Same chrome grammar as the rest of the shell: gray face, bevels, navy
+   accents. Staging leads, the count strip is a pressed well of 24 bar
+   buttons, and every stepper reuses .btn. */
+.es-body { display: grid; gap: 8px; }
+/* Grid items keep the default min-width auto, so a wide child (the 24-bar strip
+   at its 36px touch minimum is ~890px of min-content) would propagate its width
+   up through the grid and blow the modal past the viewport instead of scrolling
+   inside .es-strip's own well. Seen on a real phone (v1.57.0); the mobile
+   design party's containment ruling. */
+.es-body > * { min-width: 0; }
+.es-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.es-spread { justify-content: space-between; }
+.es-heading { font-weight: 700; }
+/* Day toggle: the pressed day sits in its bevel like #speed .btn.active. */
+.es-day .btn.es-on { font-weight: 700; box-shadow: var(--bevel-in); }
+/* The day buttons stay one group for assistive tech without boxing the row. */
+.es-daypair { display: contents; }
+/* Elevator schedule review (#1548): one pressed row per elevator, buttons wrap on a narrow screen. */
+.sched-review-entry { margin-top: 12px; }
+.sched-review-entry .btn { min-height: 44px; }
+.sched-review-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.sched-review-row { display: grid; gap: 4px; padding: 8px; box-shadow: var(--bevel-in); }
+.sched-review-title { font-weight: 700; }
+.sched-review-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.sched-review-actions .btn { min-height: 44px; }
+/* Presets row (Modern): the recommended preset carries the primary ring. */
+.es-presets .btn.es-rec { box-shadow: 0 0 0 1px var(--r-dark), var(--bevel-out); font-weight: 700; }
+.es-presets .btn.es-rec:active { box-shadow: 0 0 0 1px var(--r-dark), var(--bevel-in); }
+/* The floors grid (#464): one row per span floor descending, in a pressed well.
+   Columns: floor label, the Serve stop toggle, then the car chips. The canon
+   floors-by-cars shape: floors down the left, one chip per car. */
+.es-floors { display: grid; gap: 6px; }
+.es-grid {
+  /* No height cap on desktop (#513): the old 200px well made the grid a second
+     live scroller next to the .modal-box one, so the dialog wore two vertical
+     scrollbars at once. The grid now grows to its content and the box is the
+     dialog's single scroller. The phone and coarse-pointer blocks below
+     restore the 200px cap: there the priority is keeping the steppers and OK
+     button within a swipe on a long span (and scrollbars are typically
+     overlay on those devices, so the double bar rarely shows). */
+  padding: 2px;
+  background: var(--r-face);
+  box-shadow: var(--bevel-in);
+}
+.es-grid-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 4px;
+  min-height: 24px;
+}
+.es-grid-head {
+  font-weight: 700;
+  position: sticky;
+  /* With the grid uncapped, the head sticks in the .modal-box scrollport,
+     tucked flush under the stuck title bar. Same baseline as the title's own
+     sticky offset (the title pins at the box top with `-1 * --pad-y`; see
+     `.modal-box > .win-title`), plus the title's rendered height
+     (`--title-h`, defined on .modal-box), so the head's top meets the
+     title's bottom exactly (measured gap 0 at every scroll depth). If the
+     title ever wraps taller than --title-h it overlaps the head cosmetically;
+     z-index 1 keeps the head under the title (z-index 2). Clamped to the
+     grid's own bounds, it slides away once the grid scrolls past. */
+  top: calc(-1 * var(--pad-y, 18px) + var(--title-h, 21px));
+  background: var(--r-face);
+  z-index: 1;
+}
+.es-cell-floor {
+  min-width: 52px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-variant-numeric: tabular-nums;
+}
+.es-cell-serve { min-width: 40px; text-align: center; }
+.es-cell-serve input { cursor: pointer; }
+.es-cell-cars { display: flex; flex-wrap: wrap; gap: 3px; flex: 1; min-width: 0; }
+/* A skipped floor's row dims (its chips are gone; Serve re-lights it). */
+.es-skipped .es-cell-floor { color: var(--r-shadow); }
+/* The derived base marker and the lobby tag on the floor label. */
+.es-base { color: var(--accent); }
+.es-lobby-mark { color: var(--accent); font-size: 9px; font-weight: 700; }
+/* Measured demand hotspot (#465): where riders board at the busiest hour. */
+.es-origin { color: var(--bad); font-size: 8px; margin-left: 2px; }
+/* A car chip: a numbered mini button, hollow on other rows, pressed navy on its
+   home row. Color never carries it alone: aria-pressed and the bevel do. */
+.es-chip {
+  min-width: 22px;
+  height: 20px;
+  padding: 0 2px;
+  border: 0;
+  font-family: var(--r-font);
+  font-size: 10px;
+  background: var(--r-face);
+  box-shadow: var(--bevel-out);
+  cursor: pointer;
+}
+.es-chip.on {
+  background: var(--accent);
+  color: var(--r-title-fg);
+  font-weight: 700;
+  box-shadow: var(--bevel-in);
+}
+/* Steppers: square − / + around a fixed-width readout so the row never
+   shifts as the number changes. */
+.es-stepper { display: inline-flex; align-items: center; gap: 4px; }
+.es-sq { min-width: 26px; text-align: center; }
+.es-val { min-width: 56px; text-align: center; font-variant-numeric: tabular-nums; }
+.es-hint { color: var(--muted); font-size: 0.85em; margin: 0; }
+/* The 24-hour count strip: a pressed well of one bar button per hour. */
+.es-strip-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.es-fleet { color: var(--muted); font-size: 0.85em; }
+.es-strip {
+  overflow-x: auto;
+  padding: 2px;
+  background: var(--r-face);
+  box-shadow: var(--bevel-in);
+}
+/* The inner track carries the bars AND the hour axis, so the axis labels scroll
+   with the bars they describe (the v1.57.1 hotfix hid a static axis for exactly
+   this lie; this is the real fix). max-content so 24 touch-sized bars can run
+   wider than the well and scroll inside it. */
+.es-strip-inner { min-width: 100%; width: max-content; }
+.es-strip-bars {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  gap: 1px;
+  height: 64px;
+  min-width: 100%;
+}
+/* Count gridlines: one faint rule per car level so a bar's height reads as a
+   number without counting pixels. */
+.es-gridline {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--r-shadow);
+  opacity: 0.45;
+  pointer-events: none;
+}
+.es-bar {
+  position: relative;
+  flex: 1;
+  min-width: 10px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font-family: var(--r-font);
+}
+.es-bar-fill {
+  position: absolute;
+  left: 1px;
+  right: 1px;
+  bottom: 0;
+  background: var(--accent);
+  pointer-events: none;
+}
+/* The ghost series (#464): a dash marks the measured demand level, and the
+   authored fill ABOVE it renders pale, visible spare capacity. Information in
+   both modes; only advice is Modern-gated. */
+.es-bar-over {
+  position: absolute;
+  left: 1px;
+  right: 1px;
+  background: color-mix(in srgb, var(--accent) 35%, var(--r-face));
+  pointer-events: none;
+}
+.es-bar-demand {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 0;
+  border-top: 2px dashed var(--r-dark);
+  pointer-events: none;
+}
+.es-bar.sel { outline: 2px solid var(--accent); outline-offset: -1px; }
+.es-bar-n {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 1px;
+  font-size: 9px;
+  color: var(--r-ink);
+  /* A face-gray halo keeps the count readable when a full bar's navy fill
+     reaches up behind it. */
+  text-shadow: 0 0 1px var(--r-face), 0 0 2px var(--r-face), 0 0 3px var(--r-face);
+  pointer-events: none;
+}
+/* The hour axis rides INSIDE the scrolling track, each tick anchored to its
+   hour's fraction of the full 24-bar width. */
+.es-strip-axis {
+  position: relative;
+  height: 13px;
+  color: var(--muted);
+  font-size: 0.8em;
+}
+.es-axis-tick { position: absolute; top: 0; }
+/* The touch flow hint renders only for coarse pointers (below); the ghost
+   legend shows whenever the ghost does. */
+.es-touch-hint { display: none; }
+.es-strip-step { justify-content: space-between; }
+/* Advanced disclosure (Modern's fold for the raw grid). */
+.es-adv summary { cursor: pointer; font-size: 13px; }
+.es-adv[open] summary { margin-bottom: 6px; }
+/* Advice and the Simulate readout: advice is a plain sentence, the readout
+   carries the navy emphasis (same weight as .bp-preview). */
+.es-advice { margin: 0; font-size: 13px; }
+.es-sim { min-height: 1.4em; color: var(--r-title); font-weight: 600; font-size: 13px; }
