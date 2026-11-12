@@ -95,4 +95,15 @@ fn the_1994_export_refuses_what_the_catalog_rules_out() {
             mode.as_str()
         );
     }
+    // A save that names no mode the engine knows is not refused on the mode,
+    // the same as before the rule.
+    for save in [
+        serde_json::json!({ "units": [] }),
+        serde_json::json!({ "mode": "Modern", "units": [] }),
+        serde_json::json!({ "mode": "bogus", "units": [] }),
+    ] {
+        let refused_for_mode =
+            matches!(crate::tdt::export::build_tdt(&save), Err(e) if e.0.contains("Modern rules"));
+        assert!(!refused_for_mode, "{save}");
+    }
 }
