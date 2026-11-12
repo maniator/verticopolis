@@ -59,11 +59,11 @@ function leaveAndReturn(): void {
 function openMenu(start = 2) {
   const speed = speedAt(start);
   const { ui, cb } = makeUI({ getSpeed: speed.getSpeed, onSpeed: speed.onSpeed });
-  (document.getElementById("btn-help") as HTMLButtonElement).click();
+  (document.getElementById("btn-about") as HTMLButtonElement).click();
   return { ui, cb, speed };
 }
 
-describe("the Help menu", () => {
+describe("the About menu", () => {
   beforeEach(() => {
     mountAppDom();
     standalone.isInstalledStandalone.mockReturnValue(false);
@@ -73,10 +73,11 @@ describe("the Help menu", () => {
     vi.restoreAllMocks();
   });
 
-  it("opens from Help… with every item, and pauses the tower, saying so inside the dialog", async () => {
+  it("opens from About… with every item, and pauses the tower, saying so inside the dialog", async () => {
     const { speed } = openMenu(2);
-    expect(inDialog("h2").textContent).toContain("Help");
-    for (const act of ["how-to-play", "whats-new", "release-notes", "report", "about"]) inDialog(`[data-act="${act}"]`);
+    expect(inDialog("h2").textContent).toContain("About");
+    for (const act of ["whats-new", "release-notes", "report", "about"]) inDialog(`[data-act="${act}"]`);
+    expect(dialog().querySelector('[data-act="how-to-play"]'), "the Help button opens the manual itself").toBeNull();
     expect(dialog().querySelector('[data-act="gallery"]'), "the sprite gallery is no longer linked (#2053)").toBeNull();
     expect(speed.now()).toBe(0);
     expect(inDialog("[data-help-status]").getAttribute("role")).toBe("status");
@@ -148,10 +149,9 @@ describe("the Help menu", () => {
     expect(speed.now()).toBe(2);
   });
 
-  it("opens How to play in a new tab, holds the pause, and resumes once the player is back", async () => {
+  it("opens the release notes in a new tab, holds the pause, and resumes once the player is back", async () => {
     const { speed } = openMenu(3);
-    expect(inDialog<HTMLAnchorElement>('a[data-act="how-to-play"]').getAttribute("href")).toBe("/help/?from=game");
-    followNewTab('a[data-act="how-to-play"]');
+    followNewTab('a[data-act="release-notes"]');
     expect(dialog().open).toBe(false);
     expect(speed.now()).toBe(0);
     leaveAndReturn();
@@ -170,7 +170,7 @@ describe("the Help menu", () => {
   it("lets go of the pause, and clears the toolbar mark, when the player picks a speed with Help in another tab", async () => {
     const { speed } = openMenu(3);
     pauseButton().classList.add("active"); // the game marks the speed it set
-    followNewTab('a[data-act="how-to-play"]');
+    followNewTab('a[data-act="release-notes"]');
     (document.querySelector('#speed button[data-speed="1"]') as HTMLButtonElement).click();
     await vi.waitFor(() => expect(pauseButton().getAttribute("aria-label")).toBe("Pause"));
     speed.playerSets(1);
@@ -226,7 +226,19 @@ describe("the Help menu", () => {
     lastIsFooter();
   });
 
-  it("opens How to play from the title screen in a new tab, holding the pause until the player is back", () => {
+  it("opens the manual from the Help button in a new tab, holding the pause until the player is back", () => {
+    const speed = speedAt(3);
+    makeUI({ getSpeed: speed.getSpeed, onSpeed: speed.onSpeed });
+    const open = vi.spyOn(window, "open").mockReturnValue({} as Window);
+    (document.getElementById("btn-help") as HTMLButtonElement).click();
+    expect(open).toHaveBeenCalledWith("/help/?from=game", "_blank");
+    expect(dialog().open).toBe(false);
+    expect(speed.now()).toBe(0);
+    leaveAndReturn();
+    expect(speed.now()).toBe(3);
+  });
+
+  it("opens the manual from the title screen in a new tab, holding the pause until the player is back", () => {
     const speed = speedAt(3);
     const { ui } = makeUI({ getSpeed: speed.getSpeed, onSpeed: speed.onSpeed });
     const open = vi.spyOn(window, "open").mockReturnValue({} as Window);
@@ -251,7 +263,6 @@ describe("the Help menu", () => {
   it("marks the page links as opened by the game", () => {
     openMenu();
     expect(inDialog('a[data-act="release-notes"]').getAttribute("href")).toBe("/help/changelog?from=game");
-    expect(inDialog('a[data-act="how-to-play"]').getAttribute("href")).toBe("/help/?from=game");
     expect(inDialog('a[data-act="report"]').getAttribute("href")).toContain("github.com/maniator/verticopolis/issues/new/choose");
   });
 
@@ -266,7 +277,7 @@ describe("the Help menu", () => {
   });
 });
 
-describe("the Help menu in the installed app", () => {
+describe("the About menu in the installed app", () => {
   beforeEach(() => {
     mountAppDom();
     standalone.isInstalledStandalone.mockReturnValue(true);
@@ -276,10 +287,9 @@ describe("the Help menu in the installed app", () => {
     vi.restoreAllMocks();
   });
 
-  it("links How to play to the Help site and leaves out the release notes page", () => {
+  it("leaves out the release notes page", () => {
     openMenu(2);
     expect(dialog().querySelector('[data-act="release-notes"]')).toBeNull();
-    expect(inDialog<HTMLAnchorElement>('a[data-act="how-to-play"]').getAttribute("href")).toBe("/help/?from=game");
   });
 
   it("shows What's new without the release notes link", async () => {

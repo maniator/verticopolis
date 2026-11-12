@@ -12,11 +12,12 @@ import { releaseNotesLink } from "./updatePrompt";
  * while any of them is open and wires the actions by `data-act`; these
  * templates stay presentational.
  *
- * How to play opens the Help site, the player's manual, in a new tab, and in
- * a browser tab Release notes does the same. Both are marked `?from=game` so
- * their "Back to game" closes that tab instead of loading a second game
- * (src/ui/fromGame.ts). In the installed app the guide opens in the system
- * browser, and the release notes are left out (What's new carries them).
+ * The game panel's About… opens this menu; its Help button opens the Help
+ * site, the player's manual, in a new tab (src/ui/uiHelpMenu.ts showHelp). In
+ * a browser tab Release notes opens the release notes page the same way,
+ * marked `?from=game` so its "Back to game" closes that tab instead of loading
+ * a second game (src/ui/fromGame.ts). In the installed app the release notes
+ * are left out (What's new carries them).
  * Report a problem always links out to GitHub's issue chooser.
  */
 
@@ -42,10 +43,9 @@ function windowButton(act: string, label: string): TemplateResult {
 
 export function helpMenuTemplate(inBrowserTab: boolean): TemplateResult {
   return html`
-    <h2>Help</h2>
-    <p class="help-menu-lede">The tower is paused while Help is open.</p>
+    <h2>About</h2>
+    <p class="help-menu-lede">The tower is paused while this is open.</p>
     <ul class="help-menu">
-      ${item(pageLink("how-to-play", fromGameHref("/help/"), "How to play"), "The player's manual: every room, rule and number, and your first tower.")}
       ${item(windowButton("whats-new", "What's new"), "What changed in this version and the ones before it.")}
       ${inBrowserTab ? item(pageLink("release-notes", fromGameHref("/help/changelog"), "Release notes"), "Every update's changes, back to the first.") : nothing}
       ${item(

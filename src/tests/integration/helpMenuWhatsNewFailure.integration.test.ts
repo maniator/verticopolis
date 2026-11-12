@@ -23,7 +23,7 @@ describe("What's new that cannot load", () => {
   it("keeps the menu open and the tower paused, and says it could not load", async () => {
     let speed = 2;
     const { cb } = makeUI({ getSpeed: () => speed, onSpeed: vi.fn((s: number) => (speed = s)) });
-    (document.getElementById("btn-help") as HTMLButtonElement).click();
+    (document.getElementById("btn-about") as HTMLButtonElement).click();
     const dialog = document.getElementById("modal") as HTMLDialogElement;
     dialog.querySelector<HTMLButtonElement>('[data-act="whats-new"]')!.click();
     await vi.waitFor(() => expect(dialog.textContent).toContain("What's new could not load. Try again in a moment."));

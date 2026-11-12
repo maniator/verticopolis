@@ -14,9 +14,10 @@ import { copyText } from "./copyText";
 import { announceLive } from "../game/liveRegion";
 
 /**
- * The in-game Help: the Help menu the toolbar's "Help…" opens, What's new,
- * About this game, and the Classic vs Modern comparison the Tower panel's mode
- * badge opens. The guide (How to play) is the Help site, opened in a new tab. Every one of them pauses the
+ * The in-game Help: the About menu the game panel's "About…" opens, What's
+ * new, About this game, and the Classic vs Modern comparison the Tower panel's
+ * mode badge opens. The guide (the Help button) is the Help site, opened in a
+ * new tab. Every one of them pauses the
  * tower through one {@link HelpPause} per UI, and every close route (the
  * buttons, Esc, the backdrop, the title-bar ✕, another dialog taking the
  * screen, or any other closeModal) ends that pause exactly once. Moving from
@@ -165,7 +166,8 @@ function wireNewTabLinks(ui: UI, box: HTMLElement): void {
   }
 }
 
-/** The toolbar's "Help…": the Help menu. */
+/** The game panel's "About…": what's new, the release notes, a problem
+ *  report and About this game. (Its Help button is {@link showHelp}.) */
 export function showHelpMenu(ui: UI): void {
   trackAppAction("help_open");
   const { box } = openHelpDialog(ui, helpMenuTemplate(!isInstalledStandalone()), {
@@ -177,8 +179,8 @@ export function showHelpMenu(ui: UI): void {
   wireNewTabLinks(ui, box);
 }
 
-/** The guide (How to play): the Help site's front page in a new tab, from the
- *  title screen and the tooling handle `ui.showHelp()`. */
+/** The guide: the Help site's front page in a new tab, from the game panel's
+ *  Help button, the title screen and the tooling handle `ui.showHelp()`. */
 export function showHelp(ui: UI): void {
   trackAppAction("help_open");
   openPageInTab(ui, "/help/", () => ui.sayVisibly("The guide could not open. It is at verticopolis.com/help."));
