@@ -144,7 +144,7 @@ reads it to find the room a retail row describes (section 5).
 | 5 | u8 | state | Hotels: bits 3 and 4 stay state (1 checked in, 2 asleep, 3 vacant and clean; 0 is never written by the game), 0x20 dirty, 0x40 a flag the game keeps when it loads a file that has it but clears it from a vacant or dirty room (never found in a save of a tower played in the game; tdt-format.md section 5.1), low 2 bits guests inside now, which the game resets on load; the finance guest lines count rooms in stay state 1 or 2 at full complement (section 7.2). Offices and condos carry a nonzero value while occupied | Known for hotels |
 | 6 | u8 | variant | Shop, restaurant and fast-food style. Party halls and theatres: the row of the party hall and theatre table (section 8) that holds the venue, the same in both halves | Known for retail, Inferred for venues |
 | 7 | u8 | unknown | 0 everywhere except parking stalls (0 or 1) | Unknown |
-| 8 | u32 | counter | High 16 bits always 0; values up to about 9,500; per-unit counter or timer | Unknown |
+| 8 | u32 | first person | High 16 bits always 0. The index of the unit's first record in the people block (section 4); its people follow in a row. A party hall half keeps 40 and a theater screen piece (types 35 and 34) 56. A party hall without its people crashes the game a few seconds after loading (#1932) | Inferred |
 | 12 | u8 | logical id | The unit's logical id on its floor (section 3), 255 on a plain floor tile, which has none | Inferred |
 | 13 | u8 | flag | 0 or 1 | Unknown |
 | 14 | u8 | usually 1 | | Unknown |

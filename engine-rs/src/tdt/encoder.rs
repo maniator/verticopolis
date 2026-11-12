@@ -12,7 +12,9 @@ use super::format::*;
 use super::pacing::frame_for_minute_of_day;
 use super::stamp::write_format_stamp;
 use super::tables::elevator_type;
-use super::venue_export::{index_map, logical_ids, middle_bytes, write_venue_tail, PlacedHalf};
+use super::venue_export::{
+    index_map, logical_ids, middle_bytes, write_people, write_venue_tail, PlacedHalf,
+};
 use super::LegacyExportError;
 use crate::facilities::{Kind, LOT_WIDTH, MAX_FLOOR, MIN_FLOOR};
 use crate::jsmath::round;
@@ -205,9 +207,8 @@ pub fn encode_tower(
     } else {
         0.0
     };
-    let people_count = js_max(0.0, js_min(finite_pop, TDT_MAX_CENSUS)) as i64;
-    w.i32(people_count);
-    w.pad(people_count as usize * TDT_PERSON_RECORD_SIZE);
+    let census = js_max(0.0, js_min(finite_pop, TDT_MAX_CENSUS)) as usize;
+    write_people(&mut w, census, &venue_halves);
 
     for slot in 0..TDT_RETAIL_SLOTS {
         match retail_rows.get(slot) {
