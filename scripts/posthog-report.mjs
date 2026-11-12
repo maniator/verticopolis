@@ -20,7 +20,7 @@
  * preview traffic lands in the same project tagged `preview` and never blends in.
  *
  * Runs on plain Node (18+, global fetch), no dependencies. Driven by the
- * scheduled GitHub Actions workflow (.github/workflows/analytics-report.yml) or
+ * manually run GitHub Actions workflow (.github/workflows/analytics-report.yml) or
  * locally: `POSTHOG_PERSONAL_API_KEY=phx_... node scripts/posthog-report.mjs --window 30`.
  * The window is days by default ("30", "0.5") or takes a unit suffix ("12h",
  * "3d"); `--days` is kept as an alias for the old flag name.
