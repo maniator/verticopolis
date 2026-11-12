@@ -1,9 +1,15 @@
 /* The Help dialog.
    Part of the game's stylesheet: src/styles.css imports the parts in order. */
 
+/* ---- Help pages compiled from Markdown (help-site/src/content/docs/) ---- */
+/* Their paragraphs read as the dialog's quiet explanatory text; the lead's
+   first paragraph (the premise) keeps full ink. */
+.help-md p { color: var(--muted); }
+.help-lede > p:first-child { color: inherit; }
+
 /* ---- Help dialog: keyboard-play key hints ---- */
-.help-keys { line-height: 1.9; }
-.help-keys kbd {
+.help-md[data-help="keyboard"] ul { line-height: 1.9; }
+.help-md[data-help="keyboard"] kbd {
   display: inline-block;
   min-width: 1.1em;
   padding: 0 5px;

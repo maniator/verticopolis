@@ -11,6 +11,7 @@ import { MAX_RELEASES, type BuildFingerprint } from "./src/pwaUpdateInfo";
 import { ENGINE_PRELOAD_FILES, enginePreloadAttrs } from "./src/build/enginePreload";
 import { ENGINE_BUILD_RECORD, ENGINE_DIR } from "./src/wasmhost/enginePackageNames";
 import { buildFingerprint } from "./src/build/buildFingerprint";
+import { helpMarkdown } from "./src/build/helpMarkdown";
 
 const pkgVersion = JSON.parse(readFileSync(resolve(__dirname, "package.json"), "utf8")).version as string;
 
@@ -334,6 +335,9 @@ export default defineConfig(({ command }) => ({
     noUnlistedPackageFiles(),
     sharedHead(),
     enginePreload(),
+    // The help pages are Markdown (help-site/src/content/docs/), shared with
+    // the Help site; the game's Help window imports them as lit templates.
+    helpMarkdown(),
     // Installable PWA via Workbox (vite-plugin-pwa) — no hand-rolled service
     // worker. Registration is NOT auto-injected (`injectRegister: false`);
     // only the game entry (main.ts → src/pwa.ts) registers, so the tooling

@@ -123,8 +123,16 @@ body.retro-page {
 .help-section:target h2 {
   color: var(--accent);
 }
-.help-keys {
+.help-md[data-help="keyboard"] ul {
   line-height: 1.9;
+}
+/* The guide's paragraphs are its quiet explanatory text, as in the game; the
+   lead's first paragraph (the premise) keeps full ink. */
+.help-md p {
+  color: var(--muted);
+}
+.help-lede > p:first-child {
+  color: inherit;
 }
 .win-body kbd {
   display: inline-block;
