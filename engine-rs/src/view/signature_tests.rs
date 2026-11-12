@@ -34,6 +34,17 @@ fn sched_sig(s: Option<&Schedule>) -> String {
     )
 }
 
+/// A second screen's policy, after a slash, where it differs from the
+/// first's (#1950).
+fn second_policy(u: &crate::tower::Unit) -> String {
+    let [first, second] = crate::economy::screens::screen_policies(u);
+    if second == first {
+        String::new()
+    } else {
+        format!("/{}", second.unwrap_or(""))
+    }
+}
+
 /// `towerStateSig(tower, money)` without the money: the units, then the
 /// transports, each as the TypeScript prints them.
 pub(super) fn ts_sig(tower: &Tower) -> String {
@@ -42,7 +53,7 @@ pub(super) fn ts_sig(tower: &Tower) -> String {
         .iter()
         .map(|u| {
             format!(
-                "{}@{},{}:{}:{}:{}:{}:{}:{}",
+                "{}@{},{}:{}:{}:{}:{}{}:{}:{}",
                 u.kind.as_str(),
                 u.floor,
                 u.x,
@@ -50,6 +61,7 @@ pub(super) fn ts_sig(tower: &Tower) -> String {
                 u.rent.map(number_to_string).unwrap_or_default(),
                 if u.no_rate { "N" } else { "" },
                 u.extras().film_policy.unwrap_or(""),
+                second_policy(u),
                 u.extras().ticket_price.unwrap_or(""),
                 u.subtype.unwrap_or(""),
             )

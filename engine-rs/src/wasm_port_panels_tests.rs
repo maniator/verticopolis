@@ -129,6 +129,9 @@ fn the_unit_card_is_the_detail_card() {
         .unwrap()
         .extras_mut()
         .film_policy = Some("blockbuster");
+    // Its second screen shows a revival and rebooks one (#1950).
+    e.sim.book_film(cinema, 1, FilmTier::Classic).unwrap();
+    e.sim.set_screen_policy(cinema, 1, "revival").unwrap();
     // The cinema twice: booked for the blockbuster, then not.
     e.sim.blockbusters.push(cinema as f64);
     let ids = [
@@ -146,6 +149,8 @@ fn the_unit_card_is_the_detail_card() {
         if id == cinema {
             let at = |name: &str| UNIT_CARD.iter().position(|k| *k == name).unwrap();
             assert_eq!(r[at("filmPolicy")], 2.0, "the policy's code");
+            assert_eq!(r[at("screen2Policy")], 3.0, "the second screen's");
+            assert_eq!(r[at("screen2Tier")], 1.0, "a revival");
             assert_eq!(r[at("blockbuster")], if n == 3 { 1.0 } else { 0.0 });
         }
         let json = e.sim.unit_detail(id).unwrap();
@@ -161,19 +166,27 @@ fn the_unit_card_is_the_detail_card() {
             ("filmPolicy", &FILM_POLICIES[..]),
             ("filmTier", &FILM_TIER_KEYS[..]),
             ("ticketPrice", &TICKET_PRICES[..]),
+            ("screen2Policy", &FILM_POLICIES[..]),
+            ("screen2Tier", &FILM_TIER_KEYS[..]),
         ];
+        // A second screen's slot reads the detail's `screen2` field of the
+        // first screen's name.
+        let field = |key: &str| match key.strip_prefix("screen2") {
+            Some(rest) => json["screen2"][format!("film{rest}")].clone(),
+            None => json[key].clone(),
+        };
         for (slot, key) in UNIT_CARD.iter().enumerate() {
             if let Some((_, table)) = codes.iter().find(|(k, _)| k == key) {
-                let want = json[key]
+                let want = field(key)
                     .as_str()
                     .map(|s| table.iter().position(|t| *t == s).unwrap());
                 assert!(same(r[slot], want.map_or(f64::NAN, |i| i as f64)), "{key}");
             } else if !matches!(*key, "kindCode" | "stateCode") {
                 assert!(
-                    same(r[slot], num(&json[key])),
+                    same(r[slot], num(&field(key))),
                     "{key}: {} vs {}",
                     r[slot],
-                    json[key]
+                    field(key)
                 );
             }
         }

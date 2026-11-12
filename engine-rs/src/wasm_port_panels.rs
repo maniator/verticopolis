@@ -7,6 +7,7 @@
 use crate::charges::whole;
 use crate::clock::GameMode;
 use crate::economy::films::FilmTier;
+use crate::economy::screens::screens;
 use crate::economy::tickets::shown_ticket_price;
 use crate::facilities::Kind;
 use crate::frame::unit_state_code;
@@ -73,9 +74,11 @@ pub(crate) const VACATE_REASONS: [&str; 12] = [
 /// on any other kind); the flags are 0 or 1. `filmDays` is the mornings a
 /// theater's film has shown and `filmTier` its film by code (`filmTiers`,
 /// #1932, #1950). `ticketPrice` is a Modern theater's ticket price by code
-/// (`ticketPrices`, #1950). The label and subtype come from `unitLabel` and
-/// `unitSubtype`.
-pub(crate) const UNIT_CARD: [&str; 23] = [
+/// (`ticketPrices`, #1950). `screen2Policy`, `screen2Days` and
+/// `screen2Tier` are a Modern theater's second screen, read like the first
+/// screen's slots, and NaN where the theater runs one screen (#1950). The
+/// label and subtype come from `unitLabel` and `unitSubtype`.
+pub(crate) const UNIT_CARD: [&str; 26] = [
     "id",
     "kindCode",
     "floor",
@@ -99,6 +102,9 @@ pub(crate) const UNIT_CARD: [&str; 23] = [
     "filmDays",
     "filmTier",
     "ticketPrice",
+    "screen2Policy",
+    "screen2Days",
+    "screen2Tier",
 ];
 
 /// `shaftCard`'s header. `utilization` is NaN when the shaft has no reading.
@@ -293,6 +299,8 @@ impl Engine {
             return Vec::new();
         };
         let cinema = (u.kind == Kind::Cinema).then(|| u.extras());
+        let second =
+            (u.kind == Kind::Cinema && mode.cinema_screens() > 1).then(|| screens(mode, u)[1]);
         vec![
             u.id as f64,
             u.kind as usize as f64,
@@ -317,6 +325,9 @@ impl Engine {
             cinema.map_or(f64::NAN, |e| f64::from(e.film_days.unwrap_or(0))),
             cinema.map_or(f64::NAN, |e| film_tier_code(FilmTier::showing(e))),
             ticket_price_code(mode, u),
+            second.map_or(f64::NAN, |f| code_of(&FILM_POLICIES, f.policy)),
+            second.map_or(f64::NAN, |f| f.days_shown() as f64),
+            second.map_or(f64::NAN, |f| film_tier_code(f.tier)),
         ]
     }
 

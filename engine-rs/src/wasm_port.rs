@@ -35,6 +35,11 @@ pub(crate) const DELTA: usize = 1;
 /// theater books again once its film is spent, or "off" (#1950).
 pub(crate) const FILM_POLICIES: [&str; 5] = ["auto", "feature", "blockbuster", "revival", "off"];
 
+/// A theater's screen as the film commands take it: a whole number from 0.
+fn screen_index(screen: f64) -> Option<usize> {
+    whole(screen).and_then(|s| usize::try_from(s).ok())
+}
+
 /// The ticket price steps by code, as `setTicketPrice` takes them and the
 /// unit card reports them (#1950).
 pub(crate) const TICKET_PRICES: [&str; 4] = ["low", "normal", "high", "premium"];
@@ -336,19 +341,19 @@ impl Engine {
         }
     }
 
-    /// Show a film of tier `tier` (by code, `filmTiers`) at theater `id`,
-    /// with the price paid. A refusal for want of funds is "funds" and
+    /// Show a film of tier `tier` (by code, `filmTiers`) on screen `screen`
+    /// (from 0) of theater `id`, with the price paid. A refusal for want of funds is "funds" and
     /// carries the price; the others carry 0.
-    pub(crate) fn port_change_film(&mut self, id: f64, tier: f64) -> Vec<f64> {
+    pub(crate) fn port_change_film(&mut self, id: f64, tier: f64, screen: f64) -> Vec<f64> {
         self.reason = None;
         let tier = whole(tier)
             .and_then(|t| usize::try_from(t).ok())
             .and_then(|t| FilmTier::ALL.get(t).copied());
-        let (Some(id), Some(tier)) = (whole(id), tier) else {
+        let (Some(id), Some(tier), Some(screen)) = (whole(id), tier, screen_index(screen)) else {
             return self.refuse(INVALID_REQUEST, &[0.0]);
         };
         let before = self.sim.money;
-        match self.sim.change_film(id, tier) {
+        match self.sim.book_film(id, screen, tier) {
             Ok(cost) => self.finish(before, true, None, &[cost]),
             Err(FilmRefusal::Funds { cost }) => self.refuse("funds", &[cost]),
             Err(other) => self.refuse(other.reason(), &[0.0]),
@@ -372,16 +377,18 @@ impl Engine {
         record(true, 0.0, &[])
     }
 
-    /// A cinema's film policy by code ([`FILM_POLICIES`]), with the code stored.
-    pub(crate) fn port_set_film(&mut self, id: f64, policy: f64) -> Vec<f64> {
+    /// A cinema screen's film policy by code ([`FILM_POLICIES`]), with the
+    /// code stored. `screen` counts from 0; a screen the theater does not run
+    /// is refused.
+    pub(crate) fn port_set_film(&mut self, id: f64, policy: f64, screen: f64) -> Vec<f64> {
         self.reason = None;
         let code = whole(policy)
             .and_then(|p| usize::try_from(p).ok())
             .filter(|&p| p < FILM_POLICIES.len());
-        let (Some(id), Some(code)) = (whole(id), code) else {
+        let (Some(id), Some(code), Some(screen)) = (whole(id), code, screen_index(screen)) else {
             return self.refuse(INVALID_REQUEST, &[f64::NAN]);
         };
-        match self.sim.set_film_policy(id, FILM_POLICIES[code]) {
+        match self.sim.set_screen_policy(id, screen, FILM_POLICIES[code]) {
             Some(_) => record(true, 0.0, &[code as f64]),
             None => self.refuse(INVALID_REQUEST, &[f64::NAN]),
         }

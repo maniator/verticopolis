@@ -10,6 +10,7 @@ use super::{
     MODERN_SPENT_DAYS, REVIVAL_INCOME_MULT, SPENT_INCOME_SHARE,
 };
 use crate::clock::GameMode;
+use crate::economy::screens::{put_screens, screens, ScreenFilm};
 use crate::sim::{LogKind, Simulation};
 use crate::tower::UnitState;
 
@@ -17,8 +18,27 @@ fn tier(sim: &Simulation, id: i64) -> FilmTier {
     FilmTier::showing(sim.tower.get_unit(id).unwrap().extras())
 }
 
+/// Changes each screen alike, so the theater's two screens show one film
+/// as every theater did before it had two (#1950).
+fn each_screen(sim: &mut Simulation, id: i64, change: impl Fn(&mut ScreenFilm)) {
+    let mode = sim.tower.mode;
+    let u = sim.tower.get_unit_mut(id).unwrap();
+    let mut films = screens(mode, u);
+    films.iter_mut().for_each(change);
+    put_screens(mode, u, films);
+}
+
 fn set_days(sim: &mut Simulation, id: i64, days: i64) {
-    sim.tower.get_unit_mut(id).unwrap().extras_mut().film_days = Some(days as u8);
+    each_screen(sim, id, |f| f.days = Some(days as u8));
+}
+
+fn set_policy(sim: &mut Simulation, id: i64, policy: Option<&'static str>) {
+    each_screen(sim, id, |f| f.policy = policy);
+}
+
+/// Books a `tier` film on both screens, each paying its own price.
+fn book_both(sim: &mut Simulation, id: i64, tier: FilmTier) -> f64 {
+    (0..2).map(|s| sim.book_film(id, s, tier).unwrap()).sum()
 }
 
 /// One morning as the day loop runs it: the rollover counts last night's
@@ -62,18 +82,14 @@ fn modern_sells_three_films_and_classic_no_blockbuster() {
 #[test]
 fn a_modern_film_draws_28_days_fades_14_then_is_spent() {
     let (mut sim, cinema, _) = theater(GameMode::Modern);
-    sim.change_film(cinema, FilmTier::New).unwrap();
-    sim.tower
-        .get_unit_mut(cinema)
-        .unwrap()
-        .extras_mut()
-        .film_policy = Some("off");
+    book_both(&mut sim, cinema, FilmTier::New);
+    set_policy(&mut sim, cinema, Some("off"));
     let nights = counts(&mut sim, cinema, 44);
     assert_eq!(nights[..28], [120; 28]);
     assert_eq!(nights[28..42], [80; 14]);
     assert_eq!(nights[42..], [40, 40]);
     // A revival never counts past a fading film.
-    sim.change_film(cinema, FilmTier::Classic).unwrap();
+    book_both(&mut sim, cinema, FilmTier::Classic);
     assert_eq!(counts(&mut sim, cinema, 1), [80]);
 }
 
@@ -87,7 +103,7 @@ fn modern_income_follows_the_film_and_classic_keeps_its_blockbuster_slot() {
         (FilmTier::New, 1.0),
         (FilmTier::Blockbuster, BLOCKBUSTER_INCOME_MULT),
     ] {
-        sim.change_film(cinema, tier_bought).unwrap();
+        book_both(&mut sim, cinema, tier_bought);
         for (days, share) in [
             (0, 1.0),
             (full - 1, 1.0),
@@ -127,15 +143,18 @@ fn only_a_modern_blockbuster_at_full_draw_holds_a_blockbuster_slot() {
 #[test]
 fn a_spent_film_is_booked_again_after_its_last_night_is_counted() {
     let (mut sim, cinema, _) = theater(GameMode::Modern);
-    sim.change_film(cinema, FilmTier::New).unwrap();
-    assert_eq!(
-        sim.set_film_policy(cinema, "blockbuster"),
-        Some("blockbuster")
-    );
+    book_both(&mut sim, cinema, FilmTier::New);
+    for screen in 0..2 {
+        assert_eq!(
+            sim.set_screen_policy(cinema, screen, "blockbuster"),
+            Some("blockbuster")
+        );
+    }
     set_days(&mut sim, cinema, MODERN_SPENT_DAYS - 1);
     let before = sim.money;
     assert_eq!(morning(&mut sim, cinema), 80, "the old film's last night");
-    assert_eq!(sim.money, before - MODERN_BLOCKBUSTER_PRICE);
+    // Each screen books its own (#1950).
+    assert_eq!(sim.money, before - 2.0 * MODERN_BLOCKBUSTER_PRICE);
     assert_eq!(tier(&sim, cinema), FilmTier::Blockbuster);
     assert_eq!(film_days(&sim, cinema), Some(0));
     assert_eq!(sim.blockbusters, [cinema as f64]);
@@ -148,7 +167,7 @@ fn the_day_loop_rebooks_on_the_morning_the_film_is_spent_after_counting_its_last
     // the old film's last night, then the same morning books the new film.
     let (mut sim, cinema, _) = theater(GameMode::Modern);
     sim.star = 1; // no fires: the theater stays open through the run
-    sim.change_film(cinema, FilmTier::New).unwrap();
+    book_both(&mut sim, cinema, FilmTier::New);
     set_days(&mut sim, cinema, MODERN_SPENT_DAYS - 3);
     let mut mornings: Vec<(u8, Option<u8>)> = Vec::new();
     for _ in 0..5 {
@@ -179,17 +198,14 @@ fn the_day_loop_rebooks_on_the_morning_the_film_is_spent_after_counting_its_last
 fn a_theater_with_no_policy_rebooks_a_feature_and_off_keeps_its_spent_film() {
     for (policy, rebooked) in [(None, true), (Some("auto"), true), (Some("off"), false)] {
         let (mut sim, cinema, _) = theater(GameMode::Modern);
-        sim.change_film(cinema, FilmTier::Classic).unwrap();
-        sim.tower
-            .get_unit_mut(cinema)
-            .unwrap()
-            .extras_mut()
-            .film_policy = policy;
+        book_both(&mut sim, cinema, FilmTier::Classic);
+        set_policy(&mut sim, cinema, policy);
         set_days(&mut sim, cinema, MODERN_SPENT_DAYS - 1);
         let before = sim.money;
         morning(&mut sim, cinema);
         if rebooked {
-            assert_eq!(sim.money, before - MODERN_FEATURE_PRICE, "{policy:?}");
+            let both = 2.0 * MODERN_FEATURE_PRICE;
+            assert_eq!(sim.money, before - both, "{policy:?}");
             assert_eq!(tier(&sim, cinema), FilmTier::New, "{policy:?}");
         } else {
             assert_eq!(sim.money, before, "{policy:?}");
@@ -218,10 +234,10 @@ fn a_closed_or_unaffordable_theater_books_nothing_and_says_so_once() {
     };
     morning(&mut sim, cinema);
     assert_eq!(sim.money, MODERN_FEATURE_PRICE - 1.0);
-    assert_eq!(warnings(&sim), 1);
+    assert_eq!(warnings(&sim), 2, "a line for each screen");
     morning(&mut sim, cinema);
-    assert_eq!(warnings(&sim), 1, "only on the morning the film is spent");
-    sim.money = MODERN_FEATURE_PRICE;
+    assert_eq!(warnings(&sim), 2, "only on the morning the film is spent");
+    sim.money = 2.0 * MODERN_FEATURE_PRICE;
     morning(&mut sim, cinema);
     assert_eq!(tier(&sim, cinema), FilmTier::New);
     assert_eq!(film_days(&sim, cinema), Some(0), "booked once it can pay");

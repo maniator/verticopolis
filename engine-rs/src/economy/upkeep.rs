@@ -2,7 +2,8 @@
 
 use indexmap::IndexMap;
 
-use super::films::{audience_draw, fills_blockbuster_slot};
+use super::films::{fills_blockbuster_slot, theater_audience};
+use super::screens::{put_screens, screens};
 use super::visitors::{
     climb_steps, counts_set_audience, expected_visitors, served_visitors, set_audience,
     NEW_FILM_DRAW,
@@ -132,12 +133,14 @@ impl Simulation {
             if u.kind == Kind::Cinema {
                 // A theatre counts the draw its film had overnight, and the
                 // film is a day older (#1932).
-                let days_shown = u.extras().film_days.unwrap_or(0);
-                let draw = audience_draw(mode, u);
-                let audience = set_audience(u.kind, draw).unwrap_or(0);
+                let audience = theater_audience(mode, u);
                 let (u, at) = self.tower.marked(i);
                 u.set_visitors_yest(at, Some(u8::try_from(audience).unwrap_or(u8::MAX)));
-                u.extras_mut().film_days = Some(days_shown.saturating_add(1));
+                let mut films = screens(mode, u);
+                for film in &mut films {
+                    film.days = Some(film.days.unwrap_or(0).saturating_add(1));
+                }
+                put_screens(mode, u, films);
                 if fills_blockbuster_slot(mode, u) {
                     full_houses.push(u.id as f64);
                 }

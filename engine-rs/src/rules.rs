@@ -8,6 +8,7 @@ use crate::clock::GameMode;
 mod amenities;
 mod construction;
 mod economy;
+mod films;
 mod households;
 mod parking;
 mod people;

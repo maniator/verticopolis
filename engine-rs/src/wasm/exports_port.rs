@@ -71,12 +71,12 @@ impl Engine {
         self.port_set_camera(tile, floor, zoom)
     }
     #[wasm_bindgen(js_name = setFilm)]
-    pub fn set_film(&mut self, id: f64, policy: f64) -> Vec<f64> {
-        self.port_set_film(id, policy)
+    pub fn set_film(&mut self, id: f64, policy: f64, screen: f64) -> Vec<f64> {
+        self.port_set_film(id, policy, screen)
     }
     #[wasm_bindgen(js_name = changeFilm)]
-    pub fn change_film(&mut self, id: f64, tier: f64) -> Vec<f64> {
-        self.port_change_film(id, tier)
+    pub fn change_film(&mut self, id: f64, tier: f64, screen: f64) -> Vec<f64> {
+        self.port_change_film(id, tier, screen)
     }
     #[wasm_bindgen(js_name = setTicketPrice)]
     pub fn set_ticket_price(&mut self, id: f64, price: f64) -> Vec<f64> {

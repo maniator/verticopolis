@@ -420,12 +420,12 @@
     "player-edits-modern": [
       {"label":"start","state":"ebb031056522bdb6","crowd":"7cb294222cbe0188","events":"4f53cda18c2baa0c"},
       {"label":"built","state":"0949b0569569e773","crowd":"7cb294222cbe0188","events":"f2c6a35f7d238bb0"},
-      {"label":"edited","state":"37a7fbe1393ed914","crowd":"7cb294222cbe0188","events":"a969a9cb4d3325a6"},
-      {"label":"t+360","state":"5884d2e7125f3853","crowd":"df9e2b9c8c385313","events":"4f53cda18c2baa0c"},
-      {"label":"t+720","state":"8897252b1d8a2b12","crowd":"0317256866f35d08","events":"4f53cda18c2baa0c"},
-      {"label":"t+1080","state":"846db8516fcd766b","crowd":"1ed8f167014b097b","events":"23e79471eb583fb3"},
-      {"label":"t+1440","state":"db5a41b011c8d1e5","crowd":"eaae733d83596e1e","events":"4f53cda18c2baa0c"},
-      {"label":"final","state":"db5a41b011c8d1e5","crowd":"eaae733d83596e1e","events":"4f53cda18c2baa0c"}
+      {"label":"edited","state":"e76a4f0b2ae626e3","crowd":"7cb294222cbe0188","events":"a969a9cb4d3325a6"},
+      {"label":"t+360","state":"af99e2649dc8558c","crowd":"df9e2b9c8c385313","events":"4f53cda18c2baa0c"},
+      {"label":"t+720","state":"56bfd9362be6cf21","crowd":"0317256866f35d08","events":"4f53cda18c2baa0c"},
+      {"label":"t+1080","state":"d19c38d86ebbcbce","crowd":"1ed8f167014b097b","events":"23e79471eb583fb3"},
+      {"label":"t+1440","state":"4ffb30c1b61c3f2d","crowd":"eaae733d83596e1e","events":"4f53cda18c2baa0c"},
+      {"label":"final","state":"4ffb30c1b61c3f2d","crowd":"eaae733d83596e1e","events":"4f53cda18c2baa0c"}
     ],
     "ransom-declined-classic": [
       {"label":"start","state":"9f2e32e4d081cd40","crowd":"7cb294222cbe0188","events":"4f53cda18c2baa0c"},

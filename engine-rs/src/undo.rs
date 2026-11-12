@@ -33,6 +33,7 @@
 //! (`Transport::rides`). So an undo is never a way to sell a used build
 //! back at its full price.
 #![cfg_attr(not(feature = "wasm"), allow(dead_code))]
+use crate::economy::screens::screen_policies;
 use crate::sim_undo_caps::CapHeld;
 use crate::tower::{Transport, Unit, UnitState};
 
@@ -72,14 +73,15 @@ pub(crate) enum UnitChange {
 }
 
 /// The facts of a unit an edit owns: the price, the market flag, the name,
-/// the variety, the film policy and the ticket price (`Unit::config_eq`).
+/// the variety, each screen's film policy and the ticket price
+/// (`Unit::config_eq`).
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct UnitFacts {
     pub(crate) rent: Option<f64>,
     pub(crate) no_rate: bool,
     pub(crate) label: String,
     pub(crate) subtype: Option<&'static str>,
-    pub(crate) film_policy: Option<&'static str>,
+    pub(crate) film_policies: [Option<&'static str>; 2],
     pub(crate) ticket_price: Option<&'static str>,
 }
 
@@ -90,7 +92,7 @@ impl UnitFacts {
             no_rate: u.no_rate,
             label: u.label.clone(),
             subtype: u.subtype,
-            film_policy: u.extras().film_policy,
+            film_policies: screen_policies(u),
             ticket_price: u.extras().ticket_price,
         }
     }

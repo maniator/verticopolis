@@ -4,17 +4,19 @@
 //! insertions that put removed units and shafts back where they stood.
 #![cfg_attr(not(feature = "wasm"), allow(dead_code))]
 use super::*;
+use crate::economy::screens::{put_screen_policies, screen_policies};
 use crate::undo::{puts_back, UnitFacts};
 
 impl Unit {
     /// Whether the facts an edit owns are the same: the price, the market
-    /// flag, the name, the variety, the film policy and the ticket price.
+    /// flag, the name, the variety, each screen's film policy and the ticket
+    /// price.
     pub(crate) fn config_eq(&self, other: &Unit) -> bool {
         self.rent == other.rent
             && self.no_rate == other.no_rate
             && self.label == other.label
             && self.subtype == other.subtype
-            && self.extras().film_policy == other.extras().film_policy
+            && screen_policies(self) == screen_policies(other)
             && self.extras().ticket_price == other.extras().ticket_price
     }
 
@@ -34,7 +36,7 @@ impl Unit {
     }
 
     /// This unit, with the facts an edit owns (the price, the market flag,
-    /// the name, the variety, the film policy and the ticket price) taken
+    /// the name, the variety, each screen's film policy and the ticket price) taken
     /// from `found`: the unit as it leaves a gesture that changed those facts
     /// first, which an undo of the gesture puts back.
     pub(crate) fn with_edit_facts_of(&self, found: &Unit) -> Unit {
@@ -52,16 +54,16 @@ impl Unit {
         u
     }
 
-    /// Put the price, the market flag, the film policy and the ticket price
+    /// Put the price, the market flag, each screen's film policy and the ticket price
     /// back from `other`.
     /// The name and the variety go through the tower's setters
     /// ([`Tower::put_unit_config`]), which log a change.
     fn take_price_and_policy_from(&mut self, other: &Unit) {
         self.rent = other.rent;
         self.no_rate = other.no_rate;
-        let policy = other.extras().film_policy;
-        if self.extras().film_policy != policy {
-            self.extras_mut().film_policy = policy;
+        let policies = screen_policies(other);
+        if screen_policies(self) != policies {
+            put_screen_policies(self, policies);
         }
         let price = other.extras().ticket_price;
         if self.extras().ticket_price != price {
@@ -160,12 +162,15 @@ impl Tower {
         if puts_back(&want.no_rate, &left.no_rate, &u.no_rate) {
             u.no_rate = want.no_rate;
         }
-        if puts_back(
-            &want.film_policy,
-            &left.film_policy,
-            &u.extras().film_policy,
-        ) {
-            u.extras_mut().film_policy = want.film_policy;
+        let mut policies = screen_policies(u);
+        for (screen, now) in policies.iter_mut().enumerate() {
+            let (want, left) = (&want.film_policies[screen], &left.film_policies[screen]);
+            if puts_back(want, left, now) {
+                *now = *want;
+            }
+        }
+        if policies != screen_policies(u) {
+            put_screen_policies(u, policies);
         }
         if puts_back(
             &want.ticket_price,

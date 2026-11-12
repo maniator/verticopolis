@@ -51,7 +51,7 @@ pub use rules::Rules;
 
 /// The version of the catalog's shape. It moves when a field is added,
 /// renamed or removed, so a frontend can refuse a shape it does not know.
-pub const CATALOG_VERSION: u32 = 12;
+pub const CATALOG_VERSION: u32 = 13;
 
 /// Every price, size and build rule of one mode.
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -106,9 +106,8 @@ pub struct Economy {
     pub add_car_cost: f64,
     /// What `remove_car` refunds for one car.
     pub car_resale_refund: f64,
-    /// The price of each floor an elevator spans past its first. The build
-    /// charges it, and `extend_transport` charges it for each floor an extend
-    /// adds. Stairs and escalators pay none.
+    /// The price of each floor an elevator spans past its first, charged by
+    /// the build and by each floor an extend adds; stairs and escalators pay none.
     pub transport_floor_cost: f64,
     /// The calendars a tower of this mode can run, its default first. Every
     /// `...Monthly` figure here and each facility's `upkeepMonthly` is quoted
@@ -130,14 +129,15 @@ pub struct Economy {
     pub garbage_collect_hour: f64,
     /// The paid exterminator's fees, or null where the mode has none.
     pub exterminator: Option<ExterminatorFees>,
-    /// The films a theater can show, with their prices, in the order the
-    /// card lists them (#1932, #1950). No theater pays anything each period.
+    /// The films a theater shows, priced, in card order; none bills a period.
     pub films: &'static [FilmOffer],
     /// The Auto-rebook choices in the card button's order: each policy and
     /// the film it books once a theater's film is spent; empty if none (#1950).
     pub film_rebooks: &'static [FilmRebook],
     /// The policy a theater with none (or an old save's "auto") rebooks by.
     pub film_rebook_default: Option<&'static str>,
+    /// The screens a theater runs, each with its own film and booking (#1950).
+    pub cinema_screens: usize,
     /// A theater's ticket price steps, cheapest first, against Normal's 1.
     pub ticket_prices: &'static [TicketPrice],
     /// The step a theater with none set charges, or null (#1950).

@@ -36,6 +36,7 @@ const VIEW_LAYOUT_PINS: &[&str] = &[
     "553c9de705149e20",
     "79826ee6f478bbf8",
     "434e2a689a7cedbb",
+    "05b6d2f6950ec187",
 ];
 
 fn pinned_text() -> String {

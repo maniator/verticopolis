@@ -312,15 +312,38 @@ pub(crate) fn assemble(
         // A Modern save from before #1950 lists the theaters that booked a
         // blockbuster this month and carries no film tier: those keep
         // their blockbuster (a later save lists only blockbusters at full
-        // draw, which carry the tier already).
+        // draw, which carry the tier already). A theater with its own
+        // second screen is a later save, and may be listed for that
+        // screen's blockbuster alone, so its first screen stays as saved.
+        // A gutted theater stays listed until the night's count, and
+        // reopens with a new film.
         for &id in &sim.blockbusters {
             if id.fract() != 0.0 {
                 continue;
             }
             if let Some(u) = sim.tower.get_unit_mut(id as i64) {
-                if u.kind == Kind::Cinema && !u.extras().film_classic {
+                let gutted = u.state == UnitState::Gutted;
+                let extras = u.extras();
+                if u.kind == Kind::Cinema
+                    && !gutted
+                    && !extras.film_classic
+                    && extras.second_screen.is_none()
+                {
                     u.extras_mut().film_blockbuster = true;
                 }
+            }
+        }
+    }
+    // A mode that runs one screen keeps no second one (#1950).
+    if mode.cinema_screens() < 2 {
+        for u in sim
+            .tower
+            .units
+            .iter_mut()
+            .filter(|u| u.kind == Kind::Cinema)
+        {
+            if u.extras().second_screen.is_some() {
+                u.extras_mut().second_screen = None;
             }
         }
     }

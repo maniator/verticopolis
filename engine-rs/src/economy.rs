@@ -10,6 +10,7 @@ use crate::services::with_thousands;
 use crate::sim::{LogKind, Simulation};
 
 pub mod films;
+pub mod screens;
 pub mod tickets;
 mod traffic;
 mod upkeep;
