@@ -50,7 +50,8 @@ describe("the side menu", () => {
     // name (Starlight's slug for rooms/index.mdx is "rooms").
     const pages = readdirSync(pagesDir, { recursive: true, encoding: "utf8" })
       .filter((f) => /\.mdx?$/.test(f) && f !== "index.md")
-      .map((f) => f.replace(/\.mdx?$/, "").replace(/\/index$/, ""));
+      // Windows lists nested files with backslashes; slugs use slashes.
+      .map((f) => f.replace(/\\/g, "/").replace(/\.mdx?$/, "").replace(/\/index$/, ""));
     for (const page of pages) expect(slugs.has(page), page).toBe(true);
   });
 
