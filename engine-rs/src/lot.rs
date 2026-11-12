@@ -91,6 +91,7 @@ impl Lot {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::clock::GameMode;
 
     #[test]
     fn the_standard_lot_tops_out_at_floor_100() {
@@ -153,5 +154,20 @@ mod tests {
         assert_eq!(tall.max_span(Kind::ElevatorStandard), 30);
         assert!(tall.touches_top_floor(Kind::Office, 120));
         assert!(!tall.touches_top_floor(Kind::Office, 100));
+    }
+
+    #[test]
+    fn classic_keeps_whichever_floor_tops_the_lot_for_the_wedding_hall() {
+        let tall = Lot { top_floor: 120 };
+        for (lot, top) in [(Lot::STANDARD, 100), (tall, 120)] {
+            let classic = GameMode::Classic;
+            assert!(classic.refuses_room_on_reserved_top_floor(lot, Kind::Office, top));
+            assert!(classic.refuses_room_on_reserved_top_floor(lot, Kind::PartyHall, top - 1));
+            assert!(!classic.refuses_room_on_reserved_top_floor(lot, Kind::Office, top - 1));
+            assert!(!classic.refuses_room_on_reserved_top_floor(lot, Kind::WeddingHall, top));
+            assert!(!GameMode::Modern.refuses_room_on_reserved_top_floor(lot, Kind::Office, top));
+        }
+        // Floor 100 is an ordinary floor on a taller lot.
+        assert!(!GameMode::Classic.refuses_room_on_reserved_top_floor(tall, Kind::Office, 100));
     }
 }
