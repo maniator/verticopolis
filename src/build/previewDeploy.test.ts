@@ -89,4 +89,13 @@ describe("RETIRING_SERVICE_WORKER", () => {
     expect(self.registration.unregister).toHaveBeenCalledTimes(1);
     expect(navigate).toHaveBeenCalledTimes(2);
   });
+
+  it("still unregisters and reloads when Cache Storage fails", async () => {
+    const { fire, navigate, self } = retiringWorker();
+    self.caches.keys.mockRejectedValueOnce(new DOMException("blocked", "SecurityError"));
+    await fire("activate");
+    expect(self.caches.delete).not.toHaveBeenCalled();
+    expect(self.registration.unregister).toHaveBeenCalledTimes(1);
+    expect(navigate).toHaveBeenCalledTimes(2);
+  });
 });

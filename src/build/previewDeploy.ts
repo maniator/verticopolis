@@ -49,7 +49,8 @@ export function isPreviewDeploy(env: Readonly<Record<string, string | undefined>
  *
  * A tab can only be navigated by the worker that controls it, and a tab the
  * old worker controlled passes to this one when it activates. Unregistering
- * first means that navigation reaches the network instead of a worker.
+ * first means that navigation reaches the network instead of a worker. A
+ * Cache Storage failure never stops the unregister or the reload.
  */
 export const RETIRING_SERVICE_WORKER = `// Verticopolis preview deployment: no service worker (src/build/previewDeploy.ts).
 self.addEventListener("install", () => {
@@ -58,8 +59,8 @@ self.addEventListener("install", () => {
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     (async () => {
-      const names = await self.caches.keys();
-      await Promise.all(names.filter((name) => name.startsWith(${JSON.stringify(WORKBOX_CACHE_PREFIX)})).map((name) => self.caches.delete(name)));
+      const names = await self.caches.keys().catch(() => []);
+      await Promise.all(names.filter((name) => name.startsWith(${JSON.stringify(WORKBOX_CACHE_PREFIX)})).map((name) => self.caches.delete(name).catch(() => false)));
       await self.registration.unregister();
       const windows = await self.clients.matchAll({ type: "window" });
       await Promise.all(windows.map((client) => client.navigate(client.url).catch(() => null)));
