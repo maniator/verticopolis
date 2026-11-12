@@ -28,6 +28,7 @@ mod elevator_dispatch_balancing;
 mod elevator_doors;
 mod elevator_schedule;
 mod elevator_scheduling;
+mod elevator_waiting_floors;
 mod elevator_width_migration;
 mod elevator_width_migration_load;
 mod event_fx;

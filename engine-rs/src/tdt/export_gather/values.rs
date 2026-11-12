@@ -76,6 +76,26 @@ pub fn js_finite(v: Option<&Value>) -> Option<f64> {
     }
 }
 
+/// Each car's waiting floor for the elevator record's home bytes: the
+/// shaft's `schedule.homeFloors` entry where it is a finite number, else
+/// where the car stands (`carPositions`), which is all a shaft with no
+/// authored homes can offer. A car neither names reads as `null`, and the
+/// encoder writes the shaft's bottom for it.
+pub fn car_homes(t: &Value) -> Vec<Value> {
+    let positions = t.get("carPositions").and_then(Value::as_array);
+    let homes = t.pointer("/schedule/homeFloors").and_then(Value::as_array);
+    let at = |list: Option<&Vec<Value>>, c: usize| list.and_then(|l| l.get(c)).cloned();
+    let cars = positions.map_or(0, Vec::len).max(homes.map_or(0, Vec::len));
+    (0..cars)
+        .map(|c| {
+            at(homes, c)
+                .filter(|h| js_finite(Some(h)).is_some())
+                .or_else(|| at(positions, c))
+                .unwrap_or(Value::Null)
+        })
+        .collect()
+}
+
 /// JavaScript truthiness.
 pub fn js_truthy(v: Option<&Value>) -> bool {
     match v {
