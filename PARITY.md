@@ -51,7 +51,7 @@ abstraction · ⬜ not present.
 ## Population, stress & ratings
 - ✅ Population from offices/condos/hotels; weekday/weekend + rush-hour cycle
 - ✅ **Individually-routed commuters**: real people walk to a shaft, wait, board an actual car, transfer at sky lobbies and arrive (BFS over the transport network)
-- ◑ Tenant stress from elevator crowding: the aggregate congestion model lowers ratings and low-satisfaction tenants move out, but the real waits of routed commuters (the red crowds) do not yet feed a tenant's rating (#1971)
+- ✅ Tenant stress from elevator crowding: the aggregate congestion model and the real waits of routed commuters both lower ratings, and low-satisfaction tenants move out. A floor's average commute wait counts once it passes a rider's patience (120 s in Classic, 180 s in Modern) (#1971)
 - ✅ **Two-ride rule has teeth:** a floor more than two rides from the lobby (one sky-lobby transfer) draws no visitors. Its shops/food/cinema earn **no** traffic income, not just a warning, so late-game transport layout is a real economic puzzle
 - ✅ Crowds tint red when they've waited too long / transport is overwhelmed (the original's visual cue)
 - ✅ Star thresholds: 2★ 300 · 3★ 1,000 · 4★ 5,000 · 5★ 10,000
@@ -96,7 +96,7 @@ abstraction · ⬜ not present.
 - ✅ Mobile: responsive layout, touch pan/pinch, drawer panels
 
 ## Deliberate divergences
-- Commuters are **individually pathfound** (walk → wait → ride a real car → transfer → arrive), but their waits do not yet feed tenant ratings (#1971), and a lightweight **aggregate** congestion model still runs underneath as the deterministic, DOM-free backbone the headless tests assert against. The visible crowd is capped (~140 on screen) for performance rather than rendering the entire population at once.
+- Commuters are **individually pathfound** (walk → wait → ride a real car → transfer → arrive), and their average wait on each floor feeds tenant ratings (#1971), while a lightweight **aggregate** congestion model still runs underneath as the deterministic, DOM-free backbone the headless tests assert against. The visible crowd is capped (~140 on screen) for performance rather than rendering the entire population at once.
 - The **Cathedral** is a religion-agnostic **Wedding Hall**.
 - The population census counts **occupants**: office workers + condo residents (hotel guests count up through 4★, then drop out); shops, restaurants and fast food count the customers inside them (up to their capacity, minus hotel guests once the census is occupants-only), while cinemas and party halls count nobody. The **TOWER** goal is the canonical **15,000**, kept reachable by the canon **375-tile** buildable lot width (the 1994 map is 375 segments wide; a well-zoned 100-floor tower measures well over 15,000 occupants).
 - Optional **rule-set** chosen when a tower is founded and fixed for its life: **Classic** is the pixel-faithful 1994 game; **Modern** adds what the original couldn't; today that means *variant households* (a condo sells to a 2–5 person family, weighted to a mean of 3 so the star ladder is unchanged, that scales its price and how demanding it is) and a *calendar choice* (the compressed 1994 calendar or a real-world-length one). Classic always runs the canon calendar. Saves with no mode load as Classic, and a Modern save with no calendar choice loads real-world-length.

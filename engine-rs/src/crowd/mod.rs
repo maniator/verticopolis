@@ -106,6 +106,10 @@ pub struct Person {
     pub returning: bool,
     pub routine: Option<&'static str>,
     pub linger_for: Option<f64>,
+    /// Whether the trip began on a Metro platform, so its wait belongs to
+    /// the tenant floor it heads for (#1971). Engine-internal: not in the
+    /// `Person` shape.
+    pub from_metro: bool,
 }
 
 impl Person {

@@ -334,6 +334,9 @@ fn is_known_state_loss(kind: &str, ours: &str, back: &str) -> bool {
         ("cinema" | "partyHall", "occupied", "empty") => true,
         // An infested room exports as a dirty one (#1629, tdt-format.md 5.1).
         (hotel, "infested", "dirty") => hotel.starts_with("hotel"),
+        // The file has no notice state: an office or condo whose tenant has
+        // given notice is still tenanted, and exports that way (export_gather).
+        ("office" | "condo", "vacating", "occupied") => true,
         _ => false,
     }
 }

@@ -69,6 +69,7 @@ pub fn make_person(
         returning: false,
         routine: None,
         linger_for: None,
+        from_metro: false,
     };
     crowd.next_id += 1;
     crowd.people.push(person);
@@ -175,6 +176,7 @@ fn metro_arrival(crowd: &mut Crowd, tower: &Tower, station: &Unit, to: i64) {
         return;
     };
     crowd.people[i].x = inside_x(crowd, station, 2) as f64;
+    crowd.people[i].from_metro = true;
 }
 
 fn metro_departure(crowd: &mut Crowd, tower: &Tower, station: &Unit, from: i64) {

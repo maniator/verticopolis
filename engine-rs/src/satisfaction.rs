@@ -142,6 +142,20 @@ impl Simulation {
         }
     }
 
+    /// The congestion a floor's tenants feel from their real elevator waits
+    /// (#1971): the crowd's average wait for trips that start or end on the
+    /// floor, as this mode reads it. A lobby floor has none, since every
+    /// trip passes through one; nor does a floor no finished trip has named.
+    pub fn commute_wait_congestion(&self, floor: i64) -> f64 {
+        if self.tower.floor_has_lobby(floor) {
+            return 0.0;
+        }
+        self.crowd
+            .commute_wait_by_floor
+            .get(&floor)
+            .map_or(0.0, |&wait| self.mode.commute_wait_congestion(wait))
+    }
+
     /// `reachesLobby`.
     pub fn reaches_lobby(&mut self, u: &Unit) -> bool {
         if !self.tower.is_floor_served(u.floor) {
@@ -161,9 +175,14 @@ impl Simulation {
         ctx: &mut SatisfactionContext,
     ) -> StepResult {
         let served = ctx.served_set.contains(&u.floor) && self.reaches_lobby(u);
-        let cong = match &ctx.cong_map {
+        let estimate = match &ctx.cong_map {
             Some(m) => m.get(&u.floor).copied().unwrap_or(0.0),
             None => ctx.global_cong,
+        };
+        let cong = if ctx.cong_map.is_some() {
+            estimate.max(self.commute_wait_congestion(u.floor))
+        } else {
+            estimate
         };
         let churn = self.mode.churn_multiplier(u.residents);
         let mut s = current;
