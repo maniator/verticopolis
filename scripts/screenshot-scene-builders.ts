@@ -313,11 +313,19 @@ export function buildOverlayTower(): void {
       } else x += 1;
     }
   };
+  const vacantBand = (f: number) => (f >= 10 && f <= 12) || (f >= 24 && f <= 26);
   for (let f = 2; f <= 28; f++) {
     if (f === 15) continue;
-    const vacantBand = (f >= 10 && f <= 12) || (f >= 24 && f <= 26);
-    fill(f, !vacantBand);
+    fill(f, !vacantBand(f));
   }
+  // Recycling and parking below ground: from 3 stars a tower short of either
+  // has its ratings drained (#1970), which would muddy the views this tower
+  // stages. Two basement stories hold a ramp and spaces on B1 and a center
+  // rising from B2.
+  for (const f of [0, -1]) for (let x = left; x <= right; x++) s.tower.place("floor", f, x);
+  if (!s.tower.place("parkingRamp", 0, left).ok) throw new Error("overlay tower: no room for its parking ramp");
+  for (let x = left + 16; x + 4 <= left + 40; x += 4) s.tower.place("parking", 0, x);
+  if (!s.tower.place("recycling", -1, right - 25).ok) throw new Error("overlay tower: no room for its recycling center");
   s.evaluateStar();
   // Monday 08:00 + a FIXED tick budget so crowd + congestion develop identically
   // every run, then FREEZE so the capture is byte-stable.
@@ -334,6 +342,16 @@ export function buildOverlayTower(): void {
     s = g.sim;
   }
   for (let i = 0; i < 150; i++) s.tick(1);
+  // The ticks lease the vacant bands too (a free parking space serves every
+  // Classic office, #1970), so empty three in four again: the bands read
+  // mostly empty and the upper local keeps the riders that back it up.
+  let band = 0;
+  for (const u of s.tower.units) {
+    if (u.kind !== "office" || !vacantBand(u.floor) || band++ % 4 === 0) continue;
+    u.state = "empty";
+    u.everOccupied = false;
+    u.occupants = 0;
+  }
   // Stage a satisfaction spread AFTER the ticks (updateSatisfaction would recompute
   // it): the well-served left/lower core stays happy, the far-right (transport-far)
   // and the jammed upper zone read unhappy, so the satisfaction overlay shows the
