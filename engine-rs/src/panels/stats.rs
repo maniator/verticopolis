@@ -175,6 +175,7 @@ impl Simulation {
                 "officePop": parking.office_pop,
                 "offices": parking.offices,
                 "suites": parking.suites,
+                "homes": parking.homes,
                 "total": parking.total,
             }),
         );

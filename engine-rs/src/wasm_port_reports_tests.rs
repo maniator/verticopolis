@@ -318,6 +318,7 @@ fn check_stats_sheet(e: &mut Engine) {
         num(&j["parkingDemand"]["officePop"]),
         num(&j["parkingDemand"]["offices"]),
         num(&j["parkingDemand"]["suites"]),
+        num(&j["parkingDemand"]["homes"]),
         num(&j["parkingDemand"]["total"]),
         num(&j["housekeepingReport"]["cleaned"]),
         num(&j["housekeepingReport"]["leftover"]),

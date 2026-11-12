@@ -389,6 +389,7 @@ pub fn vacate_reason_text(reason: &'static str) -> &'static str {
         "unmetDemand" => "too few shops or restaurants within reach",
         "trash" => "trash piling up without enough recycling",
         "parking" => "too little parking for its workers",
+        "homeParking" => "too little parking for its households",
         "relocation" => "the household is relocating",
         other => other,
     }

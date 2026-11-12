@@ -21,13 +21,14 @@ use super::Engine;
 /// rows ([`GATE_ROW`]), the `stranded` floors, one done flag per milestone in
 /// `milestones` order, the `elevators` rows ([`ELEVATOR_ROW`]) and the `mix`
 /// rows ([`MIX_ROW`]).
-pub(crate) const STATS_SHEET: [&str; 25] = [
+pub(crate) const STATS_SHEET: [&str; 26] = [
     "ratingPopulation",
     "hotelsCountTowardRating",
     "functionalParking",
     "parkingOfficePop",
     "parkingOffices",
     "parkingSuites",
+    "parkingHomes",
     "parkingTotal",
     "cleaned",
     "leftover",
@@ -211,6 +212,7 @@ impl Engine {
             parking.office_pop,
             parking.offices,
             parking.suites,
+            parking.homes,
             parking.total,
             cleaned,
             leftover,

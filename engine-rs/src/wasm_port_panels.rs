@@ -53,7 +53,7 @@ pub(crate) const CREW_COVERAGE: [&str; 7] = [
 ];
 
 /// Why a tenant left, by code (`vacateReason` in `unitCard`).
-pub(crate) const VACATE_REASONS: [&str; 11] = [
+pub(crate) const VACATE_REASONS: [&str; 12] = [
     "access",
     "noTransport",
     "congestion",
@@ -65,6 +65,7 @@ pub(crate) const VACATE_REASONS: [&str; 11] = [
     "relocation",
     "trash",
     "parking",
+    "homeParking",
 ];
 
 /// `unitCard`'s slots. NaN marks a field the unit does not carry (a code

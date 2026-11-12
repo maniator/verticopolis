@@ -143,6 +143,22 @@ pub(crate) fn office_parking_nudge_message(need: f64, spare: f64) -> String {
     )
 }
 
+/// Modern's advisory once homes need parking too (#1973): homes are held at
+/// Good and fill more slowly, offices' ratings fall.
+pub(crate) fn home_parking_nudge_message(offices: f64, homes: f64, spare: f64) -> String {
+    let need = offices + homes;
+    let who = if offices > 0.0 {
+        "Homes and offices need parking: they need"
+    } else {
+        "Homes need parking: their households need"
+    };
+    format!(
+        "🚗 {who} {need} space{} and {spare} {} left after the hotel suites. Ratings slip and homes fill more slowly until there is room.",
+        if need == 1.0 { "" } else { "s" },
+        if spare == 1.0 { "is" } else { "are" }
+    )
+}
+
 /// The population `centers` working recycling centers can process.
 pub(crate) fn recycling_capacity_of(centers: i64) -> f64 {
     centers as f64 * RECYCLING_POP_PER_CENTER
@@ -151,13 +167,6 @@ pub(crate) fn recycling_capacity_of(centers: i64) -> f64 {
 /// Whether `capacity` covers the whole `population` (the 4-star demand check).
 pub(crate) fn recycling_demand_met_of(population: i64, capacity: f64) -> bool {
     population as f64 <= capacity
-}
-
-pub struct ParkingDemand {
-    pub office_pop: f64,
-    pub offices: f64,
-    pub suites: f64,
-    pub total: f64,
 }
 
 #[doc(hidden)]
@@ -174,48 +183,9 @@ impl Simulation {
         recycling_demand_met_of(self.tower.total_population(), self.recycling_capacity())
     }
 
-    pub fn parking_demand(&self) -> ParkingDemand {
-        if self.star < Kind::Parking.facility().min_star {
-            return ParkingDemand {
-                office_pop: 0.0,
-                offices: 0.0,
-                suites: 0.0,
-                total: 0.0,
-            };
-        }
-        let mut office_pop = 0.0;
-        let mut suites = 0.0;
-        for u in self.tower.room_units() {
-            if u.kind == Kind::Office && u.is_tenanted() {
-                office_pop += Kind::Office.facility().population as f64;
-            } else if u.kind == Kind::HotelSuite && u.is_operational() {
-                suites += 1.0;
-            }
-        }
-        // The spaces the office workers' cars fill: what the garage draws and
-        // the statistics count. Whether the offices are short is the mode's
-        // rule ([`Simulation::office_parking_short`]); in Classic one free
-        // space serves them all (#1970).
-        let offices = (office_pop / PARKING_WORKERS_PER_SPACE).ceil();
-        ParkingDemand {
-            office_pop,
-            offices,
-            suites,
-            total: offices + suites,
-        }
-    }
-
     pub fn suite_parking_short(&self) -> bool {
         let d = self.parking_demand();
         d.suites > 0.0 && (self.tower.functional_parking_spots() as f64) < d.suites
-    }
-
-    /// Whether the offices lack parking under this mode's rule (#1970), the
-    /// same answer the satisfaction drain and the log nudge read.
-    pub fn office_parking_short(&self) -> bool {
-        self.service_shortfalls()
-            .office_parking_coverage()
-            .is_some()
     }
 
     pub fn nudge_service_shortfalls(&mut self) {
@@ -234,17 +204,18 @@ impl Simulation {
             self.emit(&msg, LogKind::Info);
         }
         self.suite_parking_nudged = suite_short;
-        let office_short = self
-            .service_shortfalls()
-            .office_parking_coverage()
-            .is_some();
+        let office_short = self.service_shortfalls().parking_coverage().is_some();
         if office_short && !self.office_parking_nudged {
             let msg = match self.mode.office_parking() {
                 OfficeParking::AnyFreeSpace => OFFICE_PARKING_NONE_MESSAGE.to_string(),
                 OfficeParking::WorkersPerSpace(_) => {
                     let d = self.parking_demand();
-                    let spots = self.tower.functional_parking_spots() as f64;
-                    office_parking_nudge_message(d.offices, (spots - d.suites).max(0.0))
+                    let spare = self.parking_spare_after_suites(&d);
+                    if d.homes > 0.0 {
+                        home_parking_nudge_message(d.offices, d.homes, spare)
+                    } else {
+                        office_parking_nudge_message(d.offices, spare)
+                    }
                 }
             };
             self.emit(&msg, LogKind::Info);
@@ -469,6 +440,14 @@ impl Simulation {
         }
     }
 }
+
+mod parking;
+
+pub use parking::{
+    is_parked_home, modern_spaces_for, ParkingDemand, ParkingMoveIn, APARTMENTS_PER_SPACE,
+    CONDOS_PER_SPACE, HOME_MOVE_IN_SHORT_FACTOR, HOME_SLOW_COVERAGE, METRO_PARKING_SHARE,
+    SHARE_EPSILON, STUDIOS_PER_SPACE,
+};
 
 #[cfg(test)]
 mod tests;
