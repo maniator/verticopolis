@@ -13,6 +13,7 @@ use serde_json::{json, Map, Value};
 use std::collections::BTreeMap;
 
 use crate::facilities::Kind;
+use crate::services::parking_short_of;
 use crate::sim::Simulation;
 use crate::tower::UnitState;
 
@@ -161,14 +162,13 @@ impl Simulation {
     /// reachability by tower revision, as the engine's own reads do.
     pub fn stats_report(&mut self) -> Value {
         let parking = self.parking_demand();
+        let spots = self.tower.functional_parking_set().len();
+        let coverage = self.service_shortfalls().parking_coverage();
         let mut out = Map::new();
         out.insert("stats".into(), self.tower_stats());
         out.insert("ratingPopulation".into(), json!(self.rating_population()));
         out.insert("hotelsCountTowardRating".into(), json!(self.star < 4));
-        out.insert(
-            "functionalParking".into(),
-            json!(self.tower.functional_parking_set().len()),
-        );
+        out.insert("functionalParking".into(), json!(spots));
         out.insert(
             "parkingDemand".into(),
             json!({
@@ -177,7 +177,8 @@ impl Simulation {
                 "suites": parking.suites,
                 "homes": parking.homes,
                 "total": parking.total,
-                "coverage": self.service_shortfalls().parking_coverage(),
+                "coverage": coverage,
+                "short": parking_short_of(&parking, spots as f64, coverage),
             }),
         );
         out.insert(

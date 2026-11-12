@@ -319,6 +319,7 @@ fn check_stats_sheet(e: &mut Engine) {
         num(&j["parkingDemand"]["homes"]),
         num(&j["parkingDemand"]["total"]),
         num(&j["parkingDemand"]["coverage"]),
+        num(&j["parkingDemand"]["short"]),
         num(&j["housekeepingReport"]["cleaned"]),
         num(&j["housekeepingReport"]["leftover"]),
         num(&j["recycling"]["capacity"]),

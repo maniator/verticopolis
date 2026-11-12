@@ -63,6 +63,19 @@ pub struct ParkingMoveIn {
     pub home_factor: f64,
 }
 
+/// Whether a hotel suite lacks its space: fewer working spaces than suites.
+pub(crate) fn suite_short_of(d: &ParkingDemand, spots: f64) -> bool {
+    d.suites > 0.0 && spots < d.suites
+}
+
+/// [`Simulation::parking_short`] from readings a caller already holds: the
+/// demand, the working spaces and `ServiceShortfalls::parking_coverage()`,
+/// which is `Some` exactly while offices (and Modern homes) are short by the
+/// mode's rule, the same answer the move-in pass reads.
+pub(crate) fn parking_short_of(d: &ParkingDemand, spots: f64, coverage: Option<f64>) -> bool {
+    suite_short_of(d, spots) || coverage.is_some()
+}
+
 /// `need` as whole spaces, ignoring rounding noise in the shares.
 fn whole_spaces(need: f64) -> f64 {
     (need - SHARE_EPSILON).ceil().max(0.0)
@@ -137,6 +150,17 @@ impl Simulation {
     /// they share the spaces.
     pub fn office_parking_short(&self) -> bool {
         self.parking_move_in_reading().office_short
+    }
+
+    /// Whether the tower is short of parking by the mode's rule: a hotel suite
+    /// lacks its space, or offices are short (#1970). This is the answer the
+    /// stats screen's parking line and the parking inspector color by, so a
+    /// Classic garage with fewer spaces than cars, but one free for the
+    /// offices, does not read as short.
+    pub fn parking_short(&self) -> bool {
+        let d = self.parking_demand();
+        let spots = self.tower.functional_parking_spots() as f64;
+        parking_short_of(&d, spots, self.service_shortfalls().parking_coverage())
     }
 
     /// One reading of the parking for the daily move-in pass: whether offices

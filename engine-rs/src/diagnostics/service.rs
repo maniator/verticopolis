@@ -13,6 +13,7 @@ use crate::facilities::Kind;
 use crate::housekeeping::{HK_MAIDS_PER_UNIT, INFEST_DAYS};
 use crate::jsmath::round;
 use crate::panels::coverage::HK_NOMINAL_ROOMS_PER_MAID;
+use crate::services::parking_short_of;
 use crate::sim::Simulation;
 use crate::sim_loop::Weather;
 use crate::tower::UnitState;
@@ -226,8 +227,10 @@ impl Simulation {
             };
             if facts.parking.status != ParkingStatus::Disconnected {
                 let demand = self.parking_demand();
-                // Short by the mode's rule (#1970), not by the cars counted.
-                let short = self.suite_parking_short() || self.office_parking_short();
+                // Short by the mode's rule (#1970), from the spaces and demand
+                // already in hand.
+                let coverage = self.service_shortfalls().parking_coverage();
+                let short = parking_short_of(&demand, spaces.len() as f64, coverage);
                 facts.parking.shortage = Some(short);
                 facts.parking.have = Some(spaces.len());
                 facts.parking.total = Some(demand.total);
