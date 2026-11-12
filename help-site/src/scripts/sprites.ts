@@ -1,0 +1,109 @@
+// Draws every room picture on a help page with the game's own painters
+// (src/render/roomPortrait.ts, the code the sprite gallery used), so a room
+// looks here exactly as it does in a tower. Each picture is a
+// <canvas data-sprite> that src/components/Sprite.astro writes; the catalog
+// comes from /help/catalog.json (src/pages/catalog.json.ts).
+import type { Catalog, CatalogFacility } from "../../../src/catalog/catalogTypes";
+import { bindViewKinds } from "../../../src/presentation/viewKinds";
+import { bindViewWorld } from "../../../src/presentation/viewWorld";
+import { drawRoomPortrait, drawTransportPortrait } from "../../../src/render/roomPortrait";
+import type { DrawCtx } from "../../../src/render/sprites";
+import type { FacilityKind, UnitState } from "../../../src/shared/types";
+
+/** The most a picture magnifies the world: three whole game pixels per pixel,
+ *  as the gallery did, stepping down for a room too big for its box. */
+const MAG = 3;
+const BACKGROUND = "#12151d";
+
+interface Picture {
+  canvas: HTMLCanvasElement;
+  ctx: CanvasRenderingContext2D;
+  draw(d: DrawCtx, w: number, h: number): void;
+  visible: boolean;
+}
+
+function pictureOf(canvas: HTMLCanvasElement, facts: (k: FacilityKind) => CatalogFacility): Picture | null {
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return null;
+  const kind = canvas.dataset.sprite as FacilityKind;
+  facts(kind);
+  const span = canvas.dataset.span ? Number(canvas.dataset.span) : null;
+  const pose = {
+    state: (canvas.dataset.state as UnitState | undefined) ?? "occupied",
+    occupants: canvas.dataset.occupants ? Number(canvas.dataset.occupants) : undefined,
+    subtype: canvas.dataset.subtype,
+    floor: canvas.dataset.floor ? Number(canvas.dataset.floor) : undefined,
+  };
+  const draw =
+    span !== null
+      ? (d: DrawCtx, w: number, h: number) => drawTransportPortrait(d, facts, kind, span, 0, 0, w, h, 0, MAG)
+      : (d: DrawCtx, w: number, h: number) => drawRoomPortrait(d, facts, kind, pose, 0, 0, w, h, 0, MAG);
+  return { canvas, ctx, draw, visible: false };
+}
+
+function paint(p: Picture, anim: number): void {
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  const w = p.canvas.clientWidth;
+  const h = p.canvas.clientHeight;
+  if (w < 1 || h < 1) return;
+  if (p.canvas.width !== Math.round(w * dpr) || p.canvas.height !== Math.round(h * dpr)) {
+    p.canvas.width = Math.round(w * dpr);
+    p.canvas.height = Math.round(h * dpr);
+  }
+  p.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  p.ctx.fillStyle = BACKGROUND;
+  p.ctx.fillRect(0, 0, w, h);
+  // Evening, lights on, a garage two-thirds full and a recycling plant filling
+  // up: the moment the gallery showed, when every room has something going on.
+  p.draw({ ctx: p.ctx, lit: true, anim, hour: 19, parkingUse: 0.7, recycleFill: 0.66 }, w, h);
+}
+
+async function start(): Promise<void> {
+  const canvases = [...document.querySelectorAll<HTMLCanvasElement>("canvas[data-sprite]")];
+  if (canvases.length === 0) return;
+  let catalog: Catalog;
+  try {
+    const res = await fetch(canvases[0].dataset.catalog ?? "/help/catalog.json");
+    catalog = (await res.json()) as Catalog;
+    bindViewWorld(catalog.world);
+    bindViewKinds(catalog);
+  } catch (e) {
+    console.error("Help: the room pictures could not read the catalog.", e);
+    return;
+  }
+  const byKind = new Map(catalog.facilities.map((f) => [f.key, f]));
+  const facts = (k: FacilityKind): CatalogFacility => {
+    const f = byKind.get(k);
+    if (!f) throw new Error(`the catalog lists no ${k}`);
+    return f;
+  };
+  const pictures: Picture[] = [];
+  for (const c of canvases) {
+    try {
+      const p = pictureOf(c, facts);
+      if (p) pictures.push(p);
+    } catch (e) {
+      console.error("Help: a room picture could not be drawn.", e);
+    }
+  }
+  const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  for (const p of pictures) paint(p, 0);
+  if (still) return;
+  // Animate only the pictures on screen, so a long page costs nothing for the
+  // rooms scrolled out of view.
+  const seen = new IntersectionObserver((entries) => {
+    for (const e of entries) {
+      const p = pictures.find((q) => q.canvas === e.target);
+      if (p) p.visible = e.isIntersecting;
+    }
+  });
+  for (const p of pictures) seen.observe(p.canvas);
+  const frame = (): void => {
+    const anim = performance.now() / 1000;
+    for (const p of pictures) if (p.visible) paint(p, anim);
+    requestAnimationFrame(frame);
+  };
+  requestAnimationFrame(frame);
+}
+
+void start();

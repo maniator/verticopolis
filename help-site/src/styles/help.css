@@ -95,3 +95,84 @@ mobile-starlight-toc .display-current {
 .title-screen .ts-tag {
   width: min(78vw, 340px);
 }
+
+/* Room pictures, drawn by the game's own painters (src/scripts/sprites.ts). */
+.vc-sprite {
+  margin: 1rem auto;
+  max-width: 40rem;
+}
+.vc-sprite canvas {
+  display: block;
+  width: 100%;
+  background: #12151d;
+  border: 2px solid var(--r-bevel-dark, #000);
+  image-rendering: pixelated;
+}
+.vc-sprite figcaption {
+  font-size: var(--sl-text-sm);
+  color: var(--sl-color-gray-3);
+  margin-top: 0.25rem;
+  text-align: center;
+}
+.vc-sprite-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 14rem), 1fr));
+  gap: 0 1rem;
+}
+.vc-sprite-row .vc-sprite {
+  margin: 0.5rem 0;
+}
+
+/* A room's fact box, beside the article on a wide screen and above it on a
+   phone, the way a wiki shows one. */
+.vc-infobox {
+  border: 2px solid var(--sl-color-gray-5);
+  background: var(--sl-color-gray-7, var(--sl-color-black));
+  padding: 0.75rem;
+  margin: 0 0 1.5rem;
+  font-size: var(--sl-text-sm);
+}
+.vc-infobox .vc-sprite {
+  margin-top: 0.25rem;
+}
+.vc-infobox-title {
+  font-weight: 700;
+  text-align: center;
+  margin: 0;
+}
+.sl-markdown-content .vc-infobox table {
+  display: table;
+  width: 100%;
+  margin: 0;
+  font-size: var(--sl-text-sm);
+}
+.sl-markdown-content .vc-infobox th,
+.sl-markdown-content .vc-infobox td {
+  padding: 0.3rem 0.4rem;
+  vertical-align: top;
+  white-space: pre-line;
+}
+.sl-markdown-content .vc-infobox tbody th {
+  text-align: left;
+  white-space: nowrap;
+}
+@media (min-width: 90rem) {
+  .vc-infobox {
+    float: right;
+    width: 20rem;
+    margin: 0 0 1rem 1.5rem;
+  }
+  .sl-markdown-content h2 {
+    clear: none;
+  }
+}
+
+/* Classic and Modern labels in running text and tables. */
+.vc-mode {
+  display: inline-block;
+  font-size: 0.75em;
+  font-weight: 700;
+  padding: 0 0.4em;
+  border: 1px solid currentColor;
+  vertical-align: 0.1em;
+}

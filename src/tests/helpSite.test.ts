@@ -39,14 +39,16 @@ describe("the side menu", () => {
   it("names only pages that exist", () => {
     const slugs = flatten(sidebar).flatMap((entry) => ("slug" in entry ? [entry.slug] : []));
     expect(slugs.length).toBeGreaterThan(0);
-    for (const slug of slugs) expect(existsSync(resolve(pagesDir, `${slug}.md`)), slug).toBe(true);
+    for (const slug of slugs) expect(existsSync(resolve(pagesDir, `${slug}.md`)) || existsSync(resolve(pagesDir, `${slug}.mdx`)), slug).toBe(true);
   });
 
   it("lists every page but the front page", () => {
     const slugs = new Set(flatten(sidebar).flatMap((entry) => ("slug" in entry ? [entry.slug] : [])));
-    const pages = readdirSync(pagesDir)
-      .filter((f) => f.endsWith(".md") && f !== "index.md")
-      .map((f) => f.replace(/\.md$/, ""));
+    // Every page in every folder, a folder's own index page by the folder's
+    // name (Starlight's slug for rooms/index.mdx is "rooms").
+    const pages = readdirSync(pagesDir, { recursive: true, encoding: "utf8" })
+      .filter((f) => /\.mdx?$/.test(f) && f !== "index.md")
+      .map((f) => f.replace(/\.mdx?$/, "").replace(/\/index$/, ""));
     for (const page of pages) expect(slugs.has(page), page).toBe(true);
   });
 

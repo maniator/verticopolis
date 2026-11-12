@@ -1,0 +1,161 @@
+---
+// A room's fact box, the way a wiki puts one beside an article: the picture,
+// then every number the game uses for it, read from the engine's catalog at
+// build time. Where Classic and Modern differ, the box shows both.
+import type { CatalogFacility, CatalogRent } from "../../../src/catalog/catalogTypes";
+import type { FacilityKind } from "../../../src/shared/types";
+import { catalogs, dollars, facility } from "../lib/catalog";
+import Sprite from "./Sprite.astro";
+
+interface Props {
+  kind: FacilityKind;
+  /** Picture options, passed to the sprite. */
+  state?: "occupied" | "empty" | "asleep";
+  span?: number;
+}
+
+const { kind, state, span } = Astro.props;
+const { classic, modern } = await facility(kind);
+const { classic: classicCatalog, modern: modernCatalog } = await catalogs();
+const inClassic = classic.available;
+
+const CADENCE: Record<string, string> = {
+  quarterly: "a quarter",
+  maintenancePeriod: "a month",
+  sale: "sale",
+  nightly: "a night",
+};
+
+function rent(r: CatalogRent | null): string | null {
+  if (!r) return null;
+  const per = CADENCE[r.cadence];
+  if (r.shape === "ladder") {
+    const rungs = r.rungs.map((x) => `${x.label} ${dollars(x.value)}`).join("\n");
+    return r.cadence === "sale" ? `Sells for:\n${rungs}` : `Per ${per.replace(/^a /, "")}:\n${rungs}`;
+  }
+  const range = `${dollars(r.min)} to ${dollars(r.max)} (starts at ${dollars(r.default)})`;
+  return r.cadence === "sale" ? `Sells for ${range}` : `${range}, ${per}`;
+}
+
+/** Open hours as ranges ("7 AM to 10 PM"). */
+function hours(open: readonly boolean[] | null): string | null {
+  if (!open) return null;
+  const fmt = (h: number) => {
+    const hh = h % 24;
+    if (hh === 0) return "midnight";
+    if (hh === 12) return "noon";
+    return hh < 12 ? `${hh} AM` : `${hh - 12} PM`;
+  };
+  const runs: string[] = [];
+  // Start a run at an open hour after a closed one, wrapping past midnight.
+  for (let h = 0; h < 24; h++) {
+    if (!open[h] || open[(h + 23) % 24]) continue;
+    let end = h;
+    while (open[(end + 1) % 24] && (end + 1) % 24 !== h) end++;
+    runs.push(`${fmt(h)} to ${fmt(end + 1)}`);
+  }
+  if (runs.length === 0) return open.every(Boolean) ? "Always" : null;
+  return runs.join(", ");
+}
+
+function stars(n: number): string {
+  return n <= 1 ? "From the start" : `${n}★`;
+}
+
+function size(f: CatalogFacility): string {
+  if (f.transport) return `${f.width} tiles wide`;
+  return `${f.width} tiles wide, ${f.floors} floor${f.floors === 1 ? "" : "s"} tall`;
+}
+
+function limit(f: CatalogFacility, mode: "classic" | "modern"): string | null {
+  const pools = (mode === "classic" ? classicCatalog : modernCatalog).pools;
+  const pool = f.pool ? pools.find((p) => p.key === f.pool) : null;
+  if (pool) return `${pool.cap} ${pool.label} in all`;
+  return f.buildCap ? `${f.buildCap} per tower` : null;
+}
+
+function people(f: CatalogFacility): string | null {
+  if (f.carCapacity) return `${f.carCapacity} riders a car, up to ${f.maxCars} cars`;
+  if (f.attendance) return `${f.attendance} seats`;
+  if (!f.population) return null;
+  if (f.maxHousehold) return `A household of up to ${f.maxHousehold}`;
+  if (f.hotel) return `${f.population} guest${f.population === 1 ? "" : "s"}`;
+  if (f.commercial) return `${f.population} customers at a time`;
+  return `${f.population} ${f.category === "office" ? "workers" : f.population === 1 ? "person" : "people"}`;
+}
+
+function income(f: CatalogFacility): string | null {
+  const r = rent(f.rent);
+  if (r) return r;
+  if (f.dailyIncome) return `About ${dollars(f.dailyIncome)} on a good day${f.spendPerCustomer ? ` (${dollars(f.spendPerCustomer)} a customer)` : ""}`;
+  return null;
+}
+
+function upkeep(f: CatalogFacility): string | null {
+  return f.upkeepMonthly ? `${dollars(f.upkeepMonthly)} a month` : null;
+}
+
+function travel(f: CatalogFacility): string | null {
+  if (!f.transport) return null;
+  if (f.fixedSpan) return "2 floors";
+  return f.maxSpan ? `Up to ${f.maxSpan} floors` : null;
+}
+
+function where(f: CatalogFacility): string | null {
+  if (f.basement) return "Underground only";
+  if (f.noBasement) return "Above ground only";
+  return null;
+}
+
+type Row = { label: string; classic: string | null; modern: string | null };
+const rows: Row[] = [
+  { label: "Size", classic: size(classic), modern: size(modern) },
+  { label: "Price", classic: dollars(classic.cost), modern: dollars(modern.cost) },
+  { label: "Unlocks", classic: stars(classic.minStar), modern: stars(modern.minStar) },
+  { label: "Holds", classic: people(classic), modern: people(modern) },
+  { label: "Earns", classic: income(classic), modern: income(modern) },
+  { label: "Upkeep", classic: upkeep(classic), modern: upkeep(modern) },
+  { label: "Open", classic: hours(classic.openHours), modern: hours(modern.openHours) },
+  { label: "Travels", classic: travel(classic), modern: travel(modern) },
+  { label: "Limit", classic: limit(classic, "classic"), modern: limit(modern, "modern") },
+  { label: "Where", classic: where(classic), modern: where(modern) },
+  { label: "Sells back for", classic: classic.resaleRefund ? dollars(classic.resaleRefund) : null, modern: modern.resaleRefund ? dollars(modern.resaleRefund) : null },
+].filter((r) => (inClassic ? r.classic : null) || r.modern);
+---
+
+<aside class="vc-infobox" aria-label={`${modern.name} at a glance`}>
+  <p class="vc-infobox-title">{modern.name}</p>
+  <Sprite kind={kind} state={state} span={span} caption={inClassic ? "In both modes" : "Modern only"} />
+  <table>
+    {
+      inClassic && (
+        <thead>
+          <tr>
+            <th scope="col"></th>
+            <th scope="col">Classic</th>
+            <th scope="col">Modern</th>
+          </tr>
+        </thead>
+      )
+    }
+    <tbody>
+      {
+        rows.map((r) => (
+          <tr>
+            <th scope="row">{r.label}</th>
+            {inClassic && r.classic === r.modern ? (
+              <td colspan="2">{r.modern ?? "None"}</td>
+            ) : inClassic ? (
+              <>
+                <td>{r.classic ?? "None"}</td>
+                <td>{r.modern ?? "None"}</td>
+              </>
+            ) : (
+              <td>{r.modern}</td>
+            )}
+          </tr>
+        ))
+      }
+    </tbody>
+  </table>
+</aside>

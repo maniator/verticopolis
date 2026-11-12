@@ -1,0 +1,53 @@
+---
+// A room or a shaft as the game draws it, animated, with a caption. The
+// picture is painted in the browser by src/scripts/sprites.ts with the game's
+// own painters; the box is sized here from the engine's catalog so the page
+// does not jump when the picture arrives.
+import { FLOOR } from "../../../src/render/scale";
+import type { FacilityKind, UnitState } from "../../../src/shared/types";
+import { facility } from "../lib/catalog";
+
+interface Props {
+  kind: FacilityKind;
+  caption?: string;
+  state?: UnitState;
+  subtype?: string;
+  /** A lobby's floor (1 is the ground concourse, anything else a sky lobby). */
+  floor?: number;
+  occupants?: number;
+  /** For a shaft: the floors of travel to draw. */
+  span?: number;
+  /** A smaller picture, for a row of variants. */
+  small?: boolean;
+}
+
+const { kind, caption, state, subtype, floor, occupants, span, small = false } = Astro.props;
+const { modern } = await facility(kind);
+const floors = span !== undefined ? span + 1 : (modern.floors ?? 1);
+// The tallest whole magnification that keeps the picture under a set height,
+// the same steps the painters take (three for a one-floor room).
+const budget = small ? 150 : 210;
+const mag = Math.max(1, Math.min(3, Math.floor(budget / (floors * FLOOR))));
+const height = floors * FLOOR * mag + 16;
+const label = caption ?? (subtype ? `${modern.name}: ${subtype}` : modern.name);
+const catalogUrl = `${import.meta.env.BASE_URL.replace(/\/$/, "")}/catalog.json`;
+---
+
+<figure class:list={["vc-sprite", { "vc-sprite-small": small }]}>
+  <canvas
+    data-sprite={kind}
+    data-state={state}
+    data-subtype={subtype}
+    data-floor={floor}
+    data-occupants={occupants}
+    data-span={span}
+    data-catalog={catalogUrl}
+    style={`height:${height}px`}
+    role="img"
+    aria-label={`${label}, as drawn in the game`}></canvas>
+  <figcaption>{label}</figcaption>
+</figure>
+
+<script>
+  import "../scripts/sprites";
+</script>

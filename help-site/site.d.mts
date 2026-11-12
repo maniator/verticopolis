@@ -1,6 +1,7 @@
 // Types for site.mjs, for the TypeScript test that reads it
 // (src/tests/helpSite.test.ts).
 export const HELP_BASE: string;
+export const ENGINE_DOCS: string;
 export const GITHUB_ISSUES: string;
 export const OG_IMAGE_ALT: string;
 export const sharedHead: { tag: string; attrs: Record<string, string> }[];

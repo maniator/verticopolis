@@ -4,6 +4,10 @@
 /** The site's path on verticopolis.com. */
 export const HELP_BASE = "/help";
 
+/** The engine developer docs (docs/engine-site), for players who want the
+ *  rules as code. */
+export const ENGINE_DOCS = "https://docs.verticopolis.com/";
+
 export const GITHUB_ISSUES = "https://github.com/maniator/verticopolis/issues/new/choose";
 
 /** The share card's alt text, the same words as OG_IMAGE_ALT in the game's
@@ -36,20 +40,23 @@ export const sharedHead = [
 export const sidebar = [
   { label: "How to Play", link: "/" },
   {
+    label: "Getting started",
+    items: [{ slug: "getting-started" }, { slug: "classic-vs-modern" }, { slug: "phones" }, { slug: "keyboard" }],
+  },
+  {
+    label: "Rooms",
+    items: [{ slug: "rooms/offices" }],
+  },
+  {
     label: "Guides",
-    items: [
-      { slug: "getting-started" },
-      { slug: "going-further" },
-      { slug: "classic-vs-modern" },
-      { slug: "phones" },
-      { slug: "keyboard" },
-    ],
+    items: [{ slug: "going-further" }],
   },
   {
     label: "More",
     items: [
       { label: "Release notes", link: "/changelog/" },
       { label: "Sprite gallery", link: "/../gallery" },
+      { label: "Engine docs", link: ENGINE_DOCS, attrs: { target: "_blank", rel: "noopener noreferrer" } },
       { label: "Report a problem", link: GITHUB_ISSUES, attrs: { target: "_blank", rel: "noopener noreferrer" } },
       { slug: "privacy" },
     ],

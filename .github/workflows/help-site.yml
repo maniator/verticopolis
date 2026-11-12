@@ -15,6 +15,14 @@ on:
       - "src/public/favicon.png"
       - "src/public/icon-1024x1024.png"
       - "src/ui/fromGame.ts"
+      - "src/render/**"
+      - "src/presentation/**"
+      - "src/catalog/**"
+      - "src/dualrun/catalog.ts"
+      - "src/shared/**"
+      - "engine-rs/src/**"
+      - "scripts/build-engine-wasm.sh"
+      - ".github/actions/engine-wasm/**"
       - "src/telemetry.ts"
       - "src/analytics*.ts"
       - "src/appVersion.ts"
@@ -39,8 +47,8 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      # The header imports a few game modules, which need the game's own
-      # packages; the site has its own npm project beside them.
+      # The header and the room pictures import game modules, which need the
+      # game's own packages; the site has its own npm project beside them.
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: ".nvmrc"
@@ -51,6 +59,10 @@ jobs:
 
       - name: Game dependencies
         run: npm ci --no-audit --no-fund
+
+      # The room pages read prices, sizes and limits from the engine's
+      # catalog at build time, and draw rooms with the game's painters.
+      - uses: ./.github/actions/engine-wasm
 
       - name: Site dependencies
         run: npm ci --prefix help-site --no-audit --no-fund

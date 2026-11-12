@@ -1,0 +1,55 @@
+---
+title: Offices
+description: How offices earn rent, what their workers need, and how to keep them from moving out, in Classic and Modern.
+---
+
+import RoomInfo from "../../../components/RoomInfo.astro";
+import Sprite from "../../../components/Sprite.astro";
+
+<RoomInfo kind="office" />
+
+Offices are where most towers find their feet. They are cheap to build, they fill quickly, and every one of them sends a check at the end of each quarter. Six people work in each office, and from nine to five your elevators belong to them.
+
+## How an office pays you
+
+An office pays **rent once a quarter**. You set the price when you inspect the office, and the tenant pays it as long as they stay. In Classic you choose a rung on the old four-step ladder (Very Low, Low, Average or High). In Modern you slide the price anywhere in a band, in steps of $1,000.
+
+How long a quarter lasts depends on the calendar. Classic always runs the 1994 calendar, where a quarter is three days and the full rent arrives every quarter. A Modern tower can run the real-world calendar, where a quarter is 90 days, or the old one, where the rent is cut down to match the short quarter. See [Calendar and clock](/help/tower/clock/) for the details.
+
+Offices also bring customers. Each office worker is good for about $30 a day of lunches and errands, so a floor of busy offices is what keeps a [Fast Food](/help/rooms/food-and-shops/) or a [Retail Shop](/help/rooms/food-and-shops/) in business.
+
+<Sprite kind="office" state="empty" caption="An office waiting for a tenant" />
+
+## What office workers want
+
+Every office has a rating, which you can see by inspecting it, or for the whole tower at once on the Map's **Eval** view. A tenant whose rating falls all the way gives two days' notice and then leaves. If you fix the problem in time and the rating climbs back to 40 percent, they tear up the notice and stay.
+
+Here is what wears an office down:
+
+| Problem | What to do about it |
+| --- | --- |
+| No way to reach a lobby | Every office floor needs an elevator, stairs or an escalator that leads back to the ground [lobby](/help/building/floors-and-lobbies/). An office with no route starts losing patience every hour. |
+| Long waits for the elevator | Add cars or another shaft. See [Elevators](/help/building/elevators/). |
+| Rent set too high | Anything over the default price chips away at the rating a little every hour. Lower it, or make the office happy enough in other ways to carry the price. |
+| Too far from a stair or elevator | An office more than 79 tiles from the nearest stairway, escalator or passenger elevator is held to a middling rating. Put a shaft nearer. |
+| A noisy neighbor | Shops, restaurants, theaters and other noisy venues within 11 tiles on the same floor bother an office. A lobby between them blocks the noise. See [Tenant ratings](/help/tower/ratings/). |
+| Too far from a lobby | More than 7 floors from a lobby or [sky lobby](/help/building/floors-and-lobbies/) caps the rating, and past 11 floors it starts to slide. |
+| Too few shops in reach | Workers want somewhere to eat and shop. If the shops they can reach could serve fewer than half of them, the rating is capped. |
+| No parking | From three stars, offices want parking. See [Services](/help/rooms/services/). |
+
+<span class="vc-mode">Classic</span> A noisy neighbor holds an office down but never drives it out on its own, as in the original game. Parking is all or nothing: any space left over once the hotel suites have parked serves every office.
+
+<span class="vc-mode">Modern</span> Noise keeps wearing at a rating until the tenant leaves. Offices count parking properly: one space for every 24 workers, the lowest offices served first, and a working [Metro](/help/rooms/services/) halves what they need.
+
+## Tips
+
+- Build offices low, near the lobby, while the tower is young. They are the cheapest rooms to keep happy.
+- Keep restaurants and shops off office floors, or put a stretch of lobby between them.
+- When a block of offices goes quiet, open the Map's **Pricing** view. A row of High prices is often the reason.
+- Use **Set all offices** on the office card to change every office's rent at once.
+
+## See also
+
+- [Money](/help/tower/money/) for how the quarter's rent lands in your books
+- [People and traffic](/help/tower/people/) for the morning and evening rush
+- [Stars and the TOWER](/help/tower/stars/) for how population earns stars
