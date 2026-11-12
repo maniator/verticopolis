@@ -79,13 +79,15 @@ function announceHelp(ui: UI, text: string): void {
   else set();
 }
 
-/** An empty, visually hidden status line at the end of a Help dialog. */
+/** An empty, visually hidden status line just above a Help dialog's buttons.
+ *  The buttons stay the box's last child, which the sticky footer's cover
+ *  under them depends on (src/styles/game/dialogs.css). */
 function addStatusLine(box: HTMLElement): void {
   const p = document.createElement("p");
   p.className = "visually-hidden";
   p.setAttribute("role", "status");
   p.setAttribute(HELP_STATUS_ATTR, "");
-  box.appendChild(p);
+  box.insertBefore(p, box.querySelector(":scope > .modal-actions"));
 }
 
 /** The game marks the active speed button; when the Pause button stops being
@@ -262,11 +264,14 @@ export function showCompare(ui: UI): void {
  * Classic vs Modern section in a new tab and holds the pause until the player
  * is back; in the installed app it opens the in-game comparison.
  */
-export function showModeHelp(ui: UI): void {
+export function showModeHelp(ui: UI, e?: MouseEvent): void {
   if (isInstalledStandalone()) {
     showCompare(ui);
     return;
   }
+  // A Ctrl or Cmd click opens the page in a background tab and the player
+  // stays here, so the tower keeps running.
+  const background = !!e && (e.ctrlKey || e.metaKey);
   const tab = window.open(fromGameHref("/help#classic-vs-modern"), "_blank");
   if (!tab) {
     // A blocked pop-up: show the same comparison in the game instead.
@@ -279,6 +284,7 @@ export function showModeHelp(ui: UI): void {
     // Read-only in some hosts; the page never uses it either way.
   }
   trackAppAction("compare_open");
+  if (background) return;
   const pause = helpPause(ui);
   pause.begin();
   pause.untilReturn({ win: window, doc: document });

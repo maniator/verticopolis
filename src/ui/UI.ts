@@ -202,7 +202,7 @@ export class UI {
     document.getElementById("btn-new")!.addEventListener("click", () => this.promptNewTower());
     document.getElementById("btn-settings")!.addEventListener("click", () => this.showSettings());
     document.getElementById("btn-help")!.addEventListener("click", () => this.showHelpMenu());
-    this.el.modeBadge.addEventListener("click", () => help.showModeHelp(this)); // "tell me more"
+    this.el.modeBadge.addEventListener("click", (e) => help.showModeHelp(this, e)); // "tell me more"
     document.getElementById("btn-stats")!.addEventListener("click", () => this.cb.onShowStats());
 
     this.el.towerName.addEventListener("change", () => {

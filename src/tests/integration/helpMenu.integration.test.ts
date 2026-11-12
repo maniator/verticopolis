@@ -205,6 +205,41 @@ describe("the Help menu", () => {
     expect(speed.onSpeed).toHaveBeenCalledTimes(2);
   });
 
+  it("keeps each Help window's buttons last, under the status line, so the sticky footer covers below them", async () => {
+    const lastIsFooter = () => {
+      const box = inDialog<HTMLElement>(".modal-box");
+      expect(box.lastElementChild?.classList.contains("modal-actions")).toBe(true);
+      expect(box.querySelector(":scope > [data-help-status]")).not.toBeNull();
+    };
+    const { ui } = openMenu(2);
+    lastIsFooter();
+    inDialog<HTMLButtonElement>('[data-act="about"]').click();
+    lastIsFooter();
+    inDialog<HTMLButtonElement>('[data-act="close"]').click();
+    ui.showHelpMenu();
+    inDialog<HTMLButtonElement>('[data-act="whats-new"]').click();
+    await vi.waitFor(() => expect(inDialog("h2").textContent).toContain("What's new"));
+    lastIsFooter();
+    inDialog<HTMLButtonElement>('[data-act="close"]').click();
+    ui.showHelp();
+    lastIsFooter();
+    inDialog<HTMLButtonElement>('[data-act="close"]').click();
+    ui.showCompare();
+    lastIsFooter();
+  });
+
+  it("keeps the guide open on a Ctrl click on its full help page link", () => {
+    const speed = speedAt(3);
+    const { ui } = makeUI({ getSpeed: speed.getSpeed, onSpeed: speed.onSpeed });
+    ui.showHelp();
+    const a = inDialog<HTMLAnchorElement>('a[data-act="open-help"]');
+    a.addEventListener("click", (e) => e.preventDefault());
+    a.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, ctrlKey: true }));
+    expect(dialog().open).toBe(true);
+    inDialog<HTMLButtonElement>('[data-act="close"]').click();
+    expect(speed.now()).toBe(3);
+  });
+
   it("marks the page links as opened by the game", () => {
     openMenu();
     expect(inDialog('a[data-act="release-notes"]').getAttribute("href")).toBe("/help/changelog?from=game");

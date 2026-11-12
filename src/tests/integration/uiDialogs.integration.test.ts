@@ -3477,6 +3477,20 @@ describe("Compare modal (showCompare) pauses the tower and restores speed", () =
     open.mockRestore();
   });
 
+  it("leaves the tower running on a Ctrl or Cmd click on the mode badge, which opens a background tab", () => {
+    for (const mod of [{ ctrlKey: true }, { metaKey: true }]) {
+      document.body.innerHTML = "";
+      mountAppDom();
+      const open = vi.spyOn(window, "open").mockReturnValue({ opener: {} } as unknown as Window);
+      const { onSpeed, getSpeed } = speedAt(2);
+      makeUI({ getSpeed, onSpeed });
+      document.getElementById("btn-mode")!.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, ...mod }));
+      expect(open).toHaveBeenCalledWith("/help?from=game#classic-vs-modern", "_blank");
+      expect(onSpeed).not.toHaveBeenCalled();
+      open.mockRestore();
+    }
+  });
+
   it("falls back to the in-game comparison when the browser blocks the new tab", () => {
     const open = vi.spyOn(window, "open").mockReturnValue(null);
     makeUI();
