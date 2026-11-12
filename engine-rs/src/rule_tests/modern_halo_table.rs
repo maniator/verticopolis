@@ -78,6 +78,33 @@ fn classic_has_no_halos() {
     }
 }
 
+#[test]
+fn a_family_scaled_halo_fades_over_its_own_reach_from_its_own_maximum() {
+    let modern = GameMode::Modern;
+    let daycare = *modern.halo_of(Kind::Daycare).expect("listed");
+    for d in [0.0, 1.0, 2.5, 3.0, 4.0, 6.0] {
+        for family in [1.0, 2.0, 3.0, 5.0] {
+            assert_eq!(
+                modern.halo_strength(&daycare, d, family),
+                modern.daycare_family_bonus(d, family),
+                "the table's daycare at d {d}, family {family}"
+            );
+        }
+    }
+    let mut wider = daycare;
+    wider.floors = 8.0;
+    wider.max = 0.07;
+    let at = |d: f64, family: f64| modern.halo_strength(&wider, d, family);
+    assert!((at(5.0, 5.0) - 0.07 * (1.0 - 5.0 / 8.0)).abs() < 1e-12);
+    assert!(
+        (at(0.0, 2.0) - 0.07 * 0.4).abs() < 1e-12,
+        "the smallest family's share"
+    );
+    assert_eq!(at(8.0, 5.0), 0.0, "none at its reach");
+    assert_eq!(at(0.0, 1.0), 0.0, "none without a family");
+    assert_eq!(GameMode::Classic.halo_strength(&wider, 0.0, 5.0), 0.0);
+}
+
 /// A content condo of five on floor 3 with each `(venue, floor)` built and
 /// open: its inspector's amenity fact.
 fn amenity_near(mode: GameMode, venues: &[(Kind, i64)]) -> Option<(&'static str, f64)> {

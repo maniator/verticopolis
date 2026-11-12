@@ -4,6 +4,7 @@
 //! holds to this table), the catalog publishes them for the placement range
 //! rings, and the inspector names the amenity helping a room. Classic has none.
 
+use super::amenities::daycare_family_share;
 use super::{
     AMENITY_CAP_LIFT_MAX, DAYCARE_HALO_FLOORS, DAYCARE_HALO_MAX, FITNESS_HALO_FLOORS,
     FITNESS_HALO_MAX, NIGHTCLUB_NOISE_FLOORS, NIGHTCLUB_NOISE_MAX, SPA_SERENITY_FLOORS,
@@ -127,12 +128,14 @@ impl GameMode {
 
     /// The hourly bonus or drain `halo` gives a room `d` floors from its
     /// venue whose household is `family_size` (read only by a family-scaled
-    /// halo): the same values the hourly step applies.
+    /// halo): the same values the hourly step applies, faded over the
+    /// halo's own `floors` from its own `max`.
     pub fn halo_strength(self, halo: &Halo, d: f64, family_size: f64) -> f64 {
+        let strength = self.halo(d, halo.floors, halo.max);
         if halo.family_scaled {
-            self.daycare_family_bonus(d, family_size)
+            strength * daycare_family_share(family_size)
         } else {
-            self.halo(d, halo.floors, halo.max)
+            strength
         }
     }
 }

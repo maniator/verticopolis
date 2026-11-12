@@ -48,17 +48,7 @@ impl GameMode {
     }
 
     pub fn daycare_family_bonus(self, d: f64, family_size: f64) -> f64 {
-        if self == GameMode::Classic || !(0.0..DAYCARE_HALO_FLOORS).contains(&d) {
-            return 0.0;
-        }
-        let smallest = HOUSEHOLD_SIZES[0] as f64;
-        if family_size < smallest {
-            return 0.0;
-        }
-        let growth = (family_size - smallest) / (MAX_HOUSEHOLD as f64 - smallest);
-        let family_factor =
-            DAYCARE_SMALLEST_FAMILY_SHARE + (1.0 - DAYCARE_SMALLEST_FAMILY_SHARE) * growth.min(1.0);
-        DAYCARE_HALO_MAX * (1.0 - d / DAYCARE_HALO_FLOORS) * family_factor
+        self.halo(d, DAYCARE_HALO_FLOORS, DAYCARE_HALO_MAX) * daycare_family_share(family_size)
     }
 
     /// How far an amenity whose bonus here is `bonus` (out of its full-strength
@@ -70,4 +60,16 @@ impl GameMode {
         }
         AMENITY_CAP_LIFT_MAX * (bonus / bonus_max).min(1.0)
     }
+}
+
+/// The share of the daycare's bonus a household of `family_size` feels:
+/// none without a family, [`DAYCARE_SMALLEST_FAMILY_SHARE`] for the
+/// smallest, rising in equal steps to the whole bonus for the largest.
+pub(super) fn daycare_family_share(family_size: f64) -> f64 {
+    let smallest = HOUSEHOLD_SIZES[0] as f64;
+    if family_size < smallest {
+        return 0.0;
+    }
+    let growth = (family_size - smallest) / (MAX_HOUSEHOLD as f64 - smallest);
+    DAYCARE_SMALLEST_FAMILY_SHARE + (1.0 - DAYCARE_SMALLEST_FAMILY_SHARE) * growth.min(1.0)
 }
