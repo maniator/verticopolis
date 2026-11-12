@@ -145,7 +145,7 @@ export const FACILITY_PRESENTATION: Readonly<Record<FacilityKind, FacilityPresen
   },
   recycling: {
     color: "#7f9f5f",
-    description: "Basement facility that fills with the tower's daily waste: one center processes ~2,500 population; build more as you grow. A garbage truck collects each morning. 4★ requires demand met.",
+    description: "Basement facility that fills with the tower's daily waste: one center processes ~2,500 population; build more as you grow. A garbage truck collects each morning. From 3★, too little capacity lowers tenant ratings, and 4★ requires demand met.",
   },
   metro: {
     color: "#9f7f5f",

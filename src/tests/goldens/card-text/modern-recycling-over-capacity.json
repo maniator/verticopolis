@@ -2,7 +2,7 @@
   "case": "recycling over capacity",
   "mode": "modern",
   "units": [
-    {"id":4862,"kind":"recycling","floor":-1,"lines":["Fill: 9%. Truck collects each morning.","Over capacity: 2,592 population vs 2,500 processed. Build another center (4★ requires demand met)."]},
+    {"id":4862,"kind":"recycling","floor":-1,"lines":["Fill: 9%. Truck collects each morning.","Over capacity: 2,592 population vs 2,500 processed. Build another center: tenant ratings fall while trash piles up, and 4★ requires demand met."]},
     {"id":4863,"kind":"office","floor":2,"lines":["Access: reachable from the lobby."]},
     {"id":4864,"kind":"office","floor":2,"lines":["Access: reachable from the lobby."]},
     {"id":4865,"kind":"office","floor":2,"lines":["Access: reachable from the lobby."]},

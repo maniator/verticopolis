@@ -80,6 +80,22 @@ describe("Rust port tenant explanations", () => {
     expect(render(record)).toContain("Reconnect your retail");
   });
 
+  it("names a recycling or parking shortfall with the coverage the port sends (#1970)", () => {
+    const trash = render(facts({
+      gripe: 1,
+      gripeCause: code("vacateReasons", "trash"),
+      gripeCoverage: 0.625,
+    }));
+    expect(trash).toContain("Main gripe: trash piling up: recycling handles 62% of the tower. Build another Recycling Center.");
+    const parking = render(facts({
+      gripe: 1,
+      gripeCause: code("vacateReasons", "parking"),
+      gripeCoverage: 0,
+    }));
+    expect(parking).toContain("Main gripe: too little parking: the spaces left after hotel suites cover 0% of the office workers.");
+    expect(render(facts({ gripe: 1, gripeCause: code("vacateReasons", "parking") }))).toContain("cover too little of the office workers");
+  });
+
   it("shows lobby placement fixes and No Rate from the port's flags", () => {
     const rendered = render(facts({
       noRate: code("noRateLines", "occupied"),

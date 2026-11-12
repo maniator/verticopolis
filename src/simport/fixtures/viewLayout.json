@@ -1,5 +1,5 @@
 {
-  "version": 16,
+  "version": 17,
   "header": {
     "minutes": 0,
     "towerRevision": 1,
@@ -759,7 +759,9 @@
     "transportFar",
     "lobbyFar",
     "unmetDemand",
-    "relocation"
+    "relocation",
+    "trash",
+    "parking"
   ],
   "evalTiers": [
     "unrated",

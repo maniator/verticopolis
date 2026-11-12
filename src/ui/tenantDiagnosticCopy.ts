@@ -17,6 +17,12 @@ export interface GripeCopyFacts {
   floorReachable?: boolean;
 }
 
+/** A service coverage (0 to 1) as a whole percent, or "too little" when the
+ *  engine sent none (an absent slot decodes as NaN). */
+function shareOf(coverage: number | null | undefined): string {
+  return typeof coverage === "number" && Number.isFinite(coverage) ? `${Math.floor(coverage * 100)}%` : "too little";
+}
+
 export function gripeCopy(f: GripeCopyFacts): string | undefined {
   if (f.cause === "rent") return "the rent is above the going rate. Lower it to keep them.";
   if (f.cause === "noise") {
@@ -55,6 +61,12 @@ export function gripeCopy(f: GripeCopyFacts): string | undefined {
         : undefined;
     }
     return "too few shops and restaurants for the tower's crowds. Add venues on any connected floor: retail is shared tower-wide.";
+  }
+  if (f.cause === "trash") {
+    return `trash piling up: recycling handles ${shareOf(f.coverage)} of the tower. Build another Recycling Center.`;
+  }
+  if (f.cause === "parking") {
+    return `too little parking: the spaces left after hotel suites cover ${shareOf(f.coverage)} of the office workers. Add parking spaces chained to a ramp.`;
   }
   // Access, long walk and lobby distance use dedicated diagnostic lines.
   return undefined;

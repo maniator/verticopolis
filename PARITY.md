@@ -26,7 +26,9 @@ abstraction · ⬜ not present.
 - ✅ Cinema and Party Hall, both two-story rooms (guests enter on the lower floor); evening crowds
 - ✅ Services: Security, Medical Center, Housekeeping, Recycling Center, Parking
 - ✅ Recycling Center **fills daily** with the tower's garbage (one center per ~2,500 population; a pre-dawn garbage truck empties them). 4★ requires demand MET, not merely built
-- ✅ Parking demand: offices want a space per ~12 workers from 3★; **every hotel suite needs a space of its own** (the VIP won't review without it); cars visibly fill the garage with real usage
+- ✅ **Too little recycling lowers ratings from 3★** (#1970): in Classic, any shortfall drains every rated tenant (offices, condos, hotel rooms, rentals) to red until it is fixed; in Modern, a tower up to one center short holds those ratings at Good, and a bigger shortfall drains them
+- ✅ Parking demand: offices want a space per ~24 workers from 3★ (the statistics count); **every hotel suite needs a space of its own** (the VIP won't review without it); cars visibly fill the garage with real usage
+- ✅ **Offices without parking lose their rating from 3★** (#1970): in Classic, offices drain to red only when no space is left once the occupied suites take theirs (real 5★ towers saved by the original park far fewer workers than any ratio, so Classic counts none); in Modern, the lowest offices are parked first and the rest hold at Good, draining once coverage falls under half. Distance to parking waits on a PC check (#1524)
 - ✅ Metro Station (whole-floor deep basement; brings visitors)
 - ✅ Wedding Hall on floor 100, 28 wide and five floors tall with a tapering steeple (religion-agnostic stand-in for the Cathedral)
 
@@ -49,7 +51,7 @@ abstraction · ⬜ not present.
 ## Population, stress & ratings
 - ✅ Population from offices/condos/hotels; weekday/weekend + rush-hour cycle
 - ✅ **Individually-routed commuters**: real people walk to a shaft, wait, board an actual car, transfer at sky lobbies and arrive (BFS over the transport network)
-- ✅ Tenant stress from real elevator waits (visible commuter frustration) on top of an aggregate congestion backstop → low-satisfaction tenants move out
+- ◑ Tenant stress from elevator crowding: the aggregate congestion model lowers ratings and low-satisfaction tenants move out, but the real waits of routed commuters (the red crowds) do not yet feed a tenant's rating (#1971)
 - ✅ **Two-ride rule has teeth:** a floor more than two rides from the lobby (one sky-lobby transfer) draws no visitors. Its shops/food/cinema earn **no** traffic income, not just a warning, so late-game transport layout is a real economic puzzle
 - ✅ Crowds tint red when they've waited too long / transport is overwhelmed (the original's visual cue)
 - ✅ Star thresholds: 2★ 300 · 3★ 1,000 · 4★ 5,000 · 5★ 10,000
@@ -94,7 +96,7 @@ abstraction · ⬜ not present.
 - ✅ Mobile: responsive layout, touch pan/pinch, drawer panels
 
 ## Deliberate divergences
-- Commuters are **individually pathfound** (walk → wait → ride a real car → transfer → arrive) and their waiting drives stress, but a lightweight **aggregate** congestion model still runs underneath as the deterministic, DOM-free backbone the headless tests assert against. The visible crowd is capped (~140 on screen) for performance rather than rendering the entire population at once.
+- Commuters are **individually pathfound** (walk → wait → ride a real car → transfer → arrive), but their waits do not yet feed tenant ratings (#1971), and a lightweight **aggregate** congestion model still runs underneath as the deterministic, DOM-free backbone the headless tests assert against. The visible crowd is capped (~140 on screen) for performance rather than rendering the entire population at once.
 - The **Cathedral** is a religion-agnostic **Wedding Hall**.
 - The population census counts **occupants**: office workers + condo residents (hotel guests count up through 4★, then drop out); shops, restaurants and fast food count the customers inside them (up to their capacity, minus hotel guests once the census is occupants-only), while cinemas and party halls count nobody. The **TOWER** goal is the canonical **15,000**, kept reachable by the canon **375-tile** buildable lot width (the 1994 map is 375 segments wide; a well-zoned 100-floor tower measures well over 15,000 occupants).
 - Optional **rule-set** chosen when a tower is founded and fixed for its life: **Classic** is the pixel-faithful 1994 game; **Modern** adds what the original couldn't; today that means *variant households* (a condo sells to a 2–5 person family, weighted to a mean of 3 so the star ladder is unchanged, that scales its price and how demanding it is) and a *calendar choice* (the compressed 1994 calendar or a real-world-length one). Classic always runs the canon calendar. Saves with no mode load as Classic, and a Modern save with no calendar choice loads real-world-length.
