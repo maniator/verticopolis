@@ -166,3 +166,96 @@ fn a_sold_condo_stays_when_the_buy_back_is_out_of_reach() {
     assert!(sim.tower.get_unit(id).is_some());
     assert_eq!(sim.money, 100_000.0);
 }
+
+/// The id of the floor tile at `floor`, `x`.
+fn floor_tile(sim: &Simulation, floor: i64, x: i64) -> i64 {
+    let u = sim.tower.unit_at(floor, x).unwrap();
+    assert_eq!(u.kind, Kind::Floor, "floor {floor}, x {x}");
+    u.id
+}
+
+#[test]
+fn classic_refuses_a_floor_tile_with_floor_on_both_sides() {
+    // Owner ruling, 2026-11-12: a gap in the middle of a Classic story
+    // leaves the story above unbuildable across it. Floor 4 is the top
+    // story, so the story-above rule does not apply; floor 0 is a basement.
+    for floor in [4, 0, -1] {
+        let mut sim = tower_in(GameMode::Classic);
+        let mid = floor_tile(&sim, floor, 50);
+        let money = sim.money;
+        assert_eq!(
+            sim.remove_facility(mid, RemovalMethod::Bulldoze),
+            ChargeResult::refuse(crate::tower::MID_FLOOR_GAP),
+            "floor {floor}"
+        );
+        assert_eq!(
+            sim.remove_facility(mid, RemovalMethod::Sell),
+            ChargeResult::refuse(crate::tower::MID_FLOOR_GAP),
+            "floor {floor}"
+        );
+        assert!(sim.tower.get_unit(mid).is_some());
+        assert_eq!(sim.money, money);
+        assert!(!sim.sell_at(floor, 50));
+        assert!(sim.tower.unit_at(floor, 50).is_some());
+    }
+}
+
+#[test]
+fn classic_bulldozes_a_floor_from_either_end_inward() {
+    let mut sim = tower_in(GameMode::Classic);
+    for x in [119, 118, 10, 11] {
+        let id = floor_tile(&sim, 4, x);
+        assert!(sim.remove_facility(id, RemovalMethod::Bulldoze).ok, "x {x}");
+        assert!(sim.tower.unit_at(4, x).is_none());
+    }
+    // The tile next to the new end now has floor on one side only.
+    let id = floor_tile(&sim, 4, 117);
+    assert!(sim.remove_facility(id, RemovalMethod::Bulldoze).ok);
+}
+
+#[test]
+fn the_story_above_still_comes_first_in_classic() {
+    let mut sim = tower_in(GameMode::Classic);
+    let id = floor_tile(&sim, 3, 50);
+    assert_eq!(
+        sim.remove_facility(id, RemovalMethod::Bulldoze)
+            .reason
+            .as_deref(),
+        Some("Remove the story above first. Floors can't hang in midair.")
+    );
+}
+
+#[test]
+fn modern_bulldozes_a_floor_tile_in_the_middle() {
+    // Through a save and a load, so a loaded Modern tower keeps its rule.
+    let sim = tower_in(GameMode::Modern);
+    let mut sim = crate::load_stream::load_save_text(sim.save_text().as_bytes()).unwrap();
+    assert_eq!(sim.tower.mode, GameMode::Modern);
+    for floor in [4, 0, -1] {
+        let id = floor_tile(&sim, floor, 50);
+        assert!(
+            sim.remove_facility(id, RemovalMethod::Bulldoze).ok,
+            "floor {floor}"
+        );
+        assert!(sim.tower.unit_at(floor, 50).is_none());
+    }
+}
+
+#[test]
+fn a_saved_classic_gap_loads_as_it_was_and_can_be_filled() {
+    // A Classic tower saved before the rule may hold a gap. It loads with
+    // the gap (nothing is laid or charged on load), the gap still blocks the
+    // story above, and the Floor tool fills it.
+    let mut sim = tower_in(GameMode::Classic);
+    let gap = floor_tile(&sim, 4, 50);
+    sim.tower.remove_unit(gap);
+    let mut sim = crate::load_stream::load_save_text(sim.save_text().as_bytes()).unwrap();
+    assert_eq!(sim.tower.mode, GameMode::Classic);
+    assert!(sim.tower.unit_at(4, 50).is_none());
+    assert!(sim.tower.unit_at(4, 49).is_some() && sim.tower.unit_at(4, 51).is_some());
+    let money = sim.money;
+    assert!(!sim.build(Kind::Floor, 5, 50).ok);
+    assert!(sim.build(Kind::Floor, 4, 50).ok);
+    assert!(sim.money < money);
+    assert!(sim.build(Kind::Floor, 5, 50).ok);
+}

@@ -13,6 +13,7 @@ abstraction · ⬜ not present.
 - ✅ Lobbies are transit-only, so rooms can't be placed on a lobby concourse
 - ✅ Floors auto-created under a room when placed (no pre-laying bare floor)
 - ✅ No floating overhangs: a room must sit on the floor directly below (or the ground)
+- ✅ **Classic floors stay whole when bulldozed** (owner ruling, 2026-11-12): the bulldozer takes a bare floor tile only from either end of its story, so it never opens a gap the story above can't be built across. A Classic tower saved with a gap loads as it was, and the Floor tool fills the gap. Modern still lets the bulldozer open a gap. Not yet checked against the 1994 game on the PC
 - ✅ Basements (B1…B10) with continuous numbering (floor 0 = B1)
 - ✅ Multi-story facilities (cinema and party hall span 2 floors; recycling 2; metro a whole basement floor)
 - ✅ Build/sell with construction time and a partial-refund bulldoze

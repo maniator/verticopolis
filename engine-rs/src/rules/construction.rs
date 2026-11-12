@@ -72,6 +72,16 @@ impl GameMode {
         self == GameMode::Classic
     }
 
+    /// Whether the bulldozer may take out a floor tile that has floor on
+    /// both sides, opening a gap in the middle of a story. Classic refuses
+    /// it (owner ruling, 2026-11-12): a story above a gap can't be built
+    /// across it, so the tower above looks cut. Classic floors come out from
+    /// either end inward. Modern allows the gap. Read through
+    /// `Tower::removal_reason`.
+    pub fn removes_mid_floor_tiles(self) -> bool {
+        self == GameMode::Modern
+    }
+
     /// Whether a placed room of `kind` stays for good: SimTower gives the
     /// player no way to delete housekeeping, security, recycling, the movie
     /// theater or the cathedral (our wedding hall). Modern lets them be sold
