@@ -98,7 +98,7 @@ tower running, then the same hook the engine raises when the GPU drops the WebGL
 
 Captured from the built app via the `security-*` scenes in
 `scripts/scenes/security.ts` on one 12-floor office tower with a Security
-office on floor 6. Each search scene declines the ransom call through the real
+office on floor 6 (the split scene stands its floors as two towers). Each search scene declines the ransom call through the real
 emergency dialog and lets the engine run, and its setup fails the shot when the
 guards are not where the shot needs them, so these images drift when the
 search's timing, the guards' routes or their drawing change.
@@ -108,6 +108,7 @@ search's timing, the guards' routes or their drawing change.
 | `security-search-classic.png` | Classic, three game minutes after the refusal: the six guards out of the floor 6 office, the ones headed one floor away already walking the rooms and the ones headed further still on the emergency stairs at the rooms' left edge, with the countdown to 1:00 PM and the red edge glow. |
 | `security-search-modern.png` | The same moment in Modern, which answers a refused ransom with the same search. |
 | `security-search-joins.png` | Modern: a second Security office on floor 11 opens inside one long engine step during the search, and its six guards set out from the minute it opened, after the first office's guards moved on from the floors they finished. |
+| `security-search-split.png` | Modern, a lot whose floors stand as two towers apart on one shared lobby: each tower hangs fire escapes on both of its sides, and the guards from the left tower's Security office climb its own stairs while the ones sent to the right tower walk down to the lobby and climb that tower's stairs. |
 | `security-search-over.png` | The Classic search played out until the guards find the bomb: the guards, the countdown and the glow are gone. |
 | `security-quiet-day.png` | No event running: the lunch crowd moves through the tower and the overlay draws no search. |
 | `security-thief-caught.png` | Security catching a thief: he runs floor 4's rooms from the emergency stairs at their left edge, feet on the floor, with the guard close behind. |

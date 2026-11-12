@@ -10,7 +10,7 @@
 import { type Page } from "playwright";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
-import { mkdirSync, existsSync } from "node:fs";
+import { mkdirSync, existsSync, readdirSync } from "node:fs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 export const ROOT = resolve(__dirname, "..");
@@ -31,10 +31,28 @@ export const DIRS = {
 };
 export type OutDir = keyof typeof DIRS;
 // Browser: PW_CHROME wins (the CI container path sets it to the image's Chromium);
-// else a preinstalled sandbox Chromium if present; else undefined so Playwright
+// else, inside the pinned Playwright image, that same full Chromium; else a
+// preinstalled sandbox Chromium if present; else undefined so Playwright
 // launches its OWN bundled browser (the normal `npm run screenshots` dev machine).
 const SANDBOX_CHROME = "/opt/pw-browsers/chromium-1194/chrome-linux/chrome";
-export const EXECUTABLE = process.env.PW_CHROME || (existsSync(SANDBOX_CHROME) ? SANDBOX_CHROME : undefined);
+export const EXECUTABLE = process.env.PW_CHROME || pinnedImageChrome() || (existsSync(SANDBOX_CHROME) ? SANDBOX_CHROME : undefined);
+
+/** The pinned Playwright image's full Chromium, found the way CI finds it
+ *  (`ls -d /ms-playwright/chromium-*\/chrome-linux*\/chrome | head -1`). The
+ *  image also ships `chromium_headless_shell`, which Playwright launches by
+ *  default and which rasters text differently, so a local render in the
+ *  pinned image matched CI's only when PW_CHROME was set by hand. */
+function pinnedImageChrome(): string | undefined {
+  const root = "/ms-playwright";
+  if (!existsSync(root)) return undefined;
+  for (const dir of readdirSync(root).filter((d) => /^chromium-\d+$/.test(d)).sort()) {
+    for (const sub of readdirSync(`${root}/${dir}`).filter((d) => d.startsWith("chrome-linux")).sort()) {
+      const chrome = `${root}/${dir}/${sub}/chrome`;
+      if (existsSync(chrome)) return chrome;
+    }
+  }
+  return undefined;
+}
 export const PORT = Number(process.env.PORT || 4173);
 export const BASE = process.env.BASE_URL || `http://localhost:${PORT}`;
 for (const d of Object.values(DIRS)) mkdirSync(d, { recursive: true });

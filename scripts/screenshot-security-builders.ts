@@ -19,7 +19,11 @@
  *  picks the mode, the hour the tower starts at, whether the bomb ransom call
  *  is waiting for the player (the scene's setup declines it through the real
  *  dialog), whether floor 11 keeps a gap a second Security office can be
- *  built in, and the game speed. */
+ *  built in, and the game speed. With `split`, the floors above the lobby
+ *  stand as two towers apart on one shared lobby (the lot a player gets with
+ *  Modern's bridging off), each with its own elevator, and the Security
+ *  office sits in the left one; the towers' tile ranges are left on
+ *  `window.__vcShotSecuritySplit`. */
 export function buildSecurityTower(): void {
   const w = window as unknown as { game: any; __vcShotSecurity?: any };
   const g = w.game;
@@ -32,14 +36,21 @@ export function buildSecurityTower(): void {
   s.star = 4;
   const W = g.grid.width;
   const cx = Math.floor(W / 2);
-  const left = cx - 20;
-  const right = cx + 19;
+  // Split: two towers 24 tiles wide with 18 open tiles between them, over
+  // one lobby that runs under both.
+  const split = opts.split === true;
+  const left = split ? cx - 33 : cx - 20;
+  const right = split ? cx + 32 : cx + 19;
+  const towers: [number, number][] = split ? [[left, cx - 10], [cx + 9, right]] : [[left, right]];
+  if (split) (window as unknown as { __vcShotSecuritySplit?: unknown }).__vcShotSecuritySplit = towers;
   // The founding lot differs by mode, so lay the ground row outward from the
   // center in both: every later tile connects by touching the first.
   for (let x = cx; x <= right; x++) s.tower.place("lobby", 1, x);
   for (let x = cx - 1; x >= left; x--) s.tower.place("lobby", 1, x);
-  for (let f = 2; f <= 12; f++) for (let x = left; x <= right; x++) s.tower.place("floor", f, x);
-  s.tower.placeTransport("elevatorStandard", left + 2, 1, 12);
+  for (const [lo, hi] of towers) {
+    for (let f = 2; f <= 12; f++) for (let x = lo; x <= hi; x++) s.tower.place("floor", f, x);
+    s.tower.placeTransport("elevatorStandard", lo + 2, 1, 12);
+  }
   const room = (kind: string, f: number, x: number, people: number): number => {
     const r = s.tower.place(kind, f, x);
     if (!r.ok) return 1;
@@ -53,16 +64,18 @@ export function buildSecurityTower(): void {
   const sec = s.tower.place("security", 6, left + 6);
   if (!sec.ok) throw new Error(`the Security office did not place: ${sec.reason ?? "no reason given"}`);
   const secWidth = s.tower.getUnit(sec.unitId).width;
-  for (let f = 2; f <= 12; f++) {
-    // Floor 11 keeps room for a second office when the scene asks for it;
-    // the setup builds it at the first free tile, left on the window.
-    const gap = f === 11 && opts.gap;
-    const end = gap ? right - secWidth - 8 : right;
-    let x = f === 6 ? left + 6 + secWidth : left + 6;
-    while (x + 1 <= end) x += room(f === 2 ? "fastFood" : "office", f, x, f === 2 ? 0 : 6);
-    if (gap) {
-      if (right + 1 - x < secWidth) throw new Error(`floor 11 left ${right + 1 - x} free tiles, short of a Security office`);
-      (window as unknown as { __vcShotSecurityGapAt?: number }).__vcShotSecurityGapAt = x;
+  for (const [lo, hi] of towers) {
+    for (let f = 2; f <= 12; f++) {
+      // Floor 11 keeps room for a second office when the scene asks for it;
+      // the setup builds it at the first free tile, left on the window.
+      const gap = f === 11 && opts.gap;
+      const end = gap ? hi - secWidth - 8 : hi;
+      let x = f === 6 && lo === left ? lo + 6 + secWidth : lo + 6;
+      while (x + 1 <= end) x += room(f === 2 ? "fastFood" : "office", f, x, f === 2 ? 0 : 6);
+      if (gap) {
+        if (hi + 1 - x < secWidth) throw new Error(`floor 11 left ${hi + 1 - x} free tiles, short of a Security office`);
+        (window as unknown as { __vcShotSecurityGapAt?: number }).__vcShotSecurityGapAt = x;
+      }
     }
   }
   if (opts.ransom) {
