@@ -5,6 +5,7 @@ import {
   NOT_ENOUGH_MONEY,
 } from "../simport/request";
 import { priceOptionsFor } from "../ui/catalogPricing";
+import { catalogFor } from "../tests/catalogFixture";
 import {
   CATALOG,
   lift,
@@ -183,10 +184,12 @@ describe("EditorActions: unit card", () => {
     expect(deps.refreshEditor).toHaveBeenCalledOnce();
   });
 
-  it("cycles the film a theatre rebooks: off, revival, feature, blockbuster and back", async () => {
-    const { actions, cards, codes, port } = setup({
-      setFilm: () => rec("buildAt", true),
-    });
+  it("cycles the film a theatre rebooks through the catalog's choices: off, revival, feature, blockbuster and back", async () => {
+    const { actions, cards, codes, port } = setup(
+      { setFilm: () => rec("buildAt", true) },
+      undefined,
+      catalogFor("modern"),
+    );
     for (const [now, next] of [
       [undefined, "blockbuster"],
       ["auto", "blockbuster"],
@@ -206,6 +209,14 @@ describe("EditorActions: unit card", () => {
         codes.code("filmPolicies", next),
       );
     }
+  });
+
+  it("leaves the film policy alone where the mode never rebooks (Classic)", async () => {
+    const { actions, cards, deps, port } = setup({ setFilm: () => rec("buildAt", true) });
+    cards.unit.mockReturnValueOnce({ id: office.id, kind: "cinema", filmPolicy: "feature" });
+    await actions.handleEditAction("filmPolicy", root(""));
+    expect(port.setFilm).not.toHaveBeenCalled();
+    expect(deps.refreshEditor).not.toHaveBeenCalled();
   });
 
   it("shows each film through changeFilm by its tier code, with no undo step for the payment's sake", async () => {

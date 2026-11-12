@@ -26,7 +26,7 @@ use crate::build::pays_for_floor;
 use crate::charges::{car_resale_refund, ADD_CAR_COST, TRANSPORT_FLOOR_COST};
 use crate::clock::{resolve_calendar, CalendarKind, GameMode};
 use crate::econ::{classic_ladder, rent_config};
-use crate::economy::films::FilmOffer;
+use crate::economy::films::{FilmOffer, FilmRebook};
 use crate::economy::{
     catalog_spend_per_customer, commercial_daily_income, service_maintenance_monthly,
     MAINTENANCE_PER_CAR_MONTHLY, NIGHTCLUB_DJ_MONTHLY, REAL_WORLD_MAINT_PERIOD_DAYS,
@@ -131,8 +131,13 @@ pub struct Economy {
     /// The films a theatre can show, with their prices, in the order the
     /// card lists them (#1932, #1950). No theatre pays anything each period.
     pub films: &'static [FilmOffer],
-    /// Whether a theatre books its chosen film again once its film is spent.
-    pub film_auto_rebook: bool,
+    /// The Auto-rebook choices, in the order the card's button cycles
+    /// through them: each policy and the film a theatre with it books again
+    /// once its film is spent (#1950). Empty where no theatre rebooks.
+    pub film_rebooks: &'static [FilmRebook],
+    /// The policy a theatre with none, or an old save's "auto", rebooks by,
+    /// or null where no theatre rebooks.
+    pub film_rebook_default: Option<&'static str>,
     /// Whether the player can switch automatic bridging off. When false,
     /// bridging is always on. When true, a tower starts bridged unless it
     /// was founded unbridged, and the live setting is per tower (the

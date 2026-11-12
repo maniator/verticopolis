@@ -14,7 +14,8 @@
     "carResaleRefund": 20000,
     "condoHoldTaxRate": 0,
     "exterminator": null,
-    "filmAutoRebook": false,
+    "filmRebookDefault": null,
+    "filmRebooks": [],
     "films": [
       {
         "key": "new",

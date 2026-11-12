@@ -2,9 +2,8 @@ import { html, nothing, type TemplateResult } from "lit-html";
 import { keyed } from "lit-html/directives/keyed.js";
 import { isOperational, isTenanted } from "../../shared/unitState";
 import { isCommercialKind, isHotelKind } from "../../presentation/viewKinds";
-import { catalogFacility, catalogHouseholdPrice, catalogOpenAt, catalogResidents, rungFor, type Catalog } from "../../catalog/catalogTypes";
+import { catalogFacility, catalogFilmRebook, catalogHouseholdPrice, catalogOpenAt, catalogResidents, rungFor, type Catalog } from "../../catalog/catalogTypes";
 import type { TransportDetail, UnitDetail } from "../../simport/panels";
-import type { FilmPolicy, FilmTier } from "../../simport/commands";
 import { priceOptionsFor } from "../catalogPricing";
 import { hasAccessDiagnostic } from "../../game/cardLines";
 import { rungPickerTemplate, type RungChoice } from "./rungPicker";
@@ -40,17 +39,6 @@ const kv = (label: string, value: unknown, field?: string): TemplateResult =>
 
 /** One action row of the editor card. */
 const edRow = (inner: TemplateResult): TemplateResult => html`<div class="ed-row">${inner}</div>`;
-
-/** The film a Modern theatre's policy books again once its film is spent,
- *  by catalog key, or null when rebooking is off (#1950). No policy and an
- *  old save's "auto" book a feature. */
-const REBOOKED_FILM: Readonly<Record<FilmPolicy, FilmTier | null>> = {
-  auto: "new",
-  feature: "new",
-  revival: "classic",
-  blockbuster: "blockbuster",
-  off: null,
-};
 
 /** The shared editor-card frame: title bar + stat grid + an optional full-width
  *  block (the mobile diagnostics fold-in) + action rows. `key` is the selected
@@ -139,7 +127,7 @@ export function unitEditorTemplate(
   }
   // A theatre shows one film, and the player pays to show another; the
   // catalog lists the mode's films and their prices (#1932, #1950).
-  const { films, filmAutoRebook } = catalog.economy;
+  const { films } = catalog.economy;
   if (u.kind === "cinema" && isOperational(u)) {
     // A gutted/burning/under-construction cinema shows no film, omit the rows.
     const showing = films.find((film) => film.key === u.filmTier);
@@ -212,10 +200,11 @@ export function unitEditorTemplate(
       edRow(html`${films.map((film) => html`<button class="btn" data-edit=${`${film.key}Film`}>${film.label} ($${groupDigits(film.price)})</button>`)}`),
     );
   }
-  if (u.kind === "cinema" && filmAutoRebook) {
-    // The film the theatre books again once its film is spent (#1950).
-    const rebooks = REBOOKED_FILM[u.filmPolicy ?? "auto"];
-    const label = rebooks === null ? "Off" : (films.find((film) => film.key === rebooks)?.label ?? "Off");
+  // The film the theatre books again once its film is spent (#1950), where
+  // the mode rebooks.
+  const rebook = u.kind === "cinema" ? catalogFilmRebook(catalog, u.filmPolicy) : null;
+  if (rebook) {
+    const label = films.find((film) => film.key === rebook.film)?.label ?? "Off";
     actions.push(edRow(html`<button class="btn" data-edit="filmPolicy">Auto-rebook: ${label} ▸</button>`));
   }
   // Canon retail reroll: only offer on shop / fastFood / restaurant. Legacy

@@ -31,7 +31,8 @@ pub fn catalog(mode: GameMode) -> Catalog {
                     per_room_fee,
                 }),
             films: mode.films().offers,
-            film_auto_rebook: mode.films().rebooks_spent,
+            film_rebooks: mode.films().rebooks,
+            film_rebook_default: mode.films().rebook_default,
             auto_bridge_toggleable: mode.bridging_toggleable(),
         },
         rules: Rules {

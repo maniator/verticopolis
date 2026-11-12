@@ -234,4 +234,34 @@ fn an_old_modern_save_keeps_its_booked_blockbuster() {
     classic.blockbusters = vec![cinema as f64];
     let back = crate::load_stream::load_save_text(classic.save_text().as_bytes()).unwrap();
     assert_eq!(tier(&back, cinema), FilmTier::New);
+    // Classic has no blockbuster, so a Classic save that carries the flag
+    // shows a new film.
+    let text = classic.save_text().replace(
+        "\"kind\":\"cinema\"",
+        "\"kind\":\"cinema\",\"filmBlockbuster\":true",
+    );
+    assert!(text.contains("\"filmBlockbuster\":true"));
+    let back = crate::load_stream::load_save_text(text.as_bytes()).unwrap();
+    assert_eq!(tier(&back, cinema), FilmTier::New);
+}
+
+#[test]
+fn each_rebook_choice_names_an_offered_film_and_a_policy_the_save_takes() {
+    let films = GameMode::Modern.films();
+    let (mut sim, cinema, _) = theatre(GameMode::Modern);
+    for r in films.rebooks {
+        assert_eq!(sim.set_film_policy(cinema, r.policy), Some(r.policy));
+        assert_eq!(r.film, r.tier.map(FilmTier::key), "{}", r.policy);
+        if let Some(t) = r.tier {
+            assert!(
+                films.offer(t).is_some(),
+                "{} books an offered film",
+                r.policy
+            );
+        }
+        assert_eq!(films.rebooked(Some(r.policy)), r.tier);
+    }
+    assert_eq!(films.rebooked(None), Some(FilmTier::New));
+    assert!(GameMode::Classic.films().rebooks.is_empty());
+    assert_eq!(GameMode::Classic.films().rebooked(None), None);
 }

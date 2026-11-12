@@ -90,12 +90,14 @@ const ECONOMY: Shape = {
   garbageCollectHour: count,
   exterminator: (v) => v === null || isRecord(v),
   films: Array.isArray,
-  filmAutoRebook: bool,
+  filmRebooks: Array.isArray,
+  filmRebookDefault: (v) => v === null || typeof v === "string",
   autoBridgeToggleable: bool,
 };
 const RULES: Shape = { variantHouseholds: bool, previewNamesRefusal: bool, scheduleAssist: bool };
 const EXTERMINATOR: Shape = { calloutFee: amount, perRoomFee: amount };
 const FILM: Shape = { key: (v) => v === "new" || v === "classic" || v === "blockbuster", label: (v) => typeof v === "string", price: amount };
+const FILM_REBOOK: Shape = { policy: (v) => typeof v === "string", film: (v) => v === null || v === "new" || v === "classic" || v === "blockbuster" };
 const CALENDAR: Shape = {
   key: oneOf("realWorld", "canon"),
   quarterDays: size,
@@ -185,6 +187,7 @@ function checkCatalog(c: Record<string, unknown>): void {
   const economy = checkShape(c.economy, ECONOMY, "economy");
   if (economy.exterminator !== null) checkShape(economy.exterminator, EXTERMINATOR, "economy.exterminator");
   (economy.films as unknown[]).forEach((film, i) => checkShape(film, FILM, `economy.films[${i}]`));
+  (economy.filmRebooks as unknown[]).forEach((r, i) => checkShape(r, FILM_REBOOK, `economy.filmRebooks[${i}]`));
   const calendars = economy.calendars as unknown[];
   if (calendars.length === 0) refuse("economy.calendars", "no calendar");
   calendars.forEach((cal, i) => checkShape(cal, CALENDAR, `economy.calendars[${i}]`));

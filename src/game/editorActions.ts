@@ -1,5 +1,5 @@
 import { isElevatorKind, isHotelKind } from "../presentation/viewKinds";
-import { catalogFacility } from "../catalog/catalogTypes";
+import { catalogFacility, catalogFilmRebook } from "../catalog/catalogTypes";
 import { priceOptionsFor } from "../ui/catalogPricing";
 import type { FacilityKind } from "../shared/types";
 import type { BatchRentResult } from "../shared/engineTypes";
@@ -342,14 +342,17 @@ export class EditorActions {
         }
       } else if (action === "filmPolicy") {
         // The film a Modern theatre books again once its film is spent
-        // (#1950): off, then each film from the cheapest. No policy, or an
-        // old save's "auto", rebooks a feature.
-        const order = ["off", "revival", "feature", "blockbuster"] as const;
-        const now = u.filmPolicy === "auto" || u.filmPolicy === null || u.filmPolicy === undefined ? "feature" : u.filmPolicy;
-        const next = order[(order.indexOf(now) + 1) % order.length];
-        engine.setFilm(u.id, codes.code("filmPolicies", next));
-        this.deps.audio.sfx("click");
-        this.deps.refreshEditor();
+        // (#1950): the button steps through the catalog's choices, from the
+        // one the theatre follows now.
+        const catalog = kit.catalog();
+        const order = catalog.economy.filmRebooks;
+        const now = catalogFilmRebook(catalog, u.filmPolicy);
+        if (now) {
+          const next = order[(order.indexOf(now) + 1) % order.length].policy;
+          engine.setFilm(u.id, codes.code("filmPolicies", next));
+          this.deps.audio.sfx("click");
+          this.deps.refreshEditor();
+        }
       } else if (Object.prototype.hasOwnProperty.call(FILM_ACTIONS, action)) {
         // Showing a film (#1932, #1950): the engine charges the price and
         // starts the film; a payment is no edit, so no undo step holds it.

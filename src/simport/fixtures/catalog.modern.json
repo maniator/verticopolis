@@ -24,7 +24,25 @@
       "calloutFee": 5000,
       "perRoomFee": 2000
     },
-    "filmAutoRebook": true,
+    "filmRebookDefault": "feature",
+    "filmRebooks": [
+      {
+        "film": null,
+        "policy": "off"
+      },
+      {
+        "film": "classic",
+        "policy": "revival"
+      },
+      {
+        "film": "new",
+        "policy": "feature"
+      },
+      {
+        "film": "blockbuster",
+        "policy": "blockbuster"
+      }
+    ],
     "films": [
       {
         "key": "classic",

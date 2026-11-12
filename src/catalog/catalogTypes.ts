@@ -7,7 +7,7 @@
  */
 import type { CalendarKind } from "../shared/engineTypes";
 import type { FacilityCategory, FacilityKind, GameMode } from "../shared/types";
-import type { FilmTier } from "../simport/commands";
+import type { FilmPolicy, FilmTier } from "../simport/commands";
 
 /** A film a theatre can show, as the catalog publishes it (#1950). */
 export interface CatalogFilm {
@@ -16,6 +16,14 @@ export interface CatalogFilm {
   readonly label: string;
   /** What showing it costs, charged once. */
   readonly price: number;
+}
+
+/** An Auto-rebook choice for a Modern theatre (#1950): the policy the save
+ *  stores, and the film it books again once the theatre's film is spent, or
+ *  null where rebooking is off. */
+export interface CatalogFilmRebook {
+  readonly policy: FilmPolicy;
+  readonly film: FilmTier | null;
 }
 
 /** The version of the catalog's shape. It moves when a field is added,
@@ -93,9 +101,12 @@ export interface CatalogEconomy {
   /** The films a theatre can show, with their prices, in the order the card
    *  lists them (#1932, #1950). No theatre pays anything each period. */
   readonly films: readonly CatalogFilm[];
-  /** Whether a theatre books its chosen film again once its film is spent
-   *  (Modern). */
-  readonly filmAutoRebook: boolean;
+  /** The Auto-rebook choices, in the order the card's button cycles through
+   *  them (#1950); empty where no theatre rebooks (Classic). */
+  readonly filmRebooks: readonly CatalogFilmRebook[];
+  /** The policy a theatre with none, or an old save's "auto", rebooks by,
+   *  or null where no theatre rebooks. */
+  readonly filmRebookDefault: FilmPolicy | null;
   /** Whether the player can switch automatic bridging off. When false,
    *  bridging is always on. When true, a tower starts bridged unless it was
    *  founded unbridged, and the live setting is per tower (the engine's
@@ -310,6 +321,15 @@ export type TileGround = "no floor yet" | "a floor tile";
 export function catalogTileCost(catalog: Catalog, kind: FacilityKind, ground: TileGround): number {
   const f = catalogFacility(catalog, kind);
   return f.paysForFloor && ground === "no floor yet" ? f.cost + catalogFacility(catalog, "floor").cost : f.cost;
+}
+
+/** The Auto-rebook choice a theatre with `policy` follows: its own where the
+ *  catalog lists it, otherwise the mode's default (no policy, or an old
+ *  save's "auto"). Null where no theatre rebooks (#1950). */
+export function catalogFilmRebook(catalog: Catalog, policy: FilmPolicy | null | undefined): CatalogFilmRebook | null {
+  const { filmRebooks, filmRebookDefault } = catalog.economy;
+  const listed = (p: FilmPolicy | null | undefined) => filmRebooks.find((r) => r.policy === p);
+  return listed(policy) ?? listed(filmRebookDefault) ?? null;
 }
 
 /** Whether a facility is open in `hour` (the game hour; fractions and 24 read

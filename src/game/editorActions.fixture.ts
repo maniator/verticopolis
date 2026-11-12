@@ -42,6 +42,7 @@ export function setup(
     type: "unit",
     id: office.id,
   },
+  catalog: typeof CATALOG = CATALOG,
 ) {
   const port = mockPort({
     lastReason: () => "The engine said no.",
@@ -55,7 +56,7 @@ export function setup(
   };
   const kit = {
     cards,
-    catalog: () => CATALOG,
+    catalog: () => catalog,
     currentSchedule: vi.fn(() => SCHEDULE),
     previewRentBatch: vi.fn(() => ({ matched: 3 })),
   } as unknown as CardKit;

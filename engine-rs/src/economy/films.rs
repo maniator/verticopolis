@@ -75,18 +75,6 @@ impl FilmTier {
             FilmTier::New
         }
     }
-
-    /// The film a Modern theatre books again when its film is spent, by its
-    /// policy, or `None` when the player switched rebooking off. A theatre
-    /// with no policy, or the old "auto", books a feature.
-    pub fn rebooked(policy: Option<&str>) -> Option<FilmTier> {
-        match policy {
-            Some("off") => None,
-            Some("revival") => Some(FilmTier::Classic),
-            Some("blockbuster") => Some(FilmTier::Blockbuster),
-            _ => Some(FilmTier::New),
-        }
-    }
 }
 
 /// How far into its run a film is.
@@ -156,6 +144,20 @@ pub struct FilmOffer {
     pub income_mult: f64,
 }
 
+/// A choice on a Modern theatre's Auto-rebook button: the policy the save
+/// stores, and the film it books again once the theatre's film is spent, or
+/// none where the player switched rebooking off (#1950).
+#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FilmRebook {
+    /// The policy, as the save and `setFilm` name it.
+    pub policy: &'static str,
+    /// The film's key in `films`, or null for off.
+    pub film: Option<&'static str>,
+    #[serde(skip)]
+    pub tier: Option<FilmTier>,
+}
+
 /// A mode's film rules.
 #[derive(Debug)]
 pub struct FilmRules {
@@ -164,9 +166,13 @@ pub struct FilmRules {
     pub run: FilmRun,
     /// The tier whose film fills the blockbuster slots at full draw.
     pub blockbuster_tier: FilmTier,
-    /// Whether a theatre books its policy's film again once its film is
-    /// spent (Modern).
-    pub rebooks_spent: bool,
+    /// The Auto-rebook choices, in the order the button cycles through
+    /// them, where a theatre books its policy's film again once its film is
+    /// spent (Modern); empty where it never does (Classic).
+    pub rebooks: &'static [FilmRebook],
+    /// The choice a theatre with no policy, or an unlisted one (an old
+    /// save's "auto"), rebooks by.
+    pub rebook_default: Option<&'static str>,
     /// Whether a theatre's income follows its film's tier and age (Modern).
     /// Classic earns the blockbuster multiplier in a blockbuster slot only.
     pub income_follows_film: bool,
@@ -176,6 +182,17 @@ impl FilmRules {
     /// The offer for `tier`, or `None` where the mode has no such film.
     pub fn offer(&self, tier: FilmTier) -> Option<&'static FilmOffer> {
         self.offers.iter().find(|o| o.tier == tier)
+    }
+
+    /// The film a theatre with `policy` books again once its film is spent,
+    /// or `None` where it books none: rebooking is off, or the mode never
+    /// rebooks.
+    pub fn rebooked(&self, policy: Option<&str>) -> Option<FilmTier> {
+        let listed = |p: &str| self.rebooks.iter().find(|r| r.policy == p);
+        policy
+            .and_then(listed)
+            .or_else(|| self.rebook_default.and_then(listed))
+            .and_then(|r| r.tier)
     }
 }
 
@@ -203,7 +220,8 @@ pub static CLASSIC_FILMS: FilmRules = FilmRules {
         spent_days: FILM_SPENT_DAYS,
     },
     blockbuster_tier: FilmTier::New,
-    rebooks_spent: false,
+    rebooks: &[],
+    rebook_default: None,
     income_follows_film: false,
 };
 
@@ -239,7 +257,29 @@ pub static MODERN_FILMS: FilmRules = FilmRules {
         spent_days: MODERN_SPENT_DAYS,
     },
     blockbuster_tier: FilmTier::Blockbuster,
-    rebooks_spent: true,
+    rebooks: &[
+        FilmRebook {
+            policy: "off",
+            film: None,
+            tier: None,
+        },
+        FilmRebook {
+            policy: "revival",
+            film: Some("classic"),
+            tier: Some(FilmTier::Classic),
+        },
+        FilmRebook {
+            policy: "feature",
+            film: Some("new"),
+            tier: Some(FilmTier::New),
+        },
+        FilmRebook {
+            policy: "blockbuster",
+            film: Some("blockbuster"),
+            tier: Some(FilmTier::Blockbuster),
+        },
+    ],
+    rebook_default: Some("feature"),
     income_follows_film: true,
 };
 
@@ -369,7 +409,7 @@ impl Simulation {
     /// morning the film is spent.
     pub fn rebook_spent_films(&mut self) {
         let films = self.tower.mode.films();
-        if !films.rebooks_spent {
+        if films.rebooks.is_empty() {
             return;
         }
         let due: Vec<(i64, FilmTier, bool, i64)> = self
@@ -378,7 +418,7 @@ impl Simulation {
             .filter(|u| u.is_operational())
             .filter_map(|u| {
                 let (_, days) = showing(u);
-                let tier = FilmTier::rebooked(u.extras().film_policy)?;
+                let tier = films.rebooked(u.extras().film_policy)?;
                 (days >= films.run.spent_days).then_some((
                     u.id,
                     tier,
