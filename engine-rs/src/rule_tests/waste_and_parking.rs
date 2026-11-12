@@ -308,5 +308,19 @@ fn the_stats_report_calls_parking_short_by_the_mode_rule() {
         // A suite takes the one space first, so the offices have none left.
         occupy(&mut sim, Kind::HotelSuite, 2, 80, UnitState::Occupied);
         assert_eq!(short(&mut sim), true, "{mode:?}: the suite took the space");
+        // A second space is free for the offices: enough for Classic, while
+        // Modern's cars still need two after the suite's.
+        must_place(&mut sim, Kind::Parking, 0, C + RAMP_WIDTH + SPACE_WIDTH);
+        assert_eq!(
+            short(&mut sim),
+            !classic,
+            "{mode:?}: one space after the suite"
+        );
+        must_place(&mut sim, Kind::Parking, 0, C + RAMP_WIDTH + 2 * SPACE_WIDTH);
+        assert_eq!(
+            short(&mut sim),
+            false,
+            "{mode:?}: two spaces after the suite"
+        );
     }
 }
