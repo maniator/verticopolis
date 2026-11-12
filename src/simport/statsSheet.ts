@@ -87,6 +87,7 @@ export function statsReport(rec: PortRecord, codes: PortCodes): StatsReport {
       officePop: h("parkingOfficePop"),
       offices: h("parkingOffices"),
       suites: h("parkingSuites"),
+      homes: h("parkingHomes"),
       total: h("parkingTotal"),
     },
     housekeeping,

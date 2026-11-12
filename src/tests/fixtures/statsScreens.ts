@@ -56,7 +56,7 @@ export function statsScreenFor(parts: ScreenParts = {}): StatsScreen {
     ratingPopulation: stats.population,
     hotelsCountTowardRating: stats.star < 4,
     functionalParking: 0,
-    parkingDemand: { officePop: 0, offices: 0, suites: 0, total: 0 },
+    parkingDemand: { officePop: 0, offices: 0, suites: 0, homes: 0, total: 0 },
     housekeeping: { rooms: 0, crews: 0, maids: 0, dailyCapacity: 0, outOfReach: 0, dirty: 0, infested: 0 },
     housekeepingReport: null,
     recycling: { capacity: 0, demandMet: true },

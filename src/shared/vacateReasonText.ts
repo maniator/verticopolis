@@ -16,4 +16,5 @@ export const VACATE_REASON_TEXT = {
   relocation: "the household is relocating",
   trash: "trash piling up without enough recycling",
   parking: "too little parking for its workers",
+  homeParking: "too little parking for its households",
 };
