@@ -13,7 +13,8 @@ use crate::tower::{Unit, UnitState};
 pub struct Memo {
     pub served: Option<(i64, HashSet<i64>)>,
     pub stops: HashMap<i64, (i64, Vec<i64>)>,
-    pub segs: Option<(i64, HashMap<i64, Vec<(i64, i64)>>)>,
+    /// Each floor's runs, keyed like the tile index they are built from.
+    pub segs: Option<(crate::tower_index::IndexKey, HashMap<i64, Vec<(i64, i64)>>)>,
     pub staff: Option<(i64, HashMap<i64, i64>)>,
     pub cols: Option<(i64, HashMap<i64, Vec<(i64, i64)>>)>,
     pub tiles: Option<(crate::tower_index::IndexKey, crate::tower_index::FloorTiles)>,
