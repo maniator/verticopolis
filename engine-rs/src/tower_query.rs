@@ -417,6 +417,7 @@ impl Tower {
 
     /// `landingSegs`.
     pub fn landing_segs(&self, t: &Transport, floor: i64) -> Vec<i64> {
+        crate::tower_index::work_counts::landing_segs_called();
         let mut segs: Vec<i64> = Vec::new();
         for i in 0..t.width {
             if self.has_structure(floor, t.x + i) {

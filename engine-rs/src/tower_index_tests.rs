@@ -422,3 +422,28 @@ fn unit_state_is_not_an_input_to_the_noise_memo() {
         assert!(afflicted(&mut sim, office), "{state:?}");
     }
 }
+
+#[test]
+fn an_edit_rebuilds_every_floors_runs_from_one_pass_over_the_units() {
+    // A9 in #1158 (PR #1977): the runs of each floor used to walk every
+    // unit once per floor after each edit. They now come from the tile
+    // index, which one pass fills for every floor.
+    use crate::tower_index::work_counts::TILE_INDEX_BUILDS;
+    let builds = || TILE_INDEX_BUILDS.with(|n| n.get());
+    let mut tower = stacked();
+    must(tower.place(Kind::Office, 2, 104));
+    let before = builds();
+    for floor in -2..=7 {
+        tower.segments_of(floor);
+    }
+    assert_eq!(builds() - before, 1, "one pass for every floor's runs");
+    for floor in -2..=7 {
+        tower.segments_of(floor);
+    }
+    assert_eq!(builds() - before, 1, "cached runs walk nothing");
+    must(tower.place(Kind::Office, 3, 120));
+    for floor in -2..=7 {
+        tower.segments_of(floor);
+    }
+    assert_eq!(builds() - before, 2, "the next edit costs one pass again");
+}
