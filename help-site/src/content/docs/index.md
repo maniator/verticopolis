@@ -46,7 +46,8 @@ Build a thriving high-rise, keep the people in it happy, and earn your way to th
 
 ## Your towers
 
-- [Saving and loading](/help/your-towers/saving/), including towers from the 1994 game
+- [Saving and loading](/help/your-towers/saving/)
+- [Importing and exporting](/help/your-towers/importing-exporting/): back up a tower, move it to another device, or bring in a 1994 SimTower save
 - [Installing and updates](/help/your-towers/installing/): play offline from your home screen
 - [Settings](/help/your-towers/settings/)
 

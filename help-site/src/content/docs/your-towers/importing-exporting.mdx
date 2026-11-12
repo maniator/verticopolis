@@ -1,0 +1,69 @@
+---
+title: Importing and exporting
+description: Move a Verticopolis tower between devices with a .vctower file, bring in a 1994 SimTower .TDT save, and save a Classic tower for the original game.
+---
+
+A tower can leave the game as a file and come back in later, on this device or another one. There are two kinds of file:
+
+| File | What it holds | Works with |
+| --- | --- | --- |
+| `.vctower` | Your whole tower, exactly as it is | Verticopolis, Classic and Modern |
+| `.TDT` | A tower in the 1994 game's own format | The original SimTower, and Verticopolis |
+
+## Your own towers: .vctower
+
+**Export.** Open **Saved Towers** from the game menu and choose **Export to file…**, then **Export**. The game packs the tower you're playing into a `.vctower` file and downloads it. Nothing about the tower changes.
+
+**Import.** Choose **Import from file…** in Saved Towers, or **Load from a file…** on the opening screen, and pick the file.
+
+A `.vctower` carries everything: every room, its tenants, the money, the clock, your settings for that tower, and its rules. A <span class="vc-mode">Classic</span> tower comes back Classic and a <span class="vc-mode">Modern</span> tower comes back Modern, because a tower keeps its rules for life ([Classic and Modern](/help/classic-vs-modern/)).
+
+Use it to:
+
+- keep a backup somewhere safe, since [clearing your browsing data](/help/your-towers/saving/) deletes saves,
+- move a tower to another browser, computer or phone, or
+- share a tower with a friend.
+
+A `.vctower` written by a newer version of the game may not open in an older one. Update the game first ([Installing and updates](/help/your-towers/installing/)).
+
+## Towers from 1994: importing a .TDT
+
+Have a tower from the original SimTower? Pick its `.TDT` file with **Load from a file…** or **Import from file…**, the same way as a `.vctower`. The game spots a 1994 save even if it was renamed.
+
+Before anything changes, the game shows what it found: the tower's name, stars, funds, floors and rooms, then two lists.
+
+- **Brought over** lists what made it across: the funds and star rating, the floors and basements, the elevators and stairs with their stop settings, offices and condos with their tenants, hotel rooms, shops and venues, rents, parking, rooms still being built, and the time of day.
+- **Couldn't bring over** lists anything that arrived changed or stayed behind, so nothing goes missing quietly. A few things are always different: hotel rooms that were booked arrive empty, guests asleep past checkout leave rooms to clean, and the shoppers and moviegoers come back as the tower runs. A damaged save can also leave out rooms or elevators that sat somewhere impossible.
+
+Nothing happens until you choose **Open tower**. Your current tower stays in its autosave, and the imported one also goes into a free save slot if there is one.
+
+A 1994 tower always comes in as a <span class="vc-mode">Classic</span> tower, with the 1994 rules it was built under.
+
+## Saving for 1994: exporting a .TDT
+
+<span class="vc-mode">Classic</span> A Classic tower can be saved in the original game's format. Choose **Export to file…**, then **For SimTower (1994)…**. The game shows what comes along and what stays behind before you download anything.
+
+- **Comes along:** every room with its tenants and hotel states, the elevators with their stops, the stairs and escalators, your funds, your star rating and the clock.
+- **Stays behind:** custom room names, the exact rent on a room (it snaps to the nearest of 1994's four rent steps), and anything past the original's limits. Funds round to the nearest $100. The income history starts fresh, and tenants size the tower up again once it runs.
+
+The file is named after your tower, shortened to eight letters for the old game's file names, for example `MYTOWER.TDT`. Your tower here is never changed.
+
+This is still experimental. It has been checked in the real 1994 game with smaller Classic towers, and a large or complicated tower may not load correctly yet. If one doesn't, please [tell us](https://github.com/maniator/verticopolis/issues/new/choose) and attach the `.vctower` export of the same tower.
+
+<span class="vc-mode">Modern</span> A Modern tower can't be saved for 1994. The original has no place for what Modern adds, like rental homes, the new rooms and the real-world calendar, so the button stays off. Export it as a `.vctower` instead.
+
+## Quick answers
+
+| I want to | Do this |
+| --- | --- |
+| Back up a tower | Export to file, then Export (`.vctower`) |
+| Move a tower to my phone | Export it, send the file to your phone, then Load from a file there |
+| Play an old SimTower save | Load from a file and pick the `.TDT` |
+| Play my tower in the 1994 game | Classic only: Export to file, then For SimTower (1994) |
+| Turn a Classic tower into a Modern one | Not possible. A tower keeps its rules; found a new Modern tower instead |
+
+## See also
+
+- [Saving and loading](/help/your-towers/saving/)
+- [Classic and Modern](/help/classic-vs-modern/)
+- [Installing and updates](/help/your-towers/installing/)

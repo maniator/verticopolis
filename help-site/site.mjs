@@ -44,7 +44,7 @@ export const sidebar = [
   },
   {
     label: "Your towers",
-    items: [{ slug: "your-towers/saving" }, { slug: "your-towers/installing" }, { slug: "your-towers/settings" }],
+    items: [{ slug: "your-towers/saving" }, { slug: "your-towers/importing-exporting" }, { slug: "your-towers/installing" }, { slug: "your-towers/settings" }],
   },
   {
     label: "Rooms",
