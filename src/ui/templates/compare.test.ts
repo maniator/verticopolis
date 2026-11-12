@@ -21,6 +21,7 @@ const DIVERGENCE_PHRASES = [
   "Smarter scheduling",
   "paid exterminator",
   "Hovering an invalid spot",
+  "Build while paused",
   "linger past checkout",
   "Calendar pace",
 ];

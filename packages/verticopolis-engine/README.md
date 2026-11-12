@@ -151,6 +151,11 @@ hold.
 - **Modes.** `"classic"` follows the 1994 original; `"modern"` adds the
   facilities and rules the original did not have. The catalog marks each
   facility that is Modern-only.
+- **Pause.** The engine has no paused state: pausing means your frontend
+  stops calling `tick`, and a build still applies while it is stopped. The
+  catalog's `rules.buildsWhilePaused` says whether the mode allows that.
+  Classic does not, as in the original, so a Classic frontend refuses new
+  placement while paused.
 
 ## API reference
 

@@ -94,7 +94,7 @@ const ECONOMY: Shape = {
   filmRebookDefault: (v) => v === null || typeof v === "string",
   autoBridgeToggleable: bool,
 };
-const RULES: Shape = { variantHouseholds: bool, previewNamesRefusal: bool, scheduleAssist: bool };
+const RULES: Shape = { variantHouseholds: bool, previewNamesRefusal: bool, scheduleAssist: bool, buildsWhilePaused: bool };
 const EXTERMINATOR: Shape = { calloutFee: amount, perRoomFee: amount };
 const FILM: Shape = { key: (v) => v === "new" || v === "classic" || v === "blockbuster", label: (v) => typeof v === "string", price: amount };
 const FILM_REBOOK: Shape = { policy: (v) => typeof v === "string", film: (v) => v === null || v === "new" || v === "classic" || v === "blockbuster" };

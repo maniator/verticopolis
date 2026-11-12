@@ -103,6 +103,16 @@ impl GameMode {
         self == GameMode::Modern
     }
 
+    /// Whether a frontend lets the player place new construction while the
+    /// clock is stopped. Classic refuses it, the 1994 game's way, so the
+    /// pressure of building against the clock stays; Modern allows it, a
+    /// deliberate divergence. The engine has no paused state and applies a
+    /// build between steps either way, so only the catalog states this one
+    /// and the host, which owns pause, gates its build tools on it.
+    pub fn builds_while_paused(self) -> bool {
+        self == GameMode::Modern
+    }
+
     /// `operatingOverheadPerUnit()`: Classic charges none.
     pub fn operating_overhead_per_unit(self) -> f64 {
         match self {

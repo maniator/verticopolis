@@ -40,6 +40,7 @@ import { showTowerPicker } from "./appModals";
 // the suites that import it from here keep resolving.
 import { APP_VERSION } from "../appVersion";
 import { touchOverviewMap, wireOverviewMap } from "./overviewMapWiring";
+import { refuseAppPlacementWhilePaused } from "./pausedBuild";
 export { APP_VERSION };
 
 /** Classify why this boot happened, for the analytics boot snapshot. Mirrors
@@ -219,6 +220,7 @@ export function wireControllers(app: GameApp): void {
     selectPicked: (p) => app.selectPicked(p),
     placeSimpleBuild: (kind, tile, floor) => app.placeSimpleBuild(kind, tile, floor),
     updateBuildPreview: (tile, floor) => app.updateBuildPreview(tile, floor),
+    refusePausedPlacement: () => refuseAppPlacementWhilePaused(app),
     captureUndo: (label) => app.captureUndo(label),
     commitUndo: () => app.commitUndo(),
   });

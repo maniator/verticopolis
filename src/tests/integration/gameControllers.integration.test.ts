@@ -607,6 +607,7 @@ describe.skipIf(noEngine)("KeyboardPlay (commit announcements)", () => {
       selectPicked: () => {},
       placeSimpleBuild,
       updateBuildPreview: () => {},
+      refusePausedPlacement: () => false,
       captureUndo: (label) => undoLog.push(`capture:${label}`),
       commitUndo: () => undoLog.push("commit"),
     });

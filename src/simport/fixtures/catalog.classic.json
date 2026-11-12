@@ -1982,11 +1982,12 @@
     }
   ],
   "rules": {
+    "buildsWhilePaused": false,
     "previewNamesRefusal": false,
     "scheduleAssist": false,
     "variantHouseholds": false
   },
-  "version": 9,
+  "version": 10,
   "world": {
     "groundFloor": 1,
     "groundFloorStructure": "lobby",

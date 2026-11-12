@@ -49,7 +49,7 @@ pub use lock::{lock_view, LOCK_FOOTPRINT_EXEMPT};
 
 /// The version of the catalog's shape. It moves when a field is added,
 /// renamed or removed, so a frontend can refuse a shape it does not know.
-pub const CATALOG_VERSION: u32 = 9;
+pub const CATALOG_VERSION: u32 = 10;
 
 /// Every price, size and build rule of one mode.
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -162,6 +162,10 @@ pub struct Rules {
     /// presets, auto-tune and the staffing advice. When false the schedule
     /// is the manual grid only and each assisted query is refused.
     pub schedule_assist: bool,
+    /// Whether the player may place new construction while the game is
+    /// paused. When false the frontend refuses a placement at speed 0 and
+    /// says to unpause; the engine itself has no paused state.
+    pub builds_while_paused: bool,
 }
 
 /// One calendar a tower can run and how it scales the quoted figures.

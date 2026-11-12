@@ -281,6 +281,7 @@ test.describe("overview map on the desktop", () => {
       const g = (window as any).game;
       g.sim.money = 1e9;
       g.syncSim();
+      g.setSpeed(1); // Classic builds only while the clock runs (#1936)
     });
     await page.click('.pal-item[data-kind="office"]');
     const before = await page.evaluate(() => (window as any).game.sim.tower.units.length);

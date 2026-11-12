@@ -88,6 +88,8 @@ test.describe("mobile multi-touch gestures: pinch survives any finger lift order
     // ---- Phase 2: a single-finger tap with a build tool still places ----
     // (with the phantom contact of the old bug, this tap was misread as a
     // pinch start and swallowed: nothing placed, no message, forever).
+    // Classic builds only while the clock runs (#1936), so let time run for the tap.
+    await page.evaluate(() => (window as any).game.setSpeed(1)); // eslint-disable-line @typescript-eslint/no-explicit-any
     await page.click('.pal-item[data-kind="office"]');
     const unitsBefore = await page.evaluate(() => (window as any).game.sim.tower.units.length); // eslint-disable-line @typescript-eslint/no-explicit-any
     const tap = await page.evaluate(() => {
@@ -171,6 +173,8 @@ test.describe("mobile inspect: a tap opens ONE panel with the diagnostics folded
     // default (desktop) width where the tool palette is docked and clickable.
     // Compare the unit count before/after so the assertion proves THIS tap placed
     // a room, not that the tower merely already had units.
+    // Classic builds only while the clock runs (#1936), so let time run for the tap.
+    await page.evaluate(() => (window as any).game.setSpeed(1)); // eslint-disable-line @typescript-eslint/no-explicit-any
     await page.click('.pal-item[data-kind="office"]');
     const spot = await page.evaluate(() => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any

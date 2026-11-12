@@ -122,6 +122,11 @@ is [`engine-rs/consumer/`](https://github.com/maniator/verticopolis/tree/main/en
   lot. The catalog's world record carries the exact bounds.
 - **Modes.** `GameMode::Classic` follows the 1994 original;
   `GameMode::Modern` adds facilities and rules the original did not have.
+- **Pause.** The simulation has no paused state: a paused frontend stops
+  calling `tick`, and a build still applies while it is stopped. The
+  catalog's `rules.builds_while_paused` says whether the mode allows that.
+  Classic does not, as in the original, so a Classic frontend refuses new
+  placement while paused.
 
 ## The host API
 

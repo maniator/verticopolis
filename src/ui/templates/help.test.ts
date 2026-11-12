@@ -111,6 +111,7 @@ describe("helpTemplate structure and a11y", () => {
     variantHouseholds: "Variant households",
     previewNamesRefusal: "Hovering an invalid spot",
     scheduleAssist: "Smarter scheduling", // #305, presets + auto-tune + advice vs the raw grid
+    buildsWhilePaused: "Build while paused", // #1936, Classic refuses placement at speed 0
   };
   const RULE_TO_HELP: Record<string, string | null> = {
     ...CATALOG_RULE_TO_HELP,
