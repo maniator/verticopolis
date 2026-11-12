@@ -396,7 +396,9 @@ export function elevatorScheduleTemplate(ctx: SchedCtx, state: SchedState, h: Sc
       </div>
       <div class="modal-actions">
         ${state.dirty
-          ? html`<span class="modal-warn" role=${state.cancelArmed ? "alert" : "status"}>You have unsaved changes.</span>`
+          ? html`<span class="modal-warn" role=${state.cancelArmed ? "alert" : "status"}>${state.cancelArmed
+              ? "Press Discard changes? again to close without saving."
+              : "You have unsaved changes."}</span>`
           : nothing}
         <button class="btn primary" data-act="apply" @click=${h.onOk}>OK</button>
         <button class="btn" data-act="close" @click=${h.onCancel}>${state.cancelArmed ? "Discard changes?" : "Cancel"}</button>

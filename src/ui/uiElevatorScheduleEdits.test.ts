@@ -411,6 +411,8 @@ describe("OK and Cancel", () => {
     dialog().dispatchEvent(esc);
     expect(esc.defaultPrevented).toBe(true);
     expect(text('[data-act="close"]')).toBe("Discard changes?");
+    // The live region announces text, not a role change, so arming must change the warning's words.
+    expect(text(".modal-warn")).toBe("Press Discard changes? again to close without saving.");
     const again = new Event("cancel", { cancelable: true });
     dialog().dispatchEvent(again);
     expect(again.defaultPrevented).toBe(false);
