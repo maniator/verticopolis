@@ -14,7 +14,7 @@ use crate::clock::Clock;
 use crate::economy::tickets::{charged, ticket_pick_mult};
 use crate::facilities::Kind;
 use crate::tower::{Tower, UnitState};
-use crate::tower_index::{floor_slot, FloorRooms};
+use crate::tower_index::{floor_slot, FloorRooms, FLOOR_SLOTS};
 
 /// A bit per floor slot, in two words: a `u128` shift is a library call on
 /// wasm32.
@@ -78,11 +78,10 @@ pub struct SpawnFloors {
     /// `None` where every one charges Normal and the crowd draws them as it
     /// always has (#1950).
     pub cinema_picks: Option<f64>,
-    /// Where `cinema_picks` is set, each cinema floor with the mean pick
-    /// multiplier of its open theaters, so a visit weighs a floor without
-    /// walking its rooms. Empty otherwise. At most one entry per theater
-    /// (16 per tower).
-    pub cinema_floor_picks: Vec<(i64, f64)>,
+    /// Where `cinema_picks` is set, the mean pick multiplier of each floor's
+    /// open theaters by floor slot (1 on a floor without one), so a visit
+    /// weighs a floor in O(1) without walking its rooms. Empty otherwise.
+    cinema_floor_picks: Vec<f64>,
     units_by_floor: Arc<FloorRooms>,
     /// Operational metro station ids.
     pub metro_stations: Vec<i64>,
@@ -92,10 +91,10 @@ impl SpawnFloors {
     /// The mean ticket price pick multiplier of the open theaters on cinema
     /// floor `floor`, 1 where none charges other than Normal.
     pub fn cinema_floor_pick(&self, floor: i64) -> f64 {
-        self.cinema_floor_picks
-            .iter()
-            .find(|(f, _)| *f == floor)
-            .map_or(1.0, |(_, pick)| *pick)
+        floor_slot(floor)
+            .and_then(|i| self.cinema_floor_picks.get(i))
+            .copied()
+            .unwrap_or(1.0)
     }
 
     /// Room unit ids on `floor`, in unit order.
@@ -239,10 +238,13 @@ pub fn spawn_floors(tower: &Tower, clock: &Clock) -> SpawnFloors {
         ),
         cinema_picks: cinema_priced.then(|| cinema_pick_sum / f64::from(cinemas)),
         cinema_floor_picks: if cinema_priced {
-            cinema_floors
-                .into_iter()
-                .map(|(f, sum, n)| (f, sum / f64::from(n)))
-                .collect()
+            let mut picks = vec![1.0; FLOOR_SLOTS];
+            for (f, sum, n) in cinema_floors {
+                if let Some(i) = floor_slot(f) {
+                    picks[i] = sum / f64::from(n);
+                }
+            }
+            picks
         } else {
             Vec::new()
         },

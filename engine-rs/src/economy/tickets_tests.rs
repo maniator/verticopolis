@@ -8,7 +8,7 @@ use super::{
 use crate::catalog::catalog;
 use crate::clock::GameMode;
 use crate::crowd::spawn::weighted_index;
-use crate::economy::films::films_tests::theatre;
+use crate::economy::films::films_tests::theater;
 use crate::load::deserialize;
 use crate::rng::Rng;
 use crate::sim::Simulation;
@@ -51,7 +51,7 @@ fn modern_lists_four_steps_and_classic_none() {
 
 #[test]
 fn a_ticket_price_is_set_on_a_modern_theater_only() {
-    let (mut sim, cinema, office) = theatre(GameMode::Modern);
+    let (mut sim, cinema, office) = theater(GameMode::Modern);
     assert_eq!(sim.set_ticket_price(cinema, "premium"), Some("premium"));
     assert_eq!(stored(&sim, cinema), Some("premium"));
     assert_eq!(
@@ -71,7 +71,7 @@ fn a_ticket_price_is_set_on_a_modern_theater_only() {
     assert_eq!(stored(&sim, office), None);
     assert_eq!(shown_ticket_price(sim.tower.mode, unit(&sim, office)), None);
 
-    let (mut classic, cinema, _) = theatre(GameMode::Classic);
+    let (mut classic, cinema, _) = theater(GameMode::Classic);
     let before = classic.save_text();
     assert_eq!(classic.set_ticket_price(cinema, "low"), None);
     assert_eq!(classic.save_text(), before);
@@ -83,7 +83,7 @@ fn a_ticket_price_is_set_on_a_modern_theater_only() {
 
 #[test]
 fn each_step_moves_ticket_income_and_visits_and_classic_reads_normal() {
-    let (mut sim, cinema, _) = theatre(GameMode::Modern);
+    let (mut sim, cinema, _) = theater(GameMode::Modern);
     for step in &MODERN_TICKET_PRICES {
         sim.set_ticket_price(cinema, step.key);
         let u = unit(&sim, cinema);
@@ -92,7 +92,7 @@ fn each_step_moves_ticket_income_and_visits_and_classic_reads_normal() {
     }
     // A step forced onto a Classic theater (no path sets one) charges
     // nothing: Classic lists no step.
-    let (mut classic, cinema, _) = theatre(GameMode::Classic);
+    let (mut classic, cinema, _) = theater(GameMode::Classic);
     classic
         .tower
         .get_unit_mut(cinema)
@@ -107,7 +107,7 @@ fn each_step_moves_ticket_income_and_visits_and_classic_reads_normal() {
 
 #[test]
 fn a_ticket_price_survives_a_save_and_normal_saves_nothing() {
-    let (mut sim, cinema, office) = theatre(GameMode::Modern);
+    let (mut sim, cinema, office) = theater(GameMode::Modern);
     let theater_record = |sim: &Simulation| {
         sim.serialize()["units"]
             .as_array()
@@ -138,7 +138,7 @@ fn a_ticket_price_survives_a_save_and_normal_saves_nothing() {
     }
 
     // A Classic save has no ticket price.
-    let (classic, cinema, _) = theatre(GameMode::Classic);
+    let (classic, cinema, _) = theater(GameMode::Classic);
     let mut raw = classic.serialize();
     for u in raw["units"].as_array_mut().unwrap() {
         if u["id"] == cinema {
