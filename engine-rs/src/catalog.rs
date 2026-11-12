@@ -25,7 +25,6 @@ use serde::Serialize;
 use crate::build::pays_for_floor;
 use crate::charges::{car_resale_refund, ADD_CAR_COST, TRANSPORT_FLOOR_COST};
 use crate::clock::{resolve_calendar, CalendarKind, GameMode};
-use crate::econ::{classic_ladder, rent_config};
 use crate::economy::films::{FilmOffer, FilmRebook};
 use crate::economy::tickets::TicketPrice;
 use crate::economy::{
@@ -36,7 +35,7 @@ use crate::facilities::{
     build_cap, ground_floor_structure_kind, no_basement, Kind, FACILITIES, LOBBY_INTERVAL,
     LOT_WIDTH, MAX_FLOOR, MIN_FLOOR, POOLED_CAPS,
 };
-use crate::rules::MAX_HOUSEHOLD;
+use crate::rules::{RentModel, MAX_HOUSEHOLD};
 use crate::services::GARBAGE_COLLECT_HOUR;
 use crate::sim::STARTING_MONEY;
 mod build;
@@ -373,9 +372,10 @@ const _: () = assert!(
 
 /// The calendars a mode can run, its default first.
 fn calendars_for(mode: GameMode) -> Vec<CalendarEntry> {
-    let kinds: &[CalendarKind] = match mode {
-        GameMode::Classic => &[CalendarKind::Canon],
-        GameMode::Modern => &[CalendarKind::RealWorld, CalendarKind::Canon],
+    let kinds: &[CalendarKind] = if mode.lets_player_choose_calendar() {
+        &[CalendarKind::RealWorld, CalendarKind::Canon]
+    } else {
+        &[CalendarKind::Canon]
     };
     kinds
         .iter()
@@ -412,8 +412,8 @@ fn rent_cadence(kind: Kind) -> &'static str {
 /// `rules.priceOptions(kind)` as a [`Rent`]: the canon ladder in Classic for
 /// the kinds that have one, the tuned band in Modern for every priced kind.
 fn rent_for(mode: GameMode, kind: Kind) -> Option<Rent> {
-    match mode {
-        GameMode::Classic => classic_ladder(kind).map(|values| Rent::Ladder {
+    mode.rent_model(kind).map(|model| match model {
+        RentModel::Ladder(values) => Rent::Ladder {
             cadence: rent_cadence(kind),
             default: values[crate::rent::AVERAGE_RUNG],
             rungs: values
@@ -426,16 +426,16 @@ fn rent_for(mode: GameMode, kind: Kind) -> Option<Rent> {
                 })
                 .collect(),
             no_rate: true,
-        }),
-        GameMode::Modern => rent_config(kind).map(|c| Rent::Band {
+        },
+        RentModel::Band(c) => Rent::Band {
             cadence: rent_cadence(kind),
             default: c.default,
             min: c.min,
             max: c.max,
             step: c.step,
             no_rate: false,
-        }),
-    }
+        },
+    })
 }
 
 fn pool_key(kind: Kind) -> Option<&'static str> {

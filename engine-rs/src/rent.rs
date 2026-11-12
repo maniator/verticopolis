@@ -9,9 +9,10 @@
 //! defaults for each kind. A condo that has been sold keeps its price.
 
 use crate::clock::GameMode;
-use crate::econ::{classic_ladder, rent_config, rent_of};
+use crate::econ::{rent_config, rent_of};
 use crate::facilities::Kind;
 use crate::gameplay::GameplayEvent;
+use crate::rules::RentModel;
 use crate::sim::Simulation;
 use crate::tower::Unit;
 
@@ -50,10 +51,10 @@ pub(crate) fn ladder_level(rungs: &[f64; 4], value: f64) -> usize {
 /// `priceOptions(kind)`: `Some(Some(ladder))` in Classic for the canon kinds,
 /// `Some(None)` for a Modern band, `None` for an unpriced kind.
 pub(crate) fn price_options(mode: GameMode, kind: Kind) -> Option<Option<[f64; 4]>> {
-    match mode {
-        GameMode::Classic => classic_ladder(kind).map(Some),
-        GameMode::Modern => rent_config(kind).map(|_| None),
-    }
+    mode.rent_model(kind).map(|model| match model {
+        RentModel::Ladder(rungs) => Some(rungs),
+        RentModel::Band(_) => None,
+    })
 }
 
 fn price_neutral(mode: GameMode, kind: Kind) -> Option<f64> {

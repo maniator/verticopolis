@@ -14,6 +14,7 @@
 
 use serde::Serialize;
 
+use super::tickets::{TicketPrice, MODERN_TICKET_PRICES};
 use super::visitors::{
     FADING_FILM_DRAW, FILM_SPENT_DAYS, NEW_FILM_DRAW, NEW_FILM_FULL_DRAW_DAYS, SPENT_FILM_DRAW,
 };
@@ -176,6 +177,9 @@ pub struct FilmRules {
     /// Whether a theater's income follows its film's tier and age (Modern).
     /// Classic earns the blockbuster multiplier in a blockbuster slot only.
     pub income_follows_film: bool,
+    /// The ticket price steps a theater can charge, cheapest first (Modern),
+    /// or none where the player sets no ticket price (Classic).
+    pub ticket_prices: &'static [TicketPrice],
 }
 
 impl FilmRules {
@@ -223,6 +227,7 @@ pub static CLASSIC_FILMS: FilmRules = FilmRules {
     rebooks: &[],
     rebook_default: None,
     income_follows_film: false,
+    ticket_prices: &[],
 };
 
 pub static MODERN_FILMS: FilmRules = FilmRules {
@@ -281,6 +286,7 @@ pub static MODERN_FILMS: FilmRules = FilmRules {
     ],
     rebook_default: Some("feature"),
     income_follows_film: true,
+    ticket_prices: &MODERN_TICKET_PRICES,
 };
 
 /// Why a theatre's film did not change.

@@ -1,6 +1,7 @@
 //! Assembling a `Simulation` once the units are read.
 
 use super::*;
+use crate::rules::RentModel;
 
 /// The rest of `deserialize` once the units are read: `data` is the migrated
 /// save, `units` its kept units in save order and `unit_ids` their saved ids
@@ -35,7 +36,6 @@ pub(crate) fn assemble(
     if let Some(s) = finite_num(data.get("seed")) {
         sim.rng.restore(to_uint32(s));
     }
-    let modern = mode == GameMode::Modern;
     sim.auto_bridge = if mode.bridging_toggleable() {
         data.get("autoBridge") != Some(&Value::Bool(false))
             && data.get("manualStructure") != Some(&Value::Bool(true))
@@ -162,12 +162,12 @@ pub(crate) fn assemble(
     // Snap-on-load for ladder-priced kinds (Classic).
     let mut rents_snapped = 0;
     let mut has_condo = false;
-    if !modern {
+    if mode.prices_on_ladder() {
         for u in units.iter_mut() {
             if u.kind == Kind::Condo {
                 has_condo = true;
             }
-            let Some(ladder) = classic_ladder(u.kind) else {
+            let Some(RentModel::Ladder(ladder)) = mode.rent_model(u.kind) else {
                 continue;
             };
             let cfg = rent_config(u.kind).unwrap();

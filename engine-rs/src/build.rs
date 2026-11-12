@@ -8,9 +8,9 @@
 //! read. A placed one charges the money, logs the purchase and emits its
 //! gameplay events.
 
-use crate::clock::GameMode;
 use crate::facilities::*;
 use crate::gameplay::{GameplayEvent, RemovalMethod};
+use crate::rules::RentModel;
 use crate::sim::{LogKind, Simulation};
 use crate::tower::UnitState;
 
@@ -306,13 +306,11 @@ impl Simulation {
                 let name = *self.rng.pick(list);
                 self.tower.set_unit_subtype(id, Some(name));
             }
-            if self.mode == GameMode::Classic {
-                if let Some(ladder) = crate::econ::classic_ladder(kind) {
-                    let cfg = crate::econ::rent_config(kind).unwrap();
-                    let v = ladder[crate::rent::AVERAGE_RUNG];
-                    self.tower.get_unit_mut(id).unwrap().rent =
-                        if v == cfg.default { None } else { Some(v) };
-                }
+            if let Some(RentModel::Ladder(ladder)) = self.mode.rent_model(kind) {
+                let cfg = crate::econ::rent_config(kind).unwrap();
+                let v = ladder[crate::rent::AVERAGE_RUNG];
+                self.tower.get_unit_mut(id).unwrap().rent =
+                    if v == cfg.default { None } else { Some(v) };
             }
             let dur = kind.build_minutes();
             if dur > 0.0 {
