@@ -28,7 +28,6 @@ import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
  * tool lays a lobby on the ground floor.
  */
 
-
 const MODES: readonly GameMode[] = ["classic", "modern"];
 /** Where the cases lay the ground lobby, in the middle of the lot. */
 const LOBBY_LEFT = 170;
@@ -88,6 +87,7 @@ function previewWith(t: Tower, tool: string, tile: number, floor: number, amount
     build: {},
     inspectAnchor: null,
     buildRefusalShowing: false,
+    lobbyHeight: { height: 1 },
   } as unknown as GameApp;
   t.setMoney(amount);
   updateBuildPreview(app, tile, floor);
@@ -125,6 +125,7 @@ const buildActions = (t: Tower, toasts: string[] = []) =>
     audio: { sfx: () => {} },
     selectedId: () => null,
     clearSelection: () => {},
+    lobbyHeight: () => 1,
   });
 
 /** Paint the `tool` brush at `(tile, floor)` with exactly `amount`, and answer

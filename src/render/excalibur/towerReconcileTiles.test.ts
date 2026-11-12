@@ -56,7 +56,7 @@ const office: UnitView = { id: 7, kind: "office", floor: 2, x: 10, width: 6, sta
 /** Lobby graphics named by lighting, so a test can read which one a cell got. */
 const lobbyGfx = (lit: number): string[][] => [Array.from({ length: 16 }, (_, v) => `upper ${lit}:${v}`), Array.from({ length: 16 }, (_, v) => `ground ${lit}:${v}`)];
 
-function fakeEngine(state: { units: UnitView[]; revision: number }) {
+function fakeEngine(state: { units: UnitView[]; revision: number; tall?: Map<number, number> }) {
   const cells = new Map<string, Cell>();
   const getTile = vi.fn((x: number, y: number) => {
     const key = `${x},${y}`;
@@ -73,6 +73,7 @@ function fakeEngine(state: { units: UnitView[]; revision: number }) {
       },
       transports: [],
       functionalParkingSet: () => new Set<number>(),
+      tallLobbies: vi.fn(() => state.tall ?? new Map<number, number>()),
     },
     parkingUsage: () => 0,
     recyclingFill: () => 0,
@@ -91,6 +92,7 @@ function fakeEngine(state: { units: UnitView[]; revision: number }) {
     entranceGrandRightGfx: ["grand-right 0", "grand-right 1"],
     entranceGrandSoloGfx: ["grand-solo 0", "grand-solo 1"],
     entranceServiceGfx: ["service 0", "service 1"],
+    tallLobbyGfx: vi.fn((lit: boolean, ground: boolean, height: number, story: number, slot: number | string) => `tall ${lit ? 1 : 0}:${ground ? "ground" : "sky"}:${height}:${story}:${slot}`),
     floor1EntranceMap: new Map(),
     structTiles: new Set(),
     structPass: emptyStructPass(),
@@ -192,6 +194,47 @@ describe("the scene sync walks the structure tiles only when what they draw from
     syncScene(engine);
     expect(cell(4, 1)?.gfx).toEqual(["grand-left 0"]);
     expect(engine.structTiles.size).toBe(8);
+  });
+
+  it("paints a tall lobby's cells on every story it rises through, and relights them (#308)", () => {
+    const units = [{ ...office }];
+    for (let x = 4; x < 8; x++) units.push(tile("lobby", 1, x));
+    for (let x = 4; x < 6; x++) units.push(tile("lobby", 15, x));
+    const state = { units, revision: 5, tall: new Map([[1, 2], [15, 3]]) };
+    const { engine, cell } = fakeEngine(state);
+    syncScene(engine);
+    // The entrance keeps its one-story storefront; the hall rises above it.
+    expect(cell(4, 1)?.gfx).toEqual(["grand-left 0"]);
+    expect(cell(4, 2)?.gfx).toEqual(["tall 0:ground:2:1:grand-left"]);
+    expect(cell(6, 1)?.gfx).toEqual([`tall 0:ground:2:0:${6 % 4}`]);
+    expect(cell(6, 2)?.gfx).toEqual([`tall 0:ground:2:1:${6 % 4}`]);
+    expect(cell(7, 2)?.gfx).toEqual(["tall 0:ground:2:1:service"]);
+    expect(cell(4, 3)).toBeUndefined();
+    // A three-story sky lobby covers floors 15 to 17.
+    expect(cell(5, 15)?.gfx).toEqual([`tall 0:sky:3:0:${5 % 4}`]);
+    expect(cell(5, 17)?.gfx).toEqual([`tall 0:sky:3:2:${5 % 4}`]);
+    expect(engine.structTiles.size).toBe(4 * 2 + 2 * 3);
+    engine.litState = true;
+    syncScene(engine);
+    expect(cell(4, 2)?.gfx).toEqual(["tall 1:ground:2:1:grand-left"]);
+    expect(cell(5, 16)?.gfx).toEqual([`tall 1:sky:3:1:${5 % 4}`]);
+    // The heights are read once per full pass, never on a lighting-only sync.
+    expect(engine.sim.tower.tallLobbies).toHaveBeenCalledOnce();
+  });
+
+  it("clears a tall lobby's upper cells when its lobby goes", () => {
+    const units = [{ ...office }];
+    for (let x = 4; x < 8; x++) units.push(tile("lobby", 1, x));
+    const state = { units, revision: 5, tall: new Map([[1, 3]]) };
+    const { engine, cell } = fakeEngine(state);
+    syncScene(engine);
+    expect(engine.structTiles.size).toBe(12);
+    state.units = [{ ...office }];
+    state.tall = new Map();
+    state.revision = 6;
+    syncScene(engine);
+    expect(engine.structTiles.size).toBe(0);
+    expect(cell(5, 3)?.gfx).toEqual([]);
   });
 
   it("walks only the kept rooms on a sync that skips the tiles, and reads their entries as patched in place", () => {

@@ -54,6 +54,19 @@ impl Engine {
         self.sim
             .set_lobby_height(if whole { height as i64 } else { 1 });
     }
+    /// `lobbyRise(floor)` (#308): how many stories a lobby tile laid on
+    /// `floor` now rises, from the height set by `setLobbyHeight` and the
+    /// floor's own lobby: what `quoteBuild` prices a lobby tile at. 1 for a
+    /// floor that is not a whole number.
+    #[wasm_bindgen(js_name = lobbyRise)]
+    pub fn lobby_rise(&self, floor: f64) -> f64 {
+        let whole = floor.is_finite() && floor.fract() == 0.0 && floor.abs() < 1e9;
+        if !whole {
+            return 1.0;
+        }
+        self.sim
+            .tile_stories(crate::facilities::Kind::Lobby, floor as i64) as f64
+    }
     /// `lobbyHeights()` (#308): every lobby taller than one story, as flat
     /// `[floor, height, ...]` pairs by floor. Empty when none is.
     #[wasm_bindgen(js_name = lobbyHeights)]

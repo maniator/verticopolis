@@ -12,7 +12,7 @@ import { render, type TemplateResult } from "lit-html";
 import { iconElement } from "./icons";
 import { mountToolbarIcons } from "./uiToolbarIcons";
 import type { ReviewRow } from "./templates/scheduleReview";
-import { toolInfoFor, BULLDOZE_TOOL_INFO, INSPECT_TOOL_INFO } from "./templates/toolInfo";
+import { toolInfoFor, BULLDOZE_TOOL_INFO, INSPECT_TOOL_INFO, type LobbyHeightPicker } from "./templates/toolInfo";
 import * as dialogs from "./uiDialogs";
 import * as help from "./uiHelp";
 import * as panels from "./uiPanels";
@@ -27,6 +27,8 @@ export type Tool = { type: "build"; kind: FacilityKind } | { type: "bulldoze" } 
 export interface UICallbacks {
   /** The live tower's catalog (#921), re-read per call. */
   getCatalog(): Catalog;
+  /** The lobby tool's height choice (#308), for the Lobby card's picker. */
+  lobbyHeight(): LobbyHeightPicker;
   onSelectTool(tool: Tool): void;
   onSpeed(speed: number): void;
   /** The live game-speed index, so a dialog can pause and restore the tower. */
@@ -217,11 +219,18 @@ export class UI {
     document.querySelectorAll(".pal-item").forEach((x) => x.classList.remove("active"));
     if (tool.type === "build") {
       document.querySelector(`.pal-item[data-kind="${tool.kind}"]`)?.classList.add("active");
-      render(toolInfoFor(this.cb.getCatalog(), tool.kind), this.el.toolInfo);
+      render(toolInfoFor(this.cb.getCatalog(), tool.kind, this.lobbyPicker()), this.el.toolInfo);
     } else {
       document.querySelector(`.pal-item[data-tool="${tool.type}"]`)?.classList.add("active");
       render(tool.type === "bulldoze" ? BULLDOZE_TOOL_INFO : INSPECT_TOOL_INFO, this.el.toolInfo);
     }
+  }
+
+  /** The Lobby card's height picker (#308): a pick redraws the card. */
+  lobbyPicker(): LobbyHeightPicker {
+    const choice = this.cb.lobbyHeight();
+    const redraw = () => this.tool.type === "build" && render(toolInfoFor(this.cb.getCatalog(), this.tool.kind, this.lobbyPicker()), this.el.toolInfo);
+    return { picked: choice.picked, pick: (h) => (choice.pick(h), redraw()) };
   }
 
   setTowerName(name: string): void {

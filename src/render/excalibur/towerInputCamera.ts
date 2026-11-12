@@ -152,10 +152,10 @@ function pointerDown(engine: TowerEngine, ev: ex.PointerEvent): void {
   finishLongPress(engine); // an orphaned peek (lost release) dismisses its card, not just the latch
   const touch = ev.pointerType === "Touch";
   engine.downTouch = touch;
-  // Pan key: the game's Space hold (spacePanKey) as this press went down, or
-  // Shift off the native pointer event. Down-only: releasing it mid-drag keeps the pan.
-  const native = ev.nativeEvent as (Event & { shiftKey?: boolean }) | undefined;
-  const panKey = engine.spacePanKey?.(native) === true || native?.shiftKey === true;
+  // Pan key: the game's Space hold (spacePanKey) as this press went down, or Shift alone (Ctrl+Shift
+  // or Cmd+Shift is the three-story lobby, #308). Down-only: releasing it mid-drag keeps the pan.
+  const native = ev.nativeEvent as (Event & { shiftKey?: boolean; ctrlKey?: boolean; metaKey?: boolean }) | undefined;
+  const panKey = engine.spacePanKey?.(native) === true || (native?.shiftKey === true && !native.ctrlKey && !native.metaKey);
   // Left-click on a selected elevator's extend arrow grows the shaft. A held
   // pan key skips the arrow: the modifier promises the drag only pans.
   if (buttonNum(ev) === 0 && !panKey && engine.onExtendTo) {

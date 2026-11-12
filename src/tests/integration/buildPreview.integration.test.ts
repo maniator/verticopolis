@@ -70,6 +70,7 @@ function makeApp(
     build: overrides.build ?? {},
     inspectAnchor: null as unknown,
     buildRefusalShowing: overrides.buildRefusalShowing ?? false,
+    lobbyHeight: { height: 1 },
   };
   return { app: app as unknown as GameApp, raw: app, showInspector, engine: view };
 }

@@ -185,7 +185,7 @@ shapes for each one.
 | `canBuild(kind, floor, x)` | The dry run of `build`: `{ ok, reason?, cost }`, with the full price (floor tiles and bridging included). |
 | `build(kind, floor, x)` | Place a facility with its left edge at `x`. `{ ok, reason? }`. `kind` is a catalog `key` such as `"office"`, `"condo"` or `"hotelSingle"`. |
 | `paintBrush(kind, floor, tilesJson)` | Lay floor or lobby tiles along a stroke in one command. `{ placed, reason? }`. |
-| `setLobbyHeight(height)`, `lobbyHeights()` | How many stories (1 to 3) a floor's first lobby rises from now on, where the mode lets that floor's lobby rise (the catalog's `rules`; Classic only the ground floor), and every taller lobby as flat `[floor, height, ...]` pairs. A lobby's height never changes once built. |
+| `setLobbyHeight(height)`, `lobbyRise(floor)`, `lobbyHeights()` | How many stories (1 to 3) a floor's first lobby rises from now on, where the mode lets that floor's lobby rise (the catalog's `rules.tallSkyLobbies`; the ground lobby always may), how many a lobby tile laid on `floor` would rise now, and every taller lobby as flat `[floor, height, ...]` pairs. A lobby's height never changes once built, and it costs the lobby price per story. |
 | `buildTransport(kind, x, bottom, top)` | Place stairs, an escalator or an elevator shaft between two floors. `{ ok, reason? }`. |
 | `validateTransport(kind, x, bottom, top)` | The same check without building. |
 | `addCar(id)`, `removeCar(id)` | Add or remove an elevator car, charging or refunding it. `{ ok, reason?, delta }`. |

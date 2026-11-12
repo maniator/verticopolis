@@ -1,3 +1,4 @@
+import type { LobbyHeightPicker } from "../ui/templates/toolInfo";
 import { trackAppAction } from "../analytics";
 import { wellFormed } from "../shared/wellFormed";
 import type { UICallbacks, Tool } from "../ui/UI";
@@ -45,6 +46,8 @@ export interface GameAppPorts {
   >;
   readonly editor: Pick<EditorActions, "handleEditAction" | "renameTower">;
   readonly inspector: Pick<InspectorController, "dismiss">;
+  /** The lobby tool's height choice (#308), which the Lobby card picks. */
+  readonly lobbyHeight: LobbyHeightPicker;
 
   handleSelectTool(tool: Tool): void;
   setSpeed(speed: number): void;
@@ -85,6 +88,7 @@ export interface GameAppPorts {
 export function createUICallbacks(app: GameAppPorts): UICallbacks {
   return {
     getCatalog: () => app.getCatalog(),
+    lobbyHeight: () => app.lobbyHeight,
     onSelectTool: (tool) => app.handleSelectTool(tool),
     onSpeed: (speed) => app.setSpeed(speed),
     getSpeed: () => app.getSpeed(),

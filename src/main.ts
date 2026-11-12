@@ -27,7 +27,8 @@ import { wireControllers, runBootFlow } from "./game/appBoot";
 import { wireEngine } from "./game/engineWiring";
 import { bindKeys } from "./game/inputKeys";
 import { SPEEDS, applySpeed } from "./game/frameLoop";
-import { placeSimpleBuild, updateBuildPreview, isTransportTool, pickedAt, clearBuildRefusal } from "./game/buildPreview";
+import { placeSimpleBuild, updateBuildPreview, isTransportTool, pickedAt, clearBuildRefusal, refreshBuildPreview } from "./game/buildPreview";
+import { LobbyHeightChoice, trackLobbyHeightKeys } from "./game/lobbyHeight";
 import { toggleMute, setVolume, toggleReducedMotion, toggleSteadyClock, isSteadyClock, applyReducedMotion } from "./game/audioPrefs";
 import { showStats, showSaves, saveToSlot, loadFromSlot, deleteSlot } from "./game/appModals";
 import { refreshTraffic } from "./game/trafficHud";
@@ -148,6 +149,8 @@ class GameApp implements GameAppPorts {
   /** In-progress touch room-build gesture: `tile`/`floor` is the deferred room's
    *  target (finger for a tap, lifted on a drag); `o*`/`lifting` gate the latch. @internal */
   buildAnchor: { tile: number; floor: number; oTile: number; oFloor: number; lifting: boolean } | null = null;
+  /** The lobby tool's height (#308): the card's pick, or Ctrl / Ctrl+Shift held. @internal */
+  readonly lobbyHeight = new LobbyHeightChoice();
   /** Currently selected facility for the edit panel. @internal */
   selected: { type: "unit" | "transport"; id: number } | null = null;
   /** World cell the hover inspector tooltip is describing, so it can be
@@ -257,6 +260,8 @@ class GameApp implements GameAppPorts {
 
     wireEngine(this);
     bindKeys(this);
+    trackLobbyHeightKeys(this.lobbyHeight, window);
+    this.lobbyHeight.onChange(() => refreshBuildPreview(this));
     // Prime the UI once before the first paint. The palette starts with every
     // facility button present; without this pass a returning player (who skips
     // the splash) would briefly see the full locked catalog before the throttled

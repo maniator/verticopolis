@@ -22,6 +22,7 @@ function makePorts() {
   const reader = { header: { mode: "classic" as GameMode } };
   const ports: GameAppPorts = {
     getCatalog: vi.fn(() => catalogFor("classic")),
+    lobbyHeight: { picked: 2, pick: vi.fn() },
     reader,
     enginePort: { flipAutoBridge: vi.fn(() => Float64Array.of(1, 0, 0)), autoBridge: vi.fn(() => true) } as unknown as EnginePort,
     portCodes: new PortCodes(mockPort()),

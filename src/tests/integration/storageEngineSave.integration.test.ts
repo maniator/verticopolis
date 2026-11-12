@@ -167,7 +167,8 @@ describeEngines("save fields the engine keeps across a load", (leg: Leg) => {
     const beforeUnits = JSON.stringify(data.units);
     const sim = load(leg, data);
     const after = JSON.parse(sim.save()) as Save;
-    expect(after.version).toBe(parseEngineIdentity(readEngineIdentity(wasm()))!.saveVersion);
+    // No tall lobby (#308), so the engine stamps the plain format, one before its newest.
+    expect(after.version).toBe(parseEngineIdentity(readEngineIdentity(wasm()))!.saveVersion - 1);
     expect(after.money).toBe(data.money);
     expect(sim.state.tower.totalPopulation()).toBe(population);
     // Units survive the hop byte-for-byte (only the version stamp changed),

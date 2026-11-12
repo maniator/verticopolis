@@ -44,6 +44,9 @@ export interface BuildActionsDeps {
    *  allocation ever splits per type, this dep must carry the type too. */
   selectedId(): number | null;
   clearSelection(): void;
+  /** The height a floor's first lobby asks for (#308), handed to the engine
+   *  before each placement: the tool card's pick, or Ctrl / Ctrl+Shift held. */
+  lobbyHeight(): number;
 }
 
 export class BuildActions {
@@ -61,6 +64,7 @@ export class BuildActions {
   /** Build one facility; true when the engine placed it. */
   tryBuild(kind: FacilityKind, floor: number, x: number, quiet = false): boolean {
     const port = this.deps.enginePort();
+    port.setLobbyHeight(this.deps.lobbyHeight());
     const res = outcome(port, port.buildAt(this.deps.portCodes().kind(kind), floor, x));
     if (res.ok) {
       if (!quiet) this.deps.audio.sfx("build");
@@ -106,6 +110,7 @@ export class BuildActions {
     this.paint = { tile, floor };
     const port = this.deps.enginePort();
     const codes = this.deps.portCodes();
+    port.setLobbyHeight(this.deps.lobbyHeight());
     const rec = port.paintTiles(codes.kind(kind), floor, Float64Array.from(tiles));
     const placed = codes.slot(rec, "paintTiles", "placed");
     const res = outcome(port, rec);
@@ -121,7 +126,9 @@ export class BuildActions {
       const f = catalogFacility(catalog, laid);
       // The Floor tool's brush lays only where there is no floor yet, so each
       // tile paid for its floor too (catalogTileCost).
-      const perTile = catalogTileCost(catalog, laid, "no floor yet");
+      // A tall lobby (#308) pays the lobby price once per story.
+      const rise = port.lobbyRise(floor);
+      const perTile = catalogTileCost(catalog, laid, "no floor yet") + (rise - 1) * catalogTileCost(catalog, laid, "a floor tile");
       this.deps.ui.toast(
         `The ground floor is a ${f.name.toLowerCase()}, so a ${f.name.toLowerCase()} ($${groupDigits(perTile)}/tile) went here.`,
         "info",

@@ -271,6 +271,13 @@ export class Engine {
      * `[floor, height, ...]` pairs by floor. Empty when none is.
      */
     lobbyHeights(): Float64Array;
+    /**
+     * `lobbyRise(floor)` (#308): how many stories a lobby tile laid on
+     * `floor` now rises, from the height set by `setLobbyHeight` and the
+     * floor's own lobby: what `quoteBuild` prices a lobby tile at. 1 for a
+     * floor that is not a whole number.
+     */
+    lobbyRise(floor: number): number;
     logAfter(seq: number): Float64Array;
     logLine(text: string, kind: number): Float64Array;
     /**

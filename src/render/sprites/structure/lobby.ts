@@ -104,7 +104,7 @@ export function drawLobby(d: DrawCtx, u: UnitView, x: number, y: number, w: numb
  * every fourth column. A degenerate 1-tile lobby uses the compact grand-solo
  * fallback and shows none. Decoration reads only `lit`, `variant`, `ground`.
  */
-function drawLobbyTile(d: DrawCtx, x: number, y: number, w: number, h: number, variant: number, ground: boolean) {
+export function drawLobbyTile(d: DrawCtx, x: number, y: number, w: number, h: number, variant: number, ground: boolean) {
   const { ctx, lit } = d;
   const x0 = Math.round(x);
   const y0 = Math.round(y);
@@ -193,7 +193,7 @@ function drawLobbyTile(d: DrawCtx, x: number, y: number, w: number, h: number, v
 }
 
 /** Fluted column, cornice to floor, with a gold capital and base. */
-function fluteColumn(ctx: CanvasRenderingContext2D, cx: number, y0: number, hh: number, ground: boolean): void {
+export function fluteColumn(ctx: CanvasRenderingContext2D, cx: number, y0: number, hh: number, ground: boolean): void {
   ctx.fillStyle = ground ? "#F1E8CE" : "#E4EAF2";
   ctx.fillRect(cx - 1, y0 + 5, 3, hh - 12);
   ctx.fillStyle = "rgba(255,255,255,0.6)"; // fluted highlight
@@ -211,7 +211,7 @@ function fluteColumn(ctx: CanvasRenderingContext2D, cx: number, y0: number, hh: 
  *  few dim city lights, so the transfer floor no longer glares as a bright blue
  *  band against the muted floors around it; by day it is a low-contrast muted
  *  sky. A recessed slate mullion grid keeps the glass reading as background. */
-function skyGlass(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, lit: boolean, seed: number): void {
+export function skyGlass(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, lit: boolean, seed: number): void {
   const x0 = Math.round(x);
   const y0 = Math.round(y);
   const ww = Math.max(1, Math.round(w));
@@ -251,7 +251,7 @@ function skyGlass(ctx: CanvasRenderingContext2D, x: number, y: number, w: number
  *  grand-entrance tile (ground lobby), so the attendant no longer tiles every
  *  fourth column. Sky lobbies have no single-tile placement path, so they now
  *  show no attendant at all (a logged followup). */
-function consolePanel(ctx: CanvasRenderingContext2D, x0: number, ww: number, y0: number, floorTop: number, ground: boolean, lit: boolean): void {
+export function consolePanel(ctx: CanvasRenderingContext2D, x0: number, ww: number, y0: number, floorTop: number, ground: boolean, lit: boolean): void {
   const cx = x0 + Math.floor(ww / 2);
   const topY = floorTop - 5; // top of the console/bench, sitting on the floor
   if (ground) {
@@ -312,7 +312,7 @@ function consolePanel(ctx: CanvasRenderingContext2D, x0: number, ww: number, y0:
 }
 
 /** Chandelier: gold tiers on a chain, aglow after dark. */
-function chandelier(ctx: CanvasRenderingContext2D, cx: number, y0: number, lit: boolean, ww: number): void {
+export function chandelier(ctx: CanvasRenderingContext2D, cx: number, y0: number, lit: boolean, ww: number): void {
   ctx.fillStyle = "#8A7430";
   ctx.fillRect(cx, y0 + 3, 1, 3); // chain
   ctx.fillStyle = lit ? "#FFD76B" : "#C8A343";
@@ -329,7 +329,7 @@ function chandelier(ctx: CanvasRenderingContext2D, cx: number, y0: number, lit: 
 }
 
 /** Sky-lobby planter: a potted shrub standing on the floor. */
-function planter(ctx: CanvasRenderingContext2D, cx: number, floorTop: number): void {
+export function planter(ctx: CanvasRenderingContext2D, cx: number, floorTop: number): void {
   ctx.fillStyle = "#8C5A3A"; // brass pot
   ctx.fillRect(cx - 2, floorTop - 4, 5, 4);
   ctx.fillStyle = "rgba(255,255,255,0.3)";
@@ -343,7 +343,7 @@ function planter(ctx: CanvasRenderingContext2D, cx: number, floorTop: number): v
 }
 
 /** Wall sconce, warm when the evening lights come on. */
-function sconce(ctx: CanvasRenderingContext2D, cx: number, y0: number, lit: boolean): void {
+export function sconce(ctx: CanvasRenderingContext2D, cx: number, y0: number, lit: boolean): void {
   ctx.fillStyle = "#C9A24B";
   ctx.fillRect(cx - 1, y0 + 12, 3, 1);
   ctx.fillStyle = lit ? "#F8E2B4" : "#8A7A5C";
@@ -355,7 +355,7 @@ function sconce(ctx: CanvasRenderingContext2D, cx: number, y0: number, lit: bool
 }
 
 /** Framed print between the sky-lobby windows. */
-function framedPrint(ctx: CanvasRenderingContext2D, cx: number, y0: number): void {
+export function framedPrint(ctx: CanvasRenderingContext2D, cx: number, y0: number): void {
   ctx.fillStyle = "#8A7430";
   ctx.fillRect(cx - 2, y0 + 9, 5, 7);
   ctx.fillStyle = "#B9CADB";

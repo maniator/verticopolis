@@ -36,6 +36,8 @@ function setup(
 ) {
   const port = mockPort({
     lastReason: () => "The engine said no.",
+    setLobbyHeight: () => undefined,
+    lobbyRise: () => 1,
     ...answers,
   });
   const codes = new PortCodes(port);
@@ -55,6 +57,7 @@ function setup(
     audio: { sfx: vi.fn() },
     selectedId: vi.fn((): number | null => null),
     clearSelection: vi.fn(),
+    lobbyHeight: vi.fn(() => 1),
   } satisfies BuildActionsDeps;
   return { port, codes, tower, reader, deps, build: new BuildActions(deps) };
 }
@@ -71,6 +74,15 @@ describe("BuildActions.tryBuild", () => {
       10,
     );
     expect(deps.audio.sfx).toHaveBeenCalledExactlyOnceWith("build");
+  });
+
+  it("hands the asked lobby height to the engine before the build (#308)", () => {
+    const { build, deps, port } = setup({ buildAt: () => rec("buildAt", true) });
+    deps.lobbyHeight.mockReturnValue(2);
+    build.tryBuild("lobby", 1, 100);
+    expect(port.setLobbyHeight).toHaveBeenCalledExactlyOnceWith(2);
+    const order = (fn: unknown) => vi.mocked(fn as () => void).mock.invocationCallOrder[0];
+    expect(order(port.setLobbyHeight)).toBeLessThan(order(port.buildAt));
   });
 
   it("a refusal errors with the engine's reason; quiet plays nothing either way", () => {
@@ -177,6 +189,26 @@ describe("BuildActions.paintBrush", () => {
     build.paintBrush("floor", 20, 1);
     const lobby = catalogFacility(CATALOG, "lobby");
     const perTile = catalogTileCost(CATALOG, "lobby", "no floor yet");
+    expect(deps.ui.toast).toHaveBeenCalledExactlyOnceWith(
+      `The ground floor is a ${lobby.name.toLowerCase()}, so a ${lobby.name.toLowerCase()} ($${groupDigits(perTile)}/tile) went here.`,
+      "info",
+    );
+  });
+
+  it("hands the asked lobby height to the engine before the strip, and prices a tall lobby per story (#308)", () => {
+    const { build, deps, port, codes } = setup({
+      paintTiles: () => rec("paintTiles", true, { placed: 3 }),
+      lobbyRise: () => 3,
+    });
+    deps.lobbyHeight.mockReturnValue(3);
+    build.paintBrush("floor", 20, 1);
+    expect(port.setLobbyHeight).toHaveBeenCalledExactlyOnceWith(3);
+    const order = (fn: unknown) => vi.mocked(fn as () => void).mock.invocationCallOrder[0];
+    expect(order(port.setLobbyHeight)).toBeLessThan(order(port.paintTiles));
+    expect(port.lobbyRise).toHaveBeenCalledExactlyOnceWith(1);
+    expect(port.paintTiles).toHaveBeenCalledExactlyOnceWith(codes.kind("floor"), 1, Float64Array.from(brushTiles(20)));
+    const lobby = catalogFacility(CATALOG, "lobby");
+    const perTile = catalogTileCost(CATALOG, "lobby", "no floor yet") + 2 * catalogTileCost(CATALOG, "lobby", "a floor tile");
     expect(deps.ui.toast).toHaveBeenCalledExactlyOnceWith(
       `The ground floor is a ${lobby.name.toLowerCase()}, so a ${lobby.name.toLowerCase()} ($${groupDigits(perTile)}/tile) went here.`,
       "info",

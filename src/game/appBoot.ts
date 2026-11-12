@@ -79,6 +79,7 @@ export function wireControllers(app: GameApp): void {
     audio: app.audio,
     selectedId: () => app.selected?.id ?? null,
     clearSelection: () => app.clearSelection(),
+    lobbyHeight: () => app.lobbyHeight.height,
   });
   app.cardKit = createCardKit(app);
   app.inspector = new InspectorController({

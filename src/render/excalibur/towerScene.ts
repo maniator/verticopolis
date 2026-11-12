@@ -1,4 +1,5 @@
 import * as ex from "excalibur";
+import { drawTallLobbyEntrance, drawTallLobbyTile } from "../sprites/structure/tallLobby";
 import { Z } from "../depthPlanes";
 import { GROUND, groundBelowFloors } from "../sceneryLayout";
 import type { RenderSim } from "../renderSim";
@@ -205,6 +206,29 @@ export function bakeSharedGraphics(engine: TowerEngine): void {
   engine.entranceGrandRightGfx = [bakeGrand("grand-right")(false), bakeGrand("grand-right")(true)];
   engine.entranceGrandSoloGfx = [bakeGrand("grand-solo")(false), bakeGrand("grand-solo")(true)];
   engine.entranceServiceGfx = [bakeService(false), bakeService(true)];
+  // Tall lobby stories (#308): each cell draws the whole hall shifted up so
+  // only its own story lands on the canvas, so the slices line up into one
+  // hall. Baked on first use: a tower holds at most a few tall lobbies.
+  const tall = new Map<string, ex.Canvas>();
+  engine.tallLobbyGfx = (lit, ground, height, story, slot) => {
+    const key = `${lit ? 1 : 0}|${ground ? 1 : 0}|${height}|${story}|${slot}`;
+    let gfx = tall.get(key);
+    if (!gfx) {
+      const y = -(height - 1 - story) * FLOOR;
+      gfx = new ex.Canvas({
+        width: TILE,
+        height: FLOOR,
+        cache: true,
+        draw: (ctx) => {
+          const d = { ctx, lit, anim: 0, hour: lit ? 20 : 12 };
+          if (typeof slot === "string") drawTallLobbyEntrance(d, slot, 0, y, TILE, height * FLOOR, height);
+          else drawTallLobbyTile(d, 0, y, TILE, height * FLOOR, slot, ground, height);
+        },
+      });
+      tall.set(key, gfx);
+    }
+    return gfx;
+  };
   const bakeEsc = (side: "left" | "right") =>
     [0, 1].map(
       (p) =>

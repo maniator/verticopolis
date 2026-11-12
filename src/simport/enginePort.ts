@@ -317,6 +317,9 @@ export interface EnginePortView {
 export interface EnginePortCommands {
   buildAt(kind: number, floor: number, x: number): PortRecord;
   paintTiles(kind: number, floor: number, tiles: Float64Array): PortRecord;
+  /** The height, 1 to 3 stories, a floor's first lobby tile rises to from now
+   *  on (#308); `buildAt`, `paintTiles` and `quoteBuild` all use it. */
+  setLobbyHeight(height: number): void;
   buildShaft(kind: number, x: number, bottom: number, top: number): PortRecord;
   demolish(id: number, bulldoze: boolean): PortRecord;
   /** The floor or lobby tile at a cell, which the view gives no id (#1417). */
@@ -359,6 +362,8 @@ export interface EnginePortCommands {
 /** The queries (contract section 2). */
 export interface EnginePortQueries {
   quoteBuild(kind: number, floor: number, x: number): PortRecord;
+  /** How many stories a lobby tile laid on `floor` now rises (#308). */
+  lobbyRise(floor: number): number;
   quoteShaft(kind: number, x: number, bottom: number, top: number): PortRecord;
   /** What `rentBatch` would do, nothing written; `ok` 0 for an unpriced kind. */
   quoteRentBatch(kind: number, target: number, onlyDefault: boolean): PortRecord;
@@ -455,6 +460,9 @@ export interface EnginePortRender {
   parkingUsage(spots: number): number;
   /** The recycling bins' fill, 0 to 1. */
   recyclingFill(): number;
+  /** Every lobby taller than one story as flat `[floor, height, ...]` pairs
+   *  by floor (#308); read once per structure pass. */
+  lobbyHeights(): PortRecord;
   /** The population the working recycling centers can process. */
   recyclingCapacity(): number;
   /** Whether the working recycling centers can process the whole population. */

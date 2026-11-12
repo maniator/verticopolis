@@ -4,6 +4,7 @@ import type { SimView, UnitView, TransportView } from "../../simport/view";
 import type { RenderSim } from "../renderSim";
 import { PinchTracker } from "../pinchTracker";
 import type { DrawCtx } from "../sprites";
+import type { EntranceKind } from "../sprites/structure/lobby";
 // World-scale constants live in ../scale (pure); re-exported for consumers.
 import { FLOOR, TILE } from "../scale";
 
@@ -80,7 +81,7 @@ export class TowerEngine {
   // Set by the controller each frame; rendered by the overlay. `reason` is the
   // refusal string (only when `valid` is false AND the tower's catalog says the
   // preview names a refusal, `rules.previewNamesRefusal`; presentation only).
-  preview: { kind: FacilityKind; floor: number; x: number; valid: boolean; span?: number; reason?: string } | null = null;
+  preview: { kind: FacilityKind; floor: number; x: number; valid: boolean; span?: number; reason?: string; stories?: number } | null = null;
   transportPreview: { kind: FacilityKind; x: number; bottom: number; top: number; valid: boolean } | null = null;
   selectedId: number | null = null;
 
@@ -270,6 +271,10 @@ export class TowerEngine {
   /** The floor-1 service entrance tile, baked per [lit]. Static (`cache: true`)
    *  because it has no motion of its own. */
   entranceServiceGfx!: ex.Canvas[];
+  /** One story of a tall lobby's slice (#308), baked on first use and kept:
+   *  by lighting, ground or sky style, height, story (0 = the lobby's floor)
+   *  and pattern slot or entrance kind. */
+  tallLobbyGfx!: (lit: boolean, ground: boolean, height: number, story: number, slot: number | EntranceKind) => ex.Canvas;
   /** Per-tile entrance kind for the floor-1 lobby, refreshed at the top of every
    *  {@link reconcile.syncScene} sweep. Keyed by grid x; absent x takes the
    *  normal 4-variant cycle. Recomputed by walking the lobby's CONTIGUOUS runs so

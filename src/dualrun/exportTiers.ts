@@ -185,6 +185,7 @@ export const BINDING_EXPORT_TIERS = {
   lastReason: T2,
   quoteBuild: T2,
   lobbyHeights: T2,
+  lobbyRise: T2,
   quoteShaft: T2,
   quoteRentBatch: T2,
   shaftSchedule: T2,
