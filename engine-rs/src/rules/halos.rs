@@ -6,8 +6,9 @@
 
 use super::amenities::daycare_family_share;
 use super::{
-    AMENITY_CAP_LIFT_MAX, DAYCARE_HALO_FLOORS, DAYCARE_HALO_MAX, FITNESS_HALO_FLOORS,
-    FITNESS_HALO_MAX, NIGHTCLUB_NOISE_FLOORS, NIGHTCLUB_NOISE_MAX, SPA_SERENITY_FLOORS,
+    AMENITY_CAP_LIFT_MAX, AQUATIC_HALO_FLOORS, AQUATIC_HALO_MAX, DAYCARE_HALO_FLOORS,
+    DAYCARE_HALO_MAX, FITNESS_HALO_FLOORS, FITNESS_HALO_MAX, NIGHTCLUB_NOISE_FLOORS,
+    NIGHTCLUB_NOISE_MAX, PARTY_HALL_HALO_FLOORS, PARTY_HALL_HALO_MAX, SPA_SERENITY_FLOORS,
     SPA_SERENITY_MAX,
 };
 use crate::clock::GameMode;
@@ -38,8 +39,8 @@ pub struct Halo {
     /// The venue that casts it.
     pub source: Kind,
     pub effect: HaloEffect,
-    /// How far it reaches: a room `d` floors away feels
-    /// `max * (1 - d / floors)`, and none at `floors` or beyond.
+    /// How far it reaches: a room `d` floors from the venue's nearest story
+    /// feels `max * (1 - d / floors)`, and none at `floors` or beyond.
     pub floors: f64,
     /// The hourly bonus or drain on the venue's own floor.
     pub max: f64,
@@ -57,6 +58,19 @@ impl Halo {
         (self.felt_by)(kind)
     }
 
+    /// Whether the halo is felt in `hour`: always, or only while the venue
+    /// is open for one that follows its open hours.
+    pub fn is_felt_at(&self, hour: i64) -> bool {
+        !self.open_hours_only || self.source.is_open_at(hour)
+    }
+
+    /// How many floors a room on `floor` is from a venue whose lowest story
+    /// is `venue_floor`: from its nearer story, so 0 on any story it fills.
+    pub fn distance(&self, venue_floor: i64, floor: i64) -> i64 {
+        let top = venue_floor + self.source.floors() - 1;
+        (venue_floor - floor).max(floor - top).max(0)
+    }
+
     /// How far a lift raises a capped room's ceiling at full strength, or
     /// None for a drain.
     pub fn cap_lift_max(&self) -> Option<f64> {
@@ -72,8 +86,9 @@ fn is_home_or_hotel(kind: Kind) -> bool {
     is_home(kind) || kind.is_hotel()
 }
 
-/// A `static`, so every lookup hands out the same entries.
-static MODERN_HALOS: [Halo; 4] = [
+/// A `static`, so every lookup hands out the same entries. The hourly step
+/// applies the rows in this order, each clamped to 0 and 1 as it lands.
+static MODERN_HALOS: [Halo; 6] = [
     Halo {
         source: Kind::FitnessClub,
         effect: HaloEffect::Lift,
@@ -82,6 +97,15 @@ static MODERN_HALOS: [Halo; 4] = [
         open_hours_only: false,
         family_scaled: false,
         felt_by: is_home,
+    },
+    Halo {
+        source: Kind::Nightclub,
+        effect: HaloEffect::Drain,
+        floors: NIGHTCLUB_NOISE_FLOORS,
+        max: NIGHTCLUB_NOISE_MAX,
+        open_hours_only: true,
+        family_scaled: false,
+        felt_by: is_home_or_hotel,
     },
     Halo {
         source: Kind::Spa,
@@ -102,18 +126,27 @@ static MODERN_HALOS: [Halo; 4] = [
         felt_by: is_home,
     },
     Halo {
-        source: Kind::Nightclub,
-        effect: HaloEffect::Drain,
-        floors: NIGHTCLUB_NOISE_FLOORS,
-        max: NIGHTCLUB_NOISE_MAX,
-        open_hours_only: true,
+        source: Kind::AquaticCenter,
+        effect: HaloEffect::Lift,
+        floors: AQUATIC_HALO_FLOORS,
+        max: AQUATIC_HALO_MAX,
+        open_hours_only: false,
+        family_scaled: false,
+        felt_by: is_home_or_hotel,
+    },
+    Halo {
+        source: Kind::PartyHall,
+        effect: HaloEffect::Lift,
+        floors: PARTY_HALL_HALO_FLOORS,
+        max: PARTY_HALL_HALO_MAX,
+        open_hours_only: false,
         family_scaled: false,
         felt_by: is_home_or_hotel,
     },
 ];
 
 impl GameMode {
-    /// Every venue halo in this mode: the four Modern ones, none in Classic.
+    /// Every venue halo in this mode: the six Modern ones, none in Classic.
     pub fn halos(self) -> &'static [Halo] {
         match self {
             GameMode::Modern => &MODERN_HALOS,

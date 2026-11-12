@@ -28,12 +28,17 @@ const ROOMS: [Kind; 9] = [
 /// `venue` on the floor `distance` floors above when given. Returns the
 /// room's satisfaction after one step from 0.5.
 fn step(room: Kind, venue: Option<(Kind, i64)>) -> f64 {
+    step_beside(room, venue.map(|(kind, distance)| (kind, 3 + distance, C)))
+}
+
+/// As [`step`], with the venue's lowest story on `floor` at `x`.
+fn step_beside(room: Kind, venue: Option<(Kind, i64, i64)>) -> f64 {
     let mut sim: Simulation = lot_tower(5, GameMode::Modern, 12);
     let id = put(&mut sim, room, 3, C);
     seat(&mut sim, id, UnitState::Occupied, 0.5);
     sim.tower.get_unit_mut(id).unwrap().residents = Some(5);
-    if let Some((kind, distance)) = venue {
-        let v = put(&mut sim, kind, 3 + distance, C);
+    if let Some((kind, floor, x)) = venue {
+        let v = put(&mut sim, kind, floor, x);
         seat(&mut sim, v, UnitState::Occupied, 1.0);
     }
     sim.clock.minutes = 22.0 * 60.0;
@@ -45,7 +50,11 @@ fn step(room: Kind, venue: Option<(Kind, i64)>) -> f64 {
 #[test]
 fn the_step_moves_a_room_exactly_as_the_halo_table_says() {
     let halos = GameMode::Modern.halos();
-    assert_eq!(halos.len(), 4, "fitness club, spa, daycare and nightclub");
+    assert_eq!(
+        halos.len(),
+        6,
+        "fitness club, nightclub, spa, daycare, aquatic center and party hall"
+    );
     for room in ROOMS {
         let alone = step(room, None);
         for h in halos {
@@ -123,7 +132,11 @@ fn amenity_in(
     sim.tower.get_unit_mut(condo).unwrap().residents = Some(5);
     for &(kind, floor) in venues {
         // A venue on the condo's own floor stands further along it.
-        let x = if floor == 3 { C - 40 } else { C };
+        let x = if (floor..floor + kind.floors()).contains(&3) {
+            C - 40
+        } else {
+            C
+        };
         let v = put(&mut sim, kind, floor, x);
         seat(&mut sim, v, UnitState::Occupied, 1.0);
     }
@@ -165,4 +178,58 @@ fn the_inspector_names_the_amenity_that_lifts_a_room_most() {
     assert_eq!(amenity_near(GameMode::Classic, &[]), None);
     let gutted = amenity_in(modern, UnitState::Gutted, &[(Kind::FitnessClub, 4)]);
     assert_eq!(gutted, None, "a gutted room has no tenant to help");
+}
+
+#[test]
+fn the_aquatic_center_and_party_hall_lift_homes_and_hotel_rooms() {
+    let modern = GameMode::Modern;
+    for kind in [Kind::AquaticCenter, Kind::PartyHall] {
+        let h = modern.halo_of(kind).expect("listed");
+        assert_eq!(h.effect, HaloEffect::Lift, "{kind:?}");
+        assert!(!h.open_hours_only, "{kind:?} is felt at every hour");
+        for room in [Kind::Condo, Kind::RentalApartment, Kind::HotelSuite] {
+            assert!(h.felt_by(room), "{kind:?} lifts {room:?}");
+        }
+        assert!(!h.felt_by(Kind::Office), "{kind:?} does not lift an office");
+    }
+    let pool = modern.halo_of(Kind::AquaticCenter).unwrap();
+    let hall = modern.halo_of(Kind::PartyHall).unwrap();
+    assert!(
+        pool.floors > hall.floors && pool.max > hall.max,
+        "the pool outdoes the hall"
+    );
+    let pool_lift = amenity_near(modern, &[(Kind::AquaticCenter, 4)]);
+    let hall_lift = amenity_near(modern, &[(Kind::PartyHall, 4)]);
+    assert_eq!(pool_lift.map(|a| a.0), Some("aquaticCenter"));
+    assert_eq!(hall_lift.map(|a| a.0), Some("partyHall"));
+}
+
+/// A two-story venue reaches from its nearer story: a room on either story
+/// it fills feels it at full strength, and one a floor above its top story
+/// feels it one floor away.
+#[test]
+fn a_two_story_venue_reaches_from_its_nearer_story() {
+    let modern = GameMode::Modern;
+    let pool = modern.halo_of(Kind::AquaticCenter).unwrap();
+    assert_eq!(Kind::AquaticCenter.floors(), 2);
+    assert_eq!(pool.distance(2, 2), 0);
+    assert_eq!(pool.distance(2, 3), 0, "its upper story");
+    assert_eq!(pool.distance(2, 4), 1);
+    assert_eq!(pool.distance(2, 0), 2);
+    let gym = modern.halo_of(Kind::FitnessClub).unwrap();
+    assert_eq!(gym.distance(2, 3), 1, "a one-story venue");
+    // The step agrees: the pool on floors 2 and 3 lifts the condo on 3 as
+    // much as a pool whose lowest story is the condo's floor, and more than
+    // one on floors 4 and 5.
+    let beside = |floor: i64| step_beside(Kind::Condo, Some((Kind::AquaticCenter, floor, C - 40)));
+    let (upper, level, above) = (beside(2), beside(3), beside(4));
+    assert_eq!(
+        upper, level,
+        "the upper story counts as the venue's own floor"
+    );
+    assert!(above < upper, "a pool on floors 4 and 5 is a floor away");
+    assert_eq!(
+        amenity_near(modern, &[(Kind::AquaticCenter, 2)]),
+        Some(("aquaticCenter", crate::rules::AMENITY_CAP_LIFT_MAX))
+    );
 }

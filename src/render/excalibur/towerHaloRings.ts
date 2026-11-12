@@ -3,9 +3,10 @@ import { FLOOR, TILE } from "../scale";
 
 /**
  * The range rings a venue paints while it is being placed (#1980): one band
- * across the lot for every floor its halo reaches, the venue's own floor
+ * across the lot for every floor its halo reaches, the venue's own stories
  * included, as strong as the engine makes it there (`max * (1 - d / floors)`,
- * from the catalog's halo), then a dashed outline around the whole reach. A
+ * from the catalog's halo, with `d` counted from the venue's nearer story),
+ * then a dashed outline around the whole reach. A
  * lift paints green, a drain violet. Classic venues have no halo, so nothing
  * is painted there.
  */
@@ -36,18 +37,32 @@ export function haloStrength(halo: CatalogHalo, d: number): number {
   return d < 0 || d >= halo.floors ? 0 : 1 - d / halo.floors;
 }
 
-/** Paint `halo`'s rings around a venue placed on `floor`. */
-export function drawHaloRings(ctx: CanvasRenderingContext2D, halo: CatalogHalo, floor: number, world: RingWorld, view: RingView): void {
+/** How many floors `f` is from a venue whose lowest story is `floor` and
+ *  that fills `stories`: 0 on any story it fills, as the engine counts it. */
+export function storyDistance(f: number, floor: number, stories: number): number {
+  return Math.max(floor - f, f - (floor + stories - 1), 0);
+}
+
+/** Paint `halo`'s rings around a venue placed with its lowest story on
+ *  `floor`, filling `stories`. */
+export function drawHaloRings(
+  ctx: CanvasRenderingContext2D,
+  halo: CatalogHalo,
+  floor: number,
+  stories: number,
+  world: RingWorld,
+  view: RingView,
+): void {
   const color = halo.effect === "lift" ? LIFT_COLOR : DRAIN_COLOR;
   const left = view.worldToScreenX(0);
   const width = world.lotWidth * TILE * view.cam.zoom;
   const height = FLOOR * view.cam.zoom;
   const reach = Math.ceil(halo.floors) - 1;
-  const top = Math.min(world.maxFloor, floor + reach);
+  const top = Math.min(world.maxFloor, floor + stories - 1 + reach);
   const bottom = Math.max(world.minFloor, floor - reach);
   ctx.fillStyle = color;
   for (let f = bottom; f <= top; f++) {
-    const strength = haloStrength(halo, Math.abs(f - floor));
+    const strength = haloStrength(halo, storyDistance(f, floor, stories));
     if (strength <= 0) continue;
     ctx.globalAlpha = BAND_ALPHA * strength;
     ctx.fillRect(left, view.worldToScreenY(f), width, height);

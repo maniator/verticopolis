@@ -1,5 +1,6 @@
-//! Modern's amenity halos: the fitness club, nightclub, spa and daycare
-//! effects on nearby floors, and how far they lift a capped room.
+//! Modern's amenity halos: the fitness club, nightclub, spa, daycare,
+//! aquatic center and party hall effects on nearby floors, and how far they
+//! lift a capped room.
 
 use super::households::{HOUSEHOLD_SIZES, MAX_HOUSEHOLD};
 use crate::clock::GameMode;
@@ -17,13 +18,21 @@ pub const SPA_SERENITY_FLOORS: f64 = 5.0;
 pub const SPA_SERENITY_MAX: f64 = 0.03;
 pub const DAYCARE_HALO_FLOORS: f64 = 4.0;
 pub const DAYCARE_HALO_MAX: f64 = 0.035;
+/// The aquatic center's reach: the priciest amenity reaches furthest, and it
+/// is the one both homes and hotel rooms feel.
+pub const AQUATIC_HALO_FLOORS: f64 = 6.0;
+pub const AQUATIC_HALO_MAX: f64 = 0.035;
+/// The party hall's reach: a small lift for the cheapest venue, so it does not
+/// outdo the aquatic center for a quarter of the price.
+pub const PARTY_HALL_HALO_FLOORS: f64 = 3.0;
+pub const PARTY_HALL_HALO_MAX: f64 = 0.02;
 /// The share of the daycare's bonus the smallest household (two people)
 /// feels; it rises in equal steps to the whole bonus for the largest one.
 pub const DAYCARE_SMALLEST_FAMILY_SHARE: f64 = 0.4;
-/// How far a fitness club, spa or daycare at full strength raises a room's
-/// ceiling when noise, a far lobby or unmet demand caps it (Modern). It fades
-/// with distance exactly as the amenity's bonus does, and a room takes the
-/// largest single lift around it, never a sum.
+/// How far an amenity (any lift in `GameMode::halos`) at full strength
+/// raises a room's ceiling when noise, a far lobby or unmet demand caps it
+/// (Modern). It fades with distance exactly as the amenity's bonus does,
+/// and a room takes the largest single lift around it, never a sum.
 pub const AMENITY_CAP_LIFT_MAX: f64 = 0.15;
 
 #[doc(hidden)]

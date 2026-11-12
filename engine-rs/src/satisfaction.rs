@@ -2,12 +2,11 @@
 
 use indexmap::IndexMap;
 
+use crate::clock::GameMode;
 use crate::demand::{compute_demand_map, origin_demand, unmet_coverage, DemandMap};
 use crate::econ::{rent_config, rent_of};
 use crate::facilities::Kind;
-use crate::rules::{
-    CLASSIC_HOUSEHOLD, DAYCARE_HALO_MAX, FITNESS_HALO_MAX, NO_DRAIN, SPA_SERENITY_MAX,
-};
+use crate::rules::{HaloEffect, CLASSIC_HOUSEHOLD, NO_DRAIN};
 use crate::sim::Simulation;
 use crate::tower::Unit;
 
@@ -43,7 +42,9 @@ pub fn names_gripe(satisfaction: f64) -> bool {
 pub(crate) fn casts_halo(c: &Unit) -> bool {
     match c.kind {
         Kind::FitnessClub => c.is_tenanted(),
-        Kind::Nightclub | Kind::Spa | Kind::Daycare => c.is_operational(),
+        Kind::Nightclub | Kind::Spa | Kind::Daycare | Kind::AquaticCenter | Kind::PartyHall => {
+            c.is_operational()
+        }
         _ => false,
     }
 }
@@ -52,14 +53,12 @@ pub struct SatisfactionContext {
     pub cong_map: Option<IndexMap<i64, f64>>,
     pub global_cong: f64,
     pub served_set: std::collections::HashSet<i64>,
-    pub club_floors: Vec<i64>,
-    /// Every operational nightclub's floor, open or not.
-    pub nightclub_floors: Vec<i64>,
-    /// Whether the nightclubs are open in the hour this context is stepped
-    /// for: they disturb the homes around them only then.
-    pub nightclub_open: bool,
-    pub spa_floors: Vec<i64>,
-    pub daycare_floors: Vec<i64>,
+    /// For each row of `GameMode::halos`, in order, every story a served
+    /// venue casting it fills, open or not.
+    pub halo_floors: Vec<Vec<i64>>,
+    /// The hour this context is stepped for: a halo that follows its venue's
+    /// hours (the nightclub's) is felt only while the venue is open then.
+    pub hour: i64,
     pub demand_map: Option<DemandMap>,
     /// This hour's recycling and office parking coverage, read once.
     pub shortfalls: ServiceShortfalls,
@@ -87,6 +86,15 @@ fn nearest_floor_dist(floors: &[i64], floor: i64) -> f64 {
         }
     }
     nearest
+}
+
+/// Add every story venue `c` fills to the list for the halo it casts in
+/// `mode`, if any. A venue that starts casting mid-hour (a fitness club
+/// leased this hour) is added the same way.
+pub(crate) fn note_halo_venue(halo_floors: &mut [Vec<i64>], mode: GameMode, c: &Unit) {
+    if let Some(i) = mode.halos().iter().position(|h| h.source == c.kind) {
+        halo_floors[i].extend(c.floor..c.floor + c.kind.floors());
+    }
 }
 
 /// `noiseBaseErosionFor`.
@@ -118,33 +126,18 @@ impl Simulation {
             }
         }
         let served_set = self.tower.served_floors();
-        // A nightclub disturbs the homes around it only while it is open.
-        let nightclub_open = Kind::Nightclub.is_open_at(self.clock.hour());
-        let mut club_floors = Vec::new();
-        let mut nightclub_floors = Vec::new();
-        let mut spa_floors = Vec::new();
-        let mut daycare_floors = Vec::new();
+        let mut halo_floors = vec![Vec::new(); self.mode.halos().len()];
         for c in self.tower.room_units() {
-            if !casts_halo(c) || !served_set.contains(&c.floor) {
-                continue;
-            }
-            match c.kind {
-                Kind::FitnessClub => club_floors.push(c.floor),
-                Kind::Nightclub => nightclub_floors.push(c.floor),
-                Kind::Spa => spa_floors.push(c.floor),
-                Kind::Daycare => daycare_floors.push(c.floor),
-                _ => {}
+            if casts_halo(c) && served_set.contains(&c.floor) {
+                note_halo_venue(&mut halo_floors, self.mode, c);
             }
         }
         SatisfactionContext {
             cong_map,
             global_cong,
             served_set,
-            club_floors,
-            nightclub_floors,
-            nightclub_open,
-            spa_floors,
-            daycare_floors,
+            halo_floors,
+            hour: self.clock.hour(),
             demand_map: None,
             shortfalls: self.service_shortfalls(),
         }
@@ -206,50 +199,27 @@ impl Simulation {
             let over = (rent_of(u.kind, u.rent, u.no_rate) - cfg.default) / cfg.default;
             s = (s - over * 0.07).min(1.0).max(0.0);
         }
-        let residential = u.kind == Kind::Condo || u.kind == Kind::RentalApartment;
         // The largest ceiling lift any nearby amenity gives this room.
         let mut amenity_lift: f64 = 0.0;
-        if residential && served && !ctx.club_floors.is_empty() {
-            let bonus = self
-                .mode
-                .fitness_halo_bonus(nearest_floor_dist(&ctx.club_floors, u.floor));
-            if bonus > 0.0 {
-                s = (s + bonus).min(1.0);
-                amenity_lift =
-                    amenity_lift.max(self.mode.amenity_cap_lift(bonus, FITNESS_HALO_MAX));
-            }
-        }
-        if (u.kind == Kind::Condo || u.kind.is_hotel() || u.kind == Kind::RentalApartment)
-            && served
-            && ctx.nightclub_open
-            && !ctx.nightclub_floors.is_empty()
-        {
-            let penalty = self
-                .mode
-                .nightclub_noise_penalty(nearest_floor_dist(&ctx.nightclub_floors, u.floor));
-            if penalty > 0.0 {
-                s = (s - penalty).max(0.0);
-            }
-        }
-        if u.kind.is_hotel() && served && !ctx.spa_floors.is_empty() {
-            let bonus = self
-                .mode
-                .spa_serenity_bonus(nearest_floor_dist(&ctx.spa_floors, u.floor));
-            if bonus > 0.0 {
-                s = (s + bonus).min(1.0);
-                amenity_lift =
-                    amenity_lift.max(self.mode.amenity_cap_lift(bonus, SPA_SERENITY_MAX));
-            }
-        }
-        if residential && served && !ctx.daycare_floors.is_empty() {
-            let bonus = self.mode.daycare_family_bonus(
-                nearest_floor_dist(&ctx.daycare_floors, u.floor),
-                u.residents.unwrap_or(0) as f64,
-            );
-            if bonus > 0.0 {
-                s = (s + bonus).min(1.0);
-                amenity_lift =
-                    amenity_lift.max(self.mode.amenity_cap_lift(bonus, DAYCARE_HALO_MAX));
+        if served {
+            let family = u.residents.unwrap_or(0) as f64;
+            for (h, floors) in self.mode.halos().iter().zip(&ctx.halo_floors) {
+                if floors.is_empty() || !h.felt_by(u.kind) || !h.is_felt_at(ctx.hour) {
+                    continue;
+                }
+                let d = nearest_floor_dist(floors, u.floor);
+                let strength = self.mode.halo_strength(h, d, family);
+                if strength <= 0.0 {
+                    continue;
+                }
+                match h.effect {
+                    HaloEffect::Lift => {
+                        s = (s + strength).min(1.0);
+                        amenity_lift =
+                            amenity_lift.max(self.mode.amenity_cap_lift(strength, h.max));
+                    }
+                    HaloEffect::Drain => s = (s - strength).max(0.0),
+                }
             }
         }
         let far_walk = (u.kind == Kind::Office || u.kind == Kind::RentalApartment)
@@ -371,11 +341,11 @@ impl Simulation {
         // run would let a tenant in beside one that evicts them overnight.
         // The newcomer adds to the trash and parking need it is judged by,
         // only while the probe runs.
-        let open_now = ctx.nightclub_open;
+        let hour_now = ctx.hour;
         ctx.shortfalls.set_candidate(Some(fresh_tenant_need(u)));
         let doomed = self.gate_horizon_dooms(&probe, ctx);
         ctx.shortfalls.set_candidate(None);
-        ctx.nightclub_open = open_now;
+        ctx.hour = hour_now;
         doomed
     }
 
@@ -385,7 +355,7 @@ impl Simulation {
         let mut s = 1.0;
         let now = self.clock.hour();
         for h in 0..GATE_HORIZON_HOURS {
-            ctx.nightclub_open = Kind::Nightclub.is_open_at((now + h) % 24);
+            ctx.hour = (now + h) % 24;
             let prev = s;
             s = self.satisfaction_step(probe, s, ctx).next;
             if s < VACATE_RESCIND {
