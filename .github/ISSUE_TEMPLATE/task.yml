@@ -1,0 +1,34 @@
+name: 🛠️ Task
+description: Internal work for maintainers and agents, such as a chore, a test, build or tooling change, a performance fix, a review follow-up or a backlog row.
+labels: ["task", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For work on the project itself that no player would report: cleanup, tests, build and CI, tooling, performance, or a follow-up from a code review. To report a problem in the game, use the Bug report, Feature request or SimTower parity report instead.
+  - type: textarea
+    id: what
+    attributes:
+      label: What and why
+      description: What needs doing, and why. Name the files, functions or rules involved, and link the PR, review or issue it came from.
+    validations:
+      required: true
+  - type: textarea
+    id: done
+    attributes:
+      label: Done when
+      description: How we will know it is finished, such as a test that passes, a check that holds, or a number that drops.
+    validations:
+      required: true
+  - type: input
+    id: backlog
+    attributes:
+      label: Backlog row
+      description: The row's story id in `_bmad-output/implementation-artifacts/backlog.md`, if the work has one.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing issues and this is not a duplicate.
+          required: true

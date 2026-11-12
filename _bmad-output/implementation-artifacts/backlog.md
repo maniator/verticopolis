@@ -41,11 +41,13 @@ How items flow:
    live issue. Create the issue when the row lands, with a plain title (no
    `[Bug]:` or `[P2]` style prefix: labels carry both), a type label (`bug` for
    a defect-shaped `review-deferral` or a `bug`; `enhancement` for a
-   `feature-request` or an improvement-shaped `review-deferral`, `perf`,
-   `design-decision` or `task`; `parity` for implemented behavior that diverges
-   from 1994; `documentation` for docs and process work), the row's priority as
-   a `P1`/`P2`/`P3` label, and the row's notes as the body with a pointer back
-   to the story id. The row's `Priority` cell owns the P label: when a push to
+   `feature-request` or an improvement-shaped `review-deferral`, `perf` or
+   `design-decision`; `task` for a `task` row or other internal work no player
+   would report; `parity` for implemented behavior that diverges from 1994;
+   `documentation` for docs and process work), the row's priority as a
+   `P1`/`P2`/`P3` label, and a body laid out in the issue form that type label
+   names (AGENTS.md, "Filing issues"), with the row's notes in its main field
+   and the story id in its backlog or reference field. The row's `Priority` cell owns the P label: when a push to
    `main` changes this file, and weekly, `backlog-priority-labels.yml` sets the
    matching label on each open issue a row cites, removes any other P label and
    `needs-triage`, and lists rows whose issue is no longer open. To change a

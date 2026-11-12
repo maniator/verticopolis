@@ -5,9 +5,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thanks for reporting a bug! Please check the [live build](https://verticopolis.com)
-        first, since the issue may already be fixed. The version line on the title screen (also in
-        Settings and in Help, under About) names the game's version and the Rust engine's version.
+        Thanks for reporting a bug! Please check the [live game](https://verticopolis.com) first, since it may already be fixed. The version line on the title screen (also in Settings, and in Help under About) tells us which version you played.
   - type: input
     id: version
     attributes:

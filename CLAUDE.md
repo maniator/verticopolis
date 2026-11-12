@@ -157,7 +157,10 @@ review skill. The BMAD agent rules live in `_bmad-output/project-context.md`.
   ("None" or "n/a: <reason>" where it does not apply), and check it with
   `npm run pr:check -- --body-file <file>`. The `PR template` workflow fails a
   description that drops a section. See `AGENTS.md` → "Pull request
-  descriptions".
+  descriptions". **Issues follow their issue form the same way:** an issue
+  filed through the API skips `.github/ISSUE_TEMPLATE/`, so write one
+  `### <field label>` section per field of the form its type label names,
+  check it with `npm run issue:check`, and see `AGENTS.md` → "Filing issues".
 - **Merge commits only** to `main` (never squash). Commit/push only when asked.
 - **Keep a branch's own history readable before it merges.** A tidy branch is
   a handful of commits that each state a real step. When review nitpicks pile

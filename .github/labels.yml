@@ -42,6 +42,9 @@ labels:
   - name: documentation
     color: "0075ca"
     description: Docs, README, or setup fixes
+  - name: task
+    color: "ededed"
+    description: Internal work with no player-facing report (the Task issue form)
 
   # --- mode ---
   - name: classic
@@ -58,6 +61,9 @@ labels:
   - name: needs-repro
     color: "d4c5f9"
     description: Awaiting a reproduction
+  - name: needs-form
+    color: "e4e669"
+    description: The body does not follow its issue form (set by issue-form.yml)
 
   - name: gate-1
     color: "0e8a16"
@@ -143,10 +149,12 @@ labels:
 #   gh label create parity        -c 231367 -d "Diverges from the 1994 SimTower original" --force
 #   gh label create security      -c b60205 -d "Security-relevant; triaged from a private report" --force
 #   gh label create documentation -c 0075ca -d "Docs, README, or setup fixes" --force
+#   gh label create task          -c ededed -d "Internal work with no player-facing report (the Task issue form)" --force
 #   gh label create classic       -c 5319e7 -d "Affects Classic (1994-faithful) towers" --force
 #   gh label create modern        -c 1d76db -d "Affects Modern (opt-in) towers" --force
 #   gh label create needs-triage  -c fbca04 -d "Not yet reviewed by a maintainer" --force
 #   gh label create needs-repro   -c d4c5f9 -d "Awaiting a reproduction" --force
+#   gh label create needs-form    -c e4e669 -d "The body does not follow its issue form (set by issue-form.yml)" --force
 #   gh label create gate-1        -c 0e8a16 -d "Needed before stage 1 of the engine cohort (3.0 priorities plan)" --force
 #   gh label create gate-3        -c d93f0b -d "Needed before the 3.0.0 flip (3.0 priorities plan)" --force
 #   gh label create engine-1.0    -c 5319e7 -d "Needed before the engine crate's 1.0.0 release (#893)" --force
