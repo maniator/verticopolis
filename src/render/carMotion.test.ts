@@ -74,6 +74,36 @@ describe("stepCarPursuit", () => {
     expect(maxTrail).toBeLessThan(26 * CAR_TAU + 1); // and near the designed speed x tau trail
   });
 
+  it("keeps up with a normal-speed car and lands on its stop while the sim car stands there", () => {
+    // The morning speed-1 rate: 0.8 floors per game minute at 10 game minutes
+    // per second and the canon day curve's 1.35x pace, about 11 floors/s.
+    const rate = 11;
+    const s: CarDrawState = { pos: 0, vel: 0 };
+    let target = 0;
+    let cruiseTrail = 0;
+    for (let i = 0; i < 60; i++) {
+      target += rate * DT;
+      stepCarPursuit(s, target, DT);
+      if (i >= 30) cruiseTrail = Math.max(cruiseTrail, target - s.pos);
+    }
+    // The drawn car runs less than a floor behind, so riders who step off at
+    // the sim's stop step out of a car drawn at (or a moment from) their floor.
+    expect(cruiseTrail).toBeLessThan(1);
+    // The sim car stops on a floor: the drawn car settles there within a
+    // fifth of a second or so, while a lunch-hour stop still stands.
+    const stop = Math.ceil(target);
+    let settledAt = -1;
+    for (let i = 0; i < 60; i++) {
+      stepCarPursuit(s, stop, DT);
+      if (Math.abs(stop - s.pos) < 0.05) {
+        settledAt = i;
+        break;
+      }
+    }
+    expect(settledAt).toBeGreaterThanOrEqual(0);
+    expect(settledAt).toBeLessThan(18);
+  });
+
   it("CAP-2: speed ramps up from rest, peaks, then falls as the target nears, without crossing it", () => {
     const s: CarDrawState = { pos: 0, vel: 0 };
     const speeds = run(s, 5, 240);
