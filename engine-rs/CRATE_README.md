@@ -114,6 +114,12 @@ is [`engine-rs/consumer/`](https://github.com/maniator/verticopolis/tree/main/en
   or network, and spawns no thread or process. You pass in time (`tick`),
   file contents and timestamps, and you get bytes back to store wherever you
   like. A test in the repository holds the library to this.
+- **Threads are your choice.** `Simulation` is `Send`, so a native host can
+  own a game on a worker thread, send it commands over a channel and hand
+  frames back to the render thread. It is not `Sync` (it keeps internal
+  caches it fills while you read), so one thread drives a game at a time;
+  wrap it in a `Mutex` if several threads must reach it. The engine does the
+  same work on any thread, and `tests/threads.rs` holds both promises.
 - **It is deterministic.** The same seed, the same commands and the same
   sequence of `tick` calls give the same game on any machine, in this crate
   and in the WebAssembly build.
