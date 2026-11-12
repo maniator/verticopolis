@@ -227,7 +227,10 @@ fn the_story_above_still_comes_first_in_classic() {
 
 #[test]
 fn modern_bulldozes_a_floor_tile_in_the_middle() {
-    let mut sim = tower_in(GameMode::Modern);
+    // Through a save and a load, so a loaded Modern tower keeps its rule.
+    let sim = tower_in(GameMode::Modern);
+    let mut sim = crate::load_stream::load_save_text(sim.save_text().as_bytes()).unwrap();
+    assert_eq!(sim.tower.mode, GameMode::Modern);
     for floor in [4, 0, -1] {
         let id = floor_tile(&sim, floor, 50);
         assert!(
@@ -247,7 +250,7 @@ fn a_saved_classic_gap_loads_as_it_was_and_can_be_filled() {
     let gap = floor_tile(&sim, 4, 50);
     sim.tower.remove_unit(gap);
     let mut sim = crate::load_stream::load_save_text(sim.save_text().as_bytes()).unwrap();
-    assert_eq!(sim.mode, GameMode::Classic);
+    assert_eq!(sim.tower.mode, GameMode::Classic);
     assert!(sim.tower.unit_at(4, 50).is_none());
     assert!(sim.tower.unit_at(4, 49).is_some() && sim.tower.unit_at(4, 51).is_some());
     let money = sim.money;

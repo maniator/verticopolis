@@ -421,10 +421,11 @@
       {"step":"schedule the elevator","kind":"command","answer":{"status":1,"delta":0},"minute":420,"state":"274d2ed22a573a0d","crowd":"0f5484eca27c26bd","events":"4f53cda18c2baa0c","count":0},
       {"step":"raise the rent a step","kind":"command","answer":{"status":1,"delta":0,"rent":15000},"minute":420,"state":"0e2c1f44f205d9ae","crowd":"0f5484eca27c26bd","events":"14d20142df968562","count":1},
       {"step":"set No Rate on the office","kind":"command","answer":{"status":1,"delta":0},"minute":420,"state":"563e7f5147640ce9","crowd":"0f5484eca27c26bd","events":"14d20142df968562","count":1},
-      {"step":"sell the tile at floor 3, x 180","kind":"command","answer":{"status":1,"delta":250},"minute":420,"state":"739b6b47a18a5c37","crowd":"0f5484eca27c26bd","events":"0bc8258e13fe2383","count":1},
-      {"step":"move the top to floor 2","kind":"command","answer":{"status":1,"delta":0,"bottom":1,"top":2,"added":0},"minute":420,"state":"127f5f5da5157a8f","crowd":"0f5484eca27c26bd","events":"a29d256430ead131","count":1},
-      {"step":"play 60 minutes","kind":"play","answer":"first frame","minute":422,"state":"a47991d8de00c069","crowd":"0f5484eca27c26bd","events":"4f53cda18c2baa0c","count":0},
-      {"step":"play 60 minutes","kind":"play","answer":{"hour":8},"minute":482,"state":"01d88c451b6599b5","crowd":"0f5484eca27c26bd","events":"4f53cda18c2baa0c","count":0}
+      {"step":"sell the tile at floor 3, x 180, floor on both sides","kind":"command","answer":{"status":0,"delta":0,"reason":"Remove floor from either end. A Classic floor can't have a gap in the middle."},"minute":420,"state":"563e7f5147640ce9","crowd":"0f5484eca27c26bd","events":"4f53cda18c2baa0c","count":0},
+      {"step":"sell the tile at floor 3, x 199, the floor's end","kind":"command","answer":{"status":1,"delta":250},"minute":420,"state":"ad6881bc1d171b73","crowd":"0f5484eca27c26bd","events":"0bc8258e13fe2383","count":1},
+      {"step":"move the top to floor 2","kind":"command","answer":{"status":1,"delta":0,"bottom":1,"top":2,"added":0},"minute":420,"state":"0829bccac9ed707f","crowd":"0f5484eca27c26bd","events":"a29d256430ead131","count":1},
+      {"step":"play 60 minutes","kind":"play","answer":"first frame","minute":422,"state":"2208628749e3c040","crowd":"0f5484eca27c26bd","events":"4f53cda18c2baa0c","count":0},
+      {"step":"play 60 minutes","kind":"play","answer":{"hour":8},"minute":482,"state":"3284e081e882e804","crowd":"0f5484eca27c26bd","events":"4f53cda18c2baa0c","count":0}
     ],
     "the floor and lobby brush": [
       {"step":"start","kind":"start","answer":null,"minute":420,"state":"1e511637befc08ca","crowd":"b61bef4587f17939","events":"61704aba4769df8d","count":1},

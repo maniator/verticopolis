@@ -18,7 +18,7 @@ pub use types::{Extras, ExtrasMut, PlaceResult, ResizeResult, Transport, Unit, U
 
 /// The refusal for a Classic floor tile with floor on both sides: taking it
 /// out would leave a gap the story above could not be built across.
-pub const MID_FLOOR_GAP: &str =
+pub(crate) const MID_FLOOR_GAP: &str =
     "Remove floor from either end. A Classic floor can't have a gap in the middle.";
 
 pub struct Tower {

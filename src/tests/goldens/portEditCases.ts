@@ -298,7 +298,8 @@ const badValues = (good: number) =>
   ] as const;
 
 /** Malformed edits (#996, `dualRunEdits`' sixth test): each refused before
- *  anything moves, then the same edits, well formed, land. */
+ *  anything moves, then the same edits, well formed, land (the tile sale
+ *  from the floor's end, since Classic refuses a gap in the middle). */
 function malformedEdits(s: PortEditSession): void {
   const lift = liftTower(s, 3);
   s.done("build an office at floor 2, x 180", "buildAt", s.kind("office"), 2, 180);
@@ -323,7 +324,10 @@ function malformedEdits(s: PortEditSession): void {
   s.done("schedule the elevator", "scheduleShaft", lift, schedule);
   s.done("raise the rent a step", "stepRent", office, 1);
   s.done("set No Rate on the office", "noRate", office);
-  s.done("sell the tile at floor 3, x 180", "demolishTile", 3, 180, SELL);
+  // Classic keeps a floor whole (owner ruling, 2026-11-12): a tile with floor
+  // on both sides stays, and the floor comes out from its end.
+  s.refused("sell the tile at floor 3, x 180, floor on both sides", "demolishTile", 3, 180, SELL);
+  s.done("sell the tile at floor 3, x 199, the floor's end", "demolishTile", 3, 199, SELL);
   s.done("move the top to floor 2", "extendShaft", lift, TOP, 2);
   s.play(60);
 }
