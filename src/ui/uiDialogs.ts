@@ -441,7 +441,9 @@ export function showUpdatePrompt(
   };
   // Actions bind inline in the template; the controller keeps the fire-once logic
   // and the dismissal paths. No wireActions pass, no [data-act="close"].
-  ui.openModalTemplate(updatePromptTemplate(info, { onLater: later, onUpdate: update }));
+  // The release notes link opens a new tab, which in the installed app means
+  // leaving it for the system browser, so it shows in a browser tab only.
+  ui.openModalTemplate(updatePromptTemplate(info, { onLater: later, onUpdate: update }, { releaseNotesLink: !isInstalledStandalone() }));
   dialog.onclick = (e) => {
     if (e.target === dialog) later();
   }; // backdrop

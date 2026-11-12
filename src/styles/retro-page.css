@@ -224,6 +224,20 @@ body.retro-page {
   font-size: 13.5px;
 }
 
+/* A notice at the top of the page, such as the release notes page's
+   "Close this tab" note when the browser keeps a game-opened tab open. */
+.page-note {
+  max-width: 64ch;
+  margin: 0 0 14px;
+  padding: 6px 10px;
+  border: 1px solid var(--r-ink, currentColor);
+  font-weight: 700;
+}
+.page-note:focus-visible {
+  outline: 1px dotted currentColor;
+  outline-offset: 2px;
+}
+
 /* Card grid (the /help divergence cards; unused by the gallery, harmless). */
 .page-grid {
   display: grid;

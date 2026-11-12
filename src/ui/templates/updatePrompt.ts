@@ -73,9 +73,31 @@ function incomingNotes(notes: readonly string[]): TemplateResult | typeof nothin
     >${list}</div></div>`;
 }
 
+/** Presentation choices the controller makes for the update prompt. */
+export interface UpdatePromptOptions {
+  /** Show the "All release notes" link under the notes. The controller turns it
+   *  off in the installed app, where a new tab leaves the app for the browser. */
+  releaseNotesLink?: boolean;
+}
+
+/** The release notes page, at the incoming version's section when there is
+ *  one. `from=game` tells the page a running game opened it, so its "Back to
+ *  game" closes the tab instead of loading a second game (src/releaseNotesPage.ts). */
+export function releaseNotesHref(version: string | undefined): string {
+  const page = "/help/changelog?from=game";
+  return version ? `${page}#${encodeURIComponent(version)}` : page;
+}
+
+/** The "All release notes" link: opens the release notes page in a new tab,
+ *  so the prompt (and the tower behind it) stay where they are. */
+function releaseNotesLink(version: string | undefined): TemplateResult {
+  return html`<p class="whatsnew-all"><a href=${releaseNotesHref(version)} target="_blank" rel="noopener noreferrer" data-act="release-notes">All release notes<span class="visually-hidden"> (opens in a new tab)</span></a></p>`;
+}
+
 export function updatePromptTemplate(
   info: UpdateInfo | null | undefined,
   actions: UpdatePromptActions,
+  options: UpdatePromptOptions = {},
 ): TemplateResult {
   const notes = info?.notes ?? [];
   // Keep a real sha (it anchors a bug report to an exact build) but drop the
@@ -94,6 +116,7 @@ export function updatePromptTemplate(
       <p>A newer version of Verticopolis is ready. Update now saves your tower and reloads onto it. You won't lose any progress.</p>
       <p>Or keep playing: it'll apply next time you reopen.</p>
       ${notesBlock}
+      ${notesBlock !== nothing && options.releaseNotesLink ? releaseNotesLink(info?.version) : nothing}
       ${engineLine}
       ${buildLine}
       <div class="modal-actions">

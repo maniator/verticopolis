@@ -49,7 +49,10 @@ export function helpPageTemplate(): TemplateResult {
     title: "Verticopolis: How to Play",
     backHref: "/",
     main: body,
-    links: [{ href: "/gallery", label: "Sprite Gallery" }],
+    links: [
+      { href: "/help/changelog", label: "Release notes" },
+      { href: "/gallery", label: "Sprite Gallery" },
+    ],
   });
 }
 

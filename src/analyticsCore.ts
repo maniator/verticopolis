@@ -308,6 +308,7 @@ export type AppActionName =
   | "replay_onboarding"
   | "page_help"
   | "page_gallery"
+  | "page_changelog"
   // Preference toggles (detail carries the new on/off state).
   | "mute"
   | "reduced_motion"

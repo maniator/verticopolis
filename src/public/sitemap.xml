@@ -11,6 +11,11 @@
     <priority>0.6</priority>
   </url>
   <url>
+    <loc>https://verticopolis.com/help/changelog</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
     <loc>https://verticopolis.com/gallery</loc>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
