@@ -33,9 +33,12 @@ impl Simulation {
                 }
             }
         }
+        // The club drains only in its open hours, so the ladder weighs its
+        // average over the day against drains that run around the clock.
+        let open_share = Kind::Nightclub.open_hours_per_day() as f64 / 24.0;
         match nearest {
             None => 0.0,
-            Some(d) => self.mode.nightclub_noise_penalty(d as f64),
+            Some(d) => self.mode.nightclub_noise_penalty(d as f64) * open_share,
         }
     }
 

@@ -268,9 +268,12 @@ impl Simulation {
             let cap = (if far_walk || noisy { NOISE_CAP } else { 1.0 })
                 .min(lobby_drain.cap)
                 .min(unmet_drain.cap);
-            // A nearby amenity raises the ceiling; the capped flags above still
-            // read the raw caps, so the gripe ladder keeps naming the cause.
-            let cap = (cap + amenity_lift).min(1.0);
+            // A nearby amenity raises the ceiling that noise, a far lobby or
+            // unmet demand sets, never the one a far walk to transport sets
+            // (no gym shortens that walk). The capped flags above still read
+            // the raw caps, so the gripe ladder keeps naming the cause.
+            let lift = if far_walk { 0.0 } else { amenity_lift };
+            let cap = (cap + lift).min(1.0);
             s = (s - erosion).min(cap).max(0.0);
         }
         StepResult {

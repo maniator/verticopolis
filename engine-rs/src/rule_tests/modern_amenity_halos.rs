@@ -138,3 +138,24 @@ fn the_spa_and_daycare_make_no_noise_for_their_neighbors() {
     let u = unit(&control, id).clone();
     assert!(control.noise_afflicted(&u), "another venue still does");
 }
+
+#[test]
+fn an_amenity_never_lifts_the_far_walk_ceiling() {
+    // An apartment far along the floor from the only shaft walks too far to
+    // transport; a gym beside it does not shorten that walk.
+    let mut sim = lot_tower(14, GameMode::Modern, 4);
+    let apt = put(&mut sim, Kind::RentalApartment, 3, 10);
+    seat(&mut sim, apt, UnitState::Occupied, 1.0);
+    let u = sim.tower.get_unit_mut(apt).unwrap();
+    u.residents = Some(3);
+    u.ever_occupied = true;
+    open_venue(&mut sim, Kind::FitnessClub, 3, 40);
+    let s = run_hours(&mut sim, apt, 48).last().unwrap().1;
+    let r = {
+        let u = unit(&sim, apt).clone();
+        let mut ctx = sim.build_satisfaction_context(false);
+        sim.satisfaction_step(&u, u.satisfaction, &mut ctx)
+    };
+    assert!(r.far_walk, "the walk to transport is too far");
+    assert!(s <= NOISE_CAP + 1e-9, "held at the far-walk ceiling: {s}");
+}
