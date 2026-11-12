@@ -142,7 +142,7 @@ describe("bootGame engine", () => {
     const tower = create.mock.calls[0][0] as { port: unknown };
     expect(tower).toMatchObject({ port: { engine: "rust" }, corrupt: false });
     // The title screen's version line reads it as the app builds.
-    expect(seen).toEqual({ status: { engine: "wasm", hosted: true, lastError: null, lastFallback: null }, port: tower.port });
+    expect(seen).toEqual({ status: { engine: "wasm", hosted: true, lastError: null }, port: tower.port });
     expect(bootState()).toEqual({ build: "wasm-only", engine: "wasm", failure: null });
   });
 

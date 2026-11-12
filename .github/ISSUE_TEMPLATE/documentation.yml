@@ -1,18 +1,20 @@
 name: 📚 Documentation issue
-description: A README, setup, or canon-reference doc is wrong, unclear, or missing.
+description: A README, setup or canon-reference doc, the in-game Help, or the engine docs site is wrong, unclear, or missing.
 labels: ["documentation", "needs-triage"]
 body:
   - type: markdown
     attributes:
       value: |
-        For docs only: wrong setup steps, a broken script, unclear wording, or a
-        canon reference that contradicts `PARITY.md`. For gameplay bugs use the Bug
-        report; for parity discrepancies use the SimTower parity report.
+        For docs only: wrong setup steps, a broken script, unclear wording, a
+        canon reference that contradicts `PARITY.md`, a How to play section in the
+        game's Help that no longer matches the game, or a page on the
+        [engine docs site](https://docs.verticopolis.com). For gameplay bugs use the
+        Bug report; for parity discrepancies use the SimTower parity report.
   - type: input
     id: location
     attributes:
       label: Where is it?
-      description: File and section, or a link (e.g. README.md → "Play", CONTRIBUTING.md → "Versioning").
+      description: File and section, a Help section, or a link (e.g. README.md → "Play", Help → "Going further", a docs.verticopolis.com page).
       placeholder: README.md → Play
     validations:
       required: true

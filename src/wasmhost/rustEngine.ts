@@ -60,14 +60,14 @@ export function rustBootTower(mod: WasmModule): BootTower {
  *  engine through `port`. A trap that stops the game turns `hosted` off with
  *  the reason in `lastError`. */
 export interface RustEngineHandle {
-  status: { engine: "wasm"; hosted: boolean; lastError: string | null; lastFallback: null };
+  status: { engine: "wasm"; hosted: boolean; lastError: string | null };
   port: EnginePort;
 }
 
 /** Say that the Rust engine runs the game. Published before the app is
  *  built, so the title screen's version line reads it as it renders. */
 export function publishRustEngine(port: EnginePort, g: { __vcEngine?: RustEngineHandle } = globalThis as { __vcEngine?: RustEngineHandle }): RustEngineHandle {
-  const handle: RustEngineHandle = { status: { engine: "wasm", hosted: true, lastError: null, lastFallback: null }, port };
+  const handle: RustEngineHandle = { status: { engine: "wasm", hosted: true, lastError: null }, port };
   g.__vcEngine = handle;
   return handle;
 }

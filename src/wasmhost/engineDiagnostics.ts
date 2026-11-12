@@ -26,7 +26,7 @@ import type { BuildMetadataResult } from "./buildSection";
  */
 export type DiagnosticsState =
   | "ok"
-  | "typescript"
+  | "not-running"
   | "not-loaded"
   | "mismatch"
   | "unavailable";
@@ -50,9 +50,6 @@ export interface DiagnosticsHost {
   placement?: "worker";
   lastError?: string | null;
   droppedErrors?: number;
-  /** The code and stage of the latest fallback to the TypeScript engine
-   *  (`WasmHostStatus.lastFallback`); the worker host has none yet (#1086). */
-  lastFallback?: { reason: string; stage: string } | null;
 }
 
 export interface DiagnosticsInput {
@@ -128,37 +125,32 @@ function buildValue(build: BuildMetadataResult): string {
   return `unavailable (malformed: ${build.why})`;
 }
 
-/** Whether the current tower runs on the WASM engine. The host's status is the
+/** Whether the current tower runs on the Rust engine. The host's status is the
  *  authority when there is one: a later tower can be hosted after the first
- *  was refused, and a tower can fall back with no boot failure recorded. The
- *  boot state decides only when no host handle exists. */
+ *  was refused, and a tower can stop with no boot failure recorded. The boot
+ *  state decides only when no host handle exists. */
 function wasmRunning(input: DiagnosticsInput): boolean {
   if (input.host) return !!input.host.hosted;
   return input.boot?.engine === "wasm" && !input.boot.failure;
 }
 
+/** The Rust engine is the only engine (#1875), so a tower it does not run has
+ *  no engine at all. */
 function engineName(input: DiagnosticsInput): string {
-  if (input.boot?.engine === "none") return "none";
-  if (wasmRunning(input))
-    return input.host?.placement === "worker"
-      ? "Rust engine (worker)"
-      : "Rust engine";
-  return "TypeScript engine";
+  if (!wasmRunning(input)) return "none";
+  return input.host?.placement === "worker"
+    ? "Rust engine (worker)"
+    : "Rust engine";
 }
 
 /** The sentence for an engine that is not running, by where it stopped. */
-function failureSummary(
-  boot: EngineBootState,
-  stage: string,
-): string {
+function failureSummary(stage: string): string {
   const WHAT: Record<string, string> = {
     host: "The Rust engine stopped after a fault",
     start: "The Rust engine did not take the first tower",
   };
   const what = WHAT[stage] ?? "The Rust engine did not load";
-  return boot.engine === "none"
-    ? `${what}, and this build has no other engine.`
-    : `${what}, so the game is running on the TypeScript engine.`;
+  return `${what}, and this build has no other engine.`;
 }
 
 export function buildDiagnostics(input: DiagnosticsInput): DiagnosticsReport {
@@ -181,12 +173,10 @@ export function buildDiagnostics(input: DiagnosticsInput): DiagnosticsReport {
   let summary: string;
   if (!running && failure) {
     state = "not-loaded";
-    summary = failureSummary(boot as EngineBootState, failure.stage);
+    summary = failureSummary(failure.stage);
   } else if (!running) {
-    state = "typescript";
-    summary = host?.lastFallback
-      ? "The game fell back to the TypeScript engine for this tower."
-      : "The game is running on the TypeScript engine.";
+    state = "not-running";
+    summary = "The Rust engine is not running this tower.";
   } else if (mismatches.length > 0) {
     state = "mismatch";
     summary = "The Rust engine does not match the build this page expected.";
@@ -222,11 +212,6 @@ export function buildDiagnostics(input: DiagnosticsInput): DiagnosticsReport {
     rows.push({ label: "Reason", value: failure.reason });
     rows.push({ label: "Detail", value: cap(failure.message) });
   }
-  if (host?.lastFallback)
-    rows.push({
-      label: "Last fallback",
-      value: `${host.lastFallback.reason} at ${host.lastFallback.stage}`,
-    });
   if (host?.lastError)
     rows.push({ label: "Last engine error", value: cap(host.lastError) });
   if (host?.droppedErrors)

@@ -25,6 +25,7 @@ body:
         - Economy (rent, income, costs)
         - Tenants / population / star ratings
         - Events (fire, terrorism, etc.)
+        - 1994 .TDT save import / export
         - Other
     validations:
       required: true
@@ -39,7 +40,7 @@ body:
     id: current
     attributes:
       label: Current Verticopolis behavior
-      description: What does Verticopolis do instead? Include the build version and a repro if possible. For economy or population divergences, attach your saved tower export (`.vctower`) so we can reproduce the exact state.
+      description: What does Verticopolis do instead? Include the whole version line from the title screen and a repro if possible. For economy or population divergences, attach your tower so we can reproduce the exact state. GitHub does not accept `.vctower` files, so put the export in a `.zip`, or rename it to end in `.txt`, before attaching it. A `.TDT` file needs a `.zip` too.
     validations:
       required: true
   - type: input
