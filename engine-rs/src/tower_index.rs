@@ -44,6 +44,39 @@ use crate::tower::{Tower, Unit};
 /// What an index was built from: the tower revision and the unit count.
 pub type IndexKey = (i64, usize);
 
+/// Work counters the tests read to pin what an edit costs (#1977), so a
+/// per-floor walk or a per-pair landing read cannot come back unnoticed.
+/// Each thread counts its own work, so parallel tests never mix counts.
+#[cfg(test)]
+pub(crate) mod work_counts {
+    use std::cell::Cell;
+
+    thread_local! {
+        /// Rebuilds of the structural tile index (one pass over every unit).
+        pub(crate) static TILE_INDEX_BUILDS: Cell<usize> = const { Cell::new(0) };
+        /// Calls to `Tower::landing_segs`.
+        pub(crate) static LANDING_SEGS_CALLS: Cell<usize> = const { Cell::new(0) };
+    }
+
+    pub(crate) fn tile_index_built() {
+        TILE_INDEX_BUILDS.with(|n| n.set(n.get() + 1));
+    }
+
+    pub(crate) fn landing_segs_called() {
+        LANDING_SEGS_CALLS.with(|n| n.set(n.get() + 1));
+    }
+}
+
+/// Outside the tests the counters compile to nothing.
+#[cfg(not(test))]
+pub(crate) mod work_counts {
+    #[inline(always)]
+    pub(crate) fn tile_index_built() {}
+
+    #[inline(always)]
+    pub(crate) fn landing_segs_called() {}
+}
+
 /// Floor to the x of every structural tile on it, in unit order and with a
 /// unit's tiles left to right: the list `pickX` builds. A floor with no
 /// tiles has no entry.
@@ -244,6 +277,7 @@ impl Tower {
                 return tiles.get(&floor).cloned();
             }
         }
+        work_counts::tile_index_built();
         let mut rows: HashMap<i64, Vec<i64>> = HashMap::new();
         for u in &self.units {
             if u.kind.is_structural() && u.width > 0 {

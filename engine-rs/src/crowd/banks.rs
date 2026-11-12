@@ -56,3 +56,7 @@ pub fn balance_shafts(crowd: &mut Crowd, tower: &Tower, mut r: Route) -> Route {
     }
     r
 }
+
+#[cfg(test)]
+#[path = "banks_tests.rs"]
+mod tests;
