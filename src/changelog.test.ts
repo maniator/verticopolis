@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { marked } from "marked";
-import { escapeMarkdown, notesForVersion, recentReleaseNotes, releaseNoteLines } from "./changelog";
+import { allReleaseNotes, escapeMarkdown, notesForVersion, recentReleaseNotes, releaseNoteLines } from "./changelog";
 import { MAX_NOTES, MAX_NOTE_LEN, MAX_RELEASES } from "./pwaUpdateInfo";
 
 /**
@@ -243,5 +243,61 @@ describe("recentReleaseNotes (#1897)", () => {
     expect(releases[0]?.version).toBe(version);
     expect(releases.length).toBe(MAX_RELEASES);
     for (const r of releases) expect(r.notes.length).toBeGreaterThan(0);
+  });
+});
+
+describe("allReleaseNotes (the /help/changelog page)", () => {
+  const LONG = "x".repeat(MAX_NOTE_LEN + 50);
+  const LOG = `# Changelog
+
+Intro prose, not a section.
+
+## 3.0.2
+
+- Second **patch**, with [a link](https://example.com).
+
+## 3.0.1
+
+## v3.0.0 - 2026-10-01
+
+Some prose before the list.
+
+${Array.from({ length: MAX_NOTES + 2 }, (_, i) => `- Note ${i}.`).join("\n")}
+
+Prose between two lists.
+
+- A second list, which is not the section's notes.
+
+## [2.90.0]
+
+- ${LONG}
+`;
+
+  it("lists every section with notes, newest first, and skips one with none", () => {
+    expect(allReleaseNotes(LOG).map((r) => r.version)).toEqual(["3.0.2", "3.0.0", "2.90.0"]);
+  });
+
+  it("keeps every note whole: no note-count or length cap", () => {
+    const [, big, long] = allReleaseNotes(LOG);
+    expect(big.notes).toHaveLength(MAX_NOTES + 2);
+    expect(big.notes[MAX_NOTES + 1]).toBe(`Note ${MAX_NOTES + 1}.`);
+    expect(long.notes).toEqual([LONG]);
+  });
+
+  it("flattens markdown to plain text, as the update prompt does", () => {
+    expect(allReleaseNotes(LOG)[0].notes).toEqual(["Second patch, with a link."]);
+  });
+
+  it("returns [] for a file with no sections", () => {
+    expect(allReleaseNotes("# Changelog\n\n- Not under a version.\n")).toEqual([]);
+  });
+
+  it("agrees with notesForVersion (caps lifted) on every section of the real CHANGELOG.md", () => {
+    const real = readFileSync(resolve(__dirname, "..", "CHANGELOG.md"), "utf8");
+    const all = allReleaseNotes(real);
+    expect(all.length).toBeGreaterThan(MAX_RELEASES);
+    for (const r of all) {
+      expect(r.notes).toEqual(notesForVersion(real, r.version, { maxNotes: Infinity, maxLen: Infinity }));
+    }
   });
 });

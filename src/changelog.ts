@@ -17,7 +17,7 @@
  * re-sanitizes via `parseUpdateInfo`, so the caps here are belt-and-suspenders
  * that additionally keep `version.json` small.
  */
-import { marked, type Token } from "marked";
+import { marked, type Token, type Tokens } from "marked";
 import { MAX_NOTES, MAX_NOTE_LEN } from "./pwaUpdateInfo";
 
 /**
@@ -167,4 +167,31 @@ export function escapeMarkdown(text: string): string {
  */
 export function releaseNoteLines(changelog: string, version: string): string[] {
   return notesForVersion(changelog, version, { maxNotes: Infinity, maxLen: Infinity }).map((n) => `- ${escapeMarkdown(n.replace(/\s+/g, " "))}`);
+}
+
+/**
+ * Every version's player notes, newest first, as the release notes page
+ * (`/help/changelog`) shows them: each `## <version>` section with at least
+ * one bullet, every top-level bullet whole (no {@link MAX_NOTES} or
+ * {@link MAX_NOTE_LEN} cap, since the page is not the update prompt). A
+ * section with no bullets (an internal release) is left out. One pass over
+ * the file, read at build time only.
+ */
+export function allReleaseNotes(changelog: string): ReleaseNotes[] {
+  const out: ReleaseNotes[] = [];
+  let version: string | undefined;
+  let taken = false;
+  for (const tok of marked.lexer(changelog)) {
+    if (tok.type === "heading" && tok.depth === 2) {
+      version = headingVersion(tok.text);
+      taken = false;
+      continue;
+    }
+    if (tok.type !== "list" || version === undefined || taken) continue;
+    // The first list under a heading is the section's notes, as in notesForVersion.
+    taken = true;
+    const notes = (tok as Tokens.List).items.map((item) => plainText(item.tokens).trim()).filter((n) => n.length > 0);
+    if (notes.length > 0) out.push({ version, notes });
+  }
+  return out;
 }

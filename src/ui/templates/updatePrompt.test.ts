@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { updatePromptTemplate } from "./updatePrompt";
+import { releaseNotesHref, updatePromptTemplate } from "./updatePrompt";
 import { renderToFragment, click } from "../testing/litTestUtils";
 import type { UpdateInfo } from "../../pwa";
 
@@ -163,5 +163,48 @@ describe("updatePromptTemplate skipped versions (#1897)", () => {
       updatePromptTemplate(info({ releases: [rel("<img src=x>", "<script>x</script>"), rel("1.5.0", "<b>o</b>")], since: "<i>1</i>" }), noop),
     );
     expect(frag.querySelector("img, script, b, i")).toBeNull();
+  });
+});
+
+describe("updatePromptTemplate release notes link", () => {
+  const withNotes = info({ notes: ["One."] });
+  const link = (frag: DocumentFragment) => frag.querySelector<HTMLAnchorElement>('a[data-act="release-notes"]');
+
+  it("links to the incoming version's section of the release notes page, in a new tab", () => {
+    const a = link(renderToFragment(updatePromptTemplate(withNotes, noop, { releaseNotesLink: true })));
+    expect(a?.getAttribute("href")).toBe("/help/changelog?from=game#1.6.0");
+    expect(a?.getAttribute("target")).toBe("_blank");
+    expect(a?.getAttribute("rel")).toBe("noopener noreferrer");
+    expect(a?.textContent).toBe("All release notes (opens in a new tab)");
+  });
+
+  it("sits after the notes and before the actions, never in the actions row", () => {
+    const frag = renderToFragment(updatePromptTemplate(withNotes, noop, { releaseNotesLink: true }));
+    const a = link(frag)!;
+    expect(a.closest(".modal-actions")).toBeNull();
+    const whatsnew = frag.querySelector(".whatsnew")!;
+    const actions = frag.querySelector(".modal-actions")!;
+    expect(whatsnew.compareDocumentPosition(a) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(a.compareDocumentPosition(actions) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("also follows the skipped-versions log", () => {
+    const skipped = info({ notes: ["New."], releases: [{ version: "1.6.0", notes: ["New."] }, { version: "1.5.0", notes: ["Old."] }], since: "1.4.0" });
+    expect(link(renderToFragment(updatePromptTemplate(skipped, noop, { releaseNotesLink: true })))?.getAttribute("href")).toBe("/help/changelog?from=game#1.6.0");
+  });
+
+  it("is absent unless the controller asks for it (the installed app)", () => {
+    expect(link(renderToFragment(updatePromptTemplate(withNotes, noop)))).toBeNull();
+    expect(link(renderToFragment(updatePromptTemplate(withNotes, noop, { releaseNotesLink: false })))).toBeNull();
+  });
+
+  it("is absent when the update carries no notes to read more of", () => {
+    expect(link(renderToFragment(updatePromptTemplate(info(), noop, { releaseNotesLink: true })))).toBeNull();
+  });
+
+  it("encodes the version into the fragment and falls back to the page top", () => {
+    expect(releaseNotesHref("1.6.0")).toBe("/help/changelog?from=game#1.6.0");
+    expect(releaseNotesHref("1.6.0 beta")).toBe("/help/changelog?from=game#1.6.0%20beta");
+    expect(releaseNotesHref(undefined)).toBe("/help/changelog?from=game");
   });
 });

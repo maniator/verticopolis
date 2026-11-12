@@ -4,7 +4,7 @@ import { resolve } from "node:path";
 import { existsSync, readFileSync } from "node:fs";
 import { execSync } from "node:child_process";
 import { VitePWA } from "vite-plugin-pwa";
-import { notesForVersion, recentReleaseNotes, type ReleaseNotes } from "./src/changelog";
+import { allReleaseNotes, notesForVersion, recentReleaseNotes, type ReleaseNotes } from "./src/changelog";
 import { PACKAGE_STYLESHEET, isPackagePath } from "./src/build/thirdPartyNotices";
 import { entryWithIntegrity, precacheIntegrityTransform, readExpectedPackage } from "./src/build/enginePackageBuild";
 import { MAX_RELEASES, type BuildFingerprint } from "./src/pwaUpdateInfo";
@@ -31,6 +31,17 @@ function changelogNotes(): string[] {
 function changelogReleases(): ReleaseNotes[] {
   try {
     return recentReleaseNotes(readFileSync(resolve(__dirname, "CHANGELOG.md"), "utf8"), pkgVersion, MAX_RELEASES);
+  } catch {
+    return [];
+  }
+}
+
+/** Every version's notes, newest first and whole, for the release notes page
+ *  (`/help/changelog`, src/releaseNotesPage.ts). Empty when the file is
+ *  missing. */
+function changelogAllReleases(): ReleaseNotes[] {
+  try {
+    return allReleaseNotes(readFileSync(resolve(__dirname, "CHANGELOG.md"), "utf8"));
   } catch {
     return [];
   }
@@ -207,11 +218,11 @@ const SHARED_HEAD_TAGS: HtmlTagDescriptor[] = [
   { tag: "link", attrs: { rel: "apple-touch-icon", href: "./apple-touch-icon.png" }, injectTo: "head" },
 ];
 
-/** Inject the shared head tags into the three PUBLIC pages (the game, the
- *  gallery, and /help). `preview.html` is the noindex screenshot harness, so it
+/** Inject the shared head tags into the four PUBLIC pages (the game, the
+ *  gallery, /help and the release notes at /help/changelog). `preview.html` is the noindex screenshot harness, so it
  *  is deliberately left out. */
 function sharedHead(): Plugin {
-  const pages = new Set(["index.html", "gallery.html", "help.html"]);
+  const pages = new Set(["index.html", "gallery.html", "help.html", "release-notes.html"]);
   return {
     name: "shared-head",
     transformIndexHtml: {
@@ -293,6 +304,10 @@ export default defineConfig(({ command }) => ({
     // This build's game and engine parts, for the update prompt's label
     // (src/pwaUpdateInfo.ts `classifyUpdate`); version.json carries the same.
     __BUILD_FINGERPRINT__: JSON.stringify(fingerprintOf(command)),
+    // Every version's player notes for the release notes page
+    // (src/releaseNotesPage.ts). Only that page's module reads it, so the
+    // text lands in its own chunk and never in the game's bundle.
+    __RELEASE_NOTES__: JSON.stringify(changelogAllReleases()),
   },
   plugins: [
     captureOutDir((dir) => {
@@ -427,7 +442,7 @@ export default defineConfig(({ command }) => ({
         // the game shell: the PWA needs nothing that large, so it stays out
         // of every web player's offline precache (a review catch on the PR
         // that added it).
-        globIgnores: ["**/gallery*", "**/preview*", "**/og-image*", "**/help.html", "**/help-*.js", "**/help-media/**", "**/icon-1024x1024.png", "**/sw-navigation-fallback.js"],
+        globIgnores: ["**/gallery*", "**/release-notes*", "**/releaseNotes*", "**/preview*", "**/og-image*", "**/help.html", "**/help-*.js", "**/help-media/**", "**/icon-1024x1024.png", "**/sw-navigation-fallback.js"],
         // The worker's own helper, loaded by importScripts and updated with it,
         // so it stays out of the precache.
         importScripts: ["sw-navigation-fallback.js"],
@@ -511,6 +526,7 @@ export default defineConfig(({ command }) => ({
         main: resolve(__dirname, "src/index.html"),
         gallery: resolve(__dirname, "src/gallery.html"),
         help: resolve(__dirname, "src/help.html"),
+        releaseNotes: resolve(__dirname, "src/release-notes.html"),
         preview: resolve(__dirname, "src/preview.html"),
       },
       output: {

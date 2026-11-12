@@ -363,7 +363,10 @@ render(
       </div>
       <div class="gallery-scroll"><canvas id="gallery"></canvas></div>
     `,
-    links: [{ href: "/help", label: "Help" }],
+    links: [
+      { href: "/help", label: "Help" },
+      { href: "/help/changelog", label: "Release notes" },
+    ],
   }),
   document.getElementById("app")!,
 );

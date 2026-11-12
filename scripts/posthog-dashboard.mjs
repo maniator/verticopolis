@@ -527,9 +527,9 @@ function buildInsights(ids) {
       }),
     },
     {
-      name: "Standalone page landings (help & gallery)",
-      description: "Landings on the /help and /gallery pages (app_action page_help / page_gallery), production. These pages report nowhere else in PostHog.",
-      query: trends([series("app_action", "Landings")], { breakdown: "action", display: "ActionsBar", where: [inAction(["page_help", "page_gallery"])] }),
+      name: "Standalone page landings (help, gallery & release notes)",
+      description: "Landings on the /help, /gallery and /help/changelog pages (app_action page_help / page_gallery / page_changelog), production. These pages report nowhere else in PostHog.",
+      query: trends([series("app_action", "Landings")], { breakdown: "action", display: "ActionsBar", where: [inAction(["page_help", "page_gallery", "page_changelog"])] }),
     },
     {
       name: "Mute toggles by state",

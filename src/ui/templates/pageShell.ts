@@ -21,6 +21,10 @@ export interface PageShellOptions {
   footer?: TemplateResult;
   /** Title-bar app icon (defaults to the brand building). */
   icon?: IconName;
+  /** Runs on a click of either "Back to game" link, before its navigation.
+   *  A page the game opened in a new tab uses it to close itself instead of
+   *  loading a second copy of the game; the `href` stays for no-JS. */
+  onBack?: (e: MouseEvent) => void;
 }
 
 /**
@@ -38,9 +42,9 @@ export interface PageShellOptions {
  * this helper only supplies structure and the shared class names.
  */
 export function pageShell(opts: PageShellOptions): TemplateResult {
-  const { title, backHref, main, links = [], footer, icon = "brand" } = opts;
+  const { title, backHref, main, links = [], footer, icon = "brand", onBack } = opts;
   const back = (cls: string): TemplateResult =>
-    html`<a class="btn ${cls}" href=${backHref}>${iconTemplate("back", { size: 12 })}Back to game</a>`;
+    html`<a class="btn ${cls}" href=${backHref} data-act="back-to-game" @click=${onBack ?? nothing}>${iconTemplate("back", { size: 12 })}Back to game</a>`;
   return html`
     <main class="page-win win">
       <div class="win-title">

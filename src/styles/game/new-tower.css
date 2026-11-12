@@ -203,6 +203,12 @@
   font-style: italic;
   margin: 6px 0 0;
 }
+/* "All release notes": a quiet link under the notes, never beside the
+   actions, so it reads as more to read rather than a third choice. */
+.whatsnew-all {
+  margin: 6px 0 0;
+  font-size: 12px;
+}
 /* Incoming build id — quiet fine print under the prompt, never the headline.
    A long unbroken sha must wrap rather than force a horizontal scroll. */
 .build-id {
