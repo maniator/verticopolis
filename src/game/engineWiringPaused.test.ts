@@ -159,6 +159,20 @@ describe("a drag begun while the clock ran, after the game pauses", () => {
     expect(app.ui.toast, "the stop says why, once for the drag").toHaveBeenCalledExactlyOnceWith(UNPAUSE_TO_BUILD, "bad");
   });
 
+  it("lays no deferred touch strip on release in Classic, and says why once", () => {
+    vi.mocked(isPaintTool).mockReturnValue(true);
+    const { app, hooks } = makeApp("classic", PLAYING, FLOOR);
+    hooks.onActionDown!(10, 2, true, null);
+    expect(app.paintAnchor, "a touch paint defers to the move").not.toBeNull();
+    app.speed = PAUSED;
+    hooks.onActionMove!(12, 2, null);
+    hooks.onActionUp!();
+    expect(app.build.seedPaint).not.toHaveBeenCalled();
+    expect(app.build.paintFloorRun).not.toHaveBeenCalled();
+    expect(app.ui.toast).toHaveBeenCalledExactlyOnceWith(UNPAUSE_TO_BUILD, "bad");
+    expect(app.audio.sfx).toHaveBeenCalledExactlyOnceWith("error");
+  });
+
   it("commits no shaft on release in Classic, and says why once", () => {
     vi.mocked(isTransportTool).mockReturnValue(true);
     vi.mocked(placeSimpleBuild).mockReturnValue(null);

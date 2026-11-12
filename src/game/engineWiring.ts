@@ -202,7 +202,8 @@ export function wireEngine(app: GameApp): void {
     // nothing in a mode that refuses building while paused (#1936); the
     // release says why once.
     const pending = app.tool.type === "build" && (app.paintAnchor !== null || app.buildAnchor !== null || app.transportStart !== null);
-    const refused = pending && dragActs() && refuseAppPlacementWhilePaused(app);
+    // A drag whose moves already said why stays refused without a second note.
+    const refused = pending && dragActs() && (drag?.pausedNoted ? appPlacementPaused(app) : refuseAppPlacementWhilePaused(app));
     const acts = dragActs() && !refused;
     // Another gesture opened over the drag is that gesture's to close.
     const closes = drag === null || app.undoGesture() === drag.gesture;
