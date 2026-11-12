@@ -88,6 +88,17 @@ describe("reshapeIssueBody", () => {
     ).toBe("Classic");
   });
 
+  it("closes a fence the original left open so the next fields still read", () => {
+    const open = "Log follows:\n\n~~~~\n### not a field\nstack trace";
+    const out = reshapeIssueBody(open, ["bug"], bug);
+    const got = answers(out);
+    expect(got.get("What happened?")).toBe(`${open}\n~~~~`);
+    expect(got.get("Steps to reproduce")).toMatch(/^n\/a: filed before/);
+    expect(
+      checkIssueBody(out, bug).every((p) => p.includes("does not tick")),
+    ).toBe(true);
+  });
+
   it("marks an empty original as n/a instead of leaving the field blank", () => {
     expect(
       answers(reshapeIssueBody("  ", ["task"], task)).get("What and why"),

@@ -25,8 +25,12 @@ export function parseLabelList(text: string): Label[] {
   const lines = text.split(/\r?\n/);
   const labels: Label[] = [];
   for (let i = 0; i < lines.length; i++) {
-    const name = /^ {2}- name: (.+)$/.exec(lines[i])?.[1];
-    if (name === undefined) continue;
+    if (!/^\s*-/.test(lines[i])) continue;
+    const name = /^ {2}- name: *(\S.*)$/.exec(lines[i])?.[1];
+    if (name === undefined)
+      throw new Error(
+        `labels.yml: line ${i + 1} starts an entry that is not "  - name: <label>"`,
+      );
     const color = /^ {4}color: (.+)$/.exec(lines[i + 1] ?? "")?.[1];
     const description = /^ {4}description: (.+)$/.exec(lines[i + 2] ?? "")?.[1];
     const label = {

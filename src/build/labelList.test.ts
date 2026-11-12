@@ -47,6 +47,19 @@ describe("parseLabelList", () => {
     ).toThrow(/needs a quoted six-digit color and a description/);
   });
 
+  it("refuses an entry it cannot read instead of skipping it", () => {
+    const ok = '  - name: a\n    color: "aaaaaa"\n    description: x\n';
+    for (const bad of [
+      "  - name:",
+      "  - name:   ",
+      "  - title: b",
+      "    - name: b",
+    ])
+      expect(() => parseLabelList(`labels:\n${ok}${bad}\n`)).toThrow(
+        /line 5 starts an entry/,
+      );
+  });
+
   it("refuses a duplicate name and an empty list", () => {
     const one = '  - name: a\n    color: "aaaaaa"\n    description: x\n';
     expect(() => parseLabelList(`labels:\n${one}${one}`)).toThrow(

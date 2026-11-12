@@ -30,23 +30,25 @@ export function modeFromLabels(
   return undefined;
 }
 
-/** Demotes `### ` headings outside code fences to `#### `. */
+/**
+ * Demotes `### ` headings outside code fences to `#### `, and closes a fence
+ * the original left open, so the fields after it render as fields.
+ */
 export function demoteFieldHeadings(body: string): string {
   let fence: string | null = null;
-  return body
-    .split(/\r?\n/)
-    .map((line) => {
-      const marker = /^\s*(`{3,}|~{3,})/.exec(line)?.[1];
-      if (fence === null && marker) fence = marker;
-      else if (
-        fence !== null &&
-        marker?.[0] === fence[0] &&
-        marker.length >= fence.length
-      )
-        fence = null;
-      return fence === null && /^###\s/.test(line) ? `#${line}` : line;
-    })
-    .join("\n");
+  const lines = body.split(/\r?\n/).map((line) => {
+    const marker = /^\s*(`{3,}|~{3,})/.exec(line)?.[1];
+    if (fence === null && marker) fence = marker;
+    else if (
+      fence !== null &&
+      marker?.[0] === fence[0] &&
+      marker.length >= fence.length
+    )
+      fence = null;
+    return fence === null && /^###\s/.test(line) ? `#${line}` : line;
+  });
+  if (fence !== null) lines.push(fence);
+  return lines.join("\n");
 }
 
 /** True when the body already has every one of the form's headings. */
