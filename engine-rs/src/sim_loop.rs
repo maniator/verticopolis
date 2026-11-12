@@ -253,7 +253,7 @@ impl Simulation {
                 (None, None) => 0.0,
             };
             if self.clock.minutes >= threshold {
-                let (name, floor, kind) = (u.kind.facility().name, u.floor, u.kind);
+                let (name, floor, x, kind) = (u.kind.facility().name, u.floor, u.x, u.kind);
                 let mode = self.tower.mode;
                 let (u, at) = self.tower.marked_by_id(id).unwrap();
                 u.set_state(at, UnitState::Empty);
@@ -268,7 +268,7 @@ impl Simulation {
                 );
                 self.emit(&msg, LogKind::Good);
                 if kind == Kind::Security {
-                    self.join_bomb_search(floor);
+                    self.join_bomb_search(floor, x);
                 }
                 // A theater opens with its mode's first film free: a Classic
                 // new film fills the house tonight (#1932), so it is a

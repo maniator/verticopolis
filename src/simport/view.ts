@@ -124,14 +124,24 @@ export interface FxView {
   readonly treasure: { readonly floor: number; readonly x: number; readonly seq: number };
 }
 
-/** Classic's bomb search: the minute the bomb goes off, the floors guards
- *  are sweeping now and the floors already clear. The engine keeps the
- *  bomb's hiding place to itself. */
+/** Classic's bomb search: the minute the bomb goes off, the stretches of
+ *  floor guards are sweeping now and the floors with a stretch already
+ *  clear. A stretch is one tower's part of a floor on a lot with several
+ *  towers, the whole floor otherwise. The engine keeps the bomb's hiding
+ *  place to itself. */
 export interface BombSearchGuard {
   readonly floor: number;
+  /** The tile span of the stretch's rooms. */
   readonly left: number;
   readonly right: number;
   readonly from: number;
+  /** The left edge of the rooms the guard set off from: it takes the
+   *  emergency stairs beside them. */
+  readonly fromLeft: number;
+  /** The floor it walks down (or up) to before climbing to `floor`, when
+   *  the stretch is in another tower; `from` when the stairs lead straight
+   *  there. */
+  readonly turn: number;
   readonly start: number;
   readonly arrive: number;
   readonly done: number;
@@ -139,9 +149,9 @@ export interface BombSearchGuard {
 
 export interface BombSearchView {
   readonly deadline: number;
-  /** Each floor a guard is headed for or sweeping, with the tile span of
-   *  its rooms, the floor it set off from, and the minutes it left, reaches
-   *  the floor by the emergency stairs, and finishes the walk. */
+  /** Each stretch a guard is headed for or sweeping, with the tile span of
+   *  its rooms, where it set off from, and the minutes it left, reaches the
+   *  stretch by the emergency stairs, and finishes the walk. */
   readonly sweeping: readonly BombSearchGuard[];
   readonly searched: readonly number[];
   readonly seq: number;

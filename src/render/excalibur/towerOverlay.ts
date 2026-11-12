@@ -153,14 +153,22 @@ export function bombCountdownText(minutesLeft: number): string {
   return `💣 Bomb search: ${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")} left`;
 }
 
-/** Where a guard is at minute `now`: climbing the emergency stairs at the
- *  left edge of its floor's rooms from `from` to `floor` until `arrive`, then
- *  walking the rooms left to right until `done`. `floor` may be fractional
- *  on the stairs; `x` is in tiles. */
+/** Where a guard is at minute `now`: on the emergency stairs until
+ *  `arrive`, then walking the rooms left to right until `done`. On the
+ *  stairs it goes from `from` to `turn` beside the rooms it left
+ *  (`fromLeft`), then from `turn` to `floor` beside the rooms it is headed
+ *  for, so a guard crossing to another tower walks down to the floor they
+ *  share and back up instead of climbing through the sky between them. The
+ *  stairs time is split by floors. `floor` may be fractional on the stairs;
+ *  `x` is in tiles. */
 export function guardPosition(g: BombSearchGuard, now: number): { floor: number; x: number; climbing: boolean } {
   const part = (a: number, b: number): number => (b > a ? Math.min(1, Math.max(0, (now - a) / (b - a))) : 1);
   if (now < g.arrive) {
-    return { floor: g.from + (g.floor - g.from) * part(g.start, g.arrive), x: g.left - 1, climbing: true };
+    const down = Math.abs(g.turn - g.from);
+    const total = down + Math.abs(g.floor - g.turn);
+    const along = part(g.start, g.arrive) * total;
+    if (along < down) return { floor: g.from + Math.sign(g.turn - g.from) * along, x: g.fromLeft - 1, climbing: true };
+    return { floor: g.turn + Math.sign(g.floor - g.turn) * (along - down), x: g.left - 1, climbing: true };
   }
   return { floor: g.floor, x: g.left + (g.right - g.left) * part(g.arrive, g.done), climbing: false };
 }

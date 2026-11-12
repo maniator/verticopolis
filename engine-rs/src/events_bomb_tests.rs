@@ -5,7 +5,7 @@ use crate::tower::UnitState;
 
 /// A Classic tower with offices on floors 2 to `top`, a lobby on 1, and
 /// `offices` Security offices on floor 1, every room open.
-fn tower(top: i64, offices: usize) -> Simulation {
+pub(super) fn tower(top: i64, offices: usize) -> Simulation {
     let mut sim = Simulation::new_game(11, GameMode::Classic);
     sim.money = 1e9;
     for x in 160..220 {
@@ -31,7 +31,7 @@ fn tower(top: i64, offices: usize) -> Simulation {
     sim
 }
 
-fn decline(sim: &mut Simulation) {
+pub(super) fn decline(sim: &mut Simulation) {
     sim.events.pending = Some(PendingChoice {
         kind: "bombThreat",
         cost: 300_000.0,
@@ -41,7 +41,7 @@ fn decline(sim: &mut Simulation) {
 }
 
 /// Steps the search minute by minute until it ends or `limit` minutes pass.
-fn run(sim: &mut Simulation, limit: i64) {
+pub(super) fn run(sim: &mut Simulation, limit: i64) {
     for _ in 0..limit {
         if sim.events.bomb.is_none() {
             return;
@@ -120,97 +120,6 @@ fn a_tower_too_tall_for_its_guards_can_lose_the_race() {
     assert!(sim.log.iter().any(|e| e.text.contains("ran out of time")));
 }
 
-/// Two towers standing apart on one shared lobby (floors 2 to 8 at tiles
-/// 100 to 139 and 200 to 239), an office on every floor of each, no Security.
-/// Built in Modern with the gap bridging off, the way a player splits a lot.
-fn split_tower() -> Simulation {
-    let mut sim = Simulation::new_game(11, GameMode::Modern);
-    sim.money = 1e9;
-    if sim.auto_bridge {
-        sim.toggle_auto_bridge();
-    }
-    for x in 100..240 {
-        assert!(sim.build(Kind::Lobby, 1, x).ok);
-    }
-    for f in 2..=8 {
-        for left in [100, 200] {
-            for x in left..left + 40 {
-                assert!(sim.build(Kind::Floor, f, x).ok);
-            }
-            assert!(sim.build(Kind::Office, f, left + 10).ok, "office on {f}");
-        }
-    }
-    sim.star = 4;
-    for u in sim.tower.units.iter_mut() {
-        if u.state == UnitState::Construction {
-            u.state = UnitState::Empty;
-        }
-    }
-    sim
-}
-
-/// The floors gutted on the tower whose rooms start at or right of `left`.
-fn gutted_floors(sim: &Simulation, left: i64, right: i64) -> Vec<i64> {
-    let mut floors: Vec<i64> = sim
-        .tower
-        .units
-        .iter()
-        .filter(|u| u.state == UnitState::Gutted && u.x >= left && u.x < right)
-        .map(|u| u.floor)
-        .collect();
-    floors.sort();
-    floors
-}
-
-#[test]
-fn a_bomb_in_one_of_two_towers_on_a_lot_leaves_the_other_standing() {
-    for mode in [GameMode::Classic, GameMode::Modern] {
-        let mut sim = split_tower();
-        sim.mode = mode;
-        decline(&mut sim);
-        let b = sim.events.bomb.as_mut().expect("a search runs");
-        (b.floor, b.x) = (5, 115.0);
-        run(&mut sim, 1500);
-        assert_eq!(sim.events.bombs_detonated, 1, "{mode:?}");
-        assert_eq!(
-            gutted_floors(&sim, 100, 140),
-            vec![3, 4, 5, 6, 7],
-            "{mode:?}: five floors of the bomb's tower"
-        );
-        assert!(
-            gutted_floors(&sim, 200, 240).is_empty(),
-            "{mode:?}: the tower next door is untouched"
-        );
-    }
-}
-
-#[test]
-fn a_blast_with_no_security_stays_in_its_tower_too() {
-    let mut sim = split_tower();
-    assert_eq!(sim.tower.segments_of(5), vec![(100, 139), (200, 239)]);
-    sim.blast(15_000.0, Some((5, 215.0)));
-    assert_eq!(gutted_floors(&sim, 200, 240), vec![3, 4, 5, 6, 7]);
-    assert!(gutted_floors(&sim, 100, 140).is_empty());
-}
-
-#[test]
-fn a_tower_that_fills_its_floors_takes_the_blast_across_their_width() {
-    // One tower, offices at both ends of every floor: the blast reaches
-    // the far end of the floors around it, as it always has.
-    let mut sim = tower(8, 0);
-    for f in 2..=8 {
-        assert!(sim.build(Kind::Office, f, 205).ok, "office on {f}");
-    }
-    for u in sim.tower.units.iter_mut() {
-        if u.state == UnitState::Construction {
-            u.state = UnitState::Empty;
-        }
-    }
-    sim.blast(15_000.0, Some((5, 175.0)));
-    assert_eq!(gutted_floors(&sim, 200, 220), vec![3, 4, 5, 6, 7]);
-    assert_eq!(gutted_floors(&sim, 160, 200), vec![3, 4, 5, 6, 7]);
-}
-
 #[test]
 fn the_search_survives_a_save_and_load() {
     let mut sim = tower(30, 1);
@@ -285,7 +194,7 @@ fn in_modern_a_security_office_that_opens_mid_search_joins_it() {
     sim.mode = GameMode::Modern;
     decline(&mut sim);
     assert!(sim.events.bomb.as_ref().unwrap().guards.is_empty());
-    sim.join_bomb_search(2);
+    sim.join_bomb_search(2, 185);
     let b = sim.events.bomb.as_ref().unwrap();
     assert_eq!(b.guards.len(), GUARDS_PER_OFFICE);
     assert!(
@@ -314,7 +223,7 @@ fn a_new_office_joins_through_finished_construction() {
 fn in_classic_a_late_office_stays_out_of_the_search() {
     let mut sim = tower(6, 0);
     decline(&mut sim);
-    sim.join_bomb_search(2);
+    sim.join_bomb_search(2, 185);
     assert!(sim.events.bomb.as_ref().unwrap().guards.is_empty());
 }
 
@@ -489,7 +398,7 @@ fn every_turn_of_a_bomb_threat_is_a_line_the_game_toasts() {
         sim.mode = mode;
         let from = sim.log.len();
         decline(&mut sim);
-        sim.join_bomb_search(2);
+        sim.join_bomb_search(2, 185);
         run(&mut sim, 1500);
         assert!(sim.events.bomb.is_none(), "{mode:?}: the search ended");
         assert!(

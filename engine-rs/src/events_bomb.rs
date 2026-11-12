@@ -11,16 +11,28 @@
 //! furdude2), and a missed bomb guts about five floors. The search pace is
 //! our estimate until a run in the original measures it; each number is one
 //! named constant so that run changes a number, not the shape.
+//!
+//! A guard sweeps one stretch of floor at a time (`events_stairs.rs`): the
+//! whole floor in a tower that fills it, one tower's part of it on a lot with
+//! several towers standing apart. Guards reach a stretch only by the
+//! emergency stairs, so a tower no floor joins to a Security office's own is
+//! never searched, and one joined only through a shared lobby costs the walk
+//! down to it and back up.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
-use serde_json::{json, Value};
-
+use super::stairs::{Stairs, Walk};
 use crate::facilities::Kind;
 use crate::gameplay::GameplayEvent;
 use crate::services::with_thousands;
-use crate::sim::{LogKind, PointFx, Simulation};
-use crate::tower::UnitState;
+use crate::sim::{LogKind, Simulation};
+
+#[path = "events_bomb_blast.rs"]
+mod blast;
+#[path = "events_bomb_save.rs"]
+mod save;
+#[path = "events_bomb_view.rs"]
+mod view;
 
 /// Guards each Security office sends out.
 pub const GUARDS_PER_OFFICE: usize = 6;
@@ -44,16 +56,29 @@ fn deadline_after(now: f64) -> f64 {
 }
 
 /// One guard on the search: the floor it is sweeping, or `None` once no
-/// floor is left for it, and the minute that sweep ends. `from` and `start`
-/// are where and when it set off for that floor, so a host can draw the
-/// climb up the emergency stairs before the walk along the rooms.
+/// stretch is left for it, the tile `x` that names the stretch on that floor,
+/// and the minute that sweep ends. `from` and `start` are where and when it
+/// set off, `from_x` a tile of the stretch it left, `turn` the floor it went
+/// down (or up) to on the way when the stairs do not lead straight there, and
+/// `arrive` the minute it reached the stretch, so a host can draw the walk on
+/// the emergency stairs before the walk along the rooms.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Guard {
     pub floor: Option<i64>,
+    /// `None` for a guard from a save made before towers were searched one by
+    /// one: it sweeps its whole floor.
+    pub x: Option<i64>,
     pub done_at: f64,
     pub from: i64,
+    pub from_x: Option<i64>,
+    pub turn: i64,
     pub start: f64,
+    pub arrive: f64,
 }
+
+/// A stretch swept clean: its floor and a tile of it, or `None` for a whole
+/// floor (a save from before towers were searched one by one).
+pub type Swept = (i64, Option<i64>);
 
 /// A bomb waiting to be found. `floor` and `x` are its hiding place (the
 /// player never sees them), `deadline` the minute it goes off.
@@ -63,73 +88,61 @@ pub struct BombSearch {
     pub x: f64,
     pub deadline: f64,
     pub guards: Vec<Guard>,
-    /// Floors swept clean, in the order the guards finished them.
-    pub searched: Vec<i64>,
+    /// Stretches swept clean, in the order the guards finished them.
+    pub searched: Vec<Swept>,
     /// Bumped on every change a viewer can see, so a host rereads the search
     /// only when it moved.
     pub seq: i64,
 }
 
-impl BombSearch {
-    /// The save's `bomb` object.
-    pub fn save_state(&self) -> Value {
-        json!({
-            "floor": self.floor,
-            "x": self.x,
-            "deadline": self.deadline,
-            "guards": self.guards.iter().map(|g| json!({"floor": g.floor, "doneAt": g.done_at, "from": g.from, "start": g.start})).collect::<Vec<_>>(),
-            "searched": self.searched,
-            "seq": self.seq,
-        })
+/// The stretch a guard sets off for: its floor and first tile, the width of
+/// its rooms, the floors of stairs on the way and the floor it turns at.
+struct Target {
+    floor: i64,
+    x: i64,
+    width: i64,
+    floors: i64,
+    turn: i64,
+}
+
+/// The stretches already swept or taken by a guard, so each is swept once.
+/// Whole floors stand for the guards and sweeps of an older save.
+#[derive(Default)]
+struct Claims {
+    stretches: BTreeSet<usize>,
+    floors: BTreeSet<i64>,
+}
+
+impl Claims {
+    fn claim(&mut self, stairs: &Stairs, floor: i64, x: Option<i64>) {
+        match x {
+            None => {
+                self.floors.insert(floor);
+            }
+            Some(x) => {
+                if let Some(i) = stairs.at(floor, x) {
+                    self.stretches.insert(i);
+                }
+            }
+        }
     }
 
-    /// The save's `bomb` object read back; `None` for anything malformed, so
-    /// a damaged save loads without a bomb instead of failing.
-    pub fn from_save(v: &Value) -> Option<BombSearch> {
-        let o = v.as_object()?;
-        let finite = |k: &str| o.get(k).and_then(Value::as_f64).filter(|n| n.is_finite());
-        let floor = finite("floor")?.trunc() as i64;
-        let x = finite("x")?;
-        let deadline = finite("deadline")?;
-        let mut guards = Vec::new();
-        for g in o.get("guards").and_then(Value::as_array)? {
-            let g = g.as_object()?;
-            let done_at = g
-                .get("doneAt")
-                .and_then(Value::as_f64)
-                .filter(|n| n.is_finite())?;
-            let floor = match g.get("floor") {
-                Some(Value::Null) | None => None,
-                Some(f) => Some(f.as_f64().filter(|n| n.is_finite())?.trunc() as i64),
-            };
-            // A save from before the climb was drawn starts the guard where
-            // it already is.
-            let num = |k: &str| match g.get(k) {
-                None => Some(None),
-                Some(v) => v.as_f64().filter(|n| n.is_finite()).map(Some),
-            };
-            let from = num("from")?.map_or(floor.unwrap_or(0), |n| n.trunc() as i64);
-            let start = num("start")?.unwrap_or(done_at);
-            guards.push(Guard {
-                floor,
-                done_at,
-                from,
-                start,
-            });
+    fn holds(&self, i: usize, floor: i64) -> bool {
+        self.stretches.contains(&i) || self.floors.contains(&floor)
+    }
+
+    /// Everything swept so far and every stretch a guard is headed for.
+    fn of(stairs: &Stairs, b: &BombSearch) -> Claims {
+        let mut c = Claims::default();
+        for &(f, x) in &b.searched {
+            c.claim(stairs, f, x);
         }
-        let mut searched = Vec::new();
-        for f in o.get("searched").and_then(Value::as_array)? {
-            searched.push(f.as_f64().filter(|n| n.is_finite())?.trunc() as i64);
+        for g in &b.guards {
+            if let Some(f) = g.floor {
+                c.claim(stairs, f, g.x);
+            }
         }
-        let seq = (finite("seq").unwrap_or(1.0).trunc() as i64).max(1);
-        Some(BombSearch {
-            floor,
-            x,
-            deadline,
-            guards,
-            searched,
-            seq,
-        })
+        c
     }
 }
 
@@ -147,105 +160,6 @@ fn clock_label(minutes: f64) -> String {
 
 #[doc(hidden)]
 impl Simulation {
-    /// The bomb threat a random event calls in: Security sweeps the tower
-    /// for a fee, and a tower without Security takes the blast and a fine.
-    pub fn bomb_threat(&mut self) {
-        if self.has_any(Kind::Security) {
-            let cost = 2_000.0 + self.rng.int(0, 3_000) as f64;
-            self.money -= cost;
-            self.emit(&format!("💣 A bomb threat was called in. Security swept the tower and found nothing. The evacuation cost ${}.", with_thousands(cost)), LogKind::Info);
-            return;
-        }
-        let fine = 15_000.0 + self.rng.int(0, 15_000) as f64;
-        let targets = self.flammable_units();
-        let epicenter = if targets.is_empty() {
-            None
-        } else {
-            let ground = &self.tower.units[*self.rng.pick(&targets)];
-            Some((ground.floor, ground.x as f64 + ground.width as f64 / 2.0))
-        };
-        let destroyed = self.blast(fine, epicenter);
-        self.emit(&format!("💣 A bomb detonated with no security to stop it. {destroyed} room(s) across ~5 floors were gutted, plus a ${} fine. Build Security!", with_thousands(fine)), LogKind::Bad);
-    }
-
-    /// The host's read of the search: the deadline, each floor guards are
-    /// sweeping now with the tile span of its rooms, where the guard set off
-    /// from and the minutes it left, reaches the floor by the emergency
-    /// stairs and finishes the walk, and the floors already clear. The hiding place stays out. One pass
-    /// over the units, read only when the search's `seq` moves.
-    pub fn bomb_search_view(&self) -> Option<Value> {
-        let b = self.events.bomb.as_ref()?;
-        let spans = self.floor_spans();
-        let sweeping: Vec<Value> = b
-            .guards
-            .iter()
-            .filter_map(|g| Some((g, g.floor?)))
-            .filter_map(|(g, f)| {
-                let &(left, right) = spans.get(&f)?;
-                let arrive = g.start + (f - g.from).abs() as f64 * STAIR_MINUTES_PER_FLOOR;
-                Some(json!({
-                    "floor": f, "left": left, "right": right,
-                    "from": g.from, "start": g.start, "arrive": arrive, "done": g.done_at,
-                }))
-            })
-            .collect();
-        Some(
-            json!({ "deadline": b.deadline, "sweeping": sweeping, "searched": b.searched, "seq": b.seq }),
-        )
-    }
-
-    /// A bomb going off at `epicenter` (floor, x), or nowhere when the tower
-    /// had no room to hide it in: the fine, the tally, the flash, every room
-    /// within two floors gutted and the gameplay event. The rooms gutted.
-    ///
-    /// The blast stays in the building it went off in: only rooms that
-    /// overlap the epicenter floor's run of floor tiles around the bomb are
-    /// hit, so on a lot with several towers side by side the others stand.
-    /// A tower that fills its floors has one run there, the whole floor.
-    pub(super) fn blast(&mut self, fine: f64, epicenter: Option<(i64, f64)>) -> i64 {
-        self.money -= fine;
-        self.events.bombs_detonated += 1;
-        let mut destroyed = 0;
-        if let Some((floor, x)) = epicenter {
-            self.fx.explosion = PointFx {
-                floor,
-                x,
-                seq: self.fx.explosion.seq + 1,
-            };
-            let (left, right) = self.blast_span(floor, x);
-            for i in 0..self.tower.units.len() {
-                let u = &self.tower.units[i];
-                if (u.floor - floor).abs() <= BLAST_FLOORS
-                    && u.x <= right
-                    && u.x + u.width > left
-                    && !u.kind.is_structural()
-                    && u.state != UnitState::Construction
-                    && u.state != UnitState::Gutted
-                {
-                    let id = u.id;
-                    self.events.active.shift_remove(&id);
-                    self.gut(i);
-                    destroyed += 1;
-                }
-            }
-        }
-        self.gameplay
-            .push(GameplayEvent::BombDetonated { rooms: destroyed });
-        destroyed
-    }
-
-    /// The tiles (first, last) of the run of floor on `floor` that holds the
-    /// epicenter at `x`, the building the bomb was in. A bomb with no floor
-    /// under it (never placed by the game) keeps to the tile it sits on.
-    fn blast_span(&self, floor: i64, x: f64) -> (i64, i64) {
-        let tile = x.floor() as i64;
-        self.tower
-            .segments_of(floor)
-            .into_iter()
-            .find(|&(first, last)| first <= tile && tile <= last)
-            .unwrap_or((tile, tile))
-    }
-
     /// The answer to a declined ransom in both modes: hide the bomb in a random room
     /// and send Security out. With no room to hide it in, the threat was
     /// empty; with no Security, nobody searches and it simply waits for the
@@ -264,12 +178,12 @@ impl Simulation {
         let (floor, x) = (room.floor, room.x as f64 + room.width as f64 / 2.0);
         let now = self.clock.minutes;
         let deadline = deadline_after(now);
-        let offices: Vec<i64> = self
+        let offices: Vec<(i64, i64)> = self
             .tower
             .units
             .iter()
             .filter(|u| u.kind == Kind::Security && u.is_operational())
-            .map(|u| u.floor)
+            .map(|u| (u.floor, u.x))
             .collect();
         self.events.bomb = Some(BombSearch {
             floor,
@@ -279,12 +193,13 @@ impl Simulation {
             searched: Vec::new(),
             seq: 1,
         });
-        let spans = self.floor_spans();
         let mut guards = Vec::with_capacity(offices.len() * GUARDS_PER_OFFICE);
-        for &office in &offices {
-            for _ in 0..GUARDS_PER_OFFICE {
-                let next = self.next_floor_to_sweep(office, &guards, &spans);
-                guards.push(sweep(next, office, now));
+        if !offices.is_empty() {
+            let stairs = Stairs::of(&self.tower);
+            let rooms = self.stretch_rooms(&stairs);
+            let mut claims = Claims::default();
+            for &(office, ox) in &offices {
+                guards.extend(self.send_guards(&stairs, &rooms, &mut claims, office, ox, now));
             }
         }
         if let Some(b) = self.events.bomb.as_mut() {
@@ -299,19 +214,20 @@ impl Simulation {
         }
     }
 
-    /// A Security office on `office` just opened. In a mode where late
+    /// A Security office at (`office`, `x`) just opened. In a mode where late
     /// offices join, its guards set out from there now.
-    pub(crate) fn join_bomb_search(&mut self, office: i64) {
-        if self.events.bomb.is_none() || !self.mode.security_joins_bomb_search() {
+    pub(crate) fn join_bomb_search(&mut self, office: i64, x: i64) {
+        let Some(b) = self.events.bomb.as_ref() else {
+            return;
+        };
+        if !self.mode.security_joins_bomb_search() {
             return;
         }
         let now = self.clock.minutes;
-        let spans = self.floor_spans();
-        let mut fresh = Vec::with_capacity(GUARDS_PER_OFFICE);
-        for _ in 0..GUARDS_PER_OFFICE {
-            let next = self.next_floor_to_sweep(office, &fresh, &spans);
-            fresh.push(sweep(next, office, now));
-        }
+        let stairs = Stairs::of(&self.tower);
+        let rooms = self.stretch_rooms(&stairs);
+        let mut claims = Claims::of(&stairs, b);
+        let fresh = self.send_guards(&stairs, &rooms, &mut claims, office, x, now);
         if let Some(b) = self.events.bomb.as_mut() {
             b.guards.extend(fresh);
             b.seq += 1;
@@ -322,64 +238,75 @@ impl Simulation {
         );
     }
 
-    /// Each floor with a room a bomb can hide in, with the tile span of
-    /// those rooms (left edge, right edge). One pass over the units.
-    fn floor_spans(&self) -> BTreeMap<i64, (i64, i64)> {
-        let mut spans = BTreeMap::new();
-        for u in &self.tower.units {
-            if u.kind.is_structural() || !u.is_operational() {
-                continue;
-            }
-            let span = spans.entry(u.floor).or_insert((u.x, u.x + u.width));
-            span.0 = span.0.min(u.x);
-            span.1 = span.1.max(u.x + u.width);
-        }
-        spans
-    }
-
-    /// The nearest floor in `spans` that no guard has swept or is sweeping,
-    /// from `from`, with its span's width; the upper one when two are as
-    /// near. `None` when every floor is covered.
-    fn next_floor_to_sweep(
+    /// One office's guards setting out at minute `now` from its stretch, each
+    /// to the nearest stretch by the stairs that nobody has claimed. An
+    /// office on no stretch of floor (never placed by the game) sends guards
+    /// with nowhere to go.
+    fn send_guards(
         &self,
-        from: i64,
-        busy: &[Guard],
-        spans: &BTreeMap<i64, (i64, i64)>,
-    ) -> Option<(i64, i64)> {
-        let b = self.events.bomb.as_ref()?;
-        spans
-            .iter()
-            .filter(|(f, _)| !b.searched.contains(f))
-            .filter(|(f, _)| !busy.iter().chain(&b.guards).any(|g| g.floor == Some(**f)))
-            .min_by_key(|(f, _)| ((*f - from).abs(), -**f))
-            .map(|(&f, &(left, right))| (f, right - left))
+        stairs: &Stairs,
+        rooms: &BTreeMap<usize, (i64, i64)>,
+        claims: &mut Claims,
+        office: i64,
+        x: i64,
+        now: f64,
+    ) -> Vec<Guard> {
+        let start = stairs.at(office, x);
+        let walk = start.map(|s| stairs.walk_from(s));
+        (0..GUARDS_PER_OFFICE)
+            .map(|_| {
+                let next = start
+                    .zip(walk.as_ref())
+                    .and_then(|(s, w)| next_stretch(stairs, rooms, claims, s, w));
+                if let Some(t) = &next {
+                    claims.claim(stairs, t.floor, Some(t.x));
+                }
+                sweep(next, office, Some(x), now)
+            })
+            .collect()
     }
 
-    /// One step of the search: guards who finished a floor move on (a big
-    /// step can finish several floors for one guard), then a guard who
-    /// swept the bomb's floor by the deadline finds it, and otherwise at the
-    /// deadline it goes off.
+    /// Whether guard `g` is sweeping the bomb's stretch.
+    fn sweeps_bomb(stairs: &Stairs, b: &BombSearch, g: &Guard) -> bool {
+        if g.floor != Some(b.floor) {
+            return false;
+        }
+        let Some(x) = g.x else {
+            return true;
+        };
+        let here = stairs.at(b.floor, x);
+        here.is_some() && here == stairs.at(b.floor, b.x.floor() as i64)
+    }
+
+    /// One step of the search: guards who finished a stretch move on (a big
+    /// step can finish several for one guard), then a guard who swept the
+    /// bomb's stretch by the deadline finds it, and otherwise at the deadline
+    /// it goes off. The stairs are mapped only when a sweep has ended.
     pub fn advance_bomb_search(&mut self) {
         let Some(b) = self.events.bomb.as_ref() else {
             return;
         };
         // Nothing after the deadline can change the outcome.
         let now = self.clock.minutes.min(b.deadline);
-        let moved = b
+        let due = b
             .guards
             .iter()
-            .any(|g| g.floor.is_some_and(|f| f != b.floor) && g.done_at <= now);
-        if moved {
-            self.move_finished_guards(now);
+            .any(|g| g.floor.is_some() && g.done_at <= now);
+        let mut found = false;
+        if due {
+            let stairs = Stairs::of(&self.tower);
+            self.move_finished_guards(now, &stairs);
+            if let Some(b) = self.events.bomb.as_ref() {
+                found = b
+                    .guards
+                    .iter()
+                    .any(|g| g.done_at <= now && Self::sweeps_bomb(&stairs, b, g));
+            }
         }
         let Some(b) = self.events.bomb.as_ref() else {
             return;
         };
         let deadline = b.deadline;
-        let found = b
-            .guards
-            .iter()
-            .any(|g| g.floor == Some(b.floor) && g.done_at <= now);
         if found {
             let floor = b.floor;
             self.events.bomb = None;
@@ -397,63 +324,125 @@ impl Simulation {
         }
     }
 
-    /// Every guard whose sweep of a floor without the bomb has ended by
+    /// Every guard whose sweep of a stretch without the bomb has ended by
     /// `now` marks it clear and starts the next, from the minute it finished,
-    /// until each is busy past `now` or out of floors. One walk of the rooms.
-    fn move_finished_guards(&mut self, now: f64) {
-        let spans = self.floor_spans();
+    /// until each is busy past `now` or out of stretches. One walk of the
+    /// rooms.
+    fn move_finished_guards(&mut self, now: f64, stairs: &Stairs) {
+        let rooms = self.stretch_rooms(stairs);
+        let Some(b) = self.events.bomb.as_ref() else {
+            return;
+        };
+        let mut claims = Claims::of(stairs, b);
+        let mut moved = false;
         loop {
             let Some(b) = self.events.bomb.as_ref() else {
                 return;
             };
-            let bomb_floor = b.floor;
             // The earliest finish goes first (the lowest index on a tie), so
-            // one long step hands out floors in the order short steps would.
+            // one long step hands out stretches in the order short steps would.
             let Some(i) = b
                 .guards
                 .iter()
                 .enumerate()
-                .filter(|(_, g)| g.floor.is_some_and(|f| f != bomb_floor) && g.done_at <= now)
+                .filter(|(_, g)| {
+                    g.floor.is_some() && g.done_at <= now && !Self::sweeps_bomb(stairs, b, g)
+                })
                 .min_by(|(_, a), (_, b)| a.done_at.total_cmp(&b.done_at))
                 .map(|(i, _)| i)
             else {
                 break;
             };
+            let bomb_tile = b.x.floor() as i64;
             let Some(b) = self.events.bomb.as_mut() else {
                 return;
             };
             let done = b.guards[i].clone();
-            let from = done.floor.unwrap_or(bomb_floor);
-            b.searched.push(from);
-            b.guards[i].floor = None;
-            let next = self.next_floor_to_sweep(from, &[], &spans);
-            if let Some(b) = self.events.bomb.as_mut() {
-                b.guards[i] = sweep(next, from, done.done_at);
+            let from = done.floor.unwrap_or(b.floor);
+            b.searched.push((from, done.x));
+            // A guard from an older save swept its whole floor: it leaves
+            // from the floor's first stretch with rooms.
+            let start = match done.x {
+                Some(x) => stairs.at(from, x),
+                None => rooms
+                    .keys()
+                    .copied()
+                    .find(|&s| stairs.stretch(s).floor == from)
+                    .or_else(|| stairs.at(from, bomb_tile)),
+            };
+            let from_x = start.map(|s| stairs.stretch(s).first);
+            let next = start.and_then(|s| {
+                let walk = stairs.walk_from(s);
+                next_stretch(stairs, &rooms, &claims, s, &walk)
+            });
+            if let Some(t) = &next {
+                claims.claim(stairs, t.floor, Some(t.x));
             }
+            b.guards[i] = sweep(next, from, from_x, done.done_at);
+            moved = true;
         }
-        if let Some(b) = self.events.bomb.as_mut() {
-            b.seq += 1;
+        if moved {
+            if let Some(b) = self.events.bomb.as_mut() {
+                b.seq += 1;
+            }
         }
     }
 }
 
-/// A guard leaving `from` at minute `start` to sweep `next` (a floor and its
-/// rooms' width): the stairs there, then the walk along the rooms.
-fn sweep(next: Option<(i64, i64)>, from: i64, start: f64) -> Guard {
+/// The nearest stretch by the stairs from `start` (along `walk`) that has
+/// rooms and nobody has claimed; the upper one when two are as near, the
+/// left one on one floor. `None` when every stretch the stairs reach is
+/// covered.
+fn next_stretch(
+    stairs: &Stairs,
+    rooms: &BTreeMap<usize, (i64, i64)>,
+    claims: &Claims,
+    start: usize,
+    walk: &Walk,
+) -> Option<Target> {
+    rooms
+        .iter()
+        .filter_map(|(&i, &(left, right))| {
+            let s = stairs.stretch(i);
+            let floors = walk.floors[i]?;
+            (!claims.holds(i, s.floor)).then_some((i, s.floor, floors, right - left))
+        })
+        .min_by_key(|&(i, floor, floors, _)| (floors, -floor, i))
+        .map(|(i, floor, floors, width)| Target {
+            floor,
+            x: stairs.stretch(i).first,
+            width,
+            floors,
+            turn: stairs.turn_floor(walk, start, i),
+        })
+}
+
+/// A guard leaving `from` (a tile `from_x` of its stretch) at minute `start`
+/// for `next`: the stairs there, then the walk along the rooms.
+fn sweep(next: Option<Target>, from: i64, from_x: Option<i64>, start: f64) -> Guard {
     match next {
-        Some((f, width)) => Guard {
-            floor: Some(f),
-            done_at: start
-                + (f - from).abs() as f64 * STAIR_MINUTES_PER_FLOOR
-                + width as f64 * SWEEP_MINUTES_PER_TILE,
-            from,
-            start,
-        },
+        Some(t) => {
+            let arrive = start + t.floors as f64 * STAIR_MINUTES_PER_FLOOR;
+            Guard {
+                floor: Some(t.floor),
+                x: Some(t.x),
+                done_at: arrive + t.width as f64 * SWEEP_MINUTES_PER_TILE,
+                from,
+                from_x,
+                turn: t.turn,
+                start,
+                arrive,
+            }
+        }
         None => Guard {
             floor: None,
+            x: None,
             done_at: start,
             from,
+            from_x,
+            turn: from,
             start,
+            arrive: start,
         },
     }
 }
@@ -461,3 +450,7 @@ fn sweep(next: Option<(i64, i64)>, from: i64, start: f64) -> Guard {
 #[cfg(test)]
 #[path = "events_bomb_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "events_bomb_split_tests.rs"]
+mod split_tests;

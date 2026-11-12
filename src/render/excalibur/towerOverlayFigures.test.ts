@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { FLOOR } from "../scale";
 import { VIEW_ZOOM_MIN } from "../../shared/viewZoom";
 import { drawSearchGuard, drawThief, FIGURE_HEIGHT } from "../sprites/events";
-import { drawOverlay, floorFigureScale } from "./towerOverlay";
+import { drawOverlay, floorFigureScale, guardPosition } from "./towerOverlay";
 
 /**
  * The bomb search's guards and the thief walk a floor, so each must fit
@@ -83,7 +83,7 @@ describe("a figure walking a floor fits inside it at every zoom", () => {
   it("keeps the guards the overlay draws during a search inside their floor when zoomed out", () => {
     const zoom = 0.1;
     const { ctx, rects } = rectCtx();
-    const sweeping = [{ floor: 5, left: 160, right: 200, from: 5, start: 0, arrive: 0, done: 40 }];
+    const sweeping = [{ floor: 5, left: 160, right: 200, from: 5, fromLeft: 160, turn: 5, start: 0, arrive: 0, done: 40 }];
     const engine: any = {
       viewWidth: 800,
       viewHeight: 600,
@@ -114,5 +114,23 @@ describe("a figure walking a floor fits inside it at every zoom", () => {
     const uniform = rects.filter((r) => r.style === "#274B8F");
     expect(uniform.length).toBe(1);
     expect(uniform[0]!.h).toBeLessThanOrEqual(FLOOR * zoom);
+  });
+});
+
+describe("a guard crossing to another tower on the lot", () => {
+  // Off from floor 4 of the left tower (rooms from tile 110) at minute 0,
+  // down 3 floors to the shared lobby on 1 and up 4 to floor 5 of the right
+  // tower (rooms from tile 210): 7 floors of stairs, 14 minutes.
+  const g = { floor: 5, left: 210, right: 219, from: 4, fromLeft: 110, turn: 1, start: 0, arrive: 14, done: 18.5 };
+
+  it("walks down its own tower's stairs to the lobby first", () => {
+    expect(guardPosition(g, 0)).toEqual({ floor: 4, x: 109, climbing: true });
+    expect(guardPosition(g, 4)).toEqual({ floor: 2, x: 109, climbing: true });
+  });
+
+  it("then climbs the other tower's stairs, never the sky between them", () => {
+    expect(guardPosition(g, 8)).toEqual({ floor: 2, x: 209, climbing: true });
+    expect(guardPosition(g, 12)).toEqual({ floor: 4, x: 209, climbing: true });
+    expect(guardPosition(g, 14)).toEqual({ floor: 5, x: 210, climbing: false });
   });
 });
