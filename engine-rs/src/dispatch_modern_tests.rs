@@ -18,28 +18,20 @@ fn moving(pos: f64, dir: i64) -> CarView {
     CarView::of(pos, dir, 0.0, None, 0.8)
 }
 
-/// The bit set over `STOPS` with a call at each of `floors`.
-fn calls_at(floors: &[i64]) -> Vec<u64> {
-    let mut bits = vec![0u64; 1];
-    for f in floors {
-        let k = STOPS.binary_search(f).unwrap();
-        bits[0] |= 1 << k;
+/// A shaft over `STOPS` with `cars` on shift.
+fn shaft(cars: &[CarView], response: Option<f64>) -> BestCars {
+    let mut best = BestCars::default();
+    best.start(STOPS.len(), response, SPAN);
+    for &car in cars {
+        best.push(car);
     }
-    bits
+    best
 }
 
-/// The car `assign_best_cars` gives the one call at `floor`.
+/// The car `BestCars` gives the call at `floor`.
 fn owner_of(cars: &[CarView], floor: i64, response: Option<f64>) -> usize {
-    let mut owner = Vec::new();
-    assign_best_cars(
-        cars,
-        &STOPS,
-        &calls_at(&[floor]),
-        response,
-        SPAN,
-        &mut owner,
-    );
-    owner[STOPS.binary_search(&floor).unwrap()]
+    let k = STOPS.binary_search(&floor).unwrap();
+    shaft(cars, response).owner(k, floor)
 }
 
 #[test]
@@ -138,21 +130,19 @@ fn a_car_already_coming_within_the_response_wins_outright() {
 }
 
 #[test]
-fn every_called_stop_gets_an_owner_and_nothing_else_does() {
-    let cars = [parked(1.0), parked(20.0)];
-    let mut owner = vec![7; 3];
-    let calls = calls_at(&[3, 18]);
-    assign_best_cars(&cars, &STOPS, &calls, None, SPAN, &mut owner);
-    assert_eq!(owner.len(), STOPS.len());
-    for (k, &o) in owner.iter().enumerate() {
-        let want = match STOPS[k] {
-            3 => 0,
-            18 => 1,
-            _ => NO_CAR,
-        };
-        assert_eq!(o, want, "stop {}", STOPS[k]);
-    }
+fn a_stop_keeps_the_owner_it_was_first_given() {
+    let mut best = shaft(&[parked(1.0), parked(20.0)], None);
+    let (k3, k18) = (2, 17);
+    assert_eq!(best.owner(k3, 3), 0);
+    assert_eq!(best.owner(k18, 18), 1);
+    // A car added after the answer does not change it.
+    best.push(parked(3.0));
+    assert_eq!(best.owner(k3, 3), 0);
+    // A new step starts every stop over.
+    best.start(STOPS.len(), None, SPAN);
+    best.push(parked(20.0));
+    assert_eq!(best.owner(k3, 3), 0);
     // Nobody on shift: the calls stay unowned.
-    assign_best_cars(&[], &STOPS, &calls, None, SPAN, &mut owner);
-    assert!(owner.iter().all(|&o| o == NO_CAR));
+    best.start(STOPS.len(), None, SPAN);
+    assert_eq!(best.owner(k3, 3), NO_CAR);
 }

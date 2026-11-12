@@ -14,15 +14,18 @@
 //! - Standard Floor Departure restarts when a rider arrives, up to twice the
 //!   setting (`ElevatorDispatch::car_held` keeps the time waited).
 
+use std::cell::Cell;
 use std::collections::BTreeSet;
 
 use super::classic::ON_FLOOR;
-use super::WORD;
 use super::CAR_FLOORS_PER_MINUTE;
 use crate::clock::GameMode;
 
 /// The owner of a called stop no on-shift car can answer.
 pub(super) const NO_CAR: usize = usize::MAX;
+
+/// A stop whose owner no sweep has asked for yet this step.
+const UNASKED: usize = usize::MAX - 1;
 
 /// The dispatch rules one tower runs this step.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -145,31 +148,48 @@ impl CarView {
     }
 }
 
-/// The best car for each called stop of a shaft, into `owner` (one slot per
-/// stop, `NO_CAR` where nobody is on shift or no call is up). `cars` are the
-/// on-shift cars in index order; `calls` the called stops as bits over
-/// `stops`. A car heading to the call within `response` floors wins outright,
-/// the nearest such first; otherwise the cheapest `CarView::cost`, a car
-/// moving away paying `wrong_way` floors on top. Ties go to the lower index.
-/// One pass over at most eight cars per call, no allocation once `owner` has
-/// grown to the shaft.
-pub(super) fn assign_best_cars(
-    cars: &[CarView],
-    stops: &[i64],
-    calls: &[u64],
+/// Modern's best car for each called stop of one shaft this step. The cars
+/// are the on-shift cars in index order, as they stood when the step began.
+/// A stop's owner is worked out the first time a car's sweep asks about it
+/// and kept for the rest of the shaft's step, so only the stops the sweeps
+/// reach cost a pass over the cars. Working it out later changes nothing:
+/// the answer reads only the cars as they began the step. No allocation once
+/// the scratch has grown to the shaft.
+#[derive(Default)]
+pub(super) struct BestCars {
+    cars: Vec<CarView>,
+    owner: Vec<Cell<usize>>,
     response: Option<f64>,
     wrong_way: f64,
-    owner: &mut Vec<usize>,
-) {
-    owner.clear();
-    owner.resize(stops.len(), NO_CAR);
-    for (w, &word) in calls.iter().enumerate() {
-        let mut bits = word;
-        while bits != 0 {
-            let k = w * WORD + bits.trailing_zeros() as usize;
-            bits &= bits - 1;
-            owner[k] = best_car(cars, stops[k] as f64, response, wrong_way);
+}
+
+impl BestCars {
+    /// Starts a shaft of `stops` stops with Waiting Car Response `response`
+    /// and `wrong_way` floors charged to a car moving away from a call.
+    pub fn start(&mut self, stops: usize, response: Option<f64>, wrong_way: f64) {
+        self.cars.clear();
+        self.owner.clear();
+        self.owner.resize_with(stops, || Cell::new(UNASKED));
+        (self.response, self.wrong_way) = (response, wrong_way);
+    }
+
+    /// Adds the next on-shift car.
+    pub fn push(&mut self, car: CarView) {
+        self.cars.push(car);
+    }
+
+    /// The car that answers the call at stop `k` on `floor`, or `NO_CAR`
+    /// when nobody is on shift. A car heading to the call within the
+    /// response wins outright, the nearest such first; otherwise the
+    /// cheapest `CarView::cost`. Ties go to the lower index.
+    pub fn owner(&self, k: usize, floor: i64) -> usize {
+        let known = self.owner[k].get();
+        if known != UNASKED {
+            return known;
         }
+        let best = best_car(&self.cars, floor as f64, self.response, self.wrong_way);
+        self.owner[k].set(best);
+        best
     }
 }
 

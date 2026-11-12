@@ -17,8 +17,8 @@ use classic::{first_answering, moving_car_covers, Boarding};
 
 #[path = "dispatch_modern.rs"]
 mod modern;
-use modern::{assign_best_cars, CarView};
 pub(crate) use modern::{idle_home, DispatchRules};
+use modern::{BestCars, CarView};
 
 pub const CAR_FLOORS_PER_MINUTE: f64 = 0.8;
 const DWELL_MINUTES: f64 = 0.8;
@@ -75,8 +75,7 @@ pub struct ElevatorDispatch {
     no_calls: Vec<u64>,
     /// Scratch for Modern's best car: the on-shift cars as the choice sees
     /// them, and each called stop's chosen car.
-    views: Vec<CarView>,
-    owner: Vec<usize>,
+    best: BestCars,
     /// A rules profile run in place of the tower's mode. Only tests set it
     /// (`DispatchRules::plain_scan`); the game always reads the mode.
     pub(crate) profile: Option<DispatchRules>,
@@ -267,22 +266,15 @@ impl ElevatorDispatch {
             }
             let stop_index = |floor: i64| stops.binary_search(&floor).ok();
             if rules.best_car {
-                // Each called stop's best car, once for the shaft this step.
-                self.views.clear();
+                // The on-shift cars as they begin the step; each called
+                // stop's best car is worked out when a sweep first asks.
+                self.best.start(stops.len(), response, span);
                 for j in 0..active_count.min(cars) {
                     let cab = cabs.and_then(|c| c.get(&(j as i64)));
                     let (pos, dir) = (t.car_positions[j], t.car_dir[j]);
-                    self.views
+                    self.best
                         .push(CarView::of(pos, dir, dwell[j], cab, shaft_dwell));
                 }
-                assign_best_cars(
-                    &self.views,
-                    &stops,
-                    call_bits,
-                    response,
-                    span,
-                    &mut self.owner,
-                );
             }
             for i in 0..cars {
                 let unset = idle_home(rules.spread_homes, &stops, idle_floor, i, cars);
@@ -368,10 +360,10 @@ impl ElevatorDispatch {
                 // Modern: a call is another car's when that car is its best.
                 // Classic's Waiting Car Response: a parked car leaves a call
                 // to a car already heading there within that many floors.
-                let owner = &self.owner;
+                let best = &self.best;
                 let covered = |k: usize| {
                     if rules.best_car {
-                        return owner[k] != i;
+                        return best.owner(k, stops[k]) != i;
                     }
                     let r = response.filter(|_| rules.parked_car_yields && was_parked);
                     r.is_some_and(|r| {
