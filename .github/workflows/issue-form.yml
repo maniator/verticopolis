@@ -59,6 +59,9 @@ jobs:
             echo "Issue #$ISSUE was filed before $FORMS_SINCE; not checked."
             exit 0
           fi
+          # The step shell runs with -e; read the check's exit code instead
+          # of stopping on its "does not follow" answer.
+          set +e
           node scripts/issue-form-check.ts --labels "$LABELS"
           status=$?
           set -e
