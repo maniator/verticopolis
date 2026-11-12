@@ -6,33 +6,21 @@ body:
     attributes:
       value: |
         Thanks for reporting a bug! Please check the [live build](https://verticopolis.com)
-        first, since the issue may already be fixed. The build version is shown on the splash screen,
-        and the line also says "Rust engine" when the Rust engine is running.
+        first, since the issue may already be fixed. The version line on the title screen (also in
+        Settings and in Help, under About) names the game's version and the Rust engine's version.
   - type: input
     id: version
     attributes:
       label: Build version
-      description: The version line shown on the splash screen (e.g. 1.1.0). If it also names an engine, include the whole line.
-      placeholder: "1.1.0"
+      description: The whole version line from the title screen, Settings or Help's About section.
+      placeholder: "v3.1.0 · Rust engine 1.25.0 (1a2b3c4d5e6f)"
     validations:
       required: true
-  - type: dropdown
-    id: engine
-    attributes:
-      label: Engine
-      description: Which simulation engine was running? Rust/WASM is the Rust engine, which the game calls the "Rust engine" on the version line on the splash screen, in Settings and in Help (versions before 2.47.0 called it the "WASM engine"). Choose Fallback if the game said the Rust engine stopped and it runs on the TypeScript engine now, for example after the Rust engine stopped twice and the game reloaded on TypeScript.
-      options:
-        - Not sure
-        - Rust/WASM
-        - TypeScript
-        - Fallback
-    validations:
-      required: false
   - type: textarea
     id: diagnostics
     attributes:
       label: Engine diagnostics
-      description: Optional. In Help, open About and press Copy diagnostics, then paste the result here. It names the engine, any fallback reason and the engine build, which the version line does not. It helps most if the game started on the TypeScript engine when you expected the Rust engine.
+      description: Optional. In Help, open About and press Copy diagnostics, then paste the result here. It names the engine build, the package and source hashes this page expects next to the ones the engine reports, and where and why the engine stopped if it did. It helps most when the game stopped or reloaded after an engine crash.
       render: shell
     validations:
       required: false
@@ -83,9 +71,9 @@ body:
     id: mode
     attributes:
       label: Game mode
-      description: If your tower was founded with a mode picker, which mode was it? Leave as "Not sure / not applicable" if your build has no mode selector.
+      description: Which mode was the tower founded in? You pick Classic or Modern when you start a new tower.
       options:
-        - Not sure / not applicable
+        - Not sure
         - Classic
         - Modern
   - type: textarea

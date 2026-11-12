@@ -6,6 +6,9 @@ contact_links:
   - name: 🔎 Search existing issues
     url: https://github.com/maniator/verticopolis/issues?q=is%3Aissue
     about: Check whether your bug or idea has already been reported.
+  - name: 📖 Engine docs
+    url: https://docs.verticopolis.com
+    about: The Rust engine's developer docs, for building a frontend or tool on the engine package.
   - name: 🔐 Report a security vulnerability
     url: https://github.com/maniator/verticopolis/security/advisories/new
     about: Privately disclose a security issue. Please don't open a public issue for vulnerabilities; see SECURITY.md.
