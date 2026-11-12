@@ -25,7 +25,18 @@ import { buildSecurityTower } from "../screenshot-builders.ts";
 /** What the engine reports about the search (`bombSearch()`), or null. */
 interface SearchRead {
   minutes: number;
-  search: { deadline: number; sweeping: { floor: number; from: number; start: number; arrive: number; done: number }[]; searched: number[] } | null;
+  search: { deadline: number; sweeping: SweepRead[]; searched: number[] } | null;
+}
+
+/** One guard out on the search, as the engine reports it. `route` is the
+ *  corners of its walk on the stairs, `[floor, stairs tile]`. */
+interface SweepRead {
+  floor: number;
+  from: number;
+  start: number;
+  arrive: number;
+  done: number;
+  route?: [number, number][];
 }
 
 /** In-page: the engine's clock and its read of the search. */
@@ -86,6 +97,47 @@ async function searchUnderWay(page: Page, where: string): Promise<void> {
   await declineRansom(page);
   await page.evaluate(pgRunEngine, 3);
   expectClimbingAndWalking(await page.evaluate(pgReadSearch), where);
+}
+
+/** The stairs tile of each guard still on the stairs at `minutes`: the
+ *  route leg it is on, the way the overlay walks it (guardPosition). */
+function climbingTiles(read: SearchRead): number[] {
+  const out: number[] = [];
+  for (const g of read.search?.sweeping ?? []) {
+    const route = g.route ?? [];
+    if (read.minutes >= g.arrive || route.length < 2) continue;
+    const legs = route.slice(1).map((c, i) => Math.abs(c[0] - route[i]![0]));
+    const total = legs.reduce((a, b) => a + b, 0);
+    let along = (Math.max(0, read.minutes - g.start) / (g.arrive - g.start)) * total;
+    let leg = 0;
+    while (leg < legs.length - 1 && along >= legs[leg]!) along -= legs[leg++]!;
+    out.push(route[leg]![1]);
+  }
+  return out;
+}
+
+/** Run the split lot's search a minute at a time until guards are on both
+ *  towers' stairs at once: the left tower's own, and the right tower's,
+ *  reached down to the shared lobby and back up. */
+async function searchOnBothTowers(page: Page): Promise<void> {
+  await declineRansom(page);
+  const towers = await page.evaluate(() => (window as unknown as { __vcShotSecuritySplit?: [number, number][] }).__vcShotSecuritySplit);
+  if (!towers || towers.length !== 2) throw new Error("security-search-split: the builder left no split towers");
+  const inTower = (x: number, [lo, hi]: [number, number]): boolean => x >= lo && x <= hi;
+  for (let i = 0; i < 170; i++) {
+    const read = await page.evaluate(pgReadSearch);
+    if (!read.search) throw new Error(`security-search-split: the search ended at minute ${read.minutes} before a guard reached the right tower's stairs`);
+    const tiles = climbingTiles(read);
+    if (tiles.some((x) => inTower(x, towers[0]!)) && tiles.some((x) => inTower(x, towers[1]!))) {
+      // Center a little right of the lot so the towers clear the Map.
+      await page.evaluate(([lo, hi]) => {
+        (window as unknown as { game: any }).game.engine.setCamera(Math.round((lo + hi) / 2) + 11, 6.5, 0.9);
+      }, [towers[0]![0], towers[1]![1]] as const);
+      return;
+    }
+    await page.evaluate(pgRunEngine, 1);
+  }
+  throw new Error("security-search-split: no minute had guards on both towers' stairs");
 }
 
 /** The shared framing: floors 3 to 10 around the Security office's floor
@@ -199,6 +251,30 @@ export const SECURITY_SCENES: Scene[] = [
           if (late.length === 0) throw new Error(`security-search-joins: no guard set out from floor 11 at minute ${opens}`);
           expectClimbingAndWalking(read, "security-search-joins");
         },
+        wait: 400,
+      },
+    ],
+  },
+  {
+    id: "security-search-split",
+    outDir: "features",
+    initScript: () => {
+      // The seed hides the bomb where the search lasts until guards reach
+      // the right tower (the builder's default seed finds it in minutes).
+      (window as unknown as { __vcShotSecurity: unknown }).__vcShotSecurity = { mode: "modern", hour: 10, ransom: true, split: true, seed: 6101 };
+    },
+    build: buildSecurityTower,
+    assertUnits: 40,
+    shots: [
+      {
+        // Two towers standing apart on one lobby, each with fire escapes on
+        // both of its sides. The guards from the left tower's Security office
+        // climb its own stairs, and the ones sent to the right tower walk
+        // down to the shared lobby and climb that tower's stairs.
+        name: "security-search-split",
+        // No `frame`: the setup frames the lot itself, both towers whole and
+        // left of the overview Map, which covers the canvas's lower right.
+        setup: searchOnBothTowers,
         wait: 400,
       },
     ],
