@@ -104,6 +104,14 @@ describe("parseIssueForm", () => {
     ]);
   });
 
+  it("reads a dropdown's choices and leaves other fields without any", () => {
+    expect(sample.fields.find((f) => f.id === "mode")?.options).toEqual([
+      "Classic",
+      "Modern",
+    ]);
+    expect(sample.fields.find((f) => f.id === "checks")?.options).toEqual([]);
+  });
+
   it("throws on a form it cannot read", () => {
     expect(() => parseIssueForm("name: Empty\nlabels: []\nbody:\n")).toThrow(
       /cannot read/,

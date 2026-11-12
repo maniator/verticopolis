@@ -30,6 +30,8 @@ export interface FormField {
   required: boolean;
   /** Checkbox options a submitter must tick. */
   requiredOptions: string[];
+  /** A dropdown's choices, in order. */
+  options: string[];
 }
 
 export interface IssueForm {
@@ -82,6 +84,7 @@ export function parseIssueForm(yaml: string): IssueForm {
         label: "",
         required: false,
         requiredOptions: [],
+        options: [],
       };
       fields.push(field);
       section = "";
@@ -109,6 +112,16 @@ export function parseIssueForm(yaml: string): IssueForm {
       key?.[1] === "required"
     ) {
       field.required = unquote(key[2]) === "true";
+      continue;
+    }
+    if (
+      section === "attributes" &&
+      optionIndent >= 0 &&
+      field.type === "dropdown" &&
+      indent === optionIndent
+    ) {
+      const choice = /^\s*- (.+)$/.exec(line);
+      if (choice) field.options.push(unquote(choice[1]));
       continue;
     }
     if (

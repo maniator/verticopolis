@@ -1,11 +1,11 @@
 # Label taxonomy for Verticopolis — the human-readable list of repo labels.
 #
-# To apply it, run the "Sync labels" workflow (.github/workflows/labels.yml):
-#   Actions → Sync labels → Run workflow (from the default branch).
-# It's manual (workflow_dispatch) — there is no automatic on-push sync. The
-# workflow mirrors the list below as plain `gh label create` commands; when you
-# change a label here, change it there too. As a manual alternative without the
-# workflow, the equivalent `gh` commands are also at the bottom of this file.
+# This file is the one list. The "Sync labels" workflow
+# (.github/workflows/labels.yml) applies it on a push to main that changes this
+# file or the workflow, daily, and by hand from Actions > Sync labels > Run
+# workflow. Without the workflow, run `node scripts/sync-labels.ts` with gh
+# signed in (`--dry-run` prints the commands). Keep each entry's shape: `name`,
+# then a quoted six-digit `color`, then `description`.
 #
 # Colors are quoted strings on purpose: an unquoted value like 5319e7 would be
 # parsed as a float (scientific notation) by a YAML reader and corrupt the color.
@@ -140,41 +140,3 @@ labels:
   - name: help wanted
     color: "008672"
     description: Maintainer would welcome help on this
-
-# Manual alternative to the Sync labels workflow (safe to re-run; --force updates
-# an existing label). Run once from a machine with the gh CLI authenticated:
-#
-#   gh label create bug           -c d73a4a -d "Something isn't working" --force
-#   gh label create enhancement   -c a2eeef -d "New feature or request" --force
-#   gh label create parity        -c 231367 -d "Diverges from the 1994 SimTower original" --force
-#   gh label create security      -c b60205 -d "Security-relevant; triaged from a private report" --force
-#   gh label create documentation -c 0075ca -d "Docs, README, or setup fixes" --force
-#   gh label create task          -c ededed -d "Internal work with no player-facing report (the Task issue form)" --force
-#   gh label create classic       -c 5319e7 -d "Affects Classic (1994-faithful) towers" --force
-#   gh label create modern        -c 1d76db -d "Affects Modern (opt-in) towers" --force
-#   gh label create needs-triage  -c fbca04 -d "Not yet reviewed by a maintainer" --force
-#   gh label create needs-repro   -c d4c5f9 -d "Awaiting a reproduction" --force
-#   gh label create needs-form    -c e4e669 -d "The body does not follow its issue form (set by issue-form.yml)" --force
-#   gh label create gate-1        -c 0e8a16 -d "Needed before stage 1 of the engine cohort (3.0 priorities plan)" --force
-#   gh label create gate-3        -c d93f0b -d "Needed before the 3.0.0 flip (3.0 priorities plan)" --force
-#   gh label create engine-1.0    -c 5319e7 -d "Needed before the engine crate's 1.0.0 release (#893)" --force
-#   gh label create "closes with TS removal" -c cfd3d7 -d "Only affects the TypeScript engine fallback; closes when the TypeScript engine is removed in 3.x" --force
-#   gh label create P1            -c e60000 -d "Priority 1: work next" --force
-#   gh label create P2            -c ff8c00 -d "Priority 2: do when you next touch the area" --force
-#   gh label create P3            -c b8e600 -d "Priority 3: low, gated, watch-only or awaiting a spec" --force
-#   gh label create engine        -c c5def5 -d "The TypeScript simulation: tenants, demand, stars, events" --force
-#   gh label create engine-rs     -c c5def5 -d "The Rust engine crate, its binding and the conformance lock" --force
-#   gh label create wasm          -c c5def5 -d "The web's WASM host and worker, and the 3.0.0 cutover" --force
-#   gh label create economy       -c c5def5 -d "Rent, fees, prices, maintenance and money" --force
-#   gh label create transport     -c c5def5 -d "Elevators, stairs, escalators, walkways and routing" --force
-#   gh label create render        -c c5def5 -d "Sprites, art, canvas drawing and visual effects" --force
-#   gh label create ui            -c c5def5 -d "Dialogs, panels, input, toasts and the build palette" --force
-#   gh label create accessibility -c c5def5 -d "Screen readers, keyboard navigation and other barriers" --force
-#   gh label create audio         -c c5def5 -d "Sound effects, music and the audio engine" --force
-#   gh label create analytics     -c c5def5 -d "Product analytics, telemetry and the analytics report" --force
-#   gh label create save-load     -c c5def5 -d "Saves, autosave, stashes, migrations and .vctower files" --force
-#   gh label create tdt           -c c5def5 -d "1994 TDT import and export" --force
-#   gh label create pwa           -c c5def5 -d "Install, offline, service worker and the update flow" --force
-#   gh label create tooling       -c c5def5 -d "CI, tests, screenshots, perf scripts and agent scaffolding" --force
-#   gh label create "good first issue" -c 7057ff -d "Good entry point for newcomers" --force
-#   gh label create "help wanted" -c 008672 -d "Maintainer would welcome help on this" --force

@@ -2,21 +2,37 @@ name: Sync labels
 
 # Create or update the repository's labels.
 #
-# Deliberately workflow_dispatch ONLY — runs when a maintainer taps "Run
-# workflow", never automatically on push/PR. Run it from the DEFAULT branch so
-# the latest label list is applied; label changes are repository-wide, so the
-# branch only decides which version of this list runs. Non-destructive: it
-# creates/updates the labels below and never deletes labels that aren't listed.
+# Runs on a push to main that changes the list (.github/labels.yml), its reader
+# or this workflow, daily as a backstop, and by hand from Actions > Sync labels
+# > Run workflow.
+# Every run uses the default branch's list, since labels are repository-wide.
+# Non-destructive: it creates or updates the listed labels and never deletes a
+# label that isn't listed, so a daily run only puts back a color or
+# description someone changed by hand.
 #
-# The list below mirrors .github/labels.yml (the human-readable taxonomy).
-# When you change one, change the other. It's a plain `gh` list on purpose —
-# no YAML parsing at runtime, so nothing can coerce a color like 5319e7 into a
-# float, and there are no tool/dialect dependencies beyond gh (always present).
+# The list is .github/labels.yml, read by scripts/sync-labels.ts through
+# src/build/labelList.ts (a narrow reader with its own tests, so a color like
+# 5319e7 stays a string). The same script runs by hand with gh signed in.
 on:
+  push:
+    branches: [main]
+    paths:
+      - .github/labels.yml
+      - .github/workflows/labels.yml
+      - scripts/sync-labels.ts
+      - src/build/labelList.ts
+  schedule:
+    - cron: "17 9 * * *"
   workflow_dispatch:
 
-# Least privilege: label management only needs write access to issues.
+concurrency:
+  group: sync-labels
+  cancel-in-progress: false
+
+# Least privilege: label management needs write access to issues, and the
+# checkout reads the list.
 permissions:
+  contents: read
   issues: write
 
 jobs:
@@ -27,46 +43,14 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: ".nvmrc"
+
       - name: Create or update labels
-        run: |
-          set -euo pipefail
-          sync() {
-            echo "::group::$1"
-            gh label create "$1" --color "$2" --description "$3" --force
-            echo "::endgroup::"
-          }
-          sync bug                d73a4a "Something isn't working"
-          sync enhancement        a2eeef "New feature or request"
-          sync parity             231367 "Diverges from the 1994 SimTower original"
-          sync security           b60205 "Security-relevant; triaged from a private report"
-          sync documentation      0075ca "Docs, README, or setup fixes"
-          sync task               ededed "Internal work with no player-facing report (the Task issue form)"
-          sync classic            5319e7 "Affects Classic (1994-faithful) towers"
-          sync modern             1d76db "Affects Modern (opt-in \"what the original couldn't do\") towers"
-          sync needs-triage       fbca04 "Not yet reviewed by a maintainer"
-          sync needs-repro        d4c5f9 "Awaiting a reproduction"
-          sync needs-form         e4e669 "The body does not follow its issue form (set by issue-form.yml)"
-          sync gate-1             0e8a16 "Needed before stage 1 of the engine cohort (3.0 priorities plan)"
-          sync gate-3             d93f0b "Needed before the 3.0.0 flip (3.0 priorities plan)"
-          sync engine-1.0         5319e7 "Needed before the engine crate's 1.0.0 release (#893)"
-          sync "closes with TS removal" cfd3d7 "Only affects the TypeScript engine fallback; closes when the TypeScript engine is removed in 3.x"
-          sync P1                 e60000 "Priority 1: work next"
-          sync P2                 ff8c00 "Priority 2: do when you next touch the area"
-          sync P3                 b8e600 "Priority 3: low, gated, watch-only or awaiting a spec"
-          sync engine             c5def5 "The TypeScript simulation: tenants, demand, stars, events"
-          sync engine-rs          c5def5 "The Rust engine crate, its binding and the conformance lock"
-          sync wasm               c5def5 "The web's WASM host and worker, and the 3.0.0 cutover"
-          sync economy            c5def5 "Rent, fees, prices, maintenance and money"
-          sync transport          c5def5 "Elevators, stairs, escalators, walkways and routing"
-          sync render             c5def5 "Sprites, art, canvas drawing and visual effects"
-          sync ui                 c5def5 "Dialogs, panels, input, toasts and the build palette"
-          sync accessibility      c5def5 "Screen readers, keyboard navigation and other barriers"
-          sync audio              c5def5 "Sound effects, music and the audio engine"
-          sync analytics          c5def5 "Product analytics, telemetry and the analytics report"
-          sync save-load          c5def5 "Saves, autosave, stashes, migrations and .vctower files"
-          sync tdt                c5def5 "1994 TDT import and export"
-          sync pwa                c5def5 "Install, offline, service worker and the update flow"
-          sync tooling            c5def5 "CI, tests, screenshots, perf scripts and agent scaffolding"
-          sync "good first issue" 7057ff "Good entry point for newcomers"
-          sync "help wanted"      008672 "Maintainer would welcome help on this"
-          echo "Synced 28 labels."
+        run: node scripts/sync-labels.ts
