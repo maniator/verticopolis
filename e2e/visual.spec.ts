@@ -186,8 +186,9 @@ test.describe("dialog chrome", () => {
 
   test("update prompt with what's-new notes matches baseline", async ({ page }) => {
     // The optional "What's new" block: when the incoming build carries
-    // player-facing notes (harvested from `Player-note:` trailers), the modal
-    // shows up to three, above the build-id line. Deterministic stub info.
+    // player-facing notes (from CHANGELOG.md), the modal shows up to three as
+    // a plain list above the build-id line (a longer release scrolls in the
+    // log the skipped-versions test pins). Deterministic stub info.
     await page.evaluate(() =>
       (window as any).game.onUpdateAvailable(async () => {}, {
         version: "1.1.1",

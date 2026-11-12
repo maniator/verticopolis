@@ -818,7 +818,11 @@ the prompt already carries it to a player who skipped it.
 
 Cadence: one curated block **per player-noticeable release** (per PR, not per
 commit). Fewer lines beat more, and a release that is a patch or internal-only
-gets none, just the build-id line. Curation is the point: the modal is a "here's
+gets none, just the build-id line. The prompt shows every line of a release
+whole: up to three as a plain list, more in a log that scrolls in place. A
+release may carry up to `MAX_NOTES` lines of up to `MAX_NOTE_LEN` characters
+each (`src/pwaUpdateInfo.ts`); `src/changelog.test.ts` fails the release PR
+whose notes would not fit whole. Curation is the point: the modal is a "here's
 what's new, get back in" moment, not a patch-note viewer.
 
 For a player-facing change, write the lines under `## Player` in the PR's change

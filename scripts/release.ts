@@ -32,6 +32,7 @@ import {
   setLockVersion,
 } from "../src/build/changeNotes.ts";
 import { cargoPackage, isSemverIncrease } from "../src/build/engineCompat.ts";
+import { MAX_NOTE_LEN, MAX_NOTES } from "../src/pwaUpdateInfo.ts";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const path = (rel: string) => join(root, rel);
@@ -81,7 +82,9 @@ if (app !== appWas) {
   npm(["version", app, "--no-git-tag-version"]);
   const lines = pending.flatMap((n) => n.player);
   write("CHANGELOG.md", insertSection(read("CHANGELOG.md"), app, lines));
-  if (lines.length > 3) console.warn(`release: ${lines.length} player lines; the update prompt shows three, so trim CHANGELOG.md to the few that matter`);
+  if (lines.length > MAX_NOTES) console.warn(`release: ${lines.length} player lines; the update prompt shows ${MAX_NOTES}, so merge some of them in CHANGELOG.md`);
+  const long = lines.filter((l) => l.length > MAX_NOTE_LEN).length;
+  if (long > 0) console.warn(`release: ${long} player line(s) over ${MAX_NOTE_LEN} characters; the update prompt would cut them, so split them in CHANGELOG.md`);
 }
 
 const crate = cargoPackage(read("engine-rs/Cargo.toml"));

@@ -160,7 +160,8 @@
    DIRECT children, so it never inherits the full-bleed (.win > .win-title) or
    sticky (.modal-box > .win-title) treatment reserved for the dialog title bar.
    Wells are reserved for scrolling logs: one version's notes stay a short
-   list (≤3 lines), and only several skipped versions get the well below. */
+   list up to three lines, and a longer release or several skipped versions
+   get the well below. */
 .whatsnew {
   margin-top: 10px;
 }
@@ -174,7 +175,8 @@
   margin-bottom: 2px;
   overflow-wrap: anywhere;
 }
-/* Several skipped versions' notes (#1897), newest first. The log scrolls on
+/* Several skipped versions' notes (#1897), newest first, or one release's
+   notes when it has more than three. The log scrolls on
    its own once it is taller than its cap, so the box itself stays under its
    82vh cap and only one scroller is live in practice (the guard in
    modalSingleScroller.guard.test.ts names this exception). The cap leaves the
