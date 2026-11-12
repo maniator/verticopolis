@@ -5,18 +5,11 @@
      reading text on a white well;
    - the landing page is the title screen (src/components/TitleScreen.astro),
      with the cards as small game windows over the skyline.
-   The chrome tokens (--r-*) come from the game's retro-tokens.css, copied in
-   beside this file by scripts/sync-pages.mjs. The splash colors are literals
-   in the game's src/styles.css, copied here under --ts-*. */
+   The chrome tokens (--r-*) and the title screen's colors (--splash-*) come
+   from the game's retro-tokens.css, and the skyline from its
+   splash-skyline.svg, both copied in by scripts/sync-pages.mjs. */
 
 :root {
-  --ts-sky: linear-gradient(#161634 0%, #241f4c 34%, #5b3560 62%, #c65a63 86%, #ef8560 100%);
-  --ts-building: #201643;
-  --ts-amber: #ffc94a;
-  --ts-cream: #e6dcc0;
-  --ts-plate-ink: #20204a;
-  --ts-border: #0d0d10;
-  --ts-premise: #e7ddf5;
   --ts-skyline-height: clamp(10rem, 20vw, 15rem);
 
   --sl-font: var(--r-font);
@@ -78,7 +71,7 @@
   border-bottom-color: var(--r-title);
 }
 .header :focus-visible {
-  outline-color: var(--ts-amber);
+  outline-color: var(--splash-amber);
 }
 .header .site-title {
   font-weight: 700;
@@ -162,20 +155,20 @@ mobile-starlight-toc .toggle,
 /* Below the skyline the page is the buildings' own color, and the content
    panel lets the title screen run edge to edge. */
 [data-has-hero] .main-frame {
-  background: var(--ts-building);
+  background: var(--splash-building);
   overflow-x: clip;
-  --sl-color-text: var(--ts-premise);
+  --sl-color-text: var(--splash-premise);
   --sl-color-white: var(--r-title-fg);
 }
 [data-has-hero] :focus-visible {
-  outline-color: var(--ts-amber);
+  outline-color: var(--splash-amber);
   outline-offset: 2px;
 }
 [data-has-hero] .content-panel {
   padding-top: 0;
 }
 [data-has-hero] .sl-markdown-content > p {
-  color: var(--ts-premise);
+  color: var(--splash-premise);
   text-align: center;
 }
 
@@ -187,8 +180,8 @@ mobile-starlight-toc .toggle,
   overflow: hidden;
   padding: clamp(3rem, 9vh, 6rem) 1rem calc(var(--ts-skyline-height) + 1.5rem);
   text-align: center;
-  background: var(--ts-sky);
-  color: var(--ts-premise);
+  background: var(--splash-sky);
+  color: var(--splash-premise);
 }
 .ts-stars {
   position: absolute;
@@ -209,8 +202,8 @@ mobile-starlight-toc .toggle,
   width: min(40vmin, 210px);
   aspect-ratio: 1;
   border-radius: 50%;
-  background: radial-gradient(circle, #ffe6a0 0%, #ffc94a 52%, #f18f4b 100%);
-  box-shadow: 0 0 60px 16px rgba(255, 179, 87, 0.26);
+  background: var(--splash-sun);
+  box-shadow: 0 0 60px 16px var(--splash-sun-glow);
 }
 .ts-skyline {
   position: absolute;
@@ -221,7 +214,7 @@ mobile-starlight-toc .toggle,
   height: var(--ts-skyline-height);
   /* The title screen's skyline at its own proportions, repeated across a
      wide screen instead of stretched, so the rooftops always show. */
-  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 460 200'%3E%3Cg fill='%23201643' stroke='%230d0d10' stroke-width='1'%3E%3Cpath d='M-5 200 V120 h34 V98 h16 V120 h40 V200 z'/%3E%3Cpath d='M95 200 V80 h26 V56 h12 V80 h26 V200 z'/%3E%3Cpath d='M200 200 V54 h20 V30 h9 V10 h9 V30 h9 V54 h20 V200 z'/%3E%3Cpath d='M310 200 V92 h30 V68 h15 V92 h30 V200 z'/%3E%3Cpath d='M410 200 V60 h20 V36 h11 V60 h34 V200 z'/%3E%3C/g%3E%3Cg fill='%23ffdca0'%3E%3Crect x='8' y='130' width='3' height='4'/%3E%3Crect x='8' y='146' width='3' height='4'/%3E%3Crect x='104' y='92' width='3' height='4'/%3E%3Crect x='104' y='112' width='3' height='4'/%3E%3Crect x='214' y='66' width='3' height='4'/%3E%3Crect x='214' y='90' width='3' height='4'/%3E%3Crect x='320' y='100' width='3' height='4'/%3E%3Crect x='424' y='72' width='3' height='4'/%3E%3C/g%3E%3C/svg%3E") repeat-x center bottom / auto 100%;
+  background: url("/splash-skyline.svg") repeat-x center bottom / auto 100%;
 }
 .ts-brand h1 {
   margin: 0;
@@ -244,10 +237,10 @@ mobile-starlight-toc .toggle,
   stroke-width: 2px;
 }
 .ts-word .a {
-  fill: #f7f1e4;
+  fill: var(--splash-wordmark);
 }
 .ts-word .b {
-  fill: var(--ts-amber);
+  fill: var(--splash-amber);
 }
 .ts-tag {
   display: block;
@@ -256,7 +249,7 @@ mobile-starlight-toc .toggle,
 }
 .ts-tag text {
   font-size: 15px;
-  fill: #ffd9a8;
+  fill: var(--splash-tagline);
 }
 .ts-premise {
   max-width: 46ch;
@@ -282,21 +275,21 @@ mobile-starlight-toc .toggle,
   padding: 9px 20px;
   font-family: var(--r-font);
   font-size: 1rem;
-  color: var(--ts-plate-ink);
+  color: var(--splash-plate-ink);
   text-decoration: none;
-  background: var(--ts-cream);
-  border: 2px solid var(--ts-border);
+  background: var(--splash-cream);
+  border: 2px solid var(--splash-ink);
   box-shadow: inset 2px 2px 0 rgba(255, 255, 255, 0.75), inset -2px -2px 0 rgba(0, 0, 0, 0.2), 3px 3px 0 rgba(0, 0, 0, 0.4);
 }
 .ts-btn:hover {
-  color: var(--ts-plate-ink);
+  color: var(--splash-plate-ink);
   filter: brightness(1.05);
 }
 .ts-btn:active {
   box-shadow: inset 2px 2px 0 rgba(0, 0, 0, 0.3);
 }
 .ts-btn.primary {
-  background: var(--ts-amber);
+  background: var(--splash-amber);
   font-weight: 700;
 }
 @media (max-width: 40rem) {

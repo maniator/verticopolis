@@ -44,4 +44,19 @@
   --rung-low: #1e7a2e;
   --rung-avg: #c8a000;
   --rung-high: #b02020;
+  /* The title screen ("Metropolis Dusk"): the game's splash and boot cover
+     (styles/game/splash.css) and the docs site's landing page share these, so
+     the two skies never drift. The splash is box art, not Win 3.1 chrome, and
+     keeps its own colors. */
+  --splash-sky: linear-gradient(#161634 0%, #241f4c 34%, #5b3560 62%, #c65a63 86%, #ef8560 100%);
+  --splash-amber: #ffc94a;   /* POLIS, the primary plate, the focus ring */
+  --splash-sun: radial-gradient(circle, #ffe6a0 0%, var(--splash-amber) 52%, #f18f4b 100%);
+  --splash-sun-glow: rgba(255, 179, 87, 0.26);
+  --splash-building: #201643;
+  --splash-cream: #e6dcc0;   /* the plates and the corner buttons' glyphs */
+  --splash-plate-ink: #20204a;
+  --splash-ink: #0d0d10;     /* plate borders and the skyline's outlines */
+  --splash-wordmark: #f7f1e4; /* VERTICO */
+  --splash-tagline: #ffd9a8;
+  --splash-premise: #e7ddf5;
 }
