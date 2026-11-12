@@ -10,15 +10,16 @@ import { drawRoomPortrait, drawTransportPortrait } from "../../../src/render/roo
 import type { DrawCtx } from "../../../src/render/sprites";
 import type { FacilityKind, UnitState } from "../../../src/shared/types";
 
-/** The most a picture magnifies the world: three whole game pixels per pixel,
- *  as the gallery did, stepping down for a room too big for its box. */
+/** The most a picture magnifies the world: three whole game pixels per CSS
+ *  pixel, as the gallery did, stepping down for a room too big for its box. */
 const MAG = 3;
 const BACKGROUND = "#12151d";
 
 interface Picture {
   canvas: HTMLCanvasElement;
   ctx: CanvasRenderingContext2D;
-  draw(d: DrawCtx, w: number, h: number): void;
+  /** Paints into a w by h box of device pixels, magnifying at most `mag`. */
+  draw(d: DrawCtx, w: number, h: number, mag: number): void;
   /** The hour the picture shows. */
   hour: number;
   visible: boolean;
@@ -51,26 +52,30 @@ function pictureOf(canvas: HTMLCanvasElement, facts: (k: FacilityKind) => Catalo
   };
   const draw =
     span !== null
-      ? (d: DrawCtx, w: number, h: number) => drawTransportPortrait(d, facts, kind, span, 0, 0, w, h, 0, MAG)
-      : (d: DrawCtx, w: number, h: number) => drawRoomPortrait(d, facts, kind, pose, 0, 0, w, h, 0, MAG);
+      ? (d: DrawCtx, w: number, h: number, mag: number) => drawTransportPortrait(d, facts, kind, span, 0, 0, w, h, 0, mag)
+      : (d: DrawCtx, w: number, h: number, mag: number) => drawRoomPortrait(d, facts, kind, pose, 0, 0, w, h, 0, mag);
   return { canvas, ctx, draw, hour, visible: false };
 }
 
 function paint(p: Picture, anim: number): void {
   const dpr = Math.min(2, window.devicePixelRatio || 1);
-  const w = p.canvas.clientWidth;
-  const h = p.canvas.clientHeight;
+  const w = Math.round(p.canvas.clientWidth * dpr);
+  const h = Math.round(p.canvas.clientHeight * dpr);
   if (w < 1 || h < 1) return;
-  if (p.canvas.width !== Math.round(w * dpr) || p.canvas.height !== Math.round(h * dpr)) {
-    p.canvas.width = Math.round(w * dpr);
-    p.canvas.height = Math.round(h * dpr);
+  if (p.canvas.width !== w || p.canvas.height !== h) {
+    p.canvas.width = w;
+    p.canvas.height = h;
   }
-  p.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  // The painters magnify by whole steps, so they work in device pixels here:
+  // on a sharp screen a wide room that would drop to one game pixel per CSS
+  // pixel can still take three device pixels (1.5 CSS pixels), and fill its
+  // box instead of sitting small in the middle of it.
+  p.ctx.setTransform(1, 0, 0, 1, 0, 0);
   p.ctx.fillStyle = BACKGROUND;
   p.ctx.fillRect(0, 0, w, h);
   // Lights on, a garage two-thirds full and a recycling plant filling up, at
   // an hour the room is open.
-  p.draw({ ctx: p.ctx, lit: true, anim, hour: p.hour, parkingUse: 0.7, recycleFill: 0.66 }, w, h);
+  p.draw({ ctx: p.ctx, lit: true, anim, hour: p.hour, parkingUse: 0.7, recycleFill: 0.66 }, w, h, Math.round(MAG * dpr));
 }
 
 async function start(): Promise<void> {
