@@ -20,6 +20,8 @@ pub(super) fn served_tower(mode: GameMode, top: i64) -> Simulation {
     for x in 0..LOT_WIDTH {
         assert!(sim.tower.place(Kind::Lobby, 1, x).ok);
     }
+    // The tower is judged at three stars and up, so it has its services.
+    crate::rule_tests::stocked_services::stock_services(&mut sim, 1);
     for f in 2..=top {
         for x in 0..LOT_WIDTH {
             assert!(sim.tower.place(Kind::Floor, f, x).ok);
@@ -419,7 +421,7 @@ fn walkway_bindings_name_their_class_and_the_elevator_stop() {
     let probe = |sim: &mut Simulation, floor: i64| {
         let id = tenant(sim, Kind::Office, floor, 10, UnitState::Empty, 1.0);
         let u = sim.tower.get_unit(id).unwrap().clone();
-        let g = sim.gripe_facts(&u, "congestion", None, None);
+        let g = sim.gripe_facts(&u, "congestion", None, None, None);
         (g.binding, g.elevator_here)
     };
     // Each probed floor sits inside the lift's run, so its stop can drop.

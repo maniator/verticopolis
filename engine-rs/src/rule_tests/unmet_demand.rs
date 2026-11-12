@@ -75,6 +75,7 @@ fn classic_caps_an_under_served_office_without_evicting_it() {
         noisy: true,
         unmet_demand: true,
         unmet_cov: Some(cov),
+        service_short: None,
         ..calm()
     };
     assert_eq!(sim.dominant_gripe(&u, &noisy), Some("noise"));
@@ -189,6 +190,7 @@ fn the_nightclub_halo_also_yields_to_a_steeper_unmet_drain() {
     let with = |unmet_demand, cov| StepResult {
         unmet_demand,
         unmet_cov: Some(cov),
+        service_short: None,
         ..calm()
     };
     assert_eq!(

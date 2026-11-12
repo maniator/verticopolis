@@ -12,8 +12,10 @@ use crate::econ::rent_of;
 use crate::economy::commercial_daily_income;
 use crate::facilities::{is_sky_lobby_floor, Kind, LOBBY_INTERVAL, MAX_FLOOR};
 use crate::presence::CongestionAttribution;
+use crate::satisfaction::shortfall::{ServiceShort, ServiceShortfalls, PARKING_CAUSE, TRASH_CAUSE};
 use crate::satisfaction::{
-    names_gripe, StepResult, GRIPE_WARN, SERVED_RECOVERY, TRANSPORT_FAR_TILES, VACATE_RESCIND,
+    fresh_tenant_need, names_gripe, StepResult, GRIPE_WARN, SERVED_RECOVERY, TRANSPORT_FAR_TILES,
+    VACATE_RESCIND,
 };
 use crate::sim::Simulation;
 use crate::tower::{Tower, Unit, UnitState};
@@ -277,7 +279,14 @@ impl Simulation {
     /// Apartment), and unmet
     /// demand active on a cap or an erosion (the inspector's reading; the
     /// eviction path takes erosion only).
-    fn gripe_flags(&mut self, u: &Unit, served: bool, cong: f64, cov: Option<f64>) -> StepResult {
+    fn gripe_flags(
+        &mut self,
+        u: &Unit,
+        served: bool,
+        cong: f64,
+        cov: Option<f64>,
+        shortfalls: &ServiceShortfalls,
+    ) -> StepResult {
         let lobby_far = served
             && lobby_tenant(u.kind)
             && self
@@ -286,6 +295,7 @@ impl Simulation {
                 .cap
                 <= GRIPE_WARN;
         let unmet_demand = unmet_active(self, cov);
+        let service_short = shortfalls.binding_for(u, served);
         StepResult {
             next: u.satisfaction,
             served,
@@ -295,6 +305,7 @@ impl Simulation {
             lobby_far,
             unmet_demand,
             unmet_cov: cov,
+            service_short,
         }
     }
 
@@ -307,7 +318,8 @@ impl Simulation {
     /// tier, unmet demand itself, so the hour's demand memo fills at those
     /// reads and nowhere else. The first pass therefore runs with unmet demand
     /// off, and only a first answer of noise or nothing reads the coverage; an
-    /// earlier cause stands, since no tier before noise reads it. Both the
+    /// earlier cause stands, since no tier before noise reads it (a service
+    /// shortfall that only holds the rating ranks last, so it reads on). Both the
     /// #548 override and the last tier need the drain active, so the ladder
     /// runs a second time only when the coverage turns unmet demand on;
     /// otherwise the second pass would repeat the first.
@@ -322,29 +334,37 @@ impl Simulation {
         };
         let cong = att.as_ref().map_or(0.0, |(c, _)| *c);
         let att = att.and_then(|(_, a)| a);
-        let mut flags = self.gripe_flags(u, served, cong, None);
+        let shortfalls = self.service_shortfalls();
+        let mut flags = self.gripe_flags(u, served, cong, None, &shortfalls);
+        let short = flags.service_short;
         let first = self.dominant_gripe(u, &flags);
-        if !matches!(first, None | Some("noise")) || !(served && u.kind.is_unmet_demand_kind()) {
-            return first.map(|cause| self.gripe_facts(u, cause, None, att.as_ref()));
+        // A shortfall that only holds the rating ranks under unmet demand, so
+        // it reads coverage too.
+        let holding_short = flags.service_short.filter(|s| !s.sinks).map(|s| s.cause);
+        let reads_coverage = first.is_none() || first == Some("noise") || first == holding_short;
+        if !reads_coverage || !(served && u.kind.is_unmet_demand_kind()) {
+            return first.map(|cause| self.gripe_facts(u, cause, None, short, att.as_ref()));
         }
         let cov = self.inspector_coverage(u);
         if !unmet_active(self, cov) {
-            return first.map(|cause| self.gripe_facts(u, cause, None, att.as_ref()));
+            return first.map(|cause| self.gripe_facts(u, cause, None, short, att.as_ref()));
         }
         flags.unmet_demand = true;
         flags.unmet_cov = cov;
         let cause = self.dominant_gripe(u, &flags)?;
-        Some(self.gripe_facts(u, cause, cov, att.as_ref()))
+        Some(self.gripe_facts(u, cause, cov, short, att.as_ref()))
     }
 
-    /// The facts a cause's copy branches on (`gripeLineText`). `att` is the
-    /// floor's congestion attribution when the caller built it; only a
-    /// congestion cause reads it.
+    /// The facts a cause's copy branches on (`gripeLineText`). `short` is
+    /// the service shortfall binding the room, whose coverage a trash or
+    /// parking cause reads; `att` is the floor's congestion attribution when
+    /// the caller built it, which only a congestion cause reads.
     pub(super) fn gripe_facts(
         &mut self,
         u: &Unit,
         cause: &'static str,
         cov: Option<f64>,
+        short: Option<ServiceShort>,
         att: Option<&CongestionAttribution>,
     ) -> GripeFacts {
         let mut g = GripeFacts {
@@ -382,6 +402,9 @@ impl Simulation {
                     g.floor_reachable = Some(self.floor_reachable(u.floor));
                 }
             }
+            TRASH_CAUSE | PARKING_CAUSE => {
+                g.coverage = short.filter(|s| s.cause == cause).map(|s| s.coverage);
+            }
             _ => {}
         }
         g
@@ -417,10 +440,12 @@ impl Simulation {
             None
         };
         let served = self.reaches_once(u, reaches);
-        let flags = self.gripe_flags(u, served, 0.0, cov);
+        // The gate counted the newcomer in the service need; so does its gripe.
+        ctx.shortfalls.set_candidate(Some(fresh_tenant_need(u)));
+        let flags = self.gripe_flags(u, served, 0.0, cov, &ctx.shortfalls);
         let gripe = self
             .dominant_gripe(u, &flags)
-            .map(|cause| self.gripe_facts(u, cause, cov, None));
+            .map(|cause| self.gripe_facts(u, cause, cov, flags.service_short, None));
         Some(WontLeaseFacts {
             gripe,
             carry: self.carrying_cost(u),

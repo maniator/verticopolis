@@ -11,6 +11,7 @@ use crate::sim::Simulation;
 use crate::star::TOWER_POPULATION;
 use crate::tower::UnitState;
 
+use super::stocked_services::{stock_parking_within, stock_recycling};
 use super::MID as C;
 
 const W: i64 = LOT_WIDTH;
@@ -240,7 +241,7 @@ fn zoned_tower() -> Simulation {
         };
         lay(&mut sim, kind, floor);
     }
-    for floor in [0, -1, -2] {
+    for floor in [0, -1, -2, -3, -4] {
         lay(&mut sim, Kind::Floor, floor);
     }
     sim.star = 5;
@@ -274,7 +275,12 @@ fn zoned_tower() -> Simulation {
     for floor in 2..=100 {
         assert!(sim.crowd.floor_reachable(&sim.tower, floor), "{floor}");
     }
-    assert!(sim.tower.place(Kind::Metro, -2, 0).ok);
+    assert!(sim.tower.place(Kind::Metro, -4, 0).ok);
+    // Seven centers process 17,500 people's trash, and a ramp with a row of
+    // spaces beside them gives the offices parking (Classic asks only that
+    // some be free).
+    stock_recycling(&mut sim, -1, 0, 7);
+    stock_parking_within(&mut sim, 200, 0, 200, LOT_WIDTH);
     for floor in (8..=98).step_by(15) {
         assert!(sim.tower.place(Kind::Security, floor, 60).ok);
     }

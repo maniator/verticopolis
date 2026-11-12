@@ -11,6 +11,7 @@ use crate::clock::GameMode;
 use crate::crowd::spawn::make_person;
 use crate::crowd::{motion, ElevatorCalls, PState, Route};
 use crate::facilities::Kind;
+use crate::rule_tests::stocked_services::{lay_basement, stock_parking_within, stock_recycling};
 use crate::sim::Simulation;
 use crate::tower::UnitState;
 use crate::undo::Step;
@@ -238,6 +239,10 @@ fn rides_after_three_days(kind: Kind, top: i64) -> u64 {
     }
     assert!(sim.build_transport(kind, 12, 1, top).ok);
     let id = sim.tower.transport_at(1, 12).unwrap().id;
+    // The offices need their parking and recycling at five stars.
+    lay_basement(&mut sim, -3);
+    stock_parking_within(&mut sim, 30, 0, 10, 60);
+    stock_recycling(&mut sim, -3, 10, 1);
     for x in [20, 30, 40] {
         assert!(sim.build(Kind::Office, top, x).ok);
     }

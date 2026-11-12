@@ -158,7 +158,8 @@ fn demand_sums_both_and_suites_take_their_spaces_first() {
         );
     }
     for i in 0..3 {
-        must_place(&mut sim, Kind::HotelSuite, 2, 40 + i * 12);
+        let x = 40 + i * 12;
+        occupy(&mut sim, Kind::HotelSuite, 2, x, UnitState::Occupied);
     }
     let d = sim.parking_demand();
     assert_eq!(
@@ -233,4 +234,33 @@ fn shop_income(with_recycling: bool) -> f64 {
 #[test]
 fn a_recycling_center_lifts_commercial_income() {
     assert!(shop_income(true) > shop_income(false));
+}
+
+#[test]
+fn classic_offices_need_one_free_space_whatever_their_size() {
+    let mut sim = floor_two(14);
+    sim.star = 3;
+    for i in 0..8 {
+        occupy(
+            &mut sim,
+            Kind::Office,
+            2,
+            i * OFFICE_WIDTH,
+            UnitState::Occupied,
+        );
+    }
+    assert_eq!(sim.parking_demand().offices, 2.0, "their cars fill two");
+    assert!(sim.office_parking_short(), "no space at all");
+    parking_floor(&mut sim, 1);
+    assert!(
+        !sim.office_parking_short(),
+        "one free space serves every office, so move-ins run at full speed"
+    );
+    // The garage still draws every worker's car on a weekday: two cars'
+    // worth fill the one space.
+    sim.clock.minutes = 12.0 * 60.0;
+    assert!(!sim.clock.is_weekend());
+    let spots = sim.tower.functional_parking_spots() as f64;
+    assert_eq!(spots, 1.0);
+    assert_eq!(sim.parking_usage(spots), 1.0);
 }

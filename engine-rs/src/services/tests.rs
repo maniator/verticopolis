@@ -8,11 +8,11 @@ fn the_advisories_word_their_counts_as_typescript_does() {
     // The TypeScript templates with these inputs (sim/services.ts).
     assert_eq!(
         waste_nudge_message(1234.0, 1.0, 0),
-        "♻️ Garbage is piling up: 1,234 population needs 1 Recycling Center (you have 0). 4★ requires demand met."
+        "♻️ Garbage is piling up: 1,234 population needs 1 Recycling Center (you have 0). Tenant ratings fall until it is handled, and 4★ requires demand met."
     );
     assert_eq!(
         waste_nudge_message(12345.0, 3.0, 1),
-        "♻️ Garbage is piling up: 12,345 population needs 3 Recycling Centers (you have 1). 4★ requires demand met."
+        "♻️ Garbage is piling up: 12,345 population needs 3 Recycling Centers (you have 1). Tenant ratings fall until it is handled, and 4★ requires demand met."
     );
     assert_eq!(
         suite_nudge_message(1.0, 0),
@@ -21,6 +21,14 @@ fn the_advisories_word_their_counts_as_typescript_does() {
     assert_eq!(
         suite_nudge_message(4.0, 2),
         "🚗 Hotel suites need a working parking space each: 4 suites, 2 space(s) chained to a ramp."
+    );
+    assert_eq!(
+        office_parking_nudge_message(1.0, 1.0),
+        "🚗 Offices need parking: their workers need 1 space and 1 is left after the hotel suites. Office ratings fall until there is room."
+    );
+    assert_eq!(
+        office_parking_nudge_message(184.0, 0.0),
+        "🚗 Offices need parking: their workers need 184 spaces and 0 are left after the hotel suites. Office ratings fall until there is room."
     );
 }
 

@@ -7,7 +7,10 @@ use crate::economy::{
     CONDO_MONTHLY_TAX_RATE, OVERHEAD_PER_LEASABLE_UNIT_MONTHLY, REAL_WORLD_QUARTER_DAYS,
 };
 use crate::facilities::Kind;
-use crate::services::{EXTERMINATOR_CALLOUT_FEE, EXTERMINATOR_PER_ROOM_FEE};
+use crate::satisfaction::shortfall::{SHORTFALL_SINK_COVERAGE, TRASH_SINK_MISSING_CAPACITY};
+use crate::services::{
+    EXTERMINATOR_CALLOUT_FEE, EXTERMINATOR_PER_ROOM_FEE, PARKING_WORKERS_PER_SPACE,
+};
 
 mod presentation;
 mod rent;
@@ -24,6 +27,17 @@ pub struct HousekeepingShift {
 pub struct Drain {
     pub cap: f64,
     pub erosion: f64,
+}
+
+/// How a mode counts the parking its offices have (#1970).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum OfficeParking {
+    /// Classic: any space left once the occupied hotel suites park serves
+    /// every office, and none serves none.
+    AnyFreeSpace,
+    /// Modern: each space left after every operational suite serves this
+    /// many workers, lowest offices first.
+    WorkersPerSpace(f64),
 }
 
 pub const NO_DRAIN: Drain = Drain {
@@ -369,6 +383,34 @@ impl GameMode {
                     erosion: ero_t * LOBBY_VERY_FAR_EROSION,
                 }
             }
+        }
+    }
+
+    /// Whether a recycling shortfall `missing` people past capacity sinks
+    /// ratings rather than holding them at Good: any shortfall in Classic,
+    /// more than one center's worth in Modern.
+    pub fn trash_shortfall_sinks(self, missing: f64) -> bool {
+        match self {
+            GameMode::Classic => missing > 0.0,
+            GameMode::Modern => missing > TRASH_SINK_MISSING_CAPACITY,
+        }
+    }
+
+    /// Whether an unparked office's shortfall sinks its rating at
+    /// `coverage`: always in Classic (where it means no parking at all),
+    /// and in Modern under [`SHORTFALL_SINK_COVERAGE`].
+    pub fn office_parking_shortfall_sinks(self, coverage: f64) -> bool {
+        match self {
+            GameMode::Classic => true,
+            GameMode::Modern => coverage < SHORTFALL_SINK_COVERAGE,
+        }
+    }
+
+    /// How the mode counts its offices' parking.
+    pub fn office_parking(self) -> OfficeParking {
+        match self {
+            GameMode::Classic => OfficeParking::AnyFreeSpace,
+            GameMode::Modern => OfficeParking::WorkersPerSpace(PARKING_WORKERS_PER_SPACE),
         }
     }
 

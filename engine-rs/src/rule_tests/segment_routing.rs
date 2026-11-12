@@ -116,6 +116,7 @@ fn the_left_tenant_of_a_served_floor_is_stranded_with_its_own_gripe() {
         lobby_far: false,
         unmet_demand: false,
         unmet_cov: None,
+        service_short: None,
     };
     assert_eq!(sim.dominant_gripe(&office, &stranded), Some("noTransport"));
     let mut dead = office.clone();
