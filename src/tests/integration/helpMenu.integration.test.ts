@@ -26,6 +26,9 @@ const inDialog = <T extends Element>(sel: string): T => {
   return el!;
 };
 const live = (): string => document.getElementById("a11y-live")!.textContent ?? "";
+/** The open Help dialog's own status line (the page's live region is inert
+ *  while a dialog is open). */
+const status = (): string => dialog().querySelector("[data-help-status]")?.textContent ?? "";
 const pauseButton = (): HTMLElement => document.querySelector<HTMLElement>('#speed button[data-speed="0"]')!;
 
 /** A speed the controller reads back after it sets it, as the game's does. */
@@ -70,23 +73,25 @@ describe("the Help menu", () => {
     vi.restoreAllMocks();
   });
 
-  it("opens from Help… with every item, and pauses the tower, saying so", () => {
+  it("opens from Help… with every item, and pauses the tower, saying so inside the dialog", async () => {
     const { speed } = openMenu(2);
     expect(inDialog("h2").textContent).toContain("Help");
     for (const act of ["how-to-play", "whats-new", "release-notes", "gallery", "report", "about"]) inDialog(`[data-act="${act}"]`);
     expect(speed.now()).toBe(0);
-    expect(live()).toBe(PAUSED_FOR_HELP);
+    expect(inDialog("[data-help-status]").getAttribute("role")).toBe("status");
+    await vi.waitFor(() => expect(status()).toBe(PAUSED_FOR_HELP));
+    expect(live()).not.toBe(PAUSED_FOR_HELP);
     expect(pauseButton().getAttribute("aria-label")).toBe(PAUSED_FOR_HELP);
   });
 
-  it("restores the prior speed once on Close, and says so", () => {
+  it("restores the prior speed once on Close, and says so", async () => {
     const { speed } = openMenu(2);
     inDialog<HTMLButtonElement>('[data-act="close"]').click();
     dialog().dispatchEvent(new Event("cancel", { cancelable: true }));
     expect(dialog().open).toBe(false);
     expect(speed.now()).toBe(2);
     expect(speed.onSpeed).toHaveBeenCalledTimes(2);
-    expect(live()).toBe("Back at medium speed");
+    await vi.waitFor(() => expect(live()).toBe("Back at medium speed"));
     expect(pauseButton().getAttribute("aria-label")).toBe("Pause");
   });
 
@@ -113,6 +118,7 @@ describe("the Help menu", () => {
     inDialog<HTMLButtonElement>('[data-act="about"]').click();
     expect(inDialog("h2").textContent).toContain("About this game");
     inDialog(".help-diagnostics");
+    expect(document.activeElement).toBe(inDialog('[data-act="close"]'));
     expect(speed.onSpeed).toHaveBeenCalledTimes(1);
     inDialog<HTMLButtonElement>('[data-act="close"]').click();
     expect(speed.now()).toBe(2);
@@ -141,7 +147,7 @@ describe("the Help menu", () => {
     expect(speed.now()).toBe(2);
   });
 
-  it("opens How to play in a new tab, holds the pause, and resumes once the player is back", () => {
+  it("opens How to play in a new tab, holds the pause, and resumes once the player is back", async () => {
     const { speed } = openMenu(3);
     expect(inDialog<HTMLAnchorElement>('a[data-act="how-to-play"]').getAttribute("href")).toBe("/help?from=game");
     followNewTab('a[data-act="how-to-play"]');
@@ -149,7 +155,7 @@ describe("the Help menu", () => {
     expect(speed.now()).toBe(0);
     leaveAndReturn();
     expect(speed.now()).toBe(3);
-    expect(live()).toBe("Back at fast speed");
+    await vi.waitFor(() => expect(live()).toBe("Back at fast speed"));
   });
 
   it("keeps a speed the player picked before coming back", () => {
@@ -169,6 +175,34 @@ describe("the Help menu", () => {
     speed.playerSets(1);
     leaveAndReturn();
     expect(speed.now()).toBe(1);
+  });
+
+  it("keeps Help open, and the speed it owes, on a Ctrl or Cmd click that opens a background tab", () => {
+    for (const mod of [{ ctrlKey: true }, { metaKey: true }]) {
+      document.body.innerHTML = "";
+      mountAppDom();
+      const { speed } = openMenu(3);
+      const a = inDialog<HTMLAnchorElement>('a[data-act="gallery"]');
+      a.addEventListener("click", (e) => e.preventDefault());
+      a.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, ...mod }));
+      expect(dialog().open).toBe(true);
+      leaveAndReturn();
+      expect(speed.now()).toBe(0);
+      inDialog<HTMLButtonElement>('[data-act="close"]').click();
+      expect(speed.now()).toBe(3);
+    }
+  });
+
+  it("opens nothing when the menu closes before What's new has loaded", async () => {
+    const { speed } = openMenu(2);
+    inDialog<HTMLButtonElement>('[data-act="whats-new"]').click();
+    inDialog<HTMLButtonElement>('[data-act="close"]').click();
+    expect(speed.now()).toBe(2);
+    await import("../../whatsNewData");
+    await new Promise((r) => setTimeout(r, 0));
+    expect(dialog().open).toBe(false);
+    expect(speed.now()).toBe(2);
+    expect(speed.onSpeed).toHaveBeenCalledTimes(2);
   });
 
   it("marks the page links as opened by the game", () => {

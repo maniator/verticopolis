@@ -12,6 +12,7 @@ import { engineSuffix } from "../wasmhost/engineLabel";
 import { liveDiagnostics } from "../wasmhost/engineDiagnosticsLive";
 import type { DiagnosticsReport } from "../wasmhost/engineDiagnostics";
 import { copyText } from "./copyText";
+import { announceLive } from "../game/liveRegion";
 
 /**
  * The in-game Help: the Help menu the toolbar's "Help…" opens, the guide
@@ -37,10 +38,7 @@ export function helpPause(ui: UI): HelpPause {
     pause = new HelpPause({
       getSpeed: () => ui.cb.getSpeed(),
       setSpeed: (s) => ui.cb.onSpeed(s),
-      announce: (text) => {
-        const live = document.getElementById("a11y-live");
-        if (live) live.textContent = text;
-      },
+      announce: (text) => announceHelp(ui, text),
       markToolbar: (held) => {
         const button = document.querySelector<HTMLElement>('#speed button[data-speed="0"]');
         if (!button) return;
@@ -53,6 +51,41 @@ export function helpPause(ui: UI): HelpPause {
     watchPlayerSpeed(pause);
   }
   return pause;
+}
+
+/** The attribute that marks a Help dialog's own status line. */
+const HELP_STATUS_ATTR = "data-help-status";
+
+/**
+ * Say `text` to a screen reader. While a dialog is open everything outside it
+ * is inert, so the page's live region would never be read: the line goes to
+ * the open Help dialog's own status line instead. Once the dialog has closed
+ * (the "Back at ..." line), the page's live region reads it.
+ */
+function announceHelp(ui: UI, text: string): void {
+  const dialog = ui.el.modal as HTMLDialogElement;
+  const status = dialog.open ? dialog.querySelector<HTMLElement>(`[${HELP_STATUS_ATTR}]`) : null;
+  if (!status) {
+    announceLive(text);
+    return;
+  }
+  // Set on the next frame, so a status line that was only just added is in
+  // the accessibility tree before its text changes.
+  status.textContent = "";
+  const set = () => {
+    status.textContent = text;
+  };
+  if (typeof requestAnimationFrame === "function") requestAnimationFrame(set);
+  else set();
+}
+
+/** An empty, visually hidden status line at the end of a Help dialog. */
+function addStatusLine(box: HTMLElement): void {
+  const p = document.createElement("p");
+  p.className = "visually-hidden";
+  p.setAttribute("role", "status");
+  p.setAttribute(HELP_STATUS_ATTR, "");
+  box.appendChild(p);
 }
 
 /** The game marks the active speed button; when the Pause button stops being
@@ -83,10 +116,15 @@ interface HelpDialogOpts {
 function openHelpDialog(ui: UI, result: TemplateResult, opts: HelpDialogOpts = {}): { box: HTMLElement; finish: () => void } {
   const pause = helpPause(ui);
   const dialog = ui.el.modal as HTMLDialogElement;
+  const replacing = dialog.open;
   let box!: HTMLElement;
   pause.swap(() => {
     box = ui.openModalTemplate(result, { displaceable: opts.displaceable ?? true, onDisplaced: () => pause.displaced() });
   });
+  addStatusLine(box);
+  // A dialog that was already open is not shown again, so the browser never
+  // runs `autofocus` and focus would fall to the page with the old content.
+  if (replacing) box.querySelector<HTMLElement>("[autofocus]")?.focus();
   pause.begin();
   let done = false;
   const finish = () => {
@@ -109,8 +147,11 @@ function openHelpDialog(ui: UI, result: TemplateResult, opts: HelpDialogOpts = {
 }
 
 /** A row or link that opens a page in a new tab: let the browser follow the
- *  link, close the dialog, and hold the pause until the player comes back. */
-function leaveForTab(ui: UI): void {
+ *  link, close the dialog, and hold the pause until the player comes back.
+ *  A Ctrl or Cmd click opens the tab in the background and the player stays
+ *  here, so Help stays open and its own close restores the speed. */
+function leaveForTab(ui: UI, e: MouseEvent): void {
+  if (e.ctrlKey || e.metaKey) return;
   const pause = helpPause(ui);
   pause.untilReturn({ win: window, doc: document });
   ui.closeModal();
@@ -119,7 +160,7 @@ function leaveForTab(ui: UI): void {
 /** Wire every new-tab link in `box` to {@link leaveForTab}. */
 function wireNewTabLinks(ui: UI, box: HTMLElement): void {
   for (const a of box.querySelectorAll<HTMLAnchorElement>('a[target="_blank"]')) {
-    a.addEventListener("click", () => leaveForTab(ui));
+    a.addEventListener("click", (e) => leaveForTab(ui, e));
   }
 }
 
@@ -173,7 +214,7 @@ function openGuide(ui: UI): void {
       showCompare(ui);
       return;
     }
-    leaveForTab(ui);
+    leaveForTab(ui, e);
   });
 }
 
