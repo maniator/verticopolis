@@ -39,7 +39,7 @@ export interface CatalogTicketPrice {
 
 /** The version of the catalog's shape. It moves when a field is added,
  *  renamed or removed, so a frontend can refuse a shape it does not know. */
-export const CATALOG_VERSION = 12;
+export const CATALOG_VERSION = 13;
 
 /** Every price, size and build rule of one mode. */
 export interface Catalog {
@@ -118,6 +118,9 @@ export interface CatalogEconomy {
   /** The policy a theater with none, or an old save's "auto", rebooks by,
    *  or null where no theater rebooks. */
   readonly filmRebookDefault: FilmPolicy | null;
+  /** The screens a theater runs, each with its own film, age, Auto-rebook
+   *  choice and booking: 1 in Classic, 2 in Modern (#1950). */
+  readonly cinemaScreens: number;
   /** A theater's ticket price steps, cheapest first, in the order the card's
    *  button cycles through them (#1950); empty where the mode has none
    *  (Classic). */
@@ -352,9 +355,16 @@ export function catalogTileCost(catalog: Catalog, kind: FacilityKind, ground: Ti
   return f.paysForFloor && ground === "no floor yet" ? f.cost + catalogFacility(catalog, "floor").cost : f.cost;
 }
 
-/** The editor card's action for showing a `key` film (`data-edit`). */
-export function filmEditAction(key: FilmTier): string {
-  return `${key}Film`;
+/** The editor card's action for showing a `key` film on screen `screen`
+ *  (from 0; `data-edit`). The first screen's keeps the one-screen name. */
+export function filmEditAction(key: FilmTier, screen = 0): string {
+  return screen === 0 ? `${key}Film` : `${key}Film${screen + 1}`;
+}
+
+/** The editor card's action for stepping screen `screen`'s Auto-rebook
+ *  choice (from 0; `data-edit`). */
+export function filmPolicyEditAction(screen = 0): string {
+  return screen === 0 ? "filmPolicy" : `filmPolicy${screen + 1}`;
 }
 
 /** The Auto-rebook choice a theater with `policy` follows: its own where the

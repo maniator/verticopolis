@@ -1,6 +1,8 @@
 //! Coercion of loose saved fields into the types the game holds.
 
 use super::*;
+use crate::economy::films::FilmTier;
+use crate::economy::screens::ScreenFilm;
 use crate::economy::tickets::NORMAL_TICKET_PRICE;
 
 pub(super) fn coerce_log(v: Option<&Value>) -> Vec<LogEntry> {
@@ -78,7 +80,7 @@ pub(super) fn coerce_dirty_days(state: UnitState, kind: Kind, raw: Option<&Value
     Some(n.min(crate::housekeeping::INFEST_DAYS - 1))
 }
 
-/// A theatre's film age (#1932): a whole number of days, held to a byte as
+/// A theater's film age (#1932): a whole number of days, held to a byte as
 /// the original keeps it. Any other kind, or a value that is not a finite
 /// number, carries none.
 pub(super) fn film_days(kind: Kind, raw: Option<&Value>) -> Option<u8> {
@@ -89,7 +91,43 @@ pub(super) fn film_days(kind: Kind, raw: Option<&Value>) -> Option<u8> {
     Some(days.floor().clamp(0.0, f64::from(u8::MAX)) as u8)
 }
 
-/// Whether a theatre shows a classic film (#1932): `true` on a theatre, and
+/// A theater's Auto-rebook choice (#1950): one of the five the port lists,
+/// or none.
+pub(super) fn film_policy(raw: Option<&Value>) -> Option<&'static str> {
+    match raw?.as_str()? {
+        "feature" => Some("feature"),
+        "blockbuster" => Some("blockbuster"),
+        "auto" => Some("auto"),
+        "revival" => Some("revival"),
+        "off" => Some("off"),
+        _ => None,
+    }
+}
+
+/// A theater's second screen (#1950), read with the keys of its first. Any
+/// other room, and a value that is not an object, carry none, and a theater
+/// without one shows its first screen's film on both. A mode that runs one
+/// screen drops it once the tower is assembled (`assemble.rs`).
+pub(super) fn second_screen(kind: Kind, raw: Option<&Value>) -> Option<ScreenFilm> {
+    if kind != Kind::Cinema {
+        return None;
+    }
+    let screen = raw?.as_object()?;
+    let tier = if cinema_flag(kind, screen.get("filmClassic")) {
+        FilmTier::Classic
+    } else if cinema_flag(kind, screen.get("filmBlockbuster")) {
+        FilmTier::Blockbuster
+    } else {
+        FilmTier::New
+    };
+    Some(ScreenFilm {
+        tier,
+        days: film_days(kind, screen.get("filmDays")),
+        policy: film_policy(screen.get("filmPolicy")),
+    })
+}
+
+/// Whether a theater shows a classic film (#1932): `true` on a theater, and
 /// anything else reads as a new film.
 pub(super) fn cinema_flag(kind: Kind, raw: Option<&Value>) -> bool {
     kind == Kind::Cinema && raw == Some(&Value::Bool(true))

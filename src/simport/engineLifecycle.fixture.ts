@@ -230,7 +230,7 @@ export function describeEngineLifecycle(name: string, make: MakeEngine): void {
         { name: "No Rate, which Modern rules refuse", run: (p) => p.noRate(ids.office), moves: false, refused: true },
         { name: "a fast food", run: (p) => p.buildAt(kind("fastFood"), 3, mid - 4), moves: true, after: () => (ids.food = unit("fastFood")) },
         { name: "a variety reroll", run: (p) => p.rerollUnit(ids.food), moves: true },
-        { name: "a film policy on a room that has none", run: (p) => p.setFilm(ids.food, filmPolicy("feature")), moves: false, refused: true },
+        { name: "a film policy on a room that has none", run: (p) => p.setFilm(ids.food, filmPolicy("feature"), 0), moves: false, refused: true },
         { name: "the exterminator, with nothing to treat", run: (p) => p.bookExterminator(), moves: false, refused: true },
         { name: "an answer with no emergency", run: (p) => p.answerChoice(true), moves: false, refused: true },
         { name: "bridging flipped", run: (p) => p.flipAutoBridge(), moves: false },
@@ -272,8 +272,8 @@ export function describeEngineLifecycle(name: string, make: MakeEngine): void {
       };
       step("a cinema", (p) => p.buildAt(kind("cinema"), 2, mid - 15), true);
       const cinema = mustFind(s.reader.tower.units, (u) => u.kind === "cinema").id;
-      step("a film policy", (p) => p.setFilm(cinema, filmPolicy("feature")), true, true);
-      step("the same film policy", (p) => p.setFilm(cinema, filmPolicy("feature")), false, true);
+      step("a film policy", (p) => p.setFilm(cinema, filmPolicy("feature"), 0), true, true);
+      step("the same film policy", (p) => p.setFilm(cinema, filmPolicy("feature"), 0), false, true);
       step("an office", (p) => p.buildAt(kind("office"), 4, mid - 4), true);
       const office = mustFind(s.reader.tower.units, (u) => u.kind === "office").id;
       step("No Rate", (p) => p.noRate(office), true, true);
@@ -302,10 +302,33 @@ export function describeEngineLifecycle(name: string, make: MakeEngine): void {
       must(s, (p) => p.buildAt(kind("office"), 2, MID + 11), "office");
       const cinema = mustFind(s.reader.tower.units, (u) => u.kind === "cinema").id;
       const office = mustFind(s.reader.tower.units, (u) => u.kind === "office").id;
-      const set = must(s, (p) => p.setFilm(cinema, filmPolicy("blockbuster")), "a blockbuster");
+      const set = must(s, (p) => p.setFilm(cinema, filmPolicy("blockbuster"), 0), "a blockbuster");
       expect([delta(set), slot("setFilm", set, "policyCode")]).toEqual([0, filmPolicy("blockbuster")]);
       expect(mustFind(saved(s).units, (u) => u.id === cinema).filmPolicy).toBe("blockbuster");
-      expect(done(run(s, (p) => p.setFilm(office, filmPolicy("auto")), "a film for an office"))).toBe(false);
+      expect(done(run(s, (p) => p.setFilm(office, filmPolicy("auto"), 0), "a film for an office"))).toBe(false);
+    });
+
+    it("keeps a Modern theater's second screen apart in the save, and refuses a screen the theater does not run", () => {
+      const subjectIn = (m: "classic" | "modern") => {
+        const tower = newSeededDraft(7, m);
+        Object.assign(tower, { star: 3, money: 10_000_000 });
+        const s = subject(make, tower);
+        must(s, (p) => p.buildAt(kind("cinema"), 2, MID - 20), "cinema");
+        return [s, mustFind(s.reader.tower.units, (u) => u.kind === "cinema").id] as const;
+      };
+      const [s, cinema] = subjectIn("modern");
+      const theater = () => mustFind(saved(s).units, (u) => u.id === cinema);
+      expect(theater().screen2).toBeUndefined();
+      const set = must(s, (p) => p.setFilm(cinema, filmPolicy("revival"), 1), "the second screen's revival");
+      expect(slot("setFilm", set, "policyCode")).toBe(filmPolicy("revival"));
+      expect([theater().filmPolicy, theater().screen2]).toEqual([undefined, { filmPolicy: "revival" }]);
+      // The same choice on the first screen makes the screens alike again.
+      must(s, (p) => p.setFilm(cinema, filmPolicy("revival"), 0), "the first screen's revival");
+      expect([theater().filmPolicy, theater().screen2]).toEqual(["revival", undefined]);
+      expect(done(run(s, (p) => p.setFilm(cinema, filmPolicy("off"), 2), "a third screen"))).toBe(false);
+      expect(done(run(s, (p) => p.changeFilm(cinema, 0, 2), "a film on a third screen"))).toBe(false);
+      const [classic, one] = subjectIn("classic");
+      expect(done(run(classic, (p) => p.setFilm(one, filmPolicy("off"), 1), "a Classic second screen"))).toBe(false);
     });
 
     it("sets a Modern theater's ticket price as an undoable edit, and refuses it on an office and in Classic", () => {

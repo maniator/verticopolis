@@ -8,8 +8,8 @@ use super::source_scan_tests::{
 };
 use super::unit_scan_tests::{new_list_aside, top_level, unit_writes};
 use super::write_cases_tests::{MORE_WRITES, WRITES};
-use crate::frame::unit_fields;
 use crate::tower::{Extras, Unit};
+use crate::{economy::screens::ScreenFilm, frame::unit_fields};
 
 /// The frame fields, the census share and `is_operational` read no field but the six the
 /// setters mark and the kind, which no engine code writes in place
@@ -67,6 +67,10 @@ fn the_frame_and_the_census_read_only_marked_fields() {
             film_classic: !old.film_classic,
             film_blockbuster: !old.film_blockbuster,
             ticket_price: other(old.ticket_price),
+            second_screen: Some(ScreenFilm {
+                days: Some(old.second_screen.map_or(1, |f| f.days_shown() as u8 + 1)),
+                ..ScreenFilm::first(&old)
+            }),
             patronage_today: Some(old.patronage_today.unwrap_or(0.0) + 1.0),
             patronage_yest: Some(old.patronage_yest.unwrap_or(0.0) + 1.0),
             profit_today: Some(old.profit_today.unwrap_or(0.0) + 1.0),
@@ -78,13 +82,11 @@ fn the_frame_and_the_census_read_only_marked_fields() {
         let bits = |u: &Unit| unit_fields(u).map(f64::to_bits);
         assert_eq!(bits(&v), bits(u), "unit {}", u.id);
         assert_eq!(v.census_share(), u.census_share(), "unit {}", u.id);
-        // The census tally counts a working recycling center by its kind and
-        // this predicate, so it must read marked fields only too.
+        // The census counts a working recycling center by this, so it reads marked fields only.
         assert_eq!(v.is_operational(), u.is_operational(), "unit {}", u.id);
     }
-    // The pattern names every field, with no `..`; the ones it leaves
-    // unchanged (`_`) are exactly the marked ones and the kind; and every
-    // other one is written after it, by `*name =` or `name.push`.
+    // The pattern names every field, with no `..`; the ones it leaves unchanged (`_`) are
+    // exactly the marked ones and the kind; every other is written by `*name =` or `name.push`.
     let own = squeeze("x.rs".into(), include_str!("marks_guard_tests.rs")).code;
     let pattern = own.find("let Unit{id,").unwrap() + "let Unit{".len();
     let close = closing(&own, pattern - 1).unwrap();
@@ -150,11 +152,10 @@ const READS: [&str; 22] = [
     "to_string",
 ];
 
-/// Where `code` (of the file `rel`) writes a room's frame field or residents
-/// past the setters, as each write's field and byte offset. A person's
-/// `state` (a value that is a `PState`), the RNG's own `state`, and the
-/// satisfaction pass's local copy (`let mut probe = u.clone()`) are not a
-/// room's, and the loader's list is a new tower's.
+/// Where `code` (of the file `rel`) writes a room's frame field or residents past the setters,
+/// as each write's field and byte offset. A person's `state` (a value that is a `PState`), the
+/// RNG's own `state`, and the satisfaction pass's local copy (`let mut probe = u.clone()`) are
+/// not a room's, and the loader's list is a new tower's.
 fn frame_field_writes(rel: &str, code: &str) -> Vec<(String, usize)> {
     let mut out = Vec::new();
     for field in FIELDS {
@@ -215,9 +216,8 @@ fn variant(v: &str) -> bool {
             || fields.starts_with(['(', '{']) && closing(fields, 0) == Some(fields.len() - 1))
 }
 
-/// The values of an `if` (`if c{a}else if d{b}else{c}`) or a `match`
-/// (`match x{A=>a,B=>{b}}`) that ends at its last block, or `None` for any
-/// other value.
+/// The values of an `if` (`if c{a}else if d{b}else{c}`) or a `match` (`match x{A=>a,B=>{b}}`)
+/// that ends at its last block, or `None` for any other value.
 fn branches(value: &str) -> Option<Vec<&str>> {
     let close = value
         .len()

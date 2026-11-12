@@ -334,11 +334,15 @@ export interface EnginePortCommands {
   noRate(id: number): PortRecord;
   setRent(id: number, target: number): PortRecord;
   rentBatch(kind: number, target: number, onlyDefault: boolean): PortRecord;
-  setFilm(id: number, policyCode: number): PortRecord;
-  /** Show a new film, or a classic, at a theatre where the player changes
-   *  films (Classic): the record's `cost` slot is the price paid, or the
-   *  price wanted on a "funds" refusal. */
-  changeFilm(id: number, tier: number): PortRecord;
+  /** Set the film screen `screen` (from 0) of a theater books again once its
+   *  film is spent, by code (`filmPolicies`); a screen the theater does not
+   *  run is refused (#1950). */
+  setFilm(id: number, policyCode: number, screen: number): PortRecord;
+  /** Show a film of tier `tier` (by code, `filmTiers`) on screen `screen`
+   *  (from 0) of a theater: the record's `cost` slot is the price paid, or the
+   *  price wanted on a "funds" refusal. A Modern theater runs two screens and
+   *  a Classic one a single screen (`economy.cinemaScreens`, #1950). */
+  changeFilm(id: number, tier: number, screen: number): PortRecord;
   /** Set a Modern theater's ticket price step by code (`ticketPrices`); the
    *  record's `priceCode` slot is the code stored (#1950). */
   setTicketPrice(id: number, priceCode: number): PortRecord;

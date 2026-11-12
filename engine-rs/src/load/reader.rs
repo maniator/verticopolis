@@ -205,14 +205,7 @@ pub(crate) fn unit_from_value(u: &Value, modern: bool) -> Option<(Unit, Option<i
     } else {
         None
     };
-    let film_policy: Option<&'static str> = match u.get("filmPolicy").and_then(Value::as_str) {
-        Some("feature") => Some("feature"),
-        Some("blockbuster") => Some("blockbuster"),
-        Some("auto") => Some("auto"),
-        Some("revival") => Some("revival"),
-        Some("off") => Some("off"),
-        _ => None,
-    };
+    let film_policy = film_policy(u.get("filmPolicy"));
     let subtype: Option<&'static str> = match (
         u.get("subtype").and_then(Value::as_str),
         kind.subtype_list(),
@@ -276,6 +269,7 @@ pub(crate) fn unit_from_value(u: &Value, modern: bool) -> Option<(Unit, Option<i
             // Only Modern shows a blockbuster (#1950); Classic reads a new film.
             film_blockbuster: modern && cinema_flag(kind, u.get("filmBlockbuster")),
             ticket_price: ticket_price(kind, modern, u.get("ticketPrice")),
+            second_screen: second_screen(kind, u.get("screen2")),
             patronage_today: retail_field("patronageToday"),
             patronage_yest: retail_field("patronageYest"),
             profit_today: retail_field("profitToday"),
@@ -287,6 +281,7 @@ pub(crate) fn unit_from_value(u: &Value, modern: bool) -> Option<(Unit, Option<i
             },
             dirty_days: coerce_dirty_days(state, kind, u.get("dirtyDays")),
         }
+        .without_mirrored_screen()
         .boxed(),
     };
     Some((unit, sane_id(u.get("id"))))

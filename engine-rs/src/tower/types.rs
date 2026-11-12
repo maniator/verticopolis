@@ -2,6 +2,7 @@
 
 use serde_json::{json, Map, Value};
 
+use crate::economy::screens::ScreenFilm;
 use crate::facilities::*;
 use crate::schedule::Schedule;
 
@@ -104,6 +105,9 @@ pub struct Extras {
     pub film_blockbuster: bool,
     /// A Modern theater's ticket price step, unset at Normal (#1950).
     pub ticket_price: Option<&'static str>,
+    /// A Modern theater's second screen, stored only while it shows
+    /// something other than the first (#1950); unset, it mirrors screen 1.
+    pub second_screen: Option<ScreenFilm>,
     pub patronage_today: Option<f64>,
     pub patronage_yest: Option<f64>,
     pub profit_today: Option<f64>,
@@ -128,6 +132,7 @@ static NO_EXTRAS: Extras = Extras {
     film_classic: false,
     film_blockbuster: false,
     ticket_price: None,
+    second_screen: None,
     patronage_today: None,
     patronage_yest: None,
     profit_today: None,
@@ -243,6 +248,9 @@ impl Unit {
         }
         if let Some(v) = extras.ticket_price {
             m.insert("ticketPrice".into(), json!(v));
+        }
+        if let Some(screen) = extras.second_screen {
+            m.insert("screen2".into(), screen.to_json());
         }
         if let Some(v) = self.subtype {
             m.insert("subtype".into(), json!(v));

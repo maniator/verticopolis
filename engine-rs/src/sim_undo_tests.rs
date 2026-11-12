@@ -286,6 +286,9 @@ fn prices_names_and_policies_round_trip() {
     round_trip(&mut sim, |s| {
         assert!(s.set_ticket_price(cinema, "premium").is_some())
     });
+    round_trip(&mut sim, |s| {
+        assert!(s.set_screen_policy(cinema, 1, "revival").is_some())
+    });
 }
 
 #[test]

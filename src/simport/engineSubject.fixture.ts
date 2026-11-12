@@ -101,7 +101,7 @@ export interface SavedTower {
   founder?: boolean;
   towerName?: string;
   view?: { tile: number; floor: number; zoom?: number };
-  units: { id: number; kind: string; floor: number; x: number; rent?: number; label?: string; noRate?: boolean; filmPolicy?: string; ticketPrice?: string }[];
+  units: { id: number; kind: string; floor: number; x: number; rent?: number; label?: string; noRate?: boolean; filmPolicy?: string; ticketPrice?: string; screen2?: Record<string, unknown> }[];
   transports: { id: number; skipFloors?: number[]; schedule?: Record<string, unknown> }[];
   log?: { text: string; kind: string }[];
 }

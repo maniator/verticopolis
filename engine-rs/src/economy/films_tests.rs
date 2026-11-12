@@ -35,7 +35,7 @@ pub(crate) fn theater(mode: GameMode) -> (Simulation, i64, i64) {
     (sim, cinema, office)
 }
 
-pub(super) fn counts(sim: &mut Simulation, id: i64, nights: usize) -> Vec<u8> {
+pub(crate) fn counts(sim: &mut Simulation, id: i64, nights: usize) -> Vec<u8> {
     (0..nights)
         .map(|_| {
             sim.roll_over_retail_day();

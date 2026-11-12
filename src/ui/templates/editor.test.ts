@@ -201,6 +201,32 @@ describe("unit editor row and action branches", () => {
     expect(gutted.querySelector('[data-edit="newFilm"]')).toBeNull();
   });
 
+  it("modern cinema: a row, the films and an Auto-rebook button for each of its two screens (#1950)", () => {
+    const modern = { mode: "modern" as const };
+    const economy = catalogFor("modern").economy;
+    const screen2 = { filmPolicy: "revival", filmDays: 1, filmTier: "classic" } as const;
+    const card = (over: Partial<UnitDetail>) => renderToFragment(unitEditor(unit("cinema", { screen2, ...over }, "modern"), modern));
+    const op = card({ filmPolicy: null, filmTier: "blockbuster", filmDays: 9 });
+    expect(op.querySelector('[data-field="showing"]')!.textContent).toBe("Blockbuster, 9 days");
+    expect(op.querySelector('[data-field="showing2"]')!.textContent).toBe("Revival, 1 day");
+    expect(op.querySelector('[data-field="filmDays"]')).toBeNull();
+    expect(op.querySelector('[data-edit="filmPolicy"]')!.textContent).toBe("Screen 1 auto-rebook: Feature ▸");
+    expect(op.querySelector('[data-edit="filmPolicy2"]')!.textContent).toBe("Screen 2 auto-rebook: Revival ▸");
+    for (const film of economy.films) {
+      const label = `${film.label} ($${groupDigits(film.price)})`;
+      expect(op.querySelector(`[data-edit="${film.key}Film"]`)!.textContent).toBe(label);
+      expect(op.querySelector(`[data-edit="${film.key}Film2"]`)!.textContent).toBe(label);
+    }
+    expect([...op.querySelectorAll(".ed-screen")].map((e) => e.textContent)).toEqual(["Book a film on screen 1", "Book a film on screen 2"]);
+    // One ticket price for the whole theater.
+    expect(op.querySelectorAll('[data-edit="ticketPrice"]')).toHaveLength(1);
+    // A closed theater books nothing on either screen and keeps each choice.
+    const gutted = card({ state: "gutted" });
+    expect(gutted.querySelector('[data-field="showing2"]')).toBeNull();
+    expect(gutted.querySelector('[data-edit="newFilm2"]')).toBeNull();
+    expect(gutted.querySelector('[data-edit="filmPolicy2"]')!.textContent).toBe("Screen 2 auto-rebook: Revival ▸");
+  });
+
   it("modern cinema: names the ticket price it charges, Normal when it has none (#1950)", () => {
     const modern = { mode: "modern" as const };
     const price = (ticketPrice: UnitDetail["ticketPrice"]) =>

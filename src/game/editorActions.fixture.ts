@@ -19,7 +19,7 @@ export function rec(
   return Float64Array.from(LAYOUT.records[op].map((n) => all[n] ?? 0));
 }
 
-export const office: { id: number; kind: string; filmPolicy?: string; ticketPrice?: string | null } = {
+export const office: { id: number; kind: string; filmPolicy?: string; ticketPrice?: string | null; screen2?: unknown } = {
   id: 7,
   kind: "office",
 };

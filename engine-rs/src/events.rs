@@ -25,6 +25,8 @@ pub mod bomb;
 /// Why [`Simulation::change_film`] refused, kept here beside the other
 /// cinema command, [`Simulation::set_film_policy`].
 pub use crate::economy::films::FilmRefusal;
+use crate::economy::films::FilmTier;
+use crate::economy::screens::{put_screens, screens};
 #[doc(hidden)]
 pub use bomb::{BombSearch, Guard};
 
@@ -112,27 +114,6 @@ impl EventSystem {
 }
 
 impl Simulation {
-    /// Sets the film cinema `id` books again once its film is spent (Modern):
-    /// `auto` or `feature` (a feature), `revival`, `blockbuster`, or `off`.
-    /// Returns the policy set, or `None` when `id` is not a cinema or
-    /// `policy` is none of the five.
-    pub fn set_film_policy(&mut self, id: i64, policy: &str) -> Option<&'static str> {
-        let policy: &'static str = match policy {
-            "auto" => "auto",
-            "feature" => "feature",
-            "blockbuster" => "blockbuster",
-            "revival" => "revival",
-            "off" => "off",
-            _ => return None,
-        };
-        let u = self.tower.get_unit_mut(id)?;
-        if u.kind != Kind::Cinema {
-            return None;
-        }
-        u.extras_mut().film_policy = Some(policy);
-        Some(policy)
-    }
-
     #[doc(hidden)]
     /// `maybeRandomEvent`: the daily roll.
     pub fn maybe_random_event(&mut self) {
@@ -231,6 +212,7 @@ impl Simulation {
     }
 
     fn gut(&mut self, i: usize) {
+        let mode = self.tower.mode;
         let (u, at) = self.tower.marked(i);
         u.set_state(at, UnitState::Gutted);
         u.set_occupants(at, 0);
@@ -247,10 +229,16 @@ impl Simulation {
             extras.profit_today = None;
             extras.profit_yest = None;
             extras.dirty_days = None;
-            // A rebuilt theatre opens with a new film.
-            extras.film_days = None;
-            extras.film_classic = false;
-            extras.film_blockbuster = false;
+        }
+        if u.kind == Kind::Cinema {
+            // A rebuilt theater opens with a new film on each screen, and
+            // keeps each screen's Auto-rebook choice.
+            let mut films = screens(mode, u);
+            for film in &mut films {
+                film.tier = FilmTier::New;
+                film.days = None;
+            }
+            put_screens(mode, u, films);
         }
         let name = u.kind.facility().name;
         self.tower.set_unit_label_at(i, name.to_string());

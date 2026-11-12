@@ -4,6 +4,7 @@
 // in between. Money, the other half of undo's check, stays a value compare
 // beside it. A full state digest would answer too, but costs about 108 ms on
 // the large tower.
+use crate::economy::screens::screen_policies;
 use crate::sim::Simulation;
 use crate::tower::Tower;
 
@@ -94,7 +95,8 @@ impl Fingerprint {
 }
 
 /// The fields `towerStateSig` reads, in its order: per unit its kind, floor,
-/// x, label, rent, No Rate flag, film policy and subtype; per transport its
+/// x, label, rent, No Rate flag, film policy (and a second screen's, where
+/// it differs), ticket price and subtype; per transport its
 /// kind, x, bottom, top, cars, skipped floors and schedule (`schedSig`'s
 /// five player-set fields).
 fn fingerprint(tower: &Tower) -> u64 {
@@ -108,6 +110,12 @@ fn fingerprint(tower: &Tower) -> u64 {
         h.opt(u.rent, Fingerprint::num);
         h.word(u.no_rate as u64);
         h.opt(u.extras().film_policy, Fingerprint::text);
+        // A second screen's policy counts where it differs from the first's
+        // (#1950), so a one-screen theater's fingerprint is as it was.
+        let [first, second] = screen_policies(u);
+        if second != first {
+            h.opt(second, Fingerprint::text);
+        }
         h.opt(u.extras().ticket_price, Fingerprint::text);
         h.opt(u.subtype, Fingerprint::text);
     }

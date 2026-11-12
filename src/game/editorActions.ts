@@ -1,5 +1,5 @@
 import { isElevatorKind, isHotelKind } from "../presentation/viewKinds";
-import { catalogFacility, catalogFilmRebook, catalogTicketPrice, filmEditAction } from "../catalog/catalogTypes";
+import { catalogFacility, catalogFilmRebook, catalogTicketPrice, filmEditAction, filmPolicyEditAction } from "../catalog/catalogTypes";
 import { priceOptionsFor } from "../ui/catalogPricing";
 import type { FacilityKind } from "../shared/types";
 import type { BatchRentResult } from "../shared/engineTypes";
@@ -281,9 +281,17 @@ export class EditorActions {
       changeVariety: "Change variety",
       batchKind: "Edit",
     };
-    // The film a film button shows, by the catalog's films (#1950).
-    const film = kit.catalog().economy.films.find((f) => filmEditAction(f.key) === action);
-    this.deps.captureUndo(UNDO_LABELS[action] ?? (film ? "Film change" : "Edit"));
+    // The film a film button shows and the screen it books, and the screen
+    // an Auto-rebook button steps, by the catalog's films and screens (#1950).
+    const { films, cinemaScreens } = kit.catalog().economy;
+    const screens = Array.from({ length: cinemaScreens }, (_, screen) => screen);
+    const booking = screens
+      .flatMap((screen) => films.map((film) => ({ film, screen })))
+      .find(({ film, screen }) => filmEditAction(film.key, screen) === action);
+    const policyScreen = screens.find((screen) => filmPolicyEditAction(screen) === action);
+    let fallback = policyScreen === undefined ? "Edit" : "Film policy";
+    if (booking) fallback = "Film change";
+    this.deps.captureUndo(UNDO_LABELS[action] ?? fallback);
     if (selected.type === "unit") {
       const u = kit.cards.unit(selected.id);
       if (!u) return this.deps.clearSelection();
@@ -337,16 +345,17 @@ export class EditorActions {
           // so a refused choice never sits on the select until the next pump.
           this.deps.refreshEditor();
         }
-      } else if (action === "filmPolicy") {
-        // The film a Modern theater books again once its film is spent
-        // (#1950): the button steps through the catalog's choices, from the
-        // one the theater follows now.
+      } else if (policyScreen !== undefined) {
+        // The film a Modern theater's screen books again once its film is
+        // spent (#1950): the button steps through the catalog's choices, from
+        // the one the screen follows now.
         const catalog = kit.catalog();
         const order = catalog.economy.filmRebooks;
-        const now = catalogFilmRebook(catalog, u.filmPolicy);
+        const policy = policyScreen === 0 ? u.filmPolicy : u.screen2?.filmPolicy;
+        const now = catalogFilmRebook(catalog, policy);
         if (now) {
           const next = order[(order.indexOf(now) + 1) % order.length].policy;
-          engine.setFilm(u.id, codes.code("filmPolicies", next));
+          engine.setFilm(u.id, codes.code("filmPolicies", next), policyScreen);
           this.deps.audio.sfx("click");
           this.deps.refreshEditor();
         }
@@ -364,10 +373,12 @@ export class EditorActions {
           }
           this.deps.refreshEditor();
         }
-      } else if (film) {
-        // Showing a film (#1932, #1950): the engine charges the price and
-        // starts the film; a payment is no edit, so no undo step holds it.
-        const rec = engine.changeFilm(u.id, codes.code("filmTiers", film.key));
+      } else if (booking) {
+        // Showing a film on a screen (#1932, #1950): the engine charges the
+        // price and starts the film; a payment is no edit, so no undo step
+        // holds it.
+        const { film, screen } = booking;
+        const rec = engine.changeFilm(u.id, codes.code("filmTiers", film.key), screen);
         const res = outcome(engine, rec);
         if (!res.ok) {
           const cost = codes.slot(rec, "changeFilm", "cost");
@@ -378,7 +389,8 @@ export class EditorActions {
           );
         }
         this.deps.audio.sfx("build");
-        this.deps.announce(`Now showing: a ${film.label.toLowerCase()}.`);
+        const where = cinemaScreens > 1 ? ` on screen ${screen + 1}` : "";
+        this.deps.announce(`Now showing${where}: a ${film.label.toLowerCase()}.`);
         this.deps.refreshEditor();
       } else if (action === "changeVariety") {
         // Canon retail reroll: picks a §7 name different from the current

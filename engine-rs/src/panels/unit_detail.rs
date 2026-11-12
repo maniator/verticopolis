@@ -8,6 +8,7 @@ use serde_json::{json, Value};
 
 use crate::clock::GameMode;
 use crate::economy::films::FilmTier;
+use crate::economy::screens::screens;
 use crate::economy::tickets::shown_ticket_price;
 use crate::facilities::Kind;
 use crate::rent::AVERAGE_RUNG;
@@ -88,6 +89,12 @@ impl Simulation {
         // A theater's film: the mornings it has shown, and its tier (#1932,
         // #1950); null on any other kind.
         let film = (u.kind == Kind::Cinema).then(|| u.extras());
+        // A Modern theater's second screen, read like the first (#1950); null
+        // where the theater runs one screen.
+        let second = (u.kind == Kind::Cinema && self.mode.cinema_screens() > 1).then(|| {
+            let f = screens(self.mode, u)[1];
+            json!({ "filmPolicy": f.policy, "filmDays": f.days_shown(), "filmTier": f.tier.key() })
+        });
         Some(json!({
             "id": u.id,
             "kind": u.kind.as_str(),
@@ -114,6 +121,7 @@ impl Simulation {
             "filmDays": film.as_ref().map(|e| e.film_days.unwrap_or(0)),
             "filmTier": film.as_ref().map(|e| FilmTier::showing(e).key()),
             "ticketPrice": shown_ticket_price(self.mode, u),
+            "screen2": second,
         }))
     }
 }

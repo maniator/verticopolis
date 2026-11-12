@@ -145,6 +145,17 @@ export interface UnitDetail {
   /** A Modern theater's ticket price step; null off a cinema and in Classic
    *  (#1950). */
   readonly ticketPrice: TicketPrice | null;
+  /** A Modern theater's second screen; null off a cinema and where the
+   *  theater runs one screen (Classic, #1950). */
+  readonly screen2: ScreenDetail | null;
+}
+
+/** A theater screen's film, its age in mornings and its Auto-rebook choice
+ *  (#1950). */
+export interface ScreenDetail {
+  readonly filmPolicy: FilmPolicy | null;
+  readonly filmDays: number;
+  readonly filmTier: FilmTier;
 }
 
 /** One floor of an elevator's stop list, top floor first. */

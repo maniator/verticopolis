@@ -102,7 +102,7 @@ export class Engine {
      */
     canBuild(kind: string, floor: number, x: number): string;
     changeCars(id: number, add: boolean): Float64Array;
-    changeFilm(id: number, tier: number): Float64Array;
+    changeFilm(id: number, tier: number, screen: number): Float64Array;
     chooseAutoBridge(value: boolean): Float64Array;
     /**
      * Tooling only: clear every unit's four retail tallies (patronage and
@@ -495,7 +495,7 @@ export class Engine {
      * `setFilmPolicy(id, policy)`: the policy stored, or null.
      */
     setFilmPolicy(id: number, policy: string): string | undefined;
-    setFilm(id: number, policy: number): Float64Array;
+    setFilm(id: number, policy: number, screen: number): Float64Array;
     /**
      * The editor's rename of a unit.
      */

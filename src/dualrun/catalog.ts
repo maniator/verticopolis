@@ -92,6 +92,7 @@ const ECONOMY: Shape = {
   films: Array.isArray,
   filmRebooks: Array.isArray,
   filmRebookDefault: (v) => v === null || typeof v === "string",
+  cinemaScreens: (v) => count(v) && (v as number) > 0,
   ticketPrices: Array.isArray,
   ticketPriceDefault: (v) => v === null || typeof v === "string",
   autoBridgeToggleable: bool,
