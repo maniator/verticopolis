@@ -12,6 +12,7 @@ use crate::services::{
     EXTERMINATOR_CALLOUT_FEE, EXTERMINATOR_PER_ROOM_FEE, PARKING_WORKERS_PER_SPACE,
 };
 
+mod parking;
 mod presentation;
 mod rent;
 pub use rent::RentModel;

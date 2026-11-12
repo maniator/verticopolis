@@ -36,6 +36,7 @@ mod fixed_step;
 mod game_events;
 mod golden_master;
 mod heatmap;
+mod home_parking;
 mod hotel_late_checkout;
 mod housekeeping_legibility;
 mod housekeeping_maids;

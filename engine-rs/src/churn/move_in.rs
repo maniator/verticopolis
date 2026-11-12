@@ -16,11 +16,9 @@ impl Simulation {
     /// `attemptMoveIns`.
     pub fn attempt_move_ins(&mut self) {
         let weekend = self.clock.is_weekend();
-        let parking_penalty = if self.office_parking_short() {
-            0.5
-        } else {
-            1.0
-        };
+        let parking = self.parking_move_in_reading();
+        let parking_penalty = if parking.office_short { 0.5 } else { 1.0 };
+        let home_parking_factor = parking.home_factor;
         let served_set = self.tower.served_floors();
         let mut reach_memo: FastMap<i64, bool> = FastMap::default();
         let mut sat_ctx: Option<SatisfactionContext> = None;
@@ -70,7 +68,7 @@ impl Simulation {
                     }
                 }
                 Kind::Condo => {
-                    if self.rng.chance(0.18 * demand) {
+                    if self.rng.chance(0.18 * demand * home_parking_factor) {
                         filled = true;
                     }
                 }
@@ -92,7 +90,7 @@ impl Simulation {
                     } else {
                         0.16
                     };
-                    if self.rng.chance(fill_rate * demand) {
+                    if self.rng.chance(fill_rate * demand * home_parking_factor) {
                         filled = true;
                     }
                 }

@@ -31,7 +31,7 @@
     {
       "op": "tick",
       "dt": 60,
-      "times": 256,
+      "times": 208,
       "checkpointEvery": 64
     },
     {

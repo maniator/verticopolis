@@ -135,9 +135,11 @@ export function isUnitState(v: unknown): v is UnitState {
  *  can (a gap-split floor whose transport sits on the far half); distinct from
  *  `access`, which is the whole floor being off the network (#647). `trash`:
  *  from 3 stars, too few recycling centers for the population. `parking`: from
- *  3 stars, an office without enough parking for its workers. */
+ *  3 stars, an office without enough parking for its workers. `homeParking`:
+ *  Modern, from 3 stars, a home without parking for its households (#1973).
+ *  It holds the home at Good and never empties it. */
 export type VacateReason =
-  | "access" | "noTransport" | "congestion" | "rent" | "noise" | "transportFar" | "lobbyFar" | "unmetDemand" | "relocation" | "trash" | "parking";
+  | "access" | "noTransport" | "congestion" | "rent" | "noise" | "transportFar" | "lobbyFar" | "unmetDemand" | "relocation" | "trash" | "parking" | "homeParking";
 
 /** Player-facing phrase for each departure cause (toasts + inspector). Kept
  *  transport-neutral: a floor is "served" by any route to the lobby (elevator,

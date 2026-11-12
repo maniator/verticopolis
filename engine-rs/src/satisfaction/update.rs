@@ -1,5 +1,6 @@
 //! The hourly satisfaction pass and the notices it raises.
 
+use super::shortfall::ServiceShort;
 use super::{vacate_reason_text, NOISE_CAP, VACATE_NOTICE_MINUTES, VACATE_RESCIND};
 use crate::econ::{rent_config, rent_of};
 use crate::facilities::Kind;
@@ -53,7 +54,7 @@ impl Simulation {
                     || over_market_rent
                     || r.far_walk
                     || r.lobby_far
-                    || r.service_short.is_some();
+                    || r.service_short.is_some_and(ServiceShort::can_empty_a_room);
                 if noise_cannot_evict && non_noise_problem {
                     u.extras_mut().vacate_reason = Some(self.vacate_cause(&u, &r));
                     self.tower.units[i].extras_mut().vacate_reason = u.extras().vacate_reason;

@@ -12,7 +12,9 @@ use crate::econ::rent_of;
 use crate::economy::commercial_daily_income;
 use crate::facilities::{is_sky_lobby_floor, Kind, LOBBY_INTERVAL, MAX_FLOOR};
 use crate::presence::CongestionAttribution;
-use crate::satisfaction::shortfall::{ServiceShort, ServiceShortfalls, PARKING_CAUSE, TRASH_CAUSE};
+use crate::satisfaction::shortfall::{
+    ServiceShort, ServiceShortfalls, HOME_PARKING_CAUSE, PARKING_CAUSE, TRASH_CAUSE,
+};
 use crate::satisfaction::{
     fresh_tenant_need, names_gripe, StepResult, GRIPE_WARN, SERVED_RECOVERY, TRANSPORT_FAR_TILES,
     VACATE_RESCIND,
@@ -402,7 +404,7 @@ impl Simulation {
                     g.floor_reachable = Some(self.floor_reachable(u.floor));
                 }
             }
-            TRASH_CAUSE | PARKING_CAUSE => {
+            TRASH_CAUSE | PARKING_CAUSE | HOME_PARKING_CAUSE => {
                 g.coverage = short.filter(|s| s.cause == cause).map(|s| s.coverage);
             }
             _ => {}
