@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
-import { HELP_BASE, OG_IMAGE_ALT, oldAnchorRedirects, sharedHead, sidebar, type SidebarEntry } from "../../help-site/site.mjs";
+import { HELP_BASE, OG_IMAGE_ALT, landingAction, oldAnchorRedirects, sharedHead, sidebar, type SidebarEntry } from "../../help-site/site.mjs";
 import { HELP_PAGES_DIR, parseHelpPage } from "../build/helpMarkdown";
 
 const pagesDir = resolve(__dirname, "../..", HELP_PAGES_DIR);
@@ -54,7 +54,7 @@ describe("the side menu", () => {
     // Starlight puts the base in front of a link that starts with a slash.
     const links = flatten(sidebar).flatMap((entry) => ("link" in entry ? [entry.link] : []));
     const served = links.filter((l) => l.startsWith("/")).map((l) => new URL(HELP_BASE + l, "https://x.test").pathname);
-    expect(served).toEqual(["/help/", "/help/changelog", "/gallery"]);
+    expect(served).toEqual(["/help/", "/help/changelog/", "/gallery"]);
   });
 });
 
@@ -91,5 +91,22 @@ describe("the shared head tags", () => {
     for (const [key, content] of gameTags) {
       expect(siteTags, key).toContainEqual([key, content]);
     }
+  });
+});
+
+describe("the analytics landing", () => {
+  const origin = "https://verticopolis.com";
+
+  it("counts a page view from outside the site as a landing, the release notes apart", () => {
+    expect(landingAction("/help/", "", origin)).toBe("page_help");
+    expect(landingAction("/help/keyboard/", `${origin}/`, origin)).toBe("page_help");
+    expect(landingAction("/help/changelog/", "https://www.reddit.com/r/x", origin)).toBe("page_changelog");
+    expect(landingAction("/help/changelog", `${origin}/help-me`, origin)).toBe("page_changelog");
+  });
+
+  it("does not count a step from one help page to another", () => {
+    expect(landingAction("/help/keyboard/", `${origin}/help/`, origin)).toBeNull();
+    expect(landingAction("/help/changelog/", `${origin}/help`, origin)).toBeNull();
+    expect(landingAction("/help/", "https://elsewhere.test/help/", origin)).toBe("page_help");
   });
 });

@@ -364,8 +364,9 @@ describe.skipIf(process.platform === "win32")("scripts/vercel-ignore-build.sh", 
       /(?:\bfrom\s*|\bimport\s*\(?\s*)["'](\.{1,2}\/[^"']+)["']/g,
       /new\s+URL\(\s*["'](\.{1,2}\/[^"']+)["']\s*,\s*import\.meta\.url/g,
       /\b(?:src|href)=["'](\.{1,2}\/[^"']+)["']/g,
-      // A Markdown image or link (the help site's pages show screenshots).
-      /\]\((\.{1,2}\/[^)\s]+)\)/g,
+      // A Markdown image (the help site's pages show screenshots). A plain
+      // link is a page a reader opens, not something the build bundles.
+      /!\[[^\]]*\]\((\.{1,2}\/[^)\s]+)\)/g,
     ];
 
     /** The repo-relative file a specifier names, or null for a generated or
@@ -394,7 +395,6 @@ describe.skipIf(process.platform === "win32")("scripts/vercel-ignore-build.sh", 
         "vite.config.ts",
         "src/index.html",
         "src/gallery.html",
-        "src/release-notes.html",
         "src/preview.html",
         "scripts/wasm-build.ts",
         "scripts/engine-third-party.ts",
@@ -404,6 +404,7 @@ describe.skipIf(process.platform === "win32")("scripts/vercel-ignore-build.sh", 
         "help-site/astro.config.mjs",
         "help-site/src/components/Header.astro",
         "help-site/src/components/TitleScreen.astro",
+        "help-site/src/pages/changelog.astro",
         "docs/engine-site/src/styles/theme.css",
         ...sourceFiles("help-site/src/content/docs", [".md"]).map(repoRel),
         ...sourceFiles("scripts", [".ts"])

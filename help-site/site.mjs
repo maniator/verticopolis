@@ -30,9 +30,9 @@ export const sharedHead = [
 
 /** Starlight's sidebar. A `slug` entry takes its label from the page's title.
  *  Starlight puts the site's base (/help) in front of every `link` that starts
- *  with a slash, so the release notes page (/help/changelog, served by the
- *  game's build) is "/changelog", and the gallery, outside /help, climbs out
- *  of it ("/help/../gallery" is /gallery). */
+ *  with a slash, so the release notes page (src/pages/changelog.astro) is
+ *  "/changelog/", and the gallery, outside /help, climbs out of it
+ *  ("/help/../gallery" is /gallery). */
 export const sidebar = [
   { label: "How to Play", link: "/" },
   {
@@ -48,7 +48,7 @@ export const sidebar = [
   {
     label: "More",
     items: [
-      { label: "Release notes", link: "/changelog" },
+      { label: "Release notes", link: "/changelog/" },
       { label: "Sprite gallery", link: "/../gallery" },
       { label: "Report a problem", link: GITHUB_ISSUES, attrs: { target: "_blank", rel: "noopener noreferrer" } },
       { slug: "privacy" },
@@ -66,4 +66,23 @@ export const sidebar = [
 export function oldAnchorRedirects(helpIds) {
   const map = JSON.stringify(helpIds);
   return `(function(){var p=location.pathname.replace(/\\/+$/,"");if(p!==${JSON.stringify(HELP_BASE)})return;var id=location.hash.slice(1);var to=Object.prototype.hasOwnProperty.call(${map},id)?${map}[id]:null;if(to)location.replace(${JSON.stringify(HELP_BASE + "/")}+to+"/"+location.search);})();`;
+}
+
+/**
+ * The analytics landing a page view counts as: `page_changelog` on the release
+ * notes, `page_help` on any other page, or null for a step from one help page
+ * to another (a referrer under /help on the same site), so a visit counts once
+ * however many pages it reads, as the old one-page /help did.
+ */
+export function landingAction(pathname, referrer, origin) {
+  let from = null;
+  try {
+    const ref = new URL(referrer);
+    if (ref.origin === origin) from = ref.pathname;
+  } catch {
+    // No referrer, or not a URL: a landing.
+  }
+  const inSite = (path) => path === HELP_BASE || path.startsWith(HELP_BASE + "/");
+  if (from !== null && inSite(from)) return null;
+  return /^\/help\/changelog\/?$/.test(pathname) ? "page_changelog" : "page_help";
 }

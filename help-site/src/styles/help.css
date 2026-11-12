@@ -81,3 +81,17 @@
 mobile-starlight-toc .display-current {
   color: var(--r-title-fg);
 }
+
+/* The title lettered as the game's title screen draws it (src/styles/game/
+   splash.css): regular weight, not the page heading's bold, at the same
+   width. */
+.title-screen .ts-word {
+  width: min(86vw, 420px);
+}
+.title-screen .ts-word text,
+.title-screen .ts-tag text {
+  font-weight: 400;
+}
+.title-screen .ts-tag {
+  width: min(78vw, 340px);
+}

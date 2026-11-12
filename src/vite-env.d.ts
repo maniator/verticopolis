@@ -15,10 +15,6 @@ declare const __TOOLING_BUILD__: boolean;
 /** This build's parts, for the update prompt's "game or engine" label (see
  *  src/pwaUpdateInfo.ts and src/build/buildFingerprint.ts). */
 declare const __BUILD_FINGERPRINT__: import("./pwaUpdateInfo").BuildFingerprint;
-/** Every version's player notes, newest first and whole, read from
- *  CHANGELOG.md at build time for the release notes page
- *  (src/releaseNotesPage.ts). */
-declare const __RELEASE_NOTES__: import("./changelog").ReleaseNotes[];
 /** This build's own notes and the ones below it, for the Help menu's What's
  *  new (src/whatsNewData.ts). */
 declare const __WHATS_NEW__: import("./changelog").ReleaseNotes[];

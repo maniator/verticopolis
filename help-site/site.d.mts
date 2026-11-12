@@ -9,4 +9,5 @@ export type SidebarEntry =
   | { slug: string }
   | { label: string; items: SidebarEntry[] };
 export const sidebar: SidebarEntry[];
+export function landingAction(pathname: string, referrer: string, origin: string): "page_help" | "page_changelog" | null;
 export function oldAnchorRedirects(helpIds: Record<string, string>): string;

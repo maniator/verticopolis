@@ -4,7 +4,7 @@ import { resolve } from "node:path";
 import { existsSync, readFileSync } from "node:fs";
 import { execSync } from "node:child_process";
 import { VitePWA } from "vite-plugin-pwa";
-import { allReleaseNotes, notesForVersion, recentReleaseNotes, whatsNewReleases, type ReleaseNotes } from "./src/changelog";
+import { notesForVersion, recentReleaseNotes, whatsNewReleases, type ReleaseNotes } from "./src/changelog";
 import { PACKAGE_STYLESHEET, isPackagePath } from "./src/build/thirdPartyNotices";
 import { entryWithIntegrity, precacheIntegrityTransform, readExpectedPackage } from "./src/build/enginePackageBuild";
 import { MAX_RELEASES, type BuildFingerprint } from "./src/pwaUpdateInfo";
@@ -32,17 +32,6 @@ function changelogNotes(): string[] {
 function changelogReleases(): ReleaseNotes[] {
   try {
     return recentReleaseNotes(readFileSync(resolve(__dirname, "CHANGELOG.md"), "utf8"), pkgVersion, MAX_RELEASES);
-  } catch {
-    return [];
-  }
-}
-
-/** Every version's notes, newest first and whole, for the release notes page
- *  (`/help/changelog`, src/releaseNotesPage.ts). Empty when the file is
- *  missing. */
-function changelogAllReleases(): ReleaseNotes[] {
-  try {
-    return allReleaseNotes(readFileSync(resolve(__dirname, "CHANGELOG.md"), "utf8"));
   } catch {
     return [];
   }
@@ -204,7 +193,7 @@ const OG_IMAGE_ALT =
 
 /**
  * The SEO/OG head tags every deployed page shares, identical across the game,
- * the gallery, and the release notes page. Per-page UNIQUE tags (title, description,
+ * and the gallery. Per-page UNIQUE tags (title, description,
  * canonical, og:url, og:title/description, twitter:title/description) stay inline
  * in each page's own HTML; only the invariant boilerplate is centralized here.
  *
@@ -230,12 +219,12 @@ const SHARED_HEAD_TAGS: HtmlTagDescriptor[] = [
   { tag: "link", attrs: { rel: "apple-touch-icon", href: "./apple-touch-icon.png" }, injectTo: "head" },
 ];
 
-/** Inject the shared head tags into the three PUBLIC pages this build makes
- *  (the game, the gallery and the release notes at /help/changelog; the Help
- *  site at /help carries its own, help-site/astro.config.mjs). `preview.html` is the noindex screenshot harness, so it
+/** Inject the shared head tags into the two PUBLIC pages this build makes
+ *  (the game and the gallery; the Help site at /help, release notes included,
+ *  carries its own, help-site/site.mjs). `preview.html` is the noindex screenshot harness, so it
  *  is deliberately left out. */
 function sharedHead(): Plugin {
-  const pages = new Set(["index.html", "gallery.html", "release-notes.html"]);
+  const pages = new Set(["index.html", "gallery.html"]);
   return {
     name: "shared-head",
     transformIndexHtml: {
@@ -317,10 +306,6 @@ export default defineConfig(({ command }) => ({
     // This build's game and engine parts, for the update prompt's label
     // (src/pwaUpdateInfo.ts `classifyUpdate`); version.json carries the same.
     __BUILD_FINGERPRINT__: JSON.stringify(fingerprintOf(command)),
-    // Every version's player notes for the release notes page
-    // (src/releaseNotesPage.ts). Only that page's module reads it, so the
-    // text lands in its own chunk and never in the game's bundle.
-    __RELEASE_NOTES__: JSON.stringify(changelogAllReleases()),
     // This build's own notes for the Help menu's What's new. Only
     // src/whatsNewData.ts reads it, and the game imports that module on
     // demand, so the text is a precached chunk of its own (offline) and stays
@@ -460,7 +445,7 @@ export default defineConfig(({ command }) => ({
         // the game shell: the PWA needs nothing that large, so it stays out
         // of every web player's offline precache (a review catch on the PR
         // that added it).
-        globIgnores: ["**/gallery*", "**/release-notes*", "**/releaseNotes*", "**/404.html", "**/notFound-*.js", "**/preview*", "**/og-image*", "help/**", "**/icon-1024x1024.png", "**/sw-navigation-fallback.js"],
+        globIgnores: ["**/gallery*", "**/404.html", "**/notFound-*.js", "**/preview*", "**/og-image*", "help/**", "**/icon-1024x1024.png", "**/sw-navigation-fallback.js"],
         // The worker's own helper, loaded by importScripts and updated with it,
         // so it stays out of the precache.
         importScripts: ["sw-navigation-fallback.js"],
@@ -532,7 +517,6 @@ export default defineConfig(({ command }) => ({
       input: {
         main: resolve(__dirname, "src/index.html"),
         gallery: resolve(__dirname, "src/gallery.html"),
-        releaseNotes: resolve(__dirname, "src/release-notes.html"),
         // The host's "page not found" page: Vercel serves `404.html` from the
         // output root, with a 404 status, for any path nothing else answers.
         notFound: resolve(__dirname, "src/404.html"),

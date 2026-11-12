@@ -7,11 +7,9 @@
   "outputDirectory": "dist",
   "git": { "deploymentEnabled": { "main": false } },
   "redirects": [
-    { "source": "/help/changelog/", "destination": "/help/changelog", "permanent": true },
     { "source": "/gallery/", "destination": "/gallery", "permanent": true }
   ],
   "rewrites": [
-    { "source": "/help/changelog", "destination": "/release-notes.html" },
     { "source": "/gallery", "destination": "/gallery.html" }
   ],
   "headers": [

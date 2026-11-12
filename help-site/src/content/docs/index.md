@@ -1,8 +1,9 @@
 ---
 title: How to Play
 description: How to build, run and grow a tower in Verticopolis, from the first floor to the TOWER rating.
-template: splash
+tableOfContents: false
 hero:
+  tagline: The player's guide to building, running and growing your tower.
   actions:
     - text: Play the game
       link: /

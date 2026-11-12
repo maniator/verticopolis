@@ -1,8 +1,8 @@
 ---
 // The front page's hero, drawn as the game's title screen: the dusk sky, the
 // setting sun, the skyline and the VERTICO/POLIS wordmark, as on the engine
-// docs site (docs/engine-site/src/components/TitleScreen.astro), with this
-// site's tagline. Starlight renders it from the page's `hero` front matter.
+// docs site (docs/engine-site/src/components/TitleScreen.astro), lettered as
+// the game's own title screen (src/ui/splashTemplate.ts, splash.css). Starlight renders it from the page's `hero` front matter.
 const { data } = Astro.locals.starlightRoute.entry;
 const { tagline, actions = [] } = data.hero || {};
 ---
@@ -18,7 +18,7 @@ const { tagline, actions = [] } = data.hero || {};
       </svg>
     </h1>
     <svg class="ts-tag" viewBox="0 0 360 20" aria-hidden="true">
-      <text x="180" y="15" text-anchor="middle" textLength="200" lengthAdjust="spacing">HOW TO PLAY</text>
+      <text x="180" y="15" text-anchor="middle" textLength="330" lengthAdjust="spacingAndGlyphs">THE VERTICAL METROPOLIS</text>
     </svg>
     {tagline && <p class="ts-premise">{tagline}</p>}
     <div class="ts-actions">

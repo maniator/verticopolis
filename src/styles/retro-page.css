@@ -1,7 +1,7 @@
 /* Standalone retro page layer: the shared Windows-3.1 chrome (tokens +
    components) plus the layout a full-page document needs (the teal desktop
    ground, a centered window, a sticky title bar, a body, a card grid, and a
-   status bar). The release notes, sprite gallery and 404 pages load this so they wear
+   status bar). The sprite gallery and 404 pages load this so they wear
    the same chrome as the game from one source. The game itself does NOT load
    this file (it uses styles.css); this is page-only layout.
 
@@ -93,7 +93,7 @@ body.retro-page {
   padding: 20px 22px 22px;
 }
 
-/* Lists in a page body (the release notes) get comfortable spacing. */
+/* Lists in a page body get comfortable spacing. */
 .win-body ul {
   margin: 12px 0;
   padding-left: 22px;
@@ -105,8 +105,7 @@ body.retro-page {
   margin-bottom: 0;
 }
 
-/* A page section under its own heading (the release notes' versions, the 404
-   page's body). */
+/* A page section under its own heading (the 404 page's body). */
 .help-section {
   margin: 0 0 22px;
 }
@@ -115,7 +114,7 @@ body.retro-page {
   margin: 0 0 8px;
   text-wrap: balance;
 }
-/* A deep link (e.g. /help/changelog#3.2.0) highlights the section it lands on. */
+/* A deep link to a section highlights the section it lands on. */
 .help-section:target h2 {
   color: var(--accent);
 }
@@ -180,8 +179,8 @@ body.retro-page {
   font-size: 14px;
 }
 
-/* A notice at the top of the page, such as the release notes page's
-   "Close this tab" note when the browser keeps a game-opened tab open. */
+/* A notice at the top of the page, such as the "Close this tab" note when the
+   browser keeps a game-opened tab open. */
 .page-note {
   max-width: 64ch;
   margin: 0 0 14px;

@@ -17,9 +17,11 @@ import Default from "@astrojs/starlight/components/Header.astro";
   import { backToOpenGame, takeFromGameFlag } from "../../../src/ui/fromGame";
   import { injectVercelTelemetry } from "../../../src/telemetry";
   import { trackAppAction } from "../../../src/analytics";
+  import { landingAction } from "../../site.mjs";
 
   injectVercelTelemetry();
-  trackAppAction("page_help");
+  const landing = landingAction(location.pathname, document.referrer, location.origin);
+  if (landing) trackAppAction(landing);
   if (takeFromGameFlag(location, history)) {
     for (const back of document.querySelectorAll<HTMLAnchorElement>('a[data-act="back-to-game"]')) {
       back.addEventListener("click", (e) => backToOpenGame(e));
