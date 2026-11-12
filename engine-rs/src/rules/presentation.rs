@@ -43,4 +43,11 @@ impl GameMode {
     pub fn advises_on_retail_demand(self) -> bool {
         self == GameMode::Modern
     }
+
+    /// Whether a frontend shows how far a room's same-floor noise carries
+    /// while it is placed (Modern). Classic keeps the 1994 game's silence
+    /// about it, though the rule holds in both.
+    pub fn shows_noise_reach(self) -> bool {
+        self == GameMode::Modern
+    }
 }

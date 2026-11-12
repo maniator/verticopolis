@@ -315,6 +315,9 @@ export interface CatalogFacility {
   /** The venue's cross-floor halo in this mode, or null (#1980): the
    *  placement range rings draw it. */
   readonly halo: CatalogHalo | null;
+  /** How far the room's same-floor noise carries and how far it hears its
+   *  neighbors, which the placement overlay draws; empty in Classic. */
+  readonly noise: readonly CatalogNoise[];
 }
 
 /** A venue's cross-floor halo: who feels it, over how many floors and how
@@ -335,6 +338,18 @@ export interface CatalogHalo {
   readonly openHoursOnly: boolean;
   /** Scaled by the household's size, largest for the biggest family. */
   readonly familyScaled: boolean;
+}
+
+/** One reach of a room's same-floor noise. The tile beside the room is tile
+ *  0, so a room of the other side within `tiles + 1` tiles of an edge counts;
+ *  a lobby tile or a gap in the floor stops it. */
+export interface CatalogNoise {
+  /** `carries`: the room makes noise `kinds` hear. `hears`: the room hears
+   *  noise `kinds` make. */
+  readonly role: "carries" | "hears";
+  readonly tiles: number;
+  /** The facility keys on the other side. */
+  readonly kinds: readonly FacilityKind[];
 }
 
 const facilityIndex = new WeakMap<Catalog, ReadonlyMap<FacilityKind, CatalogFacility>>();

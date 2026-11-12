@@ -106,5 +106,6 @@ fn facility_entry(mode: GameMode, kind: Kind) -> FacilityEntry {
         lease_amenity: kind.is_lease_amenity(),
         unmet_demand: kind.is_unmet_demand_kind(),
         halo: halo::halo_entry(mode, kind),
+        noise: noise::noise_entries(mode, kind),
     }
 }

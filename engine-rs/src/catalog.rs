@@ -42,6 +42,7 @@ mod build;
 mod halo;
 mod json;
 mod lock;
+mod noise;
 mod rules;
 
 pub use build::catalog;
@@ -49,6 +50,7 @@ pub use halo::HaloEntry;
 pub use json::{catalog_digest, catalog_json, catalog_value};
 #[doc(hidden)]
 pub use lock::{lock_view, LOCK_FOOTPRINT_EXEMPT};
+pub use noise::NoiseEntry;
 pub use rules::Rules;
 
 /// The version of the catalog's shape. It moves when a field is added,
@@ -293,6 +295,9 @@ pub struct FacilityEntry {
     pub unmet_demand: bool,
     /// The venue's cross-floor halo in this mode, or null (#1980).
     pub halo: Option<HaloEntry>,
+    /// How far the room's same-floor noise carries and how far it hears
+    /// its neighbors, shown while placing it; empty in Classic.
+    pub noise: Vec<NoiseEntry>,
 }
 
 /// How the player prices a kind: a ladder of fixed rungs (Classic) or a

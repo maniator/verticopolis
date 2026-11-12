@@ -148,6 +148,7 @@ const FACILITY: Shape = {
   leaseAmenity: bool,
   unmetDemand: bool,
   halo: (v) => v === null || isRecord(v),
+  noise: Array.isArray,
 };
 const HALO: Shape = {
   effect: oneOf("lift", "drain"),
@@ -157,6 +158,11 @@ const HALO: Shape = {
   feltBy: (v) => Array.isArray(v) && v.length > 0 && v.every(text),
   openHoursOnly: bool,
   familyScaled: bool,
+};
+const NOISE: Shape = {
+  role: oneOf("carries", "hears"),
+  tiles: count,
+  kinds: (v) => Array.isArray(v) && v.length > 0 && v.every(text),
 };
 const LADDER: Shape = { cadence, default: amount, rungs: Array.isArray, noRate: oneOf(true) };
 const RUNG: Shape = { level: count, label: text, value: amount };
@@ -227,12 +233,16 @@ function checkCatalog(c: Record<string, unknown>): void {
       // A lift raises a capped room's ceiling; a drain only drains.
       if ((halo.effect === "lift") !== (halo.capLift !== null)) refuse(`${path}.halo`, `${key}'s capLift does not match its effect`);
     }
+    (e.noise as unknown[]).forEach((n, j) => checkShape(n, NOISE, `${path}.noise[${j}]`));
   });
   facilities.forEach((f, i) => {
-    const halo = (f as Record<string, unknown>).halo as { feltBy: string[] } | null;
-    for (const kind of halo?.feltBy ?? []) {
+    const e = f as { halo: { feltBy: string[] } | null; noise: Array<{ kinds: string[] }> };
+    for (const kind of e.halo?.feltBy ?? []) {
       if (!keys.has(kind)) refuse(`facilities[${i}].halo.feltBy`, `${kind} is not a listed facility`);
     }
+    e.noise.forEach((n, j) => {
+      for (const kind of n.kinds) if (!keys.has(kind)) refuse(`facilities[${i}].noise[${j}].kinds`, `${kind} is not a listed facility`);
+    });
   });
   if (!keys.has(world.groundFloorStructure as string)) {
     refuse("world.groundFloorStructure", `${String(world.groundFloorStructure)} is not a listed facility`);

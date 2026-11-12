@@ -10,6 +10,7 @@ import type { ScreenRect } from "./towerInputCamera";
 import type { ThiefSpan, TowerEngine } from "./TowerEngine";
 import { drawShaftNumbers } from "./towerShaftNumbers";
 import { drawHaloRings } from "./towerHaloRings";
+import { drawNoiseReach } from "./towerNoiseReach";
 
 /**
  * The 2D canvas overlay and sky painters for {@link TowerEngine}, plus the
@@ -352,6 +353,8 @@ function drawPreview(engine: TowerEngine, ctx: CanvasRenderingContext2D): void {
     // Floor/lobby tools lay a multi-tile brush strip; `span` (when set) is the
     // real footprint so the shadow matches what a click actually places.
     const w = p.span ?? f.width;
+    // And how far its noise carries along its floor, or how far it hears.
+    drawNoiseReach(ctx, f.noise, { floor: p.floor, floors: hgt, x: p.x, width: w }, engine.sim.tower, engine);
     const sx = engine.worldToScreenX(p.x);
     const sy = engine.worldToScreenY(p.floor + hgt - 1);
     const sw = w * TILE * engine.cam.zoom;
