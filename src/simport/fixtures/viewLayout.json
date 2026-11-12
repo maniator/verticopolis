@@ -1,5 +1,5 @@
 {
-  "version": 17,
+  "version": 18,
   "header": {
     "minutes": 0,
     "towerRevision": 1,
@@ -524,6 +524,7 @@
       "parkingOfficePop",
       "parkingOffices",
       "parkingSuites",
+      "parkingHomes",
       "parkingTotal",
       "cleaned",
       "leftover",
@@ -761,7 +762,8 @@
     "unmetDemand",
     "relocation",
     "trash",
-    "parking"
+    "parking",
+    "homeParking"
   ],
   "evalTiers": [
     "unrated",
