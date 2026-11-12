@@ -748,6 +748,19 @@ source files, never the copies under `src/content/docs/`.
 real file and is in the side menu; the workflow's own pull request run checks
 the build.
 
+**Docs previews.** Each open pull request that changes a page, the site, the
+engine's sources or `engine-rs/Cargo.toml` gets a preview at
+`docs.verticopolis.com/pr-preview/pr-<number>/`, with a comment on the pull
+request linking it, and loses it when it closes. Its pull request build runs
+under that path (`DOCS_BASE`, with `docs/engine-site/scripts/preview-base.mjs`
+moving the links written from the site root, and marking the pages noindex);
+`.github/workflows/docs-preview.yml` publishes it from `main` once the build
+passes. Pages takes the whole site in one deploy, so the live docs and the
+previews are kept together, built, on the `docs-pages` branch (one commit,
+replaced on each change), and `.github/workflows/docs-pages-publish.yml`
+stores each part there and deploys the branch. A pull request from a fork
+gets no preview.
+
 ### Two changelogs, and the update label
 
 Two files, by audience. `CHANGELOG.md` is for players, one section per app

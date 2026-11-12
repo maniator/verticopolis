@@ -1,0 +1,172 @@
+name: Docs pages publish
+
+# Publishes one part of the GitHub Pages site at docs.verticopolis.com. Pages
+# takes the whole site in one deploy, so the site is kept, built, on the
+# docs-pages branch: the live docs at its root, and each open pull request's
+# preview under pr-preview/pr-<number>/. A caller stores its part there, and
+# the branch tip, with every part, is what deploys.
+#
+#   engine-docs.yml   a push to main (or a dispatch) stores the live docs
+#   docs-preview.yml  a pull request's docs build stores its preview, and the
+#                     pull request closing removes it
+#
+# The branch holds one commit, force-pushed each time, so old builds do not
+# pile up in its history. Storing has no lock: each run rebuilds the commit
+# from the tip it fetched and pushes with a lease, trying again when another
+# run moved the tip. Each store also drops the preview of any pull request
+# that is no longer open. Deploys queue one at a time, and a queued deploy may
+# be replaced by a newer one, which deploys the newer tip with every part.
+on:
+  workflow_call:
+    inputs:
+      slot:
+        description: "site (the live docs) or pr-preview/pr-<number>"
+        type: string
+        required: true
+      artifact:
+        description: "The artifact holding the built site; empty removes the slot"
+        type: string
+        default: ""
+      run-id:
+        description: "The run that uploaded the artifact"
+        type: string
+        default: ""
+    outputs:
+      changed:
+        description: "true when this run changed the stored site"
+        value: ${{ jobs.store.outputs.changed }}
+
+permissions: {}
+
+env:
+  BRANCH: docs-pages
+
+jobs:
+  store:
+    name: docs-pages (store)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      actions: read
+      pull-requests: read
+    outputs:
+      changed: ${{ steps.store.outputs.changed }}
+    steps:
+      - name: Check the slot
+        env:
+          SLOT: ${{ inputs.slot }}
+        run: |
+          if [ "$SLOT" != site ] && ! printf '%s' "$SLOT" | grep -Eq '^pr-preview/pr-[1-9][0-9]*$'; then
+            echo "::error::$SLOT is neither site nor pr-preview/pr-<number>."; exit 1
+          fi
+
+      - name: Download the built site
+        if: ${{ inputs.artifact != '' }}
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: ${{ inputs.artifact }}
+          path: built
+          run-id: ${{ inputs.run-id }}
+          github-token: ${{ github.token }}
+
+      # Pages packs the site following links, so a link in a build could
+      # publish a file from the deploy runner.
+      - name: Refuse links
+        if: ${{ inputs.artifact != '' }}
+        run: |
+          if [ -n "$(find built -type l -print -quit)" ]; then
+            echo "::error::The built site holds a symbolic link."; exit 1
+          fi
+          test -f built/index.html
+
+      - name: Store it on the docs-pages branch
+        id: store
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SLOT: ${{ inputs.slot }}
+          HAS_BUILD: ${{ inputs.artifact != '' }}
+        run: |
+          set -euo pipefail
+          built="$PWD/built"
+          open=" $(gh pr list --repo "$REPO" --state open --limit 1000 --json number --jq '[.[].number] | join(" ")') "
+          auth="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
+          for attempt in 1 2 3 4 5; do
+            rm -rf store && git init -q store && cd store
+            git config http.https://github.com/.extraheader "$auth"
+            git remote add origin "https://github.com/$REPO.git"
+            tip=$(git ls-remote origin "refs/heads/$BRANCH" | cut -f1)
+            if [ -z "$tip" ] && [ "$HAS_BUILD" != true ]; then
+              echo "Nothing stored yet, so nothing to remove."; echo "changed=false" >> "$GITHUB_OUTPUT"; exit 0
+            fi
+            if [ -n "$tip" ]; then
+              git fetch -q --depth 1 origin "$tip"
+              git checkout -q "$tip"
+            fi
+            if [ "$SLOT" = site ]; then
+              find . -mindepth 1 -maxdepth 1 ! -name .git ! -name pr-preview -exec rm -rf {} +
+              cp -R "$built/." .
+            else
+              rm -rf "$SLOT"
+              if [ "$HAS_BUILD" = true ]; then mkdir -p "$SLOT" && cp -R "$built/." "$SLOT/"; fi
+            fi
+            for dir in pr-preview/pr-*; do
+              [ -d "$dir" ] || continue
+              case "$open" in *" ${dir#pr-preview/pr-} "*) ;; *) echo "Dropping $dir: its pull request is closed."; rm -rf "$dir" ;; esac
+            done
+            rmdir pr-preview 2>/dev/null || true
+            # Deploying a tree without the live docs would take the site down.
+            # The first push to main after this workflow lands stores them.
+            if [ ! -f index.html ]; then
+              echo "::error::$BRANCH has no live docs at its root yet. Run Engine docs for main first."; exit 1
+            fi
+            git add -A
+            if [ -n "$tip" ] && git diff --cached --quiet "$tip"; then
+              echo "Nothing changed on $BRANCH."; echo "changed=false" >> "$GITHUB_OUTPUT"; exit 0
+            fi
+            commit=$(GIT_AUTHOR_NAME=github-actions GIT_AUTHOR_EMAIL=41898282+github-actions[bot]@users.noreply.github.com \
+              GIT_COMMITTER_NAME=github-actions GIT_COMMITTER_EMAIL=41898282+github-actions[bot]@users.noreply.github.com \
+              git commit-tree "$(git write-tree)" -m "Docs site, $SLOT updated by run $GITHUB_RUN_ID")
+            if git push -q --force-with-lease="refs/heads/$BRANCH:$tip" origin "$commit:refs/heads/$BRANCH"; then
+              echo "changed=true" >> "$GITHUB_OUTPUT"; exit 0
+            fi
+            cd ..
+            echo "The branch moved; trying again."
+            sleep $((attempt * 5))
+          done
+          echo "::error::Could not store $SLOT on $BRANCH after 5 tries."; exit 1
+
+  deploy:
+    name: docs-pages (deploy)
+    needs: store
+    # The github-pages environment deploys from main only. A run from another
+    # branch (a pull request stacked on another one closing) still stores its
+    # change, and the next deploy from main carries it.
+    if: ${{ needs.store.outputs.changed == 'true' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    concurrency:
+      group: docs-pages-deploy
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: docs-pages
+          path: site
+          persist-credentials: false
+
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: site
+
+      - name: Deploy to GitHub Pages
+        id: deploy
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
