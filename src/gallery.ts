@@ -5,6 +5,7 @@ import { fitAtGameScale } from "./render/catalogScale";
 import { FLOOR, TILE } from "./render/scale";
 import { drawCar, drawTransport, drawUnit, type DrawCtx } from "./render/sprites";
 import { pageShell } from "./ui/templates/pageShell";
+import { takeFromGameFlag } from "./ui/fromGame";
 import { injectVercelTelemetry } from "./telemetry";
 import { trackAppAction } from "./analytics";
 import { bindViewWorld } from "./presentation/viewWorld";
@@ -367,6 +368,7 @@ render(
       { href: "/help", label: "Help" },
       { href: "/help/changelog", label: "Release notes" },
     ],
+    fromGame: takeFromGameFlag(location, history),
   }),
   document.getElementById("app")!,
 );

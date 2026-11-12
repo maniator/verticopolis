@@ -74,12 +74,17 @@ export function mountAppDom(): void {
 }
 
 export function makeUI(overrides: Partial<UICallbacks> = {}): { ui: UI; cb: UICallbacks } {
+  // The speed follows onSpeed, as the game's does, so a dialog that pauses and
+  // restores reads back the speed it set.
+  let speed = 1;
   const classic = catalogFor("classic"); // one object, as a tower's catalog is, so the palette redraws only on a change
   const cb: UICallbacks = {
     getCatalog: vi.fn(() => classic),
     onSelectTool: vi.fn(),
-    onSpeed: vi.fn(),
-    getSpeed: vi.fn(() => 1),
+    onSpeed: vi.fn((s: number) => {
+      speed = s;
+    }),
+    getSpeed: vi.fn(() => speed),
     onSave: vi.fn(),
     onLoad: vi.fn(),
     onExport: vi.fn(),

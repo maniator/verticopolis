@@ -14,6 +14,7 @@ import { mountToolbarIcons } from "./uiToolbarIcons";
 import type { ReviewRow } from "./templates/scheduleReview";
 import { toolInfoFor, BULLDOZE_TOOL_INFO, INSPECT_TOOL_INFO } from "./templates/toolInfo";
 import * as dialogs from "./uiDialogs";
+import * as help from "./uiHelpMenu";
 import * as panels from "./uiPanels";
 import * as status from "./uiStatus";
 import type { HudSource } from "./uiStatus";
@@ -200,8 +201,8 @@ export class UI {
     document.getElementById("btn-load")!.addEventListener("click", () => this.cb.onShowSaves());
     document.getElementById("btn-new")!.addEventListener("click", () => this.promptNewTower());
     document.getElementById("btn-settings")!.addEventListener("click", () => this.showSettings());
-    document.getElementById("btn-help")!.addEventListener("click", () => this.showHelp());
-    this.el.modeBadge.addEventListener("click", () => this.showCompare()); // "tell me more"
+    document.getElementById("btn-help")!.addEventListener("click", () => this.showHelpMenu());
+    this.el.modeBadge.addEventListener("click", () => help.showModeHelp(this)); // "tell me more"
     document.getElementById("btn-stats")!.addEventListener("click", () => this.cb.onShowStats());
 
     this.el.towerName.addEventListener("change", () => {
@@ -450,13 +451,12 @@ export class UI {
     dialogs.showExportReport(this, report, cb);
   }
 
-  showHelp(): void {
-    dialogs.showHelp(this);
-  }
-
-  showCompare(): void {
-    dialogs.showCompare(this);
-  }
+  /** The toolbar's Help menu, the in-game guide, About this game, and the
+   *  Classic vs Modern comparison (src/ui/uiHelpMenu.ts). */
+  showHelpMenu(): void { help.showHelpMenu(this); }
+  showHelp(): void { help.showHelp(this); }
+  showAbout(): void { help.showAbout(this); }
+  showCompare(): void { help.showCompare(this); }
 
   showSettings(): void {
     dialogs.showSettings(this);

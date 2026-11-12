@@ -1,5 +1,6 @@
 import { html, nothing, type TemplateResult } from "lit-html";
 import { iconTemplate, type IconName } from "../icons";
+import { BACK_NOTE_ID, backToOpenGame } from "../fromGame";
 
 /** A sibling-page link in the title-bar nav (e.g. the Sprite Gallery). */
 export interface PageShellLink {
@@ -21,10 +22,11 @@ export interface PageShellOptions {
   footer?: TemplateResult;
   /** Title-bar app icon (defaults to the brand building). */
   icon?: IconName;
-  /** Runs on a click of either "Back to game" link, before its navigation.
-   *  A page the game opened in a new tab uses it to close itself instead of
-   *  loading a second copy of the game; the `href` stays for no-JS. */
-  onBack?: (e: MouseEvent) => void;
+  /** The running game opened this page in a new tab (src/ui/fromGame.ts):
+   *  "Back to game" then closes the tab instead of loading a second copy of
+   *  the game, and the shell adds the note it fills when the browser keeps
+   *  the tab open. The `href` stays for no-JS. */
+  fromGame?: boolean;
 }
 
 /**
@@ -42,9 +44,10 @@ export interface PageShellOptions {
  * this helper only supplies structure and the shared class names.
  */
 export function pageShell(opts: PageShellOptions): TemplateResult {
-  const { title, backHref, main, links = [], footer, icon = "brand", onBack } = opts;
+  const { title, backHref, main, links = [], footer, icon = "brand", fromGame = false } = opts;
+  const onBack = fromGame ? (e: MouseEvent) => backToOpenGame(e) : nothing;
   const back = (cls: string): TemplateResult =>
-    html`<a class="btn ${cls}" href=${backHref} data-act="back-to-game" @click=${onBack ?? nothing}>${iconTemplate("back", { size: 12 })}Back to game</a>`;
+    html`<a class="btn ${cls}" href=${backHref} data-act="back-to-game" @click=${onBack}>${iconTemplate("back", { size: 12 })}Back to game</a>`;
   return html`
     <main class="page-win win">
       <div class="win-title">
@@ -56,6 +59,7 @@ export function pageShell(opts: PageShellOptions): TemplateResult {
         </nav>
       </div>
       <div class="win-body">
+        ${fromGame ? html`<p id=${BACK_NOTE_ID} class="page-note" tabindex="-1" hidden></p>` : nothing}
         ${main}
         <div class="page-foot">
           <span>${footer ?? nothing}</span>

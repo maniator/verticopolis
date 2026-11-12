@@ -1,6 +1,7 @@
 import { html, nothing, type TemplateResult } from "lit-html";
 import type { UpdateInfo } from "../../pwa";
 import { SHORT_NOTES } from "../../pwaUpdateInfo";
+import { fromGameHref } from "../fromGame";
 
 /**
  * The "a new build is ready" prompt. Authored to match `updatePromptHtml`
@@ -82,15 +83,14 @@ export interface UpdatePromptOptions {
 
 /** The release notes page, at the incoming version's section when there is
  *  one. `from=game` tells the page a running game opened it, so its "Back to
- *  game" closes the tab instead of loading a second game (src/releaseNotesPage.ts). */
+ *  game" closes the tab instead of loading a second game (src/ui/fromGame.ts). */
 export function releaseNotesHref(version: string | undefined): string {
-  const page = "/help/changelog?from=game";
-  return version ? `${page}#${encodeURIComponent(version)}` : page;
+  return fromGameHref(version ? `/help/changelog#${encodeURIComponent(version)}` : "/help/changelog");
 }
 
 /** The "All release notes" link: opens the release notes page in a new tab,
  *  so the prompt (and the tower behind it) stay where they are. */
-function releaseNotesLink(version: string | undefined): TemplateResult {
+export function releaseNotesLink(version: string | undefined): TemplateResult {
   return html`<p class="whatsnew-all"><a href=${releaseNotesHref(version)} target="_blank" rel="noopener noreferrer" data-act="release-notes">All release notes<span class="visually-hidden"> (opens in a new tab)</span></a></p>`;
 }
 

@@ -86,3 +86,36 @@
    palette and cream/amber buttons, sharing only the interaction grammar
    (bevel press states, focus visibility). Everything below the splash —
    the coach card — is regular chrome. */
+
+/* The Help menu (src/ui/templates/helpMenu.ts): one row per item, the action
+   as a full-width button or link on the left and a muted line saying what it
+   opens. Rows stack on a phone. */
+.help-menu-lede {
+  margin: 0 0 10px;
+  color: var(--muted);
+}
+.help-menu {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.help-menu > li {
+  display: grid;
+  grid-template-columns: 11em 1fr;
+  align-items: center;
+  gap: 4px 12px;
+}
+.help-menu > li > .btn {
+  text-align: center;
+}
+.help-menu-blurb {
+  color: var(--muted);
+  font-size: 0.92em;
+}
+@media (max-width: 520px) {
+  .help-menu > li {
+    grid-template-columns: 1fr;
+  }
+}

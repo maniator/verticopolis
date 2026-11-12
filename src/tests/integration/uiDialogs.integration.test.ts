@@ -3420,6 +3420,15 @@ describe("mode badge (uiStatus.setMode) follows the live rule-set", () => {
   });
 });
 
+/** A speed the dialog under test reads back after it sets it, as the game's does. */
+function speedAt(start: number) {
+  let speed = start;
+  const onSpeed = vi.fn((s: number) => {
+    speed = s;
+  });
+  return { onSpeed, getSpeed: () => speed };
+}
+
 describe("Compare modal (showCompare) pauses the tower and restores speed", () => {
   beforeEach(() => mountAppDom());
   afterEach(() => (document.body.innerHTML = ""));
@@ -3433,8 +3442,8 @@ describe("Compare modal (showCompare) pauses the tower and restores speed", () =
   });
 
   it("pauses on open and restores the prior speed on Got it", () => {
-    const onSpeed = vi.fn();
-    const { ui } = makeUI({ getSpeed: () => 2, onSpeed });
+    const { onSpeed, getSpeed } = speedAt(2);
+    const { ui } = makeUI({ getSpeed, onSpeed });
     ui.showCompare();
     expect(onSpeed).toHaveBeenNthCalledWith(1, 0); // paused on open
     click('[data-act="close"]');
@@ -3443,8 +3452,8 @@ describe("Compare modal (showCompare) pauses the tower and restores speed", () =
   });
 
   it("restores the prior speed on Esc/cancel too, exactly once", () => {
-    const onSpeed = vi.fn();
-    const { ui } = makeUI({ getSpeed: () => 3, onSpeed });
+    const { onSpeed, getSpeed } = speedAt(3);
+    const { ui } = makeUI({ getSpeed, onSpeed });
     ui.showCompare();
     // Esc routes through the dialog's cancel path (the ✕ dispatches it too).
     dialog().dispatchEvent(new Event("cancel", { cancelable: true }));
@@ -3455,12 +3464,26 @@ describe("Compare modal (showCompare) pauses the tower and restores speed", () =
     expect(onSpeed).toHaveBeenCalledTimes(2);
   });
 
-  it("opens from a click on the Tower-panel mode badge", () => {
-    const { ui } = makeUI();
-    void ui; // constructed for its side effect: the badge click is wired in the ctor
+  it("opens the guide's Classic vs Modern page in a new tab from the mode badge, holding the pause", () => {
+    const tab = { opener: {} };
+    const open = vi.spyOn(window, "open").mockReturnValue(tab as unknown as Window);
+    const { onSpeed, getSpeed } = speedAt(2);
+    makeUI({ getSpeed, onSpeed }); // constructed for its side effect: the badge click is wired in the ctor
+    (document.getElementById("btn-mode") as HTMLButtonElement).click();
+    expect(open).toHaveBeenCalledWith("/help?from=game#classic-vs-modern", "_blank");
+    expect(tab.opener).toBeNull();
+    expect(dialog().open).toBe(false);
+    expect(onSpeed).toHaveBeenLastCalledWith(0);
+    open.mockRestore();
+  });
+
+  it("falls back to the in-game comparison when the browser blocks the new tab", () => {
+    const open = vi.spyOn(window, "open").mockReturnValue(null);
+    makeUI();
     (document.getElementById("btn-mode") as HTMLButtonElement).click();
     expect(dialog().open).toBe(true);
     expect(dialog().textContent).toContain("Variant households");
+    open.mockRestore();
   });
 });
 
@@ -3494,10 +3517,19 @@ describe("Help dialog: the 'Open full page' link downgrades to the compare modal
     a!.click();
   };
 
+  it("opens the in-game comparison from the mode badge in the installed app", () => {
+    setStandalone(true);
+    const open = vi.spyOn(window, "open");
+    makeUI();
+    (document.getElementById("btn-mode") as HTMLButtonElement).click();
+    expect(open).not.toHaveBeenCalled();
+    expect(dialog().textContent).toContain("Variant households");
+  });
+
   it("intercepts the click and opens the in-app compare modal when running standalone", () => {
     setStandalone(true);
-    const onSpeed = vi.fn();
-    const { ui } = makeUI({ getSpeed: () => 2, onSpeed });
+    const { onSpeed, getSpeed } = speedAt(2);
+    const { ui } = makeUI({ getSpeed, onSpeed });
     ui.showHelp();
     expect(dialog().querySelector("h2")?.textContent).toContain("How to play");
 
@@ -3512,7 +3544,8 @@ describe("Help dialog: the 'Open full page' link downgrades to the compare modal
 
   it("leaves the anchor to navigate in a plain browser tab (no interception)", () => {
     setStandalone(false);
-    const { ui } = makeUI();
+    const { onSpeed, getSpeed } = speedAt(2);
+    const { ui } = makeUI({ getSpeed, onSpeed });
     ui.showHelp();
     // Suppress happy-dom's real new-tab navigation (it would fetch /help against
     // no server): a test-only listener cancels the default AFTER the production
@@ -3523,8 +3556,13 @@ describe("Help dialog: the 'Open full page' link downgrades to the compare modal
 
     clickFullPage();
 
-    // The help modal is untouched: the click was left to the real <a target=_blank>.
-    expect(dialog().querySelector("h2")?.textContent).toContain("How to play");
+    // The click was left to the real <a target=_blank>, marked as opened by
+    // the game: the compare modal never opened, the guide closed, and the
+    // pause is held until the player is back on this tab.
+    expect(a.getAttribute("href")).toBe("/help?from=game#classic-vs-modern");
+    expect(dialog().open).toBe(false);
+    expect(dialog().textContent).not.toContain("pixel-faithful to 1994");
+    expect(onSpeed).toHaveBeenLastCalledWith(0);
   });
 });
 

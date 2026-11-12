@@ -4,6 +4,7 @@ import { HELP_SECTIONS, helpLede, helpAboutBody, helpPrivacyBody, helpReportBloc
 import { compareFigures } from "./ui/templates/compareFigures";
 import { injectVercelTelemetry } from "./telemetry";
 import { trackAppAction } from "./analytics";
+import { takeFromGameFlag } from "./ui/fromGame";
 
 /**
  * Entry for the standalone `/help` page: the shareable, canonical How-to-play
@@ -27,8 +28,9 @@ const APP_VERSION = typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "
 
 /** The page body: the lead block, then every guide section expanded under a
  *  heading, then About and the report call to action, wrapped in the retro window
- *  shell. Pure (no DOM side effects) so the page test can render it directly. */
-export function helpPageTemplate(): TemplateResult {
+ *  shell. Pure (no DOM side effects) so the page test can render it directly.
+ *  `fromGame` makes "Back to game" close this tab (src/ui/fromGame.ts). */
+export function helpPageTemplate(fromGame = false): TemplateResult {
   const body = html`
     <div class="page-lede">
       <h1>How to Play</h1>
@@ -53,6 +55,7 @@ export function helpPageTemplate(): TemplateResult {
       { href: "/help/changelog", label: "Release notes" },
       { href: "/gallery", label: "Sprite Gallery" },
     ],
+    fromGame,
   });
 }
 
@@ -69,7 +72,7 @@ function main(): void {
   // of a blank page. Both steps run in one synchronous frame, so the swap is
   // not visible.
   const prerendered = [...root.childNodes];
-  render(helpPageTemplate(), root);
+  render(helpPageTemplate(takeFromGameFlag(location, history)), root);
   for (const node of prerendered) node.remove();
   // Signal readiness for screenshot tooling (mirrors the gallery's flag).
   (window as unknown as { helpReady: boolean }).helpReady = true;

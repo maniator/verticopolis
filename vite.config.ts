@@ -4,7 +4,7 @@ import { resolve } from "node:path";
 import { existsSync, readFileSync } from "node:fs";
 import { execSync } from "node:child_process";
 import { VitePWA } from "vite-plugin-pwa";
-import { allReleaseNotes, notesForVersion, recentReleaseNotes, type ReleaseNotes } from "./src/changelog";
+import { allReleaseNotes, notesForVersion, recentReleaseNotes, whatsNewReleases, type ReleaseNotes } from "./src/changelog";
 import { PACKAGE_STYLESHEET, isPackagePath } from "./src/build/thirdPartyNotices";
 import { entryWithIntegrity, precacheIntegrityTransform, readExpectedPackage } from "./src/build/enginePackageBuild";
 import { MAX_RELEASES, type BuildFingerprint } from "./src/pwaUpdateInfo";
@@ -42,6 +42,17 @@ function changelogReleases(): ReleaseNotes[] {
 function changelogAllReleases(): ReleaseNotes[] {
   try {
     return allReleaseNotes(readFileSync(resolve(__dirname, "CHANGELOG.md"), "utf8"));
+  } catch {
+    return [];
+  }
+}
+
+/** This build's notes for the Help menu's What's new (src/whatsNewData.ts):
+ *  this version and the ones below it, whole, offline. Empty when the file is
+ *  missing. */
+function changelogWhatsNew(): ReleaseNotes[] {
+  try {
+    return whatsNewReleases(readFileSync(resolve(__dirname, "CHANGELOG.md"), "utf8"), pkgVersion, MAX_RELEASES);
   } catch {
     return [];
   }
@@ -308,6 +319,12 @@ export default defineConfig(({ command }) => ({
     // (src/releaseNotesPage.ts). Only that page's module reads it, so the
     // text lands in its own chunk and never in the game's bundle.
     __RELEASE_NOTES__: JSON.stringify(changelogAllReleases()),
+    // This build's own notes for the Help menu's What's new. Only
+    // src/whatsNewData.ts reads it, and the game imports that module on
+    // demand, so the text is a precached chunk of its own (offline) and stays
+    // out of the startup bundle. Kept apart from version.json, which
+    // describes the NEXT build.
+    __WHATS_NEW__: JSON.stringify(changelogWhatsNew()),
   },
   plugins: [
     captureOutDir((dir) => {
