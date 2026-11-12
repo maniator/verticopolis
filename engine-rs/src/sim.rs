@@ -281,17 +281,16 @@ impl Simulation {
         modern_calendar: CalendarKind,
         start_unbridged: bool,
     ) -> Simulation {
-        let bridging_toggleable = mode == GameMode::Modern;
-        let modern_calendar = if mode == GameMode::Classic {
-            CalendarKind::RealWorld
-        } else {
+        let modern_calendar = if mode.lets_player_choose_calendar() {
             modern_calendar
+        } else {
+            CalendarKind::RealWorld
         };
         Simulation {
             rng: Rng::new(seed),
             mode,
             modern_calendar,
-            auto_bridge: if bridging_toggleable {
+            auto_bridge: if mode.bridging_toggleable() {
                 !start_unbridged
             } else {
                 true
@@ -303,7 +302,7 @@ impl Simulation {
             ledger: Ledger::new(),
             tower: {
                 let mut t = Tower::new();
-                t.allows_escalator_on_office_floors = mode == GameMode::Modern;
+                t.allows_escalator_on_office_floors = mode.escalators_on_office_floors();
                 t.mode = mode;
                 t
             },

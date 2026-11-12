@@ -88,9 +88,9 @@ pub const CLASSIC_FILM_DRAW_CAP: i64 = FADING_FILM_DRAW;
 
 /// The draw of the film a theatre shows: a new film's, held to
 /// [`CLASSIC_FILM_DRAW_CAP`] for a classic.
-pub fn showing_draw(days_shown: i64, classic: bool) -> i64 {
+pub fn showing_draw(days_shown: i64, classic_film: bool) -> i64 {
     let draw = film_draw(days_shown);
-    if classic {
+    if classic_film {
         draw.min(CLASSIC_FILM_DRAW_CAP)
     } else {
         draw

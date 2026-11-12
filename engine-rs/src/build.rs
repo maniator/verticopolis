@@ -219,7 +219,7 @@ impl Simulation {
         // Classic keeps floor 100 for the wedding hall alone. This sits after
         // every shared refusal reason, so the TypeScript reasons still win where
         // both engines refuse.
-        if self.mode == GameMode::Classic
+        if self.mode.reserves_top_floor_for_wedding_hall()
             && kind != Kind::WeddingHall
             && floor <= MAX_FLOOR
             && floor + kind.floors() > MAX_FLOOR
