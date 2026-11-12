@@ -8,7 +8,7 @@ import Sprite from "../../../components/Sprite.astro";
 
 A hotel is the busiest business in your tower. Guests arrive in the evening, eat in your restaurants, sleep, pay in the morning and leave, and by lunchtime the room has to be clean for the next one. Keep that cycle turning and a hotel floor earns every single night. Let it slip and you will have cockroaches.
 
-<RoomInfo kind="hotelSuite" state="asleep" />
+<RoomInfo kind="hotelSuite" />
 
 ## The three rooms
 
@@ -19,8 +19,8 @@ A hotel is the busiest business in your tower. Guests arrive in the evening, eat
 | Suite | 3★ | 2 | High nightly price, and the room the VIP stays in |
 
 <div class="vc-sprite-row">
-  <Sprite kind="hotelSingle" state="asleep" small caption="Single Room, guest asleep" />
-  <Sprite kind="hotelDouble" state="asleep" small caption="Double Room, guest asleep" />
+  <Sprite kind="hotelSingle" state="occupied" small caption="Single Room, guest checked in" />
+  <Sprite kind="hotelDouble" state="occupied" small caption="Double Room, guests checked in" />
   <Sprite kind="hotelSuite" state="empty" small caption="Suite, made up and waiting" />
 </div>
 
