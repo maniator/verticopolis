@@ -253,11 +253,11 @@ fn drop_a_stop(towers: [&mut Tower; 2], d: &ElevatorDispatch, rng: &mut Lcg) -> 
 #[test]
 fn dispatch_matches_the_hashed_reference_step_for_step() {
     let (mut tower, mut rt) = (tall_scenario(), tall_scenario());
-    // The reference predates Classic's 1994 rules (`rules::elevators`): pin Modern.
-    (tower.mode, rt.mode) = (GameMode::Modern, GameMode::Modern);
     let tall_id = tower.transports.iter().find(|t| t.x == TALL_X).unwrap().id;
     assert_eq!(tower.stops_of(tall_shaft(&tower)).len(), 80);
     let (mut d, mut r) = (ElevatorDispatch::new(), Reference::default());
+    // The reference is plain SCAN, which no mode runs now (`rules::elevators`).
+    d.profile = Some(DispatchRules::plain_scan());
     let mut rng = Lcg(0x1143_0005);
     let mut dropped: Vec<(i64, i64)> = Vec::new();
     let (mut off_stop, mut empty_steps, mut tallies, mut estimate_only) = (0, 0, 0, 0);

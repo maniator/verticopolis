@@ -1,9 +1,10 @@
 //! The authored elevator schedule in dispatch (#305 phase 2): idle cars
 //! home at their authored floor, a 0-active hour parks the fleet without
 //! stranding its floors, each day type runs its own row, a longer Standard
-//! Floor Departure holds a car longer, a high Waiting Car Response holds a
-//! parked Modern car for a far call but not a near one, an off-shaft home clamps
-//! to the shaft, and a scheduled shaft runs the same every time.
+//! Floor Departure holds a car longer, the plain SCAN profile's reach (span
+//! less Waiting Car Response) holds a parked car from a far call but not a
+//! near one while Modern answers it, an off-shaft home clamps to the shaft,
+//! and a scheduled shaft runs the same every time.
 //!
 //! The TypeScript case "ignores the schedule when no clock is supplied" is
 //! n/a in Rust: `ElevatorDispatch::move_cars` always takes the hour and day
@@ -16,7 +17,7 @@ use std::collections::HashMap;
 
 use crate::clock::GameMode;
 use crate::crowd::ElevatorCalls;
-use crate::dispatch::ElevatorDispatch;
+use crate::dispatch::{DispatchRules, ElevatorDispatch};
 use crate::facilities::Kind;
 use crate::schedule::{Schedule, SCHEDULE_HOURS};
 use crate::tower::{Tower, Transport};
@@ -232,9 +233,10 @@ fn a_longer_standard_floor_departure_holds_a_car_longer() {
 }
 
 /// Two cars homed at floor 10 and parked there, then a call at floor 2, in
-/// a Modern tower (Classic reads the setting as the 1994 game does:
-/// `rule_tests::classic_elevator_dispatch`).
-fn reaches_a_far_call(response: Option<f64>) -> bool {
+/// a Modern tower, under the plain SCAN profile (`plain`) the reference
+/// dispatcher pins or Modern's own rules. Classic reads the setting as the
+/// 1994 game does: `rule_tests::classic_elevator_dispatch`.
+fn reaches_a_far_call(response: Option<f64>, plain: bool) -> bool {
     let s = Schedule {
         home_floors: Some(vec![10, 10]),
         waiting_car_response: response,
@@ -243,6 +245,7 @@ fn reaches_a_far_call(response: Option<f64>) -> bool {
     let (mut tower, id) = scheduled(2, Some(s));
     tower.mode = GameMode::Modern;
     let mut d = ElevatorDispatch::new();
+    d.profile = plain.then(DispatchRules::plain_scan);
     run(&mut d, &mut tower, &ElevatorCalls::default(), 60, WEEKDAY);
     assert!(shaft(&tower)
         .car_positions
@@ -259,11 +262,18 @@ fn reaches_a_far_call(response: Option<f64>) -> bool {
 }
 
 #[test]
-fn modern_a_high_waiting_car_response_holds_parked_cars_from_a_far_call() {
+fn plain_scan_a_high_waiting_car_response_holds_parked_cars_from_a_far_call() {
     // Reach is span 19 less the response 15, so 4 floors: the call 8 away
     // waits; with no response set the call is answered.
-    assert!(!reaches_a_far_call(Some(15.0)));
-    assert!(reaches_a_far_call(None));
+    assert!(!reaches_a_far_call(Some(15.0), true));
+    assert!(reaches_a_far_call(None, true));
+}
+
+#[test]
+fn modern_answers_a_far_call_whatever_the_response() {
+    // Modern retired the reach: the best car goes, response or not.
+    assert!(reaches_a_far_call(Some(15.0), false));
+    assert!(reaches_a_far_call(None, false));
 }
 
 #[test]
@@ -274,7 +284,9 @@ fn a_held_far_call_does_not_mask_a_near_call_the_other_way() {
         ..blank()
     };
     let (mut tower, id) = scheduled(1, Some(s));
+    // The reach exists only in the plain SCAN profile.
     let mut d = ElevatorDispatch::new();
+    d.profile = Some(DispatchRules::plain_scan());
     run(&mut d, &mut tower, &ElevatorCalls::default(), 60, WEEKDAY);
     assert!(near(shaft(&tower).car_positions[0], 10, 0.05));
     // Floor 15 is 5 above (held); floor 8 is 2 below (in reach).
