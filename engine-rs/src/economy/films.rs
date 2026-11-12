@@ -1,15 +1,15 @@
-//! A theatre's film (#1932, #1950). Neither mode charges a theatre each
+//! A theater's film (#1932, #1950). Neither mode charges a theater each
 //! period. The player pays to show a film, the film ages until its draw is
 //! spent, and the mode's [`FilmRules`] say what each film costs, how long
 //! it draws, and what it earns.
 //!
 //! Classic follows SimTower: a new film or a cheaper classic, a run of six
-//! days at full draw and three fading, and a theatre whose new film draws a
+//! days at full draw and three fading, and a theater whose new film draws a
 //! full house fills the crowd's and the traffic model's blockbuster slots.
 //!
 //! Modern offers a revival, a feature or a blockbuster, each film draws for
 //! 28 days and fades for 14, its income follows its tier and its age, and a
-//! theatre books its chosen film again the morning the old one is spent
+//! theater books its chosen film again the morning the old one is spent
 //! (`film_policy`, unless the player switched that off).
 
 use serde::Serialize;
@@ -31,7 +31,7 @@ pub const CLASSIC_FILM_PRICE: f64 = 150_000.0;
 pub const MODERN_REVIVAL_PRICE: f64 = 60_000.0;
 pub const MODERN_FEATURE_PRICE: f64 = 120_000.0;
 pub const MODERN_BLOCKBUSTER_PRICE: f64 = 300_000.0;
-/// What a theatre showing a blockbuster earns, against a feature's 1.
+/// What a theater showing a blockbuster earns, against a feature's 1.
 pub const BLOCKBUSTER_INCOME_MULT: f64 = 2.2;
 /// What a Modern revival earns at full draw, against a feature's 1.
 pub const REVIVAL_INCOME_MULT: f64 = 0.6;
@@ -43,7 +43,7 @@ pub const SPENT_INCOME_SHARE: f64 = 0.25;
 pub const MODERN_FULL_DRAW_DAYS: i64 = 28;
 pub const MODERN_SPENT_DAYS: i64 = 42;
 
-/// A film a theatre can show. Classic calls `New` a new film and `Classic` a
+/// A film a theater can show. Classic calls `New` a new film and `Classic` a
 /// classic; Modern calls them a feature and a revival, and adds `Blockbuster`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum FilmTier {
@@ -65,7 +65,7 @@ impl FilmTier {
         }
     }
 
-    /// The film a theatre's saved flags say it shows.
+    /// The film a theater's saved flags say it shows.
     pub fn showing(extras: &Extras) -> FilmTier {
         if extras.film_classic {
             FilmTier::Classic
@@ -144,8 +144,8 @@ pub struct FilmOffer {
     pub income_mult: f64,
 }
 
-/// A choice on a Modern theatre's Auto-rebook button: the policy the save
-/// stores, and the film it books again once the theatre's film is spent, or
+/// A choice on a Modern theater's Auto-rebook button: the policy the save
+/// stores, and the film it books again once the theater's film is spent, or
 /// none where the player switched rebooking off (#1950).
 #[derive(Clone, Copy, Debug, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -167,13 +167,13 @@ pub struct FilmRules {
     /// The tier whose film fills the blockbuster slots at full draw.
     pub blockbuster_tier: FilmTier,
     /// The Auto-rebook choices, in the order the button cycles through
-    /// them, where a theatre books its policy's film again once its film is
+    /// them, where a theater books its policy's film again once its film is
     /// spent (Modern); empty where it never does (Classic).
     pub rebooks: &'static [FilmRebook],
-    /// The choice a theatre with no policy, or an unlisted one (an old
+    /// The choice a theater with no policy, or an unlisted one (an old
     /// save's "auto"), rebooks by.
     pub rebook_default: Option<&'static str>,
-    /// Whether a theatre's income follows its film's tier and age (Modern).
+    /// Whether a theater's income follows its film's tier and age (Modern).
     /// Classic earns the blockbuster multiplier in a blockbuster slot only.
     pub income_follows_film: bool,
 }
@@ -184,7 +184,7 @@ impl FilmRules {
         self.offers.iter().find(|o| o.tier == tier)
     }
 
-    /// The film a theatre with `policy` books again once its film is spent,
+    /// The film a theater with `policy` books again once its film is spent,
     /// or `None` where it books none: rebooking is off, or the mode never
     /// rebooks.
     pub fn rebooked(&self, policy: Option<&str>) -> Option<FilmTier> {
@@ -311,7 +311,7 @@ impl FilmRefusal {
     }
 }
 
-/// The tier a theatre shows and the days it has shown.
+/// The tier a theater shows and the days it has shown.
 fn showing(u: &Unit) -> (FilmTier, i64) {
     let extras = u.extras();
     (
@@ -320,7 +320,7 @@ fn showing(u: &Unit) -> (FilmTier, i64) {
     )
 }
 
-/// Whether a theatre's film fills a blockbuster slot tonight: the mode's
+/// Whether a theater's film fills a blockbuster slot tonight: the mode's
 /// blockbuster film at full draw.
 pub(crate) fn fills_blockbuster_slot(mode: GameMode, u: &Unit) -> bool {
     let films = mode.films();
@@ -328,13 +328,13 @@ pub(crate) fn fills_blockbuster_slot(mode: GameMode, u: &Unit) -> bool {
     tier == films.blockbuster_tier && films.run.stage(days) == FilmStage::Full
 }
 
-/// The census draw of a theatre's film tonight.
+/// The census draw of a theater's film tonight.
 pub(crate) fn audience_draw(mode: GameMode, u: &Unit) -> i64 {
     let (tier, days) = showing(u);
     mode.films().run.draw(days, tier)
 }
 
-/// What a theatre's film multiplies its ticket income by. `in_slot` is
+/// What a theater's film multiplies its ticket income by. `in_slot` is
 /// whether it holds a blockbuster slot, which is all Classic reads.
 pub(crate) fn film_income_mult(mode: GameMode, u: &Unit, in_slot: bool) -> f64 {
     let films = mode.films();
@@ -402,9 +402,9 @@ impl Simulation {
         Ok(cost)
     }
 
-    /// Where the mode rebooks spent films (Modern), each open theatre whose
+    /// Where the mode rebooks spent films (Modern), each open theater whose
     /// film is spent books its policy's film again. Runs after the day's
-    /// rollover, so the spent film's last night is counted first. A theatre
+    /// rollover, so the spent film's last night is counted first. A theater
     /// that cannot pay keeps its spent film, and the log says so on the
     /// morning the film is spent.
     pub fn rebook_spent_films(&mut self) {

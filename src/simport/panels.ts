@@ -140,7 +140,7 @@ export interface UnitDetail {
   readonly blockbuster: boolean | null;
   /** The mornings a theatre's film has shown; null off a cinema (#1932). */
   readonly filmDays: number | null;
-  /** The film a theatre shows; null off a cinema (#1950). */
+  /** The film a theater shows; null off a cinema (#1950). */
   readonly filmTier: FilmTier | null;
 }
 

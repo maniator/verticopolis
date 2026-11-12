@@ -288,7 +288,7 @@ fn booked_blockbusters_survive_a_reload() {
     lay(&mut sim, Kind::Floor, 3);
     assert!(sim.tower.place(Kind::Cinema, 2, 0).ok);
     sim.tick(24.0 * 60.0);
-    let cinema = sim.tower.unit_at(2, 0).expect("the theatre").id;
+    let cinema = sim.tower.unit_at(2, 0).expect("the theater").id;
     sim.change_film(cinema, FilmTier::Blockbuster)
         .expect("a blockbuster");
     assert!(!sim.blockbusters.is_empty());

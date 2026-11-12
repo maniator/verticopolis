@@ -306,7 +306,7 @@ pub(crate) fn assemble(
         .map(|v| v.as_bool().unwrap_or(false));
     sim.tower.reindex();
     if mode == GameMode::Modern {
-        // A Modern save from before #1950 lists the theatres that booked a
+        // A Modern save from before #1950 lists the theaters that booked a
         // blockbuster this month and carries no film tier: those keep
         // their blockbuster (a later save lists only blockbusters at full
         // draw, which carry the tier already).

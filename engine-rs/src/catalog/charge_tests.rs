@@ -223,7 +223,7 @@ fn film_and_dj_bookings_follow_the_quote() {
                 }
             };
             let cinema_overhead = overhead(entry(&c, "cinema"));
-            // No mode charges a theatre for its film each period (#1950),
+            // No mode charges a theater for its film each period (#1950),
             // whatever film it books again.
             for policy in ["feature", "blockbuster", "revival", "off"] {
                 assert_eq!(sim.set_film_policy(cinema, policy), Some(policy));

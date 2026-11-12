@@ -1,5 +1,5 @@
 import { isElevatorKind, isHotelKind } from "../presentation/viewKinds";
-import { catalogFacility, catalogFilmRebook } from "../catalog/catalogTypes";
+import { catalogFacility, catalogFilmRebook, filmEditAction } from "../catalog/catalogTypes";
 import { priceOptionsFor } from "../ui/catalogPricing";
 import type { FacilityKind } from "../shared/types";
 import type { BatchRentResult } from "../shared/engineTypes";
@@ -7,7 +7,6 @@ import type { UI } from "../ui/UI";
 import type { AudioEngine } from "../audio/Audio";
 import type { BuildActions } from "./buildActions";
 import type { EnginePort } from "../simport/enginePort";
-import type { FilmTier } from "../simport/commands";
 import { outcome, type PortCodes } from "../simport/portCodes";
 import { clockOf } from "../simport/headerClock";
 import { scheduleDialogUX } from "../ui/scheduleDialogRules";
@@ -17,8 +16,6 @@ import { groupDigits } from "../ui/format";
 import { INVALID_COMMAND, MAX_TEXT, NOT_ENOUGH_MONEY } from "../simport/request";
 import { BATCH_COUNTERS, batchTargetCode, type CardKit } from "./cardKit";
 
-/** The card's film buttons and the film each shows (`data-edit="<key>Film"`). */
-const FILM_ACTIONS: Readonly<Record<string, FilmTier>> = { newFilm: "new", classicFilm: "classic", blockbusterFilm: "blockbuster" };
 
 /**
  * The editor-card actions: everything the selected facility's buttons can do
@@ -280,13 +277,12 @@ export class EditorActions {
       extendUp: "Extend",
       extendDown: "Extend",
       filmPolicy: "Film policy",
-      newFilm: "Film change",
-      classicFilm: "Film change",
-      blockbusterFilm: "Film change",
       changeVariety: "Change variety",
       batchKind: "Edit",
     };
-    this.deps.captureUndo(UNDO_LABELS[action] ?? "Edit");
+    // The film a film button shows, by the catalog's films (#1950).
+    const film = kit.catalog().economy.films.find((f) => filmEditAction(f.key) === action);
+    this.deps.captureUndo(UNDO_LABELS[action] ?? (film ? "Film change" : "Edit"));
     if (selected.type === "unit") {
       const u = kit.cards.unit(selected.id);
       if (!u) return this.deps.clearSelection();
@@ -341,9 +337,9 @@ export class EditorActions {
           this.deps.refreshEditor();
         }
       } else if (action === "filmPolicy") {
-        // The film a Modern theatre books again once its film is spent
+        // The film a Modern theater books again once its film is spent
         // (#1950): the button steps through the catalog's choices, from the
-        // one the theatre follows now.
+        // one the theater follows now.
         const catalog = kit.catalog();
         const order = catalog.economy.filmRebooks;
         const now = catalogFilmRebook(catalog, u.filmPolicy);
@@ -353,11 +349,10 @@ export class EditorActions {
           this.deps.audio.sfx("click");
           this.deps.refreshEditor();
         }
-      } else if (Object.prototype.hasOwnProperty.call(FILM_ACTIONS, action)) {
+      } else if (film) {
         // Showing a film (#1932, #1950): the engine charges the price and
         // starts the film; a payment is no edit, so no undo step holds it.
-        const tier = FILM_ACTIONS[action];
-        const rec = engine.changeFilm(u.id, codes.code("filmTiers", tier));
+        const rec = engine.changeFilm(u.id, codes.code("filmTiers", film.key));
         const res = outcome(engine, rec);
         if (!res.ok) {
           const cost = codes.slot(rec, "changeFilm", "cost");
@@ -367,9 +362,8 @@ export class EditorActions {
               : "That film can't be shown now.",
           );
         }
-        const film = kit.catalog().economy.films.find((f) => f.key === tier)?.label ?? "film";
         this.deps.audio.sfx("build");
-        this.deps.announce(`Now showing: a ${film.toLowerCase()}.`);
+        this.deps.announce(`Now showing: a ${film.label.toLowerCase()}.`);
         this.deps.refreshEditor();
       } else if (action === "changeVariety") {
         // Canon retail reroll: picks a §7 name different from the current

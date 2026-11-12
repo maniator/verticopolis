@@ -84,7 +84,7 @@ impl Simulation {
             blockbuster,
         } = self.card_flags(id)?;
         let u = self.tower.get_unit(id)?;
-        // A theatre's film: the mornings it has shown, and its tier (#1932,
+        // A theater's film: the mornings it has shown, and its tier (#1932,
         // #1950); null on any other kind.
         let film = (u.kind == Kind::Cinema).then(|| u.extras());
         Some(json!({

@@ -128,15 +128,15 @@ pub struct Economy {
     pub garbage_collect_hour: f64,
     /// The paid exterminator's fees, or null where the mode has none.
     pub exterminator: Option<ExterminatorFees>,
-    /// The films a theatre can show, with their prices, in the order the
-    /// card lists them (#1932, #1950). No theatre pays anything each period.
+    /// The films a theater can show, with their prices, in the order the
+    /// card lists them (#1932, #1950). No theater pays anything each period.
     pub films: &'static [FilmOffer],
     /// The Auto-rebook choices, in the order the card's button cycles
-    /// through them: each policy and the film a theatre with it books again
-    /// once its film is spent (#1950). Empty where no theatre rebooks.
+    /// through them: each policy and the film a theater with it books again
+    /// once its film is spent (#1950). Empty where no theater rebooks.
     pub film_rebooks: &'static [FilmRebook],
-    /// The policy a theatre with none, or an old save's "auto", rebooks by,
-    /// or null where no theatre rebooks.
+    /// The policy a theater with none, or an old save's "auto", rebooks by,
+    /// or null where no theater rebooks.
     pub film_rebook_default: Option<&'static str>,
     /// Whether the player can switch automatic bridging off. When false,
     /// bridging is always on. When true, a tower starts bridged unless it

@@ -137,8 +137,8 @@ impl GameMode {
         }
     }
 
-    /// The films a theatre can show, their prices and run, and how they earn
-    /// (#1932, #1950). Neither mode charges a theatre each period: Classic
+    /// The films a theater can show, their prices and run, and how they earn
+    /// (#1932, #1950). Neither mode charges a theater each period: Classic
     /// shows a new film or a classic when ticket sales fall, as SimTower
     /// does, and Modern books a revival, a feature or a blockbuster and books
     /// it again when it is spent.

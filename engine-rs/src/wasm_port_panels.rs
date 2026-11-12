@@ -58,7 +58,7 @@ pub(crate) const VACATE_REASONS: [&str; 9] = [
 /// `unitCard`'s slots. NaN marks a field the unit does not carry (a code
 /// with no value, a count only some kinds keep, a cinema's booking and film
 /// on any other kind); the flags are 0 or 1. `filmDays` is the mornings a
-/// theatre's film has shown and `filmTier` its film by code (`filmTiers`,
+/// theater's film has shown and `filmTier` its film by code (`filmTiers`,
 /// #1932, #1950). The
 /// label and subtype come from `unitLabel` and `unitSubtype`.
 pub(crate) const UNIT_CARD: [&str; 22] = [

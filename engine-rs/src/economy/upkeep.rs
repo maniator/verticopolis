@@ -20,7 +20,7 @@ use crate::tower::UnitState;
 
 #[doc(hidden)]
 impl Simulation {
-    /// `payMaintenance`: the per-period upkeep. A theatre's film is paid
+    /// `payMaintenance`: the per-period upkeep. A theater's film is paid
     /// for when it is shown (`change_film`), never each period (#1950).
     pub fn pay_maintenance(&mut self) {
         let mut cost = 0.0;
@@ -121,7 +121,7 @@ impl Simulation {
         let ended_weekend = self.clock.is_weekend_on(self.clock.day() - 1);
         // Rooms only: the tower's floor tiles never carry a venue.
         let rooms = self.tower.room_index();
-        // The theatres whose film fills a blockbuster slot tonight.
+        // The theaters whose film fills a blockbuster slot tonight.
         let mode = self.tower.mode;
         let mut full_houses: Vec<f64> = Vec::new();
         for &i in rooms.iter() {

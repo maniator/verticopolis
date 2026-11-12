@@ -9,7 +9,7 @@ import type { CalendarKind } from "../shared/engineTypes";
 import type { FacilityCategory, FacilityKind, GameMode } from "../shared/types";
 import type { FilmPolicy, FilmTier } from "../simport/commands";
 
-/** A film a theatre can show, as the catalog publishes it (#1950). */
+/** A film a theater can show, as the catalog publishes it (#1950). */
 export interface CatalogFilm {
   readonly key: FilmTier;
   /** What the card calls it ("New film", "Feature", ...). */
@@ -18,8 +18,8 @@ export interface CatalogFilm {
   readonly price: number;
 }
 
-/** An Auto-rebook choice for a Modern theatre (#1950): the policy the save
- *  stores, and the film it books again once the theatre's film is spent, or
+/** An Auto-rebook choice for a Modern theater (#1950): the policy the save
+ *  stores, and the film it books again once the theater's film is spent, or
  *  null where rebooking is off. */
 export interface CatalogFilmRebook {
   readonly policy: FilmPolicy;
@@ -98,14 +98,14 @@ export interface CatalogEconomy {
   readonly garbageCollectHour: number;
   /** The paid exterminator's fees, or null where the mode has none. */
   readonly exterminator: { readonly calloutFee: number; readonly perRoomFee: number } | null;
-  /** The films a theatre can show, with their prices, in the order the card
-   *  lists them (#1932, #1950). No theatre pays anything each period. */
+  /** The films a theater can show, with their prices, in the order the card
+   *  lists them (#1932, #1950). No theater pays anything each period. */
   readonly films: readonly CatalogFilm[];
   /** The Auto-rebook choices, in the order the card's button cycles through
-   *  them (#1950); empty where no theatre rebooks (Classic). */
+   *  them (#1950); empty where no theater rebooks (Classic). */
   readonly filmRebooks: readonly CatalogFilmRebook[];
-  /** The policy a theatre with none, or an old save's "auto", rebooks by,
-   *  or null where no theatre rebooks. */
+  /** The policy a theater with none, or an old save's "auto", rebooks by,
+   *  or null where no theater rebooks. */
   readonly filmRebookDefault: FilmPolicy | null;
   /** Whether the player can switch automatic bridging off. When false,
    *  bridging is always on. When true, a tower starts bridged unless it was
@@ -323,9 +323,14 @@ export function catalogTileCost(catalog: Catalog, kind: FacilityKind, ground: Ti
   return f.paysForFloor && ground === "no floor yet" ? f.cost + catalogFacility(catalog, "floor").cost : f.cost;
 }
 
-/** The Auto-rebook choice a theatre with `policy` follows: its own where the
+/** The editor card's action for showing a `key` film (`data-edit`). */
+export function filmEditAction(key: FilmTier): string {
+  return `${key}Film`;
+}
+
+/** The Auto-rebook choice a theater with `policy` follows: its own where the
  *  catalog lists it, otherwise the mode's default (no policy, or an old
- *  save's "auto"). Null where no theatre rebooks (#1950). */
+ *  save's "auto"). Null where no theater rebooks (#1950). */
 export function catalogFilmRebook(catalog: Catalog, policy: FilmPolicy | null | undefined): CatalogFilmRebook | null {
   const { filmRebooks, filmRebookDefault } = catalog.economy;
   const listed = (p: FilmPolicy | null | undefined) => filmRebooks.find((r) => r.policy === p);

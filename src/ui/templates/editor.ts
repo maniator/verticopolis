@@ -2,7 +2,7 @@ import { html, nothing, type TemplateResult } from "lit-html";
 import { keyed } from "lit-html/directives/keyed.js";
 import { isOperational, isTenanted } from "../../shared/unitState";
 import { isCommercialKind, isHotelKind } from "../../presentation/viewKinds";
-import { catalogFacility, catalogFilmRebook, catalogHouseholdPrice, catalogOpenAt, catalogResidents, rungFor, type Catalog } from "../../catalog/catalogTypes";
+import { catalogFacility, catalogFilmRebook, filmEditAction, catalogHouseholdPrice, catalogOpenAt, catalogResidents, rungFor, type Catalog } from "../../catalog/catalogTypes";
 import type { TransportDetail, UnitDetail } from "../../simport/panels";
 import { priceOptionsFor } from "../catalogPricing";
 import { hasAccessDiagnostic } from "../../game/cardLines";
@@ -125,7 +125,7 @@ export function unitEditorTemplate(
       : `$${groupDigits(u.kind === "condo" ? catalogHouseholdPrice(catalog, u.price, u.residents) : u.price)}${isHotelKind(u.kind) ? "/night" : ""}`;
     rows.push(kv(label, rent, "rent"));
   }
-  // A theatre shows one film, and the player pays to show another; the
+  // A theater shows one film, and the player pays to show another; the
   // catalog lists the mode's films and their prices (#1932, #1950).
   const { films } = catalog.economy;
   if (u.kind === "cinema" && isOperational(u)) {
@@ -194,13 +194,13 @@ export function unitEditorTemplate(
       edRow(html`<button class="btn" data-edit="batchKind">Set all ${f.name.toLowerCase()}s…</button>`),
     );
   }
-  // Only an open theatre shows a film (the engine refuses the others).
+  // Only an open theater shows a film (the engine refuses the others).
   if (u.kind === "cinema" && isOperational(u)) {
     actions.push(
-      edRow(html`${films.map((film) => html`<button class="btn" data-edit=${`${film.key}Film`}>${film.label} ($${groupDigits(film.price)})</button>`)}`),
+      edRow(html`${films.map((film) => html`<button class="btn" data-edit=${filmEditAction(film.key)}>${film.label} ($${groupDigits(film.price)})</button>`)}`),
     );
   }
-  // The film the theatre books again once its film is spent (#1950), where
+  // The film the theater books again once its film is spent (#1950), where
   // the mode rebooks.
   const rebook = u.kind === "cinema" ? catalogFilmRebook(catalog, u.filmPolicy) : null;
   if (rebook) {

@@ -5,8 +5,8 @@ import { PortSim, describeEngines, type Leg } from "../portKit/portSim";
 /** The cinema's film booking (FAQ), on the engine. Moved from
  *  faqComplete.integration.test.ts, where it ran on the sampled v1 model to
  *  stay inside the CI timeout; the engine runs the hourly model only. No mode
- *  charges a theatre each period: the player pays to show a film (#1932), and
- *  a Modern theatre books its policy's film again once its film is spent
+ *  charges a theater each period: the player pays to show a film (#1932), and
+ *  a Modern theater books its policy's film again once its film is spent
  *  (#1950). */
 
 const W = LOT_WIDTH;
@@ -61,7 +61,7 @@ describeEngines("Cinema film booking (FAQ)", (leg: Leg) => {
  *  engine's unit card answers whether the cinema holds a blockbuster slot. */
 describeEngines("Cinema film policy (economy depth #5)", (leg: Leg) => {
   const MONTH = 60 * 24 * 31;
-  /** Past a Modern film's run: the feature a theatre opens with is spent and
+  /** Past a Modern film's run: the feature a theater opens with is spent and
    *  booked again by the policy. */
   const RUN = 60 * 24 * 43;
 

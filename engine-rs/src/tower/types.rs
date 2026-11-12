@@ -100,7 +100,7 @@ pub struct Extras {
     /// Whether a theatre shows a classic film, whose draw never climbs past
     /// a fading film's (#1932). Modern calls it a revival.
     pub film_classic: bool,
-    /// Whether a Modern theatre shows a blockbuster (#1950).
+    /// Whether a Modern theater shows a blockbuster (#1950).
     pub film_blockbuster: bool,
     pub patronage_today: Option<f64>,
     pub patronage_yest: Option<f64>,

@@ -32,7 +32,7 @@ pub(crate) const STATUS: usize = 0;
 pub(crate) const DELTA: usize = 1;
 
 /// The film policies by code, as `setFilm` takes them: the film a Modern
-/// theatre books again once its film is spent, or "off" (#1950).
+/// theater books again once its film is spent, or "off" (#1950).
 pub(crate) const FILM_POLICIES: [&str; 5] = ["auto", "feature", "blockbuster", "revival", "off"];
 
 /// The onboarding facts by bit, as `onboarding()` packs them.
@@ -330,7 +330,7 @@ impl Engine {
         }
     }
 
-    /// Show a film of tier `tier` (by code, `filmTiers`) at theatre `id`,
+    /// Show a film of tier `tier` (by code, `filmTiers`) at theater `id`,
     /// with the price paid. A refusal for want of funds is "funds" and
     /// carries the price; the others carry 0.
     pub(crate) fn port_change_film(&mut self, id: f64, tier: f64) -> Vec<f64> {

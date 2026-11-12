@@ -577,7 +577,7 @@ describe.skipIf(noEngine)("EditorActions (dialogs, extend billing, per-kind butt
   it("filmPolicy cycles a Modern cinema's rebooking from a feature to blockbuster, off, revival and back", async () => {
     sel = { type: "unit", id: cinema.id };
     render(unitEditor(sim, cinema), root);
-    // This suite's tower is Classic, whose theatres never rebook: the button
+    // This suite's tower is Classic, whose theaters never rebook: the button
     // leaves the policy alone there.
     await editor.handleEditAction("filmPolicy", root);
     expect(unitOf(sim, cinema.id)!.filmPolicy).toBeUndefined();

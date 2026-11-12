@@ -1,7 +1,7 @@
 //! Modern's films (#1950): a revival, a feature or a blockbuster bought one
 //! at a time, a 28-day run at full draw and 14 fading, income that follows
-//! the film's tier and age, and a theatre that books its chosen film again
-//! the morning its film is spent. No mode charges a theatre each period.
+//! the film's tier and age, and a theater that books its chosen film again
+//! the morning its film is spent. No mode charges a theater each period.
 
 use super::films_tests::{counts, film_days, theatre};
 use super::{
@@ -143,7 +143,40 @@ fn a_spent_film_is_booked_again_after_its_last_night_is_counted() {
 }
 
 #[test]
-fn a_theatre_with_no_policy_rebooks_a_feature_and_off_keeps_its_spent_film() {
+fn the_day_loop_rebooks_on_the_morning_the_film_is_spent_after_counting_its_last_night() {
+    // Through the day loop rather than the helper above: the rollover counts
+    // the old film's last night, then the same morning books the new film.
+    let (mut sim, cinema, _) = theatre(GameMode::Modern);
+    sim.star = 1; // no fires: the theater stays open through the run
+    sim.change_film(cinema, FilmTier::New).unwrap();
+    set_days(&mut sim, cinema, MODERN_SPENT_DAYS - 3);
+    let mut mornings: Vec<(u8, Option<u8>)> = Vec::new();
+    for _ in 0..5 {
+        sim.tick(60.0 * 24.0);
+        let u = sim.tower.get_unit(cinema).unwrap();
+        mornings.push((u.visitors_yest.unwrap_or(0), u.extras().film_days));
+    }
+    let rebooked = mornings
+        .iter()
+        .position(|&(_, days)| days == Some(0))
+        .expect("a morning that books the new film");
+    assert_eq!(
+        mornings[rebooked].0, 80,
+        "the old film's last night: {mornings:?}"
+    );
+    assert_eq!(
+        mornings[rebooked + 1],
+        (120, Some(1)),
+        "the new film's first night: {mornings:?}"
+    );
+    assert!(sim
+        .log
+        .iter()
+        .any(|e| e.text.contains("A feature opens at the movie theater")));
+}
+
+#[test]
+fn a_theater_with_no_policy_rebooks_a_feature_and_off_keeps_its_spent_film() {
     for (policy, rebooked) in [(None, true), (Some("auto"), true), (Some("off"), false)] {
         let (mut sim, cinema, _) = theatre(GameMode::Modern);
         sim.change_film(cinema, FilmTier::Classic).unwrap();
@@ -167,13 +200,13 @@ fn a_theatre_with_no_policy_rebooks_a_feature_and_off_keeps_its_spent_film() {
 }
 
 #[test]
-fn a_closed_or_unaffordable_theatre_books_nothing_and_says_so_once() {
+fn a_closed_or_unaffordable_theater_books_nothing_and_says_so_once() {
     let (mut sim, cinema, _) = theatre(GameMode::Modern);
     set_days(&mut sim, cinema, MODERN_SPENT_DAYS);
     sim.tower.get_unit_mut(cinema).unwrap().state = UnitState::Gutted;
     let before = sim.money;
     sim.rebook_spent_films();
-    assert_eq!(sim.money, before, "a closed theatre books nothing");
+    assert_eq!(sim.money, before, "a closed theater books nothing");
     sim.tower.get_unit_mut(cinema).unwrap().state = UnitState::Empty;
     set_days(&mut sim, cinema, MODERN_SPENT_DAYS - 1);
     sim.money = MODERN_FEATURE_PRICE - 1.0;
@@ -195,7 +228,7 @@ fn a_closed_or_unaffordable_theatre_books_nothing_and_says_so_once() {
 }
 
 #[test]
-fn no_mode_charges_a_theatre_each_period() {
+fn no_mode_charges_a_theater_each_period() {
     for mode in [GameMode::Classic, GameMode::Modern] {
         let (mut sim, cinema, _) = theatre(mode);
         sim.tower.get_unit_mut(cinema).unwrap().state = UnitState::Gutted;
@@ -210,7 +243,7 @@ fn no_mode_charges_a_theatre_each_period() {
         assert_eq!(
             before - sim.money,
             without + crate::jsmath::round(overhead * scale),
-            "{mode:?}: an open theatre adds only the overhead"
+            "{mode:?}: an open theater adds only the overhead"
         );
     }
 }
@@ -264,4 +297,25 @@ fn each_rebook_choice_names_an_offered_film_and_a_policy_the_save_takes() {
     assert_eq!(films.rebooked(None), Some(FilmTier::New));
     assert!(GameMode::Classic.films().rebooks.is_empty());
     assert_eq!(GameMode::Classic.films().rebooked(None), None);
+}
+
+#[test]
+fn a_gutted_theater_drops_its_blockbuster() {
+    // A theater that burns down shows no film: a rebuilt one opens with a
+    // feature, so the gutted shell keeps no blockbuster on its card or save.
+    let (mut sim, cinema, _) = theatre(GameMode::Modern);
+    sim.change_film(cinema, FilmTier::Blockbuster).unwrap();
+    let (u, at) = sim.tower.marked_by_id(cinema).unwrap();
+    u.set_state(at, UnitState::Fire);
+    sim.events.active.insert(cinema);
+    sim.events.pending = Some(crate::events::PendingChoice {
+        kind: "fireRescue",
+        cost: 0.0,
+        message: String::new(),
+    });
+    sim.resolve_choice(true);
+    let u = sim.tower.get_unit(cinema).unwrap();
+    assert_eq!(u.state, UnitState::Gutted);
+    assert!(!u.extras().film_blockbuster);
+    assert_eq!(tier(&sim, cinema), FilmTier::New);
 }
