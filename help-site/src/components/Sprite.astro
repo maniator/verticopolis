@@ -19,9 +19,11 @@ interface Props {
   span?: number;
   /** A smaller picture, for a row of variants. */
   small?: boolean;
+  /** An anchor, for a room with no fact box of its own (links name it as `#kind`). */
+  id?: string;
 }
 
-const { kind, caption, state, subtype, floor, occupants, span, small = false } = Astro.props;
+const { kind, caption, state, subtype, floor, occupants, span, small = false, id } = Astro.props;
 const { modern } = await facility(kind);
 const floors = span !== undefined ? span + 1 : (modern.floors ?? 1);
 // The tallest whole magnification that keeps the picture under a set height,
@@ -33,7 +35,7 @@ const label = caption ?? (subtype ? `${modern.name}: ${subtype}` : modern.name);
 const catalogUrl = `${import.meta.env.BASE_URL.replace(/\/$/, "")}/catalog.json`;
 ---
 
-<figure class:list={["vc-sprite", { "vc-sprite-small": small }]}>
+<figure id={id} class:list={["vc-sprite", { "vc-sprite-small": small }]}>
   <canvas
     data-sprite={kind}
     data-state={state}

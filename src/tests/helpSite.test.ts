@@ -50,14 +50,18 @@ describe("the side menu", () => {
     const pages = readdirSync(pagesDir, { recursive: true, encoding: "utf8" })
       .filter((f) => /\.mdx?$/.test(f) && f !== "index.md")
       .map((f) => f.replace(/\.mdx?$/, "").replace(/\/index$/, ""));
-    for (const page of pages) expect(slugs.has(page), page).toBe(true);
+    // The old guide pages still feed the in-game guide until it gives way to
+    // this site later in #2053; they are off the menu already.
+    const leaving = new Set(["getting-started", "going-further", "phones", "keyboard"]);
+    for (const page of pages) if (!leaving.has(page)) expect(slugs.has(page), page).toBe(true);
   });
 
-  it("climbs out of the site's base for the pages the game serves", () => {
-    // Starlight puts the base in front of a link that starts with a slash.
+  it("links the front page and the release notes inside the site, and no game page", () => {
+    // Starlight puts the base in front of a link that starts with a slash, so
+    // these stay under /help (the sprite gallery is no longer linked, #2053).
     const links = flatten(sidebar).flatMap((entry) => ("link" in entry ? [entry.link] : []));
     const served = links.filter((l) => l.startsWith("/")).map((l) => new URL(HELP_BASE + l, "https://x.test").pathname);
-    expect(served).toEqual(["/help/", "/help/changelog/", "/gallery"]);
+    expect(served).toEqual(["/help/", "/help/changelog/"]);
   });
 });
 
@@ -144,5 +148,18 @@ describe("the help site's cache headers", () => {
     ]) {
       expect(immutable(path), path).toBe(false);
     }
+  });
+});
+
+describe("the link check", () => {
+  it("finds a link to a missing page or a missing section, and passes the rest", async () => {
+    const { brokenLinks, servedPath } = await import("../../help-site/scripts/check-links.mjs");
+    expect(servedPath("rooms/venues/index.html")).toBe("/help/rooms/venues/");
+    expect(servedPath("index.html")).toBe("/help/");
+    const pages = new Map([
+      ["/help/", '<a href="/help/rooms/#spa">ok</a><a href="/help/rooms/#nope">x</a><a href="/help/gone/">x</a>'],
+      ["/help/rooms/", '<h2 id="spa">Spa</h2><a href="/help/">home</a><a href="/help/catalog.json">data</a><a href="https://example.com/">out</a>'],
+    ]);
+    expect(brokenLinks(pages)).toEqual(["/help/ → /help/rooms/#nope (no such section)", "/help/ → /help/gone/ (no such page)"]);
   });
 });

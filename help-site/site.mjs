@@ -35,13 +35,16 @@ export const sharedHead = [
 /** Starlight's sidebar. A `slug` entry takes its label from the page's title.
  *  Starlight puts the site's base (/help) in front of every `link` that starts
  *  with a slash, so the release notes page (src/pages/changelog.astro) is
- *  "/changelog/", and the gallery, outside /help, climbs out of it
- *  ("/help/../gallery" is /gallery). */
+ *  "/changelog/". */
 export const sidebar = [
   { label: "How to Play", link: "/" },
   {
     label: "Getting started",
-    items: [{ slug: "getting-started" }, { slug: "classic-vs-modern" }, { slug: "phones" }, { slug: "keyboard" }],
+    items: [{ slug: "first-tower" }, { slug: "classic-vs-modern" }, { slug: "controls" }],
+  },
+  {
+    label: "Your towers",
+    items: [{ slug: "your-towers/saving" }, { slug: "your-towers/installing" }, { slug: "your-towers/settings" }],
   },
   {
     label: "Rooms",
@@ -79,14 +82,9 @@ export const sidebar = [
     ],
   },
   {
-    label: "Guides",
-    items: [{ slug: "going-further" }],
-  },
-  {
     label: "More",
     items: [
       { label: "Release notes", link: "/changelog/" },
-      { label: "Sprite gallery", link: "/../gallery" },
       { label: "Engine docs", link: ENGINE_DOCS, attrs: { target: "_blank", rel: "noopener noreferrer" } },
       { label: "Report a problem", link: GITHUB_ISSUES, attrs: { target: "_blank", rel: "noopener noreferrer" } },
       { slug: "privacy" },

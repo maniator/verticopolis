@@ -75,10 +75,14 @@ jobs:
       - name: Check the pages
         run: |
           grep -q 'class="title-screen' dist/help/index.html || { echo "::error::the front page has no title screen"; exit 1; }
-          for page in getting-started going-further classic-vs-modern phones keyboard privacy changelog; do
+          for page in first-tower classic-vs-modern controls rooms rooms/hotels building/elevators tower/stars your-towers/saving privacy changelog; do
             file="dist/help/$page/index.html"
             test -s "$file" || { echo "::error::missing $file"; exit 1; }
             if grep -q 'class="title-screen' "$file"; then echo "::error::$file draws the title screen"; exit 1; fi
           done
           # The release notes have a section per version.
           grep -q '<section id="[0-9]' dist/help/changelog/index.html || { echo "::error::the release notes have no versions"; exit 1; }
+
+      # Every link between help pages reaches a real page, and a real section.
+      - name: Check the links
+        run: node help-site/scripts/check-links.mjs

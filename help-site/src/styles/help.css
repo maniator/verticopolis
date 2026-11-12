@@ -176,8 +176,9 @@ mobile-starlight-toc .display-current {
   border: 1px solid currentColor;
   vertical-align: 0.1em;
 }
-/* A room linked from the table lands with its fact box below the header. */
-.vc-infobox {
+/* A linked room lands with its fact box (or its picture) below the header. */
+.vc-infobox,
+.vc-sprite[id] {
   /* Leave room for the sticky bars and the room's own heading above the box. */
   scroll-margin-top: calc(var(--sl-nav-height, 4rem) + var(--sl-mobile-toc-height, 0rem) + 4rem);
 }
