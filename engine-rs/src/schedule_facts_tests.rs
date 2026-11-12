@@ -315,3 +315,18 @@ fn a_shaft_with_no_cars_has_no_homes() {
         .home_floors
         .is_empty());
 }
+
+#[test]
+fn an_unhomed_car_idles_where_dispatch_parks_it_when_no_lobby_is_served() {
+    // An express that skips its bottom floor and serves no lobby: dispatch
+    // parks car 0 at the first stop, not at the unserved bottom.
+    let geo = ShaftGeometry {
+        cars: 3,
+        bottom: 1,
+        top: 12,
+        served: vec![4, 8, 12],
+        lobbies: Vec::new(),
+    };
+    assert_eq!(served_homes(None, &geo, false), vec![4, 4, 4]);
+    assert_eq!(served_homes(None, &geo, true), vec![4, 8, 12]);
+}

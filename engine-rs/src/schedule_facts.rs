@@ -151,7 +151,10 @@ fn peak_hour(curve: Option<&[f64]>) -> usize {
 fn served_homes(draft: Option<&Schedule>, geo: &ShaftGeometry, spread: bool) -> Vec<i64> {
     let homes = draft.and_then(|d| d.home_floors.as_ref());
     let cars = geo.cars.max(0) as usize;
-    let unset = |i| idle_home(spread, &geo.served, geo.base_lobby(), i, cars);
+    // Dispatch idles an unhomed car 0 at the first served lobby, else at the
+    // first stop (`ElevatorDispatch::move_cars`).
+    let idle = geo.lobbies.first().or(geo.served.first()).copied();
+    let unset = |i| idle_home(spread, &geo.served, idle.unwrap_or(geo.bottom), i, cars);
     (0..cars)
         .map(|i| {
             homes
