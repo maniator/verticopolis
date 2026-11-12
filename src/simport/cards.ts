@@ -1,5 +1,5 @@
 import type { FacilityKind, UnitState, VacateReason } from "../shared/types";
-import type { FilmPolicy, FilmTier } from "./commands";
+import type { FilmPolicy, FilmTier, TicketPrice } from "./commands";
 import type { EnginePort } from "./enginePort";
 import type { HourlyView, OriginsView, StopRow, TransportDetail, UnitDetail } from "./panels";
 import type { ViewReader } from "./viewReader";
@@ -23,6 +23,7 @@ interface Layout {
   vacateReasons: readonly string[];
   filmPolicies: readonly string[];
   filmTiers: readonly string[];
+  ticketPrices: readonly string[];
   records: { unitCard: readonly string[]; shaftCard: readonly string[]; stopRow: readonly string[] };
 }
 
@@ -90,6 +91,7 @@ export class Cards {
       blockbuster: Number.isNaN(blockbuster) ? null : blockbuster === 1,
       filmDays: nullable(r[at.filmDays]),
       filmTier: named<FilmTier>(l.filmTiers, r[at.filmTier]),
+      ticketPrice: named<TicketPrice>(l.ticketPrices, r[at.ticketPrice]),
     };
   }
 

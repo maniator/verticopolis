@@ -54,6 +54,8 @@ export type Command =
 export type FilmPolicy = "auto" | "feature" | "blockbuster" | "revival" | "off";
 /** A film a theater can show, by its catalog key (#1932, #1950). */
 export type FilmTier = "new" | "classic" | "blockbuster";
+/** A Modern theater's ticket price step (#1950). */
+export type TicketPrice = "low" | "normal" | "high" | "premium";
 
 /** The kinds the brush lays: plain floor and lobby. */
 export type BrushKind = "floor" | "lobby";

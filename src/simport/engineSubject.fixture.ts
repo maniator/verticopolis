@@ -47,6 +47,7 @@ export const mode = (name: "classic" | "modern"): number => codeIn(VIEW_LAYOUT.m
 export const calendar = (name: "canon" | "realWorld"): number => codeIn(VIEW_LAYOUT.calendars, name);
 export const logKind = (name: string): number => VIEW_LAYOUT.logKinds.indexOf(name);
 export const filmPolicy = (name: string): number => VIEW_LAYOUT.filmPolicies.indexOf(name);
+export const ticketPrice = (name: string): number => VIEW_LAYOUT.ticketPrices.indexOf(name);
 
 /** Slot `name` of `op`'s record. */
 export function slot(op: keyof typeof VIEW_LAYOUT.records, rec: PortRecord, name: string): number {
@@ -100,7 +101,7 @@ export interface SavedTower {
   founder?: boolean;
   towerName?: string;
   view?: { tile: number; floor: number; zoom?: number };
-  units: { id: number; kind: string; floor: number; x: number; rent?: number; label?: string; noRate?: boolean; filmPolicy?: string }[];
+  units: { id: number; kind: string; floor: number; x: number; rent?: number; label?: string; noRate?: boolean; filmPolicy?: string; ticketPrice?: string }[];
   transports: { id: number; skipFloors?: number[]; schedule?: Record<string, unknown> }[];
   log?: { text: string; kind: string }[];
 }

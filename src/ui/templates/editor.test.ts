@@ -201,6 +201,20 @@ describe("unit editor row and action branches", () => {
     expect(gutted.querySelector('[data-edit="newFilm"]')).toBeNull();
   });
 
+  it("modern cinema: names the ticket price it charges, Normal when it has none (#1950)", () => {
+    const modern = { mode: "modern" as const };
+    const price = (ticketPrice: UnitDetail["ticketPrice"]) =>
+      renderToFragment(unitEditor(unit("cinema", { ticketPrice }, "modern"), modern)).querySelector('[data-edit="ticketPrice"]')!.textContent;
+    expect([null, "low", "normal", "high", "premium"].map((p) => price(p as UnitDetail["ticketPrice"]))).toEqual([
+      "Ticket price: Normal ▸",
+      "Ticket price: Low ▸",
+      "Ticket price: Normal ▸",
+      "Ticket price: High ▸",
+      "Ticket price: Premium ▸",
+    ]);
+    expect(renderToFragment(unitEditor(unit("cinema"))).querySelector('[data-edit="ticketPrice"]')).toBeNull();
+  });
+
   it("classic cinema: shows the film and its days, and offers a new film or a classic at the catalog's prices", () => {
     const economy = catalogFor("classic").economy;
     const film = (classic: boolean) => renderToFragment(unitEditor(unit("cinema", { filmDays: 4, filmTier: classic ? "classic" : "new" })));

@@ -45,6 +45,7 @@ export interface Layout {
   calendars: string[];
   filmPolicies: string[];
   filmTiers: string[];
+  ticketPrices: string[];
   vacateReasons: string[];
   logKinds: string[];
   heatModes: string[];
@@ -80,7 +81,7 @@ export function mockPort(answers: Methods = {}): EnginePort {
 }
 
 /** `name`'s code in a layout table; throws for a name the table lacks. */
-export function code(table: keyof Pick<Layout, "kinds" | "unitStates" | "personStates" | "weather" | "modes" | "calendars" | "filmPolicies" | "filmTiers" | "vacateReasons" | "heatModes" | "heatTints">, name: string): number {
+export function code(table: keyof Pick<Layout, "kinds" | "unitStates" | "personStates" | "weather" | "modes" | "calendars" | "filmPolicies" | "filmTiers" | "ticketPrices" | "vacateReasons" | "heatModes" | "heatTints">, name: string): number {
   const at = LAYOUT[table].indexOf(name);
   if (at < 0) throw new Error(`${table} has no ${name}`);
   return at;

@@ -33,6 +33,8 @@
     "nightclubDjMonthly": 40000,
     "overheadPerUnitMonthly": 0,
     "startingMoney": 2000000,
+    "ticketPriceDefault": null,
+    "ticketPrices": [],
     "transportFloorCost": 5000
   },
   "facilities": [

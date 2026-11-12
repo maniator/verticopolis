@@ -7,7 +7,7 @@
  */
 import type { CalendarKind } from "../shared/engineTypes";
 import type { FacilityCategory, FacilityKind, GameMode } from "../shared/types";
-import type { FilmPolicy, FilmTier } from "../simport/commands";
+import type { FilmPolicy, FilmTier, TicketPrice } from "../simport/commands";
 
 /** A film a theater can show, as the catalog publishes it (#1950). */
 export interface CatalogFilm {
@@ -24,6 +24,17 @@ export interface CatalogFilm {
 export interface CatalogFilmRebook {
   readonly policy: FilmPolicy;
   readonly film: FilmTier | null;
+}
+
+/** A ticket price step for a Modern theater (#1950): what it multiplies a
+ *  seat's ticket income by, and the share of the crowd's visits the theater
+ *  draws, both against Normal's 1. */
+export interface CatalogTicketPrice {
+  readonly key: TicketPrice;
+  /** What the card calls it ("Low", "Normal", ...). */
+  readonly label: string;
+  readonly incomeMult: number;
+  readonly pickMult: number;
 }
 
 /** The version of the catalog's shape. It moves when a field is added,
@@ -107,6 +118,13 @@ export interface CatalogEconomy {
   /** The policy a theater with none, or an old save's "auto", rebooks by,
    *  or null where no theater rebooks. */
   readonly filmRebookDefault: FilmPolicy | null;
+  /** A theater's ticket price steps, cheapest first, in the order the card's
+   *  button cycles through them (#1950); empty where the mode has none
+   *  (Classic). */
+  readonly ticketPrices: readonly CatalogTicketPrice[];
+  /** The step a theater with none set charges, or null where the mode has no
+   *  ticket price. */
+  readonly ticketPriceDefault: TicketPrice | null;
   /** Whether the player can switch automatic bridging off. When false,
    *  bridging is always on. When true, a tower starts bridged unless it was
    *  founded unbridged, and the live setting is per tower (the engine's
@@ -339,6 +357,15 @@ export function catalogFilmRebook(catalog: Catalog, policy: FilmPolicy | null | 
   const { filmRebooks, filmRebookDefault } = catalog.economy;
   const listed = (p: FilmPolicy | null | undefined) => filmRebooks.find((r) => r.policy === p);
   return listed(policy) ?? listed(filmRebookDefault) ?? null;
+}
+
+/** The ticket price step a theater charges: its own where the catalog lists
+ *  it, otherwise the mode's default. Null where the mode has no ticket price
+ *  (#1950). */
+export function catalogTicketPrice(catalog: Catalog, price: TicketPrice | null | undefined): CatalogTicketPrice | null {
+  const { ticketPrices, ticketPriceDefault } = catalog.economy;
+  const listed = (p: TicketPrice | null | undefined) => ticketPrices.find((t) => t.key === p);
+  return listed(price) ?? listed(ticketPriceDefault) ?? null;
 }
 
 /** Whether a facility is open in `hour` (the game hour; fractions and 24 read

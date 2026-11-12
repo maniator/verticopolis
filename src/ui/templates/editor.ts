@@ -2,7 +2,7 @@ import { html, nothing, type TemplateResult } from "lit-html";
 import { keyed } from "lit-html/directives/keyed.js";
 import { isOperational, isTenanted } from "../../shared/unitState";
 import { isCommercialKind, isHotelKind } from "../../presentation/viewKinds";
-import { catalogFacility, catalogFilmRebook, filmEditAction, catalogHouseholdPrice, catalogOpenAt, catalogResidents, rungFor, type Catalog } from "../../catalog/catalogTypes";
+import { catalogFacility, catalogFilmRebook, catalogTicketPrice, filmEditAction, catalogHouseholdPrice, catalogOpenAt, catalogResidents, rungFor, type Catalog } from "../../catalog/catalogTypes";
 import type { TransportDetail, UnitDetail } from "../../simport/panels";
 import { priceOptionsFor } from "../catalogPricing";
 import { hasAccessDiagnostic } from "../../game/cardLines";
@@ -206,6 +206,11 @@ export function unitEditorTemplate(
   if (rebook) {
     const label = films.find((film) => film.key === rebook.film)?.label ?? "Off";
     actions.push(edRow(html`<button class="btn" data-edit="filmPolicy">Auto-rebook: ${label} ▸</button>`));
+  }
+  // The theater's ticket price (#1950), where the mode has one.
+  const ticket = u.kind === "cinema" ? catalogTicketPrice(catalog, u.ticketPrice) : null;
+  if (ticket) {
+    actions.push(edRow(html`<button class="btn" data-edit="ticketPrice">Ticket price: ${ticket.label} ▸</button>`));
   }
   // Canon retail reroll: only offer on shop / fastFood / restaurant. Legacy
   // retail units without a subtype still get the button so a player can opt
