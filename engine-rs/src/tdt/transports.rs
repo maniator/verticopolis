@@ -140,17 +140,19 @@ pub fn transports_from_decoded(
         }
         let cars = e.cars.min(kind.max_cars()).max(1);
         let mut skip_floors = vec![];
+        // The floors the cars stop at, ascending, built in the same pass.
+        let mut stops = vec![bottom];
         for fl in bottom + 1..top {
             if e.serviced[(fl + TDT_FLOOR_OFFSET) as usize] == 0 {
                 skip_floors.push(fl);
+            } else {
+                stops.push(fl);
             }
         }
+        stops.push(top);
         // Each car starts on its waiting floor and returns there when idle.
         // A home the shaft does not stop at snaps to the nearest stop (the
         // lower one on a tie), as an authored home does on a stop edit.
-        let stops: Vec<i64> = (bottom..=top)
-            .filter(|f| !skip_floors.contains(f))
-            .collect();
         let car_positions: Vec<i64> = (0..cars as usize)
             .map(|i| {
                 let home = e.car_homes[i] - TDT_FLOOR_OFFSET;
