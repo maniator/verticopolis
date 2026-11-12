@@ -63,7 +63,7 @@ export function createCardKit(app: { readonly enginePort: EnginePort; readonly r
   const port = app.enginePort;
   const codes = new PortCodes(port);
   const cards = new Cards(app.enginePort, app.reader);
-  const tenantParts = createPortUnitParts(port, (id) => {
+  const tenantParts = createPortUnitParts(port, () => catalogOf(app).rules, (id) => {
     const facts = port.serviceDiagnostics(id);
     return facts ? portServiceSections(facts) : NO_SERVICE_LINES;
   });

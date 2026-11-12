@@ -1985,11 +1985,13 @@
   ],
   "rules": {
     "buildsWhilePaused": false,
+    "exportsTo1994": true,
     "previewNamesRefusal": false,
+    "quotesLobbyDistance": false,
     "scheduleAssist": false,
     "variantHouseholds": false
   },
-  "version": 11,
+  "version": 12,
   "world": {
     "groundFloor": 1,
     "groundFloorStructure": "lobby",

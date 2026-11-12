@@ -189,10 +189,10 @@ export function newTowerModal(
  *  the player clicks a choice here. The .vctower path stays primary; the 1994
  *  .TDT path is secondary and leads to its own reverse fidelity modal. */
 export function confirmExport(ui: UI): void {
-  // The 1994 .TDT path is Classic only: buildTDT refuses a Modern tower, so
-  // disable the button up front (with the reason) rather than let it fail.
-  const isModern = ui.cb.getMode() === "modern";
-  const box = ui.openModalTemplate(exportConfirmTemplate(isModern));
+  // The catalog says whether this tower can go to the 1994 .TDT format; where
+  // it cannot, the engine's export refuses it, so disable the button up front
+  // (with the reason) rather than let it fail.
+  const box = ui.openModalTemplate(exportConfirmTemplate(ui.cb.getCatalog().rules.exportsTo1994));
   ui.wireActions(box, {
     export: () => {
       ui.closeModal();

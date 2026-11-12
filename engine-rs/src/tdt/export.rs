@@ -9,6 +9,7 @@ use serde_json::Value;
 use super::encoder::{encode_tower, EncodeStats};
 use super::export_gather::{gather_tower, gather_units, ExportCounts, GatheredTower};
 use super::LegacyExportError;
+use crate::clock::GameMode;
 use crate::facilities::{MAX_FLOOR, MIN_FLOOR};
 
 /// Result of a successful export build.
@@ -42,7 +43,11 @@ pub fn build_tdt_streamed<U: Borrow<Value>>(
 }
 
 fn refuse_modern(save: &Value) -> Result<(), LegacyExportError> {
-    if save.get("mode").and_then(Value::as_str) == Some("modern") {
+    let mode = save
+        .get("mode")
+        .and_then(Value::as_str)
+        .and_then(GameMode::parse);
+    if mode.is_some_and(|m| !m.exports_to_1994()) {
         return Err(LegacyExportError(
             "This tower uses Modern rules. SimTower (1994) can only load Classic towers.".into(),
         ));

@@ -56,11 +56,15 @@ fn each_mode_states_its_rules() {
     assert!(!classic.preview_names_refusal);
     assert!(!classic.schedule_assist);
     assert!(!classic.builds_while_paused);
+    assert!(classic.exports_to_1994);
+    assert!(!classic.quotes_lobby_distance);
     let modern = catalog(GameMode::Modern).rules;
     assert!(modern.variant_households);
     assert!(modern.preview_names_refusal);
     assert!(modern.schedule_assist);
     assert!(modern.builds_while_paused);
+    assert!(!modern.exports_to_1994);
+    assert!(modern.quotes_lobby_distance);
     let v = catalog_value(GameMode::Modern);
     assert_eq!(v["rules"]["variantHouseholds"], Value::Bool(true));
     assert_eq!(v["rules"]["previewNamesRefusal"], Value::Bool(true));
@@ -68,4 +72,27 @@ fn each_mode_states_its_rules() {
     assert_eq!(v["rules"]["buildsWhilePaused"], Value::Bool(true));
     let c = catalog_value(GameMode::Classic);
     assert_eq!(c["rules"]["buildsWhilePaused"], Value::Bool(false));
+    assert_eq!(c["rules"]["exportsTo1994"], Value::Bool(true));
+    assert_eq!(c["rules"]["quotesLobbyDistance"], Value::Bool(false));
+    assert_eq!(v["rules"]["exportsTo1994"], Value::Bool(false));
+    assert_eq!(v["rules"]["quotesLobbyDistance"], Value::Bool(true));
+}
+
+/// The `.TDT` export refuses a tower exactly where the catalog says the mode
+/// cannot export for SimTower (1994).
+#[test]
+fn the_1994_export_refuses_what_the_catalog_rules_out() {
+    for mode in MODES {
+        let save = serde_json::json!({ "mode": mode.as_str(), "units": [] });
+        let refused_for_mode = match crate::tdt::export::build_tdt(&save) {
+            Ok(_) => false,
+            Err(e) => e.0.contains("Modern rules"),
+        };
+        assert_eq!(
+            refused_for_mode,
+            !catalog(mode).rules.exports_to_1994,
+            "{}",
+            mode.as_str()
+        );
+    }
 }

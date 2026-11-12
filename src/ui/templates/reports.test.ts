@@ -42,8 +42,8 @@ const exportReport = (over: Partial<ExportReport> = {}): ExportReport => ({
 });
 
 describe("exportConfirmTemplate: the .TDT gate", () => {
-  it("enables the legacy button with no title for a Classic tower", () => {
-    const frag = renderToFragment(exportConfirmTemplate(false));
+  it("enables the legacy button with no title where the tower exports to 1994 (Classic)", () => {
+    const frag = renderToFragment(exportConfirmTemplate(true));
     const legacy = frag.querySelector<HTMLButtonElement>('[data-act="legacy"]')!;
     expect(legacy.disabled).toBe(false);
     expect(legacy.hasAttribute("title")).toBe(false);
@@ -51,8 +51,8 @@ describe("exportConfirmTemplate: the .TDT gate", () => {
     expect(frag.querySelector('[data-act="export"]')!.hasAttribute("autofocus")).toBe(true);
   });
 
-  it("disables the legacy button with an explaining title for a Modern tower", () => {
-    const frag = renderToFragment(exportConfirmTemplate(true));
+  it("disables the legacy button with an explaining title where it cannot (Modern)", () => {
+    const frag = renderToFragment(exportConfirmTemplate(false));
     const legacy = frag.querySelector<HTMLButtonElement>('[data-act="legacy"]')!;
     expect(legacy.disabled).toBe(true);
     expect(legacy.getAttribute("title")).toBe("Classic towers only");

@@ -42,6 +42,8 @@ pub fn catalog(mode: GameMode) -> Catalog {
             preview_names_refusal: mode.preview_names_refusal(),
             schedule_assist: mode.schedule_assist(),
             builds_while_paused: mode.builds_while_paused(),
+            exports_to_1994: mode.exports_to_1994(),
+            quotes_lobby_distance: mode.quotes_lobby_distance(),
         },
         pools: POOLED_CAPS
             .iter()

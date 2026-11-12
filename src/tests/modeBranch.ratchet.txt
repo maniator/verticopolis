@@ -16,14 +16,11 @@ engine-rs/src/load_stream.rs 2  # unit fields read by the save's mode
 engine-rs/src/tower.rs 1  # Tower::new's default mode
 engine-rs/src/view/structure.rs 2  # the frame layout's mode code
 
-# Web: labels, the mode-name type guard and save normalization, plus two rule
-# decisions to move into the catalog (reports/uiDialogs: the 1994 export;
-# tenantDiagnosticCopy: the lobby distance).
+# Web: labels, the mode-name type guard, save normalization and the new-game
+# mode picker.
 src/dualrun/catalog.ts 2  # film keys ("classic" film), not the mode
 src/shared/types.ts 2
 src/storage/SaveGame.ts 1
-src/ui/templates/reports.ts 4
 src/ui/templates/saves.ts 1
-src/ui/tenantDiagnosticCopy.ts 1
-src/ui/uiDialogs.ts 5
+src/ui/uiDialogs.ts 2  # the new-game dialog reads the picked mode
 src/ui/uiStatus.ts 5

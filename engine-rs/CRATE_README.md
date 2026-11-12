@@ -179,7 +179,8 @@ The crate has no default features.
   `mark_founder_from_loaded_file`, which keeps the status the web game gives
   a tower saved before build stamps existed.
 - **`.TDT`** is the 1994 SimTower format: `import_tdt(bytes, filename)` reads
-  one and `export_tdt(save_json)` writes one.
+  one and `export_tdt(save_json)` writes one, for a mode whose catalog
+  `rules.exports_to_1994` is true (Classic); a Modern tower is refused.
 - **A save holds the tower, not the moment.** The people in the building and
   the elevator cars restart on load, so a loaded game does not carry on
   exactly where the saving game was. Two loads of the same save stay

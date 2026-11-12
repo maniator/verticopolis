@@ -1979,11 +1979,13 @@
   ],
   "rules": {
     "buildsWhilePaused": true,
+    "exportsTo1994": false,
     "previewNamesRefusal": true,
+    "quotesLobbyDistance": true,
     "scheduleAssist": true,
     "variantHouseholds": true
   },
-  "version": 11,
+  "version": 12,
   "world": {
     "groundFloor": 1,
     "groundFloorStructure": "lobby",

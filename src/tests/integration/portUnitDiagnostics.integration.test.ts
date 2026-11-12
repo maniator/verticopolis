@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import type { EnginePort } from "../../simport/enginePort";
 import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
 import { createPortUnitDiagnostics } from "../../game/portUnitDiagnostics";
+import { readCatalog } from "../../dualrun/catalog";
 
 /**
  * The inspector's unit diagnostics, rendered by the production adapter from
@@ -27,7 +28,7 @@ describe.skipIf(!hasWasmPackage())("the unit diagnostics adapter on the Rust eng
     freed.push(rust);
     const saved = readFileSync(resolve(FIXTURES, "split-tower-4.vctower"), "utf8");
     expect(rust.loadVctower(saved)[0]).toBe(1);
-    const diagnostic = createPortUnitDiagnostics(rust);
+    const diagnostic = createPortUnitDiagnostics(rust, () => readCatalog(wasm(), "modern").rules);
     const ids = (JSON.parse(rust.serialize()) as { units: { id: number }[] }).units.map((u) => u.id);
     const gripes = ids
       .map((id) => diagnostic(id).map((line) => line.strings.map((part, i) => part + (i < line.values.length ? String(line.values[i]) : "")).join("")).join("\n"))

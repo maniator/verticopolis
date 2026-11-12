@@ -43,18 +43,7 @@ fn a_new_game_takes_its_mode_rules() {
 fn each_mode_prices_a_room_by_one_rent_model() {
     use crate::econ::{classic_ladder, rent_config};
     use crate::rules::RentModel;
-    for kind in [
-        Kind::Office,
-        Kind::Condo,
-        Kind::HotelSingle,
-        Kind::HotelDouble,
-        Kind::HotelSuite,
-        Kind::FitnessClub,
-        Kind::Clinic,
-        Kind::RentalStudio,
-        Kind::RentalApartment,
-        Kind::Lobby,
-    ] {
+    for kind in crate::facilities::FACILITIES.iter().map(|f| f.kind) {
         // Classic prices on the canon ladder and nothing else: a kind with no
         // canon rungs has no price there.
         match GameMode::Classic.rent_model(kind) {
@@ -67,8 +56,8 @@ fn each_mode_prices_a_room_by_one_rent_model() {
             Some(RentModel::Band(band)) => {
                 let tuned = rent_config(kind).expect("a band comes from the tuned table");
                 assert_eq!(
-                    (band.default, band.min, band.max),
-                    (tuned.default, tuned.min, tuned.max)
+                    (band.default, band.min, band.max, band.step),
+                    (tuned.default, tuned.min, tuned.max, tuned.step)
                 );
             }
             Some(RentModel::Ladder(_)) => panic!("Modern offered a ladder for {kind:?}"),

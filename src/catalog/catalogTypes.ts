@@ -39,7 +39,7 @@ export interface CatalogTicketPrice {
 
 /** The version of the catalog's shape. It moves when a field is added,
  *  renamed or removed, so a frontend can refuse a shape it does not know. */
-export const CATALOG_VERSION = 11;
+export const CATALOG_VERSION = 12;
 
 /** Every price, size and build rule of one mode. */
 export interface Catalog {
@@ -151,6 +151,13 @@ export interface CatalogRules {
    *  paused. When false a placement at speed 0 is refused with a note to
    *  unpause; the engine itself has no paused state. */
   readonly buildsWhilePaused: boolean;
+  /** Whether the tower can be exported for SimTower (1994) as a `.TDT`.
+   *  When false the export dialog disables that choice with the reason, and
+   *  the engine's `.TDT` export refuses the tower. */
+  readonly exportsTo1994: boolean;
+  /** Whether the tenant card's lobby warning quotes the floors to the
+   *  nearest lobby. When false it names the problem without the number. */
+  readonly quotesLobbyDistance: boolean;
 }
 
 /** One calendar a tower can run and how it scales the quoted figures. */

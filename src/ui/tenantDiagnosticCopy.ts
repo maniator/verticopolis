@@ -75,14 +75,15 @@ export function lobbyFixCopy(floor: number, sinking: boolean, onSlot: boolean, n
 
 export function lobbyWarningCopy(f: {
   sinking: boolean;
-  mode: string;
+  /** The catalog's `rules.quotesLobbyDistance`. */
+  quotesDistance: boolean;
   distance: number;
   slotFloor?: number;
   onSlot?: boolean;
   needsSupport?: boolean;
   clearFirst?: boolean;
 }): string {
-  const distance = f.mode === "modern" ? `: ${f.distance} floors` : "";
+  const distance = f.quotesDistance ? `: ${f.distance} floors` : "";
   const opening = f.sinking ? "Too far from any lobby" : "Far from the nearest lobby";
   if (f.slotFloor === undefined) {
     return f.sinking
