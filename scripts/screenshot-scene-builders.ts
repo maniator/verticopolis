@@ -192,6 +192,10 @@ export function buildStatsTower(): void {
     if (r.ok) x += s.tower.getUnit(r.unitId).width;
     else x += 1;
   }
+  // A recycling center two stories down: from 3 stars a tower short of
+  // recycling has its ratings drained (#1970), and this is a well-run tower.
+  for (const f of [-1, -2]) for (let x = left; x <= right; x++) s.tower.place("floor", f, x);
+  if (!s.tower.place("recycling", -2, left).ok) throw new Error("stats tower: no room for its recycling center");
   // Run a simulated quarter so incomeBreakdown()/elevator loads have data.
   s.evaluateStar();
   // The gallery settles the tower here (scripts/screenshot-engine.ts): a
