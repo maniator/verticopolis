@@ -55,7 +55,7 @@ pub use rules::Rules;
 
 /// The version of the catalog's shape. It moves when a field is added,
 /// renamed or removed, so a frontend can refuse a shape it does not know.
-pub const CATALOG_VERSION: u32 = 13;
+pub const CATALOG_VERSION: u32 = 14;
 
 /// Every price, size and build rule of one mode.
 #[derive(Clone, Debug, PartialEq, Serialize)]

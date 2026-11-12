@@ -2066,7 +2066,7 @@
     "scheduleAssist": false,
     "variantHouseholds": false
   },
-  "version": 13,
+  "version": 14,
   "world": {
     "groundFloor": 1,
     "groundFloorStructure": "lobby",
