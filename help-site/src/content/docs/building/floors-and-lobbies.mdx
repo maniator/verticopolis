@@ -1,0 +1,60 @@
+---
+title: Floors and lobbies
+description: Laying floors, the ground lobby, sky lobbies every fifteen floors, basements and how tall and wide a Verticopolis tower can grow.
+---
+
+import RoomInfo from "../../../components/RoomInfo.astro";
+import Sprite from "../../../components/Sprite.astro";
+
+Every tower starts the same way: a strip of lobby on the ground and nothing above it but sky. Everything else stands on floors you lay yourself.
+
+## The lot
+
+Your lot is 375 tiles wide. You can build up to **floor 100** and down to **nine basement floors** (B1 to B9). Floor 1 is the ground floor, where the main lobby goes.
+
+## Floors
+
+<Sprite kind="floor" caption="A stretch of empty floor" />
+
+A floor tile is the cheapest thing in the game. You can lay a run of floor with the **Floor** tool and fill it later, but you don't have to: a room placed where there is no floor pays for the floor under it as it goes up.
+
+A new floor has to touch the tower: it must sit on top of floor below it, or beside floor on the same story. You can't hang a floor in mid-air.
+
+**Bridging.** When you drop a room or a run of floor close to existing structure, the game fills in the walkway between them so people can walk across. In Classic that always happens. In Modern you can switch it off in [Settings](/help/your-towers/settings/) (**Bridge floors between rooms**) when you want two parts of a floor kept apart.
+
+## The ground lobby
+
+<RoomInfo kind="lobby" />
+
+The lobby is where everyone enters and leaves the tower, and where every trip begins or ends. Lay it along the ground floor, and make it at least as wide as the floors you plan to build above it.
+
+<div class="vc-sprite-row">
+  <Sprite kind="lobby" small caption="Ground lobby" />
+  <Sprite kind="lobby" floor={15} small caption="Sky lobby" />
+</div>
+
+## Sky lobbies
+
+Above the ground, you may build a lobby on **every fifteenth floor**: 15, 30, 45, 60, 75 and 90. These are sky lobbies, and a tall tower can't do without them.
+
+People like being near a lobby. A home, office or hotel room more than **7 floors** from the nearest lobby has its rating held down, and past **11 floors** it starts to slide (see [Tenant ratings](/help/tower/ratings/)). Shops and restaurants more than **2 floors** from a lobby earn half as much. And sky lobbies are where [express elevators](/help/building/elevators/) stop, so they are how people change from a fast long ride to a short local one.
+
+A lobby also blocks noise: a stretch of lobby on a floor stops the sound of a shop reaching the offices beyond it.
+
+## Basements
+
+Some things only go underground: [parking](/help/rooms/services/#parking) and the [Metro Station](/help/rooms/services/#metro). Homes and offices never go below ground. Elevators and stairs reach the basements like any other floor.
+
+## Construction
+
+A new room takes a little while to build; you will see it under scaffolding, and it opens on its own when it's done. Floors, lobbies and shafts are ready at once.
+
+<span class="vc-mode">Classic</span> As in 1994, you can't start new construction while the game is paused. You build against the clock.
+
+<span class="vc-mode">Modern</span> You can pause, lay out a whole block, and let it go up when you start the clock again.
+
+## See also
+
+- [Elevators](/help/building/elevators/) and [Stairs and escalators](/help/building/stairs-and-escalators/)
+- [Build limits](/help/building/limits/)
+- [Bulldoze and undo](/help/building/bulldoze-and-undo/)

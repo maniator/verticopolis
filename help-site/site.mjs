@@ -57,6 +57,28 @@ export const sidebar = [
     ],
   },
   {
+    label: "Building",
+    items: [
+      { slug: "building/floors-and-lobbies" },
+      { slug: "building/elevators" },
+      { slug: "building/stairs-and-escalators" },
+      { slug: "building/limits" },
+      { slug: "building/bulldoze-and-undo" },
+    ],
+  },
+  {
+    label: "How the tower works",
+    items: [
+      { slug: "tower/money" },
+      { slug: "tower/people" },
+      { slug: "tower/ratings" },
+      { slug: "tower/stars" },
+      { slug: "tower/clock" },
+      { slug: "tower/events" },
+      { slug: "tower/map-and-windows" },
+    ],
+  },
+  {
     label: "Guides",
     items: [{ slug: "going-further" }],
   },

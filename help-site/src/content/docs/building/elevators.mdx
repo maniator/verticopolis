@@ -1,0 +1,72 @@
+---
+title: Elevators
+description: Standard, service and express elevators in Verticopolis, how far each reaches, how many cars to add, stops, schedules and keeping the waits short.
+---
+
+import RoomInfo from "../../../components/RoomInfo.astro";
+import Sprite from "../../../components/Sprite.astro";
+
+If a tower has a heart, it's the elevators. Every office worker, resident, guest and shopper above the ground floor rides one, and when the elevators can't keep up, nothing else matters: people wait, then grumble, then leave. Most of the art of a good tower is the art of moving people.
+
+## Three kinds of elevator
+
+<div class="vc-sprite-row">
+  <Sprite kind="elevatorStandard" span={3} small caption="Standard" />
+  <Sprite kind="elevatorService" span={3} small caption="Service" />
+  <Sprite kind="elevatorExpress" span={3} small caption="Express" />
+</div>
+
+| | Standard | Service | Express |
+| --- | --- | --- | --- |
+| Who rides | Everyone | Staff only (housekeepers) | Everyone |
+| Reaches | Up to 30 floors | Up to 30 floors | The whole tower |
+| Stops | Every floor, unless you turn one off | Every floor | Lobbies only, plus its two ends |
+| Riders per car | 21 | 17 | 42 |
+| Unlocks | From the start | 2★ | 3★ |
+
+All three share one limit: **24 elevator shafts** in the whole tower, whatever the mix. See [Build limits](/help/building/limits/).
+
+<RoomInfo kind="elevatorStandard" span={3} />
+
+## Placing a shaft
+
+Choose an elevator and drag from its bottom floor to its top floor. The shaft costs its base price plus a little for every floor it spans past the first. You can make it taller or shorter later from its card.
+
+A shaft comes with one car. Add more from the card, up to **eight**: each extra car costs $40,000, and you get half of that back if you take it off. Every car also costs a small sum in upkeep each month.
+
+## Express elevators and sky lobbies
+
+The standard elevator's limit of 30 floors is no accident. A tall tower is meant to be built in stages: an express shaft carries people from the ground lobby straight up to a [sky lobby](/help/building/floors-and-lobbies/), and from there standard elevators take them the last few floors. An express never stops between lobbies, which is what makes it fast, and it holds twice as many people as a standard car.
+
+A tower that makes people change elevators three or four times on the way home will crawl. People will ride as many elevators as it takes, but every change is another wait.
+
+## Stops
+
+Inspect a standard elevator to see its stops. You can turn off a floor the shaft passes, so it runs past without stopping; that is useful for a shaft meant to serve only the top of its run. An express stops only at lobbies, and when you build a new sky lobby on a floor an express passes, it starts stopping there by itself.
+
+## Schedules
+
+Each shaft has a **schedule**: how many of its cars run in each hour of a weekday and of a weekend, which floor each car goes home to when it's idle, and how long a car waits at a floor before it leaves. The default works for most shafts. When a shaft is swamped at nine and idle at noon, the schedule is where to fix it.
+
+<span class="vc-mode">Classic</span> The schedule is the raw hour-by-hour grid, set by hand, as in 1994.
+
+<span class="vc-mode">Modern</span> The schedule also offers presets for common jobs, a one-tap auto-tune from the waits it has measured, and advice on which hours the shaft has too many or too few cars running.
+
+## Keeping the waits short
+
+The game measures how long people actually wait. When a floor's people wait too long on average, the floor counts as jammed, and the homes, offices and hotel rooms on it lose rating every hour until it clears. At nine in the morning, if the whole tower is badly backed up, tenants will tell you so.
+
+The Map's **Traffic** view colors each floor Clear, Busy or Jammed. When a floor turns red:
+
+1. **Add cars** to the shafts that serve it, up to eight each.
+2. **Add a shaft.** Two shafts side by side share the load.
+3. **Shorten trips.** Add an express to a sky lobby, so long trips skip the local stops.
+4. **Check the schedule** for hours with too few cars running.
+
+<span class="vc-mode">Modern</span> People are a little more patient: they will wait half as long again before a floor counts as jammed.
+
+## See also
+
+- [Stairs and escalators](/help/building/stairs-and-escalators/) for short hops
+- [People and traffic](/help/tower/people/) for when the rushes come
+- [Hotels](/help/rooms/hotels/) for why Housekeeping needs a service elevator

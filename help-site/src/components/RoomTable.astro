@@ -53,7 +53,7 @@ const rows = modern.facilities
     const c = classic.facilities.find((e) => e.key === f.key);
     return {
       name: f.name,
-      href: `${base}/${PAGE_OF[f.key]}/`,
+      href: `${base}/${PAGE_OF[f.key]}/#${f.key}`,
       size: f.transport ? `${f.width} wide` : `${f.width} × ${f.floors}`,
       price: dollars(f.cost),
       stars: f.minStar <= 1 ? "Start" : `${f.minStar}★`,

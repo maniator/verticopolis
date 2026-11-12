@@ -39,7 +39,8 @@ describe("the side menu", () => {
   it("names only pages that exist", () => {
     const slugs = flatten(sidebar).flatMap((entry) => ("slug" in entry ? [entry.slug] : []));
     expect(slugs.length).toBeGreaterThan(0);
-    for (const slug of slugs) expect(existsSync(resolve(pagesDir, `${slug}.md`)) || existsSync(resolve(pagesDir, `${slug}.mdx`)), slug).toBe(true);
+    const exists = (slug: string) => [`${slug}.md`, `${slug}.mdx`, `${slug}/index.mdx`].some((f) => existsSync(resolve(pagesDir, f)));
+    for (const slug of slugs) expect(exists(slug), slug).toBe(true);
   });
 
   it("lists every page but the front page", () => {
@@ -110,5 +111,38 @@ describe("the analytics landing", () => {
     expect(landingAction("/help/keyboard/", `${origin}/help/`, origin)).toBeNull();
     expect(landingAction("/help/changelog/", `${origin}/help`, origin)).toBeNull();
     expect(landingAction("/help/", "https://elsewhere.test/help/", origin)).toBe("page_help");
+  });
+});
+
+describe("the help site's cache headers", () => {
+  type Rule = { source: string; headers: { key: string; value: string }[] };
+  const rules = (JSON.parse(readFileSync(resolve(__dirname, "../../vercel.json"), "utf8")) as { headers: Rule[] }).headers;
+  // Vercel sources are path-to-regexp; the ones here only use `(.*)` and `(a|b)` groups.
+  const matches = (source: string, path: string) => new RegExp(`^${source.replace(/\./g, "\\.").replace(/\\\.\*/g, ".*")}$`).test(path);
+  const immutable = (path: string) =>
+    rules.some((r) => matches(r.source, path) && r.headers.some((h) => h.key === "Cache-Control" && h.value.includes("immutable")));
+
+  it("keeps Astro's and Pagefind's content-hashed files for a year", () => {
+    expect(immutable("/help/_astro/Sprite.astro_astro_type_script_index_0_lang.B-Iva01u.js")).toBe(true);
+    expect(immutable("/help/_astro/ec.w36nc.css")).toBe(true);
+    expect(immutable("/help/pagefind/fragment/en_1144b33.pf_fragment")).toBe(true);
+    expect(immutable("/help/pagefind/index/en_15b0e9b.pf_index")).toBe(true);
+  });
+
+  it("never pins a file whose name stays the same when it changes", () => {
+    for (const path of [
+      "/help/",
+      "/help/rooms/venues/",
+      "/help/catalog.json",
+      "/help/sitemap-index.xml",
+      "/help/pagefind/pagefind.js",
+      "/help/pagefind/pagefind-entry.json",
+      "/help/pagefind/wasm.en.pagefind",
+      "/engine/verticopolis_engine_bg.wasm",
+      "/sw.js",
+      "/version.json",
+    ]) {
+      expect(immutable(path), path).toBe(false);
+    }
   });
 });

@@ -19,14 +19,29 @@ interface Picture {
   canvas: HTMLCanvasElement;
   ctx: CanvasRenderingContext2D;
   draw(d: DrawCtx, w: number, h: number): void;
+  /** The hour the picture shows. */
+  hour: number;
   visible: boolean;
+}
+
+/** Evening is when every room has something going on, so each picture shows
+ *  7 PM, or the first hour after it that the room is open (a nightclub opens
+ *  at 8), so no room is drawn behind its shutter. */
+const EVENING = 19;
+function openHourFor(open: readonly boolean[] | null | undefined): number {
+  if (!open) return EVENING;
+  for (let i = 0; i < 24; i++) {
+    const hour = (EVENING + i) % 24;
+    if (open[hour]) return hour;
+  }
+  return EVENING;
 }
 
 function pictureOf(canvas: HTMLCanvasElement, facts: (k: FacilityKind) => CatalogFacility): Picture | null {
   const ctx = canvas.getContext("2d");
   if (!ctx) return null;
   const kind = canvas.dataset.sprite as FacilityKind;
-  facts(kind);
+  const hour = openHourFor(facts(kind).openHours);
   const span = canvas.dataset.span ? Number(canvas.dataset.span) : null;
   const pose = {
     state: (canvas.dataset.state as UnitState | undefined) ?? "occupied",
@@ -38,7 +53,7 @@ function pictureOf(canvas: HTMLCanvasElement, facts: (k: FacilityKind) => Catalo
     span !== null
       ? (d: DrawCtx, w: number, h: number) => drawTransportPortrait(d, facts, kind, span, 0, 0, w, h, 0, MAG)
       : (d: DrawCtx, w: number, h: number) => drawRoomPortrait(d, facts, kind, pose, 0, 0, w, h, 0, MAG);
-  return { canvas, ctx, draw, visible: false };
+  return { canvas, ctx, draw, hour, visible: false };
 }
 
 function paint(p: Picture, anim: number): void {
@@ -53,9 +68,9 @@ function paint(p: Picture, anim: number): void {
   p.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   p.ctx.fillStyle = BACKGROUND;
   p.ctx.fillRect(0, 0, w, h);
-  // Evening, lights on, a garage two-thirds full and a recycling plant filling
-  // up: the moment the gallery showed, when every room has something going on.
-  p.draw({ ctx: p.ctx, lit: true, anim, hour: 19, parkingUse: 0.7, recycleFill: 0.66 }, w, h);
+  // Lights on, a garage two-thirds full and a recycling plant filling up, at
+  // an hour the room is open.
+  p.draw({ ctx: p.ctx, lit: true, anim, hour: p.hour, parkingUse: 0.7, recycleFill: 0.66 }, w, h);
 }
 
 async function start(): Promise<void> {

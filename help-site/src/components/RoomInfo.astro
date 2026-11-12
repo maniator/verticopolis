@@ -123,7 +123,7 @@ const rows: Row[] = [
 ].filter((r) => (inClassic ? r.classic : null) || r.modern);
 ---
 
-<aside class="vc-infobox" aria-label={`${modern.name} at a glance`}>
+<aside class="vc-infobox" id={kind} aria-label={`${modern.name} at a glance`}>
   <p class="vc-infobox-title">{modern.name}</p>
   <Sprite kind={kind} state={state} span={span} caption={inClassic ? "In both modes" : "Modern only"} />
   <table>
