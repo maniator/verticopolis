@@ -71,7 +71,8 @@ fn is_home_or_hotel(kind: Kind) -> bool {
     is_home(kind) || kind.is_hotel()
 }
 
-const MODERN_HALOS: [Halo; 4] = [
+/// A `static`, so every lookup hands out the same entries.
+static MODERN_HALOS: [Halo; 4] = [
     Halo {
         source: Kind::FitnessClub,
         effect: HaloEffect::Lift,

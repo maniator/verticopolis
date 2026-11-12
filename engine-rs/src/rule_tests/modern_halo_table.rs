@@ -69,7 +69,12 @@ fn classic_has_no_halos() {
     assert!(GameMode::Classic.halos().is_empty());
     for h in GameMode::Modern.halos() {
         assert!(GameMode::Classic.halo_of(h.source).is_none());
-        assert!(std::ptr::eq(GameMode::Modern.halo_of(h.source).unwrap(), h));
+        // Each venue casts one halo: the lookup finds this entry, by source.
+        let found = GameMode::Modern.halo_of(h.source).expect("listed");
+        assert_eq!(
+            (found.source, found.floors, found.max),
+            (h.source, h.floors, h.max)
+        );
     }
 }
 
