@@ -1,0 +1,55 @@
+name: Issue form backfill
+
+# Lays out open issues filed before the issue forms (2026-11-12) in their
+# form's fields, keeping each original body word for word under the form's
+# first required text field. Run by hand only, from the default branch: a dry
+# run lists what would change, and ticking "write" makes the edits. A second
+# run skips every issue already laid out. Only the chosen author's issues are
+# touched, so community reports keep their own text. GitHub keeps each
+# body's edit history. The rules are in src/build/issueBackfill.ts.
+on:
+  workflow_dispatch:
+    inputs:
+      write:
+        description: Edit the issues (leave unticked for a dry run)
+        type: boolean
+        default: false
+      author:
+        description: Only reshape issues opened by this account
+        type: string
+        default: maniator
+
+concurrency:
+  group: issue-form-backfill
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  backfill:
+    name: Issue form backfill
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      AUTHOR: ${{ inputs.author }}
+      WRITE: ${{ inputs.write }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: ".nvmrc"
+
+      - name: Reshape the issues
+        run: |
+          set -euo pipefail
+          args=(--author "$AUTHOR")
+          if [[ "$WRITE" == "true" ]]; then args+=(--write); fi
+          node scripts/issue-form-backfill.ts "${args[@]}"
