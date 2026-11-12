@@ -43,6 +43,25 @@ impl Engine {
     pub fn paint_tiles(&mut self, kind: f64, floor: f64, tiles: &[f64]) -> Vec<f64> {
         self.port_paint(kind, floor, tiles)
     }
+    /// `setLobbyHeight(height)` (#308): the height, 1 to 3 stories, that a
+    /// floor's first lobby tile rises to from now on, where the mode lets
+    /// that floor's lobby rise. Every later `buildAt`, `paintTiles` and
+    /// `quoteBuild` uses it; a floor that holds a lobby keeps its own
+    /// height. A height that is not a whole number counts as 1.
+    #[wasm_bindgen(js_name = setLobbyHeight)]
+    pub fn set_lobby_height(&mut self, height: f64) {
+        let whole = height.is_finite() && height.fract() == 0.0;
+        self.sim
+            .set_lobby_height(if whole { height as i64 } else { 1 });
+    }
+    /// `lobbyHeights()` (#308): every lobby taller than one story, as flat
+    /// `[floor, height, ...]` pairs by floor. Empty when none is.
+    #[wasm_bindgen(js_name = lobbyHeights)]
+    pub fn lobby_heights(&self) -> Vec<f64> {
+        let tall = self.sim.tower.tall_lobbies().into_iter();
+        tall.flat_map(|(floor, height)| [floor as f64, height as f64])
+            .collect()
+    }
     #[wasm_bindgen(js_name = buildShaft)]
     pub fn build_shaft(&mut self, kind: f64, x: f64, bottom: f64, top: f64) -> Vec<f64> {
         self.port_build_shaft(kind, x, bottom, top)

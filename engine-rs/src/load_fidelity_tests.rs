@@ -11,7 +11,7 @@ use crate::load::{
 };
 use crate::load_stream::{load_save_text, read_save};
 use crate::rng::Rng;
-use crate::sim::{Simulation, SAVE_VERSION};
+use crate::sim::{Simulation, PLAIN_SAVE_VERSION, SAVE_VERSION};
 use serde_json::{json, Value};
 
 /// A seed one draw before state 0: Mulberry32 adds 0x6d2b79f5 per draw.
@@ -59,7 +59,8 @@ fn is_current(save: &Value) -> bool {
     let at = |key: &str| top.keys().position(|k| k == key);
     let units = at("units").unwrap_or(usize::MAX);
     let before_units = |key: &str| at(key).is_some_and(|i| i < units);
-    save["version"].as_f64() == Some(SAVE_VERSION as f64)
+    let version = save["version"].as_f64();
+    (version == Some(SAVE_VERSION as f64) || version == Some(PLAIN_SAVE_VERSION as f64))
         && matches!(save["mode"].as_str(), Some("classic" | "modern"))
         && before_units("version")
         && before_units("mode")

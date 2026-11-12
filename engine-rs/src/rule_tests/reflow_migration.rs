@@ -18,7 +18,7 @@ use serde_json::{json, Value};
 use crate::clock::GameMode;
 use crate::facilities::{Kind, LOT_WIDTH};
 use crate::load::{deserialize, floating_structure_count, reflow_v1_to_v2};
-use crate::sim::{Simulation, SAVE_VERSION};
+use crate::sim::{Simulation, PLAIN_SAVE_VERSION};
 use crate::tower::Unit;
 
 use super::{fixture_save, legacy_save, pave};
@@ -122,7 +122,7 @@ fn a_floor_too_full_for_canon_widths_still_loads_valid() {
         x += 12;
     }
     let sim = v1(units);
-    assert_eq!(sim.serialize()["version"], SAVE_VERSION);
+    assert_eq!(sim.serialize()["version"], PLAIN_SAVE_VERSION);
     let spans: Vec<(i64, i64)> = of(&sim, Kind::FastFood)
         .iter()
         .map(|u| (u.x, u.width))
@@ -153,7 +153,7 @@ fn a_floor_that_would_float_stays_at_legacy_widths() {
     units.push(room("office", 3, 16, 9));
     let sim = v1(units);
     let save = sim.serialize();
-    assert_eq!(save["version"], SAVE_VERSION);
+    assert_eq!(save["version"], PLAIN_SAVE_VERSION);
     assert_eq!(floating_structure_count(&save), 0);
     assert!(rooms(&sim).iter().all(|r| r.x + r.width <= 30));
 }
@@ -201,9 +201,9 @@ fn a_current_save_loads_with_its_units_untouched() {
     sim.money = 1e9;
     assert!(sim.tower.place(Kind::Lobby, 1, 0).ok);
     let current = sim.serialize();
-    assert_eq!(current["version"], SAVE_VERSION);
+    assert_eq!(current["version"], PLAIN_SAVE_VERSION);
     let reloaded = deserialize(&current).unwrap().serialize();
-    assert_eq!(reloaded["version"], SAVE_VERSION);
+    assert_eq!(reloaded["version"], PLAIN_SAVE_VERSION);
     assert_eq!(reloaded["units"].to_string(), current["units"].to_string());
 }
 
@@ -242,7 +242,7 @@ fn the_real_towerone_6_save_migrates_within_the_rules() {
         .collect();
     let sim = deserialize(&raw).expect("the fixture loads");
     let save = sim.serialize();
-    assert_eq!(save["version"], SAVE_VERSION);
+    assert_eq!(save["version"], PLAIN_SAVE_VERSION);
     let rooms = rooms(&sim);
     // Each room sits at its canon width or the width it was saved at.
     let mut at_canon = 0;

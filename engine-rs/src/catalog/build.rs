@@ -45,6 +45,8 @@ pub fn catalog(mode: GameMode) -> Catalog {
             builds_while_paused: mode.builds_while_paused(),
             exports_to_1994: mode.exports_to_1994(),
             quotes_lobby_distance: mode.quotes_lobby_distance(),
+            tall_sky_lobbies: mode.raises_sky_lobbies(),
+            max_lobby_height: crate::facilities::MAX_LOBBY_HEIGHT,
         },
         pools: keyed_pools(mode)
             .map(|(key, p)| PoolEntry {

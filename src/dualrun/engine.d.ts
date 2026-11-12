@@ -266,6 +266,11 @@ export class Engine {
     loadSave(text: string): Float64Array;
     loadTdt(bytes: Uint8Array, filename: string): Float64Array;
     loadVctower(text: string): Float64Array;
+    /**
+     * `lobbyHeights()` (#308): every lobby taller than one story, as flat
+     * `[floor, height, ...]` pairs by floor. Empty when none is.
+     */
+    lobbyHeights(): Float64Array;
     logAfter(seq: number): Float64Array;
     logLine(text: string, kind: number): Float64Array;
     /**
@@ -500,6 +505,14 @@ export class Engine {
      * The editor's rename of a unit.
      */
     setLabel(id: number, label: string): boolean;
+    /**
+     * `setLobbyHeight(height)` (#308): the height, 1 to 3 stories, that a
+     * floor's first lobby tile rises to from now on, where the mode lets
+     * that floor's lobby rise. Every later `buildAt`, `paintTiles` and
+     * `quoteBuild` uses it; a floor that holds a lobby keeps its own
+     * height. A height that is not a whole number counts as 1.
+     */
+    setLobbyHeight(height: number): void;
     setMoney(amount: number): void;
     /**
      * `setNoRate(id)`: whether the unit is now off the market. The id is

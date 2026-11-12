@@ -156,6 +156,7 @@ export const BINDING_EXPORT_TIERS = {
   answerChoice: T1,
   buildAt: T1,
   paintTiles: T1,
+  setLobbyHeight: T1,
   buildShaft: T1,
   demolish: T1,
   demolishTile: T1,
@@ -183,6 +184,7 @@ export const BINDING_EXPORT_TIERS = {
   // the HUD and the build preview ask per UI tick or pointer move.
   lastReason: T2,
   quoteBuild: T2,
+  lobbyHeights: T2,
   quoteShaft: T2,
   quoteRentBatch: T2,
   shaftSchedule: T2,

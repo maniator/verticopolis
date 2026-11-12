@@ -307,6 +307,7 @@ pub(crate) fn assemble(
     sim.tower.built_wedding_hall = data
         .get("builtWeddingHall")
         .map(|v| v.as_bool().unwrap_or(false));
+    sim.tower.adopt_lobby_heights(data.get("lobbyHeights"));
     sim.tower.reindex();
     if mode == GameMode::Modern {
         // A Modern save from before #1950 lists the theaters that booked a
@@ -348,6 +349,7 @@ pub(crate) fn assemble(
         }
     }
     sim.tower.coerce_express_stops();
+    sim.tower.coerce_tall_lobby_stops();
     if rents_snapped > 0 {
         let msg = format!(
             "Classic pricing: rents snapped to the four 1994 rate levels.{}",

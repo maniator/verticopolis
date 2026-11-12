@@ -13,7 +13,7 @@ use serde_json::{json, Value};
 
 use crate::facilities::{Kind, LOT_WIDTH};
 use crate::load::{deserialize, migrate_save, widen_legacy_elevator_shafts};
-use crate::sim::{Simulation, SAVE_VERSION};
+use crate::sim::{Simulation, PLAIN_SAVE_VERSION};
 
 use super::legacy_save;
 
@@ -105,7 +105,7 @@ fn a_lone_narrow_shaft_grows_right_in_place() {
     let out = widened(vec![shaft(json!({ "x": 100 }))]);
     assert_eq!(foot(&out[0]), (100, 4));
     let migrated = migrate_save(&v4(vec![shaft(json!({ "x": 100 }))]));
-    assert_eq!(migrated["version"], SAVE_VERSION);
+    assert_eq!(migrated["version"], PLAIN_SAVE_VERSION);
     assert_eq!(foot(&migrated["transports"][0]), (100, 4));
 }
 

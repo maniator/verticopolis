@@ -226,7 +226,7 @@ describe("engine crate version rule", () => {
 
   describe("unbumpedPins", () => {
     it("names a pin that moved under the same version", () => {
-      expect(unbumpedPins(record, { ...record, saveVersion: 8 })).toEqual([
+      expect(unbumpedPins(record, { ...record, saveVersion: record.saveVersion + 1 })).toEqual([
         "saveVersion",
       ]);
       expect(
@@ -243,7 +243,7 @@ describe("engine crate version rule", () => {
         unbumpedPins(record, {
           ...record,
           crateVersion: "9.9.9",
-          saveVersion: 8,
+          saveVersion: record.saveVersion + 1,
         }),
       ).toEqual([]);
       expect(unbumpedPins(record, record)).toEqual([]);

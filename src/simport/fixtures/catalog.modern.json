@@ -2441,9 +2441,11 @@
   "rules": {
     "buildsWhilePaused": true,
     "exportsTo1994": false,
+    "maxLobbyHeight": 3,
     "previewNamesRefusal": true,
     "quotesLobbyDistance": true,
     "scheduleAssist": true,
+    "tallSkyLobbies": true,
     "variantHouseholds": true
   },
   "version": 15,

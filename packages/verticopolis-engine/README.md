@@ -185,6 +185,7 @@ shapes for each one.
 | `canBuild(kind, floor, x)` | The dry run of `build`: `{ ok, reason?, cost }`, with the full price (floor tiles and bridging included). |
 | `build(kind, floor, x)` | Place a facility with its left edge at `x`. `{ ok, reason? }`. `kind` is a catalog `key` such as `"office"`, `"condo"` or `"hotelSingle"`. |
 | `paintBrush(kind, floor, tilesJson)` | Lay floor or lobby tiles along a stroke in one command. `{ placed, reason? }`. |
+| `setLobbyHeight(height)`, `lobbyHeights()` | How many stories (1 to 3) a floor's first lobby rises from now on, where the mode lets that floor's lobby rise (the catalog's `rules`; Classic only the ground floor), and every taller lobby as flat `[floor, height, ...]` pairs. A lobby's height never changes once built. |
 | `buildTransport(kind, x, bottom, top)` | Place stairs, an escalator or an elevator shaft between two floors. `{ ok, reason? }`. |
 | `validateTransport(kind, x, bottom, top)` | The same check without building. |
 | `addCar(id)`, `removeCar(id)` | Add or remove an elevator car, charging or refunding it. `{ ok, reason?, delta }`. |
@@ -241,7 +242,8 @@ calls above.
   web game's loader does; only a file it cannot read at all is refused.
 - **Newer saves are refused.** A save written by a newer engine than the one
   loading it is refused rather than half-read. `engineIdentity()` tells you
-  which save version an engine writes.
+  which save version an engine writes. A save is version 7 unless it holds a
+  lobby taller than one story, which makes it version 8.
 
 ## Versioning
 

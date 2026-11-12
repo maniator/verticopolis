@@ -25,7 +25,7 @@ impl Tower {
 
     /// The index of shaft `id` that the caller is about to write, noted for
     /// the open undo gesture.
-    fn transport_index_edit(&mut self, id: i64) -> Option<usize> {
+    pub(super) fn transport_index_edit(&mut self, id: i64) -> Option<usize> {
         let i = self.transport_index(id)?;
         if let Some(j) = self.journal.as_mut() {
             j.transport_edit(i, &self.transports[i]);
@@ -57,7 +57,10 @@ impl Tower {
     }
 
     fn span_reason(&self, kind: Kind, bottom: i64, top: i64) -> Option<String> {
-        let max_span = self.lot().max_span(kind);
+        let mut max_span = self.lot().max_span(kind);
+        if kind.is_fixed_span() {
+            max_span = max_span.max(self.lobby_height(bottom)); // #308
+        }
         if top.saturating_sub(bottom) <= max_span {
             return None;
         }
@@ -74,6 +77,7 @@ impl Tower {
     }
 
     pub fn validate_transport(&self, kind: Kind, x: i64, bottom: i64, top: i64) -> PlaceResult {
+        let top = self.walkway_top(kind, bottom, top);
         let f = kind.facility();
         if !f.transport {
             return PlaceResult::fail("Not a transport.");
@@ -88,6 +92,9 @@ impl Tower {
             return PlaceResult::fail("Off the edge of the lot.");
         }
         if let Some(r) = self.span_reason(kind, bottom, top) {
+            return PlaceResult::fail(r);
+        }
+        if let Some(r) = self.tall_lobby_shaft_reason(bottom, top) {
             return PlaceResult::fail(r);
         }
         if kind == Kind::Escalator && !self.allows_escalator_on_office_floors {
@@ -122,6 +129,7 @@ impl Tower {
     }
 
     pub fn place_transport(&mut self, kind: Kind, x: i64, bottom: i64, top: i64) -> PlaceResult {
+        let top = self.walkway_top(kind, bottom, top);
         let v = self.validate_transport(kind, x, bottom, top);
         if !v.ok {
             return v;
@@ -161,6 +169,7 @@ impl Tower {
         if kind == Kind::ElevatorExpress {
             self.set_express_stops(id);
         }
+        self.skip_tall_lobby_stories(id);
         self.revision += 1;
         PlaceResult {
             ok: true,
@@ -213,7 +222,8 @@ impl Tower {
         if floor == t.bottom || floor == t.top {
             return true;
         }
-        if t.kind == Kind::ElevatorExpress && stop && !self.floor_has_lobby(floor) {
+        let lobby_only = t.kind == Kind::ElevatorExpress && !self.floor_has_lobby(floor);
+        if stop && (lobby_only || self.is_tall_lobby_story(floor)) {
             return false;
         }
         let mut skip: Vec<f64> = self.transports[i].skip_floors.clone().unwrap_or_default();
@@ -285,7 +295,10 @@ impl Tower {
             let t = &self.transports[i];
             (t.kind, t.x, t.width, t.bottom, t.top)
         };
-        if let Some(reason) = self.span_reason(kind, new_bottom, new_top) {
+        if let Some(reason) = self
+            .span_reason(kind, new_bottom, new_top)
+            .or_else(|| self.tall_lobby_shaft_reason(new_bottom, new_top))
+        {
             return ResizeResult::fail(reason);
         }
         let mut new_floors = Vec::new();
@@ -352,6 +365,7 @@ impl Tower {
             skip.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
             self.transports[i].skip_floors = Some(skip);
         }
+        self.skip_tall_lobby_stories(id);
         self.revision += 1;
         let (cars, bottom, top) = {
             let t = &self.transports[i];
@@ -385,6 +399,7 @@ impl Tower {
             return true;
         }
         self.transports[i].skip_floors = Some(Vec::new());
+        self.skip_tall_lobby_stories(id);
         self.revision += 1;
         true
     }

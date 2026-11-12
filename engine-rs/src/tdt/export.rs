@@ -7,7 +7,9 @@ use std::borrow::Borrow;
 use serde_json::Value;
 
 use super::encoder::{encode_tower, EncodeStats};
-use super::export_gather::{gather_tower, gather_units, ExportCounts, GatheredTower};
+use super::export_gather::{
+    gather_tower, gather_units, ground_lobby_height, ExportCounts, GatheredTower,
+};
 use super::LegacyExportError;
 use crate::clock::GameMode;
 use crate::facilities::{MAX_FLOOR, MIN_FLOOR};
@@ -39,7 +41,7 @@ pub fn build_tdt_streamed<U: Borrow<Value>>(
     units: impl IntoIterator<Item = U>,
 ) -> Result<BuiltLegacyTower, LegacyExportError> {
     refuse_modern(rest)?;
-    finish(rest, gather_units(units)?)
+    finish(rest, gather_units(units, ground_lobby_height(rest))?)
 }
 
 fn refuse_modern(save: &Value) -> Result<(), LegacyExportError> {

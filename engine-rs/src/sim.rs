@@ -42,9 +42,28 @@ pub struct MoveIns {
     pub rentals: i64,
 }
 
-/// The save format version this engine writes. It loads every older version
-/// back to the oldest one [`crate::identity::identity`] names.
-pub const SAVE_VERSION: i64 = 7;
+/// The newest save format version this engine writes. It loads every older
+/// version back to the oldest one [`crate::identity::identity`] names.
+///
+/// Version 8 adds one key, `lobbyHeights` (#308), so a save is stamped with
+/// the oldest version that reads it whole ([`save_version`]): 8 when it
+/// holds a tall lobby, which a build from before tall lobbies refuses rather
+/// than drop, and [`PLAIN_SAVE_VERSION`] otherwise, which every build from
+/// version 7 on still loads.
+pub const SAVE_VERSION: i64 = 8;
+/// The version a save with no tall lobby is written at: the format before
+/// `lobbyHeights`, which it does not need.
+pub const PLAIN_SAVE_VERSION: i64 = 7;
+
+/// The version a save is stamped with: [`SAVE_VERSION`] when it holds a tall
+/// lobby, [`PLAIN_SAVE_VERSION`] when it does not.
+pub fn save_version(has_tall_lobby: bool) -> i64 {
+    if has_tall_lobby {
+        SAVE_VERSION
+    } else {
+        PLAIN_SAVE_VERSION
+    }
+}
 /// The money a new game starts with.
 pub const STARTING_MONEY: f64 = 2_000_000.0;
 /// How many messages [`Simulation::log`] keeps; the oldest goes first.

@@ -16,7 +16,7 @@ use serde_json::{json, Map, Value};
 
 use crate::events::{EventSystem, PendingChoice};
 use crate::ledger::{totals_json, Ledger};
-use crate::sim::{LogEntry, Simulation, LOG_SAVE_CAP, SAVE_VERSION};
+use crate::sim::{save_version, LogEntry, Simulation, LOG_SAVE_CAP};
 use crate::tower::{Transport, Unit};
 
 /// One top-level value of the save. The lists stay borrowed until they are
@@ -149,7 +149,11 @@ impl Simulation {
     /// writer expects. Each key appears once.
     fn save_fields(&self) -> Vec<(&'static str, Field<'_>)> {
         let mut m: Vec<(&'static str, Field<'_>)> = Vec::with_capacity(31);
-        m.push(own("version", json!(SAVE_VERSION)));
+        let tall_lobbies = self.tower.tall_lobbies();
+        m.push(own(
+            "version",
+            json!(save_version(!tall_lobbies.is_empty())),
+        ));
         m.push(own("seed", json!(self.rng.seed())));
         m.push(own("initialSeed", json!(self.rng.initial_seed)));
         m.push(own("money", json!(self.money)));
@@ -172,6 +176,9 @@ impl Simulation {
         }
         if let Some(b) = self.tower.built_wedding_hall {
             m.push(own("builtWeddingHall", json!(b)));
+        }
+        if !tall_lobbies.is_empty() {
+            m.push(own("lobbyHeights", json!(tall_lobbies)));
         }
         if let Some(b) = self.evaluated_tower {
             m.push(own("evaluatedTower", json!(b)));
@@ -211,11 +218,12 @@ impl Simulation {
     ///
     /// ```
     /// use verticopolis_engine::clock::GameMode;
-    /// use verticopolis_engine::sim::{Simulation, SAVE_VERSION};
+    /// use verticopolis_engine::sim::{Simulation, PLAIN_SAVE_VERSION};
     ///
     /// let sim = Simulation::new_game(3, GameMode::Classic);
     /// let save = sim.serialize();
-    /// assert_eq!(save["version"], SAVE_VERSION);
+    /// // A tower with no tall lobby is stamped with the version before them.
+    /// assert_eq!(save["version"], PLAIN_SAVE_VERSION);
     /// ```
     pub fn serialize(&self) -> Value {
         let mut m = Map::new();

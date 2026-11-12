@@ -11,7 +11,7 @@ use serde_json::{json, Value};
 
 use crate::facilities::{Kind, LOT_WIDTH, POOLED_CAPS};
 use crate::load::{deserialize, migrate_save};
-use crate::sim::SAVE_VERSION;
+use crate::sim::PLAIN_SAVE_VERSION;
 
 use super::elevator_width_migration::{collide, foot, loaded_transports, shaft, v4};
 use super::fixture_save;
@@ -52,7 +52,7 @@ fn the_sixseven_fixture_is_a_version_4_save_with_nine_legacy_shafts() {
 fn every_sixseven_elevator_widens_in_place_with_no_overlap() {
     let data = fixture_save("sixseven_2");
     let out = migrate_save(&data);
-    assert_eq!(out["version"], SAVE_VERSION);
+    assert_eq!(out["version"], PLAIN_SAVE_VERSION);
     let after = out["transports"].as_array().unwrap();
     for t in after.iter().filter(|t| is_elevator(t)) {
         let canon = if t["kind"] == "elevatorExpress" { 6 } else { 4 };
@@ -68,7 +68,7 @@ fn every_sixseven_elevator_widens_in_place_with_no_overlap() {
 fn the_sixseven_save_loads_widened_and_runs_an_hour() {
     let mut sim = deserialize(&fixture_save("sixseven_2")).expect("the fixture loads");
     let saved = sim.serialize();
-    assert_eq!(saved["version"], SAVE_VERSION);
+    assert_eq!(saved["version"], PLAIN_SAVE_VERSION);
     let list = saved["transports"].as_array().unwrap();
     for (kind, w) in [("elevatorStandard", 4), ("elevatorExpress", 6)] {
         let of_kind: Vec<&Value> = list.iter().filter(|t| t["kind"] == kind).collect();

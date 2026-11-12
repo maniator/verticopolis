@@ -23,6 +23,7 @@ Every tower runs one of two sets of rules. You choose when you found the tower, 
 | Escalators | Never to an office floor | Anywhere |
 | Elevator schedules | The hour-by-hour grid | Adds presets, auto-tune and advice ([Elevators](/help/building/elevators/)) |
 | Building while paused | Not allowed | Allowed |
+| Tall lobbies | Only the ground lobby can rise 2 or 3 stories | Sky lobbies can rise too ([Floors and lobbies](/help/building/floors-and-lobbies/#tall-lobbies)) |
 | Build hints | A refused spot says why when you click | Hovering a refused spot says why first |
 | Bulldozing | Some rooms are for keeps, and floors come out from the ends | Everything can be sold, from anywhere ([Bulldoze and undo](/help/building/bulldoze-and-undo/)) |
 | The top floor | Reserved for the Wedding Hall | Yours to use ([Wedding Hall](/help/rooms/wedding-hall/)) |

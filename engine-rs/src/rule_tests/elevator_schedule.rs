@@ -19,7 +19,7 @@ use crate::clock::{CalendarKind, GameMode};
 use crate::facilities::Kind;
 use crate::load::{deserialize, migrate_save};
 use crate::schedule::SCHEDULE_HOURS;
-use crate::sim::{Simulation, SAVE_VERSION};
+use crate::sim::{Simulation, PLAIN_SAVE_VERSION};
 use crate::tower::{Transport, UnitState};
 
 const WIDTH: i64 = 24;
@@ -67,7 +67,7 @@ fn homes(sim: &Simulation) -> Vec<i64> {
 
 #[test]
 fn a_save_is_stamped_with_the_current_version() {
-    assert_eq!(SAVE_VERSION, 7);
+    assert_eq!(PLAIN_SAVE_VERSION, 7);
     assert_eq!(tower_with_elevator().serialize()["version"], 7);
 }
 
@@ -193,9 +193,9 @@ fn a_version_6_save_migrates_to_the_current_version_with_no_schedule() {
     for t in legacy["transports"].as_array_mut().unwrap() {
         t.as_object_mut().unwrap().remove("schedule");
     }
-    assert_eq!(migrate_save(&legacy)["version"], SAVE_VERSION);
+    assert_eq!(migrate_save(&legacy)["version"], PLAIN_SAVE_VERSION);
     let back = deserialize(&legacy).unwrap();
-    assert_eq!(back.serialize()["version"], SAVE_VERSION);
+    assert_eq!(back.serialize()["version"], PLAIN_SAVE_VERSION);
     assert!(shaft(&back).schedule.is_none());
 }
 
