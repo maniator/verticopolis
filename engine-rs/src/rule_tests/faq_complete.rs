@@ -15,6 +15,7 @@ use crate::load::deserialize;
 use crate::sim::Simulation;
 use crate::tower::UnitState;
 
+use super::stocked_services::{lay_basement, stock_recycling};
 use super::{seeded_game, MID as C};
 
 const W: i64 = LOT_WIDTH;
@@ -305,6 +306,9 @@ fn suite_tower(with_parking: bool) -> (Simulation, i64) {
         assert!(sim.tower.place(Kind::ParkingRamp, 0, c).ok);
         assert!(sim.tower.place(Kind::Parking, 0, c + 16).ok);
     }
+    // A three-star tower is judged on its trash too.
+    lay_basement(&mut sim, -3);
+    stock_recycling(&mut sim, -3, 0, 1);
     let suite = sim.tower.place(Kind::HotelSuite, 2, 0).unit_id.unwrap();
     (sim, suite)
 }

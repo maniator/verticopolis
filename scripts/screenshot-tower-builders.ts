@@ -98,13 +98,9 @@ export function buildCanonTower(): void {
   const metro = s.tower.place("metro", -4, left + 8);
   if (!metro.ok) throw new Error(`hero metro failed: ${metro.reason}`);
   s.tower.getUnit(metro.unitId).state = "occupied";
-  // The first elevator bank, held back from the transport block above: it
-  // serves the metro platform (B4, floor -3) through the lobby up to the
-  // 15F sky lobby, and can only be placed once the basement floors exist
-  // (review Edge #1: the earlier placement was silently rejected, orphaning
-  // the platform AND floors 3-14). Hard-assert the result: this call is
-  // order-sensitive and load-bearing for the metro scene, so a regression
-  // must fail the capture loudly, not ship an empty platform.
+  // The first elevator bank serves the metro platform (B4) up to the 15F sky
+  // lobby. It needs the basement floors first (review Edge #1), and the metro
+  // scene depends on it, so a failed placement fails the capture loudly.
   const platformBank = s.tower.placeTransport("elevatorStandard", left + 2, -3, 15);
   if (!platformBank.ok) throw new Error(`hero platform bank failed: ${platformBank.reason}`);
   s.tower.place("parkingRamp", -1, left);
@@ -113,6 +109,9 @@ export function buildCanonTower(): void {
     if (r.ok) x += s.tower.getUnit(r.unitId).width;
     else x += 1;
   }
+  // Recycling beside the metro: from 3 stars a shortfall drains ratings (#1970).
+  const recycling = s.tower.place("recycling", -3, left + 50);
+  if (!recycling.ok) throw new Error(`hero recycling failed: ${recycling.reason}`);
   s.evaluateStar();
   g.engine.setSim(g.enginePort.sim ? s : (g.syncSim(), g.renderSim));
   g.engine.setCamera(cx, 20, 0.5);

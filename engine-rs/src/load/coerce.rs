@@ -120,6 +120,8 @@ pub(super) fn vacate_reason(v: Option<&Value>) -> Option<&'static str> {
         "transportFar" => "transportFar",
         "lobbyFar" => "lobbyFar",
         "unmetDemand" => "unmetDemand",
+        "trash" => "trash",
+        "parking" => "parking",
         "relocation" => "relocation",
         _ => return None,
     })

@@ -52,7 +52,8 @@ impl Simulation {
                     || (u.floor != 1 && r.cong > 1.0)
                     || over_market_rent
                     || r.far_walk
-                    || r.lobby_far;
+                    || r.lobby_far
+                    || r.service_short.is_some();
                 if noise_cannot_evict && non_noise_problem {
                     u.extras_mut().vacate_reason = Some(self.vacate_cause(&u, &r));
                     self.tower.units[i].extras_mut().vacate_reason = u.extras().vacate_reason;

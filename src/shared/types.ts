@@ -133,9 +133,11 @@ export function isUnitState(v: unknown): v is UnitState {
  *  `noTransport`: the unit's own contiguous floor segment cannot reach the ground
  *  lobby through any chain of transports, even though another part of the floor
  *  can (a gap-split floor whose transport sits on the far half); distinct from
- *  `access`, which is the whole floor being off the network (#647). */
+ *  `access`, which is the whole floor being off the network (#647). `trash`:
+ *  from 3 stars, too few recycling centers for the population. `parking`: from
+ *  3 stars, an office without enough parking for its workers. */
 export type VacateReason =
-  | "access" | "noTransport" | "congestion" | "rent" | "noise" | "transportFar" | "lobbyFar" | "unmetDemand" | "relocation";
+  | "access" | "noTransport" | "congestion" | "rent" | "noise" | "transportFar" | "lobbyFar" | "unmetDemand" | "relocation" | "trash" | "parking";
 
 /** Player-facing phrase for each departure cause (toasts + inspector). Kept
  *  transport-neutral: a floor is "served" by any route to the lobby (elevator,

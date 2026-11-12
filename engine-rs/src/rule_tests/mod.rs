@@ -71,6 +71,7 @@ mod save_log;
 mod save_versions;
 mod segment_routing;
 mod segment_routing_reachable;
+mod service_shortfall;
 mod simulation_bridge;
 mod simulation_economy;
 mod simulation_events;
@@ -80,6 +81,7 @@ mod simulation_sky_lobby;
 mod simulation_transport;
 mod skylobby_transfer;
 mod sparse_save;
+pub(crate) mod stocked_services;
 mod subsystems;
 mod undo_signature;
 mod unmet_demand;
@@ -211,6 +213,7 @@ pub fn calm() -> crate::satisfaction::StepResult {
         lobby_far: false,
         unmet_demand: false,
         unmet_cov: None,
+        service_short: None,
     }
 }
 

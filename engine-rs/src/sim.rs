@@ -246,6 +246,8 @@ pub struct Simulation {
     #[doc(hidden)]
     pub suite_parking_nudged: bool,
     #[doc(hidden)]
+    pub office_parking_nudged: bool,
+    #[doc(hidden)]
     pub stranded_nudged: bool,
     #[doc(hidden)]
     pub metro_platform_nudged: bool,
@@ -335,6 +337,7 @@ impl Simulation {
             move_ins_today: MoveIns::default(),
             waste_nudged: false,
             suite_parking_nudged: false,
+            office_parking_nudged: false,
             stranded_nudged: false,
             metro_platform_nudged: false,
             extermination_room_ids: None,

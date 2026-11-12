@@ -55,6 +55,10 @@ impl Simulation {
             return Some("congestion");
         }
         let very_far = r.lobby_far;
+        // A service shortfall that sinks the rating outranks unmet demand; one
+        // that only holds it at Good ranks last.
+        let sinking_short = r.service_short.filter(|s| s.sinks).map(|s| s.cause);
+        let holding_short = r.service_short.filter(|s| !s.sinks).map(|s| s.cause);
         let unmet_active = r.unmet_demand;
         let unmet_drain = |cov: Option<f64>| -> Option<Drain> {
             if !unmet_active || !u.kind.is_unmet_demand_kind() {
@@ -85,10 +89,13 @@ impl Simulation {
             if r.noisy && !unmet_outranks_noise() {
                 return Some("noise");
             }
+            if let Some(cause) = sinking_short {
+                return Some(cause);
+            }
             if unmet_active {
                 return Some("unmetDemand");
             }
-            return None;
+            return holding_short;
         }
         if u.kind.is_lease_amenity() {
             if over_rent(u.kind) {
@@ -115,10 +122,13 @@ impl Simulation {
             {
                 return Some("noise");
             }
+            if let Some(cause) = sinking_short {
+                return Some(cause);
+            }
             if u.kind.is_unmet_demand_kind() && unmet_active {
                 return Some("unmetDemand");
             }
-            return None;
+            return holding_short;
         }
         if very_far {
             return Some("lobbyFar");
@@ -129,10 +139,13 @@ impl Simulation {
         if self.near_nightclub(u.floor) && !unmet_outranks(self.nightclub_penalty_at(u.floor)) {
             return Some("noise");
         }
+        if let Some(cause) = sinking_short {
+            return Some(cause);
+        }
         if unmet_active {
             return Some("unmetDemand");
         }
-        None
+        holding_short
     }
 
     pub fn vacate_cause(&self, u: &Unit, r: &StepResult) -> &'static str {

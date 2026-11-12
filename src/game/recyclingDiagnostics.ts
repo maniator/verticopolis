@@ -15,6 +15,6 @@ export function recyclingLinesOf(pop: number, cap: number, fill: number, demandM
     html`<div>Fill: ${fillPct}%. Truck collects each morning.</div>`,
     demandMet
       ? html`<div style="color:var(--good)">Capacity: ${groupDigits(pop)}/${groupDigits(cap)} population; demand met.</div>`
-      : html`<div style="color:var(--bad)">Over capacity: ${groupDigits(pop)} population vs ${groupDigits(cap)} processed. Build another center (4★ requires demand met).</div>`,
+      : html`<div style="color:var(--bad)">Over capacity: ${groupDigits(pop)} population vs ${groupDigits(cap)} processed. Build another center: tenant ratings fall while trash piles up, and 4★ requires demand met.</div>`,
   ];
 }

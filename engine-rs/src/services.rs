@@ -2,6 +2,7 @@
 
 use crate::demand::RECYCLING_POP_PER_CENTER;
 use crate::facilities::Kind;
+use crate::rules::OfficeParking;
 use crate::sim::{LogKind, Simulation};
 use crate::star::is_tenant_floor_unit;
 use crate::tower::{Unit, UnitState};
@@ -113,7 +114,7 @@ pub(crate) fn with_thousands(x: f64) -> String {
 /// The garbage advisory (`nudgeServiceShortfalls` in `sim/services.ts`).
 pub(crate) fn waste_nudge_message(pop: f64, need: f64, have: impl std::fmt::Display) -> String {
     format!(
-        "♻️ Garbage is piling up: {} population needs {need} Recycling Center{} (you have {have}). 4★ requires demand met.",
+        "♻️ Garbage is piling up: {} population needs {need} Recycling Center{} (you have {have}). Tenant ratings fall until it is handled, and 4★ requires demand met.",
         with_thousands(pop),
         if need == 1.0 { "" } else { "s" }
     )
@@ -124,6 +125,21 @@ pub(crate) fn suite_nudge_message(suites: f64, spots: impl std::fmt::Display) ->
     format!(
         "🚗 Hotel suites need a working parking space each: {suites} suite{}, {spots} space(s) chained to a ramp.",
         if suites == 1.0 { "" } else { "s" }
+    )
+}
+
+/// Classic's office-parking advisory: offices lose their ratings while no
+/// parking is left for them (`satisfaction::shortfall`).
+pub(crate) const OFFICE_PARKING_NONE_MESSAGE: &str =
+    "🚗 Offices have no parking: no working space is left once hotel guests park. Office ratings fall until you add spaces.";
+
+/// Modern's office-parking advisory: offices want parking from three stars,
+/// and their ratings fall while it runs short (`satisfaction::shortfall`).
+pub(crate) fn office_parking_nudge_message(need: f64, spare: f64) -> String {
+    format!(
+        "🚗 Offices need parking: their workers need {need} space{} and {spare} {} left after the hotel suites. Office ratings fall until there is room.",
+        if need == 1.0 { "" } else { "s" },
+        if spare == 1.0 { "is" } else { "are" }
     )
 }
 
@@ -176,6 +192,10 @@ impl Simulation {
                 suites += 1.0;
             }
         }
+        // The spaces the office workers' cars fill: what the garage draws and
+        // the statistics count. Whether the offices are short is the mode's
+        // rule ([`Simulation::office_parking_short`]); in Classic one free
+        // space serves them all (#1970).
         let offices = (office_pop / PARKING_WORKERS_PER_SPACE).ceil();
         ParkingDemand {
             office_pop,
@@ -190,13 +210,12 @@ impl Simulation {
         d.suites > 0.0 && (self.tower.functional_parking_spots() as f64) < d.suites
     }
 
+    /// Whether the offices lack parking under this mode's rule (#1970), the
+    /// same answer the satisfaction drain and the log nudge read.
     pub fn office_parking_short(&self) -> bool {
-        if self.star < Kind::Parking.facility().min_star {
-            return false;
-        }
-        let d = self.parking_demand();
-        let for_offices = (self.tower.functional_parking_spots() as f64 - d.suites).max(0.0);
-        for_offices * PARKING_WORKERS_PER_SPACE < d.office_pop
+        self.service_shortfalls()
+            .office_parking_coverage()
+            .is_some()
     }
 
     pub fn nudge_service_shortfalls(&mut self) {
@@ -215,6 +234,22 @@ impl Simulation {
             self.emit(&msg, LogKind::Info);
         }
         self.suite_parking_nudged = suite_short;
+        let office_short = self
+            .service_shortfalls()
+            .office_parking_coverage()
+            .is_some();
+        if office_short && !self.office_parking_nudged {
+            let msg = match self.mode.office_parking() {
+                OfficeParking::AnyFreeSpace => OFFICE_PARKING_NONE_MESSAGE.to_string(),
+                OfficeParking::WorkersPerSpace(_) => {
+                    let d = self.parking_demand();
+                    let spots = self.tower.functional_parking_spots() as f64;
+                    office_parking_nudge_message(d.offices, (spots - d.suites).max(0.0))
+                }
+            };
+            self.emit(&msg, LogKind::Info);
+        }
+        self.office_parking_nudged = office_short;
     }
 
     pub fn nudge_stranded(&mut self) {

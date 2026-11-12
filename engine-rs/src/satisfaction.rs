@@ -12,7 +12,10 @@ use crate::sim::Simulation;
 use crate::tower::Unit;
 
 mod gripes;
+pub mod shortfall;
 mod update;
+
+use shortfall::{shortfall_drain, ServiceShort, ServiceShortfalls};
 
 pub const VACATE_NOTICE_MINUTES: f64 = 2.0 * 24.0 * 60.0;
 pub const VACATE_RESCIND: f64 = 0.4;
@@ -47,6 +50,8 @@ pub struct SatisfactionContext {
     pub spa_floors: Vec<i64>,
     pub daycare_floors: Vec<i64>,
     pub demand_map: Option<DemandMap>,
+    /// This hour's recycling and office parking coverage, read once.
+    pub shortfalls: ServiceShortfalls,
 }
 
 pub struct StepResult {
@@ -58,6 +63,8 @@ pub struct StepResult {
     pub lobby_far: bool,
     pub unmet_demand: bool,
     pub unmet_cov: Option<f64>,
+    /// The service shortfall holding this room down, if any.
+    pub service_short: Option<ServiceShort>,
 }
 
 fn nearest_floor_dist(floors: &[i64], floor: i64) -> f64 {
@@ -131,6 +138,7 @@ impl Simulation {
             spa_floors,
             daycare_floors,
             demand_map: None,
+            shortfalls: self.service_shortfalls(),
         }
     }
 
@@ -255,7 +263,10 @@ impl Simulation {
             Some(c) => self.mode.unmet_demand_drain(c),
         };
         let unmet_capped = unmet_drain.cap < 1.0;
-        if far_walk || noisy || lobby_capped || unmet_capped {
+        let service_short = ctx.shortfalls.binding_for(u, served);
+        let short_drain = service_short.map_or(NO_DRAIN, shortfall_drain);
+        let short_capped = short_drain.cap < 1.0;
+        if far_walk || noisy || lobby_capped || unmet_capped || short_capped {
             let base_erosion = noise_base_erosion_for(u.kind, u.ever_occupied);
             let scale = if far_walk {
                 1.0
@@ -269,16 +280,18 @@ impl Simulation {
             };
             let erosion = placement_erosion
                 .max(lobby_drain.erosion)
-                .max(unmet_drain.erosion);
+                .max(unmet_drain.erosion)
+                .max(short_drain.erosion);
             let cap = (if far_walk || noisy { NOISE_CAP } else { 1.0 })
                 .min(lobby_drain.cap)
                 .min(unmet_drain.cap);
             // A nearby amenity raises the ceiling that noise, a far lobby or
             // unmet demand sets, never the one a far walk to transport sets
-            // (no gym shortens that walk). The capped flags above still read
-            // the raw caps, so the gripe ladder keeps naming the cause.
+            // (no gym shortens that walk) nor a service shortfall's (#1970).
+            // The capped flags above still read the raw caps, so the gripe
+            // ladder keeps naming the cause.
             let lift = if far_walk { 0.0 } else { amenity_lift };
-            let cap = (cap + lift).min(1.0);
+            let cap = (cap + lift).min(1.0).min(short_drain.cap);
             s = (s - erosion).min(cap).max(0.0);
         }
         StepResult {
@@ -290,6 +303,7 @@ impl Simulation {
             lobby_far: lobby_drain.cap <= GRIPE_WARN,
             unmet_demand: unmet_drain.erosion > 0.0,
             unmet_cov: coverage,
+            service_short,
         }
     }
 
@@ -328,8 +342,12 @@ impl Simulation {
         // horizon hour by hour from now and opens the clubs in their hours:
         // a night run would otherwise hold every spot near a club, and a day
         // run would let a tenant in beside one that evicts them overnight.
+        // The newcomer adds to the trash and parking need it is judged by,
+        // only while the probe runs.
         let open_now = ctx.nightclub_open;
+        ctx.shortfalls.set_candidate(Some(fresh_tenant_need(u)));
         let doomed = self.gate_horizon_dooms(&probe, ctx);
+        ctx.shortfalls.set_candidate(None);
         ctx.nightclub_open = open_now;
         doomed
     }
@@ -369,9 +387,24 @@ pub fn vacate_reason_text(reason: &'static str) -> &'static str {
         "transportFar" => "too far from a stairway, escalator, or passenger elevator",
         "lobbyFar" => "too far from a lobby or sky lobby",
         "unmetDemand" => "too few shops or restaurants within reach",
+        "trash" => "trash piling up without enough recycling",
+        "parking" => "too little parking for its workers",
         "relocation" => "the household is relocating",
         other => other,
     }
+}
+
+/// The kind and head count a fresh tenant of `u` adds to the service need:
+/// a seated household for a condo or rental apartment (as the move-in gate
+/// seats its probe), else the unit's residents or its kind's population.
+pub(crate) fn fresh_tenant_need(u: &Unit) -> (Kind, f64) {
+    let heads = if u.kind == Kind::Condo || u.kind == Kind::RentalApartment {
+        CLASSIC_HOUSEHOLD
+    } else {
+        u.residents
+            .map_or(u.kind.facility().population as f64, |r| r as f64)
+    };
+    (u.kind, heads)
 }
 
 #[cfg(test)]

@@ -46,6 +46,8 @@ fn slabs(mode: GameMode, top: i64) -> Simulation {
     for x in 0..LOT_WIDTH {
         assert!(sim.tower.place(Kind::Lobby, 1, x).ok);
     }
+    // The tower is judged at three stars and up, so it has its services.
+    crate::rule_tests::stocked_services::stock_services(&mut sim, 1);
     for f in 2..=top {
         for x in 0..LOT_WIDTH {
             assert!(sim.tower.place(Kind::Floor, f, x).ok);

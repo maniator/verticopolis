@@ -16,6 +16,7 @@ use crate::star::{STAR_THRESHOLDS, TOWER_POPULATION};
 use crate::tower::UnitState;
 
 use super::faq_complete::lay;
+use super::stocked_services::{lay_basement, stock_recycling};
 use super::{seeded_game, MID as C};
 
 const W: i64 = LOT_WIDTH;
@@ -143,6 +144,9 @@ fn new_offices_filled(with_parking: bool) -> usize {
             );
         }
     }
+    // A three-star tower is judged on its trash too.
+    lay_basement(&mut sim, -3);
+    stock_recycling(&mut sim, -3, 0, 1);
     for _ in 0..12 {
         sim.tick(60.0);
     }
