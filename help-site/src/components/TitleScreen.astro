@@ -3,6 +3,8 @@
 // setting sun, the skyline and the VERTICO/POLIS wordmark, as on the engine
 // docs site (docs/engine-site/src/components/TitleScreen.astro), lettered as
 // the game's own title screen (src/ui/splashTemplate.ts, splash.css). Starlight renders it from the page's `hero` front matter.
+// A button that starts the game (link "/") is marked `data-game-link`, so in a
+// tab the game opened it reads Back to game and closes the tab (Header.astro).
 const { data } = Astro.locals.starlightRoute.entry;
 const { tagline, actions = [] } = data.hero || {};
 ---
@@ -23,7 +25,10 @@ const { tagline, actions = [] } = data.hero || {};
     {tagline && <p class="ts-premise">{tagline}</p>}
     <div class="ts-actions">
       {actions.map((action) => (
-        <a class:list={["ts-btn", { primary: action.variant === "primary" }]} href={action.link}>
+        <a
+          class:list={["ts-btn", { primary: action.variant === "primary" }]}
+          href={action.link}
+          data-game-link={action.link === "/" ? "" : undefined}>
           {action.text}
         </a>
       ))}

@@ -1,15 +1,17 @@
 ---
-// Starlight's own header (title, search, theme switch) with the game's "Back
-// to game" button at its right, so it shows on every page and every screen
-// size. A tab the game opened (?from=game, src/ui/fromGame.ts) closes on Back
-// to game instead of loading a second copy of the game; the note below says
-// so when the browser keeps the tab open.
+// Starlight's own header (title, search, theme switch), with the game's "Back
+// to game" button at its right in a tab the game opened (?from=game,
+// src/ui/fromGame.ts), on every page and every screen size. Back to game
+// closes that tab instead of loading a second copy of the game; the note below
+// says so when the browser keeps the tab open. A visitor who came from
+// anywhere else gets no button here: the front page's own Play button starts
+// the game. In a game-opened tab that Play button turns into Back to game too.
 import Default from "@astrojs/starlight/components/Header.astro";
 ---
 
 <div class="vc-header">
   <div class="vc-header-default"><Default /></div>
-  <a class="vc-back" href="/" data-act="back-to-game">Back to game</a>
+  <a class="vc-back" href="/" data-act="back-to-game" hidden>Back to game</a>
 </div>
 <p id="back-note" class="vc-back-note" tabindex="-1" hidden></p>
 
@@ -24,7 +26,13 @@ import Default from "@astrojs/starlight/components/Header.astro";
   if (landing) trackAppAction(landing);
   if (takeFromGameFlag(location, history)) {
     for (const back of document.querySelectorAll<HTMLAnchorElement>('a[data-act="back-to-game"]')) {
+      back.hidden = false;
       back.addEventListener("click", (e) => backToOpenGame(e));
+    }
+    // The front page's Play button: the game is already open in another tab.
+    for (const play of document.querySelectorAll<HTMLAnchorElement>("a[data-game-link]")) {
+      play.textContent = "Back to game";
+      play.addEventListener("click", (e) => backToOpenGame(e));
     }
   }
 </script>

@@ -27,6 +27,9 @@
   background: var(--r-face);
   box-shadow: var(--bevel-out);
 }
+.vc-back[hidden] {
+  display: none;
+}
 .vc-back:hover {
   color: var(--r-ink);
 }
