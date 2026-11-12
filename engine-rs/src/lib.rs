@@ -64,7 +64,7 @@
 //! - **Threads are the host's choice.** A [`Simulation`](sim::Simulation)
 //!   is `Send`, so a native host can run a game on a worker thread and send
 //!   it commands. It is not `Sync`: one thread drives a game at a time. A
-//!   game played on another thread comes out the same, byte for byte.
+//!   game played on another thread ends in the same state.
 //! - **Deterministic.** The same seed, commands and sequence of `tick` calls
 //!   give the same game on any machine, here and in the WebAssembly build.
 //!   The conformance suite in the repository is how a host proves it.
