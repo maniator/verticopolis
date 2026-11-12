@@ -59,7 +59,7 @@ export function splashTemplate(hasSave: boolean, premise: string, muted: boolean
   return html`<div class="splash-stars" aria-hidden="true"></div>
     <div class="splash-sun" aria-hidden="true"></div>
     <svg class="splash-skyline" aria-hidden="true" viewBox="0 0 460 200" preserveAspectRatio="xMidYMax slice">
-      <g fill="#201643" stroke="#0d0d10" stroke-width="1">
+      <g class="buildings" stroke-width="1">
         <path d="M-5 200 V120 h34 V98 h16 V120 h40 V200 z" />
         <path d="M95 200 V80 h26 V56 h12 V80 h26 V200 z" />
         <path d="M200 200 V54 h20 V30 h9 V10 h9 V30 h9 V54 h20 V200 z" />

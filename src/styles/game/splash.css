@@ -1,11 +1,9 @@
 /* The title screen, the boot cover and their buttons.
    Part of the game's stylesheet: src/styles.css imports the parts in order. */
 
-/* The title-screen sky, shared by the JS splash and the static boot cover below
-   so the two never diverge. */
-:root {
-  --splash-sky: linear-gradient(#161634 0%, #241f4c 34%, #5b3560 62%, #c65a63 86%, #ef8560 100%);
-}
+/* The title-screen colors (--splash-*) live in styles/retro-tokens.css, which
+   the docs site's landing page reads too. The JS splash and the static boot
+   cover below wear the same sky, so the two never diverge. */
 #splash {
   position: fixed;
   inset: 0;
@@ -80,8 +78,12 @@
   width: min(44vmin, 210px);
   height: min(44vmin, 210px);
   border-radius: 50%;
-  background: radial-gradient(circle, #ffe6a0 0%, #ffc94a 52%, #f18f4b 100%);
-  box-shadow: 0 0 60px 16px rgba(255, 179, 87, 0.26);
+  background: var(--splash-sun);
+  box-shadow: 0 0 60px 16px var(--splash-sun-glow);
+}
+.splash-skyline .buildings {
+  fill: var(--splash-building);
+  stroke: var(--splash-ink);
 }
 .splash-skyline {
   position: absolute;
@@ -112,8 +114,8 @@
   stroke: rgba(0, 0, 0, 0.35);
   stroke-width: 2px;
 }
-.splash-word .a { fill: #f7f1e4; }
-.splash-word .b { fill: #ffc94a; }
+.splash-word .a { fill: var(--splash-wordmark); }
+.splash-word .b { fill: var(--splash-amber); }
 .splash-tag {
   display: block;
   width: min(78vw, 340px);
@@ -122,12 +124,12 @@
 .splash-tag text {
   font-family: "Century Gothic", "Twentieth Century", "URW Gothic", system-ui, sans-serif;
   font-size: 15px;
-  fill: #ffd9a8;
+  fill: var(--splash-tagline);
 }
 .splash-premise {
   max-width: 46ch;
   margin: 18px auto 0;
-  color: #e7ddf5;
+  color: var(--splash-premise);
   line-height: 1.45;
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.55);
 }
@@ -152,14 +154,14 @@
   min-height: 48px;
   font-size: 22px;
   line-height: 1;
-  color: #e6dcc0;
+  color: var(--splash-cream);
   background: rgba(13, 13, 16, 0.35);
   border: 2px solid rgba(230, 220, 192, 0.55);
   border-radius: 8px;
   cursor: pointer;
 }
 .splash-mute:hover { background: rgba(13, 13, 16, 0.55); }
-.splash-mute:focus-visible { outline: 2px solid #ffc94a; outline-offset: 2px; }
+.splash-mute:focus-visible { outline: 2px solid var(--splash-amber); outline-offset: 2px; }
 
 /* The persistent splash install button (SPEC-pwa-install CAP-5): the quiet
    front door for getting Verticopolis onto the device. A labeled pill (download
@@ -183,30 +185,30 @@
   font-weight: 600;
   letter-spacing: 0.02em;
   line-height: 1;
-  color: #e6dcc0;
+  color: var(--splash-cream);
   background: rgba(13, 13, 16, 0.35);
   border: 2px solid rgba(230, 220, 192, 0.55);
   border-radius: 8px;
   cursor: pointer;
 }
 .splash-install:hover { background: rgba(13, 13, 16, 0.55); }
-.splash-install:focus-visible { outline: 2px solid #ffc94a; outline-offset: 2px; }
+.splash-install:focus-visible { outline: 2px solid var(--splash-amber); outline-offset: 2px; }
 
 .splash-btn {
   font-family: var(--r-font);
   font-size: 15px;
   padding: 9px 18px;
   min-height: 42px;
-  color: #20204a;
-  background: #e6dcc0;
-  border: 2px solid #0d0d10;
+  color: var(--splash-plate-ink);
+  background: var(--splash-cream);
+  border: 2px solid var(--splash-ink);
   box-shadow: inset 2px 2px 0 rgba(255, 255, 255, 0.75), inset -2px -2px 0 rgba(0, 0, 0, 0.2), 3px 3px 0 rgba(0, 0, 0, 0.4);
   cursor: pointer;
 }
 .splash-btn:active { box-shadow: inset 2px 2px 0 rgba(0, 0, 0, 0.3); }
 /* The global navy focus ring is invisible on the night-sky splash. */
-.splash-btn:focus-visible { outline: 2px solid #ffc94a; outline-offset: 2px; }
-.splash-btn.primary { background: #ffc94a; font-weight: 700; }
+.splash-btn:focus-visible { outline: 2px solid var(--splash-amber); outline-offset: 2px; }
+.splash-btn.primary { background: var(--splash-amber); font-weight: 700; }
 .splash-btn.ghost {
   background: transparent;
   box-shadow: none;

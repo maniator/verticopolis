@@ -5,7 +5,7 @@
 // (Starlight prints the title), and its links rewritten: a link to another
 // page of the site stays on the site, and any other repository link points at
 // GitHub at DOCS_REF (the release tag on a release build, main otherwise).
-// The game's palette, logo and favicon are copied in the same way.
+// The game's palette, logo, favicon and title-screen skyline are copied in the same way.
 import { copyFileSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, posix, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -87,6 +87,7 @@ function main() {
   mkdirSync(join(site, "public"), { recursive: true });
   copyFileSync(join(repo, "src/public/icon-1024x1024.png"), join(site, "src/assets/logo.png"));
   copyFileSync(join(repo, "src/public/favicon.png"), join(site, "public/favicon.png"));
+  copyFileSync(join(repo, "src/public/splash-skyline.svg"), join(site, "public/splash-skyline.svg"));
   copyFileSync(join(repo, "src/styles/retro-tokens.css"), join(site, "src/styles/retro-tokens.css"));
   console.log(`synced ${pages.length} pages at ${ref}`);
 }
