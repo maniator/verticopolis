@@ -58,10 +58,11 @@ fn deadline_after(now: f64) -> f64 {
 /// One guard on the search: the floor it is sweeping, or `None` once no
 /// stretch is left for it, the tile `x` that names the stretch on that floor,
 /// and the minute that sweep ends. `from` and `start` are where and when it
-/// set off, `from_x` a tile of the stretch it left, `turn` the floor it went
-/// down (or up) to on the way when the stairs do not lead straight there, and
-/// `arrive` the minute it reached the stretch, so a host can draw the walk on
-/// the emergency stairs before the walk along the rooms.
+/// set off, `route` the corners of its walk on the emergency stairs (the
+/// floor and stairs tile where it sets off, turns back or changes stairs,
+/// and steps off; empty for a guard from an older save, which climbed
+/// straight), and `arrive` the minute it reached the stretch, so a host can
+/// draw the walk on the stairs before the walk along the rooms.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Guard {
     pub floor: Option<i64>,
@@ -70,8 +71,7 @@ pub struct Guard {
     pub x: Option<i64>,
     pub done_at: f64,
     pub from: i64,
-    pub from_x: Option<i64>,
-    pub turn: i64,
+    pub route: Vec<(i64, i64)>,
     pub start: f64,
     pub arrive: f64,
 }
@@ -96,13 +96,13 @@ pub struct BombSearch {
 }
 
 /// The stretch a guard sets off for: its floor and first tile, the width of
-/// its rooms, the floors of stairs on the way and the floor it turns at.
+/// its rooms, the floors of stairs on the way and the corners of that walk.
 struct Target {
     floor: i64,
     x: i64,
     width: i64,
     floors: i64,
-    turn: i64,
+    route: Vec<(i64, i64)>,
 }
 
 /// The stretches already swept or taken by a guard, so each is swept once.
@@ -261,7 +261,7 @@ impl Simulation {
                 if let Some(t) = &next {
                     claims.claim(stairs, t.floor, Some(t.x));
                 }
-                sweep(next, office, Some(x), now)
+                sweep(next, office, now)
             })
             .collect()
     }
@@ -370,7 +370,6 @@ impl Simulation {
                     .find(|&s| stairs.stretch(s).floor == from)
                     .or_else(|| stairs.at(from, bomb_tile)),
             };
-            let from_x = start.map(|s| stairs.stretch(s).first);
             let next = start.and_then(|s| {
                 let walk = stairs.walk_from(s);
                 next_stretch(stairs, &rooms, &claims, s, &walk)
@@ -378,7 +377,7 @@ impl Simulation {
             if let Some(t) = &next {
                 claims.claim(stairs, t.floor, Some(t.x));
             }
-            b.guards[i] = sweep(next, from, from_x, done.done_at);
+            b.guards[i] = sweep(next, from, done.done_at);
             moved = true;
         }
         if moved {
@@ -413,13 +412,13 @@ fn next_stretch(
             x: stairs.stretch(i).first,
             width,
             floors,
-            turn: stairs.turn_floor(walk, start, i),
+            route: stairs.route(walk, start, i),
         })
 }
 
-/// A guard leaving `from` (a tile `from_x` of its stretch) at minute `start`
-/// for `next`: the stairs there, then the walk along the rooms.
-fn sweep(next: Option<Target>, from: i64, from_x: Option<i64>, start: f64) -> Guard {
+/// A guard leaving `from` at minute `start` for `next`: the stairs there,
+/// then the walk along the rooms.
+fn sweep(next: Option<Target>, from: i64, start: f64) -> Guard {
     match next {
         Some(t) => {
             let arrive = start + t.floors as f64 * STAIR_MINUTES_PER_FLOOR;
@@ -428,8 +427,7 @@ fn sweep(next: Option<Target>, from: i64, from_x: Option<i64>, start: f64) -> Gu
                 x: Some(t.x),
                 done_at: arrive + t.width as f64 * SWEEP_MINUTES_PER_TILE,
                 from,
-                from_x,
-                turn: t.turn,
+                route: t.route,
                 start,
                 arrive,
             }
@@ -439,8 +437,7 @@ fn sweep(next: Option<Target>, from: i64, from_x: Option<i64>, start: f64) -> Gu
             x: None,
             done_at: start,
             from,
-            from_x,
-            turn: from,
+            route: Vec::new(),
             start,
             arrive: start,
         },

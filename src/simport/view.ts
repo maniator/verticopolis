@@ -137,13 +137,11 @@ export interface BombSearchGuard {
   readonly left: number;
   readonly right: number;
   readonly from: number;
-  /** The left edge of the rooms the guard set off from: it takes the
-   *  emergency stairs beside them. */
-  readonly fromLeft: number;
-  /** The floor it walks down (or up) to before climbing to `floor`, when
-   *  the stretch is in another tower; `from` when the stairs lead straight
-   *  there. */
-  readonly turn: number;
+  /** The corners of its walk on the emergency stairs, as [floor, stairs
+   *  tile]: where it sets off, each place it turns back or crosses a shared
+   *  floor to other stairs, and where it steps off. Empty for a guard from
+   *  an older save, which climbs straight from `from` beside the rooms. */
+  readonly route: ReadonlyArray<readonly [number, number]>;
   readonly start: number;
   readonly arrive: number;
   readonly done: number;

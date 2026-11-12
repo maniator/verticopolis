@@ -89,7 +89,7 @@ describe("a figure walking a floor fits inside it at every zoom", () => {
   it("keeps the guards the overlay draws during a search inside their floor when zoomed out", () => {
     const zoom = 0.1;
     const { ctx, rects } = rectCtx();
-    const sweeping = [{ floor: 5, left: 160, right: 200, from: 5, fromLeft: 160, turn: 5, start: 0, arrive: 0, done: 40 }];
+    const sweeping = [{ floor: 5, left: 160, right: 200, from: 5, route: [], start: 0, arrive: 0, done: 40 }];
     const engine: any = {
       viewWidth: 800,
       viewHeight: 600,
@@ -124,20 +124,37 @@ describe("a figure walking a floor fits inside it at every zoom", () => {
 });
 
 describe("a guard crossing to another tower on the lot", () => {
-  // Off from floor 4 of the left tower (rooms from tile 110) at minute 0,
-  // down 3 floors to the shared lobby on 1 and up 4 to floor 5 of the right
-  // tower (rooms from tile 210): 7 floors of stairs, 14 minutes.
-  const g = { floor: 5, left: 210, right: 219, from: 4, fromLeft: 110, turn: 1, start: 0, arrive: 14, done: 18.5 };
+  // Off from floor 4 of the left tower (stairs at tile 100) at minute 0,
+  // down 3 floors to the shared lobby on 1, over to the right tower's stairs
+  // (tile 200) and up 4 to floor 5 (rooms from tile 210): 7 floors of
+  // stairs, 14 minutes.
+  const g = {
+    floor: 5, left: 210, right: 219, from: 4, start: 0, arrive: 14, done: 18.5,
+    route: [[4, 100], [1, 100], [1, 200], [5, 200]] as const,
+  };
 
   it("walks down its own tower's stairs to the lobby first", () => {
-    expect(guardPosition(g, 0)).toEqual({ floor: 4, x: 109, climbing: true });
-    expect(guardPosition(g, 4)).toEqual({ floor: 2, x: 109, climbing: true });
+    expect(guardPosition(g, 0)).toEqual({ floor: 4, x: 100, climbing: true });
+    expect(guardPosition(g, 4)).toEqual({ floor: 2, x: 100, climbing: true });
   });
 
   it("then climbs the other tower's stairs, never the sky between them", () => {
-    expect(guardPosition(g, 8)).toEqual({ floor: 2, x: 209, climbing: true });
-    expect(guardPosition(g, 12)).toEqual({ floor: 4, x: 209, climbing: true });
+    expect(guardPosition(g, 6)).toEqual({ floor: 1, x: 200, climbing: true });
+    expect(guardPosition(g, 8)).toEqual({ floor: 2, x: 200, climbing: true });
+    expect(guardPosition(g, 12)).toEqual({ floor: 4, x: 200, climbing: true });
     expect(guardPosition(g, 14)).toEqual({ floor: 5, x: 210, climbing: false });
+  });
+
+  it("follows a route that turns back more than once", () => {
+    // Up 1 to a bridge on 6, over to the middle tower, down 3 to a bridge
+    // on 3, over to the right tower and up 2: 6 floors, 12 minutes.
+    const zigzag = {
+      ...g, from: 5, arrive: 12, done: 20,
+      route: [[5, 100], [6, 100], [6, 200], [3, 200], [3, 300], [5, 300]] as const,
+    };
+    expect(guardPosition(zigzag, 1)).toEqual({ floor: 5.5, x: 100, climbing: true });
+    expect(guardPosition(zigzag, 4)).toEqual({ floor: 5, x: 200, climbing: true });
+    expect(guardPosition(zigzag, 9)).toEqual({ floor: 3.5, x: 300, climbing: true });
   });
 });
 

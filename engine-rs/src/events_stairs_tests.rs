@@ -57,7 +57,15 @@ fn the_stairs_climb_a_tower_floor_by_floor() {
     let walk = stairs.walk_from(start);
     assert_eq!(walk.floors[stairs.at(6, 110).unwrap()], Some(4));
     let up = stairs.at(6, 110).unwrap();
-    assert_eq!(stairs.turn_floor(&walk, start, up), 2, "straight up");
+    assert_eq!(
+        stairs.route(&walk, start, up),
+        vec![(2, 100), (6, 100)],
+        "straight up its stairs"
+    );
+    assert!(
+        stairs.route(&walk, start, start).is_empty(),
+        "already there"
+    );
 }
 
 #[test]
@@ -69,7 +77,55 @@ fn the_other_tower_is_reached_down_to_the_lobby_and_back_up() {
     let other = stairs.at(5, 210).unwrap();
     // Down 3 floors to the lobby on 1, then up 4.
     assert_eq!(walk.floors[other], Some(7));
-    assert_eq!(stairs.turn_floor(&walk, start, other), 1);
+    assert_eq!(
+        stairs.route(&walk, start, other),
+        vec![(4, 100), (1, 100), (1, 200), (5, 200)]
+    );
+}
+
+/// Three towers (tiles 100, 200 and 300 on, floors 2 to 6) with no lobby
+/// between them: a bridge on floor 6 joins the left and middle towers and
+/// one on floor 3 the middle and right. The game builds no overhang, so the
+/// lot is built solid and the gaps cut out under and over the bridges.
+fn bridged() -> Simulation {
+    let mut sim = Simulation::new_game(11, GameMode::Modern);
+    sim.money = 1e9;
+    for x in 100..340 {
+        assert!(sim.build(Kind::Lobby, 1, x).ok);
+    }
+    for f in 2..=6 {
+        for x in 100..340 {
+            assert!(sim.build(Kind::Floor, f, x).ok);
+        }
+    }
+    let cut: Vec<i64> = sim
+        .tower
+        .units
+        .iter()
+        .filter(|u| {
+            ((140..200).contains(&u.x) && u.floor != 6)
+                || ((240..300).contains(&u.x) && u.floor != 3)
+        })
+        .map(|u| u.id)
+        .collect();
+    sim.tower.remove_units(&cut);
+    sim
+}
+
+#[test]
+fn a_route_that_turns_back_twice_keeps_every_corner() {
+    let sim = bridged();
+    let stairs = Stairs::of(&sim.tower);
+    let start = stairs.at(5, 110).unwrap();
+    let walk = stairs.walk_from(start);
+    let to = stairs.at(5, 310).unwrap();
+    assert_eq!(walk.floors[to], Some(6));
+    // Up to the bridge on 6, over, down the middle tower to the bridge on
+    // 3, over, and up the right tower: never through the sky between.
+    assert_eq!(
+        stairs.route(&walk, start, to),
+        vec![(5, 100), (6, 100), (6, 200), (3, 200), (3, 300), (5, 300)]
+    );
 }
 
 #[test]

@@ -190,7 +190,11 @@ fn a_guard_reaches_the_other_tower_down_to_the_lobby_and_back_up() {
         .find(|g| g.x == Some(200))
         .expect("a guard crosses to the right tower");
     assert_eq!(across.floor, Some(2));
-    assert_eq!(across.turn, 1, "it walks down to the shared lobby");
+    assert_eq!(
+        across.route,
+        vec![(2, 100), (1, 100), (1, 200), (2, 200)],
+        "down its own tower's stairs to the shared lobby, over and back up"
+    );
     assert_eq!(across.arrive, start + 2.0 * STAIR_MINUTES_PER_FLOOR);
     let view = sim.bomb_search_view().unwrap();
     let drawn = view["sweeping"]
@@ -201,10 +205,9 @@ fn a_guard_reaches_the_other_tower_down_to_the_lobby_and_back_up() {
         .expect("the right tower's floor 2 is drawn");
     assert_eq!(drawn["right"], 219, "only that tower's rooms");
     assert_eq!(
-        drawn["fromLeft"], 110,
-        "it leaves from the left tower's rooms"
+        drawn["route"],
+        serde_json::json!([[2, 100], [1, 100], [1, 200], [2, 200]])
     );
-    assert_eq!(drawn["turn"], 1);
 }
 
 #[test]
@@ -245,7 +248,7 @@ fn a_search_across_towers_survives_a_save_and_load() {
 #[test]
 fn a_guard_from_an_older_save_sweeps_its_whole_floor() {
     // Before towers were searched one by one a guard held a floor, with no
-    // stretch, turn or arrival.
+    // stretch, route or arrival.
     let old = serde_json::json!({
         "floor": 4, "x": 215.0, "deadline": 9000.0, "seq": 3,
         "guards": [{"floor": 4, "doneAt": 50.0, "from": 2, "start": 10.0}],
@@ -253,7 +256,7 @@ fn a_guard_from_an_older_save_sweeps_its_whole_floor() {
     });
     let b = BombSearch::from_save(&old).expect("reads back");
     assert_eq!(b.guards[0].x, None);
-    assert_eq!(b.guards[0].turn, 2);
+    assert!(b.guards[0].route.is_empty(), "it climbs straight");
     assert_eq!(b.guards[0].arrive, 10.0 + 2.0 * STAIR_MINUTES_PER_FLOOR);
     assert_eq!(b.searched, vec![(2, None), (3, None)]);
     let mut sim = guarded_split_tower();

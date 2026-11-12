@@ -109,23 +109,39 @@ impl Stairs {
         Walk { floors, came_from }
     }
 
-    /// The floor a guard turns at on the way from `start` to `to` along
-    /// `walk`: the shared floor it goes down (or up) to before climbing the
-    /// other tower, or `start`'s own floor when the stairs lead straight there.
-    pub fn turn_floor(&self, walk: &Walk, start: usize, to: usize) -> i64 {
-        let (from, dest) = (self.stretches[start].floor, self.stretches[to].floor);
-        let (low, high) = (from.min(dest), from.max(dest));
-        let mut turn = from;
-        let mut i = to;
-        while i != start {
-            let f = self.stretches[i].floor;
-            let outside = |g: i64| (g - g.clamp(low, high)).abs();
-            if outside(f) > outside(turn) {
-                turn = f;
-            }
-            i = walk.came_from[i];
+    /// The corners of a guard's walk from `start` to `to` along `walk`: the
+    /// floor and the stairs tile where it sets off, each place it turns
+    /// back or crosses a shared floor to other stairs, and where it steps
+    /// off. A step between two stretches takes the stairs at the left edge
+    /// of where they overlap. Empty when `to` is `start` or out of reach.
+    pub fn route(&self, walk: &Walk, start: usize, to: usize) -> Vec<(i64, i64)> {
+        if to == start || walk.floors[to].is_none() {
+            return Vec::new();
         }
-        turn
+        let mut path = vec![to];
+        while let Some(&i) = path.last().filter(|&&i| i != start) {
+            path.push(walk.came_from[i]);
+        }
+        path.reverse();
+        let mut corners: Vec<(i64, i64)> = Vec::new();
+        for step in path.windows(2) {
+            let (s, t) = (self.stretches[step[0]], self.stretches[step[1]]);
+            let stairs = s.first.max(t.first);
+            for p in [(s.floor, stairs), (t.floor, stairs)] {
+                if corners.last() == Some(&p) {
+                    continue;
+                }
+                // A floor passed on the same stairs, going the same way, is
+                // no corner.
+                let straight = matches!(corners.as_slice(), [.., a, b]
+                    if a.1 == p.1 && b.1 == p.1 && (b.0 - a.0).signum() == (p.0 - b.0).signum());
+                if straight {
+                    corners.pop();
+                }
+                corners.push(p);
+            }
+        }
+        corners
     }
 }
 

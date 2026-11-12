@@ -3,7 +3,7 @@ import { isElevatorKind } from "../../presentation/viewKinds";
 import { catalogFacility } from "../../catalog/catalogTypes";
 import { towerCatalog } from "../../catalog/towerCatalog";
 import { viewWorld } from "../../presentation/viewWorld";
-import type { BombSearchGuard, TransportView, UnitView } from "../../simport/view";
+import type { TransportView, UnitView } from "../../simport/view";
 import { drawExplosion, drawSearchGuard, drawThief, drawTreasure, drawVipLimo } from "../sprites/events";
 import { FLOOR, TILE } from "../scale";
 import type { ScreenRect } from "./towerInputCamera";
@@ -11,6 +11,9 @@ import type { ThiefSpan, TowerEngine } from "./TowerEngine";
 import { drawShaftNumbers } from "./towerShaftNumbers";
 import { drawHaloRings } from "./towerHaloRings";
 import { drawNoiseReach } from "./towerNoiseReach";
+import { guardPosition } from "./guardPosition";
+
+export { guardPosition };
 
 /**
  * The 2D canvas overlay and sky painters for {@link TowerEngine}, plus the
@@ -151,26 +154,6 @@ export function drawOverlay(engine: TowerEngine, ctx: CanvasRenderingContext2D):
 export function bombCountdownText(minutesLeft: number): string {
   const left = Math.max(0, Math.ceil(minutesLeft));
   return `💣 Bomb search: ${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")} left`;
-}
-
-/** Where a guard is at minute `now`: on the emergency stairs until
- *  `arrive`, then walking the rooms left to right until `done`. On the
- *  stairs it goes from `from` to `turn` beside the rooms it left
- *  (`fromLeft`), then from `turn` to `floor` beside the rooms it is headed
- *  for, so a guard crossing to another tower walks down to the floor they
- *  share and back up instead of climbing through the sky between them. The
- *  stairs time is split by floors. `floor` may be fractional on the stairs;
- *  `x` is in tiles. */
-export function guardPosition(g: BombSearchGuard, now: number): { floor: number; x: number; climbing: boolean } {
-  const part = (a: number, b: number): number => (b > a ? Math.min(1, Math.max(0, (now - a) / (b - a))) : 1);
-  if (now < g.arrive) {
-    const down = Math.abs(g.turn - g.from);
-    const total = down + Math.abs(g.floor - g.turn);
-    const along = part(g.start, g.arrive) * total;
-    if (along < down) return { floor: g.from + Math.sign(g.turn - g.from) * along, x: g.fromLeft - 1, climbing: true };
-    return { floor: g.turn + Math.sign(g.floor - g.turn) * (along - down), x: g.left - 1, climbing: true };
-  }
-  return { floor: g.floor, x: g.left + (g.right - g.left) * part(g.arrive, g.done), climbing: false };
 }
 
 /** How strong the red glow at the screen's edges is during a bomb search:

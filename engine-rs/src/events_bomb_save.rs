@@ -21,7 +21,8 @@ impl BombSearch {
             "deadline": self.deadline,
             "guards": self.guards.iter().map(|g| json!({
                 "floor": g.floor, "x": g.x, "doneAt": g.done_at, "from": g.from,
-                "fromX": g.from_x, "turn": g.turn, "start": g.start, "arrive": g.arrive,
+                "route": g.route.iter().map(|&(f, x)| json!([f, x])).collect::<Vec<_>>(),
+                "start": g.start, "arrive": g.arrive,
             })).collect::<Vec<_>>(),
             "searched": floors,
             "swept": self.searched.iter().map(|&(f, x)| json!([f, x])).collect::<Vec<_>>(),
@@ -77,7 +78,7 @@ fn tile(v: &Value) -> Option<Option<i64>> {
 }
 
 /// One guard read back. Keys an older save does not have take what that
-/// save meant: no stretch (the whole floor), no turn, and a climb straight
+/// save meant: no stretch (the whole floor), no route, and a climb straight
 /// from where it set off.
 fn guard(g: &serde_json::Map<String, Value>) -> Option<Guard> {
     let done_at = g
@@ -94,16 +95,29 @@ fn guard(g: &serde_json::Map<String, Value>) -> Option<Guard> {
     };
     let from = num("from")?.map_or(floor.unwrap_or(0), |n| n.trunc() as i64);
     let start = num("start")?.unwrap_or(done_at);
-    let turn = opt("turn")?.unwrap_or(from);
-    let climb = floor.map_or(0, |f| (f - turn).abs() + (turn - from).abs());
+    let route = match g.get("route") {
+        None => Vec::new(),
+        Some(v) => v
+            .as_array()?
+            .iter()
+            .map(|p| match p.as_array()?.as_slice() {
+                [f, x] => Some((tile(f)??, tile(x)??)),
+                _ => None,
+            })
+            .collect::<Option<Vec<_>>>()?,
+    };
+    let climb = match (floor, route.as_slice()) {
+        (_, [_, ..]) => route.windows(2).map(|w| (w[1].0 - w[0].0).abs()).sum(),
+        (Some(f), []) => (f - from).abs(),
+        (None, []) => 0,
+    };
     let arrive = num("arrive")?.unwrap_or(start + climb as f64 * STAIR_MINUTES_PER_FLOOR);
     Some(Guard {
         floor,
         x: opt("x")?,
         done_at,
         from,
-        from_x: opt("fromX")?,
-        turn,
+        route,
         start,
         arrive,
     })

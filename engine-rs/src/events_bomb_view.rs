@@ -11,10 +11,10 @@ use crate::sim::Simulation;
 #[doc(hidden)]
 impl Simulation {
     /// The host's read of the search: the deadline, each stretch guards are
-    /// sweeping now with the tile span of its rooms, where the guard set off
-    /// from (the floor, the left edge of the rooms it left and the floor it
-    /// turned at) and the minutes it left, reaches the stretch by the
-    /// emergency stairs and finishes the walk, and the floors with a stretch
+    /// sweeping now with the tile span of its rooms, the floor the guard set
+    /// off from, the corners of its walk on the emergency stairs (floor and
+    /// stairs tile) and the minutes it left, reaches the stretch by the
+    /// stairs and finishes the walk, and the floors with a stretch
     /// already clear. The hiding place stays out. One pass over the units,
     /// read only when the search's `seq` moves.
     pub fn bomb_search_view(&self) -> Option<Value> {
@@ -37,14 +37,10 @@ impl Simulation {
             .filter_map(|g| Some((g, g.floor?)))
             .filter_map(|(g, f)| {
                 let (left, right) = span(f, g.x)?;
-                let from_left = g
-                    .from_x
-                    .and_then(|x| span(g.from, Some(x)))
-                    .map_or(left, |s| s.0);
+                let route: Vec<Value> = g.route.iter().map(|&(f, x)| json!([f, x])).collect();
                 Some(json!({
-                    "floor": f, "left": left, "right": right,
-                    "from": g.from, "fromLeft": from_left, "turn": g.turn,
-                    "start": g.start, "arrive": g.arrive, "done": g.done_at,
+                    "floor": f, "left": left, "right": right, "from": g.from,
+                    "route": route, "start": g.start, "arrive": g.arrive, "done": g.done_at,
                 }))
             })
             .collect();
