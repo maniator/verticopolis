@@ -4,7 +4,7 @@ use crate::crowd::fasthash::FastMap;
 use crate::demand::fold_origin_demand;
 use crate::econ::rent_of;
 use crate::facilities::Kind;
-use crate::satisfaction::SatisfactionContext;
+use crate::satisfaction::{note_halo_venue, SatisfactionContext};
 use crate::services::with_thousands;
 use crate::sim::{LogKind, Simulation};
 use crate::tower::UnitState;
@@ -75,11 +75,9 @@ impl Simulation {
                 Kind::FitnessClub | Kind::Clinic => {
                     if self.rng.chance(0.22 * demand) {
                         self.move_in(i);
-                        if u.kind == Kind::FitnessClub {
-                            if let Some(ctx) = sat_ctx.as_mut() {
-                                if served_set.contains(&u.floor) {
-                                    ctx.club_floors.push(u.floor);
-                                }
+                        if let Some(ctx) = sat_ctx.as_mut() {
+                            if u.kind == Kind::FitnessClub && served_set.contains(&u.floor) {
+                                note_halo_venue(&mut ctx.halo_floors, self.mode, &u);
                             }
                         }
                     }

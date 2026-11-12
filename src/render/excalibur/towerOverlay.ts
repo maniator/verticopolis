@@ -348,8 +348,8 @@ function drawPreview(engine: TowerEngine, ctx: CanvasRenderingContext2D): void {
     const catalog = towerCatalog(engine.sim);
     const f = catalogFacility(catalog, p.kind);
     // A venue's halo shows where it reaches before it is placed (#1980).
-    if (f.halo) drawHaloRings(ctx, f.halo, p.floor, catalog.world, engine);
     const hgt = f.floors;
+    if (f.halo) drawHaloRings(ctx, f.halo, p.floor, hgt, catalog.world, engine);
     // Floor/lobby tools lay a multi-tile brush strip; `span` (when set) is the
     // real footprint so the shadow matches what a click actually places.
     const w = p.span ?? f.width;

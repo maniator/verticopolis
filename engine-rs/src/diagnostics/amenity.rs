@@ -39,7 +39,7 @@ impl Simulation {
                 .room_units()
                 .filter(|c| c.kind == h.source && casts_halo(c))
                 .filter(|c| self.tower.is_floor_served(c.floor))
-                .map(|c| (c.floor - u.floor).abs())
+                .map(|c| h.distance(c.floor, u.floor))
                 .min();
             let Some(d) = nearest else { continue };
             let bonus = mode.halo_strength(h, d as f64, family);
