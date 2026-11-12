@@ -14,16 +14,17 @@ fn shaft_banks<'a>(crowd: &'a mut Crowd, tower: &Tower) -> &'a Banks {
         let mut banks: Banks = HashMap::new();
         for t in &tower.transports {
             let stops = tower.stops_of(t);
-            for &from in &stops {
-                for &to in &stops {
+            // Each stop's landing segments once per shaft, not once per
+            // stop pair: the pair loop below is O(stops^2), and
+            // `landing_segs` allocates and reads the floor's runs (A18 in
+            // #1158).
+            let segs: Vec<Vec<i64>> = stops.iter().map(|&f| tower.landing_segs(t, f)).collect();
+            for (a, &from) in stops.iter().enumerate() {
+                for (b, &to) in stops.iter().enumerate() {
                     if to == from {
                         continue;
                     }
-                    let key = (
-                        t.kind,
-                        tower.landing_segs(t, from),
-                        tower.landing_segs(t, to),
-                    );
+                    let key = (t.kind, segs[a].clone(), segs[b].clone());
                     banks.entry(key).or_default().push(t.id);
                 }
             }

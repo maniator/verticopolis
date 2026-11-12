@@ -19,6 +19,22 @@ fn walked_tiles(tower: &Tower, floor: i64) -> Vec<i64> {
     tiles
 }
 
+/// `segments_of`'s runs as the walk over every unit built them before
+/// they came from the tile index (A9 in #1158).
+fn walked_segments(tower: &Tower, floor: i64) -> Vec<(i64, i64)> {
+    let mut xs = walked_tiles(tower, floor);
+    xs.sort();
+    xs.dedup();
+    let mut runs: Vec<(i64, i64)> = Vec::new();
+    for x in xs {
+        match runs.last_mut() {
+            Some(last) if x == last.1 + 1 => last.1 = x,
+            _ => runs.push((x, x)),
+        }
+    }
+    runs
+}
+
 /// The room ids on `floor` as the walk over every unit lists them.
 fn walked_floor_rooms(tower: &Tower, floor: i64) -> Vec<i64> {
     tower
@@ -90,6 +106,11 @@ fn assert_matches_walks(tower: &Tower) {
             .structural_tiles(floor)
             .map_or_else(Vec::new, |t| t.to_vec());
         assert_eq!(tiles, walked_tiles(tower, floor), "floor {floor}");
+        assert_eq!(
+            tower.segments_of(floor),
+            walked_segments(tower, floor),
+            "floor {floor}"
+        );
         for seed in SEEDS {
             assert_eq!(
                 pick_x(tower, floor, seed),

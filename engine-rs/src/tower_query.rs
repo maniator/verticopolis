@@ -328,24 +328,24 @@ impl Tower {
     /// `segmentsOf`: the contiguous structural runs on a floor.
     pub fn segments_of(&self, floor: i64) -> Vec<(i64, i64)> {
         {
+            let key = self.index_key();
             let mut memo = self.memo.borrow_mut();
             match &memo.segs {
-                Some((rev, _)) if *rev == self.revision => {}
-                _ => memo.segs = Some((self.revision, HashMap::new())),
+                Some((built, _)) if *built == key => {}
+                _ => memo.segs = Some((key, HashMap::new())),
             }
             if let Some(v) = memo.segs.as_ref().unwrap().1.get(&floor) {
                 return v.clone();
             }
         }
-        let mut xs: Vec<i64> = Vec::new();
-        for u in &self.units {
-            if u.kind.is_structural() && u.floor == floor {
-                for i in 0..u.width {
-                    xs.push(u.x + i);
-                }
-            }
-        }
-        xs.sort();
+        // One pass over the units fills every floor's tile list
+        // (`structural_tiles`, cached on the same edit), so filling the
+        // runs of every floor after an edit is O(units), not one whole-unit
+        // walk per floor (A9 in #1158).
+        let mut xs: Vec<i64> = self
+            .structural_tiles(floor)
+            .map_or_else(Vec::new, |tiles| tiles.to_vec());
+        xs.sort_unstable();
         let mut runs: Vec<(i64, i64)> = Vec::new();
         for i in 0..xs.len() {
             let x = xs[i];
