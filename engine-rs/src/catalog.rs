@@ -41,15 +41,17 @@ use crate::sim::STARTING_MONEY;
 mod build;
 mod json;
 mod lock;
+mod rules;
 
 pub use build::catalog;
 pub use json::{catalog_digest, catalog_json, catalog_value};
 #[doc(hidden)]
 pub use lock::{lock_view, LOCK_FOOTPRINT_EXEMPT};
+pub use rules::Rules;
 
 /// The version of the catalog's shape. It moves when a field is added,
 /// renamed or removed, so a frontend can refuse a shape it does not know.
-pub const CATALOG_VERSION: u32 = 11;
+pub const CATALOG_VERSION: u32 = 12;
 
 /// Every price, size and build rule of one mode.
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -145,29 +147,6 @@ pub struct Economy {
     /// was founded unbridged, and the live setting is per tower (the
     /// engine's `autoBridge()`, the save's `autoBridge`).
     pub auto_bridge_toggleable: bool,
-}
-
-/// Mode rules a frontend shows the player, each stated from the engine's own
-/// rule method, so a frontend reads them here instead of deciding them from
-/// the mode's name.
-#[derive(Clone, Debug, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Rules {
-    /// Whether a sold condo carries its own household of 2 to 5 that prices
-    /// the sale and counts its residents. When false every condo houses the
-    /// flat family and stores no household.
-    pub variant_households: bool,
-    /// Whether the build preview names the engine's refusal before the
-    /// click. When false the refusal shows only once a click is refused.
-    pub preview_names_refusal: bool,
-    /// Whether the elevator schedule's assisted tools answer: the intent
-    /// presets, auto-tune and the staffing advice. When false the schedule
-    /// is the manual grid only and each assisted query is refused.
-    pub schedule_assist: bool,
-    /// Whether the player may place new construction while the game is
-    /// paused. When false the frontend refuses a placement at speed 0 and
-    /// says to unpause; the engine itself has no paused state.
-    pub builds_while_paused: bool,
 }
 
 /// One calendar a tower can run and how it scales the quoted figures.

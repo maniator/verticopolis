@@ -1,4 +1,5 @@
 import { html, type TemplateResult } from "lit-html";
+import type { CatalogRules } from "../catalog/catalogTypes";
 import type { EnginePort, PortRecord } from "../simport/enginePort";
 import type { VacateReason } from "../shared/types";
 import {
@@ -22,7 +23,6 @@ interface Layout {
   records: { unitFacts: string[] };
   accessLines: string[];
   noRateLines: string[];
-  modes: string[];
   bindings: string[];
   vacateReasons: string[];
 }
@@ -67,16 +67,21 @@ export function joinParts(parts: PortUnitParts, between?: () => readonly Templat
   return between ? [...parts.head, ...between(), ...parts.tail] : parts.lines;
 }
 
+/** The catalog rules the card's copy follows, read when a card renders. */
+export type DiagnosticRules = () => Pick<CatalogRules, "quotesLobbyDistance">;
+
 export function createPortUnitDiagnostics(
   port: Pick<EnginePort, "viewLayout" | "unitFacts">,
+  rules: DiagnosticRules,
   supplemental?: (id: number) => SupplementalLines,
 ): PortUnitLines {
-  const parts = createPortUnitParts(port, supplemental);
+  const parts = createPortUnitParts(port, rules, supplemental);
   return (id, beforeComplaints) => joinParts(parts(id), beforeComplaints);
 }
 
 export function createPortUnitParts(
   port: Pick<EnginePort, "viewLayout" | "unitFacts">,
+  rules: DiagnosticRules,
   supplemental?: (id: number) => SupplementalLines,
 ): (id: number) => PortUnitParts {
   const layout = JSON.parse(port.viewLayout()) as Layout;
@@ -122,7 +127,7 @@ export function createPortUnitParts(
       const hasSlot = flag(r, "slot");
       const advice = lobbyWarningCopy({
         sinking,
-        mode: named(layout.modes, at(r, "modeCode")) ?? "",
+        quotesDistance: rules().quotesLobbyDistance,
         distance: at(r, "lobbyDistance"),
         slotFloor: hasSlot ? at(r, "slotFloor") : undefined,
         onSlot: flag(r, "onSlot"),

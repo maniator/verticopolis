@@ -9,6 +9,7 @@ use crate::economy::{
 use crate::facilities::Kind;
 use crate::services::{EXTERMINATOR_CALLOUT_FEE, EXTERMINATOR_PER_ROOM_FEE};
 
+mod presentation;
 mod rent;
 pub use rent::RentModel;
 

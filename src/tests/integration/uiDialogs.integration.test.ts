@@ -832,8 +832,8 @@ describe("export/import — file downloads and the file picker, no copy-paste pa
     expect(dialog().open).toBe(false);
   });
 
-  it("the 1994 export is disabled for a Modern tower (Classic only)", () => {
-    const { ui, cb } = makeUI({ getMode: () => "modern" as const });
+  it("the 1994 export is disabled where the catalog rules it out (Modern)", () => {
+    const { ui, cb } = makeUI({ getMode: () => "modern" as const, getCatalog: () => catalogFor("modern") });
     openExportConfirm(ui);
     const legacy = document.querySelector('[data-act="legacy"]') as HTMLButtonElement;
     expect(legacy.disabled).toBe(true);

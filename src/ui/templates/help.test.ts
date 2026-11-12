@@ -112,6 +112,8 @@ describe("helpTemplate structure and a11y", () => {
     previewNamesRefusal: "Hovering an invalid spot",
     scheduleAssist: "Smarter scheduling", // #305, presets + auto-tune + advice vs the raw grid
     buildsWhilePaused: "Build while paused", // #1936, Classic refuses placement at speed 0
+    exportsTo1994: null, // the export dialog explains it where the choice is disabled
+    quotesLobbyDistance: null, // a wording detail of the tenant card's lobby warning
   };
   const RULE_TO_HELP: Record<string, string | null> = {
     ...CATALOG_RULE_TO_HELP,

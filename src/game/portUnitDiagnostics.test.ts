@@ -1,10 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { html, type TemplateResult } from "lit-html";
 import { LAYOUT_TEXT } from "../tests/portKit/mockPort";
 import { createPortUnitDiagnostics, createPortUnitParts, joinParts, type SupplementalLines } from "./portUnitDiagnostics";
 
 /** The Rust engine's view layout (the checked-in fixture), with the tables these tests code by. */
-type CodeTable = "vacateReasons" | "bindings" | "accessLines" | "modes" | "noRateLines";
+type CodeTable = "vacateReasons" | "bindings" | "accessLines" | "noRateLines";
 const VIEW_LAYOUT = JSON.parse(LAYOUT_TEXT) as { records: { unitFacts: string[] } } & Record<CodeTable, string[]>;
 const slots = VIEW_LAYOUT.records.unitFacts;
 function facts(changes: Record<string, number>): Float64Array {
@@ -23,11 +23,13 @@ function code(table: CodeTable, value: string): number {
 function text(lines: TemplateResult[]): string {
   return lines.map(({ strings, values }) => strings.map((part, i) => part + (i < values.length ? String(values[i]) : "")).join("")).join("\n");
 }
-function render(record: Float64Array, id = 73, supplemental?: () => SupplementalLines): string {
+/** The catalog rules a card reads; Modern's answer unless a test says otherwise. */
+const MODERN_RULES = () => ({ quotesLobbyDistance: true });
+function render(record: Float64Array, id = 73, supplemental?: () => SupplementalLines, rules = MODERN_RULES): string {
   const diag = createPortUnitDiagnostics({
     viewLayout: () => LAYOUT_TEXT,
     unitFacts: () => record,
-  }, supplemental);
+  }, rules, supplemental);
   return text(diag(id));
 }
 
@@ -80,7 +82,6 @@ describe("Rust port tenant explanations", () => {
 
   it("shows lobby placement fixes and No Rate from the port's flags", () => {
     const rendered = render(facts({
-      modeCode: code("modes", "modern"),
       noRate: code("noRateLines", "occupied"),
       lobby: 1,
       sinking: 1,
@@ -92,6 +93,22 @@ describe("Rust port tenant explanations", () => {
     expect(rendered).toContain("No Rate: the tenant stays");
     expect(rendered).toContain("Too far from any lobby: 13 floors.");
     expect(rendered).toContain("Build floors up to 74");
+  });
+
+  it("quotes the lobby distance only where the catalog's rules say to", () => {
+    const record = facts({ lobby: 1, sinking: 1, lobbyDistance: 13 });
+    const quoting = vi.fn(() => ({ quotesLobbyDistance: true }));
+    const silent = vi.fn(() => ({ quotesLobbyDistance: false }));
+    expect(render(record, 73, undefined, quoting)).toContain("Too far from any lobby: 13 floors.");
+    const unquoted = render(record, 73, undefined, silent);
+    expect(unquoted).toContain("Too far from any lobby. ");
+    expect(unquoted).not.toContain("13 floors");
+    expect(quoting).toHaveBeenCalled();
+    expect(silent).toHaveBeenCalled();
+    // A card with no lobby warning never asks.
+    const asked = vi.fn(MODERN_RULES);
+    render(facts({ access: code("accessLines", "reachable") }), 73, undefined, asked);
+    expect(asked).not.toHaveBeenCalled();
   });
 
   it("distinguishes an empty unit held by the move-in gate from an on-notice tenant", () => {
@@ -160,7 +177,7 @@ describe("Rust port tenant explanations", () => {
         reads.push("unitFacts");
         return facts({ access: code("accessLines", "reachable"), notice: 1, noticeReason: code("vacateReasons", "rent"), minutesLeft: 600, noticeSatisfaction: 0.25, keepAt: 0.4 });
       },
-    }, supplemental);
+    }, MODERN_RULES, supplemental);
     inOrder(text(recycler(73, recycling)), ["Access:", "SERVICE", "RECYCLING", "Giving notice:", "RETAIL"]);
     expect(reads).toEqual(["unitFacts", "recycling"]);
   });
@@ -174,7 +191,7 @@ describe("Rust port tenant explanations", () => {
     const block = () => [html`<div>RECYCLING</div>`];
     const supplemental = (): SupplementalLines => ({ lines: [html`<div>SERVICE</div>`], trailing: [html`<div>RETAIL</div>`] });
     let record = facts({ access: code("accessLines", "reachable"), gripe: 1, gripeCause: code("vacateReasons", "rent") });
-    const parts = createPortUnitParts({ viewLayout: () => LAYOUT_TEXT, unitFacts: () => record }, supplemental);
+    const parts = createPortUnitParts({ viewLayout: () => LAYOUT_TEXT, unitFacts: () => record }, MODERN_RULES, supplemental);
     const kept = parts(73);
     // The same kept halves place the block above the gripe on every read,
     // and with no block the card is the kept lines themselves, with no copy made.
