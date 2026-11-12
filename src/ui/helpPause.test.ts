@@ -148,6 +148,17 @@ describe("HelpPause for Help in a new tab", () => {
     expect(t.count()).toBe(0);
   });
 
+  it("counts a departure that happened before the watch was armed (a scripted window.open)", () => {
+    const { p, speed } = ports(2);
+    const pause = new HelpPause(p);
+    const t = tab();
+    pause.begin();
+    t.leave(); // focus already moved to the new tab
+    pause.untilReturn(t.target);
+    t.comeBack();
+    expect(speed()).toBe(2);
+  });
+
   it("drops the watch when Help is opened again in the game, keeping the first speed", () => {
     const { p, speed } = ports(3);
     const pause = new HelpPause(p);

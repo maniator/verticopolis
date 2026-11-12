@@ -132,10 +132,12 @@ export class HelpPause {
     this.clearWatch();
     if (this.prev === null) return;
     const { win, doc } = target;
-    let left = false;
+    const here = () => doc.visibilityState === "visible" && doc.hasFocus();
+    // A tab opened by script may already have taken focus before the watch is
+    // armed, and that departure's events fired with no one listening; count it.
+    let left = !here();
     const check = () => {
-      const here = doc.visibilityState === "visible" && doc.hasFocus();
-      if (!here) left = true;
+      if (!here()) left = true;
       else if (left) this.end();
     };
     win.addEventListener("blur", check);

@@ -16,6 +16,10 @@ export const FROM_GAME_VALUE = "game";
  *  reload or a move to a sibling page still knows after the query is gone. */
 export const FROM_GAME_STORAGE_KEY = "vc.page.fromGame";
 
+/** The key the release notes page used before the pages shared one (#2030),
+ *  still read so a tab opened by that build keeps its flag across a reload. */
+export const LEGACY_FROM_GAME_STORAGE_KEY = "vc.releaseNotes.fromGame";
+
 /** `href` (a same-origin path, with or without a `#fragment`) marked as opened
  *  by the running game. */
 export function fromGameHref(href: string): string {
@@ -56,7 +60,8 @@ export function takeFromGameFlag(
     return true;
   }
   try {
-    return storage().getItem(FROM_GAME_STORAGE_KEY) === FROM_GAME_VALUE;
+    const store = storage();
+    return [FROM_GAME_STORAGE_KEY, LEGACY_FROM_GAME_STORAGE_KEY].some((key) => store.getItem(key) === FROM_GAME_VALUE);
   } catch {
     return false;
   }

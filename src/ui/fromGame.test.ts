@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, html } from "lit-html";
-import { CLOSE_TAB_NOTE, FROM_GAME_STORAGE_KEY, backToOpenGame, fromGameHref, openedFromGame, takeFromGameFlag } from "./fromGame";
+import { CLOSE_TAB_NOTE, FROM_GAME_STORAGE_KEY, LEGACY_FROM_GAME_STORAGE_KEY, backToOpenGame, fromGameHref, openedFromGame, takeFromGameFlag } from "./fromGame";
 import { pageShell } from "./templates/pageShell";
 
 /** A page the game opened, in the shared shell, mounted in the test DOM. */
@@ -91,6 +91,12 @@ describe("takeFromGameFlag", () => {
     takeFromGameFlag({ pathname: "/help/changelog", search: "?from=game", hash: "" }, hist, () => store);
     expect(takeFromGameFlag({ pathname: "/help/changelog", search: "", hash: "" }, hist, () => store)).toBe(true);
     expect(hist.replaceState).toHaveBeenCalledTimes(1);
+  });
+
+  it("still knows a tab the earlier release notes build marked under its old key", () => {
+    const store = memoryStorage();
+    store.setItem(LEGACY_FROM_GAME_STORAGE_KEY, "game");
+    expect(takeFromGameFlag({ pathname: "/help/changelog", search: "", hash: "" }, { replaceState: vi.fn() }, () => store)).toBe(true);
   });
 
   it("is a plain visit with no marker and nothing stored", () => {
