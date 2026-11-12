@@ -44,24 +44,6 @@ fn origin_floors_for(origin: VisitOrigin, floors: &SpawnFloors) -> &[i64] {
     }
 }
 
-/// The mean ticket price pick multiplier of the open theaters on `floor`
-/// (the ones a visitor can be seated in), 1 where it holds none.
-fn floor_pick_mult(tower: &Tower, floors: &SpawnFloors, floor: i64) -> f64 {
-    let (mut n, mut sum) = (0_u32, 0.0);
-    for &id in floors.units_on(floor) {
-        let u = tower.get_unit(id).unwrap();
-        if u.kind == Kind::Cinema && u.is_tenanted() {
-            n += 1;
-            sum += ticket_pick_mult(tower.mode, u);
-        }
-    }
-    if n == 0 {
-        1.0
-    } else {
-        sum / f64::from(n)
-    }
-}
-
 fn meal_origin_of(origin: VisitOrigin) -> super::meals::MealOrigin {
     match origin {
         VisitOrigin::Condo => super::meals::MealOrigin::Condo,
@@ -187,9 +169,7 @@ pub fn spawn_venue_visit(
     // they always were.
     let priced = kind == Kind::Cinema && floors.cinema_picks.is_some();
     let venue_floor = if priced {
-        let weights = venue_floors
-            .iter()
-            .map(|&f| floor_pick_mult(tower, floors, f));
+        let weights = venue_floors.iter().map(|&f| floors.cinema_floor_pick(f));
         venue_floors[weighted_index(crowd.rng.next(), weights)]
     } else {
         *crowd.rng.pick(venue_floors)

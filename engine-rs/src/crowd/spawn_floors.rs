@@ -78,12 +78,26 @@ pub struct SpawnFloors {
     /// `None` where every one charges Normal and the crowd draws them as it
     /// always has (#1950).
     pub cinema_picks: Option<f64>,
+    /// Where `cinema_picks` is set, each cinema floor with the mean pick
+    /// multiplier of its open theaters, so a visit weighs a floor without
+    /// walking its rooms. Empty otherwise. At most one entry per theater
+    /// (16 per tower).
+    pub cinema_floor_picks: Vec<(i64, f64)>,
     units_by_floor: Arc<FloorRooms>,
     /// Operational metro station ids.
     pub metro_stations: Vec<i64>,
 }
 
 impl SpawnFloors {
+    /// The mean ticket price pick multiplier of the open theaters on cinema
+    /// floor `floor`, 1 where none charges other than Normal.
+    pub fn cinema_floor_pick(&self, floor: i64) -> f64 {
+        self.cinema_floor_picks
+            .iter()
+            .find(|(f, _)| *f == floor)
+            .map_or(1.0, |(_, pick)| *pick)
+    }
+
     /// Room unit ids on `floor`, in unit order.
     pub fn units_on(&self, floor: i64) -> &[i64] {
         self.units_by_floor.on(floor)
@@ -146,6 +160,8 @@ pub fn spawn_floors(tower: &Tower, clock: &Clock) -> SpawnFloors {
     let mut staff_seen: Vec<(Kind, FloorBits)> = Vec::new();
     let mut venues_by_kind: Vec<(Kind, FloorList)> = Vec::new();
     let (mut cinemas, mut cinema_pick_sum, mut cinema_priced) = (0_u32, 0.0, false);
+    // Each cinema floor's pick sum and open theater count.
+    let mut cinema_floors: Vec<(i64, f64, u32)> = Vec::new();
     for u in tower.room_units() {
         if u.kind.is_staff_kind() {
             if u.is_operational() {
@@ -192,9 +208,17 @@ pub fn spawn_floors(tower: &Tower, clock: &Clock) -> SpawnFloors {
         } else if u.kind.attendance_cap().is_some() && u.kind.is_open_at(hour) {
             add_floor(&mut venues_by_kind, u.kind, u.floor);
             if u.kind == Kind::Cinema {
+                let pick = ticket_pick_mult(tower.mode, u);
                 cinemas += 1;
-                cinema_pick_sum += ticket_pick_mult(tower.mode, u);
+                cinema_pick_sum += pick;
                 cinema_priced |= charged(tower.mode, u).is_some();
+                match cinema_floors.iter_mut().find(|(f, _, _)| *f == u.floor) {
+                    Some((_, sum, n)) => {
+                        *sum += pick;
+                        *n += 1;
+                    }
+                    None => cinema_floors.push((u.floor, pick, 1)),
+                }
             }
         }
     }
@@ -214,6 +238,14 @@ pub fn spawn_floors(tower: &Tower, clock: &Clock) -> SpawnFloors {
                 .collect(),
         ),
         cinema_picks: cinema_priced.then(|| cinema_pick_sum / f64::from(cinemas)),
+        cinema_floor_picks: if cinema_priced {
+            cinema_floors
+                .into_iter()
+                .map(|(f, sum, n)| (f, sum / f64::from(n)))
+                .collect()
+        } else {
+            Vec::new()
+        },
         units_by_floor: tower.floor_rooms(),
         metro_stations,
     }

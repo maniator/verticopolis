@@ -411,3 +411,23 @@ fn a_cheaper_ticket_draws_more_visits_and_a_dearer_one_fewer() {
         "visits by step, cheapest first: {draws:?}"
     );
 }
+
+/// Only open theaters weigh in (#1950): an empty Premium theater beside an
+/// open Low one leaves floor 2 drawing as Low, and each floor keeps its own
+/// mean while the tower's share takes the mean of every open theater.
+#[test]
+fn the_crowd_weighs_each_floor_by_its_open_theaters_only() {
+    let mut sim = strip_tower(2024, GameMode::Modern, 80, 5);
+    let low = place_seated(&mut sim, Kind::Cinema, 2, 0, UnitState::Occupied, 0);
+    let empty = place_seated(&mut sim, Kind::Cinema, 2, 40, UnitState::Empty, 0);
+    let high = place_seated(&mut sim, Kind::Cinema, 4, 0, UnitState::Occupied, 0);
+    for (id, price) in [(low, "low"), (empty, "premium"), (high, "high")] {
+        assert_eq!(sim.set_ticket_price(id, price), Some(price));
+    }
+    at_time(&mut sim, 0, 14);
+    let floors = spawn_floors(&sim.tower, &sim.clock);
+    assert_eq!(floors.cinema_floor_pick(2), 1.25);
+    assert_eq!(floors.cinema_floor_pick(4), 0.75);
+    assert_eq!(floors.cinema_floor_pick(3), 1.0);
+    assert_eq!(floors.cinema_picks, Some(1.0));
+}
