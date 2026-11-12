@@ -2,10 +2,7 @@ import type { UI } from "./UI";
 import { confirmTemplate, installHelpTemplate, type InstallHelpVariant } from "./templates/confirm";
 import { eventChoiceTemplate } from "./templates/eventChoice";
 import { updatePromptTemplate } from "./templates/updatePrompt";
-import { helpTemplate } from "./templates/help";
 import { TOWER_FILE_MAGIC } from "../storage/saveCompression";
-import { isSplashUp } from "../game/interactionState";
-import { compareModalTemplate } from "./templates/compare";
 import { savesTemplate } from "./templates/saves";
 import { newTowerTemplate } from "./templates/newTower";
 import { exportConfirmTemplate, importReportTemplate, exportReportTemplate } from "./templates/reports";
@@ -20,10 +17,6 @@ import type { ImportReport } from "../storage/tdtImportReport";
 import type { ExportReport } from "../storage/tdtExportReport";
 import type { UpdateInfo } from "../pwa";
 import { isInstalledStandalone } from "./standalone";
-import { trackAppAction } from "../analytics";
-import { engineSuffix } from "../wasmhost/engineLabel";
-import { liveDiagnostics } from "../wasmhost/engineDiagnosticsLive";
-import { copyText } from "./copyText";
 
 /**
  * Dialog and modal controllers for {@link UI}, as friend functions taking the
@@ -299,78 +292,6 @@ export function showExportReport(ui: UI, report: ExportReport, cb: { onDownload:
       cb.onDownload();
     },
   });
-}
-
-export function showHelp(ui: UI): void {
-  trackAppAction("help_open");
-  // Replaying the intro is meaningless while the title screen is still up, so
-  // disable that button there.
-  const onSplash = isSplashUp();
-  const version = typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "dev";
-  // Replay binds inline via @click. While the splash is up the button is
-  // disabled, so a real browser suppresses the click, and onReplayOnboarding
-  // also no-ops behind #splash; both make a splash-time trigger a no-op.
-  const diagnostics = liveDiagnostics();
-  const box = ui.openModalTemplate(helpTemplate(onSplash, version, { onReplay: () => ui.cb.onReplayOnboarding() }, engineSuffix(), diagnostics), { displaceable: true });
-  // "Open the full help page" is a real <a href="/help#classic-vs-modern"
-  // target="_blank">, so a plain browser tab opens the shareable help page
-  // (deep-linked to the comparison section) as written. But from an installed
-  // standalone PWA a new tab drops to the system browser and loses the session,
-  // so there we keep the player in the running sim: swap the navigation for the
-  // in-app compare modal, which pauses the tower and shows the same comparison.
-  const fullPage = box.querySelector<HTMLAnchorElement>('a[data-act="open-help"]');
-  fullPage?.addEventListener("click", (e) => {
-    // Downgrade in an installed standalone PWA.
-    if (isInstalledStandalone()) {
-      e.preventDefault();
-      showCompare(ui);
-    }
-  });
-  ui.wireActions(box, {
-    "copy-diagnostics": () => {
-      const status = box.querySelector<HTMLElement>(".help-diagnostics-status");
-      void copyText(diagnostics.text, navigator, document, box.closest("dialog") ?? undefined).then((ok) => {
-        if (status) status.textContent = ok ? "Copied." : "Could not copy. Select the lines above and copy them by hand.";
-      });
-    },
-  });
-}
-
-/**
- * The in-game Classic vs Modern comparison, opened from the Tower-panel mode
- * badge. It renders the shared {@link compareModalTemplate} through the single
- * `#modal`. Reading the reference should never cost the player elevator time, so
- * the tower pauses on open and its prior speed is restored on close, no matter
- * how the modal is dismissed (Got it, Esc, the backdrop, or the title-bar ✕).
- * The restore fires exactly once through a shared `finish`, wired to every close
- * path, so a double dismissal can't over-restore or leave the tower stuck paused.
- */
-export function showCompare(ui: UI): void {
-  trackAppAction("compare_open");
-  const dialog = ui.el.modal as HTMLDialogElement;
-  // Open the modal FIRST, then pause. If the render/open ever threw, pausing
-  // first would leave the tower stuck at speed 0 with no modal to dismiss and no
-  // restore path; opening first means a failure never pauses at all.
-  const box = ui.openModalTemplate(compareModalTemplate());
-  const prevSpeed = ui.cb.getSpeed();
-  ui.cb.onSpeed(0);
-  let restored = false;
-  const finish = () => {
-    if (restored) return;
-    restored = true;
-    ui.closeModal();
-    ui.cb.onSpeed(prevSpeed);
-  };
-  // The "Got it" button, the backdrop, and Esc/✕ all route through finish so the
-  // speed is always restored. Passing a `close` handler overrides wireActions'
-  // default plain-close binding. These property handlers are re-set by
-  // finishModal on the next modal open (as with showEventChoice), so they do not
-  // leak to a later dialog.
-  ui.wireActions(box, { close: finish });
-  dialog.onclick = (e) => {
-    if (e.target === dialog) finish();
-  };
-  dialog.oncancel = () => finish();
 }
 
 /** A two-choice emergency modal (fire rescue / bomb ransom). */

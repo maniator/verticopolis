@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { marked } from "marked";
-import { allReleaseNotes, escapeMarkdown, notesForVersion, recentReleaseNotes, releaseNoteLines } from "./changelog";
+import { allReleaseNotes, escapeMarkdown, notesForVersion, recentReleaseNotes, releaseNoteLines, whatsNewReleases } from "./changelog";
 import { MAX_NOTES, MAX_NOTE_LEN, MAX_RELEASES } from "./pwaUpdateInfo";
 
 /**
@@ -299,5 +299,44 @@ Prose between two lists.
     for (const r of all) {
       expect(r.notes).toEqual(notesForVersion(real, r.version, { maxNotes: Infinity, maxLen: Infinity }));
     }
+  });
+});
+
+describe("whatsNewReleases (the Help menu's What's new)", () => {
+  const LOG = `# Changelog
+
+## 3.1.1
+
+## 3.1.0
+
+- Newest notes.
+
+## 3.0.0
+
+- Older notes, whole: ${"y".repeat(1200)}
+
+## 2.9.0
+
+- Oldest.
+`;
+
+  it("starts at this build's version, newest first, capped at count", () => {
+    expect(whatsNewReleases(LOG, "3.1.0", 2).map((r) => r.version)).toEqual(["3.1.0", "3.0.0"]);
+  });
+
+  it("starts at the last version with notes for an internal build with none", () => {
+    expect(whatsNewReleases(LOG, "3.1.1", 1).map((r) => r.version)).toEqual(["3.1.0"]);
+  });
+
+  it("shows the newest versions for a build whose version has no section", () => {
+    expect(whatsNewReleases(LOG, "9.9.9-dev", 10).map((r) => r.version)).toEqual(["3.1.0", "3.0.0", "2.9.0"]);
+  });
+
+  it("never starts above this build's version", () => {
+    expect(whatsNewReleases(LOG, "3.0.0", 10).map((r) => r.version)).toEqual(["3.0.0", "2.9.0"]);
+  });
+
+  it("keeps each note whole", () => {
+    expect(whatsNewReleases(LOG, "3.0.0", 1)[0].notes[0]).toHaveLength("Older notes, whole: ".length + 1200);
   });
 });

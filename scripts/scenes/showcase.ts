@@ -75,8 +75,8 @@ export const SHOWCASE_SCENES: Scene[] = [
         keepDialogs: true,
         setup: async (page) => {
           await page.evaluate(() => document.getElementById("btn-help")?.click());
-          // Fail loudly if the Help modal never opens rather than commit a wrong shot.
-          await page.waitForSelector("#modal", { timeout: 4000 });
+          // Fail loudly if the Help menu never opens rather than commit a wrong shot.
+          await page.waitForSelector('#modal [data-act="whats-new"]', { timeout: 4000 });
         },
         wait: 300,
       },

@@ -44,7 +44,9 @@ export const DIALOG_PIN_SHOTS: Shot[] = [
     // A per-shot viewport resize is draw-coupled; draw every settle frame.
     drawSettle: true,
     setup: async (page) => {
-      await page.evaluate(() => document.getElementById("btn-help")?.click());
+      // The in-game guide (How to play). The toolbar's Help… opens the short
+      // Help menu now, so the shot opens the guide through the tooling handle.
+      await page.evaluate(() => (window as any).game.ui.showHelp());
       await page.waitForSelector("#modal .help-modes", { timeout: 4000 });
       await page.evaluate(() => {
         const box = document.querySelector("#modal .modal-box") as HTMLElement | null;

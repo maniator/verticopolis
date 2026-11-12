@@ -1,13 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
-import {
-  CLOSE_TAB_NOTE,
-  FROM_GAME_STORAGE_KEY,
-  backToOpenGame,
-  openedFromGame,
-  releaseNotesPageTemplate,
-  takeFromGameFlag,
-  versionSection,
-} from "./releaseNotesPage";
+import { releaseNotesPageTemplate, versionSection } from "./releaseNotesPage";
+import { openedFromGame } from "./ui/fromGame";
 import { releaseNotesHref } from "./ui/templates/updatePrompt";
 import { render } from "lit-html";
 import { renderToFragment } from "./ui/testing/litTestUtils";
@@ -87,12 +80,6 @@ describe("versionSection", () => {
 });
 
 describe("Back to game on a page the game opened", () => {
-  it("reads the update prompt's from=game marker, and only that", () => {
-    expect(openedFromGame("?from=game")).toBe(true);
-    expect(openedFromGame("")).toBe(false);
-    expect(openedFromGame("?from=search")).toBe(false);
-  });
-
   it("matches the address the update prompt links to", () => {
     expect(openedFromGame(new URL(releaseNotesHref("3.2.0"), "https://example.test").search)).toBe(true);
   });
@@ -116,89 +103,5 @@ describe("Back to game on a page the game opened", () => {
     expect(click.defaultPrevented).toBe(true);
     expect(close).toHaveBeenCalledTimes(1);
     close.mockRestore();
-  });
-
-  it("says to close the tab, and focuses that note, when the browser keeps it open", () => {
-    vi.useFakeTimers();
-    try {
-      const root = document.createElement("div");
-      render(releaseNotesPageTemplate(RELEASES, true), root);
-      document.body.replaceChildren(root);
-      const win = { close: vi.fn(), closed: false, setTimeout: window.setTimeout.bind(window), document } as unknown as Window;
-      const e = new MouseEvent("click", { cancelable: true });
-      backToOpenGame(e, win);
-      const note = document.getElementById("back-note")!;
-      expect(note.hidden).toBe(true);
-      vi.advanceTimersByTime(300);
-      expect(note.hidden).toBe(false);
-      expect(note.textContent).toBe(CLOSE_TAB_NOTE);
-      expect(document.activeElement).toBe(note);
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
-  it("stays quiet when the tab did close", () => {
-    vi.useFakeTimers();
-    try {
-      const root = document.createElement("div");
-      render(releaseNotesPageTemplate(RELEASES, true), root);
-      document.body.replaceChildren(root);
-      const win = { close: vi.fn(), closed: true, setTimeout: window.setTimeout.bind(window), document } as unknown as Window;
-      backToOpenGame(new MouseEvent("click", { cancelable: true }), win);
-      vi.advanceTimersByTime(300);
-      expect(document.getElementById("back-note")!.hidden).toBe(true);
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-});
-
-describe("takeFromGameFlag", () => {
-  const memoryStorage = (): Storage => {
-    const items = new Map<string, string>();
-    return {
-      getItem: (k: string) => items.get(k) ?? null,
-      setItem: (k: string, v: string) => void items.set(k, v),
-    } as unknown as Storage;
-  };
-
-  it("takes from=game out of the address bar, keeping the version fragment and other params", () => {
-    const hist = { replaceState: vi.fn() };
-    const store = memoryStorage();
-    const loc = { pathname: "/help/changelog", search: "?from=game&ref=x", hash: "#3.2.0" };
-    expect(takeFromGameFlag(loc, hist, () => store)).toBe(true);
-    expect(hist.replaceState).toHaveBeenCalledWith(null, "", "/help/changelog?ref=x#3.2.0");
-    expect(store.getItem(FROM_GAME_STORAGE_KEY)).toBe("game");
-  });
-
-  it("leaves no bare question mark when from=game was the only param", () => {
-    const hist = { replaceState: vi.fn() };
-    takeFromGameFlag({ pathname: "/help/changelog", search: "?from=game", hash: "" }, hist, memoryStorage);
-    expect(hist.replaceState).toHaveBeenCalledWith(null, "", "/help/changelog");
-  });
-
-  it("still knows after a reload of the same tab, from its session storage", () => {
-    const store = memoryStorage();
-    const hist = { replaceState: vi.fn() };
-    takeFromGameFlag({ pathname: "/help/changelog", search: "?from=game", hash: "" }, hist, () => store);
-    expect(takeFromGameFlag({ pathname: "/help/changelog", search: "", hash: "" }, hist, () => store)).toBe(true);
-    expect(hist.replaceState).toHaveBeenCalledTimes(1);
-  });
-
-  it("is a plain visit with no marker and nothing stored", () => {
-    const hist = { replaceState: vi.fn() };
-    expect(takeFromGameFlag({ pathname: "/help/changelog", search: "", hash: "" }, hist, memoryStorage)).toBe(false);
-    expect(hist.replaceState).not.toHaveBeenCalled();
-  });
-
-  it("keeps working when the browser blocks storage", () => {
-    const blocked = (): Storage => {
-      throw new DOMException("blocked", "SecurityError");
-    };
-    const hist = { replaceState: vi.fn() };
-    expect(takeFromGameFlag({ pathname: "/help/changelog", search: "?from=game", hash: "" }, hist, blocked)).toBe(true);
-    expect(hist.replaceState).toHaveBeenCalledTimes(1);
-    expect(takeFromGameFlag({ pathname: "/help/changelog", search: "", hash: "" }, hist, blocked)).toBe(false);
   });
 });
