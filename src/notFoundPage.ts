@@ -15,7 +15,7 @@ import { takeFromGameFlag } from "./ui/fromGame";
 export const NOT_FOUND_LINKS: readonly { href: string; label: string }[] = [
   { href: "/help", label: "How to Play" },
   { href: "/help/changelog", label: "Release notes" },
-  { href: "/gallery", label: "Sprite Gallery" },
+  { href: "/help/rooms", label: "Every room" },
 ];
 
 /** The page body inside the retro page shell. `path` is the address that was

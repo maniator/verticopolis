@@ -219,10 +219,12 @@ const SHARED_HEAD_TAGS: HtmlTagDescriptor[] = [
   { tag: "link", attrs: { rel: "apple-touch-icon", href: "./apple-touch-icon.png" }, injectTo: "head" },
 ];
 
-/** Inject the shared head tags into the two PUBLIC pages this build makes
- *  (the game and the gallery; the Help site at /help, release notes included,
- *  carries its own, help-site/site.mjs). `preview.html` is the noindex screenshot harness, so it
- *  is deliberately left out. */
+/** Inject the shared head tags into the game and the old sprite gallery (the
+ *  Help site at /help, release notes included, carries its own,
+ *  help-site/site.mjs). The gallery is a screenshot fixture now, out of search
+ *  (/gallery redirects to /help/rooms), so it takes every tag but the robots
+ *  one and keeps its own noindex. `preview.html` is the noindex screenshot
+ *  harness, so it is deliberately left out. */
 function sharedHead(): Plugin {
   const pages = new Set(["index.html", "gallery.html"]);
   return {
@@ -235,7 +237,8 @@ function sharedHead(): Plugin {
         // "/", whose basename is "", so map an empty basename to index.html.
         const base = (ctx.path.split("?")[0].split("/").pop() ?? "").toLowerCase();
         const file = base === "" ? "index.html" : base;
-        return pages.has(file) ? SHARED_HEAD_TAGS : [];
+        if (!pages.has(file)) return [];
+        return file === "gallery.html" ? SHARED_HEAD_TAGS.filter((t) => t.attrs?.name !== "robots") : SHARED_HEAD_TAGS;
       },
     },
   };

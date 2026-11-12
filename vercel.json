@@ -7,10 +7,8 @@
   "outputDirectory": "dist",
   "git": { "deploymentEnabled": { "main": false } },
   "redirects": [
-    { "source": "/gallery/", "destination": "/gallery", "permanent": true }
-  ],
-  "rewrites": [
-    { "source": "/gallery", "destination": "/gallery.html" }
+    { "source": "/gallery", "destination": "/help/rooms/", "permanent": true },
+    { "source": "/gallery/", "destination": "/help/rooms/", "permanent": true }
   ],
   "headers": [
     {

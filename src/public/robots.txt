@@ -1,10 +1,12 @@
 # Verticopolis (https://verticopolis.com/): a free browser SimTower clone.
-# The game and its sprite gallery are public content; let every well-behaved
-# crawler index them. Only the internal render-preview page is kept out of the
-# index (it is a developer tool, not player content).
+# The game and its help site are public content; let every well-behaved
+# crawler index them. The render-preview page and the old sprite gallery
+# (whose rooms now live on /help/rooms, where /gallery redirects) are kept out
+# of the index: they are developer tools the screenshot checks use.
 User-agent: *
 Allow: /
 Disallow: /preview.html
+Disallow: /gallery.html
 
 Sitemap: https://verticopolis.com/sitemap.xml
 Sitemap: https://verticopolis.com/help/sitemap-index.xml
