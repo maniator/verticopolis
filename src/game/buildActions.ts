@@ -10,6 +10,7 @@ import type { ViewReader } from "../simport/viewReader";
 import { brushTiles, dragRunTiles, isOffLot, snapX } from "../ui/placement";
 import { groupDigits } from "../ui/format";
 import { quoteShaft } from "./portAccess";
+import { lobbyHeightFor } from "./lobbyHeight";
 
 /**
  * The money boundary of the game shell: every gesture that buys, paints, or
@@ -64,7 +65,7 @@ export class BuildActions {
   /** Build one facility; true when the engine placed it. */
   tryBuild(kind: FacilityKind, floor: number, x: number, quiet = false): boolean {
     const port = this.deps.enginePort();
-    port.setLobbyHeight(this.deps.lobbyHeight());
+    port.setLobbyHeight(lobbyHeightFor(kind, this.deps.lobbyHeight()));
     const res = outcome(port, port.buildAt(this.deps.portCodes().kind(kind), floor, x));
     if (res.ok) {
       if (!quiet) this.deps.audio.sfx("build");
@@ -110,7 +111,7 @@ export class BuildActions {
     this.paint = { tile, floor };
     const port = this.deps.enginePort();
     const codes = this.deps.portCodes();
-    port.setLobbyHeight(this.deps.lobbyHeight());
+    port.setLobbyHeight(lobbyHeightFor(kind, this.deps.lobbyHeight()));
     const rec = port.paintTiles(codes.kind(kind), floor, Float64Array.from(tiles));
     const placed = codes.slot(rec, "paintTiles", "placed");
     const res = outcome(port, rec);

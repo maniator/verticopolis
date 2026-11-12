@@ -8,6 +8,14 @@
  * and the build controller hands it to the engine before each lobby command.
  */
 
+/** The height a build with `tool` asks the engine for: the choice for the
+ *  Lobby tool, and one story for every other tool, so the Floor tool's ground
+ *  lobby and a room never rise from a height picked on the Lobby card or a
+ *  modifier held for something else. */
+export function lobbyHeightFor(tool: string, height: number): number {
+  return tool === "lobby" ? height : 1;
+}
+
 /** The height a held modifier asks for: Ctrl (or Cmd) for 2 stories, with
  *  Shift for 3; 1 when neither is held. */
 export function heldLobbyHeight(mods: { ctrlKey: boolean; metaKey: boolean; shiftKey: boolean }): number {

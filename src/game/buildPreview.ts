@@ -8,6 +8,7 @@ import { isPaintKind } from "./gesture";
 import { FLOOR } from "../render/scale";
 import { catalogOf, isUnlocked, quoteBuild, quoteShaft, type BuildQuote } from "./portAccess";
 import { NOT_ENOUGH_MONEY } from "../simport/request";
+import { lobbyHeightFor } from "./lobbyHeight";
 
 /**
  * How far above the touch point a room's placement ghost floats, in SCREEN pixels
@@ -199,7 +200,7 @@ export function updateBuildPreview(app: GameApp, tile: number, floor: number, sh
     const ghostKind = catalogBuildKind(catalog, kind, floor);
     // A lobby rises as many stories as the engine would lay it here (#308):
     // the asked height on a floor's first lobby, else the floor's own.
-    app.enginePort.setLobbyHeight(app.lobbyHeight.height);
+    app.enginePort.setLobbyHeight(lobbyHeightFor(kind, app.lobbyHeight.height));
     const rise = ghostKind === "lobby" ? app.enginePort.lobbyRise(floor) : 1;
     // Whole-brush affordability: the brush charges per tile, so the ghost goes
     // green only when the money covers every tile a click lays and the bridges

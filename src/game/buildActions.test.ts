@@ -85,6 +85,13 @@ describe("BuildActions.tryBuild", () => {
     expect(order(port.setLobbyHeight)).toBeLessThan(order(port.buildAt));
   });
 
+  it("asks one story for any other kind, whatever the Lobby card holds (#308)", () => {
+    const { build, deps, port } = setup({ buildAt: () => rec("buildAt", true) });
+    deps.lobbyHeight.mockReturnValue(3);
+    build.tryBuild("office", 2, 100);
+    expect(port.setLobbyHeight).toHaveBeenCalledExactlyOnceWith(1);
+  });
+
   it("a refusal errors with the engine's reason; quiet plays nothing either way", () => {
     const { build, deps } = setup({ buildAt: () => rec("buildAt", false) });
     expect(build.tryBuild(WIDE, 3, 10)).toBe(false);
@@ -195,14 +202,25 @@ describe("BuildActions.paintBrush", () => {
     );
   });
 
-  it("hands the asked lobby height to the engine before the strip, and prices a tall lobby per story (#308)", () => {
+  it("hands the Lobby tool's height to the engine before the strip (#308)", () => {
+    const { build, deps, port } = setup({ paintTiles: () => rec("paintTiles", true, { placed: 3 }) });
+    deps.lobbyHeight.mockReturnValue(3);
+    build.paintBrush("lobby", 20, 1);
+    expect(port.setLobbyHeight).toHaveBeenCalledExactlyOnceWith(3);
+    const order = (fn: unknown) => vi.mocked(fn as () => void).mock.invocationCallOrder[0];
+    expect(order(port.setLobbyHeight)).toBeLessThan(order(port.paintTiles));
+  });
+
+  it("asks one story for the Floor tool's ground lobby, and prices the floor's own tall lobby per story (#308)", () => {
     const { build, deps, port, codes } = setup({
       paintTiles: () => rec("paintTiles", true, { placed: 3 }),
+      // The ground floor already holds a three-story lobby, so the tiles rise with it.
       lobbyRise: () => 3,
     });
     deps.lobbyHeight.mockReturnValue(3);
     build.paintBrush("floor", 20, 1);
-    expect(port.setLobbyHeight).toHaveBeenCalledExactlyOnceWith(3);
+    // A height picked on the Lobby card never raises the Floor tool's lobby.
+    expect(port.setLobbyHeight).toHaveBeenCalledExactlyOnceWith(1);
     const order = (fn: unknown) => vi.mocked(fn as () => void).mock.invocationCallOrder[0];
     expect(order(port.setLobbyHeight)).toBeLessThan(order(port.paintTiles));
     expect(port.lobbyRise).toHaveBeenCalledExactlyOnceWith(1);

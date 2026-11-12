@@ -306,6 +306,14 @@ describe("updateBuildPreview", () => {
     expect(ghostWith(4 * tall - 1)).toMatchObject({ valid: false, stories: 2 });
   });
 
+  it("the Floor tool's ground ghost asks one story, whatever the Lobby card holds (#308)", () => {
+    const tower = { structure: run(1, 10, 29, "lobby"), money: 1e9 };
+    const { app, raw, enginePort } = makeApp(buildTool("floor"), tower, { height: 3, rise: 1 });
+    updateBuildPreview(app, 30, 1);
+    expect(enginePort.setLobbyHeight).toHaveBeenCalledExactlyOnceWith(1);
+    expect(raw.engine.preview).toMatchObject({ kind: "lobby", stories: 1 });
+  });
+
   it("counts a quoted bridge past the brush's end in the strip's price", () => {
     // Lobby on 10..29; the brush at 35 lays 31..38, detached, and its quote
     // bridges tile 30 back to the lobby: one more bare tile than the brush.
