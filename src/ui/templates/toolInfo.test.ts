@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { toolInfoTemplate } from "./toolInfo";
+import { toolInfoFor, toolInfoTemplate } from "./toolInfo";
+import { catalogFor } from "../../tests/catalogFixture";
 import { renderToFragment } from "../testing/litTestUtils";
 import { groupDigits } from "../format";
 
@@ -61,5 +62,14 @@ describe("toolInfoTemplate escapes catalog copy as text", () => {
     expect(frag.querySelector("img")).toBeNull();
     expect(frag.querySelector(".ti-name")!.textContent).toBe(hostile);
     expect(frag.querySelector("p")!.textContent).toBe(hostile);
+  });
+});
+
+describe("toolInfoFor words the card from the tower's catalog (#1987)", () => {
+  it("stands the wedding hall on the catalog's top floor", () => {
+    const catalog = catalogFor("modern");
+    const taller = { ...catalog, world: { ...catalog.world, maxFloor: catalog.world.maxFloor + 20 } };
+    const text = renderToFragment(toolInfoFor(taller, "weddingHall")).textContent ?? "";
+    expect(text).toContain(`standing on floor ${catalog.world.maxFloor + 20}.`);
   });
 });
