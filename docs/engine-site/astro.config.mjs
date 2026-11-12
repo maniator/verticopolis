@@ -11,8 +11,11 @@ import { GITHUB, sidebar, siteTitle } from "./site.mjs";
 // publishes a release instead; the workflow sets it.
 const title = siteTitle(process.env.DOCS_REF);
 
+// DOCS_BASE puts a pull request's preview under /pr-preview/pr-<number>/
+// (docs-preview.yml); the live site sits at the root.
 export default defineConfig({
   site: "https://docs.verticopolis.com",
+  base: process.env.DOCS_BASE || "/",
   integrations: [
     starlight({
       title,

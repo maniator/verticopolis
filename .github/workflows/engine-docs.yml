@@ -11,8 +11,13 @@ name: Engine docs
 # that writes the engine changelog. A maintainer can run it by hand for main, or
 # for an engine tag made after the site existed to show that release instead
 # (until the next push to main). A pull request that touches the same files
-# builds it without deploying, so a missing page or a build error fails there
-# first.
+# (or the crate's Cargo.toml) builds it under its preview path, so a missing
+# page or a build error fails there first, and docs-preview.yml publishes the
+# build at docs.verticopolis.com/pr-preview/pr-<number>/.
+#
+# Pages takes the whole site in one deploy, so the live docs and the previews
+# are kept together on the docs-pages branch; docs-pages-publish.yml stores
+# this build there and deploys.
 on:
   workflow_dispatch:
     inputs:
@@ -31,9 +36,11 @@ on:
       - "engine-rs/CRATE_README.md"
       - "engine-rs/API.md"
       - "engine-rs/CHANGELOG.md"
+      - "engine-rs/Cargo.toml"
       - "engine-rs/src/**"
       - "conformance/README.md"
       - ".github/workflows/engine-docs.yml"
+      - ".github/workflows/docs-pages-publish.yml"
   pull_request:
     paths:
       - "docs/engine-site/**"
@@ -45,9 +52,11 @@ on:
       - "engine-rs/CRATE_README.md"
       - "engine-rs/API.md"
       - "engine-rs/CHANGELOG.md"
+      - "engine-rs/Cargo.toml"
       - "engine-rs/src/**"
       - "conformance/README.md"
       - ".github/workflows/engine-docs.yml"
+      - ".github/workflows/docs-pages-publish.yml"
 
 permissions:
   contents: read
@@ -104,12 +113,15 @@ jobs:
       - name: Build the site
         env:
           TAG: ${{ inputs.tag }}
+          PR: ${{ github.event.pull_request.number }}
         run: |
           set -euo pipefail
           # DOCS_REF names a release in the title and points the pages'
           # repository links at the same commit; a push or a pull request
           # builds as main.
           export DOCS_REF="${TAG:-main}"
+          # A pull request builds for its preview path (docs-preview.yml).
+          if [ -n "$PR" ]; then export DOCS_BASE="/pr-preview/pr-$PR/"; fi
           npm run build --prefix docs/engine-site
           # The Rust API reference wears the site's header, side menu and
           # colors (docs/engine-site/rustdoc/, scripts/rustdoc-chrome.mjs).
@@ -123,26 +135,28 @@ jobs:
           test -f docs/engine-site/dist/index.html
           test -f docs/engine-site/dist/crate/index.html
           test -f docs/engine-site/dist/rust/verticopolis_engine/index.html
+          if [ -n "$PR" ]; then node docs/engine-site/scripts/preview-base.mjs docs/engine-site/dist "$DOCS_BASE"; fi
 
       - name: Upload the site
-        if: ${{ github.event_name != 'pull_request' }}
-        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
+          name: engine-docs-site
           path: docs/engine-site/dist
+          retention-days: 3
+          if-no-files-found: error
 
   deploy:
     name: engine-docs (deploy)
     if: ${{ github.event_name != 'pull_request' }}
     needs: build
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
+    uses: ./.github/workflows/docs-pages-publish.yml
+    with:
+      slot: site
+      artifact: engine-docs-site
+      run-id: ${{ github.run_id }}
     permissions:
+      contents: write
+      actions: read
+      pull-requests: read
       pages: write
       id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deploy.outputs.page_url }}
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deploy
-        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
