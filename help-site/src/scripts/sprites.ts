@@ -44,7 +44,8 @@ function pictureOf(canvas: HTMLCanvasElement, facts: (k: FacilityKind) => Catalo
   const kind = canvas.dataset.sprite as FacilityKind;
   // A floor or lobby is drawn as a run of `data-tiles` tiles (Sprite.astro).
   const tiles = canvas.dataset.tiles ? Number(canvas.dataset.tiles) : null;
-  const factsOf = tiles ? (k: FacilityKind): CatalogFacility => (k === kind ? { ...facts(k), width: tiles } : facts(k)) : facts;
+  const run = tiles ? { ...facts(kind), width: tiles } : null; // built once, not per frame
+  const factsOf = run ? (k: FacilityKind): CatalogFacility => (k === kind ? run : facts(k)) : facts;
   const hour = openHourFor(facts(kind).openHours);
   const span = canvas.dataset.span ? Number(canvas.dataset.span) : null;
   const pose = {

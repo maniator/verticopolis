@@ -169,7 +169,7 @@ function wireNewTabLinks(ui: UI, box: HTMLElement): void {
 /** The game panel's "About…": what's new, the release notes, a problem
  *  report and About this game. (Its Help button is {@link showHelp}.) */
 export function showHelpMenu(ui: UI): void {
-  trackAppAction("help_open");
+  trackAppAction("about_open");
   const { box } = openHelpDialog(ui, helpMenuTemplate(!isInstalledStandalone()), {
     actions: {
       "whats-new": () => openWhatsNew(ui, box),
@@ -183,6 +183,12 @@ export function showHelpMenu(ui: UI): void {
  *  Help button, the title screen and the tooling handle `ui.showHelp()`. */
 export function showHelp(ui: UI): void {
   trackAppAction("help_open");
+  // The manual is online only (the service worker leaves /help to the
+  // network), so offline say so rather than open a tab that cannot load.
+  if (!navigator.onLine) {
+    ui.sayVisibly("The manual needs an internet connection. It is at verticopolis.com/help.");
+    return;
+  }
   openPageInTab(ui, "/help/", () => ui.sayVisibly("The guide could not open. It is at verticopolis.com/help."));
 }
 

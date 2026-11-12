@@ -297,6 +297,9 @@ export type AppActionName =
   // Dialogs / navigation.
   | "settings_open"
   | "help_open"
+  // The game panel's About… menu (what's new, release notes, report, About this
+  // game); help_open is the manual itself.
+  | "about_open"
   | "compare_open"
   | "saves_open"
   // The TITLE SCREEN's load-only tower picker. Deliberately its own action, not

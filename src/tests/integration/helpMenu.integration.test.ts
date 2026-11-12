@@ -250,6 +250,18 @@ describe("the About menu", () => {
     expect(speed.now()).toBe(3);
   });
 
+  it("says the manual needs a connection when offline, opens no tab, and keeps the tower running", () => {
+    const speed = speedAt(3);
+    const { ui } = makeUI({ getSpeed: speed.getSpeed, onSpeed: speed.onSpeed });
+    vi.spyOn(navigator, "onLine", "get").mockReturnValue(false);
+    const open = vi.spyOn(window, "open");
+    const say = vi.spyOn(ui, "sayVisibly");
+    ui.showHelp();
+    expect(open).not.toHaveBeenCalled();
+    expect(say).toHaveBeenCalledWith("The manual needs an internet connection. It is at verticopolis.com/help.");
+    expect(speed.now()).toBe(3);
+  });
+
   it("says where the guide is when the browser blocks the new tab, and keeps the tower running", () => {
     const speed = speedAt(3);
     const { ui } = makeUI({ getSpeed: speed.getSpeed, onSpeed: speed.onSpeed });
