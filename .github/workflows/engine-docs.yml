@@ -6,8 +6,9 @@ name: Engine docs
 # at docs.verticopolis.com.
 #
 # The site shows main, as the engine READMEs do: a push to main that touches
-# the site or a page it shows deploys it, and so does the release merge that
-# writes the engine changelog. A maintainer can run it by hand for main, or
+# the site, a page it shows or the engine's sources (the Rust API reference
+# comes from their doc comments) deploys it, and so does the release merge
+# that writes the engine changelog. A maintainer can run it by hand for main, or
 # for an engine tag made after the site existed to show that release instead
 # (until the next push to main). A pull request that touches the same files
 # builds it without deploying, so a missing page or a build error fails there
@@ -29,6 +30,7 @@ on:
       - "engine-rs/CRATE_README.md"
       - "engine-rs/API.md"
       - "engine-rs/CHANGELOG.md"
+      - "engine-rs/src/**"
       - "conformance/README.md"
       - ".github/workflows/engine-docs.yml"
   pull_request:
@@ -41,6 +43,7 @@ on:
       - "engine-rs/CRATE_README.md"
       - "engine-rs/API.md"
       - "engine-rs/CHANGELOG.md"
+      - "engine-rs/src/**"
       - "conformance/README.md"
       - ".github/workflows/engine-docs.yml"
 
@@ -106,7 +109,12 @@ jobs:
           # builds as main.
           export DOCS_REF="${TAG:-main}"
           npm run build --prefix docs/engine-site
-          cargo doc --locked --no-deps --manifest-path engine-rs/Cargo.toml
+          # The Rust API reference wears the site's header, side menu and
+          # colors (docs/engine-site/rustdoc/, scripts/rustdoc-chrome.mjs).
+          chrome="$RUNNER_TEMP/rustdoc-chrome"
+          node docs/engine-site/scripts/rustdoc-chrome.mjs "$chrome"
+          RUSTDOCFLAGS="--html-in-header $chrome/head.html --html-before-content $chrome/before.html --html-after-content $chrome/after.html" \
+            cargo doc --locked --no-deps --manifest-path engine-rs/Cargo.toml
           mkdir -p docs/engine-site/dist/rust
           cp -R engine-rs/target/doc/. docs/engine-site/dist/rust/
           printf '<!doctype html><meta charset="utf-8"><meta http-equiv="refresh" content="0; url=verticopolis_engine/index.html"><title>Rust API reference</title><a href="verticopolis_engine/index.html">Rust API reference</a>\n' > docs/engine-site/dist/rust/index.html

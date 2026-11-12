@@ -1,8 +1,17 @@
-//! Port of `src/engine/Clock.ts` and `src/engine/calendar.ts`.
+//! Game time: the [`Clock`] on [`Simulation::clock`](crate::sim::Simulation::clock),
+//! the [`GameMode`] a game is started in, and the two calendars.
+//!
+//! A game day is 1,440 game minutes. The canon calendar is the 1994
+//! original's short one (a 3-day week with a 1-day weekend, 3-day quarters,
+//! 12-day years); the real-world calendar has 7-day weeks, 90-day quarters
+//! and 360-day years. Classic games always run canon.
 
+/// Which calendar a game runs on.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CalendarKind {
+    /// The 1994 original's short calendar ([`CANON`]).
     Canon,
+    /// Weeks, quarters and years of real length ([`REAL_WORLD`]).
     RealWorld,
 }
 
@@ -16,6 +25,7 @@ impl CalendarKind {
         }
     }
 
+    /// The calendar's saved spelling: `canon` or `realWorld`.
     pub fn as_str(self) -> &'static str {
         match self {
             CalendarKind::Canon => "canon",
@@ -24,16 +34,24 @@ impl CalendarKind {
     }
 }
 
+/// The lengths a calendar gives the week, the quarter and the year, in days.
 #[derive(Clone, Copy, Debug)]
 pub struct Calendar {
+    /// Which calendar this is.
     pub kind: CalendarKind,
+    /// Days in a week, the weekend included.
     pub week_days: i64,
+    /// Days at the end of each week that are the weekend.
     pub weekend_days: i64,
+    /// Days in a quarter, when rent is collected.
     pub quarter_days: i64,
+    /// Days in a year.
     pub year_days: i64,
+    /// Days between maintenance bills.
     pub maint_period_days: i64,
 }
 
+/// The 1994 original's calendar, which Classic always runs.
 pub const CANON: Calendar = Calendar {
     kind: CalendarKind::Canon,
     week_days: 3,
@@ -43,6 +61,7 @@ pub const CANON: Calendar = Calendar {
     maint_period_days: 3,
 };
 
+/// The real-world calendar a Modern game may choose.
 pub const REAL_WORLD: Calendar = Calendar {
     kind: CalendarKind::RealWorld,
     week_days: 7,
@@ -52,13 +71,19 @@ pub const REAL_WORLD: Calendar = Calendar {
     maint_period_days: 30,
 };
 
+/// The two ways to play, chosen when a game starts.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum GameMode {
+    /// The 1994 original's rules, prices and limits.
     Classic,
+    /// The original with quality-of-life changes and the calendar and
+    /// bridging options. [`crate::catalog::catalog`] lists every difference
+    /// a frontend shows.
     Modern,
 }
 
 impl GameMode {
+    /// The mode's saved spelling: `classic` or `modern`.
     pub fn as_str(self) -> &'static str {
         match self {
             GameMode::Classic => "classic",
@@ -76,7 +101,8 @@ impl GameMode {
     }
 }
 
-/// Classic always runs canon; Modern honors the player's choice.
+/// The calendar a game in `mode` runs: Classic always runs canon, and
+/// Modern runs the one the player chose.
 pub fn resolve_calendar(mode: GameMode, modern_calendar: CalendarKind) -> Calendar {
     if mode == GameMode::Classic {
         return CANON;
@@ -87,15 +113,18 @@ pub fn resolve_calendar(mode: GameMode, modern_calendar: CalendarKind) -> Calend
     }
 }
 
+/// The game clock.
 #[derive(Clone, Debug)]
 pub struct Clock {
-    /// Game minutes since day 0 00:00. Fractional mid-step.
+    /// Game minutes since 00:00 on day 0. It can be fractional.
     pub minutes: f64,
+    /// The calendar the game runs on.
     pub calendar: Calendar,
 }
 
 impl Clock {
-    /// `new Clock(minutes, calendar)`: a literal 0 starts at 07:00 on day 0.
+    // `new Clock(minutes, calendar)`: a literal 0 starts at 07:00 on day 0.
+    #[doc(hidden)]
     pub fn new(minutes: f64, calendar: Calendar) -> Clock {
         Clock {
             minutes: if minutes == 0.0 { 7.0 * 60.0 } else { minutes },
@@ -103,30 +132,37 @@ impl Clock {
         }
     }
 
+    #[doc(hidden)]
     pub fn advance(&mut self, min: f64) {
         self.minutes += min;
     }
 
+    /// Minutes since midnight, 0 up to 1,440.
     pub fn minute_of_day(&self) -> f64 {
         ((self.minutes % 1440.0) + 1440.0) % 1440.0
     }
 
+    /// The hour, 0 to 23.
     pub fn hour(&self) -> i64 {
         (self.minute_of_day() / 60.0).floor() as i64
     }
 
+    /// The minute of the hour, 0 to 59.
     pub fn minute(&self) -> i64 {
         (self.minute_of_day() % 60.0).floor() as i64
     }
 
+    /// The day number, counting from day 0.
     pub fn day(&self) -> i64 {
         (self.minutes / 1440.0).floor() as i64
     }
 
+    /// The day of the week, from 0 to `week_days - 1`; the weekend is last.
     pub fn day_of_week(&self) -> i64 {
         self.day() % self.calendar.week_days
     }
 
+    /// Whether today is a weekend day.
     pub fn is_weekend(&self) -> bool {
         self.is_weekend_on(self.day())
     }
@@ -137,32 +173,38 @@ impl Clock {
             >= self.calendar.week_days - self.calendar.weekend_days
     }
 
+    /// The quarter of the year, from 0.
     pub fn quarter(&self) -> i64 {
         ((self.day() % self.calendar.year_days) as f64 / self.calendar.quarter_days as f64).floor()
             as i64
     }
 
+    /// The year, counting from 0.
     pub fn year(&self) -> i64 {
         (self.day() as f64 / self.calendar.year_days as f64).floor() as i64
     }
 }
 
 impl Clock {
+    /// 07:00 to 09:59, the morning rush.
     pub fn is_morning(&self) -> bool {
         let h = self.hour();
         (7..10).contains(&h)
     }
 
+    /// 11:00 to 13:59, lunch.
     pub fn is_lunch(&self) -> bool {
         let h = self.hour();
         (11..14).contains(&h)
     }
 
+    /// 17:00 to 20:59, the evening rush.
     pub fn is_evening(&self) -> bool {
         let h = self.hour();
         (17..21).contains(&h)
     }
 
+    /// 21:00 to 05:59.
     pub fn is_night(&self) -> bool {
         let h = self.hour();
         !(6..21).contains(&h)

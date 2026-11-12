@@ -4,18 +4,24 @@ use super::*;
 use crate::economy::visitors::census_follows_the_day;
 use crate::tower::Extras;
 
+#[doc(hidden)]
 /// The sentence a save written by a newer build is refused with.
 pub const NEWER_SAVE_REFUSAL: &str =
     "This save was made by a newer version of Verticopolis. Update the game to load it.";
 
-/// `Simulation.deserialize(raw)`.
+/// Builds a game from save JSON (from [`decode_vctower`] or
+/// [`Simulation::serialize`]). An older save is upgraded first, and damaged
+/// or edited fields are corrected the way the web game's loader corrects
+/// them. Refuses a save from a newer version of the engine, and one it cannot
+/// read, with a sentence a player can read.
 pub fn deserialize(raw: &Value) -> Result<Simulation, String> {
     deserialize_owned(raw.clone())
 }
 
-/// Restore underground express stops from an ORIGINAL PC SimTower TDT file.
-/// Ordinary saved towers keep the existing normalization; changing new
-/// shafts or generic Classic save rules is not part of this bug (#1532).
+/// [`deserialize`] for a save that [`import_tdt`](crate::import_tdt) made from
+/// a 1994 `.TDT` file. It also keeps the basement stops of the original's
+/// express elevators, which a normal load would drop.
+#[doc(hidden)]
 pub fn deserialize_tdt(raw: &Value) -> Result<Simulation, String> {
     let mut sim = deserialize(raw)?;
     if sim.mode != GameMode::Classic {
@@ -64,9 +70,9 @@ pub fn deserialize_tdt(raw: &Value) -> Result<Simulation, String> {
     Ok(sim)
 }
 
-/// `deserialize` on a save this call owns: the save is migrated in place and
-/// each unit entry is freed as it is converted, so the load holds the save
-/// and the game it builds, not the save several times over (#1225).
+/// [`deserialize`] for save JSON the caller no longer needs: it upgrades the
+/// save in place and frees it as it goes, so a large tower loads in less
+/// memory.
 pub fn deserialize_owned(raw: Value) -> Result<Simulation, String> {
     // `migrateSave(null)` throws reading `version`; any other top-level value
     // loads as the TypeScript loads it (#858).

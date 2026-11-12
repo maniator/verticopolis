@@ -10,6 +10,7 @@ pub(super) struct Fp {
     top: i64,
 }
 
+#[doc(hidden)]
 /// `widenLegacyElevatorShafts`.
 pub fn widen_legacy_elevator_shafts(data: &Value) -> Value {
     let transports = data.get("transports").and_then(Value::as_array);

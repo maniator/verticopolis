@@ -1,14 +1,24 @@
-//! Port of `src/engine/sim/build.ts`: the money-aware build, transport build
-//! and sell paths.
+//! Placing and selling: [`Simulation::build`] for floors, lobbies and rooms,
+//! [`Simulation::build_transport`] for elevators, stairs and escalators, and
+//! [`Simulation::sell_at`]. Each build has a dry run
+//! ([`Simulation::can_build`], [`Simulation::can_build_transport`]) that
+//! answers with the same refusal and the full price, for a placement ghost.
+//!
+//! A refused command changes nothing and says why in a sentence a player can
+//! read. A placed one charges the money, logs the purchase and emits its
+//! gameplay events.
 
 use crate::clock::GameMode;
 use crate::facilities::*;
 use crate::gameplay::{GameplayEvent, RemovalMethod};
 use crate::sim::{LogKind, Simulation};
-use crate::tower::{ResizeResult, UnitState};
+use crate::tower::UnitState;
 
+/// What a build did.
 pub struct BuildResult {
+    /// Whether it was placed.
     pub ok: bool,
+    /// Why it was refused, ready to show a player. `None` when placed.
     pub reason: Option<String>,
 }
 
@@ -21,17 +31,21 @@ impl BuildResult {
     }
 }
 
+/// The answer to a dry run: what the build would do, and its price.
 pub struct CanBuild {
+    /// Whether the build would be placed.
     pub ok: bool,
+    /// Why it would be refused. `None` when it would be placed.
     pub reason: Option<String>,
+    /// The full price, in dollars, floors and bridged tiles included. It is
+    /// set even when the build would be refused.
     pub cost: f64,
 }
 
 /// Whether a tile of `kind` placed where there is no floor yet also pays for
-/// the floor it lays: a lobby does, as in the original, so a bare lobby tile
-/// costs the lobby's price plus the floor's, and a lobby over a floor tile the
-/// lobby's price alone. The build charges it and the catalog publishes it
-/// (`paysForFloor`).
+/// the floor it lays. A lobby does, as in the original: a bare lobby tile
+/// costs the lobby's price plus the floor's, and a lobby over a floor tile
+/// the lobby's price alone. The catalog publishes this as `paysForFloor`.
 pub fn pays_for_floor(kind: Kind) -> bool {
     kind == Kind::Lobby
 }
@@ -64,7 +78,7 @@ fn bare_tile_cost(kind: Kind) -> f64 {
 pub(crate) const CLASSIC_TOP_FLOOR_REASON: &str =
     "Only the wedding hall can be built on floor 100.";
 
-/// The buried-treasure line (`sim/build.ts`).
+/// The buried-treasure log line.
 pub(crate) fn treasure_message(gold: f64) -> String {
     format!(
         "💰 Excavation crews unearthed buried treasure worth ${}!",
@@ -73,8 +87,9 @@ pub(crate) fn treasure_message(gold: f64) -> String {
 }
 
 impl Simulation {
-    /// `toggleAutoBridge()`: Modern flips the bridging preference, Classic
-    /// always bridges and never flips (`rules.bridgingToggleable()`).
+    /// Turns automatic floor bridging off or on, and returns the new setting.
+    /// Only a Modern game can turn it off; a Classic game always bridges and
+    /// this returns `true`.
     pub fn toggle_auto_bridge(&mut self) -> bool {
         if self.mode.bridging_toggleable() {
             self.auto_bridge = !self.auto_bridge;
@@ -82,6 +97,7 @@ impl Simulation {
         self.auto_bridge
     }
 
+    #[doc(hidden)]
     pub fn is_unlocked(&self, kind: Kind) -> bool {
         let f = kind.facility();
         f.available_in(self.mode) && self.star >= f.min_star
@@ -99,6 +115,20 @@ impl Simulation {
         }
     }
 
+    /// The dry run [`build`](Simulation::build) makes first: whether a
+    /// `kind` at `(floor, x)` would be placed, why not, and its full price.
+    /// Changes nothing.
+    ///
+    /// ```
+    /// use verticopolis_engine::clock::GameMode;
+    /// use verticopolis_engine::facilities::Kind;
+    /// use verticopolis_engine::sim::Simulation;
+    ///
+    /// let sim = Simulation::new_game(1, GameMode::Classic);
+    /// let quote = sim.can_build(Kind::Lobby, 1, 100);
+    /// assert!(quote.ok);
+    /// assert!(quote.cost > 0.0);
+    /// ```
     pub fn can_build(&self, kind: Kind, floor: i64, x: i64) -> CanBuild {
         let kind = ground_floor_structure_kind(kind, floor);
         let f = kind.facility();
@@ -210,6 +240,28 @@ impl Simulation {
         money_check(f.cost + ((missing + bridge) as f64) * Kind::Floor.facility().cost)
     }
 
+    /// Places a floor tile, a lobby tile or a room with its left edge at
+    /// tile `x` and its bottom on `floor`, and charges for it.
+    ///
+    /// A room needs a floor under each of its tiles or bridges the gap when
+    /// [`auto_bridge`](Simulation::auto_bridge) is on, paying for the floor it
+    /// lays. Floors and lobbies are laid one tile at a time; to lay a run, call
+    /// [`paint_brush`](Simulation::paint_brush). A refused build changes
+    /// nothing. Floor 1 is the ground floor and basements are 0 and below.
+    ///
+    /// ```
+    /// use verticopolis_engine::clock::GameMode;
+    /// use verticopolis_engine::facilities::Kind;
+    /// use verticopolis_engine::sim::Simulation;
+    ///
+    /// let mut sim = Simulation::new_game(1, GameMode::Classic);
+    /// assert!(sim.build(Kind::Lobby, 1, 100).ok);
+    ///
+    /// // Offices open at one star, but not on a bare lot five floors up.
+    /// let refused = sim.build(Kind::Office, 5, 300);
+    /// assert!(!refused.ok);
+    /// println!("{}", refused.reason.unwrap());
+    /// ```
     pub fn build(&mut self, kind: Kind, floor: i64, x: i64) -> BuildResult {
         let kind = ground_floor_structure_kind(kind, floor);
         let can = self.can_build(kind, floor, x);
@@ -316,17 +368,15 @@ impl Simulation {
         }
     }
 
-    /// The dry run `build_transport` makes first: whether a shaft of `kind`
-    /// at `x` spanning `bottom..=top` would be placed, and its full price.
+    /// The dry run [`build_transport`](Simulation::build_transport) makes
+    /// first: whether a shaft of `kind` at `x` spanning `bottom..=top` would
+    /// be placed, why not, and its full price. Changes nothing.
+    ///
     /// An elevator costs the catalog `cost` plus `transportFloorCost` for
     /// each floor past its first; stairs and escalators cost the catalog
-    /// `cost`. Refusals come in `build_transport`'s order (locked, then money,
-    /// then placement) with its reasons, and every answer carries the price
-    /// `build_transport` checks the balance against. That price is the
-    /// shaft's only for a transport kind with `top` above `bottom`: an
-    /// inverted span prices below the base, and a room kind at its own
-    /// price, and both are refused by the placement rules (as the
-    /// TypeScript `buildTransport` refuses them, after the same money check).
+    /// `cost`. Refusals come in the build's order: not unlocked yet, then
+    /// money, then placement. The price is only a shaft's price for a
+    /// transport kind with `top` above `bottom`; anything else is refused.
     pub fn can_build_transport(&self, kind: Kind, x: i64, bottom: i64, top: i64) -> CanBuild {
         let f = kind.facility();
         // Saturating, as are the placement checks, so an out-of-range span
@@ -367,6 +417,29 @@ impl Simulation {
         }
     }
 
+    /// Places an elevator, stairs or an escalator with its left edge at tile
+    /// `x`, serving floors `bottom` to `top`, and charges for it. A new
+    /// elevator starts with one car for every six floors it serves, up to its
+    /// kind's limit; [`add_car`](Simulation::add_car) adds more. Stairs and
+    /// escalators span exactly two floors.
+    ///
+    /// ```
+    /// use verticopolis_engine::clock::GameMode;
+    /// use verticopolis_engine::facilities::Kind;
+    /// use verticopolis_engine::sim::Simulation;
+    ///
+    /// let mut sim = Simulation::new_game(1, GameMode::Classic);
+    /// for x in 100..124 {
+    ///     sim.build(Kind::Lobby, 1, x);
+    /// }
+    /// for floor in 2..=4 {
+    ///     for x in 100..124 {
+    ///         sim.build(Kind::Floor, floor, x);
+    ///     }
+    /// }
+    /// let shaft = sim.build_transport(Kind::ElevatorStandard, 110, 1, 4);
+    /// assert!(shaft.ok, "{:?}", shaft.reason);
+    /// ```
     pub fn build_transport(&mut self, kind: Kind, x: i64, bottom: i64, top: i64) -> BuildResult {
         let quote = self.can_build_transport(kind, x, bottom, top);
         if !quote.ok {
@@ -395,9 +468,10 @@ impl Simulation {
         }
     }
 
-    /// `sellAt(floor, x)`: sell whatever stands at a tile, a room before
-    /// the shaft or floor beneath it, then the shaft, then the floor tile.
-    /// The refund and the refusals are `remove_facility`'s.
+    /// Sells whatever stands at a tile: a room first, then a shaft, then the
+    /// floor or lobby tile. Returns whether anything was sold. The refund and
+    /// the refusals are [`remove_facility`](Simulation::remove_facility)'s
+    /// with [`RemovalMethod::Sell`].
     pub fn sell_at(&mut self, floor: i64, x: i64) -> bool {
         let t = self.tower.transport_at(floor, x).map(|t| t.id);
         let u = self.tower.unit_at(floor, x).map(|u| (u.id, u.kind));
@@ -409,48 +483,10 @@ impl Simulation {
         };
         self.remove_facility(id, RemovalMethod::Sell).ok
     }
-
-    /// `tower.setCars(id, cars)` with its `capacity_changed`. Both engines
-    /// emit from this layer (TypeScript `Simulation.setCars`, #906); the
-    /// binding, the referee and the charges call it, and the tower stays silent.
-    pub fn set_cars(&mut self, id: i64, cars: i64) -> bool {
-        let ok = self.tower.set_cars(id, cars);
-        if ok {
-            self.note_capacity(id);
-        }
-        ok
-    }
-
-    /// `tower.resizeTransport(id, bottom, top)` with its `capacity_changed`,
-    /// when the span actually moved.
-    pub fn resize_transport(&mut self, id: i64, bottom: i64, top: i64) -> ResizeResult {
-        let span = |sim: &Simulation| {
-            sim.tower
-                .transports
-                .iter()
-                .find(|t| t.id == id)
-                .map(|t| (t.bottom, t.top))
-        };
-        let before = span(self);
-        let r = self.tower.resize_transport(id, bottom, top);
-        if r.ok && span(self) != before {
-            self.note_capacity(id);
-        }
-        r
-    }
-
-    fn note_capacity(&mut self, id: i64) {
-        if let Some(kind) = self
-            .tower
-            .transports
-            .iter()
-            .find(|t| t.id == id)
-            .map(|t| t.kind)
-        {
-            self.gameplay.push(GameplayEvent::CapacityChanged { kind });
-        }
-    }
 }
+
+#[path = "build_capacity.rs"]
+mod capacity;
 
 #[cfg(test)]
 #[path = "build_tests.rs"]

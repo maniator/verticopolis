@@ -207,6 +207,7 @@ fn staging(
     }
 }
 
+#[doc(hidden)]
 impl Simulation {
     /// The advice and staging facts for shaft `id` against the player's working
     /// `draft`, for the day tab `weekend_view`. Read-only.

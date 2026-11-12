@@ -143,7 +143,29 @@ fn clock_label(minutes: f64) -> String {
     format!("{h12}:{m:02} {half}")
 }
 
+#[doc(hidden)]
 impl Simulation {
+    /// The bomb threat a random event calls in: Security sweeps the tower
+    /// for a fee, and a tower without Security takes the blast and a fine.
+    pub fn bomb_threat(&mut self) {
+        if self.has_any(Kind::Security) {
+            let cost = 2_000.0 + self.rng.int(0, 3_000) as f64;
+            self.money -= cost;
+            self.emit(&format!("💣 A bomb threat was called in. Security swept the tower and found nothing. The evacuation cost ${}.", with_thousands(cost)), LogKind::Info);
+            return;
+        }
+        let fine = 15_000.0 + self.rng.int(0, 15_000) as f64;
+        let targets = self.flammable_units();
+        let epicenter = if targets.is_empty() {
+            None
+        } else {
+            let ground = &self.tower.units[*self.rng.pick(&targets)];
+            Some((ground.floor, ground.x as f64 + ground.width as f64 / 2.0))
+        };
+        let destroyed = self.blast(fine, epicenter);
+        self.emit(&format!("💣 A bomb detonated with no security to stop it. {destroyed} room(s) across ~5 floors were gutted, plus a ${} fine. Build Security!", with_thousands(fine)), LogKind::Bad);
+    }
+
     /// The host's read of the search: the deadline, each floor guards are
     /// sweeping now with the tile span of its rooms, where the guard set off
     /// from and the minutes it left, reaches the floor by the emergency

@@ -53,6 +53,7 @@ pub fn roll_household(rng: &mut crate::rng::Rng) -> i64 {
     3
 }
 
+#[doc(hidden)]
 impl Simulation {
     /// `servingTransportKindsAt(floor)`: (elevator, stairs, escalator), the
     /// passenger kinds with a shaft stopping at the floor; staff-only

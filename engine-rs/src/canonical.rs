@@ -1,6 +1,6 @@
-//! Canonical JSON and the checkpoint digest, matching
-//! `src/tests/conformance/canonical.ts` and the rules in `conformance/README.md`.
-
+//! Canonical JSON and the digest the conformance suite compares: object
+//! keys sorted, numbers and strings written one way, so two equal values
+//! always give the same text and the same hash on any platform.
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 
@@ -113,14 +113,15 @@ pub(crate) fn write_js_string(out: &mut String, s: &str) {
     write_string(out, s);
 }
 
-/// The canonical text of a value. A JSON value never holds `undefined`, so
-/// callers leave absent fields out of the map before calling this.
+/// The canonical text of a value: keys in UTF-16 code unit order, numbers and
+/// strings as JavaScript's `JSON.stringify` writes them.
 pub fn canonical_json(v: &Value) -> String {
     let mut out = String::new();
     write_value(&mut out, v, KeyOrder::Sorted);
     out
 }
 
+#[doc(hidden)]
 /// `JSON.stringify` of the value as JavaScript would hold it: every map in
 /// insertion order (serde_json's `preserve_order`), except that keys that are
 /// array indices come first in numeric order, as in any JavaScript object.
@@ -132,7 +133,9 @@ pub fn js_json(v: &Value) -> String {
     out
 }
 
-/// First 16 hex digits of the SHA-256 of the canonical JSON's UTF-8 bytes.
+/// The first 16 hex digits of the SHA-256 of the value's canonical JSON. Two
+/// games with equal [state views](crate::snapshot::state_view) have equal
+/// digests.
 pub fn digest(v: &Value) -> String {
     let hash = Sha256::digest(canonical_json(v).as_bytes());
     let mut hex = String::with_capacity(16);

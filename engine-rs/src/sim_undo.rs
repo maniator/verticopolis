@@ -42,6 +42,7 @@ use crate::undo_journal::Before;
 
 pub(crate) use crate::sim_undo_check::StepRefused;
 
+#[doc(hidden)]
 impl Simulation {
     /// Open the journal for a gesture named `label`. The port keeps the step
     /// of a journal already open before it opens this one.

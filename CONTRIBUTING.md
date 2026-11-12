@@ -729,16 +729,23 @@ quick start must match the compiled example
 `pages.json`; `scripts/sync-pages.mjs` copies them in before each build and
 points their repository links at the site or at GitHub. The palette, logo and
 favicon are copied from the game (`src/styles/retro-tokens.css`,
-`src/public/`), and the crate's `cargo doc` output goes under `/rust/`.
-`.github/workflows/engine-docs.yml` builds it on a pull request that touches
-any of those files and deploys it to GitHub Pages on every push to `main` that
-does, so the site shows `main`, as the READMEs do. Run it by hand from the
+`src/public/`), and the crate's `cargo doc` output goes under `/rust/`, with
+the site's header, side menu and colors drawn in by
+`docs/engine-site/scripts/rustdoc-chrome.mjs` from the same title and menu
+(`docs/engine-site/site.mjs`) and `docs/engine-site/rustdoc/theme.css`. The
+reference shows the host API only: modules and items a host does not call are
+`#[doc(hidden)]`, and `#![warn(missing_docs)]` (an error under clippy's
+`-D warnings`) holds every item it does show to a doc comment that tells a
+host what the item does. `.github/workflows/engine-docs.yml` builds it on a
+pull request that touches any of those files or `engine-rs/src/` and deploys
+it to GitHub Pages on every push to `main` that does, so the site shows
+`main`, as the READMEs do. Run it by hand from the
 Actions tab to redeploy `main`, or to show a release tag instead until the
 next push. Locally: `npm ci --prefix
 docs/engine-site`, then `npm run dev --prefix docs/engine-site`. Edit the
 source files, never the copies under `src/content/docs/`.
 `src/tests/engineDocsSite.guard.test.ts` checks that every listed page names a
-real file and is in the sidebar; the workflow's own pull request run checks
+real file and is in the side menu; the workflow's own pull request run checks
 the build.
 
 ### Two changelogs, and the update label

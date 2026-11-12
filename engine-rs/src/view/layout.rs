@@ -1,15 +1,12 @@
-//! The view's layout: every slot and record width of the dynamic frame and
-//! the structural snapshot, by name. A host decodes both by these numbers,
-//! and `layout_json` (`viewLayout()` in the binding) hands them over, so a
-//! frontend checks them instead of copying them by hand (AD-4).
-//!
-//! Raise `VIEW_LAYOUT_VERSION` in the same commit as any change to a slot,
-//! a width, a slot's meaning or a code (`layout_tests.rs` pins the tables
-//! and fails with them). The compat record pins the version, so raising it
-//! also asks for a crate version bump.
+//! Every slot and record width of the view's frame and structural snapshot,
+//! by name. Decode both with these, such as `frame[header::MONEY]`, never
+//! with bare numbers. [`super::layout_json`] hands the same tables over as
+//! JSON, with the state, weather, mode and calendar codes, for a host in
+//! another language.
 use serde_json::{json, Map, Value};
 
-/// The version of the view's layout, reported by `viewLayout()`.
+/// The version of the view's layout. It goes up when a slot moves, a width
+/// changes, or a slot or code changes meaning.
 pub const VIEW_LAYOUT_VERSION: u32 = 14;
 
 /// The dynamic frame's header slots, one name each. `UNLOCKED` holds the
@@ -23,7 +20,9 @@ pub const VIEW_LAYOUT_VERSION: u32 = 14;
 /// year, all counted from 0) and the calendar's week and weekend lengths in
 /// days, so a host shows dates without doing the date arithmetic.
 /// `BOMB_SEARCH_SEQ` is 0 while no bomb search runs and otherwise moves with
-/// every change to it, so a host rereads `bombSearch()` only when it moved.
+/// every change to it, so a host rereads the search only when it moved.
+// Each slot is named for the value it holds.
+#[allow(missing_docs)]
 pub mod header {
     pub const MINUTES: usize = 0;
     pub const TOWER_REVISION: usize = 1;
@@ -71,6 +70,8 @@ pub mod header {
 pub const HEADER: usize = header::BOMB_SEARCH_SEQ + 1;
 
 /// The slots of a drawn person's record.
+// Each slot is named for the value it holds.
+#[allow(missing_docs)]
 pub mod person {
     pub const ID: usize = 0;
     pub const SEED: usize = 1;
@@ -87,6 +88,8 @@ pub const PERSON_RECORD: usize = person::WAIT + 1;
 
 /// The slots of a changed room's record: its slot in the structural
 /// snapshot's room list, then its frame fields.
+// Each slot is named for the value it holds.
+#[allow(missing_docs)]
 pub mod unit {
     pub const SLOT: usize = 0;
     pub const STATE: usize = 1;
@@ -100,7 +103,9 @@ pub mod unit {
 pub const UNIT_RECORD: usize = unit::OUT_FOR_MEAL + 1;
 
 /// The slots of a transport's record in the dynamic frame: `ID` and `CARS`,
-/// then `CARS` car records, as `frameView` lays them out.
+/// then `CARS` car records.
+// Each slot is named for the value it holds.
+#[allow(missing_docs)]
 pub mod transport {
     pub const ID: usize = 0;
     pub const CARS: usize = 1;
@@ -110,6 +115,8 @@ pub mod transport {
 pub const TRANSPORT_FIXED: usize = transport::CARS + 1;
 
 /// The slots of one car, counted from the car's start.
+// Each slot is named for the value it holds.
+#[allow(missing_docs)]
 pub mod car {
     pub const POSITION: usize = 0;
     pub const LOAD: usize = 1;
@@ -124,7 +131,9 @@ pub const CAR_RECORD: usize = car::DIRECTION + 1;
 /// an empty tower), the bounds the camera reads; `MODE` and `CALENDAR` are
 /// the game mode and the Modern calendar, by the codes in `MODES` and
 /// `CALENDARS`; `SCENE_SEED` is the founding seed the scenery derives from
-/// (`rng.initial_seed`, `HeaderView.sceneSeed`), fixed for a tower's life.
+/// (so the scenery stays the same across saves), fixed for a tower's life.
+// Each slot is named for the value it holds.
+#[allow(missing_docs)]
 pub mod structure {
     pub const REVISION: usize = 0;
     pub const ROOMS: usize = 1;
@@ -141,6 +150,8 @@ pub mod structure {
 pub const STRUCTURE_HEADER: usize = structure::SCENE_SEED + 1;
 
 /// The slots of a room in the structural snapshot.
+// Each slot is named for the value it holds.
+#[allow(missing_docs)]
 pub mod room {
     pub const ID: usize = 0;
     pub const KIND: usize = 1;
@@ -155,6 +166,8 @@ pub const ROOM_RECORD: usize = room::WIDTH + 1;
 /// The slots of a run of floor or lobby tiles: `COUNT` tiles of one kind and
 /// width side by side on one floor, the k-th at `X + k * WIDTH`, every one
 /// with the same frame fields.
+// Each slot is named for the value it holds.
+#[allow(missing_docs)]
 pub mod run {
     pub const KIND: usize = 0;
     pub const FLOOR: usize = 1;
@@ -173,6 +186,8 @@ pub const RUN_RECORD: usize = run::OUT_FOR_MEAL + 1;
 
 /// The slots of a transport in the structural snapshot, before its
 /// `SKIPS` skipped floors.
+// Each slot is named for the value it holds.
+#[allow(missing_docs)]
 pub mod shaft {
     pub const ID: usize = 0;
     pub const KIND: usize = 1;

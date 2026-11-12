@@ -1,18 +1,35 @@
-//! The per-frame read model a host reads between structural syncs: the
-//! flat frame (`frame_view`) and the log entries since a sequence number
-//! (`log_since`). Both are plain reads of a `Simulation`, so a native host
-//! calls them directly; the JavaScript binding (`wasm.rs`, `wasm/`) re-exports them
-//! and passes the frame across as one typed array.
+//! The flat frame: everything a renderer reads each frame, as one
+//! `Vec<f64>` ([`frame_view`]), and the new log messages ([`log_since`]).
+//!
+//! Read the frame by slot name, never by bare index: [`header`] names the
+//! header slots, [`person`], [`unit`](mod@unit), [`transport`] and [`car`] the slots
+//! of each record, and [`FRAME_HEADER`], [`PERSON_FIXED`], [`UNIT_RECORD`],
+//! [`TRANSPORT_FIXED`] and [`CAR_RECORD`] the widths. [`frame_view`] says
+//! what each value means. The JavaScript binding hands over the same frame as
+//! one `Float64Array`.
+//!
+//! [`crate::view`] is the newer read path: it sends only the rooms that
+//! changed since the last frame, plus a structural snapshot for the floors
+//! and shafts. Both read the same simulation.
+//!
+//! ```
+//! use verticopolis_engine::clock::GameMode;
+//! use verticopolis_engine::frame::{frame_view, header, FRAME_LAYOUT_VERSION};
+//! use verticopolis_engine::sim::{Simulation, STARTING_MONEY};
+//!
+//! let sim = Simulation::new_game(1, GameMode::Classic);
+//! let frame = frame_view(&sim);
+//! assert_eq!(frame[header::MONEY], STARTING_MONEY);
+//! assert_eq!(frame[header::PEOPLE], 0.0);
+//! # let _ = FRAME_LAYOUT_VERSION;
+//! ```
 use serde_json::Value;
 
 use crate::sim::Simulation;
 
-/// The version of the frame view's layout, reported by `engineIdentity()`.
-/// Raise it, in the same commit, when a slot's offset or a record's width
-/// changes (`identity_tests.rs` pins every offset and width, and fails with
-/// the table) or when a slot's meaning or a state, routine or weather code
-/// changes (no test sees that; it is a review item). The compat record pins
-/// this number, so raising it also asks for a crate version bump.
+/// The version of the frame's layout, also in [`crate::identity::identity`].
+/// It goes up when a slot moves, a record's width changes, or a slot or code
+/// changes meaning, so a decoder can refuse a layout it was not written for.
 pub const FRAME_LAYOUT_VERSION: u32 = 1;
 
 /// The header slots of the frame view by name, so a native decoder reads
@@ -20,6 +37,8 @@ pub const FRAME_LAYOUT_VERSION: u32 = 1;
 /// its named slot: `EXPLOSION_FX` is seq, floor, x; `THIEF_FX` is seq,
 /// caught, floor; `TREASURE_FX` is seq, floor, x; `EVENT_COUNTS` is fires,
 /// firesGutRooms, bombs. [`frame_view`] describes each value.
+// Each slot is named for its value, and `frame_view` says what it holds.
+#[allow(missing_docs)]
 pub mod header {
     pub const MINUTES: usize = 0;
     pub const TOWER_REVISION: usize = 1;
@@ -44,6 +63,8 @@ pub mod header {
 /// The fixed slots of a person record by name, counted from the record's
 /// start. The route follows them: `FLOOR_COUNT` floors, then `SHAFT_COUNT`
 /// shafts.
+// Each slot is named for its value, and `frame_view` says what it holds.
+#[allow(missing_docs)]
 pub mod person {
     pub const ID: usize = 0;
     pub const SEED: usize = 1;
@@ -72,6 +93,8 @@ pub const FRAME_HEADER: usize = header::TRANSPORTS + 1;
 pub const PERSON_FIXED: usize = person::SHAFT_COUNT + 1;
 
 /// The slots of a unit record by name.
+// Each slot is named for its value, and `frame_view` says what it holds.
+#[allow(missing_docs)]
 pub mod unit {
     pub const ID: usize = 0;
     pub const STATE: usize = 1;
@@ -83,12 +106,16 @@ pub mod unit {
 
 /// The slots of a transport record by name: `ID` and `CARS`, then `CARS`
 /// car records of [`CAR_RECORD`] slots, each laid out as [`car`].
+// Each slot is named for its value, and `frame_view` says what it holds.
+#[allow(missing_docs)]
 pub mod transport {
     pub const ID: usize = 0;
     pub const CARS: usize = 1;
 }
 
 /// The slots of one car in a transport record, counted from the car's start.
+// Each slot is named for its value, and `frame_view` says what it holds.
+#[allow(missing_docs)]
 pub mod car {
     pub const POSITION: usize = 0;
     pub const LOAD: usize = 1;
@@ -104,15 +131,13 @@ pub const TRANSPORT_FIXED: usize = transport::CARS + 1;
 /// Slots of each car in a transport record.
 pub const CAR_RECORD: usize = car::DIRECTION + 1;
 
-/// The routine code for a routine `frame_view` has no code for. The
-/// TypeScript decoder rejects it, and a native decoder should too: it means
-/// the engine gained a routine this layout has not named yet (the engine's
-/// unit tests stop on it, and the consumer's frame check refuses it).
+/// The routine code for a routine this layout has no code for yet. A decoder
+/// should refuse a frame that carries it: the engine has gained a routine the
+/// decoder does not know.
 pub const UNKNOWN_ROUTINE: f64 = 255.0;
 
-/// The per-frame read model: every value the web host reads from the
-/// simulation between two structural syncs, flat so it crosses the WASM
-/// boundary as one typed array.
+/// The frame: every value a renderer reads between two structural reads,
+/// flat, so it crosses to another language as one array of numbers.
 ///
 /// Header (`FRAME_HEADER` slots): 0 minutes, 1 tower revision, 2 meal
 /// overlay revision, 3 logSeq, 4 money, 5 star, 6 weather (0 clear, 1 cloudy,
@@ -123,7 +148,7 @@ pub const UNKNOWN_ROUTINE: f64 = 255.0;
 /// count.
 ///
 /// Then `people count` records of `PERSON_FIXED + floors + shafts`: id, seed,
-/// staff (0 or 1), state (the `PersonState` index), floor, x, fy, wait, then
+/// staff (0 or 1), state (a person state code), floor, x, fy, wait, then
 /// the routing slice the suites read: originFloor (always present, so -1 is
 /// a real basement floor), originUnitId, venueUnitId, mealVenueId (each -1
 /// when absent), countedHotelGuest (0 or 1), routine
@@ -132,10 +157,13 @@ pub const UNKNOWN_ROUTINE: f64 = 255.0;
 /// (NaN when absent: a drained timer stays negative on the person through
 /// the return leg, so no number is free), the floors count, the shafts
 /// count, then the route's floors and its shafts. Then `unit count` records
-/// of 6: id, state (the `UnitState` index), occupants, customersIn,
+/// of 6: id, state (a room state code), occupants, customersIn,
 /// hotelCustomersIn, outForMeal (an absent counter is -1). Then
 /// `transport count` records of `2 + 3 * cars`: id, cars, then per car
 /// position, load (-1 when the shaft keeps none), direction.
+///
+/// [`crate::view::layout_json`] lists the person and room state codes, the
+/// weather codes and the routine codes by name.
 pub fn frame_view(sim: &Simulation) -> Vec<f64> {
     use crate::crowd::PState;
     use crate::sim_loop::Weather;
@@ -369,8 +397,9 @@ pub(crate) fn push_transports(v: &mut Vec<f64>, transports: &[crate::tower::Tran
     }
 }
 
-/// The log entries numbered after `seq`, oldest first. The ring's entries
-/// are numbered from `log_seq` backwards, so the last entry is `log_seq`.
+/// The log messages numbered after `seq`, oldest first, as JSON. The newest
+/// message's number is the frame's [`header::LOG_SEQ`], so a host passes the
+/// last number it showed and gets only the new ones.
 pub fn log_since(sim: &Simulation, seq: i64) -> Value {
     let len = sim.log.len() as i64;
     let first = sim.log_seq - len + 1;

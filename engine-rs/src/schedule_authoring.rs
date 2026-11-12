@@ -174,6 +174,7 @@ fn seeded_homes(geo: &ShaftGeometry, aim: Option<i64>) -> Vec<i64> {
     geo.seeded_homes(up)
 }
 
+#[doc(hidden)]
 impl Simulation {
     /// The Auto-tune proposal for shaft `id` against the player's working
     /// `draft` (the schedule as the dialog holds it, homes left out when the

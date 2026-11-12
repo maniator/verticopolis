@@ -183,6 +183,7 @@ fn format_floors(floors: &[i64]) -> String {
     parts.join(", ")
 }
 
+#[doc(hidden)]
 impl Simulation {
     /// `Housekeeping.beforeCheckout`.
     pub fn housekeeping_before_checkout(&mut self) {

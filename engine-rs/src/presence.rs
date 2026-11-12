@@ -17,6 +17,7 @@ pub struct CongestionAttribution {
     pub escalator: f64,
 }
 
+#[doc(hidden)]
 impl Simulation {
     /// `updatePresence`: the hourly head count per room.
     pub fn update_presence(&mut self) {

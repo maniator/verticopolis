@@ -144,6 +144,7 @@ pub struct ParkingDemand {
     pub total: f64,
 }
 
+#[doc(hidden)]
 impl Simulation {
     pub fn recycling_centers(&self) -> i64 {
         self.count_operational(Kind::Recycling)

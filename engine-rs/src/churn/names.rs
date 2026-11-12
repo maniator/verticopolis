@@ -2,6 +2,7 @@
 
 use crate::sim::Simulation;
 
+#[doc(hidden)]
 impl Simulation {
     pub fn company_name(&mut self) -> String {
         const A: [&str; 10] = [

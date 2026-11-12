@@ -7,6 +7,7 @@ use crate::rules::{Drain, NIGHTCLUB_NOISE_FLOORS};
 use crate::sim::Simulation;
 use crate::tower::Unit;
 
+#[doc(hidden)]
 impl Simulation {
     /// `nearNightclub`.
     pub(crate) fn near_nightclub(&self, floor: i64) -> bool {

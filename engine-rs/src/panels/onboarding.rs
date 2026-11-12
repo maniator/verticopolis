@@ -9,6 +9,7 @@ use crate::facilities::Kind;
 use crate::sim::Simulation;
 use crate::tower::UnitState;
 
+#[doc(hidden)]
 impl Simulation {
     /// `{ lobby, floor, office, connect, play }`, each a boolean. Reads the
     /// lobby tile count and the per-revision floor fact, then walks the rooms

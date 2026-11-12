@@ -6,11 +6,13 @@ pub(super) fn is_game_mode(v: Option<&Value>) -> bool {
     matches!(v.and_then(Value::as_str), Some("classic") | Some("modern"))
 }
 
+#[doc(hidden)]
 /// `migrateSave(data)`.
 pub fn migrate_save(data: &Value) -> Value {
     migrate_save_owned(data.clone())
 }
 
+#[doc(hidden)]
 /// `migrate_save` on a save this call owns. The steps that only set a key
 /// set it in place, so an old save is held once, not once per step: a
 /// version 4 tower of 12,000 units peaked at eleven times what it keeps.

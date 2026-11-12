@@ -1,25 +1,18 @@
-//! The engine's identity record: which engine this is and which contracts it
-//! speaks, written by the engine itself so a frontend, a bug report and a perf
-//! run all name the same facts (#963).
+//! The engine's identity record: which engine this is and which contracts
+//! it speaks (crate version, save version, frame, view and catalog layout
+//! versions, and the conformance lock's digest), so a frontend, a bug report
+//! and a benchmark all name the same engine.
 //!
-//! It holds only what the engine can know about itself. A hash of the engine's
-//! sources cannot be compiled into those sources, and a build script or an
-//! environment macro would run outside the independence rules
-//! (`tests/independence.rs`), so the build hash stays the host's fact: the
-//! served package's `BUILD.json` records it and the loader checks the bytes it
-//! instantiates against that record.
+//! The record holds only what the engine knows about itself. Which build of
+//! the sources a binary came from is the packaging's fact; the crate's
+//! README describes the build metadata a host supplies for it.
 //!
-//! `src/compat-record.json` (compiled in; it sits inside the crate, so the source
-//! hash covers it) holds the crate version and the lock digest. A test checks
-//! them against `Cargo.toml`, the conformance files and the constants here, and
-//! `src/tests/engineCompat.guard.test.ts` checks them against the same
-//! constants and the checked-in binding declaration, so the version cannot stay
-//! put when one of those moves. The rule is in the release plan (section 7.4) and
-//! `CONTRIBUTING.md` (Versioning): the crate version goes up with the conformance
-//! lock, `SAVE_VERSION`, the frame layout, catalog and identity record versions
-//! and `src/dualrun/engine.d.ts`. The Rust `pub` API is not checked by a test, so
-//! a change there is a review call. An internal change that keeps all of these is
-//! told apart by the build hash alone.
+//! ```
+//! let id = verticopolis_engine::identity::identity();
+//! assert_eq!(id["crate"]["name"], "verticopolis-engine");
+//! println!("{}", verticopolis_engine::identity::identity_json());
+//! ```
+
 use serde_json::{json, Value};
 
 use crate::canonical::canonical_json;
@@ -71,7 +64,7 @@ pub fn identity() -> Value {
     })
 }
 
-/// The record as canonical JSON, the text the binding returns.
+/// The record as canonical JSON, the text the JavaScript package returns.
 pub fn identity_json() -> String {
     canonical_json(&identity())
 }

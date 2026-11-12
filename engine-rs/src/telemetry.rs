@@ -94,6 +94,7 @@ pub fn fold_origins(
     }
 }
 
+#[doc(hidden)]
 impl Simulation {
     /// `sampleElevatorUtil`: fold this hour's car occupancy into each
     /// elevator's demand ring and (passenger shafts only) its utilization
@@ -188,6 +189,7 @@ impl Simulation {
     }
 }
 
+#[doc(hidden)]
 impl Simulation {
     /// Replace the telemetry with the `telemetry_json` shape. Tooling only:
     /// the gallery's engine leg carries a scene's authored curve across the

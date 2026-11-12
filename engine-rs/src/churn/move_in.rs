@@ -11,6 +11,7 @@ use crate::tower::UnitState;
 
 use super::{household_price, roll_household};
 
+#[doc(hidden)]
 impl Simulation {
     /// `attemptMoveIns`.
     pub fn attempt_move_ins(&mut self) {

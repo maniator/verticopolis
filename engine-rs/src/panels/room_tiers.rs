@@ -228,6 +228,7 @@ pub struct RoomTier {
     pub rent: RentTier,
 }
 
+#[doc(hidden)]
 impl Simulation {
     /// Every room that carries an evaluation or a rent level, in the rooms'
     /// order (`room_units`, the view's room order). A room with neither is

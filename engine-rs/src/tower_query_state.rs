@@ -44,6 +44,7 @@ pub struct Memo {
 
 // ---- unit state predicates (types.ts) --------------------------------------
 
+#[doc(hidden)]
 impl Unit {
     pub fn is_operational(&self) -> bool {
         !matches!(

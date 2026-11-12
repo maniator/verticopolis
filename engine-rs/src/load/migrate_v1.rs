@@ -2,6 +2,7 @@
 
 use super::*;
 
+#[doc(hidden)]
 /// `migrationLooksValid`.
 pub fn migration_looks_valid(data: &Value) -> bool {
     let version = version_of(data);
@@ -46,6 +47,7 @@ pub fn migration_looks_valid(data: &Value) -> bool {
     true
 }
 
+#[doc(hidden)]
 /// `floatingStructureCount`.
 pub fn floating_structure_count(data: &Value) -> i64 {
     let units = units_of(data);
@@ -97,6 +99,7 @@ pub(super) struct Room {
     fl: i64,
 }
 
+#[doc(hidden)]
 /// `reflowV1toV2`: re-lay rooms at canon widths.
 pub fn reflow_v1_to_v2(data: &Value) -> Value {
     let src = units_of(data);
@@ -363,6 +366,7 @@ pub fn reflow_v1_to_v2(data: &Value) -> Value {
     )
 }
 
+#[doc(hidden)]
 pub fn upgrade_v1_to_v2(data: &Value) -> Value {
     let safe = with(data, vec![("version", json!(2))]);
     let out = reflow_v1_to_v2(data);

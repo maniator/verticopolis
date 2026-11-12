@@ -202,12 +202,21 @@ impl Simulation {
         m
     }
 
-    /// `serialize()`: the saved game as a JSON tree, for the readers that
-    /// edit, hash or walk it: the state view and its digest (the dual run's
-    /// shadow and the tooling digest), the scenario runner and the TDT
-    /// referee. The sync paths `serializeForSync` and `saveDelta`
-    /// (`save_delta.rs`) read it too. The `.vctower` and `.TDT` exports do
-    /// not: they read the text and the units one at a time (#1338, #1431).
+    /// The whole game as save JSON, the object a `.vctower` file wraps.
+    ///
+    /// A host that edits or inspects the save uses this, then
+    /// [`crate::load::stamp_save`] and [`crate::load::encode_vctower`] to
+    /// write the file. To go straight to the file's bytes, use
+    /// [`crate::load::encode_simulation_vctower`].
+    ///
+    /// ```
+    /// use verticopolis_engine::clock::GameMode;
+    /// use verticopolis_engine::sim::{Simulation, SAVE_VERSION};
+    ///
+    /// let sim = Simulation::new_game(3, GameMode::Classic);
+    /// let save = sim.serialize();
+    /// assert_eq!(save["version"], SAVE_VERSION);
+    /// ```
     pub fn serialize(&self) -> Value {
         let mut m = Map::new();
         for (k, f) in self.save_fields() {
@@ -235,6 +244,7 @@ impl Simulation {
         )
     }
 
+    #[doc(hidden)]
     /// The saved game as `serde_json`'s compact text: the same bytes as
     /// `serialize().to_string()`, written without the tree. `Engine.serialize`
     /// returns it; that binding keeps its doc line, `serialize()` as JSON

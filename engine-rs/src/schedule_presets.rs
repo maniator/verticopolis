@@ -195,6 +195,7 @@ fn build(preset: Preset, geo: &ShaftGeometry) -> PresetProposal {
     }
 }
 
+#[doc(hidden)]
 impl Simulation {
     /// The rows and homes the named `preset` sets for shaft `id`. Read-only.
     pub fn schedule_preset(&self, id: i64, preset: &str) -> PresetProposal {

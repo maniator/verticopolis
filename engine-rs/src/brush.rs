@@ -1,24 +1,24 @@
-//! The floor and lobby brush (`paintBrush`), twin of
-//! `src/engine/sim/brush.ts`.
+//! The floor and lobby brush: [`Simulation::paint_brush`] lays a run of
+//! floor or lobby tiles in one command.
 
 use crate::charges::INVALID_REQUEST;
 use crate::facilities::Kind;
 use crate::sim::Simulation;
 
-/// The most tiles one brush may carry (`BRUSH_TILE_LIMIT`). The binding
-/// refuses more with `INVALID_REQUEST`.
+/// The most tiles one brush may carry.
 pub const BRUSH_TILE_LIMIT: usize = 32;
 
-/// `BrushResult`: how many tiles the brush laid, and the last refusal reason
-/// a build gave.
+/// What a brush laid.
 #[derive(Clone, Debug, PartialEq)]
 pub struct BrushResult {
+    /// How many tiles it laid.
     pub placed: i64,
+    /// The last refusal one of its tiles got, if any did.
     pub reason: Option<String>,
 }
 
 impl BrushResult {
-    /// The refusal for a malformed brush: nothing laid.
+    #[doc(hidden)]
     pub fn invalid() -> BrushResult {
         BrushResult {
             placed: 0,
@@ -28,27 +28,26 @@ impl BrushResult {
 }
 
 impl Simulation {
-    /// `paintBrush(kind, floor, tiles)`: `build(kind, floor, x)` over the
-    /// brush's tiles, the same builds in the same order as laying them one at
-    /// a time, so the brush charges, logs and reports exactly as those builds
-    /// do. One engine call, so no step runs between its tiles.
+    /// Lays `kind` (floor or lobby) on each tile column in `tiles` on
+    /// `floor`, charging as that many [`build`](Simulation::build) calls
+    /// would, in one command. It skips a tile that already carries `kind`,
+    /// and tries a refused tile again once a neighbor it needed is laid, so
+    /// the order of `tiles` does not matter.
     ///
-    /// Each pass walks `tiles` in order and skips a tile that already carries
-    /// `kind`, or any structure when the brush is not a lobby brush (a lobby
-    /// brush upgrades plain floor in place, the sky-lobby conversion). Passes
-    /// repeat while one laid something, so a tile refused for want of support
-    /// is tried again once its neighbor stands. A repeated column is laid
-    /// once and then skipped, and a refused one is tried again, as the same
-    /// builds issued one by one would be.
+    /// A lobby brush also turns plain floor into lobby (a sky lobby). Any
+    /// other kind, or more than [`BRUSH_TILE_LIMIT`] tiles, lays nothing and
+    /// answers `INVALID_REQUEST`.
     ///
-    /// A lobby laid over plain floor takes the tile's place in the unit list,
-    /// and what the brush placed moves to the end of the list in one pass at
-    /// the end ([`Simulation::with_lobby_upgrades`]), where laying them one at
-    /// a time would make a pass per tile.
+    /// ```
+    /// use verticopolis_engine::clock::GameMode;
+    /// use verticopolis_engine::facilities::Kind;
+    /// use verticopolis_engine::sim::Simulation;
     ///
-    /// A kind other than floor or lobby, or more than [`BRUSH_TILE_LIMIT`]
-    /// tiles, lays nothing and answers `INVALID_REQUEST`. The binding refuses
-    /// a floor or tile that is not a whole number the same way.
+    /// let mut sim = Simulation::new_game(1, GameMode::Classic);
+    /// let tiles: Vec<i64> = (100..124).collect();
+    /// let laid = sim.paint_brush(Kind::Lobby, 1, &tiles);
+    /// assert_eq!(laid.placed, 24);
+    /// ```
     pub fn paint_brush(&mut self, kind: Kind, floor: i64, tiles: &[i64]) -> BrushResult {
         if !matches!(kind, Kind::Floor | Kind::Lobby) || tiles.len() > BRUSH_TILE_LIMIT {
             return BrushResult::invalid();

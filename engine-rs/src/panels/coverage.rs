@@ -61,6 +61,7 @@ impl CrewReach {
     }
 }
 
+#[doc(hidden)]
 impl Simulation {
     /// The reach of the operational housekeeping crews.
     pub(super) fn crew_reach(&self) -> CrewReach {

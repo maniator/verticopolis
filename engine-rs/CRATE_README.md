@@ -93,8 +93,11 @@ fn main() -> Result<(), String> {
 }
 ```
 
-These pages and the Rust API reference are also at
-[docs.verticopolis.com](https://docs.verticopolis.com).
+These pages are also at [docs.verticopolis.com](https://docs.verticopolis.com),
+with the [Rust API reference](https://docs.verticopolis.com/rust/verticopolis_engine/):
+every host call with what it does and a runnable example. The reference
+shows the host API only; the engine's internals are public for its tests and
+hidden there.
 
 A fuller host, which every CI run builds and runs from outside the engine,
 is [`engine-rs/consumer/`](https://github.com/maniator/verticopolis/tree/main/engine-rs/consumer).

@@ -137,6 +137,7 @@ impl<T: Copy> FloorSlots<T> {
     }
 }
 
+#[doc(hidden)]
 impl Simulation {
     /// `peakCongestionHotspot()`: the worst floor's ratio and which floor it
     /// is (`null` when nothing is congested). A tie names the lowest floor,

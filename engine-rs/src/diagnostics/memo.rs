@@ -61,6 +61,7 @@ pub struct DiagMemo {
     recycling: CensusTally,
 }
 
+#[doc(hidden)]
 impl Simulation {
     fn demand_key(&self) -> DemandKey {
         (

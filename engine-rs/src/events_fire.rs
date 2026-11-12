@@ -9,6 +9,7 @@ use crate::services::with_thousands;
 use crate::sim::{LogKind, Simulation};
 use crate::tower::UnitState;
 
+#[doc(hidden)]
 impl Simulation {
     /// `startFireOn`: set the room at index `i` ablaze as a new outbreak. A
     /// blaze spreading to a neighbor is the same fire, so only this counts as

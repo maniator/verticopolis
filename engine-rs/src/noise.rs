@@ -7,6 +7,7 @@ use crate::satisfaction::{HOTEL_NOISE_TILES, OFFICE_NOISE_TILES};
 use crate::sim::Simulation;
 use crate::tower::Unit;
 
+#[doc(hidden)]
 impl Simulation {
     /// `nearestKindWithin`.
     fn nearest_kind_within(
