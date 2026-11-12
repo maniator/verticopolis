@@ -291,8 +291,8 @@ export interface CatalogFacility {
    *  then stands in for `population`; a condo's price scales with it against
    *  the condo's `population`. */
   readonly ownHousehold: boolean;
-  /** A foot-traffic trading kind: the one predicate the noise and
-   *  lobby-proximity rules key off. */
+  /** A foot-traffic trading kind: the predicate the lobby-proximity rule
+   *  keys off, and the noise rule too, less the quiet spa and daycare. */
   readonly commercial: boolean;
   /** A hotel room of any size. */
   readonly hotel: boolean;

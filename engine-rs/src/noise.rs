@@ -57,12 +57,12 @@ impl Simulation {
     /// `noiseAfflictedFresh`: the scan behind the memo.
     pub(crate) fn noise_afflicted_fresh(&self, u: &Unit) -> bool {
         if u.kind == Kind::Office {
-            return self.nearest_kind_within(u, |k| k.is_commercial(), OFFICE_NOISE_TILES);
+            return self.nearest_kind_within(u, |k| k.is_noisy_venue(), OFFICE_NOISE_TILES);
         }
         if u.kind.is_hotel() || u.kind == Kind::Condo || u.kind.is_rental() {
             return self.nearest_kind_within(
                 u,
-                |k| k == Kind::Office || k.is_commercial(),
+                |k| k == Kind::Office || k.is_noisy_venue(),
                 HOTEL_NOISE_TILES,
             );
         }

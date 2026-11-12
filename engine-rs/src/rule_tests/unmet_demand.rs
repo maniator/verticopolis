@@ -195,6 +195,11 @@ fn the_nightclub_halo_also_yields_to_a_steeper_unmet_drain() {
         sim.dominant_gripe(&u, &with(true, 0.0)),
         Some("unmetDemand")
     );
+    assert_eq!(
+        sim.dominant_gripe(&u, &with(true, 0.15)),
+        Some("unmetDemand"),
+        "the club drains only at night, so its daily share yields to a round-the-clock drain"
+    );
     assert_eq!(sim.dominant_gripe(&u, &with(true, 0.34)), Some("noise"));
     assert_eq!(sim.dominant_gripe(&u, &with(false, 1.0)), Some("noise"));
 }

@@ -59,13 +59,19 @@ fn a_gated_noisy_condo_names_noise_and_what_holding_it_costs() {
 }
 
 #[test]
-fn a_club_gated_condo_gets_the_cross_floor_remedy_and_a_doubly_noisy_one_both() {
-    let mut sim = lot_tower(40, GameMode::Modern, 4);
-    occupied_club(&mut sim, 2, C);
-    let condo = put(&mut sim, Kind::Condo, 3, C);
-    let u = unit(&sim, condo).clone();
-    assert!(!sim.noise_afflicted(&u), "cross-floor only");
-    assert_eq!(remedies(&mut sim, condo), (Some(false), Some(true)));
+fn a_club_alone_never_holds_a_condo_and_a_doubly_noisy_one_gets_both_remedies() {
+    // The club is felt only while it is open and never brings a tenant to
+    // notice by itself, so it holds no spot at any hour, open or closed.
+    for hour in [12, 22] {
+        let mut sim = lot_tower(40, GameMode::Modern, 4);
+        sim.clock.minutes = hour as f64 * 60.0;
+        assert_eq!(sim.clock.hour(), hour);
+        occupied_club(&mut sim, 2, C);
+        let condo = put(&mut sim, Kind::Condo, 3, C);
+        let u = unit(&sim, condo).clone();
+        assert!(!sim.noise_afflicted(&u), "cross-floor only");
+        assert!(wont_lease(&mut sim, condo).is_none(), "hour {hour}");
+    }
     let mut sim = lot_tower(43, GameMode::Modern, 6);
     occupied_club(&mut sim, 2, C - 40);
     put(&mut sim, Kind::FastFood, 4, C - 20);

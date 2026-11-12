@@ -5,7 +5,9 @@ use indexmap::IndexMap;
 use crate::demand::{compute_demand_map, origin_demand, unmet_coverage, DemandMap};
 use crate::econ::{rent_config, rent_of};
 use crate::facilities::Kind;
-use crate::rules::{CLASSIC_HOUSEHOLD, NO_DRAIN};
+use crate::rules::{
+    CLASSIC_HOUSEHOLD, DAYCARE_HALO_MAX, FITNESS_HALO_MAX, NO_DRAIN, SPA_SERENITY_MAX,
+};
 use crate::sim::Simulation;
 use crate::tower::Unit;
 
@@ -37,7 +39,11 @@ pub struct SatisfactionContext {
     pub global_cong: f64,
     pub served_set: std::collections::HashSet<i64>,
     pub club_floors: Vec<i64>,
+    /// Every operational nightclub's floor, open or not.
     pub nightclub_floors: Vec<i64>,
+    /// Whether the nightclubs are open in the hour this context is stepped
+    /// for: they disturb the homes around them only then.
+    pub nightclub_open: bool,
     pub spa_floors: Vec<i64>,
     pub daycare_floors: Vec<i64>,
     pub demand_map: Option<DemandMap>,
@@ -94,6 +100,8 @@ impl Simulation {
             }
         }
         let served_set = self.tower.served_floors();
+        // A nightclub disturbs the homes around it only while it is open.
+        let nightclub_open = Kind::Nightclub.is_open_at(self.clock.hour());
         let mut club_floors = Vec::new();
         let mut nightclub_floors = Vec::new();
         let mut spa_floors = Vec::new();
@@ -119,6 +127,7 @@ impl Simulation {
             served_set,
             club_floors,
             nightclub_floors,
+            nightclub_open,
             spa_floors,
             daycare_floors,
             demand_map: None,
@@ -163,16 +172,21 @@ impl Simulation {
             s = (s - over * 0.07).min(1.0).max(0.0);
         }
         let residential = u.kind == Kind::Condo || u.kind == Kind::RentalApartment;
+        // The largest ceiling lift any nearby amenity gives this room.
+        let mut amenity_lift: f64 = 0.0;
         if residential && served && !ctx.club_floors.is_empty() {
             let bonus = self
                 .mode
                 .fitness_halo_bonus(nearest_floor_dist(&ctx.club_floors, u.floor));
             if bonus > 0.0 {
                 s = (s + bonus).min(1.0);
+                amenity_lift =
+                    amenity_lift.max(self.mode.amenity_cap_lift(bonus, FITNESS_HALO_MAX));
             }
         }
         if (u.kind == Kind::Condo || u.kind.is_hotel() || u.kind == Kind::RentalApartment)
             && served
+            && ctx.nightclub_open
             && !ctx.nightclub_floors.is_empty()
         {
             let penalty = self
@@ -188,6 +202,8 @@ impl Simulation {
                 .spa_serenity_bonus(nearest_floor_dist(&ctx.spa_floors, u.floor));
             if bonus > 0.0 {
                 s = (s + bonus).min(1.0);
+                amenity_lift =
+                    amenity_lift.max(self.mode.amenity_cap_lift(bonus, SPA_SERENITY_MAX));
             }
         }
         if residential && served && !ctx.daycare_floors.is_empty() {
@@ -197,6 +213,8 @@ impl Simulation {
             );
             if bonus > 0.0 {
                 s = (s + bonus).min(1.0);
+                amenity_lift =
+                    amenity_lift.max(self.mode.amenity_cap_lift(bonus, DAYCARE_HALO_MAX));
             }
         }
         let far_walk = (u.kind == Kind::Office || u.kind == Kind::RentalApartment)
@@ -255,6 +273,12 @@ impl Simulation {
             let cap = (if far_walk || noisy { NOISE_CAP } else { 1.0 })
                 .min(lobby_drain.cap)
                 .min(unmet_drain.cap);
+            // A nearby amenity raises the ceiling that noise, a far lobby or
+            // unmet demand sets, never the one a far walk to transport sets
+            // (no gym shortens that walk). The capped flags above still read
+            // the raw caps, so the gripe ladder keeps naming the cause.
+            let lift = if far_walk { 0.0 } else { amenity_lift };
+            let cap = (cap + lift).min(1.0);
             s = (s - erosion).min(cap).max(0.0);
         }
         StepResult {
@@ -300,10 +324,25 @@ impl Simulation {
                 0.0
             };
         }
+        // The nightclub is felt only while it is open, so the gate walks its
+        // horizon hour by hour from now and opens the clubs in their hours:
+        // a night run would otherwise hold every spot near a club, and a day
+        // run would let a tenant in beside one that evicts them overnight.
+        let open_now = ctx.nightclub_open;
+        let doomed = self.gate_horizon_dooms(&probe, ctx);
+        ctx.nightclub_open = open_now;
+        doomed
+    }
+
+    /// Whether `probe`, starting content, falls under [`VACATE_RESCIND`]
+    /// within the gate's horizon without ever recovering.
+    fn gate_horizon_dooms(&mut self, probe: &Unit, ctx: &mut SatisfactionContext) -> bool {
         let mut s = 1.0;
-        for _ in 0..GATE_HORIZON_HOURS {
+        let now = self.clock.hour();
+        for h in 0..GATE_HORIZON_HOURS {
+            ctx.nightclub_open = Kind::Nightclub.is_open_at((now + h) % 24);
             let prev = s;
-            s = self.satisfaction_step(&probe, s, ctx).next;
+            s = self.satisfaction_step(probe, s, ctx).next;
             if s < VACATE_RESCIND {
                 return true;
             }

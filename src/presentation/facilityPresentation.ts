@@ -75,7 +75,7 @@ export const FACILITY_PRESENTATION: Readonly<Record<FacilityKind, FacilityPresen
   },
   fitnessClub: {
     color: "#4a86c8",
-    description: "Modern: a members' gym (weight floor, yoga, spin, boxing, climbing). Pays a membership lease like an office, and nearby condos are happier for having it close (a capped bonus that fades with distance).",
+    description: "Modern: a members' gym (weight floor, yoga, spin, boxing, climbing). Pays a membership lease like an office, and nearby condos and apartments are happier for having it close (a bonus that fades with distance, which also lifts the ceiling a noisy or out-of-the-way home is held to).",
   },
   clinic: {
     color: "#5ab0c8",
@@ -83,11 +83,11 @@ export const FACILITY_PRESENTATION: Readonly<Record<FacilityKind, FacilityPresen
   },
   nightclub: {
     color: "#a24ad0",
-    description: "Modern: a nightclub that fills after dark, earning when the office crowd is gone. Pays a monthly DJ booking, and its noise makes nearby homes unhappy: keep it away from condos.",
+    description: "Modern: a nightclub that fills after dark, earning when the office crowd is gone. Pays a monthly DJ booking, and while it is open its noise makes homes and hotel rooms on nearby floors unhappy overnight: keep it away from condos.",
   },
   spa: {
     color: "#5cc0a0",
-    description: "Modern: a wellness spa (massage, sauna, hot tubs). Earns from foot traffic, busier on weekends, and hotel rooms on nearby floors rest better for it (a capped bonus that fades with distance).",
+    description: "Modern: a wellness spa (massage, sauna, hot tubs). Earns from foot traffic, busier on weekends, and hotel rooms on nearby floors rest better for it (a bonus that fades with distance and lifts a capped room's ceiling). It makes no noise for its neighbors.",
   },
   skyBar: {
     color: "#d89050",
@@ -99,7 +99,7 @@ export const FACILITY_PRESENTATION: Readonly<Record<FacilityKind, FacilityPresen
   },
   daycare: {
     color: "#eeb63c",
-    description: "Modern: a children's daycare. Earns from parents dropping off and collecting kids, busiest on weekdays when they are at work, and condos on nearby floors are happier for it, most of all the biggest families who lean on childcare the most (a bonus that grows with family size and fades over the next few floors).",
+    description: "Modern: a children's daycare. Earns from parents dropping off and collecting kids, busiest on weekdays when they are at work, and condos and apartments on nearby floors are happier for it, most of all the biggest families who lean on childcare the most (a bonus that grows with family size, fades over the next few floors and lifts a capped home's ceiling). It keeps working hours, so it makes no noise for its neighbors.",
   },
   stairs: {
     color: "#b0a890",
