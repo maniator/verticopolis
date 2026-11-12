@@ -31,10 +31,6 @@ on:
         description: "The run that uploaded the artifact"
         type: string
         default: ""
-    outputs:
-      changed:
-        description: "true when this run changed the stored site"
-        value: ${{ jobs.store.outputs.changed }}
 
 permissions: {}
 
@@ -140,10 +136,16 @@ jobs:
   deploy:
     name: docs-pages (deploy)
     needs: store
+    # A run that stores a build deploys even when the branch already held it,
+    # so re-running a run whose deploy failed deploys again. A removal deploys
+    # only when it changed the branch.
+    #
     # The github-pages environment deploys from main only. A run from another
     # branch (a pull request stacked on another one closing) still stores its
     # change, and the next deploy from main carries it.
-    if: ${{ needs.store.outputs.changed == 'true' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    if: >-
+      (needs.store.outputs.changed == 'true' || inputs.artifact != '') &&
+      github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
     runs-on: ubuntu-latest
     timeout-minutes: 10
     concurrency:
