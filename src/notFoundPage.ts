@@ -28,20 +28,19 @@ export function notFoundPageTemplate(path: string, fromGame = false): TemplateRe
     <div class="page-lede">
       <h1>Page not found</h1>
       <p class="sub">There is no page at <code>${path}</code>.</p>
-      <p>The link may be mistyped, or the page may have moved. These pages are here:</p>
+      <p>The link may be mistyped, or the page may have moved. Try one of these:</p>
     </div>
-    <section class="help-section">
-      <ul>
-        <li><a href="/">Play the game</a></li>
-        ${NOT_FOUND_LINKS.map((l) => html`<li><a href=${l.href}>${l.label}</a></li>`)}
-      </ul>
-    </section>
+    <nav class="page-links" aria-label="Pages">
+      <a class="btn primary" href="/">Play the game</a>
+      ${NOT_FOUND_LINKS.map((l) => html`<a class="btn" href=${l.href}>${l.label}</a>`)}
+    </nav>
   `;
   return pageShell({
     title: "Verticopolis: Page not found",
     backHref: "/",
     main: body,
-    links: [...NOT_FOUND_LINKS],
+    // The body lists the pages as buttons; repeating them in the title bar
+    // pushed Back to game off a phone screen.
     fromGame,
   });
 }

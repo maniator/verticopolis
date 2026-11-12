@@ -229,6 +229,22 @@ body.retro-page {
   overflow-wrap: anywhere;
 }
 
+/* A short list of pages as large buttons (the "Page not found" page): one
+   column on a phone, two by two on a wider screen. */
+.page-links {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14em, 1fr));
+  gap: 10px;
+  max-width: 36em;
+  margin: 0 0 6px;
+}
+.page-links .btn {
+  justify-content: center;
+  min-height: 40px;
+  padding: 8px 12px;
+  font-size: 14px;
+}
+
 /* A notice at the top of the page, such as the release notes page's
    "Close this tab" note when the browser keeps a game-opened tab open. */
 .page-note {
