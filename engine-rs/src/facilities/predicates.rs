@@ -83,6 +83,22 @@ impl Kind {
     }
 
     #[doc(hidden)]
+    /// A venue that makes no noise for the rooms beside it on its floor,
+    /// though it is commercial in every other sense: the spa is calm by
+    /// design, and the daycare keeps the hours its neighbors are at work.
+    pub fn is_quiet_venue(self) -> bool {
+        matches!(self, Kind::Spa | Kind::Daycare)
+    }
+
+    #[doc(hidden)]
+    /// A commercial venue that makes noise for the rooms beside it on its
+    /// floor: every commercial kind except the quiet ones. (An office is a
+    /// noise source too, for homes and hotel rooms; the noise check adds it.)
+    pub fn is_noisy_venue(self) -> bool {
+        self.is_commercial() && !self.is_quiet_venue()
+    }
+
+    #[doc(hidden)]
     /// `hasBusinessHours`.
     pub fn has_business_hours(self) -> bool {
         self.is_commercial() || matches!(self, Kind::PartyHall | Kind::AquaticCenter)
