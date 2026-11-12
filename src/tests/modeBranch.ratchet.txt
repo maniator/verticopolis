@@ -1,0 +1,38 @@
+# Direct Classic/Modern checks outside the rule hub, per file, read by
+# modeBranch.guard.test.ts. Format: `<repo-relative path> <count>`, then an
+# optional `#` note. This is a ratchet: it only ever shrinks. A PR that moves a
+# check into a named rule on GameMode (engine-rs/src/rules.rs) or a catalog rule
+# lowers the file's count here; a file not listed must hold none. When the list
+# is empty, delete it and the guard's ratchet half with it.
+
+# Rent: Classic prices on the canon ladder, Modern on a band. One rent-model
+# rule replaces these (#1976, after #1972).
+engine-rs/src/build.rs 2
+engine-rs/src/catalog.rs 4  # rent model (2), offered calendars (2)
+engine-rs/src/churn.rs 2
+engine-rs/src/panels/unit_detail.rs 2
+engine-rs/src/rent.rs 2
+
+# Per-mode data and save handling.
+engine-rs/src/catalog/json.rs 2  # picks each mode's catalog document
+engine-rs/src/economy.rs 4  # per-mode traffic income and weekend multiplier tables
+engine-rs/src/identity.rs 2  # publishes both modes' catalog digests
+engine-rs/src/load/assemble.rs 6
+engine-rs/src/load/reader.rs 3  # TDT path is Classic-only (1), unit fields read by mode (2)
+engine-rs/src/tower.rs 2
+engine-rs/src/diagnostics/service.rs 1
+engine-rs/src/economy/visitors.rs 1
+engine-rs/src/housekeeping.rs 6
+engine-rs/src/sim.rs 3
+
+# Web: labels, the mode-name type guard and save normalization, plus two rule
+# decisions to move into the catalog (reports/uiDialogs: the 1994 export;
+# tenantDiagnosticCopy: the lobby distance).
+src/dualrun/catalog.ts 2  # film keys ("classic" film), not the mode
+src/shared/types.ts 2
+src/storage/SaveGame.ts 1
+src/ui/templates/reports.ts 4
+src/ui/templates/saves.ts 1
+src/ui/tenantDiagnosticCopy.ts 1
+src/ui/uiDialogs.ts 5
+src/ui/uiStatus.ts 5
