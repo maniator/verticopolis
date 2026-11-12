@@ -106,19 +106,23 @@ impl Tower {
     ) -> Option<String> {
         let f = kind.facility();
         let hgt = kind.floors();
-        if !(MIN_FLOOR..=MAX_FLOOR).contains(&floor) {
+        let lot = self.lot();
+        if !lot.holds_floor(floor) {
             return Some("Outside the buildable range.".into());
         }
         if x < 0 || x.saturating_add(f.width) > LOT_WIDTH {
             return Some("Off the edge of the lot.".into());
         }
-        if kind == Kind::WeddingHall && floor != MAX_FLOOR {
-            return Some("The wedding hall can only crown floor 100.".into());
+        if kind == Kind::WeddingHall && !lot.crowns_with_wedding_hall(floor) {
+            return Some(format!(
+                "The wedding hall can only crown floor {}.",
+                lot.top_floor()
+            ));
         }
         if let Some(r) = self.cap_reason(kind) {
             return Some(r);
         }
-        if floor + hgt - 1 > kind.highest_story() {
+        if floor + hgt - 1 > lot.highest_story(kind) {
             return Some("Not enough floors above for this facility.".into());
         }
         if f.basement && floor + hgt > 1 {
@@ -137,7 +141,7 @@ impl Tower {
                 return Some("Something is already here.".into());
             }
             // The wedding hall's upper stories stand above the last floor slab.
-            if fl > MAX_FLOOR {
+            if fl > lot.top_floor() {
                 continue;
             }
             if require_floor && !self.span_has_floor(fl, x, f.width) {
@@ -160,7 +164,7 @@ impl Tower {
 
     pub fn can_place(&self, kind: Kind, floor: i64, x: i64) -> PlaceResult {
         let f = kind.facility();
-        if !(MIN_FLOOR..=MAX_FLOOR).contains(&floor) {
+        if !self.lot().holds_floor(floor) {
             return PlaceResult::fail("Outside the buildable range.");
         }
         if x < 0 || x.saturating_add(f.width) > LOT_WIDTH {
@@ -232,7 +236,7 @@ impl Tower {
         if !kind.is_structural() {
             return PlaceResult::fail("Not a structural tile.");
         }
-        if !(MIN_FLOOR..=MAX_FLOOR).contains(&floor) {
+        if !self.lot().holds_floor(floor) {
             return PlaceResult::fail("Outside the buildable range.");
         }
         if x < 0 || x.saturating_add(f.width) > LOT_WIDTH {
@@ -411,7 +415,7 @@ impl Tower {
             || w < 1
             || x.saturating_add(w) > LOT_WIDTH
             || floor < MIN_FLOOR
-            || floor.saturating_add(hgt - 1) > kind.highest_story()
+            || floor.saturating_add(hgt - 1) > self.lot().highest_story(kind)
         {
             return Vec::new();
         }
@@ -428,7 +432,7 @@ impl Tower {
         // gap tile sits on the lot (x, w and the walls are checked above).
         let mut below = [false; LOT_WIDTH as usize];
         let mut here = [false; LOT_WIDTH as usize];
-        for fl in floor..(floor + hgt).min(MAX_FLOOR + 1) {
+        for fl in floor..(floor + hgt).min(self.lot().top_floor() + 1) {
             let supportable = |tx: i64, below: &[bool]| -> bool {
                 fl < 2 || self.structure.contains_key(&(fl - 1, tx)) || below[tx as usize]
             };

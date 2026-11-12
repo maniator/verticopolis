@@ -7,7 +7,7 @@
 //! ground-floor lobby tile leaves nothing laid since hanging, has its own
 //! file (`sim_undo_lobby.rs`).
 use crate::crowd::fasthash::{FastMap, FastSet};
-use crate::facilities::{is_sky_lobby_floor, Kind, LOT_WIDTH, MAX_FLOOR, MIN_FLOOR};
+use crate::facilities::{is_sky_lobby_floor, Kind, LOT_WIDTH, MIN_FLOOR};
 use crate::tower::{Tower, Transport, Unit};
 use crate::undo::{Step, UnitChange};
 
@@ -176,7 +176,7 @@ impl<'a> Ground<'a> {
                 && !(concourse && self.rooms_stay_on(u.floor))
                 && self.station.is_none_or(|station| u.floor >= station);
         }
-        let stories = u.kind.floors().min(MAX_FLOOR + 1 - u.floor);
+        let stories = self.tower.lot().slab_stories(u.kind, u.floor);
         let floored = (u.floor..u.floor + stories).all(|f| {
             !(is_sky_lobby_floor(f) && self.has_lobby(f))
                 && (u.x..u.x + u.width).all(|x| self.holds(f, x))

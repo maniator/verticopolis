@@ -176,7 +176,7 @@ fn classic_keeps_floor_100_for_the_wedding_hall_alone() {
     assert!(!office.ok);
     assert_eq!(
         office.reason.as_deref(),
-        Some(crate::build::CLASSIC_TOP_FLOOR_REASON)
+        Some("Only the wedding hall can be built on floor 100.")
     );
     // A two story room whose upper story reaches floor 100 is refused too.
     assert!(!sim.can_build(Kind::PartyHall, MAX_FLOOR - 1, HALL_X).ok);

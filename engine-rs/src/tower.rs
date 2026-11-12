@@ -7,6 +7,7 @@ use std::collections::HashMap;
 use crate::clock::GameMode;
 use crate::crowd::fasthash::FastMap;
 use crate::facilities::*;
+use crate::lot::Lot;
 
 mod placement;
 mod transports;
@@ -66,6 +67,13 @@ pub(crate) fn unit_list_headroom(units: usize) -> usize {
 }
 
 impl Tower {
+    /// The lot this tower stands on. Every tower stands on the standard lot
+    /// today; a lot shape a save names (the tall lot, #1983) changes this one
+    /// answer, and every top-floor rule reads it.
+    pub(crate) fn lot(&self) -> Lot {
+        Lot::STANDARD
+    }
+
     pub fn new() -> Tower {
         Tower {
             units: Vec::new(),

@@ -2,6 +2,7 @@
 
 use crate::clock::GameMode;
 use crate::facilities::Kind;
+use crate::lot::Lot;
 
 #[doc(hidden)]
 impl GameMode {
@@ -29,10 +30,25 @@ impl GameMode {
     }
 
     /// Whether the top floor is kept for the wedding hall: in Classic only
-    /// the wedding hall (the 1994 cathedral) may reach floor 100, so any
-    /// other room that would touch it is refused. Modern builds there freely.
+    /// the wedding hall (the 1994 cathedral) may reach the top floor (floor
+    /// 100 on the standard lot), so any other room that would touch it is
+    /// refused. Modern builds there freely.
     pub fn reserves_top_floor_for_wedding_hall(self) -> bool {
         self == GameMode::Classic
+    }
+
+    /// Whether this mode refuses a `kind` unit on `floor` of `lot` because it
+    /// would reach the top floor kept for the wedding hall
+    /// ([`GameMode::reserves_top_floor_for_wedding_hall`]).
+    pub(crate) fn refuses_room_on_reserved_top_floor(
+        self,
+        lot: Lot,
+        kind: Kind,
+        floor: i64,
+    ) -> bool {
+        self.reserves_top_floor_for_wedding_hall()
+            && kind != Kind::WeddingHall
+            && lot.touches_top_floor(kind, floor)
     }
 
     /// Whether an escalator may serve office floors. Modern allows it;

@@ -74,9 +74,10 @@ fn bare_tile_cost(kind: Kind) -> f64 {
     }
 }
 
-/// Classic's refusal for any room but the wedding hall on floor 100.
-pub(crate) const CLASSIC_TOP_FLOOR_REASON: &str =
-    "Only the wedding hall can be built on floor 100.";
+/// Classic's refusal for any room but the wedding hall on the top floor.
+pub(crate) fn classic_top_floor_reason(top_floor: i64) -> String {
+    format!("Only the wedding hall can be built on floor {top_floor}.")
+}
 
 /// The buried-treasure log line.
 pub(crate) fn treasure_message(gold: f64) -> String {
@@ -201,8 +202,10 @@ impl Simulation {
                 cost: f.cost,
             };
         }
-        // Floor slabs end at `MAX_FLOOR`: the wedding hall's upper stories stand above them.
-        let hgt = kind.floors().min(MAX_FLOOR + 1 - floor);
+        // Floor slabs end at the lot's top floor: the wedding hall's upper
+        // stories stand above them.
+        let lot = self.tower.lot();
+        let hgt = lot.slab_stories(kind, floor);
         let missing = self.tower.missing_floor_count(floor, x, f.width, hgt);
         if missing > 0 && !self.tower.span_connects(floor, x, f.width, hgt) {
             let reason = if floor >= 2 {
@@ -216,17 +219,16 @@ impl Simulation {
                 cost: f.cost,
             };
         }
-        // Classic keeps floor 100 for the wedding hall alone. This sits after
-        // every shared refusal reason, so the TypeScript reasons still win where
-        // both engines refuse.
-        if self.mode.reserves_top_floor_for_wedding_hall()
-            && kind != Kind::WeddingHall
-            && floor <= MAX_FLOOR
-            && floor + kind.floors() > MAX_FLOOR
+        // Classic keeps the top floor for the wedding hall alone. This sits
+        // after every shared refusal reason, so the TypeScript reasons still
+        // win where both engines refuse.
+        if self
+            .mode
+            .refuses_room_on_reserved_top_floor(lot, kind, floor)
         {
             return CanBuild {
                 ok: false,
-                reason: Some(CLASSIC_TOP_FLOOR_REASON.into()),
+                reason: Some(classic_top_floor_reason(lot.top_floor())),
                 cost: f.cost,
             };
         }
@@ -272,7 +274,8 @@ impl Simulation {
             };
         }
         let f = kind.facility();
-        let hgt = kind.floors().min(MAX_FLOOR + 1 - floor);
+        let lot = self.tower.lot();
+        let hgt = lot.slab_stories(kind, floor);
         let quoted_bridge = if self.auto_bridge {
             self.tower
                 .bridge_fill_plan(kind, floor, x, f.width, hgt)
@@ -357,7 +360,7 @@ impl Simulation {
         }
         self.gameplay.push(GameplayEvent::FacilityPlaced {
             kind,
-            floor: (floor + hgt - 1).min(MAX_FLOOR),
+            floor: lot.highest_slab_story(floor, hgt),
             count: 1,
         });
         BuildResult {
