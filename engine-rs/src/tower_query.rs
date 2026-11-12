@@ -53,7 +53,7 @@ impl Tower {
                 }
             }
         }
-        let s: Vec<i64> = (t.bottom..=t.top).filter(|&fl| t.stops_at(fl)).collect();
+        let s = t.stop_floors();
         self.memo
             .borrow_mut()
             .stops
@@ -84,7 +84,7 @@ impl Tower {
             .transports
             .iter()
             .filter(|t| !t.kind.is_staff_only_transport())
-            .map(|t| (t.bottom..=t.top).filter(|&fl| t.stops_at(fl)).collect())
+            .map(Transport::stop_floors)
             .collect();
         let mut reachable: HashSet<i64> = HashSet::new();
         reachable.insert(1);
@@ -283,8 +283,8 @@ impl Tower {
             if t.kind.is_staff_only_transport() {
                 continue;
             }
-            for fl in t.bottom..=t.top {
-                if !t.stops_at(fl) || !served.contains(&fl) {
+            for fl in t.stop_floors() {
+                if !served.contains(&fl) {
                     continue;
                 }
                 let span = (t.x.max(0), (t.x + t.width).min(LOT_WIDTH));

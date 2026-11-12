@@ -156,13 +156,14 @@ impl Simulation {
             if t.kind.is_staff_only_transport() {
                 continue;
             }
-            let active = (t.bottom..=t.top).any(|f| t.stops_at(f) && served.contains(&f));
+            let stops = self.tower.stops_of(t);
+            let active = stops.iter().any(|f| served.contains(f));
             if !active {
                 continue;
             }
             let cap = Simulation::transport_capacity(t.kind, t.cars);
-            for f in t.bottom..=t.top {
-                if t.stops_at(f) && served.contains(&f) {
+            for &f in &stops {
+                if served.contains(&f) {
                     shafts_by_floor
                         .entry(f)
                         .or_default()

@@ -112,12 +112,13 @@ impl Simulation {
             .map(|r| json!({ "weekday": ring_json(&r.weekday), "weekend": ring_json(&r.weekend) }));
         let stops: Vec<Value> = if t.kind.is_elevator() {
             let lobbies = self.tower.lobby_floors();
+            let served = t.stop_floors();
             (t.bottom..=t.top)
                 .rev()
                 .map(|fl| {
                     json!({
                         "floor": fl,
-                        "served": t.stops_at(fl),
+                        "served": served.binary_search(&fl).is_ok(),
                         "lobby": lobbies.contains(&fl),
                         "endpoint": fl == t.bottom || fl == t.top,
                     })

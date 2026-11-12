@@ -209,10 +209,11 @@ fn shaft_card(sim: &Simulation, id: i64) -> Option<Vec<f64>> {
     }
     if stops > 0 {
         let lobbies = sim.tower.lobby_floors();
+        let served = t.stop_floors();
         for fl in (t.bottom..=t.top).rev() {
             r.extend_from_slice(&[
                 fl as f64,
-                flag(t.stops_at(fl)),
+                flag(served.binary_search(&fl).is_ok()),
                 flag(lobbies.binary_search(&fl).is_ok()),
                 flag(fl == t.bottom || fl == t.top),
             ]);

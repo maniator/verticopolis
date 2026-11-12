@@ -350,3 +350,66 @@ fn an_extend_through_a_lobby_floor_waits_until_it_is_built() {
         }
     }
 }
+
+fn express_with_skips(bottom: i64, top: i64, skips: Option<Vec<f64>>) -> Transport {
+    Transport {
+        id: 1,
+        kind: Kind::ElevatorExpress,
+        x: 10,
+        width: 4,
+        bottom,
+        top,
+        cars: 1,
+        car_positions: vec![bottom as f64],
+        car_dir: vec![0],
+        car_load: None,
+        load: 0,
+        skip_floors: skips,
+        preserve_basement_stops: false,
+        schedule: None,
+        rides: 0,
+    }
+}
+
+/// `stop_floors` lists exactly the floors `stops_at` answers true for, in
+/// order, for every kind of skip a save can carry: whole floors inside the
+/// span, floors outside it, fractions, a negative zero, NaN and infinities
+/// (none of which but the whole floors in the span may drop a stop).
+#[test]
+fn stop_floors_lists_the_floors_stops_at_accepts() {
+    let skip_kinds = [
+        None,
+        Some(vec![]),
+        Some(vec![2.0, 3.0, 5.0, 3.0]),
+        Some(vec![-1.0, 0.0, 7.0, 120.0, -12.0]),
+        Some(vec![
+            2.5,
+            4.000_001,
+            f64::NAN,
+            f64::INFINITY,
+            f64::NEG_INFINITY,
+        ]),
+        Some(vec![-0.0, 1.0]),
+        Some((-9..=104).map(|f| f as f64).collect()),
+    ];
+    for (bottom, top) in [(-9, 104), (1, 1), (0, 7), (15, 30), (5, 4)] {
+        for skips in &skip_kinds {
+            let t = express_with_skips(bottom, top, skips.clone());
+            let walked: Vec<i64> = (bottom..=top).filter(|&f| t.stops_at(f)).collect();
+            assert_eq!(
+                t.stop_floors(),
+                walked,
+                "span {bottom}..={top}, skips {skips:?}"
+            );
+        }
+    }
+}
+
+/// The skipped floors drop out and the rest stay, so a check that only
+/// compared `stop_floors` with itself could not pass by accident.
+#[test]
+fn stop_floors_drops_whole_skipped_floors_only() {
+    let t = express_with_skips(0, 6, Some(vec![2.0, 3.5, 5.0, 9.0]));
+    assert_eq!(t.stop_floors(), vec![0, 1, 3, 4, 6]);
+    assert!(express_with_skips(5, 4, None).stop_floors().is_empty());
+}
