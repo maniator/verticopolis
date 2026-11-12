@@ -25,6 +25,10 @@ export interface FloorEdge {
 export interface FacadeGeometry {
   /** Leftmost/rightmost built tile per above-ground floor row. */
   edges: Map<number, FloorEdge>;
+  /** Each above-ground floor row's runs of built tiles, left to right: one
+   *  per tower on a lot whose towers stand apart, so each tower hangs its own
+   *  escape stairs on both of its sides. */
+  runs: Map<number, FloorEdge[]>;
   /** Built tile columns on `highestFloor` — where the crane perches. Empty
    *  when the top floor carries no above-ground structure (basement-only or
    *  empty lot), which is exactly when no crane should be shown. */
@@ -44,6 +48,7 @@ function isGardenCrownStory(u: UnitView, floor: number): boolean {
  */
 export function facadeGeometry(units: readonly UnitView[], highestFloor: number, catalog: Catalog): FacadeGeometry {
   const edges = new Map<number, FloorEdge>();
+  const spans = new Map<number, FloorEdge[]>();
   const topTiles = new Set<number>();
   for (const u of units) {
     const right = u.x + u.width;
@@ -56,10 +61,30 @@ export function facadeGeometry(units: readonly UnitView[], highestFloor: number,
         if (u.x < e.min) e.min = u.x;
         if (right > e.max) e.max = right;
       }
+      const row = spans.get(f);
+      if (row) row.push({ min: u.x, max: right });
+      else spans.set(f, [{ min: u.x, max: right }]);
       // Same scan feeds the crane: remember the top row's built columns so
       // syncCrane needn't re-traverse every unit to find them.
       if (f === highestFloor) for (let x = u.x; x < right; x++) topTiles.add(x);
     }
   }
-  return { edges, topTiles };
+  return { edges, runs: joinRuns(spans), topTiles };
+}
+
+/** Each row's spans joined into runs: spans that touch or overlap are one
+ *  run. One sort per row, made only when the layout changes. */
+function joinRuns(spans: Map<number, FloorEdge[]>): Map<number, FloorEdge[]> {
+  const runs = new Map<number, FloorEdge[]>();
+  for (const [floor, row] of spans) {
+    row.sort((a, b) => a.min - b.min);
+    const joined: FloorEdge[] = [];
+    for (const s of row) {
+      const last = joined[joined.length - 1];
+      if (last && s.min <= last.max) last.max = Math.max(last.max, s.max);
+      else joined.push({ ...s });
+    }
+    runs.set(floor, joined);
+  }
+  return runs;
 }

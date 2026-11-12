@@ -106,9 +106,14 @@ fn guard(g: &serde_json::Map<String, Value>) -> Option<Guard> {
             })
             .collect::<Option<Vec<_>>>()?,
     };
+    // A save is outside input: floors far enough apart to overflow make it
+    // unreadable, never a panic or a wrapped arrival.
+    let floors_between = |a: i64, b: i64| b.checked_sub(a)?.checked_abs();
     let climb = match (floor, route.as_slice()) {
-        (_, [_, ..]) => route.windows(2).map(|w| (w[1].0 - w[0].0).abs()).sum(),
-        (Some(f), []) => (f - from).abs(),
+        (_, [_, ..]) => route.windows(2).try_fold(0_i64, |total, w| {
+            total.checked_add(floors_between(w[0].0, w[1].0)?)
+        })?,
+        (Some(f), []) => floors_between(from, f)?,
         (None, []) => 0,
     };
     let arrive = num("arrive")?.unwrap_or(start + climb as f64 * STAIR_MINUTES_PER_FLOOR);

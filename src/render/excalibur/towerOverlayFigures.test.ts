@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { ON_THE_ESCAPE } from "./guardPosition";
 import { FLOOR } from "../scale";
 import { VIEW_ZOOM_MIN } from "../../shared/viewZoom";
 import { drawSearchGuard, drawThief, FIGURE_HEIGHT } from "../sprites/events";
@@ -134,14 +135,14 @@ describe("a guard crossing to another tower on the lot", () => {
   };
 
   it("walks down its own tower's stairs to the lobby first", () => {
-    expect(guardPosition(g, 0)).toEqual({ floor: 4, x: 100, climbing: true });
-    expect(guardPosition(g, 4)).toEqual({ floor: 2, x: 100, climbing: true });
+    expect(guardPosition(g, 0)).toEqual({ floor: 4, x: 100 - ON_THE_ESCAPE, climbing: true });
+    expect(guardPosition(g, 4)).toEqual({ floor: 2, x: 100 - ON_THE_ESCAPE, climbing: true });
   });
 
   it("then climbs the other tower's stairs, never the sky between them", () => {
-    expect(guardPosition(g, 6)).toEqual({ floor: 1, x: 200, climbing: true });
-    expect(guardPosition(g, 8)).toEqual({ floor: 2, x: 200, climbing: true });
-    expect(guardPosition(g, 12)).toEqual({ floor: 4, x: 200, climbing: true });
+    expect(guardPosition(g, 6)).toEqual({ floor: 1, x: 200 - ON_THE_ESCAPE, climbing: true });
+    expect(guardPosition(g, 8)).toEqual({ floor: 2, x: 200 - ON_THE_ESCAPE, climbing: true });
+    expect(guardPosition(g, 12)).toEqual({ floor: 4, x: 200 - ON_THE_ESCAPE, climbing: true });
     expect(guardPosition(g, 14)).toEqual({ floor: 5, x: 210, climbing: false });
   });
 
@@ -152,9 +153,9 @@ describe("a guard crossing to another tower on the lot", () => {
       ...g, from: 5, arrive: 12, done: 20,
       route: [[5, 100], [6, 100], [6, 200], [3, 200], [3, 300], [5, 300]] as const,
     };
-    expect(guardPosition(zigzag, 1)).toEqual({ floor: 5.5, x: 100, climbing: true });
-    expect(guardPosition(zigzag, 4)).toEqual({ floor: 5, x: 200, climbing: true });
-    expect(guardPosition(zigzag, 9)).toEqual({ floor: 3.5, x: 300, climbing: true });
+    expect(guardPosition(zigzag, 1)).toEqual({ floor: 5.5, x: 100 - ON_THE_ESCAPE, climbing: true });
+    expect(guardPosition(zigzag, 4)).toEqual({ floor: 5, x: 200 - ON_THE_ESCAPE, climbing: true });
+    expect(guardPosition(zigzag, 9)).toEqual({ floor: 3.5, x: 300 - ON_THE_ESCAPE, climbing: true });
   });
 });
 

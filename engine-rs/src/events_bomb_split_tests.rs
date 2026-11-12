@@ -269,3 +269,19 @@ fn a_guard_from_an_older_save_sweeps_its_whole_floor() {
         "a whole floor's sweep covers the right tower's stretch too"
     );
 }
+
+#[test]
+fn a_save_whose_route_overflows_is_refused_without_a_panic() {
+    let guard = |route: serde_json::Value| {
+        serde_json::json!({
+            "floor": 4, "x": 215.0, "deadline": 9000.0, "seq": 3, "searched": [],
+            "guards": [{"floor": 4, "x": 200, "doneAt": 50.0, "from": 2, "start": 10.0,
+                        "route": route}],
+        })
+    };
+    let far = guard(serde_json::json!([[9.0e18, 100], [-9.0e18, 100]]));
+    assert_eq!(BombSearch::from_save(&far), None);
+    let fine = guard(serde_json::json!([[2, 100], [4, 100]]));
+    let b = BombSearch::from_save(&fine).expect("reads back");
+    assert_eq!(b.guards[0].arrive, 10.0 + 2.0 * STAIR_MINUTES_PER_FLOOR);
+}

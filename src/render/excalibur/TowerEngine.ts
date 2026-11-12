@@ -280,7 +280,7 @@ export class TowerEngine {
    *  escape on floor 1 (see {@link reconcile.syncEscapes}). */
   awningGfx!: { left: ex.Canvas; right: ex.Canvas };
   /** Exterior escape-stair actors per above-ground floor, keyed by floor. */
-  escapeActors = new Map<number, { l: ex.Actor; r: ex.Actor; sig: string }>();
+  escapeActors = new Map<string, { l: ex.Actor; r: ex.Actor; sig: string }>();
   /** The rooftop construction crane (present until the 100th floor tops out). */
   craneActor: ex.Actor | null = null;
   /** The crane's canvas; tick() flags it dirty while the decorative clock runs. */

@@ -7,6 +7,7 @@ readmes: unchanged
 - A bomb that goes off now damages only the tower it was hidden in. On a lot with several towers side by side, the others are left standing.
 - During a bomb search on a lot with several towers, Security sweeps each tower separately and walks between towers only by the emergency stairs, through a floor they share such as the lobby. A tower that no floor joins to a Security office is not searched.
 - On a lot with several towers, Security catches a thief only in a tower it can walk to by the stairs, and the thief runs his own tower's rooms instead of the whole floor.
+- Every tower on a lot now has fire escapes on both of its sides, and Security climbs them during a bomb search instead of hanging in the air beside the building.
 - Security guards searching for a bomb, and the thief and his guard, now stay the size of the crowd when you zoom out, instead of towering over several floors.
 ## Engine
 - A bomb blast guts, on each floor within `BLAST_FLOORS` of the bomb, only the runs of floor tiles that overlap the run holding the bomb, so a tower standing apart on the same lot is spared.

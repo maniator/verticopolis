@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { ON_THE_ESCAPE } from "./guardPosition";
 import { FLOOR, TILE } from "../scale";
 import {
   drawOverlay,
@@ -397,16 +398,14 @@ describe("the bomb search on screen", () => {
 
 describe("a search guard on screen", () => {
   // Off from floor 2 at minute 100, three floors of stairs (6 minutes) up to
-  // floor 5 on the stairs at tile 159, then the rooms from tile 160 to 200
-  // until minute 126.
-  const g = {
-    floor: 5, left: 160, right: 200, from: 2, start: 100, arrive: 106, done: 126,
-    route: [[2, 159], [5, 159]] as const,
-  };
+  // floor 5 on the fire escape left of tile 160, then the rooms from tile
+  // 160 to 200 until minute 126.
+  const route = [[2, 160], [5, 160]] as const;
+  const g = { floor: 5, left: 160, right: 200, from: 2, start: 100, arrive: 106, done: 126, route };
 
   it("climbs the emergency stairs beside the rooms, floor by floor", () => {
-    expect(guardPosition(g, 100)).toEqual({ floor: 2, x: 159, climbing: true });
-    expect(guardPosition(g, 103)).toEqual({ floor: 3.5, x: 159, climbing: true });
+    expect(guardPosition(g, 100)).toEqual({ floor: 2, x: 160 - ON_THE_ESCAPE, climbing: true });
+    expect(guardPosition(g, 103)).toEqual({ floor: 3.5, x: 160 - ON_THE_ESCAPE, climbing: true });
   });
 
   it("walks the floor left to right as the sweep goes", () => {
@@ -416,11 +415,11 @@ describe("a search guard on screen", () => {
   });
 
   it("goes down the stairs as well as up", () => {
-    expect(guardPosition({ ...g, from: 8, route: [[8, 159], [5, 159]] }, 103).floor).toBe(6.5);
+    expect(guardPosition({ ...g, from: 8, route: [[8, 160], [5, 160]] }, 103).floor).toBe(6.5);
   });
 
   it("climbs straight beside the rooms when an older save gave no route", () => {
-    expect(guardPosition({ ...g, route: [] }, 103)).toEqual({ floor: 3.5, x: 159, climbing: true });
+    expect(guardPosition({ ...g, route: [] }, 103)).toEqual({ floor: 3.5, x: 160 - ON_THE_ESCAPE, climbing: true });
   });
 });
 
