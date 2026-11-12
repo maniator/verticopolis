@@ -89,7 +89,9 @@ pub(crate) const MIX_ROW: [&str; 2] = ["size", "count"];
 /// slots are NaN. A flag a section carries only sometimes (`elevatorHere`,
 /// `adjacent`, `club`, `floorReachable`) is NaN when absent, else 0 or 1.
 /// The gripe slots repeat for the gripe a held-vacant spot was held for.
-pub(crate) const UNIT_FACTS: [&str; 37] = [
+/// `amenity` (a kind code) and `amenityLift` name the amenity helping the
+/// room, both NaN when none does (#1980).
+pub(crate) const UNIT_FACTS: [&str; 39] = [
     "id",
     "kindCode",
     "modeCode",
@@ -127,6 +129,8 @@ pub(crate) const UNIT_FACTS: [&str; 37] = [
     "minutesLeft",
     "noticeSatisfaction",
     "keepAt",
+    "amenity",
+    "amenityLift",
 ];
 
 /// The access line by code.
@@ -363,6 +367,14 @@ impl Engine {
                 n.keep_at,
             ]),
             None => r.extend_from_slice(&[0.0, f64::NAN, f64::NAN, f64::NAN, f64::NAN]),
+        }
+        match &f.amenity {
+            Some(a) => {
+                let code =
+                    crate::facilities::Kind::parse(a.kind).map_or(f64::NAN, |k| k as usize as f64);
+                r.extend_from_slice(&[code, a.lift]);
+            }
+            None => r.extend_from_slice(&[f64::NAN, f64::NAN]),
         }
         r
     }

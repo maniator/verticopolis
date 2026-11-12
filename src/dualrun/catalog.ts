@@ -147,6 +147,16 @@ const FACILITY: Shape = {
   hotel: bool,
   leaseAmenity: bool,
   unmetDemand: bool,
+  halo: (v) => v === null || isRecord(v),
+};
+const HALO: Shape = {
+  effect: oneOf("lift", "drain"),
+  floors: positive,
+  max: positive,
+  capLift: orNull(positive),
+  feltBy: (v) => Array.isArray(v) && v.length > 0 && v.every(text),
+  openHoursOnly: bool,
+  familyScaled: bool,
 };
 const LADDER: Shape = { cadence, default: amount, rungs: Array.isArray, noRate: oneOf(true) };
 const RUNG: Shape = { level: count, label: text, value: amount };
@@ -212,6 +222,17 @@ function checkCatalog(c: Record<string, unknown>): void {
       refuse(path, `${key} states a span or car capacity that does not match its transport flag`);
     }
     if (e.rent !== null) checkRent(e.rent as Record<string, unknown>, `${path}.rent`);
+    if (e.halo !== null) {
+      const halo = checkShape(e.halo, HALO, `${path}.halo`);
+      // A lift raises a capped room's ceiling; a drain only drains.
+      if ((halo.effect === "lift") !== (halo.capLift !== null)) refuse(`${path}.halo`, `${key}'s capLift does not match its effect`);
+    }
+  });
+  facilities.forEach((f, i) => {
+    const halo = (f as Record<string, unknown>).halo as { feltBy: string[] } | null;
+    for (const kind of halo?.feltBy ?? []) {
+      if (!keys.has(kind)) refuse(`facilities[${i}].halo.feltBy`, `${kind} is not a listed facility`);
+    }
   });
   if (!keys.has(world.groundFloorStructure as string)) {
     refuse("world.groundFloorStructure", `${String(world.groundFloorStructure)} is not a listed facility`);

@@ -28,7 +28,7 @@ pub const AMENITY_CAP_LIFT_MAX: f64 = 0.15;
 
 #[doc(hidden)]
 impl GameMode {
-    fn halo(self, d: f64, floors: f64, max: f64) -> f64 {
+    pub(super) fn halo(self, d: f64, floors: f64, max: f64) -> f64 {
         if self == GameMode::Classic || d < 0.0 || d >= floors {
             return 0.0;
         }

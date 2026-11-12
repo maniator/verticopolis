@@ -39,11 +39,13 @@ use crate::rules::{RentModel, MAX_HOUSEHOLD};
 use crate::services::GARBAGE_COLLECT_HOUR;
 use crate::sim::STARTING_MONEY;
 mod build;
+mod halo;
 mod json;
 mod lock;
 mod rules;
 
 pub use build::catalog;
+pub use halo::HaloEntry;
 pub use json::{catalog_digest, catalog_json, catalog_value};
 #[doc(hidden)]
 pub use lock::{lock_view, LOCK_FOOTPRINT_EXEMPT};
@@ -289,6 +291,8 @@ pub struct FacilityEntry {
     pub lease_amenity: bool,
     /// A demand tenant whose unmet coverage drains satisfaction.
     pub unmet_demand: bool,
+    /// The venue's cross-floor halo in this mode, or null (#1980).
+    pub halo: Option<HaloEntry>,
 }
 
 /// How the player prices a kind: a ladder of fixed rungs (Classic) or a
@@ -422,51 +426,6 @@ fn pool_key(kind: Kind) -> Option<&'static str> {
         .iter()
         .position(|p| p.kinds.contains(&kind))
         .map(|i| POOL_KEYS[i])
-}
-
-fn facility_entry(mode: GameMode, kind: Kind) -> FacilityEntry {
-    let f = kind.facility();
-    let transport = kind.is_transport();
-    FacilityEntry {
-        key: f.key,
-        name: f.name,
-        category: f.category.as_str(),
-        width: f.width,
-        floors: kind.floors(),
-        cost: f.cost,
-        pays_for_floor: pays_for_floor(kind),
-        min_star: f.min_star,
-        population: f.population,
-        max_household: kind.has_household().then_some(MAX_HOUSEHOLD),
-        attendance: f.attendance,
-        modern_only: f.modern_only,
-        transport,
-        staff_only: f.staff_only,
-        basement: f.basement,
-        no_basement: no_basement(kind),
-        available: f.available_in(mode),
-        build_minutes: if transport { 0.0 } else { kind.build_minutes() },
-        resale_refund: kind.resale_refund(),
-        build_cap: build_cap(kind),
-        pool: pool_key(kind),
-        max_span: transport.then(|| kind.max_span()),
-        fixed_span: kind.is_fixed_span(),
-        max_cars: kind.is_elevator().then(|| kind.max_cars()),
-        car_capacity: transport.then(|| kind.car_capacity()),
-        subtypes: kind.subtype_list().map(|l| l.to_vec()),
-        rent: rent_for(mode, kind),
-        daily_income: commercial_daily_income(mode, kind),
-        spend_per_customer: catalog_spend_per_customer(mode, kind),
-        upkeep_monthly: service_maintenance_monthly(kind),
-        open_hours: kind
-            .has_business_hours()
-            .then(|| (0..24).map(|hour| kind.is_open_at(hour)).collect()),
-        own_household: kind.has_household(),
-        commercial: kind.is_commercial(),
-        hotel: kind.is_hotel(),
-        lease_amenity: kind.is_lease_amenity(),
-        unmet_demand: kind.is_unmet_demand_kind(),
-    }
 }
 
 #[cfg(test)]

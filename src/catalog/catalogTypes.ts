@@ -312,6 +312,29 @@ export interface CatalogFacility {
   /** A demand tenant whose unmet local coverage drains satisfaction (office,
    *  condo, apartment, hotel rooms). */
   readonly unmetDemand: boolean;
+  /** The venue's cross-floor halo in this mode, or null (#1980): the
+   *  placement range rings draw it. */
+  readonly halo: CatalogHalo | null;
+}
+
+/** A venue's cross-floor halo: who feels it, over how many floors and how
+ *  hard. A room `d` floors from the venue feels `max * (1 - d / floors)`,
+ *  and none at `floors` or beyond. */
+export interface CatalogHalo {
+  /** `lift` (an amenity) or `drain` (a nuisance). */
+  readonly effect: "lift" | "drain";
+  readonly floors: number;
+  /** The hourly bonus or drain on the venue's own floor. */
+  readonly max: number;
+  /** How far a lift raises a capped room's ceiling at full strength, or
+   *  null for a drain. */
+  readonly capLift: number | null;
+  /** The facility keys that feel it. */
+  readonly feltBy: readonly FacilityKind[];
+  /** Felt only in the venue's `openHours`. */
+  readonly openHoursOnly: boolean;
+  /** Scaled by the household's size, largest for the biggest family. */
+  readonly familyScaled: boolean;
 }
 
 const facilityIndex = new WeakMap<Catalog, ReadonlyMap<FacilityKind, CatalogFacility>>();

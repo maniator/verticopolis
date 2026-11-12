@@ -612,7 +612,9 @@
       "noticeReason",
       "minutesLeft",
       "noticeSatisfaction",
-      "keepAt"
+      "keepAt",
+      "amenity",
+      "amenityLift"
     ],
     "queueView": [
       "landings",

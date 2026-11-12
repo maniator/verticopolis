@@ -37,6 +37,17 @@ pub fn names_gripe(satisfaction: f64) -> bool {
     satisfaction <= GRIPE_WARN
 }
 
+/// Whether a venue is open for business enough to cast its halo: a leased
+/// fitness club once it has a tenant, any other venue once it is operating.
+/// The hourly context and the inspector's amenity fact both ask this.
+pub(crate) fn casts_halo(c: &Unit) -> bool {
+    match c.kind {
+        Kind::FitnessClub => c.is_tenanted(),
+        Kind::Nightclub | Kind::Spa | Kind::Daycare => c.is_operational(),
+        _ => false,
+    }
+}
+
 pub struct SatisfactionContext {
     pub cong_map: Option<IndexMap<i64, f64>>,
     pub global_cong: f64,
@@ -114,18 +125,15 @@ impl Simulation {
         let mut spa_floors = Vec::new();
         let mut daycare_floors = Vec::new();
         for c in self.tower.room_units() {
-            if c.kind == Kind::FitnessClub && c.is_tenanted() && served_set.contains(&c.floor) {
-                club_floors.push(c.floor);
-            } else if c.kind == Kind::Nightclub
-                && c.is_operational()
-                && served_set.contains(&c.floor)
-            {
-                nightclub_floors.push(c.floor);
-            } else if c.kind == Kind::Spa && c.is_operational() && served_set.contains(&c.floor) {
-                spa_floors.push(c.floor);
-            } else if c.kind == Kind::Daycare && c.is_operational() && served_set.contains(&c.floor)
-            {
-                daycare_floors.push(c.floor);
+            if !casts_halo(c) || !served_set.contains(&c.floor) {
+                continue;
+            }
+            match c.kind {
+                Kind::FitnessClub => club_floors.push(c.floor),
+                Kind::Nightclub => nightclub_floors.push(c.floor),
+                Kind::Spa => spa_floors.push(c.floor),
+                Kind::Daycare => daycare_floors.push(c.floor),
+                _ => {}
             }
         }
         SatisfactionContext {
