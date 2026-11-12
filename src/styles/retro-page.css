@@ -223,6 +223,11 @@ body.retro-page {
   color: var(--muted);
   font-size: 13.5px;
 }
+/* An address in the lead (the "Page not found" page's missing path) can be
+   one long unbroken word; let it wrap instead of widening a phone screen. */
+.page-lede code {
+  overflow-wrap: anywhere;
+}
 
 /* A notice at the top of the page, such as the release notes page's
    "Close this tab" note when the browser keeps a game-opened tab open. */

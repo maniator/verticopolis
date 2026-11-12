@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <!-- Served for any path the site does not have, at any depth
+         (/help/missing, /a/b/c). The build writes relative asset URLs
+         (base "./"), so resolve them from the site root. -->
+    <base href="/" />
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex" />
+    <title>Verticopolis: Page not found</title>
+    <meta name="description" content="This Verticopolis page does not exist." />
+    <meta name="theme-color" content="#000080" />
+    <link rel="icon" href="./favicon.png" type="image/png" />
+    <link rel="stylesheet" href="./styles/retro-page.css" />
+  </head>
+  <body class="retro-page">
+    <div id="app">
+      <noscript>
+        <p style="max-width: 64ch; margin: 1em auto">
+          This page does not exist. <a href="/">Open the game</a> or read <a href="/help">How to Play</a>.
+        </p>
+      </noscript>
+    </div>
+    <script type="module" src="./notFoundPage.ts"></script>
+  </body>
+</html>
