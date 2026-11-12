@@ -112,6 +112,13 @@ jobs:
               case "$open" in *" ${dir#pr-preview/pr-} "*) ;; *) echo "Dropping $dir: its pull request is closed."; rm -rf "$dir" ;; esac
             done
             rmdir pr-preview 2>/dev/null || true
+            # Vercel's git integration sees every branch push, and this branch
+            # has none of the app's build scripts, so a Vercel build of it fails
+            # (and costs a build) on every store. Vercel reads vercel.json from
+            # the commit it was pushed, so this file turns Vercel off for the
+            # branch before a deployment is created. The deploy job drops it
+            # from the Pages site.
+            printf '%s\n' '{ "git": { "deploymentEnabled": false } }' > vercel.json
             # Deploying a tree without the live docs would take the site down.
             # The first push to main after this workflow lands stores them.
             if [ ! -f index.html ]; then
@@ -164,6 +171,10 @@ jobs:
           ref: docs-pages
           path: site
           persist-credentials: false
+
+      # vercel.json only keeps Vercel off this branch (see the store job).
+      - name: Leave the Vercel config out of the site
+        run: rm -f site/vercel.json
 
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
