@@ -455,11 +455,13 @@ export default defineConfig(({ command }) => ({
         // not `help-`) is left precached, because the in-game Help modal imports
         // it and needs it offline. A broad `**/help*` would wrongly sweep
         // `helpContent-*.js` too.
+        // `404.html` and its entry chunk (`notFound-*.js`) are the host's
+        // "page not found" page, which only the network ever serves.
         // `icon-1024x1024.png` is the DESKTOP icns master (#761), not part of
         // the game shell: the PWA needs nothing that large, so it stays out
         // of every web player's offline precache (a review catch on the PR
         // that added it).
-        globIgnores: ["**/gallery*", "**/release-notes*", "**/releaseNotes*", "**/preview*", "**/og-image*", "**/help.html", "**/help-*.js", "**/help-media/**", "**/icon-1024x1024.png", "**/sw-navigation-fallback.js"],
+        globIgnores: ["**/gallery*", "**/release-notes*", "**/releaseNotes*", "**/404.html", "**/notFound-*.js", "**/preview*", "**/og-image*", "**/help.html", "**/help-*.js", "**/help-media/**", "**/icon-1024x1024.png", "**/sw-navigation-fallback.js"],
         // The worker's own helper, loaded by importScripts and updated with it,
         // so it stays out of the precache.
         importScripts: ["sw-navigation-fallback.js"],
@@ -544,6 +546,9 @@ export default defineConfig(({ command }) => ({
         gallery: resolve(__dirname, "src/gallery.html"),
         help: resolve(__dirname, "src/help.html"),
         releaseNotes: resolve(__dirname, "src/release-notes.html"),
+        // The host's "page not found" page: Vercel serves `404.html` from the
+        // output root, with a 404 status, for any path nothing else answers.
+        notFound: resolve(__dirname, "src/404.html"),
         preview: resolve(__dirname, "src/preview.html"),
       },
       output: {
