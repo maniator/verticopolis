@@ -155,3 +155,26 @@ fn the_dirty_clock_survives_a_reload_and_a_far_future_booking_is_clamped() {
         Some(today + 1.0)
     );
 }
+
+#[test]
+fn the_infestation_notice_offers_the_exterminator_only_where_the_mode_has_one() {
+    for mode in [GameMode::Classic, GameMode::Modern] {
+        let mut sim = hotel_tower(1, mode);
+        hotel(&mut sim, X0, UnitState::Dirty);
+        for _ in 0..INFEST_DAYS {
+            sim.hotel_checkout();
+        }
+        let notice = sim
+            .log
+            .iter()
+            .find(|e| e.text.contains("cockroach-infested"))
+            .map(|e| e.text.clone())
+            .expect("an infestation notice");
+        assert_eq!(
+            notice.contains("Call an exterminator"),
+            mode.infestation_recovery().is_some(),
+            "{mode:?}: {notice}"
+        );
+        assert!(notice.contains("bulldoze") || notice.contains("Bulldoze"));
+    }
+}

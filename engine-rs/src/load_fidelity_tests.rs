@@ -469,3 +469,13 @@ fn a_number_past_the_double_range_is_refused_ex3() {
     assert!(parse_save_json(br#"{"money":-1e400}"#).is_err());
     assert!(parse_save_json(br#"{"money":1e308}"#).is_ok());
 }
+
+#[test]
+fn a_mode_name_other_than_modern_loads_as_classic() {
+    let mode_of = |name: Value| edited(|s| s["mode"] = name).mode;
+    assert_eq!(mode_of(json!("modern")), GameMode::Modern);
+    assert_eq!(mode_of(json!("classic")), GameMode::Classic);
+    for unknown in [json!("Modern"), json!(""), json!(7), Value::Null] {
+        assert_eq!(mode_of(unknown.clone()), GameMode::Classic, "{unknown}");
+    }
+}
