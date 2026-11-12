@@ -144,3 +144,18 @@ describe("gameplay event catalog", () => {
     expect(digest).toBe("f096241b5a4d986061363a2698ef811cc7088ae755eb3ce98aa0c4c6d5d0ae34");
   });
 });
+
+describe("the placement event's floor bound (#1987)", () => {
+  // The bound lives in the conformance catalog, which the engine also reads,
+  // so it cannot follow the tower's catalog at run time. A world whose floors
+  // reach past it (the Tall lot, #1983) must raise it in the same change, or
+  // the analytics bridge drops every placement above the old top.
+  it("covers every floor both towers' catalogs can build on", () => {
+    const placed = GAMEPLAY_EVENT_RULES.events.find((e) => e.name === "facility_placed")!;
+    const floor = placed.payload.floor as { type: string; min: number; max: number };
+    for (const mode of ["classic", "modern"] as const) {
+      const world = catalogFor(mode).world;
+      expect([floor.min <= world.minFloor, floor.max >= world.maxFloor], mode).toEqual([true, true]);
+    }
+  });
+});

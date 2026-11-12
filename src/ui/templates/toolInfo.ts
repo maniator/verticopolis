@@ -52,7 +52,7 @@ export function toolInfoTemplate(
  *  floor, so its card carries that price too (see catalogBuildKind). */
 export function toolInfoFor(catalog: Catalog, kind: FacilityKind): TemplateResult {
   // The description is display copy, which the catalog leaves to the UI.
-  const f = { ...catalogFacility(catalog, kind), description: facilityDescription(kind) };
+  const f = { ...catalogFacility(catalog, kind), description: facilityDescription(kind, catalog.world) };
   return toolInfoTemplate(f, isCommercialKind(kind), groundFloorCost(catalog, kind), noFloorYetCost(catalog, kind));
 }
 

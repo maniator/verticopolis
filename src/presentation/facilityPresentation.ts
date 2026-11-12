@@ -1,3 +1,4 @@
+import type { CatalogWorld } from "../catalog/catalogTypes";
 import type { FacilityKind } from "../shared/types";
 
 /**
@@ -8,8 +9,9 @@ import type { FacilityKind } from "../shared/types";
 export interface FacilityPresentation {
   /** Hex color the palette swatch and the procedural sprites use. */
   readonly color: string;
-  /** The tool card's one-paragraph description. */
-  readonly description: string;
+  /** The tool card's one-paragraph description: fixed, or worded from the
+   *  tower's world for a facility that names where it stands. */
+  readonly description: string | ((world: Pick<CatalogWorld, "maxFloor">) => string);
 }
 
 export const FACILITY_PRESENTATION: Readonly<Record<FacilityKind, FacilityPresentation>> = {
@@ -151,7 +153,9 @@ export const FACILITY_PRESENTATION: Readonly<Record<FacilityKind, FacilityPresen
   },
   weddingHall: {
     color: "#f3ecdc",
-    description: "A grand wedding hall atop a 5-star tower: 28 tiles wide and five floors tall, standing on floor 100. Triggers the final TOWER evaluation.",
+    // It stands on the top floor the tower's catalog states (#1987).
+    description: (world) =>
+      `A grand wedding hall atop a 5-star tower: 28 tiles wide and five floors tall, standing on floor ${world.maxFloor}. Triggers the final TOWER evaluation.`,
   },
   rentalStudio: {
     color: "#86c5a8",
@@ -168,8 +172,10 @@ export function facilityColor(kind: FacilityKind): string {
   return FACILITY_PRESENTATION[kind].color;
 }
 
-/** The description the tool card shows for a facility kind. */
-export function facilityDescription(kind: FacilityKind): string {
-  return FACILITY_PRESENTATION[kind].description;
+/** The description the tool card shows for a facility kind on a tower whose
+ *  catalog states `world`. */
+export function facilityDescription(kind: FacilityKind, world: Pick<CatalogWorld, "maxFloor">): string {
+  const description = FACILITY_PRESENTATION[kind].description;
+  return typeof description === "string" ? description : description(world);
 }
 

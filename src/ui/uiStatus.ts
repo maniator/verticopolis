@@ -104,7 +104,8 @@ export function update(ui: UI, src: HudSource): void {
   // shows the TypeScript tables' values (#921).
   const catalog = ui.cb.getCatalog();
   if (catalog !== ui.paletteCatalog) {
-    // A new catalog must state the world the view was built for.
+    // A new catalog must state the lot the view was built for (its width and
+    // lowest floor); its top floor may differ (#1985).
     bindViewWorld(catalog.world);
     bindViewKinds(catalog);
     relabelPalette(ui, catalog);

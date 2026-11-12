@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { clampCameraY, fitZoom, FIT_SKY_FLOORS, MIN_FIT_SPAN_FLOORS, MAX_FIT_ZOOM, SKY_HEADROOM_FLOORS } from "./cameraBounds";
+import { clampCameraY, fitZoom, FIT_SKY_FLOORS, MIN_FIT_SPAN_FLOORS, MAX_FIT_ZOOM, SKY_HEADROOM_FLOORS, WEDDING_HALL_RISE_FLOORS } from "./cameraBounds";
 import { VIEW_ZOOM_MIN } from "../shared/types";
 import { catalogFor } from "../tests/catalogFixture";
 import { CRANE_H } from "./sprites/structure/rooftop";
@@ -182,6 +182,15 @@ describe("fitZoom (tower-aware zoom-out floor)", () => {
     for (const viewH of [500 /* portrait-ish */, 360 /* small phone landscape */]) {
       const z = fitZoom(viewH, worldSpan, FLOOR, HARD);
       expect(z).toBeGreaterThan(HARD); // fit math wins, hard floor never clips it
+    }
+  });
+});
+
+describe("the wedding hall's rise above the top floor (#1987)", () => {
+  it("is the hall's height in both catalogs, less the top floor it stands on", () => {
+    for (const mode of ["classic", "modern"] as const) {
+      const hall = catalogFor(mode).facilities.find((f) => f.key === "weddingHall")!;
+      expect(WEDDING_HALL_RISE_FLOORS, mode).toBe(hall.floors - 1);
     }
   });
 });
