@@ -134,6 +134,13 @@ Lobbies appear at indexes 10, 24, 39, 54, 69, 84, 99 (floors 1, 15, 30, 45, 60,
 Each floor is a small header, its unit records and a remap; the fields are in the
 byte map, [section 3](./tdt-byte-map.md#3-floors-120-records).
 
+**Logical unit ids.** The game numbers a floor's units and gives a plain floor
+tile (type 0) no id: the tile's record carries `FF` in byte 12 and has no remap
+entry, and every other record carries its id there. People records, retail rows
+and the party hall and theatre table name a unit by this id, so it must skip
+the tiles exactly as the game does. Our exporter numbers the units in record
+order the same way and writes the remap for the numbered units alone (#1932).
+
 **Record order matters.** Unit records are written in ascending left-edge order
 with empty-floor (type 0) paving spans interleaved at their real x. The game
 draws left to right and stops at the first record whose left edge goes backwards,
@@ -272,7 +279,18 @@ populations: condo 3, office 6, fast food 48 (workers plus customers).
 The game rebuilds the live crowd on load, so record contents are not needed,
 but a populated tower must carry a nonzero N or the game faults ("file is already
 open, or damaged"). An empty tower may carry 0. Our exporter writes the census
-as N zero-filled records. We do not import the roster.
+as zero-filled records. We do not import the roster.
+
+Each unit's people sit in a row in the block, and its unit record names the
+first in bytes 8 and 9 (byte map section 3.1): an office keeps 6, a party hall
+40 per half and a theatre's screen piece (types 35 and 34) 56. A party hall
+must have its people. Without them the game crashes a few seconds after it
+loads the tower (#1932, PC runs headless on 2026-11-12), so after the census
+our exporter writes each hall half's 40 people with the floor, the logical
+unit id, the person number and type 29 (the hall's upper part, which the game
+writes for both halves), the rest 0, and points the half's record at the
+first. Theatres load and play with no people of their own, and our exporter
+gives them none (#2044).
 
 The zero-filled records are inert (owner's PC run, 2026-11-04, TOWER4, #920
 claim 7). With our count (4,173) and with 15,000, the game loaded the tower, ran
@@ -516,6 +534,9 @@ point after the first import. Known canonical forms:
   theatre that has not seen a morning in the engine writes no record and
   reimports with a new film, as it would have shown anyway. Exports before
   #1932 wrote byte 15 as 0, an all-zero index map and no table.
+- Exports before #2043 numbered every record, plain floor tiles included, so
+  their venue table named the wrong units, and wrote no people for a party
+  hall, which crashes the original. Re-export the tower to open it there.
 - A room the file's flags mark occupied but whose people the finance lines do not
   count comes back vacant and never lived in.
 - An infested hotel room is written as a dirty room (`0x20`) and comes back
