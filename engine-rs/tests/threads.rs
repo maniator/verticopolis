@@ -21,6 +21,29 @@ fn a_host_can_move_a_game_and_its_readers_to_another_thread() {
     assert_send::<Simulation>();
     assert_send::<ViewReader>();
     assert_send::<FrameStepper>();
+
+    // A worker thread owns the game for a day, then hands it back.
+    let sim = Simulation::new_game(1, GameMode::Classic);
+    let day = sim.clock.day();
+    let reader = ViewReader::new();
+    let stepper = FrameStepper::default();
+    let (sim, mut reader, stepper) = std::thread::spawn(move || {
+        let mut sim = sim;
+        sim.tick(24.0 * 60.0);
+        (sim, reader, stepper)
+    })
+    .join()
+    .expect("the worker thread finishes");
+    assert_eq!(sim.clock.day(), day + 1, "the day passed on the worker");
+    assert_eq!(
+        stepper,
+        FrameStepper::default(),
+        "the stepper arrives intact"
+    );
+    assert!(
+        !reader.frame(&sim, true).is_empty(),
+        "the reader still draws the game"
+    );
 }
 
 /// A small tower with people in it, so the crowd, the cars and the economy
