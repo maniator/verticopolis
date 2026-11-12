@@ -39,7 +39,7 @@ export interface CatalogTicketPrice {
 
 /** The version of the catalog's shape. It moves when a field is added,
  *  renamed or removed, so a frontend can refuse a shape it does not know. */
-export const CATALOG_VERSION = 10;
+export const CATALOG_VERSION = 11;
 
 /** Every price, size and build rule of one mode. */
 export interface Catalog {

@@ -1983,7 +1983,7 @@
     "scheduleAssist": true,
     "variantHouseholds": true
   },
-  "version": 10,
+  "version": 11,
   "world": {
     "groundFloor": 1,
     "groundFloorStructure": "lobby",
