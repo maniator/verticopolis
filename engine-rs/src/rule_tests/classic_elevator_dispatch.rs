@@ -58,12 +58,18 @@ fn schedule(response: Option<f64>) -> Schedule {
 /// floor `TOP`; a hall call at `CALL_FLOOR`. Whether car 0 leaves the lobby
 /// within a few steps.
 fn parked_car_answers(mode: GameMode, response: f64, from: f64) -> bool {
+    parked_car_answers_calls(mode, response, from, &[CALL_FLOOR])
+}
+
+/// `parked_car_answers` with a hall call at each of `call_floors`.
+fn parked_car_answers_calls(mode: GameMode, response: f64, from: f64, call_floors: &[i64]) -> bool {
     let (mut tower, id) = shaft_tower(mode, 2, schedule(Some(response)));
     let t = &mut tower.transports[0];
     t.car_positions = vec![1.0, from];
     t.car_dir = vec![0, 1];
     let mut calls = ElevatorCalls::default();
-    calls.hall.insert(id, HashMap::from([(CALL_FLOOR, 1.0)]));
+    let hall = call_floors.iter().map(|&f| (f, 1.0)).collect();
+    calls.hall.insert(id, hall);
     let rider = HashMap::from([(1, BTreeSet::from([TOP]))]);
     calls.cab.insert(id, rider);
     let mut d = ElevatorDispatch::new();
@@ -94,16 +100,35 @@ fn a_moving_car_past_the_call_does_not_cover_it() {
 }
 
 #[test]
+fn a_parked_car_answers_an_uncovered_call_beyond_a_covered_one() {
+    // Car 1 at floor 9 heading up covers the call at 10 under a response of
+    // 2, but not the call at 15: the lobby car passes over 10 and goes.
+    assert!(parked_car_answers_calls(
+        GameMode::Classic,
+        2.0,
+        9.0,
+        &[CALL_FLOOR, 15]
+    ));
+    assert!(!parked_car_answers_calls(
+        GameMode::Classic,
+        2.0,
+        9.0,
+        &[CALL_FLOOR]
+    ));
+}
+
+#[test]
 fn modern_ignores_the_moving_car() {
     // Modern reads the response as a reach (span 19 less 8 is 11 floors):
     // the call 9 floors off is in reach, so the lobby car goes.
     assert!(parked_car_answers(GameMode::Modern, 8.0, 4.0));
 }
 
-/// One car sent to floor `CALL_FLOOR`, where a new rider then arrives every
-/// minute. The longest run of steps it spends on that floor, and whether it
-/// ever left again.
-fn stay_at_the_call(mode: GameMode) -> (usize, bool) {
+/// One car sent to floor `CALL_FLOOR`, where, if `newcomers`, one more
+/// caller joins every step the car stands there (otherwise the one caller
+/// just keeps waiting). The longest run of steps it spends on that floor, and
+/// whether it ever left again.
+fn stay_at_the_call(mode: GameMode, newcomers: bool) -> (usize, bool) {
     let mut s = schedule(None);
     s.home_floors = Some(vec![1]);
     let (mut tower, id) = shaft_tower(mode, 1, s);
@@ -115,6 +140,14 @@ fn stay_at_the_call(mode: GameMode) -> (usize, bool) {
         d.move_cars(&mut tower, 0.5, &calls, HOUR, WEEKDAY);
         let on_floor = (tower.transports[0].car_positions[0] - CALL_FLOOR as f64).abs() < 0.05;
         if on_floor {
+            if newcomers {
+                *calls
+                    .hall
+                    .get_mut(&id)
+                    .unwrap()
+                    .get_mut(&CALL_FLOOR)
+                    .unwrap() += 1.0;
+            }
             arrived = true;
             run += 1;
             longest = longest.max(run);
@@ -128,8 +161,8 @@ fn stay_at_the_call(mode: GameMode) -> (usize, bool) {
 
 #[test]
 fn a_classic_car_keeps_loading_while_riders_arrive_and_leaves_when_full() {
-    let (classic, classic_left) = stay_at_the_call(GameMode::Classic);
-    let (modern, _) = stay_at_the_call(GameMode::Modern);
+    let (classic, classic_left) = stay_at_the_call(GameMode::Classic, true);
+    let (modern, _) = stay_at_the_call(GameMode::Modern, true);
     assert!(
         classic > modern,
         "Classic held {classic} steps, Modern {modern}"
@@ -137,4 +170,14 @@ fn a_classic_car_keeps_loading_while_riders_arrive_and_leaves_when_full() {
     // One rider a step fills the 21-place car, so it does leave.
     assert!(classic_left, "a full Classic car departs");
     assert!(classic <= 21 * 2 + 2, "held {classic} half-minute steps");
+}
+
+#[test]
+fn a_caller_who_was_already_waiting_does_not_restart_the_wait() {
+    // The same caller still standing there is nobody new: the Classic car
+    // leaves after one wait, as the Modern car does.
+    let (classic, classic_left) = stay_at_the_call(GameMode::Classic, false);
+    let (modern, _) = stay_at_the_call(GameMode::Modern, false);
+    assert_eq!(classic, modern);
+    assert!(classic_left);
 }

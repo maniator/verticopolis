@@ -11,6 +11,8 @@
 
 use std::collections::{BTreeMap, HashMap};
 
+use super::Demand;
+
 use indexmap::IndexMap;
 
 /// How close to a stop a car must stand to count as on it, in floors.
@@ -81,29 +83,64 @@ impl Boarding<'_> {
     }
 
     /// Standard Floor Departure's arrivals at a car waiting on `floor` with
-    /// `room` to spare: the statistical estimate there (for a staff car, the
-    /// crowd's calls, as its arrival boarding reads them) and, for a
-    /// passenger car, the crowd's callers too. Nothing boards until a whole
-    /// rider is waiting. The riders count against the car's load, so a car
-    /// that keeps taking arrivals fills and leaves. Returns how many boarded.
+    /// `room` to spare: the statistical estimate there (boarding consumes
+    /// it, so what is left is new) and the crowd's newcomers, the callers
+    /// above the count the car last saw (`hall` is the count now and the
+    /// count seen, which this updates). A staff car reads only the crowd, as
+    /// its arrival boarding does. Nothing boards until a whole rider is
+    /// waiting. The riders count against the car's load, so a car that keeps
+    /// taking arrivals fills and leaves. Returns how many boarded.
     pub fn arrivals(
         &mut self,
         id: i64,
         floor: i64,
-        hall: f64,
+        hall: (f64, &mut f64),
         room: f64,
         staff_only: bool,
         live_call: bool,
     ) -> f64 {
+        let (now, seen) = hall;
+        let newcomers = (now - *seen).max(0.0);
+        *seen = now;
         let (estimate, crowd) = if staff_only {
-            (hall, 0.0)
+            (newcomers, 0.0)
         } else {
-            (self.waiting.get(&floor).copied().unwrap_or(0.0), hall)
+            (self.waiting.get(&floor).copied().unwrap_or(0.0), newcomers)
         };
         if estimate + crowd < 1.0 {
             return 0.0;
         }
         let took = self.board(id, floor, estimate, room, staff_only, live_call);
         took + (room - took).min(crowd).max(0.0)
+    }
+}
+
+/// The nearest stop ahead of `pos` going `dir` that the car answers: a stop
+/// in its own cab, or one within `reach` that no moving car covers
+/// (`covered`). A covered stop is passed over and the search goes on past
+/// it; a stop beyond `reach` ends it, as every later stop is farther. The
+/// search only returns a stop at a finite distance and `reach` is never
+/// NaN, so `<=` is the TypeScript's `!(dist > reach)`. Outside Classic's
+/// Waiting Car Response nothing is covered, so this is one `next_stop`.
+pub(super) fn first_answering(
+    demand: &Demand,
+    pos: f64,
+    dir: i64,
+    reach: f64,
+    covered: impl Fn(usize) -> bool,
+) -> Option<usize> {
+    let mut from = pos;
+    loop {
+        let k = demand.next_stop(from, dir)?;
+        if demand.is_cab(k) {
+            return Some(k);
+        }
+        if (demand.stops[k] as f64 - pos).abs() > reach {
+            return None;
+        }
+        if !covered(k) {
+            return Some(k);
+        }
+        from = demand.stops[k] as f64;
     }
 }

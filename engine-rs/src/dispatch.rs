@@ -13,7 +13,7 @@ use demand::{fill_cab_stops, has_bit, set_bit, Demand};
 
 #[path = "dispatch_classic.rs"]
 mod classic;
-use classic::{moving_car_covers, Boarding};
+use classic::{first_answering, moving_car_covers, Boarding};
 
 pub const CAR_FLOORS_PER_MINUTE: f64 = 0.8;
 const DWELL_MINUTES: f64 = 0.8;
@@ -31,6 +31,9 @@ pub struct ElevatorDispatch {
     /// Transient per-car dwell timers, by shaft id. An ordered map, so the
     /// prune's `retain` iterates no hashed collection.
     car_dwell: BTreeMap<i64, Vec<f64>>,
+    /// Transient per-car crowd callers seen at the car's stop, by shaft id,
+    /// so Standard Floor Departure counts only newcomers.
+    car_seen: BTreeMap<i64, Vec<f64>>,
     /// Waiting passengers per floor. An ordered map, so a floor lookup
     /// compares small integer keys where a hash map ran SipHash on each.
     /// Every read and write is by floor, and `retain` decays each entry on
@@ -106,8 +109,9 @@ impl ElevatorDispatch {
 
     fn prune_removed_shafts(&mut self, tower: &Tower) {
         // The shaft index answers "is this id live" without building a set.
-        self.car_dwell
-            .retain(|id, _| tower.transport_index(*id).is_some());
+        let live = |id: &i64| tower.transport_index(*id).is_some();
+        self.car_dwell.retain(|id, _| live(id));
+        self.car_seen.retain(|id, _| live(id));
     }
 
     /// `accumulate(tower, dt, rush)`: once per outer step. Returns the tower's
@@ -211,8 +215,9 @@ impl ElevatorDispatch {
             let span = (t.top - t.bottom) as f64;
             let cars = t.cars as usize;
             let dwell = self.car_dwell.entry(id).or_default();
-            if dwell.len() != cars {
-                *dwell = vec![0.0; cars];
+            let seen = self.car_seen.entry(id).or_default();
+            if dwell.len() != cars || seen.len() != cars {
+                (*dwell, *seen) = (vec![0.0; cars], vec![0.0; cars]);
             }
             if t.car_load.as_ref().is_none_or(|l| l.len() != cars) {
                 t.car_load = Some(vec![0.0; cars]);
@@ -287,7 +292,8 @@ impl ElevatorDispatch {
                             tally: &mut self.board_tally,
                         };
                         let (room, live) = (cap - car_load[i], has_bit(call_bits, k));
-                        let got = b.arrivals(id, fl, hall_at(fl), room, staff_only, live);
+                        let got =
+                            b.arrivals(id, fl, (hall_at(fl), &mut seen[i]), room, staff_only, live);
                         if got > 0.0 {
                             car_load[i] += got;
                             dwell[i] = shaft_dwell;
@@ -339,19 +345,11 @@ impl ElevatorDispatch {
                     claimed: &claimed[..],
                     cab: cab_stops,
                 };
-                // A parked car leaves a stop beyond its reach alone unless the
-                // stop is in its own cab. The search only returns a stop at a
-                // finite distance and `reach` is never NaN, so `<=` is the
-                // TypeScript's `!(dist > reach)`.
-                let held = |k: Option<usize>| {
-                    k.filter(|&k| {
-                        demand.is_cab(k) || ((stops[k] as f64 - pos).abs() <= reach && !covered(k))
-                    })
-                };
-                let mut target = held(demand.next_stop(pos, dir));
+                let pick = |dir: i64| first_answering(&demand, pos, dir, reach, covered);
+                let mut target = pick(dir);
                 if target.is_none() {
                     dir = -dir;
-                    target = held(demand.next_stop(pos, dir));
+                    target = pick(dir);
                 }
                 if let Some(k) = target {
                     set_bit(claimed, k);
@@ -378,6 +376,7 @@ impl ElevatorDispatch {
                 if (target - pos).abs() <= v + AT_STOP_FLOORS {
                     pos = target;
                     dwell[i] = shaft_dwell;
+                    seen[i] = hall_at(target as i64);
                     // Arrived: the doors open for the rest of the step.
                     self.open_cars.push((id, i as i64, target as i64));
                     car_load[i] = (car_load[i] - (car_load[i] * 0.45).ceil()).max(0.0);
