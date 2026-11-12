@@ -1,6 +1,6 @@
 //! The Modern venues' cross-floor halos (the audit and round table of
-//! 2026-11-12): the nightclub is felt only while it is open and never brings
-//! a home to notice by itself; the fitness club, spa and daycare lift the
+//! 2026-11-12): the nightclub is felt only while it is open and, outside its
+//! own same-floor noise band, never brings a home to notice by itself; the fitness club, spa and daycare lift the
 //! ceiling a capped room is held to; the spa and daycare make no noise for
 //! the rooms beside them. Classic has none of it.
 use crate::clock::GameMode;
@@ -72,6 +72,49 @@ fn a_nightclub_on_a_condos_floor_dips_it_overnight_and_never_brings_notice() {
         unit(&quiet_sim, quiet).satisfaction > 0.9,
         "a closed club ({club}) drains nothing at noon"
     );
+}
+
+/// Inside the same-floor noise band the club is also the noisy neighbor: the
+/// condo never recovers there, so the night drain takes it to notice. The
+/// move-in gate walks the club's open hours, so it holds that spot by day and
+/// by night (a tenant is never let in beside a club that evicts them), and
+/// still lets the spot outside the band.
+#[test]
+fn a_nightclub_inside_the_noise_band_is_a_spot_the_gate_holds() {
+    let (mut sim, condo) = condo_tower(11);
+    let club_width = Kind::Nightclub.facility().width;
+    open_venue(&mut sim, Kind::Nightclub, 3, C - club_width);
+    let u = unit(&sim, condo).clone();
+    assert!(
+        sim.noise_afflicted(&u),
+        "beside the club, inside the noise band"
+    );
+    let trace = run_hours(&mut sim, condo, 24);
+    let lowest = trace.iter().map(|&(_, s)| s).fold(1.0, f64::min);
+    assert_eq!(
+        lowest, 0.0,
+        "the noise ceiling leaves no recovery: {trace:?}"
+    );
+    for hour in [12, 22] {
+        sim.clock.minutes = hour as f64 * 60.0;
+        let mut ctx = sim.build_satisfaction_context(false);
+        assert!(
+            sim.would_evict_fresh_tenant(&u, &mut ctx),
+            "held at {hour}:00"
+        );
+    }
+
+    let (mut far_sim, far) = condo_tower(11);
+    open_venue(&mut far_sim, Kind::Nightclub, 3, C - 60);
+    let u = unit(&far_sim, far).clone();
+    for hour in [12, 22] {
+        far_sim.clock.minutes = hour as f64 * 60.0;
+        let mut ctx = far_sim.build_satisfaction_context(false);
+        assert!(
+            !far_sim.would_evict_fresh_tenant(&u, &mut ctx),
+            "let at {hour}:00"
+        );
+    }
 }
 
 #[test]

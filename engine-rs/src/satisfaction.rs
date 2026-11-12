@@ -39,7 +39,11 @@ pub struct SatisfactionContext {
     pub global_cong: f64,
     pub served_set: std::collections::HashSet<i64>,
     pub club_floors: Vec<i64>,
+    /// Every operational nightclub's floor, open or not.
     pub nightclub_floors: Vec<i64>,
+    /// Whether the nightclubs are open in the hour this context is stepped
+    /// for: they disturb the homes around them only then.
+    pub nightclub_open: bool,
     pub spa_floors: Vec<i64>,
     pub daycare_floors: Vec<i64>,
     pub demand_map: Option<DemandMap>,
@@ -106,7 +110,6 @@ impl Simulation {
             if c.kind == Kind::FitnessClub && c.is_tenanted() && served_set.contains(&c.floor) {
                 club_floors.push(c.floor);
             } else if c.kind == Kind::Nightclub
-                && nightclub_open
                 && c.is_operational()
                 && served_set.contains(&c.floor)
             {
@@ -124,6 +127,7 @@ impl Simulation {
             served_set,
             club_floors,
             nightclub_floors,
+            nightclub_open,
             spa_floors,
             daycare_floors,
             demand_map: None,
@@ -182,6 +186,7 @@ impl Simulation {
         }
         if (u.kind == Kind::Condo || u.kind.is_hotel() || u.kind == Kind::RentalApartment)
             && served
+            && ctx.nightclub_open
             && !ctx.nightclub_floors.is_empty()
         {
             let penalty = self
@@ -319,12 +324,13 @@ impl Simulation {
                 0.0
             };
         }
-        // The nightclub is felt only while it is open and never brings a
-        // tenant to notice by itself, so the gate leaves it out: run at night,
-        // a club's hourly drain would otherwise read as a doomed spot.
-        let open_clubs = std::mem::take(&mut ctx.nightclub_floors);
+        // The nightclub is felt only while it is open, so the gate walks its
+        // horizon hour by hour from now and opens the clubs in their hours:
+        // a night run would otherwise hold every spot near a club, and a day
+        // run would let a tenant in beside one that evicts them overnight.
+        let open_now = ctx.nightclub_open;
         let doomed = self.gate_horizon_dooms(&probe, ctx);
-        ctx.nightclub_floors = open_clubs;
+        ctx.nightclub_open = open_now;
         doomed
     }
 
@@ -332,7 +338,9 @@ impl Simulation {
     /// within the gate's horizon without ever recovering.
     fn gate_horizon_dooms(&mut self, probe: &Unit, ctx: &mut SatisfactionContext) -> bool {
         let mut s = 1.0;
-        for _ in 0..GATE_HORIZON_HOURS {
+        let now = self.clock.hour();
+        for h in 0..GATE_HORIZON_HOURS {
+            ctx.nightclub_open = Kind::Nightclub.is_open_at((now + h) % 24);
             let prev = s;
             s = self.satisfaction_step(probe, s, ctx).next;
             if s < VACATE_RESCIND {
