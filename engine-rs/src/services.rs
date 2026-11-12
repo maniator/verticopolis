@@ -185,7 +185,7 @@ impl Simulation {
 
     pub fn suite_parking_short(&self) -> bool {
         let d = self.parking_demand();
-        d.suites > 0.0 && (self.tower.functional_parking_spots() as f64) < d.suites
+        parking::suite_short_of(&d, self.tower.functional_parking_spots() as f64)
     }
 
     pub fn nudge_service_shortfalls(&mut self) {
@@ -443,6 +443,7 @@ impl Simulation {
 
 mod parking;
 
+pub(crate) use parking::parking_short_of;
 pub use parking::{
     is_parked_home, modern_spaces_for, ParkingDemand, ParkingMoveIn, APARTMENTS_PER_SPACE,
     CONDOS_PER_SPACE, HOME_MOVE_IN_SHORT_FACTOR, HOME_SLOW_COVERAGE, METRO_PARKING_SHARE,

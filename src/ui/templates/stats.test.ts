@@ -72,13 +72,13 @@ describe("statsTemplate structure", () => {
   it("hides the parking demand row until the engine reports a demand or a space", () => {
     // Below 3★ the engine reports no demand (parking is not buildable yet).
     expect(body().textContent).not.toContain("Parking demand");
-    const demand = { officePop: 6, offices: 1, suites: 0, homes: 0, total: 1, coverage: null };
+    const demand = { officePop: 6, offices: 1, suites: 0, homes: 0, total: 1, coverage: null, short: false };
     expect(body({ stats: { star: 3 }, report: { parkingDemand: demand } }).textContent).toContain("Parking demand");
     expect(cellAfter(body({ stats: { parkingSpaces: 2 } }), "Parking spaces")!.textContent).toBe("0 / 2 working");
   });
 
   it("names the homes in the parking demand only when Modern homes need spaces (#1973)", () => {
-    const offices = { officePop: 6, offices: 1, suites: 2, homes: 0, total: 3, coverage: null as number | null };
+    const offices = { officePop: 6, offices: 1, suites: 2, homes: 0, total: 3, coverage: null as number | null, short: false };
     const cell = (demand: typeof offices) =>
       cellAfter(body({ stats: { star: 3 }, report: { parkingDemand: demand } }), "Parking demand")!.textContent;
     expect(cell(offices)).toBe("3 needed (1 offices + 2 suites)");
@@ -86,11 +86,22 @@ describe("statsTemplate structure", () => {
   });
 
   it("shows how much of the parking need is covered only while it falls short (#1973)", () => {
-    const demand = { officePop: 6, offices: 1, suites: 2, homes: 4, total: 7, coverage: null as number | null };
+    const demand = { officePop: 6, offices: 1, suites: 2, homes: 4, total: 7, coverage: null as number | null, short: false };
     const cell = (d: typeof demand) =>
       cellAfter(body({ stats: { star: 3 }, report: { parkingDemand: d } }), "Parking demand")!.textContent;
     expect(cell(demand)).toBe("7 needed (1 offices + 2 suites + 4 homes)");
     expect(cell({ ...demand, coverage: 0.6449 })).toBe("7 needed (1 offices + 2 suites + 4 homes) · 64% covered");
+  });
+
+  it("colors the parking demand by the engine's shortage answer alone", () => {
+    // Classic: 48 office workers' cars want 2 spaces and 1 works, yet one
+    // free space serves every office, so the engine says not short (green).
+    const demand = { officePop: 48, offices: 2, suites: 0, homes: 0, total: 2, coverage: null as number | null, short: false };
+    const cell = (d: typeof demand, working: number) =>
+      cellAfter(body({ stats: { star: 3, parkingSpaces: 1 }, report: { functionalParking: working, parkingDemand: d } }), "Parking demand")!;
+    expect(cell(demand, 1).getAttribute("style")).toContain("var(--good)");
+    // The engine's answer alone turns it red, even with the spaces to cover the count.
+    expect(cell({ ...demand, short: true }, 5).getAttribute("style")).toContain("var(--bad)");
   });
 
   it("escapes a hostile tower name as text, injecting no element", () => {

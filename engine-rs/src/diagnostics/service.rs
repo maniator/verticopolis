@@ -227,8 +227,7 @@ impl Simulation {
             if facts.parking.status != ParkingStatus::Disconnected {
                 let demand = self.parking_demand();
                 // Short by the mode's rule (#1970), not by the cars counted.
-                let short = self.suite_parking_short() || self.office_parking_short();
-                facts.parking.shortage = Some(short);
+                facts.parking.shortage = Some(self.parking_short());
                 facts.parking.have = Some(spaces.len());
                 facts.parking.total = Some(demand.total);
                 facts.parking.offices = Some(demand.offices);

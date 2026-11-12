@@ -8,6 +8,7 @@
 use crate::diagnostics::GripeFacts;
 use crate::ledger::LEDGER_CATS;
 use crate::panels::progress::MILESTONE_IDS;
+use crate::services::parking_short_of;
 use crate::view::layout::MODES;
 
 use super::port_panels::{code_of, flag, VACATE_REASONS};
@@ -21,7 +22,7 @@ use super::Engine;
 /// rows ([`GATE_ROW`]), the `stranded` floors, one done flag per milestone in
 /// `milestones` order, the `elevators` rows ([`ELEVATOR_ROW`]) and the `mix`
 /// rows ([`MIX_ROW`]).
-pub(crate) const STATS_SHEET: [&str; 27] = [
+pub(crate) const STATS_SHEET: [&str; 28] = [
     "ratingPopulation",
     "hotelsCountTowardRating",
     "functionalParking",
@@ -31,6 +32,7 @@ pub(crate) const STATS_SHEET: [&str; 27] = [
     "parkingHomes",
     "parkingTotal",
     "parkingCoverage",
+    "parkingShort",
     "cleaned",
     "leftover",
     "recyclingCapacity",
@@ -196,6 +198,7 @@ impl Engine {
         let stranded = sim.stranded_floors(false);
         let parking = sim.parking_demand();
         let parking_coverage = sim.service_shortfalls().parking_coverage();
+        let spots = sim.tower.functional_parking_set().len() as f64;
         let next = sim.next_star();
         let rows = sim.elevator_rows();
         let (households, residents, mix) = sim.household_mix();
@@ -210,13 +213,14 @@ impl Engine {
         let mut r = vec![
             sim.rating_population() as f64,
             flag(sim.star < 4),
-            sim.tower.functional_parking_set().len() as f64,
+            spots,
             parking.office_pop,
             parking.offices,
             parking.suites,
             parking.homes,
             parking.total,
             parking_coverage.unwrap_or(f64::NAN),
+            flag(parking_short_of(&parking, spots, parking_coverage)),
             cleaned,
             leftover,
             sim.recycling_capacity(),

@@ -7,7 +7,7 @@ use serde_json::{json, Map, Value};
 
 /// The version of the view's layout. It goes up when a slot moves, a width
 /// changes, or a slot or code changes meaning.
-pub const VIEW_LAYOUT_VERSION: u32 = 19;
+pub const VIEW_LAYOUT_VERSION: u32 = 20;
 
 /// The dynamic frame's header slots, one name each. `UNLOCKED` holds the
 /// unlocked kinds as a bitmask by kind code in one double, with more than 32

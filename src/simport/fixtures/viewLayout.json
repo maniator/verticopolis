@@ -1,5 +1,5 @@
 {
-  "version": 19,
+  "version": 20,
   "header": {
     "minutes": 0,
     "towerRevision": 1,
@@ -530,6 +530,7 @@
       "parkingHomes",
       "parkingTotal",
       "parkingCoverage",
+      "parkingShort",
       "cleaned",
       "leftover",
       "recyclingCapacity",

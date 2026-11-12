@@ -264,3 +264,49 @@ fn classic_offices_need_one_free_space_whatever_their_size() {
     assert_eq!(spots, 1.0);
     assert_eq!(sim.parking_usage(spots), 1.0);
 }
+
+/// The stats screen's parking line reads `parkingDemand.short`, the mode's
+/// rule, so a Classic garage with fewer spaces than cars but one free for the
+/// offices reads as covered, while Modern counts the workers per space.
+#[test]
+fn the_stats_report_calls_parking_short_by_the_mode_rule() {
+    // The stats report's answer, checked against the engine's two shortage
+    // reads each time, so the shared helper cannot drift from the rule.
+    let short = |sim: &mut Simulation| {
+        let report = sim.stats_report()["parkingDemand"]["short"].clone();
+        let rule = sim.suite_parking_short() || sim.office_parking_short();
+        assert_eq!(report, rule, "the stats answer follows the move-in rule");
+        assert_eq!(sim.parking_short(), rule);
+        report
+    };
+    for mode in [GameMode::Classic, GameMode::Modern] {
+        let mut sim = Simulation::new_game(16, mode);
+        sim.money = 1e12;
+        lay(&mut sim, Kind::Lobby, 1);
+        lay(&mut sim, Kind::Floor, 2);
+        sim.star = 3;
+        for i in 0..8 {
+            occupy(
+                &mut sim,
+                Kind::Office,
+                2,
+                i * OFFICE_WIDTH,
+                UnitState::Occupied,
+            );
+        }
+        assert_eq!(short(&mut sim), true, "{mode:?}: no space at all");
+        parking_floor(&mut sim, 1);
+        let d = sim.parking_demand();
+        assert_eq!(d.total, 2.0, "{mode:?}: the cars need two spaces");
+        assert_eq!(sim.tower.functional_parking_spots(), 1);
+        let classic = mode == GameMode::Classic;
+        assert_eq!(
+            short(&mut sim),
+            !classic,
+            "{mode:?}: Classic needs one free space, Modern one per 24 workers"
+        );
+        // A suite takes the one space first, so the offices have none left.
+        occupy(&mut sim, Kind::HotelSuite, 2, 80, UnitState::Occupied);
+        assert_eq!(short(&mut sim), true, "{mode:?}: the suite took the space");
+    }
+}

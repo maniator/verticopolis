@@ -90,6 +90,7 @@ export function statsReport(rec: PortRecord, codes: PortCodes): StatsReport {
       homes: h("parkingHomes"),
       total: h("parkingTotal"),
       coverage: orNull(h("parkingCoverage")),
+      short: yes("parkingShort"),
     },
     housekeeping,
     housekeepingReport: cleaned === null ? null : { cleaned, leftover: h("leftover") },
