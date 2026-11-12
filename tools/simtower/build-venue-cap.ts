@@ -6,9 +6,13 @@
 // game can try to build a 17th. If the game refuses a 17th hall or theater,
 // the two kinds share one cap of 16.
 //
-// Layout (tower width 120, floors 1..11), one standard elevator at x 0:
-//   floors 2-3, 4-5, 6-7, 8-9: theater x 6, theater x 37, hall x 68, hall x 92
+// Layout (tower width 132, floors 1..11), one standard elevator at x 0:
+//   floors 2-3, 4-5, 6-7, 8-9: four 31-wide slots each at x 6, 37, 68 and 99,
+//   theaters first, then halls
 //   floors 10-11: empty floors, room for one more theater or hall
+//
+// `16 0 THEAT16` (16 theaters, then build a hall) loads even in exports from
+// before the party hall fix, which crashed the original once its clock ran.
 //
 // Usage:  npx tsx tools/simtower/build-venue-cap.ts [theaters] [halls] [NAME]
 // Writes: tools/simtower/saves/<NAME>.TDT (default 8 theaters, 8 halls, VENUE16)
@@ -22,7 +26,7 @@ import type { FacilityKind, SerializedGame } from "../../src/shared/types";
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SAVES = resolve(HERE, "saves");
 
-const TOWER_W = 120;
+const TOWER_W = 132;
 const TOP = 11;
 
 function must(ok: boolean, msg: string): void {
@@ -43,12 +47,12 @@ must(shaft.ok, `shaft: ${shaft.reason}`);
 const theaters = Number(process.argv[2] ?? 8);
 const halls = Number(process.argv[3] ?? 8);
 const name = process.argv[4] ?? "VENUE16";
-must(theaters >= 0 && theaters <= 8 && halls >= 0 && halls <= 8, "0 to 8 theaters and 0 to 8 halls");
+must(theaters >= 0 && halls >= 0 && theaters + halls <= 16, "at most 16 venues");
 type Venue = { kind: FacilityKind; floor: number; x: number };
 const venues: Venue[] = [];
-const floors = [2, 4, 6, 8];
-for (let i = 0; i < theaters; i++) venues.push({ kind: "cinema", floor: floors[Math.floor(i / 2)], x: i % 2 === 0 ? 6 : 37 });
-for (let i = 0; i < halls; i++) venues.push({ kind: "partyHall", floor: floors[Math.floor(i / 2)], x: i % 2 === 0 ? 68 : 92 });
+const SLOT_X = [6, 37, 68, 99];
+const kinds: FacilityKind[] = [...Array<FacilityKind>(theaters).fill("cinema"), ...Array<FacilityKind>(halls).fill("partyHall")];
+kinds.forEach((kind, i) => venues.push({ kind, floor: 2 + 2 * Math.floor(i / SLOT_X.length), x: SLOT_X[i % SLOT_X.length] }));
 for (const v of venues) {
   const r = t.place(v.kind, v.floor, v.x);
   must(r.ok, `place ${v.kind} at floor ${v.floor}, x ${v.x}: ${r.reason}`);
@@ -56,7 +60,7 @@ for (const v of venues) {
 
 const save: SerializedGame = sim.serialize();
 save.star = 3;
-save.view = { tile: 60, floor: 6 };
+save.view = { tile: 66, floor: 6 };
 
 const built = buildTDT(save);
 mkdirSync(SAVES, { recursive: true });

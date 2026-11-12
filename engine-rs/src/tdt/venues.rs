@@ -14,7 +14,7 @@
 //! A misfit never fails the import: a table that does not read as one is
 //! left out, and the theatres then start their films fresh.
 //!
-//! The exporter writes the table back (`write_routing_tail`) so a film's age
+//! The exporter writes the table back (`venue_export.rs`) so a film's age
 //! survives a trip through a `.TDT`. It writes the audience bytes as the
 //! original leaves them each night (a theatre 20 per half for each step of
 //! its draw, a hall 0 and 50), film 7 for a theatre showing a new film and 3
@@ -28,8 +28,7 @@
 //! below 6 reads as a classic; the classics' other numbers are not pinned.
 
 use super::format::{
-    TDT_FLOOR_COUNT, TDT_FLOOR_INDEX_ENTRIES, TDT_ROUTING_TAIL_SIZE, TDT_STAIR_RECORD_SIZE,
-    TDT_STAIR_SLOTS,
+    TDT_FLOOR_COUNT, TDT_FLOOR_INDEX_ENTRIES, TDT_STAIR_RECORD_SIZE, TDT_STAIR_SLOTS,
 };
 use super::types::TdtVenue;
 use crate::economy::visitors::showing_draw;
@@ -41,26 +40,11 @@ pub const TDT_VENUE_SLOTS: usize = 16;
 /// Bytes in one record.
 pub const TDT_VENUE_RECORD_SIZE: usize = 12;
 /// The first byte of an empty record.
-const EMPTY_RECORD: u8 = 0xFE;
+pub(super) const EMPTY_RECORD: u8 = 0xFE;
 /// The film byte of a party hall's record.
-const NO_FILM: u8 = 0xFF;
-/// Where the table starts inside the routing tail the exporter writes after
-/// the stairs table.
-const TABLE_IN_ROUTING_TAIL: usize =
-    TDT_VENUE_TABLE_FROM_STAIRS - TDT_STAIR_SLOTS * TDT_STAIR_RECORD_SIZE;
+pub(super) const NO_FILM: u8 = 0xFF;
 /// The first new film's number; the classics' numbers sit below it.
 const FIRST_NEW_FILM: u8 = 6;
-/// The film number the exporter writes for a theatre showing a new film: the
-/// second new film, Dino Wars.
-const EXPORTED_FILM: u8 = 7;
-/// The film number the exporter writes for a theatre showing a classic: Big
-/// Wave, the one classic a run of the original pinned.
-const EXPORTED_CLASSIC_FILM: u8 = 3;
-/// A theatre's audience per half for each step of its draw, as the original
-/// resets bytes 4 and 5 at night.
-const THEATRE_HALF_PER_DRAW: i64 = 20;
-/// A hall's audience bytes as the original resets them at night.
-const HALL_AUDIENCE_BYTES: [u8; 2] = [0, 50];
 
 /// One half of a party hall or theatre as the exporter gathers it: the
 /// room's place in the save's room list, whether this is its upper half, and
@@ -82,76 +66,6 @@ impl OutVenueHalf {
         self.film_days
             .map_or(0, |days| showing_draw((days - 1).max(0), self.film_classic))
     }
-}
-
-/// A half as the encoder placed it: its TDT floor index and its tenant's
-/// position on that floor, which the floor's index map gives as its logical
-/// unit id.
-pub type PlacedHalf = (OutVenueHalf, usize, usize);
-
-/// A floor's index map as the exporter writes it: logical unit id `n` is the
-/// floor's `n`th tenant record, and the ids past its records are 0, as the
-/// game leaves them.
-pub fn index_map(tenants: usize) -> Vec<u8> {
-    (0..TDT_FLOOR_INDEX_ENTRIES)
-        .flat_map(|id| (if id < tenants { id as u16 } else { 0 }).to_le_bytes())
-        .collect()
-}
-
-/// The routing tail after the stairs table, `FF` but for the venue table
-/// holding the halls and theatres that have both halves placed, theatres
-/// first and each kind in the order its lower halves were placed, up to the
-/// table's 16 records.
-pub fn write_routing_tail(placed: &[PlacedHalf]) -> Vec<u8> {
-    let mut tail = vec![0xff; TDT_ROUTING_TAIL_SIZE];
-    let mut table = vec![];
-    for &(half, floor, slot) in placed.iter().filter(|p| !p.0.upper) {
-        let upper = placed
-            .iter()
-            .find(|p| p.0.upper && p.0.room == half.room && p.1 == floor + 1);
-        let Some(&(_, upper_floor, upper_slot)) = upper else {
-            continue;
-        };
-        // A half past the index map's 94 ids has no logical id to name, and
-        // one bad record would make the reader drop the whole table.
-        if slot >= TDT_FLOOR_INDEX_ENTRIES || upper_slot >= TDT_FLOOR_INDEX_ENTRIES {
-            continue;
-        }
-        let mut record = [0u8; TDT_VENUE_RECORD_SIZE];
-        record[0] = upper_floor as u8;
-        record[1] = floor as u8;
-        record[2] = upper_slot as u8;
-        record[3] = slot as u8;
-        match half.film_days {
-            Some(days) => {
-                let left = (THEATRE_HALF_PER_DRAW * (half.draw() + 1)) as u8;
-                record[4] = left;
-                record[5] = left;
-                record[7] = if half.film_classic {
-                    EXPORTED_CLASSIC_FILM
-                } else {
-                    EXPORTED_FILM
-                };
-                record[9] = days.clamp(0, i64::from(u8::MAX)) as u8;
-            }
-            None => {
-                record[4..6].copy_from_slice(&HALL_AUDIENCE_BYTES);
-                record[7] = NO_FILM;
-            }
-        }
-        table.push(record);
-    }
-    // Past 16 venues, theatres keep their records first: a hall's record
-    // carries nothing the importer reads.
-    table.sort_by_key(|record| record[7] == NO_FILM);
-    for slot in 0..TDT_VENUE_SLOTS {
-        let at = TABLE_IN_ROUTING_TAIL + slot * TDT_VENUE_RECORD_SIZE;
-        let mut empty = [0u8; TDT_VENUE_RECORD_SIZE];
-        empty[..2].copy_from_slice(&[EMPTY_RECORD; 2]);
-        let record = table.get(slot).unwrap_or(&empty);
-        tail[at..at + TDT_VENUE_RECORD_SIZE].copy_from_slice(record);
-    }
-    tail
 }
 
 /// Whether film number `film` is a classic: the classics sit below the
@@ -256,87 +170,6 @@ mod tests {
     }
 
     #[test]
-    fn a_written_table_reads_back_with_its_floors_slots_film_and_days() {
-        let theatre = |upper, film_days| OutVenueHalf {
-            room: 3,
-            upper,
-            film_days,
-            film_classic: false,
-        };
-        let hall = |upper| OutVenueHalf {
-            room: 5,
-            upper,
-            film_days: None,
-            film_classic: false,
-        };
-        let theatre_far = |upper| OutVenueHalf {
-            room: 7,
-            upper,
-            film_days: Some(2),
-            film_classic: false,
-        };
-        // A lone half (a room cut at the roof) writes no record.
-        let stray = OutVenueHalf {
-            room: 9,
-            upper: false,
-            film_days: Some(1),
-            film_classic: false,
-        };
-        let placed = [
-            (hall(false), 20, 6),
-            (theatre(false, Some(7)), 20, 4),
-            (stray, 30, 0),
-            // A theatre whose lower half sits past the index map writes none.
-            (theatre_far(false), 40, TDT_FLOOR_INDEX_ENTRIES),
-            (theatre_far(true), 41, 0),
-            (theatre(true, Some(7)), 21, 2),
-            (hall(true), 21, 5),
-        ];
-        let mut raw = vec![0; TDT_STAIR_SLOTS * TDT_STAIR_RECORD_SIZE];
-        raw.extend(write_routing_tail(&placed));
-        let read = read_venue_table(&raw, 0);
-        assert_eq!(
-            read,
-            [
-                TdtVenue {
-                    upper_floor: 21,
-                    lower_floor: 20,
-                    upper_slot: 2,
-                    lower_slot: 4,
-                    film: Some(EXPORTED_FILM),
-                    days_shown: 7,
-                },
-                TdtVenue {
-                    upper_floor: 21,
-                    lower_floor: 20,
-                    upper_slot: 5,
-                    lower_slot: 6,
-                    film: None,
-                    days_shown: 0,
-                },
-            ]
-        );
-        let at = TDT_VENUE_TABLE_FROM_STAIRS;
-        // A seven-day-old film showed draw 1 last night: 40 per half.
-        assert_eq!(&raw[at + 4..at + 6], &[40, 40]);
-        assert_eq!(&raw[at + 16..at + 18], &HALL_AUDIENCE_BYTES);
-        assert_eq!(&raw[at + 24..at + 26], &[EMPTY_RECORD; 2]);
-        assert_eq!(
-            raw.len(),
-            TDT_STAIR_SLOTS * TDT_STAIR_RECORD_SIZE + TDT_ROUTING_TAIL_SIZE
-        );
-        assert_eq!(raw[raw.len() - 1], 0xff);
-    }
-
-    #[test]
-    fn an_index_map_names_each_record_by_its_place_on_the_floor() {
-        let map = index_map(3);
-        assert_eq!(map.len(), TDT_FLOOR_INDEX_ENTRIES * 2);
-        assert_eq!(&map[..8], &[0, 0, 1, 0, 2, 0, 0, 0]);
-        assert!(map[6..].iter().all(|&b| b == 0));
-    }
-
-    #[test]
     fn a_theatre_writes_the_draw_its_film_had_last_night() {
         let draws = |film_classic| -> Vec<i64> {
             [None, Some(0), Some(1), Some(6), Some(7), Some(9), Some(10)]
@@ -358,25 +191,6 @@ mod tests {
             [0, 1, 1, 1, 1, 1, 0],
             "a classic tops out at 1"
         );
-    }
-
-    #[test]
-    fn a_classic_writes_and_reads_back_as_a_classic() {
-        let half = |upper| OutVenueHalf {
-            room: 3,
-            upper,
-            film_days: Some(2),
-            film_classic: true,
-        };
-        let placed = [(half(false), 20, 4), (half(true), 21, 2)];
-        let mut raw = vec![0; TDT_STAIR_SLOTS * TDT_STAIR_RECORD_SIZE];
-        raw.extend(write_routing_tail(&placed));
-        let read = read_venue_table(&raw, 0);
-        assert_eq!(read.len(), 1);
-        assert_eq!(read[0].film, Some(EXPORTED_CLASSIC_FILM));
-        assert!(read[0].shows_classic());
-        let at = TDT_VENUE_TABLE_FROM_STAIRS;
-        assert_eq!(&raw[at + 4..at + 6], &[40, 40], "a classic's draw 1");
     }
 
     #[test]

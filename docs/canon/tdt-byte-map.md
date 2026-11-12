@@ -124,12 +124,14 @@ Each floor: 6-byte header, `n` unit records of 18 bytes, a 188-byte remap.
 | 2 | u16 | left | Smallest `left` of the floor's units | Known |
 | 4 | u16 | right | Largest `right` of the floor's units | Known |
 | 6 | 18 n | units | Unit records, ascending `left` | Known |
-| 6 + 18 n | 188 | remap | 94 x u16: logical unit id to list index. Our exporter writes logical id n for the floor's nth record and 0 past them (the game assigns ids in build order; unused entries are 0) | Known |
+| 6 + 18 n | 188 | remap | 94 x u16: logical unit id to list index. The game numbers a floor's units and gives a plain floor tile (type 0) no id; our exporter numbers the units in record order, skipping plain floor tiles, and writes 0 past them (the game assigns ids in build order; unused entries are 0) | Known |
 
 `left` and `right` match the units on every floor of every save. The remap maps
 the id that people records and retail rows use ("logical id") to the unit's
-position in the list; ids are unique per floor. Our exporter writes zeros here
-and the game loads that fine; the game's own re-saves rebuild it. The importer
+position in the list; ids are unique per floor. A unit record carries its own
+id in byte 12. A party hall or theatre record in the tail names its halves by
+these ids, and the game crashed on a party hall whose record named ids that
+counted plain floor tiles (#1932), so the exporter skips them as the game does. The importer
 reads it to find the room a retail row describes (section 5).
 
 ### 3.1 Unit record (18 bytes)
@@ -140,10 +142,10 @@ reads it to find the room a retail row describes (section 5).
 | 2 | u16 | right | End tile, half open | Known |
 | 4 | u8 | type | Section 6 of `tdt-format.md`. As a signed byte, negative = under construction: 226 and 227 are a Party Hall under construction (-30, -29) in TOWER3 | Known |
 | 5 | u8 | state | Hotels: bits 3 and 4 stay state (1 checked in, 2 asleep, 3 vacant and clean; 0 is never written by the game), 0x20 dirty, 0x40 a flag the game keeps when it loads a file that has it but clears it from a vacant or dirty room (never found in a save of a tower played in the game; tdt-format.md section 5.1), low 2 bits guests inside now, which the game resets on load; the finance guest lines count rooms in stay state 1 or 2 at full complement (section 7.2). Offices and condos carry a nonzero value while occupied | Known for hotels |
-| 6 | u8 | variant | Shop, restaurant and fast-food style | Known |
+| 6 | u8 | variant | Shop, restaurant and fast-food style. Party halls and theatres: the row of the party hall and theatre table (section 8) that holds the venue, the same in both halves | Known for retail, Inferred for venues |
 | 7 | u8 | unknown | 0 everywhere except parking stalls (0 or 1) | Unknown |
 | 8 | u32 | counter | High 16 bits always 0; values up to about 9,500; per-unit counter or timer | Unknown |
-| 12 | u8 | small count | 255 on units that are not rooms; a small count on rooms | Unknown |
+| 12 | u8 | logical id | The unit's logical id on its floor (section 3), 255 on a plain floor tile, which has none | Inferred |
 | 13 | u8 | flag | 0 or 1 | Unknown |
 | 14 | u8 | usually 1 | | Unknown |
 | 15 | u8 | state | Theatres (all four parts): the film's draw, 2 for a new film, then 1 and 0 as it ages. The census counts a theatre at 40 per step plus 40 (120, 80, 40) and picks up a changed draw the next morning (`tdt-format.md` section 11). Party halls: 255. Other kinds: 2 normal; 1, 0, 3 seen; 255 on vacant or non-applicable units | Known for theatres |
@@ -427,7 +429,7 @@ a baseline). TOWER8 (no elevators) is the nearest baseline we have; an empty
 | Unknown | Experiment |
 | --- | --- |
 | Header 26, 30, 32, 34, 36, 44, 60 | Save at 1 to 6 stars; move the ground lobby; build the first elevator |
-| Unit bytes 7, 8, 12, 13, 14, 15, 17 | One unit per save across ticks (office empty, filled, then after a few days) |
+| Unit bytes 7, 8, 13, 14, 15, 17 | One unit per save across ticks (office empty, filled, then after a few days) |
 | Cars byte versus car blocks | Build an elevator with 1 car, then add cars; compare slot length |
 | Per-floor map bits (6.2, 6.3) | Two shafts that serve different stretches; toggle a floor stop |
 | Car block bytes (6.5) | Freeze a tower with cars at known floors and compare |
