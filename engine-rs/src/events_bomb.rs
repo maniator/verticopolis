@@ -30,6 +30,8 @@ pub const BOMB_HOUR: f64 = 13.0;
 pub const SWEEP_MINUTES_PER_TILE: f64 = 0.5;
 /// Game minutes a guard spends on the emergency stairs per floor climbed.
 pub const STAIR_MINUTES_PER_FLOOR: f64 = 2.0;
+/// Floors above and below the bomb its blast guts (five floors in all).
+pub const BLAST_FLOORS: i64 = 2;
 
 /// The next 1:00 PM at or after `now`, as a minute count.
 fn deadline_after(now: f64) -> f64 {
@@ -195,6 +197,11 @@ impl Simulation {
     /// A bomb going off at `epicenter` (floor, x), or nowhere when the tower
     /// had no room to hide it in: the fine, the tally, the flash, every room
     /// within two floors gutted and the gameplay event. The rooms gutted.
+    ///
+    /// The blast stays in the building it went off in: only rooms that
+    /// overlap the epicenter floor's run of floor tiles around the bomb are
+    /// hit, so on a lot with several towers side by side the others stand.
+    /// A tower that fills its floors has one run there, the whole floor.
     pub(super) fn blast(&mut self, fine: f64, epicenter: Option<(i64, f64)>) -> i64 {
         self.money -= fine;
         self.events.bombs_detonated += 1;
@@ -205,9 +212,12 @@ impl Simulation {
                 x,
                 seq: self.fx.explosion.seq + 1,
             };
+            let (left, right) = self.blast_span(floor, x);
             for i in 0..self.tower.units.len() {
                 let u = &self.tower.units[i];
-                if (u.floor - floor).abs() <= 2
+                if (u.floor - floor).abs() <= BLAST_FLOORS
+                    && u.x <= right
+                    && u.x + u.width > left
                     && !u.kind.is_structural()
                     && u.state != UnitState::Construction
                     && u.state != UnitState::Gutted
@@ -222,6 +232,18 @@ impl Simulation {
         self.gameplay
             .push(GameplayEvent::BombDetonated { rooms: destroyed });
         destroyed
+    }
+
+    /// The tiles (first, last) of the run of floor on `floor` that holds the
+    /// epicenter at `x`, the building the bomb was in. A bomb with no floor
+    /// under it (never placed by the game) keeps to the tile it sits on.
+    fn blast_span(&self, floor: i64, x: f64) -> (i64, i64) {
+        let tile = x.floor() as i64;
+        self.tower
+            .segments_of(floor)
+            .into_iter()
+            .find(|&(first, last)| first <= tile && tile <= last)
+            .unwrap_or((tile, tile))
     }
 
     /// The answer to a declined ransom in both modes: hide the bomb in a random room
