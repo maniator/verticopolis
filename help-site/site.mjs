@@ -45,7 +45,16 @@ export const sidebar = [
   },
   {
     label: "Rooms",
-    items: [{ slug: "rooms/offices" }],
+    items: [
+      { label: "All rooms", slug: "rooms" },
+      { slug: "rooms/offices" },
+      { slug: "rooms/homes" },
+      { slug: "rooms/hotels" },
+      { slug: "rooms/food-and-shops" },
+      { slug: "rooms/venues" },
+      { slug: "rooms/services" },
+      { slug: "rooms/wedding-hall" },
+    ],
   },
   {
     label: "Guides",

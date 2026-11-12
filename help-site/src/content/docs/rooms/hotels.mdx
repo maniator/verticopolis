@@ -1,0 +1,81 @@
+---
+title: Hotels
+description: Hotel rooms, suites and Housekeeping in Verticopolis, how guests pay each night, and how to keep cockroaches out.
+---
+
+import RoomInfo from "../../../components/RoomInfo.astro";
+import Sprite from "../../../components/Sprite.astro";
+
+A hotel is the busiest business in your tower. Guests arrive in the evening, eat in your restaurants, sleep, pay in the morning and leave, and by lunchtime the room has to be clean for the next one. Keep that cycle turning and a hotel floor earns every single night. Let it slip and you will have cockroaches.
+
+<RoomInfo kind="hotelSuite" state="asleep" />
+
+## The three rooms
+
+| Room | Unlocks | Sleeps | Good for |
+| --- | --- | --- | --- |
+| Single Room | 2★ | 1 | Cheap, small, quick to fill |
+| Double Room | 3★ | 2 | The everyday hotel room |
+| Suite | 3★ | 2 | High nightly price, and the room the VIP stays in |
+
+<div class="vc-sprite-row">
+  <Sprite kind="hotelSingle" state="asleep" small caption="Single Room, guest asleep" />
+  <Sprite kind="hotelDouble" state="asleep" small caption="Double Room, guest asleep" />
+  <Sprite kind="hotelSuite" state="empty" small caption="Suite, made up and waiting" />
+</div>
+
+## A night in the hotel
+
+1. **Evening:** guests check in and head out to eat. A busy hotel keeps your [restaurants and fast food](/help/rooms/food-and-shops/) full at night.
+2. **Overnight:** the room shows its guest asleep.
+3. **8 AM:** guests check out and pay for the night. The game tells you what the hotel earned. <span class="vc-mode">Modern</span> About one guest in five sleeps in and leaves in the early afternoon instead, paying then.
+4. **Daytime:** every room a guest left is now dirty, and stays empty until Housekeeping cleans it.
+
+Hotel guests count toward your population until four stars. From then on the game counts only the people who work and live in the tower, so a hotel alone won't carry you to five. See [Stars and the TOWER](/help/tower/stars/).
+
+## Housekeeping
+
+<RoomInfo kind="housekeeping" />
+
+Each Housekeeping room sends out a crew of six. A housekeeper walks to a dirty room, cleans it in a few minutes and moves on to the next. Crews only work during their shift, and they get around only on stairs and the **service elevator** (never the guests' elevators or escalators), so make sure your hotel floors are connected to a Housekeeping room that way.
+
+| | Classic | Modern |
+| --- | --- | --- |
+| Shift | Noon to 5 PM | 8 AM to 7 PM |
+| Which crew goes | The crews in the order you built them | The nearest crew first |
+
+If the game reports rooms left uncleaned at the end of the day, add another Housekeeping room or a service elevator.
+
+## Cockroaches
+
+A room left dirty for three days becomes **infested**. It can't be cleaned or rented any more, and every night the cockroaches spread into the empty or sleeping rooms on either side of it.
+
+<div class="vc-sprite-row">
+  <Sprite kind="hotelDouble" state="dirty" small caption="Needs cleaning" />
+  <Sprite kind="hotelDouble" state="infested" small caption="Cockroaches" />
+</div>
+
+<span class="vc-mode">Classic</span> The only cure is to bulldoze the infested rooms and build them again.
+
+<span class="vc-mode">Modern</span> You can also call an **exterminator** from the hotel room's card: a $5,000 call-out plus $2,000 for each infested room. The rooms are clear the next day.
+
+## What guests want
+
+Guests are short-tempered. A hotel guest whose rating falls all the way leaves at once, without notice. Their complaints are the same as everyone's (a lobby they can reach, short waits, a quiet neighborhood), with noise the biggest worry: offices and noisy venues within 21 tiles on the same floor disturb them. See [Tenant ratings](/help/tower/ratings/).
+
+<span class="vc-mode">Modern</span> A [Spa](/help/rooms/venues/) within five floors soothes hotel guests, and an Aquatic Center or Party Hall nearby helps too. A Nightclub nearby keeps them up at night.
+
+## The VIP and your suites
+
+From three stars, a VIP may book one of your suites. If they find a suite with a good rating (70 percent or better) that their car can park for, they leave a glowing review, which is one of the things four stars needs. You also need at least **two suites** in the tower for four stars. Every suite needs a [parking space](/help/rooms/services/) of its own, so build a ramp and some spaces before you build suites.
+
+## Tips
+
+- Put hotels on floors of their own, well away from offices and shops.
+- One Housekeeping room per hotel block, connected by a service elevator, saves a lot of trouble.
+- Build the suites near the bottom of the hotel, close to the parking ramp and the lobby.
+
+## See also
+
+- [Services](/help/rooms/services/) for parking
+- [Events](/help/tower/events/) for the VIP's other visit, to the Wedding Hall
