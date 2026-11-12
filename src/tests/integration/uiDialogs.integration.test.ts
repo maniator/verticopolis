@@ -607,10 +607,10 @@ describe("aria-labelledby across the real dialogs: every modal names itself for 
     expect(titleFor().textContent).toContain("Tower Statistics");
   });
 
-  it("showHelp labels the dialog with the rendered title", () => {
+  it("showAbout labels the dialog with the rendered title", () => {
     const { ui } = makeUI();
-    ui.showHelp();
-    expect(titleFor().textContent).toContain("How to play");
+    ui.showAbout();
+    expect(titleFor().textContent).toContain("About this game");
   });
 
   it("confirmModal labels the dialog with the caller-supplied title, not a generic string", () => {
@@ -997,7 +997,7 @@ describe("import fidelity report: nothing adopted until the player opens it", ()
     // Help owns no decision and no unsaved work, so making the player close it
     // and re-pick the file bought nothing. The report replaces it outright.
     const { ui } = makeUI();
-    ui.showHelp();
+    ui.showAbout();
     expect(dialog().textContent).toContain("Getting Started");
     ui.showImportReport(report(), { onOpen: vi.fn() });
     expect(dialog().textContent).toContain("Open tower");
@@ -1189,7 +1189,7 @@ describe("export fidelity report: nothing downloads until the player confirms", 
 
   it("takes the dialog from a modal that owns nothing", () => {
     const { ui } = makeUI();
-    ui.showHelp();
+    ui.showAbout();
     ui.showExportReport(exportReport(), { onDownload: vi.fn() });
     expect(dialog().textContent).toContain("GRAND.TDT");
     expect(dialog().textContent).not.toContain("Getting Started");
@@ -1233,7 +1233,7 @@ describe("toast — kind class and stack cap", () => {
   });
 });
 
-describe("showHelp — the Report an issue link", () => {
+describe("the Help menu: the Report a problem link", () => {
   const CHOOSER = "https://github.com/maniator/verticopolis/issues/new/choose";
 
   afterEach(() => {
@@ -1242,7 +1242,7 @@ describe("showHelp — the Report an issue link", () => {
 
   it("renders a chooser link that opens in a new tab with rel=noopener", () => {
     const { ui } = makeUI();
-    ui.showHelp();
+    ui.showHelpMenu();
     const link = dialog().querySelector<HTMLAnchorElement>(`a[href="${CHOOSER}"]`);
     expect(link, "expected a Report-an-issue link to the GitHub chooser").not.toBeNull();
     // A new tab (so the game isn't navigated away), with noopener+noreferrer so
@@ -1260,10 +1260,10 @@ describe("showHelp — the Report an issue link", () => {
     // Nothing intercepts the click, preserving middle-click and context-menu
     // semantics that a delegating handler would break.
     const { ui } = makeUI();
-    ui.showHelp();
+    ui.showHelpMenu();
     const link = dialog().querySelector<HTMLAnchorElement>(`a[href="${CHOOSER}"]`)!;
     // Listeners run in registration order, so this one (attached after
-    // showHelp wired anything it was going to wire) observes whether the game
+    // showHelpMenu wired anything it was going to wire) observes whether the game
     // cancelled the default, then cancels it itself so happy-dom doesn't
     // actually navigate the test window to GitHub.
     let preventedByGame = true;
@@ -1275,42 +1275,41 @@ describe("showHelp — the Report an issue link", () => {
     expect(preventedByGame).toBe(false);
   });
 
-  it("puts the link in the modal BODY, leaving the footer at its two buttons", () => {
+  it("puts the link in the modal BODY, leaving the footer at its Close button", () => {
     const { ui } = makeUI();
-    ui.showHelp();
+    ui.showHelpMenu();
     const box = dialog().firstElementChild!;
     const actions = box.querySelector(".modal-actions")!;
     // The report link is a body affordance, never a dialog action.
     expect(actions.querySelector('a[href*="/issues/new"]')).toBeNull();
-    // Footer stays exactly replay-onboard / close (Got it); the preference
-    // toggles live in the Settings dialog now.
+    // The footer is the one Close; the preference toggles live in Settings.
     const acts = [...actions.querySelectorAll("[data-act]")].map((b) => b.getAttribute("data-act"));
-    expect(acts).toEqual(["replay-onboard", "close"]);
+    expect(acts).toEqual(["close"]);
   });
 
   it("hosts no settings controls: no sliders, no preference toggles", () => {
     const { ui } = makeUI();
-    ui.showHelp();
+    ui.showHelpMenu();
     expect(dialog().querySelector("input[type=range]")).toBeNull();
     expect(dialog().querySelector('[data-act="reduce-motion"]')).toBeNull();
     expect(dialog().querySelector('[data-act="steady-clock"]')).toBeNull();
   });
 
-  it("gives initial focus to the primary 'Got it', not the external link", () => {
+  it("gives initial focus to the primary Close, not the external link", () => {
     // showModal() focuses the first focusable descendant unless something has
     // autofocus. The report link sits above the footer in DOM order, so without
-    // autofocus an Enter/Space reflex on opening Help would fire the external
+    // autofocus an Enter/Space reflex on opening the menu would fire the external
     // link and pop a GitHub tab. autofocus on the primary keeps focus on the
     // safe dismiss action (and realizes the design-system's stated intent).
     const { ui } = makeUI();
-    ui.showHelp();
+    ui.showHelpMenu();
     const box = dialog().firstElementChild!;
     expect(box.querySelector('[data-act="close"]')!.hasAttribute("autofocus")).toBe(true);
     expect(box.querySelector('a[href*="/issues/new"]')!.hasAttribute("autofocus")).toBe(false);
   });
 
   it("disables Replay while the title screen is up (replaying the intro is meaningless there)", () => {
-    // showHelp reads #splash to gate the button. With the splash mounted the
+    // showAbout reads #splash to gate the button. With the splash mounted the
     // Replay button must render disabled, which is the real production backstop
     // (a browser then suppresses the click) against replaying mid-title.
     const splash = document.createElement("div");
@@ -1318,7 +1317,7 @@ describe("showHelp — the Report an issue link", () => {
     document.body.appendChild(splash);
     try {
       const { ui } = makeUI();
-      ui.showHelp();
+      ui.showAbout();
       const replay = dialog().querySelector<HTMLButtonElement>('[data-act="replay-onboard"]')!;
       expect(replay.disabled).toBe(true);
     } finally {
@@ -1331,7 +1330,7 @@ describe("showHelp — the Report an issue link", () => {
     // callback: this pins the controller closure that replaced the old manual
     // addEventListener wiring.
     const { ui, cb } = makeUI();
-    ui.showHelp();
+    ui.showAbout();
     const replay = dialog().querySelector<HTMLButtonElement>('[data-act="replay-onboard"]')!;
     expect(replay.disabled).toBe(false);
     replay.dispatchEvent(new MouseEvent("click", { bubbles: true }));
@@ -3438,7 +3437,7 @@ describe("Compare modal (showCompare) pauses the tower and restores speed", () =
     ui.showCompare();
     expect(dialog().open).toBe(true);
     expect(dialog().querySelector("h2")?.textContent).toContain("Classic vs Modern");
-    expect(dialog().textContent).toContain("pixel-faithful to 1994");
+    expect(dialog().textContent).toContain("SimTower as it was in 1994");
   });
 
   it("pauses on open and restores the prior speed on Got it", () => {
@@ -3496,12 +3495,12 @@ describe("Compare modal (showCompare) pauses the tower and restores speed", () =
     makeUI();
     (document.getElementById("btn-mode") as HTMLButtonElement).click();
     expect(dialog().open).toBe(true);
-    expect(dialog().textContent).toContain("Variant households");
+    expect(dialog().textContent).toContain("Households of two to five");
     open.mockRestore();
   });
 });
 
-describe("Help dialog: the 'Open full page' link downgrades to the compare modal when installed", () => {
+describe("the mode badge in the installed app", () => {
   beforeEach(() => mountAppDom());
   afterEach(() => {
     document.body.innerHTML = "";
@@ -3525,58 +3524,13 @@ describe("Help dialog: the 'Open full page' link downgrades to the compare modal
     );
   };
 
-  const clickFullPage = (): void => {
-    const a = dialog().querySelector<HTMLAnchorElement>('a[data-act="open-help"]');
-    expect(a, "expected the Open full page link in the Help dialog").not.toBeNull();
-    a!.click();
-  };
-
   it("opens the in-game comparison from the mode badge in the installed app", () => {
     setStandalone(true);
     const open = vi.spyOn(window, "open");
     makeUI();
     (document.getElementById("btn-mode") as HTMLButtonElement).click();
     expect(open).not.toHaveBeenCalled();
-    expect(dialog().textContent).toContain("Variant households");
-  });
-
-  it("intercepts the click and opens the in-app compare modal when running standalone", () => {
-    setStandalone(true);
-    const { onSpeed, getSpeed } = speedAt(2);
-    const { ui } = makeUI({ getSpeed, onSpeed });
-    ui.showHelp();
-    expect(dialog().querySelector("h2")?.textContent).toContain("How to play");
-
-    clickFullPage();
-
-    // The single #modal now shows the compare modal, and opening it paused the
-    // tower (showCompare's pause-on-open), so the player never left the sim.
-    expect(dialog().querySelector("h2")?.textContent).toContain("Classic vs Modern");
-    expect(dialog().textContent).toContain("pixel-faithful to 1994");
-    expect(onSpeed).toHaveBeenCalledWith(0);
-  });
-
-  it("leaves the anchor to navigate in a plain browser tab (no interception)", () => {
-    setStandalone(false);
-    const { onSpeed, getSpeed } = speedAt(2);
-    const { ui } = makeUI({ getSpeed, onSpeed });
-    ui.showHelp();
-    // Suppress happy-dom's real new-tab navigation (it would fetch /help against
-    // no server): a test-only listener cancels the default AFTER the production
-    // handler has had its chance, so we still prove the handler itself did not
-    // hijack the click (the compare modal never opens; the Help modal stays put).
-    const a = dialog().querySelector<HTMLAnchorElement>('a[data-act="open-help"]')!;
-    a.addEventListener("click", (e) => e.preventDefault());
-
-    clickFullPage();
-
-    // The click was left to the real <a target=_blank>, marked as opened by
-    // the game: the compare modal never opened, the guide closed, and the
-    // pause is held until the player is back on this tab.
-    expect(a.getAttribute("href")).toBe("/help/classic-vs-modern/?from=game");
-    expect(dialog().open).toBe(false);
-    expect(dialog().textContent).not.toContain("pixel-faithful to 1994");
-    expect(onSpeed).toHaveBeenLastCalledWith(0);
+    expect(dialog().textContent).toContain("Households of two to five");
   });
 });
 

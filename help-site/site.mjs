@@ -93,11 +93,24 @@ export const sidebar = [
 ];
 
 /**
+ * Where each section of the old one-page /help went (its `/help#id` anchor,
+ * as the game and old links name it). "going-further" and "about" stay on the
+ * front page, which links to everything they covered.
+ */
+export const OLD_ANCHORS = {
+  basics: "first-tower",
+  "classic-vs-modern": "classic-vs-modern",
+  touch: "controls",
+  keyboard: "controls",
+  privacy: "privacy",
+};
+
+/**
  * The old /help page was one long page with a section per topic
  * (/help#classic-vs-modern). Each topic is its own page now; this script, run
  * in every page's head, sends an old link to the new page before anything
  * draws, keeping the query (the game's ?from=game mark). `helpIds` maps an old
- * section id to its page's slug (each page's `helpId` front matter).
+ * section id to its page's slug ({@link OLD_ANCHORS}).
  */
 export function oldAnchorRedirects(helpIds) {
   const map = JSON.stringify(helpIds);

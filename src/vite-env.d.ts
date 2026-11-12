@@ -26,8 +26,6 @@ declare module "*.md" {
   import type { TemplateResult } from "lit-html";
   export const title: string;
   export const description: string;
-  /** The page's old `/help#id` anchor, or null. */
-  export const helpId: string | null;
   /** The whole page body. */
   export const body: () => TemplateResult;
   /** The body before its first second-level heading. */

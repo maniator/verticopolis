@@ -12,13 +12,12 @@ import { releaseNotesLink } from "./updatePrompt";
  * while any of them is open and wires the actions by `data-act`; these
  * templates stay presentational.
  *
- * In a browser tab, How to play, Release notes and the sprite gallery are
- * links that open the standalone pages in a new tab, marked `?from=game` so
+ * How to play opens the Help site, the player's manual, in a new tab, and in
+ * a browser tab Release notes does the same. Both are marked `?from=game` so
  * their "Back to game" closes that tab instead of loading a second game
- * (src/ui/fromGame.ts). In the installed app a new tab would leave the app for
- * the system browser, so How to play opens the in-game guide instead and the
- * two page-only items are left out. Report a problem always links out to
- * GitHub's issue chooser.
+ * (src/ui/fromGame.ts). In the installed app the guide opens in the system
+ * browser, and the release notes are left out (What's new carries them).
+ * Report a problem always links out to GitHub's issue chooser.
  */
 
 /** The GitHub page that lets a player pick a bug report or an idea. */
@@ -46,13 +45,9 @@ export function helpMenuTemplate(inBrowserTab: boolean): TemplateResult {
     <h2>Help</h2>
     <p class="help-menu-lede">The tower is paused while Help is open.</p>
     <ul class="help-menu">
-      ${item(
-        inBrowserTab ? pageLink("how-to-play", fromGameHref("/help"), "How to play") : windowButton("how-to-play", "How to play"),
-        "The guide: the basics, going further, keyboard play, Classic vs Modern.",
-      )}
+      ${item(pageLink("how-to-play", fromGameHref("/help/"), "How to play"), "The player's manual: every room, rule and number, and your first tower.")}
       ${item(windowButton("whats-new", "What's new"), "What changed in this version and the ones before it.")}
       ${inBrowserTab ? item(pageLink("release-notes", fromGameHref("/help/changelog"), "Release notes"), "Every update's changes, back to the first.") : nothing}
-      ${inBrowserTab ? item(pageLink("gallery", fromGameHref("/gallery"), "Sprite gallery"), "Every facility, transport and special state, as the game draws them.") : nothing}
       ${item(
         html`<a class="btn" data-act="report" href=${REPORT_HREF} target="_blank" rel="noopener noreferrer">Report a problem<span class="visually-hidden"> (opens GitHub in a new tab)</span></a>`,
         "Report a bug or share an idea on GitHub.",

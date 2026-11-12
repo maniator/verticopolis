@@ -23,8 +23,6 @@ export interface HelpPageData {
   title: string;
   /** One line about the page (the site's meta description). */
   description: string;
-  /** The page's old `/help#id` anchor, for the pages that had one. */
-  helpId?: string;
 }
 
 /** A help page, compiled: its front matter and its body as HTML. `intro` is
@@ -54,8 +52,7 @@ export function parseHelpPage(source: string): { data: HelpPageData; body: strin
   const description = fields.get("description");
   if (!title) throw new Error("help page has no title");
   if (!description) throw new Error(`help page "${title}" has no description`);
-  const helpId = fields.get("helpId");
-  return { data: { title, description, ...(helpId ? { helpId } : {}) }, body: text.slice(match[0].length) };
+  return { data: { title, description }, body: text.slice(match[0].length) };
 }
 
 /** Compiles a page's Markdown (GitHub-flavored, inline HTML such as `<kbd>`
@@ -80,7 +77,6 @@ export function helpPageModule(source: string): string {
     `import { html } from "lit-html";`,
     `export const title = ${JSON.stringify(page.title)};`,
     `export const description = ${JSON.stringify(page.description)};`,
-    `export const helpId = ${JSON.stringify(page.helpId ?? null)};`,
     `export const body = () => html\`${templateLiteralText(page.html)}\`;`,
     `export const intro = () => html\`${templateLiteralText(page.intro)}\`;`,
     "",

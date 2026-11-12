@@ -45,7 +45,7 @@ describe("Help diagnostics", () => {
     const writeText = vi.fn(async () => {});
     stubClipboard(writeText);
     const { ui } = makeUI();
-    ui.showHelp();
+    ui.showAbout();
     const block = dialog().querySelector(".help-diagnostics")!;
     expect(block.getAttribute("data-state")).toBe("ok");
     expect(block.textContent).toContain("example-engine 9.8.7");
@@ -70,7 +70,7 @@ describe("Help diagnostics", () => {
     const writeText = vi.fn(async () => {});
     stubClipboard(writeText);
     const { ui } = makeUI();
-    ui.showHelp();
+    ui.showAbout();
     expect(
       dialog().querySelector(".help-diagnostics")!.getAttribute("data-state"),
     ).toBe("not-loaded");
@@ -96,7 +96,7 @@ describe("Help diagnostics", () => {
     const writeText = vi.fn(async () => {});
     stubClipboard(writeText);
     const { ui } = makeUI();
-    ui.showHelp();
+    ui.showAbout();
     dialog()
       .querySelector<HTMLButtonElement>('[data-act="copy-diagnostics"]')!
       .click();
@@ -118,7 +118,7 @@ describe("Help diagnostics", () => {
     const writeText = vi.fn(async () => {});
     stubClipboard(writeText);
     const { ui } = makeUI();
-    ui.showHelp();
+    ui.showAbout();
     const block = dialog().querySelector(".help-diagnostics")!;
     expect(block.getAttribute("data-state")).toBe("unavailable");
     expect(block.textContent).toContain("no build metadata section");
@@ -141,7 +141,7 @@ describe("Help diagnostics", () => {
     const writeText = vi.fn(async () => {});
     stubClipboard(writeText);
     const { ui } = makeUI();
-    ui.showHelp();
+    ui.showAbout();
     dialog()
       .querySelector<HTMLButtonElement>('[data-act="copy-diagnostics"]')!
       .click();
@@ -168,7 +168,7 @@ describe("Help diagnostics", () => {
       },
     };
     const { ui } = makeUI();
-    ui.showHelp();
+    ui.showAbout();
     const text = dialog().querySelector(".help-diagnostics")!.textContent!;
     expect(text).toContain("trap in tick");
     expect(text).toContain("Errors not kept");
@@ -181,7 +181,7 @@ describe("Help diagnostics", () => {
     });
     document.execCommand = () => false;
     const { ui } = makeUI();
-    ui.showHelp();
+    ui.showAbout();
     dialog()
       .querySelector<HTMLButtonElement>('[data-act="copy-diagnostics"]')!
       .click();
@@ -193,7 +193,7 @@ describe("Help diagnostics", () => {
 
   it("still closes with Got it", () => {
     const { ui } = makeUI();
-    ui.showHelp();
+    ui.showAbout();
     dialog().querySelector<HTMLButtonElement>('[data-act="close"]')!.click();
     expect(dialog().open).toBe(false);
   });

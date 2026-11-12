@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { render } from "lit-html";
-import * as keyboard from "../../help-site/src/content/docs/keyboard.md";
+import * as privacy from "../../help-site/src/content/docs/privacy.md";
 import {
   HELP_PAGES_DIR,
   compileHelpPage,
@@ -16,7 +16,6 @@ import {
 const PAGE = `---
 title: "Keyboard: play"
 description: Every key.
-helpId: keyboard
 ---
 
 Lead with **bold** and <kbd>Esc</kbd>.
@@ -29,7 +28,7 @@ Lead with **bold** and <kbd>Esc</kbd>.
 describe("parseHelpPage", () => {
   it("reads the flat front matter, unquoting a quoted value, and returns the body", () => {
     const { data, body } = parseHelpPage(PAGE);
-    expect(data).toEqual({ title: "Keyboard: play", description: "Every key.", helpId: "keyboard" });
+    expect(data).toEqual({ title: "Keyboard: play", description: "Every key." });
     expect(body.startsWith("\nLead with")).toBe(true);
   });
 
@@ -73,13 +72,8 @@ describe("helpPageModule", () => {
     const code = helpPageModule(PAGE);
     expect(code).toContain('import { html } from "lit-html";');
     expect(code).toContain('export const title = "Keyboard: play";');
-    expect(code).toContain('export const helpId = "keyboard";');
     expect(code).toContain("export const body = () => html`");
     expect(code).toContain("export const intro = () => html`<p>Lead with");
-  });
-
-  it("exports a null helpId when the page has none", () => {
-    expect(helpPageModule("---\ntitle: T\ndescription: D\n---\nBody\n")).toContain("export const helpId = null;");
   });
 });
 
@@ -112,21 +106,13 @@ describe("the help pages", () => {
     }
   });
 
-  it("no two pages claim the same old /help# anchor", () => {
-    const ids = files
-      .map((f) => compileHelpPage(readFileSync(resolve(dir, f), "utf8")).helpId)
-      .filter((id): id is string => !!id);
-    expect(new Set(ids).size).toBe(ids.length);
-  });
-
   it("an imported page renders its compiled Markdown through lit", () => {
     const root = document.createElement("div");
-    render(keyboard.body(), root);
+    render(privacy.body(), root);
     const expected = document.createElement("div");
-    expected.innerHTML = compileHelpPage(readFileSync(resolve(dir, "keyboard.md"), "utf8")).html;
-    expect(root.querySelectorAll("kbd").length).toBeGreaterThan(10);
+    expected.innerHTML = compileHelpPage(readFileSync(resolve(dir, "privacy.md"), "utf8")).html;
+    expect(root.querySelectorAll("p").length).toBeGreaterThan(2);
     expect(root.textContent?.trim()).toBe(expected.textContent?.trim());
-    expect(keyboard.title).toBe("Keyboard play");
-    expect(keyboard.helpId).toBe("keyboard");
+    expect(privacy.title).toBe("Privacy");
   });
 });

@@ -1,8 +1,9 @@
 import { describe, it, expect, vi } from "vitest";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
-import { HELP_BASE, OG_IMAGE_ALT, landingAction, oldAnchorRedirects, sharedHead, sidebar, type SidebarEntry } from "../../help-site/site.mjs";
-import { HELP_PAGES_DIR, parseHelpPage } from "../build/helpMarkdown";
+import { HELP_BASE, OG_IMAGE_ALT, OLD_ANCHORS, landingAction, oldAnchorRedirects, sharedHead, sidebar, type SidebarEntry } from "../../help-site/site.mjs";
+import { catalogFor } from "./catalogFixture";
+import { HELP_PAGES_DIR } from "../build/helpMarkdown";
 
 const pagesDir = resolve(__dirname, "../..", HELP_PAGES_DIR);
 
@@ -50,10 +51,7 @@ describe("the side menu", () => {
     const pages = readdirSync(pagesDir, { recursive: true, encoding: "utf8" })
       .filter((f) => /\.mdx?$/.test(f) && f !== "index.md")
       .map((f) => f.replace(/\.mdx?$/, "").replace(/\/index$/, ""));
-    // The old guide pages still feed the in-game guide until it gives way to
-    // this site later in #2053; they are off the menu already.
-    const leaving = new Set(["getting-started", "going-further", "phones", "keyboard"]);
-    for (const page of pages) if (!leaving.has(page)) expect(slugs.has(page), page).toBe(true);
+    for (const page of pages) expect(slugs.has(page), page).toBe(true);
   });
 
   it("links the front page and the release notes inside the site, and no game page", () => {
@@ -66,12 +64,35 @@ describe("the side menu", () => {
 });
 
 describe("the pages' old anchors", () => {
-  it("cover every section the old page had", () => {
-    const ids = readdirSync(pagesDir)
-      .filter((f) => f.endsWith(".md"))
-      .map((f) => parseHelpPage(readFileSync(resolve(pagesDir, f), "utf8")).data.helpId)
-      .filter(Boolean);
-    expect(ids.sort()).toEqual(["basics", "classic-vs-modern", "going-further", "keyboard", "touch"]);
+  // The sections of the old one-page /help that prod served before #2053.
+  // "going-further" and "about" stay on the front page, which links on.
+  it("send every old section that has a page of its own to a page that exists", () => {
+    expect(Object.keys(OLD_ANCHORS).sort()).toEqual(["basics", "classic-vs-modern", "keyboard", "privacy", "touch"]);
+    const exists = (slug: string) => [`${slug}.md`, `${slug}.mdx`, `${slug}/index.mdx`].some((f) => existsSync(resolve(pagesDir, f)));
+    for (const [id, slug] of Object.entries(OLD_ANCHORS)) expect(exists(slug), `${id} → ${slug}`).toBe(true);
+  });
+});
+
+describe("the manual's own words, checked against the engine", () => {
+  const page = (file: string) => readFileSync(resolve(pagesDir, file), "utf8");
+
+  it("tells players what happens if the game engine stops", () => {
+    const text = page("your-towers/saving.mdx");
+    expect(text).toContain("If the game engine crashes, the game reloads your tower from its last autosave.");
+    expect(text).toContain("Your saves are still on your device, and **Reload** tries again.");
+  });
+
+  it("gives the Wedding Hall and the top floor the size both catalogs state (#1987)", () => {
+    // The pages are written for the standard lot. A lot whose top moves (the
+    // Tall lot, #1983) needs its own line here.
+    const words: Record<number, string> = { 5: "five" };
+    for (const mode of ["classic", "modern"] as const) {
+      const catalog = catalogFor(mode);
+      const hall = catalog.facilities.find((f) => f.key === "weddingHall")!;
+      expect(page("rooms/wedding-hall.mdx"), mode).toContain(`It is ${hall.width} tiles wide and ${words[hall.floors]} floors tall`);
+      expect(page("rooms/wedding-hall.mdx"), mode).toContain(`Nothing else may reach floor ${catalog.world.maxFloor}`);
+      expect(page("building/floors-and-lobbies.mdx"), mode).toContain(`You can build up to **floor ${catalog.world.maxFloor}**`);
+    }
   });
 });
 

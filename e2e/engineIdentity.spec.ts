@@ -42,10 +42,9 @@ async function openHelp(page: Page): Promise<void> {
   await page.waitForFunction(() => !!(window as any).game && !!(window as any).__vcEngineBoot, undefined, { timeout: 30_000 });
   await page.evaluate(() => {
     document.getElementById("splash")?.remove();
-    (window as any).game.ui.showHelp();
+    (window as any).game.ui.showAbout();
   });
-  // The diagnostics sit inside the collapsed About section.
-  await page.locator("#modal details.help-modes", { has: page.locator(".help-diagnostics") }).locator("summary").click();
+  // About this game shows the diagnostics in the open.
   await expect(page.locator("#modal .help-diagnostics")).toBeVisible();
 }
 

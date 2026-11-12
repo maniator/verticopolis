@@ -76,7 +76,8 @@ describe("the Help menu", () => {
   it("opens from Help… with every item, and pauses the tower, saying so inside the dialog", async () => {
     const { speed } = openMenu(2);
     expect(inDialog("h2").textContent).toContain("Help");
-    for (const act of ["how-to-play", "whats-new", "release-notes", "gallery", "report", "about"]) inDialog(`[data-act="${act}"]`);
+    for (const act of ["how-to-play", "whats-new", "release-notes", "report", "about"]) inDialog(`[data-act="${act}"]`);
+    expect(dialog().querySelector('[data-act="gallery"]'), "the sprite gallery is no longer linked (#2053)").toBeNull();
     expect(speed.now()).toBe(0);
     expect(inDialog("[data-help-status]").getAttribute("role")).toBe("status");
     await vi.waitFor(() => expect(status()).toBe(PAUSED_FOR_HELP));
@@ -149,7 +150,7 @@ describe("the Help menu", () => {
 
   it("opens How to play in a new tab, holds the pause, and resumes once the player is back", async () => {
     const { speed } = openMenu(3);
-    expect(inDialog<HTMLAnchorElement>('a[data-act="how-to-play"]').getAttribute("href")).toBe("/help?from=game");
+    expect(inDialog<HTMLAnchorElement>('a[data-act="how-to-play"]').getAttribute("href")).toBe("/help/?from=game");
     followNewTab('a[data-act="how-to-play"]');
     expect(dialog().open).toBe(false);
     expect(speed.now()).toBe(0);
@@ -160,7 +161,7 @@ describe("the Help menu", () => {
 
   it("keeps a speed the player picked before coming back", () => {
     const { speed } = openMenu(3);
-    followNewTab('a[data-act="gallery"]');
+    followNewTab('a[data-act="release-notes"]');
     speed.playerSets(1);
     leaveAndReturn();
     expect(speed.now()).toBe(1);
@@ -182,7 +183,7 @@ describe("the Help menu", () => {
       document.body.innerHTML = "";
       mountAppDom();
       const { speed } = openMenu(3);
-      const a = inDialog<HTMLAnchorElement>('a[data-act="gallery"]');
+      const a = inDialog<HTMLAnchorElement>('a[data-act="release-notes"]');
       a.addEventListener("click", (e) => e.preventDefault());
       a.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, ...mod }));
       expect(dialog().open).toBe(true);
@@ -221,29 +222,36 @@ describe("the Help menu", () => {
     await vi.waitFor(() => expect(inDialog("h2").textContent).toContain("What's new"));
     lastIsFooter();
     inDialog<HTMLButtonElement>('[data-act="close"]').click();
-    ui.showHelp();
-    lastIsFooter();
-    inDialog<HTMLButtonElement>('[data-act="close"]').click();
     ui.showCompare();
     lastIsFooter();
   });
 
-  it("keeps the guide open on a Ctrl click on its full help page link", () => {
+  it("opens How to play from the title screen in a new tab, holding the pause until the player is back", () => {
     const speed = speedAt(3);
     const { ui } = makeUI({ getSpeed: speed.getSpeed, onSpeed: speed.onSpeed });
+    const open = vi.spyOn(window, "open").mockReturnValue({} as Window);
     ui.showHelp();
-    const a = inDialog<HTMLAnchorElement>('a[data-act="open-help"]');
-    a.addEventListener("click", (e) => e.preventDefault());
-    a.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, ctrlKey: true }));
-    expect(dialog().open).toBe(true);
-    inDialog<HTMLButtonElement>('[data-act="close"]').click();
+    expect(open).toHaveBeenCalledWith("/help/?from=game", "_blank");
+    expect(dialog().open).toBe(false);
+    expect(speed.now()).toBe(0);
+    leaveAndReturn();
+    expect(speed.now()).toBe(3);
+  });
+
+  it("says where the guide is when the browser blocks the new tab, and keeps the tower running", () => {
+    const speed = speedAt(3);
+    const { ui } = makeUI({ getSpeed: speed.getSpeed, onSpeed: speed.onSpeed });
+    vi.spyOn(window, "open").mockReturnValue(null);
+    const say = vi.spyOn(ui, "sayVisibly");
+    ui.showHelp();
+    expect(say).toHaveBeenCalledWith("The guide could not open. It is at verticopolis.com/help.");
     expect(speed.now()).toBe(3);
   });
 
   it("marks the page links as opened by the game", () => {
     openMenu();
     expect(inDialog('a[data-act="release-notes"]').getAttribute("href")).toBe("/help/changelog?from=game");
-    expect(inDialog('a[data-act="gallery"]').getAttribute("href")).toBe("/gallery?from=game");
+    expect(inDialog('a[data-act="how-to-play"]').getAttribute("href")).toBe("/help/?from=game");
     expect(inDialog('a[data-act="report"]').getAttribute("href")).toContain("github.com/maniator/verticopolis/issues/new/choose");
   });
 
@@ -268,15 +276,10 @@ describe("the Help menu in the installed app", () => {
     vi.restoreAllMocks();
   });
 
-  it("opens the in-game guide for How to play and leaves out the page-only items", () => {
-    const { speed } = openMenu(2);
+  it("links How to play to the Help site and leaves out the release notes page", () => {
+    openMenu(2);
     expect(dialog().querySelector('[data-act="release-notes"]')).toBeNull();
-    expect(dialog().querySelector('[data-act="gallery"]')).toBeNull();
-    inDialog<HTMLButtonElement>('button[data-act="how-to-play"]').click();
-    expect(inDialog("h2").textContent).toContain("How to play");
-    expect(speed.onSpeed).toHaveBeenCalledTimes(1);
-    inDialog<HTMLButtonElement>('[data-act="close"]').click();
-    expect(speed.now()).toBe(2);
+    expect(inDialog<HTMLAnchorElement>('a[data-act="how-to-play"]').getAttribute("href")).toBe("/help/?from=game");
   });
 
   it("shows What's new without the release notes link", async () => {

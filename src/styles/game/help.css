@@ -2,32 +2,32 @@
    Part of the game's stylesheet: src/styles.css imports the parts in order. */
 
 /* ---- Help pages compiled from Markdown (help-site/src/content/docs/) ---- */
-/* Their paragraphs read as the dialog's quiet explanatory text; the lead's
-   first paragraph (the premise) keeps full ink. */
+/* The Classic and Modern summary and the privacy note. Their paragraphs read
+   as the dialog's quiet explanatory text. */
 .help-md p { color: var(--muted); }
-.help-lede > p:first-child { color: inherit; }
-
-/* ---- Help dialog: keyboard-play key hints ---- */
-.help-md[data-help="keyboard"] ul { line-height: 1.9; }
-.help-md[data-help="keyboard"] kbd {
-  display: inline-block;
-  min-width: 1.1em;
-  padding: 0 5px;
-  margin: 0 1px;
-  font: 600 0.85em "Courier New", monospace;
-  text-align: center;
-  color: var(--ink, #1a1a1a);
-  background: #f4f4f4;
-  border: 1px solid #b5b5b5;
-  border-bottom-width: 2px;
-  border-radius: 3px;
+/* The Classic and Modern table: three columns that wrap their words, ruled
+   between rows, the first column a label. */
+.help-md table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9em;
+  margin: 8px 0;
 }
-/* Collapsible Help sections (The basics, Going further, Classic vs Modern,
-   Keyboard play, About). Each summary reads like the dialog's other <h3> section
-   headings (bold, same size), with a caret that swaps on open (no motion, so it
-   respects reduced-motion). The body keeps a real heading inside the summary for
-   screen-reader heading navigation. All but "The basics" are collapsed, so Help
-   opens short; the New Tower dialog points at the Classic vs Modern section. */
+.help-md th,
+.help-md td {
+  text-align: left;
+  vertical-align: top;
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--line);
+  overflow-wrap: anywhere;
+}
+.help-md td:first-child { font-weight: 700; }
+
+/* Collapsible Help sections (About's Privacy, the New Tower dialog's
+   comparison). Each summary reads like the dialog's other <h3> section headings
+   (bold, same size), with a caret that swaps on open (no motion, so it respects
+   reduced-motion). The body keeps a real heading inside the summary for
+   screen-reader heading navigation. */
 .help-modes > summary {
   cursor: pointer;
   font-size: 1.17em; /* match the default <h3> the other Help sections use */
@@ -77,14 +77,6 @@
   align-items: center;
   gap: 8px;
   margin: 0;
-}
-
-/* Help "Report an issue" row — a plain flex row so the link keeps its natural
-   button width and would sit beside any future sibling link. */
-.help-report {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
 }
 
 /* ── First-run splash + onboarding ─────────────────────────────────────
