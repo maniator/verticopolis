@@ -2700,7 +2700,7 @@ describe.skipIf(noEngine)("showElevatorScheduleDialog — the per-shaft Schedule
   const okBtn = () => dialog().querySelector<HTMLButtonElement>('[data-act="apply"]')!;
   const simText = () => dialog().querySelector(".es-sim")!.textContent!;
 
-  it("opens with every hour at the full fleet, homes at the base lobby, and the defaults", async () => {
+  it("opens with every hour at the full fleet, homes spread up the shaft, and the defaults", async () => {
     const { apply } = open();
     okBtn().click();
     // One OK per open, and the dialog closes once the engine has answered.
@@ -2709,7 +2709,9 @@ describe.skipIf(noEngine)("showElevatorScheduleDialog — the per-shaft Schedule
     const s = apply.mock.calls[0][0];
     expect(s.activeCars.weekday).toEqual(Array(24).fill(4));
     expect(s.activeCars.weekend).toEqual(Array(24).fill(4));
-    expect(s.homeFloors).toEqual([1, 1, 1, 1]);
+    // Modern idles unhomed cars spread up the shaft: car 1 at the lobby, then
+    // stops 3, 6 and 8 of the ten, where the engine parks them.
+    expect(s.homeFloors).toEqual([1, 3, 6, 8]);
     expect(s.waitingCarResponse).toBe(0);
     expect(s.standardFloorDeparture).toBe(48);
     expect(dialog().open).toBe(true);
@@ -2731,7 +2733,7 @@ describe.skipIf(noEngine)("showElevatorScheduleDialog — the per-shaft Schedule
     const s = apply.mock.calls[0][0];
     expect(s.activeCars.weekday).toEqual(Array(24).fill(2));
     expect(s.activeCars.weekend).toEqual(Array(24).fill(4)); // missing day row: full fleet
-    expect(s.homeFloors).toEqual([8, 8, 1, 1]); // short homes list: base lobby fill
+    expect(s.homeFloors).toEqual([8, 8, 6, 8]); // short homes list: filled with the spread homes
     expect(s.waitingCarResponse).toBe(6);
     expect(s.standardFloorDeparture).toBe(30);
   });
@@ -2859,7 +2861,7 @@ describe.skipIf(noEngine)("showElevatorScheduleDialog — the per-shaft Schedule
 
   it("the staging quick actions rewrite the homes and the Simulate readout follows", () => {
     const { apply } = open();
-    expect(simText()).toContain("4 at the lobby");
+    expect(simText()).toContain("3 staged up-tower, 1 at the lobby"); // the spread homes
     dialog().querySelector<HTMLButtonElement>(".es-quick .btn:last-child")!.click(); // stage upper half up-tower
     expect(simText()).toContain("2 staged up-tower");
     // The quick row leads with the folded-in stops actions; home-all is third.
@@ -2874,7 +2876,7 @@ describe.skipIf(noEngine)("showElevatorScheduleDialog — the per-shaft Schedule
     chipAt(8, 4).click(); // home car 4 at the sky lobby
     expect(chipAt(8, 4).classList.contains("on")).toBe(true);
     okBtn().click();
-    expect(apply.mock.calls[0][0].homeFloors).toEqual([1, 1, 1, 8]);
+    expect(apply.mock.calls[0][0].homeFloors).toEqual([1, 3, 6, 8]);
   });
 
   it("a Modern preset rewrites both day rows and the staging", () => {
@@ -2986,7 +2988,7 @@ describe.skipIf(noEngine)("showElevatorScheduleDialog — the per-shaft Schedule
     chipAt(5, 1).click(); // hand-home car 1 at floor 5
     dialog().querySelector<HTMLButtonElement>(".es-autotune")!.click();
     okBtn().click();
-    expect(apply.mock.calls[0][0].homeFloors).toEqual([5, 1, 1, 1]);
+    expect(apply.mock.calls[0][0].homeFloors).toEqual([5, 3, 6, 8]);
   });
 
   it("asks the engine with the working copy: homes only once the player has staged by hand", () => {
@@ -3062,7 +3064,7 @@ describe.skipIf(noEngine)("showElevatorScheduleDialog — the per-shaft Schedule
     const rush = Array.from(dialog().querySelectorAll<HTMLButtonElement>(".es-presets .btn")).find((b) => b.textContent === "Rush")!;
     rush.click();
     okBtn().click();
-    expect(apply.mock.calls[0][0].homeFloors).toEqual([1, 1, 1, 9]); // staging untouched
+    expect(apply.mock.calls[0][0].homeFloors).toEqual([1, 3, 6, 9]); // staging untouched
     expect(apply.mock.calls[0][0].activeCars.weekday[8]).toBe(4); // counts repainted
   });
 
