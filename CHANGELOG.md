@@ -25,6 +25,25 @@ prompt already tells players it is an engine update and shows the new version.
 Entries below 1.51.1 were curated from the commit history after the fact, so they
 are documentation only: no build that a client fetches carries them.
 
+## 3.3.0
+
+- A link to a page that does not exist, such as a mistyped help address, now opens a "Page not found" page with links to the game, How to Play, the release notes and the sprite gallery.
+- Help… now opens a short Help menu: How to play, What's new, Release notes, Sprite gallery, Report a problem and About this game. What's new shows this version's notes and the ones before it, offline too.
+- The tower pauses while any Help window is open and picks up at your speed when you close it. Help opened in a new tab keeps it paused until you are back on the game's tab, and a speed you picked meanwhile is kept.
+- The Classic or Modern badge in the Tower panel opens the guide's Classic vs Modern page in a new tab (the installed app keeps the comparison in the game).
+- "Back to game" on a help page the game opened closes that tab, so you land on the tower that is still running instead of loading a second copy.
+- Modern: the aquatic center now makes nearby condos, apartments and hotel rooms happier, up to six floors away, and the party hall does the same over three floors; placing either shows its green bands.
+- A bomb that goes off now damages only the tower it was hidden in. On a lot with several towers side by side, the others are left standing.
+- During a bomb search on a lot with several towers, Security sweeps each tower separately and walks between towers only by the emergency stairs, through a floor they share such as the lobby. A tower that no floor joins to a Security office is not searched.
+- On a lot with several towers, Security catches a thief only in a tower it can walk to by the stairs, and the thief runs his own tower's rooms instead of the whole floor.
+- Every tower on a lot now has fire escapes on both of its sides, and Security climbs them during a bomb search instead of hanging in the air beside the building.
+- Security guards searching for a bomb, and the thief and his guard, now stay the size of the crowd when you zoom out, instead of towering over several floors.
+- In Classic, party halls and theaters now share one limit of 16, as in the original game, instead of 16 of each.
+- A tower with a party hall exported to a `.TDT` file now opens and plays in the original game, which crashed on it a few seconds after loading.
+- In Classic, an undo refused for floor in use no longer tells you to sell floor that can't be sold, and the floor message now says that only a tile at either end of a floor can be removed.
+- In Classic, the bulldozer no longer cuts a gap in the middle of a floor, which left the floors above looking hollow. Remove bare floor from either end instead; a gap in a tower you already saved can be filled with the Floor tool.
+- Every update's release notes now have their own page at verticopolis.com/help/changelog, newest first and each note whole, linked from the help page, the sprite gallery and an "All release notes" link under the update prompt's notes.
+
 ## 3.2.0
 
 - Long elevator waits now stress your tenants, as they did in the original game. Each floor keeps a running average of how long its commuters really waited, and once that passes a rider's patience (two minutes in Classic, three in Modern) the floor's offices, condos and hotel rooms lose rating and name congestion as their complaint. A lobby floor is never charged for its own queue, and a Metro rider's wait counts on the floor it heads for (#1971).
