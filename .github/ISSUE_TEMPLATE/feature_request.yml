@@ -5,14 +5,9 @@ body:
   - type: markdown
     attributes:
       value: |
-        Verticopolis is a homage to the 1994 **SimTower**. Towers are founded in one of two modes:
-        **Classic** (faithful to the 1994 original) or **Modern** (an opt-in "what the original
-        couldn't do" layer). New behavior that departs from the original generally belongs in
-        **Modern** mode so Classic stays canon.
+        Verticopolis is a homage to the 1994 **SimTower**. A tower is founded in one of two modes: **Classic** (plays like the 1994 original) or **Modern** (adds things the original couldn't do). New ideas that change how the original played usually belong in **Modern**, so Classic stays true to 1994.
 
-        **⚠️ This form is for behavior we don't have yet.** If you're reporting that an
-        *already-implemented* behavior diverges from the 1994 original, use the **SimTower parity
-        report** template instead.
+        **⚠️ This form is for things the game doesn't do yet.** If something the game already has works differently from the 1994 original, use the **SimTower parity report** instead.
   - type: textarea
     id: problem
     attributes:

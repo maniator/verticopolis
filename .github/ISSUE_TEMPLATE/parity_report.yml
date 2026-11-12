@@ -5,16 +5,9 @@ body:
   - type: markdown
     attributes:
       value: |
-        Verticopolis aims to faithfully recreate **SimTower (1994)**. Use this template when a
-        number, rule, or behavior diverges from the original. Canon values (build caps, transport
-        pooling, economy math) live in the Rust engine (`engine-rs/src/facilities.rs`,
-        `engine-rs/src/econ.rs`, `engine-rs/src/rules.rs`) and `PARITY.md`. Please cite a source for the original's
-        behavior so we can verify it.
+        Verticopolis aims to play like **SimTower (1994)**. Use this form when a number, a rule or a behavior in the game is different from the original. Please say where you saw the original's behavior so we can check it.
 
-        **⚠️ Parity only applies to Classic-mode towers.** Towers can be founded in **Classic**
-        (faithful to 1994) or **Modern** (an opt-in "what the original couldn't do" layer).
-        Differences you see in a **Modern** tower are intentional and are *not* parity bugs. If
-        you'd like to change or extend a Modern-mode behavior, please open a **Feature request** instead.
+        **⚠️ This is for Classic towers only.** A tower is founded as **Classic** (plays like 1994) or **Modern** (adds things the original couldn't do). Differences in a **Modern** tower are on purpose, so use a **Feature request** to suggest a change there.
   - type: dropdown
     id: area
     attributes:
@@ -57,7 +50,7 @@ body:
       options:
         - label: This is about a **Classic**-mode tower (Modern-mode differences are intentional; use a Feature request for those).
           required: true
-        - label: I checked PARITY.md and this divergence is not already documented as intentional.
+        - label: I checked the [list of known differences](https://github.com/maniator/verticopolis/blob/main/PARITY.md) and this one is not on it as intentional.
           required: true
         - label: I searched existing issues and this is not a duplicate.
           required: true

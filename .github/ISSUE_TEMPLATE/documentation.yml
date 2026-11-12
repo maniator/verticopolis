@@ -5,11 +5,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        For docs only: wrong setup steps, a broken script, unclear wording, a
-        canon reference that contradicts `PARITY.md`, a How to play section in the
-        game's Help that no longer matches the game, or a page on the
-        [engine docs site](https://docs.verticopolis.com). For gameplay bugs use the
-        Bug report; for parity discrepancies use the SimTower parity report.
+        For writing that is wrong, unclear or missing: a section of the game's Help that no longer matches the game, the project's README or setup steps, or a page on the [engine docs site](https://docs.verticopolis.com). For something the game does wrong, use the Bug report. For a difference from the 1994 original, use the SimTower parity report.
   - type: input
     id: location
     attributes:
