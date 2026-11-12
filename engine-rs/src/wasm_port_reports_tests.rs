@@ -5,6 +5,9 @@ use crate::facilities::{Kind, FACILITIES};
 use crate::panels::stats::TOWER_STATS;
 use crate::sim::Simulation;
 
+#[path = "wasm_port_reports_held_tests.rs"]
+mod held;
+
 fn code(kind: Kind) -> f64 {
     FACILITIES.iter().position(|f| f.kind == kind).unwrap() as f64
 }
@@ -481,6 +484,7 @@ fn every_slot_matches_the_json_getters_on_real_towers() {
             u.extras_mut().vacate_reason = Some("rent");
             u.extras_mut().vacate_at = Some(now + 90.0);
         }
+        held::hold_an_overpriced_office(&mut e); // a spot the gate holds
         let r = e.port_stats_sheet();
         for (k, slot) in ["gates", "elevators", "mix"].iter().enumerate() {
             rows[k] += r[STATS_SHEET.iter().position(|n| n == slot).unwrap()];
