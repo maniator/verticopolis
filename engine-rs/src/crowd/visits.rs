@@ -75,24 +75,31 @@ pub fn push_venue_visit_options(
             // their mean pick multiplier (#1950); at Normal it is 1.
             push_visits(Kind::Cinema, cinemas, floors.cinema_picks.unwrap_or(1.0));
             if !crowd.blockbusters.is_empty() {
-                let mut bb: Vec<i64> = Vec::new();
-                let mut bb_picks = 0.0;
-                for &f in cinemas {
-                    for &id in floors.units_on(f) {
-                        let u = tower.get_unit(id).unwrap();
-                        if u.kind == Kind::Cinema && crowd.blockbusters.contains(&u.id) {
-                            bb.push(f);
-                            bb_picks += ticket_pick_mult(tower.mode, u);
-                            break;
-                        }
+                // The booked theaters (16 at most) on an open cinema floor,
+                // read by id so no floor's rooms are walked.
+                let (mut bb_floors, mut bb_picks) = (Vec::new(), 0.0);
+                for &id in &crowd.blockbusters {
+                    let Some(u) = tower.get_unit(id) else {
+                        continue;
+                    };
+                    if u.kind == Kind::Cinema && cinemas.contains(&u.floor) {
+                        bb_floors.push(u.floor);
+                        bb_picks += ticket_pick_mult(tower.mode, u);
                     }
                 }
-                if !bb.is_empty() {
+                if !bb_floors.is_empty() {
                     let weight = if floors.cinema_picks.is_some() {
-                        bb_picks / bb.len() as f64
+                        bb_picks / bb_floors.len() as f64
                     } else {
                         1.0
                     };
+                    // The floors in the open cinema floors' order, each once,
+                    // since the set's own order is not stable.
+                    let bb: Vec<i64> = cinemas
+                        .iter()
+                        .copied()
+                        .filter(|f| bb_floors.contains(f))
+                        .collect();
                     push_visits(Kind::Cinema, &bb, weight);
                 }
             }

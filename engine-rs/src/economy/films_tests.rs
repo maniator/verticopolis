@@ -1,4 +1,4 @@
-//! Changing a theatre's film (#1932): Classic charges $300,000 for a new film
+//! Changing a theater's film (#1932): Classic charges $300,000 for a new film
 //! or $150,000 for a classic and nothing each period, a classic's count never
 //! passes 80, and a changed film starts its age again. Modern's films are in
 //! `films_modern_tests.rs` (#1950).
@@ -15,8 +15,8 @@ pub(super) fn put(sim: &mut Simulation, kind: Kind, floor: i64, x: i64) -> i64 {
     sim.tower.unit_at(floor, x).expect("a unit there").id
 }
 
-/// An open theatre on floors 2 and 3, and an office, in a tower of `mode`.
-pub(crate) fn theatre(mode: GameMode) -> (Simulation, i64, i64) {
+/// An open theater on floors 2 and 3, and an office, in a tower of `mode`.
+pub(crate) fn theater(mode: GameMode) -> (Simulation, i64, i64) {
     let mut sim = Simulation::new_game(5, mode);
     sim.money = 1.0e9;
     sim.star = 5;
@@ -50,7 +50,7 @@ pub(super) fn film_days(sim: &Simulation, id: i64) -> Option<u8> {
 
 #[test]
 fn a_new_film_costs_300000_and_starts_the_film_again() {
-    let (mut sim, cinema, _) = theatre(GameMode::Classic);
+    let (mut sim, cinema, _) = theater(GameMode::Classic);
     assert_eq!(counts(&mut sim, cinema, 10).last(), Some(&40));
     let before = sim.money;
     assert_eq!(sim.change_film(cinema, FilmTier::New), Ok(NEW_FILM_PRICE));
@@ -64,7 +64,7 @@ fn a_new_film_costs_300000_and_starts_the_film_again() {
 
 #[test]
 fn a_classic_costs_150000_and_never_counts_more_than_80() {
-    let (mut sim, cinema, _) = theatre(GameMode::Classic);
+    let (mut sim, cinema, _) = theater(GameMode::Classic);
     let before = sim.money;
     assert_eq!(
         sim.change_film(cinema, FilmTier::Classic),
@@ -82,7 +82,7 @@ fn a_classic_costs_150000_and_never_counts_more_than_80() {
 
 #[test]
 fn a_classic_film_survives_a_save_and_a_load() {
-    let (mut sim, cinema, _) = theatre(GameMode::Classic);
+    let (mut sim, cinema, _) = theater(GameMode::Classic);
     sim.change_film(cinema, FilmTier::Classic).unwrap();
     let text = sim.save_text();
     assert!(text.contains("\"filmClassic\":true"));
@@ -93,7 +93,7 @@ fn a_classic_film_survives_a_save_and_a_load() {
 
 #[test]
 fn classic_charges_no_booking_each_period() {
-    let (mut sim, cinema, _) = theatre(GameMode::Classic);
+    let (mut sim, cinema, _) = theater(GameMode::Classic);
     let before = sim.money;
     sim.pay_maintenance();
     let maintenance_without_films = before - sim.money;
@@ -103,13 +103,13 @@ fn classic_charges_no_booking_each_period() {
     assert_eq!(
         before - sim.money,
         maintenance_without_films,
-        "an open theatre adds nothing to the period's upkeep"
+        "an open theater adds nothing to the period's upkeep"
     );
 }
 
 #[test]
 fn only_a_new_film_in_its_first_days_is_a_classic_blockbuster() {
-    let (mut sim, cinema, _) = theatre(GameMode::Classic);
+    let (mut sim, cinema, _) = theater(GameMode::Classic);
     let key = cinema as f64;
     sim.change_film(cinema, FilmTier::New).unwrap();
     assert_eq!(sim.blockbusters, [key], "a new film fills the house");
@@ -126,7 +126,7 @@ fn only_a_new_film_in_its_first_days_is_a_classic_blockbuster() {
 
 #[test]
 fn a_film_change_is_refused_with_its_reason() {
-    let (mut sim, cinema, office) = theatre(GameMode::Classic);
+    let (mut sim, cinema, office) = theater(GameMode::Classic);
     let before = (sim.money, sim.save_text());
     assert_eq!(
         sim.change_film(office, FilmTier::New),
@@ -170,7 +170,7 @@ fn a_film_change_is_a_payment_and_leaves_no_undo_step() {
     // The card's buttons open a gesture around the change, as every editor
     // action does: the film and its price stay, and no step hands the price
     // back (the way the exterminator's fee stays paid).
-    let (mut sim, cinema, _) = theatre(GameMode::Classic);
+    let (mut sim, cinema, _) = theater(GameMode::Classic);
     let money = sim.money;
     sim.begin_undo_journal("Film change");
     assert_eq!(sim.change_film(cinema, FilmTier::New), Ok(NEW_FILM_PRICE));
@@ -181,7 +181,7 @@ fn a_film_change_is_a_payment_and_leaves_no_undo_step() {
 #[test]
 fn a_classic_theater_is_a_blockbuster_from_the_evening_it_opens() {
     for mode in [GameMode::Classic, GameMode::Modern] {
-        let (mut sim, cinema, _) = theatre(mode);
+        let (mut sim, cinema, _) = theater(mode);
         // Put it back under construction, due now, so it opens through the
         // game's own path.
         let (u, at) = sim.tower.marked_by_id(cinema).unwrap();
