@@ -239,6 +239,32 @@ impl<'a> Ground<'a> {
         })
     }
 
+    /// Whether the player could sell floor tile `u`, with the other tiles
+    /// the step takes out, by the floor rule a sale keeps to
+    /// (`Tower::removal_reason`): in a mode that keeps floors whole
+    /// ([`GameMode::removes_mid_floor_tiles`](crate::clock::GameMode::removes_mid_floor_tiles)),
+    /// the run of leaving tiles around `u` must reach an end of its story,
+    /// so the sales can start there. Only the run's first tile walks it, and
+    /// the others answer yes, so a step's check stays linear in its tiles:
+    /// the step is sellable only when every tile is, and the first one's
+    /// answer is the run's.
+    pub(crate) fn sells_from_an_end(&self, u: &Unit) -> bool {
+        let leaves = |x: i64| {
+            self.tower
+                .structure
+                .get(&(u.floor, x))
+                .is_some_and(|id| self.leaving.contains(id))
+        };
+        if self.tower.mode.removes_mid_floor_tiles() || leaves(u.x - 1) {
+            return true;
+        }
+        let mut right = u.x + u.width;
+        while leaves(right) {
+            right += 1;
+        }
+        !(self.stays(u.floor, u.x - 1) && self.stays(u.floor, right))
+    }
+
     /// Whether taking out floor or lobby tile `u` leaves everything it held
     /// up standing, by the rules a sale keeps to (`Tower::removal_reason`):
     /// no room stays on its tiles, and from the ground floor up no story
