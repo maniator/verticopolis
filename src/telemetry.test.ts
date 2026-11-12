@@ -10,7 +10,7 @@ vi.mock("@vercel/analytics", () => ({ inject: vi.fn() }));
 
 /**
  * The shared, host-gated Vercel telemetry inject. It is called the same way by
- * the game boot, the sprite gallery, and the standalone /help page, so every
+ * the game boot, the sprite gallery, and the Help site at /help, so every
  * deployed page reports Core Web Vitals and page views (the kept page-level
  * pair) only where the Vercel endpoints exist
  * (production + preview) and never throws past its caller.

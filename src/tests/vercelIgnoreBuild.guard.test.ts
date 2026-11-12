@@ -39,9 +39,12 @@ function classify(paths: string[]): Map<string, "build" | "skip"> {
 describe.skipIf(process.platform === "win32")("scripts/vercel-ignore-build.sh", () => {
   describe("the path table", () => {
     const BUILDS = [
-      // The /help page imports these pictures.
+      // The /help site shows these pictures and wears the engine site's theme.
       "docs/screenshots/00-splash.png",
       "docs/screenshots/features/stats-tenancy-modern.png",
+      "docs/engine-site/src/styles/theme.css",
+      "help-site/src/content/docs/keyboard.md",
+      "help-site/astro.config.mjs",
       // Build inputs and configs.
       "CHANGELOG.md",
       "package.json",
@@ -361,6 +364,8 @@ describe.skipIf(process.platform === "win32")("scripts/vercel-ignore-build.sh", 
       /(?:\bfrom\s*|\bimport\s*\(?\s*)["'](\.{1,2}\/[^"']+)["']/g,
       /new\s+URL\(\s*["'](\.{1,2}\/[^"']+)["']\s*,\s*import\.meta\.url/g,
       /\b(?:src|href)=["'](\.{1,2}\/[^"']+)["']/g,
+      // A Markdown image or link (the help site's pages show screenshots).
+      /\]\((\.{1,2}\/[^)\s]+)\)/g,
     ];
 
     /** The repo-relative file a specifier names, or null for a generated or
@@ -389,13 +394,18 @@ describe.skipIf(process.platform === "win32")("scripts/vercel-ignore-build.sh", 
         "vite.config.ts",
         "src/index.html",
         "src/gallery.html",
-        "src/help.html",
         "src/release-notes.html",
         "src/preview.html",
         "scripts/wasm-build.ts",
         "scripts/engine-third-party.ts",
         "scripts/gen-third-party-notices.ts",
-        "scripts/prerender-help.ts",
+        // The help site: its config, its header and title screen (the config
+        // names them by path), the engine site theme it wears and its pages.
+        "help-site/astro.config.mjs",
+        "help-site/src/components/Header.astro",
+        "help-site/src/components/TitleScreen.astro",
+        "docs/engine-site/src/styles/theme.css",
+        ...sourceFiles("help-site/src/content/docs", [".md"]).map(repoRel),
         ...sourceFiles("scripts", [".ts"])
           .map(repoRel)
           .filter((p) => /^scripts\/verify-.*\.ts$/.test(p)),
@@ -406,7 +416,7 @@ describe.skipIf(process.platform === "win32")("scripts/vercel-ignore-build.sh", 
         const file = queue.pop() as string;
         if (seen.has(file)) continue;
         seen.add(file);
-        if (!/\.(ts|tsx|mts|mjs|js|html|css)$/.test(file)) continue;
+        if (!/\.(ts|tsx|mts|mjs|js|html|css|md|astro)$/.test(file)) continue;
         const text = readFileSync(resolve(repoRoot, file), "utf8");
         for (const pattern of RELATIVE) {
           for (const match of text.matchAll(pattern)) {

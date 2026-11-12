@@ -6,7 +6,7 @@
  * (the `appBoot` test suites) did not have to move. It had to come out because
  * `analyticsCore.ts` seeds the version onto the analytics common props at MODULE
  * LOAD, so that every event names its build whatever the entry point, including
- * the standalone `/help` and `/gallery` pages that never boot the game.
+ * the Help site at `/help` and the `/gallery` page that never boot the game.
  *
  * Reading it from `appBoot` instead would close a real value cycle:
  * `analyticsCore` imports `appBoot`, `appBoot` imports `../analytics`, and

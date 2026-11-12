@@ -9,24 +9,23 @@ import * as keyboard from "../../../help-site/src/content/docs/keyboard.md";
 import * as privacy from "../../../help-site/src/content/docs/privacy.md";
 
 /**
- * The How-to-play guide content, shared by BOTH the in-game Help modal
- * (`help.ts`) and the standalone `/help` page (`helpPage.ts`). The copy itself
+ * The How-to-play guide content for the in-game Help modal (`help.ts`). The
+ * Help site at `/help` serves the same pages. The copy itself
  * lives in the Help site's Markdown pages (`help-site/src/content/docs/`),
  * compiled into lit templates at build time (`src/build/helpMarkdown.ts`). The
- * modal wraps each section in a collapsible `<details class="help-modes">`; the
- * page renders the same sections expanded under headings. Keeping the bodies here
- * means the guide copy has one home and cannot drift between the two surfaces,
- * the same discipline `compareTemplate()` already brings to the Classic vs Modern
- * section (which is one of these sections).
+ * modal wraps each section in a collapsible `<details class="help-modes">`.
+ * Keeping the copy in those pages means it has one home and cannot drift
+ * between the game and the site, the same discipline `compareTemplate()`
+ * brings to the Classic vs Modern section (which is one of these sections).
  *
- * Section `id`s are the page's anchor targets (e.g. `/help#classic-vs-modern`,
- * which the in-game "Open full page" link deep-links to). The copy is trusted
+ * Section `id`s are the old `/help#id` anchors, which the site still sends to
+ * their pages (each page's `helpId` front matter). The copy is trusted
  * static prose; only the app `version` in About is interpolated (auto-escaped by
  * lit). The `help.test.ts` drift guard inspects the Classic vs Modern section, so
  * keep that section rendering `compareTemplate()` verbatim.
  */
 export interface HelpSection {
-  /** Anchor id on the standalone page (also the section's stable key). */
+  /** The section's stable key (its old `/help#id` anchor). */
   id: string;
   /** Heading text (the modal's `<summary>`, the page's `<h2>`). */
   title: string;
@@ -61,16 +60,16 @@ export const HELP_SECTIONS: readonly HelpSection[] = [
  *  link to the third-party license notices the build generates,
  *  `scripts/gen-third-party-notices.ts`, #951). The in-game modal uses the
  *  default relative href, which resolves against the game page's own URL (the
- *  site root on the web, where the file sits beside `index.html`); the `/help`
- *  page passes the root-relative one so a trailing slash on its URL cannot
- *  move the link. */
+ *  site root on the web, where the file sits beside `index.html`); a page at
+ *  a deeper path passes the root-relative one. */
 export function helpAboutBody(version: string, engine = "", licensesHref = "third-party-notices.txt"): TemplateResult {
   return html`<p style="color:var(--muted)">An unofficial, from-scratch homage to SimTower (1994). Original code and art; no ripped assets. Not affiliated with or endorsed by Maxis / OPeNBooK / Vivarium.<br />Verticopolis <span class="app-version">v${version}</span>${engine}</p><p class="help-licenses"><a href=${licensesHref} target="_blank" rel="noopener noreferrer">Third-party licenses<span class="visually-hidden"> (opens in a new tab)</span></a></p>`;
 }
 
-/** The Privacy section body, shared by the in-game Help modal and the standalone
- *  `/help` page (each surface supplies its own heading, like About). One home for
- *  the promise so the two surfaces can never disagree about what is collected.
+/** The Privacy section body for the in-game Help modal, compiled from the Help
+ *  site's privacy page (the modal supplies its own heading, like About). One
+ *  home for the promise so the game and the site can never disagree about what
+ *  is collected.
  *  Keep this in step with reality: the gameplay counters (`analytics.ts`, relayed
  *  by `analyticsIngest.ts`), the page/performance metrics (`telemetry.ts`), and
  *  the error reporter (`analyticsErrors.ts`) are all cookieless and carry no

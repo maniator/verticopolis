@@ -1,0 +1,15 @@
+{
+  "name": "verticopolis-help",
+  "private": true,
+  "description": "The player help site at verticopolis.com/help, a Starlight site over the help pages the game also reads",
+  "type": "module",
+  "scripts": {
+    "sync": "node scripts/sync-assets.mjs",
+    "dev": "node scripts/sync-assets.mjs && astro dev",
+    "build": "node scripts/sync-assets.mjs && astro build"
+  },
+  "dependencies": {
+    "@astrojs/starlight": "0.42.7",
+    "astro": "7.4.2"
+  }
+}

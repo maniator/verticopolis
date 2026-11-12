@@ -22,3 +22,8 @@ bash scripts/build-engine-wasm.sh
 # no cohort, no runtime switch and no TypeScript fallback (see
 # src/build/engineBundle.ts).
 npm run build
+
+# The player help site at /help (help-site/, Astro + Starlight) builds into
+# dist/help/ after the game, from the same Markdown the game's Help window reads.
+npm ci --prefix help-site
+npm run build --prefix help-site

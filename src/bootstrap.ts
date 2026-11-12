@@ -237,7 +237,7 @@ export function bootGame(create: (tower: BootTower) => BootApp): Promise<void> {
     // (SPEC-pwa-install CAP-2 / CAP-4.)
     initPwaInstall({ onInstalled: () => trackAppActionOnce("install_app") });
     // Report Core Web Vitals and page views through the shared, host-gated
-    // helper (the same inject the gallery and the /help page use), so a
+    // helper (the same inject the gallery and the Help site use), so a
     // telemetry hiccup can never throw past this line and suppress the WebGL
     // fallback below.
     injectVercelTelemetry();

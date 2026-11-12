@@ -7,3 +7,4 @@ Allow: /
 Disallow: /preview.html
 
 Sitemap: https://verticopolis.com/sitemap.xml
+Sitemap: https://verticopolis.com/help/sitemap-index.xml

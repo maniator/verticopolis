@@ -1,0 +1,32 @@
+---
+// The front page's hero, drawn as the game's title screen: the dusk sky, the
+// setting sun, the skyline and the VERTICO/POLIS wordmark, as on the engine
+// docs site (docs/engine-site/src/components/TitleScreen.astro), with this
+// site's tagline. Starlight renders it from the page's `hero` front matter.
+const { data } = Astro.locals.starlightRoute.entry;
+const { tagline, actions = [] } = data.hero || {};
+---
+
+<section class="title-screen not-content">
+  <div class="ts-stars" aria-hidden="true"></div>
+  <div class="ts-sun" aria-hidden="true"></div>
+  <div class="ts-skyline" aria-hidden="true"></div>
+  <div class="ts-brand">
+    <h1 id="_top" data-page-title>
+      <svg class="ts-word" viewBox="0 0 400 66" role="img" aria-label="Verticopolis: How to Play">
+        <text x="200" y="52" text-anchor="middle" textLength="392" lengthAdjust="spacingAndGlyphs"><tspan class="a">VERTICO</tspan><tspan class="b">POLIS</tspan></text>
+      </svg>
+    </h1>
+    <svg class="ts-tag" viewBox="0 0 360 20" aria-hidden="true">
+      <text x="180" y="15" text-anchor="middle" textLength="330" lengthAdjust="spacingAndGlyphs">HOW TO PLAY</text>
+    </svg>
+    {tagline && <p class="ts-premise">{tagline}</p>}
+    <div class="ts-actions">
+      {actions.map((action) => (
+        <a class:list={["ts-btn", { primary: action.variant === "primary" }]} href={action.link}>
+          {action.text}
+        </a>
+      ))}
+    </div>
+  </div>
+</section>

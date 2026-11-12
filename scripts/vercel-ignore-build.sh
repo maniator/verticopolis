@@ -39,8 +39,10 @@
 # What always builds, so do not add it above:
 #   - .gitattributes: it sets line endings and the binary list for Vercel's own
 #     checkout, so it can change the bytes of built files
-#   - docs/screenshots: src/ui/templates/compareFigures.ts imports those
-#     pictures into the /help page
+#   - docs/screenshots: the help site's pages (help-site/src/content/docs/)
+#     show those pictures at /help
+#   - docs/engine-site/src/styles: the help site wears the engine docs site's
+#     theme
 #   - CHANGELOG.md: the build reads it into version.json `notes`
 #   - the conformance lock files (catalog-digests, events/, expected,
 #     loader-cases, tdt-cases): the engine crate includes some with
@@ -62,8 +64,9 @@ set -uo pipefail
 # (build), 1 when it cannot (skip). Unknown paths build.
 affects_deploy() {
   case "$1" in
-    # Reaches the deployed /help page through compareFigures.ts.
-    docs/screenshots/*) return 0 ;;
+    # Reach the deployed /help site: its pages show the screenshots, and it
+    # wears the engine docs site's theme.
+    docs/screenshots/* | docs/engine-site/src/styles/*) return 0 ;;
 
     # Documentation, agent skills, workflows and other repo meta.
     docs/* | _bmad/* | _bmad-output/* | .agents/* | .claude/* | .github/* | .vscode/*) return 1 ;;

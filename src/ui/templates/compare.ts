@@ -4,9 +4,10 @@ import * as classicVsModern from "../../../help-site/src/content/docs/classic-vs
 /**
  * The Classic vs Modern comparison body. Its copy is the Help site's Classic vs
  * Modern page (`help-site/src/content/docs/classic-vs-modern.md`), compiled at
- * build time. It is rendered by the Help dialog (inside its "Classic vs Modern"
- * section), by the in-game Compare modal, by the founding screen, and by
- * the standalone `/help` page (`helpPage.ts`), so the copy has one home and
+ * build time: the page's text before its "Side by side" pictures, which only
+ * the Help site shows. It is rendered by the Help dialog (inside its "Classic vs Modern"
+ * section), by the in-game Compare modal and by the founding screen, and
+ * the Help site serves the same page whole, so the copy has one home and
  * cannot drift (it had drifted twice before this extraction). This exports the
  * BODY only, the intro paragraph, the divergence list, and the "pixel-faithful
  * to 1994" closer, with no `<details>`/`<summary>` or `<h2>` wrapper; each caller
@@ -18,7 +19,7 @@ import * as classicVsModern from "../../../help-site/src/content/docs/classic-vs
  * there before it can ship. Keep this copy verbatim with what that guard expects.
  */
 export function compareTemplate(): TemplateResult {
-  return html`<div class="help-md">${classicVsModern.body()}</div>`;
+  return html`<div class="help-md">${classicVsModern.intro()}</div>`;
 }
 
 /**

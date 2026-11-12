@@ -24,3 +24,47 @@ You pick a rule-set when you **found a tower**, and it's fixed for that tower's 
 - **Office rent, smoothed.** Modern spreads office rent so the same tower earns the same per in-game day whichever calendar it runs. Classic collects the full 1994 rent lump every 3-day quarter (an Average office pays its whole $10,000 each quarter), the fast office money the original was known for.
 
 **Classic aims to be pixel-faithful to 1994.** If something in Classic doesn't match the original, please report it so we can fix it. And if there's a "what the original couldn't do" behavior Modern doesn't have yet, suggest it too.
+
+## Side by side
+
+The differences you can see, Modern beside Classic.
+
+### Founding a tower
+
+You choose the rule-set once, when you found the tower. Modern keeps every Classic behavior and adds the rest.
+
+| Modern | Classic |
+| --- | --- |
+| ![The New Tower dialog with the Modern rule-set selected](../../../../docs/screenshots/00b-onboarding-modern.png) | ![The New Tower dialog with the Classic rule-set selected](../../../../docs/screenshots/00b-onboarding-classic.png) |
+
+### Pricing a unit
+
+Modern prices on a continuous slider. Classic keeps the 1994 four-rung price menu plus the No Rate off-market option.
+
+| Modern | Classic |
+| --- | --- |
+| ![The unit editor showing the Modern continuous rent slider](../../../../docs/screenshots/features/editor-pricing-modern.png) | ![The unit editor showing the Classic four-rung price menu](../../../../docs/screenshots/features/editor-pricing-classic.png) |
+
+### Elevator scheduling
+
+Modern offers presets, a one-tap auto-tune from measured demand, and advice on over- and understaffed hours. Classic gives you the raw 24-hour grid to set by hand.
+
+| Modern | Classic |
+| --- | --- |
+| ![The elevator schedule dialog with Modern presets and a recommended preset](../../../../docs/screenshots/features/schedule-express.png) | ![The elevator schedule dialog with the Classic raw 24-hour grid](../../../../docs/screenshots/features/schedule-classic.png) |
+
+### Tenancy and economy
+
+Modern tracks variant households that come and go, held-space overhead, and unmet-demand notices. Classic runs the 1994 economy untouched.
+
+| Modern | Classic |
+| --- | --- |
+| ![The statistics panel with the Modern households and economy readouts](../../../../docs/screenshots/features/stats-tenancy-modern.png) | ![The statistics panel under Classic rules](../../../../docs/screenshots/features/stats-tenancy-classic.png) |
+
+### Escalators on office floors
+
+Modern lets escalators serve office floors. Classic keeps them to commercial floors only, the way the original did: the same tower keeps only its lobby-to-shops flight.
+
+| Modern | Classic |
+| --- | --- |
+| ![A tower with escalators climbing from the lobby up through two office floors](../../../../docs/screenshots/features/escalator-office-modern.png) | ![The same tower under Classic rules, with a single escalator on the shop floor only](../../../../docs/screenshots/features/escalator-office-classic.png) |

@@ -21,7 +21,7 @@
 
 /* ---- 1. TOKENS + SHARED CHROME (extracted for reuse by standalone pages) ---
    The retro tokens and the shared window/button/well/kv components live in
-   src/styles/ so the /help page and the gallery wear the same chrome from one
+   src/styles/ so the standalone pages and the Help site wear the same chrome from one
    source. Imported first so the game render is unchanged. See
    _bmad-output/specs/spec-classic-modern-reachability/retro-design-system.md. */
 @import "./styles/retro-tokens.css";

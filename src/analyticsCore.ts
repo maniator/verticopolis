@@ -345,7 +345,7 @@ export type AppActionName =
  * enrichment runs (the window that produced the largest real error signal in
  * production, `WebGL context lost (at boot)`), a boot where the enrichment's own
  * optional reads throw and its catch leaves the props untouched, and the
- * standalone `/help` and `/gallery` pages, which never call `bootGame` at all
+ * Help site at `/help` and the `/gallery` page, which never call `bootGame` at all
  * and fire their page events immediately. A compile-time constant needs no
  * boot to be known, so nothing is gained by deferring it.
  */

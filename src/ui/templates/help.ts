@@ -12,12 +12,12 @@ import type { DiagnosticsReport } from "../../wasmhost/engineDiagnostics";
  * "About" are collapsed.
  *
  * The section bodies come from the shared `./helpContent` module (`HELP_SECTIONS`,
- * `helpLede`, `helpAboutBody`, `helpReportBlock`), the single source this dialog
- * and the standalone `/help` page both render, so the guide copy cannot drift
- * between them. This dialog wraps each section in a `<details>`; the page renders
- * the same sections expanded. Only the Classic vs Modern section additionally
- * gets the "Open full help page" link here (it deep-links to
- * `/help#classic-vs-modern`); the page itself is that destination. The external
+ * `helpLede`, `helpAboutBody`, `helpReportBlock`), compiled from the same
+ * Markdown pages the Help site at `/help` serves, so the guide copy cannot drift
+ * between them. This dialog wraps each section in a `<details>`. Only the
+ * Classic vs Modern section additionally gets the "Open full help page" link
+ * here (it opens the site's `/help/classic-vs-modern/` page, which adds the
+ * side-by-side pictures). The external
  * report link (with `rel="noopener noreferrer"` and its visually-hidden "opens
  * GitHub in a new tab" span) stays out in the open as a call to action, between
  * the collapsible sections and the About section. Each
@@ -51,7 +51,7 @@ export function helpTemplate(onSplash: boolean, version: string, actions: HelpAc
         <summary><span role="heading" aria-level="3">${s.title}</span></summary>
         ${s.body()}
         ${s.id === "classic-vs-modern"
-          ? html`<p class="help-fullpage"><a class="btn" href="/help#classic-vs-modern" target="_blank" rel="noopener noreferrer" data-act="open-help">Open the full help page<span class="visually-hidden"> (opens in a new tab)</span></a></p>`
+          ? html`<p class="help-fullpage"><a class="btn" href="/help/classic-vs-modern/" target="_blank" rel="noopener noreferrer" data-act="open-help">Open the full help page<span class="visually-hidden"> (opens in a new tab)</span></a></p>`
           : nothing}
       </details>`,
       )}

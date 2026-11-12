@@ -205,7 +205,7 @@ function openGuide(ui: UI): void {
     { actions: { "copy-diagnostics": () => copyDiagnostics(box, diagnostics) } },
   );
   finishGuide = finish;
-  // "Open the full help page" is a real link to /help#classic-vs-modern in a
+  // "Open the full help page" is a real link to /help/classic-vs-modern/ in a
   // new tab. From the installed app a new tab drops to the system browser and
   // loses the session, so there it opens the in-app comparison instead.
   const fullPage = box.querySelector<HTMLAnchorElement>('a[data-act="open-help"]');
@@ -272,7 +272,7 @@ export function showModeHelp(ui: UI, e?: MouseEvent): void {
   // A Ctrl or Cmd click opens the page in a background tab and the player
   // stays here, so the tower keeps running.
   const background = !!e && (e.ctrlKey || e.metaKey);
-  const tab = window.open(fromGameHref("/help#classic-vs-modern"), "_blank");
+  const tab = window.open(fromGameHref("/help/classic-vs-modern/"), "_blank");
   if (!tab) {
     // A blocked pop-up: show the same comparison in the game instead.
     showCompare(ui);

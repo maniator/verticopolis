@@ -45,7 +45,7 @@ describe("helpTemplate structure and a11y", () => {
     const frag = renderToFragment(helpTemplate(false, "1.2.3", noop));
     const a = frag.querySelector<HTMLAnchorElement>('a[data-act="open-help"]')!;
     expect(a, "expected the Open full page link").not.toBeNull();
-    expect(a.getAttribute("href")).toBe("/help#classic-vs-modern");
+    expect(a.getAttribute("href")).toBe("/help/classic-vs-modern/");
     expect(a.getAttribute("target")).toBe("_blank");
     expect(a.getAttribute("rel")).toBe("noopener noreferrer");
   });

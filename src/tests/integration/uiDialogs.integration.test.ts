@@ -3470,7 +3470,7 @@ describe("Compare modal (showCompare) pauses the tower and restores speed", () =
     const { onSpeed, getSpeed } = speedAt(2);
     makeUI({ getSpeed, onSpeed }); // constructed for its side effect: the badge click is wired in the ctor
     (document.getElementById("btn-mode") as HTMLButtonElement).click();
-    expect(open).toHaveBeenCalledWith("/help?from=game#classic-vs-modern", "_blank");
+    expect(open).toHaveBeenCalledWith("/help/classic-vs-modern/?from=game", "_blank");
     expect(tab.opener).toBeNull();
     expect(dialog().open).toBe(false);
     expect(onSpeed).toHaveBeenLastCalledWith(0);
@@ -3485,7 +3485,7 @@ describe("Compare modal (showCompare) pauses the tower and restores speed", () =
       const { onSpeed, getSpeed } = speedAt(2);
       makeUI({ getSpeed, onSpeed });
       document.getElementById("btn-mode")!.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, ...mod }));
-      expect(open).toHaveBeenCalledWith("/help?from=game#classic-vs-modern", "_blank");
+      expect(open).toHaveBeenCalledWith("/help/classic-vs-modern/?from=game", "_blank");
       expect(onSpeed).not.toHaveBeenCalled();
       open.mockRestore();
     }
@@ -3573,7 +3573,7 @@ describe("Help dialog: the 'Open full page' link downgrades to the compare modal
     // The click was left to the real <a target=_blank>, marked as opened by
     // the game: the compare modal never opened, the guide closed, and the
     // pause is held until the player is back on this tab.
-    expect(a.getAttribute("href")).toBe("/help?from=game#classic-vs-modern");
+    expect(a.getAttribute("href")).toBe("/help/classic-vs-modern/?from=game");
     expect(dialog().open).toBe(false);
     expect(dialog().textContent).not.toContain("pixel-faithful to 1994");
     expect(onSpeed).toHaveBeenLastCalledWith(0);
