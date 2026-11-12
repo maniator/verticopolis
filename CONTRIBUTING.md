@@ -476,15 +476,19 @@ Code reads the catalog through the catalog handle (`towerCatalog`,
 The tower grid is **two-layered**: a structural layer (floor/lobby) with a room
 layer sitting on top, exactly like the original SimTower corridor model.
 
-### Classic vs Modern rule-sets (`engine-rs/src/rules.rs`)
+### Classic vs Modern rule-sets (`engine-rs/src/rules/`)
 
 A tower is founded under an immutable `GameMode` (`classic` | `modern`), chosen
 once at creation and persisted. Behavior the two modes disagree on belongs
 behind the mode's rule methods in the Rust engine (`impl GameMode` in
-`engine-rs/src/rules.rs`), which the simulation calls (`self.mode.<x>()`). Some
-older Rust subsystems still test the mode inline (`self.mode.is_modern()`, a
-comparison with `GameMode::Classic`); move such a test behind a rule method
-when you change that code.
+`engine-rs/src/rules/`, one file per domain: construction, economy,
+households, people, services, satisfaction, amenities, parking, rent and
+presentation), which the simulation calls (`self.mode.<x>()`). A few older
+Rust subsystems still test the mode inline (`self.mode.is_modern()`, a
+comparison with `GameMode::Classic`); `src/tests/modeBranch.guard.test.ts`
+fails a new one, and `src/tests/modeBranch.ratchet.txt` lists the old ones,
+which only go down. Move such a test behind a rule method when you change that
+code, and lower its line in the same PR.
 
 **Tripwire: don't let mode logic smear.** Map the mode to behavior in one
 place, a rule method. Never write

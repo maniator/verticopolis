@@ -17,7 +17,7 @@ must reproduce every pinned checkpoint hash (`expected.json`) byte for byte.
 | Area | Files in `src/` |
 | --- | --- |
 | Core and determinism | `lib.rs`, `rng.rs` (seeded Mulberry32), `jsmath.rs` (JavaScript number semantics), `canonical.rs` (the conformance hash), `fixed_step.rs` (pacing a frame's minutes) |
-| Rules and reference data | `rules.rs` (Classic vs Modern, `impl GameMode`), `facilities.rs` and `facilities/` (sizes, prices, build caps, transport pooling), `econ.rs`, `clock.rs`, `catalog.rs` and `catalog/` (everything a frontend shows) |
+| Rules and reference data | `rules.rs` and `rules/` (Classic vs Modern, `impl GameMode`, one file per domain), `facilities.rs` and `facilities/` (sizes, prices, build caps, transport pooling), `econ.rs`, `clock.rs`, `catalog.rs` and `catalog/` (everything a frontend shows) |
 | The tower | `tower.rs` and `tower/` (placement, transports), `tower_index.rs`, `tower_query.rs`, `tower_query_state.rs`, `tower_removal.rs`, `build.rs`, `brush.rs` (floor and lobby painting), `schedule*.rs` (elevator schedules) |
 | The simulation loop | `sim.rs` (`Simulation`), `sim_loop.rs` (`tick`), `presence.rs`, `demand.rs`, `churn.rs` and `churn/`, `star.rs`, `services.rs` (recycling, parking, extermination) |
 | People and transport | `crowd/` (spawning, routing, walking, meals, staff), `dispatch.rs` (elevator cars), `housekeeping.rs` |

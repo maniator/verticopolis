@@ -263,7 +263,7 @@ body it sends, so write it from the form:
   story id) in the fields; the forms' intro text stays in plain language for
   players. A parity issue names where the canon value lives, such as
   `engine-rs/src/facilities.rs` (build caps), `engine-rs/src/econ.rs`
-  (economy) or `engine-rs/src/rules.rs` (mode rules), and whether `PARITY.md`
+  (economy) or `engine-rs/src/rules/` (mode rules), and whether `PARITY.md`
   lists it.
 - Apply the form's own labels except `needs-triage` when a backlog row gives
   the priority (the P label replaces it), plus the area labels. Use a plain

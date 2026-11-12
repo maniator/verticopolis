@@ -60,7 +60,7 @@ full spec see the PRD under `_bmad-output/planning-artifacts/prds/`.
 - **The Rust engine (`engine-rs/`) is the source of truth for gameplay rules, caps and
   tuning**: `engine-rs/src/facilities.rs` (lot 375 wide, floors −9…100, per-facility
   cost/width/minStar/population, build caps), `engine-rs/src/star.rs` (`STAR_THRESHOLDS`,
-  `TOWER_POPULATION`) and `engine-rs/src/rules.rs` (the Classic and Modern rule values).
+  `TOWER_POPULATION`) and `engine-rs/src/rules.rs` with its `rules/` submodules (the Classic and Modern rule values).
   The web UI reads them through the engine's catalog. Quote numbers from there, never
   hard-code duplicates.
 - The `src/engine/` paths below are the TypeScript reference engine, kept as a test

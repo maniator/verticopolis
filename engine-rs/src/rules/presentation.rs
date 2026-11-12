@@ -20,4 +20,27 @@ impl GameMode {
     pub fn quotes_lobby_distance(self) -> bool {
         self == GameMode::Modern
     }
+
+    /// `showsPreviewReason`: Modern's build preview names the refusal before
+    /// the click; Classic refuses on the click, the 1994 game's way. The
+    /// engine refuses the same builds in both modes, so only the catalog
+    /// states this one.
+    pub fn preview_names_refusal(self) -> bool {
+        self == GameMode::Modern
+    }
+
+    /// `elevatorScheduleUX().presets`: whether the elevator schedule's
+    /// assisted tools answer, the intent presets, auto-tune and the staffing
+    /// advice (Modern). Classic offers the manual grid only, and each assisted
+    /// query answers that the mode has none.
+    pub fn schedule_assist(self) -> bool {
+        self == GameMode::Modern
+    }
+
+    /// Whether the shop inspector turns the local demand share into advice
+    /// (under-served or over-built). Modern does; Classic shows the figures
+    /// and leaves the reading to the player.
+    pub fn advises_on_retail_demand(self) -> bool {
+        self == GameMode::Modern
+    }
 }

@@ -32,7 +32,7 @@
 //!   that just reached three stars room to afford its first center before
 //!   anyone leaves.
 //!
-//! Each mode's choices are named rules on `GameMode` in `rules.rs`.
+//! Each mode's choices are named rules on `GameMode` in `rules/`.
 //!
 //! Recycling is tower-wide: every rated tenant shares the trash. An empty
 //! office the move-in gate weighs gets parking only if it would be parked.
