@@ -1,6 +1,6 @@
 name: Analytics Report
 
-# Twice-weekly rollup of the Verticopolis custom events (see src/analytics.ts),
+# On-demand rollup of the Verticopolis custom events (see src/analytics.ts),
 # rendered by scripts/posthog-report.mjs (PostHog / HogQL percentiles plus
 # per-session and per-tool splits; the percentiles are ClickHouse `quantile`,
 # which is approximate, so read them as close estimates). The report renders inline into the
@@ -18,10 +18,10 @@ name: Analytics Report
 #   POSTHOG_PROJECT_ID        (var, optional)  defaults to 524085.
 #   POSTHOG_HOST              (var, optional)  defaults to https://us.posthog.com.
 
+# Manual runs only. The Tuesday and Friday schedule stopped on 2026-11-12
+# (#959): nobody read the scheduled output, and the Gameplay Analytics
+# dashboard is the live number. Run this when writing a readout.
 on:
-  schedule:
-    # Tuesdays and Fridays at 13:00 UTC.
-    - cron: "0 13 * * 2,5"
   workflow_dispatch:
     inputs:
       window:
