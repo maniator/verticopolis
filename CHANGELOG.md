@@ -23,6 +23,26 @@ prompt already tells players it is an engine update and shows the new version.
 Entries below 1.51.1 were curated from the commit history after the fact, so they
 are documentation only: no build that a client fetches carries them.
 
+## 3.1.0
+
+- An installed copy of the game now picks up new versions even when something on your computer or network changes the page on its way in, such as an antivirus web shield. Before, those copies could stay on an old version and never ask to update.
+- If a new version is out but your installed copy could not get it ready in the background, the update prompt now appears anyway, and Update saves your tower and reloads onto the new version.
+- A thief now runs along the floor he was caught on, starting from the emergency stairs, instead of drifting across the whole screen.
+- Security guards now wear a gold badge on the chest and cap and a black duty belt, so they stand out from office staff.
+- Selling or bulldozing a condo that has already been sold now buys it back from its owners first, the same way an owner leaving does, so a sold condo can no longer be demolished for a refund on top of its sale price (#713).
+- Shops, fast food and restaurants now count the visitors they served the day before, the way the original game does. A new venue expects 10 visitors on its first day and gains 5 to 15 more each day until it reaches its cap: 25 for a shop (30 on weekends) and 35 for fast food and restaurants (50 on weekends). Tower population and star progress follow these counts (#1500).
+- An imported SimTower tower keeps its venues' visitor counts, so its shop, fast food and restaurant population matches the original's on load (#1500).
+- Party halls and movie theaters now count toward the tower's population, the way the original game does: 50 for each open party hall and 120 for each theater showing a new film, from the morning after it opens (#1500).
+- An imported SimTower tower keeps its party hall and theater population, including a theater whose film has aged, so it matches the original's on load (#1500).
+- A movie theater's audience now falls as its film ages, the way the original game does: 120 for the first six mornings of a film, 80 for the next three, then 40 (#1932).
+- An imported SimTower tower keeps each theater's film age, and a tower exported to SimTower and opened again keeps it too (#1932).
+- In Classic, a movie theater no longer costs a booking every few days. Its film ages until ticket sales fall, and the theater's card shows the film and how long it has been showing, with buttons to show a new film ($300,000) or a cheaper classic ($150,000) that never fills the house, as in the original game (#1932).
+- In Modern, each film booking starts a fresh film, so a theater's audience is back to full after every booking (#1932).
+- A classic film stays a classic through a SimTower import and export (#1932).
+- Modern: cinemas, party halls and aquatic centers now count as amenities for offices, hotels, condos and apartments, so a tower built around entertainment no longer loses tenants just because it has only a shop or two.
+- The wedding hall's rooftop garden now keeps the same hedges and flowers wherever the hall is built.
+- The diagnostics panel and the version line no longer mention the retired TypeScript engine. The game has run on the Rust engine alone since 3.0.
+
 ## 3.0.1
 
 - Refusing the bomb ransom now starts a race: Security searches floor by floor before the 1:00 PM deadline, with a countdown, a ticking clock and a red glow. If they miss it, the bomb goes off.
