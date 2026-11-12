@@ -13,6 +13,7 @@ import { iconElement } from "./icons";
 import { mountToolbarIcons } from "./uiToolbarIcons";
 import type { ReviewRow } from "./templates/scheduleReview";
 import { toolInfoFor, BULLDOZE_TOOL_INFO, INSPECT_TOOL_INFO, type LobbyHeightPicker } from "./templates/toolInfo";
+import { lobbyPickerFor, syncLobbyHeightStrip } from "./lobbyHeightStrip";
 import * as dialogs from "./uiDialogs";
 import * as help from "./uiHelp";
 import * as panels from "./uiPanels";
@@ -224,13 +225,12 @@ export class UI {
       document.querySelector(`.pal-item[data-tool="${tool.type}"]`)?.classList.add("active");
       render(tool.type === "bulldoze" ? BULLDOZE_TOOL_INFO : INSPECT_TOOL_INFO, this.el.toolInfo);
     }
+    syncLobbyHeightStrip(tool, this.cb.getCatalog(), this.lobbyPicker());
   }
 
-  /** The Lobby card's height picker (#308): a pick redraws the card. */
+  /** The Lobby card's height picker (#308): a pick redraws the card and the phone's strip. */
   lobbyPicker(): LobbyHeightPicker {
-    const choice = this.cb.lobbyHeight();
-    const redraw = () => this.tool.type === "build" && render(toolInfoFor(this.cb.getCatalog(), this.tool.kind, this.lobbyPicker()), this.el.toolInfo);
-    return { picked: choice.picked, pick: (h) => (choice.pick(h), redraw()) };
+    return lobbyPickerFor(this);
   }
 
   setTowerName(name: string): void {

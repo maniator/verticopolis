@@ -147,10 +147,14 @@ impl Tower {
         }
     }
 
-    /// Whether any tile of `story` holds structure. One lookup per column,
-    /// so only a floor's first lobby placement asks.
+    /// Whether any tile of `story` holds structure. The build preview asks on
+    /// every pointer move, so it reads the revision-keyed structural tile
+    /// index (one lookup) rather than probing each column. That index lists
+    /// the structural units by their own floor, which is every structure a
+    /// story above a floor's first lobby can hold: a tall lobby's raised
+    /// story would make that floor a lobby story, refused before this runs.
     fn story_has_structure(&self, story: i64) -> bool {
-        (0..LOT_WIDTH).any(|x| self.structure.contains_key(&(story, x)))
+        self.structural_tiles(story).is_some()
     }
 
     /// Why shaft ends at `bottom` and `top` cannot be, or `None`: no shaft

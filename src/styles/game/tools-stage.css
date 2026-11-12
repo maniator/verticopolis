@@ -123,6 +123,17 @@
   touch-action: none; /* we handle pan/zoom ourselves */
   image-rendering: pixelated; /* crisp retro pixels, no blur */
 }
+/* Shown on the phone layout only (media-phone.css). */
+#lobby-height-strip {
+  display: none;
+}
+/* The picked lobby height (#308), on the tool card and the phone strip. */
+:is(.ti-lobby-height, #lobby-height-strip) .btn[aria-pressed="true"] {
+  font-weight: 700;
+  box-shadow: var(--bevel-in);
+  background: var(--r-title);
+  color: var(--r-title-fg);
+}
 #hint {
   position: absolute;
   bottom: 8px;

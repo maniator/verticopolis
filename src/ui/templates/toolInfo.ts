@@ -68,14 +68,20 @@ export interface LobbyHeightPicker {
  *  `maxLobbyHeight` stories, which floors may rise (the catalog's
  *  `tallSkyLobbies`), the price per story, and the original's keys. */
 export function lobbyHeightTemplate(catalog: Catalog, lobby: LobbyHeightPicker): TemplateResult {
-  const heights = Array.from({ length: catalog.rules.maxLobbyHeight }, (_, i) => i + 1);
   const where = catalog.rules.tallSkyLobbies ? "The ground lobby and sky lobbies can rise." : "Only the ground lobby can rise.";
   const per = groupDigits(catalogFacility(catalog, "lobby").cost);
+  return html`<div class="ti-lobby-height" role="group" aria-label="Lobby height">Height: ${lobbyHeightButtons(catalog, lobby)}</div><p style="margin-top:6px;color:var(--muted)">${where} A floor's first lobby sets its height, and it never changes after. Each story costs $${per} a tile. On a keyboard, hold Ctrl for 2 stories or Ctrl+Shift for 3 as you place it.</p>`;
+}
+
+/** One button per height, one to the catalog's `maxLobbyHeight` stories, the
+ *  picked one pressed. Shared by the Lobby card and the phone's strip. */
+export function lobbyHeightButtons(catalog: Catalog, lobby: LobbyHeightPicker): TemplateResult[] {
+  const heights = Array.from({ length: catalog.rules.maxLobbyHeight }, (_, i) => i + 1);
   const label = (h: number) => (h === 1 ? "1 story" : `${h} stories`);
-  return html`<div class="ti-lobby-height" role="group" aria-label="Lobby height">Height: ${heights.map(
+  return heights.map(
     (h) =>
       html`<button type="button" class="btn${lobby.picked === h ? " es-on" : ""}" aria-pressed=${lobby.picked === h} @click=${() => lobby.pick(h)}>${label(h)}</button>`,
-  )}</div><p style="margin-top:6px;color:var(--muted)">${where} A floor's first lobby sets its height, and it never changes after. Each story costs $${per} a tile. On a keyboard, hold Ctrl for 2 stories or Ctrl+Shift for 3 as you place it.</p>`;
+  );
 }
 
 export const BULLDOZE_TOOL_INFO: TemplateResult = html`<div class="ti-name">Bulldoze</div><p style="color:var(--muted)">Click a room or shaft to sell it for half its cost.</p>`;

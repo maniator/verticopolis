@@ -251,7 +251,7 @@ export function skyGlass(ctx: CanvasRenderingContext2D, x: number, y: number, w:
  *  grand-entrance tile (ground lobby), so the attendant no longer tiles every
  *  fourth column. Sky lobbies have no single-tile placement path, so they now
  *  show no attendant at all (a logged followup). */
-export function consolePanel(ctx: CanvasRenderingContext2D, x0: number, ww: number, y0: number, floorTop: number, ground: boolean, lit: boolean): void {
+function consolePanel(ctx: CanvasRenderingContext2D, x0: number, ww: number, y0: number, floorTop: number, ground: boolean, lit: boolean): void {
   const cx = x0 + Math.floor(ww / 2);
   const topY = floorTop - 5; // top of the console/bench, sitting on the floor
   if (ground) {
@@ -312,7 +312,7 @@ export function consolePanel(ctx: CanvasRenderingContext2D, x0: number, ww: numb
 }
 
 /** Chandelier: gold tiers on a chain, aglow after dark. */
-export function chandelier(ctx: CanvasRenderingContext2D, cx: number, y0: number, lit: boolean, ww: number): void {
+function chandelier(ctx: CanvasRenderingContext2D, cx: number, y0: number, lit: boolean, ww: number): void {
   ctx.fillStyle = "#8A7430";
   ctx.fillRect(cx, y0 + 3, 1, 3); // chain
   ctx.fillStyle = lit ? "#FFD76B" : "#C8A343";
@@ -329,7 +329,7 @@ export function chandelier(ctx: CanvasRenderingContext2D, cx: number, y0: number
 }
 
 /** Sky-lobby planter: a potted shrub standing on the floor. */
-export function planter(ctx: CanvasRenderingContext2D, cx: number, floorTop: number): void {
+function planter(ctx: CanvasRenderingContext2D, cx: number, floorTop: number): void {
   ctx.fillStyle = "#8C5A3A"; // brass pot
   ctx.fillRect(cx - 2, floorTop - 4, 5, 4);
   ctx.fillStyle = "rgba(255,255,255,0.3)";
