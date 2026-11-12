@@ -21,10 +21,18 @@ interface Props {
   small?: boolean;
   /** An anchor, for a room with no fact box of its own (links name it as `#kind`). */
   id?: string;
+  /** For a piece laid as a run (floor, lobby): how many tiles to draw. */
+  tiles?: number;
 }
+
+/** A floor or a lobby is one tile in the catalog but is laid in long runs, and
+ *  one tile of it shows nothing, so the picture draws a stretch this wide. */
+const RUN_TILES = 16;
 
 const { kind, caption, state, subtype, floor, occupants, span, small = false, id } = Astro.props;
 const { modern } = await facility(kind);
+const isRun = modern.category === "structure" && modern.width === 1 && !modern.transport;
+const tiles = Astro.props.tiles ?? (isRun ? RUN_TILES : undefined);
 const floors = span !== undefined ? span + 1 : (modern.floors ?? 1);
 // The tallest whole magnification that keeps the picture under a set height,
 // the same steps the painters take (three for a one-floor room).
@@ -43,6 +51,7 @@ const catalogUrl = `${import.meta.env.BASE_URL.replace(/\/$/, "")}/catalog.json`
     data-floor={floor}
     data-occupants={occupants}
     data-span={span}
+    data-tiles={tiles}
     data-catalog={catalogUrl}
     style={`height:${height}px`}
     role="img"

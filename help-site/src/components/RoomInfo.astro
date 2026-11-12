@@ -63,8 +63,9 @@ function stars(n: number): string {
 }
 
 function size(f: CatalogFacility): string {
-  if (f.transport) return `${f.width} tiles wide`;
-  return `${f.width} tiles wide, ${f.floors} floor${f.floors === 1 ? "" : "s"} tall`;
+  const wide = `${f.width} tile${f.width === 1 ? "" : "s"} wide`;
+  if (f.transport) return wide;
+  return `${wide}, ${f.floors} floor${f.floors === 1 ? "" : "s"} tall`;
 }
 
 function limit(f: CatalogFacility, mode: "classic" | "modern"): string | null {

@@ -42,6 +42,9 @@ function pictureOf(canvas: HTMLCanvasElement, facts: (k: FacilityKind) => Catalo
   const ctx = canvas.getContext("2d");
   if (!ctx) return null;
   const kind = canvas.dataset.sprite as FacilityKind;
+  // A floor or lobby is drawn as a run of `data-tiles` tiles (Sprite.astro).
+  const tiles = canvas.dataset.tiles ? Number(canvas.dataset.tiles) : null;
+  const factsOf = tiles ? (k: FacilityKind): CatalogFacility => (k === kind ? { ...facts(k), width: tiles } : facts(k)) : facts;
   const hour = openHourFor(facts(kind).openHours);
   const span = canvas.dataset.span ? Number(canvas.dataset.span) : null;
   const pose = {
@@ -52,8 +55,8 @@ function pictureOf(canvas: HTMLCanvasElement, facts: (k: FacilityKind) => Catalo
   };
   const draw =
     span !== null
-      ? (d: DrawCtx, w: number, h: number, mag: number) => drawTransportPortrait(d, facts, kind, span, 0, 0, w, h, 0, mag)
-      : (d: DrawCtx, w: number, h: number, mag: number) => drawRoomPortrait(d, facts, kind, pose, 0, 0, w, h, 0, mag);
+      ? (d: DrawCtx, w: number, h: number, mag: number) => drawTransportPortrait(d, factsOf, kind, span, 0, 0, w, h, 0, mag)
+      : (d: DrawCtx, w: number, h: number, mag: number) => drawRoomPortrait(d, factsOf, kind, pose, 0, 0, w, h, 0, mag);
   return { canvas, ctx, draw, hour, visible: false };
 }
 
