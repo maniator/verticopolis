@@ -798,7 +798,7 @@
       ],
       "ownHousehold": false,
       "paysForFloor": false,
-      "pool": null,
+      "pool": "venues",
       "population": 0,
       "rent": null,
       "resaleRefund": 250000,
@@ -863,7 +863,7 @@
       ],
       "ownHousehold": false,
       "paysForFloor": false,
-      "pool": null,
+      "pool": "venues",
       "population": 0,
       "rent": null,
       "resaleRefund": 50000,
@@ -2056,6 +2056,15 @@
         "escalator"
       ],
       "label": "stairs/escalators"
+    },
+    {
+      "cap": 16,
+      "key": "venues",
+      "kinds": [
+        "cinema",
+        "partyHall"
+      ],
+      "label": "party halls and theaters"
     }
   ],
   "rules": {
@@ -2066,7 +2075,7 @@
     "scheduleAssist": false,
     "variantHouseholds": false
   },
-  "version": 14,
+  "version": 15,
   "world": {
     "groundFloor": 1,
     "groundFloorStructure": "lobby",

@@ -278,7 +278,7 @@ impl Tower {
                 ));
             }
         }
-        for pool in POOLED_CAPS.iter() {
+        for pool in pools_for(self.mode) {
             if !pool.kinds.contains(&kind) {
                 continue;
             }

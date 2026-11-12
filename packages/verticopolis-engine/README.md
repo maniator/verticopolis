@@ -212,7 +212,7 @@ shapes for each one.
 
 | Call | What it answers |
 | --- | --- |
-| `catalog(mode)` | Every price, size, build cap and rule a frontend shows, for one mode, as JSON: `facilities` (one entry per kind, with its `key`, `name`, `width`, `cost`, `minStar` and so on), `world`, `economy`, `pools` and `rules`. Read rules from here rather than copying them into your code. |
+| `catalog(mode)` | Every price, size, build cap and rule a frontend shows, for one mode, as JSON: `facilities` (one entry per kind, with its `key`, `name`, `width`, `cost`, `minStar` and so on), `world`, `economy`, `pools` (caps several kinds share; Classic adds one for party halls and theaters together) and `rules`. Read rules from here rather than copying them into your code. |
 | `engineIdentity()` | Which engine this is and which contracts it speaks: the crate version, the save version it writes and the oldest it loads, the frame layout version, the catalog version with a digest per mode, and the conformance lock digest. |
 
 The binding exports more than this table. The rest are the web game's own

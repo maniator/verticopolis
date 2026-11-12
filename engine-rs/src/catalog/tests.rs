@@ -79,6 +79,28 @@ fn json_entry<'a>(v: &'a Value, key: &str) -> &'a Value {
         .unwrap_or_else(|| panic!("no {key} in the catalog JSON"))
 }
 
+/// Classic publishes its shared party hall and theater pool (#1932), and
+/// Modern does not.
+#[test]
+fn classic_publishes_the_venue_pool_and_modern_does_not() {
+    let classic = catalog(GameMode::Classic);
+    assert_eq!(classic.pools.len(), 3);
+    assert_eq!(
+        (
+            classic.pools[2].key,
+            classic.pools[2].cap,
+            classic.pools[2].kinds.clone()
+        ),
+        ("venues", 16, vec!["cinema", "partyHall"])
+    );
+    let modern = catalog(GameMode::Modern);
+    for key in ["cinema", "partyHall"] {
+        assert_eq!(entry(&classic, key).pool, Some("venues"), "{key}");
+        assert_eq!(entry(&modern, key).pool, None, "{key}");
+        assert_eq!(entry(&classic, key).build_cap, Some(16), "{key}");
+    }
+}
+
 /// The canon pooling of CLAUDE.md, read back through the catalog.
 #[test]
 fn pools_caps_and_spans_follow_canon() {

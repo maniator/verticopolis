@@ -46,10 +46,8 @@ pub fn catalog(mode: GameMode) -> Catalog {
             exports_to_1994: mode.exports_to_1994(),
             quotes_lobby_distance: mode.quotes_lobby_distance(),
         },
-        pools: POOLED_CAPS
-            .iter()
-            .zip(POOL_KEYS)
-            .map(|(p, key)| PoolEntry {
+        pools: keyed_pools(mode)
+            .map(|(key, p)| PoolEntry {
                 key,
                 label: p.label,
                 cap: p.cap,
@@ -87,7 +85,7 @@ fn facility_entry(mode: GameMode, kind: Kind) -> FacilityEntry {
         build_minutes: if transport { 0.0 } else { kind.build_minutes() },
         resale_refund: kind.resale_refund(),
         build_cap: build_cap(kind),
-        pool: pool_key(kind),
+        pool: pool_key(mode, kind),
         max_span: transport.then(|| kind.max_span()),
         fixed_span: kind.is_fixed_span(),
         max_cars: kind.is_elevator().then(|| kind.max_cars()),

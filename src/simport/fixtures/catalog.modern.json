@@ -2418,7 +2418,7 @@
     "scheduleAssist": true,
     "variantHouseholds": true
   },
-  "version": 14,
+  "version": 15,
   "world": {
     "groundFloor": 1,
     "groundFloorStructure": "lobby",

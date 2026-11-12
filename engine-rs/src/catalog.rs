@@ -32,8 +32,8 @@ use crate::economy::{
     MAINTENANCE_PER_CAR_MONTHLY, NIGHTCLUB_DJ_MONTHLY, REAL_WORLD_MAINT_PERIOD_DAYS,
 };
 use crate::facilities::{
-    build_cap, ground_floor_structure_kind, no_basement, Kind, FACILITIES, LOBBY_INTERVAL,
-    LOT_WIDTH, MAX_FLOOR, MIN_FLOOR, POOLED_CAPS,
+    build_cap, ground_floor_structure_kind, no_basement, pools_for, Kind, Pool, FACILITIES,
+    LOBBY_INTERVAL, LOT_WIDTH, MAX_FLOOR, MIN_FLOOR, POOLED_CAPS,
 };
 use crate::rules::{RentModel, MAX_HOUSEHOLD};
 use crate::services::GARBAGE_COLLECT_HOUR;
@@ -55,7 +55,7 @@ pub use rules::Rules;
 
 /// The version of the catalog's shape. It moves when a field is added,
 /// renamed or removed, so a frontend can refuse a shape it does not know.
-pub const CATALOG_VERSION: u32 = 14;
+pub const CATALOG_VERSION: u32 = 15;
 
 /// Every price, size and build rule of one mode.
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -426,11 +426,21 @@ fn rent_for(mode: GameMode, kind: Kind) -> Option<Rent> {
     })
 }
 
-fn pool_key(kind: Kind) -> Option<&'static str> {
-    POOLED_CAPS
-        .iter()
-        .position(|p| p.kinds.contains(&kind))
-        .map(|i| POOL_KEYS[i])
+/// The key of Classic's [`crate::facilities::CLASSIC_VENUE_POOL`].
+const VENUE_POOL_KEY: &str = "venues";
+
+/// Each pool `mode` enforces, with the key the catalog gives it.
+pub(crate) fn keyed_pools(mode: GameMode) -> impl Iterator<Item = (&'static str, &'static Pool)> {
+    POOL_KEYS
+        .into_iter()
+        .chain(std::iter::once(VENUE_POOL_KEY))
+        .zip(pools_for(mode))
+}
+
+fn pool_key(mode: GameMode, kind: Kind) -> Option<&'static str> {
+    keyed_pools(mode)
+        .find(|(_, p)| p.kinds.contains(&kind))
+        .map(|(key, _)| key)
 }
 
 #[cfg(test)]
