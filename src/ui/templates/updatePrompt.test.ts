@@ -55,12 +55,24 @@ describe("updatePromptTemplate structure", () => {
     expect(frag.querySelector(".build-id")).toBeNull();
   });
 
-  it("renders up to three release notes and the build-id from info", () => {
-    const frag = renderToFragment(updatePromptTemplate(info({ notes: ["a", "b", "c", "d"] }), noop));
-    const items = frag.querySelectorAll(".whatsnew li");
-    expect(items).toHaveLength(3); // capped at three
-    expect([...items].map((li) => li.textContent)).toEqual(["a", "b", "c"]);
+  it("renders up to three release notes as a plain list, with the build-id from info", () => {
+    const frag = renderToFragment(updatePromptTemplate(info({ notes: ["a", "b", "c"] }), noop));
+    expect([...frag.querySelectorAll(".whatsnew li")].map((li) => li.textContent)).toEqual(["a", "b", "c"]);
+    expect(frag.querySelector(".whatsnew-log")).toBeNull();
     expect(frag.querySelector(".build-id")?.textContent).toBe("Build 1.6.0 · abc1234");
+  });
+
+  it("puts every note of a longer release, whole, in a labeled, focusable log", () => {
+    const long = "A long note. ".repeat(40).trim();
+    const notes = ["a", "b", "c", "d", long];
+    const frag = renderToFragment(updatePromptTemplate(info({ notes }), noop));
+    const log = frag.querySelector(".whatsnew-log");
+    expect(log?.getAttribute("tabindex")).toBe("0");
+    expect(log?.getAttribute("role")).toBe("region");
+    expect(log?.getAttribute("aria-labelledby")).toBe("whatsnew-title");
+    expect(frag.getElementById("whatsnew-title")?.textContent).toBe("What's new");
+    expect(frag.querySelector(".whatsnew-ver")).toBeNull();
+    expect([...frag.querySelectorAll(".whatsnew-log li")].map((li) => li.textContent)).toEqual(notes);
   });
 
   it("drops the 'unknown' sha placeholder from the build line", () => {

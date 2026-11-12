@@ -1,5 +1,6 @@
 import { html, nothing, type TemplateResult } from "lit-html";
 import type { UpdateInfo } from "../../pwa";
+import { SHORT_NOTES } from "../../pwaUpdateInfo";
 
 /**
  * The "a new build is ready" prompt. Authored to match `updatePromptHtml`
@@ -15,9 +16,10 @@ import type { UpdateInfo } from "../../pwa";
  * auto-escaped by lit; the notes list uses nested `html` sub-templates, never
  * string interpolation. The `data-act` attributes are kept for structural parity
  * and as stable test selectors; dispatch is via `@click`. Later carries
- * `autofocus` so the dialog opens on it, as it did before the skipped-versions
- * log (#1897) became the first focusable element: opening the prompt never
- * lands focus inside the notes.
+ * `autofocus` so the dialog opens on it, as it did before the scrolling notes
+ * log (skipped versions, #1897, or a release with more than three notes)
+ * became the first focusable element: opening the prompt never lands focus
+ * inside the notes.
  */
 
 /** The two actions the update prompt dispatches, bound inline in the template. */
@@ -34,7 +36,7 @@ const KIND_LABEL = { game: "Game update", engine: "Engine update", both: "Game a
  * The notes of every version the player skipped (#1897), newest first, in a
  * well that scrolls on its own once it is taller than its cap, so a long log
  * never pushes the actions away. `undefined` when there is only the incoming
- * version's notes to show, which keep the single-list look above. Shown when
+ * version's notes to show (see {@link incomingNotes}). Shown when
  * two or more versions are unseen, or one that is not the incoming build (an
  * incoming build with no notes of its own).
  */
@@ -53,20 +55,36 @@ function skippedLog(info: UpdateInfo | null | undefined): TemplateResult | undef
       : nothing}</div></div>`;
 }
 
+/**
+ * The incoming version's own notes: a short list when there are at most
+ * {@link SHORT_NOTES}, and every note, whole, in the same scrolling well as
+ * {@link skippedLog} when there are more, so a long release never pushes the
+ * actions away.
+ */
+function incomingNotes(notes: readonly string[]): TemplateResult | typeof nothing {
+  if (notes.length === 0) return nothing;
+  const list = html`<ul>${notes.map((n) => html`<li>${n}</li>`)}</ul>`;
+  if (notes.length <= SHORT_NOTES) return html`<div class="whatsnew"><h3 class="win-title sm">What's new</h3>${list}</div>`;
+  return html`<div class="whatsnew"><h3 class="win-title sm" id="whatsnew-title">What's new</h3><div
+      class="well whatsnew-log"
+      tabindex="0"
+      role="region"
+      aria-labelledby="whatsnew-title"
+    >${list}</div></div>`;
+}
+
 export function updatePromptTemplate(
   info: UpdateInfo | null | undefined,
   actions: UpdatePromptActions,
 ): TemplateResult {
-  const notes = (info?.notes ?? []).slice(0, 3);
+  const notes = info?.notes ?? [];
   // Keep a real sha (it anchors a bug report to an exact build) but drop the
   // "unknown" placeholder a non-git build would stamp.
   const sha = info?.sha && info.sha !== "unknown" ? info.sha : undefined;
   const idText = [info?.version, sha].filter(Boolean).join(" · ");
   // The `.win-title.sm` strip is a GRANDCHILD of `.modal-box.win` (wrapped in
   // `.whatsnew`); a direct child would inherit the title bar's full-bleed treatment.
-  const notesBlock = skippedLog(info) ?? (notes.length
-    ? html`<div class="whatsnew"><h3 class="win-title sm">What's new</h3><ul>${notes.map((n) => html`<li>${n}</li>`)}</ul></div>`
-    : nothing);
+  const notesBlock = skippedLog(info) ?? incomingNotes(notes);
   const buildLine = idText ? html`<p class="build-id">Build ${idText}</p>` : nothing;
   const kind = info?.kind ? html`<p class="update-kind"><strong>${KIND_LABEL[info.kind]}</strong></p>` : nothing;
   const engineLine = info?.engineLine ? html`<p class="build-id">${info.engineLine}</p>` : nothing;

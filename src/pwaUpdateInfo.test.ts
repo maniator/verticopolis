@@ -262,10 +262,11 @@ describe("notes since the player's version (#1897)", () => {
 
   it("parses releases with the same caps as notes and drops malformed entries", () => {
     const long = "x".repeat(MAX_NOTE_LEN + 10);
+    const rest = Array.from({ length: MAX_NOTES }, (_, i) => `n${i}`);
     const parsed = parseUpdateInfo({
-      releases: [{ version: "3.0.1", notes: [long, "b", "c", "d"] }, { version: 7, notes: ["a"] }, { version: "3.0.0", notes: [] }, null, "x"],
+      releases: [{ version: "3.0.1", notes: [long, ...rest] }, { version: 7, notes: ["a"] }, { version: "3.0.0", notes: [] }, null, "x"],
     });
-    expect(parsed?.releases).toEqual([{ version: "3.0.1", notes: [long.slice(0, MAX_NOTE_LEN), "b", "c"] }]);
+    expect(parsed?.releases).toEqual([{ version: "3.0.1", notes: [long.slice(0, MAX_NOTE_LEN), ...rest.slice(0, MAX_NOTES - 1)] }]);
     const many = Array.from({ length: MAX_RELEASES + 5 }, (_, i) => ({ version: `1.0.${i}`, notes: ["n"] }));
     expect(parseUpdateInfo({ releases: many })?.releases).toHaveLength(MAX_RELEASES);
     expect(parseUpdateInfo({ releases: "nope" })?.releases).toEqual([]);

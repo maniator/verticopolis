@@ -105,16 +105,13 @@ describe("notesForVersion", () => {
   });
 
   it("lifts the prompt's caps when the release workflow asks for every bullet whole", () => {
-    const long = "x".repeat(300);
-    const cl = `## 1.0.0\n- One.\n- Two.\n- Three.\n- Four.\n- ${long}\n`;
-    expect(notesForVersion(cl, "1.0.0")).toHaveLength(3);
-    expect(notesForVersion(cl, "1.0.0", { maxNotes: Infinity, maxLen: Infinity })).toEqual([
-      "One.",
-      "Two.",
-      "Three.",
-      "Four.",
-      long,
-    ]);
+    const long = "x".repeat(MAX_NOTE_LEN + 1);
+    const extra = Array.from({ length: MAX_NOTES }, (_, i) => `Note ${i}.`);
+    const cl = `## 1.0.0\n- ${long}\n${extra.map((n) => `- ${n}`).join("\n")}\n`;
+    const capped = notesForVersion(cl, "1.0.0");
+    expect(capped).toHaveLength(MAX_NOTES);
+    expect(capped[0]).toHaveLength(MAX_NOTE_LEN);
+    expect(notesForVersion(cl, "1.0.0", { maxNotes: Infinity, maxLen: Infinity })).toEqual([long, ...extra]);
   });
 
   it("turns a hard line break inside a bullet into a space", () => {

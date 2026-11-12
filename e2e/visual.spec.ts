@@ -1,5 +1,9 @@
 import { test, expect } from "@playwright/test";
+import { readFileSync } from "node:fs";
 import { buildToStar, hideMapBeforeLoad, expectEngineHosted } from "./helpers";
+
+/** Release 3.2.0's player notes, for the long-release update prompt baselines. */
+const longReleaseNotes = JSON.parse(readFileSync(new URL("./longReleaseNotes.json", import.meta.url), "utf8")) as string[];
 
 // Every test must end with its tower still on the engine.
 test.afterEach(async ({ page }) => expectEngineHosted(page));
@@ -186,8 +190,9 @@ test.describe("dialog chrome", () => {
 
   test("update prompt with what's-new notes matches baseline", async ({ page }) => {
     // The optional "What's new" block: when the incoming build carries
-    // player-facing notes (harvested from `Player-note:` trailers), the modal
-    // shows up to three, above the build-id line. Deterministic stub info.
+    // player-facing notes (from CHANGELOG.md), the modal shows up to three as
+    // a plain list above the build-id line (a longer release scrolls in the
+    // log the skipped-versions test pins). Deterministic stub info.
     await page.evaluate(() =>
       (window as any).game.onUpdateAvailable(async () => {}, {
         version: "1.1.1",
@@ -229,6 +234,30 @@ test.describe("dialog chrome", () => {
     await page.evaluate(() => ((window as any).game.setSpeed(0)));
     await expect(page.locator("#modal .modal-box")).toHaveScreenshot("update-prompt-skipped-versions.png");
   });
+
+  for (const [name, viewport] of [
+    ["desktop", undefined],
+    ["phone", { width: 390, height: 700 }],
+  ] as const) {
+    test(`update prompt with a long release scrolls its notes on the ${name}`, async ({ page }) => {
+      // Release 3.2.0's 22 notes, most of them 300 to 700 characters, fixed in
+      // longReleaseNotes.json so the baseline does not move with later
+      // releases. Every note shows whole in the log, which is capped in height
+      // and scrolls in place, so Later and Update now stay on screen. The phone
+      // is 700 tall, a phone showing browser chrome, as the dialog-chrome pin.
+      if (viewport) await page.setViewportSize(viewport);
+      await page.evaluate((notes) => (window as any).game.onUpdateAvailable(async () => {}, { version: "3.2.0", sha: "abc1234", notes }), longReleaseNotes);
+      await page.waitForSelector("#modal[open]");
+      await expect(page.locator("#modal .whatsnew-log li")).toHaveCount(longReleaseNotes.length);
+      await expect(page.locator("#modal .whatsnew-log li").last()).toHaveText(longReleaseNotes[longReleaseNotes.length - 1]);
+      const log = await page.locator("#modal .whatsnew-log").evaluate((el) => ({ scroll: el.scrollHeight, client: el.clientHeight }));
+      expect(log.scroll).toBeGreaterThan(log.client);
+      await expect(page.locator('#modal [data-act="later"]')).toBeInViewport();
+      await expect(page.locator('#modal [data-act="update"]')).toBeInViewport();
+      await page.evaluate(() => ((window as any).game.setSpeed(0)));
+      await expect(page.locator("#modal .modal-box")).toHaveScreenshot(`update-prompt-long-release-${name}.png`);
+    });
+  }
 
   test("deferred update chip matches baseline", async ({ page }) => {
     // Find an update, then choose "Later" — the deferred state where the modal

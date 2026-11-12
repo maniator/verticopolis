@@ -99,11 +99,18 @@ export function withUpdateKind(info: UpdateInfo | undefined, running: BuildFinge
   return c ? { ...info, ...c } : info;
 }
 
-/** Per-line cap: one giant unbroken token must not be able to wreck the modal
- *  layout, so each note is truncated to this many characters. */
-export const MAX_NOTE_LEN = 200;
-/** At most this many "what's new" lines are surfaced in the update prompt. */
-export const MAX_NOTES = 3;
+/** Per-line cap: a bound on what `version.json` can make the modal render.
+ *  Every note of a release must fit it whole (a guard in src/changelog.test.ts
+ *  holds this build's notes to it), since a cut note stops mid-sentence; the
+ *  list wraps long words (`overflow-wrap: anywhere`) so a long unbroken token
+ *  cannot widen the modal. */
+export const MAX_NOTE_LEN = 1000;
+/** At most this many "what's new" lines of one version reach the update
+ *  prompt. A version with more than {@link SHORT_NOTES} lines shows them in a
+ *  scrolling well, so a long release keeps the actions in view. */
+export const MAX_NOTES = 40;
+/** Up to this many notes show as a plain list; more go in the scrolling well. */
+export const SHORT_NOTES = 3;
 /** At most this many versions' notes travel in `version.json` `releases` and
  *  reach the prompt: enough to cover a player who skipped a season of updates,
  *  small enough to keep the file and the modal short. */
