@@ -93,13 +93,31 @@ test("an imported tower's unhappy tenants explain themselves on the desktop card
   await expect(page.getByText("Tower imported.")).toBeVisible();
   // Hold the clock after the import, so no tenant's state moves while it is read.
   await page.evaluate(() => (window as any).game.setSpeed(0));
+  const unmodified = (await roomsWithSections(page)).flatMap((r) => r.sections);
+  // The canary: the unmodified split-tower-4 holds tenants with a main gripe.
+  expect(unmodified, "split-tower-4 must hold a tenant with a main gripe").toContain("gripe");
+
+  // Its only room that wouldn't lease was a condo beside the nightclub, which
+  // no longer holds a fresh tenant (#1978). So an office tenant leaves over
+  // the rent and the player prices the office at the top of its band, a rent
+  // no fresh tenant stays for: a room the move-in gate holds.
+  const held = await page.evaluate(() => {
+    const g = (window as any).game;
+    const office = g.sim.tower.units.find((u: any) =>
+      u.kind === "office" && u.state === "occupied" && !u.noRate && g.sim.tower.isFloorServed(u.floor));
+    if (!office) throw new Error("split-tower-4 has no occupied office on a served floor");
+    if (!g.enginePort.vacateUnit(office.id, "rent")) throw new Error(`the engine refused to vacate office ${office.id}`);
+    // A Modern price clamps to the band, so this asks for its top.
+    g.enginePort.setRent(office.id, Number.MAX_SAFE_INTEGER);
+    g.syncSim();
+    return office.id as number;
+  });
 
   const rooms = await roomsWithSections(page);
   const present = rooms.flatMap((r) => r.sections);
   test.info().annotations.push({ type: "sections", description: present.join(", ") });
-  // The canary: split-tower-4 holds tenants with a main gripe and a room that won't lease.
-  expect(present, "split-tower-4 must hold a tenant with a main gripe").toContain("gripe");
-  expect(present, "split-tower-4 must hold a room that won't lease").toContain("wontLease");
+  expect(present, "the overpriced empty office must be a room that won't lease").toContain("wontLease");
+  expect(rooms.find((r) => r.sections.includes("wontLease"))?.id, "the held room is the office the test priced").toBe(held);
 
   for (const phone of [false, true]) {
     if (phone) await page.setViewportSize(PHONE);
