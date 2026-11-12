@@ -5,6 +5,7 @@ import { syncScene } from "./towerReconcile";
 import { markRegionUnit } from "./towerRegions";
 import { disposeScene } from "./towerScene";
 import { emptyStructPass } from "./towerStructTiles";
+import { bindViewWorld, viewWorld } from "../../presentation/viewWorld";
 
 // The scene sync's tile pass (floor and lobby cells of the structure TileMap)
 // draws from the layout, the lobby lighting and the sim alone. These tests pin
@@ -19,7 +20,6 @@ vi.mock("./roomSignature", () => ({
 vi.mock("../regionPaint", () => ({ paintAnimatedUnit: vi.fn() }));
 vi.mock("../../catalog/towerCatalog", () => ({ towerCatalog: () => ({}) }));
 vi.mock("../../catalog/catalogTypes", () => ({ catalogFacility: () => ({ floors: 1 }) }));
-vi.mock("../../presentation/viewWorld", () => ({ viewWorld: () => ({ maxFloor: 20 }) }));
 vi.mock("./towerCrowd", () => ({
   clearMotion: vi.fn(),
   reap: <K, V>(map: Map<K, V>, seen: ReadonlySet<K>, dispose: (v: V, k: K) => void): void => {
@@ -83,6 +83,8 @@ function fakeEngine(state: { units: UnitView[]; revision: number }) {
     d: { hour: 9 },
     litState: false,
     structTileMap: { getTile },
+    // The map's row 0 is floor 20.
+    structTopFloor: 20,
     floorGfx: "floor",
     lobbyGfx: [lobbyGfx(0), lobbyGfx(1)],
     entranceGrandLeftGfx: ["grand-left 0", "grand-left 1"],
@@ -133,6 +135,21 @@ describe("the scene sync walks the structure tiles only when what they draw from
     expect(cell(4, 1)?.gfx).toEqual(["grand-left 0"]);
     expect(cell(6, 2)?.gfx).toEqual(["floor"]);
     expect(engine.structTiles.size).toBe(8);
+  });
+
+  it("maps floors to rows by the map's own top floor, whatever world is bound (#1985)", () => {
+    // A taller tower's catalog can be bound before the swap that resizes the
+    // map; the pass must keep indexing the map it has.
+    const world = viewWorld();
+    bindViewWorld({ ...world, maxFloor: world.maxFloor + 20 });
+    try {
+      const { engine, getTile } = fakeEngine(tower());
+      syncScene(engine);
+      expect(getTile).toHaveBeenCalledWith(4, 20 - 1);
+      expect(getTile).toHaveBeenCalledWith(6, 20 - 2);
+    } finally {
+      bindViewWorld(world);
+    }
   });
 
   it("skips the tiles on an hour-only sync, and still repaints a room whose look changed", () => {

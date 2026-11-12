@@ -163,6 +163,11 @@ export class TowerEngine {
    *  actors used, so pixels don't change. The set holds the cells that carry a
    *  graphic. Cells, not unit ids, because the view gives tiles no ids. */
   structTileMap!: ex.TileMap;
+  /** The top floor the tile map was sized for: its row 0. The tile pass maps
+   *  floors to rows by it rather than by the bound world, so a taller world
+   *  bound before the swap that rebuilds the map (towerScene `setSim`) never
+   *  shifts a cell against the map it indexes (#1985). */
+  structTopFloor = 0;
   structTiles = new Set<ex.Tile>();
   /** What the tile pass last drew from (towerReconcile `syncScene`), with the
    *  rooms and lobby cells it kept for the syncs that skip the tiles; a null

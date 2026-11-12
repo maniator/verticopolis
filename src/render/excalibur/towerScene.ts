@@ -42,8 +42,9 @@ import { towerCatalog } from "../../catalog/towerCatalog";
 
 /** Bind the view's world from the tower's catalog: the tile maps, region grid,
  *  scenery and cursor clamps are all sized from it (#921). The engine binds it
- *  when it is built, before any input can read it; a swapped-in tower must
- *  state the same world. */
+ *  when it is built, before any input can read it. A swapped-in tower must
+ *  state the same lot width and basement; its top floor may differ, and
+ *  {@link setSim} then resizes the structure map to it (#1985). */
 export function bindSceneWorld(sim: RenderSim): void {
   const catalog = towerCatalog(sim);
   bindViewWorld(catalog.world);
@@ -133,15 +134,19 @@ export function makeOverlay(engine: TowerEngine): void {
 /** One TileMap entity carries every static floor/lobby tile (see the
  *  structTiles field note). Sized to the whole buildable grid so cell
  *  lookups are plain coordinate math; row 0 is the TOP floor because the
- *  map's origin is its top-left corner in world space. */
+ *  map's origin is its top-left corner in world space. A map built before
+ *  (a swap to a tower with another top floor) leaves the scene first. */
 export function makeStructTileMap(engine: TowerEngine): void {
+  const world = viewWorld();
+  if (engine.structTileMap) engine.engine.remove(engine.structTileMap);
   engine.structTileMap = new ex.TileMap({
-    pos: ex.vec(0, engine.worldYTop(viewWorld().maxFloor)),
+    pos: ex.vec(0, engine.worldYTop(world.maxFloor)),
     tileWidth: TILE,
     tileHeight: FLOOR,
-    columns: viewWorld().lotWidth,
-    rows: viewWorld().maxFloor - viewWorld().minFloor + 1,
+    columns: world.lotWidth,
+    rows: world.maxFloor - world.minFloor + 1,
   });
+  engine.structTopFloor = world.maxFloor;
   engine.structTileMap.z = Z.structure; // behind rooms (0) and transports (1), like the old actors
   engine.engine.add(engine.structTileMap);
 }
@@ -388,10 +393,14 @@ export function followStep(engine: TowerEngine): void {
 }
 
 export function setSim(engine: TowerEngine, sim: RenderSim, opts?: { keepCamera?: boolean }): void {
-  // The scene keeps its size, so the swapped-in tower must state the same
-  // world. Bind first: a refused world throws before anything is torn down.
+  // The scene keeps its lot width and basement, so the swapped-in tower must
+  // state the same ones. Bind first: a refused world throws before anything
+  // is torn down.
   bindSceneWorld(sim);
   disposeScene(engine);
+  // A tower with another top floor (a taller lot, #1985) gets a structure map
+  // of its own height. The cells were just cleared, so nothing drawn is lost.
+  if (engine.structTileMap && viewWorld().maxFloor !== engine.structTopFloor) makeStructTileMap(engine);
   crowd.clearCrowd(engine);
   resetInput(engine);
   // Drop any in-flight event visuals and adopt the new sim's fx baselines, so

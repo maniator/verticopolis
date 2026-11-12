@@ -6,10 +6,13 @@ import type { CatalogWorld } from "../catalog/catalogTypes";
  * (#921). It comes from the tower's catalog when the scene is built, so the
  * view reads the engine's world rather than the TypeScript tables.
  *
- * The scene sizes its tile maps once, so the world is bound once and must not
- * change under it. Both engines' catalogs state the same world (the catalog
- * digests pin it), so a later bind with a different world means a damaged or
- * mismatched catalog, and it throws instead of drawing a lot of the wrong size.
+ * The ground, the scenery and the region grid are built once for the lot's
+ * width and basement, so a later bind must state the same ones: a different
+ * lot width or lowest floor means a damaged or mismatched catalog, and it
+ * throws instead of drawing a lot of the wrong size. The top floor may move
+ * between towers (a taller lot, #1985): every reader takes it live, and the
+ * scene resizes its structure map when it swaps to such a tower (towerScene
+ * `setSim`).
  */
 
 /** The fields the view reads. */
@@ -18,12 +21,14 @@ export type ViewWorld = Pick<CatalogWorld, "lotWidth" | "minFloor" | "maxFloor">
 let bound: ViewWorld | null = null;
 
 /** Binds the view to a catalog's world. A second bind must state the same
- *  world; a different one throws. */
+ *  lot width and lowest floor; a different one throws and leaves the bound
+ *  world in place. The top floor may change. */
 export function bindViewWorld(world: ViewWorld): void {
   const next = { lotWidth: world.lotWidth, minFloor: world.minFloor, maxFloor: world.maxFloor };
-  if (bound && (bound.lotWidth !== next.lotWidth || bound.minFloor !== next.minFloor || bound.maxFloor !== next.maxFloor)) {
+  const otherLot = bound !== null && (bound.lotWidth !== next.lotWidth || bound.minFloor !== next.minFloor);
+  if (bound && otherLot) {
     throw new Error(
-      `the catalog's world (${next.lotWidth} tiles, floors ${next.minFloor} to ${next.maxFloor}) differs from the one the view was built for (${bound.lotWidth} tiles, floors ${bound.minFloor} to ${bound.maxFloor})`,
+      `the catalog's lot (${next.lotWidth} tiles, lowest floor ${next.minFloor}) differs from the one the view was built for (${bound.lotWidth} tiles, lowest floor ${bound.minFloor})`,
     );
   }
   bound = next;
