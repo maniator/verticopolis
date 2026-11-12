@@ -5,7 +5,8 @@
 //! its price without losing a seat until its demand falls below capacity.
 //!
 //! Classic has no ticket price: SimTower gives the player no such control,
-//! so its list is empty and every theater earns and draws as Normal.
+//! so its film rules list no steps and every theater earns and draws as
+//! Normal.
 
 use serde::Serialize;
 
@@ -64,10 +65,7 @@ impl GameMode {
     /// The ticket price steps a theater can charge, cheapest first, or an
     /// empty list where the mode has no ticket price (Classic).
     pub fn ticket_prices(self) -> &'static [TicketPrice] {
-        match self {
-            GameMode::Classic => &[],
-            GameMode::Modern => &MODERN_TICKET_PRICES,
-        }
+        self.films().ticket_prices
     }
 
     /// The step a theater with none set charges, or `None` where the mode

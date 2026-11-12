@@ -7,11 +7,11 @@
 use serde_json::{json, Value};
 
 use crate::clock::GameMode;
-use crate::econ::{classic_ladder, rent_config};
 use crate::economy::films::FilmTier;
 use crate::economy::tickets::shown_ticket_price;
 use crate::facilities::Kind;
 use crate::rent::AVERAGE_RUNG;
+use crate::rules::RentModel;
 use crate::sim::Simulation;
 use crate::tower::Unit;
 
@@ -21,10 +21,10 @@ use crate::tower::Unit;
 /// rung differs from `ECON.rent`'s default), which is why the card reads the
 /// catalog's.
 pub(crate) fn catalog_rent_default(mode: GameMode, kind: Kind) -> Option<f64> {
-    match mode {
-        GameMode::Classic => classic_ladder(kind).map(|rungs| rungs[AVERAGE_RUNG]),
-        GameMode::Modern => rent_config(kind).map(|c| c.default),
-    }
+    mode.rent_model(kind).map(|model| match model {
+        RentModel::Ladder(rungs) => rungs[AVERAGE_RUNG],
+        RentModel::Band(band) => band.default,
+    })
 }
 
 /// `unitPrice(catalog, u)`: nothing when off the market, the stored price

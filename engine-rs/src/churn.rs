@@ -1,10 +1,11 @@
 //! Port of `sim/churn.ts`: vacate, move-ins, names, relocations.
 
-use crate::econ::{classic_ladder, rent_config};
+use crate::econ::rent_config;
 use crate::facilities::Kind;
 use crate::jsmath;
 use crate::presence::CongestionAttribution;
 use crate::rent::snap_to_ladder;
+use crate::rules::RentModel;
 use crate::satisfaction::{vacate_reason_text, VACATE_NOTICE_MINUTES};
 use crate::services::with_thousands;
 use crate::sim::{LogKind, Simulation};
@@ -207,7 +208,7 @@ impl Simulation {
             self.money -= buyback;
             self.record_money("condos", -buyback);
         }
-        let modern = self.mode.is_modern();
+        let mode = self.mode;
         let (u, at) = self.tower.marked(i);
         u.set_state(at, UnitState::Empty);
         u.set_occupants(at, 0);
@@ -217,12 +218,15 @@ impl Simulation {
         u.set_residents(at, None);
         if kind == Kind::Condo {
             if let Some(r) = u.rent {
-                u.rent = Some(if modern {
-                    let band = rent_config(Kind::Condo).unwrap();
-                    r.min(band.max).max(band.min)
-                } else {
-                    snap_to_ladder(&classic_ladder(Kind::Condo).unwrap(), r)
-                });
+                u.rent = Some(
+                    match mode
+                        .rent_model(Kind::Condo)
+                        .expect("every mode prices a condo")
+                    {
+                        RentModel::Band(band) => r.min(band.max).max(band.min),
+                        RentModel::Ladder(rungs) => snap_to_ladder(&rungs, r),
+                    },
+                );
             }
         }
         u.extras_mut().vacate_reason = None;
