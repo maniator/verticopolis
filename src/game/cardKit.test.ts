@@ -52,9 +52,9 @@ const card = (
     ...over,
   });
 
-/** A room's engine facts (`unitFacts`): no access or No Rate line unless set. */
+/** A room's engine facts (`unitFacts`): no access, No Rate or amenity line unless set. */
 const facts = (id: number, over: Record<string, number> = {}) =>
-  record("unitFacts", { id, access: NaN, noRate: NaN, ...over });
+  record("unitFacts", { id, access: NaN, noRate: NaN, amenity: NaN, amenityLift: NaN, ...over });
 
 /** A tower with a recycling center in the basement and an occupied office on
  *  floor 2 that no elevator reaches; each answer can be changed by the test. */

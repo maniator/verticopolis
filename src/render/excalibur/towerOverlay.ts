@@ -9,6 +9,8 @@ import { FLOOR, TILE } from "../scale";
 import type { ScreenRect } from "./towerInputCamera";
 import type { ThiefSpan, TowerEngine } from "./TowerEngine";
 import { drawShaftNumbers } from "./towerShaftNumbers";
+import { drawHaloRings } from "./towerHaloRings";
+import { drawNoiseReach } from "./towerNoiseReach";
 
 /**
  * The 2D canvas overlay and sky painters for {@link TowerEngine}, plus the
@@ -343,11 +345,16 @@ function strokeSelection(ctx: CanvasRenderingContext2D, sx: number, sy: number, 
 function drawPreview(engine: TowerEngine, ctx: CanvasRenderingContext2D): void {
   if (engine.preview) {
     const p = engine.preview;
-    const f = catalogFacility(towerCatalog(engine.sim), p.kind);
+    const catalog = towerCatalog(engine.sim);
+    const f = catalogFacility(catalog, p.kind);
+    // A venue's halo shows where it reaches before it is placed (#1980).
+    if (f.halo) drawHaloRings(ctx, f.halo, p.floor, catalog.world, engine);
     const hgt = f.floors;
     // Floor/lobby tools lay a multi-tile brush strip; `span` (when set) is the
     // real footprint so the shadow matches what a click actually places.
     const w = p.span ?? f.width;
+    // And how far its noise carries along its floor, or how far it hears.
+    drawNoiseReach(ctx, f.noise, { floor: p.floor, floors: hgt, x: p.x, width: w }, engine.sim.tower, engine);
     const sx = engine.worldToScreenX(p.x);
     const sy = engine.worldToScreenY(p.floor + hgt - 1);
     const sw = w * TILE * engine.cam.zoom;

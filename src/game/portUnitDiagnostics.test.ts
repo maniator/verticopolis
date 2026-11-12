@@ -5,7 +5,7 @@ import { createPortUnitDiagnostics, createPortUnitParts, joinParts, type Supplem
 
 /** The Rust engine's view layout (the checked-in fixture), with the tables these tests code by. */
 type CodeTable = "vacateReasons" | "bindings" | "accessLines" | "noRateLines";
-const VIEW_LAYOUT = JSON.parse(LAYOUT_TEXT) as { records: { unitFacts: string[] } } & Record<CodeTable, string[]>;
+const VIEW_LAYOUT = JSON.parse(LAYOUT_TEXT) as { records: { unitFacts: string[] }; kinds: string[] } & Record<CodeTable, string[]>;
 const slots = VIEW_LAYOUT.records.unitFacts;
 function facts(changes: Record<string, number>): Float64Array {
   const record = new Float64Array(slots.length).fill(NaN);
@@ -218,5 +218,24 @@ describe("Rust port tenant explanations", () => {
     expect(text(kept.lines)).not.toContain("RECYCLING");
     record = new Float64Array(2);
     expect(text(joinParts(parts(73), block))).toBe("<div>RECYCLING</div>");
+  });
+
+  it("names the amenity helping a room by the catalog's name, after the gripes and notice", () => {
+    const name = vi.fn((kind: string) => (kind === "fitnessClub" ? "Fitness Club" : undefined));
+    const record = facts({
+      access: code("accessLines", "reachable"),
+      gripe: 1,
+      gripeCause: code("vacateReasons", "noise"),
+      amenity: VIEW_LAYOUT.kinds.indexOf("fitnessClub"),
+      amenityLift: 0.12,
+    });
+    const lines = text(createPortUnitDiagnostics({ viewLayout: () => LAYOUT_TEXT, unitFacts: () => record }, MODERN_RULES, undefined, name)(73));
+    expect(name).toHaveBeenCalledWith("fitnessClub");
+    expect(lines).toContain("Helped by a nearby fitness club: when noise, a far lobby or too few shops hold this room back, it can still be up to 12% happier.");
+    expect(lines.indexOf("Helped by")).toBeGreaterThan(lines.indexOf("Main gripe:"));
+    // No amenity, no line, and no name asked for.
+    name.mockClear();
+    expect(render(facts({ access: code("accessLines", "reachable") }))).not.toContain("Helped by");
+    expect(name).not.toHaveBeenCalled();
   });
 });

@@ -3,7 +3,7 @@
 //! per-revision memo the TypeScript keeps in front of it (#1051).
 
 use crate::facilities::Kind;
-use crate::satisfaction::{HOTEL_NOISE_TILES, OFFICE_NOISE_TILES};
+use crate::rules::noise_rule_for;
 use crate::sim::Simulation;
 use crate::tower::Unit;
 
@@ -54,18 +54,12 @@ impl Simulation {
         fresh
     }
 
-    /// `noiseAfflictedFresh`: the scan behind the memo.
+    /// `noiseAfflictedFresh`: the scan behind the memo, for the rule the
+    /// room hears in the noise table ([`crate::rules::NOISE_RULES`]).
     pub(crate) fn noise_afflicted_fresh(&self, u: &Unit) -> bool {
-        if u.kind == Kind::Office {
-            return self.nearest_kind_within(u, |k| k.is_noisy_venue(), OFFICE_NOISE_TILES);
+        match noise_rule_for(u.kind) {
+            Some(rule) => self.nearest_kind_within(u, |k| rule.made_by(k), rule.tiles),
+            None => false,
         }
-        if u.kind.is_hotel() || u.kind == Kind::Condo || u.kind.is_rental() {
-            return self.nearest_kind_within(
-                u,
-                |k| k == Kind::Office || k.is_noisy_venue(),
-                HOTEL_NOISE_TILES,
-            );
-        }
-        false
     }
 }

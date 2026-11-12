@@ -39,7 +39,7 @@ export interface CatalogTicketPrice {
 
 /** The version of the catalog's shape. It moves when a field is added,
  *  renamed or removed, so a frontend can refuse a shape it does not know. */
-export const CATALOG_VERSION = 13;
+export const CATALOG_VERSION = 14;
 
 /** Every price, size and build rule of one mode. */
 export interface Catalog {
@@ -312,6 +312,44 @@ export interface CatalogFacility {
   /** A demand tenant whose unmet local coverage drains satisfaction (office,
    *  condo, apartment, hotel rooms). */
   readonly unmetDemand: boolean;
+  /** The venue's cross-floor halo in this mode, or null (#1980): the
+   *  placement range rings draw it. */
+  readonly halo: CatalogHalo | null;
+  /** How far the room's same-floor noise carries and how far it hears its
+   *  neighbors, which the placement overlay draws; empty in Classic. */
+  readonly noise: readonly CatalogNoise[];
+}
+
+/** A venue's cross-floor halo: who feels it, over how many floors and how
+ *  hard. A room `d` floors from the venue feels `max * (1 - d / floors)`,
+ *  and none at `floors` or beyond. */
+export interface CatalogHalo {
+  /** `lift` (an amenity) or `drain` (a nuisance). */
+  readonly effect: "lift" | "drain";
+  readonly floors: number;
+  /** The hourly bonus or drain on the venue's own floor. */
+  readonly max: number;
+  /** How far a lift raises a capped room's ceiling at full strength, or
+   *  null for a drain. */
+  readonly capLift: number | null;
+  /** The facility keys that feel it. */
+  readonly feltBy: readonly FacilityKind[];
+  /** Felt only in the venue's `openHours`. */
+  readonly openHoursOnly: boolean;
+  /** Scaled by the household's size, largest for the biggest family. */
+  readonly familyScaled: boolean;
+}
+
+/** One reach of a room's same-floor noise. The tile beside the room is tile
+ *  0, so a room of the other side within `tiles + 1` tiles of an edge counts;
+ *  a lobby tile or a gap in the floor stops it. */
+export interface CatalogNoise {
+  /** `carries`: the room makes noise `kinds` hear. `hears`: the room hears
+   *  noise `kinds` make. */
+  readonly role: "carries" | "hears";
+  readonly tiles: number;
+  /** The facility keys on the other side. */
+  readonly kinds: readonly FacilityKind[];
 }
 
 const facilityIndex = new WeakMap<Catalog, ReadonlyMap<FacilityKind, CatalogFacility>>();

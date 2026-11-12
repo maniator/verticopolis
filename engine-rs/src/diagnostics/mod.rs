@@ -17,6 +17,7 @@
 //! `memo.rs`, keyed on at least what the TypeScript keys it on and filled at
 //! the same reads.
 
+mod amenity;
 mod memo;
 #[cfg(test)]
 mod memo_tests;
@@ -28,6 +29,7 @@ mod tenant;
 #[cfg(test)]
 mod tenant_tests;
 
+pub use amenity::AmenityFacts;
 pub use memo::DiagMemo;
 pub use tenant::{GripeFacts, LobbyFacts, NoticeFacts, SlotFacts, WontLeaseFacts};
 
@@ -60,6 +62,9 @@ pub struct DiagnosticFacts {
     pub wont_lease: Option<WontLeaseFacts>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub notice: Option<NoticeFacts>,
+    /// The amenity helping the room (#1980).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub amenity: Option<AmenityFacts>,
 }
 
 #[doc(hidden)]
@@ -81,8 +86,10 @@ impl Simulation {
             gripe: None,
             wont_lease: None,
             notice: None,
+            amenity: None,
         };
         self.tenant_facts(&u, &mut facts);
+        facts.amenity = self.amenity_facts(&u);
         Some(facts)
     }
 }

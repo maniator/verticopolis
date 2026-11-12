@@ -1,5 +1,5 @@
 {
-  "version": 20,
+  "version": 21,
   "header": {
     "minutes": 0,
     "towerRevision": 1,
@@ -612,7 +612,9 @@
       "noticeReason",
       "minutesLeft",
       "noticeSatisfaction",
-      "keepAt"
+      "keepAt",
+      "amenity",
+      "amenityLift"
     ],
     "queueView": [
       "landings",

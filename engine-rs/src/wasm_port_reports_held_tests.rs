@@ -1,5 +1,5 @@
-//! A spot the move-in gate holds, for the port report test's coverage of
-//! the won't-lease section.
+//! Helpers for the port report tests: a spot the move-in gate holds, for the
+//! coverage of the won't-lease section, and the slot comparison.
 
 use super::Engine;
 use crate::facilities::Kind;
@@ -27,4 +27,12 @@ pub(super) fn hold_an_overpriced_office(e: &mut Engine) {
     let (u, at) = e.sim.tower.marked_by_id(id).unwrap();
     u.set_state(at, crate::tower::UnitState::Empty);
     u.rent = Some(top);
+}
+
+/// A slot's value against the JSON getter's, NaN matching NaN.
+pub(super) fn same(got: f64, want: f64, what: &str) {
+    assert!(
+        got == want || (got.is_nan() && want.is_nan()),
+        "{what}: {got} vs {want}"
+    );
 }

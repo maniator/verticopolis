@@ -7,6 +7,7 @@ use crate::sim::Simulation;
 
 #[path = "wasm_port_reports_held_tests.rs"]
 mod held;
+use held::same;
 
 fn code(kind: Kind) -> f64 {
     FACILITIES.iter().position(|f| f.kind == kind).unwrap() as f64
@@ -280,12 +281,6 @@ fn keyed_housekeeping_fixture_emits_observed_shortfall_only_with_hotel_rooms() {
     assert_eq!(read(&mut engine)["housekeeping"]["status"], "adequate");
 }
 
-fn fixture(name: &str) -> Engine {
-    let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../conformance/fixtures/");
-    let text = std::fs::read_to_string(format!("{dir}{name}")).unwrap();
-    Engine::of(crate::load_stream::load_vctower_text(&text, None).unwrap())
-}
-
 /// A JSON number, NaN for null or absent, 0 or 1 for a boolean.
 fn num(v: &serde_json::Value) -> f64 {
     match v {
@@ -294,11 +289,11 @@ fn num(v: &serde_json::Value) -> f64 {
     }
 }
 
-fn same(got: f64, want: f64, what: &str) {
-    assert!(
-        got == want || (got.is_nan() && want.is_nan()),
-        "{what}: {got} vs {want}"
-    );
+/// A conformance fixture tower, loaded as a player's file is.
+fn fixture(name: &str) -> Engine {
+    let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../conformance/fixtures/");
+    let text = std::fs::read_to_string(format!("{dir}{name}")).unwrap();
+    Engine::of(crate::load_stream::load_vctower_text(&text, None).unwrap())
 }
 
 fn kind_code(name: &str) -> f64 {
@@ -446,6 +441,9 @@ fn check_unit_facts(e: &mut Engine) -> [usize; 4] {
             num(&n["satisfaction"]),
             num(&n["keepAt"]),
         ]);
+        let a = &f["amenity"];
+        let amenity = a["kind"].as_str().map_or(f64::NAN, kind_code);
+        want.extend([amenity, num(&a["lift"])]);
         assert_eq!(r.len(), want.len());
         for (i, (g, w)) in r.iter().zip(&want).enumerate() {
             same(*g, *w, &format!("unit {id} slot {}", UNIT_FACTS[i]));
