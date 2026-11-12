@@ -53,6 +53,42 @@ fn meal_origin_of(origin: VisitOrigin) -> super::meals::MealOrigin {
     }
 }
 
+/// The blockbuster option: the open cinema floors holding a booked theater,
+/// in `cinemas`' order, and the option's weight. The weight is 1 where every
+/// theater charges Normal, and otherwise the mean ticket pick of the booked
+/// theaters on those floors (#1950). The booked ids (16 at most) are read
+/// directly, in id order, so neither a floor's rooms nor the set's own order
+/// enter the draw. `None` when no open cinema floor holds a booked theater.
+pub(crate) fn booked_cinema_floors(
+    crowd: &Crowd,
+    tower: &Tower,
+    cinemas: &[i64],
+    floors: &SpawnFloors,
+) -> Option<(Vec<i64>, f64)> {
+    let mut booked: Vec<(i64, i64, f64)> = crowd
+        .blockbusters
+        .iter()
+        .filter_map(|&id| tower.get_unit(id))
+        .filter(|u| u.kind == Kind::Cinema && cinemas.contains(&u.floor))
+        .map(|u| (u.id, u.floor, ticket_pick_mult(tower.mode, u)))
+        .collect();
+    if booked.is_empty() {
+        return None;
+    }
+    booked.sort_unstable_by_key(|&(id, _, _)| id);
+    let weight = if floors.cinema_picks.is_some() {
+        booked.iter().map(|&(_, _, pick)| pick).sum::<f64>() / booked.len() as f64
+    } else {
+        1.0
+    };
+    let bb = cinemas
+        .iter()
+        .copied()
+        .filter(|f| booked.iter().any(|&(_, floor, _)| floor == *f))
+        .collect();
+    Some((bb, weight))
+}
+
 pub fn push_venue_visit_options(
     crowd: &mut Crowd,
     tower: &Tower,
@@ -74,34 +110,8 @@ pub fn push_venue_visit_options(
             // Ticket prices move the theaters' whole share of the crowd by
             // their mean pick multiplier (#1950); at Normal it is 1.
             push_visits(Kind::Cinema, cinemas, floors.cinema_picks.unwrap_or(1.0));
-            if !crowd.blockbusters.is_empty() {
-                // The booked theaters (16 at most) on an open cinema floor,
-                // read by id so no floor's rooms are walked.
-                let (mut bb_floors, mut bb_picks) = (Vec::new(), 0.0);
-                for &id in &crowd.blockbusters {
-                    let Some(u) = tower.get_unit(id) else {
-                        continue;
-                    };
-                    if u.kind == Kind::Cinema && cinemas.contains(&u.floor) {
-                        bb_floors.push(u.floor);
-                        bb_picks += ticket_pick_mult(tower.mode, u);
-                    }
-                }
-                if !bb_floors.is_empty() {
-                    let weight = if floors.cinema_picks.is_some() {
-                        bb_picks / bb_floors.len() as f64
-                    } else {
-                        1.0
-                    };
-                    // The floors in the open cinema floors' order, each once,
-                    // since the set's own order is not stable.
-                    let bb: Vec<i64> = cinemas
-                        .iter()
-                        .copied()
-                        .filter(|f| bb_floors.contains(f))
-                        .collect();
-                    push_visits(Kind::Cinema, &bb, weight);
-                }
+            if let Some((bb, weight)) = booked_cinema_floors(crowd, tower, cinemas, floors) {
+                push_visits(Kind::Cinema, &bb, weight);
             }
         }
     }

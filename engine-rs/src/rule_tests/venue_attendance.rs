@@ -10,7 +10,7 @@
 use crate::clock::GameMode;
 use crate::crowd::spawn::spawn_trips;
 use crate::crowd::spawn_floors::spawn_floors;
-use crate::crowd::visits::{spawn_venue_visit, VisitOrigin};
+use crate::crowd::visits::{booked_cinema_floors, spawn_venue_visit, VisitOrigin};
 use crate::crowd::{
     dwell_seconds_range, CROWD_SECONDS_PER_MINUTE, EAT_SECONDS_MAX, EAT_SECONDS_MIN,
 };
@@ -430,4 +430,33 @@ fn the_crowd_weighs_each_floor_by_its_open_theaters_only() {
     assert_eq!(floors.cinema_floor_pick(4), 0.75);
     assert_eq!(floors.cinema_floor_pick(3), 1.0);
     assert_eq!(floors.cinema_picks, Some(1.0));
+}
+
+/// The blockbuster option (#1950): each open cinema floor holding a booked
+/// theater, once, weighted by the mean ticket pick of the booked theaters
+/// there. A stale id, a booked room that is no cinema and a booked theater
+/// on a floor with no open theater all stay out, and at Normal it weighs 1.
+#[test]
+fn the_blockbuster_option_lists_booked_open_floors_and_their_mean_pick() {
+    let mut sim = strip_tower(2024, GameMode::Modern, 80, 7);
+    let low = place_seated(&mut sim, Kind::Cinema, 2, 0, UnitState::Occupied, 0);
+    let premium = place_seated(&mut sim, Kind::Cinema, 2, 40, UnitState::Occupied, 0);
+    place_seated(&mut sim, Kind::Cinema, 4, 0, UnitState::Occupied, 0);
+    let closed = place_seated(&mut sim, Kind::Cinema, 6, 0, UnitState::Empty, 0);
+    let shop = place_seated(&mut sim, Kind::Shop, 4, 40, UnitState::Occupied, 0);
+    sim.crowd
+        .blockbusters
+        .extend([low, premium, closed, shop, 9_999]);
+    at_time(&mut sim, 0, 14);
+    let booked = |sim: &Simulation| {
+        let floors = spawn_floors(&sim.tower, &sim.clock);
+        let cinemas = floors.venues_by_kind.get(&Kind::Cinema).unwrap().to_vec();
+        booked_cinema_floors(&sim.crowd, &sim.tower, &cinemas, &floors)
+    };
+    assert_eq!(booked(&sim), Some((vec![2], 1.0)));
+    sim.set_ticket_price(low, "low");
+    sim.set_ticket_price(premium, "premium");
+    let (bb, weight) = booked(&sim).unwrap();
+    assert_eq!(bb, vec![2]);
+    assert!((weight - 0.9).abs() < 1e-12, "weight {weight}");
 }
