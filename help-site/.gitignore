@@ -1,0 +1,5 @@
+node_modules/
+.astro/
+# Written by scripts/sync-assets.mjs from the game's own files.
+/src/assets/
+/public/

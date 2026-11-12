@@ -2,8 +2,8 @@ import { analyticsAdapter } from "./analyticsAdapter";
 
 /**
  * Shared page-view + Core Web Vitals inject for every deployed page: the game
- * boot (`bootstrap.ts`), the sprite gallery (`gallery.ts`), and the standalone
- * `/help` page (`helpPage.ts`). It reports page performance and page views
+ * boot (`bootstrap.ts`), the sprite gallery (`gallery.ts`), and the Help site
+ * at `/help` (its header, `help-site/src/components/Header.astro`). It reports page performance and page views
  * through the one analytics adapter (the page-level pair kept at the D-1
  * cutover: Vercel Speed Insights plus the Web Analytics page-view inject; the
  * custom-event side of Web Analytics is retired), but only where the Vercel

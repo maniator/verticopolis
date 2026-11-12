@@ -22,9 +22,9 @@ describe("notFoundPageTemplate", () => {
   it("links to the game and to each standalone page", () => {
     const frag = renderToFragment(notFoundPageTemplate("/x"));
     const links = [...frag.querySelectorAll<HTMLAnchorElement>(".page-links a.btn")];
-    expect(links.map((a) => a.getAttribute("href"))).toEqual(["/", "/help", "/help/changelog", "/gallery"]);
+    expect(links.map((a) => a.getAttribute("href"))).toEqual(["/", "/help", "/help/changelog", "/help/rooms"]);
     expect(links[0].classList.contains("primary")).toBe(true);
-    expect(NOT_FOUND_LINKS.map((l) => l.href)).toEqual(["/help", "/help/changelog", "/gallery"]);
+    expect(NOT_FOUND_LINKS.map((l) => l.href)).toEqual(["/help", "/help/changelog", "/help/rooms"]);
   });
 
   it("frames the page in the retro shell with Back to game pointing at the game", () => {

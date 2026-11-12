@@ -96,7 +96,7 @@ test.describe("fidelity report precedence (real dialog, real top layer)", () => 
   test("a report takes a dialog that owns nothing", async ({ page }) => {
     await page.evaluate((report) => {
       const ui = (window as any).game.ui;
-      ui.showHelp();
+      ui.showAbout();
       ui.showImportReport(report, { onOpen: () => {} });
     }, REPORT);
     await expect(page.locator('#modal [data-act="open"]')).toBeVisible();

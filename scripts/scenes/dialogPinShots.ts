@@ -44,14 +44,15 @@ export const DIALOG_PIN_SHOTS: Shot[] = [
     // A per-shot viewport resize is draw-coupled; draw every settle frame.
     drawSettle: true,
     setup: async (page) => {
-      // The in-game guide (How to play). The toolbar's Help… opens the short
-      // Help menu now, so the shot opens the guide through the tooling handle.
-      await page.evaluate(() => (window as any).game.ui.showHelp());
+      // About this game, the tallest Help window now that the guide is the
+      // Help site: open its Privacy section so it overflows the short viewport.
+      await page.evaluate(() => (window as any).game.ui.showAbout());
       await page.waitForSelector("#modal .help-modes", { timeout: 4000 });
       await page.evaluate(() => {
         const box = document.querySelector("#modal .modal-box") as HTMLElement | null;
         const strip = document.querySelector("#modal .modal-box > .modal-actions") as HTMLElement | null;
         if (!box || !strip) throw new Error("the Help dialog did not mount");
+        for (const d of box.querySelectorAll("details")) d.open = true;
         box.scrollTop = Math.floor((box.scrollHeight - box.clientHeight) / 2);
         // Same floor as the schedule shots: enough content must remain below
         // the fold that an unpinned footer would be off screen here.

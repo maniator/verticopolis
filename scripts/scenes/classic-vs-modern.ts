@@ -10,7 +10,7 @@
  * same moment in both rule-sets. The builders and these setups fail closed on
  * the placement divergence, so a matched (non-divergent) pair can never ship.
  * The other shortlisted cards (mode picker, pricing, schedule, stats) already
- * have committed pairs the `/help` page reuses; the data/math divergences stay
+ * have committed pairs the Help site's Classic vs Modern page shows; the data/math divergences stay
  * caption-only per media-plan.md.
  *
  * The theater card pair (#1932): Modern books a film each period (the

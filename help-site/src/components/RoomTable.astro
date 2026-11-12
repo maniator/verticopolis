@@ -1,0 +1,90 @@
+---
+// Every room and shaft in one table, read from the engine's catalog, each
+// linked to the page that tells its story.
+import type { FacilityKind } from "../../../src/shared/types";
+import { catalogs, dollars } from "../lib/catalog";
+
+/** The page each kind is written up on. */
+const PAGE_OF: Partial<Record<FacilityKind, string>> = {
+  lobby: "building/floors-and-lobbies",
+  floor: "building/floors-and-lobbies",
+  office: "rooms/offices",
+  condo: "rooms/homes",
+  rentalStudio: "rooms/homes",
+  rentalApartment: "rooms/homes",
+  hotelSingle: "rooms/hotels",
+  hotelDouble: "rooms/hotels",
+  hotelSuite: "rooms/hotels",
+  housekeeping: "rooms/hotels",
+  fastFood: "rooms/food-and-shops",
+  restaurant: "rooms/food-and-shops",
+  foodHall: "rooms/food-and-shops",
+  shop: "rooms/food-and-shops",
+  boutiqueBay: "rooms/food-and-shops",
+  clinic: "rooms/food-and-shops",
+  cinema: "rooms/venues",
+  partyHall: "rooms/venues",
+  amusements: "rooms/venues",
+  fitnessClub: "rooms/venues",
+  nightclub: "rooms/venues",
+  spa: "rooms/venues",
+  skyBar: "rooms/venues",
+  aquaticCenter: "rooms/venues",
+  daycare: "rooms/venues",
+  stairs: "building/stairs-and-escalators",
+  escalator: "building/stairs-and-escalators",
+  elevatorStandard: "building/elevators",
+  elevatorService: "building/elevators",
+  elevatorExpress: "building/elevators",
+  parkingRamp: "rooms/services",
+  parking: "rooms/services",
+  security: "rooms/services",
+  medical: "rooms/services",
+  recycling: "rooms/services",
+  metro: "rooms/services",
+  weddingHall: "rooms/wedding-hall",
+};
+
+const { classic, modern } = await catalogs();
+const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+const rows = modern.facilities
+  .filter((f) => PAGE_OF[f.key])
+  .map((f) => {
+    const c = classic.facilities.find((e) => e.key === f.key);
+    return {
+      name: f.name,
+      href: `${base}/${PAGE_OF[f.key]}/#${f.key}`,
+      size: f.transport ? `${f.width} wide` : `${f.width} × ${f.floors}`,
+      price: dollars(f.cost),
+      stars: f.minStar <= 1 ? "Start" : `${f.minStar}★`,
+      modes: c?.available ? "Both" : "Modern",
+    };
+  });
+---
+
+<table class="vc-room-table">
+  <thead>
+    <tr>
+      <th scope="col">Room</th>
+      <th scope="col">Size (tiles × floors)</th>
+      <th scope="col">Price</th>
+      <th scope="col">Unlocks</th>
+      <th scope="col">Modes</th>
+    </tr>
+  </thead>
+  <tbody>
+    {
+      rows.map((r) => (
+        <tr>
+          <th scope="row">
+            <a href={r.href}>{r.name}</a>
+          </th>
+          <td>{r.size}</td>
+          <td>{r.price}</td>
+          <td>{r.stars}</td>
+          <td>{r.modes}</td>
+        </tr>
+      ))
+    }
+  </tbody>
+</table>

@@ -63,8 +63,8 @@ describe("newTowerTemplate structure and defaults", () => {
     expect(details.closest(".nt-modern-only")).toBeNull();
     expect(details.querySelector("summary")?.textContent?.trim()).toBe("Classic vs Modern: the full comparison");
     // A signature phrase from the shared body is present.
-    expect(details.textContent).toContain("pixel-faithful to 1994");
-    expect(details.textContent).toContain("Variant households");
+    expect(details.textContent).toContain("SimTower as it was in 1994");
+    expect(details.textContent).toContain("Households of two to five");
   });
 
   it("keeps the three-feature teaser and adds no 'Modern adds N' count", () => {

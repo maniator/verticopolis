@@ -1,9 +1,8 @@
 import { html, render } from "lit-html";
 import type { Catalog, CatalogFacility } from "./catalog/catalogTypes";
-import type { FacilityKind, Transport, Unit, UnitState } from "./shared/types";
-import { fitAtGameScale } from "./render/catalogScale";
-import { FLOOR, TILE } from "./render/scale";
-import { drawCar, drawTransport, drawUnit, type DrawCtx } from "./render/sprites";
+import type { FacilityKind, UnitState } from "./shared/types";
+import type { DrawCtx } from "./render/sprites";
+import { drawRoomPortrait, drawTransportPortrait } from "./render/roomPortrait";
 import { pageShell } from "./ui/templates/pageShell";
 import { takeFromGameFlag } from "./ui/fromGame";
 import { injectVercelTelemetry } from "./telemetry";
@@ -45,27 +44,6 @@ const MAG = 3;
  *  own label. */
 const CAPTION_H = 26;
 
-function makeUnit(kind: FacilityKind, state: UnitState, occupants: number, id = 1, subtype?: string, floorOverride?: number): Unit {
-  const f = facilityOf(kind);
-  return {
-    id,
-    kind,
-    // Lobbies style by floor (1 = the grand ground concourse, else the sky-
-    // lobby look). Default to the ground lobby, the one the starter tower
-    // builds; `floorOverride` lets the catalog show the sky-lobby variant too.
-    floor: floorOverride ?? (kind === "lobby" ? 1 : 5),
-    x: 0,
-    width: f.width,
-    state,
-    satisfaction: 1,
-    occupants,
-    everOccupied: true,
-    pendingIncome: 0,
-    label: f.name,
-    subtype,
-  };
-}
-
 function roomEntry(
   label: string,
   kind: FacilityKind,
@@ -74,52 +52,10 @@ function roomEntry(
   subtype?: string,
   floorOverride?: number,
 ): Entry {
-  const f = facilityOf(kind);
+  facilityOf(kind);
   return {
     label,
-    draw(d, cx, cy, cw, ch) {
-      // Size the cell by the facility's own floor count so a genuinely multi-
-      // floor kind (cinema, party hall, metro) shows at its true proportion
-      // instead of squished into one floor. `fitAtGameScale` steps a footprint
-      // that overflows the cell down to a smaller whole multiple (and below 1x
-      // only when nothing else fits), so a room loses size rather than shape.
-      const floors = f.floors ?? 1;
-      const box = fitAtGameScale(f.width, floors, cw - 16, ch - CAPTION_H, MAG);
-      const w = box.w;
-      const h = box.h;
-      // Under 1px is as unusable as zero, and worse than nothing: drawFloor
-      // clamps height up to 1, so a sub-pixel box paints a stray hairline. Both
-      // are skipped, which is what "a degenerate cell draws nothing" has to mean.
-      if (w < 1 || h < 1) return;
-      // Whole screen pixels for the origin: centering can land on a half pixel,
-      // and with the scale a whole multiple, a whole origin is what keeps every
-      // magnified world pixel on whole screen pixels instead of antialiasing.
-      const x = Math.round(cx + (cw - w) / 2);
-      const y = Math.round(cy + (ch - CAPTION_H - h) / 2);
-      // The painters are FIXED-PIXEL: they draw a 17px cubicle whatever box they
-      // are handed, because the game always rasterizes a unit at exactly its
-      // world size and lets the camera do the zooming. So magnify the way the
-      // camera does, by transforming the context, and hand the painter its world
-      // box. Inflating the box instead would grow the room while its furniture
-      // stayed put, which is the same wrong-proportion defect this page was fixed
-      // to stop, just moved from aspect to interior scale.
-      const worldW = f.width * TILE;
-      const worldH = floors * FLOOR;
-      const ctx = d.ctx;
-      ctx.save();
-      ctx.imageSmoothingEnabled = false;
-      ctx.translate(x, y);
-      ctx.scale(box.scale, box.scale);
-      // Floor strip for context, in world units like everything else here.
-      const floorU = makeUnit("floor", "occupied", 0, 999);
-      const pad = 6 / box.scale;
-      // The wedding hall crowns the tower: only its ground story stands on a floor,
-      // and the garden above it stands in the open sky.
-      const stripH = kind === "weddingHall" ? FLOOR : worldH;
-      drawUnit(d, floorU, -pad, worldH - stripH, worldW + pad * 2, stripH);
-      drawUnit(d, makeUnit(kind, state, occ ?? (state === "occupied" ? f.population : 0), 1, subtype, floorOverride), 0, 0, worldW, worldH);
-      ctx.restore();
-    },
+    draw: (d, cx, cy, cw, ch) => drawRoomPortrait(d, facilityOf, kind, { state, occupants: occ, subtype, floor: floorOverride }, cx, cy, cw, ch, CAPTION_H, MAG),
   };
 }
 
@@ -130,66 +66,10 @@ function retailEntries(kind: FacilityKind): Entry[] {
 }
 
 function transportEntry(label: string, kind: FacilityKind, span = 3): Entry {
-  const f = facilityOf(kind);
+  facilityOf(kind);
   return {
     label,
-    draw(d, cx, cy, cw, ch) {
-      // A shaft is drawn as its span plus the floor it lands on, so it is sized
-      // as a `span + 1` floor footprint and its per-floor pitch falls out of the
-      // fitted box. Same scale as the rooms, so a shaft and a room next to each
-      // other in the catalog are honest about their relative proportions.
-      const floors = span + 1;
-      const box = fitAtGameScale(f.width, floors, cw - 16, ch - CAPTION_H, MAG);
-      // World units, like the room path: the shaft art is fixed-pixel too, so the
-      // context carries the magnification and the painter is handed its true box.
-      const worldW = f.width * TILE;
-      const floorH = FLOOR;
-      const w = box.w;
-      // Same degenerate-cell guard as the room path above: sub-pixel counts as
-      // empty, because drawFloor clamps a zero height up to a visible 1px.
-      if (w < 1 || box.h < 1) return;
-      const cars = kind.startsWith("elevator") ? 2 : 0;
-      const t: Transport = {
-        id: 1,
-        kind,
-        x: 0,
-        width: f.width,
-        bottom: 1,
-        top: 1 + span,
-        cars,
-        carPositions: cars ? [1.4, 1 + span - 0.6] : [],
-        carDir: cars ? [1, -1] : [],
-        load: 1,
-      };
-      // Whole screen pixels for the origin, as in the room path.
-      const x = Math.round(cx + (cw - w) / 2);
-      const topY = Math.round(cy + (ch - CAPTION_H - box.h) / 2);
-      const ctx = d.ctx;
-      ctx.save();
-      ctx.imageSmoothingEnabled = false;
-      ctx.translate(x, topY);
-      ctx.scale(box.scale, box.scale);
-      // Backing floors so the shaft reads in context, in world units.
-      const pad = 8 / box.scale;
-      for (let i = 0; i <= span; i++) {
-        drawUnit(d, makeUnit("floor", "occupied", 0, 500 + i), -pad, i * floorH, worldW + pad * 2, floorH);
-      }
-      drawTransport(ctx, t, 0, 0, worldW, floorH);
-      // Elevator entries also show their cars so the per-kind cab dressing
-      // (standard / service / express) is visible in the catalog.
-      for (let i = 0; i < cars; i++) {
-        ctx.save();
-        // Whole world units so the cab's 1px dressing rows (hazard stripes,
-        // livery pinstripe) sit on the world grid. With a whole origin and a
-        // whole-multiple scale, which every shaft gets in a full-size cell,
-        // they land on whole screen pixels too. Only a cell too narrow for 1x
-        // (a narrow phone) scales by a fraction and softens them.
-        ctx.translate(0, Math.round((t.top - t.carPositions[i]) * floorH));
-        drawCar(ctx, i * 7 + 1, worldW, floorH, i === 0 ? 2 : 0, i === 0 ? "up" : "down", false, kind);
-        ctx.restore();
-      }
-      ctx.restore();
-    },
+    draw: (d, cx, cy, cw, ch) => drawTransportPortrait(d, facilityOf, kind, span, cx, cy, cw, ch, CAPTION_H, MAG),
   };
 }
 

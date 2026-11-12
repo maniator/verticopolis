@@ -1,0 +1,19 @@
+---
+// Every variant of a shop, restaurant or other room that opens as one of
+// several kinds, drawn in a row, with the names the game uses for them.
+import type { FacilityKind } from "../../../src/shared/types";
+import { facility } from "../lib/catalog";
+import Sprite from "./Sprite.astro";
+
+interface Props {
+  kind: FacilityKind;
+}
+
+const { kind } = Astro.props;
+const { modern } = await facility(kind);
+const names = modern.subtypes ?? [];
+---
+
+<div class="vc-sprite-row">
+  {names.map((name) => <Sprite kind={kind} subtype={name} caption={name} small />)}
+</div>

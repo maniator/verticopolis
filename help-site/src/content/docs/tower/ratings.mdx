@@ -1,0 +1,64 @@
+---
+title: Tenant ratings
+description: How Verticopolis rates every office, home and hotel room, what wears a rating down, what lifts it, and how to stop tenants moving out.
+---
+
+Every office, home and hotel room in your tower has a **rating**: how happy the people in it are. You can see one room's rating by inspecting it, or the whole tower's at a glance on the Map's **Eval** view, which colors each room:
+
+| On the Map | Rating | What it means |
+| --- | --- | --- |
+| Excellent | Above 60% | All is well |
+| Good | 40% to 60% | Something is bothering them; the room's card names it |
+| Terrible | Below 40% | Trouble. If it hits zero, they leave |
+
+## How a rating moves
+
+Every game hour, each room's rating takes a small step. If the room is connected and its people aren't stuck in traffic, it climbs back toward full by a few points. If something is wrong, it falls, or it is held under a ceiling it can't climb past until you fix the cause.
+
+So a room with one problem doesn't empty overnight. It slides, and you have time to notice. The card of a room that is slipping names the main problem, and the message log tells you when a tenant gives notice.
+
+## Moving out
+
+- **Offices, homes and Modern's rentals** give **two days' notice** when their rating reaches zero. Fix the cause and get the rating back above 40% in that time, and they stay.
+- **Hotel guests** just leave.
+- **Condo owners** who leave sell the condo back to you, at the price they paid. See [Homes](/help/rooms/homes/).
+
+## What wears a rating down
+
+| Problem | Who minds | What happens |
+| --- | --- | --- |
+| No way to a lobby | Everyone | The rating falls quickly every hour |
+| Traffic jams | Everyone above the ground floor | The rating falls while waits are long, faster the worse they are |
+| Rent over the default | Offices, rentals, fitness clubs, clinics | A small drop every hour, bigger the higher the rent |
+| A noisy neighbor | Offices hear noisy venues within 11 tiles. Homes and hotel rooms hear offices and noisy venues within 21 tiles. | Held to 60% at best |
+| Far from a stair or elevator | Offices and apartments more than 79 tiles from one | Held to 60% and slowly worn down |
+| Far from a lobby | Offices, homes and hotel rooms | Held down past 7 floors, and worn down past 11 |
+| Too few shops | Offices, condos, apartments and hotel rooms | Held down when the shops they can reach could serve fewer than half of them |
+| Too little recycling | Everyone, from 3★ | Held down while the garbage piles up |
+| Too little parking | Offices from 3★; homes in Modern | Held down until there are spaces |
+
+Noisy venues are every shop, restaurant, theater and Modern venue except the quiet ones: the spa, the daycare and the clinic. A stretch of lobby between two rooms blocks noise, and so does a gap in the floor.
+
+### Classic and Modern
+
+<span class="vc-mode">Classic</span> The original's rules, as they were. Noise holds a room down but never empties it on its own. A far lobby caps a rating in two clear steps. Too few shops caps it, but never drives anyone out. Any recycling shortfall drags everyone down.
+
+<span class="vc-mode">Modern</span> The same problems, but they bite in proportion: the further from a lobby, or the fewer shops, the lower the ceiling, and a bad enough case wears a room all the way to notice. Noise keeps wearing too. Bigger households feel every problem a little more. In return, amenities can lift a room back up (below), cinemas and party halls count toward shopping, and people wait longer before a floor counts as jammed.
+
+## What lifts a rating <span class="vc-mode">Modern</span>
+
+Some of Modern's venues make the floors around them nicer places to be: a [Fitness Club](/help/rooms/venues/#fitnessClub), [Daycare](/help/rooms/venues/#daycare), [Spa](/help/rooms/venues/#spa), [Aquatic Center](/help/rooms/venues/#aquaticCenter) or [Party Hall](/help/rooms/venues/#partyHall) nearby adds a little to a room's rating every hour, and raises the ceiling that noise, a far lobby or too few shops would hold it under. The effect is strongest on the venue's own floor and fades over the next few. A [Nightclub](/help/rooms/venues/#nightclub) does the opposite at night.
+
+## Finding the trouble
+
+1. Open the Map and switch to **Eval**. Look for red.
+2. Inspect a red room. Its card names its main gripe.
+3. Fix that, and watch the room turn green over the next few hours.
+
+The **Traffic** view helps with jams, and the **Pricing** view with rents.
+
+## See also
+
+- [Offices](/help/rooms/offices/), [Homes](/help/rooms/homes/) and [Hotels](/help/rooms/hotels/)
+- [Elevators](/help/building/elevators/) for traffic
+- [Map and windows](/help/tower/map-and-windows/)

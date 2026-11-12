@@ -4,13 +4,14 @@ import { resolve } from "node:path";
 import { existsSync, readFileSync } from "node:fs";
 import { execSync } from "node:child_process";
 import { VitePWA } from "vite-plugin-pwa";
-import { allReleaseNotes, notesForVersion, recentReleaseNotes, whatsNewReleases, type ReleaseNotes } from "./src/changelog";
+import { notesForVersion, recentReleaseNotes, whatsNewReleases, type ReleaseNotes } from "./src/changelog";
 import { PACKAGE_STYLESHEET, isPackagePath } from "./src/build/thirdPartyNotices";
 import { entryWithIntegrity, precacheIntegrityTransform, readExpectedPackage } from "./src/build/enginePackageBuild";
 import { MAX_RELEASES, type BuildFingerprint } from "./src/pwaUpdateInfo";
 import { ENGINE_PRELOAD_FILES, enginePreloadAttrs } from "./src/build/enginePreload";
 import { ENGINE_BUILD_RECORD, ENGINE_DIR } from "./src/wasmhost/enginePackageNames";
 import { buildFingerprint } from "./src/build/buildFingerprint";
+import { helpMarkdown } from "./src/build/helpMarkdown";
 
 const pkgVersion = JSON.parse(readFileSync(resolve(__dirname, "package.json"), "utf8")).version as string;
 
@@ -31,17 +32,6 @@ function changelogNotes(): string[] {
 function changelogReleases(): ReleaseNotes[] {
   try {
     return recentReleaseNotes(readFileSync(resolve(__dirname, "CHANGELOG.md"), "utf8"), pkgVersion, MAX_RELEASES);
-  } catch {
-    return [];
-  }
-}
-
-/** Every version's notes, newest first and whole, for the release notes page
- *  (`/help/changelog`, src/releaseNotesPage.ts). Empty when the file is
- *  missing. */
-function changelogAllReleases(): ReleaseNotes[] {
-  try {
-    return allReleaseNotes(readFileSync(resolve(__dirname, "CHANGELOG.md"), "utf8"));
   } catch {
     return [];
   }
@@ -203,7 +193,7 @@ const OG_IMAGE_ALT =
 
 /**
  * The SEO/OG head tags every deployed page shares, identical across the game,
- * the gallery, and the /help page. Per-page UNIQUE tags (title, description,
+ * and the gallery. Per-page UNIQUE tags (title, description,
  * canonical, og:url, og:title/description, twitter:title/description) stay inline
  * in each page's own HTML; only the invariant boilerplate is centralized here.
  *
@@ -229,11 +219,14 @@ const SHARED_HEAD_TAGS: HtmlTagDescriptor[] = [
   { tag: "link", attrs: { rel: "apple-touch-icon", href: "./apple-touch-icon.png" }, injectTo: "head" },
 ];
 
-/** Inject the shared head tags into the four PUBLIC pages (the game, the
- *  gallery, /help and the release notes at /help/changelog). `preview.html` is the noindex screenshot harness, so it
- *  is deliberately left out. */
+/** Inject the shared head tags into the game and the old sprite gallery (the
+ *  Help site at /help, release notes included, carries its own,
+ *  help-site/site.mjs). The gallery is a screenshot fixture now, out of search
+ *  (/gallery redirects to /help/rooms), so it takes every tag but the robots
+ *  one and keeps its own noindex. `preview.html` is the noindex screenshot
+ *  harness, so it is deliberately left out. */
 function sharedHead(): Plugin {
-  const pages = new Set(["index.html", "gallery.html", "help.html", "release-notes.html"]);
+  const pages = new Set(["index.html", "gallery.html"]);
   return {
     name: "shared-head",
     transformIndexHtml: {
@@ -244,7 +237,8 @@ function sharedHead(): Plugin {
         // "/", whose basename is "", so map an empty basename to index.html.
         const base = (ctx.path.split("?")[0].split("/").pop() ?? "").toLowerCase();
         const file = base === "" ? "index.html" : base;
-        return pages.has(file) ? SHARED_HEAD_TAGS : [];
+        if (!pages.has(file)) return [];
+        return file === "gallery.html" ? SHARED_HEAD_TAGS.filter((t) => t.attrs?.name !== "robots") : SHARED_HEAD_TAGS;
       },
     },
   };
@@ -315,10 +309,6 @@ export default defineConfig(({ command }) => ({
     // This build's game and engine parts, for the update prompt's label
     // (src/pwaUpdateInfo.ts `classifyUpdate`); version.json carries the same.
     __BUILD_FINGERPRINT__: JSON.stringify(fingerprintOf(command)),
-    // Every version's player notes for the release notes page
-    // (src/releaseNotesPage.ts). Only that page's module reads it, so the
-    // text lands in its own chunk and never in the game's bundle.
-    __RELEASE_NOTES__: JSON.stringify(changelogAllReleases()),
     // This build's own notes for the Help menu's What's new. Only
     // src/whatsNewData.ts reads it, and the game imports that module on
     // demand, so the text is a precached chunk of its own (offline) and stays
@@ -334,6 +324,9 @@ export default defineConfig(({ command }) => ({
     noUnlistedPackageFiles(),
     sharedHead(),
     enginePreload(),
+    // The help pages are Markdown (help-site/src/content/docs/), shared with
+    // the Help site; the game's Help window imports them as lit templates.
+    helpMarkdown(),
     // Installable PWA via Workbox (vite-plugin-pwa) — no hand-rolled service
     // worker. Registration is NOT auto-injected (`injectRegister: false`);
     // only the game entry (main.ts → src/pwa.ts) registers, so the tooling
@@ -445,23 +438,17 @@ export default defineConfig(({ command }) => ({
         // does not classify.
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff,woff2,mp3,wasm}", "engine/BUILD.json"],
         // og-image.png is the social/crawler share card, not part of the game
-        // shell, so keep it out of the offline precache. `help.html` and its own
-        // page entry chunk (`help-*.js`) are excluded too (see the note below),
-        // and so is `assets/help-media/**`, the `/help` page's Classic vs Modern
-        // stills (online-only, like the rest of `/help`; see the build's
-        // `assetFileNames` note). The two help patterns are deliberately narrow:
-        // `**/help.html` and `**/help-*.js` match the page and its entry chunk,
-        // while the shared `helpContent-*.js` chunk (which starts with `helpC`,
-        // not `help-`) is left precached, because the in-game Help modal imports
-        // it and needs it offline. A broad `**/help*` would wrongly sweep
-        // `helpContent-*.js` too.
+        // shell, so keep it out of the offline precache. The Help site
+        // (`help/**`, built into this folder after the game by
+        // scripts/vercel-build.sh) is online-only too, and the game's own Help
+        // chunks stay precached for the in-game Help window offline.
         // `404.html` and its entry chunk (`notFound-*.js`) are the host's
         // "page not found" page, which only the network ever serves.
         // `icon-1024x1024.png` is the DESKTOP icns master (#761), not part of
         // the game shell: the PWA needs nothing that large, so it stays out
         // of every web player's offline precache (a review catch on the PR
         // that added it).
-        globIgnores: ["**/gallery*", "**/release-notes*", "**/releaseNotes*", "**/404.html", "**/notFound-*.js", "**/preview*", "**/og-image*", "**/help.html", "**/help-*.js", "**/help-media/**", "**/icon-1024x1024.png", "**/sw-navigation-fallback.js"],
+        globIgnores: ["**/gallery*", "**/404.html", "**/notFound-*.js", "**/preview*", "**/og-image*", "help/**", "**/icon-1024x1024.png", "**/sw-navigation-fallback.js"],
         // The worker's own helper, loaded by importScripts and updated with it,
         // so it stays out of the precache.
         importScripts: ["sw-navigation-fallback.js"],
@@ -476,23 +463,12 @@ export default defineConfig(({ command }) => ({
         // routes. Without the `/help` entry the fallback would answer a `/help`
         // navigation with the precached game shell.
         //
-        // `help.html` is kept OUT of precache (the `globIgnores` entries above),
-        // exactly like `gallery.html`, so the CLEAN `/help` always resolves over
-        // the network via the Vercel rewrite and is never stale. This matters
-        // because Workbox precaching defaults `cleanURLs` to true: a navigation to
-        // `/help` generates a `/help.html` variation, so a precached `/help.html`
-        // would answer the clean `/help` FROM THE CACHE, pinning it to whatever was
-        // cached when the service worker installed and serving an outdated page
-        // across deploys until the worker updates (and the `/help` page does not
-        // register the worker, so a `/help`-only visitor never triggers that
-        // update). The `navigateFallbackDenylist` alone does not prevent this: it
-        // governs only the app-shell NavigationRoute, not the precache route. Not
-        // precaching the page is the fix; the trade-off is that `/help` is
-        // online-only (no offline copy), the same call already made for `/gallery`.
-        // A precache alias for the clean URL is separately rejected: with
-        // generateSW it would make Workbox fetch `/help` at install, which 404s
-        // anywhere the Vercel rewrite is absent (`vite preview`, the e2e harness),
-        // failing the whole precache and taking the game's offline down with it.
+        // The Help site under `/help/` is never precached (the `globIgnores`
+        // entry above), so a `/help` page always comes from the network and is
+        // never stale: it does not register the worker, so a Help-only visitor
+        // would never trigger an update of a cached copy. The trade-off is that
+        // Help is online-only, the same call made for `/gallery`; the game's
+        // own Help window works offline.
         // `.well-known/` joins the machine-readable files for the same reason
         // robots.txt and sitemap.xml are here: they are documents ABOUT the
         // site rather than pages of it, and answering one with the game shell
@@ -544,26 +520,12 @@ export default defineConfig(({ command }) => ({
       input: {
         main: resolve(__dirname, "src/index.html"),
         gallery: resolve(__dirname, "src/gallery.html"),
-        help: resolve(__dirname, "src/help.html"),
-        releaseNotes: resolve(__dirname, "src/release-notes.html"),
         // The host's "page not found" page: Vercel serves `404.html` from the
         // output root, with a 404 status, for any path nothing else answers.
         notFound: resolve(__dirname, "src/404.html"),
         preview: resolve(__dirname, "src/preview.html"),
       },
       output: {
-        // The `/help` page's paired Classic vs Modern stills are imported from
-        // `docs/screenshots` (one source with the docs gallery). Route those
-        // assets into a dedicated `assets/help-media/` folder so the
-        // service-worker precache can exclude them with a single `**/help-media/**`
-        // glob: the `/help` page is online-only (see the workbox globIgnores note),
-        // so its images do not belong in the game-shell install. Every other asset
-        // keeps Vite's default `assets/[name]-[hash][extname]` path.
-        assetFileNames(info) {
-          const sources = info.originalFileNames ?? (info.originalFileName ? [info.originalFileName] : []);
-          const fromHelpMedia = sources.some((p) => p.replace(/\\/g, "/").includes("docs/screenshots/"));
-          return fromHelpMedia ? "assets/help-media/[name]-[hash][extname]" : "assets/[name]-[hash][extname]";
-        },
         // Split the Excalibur engine into its own vendor chunk, separate from our
         // TowerEngine app code. Sharing a hash with our own code meant every
         // TowerEngine edit re-downloaded all ~550 kB of the pinned engine.
@@ -652,7 +614,6 @@ export default defineConfig(({ command }) => ({
         // Fixtures and any non-`.test.ts` helpers under the integration tree.
         "src/tests/**",
         "src/gallery.ts",
-        "src/helpPage.ts",
         "src/preview.ts",
         "src/pwa.ts",
         "src/main.ts",

@@ -1,0 +1,92 @@
+name: Help site
+
+# Builds the player help site (help-site/, a Starlight site at /help) on a pull
+# request that touches it or anything it reads, so a broken page, a bad link in
+# the side menu or a build error fails here first. The site itself ships with
+# every app deploy: scripts/vercel-build.sh builds it into dist/help/ after the
+# game, so this workflow publishes nothing.
+on:
+  pull_request:
+    paths:
+      - "help-site/**"
+      - "docs/engine-site/src/styles/**"
+      - "docs/screenshots/**"
+      - "src/styles/retro-tokens.css"
+      - "src/public/favicon.png"
+      - "src/public/icon-1024x1024.png"
+      - "src/ui/fromGame.ts"
+      - "src/render/**"
+      - "src/presentation/**"
+      - "src/catalog/**"
+      - "src/dualrun/catalog.ts"
+      - "src/shared/**"
+      - "engine-rs/src/**"
+      - "scripts/build-engine-wasm.sh"
+      - ".github/actions/engine-wasm/**"
+      - "src/telemetry.ts"
+      - "src/analytics*.ts"
+      - "src/appVersion.ts"
+      - "src/changelog.ts"
+      - "src/pwaUpdateInfo.ts"
+      - "CHANGELOG.md"
+      - "package.json"
+      - ".github/workflows/help-site.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: help-site-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: help-site (build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # The header and the room pictures import game modules, which need the
+      # game's own packages; the site has its own npm project beside them.
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: ".nvmrc"
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            help-site/package-lock.json
+
+      - name: Game dependencies
+        run: npm ci --no-audit --no-fund
+
+      # The room pages read prices, sizes and limits from the engine's
+      # catalog at build time, and draw rooms with the game's painters.
+      - uses: ./.github/actions/engine-wasm
+
+      - name: Site dependencies
+        run: npm ci --prefix help-site --no-audit --no-fund
+
+      - name: Build the site
+        run: npm run build --prefix help-site
+
+      # Every page is there, only the front page draws the title screen
+      # (Starlight shows the hero only where a page's front matter sets one),
+      # and every page carries its structured data for search results.
+      - name: Check the pages
+        run: |
+          grep -q 'class="title-screen' dist/help/index.html || { echo "::error::the front page has no title screen"; exit 1; }
+          for page in first-tower classic-vs-modern controls rooms rooms/hotels building/elevators tower/stars your-towers/saving your-towers/importing-exporting privacy changelog; do
+            file="dist/help/$page/index.html"
+            test -s "$file" || { echo "::error::missing $file"; exit 1; }
+            if grep -q 'class="title-screen' "$file"; then echo "::error::$file draws the title screen"; exit 1; fi
+          done
+          for file in $(find dist/help -name index.html -not -path '*/_astro/*'); do
+            grep -q '<script type="application/ld+json">' "$file" || { echo "::error::$file has no structured data"; exit 1; }
+          done
+          # The release notes have a section per version.
+          grep -q '<section id="[0-9]' dist/help/changelog/index.html || { echo "::error::the release notes have no versions"; exit 1; }
+
+      # Every link between help pages reaches a real page, and a real section.
+      - name: Check the links
+        run: node help-site/scripts/check-links.mjs

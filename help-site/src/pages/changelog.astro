@@ -1,0 +1,46 @@
+---
+// The release notes at /help/changelog: every version's player notes, newest
+// first, each note whole, as the update prompt shows them. The notes come from
+// CHANGELOG.md at build time through the game's own reader (allReleaseNotes in
+// src/changelog.ts), so the page and the prompt cannot disagree. Each version is
+// a section whose id is the version, so /help/changelog#3.2.0 links to it.
+//
+// Plain text only, as in the prompt: the reader flattens each note and Astro
+// escapes it, so no markup from the file reaches the page.
+import StarlightPage from "@astrojs/starlight/components/StarlightPage.astro";
+import { allReleaseNotes } from "../../../src/changelog";
+import changelog from "../../../CHANGELOG.md?raw";
+
+/** The version below which the file's sections were written after the fact
+ *  (see the note at the top of CHANGELOG.md). */
+const FIRST_SHIPPED_NOTES = "1.51.1";
+
+const releases = allReleaseNotes(changelog);
+---
+
+<StarlightPage
+  frontmatter={{
+    title: "Release notes",
+    description: "Every Verticopolis update's changes, newest first: the release notes the in-game update prompt shows.",
+    tableOfContents: false,
+  }}
+>
+  <p>Every update's changes, newest first, as the update prompt shows them.</p>
+  <p>
+    Notes for versions before {FIRST_SHIPPED_NOTES} were written later, from the project's history, so no update showed
+    them at the time.
+  </p>
+  {releases.length === 0 && <p>No release notes are available in this build.</p>}
+  {
+    releases.map((r) => (
+      <section id={r.version} class="vc-release" aria-labelledby={`v-${r.version}`}>
+        <h2 id={`v-${r.version}`}>{r.version}</h2>
+        <ul>
+          {r.notes.map((n) => (
+            <li>{n}</li>
+          ))}
+        </ul>
+      </section>
+    ))
+  }
+</StarlightPage>

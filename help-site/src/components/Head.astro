@@ -1,0 +1,14 @@
+---
+// Starlight's own head tags, plus the page's schema.org structured data
+// (site.mjs pageJsonLd): the breadcrumb trail, and a WebSite or Article.
+import Default from "@astrojs/starlight/components/Head.astro";
+import { pageJsonLd } from "../../site.mjs";
+
+const { entry, id } = Astro.locals.starlightRoute;
+const jsonLd = JSON.stringify(
+  pageJsonLd({ slug: id, title: entry.data.title, description: entry.data.description ?? "" }),
+).replace(/</g, "\\u003c");
+---
+
+<Default />
+<script type="application/ld+json" set:html={jsonLd} />

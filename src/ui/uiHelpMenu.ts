@@ -1,7 +1,6 @@
 import type { TemplateResult } from "lit-html";
 import type { UI } from "./UI";
 import { HelpPause, PAUSED_FOR_HELP } from "./helpPause";
-import { helpTemplate } from "./templates/help";
 import { aboutTemplate, helpMenuTemplate, whatsNewTemplate } from "./templates/helpMenu";
 import { compareModalTemplate } from "./templates/compare";
 import { fromGameHref } from "./fromGame";
@@ -15,9 +14,10 @@ import { copyText } from "./copyText";
 import { announceLive } from "../game/liveRegion";
 
 /**
- * The in-game Help: the Help menu the toolbar's "Help…" opens, the guide
- * (How to play), What's new, About this game, and the Classic vs Modern
- * comparison the Tower panel's mode badge opens. Every one of them pauses the
+ * The in-game Help: the About menu the game panel's "About…" opens, What's
+ * new, About this game, and the Classic vs Modern comparison the Tower panel's
+ * mode badge opens. The guide (the Help button) is the Help site, opened in a
+ * new tab. Every one of them pauses the
  * tower through one {@link HelpPause} per UI, and every close route (the
  * buttons, Esc, the backdrop, the title-bar ✕, another dialog taking the
  * screen, or any other closeModal) ends that pause exactly once. Moving from
@@ -166,58 +166,56 @@ function wireNewTabLinks(ui: UI, box: HTMLElement): void {
   }
 }
 
-/** The toolbar's "Help…": the Help menu. */
+/** The game panel's "About…": what's new, the release notes, a problem
+ *  report and About this game. (Its Help button is {@link showHelp}.) */
 export function showHelpMenu(ui: UI): void {
-  trackAppAction("help_open");
-  const inBrowserTab = !isInstalledStandalone();
-  const { box } = openHelpDialog(
-    ui,
-    helpMenuTemplate(inBrowserTab),
-    {
-      actions: {
-        // In a browser tab How to play is a link (wired below); the button
-        // only exists in the installed app.
-        ...(inBrowserTab ? {} : { "how-to-play": () => openGuide(ui) }),
-        "whats-new": () => openWhatsNew(ui, box),
-        about: () => showAbout(ui),
-      },
+  trackAppAction("about_open");
+  const { box } = openHelpDialog(ui, helpMenuTemplate(!isInstalledStandalone()), {
+    actions: {
+      "whats-new": () => openWhatsNew(ui, box),
+      about: () => showAbout(ui),
     },
-  );
+  });
   wireNewTabLinks(ui, box);
 }
 
-/** The in-game guide (How to play). Reached from the title screen, from the
- *  installed app's Help menu, and by the tooling handle `ui.showHelp()`. */
+/** The guide: the Help site's front page in a new tab, from the game panel's
+ *  Help button, the title screen and the tooling handle `ui.showHelp()`. */
 export function showHelp(ui: UI): void {
   trackAppAction("help_open");
-  openGuide(ui);
+  // The manual is online only (the service worker leaves /help to the
+  // network), so offline say so rather than open a tab that cannot load.
+  if (!navigator.onLine) {
+    ui.sayVisibly("The manual needs an internet connection. It is at verticopolis.com/help.");
+    return;
+  }
+  openPageInTab(ui, "/help/", () => ui.sayVisibly("The guide could not open. It is at verticopolis.com/help."));
 }
 
-function openGuide(ui: UI): void {
-  // Replaying the intro is meaningless while the title screen is still up, so
-  // the button is disabled there (and onReplayOnboarding no-ops behind it).
-  const onSplash = isSplashUp();
-  const diagnostics = liveDiagnostics();
-  let finishGuide = () => {};
-  const { box, finish } = openHelpDialog(
-    ui,
-    helpTemplate(onSplash, appVersion(), { onReplay: () => replay(ui, finishGuide) }, engineSuffix(), diagnostics),
-    { actions: { "copy-diagnostics": () => copyDiagnostics(box, diagnostics) } },
-  );
-  finishGuide = finish;
-  // "Open the full help page" is a real link to /help#classic-vs-modern in a
-  // new tab. From the installed app a new tab drops to the system browser and
-  // loses the session, so there it opens the in-app comparison instead.
-  const fullPage = box.querySelector<HTMLAnchorElement>('a[data-act="open-help"]');
-  if (fullPage) fullPage.href = fromGameHref(fullPage.getAttribute("href") ?? "/help");
-  fullPage?.addEventListener("click", (e) => {
-    if (isInstalledStandalone()) {
-      e.preventDefault();
-      showCompare(ui);
-      return;
-    }
-    leaveForTab(ui, e);
-  });
+/**
+ * Open a Help site page in a new tab and hold the tower's pause until the
+ * player is back on the game tab. A Ctrl or Cmd click (`e`) opens it in the
+ * background and the tower keeps running. `blocked` runs when the browser
+ * refuses the new tab (a pop-up blocker), so the player is never left with
+ * nothing. Returns whether the tab opened.
+ */
+function openPageInTab(ui: UI, href: string, blocked: () => void, e?: MouseEvent): boolean {
+  const background = !!e && (e.ctrlKey || e.metaKey);
+  const tab = window.open(fromGameHref(href), "_blank");
+  if (!tab) {
+    blocked();
+    return false;
+  }
+  try {
+    tab.opener = null; // the page never reaches back into the game
+  } catch {
+    // Read-only in some hosts; the page never uses it either way.
+  }
+  if (background) return true;
+  const pause = helpPause(ui);
+  pause.begin();
+  pause.untilReturn({ win: window, doc: document });
+  return true;
 }
 
 /** What's new: this build's notes, offline. The notes are a chunk of their
@@ -260,34 +258,17 @@ export function showCompare(ui: UI): void {
 }
 
 /**
- * The Tower panel's mode badge. In a browser tab it opens the guide's
- * Classic vs Modern section in a new tab and holds the pause until the player
- * is back; in the installed app it opens the in-game comparison.
+ * The Tower panel's mode badge. In a browser tab it opens the Help site's
+ * Classic and Modern page in a new tab and holds the pause until the player
+ * is back; in the installed app, or when the tab is blocked, it opens the
+ * in-game comparison.
  */
 export function showModeHelp(ui: UI, e?: MouseEvent): void {
   if (isInstalledStandalone()) {
     showCompare(ui);
     return;
   }
-  // A Ctrl or Cmd click opens the page in a background tab and the player
-  // stays here, so the tower keeps running.
-  const background = !!e && (e.ctrlKey || e.metaKey);
-  const tab = window.open(fromGameHref("/help#classic-vs-modern"), "_blank");
-  if (!tab) {
-    // A blocked pop-up: show the same comparison in the game instead.
-    showCompare(ui);
-    return;
-  }
-  try {
-    tab.opener = null; // the page never reaches back into the game
-  } catch {
-    // Read-only in some hosts; the page never uses it either way.
-  }
-  trackAppAction("compare_open");
-  if (background) return;
-  const pause = helpPause(ui);
-  pause.begin();
-  pause.untilReturn({ win: window, doc: document });
+  if (openPageInTab(ui, "/help/classic-vs-modern/", () => showCompare(ui), e)) trackAppAction("compare_open");
 }
 
 /** Close the dialog and end the pause, THEN replay, so Getting Started never

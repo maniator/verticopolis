@@ -1,0 +1,105 @@
+---
+title: Venues
+description: The cinema and party hall, and Modern's fitness clubs, nightclubs, spas, sky bars, aquatic centers, arcades and daycares, what they earn and how they change the floors around them.
+---
+
+import RoomInfo from "../../../components/RoomInfo.astro";
+import Sprite from "../../../components/Sprite.astro";
+import Variants from "../../../components/Variants.astro";
+
+Venues are where your tower goes to have fun. The 1994 tower had two, the movie theater and the party hall, and both are here in both modes. Modern adds a whole street's worth more, and most of them do something besides earn: they make the homes and hotel rooms around them nicer places to be, or, in one case, a lot noisier.
+
+## Cinema
+
+<RoomInfo kind="cinema" />
+
+A cinema is big, two floors tall and expensive, and it earns from the afternoon until midnight. What it earns depends almost entirely on the **film**. A new film fills the seats; as it gets older, the crowds thin out, and sooner or later you have to show something new. Showing a film costs money once, when you book it. There is no running cost.
+
+<span class="vc-mode">Classic</span> Inspect the theater and choose a **New film** ($300,000) or a cheaper **Classic film** ($150,000), which never draws a full house. A new film packs the theater for about six days, draws a smaller crowd for three more, and from its tenth day nobody comes.
+
+<span class="vc-mode">Modern</span> The theater has **two screens**, one on each floor, each with half the seats and its own film. Each screen can show:
+
+| Film | Costs | Earns |
+| --- | --- | --- |
+| Revival | $60,000 | A little over half what a feature earns. The safe pick for a small tower. |
+| Feature | $120,000 | The everyday film. |
+| Blockbuster | $300,000 | More than twice a feature. Great in a busy tower, a money-loser in a quiet one. |
+
+A film draws a full crowd for four weeks and fades over the next two. Then the screen books its **Auto-rebook** film again on its own, or you can turn Auto-rebook off and choose each time. Book the two screens on different days, so one of them always has something fresh.
+
+A Modern theater also has a **ticket price**, from Low to Premium. A higher price earns more for every seat sold but draws fewer people. Raise it while the theater sells out; lower it when seats sit empty.
+
+## Party Hall
+
+<RoomInfo kind="partyHall" />
+
+The party hall opens in the evening and hosts parties for the people in your tower. In Classic it is one of the best earners for its price.
+
+<span class="vc-mode">Classic</span> Party halls and cinemas share one limit: sixteen of the two together.
+
+<span class="vc-mode">Modern</span> Each has its own limit of sixteen. A party hall also gives a small lift to homes and hotel rooms within three floors.
+
+## Modern's venues <span class="vc-mode">Modern</span>
+
+Modern's venues earn like shops, from the people already in the tower, and each one is open at its own hours (see the fact boxes). Several of them also reach out to the floors above and below. While you place one, green bands on the screen show the floors it helps, brightest nearest; a violet band shows where a nightclub's noise will carry.
+
+| Venue | Reaches | What it does there |
+| --- | --- | --- |
+| Fitness Club | 5 floors | Lifts condos and apartments |
+| Daycare | 4 floors | Lifts condos and apartments, more for bigger families |
+| Spa | 5 floors | Lifts hotel rooms |
+| Aquatic Center | 6 floors | Lifts homes and hotel rooms |
+| Party Hall | 3 floors | Lifts homes and hotel rooms |
+| Nightclub | 4 floors | Keeps homes and hotel rooms awake while it's open |
+
+A lift does two things. It nudges a room's rating up every hour, and it raises the ceiling that noise, a far lobby or too few shops would otherwise hold the room under. A room takes the strongest single lift around it; two gyms don't add up.
+
+### Fitness Club
+
+<RoomInfo kind="fitnessClub" />
+
+Leased like an office: a club operator pays you rent every quarter, and the club only helps the homes around it once it has a tenant.
+
+<Variants kind="fitnessClub" />
+
+### Nightclub
+
+<RoomInfo kind="nightclub" />
+
+The best earner of the lot, open from evening until two in the morning, and the loudest. It costs $40,000 a month for the DJ. Homes and hotel rooms on the club's floor feel it most; a home there dips to Good overnight and recovers by the afternoon. Put it among offices and shops, which are empty at night.
+
+### Spa
+
+<RoomInfo kind="spa" />
+
+Quiet by design, so it never bothers its neighbors. Hotel guests within five floors sleep better for it.
+
+### Sky Bar
+
+<RoomInfo kind="skyBar" />
+
+People pay for the view. A sky bar earns more the higher it goes: two percent more for every floor above the tenth, up to double. Unlike other venues, it doesn't need to be near a lobby.
+
+### Aquatic Center
+
+<RoomInfo kind="aquaticCenter" />
+
+The priciest amenity and the one that reaches furthest, six floors in each direction, for homes and hotel rooms alike.
+
+### Amusements
+
+<RoomInfo kind="amusements" />
+
+<Variants kind="amusements" />
+
+### Daycare
+
+<RoomInfo kind="daycare" />
+
+Open during working hours, and quiet. The bigger a family, the more it values a daycare nearby.
+
+## See also
+
+- [Homes](/help/rooms/homes/) and [Hotels](/help/rooms/hotels/), the rooms venues help
+- [Food and shops](/help/rooms/food-and-shops/) for how customers are shared out
+- [Tenant ratings](/help/tower/ratings/) for ceilings and lifts

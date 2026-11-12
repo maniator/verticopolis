@@ -7,18 +7,20 @@
   "outputDirectory": "dist",
   "git": { "deploymentEnabled": { "main": false } },
   "redirects": [
-    { "source": "/help/", "destination": "/help", "permanent": true },
-    { "source": "/help/changelog/", "destination": "/help/changelog", "permanent": true },
-    { "source": "/gallery/", "destination": "/gallery", "permanent": true }
-  ],
-  "rewrites": [
-    { "source": "/help", "destination": "/help.html" },
-    { "source": "/help/changelog", "destination": "/release-notes.html" },
-    { "source": "/gallery", "destination": "/gallery.html" }
+    { "source": "/gallery", "destination": "/help/rooms/", "permanent": true },
+    { "source": "/gallery/", "destination": "/help/rooms/", "permanent": true }
   ],
   "headers": [
     {
       "source": "/assets/(.*)",
+      "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }]
+    },
+    {
+      "source": "/help/_astro/(.*)",
+      "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }]
+    },
+    {
+      "source": "/help/pagefind/(fragment|index)/(.*)",
       "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }]
     },
     {

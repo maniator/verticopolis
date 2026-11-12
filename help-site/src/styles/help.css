@@ -1,0 +1,187 @@
+/* Help-only rules over the engine docs theme (docs/engine-site/src/styles/theme.css). */
+
+/* Starlight's header with the game's Back to game button at its right. */
+.vc-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  height: 100%;
+}
+.vc-header-default {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+}
+/* The game's bevelled button on the navy title bar. */
+.vc-back {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 4px 12px;
+  font-weight: 700;
+  font-size: 0.875rem;
+  color: var(--r-ink);
+  text-decoration: none;
+  white-space: nowrap;
+  background: var(--r-face);
+  box-shadow: var(--bevel-out);
+}
+.vc-back[hidden] {
+  display: none;
+}
+.vc-back:hover {
+  color: var(--r-ink);
+}
+.vc-back:active {
+  box-shadow: var(--bevel-in);
+}
+/* "Close this tab" when the browser keeps a game-opened tab open. */
+.vc-back-note {
+  position: fixed;
+  z-index: 20;
+  top: calc(var(--sl-nav-height) + 0.5rem);
+  right: 1rem;
+  max-width: min(28rem, calc(100vw - 2rem));
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  color: var(--r-ink);
+  background: var(--r-face);
+  box-shadow: var(--bevel-out), var(--win-shadow);
+}
+
+/* The key caps on the keyboard page, as the game draws them. */
+.sl-markdown-content kbd {
+  display: inline-block;
+  min-width: 1.1em;
+  padding: 0 5px;
+  margin: 0 1px;
+  font: 600 0.85em "Courier New", monospace;
+  text-align: center;
+  color: var(--r-ink);
+  background: #f4f4f4;
+  border: 1px solid #b5b5b5;
+  border-bottom-width: 2px;
+  border-radius: 3px;
+}
+
+/* On a phone the header holds the logo, search, the menu and Back to game,
+   which leaves no room for the site's name: keep the logo and give the name
+   to screen readers only, instead of cutting it off. */
+@media (max-width: 30rem) {
+  .header .site-title span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+}
+
+/* The phone's "On this page" bar sits on the navy title bar, so the section
+   it names is white, like the header's own text. */
+mobile-starlight-toc .display-current {
+  color: var(--r-title-fg);
+}
+
+/* The title lettered as the game's title screen draws it (src/styles/game/
+   splash.css): regular weight, not the page heading's bold, at the same
+   width. */
+.title-screen .ts-word {
+  width: min(86vw, 420px);
+}
+.title-screen .ts-word text,
+.title-screen .ts-tag text {
+  font-weight: 400;
+}
+.title-screen .ts-tag {
+  width: min(78vw, 340px);
+}
+
+/* Room pictures, drawn by the game's own painters (src/scripts/sprites.ts). */
+.vc-sprite {
+  margin: 1rem auto;
+  max-width: 40rem;
+}
+.vc-sprite canvas {
+  display: block;
+  width: 100%;
+  background: #12151d;
+  border: 2px solid var(--r-bevel-dark, #000);
+  image-rendering: pixelated;
+}
+.vc-sprite figcaption {
+  font-size: var(--sl-text-sm);
+  color: var(--sl-color-gray-3);
+  margin-top: 0.25rem;
+  text-align: center;
+}
+.vc-sprite-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 14rem), 1fr));
+  gap: 0 1rem;
+}
+.vc-sprite-row .vc-sprite {
+  margin: 0.5rem 0;
+}
+
+/* A room's fact box, beside the article on a wide screen and above it on a
+   phone, the way a wiki shows one. */
+.vc-infobox {
+  border: 2px solid var(--sl-color-gray-5);
+  background: var(--sl-color-gray-7, var(--sl-color-black));
+  padding: 0.75rem;
+  margin: 0 0 1.5rem;
+  font-size: var(--sl-text-sm);
+}
+.vc-infobox .vc-sprite {
+  margin-top: 0.25rem;
+}
+.vc-infobox-title {
+  font-weight: 700;
+  text-align: center;
+  margin: 0;
+}
+.sl-markdown-content .vc-infobox table {
+  display: table;
+  width: 100%;
+  margin: 0;
+  font-size: var(--sl-text-sm);
+}
+.sl-markdown-content .vc-infobox th,
+.sl-markdown-content .vc-infobox td {
+  padding: 0.3rem 0.4rem;
+  vertical-align: top;
+  white-space: pre-line;
+}
+.sl-markdown-content .vc-infobox tbody th {
+  text-align: left;
+  white-space: nowrap;
+}
+@media (min-width: 90rem) {
+  .vc-infobox {
+    float: right;
+    width: 20rem;
+    margin: 0 0 1rem 1.5rem;
+  }
+  .sl-markdown-content h2 {
+    clear: none;
+  }
+}
+
+/* Classic and Modern labels in running text and tables. */
+.vc-mode {
+  display: inline-block;
+  font-size: 0.75em;
+  font-weight: 700;
+  padding: 0 0.4em;
+  border: 1px solid currentColor;
+  vertical-align: 0.1em;
+}
+/* A linked room lands with its fact box (or its picture) below the header. */
+.vc-infobox,
+.vc-sprite[id] {
+  /* Leave room for the sticky bars and the room's own heading above the box. */
+  scroll-margin-top: calc(var(--sl-nav-height, 4rem) + var(--sl-mobile-toc-height, 0rem) + 4rem);
+}

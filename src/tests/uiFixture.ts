@@ -65,7 +65,7 @@ export function mountAppDom(): void {
     <button id="btn-load"></button>
     <button id="btn-save-top"></button>
     <button id="btn-settings"></button>
-    <button id="btn-new"></button><button id="btn-help"></button>
+    <button id="btn-new"></button><button id="btn-help"></button><button id="btn-about"></button>
     <div id="inspector" class="win hidden"></div>
     <div id="editor" class="win hidden"></div>
     <div id="toast-wrap"></div>

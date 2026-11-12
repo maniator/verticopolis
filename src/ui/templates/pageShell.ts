@@ -30,8 +30,8 @@ export interface PageShellOptions {
 }
 
 /**
- * The reusable retro window frame for a standalone page (the /help page, the
- * sprite gallery, and future pages like a changelog or credits). It renders the
+ * The reusable retro window frame for a standalone page (the sprite gallery and
+ * the 404 page). It renders the
  * shared Windows-3.1 chrome from `retro-components.css`: a navy sticky title bar
  * with the app icon, the page title, any sibling-page links, and a "Back to
  * game" button, wrapping the page body, with a footer carrying a second "Back to

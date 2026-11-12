@@ -74,8 +74,10 @@ export const SHOWCASE_SCENES: Scene[] = [
         name: "02-help",
         keepDialogs: true,
         setup: async (page) => {
-          await page.evaluate(() => document.getElementById("btn-help")?.click());
-          // Fail loudly if the Help menu never opens rather than commit a wrong shot.
+          // The game panel's About… menu (its Help button opens the Help site
+          // in a new tab, which a screenshot cannot show).
+          await page.evaluate(() => document.getElementById("btn-about")?.click());
+          // Fail loudly if the menu never opens rather than commit a wrong shot.
           await page.waitForSelector('#modal [data-act="whats-new"]', { timeout: 4000 });
         },
         wait: 300,

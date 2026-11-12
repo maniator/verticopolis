@@ -160,6 +160,14 @@ if (integrity.length > 0) fail(`the precache manifest's integrity is not sound: 
 if (!/importScripts\(\s*["']sw-navigation-fallback\.js["']/.test(sw)) fail("dist/sw.js does not import sw-navigation-fallback.js, so a navigation that fails its integrity would show a blank page");
 if (!existsSync(resolve(DIST, "sw-navigation-fallback.js"))) fail("dist/sw-navigation-fallback.js is missing, so the worker would not install");
 if (seen.has("sw-navigation-fallback.js")) fail("sw-navigation-fallback.js is in the precache manifest; the worker imports it, so it must stay out of it");
+// The Help site at /help (release notes included) always comes from the
+// network, never the worker's cache (owner, 2026-11-12): nothing under help/ is
+// precached, and the navigation fallback leaves /help alone.
+const helpCached = urls.filter((u) => u === "help" || u.startsWith("help/"));
+if (helpCached.length > 0) fail(`the Help site must not be precached, but the manifest lists: ${helpCached.join(", ")}`);
+const denylist = sw.match(/NavigationRoute\([^]*?denylist:\[([^]*?)\]\}/)?.[1];
+if (denylist === undefined) fail("found no navigation fallback denylist in dist/sw.js; did the workbox output format change?");
+if (!denylist.includes("/help/")) fail("the navigation fallback does not skip /help, so the worker would answer a Help page with the game");
 // The page checks the engine against the id compiled into its chunks, and a
 // production bundle must not carry the development serve's skip (#985).
 const shell = shellProblems(DIST, builtEngine);
