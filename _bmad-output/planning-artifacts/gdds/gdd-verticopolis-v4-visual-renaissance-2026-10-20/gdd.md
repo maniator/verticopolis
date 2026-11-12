@@ -4,13 +4,16 @@ game_type: simulation (tycoon / management)
 platforms: [web, PWA, native Godot]
 created: 2026-10-20
 updated: 2026-10-20
-status: proposed
+status: superseded
 release: 4.0.0
 scope: visual presentation only
 art_budget_usd: 0
 ---
 
 # Verticopolis 4.0: Visual Renaissance
+
+> **Superseded on 2026-11-12.** Naftali cut the Visual Renaissance as planned after a GDS and BMAD party roundtable: no renderer swap (Excalibur 0.32 stays, revisited only on measured frame-time evidence from a real phone), no full redraw, no authored-art bible on the web. #1190, #1191, #1192, #1193 and #1195 are closed as not planned. What survives is a small web track for tall towers under #1189: full-zoom legibility (#2012), the phone layout and inspector (#2013) and the accessibility suite (#1194). This folder is kept as history.
+
 **GitHub tracking:** [v4.0 umbrella #1189](https://github.com/maniator/verticopolis/issues/1189), [planning PR #1188](https://github.com/maniator/verticopolis/pull/1188). Stage issues: [4A #1190](https://github.com/maniator/verticopolis/issues/1190), [4B #1191](https://github.com/maniator/verticopolis/issues/1191), [4C #1192](https://github.com/maniator/verticopolis/issues/1192), [4D #1193](https://github.com/maniator/verticopolis/issues/1193), [4E #1194](https://github.com/maniator/verticopolis/issues/1194), [4F #1195](https://github.com/maniator/verticopolis/issues/1195).
 
 Game design document, planning proposal. Structured using the repository's `gds-gdd` workflow and existing Game Dev Studio canon. **No implementation or release authorization is implied.**

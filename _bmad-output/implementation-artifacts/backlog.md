@@ -62,13 +62,14 @@ How items flow:
    Every issue, open or closed, has a milestone: `3.0.0` (open work carries a
    `gate-1` or `gate-3` label from the 3.0 priorities plan, and the `gate-2`
    label was retired on 2026-11-03), `3.x`,
-   `Triage` (new or undecided, each gets a decision), `4.x` (Visual Renaissance:
-   renderer, art, UI polish and audio on the same simulation), `5.x` (deeper
+   `Triage` (new or undecided, each gets a decision), `4.x` (the Tall lot, the wide
+   lot, audio driven by engine events and a small web legibility track; the
+   Visual Renaissance's renderer swap and art overhaul were cut on 2026-11-12), `5.x` (deeper
    simulation: economy, transport, tenants and 1994 parity), `Backlog`
    (deliberately parked enhancements with no target version), or `1.x` and
    `2.x` for closed work by release line. A bug is never in `Backlog`, and a
-   closed issue never stays there. Bugs that the renderer choice decides ride
-   with `4.x`; every other bug goes to `3.0.0`, `3.x` or `Triage`.
+   closed issue never stays there. Render bugs no longer wait for a renderer
+   rewrite: every bug goes to `3.0.0`, `3.x` or `Triage`.
    Whoever files an issue sets its milestone; one filed without a milestone
    lands in `Triage` through `.github/workflows/issue-milestone.yml`, and an issue
    closed while still in `Triage` or `Backlog` takes the milestone of the merged pull request that
@@ -117,6 +118,8 @@ How items flow:
 
 | Date | Story | GH | Epic | Type | Priority | Severity | Owner | Status | Notes |
 | ---- | ----- | -- | ---- | ---- | -------- | -------- | ----- | ------ | ----- |
+| 2026-11-12 | full-zoom-legibility | #2012 | web track | feature-request | P2 | medium | — | open | **Ready (owner decision 2026-11-12, Visual Renaissance cut, roadmap #1189).** On a 120-floor Tall lot (#1983) the whole tower is only visible at minimum zoom, where room families can read as one smear on a phone. A legibility pass on the current Excalibur renderer and procedural paint: distinct silhouettes and a tonal scale per facility family, landed against `docs/design-system.md` tokens; folds in #826 and #350 where they fit; a pinned gallery scene of a full 120-floor tower at minimum zoom (desktop and phone); a one-day real-phone measurement (p99 frame, memory high-water) with raw results in verticopolis-benchmarks; a paint change bumps the atlas. A ship condition of #1983. |
+| 2026-11-12 | phone-layout-inspector | #2013 | web track | feature-request | P3 | medium | — | open | **Ready (owner decision 2026-11-12, Visual Renaissance cut, roadmap #1189).** The surviving part of the cut UI refresh: the phone layout (one-handed reach, measured touch targets, a jump-to-floor control for tall towers) and the inspector (readable on a phone, no per-pointer re-render, see #1287), on the existing DOM and lit-html shell with design tokens. Covered by the #1194 accessibility suite; owner reviews desktop and phone samples before any sweeping restyle. |
 | 2026-11-12 | express-stop-bitset | #1984 | engine-rs | review-deferral | P3 | medium | — | open | **Deferred from the independent review of #1989 (HP-1, HP-2, HP-7).** #1989 moved every span walk onto `Transport::stop_floors`, but single-floor `stops_at` reads still scan `skip_floors` (a `Vec<f64>`) linearly: `render_reads.rs:124` once per waiting person per step, `crowd/motion.rs:181` once per arriving rider per chunk, `churn.rs:64` once per shaft per floor. On a 100-floor express shaft that is about 284 waiting people x 95 skips, roughly 27k compares per step. Fix: a per-shaft stop bitset kept in step with every `skip_floors` edit (`set_stop`, resize, express coercion, load, undo), results byte-identical. Tall lot groundwork (#1983); the 192-slot floor set lands with the Phase 2 cap change. |
 | 2026-11-12 | mode-rules-named | #1976 | engine | refactor | P3 | low | — | open | **From the 2026-11-12 Classic vs Modern audit.** `modeBranch.guard.test.ts` keeps new direct mode checks out; its ratchet lists the rest. Left: split `engine-rs/src/rules.rs` into `rules/` by domain (after #1970, #1973 and the Modern room balance PR); one rent-model rule replacing the ladder/band copies in `rent.rs`, `catalog.rs`, `panels/unit_detail.rs`, `build.rs`, `churn.rs` and the load snap (after #1972); fold #1972's ticket prices into the films rules; a catalog rule for the 1994 export and the engine deciding the tenant card's lobby distance. Each slice lowers the ratchet. |
 | 2026-11-11 | event-catalog-stale-path | #1960 | engine | review-deferral | P3 | low | — | open | **Deferred from the review of #1958.** The `about` text in `conformance/events/catalog.json` still names `src/engine/gameplayEvents.d.ts`, which #1956 deleted; `npm run gen:events` writes `src/events/gameplayEvents.d.ts`. Fix the path, run `gen:events`, and since the file is a lock file set `crate: patch`, add an Engine line and run `npm run engine:compat` (`conformance/README.md`). |

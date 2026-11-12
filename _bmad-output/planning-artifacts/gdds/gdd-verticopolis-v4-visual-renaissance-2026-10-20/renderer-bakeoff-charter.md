@@ -1,5 +1,7 @@
 # 4A Renderer bake-off: architecture study charter
 
+> **Superseded on 2026-11-12.** Naftali cut the Visual Renaissance as planned after a GDS and BMAD party roundtable: no renderer swap (Excalibur 0.32 stays, revisited only on measured frame-time evidence from a real phone), no full redraw, no authored-art bible on the web. #1190, #1191, #1192, #1193 and #1195 are closed as not planned. What survives is a small web track for tall towers under #1189: full-zoom legibility (#2012), the phone layout and inspector (#2013) and the accessibility suite (#1194). This folder is kept as history.
+
 **Status:** proposal, not an Architecture Decision Record and not an implemented BMAD architecture workflow.
 **Owner decision needed:** selection or rejection of a web renderer switch after measured evidence.
 **Related:** `gdd.md`, `epics.md`, `decision-log.md`.
