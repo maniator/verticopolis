@@ -3,9 +3,10 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import { TRAFFIC_LABELS, TRAFFIC_LEVELS, trafficLevel, type TrafficTier } from "./traffic";
+import { gameStylesheet } from "../tests/gameStylesheet.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const styles = readFileSync(resolve(here, "../styles.css"), "utf8");
+const styles = gameStylesheet();
 const html = readFileSync(resolve(here, "../index.html"), "utf8");
 const TIERS: readonly TrafficTier[] = [0, 1, 2, 3];
 const BARS = [1, 2, 3, 4] as const;

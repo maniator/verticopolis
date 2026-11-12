@@ -1,0 +1,168 @@
+/* The facility editor, the sidebar panels and the event log.
+   Part of the game's stylesheet: src/styles.css imports the parts in order. */
+
+/* ---- Editor (selected facility) ---- */
+#editor {
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+  width: 250px;
+  --pad-y: 10px;
+  --pad-x: 12px;
+  --title-gap: 8px;
+  padding: var(--pad-y) var(--pad-x);
+  font-size: 12px;
+}
+#editor .ed-stats {
+  gap: 1px 8px;
+  margin-bottom: 8px;
+}
+#editor .ed-row {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+/* Row-scoped on purpose: the title bar's ✕ is also a .btn inside #editor,
+   and an unscoped flex: 1 would stretch it across the bar. */
+#editor .ed-row .btn {
+  flex: 1;
+  padding: 5px;
+  font-size: 11px;
+}
+#editor .ed-row .field {
+  flex: 2;
+  padding: 4px 6px;
+  font-size: 11px;
+}
+/* Mobile only: the inspector card's diagnostics folded into the editor (access
+   warnings, patronage, on-notice). A hair smaller than the stat rows, with a
+   divider above so it reads as its own block; hidden entirely when empty (a
+   well-placed, non-retail unit with nothing to warn about). */
+#editor .ed-diagnostics {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+  font-size: 11px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+#editor .ed-diagnostics:empty {
+  display: none;
+}
+
+/* ---- Sidebar (each panel reads as a little window) ---- */
+#sidebar {
+  width: 232px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  /* Scroll when the panels are taller than the viewport (e.g. a phone held
+     landscape, where it's wide enough to skip the mobile drawer layout). */
+  overflow-y: auto;
+  margin: 6px 6px 6px 0;
+  gap: 6px;
+  padding: 6px;
+}
+/* The drawer close button and dimming scrim are mobile-only. */
+#panel-close,
+#scrim {
+  display: none;
+}
+.panel {
+  padding: 0 8px 8px;
+}
+.panel.grow {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+/* Panel headers are mini title bars — the .win-title idiom at panel scale. */
+.panel h3 {
+  font-size: 10px;
+  text-transform: uppercase;
+  color: var(--r-title-fg);
+  background: var(--r-title);
+  font-weight: 700;
+  margin: 0 -8px 6px;
+  padding: 2px 6px;
+}
+#tool-info {
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--r-ink);
+}
+#tool-info .ti-name {
+  font-weight: 700;
+  color: var(--r-title);
+}
+.name-input {
+  width: 100%;
+  padding: 4px 6px;
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+.wide-btn {
+  width: 100%;
+  margin-top: 8px; /* padding stays the .btn default (3px 9px), as shipped */
+}
+/* Rule-set badge: names the active tower's rule-set and, on click, opens the
+   Classic vs Modern comparison. A real <button> (keyboard + pointer), styled as
+   a compact full-width status chip. It is its own element, kept OUT of
+   #tower-stats (the lit one-renderer container); uiStatus.setMode is the only writer,
+   dirty-gated so the per-frame pump never touches the DOM unless the mode
+   changes. The accent only tints the label, so the win bevel reads the same for
+   both rule-sets (Classic is the faithful reference build, never the lesser one). */
+.mode-badge {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+.mode-badge.is-modern {
+  color: var(--r-title, #000080);
+}
+.mode-badge.is-classic {
+  color: #5a3d00;
+}
+#tower-stats {
+  font-size: 12px;
+  gap: 2px 8px;
+  color: var(--r-ink);
+}
+
+/* ---- Bulletin / event log ---- */
+#log {
+  flex: 1;
+  overflow-y: auto;
+  font-size: 11px;
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 3px;
+  padding: 4px 6px;
+}
+.log-line {
+  border-left: 2px solid var(--line);
+  padding: 1px 6px;
+  color: var(--ink);
+}
+.log-line.good {
+  border-color: var(--good);
+}
+.log-line.bad {
+  border-color: var(--bad);
+}
+.log-line.money {
+  border-color: var(--money);
+  color: var(--money);
+}
+.btn-row {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+.btn-row .btn {
+  flex: 1; /* padding stays the .btn default (3px 9px), as shipped */
+}

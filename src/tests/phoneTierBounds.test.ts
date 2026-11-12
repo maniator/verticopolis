@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import { PHONE_TIER, isPhoneViewport } from "./phoneTier.ts";
+import { gameStylesheet } from "./gameStylesheet.ts";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const read = (path: string) => readFileSync(resolve(root, path), "utf8");
@@ -13,13 +14,13 @@ describe("phone tier bounds", () => {
     // The gallery decides which scenes present as a touch device from these
     // numbers, so they have to be the ones the page lays out by.
     expect(read("src/main.ts")).toContain(JSON.stringify(query));
-    expect(read("src/styles.css")).toContain(`@media ${query} {`);
+    expect(gameStylesheet()).toContain(`@media ${query} {`);
     // The landscape block is the short half of the tier, held sideways.
     const landscape = `(max-width: ${PHONE_TIER.shortMaxWidth}px) and (max-height: ${PHONE_TIER.shortMaxHeight}px) and (orientation: landscape)`;
-    expect(read("src/styles.css")).toContain(`@media ${landscape} {`);
+    expect(gameStylesheet()).toContain(`@media ${landscape} {`);
     // The one-row tabs: under 340px tall or 540px wide, held sideways. The
     // .98 bounds stand in for range syntax, which Safari before 16.4 ignores.
-    expect(read("src/styles.css")).toContain(
+    expect(gameStylesheet()).toContain(
       `@media (max-width: ${PHONE_TIER.shortMaxWidth}px) and (max-height: 339.98px) and (orientation: landscape),\n  (max-width: 539.98px) and (orientation: landscape) {`,
     );
   });
@@ -43,7 +44,7 @@ describe("phone tier bounds", () => {
   });
 
   it("keeps the landscape onboarding card clear and readable on split-screen widths", () => {
-    const css = read("src/styles.css");
+    const css = gameStylesheet();
     expect(css).toContain("#onboard.onboard--mobile {\n    top: 118px;\n  }");
     expect(css).toContain("width: max(200px, min(300px, calc(100vw - 360px - env(safe-area-inset-left, 0px))));");
   });

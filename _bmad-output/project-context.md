@@ -180,7 +180,8 @@ full spec see the PRD under `_bmad-output/planning-artifacts/prds/`.
 
 ## UI design system
 - `docs/design-system.md` is the contract for all UI/CSS work: tokens + components
-  (`.btn`/`.win`/`.win-title`/`.well`/`.field`/`.kv`) in `src/styles.css`, organized as ONE
+  (`.btn`/`.win`/`.win-title`/`.well`/`.field`/`.kv`) in `src/styles.css` and the parts it imports
+  (`src/styles/`, `src/styles/game/`), organized as ONE
   generation of CSS. **No skin on IDs; edit rules, never out-specify them; press-only button
   feedback; one primary per dialog; the splash is box art and stays un-unified.**
 

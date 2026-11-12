@@ -1,0 +1,32 @@
+/* The getting-started coach card and its attention pulse.
+   Part of the game's stylesheet: src/styles.css imports the parts in order. */
+
+/* Getting-started coach card (a small window pinned over the stage). */
+#onboard {
+  position: fixed;
+  left: 10px;
+  bottom: 44px;
+  z-index: 25;
+  width: 260px;
+  font-size: 13px;
+}
+#onboard.onboard--mobile { left: 8px; right: 8px; width: auto; top: 58px; bottom: auto; }
+.ob-list { list-style: none; margin: 0; padding: 8px; display: grid; gap: 6px; }
+.ob-step { display: flex; gap: 7px; align-items: flex-start; line-height: 1.3; }
+.ob-mark { width: 14px; text-align: center; font-weight: 700; }
+.ob-done { color: var(--good); }
+.ob-done .ob-text { text-decoration: line-through; opacity: 0.7; }
+.ob-cur .ob-mark { color: var(--accent); }
+.ob-todo { opacity: 0.65; }
+.ob-sub { display: block; color: var(--muted); font-weight: 400; margin-top: 2px; }
+.ob-sendoff { margin: 0; padding: 8px 10px 10px; color: var(--muted); }
+
+/* Attention pulse on the control the current onboarding step points at. */
+@keyframes tt-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(0, 0, 128, 0.0); }
+  50% { box-shadow: 0 0 0 3px rgba(0, 0, 128, 0.65); }
+}
+.tt-pulse { animation: tt-pulse 1.1s ease-in-out infinite; position: relative; z-index: 1; }
+@media (prefers-reduced-motion: reduce) {
+  .tt-pulse { animation: none; box-shadow: 0 0 0 3px rgba(0, 0, 128, 0.65); }
+}

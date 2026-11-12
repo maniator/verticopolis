@@ -1,7 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
-import { dirname, resolve } from "node:path";
+import { gameStylesheet } from "./gameStylesheet.ts";
 
 /**
  * The sideways phone layout gives each changing stat chip a fixed width
@@ -23,7 +21,7 @@ const MEASURED_PX = {
 const GLYPH_PX = 18; // the traffic meter
 const GLYPH_GAP_EM = 0.3; // the meter's margin before the tier word
 
-const css = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "../styles.css"), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+const css = gameStylesheet().replace(/\/\*[\s\S]*?\*\//g, "");
 
 /** The body of the sideways block, up to its own closing brace. */
 function landscapeBlock(): string {

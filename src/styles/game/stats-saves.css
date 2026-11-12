@@ -1,0 +1,201 @@
+/* Tower Statistics, the saves manager and batch pricing.
+   Part of the game's stylesheet: src/styles.css imports the parts in order. */
+
+/* ---- Tower Statistics dialog ----
+ * The stats live on the gray chrome face (never a bare white sheet); each
+ * section header is a navy mini title bar (.win-title), so the modal reads
+ * as a stack of little windows. */
+.stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.stats-grid .col {
+  gap: 3px 10px;
+  font-size: 13px;
+  padding: 0 2px;
+}
+/* The exterminator action row is a direct child of the two-column grid; span it
+   full width so the button never sits in a single column and breaks the flow. */
+.stats-grid .modal-actions {
+  grid-column: 1 / -1;
+}
+/* Layout only — type/casing/padding come from .win-title.sm in the markup. */
+.stats-section {
+  grid-column: 1 / -1;
+  margin-top: 6px;
+  box-shadow: var(--bevel-out);
+}
+/* Values echo the HUD: money green (red in debt), stars gold. */
+.stats-grid .v.money {
+  color: var(--money);
+  font-weight: 700;
+}
+.stats-grid .v.loss {
+  color: var(--bad);
+  font-weight: 700;
+}
+.stats-grid .v.stars {
+  color: #a07000;
+  font-weight: 700;
+}
+/* Milestones: the ✓/· mark carries done-state; a sunken gauge in the strip
+ * shows overall progress (same idiom as the facility evalbar). Rows read as
+ * "· Label   description" at every width — natural-width label, left-aligned
+ * description. */
+.stats-grid .col.ms,
+.stats-grid .col.nsr {
+  grid-template-columns: auto 1fr;
+}
+.stats-grid .col.ms .v,
+.stats-grid .col.nsr .v {
+  text-align: left;
+  color: var(--muted);
+}
+.stats-grid .col.ms .k,
+.stats-grid .col.nsr .k {
+  color: var(--muted);
+}
+.stats-grid .col.ms .k.ms-done,
+.stats-grid .col.nsr .k.ms-done {
+  color: var(--good);
+}
+/* Next-star checklist: the value ("Ready" / the population count) also greens
+ * when its gate is met, so the row reads done without an inline color. */
+.stats-grid .col.nsr .v.ms-done {
+  color: var(--good);
+}
+/* The "· ready" flag in the Next-star section header (all gates met). */
+.stats-section .nsr-ready {
+  color: var(--good);
+}
+.stats-section .evalbar {
+  margin-left: auto;
+  width: 84px;
+  flex: none;
+}
+
+/* ---- Saves manager ----
+   The slot list is a single sunken white data well; rows sit flat on it
+   with hairline separators. */
+.slots {
+  display: flex;
+  flex-direction: column;
+  padding: 4px;
+}
+.slot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 8px;
+}
+/* The title-screen picker renders .slots as a <ul> so screen readers hear a
+   list with a named row each (the in-game manager is still a <div>; both share
+   this chrome). Strip the list affordances the retro panel never had. */
+ul.slots {
+  list-style: none;
+  margin: 0;
+}
+ul.slots > li {
+  list-style: none;
+}
+/* The title-screen picker's row actions are its PRIMARY controls, so they meet
+   the contract's target floor (42px, 48px on touch) rather than inheriting the
+   in-game manager's compact 5px-padding chip. Scoped to the picker's <ul> so
+   the manager's own rows are untouched. */
+ul.slots .slot-actions .btn {
+  min-height: 42px;
+  padding: 8px 14px;
+  font-size: 12px;
+}
+.slot + .slot {
+  border-top: 1px solid var(--panel-light);
+}
+.slot-head b {
+  font-size: 13px;
+}
+.slot-detail {
+  font-size: 11px;
+  color: var(--ink);
+  margin-top: 2px;
+}
+.slot-when {
+  color: var(--muted);
+}
+/* .slot-unreadable is the title-screen picker's row for a slot present in
+   storage that this build cannot parse (SPEC-splash-load-tower). It shares
+   .slot-empty's treatment on purpose: both are non-actionable rows, and their
+   copy carries the difference between "nothing here" and "here but unreadable".
+   Such a row renders NO control at all, so there is nothing to disable. */
+.slot-empty,
+.slot-unreadable {
+  color: var(--muted);
+  font-style: italic;
+}
+/* The picker's "nothing on this device" line, standing in for a list of empty
+   rows, and its inline load failure. */
+.picker-none {
+  margin: 0;
+  padding: 10px 8px;
+  color: var(--muted);
+  font-style: italic;
+}
+.picker-error {
+  margin: 0 0 8px;
+  color: var(--bad);
+}
+/* The file row crosses from device storage to the file system, so it gets a
+   heavier rule than the hairline dividing the slots above it. With no slot rows
+   above it (nothing saved, or storage blocked) there is nothing to divide from,
+   so the rule goes away. */
+.slot-file {
+  border-top: 2px solid var(--line);
+}
+.slot-file--alone {
+  border-top: 0;
+}
+.slot-actions {
+  display: flex;
+  gap: 6px;
+  flex: none;
+}
+.slot-actions .btn {
+  padding: 5px 10px;
+  font-size: 11px;
+}
+.slot-actions .btn.danger {
+  padding: 5px 8px;
+}
+
+
+
+/* ---- Batch-pricing dialog ---- */
+.batch-modes { display: grid; gap: 8px; margin: 10px 0; }
+.batch-modes label { display: flex; align-items: center; gap: 6px; }
+.bp-amount { display: inline-flex; align-items: center; gap: 4px; margin-left: 22px; }
+.bp-amount .field { width: 8em; text-align: right; padding: 2px 4px; }
+.bp-amount .btn { min-width: 28px; }
+.bp-band { margin-left: 22px; color: var(--muted); font-size: 0.85em; }
+.bp-only { display: flex; align-items: center; gap: 6px; margin: 6px 0; }
+.bp-preview { min-height: 2.4em; color: var(--r-title); font-weight: 600; }
+/* Classic (ladder) batch variant: the rung picker row replaces the number
+   machinery; same chip + select recipe as the editor card. */
+.bp-rung { display: flex; align-items: center; gap: 6px; margin: 6px 0 8px; }
+.bp-rung .field { flex: 1; }
+.bp-rung-lead { margin: 6px 0 0; }
+/* The rent-rung chip: a 12px swatch in a pressed ring, decorative
+   reinforcement beside the rung's NAME in the select (color never carries the
+   state alone). data-rung="none" (No Rate) stays hollow: chrome face, no fill. */
+.rung-chip {
+  flex: none;
+  align-self: center;
+  width: 12px;
+  height: 12px;
+  background: var(--r-face);
+  box-shadow: var(--bevel-in);
+}
+.rung-chip[data-rung="0"] { background: var(--rung-vlow); }
+.rung-chip[data-rung="1"] { background: var(--rung-low); }
+.rung-chip[data-rung="2"] { background: var(--rung-avg); }
+.rung-chip[data-rung="3"] { background: var(--rung-high); }

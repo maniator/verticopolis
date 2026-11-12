@@ -1,0 +1,328 @@
+/* The landscape phone blocks.
+   Part of the game's stylesheet: src/styles.css imports the parts in order. */
+
+/* Landscape phone block: a phone held sideways matches the phone block above
+   (short and under 1024px wide) and keeps its drawer, but its scarce axis is
+   height. The bottom tool strip and the two-line stat chips left
+   the world view a thin band (151px of a 352px Pixel screen), so here the
+   tools become a docked column on the left, the stat chips go to one line, and
+   the Map card keeps the tower's proportions when the view is short. Same
+   query as the phone block plus `orientation: landscape`, so `mobileMq` in
+   src/main.ts still reads this tier as the phone tier. Orientation is the
+   window's shape, so an on-screen keyboard or a split screen that makes the
+   window taller than wide switches back to the portrait phone layout. */
+@media (max-width: 1023px) and (max-height: 599px) and (orientation: landscape) {
+  /* The buttons keep the first row to themselves, ending at the menu button,
+     and the stat chips share the row under them (two lines at 852px where
+     the phone layout took three), as the phone block already orders them. */
+  #topbar {
+    align-items: center;
+    gap: 4px 6px;
+    padding: 3px 6px;
+  }
+  #status {
+    gap: 4px;
+  }
+  /* One line per chip: the small label sits before its value. */
+  .stat {
+    flex-direction: row;
+    align-items: baseline;
+    gap: 4px;
+    padding: 2px 4px;
+  }
+  .stat .label {
+    font-size: 8px;
+    letter-spacing: 0.5px;
+  }
+  .stat .value {
+    font-size: 12px;
+  }
+  /* The chips whose values change in play (the traffic tier and floor, the
+     time, the date, the funds and the population) each get a fixed width,
+     so a new value can never rewrap the bar. A rewrap would resize the world
+     view and make an open Map rebuild from scratch, up to six times a second
+     while the traffic floor flickers. Each width fits its longest value
+     ("Backed up · 100F", "WD2 00:00", "2nd WD/4Q/122nd Year",
+     "$-1,000,000,000", "100,000") in the widest common UI font, DejaVu Sans
+     (measured in Chrome, within about half a pixel on the tightest), so
+     only a still longer value is trimmed with an ellipsis. The rating is
+     always five stars or the shorter TOWER, so it needs none. */
+  #stat-time,
+  #stat-date,
+  #stat-money,
+  #stat-pop {
+    display: inline-block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    vertical-align: bottom;
+  }
+  /* The traffic chip trims the tier word and keeps the floor, the fact the
+     chip is there to give. A flex row drops the space between the meter and
+     the word, so the meter's margin stands in for it; the floor keeps its
+     own leading space. */
+  #traffic {
+    display: inline-flex;
+    align-items: baseline;
+    overflow: hidden;
+    vertical-align: bottom;
+  }
+  #traffic-glyph {
+    margin-inline-end: 0.3em;
+  }
+  #traffic-glyph,
+  #traffic-floor {
+    flex: none;
+  }
+  #traffic-floor {
+    white-space: pre;
+  }
+  #traffic-label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  #traffic { width: 10.8em; }
+  #stat-time { width: 6.2em; }
+  #stat-date { width: 13.1em; }
+  #stat-money { width: 9.5em; }
+  #stat-pop { width: 4.8em; }
+  #speed {
+    gap: 3px;
+  }
+  #speed .btn {
+    padding: 2px 8px;
+  }
+
+  /* The tools dock on the left as a column: the category tabs in a two-wide
+     grid, the pinned Inspect and Bulldoze side by side, then the open
+     category as a list that scrolls. */
+  #main {
+    flex-direction: row;
+  }
+  /* On a phone whose camera cutout sits on the left, the column keeps clear
+     of it (the inset is 0 unless the page opts into the cutout area). */
+  #palette {
+    order: 0;
+    width: 168px;
+    height: auto;
+    margin: 6px 0 6px calc(6px + env(safe-area-inset-left, 0px));
+    border-top: 0;
+    box-shadow: var(--bevel-out);
+  }
+  #palette-tabs {
+    flex-wrap: wrap;
+    overflow: visible;
+  }
+  /* Tall enough to tap (WCAG 2.5.8's 24px minimum). */
+  .pal-tab {
+    flex: 1 1 calc(50% - 3px);
+    min-height: 24px;
+    padding: 2px 4px;
+    font-size: 10px;
+    text-align: center;
+  }
+  .palette-scroll {
+    flex-direction: column;
+  }
+  .pal-pinned {
+    border-right: 0;
+    border-bottom: 1px solid var(--r-shadow);
+  }
+  .pal-pinned .pal-item {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+  /* Each pinned tool already carries its icon; the swatch would crowd the
+     name out of a half-width button. */
+  .pal-pinned .pal-swatch {
+    display: none;
+  }
+  .pal-groups {
+    flex-direction: column;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+  .pal-groups .pal-group.tab-active {
+    flex-direction: column;
+  }
+  .pal-item {
+    flex-direction: row;
+    width: auto;
+    gap: 6px;
+    min-height: 32px;
+    padding: 4px 5px;
+    text-align: left;
+  }
+  .pal-swatch {
+    width: 16px;
+    height: 16px;
+  }
+  /* A long name wraps to a second line beside its price instead of pushing
+     the price out of the column. */
+  .pal-name {
+    min-width: 0;
+    flex: 1;
+    text-align: left;
+  }
+  .pal-cost {
+    font-size: 10px;
+  }
+  /* In a column the Modern sub-band is a heading again instead of a rotated
+     divider. */
+  .pal-group.tab-active > .pal-sub {
+    writing-mode: horizontal-tb;
+    transform: none;
+    align-self: stretch;
+    font-size: 9px;
+    margin: 4px 2px 2px;
+  }
+
+  /* The editor card docks at the view's bottom-left and can be taller than
+     a short view (a hotel suite's card runs about 310px), which clipped its
+     title bar and close button off the top. Capped, it scrolls instead, with
+     its title bar pinned so the close button stays in reach, and the close
+     button's touch halo turned inward so the scroll box does not clip it.
+     With no Getting Started card up, the editor has no z-index of its own,
+     so it isolates its pinned title's layer, and the title cannot paint
+     over the toasts. */
+  #editor {
+    isolation: isolate;
+    width: min(250px, calc(100% - 20px));
+    max-height: calc(100% - 20px);
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  #editor > .win-title {
+    position: sticky;
+    top: calc(-1 * var(--pad-y));
+    z-index: 1;
+  }
+  #editor > .win-title .btn.xs::after {
+    inset: -3px -8px -12px;
+  }
+
+  /* The Map card (src/styles/overview-map.css) keeps the map's 150 by 216
+     proportions here instead of being squeezed to the card's height (the map
+     stretches its lot across whatever box it gets, so a squeezed box drew a
+     flattened tower). On a view this short the phone's half-height cap would
+     leave an 80px-wide map, so the card may take about two thirds of the
+     view's height; 30px is its title bar and frame. The `dvh` line is the
+     fallback for a browser without container units. */
+  #stage {
+    container-type: size;
+  }
+  .overview-map {
+    /* The title AND the S6 view-tabs row count toward the two-thirds cap.
+       A percentage of #stage is reliable in both landscape browser layouts
+       and split-screen; cqh alone can resolve against a taller fallback. */
+    max-height: 66%;
+  }
+  /* Start-aligned, so a body narrower than the card's title bar keeps its
+     shape instead of being stretched to the bar's width. */
+  .overview-map-body {
+    align-self: flex-start;
+    width: auto;
+    height: min(216px, calc(66dvh - 70px));
+    height: min(216px, calc(66cqh - 30px));
+    aspect-ratio: 150 / 216;
+  }
+
+  /* On a narrow sideways view (split screen, say) the stage can be thinner
+     than a toast; the stage is a size container, so cap toasts to it. The
+     vw line is the fallback without container units: the view less the
+     186px outside the stage (the 168px tools column and the 6px margins
+     around it and the stage) and the toast's 10px margins. */
+  .toast {
+    max-width: min(280px, calc(100vw - 206px - env(safe-area-inset-left, 0px)));
+    max-width: min(280px, calc(100cqw - 20px));
+  }
+  /* The first-run checklist sits right of the tools column instead of over
+     it, at most 300px wide, so the tab and tiles it points at stay visible
+     and tappable and most of the world view stays clear. Its top
+     clears a top bar wrapped to three lines (71 to 73px tall from 568 to
+     740px wide, by font), and on a very short screen its step list scrolls
+     under the title bar, which stays put. */
+  /* The stage starts at 180px (the column and its margins), so the card
+     sits 2px inside it and keeps 8px clear on the right. */
+  #onboard.onboard--mobile {
+    left: calc(182px + env(safe-area-inset-left, 0px));
+    right: auto;
+    width: min(300px, calc(100vw - 190px - env(safe-area-inset-left, 0px)));
+    top: 76px;
+  }
+  /* The card would otherwise cover the title bar and close button of an
+     editor or inspector card opened under it, so those and the toasts paint
+     above it, as they do with the Map open (src/styles/overview-map.css). */
+  body:has(> #onboard.onboard--mobile) #stage > :is(#inspector, #editor, #toast-wrap) {
+    z-index: 26;
+  }
+  /* With the Map pill showing and the editor open, the pill rule in
+     overview-map.css drops the pill, the inspector and the toasts to z 1 so
+     the pill sits above the editor; here they keep that order above the
+     card too. */
+  body:has(> #onboard.onboard--mobile) #stage:has(> .overview-map-toggle:not([hidden])):has(> #editor:not(.hidden)) > :is(.overview-map-toggle, #inspector, #toast-wrap) {
+    z-index: 27;
+  }
+  #onboard.onboard--mobile .ob-list {
+    max-height: calc(100vh - 116px);
+    max-height: calc(100dvh - 116px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  /* With the Map open it moves to the right, since the Map card (above it)
+     would otherwise cover its title and the start of each step. 360px is
+     the tools column, the widest Map card and the gaps between them; on a
+     view too narrow for that it keeps 180px and sits over the Map's edge. */
+  body:has(.overview-map:not([hidden])) #onboard.onboard--mobile {
+    left: auto;
+    right: 8px;
+    width: max(200px, min(300px, calc(100vw - 360px - env(safe-area-inset-left, 0px))));
+  }
+}
+
+/* At Pixel-class landscape widths the larger funds/population chips from
+   #1830 can make #status wrap into a third line (71px top bar at 852×352).
+   Keep the buttons and stats on their own rows without clipping values. The
+   narrower split-screen tier below 820px still wraps naturally, as designed.
+   Tighten only the labels and in-chip spacing, not the pinned value widths. */
+@media (min-width: 820px) and (max-width: 1023px) and (max-height: 599px) and (orientation: landscape) {
+  #status {
+    flex-wrap: nowrap;
+    gap: 2px;
+  }
+  .stat {
+    padding: 2px 2px;
+    gap: 2px;
+  }
+  .stat .label {
+    letter-spacing: 0;
+  }
+}
+
+/* A sideways window under 340px tall (split screen, a short desktop window),
+   or one under 540px wide whose top bar wraps to four or five lines, would
+   wrap the seven category tabs into four rows and leave the open category
+   no room, so the tabs go back to one row that scrolls sideways, as on a
+   portrait phone. The .98 bounds take in a fractional height just under
+   340px or width just under 540px without range syntax, which Safari
+   reads only from 16.4. */
+@media (max-width: 1023px) and (max-height: 339.98px) and (orientation: landscape),
+  (max-width: 539.98px) and (orientation: landscape) {
+  /* Split-screen widths can wrap the top bar to five lines (about 116px high);
+     lift the card below it so the last stat row stays visible. */
+  #onboard.onboard--mobile {
+    top: 118px;
+  }
+  #palette-tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+  }
+  .pal-tab {
+    flex: none;
+    padding: 2px 6px;
+  }
+}
