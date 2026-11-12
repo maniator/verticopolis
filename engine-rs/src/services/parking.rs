@@ -41,10 +41,14 @@ pub struct ParkingDemand {
     pub offices: f64,
     /// Operational hotel suites, a space each.
     pub suites: f64,
-    /// Modern: whole spaces the homes need, after the Metro's share. Classic
-    /// homes need none.
+    /// Modern: the whole spaces the homes add to the offices', after the
+    /// Metro's share, so `offices + homes` is what the two need together
+    /// (they share spaces, so their fractions are rounded once, together).
+    /// Classic homes need none.
     pub homes: f64,
     pub total: f64,
+    /// Modern: the spaces the homes need, unrounded, after the Metro's share.
+    pub home_need: f64,
     /// The spaces offices and homes need together, unrounded: what the spaces
     /// the suites leave are measured against.
     pub shared_need: f64,
@@ -108,15 +112,17 @@ impl Simulation {
         // offices are short is the mode's rule (#1970).
         let office_need = office_pop / PARKING_WORKERS_PER_SPACE * share;
         let home_need = home_need * share;
+        let shared_need = office_need + home_need;
         let offices = whole_spaces(office_need);
-        let homes = whole_spaces(home_need);
+        let shared = whole_spaces(shared_need);
         ParkingDemand {
             office_pop,
             offices,
             suites,
-            homes,
-            total: offices + suites + homes,
-            shared_need: office_need + home_need,
+            homes: (shared - offices).max(0.0),
+            total: shared + suites,
+            home_need,
+            shared_need,
         }
     }
 

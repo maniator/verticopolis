@@ -284,7 +284,7 @@ impl Simulation {
             match self.mode.office_parking() {
                 OfficeParking::AnyFreeSpace => self.first_unparked_office(parking_capacity),
                 // Offices alone all take the same share: select the boundary.
-                OfficeParking::WorkersPerSpace(workers) if d.homes == 0.0 => {
+                OfficeParking::WorkersPerSpace(workers) if d.home_need == 0.0 => {
                     self.first_unparked_office(parking_capacity * workers / share)
                 }
                 OfficeParking::WorkersPerSpace(_) => {

@@ -211,7 +211,7 @@ impl Simulation {
                 OfficeParking::WorkersPerSpace(_) => {
                     let d = self.parking_demand();
                     let spare = self.parking_spare_after_suites(&d);
-                    if d.homes > 0.0 {
+                    if d.home_need > 0.0 {
                         home_parking_nudge_message(d.offices, d.homes, spare)
                     } else {
                         office_parking_nudge_message(d.offices, spare)

@@ -275,3 +275,18 @@ fn the_stats_screen_reads_the_parking_coverage_while_short() {
     }
     assert!(sim.stats_report()["parkingDemand"]["coverage"].is_null());
 }
+
+#[test]
+fn offices_and_homes_round_their_shared_need_once() {
+    let mut sim = bare_tower(GameMode::Modern, 3, 3);
+    occupied_row(&mut sim, Kind::Office, 2, 1);
+    occupied_row(&mut sim, Kind::Condo, 3, 1);
+    // A quarter space for the office and half for the condo: one space
+    // parks both, so the stats total is one, not one each.
+    let d = sim.parking_demand();
+    assert_eq!((d.offices, d.homes, d.total), (1.0, 0.0, 1.0));
+    assert!((d.home_need - 0.5).abs() < 1e-9);
+    park(&mut sim, 1);
+    assert_eq!(sim.service_shortfalls().parking_coverage(), None);
+    assert!(sim.stats_report()["parkingDemand"]["coverage"].is_null());
+}
