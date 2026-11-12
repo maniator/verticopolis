@@ -35,6 +35,7 @@ fn the_named_slots_read_their_values() {
     sim.fx.explosion.floor = 1010;
     sim.fx.explosion.x = 1011.0;
     sim.fx.thief.seq = 1012;
+    sim.fx.thief.x = 1013;
     sim.fx.thief.floor = 1014;
     sim.fx.treasure.seq = 1015;
     sim.fx.treasure.floor = 1016;
@@ -82,6 +83,7 @@ fn the_named_slots_read_their_values() {
         (EXPLOSION_FX_FLOOR, 1010.0),
         (EXPLOSION_FX_X, 1011.0),
         (THIEF_FX_SEQ, 1012.0),
+        (THIEF_FX_X, 1013.0),
         (THIEF_FX_FLOOR, 1014.0),
         (TREASURE_FX_SEQ, 1015.0),
         (TREASURE_FX_FLOOR, 1016.0),

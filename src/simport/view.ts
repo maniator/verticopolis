@@ -120,7 +120,9 @@ export interface FxView {
   readonly santaSeq: number;
   readonly vipSeq: number;
   readonly explosion: { readonly floor: number; readonly x: number; readonly seq: number };
-  readonly thief: { readonly caught: boolean; readonly floor: number; readonly seq: number };
+  /** `x` is a tile of the stretch of floor (one tower's part of it, on a
+   *  lot with several) the thief prowled. */
+  readonly thief: { readonly caught: boolean; readonly floor: number; readonly x: number; readonly seq: number };
   readonly treasure: { readonly floor: number; readonly x: number; readonly seq: number };
 }
 

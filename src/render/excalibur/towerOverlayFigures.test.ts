@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { FLOOR } from "../scale";
 import { VIEW_ZOOM_MIN } from "../../shared/viewZoom";
 import { drawSearchGuard, drawThief, FIGURE_HEIGHT } from "../sprites/events";
-import { drawOverlay, floorFigureScale, guardPosition } from "./towerOverlay";
+import { drawOverlay, floorFigureScale, floorRoomSpan, guardPosition } from "./towerOverlay";
 
 /**
  * The bomb search's guards and the thief walk a floor, so each must fit
@@ -44,8 +44,11 @@ function rectCtx(): { ctx: CanvasRenderingContext2D; rects: Rect[] } {
   return { ctx: ctx as CanvasRenderingContext2D, rects };
 }
 
-/** The screen height a set of rectangles covers, top to bottom. */
+/** The screen height a set of rectangles covers, top to bottom. Nothing
+ *  drawn fails the test, so a figure that stops drawing cannot pass as one
+ *  that fits. */
 function extent(rects: ReadonlyArray<Rect>): number {
+  expect(rects.length).toBeGreaterThan(0);
   const top = Math.min(...rects.map((r) => r.y));
   const bottom = Math.max(...rects.map((r) => r.y + r.h));
   return bottom - top;
@@ -76,6 +79,9 @@ describe("a figure walking a floor fits inside it at every zoom", () => {
     for (const zoom of ZOOMS) {
       const { ctx, rects } = rectCtx();
       drawThief(ctx, 100, 300, floorFigureScale(zoom), true);
+      // Both figures drew: the thief's dark coat and the guard's navy uniform.
+      expect(rects.some((r) => r.style === "#232830")).toBe(true);
+      expect(rects.some((r) => r.style === "#274B8F")).toBe(true);
       expect(extent(rects), `zoom ${zoom}`).toBeLessThanOrEqual(FLOOR * zoom + ROUNDING);
     }
   });
@@ -132,5 +138,37 @@ describe("a guard crossing to another tower on the lot", () => {
     expect(guardPosition(g, 8)).toEqual({ floor: 2, x: 209, climbing: true });
     expect(guardPosition(g, 12)).toEqual({ floor: 4, x: 209, climbing: true });
     expect(guardPosition(g, 14)).toEqual({ floor: 5, x: 210, climbing: false });
+  });
+});
+
+describe("a thief on a lot with several towers runs his own tower's rooms", () => {
+  // Floor 4 holds two towers' floor tiles (100 to 139 and 200 to 239) with
+  // an office in each; the lobby on 1 runs under both.
+  const units = [
+    { kind: "lobby", floor: 1, x: 100, width: 140 },
+    { kind: "floor", floor: 4, x: 100, width: 40 },
+    { kind: "floor", floor: 4, x: 200, width: 40 },
+    { kind: "office", floor: 4, x: 110, width: 9 },
+    { kind: "office", floor: 4, x: 220, width: 9 },
+  ] as const;
+
+  it("keeps to the tower that holds his tile", () => {
+    expect(floorRoomSpan(units, 4, 200)).toEqual({ left: 220, right: 229 });
+    expect(floorRoomSpan(units, 4, 100)).toEqual({ left: 110, right: 119 });
+  });
+
+  it("runs the whole floor when the host gives no tile, or one off every tower", () => {
+    expect(floorRoomSpan(units, 4)).toEqual({ left: 110, right: 229 });
+    expect(floorRoomSpan(units, 4, 170)).toEqual({ left: 110, right: 229 });
+  });
+
+  it("reads floor tiles one per unit as one run", () => {
+    const tiles = [
+      ...Array.from({ length: 40 }, (_, i) => ({ kind: "floor" as const, floor: 4, x: 200 + i, width: 1 })),
+      ...Array.from({ length: 40 }, (_, i) => ({ kind: "floor" as const, floor: 4, x: 100 + i, width: 1 })),
+      { kind: "office" as const, floor: 4, x: 110, width: 9 },
+      { kind: "office" as const, floor: 4, x: 220, width: 9 },
+    ];
+    expect(floorRoomSpan(tiles, 4, 239)).toEqual({ left: 220, right: 229 });
   });
 });

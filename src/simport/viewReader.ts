@@ -347,7 +347,7 @@ export class ViewReader implements SimView {
       santaSeq: f[h.santaFxSeq],
       vipSeq: f[h.vipFxSeq],
       explosion: { floor: f[h.explosionFxFloor], x: f[h.explosionFxX], seq: f[h.explosionFxSeq] },
-      thief: { caught: f[h.thiefFxCaught] === 1, floor: f[h.thiefFxFloor], seq: f[h.thiefFxSeq] },
+      thief: { caught: f[h.thiefFxCaught] === 1, floor: f[h.thiefFxFloor], x: f[h.thiefFxX], seq: f[h.thiefFxSeq] },
       treasure: { floor: f[h.treasureFxFloor], x: f[h.treasureFxX], seq: f[h.treasureFxSeq] },
     };
     this.emergency.read(this.port, f[h.pendingChoice] === 1, f[h.bombSearchSeq]);

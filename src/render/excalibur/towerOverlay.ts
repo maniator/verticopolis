@@ -94,7 +94,7 @@ export function syncEventFx(engine: TowerEngine, animating: boolean): void {
   if (engine.sim.thiefFx.seq !== engine.lastThiefSeq) {
     engine.lastThiefSeq = engine.sim.thiefFx.seq;
     // He runs the floor's rooms; a floor with none has nowhere to prowl.
-    const span = animating ? floorRoomSpan(engine.sim.tower.units, engine.sim.thiefFx.floor) : null;
+    const span = animating ? floorRoomSpan(engine.sim.tower.units, engine.sim.thiefFx.floor, engine.sim.thiefFx.x) : null;
     if (span) {
       engine.thiefStart = engine.d.anim;
       engine.thiefCaught = engine.sim.thiefFx.caught;
@@ -185,11 +185,9 @@ export function bombPulseAlpha(animSeconds: number, minutesLeft: number, reduced
 }
 
 /** The size a figure walking a floor (a search guard, a thief) is drawn at:
- *  the camera zoom, the same as the crowd, so it stays inside its floor at
- *  every zoom. A floor of {@link FLOOR} world pixels is taller than the
- *  figure (`FIGURE_HEIGHT` in the sprites), so one floor holds it at any zoom.
- *  A fixed minimum size here once drew guards several floors tall on a
- *  zoomed-out phone. */
+ *  the camera zoom, as the crowd is. A {@link FLOOR}-pixel floor is taller
+ *  than the figure (`FIGURE_HEIGHT` in the sprites), so it stays inside its
+ *  floor at every zoom; a fixed minimum once drew guards floors tall. */
 export function floorFigureScale(zoom: number): number {
   return zoom;
 }
@@ -286,16 +284,45 @@ function renderVip(engine: TowerEngine, ctx: CanvasRenderingContext2D): void {
 
 /** The tile span of the rooms on `floor` (left edge, right edge), or null
  *  when it has none. Bare floor and lobby tiles do not count, the same span
- *  the bomb search's guards walk. One pass over the units, made once when a
+ *  the bomb search's guards walk. Given `x`, only the rooms on the run of
+ *  floor and lobby tiles holding that tile count: one tower's part of the
+ *  floor on a lot with several. One pass over the units, made once when a
  *  thief appears (at most once a game day), never per frame. */
-export function floorRoomSpan(units: ReadonlyArray<Pick<UnitView, "kind" | "floor" | "x" | "width">>, floor: number): ThiefSpan | null {
+export function floorRoomSpan(
+  units: ReadonlyArray<Pick<UnitView, "kind" | "floor" | "x" | "width">>,
+  floor: number,
+  x?: number,
+): ThiefSpan | null {
+  const run = x === undefined || !Number.isFinite(x) ? null : structuralRun(units, floor, x);
   let span: ThiefSpan | null = null;
   for (const u of units) {
     if (u.floor !== floor || u.kind === "floor" || u.kind === "lobby") continue;
+    if (run && (u.x > run.right || u.x + u.width <= run.left)) continue;
     if (!span) span = { left: u.x, right: u.x + u.width };
     else span = { left: Math.min(span.left, u.x), right: Math.max(span.right, u.x + u.width) };
   }
   return span;
+}
+
+/** The run of floor and lobby tiles on `floor` that holds tile `x`, as its
+ *  first and last tiles, or null when no such tile is there. */
+function structuralRun(
+  units: ReadonlyArray<Pick<UnitView, "kind" | "floor" | "x" | "width">>,
+  floor: number,
+  x: number,
+): ThiefSpan | null {
+  const pieces: Array<[number, number]> = [];
+  for (const u of units) {
+    if (u.floor === floor && (u.kind === "floor" || u.kind === "lobby")) pieces.push([u.x, u.x + u.width - 1]);
+  }
+  pieces.sort((a, b) => a[0] - b[0]);
+  let run: ThiefSpan | null = null;
+  for (const [first, last] of pieces) {
+    if (run && first <= run.right + 1) run = { left: run.left, right: Math.max(run.right, last) };
+    else if (run && run.left <= x && x <= run.right) return run;
+    else run = { left: first, right: last };
+  }
+  return run && run.left <= x && x <= run.right ? run : null;
 }
 
 /** Where the thief is, in tiles, a fraction `p` of the way through his run:

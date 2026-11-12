@@ -79,6 +79,11 @@ impl Stairs {
             .find(|&i| self.stretches[i].first <= x && x <= self.stretches[i].last)
     }
 
+    /// The leftmost stretch on `floor`, if any.
+    pub fn first_on(&self, floor: i64) -> Option<usize> {
+        self.floors.get(&floor)?.first().copied()
+    }
+
     /// Stretch `i`.
     pub fn stretch(&self, i: usize) -> Stretch {
         self.stretches[i]

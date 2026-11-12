@@ -13,7 +13,7 @@ use crate::facilities::Kind;
 use crate::gameplay::{EmergencyDecision, EmergencyKind, EmergencySource, GameplayEvent};
 use crate::rng::Rng;
 use crate::services::with_thousands;
-use crate::sim::{LogKind, Simulation, ThiefFx};
+use crate::sim::{LogKind, Simulation};
 use crate::tower::UnitState;
 
 #[path = "events_fire.rs"]
@@ -25,6 +25,8 @@ pub mod bomb;
 #[path = "events_stairs.rs"]
 #[doc(hidden)]
 pub mod stairs;
+#[path = "events_thief.rs"]
+mod thief;
 /// Why [`Simulation::change_film`] refused, kept here beside the other
 /// cinema command, [`Simulation::set_film_policy`].
 pub use crate::economy::films::FilmRefusal;
@@ -427,57 +429,5 @@ impl Simulation {
             LogKind::Good,
         );
         self.fx.santa_seq += 1;
-    }
-
-    fn maybe_thief(&mut self) {
-        if self.star < 2 {
-            return;
-        }
-        if !self.events.extra.chance(THIEF_DAILY_CHANCE) {
-            return;
-        }
-        // The floor places the cosmetic (`triggerThief`); the draw also keeps
-        // the event stream in step with the TypeScript.
-        let floor = self.thief_floor();
-        if self.has_any(Kind::Security) {
-            self.emit(
-                "🕵️ Security caught a thief prowling the tower. Nothing was taken.",
-                LogKind::Good,
-            );
-            self.fx.thief = ThiefFx {
-                caught: true,
-                floor,
-                seq: self.fx.thief.seq + 1,
-            };
-            return;
-        }
-        self.fx.thief = ThiefFx {
-            caught: false,
-            floor,
-            seq: self.fx.thief.seq + 1,
-        };
-        let loss = 5_000.0 + self.events.extra.int(0, 20_000) as f64;
-        self.money -= loss;
-        self.emit(
-            &format!(
-                "🕵️ A thief slipped through the tower and made off with ${}. Build Security.",
-                with_thousands(loss)
-            ),
-            LogKind::Bad,
-        );
-    }
-
-    fn thief_floor(&mut self) -> i64 {
-        let mut floors: IndexSet<i64> = IndexSet::new();
-        for u in &self.tower.units {
-            if u.is_present() {
-                floors.insert(u.floor);
-            }
-        }
-        if floors.is_empty() {
-            return 1;
-        }
-        let v: Vec<i64> = floors.into_iter().collect();
-        *self.events.extra.pick(&v)
     }
 }

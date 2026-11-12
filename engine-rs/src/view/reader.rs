@@ -181,6 +181,7 @@ impl ViewReader {
             clock.calendar.week_days as f64,
             clock.calendar.weekend_days as f64,
             sim.events.bomb.as_ref().map_or(0.0, |b| b.seq as f64),
+            fx.thief.x as f64,
         ]);
         debug_assert_eq!(v.len(), HEADER);
         for p in people {

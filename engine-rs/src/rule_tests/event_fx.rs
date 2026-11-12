@@ -46,6 +46,7 @@ fn no_signal_rides_along_in_a_save() {
         thief: ThiefFx {
             caught: false,
             floor: 3,
+            x: 0,
             seq: 1,
         },
         treasure: PointFx {
