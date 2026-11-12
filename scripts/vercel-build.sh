@@ -27,3 +27,8 @@ npm run build
 # dist/help/ after the game, from the same Markdown the game's Help window reads.
 npm ci --prefix help-site
 npm run build --prefix help-site
+
+# A preview deployment ships a worker that removes itself instead of the
+# game's precaching one, so a branch link always serves the latest push (see
+# src/build/previewDeploy.ts). Production and other builds are left as built.
+node scripts/preview-service-worker.ts

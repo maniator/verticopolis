@@ -12,6 +12,7 @@ import { ENGINE_PRELOAD_FILES, enginePreloadAttrs } from "./src/build/enginePrel
 import { ENGINE_BUILD_RECORD, ENGINE_DIR } from "./src/wasmhost/enginePackageNames";
 import { buildFingerprint } from "./src/build/buildFingerprint";
 import { helpMarkdown } from "./src/build/helpMarkdown";
+import { isPreviewDeploy } from "./src/build/previewDeploy";
 
 const pkgVersion = JSON.parse(readFileSync(resolve(__dirname, "package.json"), "utf8")).version as string;
 
@@ -298,6 +299,10 @@ export default defineConfig(({ command }) => ({
     // validated by `toolingBuild()` above; scripts/verify-game-handle.ts
     // asserts the resulting dist matches the mode on every `npm run build`.
     __TOOLING_BUILD__: JSON.stringify(TOOLING_BUILD),
+    // A Vercel preview deployment registers no service worker, so a branch
+    // link always serves the latest push; production keeps it. See
+    // src/build/previewDeploy.ts for the worker a preview ships instead.
+    __PREVIEW_DEPLOY__: JSON.stringify(isPreviewDeploy(process.env)),
     // The engine package this shell was built with (#985 criterion 5): the
     // package id and the glue and binary digests from
     // src/public/engine/BUILD.json. The page hashes what it fetches against

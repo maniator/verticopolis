@@ -19,6 +19,8 @@
  */
 import { registerSW } from "virtual:pwa-register";
 import { parseUpdateInfo, isDifferentBuild, notesSinceRunning, readNotesSeen, withUpdateKind, type UpdateInfo } from "./pwaUpdateInfo";
+import { PREVIEW_DEPLOY } from "./deployTarget";
+import { WORKBOX_CACHE_PREFIX } from "./workboxCaches";
 
 /**
  * High-level facts about the INCOMING build, read at prompt time from the
@@ -156,12 +158,38 @@ async function reloadFromNetwork(registration: ServiceWorkerRegistration): Promi
   window.location.reload();
 }
 
+/**
+ * Remove whatever an earlier build of this preview registered: every worker
+ * registration on the origin and Workbox's caches. The page reached here from
+ * the network, so nothing needs a reload. Best-effort: a browser that refuses
+ * leaves the old worker to the retiring `sw.js`, which removes it on the next
+ * navigation.
+ */
+async function removeServiceWorkers(): Promise<void> {
+  try {
+    const registrations = await navigator.serviceWorker.getRegistrations();
+    await Promise.all(registrations.map((registration) => registration.unregister().catch(() => false)));
+    const names = await caches.keys();
+    await Promise.all(names.filter((name) => name.startsWith(WORKBOX_CACHE_PREFIX)).map((name) => caches.delete(name)));
+  } catch {
+    // Cache Storage or the registration list can be unavailable; see above.
+  }
+}
+
 export function registerPWA(handlers: PwaHandlers): void {
   // Service workers only work in a secure context with SW support. Bail cleanly
   // otherwise — a non-browser environment, insecure `http://`, or a page opened
   // straight from `file://` — rather than let registration throw a
   // SecurityError. (localhost counts as secure, so dev/preview still register.)
   if (typeof window === "undefined" || !("serviceWorker" in navigator) || !window.isSecureContext) {
+    return;
+  }
+
+  // A preview deployment runs without a worker, so a branch link always
+  // serves the latest push (src/build/previewDeploy.ts). No registration also
+  // means no update poll: a reload is how a preview picks up a new push.
+  if (PREVIEW_DEPLOY) {
+    void removeServiceWorkers();
     return;
   }
 
