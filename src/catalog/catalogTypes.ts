@@ -7,10 +7,28 @@
  */
 import type { CalendarKind } from "../shared/engineTypes";
 import type { FacilityCategory, FacilityKind, GameMode } from "../shared/types";
+import type { FilmPolicy, FilmTier } from "../simport/commands";
+
+/** A film a theater can show, as the catalog publishes it (#1950). */
+export interface CatalogFilm {
+  readonly key: FilmTier;
+  /** What the card calls it ("New film", "Feature", ...). */
+  readonly label: string;
+  /** What showing it costs, charged once. */
+  readonly price: number;
+}
+
+/** An Auto-rebook choice for a Modern theater (#1950): the policy the save
+ *  stores, and the film it books again once the theater's film is spent, or
+ *  null where rebooking is off. */
+export interface CatalogFilmRebook {
+  readonly policy: FilmPolicy;
+  readonly film: FilmTier | null;
+}
 
 /** The version of the catalog's shape. It moves when a field is added,
  *  renamed or removed, so a frontend can refuse a shape it does not know. */
-export const CATALOG_VERSION = 8;
+export const CATALOG_VERSION = 9;
 
 /** Every price, size and build rule of one mode. */
 export interface Catalog {
@@ -74,21 +92,21 @@ export interface CatalogEconomy {
    *  where the mode charges none). Each period the engine charges
    *  `ceil(price * rate)`, multiplied by `maintenanceScale` and rounded. */
   readonly condoHoldTaxRate: number;
-  /** A cinema's monthly film booking, and its blockbuster booking, where the
-   *  mode books films (`newFilmPrice` is null). */
-  readonly cinemaBookingMonthly: number;
-  readonly cinemaBookingBlockbusterMonthly: number;
   /** A nightclub's monthly DJ booking. */
   readonly nightclubDjMonthly: number;
   /** Hour of the daily garbage-truck collection that empties recycling bins. */
   readonly garbageCollectHour: number;
   /** The paid exterminator's fees, or null where the mode has none. */
   readonly exterminator: { readonly calloutFee: number; readonly perRoomFee: number } | null;
-  /** Showing a new film and a classic where the player changes a theatre's
-   *  film (and books none each period), or null where the mode books films
-   *  (#1932). */
-  readonly newFilmPrice: number | null;
-  readonly classicFilmPrice: number | null;
+  /** The films a theater can show, with their prices, in the order the card
+   *  lists them (#1932, #1950). No theater pays anything each period. */
+  readonly films: readonly CatalogFilm[];
+  /** The Auto-rebook choices, in the order the card's button cycles through
+   *  them (#1950); empty where no theater rebooks (Classic). */
+  readonly filmRebooks: readonly CatalogFilmRebook[];
+  /** The policy a theater with none, or an old save's "auto", rebooks by,
+   *  or null where no theater rebooks. */
+  readonly filmRebookDefault: FilmPolicy | null;
   /** Whether the player can switch automatic bridging off. When false,
    *  bridging is always on. When true, a tower starts bridged unless it was
    *  founded unbridged, and the live setting is per tower (the engine's
@@ -303,6 +321,20 @@ export type TileGround = "no floor yet" | "a floor tile";
 export function catalogTileCost(catalog: Catalog, kind: FacilityKind, ground: TileGround): number {
   const f = catalogFacility(catalog, kind);
   return f.paysForFloor && ground === "no floor yet" ? f.cost + catalogFacility(catalog, "floor").cost : f.cost;
+}
+
+/** The editor card's action for showing a `key` film (`data-edit`). */
+export function filmEditAction(key: FilmTier): string {
+  return `${key}Film`;
+}
+
+/** The Auto-rebook choice a theater with `policy` follows: its own where the
+ *  catalog lists it, otherwise the mode's default (no policy, or an old
+ *  save's "auto"). Null where no theater rebooks (#1950). */
+export function catalogFilmRebook(catalog: Catalog, policy: FilmPolicy | null | undefined): CatalogFilmRebook | null {
+  const { filmRebooks, filmRebookDefault } = catalog.economy;
+  const listed = (p: FilmPolicy | null | undefined) => filmRebooks.find((r) => r.policy === p);
+  return listed(policy) ?? listed(filmRebookDefault) ?? null;
 }
 
 /** Whether a facility is open in `hour` (the game hour; fractions and 24 read

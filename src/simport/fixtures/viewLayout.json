@@ -1,5 +1,5 @@
 {
-  "version": 14,
+  "version": 15,
   "header": {
     "minutes": 0,
     "towerRevision": 1,
@@ -481,7 +481,7 @@
       "floorHasLobby",
       "blockbuster",
       "filmDays",
-      "filmClassic"
+      "filmTier"
     ],
     "shaftCard": [
       "id",
@@ -711,6 +711,13 @@
   "filmPolicies": [
     "auto",
     "feature",
+    "blockbuster",
+    "revival",
+    "off"
+  ],
+  "filmTiers": [
+    "new",
+    "classic",
     "blockbuster"
   ],
   "logKinds": [

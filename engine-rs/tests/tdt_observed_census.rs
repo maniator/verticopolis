@@ -9,6 +9,7 @@
 
 use std::path::PathBuf;
 
+use verticopolis_engine::economy::films::FilmTier;
 use verticopolis_engine::economy::visitors::{daily_visitor_cap, set_audience};
 use verticopolis_engine::facilities::Kind;
 use verticopolis_engine::load::deserialize_tdt;
@@ -176,8 +177,10 @@ fn a_changed_film_and_a_classic_keep_their_kind_through_an_export() {
         .filter(|u| u.kind == Kind::Cinema)
         .map(|u| u.id)
         .collect();
-    sim.change_film(theatres[0], false).expect("a new film");
-    sim.change_film(theatres[1], true).expect("a classic");
+    sim.change_film(theatres[0], FilmTier::New)
+        .expect("a new film");
+    sim.change_film(theatres[1], FilmTier::Classic)
+        .expect("a classic");
     let bytes = export_tdt(&sim.save_text()).expect("exports");
     let back = parse_tdt(&bytes, "BACK.TDT").expect("reimports");
     let back = deserialize_tdt(&back.save).expect("loads");

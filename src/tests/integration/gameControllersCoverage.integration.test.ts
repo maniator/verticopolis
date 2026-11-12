@@ -574,16 +574,27 @@ describe.skipIf(noEngine)("EditorActions (dialogs, extend billing, per-kind butt
     expect(f.sfx).not.toContain("click"); // no feedback for a refused nudge
   });
 
-  it("filmPolicy cycles auto → feature → blockbuster → auto on a cinema", async () => {
+  it("filmPolicy cycles a Modern cinema's rebooking from a feature to blockbuster, off, revival and back", async () => {
     sel = { type: "unit", id: cinema.id };
     render(unitEditor(sim, cinema), root);
+    // This suite's tower is Classic, whose theaters never rebook: the button
+    // leaves the policy alone there.
     await editor.handleEditAction("filmPolicy", root);
-    expect(unitOf(sim, cinema.id)!.filmPolicy).toBe("feature");
-    await editor.handleEditAction("filmPolicy", root);
-    expect(unitOf(sim, cinema.id)!.filmPolicy).toBe("blockbuster");
-    await editor.handleEditAction("filmPolicy", root);
-    expect(unitOf(sim, cinema.id)!.filmPolicy).toBe("auto");
-    expect(f.sfx).toEqual(["click", "click", "click"]);
+    expect(unitOf(sim, cinema.id)!.filmPolicy).toBeUndefined();
+    expect(f.sfx).toEqual([]);
+    sim.write("top", "mode", "modern");
+    // The reader takes the mode with the structure, so move the structure.
+    expect(sim.tower.place("floor", 5, 6).ok).toBe(true);
+    sim.settle();
+    ports.viewReader.update();
+    expect(ports.viewReader.header.mode).toBe("modern");
+    const seen: (string | undefined)[] = [];
+    for (let i = 0; i < 4; i++) {
+      await editor.handleEditAction("filmPolicy", root);
+      seen.push(unitOf(sim, cinema.id)!.filmPolicy);
+    }
+    expect(seen).toEqual(["blockbuster", "off", "revival", "feature"]);
+    expect(f.sfx).toEqual(["click", "click", "click", "click"]);
   });
 
   it("the rung action applies the picked rung through the choke point and announces the pinned string", async () => {

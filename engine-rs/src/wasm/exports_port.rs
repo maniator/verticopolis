@@ -75,8 +75,8 @@ impl Engine {
         self.port_set_film(id, policy)
     }
     #[wasm_bindgen(js_name = changeFilm)]
-    pub fn change_film(&mut self, id: f64, classic: bool) -> Vec<f64> {
-        self.port_change_film(id, classic)
+    pub fn change_film(&mut self, id: f64, tier: f64) -> Vec<f64> {
+        self.port_change_film(id, tier)
     }
     #[wasm_bindgen(js_name = quoteBuild)]
     pub fn quote_build(&mut self, kind: f64, floor: f64, x: f64) -> Vec<f64> {

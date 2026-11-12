@@ -2,15 +2,14 @@
 
 use indexmap::IndexMap;
 
-use super::films::draws_full_house;
+use super::films::{audience_draw, fills_blockbuster_slot};
 use super::visitors::{
     climb_steps, counts_set_audience, expected_visitors, served_visitors, set_audience,
-    showing_draw, NEW_FILM_DRAW,
+    NEW_FILM_DRAW,
 };
 use super::{
     is_overhead_kind, ledger_cat_for, rental_message, service_maintenance_monthly,
-    CINEMA_BOOKING_BLOCKBUSTER, CINEMA_BOOKING_MONTHLY, MAINTENANCE_PER_CAR_MONTHLY,
-    NIGHTCLUB_DJ_MONTHLY, REAL_WORLD_MAINT_PERIOD_DAYS,
+    MAINTENANCE_PER_CAR_MONTHLY, NIGHTCLUB_DJ_MONTHLY, REAL_WORLD_MAINT_PERIOD_DAYS,
 };
 use crate::econ::rent_of;
 use crate::facilities::Kind;
@@ -21,17 +20,10 @@ use crate::tower::UnitState;
 
 #[doc(hidden)]
 impl Simulation {
-    /// `payMaintenance`: the per-period upkeep and, where the mode books
-    /// films (Modern), each theatre's booking. Answers the booked theatres:
-    /// the day's rollover still counts the night their spent film showed, and
-    /// [`Simulation::start_booked_films`] starts the new film after it.
-    /// Classic charges for a film only when the player changes it.
-    pub fn pay_maintenance(&mut self) -> Vec<i64> {
+    /// `payMaintenance`: the per-period upkeep. A theater's film is paid
+    /// for when it is shown (`change_film`), never each period (#1950).
+    pub fn pay_maintenance(&mut self) {
         let mut cost = 0.0;
-        let books_films = self.tower.mode.film_changes().is_none();
-        if books_films {
-            self.blockbusters.clear();
-        }
         let scale = self.clock.calendar.maint_period_days as f64 / REAL_WORLD_MAINT_PERIOD_DAYS;
         let mut charges: Vec<(&'static str, f64)> = Vec::new();
         let mut charge = |cat: &'static str, raw: f64| {
@@ -46,9 +38,6 @@ impl Simulation {
         }
         let tax_rate = self.mode.condo_hold_tax_rate();
         let overhead = self.mode.operating_overhead_per_unit();
-        let mut new_blockbusters: Vec<f64> = Vec::new();
-        // The theatres booked this period, each starting a fresh film.
-        let mut booked: Vec<i64> = Vec::new();
         for i in 0..self.tower.units.len() {
             let u = &self.tower.units[i];
             if let Some(m) = service_maintenance_monthly(u.kind) {
@@ -70,29 +59,9 @@ impl Simulation {
             {
                 charge(ledger_cat_for(u.kind).unwrap_or("upkeep"), overhead);
             }
-            if u.kind == Kind::Cinema && operational && books_films {
-                let blockbuster = match u.extras().film_policy {
-                    Some("blockbuster") => true,
-                    Some("feature") => false,
-                    _ => self.rng.chance(0.4),
-                };
-                let booking = if blockbuster {
-                    CINEMA_BOOKING_BLOCKBUSTER
-                } else {
-                    CINEMA_BOOKING_MONTHLY
-                };
-                if blockbuster {
-                    new_blockbusters.push(u.id as f64);
-                }
-                charge("entertainment", booking);
-                booked.push(u.id);
-            }
             if u.kind == Kind::Nightclub && operational {
                 charge("entertainment", NIGHTCLUB_DJ_MONTHLY);
             }
-        }
-        if books_films {
-            self.blockbusters = new_blockbusters;
         }
         for (cat, a) in charges {
             self.record_money(cat, a);
@@ -111,24 +80,6 @@ impl Simulation {
                 with_thousands(cost)
             );
             self.emit(&msg, LogKind::Money);
-        }
-        booked
-    }
-
-    /// Start the fresh film each theatre in `booked` paid for this period,
-    /// once the day's rollover has counted the spent film's last night. A
-    /// theatre that closed since keeps the film it had.
-    pub fn start_booked_films(&mut self, booked: &[i64]) {
-        for &id in booked {
-            let Some(&i) = self.tower.by_id.get(&id) else {
-                continue;
-            };
-            let u = &mut self.tower.units[i];
-            if u.is_operational() {
-                let mut extras = u.extras_mut();
-                extras.film_days = Some(0);
-                extras.film_classic = false;
-            }
         }
     }
 
@@ -170,9 +121,8 @@ impl Simulation {
         let ended_weekend = self.clock.is_weekend_on(self.clock.day() - 1);
         // Rooms only: the tower's floor tiles never carry a venue.
         let rooms = self.tower.room_index();
-        // Where the player changes films (Classic), the theatres whose film
-        // draws a full house tonight are the blockbusters.
-        let changes_films = self.tower.mode.film_changes().is_some();
+        // The theaters whose film fills a blockbuster slot tonight.
+        let mode = self.tower.mode;
         let mut full_houses: Vec<f64> = Vec::new();
         for &i in rooms.iter() {
             let u = &self.tower.units[i];
@@ -183,12 +133,12 @@ impl Simulation {
                 // A theatre counts the draw its film had overnight, and the
                 // film is a day older (#1932).
                 let days_shown = u.extras().film_days.unwrap_or(0);
-                let draw = showing_draw(i64::from(days_shown), u.extras().film_classic);
+                let draw = audience_draw(mode, u);
                 let audience = set_audience(u.kind, draw).unwrap_or(0);
                 let (u, at) = self.tower.marked(i);
                 u.set_visitors_yest(at, Some(u8::try_from(audience).unwrap_or(u8::MAX)));
                 u.extras_mut().film_days = Some(days_shown.saturating_add(1));
-                if changes_films && draws_full_house(u) {
+                if fills_blockbuster_slot(mode, u) {
                     full_houses.push(u.id as f64);
                 }
                 continue;
@@ -230,9 +180,7 @@ impl Simulation {
             tally.profit_yest = Some(tally.profit_today.unwrap_or(0.0));
             tally.profit_today = Some(0.0);
         }
-        if changes_films {
-            self.blockbusters = full_houses;
-        }
+        self.blockbusters = full_houses;
     }
 }
 

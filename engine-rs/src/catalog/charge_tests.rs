@@ -223,20 +223,13 @@ fn film_and_dj_bookings_follow_the_quote() {
                 }
             };
             let cinema_overhead = overhead(entry(&c, "cinema"));
-            for (policy, booking) in [
-                ("feature", economy.cinema_booking_monthly),
-                ("blockbuster", economy.cinema_booking_blockbuster_monthly),
-            ] {
-                // A mode where the player changes films books none.
-                let booking = if economy.new_film_price.is_some() {
-                    0.0
-                } else {
-                    booking
-                };
+            // No mode charges a theater for its film each period (#1950),
+            // whatever film it books again.
+            for policy in ["feature", "blockbuster", "revival", "off"] {
                 assert_eq!(sim.set_film_policy(cinema, policy), Some(policy));
                 assert_eq!(
                     maintenance_charge(&mut sim),
-                    cars + cinema_overhead + jsmath::round(booking * scale),
+                    cars + cinema_overhead,
                     "{mode:?} {} {policy}",
                     calendar.key
                 );

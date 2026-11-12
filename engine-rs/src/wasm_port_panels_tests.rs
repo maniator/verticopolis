@@ -3,6 +3,7 @@ use serde_json::Value;
 
 use super::*;
 use crate::clock::GameMode;
+use crate::economy::films::FilmTier;
 use crate::facilities::{Kind, FACILITIES};
 use crate::telemetry::{HourlyByDay, OriginRings};
 use crate::tower::UnitState;
@@ -20,6 +21,13 @@ fn num(v: &Value) -> f64 {
         v => v.as_f64().unwrap(),
     }
 }
+
+/// The film tiers' keys by code, as `filmTiers` lists them.
+const FILM_TIER_KEYS: [&str; 3] = [
+    FilmTier::ALL[0].key(),
+    FilmTier::ALL[1].key(),
+    FilmTier::ALL[2].key(),
+];
 
 fn same(a: f64, b: f64) -> bool {
     a == b || (a.is_nan() && b.is_nan())
@@ -151,6 +159,7 @@ fn the_unit_card_is_the_detail_card() {
         let codes = [
             ("vacateReason", &VACATE_REASONS[..]),
             ("filmPolicy", &FILM_POLICIES[..]),
+            ("filmTier", &FILM_TIER_KEYS[..]),
         ];
         for (slot, key) in UNIT_CARD.iter().enumerate() {
             if let Some((_, table)) = codes.iter().find(|(k, _)| k == key) {

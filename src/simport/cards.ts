@@ -1,4 +1,5 @@
 import type { FacilityKind, UnitState, VacateReason } from "../shared/types";
+import type { FilmPolicy, FilmTier } from "./commands";
 import type { EnginePort } from "./enginePort";
 import type { HourlyView, OriginsView, StopRow, TransportDetail, UnitDetail } from "./panels";
 import type { ViewReader } from "./viewReader";
@@ -21,6 +22,7 @@ interface Layout {
   unitStates: readonly string[];
   vacateReasons: readonly string[];
   filmPolicies: readonly string[];
+  filmTiers: readonly string[];
   records: { unitCard: readonly string[]; shaftCard: readonly string[]; stopRow: readonly string[] };
 }
 
@@ -63,7 +65,6 @@ export class Cards {
     const at = this.unitAt;
     const l = this.layout;
     const blockbuster = r[at.blockbuster];
-    const filmClassic = r[at.filmClassic];
     return {
       id: r[at.id],
       kind: l.kinds[r[at.kindCode]] as FacilityKind,
@@ -82,13 +83,13 @@ export class Cards {
       label: this.port.unitLabel(id) ?? "",
       subtype: this.port.unitSubtype(id) ?? null,
       vacateReason: named<VacateReason>(l.vacateReasons, r[at.vacateReason]),
-      filmPolicy: named<"auto" | "feature" | "blockbuster">(l.filmPolicies, r[at.filmPolicy]),
+      filmPolicy: named<FilmPolicy>(l.filmPolicies, r[at.filmPolicy]),
       served: r[at.served] === 1,
       reachable: r[at.reachable] === 1,
       floorHasLobby: r[at.floorHasLobby] === 1,
       blockbuster: Number.isNaN(blockbuster) ? null : blockbuster === 1,
       filmDays: nullable(r[at.filmDays]),
-      filmClassic: Number.isNaN(filmClassic) ? null : filmClassic === 1,
+      filmTier: named<FilmTier>(l.filmTiers, r[at.filmTier]),
     };
   }
 

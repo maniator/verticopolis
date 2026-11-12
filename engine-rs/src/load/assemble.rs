@@ -305,6 +305,22 @@ pub(crate) fn assemble(
         .get("builtWeddingHall")
         .map(|v| v.as_bool().unwrap_or(false));
     sim.tower.reindex();
+    if mode == GameMode::Modern {
+        // A Modern save from before #1950 lists the theaters that booked a
+        // blockbuster this month and carries no film tier: those keep
+        // their blockbuster (a later save lists only blockbusters at full
+        // draw, which carry the tier already).
+        for &id in &sim.blockbusters {
+            if id.fract() != 0.0 {
+                continue;
+            }
+            if let Some(u) = sim.tower.get_unit_mut(id as i64) {
+                if u.kind == Kind::Cinema && !u.extras().film_classic {
+                    u.extras_mut().film_blockbuster = true;
+                }
+            }
+        }
+    }
     sim.tower.coerce_express_stops();
     if rents_snapped > 0 {
         let msg = format!(

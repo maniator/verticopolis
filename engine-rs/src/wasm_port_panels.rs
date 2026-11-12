@@ -5,6 +5,7 @@
 //! wraps (`floor_heatmap`, `housekeeping_coverage`, `card_flags`, the
 //! telemetry), so the port computes nothing the game does not already.
 use crate::charges::whole;
+use crate::economy::films::FilmTier;
 use crate::facilities::Kind;
 use crate::frame::unit_state_code;
 use crate::panels::heatmap::HeatmapMode;
@@ -15,6 +16,11 @@ use crate::telemetry::ORIGIN_HOURS;
 
 use super::port::FILM_POLICIES;
 use super::Engine;
+
+/// A film tier's code in `filmTiers`.
+fn film_tier_code(tier: FilmTier) -> f64 {
+    FilmTier::ALL.iter().position(|&t| t == tier).unwrap_or(0) as f64
+}
 
 /// The overlay modes by code, as `heatCells` takes them.
 pub(crate) const HEAT_MODES: [&str; 4] = ["congestion", "occupancy", "satisfaction", "cleanliness"];
@@ -52,7 +58,8 @@ pub(crate) const VACATE_REASONS: [&str; 9] = [
 /// `unitCard`'s slots. NaN marks a field the unit does not carry (a code
 /// with no value, a count only some kinds keep, a cinema's booking and film
 /// on any other kind); the flags are 0 or 1. `filmDays` is the mornings a
-/// theatre's film has shown and `filmClassic` 1 for a classic (#1932). The
+/// theater's film has shown and `filmTier` its film by code (`filmTiers`,
+/// #1932, #1950). The
 /// label and subtype come from `unitLabel` and `unitSubtype`.
 pub(crate) const UNIT_CARD: [&str; 22] = [
     "id",
@@ -76,7 +83,7 @@ pub(crate) const UNIT_CARD: [&str; 22] = [
     "floorHasLobby",
     "blockbuster",
     "filmDays",
-    "filmClassic",
+    "filmTier",
 ];
 
 /// `shaftCard`'s header. `utilization` is NaN when the shaft has no reading.
@@ -292,7 +299,7 @@ impl Engine {
             flag(has_lobby),
             blockbuster.map_or(f64::NAN, flag),
             cinema.map_or(f64::NAN, |e| f64::from(e.film_days.unwrap_or(0))),
-            cinema.map_or(f64::NAN, |e| flag(e.film_classic)),
+            cinema.map_or(f64::NAN, |e| film_tier_code(FilmTier::showing(e))),
         ]
     }
 

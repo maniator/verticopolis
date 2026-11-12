@@ -2,6 +2,7 @@
 
 use std::collections::HashMap;
 
+use super::films::film_income_mult;
 use super::{
     commercial_daily_income, ledger_cat_for, retail_spend_per_customer, weekend_multiplier,
     COMMERCIAL_LOBBY_FAR_MULT, COMMERCIAL_LOBBY_FLOORS, TRAFFIC_FACTOR_MIN, TRAFFIC_FACTOR_SPAN,
@@ -79,8 +80,9 @@ impl Simulation {
             } else {
                 1.0
             };
-            let film_mult = if kind == Kind::Cinema && self.blockbusters.contains(&(id as f64)) {
-                2.2
+            let film_mult = if kind == Kind::Cinema {
+                let in_slot = self.blockbusters.contains(&(id as f64));
+                film_income_mult(mode, &self.tower.units[i], in_slot)
             } else {
                 1.0
             };

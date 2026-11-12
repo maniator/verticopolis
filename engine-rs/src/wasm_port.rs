@@ -18,7 +18,7 @@
 //! reach it.
 use crate::brush::{BrushResult, BRUSH_TILE_LIMIT};
 use crate::charges::{whole, ExtendEnd, INVALID_REQUEST};
-use crate::economy::films::FilmRefusal;
+use crate::economy::films::{FilmRefusal, FilmTier};
 use crate::facilities::{Kind, FACILITIES};
 use crate::gameplay::RemovalMethod;
 use crate::services::ExterminatorRefusal;
@@ -31,8 +31,9 @@ use super::Engine;
 pub(crate) const STATUS: usize = 0;
 pub(crate) const DELTA: usize = 1;
 
-/// The film policies by code, as `setFilm` takes them.
-pub(crate) const FILM_POLICIES: [&str; 3] = ["auto", "feature", "blockbuster"];
+/// The film policies by code, as `setFilm` takes them: the film a Modern
+/// theater books again once its film is spent, or "off" (#1950).
+pub(crate) const FILM_POLICIES: [&str; 5] = ["auto", "feature", "blockbuster", "revival", "off"];
 
 /// The onboarding facts by bit, as `onboarding()` packs them.
 pub(crate) const ONBOARDING: [&str; 5] = ["lobby", "floor", "office", "connect", "play"];
@@ -126,6 +127,7 @@ pub(crate) fn add_records(layout: &mut serde_json::Value) {
     layout["records"] = serde_json::Value::Object(records);
     layout["onboarding"] = serde_json::json!(ONBOARDING);
     layout["filmPolicies"] = serde_json::json!(FILM_POLICIES);
+    layout["filmTiers"] = serde_json::json!(FilmTier::ALL.map(FilmTier::key));
     layout["logKinds"] = serde_json::json!(super::port_life::LOG_KINDS);
     layout["scheduleSlots"] = serde_json::json!(super::port_life::SCHEDULE_LEN);
     super::port_panels::add_panel_records(layout);
@@ -328,16 +330,19 @@ impl Engine {
         }
     }
 
-    /// Show a new film, or a classic when `classic`, at theatre `id`, with
-    /// the price paid. A refusal for want of funds is "funds" and carries
-    /// the price; the others carry 0.
-    pub(crate) fn port_change_film(&mut self, id: f64, classic: bool) -> Vec<f64> {
+    /// Show a film of tier `tier` (by code, `filmTiers`) at theater `id`,
+    /// with the price paid. A refusal for want of funds is "funds" and
+    /// carries the price; the others carry 0.
+    pub(crate) fn port_change_film(&mut self, id: f64, tier: f64) -> Vec<f64> {
         self.reason = None;
-        let Some(id) = whole(id) else {
+        let tier = whole(tier)
+            .and_then(|t| usize::try_from(t).ok())
+            .and_then(|t| FilmTier::ALL.get(t).copied());
+        let (Some(id), Some(tier)) = (whole(id), tier) else {
             return self.refuse(INVALID_REQUEST, &[0.0]);
         };
         let before = self.sim.money;
-        match self.sim.change_film(id, classic) {
+        match self.sim.change_film(id, tier) {
             Ok(cost) => self.finish(before, true, None, &[cost]),
             Err(FilmRefusal::Funds { cost }) => self.refuse("funds", &[cost]),
             Err(other) => self.refuse(other.reason(), &[0.0]),

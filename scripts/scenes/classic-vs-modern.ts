@@ -83,8 +83,9 @@ export const CLASSIC_VS_MODERN_SCENES: Scene[] = [
     assertUnits: 3,
     shots: [
       {
-        // The theater's card under Modern: the film row and the Booking
-        // button. Fail closed if the Classic film buttons rendered instead.
+        // The theater's card under Modern: the film row, the three films at
+        // their prices and the Auto-rebook button (#1950). Fail closed if
+        // the Classic card rendered instead (no blockbuster to show).
         name: "cinema-card-modern",
         crop: "#editor",
         clock: 10,
@@ -99,7 +100,7 @@ export const CLASSIC_VS_MODERN_SCENES: Scene[] = [
           });
           await page.waitForSelector('#editor [data-edit="filmPolicy"]', { timeout: 4000 });
           await page.evaluate(() => {
-            if (document.querySelector('#editor [data-edit="newFilm"]')) throw new Error("Modern card shows the Classic film buttons");
+            if (!document.querySelector('#editor [data-edit="blockbusterFilm"]')) throw new Error("Modern card shows no blockbuster to book");
           });
         },
         wait: 300,
@@ -130,6 +131,7 @@ export const CLASSIC_VS_MODERN_SCENES: Scene[] = [
           await page.waitForSelector('#editor [data-edit="newFilm"]', { timeout: 4000 });
           await page.evaluate(() => {
             if (document.querySelector('#editor [data-edit="filmPolicy"]')) throw new Error("Classic card shows the Modern booking control");
+            if (document.querySelector('#editor [data-edit="blockbusterFilm"]')) throw new Error("Classic card offers a blockbuster");
           });
         },
         wait: 300,

@@ -66,6 +66,7 @@ fn the_frame_and_the_census_read_only_marked_fields() {
             film_policy: other(old.film_policy),
             film_days: Some(old.film_days.unwrap_or(0).wrapping_add(1)),
             film_classic: !old.film_classic,
+            film_blockbuster: !old.film_blockbuster,
             patronage_today: Some(old.patronage_today.unwrap_or(0.0) + 1.0),
             patronage_yest: Some(old.patronage_yest.unwrap_or(0.0) + 1.0),
             profit_today: Some(old.profit_today.unwrap_or(0.0) + 1.0),
@@ -173,9 +174,8 @@ fn frame_field_writes(rel: &str, code: &str) -> Vec<(String, usize)> {
     out
 }
 
-/// Whether the field at `dot` belongs to `name`, a local the same function
-/// copied from a unit (`let mut probe = u.clone();`), so a write to it
-/// reaches no room.
+/// Whether the field at `dot` belongs to `name`, a local the function copied
+/// from a unit (`let mut probe = u.clone();`): its writes reach no room.
 fn local_copy(code: &str, dot: usize, name: &str) -> bool {
     let binding = format!("let mut {name}=");
     receiver(code, dot) == name

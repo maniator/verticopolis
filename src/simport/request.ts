@@ -60,7 +60,7 @@ const member =
 
 const method = member<Field<"removeFacility", "method">>({ sell: true, bulldoze: true });
 const end = member<Field<"extendTransport", "end">>({ up: true, down: true });
-const policy = member<Field<"setFilmPolicy", "policy">>({ auto: true, feature: true, blockbuster: true });
+const policy = member<Field<"setFilmPolicy", "policy">>({ auto: true, feature: true, blockbuster: true, revival: true, off: true });
 const logKind = member<NonNullable<Field<"emit", "kind">>>({ info: true, good: true, bad: true, money: true });
 const brushKind = member<Field<"paintBrush", "kind">>({ floor: true, lobby: true });
 const batchTarget = (v: unknown): boolean => v === "default" || v === "noRate" || finite(v);

@@ -5,6 +5,7 @@ import {
   NOT_ENOUGH_MONEY,
 } from "../simport/request";
 import { priceOptionsFor } from "../ui/catalogPricing";
+import { catalogFor } from "../tests/catalogFixture";
 import {
   CATALOG,
   lift,
@@ -183,14 +184,19 @@ describe("EditorActions: unit card", () => {
     expect(deps.refreshEditor).toHaveBeenCalledOnce();
   });
 
-  it("cycles the film policy auto, feature, blockbuster and back", async () => {
-    const { actions, cards, codes, port } = setup({
-      setFilm: () => rec("buildAt", true),
-    });
+  it("cycles the film a theater rebooks through the catalog's choices: off, revival, feature, blockbuster and back", async () => {
+    const { actions, cards, codes, port } = setup(
+      { setFilm: () => rec("buildAt", true) },
+      undefined,
+      catalogFor("modern"),
+    );
     for (const [now, next] of [
-      [undefined, "feature"],
+      [undefined, "blockbuster"],
+      ["auto", "blockbuster"],
       ["feature", "blockbuster"],
-      ["blockbuster", "auto"],
+      ["blockbuster", "off"],
+      ["off", "revival"],
+      ["revival", "feature"],
     ] as const) {
       cards.unit.mockReturnValueOnce({
         id: office.id,
@@ -205,21 +211,42 @@ describe("EditorActions: unit card", () => {
     }
   });
 
-  it("shows a new film or a classic through changeFilm, with no undo step for the payment's sake", async () => {
-    for (const [action, classic] of [
-      ["newFilm", false],
-      ["classicFilm", true],
+  it("leaves the film policy alone where the mode never rebooks (Classic)", async () => {
+    const { actions, cards, deps, port } = setup({ setFilm: () => rec("buildAt", true) });
+    cards.unit.mockReturnValueOnce({ id: office.id, kind: "cinema", filmPolicy: "feature" });
+    await actions.handleEditAction("filmPolicy", root(""));
+    expect(port.setFilm).not.toHaveBeenCalled();
+    expect(deps.refreshEditor).not.toHaveBeenCalled();
+  });
+
+  it("shows each film through changeFilm by its tier code, with no undo step for the payment's sake", async () => {
+    // The buttons and their labels come from each mode's catalog.
+    for (const [mode, action, tier, said] of [
+      ["classic", "newFilm", "new", "Now showing: a new film."],
+      ["classic", "classicFilm", "classic", "Now showing: a classic film."],
+      ["modern", "classicFilm", "classic", "Now showing: a revival."],
+      ["modern", "newFilm", "new", "Now showing: a feature."],
+      ["modern", "blockbusterFilm", "blockbuster", "Now showing: a blockbuster."],
     ] as const) {
-      const { actions, deps, port } = setup({
-        changeFilm: () => rec("changeFilm", true, { cost: 1 }),
-      });
+      const { actions, codes, deps, port } = setup(
+        { changeFilm: () => rec("changeFilm", true, { cost: 1 }) },
+        undefined,
+        catalogFor(mode),
+      );
       await actions.handleEditAction(action, root(""));
-      expect(port.changeFilm).toHaveBeenCalledExactlyOnceWith(office.id, classic);
+      expect(port.changeFilm).toHaveBeenCalledExactlyOnceWith(office.id, codes.code("filmTiers", tier));
       expect(deps.captureUndo).toHaveBeenCalledExactlyOnceWith("Film change");
       expect(deps.audio.sfx).toHaveBeenCalledExactlyOnceWith("build");
-      expect(deps.announce).toHaveBeenCalledExactlyOnceWith(classic ? "A classic film is showing." : "A new film is showing.");
+      expect(deps.announce).toHaveBeenCalledExactlyOnceWith(said);
       expect(deps.refreshEditor).toHaveBeenCalledOnce();
     }
+  });
+
+  it("shows no film the mode's catalog does not list (a blockbuster in Classic)", async () => {
+    const { actions, deps, port } = setup({ changeFilm: () => rec("changeFilm", true, { cost: 1 }) });
+    await actions.handleEditAction("blockbusterFilm", root(""));
+    expect(port.changeFilm).not.toHaveBeenCalled();
+    expect(deps.captureUndo).toHaveBeenCalledExactlyOnceWith("Edit");
   });
 
   it("says what a film costs when the tower can't pay, and gives a plain refusal otherwise", async () => {

@@ -98,8 +98,10 @@ pub struct Extras {
     /// theatre that has not seen a morning yet reads it as 0.
     pub film_days: Option<u8>,
     /// Whether a theatre shows a classic film, whose draw never climbs past
-    /// a fading film's (#1932). Only Classic towers change to one.
+    /// a fading film's (#1932). Modern calls it a revival.
     pub film_classic: bool,
+    /// Whether a Modern theater shows a blockbuster (#1950).
+    pub film_blockbuster: bool,
     pub patronage_today: Option<f64>,
     pub patronage_yest: Option<f64>,
     pub profit_today: Option<f64>,
@@ -122,6 +124,7 @@ static NO_EXTRAS: Extras = Extras {
     film_policy: None,
     film_days: None,
     film_classic: false,
+    film_blockbuster: false,
     patronage_today: None,
     patronage_yest: None,
     profit_today: None,
@@ -231,6 +234,9 @@ impl Unit {
         }
         if extras.film_classic {
             m.insert("filmClassic".into(), json!(true));
+        }
+        if extras.film_blockbuster {
+            m.insert("filmBlockbuster".into(), json!(true));
         }
         if let Some(v) = self.subtype {
             m.insert("subtype".into(), json!(v));

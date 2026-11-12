@@ -26,10 +26,10 @@ use crate::build::pays_for_floor;
 use crate::charges::{car_resale_refund, ADD_CAR_COST, TRANSPORT_FLOOR_COST};
 use crate::clock::{resolve_calendar, CalendarKind, GameMode};
 use crate::econ::{classic_ladder, rent_config};
+use crate::economy::films::{FilmOffer, FilmRebook};
 use crate::economy::{
     catalog_spend_per_customer, commercial_daily_income, service_maintenance_monthly,
-    CINEMA_BOOKING_BLOCKBUSTER, CINEMA_BOOKING_MONTHLY, MAINTENANCE_PER_CAR_MONTHLY,
-    NIGHTCLUB_DJ_MONTHLY, REAL_WORLD_MAINT_PERIOD_DAYS,
+    MAINTENANCE_PER_CAR_MONTHLY, NIGHTCLUB_DJ_MONTHLY, REAL_WORLD_MAINT_PERIOD_DAYS,
 };
 use crate::facilities::{
     build_cap, ground_floor_structure_kind, no_basement, Kind, FACILITIES, LOBBY_INTERVAL,
@@ -49,7 +49,7 @@ pub use lock::{lock_view, LOCK_FOOTPRINT_EXEMPT};
 
 /// The version of the catalog's shape. It moves when a field is added,
 /// renamed or removed, so a frontend can refuse a shape it does not know.
-pub const CATALOG_VERSION: u32 = 8;
+pub const CATALOG_VERSION: u32 = 9;
 
 /// Every price, size and build rule of one mode.
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -122,22 +122,22 @@ pub struct Economy {
     /// where the mode charges none). Each period the engine charges
     /// `ceil(price * rate)`, multiplied by `maintenanceScale` and rounded.
     pub condo_hold_tax_rate: f64,
-    /// A cinema's monthly film booking, and its blockbuster booking, where
-    /// the mode books films (`new_film_price` is null).
-    pub cinema_booking_monthly: f64,
-    /// A cinema's monthly booking for a blockbuster.
-    pub cinema_booking_blockbuster_monthly: f64,
     /// A nightclub's monthly DJ booking.
     pub nightclub_dj_monthly: f64,
     /// Hour of the daily garbage-truck collection that empties recycling bins.
     pub garbage_collect_hour: f64,
     /// The paid exterminator's fees, or null where the mode has none.
     pub exterminator: Option<ExterminatorFees>,
-    /// The price of showing a new film where the player changes a cinema's
-    /// film (and books none each period), or null where the mode books films.
-    pub new_film_price: Option<f64>,
-    /// The price of showing a classic film, null where `new_film_price` is.
-    pub classic_film_price: Option<f64>,
+    /// The films a theater can show, with their prices, in the order the
+    /// card lists them (#1932, #1950). No theater pays anything each period.
+    pub films: &'static [FilmOffer],
+    /// The Auto-rebook choices, in the order the card's button cycles
+    /// through them: each policy and the film a theater with it books again
+    /// once its film is spent (#1950). Empty where no theater rebooks.
+    pub film_rebooks: &'static [FilmRebook],
+    /// The policy a theater with none, or an old save's "auto", rebooks by,
+    /// or null where no theater rebooks.
+    pub film_rebook_default: Option<&'static str>,
     /// Whether the player can switch automatic bridging off. When false,
     /// bridging is always on. When true, a tower starts bridged unless it
     /// was founded unbridged, and the live setting is per tower (the

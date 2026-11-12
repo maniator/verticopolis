@@ -27,6 +27,10 @@ fn the_named_slots_read_their_values() {
     assert!(sim.events.pending.is_none());
     set_apart(&mut sim);
     walk_records(&sim, &frame_view(&sim));
+    // The scenario's crowd can match its shaft count by chance (it did once
+    // #1950 stopped Modern's monthly film booking drawing from the stream),
+    // so one person leaves to keep the two live counts apart.
+    sim.crowd.people.pop();
     sim.clock.minutes = 1001.0;
     sim.tower.revision = 1002;
     sim.tower.meal_overlay_revision = 1003;
