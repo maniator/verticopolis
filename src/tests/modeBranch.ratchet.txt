@@ -1,7 +1,7 @@
 # Direct Classic/Modern checks outside the rule hub, per file, read by
 # modeBranch.guard.test.ts. Format: `<repo-relative path> <count>`, then an
 # optional `#` note. This is a ratchet: it only ever shrinks. A PR that moves a
-# check into a named rule on GameMode (engine-rs/src/rules.rs) or a catalog rule
+# check into a named rule on GameMode (engine-rs/src/rules/) or a catalog rule
 # lowers the file's count here; a file not listed must hold none. When the list
 # is empty, delete it and the guard's ratchet half with it.
 

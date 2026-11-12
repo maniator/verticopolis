@@ -8,7 +8,7 @@ import { repoRel, sourceFiles } from "./guardFiles";
  * Shift-left guard: a Classic or Modern difference is a named rule.
  *
  * The engine keeps its mode rules as named methods on `GameMode` in
- * `engine-rs/src/rules.rs` (`room_is_permanent`, `ransom_needs_security`,
+ * `engine-rs/src/rules/` (`room_is_permanent`, `ransom_needs_security`,
  * `quarterly_rent_scale`, ...), and every other file asks those rules by name.
  * A bare `if self.mode == GameMode::Classic` somewhere else hides which rule it
  * means, lets two copies of one rule drift apart, and is the pattern the
@@ -30,8 +30,8 @@ import { repoRel, sourceFiles } from "./guardFiles";
 
 const here = dirname(fileURLToPath(import.meta.url));
 
-/** Where a direct mode check belongs: the rule hub (a single file today, a
- *  `rules/` module once it is split by domain) and the enum's own file. */
+/** Where a direct mode check belongs: the rule hub (`rules.rs` and its
+ *  `rules/` submodules, one per domain) and the enum's own file. */
 const RULE_HOMES: readonly RegExp[] = [/^engine-rs\/src\/rules\.rs$/, /^engine-rs\/src\/rules\//, /^engine-rs\/src\/clock\.rs$/];
 
 /** Rust paths that are tests or tools, not rules: rule tests, `*_tests.rs`
@@ -171,7 +171,7 @@ describe("mode-branch guard", () => {
         const found = counts.get(rel) ?? 0;
         const allowed = ratchet.get(rel) ?? 0;
         return found > allowed
-          ? `${rel}: ${found} direct mode checks, ${allowed} allowed. Ask a named rule on GameMode (engine-rs/src/rules.rs) or a catalog rule instead.`
+          ? `${rel}: ${found} direct mode checks, ${allowed} allowed. Ask a named rule on GameMode (engine-rs/src/rules/) or a catalog rule instead.`
           : `${rel}: ${found} direct mode checks, ratchet says ${allowed}. Lower its entry in modeBranch.ratchet.txt${found === 0 ? " (delete the line)" : ""}.`;
       });
     expect(wrong, wrong.join("\n")).toEqual([]);

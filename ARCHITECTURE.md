@@ -16,7 +16,7 @@ inline.
 engine-rs/     # the simulation: a deterministic Rust engine, compiled to WebAssembly
   src/
     sim.rs, sim_loop.rs   # Simulation and its tick
-    rules.rs              # Classic vs Modern (impl GameMode)
+    rules.rs, rules/      # Classic vs Modern (impl GameMode), one file per domain
     facilities.rs         # sizes, prices, build caps, transport pooling
     catalog.rs            # everything a frontend shows
     tower.rs, tower/      # placement and transports
@@ -201,11 +201,12 @@ and keeps no table of its own.
 
 A tower is founded under an **immutable `GameMode`** (`classic` | `modern`) and
 behavior the two modes disagree on belongs behind the mode's rule methods in
-the Rust engine (`impl GameMode` in `engine-rs/src/rules.rs`). A subsystem
+the Rust engine (`impl GameMode` in `engine-rs/src/rules/`, one file per domain). A subsystem
 calls `self.mode.<x>()` rather than testing the mode in its own logic, which is
 what stops mode-specific `if` branches from smearing through the simulation.
-Some older subsystems still test the mode inline; CONTRIBUTING.md asks that
-each move behind a rule method when that code next changes.
+The few older subsystems that still test the mode inline are listed, with
+their counts, in `src/tests/modeBranch.ratchet.txt`; that list only shrinks,
+and a new inline test fails `src/tests/modeBranch.guard.test.ts`.
 The web UI reads the rules it shows from the engine's catalog (its `rules`
 block, a facility's `available`, the economy's `autoBridgeToggleable`), which
 the engine states from the same methods; the few choices the UI still makes on
@@ -213,7 +214,7 @@ the mode's name are tracked on #1621.
 
 ```mermaid
 flowchart TD
-    Found["Tower founded with GameMode"] --> Rules["impl GameMode<br/>engine-rs/src/rules.rs"]
+    Found["Tower founded with GameMode"] --> Rules["impl GameMode<br/>engine-rs/src/rules/"]
     Rules --> Sim["subsystems call self.mode.x()"]
     Rules --> Catalog["catalog rules block<br/>engine-rs/src/catalog.rs"]
     Catalog --> UI["web UI shows what the engine states"]

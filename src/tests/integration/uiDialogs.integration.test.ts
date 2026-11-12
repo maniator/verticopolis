@@ -833,7 +833,9 @@ describe("export/import — file downloads and the file picker, no copy-paste pa
   });
 
   it("the 1994 export is disabled where the catalog rules it out (Modern)", () => {
-    const { ui, cb } = makeUI({ getMode: () => "modern" as const, getCatalog: () => catalogFor("modern") });
+    // The mode name says Classic and the catalog says Modern, so only a dialog
+    // that reads the catalog's rule disables the button.
+    const { ui, cb } = makeUI({ getMode: () => "classic" as const, getCatalog: () => catalogFor("modern") });
     openExportConfirm(ui);
     const legacy = document.querySelector('[data-act="legacy"]') as HTMLButtonElement;
     expect(legacy.disabled).toBe(true);
