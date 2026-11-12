@@ -70,15 +70,19 @@ jobs:
       - name: Build the site
         run: npm run build --prefix help-site
 
-      # Every page is there, and only the front page draws the title screen
-      # (Starlight shows the hero only where a page's front matter sets one).
+      # Every page is there, only the front page draws the title screen
+      # (Starlight shows the hero only where a page's front matter sets one),
+      # and every page carries its structured data for search results.
       - name: Check the pages
         run: |
           grep -q 'class="title-screen' dist/help/index.html || { echo "::error::the front page has no title screen"; exit 1; }
-          for page in first-tower classic-vs-modern controls rooms rooms/hotels building/elevators tower/stars your-towers/saving privacy changelog; do
+          for page in first-tower classic-vs-modern controls rooms rooms/hotels building/elevators tower/stars your-towers/saving your-towers/importing-exporting privacy changelog; do
             file="dist/help/$page/index.html"
             test -s "$file" || { echo "::error::missing $file"; exit 1; }
             if grep -q 'class="title-screen' "$file"; then echo "::error::$file draws the title screen"; exit 1; fi
+          done
+          for file in $(find dist/help -name index.html -not -path '*/_astro/*'); do
+            grep -q '<script type="application/ld+json">' "$file" || { echo "::error::$file has no structured data"; exit 1; }
           done
           # The release notes have a section per version.
           grep -q '<section id="[0-9]' dist/help/changelog/index.html || { echo "::error::the release notes have no versions"; exit 1; }

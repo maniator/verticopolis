@@ -14,3 +14,5 @@ export function landingAction(pathname: string, referrer: string, origin: string
 /** Where each section of the old one-page /help went. */
 export const OLD_ANCHORS: Record<string, string>;
 export function oldAnchorRedirects(helpIds: Record<string, string>): string;
+/** A help page's schema.org structured data (breadcrumbs plus a WebSite or Article). */
+export function pageJsonLd(page: { slug: string; title: string; description: string; hasIndex?: string[] }): Record<string, unknown>;

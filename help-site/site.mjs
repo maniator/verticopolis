@@ -135,3 +135,46 @@ export function landingAction(pathname, referrer, origin) {
   if (from !== null && inSite(from)) return null;
   return /^\/help\/changelog\/?$/.test(pathname) ? "page_changelog" : "page_help";
 }
+
+/** The site's address, for the structured data below. */
+const SITE_ORIGIN = "https://verticopolis.com";
+
+/** The section folders and the names a breadcrumb shows for them. Only a
+ *  folder with an index page of its own (rooms) gets a crumb, since every
+ *  crumb but the last has to link somewhere. */
+const SECTION_NAMES = {
+  rooms: "Rooms",
+  building: "Building",
+  tower: "How the tower works",
+  "your-towers": "Your towers",
+};
+
+/**
+ * The schema.org structured data for one help page, as the object a
+ * `<script type="application/ld+json">` carries: a breadcrumb trail from the
+ * help home for every page, plus a WebSite on the home page and an Article on
+ * every other page, so search results can show where a page sits and what it
+ * is about. `slug` is the page's Starlight id ("" for the home page,
+ * "rooms/hotels" for a room page); `hasIndex` says which section folders
+ * have a page of their own.
+ */
+export function pageJsonLd({ slug, title, description, hasIndex = ["rooms"] }) {
+  const url = (path) => `${SITE_ORIGIN}${HELP_BASE}/${path ? `${path}/` : ""}`;
+  const crumbs = [{ name: "Help", item: url("") }];
+  const parts = slug ? slug.split("/") : [];
+  if (parts.length > 1) {
+    const section = parts[0];
+    const name = SECTION_NAMES[section] ?? section;
+    if (hasIndex.includes(section)) crumbs.push({ name, item: url(section) });
+  }
+  if (slug) crumbs.push({ name: title, item: url(slug) });
+  const breadcrumb = {
+    "@type": "BreadcrumbList",
+    itemListElement: crumbs.map((c, i) => ({ "@type": "ListItem", position: i + 1, ...c })),
+  };
+  const game = { "@type": "VideoGame", name: "Verticopolis", url: `${SITE_ORIGIN}/` };
+  const page = slug
+    ? { "@type": "Article", headline: title, description, url: url(slug), inLanguage: "en-US", about: game, isPartOf: { "@type": "WebSite", name: "Verticopolis Help", url: url("") } }
+    : { "@type": "WebSite", name: "Verticopolis Help", description, url: url(""), inLanguage: "en-US", about: game };
+  return { "@context": "https://schema.org", "@graph": [page, breadcrumb] };
+}

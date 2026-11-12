@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
-import { HELP_BASE, OG_IMAGE_ALT, OLD_ANCHORS, landingAction, oldAnchorRedirects, sharedHead, sidebar, type SidebarEntry } from "../../help-site/site.mjs";
+import { HELP_BASE, OG_IMAGE_ALT, OLD_ANCHORS, landingAction, oldAnchorRedirects, pageJsonLd, sharedHead, sidebar, type SidebarEntry } from "../../help-site/site.mjs";
 import { catalogFor } from "./catalogFixture";
 import { HELP_PAGES_DIR } from "../build/helpMarkdown";
 
@@ -119,6 +119,47 @@ describe("the shared head tags", () => {
     for (const [key, content] of gameTags) {
       expect(siteTags, key).toContainEqual([key, content]);
     }
+  });
+});
+
+describe("search and sharing", () => {
+  const pageFiles = readdirSync(pagesDir, { recursive: true, encoding: "utf8" }).filter((f) => /\.mdx?$/.test(f));
+  const frontMatter = (file: string, key: string): string | undefined =>
+    new RegExp(`^${key}: (.+)$`, "m").exec(readFileSync(resolve(pagesDir, file), "utf8").split("\n---")[0])?.[1];
+
+  it("gives every page a description of its own, for search results and share cards", () => {
+    const seen = new Map<string, string>();
+    for (const file of pageFiles) {
+      const description = frontMatter(file, "description");
+      expect(description, file).toBeTruthy();
+      expect(seen.get(description!), `${file} repeats a description`).toBeUndefined();
+      seen.set(description!, file);
+    }
+  });
+
+  it("marks the front page as the site and a room page as an article inside Rooms", () => {
+    const home = pageJsonLd({ slug: "", title: "How to Play", description: "d" }) as { "@graph": Record<string, unknown>[] };
+    expect(home["@graph"][0]["@type"]).toBe("WebSite");
+    expect(home["@graph"][0].url).toBe("https://verticopolis.com/help/");
+
+    const hotels = pageJsonLd({ slug: "rooms/hotels", title: "Hotels", description: "d" }) as {
+      "@graph": [Record<string, unknown>, { itemListElement: Record<string, unknown>[] }];
+    };
+    expect(hotels["@graph"][0]).toMatchObject({ "@type": "Article", headline: "Hotels", url: "https://verticopolis.com/help/rooms/hotels/" });
+    expect(hotels["@graph"][1].itemListElement).toEqual([
+      { "@type": "ListItem", position: 1, name: "Help", item: "https://verticopolis.com/help/" },
+      { "@type": "ListItem", position: 2, name: "Rooms", item: "https://verticopolis.com/help/rooms/" },
+      { "@type": "ListItem", position: 3, name: "Hotels", item: "https://verticopolis.com/help/rooms/hotels/" },
+    ]);
+  });
+
+  it("leaves a section with no page of its own out of the breadcrumbs, so every crumb links", () => {
+    const money = pageJsonLd({ slug: "tower/money", title: "Money", description: "d" }) as {
+      "@graph": [unknown, { itemListElement: { name: string; item?: string }[] }];
+    };
+    const crumbs = money["@graph"][1].itemListElement;
+    expect(crumbs.map((c) => c.name)).toEqual(["Help", "Money"]);
+    for (const crumb of crumbs) expect(crumb.item).toMatch(/^https:\/\/verticopolis\.com\/help\//);
   });
 });
 

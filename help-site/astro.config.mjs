@@ -54,6 +54,7 @@ export default defineConfig({
       // The site-wide "Page not found" page is the game's own (src/404.html).
       disable404Route: true,
       components: {
+        Head: "./src/components/Head.astro",
         Header: "./src/components/Header.astro",
         Hero: "./src/components/TitleScreen.astro",
       },
