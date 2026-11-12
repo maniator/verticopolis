@@ -61,7 +61,7 @@ describe("readCatalog", () => {
       ["a kind listed twice", "classic", (c) => (c.facilities as Json[]).push(facility(c, "office")), /office is listed twice/],
       ["a pool naming an unknown kind", "classic", (c) => ((c.pools as Json[])[0].kinds as string[]).push("monorail"), /"monorail" is not a listed facility/],
       ["a facility naming a pool key that does not exist", "classic", (c) => (facility(c, "stairs").pool = "ramps"), /invalid facilities\[\d+\]\.pool: "ramps"/],
-      ["a facility naming a pool the catalog does not list", "classic", (c) => (c.pools as Json[]).pop(), /facilities\[\d+\]\.pool: walkways is not a listed pool/],
+      ["a facility naming a pool the catalog does not list", "classic", (c) => (c.pools as Json[]).splice(1, 1), /facilities\[\d+\]\.pool: walkways is not a listed pool/],
       ["an unknown category", "classic", (c) => (facility(c, "office").category = "zoo"), /invalid facilities\[\d+\]\.category: "zoo"/],
       ["a rent without a shape", "classic", (c) => delete rent(c, "office").shape, /missing facilities\[\d+\]\.rent\.shape/],
       ["a pool with a zero cap", "classic", (c) => ((c.pools as Json[])[0].cap = 0), /invalid pools\[0\]\.cap/],

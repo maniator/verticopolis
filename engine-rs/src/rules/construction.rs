@@ -19,6 +19,14 @@ impl GameMode {
         self == GameMode::Modern
     }
 
+    /// Whether party halls and theaters share one cap of 16
+    /// (`facilities::CLASSIC_VENUE_POOL`, #1932): Classic does, as the 1994
+    /// save keeps one table of 16 records for both; Modern caps each kind at
+    /// 16 on its own. Read through `facilities::pools_for`.
+    pub fn shares_venue_cap(self) -> bool {
+        self == GameMode::Classic
+    }
+
     /// Whether a frontend lets the player place new construction while the
     /// clock is stopped. Classic refuses it, the 1994 game's way, so the
     /// pressure of building against the clock stays; Modern allows it, a

@@ -394,6 +394,22 @@ pub static POOLED_CAPS: [Pool; 2] = [
     },
 ];
 
+/// Classic's party hall and theater pool (#1932): the 1994 save keeps one
+/// table of 16 records shared by every party hall and theater, so the two
+/// kinds share one cap of 16. Modern keeps a cap of 16 for each.
+pub static CLASSIC_VENUE_POOL: Pool = Pool {
+    kinds: &[Kind::Cinema, Kind::PartyHall],
+    cap: 16,
+    label: "party halls and theaters",
+};
+
+/// Every pooled cap `mode` enforces: the transport pools, then Classic's
+/// venue pool.
+pub fn pools_for(mode: crate::clock::GameMode) -> impl Iterator<Item = &'static Pool> {
+    let venues = mode.shares_venue_cap().then_some(&CLASSIC_VENUE_POOL);
+    POOLED_CAPS.iter().chain(venues)
+}
+
 #[doc(hidden)]
 pub fn is_lobby_floor(floor: i64) -> bool {
     floor == 1 || (floor > 1 && floor % LOBBY_INTERVAL == 0)

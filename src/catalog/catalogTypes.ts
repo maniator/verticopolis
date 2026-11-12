@@ -39,7 +39,7 @@ export interface CatalogTicketPrice {
 
 /** The version of the catalog's shape. It moves when a field is added,
  *  renamed or removed, so a frontend can refuse a shape it does not know. */
-export const CATALOG_VERSION = 14;
+export const CATALOG_VERSION = 15;
 
 /** Every price, size and build rule of one mode. */
 export interface Catalog {
@@ -181,7 +181,7 @@ export interface CatalogCalendar {
 /** A cap several kinds share. */
 export interface CatalogPool {
   /** The name a {@link CatalogFacility.pool} refers to it by. */
-  readonly key: "elevators" | "walkways";
+  readonly key: "elevators" | "walkways" | "venues";
   /** The label the engine's refusal names the pool by. */
   readonly label: string;
   /** The most units of all its kinds together a tower may hold. */

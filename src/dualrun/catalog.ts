@@ -66,7 +66,7 @@ const text: Check = (v) => typeof v === "string" && v.length > 0;
 const orNull = (check: Check): Check => (v) => v === null || check(v);
 const oneOf = (...values: readonly unknown[]): Check => (v) => values.includes(v);
 const cadence = oneOf("quarterly", "maintenancePeriod", "sale", "nightly");
-const poolKey = oneOf("elevators", "walkways");
+const poolKey = oneOf("elevators", "walkways", "venues");
 const category = oneOf("structure", "transport", "office", "residential", "hotel", "food", "retail", "entertainment", "service", "special");
 
 const WORLD: Shape = {

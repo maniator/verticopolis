@@ -89,6 +89,7 @@ mod subsystems;
 mod undo_signature;
 mod unmet_demand;
 mod venue_attendance;
+mod venue_cap;
 mod venue_origins;
 mod walking_penalties;
 mod walkway_willingness;
