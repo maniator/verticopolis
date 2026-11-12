@@ -59,22 +59,31 @@ export function canCallExterminator(report: Pick<StatsReport, "housekeeping" | "
   return catalog.economy.exterminator !== null && report.exterminationDueDay === null && report.housekeeping.infested > 0;
 }
 
+/** A gate's checklist words: fixed, or worded from the tower's top floor (the
+ *  catalog's `world.maxFloor`), for a gate that names where it stands. */
+export type StarGateLabel = string | ((topFloor: number) => string);
+
 /** Each star gate's line on the "Next" checklist, keyed by the id the engine
  *  answers (a test holds the keys to the ids the engine's layout publishes). */
-export const STAR_GATE_LABELS: Readonly<Record<StarGateId, string>> = {
+export const STAR_GATE_LABELS: Readonly<Record<StarGateId, StarGateLabel>> = {
   security: "2+ security offices",
   medical: "Medical center",
   recycling: "Recycling meets demand",
   suites: "2+ hotel suites",
   vip: "Favorable VIP review",
   metro: "Metro station",
-  weddingHall: "Wedding Hall (floor 100)",
+  // The hall stands on the top floor the tower's catalog states (#1987).
+  weddingHall: (topFloor) => `Wedding Hall (floor ${topFloor})`,
 };
 
-/** A gate's checklist line, or its id for one the table does not know (an
- *  own key only, so an id such as "constructor" still reads as itself). */
-const gateLabel = (id: string): string =>
-  Object.prototype.hasOwnProperty.call(STAR_GATE_LABELS, id) ? STAR_GATE_LABELS[id as StarGateId] : id;
+/** A gate's checklist line on a tower whose top floor is `topFloor`, or its
+ *  id for one the table does not know (an own key only, so an id such as
+ *  "constructor" still reads as itself). */
+export function gateLabel(id: string, topFloor: number): string {
+  if (!Object.prototype.hasOwnProperty.call(STAR_GATE_LABELS, id)) return id;
+  const label = STAR_GATE_LABELS[id as StarGateId];
+  return typeof label === "string" ? label : label(topFloor);
+}
 
 export function statsTemplate(screen: StatsScreen): TemplateResult {
   const { report, catalog } = screen;
@@ -150,7 +159,7 @@ export function statsTemplate(screen: StatsScreen): TemplateResult {
         <span class="k">Elevators</span><span class="v">${s.elevators}</span>
         <span class="k">All transports</span><span class="v">${s.transports}</span>
       </div>
-      ${nextStarSection(report.nextStar)}
+      ${nextStarSection(report.nextStar, catalog.world.maxFloor)}
       <div class="stats-section win-title sm">Tenancy</div>
       <div class="col kv">
         <span class="k">Offices</span><span class="v">${s.occupiedOffices}/${s.offices}</span>
@@ -286,9 +295,10 @@ function householdSection({ households, residents, mix: sizes }: StatsReport["ho
  * facility gates for the next rung. Driven by the engine's answer (the stats
  * report's `nextStar`), which mirrors the promotion gates, so the checklist can
  * never disagree with an actual star-up. Hidden once the tower is a TOWER
- * (nothing above it).
+ * (nothing above it). `topFloor` is the tower's top floor from its catalog,
+ * which the wedding hall's gate names.
  */
-export function nextStarSection(req: NextStarView | null): TemplateResult | typeof nothing {
+export function nextStarSection(req: NextStarView | null, topFloor: number): TemplateResult | typeof nothing {
   if (!req) return nothing;
   const fmt = (n: number) => groupDigits(n);
   const goal = req.isTower ? "TOWER" : `${req.star}★`;
@@ -300,7 +310,7 @@ export function nextStarSection(req: NextStarView | null): TemplateResult | type
     html`<span class="k${req.popMet ? " ms-done" : ""}">${mark(req.popMet)} Population</span><span class="v${req.popMet ? " ms-done" : ""}">${fmt(req.popHave)} / ${fmt(req.popNeed)}</span>`,
     ...req.gates.map(
       (g) =>
-        html`<span class="k${g.met ? " ms-done" : ""}">${mark(g.met)} ${gateLabel(g.id)}</span><span class="v${g.met ? " ms-done" : ""}">${g.met ? "Ready" : "Needed"}</span>`,
+        html`<span class="k${g.met ? " ms-done" : ""}">${mark(g.met)} ${gateLabel(g.id, topFloor)}</span><span class="v${g.met ? " ms-done" : ""}">${g.met ? "Ready" : "Needed"}</span>`,
     ),
   ];
   const head = html`<div class="stats-section win-title sm">Next: ${goal}${

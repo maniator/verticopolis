@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { nothing } from "lit-html";
-import { incomeSection, milestonesSection, nextStarSection, statsModalTemplate, statsTemplate, STAR_GATE_LABELS } from "./stats";
+import { gateLabel, incomeSection, milestonesSection, nextStarSection, statsModalTemplate, statsTemplate, STAR_GATE_LABELS } from "./stats";
+import { catalogFor } from "../../tests/catalogFixture";
 import { renderToFragment } from "../testing/litTestUtils";
 import type { StarGateId } from "../../simport/panels";
 import { LAYOUT } from "../../tests/portKit/mockPort";
@@ -233,19 +234,35 @@ describe("star gate copy", () => {
     // words each one.
     const published = (LAYOUT as unknown as { starGates: string[] }).starGates;
     expect(Object.keys(STAR_GATE_LABELS).sort()).toEqual([...published].sort());
-    for (const id of published) expect(STAR_GATE_LABELS[id as StarGateId], id).toMatch(/\S/);
+    for (const id of published) expect(gateLabel(id, 100), id).toMatch(/\S/);
+  });
+
+  it("names the wedding hall's floor from the tower's top floor (#1987)", () => {
+    const req = { star: 6, isTower: false, popHave: 1, popNeed: 2, popMet: false, gates: [{ id: "weddingHall" as StarGateId, met: false }], allMet: false };
+    const text = (topFloor: number) => renderToFragment(nextStarSection(req, topFloor) as Exclude<ReturnType<typeof nextStarSection>, typeof nothing>).textContent ?? "";
+    const top = catalogFor("modern").world.maxFloor;
+    expect(text(top), "the catalog's top floor").toContain(`Wedding Hall (floor ${top})`);
+    expect(text(120), "a taller tower's top floor").toContain("Wedding Hall (floor 120)");
+  });
+
+  it("shows the hall's floor from the catalog on the stats screen", () => {
+    const catalog = catalogFor("modern");
+    const taller = { ...catalog, world: { ...catalog.world, maxFloor: catalog.world.maxFloor + 20 } };
+    const hallGate = { star: 6, isTower: false, popHave: 1, popNeed: 2, popMet: false, gates: [{ id: "weddingHall" as StarGateId, met: false }], allMet: false };
+    const screen = { ...statsScreenFor({ mode: "modern", report: { nextStar: hallGate } }), catalog: taller };
+    expect(renderToFragment(statsTemplate(screen)).textContent ?? "").toContain(`Wedding Hall (floor ${catalog.world.maxFloor + 20})`);
   });
 
   it("shows a gate id the table does not know as the id itself", () => {
     const req = { star: 4, isTower: false, popHave: 1, popNeed: 2, popMet: false, gates: [{ id: "observatory" as StarGateId, met: false }], allMet: false };
-    const section = nextStarSection(req);
+    const section = nextStarSection(req, 100);
     expect(section).not.toBe(nothing);
     expect(renderToFragment(section as Exclude<typeof section, typeof nothing>).textContent).toContain("observatory");
   });
 
   it("shows an id that names an Object prototype member as the id itself", () => {
     const req = { star: 4, isTower: false, popHave: 1, popNeed: 2, popMet: false, gates: [{ id: "constructor" as StarGateId, met: false }], allMet: false };
-    const section = nextStarSection(req) as Exclude<ReturnType<typeof nextStarSection>, typeof nothing>;
+    const section = nextStarSection(req, 100) as Exclude<ReturnType<typeof nextStarSection>, typeof nothing>;
     const text = renderToFragment(section).textContent ?? "";
     expect([text.includes("constructor"), text.includes("function")]).toEqual([true, false]);
   });

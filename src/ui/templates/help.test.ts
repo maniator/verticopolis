@@ -221,3 +221,20 @@ describe("helpTemplate engine diagnostics (#963)", () => {
   });
 });
 
+
+describe("the guide's wedding hall copy (#1987)", () => {
+  // The guide is prerendered without a tower, so it words the standard lot.
+  // It must agree with what both catalogs state; a lot whose top moves (the
+  // Tall lot, #1983) needs its own line here.
+  it("stands the hall on the top floor and at the size both catalogs state", () => {
+    const text = renderToFragment(helpTemplate(false, "1.2.3", noop)).textContent ?? "";
+    const words: Record<number, string> = { 5: "five" };
+    for (const mode of ["classic", "modern"] as const) {
+      const catalog = catalogFor(mode);
+      const hall = catalog.facilities.find((f) => f.key === "weddingHall")!;
+      const top = catalog.world.maxFloor;
+      expect(text, mode).toContain(`floor-${top} payoff`);
+      expect(text, mode).toContain(`(${hall.width} tiles wide and ${words[hall.floors]} floors tall) on floor ${top}`);
+    }
+  });
+});

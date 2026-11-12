@@ -2172,6 +2172,14 @@ describe("showStats / congratsTower / showUpdateChip — small dialogs & chrome"
     expect(dialog().open).toBe(false);
   });
 
+  it("congratsTower names the wedding hall's floor from the tower's catalog (#1987)", () => {
+    const catalog = catalogFor("modern");
+    const taller = { ...catalog, world: { ...catalog.world, maxFloor: 120 } };
+    const { ui } = makeUI({ getCatalog: () => taller });
+    ui.congratsTower();
+    expect(dialog().textContent?.replace(/\s+/g, " ")).toContain("wedding hall on the 120th floor");
+  });
+
   it("congratsTower announces the TOWER win and closes cleanly", () => {
     const { ui } = makeUI();
     ui.congratsTower();
