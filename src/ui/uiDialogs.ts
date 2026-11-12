@@ -468,5 +468,5 @@ export function showUpdateChip(_ui: UI, onClick: () => void): void {
 }
 
 export function congratsTower(ui: UI): void {
-  ui.openModalTemplate(congratsTemplate(() => ui.closeModal()), { displaceable: true });
+  ui.openModalTemplate(congratsTemplate(ui.cb.getCatalog().world.maxFloor, () => ui.closeModal()), { displaceable: true });
 }

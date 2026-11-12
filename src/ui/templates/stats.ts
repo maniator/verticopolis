@@ -59,12 +59,12 @@ export function canCallExterminator(report: Pick<StatsReport, "housekeeping" | "
   return catalog.economy.exterminator !== null && report.exterminationDueDay === null && report.housekeeping.infested > 0;
 }
 
-/** Each star gate's line on the "Next" checklist, keyed by the id the engine
- *  answers (a test holds the keys to the ids the engine's layout publishes). */
 /** A gate's checklist words: fixed, or worded from the tower's top floor (the
  *  catalog's `world.maxFloor`), for a gate that names where it stands. */
 export type StarGateLabel = string | ((topFloor: number) => string);
 
+/** Each star gate's line on the "Next" checklist, keyed by the id the engine
+ *  answers (a test holds the keys to the ids the engine's layout publishes). */
 export const STAR_GATE_LABELS: Readonly<Record<StarGateId, StarGateLabel>> = {
   security: "2+ security offices",
   medical: "Medical center",
