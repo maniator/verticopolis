@@ -5,9 +5,12 @@
 //! [`crate::catalog::catalog`], which a frontend reads instead of keeping
 //! tables of its own.
 
+use crate::lot::Lot;
+
 /// The lot's width in tiles. A tile column `x` runs from 0 to `LOT_WIDTH - 1`.
 pub const LOT_WIDTH: i64 = 375;
-/// The top floor.
+/// The top floor of the standard lot ([`crate::lot`]), and the highest top
+/// floor any lot has: grids sized for every tower read it.
 pub const MAX_FLOOR: i64 = 100;
 /// The lowest basement floor. Floor 1 is the ground floor and floor 0 the
 /// first basement.
@@ -221,30 +224,24 @@ impl Kind {
     }
 
     #[doc(hidden)]
-    /// The highest story a unit of this kind may occupy: `MAX_FLOOR`, except the
-    /// wedding hall, which stands on floor `MAX_FLOOR` and rises above it.
+    /// The highest story a unit of this kind may occupy on the standard lot:
+    /// `MAX_FLOOR`, except the wedding hall, which stands on floor
+    /// `MAX_FLOOR` and rises above it. A tower asks its own lot.
     pub fn highest_story(self) -> i64 {
-        if self == Kind::WeddingHall {
-            MAX_FLOOR + self.floors() - 1
-        } else {
-            MAX_FLOOR
-        }
+        Lot::STANDARD.highest_story(self)
     }
 
     #[doc(hidden)]
-    /// The highest floor a unit of this kind may stand on (its bottom story).
+    /// The highest floor a unit of this kind may stand on (its bottom story),
+    /// on the standard lot.
     pub fn highest_base_floor(self) -> i64 {
-        self.highest_story() - (self.floors() - 1)
+        Lot::STANDARD.highest_base_floor(self)
     }
 
     #[doc(hidden)]
-    /// `maxSpanFor`.
+    /// `maxSpanFor`, on the standard lot.
     pub fn max_span(self) -> i64 {
-        match self {
-            Kind::Stairs | Kind::Escalator => 1,
-            Kind::ElevatorExpress => MAX_FLOOR - MIN_FLOOR,
-            _ => 30,
-        }
+        Lot::STANDARD.max_span(self)
     }
 
     #[doc(hidden)]

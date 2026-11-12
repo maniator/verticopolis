@@ -139,6 +139,7 @@ mod wedding_hall_tests;
 // crate's tests check it against `load::deserialize`.
 #[cfg(any(test, feature = "wasm"))]
 mod load_stream;
+mod lot;
 mod noise;
 #[doc(hidden)]
 pub mod panels;

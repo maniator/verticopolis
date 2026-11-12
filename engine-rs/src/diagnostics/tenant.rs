@@ -10,7 +10,7 @@ use crate::churn::CongestionBindingClass;
 use crate::demand::unmet_coverage;
 use crate::econ::rent_of;
 use crate::economy::commercial_daily_income;
-use crate::facilities::{is_sky_lobby_floor, Kind, LOBBY_INTERVAL, MAX_FLOOR};
+use crate::facilities::{is_sky_lobby_floor, Kind, LOBBY_INTERVAL};
 use crate::presence::CongestionAttribution;
 use crate::satisfaction::shortfall::{
     ServiceShort, ServiceShortfalls, HOME_PARKING_CAUSE, PARKING_CAUSE, TRASH_CAUSE,
@@ -140,7 +140,8 @@ pub(super) fn nearest_buildable_lobby_slot(tower: &Tower, floor: i64) -> Option<
     let current = tower.nearest_lobby_floor_distance(floor);
     let mut best: Option<i64> = None;
     let mut slot = LOBBY_INTERVAL;
-    while slot <= MAX_FLOOR {
+    let top = tower.lot().top_floor();
+    while slot <= top {
         if is_sky_lobby_floor(slot) && !tower.floor_has_lobby(slot) {
             let d = (floor - slot).abs();
             if d < current && best.is_none_or(|b| d < (floor - b).abs()) {

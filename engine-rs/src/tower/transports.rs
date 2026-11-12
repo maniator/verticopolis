@@ -57,7 +57,7 @@ impl Tower {
     }
 
     fn span_reason(&self, kind: Kind, bottom: i64, top: i64) -> Option<String> {
-        let max_span = kind.max_span();
+        let max_span = self.lot().max_span(kind);
         if top.saturating_sub(bottom) <= max_span {
             return None;
         }
@@ -278,7 +278,7 @@ impl Tower {
         if new_top <= new_bottom {
             return ResizeResult::fail("Transport needs height.");
         }
-        if new_bottom < MIN_FLOOR || new_top > MAX_FLOOR {
+        if new_bottom < MIN_FLOOR || new_top > self.lot().top_floor() {
             return ResizeResult::fail("Outside the buildable range.");
         }
         let (kind, tx, twidth, prev_bottom, prev_top) = {
