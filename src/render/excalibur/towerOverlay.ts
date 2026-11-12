@@ -176,6 +176,16 @@ export function bombPulseAlpha(animSeconds: number, minutesLeft: number, reduced
   return peak * (0.35 + 0.65 * beat * beat);
 }
 
+/** The size a figure walking a floor (a search guard, a thief) is drawn at:
+ *  the camera zoom, the same as the crowd, so it stays inside its floor at
+ *  every zoom. A floor of {@link FLOOR} world pixels is taller than the
+ *  figure (`FIGURE_HEIGHT` in the sprites), so one floor holds it at any zoom.
+ *  A fixed minimum size here once drew guards several floors tall on a
+ *  zoomed-out phone. */
+export function floorFigureScale(zoom: number): number {
+  return zoom;
+}
+
 /** The bomb search: each guard climbing the emergency stairs or walking a
  *  floor's rooms (where the engine's timing says it is), the time left
  *  before the deadline, and a red glow beating at the screen's edges. Under
@@ -183,7 +193,7 @@ export function bombPulseAlpha(animSeconds: number, minutesLeft: number, reduced
 function renderBombSearch(engine: TowerEngine, ctx: CanvasRenderingContext2D): void {
   const search = engine.sim.bombSearch;
   if (!search) return;
-  const scale = Math.max(0.9, engine.cam.zoom);
+  const scale = floorFigureScale(engine.cam.zoom);
   for (const g of search.sweeping) {
     const at = guardPosition(g, engine.sim.clock.minutes);
     const x = engine.worldToScreenX(at.x);
@@ -297,7 +307,7 @@ function renderThief(engine: TowerEngine, ctx: CanvasRenderingContext2D): void {
   if (p < 0 || p > 1) return;
   const x = engine.worldToScreenX(thiefX(engine.thiefSpan, p));
   const y = engine.worldToScreenY(engine.thiefFloor) + FLOOR * engine.cam.zoom;
-  drawThief(ctx, x, y, Math.max(0.9, engine.cam.zoom), engine.thiefCaught);
+  drawThief(ctx, x, y, floorFigureScale(engine.cam.zoom), engine.thiefCaught);
 }
 
 /** Rain falls in front of the tower on rainy days (overlay layer). */
