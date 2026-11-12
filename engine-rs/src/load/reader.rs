@@ -275,6 +275,7 @@ pub(crate) fn unit_from_value(u: &Value, modern: bool) -> Option<(Unit, Option<i
             film_classic: cinema_flag(kind, u.get("filmClassic")),
             // Only Modern shows a blockbuster (#1950); Classic reads a new film.
             film_blockbuster: modern && cinema_flag(kind, u.get("filmBlockbuster")),
+            ticket_price: ticket_price(kind, modern, u.get("ticketPrice")),
             patronage_today: retail_field("patronageToday"),
             patronage_yest: retail_field("patronageYest"),
             profit_today: retail_field("profitToday"),

@@ -16,7 +16,7 @@ pub(super) fn put(sim: &mut Simulation, kind: Kind, floor: i64, x: i64) -> i64 {
 }
 
 /// An open theatre on floors 2 and 3, and an office, in a tower of `mode`.
-pub(super) fn theatre(mode: GameMode) -> (Simulation, i64, i64) {
+pub(crate) fn theatre(mode: GameMode) -> (Simulation, i64, i64) {
     let mut sim = Simulation::new_game(5, mode);
     sim.money = 1.0e9;
     sim.star = 5;

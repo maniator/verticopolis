@@ -33,6 +33,8 @@ pub fn catalog(mode: GameMode) -> Catalog {
             films: mode.films().offers,
             film_rebooks: mode.films().rebooks,
             film_rebook_default: mode.films().rebook_default,
+            ticket_prices: mode.ticket_prices(),
+            ticket_price_default: mode.ticket_price_default(),
             auto_bridge_toggleable: mode.bridging_toggleable(),
         },
         rules: Rules {

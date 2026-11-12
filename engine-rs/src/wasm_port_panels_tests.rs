@@ -160,6 +160,7 @@ fn the_unit_card_is_the_detail_card() {
             ("vacateReason", &VACATE_REASONS[..]),
             ("filmPolicy", &FILM_POLICIES[..]),
             ("filmTier", &FILM_TIER_KEYS[..]),
+            ("ticketPrice", &TICKET_PRICES[..]),
         ];
         for (slot, key) in UNIT_CARD.iter().enumerate() {
             if let Some((_, table)) = codes.iter().find(|(k, _)| k == key) {

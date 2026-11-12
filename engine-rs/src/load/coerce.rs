@@ -1,6 +1,7 @@
 //! Coercion of loose saved fields into the types the game holds.
 
 use super::*;
+use crate::economy::tickets::NORMAL_TICKET_PRICE;
 
 pub(super) fn coerce_log(v: Option<&Value>) -> Vec<LogEntry> {
     let Some(arr) = v.and_then(Value::as_array) else {
@@ -92,6 +93,17 @@ pub(super) fn film_days(kind: Kind, raw: Option<&Value>) -> Option<u8> {
 /// anything else reads as a new film.
 pub(super) fn cinema_flag(kind: Kind, raw: Option<&Value>) -> bool {
     kind == Kind::Cinema && raw == Some(&Value::Bool(true))
+}
+
+/// A Modern theater's ticket price step (#1950): a step Modern lists, other
+/// than Normal, on a theater. Normal, an unknown step, a Classic save and any
+/// other room read as none.
+pub(super) fn ticket_price(kind: Kind, modern: bool, raw: Option<&Value>) -> Option<&'static str> {
+    if kind != Kind::Cinema || !modern {
+        return None;
+    }
+    let step = GameMode::Modern.ticket_price(raw?.as_str()?)?.key;
+    (step != NORMAL_TICKET_PRICE).then_some(step)
 }
 
 pub(super) fn parse_state(v: Option<&Value>) -> Option<UnitState> {

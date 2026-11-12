@@ -5,7 +5,9 @@
 //! wraps (`floor_heatmap`, `housekeeping_coverage`, `card_flags`, the
 //! telemetry), so the port computes nothing the game does not already.
 use crate::charges::whole;
+use crate::clock::GameMode;
 use crate::economy::films::FilmTier;
+use crate::economy::tickets::shown_ticket_price;
 use crate::facilities::Kind;
 use crate::frame::unit_state_code;
 use crate::panels::heatmap::HeatmapMode;
@@ -13,9 +15,17 @@ use crate::panels::room_tiers::{EvalTier, RentTier};
 use crate::panels::unit_detail::{unit_price, CardFlags};
 use crate::sim::Simulation;
 use crate::telemetry::ORIGIN_HOURS;
+use crate::tower::Unit;
 
-use super::port::FILM_POLICIES;
+use super::port::{FILM_POLICIES, TICKET_PRICES};
 use super::Engine;
+
+/// A theater's ticket price by code in `ticketPrices`: its step, or Normal
+/// where it has none; NaN for any other room and in a mode without ticket
+/// prices (#1950).
+fn ticket_price_code(mode: GameMode, u: &Unit) -> f64 {
+    code_of(&TICKET_PRICES, shown_ticket_price(mode, u))
+}
 
 /// A film tier's code in `filmTiers`.
 fn film_tier_code(tier: FilmTier) -> f64 {
@@ -59,9 +69,10 @@ pub(crate) const VACATE_REASONS: [&str; 9] = [
 /// with no value, a count only some kinds keep, a cinema's booking and film
 /// on any other kind); the flags are 0 or 1. `filmDays` is the mornings a
 /// theater's film has shown and `filmTier` its film by code (`filmTiers`,
-/// #1932, #1950). The
-/// label and subtype come from `unitLabel` and `unitSubtype`.
-pub(crate) const UNIT_CARD: [&str; 22] = [
+/// #1932, #1950). `ticketPrice` is a Modern theater's ticket price by code
+/// (`ticketPrices`, #1950). The label and subtype come from `unitLabel` and
+/// `unitSubtype`.
+pub(crate) const UNIT_CARD: [&str; 23] = [
     "id",
     "kindCode",
     "floor",
@@ -84,6 +95,7 @@ pub(crate) const UNIT_CARD: [&str; 22] = [
     "blockbuster",
     "filmDays",
     "filmTier",
+    "ticketPrice",
 ];
 
 /// `shaftCard`'s header. `utilization` is NaN when the shaft has no reading.
@@ -300,6 +312,7 @@ impl Engine {
             blockbuster.map_or(f64::NAN, flag),
             cinema.map_or(f64::NAN, |e| f64::from(e.film_days.unwrap_or(0))),
             cinema.map_or(f64::NAN, |e| film_tier_code(FilmTier::showing(e))),
+            ticket_price_code(mode, u),
         ]
     }
 

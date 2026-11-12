@@ -42,7 +42,7 @@ pub(super) fn ts_sig(tower: &Tower) -> String {
         .iter()
         .map(|u| {
             format!(
-                "{}@{},{}:{}:{}:{}:{}:{}",
+                "{}@{},{}:{}:{}:{}:{}:{}:{}",
                 u.kind.as_str(),
                 u.floor,
                 u.x,
@@ -50,6 +50,7 @@ pub(super) fn ts_sig(tower: &Tower) -> String {
                 u.rent.map(number_to_string).unwrap_or_default(),
                 if u.no_rate { "N" } else { "" },
                 u.extras().film_policy.unwrap_or(""),
+                u.extras().ticket_price.unwrap_or(""),
                 u.subtype.unwrap_or(""),
             )
         })

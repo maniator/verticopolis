@@ -27,6 +27,7 @@ use crate::charges::{car_resale_refund, ADD_CAR_COST, TRANSPORT_FLOOR_COST};
 use crate::clock::{resolve_calendar, CalendarKind, GameMode};
 use crate::econ::{classic_ladder, rent_config};
 use crate::economy::films::{FilmOffer, FilmRebook};
+use crate::economy::tickets::TicketPrice;
 use crate::economy::{
     catalog_spend_per_customer, commercial_daily_income, service_maintenance_monthly,
     MAINTENANCE_PER_CAR_MONTHLY, NIGHTCLUB_DJ_MONTHLY, REAL_WORLD_MAINT_PERIOD_DAYS,
@@ -138,6 +139,11 @@ pub struct Economy {
     /// The policy a theater with none, or an old save's "auto", rebooks by,
     /// or null where no theater rebooks.
     pub film_rebook_default: Option<&'static str>,
+    /// A theater's ticket price steps in the card button's order, cheapest
+    /// first, each against Normal's 1; empty without ticket prices (#1950).
+    pub ticket_prices: &'static [TicketPrice],
+    /// The step a theater with none set charges, or null.
+    pub ticket_price_default: Option<&'static str>,
     /// Whether the player can switch automatic bridging off. When false,
     /// bridging is always on. When true, a tower starts bridged unless it
     /// was founded unbridged, and the live setting is per tower (the

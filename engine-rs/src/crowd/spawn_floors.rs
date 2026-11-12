@@ -11,6 +11,7 @@
 use std::sync::Arc;
 
 use crate::clock::Clock;
+use crate::economy::tickets::{charged, ticket_pick_mult};
 use crate::facilities::Kind;
 use crate::tower::{Tower, UnitState};
 use crate::tower_index::{floor_slot, FloorRooms};
@@ -73,6 +74,10 @@ pub struct SpawnFloors {
     pub hotel_floors: Vec<i64>,
     pub staff_floors: Vec<(Kind, i64)>,
     pub venues_by_kind: VenueFloors,
+    /// The mean of the open theaters' ticket price pick multipliers, or
+    /// `None` where every one charges Normal and the crowd draws them as it
+    /// always has (#1950).
+    pub cinema_picks: Option<f64>,
     units_by_floor: Arc<FloorRooms>,
     /// Operational metro station ids.
     pub metro_stations: Vec<i64>,
@@ -140,6 +145,7 @@ pub fn spawn_floors(tower: &Tower, clock: &Clock) -> SpawnFloors {
     let mut staff_floors: Vec<(Kind, i64)> = Vec::new();
     let mut staff_seen: Vec<(Kind, FloorBits)> = Vec::new();
     let mut venues_by_kind: Vec<(Kind, FloorList)> = Vec::new();
+    let (mut cinemas, mut cinema_pick_sum, mut cinema_priced) = (0_u32, 0.0, false);
     for u in tower.room_units() {
         if u.kind.is_staff_kind() {
             if u.is_operational() {
@@ -185,6 +191,11 @@ pub fn spawn_floors(tower: &Tower, clock: &Clock) -> SpawnFloors {
             add_floor(&mut venues_by_kind, u.kind, u.floor);
         } else if u.kind.attendance_cap().is_some() && u.kind.is_open_at(hour) {
             add_floor(&mut venues_by_kind, u.kind, u.floor);
+            if u.kind == Kind::Cinema {
+                cinemas += 1;
+                cinema_pick_sum += ticket_pick_mult(tower.mode, u);
+                cinema_priced |= charged(tower.mode, u).is_some();
+            }
         }
     }
     SpawnFloors {
@@ -202,6 +213,7 @@ pub fn spawn_floors(tower: &Tower, clock: &Clock) -> SpawnFloors {
                 .map(|(k, list)| (k, list.floors))
                 .collect(),
         ),
+        cinema_picks: cinema_priced.then(|| cinema_pick_sum / f64::from(cinemas)),
         units_by_floor: tower.floor_rooms(),
         metro_stations,
     }
