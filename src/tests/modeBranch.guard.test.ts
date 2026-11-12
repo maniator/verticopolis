@@ -63,17 +63,32 @@ function isCommentLine(trimmed: string): boolean {
   return trimmed.startsWith("//") || trimmed.startsWith("*") || trimmed.startsWith("/*");
 }
 
-/** Direct mode checks in one Rust file's production code: comment lines are
- *  skipped, and counting stops at the first `#[cfg(test)]`. */
+/** Direct mode checks in one Rust file's production code. Comment lines are
+ *  skipped, and counting stops at an inline `#[cfg(test)] mod name {`, which
+ *  closes the file by convention. A `#[cfg(test)]` on any other item (a
+ *  test-only helper method, a `mod name;` declaration) does not stop the
+ *  count, so production code after it is still read. */
 function rustModeChecks(text: string): number {
+  const lines = text.split("\n");
   let n = 0;
-  for (const line of text.split("\n")) {
-    const trimmed = line.trim();
-    if (trimmed.startsWith("#[cfg(test)]")) break;
+  for (let i = 0; i < lines.length; i++) {
+    const trimmed = lines[i].trim();
+    if (trimmed.startsWith("#[cfg(test)]") && opensInlineModule(lines, i + 1)) break;
     if (isCommentLine(trimmed)) continue;
-    n += countIn(line, RUST_CHECKS);
+    n += countIn(lines[i], RUST_CHECKS);
   }
   return n;
+}
+
+/** Whether the item starting at `from` (past blank lines and attributes) is
+ *  an inline module, `mod name {`. */
+function opensInlineModule(lines: readonly string[], from: number): boolean {
+  for (let i = from; i < lines.length; i++) {
+    const trimmed = lines[i].trim();
+    if (trimmed.length === 0 || trimmed.startsWith("#[")) continue;
+    return /^(?:pub(?:\([^)]*\))?\s+)?mod\s+\w+\s*\{/.test(trimmed);
+  }
+  return false;
 }
 
 /** Direct mode checks in one TypeScript file, comment lines skipped. */
@@ -86,10 +101,13 @@ function tsModeChecks(text: string): number {
   return n;
 }
 
-function scan(): Map<string, number> {
+function scan(): { counts: Map<string, number>; scanned: { rust: number; ts: number } } {
   const counts = new Map<string, number>();
+  const scanned = { rust: 0, ts: 0 };
   const add = (abs: string, count: (text: string) => number): void => {
     const rel = repoRel(abs);
+    if (rel.endsWith(".rs")) scanned.rust++;
+    else scanned.ts++;
     const n = count(readFileSync(abs, "utf8"));
     if (n > 0) counts.set(rel, n);
   };
@@ -102,7 +120,7 @@ function scan(): Map<string, number> {
     if (TS_SKIPPED.some((re) => re.test(repoRel(abs)))) continue;
     add(abs, tsModeChecks);
   }
-  return counts;
+  return { counts, scanned };
 }
 
 /** `modeBranch.ratchet.txt`: `<path> <count>` per line; `#` starts a comment. */
@@ -126,6 +144,8 @@ describe("mode-branch guard", () => {
     expect(rustModeChecks("/// let sim = Simulation::new_game(1, GameMode::Classic);")).toBe(0);
     expect(rustModeChecks("if self.mode.room_is_permanent(kind) {")).toBe(0);
     expect(rustModeChecks("fn a() {}\n#[cfg(test)]\nmod t { const M: GameMode = GameMode::Modern; }")).toBe(0);
+    expect(rustModeChecks("#[cfg(test)]\nfn helper() {}\nfn b(modern: bool) {}")).toBe(1);
+    expect(rustModeChecks("#[cfg(test)]\nmod tests;\nfn b(modern: bool) {}")).toBe(1);
     expect(tsModeChecks('const isModern = mode === "modern";')).toBe(2);
     expect(tsModeChecks('if ("classic" !== mode) return;')).toBe(1);
     expect(tsModeChecks('  case "modern":')).toBe(1);
@@ -133,12 +153,14 @@ describe("mode-branch guard", () => {
     expect(tsModeChecks("if (catalog.rules.schedulesAssist) {")).toBe(0);
   });
 
-  const counts = scan();
+  const { counts, scanned } = scan();
   const ratchet = readRatchet();
 
-  it("finds the checks the ratchet lists, so a broken scan cannot pass", () => {
-    expect(counts.size).toBeGreaterThan(0);
-    expect([...counts.keys()].some((rel) => rel.endsWith(".rs"))).toBe(true);
+  it("reads the engine and the web sources, so a broken scan cannot pass", () => {
+    // The engine and the app each hold hundreds of production files; a walk
+    // that silently found none would pass the ratchet forever.
+    expect(scanned.rust).toBeGreaterThan(100);
+    expect(scanned.ts).toBeGreaterThan(100);
   });
 
   it("each file holds exactly the mode checks its ratchet entry allows", () => {

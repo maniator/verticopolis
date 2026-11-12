@@ -15,11 +15,15 @@ engine-rs/src/rent.rs 2
 
 # Per-mode data and save handling.
 engine-rs/src/catalog/json.rs 2  # picks each mode's catalog document
+engine-rs/src/economy/tickets.rs 2  # GameMode::ticket_prices, a rule outside rules.rs (moves with #1976)
 engine-rs/src/economy.rs 4  # per-mode traffic income and weekend multiplier tables
 engine-rs/src/identity.rs 2  # publishes both modes' catalog digests
 engine-rs/src/load/assemble.rs 4  # default mode (1), Classic rent snap on load (2), Modern film-tier migration (1)
+engine-rs/src/load/coerce.rs 2  # saved ticket price read by the save's mode
 engine-rs/src/load/reader.rs 3  # TDT path is Classic-only (1), unit fields read by mode (2)
+engine-rs/src/load_stream.rs 2  # unit fields read by the save's mode
 engine-rs/src/tower.rs 1  # Tower::new's default mode
+engine-rs/src/view/structure.rs 2  # the frame layout's mode code
 
 # Web: labels, the mode-name type guard and save normalization, plus two rule
 # decisions to move into the catalog (reports/uiDialogs: the 1994 export;
