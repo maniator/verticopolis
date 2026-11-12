@@ -16,9 +16,10 @@ import { SHORT_NOTES } from "../../pwaUpdateInfo";
  * auto-escaped by lit; the notes list uses nested `html` sub-templates, never
  * string interpolation. The `data-act` attributes are kept for structural parity
  * and as stable test selectors; dispatch is via `@click`. Later carries
- * `autofocus` so the dialog opens on it, as it did before the skipped-versions
- * log (#1897) became the first focusable element: opening the prompt never
- * lands focus inside the notes.
+ * `autofocus` so the dialog opens on it, as it did before the scrolling notes
+ * log (skipped versions, #1897, or a release with more than three notes)
+ * became the first focusable element: opening the prompt never lands focus
+ * inside the notes.
  */
 
 /** The two actions the update prompt dispatches, bound inline in the template. */

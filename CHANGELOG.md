@@ -8,9 +8,11 @@ that section plus the sections below it (ten with notes in all) into `releases`
 each version newer than the one they ran, newest first, and never a version's
 notes twice. Only genuinely player-noticeable changes
 earn a line. Internal, tooling, perf, and refactor work gets none, and that build
-simply shows the build-id line. At most three lines are shown; keep to the few
-that matter, written as a player outcome in a calm voice (see CONTRIBUTING.md
-"Player notes" for the house style).
+simply shows the build-id line. The prompt shows every line whole: up to three
+as a plain list, more in a log that scrolls in place, up to 40 lines of up to
+1,000 characters each (`MAX_NOTES` and `MAX_NOTE_LEN` in `src/pwaUpdateInfo.ts`).
+Keep to the lines that matter, written as a player outcome in a calm voice (see
+CONTRIBUTING.md "Player notes" for the house style).
 
 What goes where: this file is for players, one section per app version. The
 engine crate has its own file, [`engine-rs/CHANGELOG.md`](./engine-rs/CHANGELOG.md),
@@ -552,9 +554,9 @@ are documentation only: no build that a client fetches carries them.
 - Modern towers can now rent homes as well as sell them. The Studio is cheap and easygoing; the Apartment pays more but minds noise, a long walk, and a high rent. An empty rental earns nothing.
 - A rental that will not fill now tells you why: hover it and the card names the cause, and an unhappy tenant gets that warning before they give notice, in time to fix it.
 - Building before 2.0? Your tower now wears a small gold "Ground floor" badge on the title screen, and you get a one-time welcome when you come back. Recognition, no catch.
-<!-- The update prompt shows at most MAX_NOTES (3) lines and parseUpdateInfo TRUNCATES
-     silently rather than failing, so a fourth note here is DELIBERATE and ships as
-     documentation only. Keep the three player-facing gameplay lines above in the
+<!-- When 2.0.0 shipped, the update prompt showed at most three lines (MAX_NOTES
+     was 3 until 3.2.0) and parseUpdateInfo truncated silently rather than failing,
+     so a fourth note here was DELIBERATE and shipped as documentation only. Keep the three player-facing gameplay lines above in the
      prompt; the privacy disclosure is live in Help itself and is linked from the
      release announcement. Do not "fix" the count by condensing the lines above:
      that was tried in 2.0.0 and inverted the Apartment's value proposition. -->
