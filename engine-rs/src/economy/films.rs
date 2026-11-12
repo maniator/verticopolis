@@ -57,7 +57,7 @@ impl FilmTier {
     pub const ALL: [FilmTier; 3] = [FilmTier::New, FilmTier::Classic, FilmTier::Blockbuster];
 
     /// The tier's key in the catalog and the port.
-    pub fn key(self) -> &'static str {
+    pub const fn key(self) -> &'static str {
         match self {
             FilmTier::New => "new",
             FilmTier::Classic => "classic",
