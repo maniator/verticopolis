@@ -123,7 +123,7 @@ function positionPerson(engine: TowerEngine, p: PersonView, rec: { actor: ex.Act
   // service cab rounds to zero on the cab's load indicator, and watching
   // them ride to the room floor is the whole point of the mechanic.
   const hidden = p.state === "riding" && !p.staff;
-  if (rec.actor.graphics.visible !== !hidden) rec.actor.graphics.visible = !hidden;
+  if (rec.actor.graphics.isVisible !== !hidden) rec.actor.graphics.isVisible = !hidden;
   if (hidden) return;
   // Use the continuous floor (fy) so a stair/escalator climber animates
   // smoothly between floors; for every other state fy equals the floor.
@@ -234,7 +234,7 @@ export function syncMotion(engine: TowerEngine): void {
       z: Z.vehicle,
     });
     a.graphics.use(cv);
-    a.graphics.visible = false;
+    a.graphics.isVisible = false;
     engine.engine.add(a);
     engine.truckActors.push({ actor: a, u, w });
   }
@@ -262,7 +262,7 @@ export function syncMotion(engine: TowerEngine): void {
     const cv = new ex.Canvas({ width: 16, height: 8, cache: true, draw: (ctx) => drawStreetCar(ctx, seed) });
     const a = new ex.Actor({ pos: ex.vec(x0w, engine.worldYTop(floor) + FLOOR - 10), width: 16, height: 8, anchor: ex.vec(0, 0), z: Z.streetCar });
     a.graphics.use(cv);
-    a.graphics.visible = false;
+    a.graphics.isVisible = false;
     engine.engine.add(a);
     engine.garageCars.push({ actor: a, floor, x0w, x1w, seed });
   }
@@ -411,7 +411,7 @@ export function updateMotion(engine: TowerEngine, elapsedMs = 1000 / 60): void {
     // No collection at a center that isn't running (under construction, on
     // fire, or a gutted shell), a non-operational plant processes no waste.
     const show = truckHour && isOperational(tk.u);
-    if (tk.actor.graphics.visible !== show) tk.actor.graphics.visible = show;
+    if (tk.actor.graphics.isVisible !== show) tk.actor.graphics.isVisible = show;
     if (!show) continue;
     const p = (clock.minuteOfDay - garbageCollectHour * 60) / 60; // 0..1 through the hour
     const base = engine.worldX(tk.u.x);
@@ -428,7 +428,7 @@ export function updateMotion(engine: TowerEngine, elapsedMs = 1000 / 60): void {
   // this frame-path never runs the parking flood-fill itself.
   const rushing = (clock.isMorning() || clock.isEvening()) && engine.displayParkingUse > 0;
   for (const g of engine.garageCars) {
-    if (g.actor.graphics.visible !== rushing) g.actor.graphics.visible = rushing;
+    if (g.actor.graphics.isVisible !== rushing) g.actor.graphics.isVisible = rushing;
     if (!rushing) continue;
     let p = (Math.abs(g.seed) % 100) / 100 + anim * 0.05;
     p -= Math.floor(p);
@@ -451,7 +451,7 @@ export function updateMotion(engine: TowerEngine, elapsedMs = 1000 / 60): void {
     // occupants, and stranded tenants are real people who are genuinely there
     // (a floor can lose its access and keep its leases until they churn out).
     const visible = w.rank <= threshold && (w.perFloor || walkerReachable(engine, w));
-    if (w.actor.graphics.visible !== visible) w.actor.graphics.visible = visible;
+    if (w.actor.graphics.isVisible !== visible) w.actor.graphics.isVisible = visible;
     if (!visible) continue;
     let p = w.phase + (w.dir > 0 ? 0 : 0.5) + anim * w.speed * 0.03;
     p -= Math.floor(p);

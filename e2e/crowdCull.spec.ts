@@ -45,9 +45,9 @@ test("zoom cull hides the moving layer, restores it, and survives a rebuild", as
     const e = (window as any).game.engine;
     return {
       culled: e.crowdCulled,
-      carsShown: e.carActors.filter((c: any) => c.actor.graphics.visible).length,
+      carsShown: e.carActors.filter((c: any) => c.actor.graphics.isVisible).length,
       walkers: e.walkers.length,
-      crowdShown: [...e.crowdActors.values()].filter((r: any) => r.actor.graphics.visible).length,
+      crowdShown: [...e.crowdActors.values()].filter((r: any) => r.actor.graphics.isVisible).length,
     };
   });
   expect(visibleBefore.culled).toBe(false);
@@ -62,12 +62,12 @@ test("zoom cull hides the moving layer, restores it, and survives a rebuild", as
   await page.waitForTimeout(300);
   const culled = await page.evaluate(() => {
     const e = (window as any).game.engine;
-    const hidden = (arr: any[]) => arr.every((x: any) => !x.actor.graphics.visible);
+    const hidden = (arr: any[]) => arr.every((x: any) => !x.actor.graphics.isVisible);
     return {
       culled: e.crowdCulled,
       cars: hidden(e.carActors),
       walkers: hidden(e.walkers),
-      crowd: [...e.crowdActors.values()].every((r: any) => !r.actor.graphics.visible),
+      crowd: [...e.crowdActors.values()].every((r: any) => !r.actor.graphics.isVisible),
     };
   });
   expect(culled).toEqual({ culled: true, cars: true, walkers: true, crowd: true });
@@ -90,8 +90,8 @@ test("zoom cull hides the moving layer, restores it, and survives a rebuild", as
     return {
       culled: e.crowdCulled,
       rebuilt: e.carActors.length > 0 && e.carActors.every((c: any) => !c.preRebuild),
-      anyCarShown: e.carActors.some((c: any) => c.actor.graphics.visible),
-      anyWalkerShown: e.walkers.some((w: any) => w.actor.graphics.visible),
+      anyCarShown: e.carActors.some((c: any) => c.actor.graphics.isVisible),
+      anyWalkerShown: e.walkers.some((w: any) => w.actor.graphics.isVisible),
     };
   });
   expect(afterRebuild.culled).toBe(true);
@@ -106,10 +106,10 @@ test("zoom cull hides the moving layer, restores it, and survives a rebuild", as
     const e = (window as any).game.engine;
     return {
       culled: e.crowdCulled,
-      carsShown: e.carActors.filter((c: any) => c.actor.graphics.visible).length,
+      carsShown: e.carActors.filter((c: any) => c.actor.graphics.isVisible).length,
       // Re-show leaves the people map to reconcileCrowd (stale-corpse guard),
       // so this proves the live walkers really came back through that path.
-      crowdShown: [...e.crowdActors.values()].filter((r: any) => r.actor.graphics.visible).length,
+      crowdShown: [...e.crowdActors.values()].filter((r: any) => r.actor.graphics.isVisible).length,
     };
   });
   expect(restored.culled).toBe(false);

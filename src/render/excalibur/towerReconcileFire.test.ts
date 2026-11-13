@@ -20,7 +20,7 @@ vi.mock("excalibur", async (importOriginal) => {
   }
   class FakeActor {
     readonly graphics = { use: vi.fn() };
-    readonly collider = { set: vi.fn() };
+    readonly collider = { use: vi.fn() };
     kill = vi.fn();
   }
   return { ...real, Canvas: FakeCanvas, Actor: FakeActor };

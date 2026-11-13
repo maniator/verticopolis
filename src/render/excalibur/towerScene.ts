@@ -474,15 +474,15 @@ export function rendersWithWebGL(engine: TowerEngine): boolean {
  *  TowerEngine can be constructed cleanly. Safe on a lost context (GL calls
  *  on one are no-ops per spec). */
 export function dispose(engine: TowerEngine): void {
-  // Engine.dispose()'s internal stop() is guarded by clock.isRunning(),
+  // Engine.dispose()'s internal stop() is guarded by clock.isRunning,
   // and on the recovery path the context-loss handler has already stopped
   // the clock, so that stop() would skip the texture GC and the browser
   // teardown: the GC's requestIdleCallback loop would respawn forever and
   // the per-engine window/document listeners (resize, visibilitychange)
   // would keep the dead engine graph reachable for the page's life. Run
   // both explicitly; each is idempotent, so the path where dispose()'s own
-  // stop() also runs them stays correct. The GC handle is private in
-  // Excalibur 0.32, hence the cast; if a future version renames it the
+  // stop() also runs them stays correct. The GC handle is private (still
+  // in Excalibur 1.0), hence the cast; if a future version renames it the
   // optional chain degrades to the old leak instead of a crash.
   (engine.engine as unknown as { _garbageCollector?: { stop(): void } })._garbageCollector?.stop();
   engine.engine.browser.clear();

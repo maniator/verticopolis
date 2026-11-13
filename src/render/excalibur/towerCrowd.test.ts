@@ -115,8 +115,8 @@ describe("reconcileCrowd draws one actor per live person", () => {
       ] } },
     });
     reconcileCrowd(e);
-    expect(e.crowdActors.get(1).actor.graphics.visible).toBe(false);
-    expect(e.crowdActors.get(2).actor.graphics.visible).toBe(true);
+    expect(e.crowdActors.get(1).actor.graphics.isVisible).toBe(false);
+    expect(e.crowdActors.get(2).actor.graphics.isVisible).toBe(true);
   });
 
   it("reddens a long-waiting tenant", () => {
@@ -173,7 +173,7 @@ describe("zoom cull skips the per-frame loops (CAP-1's cost mechanism)", () => {
     const e = eng({ carActors: [car], cam: { zoom: 0.06 } });
     updateMotion(e);
     expect(e.crowdCulled).toBe(true);
-    expect(car.actor.graphics.visible).toBe(false);
+    expect(car.actor.graphics.isVisible).toBe(false);
     expect(car.actor.pos.x).toBeCloseTo(0, 6); // untouched: the loop never ran
     expect(car.actor.pos.y).toBeCloseTo(0, 6);
   });
@@ -199,15 +199,15 @@ describe("zoom cull skips the per-frame loops (CAP-1's cost mechanism)", () => {
     e.cam.zoom = 0.06;
     reconcileCrowd(e); // cull: both hidden, reaping suspended
     e.sim.crowd.people = [live]; // person 2 departs while culled
-    expect(goneActor.graphics.visible).toBe(false);
+    expect(goneActor.graphics.isVisible).toBe(false);
 
     e.cam.zoom = 1;
     reconcileCrowd(e); // un-cull: the flip leaves people hidden for this pass
     // The stale actor was reaped without ever being made visible again, and
     // the live person came back through positionPerson in the same pass.
     expect(e.crowdActors.has(2)).toBe(false);
-    expect(goneActor.graphics.visible).toBe(false);
-    expect(e.crowdActors.get(1).actor.graphics.visible).toBe(true);
+    expect(goneActor.graphics.isVisible).toBe(false);
+    expect(e.crowdActors.get(1).actor.graphics.isVisible).toBe(true);
   });
 });
 
@@ -260,31 +260,31 @@ describe("updateMotion repositions the moving actors", () => {
     const truck = { actor: actor(), u: { x: 30, floor: 1, width: 4, state: "occupied" }, w: 44 };
     const e = eng({ truckActors: [truck], sim: { ...eng().sim, clock: { hour: 5, minuteOfDay: 5 * 60 + 20, isMorning: () => false, isEvening: () => false, isNight: () => false } } });
     updateMotion(e);
-    expect(truck.actor.graphics.visible).toBe(true);
+    expect(truck.actor.graphics.isVisible).toBe(true);
 
     // Off-hour: hidden.
     const off = { actor: actor(), u: { x: 30, floor: 1, width: 4, state: "occupied" }, w: 44 };
     updateMotion(eng({ truckActors: [off] }));
-    expect(off.actor.graphics.visible).toBe(false);
+    expect(off.actor.graphics.isVisible).toBe(false);
 
     // Collection hour but a gutted plant processes nothing: hidden.
     const dead = { actor: actor(), u: { x: 30, floor: 1, width: 4, state: "gutted" }, w: 44 };
     updateMotion(eng({ truckActors: [dead], sim: { ...eng().sim, clock: { hour: 5, minuteOfDay: 5 * 60 + 20, isMorning: () => false, isEvening: () => false, isNight: () => false } } }));
-    expect(dead.actor.graphics.visible).toBe(false);
+    expect(dead.actor.graphics.isVisible).toBe(false);
   });
 
   it("cruises garage cars only during a rush with cars parked", () => {
     const car = { actor: actor(), floor: -1, x0w: 100, x1w: 300, seed: 3 };
     const rush = eng({ garageCars: [car], displayParkingUse: 0.5, d: { anim: 2, stress: 0 }, sim: { ...eng().sim, clock: { hour: 8, minuteOfDay: 480, isMorning: () => true, isEvening: () => false, isNight: () => false } } });
     updateMotion(rush);
-    expect(car.actor.graphics.visible).toBe(true);
+    expect(car.actor.graphics.isVisible).toBe(true);
     expect(car.actor.pos.x).toBeGreaterThanOrEqual(100);
     expect(car.actor.pos.x).toBeLessThanOrEqual(300);
 
     // No rush -> hidden.
     const idleCar = { actor: actor(), floor: -1, x0w: 100, x1w: 300, seed: 3 };
     updateMotion(eng({ garageCars: [idleCar], displayParkingUse: 0.5 }));
-    expect(idleCar.actor.graphics.visible).toBe(false);
+    expect(idleCar.actor.graphics.isVisible).toBe(false);
   });
 
   it("gates ambient walkers on busyness and reddens impatient ones under stress", () => {
@@ -313,10 +313,10 @@ describe("updateMotion repositions the moving actors", () => {
       }),
     });
     updateMotion(e);
-    expect(lobbyWalker.actor.graphics.visible).toBe(true);
+    expect(lobbyWalker.actor.graphics.isVisible).toBe(true);
     expect(lobbyWalker.red).toBe(true);
-    expect(hiddenWalker.actor.graphics.visible).toBe(false);
-    expect(floorWalker.actor.graphics.visible).toBe(true); // its floor is lively
+    expect(hiddenWalker.actor.graphics.isVisible).toBe(false);
+    expect(floorWalker.actor.graphics.isVisible).toBe(true); // its floor is lively
     // The per-floor occupancy cache was populated for the busy floor.
     expect(e.floorLive.get(7)).toBeCloseTo(1, 6);
   });
@@ -352,11 +352,11 @@ describe("ambient walkers are gated on reachability (#639)", () => {
       sim: simFixture({ positionReachable: (f: number) => f === 1 }),
     });
     updateMotion(e);
-    expect(mainLobby.actor.graphics.visible).toBe(true);
-    expect(skyLobby.actor.graphics.visible).toBe(false);
+    expect(mainLobby.actor.graphics.isVisible).toBe(true);
+    expect(skyLobby.actor.graphics.isVisible).toBe(false);
     // Climbers carry perFloor: false too, so they are the same bug class: a
     // stair to nowhere must not show anyone walking up it.
-    expect(climber.actor.graphics.visible).toBe(false);
+    expect(climber.actor.graphics.isVisible).toBe(false);
   });
 
   it("shows the sky lobby once it becomes reachable, per floor not globally", () => {
@@ -368,9 +368,9 @@ describe("ambient walkers are gated on reachability (#639)", () => {
       sim: simFixture({ positionReachable: (f: number) => f === 1 || f === 15 }),
     });
     updateMotion(e);
-    expect(skyLobby.actor.graphics.visible).toBe(true);
+    expect(skyLobby.actor.graphics.isVisible).toBe(true);
     // Floor 16 is still cut off, so the gate is per floor and not a global flag.
-    expect(climber.actor.graphics.visible).toBe(false);
+    expect(climber.actor.graphics.isVisible).toBe(false);
   });
 
   it("hides only the stranded run of a gap-split floor (#647 segments)", () => {
@@ -386,8 +386,8 @@ describe("ambient walkers are gated on reachability (#639)", () => {
       sim: simFixture({ positionReachable: (f: number, x: number) => f === 1 || (f === 15 && x < 10) }),
     });
     updateMotion(e);
-    expect(westWing.actor.graphics.visible).toBe(true);
-    expect(strandedEast.actor.graphics.visible).toBe(false);
+    expect(westWing.actor.graphics.isVisible).toBe(true);
+    expect(strandedEast.actor.graphics.isVisible).toBe(false);
   });
 
   it("hides a climber whose flight is cut off at the top (#665)", () => {
@@ -403,9 +403,9 @@ describe("ambient walkers are gated on reachability (#639)", () => {
       sim: simFixture({ positionReachable: (f: number) => f <= 5 }),
     });
     updateMotion(e);
-    expect(cutOffAbove.actor.graphics.visible).toBe(false);
+    expect(cutOffAbove.actor.graphics.isVisible).toBe(false);
     // A flight with both landings reachable still carries its climbers.
-    expect(usable.actor.graphics.visible).toBe(true);
+    expect(usable.actor.graphics.isVisible).toBe(true);
   });
 
   it("hides a climber whose flight is cut off at the bottom", () => {
@@ -421,7 +421,7 @@ describe("ambient walkers are gated on reachability (#639)", () => {
       sim: simFixture({ positionReachable: (f: number) => f >= 6 }),
     });
     updateMotion(e);
-    expect(cutOffBelow.actor.graphics.visible).toBe(false);
+    expect(cutOffBelow.actor.graphics.isVisible).toBe(false);
   });
 
   it("asks the engine once per position per revision, and re-asks after a layout change", () => {
@@ -458,7 +458,7 @@ describe("ambient walkers are gated on reachability (#639)", () => {
       }),
     });
     updateMotion(e);
-    expect(loiterer.actor.graphics.visible).toBe(true);
+    expect(loiterer.actor.graphics.isVisible).toBe(true);
   });
 
   it("still hides a reachable walker whose rank is above the busyness threshold", () => {
@@ -466,7 +466,7 @@ describe("ambient walkers are gated on reachability (#639)", () => {
     const rankedOut = mkWalker({ floor: 15, rank: 5 });
     const e = eng({ walkers: [rankedOut], sim: simFixture() });
     updateMotion(e);
-    expect(rankedOut.actor.graphics.visible).toBe(false);
+    expect(rankedOut.actor.graphics.isVisible).toBe(false);
   });
 });
 
