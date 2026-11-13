@@ -3,6 +3,7 @@ import { html, type TemplateResult } from "lit-html";
 import { catalogFacility } from "../../catalog/catalogTypes";
 import { transportLoadLines } from "../../game/cardLines";
 import type { TransportDetail, UnitDetail } from "../../simport/panels";
+import type { CalendarKind } from "../../shared/engineTypes";
 import type { FacilityKind, GameMode } from "../../shared/types";
 import { catalogFor } from "../../tests/catalogFixture";
 import { stopRows, transportDetail, unitDetail } from "../../tests/fixtures/detailCards";
@@ -37,9 +38,9 @@ const unit = (kind: FacilityKind, over: Partial<UnitDetail> = {}, mode: GameMode
 /** The mobile fold-in's lines for a commuter unit: the engine's access line. */
 const ACCESS_LINES: TemplateResult[] = [html`<div>Access: reachable from the lobby.</div>`];
 
-function unitEditor(u: UnitDetail, opts: { mode?: GameMode; mobile?: boolean; hour?: number; lines?: TemplateResult[] } = {}): TemplateResult {
+function unitEditor(u: UnitDetail, opts: { mode?: GameMode; mobile?: boolean; hour?: number; lines?: TemplateResult[]; calendar?: CalendarKind } = {}): TemplateResult {
   const mobile = opts.mobile ?? false;
-  return unitEditorTemplate(u, catalogFor(opts.mode ?? "classic"), opts.hour ?? MORNING, mobile, mobile ? (opts.lines ?? ACCESS_LINES) : []);
+  return unitEditorTemplate(u, catalogFor(opts.mode ?? "classic"), opts.hour ?? MORNING, mobile, mobile ? (opts.lines ?? ACCESS_LINES) : [], opts.calendar);
 }
 
 function transportEditor(t: TransportDetail, mobile = false): TemplateResult {
@@ -166,6 +167,34 @@ describe("unit editor row and action branches", () => {
     const frag = renderToFragment(unitEditor(unit(kind, {}, "modern"), { mode: "modern" }));
     expect(frag.textContent).toContain("Monthly rent");
     expect(frag.textContent).not.toContain("Quarterly rent");
+  });
+
+  describe("a rent on the tower's calendar (#2107)", () => {
+    const rentCell = (u: UnitDetail, mode: GameMode, calendar?: CalendarKind) =>
+      renderToFragment(unitEditor(u, { mode, calendar })).querySelector('[data-field="rent"]')!.textContent;
+
+    it("Modern on the short 1994 calendar: an office shows what lands each 3-day quarter and the rate it is scaled from", () => {
+      expect(rentCell(unit("office", { price: 10_000 }, "modern"), "modern", "canon")).toBe("$333 (the $10,000 rate scaled to a 3-day quarter)");
+    });
+
+    it("Modern on the real-world calendar and Classic: an office shows its whole rent", () => {
+      expect(rentCell(unit("office", { price: 10_000 }, "modern"), "modern", "realWorld")).toBe("$10,000");
+      expect(rentCell(unit("office", { price: 10_000 }, "modern"), "modern")).toBe("$10,000");
+      expect(rentCell(unit("office", { price: 10_000 }), "classic", "canon")).toBe("$10,000");
+    });
+
+    it("Modern on the short calendar: a rental's monthly rent is scaled to the 3-day month", () => {
+      expect(rentCell(unit("rentalStudio", { price: 2_500 }, "modern"), "modern", "canon")).toBe("$250 (the $2,500 rate scaled to a 3-day month)");
+    });
+
+    it("Modern on the short calendar: a hotel's nightly rate and a condo's price are not scaled", () => {
+      expect(rentCell(unit("hotelSingle", { price: 150 }, "modern"), "modern", "canon")).toBe("$150/night");
+      expect(rentCell(unit("condo", { price: 150_000 }, "modern"), "modern", "canon")).toBe("$150,000");
+    });
+
+    it("No Rate reads the same on every calendar", () => {
+      expect(rentCell(unit("office", { noRate: true }, "modern"), "modern", "canon")).toBe("No Rate");
+    });
   });
 
   it("fast food: open and closed customer readouts", () => {

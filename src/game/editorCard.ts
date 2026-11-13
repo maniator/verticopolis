@@ -39,7 +39,8 @@ export function refreshEditorCard(app: EditorCardApp, freshDiagnostics = true): 
     if (!u) return app.clearSelection();
     app.engine.selectedId = u.id;
     const diag = mobile ? kit.diagnostics.unit(u.id, freshDiagnostics) : [];
-    app.ui.renderEditor(unitEditorTemplate(u, kit.catalog(), clockOf(app.reader.header).hour, mobile, diag));
+    const header = app.reader.header;
+    app.ui.renderEditor(unitEditorTemplate(u, kit.catalog(), clockOf(header).hour, mobile, diag, header.modernCalendar));
   } else {
     const t = kit.cards.shaft(sel.id);
     if (!t) return app.clearSelection();

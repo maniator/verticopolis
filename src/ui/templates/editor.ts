@@ -2,9 +2,10 @@ import { html, nothing, type TemplateResult } from "lit-html";
 import { keyed } from "lit-html/directives/keyed.js";
 import { isOperational, isTenanted } from "../../shared/unitState";
 import { isCommercialKind, isHotelKind } from "../../presentation/viewKinds";
-import { catalogFacility, catalogFilmRebook, catalogTicketPrice, filmEditAction, filmPolicyEditAction, catalogHouseholdPrice, catalogOpenAt, catalogResidents, rungFor, type Catalog } from "../../catalog/catalogTypes";
+import { catalogFacility, catalogFilmRebook, catalogTicketPrice, filmEditAction, filmPolicyEditAction, catalogHouseholdPrice, catalogOpenAt, catalogResidents, rungFor, type Catalog, type CatalogCalendar, type CatalogRentCadence } from "../../catalog/catalogTypes";
 import type { ScreenDetail, TransportDetail, UnitDetail } from "../../simport/panels";
-import { priceOptionsFor } from "../catalogPricing";
+import { catalogCalendar, priceOptionsFor, rentPerCollection } from "../catalogPricing";
+import type { CalendarKind } from "../../shared/engineTypes";
 import { hasAccessDiagnostic } from "../../game/cardLines";
 import { rungPickerTemplate, type RungChoice } from "./rungPicker";
 import { floorTag, groupDigits } from "../format";
@@ -65,12 +66,27 @@ const editorShell = (
 ): TemplateResult =>
   html`${keyed(key, html`${titleBar(name)}<div class="ed-stats kv">${rows}</div>${diagnostics}${actions}`)}`;
 
+/** A quarterly or monthly rent as one collection pays it on the tower's
+ *  calendar (#2107). Where the calendar scales the rent (Modern on the short
+ *  1994 calendar), the card leads with what lands each collection and names
+ *  the rate the price controls set, so a $10,000 office reads "$333" rather
+ *  than a figure it never pays. */
+function rentLine(cadence: CatalogRentCadence, price: number, calendar: CatalogCalendar): string {
+  const paid = rentPerCollection(cadence, price, calendar);
+  if (paid === price) return `$${groupDigits(price)}`;
+  const period = cadence === "quarterly" ? `${calendar.quarterDays}-day quarter` : `${calendar.maintenancePeriodDays}-day month`;
+  return `$${groupDigits(paid)} (the $${groupDigits(price)} rate scaled to a ${period})`;
+}
+
+/** The unit editor card. `calendar` is the calendar the tower chose (the
+ *  view header's `modernCalendar`); left out, the mode's default calendar. */
 export function unitEditorTemplate(
   u: UnitDetail,
   catalog: Catalog,
   hour: number,
   mobile = false,
   diag: TemplateResult[] = [],
+  calendar?: CalendarKind,
 ): TemplateResult {
   const f = catalogFacility(catalog, u.kind);
   const floorLabel = u.floor >= 1 ? `Floor ${u.floor}` : `Basement ${1 - u.floor}`;
@@ -128,9 +144,10 @@ export function unitEditorTemplate(
     // the base asking. householdPrice falls back to the base when there's no
     // household, so Classic and unsold condos are unchanged. "No Rate" reads
     // where the price normally shows for a unit taken off the market.
-    const rent = u.noRate
-      ? "No Rate"
-      : `$${groupDigits(u.kind === "condo" ? catalogHouseholdPrice(catalog, u.price, u.residents) : u.price)}${isHotelKind(u.kind) ? "/night" : ""}`;
+    let rent = "No Rate";
+    if (!u.noRate && u.kind === "condo") rent = `$${groupDigits(catalogHouseholdPrice(catalog, u.price, u.residents))}`;
+    else if (!u.noRate && isHotelKind(u.kind)) rent = `$${groupDigits(u.price)}/night`;
+    else if (!u.noRate) rent = rentLine(rcfg.cadence, u.price, catalogCalendar(catalog, calendar));
     rows.push(kv(label, rent, "rent"));
   }
   // A theater shows a film on each screen, and the player pays to show
