@@ -8,6 +8,15 @@ import type { Catalog } from "../catalog/catalogTypes";
 import type { GameMode } from "../shared/types";
 import type { UI } from "./UI";
 import { useGermanDefaultLocale } from "../tests/localeStub";
+import { refitPalette } from "./paletteFit";
+
+// The lock scan asks the Tools window to refit when it shows or hides a tool.
+// The fit itself reads layout, which jsdom does not have; paletteFit.test.ts
+// covers it. Here a spy records the calls.
+vi.mock("./paletteFit", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./paletteFit")>()),
+  refitPalette: vi.fn(),
+}));
 
 /**
  * Toast-rail timer lifecycle. `toast()` only touches `ui.el.toast`, so a bare
@@ -328,6 +337,29 @@ describe("the palette's lock scan", () => {
     swap(withoutOffice);
     expect(node("office")).toBe(office);
     expect(locked("office")).toBe(true);
+  });
+
+  it("refits the Tools window when a tool is shown or hidden, and not when only affordability moves", () => {
+    const refit = vi.mocked(refitPalette);
+    const win = document.createElement("aside");
+    win.id = "palette";
+    const { ui, node } = lockScan("modern");
+    win.append(node("office")!.parentElement!);
+    const pump = (star: number, money: number) => update(ui, source({ mode: "modern", star, money }).src);
+    refit.mockClear();
+    // Five stars to one: the Food Hall (three stars) is hidden.
+    pump(1, 1e9);
+    expect(node("foodHall")!.classList.contains("locked")).toBe(true);
+    expect(refit).toHaveBeenCalledTimes(1);
+    expect(refit).toHaveBeenLastCalledWith(win);
+    // Broke: the scan reruns and dims the office, but nothing is shown or hidden.
+    pump(1, 0);
+    expect(node("office")!.classList.contains("unaffordable")).toBe(true);
+    expect(refit).toHaveBeenCalledTimes(1);
+    // Back to five stars: the Food Hall shows again.
+    pump(5, 0);
+    expect(node("foodHall")!.classList.contains("locked")).toBe(false);
+    expect(refit).toHaveBeenCalledTimes(2);
   });
 
   it("drops a build tool whose kind a new catalog withholds", () => {

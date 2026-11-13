@@ -3,6 +3,7 @@ import type { EnginePort } from "../simport/enginePort";
 import { splashTemplate, type SplashHandlers } from "./splashTemplate";
 import { isDialogOpen, isEngineStopped } from "../game/interactionState";
 import { iconElement } from "./icons";
+import { openFoldedPaletteAround } from "./paletteCollapse";
 
 /**
  * First-run experience — splash/title screen + a non-blocking "Getting Started"
@@ -458,7 +459,7 @@ export class OnboardingController {
       if (this.opts.mq.matches) {
         const group = n.closest<HTMLElement>(".pal-group")?.dataset.group;
         if (group) document.querySelector<HTMLElement>(`.pal-tab[data-group="${group}"]`)?.click();
-      }
+      } else openFoldedPaletteAround(n);
       n.classList.add("tt-pulse");
     });
   }

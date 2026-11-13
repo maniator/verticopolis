@@ -9,7 +9,8 @@ import type { UI } from "./UI";
 import { render } from "lit-html";
 import { appendMessageWithIcons } from "./icons";
 import { groupDigits } from "./format";
-import { relabelPalette, syncPaletteTabs } from "./uiPalette";
+import { paletteWindow, relabelPalette, syncPaletteTabs } from "./uiPalette";
+import { refitPalette } from "./paletteFit";
 import { toolInfoFor } from "./templates/toolInfo";
 import { towerStatsTemplate, type TowerStatsSnapshot } from "./templates/towerStats";
 import { bindViewWorld } from "../presentation/viewWorld";
@@ -131,10 +132,12 @@ export function update(ui: UI, src: HudSource): void {
     // (`.locked` -> display:none, out of layout and tab order), not shown dimmed ,
     // the palette grows as stars are earned. Only affordability dims
     // (`.unaffordable`); an unlocked-but-unaffordable tool stays visible.
+    let shownToolsChanged = false;
     ui.el.palette.querySelectorAll<HTMLElement>(".pal-item[data-kind]").forEach((item) => {
       const kind = item.dataset.kind as FacilityKind;
       const locked = !unlocked(catalog, kind, star);
       const affordable = money >= catalogFacility(catalog, kind).cost;
+      if (item.classList.contains("locked") !== locked) shownToolsChanged = true;
       item.classList.toggle("locked", locked);
       item.classList.toggle("unaffordable", !locked && !affordable);
     });
@@ -144,6 +147,10 @@ export function update(ui: UI, src: HudSource): void {
     // unlocks, pips a tab whose tools just grew, and keeps a valid mobile tab
     // selected.
     syncPaletteTabs(ui);
+    // A tool shown or hidden changes the Tools window's height: refit it so a
+    // desktop window shows every tool without scrolling (paletteFit). A change
+    // in affordability alone only dims a row, so it reads no layout.
+    if (shownToolsChanged) refitPalette(paletteWindow(ui));
     // If the active build tool just became locked, loading, founding, or undoing
     // into a lower-star tower while a higher-star tool was selected, its palette
     // button is now hidden, leaving no visible active tool while canvas clicks
