@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import { ENGAGED_BY } from "./analyticsEngagement";
+import { TRAP_KINDS } from "./wasmhost/hostFault";
 import { ENGINE_STATUS_REASONS, ENGINE_BUILDS, ENGINE_KINDS, ENGINE_STATUS_FIELDS, ENGINE_STATUS_TRIGGERS, MAX_ENGINE_STATUS_ROWS } from "./analyticsEngineStatus";
 import { FALLBACK_STAGES } from "./wasmhost/engineBoot";
 import { MAX_BODY_BYTES, RATE_LIMIT_MAX } from "./analyticsIngest";
@@ -130,6 +131,7 @@ describe("analytics data map", () => {
       fallback_reason: ENGINE_STATUS_REASONS,
       fallback_stage: FALLBACK_STAGES,
       engaged_by: ENGAGED_BY,
+      trap_kind: TRAP_KINDS,
     };
     for (const [field, list] of Object.entries(codes)) {
       // The Values cell only: the Meaning cell names codes of other fields.
