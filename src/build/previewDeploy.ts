@@ -41,6 +41,13 @@ export function isPreviewDeploy(env: Readonly<Record<string, string | undefined>
   return env.VERCEL_ENV === VERCEL_PREVIEW_ENV;
 }
 
+/** The first words of {@link RETIRING_SERVICE_WORKER}, which no production
+ *  worker carries: the deploy check looks for them (productionWorkerProblem). */
+export const RETIRING_WORKER_MARKER = "Verticopolis preview deployment";
+
+/** The call Workbox's generated worker makes to precache the build. */
+export const PRECACHE_CALL = "precacheAndRoute(";
+
 /**
  * The `sw.js` a preview ships. It has no fetch handler, so it never serves a
  * request. On install it skips waiting; on activate it deletes Workbox's
@@ -53,7 +60,7 @@ export function isPreviewDeploy(env: Readonly<Record<string, string | undefined>
  * first means that navigation reaches the network instead of a worker. A
  * Cache Storage failure never stops the unregister or the reload.
  */
-export const RETIRING_SERVICE_WORKER = `// Verticopolis preview deployment: no service worker (src/build/previewDeploy.ts).
+export const RETIRING_SERVICE_WORKER = `// ${RETIRING_WORKER_MARKER}: no service worker (src/build/previewDeploy.ts).
 self.addEventListener("install", () => {
   self.skipWaiting();
 });
@@ -69,3 +76,46 @@ self.addEventListener("activate", (event) => {
   );
 });
 `;
+
+/** The file system calls {@link applyPreviewWorker} makes, so a test can stand in for them. */
+export interface WorkerFiles {
+  exists(path: string): boolean;
+  write(path: string, text: string): void;
+}
+
+/** What {@link applyPreviewWorker} did: the exit code for its script and the line to print. */
+export interface WorkerOutcome {
+  code: 0 | 1;
+  message: string;
+}
+
+/**
+ * scripts/preview-service-worker.ts: on a preview build, replace the built
+ * worker at `swPath` with {@link RETIRING_SERVICE_WORKER}; on any other build,
+ * leave it. A missing worker on a preview fails, since writing ours where the
+ * host does not serve it would hide that the build output moved.
+ */
+export function applyPreviewWorker(env: Readonly<Record<string, string | undefined>>, swPath: string, files: WorkerFiles): WorkerOutcome {
+  if (!isPreviewDeploy(env)) {
+    return { code: 0, message: "preview-service-worker: not a preview deployment; dist/sw.js stays the production worker" };
+  }
+  if (!files.exists(swPath)) {
+    return { code: 1, message: `preview-service-worker: ${swPath} does not exist; did the build output move?` };
+  }
+  files.write(swPath, RETIRING_SERVICE_WORKER);
+  return { code: 0, message: "preview-service-worker: preview deployment; dist/sw.js now unregisters itself and clears the precache" };
+}
+
+/**
+ * Why a production build's `sw.js` is not the precaching worker, or null when
+ * it is. `sw` is the file's text, or null when the file is missing. The
+ * production deploy (.github/workflows/deploy-production.yml, through
+ * scripts/check-production-worker.ts) runs this on the build it is about to
+ * ship, so a preview's retiring worker can never reach players.
+ */
+export function productionWorkerProblem(sw: string | null): string | null {
+  if (sw === null) return "dist/sw.js is missing, so production would ship no service worker";
+  if (sw.includes(RETIRING_WORKER_MARKER)) return "dist/sw.js is the preview deployment's retiring worker, which would unregister every player's worker";
+  if (!sw.includes(PRECACHE_CALL)) return `dist/sw.js has no Workbox ${PRECACHE_CALL}...) call, so production would precache nothing`;
+  return null;
+}

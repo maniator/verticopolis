@@ -1,7 +1,7 @@
 // The player help site at verticopolis.com/help: the player's manual, written
-// in src/content/docs/. The game shows two of its pages itself, the Classic and
-// Modern summary when you found a tower and the privacy note in About
-// (src/build/helpMarkdown.ts compiles them), so the two never disagree. The look is the
+// in src/content/docs/. The game shows one of its pages itself, the Classic and
+// Modern summary when you found a tower (src/ui/templates/compare.ts, compiled by
+// src/build/helpMarkdown.ts), so the two never disagree. The look is the
 // engine docs site's Windows 3.1 theme over the game's retro-tokens.css, with a
 // few help-only rules in src/styles/help.css.
 //

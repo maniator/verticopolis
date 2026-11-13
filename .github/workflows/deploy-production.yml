@@ -202,6 +202,12 @@ jobs:
       - name: Build
         run: vercel build --prod
 
+      # A preview build swaps dist/sw.js for a worker that unregisters itself
+      # (src/build/previewDeploy.ts). Production must ship Workbox's
+      # precaching worker, so stop here if the build carries anything else.
+      - name: Check the build ships the precaching service worker
+        run: node scripts/check-production-worker.ts dist/sw.js
+
       # One SHA-256 line per file of the static build (dist/, the engine
       # package included). The last step checks production serves exactly
       # these bytes, and the archive job publishes the list with the release,

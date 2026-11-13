@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 import { HELP_BASE, OLD_ANCHORS, cardAlt, cardFile, cardUrl, helpPageDetail, landingAction, oldAnchorRedirects, pageJsonLd, sharedHead, sidebar, type SidebarEntry } from "../../help-site/site.mjs";
 import { catalogFor } from "./catalogFixture";
 import { HELP_PAGES_DIR } from "../build/helpMarkdown";
+import { CARD_MANIFEST, REGENERATE, cardManifest, helpPages, staleCards, type CardManifest, type HelpCardPage } from "../../scripts/help-card-pages.mjs";
 
 const pagesDir = resolve(__dirname, "../..", HELP_PAGES_DIR);
 
@@ -161,6 +162,59 @@ describe("search and sharing", () => {
     const cards = new Set(readdirSync(cardsDir));
     for (const slug of slugs) expect(cards.has(cardFile(slug)), `no card for ${slug || "the front page"}: run scripts/gen-help-cards.mjs`).toBe(true);
     expect([...cards].sort()).toEqual(slugs.map(cardFile).sort());
+  });
+
+  describe("each card still shows its page's title and description", () => {
+    const recorded = (): CardManifest => JSON.parse(readFileSync(CARD_MANIFEST, "utf8")) as CardManifest;
+    const page = (pages: HelpCardPage[], slug: string): HelpCardPage => pages.find((p) => p.slug === slug)!;
+
+    it("matches the record of what every card was drawn from", async () => {
+      const stale = staleCards(await helpPages(), recorded());
+      expect(stale, `stale share cards; redraw them with ${REGENERATE} <slug> in the pinned Playwright image`).toEqual([]);
+    });
+
+    it("records exactly the cards on disk, the front page, a section's index page and the release notes included", async () => {
+      const cardsDir = resolve(__dirname, "../../help-site/public/cards");
+      const manifest = recorded();
+      expect(Object.keys(manifest).sort()).toEqual(readdirSync(cardsDir).sort());
+      const pages = await helpPages();
+      expect(manifest["index.png"]?.title).toBe(page(pages, "").title);
+      expect(manifest["rooms.png"]?.title).toBe(page(pages, "rooms").title);
+      expect(manifest["changelog.png"]?.description).toBe(page(pages, "changelog").description);
+      // The help site has no 404 page of its own (disable404Route), so no card for one.
+      expect(manifest["404.png"]).toBeUndefined();
+    });
+
+    it("fails on a changed title or description, naming the card and the command that redraws it", async () => {
+      const pages = await helpPages();
+      const manifest = recorded();
+      const was = manifest["rooms-venues.png"].title;
+      const renamed = pages.map((p) => (p.slug === "rooms/venues" ? { ...p, title: `${p.title} and more` } : p));
+      expect(staleCards(renamed, manifest)).toEqual([
+        `rooms-venues.png: the card says "${was}" but the page's title is now "${was} and more"; run ${REGENERATE} rooms/venues in the pinned Playwright image`,
+      ]);
+      const reworded = pages.map((p) => (p.slug === "" ? { ...p, description: `${p.description}!` } : p));
+      expect(staleCards(reworded, manifest)).toEqual([
+        `index.png: the card's description is not the page's current one; run ${REGENERATE} "" in the pinned Playwright image`,
+      ]);
+    });
+
+    it("fails on a new page with no record and on a record left over from a removed page", async () => {
+      const pages = await helpPages();
+      const manifest = recorded();
+      const added = [...pages, { slug: "rooms/casino", title: "Casino", description: "d" }];
+      expect(staleCards(added, manifest)).toEqual([expect.stringMatching(/^rooms-casino\.png: no record/)]);
+      const removed = pages.filter((p) => p.slug !== "rooms/hotels");
+      expect(staleCards(removed, manifest)).toEqual([expect.stringMatching(/^rooms-hotels\.png: recorded, but no page has this card/)]);
+    });
+
+    it("updates only the cards drawn, keeps the rest and drops pages that are gone", () => {
+      const a = { slug: "a", title: "A", description: "a" };
+      const b = { slug: "b/c", title: "B", description: "b" };
+      const previous = { "a.png": { title: "old A", description: "old a" }, "b-c.png": { title: "B", description: "b" }, "gone.png": { title: "G", description: "g" } };
+      expect(cardManifest([a, b], [a], previous)).toEqual({ "a.png": { title: "A", description: "a" }, "b-c.png": { title: "B", description: "b" } });
+      expect(Object.keys(cardManifest([b, a], [b, a]))).toEqual(["a.png", "b-c.png"]);
+    });
   });
 
   it("names each card by its page's slug, at the site's own address", () => {
