@@ -397,6 +397,7 @@ const EVERY_EVENT: { [K in keyof GameplayEvents]: GameplayEvents[K] } = {
   session_emergencies: { fires: 1, firesGutRooms: 2, bombs: 0 },
   session_crashes: { crashes: 3 },
   file_imported: { format: "tdt", mode: "classic", star: 3, population: 420 },
+  $pageview: { $referring_domain: "www.reddit.com", $pathname: "/", utm_source: "reddit", utm_medium: null, utm_campaign: null },
   file_exported: { format: "vctower", mode: "modern", star: 2, population: 90 },
   tdt_import_read: {
     star: 3, floors: 40, basements: 2, rooms: 120, shafts: 6, flights: 10, decoded: true, hasRoster: true, notes: 2,

@@ -3,6 +3,7 @@ import { APP_VERSION } from "./appVersion";
 import { telemetryHostAllowed } from "./telemetry";
 import type { EngagedBy } from "./analyticsEngagement";
 import type { SaveFileFormat, TdtImportReadProps } from "./analyticsFiles";
+import type { PageViewProps } from "./analyticsPageView";
 import type { EngineBuild, EngineKind, EngineStatusReason, EngineStatusTrigger } from "./analyticsEngineStatus";
 import type { GameplayMilestoneId } from "./events/gameplayEvents";
 import type { FallbackStage } from "./wasmhost/engineBoot";
@@ -241,6 +242,10 @@ export interface GameplayEvents {
    *  report's own numbers. Counts and flags only; never a name or a note's
    *  text. Fields: `analyticsFiles.ts` and `docs/analytics-data-map.md`. */
   tdt_import_read: TdtImportReadProps;
+  /** Where the page life came from, once at boot (approved 2026-11-13): the
+   *  referrer's host (`$direct` for none), the landing path and the link's
+   *  UTM tags. Never the referrer's path or query. `analyticsPageView.ts`. */
+  "$pageview": PageViewProps;
   /** The reliability instrument (`analyticsEngineStatus.ts`, issue #1081):
    *  which engine this page life runs, whether it fell back and why, and
    *  whether the engine save writer turned itself off. Every value is a code

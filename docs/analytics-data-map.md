@@ -88,6 +88,7 @@ an event sent before boot carries `version` only.
 | `file_imported` | `format`, `mode`, `star`, `population` | A `.vctower` or `.TDT` import finished and its tower is open (approved 2026-11-13) | Whether imports succeed, per format; `import_failed` (below) counts the refusals |
 | `file_exported` | `format`, `mode`, `star`, `population` | A `.vctower` or `.TDT` download was handed to the browser (approved 2026-11-13) | Whether exports succeed, per format; `export_failed` (below) counts the refusals |
 | `tdt_import_read` | `star`, `floors`, `basements`, `rooms`, `shafts`, `flights`, `decoded`, `hasRoster`, `notes`, `anomalies`, and one count per importer workaround (`unknown`, `droppedFloors`, `offLot`, `overlapping`, `misplaced`, `clamped`, `widthMismatch`, `asleepConverted`, `droppedShafts`, `adjustedShafts`, `droppedFlights`) | A 1994 `.TDT` read cleanly and its import report is up (approved 2026-11-13) | What old towers hold that the importer has to work around. Counts and flags only: the tower name and the report's note text are never sent |
+| `$pageview` | `$referring_domain`, `$pathname`, `utm_source`, `utm_medium`, `utm_campaign` | Once per page life, with `boot` (approved 2026-11-13) | Where players come from (a launch post, a search, a direct visit), read beside what they did. Only the referrer's host travels, never its path or query; a UTM value is kept only as a short plain token |
 | `engine_status` | see below | See below | Engine reliability for the 3.0 release |
 
 The fields of each event are documented where they are declared
