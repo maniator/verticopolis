@@ -8,8 +8,9 @@ import { MovableWindow } from "../ui/movableWindow";
  * The facility card follows its room until the player drags it; from then on
  * it stays where they put it, for every room they pick, until the card closes
  * (`panelAnchoring.ts` asks {@link editorPlacedByPlayer} each frame). On a
- * phone the card is docked under the tools and does not move. A dialog that
- * was moved opens centered again next time.
+ * phone the card opens docked under the tools and moves the same way; a
+ * switch between the phone and desktop layouts gives it back to its layout.
+ * A dialog that was moved opens centered again next time.
  */
 
 /** Each app's facility-card mover, read per frame by the panel anchoring. */
@@ -27,18 +28,18 @@ export const MOVABLE_TITLE = {
 export function wireMovableWindows(app: GameApp): void {
   if (editorMovers.has(app) || !document.getElementById("stage")) return;
   const { editor, modal } = app.ui.el;
-  editorMovers.set(
-    app,
-    new MovableWindow({ win: editor, title: MOVABLE_TITLE.editor, within: editor.parentElement, enabled: () => !app.mobileMq.matches }),
-  );
+  const card = new MovableWindow({ win: editor, title: MOVABLE_TITLE.editor, within: editor.parentElement });
+  editorMovers.set(app, card);
+  app.mobileMq.addEventListener("change", () => card.reset());
   const dialog = new MovableWindow({ win: modal, title: MOVABLE_TITLE.dialog, within: null });
   modal.addEventListener("close", () => dialog.reset());
 }
 
-/** Whether the player dragged the facility card away from its room. One map
- *  lookup and one field read, so the per-frame anchoring can ask it. */
+/** Whether the player dragged the facility card away from its room, or is
+ *  pressing its title bar to drag it. One map lookup and two field reads, so
+ *  the per-frame anchoring can ask it. */
 export function editorPlacedByPlayer(app: GameApp): boolean {
-  return editorMovers.get(app)?.isPlaced() ?? false;
+  return editorMovers.get(app)?.isHeld() ?? false;
 }
 
 /** The card closed, docked or lost its room: it follows its room again next

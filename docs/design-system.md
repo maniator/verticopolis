@@ -116,7 +116,8 @@ A closable window moves by a drag on its title bar (`src/ui/movableWindow.ts`):
 it stays whole inside the tower view (a dialog, inside the browser window), a
 double-click on the bar puts it back, and the bar shows the move cursor and a
 "Drag to move" tooltip. The Map remembers its spot per layout class; the room
-card stays where it is dropped until it closes; a dialog opens centered again.
+card (docked or anchored) stays where it is dropped until it closes; a dialog
+opens centered again.
 A press on a control in the bar (the ✕) never starts a move.
 
 ## 4. The splash exception (ratified)

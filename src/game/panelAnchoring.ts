@@ -22,12 +22,12 @@ export function positionPanels(app: GameApp): void {
   const vw = app.engine.viewWidth;
   const vh = app.engine.viewHeight;
   let editorAnchored = false;
-  if (!mobile && app.selected && app.ui.isEditorOpen()) {
+  if (app.selected && app.ui.isEditorOpen()) {
     if (editorPlacedByPlayer(app)) {
-      // The player dragged the card by its title bar: it stays where they
-      // put it, and its inline coords are theirs.
+      // The player dragged the card by its title bar (on a phone too): it
+      // stays where they put it, and its inline coords are theirs.
       editorAnchored = true;
-    } else {
+    } else if (!mobile) {
       const r = selectedScreenRect(app);
       if (r) {
         app.ui.anchorEditor(r, vw, vh);
@@ -56,8 +56,8 @@ export function positionPanels(app: GameApp): void {
   // panel's stale coords): the mobile editor falls back to its docked CSS
   // layout even while the peek card stays anchored beside its room. The clears
   // no-op when a panel carries no anchor, so per-frame calls cost nothing. A
-  // card that closes, docks or loses its room also forgets where the player
-  // dragged it, so the next card follows its room again.
+  // card that closes or loses its room also forgets where the player dragged
+  // it, so the next card follows its room (or docks, on a phone) again.
   if (!editorAnchored) {
     forgetEditorPlacement(app);
     app.ui.clearEditorAnchor();

@@ -188,20 +188,35 @@ test.describe("movable windows on a phone", () => {
     expect(moved.y).toBeCloseTo(home.y + 120, 0);
   });
 
-  test("the docked facility card does not move", async ({ page }) => {
+  test("a touch drag on the docked facility card's title bar moves it, and it docks again once closed", async ({ page }) => {
     await boot(page);
-    await page.evaluate(() => {
-      const g = (window as any).game;
-      const unit = g.sim.tower.units.find((u: { kind: string }) => u.kind === "office");
-      g.selectPicked({ type: "unit", id: unit.id, kind: unit.kind });
-    });
+    const open = () =>
+      page.evaluate(() => {
+        const g = (window as any).game;
+        const unit = g.sim.tower.units.find((u: { kind: string }) => u.kind === "office");
+        g.selectPicked({ type: "unit", id: unit.id, kind: unit.kind });
+      });
+    await open();
     const editor = page.locator("#editor");
     await expect(editor).not.toHaveClass(/hidden/);
-    const before = await box(editor);
+    await nextFrames(page);
+    const docked = await box(editor);
     const t = await box(page.locator("#editor > .win-title"));
-    await touchDrag(page, { x: t.x + 12, y: t.y + t.height / 2 }, { x: t.x + 60, y: t.y - 100 });
-    const after = await box(editor);
-    expect(after.x).toBeCloseTo(before.x, 0);
-    expect(after.y).toBeCloseTo(before.y, 0);
+    const from = { x: t.x + 12, y: t.y + t.height / 2 };
+    // Frames pass between the press and the first move, as on a real phone:
+    // the docked layout must not take the card back while the finger is down.
+    await touchDrag(page, from, { x: from.x + 60, y: from.y - 100 });
+    await nextFrames(page);
+    const moved = await box(editor);
+    expect(moved.x).toBeCloseTo(docked.x + 60, 0);
+    expect(moved.y).toBeCloseTo(docked.y - 100, 0);
+
+    await page.locator("#editor .ed-close").tap();
+    await expect(editor).toHaveClass(/hidden/);
+    await open();
+    await nextFrames(page);
+    const again = await box(editor);
+    expect(again.x).toBeCloseTo(docked.x, 0);
+    expect(again.y).toBeCloseTo(docked.y, 0);
   });
 });
