@@ -12,6 +12,7 @@ import {
   type ElementSpec,
 } from "./toneCrowdData";
 import { CrowdVoices } from "./toneCrowdVoices";
+import { LightPolySynth } from "./lightSynth";
 import { PartyBand, CinemaProgram, MetroProgram } from "./toneCrowdPrograms";
 
 /**
@@ -51,8 +52,8 @@ export class CrowdLayer {
   /** Applies each scene's murmur level (the hotel whispers, the lobby talks). */
   private murmurGain: Tone.Gain | null = null;
   private toneGain: Tone.Gain | null = null;
-  private pingSynth: Tone.PolySynth | null = null;
-  private thudSynth: Tone.PolySynth | null = null;
+  private pingSynth: LightPolySynth | null = null;
+  private thudSynth: LightPolySynth | null = null;
   private noiseSynth: Tone.NoiseSynth | null = null;
   private noiseFilter: Tone.Filter | null = null;
   /** The street's 65/98 Hz city hum, breathing on its own slow swell. */
@@ -88,13 +89,13 @@ export class CrowdLayer {
         this.murmurGain,
       );
       this.toneGain = new Tone.Gain(0.8).connect(this.master);
-      this.pingSynth = new Tone.PolySynth(Tone.Synth, {
+      this.pingSynth = new LightPolySynth({
         oscillator: { type: "sine" },
         envelope: { attack: 0.004, decay: 0.12, sustain: 0, release: 0.08 },
       }).connect(this.toneGain);
       this.pingSynth.volume.value = -10;
       this.pingSynth.maxPolyphony = 8;
-      this.thudSynth = new Tone.PolySynth(Tone.Synth, {
+      this.thudSynth = new LightPolySynth({
         oscillator: { type: "sine" },
         envelope: { attack: 0.006, decay: 0.09, sustain: 0, release: 0.08 },
       }).connect(this.toneGain);

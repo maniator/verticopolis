@@ -1,5 +1,6 @@
 import * as Tone from "tone";
 import { midiToFreq, type SfxName } from "./toneScenes";
+import { LightMonoSynth, LightPolySynth } from "./lightSynth";
 
 /**
  * The one-shot action jingles (build, sell, promote, and friends) the game
@@ -26,28 +27,28 @@ import { midiToFreq, type SfxName } from "./toneScenes";
  *  and connected to the sfx bus, so every cue follows the Effects slider. */
 export interface SfxVoices {
   /** Short percussive sine synth: the legacy money jingle. */
-  jingle: Tone.PolySynth;
+  jingle: LightPolySynth;
   /** Mono sine with a schedulable frequency glide: every bloop is a ramp. */
-  bloop: Tone.Synth;
+  bloop: LightMonoSynth;
   /** Second mono glide voice: the trailing bloop of a two-bloop gesture
    *  (sell, error) lives here so a gesture's own second swoop can never
    *  cancel its first's ramp, and a build or click can never cancel a
    *  pending second swoop. Two OVERLAPPING two-bloop gestures can still
    *  collide here; error-into-error is holdoff-guarded, and the remaining
    *  window (a sell inside an error's 0.28 s gap) is accepted as rare and
-   *  brief rather than guarded. A collision at the very same start time
-   *  would throw in Tone, so `monoStart` moves the later one aside. */
-  bloop2: Tone.Synth;
+   *  brief rather than guarded. Two starts at the very same time threw
+   *  on Tone's mono voices, so `monoStart` still moves the later one aside. */
+  bloop2: LightMonoSynth;
   /** The bomb search's clock: a dry woodblock knock, its own mono voice so
    *  its near-instant attack never reshapes the bloops. */
-  tick: Tone.Synth;
+  tick: LightMonoSynth;
   /** Quiet partials over the deeper bloops (octave + twelfth), poly so a
    *  double bloop's partials can overlap. */
-  bloopPartial: Tone.PolySynth;
+  bloopPartial: LightPolySynth;
   /** Bell fundamentals: long natural decay, no sustain. */
-  bell: Tone.PolySynth;
+  bell: LightPolySynth;
   /** Bell color: one quiet inharmonic partial per strike, shorter decay. */
-  bellPartial: Tone.PolySynth;
+  bellPartial: LightPolySynth;
 }
 
 /** Build the full jingle instrument set on the given bus, deliberately dry:
@@ -77,34 +78,34 @@ function buildSfxVoices(bus: Tone.ToneAudioNode, built: Array<{ dispose(): void 
     built.push(n);
     return n;
   };
-  const jingle = track(new Tone.PolySynth(Tone.Synth, {
+  const jingle = track(new LightPolySynth({
     envelope: { attack: 0.005, decay: 0.1, sustain: 0, release: 0.12 },
   }).connect(bus));
   jingle.maxPolyphony = 12;
   // The bloop is a mono voice because its swoop is a scheduled frequency ramp.
-  const bloop = track(new Tone.Synth({
+  const bloop = track(new LightMonoSynth({
     oscillator: { type: "sine" },
     envelope: { attack: 0.008, decay: 0.2, sustain: 0, release: 0.08 },
   }).connect(bus));
-  const bloop2 = track(new Tone.Synth({
+  const bloop2 = track(new LightMonoSynth({
     oscillator: { type: "sine" },
     envelope: { attack: 0.008, decay: 0.2, sustain: 0, release: 0.08 },
   }).connect(bus));
-  const tick = track(new Tone.Synth({
+  const tick = track(new LightMonoSynth({
     oscillator: { type: "sine" },
     envelope: { attack: 0.001, decay: 0.05, sustain: 0, release: 0.02 },
   }).connect(bus));
-  const bloopPartial = track(new Tone.PolySynth(Tone.Synth, {
+  const bloopPartial = track(new LightPolySynth({
     oscillator: { type: "sine" },
     envelope: { attack: 0.008, decay: 0.18, sustain: 0, release: 0.06 },
   }).connect(bus));
   bloopPartial.maxPolyphony = 8;
-  const bell = track(new Tone.PolySynth(Tone.Synth, {
+  const bell = track(new LightPolySynth({
     oscillator: { type: "sine" },
     envelope: { attack: 0.002, decay: 1.1, sustain: 0, release: 0.4 },
   }).connect(bus));
   bell.maxPolyphony = 12;
-  const bellPartial = track(new Tone.PolySynth(Tone.Synth, {
+  const bellPartial = track(new LightPolySynth({
     oscillator: { type: "sine" },
     envelope: { attack: 0.002, decay: 0.5, sustain: 0, release: 0.2 },
   }).connect(bus));
@@ -156,7 +157,7 @@ function monoStart(voice: object, asked: number): number {
  *  below 160 Hz, and every bloop carries its quiet octave and twelfth
  *  partials (small-speaker rules, owner-tested). */
 function swoopBloop(
-  voice: Tone.Synth,
+  voice: LightMonoSynth,
   voices: SfxVoices,
   f0: number,
   f1: number,

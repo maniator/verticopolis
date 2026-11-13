@@ -12,6 +12,7 @@ import { AUDIO_RUNTIME_FILES } from "./audioAssets";
  * (e2e/offline.spec.ts), which sees every audio request the page makes.
  */
 vi.mock("tone", async () => (await import("./toneRecordingMock")).toneMock());
+vi.mock("./lightSynth", async () => (await import("./toneRecordingMock")).lightSynthMock());
 
 import { graph } from "./toneRecordingMock";
 import { ToneAudioEngine, type SfxName } from "./ToneAudioEngine";

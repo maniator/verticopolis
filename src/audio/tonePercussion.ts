@@ -1,4 +1,5 @@
 import * as Tone from "tone";
+import { LightMembraneSynth, LightPolySynth } from "./lightSynth";
 
 /**
  * The owner's recorded percussion, rebuilt as membrane voices: the chest-hit
@@ -24,11 +25,11 @@ import * as Tone from "tone";
 /** The thump: a membrane body plus its two quiet reinforcement partials, one
  *  trigger for the engine's Part callback, one dispose for teardown. */
 export class ThumpVoice {
-  private drum: Tone.MembraneSynth;
-  private partials: Tone.PolySynth;
+  private drum: LightMembraneSynth;
+  private partials: LightPolySynth;
 
   constructor(dest: Tone.ToneAudioNode) {
-    this.drum = new Tone.MembraneSynth({
+    this.drum = new LightMembraneSynth({
       pitchDecay: 0.045,
       octaves: 0.5,
       oscillator: { type: "sine" },
@@ -36,7 +37,7 @@ export class ThumpVoice {
     }).connect(dest);
     this.drum.volume.value = -10;
     try {
-      this.partials = new Tone.PolySynth(Tone.Synth, {
+      this.partials = new LightPolySynth({
         oscillator: { type: "sine" },
         envelope: { attack: 0.001, decay: 0.1, sustain: 0, release: 0.03 },
       }).connect(dest);
@@ -68,7 +69,7 @@ export interface PercVoices {
   /** The chest-hit heartbeat: swept membrane body plus soft partials. */
   thump: ThumpVoice;
   /** The object tap: short bright membrane knock. */
-  tap: Tone.MembraneSynth;
+  tap: LightMembraneSynth;
 }
 
 /** Build the percussion voices on the given music bus at the given level.
@@ -83,7 +84,7 @@ export function createPercussion(musicBus: Tone.ToneAudioNode, level: number): P
     built.push(percGain);
     const thump = new ThumpVoice(percGain);
     built.push(thump);
-    const tap = new Tone.MembraneSynth({
+    const tap = new LightMembraneSynth({
       pitchDecay: 0.008,
       octaves: 0.5,
       oscillator: { type: "sine" },

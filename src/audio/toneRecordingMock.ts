@@ -125,3 +125,19 @@ export function toneMock() {
     now: () => 0,
   };
 }
+
+/** The module object for `vi.mock("./lightSynth", async () => (await import("./toneRecordingMock")).lightSynthMock())`:
+ *  the light voices record like any other node, under their own class names,
+ *  so a graph test sees every voice, what it was built with, where it
+ *  connects and every note it plays. */
+export function lightSynthMock() {
+  const ctorFor = (kind: string) =>
+    function (...args: unknown[]) {
+      return node(kind, args);
+    };
+  return {
+    LightPolySynth: ctorFor("LightPolySynth"),
+    LightMonoSynth: ctorFor("LightMonoSynth"),
+    LightMembraneSynth: ctorFor("LightMembraneSynth"),
+  };
+}

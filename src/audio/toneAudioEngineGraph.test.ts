@@ -12,6 +12,7 @@ import type { ViewFocus } from "../render/excalibur/TowerEngine";
  */
 
 vi.mock("tone", async () => (await import("./toneRecordingMock")).toneMock());
+vi.mock("./lightSynth", async () => (await import("./toneRecordingMock")).lightSynthMock());
 
 import { beat, graph, resetToneFaults, toneFaults, type NodeRec } from "./toneRecordingMock";
 import { ToneAudioEngine, type SfxName } from "./ToneAudioEngine";
@@ -146,7 +147,7 @@ describe("ToneAudioEngine — full graph driven with a mocked Tone.js", () => {
     // the two percussion voices by their authored tunings.
     const membranes = graph.nodes.filter(
       (n) =>
-        n.kind === "MembraneSynth" &&
+        n.kind === "LightMembraneSynth" &&
         [0.045, 0.008].includes((n.args[0] as { pitchDecay?: number } | undefined)?.pitchDecay ?? -1),
     );
     expect(membranes.length).toBe(2);
@@ -178,7 +179,7 @@ describe("ToneAudioEngine — full graph driven with a mocked Tone.js", () => {
       ).toEqual([]);
     }
     // Contrast: the melody path deliberately DOES pass the warm filters.
-    const poly = graph.nodes.filter((n) => n.kind === "PolySynth");
+    const poly = graph.nodes.filter((n) => n.kind === "LightPolySynth");
     const filtered = poly.some((p) => reachable(p).some((n) => n.kind === "Filter"));
     expect(filtered).toBe(true);
   });
@@ -232,7 +233,7 @@ describe("ToneAudioEngine — full graph driven with a mocked Tone.js", () => {
       { t: 0, midi: 69, dur: 0.5, vel: 0.7, voice: "hook" },
     ];
     for (const ev of evs) expect(() => cb(0, ev)).not.toThrow();
-    const synths = graph.nodes.filter((n) => n.kind === "PolySynth" || n.kind === "Synth");
+    const synths = graph.nodes.filter((n) => n.kind === "LightPolySynth" || n.kind === "LightMonoSynth");
     const freqs = synths
       .flatMap((s) => s.triggers)
       .map((t) => t[0])

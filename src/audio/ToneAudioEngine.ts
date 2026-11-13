@@ -17,6 +17,7 @@ import { createPercussion, type PercVoices } from "./tonePercussion";
 import { createRain, type RainVoices } from "./toneRain";
 import { programFor, type Program, type ProgramKind, type TrackVoice } from "./toneTracks";
 import { CrowdLayer } from "./toneCrowd";
+import { LightMonoSynth, LightPolySynth } from "./lightSynth";
 
 /** Audio context states with a stopped clock, where a cue cannot sound:
  *  autoplay not yet allowed or the tab backgrounded ("suspended"), Safari's
@@ -66,9 +67,9 @@ export class ToneAudioEngine {
   private reverb: Tone.Reverb | null = null;
 
   // Composed-music voices + their own warm signal path.
-  private arp: Tone.PolySynth | null = null;
-  private bassVoice: Tone.Synth | null = null;
-  private hook: Tone.PolySynth | null = null;
+  private arp: LightPolySynth | null = null;
+  private bassVoice: LightMonoSynth | null = null;
+  private hook: LightPolySynth | null = null;
   private perc: PercVoices | null = null; // heartbeat + taps; routing doc in tonePercussion
   private musicGain: Tone.Gain | null = null;
   /** Warm lowpass + sub high-pass on the music (never bright/harsh, no rumble). */
@@ -166,15 +167,15 @@ export class ToneAudioEngine {
       this.musicGain = new Tone.Gain(this.musicLevel).connect(this.musicTone);
 
       // Rolling sine arpeggio (the bed's main texture): a soft pluck.
-      this.arp = new Tone.PolySynth(Tone.Synth, {
+      this.arp = new LightPolySynth({
         oscillator: { type: "sine" },
         envelope: { attack: 0.03, decay: 0.5, sustain: 0.05, release: 0.8 },
       }).connect(this.musicGain);
       this.arp.volume.value = -9;
-      this.arp.maxPolyphony = 12; // runaway voices are mobile CPU (crackle)
+      this.arp.maxPolyphony = 12; // a runaway arpeggio would stack tails
 
       // Soft triangle bass root under each bar.
-      this.bassVoice = new Tone.Synth({
+      this.bassVoice = new LightMonoSynth({
         oscillator: { type: "triangle" },
         envelope: { attack: 0.05, decay: 0.3, sustain: 0.6, release: 0.6 },
       }).connect(this.musicGain);
@@ -182,7 +183,7 @@ export class ToneAudioEngine {
 
       // The melody voice: the owner's hummed tune (splash hook and, since the
       // Two Chapters bed, the in-game lead as well).
-      this.hook = new Tone.PolySynth(Tone.Synth, {
+      this.hook = new LightPolySynth({
         oscillator: { type: "triangle" },
         envelope: { attack: 0.025, decay: 0.3, sustain: 0.2, release: 0.3 },
       }).connect(this.musicGain);
