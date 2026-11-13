@@ -278,6 +278,7 @@ describe("SaveLoad legacy files", () => {
     cb.onDownload();
     expect(trackFileExported, "a download the page could not start is not an export").not.toHaveBeenCalled();
     vi.mocked(deps.ui.downloadFile).mockReturnValueOnce(true);
+    deps.reader = () => ({ rooms: [] as never, structure: [] as never, header: { ...HEADER, population: 9999 } as never }); // the game ran on
     cb.onDownload();
     expect(deps.ui.downloadFile).toHaveBeenLastCalledWith("TOWER.TDT", bytes);
     expect(trackFileExported).toHaveBeenCalledExactlyOnceWith("tdt", expect.any(Function));

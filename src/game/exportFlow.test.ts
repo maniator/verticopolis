@@ -102,6 +102,16 @@ describe("export single-flight latch (GH #760)", () => {
     expect(vi.mocked(trackFileExported).mock.calls[0][1]()).toBe(HEADER);
   });
 
+  it("reports the header the file was written from, even when the tower moves on before the download", async () => {
+    vi.mocked(trackFileExported).mockClear();
+    const { ui } = fakeUi([true]);
+    let header = HEADER;
+    const later = { ...HEADER, population: 9999 };
+    const written = Promise.resolve(FAKE_FILE).then((file) => ((header = later), file));
+    await runExportFlow({ ui, reader: () => ({ header: header as never }) }, saved(written));
+    expect(vi.mocked(trackFileExported).mock.calls[0][1]()).toBe(HEADER);
+  });
+
   it("REGRESSION (GH #997): a download that failed gets no success toast, and the latch frees", async () => {
     const { ui, toasts, downloads } = fakeUi([false]);
     await runExportFlow(flowDeps(ui), saved());
