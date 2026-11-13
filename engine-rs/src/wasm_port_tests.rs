@@ -309,3 +309,28 @@ fn a_tile_is_demolished_by_its_cell() {
         );
     }
 }
+
+#[test]
+fn the_lobby_height_a_frontend_sets_raises_the_next_first_lobby() {
+    // #308: the tool holds its height between clicks and the read lists it.
+    let mut e = engine();
+    assert!(e.lobby_heights().is_empty());
+    let one_story = e.port_quote_build(code(Kind::Lobby), 1.0, 100.0)[1];
+    e.set_lobby_height(3.0);
+    let three_story = e.port_quote_build(code(Kind::Lobby), 1.0, 100.0)[1];
+    assert!(three_story > one_story, "{three_story} vs {one_story}");
+    assert_eq!(e.port_build(code(Kind::Lobby), 1.0, 100.0)[STATUS], 1.0);
+    assert_eq!(e.lobby_heights(), vec![1.0, 3.0]);
+    assert_eq!(e.lobby_rise(1.0), 3.0);
+    assert_eq!(e.lobby_rise(15.0), 3.0, "a Modern sky lobby rises too");
+    assert_eq!(e.lobby_rise(4.0), 1.0, "only a lobby floor rises");
+    assert_eq!(e.lobby_rise(f64::NAN), 1.0);
+    // A height that is not whole counts as one story; a built floor keeps its own.
+    e.set_lobby_height(2.5);
+    assert_eq!(e.sim.tower.requested_lobby_height, 1);
+    let tiles: Vec<f64> = (124..130).map(f64::from).collect();
+    assert_eq!(e.port_paint(code(Kind::Lobby), 1.0, &tiles)[STATUS], 1.0);
+    assert_eq!(e.lobby_heights(), vec![1.0, 3.0]);
+    assert_eq!(e.lobby_rise(1.0), 3.0, "the built floor keeps its height");
+    assert_eq!(e.lobby_rise(15.0), 1.0);
+}

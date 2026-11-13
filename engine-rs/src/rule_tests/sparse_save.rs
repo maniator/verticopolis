@@ -14,7 +14,7 @@ use serde_json::{json, Map, Value};
 use crate::clock::GameMode;
 use crate::facilities::{Kind, LOT_WIDTH};
 use crate::load::deserialize;
-use crate::sim::{Simulation, SAVE_VERSION};
+use crate::sim::{Simulation, PLAIN_SAVE_VERSION};
 use crate::tower::UnitState;
 
 use super::fixture_save;
@@ -270,7 +270,7 @@ fn a_forged_wide_floor_tile_clamps_and_a_room_keeps_its_width() {
 fn the_real_towerone_6_tower_saves_under_half_its_full_shape() {
     let sim = reload(&fixture_save("towerone_6"));
     let sparse = sim.serialize();
-    assert_eq!(sparse["version"], SAVE_VERSION);
+    assert_eq!(sparse["version"], PLAIN_SAVE_VERSION);
     let mut full = sparse.clone();
     full["units"] = Value::Array(
         sparse["units"]

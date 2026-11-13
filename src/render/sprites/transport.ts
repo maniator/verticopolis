@@ -6,6 +6,7 @@ import { personRider } from "../pixelSprites/common";
 import { layerBreak, layerEnd } from "../pixelSprites/layers";
 import type { CarArrow } from "../carIndicator";
 import { shade, shadeAlpha } from "./common";
+import { drawSpiralStair } from "./spiralStair";
 
 // ---- Transport ----------------------------------------------------------
 
@@ -31,7 +32,15 @@ export function drawTransport(
     // top band is just the arrival landing, so a two-floor stairway draws
     // exactly one staircase rising one floor to a landing on the second-floor
     // deck, not two stacked ones.
-    for (let fl = 1; fl <= t.top - t.bottom; fl++) {
+    // A flight out of a tall lobby (#308) climbs the whole hall, as the
+    // original's two- and three-story stairs do: a spiral up the hall, since
+    // one straight flight that tall reads as a ladder.
+    const span = t.top - t.bottom;
+    if (span > 1) {
+      drawSpiralStair(ctx, sx, w, topY + floorH, topY + (span + 1) * floorH, span);
+      return;
+    }
+    for (let fl = 1; fl <= span; fl++) {
       // Each flight is confined to band `fl` (the departure floor's band); the
       // top band stays the arrival landing so a two-floor stairway never draws
       // a second stacked flight. The engine's own routed climbers ride over it.
@@ -44,7 +53,13 @@ export function drawTransport(
     // Open structure like the stairs — no solid backing, you see the tower
     // behind it. One diagonal run per floor pair, confined to the departure
     // band, rising to the second-floor landing (the top band is the landing).
-    for (let fl = 1; fl <= t.top - t.bottom; fl++) {
+    // Out of a tall lobby (#308), a switchback up the whole hall.
+    const span = t.top - t.bottom;
+    if (span > 1) {
+      drawEscalatorSwitchback(ctx, sx, w, topY, floorH, span);
+      return;
+    }
+    for (let fl = 1; fl <= span; fl++) {
       drawEscalatorRun(ctx, sx, w, topY + fl * floorH, topY + (fl + 1) * floorH);
     }
     return;
@@ -217,6 +232,46 @@ function drawStairFlight(ctx: CanvasRenderingContext2D, sx: number, w: number, b
   };
   newel(railEnd, railY(railEnd), bandTop + 4);
   newel(x0, railY(x0), Math.round(line(x0)) + depth);
+}
+
+/** An escalator up a tall lobby (#308): one run a story, each turning back
+ *  the way the last came, from a steel platform at the turn held up by a
+ *  post to the hall floor. The bottom run climbs left to right like a
+ *  one-story escalator. Drawn strictly inside `[sx, sx + w]`. */
+function drawEscalatorSwitchback(ctx: CanvasRenderingContext2D, sx: number, w: number, topY: number, floorH: number, stories: number): void {
+  const hallFloor = topY + (stories + 1) * floorH;
+  for (let k = 0; k < stories; k++) {
+    const bandTop = topY + (stories - k) * floorH;
+    if (k % 2 === 0) {
+      drawEscalatorRun(ctx, sx, w, bandTop, bandTop + floorH);
+    } else {
+      // Mirrored about the shaft's middle, so this run climbs right to left.
+      ctx.save();
+      ctx.translate(2 * sx + w, 0);
+      ctx.scale(-1, 1);
+      drawEscalatorRun(ctx, sx, w, bandTop, bandTop + floorH);
+      ctx.restore();
+    }
+  }
+  // A platform at each turn, on the side the run below arrives at.
+  for (let k = 1; k < stories; k++) {
+    const y = topY + (stories - k + 1) * floorH;
+    const right = k % 2 === 1;
+    const pw = 14;
+    const px = right ? sx + w - 2 - pw : sx + 2;
+    const deck = y - 12;
+    ctx.fillStyle = "#3A3E46"; // the post down to the hall floor
+    ctx.fillRect(px + Math.floor(pw / 2) - 1, deck + 6, 3, hallFloor - deck - 6);
+    ctx.fillStyle = "#6A6E76"; // steel deck
+    ctx.fillRect(px, deck, pw, 6);
+    ctx.fillStyle = "#8A8E96"; // lit edge
+    ctx.fillRect(px, deck, pw, 1);
+    ctx.fillStyle = "#2A2D33"; // shaded underside
+    ctx.fillRect(px, deck + 5, pw, 1);
+    ctx.fillStyle = "#1A1D24"; // guard rail along the deck
+    ctx.fillRect(px, deck - 9, pw, 2);
+    ctx.fillRect(right ? px + pw - 2 : px, deck - 9, 2, 9);
+  }
 }
 
 /** One escalator run: a clean inclined belt of metallic warm-gray steps with

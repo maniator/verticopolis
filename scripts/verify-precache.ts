@@ -26,8 +26,10 @@ const SW = resolve(DIST, "sw.js");
 
 /** What a first install may download, uncompressed. About 2.9 MiB with the
  *  engine (2026-10-13); the headroom is for ordinary growth. Crossing it should
- *  be a deliberate call: raise this with the reason. */
-const PRECACHE_BUDGET_BYTES = 4 * 1024 * 1024;
+ *  be a deliberate call: raise this with the reason. Raised from 4 MiB to
+ *  4.5 MiB with tall lobbies (#308, 2026-11-12): 3.3.0 sat just under 4 MiB,
+ *  and the tall lobby rules and art took it 34 KiB over. */
+const PRECACHE_BUDGET_BYTES = 4.5 * 1024 * 1024;
 
 /** Icons that must each appear exactly once (kept in sync with src/public/). */
 const REQUIRED_ICONS = [

@@ -36,6 +36,8 @@ function setup(
 ) {
   const port = mockPort({
     lastReason: () => "The engine said no.",
+    setLobbyHeight: () => undefined,
+    lobbyRise: () => 1,
     ...answers,
   });
   const codes = new PortCodes(port);
@@ -55,6 +57,7 @@ function setup(
     audio: { sfx: vi.fn() },
     selectedId: vi.fn((): number | null => null),
     clearSelection: vi.fn(),
+    lobbyHeight: vi.fn(() => 1),
   } satisfies BuildActionsDeps;
   return { port, codes, tower, reader, deps, build: new BuildActions(deps) };
 }
@@ -71,6 +74,22 @@ describe("BuildActions.tryBuild", () => {
       10,
     );
     expect(deps.audio.sfx).toHaveBeenCalledExactlyOnceWith("build");
+  });
+
+  it("hands the asked lobby height to the engine before the build (#308)", () => {
+    const { build, deps, port } = setup({ buildAt: () => rec("buildAt", true) });
+    deps.lobbyHeight.mockReturnValue(2);
+    build.tryBuild("lobby", 1, 100);
+    expect(port.setLobbyHeight).toHaveBeenCalledExactlyOnceWith(2);
+    const order = (fn: unknown) => vi.mocked(fn as () => void).mock.invocationCallOrder[0];
+    expect(order(port.setLobbyHeight)).toBeLessThan(order(port.buildAt));
+  });
+
+  it("asks one story for any other kind, whatever the Lobby card holds (#308)", () => {
+    const { build, deps, port } = setup({ buildAt: () => rec("buildAt", true) });
+    deps.lobbyHeight.mockReturnValue(3);
+    build.tryBuild("office", 2, 100);
+    expect(port.setLobbyHeight).toHaveBeenCalledExactlyOnceWith(1);
   });
 
   it("a refusal errors with the engine's reason; quiet plays nothing either way", () => {
@@ -183,6 +202,37 @@ describe("BuildActions.paintBrush", () => {
     );
   });
 
+  it("hands the Lobby tool's height to the engine before the strip (#308)", () => {
+    const { build, deps, port } = setup({ paintTiles: () => rec("paintTiles", true, { placed: 3 }) });
+    deps.lobbyHeight.mockReturnValue(3);
+    build.paintBrush("lobby", 20, 1);
+    expect(port.setLobbyHeight).toHaveBeenCalledExactlyOnceWith(3);
+    const order = (fn: unknown) => vi.mocked(fn as () => void).mock.invocationCallOrder[0];
+    expect(order(port.setLobbyHeight)).toBeLessThan(order(port.paintTiles));
+  });
+
+  it("asks one story for the Floor tool's ground lobby, and prices the floor's own tall lobby per story (#308)", () => {
+    const { build, deps, port, codes } = setup({
+      paintTiles: () => rec("paintTiles", true, { placed: 3 }),
+      // The ground floor already holds a three-story lobby, so the tiles rise with it.
+      lobbyRise: () => 3,
+    });
+    deps.lobbyHeight.mockReturnValue(3);
+    build.paintBrush("floor", 20, 1);
+    // A height picked on the Lobby card never raises the Floor tool's lobby.
+    expect(port.setLobbyHeight).toHaveBeenCalledExactlyOnceWith(1);
+    const order = (fn: unknown) => vi.mocked(fn as () => void).mock.invocationCallOrder[0];
+    expect(order(port.setLobbyHeight)).toBeLessThan(order(port.paintTiles));
+    expect(port.lobbyRise).toHaveBeenCalledExactlyOnceWith(1);
+    expect(port.paintTiles).toHaveBeenCalledExactlyOnceWith(codes.kind("floor"), 1, Float64Array.from(brushTiles(20)));
+    const lobby = catalogFacility(CATALOG, "lobby");
+    const perTile = catalogTileCost(CATALOG, "lobby", "no floor yet") + 2 * catalogTileCost(CATALOG, "lobby", "a floor tile");
+    expect(deps.ui.toast).toHaveBeenCalledExactlyOnceWith(
+      `The ground floor is a ${lobby.name.toLowerCase()}, so a ${lobby.name.toLowerCase()} ($${groupDigits(perTile)}/tile) went here.`,
+      "info",
+    );
+  });
+
   it("nothing laid on a strip that already carries the kind reads again and says so", () => {
     const { build, reader } = setup(
       { paintTiles: () => rec("paintTiles", true, { placed: 0 }) },
@@ -202,6 +252,7 @@ describe("BuildActions.paintBrush", () => {
     expect(build.paintBrush("floor", 20, 4)).toEqual({
       placed: 0,
       reason: "The engine said no.",
+      engineRefused: true,
     });
     expect(deps.ui.toast).not.toHaveBeenCalled();
   });
@@ -243,6 +294,30 @@ describe("BuildActions paint gestures", () => {
       snapped,
     );
     expect(room.deps.audio.sfx).toHaveBeenCalledExactlyOnceWith("build");
+  });
+
+  // Regression (#308): on a phone a Classic sky lobby asked three stories
+  // high was refused, or once laid one story, with no word on the tap.
+  it("a refused lobby tap says the engine's reason aloud, once", () => {
+    const why = "In Classic, only the ground lobby can be taller than one story. Pick 1 story to build a lobby on floor 15.";
+    const { build, deps, port } = setup({
+      paintTiles: () => rec("paintTiles", false, { placed: 0 }),
+      lastReason: () => why,
+    });
+    deps.lobbyHeight.mockReturnValue(3);
+    build.seedPaint("lobby", 20, 15);
+    expect(port.setLobbyHeight).toHaveBeenCalledWith(3);
+    expect(deps.audio.sfx).toHaveBeenCalledExactlyOnceWith("error");
+    expect(deps.ui.toast).toHaveBeenCalledExactlyOnceWith(why, "bad");
+  });
+
+  it("a tap on a strip already built, or past the lot edge, adds no second toast", () => {
+    const built = setup({ paintTiles: () => rec("paintTiles", true, { placed: 0 }) }, () => "floor");
+    built.build.seedPaint("floor", 20, 4);
+    expect(built.deps.ui.toast).not.toHaveBeenCalled();
+    const edge = setup({ paintTiles: () => rec("paintTiles", true, { placed: 0 }), lastReason: () => undefined }, () => "floor");
+    edge.build.seedPaint("floor", viewWorld().lotWidth + 2, 4);
+    expect(edge.deps.ui.toast).toHaveBeenCalledExactlyOnceWith("That's the edge of the lot.", "bad");
   });
 
   it("a drag fills every column from the anchor, quietly, and a new floor reseeds", () => {

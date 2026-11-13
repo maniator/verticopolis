@@ -142,6 +142,44 @@ describe("transport, crane & event sprites paint", () => {
     expect(stair.log.some((l) => l.includes("#EDE6D2"))).toBe(true);
   });
 
+  // Tall lobbies (#308): a flight out of a two- or three-story lobby climbs
+  // the whole hall. It used to draw a short flight per story, stacked.
+  it("a flight out of a tall lobby is one spiral, and an escalator a switchback, up the whole hall", () => {
+    const fills = (log: string[], color: string) => {
+      const at = log.flatMap((l, i) => (l === `fillStyle=${color}` ? [i] : []));
+      return at.map((i) => log.slice(i + 1).find((l) => l.startsWith("fillRect:"))).filter((l): l is string => l !== undefined);
+    };
+    const rect = (l: string) => JSON.parse(l.slice("fillRect:".length)) as number[];
+    for (const stories of [2, 3]) {
+      const stair = spyCtx();
+      drawTransport(stair.ctx, transport({ kind: "stairs", bottom: 1, top: 1 + stories, width: 8 }), 0, 0, 88, FLOOR);
+      // One brass pole cap, at the hall's top, and a pole down to its floor.
+      const caps = fills(stair.log, "#C9A24B");
+      expect(caps, `${stories} stories`).toHaveLength(1);
+      const pole = fills(stair.log, "#4A3420").map(rect).find((r) => r[2] === 3);
+      expect(pole, `${stories} stories`).toBeDefined();
+      expect((pole as number[])[3]).toBeGreaterThan((stories - 1) * FLOOR);
+      // No straight flight's walnut handrail.
+      expect(stair.log.includes("fillStyle=#8A6440") && !stair.log.some((l) => l.includes("#241E14"))).toBe(true);
+
+      const esc = spyCtx();
+      drawTransport(esc.ctx, transport({ kind: "escalator", bottom: 1, top: 1 + stories, width: 8 }), 0, 0, 88, FLOOR);
+      // A switchback: one run per story, each landing on its own story's
+      // deck (a 5px-deep top comb plate), every other run mirrored to climb
+      // back the other way, and a 6px steel platform at each turn.
+      const steel = fills(esc.log, "#6A6E76").map(rect);
+      const tops = steel.filter((r) => r[3] === 5 && r[1] % FLOOR === 0).map((r) => r[1] / FLOOR);
+      expect(tops.sort(), `${stories} stories`).toEqual(Array.from({ length: stories }, (_, i) => i + 1));
+      expect(esc.log.filter((l) => l === "scale:[-1,1]"), `${stories} stories`).toHaveLength(Math.floor(stories / 2));
+      expect(steel.filter((r) => r[3] === 6), `${stories} stories`).toHaveLength(stories - 1);
+    }
+    // A one-story flight keeps its straight flight and has no pole.
+    const one = spyCtx();
+    drawTransport(one.ctx, transport({ kind: "stairs", bottom: 1, top: 2, width: 8 }), 0, 0, 88, FLOOR);
+    expect(fills(one.log, "#C9A24B")).toHaveLength(0);
+    expect(one.log.some((l) => l.includes("#241E14"))).toBe(true);
+  });
+
   it("the wedding hall paints its five-floor wedding hall into the full rect", () => {
     // Floor 100's venue draws into whatever w x h rect the caller gives; drive
     // it at the two-floor (88px) height to prove the arch, aisle, and couple

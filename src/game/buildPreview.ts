@@ -8,6 +8,7 @@ import { isPaintKind } from "./gesture";
 import { FLOOR } from "../render/scale";
 import { catalogOf, isUnlocked, quoteBuild, quoteShaft, type BuildQuote } from "./portAccess";
 import { NOT_ENOUGH_MONEY } from "../simport/request";
+import { lobbyHeightFor } from "./lobbyHeight";
 
 /**
  * How far above the touch point a room's placement ghost floats, in SCREEN pixels
@@ -106,9 +107,18 @@ function roomBlocks(app: GameApp, kind: "floor" | "lobby", built: BuiltAt, floor
 
 /** Whether a tile laid at `(floor, x)` would have what holds it up: above the
  *  ground floor, the story below it (`Tower::is_supported`). Lower down a tile
- *  is held by its neighbors, which the brush's own passes lay. */
-function heldUp(app: GameApp, groundFloor: number, floor: number, x: number): boolean {
-  return floor <= groundFloor || app.reader.tower.structureKindAt(floor - 1, x) !== undefined;
+ *  is held by its neighbors, which the brush's own passes lay. `tallLobbies`
+ *  is `lobbyHeights()`: the engine counts a story a tall lobby rises through
+ *  as structure (#308), and the view's runs sit on the lobby's own floor only. */
+function heldUp(app: GameApp, groundFloor: number, floor: number, x: number, tallLobbies: ArrayLike<number>): boolean {
+  const t = app.reader.tower;
+  if (floor <= groundFloor || t.structureKindAt(floor - 1, x) !== undefined) return true;
+  for (let i = 0; i + 1 < tallLobbies.length; i += 2) {
+    const lobbyFloor = tallLobbies[i];
+    const raisedStory = floor - 1 > lobbyFloor && floor - 1 < lobbyFloor + tallLobbies[i + 1];
+    if (raisedStory && t.structureKindAt(lobbyFloor, x) === "lobby") return true;
+  }
+  return false;
 }
 
 /** Whether a tile at `(floor, x)` stands against built structure, so it stands
@@ -135,8 +145,11 @@ function quotedBridge(
   floor: number,
   at: number,
   quote: BuildQuote,
+  rise = 1,
 ): { at: number; extra: number; from: number; to: number } {
-  const own = catalogTileCost(catalog, kind, app.reader.tower.structureKindAt(floor, at) === undefined ? "no floor yet" : "a floor tile");
+  // A tall lobby (#308) pays the lobby price once per story it rises.
+  const tall = (rise - 1) * catalogTileCost(catalog, kind, "a floor tile");
+  const own = tall + catalogTileCost(catalog, kind, app.reader.tower.structureKindAt(floor, at) === undefined ? "no floor yet" : "a floor tile");
   // A refusal for money still carries the full price, bridge and all.
   const priced = quote.ok || quote.reason === NOT_ENOUGH_MONEY;
   const extra = priced ? quote.cost - own : 0;
@@ -151,7 +164,19 @@ function quotedBridge(
 const bridgeLays = (span: { at: number; from: number; to: number } | undefined, x: number) =>
   span !== undefined && x !== span.at && x > span.from && x < span.to;
 
+/** The last preview each app drew, so a change of the asked lobby height
+ *  under a still pointer can draw it again ({@link refreshBuildPreview}). */
+const lastPreview = new WeakMap<GameApp, { tile: number; floor: number; showReasonCard: boolean }>();
+
+/** Draw the build ghost again where it last was, when it is showing: the
+ *  lobby height changed (#308) and the pointer did not move. */
+export function refreshBuildPreview(app: GameApp): void {
+  const last = lastPreview.get(app);
+  if (last && app.engine.preview && app.tool.type === "build") updateBuildPreview(app, last.tile, last.floor, last.showReasonCard);
+}
+
 export function updateBuildPreview(app: GameApp, tile: number, floor: number, showReasonCard = true): void {
+  lastPreview.set(app, { tile, floor, showReasonCard });
   if (app.tool.type !== "build") {
     app.engine.preview = null;
     app.engine.transportPreview = null;
@@ -165,8 +190,10 @@ export function updateBuildPreview(app: GameApp, tile: number, floor: number, sh
     if (catalogFacility(catalog, kind).fixedSpan) {
       // Stairs/escalators place as a fixed two-floor unit on tap, so the
       // ghost shows the real footprint and the real validity.
-      const valid = isUnlocked(app, kind) && quoteShaft(app.enginePort, app.portCodes, kind, x, floor, floor + 1).ok;
-      app.engine.transportPreview = { kind, x, bottom: floor, top: floor + 1, valid };
+      // Out of a tall lobby the flight climbs the whole lobby (#308).
+      const top = app.enginePort.walkwayTop(app.portCodes.kind(kind), floor, floor + 1);
+      const valid = isUnlocked(app, kind) && quoteShaft(app.enginePort, app.portCodes, kind, x, floor, top).ok;
+      app.engine.transportPreview = { kind, x, bottom: floor, top, valid };
       app.engine.preview = null;
     } else {
       app.engine.transportPreview = null;
@@ -182,6 +209,10 @@ export function updateBuildPreview(app: GameApp, tile: number, floor: number, sh
     // The ground floor is lobby-only: the Floor tool on floor 1 lays a lobby, so
     // the ghost previews a lobby, priced with the floor it lays.
     const ghostKind = catalogBuildKind(catalog, kind, floor);
+    // A lobby rises as many stories as the engine would lay it here (#308):
+    // the asked height on a floor's first lobby, else the floor's own.
+    app.enginePort.setLobbyHeight(lobbyHeightFor(kind, app.lobbyHeight.height));
+    const rise = ghostKind === "lobby" ? app.enginePort.lobbyRise(floor) : 1;
     // Whole-brush affordability: the brush charges per tile, so the ghost goes
     // green only when the money covers every tile a click lays and the bridges
     // they bring. paintTiles builds the tiles in order, each with a bridge to
@@ -202,6 +233,8 @@ export function updateBuildPreview(app: GameApp, tile: number, floor: number, sh
     const brush = new Set(tiles);
     const groundFloor = catalog.world.groundFloor;
     const builtAt = (x: number) => app.reader.tower.structureKindAt(floor, x);
+    // Read once per preview: a few pairs, one per tall lobby.
+    const tallLobbies = app.enginePort.lobbyHeights();
     let tried = snapX(catalog, kind, tile);
     let firstLaid: number | undefined;
     let touching: number | undefined;
@@ -233,7 +266,7 @@ export function updateBuildPreview(app: GameApp, tile: number, floor: number, sh
       tried = tx;
       const blocked = roomBlocks(app, kind, built, floor, tx);
       if (blocked && firstLaid === undefined) builtBeforeFirst = true;
-      if (blocked || !heldUp(app, groundFloor, floor, tx)) continue;
+      if (blocked || !heldUp(app, groundFloor, floor, tx, tallLobbies)) continue;
       firstLaid ??= tx;
       if (built === undefined) lastRunStart ??= tx;
       else lastBuiltLaid = true;
@@ -249,7 +282,7 @@ export function updateBuildPreview(app: GameApp, tile: number, floor: number, sh
     }
     const quote = (x: number) => quoteBuild(app.enginePort, app.portCodes, ghostKind, floor, x);
     const can = quote(quoted);
-    const near = quotedBridge(app, catalog, ghostKind, floor, quoted, can);
+    const near = quotedBridge(app, catalog, ghostKind, floor, quoted, can, rise);
     // The first run, when a built tile past its first tile stops the quoted
     // tile's scan left: its first tile scans right only to that built tile.
     const leftEnd = !builtBeforeFirst && firstRunEnd !== undefined && firstRunEnd < quoted ? firstLaid : undefined;
@@ -260,15 +293,16 @@ export function updateBuildPreview(app: GameApp, tile: number, floor: number, sh
     // its scan left stops there.
     let rightEnd: number | undefined;
     if (lastBuilt !== undefined && quoted < lastBuilt) rightEnd = lastRunStart ?? (lastBuiltLaid ? lastBuilt : undefined);
-    const farLeft = leftEnd === undefined ? undefined : quotedBridge(app, catalog, ghostKind, floor, leftEnd, quote(leftEnd));
-    const farRight = rightEnd === undefined ? undefined : quotedBridge(app, catalog, ghostKind, floor, rightEnd, quote(rightEnd));
-    const overFloor = catalogTileCost(catalog, ghostKind, "a floor tile");
-    const noFloorYet = catalogTileCost(catalog, ghostKind, "no floor yet");
+    const farLeft = leftEnd === undefined ? undefined : quotedBridge(app, catalog, ghostKind, floor, leftEnd, quote(leftEnd), rise);
+    const farRight = rightEnd === undefined ? undefined : quotedBridge(app, catalog, ghostKind, floor, rightEnd, quote(rightEnd), rise);
+    // A tall lobby pays the lobby price once per story.
+    const overFloor = catalogTileCost(catalog, ghostKind, "a floor tile") * rise;
+    const noFloorYet = catalogTileCost(catalog, ghostKind, "no floor yet") + (rise - 1) * catalogTileCost(catalog, ghostKind, "a floor tile");
     let laid = 0;
     let stripCost = near.extra + (farLeft?.extra ?? 0) + (farRight?.extra ?? 0);
     for (const tx of brush) {
       const built = builtAt(tx);
-      if (brushSkips(kind, built) || roomBlocks(app, kind, built, floor, tx) || !heldUp(app, groundFloor, floor, tx)) continue;
+      if (brushSkips(kind, built) || roomBlocks(app, kind, built, floor, tx) || !heldUp(app, groundFloor, floor, tx, tallLobbies)) continue;
       laid++;
       if (bridgeLays(near, tx) || bridgeLays(farLeft, tx) || bridgeLays(farRight, tx)) continue;
       stripCost += built === undefined ? noFloorYet : overFloor;
@@ -280,7 +314,7 @@ export function updateBuildPreview(app: GameApp, tile: number, floor: number, sh
     const valid = laid > 0 && can.ok && affordsStrip;
     let reason: string | undefined;
     if (!valid && catalog.rules.previewNamesRefusal && (!can.ok || laid > 0)) reason = can.ok ? NOT_ENOUGH_MONEY : can.reason;
-    app.engine.preview = { kind: ghostKind, floor, x: left, span, valid, reason };
+    app.engine.preview = { kind: ghostKind, floor, x: left, span, valid, reason, stories: rise };
     app.engine.transportPreview = null;
     if (showReasonCard) updateBuildRefusal(app, reason, floor, left + Math.floor(span / 2));
     else clearBuildRefusal(app);

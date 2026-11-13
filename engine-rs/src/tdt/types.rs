@@ -62,6 +62,9 @@ pub struct TdtHeader {
     pub balance: i64,
     pub frame_time: i64,
     pub current_day: i64,
+    /// The ground lobby's height in stories (offset 28): 1 to 3 in a tower
+    /// with a lobby, 0 before the first lobby is placed (#308).
+    pub lobby_height: i64,
     pub view_x: i64,
     pub view_y: i64,
 }

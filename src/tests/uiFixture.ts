@@ -80,6 +80,7 @@ export function makeUI(overrides: Partial<UICallbacks> = {}): { ui: UI; cb: UICa
   const classic = catalogFor("classic"); // one object, as a tower's catalog is, so the palette redraws only on a change
   const cb: UICallbacks = {
     getCatalog: vi.fn(() => classic),
+    lobbyHeight: vi.fn(() => ({ picked: 1, pick: vi.fn() })),
     onSelectTool: vi.fn(),
     onSpeed: vi.fn((s: number) => {
       speed = s;

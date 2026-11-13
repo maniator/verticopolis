@@ -89,6 +89,8 @@ pub const TDT_ELEVATORS_TO_STAIRS: usize = TDT_STATS_SIZE
 pub const TDT_LEGACY_ELEVATORS_TO_STAIRS: usize = TDT_LEGACY_NO_GAP_ELEVATORS_TO_STAIRS + 4;
 pub const TDT_LEGACY_NO_GAP_ELEVATORS_TO_STAIRS: usize = TDT_FINANCE_SIZE + TDT_PARKING_SIZE;
 /// Where the header keeps the clinic count.
+/// The header's ground lobby height in stories (u16 at byte 28; #308).
+pub const TDT_HEADER_LOBBY_HEIGHT_AT: usize = 0x1c;
 pub const TDT_HEADER_CLINIC_COUNT_AT: usize = 0x34;
 /// The finance block holds, as little-endian u32s, the people of each class
 /// SimTower counts, their total, the income of each class, the total income,
@@ -220,6 +222,14 @@ pub fn tdt_stair_stories(type_id: i64) -> i64 {
     }
 }
 
+/// The stair record type for a flight of stairs (or an escalator) climbing
+/// `stories`: 0 or 1 for one story, 2 or 3 for two, 4 or 5 for three, the
+/// inverse of [`tdt_stair_stories`]. The multi-story types are the flights
+/// out of a tall ground lobby (#308).
+pub fn tdt_stair_type(stairs: bool, stories: i64) -> i64 {
+    i64::from(stairs) + 2 * (stories.clamp(1, 3) - 1)
+}
+
 /// `viewWordsFromView`: a saved camera view (center in our grid units) to
 /// the header's view-scroll words. Non-finite members fall back to the New
 /// Tower default; finite values clamp into the scrollable range, and the
@@ -285,6 +295,8 @@ pub fn parse_tdt_binary(bytes: &[u8]) -> Result<TdtTower, LegacyImportError> {
     r.skip(12)?; // otherIncome, constructionCosts, lastQuarterMoney
     let frame_time = r.u16()?;
     let current_day = r.i32()?;
+    r.skip(TDT_HEADER_LOBBY_HEIGHT_AT - r.offset())?;
+    let lobby_height = r.u16()?;
     r.skip(0x26 - r.offset())?;
     let view_x = r.u16()?;
     let view_y = r.u16()?;
@@ -295,6 +307,7 @@ pub fn parse_tdt_binary(bytes: &[u8]) -> Result<TdtTower, LegacyImportError> {
         balance,
         frame_time,
         current_day,
+        lobby_height,
         view_x,
         view_y,
     };

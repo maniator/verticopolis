@@ -18,6 +18,7 @@
  *   - scenes/milestones.ts: the star-rank growth set + the TOWER capstone.
  *   - scenes/boot-fallback.ts: the no-WebGL boot screen (staged boot failure).
  *   - scenes/security.ts: Security guards during a bomb search and on a quiet day.
+ *   - scenes/tallLobbies.ts: tall lobbies (#308) for the Help site.
  * The Node-side drivers (fixture load, star assertions) live in
  * screenshot-scenes-drivers.ts. Keep every file ERASABLE.
  */
@@ -35,6 +36,7 @@ import { INSTALL_SCENES } from "./scenes/install.ts";
 import { RENTAL_SCENES } from "./scenes/rental.ts";
 import { FOUNDER_SCENES } from "./scenes/founder.ts";
 import { SECURITY_SCENES } from "./scenes/security.ts";
+import { TALL_LOBBY_SCENES } from "./scenes/tallLobbies.ts";
 
 export const SCENES: Scene[] = [
   ...SHOWCASE_SCENES,
@@ -50,4 +52,5 @@ export const SCENES: Scene[] = [
   ...RENTAL_SCENES,
   ...FOUNDER_SCENES,
   ...SECURITY_SCENES,
+  ...TALL_LOBBY_SCENES,
 ];

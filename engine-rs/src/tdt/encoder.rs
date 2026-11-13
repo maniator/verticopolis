@@ -21,25 +21,8 @@ use super::LegacyExportError;
 use crate::facilities::{Kind, LOT_WIDTH, MAX_FLOOR, MIN_FLOOR};
 use crate::jsmath::round;
 
-/// Numbers the report reads from the encode pass (`EncodeStats`).
-#[derive(Clone, Debug, Default, PartialEq)]
-pub struct EncodeStats {
-    pub balance: i64,
-    pub money: f64,
-    pub star: i64,
-    pub shafts_dropped: i64,
-    pub shafts_colliding: i64,
-    pub flights_dropped: i64,
-    pub transports_dropped: i64,
-    pub elevators_len: i64,
-    pub walkways_len: i64,
-    pub express_len: i64,
-}
-
-pub struct EncodeResult {
-    pub bytes: Vec<u8>,
-    pub stats: EncodeStats,
-}
+mod stats;
+pub use stats::{EncodeResult, EncodeStats};
 
 struct OutElevator {
     kind: Kind,
@@ -60,6 +43,9 @@ struct OutWalkway {
     kind: Kind,
     x: f64,
     bottom: f64,
+    /// How many stories the flight climbs: 1, or a tall ground lobby's
+    /// height for a flight out of it (#308).
+    stories: i64,
 }
 
 struct StairRecord {
@@ -97,7 +83,7 @@ pub fn encode_tower(
         tenants_by_tdt,
         extents,
         header,
-        has_ground_lobby,
+        ground_lobby_height,
         people_pop,
         class_pop,
         counts,
@@ -139,7 +125,7 @@ pub fn encode_tower(
     w.i32(to_int32(js_max(0.0, (minutes / 1440.0).floor())));
     w.pad(TDT_HEADER_SIZE - w.len());
 
-    w.set_u16(0x1c, if *has_ground_lobby { 1 } else { 0 });
+    w.set_u16(TDT_HEADER_LOBBY_HEIGHT_AT, *ground_lobby_height);
     w.set_u16(0x2a, header.recycling.min(0xffff));
     w.set_u16(0x2e, header.commercial.min(512));
     w.set_u16(0x30, header.security.min(10));
@@ -241,7 +227,12 @@ pub fn encode_tower(
                 transports_dropped += 1;
                 continue;
             };
-            if bottom < MIN_FLOOR as f64 || bottom + 1.0 > MAX_FLOOR as f64 {
+            // Only a flight out of a tall ground lobby climbing all of it
+            // is written as one record; any other span stays one story.
+            let rise = t_top.map_or(1.0, |top| round(top) - bottom);
+            let tall = bottom == 1.0 && rise == *ground_lobby_height as f64;
+            let stories = if tall { rise as i64 } else { 1 };
+            if bottom < MIN_FLOOR as f64 || bottom + stories as f64 > MAX_FLOOR as f64 {
                 transports_dropped += 1;
                 continue;
             }
@@ -250,6 +241,7 @@ pub fn encode_tower(
                 kind: kind.expect("matched"),
                 x,
                 bottom,
+                stories,
             });
             continue;
         }
@@ -391,10 +383,10 @@ pub fn encode_tower(
     });
     // One record per flight, as the game writes them: it never stacks flights
     // into the multi-story types, and a stacked column is one record per floor.
+    // Only a flight out of a tall ground lobby climbs more (#308).
     for flight in &sorted {
-        let is_stairs = flight.kind == Kind::Stairs;
         stair_records.push(StairRecord {
-            type_id: if is_stairs { 1 } else { 0 },
+            type_id: tdt_stair_type(flight.kind == Kind::Stairs, flight.stories),
             x: flight.x,
             floor: flight.bottom + TDT_FLOOR_OFFSET as f64,
         });

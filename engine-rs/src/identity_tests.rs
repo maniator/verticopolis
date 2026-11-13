@@ -50,7 +50,7 @@ fn the_record_holds_every_field() {
     assert_eq!(v["crate"]["name"], env!("CARGO_PKG_NAME"));
     assert_eq!(CRATE_NAME, env!("CARGO_PKG_NAME"));
     assert_eq!(v["crate"]["version"], env!("CARGO_PKG_VERSION"));
-    assert_eq!(v["saveVersion"], 7);
+    assert_eq!(v["saveVersion"], 8);
     assert_eq!(v["oldestSaveVersion"], 1);
     assert_eq!(v["frameLayoutVersion"], 1);
     assert_eq!(v["catalogVersion"], CATALOG_VERSION);

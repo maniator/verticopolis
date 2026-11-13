@@ -86,7 +86,9 @@ export const SHARDS: Record<string, string[]> = {
   // ~67s: the live-engine scene (its demo shot is drawSettle) + the now-cheap metro
   // + onboarding + the desktop install-affordance shot (a live engine tower with
   // the topbar Install chip surfaced, drawSettle; SPEC-pwa-install).
-  engine: ["engine", "metro", "first-run", "first-run-mobile", "preview-rooms", "install-affordance"],
+  // ...plus the three tall lobby scenes (#308): small frozen towers, one or
+  // two shots each, about 11s together.
+  engine: ["engine", "metro", "first-run", "first-run-mobile", "preview-rooms", "install-affordance", "tall-lobby-classic", "tall-lobby-modern-sky", "tall-lobby-flights", "tall-lobby-phone"],
   // ~71s: anchored by the tablet shots (the heaviest drawSettle scene) plus the
   // small scenes + the mobile install-affordance shot (its engine-tower sibling)
   // + the overview Map scenes and the landscape phone pair (one built tower,

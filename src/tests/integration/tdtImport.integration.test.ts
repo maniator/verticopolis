@@ -29,6 +29,9 @@ const RESTAURANT_SUBTYPES = facts("restaurant").subtypes ?? [];
 /** The save version the engine writes, from its identity record (0 without
  *  the package, where the codec suites skip). */
 const SAVE_VERSION = hasWasmPackage() ? parseEngineIdentity(readEngineIdentity(wasm()))!.saveVersion : 0;
+/** The version a save with no tall lobby is stamped with (#308): the format
+ *  before tall lobbies, so an older app still opens it. */
+const PLAIN_SAVE_VERSION = SAVE_VERSION - 1;
 
 /** Parse a spec through the whole importer (builder → parseTDT). */
 function parse(spec: TdtSpec = {}, filename = "TOWER.TDT") {
@@ -792,7 +795,8 @@ describeWithCodec("parseTDT: golden mappings", () => {
   it("meta: classic mode, current schema version, filename-derived name, deterministic seed, sane nextId", () => {
     const a = parse(sampleTowerSpec(), "MY_TOWER.TDT");
     expect(a.save.mode).toBe("classic");
-    expect(a.save.version).toBe(SAVE_VERSION);
+    // The sample tower has no tall lobby, so it is stamped with the plain format.
+    expect(a.save.version).toBe(PLAIN_SAVE_VERSION);
     expect(a.save.towerName).toBe("MY TOWER");
     const b = parse(sampleTowerSpec(), "OTHER.TDT");
     expect(b.save.seed).toBe(a.save.seed); // same bytes → same seed

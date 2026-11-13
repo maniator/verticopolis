@@ -85,4 +85,7 @@ export interface RenderClock {
 export interface RenderTower extends TowerView {
   /** Working garage spaces by unit id (usage slice). */
   functionalParkingSet(): ReadonlySet<number>;
+  /** The height in stories of every lobby taller than one, by its floor
+   *  (#308). Read once per structure pass, never per frame. */
+  tallLobbies(): ReadonlyMap<number, number>;
 }

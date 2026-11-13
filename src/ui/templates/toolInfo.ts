@@ -50,10 +50,38 @@ export function toolInfoTemplate(
  *  tower's catalog (#921), and the description from the presentation table.
  *  The Floor tool lays the ground-floor structure (a lobby) on the ground
  *  floor, so its card carries that price too (see catalogBuildKind). */
-export function toolInfoFor(catalog: Catalog, kind: FacilityKind): TemplateResult {
+export function toolInfoFor(catalog: Catalog, kind: FacilityKind, lobby?: LobbyHeightPicker): TemplateResult {
   // The description is display copy, which the catalog leaves to the UI.
   const f = { ...catalogFacility(catalog, kind), description: facilityDescription(kind, catalog.world) };
-  return toolInfoTemplate(f, isCommercialKind(kind), groundFloorCost(catalog, kind), noFloorYetCost(catalog, kind));
+  const card = toolInfoTemplate(f, isCommercialKind(kind), groundFloorCost(catalog, kind), noFloorYetCost(catalog, kind));
+  return kind === "lobby" && lobby ? html`${card}${lobbyHeightTemplate(catalog, lobby)}` : card;
+}
+
+/** The lobby tool card's height choice (#308): the height picked, and the
+ *  pick itself, which redraws the card. */
+export interface LobbyHeightPicker {
+  readonly picked: number;
+  pick(height: number): void;
+}
+
+/** The Lobby card's height picker (#308): one to the catalog's
+ *  `maxLobbyHeight` stories, which floors may rise (the catalog's
+ *  `tallSkyLobbies`), the price per story, and the original's keys. */
+export function lobbyHeightTemplate(catalog: Catalog, lobby: LobbyHeightPicker): TemplateResult {
+  const where = catalog.rules.tallSkyLobbies ? "The ground lobby and sky lobbies can rise." : "Only the ground lobby can rise.";
+  const per = groupDigits(catalogFacility(catalog, "lobby").cost);
+  return html`<div class="ti-lobby-height" role="group" aria-label="Lobby height">Height: ${lobbyHeightButtons(catalog, lobby)}</div><p style="margin-top:6px;color:var(--muted)">${where} A floor's first lobby sets its height, and it never changes after. Each story costs $${per} a tile. On a keyboard, hold Ctrl for 2 stories or Ctrl+Shift for 3 as you place it.</p>`;
+}
+
+/** One button per height, one to the catalog's `maxLobbyHeight` stories, the
+ *  picked one pressed. Shared by the Lobby card and the phone's strip. */
+export function lobbyHeightButtons(catalog: Catalog, lobby: LobbyHeightPicker): TemplateResult[] {
+  const heights = Array.from({ length: catalog.rules.maxLobbyHeight }, (_, i) => i + 1);
+  const label = (h: number) => (h === 1 ? "1 story" : `${h} stories`);
+  return heights.map(
+    (h) =>
+      html`<button type="button" class="btn${lobby.picked === h ? " es-on" : ""}" aria-pressed=${lobby.picked === h} @click=${() => lobby.pick(h)}>${label(h)}</button>`,
+  );
 }
 
 export const BULLDOZE_TOOL_INFO: TemplateResult = html`<div class="ti-name">Bulldoze</div><p style="color:var(--muted)">Click a room or shaft to sell it for half its cost.</p>`;

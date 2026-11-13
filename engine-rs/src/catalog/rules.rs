@@ -30,4 +30,11 @@ pub struct Rules {
     /// Whether the tenant card's lobby warning quotes the floors to the
     /// nearest lobby. When false it names the problem without the number.
     pub quotes_lobby_distance: bool,
+    /// Whether a sky lobby may rise more than one story (#308). The ground
+    /// lobby always may, up to `max_lobby_height`; when false it is the only
+    /// one that can.
+    pub tall_sky_lobbies: bool,
+    /// The most stories a lobby can rise (#308). A floor's first lobby
+    /// placement sets its height, and it never changes after.
+    pub max_lobby_height: i64,
 }

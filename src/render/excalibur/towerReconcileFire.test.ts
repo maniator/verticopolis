@@ -66,6 +66,7 @@ function fakeEngine(unit: UnitView): TowerEngine {
         },
         transports: [],
         functionalParkingSet: () => new Set<number>(),
+        tallLobbies: () => new Map<number, number>(),
       },
       parkingUsage: () => 0,
       recyclingFill: () => 0,

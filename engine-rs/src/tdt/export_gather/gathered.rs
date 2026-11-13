@@ -88,7 +88,9 @@ pub struct GatheredTower {
     pub retail_rows: Vec<(f64, i64)>,
     pub counts: ExportCounts,
     pub header: ExportHeaderCounts,
-    pub has_ground_lobby: bool,
+    /// The ground lobby's height in stories for the header (#308), 0 when
+    /// the tower has no standing ground lobby.
+    pub ground_lobby_height: i64,
     pub people_pop: f64,
     /// The people of each class the finance block counts, in its order.
     pub class_pop: [f64; POPULATION_CLASSES],

@@ -140,6 +140,9 @@ impl Tower {
             if !self.room_span_free(fl, x, f.width) {
                 return Some("Something is already here.".into());
             }
+            if let Some(r) = self.tall_lobby_story_reason(fl) {
+                return Some(r);
+            }
             // The wedding hall's upper stories stand above the last floor slab.
             if fl > lot.top_floor() {
                 continue;
@@ -208,7 +211,9 @@ impl Tower {
             if let Some(r) = self.metro_reason(kind, floor) {
                 return PlaceResult::fail(r);
             }
-            return PlaceResult::ok();
+            return self
+                .tall_lobby_structure_reason(kind, floor, x, f.width)
+                .map_or_else(PlaceResult::ok, PlaceResult::fail);
         }
         match self.room_placement_reason(kind, floor, x, true) {
             Some(r) => PlaceResult::fail(r),
@@ -258,7 +263,8 @@ impl Tower {
                 return PlaceResult::fail("Lobbies are transit-only. Clear the rooms here first.");
             }
         }
-        PlaceResult::ok()
+        self.tall_lobby_structure_reason(kind, floor, x, f.width)
+            .map_or_else(PlaceResult::ok, PlaceResult::fail)
     }
 
     // ---- mutation --------------------------------------------------------
@@ -308,6 +314,7 @@ impl Tower {
             if slot.is_none() {
                 self.remove_units(&under);
             }
+            self.begin_lobby_floor(floor);
         }
         let idx = self.add_unit(unit, slot);
         self.register(idx);

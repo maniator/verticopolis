@@ -98,10 +98,15 @@ fn overlaps_placed(
 }
 
 /// `transportsFromDecoded`.
+/// `lobby_height` is the tall ground lobby's height from the header (1 for
+/// none): a flight out of the ground floor that climbs exactly that many
+/// stories comes in whole, as the one tall flight it is (#308). Every other
+/// multi-story record comes in as one flight per story.
 pub fn transports_from_decoded(
     elevators: &[TdtElevator],
     stairs: &[TdtStair],
     first_id: i64,
+    lobby_height: i64,
 ) -> DecodedTransports {
     let mut out: Vec<OutTransport> = vec![];
     let mut dropped_shafts = 0;
@@ -190,16 +195,18 @@ pub fn transports_from_decoded(
         let width = kind.facility().width;
         let x = s.x.min(LOT_WIDTH - width).max(0);
         let base = s.floor - TDT_FLOOR_OFFSET;
-        for i in 0..stories {
+        let whole = stories > 1 && base == 1 && stories == lobby_height;
+        let climb = if whole { stories } else { 1 };
+        for i in 0..stories / climb {
             let bottom = base + i;
-            if bottom < MIN_FLOOR || bottom + 1 > MAX_FLOOR {
+            if bottom < MIN_FLOOR || bottom + climb > MAX_FLOOR {
                 continue;
             }
             if walkways >= 64 {
                 dropped_flights += 1;
                 continue;
             }
-            if overlaps_placed(&out, kind, x, width, bottom, bottom + 1) {
+            if overlaps_placed(&out, kind, x, width, bottom, bottom + climb) {
                 dropped_flights += 1;
                 continue;
             }
@@ -210,7 +217,7 @@ pub fn transports_from_decoded(
                 x,
                 width,
                 bottom,
-                top: bottom + 1,
+                top: bottom + climb,
                 cars: 0,
                 car_positions: vec![],
                 home_floors: None,

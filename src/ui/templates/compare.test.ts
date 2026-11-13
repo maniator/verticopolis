@@ -30,6 +30,8 @@ describe("the Classic and Modern summary", () => {
     buildsWhilePaused: "Building while paused", // #1936
     exportsTo1994: "Export a .TDT for the original game",
     quotesLobbyDistance: null, // a wording detail of the tenant card's lobby warning
+    tallSkyLobbies: "Sky lobbies can rise too", // #308, Classic raises only the ground lobby
+    maxLobbyHeight: null, // the same 3-story cap in both modes
   };
   const RULE_TO_HELP: Record<string, string | null> = {
     ...CATALOG_RULE_TO_HELP,

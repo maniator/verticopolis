@@ -35,8 +35,12 @@ export class PortRenderSim implements RenderSim {
     const l = JSON.parse(port.viewLayout()) as { heatModes: HeatmapMode[]; heatTints: string[] };
     this.heatModes = l.heatModes;
     this.heatTints = l.heatTints;
-    const tower = Object.create(reader.tower) as RenderTower & { functionalParkingSet: () => ReadonlySet<number> };
+    const tower = Object.create(reader.tower) as RenderTower & {
+      functionalParkingSet: () => ReadonlySet<number>;
+      tallLobbies: () => ReadonlyMap<number, number>;
+    };
     tower.functionalParkingSet = () => new Set(port.parkingSet().subarray(1));
+    tower.tallLobbies = () => tallLobbyMap(port.lobbyHeights());
     this.tower = tower;
     this.crowd = { people: reader.crowd.people, queueView: () => this.queueView() };
   }
@@ -131,4 +135,11 @@ export class PortRenderSim implements RenderSim {
     this.queue = { landings, boarded };
     return this.queue;
   }
+}
+
+/** The port's flat `[floor, height, ...]` pairs as a floor to height map. */
+export function tallLobbyMap(pairs: ArrayLike<number>): ReadonlyMap<number, number> {
+  const map = new Map<number, number>();
+  for (let i = 0; i + 1 < pairs.length; i += 2) map.set(pairs[i], pairs[i + 1]);
+  return map;
 }
