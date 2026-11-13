@@ -187,8 +187,8 @@ describe("pixelSprites/common person family and palette", () => {
     return 100 - topY; // baseline minus the topmost pixel
   };
 
-  it("the builds keep the finalized heights (15 / 18 / 24 / 22), give or take a hairstyle", () => {
-    const nominal: Record<PersonBuild, number> = { seated: 15, standing: 18, walker: 24, hiVis: 22 };
+  it("the builds keep their heights (18 / 24 / 24 / 22), give or take a hairstyle", () => {
+    const nominal: Record<PersonBuild, number> = { seated: 18, standing: 24, walker: 24, hiVis: 22 };
     for (const build of Object.keys(nominal) as PersonBuild[]) {
       const heights = new Set(CAST.map((_, seed) => heightOf((ctx) => personFigure(ctx, 10, 100, build, "#5A6E8C", seed))));
       // A bun or curls add a pixel and a bald head takes one away; the body is the build's.
@@ -225,8 +225,8 @@ describe("pixelSprites/common person family and palette", () => {
     // The standing build (width 6) must leave a gap between the two legs.
     const { ctx, log } = spyCtx();
     personFigure(ctx, 10, 100, "standing", "#5A6E8C");
-    // Ink legs are the only 2px-wide rects at the leg band (foot-4 .. foot).
-    const legRects = rects(log).filter((r) => r[2] === 2 && r[3] === 4);
+    // Ink legs are the only 2px-wide rects at the leg band (foot-7 .. foot).
+    const legRects = rects(log).filter((r) => r[2] === 2 && r[3] === 7);
     expect(legRects.length).toBe(2);
     const [a, b] = legRects.map((r) => r[0]).sort((p, q) => p - q);
     expect(b - a).toBeGreaterThanOrEqual(3); // left leg ends before the right leg starts

@@ -1,8 +1,6 @@
 //! Port of `crowd/motion.ts`: the per-slice person state machine.
 
-use std::collections::HashMap;
-
-use super::landing::landing_slots;
+use super::landing::{landing_slots, Landings};
 use super::spawn::{inside_x, metro_station_for_platform, pick_x, pick_x_in_segment};
 use super::visits::begin_dwell;
 use super::walk::walk_to;
@@ -25,7 +23,7 @@ fn trip_floors(p: &Person) -> i64 {
 pub fn advance(crowd: &mut Crowd, dt_sec: f64, tower: &mut Tower) {
     let mut frustrated = 0;
     let mut travelling = 0;
-    let slots = landing_slots(crowd, tower);
+    let mut landings = landing_slots(crowd, tower);
     for i in 0..crowd.people.len() {
         crowd.people[i].age += dt_sec;
         let p = &crowd.people[i];
@@ -43,7 +41,7 @@ pub fn advance(crowd: &mut Crowd, dt_sec: f64, tower: &mut Tower) {
             finish(crowd, i, tower);
             continue;
         }
-        step(crowd, i, dt_sec, tower, &slots);
+        step(crowd, i, dt_sec, tower, &mut landings);
         let p = &crowd.people[i];
         if !p.staff
             && matches!(
@@ -66,7 +64,7 @@ pub fn advance(crowd: &mut Crowd, dt_sec: f64, tower: &mut Tower) {
     crowd.people.retain(|p| p.state != PState::Done);
 }
 
-fn step(crowd: &mut Crowd, i: usize, dt: f64, tower: &mut Tower, slots: &HashMap<i64, f64>) {
+fn step(crowd: &mut Crowd, i: usize, dt: f64, tower: &mut Tower, landings: &mut Landings) {
     let state = crowd.people[i].state;
     match state {
         PState::ToShaft => {
@@ -74,13 +72,20 @@ fn step(crowd: &mut Crowd, i: usize, dt: f64, tower: &mut Tower, slots: &HashMap
             let Some(shaft) = p.shaft_id.and_then(|id| tower.get_transport(id)) else {
                 return finish(crowd, i, tower);
             };
-            let target_x = shaft.x as f64 + shaft.width as f64 / 2.0;
             let (shaft_id, is_elevator) = (shaft.id, shaft.kind.is_elevator());
+            // An elevator rider walks straight to the back of the line, and a
+            // climber to the middle of the stairs or the escalator (#2116).
+            let target_x = if is_elevator {
+                landings.back_of_line(tower, shaft, p.floor)
+            } else {
+                shaft.x as f64 + shaft.width as f64 / 2.0
+            };
             let p = &mut crowd.people[i];
             if walk_to(p, target_x, dt, tower) {
                 if is_elevator {
                     p.state = PState::Waiting;
                     p.wait = 0.0;
+                    landings.join(shaft_id, p.floor);
                 } else {
                     p.state = PState::Climbing;
                     p.wait = 0.0;
@@ -133,7 +138,8 @@ fn step(crowd: &mut Crowd, i: usize, dt: f64, tower: &mut Tower, slots: &HashMap
             };
             let shaft = shaft.clone();
             let pid = crowd.people[i].id;
-            let target = slots
+            let target = landings
+                .slots
                 .get(&pid)
                 .copied()
                 .unwrap_or(shaft.x as f64 + shaft.width as f64 / 2.0);

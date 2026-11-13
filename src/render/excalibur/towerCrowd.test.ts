@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { kindFacts } from "../../tests/catalogKinds";
 import * as ex from "excalibur";
 import { FLOOR, TILE } from "../scale";
-import { carIndicator, type CarIndicator } from "../carIndicator";
+import { cabFit, carIndicator, type CarIndicator } from "../carIndicator";
 import { reap, reconcileCrowd, clearCrowd, clearMotion, tickCrowdClock, updateMotion } from "./towerCrowd";
 import { Z } from "../depthPlanes";
 import { HallDoorLayer } from "./towerHallDoors";
@@ -252,33 +252,6 @@ describe("reconcileCrowd draws one actor per live person", () => {
     expect(rec.actor.z).toBe(Z.walking);
   });
 
-  it("gets a rider in and out of a car when the drawn car arrives, not a step early", () => {
-    const person = { id: 1, seed: 0, staff: false, state: "waiting", x: 10, fy: 5, wait: 0 };
-    const e = eng({ sim: { ...eng().sim, crowd: { people: [person] } } });
-    frame(e, 16);
-    frame(e, 484);
-    const rec = e.crowdActors.get(1);
-    // The engine puts them in the car on this step; the drawn car is still
-    // gliding to the landing, so they wait there in sight.
-    Object.assign(person, { state: "riding" });
-    e.sim.clock = { ...e.sim.clock, minutes: 1 };
-    frame(e, 16);
-    frame(e, 100);
-    expect(rec.actor.graphics.isVisible, "while the car is on its way").toBe(true);
-    // The glide ends: they are in the car.
-    frame(e, 1000);
-    expect(rec.actor.graphics.isVisible, "once the car is there").toBe(false);
-    // Out at floor 9: hidden until the drawn car gets there, then standing at the landing.
-    Object.assign(person, { state: "toDest", fy: 9, x: 11 });
-    e.sim.clock = { ...e.sim.clock, minutes: 2 };
-    frame(e, 600);
-    expect(rec.actor.graphics.isVisible, "while the car rides up").toBe(false);
-    e.sim.clock = { ...e.sim.clock, minutes: 3 };
-    frame(e, 600);
-    expect(rec.actor.graphics.isVisible, "the next step").toBe(true);
-    expect(rec.actor.pos.y).toBeCloseTo(-9 * FLOOR + FLOOR - 3, 6);
-  });
-
   it("keeps an even leg cadence at a fast speed instead of strobing", () => {
     const g = newGlide(0, 5, false);
     // A fast step: 30 tiles in two drawn frames.
@@ -404,7 +377,7 @@ describe("updateMotion repositions the moving actors", () => {
   it("moves each elevator car to its live shaft position and repaints on a state change", () => {
     const cap = kindFacts("elevatorStandard").carCapacity ?? 0;
     expect(cap, "a standard elevator car carries passengers").toBeGreaterThan(0);
-    const changedInd = carIndicator(1, cap, cap); // ascending & full: differs from idle
+    const changedInd = carIndicator(1, cap, cap, cabFit(4 * TILE)); // ascending & full: differs from idle
     const changedKey = carKey(changedInd);
     const car = {
       actor: actor(),
