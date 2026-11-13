@@ -1,5 +1,5 @@
-import { catalogFacility, type Catalog, type CatalogRent } from "../catalog/catalogTypes";
-import type { PriceOptions, PriceRung } from "../shared/engineTypes";
+import { catalogFacility, type Catalog, type CatalogCalendar, type CatalogRent, type CatalogRentCadence } from "../catalog/catalogTypes";
+import type { CalendarKind, PriceOptions, PriceRung } from "../shared/engineTypes";
 import type { FacilityKind } from "../shared/types";
 
 /**
@@ -40,4 +40,25 @@ export function priceOptionsFromRent(rent: CatalogRent | null): PriceOptions | n
 export function unitPrice(catalog: Catalog, u: { kind: FacilityKind; rent?: number; noRate?: boolean }): number {
   if (u.noRate) return 0;
   return u.rent ?? catalogFacility(catalog, u.kind).rent?.default ?? 0;
+}
+
+/** The calendar a tower runs, from its catalog: the one the tower chose when
+ *  the mode lets it choose, else the mode's only calendar (a Classic tower
+ *  runs the 1994 calendar whatever its save stores). */
+export function catalogCalendar(catalog: Catalog, chosen: CalendarKind | undefined): CatalogCalendar {
+  const { calendars } = catalog.economy;
+  return calendars.find((c) => c.key === chosen) ?? calendars[0];
+}
+
+/** What one collection of a unit's rent pays at `price` on `calendar` (#2107):
+ *  a quarterly rent times the calendar's `quarterlyRentScale`, a monthly rent
+ *  times its `maintenanceScale`, and a sale or a nightly rate as it is. The
+ *  engine scales each collection by the same factors the catalog publishes,
+ *  so on Modern's short 1994 calendar a $10,000 office lands $333 each
+ *  three-day quarter. This is one room's share: the engine rounds each kind's
+ *  total once, so 36 such offices land $12,000, not 36 times $333. */
+export function rentPerCollection(cadence: CatalogRentCadence, price: number, calendar: CatalogCalendar): number {
+  if (cadence === "quarterly") return Math.round(price * calendar.quarterlyRentScale);
+  if (cadence === "maintenancePeriod") return Math.round(price * calendar.maintenanceScale);
+  return price;
 }

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import type { CatalogRent } from "../catalog/catalogTypes";
+import type { CatalogCalendar, CatalogRent } from "../catalog/catalogTypes";
 import { catalogFor } from "../tests/catalogFixture";
-import { priceOptionsFor, priceOptionsFromRent, unitPrice } from "./catalogPricing";
+import { catalogCalendar, priceOptionsFor, priceOptionsFromRent, rentPerCollection, unitPrice } from "./catalogPricing";
 
 /**
  * The price controls and a unit's price, read from a catalog. The engine's
@@ -81,5 +81,32 @@ describe("a unit's price from the catalog (#921)", () => {
 
   it("is nothing for a kind the mode does not price", () => {
     expect(unitPrice(catalogFor("classic"), { kind: "lobby" })).toBe(0);
+  });
+});
+
+describe("the tower's calendar and one collection's rent (#2107)", () => {
+  it("finds the calendar a Modern tower chose, and Classic's only calendar whatever the save stores", () => {
+    expect(catalogCalendar(catalogFor("modern"), "canon").key).toBe("canon");
+    expect(catalogCalendar(catalogFor("modern"), "realWorld").key).toBe("realWorld");
+    expect(catalogCalendar(catalogFor("modern"), undefined).key).toBe("realWorld");
+    expect(catalogCalendar(catalogFor("classic"), "realWorld").key).toBe("canon");
+  });
+
+  const SHORT: CatalogCalendar = { key: "canon", quarterDays: 3, maintenancePeriodDays: 3, maintenanceScale: 0.1, quarterlyRentScale: 1 / 30 };
+  const FULL: CatalogCalendar = { ...SHORT, key: "realWorld", maintenanceScale: 1, quarterlyRentScale: 1 };
+
+  it("scales a quarterly rent by the calendar's quarterly scale, rounded to whole dollars", () => {
+    expect(rentPerCollection("quarterly", 10_000, SHORT)).toBe(333);
+    expect(rentPerCollection("quarterly", 10_000, FULL)).toBe(10_000);
+  });
+
+  it("scales a monthly rent by the calendar's maintenance scale", () => {
+    expect(rentPerCollection("maintenancePeriod", 2_500, SHORT)).toBe(250);
+    expect(rentPerCollection("maintenancePeriod", 2_500, FULL)).toBe(2_500);
+  });
+
+  it("leaves a sale price and a nightly rate as they are", () => {
+    expect(rentPerCollection("sale", 150_000, SHORT)).toBe(150_000);
+    expect(rentPerCollection("nightly", 150, SHORT)).toBe(150);
   });
 });

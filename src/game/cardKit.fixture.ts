@@ -32,7 +32,7 @@ export function kitOf(sim: Draft): { kit: CardKit; engine: EnginePort; reader: V
 
 export function unitEditor(sim: Draft, u: Pick<Unit, "id">, mobile = false): TemplateResult {
   const { kit, engine, reader } = kitOf(sim);
-  return unitEditorTemplate(kit.cards.unit(u.id)!, catalogOf({ enginePort: engine, reader }), clockOf(reader.header).hour, mobile, mobile ? kit.diagnostics.unit(u.id) : []);
+  return unitEditorTemplate(kit.cards.unit(u.id)!, catalogOf({ enginePort: engine, reader }), clockOf(reader.header).hour, mobile, mobile ? kit.diagnostics.unit(u.id) : [], reader.header.modernCalendar);
 }
 
 export function transportEditor(sim: Draft, t: Pick<Transport, "id">, mobile = false): TemplateResult {
