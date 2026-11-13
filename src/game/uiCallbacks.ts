@@ -62,6 +62,8 @@ export interface GameAppPorts {
   toggleReducedMotion(): boolean;
   toggleSteadyClock(): boolean;
   isSteadyClock(): boolean;
+  togglePassersBy(): boolean;
+  isPassersBy(): boolean;
   replayOnboarding(): void;
   /** Drop the Modern build-refusal card and its ownership latch (no-op when
    *  the build path doesn't own the card). The inspector ✕ routes through
@@ -130,6 +132,8 @@ export function createUICallbacks(app: GameAppPorts): UICallbacks {
     onToggleReducedMotion: () => app.toggleReducedMotion(),
     onToggleSteadyClock: () => app.toggleSteadyClock(),
     isSteadyClock: () => app.isSteadyClock(),
+    onTogglePassersBy: () => app.togglePassersBy(),
+    isPassersBy: () => app.isPassersBy(),
     // The preference the engine holds after the toggle (a Classic tower
     // always bridges, so there it stays on).
     onToggleAutoBridge: async () => app.portCodes.slot(app.enginePort.flipAutoBridge(), "flipAutoBridge", "value") === 1,

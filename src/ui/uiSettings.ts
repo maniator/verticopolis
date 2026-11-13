@@ -18,8 +18,12 @@ export function showSettings(ui: UI): void {
   // The Building section (the bridging toggle) shows only where the tower's
   // catalog says the player can switch bridging off (Modern); elsewhere
   // bridging is always on and the section never renders.
-  const bridgingToggleable = ui.cb.getCatalog().economy.autoBridgeToggleable;
-  const box = ui.openModalTemplate(settingsTemplate(version, bridgingToggleable, engineSuffix()), { displaceable: true });
+  const catalog = ui.cb.getCatalog();
+  const bridgingToggleable = catalog.economy.autoBridgeToggleable;
+  // The passers-by switch shows only where the catalog lets the mode draw
+  // decorative passers-by (Modern); a Classic tower has none to switch (#2091).
+  const passersBy = catalog.rules.decorativePassersBy;
+  const box = ui.openModalTemplate(settingsTemplate(version, bridgingToggleable, engineSuffix(), passersBy), { displaceable: true });
   // Volume sliders: initialize from the live levels, apply on every input tick
   // (persistence is debounced by the onSetVolume handler in main.ts), and keep
   // the percent readout in step. Mute is independent; sliders never touch it.
@@ -52,6 +56,11 @@ export function showSettings(ui: UI): void {
   rm.disabled = osForced;
   if (osForced) rm.closest("label")!.querySelector("span")!.textContent = "Reduced motion (system)";
   rm.addEventListener("change", () => (rm.checked = ui.cb.onToggleReducedMotion()));
+  if (passersBy) {
+    const pb = box.querySelector<HTMLInputElement>("#set-passers-by")!;
+    pb.checked = ui.cb.isPassersBy();
+    pb.addEventListener("change", () => (pb.checked = ui.cb.onTogglePassersBy()));
+  }
   // The bridging toggle (Modern): it shows the live state and re-reads the
   // callback's return after every toggle. Always available where the catalog
   // offers it (rooms auto-lay their floor regardless; this only controls the

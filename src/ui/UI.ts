@@ -55,11 +55,9 @@ export interface UICallbacks {
   getVolumes(): { music: number; ambience: number; sfx: number };
   onUndo(): void;
   onRedo(): void;
-  /** Whether an edit gesture is still open. A release the canvas never saw
-   *  can leave one open with nothing on the stacks yet, so a click on a gray
-   *  Undo still closes and undoes it. Redo takes no such check: closing a
-   *  gesture adds an undo step and leaves no redo step, so a gray Redo has
-   *  nothing to run. */
+  /** Whether an edit gesture is still open. A release the canvas never saw can leave one open with nothing
+   *  on the stacks yet, so a click on a gray Undo still closes and undoes it. Redo takes no such check:
+   *  closing a gesture adds an undo step and leaves no redo step, so a gray Redo has nothing to run. */
   undoUnderWay(): boolean;
   onEditAction(action: string, root: HTMLElement): void;
   /** Toggle reduced motion; returns the new effective state. */
@@ -68,6 +66,9 @@ export interface UICallbacks {
   onToggleSteadyClock(): boolean;
   /** The live steady-clock state, read from the same in-memory prefs the game loop consults (never a second localStorage read, which could disagree). */
   isSteadyClock(): boolean;
+  /** Modern's "Show decorative passers-by" switch (#2091): flip it (returns the new state), and its live state. */
+  onTogglePassersBy(): boolean;
+  isPassersBy(): boolean;
   /** Modern bridging toggle for the Settings switch: flip (no-op in Classic); resolves to the preference in force afterward. */
   onToggleAutoBridge(): Promise<boolean>;
   isAutoBridge(): boolean;

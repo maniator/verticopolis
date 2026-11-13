@@ -6,7 +6,8 @@ import { trackAppAction, trackAppActionOnce } from "../analytics";
  * Audio, accessibility, and steady-clock preference commands, split out of the
  * `GameApp` class as friend functions. They read the live `app.audio`/`app.prefs`
  * facade per call (never captured). The `GameAppPorts` members
- * (`toggleMute`/`setVolume`/`toggleReducedMotion`/`toggleSteadyClock`/`isSteadyClock`)
+ * (`toggleMute`/`setVolume`/`toggleReducedMotion`/`toggleSteadyClock`/`isSteadyClock`,
+ * `togglePassersBy`/`isPassersBy`)
  * stay on `GameApp` as one-line delegators into these. Behavior unchanged.
  */
 
@@ -65,6 +66,26 @@ export function toggleSteadyClock(app: GameApp): boolean {
   savePrefs(app.prefs);
   trackAppAction("steady_clock", app.prefs.steadyClock ? "on" : "off"); // new steady state
   return app.prefs.steadyClock;
+}
+
+/** Toggle Modern's decorative passers-by, persist it, and return the new state. */
+export function togglePassersBy(app: GameApp): boolean {
+  app.prefs.passersBy = !isPassersBy(app);
+  savePrefs(app.prefs);
+  applyPassersBy(app);
+  return app.prefs.passersBy;
+}
+
+/** Whether the decorative passers-by switch is on. It starts off (owner,
+ *  2026-11-13): only an explicit `true` shows them. */
+export function isPassersBy(app: GameApp): boolean {
+  return app.prefs.passersBy === true;
+}
+
+/** Push the passers-by switch to the engine, which hides every passer-by when
+ *  it is off. A Classic tower builds none whatever it says (#2091). */
+export function applyPassersBy(app: GameApp): void {
+  app.engine.passersBy = isPassersBy(app);
 }
 
 /** The live steady-clock state (the same in-memory prefs the game loop reads). */

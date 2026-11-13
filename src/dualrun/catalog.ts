@@ -97,7 +97,7 @@ const ECONOMY: Shape = {
   ticketPriceDefault: (v) => v === null || typeof v === "string",
   autoBridgeToggleable: bool,
 };
-const RULES: Shape = { variantHouseholds: bool, previewNamesRefusal: bool, scheduleAssist: bool, buildsWhilePaused: bool, exportsTo1994: bool, quotesLobbyDistance: bool, tallSkyLobbies: bool, maxLobbyHeight: size };
+const RULES: Shape = { variantHouseholds: bool, previewNamesRefusal: bool, scheduleAssist: bool, buildsWhilePaused: bool, exportsTo1994: bool, quotesLobbyDistance: bool, tallSkyLobbies: bool, maxLobbyHeight: size, decorativePassersBy: bool };
 const EXTERMINATOR: Shape = { calloutFee: amount, perRoomFee: amount };
 const FILM: Shape = { key: (v) => v === "new" || v === "classic" || v === "blockbuster", label: (v) => typeof v === "string", price: amount };
 const TICKET_PRICE: Shape = { key: text, label: text, incomeMult: positive, pickMult: positive };

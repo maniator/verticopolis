@@ -39,7 +39,7 @@ export interface CatalogTicketPrice {
 
 /** The version of the catalog's shape. It moves when a field is added,
  *  renamed or removed, so a frontend can refuse a shape it does not know. */
-export const CATALOG_VERSION = 15;
+export const CATALOG_VERSION = 16;
 
 /** Every price, size and build rule of one mode. */
 export interface Catalog {
@@ -168,6 +168,11 @@ export interface CatalogRules {
   /** The most stories a lobby can rise (#308). A floor's first lobby sets its
    *  height, and it never changes after. */
   readonly maxLobbyHeight: number;
+  /** Whether the frontend may draw decorative passers-by: figures that pace
+   *  the corridors for life but are not people the engine knows about
+   *  (#2091). When false (Classic, as in SimTower) it draws only the
+   *  engine's own people. */
+  readonly decorativePassersBy: boolean;
 }
 
 /** One calendar a tower can run and how it scales the quoted figures. */

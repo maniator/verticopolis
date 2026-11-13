@@ -2069,6 +2069,7 @@
   ],
   "rules": {
     "buildsWhilePaused": false,
+    "decorativePassersBy": false,
     "exportsTo1994": true,
     "maxLobbyHeight": 3,
     "previewNamesRefusal": false,
@@ -2077,7 +2078,7 @@
     "tallSkyLobbies": false,
     "variantHouseholds": false
   },
-  "version": 15,
+  "version": 16,
   "world": {
     "groundFloor": 1,
     "groundFloorStructure": "lobby",

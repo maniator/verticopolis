@@ -1,166 +1,93 @@
 import * as ex from "excalibur";
 import { Z } from "../depthPlanes";
-import { coveredUpperStories, lotCovered, lobbyLaneSpan } from "./towerCrowdLayout";
-import { FLOOR, TILE } from "../scale";
-import { spiralRadius } from "../sprites/spiralStair";
+import { coveredUpperStories, lotCovered, trafficLots } from "./towerCrowdLayout";
+import { FLOOR } from "../scale";
 import type { TowerEngine } from "./TowerEngine";
-import type { Walker } from "./towerCrowd";
 import { towerCatalog } from "../../catalog/towerCatalog";
 
 /**
- * Construction of the ambient walker population: the structural runs a tower's
- * floor and lobby tiles form, and one pacing figure per slot in them. Split out
- * of `towerCrowd.ts` so the per-frame motion path and this build-once path stay
- * separately readable (and so neither file sits on the size ceiling).
+ * Construction of the decorative passers-by: figures that loiter in a short
+ * stretch of corridor for life, but are not people the engine knows about.
+ * Split out of `towerCrowd.ts` so the per-frame motion path and this
+ * build-once path stay separately readable.
+ *
+ * What they may do is set by #2091, after a player said they hid the traffic:
+ * - A Classic tower builds none, because SimTower had none. The catalog says
+ *   so (`rules.decorativePassersBy`), and nothing is built and then hidden.
+ * - A Modern tower builds them only in corridors, never in a lobby or on a
+ *   stair or escalator, and never on a lot where a player reads traffic
+ *   (an elevator landing, a flight's landing, a shop's front; see
+ *   `trafficLots`). There are half as many as the old corridor rule.
+ * - `updateMotion` next door shows a floor's figures only while that floor has
+ *   live occupants, and hides them all when the Settings switch is off or
+ *   reduced motion is on.
  *
  * This runs once per rebuild, not per frame: it reads the tower's layout and
  * hands each figure a share of the already-baked `engine.personGfx` canvases.
  * Baking none of its own means it runs under happy-dom, so it is unit-tested in
- * `towerWalkerBuild.test.ts`; the gating that decides who is actually SHOWN
- * lives in `updateMotion` next door, tested in `towerCrowd.test.ts`.
+ * `towerWalkerBuild.test.ts`.
  */
 
+/** The most figures one corridor run gets, and how many per tile of run. Half
+ *  of the old 8 and 0.14 (#2091). */
+export const PASSERS_PER_RUN_CAP = 4;
+export const PASSERS_PER_TILE = 0.07;
+/** The most figures a whole tower gets. */
+export const PASSERS_BUDGET = 200;
+
+/** One contiguous corridor stretch on a floor, in tiles (inclusive). */
 interface Run {
-  kind: "floor" | "lobby";
   floor: number;
   x0: number;
   x1: number;
 }
 
-/** Where a figure counts as standing for the reachability gate. A climber spans
- *  two landings and carries both; everyone else repeats the one they pace. */
-interface WalkerSpot {
-  floor: number;
-  tileX: number;
-  altFloor: number;
-  altTileX: number;
-}
-
-/** A figure that stands in exactly one place: both ends are the same spot. */
-function oneSpot(floor: number, tileX: number): WalkerSpot {
-  return { floor, tileX, altFloor: floor, altTileX: tileX };
-}
-
-
 export function buildWalkers(engine: TowerEngine): void {
-  const coveredRows = coveredUpperStories(engine.sim.tower.units, towerCatalog(engine.sim));
-  const byFloor = new Map<number, Map<number, "floor" | "lobby">>();
-  for (const u of engine.sim.tower.units) {
-    if (u.kind === "floor" || u.kind === "lobby") {
-      if (lotCovered(coveredRows, u.floor, u.x)) continue; // upper story of a multi-floor facility
-      let row = byFloor.get(u.floor);
-      if (!row) byFloor.set(u.floor, (row = new Map()));
-      row.set(u.x, u.kind);
-    }
+  const catalog = towerCatalog(engine.sim);
+  if (!catalog.rules.decorativePassersBy) return;
+  const tower = engine.sim.tower;
+  const coveredRows = coveredUpperStories(tower.units, catalog);
+  const traffic = trafficLots(tower.transports, tower.units, catalog);
+  const byFloor = new Map<number, Set<number>>();
+  for (const u of tower.units) {
+    // Corridors only: the bare floor lots between rooms. A lobby is where the
+    // engine's own commuters cross, so it gets no decorative figure.
+    if (u.kind !== "floor") continue;
+    if (lotCovered(coveredRows, u.floor, u.x)) continue; // upper story of a multi-floor facility
+    if (traffic.get(u.floor)?.has(u.x)) continue;
+    let row = byFloor.get(u.floor);
+    if (!row) byFloor.set(u.floor, (row = new Set()));
+    row.add(u.x);
   }
-  let budget = 400;
+  let budget = PASSERS_BUDGET;
   for (const [floor, row] of byFloor) {
     for (const run of mergeRuns(floor, row)) {
-      if (budget <= 0) break;
+      if (budget <= 0) return;
       const wTiles = run.x1 - run.x0 + 1;
-      const density = run.kind === "lobby" ? 0.5 : 0.14;
-      const count = Math.min(run.kind === "lobby" ? 20 : 8, Math.floor(wTiles * density));
+      const count = Math.min(PASSERS_PER_RUN_CAP, Math.floor(wTiles * PASSERS_PER_TILE));
       const foot = engine.worldYTop(floor) + FLOOR - 3;
       const x0w = engine.worldX(run.x0) + 3;
       const x1w = engine.worldX(run.x1 + 1) - 3;
       const runW = x1w - x0w;
       for (let i = 0; i < count && budget > 0; i++, budget--) {
         const seed = (floor * 131 + run.x0 * 7 + i * 53) | 0;
-        const rank = (i + 0.5) / count; // only the first few show until it fills
-        const speed = 7 + (Math.abs(seed) % 6);
-        if (run.kind === "lobby") {
-          // Concourse: each figure paces its own evenly spaced lane, gated on
-          // tower busyness. Confining every figure to a lane keeps a busy lobby
-          // from piling everyone at the ping-pong turnaround ends (the old
-          // full-width sweep bunched them up there).
-          const [segX0, segX1] = lobbyLaneSpan(i, count, x0w, x1w);
-          spawnWalker(engine, segX0, segX1, foot, foot, seed, speed, rank, oneSpot(floor, run.x0), false);
-        } else {
-          // Corridor: loiter in a short stretch around a spread-out anchor, so a
-          // lone figure shuffles in place instead of sprinting the whole floor,
-          // and only appears when this floor actually has occupants.
-          const anchor = x0w + rank * runW;
-          const half = Math.min(14, runW / 2);
-          // Clamp the loiter span to the run so a figure never paces past the
-          // corridor ends, robust even if the count/density constants change.
-          const segX0 = Math.max(x0w, anchor - half);
-          const segX1 = Math.min(x1w, anchor + half);
-          spawnWalker(engine, segX0, segX1, foot, foot, seed, speed, rank, oneSpot(floor, run.x0), true);
-        }
+        const rank = (i + 0.5) / count; // only the first few show until the floor fills
+        // Loiter in a short stretch around a spread-out anchor, so a lone
+        // figure shuffles in place instead of sprinting the whole floor. The
+        // span is clamped to the run, so a figure never paces past its ends
+        // onto a traffic lot.
+        const anchor = x0w + rank * runW;
+        const half = Math.min(14, runW / 2);
+        spawnWalker(engine, Math.max(x0w, anchor - half), Math.min(x1w, anchor + half), foot, seed, 7 + (Math.abs(seed) % 6), rank, floor);
       }
     }
   }
-  const tower = engine.sim.tower;
-  for (const t of tower.transports) {
-    if (t.kind !== "stairs" && t.kind !== "escalator") continue;
-    const x0w = engine.worldX(t.x) + 2;
-    const x1w = engine.worldX(t.x + t.width) - 3;
-    const yb = engine.worldYTop(t.bottom) + FLOOR - 2;
-    // A flight out of a tall lobby (#308) climbs every story of it.
-    const yt = yb - ((t.top - t.bottom) * FLOOR - 4);
-    const n = t.kind === "escalator" ? 3 : 2;
-    // Both landings, so the gate can require both ends of the flight rather
-    // than assuming the bottom stands for the whole climb (#665).
-    const spot: WalkerSpot = {
-      floor: t.bottom,
-      tileX: landingTile(tower, t, t.bottom),
-      altFloor: t.top,
-      altTileX: landingTile(tower, t, t.top),
-    };
-    // Stairs out of a tall lobby are a spiral (drawSpiralStair) and an
-    // escalator a switchback; their climbers follow the same path.
-    const stories = t.top - t.bottom;
-    const w = t.width * TILE;
-    const spiral = t.kind === "stairs" && stories > 1 ? { cx: engine.worldX(t.x) + Math.round(w / 2), r: spiralRadius(w), stories } : undefined;
-    for (let i = 0; i < n; i++) {
-      const seed = (t.id * 17 + i * 29) | 0;
-      // Low ranks so stairs/escalators show climbers even in a modest tower,
-      // otherwise the routed crowd (elevators only) makes stairs look unused.
-      spawnWalker(engine, x0w, x1w, yb, yt, seed, t.kind === "escalator" ? 12 : 7, 0.04 + i * 0.18, spot, false, spiral, t.kind === "escalator" ? stories : undefined);
-    }
-  }
 }
 
-/**
- * The tile a flight actually lands on at `floor`: the first structural tile
- * under its footprint, mirroring the leftmost run the router's own `landingSegs`
- * reports.
- *
- * Not `t.x`: a transport only needs SOME tile under its footprint to be
- * structural, so on a gap-split floor a stair may legally sit with its leftmost
- * column over the void. Probing `t.x` there finds no run, and the climbers on a
- * perfectly usable flight would be hidden (#665). Falls back to `t.x` when the
- * whole footprint is unstructured, which is the same fallback the router takes.
- *
- * This is a second copy of the router's rule living in the render layer, so the
- * two agreeing is load-bearing rather than incidental: `towerWalkerBuild.test.ts`
- * asserts `segAt(floor, landingTile(...)) === landingSegs(...)[0]` on a real tower
- * so a change to one cannot silently drift from the other (#674).
- */
-export function landingTile(tower: TowerEngine["sim"]["tower"], t: { x: number; width: number }, floor: number): number {
-  for (let i = 0; i < t.width; i++) {
-    if (tower.hasStructure(floor, t.x + i)) return t.x + i;
-  }
-  return t.x;
-}
-
-function spawnWalker(
-  engine: TowerEngine,
-  x0w: number,
-  x1w: number,
-  y0w: number,
-  y1w: number,
-  seed: number,
-  speed: number,
-  rank: number,
-  spot: WalkerSpot,
-  perFloor: boolean,
-  spiral?: Walker["spiral"],
-  switchback?: number,
-): void {
+function spawnWalker(engine: TowerEngine, x0w: number, x1w: number, yw: number, seed: number, speed: number, rank: number, floor: number): void {
   const gfx = engine.personGfx[Math.abs(seed) % engine.personGfx.length];
   // Actor bounds track the baked canvas footprint (see reconcileCrowd).
-  const a = new ex.Actor({ pos: ex.vec(x0w, y0w), width: gfx.width, height: gfx.height, anchor: ex.vec(0.5, 1), z: Z.walker });
+  const a = new ex.Actor({ pos: ex.vec(x0w, yw), width: gfx.width, height: gfx.height, anchor: ex.vec(0.5, 1), z: Z.walker });
   a.graphics.use(gfx);
   engine.engine.add(a);
   engine.walkers.push({
@@ -168,39 +95,31 @@ function spawnWalker(
     gfx,
     x0w,
     x1w,
-    y0w,
-    y1w,
+    yw,
     speed,
     dir: seed % 2 === 0 ? 1 : -1,
     phase: (Math.abs(seed) % 100) / 100,
-    impatient: (((seed >>> 8) & 0xff) / 255) < 0.5,
-    red: false,
     rank,
-    ...spot,
-    perFloor,
-    spiral,
-    switchback,
+    floor,
   });
 }
 
-function mergeRuns(floor: number, row: Map<number, "floor" | "lobby">): Run[] {
-  const xs = [...row.keys()].sort((a, b) => a - b);
+/** The contiguous runs of a floor's corridor lots. */
+function mergeRuns(floor: number, row: Set<number>): Run[] {
+  const xs = [...row].sort((a, b) => a - b);
   const runs: Run[] = [];
   if (xs.length === 0) return runs;
   let start = xs[0];
   let prev = xs[0];
-  let kind = row.get(xs[0])!;
   for (let i = 1; i < xs.length; i++) {
     const x = xs[i];
-    const k = row.get(x)!;
-    if (x === prev + 1 && k === kind) {
+    if (x === prev + 1) {
       prev = x;
     } else {
-      runs.push({ kind, floor, x0: start, x1: prev });
+      runs.push({ floor, x0: start, x1: prev });
       start = prev = x;
-      kind = k;
     }
   }
-  runs.push({ kind, floor, x0: start, x1: prev });
+  runs.push({ floor, x0: start, x1: prev });
   return runs;
 }

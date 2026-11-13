@@ -1,14 +1,21 @@
 import { describe, it, expect } from "vitest";
-import { coveredUpperStories, lotCovered, lobbyLaneSpan } from "./towerCrowdLayout";
+import {
+  coveredUpperStories,
+  ELEVATOR_LANDING_TILES,
+  FLIGHT_LANDING_TILES,
+  lotCovered,
+  SHOP_FRONT_TILES,
+  trafficLots,
+} from "./towerCrowdLayout";
 import type { Unit } from "../../shared/types";
 import { catalogFor } from "../../tests/catalogFixture";
 
 const MODERN = catalogFor("modern");
 
 /**
- * Pure layout math for the ambient-walker builder: the multi-floor-facility
- * exclusion (so figures never float on a facility's upper story) and the lobby
- * lane split (so a busy concourse fans figures out instead of clumping). These
+ * Pure layout math for the decorative passer-by builder: the multi-floor-facility
+ * exclusion (so figures never float on a facility's upper story) and the
+ * traffic lots they keep off (so they never stand where real queues form). These
  * take plain values, so unlike buildWalkers they run without a canvas bake.
  */
 
@@ -57,41 +64,29 @@ describe("lotCovered tests a lot against the covered spans (half-open)", () => {
   });
 });
 
-describe("lobbyLaneSpan splits a concourse run into non-inverting lanes", () => {
-  it("keeps every lane within the run and never inverts, for any count", () => {
-    for (const count of [1, 2, 5, 8, 20]) {
-      for (let i = 0; i < count; i++) {
-        const [a, b] = lobbyLaneSpan(i, count, 100, 400);
-        expect(a).toBeGreaterThanOrEqual(100);
-        expect(b).toBeLessThanOrEqual(400);
-        expect(b).toBeGreaterThanOrEqual(a); // segment never inverts
-      }
-    }
+describe("trafficLots marks where a player reads real traffic (#2091)", () => {
+  const span = (lots: Map<number, Set<number>>, floor: number) => {
+    const xs = [...(lots.get(floor) ?? [])].sort((a, b) => a - b);
+    return xs.length ? [xs[0], xs[xs.length - 1], xs.length] : null;
+  };
+
+  it("clears an elevator's landing on every floor it serves, and no other", () => {
+    const lots = trafficLots([{ kind: "elevatorStandard", x: 50, width: 4, bottom: 2, top: 4 }], [], MODERN);
+    const want = [50 - ELEVATOR_LANDING_TILES, 53 + ELEVATOR_LANDING_TILES, 4 + 2 * ELEVATOR_LANDING_TILES];
+    expect([span(lots, 2), span(lots, 3), span(lots, 4)]).toEqual([want, want, want]);
+    expect(span(lots, 1)).toBeNull();
+    expect(span(lots, 5)).toBeNull();
   });
 
-  it("places lanes at evenly spaced, distinct anchors across the run", () => {
-    const count = 8;
-    const mids: number[] = [];
-    for (let i = 0; i < count; i++) {
-      const [a, b] = lobbyLaneSpan(i, count, 0, 800);
-      mids.push((a + b) / 2);
-    }
-    // Midpoints climb monotonically and span the run, so figures fan across the
-    // width instead of sharing a lane.
-    for (let i = 1; i < count; i++) expect(mids[i]).toBeGreaterThan(mids[i - 1]);
-    expect(new Set(mids).size).toBe(count);
+  it("clears a narrower margin round a stair or escalator", () => {
+    const lots = trafficLots([{ kind: "stairs", x: 10, width: 8, bottom: 4, top: 5 }], [], MODERN);
+    expect(span(lots, 4)).toEqual([10 - FLIGHT_LANDING_TILES, 17 + FLIGHT_LANDING_TILES, 8 + 2 * FLIGHT_LANDING_TILES]);
+    expect(span(lots, 5)).toEqual(span(lots, 4));
   });
 
-  it("never collapses figures into one lane, even when count is a multiple of 7", () => {
-    // A stride-based interleave (i * 7 mod count) would map every figure to the
-    // same lane at count 7 or 14; the even split must keep them distinct.
-    for (const count of [7, 14]) {
-      const mids = new Set<number>();
-      for (let i = 0; i < count; i++) {
-        const [a, b] = lobbyLaneSpan(i, count, 0, 800);
-        mids.add((a + b) / 2);
-      }
-      expect(mids.size).toBe(count);
-    }
+  it("clears a commercial room's front but not an office's", () => {
+    const lots = trafficLots([], [unit("shop", 3, 40, 12), unit("office", 6, 40, 9)], MODERN);
+    expect(span(lots, 3)).toEqual([40 - SHOP_FRONT_TILES, 51 + SHOP_FRONT_TILES, 12 + 2 * SHOP_FRONT_TILES]);
+    expect(span(lots, 6)).toBeNull();
   });
 });

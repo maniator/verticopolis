@@ -13,6 +13,9 @@ export interface Prefs {
    *  the day at a uniform real-time rate. Presentation-only, like the speed
    *  buttons: never serialized with a tower, and never touches the sim. */
   steadyClock?: boolean;
+  /** Modern's decorative passers-by (#2091). Absent means off (owner,
+   *  2026-11-13); only an explicit `true` shows them. */
+  passersBy?: boolean;
   /** Master mute (the top-bar speaker button). */
   muted?: boolean;
   /** Music loudness 0..1 (the composed splash and gameplay tracks). */
@@ -35,6 +38,7 @@ export function loadPrefs(): Prefs {
     if (typeof (p as Prefs).reducedMotion === "boolean") out.reducedMotion = (p as Prefs).reducedMotion;
     if (typeof (p as Prefs).colorblindCue === "boolean") out.colorblindCue = (p as Prefs).colorblindCue;
     if (typeof (p as Prefs).steadyClock === "boolean") out.steadyClock = (p as Prefs).steadyClock;
+    if (typeof (p as Prefs).passersBy === "boolean") out.passersBy = (p as Prefs).passersBy;
     if (typeof (p as Prefs).muted === "boolean") out.muted = (p as Prefs).muted;
     const music = volumeOrNull((p as Prefs).musicVolume);
     if (music !== null) out.musicVolume = music;

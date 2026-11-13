@@ -7,14 +7,21 @@ test.afterEach(async ({ page }) => expectEngineHosted(page));
 
 /**
  * CAP-1 wiring (mobile render-perf spec): zooming out past the sub-legible
- * threshold hides the moving layer (people, walkers, elevator cars, vehicles)
+ * threshold hides the moving layer (people, passers-by, elevator cars, vehicles)
  * and skips its per-frame work; zooming back in restores it, and a structural
  * rebuild while culled never flashes fresh actors.
  */
 test("zoom cull hides the moving layer, restores it, and survives a rebuild", async ({ page }) => {
   await page.goto("/");
   await page.waitForFunction(() => Boolean((window as any).game?.sim && (window as any).game?.ui));
-  await page.evaluate(buildToStar, 2); // a tower with floors, walkers, crowd
+  // Decorative passers-by are Modern-only (#2091), so the walker half of the
+  // cull needs a Modern tower, with the Settings switch (off by default) on.
+  await page.evaluate(() => (window as any).game.saveLoad.newGame("modern"));
+  await page.waitForFunction(() => (window as any).game.reader.header.mode === "modern");
+  await page.evaluate(() => {
+    (window as any).game.engine.passersBy = true;
+  });
+  await page.evaluate(buildToStar, 2); // a tower with floors, passers-by, crowd
   await page.evaluate(() => {
     const g = (window as any).game;
     document.getElementById("splash")?.remove();
@@ -33,9 +40,13 @@ test("zoom cull hides the moving layer, restores it, and survives a rebuild", as
     // empty map. Speed stays 0 afterward, so the crowd holds still.
     // The render reads the crowd from the app's view of the engine, which a
     // frame refreshes; no frame runs inside this loop, so refresh it here.
+    // Passers-by show only on a floor with tenants in (#2091), so also wait for
+    // an office floor to have someone at work.
     const walking = () => (g.reader.update(), g.engine.sim.crowd.people.some((p: any) => p.state !== "riding"));
-    for (let minute = 0; minute < 24 * 60 && !walking(); minute++) g.sim.tick(1);
-    if (!walking()) throw new Error("no one walked the tower in a day");
+    const atWork = () => g.engine.sim.tower.units.some((u: any) => u.floor >= 3 && u.occupants > 0);
+    const ready = () => walking() && atWork();
+    for (let minute = 0; minute < 24 * 60 && !ready(); minute++) g.sim.tick(1);
+    if (!ready()) throw new Error("no one walked the tower while anyone was at work, in a day");
     g.engine.paused = false;
   });
   // Let one frame pass at a normal zoom so the moving layer exists and shows.
@@ -46,7 +57,7 @@ test("zoom cull hides the moving layer, restores it, and survives a rebuild", as
     return {
       culled: e.crowdCulled,
       carsShown: e.carActors.filter((c: any) => c.actor.graphics.isVisible).length,
-      walkers: e.walkers.length,
+      walkersShown: e.walkers.filter((w: any) => w.actor.graphics.isVisible).length,
       crowdShown: [...e.crowdActors.values()].filter((r: any) => r.actor.graphics.isVisible).length,
     };
   });
@@ -54,7 +65,7 @@ test("zoom cull hides the moving layer, restores it, and survives a rebuild", as
   expect(visibleBefore.carsShown).toBeGreaterThan(0);
   // Guard the fixture: the hide assertions below are vacuous over empty lists,
   // so prove the walker and routed-people populations are real before culling.
-  expect(visibleBefore.walkers).toBeGreaterThan(0);
+  expect(visibleBefore.walkersShown).toBeGreaterThan(0);
   expect(visibleBefore.crowdShown).toBeGreaterThan(0);
 
   // Zoom out past the threshold: the whole moving layer hides within a frame.

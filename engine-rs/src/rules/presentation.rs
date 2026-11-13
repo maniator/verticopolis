@@ -50,4 +50,12 @@ impl GameMode {
     pub fn shows_noise_reach(self) -> bool {
         self == GameMode::Modern
     }
+
+    /// Whether a frontend may draw decorative passers-by: figures that pace
+    /// the corridors for life but are not people the engine knows about
+    /// (Modern, behind a player setting). SimTower had none, so Classic
+    /// draws only the engine's own people (#2091).
+    pub fn shows_passers_by(self) -> bool {
+        self == GameMode::Modern
+    }
 }
