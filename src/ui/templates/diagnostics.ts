@@ -2,9 +2,9 @@ import { html, type TemplateResult } from "lit-html";
 import type { DiagnosticsReport } from "../../wasmhost/engineDiagnostics";
 
 /**
- * The engine diagnostics block inside Help's About section (#963): the
+ * The engine diagnostics block inside About this game (#963): the
  * report's summary, its rows and a Copy diagnostics button. The report is
- * built by `engineDiagnostics.ts`; the controller (`showHelp`) wires the
+ * built by `engineDiagnostics.ts`; the controller (`showAbout`, src/ui/uiHelp.ts) wires the
  * button and writes the outcome into the status line.
  */
 export function diagnosticsBlock(report: DiagnosticsReport): TemplateResult {

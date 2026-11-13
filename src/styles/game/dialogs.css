@@ -264,7 +264,7 @@
 }
 /* Read-only build echo at the foot of Settings: muted, small, centered, and set
    apart by a hairline so it never reads as a control. Sourced from the same
-   __APP_VERSION__ as the splash and Help's About line. */
+   __APP_VERSION__ as the splash and About this game's line. */
 .set-version {
   margin: 10px 0 0;
   padding-top: 8px;

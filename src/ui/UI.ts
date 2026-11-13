@@ -14,7 +14,7 @@ import { mountToolbarIcons } from "./uiToolbarIcons";
 import type { ReviewRow } from "./templates/scheduleReview";
 import { toolInfoFor, BULLDOZE_TOOL_INFO, INSPECT_TOOL_INFO } from "./templates/toolInfo";
 import * as dialogs from "./uiDialogs";
-import * as help from "./uiHelpMenu";
+import * as help from "./uiHelp";
 import * as panels from "./uiPanels";
 import * as status from "./uiStatus";
 import type { HudSource } from "./uiStatus";
@@ -453,7 +453,7 @@ export class UI {
   }
 
   /** The guide (the Help site in a new tab), About this game, and the
-   *  Classic vs Modern comparison (src/ui/uiHelpMenu.ts). */
+   *  Classic vs Modern comparison (src/ui/uiHelp.ts). */
   showHelp(): void { help.showHelp(this); }
   showAbout(): void { help.showAbout(this); }
   showCompare(): void { help.showCompare(this); }

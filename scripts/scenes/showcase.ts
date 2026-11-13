@@ -71,7 +71,7 @@ export const SHOWCASE_SCENES: Scene[] = [
         frame: { floor: 3, zoom: 1.2 },
       },
       {
-        name: "02-help",
+        name: "02-about",
         keepDialogs: true,
         setup: async (page) => {
           // The game panel's About…, which opens About this game (its Help

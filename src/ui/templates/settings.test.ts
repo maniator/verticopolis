@@ -68,7 +68,7 @@ describe("settingsTemplate structure and a11y", () => {
   });
 
   it("echoes the app version behind the .app-version class so screenshots mask it", () => {
-    // The version is a read-only echo of the splash and Help's About line. It must
+    // The version is a read-only echo of the splash and About this game's line. It must
     // carry `.app-version` so pgMaskVersion rewrites it to a fixed placeholder in
     // captures (a routine version bump must not churn the committed gallery).
     const frag = renderToFragment(settingsTemplate("9.9.9"));

@@ -5,7 +5,7 @@ import { shortId } from "./enginePackageRecord";
 
 /**
  * The player-visible name of the engine running the simulation, for the
- * version lines on the splash, Settings, and Help's About, with the engine's
+ * version lines on the splash, Settings, and About this game, with the engine's
  * own version and a short source hash (#1422): "v2.51.0 · Rust engine 0.20.0
  * (1a2b3c4d5e6f)", so a player or tester can tell from the title screen which
  * build of the engine they are on without opening the console. The Rust engine's version is the
