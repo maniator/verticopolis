@@ -13,8 +13,8 @@ export interface Prefs {
    *  the day at a uniform real-time rate. Presentation-only, like the speed
    *  buttons: never serialized with a tower, and never touches the sim. */
   steadyClock?: boolean;
-  /** Modern's decorative passers-by (#2091). Absent means on; only an explicit
-   *  `false` hides them. */
+  /** Modern's decorative passers-by (#2091). Absent means off (owner,
+   *  2026-11-13); only an explicit `true` shows them. */
   passersBy?: boolean;
   /** Master mute (the top-bar speaker button). */
   muted?: boolean;

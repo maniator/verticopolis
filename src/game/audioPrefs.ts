@@ -76,9 +76,10 @@ export function togglePassersBy(app: GameApp): boolean {
   return app.prefs.passersBy;
 }
 
-/** Whether the decorative passers-by switch is on (absent in prefs means on). */
+/** Whether the decorative passers-by switch is on. It starts off (owner,
+ *  2026-11-13): only an explicit `true` shows them. */
 export function isPassersBy(app: GameApp): boolean {
-  return app.prefs.passersBy !== false;
+  return app.prefs.passersBy === true;
 }
 
 /** Push the passers-by switch to the engine, which hides every passer-by when

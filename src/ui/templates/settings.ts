@@ -39,7 +39,7 @@ export function settingsTemplate(version: string, showBuilding = false, engine =
     ? html`
       <div class="set-row">
         <label class="set-switch"><input type="checkbox" id="set-passers-by" role="switch" aria-describedby="note-passers-by"><span>Show decorative passers-by</span></label>
-        <p class="set-note" id="note-passers-by">People who stroll the corridors to make the tower feel lived in. They aren't tenants or visitors and don't affect the game. Reduced motion hides them.</p>
+        <p class="set-note" id="note-passers-by">People who stroll the corridors to make the tower feel lived in. They aren't tenants or visitors and don't affect the game. Off unless you turn it on; reduced motion hides them.</p>
       </div>`
     : nothing;
   const building = showBuilding

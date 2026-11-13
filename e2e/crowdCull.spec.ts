@@ -15,9 +15,12 @@ test("zoom cull hides the moving layer, restores it, and survives a rebuild", as
   await page.goto("/");
   await page.waitForFunction(() => Boolean((window as any).game?.sim && (window as any).game?.ui));
   // Decorative passers-by are Modern-only (#2091), so the walker half of the
-  // cull needs a Modern tower.
+  // cull needs a Modern tower, with the Settings switch (off by default) on.
   await page.evaluate(() => (window as any).game.saveLoad.newGame("modern"));
   await page.waitForFunction(() => (window as any).game.reader.header.mode === "modern");
+  await page.evaluate(() => {
+    (window as any).game.engine.passersBy = true;
+  });
   await page.evaluate(buildToStar, 2); // a tower with floors, passers-by, crowd
   await page.evaluate(() => {
     const g = (window as any).game;

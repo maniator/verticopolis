@@ -266,29 +266,31 @@ describe("steady clock", () => {
 });
 
 describe("decorative passers-by (#2091)", () => {
-  it("is on when the pref is absent, and off only for an explicit false", () => {
+  it("is off when the pref is absent, and on only for an explicit true", () => {
     const { app, raw } = makeApp();
-    expect(isPassersBy(app)).toBe(true);
-    raw.prefs.passersBy = false;
     expect(isPassersBy(app)).toBe(false);
     raw.prefs.passersBy = true;
     expect(isPassersBy(app)).toBe(true);
+    raw.prefs.passersBy = false;
+    expect(isPassersBy(app)).toBe(false);
   });
 
   it("togglePassersBy flips the pref, persists it, pushes it to the engine and returns it", () => {
     const { app, raw, engine } = makeApp();
-    expect(togglePassersBy(app)).toBe(false);
-    expect([raw.prefs.passersBy, engine.passersBy]).toEqual([false, false]);
-    expect(savePrefs).toHaveBeenCalledTimes(1);
     expect(togglePassersBy(app)).toBe(true);
     expect([raw.prefs.passersBy, engine.passersBy]).toEqual([true, true]);
+    expect(savePrefs).toHaveBeenCalledTimes(1);
+    expect(togglePassersBy(app)).toBe(false);
+    expect([raw.prefs.passersBy, engine.passersBy]).toEqual([false, false]);
     expect(savePrefs).toHaveBeenCalledTimes(2);
   });
 
-  it("applyPassersBy pushes the saved switch to the engine at startup", () => {
+  it("applyPassersBy pushes the saved switch to the engine at startup, off when never set", () => {
     const { app, raw, engine } = makeApp();
-    raw.prefs.passersBy = false;
     applyPassersBy(app);
     expect(engine.passersBy).toBe(false);
+    raw.prefs.passersBy = true;
+    applyPassersBy(app);
+    expect(engine.passersBy).toBe(true);
   });
 });

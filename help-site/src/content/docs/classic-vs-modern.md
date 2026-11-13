@@ -31,7 +31,7 @@ Every tower runs one of two sets of rules. You choose when you found the tower, 
 | Cockroaches | Bulldoze and rebuild | Or call an exterminator ([Hotels](/help/rooms/hotels/)) |
 | Bomb threats | Only once you have Security | With or without; new Security joins the search ([Events](/help/tower/events/)) |
 | The day | The 1994 routine | Livelier: school runs, errands and late checkouts, each kind of shop with its own weekend, and rain thins the crowd less ([People and traffic](/help/tower/people/)) |
-| Passers-by | None, as in 1994 | Decorative passers-by stroll busy corridors, and a setting hides them ([People and traffic](/help/tower/people/)) |
+| Passers-by | None, as in 1994 | Decorative passers-by stroll busy corridors, if you turn them on in Settings ([People and traffic](/help/tower/people/)) |
 | Saving for 1994 | Export a `.TDT` for the original game | Not possible ([Saving and loading](/help/your-towers/saving/)) |
 
 Throughout this manual, a <span class="vc-mode">Classic</span> or <span class="vc-mode">Modern</span> tag marks a rule that belongs to one of them. Everything untagged is the same in both.

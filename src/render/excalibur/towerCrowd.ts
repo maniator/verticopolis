@@ -353,7 +353,7 @@ export function updateMotion(engine: TowerEngine, elapsedMs = 1000 / 60): void {
   }
   // A tower with no passers-by (every Classic tower) skips the occupancy walk.
   if (engine.walkers.length > 0) refreshFloorLiveliness(engine);
-  // The Settings switch (Modern, default on) and reduced motion each hide every
+  // The Settings switch (Modern, default off) and reduced motion each hide every
   // passer-by; reduced motion promises to calm background animation (#2091).
   const passersShown = engine.passersBy && !engine.reducedMotion;
   for (const w of engine.walkers) {
