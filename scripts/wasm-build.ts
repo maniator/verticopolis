@@ -187,6 +187,8 @@ if (which === "engine") {
   writeFileSync(resolve(crate, "../src/events/gameplayEventRules.ts"), renderGameplayEventRules(catalog));
   console.log("src/public/engine and engine-rs/pkg-player (player build), engine-rs/pkg and engine-rs/pkg-web-tooling (tooling build): built; src/engineBinding/engine.d.ts, src/events/gameplayEvents.d.ts and gameplayEventRules.ts refreshed");
 } else {
+  // The old package goes first here too, so a failed compile leaves none.
+  rmSync(resolve(crate, "pkg"), { recursive: true, force: true });
   compile(PLAYER_FEATURES);
   nodePackage("pkg");
   console.log(`${target.dir}/pkg: built`);

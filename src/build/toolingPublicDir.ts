@@ -1,4 +1,4 @@
-import { cpSync, existsSync, rmSync } from "node:fs";
+import { cpSync, existsSync, rmSync, statSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 import { ENGINE_BUILD_RECORD, ENGINE_DIR } from "../wasmhost/enginePackageNames.ts";
 
@@ -24,6 +24,11 @@ export type PublicDirChoice =
  *   (`VC_ALLOW_NO_ENGINE=1`), which the package checks downstream handle.
  * - A dev serve with no tooling package falls back to the player package; the
  *   caller warns that the tooling tower's raw edits will not run.
+ *
+ * A build copies the tooling package in ({@link assembleToolingPublicDir}); a
+ * dev serve keeps `src/public` live and answers the engine's URLs from the
+ * tooling package ({@link toolingEngineFile}), so a rebuild of either shows
+ * on the next reload.
  */
 export function choosePublicDir(opts: {
   tooling: boolean;
@@ -61,4 +66,34 @@ export function assembleToolingPublicDir(base: string, toolingPackage: string, o
   });
   cpSync(toolingPackage, join(out, ENGINE_FOLDER), { recursive: true });
   return out;
+}
+
+/** The content types of the engine package's files, for a dev serve. */
+const CONTENT_TYPES: Readonly<Record<string, string>> = {
+  ".js": "text/javascript",
+  ".wasm": "application/wasm",
+  ".json": "application/json",
+};
+
+/**
+ * The tooling package's file a dev serve answers a request with, or null for
+ * a request it leaves to Vite. `pathname` is the request's path without its
+ * query, `base` the served base path (`/`). Only a plain file name directly
+ * under the engine folder that the package holds is answered, so a path
+ * cannot climb out of `toolingPackage`.
+ */
+export function toolingEngineFile(pathname: string, base: string, toolingPackage: string): { file: string; type: string } | null {
+  const prefix = `${base.endsWith("/") ? base : `${base}/`}${ENGINE_DIR}`;
+  if (!pathname.startsWith(prefix)) return null;
+  let name: string;
+  try {
+    name = decodeURIComponent(pathname.slice(prefix.length));
+  } catch {
+    return null; // a malformed escape
+  }
+  if (!/^[\w-]+(?:\.[\w-]+)*$/.test(name)) return null;
+  const type = CONTENT_TYPES[name.slice(name.lastIndexOf("."))];
+  const file = join(toolingPackage, name);
+  if (!type || !existsSync(file) || !statSync(file).isFile()) return null;
+  return { file, type };
 }

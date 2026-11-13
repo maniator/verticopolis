@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { assembleToolingPublicDir, choosePublicDir, hasEnginePackage } from "./toolingPublicDir";
+import { assembleToolingPublicDir, choosePublicDir, hasEnginePackage, toolingEngineFile } from "./toolingPublicDir";
 
 const base = { tooling: false, serve: false, vitest: false, hasToolingPackage: true, hasPlayerPackage: true };
 
@@ -82,5 +82,33 @@ describe("assembleToolingPublicDir", () => {
     expect(hasEnginePackage(tooling)).toBe(true);
     expect(hasEnginePackage(join(publicDir, "engine"))).toBe(false);
     expect(hasEnginePackage(join(dir, "missing"))).toBe(false);
+  });
+});
+
+describe("toolingEngineFile", () => {
+  let dir = "";
+  afterEach(() => rmSync(dir, { recursive: true, force: true }));
+
+  function pkg(): string {
+    dir = mkdtempSync(join(tmpdir(), "vc-tooling-serve-"));
+    const p = join(dir, "pkg-web-tooling");
+    mkdirSync(join(p, "nested"), { recursive: true });
+    for (const f of ["verticopolis_engine.js", "verticopolis_engine_bg.wasm", "BUILD.json"]) writeFileSync(join(p, f), f);
+    writeFileSync(join(dir, "secret.json"), "{}");
+    return p;
+  }
+
+  it("answers the engine's files with their content types", () => {
+    const p = pkg();
+    expect(toolingEngineFile("/engine/verticopolis_engine.js", "/", p)).toEqual({ file: join(p, "verticopolis_engine.js"), type: "text/javascript" });
+    expect(toolingEngineFile("/engine/verticopolis_engine_bg.wasm", "/", p)).toEqual({ file: join(p, "verticopolis_engine_bg.wasm"), type: "application/wasm" });
+    expect(toolingEngineFile("/app/engine/BUILD.json", "/app/", p)).toEqual({ file: join(p, "BUILD.json"), type: "application/json" });
+  });
+
+  it("leaves every other request to Vite", () => {
+    const p = pkg();
+    for (const path of ["/main.ts", "/engine/", "/engine/missing.js", "/engine/nested", "/engine/../secret.json", "/engine/%2e%2e%2fsecret.json", "/engine/nested/x.js", "/assets/engine/verticopolis_engine.js", "/engine/verticopolis_engine.d.ts.map", "/engine/%E0%A4%A"]) {
+      expect(toolingEngineFile(path, "/", p), path).toBeNull();
+    }
   });
 });
