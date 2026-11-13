@@ -6,10 +6,11 @@
 //!   farther off than that leaves the call to the parked car.
 //! - Standard Floor Departure: a car loading at a floor boards whoever
 //!   arrives while it waits and starts the wait over, until nobody new comes
-//!   or it is full. A Modern car leaves after one fixed wait.
+//!   or it is full. A Modern car restarts the wait too, but only up to twice
+//!   the setting.
 //!
-//! Modern's reading of Waiting Car Response is
-//! `rule_tests::elevator_scheduling::modern_a_high_waiting_car_response_holds_parked_cars_from_a_far_call`.
+//! Modern's best-car dispatch, which folds Waiting Car Response into its
+//! choice, is `rule_tests::modern_elevator_dispatch`.
 use std::collections::{BTreeSet, HashMap};
 
 use crate::clock::GameMode;
@@ -19,14 +20,14 @@ use crate::facilities::Kind;
 use crate::schedule::Schedule;
 use crate::tower::Tower;
 
-const TOP: i64 = 20;
-const HOUR: i64 = 12;
-const WEEKDAY: bool = false;
+pub(super) const TOP: i64 = 20;
+pub(super) const HOUR: i64 = 12;
+pub(super) const WEEKDAY: bool = false;
 const CALL_FLOOR: i64 = 10;
 
 /// A standard elevator over floors 1 to `TOP` with `cars` cars, the given
 /// schedule, in a tower of the given mode with nobody in it.
-fn shaft_tower(mode: GameMode, cars: i64, schedule: Schedule) -> (Tower, i64) {
+pub(super) fn shaft_tower(mode: GameMode, cars: i64, schedule: Schedule) -> (Tower, i64) {
     let mut tower = Tower::new();
     tower.mode = mode;
     for x in 0..40 {
@@ -44,7 +45,7 @@ fn shaft_tower(mode: GameMode, cars: i64, schedule: Schedule) -> (Tower, i64) {
     (tower, id)
 }
 
-fn schedule(response: Option<f64>) -> Schedule {
+pub(super) fn schedule(response: Option<f64>) -> Schedule {
     Schedule {
         weekday: None,
         weekend: None,
@@ -57,7 +58,7 @@ fn schedule(response: Option<f64>) -> Schedule {
 /// Car 0 parked at the lobby; car 1 at floor `from` heading up to its rider's
 /// floor `TOP`; a hall call at `CALL_FLOOR`. Whether car 0 leaves the lobby
 /// within a few steps.
-fn parked_car_answers(mode: GameMode, response: f64, from: f64) -> bool {
+pub(super) fn parked_car_answers(mode: GameMode, response: f64, from: f64) -> bool {
     parked_car_answers_calls(mode, response, from, &[CALL_FLOOR])
 }
 
@@ -117,18 +118,11 @@ fn a_parked_car_answers_an_uncovered_call_beyond_a_covered_one() {
     ));
 }
 
-#[test]
-fn modern_ignores_the_moving_car() {
-    // Modern reads the response as a reach (span 19 less 8 is 11 floors):
-    // the call 9 floors off is in reach, so the lobby car goes.
-    assert!(parked_car_answers(GameMode::Modern, 8.0, 4.0));
-}
-
 /// One car sent to floor `CALL_FLOOR`, where, if `newcomers`, one more
 /// caller joins every step the car stands there (otherwise the one caller
 /// just keeps waiting). The longest run of steps it spends on that floor, and
 /// whether it ever left again.
-fn stay_at_the_call(mode: GameMode, newcomers: bool) -> (usize, bool) {
+pub(super) fn stay_at_the_call(mode: GameMode, newcomers: bool) -> (usize, bool) {
     let mut s = schedule(None);
     s.home_floors = Some(vec![1]);
     let (mut tower, id) = shaft_tower(mode, 1, s);
@@ -174,8 +168,8 @@ fn a_classic_car_keeps_loading_while_riders_arrive_and_leaves_when_full() {
 
 #[test]
 fn a_caller_who_was_already_waiting_does_not_restart_the_wait() {
-    // The same caller still standing there is nobody new: the Classic car
-    // leaves after one wait, as the Modern car does.
+    // The same caller still standing there is nobody new: the car leaves
+    // after one wait in either mode.
     let (classic, classic_left) = stay_at_the_call(GameMode::Classic, false);
     let (modern, _) = stay_at_the_call(GameMode::Modern, false);
     assert_eq!(classic, modern);

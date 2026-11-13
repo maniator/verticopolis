@@ -148,14 +148,26 @@ fn the_staging_summary_counts_cars_homed_above_the_base() {
 }
 
 #[test]
-fn a_car_with_no_home_idles_at_the_base() {
-    let (sim, id) = tower(GameMode::Modern, 4);
+fn a_car_with_no_home_idles_at_the_base_in_classic() {
+    let (sim, id) = tower(GameMode::Classic, 4);
     let s = sim.schedule_facts(id, None, false).staging.unwrap();
     assert_eq!((s.active_at_peak, s.up_tower_cars, s.lobby_cars), (4, 0, 4));
     // Homes shorter than the fleet: the unlisted cars idle at the base.
     let d = draft(None, None, Some(vec![TOP_HOME]));
     let s = sim.schedule_facts(id, Some(&d), false).staging.unwrap();
     assert_eq!((s.up_tower_cars, s.lobby_cars), (1, 3));
+}
+
+#[test]
+fn modern_cars_with_no_home_spread_up_the_shaft() {
+    let (sim, id) = tower(GameMode::Modern, 4);
+    // The first car waits at the base, the other three up the shaft.
+    let s = sim.schedule_facts(id, None, false).staging.unwrap();
+    assert_eq!((s.active_at_peak, s.up_tower_cars, s.lobby_cars), (4, 3, 1));
+    // Car 0 homed up-tower: the three unlisted cars still spread.
+    let d = draft(None, None, Some(vec![TOP_HOME]));
+    let s = sim.schedule_facts(id, Some(&d), false).staging.unwrap();
+    assert_eq!((s.up_tower_cars, s.lobby_cars), (4, 0));
 }
 
 #[test]
@@ -187,7 +199,8 @@ fn the_answer_serializes_with_kebab_names_and_camel_keys() {
     assert_eq!(v["recommended"], "rush");
     assert_eq!(v["advice"]["status"], "ready");
     assert_eq!(v["staging"]["peakHour"], 8);
-    assert_eq!(v["staging"]["upTowerCars"], 0);
+    // Modern spreads the three cars with no home up the shaft.
+    assert_eq!(v["staging"]["upTowerCars"], 3);
     let gone = serde_json::to_value(sim.schedule_facts(id + 9, None, false)).unwrap();
     assert_eq!(gone["status"], "missing-shaft");
     assert!(gone["staging"].is_null() && gone["recommended"].is_null());
@@ -229,7 +242,7 @@ fn a_shaft_with_no_cars_and_a_refused_query_say_so_in_their_advice_status() {
 
 #[test]
 fn the_homes_come_back_on_served_floors_with_the_base_for_unlisted_cars() {
-    let (mut sim, id) = tower(GameMode::Modern, 4);
+    let (mut sim, id) = tower(GameMode::Classic, 4);
     // Floor 6 is skipped: a car homed there snaps to the nearer served floor,
     // the lower one on a tie; the two unlisted cars wait at the base lobby.
     assert!(sim.tower.set_stop(id, 6, false));
@@ -240,6 +253,16 @@ fn the_homes_come_back_on_served_floors_with_the_base_for_unlisted_cars() {
     assert_eq!(
         sim.schedule_facts(id, None, false).home_floors,
         vec![1, 1, 1, 1]
+    );
+    // Modern spreads the unlisted cars over the eleven served floors: car 2
+    // at stop 5 (floor 7), car 3 at stop 8 (floor 10).
+    let (mut modern, mid) = tower(GameMode::Modern, 4);
+    assert!(modern.tower.set_stop(mid, 6, false));
+    let f = modern.schedule_facts(mid, Some(&d), false);
+    assert_eq!(f.home_floors, vec![5, 12, 7, 10]);
+    assert_eq!(
+        modern.schedule_facts(mid, None, false).home_floors,
+        vec![1, 3, 7, 10]
     );
     // A refusal has no homes.
     assert!(sim
@@ -291,4 +314,19 @@ fn a_shaft_with_no_cars_has_no_homes() {
         .schedule_facts(id, Some(&d), false)
         .home_floors
         .is_empty());
+}
+
+#[test]
+fn an_unhomed_car_idles_where_dispatch_parks_it_when_no_lobby_is_served() {
+    // An express that skips its bottom floor and serves no lobby: dispatch
+    // parks car 0 at the first stop, not at the unserved bottom.
+    let geo = ShaftGeometry {
+        cars: 3,
+        bottom: 1,
+        top: 12,
+        served: vec![4, 8, 12],
+        lobbies: Vec::new(),
+    };
+    assert_eq!(served_homes(None, &geo, false), vec![4, 4, 4]);
+    assert_eq!(served_homes(None, &geo, true), vec![4, 8, 12]);
 }

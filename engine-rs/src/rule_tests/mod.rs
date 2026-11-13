@@ -55,6 +55,7 @@ mod meal_cadence;
 mod mode_rules;
 mod modern_amenity_halos;
 mod modern_economy;
+mod modern_elevator_dispatch;
 mod modern_halo_table;
 mod move_in_gate_legibility;
 mod move_in_gate_rentals;

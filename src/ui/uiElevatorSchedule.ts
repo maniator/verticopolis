@@ -109,7 +109,8 @@ export function showElevatorScheduleDialog(
   };
   // A stored home floor may sit on a stop the shaft no longer serves. The
   // engine answers the homes it would hold (each on the nearest served floor, a
-  // car with no home at the base lobby), so the grid never marks a chip on a
+  // car with no home where it idles: the base lobby, or spread up the shaft in
+  // Modern), so the grid never marks a chip on a
   // skipped row and OK re-commits a floor the car can actually wait at.
   const initialFloors = readFloors();
   const seed = ctx.facts({ homeFloors: ctx.current?.homeFloors ? [...ctx.current.homeFloors] : undefined }, ctx.initialWeekend);

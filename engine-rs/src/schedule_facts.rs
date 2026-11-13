@@ -15,6 +15,7 @@
 
 use serde::Serialize;
 
+use crate::dispatch::idle_home;
 use crate::jsmath;
 use crate::schedule::{Schedule, SCHEDULE_HOURS};
 use crate::schedule_authoring::warm_curve;
@@ -144,15 +145,21 @@ fn peak_hour(curve: Option<&[f64]>) -> usize {
     peak
 }
 
-/// One home per car on a served floor; a car with no listed home waits at the
-/// base lobby.
-fn served_homes(draft: Option<&Schedule>, geo: &ShaftGeometry) -> Vec<i64> {
+/// One home per car on a served floor; a car with no listed home waits where
+/// dispatch idles it (`dispatch::idle_home`): the base lobby, or with `spread`
+/// (Modern) the first car there and the rest up the shaft.
+fn served_homes(draft: Option<&Schedule>, geo: &ShaftGeometry, spread: bool) -> Vec<i64> {
     let homes = draft.and_then(|d| d.home_floors.as_ref());
-    (0..geo.cars.max(0) as usize)
+    let cars = geo.cars.max(0) as usize;
+    // Dispatch idles an unhomed car 0 at the first served lobby, else at the
+    // first stop (`ElevatorDispatch::move_cars`).
+    let idle = geo.lobbies.first().or(geo.served.first()).copied();
+    let unset = |i| idle_home(spread, &geo.served, idle.unwrap_or(geo.bottom), i, cars);
+    (0..cars)
         .map(|i| {
             homes
                 .and_then(|h| h.get(i))
-                .map_or(geo.base_lobby(), |&f| geo.snap_to_served(f))
+                .map_or_else(|| unset(i), |&f| geo.snap_to_served(f))
         })
         .collect()
 }
@@ -257,7 +264,7 @@ impl Simulation {
                 |c| advice(row, c, geo.cars),
             )
         };
-        let home_floors = served_homes(draft, &geo);
+        let home_floors = served_homes(draft, &geo, self.mode.spreads_unset_car_homes());
         ScheduleFacts {
             status: FactsStatus::Available,
             recommended: assisted.then(|| recommended_preset(t.kind)),

@@ -11,12 +11,12 @@
 
 use std::collections::{BTreeMap, HashMap};
 
-use super::Demand;
+use super::demand::Demand;
 
 use indexmap::IndexMap;
 
 /// How close to a stop a car must stand to count as on it, in floors.
-const ON_FLOOR: f64 = 0.05;
+pub(super) const ON_FLOOR: f64 = 0.05;
 
 /// Whether a car of the shaft other than `me` already covers a call at
 /// `floor` under Waiting Car Response `response`: it is on shift (its index
