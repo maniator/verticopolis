@@ -79,7 +79,7 @@ Every number below compares the same build, browser, machine, viewport
 | large | Tier-1 win tower (`winningTower.ts`) | 17,322 | 43,358 | 5 | 2.06 MiB |
 
 The spec (#972) named `split-tower.vctower` (406 people) as the small tower.
-Over one in-game day its crowd peaks at 25 people and is empty again at the
+Over one in-game day its crowd peaks at 30 people and is empty again at the
 end, so its ticks would exercise little of the crowd simulation. A
 deterministic synthetic tower (fully occupied offices and condos, two
 elevators, built in `src/tests/perfCompare/scenarios.ts`) replaces it, and its
