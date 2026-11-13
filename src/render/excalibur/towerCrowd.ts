@@ -99,13 +99,20 @@ function positionPerson(engine: TowerEngine, p: PersonView, rec: { actor: ex.Act
   // them ride to the room floor is the whole point of the mechanic.
   const hidden = p.state === "riding" && !p.staff;
   if (rec.actor.graphics.isVisible !== !hidden) rec.actor.graphics.isVisible = !hidden;
-  if (hidden) return;
+  // A rider leaves no trail for the doors: their next step on foot is
+  // measured from where they get out, not where they got in.
+  if (hidden) {
+    rec.lastX = undefined;
+    return;
+  }
   // Use the continuous floor (fy) so a stair/escalator climber animates
   // smoothly between floors; for every other state fy equals the floor.
   rec.actor.pos = ex.vec(engine.worldX(p.x), engine.worldYTop(p.fy) + FLOOR - 3);
   // Inside a revolving door between lobby halls (#2068) a walker pushes it:
   // walking left they pass behind its center post, walking right in front.
-  const through = p.fy === p.floor ? pushThroughDoors(engine, rec, p.floor, rec.actor.pos.x) : undefined;
+  const onFloor = p.fy === p.floor;
+  if (!onFloor) rec.lastX = undefined;
+  const through = onFloor ? pushThroughDoors(engine, rec, p.floor, rec.actor.pos.x) : undefined;
   const z = through === -1 ? Z.crowdBehindDoor : Z.crowd;
   if (rec.actor.z !== z) rec.actor.z = z;
   // Long waits redden the figure, the original's "this tenant is fed up" cue.

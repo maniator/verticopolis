@@ -17,7 +17,9 @@
 /** A tower with a tall ground lobby, bare floors over it, and in Modern a
  *  tall sky lobby. No rooms: a room just placed is still under construction,
  *  which would hide the hall's ceiling. Options come from `window.__vcShotTallLobby`:
- *  `{ mode: "classic" | "modern", ground: 2 | 3, sky?: 2 | 3, flights?: true }`;
+ *  `{ mode: "classic" | "modern", ground: 2 | 3, sky?: 2 | 3, split?: 1 | 2, flights?: true }`;
+ *  `split` (Modern) lays the sky floor as two halls, `sky` and `split`
+ *  stories high, side by side with a revolving door between them;
  *  `flights` adds a stairway and an escalator out of the ground hall (a
  *  3-star tower, so escalators are unlocked). Fails closed when a lobby does
  *  not rise to the height asked or a flight is refused. */
@@ -58,7 +60,30 @@ export function buildTallLobbyTower(): void {
   // Each story must sit on the one below, so they go up in order.
   const below = sky ? lobbyInterval - 1 : top + 4;
   for (let f = top; f <= below; f++) row("floor", f, left + 4, right - 4);
-  if (sky) {
+  if (sky && opts.split) {
+    // Modern split halls (#2068): a `sky`-story hall on the left and a hall
+    // `split` stories high on the right, laid from the far end with bridging
+    // off so it keeps its own height. The gap tile left between them joins
+    // the left hall, and the wall between them carries the revolving door.
+    const short: number = opts.split;
+    const door = cx + 1;
+    const bridged: boolean = port.autoBridge();
+    port.chooseAutoBridge(false);
+    port.setLobbyHeight(sky);
+    row("lobby", lobbyInterval, left + 4, cx - 1);
+    port.setLobbyHeight(short);
+    for (let x = right - 4; x >= door; x--) port.buildAt(kind("lobby"), lobbyInterval, x);
+    port.setLobbyHeight(1);
+    port.buildAt(kind("lobby"), lobbyInterval, cx);
+    port.chooseAutoBridge(bridged);
+    // Floors over each hall from the story over it, so a floor stands over
+    // the shorter hall beside the taller hall's top story.
+    for (let f = lobbyInterval + short; f < lobbyInterval + sky; f++) row("floor", f, door, right - 4);
+    for (let f = lobbyInterval + sky; f < lobbyInterval + sky + 3; f++) row("floor", f, left + 4, right - 4);
+    const halls: number[] = Array.from(port.lobbyHeights()).slice(-8);
+    const want = [lobbyInterval, left + 4, cx, sky, lobbyInterval, door, right - 4, short];
+    if (halls.join() !== want.join()) throw new Error(`the split halls are ${halls.join()}, not ${want.join()}`);
+  } else if (sky) {
     port.setLobbyHeight(sky);
     row("lobby", lobbyInterval, left + 4, right - 4);
     port.setLobbyHeight(1);
