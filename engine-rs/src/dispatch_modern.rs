@@ -9,8 +9,12 @@
 //!   car already heading to the call within Waiting Car Response floors wins
 //!   outright, so the setting means what it means in Classic.
 //! - Spread homes: a car with no home of its own idles at the lobby (the
-//!   first car) or an evenly spread stop (the rest). Runtime only: nothing
-//!   is written to the schedule, a save or a .TDT.
+//!   first car) or an evenly spread stop (the rest). No home is written to
+//!   the schedule or a save, but a save keeps where each car stands, and a
+//!   .TDT export takes an unhomed car's home from there
+//!   (`tdt::export_gather::car_homes`). A Modern save is refused, but one
+//!   loaded as Classic, or save JSON with no mode, exports a car parked at
+//!   its spread stop with that stop as its home.
 //! - A car parked on a stop whose call it owns boards the estimate there as
 //!   an arrival would: the best-car choice sends no other car, and the sweep
 //!   only looks ahead.

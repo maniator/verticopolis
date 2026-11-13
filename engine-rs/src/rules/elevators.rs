@@ -46,7 +46,10 @@ impl GameMode {
     /// Whether a car with no home of its own idles at an evenly spread stop
     /// (Modern: the first car at the lobby, the rest up the shaft) instead of
     /// the lobby (Classic). The spread is where the car waits, never a home
-    /// written to the schedule, a save or a .TDT.
+    /// written to the schedule or a save. A save keeps where the car stands,
+    /// though, and a .TDT export takes an unhomed car's home from there, so
+    /// a save exported with the car parked at its spread stop (as Classic:
+    /// a Modern tower is refused) records that stop as its home.
     pub fn spreads_unset_car_homes(self) -> bool {
         self == GameMode::Modern
     }
