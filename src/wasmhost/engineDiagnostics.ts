@@ -23,6 +23,8 @@ import type { BuildMetadataResult } from "./buildSection";
  * error text. It holds no save and no player data, but an engine error message
  * can quote a tower name (a hand-edited save controls it), so it is something
  * the player sends on purpose, never something the page sends by itself.
+ * About's Report a problem puts it in the GitHub link it opens on the player's
+ * click (src/ui/bugReport.ts), where the player reviews it before submitting.
  */
 export type DiagnosticsState =
   | "ok"

@@ -8,10 +8,14 @@ import type { GameMode } from "../shared/types";
  * line, the engine diagnostics, the browser, the platform and the tower's
  * mode already set, and only has to say what went wrong.
  *
- * Nothing here is personal: the version and diagnostics are the lines About
- * this game shows (the same text its Copy diagnostics gives), and the
- * browser, platform and mode are the form's own dropdown choices. The player
- * sees every field on GitHub before sending anything.
+ * What the link carries: the version line; the browser, platform and mode as
+ * the form's own dropdown choices; and, in the diagnostics field, the text
+ * About this game shows (the same text its Copy diagnostics gives). That text
+ * includes the full browser string, the time of the report and any engine
+ * error text, which can quote a tower name (src/wasmhost/engineDiagnostics.ts).
+ * All of it travels to github.com in the link's query string when the player
+ * clicks Report a problem. Nothing is filed then: the player sees and can edit
+ * every field on GitHub, and only their own submit sends the report.
  */
 
 const NEW_ISSUE = "https://github.com/maniator/verticopolis/issues/new";
@@ -40,7 +44,8 @@ export interface BugReportFacts {
   versionLine: string;
   /** About this game's Copy diagnostics text, if the game has one. */
   diagnostics?: string;
-  /** `navigator.userAgent`, read only to pick the Browser choice. */
+  /** `navigator.userAgent`, read to pick the Browser choice. The raw string
+   *  reaches the link only inside `diagnostics`, as that text's Browser row. */
   userAgent: string;
   /** Whether the device is a phone or tablet. */
   mobile: boolean;

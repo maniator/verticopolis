@@ -79,8 +79,80 @@ describe("bugReportHref", () => {
     expect(q.get("diagnostics")).toBe(`${"x".repeat(MAX_DIAGNOSTICS)}\n…`);
   });
 
-  it("reads the user agent only to pick the Browser choice", () => {
-    expect(bugReportHref(base)).not.toContain("Gecko");
+  it("keeps diagnostics of exactly the limit whole and cuts one character more", () => {
+    const atLimit = "y".repeat(MAX_DIAGNOSTICS);
+    expect(fields(bugReportHref({ ...base, diagnostics: atLimit })).get("diagnostics")).toBe(atLimit);
+    const overLimit = `${atLimit}z`;
+    expect(fields(bugReportHref({ ...base, diagnostics: overLimit })).get("diagnostics")).toBe(`${atLimit}\n…`);
+  });
+
+  it("without diagnostics, the raw browser string never reaches the link", () => {
+    // The user agent only picks the Browser choice; the string itself is not a field.
+    const href = bugReportHref(base);
+    expect(href).not.toContain("Gecko");
+    expect(href).not.toContain(encodeURIComponent("Gecko/20100101"));
+    expect(fields(href).get("browser")).toBe("Firefox");
+  });
+});
+
+describe("bugReportHref with a real diagnostics report", () => {
+  // The shape About this game's Copy diagnostics gives (src/wasmhost/engineDiagnostics.ts):
+  // the full browser string, the time of the report and the engine's own error
+  // text, which can quote a tower name.
+  const DATE = "2026-11-13T09:41:07.000Z";
+  const TOWER_QUOTE = "tower \"Naomi's Plaza\" has a bad floor";
+  const diagnostics = [
+    "Verticopolis diagnostics",
+    "The Rust engine is running and matches this build.",
+    "App: v3.4.0 (cf91737)",
+    `Date: ${DATE}`,
+    `Browser: ${UA.firefox}`,
+    "Engine in use: Rust engine",
+    `Last engine error: ${TOWER_QUOTE}`,
+  ].join("\n");
+  const facts = { versionLine: "v3.4.0 · Rust engine 1.27.0 (1a2b3c4d5e6f)", diagnostics, userAgent: UA.firefox, mobile: false, mode: "classic" as const };
+
+  it("carries the whole report, browser string, time and error text included, in the diagnostics field", () => {
+    const q = fields(bugReportHref(facts));
+    expect(q.get("diagnostics")).toBe(diagnostics);
+    expect(q.get("diagnostics")).toContain(`Browser: ${UA.firefox}`);
+    expect(q.get("diagnostics")).toContain(`Date: ${DATE}`);
+    expect(q.get("diagnostics")).toContain(TOWER_QUOTE);
+  });
+
+  it("sends nothing outside the form's own fields, and none of the report leaks into them", () => {
+    const q = fields(bugReportHref(facts));
+    expect([...q.keys()].sort()).toEqual(["browser", "diagnostics", "mode", "platform", "template", "version"]);
+    expect(Object.fromEntries([...q].filter(([key]) => key !== "diagnostics"))).toEqual({
+      template: "bug_report.yml",
+      version: facts.versionLine,
+      browser: "Firefox",
+      platform: "Desktop",
+      mode: "Classic",
+    });
+  });
+
+  it("encodes the report so its own separators cannot add or change a field", () => {
+    const forged = `${diagnostics}\nmode=Modern&platform=Mobile#top`;
+    const href = bugReportHref({ ...facts, diagnostics: forged });
+    const q = fields(href);
+    expect(q.get("diagnostics")).toBe(forged);
+    expect(q.get("mode")).toBe("Classic");
+    expect(q.get("platform")).toBe("Desktop");
+    expect(q.getAll("mode")).toHaveLength(1);
+    expect(new URL(href).hash).toBe("");
+  });
+
+  it("cuts a very long report at the limit and round-trips its non-ASCII text", () => {
+    const long = `${diagnostics}\nDetail: ${"塔".repeat(MAX_DIAGNOSTICS)}`;
+    const href = bugReportHref({ ...facts, diagnostics: long });
+    const sent = fields(href).get("diagnostics") ?? "";
+    expect(sent).toBe(`${long.slice(0, MAX_DIAGNOSTICS)}\n…`);
+    expect(sent.length).toBe(MAX_DIAGNOSTICS + 2);
+    // Each 塔 is three UTF-8 bytes, nine characters once percent-encoded, so the
+    // cut is what keeps the link near 18,000 characters rather than growing with the report.
+    expect(href).toContain(encodeURIComponent("塔"));
+    expect(href.length).toBeLessThan(MAX_DIAGNOSTICS * 9 + 1000);
   });
 });
 
