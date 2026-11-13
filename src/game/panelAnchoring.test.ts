@@ -1,7 +1,8 @@
-import { describe, it, expect, vi } from "vitest";
+import { afterEach, describe, it, expect, vi } from "vitest";
 import { kindFacts } from "../tests/catalogKinds";
 import { positionPanels, selectedScreenRect } from "./panelAnchoring";
 import type { GameApp } from "../main";
+import * as moves from "./movableWindows";
 
 /**
  * Unit coverage for the world-anchoring of the DOM panels. Both functions are
@@ -238,5 +239,39 @@ describe("selectedScreenRect", () => {
       y: worldToScreenY(25), // 75
       w: worldToScreenX(8 + 4) - worldToScreenX(8), // 24 - 16 = 8
     });
+  });
+});
+
+describe("positionPanels with a facility card the player moved", () => {
+  afterEach(() => vi.restoreAllMocks());
+  const office = { selected: { type: "unit", id: 1 } as GameApp["selected"], isEditorOpen: true, unit: { x: 10, width: 9, floor: 4, kind: "office" } };
+
+  it("keeps a moved card where the player put it: no anchor, no release", () => {
+    vi.spyOn(moves, "editorPlacedByPlayer").mockReturnValue(true);
+    const forget = vi.spyOn(moves, "forgetEditorPlacement").mockImplementation(() => {});
+    const { app, ui } = makeApp(office);
+    positionPanels(app);
+    expect(ui.anchorEditor).not.toHaveBeenCalled();
+    expect(ui.clearEditorAnchor).not.toHaveBeenCalled();
+    expect(forget).not.toHaveBeenCalled();
+  });
+
+  it("anchors a card the player has not moved beside its room", () => {
+    vi.spyOn(moves, "editorPlacedByPlayer").mockReturnValue(false);
+    const { app, ui } = makeApp(office);
+    positionPanels(app);
+    expect(ui.anchorEditor).toHaveBeenCalledTimes(1);
+  });
+
+  it("forgets the moved spot once the card closes or docks", () => {
+    vi.spyOn(moves, "editorPlacedByPlayer").mockReturnValue(true);
+    const forget = vi.spyOn(moves, "forgetEditorPlacement").mockImplementation(() => {});
+    const closed = makeApp({ ...office, isEditorOpen: false });
+    positionPanels(closed.app);
+    const docked = makeApp({ ...office, matches: true });
+    positionPanels(docked.app);
+    expect(forget).toHaveBeenCalledTimes(2);
+    expect(closed.ui.clearEditorAnchor).toHaveBeenCalledTimes(1);
+    expect(docked.ui.clearEditorAnchor).toHaveBeenCalledTimes(1);
   });
 });

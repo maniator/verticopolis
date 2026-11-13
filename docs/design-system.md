@@ -74,6 +74,11 @@ right via `margin-left: auto`. Every dismissible window wears one; the modal's
 is sticky and full-bleed (negative margins derived from the `--pad-y`/`--pad-x`
 tokens on `.modal-box`; never hand-write those offsets).
 
+Closable windows (the Map, the room card, the hover card and the dialogs) add
+`.win-closable` and wear the compact bar the Map window introduced: 11px,
+`1px 2px 1px 6px` padding, set 2px inside the window's frame, with a 20 by 18
+✕. The docked panels (the Tools palette, the sidebar) keep the full-size bar.
+
 `.win-title.sm` is the explicit mini variant (11px, uppercase, `2px 6px`)
 for section strips inside a window. The statistics dialog's
 Overview/Tenancy/Milestones headers use it. The palette's "Tools" strip is a
@@ -106,6 +111,13 @@ bar + `.btn.xs` ✕. The modal ✕ routes through the dialog's **cancel path**
 modals that resolve a pending choice (the emergency dialog) will deadlock the
 paused sim. The ✕ is appended **after** `showModal()` so keyboard focus lands
 on the primary action, not on dismiss.
+
+A closable window moves by a drag on its title bar (`src/ui/movableWindow.ts`):
+it stays whole inside the tower view (a dialog, inside the browser window), a
+double-click on the bar puts it back, and the bar shows the move cursor and a
+"Drag to move" tooltip. The Map remembers its spot per layout class; the room
+card stays where it is dropped until it closes; a dialog opens centered again.
+A press on a control in the bar (the ✕) never starts a move.
 
 ## 4. The splash exception (ratified)
 

@@ -27,12 +27,12 @@
   --pad-y: 18px;
   --pad-x: 20px;
   --title-gap: 12px;
-  /* The dialog title bar's rendered height (13px font + 3px vertical padding,
-     .win-title in retro-components.css). Not set ON the title (its height
-     stays font-driven); this mirrors it for in-body sticky bars that pin flush
-     under the stuck title (the schedule grid head). Update in step with any
-     .win-title metric change. */
-  --title-h: 21px;
+  /* The dialog title bar's rendered height (the 18 px ✕ plus 1 px padding
+     above and below, .win-closable in retro-components.css). Not set ON the
+     title (its height stays content-driven); this mirrors it for in-body
+     sticky bars that pin flush under the stuck title (the schedule grid
+     head). Update in step with any .win-closable title metric change. */
+  --title-h: 20px;
   padding: var(--pad-y) var(--pad-x);
   max-height: 82vh;
   overflow-y: auto;
@@ -49,6 +49,8 @@
    must not become sticky full-bleed bars. */
 .modal-box > .win-title {
   position: sticky;
+  /* At rest the bar sits 2 px inside the frame (.win-closable); stuck, it
+     rides flush with the box's top edge, so nothing scrolls past above it. */
   top: calc(-1 * var(--pad-y));
   /* Above any in-body sticky bar (the schedule dialog's day toggle), so the
      two stuck strips layer cleanly instead of slitting. */

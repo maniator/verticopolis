@@ -1,6 +1,7 @@
 import type { GameApp } from "../main";
 import { catalogFacility } from "../catalog/catalogTypes";
 import { catalogOf } from "./portAccess";
+import { editorPlacedByPlayer, forgetEditorPlacement } from "./movableWindows";
 
 /**
  * World-anchoring for the DOM panels (selected-facility editor, hover
@@ -22,10 +23,16 @@ export function positionPanels(app: GameApp): void {
   const vh = app.engine.viewHeight;
   let editorAnchored = false;
   if (!mobile && app.selected && app.ui.isEditorOpen()) {
-    const r = selectedScreenRect(app);
-    if (r) {
-      app.ui.anchorEditor(r, vw, vh);
+    if (editorPlacedByPlayer(app)) {
+      // The player dragged the card by its title bar: it stays where they
+      // put it, and its inline coords are theirs.
       editorAnchored = true;
+    } else {
+      const r = selectedScreenRect(app);
+      if (r) {
+        app.ui.anchorEditor(r, vw, vh);
+        editorAnchored = true;
+      }
     }
   }
   const inspectorAnchored = !!app.inspectAnchor && app.ui.isInspectorOpen();
@@ -48,8 +55,13 @@ export function positionPanels(app: GameApp): void {
   // panel on its own (a shared flag would let an anchored card pin the OTHER
   // panel's stale coords): the mobile editor falls back to its docked CSS
   // layout even while the peek card stays anchored beside its room. The clears
-  // no-op when a panel carries no anchor, so per-frame calls cost nothing.
-  if (!editorAnchored) app.ui.clearEditorAnchor();
+  // no-op when a panel carries no anchor, so per-frame calls cost nothing. A
+  // card that closes, docks or loses its room also forgets where the player
+  // dragged it, so the next card follows its room again.
+  if (!editorAnchored) {
+    forgetEditorPlacement(app);
+    app.ui.clearEditorAnchor();
+  }
   if (!inspectorAnchored) app.ui.clearInspectorAnchor();
 }
 

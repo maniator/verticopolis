@@ -302,6 +302,11 @@
   #editor {
     width: min(250px, 80vw);
   }
+  /* Docked under the tools here, the card does not move by its title bar
+     (src/game/movableWindows.ts), so the bar drops the move cursor. */
+  #editor.win-movable > .win-title {
+    cursor: auto;
+  }
   /* The schedule floors grid keeps its 200px well on small screens (#513):
      the cap keeps the steppers and the OK button within reach on a long span
      when vertical space is scarce. The head sticks inside the grid's own

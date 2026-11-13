@@ -8,7 +8,8 @@
   align-items: center;
   gap: 4px;
   margin: 0 0 2px;
-  font-size: 10px;
+  /* Readable at a glance: the window's 11 px title-bar size. */
+  font-size: 11px;
   /* Over the close button's touch halo (overview-map.css), so a tap on the
      dropdown opens it and never closes the map. */
   position: relative;
@@ -21,8 +22,10 @@
 .overview-map .overview-map-picker {
   flex: 1 1 auto;
   min-width: 0;
+  /* A full-size dropdown on a desktop too: 22 px tall, easy to read and hit. */
+  min-height: 22px;
   padding: 0 2px;
-  font-size: 10px;
+  font-size: 12px;
 }
 .overview-map .overview-map-picker:focus-visible {
   outline: 2px solid #ffd84d;

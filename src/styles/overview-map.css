@@ -14,7 +14,12 @@
   display: flex;
   flex-direction: column;
   max-height: calc(100% - 20px);
-  padding: 2px;
+  /* A 2 px frame around the compact title bar every closable window wears
+     (.win-closable in retro-components.css). */
+  --pad-y: 2px;
+  --pad-x: 2px;
+  --title-gap: 2px;
+  padding: var(--pad-y) var(--pad-x);
   /* Its own stacking context: the close button's raised touch halo stays
      inside the window, so a card painted over the window still wins. */
   isolation: isolate;
@@ -32,18 +37,6 @@
 .overview-map[hidden],
 .overview-map-toggle[hidden] {
   display: none;
-}
-.overview-map > .win-title {
-  margin: 0 0 2px;
-  padding: 1px 2px 1px 6px;
-  font-size: 11px;
-}
-.overview-map .overview-map-close {
-  width: 20px;
-  height: 18px;
-  padding: 0;
-  font-size: 11px;
-  line-height: 1;
 }
 .overview-map-body {
   position: relative;
@@ -81,10 +74,19 @@
     outline-offset: 1px;
   }
 }
+/* The Map button: a full-size button with the map glyph, easy to find and to
+   hit in the corner of the tower view. */
 .overview-map-toggle {
   position: absolute;
   right: 10px;
   bottom: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 5px 14px 5px 10px;
+  font-size: 14px;
+  font-weight: 700;
 }
 /* The desktop hint bar (bottom center, hidden on a phone) centers in the room
    left of the open Map and wraps there, so it never runs under the window. */
@@ -103,7 +105,7 @@
    with a coarse pointer's 28 px dropdown; the overlap checks in
    e2e/overviewMapViews.spec.ts fail if either drifts (#1769). */
 #stage {
-  --overview-map-height: 330px;
+  --overview-map-height: 338px;
 }
 @media (pointer: coarse) {
   #stage {
@@ -163,7 +165,13 @@
     right: max(10px, env(safe-area-inset-right));
     bottom: max(10px, env(safe-area-inset-bottom));
     border-radius: 999px;
+    min-height: 0;
     padding: 0 8px;
+    font-size: 12px;
+    font-weight: 400;
+  }
+  .overview-map-toggle .vc-icon {
+    display: none;
   }
   #stage:has(> .overview-map-toggle:not([hidden])):has(> #editor:not(.hidden)) > :is(.overview-map-toggle, #inspector, #toast-wrap) {
     z-index: 1;

@@ -40,6 +40,7 @@ import { showTowerPicker } from "./appModals";
 // the suites that import it from here keep resolving.
 import { APP_VERSION } from "../appVersion";
 import { touchOverviewMap, wireOverviewMap } from "./overviewMapWiring";
+import { wireMovableWindows } from "./movableWindows";
 import { refuseAppPlacementWhilePaused } from "./pausedBuild";
 export { APP_VERSION };
 
@@ -240,6 +241,8 @@ export function runBootFlow(app: GameApp, savedAtBoot?: number): void {
   initInstallAffordance(app);
   // The overview Map window (#343): open by default on desktop, closed on a phone.
   wireOverviewMap(app);
+  // The facility card and the dialogs move by their title bars too.
+  wireMovableWindows(app);
   // First-run splash + onboarding (chrome only; the engine is untouched).
   app.onboarding = new OnboardingController({
     mq: app.mobileMq,

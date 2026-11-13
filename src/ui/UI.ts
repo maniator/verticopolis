@@ -257,7 +257,7 @@ export class UI {
     // path then lands in the INCOMING dialog, not the one being wiped.
     this.precedence.opening(displacing, opts);
     const box = document.createElement("div");
-    box.className = "modal-box win";
+    box.className = "modal-box win win-closable";
     render(result, box);
     dialog.appendChild(box);
     return finishModal(dialog, box, {
