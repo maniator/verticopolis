@@ -38,15 +38,18 @@ fn owner_of(cars: &[CarView], floor: i64, response: Option<f64>) -> usize {
 fn the_rules_follow_the_mode() {
     let classic = DispatchRules::for_mode(GameMode::Classic);
     assert!(classic.parked_car_yields && !classic.best_car && !classic.spread_homes);
+    assert!(!classic.parked_owner_boards);
     assert_eq!(classic.departure_limit, None);
     let modern = DispatchRules::for_mode(GameMode::Modern);
     assert!(!modern.parked_car_yields && modern.best_car && modern.spread_homes);
+    assert!(modern.parked_owner_boards);
     assert_eq!(modern.departure_limit, Some(2.0));
     for rules in [classic, modern] {
         assert!(rules.departure_restarts && !rules.parked_reach_gate);
     }
     let scan = DispatchRules::plain_scan();
     assert!(scan.parked_reach_gate && !scan.departure_restarts && !scan.best_car);
+    assert!(!scan.parked_owner_boards);
 }
 
 #[test]

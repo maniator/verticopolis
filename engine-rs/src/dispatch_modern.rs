@@ -11,6 +11,9 @@
 //! - Spread homes: a car with no home of its own idles at the lobby (the
 //!   first car) or an evenly spread stop (the rest). Runtime only: nothing
 //!   is written to the schedule, a save or a .TDT.
+//! - A car parked on a stop whose call it owns boards the estimate there as
+//!   an arrival would: the best-car choice sends no other car, and the sweep
+//!   only looks ahead.
 //! - Standard Floor Departure restarts when a rider arrives, up to twice the
 //!   setting (`ElevatorDispatch::car_held` keeps the time waited).
 
@@ -42,6 +45,9 @@ pub struct DispatchRules {
     pub departure_limit: Option<f64>,
     /// A car with no home idles at a spread stop instead of the lobby.
     pub spread_homes: bool,
+    /// A car parked on a stop whose call it owns boards the estimate there
+    /// as an arrival would, since its sweep looks only ahead.
+    pub parked_owner_boards: bool,
     /// The provisional reading of Waiting Car Response that both modes have
     /// retired: a parked car answers only calls within the span less that
     /// many floors. Only the test-only plain SCAN profile sets it.
@@ -57,6 +63,7 @@ impl DispatchRules {
             departure_restarts: true,
             departure_limit: mode.departure_wait_limit(),
             spread_homes: mode.spreads_unset_car_homes(),
+            parked_owner_boards: mode.parked_owner_boards_its_floor(),
             parked_reach_gate: false,
         }
     }
@@ -74,6 +81,7 @@ impl DispatchRules {
             departure_restarts: false,
             departure_limit: None,
             spread_homes: false,
+            parked_owner_boards: false,
             parked_reach_gate: true,
         }
     }
@@ -214,3 +222,7 @@ fn best_car(cars: &[CarView], floor: f64, response: Option<f64>, wrong_way: f64)
 #[cfg(test)]
 #[path = "dispatch_modern_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "dispatch_parked_owner_tests.rs"]
+mod parked_owner_tests;

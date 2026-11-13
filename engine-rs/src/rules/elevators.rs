@@ -50,4 +50,13 @@ impl GameMode {
     pub fn spreads_unset_car_homes(self) -> bool {
         self == GameMode::Modern
     }
+
+    /// Whether a car parked on a stop whose call it owns boards the riders
+    /// the statistical estimate puts there, opening and dwelling as a car
+    /// that arrives does (Modern: the best-car choice gives a parked car the
+    /// call on its own floor, so no other car comes for it). A Classic car's
+    /// sweep looks only ahead, so another car comes for that call.
+    pub fn parked_owner_boards_its_floor(self) -> bool {
+        self == GameMode::Modern
+    }
 }
