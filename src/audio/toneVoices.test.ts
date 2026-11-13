@@ -67,6 +67,25 @@ function glideRamps(v: FakeVoices) {
   );
 }
 
+// Real Tone throws when a sounding mono voice restarts at the very time
+// of an earlier start (Source.start: the restart must be strictly later
+// than the start in effect at that time, within 1e-6 s). Firefox's audio
+// clock moves in coarse steps, so a build then an error (or two clicks)
+// in one frame read the same Tone.now(). This voice throws on that same
+// collision; every cue here is still sounding when the next one lands.
+function strictMono() {
+  const g = fakeGlideSynth();
+  const starts: number[] = [];
+  g.triggerAttackRelease.mockImplementation((_f: number, _d: number, t: number) => {
+    if (starts.some((s) => Math.abs(s - t) < 1e-6)) {
+      throw new Error("Start time must be strictly greater than previous start time");
+    }
+    starts.push(t);
+  });
+  return g;
+}
+const strictVoices = () => ({ ...fakeVoices(), bloop: strictMono(), bloop2: strictMono(), tick: strictMono() });
+
 beforeEach(() => {
   clock.now = 0;
 });
@@ -165,6 +184,48 @@ describe("playSfx", () => {
     clock.now = 0.2;
     playSfx(asVoices(v), "error");
     expect(v.bloop.triggerAttackRelease.mock.calls.length).toBe(2);
+  });
+
+  it("cues read on one frozen clock tick still start strictly later on a mono voice", () => {
+    const v = strictVoices();
+    clock.now = 3;
+    for (const name of ["build", "click", "error", "sell", "build", "tick", "tick", "click"] as SfxName[]) {
+      expect(() => playSfx(asVoices(v), name), name).not.toThrow();
+    }
+    const starts = v.bloop.triggerAttackRelease.mock.calls.map((c) => c[2] as number);
+    expect(starts.length).toBe(6);
+    // The nudge stays inaudible: every start sits within a few ms of the clock.
+    for (const t of starts) expect(t - 3).toBeLessThan(0.01);
+    // Once the clock moves on, the cue starts at the clock again.
+    clock.now = 4;
+    playSfx(asVoices(v), "build");
+    expect(v.bloop.triggerAttackRelease.mock.lastCall?.[2]).toBe(4);
+  });
+
+  it("a second swoop landing on another gesture's second swoop starts just after it", () => {
+    const v = strictVoices();
+    // A sell 0.16 s into an error (60 render quanta at 48 kHz, so a clock
+    // reading Firefox can return) puts its second swoop on the error's.
+    clock.now = 5;
+    playSfx(asVoices(v), "error");
+    clock.now = 5.16;
+    expect(() => playSfx(asVoices(v), "sell")).not.toThrow();
+    const second = v.bloop2.triggerAttackRelease.mock.calls.slice(-2).map((c) => c[2] as number);
+    expect(second[1]).toBeGreaterThan(second[0]);
+    expect(second[1] - second[0]).toBeLessThan(0.01);
+  });
+
+  it("starts that miss each other keep their exact timing", () => {
+    const v = strictVoices();
+    // A sell 0.05 s into an error: its second swoop (5.17) falls before the
+    // error's pending one (5.28) and must not be pushed behind it.
+    clock.now = 5;
+    playSfx(asVoices(v), "error");
+    clock.now = 5.05;
+    playSfx(asVoices(v), "sell");
+    const starts = v.bloop2.triggerAttackRelease.mock.calls.map((c) => c[2] as number);
+    expect(starts[0]).toBeCloseTo(5.28, 9);
+    expect(starts[1]).toBeCloseTo(5.17, 9);
   });
 
   it("promote is the splash theme's peak turn on the bell voice", () => {

@@ -24,6 +24,19 @@ export type NodeRec = {
 export const beat: { step: null | ((t: number) => void) } = { step: null };
 export const graph: { nodes: NodeRec[] } = { nodes: [] };
 
+/** Ways a test can make the mocked Tone misbehave the way the real one can:
+ *  the state every audio context reports, and an error every note trigger
+ *  throws (real Tone throws from a mono voice restarted at its own start
+ *  time). Tests that turn a knob reset it with {@link resetToneFaults}. */
+export const toneFaults: { contextState: string; triggerError: Error | null } = {
+  contextState: "running",
+  triggerError: null,
+};
+export function resetToneFaults(): void {
+  toneFaults.contextState = "running";
+  toneFaults.triggerError = null;
+}
+
 /** A self-returning chainable stub for a Tone node: any property access or
  *  call yields the same proxy, so `n.connect(x).connect(y)`, `n.gain.rampTo(…)`,
  *  `n.volume.value = …` all no-op safely, while `connect`, `start` and
@@ -40,6 +53,7 @@ export function node(kind = "anon", args: unknown[] = []): unknown {
       if (prop === Symbol.toPrimitive) return () => 0; // numeric coercion (Tone.now())
       if (prop === "then") return undefined; // never a thenable
       if (prop === "__rec") return rec;
+      if (prop === "state" && kind === "Context") return toneFaults.contextState;
       if (prop === "connect")
         return (target: any) => {
           if (target?.__rec) rec.connects.push(target.__rec);
@@ -52,6 +66,7 @@ export function node(kind = "anon", args: unknown[] = []): unknown {
         };
       if (prop === "triggerAttackRelease")
         return (...a: unknown[]) => {
+          if (toneFaults.triggerError) throw toneFaults.triggerError;
           rec.triggers.push(a);
           return p;
         };
@@ -105,7 +120,7 @@ export function toneMock() {
       clear: () => {},
       stop: () => {},
     }),
-    getContext: () => node(),
+    getContext: () => node("Context"),
     start: () => Promise.resolve(),
     now: () => 0,
   };

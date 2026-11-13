@@ -18,6 +18,11 @@ import { createRain, type RainVoices } from "./toneRain";
 import { programFor, type Program, type ProgramKind, type TrackVoice } from "./toneTracks";
 import { CrowdLayer } from "./toneCrowd";
 
+/** Audio context states with a stopped clock, where a cue cannot sound:
+ *  autoplay not yet allowed or the tab backgrounded ("suspended"), Safari's
+ *  phone-call pause ("interrupted"), and a torn-down context ("closed"). */
+const SILENT_CONTEXT_STATES: ReadonlySet<string> = new Set(["suspended", "interrupted", "closed"]);
+
 type NoteVoice = { triggerAttackRelease: (f: number, d: number, t: number, v: number) => unknown };
 
 /**
@@ -413,7 +418,17 @@ export class ToneAudioEngine {
 
   sfx(name: SfxName): void {
     if (!this.started || !this.sfxVoices || this.muted) return;
-    playSfx(this.sfxVoices, name);
+    // Cues run inside input handlers and the frame loop, so a Tone error here
+    // must never escape: a missed jingle beats a dead game.
+    try {
+      // A context that is not running (autoplay still blocked, a backgrounded
+      // tab) has a frozen clock: nothing would sound, and every cue would pile
+      // up on one start time. update() nudges it back to life each frame.
+      if (SILENT_CONTEXT_STATES.has(Tone.getContext().state)) return;
+      playSfx(this.sfxVoices, name);
+    } catch {
+      /* drop this cue; the next one schedules fresh */
+    }
   }
 
   dispose(): void {

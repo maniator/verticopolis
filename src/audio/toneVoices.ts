@@ -35,7 +35,8 @@ export interface SfxVoices {
    *  pending second swoop. Two OVERLAPPING two-bloop gestures can still
    *  collide here; error-into-error is holdoff-guarded, and the remaining
    *  window (a sell inside an error's 0.28 s gap) is accepted as rare and
-   *  brief rather than guarded. */
+   *  brief rather than guarded. A collision at the very same start time
+   *  would throw in Tone, so `monoStart` moves the later one aside. */
   bloop2: Tone.Synth;
   /** The bomb search's clock: a dry woodblock knock, its own mono voice so
    *  its near-instant attack never reshapes the bloops. */
@@ -119,6 +120,36 @@ function strikeBell(voices: SfxVoices, midi: number, t: number, vel: number): vo
   voices.bellPartial.triggerAttackRelease(midiToFreq(midi + 19), 0.5, t, vel * 0.16);
 }
 
+/** How far apart two starts on one mono voice must be, in seconds. A mono
+ *  voice (the bloops, the tick) asserts in Tone when it restarts at the time
+ *  of a start still in effect ("Start time must be strictly greater than
+ *  previous start time"). Firefox advances the audio clock in coarse steps,
+ *  so two cues in one input event or one frame (a build then an error, two
+ *  clicks) can read the same Tone.now(), and a two-bloop gesture's offset
+ *  second swoop can land on another gesture's. A start that would land on
+ *  one already scheduled moves this much later instead. One millisecond is
+ *  far below what an ear can separate. */
+const MIN_START_GAP = 0.001;
+/** How long a voice remembers a start, in seconds either side of a new one.
+ *  The furthest a cue schedules ahead is the error's second swoop (0.28 s),
+ *  so a start further away than this can never collide; and when a restarted
+ *  audio context rewinds the clock, the old context's starts drop out. */
+const START_MEMORY = 1;
+const startsOn = new WeakMap<object, number[]>();
+
+/** When a mono voice may start for a cue asked to start at `asked`: then, or
+ *  a millisecond or so later if a start is already scheduled there. Starts
+ *  that miss each other keep their exact timing. Keyed to the voice object,
+ *  so a rebuilt engine starts clean. */
+function monoStart(voice: object, asked: number): number {
+  const near = (startsOn.get(voice) ?? []).filter((s) => Math.abs(s - asked) <= START_MEMORY);
+  let start = asked;
+  while (near.some((s) => Math.abs(s - start) < MIN_START_GAP)) start += MIN_START_GAP;
+  near.push(start);
+  startsOn.set(voice, near);
+  return start;
+}
+
 /** One bloop: a smooth exponential swoop from `f0` down to `f1` Hz on the
  *  given mono glide voice. The ramp must be scheduled AFTER the trigger so it
  *  overrides the setValueAtTime the trigger itself schedules. `f1` never goes
@@ -130,11 +161,12 @@ function swoopBloop(
   f0: number,
   f1: number,
   ramp: number,
-  t: number,
+  at: number,
   vel: number,
   decay = 0.2,
 ): void {
   const floor = Math.max(f1, 160);
+  const t = monoStart(voice, at);
   // Per-cue envelope: the click is a short blip (0.09 s), the error a slow
   // sigh (0.3 s). Setting the mono voice's decay is immediate, so both bloops
   // of one gesture share the cue's value.
@@ -219,14 +251,16 @@ export function playSfx(voices: SfxVoices, name: SfxName): void {
       // A single ping on G4: the onboarding step chime and other small nudges.
       strikeBell(voices, 67, t, 0.7);
       break;
-    case "tick":
+    case "tick": {
       // The bomb's clock, once a second while a bomb search runs: a woodblock
       // knock (the owner's pick of three previews), a 1 ms strike that drops
       // from 900 to 700 Hz in 10 ms and dies away within about 50 ms.
-      voices.tick.triggerAttackRelease(900, 0.03, t, 0.5);
-      voices.tick.frequency.cancelScheduledValues(t);
-      voices.tick.frequency.setValueAtTime(900, t);
-      voices.tick.frequency.exponentialRampToValueAtTime(700, t + 0.01);
+      const k = monoStart(voices.tick, t);
+      voices.tick.triggerAttackRelease(900, 0.03, k, 0.5);
+      voices.tick.frequency.cancelScheduledValues(k);
+      voices.tick.frequency.setValueAtTime(900, k);
+      voices.tick.frequency.exponentialRampToValueAtTime(700, k + 0.01);
       break;
+    }
   }
 }
