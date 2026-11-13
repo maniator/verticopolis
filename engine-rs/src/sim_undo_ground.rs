@@ -8,7 +8,7 @@
 //! file (`sim_undo_lobby.rs`).
 use crate::crowd::fasthash::{FastMap, FastSet};
 use crate::facilities::{is_sky_lobby_floor, Kind, LOT_WIDTH, MIN_FLOOR};
-use crate::tower::{Tower, Transport, Unit};
+use crate::tower::{floor_left_of, floor_right_of, Tower, Transport, Unit};
 use crate::undo::{Step, UnitChange};
 
 /// The floor the lobby concourse runs along.
@@ -243,25 +243,62 @@ impl<'a> Ground<'a> {
     /// the step takes out, by the floor rule a sale keeps to
     /// (`Tower::removal_reason`): in a mode that keeps floors whole
     /// ([`GameMode::removes_mid_floor_tiles`](crate::clock::GameMode::removes_mid_floor_tiles)),
-    /// the run of leaving tiles around `u` must reach an end of its story,
-    /// so the sales can start there: no tile that stays may stand anywhere
-    /// on one side of it, as `Tower::floor_on_both_sides` asks of a sale, so
-    /// a gap a save already has is no end. Only the run's first tile scans
-    /// the story, and the others answer yes, since every tile of one run sees
-    /// the same tiles stay on each side: the step is sellable only when every
-    /// tile is, and the first one's answer is the run's.
+    /// the sales take each run of leaving tiles from one of its ends, by
+    /// [`floor_left_of`] and [`floor_right_of`] over the tiles that stay, as
+    /// `Tower::floor_on_both_sides` asks of a sale. So a gap a save already
+    /// has is no end, and a lobby a run touches holds it in. A run still
+    /// standing is plain floor on one side of every other run on its story,
+    /// so the sales start at the story's two ends and work inward: the run
+    /// of `u` comes out once every run from one end of the story through it
+    /// can come out toward that end. Only the run's first tile asks, for the
+    /// whole run, and the others answer yes, since the step is sellable only
+    /// when every tile is.
     pub(crate) fn sells_from_an_end(&self, u: &Unit) -> bool {
-        let leaves = |x: i64| {
-            self.tower
-                .structure
-                .get(&(u.floor, x))
-                .is_some_and(|id| self.leaving.contains(id))
-        };
-        if self.tower.mode.removes_mid_floor_tiles() || leaves(u.x - 1) {
+        if self.tower.mode.removes_mid_floor_tiles() || self.leaves(u.floor, u.x - 1) {
             return true;
         }
-        let stays = |x: i64| self.stays(u.floor, x);
-        !((0..u.x).any(stays) && (u.x + u.width..LOT_WIDTH).any(stays))
+        // The run ends at the first tile past `u` that does not leave.
+        let run_end = (u.x + u.width..LOT_WIDTH)
+            .find(|&x| !self.leaves(u.floor, x))
+            .unwrap_or(LOT_WIDTH);
+        self.comes_out_leftward(u.floor, u.x) || self.comes_out_rightward(u.floor, run_end)
+    }
+
+    /// Whether every run of leaving tiles on `floor`, from the lot's left
+    /// edge through the run that starts at `start`, can come out from its
+    /// left end: none has floor on its left by [`floor_left_of`]. No plain
+    /// floor that stays is left of the run at `start`, so none is left of an
+    /// earlier run, and an earlier run has floor on its left only where a
+    /// tile that stays touches it.
+    fn comes_out_leftward(&self, floor: i64, start: i64) -> bool {
+        !floor_left_of(start, |x| self.kind_staying(floor, x))
+            && !(0..start).any(|x| self.stays(floor, x) && self.leaves(floor, x + 1))
+    }
+
+    /// Whether every run of leaving tiles on `floor`, from the run that
+    /// ends before `end` through the lot's right edge, can come out from its
+    /// right end, by [`floor_right_of`] and the reasoning of
+    /// `comes_out_leftward`.
+    fn comes_out_rightward(&self, floor: i64, end: i64) -> bool {
+        !floor_right_of(end, |x| self.kind_staying(floor, x))
+            && !(end..LOT_WIDTH).any(|x| self.stays(floor, x) && self.leaves(floor, x - 1))
+    }
+
+    /// Whether the tower's floor or lobby tile at (`floor`, `x`) is one the
+    /// step takes out.
+    fn leaves(&self, floor: i64, x: i64) -> bool {
+        self.tower
+            .structure
+            .get(&(floor, x))
+            .is_some_and(|id| self.leaving.contains(id))
+    }
+
+    /// The kind of the tower's floor or lobby tile at (`floor`, `x`) when it
+    /// stays, which is all a sale of what the step takes out leaves there.
+    fn kind_staying(&self, floor: i64, x: i64) -> Option<Kind> {
+        self.tower
+            .structure_kind_at(floor, x)
+            .filter(|_| self.stays(floor, x))
     }
 
     /// Whether taking out floor or lobby tile `u` leaves everything it held
