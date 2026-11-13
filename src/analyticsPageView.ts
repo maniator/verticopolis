@@ -8,14 +8,25 @@ import { trackEvent } from "./analyticsCore";
  * breakdowns read it as they are.
  *
  * Only the referrer's host travels, never its path or query (a search or a
- * private page could be in there), and a UTM value is kept only when it is a
- * short plain token. Vercel Web Analytics keeps counting visits on its own
+ * private page could be in there), and only when it names a public site: an IP
+ * address or a local machine name goes as {@link OTHER}. The landing path is
+ * kept only when it is one of the game's own, since any path serves the game.
+ * A UTM value is kept only when it is a short plain token with a letter in it. Vercel Web Analytics keeps counting visits on its own
  * (`analyticsAdapter.ts`); this is the relay `$pageview` that module names as
  * the pre-agreed addition.
  */
 
 /** PostHog's value for a visit with no referrer. */
 export const DIRECT = "$direct";
+
+/** A referrer that is an IP address or a local machine name. */
+export const OTHER = "$other";
+
+/** The landing paths kept; any other path is sent as {@link OTHER_PATH}. */
+export const GAME_PATHS: readonly string[] = ["/", "/index.html"];
+
+/** The path sent for any landing path outside {@link GAME_PATHS}. */
+export const OTHER_PATH = "/other";
 
 /** The UTM parameters kept, by their query names. */
 export const UTM_PARAMS = ["utm_source", "utm_medium", "utm_campaign"] as const;
@@ -26,21 +37,34 @@ type UtmName = (typeof UTM_PARAMS)[number];
  *  that is not a short plain token. */
 export type PageViewProps = { $referring_domain: string; $pathname: string } & { [K in UtmName]: string | null };
 
-/** The longest path kept; the game's own paths are far shorter. */
-const MAX_PATH = 100;
+/** A UTM value worth keeping: letters, digits and a few separators, 64 at
+ *  most, with at least one letter (so a phone number does not pass). */
+const PLAIN_TOKEN = /^(?=.*[A-Za-z])[A-Za-z0-9._+-]{1,64}$/;
 
-/** A UTM value worth keeping: letters, digits and a few separators, 64 at most. */
-const PLAIN_TOKEN = /^[A-Za-z0-9._+-]{1,64}$/;
+/** An IPv4 address (an IPv6 one has brackets in a URL's hostname). */
+const IPV4 = /^\d{1,3}(\.\d{1,3}){3}$/;
 
-/** The referrer's host, lowercased, or {@link DIRECT} when there is none or it
- *  does not parse. */
+/** Endings of local network names. */
+const LOCAL_SUFFIXES = [".local", ".lan", ".internal", ".home.arpa"];
+
+/** A host that is not a public site: an IP address, a single-label name
+ *  (`localhost`, a machine on the LAN) or a local network name. */
+function isLocalHost(host: string): boolean {
+  return IPV4.test(host) || host.startsWith("[") || !host.includes(".") || LOCAL_SUFFIXES.some((end) => host.endsWith(end));
+}
+
+/** The referrer's host, lowercased; {@link DIRECT} when there is none, it
+ *  has no host or it does not parse; {@link OTHER} when it is local. */
 function referringDomain(referrer: string): string {
   if (!referrer) return DIRECT;
+  let host: string;
   try {
-    return new URL(referrer).hostname.toLowerCase() || DIRECT;
+    host = new URL(referrer).hostname.toLowerCase();
   } catch {
     return DIRECT;
   }
+  if (!host) return DIRECT;
+  return isLocalHost(host) ? OTHER : host;
 }
 
 /** The `$pageview` fields for a referrer and the page's own address. */
@@ -51,7 +75,7 @@ export function pageViewProps(referrer: string, href: string): PageViewProps {
     const value = url.searchParams.get(name);
     utm[name] = value !== null && PLAIN_TOKEN.test(value) ? value : null;
   }
-  return { $referring_domain: referringDomain(referrer), $pathname: url.pathname.slice(0, MAX_PATH), ...utm };
+  return { $referring_domain: referringDomain(referrer), $pathname: GAME_PATHS.includes(url.pathname) ? url.pathname : OTHER_PATH, ...utm };
 }
 
 /** Send the page life's landing view. Never throws: a page without a readable
