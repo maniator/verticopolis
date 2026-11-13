@@ -119,10 +119,10 @@ function paintCell(cell: ex.Tile, gfx: ex.Graphic): void {
 function lobbyTileGfx(engine: TowerEngine, u: UnitView, story = 0, height = 1): ex.Canvas {
   const lit = engine.litState ? 1 : 0;
   if (height > 1) {
-    // A tall lobby (#308): one slice of the whole hall per story. The
-    // entrance keeps its one-story storefront (and its doorman) at the bottom.
+    // A tall lobby (#308): one slice of the whole open hall per story. The
+    // entrance's storefront (and its doorman) stands on the bottom story,
+    // with the hall's wall carried up over it in place of its own cornice.
     const kind = u.floor === 1 ? floor1EntranceKind(engine, u.x) : "none";
-    if (kind !== "none" && story === 0) return entranceGfx(engine, kind, lit);
     return engine.tallLobbyGfx(lit === 1, u.floor === 1, height, story, kind === "none" ? lobbyVariant(u.x) : kind);
   }
   if (u.floor === 1) {

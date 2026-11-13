@@ -1,8 +1,9 @@
 import type { DrawCtx } from "../common";
-import { hash } from "../../pixelSprites/common";
-import { layerBreak } from "../../pixelSprites/layers";
-import { balconySlab, balustrade, glassRail, globePendants, mezzanineRows, painting, railPlanter } from "./tallLobbyMezzanine";
+import { layerBreak, layerShell } from "../../pixelSprites/layers";
+import { archedWindow, globePendants, hallGlass, painting } from "./tallLobbyPieces";
 import {
+  chandelier,
+  consolePanel,
   drawLobbyTile,
   ENTRANCE_GRAND_LEFT,
   ENTRANCE_GRAND_RIGHT,
@@ -12,125 +13,64 @@ import {
   fluteColumn,
   framedPrint,
   LOBBY_VARIANTS,
+  lobbyFloor,
+  planter,
   sconce,
-  skyGlass,
 } from "./lobby";
 
 /**
  * Tall lobbies (#308): one slice of a lobby two or three stories high, drawn
- * whole over `stories` floors. Nothing is stretched: every story keeps the
- * one-story lobby's scale.
+ * as one open hall over all its `stories`. There is no floor between the
+ * stories: one back wall (veined marble downstairs, a skyline curtain wall in
+ * a sky lobby) runs from the gilded cornice at the top to the polished floor
+ * at the bottom. Nothing is stretched: the tall pieces (columns, arched
+ * windows, the curtain wall, the chandelier's chain, the pendants' cords) are
+ * drawn at their real height, and the furniture (the console and its lamp,
+ * the bench, the planter, the sconces) stands on the floor at the one-story
+ * lobby's size.
  *
- * - The bottom story is the one-story lobby tile itself, furniture,
- *   entrance and all, where people walk.
- * - Each story above is a mezzanine gallery over it: the same back wall
- *   (marble downstairs, skyline glass in a sky lobby), the same gilded
- *   cornice, and a balcony slab with a railing at its foot. Downstairs the
- *   railing is a cream balustrade and the wall carries columns, arched
- *   windows, paintings and sconces; in a sky lobby it is glass, with planter
- *   boxes trailing ivy and globe pendants (`tallLobbyMezzanine.ts`).
- * - Over the entrance, the mezzanine shows tall windows above the grand
- *   doors and a plain balustrade above the service door.
+ * Over the entrance the doors are the one-story entrance itself, with a tall
+ * glass wall above the grand doors and plain marble above the service door.
  *
  * Every slice is drawn whole and the renderer cuts it into one-story cells,
  * so adjacent slices line up into one continuous hall.
  */
 
-/** A glazed opening with a gold frame and, when `head` is set, a round
- *  head: dark warm glass with a few city lights after dark, pale sky by day. */
-function archedWindow(d: DrawCtx, x: number, y: number, w: number, h: number, head: boolean, seed: number): void {
-  const { ctx, lit } = d;
-  if (w < 3 || h < 6) return;
-  ctx.fillStyle = "#C9A24B";
-  ctx.fillRect(x, y + (head ? 2 : 0), w, h - (head ? 2 : 0));
-  if (head) {
-    ctx.fillRect(x + 1, y + 1, w - 2, 1);
-    ctx.fillRect(x + 2, y, Math.max(1, w - 4), 1);
-  }
-  const gx = x + 1;
-  const gy = y + (head ? 2 : 1);
-  const gw = w - 2;
-  const gh = h - (head ? 3 : 2);
-  const g = ctx.createLinearGradient(0, gy, 0, gy + gh);
-  g.addColorStop(0, lit ? "#2E2C34" : "#B7CCDA");
-  g.addColorStop(1, lit ? "#26242C" : "#D3E0E8");
-  ctx.fillStyle = g;
-  ctx.fillRect(gx, gy, gw, gh);
-  if (head) ctx.fillRect(x + 2, y + 1, Math.max(1, w - 4), 1);
-  if (lit) {
-    ctx.fillStyle = "#B89A62";
-    for (let yy = 3; yy < gh - 1; yy += 4) {
-      for (let xx = 0; xx < gw; xx += 2) {
-        if (hash(seed * 97 + xx * 13 + yy * 5) > 0.8) ctx.fillRect(gx + xx, gy + yy, 1, 1);
-      }
-    }
-  }
-  ctx.fillStyle = "rgba(138,116,48,0.8)"; // mullion and transom bar
-  if (gw >= 4) ctx.fillRect(gx + (gw >> 1), gy, 1, gh);
-  ctx.fillRect(gx, gy + Math.round(gh * 0.6), gw, 1);
-}
-
-/** The mezzanine's back wall and its cornice: veined marble downstairs,
- *  warm stone around a skyline window in a sky lobby. */
-function mezzanineWall(d: DrawCtx, x0: number, y: number, ww: number, railTop: number, ground: boolean, seed: number): void {
-  const { ctx, lit } = d;
+/** The hall's back wall and the gilded cornice along its ceiling. */
+function hallShell(d: DrawCtx, x0: number, y0: number, ww: number, floorTop: number, ground: boolean, seed: number): void {
+  const { ctx } = d;
+  const hh = floorTop - y0;
   if (ground) {
-    const g = ctx.createLinearGradient(0, y, 0, railTop);
+    const g = ctx.createLinearGradient(0, y0, 0, floorTop);
     g.addColorStop(0, "#F1E8CE");
     g.addColorStop(1, "#E3D7B3");
     ctx.fillStyle = g;
-    ctx.fillRect(x0, y, ww, railTop - y + 9);
-    ctx.fillStyle = "rgba(120,100,60,0.12)"; // faint veins, as downstairs
-    ctx.fillRect(x0 + 3, y + 6, 1, railTop - y - 6);
+    ctx.fillRect(x0, y0, ww, hh);
+    ctx.fillStyle = "rgba(120,100,60,0.12)"; // faint veins, as in the one-story lobby
+    ctx.fillRect(x0 + 3, y0 + 6, 1, hh - 11);
+    ctx.fillRect(x0 + ww - 4, y0 + 10, 1, hh - 15);
   } else {
     ctx.fillStyle = "#C4BCA8";
-    ctx.fillRect(x0, y, ww, railTop - y + 9);
-    skyGlass(ctx, x0 + 1, y + 5, ww - 2, railTop - y - 4, lit, seed);
+    ctx.fillRect(x0, y0, ww, hh);
+    hallGlass(d, x0 + 1, y0 + 5, ww - 2, hh - 8, seed);
   }
-  ctx.fillStyle = "#C9A24B"; // the gilded cornice every story shares
-  ctx.fillRect(x0, y, ww, 3);
-  ctx.fillStyle = "#8A7430";
-  ctx.fillRect(x0, y + 3, ww, 1);
+  cornice(ctx, x0, y0, ww);
 }
 
-/** One mezzanine story of a lobby slice, `h` one story high. */
-function drawMezzanine(d: DrawCtx, x0: number, y: number, ww: number, h: number, variant: number, ground: boolean): void {
+function cornice(ctx: CanvasRenderingContext2D, x0: number, y0: number, ww: number): void {
+  ctx.fillStyle = "#C9A24B";
+  ctx.fillRect(x0, y0, ww, 3);
+  ctx.fillStyle = "#8A7430";
+  ctx.fillRect(x0, y0 + 3, ww, 1);
+}
+
+/** The hall's chandelier: the one-story lobby's chandelier on a long chain,
+ *  hung from the ceiling into the open space. */
+function hallChandelier(d: DrawCtx, cx: number, y0: number, hang: number, ww: number): void {
   const { ctx, lit } = d;
-  const { railTop, slabTop } = mezzanineRows(y, h);
-  const cx = x0 + Math.floor(ww / 2);
-  const seed = variant * 7 + Math.abs(y);
-  mezzanineWall(d, x0, y, ww, railTop, ground, variant + 1);
-  if (variant >= LOBBY_VARIANTS) {
-    // Over the entrance: tall windows above the grand doors (the two grand
-    // halves frame one window across both tiles), plain wall above the
-    // service door.
-    if (variant !== ENTRANCE_SERVICE) {
-      const left = variant === ENTRANCE_GRAND_RIGHT ? x0 : x0 + 1;
-      const right = variant === ENTRANCE_GRAND_LEFT ? x0 + ww : x0 + ww - 1;
-      archedWindow(d, left, y + 6, right - left, railTop - y - 7, variant === ENTRANCE_GRAND_SOLO, seed);
-    }
-  } else if (variant === 0) {
-    layerBreak(ctx);
-    fluteColumn(ctx, cx, y, railTop - y + 6, ground); // a column per story, at the lobby's scale
-  } else if (variant === 1) {
-    if (ground) archedWindow(d, x0 + 2, y + 7, ww - 4, railTop - y - 8, true, seed);
-  } else if (variant === 2) {
-    if (ground) painting(ctx, cx, y + 10);
-    else {
-      layerBreak(ctx);
-      globePendants(d, cx, y + 4, railTop - 2);
-    }
-  } else if (variant === 3) {
-    if (ground) sconce(ctx, cx, y + 6, lit);
-    else framedPrint(ctx, cx, y + 2);
-  }
-  layerBreak(ctx);
-  balconySlab(ctx, x0, ww, slabTop, ground);
-  if (ground) balustrade(ctx, x0, ww, railTop, slabTop);
-  else {
-    glassRail(d, x0, ww, railTop, slabTop);
-    if (variant === 1 || variant === 3) railPlanter(ctx, x0, ww, railTop, seed);
-  }
+  ctx.fillStyle = "#8A7430";
+  ctx.fillRect(cx, y0 + 3, 1, hang);
+  chandelier(ctx, cx, y0 + hang, lit, ww);
 }
 
 /** One slice of a tall lobby, `h` covering all its `stories`. `variant` is a
@@ -148,13 +88,70 @@ export function drawTallLobbyTile(
 ): void {
   const s = Math.max(1, Math.min(3, Math.trunc(stories) || 1));
   if (s === 1) return drawLobbyTile(d, x, y, w, h, variant, ground);
+  const { ctx, lit } = d;
   const x0 = Math.round(x);
   const y0 = Math.round(y);
   const ww = Math.max(1, Math.round(w));
   const storyH = Math.round(Math.max(1, Math.round(h)) / s);
-  const entrance = variant >= LOBBY_VARIANTS;
-  for (let k = 0; k < s - 1; k++) drawMezzanine(d, x0, y0 + k * storyH, ww, storyH, variant, ground || entrance);
-  drawLobbyTile(d, x0, y0 + (s - 1) * storyH, ww, storyH, variant, ground || entrance);
+  const bottom = y0 + s * storyH;
+  const lowY = bottom - storyH; // top of the story people walk on
+  const floorTop = bottom - 5;
+  const cx = x0 + Math.floor(ww / 2);
+  if (variant >= LOBBY_VARIANTS) return tallEntrance(d, x0, y0, ww, storyH, lowY, floorTop, variant);
+  hallShell(d, x0, y0, ww, floorTop, ground, variant + 1);
+  lobbyFloor(ctx, x0, ww, bottom, ground);
+  if (variant === 0) {
+    layerBreak(ctx);
+    fluteColumn(ctx, cx, y0, bottom - y0, ground); // one column, ceiling to floor
+  } else if (variant === 1) {
+    if (ground) archedWindow(d, x0 + 1, y0 + 7, ww - 2, lowY + 4 - (y0 + 7), true, variant + y0);
+    consolePanel(ctx, x0, ww, lowY, floorTop, ground, lit); // marks its own split
+  } else if (variant === 2) {
+    layerBreak(ctx);
+    if (ground) hallChandelier(d, cx, y0, Math.round((bottom - y0) * 0.3), ww);
+    else {
+      globePendants(d, cx, y0 + 4, lowY + Math.round(storyH * 0.35));
+      planter(ctx, cx, floorTop);
+    }
+  } else if (variant === 3) {
+    if (ground) {
+      painting(ctx, cx, y0 + 10);
+      sconce(ctx, cx, lowY, lit);
+    } else framedPrint(ctx, cx, lowY);
+    layerBreak(ctx);
+  }
+}
+
+/** The ground entrance slice of a tall lobby: the one-story entrance on the
+ *  bottom story, under a tall glass wall (grand doors) or plain marble
+ *  (service door) that runs up to the hall's cornice. */
+function tallEntrance(d: DrawCtx, x0: number, y0: number, ww: number, storyH: number, lowY: number, floorTop: number, variant: number): void {
+  const { ctx, lit } = d;
+  const grand = variant !== ENTRANCE_SERVICE;
+  const upper = (): void => {
+    if (grand) {
+      ctx.fillStyle = lit ? "#2A3350" : "#AFC8DE"; // the entrance's sky, carried up
+      ctx.fillRect(x0, y0 + 4, ww, lowY - y0);
+      // Mullions on the composite facade's 5-pixel pitch, so the two grand
+      // halves line up; the right half sits one tile into the composite.
+      const off = variant === ENTRANCE_GRAND_RIGHT ? ww : 0;
+      ctx.fillStyle = lit ? "rgba(58,80,104,0.6)" : "rgba(90,126,154,0.6)";
+      for (let k = 0; k < ww; k++) if ((k + off) % 5 === 0) ctx.fillRect(x0 + k, y0 + 4, 1, lowY - y0);
+      for (let ty = y0 + 18; ty < lowY; ty += 15) ctx.fillRect(x0, ty, ww, 1);
+    } else {
+      const g = ctx.createLinearGradient(0, y0, 0, floorTop);
+      g.addColorStop(0, "#F1E8CE");
+      g.addColorStop(1, "#E3D7B3");
+      ctx.fillStyle = g;
+      ctx.fillRect(x0, y0, ww, lowY + 4 - y0);
+    }
+    cornice(ctx, x0, y0, ww);
+  };
+  upper();
+  drawLobbyTile(d, x0, lowY, ww, storyH, variant, true);
+  // The one-story entrance has its own cornice; in the hall it is open space,
+  // so the wall above carries on over it.
+  layerShell(ctx, upper);
 }
 
 /** Entrance kind to its sentinel variant, for {@link drawTallLobbyEntrance}. */

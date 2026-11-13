@@ -144,23 +144,7 @@ export function drawLobbyTile(d: DrawCtx, x: number, y: number, w: number, h: nu
   ctx.fillStyle = "#8A7430";
   ctx.fillRect(x0, y0 + 3, ww, 1);
 
-  // Polished floor with a sheen line and a dark base. The sky lobby's floor is
-  // toned down (dimmer slab, softer sheen) so it does not add to the bright band.
-  ctx.fillStyle = ground ? "#DCD2B8" : "#CBC3B0";
-  ctx.fillRect(x0, floorTop, ww, 5);
-  ctx.fillStyle = ground ? "#F0E8D0" : "#D8D2C2";
-  ctx.fillRect(x0, floorTop, ww, 1);
-  ctx.fillStyle = ground ? "#8F7A48" : "#8A7E64";
-  ctx.fillRect(x0, y0 + hh - 1, ww, 1);
-  if (ground) {
-    // Red carpet with a gilded edge, running the whole concourse.
-    ctx.fillStyle = "#9A2E38";
-    ctx.fillRect(x0, y0 + hh - 4, ww, 3);
-    ctx.fillStyle = "#B84450";
-    ctx.fillRect(x0, y0 + hh - 4, ww, 1);
-    ctx.fillStyle = "#D9B356";
-    ctx.fillRect(x0, y0 + hh - 5, ww, 1);
-  }
+  lobbyFloor(ctx, x0, ww, y0 + hh, ground);
 
   // Per-variant centerpiece, centered on the slice and kept inside it (each
   // slice is its own baked 11px canvas, so anything past the edge is clipped
@@ -189,6 +173,27 @@ export function drawLobbyTile(d: DrawCtx, x: number, y: number, w: number, h: nu
     drawGrandCompact(d, x, y, w, h);
   } else if (variant === ENTRANCE_SERVICE && ground) {
     drawServiceEntrance(ctx, x, y, w, h);
+  }
+}
+
+/** The lobby's polished floor band, its five rows ending at `bottom`: a sheen
+ *  line and a dark base, toned down in a sky lobby so it does not add to the
+ *  bright band, and the ground lobby's red carpet with a gilded edge. */
+export function lobbyFloor(ctx: CanvasRenderingContext2D, x0: number, ww: number, bottom: number, ground: boolean): void {
+  const floorTop = bottom - 5;
+  ctx.fillStyle = ground ? "#DCD2B8" : "#CBC3B0";
+  ctx.fillRect(x0, floorTop, ww, 5);
+  ctx.fillStyle = ground ? "#F0E8D0" : "#D8D2C2";
+  ctx.fillRect(x0, floorTop, ww, 1);
+  ctx.fillStyle = ground ? "#8F7A48" : "#8A7E64";
+  ctx.fillRect(x0, bottom - 1, ww, 1);
+  if (ground) {
+    ctx.fillStyle = "#9A2E38";
+    ctx.fillRect(x0, bottom - 4, ww, 3);
+    ctx.fillStyle = "#B84450";
+    ctx.fillRect(x0, bottom - 4, ww, 1);
+    ctx.fillStyle = "#D9B356";
+    ctx.fillRect(x0, bottom - 5, ww, 1);
   }
 }
 
@@ -251,7 +256,7 @@ export function skyGlass(ctx: CanvasRenderingContext2D, x: number, y: number, w:
  *  grand-entrance tile (ground lobby), so the attendant no longer tiles every
  *  fourth column. Sky lobbies have no single-tile placement path, so they now
  *  show no attendant at all (a logged followup). */
-function consolePanel(ctx: CanvasRenderingContext2D, x0: number, ww: number, y0: number, floorTop: number, ground: boolean, lit: boolean): void {
+export function consolePanel(ctx: CanvasRenderingContext2D, x0: number, ww: number, y0: number, floorTop: number, ground: boolean, lit: boolean): void {
   const cx = x0 + Math.floor(ww / 2);
   const topY = floorTop - 5; // top of the console/bench, sitting on the floor
   if (ground) {
@@ -312,7 +317,7 @@ function consolePanel(ctx: CanvasRenderingContext2D, x0: number, ww: number, y0:
 }
 
 /** Chandelier: gold tiers on a chain, aglow after dark. */
-function chandelier(ctx: CanvasRenderingContext2D, cx: number, y0: number, lit: boolean, ww: number): void {
+export function chandelier(ctx: CanvasRenderingContext2D, cx: number, y0: number, lit: boolean, ww: number): void {
   ctx.fillStyle = "#8A7430";
   ctx.fillRect(cx, y0 + 3, 1, 3); // chain
   ctx.fillStyle = lit ? "#FFD76B" : "#C8A343";
@@ -329,7 +334,7 @@ function chandelier(ctx: CanvasRenderingContext2D, cx: number, y0: number, lit: 
 }
 
 /** Sky-lobby planter: a potted shrub standing on the floor. */
-function planter(ctx: CanvasRenderingContext2D, cx: number, floorTop: number): void {
+export function planter(ctx: CanvasRenderingContext2D, cx: number, floorTop: number): void {
   ctx.fillStyle = "#8C5A3A"; // brass pot
   ctx.fillRect(cx - 2, floorTop - 4, 5, 4);
   ctx.fillStyle = "rgba(255,255,255,0.3)";

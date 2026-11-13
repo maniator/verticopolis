@@ -203,8 +203,10 @@ describe("the scene sync walks the structure tiles only when what they draw from
     const state = { units, revision: 5, tall: new Map([[1, 2], [15, 3]]) };
     const { engine, cell } = fakeEngine(state);
     syncScene(engine);
-    // The entrance keeps its one-story storefront; the hall rises above it.
-    expect(cell(4, 1)?.gfx).toEqual(["grand-left 0"]);
+    // The entrance is a slice of the open hall on every story, its doors
+    // included, so no one-story cornice cuts across the hall over them.
+    expect(cell(4, 1)?.gfx).toEqual(["tall 0:ground:2:0:grand-left"]);
+    expect(cell(7, 1)?.gfx).toEqual(["tall 0:ground:2:0:service"]);
     expect(cell(4, 2)?.gfx).toEqual(["tall 0:ground:2:1:grand-left"]);
     expect(cell(6, 1)?.gfx).toEqual([`tall 0:ground:2:0:${6 % 4}`]);
     expect(cell(6, 2)?.gfx).toEqual([`tall 0:ground:2:1:${6 % 4}`]);

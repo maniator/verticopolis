@@ -215,12 +215,17 @@ export function bakeSharedGraphics(engine: TowerEngine): void {
     let gfx = tall.get(key);
     if (!gfx) {
       const y = -(height - 1 - story) * FLOOR;
+      // The grand doors' story carries the swaying doorman, so it takes the
+      // animated path (and live staffing) like the one-story grand entrance.
+      const doorman = story === 0 && typeof slot === "string" && slot !== "service";
       gfx = new ex.Canvas({
         width: TILE,
         height: FLOOR,
-        cache: true,
+        cache: !doorman,
         draw: (ctx) => {
-          const d = { ctx, lit, anim: 0, hour: lit ? 20 : 12 };
+          const d = doorman
+            ? { ctx, lit, anim: engine.d.anim, hour: lit ? 20 : 12, staffed: engine.d.staffed }
+            : { ctx, lit, anim: 0, hour: lit ? 20 : 12 };
           if (typeof slot === "string") drawTallLobbyEntrance(d, slot, 0, y, TILE, height * FLOOR, height);
           else drawTallLobbyTile(d, 0, y, TILE, height * FLOOR, slot, ground, height);
         },
