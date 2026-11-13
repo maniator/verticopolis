@@ -224,7 +224,13 @@ function onError(event: ErrorEvent): void {
       return;
     }
     if (typeof event.message === "string" && event.message.length > 0) {
-      report(new Error(event.message), { source: event.filename, lineno: event.lineno, colno: event.colno });
+      // The Error is made here, so its stack is this listener's own frame, not
+      // where the error happened. Sending it pointed every cross-origin
+      // "Script error." at the game's bundle and put the listener's minified,
+      // per-build name in the V8 fingerprint. A message-only error has no stack.
+      const fromMessage = new Error(event.message);
+      fromMessage.stack = "";
+      report(fromMessage, { source: event.filename, lineno: event.lineno, colno: event.colno });
     }
     // else: a resource-load error with no script detail; not a JS exception.
   } catch {

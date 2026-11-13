@@ -13,6 +13,7 @@ import { emptyStructPass, type StructPass } from "./towerStructTiles";
 import * as crowd from "./towerCrowd";
 import * as camera from "./towerInputCamera";
 import { clearLongPress } from "./longPress";
+import { guardPointerButtons } from "./pointerButtonGuard";
 import * as overlayFx from "./towerOverlay";
 import { displayLit, runSceneSync } from "./towerSyncSchedule";
 import { clockOf } from "../../simport/headerClock";
@@ -300,6 +301,7 @@ export class TowerEngine {
   constructor(canvas: HTMLCanvasElement, sim: RenderSim, private readonly reader?: SimView) {
     this.sim = sim;
     scene.bindSceneWorld(sim);
+    guardPointerButtons(canvas); // before Excalibur's own listeners; see the module
     this.engine = new ex.Engine({
       canvasElement: canvas,
       displayMode: ex.DisplayMode.FillContainer,

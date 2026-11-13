@@ -148,6 +148,15 @@ describe("cookieless error tracking", () => {
     expect(sentException()).toMatchObject({ type: "Error", value: "Script error." });
   });
 
+  it("sends a message-only error without the listener's own stack", () => {
+    // Production 2026-11-12: two "Script error." reports carried a stack naming
+    // the game's bundle, which was the error listener itself, not the error.
+    fireError({ message: "Script error.", filename: "", lineno: 0, colno: 0 });
+    const props = sentProps();
+    expect(props.$exception_stack_trace_raw).toBe("");
+    expect(props.$exception_fingerprint).toBe("Error|Script error.|");
+  });
+
   it("bounds an oversized message and stack before sending", () => {
     const err = new Error("x".repeat(5_000));
     err.stack = "y".repeat(9_000);
