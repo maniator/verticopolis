@@ -18,7 +18,7 @@ function eng(mode: "classic" | "modern", over: { transports?: any[]; units?: any
   return {
     engine: { add: vi.fn() },
     walkers: [],
-    personGfx: [gfx(), gfx(), gfx()],
+    people: { get: vi.fn((_key: number) => gfx()) },
     worldX: (tile: number) => tile * TILE,
     worldYTop: (floor: number) => -floor * 36,
     sim: { mode, tower: { revision: 1, units: over.units ?? [], transports: over.transports ?? [] } },

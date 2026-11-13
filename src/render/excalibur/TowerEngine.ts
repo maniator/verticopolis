@@ -11,7 +11,7 @@ import { FLOOR, TILE } from "../scale";
 import * as scene from "./towerScene";
 import * as reconcile from "./towerReconcile";
 import { emptyStructPass, type StructPass } from "./towerStructTiles";
-import { HallDoorLayer, type Pusher } from "./towerHallDoors";
+import { HallDoorLayer } from "./towerHallDoors";
 import * as crowd from "./towerCrowd";
 import * as camera from "./towerInputCamera";
 import { clearLongPress } from "./longPress";
@@ -22,7 +22,8 @@ import { clockOf } from "../../simport/headerClock";
 import { beginFrame } from "./towerFrame";
 import { drainRegions, type RegionRec } from "./towerRegions";
 import { NOT_BAKED } from "./sceneBake";
-import type { Walker } from "./towerCrowd";
+import type { CrowdActor, Walker } from "./towerCrowd";
+import type { PeopleGraphics } from "./peopleGfx";
 import type { ViewFocus, Picked, ScreenRect } from "./towerInputCamera";
 
 export { FLOOR, TILE };
@@ -250,9 +251,10 @@ export class TowerEngine {
     overlayFx.resetDecorativeClock(this);
   }
 
-  // Individually-routed commuters are owned and advanced by the engine; the
-  // renderer only draws each person, never mutating the simulation.
-  crowdActors = new Map<number, { actor: ex.Actor; gfx: ex.Canvas; red: boolean } & Pusher>();
+  // Individually-routed commuters (SimTower's signature) are owned and advanced
+  // by the engine; the renderer only draws each person and removes them as they
+  // despawn, never mutating the simulation.
+  crowdActors = new Map<number, CrowdActor>();
   hallDoors = new HallDoorLayer(); // the revolving doors between lobby halls (#2068)
 
   // Shared graphics so thousands of tiles/people cost almost nothing.
@@ -291,9 +293,7 @@ export class TowerEngine {
   craneActor: ex.Actor | null = null;
   /** The crane's canvas; tick() flags it dirty while the decorative clock runs. */
   craneGfx: ex.Canvas | null = null;
-  personGfx: ex.Canvas[] = [];
-  personGfxRed!: ex.Canvas;
-  personGfxStaff!: ex.Canvas;
+  people!: PeopleGraphics;
   /** @internal friend-module access (towerScene make* / towerOverlay draw). */
   overlay!: ex.ScreenElement;
   overlayCanvas!: ex.Canvas;

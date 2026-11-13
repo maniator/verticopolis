@@ -32,6 +32,9 @@ export const Z = {
   streetCar: 0.5,
   /** The metro train and the garbage truck. */
   vehicle: 0.6,
+  /** People walking along a floor: they pass behind the shafts and cabs, as
+   *  people at a shaft, not floating over it (#2097). */
+  walking: 0.7,
   /** Shafts, stairs and escalators. */
   transport: 1,
   /** Elevator cabs. */

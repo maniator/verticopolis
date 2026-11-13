@@ -1,4 +1,6 @@
 import * as ex from "excalibur";
+import { castIndex } from "../pixelSprites/people";
+import { FIGURE_ANCHOR, FIGURE_H, FIGURE_W } from "./peopleGfx";
 import { Z } from "../depthPlanes";
 import { coveredUpperStories, lotCovered, trafficLots } from "./towerCrowdLayout";
 import { FLOOR } from "../scale";
@@ -23,7 +25,7 @@ import { towerCatalog } from "../../catalog/towerCatalog";
  *   reduced motion is on.
  *
  * This runs once per rebuild, not per frame: it reads the tower's layout and
- * hands each figure a share of the already-baked `engine.personGfx` canvases.
+ * gives each figure a cast look; the frame loop picks its walk frame.
  * Baking none of its own means it runs under happy-dom, so it is unit-tested in
  * `towerWalkerBuild.test.ts`.
  */
@@ -85,14 +87,14 @@ export function buildWalkers(engine: TowerEngine): void {
 }
 
 function spawnWalker(engine: TowerEngine, x0w: number, x1w: number, yw: number, seed: number, speed: number, rank: number, floor: number): void {
-  const gfx = engine.personGfx[Math.abs(seed) % engine.personGfx.length];
-  // Actor bounds track the baked canvas footprint (see reconcileCrowd).
-  const a = new ex.Actor({ pos: ex.vec(x0w, yw), width: gfx.width, height: gfx.height, anchor: ex.vec(0.5, 1), z: Z.walker });
-  a.graphics.use(gfx);
+  // Actor bounds track the shared figure canvas (see reconcileCrowd); the
+  // frame loop picks the bake, since the walk frame moves every beat.
+  const a = new ex.Actor({ pos: ex.vec(x0w, yw), width: FIGURE_W, height: FIGURE_H, anchor: FIGURE_ANCHOR, z: Z.walker });
   engine.engine.add(a);
   engine.walkers.push({
     actor: a,
-    gfx,
+    look: castIndex(seed),
+    key: -1,
     x0w,
     x1w,
     yw,

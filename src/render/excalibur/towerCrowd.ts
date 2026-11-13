@@ -11,12 +11,15 @@ import { metroTrainOffset } from "../metroTrainSchedule";
 import { addMetro } from "./towerMetro";
 import { buildWalkers } from "./towerWalkerBuild";
 import { carIndicator, type CarIndicator } from "../carIndicator";
-import { stepCarPursuit, type CarDrawState } from "../carMotion";
+import { glideCar, newCarDraw, type CarDrawState } from "../carMotion";
 import type { PersonView } from "../../simport/view";
 import { FLOOR, TILE } from "../scale";
 import type { TowerEngine } from "./TowerEngine";
 import { applyCrowdCull, reassertCrowdCull } from "./crowdCull";
-import { pushThroughDoors, pushingGfx, turnHallDoors, type Pusher } from "./towerHallDoors";
+import { FIGURE_ANCHOR, FIGURE_H, FIGURE_W } from "./peopleGfx";
+import { advanceGlide, figureKey, newGlide, newStepClock, stepProgress, strideFrame, tickStepClock, type Glide, type StepClock } from "./crowdLook";
+import { doorPlane, personFigure, ridingHidden, waitShaftMid, walkingPlane, type CrowdLook } from "./crowdFigure";
+import { pushThroughDoors, turnHallDoors, type Pusher } from "./towerHallDoors";
 
 /**
  * Engine-driven crowd and motion for {@link TowerEngine}: the routed commuter
@@ -46,7 +49,10 @@ export function reap<K, V>(map: Map<K, V>, seen: ReadonlySet<K>, dispose: (v: V,
  *  knows about (#2091; built by `buildWalkers`, Modern only). */
 export interface Walker {
   actor: ex.Actor;
-  gfx: ex.Canvas;
+  /** Its cast look (an index into `LOOKS`). */
+  look: number;
+  /** The bake it shows now (`figureKey`), so the graphic swaps only on a change. */
+  key: number;
   x0w: number;
   x1w: number;
   /** The world y its feet stand on. */
@@ -60,9 +66,50 @@ export interface Walker {
   floor: number;
 }
 
+/** One drawn person: the actor, its glide between the engine's positions, and
+ *  the bake it shows (`figureKey`), so the graphic swaps only on a change. */
+export interface CrowdActor extends Pusher {
+  actor: ex.Actor;
+  glide: Glide;
+  key: number;
+  /** Whether the figure is drawn as inside a car (hidden). It follows the
+   *  engine's riding state once the drawn car gets there. */
+  inCar: boolean;
+  /** The step on which this person got in or out of a car, while the drawn
+   *  car is still on its way (see `positionPerson`). */
+  boardStep?: number;
+  /** The middle of the shaft this person waits at (`waitShaftMid`), found
+   *  once per wait; `undefined` while not waiting. */
+  shaftMid?: number | null;
+  /** The floor `shaftMid` was found on: a wait on another floor finds its
+   *  own shaft, even when the zoom cull hid the ride between them. */
+  shaftFloor?: number;
+}
+
+const stepClocks = new WeakMap<TowerEngine, StepClock>();
+
+/** The renderer's step clock, advanced once per frame by `tickCrowdClock`. */
+function stepClockOf(engine: TowerEngine): StepClock {
+  let c = stepClocks.get(engine);
+  if (!c) {
+    c = newStepClock(engine.sim.clock.minutes);
+    stepClocks.set(engine, c);
+  }
+  return c;
+}
+
+/** Advance the step clock the cars and the people glide on by one frame of
+ *  `elapsedMs`, before either is drawn (`updateMotion` calls it first). A
+ *  paused game passes no time. */
+export function tickCrowdClock(engine: TowerEngine, elapsedMs: number): void {
+  tickStepClock(stepClockOf(engine), engine.sim.clock.minutes, engine.paused ? 0 : elapsedMs);
+}
+
 /** Draw the engine-owned commuters: add/remove/position one actor per live
- * person, by stable id. Read-only, the engine advances the crowd in tick(). */
+ * person, by stable id. Read-only, the engine advances the crowd in tick().
+ * The step clock (`tickCrowdClock`) paces the glide and the beats. */
 export function reconcileCrowd(engine: TowerEngine): void {
+  const clock = stepClockOf(engine);
   // Zoom cull (CAP-1): while the moving layer is sub-legible, skip the whole
   // add/remove/position pass. People who spawn or leave meanwhile are settled
   // by the first reconcile after the camera zooms back in. Runs the same
@@ -71,63 +118,78 @@ export function reconcileCrowd(engine: TowerEngine): void {
   // first: whichever runs first this frame advances the latch, and an un-cull
   // frame always reconciles (rider hiding, despawn reaping) before rendering.
   if (applyCrowdCull(engine)) return;
+  const rules = towerCatalog(engine.sim).rules;
+  const look: CrowdLook = { lit: rules.shadedLook, fedUpWait: rules.fedUpWait, progress: stepProgress(clock), clock };
   const seen = new Set<number>();
   for (const p of engine.sim.crowd.people) {
     seen.add(p.id);
     let rec = engine.crowdActors.get(p.id);
     if (!rec) {
-      const gfx = p.staff ? engine.personGfxStaff : engine.personGfx[Math.abs(p.seed) % engine.personGfx.length];
-      // Size the actor from the baked canvas so the collider and ground-line
-      // anchor can never drift from the sprite's real footprint.
-      const a = new ex.Actor({ pos: ex.vec(0, 0), width: gfx.width, height: gfx.height, anchor: ex.vec(0.5, 1), z: Z.crowd });
-      a.graphics.use(gfx);
+      const a = new ex.Actor({ pos: ex.vec(0, 0), width: FIGURE_W, height: FIGURE_H, anchor: FIGURE_ANCHOR, z: Z.crowd });
       engine.engine.add(a);
-      rec = { actor: a, gfx, red: false };
+      rec = { actor: a, glide: newGlide(p.x, p.fy, (p.seed & 1) === 1), key: -1, inCar: ridingHidden(p) };
       engine.crowdActors.set(p.id, rec);
     }
-    positionPerson(engine, p, rec);
+    positionPerson(engine, p, rec, look);
   }
   turnHallDoors(engine);
   reap(engine.crowdActors, seen, (rec) => rec.actor.kill());
 }
 
-function positionPerson(engine: TowerEngine, p: PersonView, rec: { actor: ex.Actor; gfx: ex.Canvas; red: boolean } & Pusher): void {
-  // While riding, a tenant is inside a car, the cab's own rider count shows
-  // them, so we hide the standalone figure to avoid drawing them twice.
-  // Staff stay visible while riding: a lone housekeeper in a 16-person
-  // service cab rounds to zero on the cab's load indicator, and watching
-  // them ride to the room floor is the whole point of the mechanic.
-  const hidden = p.state === "riding" && !p.staff;
-  if (rec.actor.graphics.isVisible !== !hidden) rec.actor.graphics.isVisible = !hidden;
+function positionPerson(engine: TowerEngine, p: PersonView, rec: CrowdActor, look: CrowdLook): void {
+  if (p.state !== "waiting" || p.floor !== rec.shaftFloor) rec.shaftMid = undefined;
+  const inCar = ridingHidden(p);
+  const wasShown = rec.actor.graphics.isVisible;
+  // Getting in or out shows when the drawn car gets there: the cars glide
+  // over the same step, so the change waits for the step's glide to end (or
+  // the next step to land) instead of happening while the car is drawn a
+  // floor away.
+  if (rec.inCar !== inCar) {
+    rec.boardStep ??= look.clock.steps;
+    if (look.progress < 1 && look.clock.steps === rec.boardStep) {
+      if (wasShown !== !rec.inCar) rec.actor.graphics.isVisible = !rec.inCar;
+      // Still waiting at the landing for the drawn car: hold the figure.
+      if (!rec.inCar) return;
+      // Still in the drawn car: stay hidden, and follow the engine.
+      advanceGlide(rec.glide, p.x, p.fy, look.clock.stepped, look.progress, false);
+      return;
+    }
+    rec.inCar = inCar;
+  }
+  rec.boardStep = undefined;
+  const hidden = rec.inCar;
+  if (wasShown !== !hidden) rec.actor.graphics.isVisible = !hidden;
+  // A hidden rider still follows the engine, so it reappears where it gets
+  // out instead of gliding there from the floor it boarded on.
+  advanceGlide(rec.glide, p.x, p.fy, look.clock.stepped, look.progress, wasShown && !hidden);
   // A rider leaves no trail for the doors: their next step on foot is
   // measured from where they get out, not where they got in.
   if (hidden) {
     rec.lastX = undefined;
     return;
   }
+  const g = rec.glide;
   // Use the continuous floor (fy) so a stair/escalator climber animates
   // smoothly between floors; for every other state fy equals the floor.
-  rec.actor.pos = ex.vec(engine.worldX(p.x), engine.worldYTop(p.fy) + FLOOR - 3);
+  rec.actor.pos = ex.vec(engine.worldX(g.x), engine.worldYTop(g.fy) + FLOOR - 3);
   // Inside a revolving door between lobby halls (#2068) a walker pushes it:
   // walking left they pass behind its center post, walking right in front.
-  const onFloor = p.fy === p.floor;
+  const onFloor = g.fy === p.floor;
   if (!onFloor) rec.lastX = undefined;
   const through = onFloor ? pushThroughDoors(engine, rec, p.floor, rec.actor.pos.x) : undefined;
-  const z = through === -1 ? Z.crowdBehindDoor : Z.crowd;
+  // Elsewhere, walking along a floor, a person passes behind the shafts and
+  // cabs. The waiting line, a climber and a rider stay in front: the line's
+  // mood colors are the traffic gauge, and the others are on the transport.
+  const z = through !== undefined ? doorPlane(through) : walkingPlane(p);
   if (rec.actor.z !== z) rec.actor.z = z;
-  // Long waits redden the figure, the original's "this tenant is fed up" cue.
-  // Staff never redden, they're on the clock, not an unhappy tenant.
-  const red = !p.staff && p.wait > 25;
-  if (red !== rec.red) {
-    rec.red = red;
-    rec.shown = undefined;
-    rec.actor.graphics.use(red ? engine.personGfxRed : rec.gfx);
+  if (p.state === "waiting" && rec.shaftMid === undefined) {
+    rec.shaftMid = waitShaftMid(engine.sim.tower.transports, p);
+    rec.shaftFloor = p.floor;
   }
-  if (red) return;
-  const pose = through ? pushingGfx(engine, p, through) : rec.gfx;
-  if ((rec.shown ?? rec.gfx) !== pose) {
-    rec.shown = pose;
-    rec.actor.graphics.use(pose);
+  const key = personFigure(p, g, look, through, rec.shaftMid);
+  if (key !== rec.key) {
+    rec.key = key;
+    rec.actor.graphics.use(engine.people.get(key));
   }
 }
 
@@ -181,7 +243,7 @@ function carGfx(entry: { seed: number; w: number; kind: FacilityKind; gfx: Map<s
 }
 
 export function syncMotion(engine: TowerEngine): void {
-  // Carry each car's eased draw state across the rebuild, keyed by shaft id +
+  // Carry each car's glide state across the rebuild, keyed by shaft id +
   // car index: structural edits run syncMotion on every revision bump, and
   // without the carry-over an unrelated place/demolish would snap every
   // mid-travel car to its sim position (GH #688). A shaft that vanished simply
@@ -207,6 +269,7 @@ export function syncMotion(engine: TowerEngine): void {
       const entry = { actor: a, t, i, seed, w, kind: t.kind, gfx, shown: carKey(IDLE_CAR) };
       const prev = carried.get(`${t.id}:${i}`);
       if (prev) carDrawStates.set(entry, prev);
+      freshCabs.add(entry);
       engine.carActors.push(entry);
     }
   }
@@ -286,37 +349,45 @@ function refreshFloorLiveliness(engine: TowerEngine): void {
   for (const [f, n] of people) engine.floorLive.set(f, Math.min(1, n / 16));
 }
 
-/** Per-entry eased draw state for the elevator cars (GH #688). Keyed off the
+/** Per-entry glide state for the elevator cars (GH #688, #2097). Keyed off the
  *  carActors entry object so syncMotion's full rebuild naturally forgets old
  *  cars, and a fresh entry lazily seeds AT its sim position (its first frame
  *  snaps, exactly the old behavior, which also keeps fake-entry tests exact).
  *  Deliberately not gated on `d.anim`: car motion is functional, so it keeps
  *  gliding under reduced motion, the same rule the routed crowd follows. */
 const carDrawStates = new WeakMap<object, CarDrawState>();
+/** The step on which a car's riders changed, while the drawn car is still on
+ *  its way there. */
+const cabChangeStep = new WeakMap<object, number>();
+/** Cars just rebuilt by `syncMotion`: their first riders show at once. */
+const freshCabs = new WeakSet<object>();
 
 /** Repositions every moving actor each frame (the engine then draws them).
  *  `elapsedMs` is the engine update's frame delta (stepped by the screenshot
- *  TestClock, so the eased pursuit below stays deterministic); the default
- *  keeps legacy callers and tests on a plain 60fps frame. */
+ *  TestClock, so the glide below stays deterministic); it advances the step
+ *  clock the cars and the people share, and the default keeps legacy callers
+ *  and tests on a plain 60fps frame. */
 export function updateMotion(engine: TowerEngine, elapsedMs = 1000 / 60): void {
+  // The step clock runs even while culled, so a zoom-in finds it current.
+  tickCrowdClock(engine, elapsedMs);
+  const clock = stepClockOf(engine);
+  const progress = stepProgress(clock);
   // Zoom cull (CAP-1): owns the hysteresis step for the frame. While culled,
   // every per-frame position/graphic loop below is skipped along with the
   // sibling reconcileCrowd pass.
   if (applyCrowdCull(engine)) return;
   const anim = engine.d.anim;
-  const dtSeconds = elapsedMs / 1000;
   for (const c of engine.carActors) {
     const target = c.t.carPositions[c.i];
     let drawn = carDrawStates.get(c);
     if (!drawn) {
-      drawn = { pos: target, vel: 0 };
+      drawn = newCarDraw(target);
       carDrawStates.set(c, drawn);
     }
-    // The drawn position chases the sim position with the accel/decel ease
-    // (carMotion.ts) instead of teleporting on each whole-game-minute sim tick.
-    stepCarPursuit(drawn, target, dtSeconds);
-    // A reversed target can carry the drawn car past the turn-around point on
-    // momentum; physical inside the shaft, but never draw beyond its span.
+    // The drawn car glides to the engine's position over the step, on the
+    // people's step clock, instead of catching up and waiting between floors.
+    glideCar(drawn, target, clock.stepped, progress);
+    // A stale or hostile engine value beyond the shaft never draws past it.
     if (typeof c.t.bottom === "number" && drawn.pos < c.t.bottom) drawn.pos = c.t.bottom;
     if (typeof c.t.top === "number" && drawn.pos > c.t.top) drawn.pos = c.t.top;
     c.actor.pos = ex.vec(engine.worldX(c.t.x), -drawn.pos * FLOOR);
@@ -326,10 +397,19 @@ export function updateMotion(engine: TowerEngine, elapsedMs = 1000 / 60): void {
     const load = c.t.carLoad?.[c.i] ?? 0;
     const dir = c.t.carDir?.[c.i] ?? 0;
     const ind = carIndicator(dir, load, catalogFacility(towerCatalog(engine.sim), c.t.kind).carCapacity ?? 0);
+    // The cab's riders change when the drawn car gets there, on the same rule
+    // as the people getting in or out (`positionPerson`), so nobody shows in
+    // the cab and on the landing at once, or in neither.
     const key = carKey(ind);
-    if (key !== c.shown) {
-      c.shown = key;
-      c.actor.graphics.use(carGfx(c, ind));
+    const fresh = freshCabs.delete(c);
+    if (key === c.shown) cabChangeStep.delete(c);
+    else {
+      const since = cabChangeStep.get(c) ?? clock.steps;
+      if (progress >= 1 || clock.steps > since || fresh) {
+        c.shown = key;
+        cabChangeStep.delete(c);
+        c.actor.graphics.use(carGfx(c, ind));
+      } else cabChangeStep.set(c, since);
     }
   }
   // The metro train runs on GAME time like the garbage truck: one call per
@@ -341,16 +421,16 @@ export function updateMotion(engine: TowerEngine, elapsedMs = 1000 / 60): void {
   // The garbage truck runs on GAME time (the collection is a sim event, not
   // ambience): during the collection hour it drives in along the center's
   // bottom story, loads, and drives off, pausing the game freezes it.
-  const clock = engine.sim.clock;
+  const simClock = engine.sim.clock;
   const garbageCollectHour = towerCatalog(engine.sim).economy.garbageCollectHour;
-  const truckHour = clock.hour === garbageCollectHour;
+  const truckHour = simClock.hour === garbageCollectHour;
   for (const tk of engine.truckActors) {
     // No collection at a center that isn't running (under construction, on
     // fire, or a gutted shell), a non-operational plant processes no waste.
     const show = truckHour && isOperational(tk.u);
     if (tk.actor.graphics.isVisible !== show) tk.actor.graphics.isVisible = show;
     if (!show) continue;
-    const p = (clock.minuteOfDay - garbageCollectHour * 60) / 60; // 0..1 through the hour
+    const p = (simClock.minuteOfDay - garbageCollectHour * 60) / 60; // 0..1 through the hour
     const base = engine.worldX(tk.u.x);
     const uw = tk.u.width * TILE;
     let x: number;
@@ -363,7 +443,7 @@ export function updateMotion(engine: TowerEngine, elapsedMs = 1000 / 60): void {
   // evening rushes, but only when the garage actually has cars to move.
   // Reads the fraction computed in syncScene (per sync, not per frame), so
   // this frame-path never runs the parking flood-fill itself.
-  const rushing = (clock.isMorning() || clock.isEvening()) && engine.displayParkingUse > 0;
+  const rushing = (simClock.isMorning() || simClock.isEvening()) && engine.displayParkingUse > 0;
   for (const g of engine.garageCars) {
     if (g.actor.graphics.isVisible !== rushing) g.actor.graphics.isVisible = rushing;
     if (!rushing) continue;
@@ -377,6 +457,7 @@ export function updateMotion(engine: TowerEngine, elapsedMs = 1000 / 60): void {
   // The Settings switch (Modern, default off) and reduced motion each hide every
   // passer-by; reduced motion promises to calm background animation (#2091).
   const passersShown = engine.passersBy && !engine.reducedMotion;
+  const lit = engine.walkers.length > 0 && towerCatalog(engine.sim).rules.shadedLook;
   for (const w of engine.walkers) {
     // A passer-by shows only while its own floor has live occupants, so an
     // empty floor stays empty.
@@ -389,7 +470,13 @@ export function updateMotion(engine: TowerEngine, elapsedMs = 1000 / 60): void {
     // from the far end back to the start each loop.
     const tt = 1 - Math.abs(2 * p - 1);
     // A passer-by never turns amber or red: it has no wait, and a mood color
-    // is how a player spots a real person waiting too long.
+    // is how a player spots a real person waiting too long. It faces the way
+    // it paces (the first half of the ping-pong runs toward x1w).
     w.actor.pos = ex.vec(w.x0w + tt * (w.x1w - w.x0w), w.yw);
+    const key = figureKey(w.look, "walk", strideFrame(lit, w.actor.pos.x, w.look), "content", p > 0.5, lit);
+    if (key !== w.key) {
+      w.key = key;
+      w.actor.graphics.use(engine.people.get(key));
+    }
   }
 }

@@ -55,8 +55,9 @@ describe("TowerEngine meal-overlay repaint trigger", () => {
     expect(syncMotion).not.toHaveBeenCalled();
     expect(syncFacade).not.toHaveBeenCalled();
     expect(updateMotion).toHaveBeenCalledTimes(1);
-    // With the frame's elapsedMs: the eased car pursuit (GH #688) consumes it,
-    // and an argument-less call would silently halve the chase on slow frames.
+    // With the frame's elapsedMs: the step clock the cars and the people glide
+    // on (GH #688, #2097) consumes it, and an argument-less call would run the
+    // glides at 60fps on a slow device.
     expect(updateMotion).toHaveBeenCalledWith(16);
     expect(reconcileCrowd).toHaveBeenCalledTimes(1);
     expect(fake.mealOverlayRev).toBe(1);
