@@ -39,10 +39,14 @@ function classify(paths: string[]): Map<string, "build" | "skip"> {
 describe.skipIf(process.platform === "win32")("scripts/vercel-ignore-build.sh", () => {
   describe("the path table", () => {
     const BUILDS = [
-      // The /help site shows these pictures and wears the engine site's theme.
+      // The /help site shows these pictures and wears the engine site's theme
+      // and title bar.
       "docs/screenshots/00-splash.png",
       "docs/screenshots/features/stats-tenancy-modern.png",
       "docs/engine-site/src/styles/theme.css",
+      "docs/engine-site/src/styles/title-bar.css",
+      "docs/engine-site/src/components/TitleBar.astro",
+      "docs/engine-site/title-bar.mjs",
       "help-site/src/content/docs/keyboard.md",
       "help-site/astro.config.mjs",
       // Build inputs and configs.

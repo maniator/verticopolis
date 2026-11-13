@@ -1,0 +1,53 @@
+name: Staging mirror
+
+# Keeps the `staging` branch equal to the tip of `main`, so Vercel builds a
+# preview of what the next release will look like on every push to main.
+#
+# Vercel's git integration does not deploy `main` (vercel.json turns it off,
+# because production deploys only from a release tag through
+# deploy-production.yml). A preview of main therefore needs a branch Vercel
+# does deploy: this workflow force-pushes main's tip to `staging`, Vercel
+# builds that push as a preview (VERCEL_ENV=preview, so the service
+# worker is off) in the project's `staging` custom environment, which tracks
+# that branch and carries the staging.verticopolis.com domain. Vercel
+# Authentication protects it like every other preview, so only members of the
+# Vercel team can open it. Production, its release gate and the release tag
+# workflows are untouched.
+#
+# `staging` is a mirror and nothing else: never commit to it or open a pull
+# request from it, because the next push to main overwrites it. A push made with
+# the workflow token starts no other workflow, so the mirror costs one short job
+# here and one Vercel preview build (scripts/vercel-ignore-build.sh skips the
+# build when the push changes nothing that reaches the deployed app).
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Each run pushes the tip of main as it is when the run starts, so a newer push
+# makes an older run pointless: cancel it rather than queue it.
+concurrency:
+  group: staging-mirror
+  cancel-in-progress: true
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 1
+
+      - name: Point staging at the tip of main
+        run: |
+          sha="$(git rev-parse HEAD)"
+          git push --force origin "${sha}:refs/heads/staging"
+          echo "staging now points at ${sha}" >> "$GITHUB_STEP_SUMMARY"

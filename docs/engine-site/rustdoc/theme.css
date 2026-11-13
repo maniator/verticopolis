@@ -88,44 +88,20 @@
   color: var(--r-title-fg);
   font-family: var(--r-font);
 }
-.vc-header a {
-  color: var(--r-title-fg);
-  text-decoration: none;
+.vc-header .vc-bar {
+  flex: 1;
+  justify-content: space-between;
 }
 .vc-header a:focus-visible,
+rustdoc-topbar .vc-bar-title:focus-visible,
+rustdoc-topbar .vc-bar-links a:focus-visible {
+  outline: 2px solid #ffc94a;
+  outline-offset: 1px;
+}
 .vc-site-menu a:focus-visible,
 .vc-site-menu summary:focus-visible {
   outline: 2px solid var(--r-title);
   outline-offset: 1px;
-}
-.vc-header a:focus-visible {
-  outline-color: #ffc94a;
-}
-.vc-site-title {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.75rem;
-  font-size: 1.25rem;
-  font-weight: 700;
-  white-space: nowrap;
-}
-.vc-site-title img {
-  width: 2.5rem;
-  height: 2.5rem;
-  image-rendering: pixelated;
-  box-shadow: var(--bevel-out);
-}
-.vc-social {
-  display: inline-flex;
-  padding: 0.5rem;
-}
-.vc-sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-  white-space: nowrap;
 }
 
 /* ---- The side menu: Starlight's, as the game's Tools panel ------------- */
@@ -215,11 +191,107 @@
   font-weight: 600;
 }
 
+/* A source page pins rustdoc's file-list button to the window's top left,
+   which is the title bar's logo here, so it sits just below the bar. */
+.src #sidebar-button {
+  top: calc(var(--vc-bar-height) + 8px);
+}
+
+/* GitHub closes the menu only where the title bar hides it (title-bar.css,
+   below Starlight's 50rem), which includes widths where rustdoc still shows
+   its desktop sidebar. */
+.vc-menu-github {
+  display: none;
+}
+@media (max-width: 49.99rem) {
+  .vc-menu-github {
+    display: block;
+  }
+}
+
 @media (max-width: 700px) {
+  :root {
+    --vc-bar-height: 3.5rem;
+    --topbar-height: var(--vc-bar-height);
+  }
   .vc-header {
     padding-inline: 1rem;
   }
   rustdoc-topbar {
     top: var(--vc-bar-height);
+  }
+
+  /* One bar: once the script has copied the title and the links into
+     rustdoc's top bar (rustdoc-chrome.mjs), that bar is the navy title bar,
+     holding the site's title, the game button, rustdoc's settings and help,
+     and the one menu button at its right, where Starlight puts its own. The
+     crate's name it showed is the page's own heading just below. With
+     rustdoc's "hide sidebar" setting on, rustdoc hides its top bar, so the
+     title bar stays. */
+  .vc-one-bar:not(.hide-sidebar) .vc-header {
+    display: none;
+  }
+  .vc-one-bar rustdoc-topbar {
+    top: 0;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0 1rem;
+    box-sizing: border-box;
+    background: var(--r-title);
+    color: var(--r-title-fg);
+  }
+  .vc-one-bar rustdoc-topbar > h2 {
+    display: none;
+  }
+  .vc-one-bar rustdoc-topbar .vc-bar-title {
+    flex: 1 1 auto;
+    font-size: 1.125rem;
+  }
+  .vc-one-bar rustdoc-topbar .vc-bar-title img {
+    height: 2rem;
+  }
+  .vc-one-bar rustdoc-topbar .settings-menu,
+  .vc-one-bar rustdoc-topbar .help-menu {
+    order: 1;
+  }
+  .vc-one-bar rustdoc-topbar .settings-menu > a,
+  .vc-one-bar rustdoc-topbar .help-menu > a {
+    width: 2rem;
+    height: 2rem;
+  }
+  .vc-one-bar rustdoc-topbar .settings-menu > a::before,
+  .vc-one-bar rustdoc-topbar .help-menu > a::before {
+    margin: 0;
+    filter: invert(1);
+  }
+  .vc-one-bar rustdoc-topbar .settings-menu > a:hover,
+  .vc-one-bar rustdoc-topbar .help-menu > a:hover {
+    background: transparent;
+  }
+  /* rustdoc's menu button as Starlight's: the game's bevelled gray button. */
+  .vc-one-bar rustdoc-topbar .sidebar-menu-toggle {
+    order: 2;
+    flex: none;
+    width: 2rem;
+    min-width: 2rem;
+    height: 2rem;
+    padding: 0;
+    background: var(--r-face);
+    box-shadow: var(--bevel-out);
+  }
+  /* Three ink bars, the size of Starlight's menu icon. */
+  .vc-one-bar rustdoc-topbar .sidebar-menu-toggle::before {
+    content: "";
+    display: block;
+    width: 1rem;
+    height: 2px;
+    margin: auto;
+    background: var(--r-ink);
+    box-shadow: 0 -5px 0 var(--r-ink), 0 5px 0 var(--r-ink);
+    filter: none;
+    opacity: 1;
+  }
+  .vc-one-bar rustdoc-topbar .sidebar-menu-toggle:active {
+    box-shadow: var(--bevel-in);
   }
 }

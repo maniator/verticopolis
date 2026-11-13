@@ -1,0 +1,145 @@
+/* The shared title bar (title-bar.mjs): the help site, the engine docs and
+   the Rust API reference all draw it with these classes. It sits on the navy
+   title bar each surface already paints (theme.css's .header, rustdoc's
+   .vc-header), so the colors here are the bar's own: white on navy, and the
+   game's bevelled gray button. The breakpoint is Starlight's own (50rem),
+   where its side menu turns into the phone's menu button. */
+
+.vc-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--sl-nav-gap, 1rem);
+  height: 100%;
+  min-width: 0;
+}
+
+/* The logo and the site's name, as Starlight's SiteTitle draws them. */
+.vc-bar-title {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex: 0 1 auto;
+  min-width: 0;
+  font-size: var(--sl-text-h4, 1.25rem);
+  font-weight: 700;
+  color: var(--r-title-fg);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.vc-bar-title:hover {
+  color: var(--r-title-fg);
+}
+.vc-bar-title img {
+  flex: none;
+  width: auto;
+  height: calc(var(--sl-nav-height, 4rem) - 2 * var(--sl-nav-pad-y, 0.75rem));
+  image-rendering: pixelated;
+  box-shadow: var(--bevel-out);
+}
+.vc-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.vc-bar-search {
+  display: flex;
+  flex: 1 1 auto;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+.vc-bar-links {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 1rem;
+}
+
+/* The game's bevelled button on the navy bar. */
+.vc-bar-game {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 4px 12px;
+  font-size: 0.875rem;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--r-ink);
+  text-decoration: none;
+  white-space: nowrap;
+  background: var(--r-face);
+  box-shadow: var(--bevel-out);
+}
+.vc-bar-game:hover {
+  color: var(--r-ink);
+}
+.vc-bar-game:active {
+  box-shadow: var(--bevel-in);
+}
+
+.vc-bar-github {
+  display: inline-flex;
+  padding: 0.25rem;
+  color: var(--r-title-fg);
+}
+.vc-bar-github:hover {
+  color: var(--r-light);
+}
+
+/* The theme switch, after a divider, as Starlight's header sets it. */
+.vc-bar-theme {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+.vc-bar-theme::before {
+  content: "";
+  height: 2rem;
+  border-inline-start: 1px solid var(--r-shadow);
+}
+
+.vc-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* A label written twice (twoLengths): the full one on a wide screen. */
+.vc-short {
+  display: none;
+}
+
+@media (max-width: 49.99rem) {
+  /* A phone: the short name and label, the full ones for screen readers. */
+  .vc-full {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+  .vc-short {
+    display: inline;
+  }
+  .vc-bar-title {
+    gap: 0.5rem;
+  }
+  .vc-bar-links {
+    gap: 0.75rem;
+  }
+  /* GitHub and the theme switch move to the foot of the phone's menu. */
+  .vc-bar-github,
+  .vc-bar-theme {
+    display: none;
+  }
+}
+
+@media (min-width: 50rem) {
+  .vc-bar-search {
+    justify-content: center;
+  }
+}

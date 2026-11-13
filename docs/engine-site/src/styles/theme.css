@@ -80,6 +80,11 @@
   image-rendering: pixelated;
   box-shadow: var(--bevel-out);
 }
+/* The phone's "On this page" bar sits on the navy title bar, so the section
+   it names is white, like the header's own text. */
+mobile-starlight-toc .display-current {
+  color: var(--r-title-fg);
+}
 /* The search box is a sunken white field. */
 .header site-search button[data-open-modal] {
   background: var(--r-hi);

@@ -1,130 +1,94 @@
 # SimTower (1994): Gameplay Parity Checklist
 
-This is a clean-room clone of Maxis/OPeNBooK's **SimTower** (1994), built from
-scratch: a Rust simulation engine compiled to WebAssembly, under a TypeScript
-front end on the Excalibur.js engine. The goal is **1:1 gameplay** on desktop
-with a modernized layout on mobile. Below is the feature inventory
-and where each item stands. Status: ✅ implemented · ◑ implemented as a faithful
+The developer's checklist of how a **Classic** tower matches the 1994 game,
+one line per mechanic. Players read the same story in the manual:
+**[Differences from the 1994 game](https://verticopolis.com/help/differences/)**.
+The rules themselves live in the Rust engine (`engine-rs/`), and its catalog
+publishes the prices, sizes and caps, so this page names mechanics and issues
+rather than copying numbers. Status: ✅ implemented · ◑ a faithful
 abstraction · ⬜ not present.
 
-## Building & structure
-- ✅ Two-layer grid: structural floor/corridor layer + room layer
-- ✅ Ground lobby; **sky lobbies only on the ground floor and every 15th floor** (15, 30, 45…)
-- ✅ Lobbies are transit-only, so rooms can't be placed on a lobby concourse
-- ✅ Floors auto-created under a room when placed (no pre-laying bare floor)
-- ✅ No floating overhangs: a room must sit on the floor directly below (or the ground)
-- ✅ **Classic floors stay whole when bulldozed** (owner ruling, 2026-11-12): the bulldozer takes a bare floor tile only from either end of its story, so it never opens a gap the story above can't be built across. A Classic tower saved with a gap loads as it was, and the Floor tool fills the gap; the tiles beside that gap are not ends of the story, so the bulldozer can't widen it. Lobby tiles are never removed, so a lobby tile counts as floor beside a tile only while it touches that tile with no gap between (owner ruling, 2026-11-13): a floor tile right beside a lobby is not an end, but a sky lobby beyond a gap in an older save no longer keeps the plain floor between it and the far end from coming out. Modern still lets the bulldozer open a gap. Not yet checked against the 1994 game on the PC
-- ✅ Basements (B1…B10) with continuous numbering (floor 0 = B1)
-- ✅ Multi-story facilities (cinema and party hall span 2 floors; recycling 2; metro a whole basement floor)
-- ✅ Build/sell with construction time and a partial-refund bulldoze
-- ✅ Buildable bounds: 100 floors above, 10 basement levels below (B1…B10)
+Every entry under **Deliberate divergences** and **Known parity gaps** links
+the help-page section that explains it to players, and
+`src/tests/parityHelpPage.guard.test.ts` fails when either side lists one the
+other does not.
 
-## Facilities (all original tenant/room types)
-- ✅ Office (quarterly rent; staffed 8–18 on weekdays)
-- ✅ Condominium: one-time sale, residents live in permanently. Classic lists on the canon 4-level ladder ($50k/$100k/$150k/$200k, and MAY firesale below build cost, exactly as in 1994); Modern keeps the construction-cost band (default ~2× build cost, up to a ~2.5× ceiling, floor at break-even; a higher asking price sells slower). Losing an owner to sustained neglect triggers a full-price **buy-back**
-- ✅ Hotel: Single / Double / Suite (nightly revenue, guests check in/out)
-- ✅ Fast Food, Restaurant, Retail Shop (daily traffic income, business hours)
-- ✅ Cinema and Party Hall, both two-story rooms (guests enter on the lower floor); evening crowds
-- ✅ Services: Security, Medical Center, Housekeeping, Recycling Center, Parking
-- ✅ Recycling Center **fills daily** with the tower's garbage (one center per ~2,500 population; a pre-dawn garbage truck empties them). 4★ requires demand MET, not merely built
-- ✅ **Too little recycling lowers ratings from 3★** (#1970): in Classic, any shortfall drains every rated tenant (offices, condos, hotel rooms, rentals) to red until it is fixed; in Modern, a tower up to one center short holds those ratings at Good, and a bigger shortfall drains them
-- ✅ Parking demand: offices want a space per ~24 workers from 3★ (the statistics count); **every hotel suite needs a space of its own** (the VIP won't review without it); cars visibly fill the garage with real usage
-- ✅ **Offices without parking lose their rating from 3★** (#1970): in Classic, offices drain to red only when no space is left once the occupied suites take theirs (real 5★ towers saved by the original park far fewer workers than any ratio, so Classic counts none); in Modern, the lowest offices are parked first and the rest hold at Good, draining once coverage falls under half. Distance to parking waits on a PC check (#1524)
-- ✅ Metro Station (whole-floor deep basement; brings visitors)
-- ✅ Wedding Hall on floor 100, 28 wide and five floors tall with a tapering steeple (religion-agnostic stand-in for the Cathedral)
+## Building & structure
+- ✅ Two layers: a floor layer and a room layer; floors appear under a room as it is placed, and nothing overhangs
+- ✅ Ground lobby plus sky lobbies every 15th floor; lobbies are transit-only
+- ✅ Basements below with continuous numbering (floor 0 = B1); the canon 375-tile lot
+- ✅ Multi-story rooms (cinema, party hall, recycling, the whole-floor metro)
+- ✅ Construction time and a partial-refund bulldoze
+- ✅ Classic floors stay whole when bulldozed: only a story's end tiles come out (owner rulings 2026-11-12 and 2026-11-13, #2042; a PC check is still open). Modern may open a gap
+
+## Facilities
+- ✅ Offices (quarterly rent, weekday hours), condos (one sale, owner buy-back on loss), hotel single / double / suite (nightly)
+- ✅ Fast food, restaurant, shop (business hours, foot traffic); cinema and party hall (evening crowds)
+- ✅ Security, Medical Center, Housekeeping, Recycling Center, Parking, Metro Station
+- ✅ Recycling fills daily and a pre-dawn truck empties it; 4★ needs the demand met; a shortfall lowers ratings from 3★ (#1970)
+- ✅ Parking: offices from 3★ and one space per hotel suite; offices without parking lose rating from 3★ (#1970; distance to parking waits on a PC check, #1524)
+- ✅ Wedding Hall on floor 100 in place of the Cathedral (see divergences)
 
 ## Transport
-- ✅ Stairs, Escalators (single-flight links, animated climbers). Canon (#384, #323): the 1994 game builds only **single flights** (never multi-story units, though the TDT format has bytes for 2/3-story variants), and a person will chain at most **4 contiguous stair flights / 7 escalators** on a trip before refusing (an elevator ride resets the count). Classic routes people with that contiguous-walk budget (the walk-budget search in `engine-rs/src/crowd/routing.rs`, limits from `Kind::walkway_willingness`); Modern routes without it.
-- ✅ Standard / Service / Express elevators with multiple cars (service elevators are staff-only: housekeepers ride them, passengers never do)
-- ✅ Per-elevator car count and **per-floor stop configuration** (express / skip); per-shift car scheduling and per-car home/waiting floors are a tracked gap (see Known parity gaps)
-- ✅ Demand-driven car dispatch (SCAN): cars serve waiting passengers, idle at the lobby when empty
-- ✅ Riders board to capacity and alight; cab shows its real load
-- ✅ Elevator-network reachability gates whether a floor is "served"
+- ✅ Stairs and escalators as single flights; Classic people chain at most 4 stair flights or 7 escalators before refusing (#384, #323)
+- ✅ Standard, service (staff only) and express elevators with several cars
+- ✅ Per-floor stops, hour-by-hour car schedules and idle home floors (#464); the epic's follow-ups stay on #305
+- ✅ Demand-driven dispatch; riders board to capacity; a floor counts as served only when the network reaches it
 
 ## Economy
-- ✅ Start with $2,000,000
-- ✅ Office rent (quarterly), condo sale (once, with an owner buy-back on loss), hotel nightly revenue
-- ✅ **Classic prices exactly like 1994** (v1.50.0, #299): offices, condos, and all three hotel room kinds use the original's discrete 4-level rate dropdown (Very Low / Low / Average / High) at the researched canon dollar tables (office 2k/5k/10k/15k quarterly; condo 50k/100k/150k/200k one-time; hotel single 500/1,500/2,000/3,000, double 800/2,000/3,000/4,500, suite 1,500/4,000/6,000/9,000 nightly), plus the **No Rate** off-market state (charges nothing AND blocks move-ins; an occupied unit keeps its free tenant, who still counts toward stars). Pre-split Classic saves snap once onto the ladder at load. Modern keeps the tuned continuous ranges. The dollar tables are single-source (Relentless Optimizer) pending a manual cross-check; canon hotel rates run ~10x our old band, an accepted faithful consequence (money trivializes late, as in 1994)
-- ◑ Food / retail / cinema / party-hall traffic income, scaled by foot traffic + open hours (an aggregate foot-traffic model, with per-venue demand pools and cross-venue patronage since #393; the original's opaque per-venue patron counter is a deliberate divergence, see Deliberate divergences)
-- ✅ Per-car and per-service monthly maintenance
+- ✅ $2,000,000 to start; rent, condo sales, nightly hotel income, monthly upkeep
+- ✅ Classic prices on the 1994 four-level ladder plus No Rate (#299); Modern keeps continuous ranges
+- ◑ Shop, food and venue income from reachable foot traffic (#393; see divergences)
 - ✅ Buried treasure when excavating basement rooms
 
 ## Population, stress & ratings
-- ✅ Population from offices/condos/hotels; weekday/weekend + rush-hour cycle
-- ✅ **Individually-routed commuters**: real people walk to a shaft, wait, board an actual car, transfer at sky lobbies and arrive (BFS over the transport network)
-- ✅ Tenant stress from elevator crowding: the aggregate congestion model and the real waits of routed commuters both lower ratings, and low-satisfaction tenants move out. A floor's average commute wait counts once it passes a rider's patience (120 s in Classic, 180 s in Modern) (#1971)
-- ✅ **Two-ride rule has teeth:** a floor more than two rides from the lobby (one sky-lobby transfer) draws no visitors. Its shops/food/cinema earn **no** traffic income, not just a warning, so late-game transport layout is a real economic puzzle
-- ✅ Crowds tint red when they've waited too long / transport is overwhelmed (the original's visual cue)
-- ✅ Star thresholds: 2★ 300 · 3★ 1,000 · 4★ 5,000 · 5★ 10,000
-- ✅ Facility gates: Security required for 3★; Medical + recycling demand met for 4★
-- ✅ **TOWER** rating: 5★ + Wedding Hall + metro + VIP inspection (8,000 pop, scaled to our model)
+- ✅ Weekday, weekend and rush-hour cycles; four daily meal windows that load the elevators
+- ✅ Individually routed commuters whose floor waits move ratings (#1971; see divergences)
+- ✅ The two-ride rule: a floor more than two rides from the lobby draws no visitors
+- ✅ Crowds turn red when transport is overwhelmed
+- ✅ Star thresholds, facility gates and the TOWER at 15,000 with the VIP inspection
 
 ## Events & disasters
-- ✅ Fire: spreads to the same-floor neighbor AND climbs to the room above (canon: fire spreads sideways and upward, never down) unless Security/Medical contain it; burned rooms are destroyed (gutted shells you must bulldoze and rebuild), never auto-repaired
-- ✅ Bomb threat (4★+): Security defuses it; otherwise damage + fine, with an explosion flash at the blast epicenter
-- ✅ VIP inspection → TOWER win/lose: the VIP's limousine pulls up to the lobby for the review
-- ✅ Treasure discovery (a gold sparkle rises from the dig site); flavorful headlines
-- ✅ Seasonal cameo: Santa's sleigh and reindeer fly across the sky above a 3★+ tower once over the holidays (a cameo only: "No presents, sorry", no cash)
-- ✅ Thief: slinks across the floor with a loot sack; Security catches them (a guard trails them), otherwise they make off with some cash
+- ✅ Fire spreads sideways and up, never down; burned rooms stay gutted until bulldozed
+- ✅ Bomb threats from 4★; the VIP's visits and the TOWER inspection
+- ✅ Treasure, thieves, Santa's sleigh (a cameo only) and newspaper headlines
 
 ## Stats & readouts
-- ✅ Tower Statistics: population, tenancy, transport/access, parking & recycling demand, milestones
-- ✅ **Income breakdown**: average $/day per category (offices, condos, hotels, retail, food, entertainment) net of each line's overhead, plus an upkeep line and net, over a trailing quarter (the original's income report)
-- ✅ **Elevator utilization**: per-passenger-shaft average load (busiest first) in the stats screen, and a near-capacity warning in the shaft inspector
-- ✅ **Colored evaluation overlay**: a toggleable per-floor heatmap (Congestion / Occupancy / Satisfaction) with a legend, like the original's map views
+- ✅ Tower Statistics, the income breakdown, elevator utilization, the Map's evaluation views
 
 ## Time, audio, presentation
-- ✅ **The 1994 "breathing clock"**: real time is spent the way the original spent its 2,600 frames/day. The clock crawls through the lunch crush and races through the small hours (span table in `docs/canon/tdt-format.md` §3), normalized so a full day costs the same real time and the speed buttons keep their meaning. Presentation-only (the sim stays a uniform 1,440-minute day); a per-device **Steady clock** preference in Help disables the rhythm
-- ✅ **Canon calendar** (Classic): the compressed 1994 calendar from `docs/canon/tdt-format.md` §3, a 3-day week (2 weekday + 1 weekend), a 3-day quarter, and a 12-day year (day counter rolls at 11,987 = 999 years). Office rent collects each quarter (every 3 days); the Finance date matches the retail game (e.g. `currentDay` 1280 reads "Year 107", which our old 360-day calendar rendered "Year 4"). Rent and maintenance amounts are rescaled to the period so income per in-game day is unchanged. Modern picks this compressed calendar or a friendlier real-world length (7-day week, 90-day quarter, 360-day year) at New Tower
-- ✅ **Meal cadence**: all four daily meal windows drive real elevator load from every eating population. Breakfast (6-9) brings hotel guests and condo residents down for fastFood; lunch (11-14) is the workday peak from offices, condos, hotels and on-shift staff, filling fastFood and restaurants; dinner (17-20) mirrors lunch with a clock-crawl at 18:00 that reads visibly slow like the noon one; late-night (21-24) sends hotel and condo traffic to fastFood-until-close and cinema. Bulletin logs for breakfast/lunch/dinner match the original's tempo cues
-- ✅ **Meal round-trips visibly thin the room**: a worker who leaves floor 32 for lunch has an EMPTY desk until she walks back. Offices and condos show real per-person departures during their meal windows and refill on return, matching the 1994 game's "the elevators just called them all down" feel. Round-trippers pause 30-60 minutes at the venue to eat, then walk home; a bulldozed origin during someone's lunch is a silent despawn, no ghost effects. Hotel rooms do not yet draw guest figures, so their visual dip is a planned follow-up
-- ✅ **Venue-population census seam**: a worker or resident out on a meal round-trip is tracked separately via the transient `outForMeal` overlay, so venue-side meal counts can read the lunch crowd without mutating the room's canonical occupancy. The displayed population stays on the canonical room census, and the rating census keeps the canon hotel rule: a guest out for a meal, like a guest in-room, stops counting once the tower reaches 3★
-- ✅ Day/night sky with the sun and moon both arcing across; lit interiors at night, lights-out when empty/asleep, shops show CLOSED off-hours
-- ✅ Weather: deterministic per-day clear / cloudy / rain (the `WeatherKind` states), with drifting clouds and rain streaks (purely cosmetic; off the gameplay RNG)
-- ✅ Location-aware procedural soundtrack + SFX
-- ✅ Pan / zoom / pinch and collision-based picking, all via Excalibur
-- ✅ Animated people: lobby/corridor walkers, stair/escalator climbers, elevator riders, the metro train
-- ✅ Rooftop construction crane perched over the highest built floor (animated trolley, hook and night beacon) until the tower tops out at floor 100. Then it comes down, as in the original
-- ✅ Exterior escape stairs zigzagging down both sides of the tower silhouette
-- ✅ Grand lobbies: the ground concourse gets marble, gilded cornice, columns, red carpet and chandeliers that glow after dark; sky lobbies read as cooler stone with planters and framed prints
+- ✅ The 1994 "breathing clock" (presentation only; Steady clock turns it off)
+- ✅ The canon compressed calendar in Classic (`docs/canon/tdt-format.md` §3); Modern may pick a real-world length
+- ✅ Day and night, lit windows, weather (cosmetic), the crane until floor 100, exterior escape stairs, grand lobbies
+- ✅ Location-aware soundtrack and effects; pan, zoom and pinch
 
 ## Save / platform
-- ✅ Autosave + multiple save slots, `.vctower` tower-file export/import (`localStorage`)
-- ✅ Import of original 1994 SimTower saves (**`.TDT`**, per `docs/canon/tdt-format.md`): funds, star rating, clock, floors, rooms, rent classes, hotel room states, and the save's own elevators and stairways (with their per-floor stop settings) come over, with a fidelity report shown before anything is adopted and an auto-save to a free slot. A truncated or corrupt transport block falls back to a synthesized elevator layout, and the report says which path ran; tenant names, retail subtypes and finance history are queued follow-ups (backlog `tdt-importer`)
-- ✅ Export back to original 1994 SimTower saves (**`.TDT`**): rooms with occupancy and hotel states, transports with per-floor stop settings, funds, star, and the clock make the trip; a reverse fidelity modal shows what stays behind (funds round to $100, names and the ledger drop; since the v1.50.0 pricing split Classic rents already ARE the four 1994 lease classes, so they round-trip losslessly and the old "rents snap" line no longer applies) before anything downloads, and Modern-rule towers are refused. Every exported file must re-import through our own parser with zero warnings; validation against the real game is a recorded follow-up (backlog `tdt-exporter`)
-  - **Known limitation (game-side, won't-fix):** a `.TDT` we export with **rentable rooms present but zero tenants** renders a **black frame** in the real 1994 game (a seeded population renders fine). It is a game-side divide-by-zero in the original's evaluation (`Quality = 300 - total stress / tenants` with 0 tenants), not an exporter defect: a genuinely empty tower (no rooms) renders, and our bytes verify clean. It only affects synthetic all-vacant fixtures; a real save always carries population. Party-ruled won't-fix 2026-07-20 (issue #510, closed). Harness rule: never assert render on a zero-population export; seed a person first.
-  - **Burned rooms arrive cleared (game-side limit, measured 2026-07-31):** the format has a burned-area marker (type 48) and our importer reads it, but the 1994 game does not render one. Every shape we tried draws as a block of colored static: one record spanning the room, and a strip of one-tile records (Wine harness). So a gutted or burning room exports as ordinary paving instead, which is what the original shows once the debris is cleared, and the fidelity modal reports how many were cleared. Rebuild them in 1994.
-- ✅ Mobile: responsive layout, touch pan/pinch, drawer panels
+- ✅ Autosave, save slots, `.vctower` export and import
+- ✅ `.TDT` import with a fidelity report (backlog `tdt-importer` for tenant names, retail subtypes, finance history)
+- ✅ `.TDT` export for Classic towers with a reverse fidelity report; Modern towers are refused (backlog `tdt-exporter`). Two game-side limits: a tower with rooms and no tenants shows a black frame in 1994 (#510, won't fix), and burned rooms go over cleared because the original can't draw them
+- ✅ Mobile layout with touch pan and pinch
 
 ## Deliberate divergences
-- Commuters are **individually pathfound** (walk → wait → ride a real car → transfer → arrive), and their average wait on each floor feeds tenant ratings (#1971), while a lightweight **aggregate** congestion model still runs underneath as the deterministic, DOM-free backbone the headless tests assert against. The visible crowd is capped (~140 on screen) for performance rather than rendering the entire population at once.
-- The **Cathedral** is a religion-agnostic **Wedding Hall**.
-- The population census counts **occupants**: office workers + condo residents (hotel guests count up through 4★, then drop out); shops, restaurants and fast food count the customers inside them (up to their capacity, minus hotel guests once the census is occupants-only), while cinemas and party halls count nobody. The **TOWER** goal is the canonical **15,000**, kept reachable by the canon **375-tile** buildable lot width (the 1994 map is 375 segments wide; a well-zoned 100-floor tower measures well over 15,000 occupants).
-- Optional **rule-set** chosen when a tower is founded and fixed for its life: **Classic** is the pixel-faithful 1994 game; **Modern** adds what the original couldn't; today that means *variant households* (a condo sells to a 2–5 person family, weighted to a mean of 3 so the star ladder is unchanged, that scales its price and how demanding it is) and a *calendar choice* (the compressed 1994 calendar or a real-world-length one). Classic always runs the canon calendar. Saves with no mode load as Classic, and a Modern save with no calendar choice loads real-world-length.
-- **Housekeeping fields six time-simulated maids per unit (canon, as of 1.54)**: each unit staffs 6 maids, at most one of a unit's maids works a floor at a time, maids travel only by **service elevator or stairs** (escalators dropped from the staff network, canon), and each room takes real minutes of in-room cleaning before it turns over, so per-unit throughput is emergent from placement and staff transport instead of a fixed rooms-per-crew quota. **Classic** works the canon **noon-5 shift with a 16:30 no-new-room cutoff** and dispatches opportunistically in tower order (the original's automatic behavior); **Modern** works a longer 08:00-19:00 staffed day and adds **smart triage** (as of 1.56): dirty rooms are taken by days-dirty urgency weighted against the floor distance to the nearest staff-connected crew, so about-to-infest rooms are rescued first (rule-set divergences, like the exterminator). There is **no tower-wide staff pool and no build cap on housekeeping rooms** (as of 1.57, matching canon: the 1994 facility-limit lists cap security and medical at 10 each while housekeeping appears in none of them, and documented near-max towers run 12-16 units per hotel section with every maid working); the engine's staff-actor ceiling is simply what the built units can field. What we still deliberately do not reproduce: the 1994 pathfinding quirk (seven-plus floors degraded) that pushed players to build one service elevator per six floors; our staff routing has no such degradation.
-- **Cockroaches are visible and have a full lifecycle** (as of 1.53). A hotel room left dirty for 3 straight days breeds a roach **infestation** (a distinct sprite and room state) that housekeeping can no longer clean, exactly as in 1994. **Classic** recovers only by bulldozing and rebuilding (canon). **Modern** adds an owner-ratified paid **exterminator** (a call-out fee plus a per-room fee, landing the next day) as an alternative to the bulldozer; this is a new mechanic, gated through the rule-set, and the only divergence here. Only an **infested** room spreads roaches, horizontally into an adjacent room on the same floor (a merely dirty room does not spread, and roaches never cross floors), matching the 1994 rule that cockroach-infested rooms creep along the floor.
-- **Commercial patronage is modeled from reachable nearby population** rather than the original's opaque per-venue patron counters (which expert players suspect hide a cap). The transparent per-origin demand pools that restore the classic diminishing-returns and cross-venue behavior shipped in #393; the opaque counter itself is not reproduced.
-- **Modern builds while paused** (#1936). The 1994 game and Classic refuse new construction while paused (a click, tap or keyboard placement says "Unpause to build."); Modern lets the player plan at speed 0. The engine states the rule in its catalog (`rules.buildsWhilePaused`), and the host, which owns pause, applies it.
+- Commuters are individually pathfound, with an aggregate congestion model underneath and a capped on-screen crowd. [Help](https://verticopolis.com/help/differences/#every-commuter-is-a-real-person)
+- The Cathedral is a religion-agnostic Wedding Hall. [Help](https://verticopolis.com/help/differences/#the-wedding-hall)
+- The census counts occupants (hotel guests until 4★, shoppers inside venues), with the TOWER at the canon 15,000 on the 375-tile lot. [Help](https://verticopolis.com/help/differences/#who-counts-toward-population)
+- Housekeeping fields six simulated maids per unit on stairs and service elevators, with no 1994 long-trip pathfinding decay and no housekeeping build cap (1.54, 1.57). [Help](https://verticopolis.com/help/differences/#housekeeping-maids)
+- Cockroach infestations are visible rooms with a full lifecycle; Classic cures only by bulldozing (1.53). [Help](https://verticopolis.com/help/differences/#cockroaches-you-can-see)
+- Shop and restaurant patronage comes from the reachable nearby population; the original's opaque per-venue counters are not reproduced (#393). [Help](https://verticopolis.com/help/differences/#shoppers-come-from-nearby-floors)
+- A rule-set (Classic or Modern) is chosen at founding and fixed for the tower's life; saves with no mode load as Classic. [Help](https://verticopolis.com/help/differences/#two-ways-to-play)
+- Modern builds while paused; Classic refuses, as 1994 does (#1936). [Help](https://verticopolis.com/help/differences/#building-while-paused)
 
 ## Known parity gaps
+- Lobby-distance pressure: Verticopolis drops the 1994 mid-block cap once every legal sky lobby is built (owner ruling 2026-07-16, #394); re-keying it on elevator reach is #436. [Help](https://verticopolis.com/help/differences/#lobby-distance)
+- Other actions while paused: whether 1994 also refuses bulldozing, elevator or rent edits and the inspector, and whether a loaded tower starts paused, waits on a PC check (#1974). [Help](https://verticopolis.com/help/differences/#other-actions-while-paused)
 
-- **Deep per-elevator scheduling**: per-shift car schedules and per-car home/waiting floors. Today we expose car count and per-floor stops only. Tracked as `elevator-scheduling` #305 (owner ruling: full parity).
-- **Graduated far / very-far lobby-distance penalty for all tenants**: shipped in v1.44.0 as #394, recalibrated in v1.46.1 by owner ruling (2026-07-16). The optimization-thread analysis reports the 1994 game capping mid-block floors (6-10, 21-25, ...) even under correct play; v1.44.0 mirrored that, which left about 40 percent of a fully-lobbied tower permanently capped while the inspector prescribed a "nearer sky lobby" the placement grid refuses. The ruling favors feedback integrity over that mid-block tithe: the no-penalty edge is now derived from the lobby ladder (floor(lobbyInterval / 2)), so a tower with every legal sky lobby built feels no distance pressure, the bands land only on genuinely skipped lobbies, and the short block above the highest buildable slot caps at worst and never evicts, with the inspector naming only slots that can actually be built. A deliberate, recorded divergence. Re-keying the pressure on elevator reach and transfer depth (what the wait-time-centered reading of the original models) is the tracked follow-up, #436.
-- **Other actions while paused**: Classic refuses new placement while paused, as the 1994 game does (#1936). Whether the original also refuses bulldozing, elevator edits, rent changes or the inspector while paused, and whether a loaded tower starts paused, waits on a PC check (#1974); until then those stay open while paused in both modes.
-
-The rest of the gaps an r/SimTower optimization-thread review found on
-2026-07-15 have shipped: per-venue demand and cross-venue patronage (#393),
-the "leave the tower" pressure when no venue is reachable (#395), the
-contiguous sky-lobby transfer rule (#396), condo school runs and office
-sales calls (#397), the weekday and weekend patronage curve (#398), and the
-legibility work for them (#399, #400, #401). The review is
+The gaps from the 2026-07-15 r/SimTower optimization-thread review have
+shipped (#393, #395 to #401); the review is
 `_bmad-output/planning-artifacts/design/gdd-simtower-optimization-gaps-2026-07-15.md`.
 
 ## Verification
 `npm test` runs the web game's unit and integration tests, and `cargo test`
-in `engine-rs/` runs the engine's own, covering placement rules, economy,
-rating gates, the housekeeping/fire/bomb events, elevator dispatch, the
-individually-routed **crowd's routing and movement**, save/load, and the
-VIP's **TOWER award** (`engine-rs/src/services/tests.rs`). The conformance
-suite replays every scenario in `conformance/scenarios/` on the engine and
+in `engine-rs/` runs the engine's own: placement, economy, rating gates, the
+events, dispatch, crowd routing, save and load, and the TOWER award. The
+conformance suite replays every scenario in `conformance/scenarios/` and
 checks each checkpoint hash against `conformance/expected.json`.

@@ -1,7 +1,12 @@
 // What the docs site and the Rust API reference share: the title and the side
 // menu. astro.config.mjs hands both to Starlight, and
 // scripts/rustdoc-chrome.mjs draws the same header and menu into the pages
-// cargo doc writes, so a page added here shows up in both places.
+// cargo doc writes, so a page added here shows up in both places. The title
+// bar itself (the game button, GitHub) is title-bar.mjs, which the help site
+// draws too.
+import { GAME } from "./title-bar.mjs";
+
+export { GITHUB } from "./title-bar.mjs";
 
 /** The site title: names the release when DOCS_REF is an engine tag. */
 export function siteTitle(ref = "") {
@@ -9,7 +14,8 @@ export function siteTitle(ref = "") {
   return release ? `Verticopolis engine ${release}` : "Verticopolis engine";
 }
 
-export const GITHUB = "https://github.com/maniator/verticopolis";
+/** The site's name in the title bar on a phone. */
+export const SHORT_TITLE = "Engine docs";
 
 /** The path of the Rust API reference's front page. */
 export const RUST_REFERENCE = "/rust/verticopolis_engine/";
@@ -25,5 +31,5 @@ export const sidebar = [
     label: "Reference",
     items: [{ label: "Rust API reference", link: RUST_REFERENCE }, { slug: "changelog" }],
   },
-  { label: "Play Verticopolis", link: "https://verticopolis.com" },
+  { label: "Play Verticopolis", link: GAME },
 ];

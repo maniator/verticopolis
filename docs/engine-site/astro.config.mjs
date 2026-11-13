@@ -23,8 +23,11 @@ export default defineConfig({
       logo: { src: "./src/assets/logo.png", alt: "Verticopolis" },
       favicon: "/favicon.png",
       social: [{ icon: "github", label: "GitHub", href: GITHUB }],
-      components: { Hero: "./src/components/TitleScreen.astro" },
-      customCss: ["./src/styles/retro-tokens.css", "./src/styles/theme.css"],
+      components: {
+        Header: "./src/components/Header.astro",
+        Hero: "./src/components/TitleScreen.astro",
+      },
+      customCss: ["./src/styles/retro-tokens.css", "./src/styles/theme.css", "./src/styles/title-bar.css"],
       sidebar,
     }),
   ],
