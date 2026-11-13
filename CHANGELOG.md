@@ -25,6 +25,13 @@ prompt already tells players it is an engine update and shows the new version.
 Entries below 1.51.1 were curated from the commit history after the fact, so they
 are documentation only: no build that a client fetches carries them.
 
+## 3.6.0
+
+- The How to Play manual has a new page, Differences from the 1994 game, listing where a Classic tower plays like SimTower and where it doesn't yet.
+- The How to Play manual now explains buried treasure under Events.
+- Music and sound effects no longer crackle on slower computers and phones: the sound engine now does about half the work to play the same sounds.
+- The help pages now show their name in the title bar on phones too, with a Play button beside it and a link to the project on GitHub.
+
 ## 3.5.1
 
 - In Modern towers, an idle elevator waiting on a floor now picks up the people waiting there instead of leaving them for a car that never comes.
