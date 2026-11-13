@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { test, expect, type Page } from "@playwright/test";
 import { expectEngineHosted } from "./helpers";
-import { INSTANCE_METHODS, STATIC_METHODS } from "../src/dualrun/binding";
+import { INSTANCE_METHODS, STATIC_METHODS } from "../src/engineBinding/binding";
 
 /**
  * The Rust-only build (src/build/engineBundle.ts) in a real browser. The

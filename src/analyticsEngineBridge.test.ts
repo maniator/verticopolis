@@ -318,7 +318,7 @@ describe("analytics engine bridge", () => {
     const files = readdirSync(src, { recursive: true, encoding: "utf8" })
       .map((f) => f.replace(/\\/g, "/")) // Windows joins with backslashes
       .filter((f) => f.endsWith(".ts") && !f.endsWith(".test.ts") && !f.endsWith(".d.ts"))
-      .filter((f) => f !== "analyticsEngineBridge.ts" && f !== "dualrun/binding.ts" && f !== "analyticsEngagement.ts" && f !== "tests/goldens/portEditCases.ts");
+      .filter((f) => f !== "analyticsEngineBridge.ts" && f !== "engineBinding/binding.ts" && f !== "analyticsEngagement.ts" && f !== "tests/goldens/portEditCases.ts");
     expect(files).toContain("game/buildActions.ts");
     const senders = files.filter((f) => /["'`]demolish["'`]\s*[,)};]/.test(readFileSync(resolve(src, f), "utf8")));
     expect(senders).toEqual([]);

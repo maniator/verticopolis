@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import type { EnginePort } from "../../simport/enginePort";
 import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
 import { createPortUnitDiagnostics } from "../../game/portUnitDiagnostics";
-import { readCatalog } from "../../dualrun/catalog";
+import { readCatalog } from "../../engineBinding/catalog";
 
 /**
  * The inspector's unit diagnostics, rendered by the production adapter from

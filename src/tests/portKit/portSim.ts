@@ -7,7 +7,7 @@ import type { StatsReport } from "../../simport/panels";
 import { PortCodes } from "../../simport/portCodes";
 import { statsReport } from "../../simport/statsSheet";
 import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
-import type { WasmEngine } from "../../dualrun/binding";
+import type { WasmEngine } from "../../engineBinding/binding";
 import { rustTooling, type ToolingSetters } from "./tooling";
 import { Snapshot, draftFromSave, releaseDrafts, type Draft, type Leg } from "./drafts";
 

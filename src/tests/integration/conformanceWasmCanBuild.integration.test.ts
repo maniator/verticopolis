@@ -1,11 +1,11 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { readCatalog } from "../../dualrun/catalog";
+import { readCatalog } from "../../engineBinding/catalog";
 import type { GameMode } from "../../shared/types";
 import { REPO_ROOT } from "../conformance/scenario";
 import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
-import type { WasmEngine } from "../../dualrun/binding";
+import type { WasmEngine } from "../../engineBinding/binding";
 
 /**
  * `canBuild(kind, floor, x)` through the WASM binding (#922): the dry run a

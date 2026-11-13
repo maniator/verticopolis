@@ -15,7 +15,7 @@ import {
   type ScenarioEngine,
 } from "../conformance/scenario";
 import { hasWasmPackage, reloadWasmHandle, startWasmHandle, wasmEngine } from "../conformance/wasmEngine";
-import type { WasmEngine } from "../../dualrun/binding";
+import type { WasmEngine } from "../../engineBinding/binding";
 import viewLayout from "../../simport/fixtures/viewLayout.json";
 
 /**

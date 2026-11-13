@@ -14,7 +14,7 @@ import { join, resolve } from "node:path";
  * `docs/engine-site/guides/javascript.md`. This guard keeps the copy in the
  * script and the release workflow on the script, and keeps every binding call the
  * README and the guide name a real export of the declared binding
- * (`src/dualrun/engine.d.ts`), so a rename or a removal fails here until the
+ * (`src/engineBinding/engine.d.ts`), so a rename or a removal fails here until the
  * docs follow.
  */
 const root = resolve(__dirname, "..", "..");
@@ -25,7 +25,7 @@ const guide = read("docs/engine-site/guides/javascript.md");
 const webDeclarations = read("packages/verticopolis-engine/web.d.ts");
 const packScript = read("scripts/engine-package-files.sh");
 const releaseWorkflow = ".github/workflows/release-tag.yml";
-const declared = read("src/dualrun/engine.d.ts");
+const declared = read("src/engineBinding/engine.d.ts");
 
 const exportsDeclared = new Set([
   ...[...declared.matchAll(/^ {4}(?:static )?(\w+)\(/gm)].map((m) => m[1]!),

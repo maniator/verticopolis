@@ -64,7 +64,7 @@ function lineCount(absPath: string): number {
 /** Files a tool writes, which no one splits by hand: the binding's
  *  declaration is wasm-bindgen's output (`npm run wasm:build` refreshes it)
  *  and grows with every export the engine adds. */
-const GENERATED: ReadonlySet<string> = new Set(["src/dualrun/engine.d.ts"]);
+const GENERATED: ReadonlySet<string> = new Set(["src/engineBinding/engine.d.ts"]);
 
 function scanFiles(): { rel: string; lines: number }[] {
   return SCANNED_DIRS.flatMap(({ dir, exts }) => sourceFiles(dir, exts))

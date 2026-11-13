@@ -1,4 +1,4 @@
-import type { WasmModule } from "../dualrun/binding";
+import type { WasmModule } from "../engineBinding/binding";
 import type { SlotPopulationReader } from "../storage/slotCensus";
 import { runEach } from "./hostFault";
 

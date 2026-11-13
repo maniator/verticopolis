@@ -5,7 +5,7 @@
  * for the JavaScript glue, and a package.json marking the output CommonJS (the
  * repository is ESM, and wasm-bindgen's Node target emits `require`). For the
  * engine, the declaration wasm-bindgen writes is copied to
- * src/dualrun/engine.d.ts, the one checked-in file, so the TypeScript side
+ * src/engineBinding/engine.d.ts, the one checked-in file, so the TypeScript side
  * types against the binding as the Rust source declares it (CI fails when the
  * copy is stale). The engine build also refreshes src/events/gameplayEvents.d.ts
  * (and the bridge's rules beside it, src/events/gameplayEventRules.ts)
@@ -102,7 +102,7 @@ for (const f of [`${target.lib}.js`, `${target.lib}_bg.wasm`]) {
 if (which === "engine") stamp(resolve(crate, "pkg", `${target.lib}_bg.wasm`));
 if (which === "engine") {
   // The browser build, served beside the app from src/public/engine/ (the WASM
-  // host and the dual run's worker load it through the verified loader). It is build output, not
+  // host loads it through the verified loader). It is build output, not
   // checked in; Vercel and CI build it (scripts/build-engine-wasm.sh). Its
   // BUILD.json records a hash of the Rust sources it was built from: CI keys
   // its cache on that hash, and src/wasmhost/packageHash.test.ts fails when
@@ -146,15 +146,15 @@ if (which === "engine") {
   const absent = [...listed].filter((f) => !written.includes(f));
   if (absent.length > 0) throw new Error(`src/wasmhost/engineAssets.ts lists files the build did not write to src/public/engine/: ${absent.join(", ")}`);
   // The class declaration is the same for both targets; the Node copy is the
-  // committed one (`src/dualrun/binding.ts` types against it).
-  copyFileSync(resolve(crate, "pkg/verticopolis_engine.d.ts"), resolve(crate, "../src/dualrun/engine.d.ts"));
+  // committed one (`src/engineBinding/binding.ts` types against it).
+  copyFileSync(resolve(crate, "pkg/verticopolis_engine.d.ts"), resolve(crate, "../src/engineBinding/engine.d.ts"));
   // The gameplay event types and the bridge's runtime rules come from the
   // catalog both engines are held to, so they are refreshed with the
   // binding's own declaration.
   const catalog = checkCatalog(JSON.parse(readFileSync(resolve(crate, "src/gameplay/catalog.json"), "utf8")));
   writeFileSync(resolve(crate, "../src/events/gameplayEvents.d.ts"), renderGameplayEventsDts(catalog));
   writeFileSync(resolve(crate, "../src/events/gameplayEventRules.ts"), renderGameplayEventRules(catalog));
-  console.log("engine-rs/pkg and src/public/engine: built; src/dualrun/engine.d.ts, src/events/gameplayEvents.d.ts and gameplayEventRules.ts refreshed");
+  console.log("engine-rs/pkg and src/public/engine: built; src/engineBinding/engine.d.ts, src/events/gameplayEvents.d.ts and gameplayEventRules.ts refreshed");
 } else {
   console.log(`${target.dir}/pkg: built`);
 }

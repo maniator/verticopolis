@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { WasmModule } from "../dualrun/binding";
+import type { WasmModule } from "../engineBinding/binding";
 import { EngineBootError, FALLBACK_REASONS, FALLBACK_STAGES, bootFailure, bootFailureReason, engineFailureCopy, deferEngineIdentity, failBoot, loadBootEngine, packageFailureOf, publishBootState, settleEngineIdentity, type EngineBootState } from "./engineBoot";
 import { EnginePackageError, type PackageFailureKind } from "./enginePackageCheck";
 

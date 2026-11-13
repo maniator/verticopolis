@@ -1,11 +1,11 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { readCatalog } from "../../dualrun/catalog";
+import { readCatalog } from "../../engineBinding/catalog";
 import type { GameMode } from "../../shared/types";
 import { REPO_ROOT } from "../conformance/scenario";
 import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
-import type { WasmEngine } from "../../dualrun/binding";
+import type { WasmEngine } from "../../engineBinding/binding";
 
 /**
  * The command answers the Rust-backed facade reads (slice 6d, #1216), through
@@ -13,7 +13,7 @@ import type { WasmEngine } from "../../dualrun/binding";
  * `previewRentBatch`, an unknown facility kind refused instead of thrown, and
  * `validateTransport` with `placeTransportDryRun`. Until #1875 each answer was
  * compared with the TypeScript engine's; now each is held to the answer the
- * binding documents (`src/dualrun/engine.d.ts`) and to the command it previews.
+ * binding documents (`src/engineBinding/engine.d.ts`) and to the command it previews.
  * The engine's own rules behind them are pinned in Rust by
  * `wasm_facade_commands.rs` (exterminator answers, unknown kinds, batch
  * targets), `wasm_port_tests.rs` (`the_rent_batch_quote_is_the_batch_without_the_write`)

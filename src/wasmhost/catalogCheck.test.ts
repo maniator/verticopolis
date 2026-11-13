@@ -12,7 +12,7 @@ import { refuseForeignCatalogs } from "./catalogCheck";
  * reads the Rust engine's, which `conformance/catalog-digests.json` pins.
  * Reading a catalog the build
  * cannot parse (its version, a kind listed twice) is `readCatalog`'s, in
- * `src/dualrun/catalog.test.ts`.
+ * `src/engineBinding/catalog.test.ts`.
  */
 
 const MODES = ["classic", "modern"] as const;

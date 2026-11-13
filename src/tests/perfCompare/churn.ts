@@ -1,4 +1,4 @@
-import type { WasmModule } from "../../dualrun/binding";
+import type { WasmModule } from "../../engineBinding/binding";
 import type { Scenario } from "./scenarios";
 
 /**

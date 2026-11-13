@@ -3,7 +3,7 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { CONFORMANCE_DIR, firstDivergence, loadScenario, runScenario, type Checkpoint, type EngineStart } from "../conformance/scenario";
 import { hasWasmPackage, startWasmEngine, startWasmHandle, wasm, wasmEngine } from "../conformance/wasmEngine";
-import { CATALOG_VERSION, readCatalog } from "../../dualrun/catalog";
+import { CATALOG_VERSION, readCatalog } from "../../engineBinding/catalog";
 import { catalogLockView } from "../conformance/catalogLockView";
 import { canonicalJson, digest } from "../conformance/canonical";
 import { done } from "../../simport/engineSubject.fixture";

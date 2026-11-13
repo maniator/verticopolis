@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { readCatalog } from "../../dualrun/catalog";
+import { readCatalog } from "../../engineBinding/catalog";
 import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
 
 /**

@@ -129,7 +129,7 @@ describe("the engine READMEs on an engine change", () => {
   });
 
   it("counts the binding declaration and leaves tests, tools and other files alone", () => {
-    expect(feature(main(), main({ "src/dualrun/engine.d.ts": "x", ".changes/topic.md": note("none", "none") }), ["src/dualrun/engine.d.ts"])[0]).toMatch(/src\/dualrun\/engine\.d\.ts/);
+    expect(feature(main(), main({ "src/engineBinding/engine.d.ts": "x", ".changes/topic.md": note("none", "none") }), ["src/engineBinding/engine.d.ts"])[0]).toMatch(/src\/engineBinding\/engine\.d\.ts/);
     for (const path of ["engine-rs/src/sim_tests.rs", "engine-rs/src/crowd/tests.rs", "engine-rs/src/bin/dump.rs", "engine-rs/tests/api.rs", "engine-rs/README.md"]) {
       expect(feature(main(), main({ [path]: "x", ".changes/topic.md": note("none", "none") }), [path]), path).toEqual([]);
     }

@@ -1,7 +1,7 @@
 import { readdirSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { useTowerCatalogSource } from "../../catalog/towerCatalog";
-import { readCatalog } from "../../dualrun/catalog";
+import { readCatalog } from "../../engineBinding/catalog";
 import { createCardKit } from "../../game/cardKit";
 import { newViewReader } from "../../game/portAccess";
 import { swapDone } from "../../game/portLifecycle";

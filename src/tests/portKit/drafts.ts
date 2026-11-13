@@ -3,7 +3,7 @@ import type { NextStarView, StatsReport } from "../../simport/panels";
 import type { EnginePort } from "../../simport/enginePort";
 import { ToolingTower, type ToolingEngine } from "../../game/toolingTower";
 import { wasm } from "../conformance/wasmEngine";
-import type { WasmEngine } from "../../dualrun/binding";
+import type { WasmEngine } from "../../engineBinding/binding";
 
 /**
  * The port kit's drafts (a fixture's authoring copy on an engine of its own)

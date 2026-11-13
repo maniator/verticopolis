@@ -243,8 +243,8 @@ npm run test:wasm           # every scenario through the binding, the frame-day 
 ```
 
 `engine-rs/pkg/` is build output and is not checked in, except for the
-declaration wasm-bindgen writes, copied to `src/dualrun/engine.d.ts`:
-`src/dualrun/binding.ts` types the adapters against it, so a method added
+declaration wasm-bindgen writes, copied to `src/engineBinding/engine.d.ts`:
+`src/engineBinding/binding.ts` types the adapters against it, so a method added
 or renamed in `wasm.rs` reaches TypeScript as a type change, and the
 `engine-rs.yml` job fails when the checked-in copy is stale (rebuild and
 commit it with the Rust change). The WASM suite
@@ -278,7 +278,7 @@ a `version` that moves when a field is added, renamed or removed.
 
 The WASM binding returns the same JSON from `catalog(mode)`, typed by
 `Catalog` in `src/catalog/catalogTypes.ts` and read through `readCatalog` in
-`src/dualrun/catalog.ts`, which refuses a reply whose shape is not `Catalog`
+`src/engineBinding/catalog.ts`, which refuses a reply whose shape is not `Catalog`
 (a missing or mistyped field, a negative price, a pool or ground floor
 structure naming no listed kind). `conformance/catalog-digests.json` pins
 each mode's canonical hash: the WASM suite writes it from this catalog
@@ -369,7 +369,7 @@ fixtures in `conformance/fixtures/` included (`.github/workflows/engine-rs.yml`)
 
 `version` in `Cargo.toml` moves with the engine's compatibility contract:
 the conformance lock, the save version, the frame layout, catalog and identity
-record versions, and the checked-in binding declaration `src/dualrun/engine.d.ts`.
+record versions, and the checked-in binding declaration `src/engineBinding/engine.d.ts`.
 Change any of them and the version goes up in the same pull request, in
 `Cargo.toml`, `Cargo.lock` and `consumer/Cargo.lock` (CI builds the consumer
 with `--locked`), followed by `npm run engine:compat`, which rewrites

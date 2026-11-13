@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { WasmEngine } from "../../dualrun/binding";
+import type { WasmEngine } from "../../engineBinding/binding";
 import type { EnginePort } from "../../simport/enginePort";
 import { canonicalJson } from "../conformance/canonical";
 import { hasWasmPackage, wasm } from "../conformance/wasmEngine";

@@ -119,7 +119,7 @@ review skill. The BMAD agent rules live in `_bmad-output/project-context.md`.
   `engine-rs/CRATE_README.md` on crates.io) stay short and link the site
   (owner, 2026-11-13). All four describe the engine as `main` has it. A PR that
   changes `engine-rs/src/` (tests and `src/bin/` aside) or
-  `src/dualrun/engine.d.ts` edits whichever page went stale, or, after
+  `src/engineBinding/engine.d.ts` edits whichever page went stale, or, after
   reading them, puts `readmes: unchanged` in its change note's front matter.
   `scripts/version-check.ts` fails a PR that does neither. See
   [CONTRIBUTING.md](./CONTRIBUTING.md) → **The engine READMEs**.
@@ -261,7 +261,7 @@ review skill. The BMAD agent rules live in `_bmad-output/project-context.md`.
   its rules are Rust tests now (`docs/architecture/ts-engine-retirement-map.md`).
 - **The engine crate version (`engine-rs/Cargo.toml`) goes up with the
   conformance lock, the save/frame layout/catalog/identity versions and the
-  binding declaration `src/dualrun/engine.d.ts`.** The PR that moves one sets
+  binding declaration `src/engineBinding/engine.d.ts`.** The PR that moves one sets
   `crate:` in its change note, adds an Engine line and runs
   `npm run engine:compat`; the release PR raises the version in `Cargo.toml`
   and both `Cargo.lock` files. Steps and limits are in CONTRIBUTING.md →

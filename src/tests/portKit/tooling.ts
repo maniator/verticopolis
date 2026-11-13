@@ -1,4 +1,4 @@
-import type { WasmEngine } from "../../dualrun/binding";
+import type { WasmEngine } from "../../engineBinding/binding";
 import type { UnitState, VacateReason, WeatherKind } from "../../shared/types";
 
 /** The tooling setters (binding tier 3) a test reaches mid-run. Each that

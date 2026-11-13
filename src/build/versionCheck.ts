@@ -133,7 +133,7 @@ export const ENGINE_READMES = [
 /** Engine code a README can describe: the crate's library source (its tests and
  *  command-line tools aside) and the binding declaration the WASM package ships. */
 export function isEngineSource(path: string): boolean {
-  if (path === "src/dualrun/engine.d.ts") return true;
+  if (path === "src/engineBinding/engine.d.ts") return true;
   if (!path.startsWith("engine-rs/src/") || !path.endsWith(".rs")) return false;
   if (path.startsWith("engine-rs/src/bin/")) return false;
   return !path.endsWith("_tests.rs") && !path.endsWith("/tests.rs");

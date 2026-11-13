@@ -5,7 +5,7 @@
  * tables and the gameplay event catalog), the save version it writes and the
  * oldest it loads, the frame layout, view layout, catalog and identity record
  * versions, and
- * the public Rust/WASM interface (the checked-in `src/dualrun/engine.d.ts`,
+ * the public Rust/WASM interface (the checked-in `src/engineBinding/engine.d.ts`,
  * comments and spacing aside).
  * `src/tests/engineCompat.guard.test.ts` recomputes all of it from the tree and
  * fails when a pin moved and the record did not. After a deliberate change,
@@ -208,7 +208,7 @@ export function compatInputs(): string[] {
   return [
     "engine-rs/Cargo.toml",
     ...new Set(Object.values(VERSION_CONSTANTS).map((c) => c.file)),
-    "src/dualrun/engine.d.ts",
+    "src/engineBinding/engine.d.ts",
     ...LOCK_FILES.map(lockFilePath),
   ];
 }
@@ -229,7 +229,7 @@ export function computeCompat(root: string): CompatRecord {
     viewLayoutVersion: constant("viewLayoutVersion"),
     catalogVersion: constant("catalogVersion"),
     identitySchema: constant("identitySchema"),
-    interfaceDigest: interfaceDigest(read("src/dualrun/engine.d.ts")),
+    interfaceDigest: interfaceDigest(read("src/engineBinding/engine.d.ts")),
   };
 }
 

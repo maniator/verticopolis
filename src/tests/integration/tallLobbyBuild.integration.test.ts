@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { WasmEngine } from "../../dualrun/binding";
+import type { WasmEngine } from "../../engineBinding/binding";
 import type { GameApp } from "../../main";
 import type { EnginePort } from "../../simport/enginePort";
 import { PortCodes } from "../../simport/portCodes";

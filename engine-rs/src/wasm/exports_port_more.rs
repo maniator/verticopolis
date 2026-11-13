@@ -58,7 +58,7 @@ impl Engine {
 /// The renderer-facing view (facade slice 6a, #1213): one-line wrappers over
 /// `crate::view`, which documents each layout. Their notes, and
 /// `viewLayout`'s above, are plain comments: wasm-bindgen copies doc
-/// comments into the generated `src/dualrun/engine.d.ts`, which the 500-line
+/// comments into the generated `src/engineBinding/engine.d.ts`, which the 500-line
 /// ceiling holds.
 #[wasm_bindgen]
 impl Engine {

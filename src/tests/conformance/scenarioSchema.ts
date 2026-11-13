@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { readCatalog } from "../../dualrun/catalog";
+import { readCatalog } from "../../engineBinding/catalog";
 
 /** The Rust engine's Classic catalog as checked in (the file `catalogFor` in
  *  `src/tests/catalogFixture.ts` reads; `portReads.integration.test.ts` holds

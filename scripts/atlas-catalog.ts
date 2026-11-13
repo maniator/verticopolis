@@ -9,8 +9,8 @@
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import { readCatalog, type Catalog } from "../src/dualrun/catalog";
-import type { WasmModule } from "../src/dualrun/binding";
+import { readCatalog, type Catalog } from "../src/engineBinding/catalog";
+import type { WasmModule } from "../src/engineBinding/binding";
 
 export async function atlasCatalog(root: string): Promise<Catalog> {
   const dir = ["src/public/engine", "dist/engine"]

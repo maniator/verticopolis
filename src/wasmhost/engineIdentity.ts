@@ -1,4 +1,4 @@
-import type { WasmModule } from "../dualrun/binding";
+import type { WasmModule } from "../engineBinding/binding";
 
 /**
  * The engine's own identity record (#963): which crate, which save, frame

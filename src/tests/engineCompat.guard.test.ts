@@ -101,7 +101,7 @@ describe("engine crate version rule", () => {
   });
 
   describe("each pin fails when its input moves and the record does not", () => {
-    const decl = read("src/dualrun/engine.d.ts");
+    const decl = read("src/engineBinding/engine.d.ts");
 
     it("the unchanged tree matches the record (the mutations below start from it)", () => {
       expect(
@@ -148,7 +148,7 @@ describe("engine crate version rule", () => {
         (dir) =>
           edit(
             dir,
-            "src/dualrun/engine.d.ts",
+            "src/engineBinding/engine.d.ts",
             (t) => `${t}\nexport function added(): void;\n`,
           ),
         (dir) => computeCompat(dir),
@@ -198,7 +198,7 @@ describe("engine crate version rule", () => {
     const digest = interfaceDigest;
 
     it("ignores comments and spacing", () => {
-      const decl = read("src/dualrun/engine.d.ts");
+      const decl = read("src/engineBinding/engine.d.ts");
       const doc = decl
         .replace("/**", "/** A reworded note.")
         .replace(/;\n/g, ";\n\n");

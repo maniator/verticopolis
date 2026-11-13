@@ -53,7 +53,7 @@ describe("checkEngineBundle", () => {
 
 describe("repoRelativeSource", () => {
   it("makes a path repository-relative and drops a module id's query", () => {
-    expect(repoRelativeSource("/repo/src/dualrun/worker.ts?worker_file&type=module", "/repo")).toBe("src/dualrun/worker.ts");
+    expect(repoRelativeSource("/repo/src/engineBinding/worker.ts?worker_file&type=module", "/repo")).toBe("src/engineBinding/worker.ts");
     expect(repoRelativeSource("/repo/src/game/toolingSim.ts", "/repo")).toBe(TOOLING_SIM);
     expect(repoRelativeSource("/elsewhere/x.ts#frag", "/repo")).toBe("elsewhere/x.ts");
   });

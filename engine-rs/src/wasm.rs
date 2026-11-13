@@ -250,7 +250,7 @@ fn catalog_text(mode: &str) -> Result<String, String> {
 /// Every price, size and build rule a frontend shows, resolved for `mode`
 /// (`classic` or `modern`), as canonical JSON in the shape of the `Catalog`
 /// type (declared in `src/catalog/catalogTypes.ts`, read through `readCatalog`
-/// in `src/dualrun/catalog.ts`; see `verticopolis_engine::catalog`). It needs
+/// in `src/engineBinding/catalog.ts`; see `verticopolis_engine::catalog`). It needs
 /// no running game.
 #[wasm_bindgen]
 pub fn catalog(mode: &str) -> Result<String, JsError> {
