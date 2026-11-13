@@ -217,7 +217,7 @@ those units in each save.
 | 6, 7 | 2 x u8 | expected visitors | Their sum is the visitors the room expects that day; it starts at 10 when a room opens and climbs by 5 to 15 a day to the cap (#1500) | Observed |
 | 8 | u8 | served yesterday | The visitors the room served the day before: its census. The finance block's shop, fast food and restaurant lines are the sums of this byte by class | Known |
 | 9, 10 | 2 B | venue statistics | Not decoded | Unknown |
-| 11 | u8 | style | The room's style: 0 to 10 for shops, 0 to 3 for fast food and restaurants in the observation saves (#2044; list in `tdt-format.md` section 8) | Inferred |
+| 11 | u8 | style | The room's style: 0 to 10 for shops, 0 to 3 for fast food and restaurants in the observation saves (#2044; list in `tdt-format.md` section 8). A headless run of one of our exports drew a Hamburger Stand (style 2) and a Sushi Bar (style 3) whose byte 6 held rows 5 and 6, past their style lists | Known |
 | 12 | u8 | venue statistics | Not decoded | Unknown |
 | 13 | u8 | constant | 255 in every row | Known |
 | 14 to 17 | 4 B | venue statistics | | Unknown |

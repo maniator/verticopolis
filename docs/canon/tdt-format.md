@@ -338,11 +338,13 @@ The styles, in order:
 - Shops (10): Men's Clothing, Pet Store, Flower Shop, Book Store, Drug Store,
   Boutique, Electronics, Bank, Hair Salon, Post Office, Sports Gear.
 
-An earlier Wine render of one of our exports showed a fast-food unit with
-byte 6 = 3 as an Ice Cream stand. That file wrote no style in byte 11 of any
-row, so either the game falls back to byte 6 when the row does not name the
-room, or the render needs a second look. A headless render of the new export
-settles it (#2044).
+A headless run on 2026-11-13 settled where the game reads the style (#2044):
+in one of our exports, a Hamburger Stand (byte 11 = 2) and a Sushi Bar
+(byte 11 = 3) whose byte 6 held rows 5 and 6, both past their style lists,
+drew as a burger stand and a Japanese restaurant. An earlier Wine render that
+showed a fast-food unit with byte 6 = 3 as an Ice Cream stand came from a file
+whose rows did not name their rooms. Shops in a tower with no population draw
+shuttered ("For RENT"), so their styles show only once they lease.
 
 ## 9. Elevators
 
