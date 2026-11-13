@@ -408,15 +408,17 @@ describe.skipIf(noEngine)("SaveLoad (tower-swap contracts)", () => {
     }
     expect(f.toasts).toEqual([
       {
-        text: "Save failed: storage is full or blocked. Free up space or allow site storage, then try again.",
+        text: "Save failed: storage is full or blocked. Free up space or allow site storage, or export the tower to a file.",
         kind: "bad",
       },
     ]);
-    // The success path still works once storage recovers, with its normal copy.
+    // The success path still works once storage recovers, with its normal
+    // copy, after saying saving is back to the player who was told it failed.
     saveLoad.save();
-    expect(f.toasts).toHaveLength(2);
-    expect(f.toasts[1].kind).toBe("good");
-    expect(f.toasts[1].text).toMatch(/^Saved ✓ · /);
+    expect(f.toasts).toHaveLength(3);
+    expect(f.toasts[1]).toEqual({ text: "Saving works again.", kind: "good" });
+    expect(f.toasts[2].kind).toBe("good");
+    expect(f.toasts[2].text).toMatch(/^Saved ✓ · /);
     // The recovery save above wrote a real autosave; drop it so this test
     // leaks no storage state into later suites in the file.
     localStorage.clear();

@@ -47,3 +47,23 @@
   height: 100%;
   background: var(--good);
 }
+
+/* .toast--sticky: a toast that stays until dismissed (the save-failure notice,
+   src/ui/saveWarning.ts). It carries buttons, so it takes clicks, and a
+   heading line above its text. */
+.toast--sticky {
+  pointer-events: auto;
+}
+.save-warning-title {
+  display: block;
+  margin-bottom: 4px;
+}
+.save-warning-text {
+  margin: 0 0 6px;
+  line-height: 1.35;
+}
+.save-warning-actions {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+}

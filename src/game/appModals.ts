@@ -1,9 +1,9 @@
 import { html } from "lit-html";
 import type { GameApp } from "../main";
-import { SaveGame, saveFailureMessage } from "../storage/SaveGame";
+import { SaveGame } from "../storage/SaveGame";
 import { scheduleReviewEntry } from "../ui/templates/scheduleReview";
 import { canCallExterminator, statsScreen, statsTemplate } from "../ui/templates/stats";
-import { trackAppAction, trackAppActionOnce } from "../analytics";
+import { trackAppAction } from "../analytics";
 import { outcome } from "../simport/portCodes";
 import { statsReport } from "../simport/statsSheet";
 import { catalogOf } from "./portAccess";
@@ -137,8 +137,7 @@ export function saveToSlot(app: GameApp, slot: number): void {
     // Same contract as Quick Save: a manual save must never fail silently or
     // toast success on a failed write (the throw would otherwise escape the
     // slot button's click handler with no player feedback at all).
-    trackAppActionOnce("autosave_failed", "manual");
-    app.ui.toast(saveFailureMessage(err), "bad");
+    app.saveLoad.notice.slotFailed(err);
     return;
   }
   trackAppAction("save_slot"); // manual slot write succeeded

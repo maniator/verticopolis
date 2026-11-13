@@ -5,6 +5,7 @@ import { catalogFor } from "../tests/catalogFixture";
 import { mockPort } from "../tests/portKit/mockPort";
 import { catalogOn, useTowerCatalogSource } from "../catalog/towerCatalog";
 import type { CatalogEconomy } from "../catalog/catalogTypes";
+import { SaveFailureNotice } from "./saveFailureNotice";
 
 /**
  * The hand-built fake `GameApp` the `appModals` tests pin the stats,
@@ -87,6 +88,9 @@ export function makeApp(sim: SimShape) {
     toast: vi.fn(),
   };
   const engine = { viewState: vi.fn(() => ({ tile: 40, floor: 3, zoom: 2 })) };
+  /** The save-failure notice surface; the latch in front of it is the real one. */
+  const saveWarning = { show: vi.fn(), clear: vi.fn() };
+  const saveLoad = { notice: new SaveFailureNotice(() => ({ ui, saveWarning })) };
   const current = (): SimShape => app.sim;
   const coverage = () => (current().housekeepingCoverage as () => { infested: number })();
   let reason: string | undefined;
@@ -144,6 +148,7 @@ export function makeApp(sim: SimShape) {
     portCodes: PortCodes;
     followSwap: ReturnType<typeof vi.fn>;
     scheduleReview: { findings: ReturnType<typeof vi.fn>; open: ReturnType<typeof vi.fn> };
+    saveLoad: typeof saveLoad;
   } = {
     /** A swap moves the generation, as the engine's swaps do. */
     get sim() {
@@ -162,7 +167,8 @@ export function makeApp(sim: SimShape) {
     followSwap: vi.fn(),
     // No elevator is short, as on a tower the review has nothing to say about.
     scheduleReview: { findings: vi.fn(() => []), open: vi.fn() },
+    saveLoad,
   };
   loadInto(enginePort, sim);
-  return { app: app as unknown as GameApp, ui, engine, reader, enginePort, followSwap: app.followSwap, scheduleReview: app.scheduleReview };
+  return { app: app as unknown as GameApp, ui, engine, reader, enginePort, followSwap: app.followSwap, scheduleReview: app.scheduleReview, saveWarning };
 }

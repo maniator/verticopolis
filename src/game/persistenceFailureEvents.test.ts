@@ -20,11 +20,12 @@ vi.mock("./portLifecycle", async (importActual) => {
   return { ...actual, saveText: vi.fn(() => "SAVE TEXT") };
 });
 
-function makeLoad(port: Record<string, unknown> = {}) {
+function makeLoad(port: Record<string, unknown> = {}, withNotice = true) {
   const ui = { toast: vi.fn(), sayVisibly: vi.fn(), showImportReport: vi.fn(), downloadFile: vi.fn(() => true) };
   const towerSwapped = vi.fn();
-  const deps = { ui, towerSwapped, enginePort: () => port, getView: () => null } as unknown as SaveLoadDeps;
-  return { load: new SaveLoad(deps), ui, towerSwapped };
+  const saveWarning = { show: vi.fn(), clear: vi.fn() };
+  const deps = { ui, towerSwapped, enginePort: () => port, getView: () => null, saveWarning: withNotice ? saveWarning : undefined } as unknown as SaveLoadDeps;
+  return { load: new SaveLoad(deps), ui, towerSwapped, saveWarning };
 }
 
 beforeEach(() => {
@@ -81,29 +82,74 @@ describe("a failed save reports autosave_failed", () => {
 
   it("tells the player once while autosave keeps failing, and again after it worked in between", async () => {
     const save = vi.spyOn(SaveGame, "saveAsync").mockRejectedValue(new DOMException("quota", "QuotaExceededError"));
-    const { load, ui } = makeLoad();
+    const { load, ui, saveWarning } = makeLoad();
     await load.autosave();
     await load.autosave();
-    expect(ui.toast).toHaveBeenCalledExactlyOnceWith(expect.stringMatching(/^Autosave is not working\. Save failed: storage is full or blocked/), "bad");
+    expect(saveWarning.show).toHaveBeenCalledExactlyOnceWith(expect.stringMatching(/private or incognito window/));
+    expect(ui.toast).not.toHaveBeenCalled();
 
     save.mockResolvedValue(undefined);
     await load.autosave();
-    expect(ui.toast).toHaveBeenCalledTimes(1);
+    expect(saveWarning.clear).toHaveBeenCalledTimes(1);
+    expect(ui.toast).toHaveBeenCalledExactlyOnceWith("Saving works again.", "good");
     save.mockRejectedValue(new DOMException("quota", "QuotaExceededError"));
     await load.autosave();
-    expect(ui.toast).toHaveBeenCalledTimes(2);
+    expect(saveWarning.show).toHaveBeenCalledTimes(2);
+  });
+
+  it("falls back to one toast with the notice's headline when no notice surface is wired", async () => {
+    vi.spyOn(SaveGame, "saveAsync").mockRejectedValue(new DOMException("quota", "QuotaExceededError"));
+    const { load, ui } = makeLoad({}, false);
+    await load.autosave();
+    await load.autosave();
+    expect(ui.toast).toHaveBeenCalledExactlyOnceWith(expect.stringMatching(/^Your tower isn't being saved\. This browser won't let/), "bad");
   });
 
   it("keeps the failure notice for when the tab is visible again", async () => {
     vi.spyOn(SaveGame, "saveAsync").mockRejectedValue(new DOMException("quota", "QuotaExceededError"));
     const visibility = vi.spyOn(document, "visibilityState", "get").mockReturnValue("hidden");
-    const { load, ui } = makeLoad();
+    const { load, saveWarning } = makeLoad();
     await load.autosave();
-    expect(ui.toast).not.toHaveBeenCalled();
+    expect(saveWarning.show).not.toHaveBeenCalled();
     visibility.mockReturnValue("visible");
     await load.autosave();
-    expect(ui.toast).toHaveBeenCalledTimes(1);
+    expect(saveWarning.show).toHaveBeenCalledTimes(1);
     visibility.mockRestore();
+  });
+
+  it("toasts every failed Quick Save but raises the notice once, and a later good save takes it down", () => {
+    const save = vi.spyOn(SaveGame, "save").mockImplementation(() => {
+      throw new DOMException("quota", "QuotaExceededError");
+    });
+    const { load, ui, saveWarning } = makeLoad();
+    load.save();
+    load.save();
+    expect(ui.toast).toHaveBeenCalledTimes(2);
+    expect(ui.toast).toHaveBeenNthCalledWith(2, expect.stringMatching(/^Save failed: storage is full or blocked/), "bad");
+    expect(saveWarning.show).toHaveBeenCalledTimes(1);
+
+    save.mockImplementation(() => {});
+    load.save();
+    expect(saveWarning.clear).toHaveBeenCalledTimes(1);
+    expect(ui.toast).toHaveBeenNthCalledWith(3, "Saving works again.", "good");
+    expect(ui.toast).toHaveBeenLastCalledWith(expect.stringMatching(/^Saved ✓/), "good");
+  });
+
+  it("says nothing about saving working again to a player who was never told it failed", async () => {
+    vi.spyOn(SaveGame, "saveAsync").mockResolvedValue(undefined);
+    const { load, ui, saveWarning } = makeLoad();
+    await load.autosave();
+    expect(saveWarning.clear).not.toHaveBeenCalled();
+    expect(ui.toast).not.toHaveBeenCalled();
+  });
+
+  it("words a failure that is not storage's own with its detail, still offering the export", async () => {
+    vi.spyOn(SaveGame, "saveAsync").mockRejectedValue(new Error("deflate broke"));
+    const { load, saveWarning } = makeLoad();
+    await load.autosave();
+    expect(saveWarning.show).toHaveBeenCalledExactlyOnceWith(
+      "The game couldn't write its save (deflate broke). Export the tower to a file to keep it.",
+    );
   });
 
   it("reports nothing when a periodic autosave works", async () => {
