@@ -1,3 +1,5 @@
+import { iconElement } from "./icons";
+
 /**
  * The overview MAP window's elements (#343): the window with its title bar,
  * the two stacked canvases and the text summary, plus the Map button that
@@ -68,7 +70,8 @@ export function buildMapDom(doc: Document): MapDom {
   toggle.type = "button";
   toggle.id = MAP_DOM_ID.toggle;
   toggle.className = "btn overview-map-toggle";
-  toggle.textContent = "Map";
+  // The glyph shows on desktop only (the phone pill keeps its word alone).
+  toggle.append(iconElement("map"), "Map");
   toggle.title = "Show the tower map";
   toggle.setAttribute("aria-controls", MAP_DOM_ID.window);
   return { root, title, close, body, towerCanvas, viewCanvas, summary, toggle };

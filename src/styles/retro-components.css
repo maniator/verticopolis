@@ -106,6 +106,16 @@ a.btn {
   margin-left: auto;
   flex: none;
 }
+/* A window the player can move (src/ui/movableWindow.ts): its title bar
+   takes the move cursor, and a press on it moves the window instead of
+   selecting the title or scrolling the page. */
+.win-movable > .win-title,
+.win-movable > .modal-box > .win-title {
+  cursor: move;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
 /* Mini variant — section strips inside a window (statistics headers) and
    other panel-scale bars: smaller, uppercase, tighter padding. */
 .win-title.sm {

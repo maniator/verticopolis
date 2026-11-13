@@ -9,13 +9,18 @@
  * Pricing views read the engine's room tiers through one reader built on the
  * app's port, which stays the same engine object for the page life, and the
  * Traffic and Occupancy views read its heat cells through the renderer's sim.
+ * The player drags the window by its title bar, and the spot they choose is
+ * kept per layout class (`ui/overviewMapSpot.ts`).
  */
 import type { GameApp } from "../main";
 import type { FacilityKind } from "../shared/types";
 import { findViewKind } from "../presentation/viewKinds";
 import { NO_ROOM_TIERS, RoomTierReader, type RoomTiers } from "../simport/roomTiers";
 import { FLOOR, TILE } from "../render/scale";
-import { browserStorage } from "../ui/overviewMapPrefs";
+import { browserStorage, type MapLayoutClass } from "../ui/overviewMapPrefs";
+import { rememberMapSpot, storedMapSpot } from "../ui/overviewMapSpot";
+import { MovableWindow } from "../ui/movableWindow";
+import { MOVABLE_TITLE } from "./movableWindows";
 import { OverviewMapWindow, type MutableMapCamera, type OverviewMapSource } from "../ui/overviewMapWindow";
 import { OverviewMapViews, type MapHeatSource } from "../ui/overviewMapViews";
 import { viewWorld, viewWorldBound } from "../presentation/viewWorld";
@@ -78,6 +83,7 @@ export function wireOverviewMap(app: GameApp): void {
     view: app.reader,
     world: { lotWidth: 1, minFloor: 0, maxFloor: 0 },
   };
+  const storage = browserStorage();
   const views = new OverviewMapViews({
     rooms: () => app.reader.rooms,
     minutes: () => app.reader.header.minutes,
@@ -109,10 +115,27 @@ export function wireOverviewMap(app: GameApp): void {
     moveCamera: (center) => app.engine.applyView({ tile: center.tile, floor: center.floor }),
     floorsOf,
     isPhone: () => app.mobileMq.matches,
-    storage: browserStorage(),
+    storage,
     views,
   });
-  app.mobileMq.addEventListener("change", () => win.layoutChanged());
+  // The window moves by its title bar and remembers the spot per layout class.
+  const layoutClass = (): MapLayoutClass => (app.mobileMq.matches ? "phone" : "desktop");
+  const mover = new MovableWindow({
+    win: win.root,
+    title: MOVABLE_TITLE.map,
+    within: stage,
+    placed: (spot) => rememberMapSpot(storage, layoutClass(), spot),
+  });
+  const restoreSpot = () => {
+    mover.reset();
+    const spot = storedMapSpot(storage, layoutClass());
+    if (spot) mover.moveTo(spot);
+  };
+  restoreSpot();
+  app.mobileMq.addEventListener("change", () => {
+    win.layoutChanged();
+    restoreSpot();
+  });
   windows.set(app, win);
   // The browser perf test reaches the window here (`e2e/overviewMapPerf.spec.ts`), in
   // a dev serve or a tooling build only, like the `window.game` handle.
