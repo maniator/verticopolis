@@ -90,6 +90,7 @@ mod skylobby_transfer;
 mod sparse_save;
 pub(crate) mod stocked_services;
 mod subsystems;
+mod tall_lobby_distance;
 mod undo_signature;
 mod unmet_demand;
 mod venue_attendance;

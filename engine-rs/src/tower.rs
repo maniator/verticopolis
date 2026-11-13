@@ -88,7 +88,9 @@ pub struct Tower {
     pub(crate) by_id: FastMap<i64, usize>,
     /// `transportsById`: shaft id to its index in `transports`.
     pub(crate) transport_by_id: HashMap<i64, usize>,
-    pub(crate) lobby_tiles: HashMap<i64, i64>,
+    /// Lobby tiles counted by the floor they are laid on. Ordered, so a walk
+    /// over the lobby floors is the same on every run.
+    pub(crate) lobby_tiles: BTreeMap<i64, i64>,
     /// The tall lobby tiles (#308, #2068) counted by `(floor, height)`.
     /// Each lobby unit carries its own height (`Extras::lobby_stories`);
     /// `register` and `unregister` keep this count, so the floors that hold
@@ -149,7 +151,7 @@ impl Tower {
             rooms: HashMap::new(),
             by_id: FastMap::default(),
             transport_by_id: HashMap::new(),
-            lobby_tiles: HashMap::new(),
+            lobby_tiles: BTreeMap::new(),
             tall_lobby_tiles: BTreeMap::new(),
             requested_lobby_height: 1,
             room_tiles: HashMap::new(),
@@ -211,9 +213,7 @@ impl Tower {
 
     /// `lobbyFloors()`: ascending.
     pub fn lobby_floors(&self) -> Vec<i64> {
-        let mut v: Vec<i64> = self.lobby_tiles.keys().copied().collect();
-        v.sort();
-        v
+        self.lobby_tiles.keys().copied().collect()
     }
 
     pub fn count_kind(&self, kind: Kind) -> i64 {
@@ -342,7 +342,12 @@ impl Tower {
             }
         }
         if u.kind == Kind::Lobby {
-            Self::dec_count(&mut self.lobby_tiles, u.floor, u.width);
+            if let Some(c) = self.lobby_tiles.get_mut(&u.floor) {
+                *c -= u.width;
+                if *c <= 0 {
+                    self.lobby_tiles.remove(&u.floor);
+                }
+            }
             if hgt > 1 {
                 let key = (u.floor, hgt);
                 if let Some(c) = self.tall_lobby_tiles.get_mut(&key) {
