@@ -27,6 +27,7 @@ pub mod part_merge;
 #[cfg(any(test, feature = "conformance"))]
 pub mod referee;
 pub mod resync;
+pub mod retail;
 pub mod stair_scan;
 pub mod stamp;
 pub mod tables;

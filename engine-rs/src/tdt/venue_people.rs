@@ -196,7 +196,7 @@ mod tests {
             type_id,
             status: 1,
             rent_class: 0,
-            subtype_idx: None,
+            retail_row: None,
             draw: 2,
             venue,
         }
