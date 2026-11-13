@@ -4,14 +4,15 @@
 //! towers 15 to 35 percent of their tenants) fail here.
 //!
 //! The days are played the way the game plays them at its top speed, a
-//! frame at a time on the canon day curve, which steps one to four game
-//! minutes per frame. Riders board only a car standing open at their floor,
-//! and the commute waits now depend on the step length: measured on TOWER2
-//! over four days of fixed steps, steps of up to three minutes keep all 519
-//! rated tenants, four minutes keep 503 and hour ticks keep 489. Hour ticks
-//! are not a way the game runs, so they would measure the stepping instead
-//! of the waits. Making a stop last long enough at every speed waits on the
-//! measurement of the original's car timing (#2061).
+//! frame at a time on the canon day curve, which steps one to six game
+//! minutes per frame (four through the evening, six at night). Riders board
+//! only a car standing open at their floor, and the commute waits now depend
+//! on the step length: measured on TOWER2 over four days of fixed steps,
+//! steps of up to three minutes keep all 519 rated tenants, four minutes
+//! keep 503 and hour ticks keep 489. Hour ticks are not a way the game runs,
+//! so they would measure the stepping instead of the waits. Making a stop
+//! last long enough at every speed waits on the measurement of the
+//! original's car timing (#2061).
 
 use std::path::PathBuf;
 
