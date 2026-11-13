@@ -19,9 +19,6 @@ declare const __PREVIEW_DEPLOY__: boolean;
 /** This build's parts, for the update prompt's "game or engine" label (see
  *  src/pwaUpdateInfo.ts and src/build/buildFingerprint.ts). */
 declare const __BUILD_FINGERPRINT__: import("./pwaUpdateInfo").BuildFingerprint;
-/** This build's own notes and the ones below it, for the Help menu's What's
- *  new (src/whatsNewData.ts). */
-declare const __WHATS_NEW__: import("./changelog").ReleaseNotes[];
 declare const __ENGINE_PACKAGE__: import("./wasmhost/enginePackageRecord").ExpectedEnginePackage | null;
 
 /** A help page from help-site/src/content/docs/, compiled at build time by

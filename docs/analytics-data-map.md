@@ -8,11 +8,15 @@ has no row in the Events table, when an `engine_status` field or code is
 missing from its entry or listed there without the game sending it, and when
 the limits below drift from the code.
 
-The player-facing summary of this posture is the Help "Privacy" copy
-(`helpPrivacyBody()` in `src/ui/templates/helpContent.ts`, drafted in
+The player-facing summary of this posture is the Help site's Privacy page
+(`help-site/src/content/docs/privacy.md`, which About this game links to,
+drafted in
 `_bmad-output/specs/spec-analytics-posthog-migration/transparency-note.md`).
 Anything here that would make that copy untrue changes the copy in the same
-change.
+change. Every claim on that page is an identity claim, on purpose: the
+session-scoped id and the on-device returning bucket are kept, and what the
+page promises is that none of it identifies the player or links one visit to
+the next. Keep any edit on that side of the line.
 
 What each measure can and cannot tell us, and which ones are not measurable
 under this posture, is in

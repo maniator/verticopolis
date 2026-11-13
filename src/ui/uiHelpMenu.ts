@@ -1,7 +1,7 @@
 import type { TemplateResult } from "lit-html";
 import type { UI } from "./UI";
 import { HelpPause, PAUSED_FOR_HELP } from "./helpPause";
-import { aboutTemplate, helpMenuTemplate, whatsNewTemplate } from "./templates/helpMenu";
+import { aboutTemplate } from "./templates/about";
 import { compareModalTemplate } from "./templates/compare";
 import { fromGameHref } from "./fromGame";
 import { isSplashUp } from "../game/interactionState";
@@ -14,16 +14,15 @@ import { copyText } from "./copyText";
 import { announceLive } from "../game/liveRegion";
 
 /**
- * The in-game Help: the About menu the game panel's "About…" opens, What's
- * new, About this game, and the Classic vs Modern comparison the Tower panel's
- * mode badge opens. The guide (the Help button) is the Help site, opened in a
- * new tab. Every one of them pauses the
- * tower through one {@link HelpPause} per UI, and every close route (the
- * buttons, Esc, the backdrop, the title-bar ✕, another dialog taking the
- * screen, or any other closeModal) ends that pause exactly once. Moving from
- * the menu to one of its windows keeps the one pause. A menu row that opens a
- * page in a new tab closes the menu and keeps the pause until the player is
- * back on the game tab.
+ * The in-game Help: About this game (the game panel's "About…") and the
+ * Classic vs Modern comparison the Tower panel's mode badge opens. The guide
+ * (the Help button) is the Help site, opened in a new tab; the release notes,
+ * Report a problem and the privacy page live there too. Every one of them
+ * pauses the tower through one {@link HelpPause} per UI, and every close route
+ * (the buttons, Esc, the backdrop, the title-bar ✕, another dialog taking the
+ * screen, or any other closeModal) ends that pause exactly once. A link that
+ * opens a Help site page in a new tab closes the dialog and keeps the pause
+ * until the player is back on the game tab.
  */
 
 const pauses = new WeakMap<UI, HelpPause>();
@@ -148,7 +147,7 @@ function openHelpDialog(ui: UI, result: TemplateResult, opts: HelpDialogOpts = {
   return { box, finish };
 }
 
-/** A row or link that opens a page in a new tab: let the browser follow the
+/** A link that opens a page in a new tab: let the browser follow the
  *  link, close the dialog, and hold the pause until the player comes back.
  *  A Ctrl or Cmd click opens the tab in the background and the player stays
  *  here, so Help stays open and its own close restores the speed. */
@@ -157,26 +156,6 @@ function leaveForTab(ui: UI, e: MouseEvent): void {
   const pause = helpPause(ui);
   pause.untilReturn({ win: window, doc: document });
   ui.closeModal();
-}
-
-/** Wire every new-tab link in `box` to {@link leaveForTab}. */
-function wireNewTabLinks(ui: UI, box: HTMLElement): void {
-  for (const a of box.querySelectorAll<HTMLAnchorElement>('a[target="_blank"]')) {
-    a.addEventListener("click", (e) => leaveForTab(ui, e));
-  }
-}
-
-/** The game panel's "About…": what's new, the release notes, a problem
- *  report and About this game. (Its Help button is {@link showHelp}.) */
-export function showHelpMenu(ui: UI): void {
-  trackAppAction("about_open");
-  const { box } = openHelpDialog(ui, helpMenuTemplate(!isInstalledStandalone()), {
-    actions: {
-      "whats-new": () => openWhatsNew(ui, box),
-      about: () => showAbout(ui),
-    },
-  });
-  wireNewTabLinks(ui, box);
 }
 
 /** The guide: the Help site's front page in a new tab, from the game panel's
@@ -218,24 +197,10 @@ function openPageInTab(ui: UI, href: string, blocked: () => void, e?: MouseEvent
   return true;
 }
 
-/** What's new: this build's notes, offline. The notes are a chunk of their
- *  own, loaded on demand; the menu stays up until they arrive. */
-function openWhatsNew(ui: UI, menu: HTMLElement): void {
-  void import("../whatsNewData").then(
-    ({ WHATS_NEW }) => {
-      if (!menu.isConnected) return; // the player closed the menu meanwhile
-      const { box } = openHelpDialog(ui, whatsNewTemplate(WHATS_NEW, !isInstalledStandalone()));
-      wireNewTabLinks(ui, box);
-    },
-    () => {
-      if (menu.isConnected) ui.sayVisibly("What's new could not load. Try again in a moment.");
-    },
-  );
-}
-
-/** About this game: the version, the engine diagnostics with Copy, privacy,
- *  and Replay Getting Started. */
+/** About this game, from the game panel's "About…": the version, the engine
+ *  diagnostics with Copy, the privacy link and Replay Getting Started. */
 export function showAbout(ui: UI): void {
+  trackAppAction("about_open");
   const onSplash = isSplashUp();
   const diagnostics = liveDiagnostics();
   let finishAbout = () => {};
@@ -245,6 +210,24 @@ export function showAbout(ui: UI): void {
     { actions: { "copy-diagnostics": () => copyDiagnostics(box, diagnostics) } },
   );
   finishAbout = finish;
+  wirePrivacyLink(ui, box);
+}
+
+/** The privacy link opens the Help site's page in a new tab and holds the
+ *  pause until the player is back ({@link leaveForTab}). The Help site is
+ *  online only (the service worker leaves /help to the network), so offline
+ *  the link stays put and says where the page is instead. */
+function wirePrivacyLink(ui: UI, box: HTMLElement): void {
+  const link = box.querySelector<HTMLAnchorElement>('a[data-act="privacy"]');
+  const status = box.querySelector<HTMLElement>(".help-privacy-status");
+  link?.addEventListener("click", (e) => {
+    if (!navigator.onLine) {
+      e.preventDefault();
+      if (status) status.textContent = "The privacy page needs an internet connection. It is at verticopolis.com/help/privacy.";
+      return;
+    }
+    leaveForTab(ui, e);
+  });
 }
 
 /**

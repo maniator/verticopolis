@@ -1233,18 +1233,19 @@ describe("toast — kind class and stack cap", () => {
   });
 });
 
-describe("the Help menu: the Report a problem link", () => {
-  const CHOOSER = "https://github.com/maniator/verticopolis/issues/new/choose";
+describe("About this game: the privacy link", () => {
+  const PRIVACY = "/help/privacy/?from=game";
 
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
-  it("renders a chooser link that opens in a new tab with rel=noopener", () => {
+  it("links the Help site's privacy page in a new tab with rel=noopener, marked as opened by the game", () => {
     const { ui } = makeUI();
-    ui.showHelpMenu();
-    const link = dialog().querySelector<HTMLAnchorElement>(`a[href="${CHOOSER}"]`);
-    expect(link, "expected a Report-an-issue link to the GitHub chooser").not.toBeNull();
+    ui.showAbout();
+    const link = dialog().querySelector<HTMLAnchorElement>('a[data-act="privacy"]');
+    expect(link, "expected a Privacy link in About this game").not.toBeNull();
+    expect(link!.getAttribute("href")).toBe(PRIVACY);
     // A new tab (so the game isn't navigated away), with noopener+noreferrer so
     // the opened page can't reach back through window.opener or see the referrer.
     expect(link!.target).toBe("_blank");
@@ -1252,60 +1253,44 @@ describe("the Help menu: the Report a problem link", () => {
     expect(link!.rel).toContain("noreferrer");
     // A screen-reader-only cue warns that activating the link changes context to
     // a new tab (WCAG 3.2.5), without altering the visible label.
-    const cue = link!.querySelector(".visually-hidden");
-    expect(cue?.textContent).toContain("new tab");
+    expect(link!.querySelector(".visually-hidden")?.textContent).toContain("new tab");
   });
 
-  it("keeps the plain anchor: no interception at all", () => {
-    // Nothing intercepts the click, preserving middle-click and context-menu
-    // semantics that a delegating handler would break.
+  it("no longer carries the privacy copy itself (no accordion)", () => {
     const { ui } = makeUI();
-    ui.showHelpMenu();
-    const link = dialog().querySelector<HTMLAnchorElement>(`a[href="${CHOOSER}"]`)!;
-    // Listeners run in registration order, so this one (attached after
-    // showHelpMenu wired anything it was going to wire) observes whether the game
-    // cancelled the default, then cancels it itself so happy-dom doesn't
-    // actually navigate the test window to GitHub.
-    let preventedByGame = true;
-    link.addEventListener("click", (e) => {
-      preventedByGame = e.defaultPrevented;
-      e.preventDefault();
-    });
-    link.dispatchEvent(new MouseEvent("click", { cancelable: true }));
-    expect(preventedByGame).toBe(false);
+    ui.showAbout();
+    expect(dialog().querySelector("details")).toBeNull();
+    expect(dialog().textContent).not.toContain("no cookie");
   });
 
-  it("puts the link in the modal BODY, leaving the footer at its Close button", () => {
+  it("puts the link in the modal BODY, leaving the footer at Replay and Got it", () => {
     const { ui } = makeUI();
-    ui.showHelpMenu();
+    ui.showAbout();
     const box = dialog().firstElementChild!;
     const actions = box.querySelector(".modal-actions")!;
-    // The report link is a body affordance, never a dialog action.
-    expect(actions.querySelector('a[href*="/issues/new"]')).toBeNull();
-    // The footer is the one Close; the preference toggles live in Settings.
+    expect(actions.querySelector('a[data-act="privacy"]')).toBeNull();
     const acts = [...actions.querySelectorAll("[data-act]")].map((b) => b.getAttribute("data-act"));
-    expect(acts).toEqual(["close"]);
+    expect(acts).toEqual(["replay-onboard", "close"]);
   });
 
   it("hosts no settings controls: no sliders, no preference toggles", () => {
     const { ui } = makeUI();
-    ui.showHelpMenu();
+    ui.showAbout();
     expect(dialog().querySelector("input[type=range]")).toBeNull();
     expect(dialog().querySelector('[data-act="reduce-motion"]')).toBeNull();
     expect(dialog().querySelector('[data-act="steady-clock"]')).toBeNull();
   });
 
-  it("gives initial focus to the primary Close, not the external link", () => {
+  it("gives initial focus to the primary Got it, not a link that opens a tab", () => {
     // showModal() focuses the first focusable descendant unless something has
-    // autofocus. The report link sits above the footer in DOM order, so without
-    // autofocus an Enter/Space reflex on opening the menu would fire the external
-    // link and pop a GitHub tab. autofocus on the primary keeps focus on the
-    // safe dismiss action (and realizes the design-system's stated intent).
+    // autofocus. The licenses and privacy links sit above the footer in DOM
+    // order, so without autofocus an Enter/Space reflex on opening would pop a
+    // tab. autofocus on the primary keeps focus on the safe dismiss action.
     const { ui } = makeUI();
-    ui.showHelpMenu();
+    ui.showAbout();
     const box = dialog().firstElementChild!;
     expect(box.querySelector('[data-act="close"]')!.hasAttribute("autofocus")).toBe(true);
-    expect(box.querySelector('a[href*="/issues/new"]')!.hasAttribute("autofocus")).toBe(false);
+    expect(box.querySelector('a[data-act="privacy"]')!.hasAttribute("autofocus")).toBe(false);
   });
 
   it("disables Replay while the title screen is up (replaying the intro is meaningless there)", () => {

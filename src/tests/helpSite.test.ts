@@ -62,6 +62,15 @@ describe("the side menu", () => {
     const served = links.filter((l) => l.startsWith("/")).map((l) => new URL(HELP_BASE + l, "https://x.test").pathname);
     expect(served).toEqual(["/help/", "/help/changelog/"]);
   });
+
+  it("carries what the game's old About menu held: the release notes, Report a problem and Privacy", () => {
+    // About… in the game opens only About this game; these three moved here.
+    const entries = flatten(sidebar);
+    const byLabel = (label: string) => entries.find((e) => "label" in e && e.label === label);
+    expect(byLabel("Release notes")).toMatchObject({ link: "/changelog/" });
+    expect(byLabel("Report a problem")).toMatchObject({ link: expect.stringContaining("github.com/maniator/verticopolis/issues") });
+    expect(entries.some((e) => "slug" in e && e.slug === "privacy")).toBe(true);
+  });
 });
 
 describe("the pages' old anchors", () => {
