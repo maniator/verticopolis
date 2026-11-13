@@ -202,7 +202,7 @@ export class UI {
     document.getElementById("btn-new")!.addEventListener("click", () => this.promptNewTower());
     document.getElementById("btn-settings")!.addEventListener("click", () => this.showSettings());
     document.getElementById("btn-help")!.addEventListener("click", () => this.showHelp());
-    document.getElementById("btn-about")!.addEventListener("click", () => this.showHelpMenu());
+    document.getElementById("btn-about")!.addEventListener("click", () => this.showAbout());
     this.el.modeBadge.addEventListener("click", (e) => help.showModeHelp(this, e)); // "tell me more"
     document.getElementById("btn-stats")!.addEventListener("click", () => this.cb.onShowStats());
 
@@ -452,9 +452,8 @@ export class UI {
     dialogs.showExportReport(this, report, cb);
   }
 
-  /** The toolbar's Help menu, the in-game guide, About this game, and the
+  /** The guide (the Help site in a new tab), About this game, and the
    *  Classic vs Modern comparison (src/ui/uiHelpMenu.ts). */
-  showHelpMenu(): void { help.showHelpMenu(this); }
   showHelp(): void { help.showHelp(this); }
   showAbout(): void { help.showAbout(this); }
   showCompare(): void { help.showCompare(this); }

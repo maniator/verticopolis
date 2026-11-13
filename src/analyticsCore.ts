@@ -297,8 +297,8 @@ export type AppActionName =
   // Dialogs / navigation.
   | "settings_open"
   | "help_open"
-  // The game panel's About… menu (what's new, release notes, report, About this
-  // game); help_open is the manual itself.
+  // The game panel's About…, which opens About this game (the version, the
+  // engine diagnostics, the privacy link); help_open is the manual itself.
   | "about_open"
   | "compare_open"
   | "saves_open"

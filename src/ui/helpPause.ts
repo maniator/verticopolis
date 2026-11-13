@@ -2,9 +2,9 @@
  * Help never costs the player elevator time. Every Help action pauses the
  * tower, and the pause ends exactly once, at the speed the player had:
  *
- * - In-game Help (the Help menu, How to play, What's new, About this game, the
- *   Classic vs Modern comparison) ends it when its dialog closes, by any
- *   route. Moving from one Help dialog to the next keeps the one pause.
+ * - In-game Help (About this game, the Classic vs Modern comparison) ends it
+ *   when its dialog closes, by any route. Moving from one Help dialog to the
+ *   next keeps the one pause.
  * - Help in a new tab ends it when the game tab is visible and focused again,
  *   after it was first left, so the click that opens the tab never counts as
  *   a return.

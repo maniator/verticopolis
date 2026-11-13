@@ -175,7 +175,7 @@ describe("one scroll container per dialog", () => {
     // must fail loudly here, not let the real assertions pass on empty sets.
     expect(ALL_RULES.length).toBeGreaterThan(100);
     expect(ALL_RULES.some((r) => r.conditional)).toBe(true);
-    expect(TOKENS.has("help-modes")).toBe(true);
+    expect(TOKENS.has("help-privacy-status")).toBe(true);
     // A class whose only appearance is inside an interpolated attribute: its
     // presence pins the interpolation-blanking scan (the old scan skipped
     // any attribute containing `$`, so this token vanished, and a scroller

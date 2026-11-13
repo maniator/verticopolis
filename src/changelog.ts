@@ -195,22 +195,3 @@ export function allReleaseNotes(changelog: string): ReleaseNotes[] {
   }
   return out;
 }
-
-/**
- * This build's "What's new" (the Help menu, offline): the notes of `version`
- * and the versions below it that have notes, newest first, at most `count`,
- * each note whole. An internal build with no notes of its own starts at the
- * last version below it that has some, and a build whose version has no
- * section yet (a development build) shows the newest `count`.
- */
-export function whatsNewReleases(changelog: string, version: string, count: number): ReleaseNotes[] {
-  const versions = marked
-    .lexer(changelog)
-    .filter((t): t is Extract<Token, { type: "heading" }> => t.type === "heading" && t.depth === 2)
-    .map((t) => headingVersion(t.text));
-  const start = Math.max(0, versions.indexOf(version));
-  const shown = new Set(versions.slice(start));
-  return allReleaseNotes(changelog)
-    .filter((r) => shown.has(r.version))
-    .slice(0, count);
-}

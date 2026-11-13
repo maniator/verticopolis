@@ -4,7 +4,7 @@ import { resolve } from "node:path";
 import { existsSync, readFileSync } from "node:fs";
 import { execSync } from "node:child_process";
 import { VitePWA } from "vite-plugin-pwa";
-import { notesForVersion, recentReleaseNotes, whatsNewReleases, type ReleaseNotes } from "./src/changelog";
+import { notesForVersion, recentReleaseNotes, type ReleaseNotes } from "./src/changelog";
 import { PACKAGE_STYLESHEET, isPackagePath } from "./src/build/thirdPartyNotices";
 import { entryWithIntegrity, precacheIntegrityTransform, readExpectedPackage } from "./src/build/enginePackageBuild";
 import { MAX_RELEASES, type BuildFingerprint } from "./src/pwaUpdateInfo";
@@ -33,17 +33,6 @@ function changelogNotes(): string[] {
 function changelogReleases(): ReleaseNotes[] {
   try {
     return recentReleaseNotes(readFileSync(resolve(__dirname, "CHANGELOG.md"), "utf8"), pkgVersion, MAX_RELEASES);
-  } catch {
-    return [];
-  }
-}
-
-/** This build's notes for the Help menu's What's new (src/whatsNewData.ts):
- *  this version and the ones below it, whole, offline. Empty when the file is
- *  missing. */
-function changelogWhatsNew(): ReleaseNotes[] {
-  try {
-    return whatsNewReleases(readFileSync(resolve(__dirname, "CHANGELOG.md"), "utf8"), pkgVersion, MAX_RELEASES);
   } catch {
     return [];
   }
@@ -314,12 +303,6 @@ export default defineConfig(({ command }) => ({
     // This build's game and engine parts, for the update prompt's label
     // (src/pwaUpdateInfo.ts `classifyUpdate`); version.json carries the same.
     __BUILD_FINGERPRINT__: JSON.stringify(fingerprintOf(command)),
-    // This build's own notes for the Help menu's What's new. Only
-    // src/whatsNewData.ts reads it, and the game imports that module on
-    // demand, so the text is a precached chunk of its own (offline) and stays
-    // out of the startup bundle. Kept apart from version.json, which
-    // describes the NEXT build.
-    __WHATS_NEW__: JSON.stringify(changelogWhatsNew()),
   },
   plugins: [
     captureOutDir((dir) => {
