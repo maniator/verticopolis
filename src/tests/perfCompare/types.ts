@@ -27,7 +27,7 @@ export interface CompareConfig {
   throttles: number[];
   frameWindowMs: number;
   frameWarmMs: number;
-  /** Fastest speed index (SPEEDS[3] = 120 sim-minutes per second). */
+  /** Fastest speed index (SPEEDS[3] = 50 sim-minutes per second). */
   speed: number;
   viewport: { width: number; height: number };
   scenarios: string[];

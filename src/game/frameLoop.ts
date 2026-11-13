@@ -26,8 +26,10 @@ let lastBombTickAt = -Infinity;
  * unchanged from the former `GameApp.update`/`emitMealRushes`.
  */
 
-/** Game speeds → in-game minutes advanced per real second. */
-export const SPEEDS = [0, 10, 30, 120];
+/** Game speeds → in-game minutes advanced per real second: pause, a slow
+ *  speed to watch people walk, the everyday middle, and a fast-forward
+ *  (#2097, chosen with the owner and the player panel, 2026-11-13). */
+export const SPEEDS = [0, 3, 15, 50];
 
 /** Apply the player's speed choice. A change drops the step carry here, at the
  *  seam, so a change undone before the next frame (fastest, pause, fastest)

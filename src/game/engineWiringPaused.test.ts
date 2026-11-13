@@ -24,7 +24,7 @@ vi.mock("./buildPreview", () => ({
   clearBuildRefusal: vi.fn(),
 }));
 
-vi.mock("./frameLoop", () => ({ runFrame: vi.fn(), SPEEDS: [0, 10, 30, 120] }));
+vi.mock("./frameLoop", () => ({ runFrame: vi.fn(), SPEEDS: [0, 3, 15, 50] }));
 
 interface Hooks {
   onTap?: (tile: number, floor: number, touch: boolean, picked: unknown) => void;

@@ -1,9 +1,9 @@
 import { writeFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { SPEEDS } from "../../game/frameLoop";
 import type { EnginePort, EnginePortCommands, PortRecord } from "../../simport/enginePort";
 import { PortCodes, type CodeTable } from "../../simport/portCodes";
 import { canonicalJson, digestText } from "../conformance/canonical";
+import { GOLDEN_SPEEDS } from "./goldenSpeeds";
 import { FRAME_TIMES_MS, freshDumpDir, startTower, type FrameDayStart } from "./frameDays";
 import { crowdProblem, midRouteAvoiding, shaftsBetween, walkingTo, type CrowdView } from "./portEditCrowd";
 import { answerNumber, outcomeOf, STATUS_SLOT, type AnswerValue, type LineKind, type Outcome, type PortEditLine } from "./portEditLines";
@@ -401,7 +401,7 @@ export class PortEditSession {
   /** `play`'s frames; `onMove` runs after each frame that moves the clock. */
   private playFrames(minutes: number, onMove?: () => void): void {
     if (!(Number.isFinite(minutes) && minutes > 0)) throw new Error(`${this.caseId}: play needs a positive number of minutes, and got ${minutes}`);
-    const mps = SPEEDS[PLAY_SPEED];
+    const mps = GOLDEN_SPEEDS[PLAY_SPEED];
     const step = `play ${minutes} minutes`;
     const from = this.minute();
     let now = from;

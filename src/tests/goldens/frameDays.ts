@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { SPEEDS } from "../../game/frameLoop";
+import { GOLDEN_SPEEDS } from "./goldenSpeeds";
 import { swapDone } from "../../game/portLifecycle";
 import type { EnginePort } from "../../simport/enginePort";
 import { PortCodes } from "../../simport/portCodes";
@@ -90,7 +90,7 @@ export type FrameDayStart =
 export interface FrameDayCase {
   readonly id: string;
   readonly start: FrameDayStart;
-  /** The game's speed setting, 1 to 3 (`SPEEDS`). */
+  /** The speed setting, 1 to 3 (`GOLDEN_SPEEDS`). */
   readonly speed: number;
   readonly steadyClock: boolean;
   readonly frameTimes: readonly number[];
@@ -224,7 +224,7 @@ if (dumpDir && !FRAME_DAY_CASES.some((c) => c.id === dumpCase)) {
 export function runFrameDay(leg: FrameDayLeg, c: FrameDayCase, afterStart?: () => void): FrameDayCheckpoint[] {
   const port = leg.port;
   if (c.frameTimes.length === 0) throw new Error(`${c.id}: no frame times`);
-  const minutesPerSecond = SPEEDS[c.speed];
+  const minutesPerSecond = GOLDEN_SPEEDS[c.speed];
   if (!minutesPerSecond) throw new Error(`${c.id}: speed ${c.speed} is not a running speed`);
   const drain = (into: unknown[]) => {
     const [dropped, count] = port.drainEvents();
