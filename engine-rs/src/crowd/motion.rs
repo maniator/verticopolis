@@ -140,7 +140,12 @@ fn step(crowd: &mut Crowd, i: usize, dt: f64, tower: &mut Tower, slots: &HashMap
             walk_to(&mut crowd.people[i], target, dt, tower);
             let floor = crowd.people[i].floor;
             for ci in 0..shaft.cars as usize {
-                if (shaft.car_positions[ci] - floor as f64).abs() > 0.25 {
+                // Only a car standing here with its doors open takes riders,
+                // never one passing the floor. A car not on the floor is
+                // ruled out before the open list is searched.
+                if shaft.car_positions[ci] != floor as f64
+                    || !crowd.door_open(shaft.id, ci as i64, floor)
+                {
                     continue;
                 }
                 let key = (shaft.id, ci as i64);
@@ -171,13 +176,14 @@ fn step(crowd: &mut Crowd, i: usize, dt: f64, tower: &mut Tower, slots: &HashMap
                 return finish(crowd, i, tower);
             }
             let pos = shaft.car_positions[ci as usize];
+            let dest = crowd.people[i].floors[crowd.people[i].leg + 1];
+            // A rider steps off only once the car has stopped at their floor
+            // with its doors open, never from a car passing it.
+            let arrived = pos == dest as f64 && crowd.door_open(shaft.id, ci, dest);
             let p = &mut crowd.people[i];
-            let prev = p.fy;
             p.fy = pos;
             p.x = shaft.x as f64 + shaft.width as f64 / 2.0;
-            let dest = p.floors[p.leg + 1];
             let d = dest as f64;
-            let arrived = (pos - d).abs() < 0.2 || (prev - d) * (pos - d) <= 0.0;
             if arrived && shaft.stops_at(dest) {
                 release_seat(crowd, i);
                 let p = &mut crowd.people[i];

@@ -1,11 +1,14 @@
 /**
  * Eased pursuit for the drawn position of an elevator car (GH #688,
- * spec-elevator-car-motion). The sim moves `carPositions` in whole-game-minute
- * ticks (a few per second at normal speed), while the renderer draws every
- * frame, so drawing the sim value raw freezes a moving car between ticks and
- * jumps it on each one. Each car instead keeps a drawn position that chases
- * the sim position frame by frame: the sim value stays the only truth for
- * WHERE the car is, this shapes HOW the pixels get there. Ease-in comes from
+ * spec-elevator-car-motion). The sim now steps about once per 60 Hz frame
+ * (the engine's FrameStepper), so a drawn car no longer has whole-minute ticks
+ * to bridge, but its steps still land unevenly across display rates and game
+ * speeds. Each car keeps a drawn position that chases the sim position frame
+ * by frame: the sim value stays the only truth for WHERE the car is, this
+ * shapes HOW the pixels get there. The chase is kept tight, so the drawn car
+ * reaches its floor while the sim car stands there and riders step out of a
+ * car that is drawn at their floor (a loose chase trailed the sim by more than
+ * a floor and swallowed every stop). Ease-in comes from
  * the acceleration cap, ease-out from the gap-proportional desired speed, the
  * two halves of the 1994 original's accel/decel curve. Nothing here reads a
  * clock: callers pass the frame's stepped elapsed seconds, so the screenshot
@@ -20,14 +23,16 @@
 export const CAR_MAX_SPEED = 30;
 /** Speed change ceiling, floors/second^2. Two duties: the ease-in ramp, and
  *  tracking the falling desired speed on arrival, which needs
- *  CAR_MAX_SPEED / CAR_TAU (~167) plus one-frame Euler lag headroom or the
- *  settle clamps instead of easing. */
-export const CAR_ACCEL = 200;
+ *  CAR_MAX_SPEED / CAR_TAU (375) plus one-frame Euler lag headroom or the
+ *  settle clamps instead of easing, and low enough that a departure still
+ *  takes a few frames to reach full speed. */
+export const CAR_ACCEL = 440;
 /** Pursuit time constant, seconds: desired speed is gap / CAR_TAU (capped), so
- *  a steadily advancing target is trailed by speed x CAR_TAU floors. Sized so
- *  the worst speed-1 rate (~26 floors/s at night) trails ~4.7 floors, inside
- *  the snap threshold, so ordinary play never snap-cycles. */
-export const CAR_TAU = 0.18;
+ *  a steadily advancing target is trailed by speed x CAR_TAU floors. About
+ *  five 60 Hz frames: the morning speed-1 rate (~11 floors/s) trails under a
+ *  floor and the night sprint (~26 floors/s) about two, so a car settles onto
+ *  a stop within a few frames and never nears the snap threshold. */
+export const CAR_TAU = 0.08;
 /** A gap wider than this snaps instead of gliding: motion-layer rebuilds,
  *  loaded saves, and fast-forward, where a visible chase would read as lag. */
 export const SNAP_FLOORS = 6;

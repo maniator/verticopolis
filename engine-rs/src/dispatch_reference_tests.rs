@@ -176,12 +176,15 @@ impl Reference {
                         if (pos - home as f64).abs() < 0.05 {
                             t.car_dir[i] = 0;
                             car_load[i] = 0.0;
+                            t.car_positions[i] = home as f64;
                             continue;
                         }
                         home as f64
                     }
                 };
-                if (target - pos).abs() <= v {
+                // Lands on a target it would stop within 0.05 of (the
+                // search's own reach), so no car skips its stop.
+                if (target - pos).abs() <= v + 0.05 {
                     pos = target;
                     dwell[i] = shaft_dwell;
                     car_load[i] = (car_load[i] - (car_load[i] * 0.45).ceil()).max(0.0);

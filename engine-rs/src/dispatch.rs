@@ -1,7 +1,7 @@
 //! Port of `src/engine/ElevatorDispatch.ts`: the SCAN controller that moves
 //! each car against the statistical waiting estimate and the crowd's calls.
 
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::collections::{BTreeMap, HashMap};
 
 use indexmap::IndexMap;
 
@@ -9,9 +9,14 @@ use crate::crowd::ElevatorCalls;
 use crate::jsmath;
 use crate::schedule::Schedule;
 use crate::tower::Tower;
+use demand::{fill_cab_stops, has_bit, set_bit, Demand};
 
 pub const CAR_FLOORS_PER_MINUTE: f64 = 0.8;
 const DWELL_MINUTES: f64 = 0.8;
+/// How close, in floors, a car counts as standing at a stop: the stop
+/// search looks past a stop this near, so a car that ends a move this near
+/// its target lands on it instead of skipping it.
+const AT_STOP_FLOORS: f64 = 0.05;
 
 /// Stops per word of a stop bit set: stop `k` of the shaft in hand is bit
 /// `k % 64` of word `k / 64`.
@@ -45,6 +50,12 @@ pub struct ElevatorDispatch {
     /// car outside this set, so nobody boards a car that is parked or about
     /// to park (the crowd keeps its own copy).
     closed_cars: Vec<(i64, i64)>,
+    /// The cars standing at a stop with their doors open after this
+    /// `move_cars`, as (shaft id, car index, floor), ascending: a car that
+    /// arrived, one still dwelling, or one parked at its home floor. People
+    /// step on and off only these cars, so nobody boards or leaves a car
+    /// that is passing a floor.
+    open_cars: Vec<(i64, i64, i64)>,
     /// Scratch of zero words, the calls a stood-down car answers: none.
     no_calls: Vec<u64>,
 }
@@ -71,6 +82,18 @@ impl ElevatorDispatch {
     /// no step allocates. `move_cars` clears the list it gets back.
     pub fn swap_closed_cars(&mut self, crowd_list: &mut Vec<(i64, i64)>) {
         std::mem::swap(&mut self.closed_cars, crowd_list);
+    }
+
+    /// The cars standing at a stop with their doors open, as (shaft id, car
+    /// index, floor), ascending, so a binary search finds a car at a floor.
+    pub fn open_cars(&self) -> &[(i64, i64, i64)] {
+        &self.open_cars
+    }
+
+    /// Hands the crowd this step's open cars by swapping the two lists, as
+    /// `swap_closed_cars` does. `move_cars` clears the list it gets back.
+    pub fn swap_open_cars(&mut self, crowd_list: &mut Vec<(i64, i64, i64)>) {
+        std::mem::swap(&mut self.open_cars, crowd_list);
     }
 
     pub fn waiting_at(&self, floor: i64) -> f64 {
@@ -151,6 +174,7 @@ impl ElevatorDispatch {
         let floors = tower.dispatch_floors();
         let n = tower.transports.len();
         self.closed_cars.clear();
+        self.open_cars.clear();
         for ti in 0..n {
             let (kind, id) = {
                 let t = &tower.transports[ti];
@@ -252,9 +276,12 @@ impl ElevatorDispatch {
                     dwell[i] -= pause;
                     car_dt -= pause;
                     if car_dt <= 0.0 {
-                        if let Some(k) = stop_index(jsmath::round(t.car_positions[i]) as i64) {
+                        let floor = jsmath::round(t.car_positions[i]) as i64;
+                        if let Some(k) = stop_index(floor) {
                             set_bit(claimed, k);
                         }
+                        // Still dwelling: the doors stay open all step.
+                        self.open_cars.push((id, i as i64, floor));
                         continue;
                     }
                 }
@@ -302,14 +329,23 @@ impl ElevatorDispatch {
                         if (pos - tg).abs() < 0.05 {
                             t.car_dir[i] = 0;
                             car_load[i] = 0.0;
+                            // Parked at home: it settles on the floor and
+                            // opens for whoever waits there.
+                            t.car_positions[i] = tg;
+                            self.open_cars.push((id, i as i64, car_home));
                             continue;
                         }
                         tg
                     }
                 };
-                if (target - pos).abs() <= v {
+                // A car that would end this move within `AT_STOP_FLOORS` of
+                // its target lands on it now: left short, the next search
+                // would look past the stop and the car would glide by it.
+                if (target - pos).abs() <= v + AT_STOP_FLOORS {
                     pos = target;
                     dwell[i] = shaft_dwell;
+                    // Arrived: the doors open for the rest of the step.
+                    self.open_cars.push((id, i as i64, target as i64));
                     car_load[i] = (car_load[i] - (car_load[i] * 0.45).ceil()).max(0.0);
                     let tf = target as i64;
                     let w = if staff_only {
@@ -356,117 +392,12 @@ impl ElevatorDispatch {
         // The crowd searches the list, and the shafts come in saved order,
         // which need not be id order.
         self.closed_cars.sort_unstable();
+        self.open_cars.sort_unstable();
     }
 }
 
-fn set_bit(bits: &mut [u64], k: usize) {
-    bits[k / WORD] |= 1u64 << (k % WORD);
-}
-
-fn has_bit(bits: &[u64], k: usize) -> bool {
-    bits[k / WORD] & (1u64 << (k % WORD)) != 0
-}
-
-/// The car's cab floors as a bit set over `stops`, in `bits`. A cab floor
-/// that is not a stop is left out, as the scan never reached it. The set is
-/// ordered, so the floors are read in floor order.
-fn fill_cab_stops<'a>(stops: &[i64], cab: &BTreeSet<i64>, bits: &'a mut Vec<u64>) -> &'a [u64] {
-    bits.clear();
-    bits.resize(stops.len().div_ceil(WORD), 0);
-    for fl in cab {
-        if let Ok(k) = stops.binary_search(fl) {
-            set_bit(bits, k);
-        }
-    }
-    bits
-}
-
-/// What one car asks of its shaft: the stops in ascending order, the
-/// `calls` and `claimed` bit sets over them, and the car's own cab stops.
-struct Demand<'a> {
-    stops: &'a [i64],
-    calls: &'a [u64],
-    claimed: &'a [u64],
-    cab: Option<&'a [u64]>,
-}
-
-impl Demand<'_> {
-    /// The stops that answer in word `w`: a live call no car has claimed,
-    /// or one of this car's cab stops (never blocked by a claim).
-    fn word(&self, w: usize) -> u64 {
-        (self.calls[w] & !self.claimed[w]) | self.cab.map_or(0, |c| c[w])
-    }
-
-    /// Whether stop `k` is one of this car's cab stops.
-    fn is_cab(&self, k: usize) -> bool {
-        self.cab.is_some_and(|c| has_bit(c, k))
-    }
-
-    /// The lowest answering stop at or above index `from`.
-    fn first_from(&self, from: usize) -> Option<usize> {
-        let mut w = from / WORD;
-        if w >= self.calls.len() {
-            return None;
-        }
-        let mut bits = self.word(w) & (u64::MAX << (from % WORD));
-        while bits == 0 {
-            w += 1;
-            if w >= self.calls.len() {
-                return None;
-            }
-            bits = self.word(w);
-        }
-        Some(w * WORD + bits.trailing_zeros() as usize)
-    }
-
-    /// The highest answering stop below index `end`.
-    fn last_below(&self, end: usize) -> Option<usize> {
-        let last = end.checked_sub(1)?;
-        let mut w = last / WORD;
-        let mut bits = self.word(w) & (u64::MAX >> (WORD - 1 - last % WORD));
-        while bits == 0 {
-            w = w.checked_sub(1)?;
-            bits = self.word(w);
-        }
-        Some(w * WORD + (WORD - 1) - bits.leading_zeros() as usize)
-    }
-
-    /// `nextDemandStop`: the index of the nearest stop strictly ahead that
-    /// answers.
-    ///
-    /// The TypeScript scans every stop and keeps the first strict minimum,
-    /// which is the lowest floor among equal distances. `stops` ascends, so
-    /// going up the nearest is the lowest answering stop ahead, and going
-    /// down it is the highest one below, then any lower stop at the same
-    /// distance. Ties need a position far beyond any tower, where rounding
-    /// merges distances. Each search reads a word or two (a shaft built in
-    /// play has at most 31 stops, and a floor range of about 110 caps any
-    /// shaft at two words); going down, the tie check makes one more search.
-    /// So a car with nothing to serve no longer tests its shaft's stops one
-    /// by one.
-    fn next_stop(&self, pos: f64, dir: i64) -> Option<usize> {
-        debug_assert_ne!(dir, 0);
-        let stops = self.stops;
-        let dist = |k: usize| (stops[k] as f64 - pos).abs();
-        let k = if dir > 0 {
-            self.first_from(stops.partition_point(|&s| s as f64 <= pos + 0.05))?
-        } else {
-            self.last_below(stops.partition_point(|&s| (s as f64) < pos - 0.05))?
-        };
-        let d = dist(k);
-        // Going down, a lower stop at the same distance wins. Only a finite
-        // distance can tie usefully: the check below drops the rest.
-        let mut k = k;
-        if dir < 0 && d < f64::INFINITY {
-            while let Some(j) = self.last_below(k).filter(|&j| dist(j) == d) {
-                k = j;
-            }
-        }
-        // The scan's `dist < best_dist` from infinity: a position that is not
-        // finite finds no stop.
-        (d < f64::INFINITY).then_some(k)
-    }
-}
+#[path = "dispatch_demand.rs"]
+mod demand;
 
 #[cfg(test)]
 #[path = "dispatch_tests.rs"]

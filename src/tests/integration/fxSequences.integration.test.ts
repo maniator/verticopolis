@@ -18,7 +18,9 @@ type Nonzero = Partial<Record<FxSlot, number>>;
 /** Every slot a scenario leaves non-zero at its last checkpoint. A slot not
  *  listed is 0 (the basement is floor 0, so a treasure there lists no floor). */
 const PINNED: Record<string, Nonzero> = {
-  "scenarios/holidays-classic.json": { santaFxSeq: 2, thiefSeq: 1, thiefCaught: 1, thiefFloor: 77 },
+  // Two and a half years also light one fire since riders board only cars
+  // stopped at their floor: the run takes a different seeded path from there.
+  "scenarios/holidays-classic.json": { santaFxSeq: 2, thiefSeq: 1, thiefCaught: 1, thiefFloor: 77, fires: 1, firesGutRooms: 2 },
   "scenarios/events-classic.json": { explosionSeq: 1, explosionFloor: 5, explosionX: 174.5, thiefFloor: 1, fires: 1, firesGutRooms: 1, bombs: 1 },
   // After the direct threat detonates, a second threat is called in during
   // the last two days, with Security sold and nobody to search (#1973).

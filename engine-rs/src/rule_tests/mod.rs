@@ -25,6 +25,7 @@ mod diagnostics_towers;
 mod dominant_gripe;
 mod economy_depth;
 mod elevator_dispatch_balancing;
+mod elevator_doors;
 mod elevator_schedule;
 mod elevator_scheduling;
 mod elevator_width_migration;
