@@ -14,9 +14,8 @@ use super::format::*;
 use super::pacing::frame_for_minute_of_day;
 use super::stamp::write_format_stamp;
 use super::tables::elevator_type;
-use super::venue_export::{
-    index_map, logical_ids, middle_bytes, write_people, write_venue_tail, PlacedHalf,
-};
+use super::venue_export::{index_map, logical_ids, middle_bytes, write_venue_tail, PlacedHalf};
+use super::venue_people::write_people;
 use super::LegacyExportError;
 use crate::facilities::{Kind, LOT_WIDTH, MAX_FLOOR, MIN_FLOOR};
 use crate::jsmath::round;

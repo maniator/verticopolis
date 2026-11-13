@@ -46,6 +46,7 @@ use super::tables::{
     is_priced, rent_from_class, HOTEL_ASLEEP_FLAG, HOTEL_DIRTY_FLAG, HOTEL_OCCUPANT_MASK,
     HOTEL_STAY_VACANT,
 };
+use super::venue_people::split_theatre;
 use super::venues::OutVenueHalf;
 use super::LegacyExportError;
 use crate::econ::rent_config;
@@ -96,7 +97,7 @@ pub fn gather_units<U: Borrow<Value>>(
             tenants
                 .entry(FloorKey::of(floor + TDT_FLOOR_OFFSET as f64))
                 .or_default()
-                .push(t);
+                .extend(split_theatre(t));
         };
 
     let mut counts = ExportCounts::default();
@@ -450,6 +451,7 @@ fn venue_half(
         upper,
         film_days,
         film_classic: u.film_classic,
+        auditorium: false,
     })
 }
 

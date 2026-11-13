@@ -56,6 +56,10 @@ pub struct OutVenueHalf {
     pub upper: bool,
     pub film_days: Option<i64>,
     pub film_classic: bool,
+    /// A theatre's auditorium piece (types 19 and 18), which shares its
+    /// screen piece's table row but is not named by the table and owns no
+    /// people; `false` for a screen piece or a hall.
+    pub auditorium: bool,
 }
 
 impl OutVenueHalf {
@@ -180,6 +184,7 @@ mod tests {
                         upper: false,
                         film_days,
                         film_classic,
+                        auditorium: false,
                     }
                     .draw()
                 })

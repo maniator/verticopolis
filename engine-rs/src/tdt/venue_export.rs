@@ -9,8 +9,7 @@
 
 use super::byte_writer::ByteWriter;
 use super::format::{
-    TDT_FLOOR_INDEX_ENTRIES, TDT_PERSON_RECORD_SIZE, TDT_ROUTING_TAIL_SIZE, TDT_STAIR_RECORD_SIZE,
-    TDT_STAIR_SLOTS,
+    TDT_FLOOR_INDEX_ENTRIES, TDT_ROUTING_TAIL_SIZE, TDT_STAIR_RECORD_SIZE, TDT_STAIR_SLOTS,
 };
 use super::venues::{
     OutVenueHalf, EMPTY_RECORD, NO_FILM, TDT_VENUE_RECORD_SIZE, TDT_VENUE_SLOTS,
@@ -121,11 +120,16 @@ type TableRow = ([u8; TDT_VENUE_RECORD_SIZE], [usize; 2]);
 /// halves were placed, up to the table's 16 records.
 fn table_rows(placed: &[PlacedHalf]) -> Vec<TableRow> {
     let mut table = vec![];
-    for (lower_at, lower) in placed.iter().enumerate().filter(|(_, p)| !p.half.upper) {
+    let named = |p: &PlacedHalf| !p.half.auditorium;
+    for (lower_at, lower) in placed
+        .iter()
+        .enumerate()
+        .filter(|(_, p)| named(p) && !p.half.upper)
+    {
         let half = lower.half;
-        let upper_at = placed
-            .iter()
-            .position(|p| p.half.upper && p.half.room == half.room && p.floor == lower.floor + 1);
+        let upper_at = placed.iter().position(|p| {
+            named(p) && p.half.upper && p.half.room == half.room && p.floor == lower.floor + 1
+        });
         let Some(upper_at) = upper_at else {
             continue;
         };
@@ -185,54 +189,15 @@ pub fn write_routing_tail(placed: &[PlacedHalf]) -> Vec<u8> {
 /// tenant records, already written, the table row that holds it. A venue
 /// left out of the table keeps the 0 the encoder wrote.
 pub fn write_venue_tail(w: &mut ByteWriter, placed: &[PlacedHalf]) {
-    for (row, (_, halves)) in table_rows(placed).iter().enumerate() {
-        for &at in halves {
-            w.set_u8(
-                placed[at].record_at + TABLE_ROW_IN_TENANT_RECORD,
-                row as i64,
-            );
+    for (row, (_, [lower, _])) in table_rows(placed).iter().enumerate() {
+        // Every piece of the venue, a theatre's auditorium included, names
+        // the row.
+        let room = placed[*lower].half.room;
+        for piece in placed.iter().filter(|p| p.half.room == room) {
+            w.set_u8(piece.record_at + TABLE_ROW_IN_TENANT_RECORD, row as i64);
         }
     }
     w.bytes(&write_routing_tail(placed));
-}
-
-/// The people the original keeps for each half of a party hall: 40 records
-/// in a row in the people block, which the half's tenant record names by
-/// its first index in bytes 8 and 9 (#1932). A hall without them crashes the
-/// original a few seconds after the file loads.
-pub const HALL_PEOPLE_PER_HALF: usize = 40;
-/// The unit type the original writes in both halves' people records: the
-/// hall's upper part.
-const HALL_PERSON_TYPE: u8 = 29;
-/// Bytes 8 and 9 of a tenant record: its first person in the people block.
-const FIRST_PERSON_IN_TENANT_RECORD: usize = 8;
-
-/// Write the people block: its count, the census's `census` blank records,
-/// then each party hall half's 40 people (floor, logical unit id, person
-/// number and type, the rest 0, which a run of the original loads and plays
-/// on), first giving each half's tenant record, already written, the index
-/// of its first person.
-pub fn write_people(w: &mut ByteWriter, census: usize, placed: &[PlacedHalf]) {
-    let halls: Vec<&PlacedHalf> = placed
-        .iter()
-        .filter(|p| p.half.film_days.is_none())
-        .collect();
-    for (n, hall) in halls.iter().enumerate() {
-        let first = census + n * HALL_PEOPLE_PER_HALF;
-        w.set_u16(hall.record_at + FIRST_PERSON_IN_TENANT_RECORD, first as i64);
-    }
-    w.i32((census + halls.len() * HALL_PEOPLE_PER_HALF) as i64);
-    w.pad(census * TDT_PERSON_RECORD_SIZE);
-    for hall in halls {
-        for person in 0..HALL_PEOPLE_PER_HALF {
-            let mut record = [0u8; TDT_PERSON_RECORD_SIZE];
-            record[0] = hall.floor as u8;
-            record[1] = hall.id as u8;
-            record[2] = person as u8;
-            record[4] = HALL_PERSON_TYPE;
-            w.bytes(&record);
-        }
-    }
 }
 
 #[cfg(test)]
@@ -256,18 +221,21 @@ mod tests {
             upper,
             film_days,
             film_classic: false,
+            auditorium: false,
         };
         let hall = |upper| OutVenueHalf {
             room: 5,
             upper,
             film_days: None,
             film_classic: false,
+            auditorium: false,
         };
         let theatre_far = |upper| OutVenueHalf {
             room: 7,
             upper,
             film_days: Some(2),
             film_classic: false,
+            auditorium: false,
         };
         // A lone half (a room cut at the roof) writes no record.
         let stray = OutVenueHalf {
@@ -275,6 +243,7 @@ mod tests {
             upper: false,
             film_days: Some(1),
             film_classic: false,
+            auditorium: false,
         };
         let placed = placed_at(&[
             (hall(false), 20, 6),
@@ -342,6 +311,7 @@ mod tests {
             upper,
             film_days: Some(2),
             film_classic: true,
+            auditorium: false,
         };
         let placed = placed_at(&[(half(false), 20, 4), (half(true), 21, 2)]);
         let mut raw = vec![0; TDT_STAIR_SLOTS * TDT_STAIR_RECORD_SIZE];
@@ -352,6 +322,39 @@ mod tests {
         assert!(read[0].shows_classic());
         let at = TDT_VENUE_TABLE_FROM_STAIRS;
         assert_eq!(&raw[at + 4..at + 6], &[40, 40], "a classic's draw 1");
+    }
+
+    /// A theatre's auditorium pieces name the same table row as its screen
+    /// pieces, and the table names the screen pieces alone (#2044).
+    #[test]
+    fn an_auditorium_shares_its_screen_pieces_row_and_is_not_named() {
+        const RECORD: usize = 18;
+        let piece = |room, upper, auditorium| OutVenueHalf {
+            room,
+            upper,
+            film_days: Some(2),
+            film_classic: false,
+            auditorium,
+        };
+        let screens = [
+            PlacedHalf::new(piece(2, false, false), 20, 0, 0),
+            PlacedHalf::new(piece(2, true, false), 21, 0, 2 * RECORD),
+        ];
+        let placed = [
+            screens[0],
+            PlacedHalf::new(piece(2, false, true), 20, 1, RECORD),
+            screens[1],
+            PlacedHalf::new(piece(2, true, true), 21, 1, 3 * RECORD),
+        ];
+        let mut w = ByteWriter::new();
+        w.bytes(&[0xAA; 4 * RECORD]);
+        write_venue_tail(&mut w, &placed);
+        let bytes = w.to_bytes();
+        let rows: Vec<u8> = (0..4)
+            .map(|i| bytes[i * RECORD + TABLE_ROW_IN_TENANT_RECORD])
+            .collect();
+        assert_eq!(rows, [0, 0, 0, 0]);
+        assert_eq!(write_routing_tail(&placed), write_routing_tail(&screens));
     }
 
     /// Each half's tenant record names its table row in byte 6 (#1932):
@@ -365,6 +368,7 @@ mod tests {
             upper,
             film_days,
             film_classic: false,
+            auditorium: false,
         };
         let halves = [
             (half(5, false, None), 20, 0),
@@ -387,45 +391,5 @@ mod tests {
             .collect();
         assert_eq!(rows, [1, 0, 1, 0, 0xAA]);
         assert_eq!(&bytes[5 * RECORD..], &write_routing_tail(&placed)[..]);
-    }
-
-    /// Each hall half gets 40 people after the census's blank records, and
-    /// its tenant record names the first (#1932); a theatre gets none.
-    #[test]
-    fn each_hall_half_gets_forty_people_after_the_census() {
-        const RECORD: usize = 18;
-        let half = |room, upper, film_days| OutVenueHalf {
-            room,
-            upper,
-            film_days,
-            film_classic: false,
-        };
-        let placed = [
-            PlacedHalf::new(half(3, false, Some(2)), 11, 0, 0),
-            PlacedHalf::new(half(5, false, None), 11, 1, RECORD),
-            PlacedHalf::new(half(5, true, None), 12, 1, 2 * RECORD),
-        ];
-        let mut w = ByteWriter::new();
-        w.pad(3 * RECORD);
-        let census = 7;
-        write_people(&mut w, census, &placed);
-        let bytes = w.to_bytes();
-        let first = |record: usize| {
-            let at = record * RECORD + FIRST_PERSON_IN_TENANT_RECORD;
-            u16::from_le_bytes([bytes[at], bytes[at + 1]]) as usize
-        };
-        assert_eq!([first(0), first(1), first(2)], [0, 7, 47]);
-        let block = &bytes[3 * RECORD..];
-        assert_eq!(&block[..4], &87u32.to_le_bytes());
-        let person = |n: usize| &block[4 + n * TDT_PERSON_RECORD_SIZE..][..TDT_PERSON_RECORD_SIZE];
-        assert!(
-            person(6).iter().all(|&b| b == 0),
-            "a census record is blank"
-        );
-        assert_eq!(&person(7)[..5], &[11, 1, 0, 0, HALL_PERSON_TYPE]);
-        assert_eq!(&person(46)[..5], &[11, 1, 39, 0, HALL_PERSON_TYPE]);
-        assert_eq!(&person(47)[..5], &[12, 1, 0, 0, HALL_PERSON_TYPE]);
-        assert!(person(86)[5..].iter().all(|&b| b == 0));
-        assert_eq!(block.len(), 4 + 87 * TDT_PERSON_RECORD_SIZE);
     }
 }
