@@ -9,6 +9,7 @@ import {
   MAX_ENGINE_STATUS_ROWS,
   engineKind,
   flushEngineStatus,
+  noteEngineCrashReload,
   noteEngineFallback,
   noteEngineSettled,
   noteEngineWriterLatched,
@@ -77,8 +78,8 @@ describe("engine_status rows", () => {
     noteEngineSettled(wasmSettle);
     // The reset cleared the common props (the platform buckets), so the row
     // holds the event's own fields and nothing else.
-    // `engaged_by` rides on `engaged` rows only.
-    expect(Object.keys(rows()[0]).sort()).toEqual(ENGINE_STATUS_FIELDS.filter((f) => f !== "engaged_by").sort());
+    // `engaged_by` rides on `engaged` rows only, `trap_kind` only after a trap.
+    expect(Object.keys(rows()[0]).sort()).toEqual(ENGINE_STATUS_FIELDS.filter((f) => f !== "engaged_by" && f !== "trap_kind").sort());
   });
 
   it("reads a boot failure from the settle snapshot, as one fallback", () => {
@@ -201,6 +202,20 @@ describe("engine_status rows", () => {
       expect(value).not.toContain(rows()[1].page_life as string);
     }
     setItem.mockRestore();
+  });
+
+  it("names a trap's kind from the trap on, and on no row before it", () => {
+    noteEngineSettled(wasmSettle);
+    noteEngineFallback({ reason: "attach-refused", stage: "adopt" });
+    noteEngineCrashReload({ reason: "trap-save", stage: "adopt", trapKind: "unreachable" });
+    flushEngineStatus();
+    noteEngineWriterLatched();
+    const [settle, refused, crash, latch] = rows();
+    expect(settle).not.toHaveProperty("trap_kind");
+    expect(refused).not.toHaveProperty("trap_kind");
+    expect(crash).toMatchObject({ trigger: "crash-reload", fallback_reason: "trap-save", fallback_stage: "adopt", trap_kind: "unreachable" });
+    // Later rows in the page life keep it, as they keep the reason.
+    expect(latch).toMatchObject({ trigger: "writer-latch", trap_kind: "unreachable" });
   });
 
   it("sends only codes from the closed lists", () => {

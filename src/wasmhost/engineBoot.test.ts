@@ -45,7 +45,7 @@ describe("loadBootEngine", () => {
 
 describe("fallback reason codes", () => {
   it("keeps the lists closed, with none first and the runtime codes reserved", () => {
-    expect(FALLBACK_REASONS).toEqual(["none", "boot-timeout", "boot-error", "package-mismatch", "unverifiable", "attach-refused", "trap-command", "trap-tick", "trap-undo", "other"]);
+    expect(FALLBACK_REASONS).toEqual(["none", "boot-timeout", "boot-error", "package-mismatch", "unverifiable", "attach-refused", "trap-command", "trap-tick", "trap-undo", "trap-save", "trap-census", "other"]);
     expect(FALLBACK_STAGES).toEqual(["none", "load", "start", "adopt", "undo"]);
   });
 

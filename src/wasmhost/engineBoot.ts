@@ -27,9 +27,11 @@ export type BootStage = "load" | "start" | "host";
  * runtime fallback (#874) sends the trap codes for a running engine's fault
  * in a command (the undo capture's save just before an edit included), a
  * tick, a frame sync or the event drain, or an undo or redo, and `other` for
- * a save or the reads when a tower is let go.
+ * a save or the reads when a tower is let go. A trap in the engine's save
+ * writer (#1205) is `trap-save`, and one in the slot census that loads a save
+ * into a short-lived engine (#1612) is `trap-census`.
  */
-export const FALLBACK_REASONS = ["none", "boot-timeout", "boot-error", "package-mismatch", "unverifiable", "attach-refused", "trap-command", "trap-tick", "trap-undo", "other"] as const;
+export const FALLBACK_REASONS = ["none", "boot-timeout", "boot-error", "package-mismatch", "unverifiable", "attach-refused", "trap-command", "trap-tick", "trap-undo", "trap-save", "trap-census", "other"] as const;
 export type FallbackReason = (typeof FALLBACK_REASONS)[number];
 
 /** Where a fallback happened: loading the package, starting the host on the
