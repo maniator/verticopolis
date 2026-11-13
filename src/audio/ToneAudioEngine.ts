@@ -15,6 +15,7 @@ import {
 import { createSfxVoices, playSfx, type SfxVoices } from "./toneVoices";
 import { createPercussion, type PercVoices } from "./tonePercussion";
 import { createRain, type RainVoices } from "./toneRain";
+import { usePlaybackContext } from "./toneContext";
 import { programFor, type Program, type ProgramKind, type TrackVoice } from "./toneTracks";
 import { CrowdLayer } from "./toneCrowd";
 import { LightMonoSynth, LightPolySynth } from "./lightSynth";
@@ -126,19 +127,7 @@ export class ToneAudioEngine {
       typeof (globalThis as { webkitAudioContext?: unknown }).webkitAudioContext !== "undefined";
     if (!hasWebAudio) return; // no WebAudio (tests / unsupported)
     try {
-      // Prefer larger audio buffers over low latency: this is a sim, not an
-      // instrument, and the default interactive hint underruns on phones
-      // (heard as random crackles). Must happen before any node is built.
-      // Importing Tone already opened a default low-latency context, which
-      // nothing plays through. Close it: while it stays open, an operating
-      // system that sets one buffer size per output device (macOS does) runs
-      // the device at the small size it asked for, and this context then has
-      // to render its large buffers inside those short deadlines.
-      try {
-        Tone.setContext(new Tone.Context({ latencyHint: "playback" }), true);
-      } catch {
-        /* keep the default context */
-      }
+      usePlaybackContext(); // before any node is built
       // Inside a user gesture, so resuming is allowed. Swallow rejections
       // (autoplay/permission) so a blocked context can't surface as unhandled.
       Tone.start().catch(() => {});

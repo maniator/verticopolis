@@ -120,11 +120,14 @@ abstract class LightVoiceBase {
   }
 
   /** Play one note: `freq` Hz for `duration`, starting at `time` (Tone's
-   *  clock; defaults to now), peaking at `velocity`. */
+   *  clock; defaults to now), peaking at `velocity`. A note asked for in the
+   *  past (the main thread stalled past the scheduler's look-ahead) starts
+   *  now instead: its envelope would otherwise begin partway up the attack,
+   *  a jump from silence that clicks. */
   triggerAttackRelease(freq: number, duration: Tone.Unit.Time, time?: Tone.Unit.Time, velocity = 1): this {
     if (this.disposed) return this;
     const ctx = Tone.getContext();
-    const start = time === undefined ? Tone.now() : seconds(time);
+    const start = Math.max(time === undefined ? Tone.now() : seconds(time), ctx.currentTime);
     this.reap(ctx.currentTime);
     if (!this.admit(start)) return this;
     const plan = planNote(this.envelope, start, seconds(duration), velocity, 1 / ctx.sampleRate);
@@ -171,13 +174,20 @@ abstract class LightVoiceBase {
       n.handoff.gain.setValueAtTime(1, at);
       n.handoff.gain.linearRampToValueAtTime(0, at + MONO_HANDOFF_S);
       n.stopAt = at + MONO_HANDOFF_S;
-      n.osc.stop(n.stopAt);
+      try {
+        n.osc.stop(n.stopAt);
+      } catch {
+        /* an older engine that allows one stop: the note ends at its own stop */
+      }
     }
   }
 
   /** Drop notes long finished whose `onended` never arrived. */
   private reap(now: number): void {
-    for (const n of this.live.slice()) if (n.stopAt + REAP_GRACE_S < now) this.release(n);
+    for (let i = this.live.length - 1; i >= 0; i--) {
+      const n = this.live[i];
+      if (n.stopAt + REAP_GRACE_S < now) this.release(n);
+    }
   }
 
   private release(note: LiveNote): void {

@@ -134,6 +134,18 @@ describe("LightPolySynth", () => {
     expect(ctx.oscs[0].stop).toHaveBeenCalledWith(planNote(v.envelope, 0, 0.125, 1, 1 / 48000).stopAt);
   });
 
+  it("starts a note asked for in the past at the current time, from silence", () => {
+    const v = new LightPolySynth({ envelope: ENV });
+    ctx.currentTime = 5;
+    v.triggerAttackRelease(440, 0.5, 4.8);
+    const [osc] = ctx.oscs;
+    expect(osc.start).toHaveBeenCalledWith(5);
+    expect(osc.frequency.setValueAtTime).toHaveBeenCalledWith(440, 5);
+    const plan = planNote({ ...ENV, attackCurve: "linear" }, 5, 0.5, 1, 1 / 48000);
+    expect(ctx.gains[0].gain.calls[0]).toEqual(["setValueAtTime", plan.events[0].value, 5]);
+    expect(osc.stop).toHaveBeenCalledWith(plan.stopAt);
+  });
+
   it("drops a note past maxPolyphony while the others still sound, and admits one once they end", () => {
     const v = new LightPolySynth({ envelope: ENV, maxPolyphony: 2 });
     v.triggerAttackRelease(200, 1, 0);
@@ -196,6 +208,20 @@ describe("LightMonoSynth", () => {
     expect(ctx.oscs[0].stop).toHaveBeenLastCalledWith(1.055);
     // The new note's own hand-over is untouched.
     expect(ctx.gains[3].gain.calls).toEqual([]);
+  });
+
+  it("still hands over on an engine that refuses a second stop", () => {
+    const v = new LightMonoSynth({ envelope: ENV });
+    v.triggerAttackRelease(300, 0.2, 1);
+    ctx.oscs[0].stop.mockImplementation(() => {
+      throw new Error("InvalidStateError");
+    });
+    expect(() => v.triggerAttackRelease(400, 0.2, 1.05)).not.toThrow();
+    expect(ctx.oscs).toHaveLength(2);
+    expect(ctx.gains[1].gain.calls).toEqual([
+      ["setValueAtTime", 1, 1.05],
+      ["linearRampToValueAtTime", 0, 1.055],
+    ]);
   });
 
   it("leaves a finished note alone", () => {
