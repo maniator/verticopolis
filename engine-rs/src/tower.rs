@@ -21,6 +21,37 @@ pub use types::{Extras, ExtrasMut, PlaceResult, ResizeResult, Transport, Unit, U
 pub(crate) const MID_FLOOR_GAP: &str =
     "In Classic, only the tile at either end of a floor can be removed, so a floor never has a gap in the middle.";
 
+/// Whether the `w` tiles from `x` on one story have floor on both sides,
+/// so they are not at either end of the story and taking them out in
+/// Classic would leave a gap in its middle, or widen one a loaded save
+/// already has. `tile_at` answers the kind of the floor or lobby tile at a
+/// tile of that story, if one stands there. The bulldozer
+/// (`Tower::removal_reason`) and the undo's sale advice
+/// (`Ground::sells_from_an_end`) both ask it, so they agree.
+///
+/// A side has floor when plain floor stands anywhere on it, or when the
+/// tiles touching the span on that side, unbroken by a gap, hold a lobby
+/// tile (owner ruling, 2026-11-13, on #2062). Lobby tiles are never removed,
+/// so counting one beyond a gap would trap the plain floor between it and
+/// the far end for good; a lobby the span touches still counts, so a floor
+/// tile right beside a lobby is not an end. Plain floor anywhere counts, so
+/// the tiles beside a gap a saved tower has are not ends and the gap is not
+/// cut wider one tile at a time. A plain tile in the touching run counts on
+/// its own, so the touching run counts exactly when the tile right beside
+/// the span holds floor or lobby.
+pub(crate) fn span_has_floor_on_both_sides(
+    x: i64,
+    w: i64,
+    tile_at: impl Fn(i64) -> Option<Kind>,
+) -> bool {
+    let on_lot = |tx: i64| (0..LOT_WIDTH).contains(&tx);
+    let touches_floor_or_lobby = |beside: i64| on_lot(beside) && tile_at(beside).is_some();
+    let plain_floor_on =
+        |side: std::ops::Range<i64>| side.into_iter().any(|tx| tile_at(tx) == Some(Kind::Floor));
+    let side_has_floor = |beside: i64, side| touches_floor_or_lobby(beside) || plain_floor_on(side);
+    side_has_floor(x - 1, 0..x) && side_has_floor(x + w, x + w..LOT_WIDTH)
+}
+
 pub struct Tower {
     pub units: Vec<Unit>,
     pub transports: Vec<Transport>,
@@ -186,17 +217,13 @@ impl Tower {
         self.span_every(floor, x, w, |t, f, x| !t.structure.contains_key(&(f, x)))
     }
 
-    /// Whether the story `floor` has structure somewhere left of tile `x` and
-    /// somewhere right of the `w` tiles from `x`, so those tiles are not at
-    /// either end of the story and taking them out would leave a gap in the
-    /// middle of it, or widen one a loaded save already has. Asking only for
-    /// the next tile on each side let a saved gap be cut wider one tile at a
-    /// time, since a tile beside the gap has floor on one side only. A sale
-    /// asks it once per structure tile, so the scan of at most one story's
-    /// width (`LOT_WIDTH`) stays off every per-frame path.
+    /// Whether the `w` tiles from `x` on story `floor` have floor on both
+    /// sides, by [`span_has_floor_on_both_sides`], so they are not at either
+    /// end of the story. A sale asks it once per structure tile, so the scan
+    /// of at most one story's width (`LOT_WIDTH`) stays off every per-frame
+    /// path.
     pub(crate) fn floor_on_both_sides(&self, floor: i64, x: i64, w: i64) -> bool {
-        let has_floor = |tx: i64| self.structure.contains_key(&(floor, tx));
-        (0..x).any(has_floor) && (x + w..LOT_WIDTH).any(has_floor)
+        span_has_floor_on_both_sides(x, w, |tx| self.structure_kind_at(floor, tx))
     }
 
     pub fn span_has_floor(&self, floor: i64, x: i64, w: i64) -> bool {

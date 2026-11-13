@@ -458,5 +458,9 @@ mod tests;
 mod removal_tests;
 
 #[cfg(test)]
+#[path = "charges_floor_end_tests.rs"]
+pub(crate) mod floor_end_tests;
+
+#[cfg(test)]
 #[path = "charges_schedule_tests.rs"]
 mod schedule_tests;
