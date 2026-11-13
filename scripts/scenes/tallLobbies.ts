@@ -2,7 +2,8 @@
  * Tall lobbies (#308): the stills the Help site's "Tall lobbies" section shows
  * (help-site/src/content/docs/building/floors-and-lobbies.mdx). A Classic
  * 3-story ground hall, a Modern 2-story sky lobby, the Lobby card's height
- * picker, and the phone's Lobby height strip; and for the "Stairs and
+ * picker, the phone's Lobby height strip, and Modern split halls with the
+ * revolving door between them (#2068); and for the "Stairs and
  * escalators" page, the spiral stair and switchback escalator out of a tall
  * hall. Every tower comes from
  * `buildTallLobbyTower`, which founds it through New Tower and builds with the
@@ -77,6 +78,31 @@ export const TALL_LOBBY_SCENES: Scene[] = [
         name: "tall-lobby-sky",
         clock: 10,
         setup: (page) => frameHall(page, -6, 16, 1.8),
+        wait: 400,
+      },
+    ],
+  },
+  {
+    id: "tall-lobby-split-halls",
+    outDir: "features",
+    initScript: () => {
+      (window as unknown as { __vcShotTallLobby: unknown }).__vcShotTallLobby = { mode: "modern", ground: 2, sky: 3, split: 2 };
+    },
+    build: buildTallLobbyTower,
+    shots: [
+      {
+        // Split halls (#2068): a three-story sky lobby beside a two-story
+        // one, the wall between them and the wooden revolving door in it.
+        name: "tall-lobby-split-halls",
+        clock: 10,
+        setup: (page) => frameHall(page, 5, 17, 1.8),
+        wait: 400,
+      },
+      {
+        // The same door at night, its glass lit from inside.
+        name: "tall-lobby-split-halls-night",
+        clock: 22,
+        setup: (page) => frameHall(page, 5, 17, 1.8),
         wait: 400,
       },
     ],
