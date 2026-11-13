@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { GameApp } from "../../main";
-import { runFrame } from "../../game/frameLoop";
+import { CHOICE_WAITING_NOTICE, runFrame } from "../../game/frameLoop";
 import { hasBlockingModal } from "../../game/interactionState";
 import type { UI } from "../../ui/UI";
 import { mountAppDom, makeUI } from "../uiFixture";
@@ -193,5 +193,39 @@ describe.skipIf(noEngine)("a TOWER win with the update prompt due in the same pa
     const before = minutesOf(sim);
     pass(app, raw);
     expect(minutesOf(sim)).toBeGreaterThan(before);
+  });
+});
+
+describe.skipIf(noEngine)("a TOWER save with an open emergency, under a dialog that holds the player's work (#1121)", () => {
+  it("keeps the dialog, stops time with a notice, then shows the choice and the congratulations in turn", async () => {
+    const { ui } = makeUI();
+    vi.spyOn(ui, "update").mockImplementation(() => {});
+    const sim = savedTower(true);
+    const { app, raw } = makeApp(sim, ui);
+    // The New Tower picker opens protected, as every dialog with a decision does.
+    ui.newTowerModal({ hasSave: true, onFound: vi.fn() });
+    expect(ui.precedence.ownsPendingWork(dialog().open)).toBe(true);
+    const minutes = minutesOf(sim);
+    for (let i = 0; i < 3; i++) pass(app, raw);
+    expect(has('input[name="nt-mode"]')).toBe(true);
+    expect(has('[data-act="accept"]')).toBe(false);
+    expect(raw.shownChoice).toBe(false);
+    expect(showingCongrats()).toBe(false);
+    expect(minutesOf(sim)).toBe(minutes);
+    expect(choiceOf(sim)?.kind).toBe("fireRescue");
+    // One notice, mounted once, however many frozen frames ask for it.
+    const notices = dialog().querySelectorAll(".modal-notice");
+    expect([...notices].map((n) => n.textContent)).toEqual([CHOICE_WAITING_NOTICE]);
+    // The player closes their dialog: the choice comes up, then the win.
+    click('[data-act="cancel"]');
+    expect(dialog().open).toBe(false);
+    pass(app, raw);
+    expect(raw.shownChoice).toBe(true);
+    expect(has('[data-act="decline"]')).toBe(true);
+    click('[data-act="decline"]');
+    await new Promise((r) => setTimeout(r, 0));
+    expect(choiceOf(sim)).toBeNull();
+    pass(app, raw);
+    expect(showingCongrats()).toBe(true);
   });
 });

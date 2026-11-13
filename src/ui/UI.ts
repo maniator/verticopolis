@@ -324,10 +324,11 @@ export class UI {
    *  player may have opened a dialog, and a `<dialog>` paints over the toast
    *  rail at any z-index. A failure announced with a toast from there is
    *  announced to nobody (GH #658). This routes the line into the dialog in the
-   *  way, and uses a toast only when there is no dialog to be behind.
-   *  @internal friend-module access (uiDialogs / saveLoad / uiImport). */
-  sayVisibly(text: string, kind: "bad" | "info" = "bad"): void {
-    routeNotice(this.el.modal as HTMLDialogElement, this.precedence, text, (t) => this.toast(t, kind));
+   *  way, and uses a toast only when there is no dialog to be behind. `again`
+   *  false leaves any line the dialog already shows alone, for a caller asking each frame.
+   *  @internal friend-module access (uiDialogs / saveLoad / uiImport / frameLoop). */
+  sayVisibly(text: string, kind: "bad" | "info" = "bad", again = true): void {
+    routeNotice(this.el.modal as HTMLDialogElement, this.precedence, text, (t) => this.toast(t, kind), again);
   }
 
   /** True while any modal is on screen (the shared `<dialog>` is open). Callers
@@ -488,8 +489,8 @@ export class UI {
     dialogs.showUpdateChip(this, onClick);
   }
 
-  congratsTower(): void {
-    dialogs.congratsTower(this);
+  congratsTower(onDisplaced: () => void): void {
+    dialogs.congratsTower(this, onDisplaced);
   }
 }
 
