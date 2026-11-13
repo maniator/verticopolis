@@ -13,7 +13,7 @@ import type { ViewFocus } from "../render/excalibur/TowerEngine";
 
 vi.mock("tone", async () => (await import("./toneRecordingMock")).toneMock());
 
-import { beat, graph, type NodeRec } from "./toneRecordingMock";
+import { beat, graph, resetToneFaults, toneFaults, type NodeRec } from "./toneRecordingMock";
 import { ToneAudioEngine, type SfxName } from "./ToneAudioEngine";
 import { SCENES, type Scene } from "./toneScenes";
 
@@ -37,12 +37,14 @@ describe("ToneAudioEngine — full graph driven with a mocked Tone.js", () => {
     (globalThis as { AudioContext?: unknown }).AudioContext = function () {}; // pass the hasWebAudio gate
     beat.step = null; // each start() must RE-schedule the beat callback — no stale carry-over between tests
     graph.nodes.length = 0; // fresh node registry per test
+    resetToneFaults();
   });
   afterEach(() => {
     // Restore whatever the environment had (don't blindly delete a real one).
     if (prevAudioContext === undefined) delete (globalThis as { AudioContext?: unknown }).AudioContext;
     else (globalThis as { AudioContext?: unknown }).AudioContext = prevAudioContext as never;
     beat.step = null;
+    resetToneFaults();
   });
 
   it("start() builds the graph and becomes active; a second call takes the resume path", () => {
@@ -101,6 +103,36 @@ describe("ToneAudioEngine — full graph driven with a mocked Tone.js", () => {
       eng.sfx(n);
       expect(triggerCount(), n).toBeGreaterThan(before);
     }
+  });
+
+  it("a Tone error inside a cue never escapes sfx(), and the next cue still plays", () => {
+    // Firefox, placing stairs: a mono voice restarted at its own start time
+    // threw out of sfx(), through the build handler, and killed the game loop.
+    const eng = new ToneAudioEngine();
+    eng.start();
+    toneFaults.triggerError = new Error("Start time must be strictly greater than previous start time");
+    for (const n of ["build", "error", "click", "sell", "tick"] as SfxName[]) {
+      expect(() => eng.sfx(n), n).not.toThrow();
+    }
+    toneFaults.triggerError = null;
+    const before = triggerCount();
+    eng.sfx("build");
+    expect(triggerCount()).toBeGreaterThan(before);
+  });
+
+  it("sfx() stays silent while the audio context's clock is stopped", () => {
+    const eng = new ToneAudioEngine();
+    eng.start();
+    for (const state of ["suspended", "interrupted", "closed"]) {
+      toneFaults.contextState = state;
+      const before = triggerCount();
+      eng.sfx("build");
+      expect(triggerCount(), state).toBe(before);
+    }
+    toneFaults.contextState = "running";
+    const before = triggerCount();
+    eng.sfx("build");
+    expect(triggerCount()).toBeGreaterThan(before);
   });
 
   it("the recorded percussion bypasses the music tone filters on its way to the bus", () => {
