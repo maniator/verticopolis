@@ -22,14 +22,21 @@ no web game and no Node.js, and a crate in another directory, reaching this
 repository only through its dependency line and the conformance directory
 it is given, can drive it and replay every conformance scenario, the ones
 that start from a saved tower (`conformance/fixtures/`) included, from a
-copy of the suite under another directory name. What it
-does not prove yet: a registry or packaged release (the crate reads
-`../conformance/` at compile time, so it needs the repository beside it;
-#893).
+copy of the suite under another directory name. The job builds that crate
+against the packaged crate (`cargo package`, what crates.io receives), so
+the library needs nothing outside `engine-rs/`. What it does not prove yet:
+that the suite ships with the crate; a host reads it from a checkout of the
+repository at the release tag (#893).
 
 ## Depending on the engine
 
-One of these two:
+One of these:
+
+```toml
+[dependencies]
+# From crates.io, pinned exactly (no semver promise yet; see Stability):
+verticopolis-engine = "=<version>"
+```
 
 ```toml
 [dependencies]
@@ -107,7 +114,7 @@ tier 2, the harness a host uses to prove conformance.
 | Read state | the public fields (`money`, `star`, `clock`, `tower`, `crowd`, `log`, ...) and `population()`; read them, never write them |
 | Read a frame | `frame::frame_view(&sim)`: every value a renderer reads between two structural syncs (clock, money, rating, effects, then one record per person, per unit and per shaft with its cars) as one flat `Vec<f64>`, laid out in `src/frame.rs`. Read it by name: the slots in `frame::header`, `frame::person`, `frame::unit`, `frame::transport` and `frame::car` (`frame::header::MONEY`, `frame::person::ROUTINE`, ...), and the record widths `FRAME_HEADER`, `PERSON_FIXED`, `UNIT_RECORD`, `TRANSPORT_FIXED` and `CAR_RECORD`; a routine code of `UNKNOWN_ROUTINE` means the engine has a routine the layout does not name yet, and a decoder should refuse it. `frame::log_since(&sim, seq)` returns the log entries numbered after `seq`. The JavaScript binding passes the same frame across as one typed array |
 | Read the view | The renderer-facing view (facade slice 6a, #1213), for a host that keeps no copy of the simulation: `view::structure_view(&sim)`, the structural snapshot (the floor bounds, the mode and calendar, the scene seed, the rooms by slot, the floor and lobby tiles as runs by floor and x, the shafts with their skipped floors), read again when `tower.revision` moves and after a load, whose tower starts its revisions over; `view::ViewReader::new()` and `reader.frame(&sim, full)`, the dynamic frame (the header, the people, the rooms whose fields changed since that reader's last frame, every room on its first frame, after a structural change, on another tower or when `full` asks, and the cars; from half the rooms' worth of marks, or when the tower's mark log dropped marks that reader had not read, it compares every room instead, which sends the same rooms), read every rendered frame (the engine marks a room when its own commands and tick change it, so a host that writes a unit's fields itself passes `full` on its next frame); `view::meta_since(&sim.tower, since)`, the labels and subtypes changed after a meta revision, read when `tower.meta_revision` moves (a tower starts at meta revision 1, so `None` or 0 lists them all, and a `since` holds for one tower only); `sim.tower_signature()`, a pure fingerprint of the fields the tower half of undo's signature reads, equal at two reads when those fields are (one walk over the units and shafts, a per-command read). Read them by name: the slots and widths in `view::layout` (`view::layout::header::POPULATION`, `view::layout::RUN_RECORD`, ...), all of them with the kind, state, weather, mode and calendar codes as JSON from `view::layout_json()`, versioned by `VIEW_LAYOUT_VERSION`. The JavaScript binding's `viewStructure`, `viewFrame`, `unitMetaSince`, `towerSignature` (a `bigint`) and `viewLayout` wrap these, with one frame reader per engine, whose frames the header's `frameSeq` numbers |
-| Gameplay events | `sim.gameplay.drain()` after each frame; `to_json()` on each event; names and payloads are listed in `conformance/events/catalog.json` (`gameplay::CATALOG_JSON`, checked with `check_event`). The buffer holds `GAMEPLAY_RING_CAP` events and counts any it had to drop in `sim.gameplay.dropped` |
+| Gameplay events | `sim.gameplay.drain()` after each frame; `to_json()` on each event; names and payloads are listed in `engine-rs/src/gameplay/catalog.json` (`gameplay::CATALOG_JSON`, checked with `check_event`). The buffer holds `GAMEPLAY_RING_CAP` events and counts any it had to drop in `sim.gameplay.dropped` |
 | Reference data | `catalog::catalog(mode)`: prices, sizes, caps and rules per facility kind, versioned by `CATALOG_VERSION` |
 | Identity | `identity::identity()` (`engineIdentity()` in the binding): schema, crate name and version, `SAVE_VERSION` and the oldest save version loaded, `FRAME_LAYOUT_VERSION`, `CATALOG_VERSION` with each mode's digest, and the conformance lock digest. It holds no build hash: a hash of the sources cannot be compiled into them, so the packaging supplies it as build metadata (below). The crate version goes up with the conformance lock, `SAVE_VERSION`, the frame layout, view layout, catalog and identity record versions, and `src/dualrun/engine.d.ts` (`compat-record.json`, guarded by `src/tests/engineCompat.guard.test.ts`); the guard does not see the Rust `pub` API, so a change there is a review call (`CONTRIBUTING.md`, Versioning) |
 | Snapshot hash | `canonical::digest(&snapshot::state_view(&sim))`: the hashed view the conformance lock pins (with the `conformance` feature, `scenario::state_view` names the same function) |
@@ -136,14 +143,14 @@ it, and nothing in the engine reads it or requires it:
 { "schema": 1, "sourceHash": "<64 lowercase hex digits>" }
 ```
 
-`sourceHash` is the SHA-256 over the engine's Rust sources and the conformance
-event catalog (`engineSourceHash` in `src/wasmhost/packageHash.ts`). A packager
+`sourceHash` is the SHA-256 over the engine's Rust sources and the files they
+include (`engineSourceHash` in `src/wasmhost/packageHash.ts`). A packager
 outside the web build computes the same value as follows. Take every file under
 the crate directory except `target/`, `pkg/`, hidden names, names ending in `~`
-and Markdown files, plus every file under `conformance/events/` at the repository root and
-every file a plain `include_str!("...")` or `include_bytes!("...")` names. Label each
-file with its path relative to the crate directory, using `/` (the conformance
-files are labeled `../conformance/events/...`). Sort the labels
+and Markdown files, plus every file a plain `include_str!("...")` or
+`include_bytes!("...")` names. Label each file with its path relative to the
+crate directory, using `/` (a file outside the crate is labeled
+`../conformance/...`). Sort the labels
 by UTF-16 code unit. For each file in that order, feed the SHA-256 the label, a
 zero byte, the file with each CRLF read as LF (a file containing a zero byte is taken as it is), and a zero byte.
 The hex digest, in lowercase, is the value. That makes the hash a fact about
@@ -159,15 +166,14 @@ unavailable, never as a failure of the engine.
 
 ## Stability
 
-- **No semver promise yet.** The crate is on no Cargo registry (its version
-  is in `Cargo.toml`); a consumer pins a commit or an `engine-v<version>`
-  tag. Each crate release also publishes the WASM build to GitHub Packages
-  as `@maniator/verticopolis-engine`, whose README is
-  `packages/verticopolis-engine/README.md`. The version goes up with the
+- **No semver promise yet.** Each crate release is published to crates.io
+  as `verticopolis-engine` and tagged `engine-v<version>`; a consumer pins an
+  exact version, a tag or a commit. Each crate release also publishes the
+  WASM build to npm as `@verticopolis/engine`. The version goes up with the
   conformance lock, the save, frame layout, view layout, catalog and
   identity record versions and the binding declaration (`src/compat-record.json`, held by
   `src/tests/engineCompat.guard.test.ts`; the Rust `pub` API is a review
-  call). Registry releases are #893.
+  call). The compatibility policy is #893.
 - **The lock is the contract.** Any change to simulation behavior lands
   with a regenerated `conformance/expected.json` in the same pull request,
   and that diff is what a consumer must take on a pin bump. A host that

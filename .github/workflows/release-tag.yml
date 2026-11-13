@@ -14,11 +14,12 @@ name: Release tags
 # - a crate version change in engine-rs/Cargo.toml publishes engine-v<version>
 #   as its own release with that version's engine-rs/CHANGELOG.md section. It
 #   is never marked Latest, so the app release stays the repo's Latest. It
-#   carries the built WASM package (Node and browser builds) and its checksum,
-#   the same build goes to GitHub Packages as @<owner>/verticopolis-engine, and
-#   a frontend can depend on the crate at that tag through git. GitHub Packages
-#   has no Cargo registry; publishing to crates.io or npmjs is #893. When the
-#   app version did not move, the crate tag dispatches the production deploy.
+#   carries the built WASM package (Node and browser builds) as a zip and as
+#   the npm tarball, each with its checksum, and the crate release dispatches
+#   engine-publish.yml, which waits for the owner's approval and then
+#   publishes the crate to crates.io and that tarball to npm as
+#   @verticopolis/engine. When the app version did not move, the crate tag
+#   dispatches the production deploy.
 #
 # A tag or release that already exists is left alone, so a re-run is safe.
 on:
@@ -40,7 +41,6 @@ jobs:
     permissions:
       contents: write
       actions: write
-      packages: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -108,8 +108,9 @@ jobs:
         uses: ./.github/actions/engine-wasm
 
       # The built package: engine-rs/pkg (Node) and src/public/engine
-      # (browser), with their third-party records, as a zip with a checksum
-      # for the release and as an npm package for GitHub Packages.
+      # (browser), with their third-party records, as a zip and as the npm
+      # tarball, each with a checksum, for the release. engine-publish.yml
+      # publishes that tarball to npm, so the bytes on npm are the ones here.
       # scripts/engine-package-files.sh adds the package's own README and the
       # browser build's declarations from packages/verticopolis-engine/
       # (outside engine-rs/, so they do not move the engine's source hash),
@@ -119,18 +120,22 @@ jobs:
         if: ${{ steps.versions.outputs.compare == 'true' && steps.versions.outputs.crate != steps.versions.outputs.crate_was }}
         env:
           GH_REPO: ${{ github.repository }}
-          OWNER: ${{ github.repository_owner }}
           VERSION: ${{ steps.versions.outputs.crate }}
         run: |
           set -euo pipefail
           mkdir -p npm/node npm/web
           cp -R engine-rs/pkg/. npm/node/
           cp -R src/public/engine/. npm/web/
-          npm_name="$(sh scripts/engine-package-files.sh npm "$VERSION" "$OWNER" "$GH_REPO")"
+          npm_name="$(sh scripts/engine-package-files.sh npm "$VERSION" "$GH_REPO")"
           zip="verticopolis-engine-wasm-$VERSION.zip"
           (cd npm && zip -qr "../$zip" node web README.md CHANGELOG.md LICENSE)
           sha256sum "$zip" > "$zip.sha256"
+          # npm names the tarball after the package: verticopolis-engine-<version>.tgz.
+          tgz="$(cd npm && npm pack --pack-destination .. --json | node -e 'process.stdout.write(JSON.parse(require("fs").readFileSync(0, "utf8"))[0].filename)')"
+          test -f "$tgz"
+          sha256sum "$tgz" > "$tgz.sha256"
           echo "zip=$zip" >> "$GITHUB_OUTPUT"
+          echo "tgz=$tgz" >> "$GITHUB_OUTPUT"
           echo "npm=$npm_name" >> "$GITHUB_OUTPUT"
 
       - name: Tag the crate version and publish its release
@@ -140,6 +145,7 @@ jobs:
           GH_REPO: ${{ github.repository }}
           VERSION: ${{ steps.versions.outputs.crate }}
           ZIP: ${{ steps.pack.outputs.zip }}
+          TGZ: ${{ steps.pack.outputs.tgz }}
           NPM_NAME: ${{ steps.pack.outputs.npm }}
         run: |
           set -euo pipefail
@@ -153,14 +159,15 @@ jobs:
           awk -v v="$VERSION" '/^## / { if (on) exit; if ($2 == v) { on = 1; next } } on' engine-rs/CHANGELOG.md > notes.md
           if ! grep -q '[^[:space:]]' notes.md; then echo "::error::engine-rs/CHANGELOG.md has no $VERSION section."; exit 1; fi
           {
-            printf '\nDepend on the crate at this version with `verticopolis-engine = { git = "https://github.com/%s", tag = "%s" }`.\n' "$GH_REPO" "$tag"
-            printf '\n`%s` holds the built WASM package (`node/` for Node, `web/` for the browser) with its SHA-256 checksum beside it. The same build is `%s@%s` on GitHub Packages.\n' "$ZIP" "$NPM_NAME" "$VERSION"
+            printf '\nThe crate is [`verticopolis-engine` %s](https://crates.io/crates/verticopolis-engine/%s) on crates.io, or `verticopolis-engine = { git = "https://github.com/%s", tag = "%s" }` through git.\n' "$VERSION" "$VERSION" "$GH_REPO" "$tag"
+            printf '\n`%s` holds the built WASM package (`node/` for Node, `web/` for the browser) with its SHA-256 checksum beside it. The same build is [`%s@%s`](https://www.npmjs.com/package/%s/v/%s) on npm, published from `%s`.\n' "$ZIP" "$NPM_NAME" "$VERSION" "$NPM_NAME" "$VERSION" "$TGZ"
+            printf '\nThe registry copies appear once the owner approves the publish run (`engine-publish.yml`).\n'
           } >> notes.md
           # Attach while a draft, then publish, so a published release is never edited.
           gh release create "$tag" --target "$GITHUB_SHA" --title "Engine crate $VERSION" --notes-file notes.md --latest=false --draft
-          gh release upload "$tag" "$ZIP" "$ZIP.sha256"
+          gh release upload "$tag" "$ZIP" "$ZIP.sha256" "$TGZ" "$TGZ.sha256"
           gh release edit "$tag" --draft=false --latest=false
-          echo "Published $tag with $ZIP."
+          echo "Published $tag with $ZIP and $TGZ."
 
       # A release that raised only the crate still changes the engine the web
       # game ships, so it deploys too, from the crate tag the step above
@@ -179,22 +186,19 @@ jobs:
           gh workflow run deploy-production.yml --ref main -f tag="$tag"
           echo "Dispatched the production deploy for $tag."
 
-      # GitHub Packages has an npm registry but no Cargo one, so the crate
-      # itself ships through the git tag; this is the built WASM package.
-      # Installing from it needs a GitHub token, even for a public package.
-      - name: Publish the engine package to GitHub Packages
+      # The registries: engine-publish.yml publishes the crate to crates.io
+      # and the release's npm tarball to npm, each through trusted publishing
+      # (a short-lived OIDC token, no stored registry token). Its publish jobs
+      # wait on the `registry` environment, so nothing reaches a registry
+      # until the owner approves that run. A run for a version a registry
+      # already holds leaves that registry alone, so a re-run is safe.
+      - name: Hand the crate release to the registry publish
         if: ${{ steps.pack.outcome == 'success' }}
-        working-directory: npm
         env:
-          NODE_AUTH_TOKEN: ${{ github.token }}
-          NPM_NAME: ${{ steps.pack.outputs.npm }}
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
           VERSION: ${{ steps.versions.outputs.crate }}
         run: |
           set -euo pipefail
-          printf '//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}\n' > .npmrc
-          if npm view "$NPM_NAME@$VERSION" version --registry https://npm.pkg.github.com > /dev/null 2>&1; then
-            echo "$NPM_NAME@$VERSION is already published; leaving it."
-            exit 0
-          fi
-          npm publish --registry https://npm.pkg.github.com
-          echo "Published $NPM_NAME@$VERSION."
+          gh workflow run engine-publish.yml --ref main -f version="$VERSION"
+          echo "Dispatched the registry publish for $VERSION; it waits for approval in the registry environment."

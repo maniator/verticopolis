@@ -20,8 +20,8 @@ const root = resolve(__dirname, "..", "..");
 describe("engine docs site", () => {
   it("builds its pages from files that exist", () => {
     const sources = site.pages.map((page) => page.source);
-    expect(sources).toContain("packages/verticopolis-engine/README.md");
-    expect(sources).toContain("engine-rs/CRATE_README.md");
+    expect(sources).toContain("docs/engine-site/guides/javascript.md");
+    expect(sources).toContain("docs/engine-site/guides/crate.md");
     for (const path of sources) expect(existsSync(resolve(root, path)), `${path} exists`).toBe(true);
   });
 

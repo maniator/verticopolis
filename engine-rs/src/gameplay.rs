@@ -335,7 +335,7 @@ pub fn batch_json(events: &[GameplayEvent]) -> Value {
 /// payload fields and meaning. The conformance suite holds the engine to it.
 // A static, so the reference shows the name and type without printing the
 // whole file as the value.
-pub static CATALOG_JSON: &str = include_str!("../../conformance/events/catalog.json");
+pub static CATALOG_JSON: &str = include_str!("gameplay/catalog.json");
 
 #[cfg(test)]
 mod tests;

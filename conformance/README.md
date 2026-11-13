@@ -12,8 +12,10 @@ Frontends may differ. Simulations may not.
 - `expected.json`: the pinned checkpoints for every scenario, written by the
   Rust engine's run through the WASM binding, as
   `{ "scenarios": { "<id>": [ { "label", "state", "crowd", "events" }, ... ] } }`.
-- `events/catalog.json`: the gameplay event catalog, the contract for the
-  events the engine emits (see Checkpoints).
+- The gameplay event catalog, the contract for the events the engine emits
+  (see Checkpoints), is part of the lock but lives in the crate,
+  [`engine-rs/src/gameplay/catalog.json`](../engine-rs/src/gameplay/catalog.json),
+  so the published crate compiles it in. The lock names it `events/catalog.json`.
 - `fuzz-corpus/`: scenarios the nightly fuzzer once diverged on, and smoke
   entries, each with its golden under `fuzz-corpus/goldens/` (the native
   run's records, as `fuzz --replay` writes them).
@@ -65,8 +67,9 @@ The same command also matches `conformanceWasmFrameDays` and
 usually moves those goldens too, so that run fails there until each is
 refreshed with its own switch (above); all of them go in the diff.
 
-A change to any of the five lock files (`catalog-digests.json`,
-`events/catalog.json`, `expected.json`, `loader-cases.json`, `tdt-cases.json`)
+A change to any of the five lock files (`catalog-digests.json`, the event
+catalog `engine-rs/src/gameplay/catalog.json`, `expected.json`,
+`loader-cases.json`, `tdt-cases.json`)
 also moves the engine crate version, and the steps do not stop at the lock:
 
 1. Set `crate:` in the PR's `.changes` note (a patch level for a lock change on
@@ -350,7 +353,7 @@ Labels are unique within a scenario. Each checkpoint records three hashes:
   array `[{ "name", "payload" }, ...]` in emission order. A new game's `start`
   carries its `tower_founded`; a load emits nothing. A `reload` drains the
   engine it replaces first, so the next checkpoint still counts those events.
-  `events/catalog.json` defines every event, its payload (closed enums and
+  `engine-rs/src/gameplay/catalog.json` defines every event, its payload (closed enums and
   small integers only, no free text or money) and when it fires;
   `engine-rs/src/gameplay.rs` holds the Rust type to it and
   `src/events/gameplayEvents.d.ts` is generated from it (`npm run

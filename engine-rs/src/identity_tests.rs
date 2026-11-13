@@ -123,7 +123,9 @@ fn the_compat_record_agrees_with_the_crate() {
 
 /// The lock digest of the five conformance lock files: for each, its name, a
 /// newline, its byte length, a newline, then its bytes (line endings as LF).
-/// `src/build/engineCompat.ts` computes the same digest.
+/// `src/build/engineCompat.ts` computes the same digest. The event catalog
+/// keeps its lock name but lives in the crate (`src/gameplay/catalog.json`),
+/// so the published crate compiles it in.
 #[test]
 fn the_lock_digest_is_the_digest_of_the_lock_files() {
     let dir = crate_dir().join("../conformance");
@@ -135,9 +137,12 @@ fn the_lock_digest_is_the_digest_of_the_lock_files() {
         "loader-cases.json",
         "tdt-cases.json",
     ] {
-        let text = std::fs::read_to_string(dir.join(name))
-            .unwrap()
-            .replace("\r\n", "\n");
+        let path = if name == "events/catalog.json" {
+            crate_dir().join("src/gameplay/catalog.json")
+        } else {
+            dir.join(name)
+        };
+        let text = std::fs::read_to_string(path).unwrap().replace("\r\n", "\n");
         h.update(format!("{name}\n{}\n", text.len()).as_bytes());
         h.update(text.as_bytes());
     }

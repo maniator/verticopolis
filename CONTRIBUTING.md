@@ -528,10 +528,12 @@ publishes the release with the version's player notes and then dispatches
 `.github/workflows/sprite-atlas.yml` to bake the sprite atlas and attach it
 (docs/atlas.md). The release never waits on the atlas. A crate version change gets its own `engine-v<version>`
 release with that version's `engine-rs/CHANGELOG.md` section and the built
-WASM package attached, never marked Latest, so a frontend can depend on the
-crate at that tag or download the package. The same build goes to GitHub
-Packages as `@maniator/verticopolis-engine` (installing it needs a GitHub
-token, even though it is public). A maintainer can
+WASM package attached (a zip and the npm tarball), never marked Latest, so a
+frontend can depend on the crate at that tag or download the package. The
+crate release then dispatches **Publish engine to registries**
+(`.github/workflows/engine-publish.yml`), which publishes the crate to
+crates.io and that tarball to npm as `@verticopolis/engine` (see The
+registries below). A maintainer can
 still tag a commit by hand (`git tag v2.30.0 <commit> && git push origin
 v2.30.0`). Only commits that contain the atlas exporter can get an atlas. A tag push runs
 the release workflow file as it is at the tagged commit. A manual run (Actions,
@@ -654,9 +656,11 @@ and About will show it (#963 slice 3). The app version stays what players see.
 **The crate version goes up with any of these** (the PR that moves one sets
 `crate:` in its note, and the release PR raises the version):
 
-- the conformance lock: `catalog-digests.json`, `events/catalog.json`,
-  `expected.json`, `loader-cases.json` or `tdt-cases.json` under `conformance/`
-  (a new fixture or scenario lands through `expected.json`, so it counts);
+- the conformance lock: `catalog-digests.json`, `expected.json`,
+  `loader-cases.json` or `tdt-cases.json` under `conformance/`, or the
+  gameplay event catalog, `engine-rs/src/gameplay/catalog.json` (locked as
+  `events/catalog.json`; it lives in the crate so the published crate compiles
+  it in). A new fixture or scenario lands through `expected.json`, so it counts;
 - `SAVE_VERSION`, or the oldest save version the engine loads;
 - `FRAME_LAYOUT_VERSION`, `VIEW_LAYOUT_VERSION`, `CATALOG_VERSION` or
   `IDENTITY_SCHEMA` (the frame layout and the identity record's shape each
@@ -702,34 +706,86 @@ seam. A change like that still needs a bump; review owns it, and the backlog row
 `engine-compat-coverage` tracks closing the gap. A record edited by hand in the
 same PR also skips the main comparison, so a reviewer reads the record's diff.
 
+### The registries
+
+Each crate release publishes the engine to two registries:
+
+- the crate to crates.io as
+  [`verticopolis-engine`](https://crates.io/crates/verticopolis-engine);
+- its WASM build to npm as
+  [`@verticopolis/engine`](https://www.npmjs.com/package/@verticopolis/engine)
+  (the `verticopolis` npm organization), with the same version.
+
+When a release PR raises the crate version, `release-tag.yml` creates the
+`engine-v<version>` release with the npm tarball attached and dispatches
+**Publish engine to registries** (`.github/workflows/engine-publish.yml`).
+That run checks the version, the tag and the tarball's checksum without any
+credential, then its two publish jobs wait on the `registry` environment,
+whose only reviewer is the owner. Nothing reaches a registry until the owner
+approves the run. Each job then gets a short-lived token through trusted
+publishing (GitHub's OIDC token, exchanged by crates.io and npm for this
+repository, this workflow file and that environment), so no registry token is
+stored in the repository or its secrets. The crate is published from the
+release tag's `engine-rs/`; npm gets the tarball from the GitHub release, so the
+bytes on npm are the bytes attached there, with an npm provenance statement.
+A version a registry already holds is left alone there, so a re-run is safe.
+To publish a version again after a failure, run the workflow by hand from the
+Actions tab with the version.
+
+The crate's `include` list in `engine-rs/Cargo.toml` names what crates.io
+receives, and the `consumer` job in `engine-rs.yml` packages the crate on
+every engine change and builds the consumer crate against the packaged copy,
+so a file the library needs from outside `engine-rs/` fails there. The
+conformance suite is not in the package yet (#893).
+
+**The first version of each.** Both registries set up trusted publishing only
+for a package that already exists, so the owner publishes the first version by
+hand, once, with `scripts/first-publish.ps1 -Version <x.y.z>` (PowerShell,
+from a checkout, with Rust and Node.js installed). It checks out the release
+tag in a temporary folder, runs the dry runs, asks before each publish, and
+prints the trusted-publisher settings to add on each site afterward. Revoke
+the crates.io token it used once it is done.
+
+Versions released before the registries were published only to GitHub
+Packages, as `@maniator/verticopolis-engine`. They stay there; nothing new
+goes there.
+
 ### The engine READMEs
 
-Two READMEs are written for people who build on the engine, and both describe
-the engine as it is on `main`:
+Two guides are written for people who build on the engine, and both describe
+the engine as it is on `main`. They are pages of the docs site
+(docs.verticopolis.com):
 
-- [`packages/verticopolis-engine/README.md`](./packages/verticopolis-engine/README.md),
-  the README of the WASM package each crate release publishes (the npm package
-  page shows it);
-- [`engine-rs/CRATE_README.md`](./engine-rs/CRATE_README.md), the README the
-  crate will show on a registry (#893). Its quick start is
-  `engine-rs/consumer/examples/quick_start.rs`, which CI compiles.
+- [`docs/engine-site/guides/javascript.md`](./docs/engine-site/guides/javascript.md),
+  the guide to the WASM package (`@verticopolis/engine` on npm);
+- [`docs/engine-site/guides/crate.md`](./docs/engine-site/guides/crate.md),
+  the guide to the crate (`verticopolis-engine` on crates.io). Its quick start
+  is `engine-rs/consumer/examples/quick_start.rs`, which CI compiles.
+
+Each registry shows a short README that points at its guide:
+[`packages/verticopolis-engine/README.md`](./packages/verticopolis-engine/README.md)
+is packed into the npm package, and
+[`engine-rs/CRATE_README.md`](./engine-rs/CRATE_README.md) is the crate's
+`readme`. Keep them short (install, a few lines of use, links); the detail
+belongs in the guides (owner, 2026-11-13).
 
 **Every engine change updates them.** A PR that changes the engine (the
 library source under `engine-rs/src/`, its tests and `src/bin/` aside, or the
-binding declaration `src/dualrun/engine.d.ts`) edits whichever README no longer
-describes the engine: a call added, renamed or removed, a changed answer shape,
-a rule, a save behavior, a feature or a limit. When neither needs a word, the
-PR's note says so with `readmes: unchanged` in its front matter, written only
-after you read both. The "Versions and change notes" step fails an engine
-change that does neither, and fails the line beside a README edit. Guards
-check the rest mechanically: every binding call the package README names must
-exist (`src/tests/enginePackageReadme.guard.test.ts`), and the crate README's
-quick start must match the compiled example
-(`src/tests/engineCrateReadme.guard.test.ts`).
+binding declaration `src/dualrun/engine.d.ts`) edits whichever guide or README
+no longer describes the engine: a call added, renamed or removed, a changed
+answer shape, a rule, a save behavior, a feature or a limit. When none needs a
+word, the PR's note says so with `readmes: unchanged` in its front matter,
+written only after you read them. The "Versions and change notes" step fails
+an engine change that does neither, and fails the line beside a guide or
+README edit. Guards check the rest mechanically: every binding call the
+JavaScript guide and the package README name must exist
+(`src/tests/enginePackageReadme.guard.test.ts`), the crate guide's quick start
+must match the compiled example, and both READMEs stay short and link the
+site (`src/tests/engineCrateReadme.guard.test.ts`).
 
 **The docs site.** docs.verticopolis.com is a Starlight site in
 `docs/engine-site/`, its own small npm project, dressed in the game's Windows
-3.1 palette. Its pages are both READMEs, `engine-rs/API.md`,
+3.1 palette. Its pages are both guides (`docs/engine-site/guides/`), `engine-rs/API.md`,
 `conformance/README.md` and `engine-rs/CHANGELOG.md`, listed in its
 `pages.json`; `scripts/sync-pages.mjs` copies them in before each build and
 points their repository links at the site or at GitHub. The palette, logo and

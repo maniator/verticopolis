@@ -58,27 +58,31 @@ Every rule in [CONTRIBUTING.md](../CONTRIBUTING.md) applies here, plus:
   repository root, or `bash scripts/build-engine-wasm.sh`, which also installs
   the pinned toolchain on x86_64 Linux. `npm run test:wasm` runs the web
   suites that drive the engine through its package.
-- **The READMEs follow the engine.** A change to the library source or the
-  binding updates `CRATE_README.md` and the WASM package's README where they
-  went stale, or says `readmes: unchanged` in its change note
-  (CONTRIBUTING.md, The engine READMEs).
+- **The guides follow the engine.** A change to the library source or the
+  binding updates the crate and JavaScript guides
+  (`docs/engine-site/guides/`) or their short READMEs where they went stale,
+  or says `readmes: unchanged` in its change note (CONTRIBUTING.md, The
+  engine READMEs).
 - **Review:** gameplay and engine work gets `/gds-code-review`, and engine hot
   paths get the checklist in `docs/performance/hot-path-review.md`.
 
 ## Using it from another frontend
 
-[`CRATE_README.md`](CRATE_README.md) is the crate's README for people who
-build on it, the page a registry release will show (#893; that PR points
-`readme` in `Cargo.toml` at it), and its quick start is
+The crate guide (`docs/engine-site/guides/crate.md`, the docs site's "Rust
+crate" page) is for people who build on the engine, and its quick start is
 `consumer/examples/quick_start.rs`, which the `consumer` job compiles.
-Both READMEs and `API.md` are also published at docs.verticopolis.com
-(`docs/engine-site/`, rebuilt whenever they change on `main`).
+The crate guide, the JavaScript guide (`docs/engine-site/guides/`) and
+`API.md` are published at docs.verticopolis.com (`docs/engine-site/`,
+rebuilt whenever they change on `main`). [`CRATE_README.md`](CRATE_README.md)
+is the short README crates.io shows, pointing at the site.
 [`API.md`](API.md) is the page for a host that is not the web game: how to
 depend on the crate, the calls a frontend makes, and what is stable.
 [`packages/verticopolis-engine/README.md`](../packages/verticopolis-engine/README.md)
-is the README of the WASM package each crate
-release publishes to GitHub Packages (`@maniator/verticopolis-engine`), for a
-JavaScript host; `.github/workflows/release-tag.yml` packs it.
+is the short README of the WASM package each crate release publishes to npm
+(`@verticopolis/engine`), for a JavaScript host;
+`.github/workflows/release-tag.yml` packs it and
+`.github/workflows/engine-publish.yml` publishes it (CONTRIBUTING.md "The
+registries").
 `consumer/` is a small crate that depends on the engine by path and makes
 those calls; CI builds and runs a copy of it outside the checkout, in the
 Rust container image with no Node.js and a checkout holding only
@@ -322,7 +326,7 @@ a run artifact). Every build, on Vercel or on a CI cache miss, installs the
 pinned toolchain through `scripts/build-engine-wasm.sh`. A unit test fails when
 a local package is stale.
 
-Gameplay events (`conformance/events/catalog.json`, `src/gameplay.rs`) come
+Gameplay events (`src/gameplay/catalog.json`, `src/gameplay.rs`) come
 from the engine: `Engine.drainGameplayEvents()` returns and clears the batch as
 JSON, and `Engine.gameplayEventsPending()` says how many it holds. The
 host's typed drain is `src/simport/portEvents.ts`.

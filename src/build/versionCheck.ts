@@ -5,8 +5,8 @@
  *
  * A feature PR leaves every version line as main has it, keeps main's pending
  * notes, adds or edits a note when it changes a deployed path, and declares a
- * crate level when it moves a compatibility pin, and edits an engine README (or
- * says in its note that both still hold) when it changes the engine. A release PR (a `release/`
+ * crate level when it moves a compatibility pin, and edits an engine guide or
+ * README (or says in its note that they all still hold) when it changes the engine. A release PR (a `release/`
  * branch) consumes every pending note and raises each version by exactly the
  * highest pending level (only the app may go to a later version the driver
  * names, such as 3.0.0), and changes nothing but the release files.
@@ -120,9 +120,15 @@ function movedPins(base: Tree, head: Tree): string[] {
   return [...new Set([...Object.keys(a), ...Object.keys(b)])].filter((k) => k !== "crateVersion" && a[k] !== b[k]);
 }
 
-/** The READMEs an engine user reads: the WASM package's, packed into each npm
- *  release, and the crate's, for when the crate goes on a registry. */
-export const ENGINE_READMES = ["packages/verticopolis-engine/README.md", "engine-rs/CRATE_README.md"] as const;
+/** The pages an engine user reads: the full guides on the docs site, and the
+ *  short READMEs the npm package and the crate show on their registries,
+ *  which point at the guides. */
+export const ENGINE_READMES = [
+  "docs/engine-site/guides/javascript.md",
+  "docs/engine-site/guides/crate.md",
+  "packages/verticopolis-engine/README.md",
+  "engine-rs/CRATE_README.md",
+] as const;
 
 /** Engine code a README can describe: the crate's library source (its tests and
  *  command-line tools aside) and the binding declaration the WASM package ships. */
@@ -134,8 +140,9 @@ export function isEngineSource(path: string): boolean {
 }
 
 /**
- * A PR that changes the engine either edits an engine README or says, with
- * `readmes: unchanged` in its own note, that its author checked both still hold.
+ * A PR that changes the engine either edits an engine guide or README, or says,
+ * with `readmes: unchanged` in its own note, that its author checked they all
+ * still hold.
  * A note that says so while the PR edits a README is contradicting itself.
  */
 function checkReadmes(changes: readonly Change[], own: readonly ChangeNote[]): string[] {
@@ -148,7 +155,7 @@ function checkReadmes(changes: readonly Change[], own: readonly ChangeNote[]): s
   if (engine.length === 0 || readmes.length > 0 || ack.length > 0) return [];
   const sample = engine.slice(0, 3).join(", ") + (engine.length > 3 ? `, and ${engine.length - 3} more` : "");
   return [
-    `this PR changes the engine (${sample}) and neither engine README: update ${ENGINE_READMES.join(" and ")} where they no longer describe the engine, or add "readmes: unchanged" to this PR's note once you have checked that both still hold (CONTRIBUTING.md "Versioning").`,
+    `this PR changes the engine (${sample}) and no engine guide or README: update ${ENGINE_READMES.join(", ")} where they no longer describe the engine, or add "readmes: unchanged" to this PR's note once you have checked that they all still hold (CONTRIBUTING.md "Versioning").`,
   ];
 }
 

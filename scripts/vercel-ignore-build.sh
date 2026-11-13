@@ -91,7 +91,7 @@ affects_deploy() {
 
     # The conformance suite. The lock files build (engineCompat.ts LOCK_FILES);
     # the fixtures, scenarios and fuzz corpus are read only by tests.
-    conformance/catalog-digests.json | conformance/events/* | conformance/expected.json) return 0 ;;
+    conformance/catalog-digests.json | conformance/expected.json) return 0 ;;
     conformance/loader-cases.json | conformance/tdt-cases.json) return 0 ;;
     # The fixtures the engine's rule tests compile in with include_str!.
     conformance/fixtures/sixseven_2.vctower | conformance/fixtures/split-tower.vctower | conformance/fixtures/towerone_6.vctower) return 0 ;;

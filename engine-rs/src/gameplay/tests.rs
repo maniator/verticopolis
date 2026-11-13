@@ -5,7 +5,7 @@ use crate::sim::Simulation;
 fn catalog() -> Value {
     let text = std::fs::read_to_string(concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/../conformance/events/catalog.json"
+        "/src/gameplay/catalog.json"
     ))
     .expect("catalog");
     serde_json::from_str(&text).expect("catalog parses")

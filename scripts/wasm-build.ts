@@ -9,7 +9,7 @@
  * types against the binding as the Rust source declares it (CI fails when the
  * copy is stale). The engine build also refreshes src/events/gameplayEvents.d.ts
  * (and the bridge's rules beside it, src/events/gameplayEventRules.ts)
- * from conformance/events/catalog.json (the same as `npm run gen:events`).
+ * from engine-rs/src/gameplay/catalog.json (the same as `npm run gen:events`).
  * The browser target lands in src/public/engine/ with a BUILD.json naming the
  * sources it came from (see src/wasmhost/packageHash.ts) and the digests of
  * its glue and binary (src/wasmhost/enginePackageRecord.ts) and a
@@ -151,7 +151,7 @@ if (which === "engine") {
   // The gameplay event types and the bridge's runtime rules come from the
   // catalog both engines are held to, so they are refreshed with the
   // binding's own declaration.
-  const catalog = checkCatalog(JSON.parse(readFileSync(resolve(crate, "../conformance/events/catalog.json"), "utf8")));
+  const catalog = checkCatalog(JSON.parse(readFileSync(resolve(crate, "src/gameplay/catalog.json"), "utf8")));
   writeFileSync(resolve(crate, "../src/events/gameplayEvents.d.ts"), renderGameplayEventsDts(catalog));
   writeFileSync(resolve(crate, "../src/events/gameplayEventRules.ts"), renderGameplayEventRules(catalog));
   console.log("engine-rs/pkg and src/public/engine: built; src/dualrun/engine.d.ts, src/events/gameplayEvents.d.ts and gameplayEventRules.ts refreshed");

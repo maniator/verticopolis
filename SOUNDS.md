@@ -173,7 +173,7 @@ ambience.
 
 The engine also emits gameplay events (`star_reached`, `fire_started`,
 `bomb_detonated`, `milestone_reached`, and the rest of
-`conformance/events/catalog.json`), but audio does not read them yet. The
+`engine-rs/src/gameplay/catalog.json`), but audio does not read them yet. The
 drain, `Simulation.drainGameplayEvents()`, empties the buffer, and the
 analytics bridge (`src/analyticsEngineBridge.ts`) is its only caller. **Never
 call it from audio code**: a second caller would steal the batch from

@@ -394,7 +394,7 @@ impl Engine {
     }
 
     /// The gameplay events emitted since the last drain, oldest first, as
-    /// JSON `[{ name, payload }]` (`conformance/events/catalog.json`); the
+    /// JSON `[{ name, payload }]` (`engine-rs/src/gameplay/catalog.json`); the
     /// buffer is empty afterwards.
     #[wasm_bindgen(js_name = drainGameplayEvents)]
     pub fn drain_gameplay_events(&mut self) -> String {

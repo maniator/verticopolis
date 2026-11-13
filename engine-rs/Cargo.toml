@@ -4,8 +4,22 @@ version = "1.29.0"
 edition = "2021"
 rust-version = "1.97"
 license = "MIT"
-publish = false
-description = "The Verticopolis simulation engine, ported from src/engine and checked against conformance/"
+description = "The Verticopolis simulation engine: every rule, command, save format and gameplay event of the tower game"
+repository = "https://github.com/maniator/verticopolis"
+homepage = "https://docs.verticopolis.com/crate/"
+documentation = "https://docs.verticopolis.com/rust/verticopolis_engine/"
+# The short page crates.io shows; the full guide is the docs site's crate page.
+readme = "CRATE_README.md"
+keywords = ["simulation", "game", "tower", "simtower", "wasm"]
+categories = ["game-engines", "simulation", "wasm"]
+# What crates.io receives: the library, its binaries and the data they compile
+# in, with the license (a copy of the repository's, held equal by
+# src/tests/engineCrateReadme.guard.test.ts). The tests, the consumer crate
+# and the contributors' docs stay in the
+# repository; they read the conformance suite, which is not packaged yet
+# (#893). engine-rs.yml packages the crate on every engine change and builds
+# the consumer against the packaged copy.
+include = ["src/**", "Cargo.toml", "Cargo.lock", "CRATE_README.md", "CHANGELOG.md", "LICENSE"]
 # Every binary is declared below with the conformance feature it needs; none
 # is found by its path alone (tests/independence.rs holds this).
 autobins = false

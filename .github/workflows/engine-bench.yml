@@ -25,7 +25,6 @@ on:
       - "engine-bench/**"
       - "engine-rs/src/**"
       - "engine-rs/Cargo.toml"
-      - "conformance/events/**"
       - ".github/workflows/engine-bench.yml"
 
 # Read-only: the bench checks out and measures; it never writes to the repo.
