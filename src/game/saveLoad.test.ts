@@ -4,7 +4,9 @@ import { PortCodes } from "../simport/portCodes";
 import { mockPort } from "../tests/portKit/mockPort";
 import { isCrashed, isEngineStopped, isSplashUp } from "./interactionState";
 import { adoptConfirmedLegacyImport } from "./legacyImportAdopt";
-import { trackFileExported, trackFileImported, trackTdtImportRead } from "../analytics";
+import { trackAppAction, trackFileExported, trackFileImported, trackTdtImportRead } from "../analytics";
+import { precedenceUi } from "../ui/precedenceUi.fixture";
+import { showImportReport } from "../ui/uiDialogs";
 import { importFacts } from "../simport/tdtRecords";
 import {
   RESUME_AFTER_RECOVERY_KEY,
@@ -41,7 +43,8 @@ vi.mock("../storage/tdtExportReport", () => ({
   exportReport: vi.fn(() => ({ filename: "TOWER.TDT" })),
 }));
 vi.mock("../storage/tdtImportReport", () => ({
-  importReport: vi.fn(() => ({ towerName: "Old Tower" })),
+  // A whole report, so the real dialog can render it in the waiting tests.
+  importReport: vi.fn(() => ({ towerName: "Old Tower", star: 1, money: 0, day: 1, floors: 1, basements: 0, unitsImported: 0, broughtOver: [], couldNotBring: [] })),
 }));
 
 /**
@@ -282,7 +285,7 @@ describe("SaveLoad legacy files", () => {
     cb.onDownload();
     expect(deps.ui.downloadFile).toHaveBeenLastCalledWith("TOWER.TDT", bytes);
     expect(trackFileExported).toHaveBeenCalledExactlyOnceWith("tdt", expect.any(Function));
-    expect(vi.mocked(trackFileExported).mock.calls[0][1]()).toBe(HEADER);
+    expect(vi.mocked(trackFileExported).mock.calls[0][1]()).toEqual(HEADER);
   });
 
   it("the import report's Open tower adopts through the confirmed flow, which re-stages the same file", async () => {
@@ -292,14 +295,15 @@ describe("SaveLoad legacy files", () => {
     });
     const buffer = Uint8Array.of(9, 9).buffer;
     await saves.importLegacy(buffer, "OLD.TDT");
+    const [, cb] = deps.ui.showImportReport.mock.calls[0] as unknown as [
+      unknown,
+      { onOpen(): void; onShown(): void },
+    ];
+    expect(trackTdtImportRead, "not sent until the report is on screen").not.toHaveBeenCalled();
+    cb.onShown();
     expect(trackTdtImportRead, "the read is reported with the report's facts").toHaveBeenCalledExactlyOnceWith(
       vi.mocked(importFacts).mock.results[0].value,
     );
-    expect(vi.mocked(trackTdtImportRead).mock.invocationCallOrder[0], "sent once the report is up").toBeGreaterThan(deps.ui.showImportReport.mock.invocationCallOrder[0]!);
-    const [, cb] = deps.ui.showImportReport.mock.calls[0] as unknown as [
-      unknown,
-      { onOpen(): void },
-    ];
     cb.onOpen();
     const [, name, flush, restage] = vi.mocked(adoptConfirmedLegacyImport).mock
       .calls[0];
@@ -315,6 +319,57 @@ describe("SaveLoad legacy files", () => {
       new Uint8Array(buffer),
       "OLD.TDT",
     );
+  });
+});
+
+describe("SaveLoad .TDT import report analytics", () => {
+  // The module mocks keep their calls across tests; these count from zero.
+  beforeEach(() => vi.clearAllMocks());
+
+  it("a refused file shows no report and reports no read, only the refusal", async () => {
+    const { saves, deps } = setup({
+      prepareTdt: () => Promise.resolve(),
+      loadTdt: () => Float64Array.of(0, 0),
+      lastReason: () => "Not a SimTower save.",
+    });
+    await saves.importLegacy(new ArrayBuffer(4), "BAD.TDT");
+    expect(deps.ui.showImportReport).not.toHaveBeenCalled();
+    expect(trackTdtImportRead).not.toHaveBeenCalled();
+    expect(importFacts).not.toHaveBeenCalled();
+    expect(trackAppAction).toHaveBeenCalledExactlyOnceWith("import_failed", "tdt");
+    expect(deps.ui.toast).toHaveBeenCalledExactlyOnceWith("Not a SimTower save.", "bad");
+  });
+
+  it("two reads behind a busy dialog, the first superseded by the second, report one read: the second's", async () => {
+    const { saves, deps } = setup({
+      prepareTdt: () => Promise.resolve(),
+      loadTdt: () => Float64Array.of(1, 0),
+    });
+    const dialog = precedenceUi();
+    deps.ui.showImportReport.mockImplementation((report, cb) => showImportReport(dialog.ui, report as never, cb as never));
+    const firstFacts = { file: "first" };
+    const secondFacts = { file: "second" };
+    vi.mocked(importFacts).mockReturnValueOnce(firstFacts as never).mockReturnValueOnce(secondFacts as never);
+    dialog.openBlocking();
+    await saves.importLegacy(new ArrayBuffer(4), "ONE.TDT");
+    await saves.importLegacy(new ArrayBuffer(4), "TWO.TDT");
+    expect(trackTdtImportRead, "neither report is on screen yet").not.toHaveBeenCalled();
+    dialog.spies.closeModal();
+    expect(trackTdtImportRead).toHaveBeenCalledExactlyOnceWith(secondFacts);
+  });
+
+  it("a read dropped by a tower swap while it waits reports nothing", async () => {
+    const { saves, deps } = setup({
+      prepareTdt: () => Promise.resolve(),
+      loadTdt: () => Float64Array.of(1, 0),
+    });
+    const dialog = precedenceUi();
+    deps.ui.showImportReport.mockImplementation((report, cb) => showImportReport(dialog.ui, report as never, cb as never));
+    dialog.openBlocking();
+    await saves.importLegacy(new ArrayBuffer(4), "ONE.TDT");
+    dialog.spies.precedence.towerSwapped();
+    dialog.spies.closeModal();
+    expect(trackTdtImportRead).not.toHaveBeenCalled();
   });
 });
 

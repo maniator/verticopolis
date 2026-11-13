@@ -1,4 +1,5 @@
 import { trackEvent } from "./analyticsCore";
+import type { GameMode } from "./shared/types";
 import type { HeaderView } from "./simport/view";
 import type { ImportReportFacts } from "./storage/tdtImportReport";
 
@@ -19,8 +20,9 @@ import type { ImportReportFacts } from "./storage/tdtImportReport";
  *  original 1994 SimTower `.TDT`. */
 export type SaveFileFormat = "vctower" | "tdt";
 
-/** What the file events say about the tower: its rule set and size. */
-type TowerFileProps = { format: SaveFileFormat; mode: string; star: number; population: number };
+/** What the file events say about the tower: its rule set and size. The
+ *  `file_imported` and `file_exported` events carry exactly these fields. */
+export type TowerFileProps = { format: SaveFileFormat; mode: GameMode; star: number; population: number };
 
 /** The header fields the file events read. */
 type TowerHeader = Pick<HeaderView, "mode" | "star" | "population">;
@@ -38,12 +40,13 @@ function towerFileProps(format: SaveFileFormat, header: () => TowerHeader): Towe
 
 /** The header as it stands now, for an event sent later: an export's header
  *  is the one its file was written from, even if the game runs on before the
- *  download. The reader makes a new header object every frame, so keeping the
- *  reference keeps the values. A read that throws now throws again when the
- *  event reads it, where the file event swallows it. */
+ *  download. The three fields are copied out, so a header object reused or
+ *  changed later cannot change them. A read that throws now throws again when
+ *  the event reads it, where the file event swallows it. */
 export function headerNow(header: () => TowerHeader): () => TowerHeader {
   try {
-    const now = header();
+    const { mode, star, population } = header();
+    const now: TowerHeader = { mode, star, population };
     return () => now;
   } catch (err) {
     return () => {
@@ -129,8 +132,9 @@ export function tdtImportReadProps(facts: ImportReportFacts): TdtImportReadProps
   };
 }
 
-/** A `.TDT` read cleanly and its import report is up. Like the file events,
- *  it never stands between the player and the report. */
+/** A `.TDT` read cleanly and its import report is on screen: the caller sends
+ *  it from the report's `onShown`. Like the file events, it never stands
+ *  between the player and the report. */
 export function trackTdtImportRead(facts: ImportReportFacts): void {
   let props: TdtImportReadProps;
   try {

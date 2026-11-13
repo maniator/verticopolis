@@ -99,7 +99,7 @@ describe("export single-flight latch (GH #760)", () => {
     expect(trackFileExported).not.toHaveBeenCalled();
     await runExportFlow(flowDeps(ui), saved());
     expect(trackFileExported).toHaveBeenCalledExactlyOnceWith("vctower", expect.any(Function));
-    expect(vi.mocked(trackFileExported).mock.calls[0][1]()).toBe(HEADER);
+    expect(vi.mocked(trackFileExported).mock.calls[0][1]()).toEqual(HEADER);
   });
 
   it("reports the header the file was written from, even when the tower moves on before the download", async () => {
@@ -109,7 +109,7 @@ describe("export single-flight latch (GH #760)", () => {
     const later = { ...HEADER, population: 9999 };
     const written = Promise.resolve(FAKE_FILE).then((file) => ((header = later), file));
     await runExportFlow({ ui, reader: () => ({ header: header as never }) }, saved(written));
-    expect(vi.mocked(trackFileExported).mock.calls[0][1]()).toBe(HEADER);
+    expect(vi.mocked(trackFileExported).mock.calls[0][1]()).toEqual(HEADER);
   });
 
   it("REGRESSION (GH #997): a download that failed gets no success toast, and the latch frees", async () => {

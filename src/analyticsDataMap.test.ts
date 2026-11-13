@@ -7,6 +7,8 @@ import { ENGINE_STATUS_REASONS, ENGINE_BUILDS, ENGINE_KINDS, ENGINE_STATUS_FIELD
 import { FALLBACK_STAGES } from "./wasmhost/engineBoot";
 import { MAX_BODY_BYTES, RATE_LIMIT_MAX } from "./analyticsIngest";
 import type { EngineChoice } from "./wasmhost/engineChoice";
+import { TDT_IMPORT_ANOMALIES, TDT_TRANSPORT_ANOMALIES, tdtImportReadProps, type TowerFileProps } from "./analyticsFiles";
+import type { ImportReportFacts } from "./storage/tdtImportReport";
 
 /** Every engine a page life can ask for. Typed against `EngineChoice` both
  *  ways, so a new choice fails the typecheck here until the map lists it. */
@@ -14,6 +16,14 @@ const ENGINE_CHOICES = ["ts", "wasm", "wasm-frame", "wasm-worker"] as const sati
 type MissingChoice = Exclude<EngineChoice, (typeof ENGINE_CHOICES)[number]>;
 const everyChoice: [MissingChoice] extends [never] ? true : MissingChoice = true;
 void everyChoice;
+
+/** The `file_imported` and `file_exported` fields. Typed against
+ *  `TowerFileProps` both ways, so a field added to or dropped from the events
+ *  fails the typecheck here until this list, and so the map, follows. */
+const TOWER_FILE_FIELDS = ["format", "mode", "star", "population"] as const satisfies readonly (keyof TowerFileProps)[];
+type MissingTowerFileField = Exclude<keyof TowerFileProps, (typeof TOWER_FILE_FIELDS)[number]>;
+const everyTowerFileField: [MissingTowerFileField] extends [never] ? true : MissingTowerFileField = true;
+void everyTowerFileField;
 
 /**
  * The analytics data map (`docs/analytics-data-map.md`) has to keep up with
@@ -64,6 +74,34 @@ const engineSection = () => section("`engine_status`");
 /** The first cell of every table row in a section: the names it lists. */
 const rowNames = (text: string) => [...text.matchAll(/^\| `([^`]+)` \|/gm)].map((m) => m[1]);
 
+/** Every name in backticks in the Fields cell of one event's row in the
+ *  Events table. */
+function eventFields(event: string): string[] {
+  const cell = fieldRow(section("Events"), event).split(" | ")[1] ?? "";
+  return [...cell.matchAll(/`([^`]+)`/g)].map((m) => m[1]);
+}
+
+/** The field names `tdt_import_read` really sends: the keys of the props built
+ *  from an import report's facts, so a field added to the builder shows up
+ *  here without a list to keep in step. Only the numbers the builder reads
+ *  are filled in. */
+function tdtImportReadKeys(): string[] {
+  const zeros = (names: readonly string[]) => Object.fromEntries(names.map((name) => [name, 0]));
+  const facts = {
+    counts: zeros([...TDT_IMPORT_ANOMALIES, "rooms"]),
+    decodeStats: zeros(TDT_TRANSPORT_ANOMALIES),
+    star: 1,
+    floors: 1,
+    basements: 0,
+    shafts: 0,
+    flights: 0,
+    decoded: true,
+    peopleCount: null,
+    notes: [],
+  } as unknown as ImportReportFacts;
+  return Object.keys(tdtImportReadProps(facts));
+}
+
 describe("analytics data map", () => {
   it("reads the whole vocabulary", () => {
     const names = vocabulary();
@@ -99,6 +137,20 @@ describe("analytics data map", () => {
       const listed = [...values.matchAll(/`([^`]+)`/g)].map((m) => m[1]);
       expect(listed.sort(), field).toEqual([...list].sort());
     }
+  });
+
+  it("lists exactly the fields each file event sends", () => {
+    // Set equality both ways: a field the code sends without a word in the map
+    // fails, and so does a field the map names that the code never sends.
+    expect(eventFields("file_imported").sort()).toEqual([...TOWER_FILE_FIELDS].sort());
+    expect(eventFields("file_exported").sort()).toEqual([...TOWER_FILE_FIELDS].sort());
+    expect(eventFields("tdt_import_read").sort()).toEqual(tdtImportReadKeys().sort());
+  });
+
+  it("reads the tdt_import_read keys from the builder, every anomaly included", () => {
+    const keys = tdtImportReadKeys();
+    for (const name of [...TDT_IMPORT_ANOMALIES, ...TDT_TRANSPORT_ANOMALIES, "anomalies", "hasRoster", "notes"]) expect(keys).toContain(name);
+    expect(new Set(keys).size).toBe(keys.length);
   });
 
   it("states the limits the code sets", () => {

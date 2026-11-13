@@ -444,7 +444,7 @@ export class UI {
     dialogs.newTowerModal(this, opts);
   }
 
-  showImportReport(report: ImportReport, cb: { onOpen: () => void }): void {
+  showImportReport(report: ImportReport, cb: dialogs.ImportReportCallbacks): void {
     dialogs.showImportReport(this, report, cb);
   }
 

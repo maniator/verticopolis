@@ -241,11 +241,20 @@ function announce(text: string): void {
   if (live) live.textContent = text;
 }
 
+/** What the import report tells its caller. `onOpen` fires only when the
+ *  player commits via "Open tower". `onShown` fires once, when the report is
+ *  actually on screen: a report that waits behind another dialog fires it when
+ *  it opens, and one dropped while it waits never fires it. */
+export interface ImportReportCallbacks {
+  onOpen: () => void;
+  onShown?: () => void;
+}
+
 /**
  * Fidelity report for a parsed legacy (.TDT) import, shown BEFORE anything is
- * adopted. `onOpen` fires only when the player commits via "Open tower".
+ * adopted. See {@link ImportReportCallbacks} for when each callback fires.
  */
-export function showImportReport(ui: UI, report: ImportReport, cb: { onOpen: () => void }): void {
+export function showImportReport(ui: UI, report: ImportReport, cb: ImportReportCallbacks): void {
   // Not "is a dialog open" but "would replacing it destroy something": one that
   // owns nothing is displaced, one that owns a decision is waited for. The old
   // guard refused on "open at all" and said so with a toast, which a <dialog>
@@ -269,6 +278,7 @@ export function showImportReport(ui: UI, report: ImportReport, cb: { onOpen: () 
       cb.onOpen();
     },
   });
+  cb.onShown?.();
 }
 
 /**
