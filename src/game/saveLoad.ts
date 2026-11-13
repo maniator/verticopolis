@@ -1,7 +1,7 @@
 import type { GameMode, SerializedView } from "../shared/types";
 import type { CalendarKind } from "../shared/engineTypes";
 import { SaveGame, isStorageWriteError, saveFailureMessage } from "../storage/SaveGame";
-import { trackAppAction, trackAppActionOnce } from "../analytics";
+import { trackAppAction, trackAppActionOnce, trackFileExported, trackFileImported, trackTdtImportRead } from "../analytics";
 import { exportReport, type ExportReport } from "../storage/tdtExportReport";
 import { importReport } from "../storage/tdtImportReport";
 import { runExportFlow, runLegacyDownload } from "./exportFlow";
@@ -30,7 +30,7 @@ export interface SaveLoadDeps {
   /** The layout's code tables, for the port's mode, calendar and log codes. */
   portCodes(): PortCodes;
   /** The shared reader, current as of the last swap. */
-  reader(): Pick<ViewReader, "rooms" | "structure">;
+  reader(): Pick<ViewReader, "rooms" | "structure" | "header">;
   /** A tower arrived through the port (a load, a new tower, an import): the
    *  app follows it and breaks the report dialogs' leash. Every path here
    *  brings a *different* tower, so the undo trail goes too; only the app's
@@ -416,7 +416,7 @@ export class SaveLoad {
       // and a .vctower export can never run at once.
       onDownload: () =>
         void runLegacyDownload(this.deps.ui, () => {
-          this.deps.ui.downloadFile(report.filename, file);
+          if (this.deps.ui.downloadFile(report.filename, file)) trackFileExported("tdt", () => this.deps.reader().header);
         }),
     });
   }
@@ -430,6 +430,7 @@ export class SaveLoad {
       const loaded = port.loadVctower(data);
       if (loaded[0] !== 1) throw new Error(port.lastReason() ?? SWAP_REFUSED);
       this.deps.towerSwapped();
+      trackFileImported("vctower", () => this.deps.reader().header);
       this.deps.ui.toast("Tower imported.", "good");
     } catch (err) {
       trackAppAction("import_failed", "save");
@@ -457,7 +458,9 @@ export class SaveLoad {
       this.deps.ui.toast(port.lastReason() ?? "This SimTower save couldn't be read.", "bad");
       return;
     }
-    const report = importReport(importFacts(rec, this.deps.portCodes(), port));
+    const facts = importFacts(rec, this.deps.portCodes(), port);
+    trackTdtImportRead(facts);
+    const report = importReport(facts);
     this.deps.ui.showImportReport(report, {
       // The confirmed-adoption flow (flush, adopt, fresh-slot copy, honest
       // toasts) lives in ./legacyImportAdopt, split out at the 500-line guard.
@@ -470,10 +473,8 @@ export class SaveLoad {
   }
 
   /** Found a fresh tower under the chosen rule-set. The mode, and for Modern the
-   *  calendar choice and the no-bridging option, are baked into the new
-   *  Simulation at creation and immutable for that tower's life. Classic always
-   *  runs the canon calendar and auto structure, so `modernCalendar` and
-   *  `startUnbridged` is only consulted for Modern. */
+   *  calendar and the no-bridging option, are fixed at founding for the tower's
+   *  life; Classic runs the canon calendar and structure and ignores both. */
   newGame(mode: GameMode = "classic", modernCalendar: CalendarKind = "realWorld", startUnbridged = false): void {
     const port = this.deps.enginePort();
     const codes = this.deps.portCodes();
@@ -490,10 +491,8 @@ export class SaveLoad {
         : "New tower founded. Good luck!",
       "good",
     );
-    // Auto-arm onboarding only for a genuine first-timer. A returning player (a
-    // save exists) is treated as already onboarded even if the localStorage flag
-    // was cleared, so they're never re-onboarded unexpectedly (Replay via Help
-    // still re-arms explicitly).
+    // Auto-arm onboarding only for a first-timer: a saved tower means already
+    // onboarded even with the flag cleared (Replay via Help still re-arms).
     if (shouldArm(true) && !SaveGame.hasSave()) this.deps.armOnboarding();
   }
 }

@@ -85,6 +85,9 @@ an event sent before boot carries `version` only.
 | `bomb_outcome` | `outcome` | A bomb threat ends: `paid`, `found` or `exploded` | How bomb threats end, and whether Security wins the race |
 | `session_emergencies` | `fires`, `firesGutRooms`, `bombs` | Session end | How often emergencies happen |
 | `session_crashes` | `crashes` | Terminal page hide, only when a crash screen showed (approved 2026-11-03, #841) | How many crash screens a page life showed, which the capped `crash` rows cannot say |
+| `file_imported` | `format`, `mode`, `star`, `population` | A `.vctower` or `.TDT` import finished and its tower is open (approved 2026-11-13) | Whether imports succeed, per format; `import_failed` (below) counts the refusals |
+| `file_exported` | `format`, `mode`, `star`, `population` | A `.vctower` or `.TDT` download was handed to the browser (approved 2026-11-13) | Whether exports succeed, per format; `export_failed` (below) counts the refusals |
+| `tdt_import_read` | `star`, `floors`, `basements`, `rooms`, `shafts`, `flights`, `decoded`, `hasRoster`, `notes`, `anomalies`, and one count per importer workaround (`unknown`, `droppedFloors`, `offLot`, `overlapping`, `misplaced`, `clamped`, `widthMismatch`, `asleepConverted`, `droppedShafts`, `adjustedShafts`, `droppedFlights`) | A 1994 `.TDT` read cleanly and its import report is up (approved 2026-11-13) | What old towers hold that the importer has to work around. Counts and flags only: the tower name and the report's note text are never sent |
 | `engine_status` | see below | See below | Engine reliability for the 3.0 release |
 
 The fields of each event are documented where they are declared

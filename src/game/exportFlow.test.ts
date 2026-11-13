@@ -1,6 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { SaveGame } from "../storage/SaveGame";
 import { runExportFlow, runLegacyDownload, resetExportFlowForTests, EXPORT_WATCHDOG_MS } from "./exportFlow";
+import { trackFileExported } from "../analytics";
+
+vi.mock("../analytics", async (importActual) => ({
+  ...(await importActual<typeof import("../analytics")>()),
+  trackFileExported: vi.fn(),
+}));
 
 /**
  * The export flow's single-flight latch and its watchdog (GH #760). A second
@@ -45,8 +51,10 @@ function fakeUi(downloadStarts: boolean[] = []) {
   };
 }
 
+const HEADER = { mode: "modern", star: 2, population: 90 };
+
 function flowDeps(ui: ReturnType<typeof fakeUi>["ui"]) {
-  return { ui };
+  return { ui, reader: () => ({ header: HEADER as never }) };
 }
 
 const FAKE_FILE = "VCTOWER1\nfake";
@@ -82,6 +90,16 @@ describe("export single-flight latch (GH #760)", () => {
     await runExportFlow(flowDeps(ui), saved(file, "Skyline One"));
     expect(downloads).toEqual([{ filename: SaveGame.exportFilename("Skyline One"), contents: file }]);
     expect(toasts).toEqual([{ text: "Tower exported (2.0 KB). Check your downloads.", kind: "good" }]);
+  });
+
+  it("reports a .vctower export once the download starts, and not for one that failed", async () => {
+    vi.mocked(trackFileExported).mockClear();
+    const { ui } = fakeUi([false, true]);
+    await runExportFlow(flowDeps(ui), saved());
+    expect(trackFileExported).not.toHaveBeenCalled();
+    await runExportFlow(flowDeps(ui), saved());
+    expect(trackFileExported).toHaveBeenCalledExactlyOnceWith("vctower", expect.any(Function));
+    expect(vi.mocked(trackFileExported).mock.calls[0][1]()).toBe(HEADER);
   });
 
   it("REGRESSION (GH #997): a download that failed gets no success toast, and the latch frees", async () => {

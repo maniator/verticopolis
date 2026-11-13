@@ -39,6 +39,7 @@ export {
   trackEconomyActionOnce,
   trackEmergencyChoice,
 } from "./analyticsActions";
+export { trackFileImported, trackFileExported, trackTdtImportRead, type SaveFileFormat } from "./analyticsFiles";
 
 /**
  * Start the gameplay session at boot and keep its foreground clock in step with

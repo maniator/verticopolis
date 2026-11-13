@@ -1,4 +1,5 @@
-import { trackAppAction } from "../analytics";
+import { trackAppAction, trackFileExported } from "../analytics";
+import type { ViewReader } from "../simport/viewReader";
 import { SaveGame } from "../storage/SaveGame";
 import type { UI } from "../ui/UI";
 
@@ -16,6 +17,8 @@ import type { UI } from "../ui/UI";
 /** The slice of {@link import("./saveLoad").SaveLoadDeps} the flow touches. */
 export interface ExportFlowDeps {
   ui: Pick<UI, "toast" | "downloadFile">;
+  /** The tower being exported, for the `file_exported` event. */
+  reader(): Pick<ViewReader, "header">;
 }
 
 /**
@@ -86,6 +89,7 @@ export async function runExportFlow(
     // A download that failed has already said so (GH #997); the success line
     // would contradict it.
     if (!deps.ui.downloadFile(SaveGame.exportFilename(towerName), file)) return;
+    trackFileExported("vctower", () => deps.reader().header);
     // The container is pure ASCII, so string length == bytes on disk.
     const size = `${(file.length / 1024).toFixed(1)} KB`;
     deps.ui.toast(
