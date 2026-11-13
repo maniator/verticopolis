@@ -1,0 +1,81 @@
+---
+title: Differences from the 1994 game
+description: Where a Classic Verticopolis tower plays just like SimTower (1994), the few things done differently on purpose, and what isn't in yet.
+---
+
+A **Classic** tower is meant to play like the 1994 game, rule for rule: the same rooms, the same prices, the same stars and the same headaches at the elevators. This page is the honest list of where it doesn't. Some differences are on purpose, because the original's way couldn't be known or got in the way of a fair game. A few are things we haven't finished yet.
+
+A **Modern** tower is different by design, and [Classic and Modern](/help/classic-vs-modern/) lists everything it adds.
+
+## At a glance
+
+| Part of the game | A Classic tower compared with 1994 | Read more |
+| --- | --- | --- |
+| Floors, lobbies and basements | Same | [Floors and lobbies](/help/building/floors-and-lobbies/) |
+| Rooms | Same, with a Wedding Hall in place of the Cathedral | [Rooms](/help/rooms/) |
+| Elevators, stairs and escalators | Same, schedules and stops included | [Elevators](/help/building/elevators/) |
+| Rent and prices | Same: the four 1994 price levels | [Money](/help/tower/money/) |
+| People and the elevators | Different on purpose: every commuter is a real person | [People](/help/tower/people/) |
+| Stars and the TOWER | Same thresholds, with a TOWER at 15,000 | [Stars and the TOWER](/help/tower/stars/) |
+| Hotels and Housekeeping | Different on purpose: real maids, cockroaches you can see | [Hotels](/help/rooms/hotels/) |
+| Shops and restaurants | Different on purpose: customers come from the floors that can reach them | [Food and shops](/help/rooms/food-and-shops/) |
+| Fires, bombs and other events | Same | [Events](/help/tower/events/) |
+| 1994 `.TDT` saves | Opened and written, with two limits on the way back | [Importing and exporting](/help/your-towers/importing-exporting/) |
+| Pausing | Not settled yet | [Other actions while paused](#other-actions-while-paused) |
+
+## Different on purpose
+
+### Every commuter is a real person
+
+In 1994 the crowds in the lobby were mostly a picture of what the game was counting. In Verticopolis each commuter is a person on a real trip: they walk to a shaft, wait, ride an actual car, change at a sky lobby and arrive. How long the people of each floor wait is what moves that floor's ratings. Underneath, the game also keeps a simple tally of the crowds, and only so many people are drawn on screen at once. See [People](/help/tower/people/).
+
+### The Wedding Hall
+
+The 1994 game crowned the tower with a Cathedral. Verticopolis has a **Wedding Hall** instead, standing in the same place on floor 100 and doing the same job, without the religion. See [The Wedding Hall](/help/rooms/wedding-hall/).
+
+### Who counts toward population
+
+The original never fully explained its population counter, so Verticopolis counts the people who work, live and shop in your tower, with hotel guests dropping out of the count at four stars. The TOWER still needs the 1994 game's **15,000**, and the lot is the original's full width so a well-planned tower can get there. See [Stars and the TOWER](/help/tower/stars/).
+
+### Housekeeping maids
+
+Each Housekeeping room sends out a crew of six maids who walk to the dirty rooms and clean them, getting around on the stairs and the service elevator only. How many rooms they get through each day comes from where you put them and how they get around. The 1994 game's maids got lost on long trips, which is why players built a service elevator every six floors; ours don't. See [Hotels](/help/rooms/hotels/#housekeeping).
+
+### Cockroaches you can see
+
+A hotel room left dirty for three days becomes infested, as in 1994, and the cockroaches creep along the floor to the rooms beside it. In Verticopolis you can see which rooms they're in. A Classic tower still cures them the 1994 way, with the bulldozer. See [Hotels](/help/rooms/hotels/).
+
+### Shoppers come from nearby floors
+
+The 1994 game kept a hidden customer count for each shop and restaurant, and nobody has ever worked out exactly how it behaved. Verticopolis works out each shop's customers from the people who can reach it, so a shop crowded by its neighbors earns less and a shop nobody can get to earns nothing. See [Food and shops](/help/rooms/food-and-shops/).
+
+### Two ways to play
+
+The original had one set of rules. Verticopolis asks, when you found a tower, whether it plays as **Classic** (the 1994 rules) or **Modern** (those rules plus what the original couldn't do), and the tower keeps that choice for life. Everything on this page is about Classic. See [Classic and Modern](/help/classic-vs-modern/).
+
+### Building while paused
+
+A Classic tower, like the 1994 game, won't start new construction while the clock is stopped. A Modern tower lets you pause and lay out a whole block first. See [Floors and lobbies](/help/building/floors-and-lobbies/).
+
+## Not in yet
+
+### Lobby distance
+
+The 1994 game held back the ratings of some floors in the middle of each block, even in a tower with every sky lobby built. Verticopolis leaves those floors alone once every sky lobby you're allowed is in, so the advice the game gives you can always be followed. Tying the penalty to how far people actually have to ride, as the original may have done, is still to come. See [Tenant ratings](/help/tower/ratings/).
+
+### Other actions while paused
+
+We know the 1994 game refuses new construction while paused. We haven't yet checked whether it also refuses bulldozing, changing elevators or rents, or opening a room's card, or whether a tower it loads starts paused. Until we have, those all work while paused, in both kinds of tower.
+
+## Taking a tower back to 1994
+
+A Classic tower can be written out as a `.TDT` file for the original game. Two things to know first:
+
+- **Burned rooms arrive cleared.** The original can't draw a burned-out room loaded from a file, so a gutted room goes over as plain floor, ready to rebuild. The game tells you how many before you save.
+- **A tower needs people.** A tower with rooms but nobody in them shows a black screen in the 1994 game. Any tower you've actually played has people in it, so this only catches an empty test file.
+
+See [Importing and exporting](/help/your-towers/importing-exporting/).
+
+## Found a difference?
+
+If a Classic tower does something the 1994 game didn't, and it isn't on this page, please [tell us with a parity report](https://github.com/maniator/verticopolis/issues/new?template=parity_report.yml). Say where you saw the original do it (the manual, a video, your own copy) so we can check.

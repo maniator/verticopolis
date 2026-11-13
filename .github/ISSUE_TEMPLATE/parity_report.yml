@@ -50,7 +50,7 @@ body:
       options:
         - label: This is about a **Classic**-mode tower (Modern-mode differences are intentional; use a Feature request for those).
           required: true
-        - label: I checked the [list of known differences](https://github.com/maniator/verticopolis/blob/main/PARITY.md) and this one is not on it as intentional.
+        - label: I checked the [list of known differences](https://verticopolis.com/help/differences/) and this one is not on it as intentional.
           required: true
         - label: I searched existing issues and this is not a duplicate.
           required: true

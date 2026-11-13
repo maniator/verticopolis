@@ -46,8 +46,9 @@ drawn in code.
 - **Installable and offline** on desktop and phone.
   ([Installing and updates](https://verticopolis.com/help/your-towers/installing/))
 
-How close it is to the original, mechanic by mechanic, is in
-[PARITY.md](PARITY.md).
+Where a Classic tower differs from the original, on purpose or not yet, is on
+[Differences from the 1994 game](https://verticopolis.com/help/differences/);
+the developer's checklist is [PARITY.md](PARITY.md).
 
 ## Quick start
 
