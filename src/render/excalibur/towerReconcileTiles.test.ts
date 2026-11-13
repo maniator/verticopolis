@@ -5,7 +5,17 @@ import { syncScene } from "./towerReconcile";
 import { markRegionUnit } from "./towerRegions";
 import { disposeScene } from "./towerScene";
 import { emptyStructPass } from "./towerStructTiles";
+import { HallDoorLayer, relightHallDoors, syncHallDoors } from "./towerHallDoors";
+import { lobbyHalls, NO_TALL_HALLS, type LobbyHalls } from "../lobbyHalls";
 import { bindViewWorld, viewWorld } from "../../presentation/viewWorld";
+
+// The door actors need a 2d canvas a Node test lacks; `towerHallDoors.test.ts`
+// covers them. Here the structure pass is checked for the doors it hands over.
+vi.mock("./towerHallDoors", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./towerHallDoors")>()),
+  syncHallDoors: vi.fn(),
+  relightHallDoors: vi.fn(),
+}));
 
 // The scene sync's tile pass (floor and lobby cells of the structure TileMap)
 // draws from the layout, the lobby lighting and the sim alone. These tests pin
@@ -56,7 +66,7 @@ const office: UnitView = { id: 7, kind: "office", floor: 2, x: 10, width: 6, sta
 /** Lobby graphics named by lighting, so a test can read which one a cell got. */
 const lobbyGfx = (lit: number): string[][] => [Array.from({ length: 16 }, (_, v) => `upper ${lit}:${v}`), Array.from({ length: 16 }, (_, v) => `ground ${lit}:${v}`)];
 
-function fakeEngine(state: { units: UnitView[]; revision: number; tall?: Map<number, number> }) {
+function fakeEngine(state: { units: UnitView[]; revision: number; tall?: LobbyHalls }) {
   const cells = new Map<string, Cell>();
   const getTile = vi.fn((x: number, y: number) => {
     const key = `${x},${y}`;
@@ -73,7 +83,7 @@ function fakeEngine(state: { units: UnitView[]; revision: number; tall?: Map<num
       },
       transports: [],
       functionalParkingSet: () => new Set<number>(),
-      tallLobbies: vi.fn(() => state.tall ?? new Map<number, number>()),
+      tallLobbies: vi.fn(() => state.tall ?? NO_TALL_HALLS),
     },
     parkingUsage: () => 0,
     recyclingFill: () => 0,
@@ -86,6 +96,7 @@ function fakeEngine(state: { units: UnitView[]; revision: number; tall?: Map<num
     structTileMap: { getTile },
     // The map's row 0 is floor 20.
     structTopFloor: 20,
+    hallDoors: new HallDoorLayer(),
     floorGfx: "floor",
     lobbyGfx: [lobbyGfx(0), lobbyGfx(1)],
     entranceGrandLeftGfx: ["grand-left 0", "grand-left 1"],
@@ -200,7 +211,7 @@ describe("the scene sync walks the structure tiles only when what they draw from
     const units = [{ ...office }];
     for (let x = 4; x < 8; x++) units.push(tile("lobby", 1, x));
     for (let x = 4; x < 6; x++) units.push(tile("lobby", 15, x));
-    const state = { units, revision: 5, tall: new Map([[1, 2], [15, 3]]) };
+    const state = { units, revision: 5, tall: lobbyHalls([1, 4, 7, 2, 15, 4, 5, 3]) };
     const { engine, cell } = fakeEngine(state);
     syncScene(engine);
     // The entrance is a slice of the open hall on every story, its doors
@@ -224,15 +235,40 @@ describe("the scene sync walks the structure tiles only when what they draw from
     expect(engine.sim.tower.tallLobbies).toHaveBeenCalledOnce();
   });
 
+  it("rises each hall to its own height and puts a revolving door where two heights meet (#2068)", () => {
+    const units = [{ ...office }];
+    for (let x = 4; x < 12; x++) units.push(tile("lobby", 1, x));
+    // A three-story hall over 4..7 beside a two-story hall over 8..11.
+    const state = { units, revision: 5, tall: lobbyHalls([1, 4, 7, 3, 1, 8, 11, 2]) };
+    const { engine, cell } = fakeEngine(state);
+    syncScene(engine);
+    expect(cell(7, 3)?.gfx).toHaveLength(1);
+    expect(cell(8, 2)?.gfx).toHaveLength(1);
+    expect(cell(8, 3)).toBeUndefined();
+    // The structure pass hands the door layer the one wall between the halls.
+    expect(vi.mocked(syncHallDoors)).toHaveBeenLastCalledWith(engine, [{ floor: 1, x: 8, tall: 3, short: 2, tallOnLeft: true }]);
+    // The halls level out: the next full pass hands over no door.
+    state.tall = lobbyHalls([1, 4, 11, 3]);
+    state.revision = 6;
+    syncScene(engine);
+    expect(vi.mocked(syncHallDoors)).toHaveBeenLastCalledWith(engine, []);
+    // A lighting-only sync repaints the doors without looking for new ones.
+    const passes = vi.mocked(syncHallDoors).mock.calls.length;
+    engine.litState = true;
+    syncScene(engine);
+    expect(vi.mocked(syncHallDoors).mock.calls.length).toBe(passes);
+    expect(vi.mocked(relightHallDoors)).toHaveBeenCalledWith(engine);
+  });
+
   it("clears a tall lobby's upper cells when its lobby goes", () => {
     const units = [{ ...office }];
     for (let x = 4; x < 8; x++) units.push(tile("lobby", 1, x));
-    const state = { units, revision: 5, tall: new Map([[1, 3]]) };
+    const state = { units, revision: 5, tall: lobbyHalls([1, 4, 7, 3]) };
     const { engine, cell } = fakeEngine(state);
     syncScene(engine);
     expect(engine.structTiles.size).toBe(12);
     state.units = [{ ...office }];
-    state.tall = new Map();
+    state.tall = NO_TALL_HALLS;
     state.revision = 6;
     syncScene(engine);
     expect(engine.structTiles.size).toBe(0);

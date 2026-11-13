@@ -36,8 +36,17 @@ export const Z = {
   transport: 1,
   /** Elevator cabs. */
   cab: 2,
+  /** The wall between two lobby halls of different heights, the back of
+   *  its revolving door and the wings on the far side of the post (#2068). */
+  hallDoorBack: 2.5,
+  /** A commuter walking left through a revolving door: the back of the drum. */
+  crowdBehindDoor: 2.6,
+  /** The door's center post and its near wings. */
+  hallDoorMiddle: 2.7,
   /** The commuting crowd. */
   crowd: 3,
+  /** The door drum's front glass, posts and canopy, over everyone inside. */
+  hallDoorFront: 3.5,
   /** Screen-space overlays (labels, effects). */
   overlay: 100,
 } as const;

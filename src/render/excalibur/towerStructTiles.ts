@@ -3,6 +3,8 @@ import type { RenderSim } from "../renderSim";
 import type { UnitView } from "../../simport/view";
 import { lobbyVariant } from "../sprites";
 import type { TowerEngine } from "./TowerEngine";
+import { hallDoors } from "../lobbyHalls";
+import { relightHallDoors, syncHallDoors } from "./towerHallDoors";
 
 /**
  * The scene sync's structure pass: the floor and lobby cells of the structure
@@ -49,6 +51,7 @@ export function syncStructureTiles(engine: TowerEngine): readonly UnitView[] {
       // The entrance map still matches this layout: it was built by the full
       // pass that kept these lobby cells.
       for (const [cell, u, story, height] of pass.lobbies) paintCell(cell, lobbyTileGfx(engine, u, story, height));
+      relightHallDoors(engine);
       pass.lit = engine.litState;
     }
     return pass.rooms;
@@ -59,6 +62,10 @@ export function syncStructureTiles(engine: TowerEngine): readonly UnitView[] {
   // Read once per full pass (#308): a tall lobby's cells cover the stories
   // above its floor too.
   const tall = tower.tallLobbies();
+  // The lobby columns of each floor that holds a tall hall, for the walls
+  // between halls of different heights (#2068).
+  const hallFloors = new Map<number, Set<number>>();
+  for (const r of tall.runs) hallFloors.set(r.floor, new Set());
   const floor1Lobbies: UnitView[] = [];
   const seenS = new Set<ex.Tile>();
   for (const u of units) {
@@ -67,6 +74,7 @@ export function syncStructureTiles(engine: TowerEngine): readonly UnitView[] {
       continue;
     }
     if (u.kind === "lobby" && u.floor === 1) floor1Lobbies.push(u);
+    if (u.kind === "lobby") hallFloors.get(u.floor)?.add(u.x);
     // Floor/lobby units are one tile wide, so a unit maps to one cell.
     const cell = engine.structTileMap.getTile(u.x, topFloor - u.floor);
     if (!cell) continue; // outside the grid; the engine never places there
@@ -76,7 +84,7 @@ export function syncStructureTiles(engine: TowerEngine): readonly UnitView[] {
       paintCell(cell, engine.floorGfx);
       continue;
     }
-    const height = tall.get(u.floor) ?? 1;
+    const height = tall.heightAt(u.floor, u.x);
     lobbies.push([cell, u, 0, height]);
     for (let story = 1; story < height; story++) {
       const up = engine.structTileMap.getTile(u.x, topFloor - u.floor - story);
@@ -90,6 +98,7 @@ export function syncStructureTiles(engine: TowerEngine): readonly UnitView[] {
   // lobby cells are painted after it, so a newly placed leftmost tile takes
   // the grand entrance graphic on the same sync it is added.
   refreshFloor1EntranceMap(engine, floor1Lobbies);
+  syncHallDoors(engine, hallDoors(tall, (floor, x) => hallFloors.get(floor)?.has(x) ?? false));
   for (const [cell, u, story, height] of lobbies) paintCell(cell, lobbyTileGfx(engine, u, story, height));
   for (const cell of engine.structTiles) {
     if (seenS.has(cell)) continue;

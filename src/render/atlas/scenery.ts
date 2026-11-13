@@ -276,7 +276,14 @@ const PLANE_FRAMES: Record<keyof typeof Z, string[]> = {
   vehicle: ["vehicle/metrotrain", "vehicle/garbagetruck"],
   transport: ["shaft", "transport/stairs", "transport/escalator"],
   cab: ["car"],
+  // The revolving doors between lobby halls (#2068) are drawn on the web
+  // canvas and have no atlas frames yet; a leftbound walker inside one is
+  // drawn behind its center post.
+  hallDoorBack: [],
+  crowdBehindDoor: ["person/walker"],
+  hallDoorMiddle: [],
   crowd: ["person/walker"],
+  hallDoorFront: [],
   overlay: [],
 };
 
