@@ -129,8 +129,13 @@ export class ToneAudioEngine {
       // Prefer larger audio buffers over low latency: this is a sim, not an
       // instrument, and the default interactive hint underruns on phones
       // (heard as random crackles). Must happen before any node is built.
+      // Importing Tone already opened a default low-latency context, which
+      // nothing plays through. Close it: while it stays open, an operating
+      // system that sets one buffer size per output device (macOS does) runs
+      // the device at the small size it asked for, and this context then has
+      // to render its large buffers inside those short deadlines.
       try {
-        Tone.setContext(new Tone.Context({ latencyHint: "playback" }));
+        Tone.setContext(new Tone.Context({ latencyHint: "playback" }), true);
       } catch {
         /* keep the default context */
       }

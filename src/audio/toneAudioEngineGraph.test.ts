@@ -14,7 +14,7 @@ import type { ViewFocus } from "../render/excalibur/TowerEngine";
 vi.mock("tone", async () => (await import("./toneRecordingMock")).toneMock());
 vi.mock("./lightSynth", async () => (await import("./toneRecordingMock")).lightSynthMock());
 
-import { beat, graph, resetToneFaults, toneFaults, type NodeRec } from "./toneRecordingMock";
+import { beat, contextSwaps, graph, resetToneFaults, toneFaults, type NodeRec } from "./toneRecordingMock";
 import { ToneAudioEngine, type SfxName } from "./ToneAudioEngine";
 import { SCENES, type Scene } from "./toneScenes";
 
@@ -57,6 +57,17 @@ describe("ToneAudioEngine — full graph driven with a mocked Tone.js", () => {
     // `if (!this.started) return`.
     expect((eng as unknown as { started: boolean }).started).toBe(true);
     expect(() => eng.start()).not.toThrow(); // already-started branch
+  });
+
+  it("start() plays through one playback-latency context and closes Tone's default one", () => {
+    const eng = new ToneAudioEngine();
+    eng.start();
+    expect(contextSwaps).toHaveLength(1);
+    const [swap] = contextSwaps;
+    const rec = (swap.context as { __rec: NodeRec }).__rec;
+    expect(rec.kind).toBe("Context");
+    expect(rec.args[0]).toEqual({ latencyHint: "playback" });
+    expect(swap.disposeOld).toBe(true);
   });
 
   it("update() drives scene selection across zooms and facilities (incl. overview hysteresis)", () => {
