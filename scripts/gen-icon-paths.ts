@@ -49,6 +49,7 @@ export const ICON_SOURCES: Record<string, string> = {
   play: "play",
   folder: "folder",
   plus: "plus",
+  heart: "heart",
 };
 
 /** The `d` attribute of every `<path>` in a pixelarticons SVG, in file order. */

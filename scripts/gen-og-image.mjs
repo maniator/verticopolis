@@ -133,7 +133,7 @@ function svg() {
     <circle cx="615" cy="${sunY}" r="150" fill="${GOLD}" opacity="0.9"/>
     ${skyline}
     <rect x="0" y="${ground}" width="${W}" height="${H - ground}" fill="url(#fg)"/>
-    <text x="60" y="${ground + 68}" font-family="${FONT}" font-size="70" font-weight="800" letter-spacing="2" fill="#ffffff">VERTICO<tspan fill="${GOLD}">POLIS</tspan></text>
+    <text x="60" y="${ground + 68}" font-family="${FONT}" font-size="70" font-weight="800" letter-spacing="2" fill="#ffffff">VERTICO<tspan fill="${GOLD}">POLIS</tspan><tspan font-size="26" font-weight="600" dy="-34">™</tspan></text>
     <text x="64" y="${ground + 120}" font-family="${FONT}" font-size="30" font-weight="500" letter-spacing="1" fill="#d7d2f0">Build a SimTower-style skyscraper in your browser.</text>
     <!-- Call to action pill: "free" lives here now (not in the tagline) so it is
          said once, and the play glyph reads the card as a game to play rather

@@ -58,7 +58,7 @@ describe("iconElement", () => {
     const names: IconName[] = [
       "brand", "save", "sound", "mute", "stats", "map", "settings", "inspect", "bulldoze",
       "pause", "speed1", "speed2", "speed3", "undo", "redo", "menu", "update", "install", "back",
-      "play", "help", "folder", "plus",
+      "play", "help", "folder", "plus", "heart",
     ];
     for (const name of names) {
       const svg = iconElement(name);

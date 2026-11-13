@@ -1,6 +1,7 @@
 import { html, nothing, type TemplateResult } from "lit-html";
 import { iconTemplate } from "./icons";
 import { versionLine } from "../wasmhost/engineLabel";
+import { platformLabel } from "../analyticsEnrichment";
 
 /**
  * The "Metropolis Dusk" splash/title-screen body, split out of the onboarding
@@ -19,6 +20,34 @@ import { versionLine } from "../wasmhost/engineLabel";
  */
 
 const APP_VERSION = typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "dev";
+
+/** Where the splash's Sponsor link goes: the owner's GitHub Sponsors page, the
+ *  same account `.github/FUNDING.yml` names. The help site's Support page links
+ *  the same address (help-site/site.mjs, SPONSOR_URL), and a test holds the two
+ *  equal. The game stays free and nothing in it is locked; this is a tip jar. */
+export const SPONSOR_URL = "https://github.com/sponsors/maniator";
+
+/** sessionStorage key that remembers this tab launched as the Android app, so
+ *  a later title screen in the same tab (after Back to game from the help site,
+ *  which drops the `?src=twa` marker) still knows. */
+export const TWA_SESSION_KEY = "vc-twa-session";
+
+/** Whether the splash shows the Sponsor link: every session but the Android
+ *  app (the TWA, marked by its `?src=twa` launch URL and remembered for the
+ *  tab). Google Play expects a tip inside a store app to go through Play's
+ *  own billing, and the July monetization brief keeps any Play tip behind its
+ *  own approval, so the store app shows no link to an outside payment page. */
+export function sponsorOffered(storage: () => Storage = () => sessionStorage): boolean {
+  let remembered = false;
+  try {
+    const s = storage();
+    if (platformLabel() === "twa") s.setItem(TWA_SESSION_KEY, "1");
+    remembered = s.getItem(TWA_SESSION_KEY) === "1";
+  } catch {
+    // Storage blocked: fall back to the launch URL alone.
+  }
+  return !remembered && platformLabel() !== "twa";
+}
 
 /** Click handlers the splash template binds through lit `@click`. `onToggleMute`
  *  is optional: when a caller can't toggle (no audio port), it is undefined, lit
@@ -75,7 +104,7 @@ export function splashTemplate(hasSave: boolean, premise: string, muted: boolean
     </svg>
     <div class="splash-brand">
       <svg class="splash-word" viewBox="0 0 400 66" role="img" aria-label="Verticopolis">
-        <text x="200" y="52" text-anchor="middle" textLength="392" lengthAdjust="spacingAndGlyphs"><tspan class="a">VERTICO</tspan><tspan class="b">POLIS</tspan></text>
+        <text x="194" y="52" text-anchor="middle" textLength="380" lengthAdjust="spacingAndGlyphs"><tspan class="a">VERTICO</tspan><tspan class="b">POLIS</tspan></text><text class="tm" x="386" y="24">™</text>
       </svg>
       <svg class="splash-tag" viewBox="0 0 360 20" role="img" aria-label="the vertical metropolis">
         <text x="180" y="15" text-anchor="middle" textLength="330" lengthAdjust="spacingAndGlyphs">THE VERTICAL METROPOLIS</text>
@@ -128,5 +157,13 @@ export function splashTemplate(hasSave: boolean, premise: string, muted: boolean
          how-to in the shared activation. -->
     ${installOffered && h.onInstall
       ? html`<button class="splash-install" data-splash="install" aria-label="Install Verticopolis" title="Install Verticopolis: play offline, fullscreen, from your home screen." @click=${h.onInstall}>${iconTemplate("install", { size: 14 })}Install</button>`
+      : nothing}
+    <!-- The Sponsor link (owner, 2026-11-13): a quiet tip jar pinned to the
+         top-left corner, opposite the mute and install cluster. A plain link
+         that opens GitHub Sponsors in a new tab; it never blocks play, never
+         nags, and unlocks nothing. Rendered last so it ends the Tab order, and
+         left out of the Android app (see sponsorOffered). -->
+    ${sponsorOffered()
+      ? html`<a class="splash-sponsor" data-splash="sponsor" href=${SPONSOR_URL} target="_blank" rel="noopener noreferrer" title="Verticopolis is free. Sponsoring helps keep it going.">${iconTemplate("heart", { size: 14 })}Sponsor</a>`
       : nothing}`;
 }

@@ -66,6 +66,7 @@ function cardHtml(page) {
     .text { position: absolute; left: 64px; top: 56px; width: 700px; }
     .kicker { font-size: 30px; font-weight: 800; letter-spacing: 3px; color: #fff; }
     .kicker b { color: ${GOLD}; }
+    .kicker sup { font-size: 14px; font-weight: 600; letter-spacing: 0; vertical-align: 14px; }
     .kicker span { font-weight: 500; color: #d7d2f0; letter-spacing: 2px; }
     h1 { margin-top: 28px; font-size: 68px; line-height: 1.08; font-weight: 800; color: #fff;
       display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
@@ -75,7 +76,7 @@ function cardHtml(page) {
   </style></head><body>
     <div class="bg">${backdrop()}</div>
     <div class="text">
-      <div class="kicker">VERTICO<b>POLIS</b> <span>· HELP</span></div>
+      <div class="kicker">VERTICO<b>POLIS</b><sup>™</sup> <span>· HELP</span></div>
       <h1>${escapeHtml(page.title)}</h1>
       <p>${escapeHtml(page.description)}</p>
     </div>

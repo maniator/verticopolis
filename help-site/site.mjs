@@ -10,6 +10,10 @@ export const ENGINE_DOCS = "https://docs.verticopolis.com/";
 
 export const GITHUB_ISSUES = "https://github.com/maniator/verticopolis/issues/new/choose";
 
+/** The owner's GitHub Sponsors page, the tip jar the game's splash also links
+ *  (SPONSOR_URL in src/ui/splashTemplate.ts; a test holds the two equal). */
+export const SPONSOR_URL = "https://github.com/sponsors/maniator";
+
 /** The head tags every page of the game's own build shares (SHARED_HEAD_TAGS
  *  in vite.config.ts) that Starlight does not already write: the share card's
  *  size, the title bar color and the home screen icon. Starlight writes the
@@ -80,6 +84,7 @@ export const sidebar = [
       { label: "Release notes", link: "/changelog/" },
       { label: "Engine docs", link: ENGINE_DOCS, attrs: { target: "_blank", rel: "noopener noreferrer" } },
       { label: "Report a problem", link: GITHUB_ISSUES, attrs: { target: "_blank", rel: "noopener noreferrer" } },
+      { label: "Sponsor Verticopolis", link: SPONSOR_URL, attrs: { target: "_blank", rel: "noopener noreferrer" } },
       { slug: "privacy" },
     ],
   },

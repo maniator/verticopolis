@@ -40,6 +40,10 @@ rights are held by the project owner. They are licensed under the same
 The project's **source code** is licensed separately under the **MIT License**;
 see [`LICENSE`](./LICENSE).
 
+Neither license grants any right to the **Verticopolis™** name, which is the
+project's trademark. A copy or fork of the game is welcome under these
+licenses, but it needs a name of its own.
+
 Verticopolis is an unofficial, from-scratch homage to SimTower (1994). It ships
 no assets from the original and is not affiliated with or endorsed by Maxis,
 OPeNBooK, or Vivarium.

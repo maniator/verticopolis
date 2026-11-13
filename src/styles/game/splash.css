@@ -116,6 +116,15 @@
 }
 .splash-word .a { fill: var(--splash-wordmark); }
 .splash-word .b { fill: var(--splash-amber); }
+/* The trademark mark beside the wordmark (owner, 2026-11-13): small, raised and
+   unstroked, so it reads as a mark beside the lettering. The name is the project's
+   trademark, which the MIT license does not grant. */
+.splash-word .tm {
+  font-size: 14px;
+  letter-spacing: 0;
+  stroke: none;
+  fill: var(--splash-wordmark);
+}
 .splash-tag {
   display: block;
   width: min(78vw, 340px);
@@ -193,6 +202,35 @@
 }
 .splash-install:hover { background: rgba(13, 13, 16, 0.55); }
 .splash-install:focus-visible { outline: 2px solid var(--splash-amber); outline-offset: 2px; }
+
+/* The Sponsor link (owner, 2026-11-13): a quiet tip jar in the top-left corner,
+   mirroring the install pill's box-art chrome so the corners read as one family.
+   It is a plain link that opens GitHub Sponsors in a new tab and does nothing
+   in the game. The heart takes the amber accent; the label stays cream. */
+.splash-sponsor {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 48px;
+  padding: 0 14px;
+  box-sizing: border-box;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  color: var(--splash-cream);
+  text-decoration: none;
+  background: rgba(13, 13, 16, 0.35);
+  border: 2px solid rgba(230, 220, 192, 0.55);
+  border-radius: 8px;
+}
+.splash-sponsor .vc-icon { color: var(--splash-amber); }
+.splash-sponsor:hover { background: rgba(13, 13, 16, 0.55); }
+.splash-sponsor:focus-visible { outline: 2px solid var(--splash-amber); outline-offset: 2px; }
 
 .splash-btn {
   font-family: var(--r-font);

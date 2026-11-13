@@ -1,8 +1,9 @@
 import { describe, it, expect, vi } from "vitest";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
-import { HELP_BASE, OLD_ANCHORS, cardAlt, cardFile, cardUrl, helpPageDetail, landingAction, oldAnchorRedirects, pageJsonLd, sharedHead, sidebar, type SidebarEntry } from "../../help-site/site.mjs";
+import { HELP_BASE, OLD_ANCHORS, SPONSOR_URL, cardAlt, cardFile, cardUrl, helpPageDetail, landingAction, oldAnchorRedirects, pageJsonLd, sharedHead, sidebar, type SidebarEntry } from "../../help-site/site.mjs";
 import { catalogFor } from "./catalogFixture";
+import { SPONSOR_URL as GAME_SPONSOR_URL } from "../ui/splashTemplate";
 import { HELP_PAGES_DIR } from "../build/helpMarkdown";
 import { CARD_MANIFEST, REGENERATE, cardManifest, helpPages, staleCards, type CardManifest, type HelpCardPage } from "../../scripts/help-card-pages.mjs";
 
@@ -71,6 +72,14 @@ describe("the side menu", () => {
     expect(byLabel("Release notes")).toMatchObject({ link: "/changelog/" });
     expect(byLabel("Report a problem")).toMatchObject({ link: expect.stringContaining("github.com/maniator/verticopolis/issues") });
     expect(entries.some((e) => "slug" in e && e.slug === "privacy")).toBe(true);
+  });
+
+  it("links the same Sponsor page as the game's splash, in a new tab", () => {
+    expect(SPONSOR_URL).toBe(GAME_SPONSOR_URL);
+    const sponsor = flatten(sidebar).find((e) => "label" in e && e.label === "Sponsor Verticopolis");
+    expect(sponsor).toMatchObject({ link: SPONSOR_URL, attrs: { target: "_blank", rel: "noopener noreferrer" } });
+    // The front page's Supporting Verticopolis section points at the same page.
+    expect(readFileSync(resolve(pagesDir, "index.md"), "utf8")).toContain(`](${SPONSOR_URL})`);
   });
 });
 
