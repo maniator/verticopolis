@@ -32,17 +32,17 @@ export function crowdCullNext(zoom: number, wasCulled: boolean): boolean {
  *  groups and the regular per-frame gates (walker rank, truck hour, garage
  *  rush) immediately re-refine on the next {@link updateMotion} pass. */
 function setCrowdLayerVisible(engine: TowerEngine, visible: boolean): void {
-  for (const c of engine.carActors) c.actor.graphics.visible = visible;
-  for (const tr of engine.trainActors) tr.actor.graphics.visible = visible;
-  for (const tk of engine.truckActors) tk.actor.graphics.visible = visible;
-  for (const g of engine.garageCars) g.actor.graphics.visible = visible;
-  for (const w of engine.walkers) w.actor.graphics.visible = visible;
+  for (const c of engine.carActors) c.actor.graphics.isVisible = visible;
+  for (const tr of engine.trainActors) tr.actor.graphics.isVisible = visible;
+  for (const tk of engine.truckActors) tk.actor.graphics.isVisible = visible;
+  for (const g of engine.garageCars) g.actor.graphics.isVisible = visible;
+  for (const w of engine.walkers) w.actor.graphics.isVisible = visible;
   // The routed people are only ever force-hidden here. On re-show they stay
   // hidden for the moment: the same tick's reconcileCrowd (which runs before
   // the frame draws) shows every live non-rider via positionPerson, keeps
   // riders hidden, and reaps anyone who departed while culled, so a stale
   // figure never flashes at a minutes-old position.
-  if (!visible) for (const rec of engine.crowdActors.values()) rec.actor.graphics.visible = false;
+  if (!visible) for (const rec of engine.crowdActors.values()) rec.actor.graphics.isVisible = false;
 }
 
 /** Apply the zoom cull for this frame. Returns true when the moving layer is

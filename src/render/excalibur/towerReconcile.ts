@@ -282,7 +282,7 @@ function syncCrane(engine: TowerEngine, hi: number, topTiles: Set<number>): void
 function addBoxActor(engine: TowerEngine, pos: ex.Vector, w: number, h: number, z: number, gfx: ex.Graphic): ex.Actor {
   const a = new ex.Actor({ pos, width: w, height: h, anchor: ex.vec(0, 0), z });
   a.graphics.use(gfx);
-  a.collider.set(ex.Shape.Box(w, h, ex.vec(0, 0)));
+  a.collider.use(ex.Colliders.Box(w, h, ex.vec(0, 0)));
   engine.engine.add(a);
   return a;
 }
