@@ -11,6 +11,8 @@ export type SidebarEntry =
   | { label: string; items: SidebarEntry[] };
 export const sidebar: SidebarEntry[];
 export function landingAction(pathname: string, referrer: string, origin: string): "page_help" | "page_changelog" | null;
+/** The page a help page view reports: "rooms/hotels", "home" or "other". */
+export function helpPageDetail(pathname: string): string;
 /** Where each section of the old one-page /help went. */
 export const OLD_ANCHORS: Record<string, string>;
 export function oldAnchorRedirects(helpIds: Record<string, string>): string;
