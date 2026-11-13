@@ -17,6 +17,8 @@ export const SKIPPED_PATHS: ReadonlySet<string> = new Set([
   "engine-rs/target",
   "engine-rs/consumer/target",
   "engine-rs/pkg",
+  "engine-rs/pkg-player",
+  "engine-rs/pkg-web-tooling",
   "src/public/engine",
 ]);
 

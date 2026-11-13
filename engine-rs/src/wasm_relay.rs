@@ -8,16 +8,22 @@
 //! no rent, or `{ ok: false, reason: INVALID_REQUEST }`. The simulation's own
 //! methods keep their `i64` arguments; this is the boundary. Native tests call
 //! these directly, since a raw JS value needs a wasm target.
-use crate::charges::{whole, INVALID_REQUEST};
+use crate::charges::whole;
+#[cfg(feature = "tooling")]
+use crate::charges::INVALID_REQUEST;
+#[cfg(feature = "tooling")]
 use crate::tower::ResizeResult;
 
-use super::{resize_json, Engine};
+#[cfg(feature = "tooling")]
+use super::resize_json;
+use super::Engine;
 
 /// Two whole numbers, or `None` when either is malformed.
 fn pair(a: Option<f64>, b: Option<f64>) -> Option<(i64, i64)> {
     Some((a.and_then(whole)?, b.and_then(whole)?))
 }
 
+#[cfg(feature = "tooling")]
 /// The resize refusal for a malformed request, as TypeScript spells it.
 fn invalid_resize() -> String {
     resize_json(ResizeResult {
@@ -44,6 +50,7 @@ impl Engine {
             .is_some_and(|id| self.sim.set_no_rate(id))
     }
 
+    #[cfg(feature = "tooling")]
     pub(crate) fn set_cars_checked(&mut self, id: Option<f64>, cars: Option<f64>) -> bool {
         pair(id, cars).is_some_and(|(id, cars)| self.sim.set_cars(id, cars))
     }
@@ -63,6 +70,7 @@ impl Engine {
         Ok(self.sim.tower.set_schedule(id, &raw))
     }
 
+    #[cfg(feature = "tooling")]
     pub(crate) fn resize_checked(
         &mut self,
         id: Option<f64>,
@@ -91,6 +99,7 @@ impl Engine {
 }
 
 #[cfg(test)]
+#[cfg(feature = "tooling")]
 mod tests {
     use super::*;
     use crate::clock::GameMode;

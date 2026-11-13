@@ -4,11 +4,17 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { cargoPackage } from "../build/engineCompat";
+import { glueMethods } from "../build/engineBundle";
+import { TOOLING_METHODS } from "../engineBinding/toolingMethods";
 import { engineSourceHash } from "./packageHash";
 import { BUILD_SECTION, customSectionsOf, parseBuildMetadata } from "./buildSection";
 
 const ROOT = resolve(import.meta.dirname, "../..");
 const BUILD = resolve(ROOT, "src/public/engine/BUILD.json");
+/** The player build's packages (browser, Node) and the tooling build's
+ *  (Node, browser), all written by one npm run wasm:build (#1057). */
+const PLAYER_PACKAGES = ["src/public/engine", "engine-rs/pkg-player"];
+const TOOLING_PACKAGES = ["engine-rs/pkg", "engine-rs/pkg-web-tooling"];
 
 // The served package is build output, not checked in: a local checkout has
 // one only after npm run wasm:build, and these checks skip without it. CI
@@ -26,7 +32,7 @@ describe.skipIf(!existsSync(BUILD))("the served engine package", () => {
 
   it("carries the build metadata section in both binaries, equal to BUILD.json's sources (stamped before the digests)", () => {
     const built = JSON.parse(readFileSync(BUILD, "utf8")) as { sources: string; files: Record<string, { sha256: string; bytes: number }> };
-    for (const f of ["src/public/engine/verticopolis_engine_bg.wasm", "engine-rs/pkg/verticopolis_engine_bg.wasm"]) {
+    for (const f of [...PLAYER_PACKAGES, ...TOOLING_PACKAGES].map((dir) => `${dir}/verticopolis_engine_bg.wasm`)) {
       const bytes = readFileSync(resolve(ROOT, f));
       expect(parseBuildMetadata(customSectionsOf(bytes, BUILD_SECTION)), f).toEqual({ state: "ok", sourceHash: built.sources });
     }
@@ -35,6 +41,17 @@ describe.skipIf(!existsSync(BUILD))("the served engine package", () => {
     const entry = built.files["verticopolis_engine_bg.wasm"];
     expect(entry.bytes).toBe(served.length);
     expect(entry.sha256).toBe(createHash("sha256").update(served).digest("hex"));
+  });
+
+  it("builds the binding's tier 3 ops into the tooling packages alone (#1057)", () => {
+    const tier3In = (dir: string) => {
+      const methods = glueMethods(readFileSync(resolve(ROOT, dir, "verticopolis_engine.js"), "utf8"));
+      // The reading matched real methods, so an empty answer below is not a misread.
+      expect(methods.has("tick"), `${dir} glue has no tick method`).toBe(true);
+      return TOOLING_METHODS.filter((m) => methods.has(m));
+    };
+    for (const dir of PLAYER_PACKAGES) expect(tier3In(dir), dir).toEqual([]);
+    for (const dir of TOOLING_PACKAGES) expect(tier3In(dir), dir).toEqual([...TOOLING_METHODS]);
   });
 
   it("ships the loader and the binary beside the app", () => {

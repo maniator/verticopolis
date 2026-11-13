@@ -35,6 +35,7 @@ fn build_result(r: crate::build::BuildResult) -> String {
     outcome(r.ok, r.reason.as_deref())
 }
 
+#[cfg(feature = "tooling")]
 /// A resize result as TypeScript spells it: `{ ok: true, added,
 /// floorTilesCreated }`, or `{ ok: false, reason }` for a refusal (#996).
 fn resize_json(r: crate::tower::ResizeResult) -> String {

@@ -134,6 +134,7 @@ impl Engine {
     /// `setCars(id, cars)`: the simulation-layer edit, which reports
     /// `capacity_changed`. Read raw (#996): an id or count that is not a
     /// whole JS number within `Number.isSafeInteger` is refused with `false`.
+    #[cfg(feature = "tooling")]
     #[wasm_bindgen(js_name = setCars)]
     pub fn set_cars(
         &mut self,
@@ -197,6 +198,7 @@ impl Engine {
     /// floorTilesCreated }` or `{ ok: false, reason }`. Read raw (#996): an
     /// id or floor that is not a whole JS number within
     /// `Number.isSafeInteger` is refused with `INVALID_REQUEST`.
+    #[cfg(feature = "tooling")]
     #[wasm_bindgen(js_name = resizeTransport)]
     pub fn resize_transport(
         &mut self,
@@ -278,12 +280,14 @@ impl Engine {
     }
 
     /// `tower.removeUnit(id)`: whether a unit went.
+    #[cfg(feature = "tooling")]
     #[wasm_bindgen(js_name = removeUnit)]
     pub fn remove_unit(&mut self, id: i32) -> bool {
         self.sim.tower.remove_unit(id.into()).is_some()
     }
 
     /// `tower.removeTransport(id)`: whether a shaft went.
+    #[cfg(feature = "tooling")]
     #[wasm_bindgen(js_name = removeTransport)]
     pub fn remove_transport(&mut self, id: i32) -> bool {
         self.sim.tower.remove_transport(id.into()).is_some()

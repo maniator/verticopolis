@@ -3,7 +3,7 @@ import { existsSync, lstatSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 
 /** Build output (the crate's own, or a nested crate's), never an input. */
-const SKIP_DIRS = new Set(["target", "pkg"]);
+const SKIP_DIRS = new Set(["target", "pkg", "pkg-player", "pkg-web-tooling"]);
 /** `include_str!("…")` and `include_bytes!("…")` with a literal path. */
 const INCLUDE = /\binclude_(?:str|bytes)!\(\s*"([^"]+)"\s*\)/g;
 /** Every include macro, whatever its argument or delimiter. */

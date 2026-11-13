@@ -26,12 +26,14 @@
  * (`tdtExport`) in the second, recording the memory and the time of that
  * write, since each export has its own peak (#1338, #1431).
  *
- * It measures the Node package `npm run wasm:build` writes to `engine-rs/pkg/`
- * and names it by the source hash the same build stamps into the package's
+ * It measures the player build's Node package, which `npm run wasm:build`
+ * writes to `engine-rs/pkg-player/` (the build players run, without the
+ * binding's tier 3 ops, #1057), and falls back to `engine-rs/pkg/` in a
+ * checkout from before that split. It names the package by the source hash the same build stamps into the package's
  * `.wasm` (the `verticopolis.build` section, which `BUILD.json`'s `sources`
  * repeats); it stops when the `.wasm` carries no readable stamp.
  * `--engine <checkout>` measures another checkout's build instead (its own
- * `engine-rs/pkg/`) on this checkout's scenarios, which is how a before and
+ * package, found the same way) on this checkout's scenarios, which is how a before and
  * after pair is taken:
  *
  *   git worktree add --detach ../vc-before <base commit>
@@ -48,7 +50,7 @@
  * owner's desktop under docs/performance/benchmark-protocol.md, in a browser.
  */
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -57,8 +59,11 @@ import { BUILD_SECTION, customSectionsOf, parseBuildMetadata } from "../src/wasm
 
 const SCRIPT = fileURLToPath(import.meta.url);
 const REPO = resolve(dirname(SCRIPT), "..");
-const PKG = "engine-rs/pkg/verticopolis_engine.js";
-const WASM = "engine-rs/pkg/verticopolis_engine_bg.wasm";
+/** The player build's Node package, then the one package a checkout from
+ *  before the player and tooling split (#1057) has. */
+const PACKAGE_DIRS = ["engine-rs/pkg-player", "engine-rs/pkg"];
+const GLUE = "verticopolis_engine.js";
+const BINARY = "verticopolis_engine_bg.wasm";
 const MIB = 1024 * 1024;
 /** The options, each followed by its value. */
 const OPTIONS = ["--reps", "--scenario", "--json", "--engine"];
@@ -334,8 +339,10 @@ async function main(args: string[]): Promise<void> {
   const only = option(args, "--scenario");
   const jsonOut = option(args, "--json");
   const engineRoot = resolve(option(args, "--engine") ?? REPO);
-  const pkgPath = resolve(engineRoot, PKG);
-  const wasmPath = resolve(engineRoot, WASM);
+  const pkgDir = PACKAGE_DIRS.map((d) => resolve(engineRoot, d)).find((d) => existsSync(join(d, BINARY)));
+  if (!pkgDir) throw new Error(`${engineRoot} has no Node engine package (${PACKAGE_DIRS.join(" or ")}); run npm run wasm:build there`);
+  const pkgPath = join(pkgDir, GLUE);
+  const wasmPath = join(pkgDir, BINARY);
   const stamp = parseBuildMetadata(customSectionsOf(readFileSync(wasmPath), BUILD_SECTION));
   if (stamp.state !== "ok") throw new Error(`${wasmPath} carries no readable ${BUILD_SECTION} stamp (${stamp.state === "malformed" ? stamp.why : "missing"}); run npm run wasm:build there`);
   const sources = stamp.sourceHash;

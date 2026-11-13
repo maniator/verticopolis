@@ -17,7 +17,10 @@ runs:
     - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
       with:
         name: ${{ inputs.artifact-name }}
-        path: src/public/engine
+        # The artifact holds src/public/engine/ (the player package) and
+        # engine-rs/pkg-web-tooling/ (the tooling package a VC_TOOLING=1
+        # build serves, #1057) at their workspace paths.
+        path: .
 
     - name: Check the package matches the sources
       shell: bash
@@ -25,11 +28,13 @@ runs:
         ARTIFACT: ${{ inputs.artifact-name }}
       run: |
         want=$(node --input-type=module -e 'import { engineSourceHash } from "./src/wasmhost/packageHash.ts"; process.stdout.write(engineSourceHash("engine-rs"))')
-        built=$(node -p 'require("./src/public/engine/BUILD.json").sources')
-        if [ "$built" != "$want" ]; then
-          echo "::error::the engine package in $ARTIFACT was built from sources $built, but this checkout's Rust sources hash to $want"
-          exit 1
-        fi
-        for f in verticopolis_engine.js verticopolis_engine_bg.wasm THIRD-PARTY.json; do
-          test -f "src/public/engine/$f" || { echo "::error::src/public/engine/$f is missing from $ARTIFACT"; exit 1; }
+        for dir in src/public/engine engine-rs/pkg-web-tooling; do
+          for f in verticopolis_engine.js verticopolis_engine_bg.wasm THIRD-PARTY.json BUILD.json; do
+            test -f "$dir/$f" || { echo "::error::$dir/$f is missing from $ARTIFACT"; exit 1; }
+          done
+          built=$(node -p "require('./$dir/BUILD.json').sources")
+          if [ "$built" != "$want" ]; then
+            echo "::error::$dir in $ARTIFACT was built from sources $built, but this checkout's Rust sources hash to $want"
+            exit 1
+          fi
         done

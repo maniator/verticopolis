@@ -60,8 +60,8 @@ jobs:
       - name: Install JavaScript dependencies
         run: npm ci
 
-      # The engine's WASM package (src/public/engine/, engine-rs/pkg/) is build
-      # output, not checked in: restore it from the Actions cache, or build it,
+      # The engine's WASM packages (src/public/engine/, engine-rs/pkg/ and the
+      # others .github/actions/engine-wasm names) are build output, not checked in: restore it from the Actions cache, or build it,
       # so the game, the e2e projects and the WASM test
       # suites work for the agent. continue-on-error for the same reason as the
       # Rust steps below: the TypeScript side must still start (without the
@@ -78,9 +78,9 @@ jobs:
         if: steps.engine.outcome == 'failure'
         # A step that failed partway can leave part of the package, which the
         # build refuses even with the opt-in, and a Node package (engine-rs/pkg)
-        # that would run the WASM test suites against a failed build; clear both.
+        # that would run the WASM test suites against a failed build; clear them all.
         run: |
-          rm -rf src/public/engine engine-rs/pkg
+          rm -rf src/public/engine engine-rs/pkg engine-rs/pkg-player engine-rs/pkg-web-tooling
           echo "VC_ALLOW_NO_ENGINE=1" >> "$GITHUB_ENV"
 
       # A tooling build, so an agent that runs `npm run e2e` against this dist

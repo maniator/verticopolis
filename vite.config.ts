@@ -1,7 +1,8 @@
 import { defineConfig, type Plugin, type HtmlTagDescriptor } from "vite";
 import { configDefaults } from "vitest/config";
-import { resolve } from "node:path";
-import { existsSync, readFileSync } from "node:fs";
+import { join, resolve } from "node:path";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { execSync } from "node:child_process";
 import { VitePWA } from "vite-plugin-pwa";
 import { notesForVersion, recentReleaseNotes, type ReleaseNotes } from "./src/changelog";
@@ -11,6 +12,7 @@ import { MAX_RELEASES, type BuildFingerprint } from "./src/pwaUpdateInfo";
 import { ENGINE_PRELOAD_FILES, enginePreloadAttrs } from "./src/build/enginePreload";
 import { ENGINE_BUILD_RECORD, ENGINE_DIR } from "./src/wasmhost/enginePackageNames";
 import { buildFingerprint } from "./src/build/buildFingerprint";
+import { assembleToolingPublicDir, choosePublicDir, hasEnginePackage, toolingEngineFile } from "./src/build/toolingPublicDir";
 import { helpMarkdown } from "./src/build/helpMarkdown";
 import { isPreviewDeploy } from "./src/build/previewDeploy";
 
@@ -59,15 +61,81 @@ function toolingBuild(): boolean {
   return on;
 }
 
+/** Which public folder this run uses, whether the engine it serves is the
+ *  tooling package (`__TOOLING_ENGINE__`), and, for a dev serve on the
+ *  tooling package, the folder its engine URLs are answered from. */
+interface EngineChoice {
+  publicDir: string;
+  toolingEngine: boolean;
+  serveEngineFrom?: string;
+}
+
 /** The folder Vite copies into dist/ and the engine package is read from:
  *  `src/public`, unless the offline e2e sets `VC_PUBLIC_DIR` to build a second
  *  deployment with a different engine package (e2e/deployments.ts, #985). A
  *  Vercel build refuses it, so no deploy can ship a package from elsewhere. */
-function publicDir(): string {
+function engineChoiceFor(command: "build" | "serve"): EngineChoice {
   const raw = process.env.VC_PUBLIC_DIR;
-  if (raw === undefined || raw === "") return resolve(__dirname, "src/public");
-  if (process.env.VERCEL) throw new Error("VC_PUBLIC_DIR is set in a Vercel build. Deploys build from src/public; remove VC_PUBLIC_DIR from the Vercel environment.");
-  return resolve(raw);
+  if (raw !== undefined && raw !== "") {
+    if (process.env.VERCEL) throw new Error("VC_PUBLIC_DIR is set in a Vercel build. Deploys build from src/public; remove VC_PUBLIC_DIR from the Vercel environment.");
+    // The offline e2e copies the first build's package, so it is the tooling
+    // package exactly when this is a tooling build.
+    return { publicDir: resolve(raw), toolingEngine: TOOLING_BUILD };
+  }
+  // A VC_TOOLING=1 build and a dev serve take the tooling engine package in
+  // place of the player one (#1057, src/build/toolingPublicDir.ts).
+  const base = resolve(__dirname, "src/public");
+  const tooling = resolve(__dirname, "engine-rs/pkg-web-tooling");
+  const choice = choosePublicDir({
+    tooling: TOOLING_BUILD,
+    serve: command === "serve",
+    vitest: Boolean(process.env.VITEST),
+    hasToolingPackage: hasEnginePackage(tooling),
+    hasPlayerPackage: hasEnginePackage(resolve(base, ENGINE_DIR)),
+  });
+  if (choice.kind === "missing-tooling") throw new Error(choice.why);
+  if (choice.kind === "player") {
+    if (command === "serve" && !process.env.VITEST) console.warn("[serve] engine-rs/pkg-web-tooling/ is missing, so this serve runs the player engine package: window.game's raw edits will fail. Run npm run wasm:build.");
+    return { publicDir: base, toolingEngine: false };
+  }
+  // A dev serve (and `vite preview`, which serves dist/ and ignores both)
+  // keeps src/public live and answers the engine's URLs from the tooling
+  // package; a build copies it in.
+  if (command === "serve") return { publicDir: base, toolingEngine: true, serveEngineFrom: tooling };
+  // Each build assembles its own folder, since two tooling builds can run at
+  // once (the screenshot determinism check builds both legs together), and
+  // removes it when the process ends.
+  const out = mkdtempSync(join(tmpdir(), "vc-tooling-public-"));
+  process.once("exit", () => rmSync(out, { recursive: true, force: true }));
+  return { publicDir: assembleToolingPublicDir(base, tooling, out), toolingEngine: true };
+}
+const engineChoices = new Map<"build" | "serve", EngineChoice>();
+/** This run's engine choice, made (and a build's folder assembled) once per command. */
+function engineChoice(command: "build" | "serve"): EngineChoice {
+  let choice = engineChoices.get(command);
+  if (!choice) engineChoices.set(command, (choice = engineChoiceFor(command)));
+  return choice;
+}
+const publicDir = (command: "build" | "serve"): string => engineChoice(command).publicDir;
+
+/** A dev serve's engine URLs, answered from the tooling package
+ *  (`toolingEngineFile`) ahead of Vite's own public folder. */
+function toolingEngineServe(dir: string | undefined): Plugin {
+  return {
+    name: "vc-tooling-engine-serve",
+    apply: "serve",
+    configureServer(server) {
+      if (!dir) return;
+      server.middlewares.use((req, res, next) => {
+        const pathname = (req.url ?? "").split(/[?#]/)[0];
+        const hit = toolingEngineFile(pathname, server.config.base, dir);
+        if (!hit) return next();
+        res.setHeader("Content-Type", hit.type);
+        res.setHeader("Cache-Control", "no-store");
+        res.end(readFileSync(hit.file));
+      });
+    },
+  };
 }
 
 const TOOLING_BUILD = toolingBuild();
@@ -255,19 +323,19 @@ function enginePreload(): Plugin {
         if (base !== "index.html") return [];
         // A build without the engine package (VC_ALLOW_NO_ENGINE=1, which cannot run
         // the game) has nothing to preload; the links would be three 404s.
-        if (!existsSync(resolve(publicDir(), ENGINE_DIR, ENGINE_BUILD_RECORD))) return [];
+        if (!existsSync(resolve(publicDir("build"), ENGINE_DIR, ENGINE_BUILD_RECORD))) return [];
         return ENGINE_PRELOAD_FILES.map((file) => ({ tag: "link", attrs: enginePreloadAttrs(file), injectTo: "head-prepend" as const }));
       },
     },
   };
 }
 
-const expectedPackage = (command: "build" | "serve") => readExpectedPackage(publicDir(), command === "build" ? "build" : "other");
+const expectedPackage = (command: "build" | "serve") => readExpectedPackage(publicDir(command), command === "build" ? "build" : "other");
 const fingerprintOf = (command: "build" | "serve") => buildFingerprint(resolve(__dirname, "src"), expectedPackage(command));
 
 export default defineConfig(({ command }) => ({
   root: "src",
-  publicDir: publicDir(),
+  publicDir: publicDir(command),
   resolve: { alias: engineAliases(command) },
   base: "./",
   // Compile-time app version, shown on the splash. (package.json isn't importable
@@ -288,6 +356,10 @@ export default defineConfig(({ command }) => ({
     // validated by `toolingBuild()` above; scripts/verify-game-handle.ts
     // asserts the resulting dist matches the mode on every `npm run build`.
     __TOOLING_BUILD__: JSON.stringify(TOOLING_BUILD),
+    // Whether the engine this run serves is the tooling package with the
+    // binding's tier 3 ops (#1057), so the boot check asks for them only
+    // then: a tooling build, or a dev serve that found the package.
+    __TOOLING_ENGINE__: JSON.stringify(engineChoice(command).toolingEngine),
     // A Vercel preview deployment registers no service worker, so a branch
     // link always serves the latest push; production keeps it. See
     // src/build/previewDeploy.ts for the worker a preview ships instead.
@@ -312,6 +384,7 @@ export default defineConfig(({ command }) => ({
     noUnlistedPackageFiles(),
     sharedHead(),
     enginePreload(),
+    toolingEngineServe(engineChoice(command).serveEngineFrom),
     // The help pages are Markdown (help-site/src/content/docs/), shared with
     // the Help site; the game's Help window imports them as lit templates.
     helpMarkdown(),

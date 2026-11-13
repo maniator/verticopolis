@@ -368,18 +368,23 @@ jobs:
           cargo clippy --locked --all-targets -- -D warnings
           cargo clippy --locked --all-targets --features conformance -- -D warnings
           cargo clippy --locked --all-targets --features wasm -- -D warnings
+          cargo clippy --locked --all-targets --features tooling -- -D warnings
           cargo clippy --locked --lib --target wasm32-unknown-unknown --features wasm -- -D warnings
+          cargo clippy --locked --lib --target wasm32-unknown-unknown --features tooling -- -D warnings
 
       - name: Unit tests
-        # Run native/default and WASM-feature variants. The conformance
-        # feature variant is exercised by cargo llvm-cov's test run in the
-        # rust-coverage job; don't run those same tests twice.
+        # Run native/default and WASM-feature variants. The tooling feature
+        # (the binding's tier 3 ops, #1057) turns wasm on as well, so its run
+        # covers every binding test the wasm feature alone would; the player
+        # build without tier 3 is held by the clippy runs above. The
+        # conformance feature variant is exercised by cargo llvm-cov's test
+        # run in the rust-coverage job; don't run those same tests twice.
         # Keep debug assertions and overflow checks enabled.
         env:
           CARGO_PROFILE_TEST_OPT_LEVEL: "1"
         run: |
           cargo test --locked
-          cargo test --locked --features wasm
+          cargo test --locked --features tooling
 
       - name: Conformance
         run: cargo run --locked --release --features conformance --bin conformance
@@ -559,8 +564,9 @@ jobs:
         run: cargo build --locked --release --features conformance --bin fuzz
         working-directory: engine-rs
 
-      # The shipped build's Node package (engine-rs/pkg/), from the shared
-      # cache and built on a miss with the pinned wasm-bindgen CLI.
+      # The engine's Node package (engine-rs/pkg/, the tooling build with the
+      # binding's tier 3 ops, #1057), from the shared cache and built on a
+      # miss with the pinned wasm-bindgen CLI.
       - uses: ./.github/actions/engine-wasm
 
       - name: Replay the corpus natively and through the WASM build

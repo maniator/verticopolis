@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # Install the toolchain the engine's WASM package needs, then build it with
-# `npm run wasm:build` (engine-rs/pkg/ for Node, src/public/engine/ for the
-# browser). The package is build output and is not checked in: the Vercel
+# `npm run wasm:build`: the player build (src/public/engine/ for the browser,
+# engine-rs/pkg-player/ for Node) and the tooling build with the binding's
+# tier 3 ops (engine-rs/pkg/ for Node, engine-rs/pkg-web-tooling/ for a
+# VC_TOOLING=1 browser build, #1057). The package is build output and is not checked in: the Vercel
 # deploy (scripts/vercel-build.sh) and CI (.github/actions/engine-wasm) both
 # build it through this script.
 #

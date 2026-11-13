@@ -51,8 +51,9 @@ jobs:
         run: |
           rustup toolchain install 1.97.0 --profile minimal
           rustup default 1.97.0
-      # The shipped build's Node package (engine-rs/pkg/), from the shared
-      # cache and built on a miss with the pinned wasm-bindgen CLI.
+      # The engine's Node package (engine-rs/pkg/, the tooling build with the
+      # binding's tier 3 ops, #1057), from the shared cache and built on a
+      # miss with the pinned wasm-bindgen CLI.
       - uses: ./.github/actions/engine-wasm
       - name: Build the fuzzer
         run: cargo build --locked --release --features conformance --bin fuzz

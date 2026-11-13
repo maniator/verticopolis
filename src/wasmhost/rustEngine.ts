@@ -30,7 +30,7 @@ export function enginePackageUrl(base = import.meta.env.BASE_URL, href = globalT
 export async function loadWasmEngine(url = enginePackageUrl(), signal?: AbortSignal, opts: Omit<LoadEngineOptions, "signal"> = {}): Promise<WasmModule> {
   const { mod } = await loadEngineModule(url, { ...opts, signal });
   try {
-    return checkBinding(mod);
+    return checkBinding(mod, { tooling: __TOOLING_ENGINE__ });
   } catch (e) {
     throw new EngineBootError("package-mismatch", e instanceof Error ? e.message : String(e));
   }

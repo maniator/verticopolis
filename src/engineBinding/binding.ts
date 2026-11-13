@@ -1,4 +1,5 @@
 import type { Engine, catalog, encodeVctower, engineIdentity } from "./engine";
+import { TOOLING_METHODS as TOOLING_METHOD_NAMES } from "./toolingMethods";
 
 /**
  * The WASM binding's surface, as wasm-bindgen declares it from
@@ -23,20 +24,18 @@ export interface WasmModule {
   engineIdentity?: typeof engineIdentity;
 }
 
-/** Every method the adapters call on an instance, and on the class. Each
- *  one's tier is in `exportTiers.ts`. */
+/** Every method the adapters call on an instance of the player build, and on
+ *  the class. Each one's tier is in `exportTiers.ts`. */
 export const INSTANCE_METHODS = [
   // The legacy commands, reads and host plumbing the conformance suites call.
-  "free", "mode", "money", "setMoney", "build", "paintBrush", "canBuild", "buildTransport",
-  "sellAt", "unitAt", "transportAt", "adjustRent", "setNoRate", "priceUnit", "setCars",
-  "setSchedule", "setStop", "setExpressStops", "clearStops", "resizeTransport", "removeUnit",
-  "removeTransport", "setLabel", "setTowerName", "setView", "setAutoBridge", "emit", "startFire",
-  "fires", "bombThreat", "evaluateStar", "setClock", "setUnitState", "setCustomersIn", "setWeather",
-  "clearRetailTallies", "startFireAt", "vacateUnit", "setUnitRent",
+  "free", "mode", "money", "build", "paintBrush", "canBuild", "buildTransport",
+  "sellAt", "unitAt", "transportAt", "adjustRent", "setNoRate", "priceUnit",
+  "setSchedule", "setStop", "setExpressStops", "clearStops", "setLabel", "setTowerName",
+  "setView", "setAutoBridge", "emit", "fires",
   "callExterminator", "autoBridge", "toggleAutoBridge", "setFilmPolicy", "rerollSubtype", "applyRentBatch",
   "pendingChoice", "bombSearch", "resolveChoice", "tick",
   "serialize", "stateView", "crowdView", "stateDigest", "crowdDigest", "frameView", "logSince",
-  "elevatorTelemetry", "seedElevatorTelemetry", "advanceClock", "seedLoopMemos", "loopMemos",
+  "elevatorTelemetry", "loopMemos",
   "housekeepingReport", "commuteStress", "commuteStressRevision", "drainGameplayEvents",
   "gameplayEventsPending", "gameplayEventsDropped", "serializeForSync", "saveDelta", "addCar",
   "removeCar", "beginExtend", "extendTransport", "endExtend", "removeFacility",
@@ -76,18 +75,20 @@ export const INSTANCE_METHODS = [
   "recyclingCapacity", "recyclingDemandMet",
   // The rooms' evaluation and rent tiers for the Map's Eval and Pricing views (#343 S7).
   "roomTiers",
-  // The tooling harnesses' bare edits and reads (src/game/toolingTower.ts, #1875 step 4).
-  "placeBare", "placeTransportBare", "unitRecord", "transportRecord", "roomAt",
+  // The tooling harnesses' reads (src/game/toolingTower.ts, #1875 step 4).
+  "unitRecord", "transportRecord", "roomAt",
   "structureKindAt", "floorHasLobby", "isFloorServed", "highestFloor",
   // Tall lobbies (#308): the lobby tool's height and the renderer's read.
   "setLobbyHeight", "lobbyHeights", "lobbyRise", "walkwayTop",
 ] as const satisfies readonly (keyof WasmEngine)[];
+/** The tier 3 ops only the tooling build exports (`toolingMethods.ts`). */
+export const TOOLING_METHODS = TOOLING_METHOD_NAMES satisfies readonly (keyof WasmEngine)[];
 export const STATIC_METHODS = ["newGame", "fromSave", "fromVctower"] as const satisfies readonly (keyof typeof Engine)[];
 
 // Every method of the declared class (the dispose symbol aside) and every
 // static has to be in the lists above, or the binding gained one the check
 // and the adapters do not know about.
-type Unlisted = Exclude<keyof WasmEngine, (typeof INSTANCE_METHODS)[number] | symbol>;
+type Unlisted = Exclude<keyof WasmEngine, (typeof INSTANCE_METHODS)[number] | (typeof TOOLING_METHODS)[number] | symbol>;
 const unlisted: Record<Unlisted, never> = {};
 void unlisted;
 type UnlistedStatic = Exclude<keyof typeof Engine, (typeof STATIC_METHODS)[number] | "prototype">;
@@ -96,14 +97,16 @@ void unlistedStatic;
 
 /** Check a loaded module against the surface above, naming what is missing,
  *  so a binding that renamed or dropped a method fails by name rather than
- *  as "not a function" deep inside a run. */
-export function checkBinding(mod: unknown): WasmModule {
+ *  as "not a function" deep inside a run. `tooling` asks for the tier 3 ops
+ *  too: a tooling build or a dev serve, whose tooling tower calls them, and
+ *  the test suites, which load the tooling package. */
+export function checkBinding(mod: unknown, opts: { tooling: boolean }): WasmModule {
   const m = mod as { Engine?: unknown };
   if (typeof m.Engine !== "function") throw new Error("the WASM binding exports no Engine class; rebuild it");
   const proto = (m.Engine as { prototype: Record<string, unknown> }).prototype;
   const cls = m.Engine as unknown as Record<string, unknown>;
   const missing = [
-    ...INSTANCE_METHODS.filter((name) => typeof proto[name] !== "function").map((name) => `Engine#${name}`),
+    ...[...INSTANCE_METHODS, ...(opts.tooling ? TOOLING_METHODS : [])].filter((name) => typeof proto[name] !== "function").map((name) => `Engine#${name}`),
     ...STATIC_METHODS.filter((name) => typeof cls[name] !== "function").map((name) => `Engine.${name}`),
   ];
   if (missing.length) throw new Error(`the WASM binding lacks ${missing.join(", ")}; rebuild it or update the adapter`);
