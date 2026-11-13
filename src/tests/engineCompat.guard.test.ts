@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   copyFileSync,
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -13,6 +14,7 @@ import { dirname, join, resolve } from "node:path";
 import {
   COMPAT_RECORD_PATH,
   LOCK_FILES,
+  lockFilePath,
   VERSION_CONSTANTS,
   baseRecord,
   cargoPackage,
@@ -158,12 +160,12 @@ describe("engine crate version rule", () => {
     it("the lock, in each of its files", () => {
       const dir = mkdtempSync(join(tmpdir(), "vc-lock-"));
       try {
-        for (const f of LOCK_FILES) {
+        for (const f of LOCK_FILES.map(lockFilePath)) {
           mkdirSync(dirname(join(dir, f)), { recursive: true });
-          copyFileSync(resolve(ROOT, "conformance", f), join(dir, f));
+          copyFileSync(resolve(ROOT, f), join(dir, f));
         }
         expect(lockDigest(dir)).toBe(record.lockDigest);
-        for (const f of LOCK_FILES) {
+        for (const f of LOCK_FILES.map(lockFilePath)) {
           const text = readFileSync(join(dir, f), "utf8");
           writeFileSync(
             join(dir, f),
@@ -173,7 +175,7 @@ describe("engine crate version rule", () => {
           writeFileSync(join(dir, f), text);
         }
         // A CRLF checkout digests like an LF one, and one already in CRLF stays CRLF.
-        const f = LOCK_FILES[0];
+        const f = lockFilePath(LOCK_FILES[0]);
         const crlf = (t: string) => t.replace(/\r?\n/g, "\r\n");
         writeFileSync(join(dir, f), crlf(readFileSync(join(dir, f), "utf8")));
         expect(lockDigest(dir)).toBe(record.lockDigest);
@@ -382,7 +384,7 @@ describe("engine crate version rule", () => {
   });
 
   it("the five lock files are the whole conformance lock", () => {
-    // A new file at the top of conformance/ or in events/ has to be placed:
+    // A new file at the top of conformance/ has to be placed:
     // add it to LOCK_FILES (and the Rust test's list) when it pins the engine,
     // or to this list when it is an input the lock already covers or is not
     // part of the engine's contract (the fuzz corpus's goldens are the native
@@ -393,7 +395,9 @@ describe("engine crate version rule", () => {
     const visible = (dir: string) =>
       readdirSync(resolve(ROOT, dir)).filter((n) => !n.startsWith("."));
     const top = visible("conformance").filter((n) => !inputs.has(n));
+    // The event catalog keeps its lock name but lives in the crate (lockFilePath).
+    locked.delete("events");
     expect(top.sort()).toEqual([...locked].sort());
-    expect(visible("conformance/events")).toEqual(["catalog.json"]);
+    expect(existsSync(resolve(ROOT, lockFilePath("events/catalog.json")))).toBe(true);
   });
 });

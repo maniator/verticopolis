@@ -1,4 +1,4 @@
-// Generated from conformance/events/catalog.json by `npm run gen:events`.
+// Generated from engine-rs/src/gameplay/catalog.json by `npm run gen:events`.
 // Do not edit: change the catalog and regenerate (src/events/gameplayCatalog.test.ts fails while this is stale).
 
 /**

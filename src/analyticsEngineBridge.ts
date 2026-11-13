@@ -8,7 +8,7 @@ import { trackBombOutcome, trackEconomyAction, trackEconomyActionOnce, trackEmer
 /**
  * The analytics engine bridge (#873 phase 2): the one place the game's gameplay
  * analytics come from. The engine (Rust under the WASM host, TypeScript
- * otherwise) emits the catalog's events (`conformance/events/catalog.json`)
+ * otherwise) emits the catalog's events (`engine-rs/src/gameplay/catalog.json`)
  * into a drain buffer; the frame loop hands the bridge the live tower once per
  * frame, and the session hands it over once more before it reports or opens a
  * new window. The bridge drains, checks, and folds:

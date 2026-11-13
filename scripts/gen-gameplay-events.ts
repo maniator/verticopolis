@@ -1,7 +1,7 @@
 /**
  * Regenerate `src/events/gameplayEvents.d.ts` and the runtime rules in
  * `src/events/gameplayEventRules.ts` from the gameplay event
- * catalog, `conformance/events/catalog.json`, after checking the catalog
+ * catalog, `engine-rs/src/gameplay/catalog.json`, after checking the catalog
  * against its payload rule (closed enums and small integers only):
  *
  *   npm run gen:events
@@ -17,7 +17,7 @@ import { fileURLToPath } from "node:url";
 import { checkCatalog, renderGameplayEventRules, renderGameplayEventsDts } from "../src/events/gameplayCatalog.ts";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const catalog = checkCatalog(JSON.parse(readFileSync(resolve(root, "conformance/events/catalog.json"), "utf8")));
+const catalog = checkCatalog(JSON.parse(readFileSync(resolve(root, "engine-rs/src/gameplay/catalog.json"), "utf8")));
 writeFileSync(resolve(root, "src/events/gameplayEvents.d.ts"), renderGameplayEventsDts(catalog));
 writeFileSync(resolve(root, "src/events/gameplayEventRules.ts"), renderGameplayEventRules(catalog));
-console.log("src/events/gameplayEvents.d.ts and gameplayEventRules.ts refreshed from conformance/events/catalog.json");
+console.log("src/events/gameplayEvents.d.ts and gameplayEventRules.ts refreshed from engine-rs/src/gameplay/catalog.json");

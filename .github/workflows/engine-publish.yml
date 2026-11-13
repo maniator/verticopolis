@@ -1,0 +1,154 @@
+name: Publish engine to registries
+
+# Publishes one engine release (engine-v<version>) to crates.io, as the crate
+# verticopolis-engine, and to npm, as @verticopolis/engine. release-tag.yml
+# dispatches it when a release PR raises the crate version; a maintainer can
+# also run it from the Actions tab with the version, to finish a run that
+# failed, say. CONTRIBUTING.md "The registries" is the guide.
+#
+# The check job reads the release, the crate version at its tag and the npm
+# tarball the release carries, with no credential. The two publish jobs wait
+# on the `registry` environment, which only the owner can approve, so nothing
+# reaches a registry without that approval.
+#
+# Trusted publishing: crates.io and npm each trust this repository, this
+# workflow file and the `registry` environment. A publish job asks GitHub for
+# an OIDC token (id-token: write), and the registry exchanges it for a
+# short-lived publish token, so no registry token is stored anywhere. npm
+# records a provenance statement for a package published this way. Both
+# registries set up a trusted publisher only for a package that already
+# exists, so the first version of each went up by hand
+# (scripts/first-publish.ps1).
+#
+# A version a registry already holds is left alone there, so a re-run only
+# publishes what is missing.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Engine version to publish (x.y.z, with a published engine-v<version> release)"
+        required: true
+        type: string
+
+permissions: {}
+
+concurrency:
+  group: engine-publish-${{ inputs.version }}
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Check the release, its crate version and its npm tarball
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          if ! printf '%s' "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then echo "::error::$VERSION is not a plain x.y.z."; exit 1; fi
+          tag="engine-v$VERSION"
+          if ! draft="$(gh release view "$tag" --json isDraft --jq .isDraft)"; then echo "::error::$tag has no GitHub release."; exit 1; fi
+          if [ "$draft" != "false" ]; then echo "::error::The $tag release is still a draft."; exit 1; fi
+          crate="$(gh api "repos/$GH_REPO/contents/engine-rs/Cargo.toml?ref=refs/tags/$tag" --jq .content | base64 -d \
+            | awk '/^\[package\]/ { p = 1; next } /^\[/ { p = 0 } p && /^version *=/ { gsub(/.*= *"|".*/, ""); print; exit }')"
+          if [ "$crate" != "$VERSION" ]; then echo "::error::engine-rs/Cargo.toml at $tag is version $crate, not $VERSION."; exit 1; fi
+          tgz="verticopolis-engine-$VERSION.tgz"
+          gh release download "$tag" --pattern "$tgz" --pattern "$tgz.sha256" --dir release
+          (cd release && sha256sum -c "$tgz.sha256")
+          named="$(tar -xOzf "release/$tgz" package/package.json | jq -r '.name + "@" + .version')"
+          if [ "$named" != "@verticopolis/engine@$VERSION" ]; then echo "::error::$tgz holds $named, not @verticopolis/engine@$VERSION."; exit 1; fi
+          echo "$tag is ready: crate $crate and $tgz ($named)."
+
+  crate:
+    needs: check
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: registry
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: refs/tags/engine-v${{ inputs.version }}
+          persist-credentials: false
+
+      # The toolchain the engine pins (rust-version), as the rust job uses.
+      - name: Rust toolchain
+        run: |
+          rustup toolchain install 1.97.0 --profile minimal
+          rustup default 1.97.0
+
+      - name: Skip a version crates.io already holds
+        id: have
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          code="$(curl -sS -o /dev/null -w '%{http_code}' -A "verticopolis-engine-publish (release workflow)" "https://crates.io/api/v1/crates/verticopolis-engine/$VERSION")"
+          case "$code" in
+            200) echo "verticopolis-engine $VERSION is already on crates.io; leaving it."; echo "published=true" >> "$GITHUB_OUTPUT" ;;
+            404) echo "published=false" >> "$GITHUB_OUTPUT" ;;
+            *) echo "::error::crates.io answered $code for verticopolis-engine $VERSION."; exit 1 ;;
+          esac
+
+      - name: Get a short-lived crates.io token
+        if: ${{ steps.have.outputs.published == 'false' }}
+        id: auth
+        uses: rust-lang/crates-io-auth-action@3268eb413133e2960fa4ae0e963ca76380c54cd9 # v1.0.6
+
+      - name: Publish the crate
+        if: ${{ steps.have.outputs.published == 'false' }}
+        working-directory: engine-rs
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
+        run: cargo publish --locked
+
+  npm:
+    needs: check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: registry
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: refs/tags/engine-v${{ inputs.version }}
+          persist-credentials: false
+          sparse-checkout: .nvmrc
+          sparse-checkout-cone-mode: false
+
+      # No registry-url: npm's default registry is npm, and trusted publishing
+      # needs no token in an .npmrc.
+      - name: Use Node.js (from .nvmrc)
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: ".nvmrc"
+
+      - name: Publish the release's tarball to npm
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          # Trusted publishing needs npm 11.5.1 or later.
+          have="$(npm --version)"
+          if [ "$(printf '%s\n%s\n' 11.5.1 "$have" | sort -V | head -n 1)" != 11.5.1 ]; then echo "::error::npm $have is older than 11.5.1, which trusted publishing needs."; exit 1; fi
+          if [ "$(npm view "@verticopolis/engine@$VERSION" version 2> /dev/null || true)" = "$VERSION" ]; then
+            echo "@verticopolis/engine@$VERSION is already on npm; leaving it."
+            exit 0
+          fi
+          tgz="verticopolis-engine-$VERSION.tgz"
+          gh release download "engine-v$VERSION" --pattern "$tgz" --pattern "$tgz.sha256" --dir release
+          (cd release && sha256sum -c "$tgz.sha256")
+          npm publish "release/$tgz" --access public --provenance
+          echo "Published @verticopolis/engine@$VERSION."

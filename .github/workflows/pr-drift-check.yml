@@ -145,12 +145,12 @@ jobs:
             # The package is build output, so an engine change no longer shows
             # up as a src/public/engine/ change; its inputs count instead.
             # The engine's inputs that can reach the package: the crate but its
-            # Markdown, and conformance/events/, the gameplay event catalog the
-            # engine compiles in (include_str! in engine-rs/src/gameplay.rs).
+            # Markdown (the gameplay event catalog the engine compiles in lives
+            # in the crate, engine-rs/src/gameplay/catalog.json).
             # engineSourceHash also covers the conformance files that only the
             # engine's tests include; they never reach the package.
-            case "$f" in engine-rs/*|conformance/events/*) sign=+ ;; esac
-            case "$f" in engine-rs/*.md|conformance/events/*.md) sign=- ;; esac
+            case "$f" in engine-rs/*) sign=+ ;; esac
+            case "$f" in engine-rs/*.md) sign=- ;; esac
             case "$f" in scripts/wasm-build.ts|scripts/build-engine-wasm.sh|.github/actions/engine-wasm/*|.github/actions/engine-wasm-download/*) sign=+ ;; esac
             # The pinned Playwright/browser + font versions come from the lockfile, and
             # a bump there can shift antialiasing across the WHOLE committed gallery.

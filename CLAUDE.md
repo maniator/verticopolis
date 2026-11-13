@@ -112,13 +112,15 @@ review skill. The BMAD agent rules live in `_bmad-output/project-context.md`.
   feature PR that edits a version line, and production waits for the release
   PR. See [`.changes/README.md`](./.changes/README.md) and
   [CONTRIBUTING.md](./CONTRIBUTING.md) → **Versioning**.
-- **Every engine change keeps the engine READMEs current** (owner,
-  2026-11-11). The WASM package's README
-  (`packages/verticopolis-engine/README.md`) and the crate's README
-  (`engine-rs/CRATE_README.md`) describe the engine as `main` has it. A PR that
+- **Every engine change keeps the engine guides and READMEs current** (owner,
+  2026-11-11). The full guides live on the docs site
+  (`docs/engine-site/guides/javascript.md` and `crate.md`); the READMEs the
+  registries show (`packages/verticopolis-engine/README.md` on npm,
+  `engine-rs/CRATE_README.md` on crates.io) stay short and link the site
+  (owner, 2026-11-13). All four describe the engine as `main` has it. A PR that
   changes `engine-rs/src/` (tests and `src/bin/` aside) or
-  `src/dualrun/engine.d.ts` edits whichever README went stale, or, after
-  reading both, puts `readmes: unchanged` in its change note's front matter.
+  `src/dualrun/engine.d.ts` edits whichever page went stale, or, after
+  reading them, puts `readmes: unchanged` in its change note's front matter.
   `scripts/version-check.ts` fails a PR that does neither. See
   [CONTRIBUTING.md](./CONTRIBUTING.md) → **The engine READMEs**.
 - **Screenshots come from the pinned Playwright Docker container, never a host

@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, 
 import { tmpdir } from "node:os";
 import { dirname, join, posix, resolve } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
-import { LOCK_FILES } from "../build/engineCompat";
+import { LOCK_FILES, lockFilePath } from "../build/engineCompat";
 import { repoRel, repoRoot, sourceFiles } from "./guardFiles";
 
 /**
@@ -68,10 +68,10 @@ describe.skipIf(process.platform === "win32")("scripts/vercel-ignore-build.sh", 
       "engine-rs/src/lib.rs",
       "engine-rs/Cargo.toml",
       "engine-rs/Cargo.lock",
-      "conformance/events/catalog.json",
+      "engine-rs/src/gameplay/catalog.json",
       "conformance/loader-cases.json",
       "conformance/catalog-digests.json",
-      ...LOCK_FILES.map((f) => `conformance/${f}`),
+      ...LOCK_FILES.map(lockFilePath),
       // Scripts the build runs.
       "scripts/vercel-build.sh",
       "scripts/build-engine-wasm.sh",

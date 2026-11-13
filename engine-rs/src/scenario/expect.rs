@@ -61,7 +61,7 @@ pub(super) fn expect_outcome(
 
 /// The buffered events may be hashed: none was pushed out of a full ring
 /// (the scenario must checkpoint more often), and each is one the catalog
-/// describes (`conformance/events/catalog.json`).
+/// describes (`engine-rs/src/gameplay/catalog.json`).
 pub(super) fn events_fit(sim: &Simulation) -> Result<(), String> {
     use crate::gameplay::{check_catalog, check_event, CATALOG_JSON, GAMEPLAY_RING_CAP};
     static CATALOG: std::sync::OnceLock<Value> = std::sync::OnceLock::new();

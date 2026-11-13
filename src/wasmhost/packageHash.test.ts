@@ -48,8 +48,8 @@ describe("engineSourceHash", () => {
   let dir = "";
   afterEach(() => rmSync(dir, { recursive: true, force: true }));
 
-  /** A crate whose lib.rs pulls a file in from outside src, the way
-   *  gameplay.rs embeds conformance/events/catalog.json. */
+  /** A crate whose lib.rs pulls a file in from outside the crate, the way
+   *  the engine's tests embed conformance fixtures. */
   function crate(): { crate: string; outside: string } {
     dir = mkdtempSync(join(tmpdir(), "vc-hash-"));
     const c = join(dir, "engine-rs");
@@ -112,7 +112,7 @@ describe("engineSourceHash", () => {
     expect(() => engineSourceHash(c)).toThrow(/cannot follow/);
   });
 
-  it("covers every file in the crate and the event catalog, without parsing the layout", () => {
+  it("covers every file in the crate, without parsing the layout", () => {
     const { crate: c } = crate();
     let last = engineSourceHash(c);
     const moves = (edit: () => void) => {
@@ -124,8 +124,10 @@ describe("engineSourceHash", () => {
     };
     expect(moves(() => writeFileSync(join(c, "build.rs"), "fn main() {}\n"))).toBe(true);
     expect(moves(() => writeFileSync(join(c, "lib/gen.inc"), "1"))).toBe(true);
+    expect(moves(() => writeFileSync(join(c, "src/catalog.json"), "{}"))).toBe(true);
+    // A file outside the crate that no source includes is not an input.
     mkdirSync(join(dir, "conformance/events"));
-    expect(moves(() => writeFileSync(join(dir, "conformance/events/catalog.json"), "{}"))).toBe(true);
+    expect(moves(() => writeFileSync(join(dir, "conformance/events/catalog.json"), "{}"))).toBe(false);
     expect(moves(() => writeFileSync(join(c, "README.md"), "docs"))).toBe(false);
     mkdirSync(join(c, "target"));
     mkdirSync(join(c, "pkg"));

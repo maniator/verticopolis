@@ -38,7 +38,6 @@ export type SourceView = (label: string, data: Buffer) => Buffer | null;
  *   `pkg/`, at any depth), Markdown and local clutter (dotfiles, `~` backups,
  *   symlinks), so build scripts, manifest targets and modules in any
  *   layout are in without parsing Cargo.toml or module attributes;
- * - `conformance/events/`, the gameplay event catalog the engine compiles in;
  * - every file a `.rs` source names in a literal `include_str!` or
  *   `include_bytes!`, wherever it lives. An include macro this cannot read
  *   (`include!`, a raw string, a computed path, other delimiters) or a literal
@@ -70,8 +69,6 @@ export function engineSourceHash(crate: string, view?: SourceView): string {
     }
   };
   walk(crate);
-  const events = resolve(crate, "../conformance/events");
-  if (existsSync(events)) walk(events);
   for (const p of [...files]) {
     if (!p.endsWith(".rs")) continue;
     const text = readFileSync(p, "utf8");

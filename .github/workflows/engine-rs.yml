@@ -182,11 +182,12 @@ jobs:
   # lints, tests, runs the smoke and replays every scenario of the lock
   # (API.md). The engine's own tests and referee run in the rust job, not
   # again here. The consumer still replays the full suite against a copied
-  # fixture directory outside the checkout. What
-  # this proves and what it does not: the engine builds, tests and runs with
-  # no web game and no Node.js, from a crate outside the tree; it does not
-  # prove a packaged or registry release, which needs the conformance files
-  # inside the crate first (#893).
+  # fixture directory outside the checkout. The crate is packaged first, as
+  # `cargo publish` would send it to crates.io, and the outside consumer
+  # builds against that packaged copy. What this proves and what it does
+  # not: the engine builds, tests and runs with no web game and no Node.js,
+  # from the files a registry release holds; the conformance suite itself is
+  # not in the package yet (#893), so the consumer reads it from the checkout.
   consumer:
     needs: changes
     # Fail closed: run unless the filter succeeded and found no engine file.
@@ -263,6 +264,25 @@ jobs:
       # adding host-independence coverage: the external consumer below
       # exercises the engine from an actual standalone crate instead.
 
+      # What crates.io would receive (Cargo.toml `include`), built from the
+      # unpacked copy under target/package/, so a file the library needs
+      # from outside the crate fails here instead of in the release. The
+      # crate is copied out of the checkout first: this sparse checkout has
+      # no blobs for the rest of the repository, which cargo's git status
+      # check would read, and a copy with no repository around it proves
+      # the same thing a registry download does.
+      - name: The crate packages on its own
+        run: |
+          crate="$RUNNER_TEMP/crate"
+          rm -rf "$crate"
+          mkdir -p "$crate"
+          tar -C engine-rs --exclude=./target --exclude=./pkg --exclude=./consumer -cf - . | tar -C "$crate" -xf -
+          cd "$crate"
+          cargo package --locked
+          version="$(cargo metadata --locked --no-deps --format-version 1 | grep -o '"version":"[^"]*"' | head -n 1 | cut -d'"' -f4)"
+          test -d "target/package/verticopolis-engine-$version"
+          echo "VC_PACKAGED=$crate/target/package/verticopolis-engine-$version" >> "$GITHUB_ENV"
+
       - name: The consumer, in place
         working-directory: engine-rs/consumer
         run: |
@@ -280,12 +300,12 @@ jobs:
 
       - name: The consumer, as a crate outside the checkout
         run: |
-          ws="$PWD"
           host="$RUNNER_TEMP/host"
           mkdir -p "$host"
           cp -R engine-rs/consumer/Cargo.toml engine-rs/consumer/Cargo.lock engine-rs/consumer/src "$host/"
-          sed -i "s|^verticopolis-engine = { path = \"..\", |verticopolis-engine = { path = \"$ws/engine-rs\", |" "$host/Cargo.toml"
-          grep -qx "verticopolis-engine = { path = \"$ws/engine-rs\", features = \[\"conformance\"\] }" "$host/Cargo.toml"
+          # The packaged crate, as a host that downloads it from crates.io gets it.
+          sed -i "s|^verticopolis-engine = { path = \"..\", |verticopolis-engine = { path = \"$VC_PACKAGED\", |" "$host/Cargo.toml"
+          grep -qx "verticopolis-engine = { path = \"$VC_PACKAGED\", features = \[\"conformance\"\] }" "$host/Cargo.toml"
           # The suite under another name, as a packaged copy would be: a
           # fixture resolves inside whatever directory holds the suite.
           suite="$RUNNER_TEMP/suite-copy"

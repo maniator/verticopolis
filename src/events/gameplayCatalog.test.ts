@@ -11,7 +11,7 @@ import type { FacilityKind, GameMode } from "../shared/types";
 import type { GameplayFacilityKind, GameplayMode } from "./gameplayEvents";
 
 /**
- * The gameplay event catalog (`conformance/events/catalog.json`) is the
+ * The gameplay event catalog (`engine-rs/src/gameplay/catalog.json`) is the
  * contract both engines emit against. These tests hold the catalog to its
  * payload rule, the generated `gameplayEvents.d.ts` to the catalog, and the
  * catalog's closed sets to the engine's published catalog and to the stats
@@ -20,7 +20,7 @@ import type { GameplayFacilityKind, GameplayMode } from "./gameplayEvents";
  */
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
-const raw = (): Record<string, unknown> => JSON.parse(readFileSync(resolve(root, "conformance/events/catalog.json"), "utf8")) as Record<string, unknown>;
+const raw = (): Record<string, unknown> => JSON.parse(readFileSync(resolve(root, "engine-rs/src/gameplay/catalog.json"), "utf8")) as Record<string, unknown>;
 const catalog: GameplayCatalog = checkCatalog(raw());
 
 /** A copy of the catalog with one payload field replaced on the first event. */

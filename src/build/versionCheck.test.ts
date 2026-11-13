@@ -121,9 +121,9 @@ describe("the engine READMEs on an engine change", () => {
   it("needs a README edit or the note's readmes line", () => {
     const errors = feature(main(), main({ ...engine, ".changes/topic.md": note("none", "none") }), deployed);
     expect(errors).toHaveLength(1);
-    expect(errors[0]).toMatch(/changes the engine \(engine-rs\/src\/sim\.rs\) and neither engine README.*readmes: unchanged/);
+    expect(errors[0]).toMatch(/changes the engine \(engine-rs\/src\/sim\.rs\) and no engine guide or README.*readmes: unchanged/);
     expect(feature(main(), main({ ...engine, ".changes/topic.md": readmesNote }), deployed)).toEqual([]);
-    for (const readme of ["packages/verticopolis-engine/README.md", "engine-rs/CRATE_README.md"]) {
+    for (const readme of ["docs/engine-site/guides/javascript.md", "docs/engine-site/guides/crate.md", "packages/verticopolis-engine/README.md", "engine-rs/CRATE_README.md"]) {
       expect(feature(main(), main({ ...engine, [readme]: "new", ".changes/topic.md": note("none", "none") }), deployed)).toEqual([]);
     }
   });

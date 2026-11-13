@@ -11,7 +11,7 @@ import type { ScenarioEngine } from "./scenario";
 
 // Resolved from this file: scenario.ts imports this module, so its
 // CONFORMANCE_DIR is not set yet when this runs.
-const CATALOG = resolve(dirname(fileURLToPath(import.meta.url)), "../../../conformance/events/catalog.json");
+const CATALOG = resolve(dirname(fileURLToPath(import.meta.url)), "../../../engine-rs/src/gameplay/catalog.json");
 const catalog = checkCatalog(JSON.parse(readFileSync(CATALOG, "utf8")));
 
 /** Drain an engine's gameplay events for hashing: none may have been pushed

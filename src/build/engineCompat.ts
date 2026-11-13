@@ -31,7 +31,10 @@ import { resolve } from "node:path";
 /** Where the record lives, inside the crate so the package ships it. */
 export const COMPAT_RECORD_PATH = "engine-rs/src/compat-record.json";
 
-/** The lock files under `conformance/`, in digest order. */
+/**
+ * The lock files, by the name the lock digest labels them with, in digest
+ * order. `lockFilePath` says where each one lives.
+ */
 export const LOCK_FILES = [
   "catalog-digests.json",
   "events/catalog.json",
@@ -39,6 +42,19 @@ export const LOCK_FILES = [
   "loader-cases.json",
   "tdt-cases.json",
 ];
+
+/**
+ * The gameplay event catalog lives inside the crate, so the published crate
+ * compiles it in (`gameplay::CATALOG_JSON`). It keeps its lock name,
+ * `events/catalog.json`, from when it sat under `conformance/`, so moving it
+ * did not move the lock digest.
+ */
+export const EVENT_CATALOG_PATH = "engine-rs/src/gameplay/catalog.json";
+
+/** Where the lock file `name` lives, relative to the repository root. */
+export function lockFilePath(name: string): string {
+  return name === "events/catalog.json" ? EVENT_CATALOG_PATH : `conformance/${name}`;
+}
 
 export interface CompatRecord {
   crateVersion: string;
@@ -104,11 +120,11 @@ function lf(data: Buffer): Buffer {
     : Buffer.from(data.toString("latin1").replace(/\r\n/g, "\n"), "latin1");
 }
 
-/** For each lock file in order: its name, a newline, its length, a newline, then its bytes. */
-export function lockDigest(conformanceDir: string): string {
+/** For each lock file in order (read from under `root`, the repository root): its name, a newline, its length, a newline, then its bytes. */
+export function lockDigest(root: string): string {
   const h = createHash("sha256");
   for (const name of LOCK_FILES) {
-    const bytes = lf(readFileSync(resolve(conformanceDir, name)));
+    const bytes = lf(readFileSync(resolve(root, lockFilePath(name))));
     h.update(`${name}\n${bytes.length}\n`);
     h.update(bytes);
   }
@@ -193,7 +209,7 @@ export function compatInputs(): string[] {
     "engine-rs/Cargo.toml",
     ...new Set(Object.values(VERSION_CONSTANTS).map((c) => c.file)),
     "src/dualrun/engine.d.ts",
-    ...LOCK_FILES.map((f) => `conformance/${f}`),
+    ...LOCK_FILES.map(lockFilePath),
   ];
 }
 
@@ -206,7 +222,7 @@ export function computeCompat(root: string): CompatRecord {
   };
   return {
     crateVersion: cargoVersion(read("engine-rs/Cargo.toml")),
-    lockDigest: lockDigest(resolve(root, "conformance")),
+    lockDigest: lockDigest(root),
     saveVersion: constant("saveVersion"),
     oldestSaveVersion: constant("oldestSaveVersion"),
     frameLayoutVersion: constant("frameLayoutVersion"),
