@@ -2,7 +2,7 @@ import { analyticsAdapter, type EventProps } from "./analyticsAdapter";
 import { APP_VERSION } from "./appVersion";
 import { telemetryHostAllowed } from "./telemetry";
 import type { EngagedBy } from "./analyticsEngagement";
-import type { SaveFileFormat, TdtImportReadProps } from "./analyticsFiles";
+import type { TdtImportReadProps, TowerFileProps } from "./analyticsFiles";
 import type { PageViewProps } from "./analyticsPageView";
 import type { EngineBuild, EngineKind, EngineStatusReason, EngineStatusTrigger } from "./analyticsEngineStatus";
 import type { GameplayMilestoneId } from "./events/gameplayEvents";
@@ -231,13 +231,14 @@ export interface GameplayEvents {
    *  The `import_save` and `import_tdt` app actions count the clicks; this
    *  counts the arrivals. `format` is `vctower` or `tdt`; `mode`, `star` and
    *  `population` describe the tower that arrived (`analyticsFiles.ts`). */
-  file_imported: { format: SaveFileFormat; mode: string; star: number; population: number };
+  file_imported: TowerFileProps;
   /** A tower file was written: the download was handed to the browser
    *  (approved 2026-11-13). Same fields as `file_imported`, for the tower
    *  exported. A download the browser blocks is not seen. */
-  file_exported: { format: SaveFileFormat; mode: string; star: number; population: number };
-  /** A 1994 `.TDT` read cleanly and its import report is up, before the
-   *  player chooses to open it (approved 2026-11-13). The tower's size and
+  file_exported: TowerFileProps;
+  /** A 1994 `.TDT` read cleanly and its import report is on screen, before
+   *  the player chooses to open it (approved 2026-11-13). A report dropped
+   *  while it waits behind another dialog is never sent. The tower's size and
    *  every count of what the importer had to drop, clamp or guess, from the
    *  report's own numbers. Counts and flags only; never a name or a note's
    *  text. Fields: `analyticsFiles.ts` and `docs/analytics-data-map.md`. */

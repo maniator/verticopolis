@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ImportCounts, ImportReportFacts } from "./storage/tdtImportReport";
+import type { GameMode } from "./shared/types";
 
 const trackEvent = vi.fn();
 vi.mock("./analyticsCore", () => ({ trackEvent: (...args: unknown[]) => trackEvent(...args) }));
@@ -111,7 +112,16 @@ describe("headerNow", () => {
     let current = HEADER;
     const later = headerNow(() => current);
     current = { ...HEADER, population: 9999 };
-    expect(later()).toBe(HEADER);
+    expect(later()).toEqual(HEADER);
+  });
+
+  it("copies the three fields, so a header object changed in place later does not change them", () => {
+    const reused: { mode: GameMode; star: number; population: number; towerName: string } = { ...HEADER, towerName: "Private Tower Name" };
+    const later = headerNow(() => reused);
+    reused.population = 9999;
+    reused.star = 5;
+    reused.mode = "classic";
+    expect(later()).toStrictEqual(HEADER);
   });
 
   it("defers a failed read to the event, which sends nothing", () => {
