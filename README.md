@@ -29,7 +29,8 @@ drawn in code.
   ([Classic and Modern](https://verticopolis.com/help/classic-vs-modern/))
 - **Every room from the original**: offices, condos, hotels, shops and
   restaurants, the cinema and party hall, services, the metro and the Wedding
-  Hall. ([Rooms](https://verticopolis.com/help/rooms/))
+  Hall, each one drawn on the [Rooms](https://verticopolis.com/help/rooms/)
+  pages of the manual.
 - **Stairs, escalators and three kinds of elevator**, with cars and stops you
   set yourself. ([Elevators](https://verticopolis.com/help/building/elevators/))
 - **A living tower** on one game clock: rush hours, quiet nights, people riding
