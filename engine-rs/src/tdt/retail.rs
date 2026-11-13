@@ -8,13 +8,25 @@ use super::format::{
     RETAIL_CONSTANT_BYTE, RETAIL_ROW_CONSTANT, RETAIL_STYLE_BYTE, TDT_RETAIL_RECORD_SIZE,
     TDT_RETAIL_SLOTS,
 };
-use super::types::{TdtFloor, TdtTenant, TdtTower};
+use super::types::{TdtFloor, TdtRetailRow, TdtTenant, TdtTower};
 use crate::facilities::Kind;
 
 /// Byte 0 of an empty retail row.
 const EMPTY_ROW: u8 = 0xFF;
 /// Byte 1 of a row: the room's logical unit id on its floor.
 const UNIT_BYTE: usize = 1;
+/// The rows one byte of a room's record can name; the table holds twice as
+/// many.
+const ROWS_PER_BYTE: usize = 256;
+
+/// A room record's bytes 7 to 14 with byte 7 set to the high byte of its
+/// retail `row`: a room past the 256th names its row in bytes 6 and 7, low
+/// byte first. The game's own saves hold fewer rooms and keep byte 7 at 0
+/// (#2044).
+pub fn with_row_high(mut middle: [u8; 8], row: i64) -> [u8; 8] {
+    middle[0] = (row as usize / ROWS_PER_BYTE) as u8;
+    middle
+}
 
 /// Write the retail table: each of `rows` (floor index, style) with the
 /// logical unit id `ids` gives the room at the same place, then empty rows.
@@ -40,18 +52,29 @@ pub fn write_retail_table(w: &mut ByteWriter, rows: &[(f64, i64)], ids: &[usize]
 /// exports before #2044 kept the style.
 fn retail_style(tower: &TdtTower, floor: &TdtFloor, at: usize, t: &TdtTenant) -> i64 {
     let rows = &tower.tail.retail;
-    let named = usize::try_from(t.variant)
-        .ok()
-        .and_then(|row| rows.binary_search_by_key(&row, |r| r.row).ok())
-        .map(|i| rows[i])
-        .filter(|r| {
-            i64::from(r.floor) == floor.index
-                && floor
-                    .index_map
-                    .get(usize::from(r.slot))
-                    .map(|&i| usize::from(i))
-                    == Some(at)
-        });
+    let names_this_room = |r: &TdtRetailRow| {
+        i64::from(r.floor) == floor.index
+            && floor
+                .index_map
+                .get(usize::from(r.slot))
+                .map(|&i| usize::from(i))
+                == Some(at)
+    };
+    let row_at = |row: usize| {
+        rows.binary_search_by_key(&row, |r| r.row)
+            .ok()
+            .map(|i| rows[i])
+    };
+    // Bytes 6 and 7 name the row; a file whose byte 7 is 0 for a room past
+    // the 256th (our exports from #2077 until this fix) names it by byte 6
+    // alone, so the rows 256 apart are tried too, each only if it names this
+    // room back.
+    let low = usize::try_from(t.variant).unwrap_or(usize::MAX);
+    let high = usize::try_from(t.row_high).unwrap_or(0);
+    let named = std::iter::once(low.saturating_add(high * ROWS_PER_BYTE))
+        .chain((0..TDT_RETAIL_SLOTS / ROWS_PER_BYTE).map(|k| low.saturating_add(k * ROWS_PER_BYTE)))
+        .filter_map(row_at)
+        .find(|r| names_this_room(r));
     named.and_then(|r| r.style).map_or(t.variant, i64::from)
 }
 
@@ -167,6 +190,7 @@ mod tests {
             status: 0,
             status_at: 0,
             variant,
+            row_high: 0,
             draw: 0,
             rent_rate: 0,
             subtype: 0,
@@ -192,5 +216,94 @@ mod tests {
         assert_eq!(retail_style(&tower, &floor, at, &tenant(0)), 4);
         // A row that names another room is not this room's.
         assert_eq!(retail_style(&tower, &floor, at + 1, &tenant(0)), 0);
+    }
+
+    /// Shops filling floors 2 and up, 31 to a floor, room `i` in shop style
+    /// `i % 11`.
+    fn many_shops(count: usize) -> Value {
+        let mut save = Simulation::new_game(7, GameMode::Classic).serialize();
+        let styles = Kind::Shop.subtype_list().unwrap();
+        let units: Vec<Value> = (0..count)
+            .map(|i| {
+                json!({"id": i + 1, "kind": "shop", "floor": 2 + i / 31, "x": (i % 31) * 12,
+                    "width": 12, "state": "occupied", "satisfaction": 1, "occupants": 0,
+                    "everOccupied": true, "pendingIncome": 0, "label": "Shop",
+                    "subtype": styles[i % styles.len()]})
+            })
+            .collect();
+        save["units"] = Value::Array(units);
+        save["nextId"] = json!(count + 1);
+        save["star"] = json!(3);
+        save
+    }
+
+    /// Rooms past the 256th name their row in bytes 6 and 7, so rooms 255,
+    /// 256, 257 and 512 keep their own rows and styles through export and
+    /// import; a 513th has no row, which the export counts as dropped.
+    #[test]
+    fn rooms_past_the_256th_name_their_rows_in_two_bytes() {
+        let built = build_tdt(&many_shops(513)).expect("exports");
+        assert_eq!(built.counts.retail_rows_dropped, 1);
+        let tower = parse_tdt_binary(&built.bytes).expect("reads");
+        let mut rows_named = vec![];
+        for floor in &tower.floors {
+            for (at, t) in floor.tenants.iter().enumerate() {
+                if t.type_id != 10 {
+                    continue;
+                }
+                let row = (t.variant + 256 * t.row_high) as usize;
+                let r = tower.tail.retail.get(row);
+                if r.is_some_and(|r| {
+                    i64::from(r.floor) == floor.index
+                        && usize::from(floor.index_map[usize::from(r.slot)]) == at
+                }) {
+                    rows_named.push(row);
+                }
+            }
+        }
+        assert_eq!(rows_named, (0..512).collect::<Vec<_>>());
+
+        let back = parse_tdt(&built.bytes, "SHOPS.TDT").expect("imports");
+        let styles = Kind::Shop.subtype_list().unwrap();
+        let units = back.save["units"].as_array().unwrap();
+        let style_of = |i: usize| {
+            units
+                .iter()
+                .find(|u| {
+                    u["floor"].as_i64() == Some(2 + (i / 31) as i64)
+                        && u["x"].as_i64() == Some(((i % 31) * 12) as i64)
+                })
+                .and_then(|u| u["subtype"].as_str())
+                .unwrap()
+        };
+        for i in [254, 255, 256, 511] {
+            assert_eq!(style_of(i), styles[i % styles.len()], "room {}", i + 1);
+        }
+        assert_eq!(
+            style_of(512),
+            styles[0],
+            "the room past the table opens in the first style"
+        );
+    }
+
+    /// A file that named a room past the 256th by byte 6 alone, as our
+    /// exports did before rows took two bytes, still finds the room's row.
+    #[test]
+    fn a_row_named_by_its_low_byte_alone_is_still_found() {
+        let built = build_tdt(&many_shops(300)).expect("exports");
+        let tower = parse_tdt_binary(&built.bytes).expect("reads");
+        let row = 290;
+        let floor = &tower.floors[(2 + row / 31) + TDT_FLOOR_OFFSET as usize];
+        let at = floor
+            .tenants
+            .iter()
+            .position(|t| t.left == ((row % 31) * 12) as i64)
+            .unwrap();
+        let mut t = floor.tenants[at].clone();
+        assert_eq!((t.variant, t.row_high), ((row % 256) as i64, 1));
+        let style = tower.tail.retail[row].style.map(i64::from);
+        assert_eq!(Some(retail_style(&tower, floor, at, &t)), style);
+        t.row_high = 0;
+        assert_eq!(Some(retail_style(&tower, floor, at, &t)), style);
     }
 }
