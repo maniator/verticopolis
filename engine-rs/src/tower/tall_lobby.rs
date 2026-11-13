@@ -80,6 +80,9 @@ impl Tower {
     /// empty, since the whole story becomes part of the lobby; a later one
     /// needs only the tiles it covers.
     pub(crate) fn tall_lobby_reason(&self, floor: i64, x: i64, w: i64) -> Option<String> {
+        if let Some(reason) = self.lobby_cannot_rise_reason(floor) {
+            return Some(reason);
+        }
         let height = self.placement_lobby_height(floor);
         if height <= 1 {
             return None;
@@ -104,6 +107,28 @@ impl Tower {
             }
         }
         None
+    }
+
+    /// Why a floor's first lobby, asked to rise, cannot be laid here: the
+    /// mode keeps this floor's lobby one story. Refused rather than laid one
+    /// story high, since a lobby can never be removed and the player asked
+    /// for a taller one. `None` once the floor holds a lobby (every later
+    /// tile takes its height) or when the height asked is one story.
+    fn lobby_cannot_rise_reason(&self, floor: i64) -> Option<String> {
+        if self.requested_lobby_height <= 1
+            || self.floor_has_lobby(floor)
+            || self.mode.raises_lobby_on(floor)
+        {
+            return None;
+        }
+        let which = if self.mode.raises_sky_lobbies() {
+            "Only the ground lobby and sky lobbies can be taller than one story."
+        } else {
+            "In Classic, only the ground lobby can be taller than one story."
+        };
+        Some(format!(
+            "{which} Pick 1 story to build a lobby on floor {floor}."
+        ))
     }
 
     /// The refusal for building anything on `story` when a tall lobby

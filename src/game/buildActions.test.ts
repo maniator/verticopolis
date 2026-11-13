@@ -252,6 +252,7 @@ describe("BuildActions.paintBrush", () => {
     expect(build.paintBrush("floor", 20, 4)).toEqual({
       placed: 0,
       reason: "The engine said no.",
+      engineRefused: true,
     });
     expect(deps.ui.toast).not.toHaveBeenCalled();
   });
@@ -293,6 +294,30 @@ describe("BuildActions paint gestures", () => {
       snapped,
     );
     expect(room.deps.audio.sfx).toHaveBeenCalledExactlyOnceWith("build");
+  });
+
+  // Regression (#308): on a phone a Classic sky lobby asked three stories
+  // high was refused, or once laid one story, with no word on the tap.
+  it("a refused lobby tap says the engine's reason aloud, once", () => {
+    const why = "In Classic, only the ground lobby can be taller than one story. Pick 1 story to build a lobby on floor 15.";
+    const { build, deps, port } = setup({
+      paintTiles: () => rec("paintTiles", false, { placed: 0 }),
+      lastReason: () => why,
+    });
+    deps.lobbyHeight.mockReturnValue(3);
+    build.seedPaint("lobby", 20, 15);
+    expect(port.setLobbyHeight).toHaveBeenCalledWith(3);
+    expect(deps.audio.sfx).toHaveBeenCalledExactlyOnceWith("error");
+    expect(deps.ui.toast).toHaveBeenCalledExactlyOnceWith(why, "bad");
+  });
+
+  it("a tap on a strip already built, or past the lot edge, adds no second toast", () => {
+    const built = setup({ paintTiles: () => rec("paintTiles", true, { placed: 0 }) }, () => "floor");
+    built.build.seedPaint("floor", 20, 4);
+    expect(built.deps.ui.toast).not.toHaveBeenCalled();
+    const edge = setup({ paintTiles: () => rec("paintTiles", true, { placed: 0 }), lastReason: () => undefined }, () => "floor");
+    edge.build.seedPaint("floor", viewWorld().lotWidth + 2, 4);
+    expect(edge.deps.ui.toast).toHaveBeenCalledExactlyOnceWith("That's the edge of the lot.", "bad");
   });
 
   it("a drag fills every column from the anchor, quietly, and a new floor reseeds", () => {

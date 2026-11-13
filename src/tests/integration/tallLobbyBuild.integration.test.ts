@@ -67,14 +67,14 @@ function preview(t: Tower, tile: number, floor: number, amount: number, height: 
 }
 
 /** The frontend's build actions on `t`, laying lobbies `height` stories tall. */
-const buildActions = (t: Tower, height: number) =>
+const buildActions = (t: Tower, height: number, toast: (text: string, tone?: string) => void = () => {}) =>
   new BuildActions({
     enginePort: () => t.port,
     portCodes: () => t.codes,
     reader: () => t.reader,
     catalog: t.catalog,
     isUnlocked: (k) => isUnlocked({ reader: t.reader }, k),
-    ui: { toast: () => {} },
+    ui: { toast },
     audio: { sfx: () => {} },
     selectedId: () => null,
     clearSelection: () => {},
@@ -112,5 +112,30 @@ describe.skipIf(!hasWasmPackage())("tall lobbies on the Rust engine (#308)", () 
       expect(t.port.lobbyRise(sky), mode).toBe(t.catalog().rules.tallSkyLobbies ? 3 : 1);
       expect(t.catalog().rules.tallSkyLobbies, mode).toBe(mode === "modern");
     }
+  });
+
+  // A Classic player on a phone picked 3 stories and painted a sky lobby: the
+  // engine used to lay a permanent one-story lobby without a word. It refuses
+  // now, preview and brush alike, and says how to build one.
+  it("refuses a taller Classic sky lobby with a reason, and lays nothing", () => {
+    const t = bareTower("classic");
+    const sky = t.catalog().world.lobbyInterval;
+    const at = 174;
+    t.setMoney(1e9);
+    expect(buildActions(t, 1).paintBrush("lobby", at, 1).placed).toBeGreaterThan(0);
+    for (let floor = 2; floor < sky; floor++) expect(buildActions(t, 1).paintBrush("floor", at, floor).placed, `floor ${floor}`).toBeGreaterThan(0);
+    expect(preview(t, at, sky, 1e9, 3).valid).toBe(false);
+    const toasts: [string, string | undefined][] = [];
+    const money = t.engine.money();
+    // The phone's tap stamps the brush through seedPaint, which has no hover
+    // ghost to carry the reason, so it must say it.
+    buildActions(t, 3, (text, tone) => void toasts.push([text, tone])).seedPaint("lobby", at, sky);
+    expect(toasts).toEqual([[expect.stringMatching(/^In Classic, only the ground lobby can be taller than one story\. Pick 1 story/), "bad"]]);
+    expect(t.engine.money()).toBe(money);
+    t.reader.update();
+    expect(brushTiles(at).some((x) => t.reader.tower.structureKindAt(sky, x) === "lobby")).toBe(false);
+    // One story still builds there, as in the original.
+    expect(preview(t, at, sky, 1e9, 1)).toMatchObject({ valid: true, stories: 1 });
+    expect(buildActions(t, 1).paintBrush("lobby", at, sky).placed).toBeGreaterThan(0);
   });
 });

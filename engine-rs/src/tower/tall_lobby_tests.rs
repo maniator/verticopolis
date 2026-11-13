@@ -108,15 +108,45 @@ impl Simulation {
 
 #[test]
 fn classic_raises_only_the_ground_lobby_and_modern_raises_sky_lobbies_too() {
-    for (mode, expected) in [(GameMode::Classic, 1), (GameMode::Modern, 3)] {
-        let mut sim = tower(mode, 1);
-        floors(&mut sim, 2..=14);
-        let tiles: Vec<i64> = LOBBY_X.collect();
-        let laid = sim.with_lobby_height(3, |sim| sim.paint_brush(Kind::Lobby, 15, &tiles));
-        assert!(laid.placed > 0, "{mode:?}: {:?}", laid.reason);
-        assert_eq!(sim.tower.lobby_height(15), expected, "{mode:?}");
-        assert_eq!(sim.tower.is_tall_lobby_story(16), expected > 1);
+    let tiles: Vec<i64> = LOBBY_X.collect();
+    let mut modern = tower(GameMode::Modern, 1);
+    floors(&mut modern, 2..=14);
+    let laid = modern.with_lobby_height(3, |sim| sim.paint_brush(Kind::Lobby, 15, &tiles));
+    assert!(laid.placed > 0, "{:?}", laid.reason);
+    assert_eq!(modern.tower.lobby_height(15), 3);
+    assert!(modern.tower.is_tall_lobby_story(16));
+}
+
+// Regression (owner, 2026-11-13): a Classic player picked 3 stories and
+// painted a sky lobby, and got a permanent one-story lobby without a word.
+// Classic refuses it outright, quote and brush alike, and names the way to
+// build one; one story still builds, and a taller pick then extends it at
+// its own height.
+#[test]
+fn a_taller_classic_sky_lobby_is_refused_with_the_way_to_build_one() {
+    let tiles: Vec<i64> = LOBBY_X.collect();
+    let mut classic = tower(GameMode::Classic, 1);
+    floors(&mut classic, 2..=14);
+    for height in [2, 3] {
+        let quote = classic.with_lobby_height(height, |sim| sim.can_build(Kind::Lobby, 15, 110));
+        assert!(!quote.ok, "{height}");
+        let laid =
+            classic.with_lobby_height(height, |sim| sim.paint_brush(Kind::Lobby, 15, &tiles));
+        assert_eq!(laid.placed, 0, "{height}");
+        let reason = laid.reason.unwrap();
+        assert_eq!(
+            reason,
+            "In Classic, only the ground lobby can be taller than one story. Pick 1 story to build a lobby on floor 15."
+        );
     }
+    assert!(!classic.tower.floor_has_lobby(15));
+    let one = classic.with_lobby_height(1, |sim| sim.paint_brush(Kind::Lobby, 15, &tiles[..4]));
+    assert_eq!(one.placed, 4, "{:?}", one.reason);
+    let more = classic.with_lobby_height(3, |sim| sim.paint_brush(Kind::Lobby, 15, &tiles[4..]));
+    assert_eq!(more.placed, tiles.len() as i64 - 4, "{:?}", more.reason);
+    assert_eq!(classic.tower.lobby_height(15), 1);
+    // The ground lobby still rises in Classic.
+    assert_eq!(tower(GameMode::Classic, 3).tower.lobby_height(1), 3);
 }
 
 #[test]
@@ -310,4 +340,79 @@ fn a_one_story_ground_lobby_still_writes_height_1_and_no_lobby_writes_0() {
     let (text, _) = import_tdt(&bytes, "EMPTY.TDT").unwrap();
     let save: Value = serde_json::from_str(&text).unwrap();
     assert_eq!(save["version"], json!(PLAIN_SAVE_VERSION));
+}
+
+/// A Modern tower: a one-story ground lobby, floors 2 to 14, a three-story
+/// sky lobby on floor 15, and floors 18 to 22 over it.
+fn tall_sky_tower() -> Simulation {
+    let mut sim = tower(GameMode::Modern, 1);
+    floors(&mut sim, 2..=14);
+    let tiles: Vec<i64> = LOBBY_X.collect();
+    let laid = sim.with_lobby_height(3, |sim| sim.paint_brush(Kind::Lobby, 15, &tiles));
+    assert_eq!(laid.placed, tiles.len() as i64, "{:?}", laid.reason);
+    floors(&mut sim, 18..=22);
+    sim
+}
+
+// Regression (owner, 2026-11-13): no elevator may stop on a story a tall
+// lobby rises through, whatever the kind and however its stops are edited.
+#[test]
+fn no_elevator_kind_stops_inside_a_tall_sky_lobby() {
+    let mut sim = tall_sky_tower();
+    for kind in [
+        Kind::ElevatorStandard,
+        Kind::ElevatorService,
+        Kind::ElevatorExpress,
+    ] {
+        let placed = sim.tower.place_transport(kind, 104, 10, 20);
+        assert!(placed.ok, "{kind:?}: {:?}", placed.reason);
+        let id = placed.unit_id.unwrap();
+        let stops = |sim: &Simulation| {
+            let t = sim.tower.get_transport(id).unwrap().clone();
+            sim.tower.stops_of(&t)
+        };
+        let inside = |s: &[i64]| s.contains(&16) || s.contains(&17);
+        assert!(!inside(&stops(&sim)), "{kind:?}: {:?}", stops(&sim));
+        for story in [16, 17] {
+            assert!(!sim.tower.set_stop(id, story, true), "{kind:?} {story}");
+        }
+        assert!(sim.tower.clear_stops(id));
+        assert!(!inside(&stops(&sim)), "{kind:?} after clearing");
+        // It may not end inside the lobby, from either end.
+        for (bottom, top) in [(10, 16), (10, 17), (16, 20), (17, 22)] {
+            assert!(
+                !sim.tower.resize_transport(id, bottom, top).ok,
+                "{kind:?} {bottom}-{top}"
+            );
+            assert!(
+                !sim.tower.validate_transport(kind, 104, bottom, top).ok,
+                "{kind:?} {bottom}-{top}"
+            );
+        }
+        // Grown past the lobby, it still skips it.
+        assert!(sim.tower.resize_transport(id, 10, 22).ok, "{kind:?}");
+        assert!(!inside(&stops(&sim)), "{kind:?} after growing");
+        sim.tower.remove_transport(id);
+    }
+}
+
+#[test]
+fn a_loaded_skip_list_that_stops_inside_a_tall_lobby_is_corrected() {
+    let mut sim = tall_sky_tower();
+    let id = sim
+        .tower
+        .place_transport(Kind::ElevatorStandard, 104, 12, 20)
+        .unit_id
+        .unwrap();
+    let mut save = sim.serialize();
+    for t in save["transports"].as_array_mut().unwrap() {
+        if t["id"] == json!(id) {
+            t["skipFloors"] = json!([]);
+        }
+    }
+    let back = deserialize(&save).unwrap();
+    let t = back.tower.get_transport(id).unwrap().clone();
+    let stops = back.tower.stops_of(&t);
+    assert!(!stops.contains(&16) && !stops.contains(&17), "{stops:?}");
+    assert!(stops.contains(&15) && stops.contains(&18), "{stops:?}");
 }
