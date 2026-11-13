@@ -24,6 +24,11 @@ pub struct OutTransport {
     pub top: i64,
     pub cars: i64,
     pub car_positions: Vec<i64>,
+    /// The waiting floor of each car the save names (the per-car home bytes
+    /// of the elevator record). Written as the shaft's `schedule.homeFloors`
+    /// so idle cars go back to them after their first trip, as in the 1994
+    /// game. `None` for synthesized shafts, whose save names no homes.
+    pub home_floors: Option<Vec<i64>>,
     /// `None` leaves `skipFloors` out of the save, as the synthesized
     /// standard and service shafts do.
     pub skip_floors: Option<Vec<i64>>,
@@ -42,6 +47,9 @@ impl OutTransport {
         m.insert("carPositions".into(), json!(self.car_positions));
         m.insert("carDir".into(), json!(vec![0; self.car_positions.len()]));
         m.insert("load".into(), json!(0));
+        if let Some(h) = &self.home_floors {
+            m.insert("schedule".into(), json!({ "homeFloors": h }));
+        }
         if let Some(s) = &self.skip_floors {
             m.insert("skipFloors".into(), json!(s));
         }
@@ -132,17 +140,29 @@ pub fn transports_from_decoded(
         }
         let cars = e.cars.min(kind.max_cars()).max(1);
         let mut skip_floors = vec![];
+        // The floors the cars stop at, ascending, built in the same pass.
+        let mut stops = vec![bottom];
         for fl in bottom + 1..top {
             if e.serviced[(fl + TDT_FLOOR_OFFSET) as usize] == 0 {
                 skip_floors.push(fl);
+            } else {
+                stops.push(fl);
             }
         }
-        let car_positions = (0..cars as usize)
+        stops.push(top);
+        // Each car starts on its waiting floor and returns there when idle.
+        // A home the shaft does not stop at snaps to the nearest stop (the
+        // lower one on a tie), as an authored home does on a stop edit.
+        let car_positions: Vec<i64> = (0..cars as usize)
             .map(|i| {
                 let home = e.car_homes[i] - TDT_FLOOR_OFFSET;
-                home.min(top).max(bottom)
+                *stops
+                    .iter()
+                    .min_by_key(|&&f| (f - home).abs())
+                    .expect("bottom is a stop")
             })
             .collect();
+        let home_floors = Some(car_positions.clone());
         out.push(OutTransport {
             id: first_id + out.len() as i64,
             kind,
@@ -152,6 +172,7 @@ pub fn transports_from_decoded(
             top,
             cars,
             car_positions,
+            home_floors,
             skip_floors: Some(skip_floors),
         });
     }
@@ -192,6 +213,7 @@ pub fn transports_from_decoded(
                 top: bottom + 1,
                 cars: 0,
                 car_positions: vec![],
+                home_floors: None,
                 skip_floors: None,
             });
         }
@@ -353,6 +375,7 @@ pub fn synthesize_transports(
             top: s.top,
             cars,
             car_positions: (0..cars).map(|i| (s.bottom + i).min(s.top)).collect(),
+            home_floors: None,
             skip_floors: s.skip_floors,
         });
     }

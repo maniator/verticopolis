@@ -5,7 +5,9 @@
 use serde_json::Value;
 
 use super::byte_writer::{to_int32, ByteWriter};
-use super::export_gather::{js_finite, js_max, js_min, js_num, js_truthy, FloorKey, GatheredTower};
+use super::export_gather::{
+    car_homes, js_finite, js_max, js_min, js_num, js_truthy, FloorKey, GatheredTower,
+};
 use super::export_parking::connected_stall_count;
 use super::export_tables::OutTenant;
 use super::format::*;
@@ -47,7 +49,8 @@ struct OutElevator {
     /// `cars` as `Number.isFinite` reads it: `None` for anything that is not
     /// a finite number, which the encoder then writes as one car.
     cars: Option<f64>,
-    car_positions: Vec<Value>,
+    /// Each car's waiting floor, as [`car_homes`] reads it.
+    car_homes: Vec<Value>,
     /// The numbers in `skipFloors`: a `Set` matches a floor by
     /// SameValueZero, so a `null` or a string member can never match one.
     skip_floors: Vec<f64>,
@@ -283,11 +286,7 @@ pub fn encode_tower(
             bottom,
             top,
             cars: js_finite(t.get("cars")),
-            car_positions: t
-                .get("carPositions")
-                .and_then(Value::as_array)
-                .cloned()
-                .unwrap_or_default(),
+            car_homes: car_homes(t),
             skip_floors: t
                 .get("skipFloors")
                 .and_then(Value::as_array)
@@ -327,9 +326,7 @@ pub fn encode_tower(
             w.u8(if stops { 1 } else { 0 });
         }
         for c in 0..8 {
-            let home = js_finite(e.car_positions.get(c))
-                .map(round)
-                .unwrap_or(e.bottom);
+            let home = js_finite(e.car_homes.get(c)).map(round).unwrap_or(e.bottom);
             w.u8(to_int32(
                 clamp(home, e.bottom, e.top) + TDT_FLOOR_OFFSET as f64,
             ));

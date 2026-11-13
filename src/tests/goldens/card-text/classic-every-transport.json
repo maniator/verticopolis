@@ -289,7 +289,7 @@
     {"id":6290,"kind":"office","floor":20,"lines":["Access: reachable from the lobby.","Long walk to transport. Tenants tire of the hike. Put a stairway, escalator, or passenger elevator within reach.","Too far from any lobby. Satisfaction sinks until tenants give notice. Clear floor 15 and build the sky lobby there to lift these tenants.","Giving notice: overcrowded vertical transport. Leaves in under 2 day(s).","Fix the cause and get satisfaction to 40% to keep them (now 0%)."]}
   ],
   "transports": [
-    {"id":6001,"kind":"elevatorStandard","lines":["Avg load: 69% full"]},
+    {"id":6001,"kind":"elevatorStandard","lines":["Avg load: 68% full"]},
     {"id":6002,"kind":"elevatorService","lines":[]},
     {"id":6003,"kind":"elevatorExpress","lines":["Avg load: 0% full"]},
     {"id":6004,"kind":"stairs","lines":[]},

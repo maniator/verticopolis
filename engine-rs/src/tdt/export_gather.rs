@@ -58,7 +58,9 @@ mod values;
 
 pub use gathered::{ExportCounts, ExportHeaderCounts, GatheredRoom, GatheredTower, SkipReason};
 use normalize::{fits_tdt_rows, is_present, norm, resident_count};
-pub use values::{js_finite, js_max, js_min, js_num, js_num_raw_site, js_truthy, FloorKey};
+pub use values::{
+    car_homes, js_finite, js_max, js_min, js_num, js_num_raw_site, js_truthy, FloorKey,
+};
 
 pub fn gather_tower(save: &Value) -> Result<GatheredTower, LegacyExportError> {
     let Some(raw_units) = save.get("units").and_then(Value::as_array) else {

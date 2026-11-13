@@ -2,7 +2,7 @@
 //! home at their authored floor, a 0-active hour parks the fleet without
 //! stranding its floors, each day type runs its own row, a longer Standard
 //! Floor Departure holds a car longer, a high Waiting Car Response holds a
-//! parked car for a far call but not a near one, an off-shaft home clamps
+//! parked Modern car for a far call but not a near one, an off-shaft home clamps
 //! to the shaft, and a scheduled shaft runs the same every time.
 //!
 //! The TypeScript case "ignores the schedule when no clock is supplied" is
@@ -14,6 +14,7 @@
 //! `housekeeping_dispatch_tests::maids_never_board_a_car_the_schedule_has_parked`.
 use std::collections::HashMap;
 
+use crate::clock::GameMode;
 use crate::crowd::ElevatorCalls;
 use crate::dispatch::ElevatorDispatch;
 use crate::facilities::Kind;
@@ -230,7 +231,9 @@ fn a_longer_standard_floor_departure_holds_a_car_longer() {
     assert!(long > none, "{long} held steps against {none}");
 }
 
-/// Two cars homed at floor 10 and parked there, then a call at floor 2.
+/// Two cars homed at floor 10 and parked there, then a call at floor 2, in
+/// a Modern tower (Classic reads the setting as the 1994 game does:
+/// `rule_tests::classic_elevator_dispatch`).
 fn reaches_a_far_call(response: Option<f64>) -> bool {
     let s = Schedule {
         home_floors: Some(vec![10, 10]),
@@ -238,6 +241,7 @@ fn reaches_a_far_call(response: Option<f64>) -> bool {
         ..blank()
     };
     let (mut tower, id) = scheduled(2, Some(s));
+    tower.mode = GameMode::Modern;
     let mut d = ElevatorDispatch::new();
     run(&mut d, &mut tower, &ElevatorCalls::default(), 60, WEEKDAY);
     assert!(shaft(&tower)
@@ -255,7 +259,7 @@ fn reaches_a_far_call(response: Option<f64>) -> bool {
 }
 
 #[test]
-fn a_high_waiting_car_response_holds_parked_cars_from_a_far_call() {
+fn modern_a_high_waiting_car_response_holds_parked_cars_from_a_far_call() {
     // Reach is span 19 less the response 15, so 4 floors: the call 8 away
     // waits; with no response set the call is answered.
     assert!(!reaches_a_far_call(Some(15.0)));

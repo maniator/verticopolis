@@ -217,13 +217,15 @@ const nearCapacity = (card: Card): boolean => card.slots[CARD_NEAR_CAPACITY] ===
  *  corpus moved twice more: an express elevator near capacity left, and an
  *  inert parking floor arrived, with the Classic ransom scenario now running
  *  544 hours to its threat instead of 352. The flag stays pinned on both
- *  sides by `cardVerdicts.integration.test.ts`. */
+ *  sides by `cardVerdicts.integration.test.ts`. Classic's 1994 dispatch rules
+ *  (#2049) took that parking floor away again: holidays-classic no longer
+ *  lights the fire that gutted it, and its ransom scenario runs 288 hours. */
 const CORPUS_SECTIONS: readonly string[] = [
   "commercial:lobbyFar:false", "commercial:lobbyFar:true",
   "hotel:counts:dirty", "hotel:counts:infested", "hotel:counts:other", "hotel:excluded:dirty", "hotel:excluded:other",
   "housekeeping:adequate", "housekeeping:nominalShortfall", "housekeeping:observedShortfall",
   "inert:amusements", "inert:boutiqueBay", "inert:daycare", "inert:fastFood", "inert:foodHall", "inert:housekeeping",
-  "inert:nightclub", "inert:parking", "inert:skyBar", "inert:spa",
+  "inert:nightclub", "inert:skyBar", "inert:spa",
   "parking:connected", "parking:connected:short", "parking:disconnected", "parking:ramp", "parking:ramp:short",
   "recycling:met:filling",
   "retail:advice:none", "retail:advice:overBuilt", "retail:advice:underServed", "retail:rain",

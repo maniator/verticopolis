@@ -231,7 +231,8 @@ calls above.
 - **`.TDT`** is the 1994 SimTower format. `importTdt(bytes, filename)` reads
   one and `exportTdt(saveJson)` writes one, for towers the old format can
   hold. The catalog's `rules.exportsTo1994` says which mode's towers those
-  are (Classic); a Modern tower is refused.
+  are (Classic); a Modern tower is refused. Each elevator car's waiting floor
+  travels both ways as the shaft's `schedule.homeFloors`.
 - **A save holds the tower, not the moment.** The people walking around and
   the elevator cars' positions are not saved; a loaded game starts them
   fresh, so it does not carry on exactly where the saving game was. Two loads
