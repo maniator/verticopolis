@@ -26,7 +26,7 @@ describe("clampSpot", () => {
 /** A window in a stage at client (100, 50), 800 by 600, the window 200 by 150
  *  at (500, 400) in the stage. happy-dom lays nothing out, so the boxes are
  *  stubbed: the window's box follows the `left` and `top` the mover writes. */
-function setup(opts: { enabled?: () => boolean } = {}) {
+function setup() {
   const stage = document.createElement("div");
   const win = document.createElement("div");
   win.className = "win";
@@ -47,7 +47,7 @@ function setup(opts: { enabled?: () => boolean } = {}) {
   const title = win.querySelector<HTMLElement>(".win-title")!;
   title.setPointerCapture = vi.fn();
   const placed = vi.fn<(spot: Spot | null) => void>();
-  const mover = new MovableWindow({ win, title: ".win > .win-title", within: stage, enabled: opts.enabled, placed });
+  const mover = new MovableWindow({ win, title: ".win > .win-title", within: stage, placed });
   return { stage, win, title, close: win.querySelector("button")!, body: win.querySelector<HTMLElement>(".body")!, mover, placed };
 }
 
@@ -103,16 +103,6 @@ describe("MovableWindow", () => {
     expect(placed).not.toHaveBeenCalled();
   });
 
-  it("does nothing while disabled", () => {
-    let on = false;
-    const { win, title, mover } = setup({ enabled: () => on });
-    drag(title, -100, -100);
-    expect(win.style.left).toBe("");
-    on = true;
-    drag(title, -100, -100);
-    expect(mover.placedAt()).toEqual({ x: 400, y: 300 });
-  });
-
   it("ignores another pointer's moves during a drag", () => {
     const { win, title } = setup();
     pointer(title, "pointerdown", 610, 460);
@@ -120,6 +110,20 @@ describe("MovableWindow", () => {
     expect(win.style.left).toBe("");
     pointer(title, "pointermove", 600, 450);
     expect(win.style.left).toBe("490px");
+  });
+
+  it("holds the window from the press to the release, and keeps it held once moved", () => {
+    const { title, mover } = setup();
+    expect(mover.isHeld()).toBe(false);
+    pointer(title, "pointerdown", 610, 460);
+    expect(mover.isHeld()).toBe(true);
+    expect(mover.isPlaced()).toBe(false);
+    pointer(title, "pointerup", 610, 460);
+    expect(mover.isHeld()).toBe(false);
+    drag(title, -100, -100);
+    expect(mover.isHeld()).toBe(true);
+    mover.reset();
+    expect(mover.isHeld()).toBe(false);
   });
 
   it("a press and release with no move reports nothing", () => {
@@ -210,16 +214,13 @@ describe("MovableWindow", () => {
     expect(win.style.left).toBe("400px");
   });
 
-  it("names the move on the title bar's tooltip while it can move, and drops it while it cannot", () => {
-    let on = true;
-    const { title, body } = setup({ enabled: () => on });
+  it("names the move on the title bar's tooltip, and only there", () => {
+    const { title, body, close } = setup();
     body.dispatchEvent(new PointerEvent("pointerover", { bubbles: true }));
+    close.dispatchEvent(new PointerEvent("pointerover", { bubbles: true }));
     expect(title.title).toBe("");
     title.dispatchEvent(new PointerEvent("pointerover", { bubbles: true }));
     expect(title.title).toBe(MOVE_HINT);
-    on = false;
-    title.dispatchEvent(new PointerEvent("pointerover", { bubbles: true }));
-    expect(title.hasAttribute("title")).toBe(false);
   });
 
   it("dispose removes the listeners", () => {

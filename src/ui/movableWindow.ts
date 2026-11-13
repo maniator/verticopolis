@@ -64,8 +64,6 @@ export interface MovableWindowOptions {
   /** The box the window moves inside: an element's padding box, or the
    *  browser window when null. */
   readonly within: HTMLElement | null;
-  /** Whether the window moves now (the docked phone card does not). */
-  readonly enabled?: () => boolean;
   /** Heard when a move ends with the spot the player chose, and with null when
    *  a double-click puts the window back. */
   readonly placed?: (spot: Spot | null) => void;
@@ -121,6 +119,14 @@ export class MovableWindow {
     return this.spot !== null;
   }
 
+  /** Whether the window is the player's: moved, or pressed on its title bar
+   *  and about to move. A per-frame layout that would put the window back
+   *  asks this, so a press that has not moved yet is not undone by the next
+   *  frame (a touch press and its first move are frames apart). */
+  isHeld(): boolean {
+    return this.spot !== null || this.drag !== null;
+  }
+
   /** Put the window at `spot` (a stored place), pulled inside its bounds when
    *  the window has a size to measure; a hidden window is pulled in when it
    *  shows, since showing it resizes it. */
@@ -162,7 +168,7 @@ export class MovableWindow {
     if ((this.drag && this.drag.pointerId !== e.pointerId) || !isPrimaryPress(e)) return;
     this.drag = null;
     const title = this.titleOf(e);
-    if (!title || (this.opts.enabled && !this.opts.enabled())) return;
+    if (!title) return;
     const rect = this.opts.win.getBoundingClientRect();
     const bounds = this.bounds();
     this.drag = {
@@ -209,22 +215,18 @@ export class MovableWindow {
     if (drag.moved && this.spot) this.opts.placed?.(this.spot);
   }
 
-  /** Name the move on the title bar's tooltip while the window can move, and
-   *  drop it while it cannot (the docked phone card). Runs as the pointer
-   *  enters an element, never per move. */
+  /** Name the move on the title bar's tooltip. Runs as the pointer enters
+   *  an element, never per move, and sets it once per title bar it finds
+   *  (a title bar lit renders again gets it on the next pointer over). */
   private hint(e: Event): void {
     const title = this.titleOf(e);
-    if (!title) return;
-    const can = !this.opts.enabled || this.opts.enabled();
-    if (can && title.title !== MOVE_HINT) title.title = MOVE_HINT;
-    else if (!can && title.title === MOVE_HINT) title.removeAttribute("title");
+    if (title && title.title !== MOVE_HINT) title.title = MOVE_HINT;
   }
 
   /** A double-click on the title bar puts the window back where the game
    *  keeps it. */
   private home(e: Event): void {
     if (!this.spot || !this.titleOf(e)) return;
-    if (this.opts.enabled && !this.opts.enabled()) return;
     this.reset();
     this.opts.placed?.(null);
   }

@@ -263,15 +263,35 @@ describe("positionPanels with a facility card the player moved", () => {
     expect(ui.anchorEditor).toHaveBeenCalledTimes(1);
   });
 
-  it("forgets the moved spot once the card closes or docks", () => {
+  it("forgets the moved spot once the card closes or loses its room", () => {
     vi.spyOn(moves, "editorPlacedByPlayer").mockReturnValue(true);
     const forget = vi.spyOn(moves, "forgetEditorPlacement").mockImplementation(() => {});
     const closed = makeApp({ ...office, isEditorOpen: false });
     positionPanels(closed.app);
-    const docked = makeApp({ ...office, matches: true });
-    positionPanels(docked.app);
+    const roomless = makeApp({ ...office, selected: null });
+    positionPanels(roomless.app);
     expect(forget).toHaveBeenCalledTimes(2);
     expect(closed.ui.clearEditorAnchor).toHaveBeenCalledTimes(1);
-    expect(docked.ui.clearEditorAnchor).toHaveBeenCalledTimes(1);
+    expect(roomless.ui.clearEditorAnchor).toHaveBeenCalledTimes(1);
+  });
+
+  it("on a phone, keeps a moved card where the player put it instead of docking it", () => {
+    vi.spyOn(moves, "editorPlacedByPlayer").mockReturnValue(true);
+    const forget = vi.spyOn(moves, "forgetEditorPlacement").mockImplementation(() => {});
+    const { app, ui } = makeApp({ ...office, matches: true });
+    positionPanels(app);
+    expect(ui.anchorEditor).not.toHaveBeenCalled();
+    expect(ui.clearEditorAnchor).not.toHaveBeenCalled();
+    expect(forget).not.toHaveBeenCalled();
+  });
+
+  it("on a phone, docks a card the player has not moved", () => {
+    vi.spyOn(moves, "editorPlacedByPlayer").mockReturnValue(false);
+    const forget = vi.spyOn(moves, "forgetEditorPlacement").mockImplementation(() => {});
+    const { app, ui } = makeApp({ ...office, matches: true });
+    positionPanels(app);
+    expect(ui.anchorEditor).not.toHaveBeenCalled();
+    expect(ui.clearEditorAnchor).toHaveBeenCalledTimes(1);
+    expect(forget).toHaveBeenCalledTimes(1);
   });
 });
