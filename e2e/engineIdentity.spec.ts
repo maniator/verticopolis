@@ -6,7 +6,7 @@ import { test, expect, type Page, type Route } from "@playwright/test";
  * engine's own record, the source hash stamped into its binary next to the
  * one the page was built for, and Copy diagnostics, including when the engine
  * never loaded. A failed load stops the game, so Copy diagnostics is then read
- * from the stop screen, where Help cannot be opened.
+ * from the stop screen, where About this game cannot be opened.
  */
 test.setTimeout(60_000);
 
@@ -38,7 +38,7 @@ async function swapInBinary(page: Page, from: string, to: string): Promise<void>
   });
 }
 
-async function openHelp(page: Page): Promise<void> {
+async function openAbout(page: Page): Promise<void> {
   await page.waitForFunction(() => !!(window as any).game && !!(window as any).__vcEngineBoot, undefined, { timeout: 30_000 });
   await page.evaluate(() => {
     document.getElementById("splash")?.remove();
@@ -84,7 +84,7 @@ test("the main-thread engine shows its record and the source hash BUILD.json rec
   const record = await buildRecord(page);
   await page.goto("/");
   await page.waitForFunction(() => !!(window as any).__vcEngine?.status.hosted, undefined, { timeout: 30_000 });
-  await openHelp(page);
+  await openAbout(page);
   expect(await state(page)).toBe("ok");
   const boot = await page.evaluate(() => (window as any).__vcEngineBoot);
   expect(boot.binary).toEqual({ state: "ok", sourceHash: record.sources });
