@@ -693,6 +693,14 @@ export class Engine {
      * none. Read on a new engine; `setView` is how it changes.
      */
     view(): string | undefined;
+    /**
+     * `walkwayTop(kind, bottom, top)` (#308): the top a stairway or
+     * escalator asked for from `bottom` to `top` is built to. Out of a tall
+     * lobby a one-story flight climbs the whole lobby, so the build preview
+     * draws the flight a click would place. `top` for any other kind or
+     * span, or when an argument is not a whole number or a known kind.
+     */
+    walkwayTop(kind: number, bottom: number, top: number): number;
 }
 
 /**

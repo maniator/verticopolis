@@ -67,6 +67,22 @@ impl Engine {
         self.sim
             .tile_stories(crate::facilities::Kind::Lobby, floor as i64) as f64
     }
+    /// `walkwayTop(kind, bottom, top)` (#308): the top a stairway or
+    /// escalator asked for from `bottom` to `top` is built to. Out of a tall
+    /// lobby a one-story flight climbs the whole lobby, so the build preview
+    /// draws the flight a click would place. `top` for any other kind or
+    /// span, or when an argument is not a whole number or a known kind.
+    #[wasm_bindgen(js_name = walkwayTop)]
+    pub fn walkway_top(&self, kind: f64, bottom: f64, top: f64) -> f64 {
+        let kind = port::kind_of(kind);
+        let (bottom, whole_top) = (crate::charges::whole(bottom), crate::charges::whole(top));
+        match (kind, bottom, whole_top) {
+            (Some(kind), Some(bottom), Some(t)) => {
+                self.sim.tower.walkway_top(kind, bottom, t) as f64
+            }
+            _ => top,
+        }
+    }
     /// `lobbyHeights()` (#308): every lobby taller than one story, as flat
     /// `[floor, height, ...]` pairs by floor. Empty when none is.
     #[wasm_bindgen(js_name = lobbyHeights)]

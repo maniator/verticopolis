@@ -364,6 +364,9 @@ export interface EnginePortQueries {
   quoteBuild(kind: number, floor: number, x: number): PortRecord;
   /** How many stories a lobby tile laid on `floor` now rises (#308). */
   lobbyRise(floor: number): number;
+  /** The top a stairway or escalator asked from `bottom` to `top` is built
+   *  to: out of a tall lobby a one-story flight climbs the whole lobby (#308). */
+  walkwayTop(kind: number, bottom: number, top: number): number;
   quoteShaft(kind: number, x: number, bottom: number, top: number): PortRecord;
   /** What `rentBatch` would do, nothing written; `ok` 0 for an unpriced kind. */
   quoteRentBatch(kind: number, target: number, onlyDefault: boolean): PortRecord;

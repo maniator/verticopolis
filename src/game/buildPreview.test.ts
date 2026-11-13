@@ -67,7 +67,7 @@ function viewOf(t: Tower) {
 function makeApp(
   tool: GameApp["tool"],
   tower: Tower = {},
-  answers: { quote?: (x: number) => { ok: boolean; cost: number }; shaftOk?: boolean; reason?: string; height?: number; rise?: number } = {},
+  answers: { quote?: (x: number) => { ok: boolean; cost: number }; shaftOk?: boolean; reason?: string; height?: number; rise?: number; walkTop?: number; tallLobbies?: number[] } = {},
   build: Record<string, ReturnType<typeof vi.fn>> = {},
 ) {
   const enginePort = mockPort({
@@ -79,6 +79,8 @@ function makeApp(
     lastReason: () => answers.reason,
     setLobbyHeight: vi.fn(),
     lobbyRise: vi.fn(() => answers.rise ?? 1),
+    walkwayTop: vi.fn((_kind: number, _bottom: number, top: number) => answers.walkTop ?? top),
+    lobbyHeights: vi.fn(() => new Float64Array(answers.tallLobbies ?? [])),
   });
   const showInspector = vi.fn();
   const app = {
@@ -203,6 +205,15 @@ describe("updateBuildPreview", () => {
       expect(raw.engine.preview).toBeNull();
       if (unlocked) expect(enginePort.quoteShaft).toHaveBeenCalledExactlyOnceWith(code("kinds", "stairs"), x, 3, 4);
     }
+  });
+
+  it("fixed-span transport out of a tall lobby: the ghost and quote climb to the engine's top (#308)", () => {
+    const x = snapX(CAT, "stairs", 14);
+    const { app, raw, enginePort } = makeApp(buildTool("stairs"), {}, { walkTop: 4 });
+    updateBuildPreview(app, 14, 1);
+    expect(enginePort.walkwayTop).toHaveBeenCalledExactlyOnceWith(code("kinds", "stairs"), 1, 2);
+    expect(enginePort.quoteShaft).toHaveBeenCalledExactlyOnceWith(code("kinds", "stairs"), x, 1, 4);
+    expect(raw.engine.transportPreview).toEqual({ kind: "stairs", x, bottom: 1, top: 4, valid: true });
   });
 
   it("drag-sized transport: a single-floor ghost keyed to the unlock, with no quote", () => {

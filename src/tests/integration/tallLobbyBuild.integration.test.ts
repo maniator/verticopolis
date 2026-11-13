@@ -45,15 +45,15 @@ function bareTower(mode: GameMode) {
 
 type Tower = ReturnType<typeof bareTower>;
 
-/** The Lobby brush preview at `(tile, floor)` with `amount` to spend and the
- *  card's picked `height`. */
-function preview(t: Tower, tile: number, floor: number, amount: number, height: number): { valid: boolean; stories?: number } {
+/** The `kind` tool's preview at `(tile, floor)` with `amount` to spend and the
+ *  Lobby card's picked `height`, as the engine object the renderer reads. */
+function previewOf(t: Tower, kind: string, tile: number, floor: number, amount: number, height: number) {
   const engine = { preview: null as unknown, transportPreview: null as unknown };
   const app = {
     enginePort: t.port,
     portCodes: t.codes,
     reader: t.reader,
-    tool: { type: "build", kind: "lobby" },
+    tool: { type: "build", kind },
     engine,
     ui: { showInspector: vi.fn() },
     build: {},
@@ -63,7 +63,13 @@ function preview(t: Tower, tile: number, floor: number, amount: number, height: 
   } as unknown as GameApp;
   t.setMoney(amount);
   updateBuildPreview(app, tile, floor);
-  return engine.preview as { valid: boolean; stories?: number };
+  return engine as { preview: { valid: boolean; stories?: number } | null; transportPreview: { bottom: number; top: number; valid: boolean } | null };
+}
+
+/** The Lobby brush preview at `(tile, floor)` with `amount` to spend and the
+ *  card's picked `height`. */
+function preview(t: Tower, tile: number, floor: number, amount: number, height: number): { valid: boolean; stories?: number } {
+  return previewOf(t, "lobby", tile, floor, amount, height).preview as { valid: boolean; stories?: number };
 }
 
 /** The frontend's build actions on `t`, laying lobbies `height` stories tall. */
@@ -137,5 +143,35 @@ describe.skipIf(!hasWasmPackage())("tall lobbies on the Rust engine (#308)", () 
     // One story still builds there, as in the original.
     expect(preview(t, at, sky, 1e9, 1)).toMatchObject({ valid: true, stories: 1 });
     expect(buildActions(t, 1).paintBrush("lobby", at, sky).placed).toBeGreaterThan(0);
+  });
+
+  // Review of #2054: the view's runs sit on a lobby's own floor, so the
+  // preview has to learn from the engine that a tall lobby holds up the story
+  // over it and that a flight out of it climbs the whole lobby.
+  it("previews a floor over a tall lobby and a flight out of it as the engine builds them", () => {
+    for (const height of [2, 3]) {
+      const t = bareTower("classic");
+      const at = 174;
+      t.setMoney(1e9);
+      expect(buildActions(t, height).paintBrush("lobby", at, 1).placed, `${height}`).toBeGreaterThan(0);
+      const over = 1 + height;
+      // The engine counts the raised stories as structure; the view does not.
+      expect(t.port.lobbyHeights()).toEqual(new Float64Array([1, height]));
+      expect(t.reader.tower.structureKindAt(height, at)).toBeUndefined();
+      // A floor on the story over the hall: the ghost is green, and the brush lays it.
+      expect(previewOf(t, "floor", at, over, 1e9, 1).preview?.valid, `${height}`).toBe(true);
+      expect(buildActions(t, 1).paintBrush("floor", at, over).placed, `${height}`).toBeGreaterThan(0);
+      // A stairway from the hall's floor: the ghost climbs the whole lobby,
+      // and the click lays the same flight.
+      const stairs = t.codes.kind("stairs");
+      expect(t.port.walkwayTop(stairs, 1, 2)).toBe(over);
+      expect(t.port.walkwayTop(stairs, over, over + 1)).toBe(over + 1);
+      const ghost = previewOf(t, "stairs", at - 10, 1, 1e9, 1).transportPreview;
+      expect(ghost, `${height}`).toMatchObject({ bottom: 1, top: over, valid: true });
+      expect(buildActions(t, 1).tryBuildTransport("stairs", at - 10, 1, 2).ok, `${height}`).toBe(true);
+      t.reader.update();
+      const built = t.reader.tower.transports.filter((x) => x.kind === "stairs");
+      expect(built.map((x) => [x.bottom, x.top]), `${height}`).toEqual([[1, over]]);
+    }
   });
 });

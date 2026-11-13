@@ -80,7 +80,7 @@ export const INSTANCE_METHODS = [
   "placeBare", "placeTransportBare", "unitRecord", "transportRecord", "roomAt",
   "structureKindAt", "floorHasLobby", "isFloorServed", "highestFloor",
   // Tall lobbies (#308): the lobby tool's height and the renderer's read.
-  "setLobbyHeight", "lobbyHeights", "lobbyRise",
+  "setLobbyHeight", "lobbyHeights", "lobbyRise", "walkwayTop",
 ] as const satisfies readonly (keyof WasmEngine)[];
 export const STATIC_METHODS = ["newGame", "fromSave", "fromVctower"] as const satisfies readonly (keyof typeof Engine)[];
 

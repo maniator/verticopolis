@@ -186,6 +186,7 @@ shapes for each one.
 | `build(kind, floor, x)` | Place a facility with its left edge at `x`. `{ ok, reason? }`. `kind` is a catalog `key` such as `"office"`, `"condo"` or `"hotelSingle"`. |
 | `paintBrush(kind, floor, tilesJson)` | Lay floor or lobby tiles along a stroke in one command. `{ placed, reason? }`. |
 | `setLobbyHeight(height)`, `lobbyRise(floor)`, `lobbyHeights()` | How many stories (1 to 3) a floor's first lobby rises from now on, where the mode lets that floor's lobby rise (the catalog's `rules.tallSkyLobbies`; the ground lobby always may), how many a lobby tile laid on `floor` would rise now, and every taller lobby as flat `[floor, height, ...]` pairs. A first lobby asked taller on a floor that cannot rise is refused, with a reason. A lobby's height never changes once built, and it costs the lobby price per story. |
+| `walkwayTop(kind, bottom, top)` | The top a stairway or escalator asked from `bottom` to `top` is built to: out of a tall lobby a one-story flight climbs the whole lobby, so a build preview can draw the flight a click lays. `top` for any other kind or span. |
 | `buildTransport(kind, x, bottom, top)` | Place stairs, an escalator or an elevator shaft between two floors. `{ ok, reason? }`. |
 | `validateTransport(kind, x, bottom, top)` | The same check without building. |
 | `addCar(id)`, `removeCar(id)` | Add or remove an elevator car, charging or refunding it. `{ ok, reason?, delta }`. |

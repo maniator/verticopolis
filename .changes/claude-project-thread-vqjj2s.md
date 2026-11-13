@@ -10,6 +10,6 @@ crate: minor
 ## Engine
 - `Simulation::set_lobby_height` and `with_lobby_height` set the height a floor's first lobby rises to, and `Tower::lobby_height`, `tall_lobbies` and `is_tall_lobby_story` read it back (#308).
 - A floor's first lobby asked taller than one story where the mode keeps it one story (a Classic sky lobby) is refused with a reason instead of laid one story high.
-- The binding adds `setLobbyHeight(height)`, `lobbyRise(floor)` (the stories a lobby tile laid there rises) and `lobbyHeights()`.
+- The binding adds `setLobbyHeight(height)`, `lobbyRise(floor)` (the stories a lobby tile laid there rises), `lobbyHeights()` and `walkwayTop(kind, bottom, top)` (the top a flight out of a tall lobby is built to).
 - A save with a tall lobby is version 8 and carries `lobbyHeights`; a save without one stays version 7.
 - The .TDT importer and exporter read and write the header's ground lobby height and the two- and three-story stair types.
