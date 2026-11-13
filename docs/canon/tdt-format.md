@@ -330,7 +330,9 @@ Clothing. Our exporter writes rooms and rows the same way. The table holds 512 r
 byte 6 names only 256, so a tower with more retail rooms needs a second byte.
 Byte 7 is 0 in every retail room of the game's saves we hold (none has more
 than 256), so our exporter writes a row past 255 in bytes 6 and 7, low byte
-first, and the importer also tries the rows 256 apart, keeping the one that
+first. A headless run of the game on a 280-room export (2026-11-13) confirmed
+that the game reads it that way: rooms 257 to 280 drew the styles of rows 256
+to 279, and the tower ran without a crash. The importer also tries the rows 256 apart, keeping the one that
 names the room back. A room past the 512th gets no row and opens in the first
 style, and the export report says so. Our exports before
 #2044 kept the style in byte 6 and wrote rows with unit 0 and no 255, so the
