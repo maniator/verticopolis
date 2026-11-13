@@ -1,41 +1,5 @@
 /* Help-only rules over the engine docs theme (docs/engine-site/src/styles/theme.css). */
 
-/* Starlight's header with the game's Back to game button at its right. */
-.vc-header {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  height: 100%;
-}
-.vc-header-default {
-  flex: 1;
-  min-width: 0;
-  height: 100%;
-}
-/* The game's bevelled button on the navy title bar. */
-.vc-back {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  min-height: 32px;
-  padding: 4px 12px;
-  font-weight: 700;
-  font-size: 0.875rem;
-  color: var(--r-ink);
-  text-decoration: none;
-  white-space: nowrap;
-  background: var(--r-face);
-  box-shadow: var(--bevel-out);
-}
-.vc-back[hidden] {
-  display: none;
-}
-.vc-back:hover {
-  color: var(--r-ink);
-}
-.vc-back:active {
-  box-shadow: var(--bevel-in);
-}
 /* "Close this tab" when the browser keeps a game-opened tab open. */
 .vc-back-note {
   position: fixed;
@@ -63,26 +27,6 @@
   border: 1px solid #b5b5b5;
   border-bottom-width: 2px;
   border-radius: 3px;
-}
-
-/* On a phone the header holds the logo, search, the menu and Back to game,
-   which leaves no room for the site's name: keep the logo and give the name
-   to screen readers only, instead of cutting it off. */
-@media (max-width: 30rem) {
-  .header .site-title span {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip: rect(0 0 0 0);
-    white-space: nowrap;
-  }
-}
-
-/* The phone's "On this page" bar sits on the navy title bar, so the section
-   it names is white, like the header's own text. */
-mobile-starlight-toc .display-current {
-  color: var(--r-title-fg);
 }
 
 /* The title lettered as the game's title screen draws it (src/styles/game/

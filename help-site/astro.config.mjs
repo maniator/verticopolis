@@ -15,6 +15,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "astro/config";
 import starlight from "@astrojs/starlight";
+import { GITHUB } from "../docs/engine-site/title-bar.mjs";
 import { HELP_BASE, OLD_ANCHORS, oldAnchorRedirects, sharedHead, sidebar } from "./site.mjs";
 
 const site = dirname(fileURLToPath(import.meta.url));
@@ -51,6 +52,9 @@ export default defineConfig({
       description: "How to build, run and grow a tower in Verticopolis, the free tower building game in your browser.",
       logo: { src: "./src/assets/logo.png", alt: "Verticopolis" },
       favicon: "/favicon.png",
+      // The title bar draws GitHub on a wide screen; on a phone Starlight puts
+      // this link at the foot of the menu.
+      social: [{ icon: "github", label: "GitHub", href: GITHUB }],
       // The site-wide "Page not found" page is the game's own (src/404.html).
       disable404Route: true,
       components: {
@@ -61,6 +65,7 @@ export default defineConfig({
       customCss: [
         join(repo, "src/styles/retro-tokens.css"),
         join(repo, "docs/engine-site/src/styles/theme.css"),
+        join(repo, "docs/engine-site/src/styles/title-bar.css"),
         "./src/styles/help.css",
       ],
       head: [...sharedHead, { tag: "script", content: oldAnchorRedirects(OLD_ANCHORS) }],

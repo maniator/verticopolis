@@ -43,6 +43,8 @@
 #     show those pictures at /help
 #   - docs/engine-site/src/styles: the help site wears the engine docs site's
 #     theme
+#   - docs/engine-site/src/components/TitleBar.astro and
+#     docs/engine-site/title-bar.mjs: the help site draws the shared title bar
 #   - CHANGELOG.md: the build reads it into version.json `notes`
 #   - the conformance lock files (catalog-digests, events/, expected,
 #     loader-cases, tdt-cases): the engine crate includes some with
@@ -65,8 +67,9 @@ set -uo pipefail
 affects_deploy() {
   case "$1" in
     # Reach the deployed /help site: its pages show the screenshots, and it
-    # wears the engine docs site's theme.
+    # wears the engine docs site's theme and title bar.
     docs/screenshots/* | docs/engine-site/src/styles/*) return 0 ;;
+    docs/engine-site/src/components/TitleBar.astro | docs/engine-site/title-bar.mjs) return 0 ;;
 
     # Documentation, agent skills, workflows and other repo meta.
     docs/* | _bmad/* | _bmad-output/* | .agents/* | .claude/* | .github/* | .vscode/*) return 1 ;;
