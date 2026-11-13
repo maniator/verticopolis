@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { WasmModule } from "../../dualrun/binding";
+import type { WasmModule } from "../../engineBinding/binding";
 import { churnBetween, churnUnits, measureChurn } from "./churn";
 import type { Scenario } from "./scenarios";
 

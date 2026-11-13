@@ -4,7 +4,7 @@ import { FLOOR, TILE } from "./render/scale";
 import { drawRoom, type RoomCtx } from "./render/pixelSprites";
 import { bindViewWorld } from "./presentation/viewWorld";
 import { bindViewKinds, findViewKind } from "./presentation/viewKinds";
-import { readCatalog } from "./dualrun/catalog";
+import { readCatalog } from "./engineBinding/catalog";
 import { loadWasmEngine } from "./wasmhost/rustEngine";
 
 interface Entry {

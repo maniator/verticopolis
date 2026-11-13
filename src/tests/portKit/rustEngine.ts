@@ -1,6 +1,6 @@
 import { afterEach } from "vitest";
 import { useTowerCatalogSource } from "../../catalog/towerCatalog";
-import { readCatalog } from "../../dualrun/catalog";
+import { readCatalog } from "../../engineBinding/catalog";
 import { draftTower, releaseDrafts, type Draft } from "./drafts";
 import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
 import { ToolingTower, type ToolingEngine } from "../../game/toolingTower";

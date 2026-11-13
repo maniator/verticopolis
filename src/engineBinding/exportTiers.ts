@@ -13,10 +13,9 @@ import type { WasmEngine } from "./binding";
  *   rules and charges, plus the few host writes the game makes on a player's
  *   behalf (the tower's name, the camera, a log line). Of the binding's own
  *   exports, the only tier the UI and game code (`src/ui/`, `src/game/`,
- *   `src/render/`, everything outside the engine, the relay and the host)
- *   may call to change the tower. Today they reach it through the TypeScript
- *   instance, which the relay mirrors (`mirror.ts`); on the port they reach
- *   it, and the port's Tier 2 reads, through `EnginePort` (below).
+ *   `src/render/`, everything outside this folder and the host) may call to
+ *   change the tower. They reach it, and the port's Tier 2 reads, through
+ *   `EnginePort` (below).
  * - **The port's members** (`EnginePort`, `src/simport/enginePort.ts`) follow
  *   one rule: a member that writes the tower is Tier 1, and one that only
  *   reads (a quote, a query, a view, a text getter, `lastReason`) is Tier 2,
@@ -25,23 +24,22 @@ import type { WasmEngine } from "./binding";
  * - **Tier 2, restores and reads.** Constructors from a save or a seed,
  *   getters and views, and the save writers. Entries marked `hostLoop` drive,
  *   drain or free the running engine (`tick`, the frame and log reads, the
- *   event drain, wasm-bindgen's `free`) and belong to the host, the dual run
- *   and tests; the guard fails on a call elsewhere to one whose name the
- *   TypeScript side does not share, and on any import of the binding's
- *   declaration from outside that scope.
- * - **Tier 3, relay, test and seed ops.** Raw edits that skip the charge
+ *   event drain, wasm-bindgen's `free`) and belong to the host and tests;
+ *   the guard fails on a call elsewhere to one whose name only the binding
+ *   uses, and on any import of the binding's declaration from outside that
+ *   scope.
+ * - **Tier 3, raw edit, test and seed ops.** Raw edits that skip the charge
  *   rules or the simulation layer (`setMoney`, `setCars`, `resizeTransport`,
  *   the bare tower edits), scripted events with no player trigger
  *   (`startFire`, `bombThreat`, `evaluateStar`), and the seeding calls the
- *   tooling uses. They exist so the dual-run relay can replay the TypeScript
- *   instance's edits. The guard fails on a call to one outside the relay,
- *   the host, the TypeScript engine itself, the tooling and tests, including
- *   the TypeScript-side writes the relay would turn into one: an assignment
- *   to `sim.money`, `tower.setCars` and `tower.resizeTransport`.
+ *   tooling uses. They were added so the side-by-side run of the retired
+ *   TypeScript engine could replay its edits on Rust, and the tooling and
+ *   tests still use them. The guard fails on a call to one outside this
+ *   folder, the host, the generated package, the tooling and tests, and on
+ *   a write to `.money` anywhere outside them.
  *
- * Tier 3 leaves the production binding, or moves behind a cargo feature,
- * when the TypeScript engine retires (#1057). Argument validation at the
- * boundary is #923's.
+ * Tier 3 leaving the production binding, or moving behind a cargo feature,
+ * is #1057. Argument validation at the boundary is #923's.
  */
 export type BindingTier = 1 | 2 | 3;
 
@@ -289,7 +287,7 @@ export const BINDING_EXPORT_TIERS = {
   isFloorServed: T2,
   highestFloor: T2,
 
-  // Tier 3: relay, test and seed ops.
+  // Tier 3: raw edit, test and seed ops.
   setMoney: T3,
   setCars: T3,
   resizeTransport: T3,

@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { posix, resolve, win32 } from "node:path";
 import { pathToFileURL } from "node:url";
-import { checkBinding, type WasmModule } from "../../dualrun/binding";
+import { checkBinding, type WasmModule } from "../../engineBinding/binding";
 import type { Scenario } from "./scenarios";
 
 /**

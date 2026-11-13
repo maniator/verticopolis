@@ -6,7 +6,7 @@ import type { EnginePort } from "../../simport/enginePort";
 import { newRenderSim, newViewReader } from "../../game/portAccess";
 import { bindViewKinds, findViewKind } from "../../presentation/viewKinds";
 import { catalogFor } from "../catalogFixture";
-import { readCatalog } from "../../dualrun/catalog";
+import { readCatalog } from "../../engineBinding/catalog";
 import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
 
 /**

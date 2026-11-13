@@ -667,7 +667,7 @@ and About will show it (#963 slice 3). The app version stays what players see.
   have a pin table in `engine-rs/src/identity_tests.rs` that grows with the
   version, and the view layout has one in `engine-rs/src/view/layout_tests.rs`;
   the catalog version has none yet, see #1154);
-- the binding's declaration, `src/dualrun/engine.d.ts`, outside comments.
+- the binding's declaration, `src/engineBinding/engine.d.ts`, outside comments.
 
 An internal change that keeps all of these, such as a performance
 optimization, needs no bump. The build hash (`sources` in the package's
@@ -771,7 +771,7 @@ belongs in the guides (owner, 2026-11-13).
 
 **Every engine change updates them.** A PR that changes the engine (the
 library source under `engine-rs/src/`, its tests and `src/bin/` aside, or the
-binding declaration `src/dualrun/engine.d.ts`) edits whichever guide or README
+binding declaration `src/engineBinding/engine.d.ts`) edits whichever guide or README
 no longer describes the engine: a call added, renamed or removed, a changed
 answer shape, a rule, a save behavior, a feature or a limit. When none needs a
 word, the PR's note says so with `readmes: unchanged` in its front matter,
@@ -1005,7 +1005,7 @@ alone.
 | --- | --- |
 | `engine-rs/` | The simulation: the Rust engine, compiled to WebAssembly, and the only engine the game runs. No host access (`engine-rs/tests/independence.rs`), deterministic, tested with `cargo test`. It owns the rules, caps and tuning (`facilities.rs`, `rules.rs`), the catalog the UI reads (`catalog.rs`), saves and `.TDT`, and undo. Its module map and how to build, test and change it: [`engine-rs/README.md`](./engine-rs/README.md). |
 | `src/simport/` | `EnginePort`, the one synchronous interface the game uses to call the engine, and the shared view reader that decodes the engine's frame. |
-| `src/dualrun/`, `src/wasmhost/` | The WASM binding and its declaration (`engine.d.ts`); loading the engine package, its build metadata and the catalog checks. |
+| `src/engineBinding/`, `src/wasmhost/` | The WASM binding and its declaration (`engine.d.ts`); loading the engine package, its build metadata and the catalog checks. |
 | `src/shared/` | Types and small helpers shared across the game. |
 | `src/game/` | Game controllers: the testable logic behind the composition root. |
 | `src/render/` | Canvas rendering and pixel-art sprites (`sprites.ts`, `sprites/**`, `pixelSprites.ts`). Reads engine state, never mutates it. |

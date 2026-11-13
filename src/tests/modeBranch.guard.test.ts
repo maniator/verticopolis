@@ -39,7 +39,7 @@ const RULE_HOMES: readonly RegExp[] = [/^engine-rs\/src\/rules\.rs$/, /^engine-r
 const RUST_SKIPPED: readonly RegExp[] = [/\/tests_[^/]*\.rs$/, /^engine-rs\/src\/bin\//, /\/rule_tests\//, /\/tests?\//, /_tests?\.rs$/, /\/tests\.rs$/];
 
 /** TypeScript paths that are tests, fixtures or generated declarations. */
-const TS_SKIPPED: readonly RegExp[] = [/^src\/tests\//, /\.test\.tsx?$/, /\.spec\.tsx?$/, /\.fixture\.ts$/, /^src\/dualrun\/engine\.d\.ts$/];
+const TS_SKIPPED: readonly RegExp[] = [/^src\/tests\//, /\.test\.tsx?$/, /\.spec\.tsx?$/, /\.fixture\.ts$/, /^src\/engineBinding\/engine\.d\.ts$/];
 
 const RUST_CHECKS: readonly RegExp[] = [
   /\bGameMode::(?:Classic|Modern)\b/g,

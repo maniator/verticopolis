@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import type { Catalog } from "../catalog/catalogTypes";
-import { readCatalog } from "../dualrun/catalog";
+import { readCatalog } from "../engineBinding/catalog";
 import type { GameMode } from "../shared/types";
 
 /**

@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import type { HeatmapMode } from "../../shared/engineTypes";
-import type { WasmEngine } from "../../dualrun/binding";
+import type { WasmEngine } from "../../engineBinding/binding";
 import { REPO_ROOT, type EngineStart, type ScenarioEngine, type Start } from "./scenario";
 import { wasm, wasmEngine, wasmFxSlots } from "./wasmEngine";
 

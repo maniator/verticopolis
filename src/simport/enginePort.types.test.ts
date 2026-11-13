@@ -1,5 +1,5 @@
 import { describe, expectTypeOf, it } from "vitest";
-import type { Engine } from "../dualrun/engine";
+import type { Engine } from "../engineBinding/engine";
 import type { EnginePort } from "./enginePort";
 
 // The contract's compile-time proof (section 1): the generated binding

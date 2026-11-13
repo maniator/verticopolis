@@ -8,7 +8,7 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { basename, join, resolve } from "node:path";
-import type { Engine } from "../dualrun/engine";
+import type { Engine } from "../engineBinding/engine";
 import { COMPAT_RECORD_PATH, type CompatRecord } from "./engineCompat.ts";
 import type { BuildFacts, EngineHandle, EnginePackage } from "./rollbackRehearsal.ts";
 

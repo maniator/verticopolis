@@ -1,5 +1,5 @@
 import { catalogFor } from "../tests/catalogFixture";
-import type { WasmEngine, WasmModule } from "../dualrun/binding";
+import type { WasmEngine, WasmModule } from "../engineBinding/binding";
 import { FRAME_HEADER } from "./frameView";
 
 /**

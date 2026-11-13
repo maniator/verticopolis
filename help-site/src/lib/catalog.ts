@@ -6,7 +6,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import type { Catalog, CatalogFacility } from "../../../src/catalog/catalogTypes";
-import { readCatalog } from "../../../src/dualrun/catalog";
+import { readCatalog } from "../../../src/engineBinding/catalog";
 import type { FacilityKind, GameMode } from "../../../src/shared/types";
 
 /** The game's checkout: `npm run build --prefix help-site` runs from help-site/. */

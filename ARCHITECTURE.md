@@ -34,7 +34,7 @@ src/
   main.ts      # GameApp: the composition root, owns the game loop
   game/        # controllers: build/editor actions, save/load, input, inspector, HUD wiring
   simport/     # EnginePort: the one synchronous interface the game uses to talk to the engine
-  dualrun/     # the WASM binding and its type declaration (engine.d.ts)
+  engineBinding/ # the WASM binding and its type declaration (engine.d.ts)
   wasmhost/    # loading the engine package, its build metadata and catalog checks
   render/      # Excalibur.js scene, procedural sprites, the overview Map
   ui/          # DOM controls: palette, status bar, editor panel, modals (lit-html templates)

@@ -18,7 +18,7 @@ engine-rs/src/view/structure.rs 2  # the frame layout's mode code
 
 # Web: labels, the mode-name type guard, save normalization and the new-game
 # mode picker.
-src/dualrun/catalog.ts 2  # film keys ("classic" film), not the mode
+src/engineBinding/catalog.ts 2  # film keys ("classic" film), not the mode
 src/shared/types.ts 2
 src/storage/SaveGame.ts 1
 src/ui/templates/saves.ts 1

@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { BINDING_EXPORT_TIERS, GENERATED_EXPORTS, exportsInTier, type BindingExport } from "../dualrun/exportTiers";
+import { BINDING_EXPORT_TIERS, GENERATED_EXPORTS, exportsInTier, type BindingExport } from "../engineBinding/exportTiers";
 import { repoRoot, repoRel, sourceFiles } from "./guardFiles";
 
 /**
@@ -10,7 +10,7 @@ import { repoRoot, repoRel, sourceFiles } from "./guardFiles";
  *
  * 1. Every export `engine-rs/src/wasm.rs` and its `engine-rs/src/wasm/` children
  *    declare is in the tier table
- *    (`src/dualrun/exportTiers.ts`), and every table entry is still exported.
+ *    (`src/engineBinding/exportTiers.ts`), and every table entry is still exported.
  *    The parse reads the module functions under `#[wasm_bindgen]` and every
  *    `pub fn` of a `#[wasm_bindgen] impl` block, by its `js_name` when it has
  *    one and by its Rust name when it has none (`tick`, `serialize`). A shape
@@ -18,9 +18,9 @@ import { repoRoot, repoRel, sourceFiles } from "./guardFiles";
  *    a `cfg_attr` binding) fails the test, so the parser is taught before
  *    such an export ships.
  * 2. No source outside the allowed scope calls a tier 3 op, on the binding or
- *    on the TypeScript instance the relay mirrors, and none assigns `.money`
- *    (the relay turns that write into `setMoney`). The allowed scope: the
- *    relay (`src/dualrun/`), the host and its suppressed
+ *    on anything else, and none assigns `.money` (the engine's write is
+ *    `setMoney`). The allowed scope: the binding's own folder
+ *    (`src/engineBinding/`), the host and its suppressed
  *    frame sync (`src/wasmhost/`), the generated package (`src/public/engine/`),
  *    the tooling harnesses' tower on the Rust engine (`src/game/toolingSim.ts`),
  *    tests (`src/tests/`, `*.test.*`, `e2e/`, which is not scanned) and the
@@ -29,9 +29,9 @@ import { repoRoot, repoRel, sourceFiles } from "./guardFiles";
  *    the renderer, storage, the boot.
  * 3. No scanned source outside that scope calls a host-loop op the binding
  *    alone has (`frameView`, `logSince`, ...) or imports the binding's
- *    declaration (`dualrun/binding` or `dualrun/engine`). `tick`,
- *    `drainGameplayEvents` and `free` share their names with the TypeScript
- *    instance and the renderer, so for them the guard fails on a call through
+ *    declaration (`engineBinding/binding` or `engineBinding/engine`). `tick`,
+ *    `drainGameplayEvents` and `free` share their names with the renderer
+ *    and other game objects, so for them the guard fails on a call through
  *    something named `engine` (`handle.current()?.engine.tick(dt)`) and on
  *    any use of the global host handle `__vcEngine`, and the import check
  *    covers the rest: the boot (`src/bootstrap.ts`) holds
@@ -51,11 +51,11 @@ const WASM_RS = "engine-rs/src/wasm.rs";
 /** The binding's exported members sit in child modules of `wasm.rs`. */
 const WASM_DIR = "engine-rs/src/wasm";
 const bindingFiles = (): string[] => [WASM_RS, ...sourceFiles(WASM_DIR, [".rs"]).map(repoRel).sort()];
-const ALLOWED_DIRS = ["src/dualrun/", "src/wasmhost/", "src/public/engine/", "src/tests/"];
+const ALLOWED_DIRS = ["src/engineBinding/", "src/wasmhost/", "src/public/engine/", "src/tests/"];
 const SCANNED_TREES = ["src", "api", "tools"];
 const SOURCE = /\.(m|c)?[jt]sx?$/;
 const TEST = /\.test\.(m|c)?[jt]sx?$/;
-/** Host-loop names the TypeScript side also uses for its own methods. */
+/** Host-loop names the renderer and other game objects also use for their own methods. */
 const SHARED_LOOP_NAMES: readonly BindingExport[] = ["tick", "drainGameplayEvents", "free"];
 
 interface ParsedExports {
@@ -215,7 +215,7 @@ const WRITES_MONEY = new RegExp(
 const REACHES_ENGINE_LOOP = new RegExp(
   String.raw`(?<![\w$])engine\s*[?!]?\.\s*(?:${SHARED_LOOP_NAMES.join("|")})\s*(?:!|\?\.|<[^>()]*>)?\s*(?:\(|\??\.\s*(?:call|apply|bind)\s*\()|(?<![\w$])__vcEngine\b`,
 );
-const IMPORTS_BINDING = /(?:from\s+|import\s+|import\s*\(\s*|require\s*\(\s*)["'`](?:[^"'`]*\/)?dualrun\/(?:binding|engine)(?:\.d)?(?:\.[cm]?[jt]s)?["'`]/;
+const IMPORTS_BINDING = /(?:from\s+|import\s+|import\s*\(\s*|require\s*\(\s*)["'`](?:[^"'`]*\/)?engineBinding\/(?:binding|engine)(?:\.d)?(?:\.[cm]?[jt]s)?["'`]/;
 
 /** The first offending line of a file, or null. */
 function offense(text: string, pattern: RegExp): string | null {
@@ -231,7 +231,7 @@ describe("WASM binding export tiers", () => {
 
   it("every export wasm.rs declares has a tier, and every tiered export is still declared", () => {
     const untiered = exported.filter((name) => !(name in BINDING_EXPORT_TIERS));
-    expect(untiered, `exports with no tier: add each to BINDING_EXPORT_TIERS in src/dualrun/exportTiers.ts`).toEqual([]);
+    expect(untiered, `exports with no tier: add each to BINDING_EXPORT_TIERS in src/engineBinding/exportTiers.ts`).toEqual([]);
     const declared = new Set<string>([...exported, ...GENERATED_EXPORTS]);
     expect(table.filter((name) => !declared.has(name)), "tiered names wasm.rs no longer exports").toEqual([]);
     expect(new Set(exported).size, "an export name appears twice").toBe(exported.length);
@@ -317,7 +317,7 @@ describe("WASM binding export tiers", () => {
     }
   });
 
-  describe("tier 3 stays in the relay, the host, the engine, the tooling and tests", () => {
+  describe("tier 3 stays in the binding's folder, the host, the tooling and tests", () => {
     const files = scannedSources();
     const read = (file: string) => readFileSync(resolve(repoRoot, file), "utf8");
 
@@ -341,12 +341,12 @@ describe("WASM binding export tiers", () => {
         const hit = offense(text, CALLS_HOST_LOOP) ?? offense(text, REACHES_ENGINE_LOOP);
         return hit ? [`${file}: ${hit}`] : [];
       });
-      expect(offenders, `the host loop (${HOST_LOOP.join(", ")}) belongs to src/wasmhost/, the dual run and tests`).toEqual([]);
+      expect(offenders, `the host loop (${HOST_LOOP.join(", ")}) belongs to src/wasmhost/ and tests`).toEqual([]);
     });
 
-    it("no scanned source outside the relay and the host imports the binding's declaration", () => {
+    it("no scanned source outside the binding's folder and the host imports the binding's declaration", () => {
       const offenders = files.filter((file) => !allowed(file)).filter((file) => offense(read(file), IMPORTS_BINDING) !== null);
-      expect(offenders, "only src/dualrun/, src/wasmhost/, tests and tooling may import dualrun/binding or dualrun/engine").toEqual([]);
+      expect(offenders, "only src/engineBinding/, src/wasmhost/, tests and tooling may import engineBinding/binding or engineBinding/engine").toEqual([]);
     });
 
     it("the scan reaches the UI, game and renderer, and the matchers find what they guard (no false pass)", () => {
@@ -374,7 +374,7 @@ describe("WASM binding export tiers", () => {
       for (const miss of ["const m = sim.money", "if (sim.money === 0)", "sim.money == x", "sim.money >= cost", "sim.money <= cost", "sim.money !== x", "sim.money != x", "sim.money! !== x", "(sim.money) === 0", "if (sim.money) ++n;", "if (!this.money) --budget;", "if (a.money!) ++n;", "(a.money!) == 0", "moneyLabel = 1", "sim.money ?? 0", "sim.money || 0", "const canAfford = (budget = app.sim.money) => budget >= cost;", "(budget = sim.money!) => budget", "type Fn = (m: typeof sim.money) => void;"]) {
         expect(offense(miss, WRITES_MONEY), miss).toBeNull();
       }
-      for (const hit of ['import type { WasmEngine } from "../dualrun/binding";', 'import { Engine } from "../../dualrun/engine.js";', 'await import("../dualrun/binding")', 'require("../dualrun/engine")', 'import type { Engine } from "../dualrun/engine.d.ts";', "await import(`../dualrun/binding`)", 'import "../dualrun/binding.js";', 'import { E } from "dualrun/engine";']) {
+      for (const hit of ['import type { WasmEngine } from "../engineBinding/binding";', 'import { Engine } from "../../engineBinding/engine.js";', 'await import("../engineBinding/binding")', 'require("../engineBinding/engine")', 'import type { Engine } from "../engineBinding/engine.d.ts";', "await import(`../engineBinding/binding`)", 'import "../engineBinding/binding.js";', 'import { E } from "engineBinding/engine";']) {
         expect(offense(hit, IMPORTS_BINDING), hit).not.toBeNull();
       }
       for (const hit of ["e.frameView()", "e.logSince(3)", "e.gameplayEventsPending()"]) expect(offense(hit, CALLS_HOST_LOOP), hit).not.toBeNull();
@@ -383,7 +383,7 @@ describe("WASM binding export tiers", () => {
         expect(offense(hit, REACHES_ENGINE_LOOP), hit).not.toBeNull();
       }
       for (const miss of ["this.engine.currentScene", "towerEngine.tick(1)", "app.onboarding.tick()", "g.__vcEngineBoot = state", "$engine.tick()"]) expect(offense(miss, REACHES_ENGINE_LOOP), miss).toBeNull();
-      for (const miss of ['import { x } from "../dualrun/engineX";', 'import { y } from "../engine/Simulation";', 'import { z } from "../dualrun/dualRun";']) {
+      for (const miss of ['import { x } from "../engineBinding/engineX";', 'import { y } from "../engine/Simulation";', 'import { z } from "../engineBinding/bindingX";']) {
         expect(offense(miss, IMPORTS_BINDING), miss).toBeNull();
       }
     });

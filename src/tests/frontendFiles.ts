@@ -7,8 +7,8 @@ import { isTestFile } from "./importScan";
  */
 
 /** What under `src/` is not frontend: the test tree, and the host and save
- *  code (`src/wasmhost/`, `src/dualrun/`, `src/storage/`). */
-export const NOT_FRONTEND = ["src/tests/", "src/wasmhost/", "src/dualrun/", "src/storage/"] as const;
+ *  code (`src/wasmhost/`, `src/engineBinding/`, `src/storage/`). */
+export const NOT_FRONTEND = ["src/tests/", "src/wasmhost/", "src/engineBinding/", "src/storage/"] as const;
 
 /** Every non-test frontend file under `src/`, repo-relative. */
 export function frontendFiles(): string[] {

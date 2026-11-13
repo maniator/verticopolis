@@ -36,7 +36,7 @@ export const SURFACES: Record<string, string[]> = {
     "engine-rs/src/wasm.rs",
     "engine-rs/src/wasm/",
     "engine-rs/src/frame.rs",
-    "src/dualrun/",
+    "src/engineBinding/",
   ],
   "Hosts (main thread and worker)": ["src/wasmhost/"],
   "Saves (load per command, autosave on a timer)": ["src/storage/"],

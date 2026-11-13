@@ -24,7 +24,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it, vi } from "vitest";
-import type { Engine, encodeVctower, exportTdt } from "../../dualrun/engine";
+import type { Engine, encodeVctower, exportTdt } from "../../engineBinding/engine";
 import { SaveGame } from "../../storage/SaveGame";
 import { fromBase64, inflateCapped, parseSaveJson, STORE_MAGIC } from "../../storage/saveCompression";
 import { fromTowerFile, toTowerFile } from "../../storage/towerFileCodec";

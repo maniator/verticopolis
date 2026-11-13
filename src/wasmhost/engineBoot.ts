@@ -1,4 +1,4 @@
-import type { WasmModule } from "../dualrun/binding";
+import type { WasmModule } from "../engineBinding/binding";
 import { EnginePackageError, type PackageFailureDetail, type PackageFailureKind } from "./enginePackageCheck";
 import { readEngineIdentity } from "./engineIdentity";
 import type { BuildMetadataResult } from "./buildSection";

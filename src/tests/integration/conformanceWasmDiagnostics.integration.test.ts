@@ -11,7 +11,7 @@ import {
   type ScenarioEngine,
 } from "../conformance/scenario";
 import { hasWasmPackage, reloadWasmHandle, startWasmHandle, wasmEngine } from "../conformance/wasmEngine";
-import type { WasmEngine } from "../../dualrun/binding";
+import type { WasmEngine } from "../../engineBinding/binding";
 
 /**
  * The diagnostics facts (#1215, facade slice 6c) over the whole conformance

@@ -6,7 +6,7 @@ import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
 import { HEATMAP_MODES, probedWasmStart } from "../conformance/panelProbe";
 import { statsReport } from "../../simport/statsSheet";
 import { PortCodes } from "../../simport/portCodes";
-import type { WasmEngine } from "../../dualrun/binding";
+import type { WasmEngine } from "../../engineBinding/binding";
 
 /**
  * The Rust panel getters on the conformance corpus (facade slice 6b, #1214).

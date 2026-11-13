@@ -6,8 +6,8 @@ import type { CheckpointDetail, FxSlot } from "./checkpointDetail";
 import { REPO_ROOT, type EngineStart, type Outcome, type ScenarioEngine, type Start } from "./scenario";
 import type { ChargeOutcome } from "./chargeOps";
 import { decodeHeader } from "../../wasmhost/frameView";
-import { checkBinding, type WasmEngine, type WasmModule } from "../../dualrun/binding";
-import { readCatalog } from "../../dualrun/catalog";
+import { checkBinding, type WasmEngine, type WasmModule } from "../../engineBinding/binding";
+import { readCatalog } from "../../engineBinding/catalog";
 import type { GameMode } from "../../shared/types";
 
 /**

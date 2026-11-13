@@ -9,7 +9,7 @@ import { injectVercelTelemetry } from "./telemetry";
 import { trackAppAction } from "./analytics";
 import { bindViewWorld } from "./presentation/viewWorld";
 import { bindViewKinds } from "./presentation/viewKinds";
-import { readCatalog } from "./dualrun/catalog";
+import { readCatalog } from "./engineBinding/catalog";
 import { loadWasmEngine } from "./wasmhost/rustEngine";
 
 /** The Rust engine's Modern catalog, read before the page draws. The engine is

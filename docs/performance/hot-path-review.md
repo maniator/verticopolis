@@ -40,7 +40,7 @@ at once (HP-11). A Rust toolchain or Cargo configuration file added later
 | --- | --- |
 | Rust engine and its build | `engine-rs/src/`, `engine-rs/Cargo.toml`, `engine-rs/Cargo.lock`, `scripts/wasm-build.ts`, `scripts/build-engine-wasm.sh` |
 | App build settings (which engine and code paths ship) | `vite.config.ts`, `src/build/` (the build modules it imports) |
-| WASM binding | `engine-rs/src/wasm.rs`, `engine-rs/src/wasm/`, `engine-rs/src/frame.rs`, `src/dualrun/` |
+| WASM binding | `engine-rs/src/wasm.rs`, `engine-rs/src/wasm/`, `engine-rs/src/frame.rs`, `src/engineBinding/` |
 | Hosts (main thread and worker) | `src/wasmhost/` |
 | Saves (load per command, autosave on a timer) | `src/storage/` |
 | Rendering, frame loop and UI | `src/render/`, `src/presentation/`, `src/game/`, `src/ui/`, `src/catalog/` |

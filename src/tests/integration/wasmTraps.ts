@@ -1,4 +1,4 @@
-import type { WasmEngine } from "../../dualrun/binding";
+import type { WasmEngine } from "../../engineBinding/binding";
 
 /**
  * Engine traps for the runtime fallback's integration tests (#874). A trap is

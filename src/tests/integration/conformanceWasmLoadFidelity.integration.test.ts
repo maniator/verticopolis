@@ -16,7 +16,7 @@
  * Skips without the WASM package, like the rest of `npm run test:wasm`.
  */
 import { describe, expect, it } from "vitest";
-import type { Engine } from "../../dualrun/engine";
+import type { Engine } from "../../engineBinding/engine";
 import { canonicalJson } from "../conformance/canonical";
 import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
 

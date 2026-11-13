@@ -10,7 +10,7 @@ import {
   type StartTower,
 } from "../fixtures/serviceDiagnostics.fixture";
 import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
-import { readCatalog } from "../../dualrun/catalog";
+import { readCatalog } from "../../engineBinding/catalog";
 import { draftTower, type Draft } from "../portKit/portSim";
 import { placeUnit } from "../portKit/draftFixtures";
 import type { GameMode, SerializedGame, UnitState } from "../../shared/types";

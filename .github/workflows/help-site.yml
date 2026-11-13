@@ -18,7 +18,7 @@ on:
       - "src/render/**"
       - "src/presentation/**"
       - "src/catalog/**"
-      - "src/dualrun/catalog.ts"
+      - "src/engineBinding/catalog.ts"
       - "src/shared/**"
       - "engine-rs/src/**"
       - "scripts/build-engine-wasm.sh"
