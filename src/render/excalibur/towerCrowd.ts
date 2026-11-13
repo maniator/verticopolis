@@ -443,7 +443,11 @@ export function updateMotion(engine: TowerEngine, elapsedMs = 1000 / 60): void {
   // evening rushes, but only when the garage actually has cars to move.
   // Reads the fraction computed in syncScene (per sync, not per frame), so
   // this frame-path never runs the parking flood-fill itself.
-  const rushing = (simClock.isMorning() || simClock.isEvening()) && engine.displayParkingUse > 0;
+  // While guards search for a bomb the engine holds every person and car
+  // still, so the decorations that stand for people (garage cars,
+  // passers-by) leave too.
+  const lockdown = engine.sim.bombSearch?.lockdown === true;
+  const rushing = (simClock.isMorning() || simClock.isEvening()) && engine.displayParkingUse > 0 && !lockdown;
   for (const g of engine.garageCars) {
     if (g.actor.graphics.isVisible !== rushing) g.actor.graphics.isVisible = rushing;
     if (!rushing) continue;
@@ -456,7 +460,7 @@ export function updateMotion(engine: TowerEngine, elapsedMs = 1000 / 60): void {
   if (engine.walkers.length > 0) refreshFloorLiveliness(engine);
   // The Settings switch (Modern, default off) and reduced motion each hide every
   // passer-by; reduced motion promises to calm background animation (#2091).
-  const passersShown = engine.passersBy && !engine.reducedMotion;
+  const passersShown = engine.passersBy && !engine.reducedMotion && !lockdown;
   const lit = engine.walkers.length > 0 && towerCatalog(engine.sim).rules.shadedLook;
   for (const w of engine.walkers) {
     // A passer-by shows only while its own floor has live occupants, so an

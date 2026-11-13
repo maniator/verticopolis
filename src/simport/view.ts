@@ -155,6 +155,9 @@ export interface BombSearchView {
   readonly sweeping: readonly BombSearchGuard[];
   readonly searched: readonly number[];
   readonly seq: number;
+  /** Whether guards are still out searching, so the engine holds every
+   *  person and car still (`Simulation::bomb_lockdown`). */
+  readonly lockdown: boolean;
 }
 
 /** An emergency waiting on the player's answer. */

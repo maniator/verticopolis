@@ -307,7 +307,7 @@ export interface EnginePortView {
   /** The emergency waiting on the player as JSON `{ kind, cost, message }`,
    *  read when the frame's `pendingChoice` flag rises. */
   pendingChoice(): string | undefined;
-  /** Classic's bomb search as JSON `{ deadline, sweeping, searched, seq }`,
+  /** The bomb search as JSON `{ deadline, sweeping, searched, seq, lockdown }`,
    *  read when the frame's `bombSearchSeq` moves; undefined when none runs.
    *  Rust only (#349): the TypeScript reference answers a ransom at once. */
   bombSearch?(): string | undefined;

@@ -280,3 +280,41 @@ describe("decorative passers-by (#2091)", () => {
     }
   });
 });
+
+describe("a bomb search clears the decorative passers-by and garage cars", () => {
+  const walker = () =>
+    ({ actor: actor(), look: 2, key: -1, x0w: 0, x1w: 50, yw: 0, speed: 8, dir: 1, phase: 0, rank: 0.5, floor: 7 }) as any;
+  const garageCar = () => ({ actor: actor(), seed: 3, x0w: 0, x1w: 50, floor: 0 });
+  const morning = (bombSearch: unknown) =>
+    simFixture({
+      bombSearch,
+      clock: { hour: 8, minuteOfDay: 8 * 60, isMorning: () => true, isEvening: () => false, isNight: () => false },
+      tower: { revision: 1, units: [{ floor: 7, occupants: 16 }] },
+    });
+
+  it("shows both on a calm morning rush", () => {
+    const w = walker();
+    const g = garageCar();
+    updateMotion(eng({ sim: morning(null), walkers: [w], garageCars: [g], displayParkingUse: 1 }));
+    expect(w.actor.graphics.isVisible).toBe(true);
+    expect(g.actor.graphics.isVisible).toBe(true);
+  });
+
+  it("hides both while the search runs", () => {
+    const w = walker();
+    const g = garageCar();
+    const search = { deadline: 13 * 60, sweeping: [], searched: [], seq: 1, lockdown: true };
+    updateMotion(eng({ sim: morning(search), walkers: [w], garageCars: [g], displayParkingUse: 1 }));
+    expect(w.actor.graphics.isVisible).toBe(false);
+    expect(g.actor.graphics.isVisible).toBe(false);
+  });
+
+  it("keeps both for a bomb nobody searches for (no Security)", () => {
+    const w = walker();
+    const g = garageCar();
+    const search = { deadline: 13 * 60, sweeping: [], searched: [], seq: 1, lockdown: false };
+    updateMotion(eng({ sim: morning(search), walkers: [w], garageCars: [g], displayParkingUse: 1 }));
+    expect(w.actor.graphics.isVisible).toBe(true);
+    expect(g.actor.graphics.isVisible).toBe(true);
+  });
+});

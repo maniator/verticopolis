@@ -214,6 +214,18 @@ impl Simulation {
         }
     }
 
+    /// Whether the tower is on lockdown for a bomb: while any of Security's
+    /// guards is still out searching for it, in both modes. People and cars
+    /// hold still meanwhile and only the guards move. A bomb nobody searches
+    /// for (no Security, or every stretch the guards can reach swept) freezes
+    /// nothing while it waits for the deadline (owner, 2026-11-13).
+    pub fn bomb_lockdown(&self) -> bool {
+        self.events
+            .bomb
+            .as_ref()
+            .is_some_and(|b| b.guards.iter().any(|g| g.floor.is_some()))
+    }
+
     /// A Security office at (`office`, `x`) just opened. In a mode where late
     /// offices join, its guards set out from there now.
     pub(crate) fn join_bomb_search(&mut self, office: i64, x: i64) {
@@ -451,3 +463,7 @@ mod tests;
 #[cfg(test)]
 #[path = "events_bomb_split_tests.rs"]
 mod split_tests;
+
+#[cfg(test)]
+#[path = "events_bomb_lockdown_tests.rs"]
+mod lockdown_tests;

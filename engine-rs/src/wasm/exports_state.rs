@@ -269,9 +269,11 @@ impl Engine {
             .map(|p| pending_json(p.kind, p.cost, &p.message))
     }
 
-    /// Classic's bomb search while one runs, as JSON `{ deadline, sweeping,
-    /// searched, seq }` (`sweeping` holds `{ floor, left, right }` for each
-    /// floor a guard is on, `searched` the floors already clear), or null. The bomb's hiding place stays out. A host reads it
+    /// The bomb search while one runs, as JSON `{ deadline, sweeping,
+    /// searched, seq, lockdown }` (`sweeping` holds `{ floor, left, right }`
+    /// for each floor a guard is on, `searched` the floors already clear,
+    /// `lockdown` whether guards are still out so people and cars hold
+    /// still), or null. The bomb's hiding place stays out. A host reads it
     /// when the frame's `bombSearchSeq` moves.
     #[wasm_bindgen(js_name = bombSearch)]
     pub fn bomb_search(&self) -> Option<String> {
