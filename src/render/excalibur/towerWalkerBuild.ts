@@ -1,8 +1,10 @@
 import * as ex from "excalibur";
 import { Z } from "../depthPlanes";
 import { coveredUpperStories, lotCovered, lobbyLaneSpan } from "./towerCrowdLayout";
-import { FLOOR } from "../scale";
+import { FLOOR, TILE } from "../scale";
+import { spiralRadius } from "../sprites/spiralStair";
 import type { TowerEngine } from "./TowerEngine";
+import type { Walker } from "./towerCrowd";
 import { towerCatalog } from "../../catalog/towerCatalog";
 
 /**
@@ -94,7 +96,8 @@ export function buildWalkers(engine: TowerEngine): void {
     const x0w = engine.worldX(t.x) + 2;
     const x1w = engine.worldX(t.x + t.width) - 3;
     const yb = engine.worldYTop(t.bottom) + FLOOR - 2;
-    const yt = yb - (FLOOR - 4);
+    // A flight out of a tall lobby (#308) climbs every story of it.
+    const yt = yb - ((t.top - t.bottom) * FLOOR - 4);
     const n = t.kind === "escalator" ? 3 : 2;
     // Both landings, so the gate can require both ends of the flight rather
     // than assuming the bottom stands for the whole climb (#665).
@@ -104,11 +107,16 @@ export function buildWalkers(engine: TowerEngine): void {
       altFloor: t.top,
       altTileX: landingTile(tower, t, t.top),
     };
+    // Stairs out of a tall lobby are a spiral (drawSpiralStair) and an
+    // escalator a switchback; their climbers follow the same path.
+    const stories = t.top - t.bottom;
+    const w = t.width * TILE;
+    const spiral = t.kind === "stairs" && stories > 1 ? { cx: engine.worldX(t.x) + Math.round(w / 2), r: spiralRadius(w), stories } : undefined;
     for (let i = 0; i < n; i++) {
       const seed = (t.id * 17 + i * 29) | 0;
       // Low ranks so stairs/escalators show climbers even in a modest tower,
       // otherwise the routed crowd (elevators only) makes stairs look unused.
-      spawnWalker(engine, x0w, x1w, yb, yt, seed, t.kind === "escalator" ? 12 : 7, 0.04 + i * 0.18, spot, false);
+      spawnWalker(engine, x0w, x1w, yb, yt, seed, t.kind === "escalator" ? 12 : 7, 0.04 + i * 0.18, spot, false, spiral, t.kind === "escalator" ? stories : undefined);
     }
   }
 }
@@ -147,6 +155,8 @@ function spawnWalker(
   rank: number,
   spot: WalkerSpot,
   perFloor: boolean,
+  spiral?: Walker["spiral"],
+  switchback?: number,
 ): void {
   const gfx = engine.personGfx[Math.abs(seed) % engine.personGfx.length];
   // Actor bounds track the baked canvas footprint (see reconcileCrowd).
@@ -168,6 +178,8 @@ function spawnWalker(
     rank,
     ...spot,
     perFloor,
+    spiral,
+    switchback,
   });
 }
 
