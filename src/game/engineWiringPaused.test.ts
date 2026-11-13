@@ -12,7 +12,8 @@ import { UNPAUSE_TO_BUILD } from "./pausedBuild";
  * its release place nothing at speed 0 and say why once; Modern's says it
  * does, so they place as usual. The sibling helpers are mocked, as in
  * engineWiringDrag.test.ts, and the catalog is the engine's fixture for the
- * reader's mode.
+ * reader's mode. The last block holds a touch tap made with the pan key held
+ * (#589), which shares this app.
  */
 
 vi.mock("./buildPreview", () => ({
@@ -27,6 +28,7 @@ vi.mock("./buildPreview", () => ({
 vi.mock("./frameLoop", () => ({ runFrame: vi.fn(), SPEEDS: [0, 3, 15, 50] }));
 
 interface Hooks {
+  classifyDown?: (button: number, touch: boolean, panKey: boolean) => string;
   onTap?: (tile: number, floor: number, touch: boolean, picked: unknown) => void;
   onActionDown?: (tile: number, floor: number, touch: boolean, picked: unknown) => void;
   onActionMove?: (tile: number, floor: number, picked: unknown) => void;
@@ -58,6 +60,7 @@ function makeApp(mode: GameMode, speed: number, tool: Record<string, unknown>) {
       tryBuildTransport: vi.fn(),
     },
     ui: { toast: vi.fn() },
+    selectPicked: vi.fn(),
     captureUndo: vi.fn(() => (undo.gesture += 1)),
     commitUndo: vi.fn(() => (undo.gesture = NO_GESTURE)),
     discardUndo: vi.fn(),
@@ -197,5 +200,41 @@ describe("a drag begun while the clock ran, after the game pauses", () => {
     app.speed = PAUSED;
     hooks.onActionUp!();
     expect(app.build.tryBuildTransport).toHaveBeenCalledExactlyOnceWith("elevatorStandard", 10, 2, 6);
+  });
+});
+
+describe("a touch tap with the pan key held (#589)", () => {
+  const LEFT = 0;
+  const OFFICE_ROOM = { type: "unit", id: 7, kind: "office" };
+
+  it("builds nothing: Shift or Space promised the press only pans", () => {
+    const { app, hooks } = makeApp("modern", PLAYING, OFFICE);
+    expect(hooks.classifyDown!(LEFT, true, true)).toBe("pan");
+    hooks.onTap!(10, 2, true, null);
+    expect(placeSimpleBuild).not.toHaveBeenCalled();
+    expect(app.captureUndo).not.toHaveBeenCalled();
+  });
+
+  it("bulldozes nothing either", () => {
+    const { app, hooks } = makeApp("modern", PLAYING, { type: "bulldoze", kind: "office" });
+    hooks.classifyDown!(LEFT, true, true);
+    hooks.onTap!(10, 2, true, OFFICE_ROOM);
+    expect(app.build.bulldozePicked).not.toHaveBeenCalled();
+  });
+
+  it("still opens a room's card with Inspect", () => {
+    const { app, hooks } = makeApp("modern", PLAYING, { type: "inspect", kind: "office" });
+    hooks.classifyDown!(LEFT, true, true);
+    hooks.onTap!(10, 2, true, OFFICE_ROOM);
+    expect(app.selectPicked).toHaveBeenCalledExactlyOnceWith(OFFICE_ROOM);
+  });
+
+  it("the next tap without the key places as usual", () => {
+    const { hooks } = makeApp("modern", PLAYING, OFFICE);
+    hooks.classifyDown!(LEFT, true, true);
+    hooks.onTap!(10, 2, true, null);
+    hooks.classifyDown!(LEFT, true, false);
+    hooks.onTap!(10, 2, true, null);
+    expect(placeSimpleBuild).toHaveBeenCalledOnce();
   });
 });
