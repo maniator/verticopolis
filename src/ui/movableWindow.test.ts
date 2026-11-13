@@ -1,5 +1,5 @@
 import { afterEach, describe, it, expect, vi } from "vitest";
-import { clampSpot, MOVABLE_CLASS, MovableWindow, type Spot } from "./movableWindow";
+import { clampSpot, MOVABLE_CLASS, MOVE_HINT, MovableWindow, type Spot } from "./movableWindow";
 
 describe("clampSpot", () => {
   const bounds = { w: 800, h: 600 };
@@ -52,7 +52,8 @@ function setup(opts: { enabled?: () => boolean } = {}) {
 }
 
 function pointer(target: Element, type: string, x: number, y: number, init: PointerEventInit = {}): PointerEvent {
-  const e = new PointerEvent(type, { bubbles: true, cancelable: true, pointerId: 1, button: 0, clientX: x, clientY: y, ...init });
+  const buttons = type === "pointerup" ? 0 : 1;
+  const e = new PointerEvent(type, { bubbles: true, cancelable: true, pointerId: 1, pointerType: "mouse", button: 0, buttons, clientX: x, clientY: y, ...init });
   target.dispatchEvent(e);
   return e;
 }
@@ -177,6 +178,48 @@ describe("MovableWindow", () => {
     });
     drag(title, -100, 0);
     expect(win.style.left).toBe("400px");
+  });
+
+  it("a mouse that moves with no button held ends a drag whose release was lost, and hovering then moves nothing", () => {
+    const { win, title, placed } = setup();
+    pointer(title, "pointerdown", 610, 460);
+    pointer(title, "pointermove", 510, 460);
+    expect(win.style.left).toBe("400px");
+    pointer(title, "pointermove", 410, 460, { buttons: 0 });
+    expect(win.style.left).toBe("400px");
+    expect(placed.mock.calls).toEqual([[{ x: 400, y: 400 }]]);
+    pointer(title, "pointermove", 310, 460);
+    expect(win.style.left).toBe("400px");
+  });
+
+  it("a touch drag keeps going (a touch move reports its contact as held)", () => {
+    const { win, title } = setup();
+    drag(title, -100, 0, { pointerType: "touch" });
+    expect(win.style.left).toBe("400px");
+  });
+
+  it("a new press by the pointer holding a lost drag starts over, and another pointer's press waits", () => {
+    const { win, title } = setup();
+    pointer(title, "pointerdown", 610, 460);
+    pointer(title, "pointerdown", 610, 460, { pointerId: 2 });
+    pointer(title, "pointermove", 0, 0, { pointerId: 2 });
+    expect(win.style.left).toBe("");
+    // The window moved under the pointer before its second press: the grab is measured again.
+    pointer(title, "pointerdown", 650, 470);
+    pointer(title, "pointermove", 550, 470);
+    expect(win.style.left).toBe("400px");
+  });
+
+  it("names the move on the title bar's tooltip while it can move, and drops it while it cannot", () => {
+    let on = true;
+    const { title, body } = setup({ enabled: () => on });
+    body.dispatchEvent(new PointerEvent("pointerover", { bubbles: true }));
+    expect(title.title).toBe("");
+    title.dispatchEvent(new PointerEvent("pointerover", { bubbles: true }));
+    expect(title.title).toBe(MOVE_HINT);
+    on = false;
+    title.dispatchEvent(new PointerEvent("pointerover", { bubbles: true }));
+    expect(title.hasAttribute("title")).toBe(false);
   });
 
   it("dispose removes the listeners", () => {

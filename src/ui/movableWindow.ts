@@ -1,4 +1,4 @@
-import { isPrimaryPress } from "./overviewMapInput";
+import { isPrimaryPress, noButtonHeld } from "./overviewMapInput";
 
 /**
  * Movable windows: the player drags a closable window (the Map, the facility
@@ -45,6 +45,10 @@ export function clampSpot(spot: Spot, size: Extent, bounds: Extent): Spot {
 
 /** The controls a title bar holds, which a press works rather than moves. */
 const TITLE_CONTROLS = "button, select, input, textarea, a";
+
+/** The title bar's tooltip, so a player who wonders how to move a window
+ *  finds out by pointing at its bar. */
+export const MOVE_HINT = "Drag to move. Double-click to put it back.";
 
 /** The class a movable window wears, which gives its title bar the move
  *  cursor and keeps a touch on it from scrolling the page. */
@@ -94,6 +98,7 @@ export class MovableWindow {
       ["pointercancel", (e) => this.end(e as PointerEvent)],
       ["lostpointercapture", (e) => this.end(e as PointerEvent)],
       ["dblclick", (e) => this.home(e)],
+      ["pointerover", (e) => this.hint(e)],
     ];
     for (const [type, fn] of this.listeners) win.addEventListener(type, fn);
     if (typeof ResizeObserver !== "undefined") {
@@ -151,7 +156,10 @@ export class MovableWindow {
   }
 
   private down(e: PointerEvent): void {
-    if (this.drag || !isPrimaryPress(e)) return;
+    // A press by the pointer that holds the drag means its release was lost
+    // (the title bar re-rendered under it, say): the new press starts over.
+    if ((this.drag && this.drag.pointerId !== e.pointerId) || !isPrimaryPress(e)) return;
+    this.drag = null;
     const title = this.titleOf(e);
     if (!title || (this.opts.enabled && !this.opts.enabled())) return;
     const rect = this.opts.win.getBoundingClientRect();
@@ -179,6 +187,13 @@ export class MovableWindow {
   private move(e: PointerEvent): void {
     const drag = this.drag;
     if (!drag || drag.pointerId !== e.pointerId) return;
+    // A mouse or pen that moves with no button held let go somewhere this
+    // window never heard: the move is over, and hovering moves nothing.
+    if (e.pointerType !== "touch" && noButtonHeld(e)) {
+      this.drag = null;
+      if (drag.moved && this.spot) this.opts.placed?.(this.spot);
+      return;
+    }
     const { bounds } = drag;
     const spot = clampSpot({ x: e.clientX - drag.grabX - bounds.left, y: e.clientY - drag.grabY - bounds.top }, drag.size, bounds);
     drag.moved = true;
@@ -191,6 +206,17 @@ export class MovableWindow {
     if (!drag || drag.pointerId !== e.pointerId) return;
     this.drag = null;
     if (drag.moved && this.spot) this.opts.placed?.(this.spot);
+  }
+
+  /** Name the move on the title bar's tooltip while the window can move, and
+   *  drop it while it cannot (the docked phone card). Runs as the pointer
+   *  enters an element, never per move. */
+  private hint(e: Event): void {
+    const title = this.titleOf(e);
+    if (!title) return;
+    const can = !this.opts.enabled || this.opts.enabled();
+    if (can && title.title !== MOVE_HINT) title.title = MOVE_HINT;
+    else if (!can && title.title === MOVE_HINT) title.removeAttribute("title");
   }
 
   /** A double-click on the title bar puts the window back where the game
