@@ -18,12 +18,15 @@
  *
  *   node scripts/gen-og-image.mjs                 # host (uses Playwright's browser)
  *   PW_CHROME=... node scripts/gen-og-image.mjs   # explicit browser (docker/CI)
+ *
+ * The help site's per-page cards reuse its palette and tower painter
+ * (scripts/gen-help-cards.mjs).
  */
 // copies-package: none
 import { chromium } from "playwright";
 import { mkdir } from "node:fs/promises";
 import { existsSync } from "node:fs";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { dirname, resolve } from "node:path";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -44,16 +47,16 @@ const H = 630;
 // fallback. Naming host-only faces like Trebuchet MS or Segoe UI would make the
 // committed PNG depend on who regenerated it, so regenerate this card in the
 // Linux container (as with the screenshots) to keep its output reproducible.
-const FONT = "'Liberation Sans', 'DejaVu Sans', sans-serif";
+export const FONT = "'Liberation Sans', 'DejaVu Sans', sans-serif";
 
 // "Metropolis Dusk" palette (matches the splash, wordmark, and app icons).
-const INDIGO = "#1b1b40";
-const PLUM = "#37285a";
-const CORAL = "#ef6b5e";
-const GOLD = "#ffc94a"; // lit windows / sun
-const CROWN = "#ffe6a0"; // antenna beacon
-const TOWER = "#140f2e"; // tower silhouette
-const INK = "#0d0a22"; // deep foreground
+export const INDIGO = "#1b1b40";
+export const PLUM = "#37285a";
+export const CORAL = "#ef6b5e";
+export const GOLD = "#ffc94a"; // lit windows / sun
+export const CROWN = "#ffe6a0"; // antenna beacon
+export const TOWER = "#140f2e"; // tower silhouette
+export const INK = "#0d0a22"; // deep foreground
 
 /**
  * One stepped art-deco tower with lit gold windows, sitting on the ground line.
@@ -63,7 +66,7 @@ const INK = "#0d0a22"; // deep foreground
  * @param {number} ground y of the ground line
  * @param {string} body   silhouette fill
  */
-function tower(cx, baseW, totalH, ground, body) {
+export function tower(cx, baseW, totalH, ground, body) {
   const tiers = [
     { w: 1.0, h: 0.34, cols: 4 },
     { w: 0.72, h: 0.28, cols: 3 },
@@ -158,7 +161,11 @@ async function main() {
   }
 }
 
-main().catch((e) => {
-  console.error(e);
-  process.exit(1);
-});
+// The help site's page cards (scripts/gen-help-cards.mjs) import the palette
+// and the tower painter, so the card is drawn only when this file is run.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch((e) => {
+    console.error(e);
+    process.exit(1);
+  });
+}

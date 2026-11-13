@@ -3,7 +3,6 @@
 export const HELP_BASE: string;
 export const ENGINE_DOCS: string;
 export const GITHUB_ISSUES: string;
-export const OG_IMAGE_ALT: string;
 export const sharedHead: { tag: string; attrs: Record<string, string> }[];
 export type SidebarEntry =
   | { label: string; link: string; attrs?: Record<string, string> }
@@ -18,3 +17,9 @@ export const OLD_ANCHORS: Record<string, string>;
 export function oldAnchorRedirects(helpIds: Record<string, string>): string;
 /** A help page's schema.org structured data (breadcrumbs plus a WebSite or Article). */
 export function pageJsonLd(page: { slug: string; title: string; description: string; hasIndex?: string[] }): Record<string, unknown>;
+/** A page's share card file name in help-site/public/cards/. */
+export function cardFile(slug: string): string;
+/** The full URL of a page's share card. */
+export function cardUrl(slug: string): string;
+/** A page's share card alt text. */
+export function cardAlt(title: string): string;

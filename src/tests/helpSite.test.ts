@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
-import { HELP_BASE, OG_IMAGE_ALT, OLD_ANCHORS, helpPageDetail, landingAction, oldAnchorRedirects, pageJsonLd, sharedHead, sidebar, type SidebarEntry } from "../../help-site/site.mjs";
+import { HELP_BASE, OLD_ANCHORS, cardAlt, cardFile, cardUrl, helpPageDetail, landingAction, oldAnchorRedirects, pageJsonLd, sharedHead, sidebar, type SidebarEntry } from "../../help-site/site.mjs";
 import { catalogFor } from "./catalogFixture";
 import { HELP_PAGES_DIR } from "../build/helpMarkdown";
 
@@ -109,23 +109,20 @@ describe("the manual's own words, checked against the engine", () => {
 describe("the shared head tags", () => {
   const viteConfig = readFileSync(resolve(__dirname, "../../vite.config.ts"), "utf8");
 
-  it("use the game's share card alt text", () => {
-    const alt = viteConfig.match(/const OG_IMAGE_ALT =\s*"([^"]+)"/)?.[1];
-    expect(alt).toBeTruthy();
-    expect(OG_IMAGE_ALT).toBe(alt);
-  });
-
   it("carry each tag the game's pages share that Starlight does not write", () => {
-    // The alt text tags name OG_IMAGE_ALT rather than a string, so this
-    // literal match leaves them to the test above.
+    // Each help page names its own card (src/components/Head.astro), so the
+    // game's og:image and twitter:image are the ones left out here; the alt
+    // text tags name OG_IMAGE_ALT rather than a string, so this literal match
+    // never sees them.
     const starlightWrites = ["og:type", "og:site_name", "og:locale", "twitter:card"];
+    const perPage = ["og:image", "twitter:image"];
     const gameTags = [...viteConfig.matchAll(/attrs: \{ (?:name|property): "([^"]+)", content: "([^"]+)" \}/g)]
       .map(([, key, content]) => [key, content])
-      .filter(([key]) => !starlightWrites.includes(key));
+      .filter(([key]) => !starlightWrites.includes(key) && !perPage.includes(key));
     const siteTags = sharedHead
       .filter((t) => t.tag === "meta")
       .map((t) => [t.attrs.name ?? t.attrs.property, t.attrs.content]);
-    expect(gameTags.length).toBeGreaterThan(5);
+    expect(gameTags.length).toBeGreaterThan(3);
     for (const [key, content] of gameTags) {
       expect(siteTags, key).toContainEqual([key, content]);
     }
@@ -145,6 +142,33 @@ describe("search and sharing", () => {
       expect(seen.get(description!), `${file} repeats a description`).toBeUndefined();
       seen.set(description!, file);
     }
+  });
+
+  it("draws a share card for every page, and keeps no card for a page that is gone", () => {
+    // A page's Starlight slug: its path without the extension, a folder's
+    // index page by the folder's name, and "" for the front page. The release
+    // notes are an Astro page of their own (src/pages/changelog.astro).
+    const slugs = [
+      ...pageFiles.map((f) =>
+        f
+          .replace(/\\/g, "/")
+          .replace(/\.mdx?$/, "")
+          .replace(/(^|\/)index$/, ""),
+      ),
+      "changelog",
+    ];
+    const cardsDir = resolve(__dirname, "../../help-site/public/cards");
+    const cards = new Set(readdirSync(cardsDir));
+    for (const slug of slugs) expect(cards.has(cardFile(slug)), `no card for ${slug || "the front page"}: run scripts/gen-help-cards.mjs`).toBe(true);
+    expect([...cards].sort()).toEqual(slugs.map(cardFile).sort());
+  });
+
+  it("names each card by its page's slug, at the site's own address", () => {
+    expect(cardFile("")).toBe("index.png");
+    expect(cardFile("rooms")).toBe("rooms.png");
+    expect(cardFile("rooms/hotels")).toBe("rooms-hotels.png");
+    expect(cardUrl("rooms/hotels")).toBe("https://verticopolis.com/help/cards/rooms-hotels.png");
+    expect(cardAlt("Hotels")).toContain("Hotels");
   });
 
   it("marks the front page as the site and a room page as an article inside Rooms", () => {
