@@ -198,6 +198,10 @@ Check: for 40,122 of the 44,012 non-zero records the (floor, unit id) pair finds
 a unit of the stated type. The 3,890 mismatches are multi-part units: theatre
 screens (34 and 35 against the stated 18), party halls (30 against 29).
 
+Our exporter writes N as the records in use plus at least 256 spare, rounded up
+to a multiple of 256. With no spare, the game crashed when the player built a
+theatre after loading the tower (#2044).
+
 ---
 
 ## 5. Retail table (512 rows of 18)

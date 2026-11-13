@@ -229,7 +229,7 @@ room and checks out at the next morning.
 | 24 | Lobby | `lobby` |
 | 29 / 30 | Party hall top / bottom half | `partyHall` |
 | 31 / 32 / 33 | Metro station top / middle / bottom | `metro` |
-| 34 / 35 | Theatre screen top / bottom [TD] | part of `cinema` |
+| 34 / 35 | Theatre screen top / bottom: the left 7 tiles of each floor, beside the auditorium (18 / 19) | part of `cinema` |
 | 36 to 40 | Cathedral, five stacked parts: 40 is the bottom part on floor 100 and 36 the top part on floor 104 | `weddingHall` |
 | 42 | "Structures" (string table only) [OS] | none |
 | 44 | Parkade ramp [TD] | `parkingRamp` |
@@ -289,8 +289,20 @@ loads the tower (#1932, PC runs headless on 2026-11-12), so after the census
 our exporter writes each hall half's 40 people with the floor, the logical
 unit id, the person number and type 29 (the hall's upper part, which the game
 writes for both halves), the rest 0, and points the half's record at the
-first. Theatres load and play with no people of their own, and our exporter
-gives them none (#2044).
+first. Our exporter writes a theatre the same way the game does (#2044): each
+floor is a 7-tile screen piece (35 below, 34 above) on the left and an
+auditorium piece (19 and 18) beside it. Both pieces carry the film draw and
+name the venue's table row in byte 6, but the table names the screen pieces
+alone, and only a screen piece owns people: 56, type 18, written like a hall's.
+The auditorium's bytes 8 and 9 stay 0. Our import merges the pieces back into
+one theatre.
+
+The pool must keep free records. Our exports before #2044 sized N to the
+records in use, and the game crashed when the player built a theatre in such a
+tower after loading it (PC run headless, 2026-11-13). The game's own saves round
+N up to a multiple of 256 with hundreds spare, so our exporter now rounds the
+records in use plus 256 up to the next multiple of 256 and pads with zero
+records.
 
 The zero-filled records are inert (owner's PC run, 2026-11-04, TOWER4, #920
 claim 7). With our count (4,173) and with 15,000, the game loaded the tower, ran

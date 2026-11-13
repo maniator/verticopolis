@@ -10,7 +10,12 @@ import {
   TDT_FLOOR_INDEX_ENTRIES,
   TDT_FLOOR_OFFSET,
   TDT_HEADER_SIZE,
+  TDT_ELEVATOR_HEADER_SIZE,
+  TDT_ELEVATOR_SLOTS,
   TDT_PERSON_RECORD_SIZE,
+  TDT_RETAIL_RECORD_SIZE,
+  TDT_RETAIL_SLOTS,
+  TDT_STATS_SIZE,
   TDT_TENANT_RECORD_SIZE,
   TDT_ROUTING_TAIL_SIZE,
   TDT_STAMP_GENERATION,
@@ -282,8 +287,10 @@ describeWithCodec("buildTDT: export → import round trip", () => {
     const built = buildTDT(save);
     expect(built.report.comesAlong[0]).toMatch(/^0 rooms/); // no census: see above
     // 4 bytes more than before the 4-byte gap that SimTower leaves between the
-    // parking block and the stairs table (measured on the nine 1997 saves, #1497).
-    expect(built.bytes.length).toBe(71_455);
+    // parking block and the stairs table (measured on the nine 1997 saves, #1497),
+    // and 256 empty people records (4,096 bytes) more since the pool keeps a
+    // spare block for building after loading (#2044).
+    expect(built.bytes.length).toBe(75_551);
   });
 
   // `builtShaftPayloadSize`'s own arithmetic contract is pinned at the UNIT
@@ -1448,6 +1455,28 @@ describeWithCodec("buildTDT: real-game loadability (people, routing tail, schedu
     for (let i = 0; i < 120; i++) o += 6 + u16(b, o) * 18 + 94 * 2;
     return o;
   };
+  // The people pool keeps a spare block so the player can build after loading
+  // (#2044): the census plus at least 256 free records, rounded up to whole
+  // blocks of 256 the way the game's own saves are.
+  const PEOPLE_POOL_BLOCK = 256;
+  const peoplePool = (census: number) => Math.ceil((census + PEOPLE_POOL_BLOCK) / PEOPLE_POOL_BLOCK) * PEOPLE_POOL_BLOCK;
+  // The finance block's population total, for a tower with no built shafts:
+  // past the people, the retail table, the empty elevator slots and the
+  // statistic words, at byte 40 of the block (tdt-byte-map.md section 7).
+  const FINANCE_TOTAL_AT = 40;
+  const financeTotal = (b: Uint8Array): number => {
+    const off = peopleOffset(b);
+    const finance =
+      off + 4 + u32(b, off) * TDT_PERSON_RECORD_SIZE + TDT_RETAIL_SLOTS * TDT_RETAIL_RECORD_SIZE +
+      TDT_ELEVATOR_SLOTS * TDT_ELEVATOR_HEADER_SIZE + TDT_STATS_SIZE;
+    return u32(b, finance + FINANCE_TOTAL_AT);
+  };
+  // The census a tower writes, checked two ways: the finance block counts it
+  // and the people pool is sized from it.
+  const expectCensus = (b: Uint8Array, census: number) => {
+    expect(financeTotal(b)).toBe(census);
+    expect(u32(b, peopleOffset(b))).toBe(peoplePool(census));
+  };
   const shaft = (over: Partial<Transport> = {}): Transport => ({
     id: 10, kind: "elevatorStandard", x: 20, width: 8, bottom: 1, top: 9,
     cars: 1, carPositions: [1], carDir: [0], load: 0, ...over,
@@ -1458,12 +1487,13 @@ describeWithCodec("buildTDT: real-game loadability (people, routing tail, schedu
     towerName: "Load", builtWeddingHall: false, evaluatedTower: false,
   });
 
-  it("an empty tower writes people count 0 (the game loads that fine)", () => {
+  it("an empty tower still writes a spare block of people records to build with", () => {
     const { bytes } = buildTDT(tower([unit({ id: 1, kind: "lobby", floor: 1, x: 0, width: 1 })]));
-    expect(u32(bytes, peopleOffset(bytes))).toBe(0);
+    expectCensus(bytes, 0);
+    expect(u32(bytes, peopleOffset(bytes))).toBe(PEOPLE_POOL_BLOCK);
   });
 
-  it("a populated tower writes a nonzero census with that many zeroed records", () => {
+  it("a populated tower writes its census and a pool of zeroed records sized from it", () => {
     const { bytes } = buildTDT(
       tower([
         unit({ id: 1, kind: "lobby", floor: 1, x: 0, width: 1 }),
@@ -1475,7 +1505,7 @@ describeWithCodec("buildTDT: real-game loadability (people, routing tail, schedu
     );
     const off = peopleOffset(bytes);
     const count = u32(bytes, off);
-    expect(count).toBe(6 + 6 + 3); // vacant office excluded
+    expectCensus(bytes, 6 + 6 + 3); // vacant office excluded
     const records = bytes.subarray(off + 4, off + 4 + count * TDT_PERSON_RECORD_SIZE);
     expect(records).toHaveLength(count * TDT_PERSON_RECORD_SIZE);
     expect(records.every((x) => x === 0)).toBe(true); // records re-simulate; content is zero
@@ -1491,7 +1521,7 @@ describeWithCodec("buildTDT: real-game loadability (people, routing tail, schedu
       ]),
     );
     // shop (20) + fastFood (25) = 45
-    expect(u32(bytes, peopleOffset(bytes))).toBe(20 + 25);
+    expectCensus(bytes, 20 + 25);
   });
 
   it("vacant commercial units contribute 0 to the census (the honest occupied count)", () => {
@@ -1509,7 +1539,7 @@ describeWithCodec("buildTDT: real-game loadability (people, routing tail, schedu
         unit({ id: 3, kind: "restaurant", floor: 3, x: 0, width: 24, state: "empty" }),
       ]),
     );
-    expect(u32(bytes, peopleOffset(bytes))).toBe(0);
+    expectCensus(bytes, 0);
   });
 
   it("mixed tower census sums offices, condos, and present commercial correctly", () => {
@@ -1522,7 +1552,23 @@ describeWithCodec("buildTDT: real-game loadability (people, routing tail, schedu
         unit({ id: 5, kind: "shop", floor: 5, x: 0, width: 12, state: "empty" }), // 0 (vacant)
       ]),
     );
-    expect(u32(bytes, peopleOffset(bytes))).toBe(6 + 25 + 35);
+    expectCensus(bytes, 6 + 25 + 35);
+  });
+
+  it("a census past the spare block's edge grows the pool by a whole block", () => {
+    const offices = (n: number) =>
+      tower([
+        unit({ id: 1, kind: "lobby", floor: 1, x: 0, width: 1 }),
+        ...Array.from({ length: n }, (_, i) =>
+          unit({ id: 2 + i, kind: "office", floor: 2 + i, x: 0, width: 12, state: "occupied" }),
+        ),
+      ]);
+    // 42 offices are 252 people, 4 short of a block: one more spare block.
+    expectCensus(buildTDT(offices(42)).bytes, 252);
+    expect(peoplePool(252)).toBe(2 * PEOPLE_POOL_BLOCK);
+    // 43 are 258, past it: the pool takes a third block.
+    expectCensus(buildTDT(offices(43)).bytes, 258);
+    expect(peoplePool(258)).toBe(3 * PEOPLE_POOL_BLOCK);
   });
 
   it("a forged NaN condo `residents` can't poison the census to 0", () => {
@@ -1535,7 +1581,7 @@ describeWithCodec("buildTDT: real-game loadability (people, routing tail, schedu
     );
     // The office's 6 survives (the NaN addend is skipped, not propagated), and
     // the count stays a finite nonzero -- never NaN -> 0.
-    expect(u32(bytes, peopleOffset(bytes))).toBeGreaterThanOrEqual(6);
+    expect(financeTotal(bytes)).toBeGreaterThanOrEqual(6);
   });
 
   it("emits the 0xff routing tail so the file reaches the length the game reads", () => {

@@ -31,9 +31,12 @@ pub mod stair_scan;
 pub mod stamp;
 pub mod tables;
 pub mod tail;
+#[cfg(test)]
+mod theatre_tests;
 pub mod transports;
 pub mod types;
 pub mod venue_export;
+pub mod venue_people;
 pub mod venues;
 
 /// A `.TDT` file that cannot be read; the message is player-readable.
