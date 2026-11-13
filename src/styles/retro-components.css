@@ -106,6 +106,24 @@ a.btn {
   margin-left: auto;
   flex: none;
 }
+/* .win-closable: the title bar every closable window wears (the Map, the room
+   card, the hover card, the dialogs). The compact bar the Map window
+   introduced: 11 px type, set 2 px inside the window's frame, with a small
+   square ✕ pinned right. Docked panels (the Tools palette, the sidebar) keep
+   the full-size bar above. */
+.win.win-closable > .win-title {
+  margin: calc(2px - var(--pad-y)) calc(2px - var(--pad-x)) var(--title-gap);
+  padding: 1px 2px 1px 6px;
+  font-size: 11px;
+}
+.win.win-closable > .win-title > .btn.xs {
+  width: 20px;
+  min-width: 0;
+  height: 18px;
+  padding: 0;
+  font-size: 11px;
+  line-height: 1;
+}
 /* A window the player can move (src/ui/movableWindow.ts): its title bar
    takes the move cursor, and a press on it moves the window instead of
    selecting the title or scrolling the page. */

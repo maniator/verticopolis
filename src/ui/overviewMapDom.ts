@@ -31,7 +31,7 @@ export interface MapDom {
 export function buildMapDom(doc: Document): MapDom {
   const root = doc.createElement("div");
   root.id = MAP_DOM_ID.window;
-  root.className = "win overview-map";
+  root.className = "win win-closable overview-map";
   root.hidden = true;
   root.setAttribute("role", "region");
   root.setAttribute("aria-labelledby", MAP_DOM_ID.title);

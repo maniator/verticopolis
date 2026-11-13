@@ -65,7 +65,7 @@
      title ever wraps taller than --title-h it overlaps the head cosmetically;
      z-index 1 keeps the head under the title (z-index 2). Clamped to the
      grid's own bounds, it slides away once the grid scrolls past. */
-  top: calc(-1 * var(--pad-y, 18px) + var(--title-h, 21px));
+  top: calc(-1 * var(--pad-y, 18px) + var(--title-h, 20px));
   background: var(--r-face);
   z-index: 1;
 }

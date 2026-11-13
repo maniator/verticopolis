@@ -14,9 +14,8 @@
   display: flex;
   flex-direction: column;
   max-height: calc(100% - 20px);
-  /* The shared window frame (.win in retro-components.css): a full-bleed
-     title bar over a 2 px border, the same bar the facility card and the
-     dialogs wear. */
+  /* A 2 px frame around the compact title bar every closable window wears
+     (.win-closable in retro-components.css). */
   --pad-y: 2px;
   --pad-x: 2px;
   --title-gap: 2px;
@@ -106,7 +105,7 @@
    with a coarse pointer's 28 px dropdown; the overlap checks in
    e2e/overviewMapViews.spec.ts fail if either drifts (#1769). */
 #stage {
-  --overview-map-height: 330px;
+  --overview-map-height: 338px;
 }
 @media (pointer: coarse) {
   #stage {
