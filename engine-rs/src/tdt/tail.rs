@@ -335,16 +335,19 @@ pub fn walk_tolerant_tail(r: &mut ByteReader) -> TdtTail {
         return tail;
     }
     let mut occupied = 0;
-    for _ in 0..TDT_RETAIL_SLOTS {
+    for at in 0..TDT_RETAIL_SLOTS {
         let row: Vec<u8> = (0..TDT_RETAIL_RECORD_SIZE)
             .map(|_| r.u8().expect("retail table sized") as u8)
             .collect();
         if row[0] != 0xff {
             occupied += 1;
             tail.retail.push(TdtRetailRow {
+                row: at,
                 floor: row[0],
                 slot: row[1],
                 served: row[RETAIL_SERVED_BYTE],
+                style: (row[RETAIL_CONSTANT_BYTE] == RETAIL_ROW_CONSTANT)
+                    .then_some(row[RETAIL_STYLE_BYTE]),
             });
         }
     }

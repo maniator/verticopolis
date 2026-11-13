@@ -44,6 +44,12 @@ pub const TDT_RETAIL_RECORD_SIZE: usize = 18;
 /// The retail row byte that holds the visitors the room served yesterday
 /// (#1500): its census.
 pub const RETAIL_SERVED_BYTE: usize = 8;
+/// The retail row byte that holds the room's style (#2044): 0 to 10 for a
+/// shop, 0 to 3 for fast food and restaurants in the game's own saves.
+pub const RETAIL_STYLE_BYTE: usize = 11;
+/// The retail row byte the game sets to [`RETAIL_ROW_CONSTANT`] in every row.
+pub const RETAIL_CONSTANT_BYTE: usize = 13;
+pub const RETAIL_ROW_CONSTANT: u8 = 0xFF;
 pub const TDT_ELEVATOR_SLOTS: usize = 24;
 pub const TDT_ELEVATOR_HEADER_SIZE: usize = 194;
 /// Built shafts append a fixed block measured at 3140 bytes against real

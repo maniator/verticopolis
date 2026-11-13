@@ -281,7 +281,7 @@ pub fn gather_units<U: Borrow<Value>>(
                             type_id: if construction { -part } else { part },
                             status: 0,
                             rent_class,
-                            subtype_idx: None,
+                            retail_row: None,
                             draw: 0,
                             venue: None,
                         },
@@ -298,7 +298,7 @@ pub fn gather_units<U: Borrow<Value>>(
                             type_id: if construction { -part } else { part },
                             status: 0,
                             rent_class,
-                            subtype_idx: None,
+                            retail_row: None,
                             draw: exported_film_draw(u),
                             venue: venue_half(u, idx, i == 1, construction),
                         },
@@ -320,6 +320,9 @@ pub fn gather_units<U: Borrow<Value>>(
                 .unwrap_or(-1),
             _ => -1,
         };
+        let retail = matches!(u.kind, Kind::Shop | Kind::FastFood | Kind::Restaurant);
+        let retail_row =
+            (retail && retail_rows.len() < TDT_RETAIL_SLOTS).then_some(retail_rows.len() as i64);
         push_tenant(
             &mut tenants_by_tdt,
             u.floor,
@@ -329,17 +332,15 @@ pub fn gather_units<U: Borrow<Value>>(
                 type_id: if construction { -id } else { id },
                 status,
                 rent_class,
-                subtype_idx: if sub_idx >= 0 { Some(sub_idx) } else { None },
+                retail_row,
                 draw: 0,
                 venue: None,
             },
         );
-        if matches!(u.kind, Kind::Shop | Kind::FastFood | Kind::Restaurant) {
-            if retail_rows.len() < TDT_RETAIL_SLOTS {
-                retail_rows.push((u.floor + TDT_FLOOR_OFFSET as f64, sub_idx.max(0)));
-            } else {
-                counts.retail_rows_dropped += 1;
-            }
+        if retail_row.is_some() {
+            retail_rows.push((u.floor + TDT_FLOOR_OFFSET as f64, sub_idx.max(0)));
+        } else if retail {
+            counts.retail_rows_dropped += 1;
         }
         counts.rooms += 1;
     }
@@ -400,7 +401,7 @@ pub fn gather_units<U: Borrow<Value>>(
                     },
                     status: if lobby { 0 } else { 2 },
                     rent_class: 4,
-                    subtype_idx: None,
+                    retail_row: None,
                     draw: 0,
                     venue: None,
                 },
@@ -433,8 +434,9 @@ pub fn gather_units<U: Borrow<Value>>(
 #[cfg(test)]
 mod tests;
 
-/// The venue table's half for a finished hall, or a finished theatre whose
-/// film has an age (#1932); `None` for every other record.
+/// The venue table's half for a finished hall or theatre (#1932), a theatre
+/// with no film age counting as a film on its first day; `None` for every
+/// other record.
 fn venue_half(
     u: &GatheredRoom,
     room: usize,
@@ -442,7 +444,8 @@ fn venue_half(
     construction: bool,
 ) -> Option<OutVenueHalf> {
     let film_days = match u.kind {
-        Kind::Cinema => Some(u.film_days?),
+        // A theater built today has shown its film no mornings yet.
+        Kind::Cinema => Some(u.film_days.unwrap_or(0)),
         Kind::PartyHall => None,
         _ => return None,
     };

@@ -83,7 +83,8 @@ pub struct GatheredTower {
     pub tenants_by_tdt: IndexMap<FloorKey, Vec<OutTenant>>,
     /// Built extent [left, right) per our floor.
     pub extents: IndexMap<FloorKey, (f64, f64)>,
-    /// Retail-table rows (TDT-space floor, canon variant), bounded at 512.
+    /// Retail-table rows (TDT-space floor, style), bounded at 512, in the
+    /// order their tenants' `retail_row` names them.
     pub retail_rows: Vec<(f64, i64)>,
     pub counts: ExportCounts,
     pub header: ExportHeaderCounts,

@@ -69,3 +69,21 @@ fn a_theatre_survives_a_trip_through_export_and_import() {
     );
     assert_eq!(t["filmDays"], json!(3), "the table still finds the theatre");
 }
+
+/// A theatre built today has no film age yet; it still takes its row in the
+/// table, on its film's first day, so its screen pieces get their people
+/// like any other theatre's.
+#[test]
+fn a_theatre_with_no_film_age_still_takes_a_table_row() {
+    let mut save = theatre_save();
+    save["units"][0].as_object_mut().unwrap().remove("filmDays");
+    let built = build_tdt(&save).expect("exports");
+    let tower = parse_tdt_binary(&built.bytes).expect("reads");
+    let venues: Vec<(i64, u8)> = tower
+        .tail
+        .venues
+        .iter()
+        .map(|v| (v.lower_floor - TDT_FLOOR_OFFSET, v.days_shown))
+        .collect();
+    assert_eq!(venues, [(THEATRE_FLOOR, 0)]);
+}

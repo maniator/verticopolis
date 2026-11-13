@@ -314,19 +314,37 @@ tower in four tries.
 
 The retail table is 512 slots of 18 bytes
 ([byte map section 5](./tdt-byte-map.md#5-retail-table-512-rows-of-18)). The
-importer reads three bytes of each filled row: the floor, the logical unit id
-(mapped to a room through the floor's remap) and byte 8, the visitors the room
-served yesterday, which seeds its census (section 17).
+importer reads four bytes of each filled row: the floor, the logical unit id
+(mapped to a room through the floor's remap), byte 8, the visitors the room
+served yesterday, which seeds its census (section 17), and byte 11, the room's
+style.
 
-The variant a room renders with is byte 6 of its unit record:
+The game links a room and its row both ways (#2044): byte 6 of the room's unit
+record is the index of its row, and the row names the room back by floor and
+logical unit id. This holds for every shop, fast food and restaurant in the
+seven observation saves (`conformance/fixtures/tdt-observed/`), and byte 13 of
+every row is 255. Byte 11 of the row is the style: 0 to 10 for shops and 0 to 3
+for fast food and restaurants in those saves, and reading it spreads TOWER7's
+shops over all 11 styles where reading byte 6 as the style made 54 of them Men's
+Clothing. Our exporter writes rooms and rows the same way. Our exports before
+#2044 kept the style in byte 6 and wrote rows with unit 0 and no 255, so the
+importer reads byte 6 as the style when the row it names lacks the 255 or names
+another room.
+
+The styles, in order:
 
 - Restaurants (6): English Pub, French, Chinese, Sushi Bar, Steak House.
 - Fast food (12): Japanese Soba, Chinese Cafe, Hamburger Stand, Ice Cream, Coffee Shop.
 - Shops (10): Men's Clothing, Pet Store, Flower Shop, Book Store, Drug Store,
   Boutique, Electronics, Bank, Hair Salon, Post Office, Sports Gear.
 
-Verified in a Wine render: a fast-food unit with byte 6 = 3 shows an Ice Cream
-stand.
+A headless run on 2026-11-13 settled where the game reads the style (#2044):
+in one of our exports, a Hamburger Stand (byte 11 = 2) and a Sushi Bar
+(byte 11 = 3) whose byte 6 held rows 5 and 6, both past their style lists,
+drew as a burger stand and a Japanese restaurant. An earlier Wine render that
+showed a fast-food unit with byte 6 = 3 as an Ice Cream stand came from a file
+whose rows did not name their rooms. Shops in a tower with no population draw
+shuttered ("For RENT"), so their styles show only once they lease.
 
 ## 9. Elevators
 

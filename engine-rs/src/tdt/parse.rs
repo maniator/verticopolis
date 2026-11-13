@@ -10,6 +10,7 @@ use super::import::{hash_seed, tower_name_from_filename};
 use super::import_report::{DecodeStats, ImportCounts};
 use super::pacing::minute_of_day_for_frame;
 use super::part_merge::{merge_parts, PartRecord};
+use super::retail::retail_subtype;
 use super::tables::*;
 use super::transports::{transports_from_decoded, BuiltExtents, OutTransport};
 use super::types::{TdtTenant, TdtTower};
@@ -159,7 +160,7 @@ pub fn parse_tdt(bytes: &[u8], filename: &str) -> Result<ParsedLegacyTower, Lega
             continue;
         }
         pave_range(&mut paved, ours, fl.left_edge, fl.right_edge);
-        for t in &fl.tenants {
+        for (at, t) in fl.tenants.iter().enumerate() {
             let under_construction = t.type_id < 0;
             let type_id = t.type_id.abs();
             if type_id == TDT_FLOOR || type_id == TDT_LOBBY {
@@ -260,19 +261,7 @@ pub fn parse_tdt(bytes: &[u8], filename: &str) -> Result<ParsedLegacyTower, Lega
                 counts.rents_applied += 1;
             }
             let no_rate = t.rent_rate == 4 && is_priced(kind);
-            let subtype = match kind {
-                // A byte past the style list (real 1997 saves keep a venue
-                // counter there) takes the first style, which is what the
-                // exporter writes for a venue with none, so a file imports
-                // the same before and after one trip through export.
-                Kind::Shop | Kind::FastFood | Kind::Restaurant => {
-                    kind.subtype_list().and_then(|list| {
-                        let styled = usize::try_from(t.variant).ok().and_then(|i| list.get(i));
-                        styled.or_else(|| list.first()).copied()
-                    })
-                }
-                _ => None,
-            };
+            let subtype = retail_subtype(&tdt, fl, at, t, kind);
             let unit = OutUnit {
                 id: next_id,
                 kind,

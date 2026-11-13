@@ -12,6 +12,7 @@ use super::export_parking::connected_stall_count;
 use super::export_tables::OutTenant;
 use super::format::*;
 use super::pacing::frame_for_minute_of_day;
+use super::retail::write_retail_table;
 use super::stamp::write_format_stamp;
 use super::tables::elevator_type;
 use super::venue_export::{index_map, logical_ids, middle_bytes, write_venue_tail, PlacedHalf};
@@ -164,6 +165,7 @@ pub fn encode_tower(
 
     let empty: Vec<OutTenant> = vec![];
     let mut venue_halves: Vec<PlacedHalf> = vec![];
+    let mut retail_ids = vec![0; retail_rows.len()];
     for index in 0..TDT_FLOOR_COUNT {
         let ours = index - TDT_FLOOR_OFFSET;
         let tenants = tenants_by_tdt
@@ -187,6 +189,9 @@ pub fn encode_tower(
         });
         let ids = logical_ids(&ordered.iter().map(|t| t.type_id).collect::<Vec<_>>());
         for (t, &id) in ordered.into_iter().zip(&ids) {
+            if let (Some(row), Some(id)) = (t.retail_row, id) {
+                retail_ids[row as usize] = id;
+            }
             if let (Some(half), Some(id)) = (t.venue, id) {
                 venue_halves.push(PlacedHalf::new(half, index as usize, id, w.len()));
             }
@@ -195,7 +200,7 @@ pub fn encode_tower(
             w.u16(to_int32(left.max(clamp_tile(Some(t.right)))));
             w.u8(t.type_id);
             w.u8(t.status);
-            w.u8(t.subtype_idx.unwrap_or(0));
+            w.u8(t.retail_row.unwrap_or(0));
             w.bytes(&middle_bytes(id));
             w.u8(t.draw);
             w.u8(t.rent_class);
@@ -212,20 +217,7 @@ pub fn encode_tower(
     let census = js_max(0.0, js_min(finite_pop, TDT_MAX_CENSUS)) as usize;
     write_people(&mut w, census, &venue_halves);
 
-    for slot in 0..TDT_RETAIL_SLOTS {
-        match retail_rows.get(slot) {
-            None => {
-                w.u8(0xff);
-                w.pad(TDT_RETAIL_RECORD_SIZE - 1);
-            }
-            Some(&(floor, variant)) => {
-                w.u8(to_int32(floor));
-                w.u8(0);
-                w.u8(variant);
-                w.pad(TDT_RETAIL_RECORD_SIZE - 3);
-            }
-        }
-    }
+    write_retail_table(&mut w, retail_rows, &retail_ids);
 
     // Transports, sanitized into elevators and walkways.
     let Some(raw_transports) = save.get("transports").and_then(Value::as_array) else {
