@@ -264,6 +264,12 @@ The original game's `.TDT` files are read and written by the engine's codec.
 Per-device preferences (`Prefs`) live in their own key, deliberately **off** the
 save. The undo history is cleared when a different tower is adopted.
 
+A save holds the simulation only. The Excalibur scene is derived view state:
+it is rebuilt from the engine after a load and is never saved. Saves are
+untrusted input, so the loader also skips units of a kind the catalog does not
+know and clamps car counts and shaft spans, and a hand-edited, corrupt or
+foreign file loads what it can instead of crashing the game.
+
 ```mermaid
 flowchart TD
     Sim["Rust engine"] -->|save text| SG["SaveGame<br/>fflate compression"]
@@ -276,6 +282,22 @@ flowchart TD
 
     Prefs["Prefs"] --> PLS["localStorage:<br/>separate key, off the save"]
 ```
+
+## The installable app (PWA)
+
+The production build is an installable Progressive Web App built on
+[`vite-plugin-pwa`](https://vite-pwa-org.netlify.app/) (Workbox underneath),
+with no hand-rolled service worker. `src/pwa.ts` is the only place the worker
+registers, and only the game entry imports it, so the gallery and preview
+tooling pages stay outside its scope and its precache. The Help site under
+`/help/` is never precached either (the `globIgnores` and
+`navigateFallbackDenylist` entries in `vite.config.ts`).
+
+The worker runs in `prompt` mode: a new build waits instead of taking over the
+tab, and the game asks the player whether to update now (it saves, then
+reloads onto the new assets) or later (the new version applies on the next
+cold start). The icons in `src/public/` come from an in-code SVG, like every
+other sprite; `npm run icons` regenerates them.
 
 ## The engine build
 
