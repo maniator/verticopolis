@@ -112,8 +112,9 @@ export interface StepClock {
   minutes: number;
   /** Real milliseconds since that step. */
   sinceMs: number;
-  /** How long a step lasts: the last gap seen, so a change of pace (the
-   *  lunch slowdown, a new speed) costs one uneven step at most. */
+  /** How long a step lasts: the recent gaps averaged, so steps that land
+   *  every one or two frames still glide at one speed; a change of pace (the
+   *  lunch slowdown, a new speed) jumps straight to the new gap. */
   intervalMs: number;
   /** Real milliseconds drawn, for the walk and work beats. */
   clockMs: number;
@@ -138,14 +139,36 @@ export function newStepClock(minutes: number): StepClock {
  *  0, so a figure freezes mid-glide and the pause never counts as a step. */
 export function tickStepClock(c: StepClock, minutes: number, elapsedMs: number): void {
   c.clockMs += elapsedMs;
-  c.sinceMs += elapsedMs;
   c.stepped = minutes !== c.minutes;
-  if (!c.stepped) return;
+  if (!c.stepped) {
+    c.sinceMs += elapsedMs;
+    return;
+  }
+  // The gap runs from the last step's frame to the frame before this one,
+  // and this frame already counts toward the new step: the frame a step lands
+  // on draws one frame of its travel, so a glide never holds still for a
+  // frame at each step (the 3.7.0 elevator jitter).
   const gap = Math.min(MAX_STEP_MS, Math.max(MIN_STEP_MS, c.sinceMs));
-  c.intervalMs = gap;
+  // The clock starts with no step behind it, so its first two gaps are taken
+  // as they are rather than averaged against the starting guess.
+  c.intervalMs = c.steps < 2 ? gap : smoothedInterval(c.intervalMs, gap);
   c.minutes = minutes;
   c.steps++;
-  c.sinceMs = 0;
+  c.sinceMs = elapsedMs;
+}
+
+/** A gap more than this many times longer or shorter than the running
+ *  interval is a change of pace, taken at once instead of averaged in. */
+export const PACE_CHANGE = 2.5;
+/** How much of each new gap the running interval takes in. */
+export const GAP_WEIGHT = 0.25;
+
+/** The step interval after one more gap: an average over recent gaps, so a
+ *  speed whose steps land every one or two frames still glides evenly, or
+ *  the new gap outright when the pace has changed. */
+export function smoothedInterval(intervalMs: number, gapMs: number): number {
+  if (gapMs > intervalMs * PACE_CHANGE || gapMs * PACE_CHANGE < intervalMs) return gapMs;
+  return intervalMs + (gapMs - intervalMs) * GAP_WEIGHT;
 }
 
 /** How far through the current step the drawing is, 0 to 1. */
