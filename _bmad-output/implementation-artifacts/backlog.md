@@ -54,22 +54,23 @@ How items flow:
    priority, edit the row. An issue no row cites (a community report) arrives
    with `needs-triage` from its template, and triage swaps that for a P label.
    An issue the Rust-only engine changes majorly (a TypeScript-engine rule, the
-   TypeScript codecs, the crate survey, the 4.0 roadmap) belongs to the `3.x`
+   TypeScript codecs, the crate survey, the 4.0 roadmap) belongs to the `4.0.0`
    milestone, and its row Notes lead with **Post-3.0** and the reason (the
    `post-3.0` label was retired on 2026-10-29 in favor of milestones); the P
-   label still orders it among the 3.x work. A bug that only affects the
+   label still orders it among the 4.0.0 work. A bug that only affects the
    TypeScript fallback also carries the `closes with TS removal` label.
-   Every issue, open or closed, has a milestone: `3.0.0` (open work carries a
-   `gate-1` or `gate-3` label from the 3.0 priorities plan, and the `gate-2`
-   label was retired on 2026-11-03), `3.x`,
-   `Triage` (new or undecided, each gets a decision), `4.x` (the Tall lot, the wide
-   lot, audio driven by engine events and a small web legibility track; the
-   Visual Renaissance's renderer swap and art overhaul were cut on 2026-11-12), `5.x` (deeper
-   simulation: economy, transport, tenants and 1994 parity), `Backlog`
-   (deliberately parked enhancements with no target version), or `1.x` and
-   `2.x` for closed work by release line. A bug is never in `Backlog`, and a
-   closed issue never stays there. Render bugs no longer wait for a renderer
-   rewrite: every bug goes to `3.0.0`, `3.x` or `Triage`.
+   Every issue, open or closed, has a milestone: `4.0.0` (the current release
+   line: every 3.y release up to 4.0.0, and any work already in progress),
+   `Triage` (new or undecided, each gets a decision and leaves), `5.0.0` (the
+   Tall lot, the wide lot, audio driven by engine events and a small web
+   legibility track; the Visual Renaissance's renderer swap and art overhaul
+   were cut on 2026-11-12), `6.0.0` (deeper simulation: economy, transport,
+   tenants and 1994 parity), `Backlog` (deliberately parked enhancements with
+   no target version), or `1.x`, `2.x` and `3.0.0` for closed work by release
+   line. The milestones were renamed on 2026-11-11 (`3.x` became `4.0.0`,
+   `4.x` became `5.0.0`, `5.x` became `6.0.0`). A bug is never in `Backlog`,
+   and a closed issue never stays there. Render bugs no longer wait for a
+   renderer rewrite: every bug goes to `4.0.0` or `Triage`.
    Whoever files an issue sets its milestone; one filed without a milestone
    lands in `Triage` through `.github/workflows/issue-milestone.yml`, and an issue
    closed while still in `Triage` or `Backlog` takes the milestone of the merged pull request that
