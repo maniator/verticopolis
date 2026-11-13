@@ -26,30 +26,43 @@ pub(crate) const MID_FLOOR_GAP: &str =
 /// Classic would leave a gap in its middle, or widen one a loaded save
 /// already has. `tile_at` answers the kind of the floor or lobby tile at a
 /// tile of that story, if one stands there. The bulldozer
-/// (`Tower::removal_reason`) and the undo's sale advice
-/// (`Ground::sells_from_an_end`) both ask it, so they agree.
-///
-/// A side has floor when plain floor stands anywhere on it, or when the
-/// tiles touching the span on that side, unbroken by a gap, hold a lobby
-/// tile (owner ruling, 2026-11-13, on #2062). Lobby tiles are never removed,
-/// so counting one beyond a gap would trap the plain floor between it and
-/// the far end for good; a lobby the span touches still counts, so a floor
-/// tile right beside a lobby is not an end. Plain floor anywhere counts, so
-/// the tiles beside a gap a saved tower has are not ends and the gap is not
-/// cut wider one tile at a time. A plain tile in the touching run counts on
-/// its own, so the touching run counts exactly when the tile right beside
-/// the span holds floor or lobby.
+/// (`Tower::removal_reason`) asks it, and the undo's sale advice
+/// (`Ground::sells_from_an_end`) asks its two sides, so they agree.
 pub(crate) fn span_has_floor_on_both_sides(
     x: i64,
     w: i64,
     tile_at: impl Fn(i64) -> Option<Kind>,
 ) -> bool {
-    let on_lot = |tx: i64| (0..LOT_WIDTH).contains(&tx);
-    let touches_floor_or_lobby = |beside: i64| on_lot(beside) && tile_at(beside).is_some();
-    let plain_floor_on =
-        |side: std::ops::Range<i64>| side.into_iter().any(|tx| tile_at(tx) == Some(Kind::Floor));
-    let side_has_floor = |beside: i64, side| touches_floor_or_lobby(beside) || plain_floor_on(side);
-    side_has_floor(x - 1, 0..x) && side_has_floor(x + w, x + w..LOT_WIDTH)
+    floor_left_of(x, &tile_at) && floor_right_of(x + w, &tile_at)
+}
+
+/// Whether the story has floor on the left of the tile at `x`, by Classic's
+/// floor end rule: plain floor stands anywhere left of it, or the tiles
+/// touching it on the left, unbroken by a gap, hold a lobby tile (owner
+/// ruling, 2026-11-13, on #2062). Lobby tiles are never removed, so counting
+/// one beyond a gap would trap the plain floor between it and the far end
+/// for good; a lobby the tile touches still counts, so a floor tile right
+/// beside a lobby is not an end. Plain floor anywhere counts, so the tiles
+/// beside a gap a saved tower has are not ends and the gap is not cut wider
+/// one tile at a time. A plain tile in the touching run counts on its own,
+/// so the touching run counts exactly when the tile right beside holds floor
+/// or lobby.
+pub(crate) fn floor_left_of(x: i64, tile_at: impl Fn(i64) -> Option<Kind>) -> bool {
+    touches_floor_or_lobby(x - 1, &tile_at) || plain_floor_on(0..x, &tile_at)
+}
+
+/// Whether the story has floor on the right of the tiles that end before
+/// `end`, by the rule of [`floor_left_of`].
+pub(crate) fn floor_right_of(end: i64, tile_at: impl Fn(i64) -> Option<Kind>) -> bool {
+    touches_floor_or_lobby(end, &tile_at) || plain_floor_on(end..LOT_WIDTH, &tile_at)
+}
+
+fn touches_floor_or_lobby(beside: i64, tile_at: impl Fn(i64) -> Option<Kind>) -> bool {
+    (0..LOT_WIDTH).contains(&beside) && tile_at(beside).is_some()
+}
+
+fn plain_floor_on(side: std::ops::Range<i64>, tile_at: impl Fn(i64) -> Option<Kind>) -> bool {
+    side.into_iter().any(|tx| tile_at(tx) == Some(Kind::Floor))
 }
 
 pub struct Tower {
