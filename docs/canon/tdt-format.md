@@ -295,7 +295,11 @@ auditorium piece (19 and 18) beside it. Both pieces carry the film draw and
 name the venue's table row in byte 6, but the table names the screen pieces
 alone, and only a screen piece owns people: 56, type 18, written like a hall's.
 The auditorium's bytes 8 and 9 stay 0. Our import merges the pieces back into
-one theatre.
+one theatre, joining a screen piece only to the auditorium whose left edge
+meets the screen's right edge. Two theaters built flush side by side then stay
+two: the first one's auditorium ends where the second one's screen starts, and
+a screen never joins the auditorium on its left. All 48 screen pieces in the
+nine real saves sit on the left of their auditorium.
 
 The pool must keep free records. Our exports before #2044 sized N to the
 records in use, and the game crashed when the player built a theatre in such a

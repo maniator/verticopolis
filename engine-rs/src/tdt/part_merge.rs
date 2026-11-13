@@ -39,14 +39,26 @@ fn find(parent: &mut [usize], mut i: usize) -> usize {
     i
 }
 
+/// True when `screen` is a theater's screen piece and `auditorium` is the
+/// auditorium piece on its right on the same floor: the screen's right edge
+/// meets the auditorium's left edge. The original writes every theater floor
+/// this way (all 48 screen pieces of the 24 theaters in the nine real
+/// saves), and so does our exporter. A screen whose left edge touches an
+/// auditorium belongs to the next theater over, so flush neighbors stay
+/// apart.
+fn screen_beside_auditorium(screen: &PartRecord, auditorium: &PartRecord) -> bool {
+    is_screen_part(screen.type_id)
+        && !is_screen_part(auditorium.type_id)
+        && screen.floor == auditorium.floor
+        && screen.right == auditorium.left
+}
+
 /// True when two parts can belong to the same building.
 fn same_building(kind: Kind, stories: i64, a: &PartRecord, b: &PartRecord) -> bool {
     let overlaps = a.left < b.right && b.left < a.right;
     let within_stories = (a.floor - b.floor).abs() < stories;
-    let screen_touch = kind == Kind::Cinema
-        && a.floor == b.floor
-        && (a.right == b.left || b.right == a.left)
-        && is_screen_part(a.type_id) != is_screen_part(b.type_id);
+    let screen_touch =
+        kind == Kind::Cinema && (screen_beside_auditorium(a, b) || screen_beside_auditorium(b, a));
     (overlaps && within_stories) || screen_touch
 }
 
@@ -154,13 +166,16 @@ mod tests {
         assert_eq!(got, vec![(92, -1), (107, -3), (112, -1)]);
     }
 
+    /// The original writes each theater floor as a 7-tile screen piece with
+    /// its auditorium on the right, as every theater in the nine real saves
+    /// has it.
     #[test]
     fn a_theatre_merges_its_screen_halves() {
         let parts = vec![
-            part(Kind::Cinema, 19, 11, 100, 127),
-            part(Kind::Cinema, 35, 11, 127, 131),
-            part(Kind::Cinema, 18, 12, 100, 127),
-            part(Kind::Cinema, 34, 12, 127, 131),
+            part(Kind::Cinema, 35, 11, 100, 107),
+            part(Kind::Cinema, 19, 11, 107, 131),
+            part(Kind::Cinema, 34, 12, 100, 107),
+            part(Kind::Cinema, 18, 12, 107, 131),
         ];
         let got = merge_parts(&parts);
         assert_eq!(got.len(), 1);
@@ -168,5 +183,43 @@ mod tests {
             (got[0].floor, got[0].top_floor, got[0].left, got[0].right),
             (11, 12, 100, 131)
         );
+    }
+
+    /// A screen piece whose left edge touches an auditorium belongs to the
+    /// next theater over, so it stays apart from that auditorium.
+    #[test]
+    fn a_screen_touching_an_auditorium_on_its_left_stays_separate() {
+        let parts = vec![
+            part(Kind::Cinema, 19, 11, 100, 124),
+            part(Kind::Cinema, 35, 11, 124, 131),
+        ];
+        let mut got: Vec<(i64, i64)> = merge_parts(&parts)
+            .iter()
+            .map(|m| (m.left, m.right))
+            .collect();
+        got.sort();
+        assert_eq!(got, vec![(100, 124), (124, 131)]);
+    }
+
+    /// Two theaters flush side by side: the first one's auditorium ends
+    /// where the second one's screen starts, and they stay two theaters.
+    #[test]
+    fn flush_theaters_stay_two() {
+        let parts = vec![
+            part(Kind::Cinema, 35, 11, 100, 107),
+            part(Kind::Cinema, 19, 11, 107, 131),
+            part(Kind::Cinema, 35, 11, 131, 138),
+            part(Kind::Cinema, 19, 11, 138, 162),
+            part(Kind::Cinema, 34, 12, 100, 107),
+            part(Kind::Cinema, 18, 12, 107, 131),
+            part(Kind::Cinema, 34, 12, 131, 138),
+            part(Kind::Cinema, 18, 12, 138, 162),
+        ];
+        let mut got: Vec<(i64, i64, i64, i64)> = merge_parts(&parts)
+            .iter()
+            .map(|m| (m.floor, m.top_floor, m.left, m.right))
+            .collect();
+        got.sort();
+        assert_eq!(got, vec![(11, 12, 100, 131), (11, 12, 131, 162)]);
     }
 }
