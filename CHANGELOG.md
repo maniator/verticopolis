@@ -25,6 +25,10 @@ prompt already tells players it is an engine update and shows the new version.
 Entries below 1.51.1 were curated from the commit history after the fact, so they
 are documentation only: no build that a client fetches carries them.
 
+## 3.7.1
+
+- Elevator cars and people move smoothly again at every speed, instead of shaking as they did in 3.7.0.
+
 ## 3.7.0
 
 - The title screen has a Sponsor link in its top-left corner, and the help site has a new Supporting Verticopolis section. The game stays free, with nothing locked.
