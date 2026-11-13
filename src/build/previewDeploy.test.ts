@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { isPreviewDeploy, RETIRING_SERVICE_WORKER } from "./previewDeploy";
+import { applyPreviewWorker, isPreviewDeploy, PRECACHE_CALL, productionWorkerProblem, RETIRING_SERVICE_WORKER, RETIRING_WORKER_MARKER } from "./previewDeploy";
 
 describe("isPreviewDeploy", () => {
   it("is true only for a Vercel preview build", () => {
@@ -97,5 +97,59 @@ describe("RETIRING_SERVICE_WORKER", () => {
     expect(self.caches.delete).not.toHaveBeenCalled();
     expect(self.registration.unregister).toHaveBeenCalledTimes(1);
     expect(navigate).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("applyPreviewWorker (scripts/preview-service-worker.ts)", () => {
+  const SW = "/build/dist/sw.js";
+  const files = (exists: boolean) => ({ exists: vi.fn(() => exists), write: vi.fn() });
+
+  it("replaces the built worker with the retiring one on a preview", () => {
+    const io = files(true);
+    expect(applyPreviewWorker({ VERCEL_ENV: "preview" }, SW, io)).toEqual({ code: 0, message: expect.stringContaining("now unregisters itself") });
+    expect(io.exists).toHaveBeenCalledWith(SW);
+    expect(io.write).toHaveBeenCalledExactlyOnceWith(SW, RETIRING_SERVICE_WORKER);
+  });
+
+  it("leaves the production worker alone in production and outside Vercel, without looking at the file", () => {
+    for (const env of [{ VERCEL_ENV: "production" }, {}]) {
+      const io = files(true);
+      expect(applyPreviewWorker(env, SW, io)).toEqual({ code: 0, message: expect.stringContaining("stays the production worker") });
+      expect(io.exists).not.toHaveBeenCalled();
+      expect(io.write).not.toHaveBeenCalled();
+    }
+  });
+
+  it("fails on a preview whose build wrote no worker, and writes nothing", () => {
+    const io = files(false);
+    expect(applyPreviewWorker({ VERCEL_ENV: "preview" }, SW, io)).toEqual({ code: 1, message: `preview-service-worker: ${SW} does not exist; did the build output move?` });
+    expect(io.write).not.toHaveBeenCalled();
+  });
+});
+
+describe("productionWorkerProblem (scripts/check-production-worker.ts)", () => {
+  /** The shape of Workbox's generated worker, trimmed to the parts the check reads. */
+  const PRECACHING_WORKER = `importScripts("sw-navigation-fallback.js");self.skipWaiting();e.precacheAndRoute([{url:"index.html",revision:"abc"}],{});`;
+
+  it("passes the precaching worker", () => {
+    expect(PRECACHING_WORKER).toContain(PRECACHE_CALL);
+    expect(productionWorkerProblem(PRECACHING_WORKER)).toBeNull();
+  });
+
+  it("fails the preview's retiring worker", () => {
+    expect(RETIRING_SERVICE_WORKER).toContain(RETIRING_WORKER_MARKER);
+    expect(productionWorkerProblem(RETIRING_SERVICE_WORKER)).toMatch(/retiring worker/);
+  });
+
+  it("fails a worker that carries the retiring marker even beside a precache call", () => {
+    expect(productionWorkerProblem(`${RETIRING_SERVICE_WORKER}\n${PRECACHING_WORKER}`)).toMatch(/retiring worker/);
+  });
+
+  it("fails a missing, empty or non-precaching worker", () => {
+    expect(productionWorkerProblem(null)).toMatch(/missing/);
+    expect(productionWorkerProblem("")).toMatch(/no Workbox precacheAndRoute/);
+    expect(productionWorkerProblem("self.addEventListener('fetch', () => {});")).toMatch(/no Workbox precacheAndRoute/);
+    // The bare name without the call is not enough.
+    expect(productionWorkerProblem("// precacheAndRoute is gone")).toMatch(/no Workbox precacheAndRoute/);
   });
 });
