@@ -327,7 +327,8 @@ pub fn parse_tdt_binary(bytes: &[u8]) -> Result<TdtTower, LegacyImportError> {
             let status_at = r.offset();
             let status = r.u8()?;
             let variant = r.u8()?;
-            r.skip(8)?;
+            let row_high = r.u8()?;
+            r.skip(7)?;
             let draw = r.u8()?;
             let rent_rate = r.u8()?;
             let subtype = r.u8()?;
@@ -338,6 +339,7 @@ pub fn parse_tdt_binary(bytes: &[u8]) -> Result<TdtTower, LegacyImportError> {
                 status,
                 status_at,
                 variant,
+                row_high,
                 draw,
                 rent_rate,
                 subtype,

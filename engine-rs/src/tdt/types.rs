@@ -16,8 +16,12 @@ pub struct TdtTenant {
     pub status: i64,
     /// Where that status byte sits in the file.
     pub status_at: usize,
-    /// Retail variant ordinal at offset 6.
+    /// Byte 6: a shop, fast food or restaurant's row in the retail table
+    /// (its low byte), a party hall or theatre's row in their table.
     pub variant: i64,
+    /// Byte 7: the high byte of a retail room's row, for a tower with more
+    /// than 256 retail rooms; 0 in every save the game wrote that we hold.
+    pub row_high: i64,
     /// Byte 15: a theatre's film draw (2 for a new film, then 1 and 0 as it
     /// ages); other kinds carry their own values here.
     pub draw: i64,
