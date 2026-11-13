@@ -149,7 +149,7 @@ impl Simulation {
     /// writer expects. Each key appears once.
     fn save_fields(&self) -> Vec<(&'static str, Field<'_>)> {
         let mut m: Vec<(&'static str, Field<'_>)> = Vec::with_capacity(31);
-        let tall_lobbies = self.tower.tall_lobbies();
+        let tall_lobbies = self.tower.tall_lobby_runs();
         m.push(own(
             "version",
             json!(save_version(!tall_lobbies.is_empty())),
@@ -178,7 +178,7 @@ impl Simulation {
             m.push(own("builtWeddingHall", json!(b)));
         }
         if !tall_lobbies.is_empty() {
-            m.push(own("lobbyHeights", json!(tall_lobbies)));
+            m.push(own("lobbyHeights", json!(&*tall_lobbies)));
         }
         if let Some(b) = self.evaluated_tower {
             m.push(own("evaluatedTower", json!(b)));

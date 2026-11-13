@@ -50,7 +50,7 @@ pub struct MoveIns {
 /// holds a tall lobby, which a build from before tall lobbies refuses rather
 /// than drop, and [`PLAIN_SAVE_VERSION`] otherwise, which every build from
 /// version 7 on still loads.
-pub const SAVE_VERSION: i64 = 8;
+pub const SAVE_VERSION: i64 = 9;
 /// The version a save with no tall lobby is written at: the format before
 /// `lobbyHeights`, which it does not need.
 pub const PLAIN_SAVE_VERSION: i64 = 7;

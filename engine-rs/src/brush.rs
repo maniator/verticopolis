@@ -28,12 +28,13 @@ impl BrushResult {
 }
 
 impl Simulation {
-    /// How many stories a structural tile of `kind` laid on `floor` covers:
-    /// a lobby's height on that floor ([`Self::with_lobby_height`]), 1 for a
-    /// floor tile.
-    pub(crate) fn tile_stories(&self, kind: Kind, floor: i64) -> i64 {
+    /// How many stories a structural tile of `kind` laid at `(floor, x)`
+    /// covers: the height a lobby tile there gets ([`Self::with_lobby_height`]
+    /// and the hall it is laid against), 1 for a floor tile.
+    pub(crate) fn tile_stories(&self, kind: Kind, floor: i64, x: i64) -> i64 {
         if kind == Kind::Lobby {
-            self.tower.placement_lobby_height(floor)
+            self.tower
+                .placement_lobby_height_at(floor, x, kind.facility().width)
         } else {
             1
         }

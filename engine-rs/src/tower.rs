@@ -9,12 +9,14 @@ use crate::crowd::fasthash::FastMap;
 use crate::facilities::*;
 use crate::lot::Lot;
 
+mod lobby_halls;
 mod placement;
 mod tall_lobby;
 mod transports;
 mod types;
 mod undoing;
 
+pub use lobby_halls::HallRun;
 pub use types::{Extras, ExtrasMut, PlaceResult, ResizeResult, Transport, Unit, UnitState};
 
 /// The refusal for a Classic floor tile with floor on both sides: taking it
@@ -87,12 +89,11 @@ pub struct Tower {
     /// `transportsById`: shaft id to its index in `transports`.
     pub(crate) transport_by_id: HashMap<i64, usize>,
     pub(crate) lobby_tiles: HashMap<i64, i64>,
-    /// Each tall lobby's height in stories, by its floor (#308): a lobby
-    /// unit on a listed floor covers that many stories from its floor up.
-    /// A floor's first lobby placement writes its entry, so an entry left
-    /// by a lobby an undo took away is rewritten before it is read again;
-    /// `lobby_height` and the save read only floors that hold a lobby.
-    pub(crate) lobby_heights: BTreeMap<i64, i64>,
+    /// The tall lobby tiles (#308, #2068) counted by `(floor, height)`.
+    /// Each lobby unit carries its own height (`Extras::lobby_stories`);
+    /// `register` and `unregister` keep this count, so the floors that hold
+    /// a tall hall, and each floor's tallest, are read without a unit scan.
+    pub(crate) tall_lobby_tiles: BTreeMap<(i64, i64), i64>,
     /// The height a floor's first lobby placement asks for while
     /// `Simulation::with_lobby_height` runs, 1 otherwise. Never saved.
     pub(crate) requested_lobby_height: i64,
@@ -149,7 +150,7 @@ impl Tower {
             by_id: FastMap::default(),
             transport_by_id: HashMap::new(),
             lobby_tiles: HashMap::new(),
-            lobby_heights: BTreeMap::new(),
+            tall_lobby_tiles: BTreeMap::new(),
             requested_lobby_height: 1,
             room_tiles: HashMap::new(),
             memo: RefCell::new(Default::default()),
@@ -261,6 +262,25 @@ impl Tower {
         })
     }
 
+    /// Why structure `kind` cannot go over `w` tiles at `(floor, x)` for
+    /// what already stands there, or `None`. A tall lobby's raised story is
+    /// named first (#2068), since its tiles are the lobby's own structure;
+    /// then built structure a lobby cannot be laid over, then rooms on the
+    /// plain floor a lobby would take over.
+    fn structure_taken_reason(&self, kind: Kind, floor: i64, x: i64, w: i64) -> Option<String> {
+        if let Some(r) = self.tall_lobby_story_reason(floor, x, w) {
+            return Some(r);
+        }
+        if self.structure_span_free(floor, x, w) {
+            return None;
+        }
+        if kind != Kind::Lobby || !self.span_upgradeable_to_lobby(floor, x, w) {
+            return Some("Structure already here.".into());
+        }
+        (!self.room_span_free(floor, x, w))
+            .then(|| "Lobbies are transit-only. Clear the rooms here first.".into())
+    }
+
     pub fn span_has_lobby(&self, floor: i64, x: i64, w: i64) -> bool {
         !self.span_every(floor, x, w, |t, f, x| {
             t.struct_kind.get(&(f, x)) != Some(&Kind::Lobby)
@@ -294,6 +314,9 @@ impl Tower {
         }
         if u.kind == Kind::Lobby {
             *self.lobby_tiles.entry(u.floor).or_insert(0) += u.width;
+            if hgt > 1 {
+                *self.tall_lobby_tiles.entry((u.floor, hgt)).or_insert(0) += u.width;
+            }
         }
         if u.kind == Kind::Metro {
             self.memo.get_mut().metro_changes += 1;
@@ -320,6 +343,15 @@ impl Tower {
         }
         if u.kind == Kind::Lobby {
             Self::dec_count(&mut self.lobby_tiles, u.floor, u.width);
+            if hgt > 1 {
+                let key = (u.floor, hgt);
+                if let Some(c) = self.tall_lobby_tiles.get_mut(&key) {
+                    *c -= u.width;
+                    if *c <= 0 {
+                        self.tall_lobby_tiles.remove(&key);
+                    }
+                }
+            }
         }
         if u.kind == Kind::Metro {
             self.memo.get_mut().metro_changes += 1;
@@ -372,6 +404,7 @@ impl Tower {
         self.rooms.clear();
         self.by_id.clear();
         self.lobby_tiles.clear();
+        self.tall_lobby_tiles.clear();
         self.room_tiles.clear();
         for i in 0..self.units.len() {
             self.register(i);

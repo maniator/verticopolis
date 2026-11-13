@@ -312,9 +312,10 @@ fn order_version_and_mode() {
         "{},\"mode\":\"classic\"}}",
         &text[..text.len() - 1]
     )));
-    // 8 streams too: it is 7 with `lobbyHeights` (#308).
+    // 8 and 9 stream too: 7 with `lobbyHeights` (#308), per floor and per hall (#2068).
     assert!(same(&text.replacen("\"version\":7", "\"version\":8", 1)));
-    for version in ["6", "9", "\"7\"", "7.5", "null"] {
+    assert!(same(&text.replacen("\"version\":7", "\"version\":9", 1)));
+    for version in ["6", "10", "\"7\"", "7.5", "null"] {
         assert!(!same(&patched(&save, |m| {
             m["version"] = serde_json::from_str(version).unwrap();
         })));

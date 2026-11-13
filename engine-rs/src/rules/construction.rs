@@ -89,6 +89,18 @@ impl GameMode {
         self == GameMode::Modern
     }
 
+    /// Whether each lobby hall on a floor keeps its own height (#2068). A
+    /// hall is a row of lobby tiles of one height; a tall hall claims only
+    /// the stories over its own tiles, and halls of different heights sit
+    /// side by side with a wall and a revolving door between them. Modern
+    /// does, since its towers can split. Classic keeps one height per floor,
+    /// set by the floor's first lobby, which claims the stories it rises
+    /// through across the whole lot, as the `.TDT` header's single ground
+    /// lobby height describes.
+    pub fn lobby_height_per_hall(self) -> bool {
+        self == GameMode::Modern
+    }
+
     /// Whether the bulldozer may take out a floor tile that has floor on
     /// both sides, opening a gap in the middle of a story. Classic refuses
     /// it (owner ruling, 2026-11-12): a story above a gap can't be built

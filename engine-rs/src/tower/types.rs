@@ -121,6 +121,11 @@ pub struct Extras {
     /// match.
     pub complete_at_raw: Option<Value>,
     pub dirty_days: Option<i64>,
+    /// How many stories a lobby tile rises, 2 or 3, unset for a one-story
+    /// lobby and for every other kind (#308, #2068). Set once when the tile
+    /// is laid and never changed. The save writes it as `lobbyHeights` runs,
+    /// not on the unit.
+    pub lobby_stories: Option<u8>,
 }
 
 /// A unit with no extras reads as this.
@@ -140,6 +145,7 @@ static NO_EXTRAS: Extras = Extras {
     complete_at: None,
     complete_at_raw: None,
     dirty_days: None,
+    lobby_stories: None,
 };
 
 impl Extras {
