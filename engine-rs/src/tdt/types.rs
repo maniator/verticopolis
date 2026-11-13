@@ -39,13 +39,18 @@ pub struct TdtFloor {
     pub index_map: Vec<u16>,
 }
 
-/// One row of the retail table: its floor index, room slot (through the
-/// floor's `index_map`) and the visitors it served yesterday (byte 8, #1500).
+/// One row of the retail table: its place in the table, its floor index,
+/// room slot (through the floor's `index_map`), the visitors it served
+/// yesterday (byte 8, #1500) and the room's style (byte 11, #2044), which
+/// is `None` in a row without the game's constant 255 in byte 13 (our own
+/// exports before #2044 kept the style elsewhere).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct TdtRetailRow {
+    pub row: usize,
     pub floor: u8,
     pub slot: u8,
     pub served: u8,
+    pub style: Option<u8>,
 }
 
 /// The fixed-offset header fields v1 consumes (`TdtHeader`).

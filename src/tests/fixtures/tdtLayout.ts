@@ -100,6 +100,17 @@ export interface WireTenant {
   subtype: number;
 }
 
+/** One filled retail row: its place in the table, floor index, the room's
+ *  logical unit id (byte 1), its style (byte 11) and the game's constant
+ *  (byte 13, 255 in every row the game writes) (#2044). */
+export interface WireRetailRow {
+  row: number;
+  floor: number;
+  unit: number;
+  style: number;
+  constant: number;
+}
+
 /** One built elevator slot's header fields. */
 export interface WireElevator {
   type: number;
@@ -109,6 +120,8 @@ export interface WireElevator {
   bottomFloor: number;
 }
 
+/** Byte 0 of an empty retail row. */
+const EMPTY_RETAIL_ROW = 0xff;
 const u16 = (b: Uint8Array, o: number): number => b[o] | (b[o + 1] << 8);
 const u32 = (b: Uint8Array, o: number): number => (b[o] | (b[o + 1] << 8) | (b[o + 2] << 16) | (b[o + 3] << 24)) >>> 0;
 
@@ -118,7 +131,11 @@ const u32 = (b: Uint8Array, o: number): number => (b[o] | (b[o + 1] << 8) | (b[o
  * service shaft by its spanned floors, an express by its eligible floors). It is a ground truth that does not go through
  * the importer.
  */
-export function wireModel(bytes: Uint8Array): { floors: { tenants: WireTenant[] }[]; elevators: WireElevator[] } {
+export function wireModel(bytes: Uint8Array): {
+  floors: { tenants: WireTenant[] }[];
+  retail: WireRetailRow[];
+  elevators: WireElevator[];
+} {
   let o = TDT_HEADER_SIZE;
   const floors: { tenants: WireTenant[] }[] = [];
   for (let index = 0; index < TDT_FLOOR_COUNT; index++) {
@@ -140,7 +157,11 @@ export function wireModel(bytes: Uint8Array): { floors: { tenants: WireTenant[] 
     o += 6 + count * TDT_TENANT_RECORD_SIZE + TDT_FLOOR_INDEX_ENTRIES * 2;
   }
   o += 4 + u32(bytes, o) * TDT_PERSON_RECORD_SIZE; // people
-  o += TDT_RETAIL_SLOTS * TDT_RETAIL_RECORD_SIZE; // retail table
+  const retail: WireRetailRow[] = [];
+  for (let row = 0; row < TDT_RETAIL_SLOTS; row++, o += TDT_RETAIL_RECORD_SIZE) {
+    if (bytes[o] === EMPTY_RETAIL_ROW) continue;
+    retail.push({ row, floor: bytes[o], unit: bytes[o + 1], style: bytes[o + 11], constant: bytes[o + 13] });
+  }
   const elevators: WireElevator[] = [];
   for (let slot = 0; slot < TDT_ELEVATOR_SLOTS; slot++) {
     const used = bytes[o];
@@ -150,5 +171,5 @@ export function wireModel(bytes: Uint8Array): { floors: { tenants: WireTenant[] 
     const payload = bytes[o + 1] === EXPRESS ? expressPayloadSize(bottom, top) : builtShaftPayloadSize(bottom, top);
     o += TDT_ELEVATOR_HEADER_SIZE + (used !== 0 ? payload : 0);
   }
-  return { floors, elevators };
+  return { floors, retail, elevators };
 }

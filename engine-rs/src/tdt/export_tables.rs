@@ -82,8 +82,10 @@ pub struct OutTenant {
     pub type_id: i64,
     pub status: i64,
     pub rent_class: i64,
-    /// Canon variant byte for retail; `None` for every other kind.
-    pub subtype_idx: Option<i64>,
+    /// Byte 6 of a shop, fast food or restaurant: its row in the retail
+    /// table, which holds its style (#2044). `None` for every other kind and
+    /// for a room past the table's 512 rows.
+    pub retail_row: Option<i64>,
     /// Byte 15: a theatre's film draw (#1932), 0 for every other record.
     pub draw: i64,
     /// The hall or theatre half this record is, for the venue table (#1932).

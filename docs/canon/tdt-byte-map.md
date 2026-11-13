@@ -142,7 +142,7 @@ reads it to find the room a retail row describes (section 5).
 | 2 | u16 | right | End tile, half open | Known |
 | 4 | u8 | type | Section 6 of `tdt-format.md`. As a signed byte, negative = under construction: 226 and 227 are a Party Hall under construction (-30, -29) in TOWER3 | Known |
 | 5 | u8 | state | Hotels: bits 3 and 4 stay state (1 checked in, 2 asleep, 3 vacant and clean; 0 is never written by the game), 0x20 dirty, 0x40 a flag the game keeps when it loads a file that has it but clears it from a vacant or dirty room (never found in a save of a tower played in the game; tdt-format.md section 5.1), low 2 bits guests inside now, which the game resets on load; the finance guest lines count rooms in stay state 1 or 2 at full complement (section 7.2). Offices and condos carry a nonzero value while occupied | Known for hotels |
-| 6 | u8 | variant | Shop, restaurant and fast-food style. Party halls and theatres: the row of the party hall and theatre table (section 8) that holds the venue, the same in both halves | Known for retail, Inferred for venues |
+| 6 | u8 | row | Shops, restaurants and fast food: the index of the room's row in the retail table (section 5), which names the room back, in every one of the seven observation saves (#2044). Party halls and theatres: the row of the party hall and theatre table (section 8) that holds the venue, the same in all its pieces | Known for retail, Inferred for venues |
 | 7 | u8 | unknown | 0 everywhere except parking stalls (0 or 1) | Unknown |
 | 8 | u32 | first person | High 16 bits always 0. The index of the unit's first record in the people block (section 4); its people follow in a row. A party hall half keeps 40 and a theater screen piece (types 35 and 34) 56. A party hall without its people crashes the game a few seconds after loading (#1932) | Inferred |
 | 12 | u8 | logical id | The unit's logical id on its floor (section 3), 255 on a plain floor tile, which has none | Inferred |
@@ -216,7 +216,9 @@ those units in each save.
 | 2 to 5 | 4 B | venue statistics | Not decoded | Unknown |
 | 6, 7 | 2 x u8 | expected visitors | Their sum is the visitors the room expects that day; it starts at 10 when a room opens and climbs by 5 to 15 a day to the cap (#1500) | Observed |
 | 8 | u8 | served yesterday | The visitors the room served the day before: its census. The finance block's shop, fast food and restaurant lines are the sums of this byte by class | Known |
-| 9 to 12 | 4 B | venue statistics | Not decoded | Unknown |
+| 9, 10 | 2 B | venue statistics | Not decoded | Unknown |
+| 11 | u8 | style | The room's style: 0 to 10 for shops, 0 to 3 for fast food and restaurants in the observation saves (#2044; list in `tdt-format.md` section 8) | Inferred |
+| 12 | u8 | venue statistics | Not decoded | Unknown |
 | 13 | u8 | constant | 255 in every row | Known |
 | 14 to 17 | 4 B | venue statistics | | Unknown |
 

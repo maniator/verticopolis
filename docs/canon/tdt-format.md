@@ -314,19 +314,35 @@ tower in four tries.
 
 The retail table is 512 slots of 18 bytes
 ([byte map section 5](./tdt-byte-map.md#5-retail-table-512-rows-of-18)). The
-importer reads three bytes of each filled row: the floor, the logical unit id
-(mapped to a room through the floor's remap) and byte 8, the visitors the room
-served yesterday, which seeds its census (section 17).
+importer reads four bytes of each filled row: the floor, the logical unit id
+(mapped to a room through the floor's remap), byte 8, the visitors the room
+served yesterday, which seeds its census (section 17), and byte 11, the room's
+style.
 
-The variant a room renders with is byte 6 of its unit record:
+The game links a room and its row both ways (#2044): byte 6 of the room's unit
+record is the index of its row, and the row names the room back by floor and
+logical unit id. This holds for every shop, fast food and restaurant in the
+seven observation saves (`conformance/fixtures/tdt-observed/`), and byte 13 of
+every row is 255. Byte 11 of the row is the style: 0 to 10 for shops and 0 to 3
+for fast food and restaurants in those saves, and reading it spreads TOWER7's
+shops over all 11 styles where reading byte 6 as the style made 54 of them Men's
+Clothing. Our exporter writes rooms and rows the same way. Our exports before
+#2044 kept the style in byte 6 and wrote rows with unit 0 and no 255, so the
+importer reads byte 6 as the style when the row it names lacks the 255 or names
+another room.
+
+The styles, in order:
 
 - Restaurants (6): English Pub, French, Chinese, Sushi Bar, Steak House.
 - Fast food (12): Japanese Soba, Chinese Cafe, Hamburger Stand, Ice Cream, Coffee Shop.
 - Shops (10): Men's Clothing, Pet Store, Flower Shop, Book Store, Drug Store,
   Boutique, Electronics, Bank, Hair Salon, Post Office, Sports Gear.
 
-Verified in a Wine render: a fast-food unit with byte 6 = 3 shows an Ice Cream
-stand.
+An earlier Wine render of one of our exports showed a fast-food unit with
+byte 6 = 3 as an Ice Cream stand. That file wrote no style in byte 11 of any
+row, so either the game falls back to byte 6 when the row does not name the
+room, or the render needs a second look. A headless render of the new export
+settles it (#2044).
 
 ## 9. Elevators
 
