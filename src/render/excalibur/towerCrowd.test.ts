@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { kindFacts } from "../../tests/catalogKinds";
 import * as ex from "excalibur";
 import { FLOOR, TILE } from "../scale";
-import { carIndicator, type CarIndicator } from "../carIndicator";
+import { cabFit, carIndicator, type CarIndicator } from "../carIndicator";
 import { reap, reconcileCrowd, clearCrowd, clearMotion, tickCrowdClock, updateMotion } from "./towerCrowd";
 import { Z } from "../depthPlanes";
 import { HallDoorLayer } from "./towerHallDoors";
@@ -404,7 +404,7 @@ describe("updateMotion repositions the moving actors", () => {
   it("moves each elevator car to its live shaft position and repaints on a state change", () => {
     const cap = kindFacts("elevatorStandard").carCapacity ?? 0;
     expect(cap, "a standard elevator car carries passengers").toBeGreaterThan(0);
-    const changedInd = carIndicator(1, cap, cap); // ascending & full: differs from idle
+    const changedInd = carIndicator(1, cap, cap, cabFit(4 * TILE)); // ascending & full: differs from idle
     const changedKey = carKey(changedInd);
     const car = {
       actor: actor(),

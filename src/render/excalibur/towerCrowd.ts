@@ -10,7 +10,7 @@ import { GARBAGE_TRUCK_H } from "../sprites/facilities/vehicles";
 import { metroTrainOffset } from "../metroTrainSchedule";
 import { addMetro } from "./towerMetro";
 import { buildWalkers } from "./towerWalkerBuild";
-import { carIndicator, type CarIndicator } from "../carIndicator";
+import { cabFit, carIndicator, type CarIndicator } from "../carIndicator";
 import { glideCar, newCarDraw, type CarDrawState } from "../carMotion";
 import type { PersonView } from "../../simport/view";
 import { FLOOR, TILE } from "../scale";
@@ -396,7 +396,7 @@ export function updateMotion(engine: TowerEngine, elapsedMs = 1000 / 60): void {
     // cached per state so we only redraw when the state actually changes.
     const load = c.t.carLoad?.[c.i] ?? 0;
     const dir = c.t.carDir?.[c.i] ?? 0;
-    const ind = carIndicator(dir, load, catalogFacility(towerCatalog(engine.sim), c.t.kind).carCapacity ?? 0);
+    const ind = carIndicator(dir, load, catalogFacility(towerCatalog(engine.sim), c.t.kind).carCapacity ?? 0, cabFit(c.w));
     // The cab's riders change when the drawn car gets there, on the same rule
     // as the people getting in or out (`positionPerson`), so nobody shows in
     // the cab and on the landing at once, or in neither.
