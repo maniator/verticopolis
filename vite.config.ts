@@ -1,7 +1,8 @@
 import { defineConfig, type Plugin, type HtmlTagDescriptor } from "vite";
 import { configDefaults } from "vitest/config";
-import { resolve } from "node:path";
-import { existsSync, readFileSync } from "node:fs";
+import { join, resolve } from "node:path";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { execSync } from "node:child_process";
 import { VitePWA } from "vite-plugin-pwa";
 import { notesForVersion, recentReleaseNotes, type ReleaseNotes } from "./src/changelog";
@@ -101,7 +102,12 @@ function engineChoiceFor(command: "build" | "serve"): EngineChoice {
   // keeps src/public live and answers the engine's URLs from the tooling
   // package; a build copies it in.
   if (command === "serve") return { publicDir: base, toolingEngine: true, serveEngineFrom: tooling };
-  return { publicDir: assembleToolingPublicDir(base, tooling, resolve(__dirname, "node_modules/.vc-tooling-public")), toolingEngine: true };
+  // Each build assembles its own folder, since two tooling builds can run at
+  // once (the screenshot determinism check builds both legs together), and
+  // removes it when the process ends.
+  const out = mkdtempSync(join(tmpdir(), "vc-tooling-public-"));
+  process.once("exit", () => rmSync(out, { recursive: true, force: true }));
+  return { publicDir: assembleToolingPublicDir(base, tooling, out), toolingEngine: true };
 }
 const engineChoices = new Map<"build" | "serve", EngineChoice>();
 /** This run's engine choice, made (and a build's folder assembled) once per command. */
