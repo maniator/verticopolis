@@ -9,7 +9,7 @@
 //! gameplay events.
 
 use crate::facilities::*;
-use crate::gameplay::{GameplayEvent, RemovalMethod};
+use crate::gameplay::GameplayEvent;
 use crate::rules::RentModel;
 use crate::sim::{LogKind, Simulation};
 use crate::tower::UnitState;
@@ -135,6 +135,13 @@ impl Simulation {
     pub fn can_build(&self, kind: Kind, floor: i64, x: i64) -> CanBuild {
         let kind = ground_floor_structure_kind(kind, floor);
         let f = kind.facility();
+        if let Some(reason) = self.edit_refusal() {
+            return CanBuild {
+                ok: false,
+                reason: Some(reason.into()),
+                cost: f.cost,
+            };
+        }
         if !self.is_unlocked(kind) {
             let reason = if !f.available_in(self.mode) {
                 format!("{} is a Modern-only facility.", f.name)
@@ -403,6 +410,9 @@ impl Simulation {
             reason: Some(reason),
             cost,
         };
+        if let Some(reason) = self.edit_refusal() {
+            return refuse(reason.into());
+        }
         if !self.is_unlocked(kind) {
             return refuse(format!("{} unlocks at {}★.", f.name, f.min_star));
         }
@@ -473,22 +483,6 @@ impl Simulation {
             ok: true,
             reason: None,
         }
-    }
-
-    /// Sells whatever stands at a tile: a room first, then a shaft, then the
-    /// floor or lobby tile. Returns whether anything was sold. The refund and
-    /// the refusals are [`remove_facility`](Simulation::remove_facility)'s
-    /// with [`RemovalMethod::Sell`].
-    pub fn sell_at(&mut self, floor: i64, x: i64) -> bool {
-        let t = self.tower.transport_at(floor, x).map(|t| t.id);
-        let u = self.tower.unit_at(floor, x).map(|u| (u.id, u.kind));
-        let id = match (u, t) {
-            (Some((id, kind)), _) if !kind.is_structural() => id,
-            (_, Some(id)) => id,
-            (Some((id, _)), None) => id,
-            (None, None) => return false,
-        };
-        self.remove_facility(id, RemovalMethod::Sell).ok
     }
 }
 

@@ -225,6 +225,9 @@ impl Simulation {
             self.tower.journal.is_none(),
             "a step applies outside a gesture"
         );
+        if self.edit_refusal().is_some() {
+            return Err(StepRefused::BombSearch);
+        }
         self.check_undo_step(step)?;
         let day_found = self.vip_visit_day;
         let mut back = Step {

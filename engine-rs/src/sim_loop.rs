@@ -77,6 +77,29 @@ impl Simulation {
 
     fn advance_step_inner(&mut self, dt_minutes: f64) {
         self.clock.advance(dt_minutes);
+        // While a bomb search runs, everyone but Security's guards holds
+        // still: no one arrives, walks or rides, and the cars stay put
+        // (owner, 2026-11-13). The guards walk the emergency stairs.
+        if !self.bomb_lockdown() {
+            self.move_people_and_cars(dt_minutes);
+        }
+        self.finish_construction_and_search();
+
+        let hour = self.clock.hour();
+        if hour != self.last_hour {
+            self.last_hour = hour;
+            self.on_hour();
+        }
+        let day = self.clock.day();
+        if day != self.last_day {
+            self.last_day = day;
+            self.on_day();
+        }
+    }
+
+    /// The crowd's and the cars' share of a step: demand, arrivals, the
+    /// cars' moves and the walks, and the staff jobs those walks finished.
+    fn move_people_and_cars(&mut self, dt_minutes: f64) {
         let rush = self.rush_factor();
         let population = self.elevators.accumulate(&self.tower, dt_minutes, rush);
         self.crowd.begin_step();
@@ -84,13 +107,15 @@ impl Simulation {
         // (`Crowd::queue_view`), as the TypeScript loop primes it.
         self.crowd.queue_view(&self.tower);
         // A fractional id (a forged save) matches no cinema, so only whole
-        // ids reach the crowd's set.
-        self.crowd.blockbusters = self
-            .blockbusters
-            .iter()
-            .filter(|b| b.fract() == 0.0)
-            .map(|b| *b as i64)
-            .collect();
+        // ids reach the crowd's set, refilled in place so a step allocates
+        // nothing.
+        self.crowd.blockbusters.clear();
+        self.crowd.blockbusters.extend(
+            self.blockbusters
+                .iter()
+                .filter(|b| b.fract() == 0.0)
+                .map(|b| *b as i64),
+        );
         spawn::spawn_step(
             &mut self.crowd,
             (dt_minutes * CROWD_SECONDS_PER_MINUTE).min(CROWD_MAX_STEP),
@@ -123,18 +148,6 @@ impl Simulation {
         if !staff_jobs.is_empty() {
             self.dispatch_housekeepers();
         }
-        self.finish_construction_and_search();
-
-        let hour = self.clock.hour();
-        if hour != self.last_hour {
-            self.last_hour = hour;
-            self.on_hour();
-        }
-        let day = self.clock.day();
-        if day != self.last_day {
-            self.last_day = day;
-            self.on_day();
-        }
     }
 
     #[doc(hidden)]
@@ -151,7 +164,11 @@ impl Simulation {
         let shift = self.mode.housekeeping_shift();
         if hour >= shift.start && hour < shift.end {
             self.resolve_extermination();
-            self.dispatch_housekeepers();
+            // A maid sent out during a bomb search would appear and stand
+            // still; the crews go out once the search ends.
+            if !self.bomb_lockdown() {
+                self.dispatch_housekeepers();
+            }
         }
         self.update_satisfaction();
         self.attempt_move_ins();

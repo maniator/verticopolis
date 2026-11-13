@@ -314,12 +314,14 @@ fn classic_needs_security_before_a_ransom_call() {
 #[test]
 fn an_office_opening_in_a_long_step_cannot_take_a_floor_a_guard_reached_first() {
     // Modern: the lone office's guards reach floor 9 before the deadline. A
-    // second office on floor 9 finishes inside the same long step, after the
+    // second office on floor 9, ordered before the threat (no edit lands
+    // during the search), finishes inside the same long step, after the
     // deadline; its guards must not claim the floor first.
     let mut sim = tower(30, 1);
     sim.mode = GameMode::Modern;
-    decline(&mut sim);
     assert!(sim.build(Kind::Security, 9, 185).ok);
+    decline(&mut sim);
+    assert!(sim.bomb_lockdown(), "the first office's guards are out");
     let b = sim.events.bomb.as_mut().unwrap();
     b.floor = 9;
     let deadline = b.deadline;

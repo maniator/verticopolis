@@ -1,6 +1,6 @@
 {
   "id": "ransom-ignored-modern",
-  "description": "The Modern tower-one at four stars (the towerone fixture with star raised to four and the treasury filled) runs at hour ticks until a bomb threat is called in and leaves it unanswered, so the next day's roll declines it and Security sweeps the tower for a fee; Security is then sold and a direct bomb threat detonates with nobody to search.",
+  "description": "The Modern tower-one at four stars (the towerone fixture with star raised to four and the treasury filled) runs at hour ticks until a bomb threat is called in and leaves it unanswered, so the next day's roll declines it and Security sweeps the tower for a fee; a day later, with the search over (no edit lands during one), Security is sold and a direct bomb threat detonates with nobody to search.",
   "start": {
     "fixture": "conformance/fixtures/towerone-star4.vctower",
     "mode": "modern"
@@ -24,6 +24,11 @@
     {
       "op": "checkpoint",
       "label": "swept"
+    },
+    {
+      "op": "tick",
+      "dt": 60,
+      "times": 24
     },
     {
       "op": "sell",

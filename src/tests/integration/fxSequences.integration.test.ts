@@ -25,7 +25,7 @@ const PINNED: Record<string, Nonzero> = {
   "scenarios/events-classic.json": { explosionSeq: 1, explosionFloor: 5, explosionX: 174.5, thiefFloor: 1, fires: 1, firesGutRooms: 1, bombs: 1 },
   // After the direct threat detonates, a second threat is called in during
   // the last two days, with Security sold and nobody to search (#1973).
-  "scenarios/ransom-ignored-modern.json": { explosionSeq: 2, explosionFloor: 22, explosionX: 272, thiefFloor: 1, bombs: 2 },
+  "scenarios/ransom-ignored-modern.json": { explosionSeq: 2, explosionX: 221, thiefFloor: 1, bombs: 2 },
   "scenarios/fire-rescue-ignored-modern.json": { thiefFloor: 1, vipFxSeq: 1, fires: 2, firesGutRooms: 17 },
   "scenarios/vip-review-modern.json": { thiefFloor: 1, vipFxSeq: 1 },
   "fuzz-corpus/fx-thief-uncaught.json": { thiefSeq: 3, thiefFloor: 1 },

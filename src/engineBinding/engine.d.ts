@@ -60,9 +60,11 @@ export class Engine {
      */
     beginExtend(id: number): boolean;
     /**
-     * Classic's bomb search while one runs, as JSON `{ deadline, sweeping,
-     * searched, seq }` (`sweeping` holds `{ floor, left, right }` for each
-     * floor a guard is on, `searched` the floors already clear), or null. The bomb's hiding place stays out. A host reads it
+     * The bomb search while one runs, as JSON `{ deadline, sweeping,
+     * searched, seq, lockdown }` (`sweeping` holds `{ floor, left, right }`
+     * for each floor a guard is on, `searched` the floors already clear,
+     * `lockdown` whether guards are still out so people and cars hold
+     * still), or null. The bomb's hiding place stays out. A host reads it
      * when the frame's `bombSearchSeq` moves.
      */
     bombSearch(): string | undefined;
@@ -504,7 +506,8 @@ export class Engine {
     setCustomersIn(id: number, count: number): boolean;
     /**
      * `setExpressStops(id)`: whether the id names a shaft, as TypeScript's
-     * answers; a shaft's stops are rebuilt, an unknown id changes nothing.
+     * answers; a shaft's stops are rebuilt, an unknown id (or any id while a
+     * bomb search locks edits) changes nothing.
      */
     setExpressStops(id: number): boolean;
     /**

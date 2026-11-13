@@ -50,9 +50,10 @@ impl Simulation {
                 searched.push(f);
             }
         }
-        Some(
-            json!({ "deadline": b.deadline, "sweeping": sweeping, "searched": searched, "seq": b.seq }),
-        )
+        Some(json!({
+            "deadline": b.deadline, "sweeping": sweeping, "searched": searched, "seq": b.seq,
+            "lockdown": self.bomb_lockdown(),
+        }))
     }
 
     /// Each stretch of floor with a room a bomb can hide in, with the tile

@@ -75,6 +75,9 @@ pub(crate) enum StepRefused {
     SearchedForTreasure { sellable: bool },
     /// A room the step would take out is burning.
     OnFire,
+    /// Security is searching for a bomb, and the tower takes no edits until
+    /// the search ends ([`edit_refusal`](crate::sim::Simulation::edit_refusal)).
+    BombSearch,
     /// The step would reprice a condo that has been sold since: a sold
     /// condo's price is fixed, as repricing it is refused.
     PriceFixed,
@@ -107,9 +110,12 @@ impl StepRefused {
     /// room's tenants and income seldom go back to just what a sale found,
     /// and a tower an edit changed under the step changes back only by
     /// another edit, whose own step sits above this one. Time does bring in
-    /// money and put a fire out.
+    /// money, put a fire out and end a bomb search.
     pub(crate) fn is_lasting(self) -> bool {
-        !matches!(self, StepRefused::NotEnoughMoney | StepRefused::OnFire)
+        !matches!(
+            self,
+            StepRefused::NotEnoughMoney | StepRefused::OnFire | StepRefused::BombSearch
+        )
     }
 }
 

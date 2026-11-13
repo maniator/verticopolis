@@ -29,10 +29,13 @@ use crate::sim::{LogKind, Simulation};
 
 #[path = "events_bomb_blast.rs"]
 mod blast;
+#[path = "events_bomb_edits.rs"]
+mod edits;
 #[path = "events_bomb_save.rs"]
 mod save;
 #[path = "events_bomb_view.rs"]
 mod view;
+pub use edits::BOMB_SEARCH_EDIT_REFUSAL;
 
 /// Guards each Security office sends out.
 pub const GUARDS_PER_OFFICE: usize = 6;
@@ -212,6 +215,18 @@ impl Simulation {
             let n = offices.len() * GUARDS_PER_OFFICE;
             self.emit(&format!("💣 You refused the ransom. {n} Security guards are searching the tower; the bomb goes off at {when}."), LogKind::Bad);
         }
+    }
+
+    /// Whether the tower is on lockdown for a bomb: while any of Security's
+    /// guards is still out searching for it, in both modes. People and cars
+    /// hold still meanwhile and only the guards move. A bomb nobody searches
+    /// for (no Security, or every stretch the guards can reach swept) freezes
+    /// nothing while it waits for the deadline (owner, 2026-11-13).
+    pub fn bomb_lockdown(&self) -> bool {
+        self.events
+            .bomb
+            .as_ref()
+            .is_some_and(|b| b.guards.iter().any(|g| g.floor.is_some()))
     }
 
     /// A Security office at (`office`, `x`) just opened. In a mode where late
@@ -451,3 +466,7 @@ mod tests;
 #[cfg(test)]
 #[path = "events_bomb_split_tests.rs"]
 mod split_tests;
+
+#[cfg(test)]
+#[path = "events_bomb_lockdown_tests.rs"]
+mod lockdown_tests;

@@ -74,9 +74,12 @@ impl Engine {
     /// Stop an elevator at `floor` or not.
     pub(crate) fn port_mark_stop(&mut self, id: f64, floor: f64, stop: bool) -> Vec<f64> {
         self.reason = None;
+        if let Some(reason) = self.sim.edit_refusal() {
+            return self.refuse(reason, &[]);
+        }
         let before = self.sim.money;
         let done = match (whole(id), whole(floor)) {
-            (Some(id), Some(floor)) => self.sim.tower.set_stop(id, floor, stop),
+            (Some(id), Some(floor)) => self.sim.edit_stop(id, floor, stop),
             _ => false,
         };
         self.plain(before, done)
@@ -85,18 +88,21 @@ impl Engine {
     /// An express elevator's canonical stops.
     pub(crate) fn port_express_stops(&mut self, id: f64) -> Vec<f64> {
         self.reason = None;
-        let before = self.sim.money;
-        let id = whole(id).filter(|&id| self.sim.tower.get_transport(id).is_some());
-        if let Some(id) = id {
-            self.sim.tower.set_express_stops(id);
+        if let Some(reason) = self.sim.edit_refusal() {
+            return self.refuse(reason, &[]);
         }
-        self.plain(before, id.is_some())
+        let before = self.sim.money;
+        let done = whole(id).is_some_and(|id| self.sim.edit_express_stops(id));
+        self.plain(before, done)
     }
 
     pub(crate) fn port_drop_stops(&mut self, id: f64) -> Vec<f64> {
         self.reason = None;
+        if let Some(reason) = self.sim.edit_refusal() {
+            return self.refuse(reason, &[]);
+        }
         let before = self.sim.money;
-        let done = whole(id).is_some_and(|id| self.sim.tower.clear_stops(id));
+        let done = whole(id).is_some_and(|id| self.sim.edit_clear_stops(id));
         self.plain(before, done)
     }
 
