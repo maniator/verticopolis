@@ -26,6 +26,8 @@ export function portDeps(sim: Draft) {
       reader: () => reader,
       catalog: () => catalogOf({ enginePort: engine, reader }),
       isUnlocked: (kind: FacilityKind) => isUnlocked({ reader }, kind),
+      // The lobby tool's asked height (#308): one story unless a test sets it.
+      lobbyHeight: () => 1,
     },
   };
 }

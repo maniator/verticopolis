@@ -68,7 +68,9 @@ pub fn migrate_save_owned(data: Value) -> Value {
     }
     // `load_stream.rs` applies this step to a current save on its own, so a
     // step added here for version 7 goes there too.
-    if v(&migrated) == Some(7.0) {
+    // Version 8 is version 7 with `lobbyHeights` (#308), which needs no
+    // step of its own.
+    if matches!(v(&migrated), Some(7.0) | Some(8.0)) {
         widen_shafts_in_place(&mut migrated);
     }
     migrated

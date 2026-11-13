@@ -1,7 +1,7 @@
 //! What the player may build, where, and what stays for good.
 
 use crate::clock::GameMode;
-use crate::facilities::Kind;
+use crate::facilities::{is_sky_lobby_floor, Kind};
 use crate::lot::Lot;
 
 #[doc(hidden)]
@@ -70,6 +70,23 @@ impl GameMode {
     /// import). Classic honors it; Modern ignores the flag.
     pub fn keeps_preserved_basement_stops(self) -> bool {
         self == GameMode::Classic
+    }
+
+    /// Whether a lobby on `floor` may rise more than one story (#308). The
+    /// PC original raises only the ground lobby, to two stories with Ctrl
+    /// or three with Ctrl+Shift held at its first placement (the Read Me
+    /// and the fan guides), and the `.TDT` header keeps one lobby height,
+    /// the ground lobby's. Modern lets a sky lobby rise as well. Either way
+    /// a floor's first lobby placement sets its height for good. Read
+    /// through `Tower::placement_lobby_height`.
+    pub fn raises_lobby_on(self, floor: i64) -> bool {
+        floor == 1 || (self.raises_sky_lobbies() && is_sky_lobby_floor(floor))
+    }
+
+    /// Whether a sky lobby may rise more than one story as well as the
+    /// ground lobby (#308): Modern only. See [`Self::raises_lobby_on`].
+    pub fn raises_sky_lobbies(self) -> bool {
+        self == GameMode::Modern
     }
 
     /// Whether the bulldozer may take out a floor tile that has floor on

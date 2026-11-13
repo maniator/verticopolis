@@ -17,6 +17,7 @@ import type { PersonView } from "../../simport/view";
 import { FLOOR, TILE } from "../scale";
 import type { TowerEngine } from "./TowerEngine";
 import { applyCrowdCull, reassertCrowdCull } from "./crowdCull";
+import { spiralAngle } from "../sprites/spiralStair";
 
 /**
  * Engine-driven crowd and motion for {@link TowerEngine}: the routed commuter
@@ -58,6 +59,12 @@ export interface Walker {
   phase: number;
   impatient: boolean;
   red: boolean;
+  /** A climber on a tall lobby's spiral stair (#308): it winds around the
+   *  pole at `cx`, `r` out, instead of walking straight from x0w to x1w. */
+  spiral?: { cx: number; r: number; stories: number };
+  /** A rider on a tall lobby's switchback escalator (#308): it climbs one
+   *  run a story, turning back at each platform, this many stories. */
+  switchback?: number;
   /** 0..1 position in the crowd; shown only when the tower is busy enough. */
   rank: number;
   /** Floor this figure belongs to (for per-floor occupancy gating). */
@@ -453,11 +460,26 @@ export function updateMotion(engine: TowerEngine, elapsedMs = 1000 / 60): void {
     // start each loop, the old sawtooth made people look like they spawned on
     // one side, ran across, then vanished.
     const tt = 1 - Math.abs(2 * p - 1);
-    w.actor.pos = ex.vec(w.x0w + tt * (w.x1w - w.x0w), w.y0w + tt * (w.y1w - w.y0w));
+    const x = climberX(w, tt);
+    w.actor.pos = ex.vec(x, w.y0w + tt * (w.y1w - w.y0w));
     const red = w.impatient && stress > 0.25;
     if (red !== w.red) {
       w.red = red;
       w.actor.graphics.use(red ? engine.personGfxRed : w.gfx);
     }
   }
+}
+
+/** Where a walker stands across its run at `tt` (0 at one end, 1 at the
+ *  other): straight across for most, around the pole on a spiral stair, and
+ *  back and forth a run a story on a switchback escalator (#308). */
+export function climberX(w: Pick<Walker, "x0w" | "x1w" | "spiral" | "switchback">, tt: number): number {
+  if (w.spiral) return w.spiral.cx + w.spiral.r * Math.sin(spiralAngle(tt, w.spiral.stories));
+  if (w.switchback && w.switchback > 1) {
+    const at = Math.min(tt * w.switchback, w.switchback - 1e-9);
+    const run = Math.floor(at);
+    const u = at - run;
+    return run % 2 === 0 ? w.x0w + u * (w.x1w - w.x0w) : w.x1w - u * (w.x1w - w.x0w);
+  }
+  return w.x0w + tt * (w.x1w - w.x0w);
 }

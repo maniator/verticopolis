@@ -39,10 +39,15 @@ use crate::load::{
 use crate::sim::Simulation;
 use crate::tower::{unit_list_headroom, Unit};
 
-/// The save version this reader takes. Its migration step is the one
-/// `streamed` applies, so a new save version means a new review of this file
-/// (the `streamed_version_is_the_save_version` test fails until then).
-const STREAMED_VERSION: f64 = 7.0;
+/// The save version this reader takes, with [`PLAIN_STREAMED_VERSION`]. Its
+/// migration step is the one `streamed` applies, so a new save version means
+/// a new review of this file (the `streamed_version_is_the_save_version` test
+/// fails until then). Version 8 is version 7 with `lobbyHeights` (#308),
+/// which `assemble` reads, so both take the same step.
+const STREAMED_VERSION: f64 = 8.0;
+/// The version a save with no tall lobby is still written at
+/// ([`crate::sim::PLAIN_SAVE_VERSION`]).
+const PLAIN_STREAMED_VERSION: f64 = 7.0;
 
 /// `Simulation.deserialize(JSON.parse(text))`: the same game, or the same
 /// error message, as `deserialize(&parse_save_json(text)?)`.
@@ -203,7 +208,7 @@ fn streamed(text: &[u8], mode: Option<&str>) -> Option<Streamed> {
     if let Some(m) = mode {
         rest.insert("mode".into(), Value::String(m.to_string()));
     }
-    // `migrate_save` on a version 7 save: the shaft widening, nothing else.
+    // `migrate_save` on a version 7 or 8 save: the shaft widening, nothing else.
     let widened = rest
         .get("transports")
         .and_then(Value::as_array)
@@ -235,7 +240,8 @@ struct Streamed {
 /// Whether the save loads as Modern, when its version and mode (or the mode
 /// the caller sets, `forced`) are ones this reader takes; `None` otherwise.
 fn current_mode(rest: &Map<String, Value>, forced: Option<bool>) -> Option<bool> {
-    if rest.get("version").and_then(Value::as_f64) != Some(STREAMED_VERSION) {
+    let version = rest.get("version").and_then(Value::as_f64);
+    if version != Some(STREAMED_VERSION) && version != Some(PLAIN_STREAMED_VERSION) {
         return None;
     }
     if forced.is_some() {

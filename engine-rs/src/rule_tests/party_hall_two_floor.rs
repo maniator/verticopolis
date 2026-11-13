@@ -8,7 +8,7 @@ use serde_json::{json, Value};
 
 use crate::facilities::Kind;
 use crate::load::deserialize;
-use crate::sim::SAVE_VERSION;
+use crate::sim::PLAIN_SAVE_VERSION;
 use crate::tdt::{export_tdt, import_tdt};
 
 use super::{legacy_save, pave};
@@ -23,7 +23,7 @@ fn a_version_5_save_loads_with_the_hall_on_both_stories() {
     units.extend(pave("floor", 2, 0, 60));
     units.push(json!({ "kind": "partyHall", "floor": 2, "x": 10, "width": hall_width() }));
     let sim = deserialize(&legacy_save(5, units, vec![])).expect("the save loads");
-    assert_eq!(sim.serialize()["version"], SAVE_VERSION);
+    assert_eq!(sim.serialize()["version"], PLAIN_SAVE_VERSION);
     let hall = sim
         .tower
         .units
@@ -46,7 +46,7 @@ fn a_built_hall_exports_and_imports_as_one_two_story_room() {
     units.extend(pave("floor", 2, 0, 80));
     units.extend(pave("floor", 3, 0, 80));
     units.push(json!({ "kind": "partyHall", "floor": 2, "x": 40, "width": hall_width() }));
-    let mut save = legacy_save(SAVE_VERSION, units, vec![]);
+    let mut save = legacy_save(PLAIN_SAVE_VERSION, units, vec![]);
     save["star"] = json!(5);
     let bytes = export_tdt(&save.to_string()).expect("exports");
     let (text, _) = import_tdt(&bytes, "RT.TDT").expect("imports");

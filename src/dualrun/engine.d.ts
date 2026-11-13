@@ -266,6 +266,18 @@ export class Engine {
     loadSave(text: string): Float64Array;
     loadTdt(bytes: Uint8Array, filename: string): Float64Array;
     loadVctower(text: string): Float64Array;
+    /**
+     * `lobbyHeights()` (#308): every lobby taller than one story, as flat
+     * `[floor, height, ...]` pairs by floor. Empty when none is.
+     */
+    lobbyHeights(): Float64Array;
+    /**
+     * `lobbyRise(floor)` (#308): how many stories a lobby tile laid on
+     * `floor` now rises, from the height set by `setLobbyHeight` and the
+     * floor's own lobby: what `quoteBuild` prices a lobby tile at. 1 for a
+     * floor that is not a whole number.
+     */
+    lobbyRise(floor: number): number;
     logAfter(seq: number): Float64Array;
     logLine(text: string, kind: number): Float64Array;
     /**
@@ -500,6 +512,14 @@ export class Engine {
      * The editor's rename of a unit.
      */
     setLabel(id: number, label: string): boolean;
+    /**
+     * `setLobbyHeight(height)` (#308): the height, 1 to 3 stories, that a
+     * floor's first lobby tile rises to from now on, where the mode lets
+     * that floor's lobby rise. Every later `buildAt`, `paintTiles` and
+     * `quoteBuild` uses it; a floor that holds a lobby keeps its own
+     * height. A height that is not a whole number counts as 1.
+     */
+    setLobbyHeight(height: number): void;
     setMoney(amount: number): void;
     /**
      * `setNoRate(id)`: whether the unit is now off the market. The id is
@@ -673,6 +693,14 @@ export class Engine {
      * none. Read on a new engine; `setView` is how it changes.
      */
     view(): string | undefined;
+    /**
+     * `walkwayTop(kind, bottom, top)` (#308): the top a stairway or
+     * escalator asked for from `bottom` to `top` is built to. Out of a tall
+     * lobby a one-story flight climbs the whole lobby, so the build preview
+     * draws the flight a click would place. `top` for any other kind or
+     * span, or when an argument is not a whole number or a known kind.
+     */
+    walkwayTop(kind: number, bottom: number, top: number): number;
 }
 
 /**

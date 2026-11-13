@@ -109,7 +109,7 @@ export function update(ui: UI, src: HudSource): void {
     bindViewWorld(catalog.world);
     bindViewKinds(catalog);
     relabelPalette(ui, catalog);
-    if (ui.tool.type === "build") render(toolInfoFor(catalog, ui.tool.kind), ui.el.toolInfo);
+    if (ui.tool.type === "build") render(toolInfoFor(catalog, ui.tool.kind, ui.lobbyPicker()), ui.el.toolInfo);
   }
 
   // Dirty-gate the palette lock/afford scan (E5-S3): its DOM pass depends on the

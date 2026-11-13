@@ -17,6 +17,10 @@ pub const MAX_FLOOR: i64 = 100;
 pub const MIN_FLOOR: i64 = -9;
 /// Sky lobbies go every this many floors above the ground floor.
 pub const LOBBY_INTERVAL: i64 = 15;
+/// The most stories a lobby rises (#308). The original builds a lobby two
+/// stories high when Ctrl is held at its first placement, and three with
+/// Ctrl+Shift.
+pub const MAX_LOBBY_HEIGHT: i64 = 3;
 #[doc(hidden)]
 /// The wedding hall stands on floor `MAX_FLOOR` and rises four stories above it,
 /// the only facility that does. Grids that hold every story of every unit size

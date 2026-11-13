@@ -50,23 +50,25 @@ pub fn pays_for_floor(kind: Kind) -> bool {
     kind == Kind::Lobby
 }
 
-/// The price of one bridged substrate tile: a lobby tile when the placement is
-/// a lobby, a floor tile otherwise. A bridge fills only empty tiles, so a
-/// bridged tile of a kind that pays for its floor ([`pays_for_floor`]) adds
-/// the floor's price. Read from the facility table, the same prices the
-/// catalog quotes.
-fn substrate_cost(kind: Kind) -> f64 {
-    let substrate = if kind == Kind::Lobby {
-        Kind::Lobby
+/// The price of one bridged substrate tile: a lobby tile `stories` high when
+/// the placement is a lobby, a floor tile otherwise. A bridge fills only
+/// empty tiles, so a bridged tile of a kind that pays for its floor
+/// ([`pays_for_floor`]) adds the floor's price. Read from the facility table,
+/// the same prices the catalog quotes.
+fn substrate_cost(kind: Kind, stories: i64) -> f64 {
+    if kind == Kind::Lobby {
+        bare_tile_cost(Kind::Lobby, stories)
     } else {
-        Kind::Floor
-    };
-    bare_tile_cost(substrate)
+        bare_tile_cost(Kind::Floor, 1)
+    }
 }
 
-/// The price of a tile of `kind` placed where there is no floor yet.
-fn bare_tile_cost(kind: Kind) -> f64 {
-    let tile = kind.facility().cost;
+/// The price of a tile of `kind`, `stories` high, placed where there is no
+/// floor yet. A tall lobby pays the lobby's price once for each story it
+/// covers (#308: the original's 2-story lobby costs twice the 1-story one,
+/// and its 3-story lobby three times), and for one floor tile under it.
+fn bare_tile_cost(kind: Kind, stories: i64) -> f64 {
+    let tile = kind.facility().cost * stories as f64;
     if pays_for_floor(kind) {
         tile + Kind::Floor.facility().cost
     } else {
@@ -109,10 +111,11 @@ impl Simulation {
     /// ([`pays_for_floor`]); a lobby over a floor tile turns it into lobby
     /// for the lobby's price alone.
     fn structure_tile_cost(&self, kind: Kind, floor: i64, x: i64) -> f64 {
+        let stories = self.tile_stories(kind, floor);
         if self.tower.has_structure(floor, x) {
-            kind.facility().cost
+            kind.facility().cost * stories as f64
         } else {
-            bare_tile_cost(kind)
+            bare_tile_cost(kind, stories)
         }
     }
 
@@ -191,7 +194,8 @@ impl Simulation {
                 }
             }
             return money_check(
-                self.structure_tile_cost(kind, floor, x) + bridge * substrate_cost(kind),
+                self.structure_tile_cost(kind, floor, x)
+                    + bridge * substrate_cost(kind, self.tile_stories(kind, floor)),
             );
         }
         let pre = self.tower.can_place_room_ignoring_floor(kind, floor, x);
@@ -276,6 +280,7 @@ impl Simulation {
         let f = kind.facility();
         let lot = self.tower.lot();
         let hgt = lot.slab_stories(kind, floor);
+        let stories = self.tile_stories(kind, floor);
         let quoted_bridge = if self.auto_bridge {
             self.tower
                 .bridge_fill_plan(kind, floor, x, f.width, hgt)
@@ -301,7 +306,8 @@ impl Simulation {
                 reason: res.reason,
             };
         }
-        let price = can.cost - (quoted_bridge - laid_bridge.len() as f64) * substrate_cost(kind);
+        let unlaid = quoted_bridge - laid_bridge.len() as f64;
+        let price = can.cost - unlaid * substrate_cost(kind, stories);
         self.money -= price;
         self.note_edit_cash(-price);
         if let Some(id) = res.unit_id {

@@ -7,7 +7,7 @@ use crate::facilities::Kind;
 use crate::ledger::{DayTotals, LEDGER_CATS, WINDOW};
 use crate::load::{decode_vctower, deserialize};
 use crate::load_stream::read_save;
-use crate::sim::LogKind;
+use crate::sim::{save_version, LogKind};
 use std::collections::HashSet;
 
 fn same(sim: &Simulation, what: &str) {
@@ -20,7 +20,11 @@ fn same(sim: &Simulation, what: &str) {
 /// the reference both writers must match.
 fn reference(sim: &Simulation) -> Value {
     let mut m = Map::new();
-    m.insert("version".into(), json!(SAVE_VERSION));
+    let tall_lobbies = sim.tower.tall_lobbies();
+    m.insert(
+        "version".into(),
+        json!(save_version(!tall_lobbies.is_empty())),
+    );
     m.insert("seed".into(), json!(sim.rng.seed()));
     m.insert("initialSeed".into(), json!(sim.rng.initial_seed));
     m.insert("money".into(), json!(sim.money));
@@ -49,6 +53,9 @@ fn reference(sim: &Simulation) -> Value {
     }
     if let Some(b) = sim.tower.built_wedding_hall {
         m.insert("builtWeddingHall".into(), json!(b));
+    }
+    if !tall_lobbies.is_empty() {
+        m.insert("lobbyHeights".into(), json!(tall_lobbies));
     }
     if let Some(b) = sim.evaluated_tower {
         m.insert("evaluatedTower".into(), json!(b));

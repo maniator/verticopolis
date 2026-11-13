@@ -10,6 +10,7 @@ import type { ViewReader } from "../simport/viewReader";
 import { brushTiles, dragRunTiles, isOffLot, snapX } from "../ui/placement";
 import { groupDigits } from "../ui/format";
 import { quoteShaft } from "./portAccess";
+import { lobbyHeightFor } from "./lobbyHeight";
 
 /**
  * The money boundary of the game shell: every gesture that buys, paints, or
@@ -44,6 +45,9 @@ export interface BuildActionsDeps {
    *  allocation ever splits per type, this dep must carry the type too. */
   selectedId(): number | null;
   clearSelection(): void;
+  /** The height a floor's first lobby asks for (#308), handed to the engine
+   *  before each placement: the tool card's pick, or Ctrl / Ctrl+Shift held. */
+  lobbyHeight(): number;
 }
 
 export class BuildActions {
@@ -61,6 +65,7 @@ export class BuildActions {
   /** Build one facility; true when the engine placed it. */
   tryBuild(kind: FacilityKind, floor: number, x: number, quiet = false): boolean {
     const port = this.deps.enginePort();
+    port.setLobbyHeight(lobbyHeightFor(kind, this.deps.lobbyHeight()));
     const res = outcome(port, port.buildAt(this.deps.portCodes().kind(kind), floor, x));
     if (res.ok) {
       if (!quiet) this.deps.audio.sfx("build");
@@ -100,12 +105,15 @@ export class BuildActions {
    *  reason just distinguishes a harmless no-op (the strip already carries
    *  this kind: "already built here") from a real refusal (no support, no
    *  money), which carries the engine's reason. The strip is one port command
-   *  (`paintTiles`), so no step falls between its tiles. */
-  paintBrush(kind: BrushKind, tile: number, floor: number): { placed: number; reason?: string } {
+   *  (`paintTiles`), so no step falls between its tiles. `engineRefused`
+   *  marks a strip that laid nothing for the engine's own reason, which only
+   *  a lot edge press has already said aloud. */
+  paintBrush(kind: BrushKind, tile: number, floor: number): { placed: number; reason?: string; engineRefused?: boolean } {
     const tiles = brushTiles(tile);
     this.paint = { tile, floor };
     const port = this.deps.enginePort();
     const codes = this.deps.portCodes();
+    port.setLobbyHeight(lobbyHeightFor(kind, this.deps.lobbyHeight()));
     const rec = port.paintTiles(codes.kind(kind), floor, Float64Array.from(tiles));
     const placed = codes.slot(rec, "paintTiles", "placed");
     const res = outcome(port, rec);
@@ -121,7 +129,9 @@ export class BuildActions {
       const f = catalogFacility(catalog, laid);
       // The Floor tool's brush lays only where there is no floor yet, so each
       // tile paid for its floor too (catalogTileCost).
-      const perTile = catalogTileCost(catalog, laid, "no floor yet");
+      // A tall lobby (#308) pays the lobby price once per story.
+      const rise = port.lobbyRise(floor);
+      const perTile = catalogTileCost(catalog, laid, "no floor yet") + (rise - 1) * catalogTileCost(catalog, laid, "a floor tile");
       this.deps.ui.toast(
         `The ground floor is a ${f.name.toLowerCase()}, so a ${f.name.toLowerCase()} ($${groupDigits(perTile)}/tile) went here.`,
         "info",
@@ -148,6 +158,7 @@ export class BuildActions {
       }
       if (alreadyAll) return { placed, reason: `${catalogFacility(catalog, kind).name} already built here` };
     }
+    if (placed === 0 && res.reason !== undefined) return { placed, reason: res.reason, engineRefused: true };
     return { placed, reason: res.reason };
   }
 
@@ -160,7 +171,15 @@ export class BuildActions {
    */
   seedPaint(kind: FacilityKind, tile: number, floor: number): void {
     if (kind === "floor" || kind === "lobby") {
-      this.paintBrush(kind, tile, floor); // records the run anchor itself
+      const r = this.paintBrush(kind, tile, floor); // records the run anchor itself
+      // A touch has no hover ghost to carry the reason, so a refused stamp
+      // says why (a Classic sky lobby asked taller than one story, #308, was
+      // a silent tap). A strip already built stays quiet, and the lot edge
+      // was said already.
+      if (r.engineRefused && r.reason) {
+        this.deps.audio.sfx("error");
+        this.deps.ui.toast(r.reason, "bad");
+      }
       return;
     }
     // snapX (not clampTile) so a wide unit's footprint stays on-lot: a tap at

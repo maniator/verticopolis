@@ -19,6 +19,8 @@
  *     (`buildEscalatorOfficeModern` / `buildEscalatorOfficeClassic`).
  *   - `screenshot-scene-builders.ts`: the engine/crowd/fire/condo/stats/hotspot/
  *     overlay/tablet builders folded in from the old shot-*.mjs generators.
+ *   - `screenshot-tall-lobby-builders.ts`: `buildTallLobbyTower`, the tall
+ *     lobby (#308) towers for the Help site.
  *
  * Keep re-exports only here (erasable): no enums / namespaces / parameter
  * properties.
@@ -30,3 +32,4 @@ export * from "./screenshot-crown-builder.ts";
 export * from "./screenshot-compare-builders.ts";
 export * from "./screenshot-scene-builders.ts";
 export * from "./screenshot-security-builders.ts";
+export * from "./screenshot-tall-lobby-builders.ts";

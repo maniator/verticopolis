@@ -161,6 +161,13 @@ export interface CatalogRules {
   /** Whether the tenant card's lobby warning quotes the floors to the
    *  nearest lobby. When false it names the problem without the number. */
   readonly quotesLobbyDistance: boolean;
+  /** Whether a sky lobby may rise more than one story (#308). The ground
+   *  lobby always may, up to `maxLobbyHeight`; when false it is the only one
+   *  that can. */
+  readonly tallSkyLobbies: boolean;
+  /** The most stories a lobby can rise (#308). A floor's first lobby sets its
+   *  height, and it never changes after. */
+  readonly maxLobbyHeight: number;
 }
 
 /** One calendar a tower can run and how it scales the quoted figures. */

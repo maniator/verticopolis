@@ -3,7 +3,8 @@ import { kindFacts } from "../../tests/catalogKinds";
 import * as ex from "excalibur";
 import { FLOOR, TILE } from "../scale";
 import { carIndicator, type CarIndicator } from "../carIndicator";
-import { reap, reconcileCrowd, clearCrowd, clearMotion, updateMotion } from "./towerCrowd";
+import { reap, reconcileCrowd, clearCrowd, clearMotion, updateMotion, climberX } from "./towerCrowd";
+import { spiralAngle } from "../sprites/spiralStair";
 
 /**
  * Engine-driven crowd and motion for the tower renderer. The parts that BAKE
@@ -466,5 +467,32 @@ describe("ambient walkers are gated on reachability (#639)", () => {
     const e = eng({ walkers: [rankedOut], sim: simFixture() });
     updateMotion(e);
     expect(rankedOut.actor.graphics.isVisible).toBe(false);
+  });
+});
+
+describe("climberX follows the flight a climber is on", () => {
+  const span = { x0w: 100, x1w: 160 };
+  it("a straight flight crosses once, left to right", () => {
+    expect([0, 0.5, 1].map((t) => climberX(span, t))).toEqual([100, 130, 160]);
+  });
+  it("a switchback runs out and back once per story", () => {
+    const w = { ...span, switchback: 3 };
+    // Each third of the climb is one run: right, then left, then right again.
+    expect(climberX(w, 0)).toBe(100);
+    expect(climberX(w, 1 / 6)).toBeCloseTo(130);
+    expect(climberX(w, 1 / 3 + 1e-9)).toBeCloseTo(160);
+    expect(climberX(w, 0.5)).toBeCloseTo(130);
+    expect(climberX(w, 2 / 3 + 1e-9)).toBeCloseTo(100);
+    expect(climberX(w, 1)).toBeCloseTo(160);
+  });
+  it("a spiral circles the pole on the drawn stair's angle", () => {
+    const w = { ...span, spiral: { cx: 130, r: 12, stories: 2 } };
+    for (const t of [0, 0.2, 0.5, 0.9, 1]) {
+      const x = climberX(w, t);
+      expect(x).toBeCloseTo(130 + 12 * Math.sin(spiralAngle(t, 2)));
+      expect(Math.abs(x - 130)).toBeLessThanOrEqual(12);
+    }
+    // It starts on the left edge of the stair, not at the pole.
+    expect(climberX(w, 0)).toBeCloseTo(118);
   });
 });

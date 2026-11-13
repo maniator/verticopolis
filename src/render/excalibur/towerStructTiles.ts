@@ -19,8 +19,12 @@ export interface StructPass {
   revision: number;
   lit: boolean;
   rooms: readonly UnitView[];
-  lobbies: readonly (readonly [ex.Tile, UnitView])[];
+  lobbies: readonly LobbyCell[];
 }
+
+/** A lobby cell: the tile, its lobby unit, which story of the lobby it shows
+ *  (0 is the lobby's own floor) and the lobby's height in stories (#308). */
+export type LobbyCell = readonly [ex.Tile, UnitView, number, number];
 
 /** A record that matches no sim, so the next sync walks every unit. */
 export function emptyStructPass(): StructPass {
@@ -44,14 +48,17 @@ export function syncStructureTiles(engine: TowerEngine): readonly UnitView[] {
     if (pass.lit !== engine.litState) {
       // The entrance map still matches this layout: it was built by the full
       // pass that kept these lobby cells.
-      for (const [cell, u] of pass.lobbies) paintCell(cell, lobbyTileGfx(engine, u));
+      for (const [cell, u, story, height] of pass.lobbies) paintCell(cell, lobbyTileGfx(engine, u, story, height));
       pass.lit = engine.litState;
     }
     return pass.rooms;
   }
   const topFloor = engine.structTopFloor;
   const rooms: UnitView[] = [];
-  const lobbies: [ex.Tile, UnitView][] = [];
+  const lobbies: LobbyCell[] = [];
+  // Read once per full pass (#308): a tall lobby's cells cover the stories
+  // above its floor too.
+  const tall = tower.tallLobbies();
   const floor1Lobbies: UnitView[] = [];
   const seenS = new Set<ex.Tile>();
   for (const u of units) {
@@ -65,14 +72,25 @@ export function syncStructureTiles(engine: TowerEngine): readonly UnitView[] {
     if (!cell) continue; // outside the grid; the engine never places there
     seenS.add(cell);
     engine.structTiles.add(cell);
-    if (u.kind === "lobby") lobbies.push([cell, u]);
-    else paintCell(cell, engine.floorGfx);
+    if (u.kind !== "lobby") {
+      paintCell(cell, engine.floorGfx);
+      continue;
+    }
+    const height = tall.get(u.floor) ?? 1;
+    lobbies.push([cell, u, 0, height]);
+    for (let story = 1; story < height; story++) {
+      const up = engine.structTileMap.getTile(u.x, topFloor - u.floor - story);
+      if (!up) continue;
+      seenS.add(up);
+      engine.structTiles.add(up);
+      lobbies.push([up, u, story, height]);
+    }
   }
   // The floor-1 entrance map comes from this pass's own lobby list, and the
   // lobby cells are painted after it, so a newly placed leftmost tile takes
   // the grand entrance graphic on the same sync it is added.
   refreshFloor1EntranceMap(engine, floor1Lobbies);
-  for (const [cell, u] of lobbies) paintCell(cell, lobbyTileGfx(engine, u));
+  for (const [cell, u, story, height] of lobbies) paintCell(cell, lobbyTileGfx(engine, u, story, height));
   for (const cell of engine.structTiles) {
     if (seenS.has(cell)) continue;
     cell.clearGraphics();
@@ -98,19 +116,31 @@ function paintCell(cell: ex.Tile, gfx: ex.Graphic): void {
  *  For floor-1 lobby tiles the frontage-edge predicate can override the
  *  variant to a wide-storefront grand slice, a compact grand fallback, or
  *  a service entrance; see {@link floor1EntranceKind}. */
-function lobbyTileGfx(engine: TowerEngine, u: UnitView): ex.Canvas {
+function lobbyTileGfx(engine: TowerEngine, u: UnitView, story = 0, height = 1): ex.Canvas {
   const lit = engine.litState ? 1 : 0;
+  if (height > 1) {
+    // A tall lobby (#308): one slice of the whole open hall per story. The
+    // entrance's storefront (and its doorman) stands on the bottom story,
+    // with the hall's wall carried up over it in place of its own cornice.
+    const kind = u.floor === 1 ? floor1EntranceKind(engine, u.x) : "none";
+    return engine.tallLobbyGfx(lit === 1, u.floor === 1, height, story, kind === "none" ? lobbyVariant(u.x) : kind);
+  }
   if (u.floor === 1) {
     const kind = floor1EntranceKind(engine, u.x);
-    switch (kind) {
-      case "grand-left": return engine.entranceGrandLeftGfx[lit];
-      case "grand-right": return engine.entranceGrandRightGfx[lit];
-      case "grand-solo": return engine.entranceGrandSoloGfx[lit];
-      case "service": return engine.entranceServiceGfx[lit];
-    }
+    if (kind !== "none") return entranceGfx(engine, kind, lit);
     return engine.lobbyGfx[lit][1][lobbyVariant(u.x)];
   }
   return engine.lobbyGfx[lit][0][lobbyVariant(u.x)];
+}
+
+/** The one-story entrance graphic of `kind` for this lighting. */
+function entranceGfx(engine: TowerEngine, kind: "grand-left" | "grand-right" | "grand-solo" | "service", lit: number): ex.Canvas {
+  switch (kind) {
+    case "grand-left": return engine.entranceGrandLeftGfx[lit];
+    case "grand-right": return engine.entranceGrandRightGfx[lit];
+    case "grand-solo": return engine.entranceGrandSoloGfx[lit];
+    case "service": return engine.entranceServiceGfx[lit];
+  }
 }
 
 /** Which entrance (if any) the floor-1 lobby tile at grid `x` should render

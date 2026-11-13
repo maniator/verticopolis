@@ -80,6 +80,8 @@ export function ptr(opts: {
   touch?: boolean;
   pointerId?: number;
   shift?: boolean;
+  ctrl?: boolean;
+  meta?: boolean;
 }): unknown {
   const tile = opts.tile ?? 10;
   const floor = opts.floor ?? 5;
@@ -87,7 +89,7 @@ export function ptr(opts: {
     button: opts.button ?? ex.PointerButton.Left,
     pointerType: opts.touch ? "Touch" : "Mouse",
     pointerId: opts.pointerId ?? 1,
-    nativeEvent: { pointerId: opts.pointerId ?? 1, shiftKey: opts.shift ?? false },
+    nativeEvent: { pointerId: opts.pointerId ?? 1, shiftKey: opts.shift ?? false, ctrlKey: opts.ctrl ?? false, metaKey: opts.meta ?? false },
     worldPos: ex.vec(tile * TILE, -floor * FLOOR),
     screenPos: { x: opts.sx ?? 400, y: opts.sy ?? 300 },
   };

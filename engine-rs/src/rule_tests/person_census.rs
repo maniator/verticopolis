@@ -18,7 +18,7 @@ use serde_json::Value;
 use crate::clock::GameMode;
 use crate::facilities::Kind;
 use crate::load::deserialize;
-use crate::sim::{Simulation, SAVE_VERSION};
+use crate::sim::{Simulation, PLAIN_SAVE_VERSION};
 use crate::tower::UnitState;
 
 use super::{at_time, place_seated, shaft, strip_tower};
@@ -199,8 +199,8 @@ fn a_load_starts_every_crowd_tally_at_zero_and_stamps_version_7() {
     set_customers(&mut sim, food, 7);
     set_out(&mut sim, office, 3);
     let save = sim.serialize();
-    assert_eq!(SAVE_VERSION, 7);
-    assert_eq!(save["version"], SAVE_VERSION);
+    assert_eq!(PLAIN_SAVE_VERSION, 7);
+    assert_eq!(save["version"], PLAIN_SAVE_VERSION);
     let back = deserialize(&save).unwrap();
     assert_eq!(back.tower.get_unit(food).unwrap().customers_in, None);
     assert_eq!(back.tower.associated_population(false), 0);
@@ -215,7 +215,7 @@ fn a_load_starts_every_crowd_tally_at_zero_and_stamps_version_7() {
     assert_eq!(back.tower.total_population(), 6, "the office alone");
     assert_eq!(
         back.serialize()["version"],
-        SAVE_VERSION,
+        PLAIN_SAVE_VERSION,
         "a v3 save loads current"
     );
 }

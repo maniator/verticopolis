@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { toolInfoFor, toolInfoTemplate } from "./toolInfo";
 import { catalogFor } from "../../tests/catalogFixture";
 import { renderToFragment } from "../testing/litTestUtils";
@@ -71,5 +71,33 @@ describe("toolInfoFor words the card from the tower's catalog (#1987)", () => {
     const taller = { ...catalog, world: { ...catalog.world, maxFloor: catalog.world.maxFloor + 20 } };
     const text = renderToFragment(toolInfoFor(taller, "weddingHall")).textContent ?? "";
     expect(text).toContain(`standing on floor ${catalog.world.maxFloor + 20}.`);
+  });
+});
+
+describe("the Lobby card's height picker (#308)", () => {
+  const picker = (picked: number) => ({ picked, pick: vi.fn() });
+
+  it("offers one to the catalog's most stories, marks the pick, and picks on a click", () => {
+    const lobbyPick = picker(2);
+    const frag = renderToFragment(toolInfoFor(catalogFor("classic"), "lobby", lobbyPick));
+    const buttons = [...frag.querySelectorAll<HTMLButtonElement>(".ti-lobby-height button")];
+    expect(buttons.map((b) => b.textContent)).toEqual(["1 story", "2 stories", "3 stories"]);
+    expect(buttons.map((b) => b.getAttribute("aria-pressed"))).toEqual(["false", "true", "false"]);
+    buttons[2].click();
+    expect(lobbyPick.pick).toHaveBeenCalledExactlyOnceWith(3);
+  });
+
+  it("says which lobbies rise from the catalog's rule, and prices a story", () => {
+    const classic = renderToFragment(toolInfoFor(catalogFor("classic"), "lobby", picker(1))).textContent ?? "";
+    const modern = renderToFragment(toolInfoFor(catalogFor("modern"), "lobby", picker(1))).textContent ?? "";
+    expect(classic).toContain("Only the ground lobby can rise.");
+    expect(modern).toContain("The ground lobby and sky lobbies can rise.");
+    const per = groupDigits(catalogFor("classic").facilities.find((f) => f.key === "lobby")!.cost);
+    expect(classic).toContain(`Each story costs $${per} a tile.`);
+  });
+
+  it("shows no picker on another tool's card, or with no picker given", () => {
+    expect(renderToFragment(toolInfoFor(catalogFor("classic"), "office", picker(1))).querySelector(".ti-lobby-height")).toBeNull();
+    expect(renderToFragment(toolInfoFor(catalogFor("classic"), "lobby")).querySelector(".ti-lobby-height")).toBeNull();
   });
 });

@@ -51,10 +51,12 @@ use super::venues::OutVenueHalf;
 use super::LegacyExportError;
 use crate::econ::rent_config;
 use crate::economy::visitors::showing_draw;
-use crate::facilities::{is_lobby_floor, Kind, LOT_WIDTH};
+use crate::facilities::{is_lobby_floor, Kind, LOT_WIDTH, MAX_LOBBY_HEIGHT};
 
 mod gathered;
+mod lobby_height;
 mod normalize;
+pub use lobby_height::ground_lobby_height;
 mod values;
 
 pub use gathered::{ExportCounts, ExportHeaderCounts, GatheredRoom, GatheredTower, SkipReason};
@@ -67,14 +69,17 @@ pub fn gather_tower(save: &Value) -> Result<GatheredTower, LegacyExportError> {
     let Some(raw_units) = save.get("units").and_then(Value::as_array) else {
         return Err(LegacyExportError("save.units is not an array".into()));
     };
-    gather_units(raw_units)
+    gather_units(raw_units, ground_lobby_height(save))
 }
 
 /// [`gather_tower`] over the save's unit entries as they come, each read on
 /// its own and dropped before the next, so the caller need not hold the
-/// `units` array whole (#1431).
+/// `units` array whole (#1431). `lobby_height` is the ground lobby's height
+/// ([`ground_lobby_height`]): its lobby tiles rise through that many stories,
+/// which the file paves as lobby above them.
 pub fn gather_units<U: Borrow<Value>>(
     raw_units: impl IntoIterator<Item = U>,
+    lobby_height: i64,
 ) -> Result<GatheredTower, LegacyExportError> {
     let mut tenants_by_tdt: IndexMap<FloorKey, Vec<OutTenant>> = IndexMap::new();
     let mut extents: IndexMap<FloorKey, (f64, f64)> = IndexMap::new();
@@ -103,6 +108,8 @@ pub fn gather_units<U: Borrow<Value>>(
     let mut counts = ExportCounts::default();
     let mut header = ExportHeaderCounts::default();
     let mut has_ground_lobby = false;
+    // The stories above the ground floor a tall ground lobby rises through.
+    let raised = 2..1 + lobby_height.clamp(1, MAX_LOBBY_HEIGHT);
     let mut people_pop = 0.0;
     let mut class_pop = [0.0; POPULATION_CLASSES];
     let add_residents =
@@ -124,6 +131,11 @@ pub fn gather_units<U: Borrow<Value>>(
                 has_ground_lobby = true;
             }
             widen(&mut extents, u.floor, u.x, u.x + u.width);
+            if u.kind == Kind::Lobby && u.floor == 1.0 {
+                for story in raised.clone() {
+                    widen(&mut extents, story as f64, u.x, u.x + u.width);
+                }
+            }
             continue;
         }
         let burned = u.state == "fire" || u.state == "gutted";
@@ -377,7 +389,11 @@ pub fn gather_units<U: Borrow<Value>>(
         if !fits_tdt_rows(Kind::Floor, floor, 1.0) {
             continue;
         }
-        let lobby = floor.fract() == 0.0 && is_lobby_floor(floor as i64);
+        // A tall ground lobby's raised stories are paved as lobby too: our
+        // reading of the format, where the game writes type 24 on every
+        // tile of a lobby story (to confirm on the PC, #308).
+        let lobby = floor.fract() == 0.0
+            && (is_lobby_floor(floor as i64) || raised.contains(&(floor as i64)));
         let covered = covered_tiles.get(&key);
         let lo = clamp_tile(ext.0);
         let hi = clamp_tile(ext.1).max(lo);
@@ -424,7 +440,11 @@ pub fn gather_units<U: Borrow<Value>>(
         retail_rows,
         counts,
         header,
-        has_ground_lobby,
+        ground_lobby_height: if has_ground_lobby {
+            lobby_height.clamp(1, MAX_LOBBY_HEIGHT)
+        } else {
+            0
+        },
         people_pop,
         class_pop,
         rooms,

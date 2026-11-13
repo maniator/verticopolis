@@ -67,7 +67,7 @@ function viewOf(t: Tower) {
 function makeApp(
   tool: GameApp["tool"],
   tower: Tower = {},
-  answers: { quote?: (x: number) => { ok: boolean; cost: number }; shaftOk?: boolean; reason?: string } = {},
+  answers: { quote?: (x: number) => { ok: boolean; cost: number }; shaftOk?: boolean; reason?: string; height?: number; rise?: number; walkTop?: number; tallLobbies?: number[] } = {},
   build: Record<string, ReturnType<typeof vi.fn>> = {},
 ) {
   const enginePort = mockPort({
@@ -77,6 +77,10 @@ function makeApp(
     }),
     quoteShaft: () => record("quoteShaft", { ok: answers.shaftOk === false ? 0 : 1 }),
     lastReason: () => answers.reason,
+    setLobbyHeight: vi.fn(),
+    lobbyRise: vi.fn(() => answers.rise ?? 1),
+    walkwayTop: vi.fn((_kind: number, _bottom: number, top: number) => answers.walkTop ?? top),
+    lobbyHeights: vi.fn(() => new Float64Array(answers.tallLobbies ?? [])),
   });
   const showInspector = vi.fn();
   const app = {
@@ -89,6 +93,7 @@ function makeApp(
     build,
     inspectAnchor: null as unknown,
     buildRefusalShowing: false,
+    lobbyHeight: { height: answers.height ?? 1 },
   };
   return { app: app as unknown as GameApp, raw: app, showInspector, enginePort };
 }
@@ -202,6 +207,15 @@ describe("updateBuildPreview", () => {
     }
   });
 
+  it("fixed-span transport out of a tall lobby: the ghost and quote climb to the engine's top (#308)", () => {
+    const x = snapX(CAT, "stairs", 14);
+    const { app, raw, enginePort } = makeApp(buildTool("stairs"), {}, { walkTop: 4 });
+    updateBuildPreview(app, 14, 1);
+    expect(enginePort.walkwayTop).toHaveBeenCalledExactlyOnceWith(code("kinds", "stairs"), 1, 2);
+    expect(enginePort.quoteShaft).toHaveBeenCalledExactlyOnceWith(code("kinds", "stairs"), x, 1, 4);
+    expect(raw.engine.transportPreview).toEqual({ kind: "stairs", x, bottom: 1, top: 4, valid: true });
+  });
+
   it("drag-sized transport: a single-floor ghost keyed to the unlock, with no quote", () => {
     const { app, raw, enginePort } = makeApp(buildTool("elevatorStandard"), { unlocked: false });
     updateBuildPreview(app, 14, 2);
@@ -283,6 +297,32 @@ describe("updateBuildPreview", () => {
     };
     expect(validWith(4 * BARE_LOBBY)).toMatchObject({ kind: "lobby", valid: true });
     expect(validWith(4 * BARE_LOBBY - 1)).toMatchObject({ kind: "lobby", valid: false });
+  });
+
+  it("a tall lobby's ghost covers every story it rises and prices the lobby per story (#308)", () => {
+    // Lobby on 10..29; the brush at 30 lays 30..33, four bare tiles, each
+    // the lobby price twice over and its floor once.
+    const tower = { structure: run(1, 10, 29, "lobby") };
+    const tall = BARE_LOBBY + price("lobby");
+    const ghostWith = (money: number) => {
+      const { app, raw, enginePort } = makeApp(buildTool("lobby"), { ...tower, money }, { quote: () => ({ ok: true, cost: tall }), height: 2, rise: 2 });
+      updateBuildPreview(app, 30, 1);
+      expect(enginePort.setLobbyHeight).toHaveBeenCalledExactlyOnceWith(2);
+      const order = (fn: unknown) => vi.mocked(fn as () => void).mock.invocationCallOrder[0];
+      expect(order(enginePort.setLobbyHeight)).toBeLessThan(order(enginePort.quoteBuild));
+      expect(enginePort.lobbyRise).toHaveBeenCalledExactlyOnceWith(1);
+      return raw.engine.preview as { valid: boolean; stories: number };
+    };
+    expect(ghostWith(4 * tall)).toMatchObject({ valid: true, stories: 2 });
+    expect(ghostWith(4 * tall - 1)).toMatchObject({ valid: false, stories: 2 });
+  });
+
+  it("the Floor tool's ground ghost asks one story, whatever the Lobby card holds (#308)", () => {
+    const tower = { structure: run(1, 10, 29, "lobby"), money: 1e9 };
+    const { app, raw, enginePort } = makeApp(buildTool("floor"), tower, { height: 3, rise: 1 });
+    updateBuildPreview(app, 30, 1);
+    expect(enginePort.setLobbyHeight).toHaveBeenCalledExactlyOnceWith(1);
+    expect(raw.engine.preview).toMatchObject({ kind: "lobby", stories: 1 });
   });
 
   it("counts a quoted bridge past the brush's end in the strip's price", () => {

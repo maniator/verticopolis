@@ -66,6 +66,16 @@ describe("pointer down routing", () => {
     expect(e.onActionDown).not.toHaveBeenCalled();
   });
 
+  it("Ctrl+Shift or Cmd+Shift is the three-story lobby, never the pan key (#308)", () => {
+    const classifyDown = vi.fn(() => "action");
+    const { e, handlers } = inputEng({ classifyDown });
+    handlers.down(ptr({ shift: true, ctrl: true, tile: 12, floor: 1 }));
+    handlers.up(ptr({ shift: true, ctrl: true, tile: 12, floor: 1 }));
+    handlers.down(ptr({ shift: true, meta: true, tile: 12, floor: 1 }));
+    expect(classifyDown.mock.calls).toEqual([[0, false, false], [0, false, false]]);
+    expect(e.onActionDown).toHaveBeenCalledWith(12, 1, false, null);
+  });
+
   it("without Shift (and no Space) the pan key is false", () => {
     const classifyDown = vi.fn(() => "action");
     const { handlers } = inputEng({ classifyDown });

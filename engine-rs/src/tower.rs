@@ -2,7 +2,7 @@
 //! and `tower/expressStops.ts`.
 
 use std::cell::RefCell;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 use crate::clock::GameMode;
 use crate::crowd::fasthash::FastMap;
@@ -10,6 +10,7 @@ use crate::facilities::*;
 use crate::lot::Lot;
 
 mod placement;
+mod tall_lobby;
 mod transports;
 mod types;
 mod undoing;
@@ -42,6 +43,15 @@ pub struct Tower {
     /// `transportsById`: shaft id to its index in `transports`.
     pub(crate) transport_by_id: HashMap<i64, usize>,
     pub(crate) lobby_tiles: HashMap<i64, i64>,
+    /// Each tall lobby's height in stories, by its floor (#308): a lobby
+    /// unit on a listed floor covers that many stories from its floor up.
+    /// A floor's first lobby placement writes its entry, so an entry left
+    /// by a lobby an undo took away is rewritten before it is read again;
+    /// `lobby_height` and the save read only floors that hold a lobby.
+    pub(crate) lobby_heights: BTreeMap<i64, i64>,
+    /// The height a floor's first lobby placement asks for while
+    /// `Simulation::with_lobby_height` runs, 1 otherwise. Never saved.
+    pub(crate) requested_lobby_height: i64,
     pub(crate) room_tiles: HashMap<i64, i64>,
     /// Revision-keyed memos and indexes (`servedSet`, `stopsCache`, segment
     /// runs, staff components and the `tower_index.rs` indexes), see
@@ -95,6 +105,8 @@ impl Tower {
             by_id: FastMap::default(),
             transport_by_id: HashMap::new(),
             lobby_tiles: HashMap::new(),
+            lobby_heights: BTreeMap::new(),
+            requested_lobby_height: 1,
             room_tiles: HashMap::new(),
             memo: RefCell::new(Default::default()),
             meal_overlay_revision: 0,
@@ -224,7 +236,7 @@ impl Tower {
     pub(crate) fn register(&mut self, idx: usize) {
         let u = self.units[idx].clone();
         self.by_id.insert(u.id, idx);
-        let hgt = u.kind.floors();
+        let hgt = self.unit_stories(&u);
         let structural = u.kind.is_structural();
         for fl in 0..hgt {
             for i in 0..u.width {
@@ -250,7 +262,7 @@ impl Tower {
 
     pub(crate) fn unregister(&mut self, u: &Unit) {
         self.by_id.remove(&u.id);
-        let hgt = u.kind.floors();
+        let hgt = self.unit_stories(u);
         let structural = u.kind.is_structural();
         for fl in 0..hgt {
             for i in 0..u.width {

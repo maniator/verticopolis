@@ -285,6 +285,20 @@
   #hint {
     display: none;
   }
+  /* The lobby height strip (#308): the tool card is in the drawer here, so
+     the 1 / 2 / 3 story choice floats over the tower while the Lobby tool is
+     armed. */
+  #lobby-height-strip:not([hidden]) {
+    display: flex;
+    position: absolute;
+    left: max(10px, env(safe-area-inset-left));
+    bottom: max(10px, env(safe-area-inset-bottom));
+    z-index: 2;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 6px;
+    font-size: 11px;
+  }
   #editor {
     width: min(250px, 80vw);
   }

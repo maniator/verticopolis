@@ -241,7 +241,9 @@ fn fixture_towers_import_the_same() {
     let mut took = [0; 3];
     for (i, p) in paths.iter().enumerate() {
         let text = std::fs::read_to_string(p).unwrap();
-        let current = decode_vctower(&text).unwrap()["version"] == json!(STREAMED_VERSION as i64);
+        let version = decode_vctower(&text).unwrap()["version"].clone();
+        let current = version == json!(STREAMED_VERSION as i64)
+            || version == json!(PLAIN_STREAMED_VERSION as i64);
         // A current tower is read with each mode; an older one, which goes
         // to today's path, with one, to keep the debug build's time down.
         let tried = if current { 0..3 } else { i % 3..i % 3 + 1 };

@@ -15,7 +15,7 @@ fn a_save_from_a_newer_build_is_refused_on_every_route() {
         json!(SAVE_VERSION + 1),
         json!(999),
         json!(999.5),
-        json!(7.5),
+        json!(SAVE_VERSION as f64 + 0.5),
     ] {
         let save = save_at(newer);
         let text = save.to_string();

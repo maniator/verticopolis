@@ -2070,9 +2070,11 @@
   "rules": {
     "buildsWhilePaused": false,
     "exportsTo1994": true,
+    "maxLobbyHeight": 3,
     "previewNamesRefusal": false,
     "quotesLobbyDistance": false,
     "scheduleAssist": false,
+    "tallSkyLobbies": false,
     "variantHouseholds": false
   },
   "version": 15,

@@ -146,7 +146,7 @@ fails CI until that page and the example host follow.
 | Start a game | `sim::Simulation::new_game(seed, mode)`, `new_game_with(seed, mode, calendar, start_unbridged)` |
 | Advance time | `sim.tick(dt_minutes)`, or `fixed_step::FrameStepper::advance` to pace time from frames the way the web game does |
 | Quote a placement | `sim.can_build(kind, floor, x)`, `sim.can_build_transport(kind, x, bottom, top)` |
-| Player commands | `build`, `build_transport`, `sell_at`, `paint_brush`, `add_car`, `remove_car`, `extend_transport`, `remove_facility`, `adjust_rent`, `set_no_rate`, `price_unit`, `change_film` and `book_film` (show a film tier on a theater's first screen, or on the screen named, at the price in the catalog's `films`; a Modern theater runs the catalog's `cinemaScreens` of 2, each with its own film, and each screen books its `set_film_policy` or `set_screen_policy` film again once its film is spent), `set_ticket_price` (a Modern theater's ticket price step, from the catalog's `ticketPrices`), `resolve_choice` |
+| Player commands | `build`, `build_transport`, `sell_at`, `paint_brush` (with `set_lobby_height` or `with_lobby_height` for a lobby two or three stories tall, where the mode lets that floor's lobby rise, and refused with a reason where it cannot; its height never changes once built), `add_car`, `remove_car`, `extend_transport`, `remove_facility`, `adjust_rent`, `set_no_rate`, `price_unit`, `change_film` and `book_film` (show a film tier on a theater's first screen, or on the screen named, at the price in the catalog's `films`; a Modern theater runs the catalog's `cinemaScreens` of 2, each with its own film, and each screen books its `set_film_policy` or `set_screen_policy` film again once its film is spent), `set_ticket_price` (a Modern theater's ticket price step, from the catalog's `ticketPrices`), `resolve_choice` |
 | Read state | the public fields (`money`, `star`, `clock`, `tower`, `log`) and `population()`; read them, never write them |
 | Draw a frame | `view::structure_view(&sim)` and `view::ViewReader::frame`, or `frame::frame_view(&sim)`, flat number arrays read through the named slots in `view::layout` and `frame` |
 | Gameplay events | `sim.gameplay.drain()` after each frame; the names and payloads are in `gameplay::CATALOG_JSON` |
@@ -190,6 +190,10 @@ The crate has no default features.
 - **The loader repairs.** A damaged or hand-edited save is coerced the way
   the web game's loader does; only a file it cannot read is refused, and so
   is a save from a newer engine.
+- **Save versions.** A save is version 7 unless it holds a lobby taller
+  than one story; then it is version 8 and carries `lobbyHeights`, so an
+  engine too old to build one refuses it instead of loading a one-story
+  lobby. Both load here.
 
 ## Proving conformance
 

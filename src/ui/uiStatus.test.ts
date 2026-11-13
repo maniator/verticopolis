@@ -139,7 +139,7 @@ function hud(header: Partial<typeof HEADER> = {}) {
   const catalog = catalogFor("classic");
   let scanKey = h.mode + ":" + h.star;
   for (const f of catalog.facilities) scanKey += h.money >= f.cost ? "1" : "0";
-  const ui = { el, cb: { getCatalog: () => catalog }, paletteCatalog: catalog, paletteScanKey: scanKey, lastLogSeq: h.logSeq, tool: { type: "inspect" }, setTowerName: () => {} } as unknown as UI;
+  const ui = { el, cb: { getCatalog: () => catalog }, paletteCatalog: catalog, paletteScanKey: scanKey, lastLogSeq: h.logSeq, tool: { type: "inspect" }, setTowerName: () => {}, lobbyPicker: () => undefined } as unknown as UI;
   return { ui, el };
 }
 
@@ -282,7 +282,7 @@ describe("the palette's lock scan", () => {
     const el = new Proxy({ palette } as Record<string, HTMLElement>, {
       get: (made, key: string) => (made[key] ??= document.createElement("div")),
     });
-    const ui = { el, cb: { getCatalog: () => catalog }, paletteCatalog: catalog, paletteScanKey: "", lastLogSeq: 0, tool: { type: "inspect" }, setTowerName: () => {} } as unknown as UI;
+    const ui = { el, cb: { getCatalog: () => catalog }, paletteCatalog: catalog, paletteScanKey: "", lastLogSeq: 0, tool: { type: "inspect" }, setTowerName: () => {}, lobbyPicker: () => undefined } as unknown as UI;
     ui.selectTool = (tool) => { ui.tool = tool; };
     const pump = () => update(ui, source({ mode, star: 5, money: 1e9 }).src);
     pump();

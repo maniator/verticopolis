@@ -17,12 +17,13 @@ use super::types::{TdtTenant, TdtTower};
 use super::LegacyImportError;
 use crate::economy::visitors::counts_set_audience;
 use crate::facilities::{is_lobby_floor, Kind, LOT_WIDTH, MAX_FLOOR};
-use crate::sim::SAVE_VERSION;
+use crate::sim::save_version;
 
 mod fallback;
 mod out_unit;
 mod parking;
 mod seed;
+mod stories;
 
 use self::{fallback::fallback_transports, parking::close_parking_gaps, seed::seed_from_finance};
 use out_unit::OutUnit;
@@ -359,7 +360,9 @@ pub fn parse_tdt(bytes: &[u8], filename: &str) -> Result<ParsedLegacyTower, Lega
         }
     }
 
-    // The paving pass: width-1 tiles, lobby on lobby floors.
+    // The paving pass: width-1 tiles, lobby on lobby floors, none on the
+    // stories a tall ground lobby rises through.
+    let lobby_height = stories::raise_ground_lobby(&mut paved, &tdt, &units);
     let mut unit_values: Vec<Value> = units.iter().map(OutUnit::to_json).collect();
     seed::seed_visitors(&mut unit_values, &tdt);
     seed::seed_halls_and_theatres(&mut unit_values, &tdt);
@@ -400,17 +403,7 @@ pub fn parse_tdt(bytes: &[u8], filename: &str) -> Result<ParsedLegacyTower, Lega
         }
     }
 
-    let mut excavated: Vec<String> = vec![];
-    for (&floor, row) in &paved {
-        if floor > 0 {
-            continue;
-        }
-        for (x_tile, &cell) in row.iter().enumerate() {
-            if cell != 0 {
-                excavated.push(format!("{floor}:{x_tile}"));
-            }
-        }
-    }
+    let excavated = stories::excavated_tiles(&paved);
 
     let decoded = tdt.tail.elevators.is_some();
     let mut decode_stats = DecodeStats::default();
@@ -421,6 +414,7 @@ pub fn parse_tdt(bytes: &[u8], filename: &str) -> Result<ParsedLegacyTower, Lega
                 elevators,
                 tdt.tail.stairs.as_deref().unwrap_or(&[]),
                 next_id,
+                lobby_height,
             );
             decode_stats = DecodeStats {
                 dropped_shafts: d.dropped_shafts,
@@ -452,7 +446,7 @@ pub fn parse_tdt(bytes: &[u8], filename: &str) -> Result<ParsedLegacyTower, Lega
         -1
     };
     let mut save = Map::new();
-    save.insert("version".into(), json!(SAVE_VERSION));
+    save.insert("version".into(), json!(save_version(lobby_height > 1)));
     save.insert("seed".into(), json!(hash_seed(bytes)));
     save.insert("money".into(), json!(money));
     save.insert("star".into(), json!(star));
@@ -466,6 +460,9 @@ pub fn parse_tdt(bytes: &[u8], filename: &str) -> Result<ParsedLegacyTower, Lega
     save.insert("nextId".into(), json!(next_id));
     save.insert("towerName".into(), json!(tower_name));
     save.insert("builtWeddingHall".into(), json!(has_wedding_hall));
+    if lobby_height > 1 {
+        save.insert("lobbyHeights".into(), json!([[1, lobby_height]]));
+    }
     save.insert("evaluatedTower".into(), json!(star >= 6));
     save.insert("vipVisitDay".into(), json!(vip_visit_day));
     save.insert("vipFavorable".into(), json!(star >= 4));

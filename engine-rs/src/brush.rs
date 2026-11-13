@@ -28,6 +28,56 @@ impl BrushResult {
 }
 
 impl Simulation {
+    /// How many stories a structural tile of `kind` laid on `floor` covers:
+    /// a lobby's height on that floor ([`Self::with_lobby_height`]), 1 for a
+    /// floor tile.
+    pub(crate) fn tile_stories(&self, kind: Kind, floor: i64) -> i64 {
+        if kind == Kind::Lobby {
+            self.tower.placement_lobby_height(floor)
+        } else {
+            1
+        }
+    }
+
+    /// Runs `run` with `height` as the height a floor's first lobby
+    /// placement asks for (#308), so a lobby built, quoted or brushed inside
+    /// it on a floor that holds no lobby yet rises that many stories, where
+    /// the mode lets that floor's lobby rise. A floor that holds a lobby
+    /// keeps its height whatever is asked. Outside it, a first lobby is one
+    /// story. The height is clamped to 1 through
+    /// [`MAX_LOBBY_HEIGHT`](crate::facilities::MAX_LOBBY_HEIGHT).
+    ///
+    /// ```
+    /// use verticopolis_engine::clock::GameMode;
+    /// use verticopolis_engine::facilities::Kind;
+    /// use verticopolis_engine::sim::Simulation;
+    ///
+    /// let mut sim = Simulation::new_game(1, GameMode::Classic);
+    /// let tiles: Vec<i64> = (100..104).collect();
+    /// sim.with_lobby_height(2, |sim| sim.paint_brush(Kind::Lobby, 1, &tiles));
+    /// assert_eq!(sim.tower.lobby_height(1), 2);
+    /// ```
+    pub fn with_lobby_height<T>(
+        &mut self,
+        height: i64,
+        run: impl FnOnce(&mut Simulation) -> T,
+    ) -> T {
+        let before = self.tower.requested_lobby_height;
+        self.set_lobby_height(height);
+        let out = run(self);
+        self.tower.requested_lobby_height = before;
+        out
+    }
+
+    /// Sets the height a floor's first lobby placement asks for until it is
+    /// set again, as a frontend's lobby tool holds its choice between
+    /// clicks; [`Self::with_lobby_height`] is the scoped form. Clamped to 1
+    /// through [`MAX_LOBBY_HEIGHT`](crate::facilities::MAX_LOBBY_HEIGHT).
+    /// Tool state only: never saved, and a loaded tower starts at 1.
+    pub fn set_lobby_height(&mut self, height: i64) {
+        self.tower.requested_lobby_height = height.clamp(1, crate::facilities::MAX_LOBBY_HEIGHT);
+    }
+
     /// Lays `kind` (floor or lobby) on each tile column in `tiles` on
     /// `floor`, charging as that many [`build`](Simulation::build) calls
     /// would, in one command. It skips a tile that already carries `kind`,
