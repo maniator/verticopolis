@@ -22,6 +22,7 @@
  * made per frame, or every sync would rebuild.
  */
 import type { FacilityKind } from "../../shared/types";
+import type { HallRun } from "../lobbyHalls";
 import { buildMapDrawList, type MapMark, type MapSource } from "./drawList";
 import { bandedExtent, sameExtent, viewPlacement, type BuiltFloors, type ViewPlacement } from "./extent";
 import { fitLayout, type MapCamera, type MapLayout, type MapWorld } from "./geometry";
@@ -48,6 +49,10 @@ export interface MapFrameInput {
   /** A kind's height in floors. It is not part of the rebuild key: the catalog
    *  is bound per tower, and a new tower comes with new arrays. */
   floorsOf(kind: FacilityKind): number;
+  /** The lobby halls taller than one story, read only on a rebuild. Not part
+   *  of the rebuild key either: a lobby never changes height once built, and
+   *  a new tall hall comes with a new `structure` array. */
+  tallLobbies(): ReadonlyArray<HallRun>;
 }
 
 /** A box size as `fitLayout` reads it: a positive finite number, or 1. */
@@ -105,6 +110,7 @@ export class OverviewMapModel {
       rooms: input.view.rooms,
       transports: input.view.tower.transports,
       floorsOf: (kind) => input.floorsOf(kind),
+      tallLobbies: () => input.tallLobbies(),
     };
     this.marks = buildMapDrawList(this.layout, source);
     return true;

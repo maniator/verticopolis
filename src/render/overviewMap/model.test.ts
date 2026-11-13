@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { SKY_HEADROOM_FLOORS } from "../cameraBounds";
 import { FLOOR, TILE } from "../scale";
 import { OverviewMapModel, type MapFrameInput, type MapViewInput } from "./model";
@@ -16,7 +16,7 @@ function view(highestFloor = 20, over: Partial<MapViewInput> = {}): MapViewInput
 }
 
 function input(v: MapViewInput, over: Partial<MapFrameInput> = {}): MapFrameInput {
-  return { view: v, world: WORLD, skyFloors: SKY_HEADROOM_FLOORS, boxWidth: 150, boxHeight: 300, topReserve: 0, floorsOf: () => 1, ...over };
+  return { view: v, world: WORLD, skyFloors: SKY_HEADROOM_FLOORS, boxWidth: 150, boxHeight: 300, topReserve: 0, floorsOf: () => 1, tallLobbies: () => [], ...over };
 }
 
 const cam = (line = 10) => ({ posX: 187 * TILE, posY: -line * FLOOR, zoom: 1, viewWidth: 1000, viewHeight: 14 * FLOOR });
@@ -28,6 +28,18 @@ describe("OverviewMapModel.sync", () => {
     expect(m.sync(input(v))).toBe(true);
     expect(m.marks.length).toBe(3);
     expect(m.sync(input(v))).toBe(false);
+  });
+
+  it("reads the tall lobby halls on a rebuild only, and draws them at their full height (#308)", () => {
+    const m = new OverviewMapModel();
+    const v = view();
+    const tallLobbies = vi.fn(() => [{ floor: 1, x0: 100, x1: 149, height: 3 }]);
+    expect(m.sync(input(v, { tallLobbies }))).toBe(true);
+    expect(tallLobbies).toHaveBeenCalledTimes(1);
+    expect(m.marks.length).toBe(4);
+    expect(m.marks.filter((mark) => mark.kind === "lobby")).toHaveLength(1);
+    expect(m.sync(input(v, { tallLobbies }))).toBe(false);
+    expect(tallLobbies).toHaveBeenCalledTimes(1);
   });
 
   it("does not rebuild when a new tower object keeps the same arrays", () => {

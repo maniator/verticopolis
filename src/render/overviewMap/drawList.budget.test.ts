@@ -36,7 +36,7 @@ function largeTower(): MapSource & { tiles: number } {
   }
   for (let i = 0; i < 24; i++) transports.push({ kind: "elevatorStandard", x: 14 * i, width: 4, bottom: -9, top: 100 });
   for (let i = 0; i < 64; i++) transports.push({ kind: "stairs", x: 5 * i, width: 2, bottom: i % 90, top: (i % 90) + 1 });
-  return { structure, rooms, transports, floorsOf: (k) => (k === "cinema" ? 2 : 1), tiles };
+  return { structure, rooms, transports, floorsOf: (k) => (k === "cinema" ? 2 : 1), tallLobbies: () => [], tiles };
 }
 
 const patterns: PatternSource = { get: (fill, pattern) => (pattern === "solid" ? fill : `${pattern}:${fill}`) };
