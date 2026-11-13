@@ -21,6 +21,7 @@ nvm use            # picks up .nvmrc
 npm install
 npm run dev        # Vite dev server on http://localhost:5173
 npm run build      # production build into dist/
+npm run preview    # serve that build on http://localhost:4173
 ```
 
 `npm run dev` serves the game with HMR (the service worker is disabled in dev so

@@ -1,6 +1,9 @@
 # 🏙️ Verticopolis: a browser SimTower clone
 
-**Play it: [verticopolis.com](https://verticopolis.com)**
+**Play it: [verticopolis.com](https://verticopolis.com)** ·
+[How to play](https://verticopolis.com/help/) ·
+[Engine docs](https://docs.verticopolis.com/) ·
+[Release notes](https://verticopolis.com/help/changelog/)
 
 A from-scratch, browser-native homage to the classic **SimTower** (1994): a
 vertical metropolis you build floor by floor. Wire it with elevators, attract
@@ -8,16 +11,41 @@ tenants, set the rents, keep everyone happy, and climb the star ratings all the
 way to a coveted **TOWER**.
 
 The simulation is a **Rust** engine (`engine-rs/`) compiled to
-**WebAssembly**, and it is the only engine the game runs (see
-[Architecture](#architecture)). Everything around it is
-**TypeScript** on the **[Excalibur.js](https://excaliburjs.com/)** game engine
-(camera, scene, culling and the render loop). A procedural soundtrack built on
-**[Tone.js](https://tonejs.github.io/)** changes depending on which part of the
-tower you're looking at. No external art assets: every sprite is drawn in code.
+**WebAssembly**, and it is the only engine the game runs. Everything around it
+is **TypeScript** on the **[Excalibur.js](https://excaliburjs.com/)** game
+engine (camera, scene, culling and the render loop). A procedural soundtrack
+built on **[Tone.js](https://tonejs.github.io/)** changes depending on which
+part of the tower you're looking at. No external art assets: every sprite is
+drawn in code.
 
 ![Sprite gallery](docs/screenshots/06-sprite-gallery.png)
 
-## Play
+## What's in it
+
+- **Two ways to play.** *Classic* is the 1994 game, rule for rule; *Modern*
+  keeps it and adds what the original couldn't do.
+  ([Classic and Modern](https://verticopolis.com/help/classic-vs-modern/))
+- **Every room from the original**: offices, condos, hotels, shops and
+  restaurants, the cinema and party hall, services, the metro and the Wedding
+  Hall. ([Rooms](https://verticopolis.com/help/rooms/))
+- **Stairs, escalators and three kinds of elevator**, with cars and stops you
+  set yourself. ([Elevators](https://verticopolis.com/help/building/elevators/))
+- **A living tower** on one game clock: rush hours, quiet nights, people riding
+  the cars, lights in the windows, the metro train pulling in.
+  ([People](https://verticopolis.com/help/tower/people/))
+- **Stars, events and the TOWER**: fires, bomb threats, the VIP and the final
+  inspection. ([Stars and the TOWER](https://verticopolis.com/help/tower/stars/),
+  [Events](https://verticopolis.com/help/tower/events/))
+- **Your towers, kept**: autosave and save slots, `.vctower` files, and the
+  original game's `.TDT` saves in both directions.
+  ([Saving and loading](https://verticopolis.com/help/your-towers/saving/))
+- **Installable and offline** on desktop and phone.
+  ([Installing and updates](https://verticopolis.com/help/your-towers/installing/))
+
+How close it is to the original, mechanic by mechanic, is in
+[PARITY.md](PARITY.md).
+
+## Quick start
 
 ```bash
 npm install
@@ -29,232 +57,22 @@ The game cannot start without the engine package. On x86_64 Linux,
 `bash scripts/build-engine-wasm.sh` installs the pinned Rust toolchain and builds
 it in one step.
 
-Other scripts:
+## Learn more
 
-```bash
-npm run build        # production build to dist/
-npm run preview      # serve the production build
-npm run screenshots  # preview capture only; the committed gallery is rendered in the pinned
-                     # Playwright container (see docs/screenshots.md)
-```
-
-Contributing? See **[CONTRIBUTING.md](CONTRIBUTING.md)** for the dev workflow:
-the quality gates (`typecheck`, `lint`, `test`, `build`), the two test tiers, and
-the enforced coverage floors.
-
-## Install it (PWA)
-
-The production build (`npm run build`) is an installable **Progressive Web App**.
-Open the served build in Chrome, Edge, or Safari and use **Install app** / **Add
-to Home Screen** to run Verticopolis in its own window, offline.
-
-It's built on **[`vite-plugin-pwa`](https://vite-pwa-org.netlify.app/)** (Workbox
-under the hood), so there's no hand-rolled service worker. A few details worth
-knowing:
-
-- **Always the latest, never a lost tower.** When a new version is deployed, the
-  game detects the waiting update, **forces a quick save first**, shows a brief
-  "updating…" toast, then swaps to the new assets. You always end up on the
-  current build and your tower survives the reload.
-- **Scoped to the game.** Only the main game registers the service worker; the
-  `gallery`/`preview` tooling pages are excluded from its scope and
-  precache.
-- **Icons** live in `src/public/` and are generated from an in-code SVG (no
-  external art), matching the game's "every sprite drawn in code" ethos. Regen
-  with `npm run icons`.
-
-## How to play
-
-- **Found your tower.** *New Tower* lets you pick a **rule-set**: *Classic*
-  (the 1994 game, rule for rule) or *Modern* (everything in Classic, plus
-  **2–5 person condo households** that can move out, a deeper economy, and a
-  choice of calendar pace). It's chosen once and fixed for that tower's life;
-  start another to play the other way.
-- **Build floors first.** Lay `Floor` tiles, then place rooms on top of them.
-  The ground floor and every 15th floor want a `Lobby`.
-- **Move people.** Every floor needs an `Elevator` or `Stairs` chain back to the
-  ground lobby. Unreachable tenants get unhappy and leave.
-- **Make money.** Offices pay quarterly rent, condos sell once for a lump sum,
-  hotels earn nightly (and must be cleaned by `Housekeeping`), and shops,
-  restaurants and cinemas earn from foot traffic.
-- **Grow your rating.** ⭐ thresholds: 2★ at 300 population, 3★ at 1,000 (needs
-  Security), 4★ at 5,000 (needs a Medical Center), 5★ at 10,000.
-- **Win.** At 5★ with a Metro Station, build the `Wedding Hall` on floor 100 and
-  pass the VIP inspection to become a **TOWER**.
-
-### Controls
-
-| Action | How |
+| Playing | Building it |
 | --- | --- |
-| Pan | Drag with the Inspect tool, drag with the middle button, or hold Shift or Space and drag |
-| Zoom | Mouse wheel |
-| Build a room | Pick it from the left palette, click on a floor |
-| Build/paint floors | Pick `Floor`/`Lobby`, click-drag |
-| Build an elevator/stairs | Pick it, drag vertically to set the span |
-| Edit a facility | Right-click a room or shaft, or click it with the Inspect tool → edit panel |
-| Bulldoze | Bulldoze tool, click (or drag) |
-| Game speed | Top-right buttons, or number keys `0`–`3` |
-| Undo / Redo | `Ctrl+Z` / `Ctrl+Shift+Z` (`⌘` on Mac), or the ↩ ↪ top-bar buttons |
-
-## Features
-
-- **Facilities:** lobby, floors, offices, condominiums, three hotel room grades,
-  fast food, restaurants, shops, cinema, party hall, parking, security, medical,
-  housekeeping, recycling, metro station and the wedding hall.
-- **Transport:** stairs, escalators, and **standard / service / express**
-  elevators, each with adjustable car counts and served-floor ranges, edited
-  in-game just like the original.
-- **Living tower:** people walk the lobbies, elevator cars carry passengers up
-  and down, window lights switch on and off, the cinema screen plays, and the
-  metro train pulls in and departs. All of it runs off a single global game
-  clock (no per-room timers).
-- **Economy & time:** weekday/weekend rhythms, morning/lunch/evening rushes,
-  quarterly rent, monthly maintenance, nightly hotel revenue, and a daily
-  housekeeping cycle (rooms get dirty after checkout and need cleaning).
-- **Star ratings** with population thresholds and facility gates, ending in the
-  VIP TOWER evaluation.
-- **The Map:** one overview of the whole tower with the Eval, Pricing, Hotel,
-  Traffic and Occupancy views.
-- **Events:** fires that Security has to contain, bomb threats where refusing
-  the ransom sends Security searching floor by floor against the clock, and
-  buried treasure under the basements.
-- **Location-aware soundtrack:** a procedural WebAudio synth crossfades between
-  musical "scenes" (lobby muzak, office hum, hotel calm, food-court bustle,
-  cinema score, subway rumble…) based on what the camera is centered on, plus
-  build/sell/promotion jingles.
-- **Save anywhere:** autosave to `localStorage`, multiple save slots, plus
-  tower-file (`.vctower`) export/import and the original game's `.TDT` files.
-
-## Saving & loading
-
-**For players.** The game **autosaves** to your browser's `localStorage` and
-restores that slot on the next launch. You also get **3 named manual slots** so
-you can keep several towers, and **tower-file export/import** for backups or
-sharing a tower with someone else. Export downloads your tower as a compact,
-compressed **`.vctower`** file (a fraction of the size of the old JSON
-exports), and Import loads one back through a file picker. Saves are managed
-from the in-game saves panel; clearing your browser storage erases them.
-
-The game can also **import and export the original game's `.TDT` save files**,
-so a 1994 tower can be opened here and a Classic tower built here can be written
-out as a `.TDT` (Modern towers are refused, since SimTower can only load Classic
-ones). The format is documented in [docs/canon/tdt-format.md](docs/canon/tdt-format.md).
-
-**How it works.** A save is a snapshot of the **simulation**, not the
-renderer. The Rust engine writes the deterministic source of truth (money, star
-rating, the game clock, the RNG seed, every unit and transport, the event
-system and excavation history) as save text, and `SaveGame`
-(`src/storage/SaveGame.ts`) compresses it into `localStorage`. On load, the
-engine rebuilds the tower from that text and the Excalibur scene is regenerated
-from the engine. The scene graph is *derived* view state and is never saved.
-
-Saves are treated as **untrusted input**. The engine's loader
-(`engine-rs/src/load.rs`) bounds the inflate, coerces bad numbers, drops units
-it does not recognize and clamps car counts and shaft heights, so a hand-edited,
-corrupt or foreign file degrades gracefully instead of crashing the game. Older
-saves are migrated on load; a save from a *newer* build is refused with a
-message asking the player to update. The save round-trip is covered by the
-engine's Rust tests and the Vitest suite.
-
-## 1994 SimTower parity
-
-How the clone maps to the original's mechanics, in brief. Items marked ✅ are
-implemented and covered by the test suites and/or the captured screenshots.
-[PARITY.md](PARITY.md) has the full list, with the known gaps.
-
-| Original mechanic | Status |
-| --- | --- |
-| Build floors, then rooms on top; ground + sky lobbies | ✅ |
-| Lobby floors are transit-only (no rooms) | ✅ |
-| ~100 floors up, basements below, continuous numbering (B1 = floor 0) | ✅ |
-| Offices (quarterly rent) | ✅ |
-| Condos / apartments (one-time sale, ~2×–2.5× cost, owner buy-back on loss) | ✅ |
-| Hotel single / double / suite (nightly, need housekeeping) | ✅ |
-| Fast food, restaurant, shop (foot-traffic income, business hours) | ✅ |
-| Multi-floor cinema, party hall | ✅ |
-| Parking, security, medical, housekeeping, recycling | ✅ |
-| Whole-floor basement metro that brings visitors & eases the commute | ✅ |
-| Cathedral → **religion-agnostic Wedding Hall**: 28 wide, five floors tall, standing on floor 100 | ✅ |
-| Stairs, escalators, standard / service / express elevators | ✅ |
-| Adjustable elevator cars + per-floor (express) stop config | ✅ |
-| **Demand-driven elevator cars** (SCAN dispatch toward waiting floors) | ✅ |
-| Star ratings 1–5 → TOWER, population thresholds + facility gates | ✅ |
-| VIP inspection for the final TOWER rating | ✅ |
-| Elevator overcrowding stresses tenants; the unhappy leave | ✅ |
-| Rush-hour demand (morning/lunch/evening) vs. quiet nights | ✅ |
-| Stressed crowds turn red when transport is overwhelmed | ✅ |
-| Construction time with scaffolding; destruction/sell refunds | ✅ |
-| **Fire** that spreads unless security/medical contain it | ✅ |
-| **Bomb threats**: pay the ransom, or Security searches floor by floor before the deadline | ✅ |
-| **Buried treasure** found while excavating basements | ✅ |
-| Living tower: walking people, riding cars, the metro train, day/night | ✅ |
-| Save/load, multiple slots, .vctower export/import | ✅ |
-| Per-person routing and stress | ◑ commuters are routed one by one; shop and restaurant traffic is still an aggregate model |
-
-**Desktop vs. mobile:** the desktop layout mirrors the original's dollhouse
-cross-section; mobile gets a responsive portrait layout with an icon toolbar and
-touch pan/pinch (see `docs/screenshots/09-mobile.png`), and a phone held sideways
-docks the tools in a column on the left (`docs/screenshots/09d-mobile-landscape-palette.png`).
-
-## Architecture
-
-The simulation is the **Rust** engine in `engine-rs/`, compiled to WebAssembly.
-It is the only engine the game runs: there is no TypeScript fallback, and if the
-engine cannot start, the game stops with a message. The TypeScript side
-(rendering on Excalibur.js, the DOM UI, audio, input and storage) talks to it
-through one synchronous interface, `EnginePort`, and never decides a game rule
-itself.
-
-**Want to work on the simulation?** The engine takes contributions like the
-rest of the game. [engine-rs/README.md](engine-rs/README.md) maps its modules
-and covers building (`npm run wasm:build`), testing (`cargo test`, the
-conformance referee) and the rules a gameplay change follows.
-
-**[ARCHITECTURE.md](ARCHITECTURE.md)** has the source layout and diagrams of
-the layers, the frame loop, the engine, input and persistence.
-[CONTRIBUTING.md](CONTRIBUTING.md) covers building the engine package
-(`npm run wasm:build`) and how the app and engine versions move.
+| [Your first tower](https://verticopolis.com/help/first-tower/) | [CONTRIBUTING.md](CONTRIBUTING.md): setup, quality gates, tests and coverage, versioning, review |
+| [Controls](https://verticopolis.com/help/controls/) (mouse, touch, keyboard) | [ARCHITECTURE.md](ARCHITECTURE.md): source layout, the frame loop, input, saves, the PWA |
+| [Rooms](https://verticopolis.com/help/rooms/) | [engine-rs/README.md](engine-rs/README.md): working on the simulation |
+| [Map and windows](https://verticopolis.com/help/tower/map-and-windows/) | [docs.verticopolis.com](https://docs.verticopolis.com/): the engine package, crate, API and conformance |
+| [Importing and exporting](https://verticopolis.com/help/your-towers/importing-exporting/) | [docs/canon/tdt-format.md](docs/canon/tdt-format.md): the `.TDT` save format |
+| [The whole manual](https://verticopolis.com/help/) | [docs/screenshots.md](docs/screenshots.md): the screenshot gallery and how it is rendered, including the [1★ to TOWER ladder](docs/screenshots/milestones/) |
 
 ## Screenshots
-
-See [docs/screenshots.md](docs/screenshots.md) for how these are captured and how
-to add before/after images to a pull request.
 
 | Day | Night |
 | --- | --- |
 | ![day](docs/screenshots/03-tower-day.png) | ![night](docs/screenshots/04-tower-night.png) |
-
-### From a lobby to a legend: the ★ progression
-
-A humble ground floor climbs the whole rating ladder to the coveted **TOWER**.
-These frames come from the pinned-container screenshot pipeline (the
-`milestones` scene in `scripts/scenes/milestones.ts`), the same one that
-renders the rest of the gallery. The end-to-end test (`e2e/milestones.spec.ts`)
-independently earns every rung on each run and uploads its own captures as a
-CI artifact (to the untracked `e2e/output/`, never this gallery), so the rungs
-shown here are continuously proven against what the game actually does.
-
-| 1★ | 2★ | 3★ |
-| --- | --- | --- |
-| ![1 star](docs/screenshots/milestones/1-star.png) | ![2 star](docs/screenshots/milestones/2-star.png) | ![3 star](docs/screenshots/milestones/3-star.png) |
-
-| 4★ | 5★ | TOWER |
-| --- | --- | --- |
-| ![4 star](docs/screenshots/milestones/4-star.png) | ![5 star](docs/screenshots/milestones/5-star.png) | ![TOWER achieved](docs/screenshots/milestones/tower.png) |
-
-## Tests
-
-The simulation's rules are tested in Rust (`cargo test` in `engine-rs/`), and
-the engine is held to the conformance lock in `conformance/`. The web game has
-two tiers: a fast **Vitest** unit suite (game logic, UI, sprites, audio,
-storage, save/load round-trips, and the engine through its WASM package) and a
-**Playwright** browser end-to-end suite that proves the game stays winnable and
-renders. Run `npm test` and `npm run e2e` (after
-`VC_TOOLING=1 npm run build`; the flag publishes the `window.game` handle the
-e2e specs drive, which production builds compile away). The full testing
-strategy (the two tiers, the enforced
-coverage floors, and what's unit-tested vs. integration-covered) lives in
-**[CONTRIBUTING.md](CONTRIBUTING.md)** → *Testing & coverage*.
 
 ## License
 
