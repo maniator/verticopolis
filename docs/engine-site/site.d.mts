@@ -11,5 +11,6 @@ export interface MenuGroup {
 }
 export function siteTitle(ref?: string): string;
 export const GITHUB: string;
+export const SHORT_TITLE: string;
 export const RUST_REFERENCE: string;
 export const sidebar: (MenuLink | MenuGroup)[];
