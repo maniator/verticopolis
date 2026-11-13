@@ -140,7 +140,7 @@ impl Tower {
             if !self.room_span_free(fl, x, f.width) {
                 return Some("Something is already here.".into());
             }
-            if let Some(r) = self.tall_lobby_story_reason(fl) {
+            if let Some(r) = self.tall_lobby_story_reason(fl, x, f.width) {
                 return Some(r);
             }
             // The wedding hall's upper stories stand above the last floor slab.
@@ -191,15 +191,8 @@ impl Tower {
             if kind == Kind::Lobby && is_sky_lobby_floor(floor) && self.floor_has_room(floor) {
                 return PlaceResult::fail("Clear the rooms here first, then place your sky lobby.");
             }
-            if !self.structure_span_free(floor, x, f.width) {
-                if kind != Kind::Lobby || !self.span_upgradeable_to_lobby(floor, x, f.width) {
-                    return PlaceResult::fail("Structure already here.");
-                }
-                if !self.room_span_free(floor, x, f.width) {
-                    return PlaceResult::fail(
-                        "Lobbies are transit-only. Clear the rooms here first.",
-                    );
-                }
+            if let Some(r) = self.structure_taken_reason(kind, floor, x, f.width) {
+                return PlaceResult::fail(r);
             }
             if !self.is_supported(floor, x, f.width) {
                 return PlaceResult::fail(if floor >= 2 {
@@ -255,13 +248,8 @@ impl Tower {
         if let Some(r) = self.metro_reason(kind, floor) {
             return PlaceResult::fail(r);
         }
-        if !self.structure_span_free(floor, x, f.width) {
-            if kind != Kind::Lobby || !self.span_upgradeable_to_lobby(floor, x, f.width) {
-                return PlaceResult::fail("Structure already here.");
-            }
-            if !self.room_span_free(floor, x, f.width) {
-                return PlaceResult::fail("Lobbies are transit-only. Clear the rooms here first.");
-            }
+        if let Some(r) = self.structure_taken_reason(kind, floor, x, f.width) {
+            return PlaceResult::fail(r);
         }
         self.tall_lobby_structure_reason(kind, floor, x, f.width)
             .map_or_else(PlaceResult::ok, PlaceResult::fail)
@@ -314,10 +302,21 @@ impl Tower {
             if slot.is_none() {
                 self.remove_units(&under);
             }
-            self.begin_lobby_floor(floor);
+        }
+        let mut unit = unit;
+        let stories = if kind == Kind::Lobby {
+            self.placement_lobby_stories(floor, x, f.width)
+        } else {
+            None
+        };
+        if stories.is_some() {
+            unit.extras_mut().lobby_stories = stories;
         }
         let idx = self.add_unit(unit, slot);
         self.register(idx);
+        if let Some(height) = stories {
+            self.skip_over_new_hall(floor, x, f.width, i64::from(height));
+        }
         if kind == Kind::WeddingHall {
             self.built_wedding_hall = Some(true);
         }

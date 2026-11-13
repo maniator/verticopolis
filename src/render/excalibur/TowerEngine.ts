@@ -11,6 +11,7 @@ import { FLOOR, TILE } from "../scale";
 import * as scene from "./towerScene";
 import * as reconcile from "./towerReconcile";
 import { emptyStructPass, type StructPass } from "./towerStructTiles";
+import { HallDoorLayer, type Pusher } from "./towerHallDoors";
 import * as crowd from "./towerCrowd";
 import * as camera from "./towerInputCamera";
 import { clearLongPress } from "./longPress";
@@ -249,10 +250,10 @@ export class TowerEngine {
     overlayFx.resetDecorativeClock(this);
   }
 
-  // Individually-routed commuters (SimTower's signature) are owned and advanced
-  // by the engine; the renderer only draws each person and removes them as they
-  // despawn, never mutating the simulation.
-  crowdActors = new Map<number, { actor: ex.Actor; gfx: ex.Canvas; red: boolean }>();
+  // Individually-routed commuters are owned and advanced by the engine; the
+  // renderer only draws each person, never mutating the simulation.
+  crowdActors = new Map<number, { actor: ex.Actor; gfx: ex.Canvas; red: boolean } & Pusher>();
+  hallDoors = new HallDoorLayer(); // the revolving doors between lobby halls (#2068)
 
   // Shared graphics so thousands of tiles/people cost almost nothing.
   floorGfx!: ex.Canvas;
@@ -265,8 +266,7 @@ export class TowerEngine {
    *  reads `d.anim`, and one path for both beats mixing cache-true/false. */
   entranceGrandLeftGfx!: ex.Canvas[];
   entranceGrandRightGfx!: ex.Canvas[];
-  /** The compact 1-tile grand entrance, used only when the lobby is too narrow
-   *  to fit the wide storefront. `cache: false` for the doorman sway. */
+  /** The compact grand entrance, for a lobby too narrow for the storefront (`cache: false`: doorman). */
   entranceGrandSoloGfx!: ex.Canvas[];
   /** The floor-1 service entrance tile, baked per [lit]. Static (`cache: true`)
    *  because it has no motion of its own. */

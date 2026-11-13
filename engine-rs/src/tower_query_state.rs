@@ -41,6 +41,8 @@ pub struct Memo {
         std::sync::Arc<crate::tower_index::FloorRooms>,
     )>,
     pub floors: crate::tower_index::FloorsMemo,
+    /// The tall lobby halls (`Tower::tall_lobby_runs`), per revision (#2068).
+    pub tall_runs: Option<(i64, std::sync::Arc<[crate::tower::HallRun]>)>,
 }
 
 // ---- unit state predicates (types.ts) --------------------------------------

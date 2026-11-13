@@ -1,6 +1,7 @@
 import type { ElevatorQueueView, QueueLanding } from "../shared/engineTypes";
 import type { HeatCell, HeatmapMode } from "../shared/engineTypes";
 import type { GameMode, SerializedView, WeatherKind } from "../shared/types";
+import { lobbyHalls, type LobbyHalls } from "../render/lobbyHalls";
 import type { RenderSim, RenderTower } from "../render/renderSim";
 import { ClockReads } from "./clockView";
 import type { EnginePort } from "./enginePort";
@@ -37,10 +38,10 @@ export class PortRenderSim implements RenderSim {
     this.heatTints = l.heatTints;
     const tower = Object.create(reader.tower) as RenderTower & {
       functionalParkingSet: () => ReadonlySet<number>;
-      tallLobbies: () => ReadonlyMap<number, number>;
+      tallLobbies: () => LobbyHalls;
     };
     tower.functionalParkingSet = () => new Set(port.parkingSet().subarray(1));
-    tower.tallLobbies = () => tallLobbyMap(port.lobbyHeights());
+    tower.tallLobbies = () => lobbyHalls(port.lobbyHeights());
     this.tower = tower;
     this.crowd = { people: reader.crowd.people, queueView: () => this.queueView() };
   }
@@ -137,9 +138,3 @@ export class PortRenderSim implements RenderSim {
   }
 }
 
-/** The port's flat `[floor, height, ...]` pairs as a floor to height map. */
-export function tallLobbyMap(pairs: ArrayLike<number>): ReadonlyMap<number, number> {
-  const map = new Map<number, number>();
-  for (let i = 0; i + 1 < pairs.length; i += 2) map.set(pairs[i], pairs[i + 1]);
-  return map;
-}

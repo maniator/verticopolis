@@ -8,8 +8,7 @@ use super::source_scan_tests::{
 };
 use super::unit_scan_tests::{new_list_aside, top_level, unit_writes};
 use super::write_cases_tests::{MORE_WRITES, WRITES};
-use crate::tower::{Extras, Unit};
-use crate::{economy::screens::ScreenFilm, frame::unit_fields};
+use crate::{economy::screens::ScreenFilm, frame::unit_fields, tower::Extras, tower::Unit};
 
 /// The frame fields, the census share and `is_operational` read no field but the six the
 /// setters mark and the kind, which no engine code writes in place
@@ -78,6 +77,7 @@ fn the_frame_and_the_census_read_only_marked_fields() {
             complete_at: Some(old.complete_at.unwrap_or(0.0) + 1.0),
             complete_at_raw: Some(serde_json::json!(format!("{:?}!", old.complete_at_raw))),
             dirty_days: Some(old.dirty_days.unwrap_or(0) + 1),
+            lobby_stories: Some(old.lobby_stories.unwrap_or(1) % 3 + 1),
         }));
         let bits = |u: &Unit| unit_fields(u).map(f64::to_bits);
         assert_eq!(bits(&v), bits(u), "unit {}", u.id);

@@ -16,6 +16,7 @@ import type { PersonView } from "../../simport/view";
 import { FLOOR, TILE } from "../scale";
 import type { TowerEngine } from "./TowerEngine";
 import { applyCrowdCull, reassertCrowdCull } from "./crowdCull";
+import { pushThroughDoors, pushingGfx, turnHallDoors, type Pusher } from "./towerHallDoors";
 
 /**
  * Engine-driven crowd and motion for {@link TowerEngine}: the routed commuter
@@ -86,10 +87,11 @@ export function reconcileCrowd(engine: TowerEngine): void {
     }
     positionPerson(engine, p, rec);
   }
+  turnHallDoors(engine);
   reap(engine.crowdActors, seen, (rec) => rec.actor.kill());
 }
 
-function positionPerson(engine: TowerEngine, p: PersonView, rec: { actor: ex.Actor; gfx: ex.Canvas; red: boolean }): void {
+function positionPerson(engine: TowerEngine, p: PersonView, rec: { actor: ex.Actor; gfx: ex.Canvas; red: boolean } & Pusher): void {
   // While riding, a tenant is inside a car, the cab's own rider count shows
   // them, so we hide the standalone figure to avoid drawing them twice.
   // Staff stay visible while riding: a lone housekeeper in a 16-person
@@ -101,12 +103,24 @@ function positionPerson(engine: TowerEngine, p: PersonView, rec: { actor: ex.Act
   // Use the continuous floor (fy) so a stair/escalator climber animates
   // smoothly between floors; for every other state fy equals the floor.
   rec.actor.pos = ex.vec(engine.worldX(p.x), engine.worldYTop(p.fy) + FLOOR - 3);
+  // Inside a revolving door between lobby halls (#2068) a walker pushes it:
+  // walking left they pass behind its center post, walking right in front.
+  const through = p.fy === p.floor ? pushThroughDoors(engine, rec, p.floor, rec.actor.pos.x) : undefined;
+  const z = through === -1 ? Z.crowdBehindDoor : Z.crowd;
+  if (rec.actor.z !== z) rec.actor.z = z;
   // Long waits redden the figure, the original's "this tenant is fed up" cue.
   // Staff never redden, they're on the clock, not an unhappy tenant.
   const red = !p.staff && p.wait > 25;
   if (red !== rec.red) {
     rec.red = red;
+    rec.shown = undefined;
     rec.actor.graphics.use(red ? engine.personGfxRed : rec.gfx);
+  }
+  if (red) return;
+  const pose = through ? pushingGfx(engine, p, through) : rec.gfx;
+  if ((rec.shown ?? rec.gfx) !== pose) {
+    rec.shown = pose;
+    rec.actor.graphics.use(pose);
   }
 }
 

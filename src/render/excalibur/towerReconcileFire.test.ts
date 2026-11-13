@@ -5,6 +5,8 @@ import { syncScene } from "./towerReconcile";
 import { markRegionUnit } from "./towerRegions";
 import { paintAnimatedUnit } from "../regionPaint";
 import { emptyStructPass } from "./towerStructTiles";
+import { HallDoorLayer } from "./towerHallDoors";
+import { NO_TALL_HALLS } from "../lobbyHalls";
 import { NOT_BAKED } from "./sceneBake";
 
 // The reconcile is driven with a hand-built engine: no canvas bakes here. The
@@ -66,7 +68,7 @@ function fakeEngine(unit: UnitView): TowerEngine {
         },
         transports: [],
         functionalParkingSet: () => new Set<number>(),
-        tallLobbies: () => new Map<number, number>(),
+        tallLobbies: () => NO_TALL_HALLS,
       },
       parkingUsage: () => 0,
       recyclingFill: () => 0,
@@ -82,6 +84,7 @@ function fakeEngine(unit: UnitView): TowerEngine {
     regionUnits: new Map(),
     transportActors: new Map(),
     transportSig: new Map(),
+    hallDoors: new HallDoorLayer(),
     worldX: (x: number) => x * 16,
     worldYTop: (floor: number) => floor * 16,
   } as unknown as TowerEngine;

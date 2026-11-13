@@ -320,17 +320,50 @@ fn the_lobby_height_a_frontend_sets_raises_the_next_first_lobby() {
     let three_story = e.port_quote_build(code(Kind::Lobby), 1.0, 100.0)[1];
     assert!(three_story > one_story, "{three_story} vs {one_story}");
     assert_eq!(e.port_build(code(Kind::Lobby), 1.0, 100.0)[STATUS], 1.0);
-    assert_eq!(e.lobby_heights(), vec![1.0, 3.0]);
-    assert_eq!(e.lobby_rise(1.0), 3.0);
-    assert_eq!(e.lobby_rise(15.0), 3.0, "a Modern sky lobby rises too");
-    assert_eq!(e.lobby_rise(4.0), 1.0, "only a lobby floor rises");
-    assert_eq!(e.lobby_rise(f64::NAN), 1.0);
-    // A height that is not whole counts as one story; a built floor keeps its own.
+    assert_eq!(e.lobby_heights(), vec![1.0, 100.0, 100.0, 3.0]);
+    assert_eq!(e.lobby_rise(1.0, 101.0), 3.0);
+    assert_eq!(
+        e.lobby_rise(15.0, 100.0),
+        3.0,
+        "a Modern sky lobby rises too"
+    );
+    assert_eq!(e.lobby_rise(4.0, 100.0), 1.0, "only a lobby floor rises");
+    assert_eq!(e.lobby_rise(f64::NAN, 100.0), 1.0);
+    assert_eq!(e.lobby_rise(1.0, f64::NAN), 1.0);
+    // A height that is not whole counts as one story; a tile laid against
+    // the hall keeps its height (#2068: in Modern, per hall).
     e.set_lobby_height(2.5);
     assert_eq!(e.sim.tower.requested_lobby_height, 1);
-    let tiles: Vec<f64> = (124..130).map(f64::from).collect();
+    let tiles: Vec<f64> = (101..106).map(f64::from).collect();
     assert_eq!(e.port_paint(code(Kind::Lobby), 1.0, &tiles)[STATUS], 1.0);
-    assert_eq!(e.lobby_heights(), vec![1.0, 3.0]);
-    assert_eq!(e.lobby_rise(1.0), 3.0, "the built floor keeps its height");
-    assert_eq!(e.lobby_rise(15.0), 1.0);
+    assert_eq!(e.lobby_heights(), vec![1.0, 100.0, 105.0, 3.0]);
+    e.set_lobby_height(2.0);
+    assert_eq!(e.lobby_rise(1.0, 106.0), 3.0, "the hall keeps its height");
+    assert_eq!(
+        e.lobby_rise(1.0, 130.0),
+        3.0,
+        "a tile apart bridges back to the hall and rises with it"
+    );
+    assert!(e.sim.auto_bridge);
+    e.sim.toggle_auto_bridge();
+    assert_eq!(
+        e.lobby_rise(1.0, 130.0),
+        2.0,
+        "with bridging off, a hall of its own takes the height asked"
+    );
+}
+
+#[test]
+fn walkway_top_reads_the_hall_under_the_flight() {
+    let mut e = engine();
+    e.set_lobby_height(2.0);
+    assert_eq!(e.port_build(code(Kind::Lobby), 1.0, 100.0)[STATUS], 1.0);
+    let stairs = code(Kind::Stairs);
+    assert_eq!(e.walkway_top(stairs, 100.0, 1.0, 2.0), 3.0);
+    assert_eq!(
+        e.walkway_top(stairs, 200.0, 1.0, 2.0),
+        2.0,
+        "no hall under it"
+    );
+    assert_eq!(e.walkway_top(stairs, f64::NAN, 1.0, 2.0), 2.0);
 }

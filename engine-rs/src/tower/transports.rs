@@ -56,10 +56,10 @@ impl Tower {
             .find(|t| t.bottom <= floor && floor <= t.top && t.x <= x && x < t.x + t.width)
     }
 
-    fn span_reason(&self, kind: Kind, bottom: i64, top: i64) -> Option<String> {
+    fn span_reason(&self, kind: Kind, x: i64, bottom: i64, top: i64) -> Option<String> {
         let mut max_span = self.lot().max_span(kind);
         if kind.is_fixed_span() {
-            max_span = max_span.max(self.lobby_height(bottom)); // #308
+            max_span = max_span.max(self.walkway_span_under(kind, x, bottom)); // #308
         }
         if top.saturating_sub(bottom) <= max_span {
             return None;
@@ -77,7 +77,7 @@ impl Tower {
     }
 
     pub fn validate_transport(&self, kind: Kind, x: i64, bottom: i64, top: i64) -> PlaceResult {
-        let top = self.walkway_top(kind, bottom, top);
+        let top = self.walkway_top(kind, x, bottom, top);
         let f = kind.facility();
         if !f.transport {
             return PlaceResult::fail("Not a transport.");
@@ -91,10 +91,10 @@ impl Tower {
         if x < 0 || x.saturating_add(f.width) > LOT_WIDTH {
             return PlaceResult::fail("Off the edge of the lot.");
         }
-        if let Some(r) = self.span_reason(kind, bottom, top) {
+        if let Some(r) = self.span_reason(kind, x, bottom, top) {
             return PlaceResult::fail(r);
         }
-        if let Some(r) = self.tall_lobby_shaft_reason(bottom, top) {
+        if let Some(r) = self.tall_lobby_shaft_reason(x, f.width, bottom, top) {
             return PlaceResult::fail(r);
         }
         if kind == Kind::Escalator && !self.allows_escalator_on_office_floors {
@@ -129,7 +129,7 @@ impl Tower {
     }
 
     pub fn place_transport(&mut self, kind: Kind, x: i64, bottom: i64, top: i64) -> PlaceResult {
-        let top = self.walkway_top(kind, bottom, top);
+        let top = self.walkway_top(kind, x, bottom, top);
         let v = self.validate_transport(kind, x, bottom, top);
         if !v.ok {
             return v;
@@ -223,7 +223,8 @@ impl Tower {
             return true;
         }
         let lobby_only = t.kind == Kind::ElevatorExpress && !self.floor_has_lobby(floor);
-        if stop && (lobby_only || self.is_tall_lobby_story(floor)) {
+        let in_tall_lobby = self.raised_lobby_at(floor, t.x, t.width).is_some();
+        if stop && (lobby_only || in_tall_lobby) {
             return false;
         }
         let mut skip: Vec<f64> = self.transports[i].skip_floors.clone().unwrap_or_default();
@@ -296,8 +297,8 @@ impl Tower {
             (t.kind, t.x, t.width, t.bottom, t.top)
         };
         if let Some(reason) = self
-            .span_reason(kind, new_bottom, new_top)
-            .or_else(|| self.tall_lobby_shaft_reason(new_bottom, new_top))
+            .span_reason(kind, tx, new_bottom, new_top)
+            .or_else(|| self.tall_lobby_shaft_reason(tx, twidth, new_bottom, new_top))
         {
             return ResizeResult::fail(reason);
         }

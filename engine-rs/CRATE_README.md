@@ -191,9 +191,11 @@ The crate has no default features.
   the web game's loader does; only a file it cannot read is refused, and so
   is a save from a newer engine.
 - **Save versions.** A save is version 7 unless it holds a lobby taller
-  than one story; then it is version 8 and carries `lobbyHeights`, so an
-  engine too old to build one refuses it instead of loading a one-story
-  lobby. Both load here.
+  than one story; then it is version 9 and carries `lobbyHeights`, one
+  `[floor, x0, x1, height]` entry per hall, so an engine too old to build
+  one refuses it instead of loading a one-story lobby. Version 8 gave each
+  floor one height (`[floor, height]`); it loads here with that height on
+  every lobby tile of the floor. All three load here.
 
 ## Proving conformance
 

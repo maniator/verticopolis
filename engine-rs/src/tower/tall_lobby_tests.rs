@@ -231,7 +231,7 @@ fn stairs_and_escalators_climb_the_whole_lobby() {
 }
 
 #[test]
-fn a_tall_lobby_round_trips_through_the_save_and_only_it_takes_version_8() {
+fn a_tall_lobby_round_trips_through_the_save_and_only_it_takes_the_newest_version() {
     let plain = tower(GameMode::Classic, 1).serialize();
     assert_eq!(plain["version"], json!(PLAIN_SAVE_VERSION));
     assert!(plain.get("lobbyHeights").is_none());
@@ -240,7 +240,7 @@ fn a_tall_lobby_round_trips_through_the_save_and_only_it_takes_version_8() {
     floors(&mut sim, 4..=4);
     let save = sim.serialize();
     assert_eq!(save["version"], json!(SAVE_VERSION));
-    assert_eq!(save["lobbyHeights"], json!([[1, 3]]));
+    assert_eq!(save["lobbyHeights"], json!([[1, 100, 123, 3]]));
     let back = deserialize(&save).unwrap();
     assert_eq!(back.tower.lobby_height(1), 3);
     assert!(back.tower.has_structure(3, 112));

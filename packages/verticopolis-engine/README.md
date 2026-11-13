@@ -185,8 +185,8 @@ shapes for each one.
 | `canBuild(kind, floor, x)` | The dry run of `build`: `{ ok, reason?, cost }`, with the full price (floor tiles and bridging included). |
 | `build(kind, floor, x)` | Place a facility with its left edge at `x`. `{ ok, reason? }`. `kind` is a catalog `key` such as `"office"`, `"condo"` or `"hotelSingle"`. |
 | `paintBrush(kind, floor, tilesJson)` | Lay floor or lobby tiles along a stroke in one command. `{ placed, reason? }`. |
-| `setLobbyHeight(height)`, `lobbyRise(floor)`, `lobbyHeights()` | How many stories (1 to 3) a floor's first lobby rises from now on, where the mode lets that floor's lobby rise (the catalog's `rules.tallSkyLobbies`; the ground lobby always may), how many a lobby tile laid on `floor` would rise now, and every taller lobby as flat `[floor, height, ...]` pairs. A first lobby asked taller on a floor that cannot rise is refused, with a reason. A lobby's height never changes once built, and it costs the lobby price per story. |
-| `walkwayTop(kind, bottom, top)` | The top a stairway or escalator asked from `bottom` to `top` is built to: out of a tall lobby a one-story flight climbs the whole lobby, so a build preview can draw the flight a click lays. `top` for any other kind or span. |
+| `setLobbyHeight(height)`, `lobbyRise(floor, x)`, `lobbyHeights()` | How many stories (1 to 3) a new lobby rises from now on, where the mode lets that floor's lobby rise (the catalog's `rules.tallSkyLobbies`; the ground lobby always may), how many a lobby tile laid at `(floor, x)` would rise now, and every lobby hall taller than one story as flat `[floor, x0, x1, height, ...]` quads, `x1` being the hall's last column. In Classic a floor has one lobby height, set by its first lobby. In Modern each hall keeps its own: a tile laid against a hall takes that hall's height, a tile that closes a gap takes the left hall's, and a new hall takes the asked height, so halls of different heights can stand side by side. A first lobby asked taller where it cannot rise is refused, with a reason. A lobby's height never changes once built, and it costs the lobby price per story. |
+| `walkwayTop(kind, x, bottom, top)` | The top a stairway or escalator at column `x` asked from `bottom` to `top` is built to: out of a tall lobby (in Modern, the hall under the flight) a one-story flight climbs the whole lobby, so a build preview can draw the flight a click lays. `top` for any other kind or span. |
 | `buildTransport(kind, x, bottom, top)` | Place stairs, an escalator or an elevator shaft between two floors. `{ ok, reason? }`. |
 | `validateTransport(kind, x, bottom, top)` | The same check without building. |
 | `addCar(id)`, `removeCar(id)` | Add or remove an elevator car, charging or refunding it. `{ ok, reason?, delta }`. |
@@ -244,7 +244,8 @@ calls above.
 - **Newer saves are refused.** A save written by a newer engine than the one
   loading it is refused rather than half-read. `engineIdentity()` tells you
   which save version an engine writes. A save is version 7 unless it holds a
-  lobby taller than one story, which makes it version 8.
+  lobby taller than one story, which makes it version 9 (one entry per hall).
+  A version 8 save, which gave each floor one height, still loads.
 
 ## Versioning
 

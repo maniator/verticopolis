@@ -4,6 +4,7 @@ import * as ex from "excalibur";
 import { FLOOR, TILE } from "../scale";
 import { carIndicator, type CarIndicator } from "../carIndicator";
 import { reap, reconcileCrowd, clearCrowd, clearMotion, updateMotion } from "./towerCrowd";
+import { HallDoorLayer } from "./towerHallDoors";
 
 /**
  * Engine-driven crowd and motion for the tower renderer. The parts that BAKE
@@ -50,6 +51,7 @@ function eng(over: Record<string, any> = {}): any {
     cam: { zoom: 1 },
     crowdCulled: false,
     crowdActors: new Map(),
+    hallDoors: new HallDoorLayer(),
     carActors: [],
     trainActors: [],
     tunnelActors: [],

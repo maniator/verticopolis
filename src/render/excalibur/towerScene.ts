@@ -26,6 +26,7 @@ import { personFigure } from "../pixelSprites/common";
 import { FLOOR, TILE } from "../scale";
 import * as overlayFx from "./towerOverlay";
 import * as crowd from "./towerCrowd";
+import { clearHallDoors } from "./towerHallDoors";
 import type { TowerEngine } from "./TowerEngine";
 import { towerCatalog } from "../../catalog/towerCatalog";
 
@@ -431,6 +432,7 @@ export function setSim(engine: TowerEngine, sim: RenderSim, opts?: { keepCamera?
   // of its own height. The cells were just cleared, so nothing drawn is lost.
   if (engine.structTileMap && viewWorld().maxFloor !== engine.structTopFloor) makeStructTileMap(engine);
   crowd.clearCrowd(engine);
+  clearHallDoors(engine);
   resetInput(engine);
   // Drop any in-flight event visuals and adopt the new sim's fx baselines, so
   // a tower swap neither leaves Santa mid-sky nor re-fires a stale flash.

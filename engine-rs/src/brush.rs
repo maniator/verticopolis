@@ -1,9 +1,18 @@
 //! The floor and lobby brush: [`Simulation::paint_brush`] lays a run of
 //! floor or lobby tiles in one command.
 
+use crate::build::substrate_cost;
 use crate::charges::INVALID_REQUEST;
 use crate::facilities::Kind;
 use crate::sim::Simulation;
+
+/// A structural tile and the bridge laid with it, as `build` lays them.
+pub(crate) struct BridgedTile {
+    /// How many stories the tile itself rises.
+    pub stories: i64,
+    /// The price of every bridged substrate tile.
+    pub bridge_cost: f64,
+}
 
 /// The most tiles one brush may carry.
 pub const BRUSH_TILE_LIMIT: usize = 32;
@@ -28,15 +37,87 @@ impl BrushResult {
 }
 
 impl Simulation {
-    /// How many stories a structural tile of `kind` laid on `floor` covers:
-    /// a lobby's height on that floor ([`Self::with_lobby_height`]), 1 for a
-    /// floor tile.
-    pub(crate) fn tile_stories(&self, kind: Kind, floor: i64) -> i64 {
+    /// How many stories a structural tile of `kind` laid at `(floor, x)`
+    /// covers: the height a lobby tile there gets ([`Self::with_lobby_height`]
+    /// and the hall it is laid against), 1 for a floor tile.
+    pub(crate) fn tile_stories(&self, kind: Kind, floor: i64, x: i64) -> i64 {
         if kind == Kind::Lobby {
-            self.tower.placement_lobby_height(floor)
+            self.tower
+                .placement_lobby_height_at(floor, x, kind.facility().width)
         } else {
             1
         }
+    }
+
+    /// How many stories a structural tile of `kind` at `(floor, x)` rises
+    /// once `plan`, its bridge, is laid, and that bridge's price.
+    /// `fill_bridge` lays each side of a bridge out from the structure it
+    /// reaches, so in Modern a lobby bridge takes the height of the hall on
+    /// its side, and the tile joins the left side's (#2068): it is laid last,
+    /// against the left bridge, or against the right one when only that side
+    /// bridges and nothing stands beside it. In Classic, and for any tile but
+    /// a lobby, every tile takes [`Self::tile_stories`]. `build` charges the
+    /// tiles a bridge did lay at the height each one took.
+    pub(crate) fn bridged_tile(
+        &self,
+        kind: Kind,
+        floor: i64,
+        x: i64,
+        plan: &[(i64, i64)],
+    ) -> BridgedTile {
+        let own = self.tile_stories(kind, floor, x);
+        let per_hall = kind == Kind::Lobby && self.mode.lobby_height_per_hall();
+        let w = kind.facility().width;
+        let hall = |col: i64| {
+            self.tower
+                .hall_at(floor, col)
+                .map(|u| self.tower.unit_stories(u))
+        };
+        // The height of the hall a side's bridge reaches, past its far end.
+        let reach = |left: bool| -> Option<i64> {
+            let cols = plan
+                .iter()
+                .filter(|&&(fl, g)| fl == floor && (g < x) == left)
+                .map(|&(_, g)| g);
+            let end = if left {
+                cols.min()? - 1
+            } else {
+                cols.max()? + 1
+            };
+            per_hall.then(|| hall(end)).flatten()
+        };
+        let (left, right) = (reach(true), reach(false));
+        let beside = hall(x - 1).is_some() || hall(x + w).is_some();
+        let stories = left.or(if beside { None } else { right }).unwrap_or(own);
+        let side = |fl: i64, g: i64| {
+            if fl != floor {
+                None
+            } else if g < x {
+                left
+            } else {
+                right
+            }
+        };
+        let bridge_cost = plan
+            .iter()
+            .map(|&(fl, g)| substrate_cost(kind, side(fl, g).unwrap_or(own)))
+            .sum();
+        BridgedTile {
+            stories,
+            bridge_cost,
+        }
+    }
+
+    /// How many stories a lobby tile laid at `(floor, x)` now rises, with
+    /// the bridge the engine would lay for it when bridging is on: what
+    /// [`Self::can_build`] prices it at, and what `lobbyRise` reports.
+    pub fn lobby_rise_at(&self, floor: i64, x: i64) -> i64 {
+        let plan = if self.auto_bridge {
+            self.tower.bridge_fill_plan(Kind::Lobby, floor, x, 1, 1)
+        } else {
+            Vec::new()
+        };
+        self.bridged_tile(Kind::Lobby, floor, x, &plan).stories
     }
 
     /// Runs `run` with `height` as the height a floor's first lobby

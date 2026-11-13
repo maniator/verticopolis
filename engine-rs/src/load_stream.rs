@@ -43,8 +43,12 @@ use crate::tower::{unit_list_headroom, Unit};
 /// migration step is the one `streamed` applies, so a new save version means
 /// a new review of this file (the `streamed_version_is_the_save_version` test
 /// fails until then). Version 8 is version 7 with `lobbyHeights` (#308),
-/// which `assemble` reads, so both take the same step.
-const STREAMED_VERSION: f64 = 8.0;
+/// and version 9 lists them per hall (#2068); `assemble` reads both shapes,
+/// so all three take the same step.
+const STREAMED_VERSION: f64 = 9.0;
+/// Version 8, still read here: its whole-floor `lobbyHeights` entries are
+/// the per-hall migration `assemble` applies.
+const FLOOR_HEIGHTS_STREAMED_VERSION: f64 = 8.0;
 /// The version a save with no tall lobby is still written at
 /// ([`crate::sim::PLAIN_SAVE_VERSION`]).
 const PLAIN_STREAMED_VERSION: f64 = 7.0;
@@ -208,7 +212,7 @@ fn streamed(text: &[u8], mode: Option<&str>) -> Option<Streamed> {
     if let Some(m) = mode {
         rest.insert("mode".into(), Value::String(m.to_string()));
     }
-    // `migrate_save` on a version 7 or 8 save: the shaft widening, nothing else.
+    // `migrate_save` on a version 7, 8 or 9 save: the shaft widening, nothing else.
     let widened = rest
         .get("transports")
         .and_then(Value::as_array)
@@ -241,7 +245,12 @@ struct Streamed {
 /// the caller sets, `forced`) are ones this reader takes; `None` otherwise.
 fn current_mode(rest: &Map<String, Value>, forced: Option<bool>) -> Option<bool> {
     let version = rest.get("version").and_then(Value::as_f64);
-    if version != Some(STREAMED_VERSION) && version != Some(PLAIN_STREAMED_VERSION) {
+    let taken = [
+        STREAMED_VERSION,
+        FLOOR_HEIGHTS_STREAMED_VERSION,
+        PLAIN_STREAMED_VERSION,
+    ];
+    if !version.is_some_and(|v| taken.contains(&v)) {
         return None;
     }
     if forced.is_some() {

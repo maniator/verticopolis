@@ -280,6 +280,8 @@ pub(crate) fn unit_from_value(u: &Value, modern: bool) -> Option<(Unit, Option<i
                 _ => None,
             },
             dirty_days: coerce_dirty_days(state, kind, u.get("dirtyDays")),
+            // Set from the save's `lobbyHeights` once every unit is read.
+            lobby_stories: None,
         }
         .without_mirrored_screen()
         .boxed(),

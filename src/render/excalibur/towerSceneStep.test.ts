@@ -4,6 +4,7 @@ import { syncFacade, syncScene } from "./towerReconcile";
 import { followStep, setSim } from "./towerScene";
 import { runSceneSync } from "./towerSyncSchedule";
 import { NOT_BAKED } from "./sceneBake";
+import { HallDoorLayer } from "./towerHallDoors";
 import { bindViewWorld, viewWorld } from "../../presentation/viewWorld";
 import type { RenderSim } from "../renderSim";
 import type { TowerEngine } from "./TowerEngine";
@@ -94,6 +95,7 @@ function sceneUnderSwap() {
     truckActors: [],
     garageCars: [],
     walkers: [],
+    hallDoors: new HallDoorLayer(),
     adoptCamera: vi.fn(),
   });
   const tower = (revision: number) =>
@@ -209,7 +211,13 @@ describe("a swap to another tower", () => {
 
   it("marks the torn-down scene unbaked, so a tower at the old tower's revision still bakes", () => {
     const { scene, tower } = sceneUnderSwap();
+    // A revolving door of the old tower (#2068), which the swap takes down.
+    const door = { door: { floor: 1 }, actors: [{ kill: vi.fn() }, { kill: vi.fn() }, { kill: vi.fn() }] };
+    scene.hallDoors.byKey.set("door", door as never);
+    scene.hallDoors.byFloor.set(1, [door as never]);
     setSim(scene as unknown as TowerEngine, tower(42));
+    expect(door.actors.map((a) => a.kill.mock.calls.length)).toEqual([1, 1, 1]);
+    expect(scene.hallDoors.byKey.size + scene.hallDoors.byFloor.size).toBe(0);
     expect(scene.builtRev, "the old tower drew revision 42 too").toBe(NOT_BAKED);
     runSceneSync(scene as unknown as TowerEngine);
     expect(syncScene).toHaveBeenCalledOnce();

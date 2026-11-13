@@ -267,17 +267,21 @@ export class Engine {
     loadTdt(bytes: Uint8Array, filename: string): Float64Array;
     loadVctower(text: string): Float64Array;
     /**
-     * `lobbyHeights()` (#308): every lobby taller than one story, as flat
-     * `[floor, height, ...]` pairs by floor. Empty when none is.
+     * `lobbyHeights()` (#308, #2068): every lobby hall taller than one
+     * story, as flat `[floor, x0, x1, height, ...]` quads by floor and then
+     * column, `x1` being the hall's last column. Neighboring halls of
+     * different heights are separate quads; a one-story hall is in none.
+     * Empty when no lobby is tall.
      */
     lobbyHeights(): Float64Array;
     /**
-     * `lobbyRise(floor)` (#308): how many stories a lobby tile laid on
-     * `floor` now rises, from the height set by `setLobbyHeight` and the
-     * floor's own lobby: what `quoteBuild` prices a lobby tile at. 1 for a
-     * floor that is not a whole number.
+     * `lobbyRise(floor, x)` (#308, #2068): how many stories a lobby tile
+     * laid at `(floor, x)` now rises, from the height set by
+     * `setLobbyHeight` and the lobby already there: in Modern the hall it
+     * is laid against, in Classic the floor's. What `quoteBuild` prices a
+     * lobby tile at. 1 when either argument is not a whole number.
      */
-    lobbyRise(floor: number): number;
+    lobbyRise(floor: number, x: number): number;
     logAfter(seq: number): Float64Array;
     logLine(text: string, kind: number): Float64Array;
     /**
@@ -694,13 +698,14 @@ export class Engine {
      */
     view(): string | undefined;
     /**
-     * `walkwayTop(kind, bottom, top)` (#308): the top a stairway or
-     * escalator asked for from `bottom` to `top` is built to. Out of a tall
-     * lobby a one-story flight climbs the whole lobby, so the build preview
+     * `walkwayTop(kind, x, bottom, top)` (#308, #2068): the top a
+     * stairway or escalator at column `x` asked for from `bottom` to `top`
+     * is built to. Out of a tall lobby a one-story flight climbs the whole
+     * lobby (in Modern, the hall under the flight), so the build preview
      * draws the flight a click would place. `top` for any other kind or
      * span, or when an argument is not a whole number or a known kind.
      */
-    walkwayTop(kind: number, bottom: number, top: number): number;
+    walkwayTop(kind: number, x: number, bottom: number, top: number): number;
 }
 
 /**

@@ -17,8 +17,6 @@ import type { TdtSpec } from "../fixtures/tdtBuilder";
 import { buildTdt, sampleTowerSpec } from "../fixtures/tdtBuilder";
 import { catalogFacility } from "../../catalog/catalogTypes";
 import { catalogFor } from "../catalogFixture";
-import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
-import { parseEngineIdentity, readEngineIdentity } from "../../wasmhost/engineIdentity";
 
 /** The Classic catalog, the engine's published table for the 1994 mode. */
 const CATALOG = catalogFor("classic");
@@ -26,12 +24,9 @@ const facts = (kind: FacilityKind) => catalogFacility(CATALOG, kind);
 const SHOP_SUBTYPES = facts("shop").subtypes ?? [];
 const FASTFOOD_SUBTYPES = facts("fastFood").subtypes ?? [];
 const RESTAURANT_SUBTYPES = facts("restaurant").subtypes ?? [];
-/** The save version the engine writes, from its identity record (0 without
- *  the package, where the codec suites skip). */
-const SAVE_VERSION = hasWasmPackage() ? parseEngineIdentity(readEngineIdentity(wasm()))!.saveVersion : 0;
 /** The version a save with no tall lobby is stamped with (#308): the format
- *  before tall lobbies, so an older app still opens it. */
-const PLAIN_SAVE_VERSION = SAVE_VERSION - 1;
+ *  before tall lobbies (7), so an older app still opens it. */
+const PLAIN_SAVE_VERSION = 7;
 
 /** Parse a spec through the whole importer (builder → parseTDT). */
 function parse(spec: TdtSpec = {}, filename = "TOWER.TDT") {
