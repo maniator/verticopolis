@@ -25,6 +25,30 @@ prompt already tells players it is an engine update and shows the new version.
 Entries below 1.51.1 were curated from the commit history after the fact, so they
 are documentation only: no build that a client fetches carries them.
 
+## 3.5.0
+
+- About… now opens About this game straight away. What's new, the release notes and Report a problem are in Help, and Privacy links to its Help page.
+- Pressing a mouse's forward side button, or a pen's eraser, over the tower no longer throws an error.
+- In Classic, the bulldozer no longer widens a gap that a tower saved before 3.3.0 already has. Bare floor comes out only from the two ends of the whole floor, and the Floor tool still fills an old gap.
+- Modern: elevators send the car best placed for each call (the nearest by travel, counting the stops it already owes and passing over a car heading the other way), so a far call no longer waits for a parked car and two cars no longer chase one floor. A car already on its way within the shaft's Waiting Car Response keeps the call.
+- Modern: cars with no home of their own wait spread up the shaft (the first at the lobby) instead of stacking on the lobby. Homes you set are kept, and nothing new is written to your save unless you press OK in the schedule dialog, which saves the homes it shows.
+- Modern: a car loading at a floor keeps boarding new arrivals, but leaves after twice its Standard Floor Departure at most.
+- Shops, fast food and restaurants imported from SimTower towers keep their own styles; before, most shops in a played tower came in as Men's Clothing.
+- A theater built the day a tower is exported to a .TDT file keeps its seats in SimTower like any other theater.
+- A tower exported to a .TDT file can be built on in SimTower after loading: the file keeps free room for new people, so placing a theater no longer crashes the game.
+- Theaters export the way SimTower writes them, each floor a screen piece and an auditorium, with the 56 people each screen keeps.
+- The manual's first-tower page now says to replay Getting Started from About… on the game panel, where it lives now.
+- A link to a help page shared on a forum or in a chat now shows a card for that page, with its title and what it covers.
+- Report a problem in About this game (the game panel's About…) opens GitHub's bug form with your version, the engine diagnostics, your browser, your platform and your tower's mode already filled in, so you only have to say what went wrong.
+- A tower imported from a 1994 SimTower `.TDT` file keeps each elevator car's waiting floor, so idle cars wait where the original game had them instead of all stacking on the lobby, and exporting writes those floors back.
+- Classic: elevators follow the original's two dispatch settings. With a Waiting Car Response set, a parked car stays put while another car of the shaft is already on its way to the call within that many floors, and a car loading at a floor keeps boarding new arrivals for its Standard Floor Departure wait before it leaves (or until it is full).
+- Lobbies can now be two or three stories tall. Pick the height on the Lobby card, or hold Ctrl while placing a lobby for two stories and Ctrl and Shift for three. In Classic only the ground lobby rises, and a sky lobby asked taller is refused with the reason; in Modern, sky lobbies can rise too. A lobby keeps its height once built, and each extra story costs another lobby tile.
+- Elevators pass through a tall lobby without stopping. Stairs from it wind up the whole hall as a spiral staircase, and an escalator zigzags up it with a landing at each turn.
+- On a phone, a tap that the game refuses to build now says why.
+- A tall ground lobby survives .TDT import and export.
+- People now get on and off an elevator only when it stops at their floor with its doors open, so you see riders step out of the car instead of hopping on and off a car passing by.
+- An elevator no longer slides past a floor it was about to stop at, and the drawn car keeps closer to where the car really is, so it settles onto each stop.
+
 ## 3.4.0
 
 - The help at /help is now a full player's manual: a page for every kind of room with its price, size, earnings and picture, how building and the tower work, saving, importing and exporting, settings, controls and a walk through your first tower. Every number comes from the game, and Classic and Modern rules are marked where they differ.
