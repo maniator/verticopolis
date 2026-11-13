@@ -4,7 +4,9 @@
 //! as well: the tower's structure index holds the lobby on every story it
 //! covers, so nothing else can be built there, the story above it stands on
 //! it, and like any lobby it can never be removed. Only its own floor counts
-//! as a lobby floor (`lobby_tiles`). The stories it rises through are no
+//! as a lobby floor (`lobby_tiles`), though the distance to a lobby counts
+//! from every story the hall fills (`nearest_lobby_floor_distance`), so the
+//! floor over a tall hall is next to it. The stories it rises through are no
 //! stop: a shaft may pass through them but never stops or ends there, as in
 //! the original, where the shaft shows no floor number on them.
 //!
