@@ -81,8 +81,9 @@ export class CrowdLayer {
   private tick = 1;
   private disposed = false;
   /** The target each per-update ramp was last sent, by param. update() runs
-   *  every frame, and every rampTo adds automation events to its param. Re-
-   *  sending unchanged targets each frame piled them up until the audio
+   *  on every audio update (about six a second), and every rampTo adds
+   *  automation events to its param. Re-sending unchanged targets each time
+   *  piled them up until the audio
    *  thread's render cost doubled within a minute (the crackle once a venue
    *  was on screen for a while), so a target is sent only when it moves. */
   private sentTargets = new Map<object, number>();

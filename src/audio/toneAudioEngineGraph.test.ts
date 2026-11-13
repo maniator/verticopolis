@@ -434,7 +434,7 @@ describe("ToneAudioEngine — full graph driven with a mocked Tone.js", () => {
   });
 
   it("REGRESSION: a steady view re-sends no ramps frame after frame (automation pile-up crackle)", () => {
-    // update() runs every frame. Re-sending an unchanged rampTo each frame
+    // update() runs about six times a second. Re-sending an unchanged rampTo each time
     // piled automation events onto the crowd's params until the audio
     // thread's render cost doubled within a minute of watching a venue.
     const eng = new ToneAudioEngine();
