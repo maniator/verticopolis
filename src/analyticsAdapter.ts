@@ -21,9 +21,10 @@ import { sendToRelay } from "./analyticsRelay";
  * events-versus-pages: PostHog owns every custom event, and Vercel keeps only
  * this page-level plumbing. A relay `$pageview` (`analyticsPageView.ts`, added
  * 2026-11-13) now runs beside it, so a visit's referrer can be read next to
- * what the player did; it would also be the exit if Vercel ever gated page views. A grep for either vendor package in
- * non-test source outside this file should come back empty (test suites mock
- * them by name, which is expected).
+ * what the player did; it would also be the exit if Vercel ever gated page
+ * views. A grep for either vendor package in non-test source outside this
+ * file should come back empty (test suites mock them by name, which is
+ * expected).
  */
 
 /**

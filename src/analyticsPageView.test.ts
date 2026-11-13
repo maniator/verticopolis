@@ -25,7 +25,7 @@ describe("the landing page view", () => {
   });
 
   it("never sends an IP address or a local machine name", () => {
-    for (const referrer of ["http://192.168.1.10/", "http://[::1]:8080/", "http://localhost:5173/", "http://nas/", "http://printer.local/", "http://box.lan/"]) {
+    for (const referrer of ["http://192.168.1.10/", "http://[::1]:8080/", "http://localhost:5173/", "http://nas/", "http://printer.local/", "http://box.lan/", "http://localhost./", "http://nas./"]) {
       expect(pageViewProps(referrer, GAME).$referring_domain, referrer).toBe(OTHER);
     }
   });

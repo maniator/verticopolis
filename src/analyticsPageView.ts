@@ -11,9 +11,8 @@ import { trackEvent } from "./analyticsCore";
  * private page could be in there), and only when it names a public site: an IP
  * address or a local machine name goes as {@link OTHER}. The landing path is
  * kept only when it is one of the game's own, since any path serves the game.
- * A UTM value is kept only when it is a short plain token with a letter in it. Vercel Web Analytics keeps counting visits on its own
- * (`analyticsAdapter.ts`); this is the relay `$pageview` that module names as
- * the pre-agreed addition.
+ * A UTM value is kept only when it is a short plain token with a letter in it.
+ * Vercel Web Analytics keeps counting visits on its own (`analyticsAdapter.ts`).
  */
 
 /** PostHog's value for a visit with no referrer. */
@@ -59,7 +58,7 @@ function referringDomain(referrer: string): string {
   if (!referrer) return DIRECT;
   let host: string;
   try {
-    host = new URL(referrer).hostname.toLowerCase();
+    host = new URL(referrer).hostname.toLowerCase().replace(/\.$/, ""); // `localhost.` is `localhost`
   } catch {
     return DIRECT;
   }

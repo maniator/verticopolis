@@ -3,7 +3,7 @@ title: Privacy
 description: What Verticopolis counts, what it never collects, and where your saves live.
 ---
 
-Verticopolis keeps a small, anonymous read on how the game is going: whether new players place their first facility, how far towers climb the star ladder, which tools get used, and whether returning players get further than first-timers. Those signals are worked out on your own device and sent as coarse, anonymous counts to our own site, with no cookie and nothing that could point back to you across visits. The page also sends anonymous page-visit counts, with the name of the site that linked you here (never the page you came from), whether you landed on the game's main page, and any campaign tag in the link you followed, and page performance metrics.
+Verticopolis keeps a small, anonymous read on how the game is going: whether new players place their first facility, how far towers climb the star ladder, which tools get used, and whether returning players get further than first-timers. Those signals are worked out on your own device and sent as coarse, anonymous counts to our own site, with no cookie and nothing that could point back to you across visits. The page also sends anonymous page-visit counts (the name of the site that linked you here but never the page you came from, whether you landed on the game's main page, and any campaign tag in the link you followed), along with page performance metrics.
 
 To see whether the game engine runs reliably, the game reports which engine started, whether you started playing, and a short code if the engine stopped. None of it identifies you.
 
