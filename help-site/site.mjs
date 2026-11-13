@@ -136,6 +136,26 @@ export function landingAction(pathname, referrer, origin) {
   return /^\/help\/changelog\/?$/.test(pathname) ? "page_changelog" : "page_help";
 }
 
+/** The longest page path `helpPageDetail` reports; today's longest is
+ *  under 40 characters. */
+const MAX_PAGE_DETAIL = 80;
+
+/**
+ * The page a help page view reports in its `help_page_view` event's `detail`:
+ * the path under /help without its slashes ("rooms/hotels"), "home" for the
+ * front page, or "other" for a path that is not a plain lowercase page path,
+ * so a mistyped or crafted address never reaches PostHog as free text. Only
+ * the path is read: the query (the game's ?from=game mark) and the hash stay
+ * out of it.
+ */
+export function helpPageDetail(pathname) {
+  const inSite = pathname === HELP_BASE || pathname.startsWith(HELP_BASE + "/");
+  if (!inSite) return "other";
+  const slug = pathname.slice(HELP_BASE.length).replace(/^\/+|\/+$/g, "");
+  if (slug === "") return "home";
+  return slug.length <= MAX_PAGE_DETAIL && /^[a-z0-9-]+(\/[a-z0-9-]+)*$/.test(slug) ? slug : "other";
+}
+
 /** The site's address, for the structured data below. */
 const SITE_ORIGIN = "https://verticopolis.com";
 

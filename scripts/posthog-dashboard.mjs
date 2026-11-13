@@ -532,6 +532,11 @@ function buildInsights(ids) {
       query: trends([series("app_action", "Landings")], { breakdown: "action", display: "ActionsBar", where: [inAction(["page_help", "page_gallery", "page_changelog"])] }),
     },
     {
+      name: "Help pages viewed",
+      description: "Every help site page view (app_action help_page_view), split by page (detail: the path under /help, home for the front page), production. Landings alone (one per visit) are in the \"Standalone page landings\" tile.",
+      query: trends([series("app_action", "Page views")], { breakdown: "detail", display: "ActionsBar", where: [inAction(["help_page_view"])] }),
+    },
+    {
       name: "Mute toggles by state",
       description: "app_action mute split by the new state (on / off), so the share of sessions that play muted is visible, production.",
       query: trends([series("app_action", "Mute toggles")], { breakdown: "detail", display: "ActionsPie", where: [inAction(["mute"])] }),

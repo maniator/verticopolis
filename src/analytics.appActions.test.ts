@@ -33,6 +33,17 @@ describe("app_action telemetry", () => {
     expect(sendToRelay).toHaveBeenCalledWith("app_action", { action: "mute", detail: "on" });
   });
 
+  it("reports a help page view with its page on every call, with no once-per-session latch", () => {
+    trackAppAction("help_page_view", "rooms/hotels");
+    trackAppAction("help_page_view", "rooms/hotels");
+    trackAppAction("help_page_view", "home");
+    expect(vi.mocked(sendToRelay).mock.calls).toEqual([
+      ["app_action", { action: "help_page_view", detail: "rooms/hotels" }],
+      ["app_action", { action: "help_page_view", detail: "rooms/hotels" }],
+      ["app_action", { action: "help_page_view", detail: "home" }],
+    ]);
+  });
+
   it("is host-gated: nothing fires on a non-deployed host", () => {
     window.location.href = localhost;
     trackAppAction("export_save");

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
-import { HELP_BASE, OG_IMAGE_ALT, OLD_ANCHORS, landingAction, oldAnchorRedirects, pageJsonLd, sharedHead, sidebar, type SidebarEntry } from "../../help-site/site.mjs";
+import { HELP_BASE, OG_IMAGE_ALT, OLD_ANCHORS, helpPageDetail, landingAction, oldAnchorRedirects, pageJsonLd, sharedHead, sidebar, type SidebarEntry } from "../../help-site/site.mjs";
 import { catalogFor } from "./catalogFixture";
 import { HELP_PAGES_DIR } from "../build/helpMarkdown";
 
@@ -178,6 +178,43 @@ describe("the analytics landing", () => {
     expect(landingAction("/help/keyboard/", `${origin}/help/`, origin)).toBeNull();
     expect(landingAction("/help/changelog/", `${origin}/help`, origin)).toBeNull();
     expect(landingAction("/help/", "https://elsewhere.test/help/", origin)).toBe("page_help");
+  });
+});
+
+describe("the help page view's page name", () => {
+  it("names a page by its path under /help, with or without the trailing slash", () => {
+    expect(helpPageDetail("/help/rooms/hotels/")).toBe("rooms/hotels");
+    expect(helpPageDetail("/help/rooms/hotels")).toBe("rooms/hotels");
+    expect(helpPageDetail("/help/changelog/")).toBe("changelog");
+    expect(helpPageDetail("/help/first-tower/")).toBe("first-tower");
+  });
+
+  it("names the front page home", () => {
+    expect(helpPageDetail("/help/")).toBe("home");
+    expect(helpPageDetail("/help")).toBe("home");
+  });
+
+  it("reports anything that is not a plain page path as other, never the raw text", () => {
+    expect(helpPageDetail("/helpful/")).toBe("other");
+    expect(helpPageDetail("/")).toBe("other");
+    expect(helpPageDetail("/help/Rooms/")).toBe("other");
+    expect(helpPageDetail("/help/rooms//hotels/")).toBe("other");
+    expect(helpPageDetail("/help/a%20b/")).toBe("other");
+    expect(helpPageDetail("/help/" + "a".repeat(81))).toBe("other");
+    expect(helpPageDetail("/help/" + "a".repeat(80))).toBe("a".repeat(80));
+  });
+
+  it("names every page in the side menu after itself", () => {
+    const slugs: string[] = [];
+    const walk = (entries: SidebarEntry[]) => {
+      for (const e of entries) {
+        if ("slug" in e) slugs.push(e.slug);
+        else if ("items" in e) walk(e.items);
+      }
+    };
+    walk(sidebar);
+    expect(slugs.length).toBeGreaterThan(20);
+    for (const slug of slugs) expect(helpPageDetail(`${HELP_BASE}/${slug}/`)).toBe(slug);
   });
 });
 
