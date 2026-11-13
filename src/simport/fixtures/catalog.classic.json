@@ -2071,14 +2071,16 @@
     "buildsWhilePaused": false,
     "decorativePassersBy": false,
     "exportsTo1994": true,
+    "fedUpWait": 25,
     "maxLobbyHeight": 3,
     "previewNamesRefusal": false,
     "quotesLobbyDistance": false,
     "scheduleAssist": false,
+    "shadedLook": false,
     "tallSkyLobbies": false,
     "variantHouseholds": false
   },
-  "version": 16,
+  "version": 17,
   "world": {
     "groundFloor": 1,
     "groundFloorStructure": "lobby",

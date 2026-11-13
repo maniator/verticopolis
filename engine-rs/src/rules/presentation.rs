@@ -58,4 +58,11 @@ impl GameMode {
     pub fn shows_passers_by(self) -> bool {
         self == GameMode::Modern
     }
+
+    /// Whether a frontend draws the lit look: people lit from the upper
+    /// left with a four-frame walk, and rooms shaded to match (Modern,
+    /// #2097). Classic keeps SimTower's flat look.
+    pub fn shaded_look(self) -> bool {
+        self == GameMode::Modern
+    }
 }

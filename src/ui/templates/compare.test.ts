@@ -33,6 +33,8 @@ describe("the Classic and Modern summary", () => {
     tallSkyLobbies: "Sky lobbies can rise too", // #308, Classic raises only the ground lobby
     maxLobbyHeight: null, // the same 3-story cap in both modes
     decorativePassersBy: "Decorative passers-by stroll busy corridors", // #2091
+    shadedLook: "People lit from the upper left, in shaded rooms", // #2097
+    fedUpWait: null, // the same wait turns a person red in both modes
   };
   const RULE_TO_HELP: Record<string, string | null> = {
     ...CATALOG_RULE_TO_HELP,

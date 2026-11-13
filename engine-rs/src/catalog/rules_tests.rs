@@ -80,6 +80,16 @@ fn each_mode_states_its_rules() {
     assert!(!classic.decorative_passers_by && modern.decorative_passers_by);
     assert_eq!(c["rules"]["decorativePassersBy"], Value::Bool(false));
     assert_eq!(v["rules"]["decorativePassersBy"], Value::Bool(true));
+    // #2097: Modern draws the lit look; Classic stays flat. Both show a
+    // person fed up at the wait the engine counts as stress.
+    assert!(!classic.shaded_look && modern.shaded_look);
+    assert_eq!(c["rules"]["shadedLook"], Value::Bool(false));
+    assert_eq!(v["rules"]["shadedLook"], Value::Bool(true));
+    assert_eq!(classic.fed_up_wait, crate::crowd::STRESS_WAIT);
+    assert_eq!(
+        v["rules"]["fedUpWait"],
+        serde_json::json!(crate::crowd::STRESS_WAIT)
+    );
     // #308: only Modern raises a sky lobby; both modes raise the ground one.
     assert!(!classic.tall_sky_lobbies && modern.tall_sky_lobbies);
     assert_eq!(c["rules"]["maxLobbyHeight"], Value::from(3));
