@@ -54,7 +54,9 @@ use crate::economy::visitors::showing_draw;
 use crate::facilities::{is_lobby_floor, Kind, LOT_WIDTH, MAX_LOBBY_HEIGHT};
 
 mod gathered;
+mod lobby_height;
 mod normalize;
+pub use lobby_height::ground_lobby_height;
 mod values;
 
 pub use gathered::{ExportCounts, ExportHeaderCounts, GatheredRoom, GatheredTower, SkipReason};
@@ -68,21 +70,6 @@ pub fn gather_tower(save: &Value) -> Result<GatheredTower, LegacyExportError> {
         return Err(LegacyExportError("save.units is not an array".into()));
     };
     gather_units(raw_units, ground_lobby_height(save))
-}
-
-/// The height in stories of the save's ground lobby, from its
-/// `lobbyHeights` (#308): 1 when the save lists none for floor 1. The
-/// loader keeps only heights from 2 to `MAX_LOBBY_HEIGHT`, and anything
-/// else here reads as 1 too.
-pub fn ground_lobby_height(save: &Value) -> i64 {
-    let entries = save.get("lobbyHeights").and_then(Value::as_array);
-    entries
-        .into_iter()
-        .flatten()
-        .filter_map(|e| Some((e.get(0)?.as_i64()?, e.get(1)?.as_i64()?)))
-        .find(|&(floor, _)| floor == 1)
-        .map_or(1, |(_, height)| height)
-        .clamp(1, MAX_LOBBY_HEIGHT)
 }
 
 /// [`gather_tower`] over the save's unit entries as they come, each read on
