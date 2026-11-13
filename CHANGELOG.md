@@ -25,6 +25,33 @@ prompt already tells players it is an engine update and shows the new version.
 Entries below 1.51.1 were curated from the commit history after the fact, so they
 are documentation only: no build that a client fetches carries them.
 
+## 3.7.0
+
+- When the game can't save your tower (a private window, blocked site storage or a full disk), a notice now stays on screen with the likely cause and an Export button, and it clears itself once saving works again.
+- Drag the Map, the room and elevator card, and any dialog by its blue title bar to move it out of the way. The Map remembers where you put it, and a double-click on a title bar puts a window back.
+- The room and elevator card, the hover card and every dialog now wear the Map's compact title bar and close button, so the closable windows match.
+- The Map's View menu is bigger and easier to read on a computer.
+- The Map button in the corner of the tower view is bigger, with a map icon, so it is easy to find and to click.
+- People look like people: a varied cast of builds, skin tones, hair, outfits and things in hand, in both modes. Classic draws them flat; Modern lights them from the upper left.
+- People walk smoothly instead of hopping between game steps, with a walk cycle while they move.
+- Waiting people show how long they have waited: they check the time, then put their hands on their hips in amber, then throw their arms up in red.
+- Elevator cars glide between floors at every speed instead of stopping short and catching up, and people get in and out when the car is at their floor, at the same moment the cab's riders change.
+- People keep their size inside an elevator car, and waiting people face the elevator they are waiting for.
+- Housekeepers push their cart between rooms and vacuum while they clean one. The crew is six different people in one uniform.
+- The three game speeds are slower so you can watch people walk: 3, 15 and 50 game minutes a second (they were 10, 30 and 120). A game day takes 8 minutes, 96 seconds or 29 seconds.
+- When shown, decorative passers-by walk only the corridors of occupied floors in Modern, at half the old count, and stay off lobbies, stairs, escalators and the space in front of elevators and shops.
+- Classic towers no longer show decorative passers-by, matching the original.
+- Decorative passers-by are now off unless you turn on "Show decorative passers-by" in Settings (Modern only), and reduced motion hides them.
+- Decorative passers-by no longer turn red when the tower is stressed, so red always means a real person has waited too long.
+- A revolving door between lobby halls no longer jumps a turn when someone gets out of an elevator or off a flight right beside it.
+- The Help site's Tall lobbies section shows two Modern halls side by side with the door between them, by day and by night.
+- In Modern, each lobby hall keeps its own height, so a three-story hall and a two-story hall can stand side by side on one floor.
+- Where two lobby halls of different heights meet, a wooden revolving door now turns as people walk through it, in either direction at once.
+- A floor built beside a tall lobby hall no longer blocks it, and a shaft beside the hall still stops on every floor.
+- On a desktop window, the Tools list now fits without scrolling: when every tool will not fit, its rows get tighter, and on a short window it splits into two columns.
+- Click a group's name in the Tools window (Commercial, Living and so on) to fold its tools away, and click it again to bring them back. The game remembers which groups you folded.
+- The desktop Tools window has a button on its title bar that folds it into a thin strip to give the tower more room, and opens it again. The game remembers your choice.
+
 ## 3.6.0
 
 - The How to Play manual has a new page, Differences from the 1994 game, listing where a Classic tower plays like SimTower and where it doesn't yet.
