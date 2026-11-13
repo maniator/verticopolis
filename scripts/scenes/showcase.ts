@@ -16,7 +16,7 @@ import {
   pgSetClock,
 } from "../screenshot-builders.ts";
 import { pgShowReturningSplash, pgShowTowerPicker } from "./returningPlayerPage.ts";
-import { DIALOG_PIN_SHOTS } from "./dialogPinShots.ts";
+import { CRASH_PIN_SHOTS, DIALOG_PIN_SHOTS } from "./dialogPinShots.ts";
 
 export const SHOWCASE_SCENES: Scene[] = [
   // --- Showcase: first-run splash / onboarding (fresh, splash kept) ----------
@@ -423,6 +423,7 @@ export const SHOWCASE_SCENES: Scene[] = [
         // context loss no further frames run either).
         wait: 0,
       },
+      ...CRASH_PIN_SHOTS,
     ],
   },
   // --- Mobile: built tower, stats drawer, palette -----------------------------

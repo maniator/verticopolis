@@ -41,6 +41,9 @@ const STRIP_SELECTOR =
   ".modal-box > .modal-actions:last-child,\n.modal-box > .modal-actions:nth-last-child(2)";
 /** The downward cover, which only a true last child is allowed to paint. */
 const DOWN_SELECTOR = ".modal-box > .modal-actions:last-child";
+/** The crash card is a bare `<dialog>`, not a `.modal-box`, so it pins its own
+ *  footer (#668). Its action row is always the card's last child. */
+const CRASH_STRIP_SELECTOR = ".crash-card > .modal-actions";
 
 /**
  * Every `--pad-y` the stylesheet sets ON `.modal-box`, not just the first: a
@@ -83,10 +86,11 @@ describe("pinned dialog action strip", () => {
     //
     // Read off the stylesheet rather than off the selector this test looked
     // the rule up by, which would only restate itself: EVERY sticky rule that
-    // mentions .modal-actions has to be this one, so a later `.modal-actions
-    // { position: sticky }` or a descendant-combinator variant fails here.
+    // mentions .modal-actions has to be one of the two named footers, so a
+    // later `.modal-actions { position: sticky }` or a descendant-combinator
+    // variant fails here.
     const pinned = stickyRules.filter(([sel]) => sel.includes(".modal-actions"));
-    expect(pinned.map(([sel]) => sel)).toEqual([STRIP_SELECTOR]);
+    expect(pinned.map(([sel]) => sel)).toEqual([STRIP_SELECTOR, CRASH_STRIP_SELECTOR]);
   });
 
   it("redraws the dialog's bevel on top of the downward cover", () => {
@@ -205,5 +209,50 @@ describe("pinned dialog action strip", () => {
     // guarded the one place the property would have been harmless.
     expect(warn).toMatch(/align-self:\s*center/);
     expect(block(".modal-actions")).not.toMatch(/align-items:/);
+  });
+});
+
+describe("pinned crash card buttons (#668)", () => {
+  // The crash card swallows Esc, so on a short or landscape phone its buttons
+  // are the only way out and have to stay on screen while the text scrolls.
+  const strip = block(CRASH_STRIP_SELECTOR);
+  const card = block(".crash-card");
+  const px = (re: RegExp, body: string): number => {
+    const found = re.exec(body)?.[1];
+    if (found === undefined) throw new Error(`no ${re} in the rule`);
+    return Number(found);
+  };
+  const pad = px(/[;{]\s*padding:\s*(\d+)px/, card);
+  const gap = px(/[;{]\s*gap:\s*(\d+)px/, card);
+  const margin = px(/margin-top:\s*(\d+)px/, block(".modal-actions"));
+  const shadows = (/box-shadow:([^;]*)/.exec(strip)?.[1] ?? "").split(",").map((p) => p.trim());
+
+  it("pins to the bottom of the card with a literal offset", () => {
+    expect(strip).toMatch(/position:\s*sticky/);
+    expect(strip).toMatch(/bottom:\s*0\b/);
+    expect(strip).not.toMatch(/var\(--pad-/);
+  });
+
+  it("paints an opaque background so scrolled text cannot show through", () => {
+    expect(strip).toMatch(/background:\s*var\(--panel\)/);
+  });
+
+  it("covers the card's gap plus its own margin above it, which flex does not collapse", () => {
+    // Short of that, a band of scrolled text shows above the buttons; past
+    // it, the cover would paint over the status line at rest.
+    expect(shadows).toContain(`0 -${gap + margin}px 0 var(--panel)`);
+  });
+
+  it("covers the padding band below it and redraws the card's bevel there", () => {
+    expect(shadows).toContain(`0 ${pad - BEVEL_PX}px 0 var(--panel)`);
+    expect(shadows.indexOf(`0 ${pad - 1}px 0 var(--r-shadow)`)).toBeGreaterThan(-1);
+    expect(shadows.indexOf(`0 ${pad - 1}px 0 var(--r-shadow)`)).toBeLessThan(
+      shadows.indexOf(`0 ${pad}px 0 var(--r-dark)`),
+    );
+  });
+
+  it("stays inside the padding box and adds no box of its own", () => {
+    expect(strip).not.toMatch(/[;{]\s*(padding|margin|border|min-height)/);
+    for (const part of shadows) expect(part).toMatch(/^-?\d+(px)? -?\d+(px)? 0 var\(--[a-z-]+\)$/);
   });
 });

@@ -92,6 +92,7 @@ tower running, then the same hook the engine raises when the GPU drops the WebGL
 | Screenshot | Shows |
 |---|---|
 | `crash-screen.png` | The crash card that replaced the silent auto-reload (v1.20.0): what happened, the save status, **Download crash report** (a zip with the crash details and the tower save), **Report a bug** (prefilled GitHub issue form), and **Reload game**. |
+| `crash-screen-pinned.png` | The same card on a short 720x240 window, at the top of its scroll: the buttons stay pinned to the bottom of the card over the text still below the fold (#668). The card swallows Esc, so on a phone held sideways these buttons are the only way out. |
 | `boot-no-webgl.png` | The no-WebGL boot screen (v1.84.4): a fixed full-viewport overlay naming the remedy (enable hardware acceleration or WebGL) with a **Reload** button. Staged by the `boot-no-webgl` scene stubbing the WebGL contexts before boot; pinned in the gallery because this screen once shipped invisible (the live Firefox report). |
 
 ## Security guards (the bomb search and a quiet day)
