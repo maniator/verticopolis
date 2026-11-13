@@ -38,6 +38,9 @@ const EMPTY_CROWD = 0.05;
  *  switches, so a mixed floor (cinema beside a party hall) cannot churn the
  *  programs while the camera pans. Mute bypasses it. */
 const KEY_SETTLE_UPDATES = 2;
+/** A level or cutoff target within this share of the one already sent is
+ *  not re-sent (one percent is under a tenth of a decibel). */
+const RAMP_TOLERANCE = 0.01;
 
 interface TalkerSlot {
   gain: Tone.Gain;
@@ -77,6 +80,12 @@ export class CrowdLayer {
   private activity = 0;
   private tick = 1;
   private disposed = false;
+  /** The target each per-update ramp was last sent, by param. update() runs
+   *  every frame, and every rampTo adds automation events to its param. Re-
+   *  sending unchanged targets each frame piled them up until the audio
+   *  thread's render cost doubled within a minute (the crackle once a venue
+   *  was on screen for a while), so a target is sent only when it moves. */
+  private sentTargets = new Map<object, number>();
 
   constructor(dest: Tone.InputNode, seedBaseUrl: string) {
     try {
@@ -156,7 +165,7 @@ export class CrowdLayer {
       }
       const key = this.scene;
       if (!key) {
-        this.master.gain.rampTo(0, 0.5);
+        this.rampOnChange(this.master.gain, 0, 0.5);
         this.activity = 0;
         return;
       }
@@ -173,16 +182,17 @@ export class CrowdLayer {
       // and a linear scale read as dead below half fill (the owner heard
       // "just a hum" over lightly-visited venues), the same fallacy the
       // perceptual volume sliders fixed. Empty stays exactly zero.
-      this.master.gain.rampTo(
+      this.rampOnChange(
+        this.master.gain,
         this.activity <= 0
           ? 0
           : LAYER_LEVEL * (0.38 + 0.62 * detail) * Math.sqrt(Math.min(1, this.activity)),
         0.5,
       );
-      this.humGain?.gain.rampTo(key === "outside" && this.activity > 0 ? 0.5 : 0, 1.2);
+      if (this.humGain) this.rampOnChange(this.humGain.gain, key === "outside" && this.activity > 0 ? 0.5 : 0, 1.2);
       if (spec.murmur) {
-        this.murmurFilter?.frequency.rampTo(spec.murmur.muffleHz, 0.4);
-        this.murmurGain?.gain.rampTo(spec.murmur.gain, 0.4);
+        if (this.murmurFilter) this.rampOnChange(this.murmurFilter.frequency, spec.murmur.muffleHz, 0.4);
+        if (this.murmurGain) this.rampOnChange(this.murmurGain.gain, spec.murmur.gain, 0.4);
         // Talkers = round(maxTalkers * crowd), floored at ONE while the room
         // is live: a couple eating in a big restaurant is still a quiet
         // conversation, not silence (rounding 3 talkers * 0.14 fill to zero
@@ -211,6 +221,15 @@ export class CrowdLayer {
     } catch {
       /* transient audio error: recover on the next update */
     }
+  }
+
+  /** Ramp `param` to `target` unless that target (or one within
+   *  RAMP_TOLERANCE of it) is already where it was last sent. */
+  private rampOnChange(param: { rampTo(value: number, time: number): unknown }, target: number, time: number): void {
+    const sent = this.sentTargets.get(param);
+    if (sent !== undefined && Math.abs(sent - target) <= Math.abs(target) * RAMP_TOLERANCE) return;
+    this.sentTargets.set(param, target);
+    param.rampTo(target, time);
   }
 
   /** Tear down the old scene's generators and start the new one's. */

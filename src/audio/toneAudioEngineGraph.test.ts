@@ -433,6 +433,23 @@ describe("ToneAudioEngine — full graph driven with a mocked Tone.js", () => {
     expect(steepInto(roomTone!)).toBe(true);
   });
 
+  it("REGRESSION: a steady view re-sends no ramps frame after frame (automation pile-up crackle)", () => {
+    // update() runs every frame. Re-sending an unchanged rampTo each frame
+    // piled automation events onto the crowd's params until the audio
+    // thread's render cost doubled within a minute of watching a venue.
+    const eng = new ToneAudioEngine();
+    eng.start();
+    const rampCount = () => graph.nodes.reduce((n, r) => n + r.ramps.length, 0);
+    const steady = focus({ zoom: 2.2, dominant: "restaurant", hour: 13, crowd: 0.5 });
+    for (let i = 0; i < 5; i++) eng.update(steady); // settle the scene
+    const settled = rampCount();
+    for (let i = 0; i < 60; i++) eng.update(steady);
+    expect(rampCount()).toBe(settled);
+    // A real change still ramps.
+    eng.update(focus({ zoom: 2.2, dominant: "restaurant", hour: 13, crowd: 0.1 }));
+    expect(rampCount()).toBeGreaterThan(settled);
+  });
+
   it("applies each scene's murmur level (the hotel whispers)", () => {
     const eng = new ToneAudioEngine();
     eng.start();
