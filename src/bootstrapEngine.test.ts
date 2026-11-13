@@ -207,7 +207,7 @@ describe("bootGame engine", () => {
     expect(() => slotPopulation("a save")).toThrow("unreachable");
     // The trap went down the same path as a tick's: the reader is off and the page reloads from the autosave.
     const message = "the Rust engine failed during a save's population read: unreachable";
-    expect(bootState()).toEqual({ build: "wasm-only", engine: "none", failure: { stage: "host", reason: "trap-tick", message } });
+    expect(bootState()).toEqual({ build: "wasm-only", engine: "none", failure: { stage: "host", reason: "trap-census", message } });
     expect(slotPopulation("a save")).toBeUndefined();
     expect(Engine.fromSave).toHaveBeenCalledTimes(1);
     expect(reloadSoon).toHaveBeenCalledOnce();
@@ -231,7 +231,7 @@ describe("bootGame engine", () => {
     // The host stopped as it does for a trap in a tick: nothing runs the tower, the page reloads.
     const message = "the Rust engine failed during a save: unreachable";
     expect(published()?.status).toMatchObject({ hosted: false, lastError: message });
-    expect(bootState()).toEqual({ build: "wasm-only", engine: "none", failure: { stage: "host", reason: "trap-tick", message }, writerLatched: true });
+    expect(bootState()).toEqual({ build: "wasm-only", engine: "none", failure: { stage: "host", reason: "trap-save", message }, writerLatched: true });
     expect(engineTrapped()).toBe(true);
     expect(setSpeed).toHaveBeenCalledWith(0);
     expect(reloadSoon).toHaveBeenCalledOnce();
@@ -422,7 +422,28 @@ describe("bootGame engine_status", () => {
     await boot({ setSpeed: vi.fn() });
     expect(noteEngineThrow(new WebAssembly.RuntimeError("unreachable"))).toBe(true);
     expect(reloadSoon).toHaveBeenCalledOnce();
-    expect(lastRow(engineRows())).toMatchObject({ trigger: "crash-reload", engine: "wasm", fallback_reason: "trap-tick", fallback_stage: "start", fallbacks: 1 });
+    expect(lastRow(engineRows())).toMatchObject({ trigger: "crash-reload", engine: "wasm", fallback_reason: "trap-tick", fallback_stage: "start", fallbacks: 1, trap_kind: "unreachable" });
+  });
+
+  it("names where the engine trapped and the trap's kind: a save is no tick", async () => {
+    stubWebGL();
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    wasmStub.module = { Engine: class {}, encodeVctower: () => { throw new WebAssembly.RuntimeError("memory access out of bounds"); } };
+    document.body.innerHTML = '<div id="stage"></div>';
+    await boot({ setSpeed: vi.fn() });
+    await SaveGame.export(SAVE_TEXT);
+    expect(reloadSoon).toHaveBeenCalledOnce();
+    expect(lastRow(engineRows())).toMatchObject({ trigger: "crash-reload", fallback_reason: "trap-save", trap_kind: "out-of-bounds" });
+  });
+
+  it("names a trap in the slot census as the census's", async () => {
+    stubWebGL();
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    wasmStub.module = { Engine: { fromSave: () => { throw new WebAssembly.RuntimeError("unreachable"); } }, encodeVctower: () => "VCTOWER1\n" };
+    document.body.innerHTML = '<div id="stage"></div>';
+    await boot({ setSpeed: vi.fn() });
+    expect(() => slotPopulation("a save")).toThrow("unreachable");
+    expect(lastRow(engineRows())).toMatchObject({ trigger: "crash-reload", fallback_reason: "trap-census", trap_kind: "unreachable" });
   });
 
   it("keeps the row when a boot step after the engine throws, and sends none when the game never existed", async () => {

@@ -3,6 +3,7 @@ import { APP_VERSION } from "./appVersion";
 import type { EngagedBy } from "./analyticsEngagement";
 import { FALLBACK_REASONS, type BootStage, type FallbackReason, type FallbackStage } from "./wasmhost/engineBoot";
 import type { EngineChoice } from "./wasmhost/engineChoice";
+import type { TrapKind } from "./wasmhost/hostFault";
 
 /**
  * The reliability instrument (release plan 4.1, step A1; issue #1081): one
@@ -74,6 +75,7 @@ export const ENGINE_STATUS_FIELDS = [
   "version",
   "sha",
   "engaged_by",
+  "trap_kind",
 ] as const satisfies readonly (keyof GameplayEvents["engine_status"])[];
 type MissingField = Exclude<keyof GameplayEvents["engine_status"], (typeof ENGINE_STATUS_FIELDS)[number]>;
 const everyField: [MissingField] extends [never] ? true : MissingField = true;
@@ -117,6 +119,8 @@ interface Status {
   reason: EngineStatusReason;
   stage: FallbackStage;
   fallbacks: number;
+  /** Set once a running engine trapped: what kind of trap it was. */
+  trapKind?: TrapKind;
 }
 
 let status: Status | null = null;
@@ -151,6 +155,7 @@ function fallbackId(): string {
 function send(s: Status, trigger: EngineStatusTrigger, engagedBy?: EngagedBy): void {
   trackEvent("engine_status", {
     ...(engagedBy ? { engaged_by: engagedBy } : {}),
+    ...(s.trapKind ? { trap_kind: s.trapKind } : {}),
     trigger,
     engine_requested: s.requested,
     engine: s.engine,
@@ -218,11 +223,12 @@ export function noteEngineSettled(settle: EngineSettle): void {
 /** A fallback after boot settled: a tower the host would not take, or a
  *  running engine's fault (#874). Before `settle` it is ignored, because the
  *  boot state the settle row reads already holds it. */
-export function noteEngineFallback(fallback: { reason: FallbackReason; stage: FallbackStage }): void {
+export function noteEngineFallback(fallback: { reason: FallbackReason; stage: FallbackStage; trapKind?: TrapKind }): void {
   if (!status) return;
   status.fallbacks++;
   status.reason = fallback.reason;
   status.stage = fallback.stage;
+  if (fallback.trapKind) status.trapKind = fallback.trapKind;
   status.engine = engineKind(status.build, status.requested, true);
   sendCapped(status, "fallback", !reasonsSent.has(fallback.reason));
 }
@@ -231,11 +237,12 @@ export function noteEngineFallback(fallback: { reason: FallbackReason; stage: Fa
  *  (#1422). The row keeps the engine that crashed, and goes out past the cap,
  *  since a page life reloads once. Before `settle` it is ignored, as a
  *  fallback is. */
-export function noteEngineCrashReload(fault: { reason: FallbackReason; stage: FallbackStage }): void {
+export function noteEngineCrashReload(fault: { reason: FallbackReason; stage: FallbackStage; trapKind?: TrapKind }): void {
   if (!status) return;
   status.fallbacks++;
   status.reason = fault.reason;
   status.stage = fault.stage;
+  if (fault.trapKind) status.trapKind = fault.trapKind;
   sendCapped(status, "crash-reload", true);
 }
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { EngineBootError } from "./engineBoot";
-import { isEngineTrap, runEach } from "./hostFault";
+import { TRAP_KINDS, isEngineTrap, runEach, trapKind } from "./hostFault";
 
 describe("an engine trap (#1113)", () => {
   const named = (name: string, message: string) => Object.assign(new Error(message), { name });
@@ -64,5 +64,27 @@ describe("a teardown's steps (#1113)", () => {
     const thrown = thrownBy(throwing(new Error("the events do not go back")), throwing(wrapped));
     expect(thrown).toMatchObject({ message: "wrapper 3, and the events do not go back", cause: trap });
     expect(isEngineTrap(thrown)).toBe(true);
+  });
+});
+
+describe("a trap's kind, the code a reliability row carries in place of the message", () => {
+  const named = (name: string, message: string) => Object.assign(new Error(message), { name });
+
+  it("names each kind the browsers report, from the trap or the cause a wrapper keeps", () => {
+    expect(trapKind(new WebAssembly.RuntimeError("unreachable"))).toBe("unreachable");
+    expect(trapKind(named("RuntimeError", "unreachable executed"))).toBe("unreachable");
+    expect(trapKind(new WebAssembly.RuntimeError("memory access out of bounds"))).toBe("out-of-bounds");
+    expect(trapKind(new RangeError("Maximum call stack size exceeded"))).toBe("stack-overflow");
+    expect(trapKind(named("InternalError", "too much recursion"))).toBe("stack-overflow");
+    expect(trapKind(new Error("recursive use of an object detected which would lead to unsafe aliasing in rust"))).toBe("poisoned");
+    expect(trapKind(new WebAssembly.RuntimeError("integer divide by zero"))).toBe("other");
+    expect(trapKind(Object.assign(new Error("a wrapper that quotes a tower name"), { cause: new WebAssembly.RuntimeError("unreachable") }))).toBe("unreachable");
+  });
+
+  it("is none for anything that is no trap, and never a code outside the closed list", () => {
+    expect(trapKind(new Error("the events do not go back"))).toBe("none");
+    expect(trapKind("unreachable")).toBe("none");
+    expect(trapKind(undefined)).toBe("none");
+    for (const e of [new WebAssembly.RuntimeError("anything at all"), new Error("x")]) expect(TRAP_KINDS).toContain(trapKind(e));
   });
 });

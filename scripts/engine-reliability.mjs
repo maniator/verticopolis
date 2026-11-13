@@ -126,7 +126,7 @@ export const HOSTS = ["wasm", "wasm-frame", "wasm-worker"];
 export const BUILDS = ["switchable", "wasm-only"];
 /** Every `engine` value the game sends (`src/analyticsEngineStatus.ts`). */
 export const ENGINE_KINDS_SENT = ["ts", "wasm", "wasm-frame", "wasm-worker", "ts-fallback", "none"];
-export const REASONS = ["none", "boot-timeout", "boot-error", "package-mismatch", "unverifiable", "attach-refused", "trap-command", "trap-tick", "trap-undo", "other", "unclean-exit", "marker-blocked"];
+export const REASONS = ["none", "boot-timeout", "boot-error", "package-mismatch", "unverifiable", "attach-refused", "trap-command", "trap-tick", "trap-undo", "trap-save", "trap-census", "other", "unclean-exit", "marker-blocked"];
 
 /** A build's commit (`git rev-parse --short`, or `unknown` outside a checkout)
  *  and version, as the game sends them. */

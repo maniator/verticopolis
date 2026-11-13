@@ -1,4 +1,5 @@
 import { isEngineTrap } from "../wasmhost/hostFault";
+import type { FallbackReason } from "../wasmhost/engineBoot";
 
 /**
  * A trap in the running Rust engine (#874), heard where the frame loop
@@ -12,6 +13,10 @@ import { isEngineTrap } from "../wasmhost/hostFault";
 /** Where the trap happened: a frame's step, the engine's save writer (#1205), or the slot population
  *  reader that loads a save into a short-lived engine in the same module (#1612). */
 export type TrapDuring = "tick" | "save" | "census";
+
+/** The reliability code for a trap in each place (`fallback_reason`), so a
+ *  trap in the save writer or the census is not counted as a tick's. */
+export const TRAP_REASON = { tick: "trap-tick", save: "trap-save", census: "trap-census" } as const satisfies Record<TrapDuring, FallbackReason>;
 
 let onTrap: ((error: unknown, during: TrapDuring) => void) | null = null;
 let trapped = false;

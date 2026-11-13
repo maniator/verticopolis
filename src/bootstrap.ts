@@ -13,7 +13,8 @@ import { setEngineWriter } from "./storage/vctowerWriter";
 import { populationReaderFromModule } from "./wasmhost/slotPopulation";
 import { noteEngineAttempt, noteEngineCrashReload, noteEngineFallback, noteEngineSettled, noteEngineWriterLatched } from "./analyticsEngineStatus";
 import { startEngagementWatch } from "./game/engagementWatch";
-import { noteEngineThrow, runningTowerStage, watchEngineTraps } from "./game/engineFault";
+import { TRAP_REASON, noteEngineThrow, runningTowerStage, watchEngineTraps } from "./game/engineFault";
+import { trapKind } from "./wasmhost/hostFault";
 import { ENGINE_FAILURE_ID, isEngineStopped } from "./game/interactionState";
 import { showEngineLoading } from "./engineLoading";
 import { bootFailureReason, deferEngineIdentity, engineFailureCopy, failBoot, loadBootEngine, publishBootState, settleEngineIdentity, type EngineBootState } from "./wasmhost/engineBoot";
@@ -346,13 +347,14 @@ export function bootGame(create: (tower: BootTower) => BootApp): Promise<void> {
         console.error(`[wasm] ${message}`);
         rust.status.hosted = false;
         rust.status.lastError = message;
-        // Nothing runs the tower now.
-        bootState = failBoot(bootState, "host", "trap-tick", message);
+        // Nothing runs the tower now. The code names where it trapped.
+        const reason = TRAP_REASON[during];
+        bootState = failBoot(bootState, "host", reason, message);
         setEngineWriter(null);
         setSlotPopulationReader(null);
         // The trap is counted in the reliability rows, as the stage its tower
         // was hosted at.
-        const fault = { reason: "trap-tick", stage: runningTowerStage() } as const;
+        const fault = { reason, stage: runningTowerStage(), trapKind: trapKind(e) };
         const outcome = crashOutcome(countRustCrash(tabStore(), __APP_SHA__));
         publishBootState(bootState);
         // A reload's row names the engine that crashed, and goes out by

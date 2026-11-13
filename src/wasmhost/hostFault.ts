@@ -26,6 +26,30 @@ export function isEngineTrap(error: unknown): boolean {
   return trapIn(error) !== null;
 }
 
+/**
+ * What kind of trap it was, as a code from a closed list, so a reliability row
+ * can say it without carrying the message (an engine message can quote a tower
+ * name). `unreachable` is a Rust panic or abort, which is also how a failed
+ * allocation ends: in a browser the two look the same. `out-of-bounds` is a
+ * memory access outside the module's memory, `stack-overflow` a stack that ran
+ * out, `poisoned` a call on an object an earlier trap left borrowed, and
+ * `other` any other trap. `none` is not a trap.
+ */
+export const TRAP_KINDS = ["none", "unreachable", "out-of-bounds", "stack-overflow", "poisoned", "other"] as const;
+export type TrapKind = (typeof TRAP_KINDS)[number];
+
+/** The kind of the trap in `error` (see {@link TRAP_KINDS}). */
+export function trapKind(error: unknown): TrapKind {
+  const trap = trapIn(error);
+  if (trap === null) return "none";
+  const message = String((trap as { message?: unknown }).message ?? "");
+  if (message.includes(POISONED)) return "poisoned";
+  if (/call stack size|too much recursion|stack overflow/i.test(message)) return "stack-overflow";
+  if (/out of bounds/i.test(message)) return "out-of-bounds";
+  if (/unreachable/i.test(message)) return "unreachable";
+  return "other";
+}
+
 /** The trap itself, `error` or one of its causes, or null for none. */
 function trapIn(error: unknown): unknown {
   for (let e = error, depth = 0; typeof e === "object" && e !== null && depth < 4; e = (e as { cause?: unknown }).cause, depth++) {

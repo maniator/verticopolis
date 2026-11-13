@@ -8,6 +8,7 @@ import type { EngineBuild, EngineKind, EngineStatusReason, EngineStatusTrigger }
 import type { GameplayMilestoneId } from "./events/gameplayEvents";
 import type { FallbackStage } from "./wasmhost/engineBoot";
 import type { EngineChoice } from "./wasmhost/engineChoice";
+import type { TrapKind } from "./wasmhost/hostFault";
 
 /**
  * Gameplay analytics core: the typed event vocabulary, the cross-cutting common
@@ -272,6 +273,8 @@ export interface GameplayEvents {
     sha: string;
     /** Only on `engaged` rows (#1090). */
     engaged_by?: EngagedBy;
+    /** Only once a running engine trapped in this page life: the trap's kind. */
+    trap_kind?: TrapKind;
   };
 }
 
