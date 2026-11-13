@@ -259,3 +259,52 @@ fn a_saved_classic_gap_loads_as_it_was_and_can_be_filled() {
     assert!(sim.money < money);
     assert!(sim.build(Kind::Floor, 5, 50).ok);
 }
+
+#[test]
+fn classic_refuses_to_widen_a_gap_a_saved_tower_already_has() {
+    // Naftali, 2026-11-13 (on 3.4.0): a Classic tower saved before the rule
+    // kept its notch, and a tile beside the notch, with floor on one side
+    // only, still came out, so the notch was cut wider one tile at a time.
+    // Only the two ends of the whole story come out, on every floor.
+    let mut sim = tower_in(GameMode::Classic);
+    for floor in [4, 0, -1] {
+        for x in 50..54 {
+            let id = floor_tile(&sim, floor, x);
+            sim.tower.remove_unit(id);
+        }
+    }
+    let mut sim = crate::load_stream::load_save_text(sim.save_text().as_bytes()).unwrap();
+    assert_eq!(sim.tower.mode, GameMode::Classic);
+    for floor in [4, 0, -1] {
+        for x in [49, 54] {
+            let id = floor_tile(&sim, floor, x);
+            let money = sim.money;
+            assert_eq!(
+                sim.remove_facility(id, RemovalMethod::Bulldoze),
+                ChargeResult::refuse(crate::tower::MID_FLOOR_GAP),
+                "floor {floor}, x {x}"
+            );
+            assert!(!sim.sell_at(floor, x), "floor {floor}, x {x}");
+            assert!(sim.tower.get_unit(id).is_some());
+            assert_eq!(sim.money, money);
+        }
+        for x in [119, 10] {
+            let id = floor_tile(&sim, floor, x);
+            assert!(
+                sim.remove_facility(id, RemovalMethod::Bulldoze).ok,
+                "floor {floor}, x {x}"
+            );
+        }
+    }
+}
+
+#[test]
+fn modern_still_widens_a_gap() {
+    let mut sim = tower_in(GameMode::Modern);
+    let gap = floor_tile(&sim, 4, 50);
+    sim.tower.remove_unit(gap);
+    for x in [49, 51] {
+        let id = floor_tile(&sim, 4, x);
+        assert!(sim.remove_facility(id, RemovalMethod::Bulldoze).ok, "x {x}");
+    }
+}

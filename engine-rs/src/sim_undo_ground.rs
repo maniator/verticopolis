@@ -244,10 +244,12 @@ impl<'a> Ground<'a> {
     /// (`Tower::removal_reason`): in a mode that keeps floors whole
     /// ([`GameMode::removes_mid_floor_tiles`](crate::clock::GameMode::removes_mid_floor_tiles)),
     /// the run of leaving tiles around `u` must reach an end of its story,
-    /// so the sales can start there. Only the run's first tile walks it, and
-    /// the others answer yes, so a step's check stays linear in its tiles:
-    /// the step is sellable only when every tile is, and the first one's
-    /// answer is the run's.
+    /// so the sales can start there: no tile that stays may stand anywhere
+    /// on one side of it, as `Tower::floor_on_both_sides` asks of a sale, so
+    /// a gap a save already has is no end. Only the run's first tile scans
+    /// the story, and the others answer yes, since every tile of one run sees
+    /// the same tiles stay on each side: the step is sellable only when every
+    /// tile is, and the first one's answer is the run's.
     pub(crate) fn sells_from_an_end(&self, u: &Unit) -> bool {
         let leaves = |x: i64| {
             self.tower
@@ -258,11 +260,8 @@ impl<'a> Ground<'a> {
         if self.tower.mode.removes_mid_floor_tiles() || leaves(u.x - 1) {
             return true;
         }
-        let mut right = u.x + u.width;
-        while leaves(right) {
-            right += 1;
-        }
-        !(self.stays(u.floor, u.x - 1) && self.stays(u.floor, right))
+        let stays = |x: i64| self.stays(u.floor, x);
+        !((0..u.x).any(stays) && (u.x + u.width..LOT_WIDTH).any(stays))
     }
 
     /// Whether taking out floor or lobby tile `u` leaves everything it held
