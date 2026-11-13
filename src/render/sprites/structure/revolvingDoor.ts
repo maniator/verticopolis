@@ -20,7 +20,6 @@
  * Every piece keys on `angle` and `lit` only. Integer pixels.
  */
 
-import { BUILDS, personFigure } from "../../pixelSprites/common";
 
 /** The drum's radius in world pixels: wide enough for one walker (7 px) per
  *  compartment with room to push. */
@@ -206,16 +205,6 @@ export function drawRevolvingDoorFront(ctx: CanvasRenderingContext2D, cx: number
   ctx.fillRect(left, top - 1, width, 1);
   ctx.fillRect(left, Math.round(foot) - 1, 1, 1); // brass shoes on the posts
   ctx.fillRect(left + width - 1, Math.round(foot) - 1, 1, 1);
-}
-
-/** A walker pushing a wing: the routed crowd's figure with one arm out the
- *  way they walk (`dir` -1 left, 1 right), at the torso's middle. `x` is the
- *  figure's left edge, as `personFigure` takes it. */
-export function drawPushingWalker(ctx: CanvasRenderingContext2D, x: number, footY: number, fill: string, dir: -1 | 1): void {
-  personFigure(ctx, x, footY, "walker", fill);
-  const b = BUILDS.walker;
-  ctx.fillStyle = fill;
-  ctx.fillRect(dir > 0 ? x + b.width : x - 2, Math.round(footY) - b.legs - Math.round(b.torso * 0.6), 2, 2);
 }
 
 /** True while a person standing at `personX` (their left edge, `width` wide)

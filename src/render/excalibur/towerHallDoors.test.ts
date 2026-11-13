@@ -1,11 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import { Z } from "../depthPlanes";
 import type { HallDoor } from "../lobbyHalls";
-import { SHIRTS } from "../pixelSprites/common";
 import { FLOOR, TILE } from "../scale";
 import { DOOR_RADIUS } from "../sprites/structure/revolvingDoor";
 import type { TowerEngine } from "./TowerEngine";
-import { clearHallDoors, HallDoorLayer, pushingGfx, pushThroughDoors, relightHallDoors, syncHallDoors, turnHallDoors } from "./towerHallDoors";
+import { clearHallDoors, HallDoorLayer, pushThroughDoors, relightHallDoors, syncHallDoors, turnHallDoors } from "./towerHallDoors";
 
 // A Node test has no 2d canvas: `ex.Canvas` is a stand-in that records its
 // options and repaints, and `ex.Actor` records its plane, graphic and kill.
@@ -135,16 +134,5 @@ describe("pushThroughDoors and turnHallDoors", () => {
     expect(canvases.map((c) => c.flagDirty.mock.calls.length)).toEqual([1, 1, 0]);
     turnHallDoors(e);
     expect(rec.angle).toBeCloseTo(start + 2 / DOOR_RADIUS, 9);
-  });
-});
-
-describe("pushingGfx", () => {
-  it("bakes one pose per shirt and direction, and dresses staff in the uniform", () => {
-    const e = fakeEngine();
-    const one = pushingGfx(e, { seed: 3 }, 1);
-    expect(pushingGfx(e, { seed: 3 + SHIRTS.length }, 1)).toBe(one);
-    expect(pushingGfx(e, { seed: 3 }, -1)).not.toBe(one);
-    expect(pushingGfx(e, { seed: 4, staff: true }, 1)).toBe(pushingGfx(e, { seed: 9, staff: true }, 1));
-    expect([...e.hallDoors.pushGfx.keys()]).toEqual([`${SHIRTS[3]}:1`, `${SHIRTS[3]}:-1`, "#E8E4DA:1"]);
   });
 });

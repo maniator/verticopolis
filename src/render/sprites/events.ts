@@ -9,11 +9,13 @@
  *    the sky (canon: "Santa Claus and his reindeer fly across the tower").
  *  - {@link drawExplosion}: the bomb-detonation flash at the blast epicenter,
  *    a fading starburst over the rooms it guts.
- *  - {@link drawThief}: a masked thief slinking across a floor with a loot sack;
- *    a security guard trails him when he's caught.
+ *  - {@link drawThief}: a masked thief running across a floor with a loot sack;
+ *    a security guard stands behind him when he's caught.
  *  - {@link drawTreasure}: a gold sparkle + coins rising from an unearthed find.
  *  - {@link drawVipLimo}: the VIP's limousine, arriving at the lobby for a review.
  */
+
+import { drawPerson, STAFF_LOOK } from "../pixelSprites/people";
 
 /** One reindeer facing right: body, head, antlers, legs, a red nose. */
 function drawReindeer(ctx: CanvasRenderingContext2D, x: number, y: number, s: number): void {
@@ -163,95 +165,49 @@ export function drawExplosion(ctx: CanvasRenderingContext2D, x: number, y: numbe
   ctx.restore();
 }
 
-/**
- * The board burglar, feet at (x, footY), sized by `s`. A bespoke integer-rect
- * port (no `person()` dependency): ink legs and a skin face under a striped
- * dark coat with edge shades and faint stripes, a cap with a brim, a mask band
- * across the eyes, a swag sack with a tie and a poking coin, tiptoe toes, and a
- * few sneaky motion dashes trailing behind. Every rect rounds to integer device
- * pixels after scaling. No `$` glyph.
- */
-function drawThiefFigure(ctx: CanvasRenderingContext2D, x: number, footY: number, s: number): void {
-  const px = (ax: number, ay: number, aw: number, ah: number, c: string): void => {
-    ctx.fillStyle = c;
-    ctx.fillRect(Math.round(x + ax * s), Math.round(footY + ay * s), Math.max(1, Math.round(aw * s)), Math.max(1, Math.round(ah * s)));
-  };
-  // Contact shadow, ink legs.
-  px(-1, 0, 9, 1, "rgba(0,0,0,0.22)");
-  px(1, -6, 2, 6, "#2A2E38");
-  px(4, -6, 2, 6, "#2A2E38");
-  // Dark coat with edge shades and faint burglar stripes.
-  px(0, -19, 7, 13, "#232830");
-  px(0, -19, 1, 13, "#14171C");
-  px(6, -19, 1, 13, "#33383F");
-  px(2, -17, 1, 10, "#3A4048");
-  px(4, -17, 1, 10, "#3A4048");
-  // Skin face, then a cap with a brim and a mask band across the eyes.
-  px(1, -24, 5, 5, "#E8C9A0");
-  px(0, -25, 7, 3, "#1A1D22");
-  px(0, -22, 7, 1, "#33383F"); // brim
-  px(1, -21, 5, 1, "#14171C"); // mask band
-  // Swag sack over the shoulder, with a tie and a poking coin (no `$`).
-  px(6, -16, 5, 6, "#C9B98A");
-  px(6, -16, 5, 1, "#E0D2A8"); // sack highlight
-  px(7, -17, 2, 1, "#8A7A54"); // tie
-  px(8, -18, 1, 1, "#E8C14A"); // poking coin
-  // Tiptoe toes.
-  px(1, -1, 2, 1, "#14171C");
-  px(4, -1, 2, 1, "#14171C");
-  // Sneaky motion dashes trailing behind him.
-  px(-4, -12, 2, 1, "#5A6472");
-  px(-6, -8, 2, 1, "#5A6472");
-  px(-3, -5, 2, 1, "#5A6472");
-}
-
 /** How tall the guard and thief figures are at size 1, from the guard's
- *  alert beacon (29 above the feet) to the contact shadow under them. */
+ *  alert beacon to the contact shadow under them. */
 export const FIGURE_HEIGHT = 30;
 
-/** The security guard trailing a caught thief, feet at (x, footY), sized by `s`:
- *  a bespoke integer-rect figure in a navy uniform with a peaked cap and a
- *  static red alert beacon (a functional caught-state cue, not decoration). */
-function drawGuardFigure(ctx: CanvasRenderingContext2D, x: number, footY: number, s: number): void {
-  const px = (ax: number, ay: number, aw: number, ah: number, c: string): void => {
-    ctx.fillStyle = c;
-    ctx.fillRect(Math.round(x + ax * s), Math.round(footY + ay * s), Math.max(1, Math.round(aw * s)), Math.max(1, Math.round(ah * s)));
-  };
-  px(-1, 0, 9, 1, "rgba(0,0,0,0.22)"); // contact shadow
-  px(1, -6, 2, 6, "#2A2E38"); // ink legs
-  px(4, -6, 2, 6, "#2A2E38");
-  px(0, -19, 7, 13, "#274B8F"); // navy uniform with edge shades
-  px(0, -19, 1, 13, "#1C3A6E");
-  px(6, -19, 1, 13, "#3A5A8F");
-  px(4, -17, 2, 2, "#F2C14E"); // gold chest badge, so a guard reads apart from navy-suited staff
-  px(4, -17, 1, 1, "#FFF1B8"); // its glint
-  px(0, -10, 7, 1, "#15171D"); // black duty belt
-  px(3, -10, 1, 1, "#F2C14E"); // gold buckle
-  px(1, -24, 5, 5, "#E8C9A0"); // skin face
-  px(0, -25, 7, 3, "#16305E"); // peaked cap
-  px(0, -22, 7, 1, "#3A5A8F"); // cap band
-  px(3, -24, 1, 1, "#F2C14E"); // gold cap badge
-  px(2, -29, 2, 2, "rgba(255,64,64,0.92)"); // alert beacon
+/** What the overlay's figures are doing, from the event that drives them. */
+export interface EventFigureState {
+  /** The walk or climb frame (0 to 3), from the overlay's clock. */
+  readonly frame?: number;
+  /** Lit from the upper left (Modern's `rules.shadedLook`). */
+  readonly lit?: boolean;
+}
+
+/** The static red alert beacon over a guard on a call (a functional cue). */
+function drawBeacon(ctx: CanvasRenderingContext2D, x: number, footY: number, s: number): void {
+  ctx.fillStyle = "rgba(255,64,64,0.92)";
+  ctx.fillRect(Math.round(x + 4 * s), Math.round(footY - 29 * s), Math.max(1, Math.round(2 * s)), Math.max(1, Math.round(2 * s)));
 }
 
 /** A guard sweeping a floor for Classic's bomb, feet at (x, footY), sized by
- *  `s`: the same figure that trails a caught thief. */
-export function drawSearchGuard(ctx: CanvasRenderingContext2D, x: number, footY: number, s: number): void {
+ *  `s`: the cast's security guard (#2097), climbing on the emergency stairs
+ *  and walking the floor's rooms. */
+export function drawSearchGuard(ctx: CanvasRenderingContext2D, x: number, footY: number, s: number, climbing = false, state: EventFigureState = {}): void {
   ctx.save();
-  drawGuardFigure(ctx, x, footY, s);
+  drawPerson(ctx, x, footY, STAFF_LOOK.security, { lit: state.lit ?? false, frame: state.frame ?? 1, pose: climbing ? "climb" : "walk", scale: s });
+  drawBeacon(ctx, x, footY, s);
   ctx.restore();
 }
 
 /**
- * A masked thief slinking rightward with a swag sack, feet at (x, y). When
- * `caught`, a security guard trails close behind with an alert light. Drawn in
- * screen space on the overlay (in front of the tower).
+ * The masked thief running rightward with a swag sack, feet at (x, y), in the
+ * cast's look (#2097). When `caught`, he throws his hands up and a security
+ * guard stands close behind him with an alert light. Drawn in screen space
+ * on the overlay (in front of the tower).
  */
-export function drawThief(ctx: CanvasRenderingContext2D, x: number, y: number, scale = 1, caught = false): void {
+export function drawThief(ctx: CanvasRenderingContext2D, x: number, y: number, scale = 1, caught = false, state: EventFigureState = {}): void {
   const s = scale;
+  const lit = state.lit ?? false;
   ctx.save();
-  if (caught) drawGuardFigure(ctx, x - 13 * s, y, s); // trailing guard, just behind (to the left)
-  drawThiefFigure(ctx, x, y, s);
+  if (caught) {
+    drawPerson(ctx, x - 13 * s, y, STAFF_LOOK.security, { lit, frame: 1, pose: "stand", scale: s, empty: true });
+    drawBeacon(ctx, x - 13 * s, y, s);
+  }
+  drawPerson(ctx, x, y, STAFF_LOOK.thief, { lit, frame: caught ? 1 : (state.frame ?? 0), pose: caught ? "caught" : "run", scale: s, empty: caught });
   ctx.restore();
 }
 

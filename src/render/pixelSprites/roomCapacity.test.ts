@@ -68,10 +68,10 @@ const room = (ctx: CanvasRenderingContext2D, kind?: string): RoomCtx =>
 const peopleCount = (log: string[]): number => log.filter((l) => l === "fillStyle=rgba(0,0,0,0.24)").length;
 
 /** Daycare children are their own small silhouette, not the shared person build,
- *  so they carry no contact shadow. They do share the skin literal with an adult
- *  head, so subtract the adults to count them. */
+ *  so they carry no contact shadow. Each one starts with its translucent body
+ *  block: black at 22% alpha, which nothing else in the room sets in a row. */
 const childCount = (log: string[]): number =>
-  log.filter((l) => l === "fillStyle=#E8C9A0").length - peopleCount(log);
+  log.filter((l, i) => l === "fillStyle=#000000" && log[i + 1] === "globalAlpha=0.22").length;
 
 /** A spa guest on a massage table is a fold of shaded linen, not a figure. */
 const bedGuestCount = (log: string[]): number =>

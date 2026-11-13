@@ -1,6 +1,7 @@
 import type { FacilityKind } from "../../shared/types";
 import type { UnitView } from "../../simport/view";
 import { viewWorld } from "../../presentation/viewWorld";
+import { CAST, castIndex, drawPerson, type Dims } from "./people";
 
 /**
  * Shared primitives for the dollhouse room art: the signature palette, the
@@ -220,7 +221,7 @@ export function person(ctx: CanvasRenderingContext2D, x: number, footY: number, 
 // `person()` above stays byte-identical for existing callers; per-kind specs
 // adopt these named builds as they repaint, so no call site changes here.
 
-export type PersonBuild = "seated" | "standing" | "walker" | "rider" | "hiVis";
+export type PersonBuild = "seated" | "standing" | "walker" | "hiVis";
 export type Mood = "content" | "impatient" | "fedUp";
 
 export interface BuildSpec {
@@ -232,20 +233,14 @@ export interface BuildSpec {
 }
 
 /** Finalized geometry per build (owner-approved). Totals: seated 15, standing
- *  18, walker 24, rider 17, hi-vis 22 pixels tall. */
+ *  18, walker 24, hi-vis 22 pixels tall. A car's riders have no build: they
+ *  are drawn at the size the crowd draws them (`personRider`). */
 export const BUILDS: Record<PersonBuild, BuildSpec> = {
   seated: { head: 5, torso: 10, legs: 0, width: 6 },
   standing: { head: 5, torso: 9, legs: 4, width: 6 },
   walker: { head: 5, torso: 13, legs: 6, width: 7 },
-  rider: { head: 4, torso: 9, legs: 4, width: 6 },
   hiVis: { head: 5, torso: 12, legs: 5, width: 7, hardhat: true },
 };
-
-// Head detail literals, pinned by the pixelSpritesCommon guard.
-const FIGURE_SKIN = SKIN[0]; // "#E8C9A0" skin field
-const FIGURE_HAIR = "#3A2E28"; // 1px hair line
-const FIGURE_EYE = "#F0D8B8"; // 1px eye highlight
-const FIGURE_SHADOW = "rgba(0,0,0,0.24)"; // 1px contact shadow
 
 /** Torso fill for a figure's mood. Content wears the class `SHIRTS` color;
  *  impatient warms to amber; fed up turns the reserved stress red. The impatient
@@ -257,60 +252,51 @@ export function moodTint(mood: Mood, seed: number): string {
   return SHIRTS[Math.abs(seed) % SHIRTS.length];
 }
 
-/** Draw one finalized figure. `footY` is the baseline the feet stand on; the
- *  figure rises above it. `fill` is the torso (mood) color. Integer pixels. */
-export function personFigure(ctx: CanvasRenderingContext2D, x: number, footY: number, build: PersonBuild, fill: string): void {
+/** The height overrides that keep a cast figure at its build's height: the
+ *  cast adds a neck and a row of hair, and a seated figure's lap one more.
+ *  A bun or curls stand a pixel taller, a bald head a pixel shorter. */
+export function buildDims(build: PersonBuild): Dims {
   const b = BUILDS[build];
-  const x0 = Math.round(x);
-  const foot = Math.round(footY);
-  ctx.fillStyle = FIGURE_SHADOW; // 1px contact shadow under the feet
-  ctx.fillRect(x0 - 1, foot, b.width + 2, 1);
-  const legTop = foot - b.legs;
-  if (b.legs > 0) {
-    ctx.fillStyle = PAL.ink; // two ink legs at fixed columns (1px gap at every width); seated has none
-    ctx.fillRect(x0 + 1, legTop, 2, b.legs);
-    ctx.fillRect(x0 + 4, legTop, 2, b.legs);
-  }
-  const torsoTop = legTop - b.torso;
-  ctx.fillStyle = fill; // torso: mood fill, darker left edge, lighter right edge
-  ctx.fillRect(x0, torsoTop, b.width, b.torso);
-  ctx.fillStyle = shade(fill, -26);
-  ctx.fillRect(x0, torsoTop, 1, b.torso);
-  ctx.fillStyle = shade(fill, 16);
-  ctx.fillRect(x0 + b.width - 1, torsoTop, 1, b.torso);
-  const headW = b.width - 2;
-  const headX = x0 + 1;
-  const headTop = torsoTop - b.head;
-  ctx.fillStyle = FIGURE_SKIN; // head: skin field, hair line, eye highlight
-  ctx.fillRect(headX, headTop, headW, b.head);
-  ctx.fillStyle = FIGURE_HAIR;
-  ctx.fillRect(headX, headTop, headW, 1);
-  ctx.fillStyle = FIGURE_EYE;
-  ctx.fillRect(headX + headW - 2, headTop + 2, 1, 1);
-  if (b.hardhat) {
-    ctx.fillStyle = "#F4D24A"; // hi-vis hardhat brim + vest stripe
-    ctx.fillRect(headX - 1, headTop, headW + 2, 1);
-    ctx.fillRect(x0, torsoTop + Math.round(b.torso * 0.4), b.width, 1);
-  }
+  // The torso is two narrower than the build so the arms land on its edges.
+  if (b.legs === 0) return { legs: 0, torso: b.torso - 3, head: b.head, seated: true, width: b.width - 2 };
+  return { legs: b.legs, torso: b.torso - 2, head: b.head, width: b.width - 2 };
 }
 
-/** Named convenience builds. Each picks its torso fill from the seed and mood so
- *  call sites read clearly: `personWalker(ctx, x, y, seed)` or
- *  `personWalker(ctx, x, y, seed, "fedUp")`. */
+/** Draw one figure in a room or a car, as a member of the cast (#2097).
+ *  `footY` is the baseline the feet stand on; the figure rises above it.
+ *  `fill` is the torso color: a mood color, or a uniform such as a
+ *  pharmacist's white coat. Integer pixels. */
+export function personFigure(ctx: CanvasRenderingContext2D, x: number, footY: number, build: PersonBuild, fill: string, seed = 0): void {
+  // A hi-vis build is a tradesperson: hard hat, uniform and reflective stripe.
+  const trade = BUILDS[build].hardhat ? { hairStyle: "hardhat", topKind: "uniform", hiVis: true } as const : {};
+  const look = { ...CAST[castIndex(seed)], ...trade, top: fill };
+  drawPerson(ctx, x, footY, look, { lit: false, pose: "stand", empty: true, dims: buildDims(build) });
+}
+
+/** A cast member in a build, wearing their own outfit unless a mood colors it. */
+function castFigure(ctx: CanvasRenderingContext2D, x: number, footY: number, build: PersonBuild, seed: number, mood: Mood): void {
+  drawPerson(ctx, x, footY, CAST[castIndex(seed)], { lit: false, pose: "stand", empty: true, mood, dims: buildDims(build) });
+}
+
+/** Named convenience builds. Each picks its cast member from the seed and
+ *  colors the top for the mood, so call sites read clearly:
+ *  `personWalker(ctx, x, y, seed)` or `personWalker(ctx, x, y, seed, "fedUp")`. */
 export function personSeated(ctx: CanvasRenderingContext2D, x: number, footY: number, seed: number, mood: Mood = "content"): void {
-  personFigure(ctx, x, footY, "seated", moodTint(mood, seed));
+  castFigure(ctx, x, footY, "seated", seed, mood);
 }
 export function personStanding(ctx: CanvasRenderingContext2D, x: number, footY: number, seed: number, mood: Mood = "content"): void {
-  personFigure(ctx, x, footY, "standing", moodTint(mood, seed));
+  castFigure(ctx, x, footY, "standing", seed, mood);
 }
 export function personWalker(ctx: CanvasRenderingContext2D, x: number, footY: number, seed: number, mood: Mood = "content"): void {
-  personFigure(ctx, x, footY, "walker", moodTint(mood, seed));
+  castFigure(ctx, x, footY, "walker", seed, mood);
 }
+/** A rider in an elevator car, at the size the crowd draws a person on a
+ *  floor, so someone stepping into a car does not shrink as they board. */
 export function personRider(ctx: CanvasRenderingContext2D, x: number, footY: number, seed: number, mood: Mood = "content"): void {
-  personFigure(ctx, x, footY, "rider", moodTint(mood, seed));
+  drawPerson(ctx, x, footY, CAST[castIndex(seed)], { lit: false, pose: "stand", empty: true, mood });
 }
 export function personHiVis(ctx: CanvasRenderingContext2D, x: number, footY: number, seed: number, mood: Mood = "content"): void {
-  personFigure(ctx, x, footY, "hiVis", moodTint(mood, seed));
+  personFigure(ctx, x, footY, "hiVis", moodTint(mood, seed), seed);
 }
 
 // ---- Shared room helpers (added, adopted per kind by later specs) ----------

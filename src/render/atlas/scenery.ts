@@ -274,6 +274,7 @@ const PLANE_FRAMES: Record<keyof typeof Z, string[]> = {
   animatedRoom: ["fire", "construction"],
   streetCar: ["vehicle/streetcar"],
   vehicle: ["vehicle/metrotrain", "vehicle/garbagetruck"],
+  walking: ["person/walker"],
   transport: ["shaft", "transport/stairs", "transport/escalator"],
   cab: ["car"],
   // The revolving doors between lobby halls (#2068) are drawn on the web

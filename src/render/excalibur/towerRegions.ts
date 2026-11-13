@@ -3,6 +3,7 @@ import { Z } from "../depthPlanes";
 import { catalogFacility } from "../../catalog/catalogTypes";
 import { towerCatalog } from "../../catalog/towerCatalog";
 import { paintSettledUnit } from "../regionPaint";
+import { shadeRoom, shadesRoom } from "../roomShading";
 import { FLOOR, TILE } from "../scale";
 import { regionRect, regionsOf } from "../regionGrid";
 import type { UnitView } from "../../simport/view";
@@ -58,6 +59,7 @@ function materialize(engine: TowerEngine, key: number): RegionRec {
     draw: (ctx) => {
       engine.d.ctx = ctx;
       ctx.clearRect(0, 0, r.w, r.h);
+      const shadedLook = towerCatalog(engine.sim).rules.shadedLook;
       for (const id of units) {
         const u = engine.sim.tower.getUnit(id);
         if (!u) continue;
@@ -70,6 +72,9 @@ function materialize(engine: TowerEngine, key: number): RegionRec {
         // any per-unit overdraw implicitly, a shared canvas does not, and one
         // sprite painting a pixel past its rect would bleed onto a neighbor.
         paintSettledUnit(engine.d, u, dx, dy, w, h, engine.deadParking.has(id));
+        // Modern lights its rooms from the upper left (web only: the shared
+        // sprite, and so the native atlas, stays flat).
+        if (shadesRoom(shadedLook, u)) shadeRoom(ctx, dx, dy, w, h);
       }
     },
   });

@@ -4,6 +4,7 @@ import { catalogFacility } from "../../catalog/catalogTypes";
 import { towerCatalog } from "../../catalog/towerCatalog";
 import { viewWorld } from "../../presentation/viewWorld";
 import type { TransportView, UnitView } from "../../simport/view";
+import { beatFrame, strideFrame } from "./crowdLook";
 import { drawExplosion, drawSearchGuard, drawThief, drawTreasure, drawVipLimo } from "../sprites/events";
 import { FLOOR, TILE } from "../scale";
 import type { ScreenRect } from "./towerInputCamera";
@@ -183,12 +184,18 @@ function renderBombSearch(engine: TowerEngine, ctx: CanvasRenderingContext2D): v
   const search = engine.sim.bombSearch;
   if (!search) return;
   const scale = floorFigureScale(engine.cam.zoom);
-  for (const g of search.sweeping) {
+  const lit = towerCatalog(engine.sim).rules.shadedLook;
+  const clockMs = engine.d.anim * 1000;
+  search.sweeping.forEach((g, i) => {
+    // Where the engine's timing puts the guard says what it is doing:
+    // climbing the emergency stairs, or walking the floor's rooms.
     const at = guardPosition(g, engine.sim.clock.minutes);
     const x = engine.worldToScreenX(at.x);
     const y = engine.worldToScreenY(at.floor) + FLOOR * engine.cam.zoom;
-    drawSearchGuard(ctx, x, y, scale);
-  }
+    // The walk follows the guard's own steps along the floor, in world pixels.
+    const frame = at.climbing ? beatFrame(clockMs, i) : strideFrame(lit, at.x * TILE, i);
+    drawSearchGuard(ctx, x, y, scale, at.climbing, { frame, lit });
+  });
   const minutesLeft = search.deadline - engine.sim.clock.minutes;
   drawEdgeGlow(ctx, engine.viewWidth, engine.viewHeight, bombPulseAlpha(engine.d.anim, minutesLeft, engine.reducedMotion));
   const text = bombCountdownText(minutesLeft);
@@ -325,7 +332,8 @@ function renderThief(engine: TowerEngine, ctx: CanvasRenderingContext2D): void {
   if (p < 0 || p > 1) return;
   const x = engine.worldToScreenX(thiefX(engine.thiefSpan, p));
   const y = engine.worldToScreenY(engine.thiefFloor) + FLOOR * engine.cam.zoom;
-  drawThief(ctx, x, y, floorFigureScale(engine.cam.zoom), engine.thiefCaught);
+  const lit = towerCatalog(engine.sim).rules.shadedLook;
+  drawThief(ctx, x, y, floorFigureScale(engine.cam.zoom), engine.thiefCaught, { frame: strideFrame(lit, thiefX(engine.thiefSpan, p) * TILE, 0), lit });
 }
 
 /** Rain falls in front of the tower on rainy days (overlay layer). */

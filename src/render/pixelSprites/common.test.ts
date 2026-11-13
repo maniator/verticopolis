@@ -17,6 +17,7 @@ import {
   personHiVis,
   type PersonBuild,
 } from "./common";
+import { CAST, castIndex, drawPerson } from "./people";
 
 /**
  * Gap-fill coverage for the pixelSprites/common draw helpers that the broader
@@ -163,52 +164,61 @@ describe("pixelSprites/common person family and palette", () => {
     expect(moodTint("fedUp", 0)).toBe("#C24A3A"); // the reserved stress red, deliberate
   });
 
-  it("personFigure paints the pinned head, torso-edge, and contact-shadow literals", () => {
+  it("personFigure draws a cast member: their skin, the flat contact shadow, and the given torso color", () => {
     const { ctx, log } = spyCtx();
-    personFigure(ctx, 10, 40, "seated", "#5A6E8C");
-    expect(log).toContain("fillStyle=#E8C9A0"); // skin field
-    expect(log).toContain("fillStyle=#3A2E28"); // 1px hair line
-    expect(log).toContain("fillStyle=#F0D8B8"); // 1px eye highlight
+    personFigure(ctx, 10, 40, "seated", "#5A6E8C", 3);
+    expect(log).toContain(`fillStyle=${CAST[castIndex(3)].skin}`); // the cast member's skin
     expect(log).toContain("fillStyle=rgba(0,0,0,0.24)"); // 1px contact shadow
-    expect(log.some((l) => l.startsWith("fillStyle=rgb("))).toBe(true); // shaded torso edges
+    expect(log).toContain("fillStyle=#5A6E8C"); // the torso fill
   });
 
   it("every build draws at integer coordinates only", () => {
-    for (const build of ["seated", "standing", "walker", "rider", "hiVis"] as PersonBuild[]) {
+    for (const build of ["seated", "standing", "walker", "hiVis"] as PersonBuild[]) {
       const { ctx, log } = spyCtx();
       personFigure(ctx, 12.4, 44.6, build, "#3F8C84");
       for (const r of rects(log)) for (const n of r) expect(Number.isInteger(n)).toBe(true);
     }
   });
 
-  it("the builds match the finalized heights (15 / 18 / 24 / 17 / 22)", () => {
-    const heightOf = (build: PersonBuild): number => {
-      const { ctx, log } = spyCtx();
-      personFigure(ctx, 10, 100, build, "#5A6E8C");
-      const topY = Math.min(...rects(log).map((r) => r[1]));
-      return 100 - topY; // baseline minus the topmost pixel
-    };
-    expect(heightOf("seated")).toBe(15);
-    expect(heightOf("standing")).toBe(18);
-    expect(heightOf("walker")).toBe(24);
-    expect(heightOf("rider")).toBe(17);
-    expect(heightOf("hiVis")).toBe(22);
+  const heightOf = (draw: (ctx: CanvasRenderingContext2D) => void): number => {
+    const { ctx, log } = spyCtx();
+    draw(ctx);
+    const topY = Math.min(...rects(log).map((r) => r[1]));
+    return 100 - topY; // baseline minus the topmost pixel
+  };
+
+  it("the builds keep the finalized heights (15 / 18 / 24 / 22), give or take a hairstyle", () => {
+    const nominal: Record<PersonBuild, number> = { seated: 15, standing: 18, walker: 24, hiVis: 22 };
+    for (const build of Object.keys(nominal) as PersonBuild[]) {
+      const heights = new Set(CAST.map((_, seed) => heightOf((ctx) => personFigure(ctx, 10, 100, build, "#5A6E8C", seed))));
+      // A bun or curls add a pixel and a bald head takes one away; the body is the build's.
+      for (const h of heights) expect(Math.abs(h - nominal[build]), `${build} ${h}`).toBeLessThanOrEqual(1);
+      if (build !== "hiVis") expect(heights).toContain(nominal[build]);
+    }
   });
 
   it("each named wrapper draws its own build (catches a wrong build literal)", () => {
-    const cases: [(ctx: CanvasRenderingContext2D, x: number, y: number, seed: number) => void, number][] = [
-      [personSeated, 15],
-      [personStanding, 18],
-      [personWalker, 24],
-      [personRider, 17],
-      [personHiVis, 22],
+    const cases: [(ctx: CanvasRenderingContext2D, x: number, y: number, seed: number) => void, PersonBuild][] = [
+      [personSeated, "seated"],
+      [personStanding, "standing"],
+      [personWalker, "walker"],
+      [personHiVis, "hiVis"],
     ];
-    for (const [fn, expected] of cases) {
-      const { ctx, log } = spyCtx();
-      fn(ctx, 10, 100, 3);
-      const topY = Math.min(...rects(log).map((r) => r[1]));
-      expect(100 - topY).toBe(expected);
+    for (const [fn, build] of cases) {
+      for (const seed of [0, 3, 4]) {
+        expect(heightOf((ctx) => fn(ctx, 10, 100, seed)), `${build} ${seed}`).toBe(heightOf((ctx) => personFigure(ctx, 10, 100, build, "#5A6E8C", seed)));
+      }
     }
+  });
+
+  it("a car's rider is as tall as the same person standing on a floor, so nobody shrinks boarding", () => {
+    for (let seed = 0; seed < CAST.length; seed++) {
+      const look = CAST[castIndex(seed)];
+      const onFloor = heightOf((ctx) => drawPerson(ctx, 10, 100, look, { lit: false, pose: "stand" }));
+      expect(heightOf((ctx) => personRider(ctx, 10, 100, seed)), `seed ${seed}`).toBe(onFloor);
+    }
+    // The old rider build drew 17 px; the crowd draws everyone taller than that.
+    expect(heightOf((ctx) => personRider(ctx, 10, 100, 0))).toBeGreaterThan(17);
   });
 
   it("width-6 builds draw two separated legs, not one merged block", () => {
