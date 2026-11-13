@@ -223,7 +223,7 @@ describe("BuildActions.paintBrush", () => {
     expect(port.setLobbyHeight).toHaveBeenCalledExactlyOnceWith(1);
     const order = (fn: unknown) => vi.mocked(fn as () => void).mock.invocationCallOrder[0];
     expect(order(port.setLobbyHeight)).toBeLessThan(order(port.paintTiles));
-    expect(port.lobbyRise).toHaveBeenCalledExactlyOnceWith(1);
+    expect(port.lobbyRise).toHaveBeenCalledExactlyOnceWith(1, 20);
     expect(port.paintTiles).toHaveBeenCalledExactlyOnceWith(codes.kind("floor"), 1, Float64Array.from(brushTiles(20)));
     const lobby = catalogFacility(CATALOG, "lobby");
     const perTile = catalogTileCost(CATALOG, "lobby", "no floor yet") + 2 * catalogTileCost(CATALOG, "lobby", "a floor tile");

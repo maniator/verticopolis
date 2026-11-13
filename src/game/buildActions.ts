@@ -130,7 +130,7 @@ export class BuildActions {
       // The Floor tool's brush lays only where there is no floor yet, so each
       // tile paid for its floor too (catalogTileCost).
       // A tall lobby (#308) pays the lobby price once per story.
-      const rise = port.lobbyRise(floor);
+      const rise = port.lobbyRise(floor, tile);
       const perTile = catalogTileCost(catalog, laid, "no floor yet") + (rise - 1) * catalogTileCost(catalog, laid, "a floor tile");
       this.deps.ui.toast(
         `The ground floor is a ${f.name.toLowerCase()}, so a ${f.name.toLowerCase()} ($${groupDigits(perTile)}/tile) went here.`,

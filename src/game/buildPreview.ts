@@ -108,15 +108,17 @@ function roomBlocks(app: GameApp, kind: "floor" | "lobby", built: BuiltAt, floor
 /** Whether a tile laid at `(floor, x)` would have what holds it up: above the
  *  ground floor, the story below it (`Tower::is_supported`). Lower down a tile
  *  is held by its neighbors, which the brush's own passes lay. `tallLobbies`
- *  is `lobbyHeights()`: the engine counts a story a tall lobby rises through
- *  as structure (#308), and the view's runs sit on the lobby's own floor only. */
+ *  is `lobbyHeights()`, `[floor, x0, x1, height]` quads: the engine counts a
+ *  story a tall hall rises through as structure over the hall's own columns
+ *  (#308, #2068), and the view's runs sit on the lobby's own floor only. */
 function heldUp(app: GameApp, groundFloor: number, floor: number, x: number, tallLobbies: ArrayLike<number>): boolean {
   const t = app.reader.tower;
   if (floor <= groundFloor || t.structureKindAt(floor - 1, x) !== undefined) return true;
-  for (let i = 0; i + 1 < tallLobbies.length; i += 2) {
+  for (let i = 0; i + 3 < tallLobbies.length; i += 4) {
     const lobbyFloor = tallLobbies[i];
-    const raisedStory = floor - 1 > lobbyFloor && floor - 1 < lobbyFloor + tallLobbies[i + 1];
-    if (raisedStory && t.structureKindAt(lobbyFloor, x) === "lobby") return true;
+    const overHall = tallLobbies[i + 1] <= x && x <= tallLobbies[i + 2];
+    const raisedStory = floor - 1 > lobbyFloor && floor - 1 < lobbyFloor + tallLobbies[i + 3];
+    if (overHall && raisedStory) return true;
   }
   return false;
 }
@@ -191,7 +193,7 @@ export function updateBuildPreview(app: GameApp, tile: number, floor: number, sh
       // Stairs/escalators place as a fixed two-floor unit on tap, so the
       // ghost shows the real footprint and the real validity.
       // Out of a tall lobby the flight climbs the whole lobby (#308).
-      const top = app.enginePort.walkwayTop(app.portCodes.kind(kind), floor, floor + 1);
+      const top = app.enginePort.walkwayTop(app.portCodes.kind(kind), x, floor, floor + 1);
       const valid = isUnlocked(app, kind) && quoteShaft(app.enginePort, app.portCodes, kind, x, floor, top).ok;
       app.engine.transportPreview = { kind, x, bottom: floor, top, valid };
       app.engine.preview = null;
@@ -209,10 +211,7 @@ export function updateBuildPreview(app: GameApp, tile: number, floor: number, sh
     // The ground floor is lobby-only: the Floor tool on floor 1 lays a lobby, so
     // the ghost previews a lobby, priced with the floor it lays.
     const ghostKind = catalogBuildKind(catalog, kind, floor);
-    // A lobby rises as many stories as the engine would lay it here (#308):
-    // the asked height on a floor's first lobby, else the floor's own.
     app.enginePort.setLobbyHeight(lobbyHeightFor(kind, app.lobbyHeight.height));
-    const rise = ghostKind === "lobby" ? app.enginePort.lobbyRise(floor) : 1;
     // Whole-brush affordability: the brush charges per tile, so the ghost goes
     // green only when the money covers every tile a click lays and the bridges
     // they bring. paintTiles builds the tiles in order, each with a bridge to
@@ -233,7 +232,7 @@ export function updateBuildPreview(app: GameApp, tile: number, floor: number, sh
     const brush = new Set(tiles);
     const groundFloor = catalog.world.groundFloor;
     const builtAt = (x: number) => app.reader.tower.structureKindAt(floor, x);
-    // Read once per preview: a few pairs, one per tall lobby.
+    // Read once per preview: a few quads, one per tall hall.
     const tallLobbies = app.enginePort.lobbyHeights();
     let tried = snapX(catalog, kind, tile);
     let firstLaid: number | undefined;
@@ -273,6 +272,11 @@ export function updateBuildPreview(app: GameApp, tile: number, floor: number, sh
       if (touching === undefined && touchesTower(app, groundFloor, floor, tx)) touching = tx;
     }
     let quoted = touching ?? firstLaid ?? tried;
+    // A lobby rises as many stories as the engine would lay it here (#308):
+    // the asked height on a floor's first lobby, else the floor's own; in
+    // Modern the hall the strip's first tile is laid against (#2068), which
+    // every later tile of the strip then joins.
+    const rise = ghostKind === "lobby" ? app.enginePort.lobbyRise(floor, firstLaid ?? tried) : 1;
     // Plain floor the Lobby brush lays over last, with no tile laid after it
     // and nothing built back to the quoted tile: its quote scans everything
     // the quoted tile's would and its own right side, so it is quoted alone.

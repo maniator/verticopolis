@@ -68,7 +68,8 @@ describe.skipIf(!hasWasmPackage())("rollback rehearsal on the real engine", () =
 
   it("refuses a newer save instead of quietly dropping what it does not know (#1603)", () => {
     const tower = saves.find((s) => s.name === "split-tower.vctower")!;
-    const newer = { ...(JSON.parse(tower.text) as Record<string, unknown>), version: 9, aFieldFromTheFuture: { keep: true } };
+    // Far past any version this engine writes, so the case stays newer as saves move on.
+    const newer = { ...(JSON.parse(tower.text) as Record<string, unknown>), version: 99, aFieldFromTheFuture: { keep: true } };
     let engine: ReturnType<typeof candidate.fromSave> | undefined;
     let refusal: unknown;
     try {

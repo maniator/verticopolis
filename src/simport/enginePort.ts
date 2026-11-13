@@ -362,11 +362,13 @@ export interface EnginePortCommands {
 /** The queries (contract section 2). */
 export interface EnginePortQueries {
   quoteBuild(kind: number, floor: number, x: number): PortRecord;
-  /** How many stories a lobby tile laid on `floor` now rises (#308). */
-  lobbyRise(floor: number): number;
-  /** The top a stairway or escalator asked from `bottom` to `top` is built
-   *  to: out of a tall lobby a one-story flight climbs the whole lobby (#308). */
-  walkwayTop(kind: number, bottom: number, top: number): number;
+  /** How many stories a lobby tile laid at `(floor, x)` now rises (#308):
+   *  in Modern, the hall it is laid against (#2068). */
+  lobbyRise(floor: number, x: number): number;
+  /** The top a stairway or escalator at `x` asked from `bottom` to `top` is
+   *  built to: out of a tall lobby a one-story flight climbs the whole lobby
+   *  (#308), in Modern the hall under it (#2068). */
+  walkwayTop(kind: number, x: number, bottom: number, top: number): number;
   quoteShaft(kind: number, x: number, bottom: number, top: number): PortRecord;
   /** What `rentBatch` would do, nothing written; `ok` 0 for an unpriced kind. */
   quoteRentBatch(kind: number, target: number, onlyDefault: boolean): PortRecord;
@@ -463,8 +465,9 @@ export interface EnginePortRender {
   parkingUsage(spots: number): number;
   /** The recycling bins' fill, 0 to 1. */
   recyclingFill(): number;
-  /** Every lobby taller than one story as flat `[floor, height, ...]` pairs
-   *  by floor (#308); read once per structure pass. */
+  /** Every lobby hall taller than one story as flat `[floor, x0, x1,
+   *  height, ...]` quads by floor and then column, `x1` the hall's last
+   *  column (#308, #2068); read once per structure pass. */
   lobbyHeights(): PortRecord;
   /** The population the working recycling centers can process. */
   recyclingCapacity(): number;

@@ -2,6 +2,7 @@ import type { ElevatorQueueView } from "../shared/engineTypes";
 import type { HeatCell, HeatmapMode } from "../shared/engineTypes";
 import type { GameMode, SerializedView, WeatherKind } from "../shared/types";
 import type { BombSearchView, CrowdView, TowerView } from "../simport/view";
+import type { LobbyHalls } from "./lobbyHalls";
 
 /**
  * Everything the renderer reads from the simulation, and nothing else (facade
@@ -85,7 +86,7 @@ export interface RenderClock {
 export interface RenderTower extends TowerView {
   /** Working garage spaces by unit id (usage slice). */
   functionalParkingSet(): ReadonlySet<number>;
-  /** The height in stories of every lobby taller than one, by its floor
-   *  (#308). Read once per structure pass, never per frame. */
-  tallLobbies(): ReadonlyMap<number, number>;
+  /** The lobby halls taller than one story (#308, #2068). Read once per
+   *  structure pass, never per frame. */
+  tallLobbies(): LobbyHalls;
 }

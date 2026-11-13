@@ -72,9 +72,11 @@ export function buildTallLobbyTower(): void {
   }
   g.syncSim?.();
   const heights: number[] = Array.from(port.lobbyHeights());
+  // `[floor, x0, x1, height]` per hall (#2068); a floor's tallest hall.
   const heightOf = (floor: number): number => {
-    for (let i = 0; i + 1 < heights.length; i += 2) if (heights[i] === floor) return heights[i + 1];
-    return 1;
+    let tallest = 1;
+    for (let i = 0; i + 3 < heights.length; i += 4) if (heights[i] === floor) tallest = Math.max(tallest, heights[i + 3]);
+    return tallest;
   };
   if (heightOf(1) !== groundHeight) throw new Error(`the ground lobby rose ${heightOf(1)} stories, not ${groundHeight}`);
   if (sky && heightOf(lobbyInterval) !== sky) throw new Error(`the sky lobby rose ${heightOf(lobbyInterval)} stories, not ${sky}`);
