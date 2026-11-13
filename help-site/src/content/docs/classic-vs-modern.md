@@ -77,4 +77,4 @@ The same tower under each set of rules. Modern's escalators climb through the of
 
 ## Keeping Classic honest
 
-Classic aims to match the 1994 game exactly. If something in a Classic tower behaves differently from the original, please [tell us](https://github.com/maniator/verticopolis/issues/new/choose) so we can fix it. Ideas for Modern are welcome there too.
+Classic aims to match the 1994 game exactly. The few places it doesn't, on purpose or not yet, are on [Differences from the 1994 game](/help/differences/). If something else in a Classic tower behaves differently from the original, please [tell us](https://github.com/maniator/verticopolis/issues/new/choose) so we can fix it. Ideas for Modern are welcome there too.

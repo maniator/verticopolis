@@ -45,7 +45,7 @@ know what the game *is* before I click anything. Don't gut it to a link farm.
 
 🎲 **Samus Shepard:** Agreed. Keep a short "what's in it": the rooms, the
 transport, Classic and Modern, the TOWER, events, the soundtrack, the 1994
-saves. Feelings over tables.
+saves. Feelings, not tables.
 
 😤 **Grumbal:** Bullets with no numbers. A number in a bullet is a bug with a
 delay on it.
@@ -72,8 +72,8 @@ list says buried treasure; the help site's Events page never mentions it. The
 engine has it: a basement room on ground nobody dug before has a chance at
 $400,000 to $600,000, at most three finds a tower.
 
-♿ **Wren:** If treasure goes into the manual, say it in words. A coin emoji
-alone tells a screen reader nothing. And the README's controls table can go: /help/controls/ has the
+♿ **Wren:** If treasure goes into the manual, say it in words, not just a coin
+emoji. And the README's controls table can go: /help/controls/ has the
 keyboard-only and touch paths the README never had.
 
 ⏱️ **Tess:** The star-ladder images. The paragraph under them is pipeline
@@ -146,3 +146,33 @@ from Learn more.
 Out of scope: putting ARCHITECTURE.md or CONTRIBUTING.md on
 docs.verticopolis.com. That is site work, and another thread owns the shared
 site header right now.
+
+## Follow-up round: should PARITY.md move to the help site?
+
+Owner question, 15:21 UTC. Same room.
+
+🎲 **Samus Shepard:** The fans who care most about parity are players, and we send them to a GitHub blob full of ✅ marks and issue numbers. The parity issue form even links there as "the list of known differences".
+
+📚 **Paige:** But half of PARITY.md is not for players: owner rulings with dates, issue numbers, version tags, the Verification section. Pour that onto a manual page and the 90s voice dies by the second bullet.
+
+😤 **Grumbal:** And if you copy it, you have two lists that drift. We just spent a round deleting the README's copy of the manual. Don't build a new copy the same afternoon.
+
+🌶️ **Boundary:** Then make the drift impossible to miss. Each divergence and known gap in PARITY.md gets an anchor tag pointing at its help section, and a test fails when one side has an entry the other lacks.
+
+⏱️ **Tess:** Agreed. Prose can't stop drift. A test can.
+
+🌐 **Priya:** I'd read a page called "Differences from the 1994 game". I would never open PARITY.md.
+
+📋 **John:** So it's a split, not a move. The player half goes to the help site in manual voice, the engineering checklist stays in the repo, and a test ties them together.
+
+Recommendation: a new help page, "Differences from the 1994 game", next to Classic and Modern, in manual and wiki style (what matches, the deliberate differences, the known gaps, how to report one). PARITY.md stays as the developer checklist with a pointer to it at the top. The parity issue form and the README link to the help page. A guard test keeps every divergence and gap listed on both. Its own PR, after #2098.
+
+Owner add-on, 15:21 UTC: "it's just long as well, and can probably be split into easy to read sections."
+
+📚 **Paige:** Then the help side is sections that follow the manual's own outline: Building, Rooms, Elevators and stairs, Money, People and ratings, Events, Saves. Each opens with a two-line summary and a small wiki table, 1994 / Classic / Modern, with a link to the manual page that explains the rule.
+
+🎲 **Samus Shepard:** And the known gaps get their own short section at the end, in plain words: "the 1994 game let you schedule each car; we don't yet."
+
+😤 **Grumbal:** The repo file needs the same diet. Some bullets are a whole paragraph of owner rulings. One line per item, the issue number, and the ruling lives in the issue.
+
+♿ **Wren:** Tables with real header rows, please, and no ✅ or ◑ standing alone as the only signal. Write "Same", "Different on purpose", "Not yet".

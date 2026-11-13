@@ -31,6 +31,10 @@
     "title": "Controls",
     "description": "Every way to play Verticopolis, with a mouse, by touch on a phone or tablet, or from the keyboard alone."
   },
+  "differences.png": {
+    "title": "Differences from the 1994 game",
+    "description": "Where a Classic Verticopolis tower plays just like SimTower (1994), the few things done differently on purpose, and what isn't in yet."
+  },
   "first-tower.png": {
     "title": "Your first tower",
     "description": "A walk through your first Verticopolis tower, from an empty lot to your first rent, your first star, and what to build next."

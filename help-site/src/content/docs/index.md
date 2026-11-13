@@ -19,6 +19,7 @@ Build a thriving high-rise, keep the people in it happy, and earn your way to th
 
 - [Your first tower](/help/first-tower/): from an empty lot to your first rent and your first star
 - [Classic and Modern](/help/classic-vs-modern/): the two ways to play, side by side
+- [Differences from the 1994 game](/help/differences/): where a Classic tower plays like SimTower, and where it doesn't
 - [Controls](/help/controls/): mouse, touch and keyboard
 
 ## Rooms
