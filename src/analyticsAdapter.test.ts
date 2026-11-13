@@ -114,6 +114,7 @@ describe("analytics adapter seam", () => {
     // Every event in the typed vocabulary reached the stub, in the order fired.
     expect(names).toEqual([
       "boot",
+      "$pageview",
       "new_game_started",
       "first_build",
       "tool_used",
