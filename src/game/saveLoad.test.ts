@@ -294,6 +294,7 @@ describe("SaveLoad legacy files", () => {
     expect(trackTdtImportRead, "the read is reported with the report's facts").toHaveBeenCalledExactlyOnceWith(
       vi.mocked(importFacts).mock.results[0].value,
     );
+    expect(vi.mocked(trackTdtImportRead).mock.invocationCallOrder[0], "sent once the report is up").toBeGreaterThan(deps.ui.showImportReport.mock.invocationCallOrder[0]!);
     const [, cb] = deps.ui.showImportReport.mock.calls[0] as unknown as [
       unknown,
       { onOpen(): void },
@@ -324,6 +325,8 @@ describe("SaveLoad .vctower import", () => {
     expect(deps.towerSwapped).toHaveBeenCalledOnce();
     expect(trackFileImported).toHaveBeenCalledExactlyOnceWith("vctower", expect.any(Function));
     expect(vi.mocked(trackFileImported).mock.calls[0][1]()).toBe(HEADER);
+    // After the swap, so the header read is the arrived tower's.
+    expect(vi.mocked(trackFileImported).mock.invocationCallOrder[0]).toBeGreaterThan(vi.mocked(deps.towerSwapped).mock.invocationCallOrder[0]!);
 
     answer = Float64Array.of(0, 0);
     await saves.importGame("not a tower");

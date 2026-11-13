@@ -1,7 +1,7 @@
 import type { GameMode, SerializedView } from "../shared/types";
 import type { CalendarKind } from "../shared/engineTypes";
 import { SaveGame, isStorageWriteError, saveFailureMessage } from "../storage/SaveGame";
-import { trackAppAction, trackAppActionOnce, trackFileExported, trackFileImported, trackTdtImportRead } from "../analytics";
+import { headerNow, trackAppAction, trackAppActionOnce, trackFileExported, trackFileImported, trackTdtImportRead } from "../analytics";
 import { exportReport, type ExportReport } from "../storage/tdtExportReport";
 import { importReport } from "../storage/tdtImportReport";
 import { runExportFlow, runLegacyDownload } from "./exportFlow";
@@ -411,12 +411,13 @@ export class SaveLoad {
       return;
     }
     const file = bytes;
+    const header = headerNow(() => this.deps.reader().header); // the tower the file was written from
     this.deps.ui.showExportReport(report, {
       // Through the shared export latch (GH #760 follow-on), so a .TDT download
       // and a .vctower export can never run at once.
       onDownload: () =>
         void runLegacyDownload(this.deps.ui, () => {
-          if (this.deps.ui.downloadFile(report.filename, file)) trackFileExported("tdt", () => this.deps.reader().header);
+          if (this.deps.ui.downloadFile(report.filename, file)) trackFileExported("tdt", header);
         }),
     });
   }
@@ -459,7 +460,6 @@ export class SaveLoad {
       return;
     }
     const facts = importFacts(rec, this.deps.portCodes(), port);
-    trackTdtImportRead(facts);
     const report = importReport(facts);
     this.deps.ui.showImportReport(report, {
       // The confirmed-adoption flow (flush, adopt, fresh-slot copy, honest
@@ -470,11 +470,12 @@ export class SaveLoad {
       onOpen: () =>
         adoptConfirmedLegacyImport(this.deps, report.towerName, () => this.saveBeforeUpdate(), () => port.loadTdt(bytes, filename)),
     });
+    trackTdtImportRead(facts);
   }
 
   /** Found a fresh tower under the chosen rule-set. The mode, and for Modern the
    *  calendar and the no-bridging option, are fixed at founding for the tower's
-   *  life; Classic runs the canon calendar and structure and ignores both. */
+   *  life; Classic runs the canon calendar and auto structure and ignores both. */
   newGame(mode: GameMode = "classic", modernCalendar: CalendarKind = "realWorld", startUnbridged = false): void {
     const port = this.deps.enginePort();
     const codes = this.deps.portCodes();

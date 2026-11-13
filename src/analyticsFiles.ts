@@ -36,6 +36,22 @@ function towerFileProps(format: SaveFileFormat, header: () => TowerHeader): Towe
   }
 }
 
+/** The header as it stands now, for an event sent later: an export's header
+ *  is the one its file was written from, even if the game runs on before the
+ *  download. The reader makes a new header object every frame, so keeping the
+ *  reference keeps the values. A read that throws now throws again when the
+ *  event reads it, where the file event swallows it. */
+export function headerNow(header: () => TowerHeader): () => TowerHeader {
+  try {
+    const now = header();
+    return () => now;
+  } catch (err) {
+    return () => {
+      throw err;
+    };
+  }
+}
+
 /** A tower file finished importing and the tower it carried is open.
  *  `header` reads the header of the tower that arrived. */
 export function trackFileImported(format: SaveFileFormat, header: () => TowerHeader): void {

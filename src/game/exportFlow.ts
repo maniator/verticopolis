@@ -1,4 +1,4 @@
-import { trackAppAction, trackFileExported } from "../analytics";
+import { headerNow, trackAppAction, trackFileExported } from "../analytics";
 import type { ViewReader } from "../simport/viewReader";
 import { SaveGame } from "../storage/SaveGame";
 import type { UI } from "../ui/UI";
@@ -85,11 +85,12 @@ export async function runExportFlow(
     // The engine writes the `.vctower` of the tower it holds now, with the
     // camera stamped; the page only downloads it.
     const { file: written, towerName } = save();
+    const header = headerNow(() => deps.reader().header); // the tower the file was written from
     const file = await written;
     // A download that failed has already said so (GH #997); the success line
     // would contradict it.
     if (!deps.ui.downloadFile(SaveGame.exportFilename(towerName), file)) return;
-    trackFileExported("vctower", () => deps.reader().header);
+    trackFileExported("vctower", header);
     // The container is pure ASCII, so string length == bytes on disk.
     const size = `${(file.length / 1024).toFixed(1)} KB`;
     deps.ui.toast(

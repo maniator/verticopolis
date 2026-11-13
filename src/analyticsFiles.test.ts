@@ -4,7 +4,7 @@ import type { ImportCounts, ImportReportFacts } from "./storage/tdtImportReport"
 const trackEvent = vi.fn();
 vi.mock("./analyticsCore", () => ({ trackEvent: (...args: unknown[]) => trackEvent(...args) }));
 
-const { TDT_IMPORT_ANOMALIES, TDT_TRANSPORT_ANOMALIES, tdtImportReadProps, trackFileExported, trackFileImported, trackTdtImportRead } = await import("./analyticsFiles");
+const { TDT_IMPORT_ANOMALIES, TDT_TRANSPORT_ANOMALIES, headerNow, tdtImportReadProps, trackFileExported, trackFileImported, trackTdtImportRead } = await import("./analyticsFiles");
 
 const HEADER = { mode: "modern" as const, star: 4, population: 1234 };
 
@@ -102,6 +102,23 @@ describe("a report it cannot read", () => {
   it("sends nothing and does not throw when the facts are malformed", () => {
     const broken = { ...facts(), decodeStats: undefined } as unknown as ImportReportFacts;
     expect(() => trackTdtImportRead(broken)).not.toThrow();
+    expect(trackEvent).not.toHaveBeenCalled();
+  });
+});
+
+describe("headerNow", () => {
+  it("keeps the header read now, whatever the reader says later", () => {
+    let current = HEADER;
+    const later = headerNow(() => current);
+    current = { ...HEADER, population: 9999 };
+    expect(later()).toBe(HEADER);
+  });
+
+  it("defers a failed read to the event, which sends nothing", () => {
+    const broken = headerNow(() => {
+      throw new Error("no tower");
+    });
+    expect(() => trackFileExported("tdt", broken)).not.toThrow();
     expect(trackEvent).not.toHaveBeenCalled();
   });
 });
