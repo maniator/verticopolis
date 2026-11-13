@@ -4,6 +4,8 @@ import { PortCodes } from "../simport/portCodes";
 import { mockPort } from "../tests/portKit/mockPort";
 import { isCrashed, isEngineStopped, isSplashUp } from "./interactionState";
 import { adoptConfirmedLegacyImport } from "./legacyImportAdopt";
+import { trackFileExported, trackFileImported, trackTdtImportRead } from "../analytics";
+import { importFacts } from "../simport/tdtRecords";
 import {
   RESUME_AFTER_RECOVERY_KEY,
   SaveLoad,
@@ -14,6 +16,9 @@ vi.mock("../analytics", async (importActual) => ({
   ...(await importActual<typeof import("../analytics")>()),
   trackAppAction: vi.fn(),
   trackAppActionOnce: vi.fn(),
+  trackFileImported: vi.fn(),
+  trackFileExported: vi.fn(),
+  trackTdtImportRead: vi.fn(),
 }));
 vi.mock("./interactionState", () => ({
   isSplashUp: vi.fn(() => false),
@@ -48,6 +53,7 @@ vi.mock("../storage/tdtImportReport", () => ({
  */
 
 const GENERATION = 5;
+const HEADER = { mode: "classic", star: 3, population: 420 };
 
 function setup(
   answers: Parameters<typeof mockPort>[0] = {},
@@ -65,7 +71,7 @@ function setup(
   const deps = {
     enginePort: () => port,
     portCodes: () => codes,
-    reader: () => ({ rooms: rooms as never, structure: [] as never }),
+    reader: () => ({ rooms: rooms as never, structure: [] as never, header: HEADER as never }),
     towerSwapped: vi.fn(),
     getView: () => null,
     ui: {
@@ -268,11 +274,15 @@ describe("SaveLoad legacy files", () => {
       unknown,
       { onDownload(): void },
     ];
+    vi.mocked(deps.ui.downloadFile).mockReturnValueOnce(false);
     cb.onDownload();
-    expect(deps.ui.downloadFile).toHaveBeenCalledExactlyOnceWith(
-      "TOWER.TDT",
-      bytes,
-    );
+    expect(trackFileExported, "a download the page could not start is not an export").not.toHaveBeenCalled();
+    vi.mocked(deps.ui.downloadFile).mockReturnValueOnce(true);
+    deps.reader = () => ({ rooms: [] as never, structure: [] as never, header: { ...HEADER, population: 9999 } as never }); // the game ran on
+    cb.onDownload();
+    expect(deps.ui.downloadFile).toHaveBeenLastCalledWith("TOWER.TDT", bytes);
+    expect(trackFileExported).toHaveBeenCalledExactlyOnceWith("tdt", expect.any(Function));
+    expect(vi.mocked(trackFileExported).mock.calls[0][1]()).toBe(HEADER);
   });
 
   it("the import report's Open tower adopts through the confirmed flow, which re-stages the same file", async () => {
@@ -282,6 +292,10 @@ describe("SaveLoad legacy files", () => {
     });
     const buffer = Uint8Array.of(9, 9).buffer;
     await saves.importLegacy(buffer, "OLD.TDT");
+    expect(trackTdtImportRead, "the read is reported with the report's facts").toHaveBeenCalledExactlyOnceWith(
+      vi.mocked(importFacts).mock.results[0].value,
+    );
+    expect(vi.mocked(trackTdtImportRead).mock.invocationCallOrder[0], "sent once the report is up").toBeGreaterThan(deps.ui.showImportReport.mock.invocationCallOrder[0]!);
     const [, cb] = deps.ui.showImportReport.mock.calls[0] as unknown as [
       unknown,
       { onOpen(): void },
@@ -301,5 +315,22 @@ describe("SaveLoad legacy files", () => {
       new Uint8Array(buffer),
       "OLD.TDT",
     );
+  });
+});
+
+describe("SaveLoad .vctower import", () => {
+  it("reports the arrived tower once it is open, and nothing for a refused file", async () => {
+    let answer = Float64Array.of(1, 0);
+    const { saves, deps } = setup({ loadVctower: () => answer });
+    await saves.importGame("VCTOWER1");
+    expect(deps.towerSwapped).toHaveBeenCalledOnce();
+    expect(trackFileImported).toHaveBeenCalledExactlyOnceWith("vctower", expect.any(Function));
+    expect(vi.mocked(trackFileImported).mock.calls[0][1]()).toBe(HEADER);
+    // After the swap, so the header read is the arrived tower's.
+    expect(vi.mocked(trackFileImported).mock.invocationCallOrder[0]).toBeGreaterThan(vi.mocked(deps.towerSwapped).mock.invocationCallOrder[0]!);
+
+    answer = Float64Array.of(0, 0);
+    await saves.importGame("not a tower");
+    expect(trackFileImported).toHaveBeenCalledOnce();
   });
 });

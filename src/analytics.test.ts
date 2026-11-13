@@ -396,6 +396,13 @@ const EVERY_EVENT: { [K in keyof GameplayEvents]: GameplayEvents[K] } = {
   bomb_outcome: { outcome: "found" },
   session_emergencies: { fires: 1, firesGutRooms: 2, bombs: 0 },
   session_crashes: { crashes: 3 },
+  file_imported: { format: "tdt", mode: "classic", star: 3, population: 420 },
+  file_exported: { format: "vctower", mode: "modern", star: 2, population: 90 },
+  tdt_import_read: {
+    star: 3, floors: 40, basements: 2, rooms: 120, shafts: 6, flights: 10, decoded: true, hasRoster: true, notes: 2,
+    unknown: 0, droppedFloors: 0, offLot: 0, overlapping: 1, misplaced: 0, clamped: 2, widthMismatch: 0, asleepConverted: 0,
+    droppedShafts: 0, adjustedShafts: 1, droppedFlights: 0, anomalies: 4,
+  },
   engine_status: {
     trigger: "settle",
     engine_requested: "wasm",
