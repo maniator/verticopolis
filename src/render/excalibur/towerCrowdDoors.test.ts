@@ -36,7 +36,7 @@ function eng(): any {
     people: { get: vi.fn((_key: number) => gfx()) },
     worldX: (tile: number) => tile * TILE,
     worldYTop: (floor: number, h = 1) => -(floor + h - 1) * FLOOR,
-    sim: { mode: "modern", population: 400, crowd: { people: [] }, clock: { minutes: 0 } },
+    sim: { mode: "modern", population: 400, crowd: { people: [] }, clock: { minutes: 0 }, tower: { transports: [] } },
   };
 }
 

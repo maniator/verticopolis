@@ -15,6 +15,7 @@ import { glideCar, newCarDraw, type CarDrawState } from "../carMotion";
 import type { PersonView } from "../../simport/view";
 import { FLOOR, TILE } from "../scale";
 import type { TowerEngine } from "./TowerEngine";
+import { climbDrawX, leaveFlight, type Climber } from "../climbPath";
 import { applyCrowdCull, reassertCrowdCull } from "./crowdCull";
 import { FIGURE_ANCHOR, FIGURE_H, FIGURE_W } from "./peopleGfx";
 import { advanceGlide, figureKey, newGlide, newStepClock, stepProgress, strideFrame, tickStepClock, type Glide, type StepClock } from "./crowdLook";
@@ -68,7 +69,7 @@ export interface Walker {
 
 /** One drawn person: the actor, its glide between the engine's positions, and
  *  the bake it shows (`figureKey`), so the graphic swaps only on a change. */
-export interface CrowdActor extends Pusher {
+export interface CrowdActor extends Pusher, Climber {
   actor: ex.Actor;
   glide: Glide;
   key: number;
@@ -137,9 +138,12 @@ export function reconcileCrowd(engine: TowerEngine): void {
 }
 
 function positionPerson(engine: TowerEngine, p: PersonView, rec: CrowdActor, look: CrowdLook): void {
-  if (p.state !== "waiting" || p.floor !== rec.shaftFloor) rec.shaftMid = undefined;
   const inCar = ridingHidden(p);
+  // A rider walking into the car keeps the shaft found while they waited.
+  const boarding = inCar && !rec.inCar;
+  if ((p.state !== "waiting" && !boarding) || p.floor !== rec.shaftFloor) rec.shaftMid = undefined;
   const wasShown = rec.actor.graphics.isVisible;
+  let doorX: number | undefined;
   // Getting in or out shows when the drawn car gets there: the cars glide
   // over the same step, so the change waits for the step's glide to end (or
   // the next step to land) instead of happening while the car is drawn a
@@ -147,21 +151,28 @@ function positionPerson(engine: TowerEngine, p: PersonView, rec: CrowdActor, loo
   if (rec.inCar !== inCar) {
     rec.boardStep ??= look.clock.steps;
     if (look.progress < 1 && look.clock.steps === rec.boardStep) {
-      if (wasShown !== !rec.inCar) rec.actor.graphics.isVisible = !rec.inCar;
-      // Still waiting at the landing for the drawn car: hold the figure.
-      if (!rec.inCar) return;
-      // Still in the drawn car: stay hidden, and follow the engine.
-      advanceGlide(rec.glide, p.x, p.fy, look.clock.stepped, look.progress, false);
-      return;
-    }
-    rec.inCar = inCar;
+      // Getting on: walk from the line into the car's door, reaching it as
+      // the step's glide ends and the figure is hidden.
+      if (!rec.inCar) doorX = rec.shaftMid ?? p.x;
+      else {
+        // Still in the drawn car: stay hidden, and follow the engine.
+        if (wasShown) rec.actor.graphics.isVisible = false;
+        advanceGlide(rec.glide, p.x, p.fy, look.clock.stepped, look.progress, false);
+        return;
+      }
+    } else rec.inCar = inCar;
   }
-  rec.boardStep = undefined;
+  if (doorX === undefined) rec.boardStep = undefined;
   const hidden = rec.inCar;
   if (wasShown !== !hidden) rec.actor.graphics.isVisible = !hidden;
+  // Off a stairway or escalator, the walk starts from the landing.
+  if (p.state !== "climbing") {
+    const landing = leaveFlight(rec);
+    if (landing !== undefined) rec.glide.x = landing;
+  }
   // A hidden rider still follows the engine, so it reappears where it gets
   // out instead of gliding there from the floor it boarded on.
-  advanceGlide(rec.glide, p.x, p.fy, look.clock.stepped, look.progress, wasShown && !hidden);
+  advanceGlide(rec.glide, doorX ?? p.x, p.fy, look.clock.stepped, look.progress, wasShown && !hidden);
   // A rider leaves no trail for the doors: their next step on foot is
   // measured from where they get out, not where they got in.
   if (hidden) {
@@ -171,7 +182,10 @@ function positionPerson(engine: TowerEngine, p: PersonView, rec: CrowdActor, loo
   const g = rec.glide;
   // Use the continuous floor (fy) so a stair/escalator climber animates
   // smoothly between floors; for every other state fy equals the floor.
-  rec.actor.pos = ex.vec(engine.worldX(g.x), engine.worldYTop(g.fy) + FLOOR - 3);
+  // A climber is drawn along the flight's run, not up its middle.
+  const climbX = p.state === "climbing" ? climbDrawX(rec, engine.sim.tower.transports, p.x, p.floor, g.fy, g.toFy < g.fromFy) : undefined;
+  if (climbX !== undefined) g.left = rec.climbLeft === true;
+  rec.actor.pos = ex.vec(engine.worldX(climbX ?? g.x), engine.worldYTop(g.fy) + FLOOR - 3);
   // Inside a revolving door between lobby halls (#2068) a walker pushes it:
   // walking left they pass behind its center post, walking right in front.
   const onFloor = g.fy === p.floor;
