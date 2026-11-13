@@ -18,7 +18,9 @@ built on **[Tone.js](https://tonejs.github.io/)** changes depending on which
 part of the tower you're looking at. No external art assets: every sprite is
 drawn in code.
 
-![Sprite gallery](docs/screenshots/06-sprite-gallery.png)
+| Day | Night |
+| --- | --- |
+| ![A tower by day](docs/screenshots/03-tower-day.png) | ![The same tower at night](docs/screenshots/04-tower-night.png) |
 
 ## What's in it
 
@@ -68,12 +70,6 @@ it in one step.
 | [Map and windows](https://verticopolis.com/help/tower/map-and-windows/) | [docs.verticopolis.com](https://docs.verticopolis.com/): the engine package, crate, API and conformance |
 | [Importing and exporting](https://verticopolis.com/help/your-towers/importing-exporting/) | [docs/canon/tdt-format.md](docs/canon/tdt-format.md): the `.TDT` save format |
 | [The whole manual](https://verticopolis.com/help/) | [docs/screenshots.md](docs/screenshots.md): the screenshot gallery and how it is rendered, including the [1★ to TOWER ladder](docs/screenshots/milestones/) |
-
-## Screenshots
-
-| Day | Night |
-| --- | --- |
-| ![day](docs/screenshots/03-tower-day.png) | ![night](docs/screenshots/04-tower-night.png) |
 
 ## License
 
