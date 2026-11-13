@@ -136,10 +136,15 @@ const MAX_PAGE_DETAIL = 80;
 /**
  * The page a help page view reports in its `help_page_view` event's `detail`:
  * the path under /help without its slashes ("rooms/hotels"), "home" for the
- * front page, or "other" for a path that is not a plain lowercase page path,
- * so a mistyped or crafted address never reaches PostHog as free text. Only
- * the path is read: the query (the game's ?from=game mark) and the hash stay
- * out of it.
+ * front page, or "other" for a path that is not a plain lowercase page path.
+ * The pattern checks only the format, so a well-formed but unknown slug
+ * passes it. What keeps a mistyped or crafted address out of
+ * PostHog is the help site's disabled 404 page (`disable404Route` in
+ * astro.config.mjs): only built help pages run this script, and any other
+ * /help/... address gets the game's own 404 page, which does not. Enabling a
+ * help 404 page would let such a slug through, so check it against the built
+ * page list first. Only the path is read: the query (the game's ?from=game
+ * mark) and the hash stay out of it.
  */
 export function helpPageDetail(pathname) {
   const inSite = pathname === HELP_BASE || pathname.startsWith(HELP_BASE + "/");
