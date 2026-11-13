@@ -11,6 +11,7 @@ import { type Page } from "playwright";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import { mkdirSync, existsSync, readdirSync } from "node:fs";
+export { captureCrop } from "./screenshot-crop.ts";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 export const ROOT = resolve(__dirname, "..");

@@ -50,7 +50,7 @@
 import { chromium, type Browser, type Page } from "playwright";
 import { spawn, type ChildProcess } from "node:child_process";
 import { join } from "node:path";
-import { DIRS, DESKTOP, EXECUTABLE, PORT, BASE, assertReady, isPhoneViewport, mapForShot, restoreMapAfterShot, type OutDir, type Scene, type Shot } from "./screenshot-env.ts";
+import { DIRS, DESKTOP, EXECUTABLE, PORT, BASE, assertReady, captureCrop, isPhoneViewport, mapForShot, restoreMapAfterShot, type OutDir, type Scene, type Shot } from "./screenshot-env.ts";
 import { pgAdoptTestClock, pgClearTransients, pgDismissSplash, pgFrame, pgMaskVersion, pgRefreshUi, pgSetClock, pgSetMapView, pgStep, pgStepNoDraw } from "./screenshot-builders.ts";
 import { armPhaseWatch, judgeAndPromote, markPhaseTarget, phaseCapturePath, stopPhaseWatch } from "./screenshot-phase-check.ts";
 import { SCENES } from "./screenshot-scenes.ts";
@@ -168,7 +168,7 @@ async function takeShot(page: Page, scene: Scene, shot: Shot): Promise<void> {
     // the onboarding pulse) at a fixed phase so DOM chrome is byte-stable too.
     const capturePath = shot.phaseWatch ? phaseCapturePath(path, outDir) : path;
     if (shot.crop) {
-      await page.locator(shot.crop).screenshot({ path: capturePath, animations: "disabled" });
+      await captureCrop(page, shot.crop, capturePath);
     } else {
       await page.screenshot({ path: capturePath, fullPage: !!shot.fullPage, animations: "disabled" });
     }
