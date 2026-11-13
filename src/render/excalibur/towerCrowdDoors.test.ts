@@ -104,4 +104,29 @@ describe("reconcileCrowd walks real people through the revolving doors", () => {
     expect(door.angle).toBe(0.5);
     expect(e.crowdActors.get(1).actor.z).toBe(Z.crowd);
   });
+
+  it("does not count a ride or a climb as a step through the door", () => {
+    const { e, door } = withDoor();
+    // On foot far from the door, then off out of sight in a car, then out
+    // of the car standing inside the drum: no step was walked there.
+    e.sim.crowd.people = [walker(1, 2)];
+    reconcileCrowd(e);
+    e.sim.crowd.people = [{ ...walker(1, 2), state: "riding" }];
+    reconcileCrowd(e);
+    e.sim.crowd.people = [walker(1, 20.2)];
+    reconcileCrowd(e);
+    expect(door.angle, "after the ride").toBe(0.5);
+    // The same for a climber who left the floor at the far end of the lot.
+    e.sim.crowd.people = [{ ...walker(2, 40), fy: 4 }];
+    reconcileCrowd(e);
+    e.sim.crowd.people = [{ ...walker(2, 30), fy: 4.5 }];
+    reconcileCrowd(e);
+    e.sim.crowd.people = [walker(2, 19.8)];
+    reconcileCrowd(e);
+    expect(door.angle, "after the climb").toBe(0.5);
+    // Once on foot inside it, a step does push it.
+    e.sim.crowd.people = [walker(2, 19.9)];
+    reconcileCrowd(e);
+    expect(door.angle).toBeCloseTo(0.5 + (0.1 * TILE) / DOOR_RADIUS, 6);
+  });
 });
