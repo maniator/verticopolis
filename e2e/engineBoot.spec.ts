@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { test, expect, type Page } from "@playwright/test";
 import { expectEngineHosted } from "./helpers";
-import { INSTANCE_METHODS, STATIC_METHODS } from "../src/engineBinding/binding";
+import { INSTANCE_METHODS, STATIC_METHODS, TOOLING_METHODS } from "../src/engineBinding/binding";
 
 /**
  * The Rust-only build (src/build/engineBundle.ts) in a real browser. The
@@ -202,11 +202,12 @@ test.describe("never falls back to the TypeScript engine", () => {
   });
 
   test("an engine that loads but cannot host the first tower stops the game at start", async ({ page }) => {
-    // A glue with the whole binding surface (so it passes the binding check)
+    // A glue with the whole binding surface, tier 3 included since e2e runs a
+    // tooling build (so it passes the binding check)
     // but no catalog, which boot reads before it builds an engine. The
     // byte check would refuse such a file, so it is swapped in after the
     // check, in the Blob the loader imports.
-    const methods = INSTANCE_METHODS.map((m) => `Engine.prototype.${m} = function () { throw new Error("stub"); };`).join("\n");
+    const methods = [...INSTANCE_METHODS, ...TOOLING_METHODS].map((m) => `Engine.prototype.${m} = function () { throw new Error("stub"); };`).join("\n");
     const statics = STATIC_METHODS.map((m) => `Engine.${m} = function () { throw new Error("stub"); };`).join("\n");
     const glue = `export default async function init() {}\nexport function encodeVctower() { return ""; }\nexport class Engine {}\n${methods}\n${statics}\n`;
     await page.addInitScript((stub) => {

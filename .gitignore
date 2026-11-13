@@ -58,6 +58,8 @@ engine-rs/target/
 engine-rs/consumer/target/
 engine-bench/target/
 engine-rs/pkg/
+engine-rs/pkg-player/
+engine-rs/pkg-web-tooling/
 # The served engine package (wasm:build writes it; Vercel and CI build it,
 # see scripts/build-engine-wasm.sh and .github/actions/engine-wasm).
 src/public/engine/

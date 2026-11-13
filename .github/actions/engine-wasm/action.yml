@@ -1,15 +1,17 @@
 name: Engine WASM package
 description: >-
-  Put the Rust engine's WASM package (src/public/engine/ and engine-rs/pkg/)
-  in the workspace. The package is build output and is not checked in. It is
+  Put the Rust engine's WASM packages in the workspace: the player build
+  (src/public/engine/ for the browser, engine-rs/pkg-player/ for Node) and
+  the tooling build with the binding's tier 3 ops (engine-rs/pkg/ for Node,
+  engine-rs/pkg-web-tooling/ for a VC_TOOLING=1 browser build, #1057). The package is build output and is not checked in. It is
   restored from the Actions cache, keyed on the hash of the Rust sources it is
   built from, and built (then cached) on a miss, so an engine change is
   compiled once and every later job and workflow reuses it. With
-  artifact-name set, the browser package (src/public/engine/ only) is also
-  uploaded as a run artifact for the jobs in a container (the pinned
+  artifact-name set, the two browser packages (src/public/engine/ and
+  engine-rs/pkg-web-tooling/) are also uploaded as a run artifact for the jobs in a container (the pinned
   Playwright image has no Rust toolchain or C linker), which download it with
-  .github/actions/engine-wasm-download. The Node package (engine-rs/pkg/)
-  stays out of the artifact: with it present, npm test would also run the
+  .github/actions/engine-wasm-download. The Node packages stay out of the
+  artifact: with it present, npm test would also run the
   WASM suites engine-rs.yml owns.
   Needs a checkout and Node (the .nvmrc version) set up first, and a runner
   with a C linker (ubuntu-latest).
@@ -47,6 +49,8 @@ runs:
         path: |
           src/public/engine
           engine-rs/pkg
+          engine-rs/pkg-player
+          engine-rs/pkg-web-tooling
         key: ${{ steps.key.outputs.key }}
 
     - name: Build the package (cache miss)
@@ -66,9 +70,14 @@ runs:
           echo "::error::src/public/engine/BUILD.json names sources $built, but the tree's Rust sources hash to $SOURCES"
           exit 1
         fi
-        for f in src/public/engine/verticopolis_engine.js src/public/engine/verticopolis_engine_bg.wasm src/public/engine/THIRD-PARTY.json engine-rs/pkg/verticopolis_engine.js engine-rs/pkg/verticopolis_engine_bg.wasm engine-rs/pkg/package.json; do
+        for f in src/public/engine/verticopolis_engine.js src/public/engine/verticopolis_engine_bg.wasm src/public/engine/THIRD-PARTY.json engine-rs/pkg-web-tooling/verticopolis_engine.js engine-rs/pkg-web-tooling/verticopolis_engine_bg.wasm engine-rs/pkg-web-tooling/BUILD.json engine-rs/pkg/verticopolis_engine.js engine-rs/pkg/verticopolis_engine_bg.wasm engine-rs/pkg/package.json engine-rs/pkg-player/verticopolis_engine.js engine-rs/pkg-player/verticopolis_engine_bg.wasm engine-rs/pkg-player/package.json; do
           test -f "$f" || { echo "::error::$f is missing from the engine package"; exit 1; }
         done
+        tooling=$(node -p 'require("./engine-rs/pkg-web-tooling/BUILD.json").sources')
+        if [ "$tooling" != "$SOURCES" ]; then
+          echo "::error::engine-rs/pkg-web-tooling/BUILD.json names sources $tooling, but the tree's Rust sources hash to $SOURCES"
+          exit 1
+        fi
 
     - name: Cache the package
       if: steps.cache.outputs.cache-hit != 'true'
@@ -77,6 +86,8 @@ runs:
         path: |
           src/public/engine
           engine-rs/pkg
+          engine-rs/pkg-player
+          engine-rs/pkg-web-tooling
         key: ${{ steps.key.outputs.key }}
 
     - name: Upload the package for this run's container jobs
@@ -84,7 +95,11 @@ runs:
       uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: ${{ inputs.artifact-name }}
-        path: src/public/engine/
+        # Two paths keep their places under the workspace root in the
+        # artifact, so the download action unpacks it at the root.
+        path: |
+          src/public/engine/
+          engine-rs/pkg-web-tooling/
         if-no-files-found: error
         # A re-run of the uploading job replaces the artifact instead of
         # failing on the name; a week covers re-running a downstream job alone.

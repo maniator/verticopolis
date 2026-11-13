@@ -3,6 +3,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { BINDING_EXPORT_TIERS, GENERATED_EXPORTS, exportsInTier, type BindingExport } from "../engineBinding/exportTiers";
+import { TOOLING_METHODS } from "../engineBinding/toolingMethods";
 import { repoRoot, repoRel, sourceFiles } from "./guardFiles";
 
 /**
@@ -17,6 +18,11 @@ import { repoRoot, repoRel, sourceFiles } from "./guardFiles";
  *    it cannot name (a getter, setter or constructor, a second exported type,
  *    a `cfg_attr` binding) fails the test, so the parser is taught before
  *    such an export ships.
+ *    Every tier 3 export, and nothing else, sits behind
+ *    `#[cfg(feature = "tooling")]`, so the player package (`src/public/engine/`,
+ *    built without that feature) carries none of them (#1057), and the list
+ *    the boot check and the build guard read (`src/engineBinding/toolingMethods.ts`)
+ *    is the tier 3 list. Any other `cfg` on an export fails the parse.
  * 2. No source outside the allowed scope calls a tier 3 op, on the binding or
  *    on anything else, and none assigns `.money` (the engine's write is
  *    `setMoney`). The allowed scope: the binding's own folder
@@ -60,6 +66,8 @@ const SHARED_LOOP_NAMES: readonly BindingExport[] = ["tick", "drainGameplayEvent
 
 interface ParsedExports {
   names: string[];
+  /** The names behind `#[cfg(feature = "tooling")]`, in source order. */
+  tooling: string[];
   /** Exported items the parser cannot name, with the reason. */
   unsupported: string[];
 }
@@ -93,6 +101,7 @@ function joinAttributes(rust: string): string[] {
  *  `#[cfg(test)]` is skipped: it never reaches a build. */
 function parseBindingExports(rust: string): ParsedExports {
   const names: string[] = [];
+  const tooling: string[] = [];
   const unsupported: string[] = [];
   const jsName = (attrs: string[]): string | undefined => {
     for (const a of attrs) {
@@ -103,6 +112,17 @@ function parseBindingExports(rust: string): ParsedExports {
   };
   const isComment = (line: string) => /^\s*(\/\/|$)/.test(line);
   const testOnly = (attrs: string[]) => attrs.some((a) => /#\[cfg\((?:all\()?test\b/.test(a));
+  const TOOLING_CFG = /^\s*#\[cfg\(\s*feature\s*=\s*"tooling"\s*\)\]\s*$/;
+  const toolingOnly = (attrs: string[]) => attrs.some((a) => TOOLING_CFG.test(a));
+  /** A cfg the parser does not model (not the tests' and not the tooling
+   *  feature's), which could drop an export from one build silently. */
+  const otherCfg = (attrs: string[]) => attrs.find((a) => /#\[cfg\b/.test(a) && !TOOLING_CFG.test(a));
+  const record = (name: string, attrs: string[]) => {
+    const odd = otherCfg(attrs);
+    if (odd) unsupported.push(`${name}: ${odd.trim()}`);
+    names.push(name);
+    if (toolingOnly(attrs)) tooling.push(name);
+  };
   const unnameable = (attrs: string[]) => attrs.find((a) => /wasm_bindgen\([^\]]*\b(constructor|getter|setter|skip_typescript|js_class)\b/.test(a));
   const FN = /^pub(?:\s+(?:const|async|unsafe|extern\s+"[^"]*"))*\s+fn\s+(\w+)/;
   let attrs: string[] = [];
@@ -120,7 +140,7 @@ function parseBindingExports(rust: string): ParsedExports {
         const skipped = attrs.some((a) => /wasm_bindgen\([^\]]*\bskip\b/.test(a)) || testOnly(attrs);
         const odd = unnameable(attrs);
         if (fn && !skipped && odd) unsupported.push(`${fn[1]}: ${odd.trim()}`);
-        else if (fn && !skipped) names.push(jsName(attrs) ?? fn[1]);
+        else if (fn && !skipped) record(jsName(attrs) ?? fn[1], attrs);
         attrs = [];
       }
       continue;
@@ -135,14 +155,14 @@ function parseBindingExports(rust: string): ParsedExports {
       const odd = unnameable(attrs);
       if (/^impl\b/.test(line)) inImpl = !/\}\s*$/.test(line);
       else if (fn && odd) unsupported.push(`${fn[1]}: ${odd.trim()}`);
-      else if (fn) names.push(jsName(attrs) ?? fn[1]);
+      else if (fn) record(jsName(attrs) ?? fn[1], attrs);
       // WASM imports inside an extern block are not JavaScript exports.
       else if (/^extern\s+"C"\s*\{\s*$/.test(line)) { /* import, not export */ }
       else if (!/^pub struct Engine\b/.test(line)) unsupported.push(`an exported item that is not a function: ${line.trim()}`);
     }
     attrs = [];
   }
-  return { names, unsupported };
+  return { names, tooling, unsupported };
 }
 
 /** Every source the confinement guards read, repository-relative: the tracked
@@ -283,8 +303,17 @@ describe("WASM binding export tiers", () => {
       "#[cfg(test)]",
       "#[wasm_bindgen]",
       "pub fn in_tests() {}",
+      "#[wasm_bindgen]",
+      "impl Engine {",
+      "    #[cfg(feature = \"tooling\")]",
+      "    #[wasm_bindgen(js_name = rawEdit)]",
+      "    pub fn raw_edit(&mut self) {}",
+      "}",
+      "#[cfg(feature = \"tooling\")]",
+      "#[wasm_bindgen]",
+      "pub fn tooling_free() {}",
     ].join("\n");
-    expect(parseBindingExports(sample)).toEqual({ names: ["alpha", "betaGamma", "delta", "wrappedName", "later", "quoted"], unsupported: [] });
+    expect(parseBindingExports(sample)).toEqual({ names: ["alpha", "betaGamma", "delta", "wrappedName", "later", "quoted", "rawEdit", "tooling_free"], tooling: ["rawEdit", "tooling_free"], unsupported: [] });
     const odd = [
       "#[wasm_bindgen]",
       "impl Engine {",
@@ -295,8 +324,16 @@ describe("WASM binding export tiers", () => {
       "pub enum Kind { A }",
       "#[cfg_attr(feature = \"x\", wasm_bindgen)]",
       "pub fn maybe() {}",
+      "#[wasm_bindgen]",
+      "impl Engine {",
+      "    #[cfg(not(feature = \"tooling\"))]",
+      "    pub fn player_only(&self) {}",
+      "}",
+      "#[cfg(any(feature = \"tooling\", test))]",
+      "#[wasm_bindgen]",
+      "pub fn either() {}",
     ].join("\n");
-    expect(parseBindingExports(odd).unsupported).toHaveLength(3);
+    expect(parseBindingExports(odd).unsupported).toHaveLength(5);
     const importedJson = [
       "#[wasm_bindgen]",
       'extern "C" {',
@@ -304,7 +341,7 @@ describe("WASM binding export tiers", () => {
       "    fn parse_service_diagnostics_json(text: &str) -> JsValue;",
       "}",
     ].join("\n");
-    expect(parseBindingExports(importedJson)).toEqual({ names: [], unsupported: [] });
+    expect(parseBindingExports(importedJson)).toEqual({ names: [], tooling: [], unsupported: [] });
   });
 
   it("every tier is populated, and the raw ops the issue names are tier 3", () => {
@@ -315,6 +352,11 @@ describe("WASM binding export tiers", () => {
     for (const name of ["addCar", "removeCar", "extendTransport", "removeFacility"] as const) {
       expect(BINDING_EXPORT_TIERS[name].tier, name).toBe(1);
     }
+  });
+
+  it("every tier 3 export, and only those, is built into the tooling package alone (#1057)", () => {
+    expect([...parsed.tooling].sort(), 'gate each tier 3 export with #[cfg(feature = "tooling")] and no other export').toEqual([...TIER3].sort());
+    expect([...TOOLING_METHODS].sort(), "src/engineBinding/toolingMethods.ts must list tier 3").toEqual([...TIER3].sort());
   });
 
   describe("tier 3 stays in the binding's folder, the host, the tooling and tests", () => {

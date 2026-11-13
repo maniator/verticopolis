@@ -213,10 +213,11 @@ shapes for each one.
 | `engineIdentity()` | Which engine this is and which contracts it speaks: the crate version, the save version it writes and the oldest it loads, the frame layout version, the catalog version with a digest per mode, and the conformance lock digest. |
 
 The binding exports more than this table. The rest are the web game's own
-plumbing and tooling: packed number-array answers its host decodes, test
-hooks and raw edits that skip the game's charges (`setMoney`, `setCars`,
-`startFire` and the like). They can change in any release, so build on the
-calls above.
+plumbing: packed number-array answers its host decodes. They can change in
+any release, so build on the calls above. The test hooks and raw edits that
+skip the game's charges (`setMoney`, `setCars`, `startFire` and the like) are
+not in the published package at all: only the crate's `tooling` feature
+builds them, for the web game's own tests and tooling.
 
 ## Saves
 

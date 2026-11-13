@@ -172,6 +172,7 @@ The crate has no default features.
 | --- | --- |
 | `conformance` | The harness that replays the conformance suite (`scenario`, `suite`, the `.TDT` referee) and the command-line tools. It reads the suite's files, so a host turns it on only to prove conformance. |
 | `wasm` | The JavaScript binding, for a `wasm32-unknown-unknown` build through wasm-bindgen. A native host leaves it off. |
+| `tooling` | The binding's test and tooling calls (raw edits that skip the game's charges, scripted events, seeding), on top of `wasm`. The web game's tests and tooling build it; the game it ships and the npm package do not. A host leaves it off. |
 
 ## Saves
 

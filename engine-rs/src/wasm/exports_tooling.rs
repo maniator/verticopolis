@@ -8,9 +8,13 @@
 
 use wasm_bindgen::prelude::*;
 
-use super::{parse_kind, Engine};
+#[cfg(feature = "tooling")]
+use super::parse_kind;
+use super::Engine;
+#[cfg(feature = "tooling")]
 use crate::tower::PlaceResult;
 
+#[cfg(feature = "tooling")]
 /// A placement's result as TypeScript's `PlaceResult` spells it: `{ ok,
 /// reason?, unitId? }` for a room or a structure tile, with `transportId`
 /// in place of `unitId` for a shaft.
@@ -25,6 +29,7 @@ fn place_json(r: PlaceResult, id_key: &str) -> String {
     v.to_string()
 }
 
+#[cfg(feature = "tooling")]
 /// The refusal for a kind the catalog does not name, as `build` gives it.
 fn unknown_kind() -> String {
     place_json(
@@ -41,6 +46,7 @@ fn unknown_kind() -> String {
 impl Engine {
     /// Tooling only: `placeBare(kind, floor, x)`, the TypeScript `tower.place`, the bare placement with
     /// no charge, star gate or log line. JSON `{ ok, reason?, unitId? }`.
+    #[cfg(feature = "tooling")]
     #[wasm_bindgen(js_name = placeBare)]
     pub fn place_bare(&mut self, kind: &str, floor: i32, x: i32) -> String {
         let Ok(kind) = parse_kind(kind) else {
@@ -52,6 +58,7 @@ impl Engine {
     /// Tooling only: `placeTransportBare(kind, x, bottom, top)`, the
     /// TypeScript `tower.placeTransport`, the bare
     /// shaft placement. JSON `{ ok, reason?, transportId? }`.
+    #[cfg(feature = "tooling")]
     #[wasm_bindgen(js_name = placeTransportBare)]
     pub fn place_transport_bare(&mut self, kind: &str, x: i32, bottom: i32, top: i32) -> String {
         let Ok(kind) = parse_kind(kind) else {
@@ -123,5 +130,6 @@ impl Engine {
 }
 
 #[cfg(test)]
+#[cfg(feature = "tooling")]
 #[path = "exports_tooling_tests.rs"]
 mod tests;

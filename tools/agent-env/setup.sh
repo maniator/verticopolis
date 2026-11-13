@@ -149,7 +149,9 @@ fi
 # Built when missing or stale against the Rust sources (the check the
 # engine-wasm action makes). After an engine-rs edit, run `npm run wasm:build`.
 engine_current() {
-  [ -f src/public/engine/BUILD.json ] && [ -f engine-rs/pkg/verticopolis_engine.js ] || return 1
+  # Both flavors (#1057): the player package and the tooling ones a dev serve,
+  # a VC_TOOLING=1 build and the WASM suites use.
+  [ -f src/public/engine/BUILD.json ] && [ -f engine-rs/pkg-web-tooling/BUILD.json ] && [ -f engine-rs/pkg/verticopolis_engine.js ] && [ -f engine-rs/pkg-player/verticopolis_engine.js ] || return 1
   local want built
   want="$(node --input-type=module -e 'import { engineSourceHash } from "./src/wasmhost/packageHash.ts"; process.stdout.write(engineSourceHash("engine-rs"))' 2>/dev/null)" || return 1
   built="$(node -p 'require("./src/public/engine/BUILD.json").sources' 2>/dev/null)" || return 1

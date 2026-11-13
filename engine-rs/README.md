@@ -238,12 +238,25 @@ that release and build with `RUSTUP_TOOLCHAIN=1.97.0 npm run wasm:build`.
 ```sh
 rustup target add wasm32-unknown-unknown
 cargo install wasm-bindgen-cli --locked --version 0.2.129   # the version Cargo.toml pins
-npm run wasm:build          # cargo rustc (cdylib) for wasm32 + wasm-bindgen into engine-rs/pkg/
+npm run wasm:build          # cargo rustc (cdylib) for wasm32 + wasm-bindgen: the player and tooling packages below
 npm run test:wasm           # every scenario through the binding, the frame-day and port-edit goldens, the .TDT differential test and the .vctower writer test (fails without the package)
 ```
 
-`engine-rs/pkg/` is build output and is not checked in, except for the
-declaration wasm-bindgen writes, copied to `src/engineBinding/engine.d.ts`:
+`wasm:build` compiles the crate twice (#1057). The player build
+(`--features wasm`) is the one the game ships and npm publishes: the browser
+package in `src/public/engine/` and the Node package in `engine-rs/pkg-player/`.
+The tooling build (`--features tooling`, which turns `wasm` on too) adds the
+binding's tier 3 ops (raw edits, scripted events and seeding calls, listed in
+`src/engineBinding/exportTiers.ts`) that the tests and the tooling harnesses
+call: the Node package in `engine-rs/pkg/`, which the WASM suites load, and
+the browser package in `engine-rs/pkg-web-tooling/`, which a `VC_TOOLING=1`
+build and a dev serve put in place of `src/public/engine/`. The build guard
+(`scripts/verify-engine-bundle.ts`) fails a production build whose engine has
+a tier 3 op and a tooling build whose engine lacks one.
+
+These packages are build output and are not checked in, except for the
+declaration wasm-bindgen writes for `engine-rs/pkg/`, copied to
+`src/engineBinding/engine.d.ts` (the tooling build's, so it names tier 3 too):
 `src/engineBinding/binding.ts` types the adapters against it, so a method added
 or renamed in `wasm.rs` reaches TypeScript as a type change, and the
 `engine-rs.yml` job fails when the checked-in copy is stale (rebuild and

@@ -11,6 +11,7 @@ import { MAX_RELEASES, type BuildFingerprint } from "./src/pwaUpdateInfo";
 import { ENGINE_PRELOAD_FILES, enginePreloadAttrs } from "./src/build/enginePreload";
 import { ENGINE_BUILD_RECORD, ENGINE_DIR } from "./src/wasmhost/enginePackageNames";
 import { buildFingerprint } from "./src/build/buildFingerprint";
+import { assembleToolingPublicDir, choosePublicDir, hasEnginePackage } from "./src/build/toolingPublicDir";
 import { helpMarkdown } from "./src/build/helpMarkdown";
 import { isPreviewDeploy } from "./src/build/previewDeploy";
 
@@ -63,11 +64,39 @@ function toolingBuild(): boolean {
  *  `src/public`, unless the offline e2e sets `VC_PUBLIC_DIR` to build a second
  *  deployment with a different engine package (e2e/deployments.ts, #985). A
  *  Vercel build refuses it, so no deploy can ship a package from elsewhere. */
-function publicDir(): string {
+function publicDirFor(command: "build" | "serve"): string {
   const raw = process.env.VC_PUBLIC_DIR;
-  if (raw === undefined || raw === "") return resolve(__dirname, "src/public");
-  if (process.env.VERCEL) throw new Error("VC_PUBLIC_DIR is set in a Vercel build. Deploys build from src/public; remove VC_PUBLIC_DIR from the Vercel environment.");
-  return resolve(raw);
+  if (raw !== undefined && raw !== "") {
+    if (process.env.VERCEL) throw new Error("VC_PUBLIC_DIR is set in a Vercel build. Deploys build from src/public; remove VC_PUBLIC_DIR from the Vercel environment.");
+    return resolve(raw);
+  }
+  // A VC_TOOLING=1 build and a dev serve take the tooling engine package in
+  // place of the player one (#1057, src/build/toolingPublicDir.ts).
+  const base = resolve(__dirname, "src/public");
+  const tooling = resolve(__dirname, "engine-rs/pkg-web-tooling");
+  const choice = choosePublicDir({
+    tooling: TOOLING_BUILD,
+    serve: command === "serve",
+    vitest: Boolean(process.env.VITEST),
+    hasToolingPackage: hasEnginePackage(tooling),
+    hasPlayerPackage: hasEnginePackage(resolve(base, ENGINE_DIR)),
+  });
+  if (choice.kind === "missing-tooling") throw new Error(choice.why);
+  if (choice.kind === "player") {
+    if (command === "serve" && !process.env.VITEST) console.warn("[serve] engine-rs/pkg-web-tooling/ is missing, so this serve runs the player engine package: window.game's raw edits will fail. Run npm run wasm:build.");
+    return base;
+  }
+  return assembleToolingPublicDir(base, tooling, resolve(__dirname, "node_modules/.vc-tooling-public"));
+}
+let chosenPublicDir: string | undefined;
+let chosenFor: "build" | "serve" | undefined;
+/** The public folder for this run, assembled once per command. */
+function publicDir(command: "build" | "serve"): string {
+  if (chosenPublicDir === undefined || chosenFor !== command) {
+    chosenPublicDir = publicDirFor(command);
+    chosenFor = command;
+  }
+  return chosenPublicDir;
 }
 
 const TOOLING_BUILD = toolingBuild();
@@ -255,19 +284,19 @@ function enginePreload(): Plugin {
         if (base !== "index.html") return [];
         // A build without the engine package (VC_ALLOW_NO_ENGINE=1, which cannot run
         // the game) has nothing to preload; the links would be three 404s.
-        if (!existsSync(resolve(publicDir(), ENGINE_DIR, ENGINE_BUILD_RECORD))) return [];
+        if (!existsSync(resolve(publicDir("build"), ENGINE_DIR, ENGINE_BUILD_RECORD))) return [];
         return ENGINE_PRELOAD_FILES.map((file) => ({ tag: "link", attrs: enginePreloadAttrs(file), injectTo: "head-prepend" as const }));
       },
     },
   };
 }
 
-const expectedPackage = (command: "build" | "serve") => readExpectedPackage(publicDir(), command === "build" ? "build" : "other");
+const expectedPackage = (command: "build" | "serve") => readExpectedPackage(publicDir(command), command === "build" ? "build" : "other");
 const fingerprintOf = (command: "build" | "serve") => buildFingerprint(resolve(__dirname, "src"), expectedPackage(command));
 
 export default defineConfig(({ command }) => ({
   root: "src",
-  publicDir: publicDir(),
+  publicDir: publicDir(command),
   resolve: { alias: engineAliases(command) },
   base: "./",
   // Compile-time app version, shown on the splash. (package.json isn't importable

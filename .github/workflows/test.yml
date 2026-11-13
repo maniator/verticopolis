@@ -118,11 +118,13 @@ jobs:
           [ "$(grep -c '^F ' "$list" || true)" -lt "$limit" ] || full "listing limit reached"
           node scripts/pr-lane.ts "$list" || full "classifier failed"
 
-  # The Rust engine's WASM package (src/public/engine/, engine-rs/pkg/) is build
-  # output and is not checked in. This job restores it from the Actions cache,
+  # The Rust engine's WASM packages (the player build in src/public/engine/
+  # and engine-rs/pkg-player/, the tooling build in engine-rs/pkg/ and
+  # engine-rs/pkg-web-tooling/, #1057) are build output and are not checked in. This job restores it from the Actions cache,
   # keyed on the engine's source hash, or builds and caches it on a miss (an
-  # engine change), then hands it to the e2e jobs as a run artifact: they serve
-  # it to the browser projects, and its container has no Rust toolchain to
+  # engine change), then hands the browser packages to the e2e jobs as a run
+  # artifact: their VC_TOOLING=1 build serves the tooling one to the browser
+  # projects, and its container has no Rust toolchain to
   # build it. The test job needs no package (its hash test skips without one),
   # so lint, typecheck and the unit tests never wait on a Rust build.
   engine-wasm:

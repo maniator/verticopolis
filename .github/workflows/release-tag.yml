@@ -107,8 +107,8 @@ jobs:
         if: ${{ steps.versions.outputs.compare == 'true' && steps.versions.outputs.crate != steps.versions.outputs.crate_was }}
         uses: ./.github/actions/engine-wasm
 
-      # The built package: engine-rs/pkg (Node) and src/public/engine
-      # (browser), with their third-party records, as a zip and as the npm
+      # The built player package: engine-rs/pkg-player (Node) and
+      # src/public/engine (browser), without the binding's tier 3 ops (#1057), with their third-party records, as a zip and as the npm
       # tarball, each with a checksum, for the release. engine-publish.yml
       # publishes that tarball to npm, so the bytes on npm are the ones here.
       # scripts/engine-package-files.sh adds the package's own README and the
@@ -124,7 +124,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p npm/node npm/web
-          cp -R engine-rs/pkg/. npm/node/
+          cp -R engine-rs/pkg-player/. npm/node/
           cp -R src/public/engine/. npm/web/
           npm_name="$(sh scripts/engine-package-files.sh npm "$VERSION" "$GH_REPO")"
           zip="verticopolis-engine-wasm-$VERSION.zip"

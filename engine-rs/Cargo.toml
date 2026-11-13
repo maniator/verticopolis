@@ -70,6 +70,11 @@ wasm-bindgen = { version = "=0.2.129", optional = true }
 
 [features]
 wasm = ["dep:wasm-bindgen"]
+# The binding's tier 3 ops (raw edits, scripted events, seeding: the list is
+# `src/engineBinding/exportTiers.ts`) for the test suites and the screenshot
+# and e2e tooling. The shipped game's package is built without it, so those
+# ops are not in the player's binary (#1057).
+tooling = ["wasm"]
 # The conformance harness (tier 2 in API.md): the scenario runner, the .TDT
 # referee and the binaries, which read the suite's files. Off by default, so a
 # host links no file reads; the referee and a host that replays the lock turn

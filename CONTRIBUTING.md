@@ -121,7 +121,11 @@ Verticopolis has **two test tiers**:
     every fixture with the engine and reads it back through the web game's
     readers. Every build runs the WASM engine alone
     (see below), with no TypeScript fallback. The served package
-    (`src/public/engine/`) is build output and is not checked in: build it
+    (`src/public/engine/`) is build output and is not checked in. The build
+    writes two flavors (#1057): the player package the game ships, and a
+    tooling package with the binding's tier 3 test ops, which `npm run dev`,
+    a `VC_TOOLING=1` build and the WASM suites use (engine-rs/README.md has
+    the paths). Build them
     locally to run the game, with `bash scripts/build-engine-wasm.sh`
     on x86_64 Linux (it installs the pinned toolchain) or `npm run wasm:build`
     once the toolchain in engine-rs/README.md is installed. `npm run e2e`
@@ -309,7 +313,9 @@ node scripts/screenshot-determinism-check.ts --all
 
 To regenerate `e2e/visual.spec.ts-snapshots` in the same pinned image (its
 `npm run build` needs the engine package, and the image has no Rust toolchain,
-so build `src/public/engine/` on the host first; see the engine note above):
+so build the engine packages on the host first with `npm run wasm:build`,
+which writes `src/public/engine/` and the `engine-rs/pkg-web-tooling/` a
+`VC_TOOLING=1` build serves; see the engine note above):
 
 ```bash
 docker run --rm --ipc=host \

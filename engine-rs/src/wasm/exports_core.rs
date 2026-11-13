@@ -123,6 +123,7 @@ impl Engine {
         self.sim.money
     }
 
+    #[cfg(feature = "tooling")]
     #[wasm_bindgen(js_name = setMoney)]
     pub fn set_money(&mut self, amount: f64) {
         self.sim.money = amount;

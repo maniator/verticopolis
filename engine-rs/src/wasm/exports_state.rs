@@ -1,5 +1,6 @@
 //! Stops, labels, events and the sync reads of the binding (`Engine` members).
 
+#[cfg(feature = "tooling")]
 use serde_json::Value;
 use wasm_bindgen::prelude::*;
 
@@ -65,6 +66,7 @@ impl Engine {
 
     /// Tooling: a fire, which is no edit, so it is no part of an open
     /// gesture's undo step.
+    #[cfg(feature = "tooling")]
     #[wasm_bindgen(js_name = startFire)]
     pub fn start_fire(&mut self) {
         self.sim.outside_the_gesture(|s| s.start_fire());
@@ -76,17 +78,20 @@ impl Engine {
     /// draws nothing from the random stream. False, changing nothing, while
     /// a fire burns or a choice is pending, or when `id` names no room that
     /// can catch fire. Like `startFire`, this is not part of an open undo step.
+    #[cfg(feature = "tooling")]
     #[wasm_bindgen(js_name = startFireAt)]
     pub fn start_fire_at(&mut self, id: f64) -> bool {
         whole_id(id).is_some_and(|id| self.sim.outside_the_gesture(|s| s.start_fire_at(id)))
     }
 
     /// Tooling: a bomb threat, outside an open gesture as a fire is.
+    #[cfg(feature = "tooling")]
     #[wasm_bindgen(js_name = bombThreat)]
     pub fn bomb_threat(&mut self) {
         self.sim.outside_the_gesture(|s| s.bomb_threat());
     }
 
+    #[cfg(feature = "tooling")]
     #[wasm_bindgen(js_name = evaluateStar)]
     pub fn evaluate_star(&mut self) {
         self.sim.evaluate_star();
@@ -99,6 +104,7 @@ impl Engine {
     /// skips runs once on the next tick. A literal 0 is 07:00 on day 0, as at
     /// founding. False, changing nothing, for a value that is not finite, is
     /// below 0 or is past [`MAX_TOOL_CLOCK_MINUTES`].
+    #[cfg(feature = "tooling")]
     #[wasm_bindgen(js_name = setClock)]
     pub fn set_clock(&mut self, minutes: f64) -> bool {
         if !minutes.is_finite() || !(0.0..=MAX_TOOL_CLOCK_MINUTES).contains(&minutes) {
@@ -114,6 +120,7 @@ impl Engine {
     /// own timer or event record, which this write cannot make), or for
     /// occupants that are not a whole number from 0 to
     /// [`MAX_TOOL_OCCUPANTS`]; nothing changes then.
+    #[cfg(feature = "tooling")]
     #[wasm_bindgen(js_name = setUnitState)]
     pub fn set_unit_state(&mut self, id: f64, state: &str, occupants: Option<f64>) -> bool {
         let Some(state) = crate::tower::UnitState::from_name(state) else {
@@ -141,6 +148,7 @@ impl Engine {
     /// a sold condo is bought back. Like a fire, it is not part of an open
     /// undo step. The unit's kind is not checked. False, changing nothing,
     /// for an unknown unit or cause.
+    #[cfg(feature = "tooling")]
     #[wasm_bindgen(js_name = vacateUnit)]
     pub fn vacate_unit(&mut self, id: f64, reason: &str) -> bool {
         let Some(reason) = super::port_panels::VACATE_REASONS
@@ -164,6 +172,7 @@ impl Engine {
     /// A test uses it for a legacy off-ladder price or an unpriced room,
     /// which a load would snap onto the ladder. False, changing nothing, for
     /// an unknown unit or a price that is not finite or is below 0.
+    #[cfg(feature = "tooling")]
     #[wasm_bindgen(js_name = setUnitRent)]
     pub fn set_unit_rent(&mut self, id: f64, rent: Option<f64>) -> bool {
         if rent.is_some_and(|r| !r.is_finite() || r < 0.0) {
@@ -183,6 +192,7 @@ impl Engine {
     /// count that is not a whole number from 0 to [`MAX_TOOL_OCCUPANTS`];
     /// nothing changes then. The unit's kind and its venue cap are not
     /// checked: any unit takes the stamp, at any count in that range.
+    #[cfg(feature = "tooling")]
     #[wasm_bindgen(js_name = setCustomersIn)]
     pub fn set_customers_in(&mut self, id: f64, count: f64) -> bool {
         if count.fract() != 0.0 || !(0.0..=MAX_TOOL_OCCUPANTS).contains(&count) {
@@ -203,6 +213,7 @@ impl Engine {
     /// "cloudy" or "rain"), the TypeScript `sim.weather = w`. No save carries
     /// it, and the next day's roll replaces it. False, changing nothing, for
     /// any other name.
+    #[cfg(feature = "tooling")]
     #[wasm_bindgen(js_name = setWeather)]
     pub fn set_weather(&mut self, name: &str) -> bool {
         use crate::sim_loop::Weather;
@@ -218,6 +229,7 @@ impl Engine {
     /// Tooling only: clear every unit's four retail tallies (patronage and
     /// profit, today and yesterday), the render-only fields no economy path
     /// reads, so a test can show that clearing them changes no money.
+    #[cfg(feature = "tooling")]
     #[wasm_bindgen(js_name = clearRetailTallies)]
     pub fn clear_retail_tallies(&mut self) {
         for u in self.sim.tower.units.iter_mut() {
@@ -306,6 +318,7 @@ impl Engine {
 
     /// Replace the elevator telemetry with an `elevatorTelemetry` document.
     /// Tooling only (the gallery's engine leg); no game command reaches it.
+    #[cfg(feature = "tooling")]
     #[wasm_bindgen(js_name = seedElevatorTelemetry)]
     pub fn seed_elevator_telemetry(&mut self, json: &str) -> Result<(), JsError> {
         let doc: Value = serde_json::from_str(json).map_err(err)?;
@@ -316,6 +329,7 @@ impl Engine {
     /// `clock.advance(minutes)`. Whatever pass the move skips is owed and runs
     /// on the next tick, as on the TypeScript engine. Tooling only (the
     /// gallery's clock pin); no game command reaches it.
+    #[cfg(feature = "tooling")]
     #[wasm_bindgen(js_name = advanceClock)]
     pub fn advance_clock(&mut self, minutes: f64) -> Result<(), JsError> {
         if !minutes.is_finite() || minutes < 0.0 {
@@ -344,6 +358,7 @@ impl Engine {
     /// `lastQuarter`), which a load derives from the clock. Tooling only: the
     /// gallery's engine leg hands over a tower built in place, whose memos
     /// still owe its first passes, and this keeps them owed.
+    #[cfg(feature = "tooling")]
     #[wasm_bindgen(js_name = seedLoopMemos)]
     pub fn seed_loop_memos(
         &mut self,
@@ -417,15 +432,18 @@ impl Engine {
     }
 }
 
+#[cfg(feature = "tooling")]
 /// The latest clock `setClock` takes, in minutes (about 1,900 years): far past
 /// any game, and small enough that a tick still moves the clock.
 const MAX_TOOL_CLOCK_MINUTES: f64 = 1e9;
 
+#[cfg(feature = "tooling")]
 /// The largest count `setUnitState` writes as occupants and `setCustomersIn`
 /// writes as customers: the largest whole number a JavaScript number holds
 /// exactly, so both engines store the same count.
 const MAX_TOOL_OCCUPANTS: f64 = 9_007_199_254_740_991.0;
 
+#[cfg(feature = "tooling")]
 /// A state the engine enters only alongside a record of its own (a
 /// construction timer, an active fire), which a bare state write cannot make.
 fn needs_its_own_record(state: crate::tower::UnitState) -> bool {
@@ -435,11 +453,13 @@ fn needs_its_own_record(state: crate::tower::UnitState) -> bool {
     )
 }
 
+#[cfg(feature = "tooling")]
 /// A unit id the binding was handed as a number: whole and in range.
 fn whole_id(id: f64) -> Option<i64> {
     (id.fract() == 0.0 && id.abs() < 9007199254740992.0).then_some(id as i64)
 }
 
 #[cfg(test)]
+#[cfg(feature = "tooling")]
 #[path = "exports_state_tests.rs"]
 mod tests;

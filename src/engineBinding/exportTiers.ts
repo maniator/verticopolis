@@ -38,8 +38,13 @@ import type { WasmEngine } from "./binding";
  *   folder, the host, the generated package, the tooling and tests, and on
  *   a write to `.money` anywhere outside them.
  *
- * Tier 3 leaving the production binding, or moving behind a cargo feature,
- * is #1057. Argument validation at the boundary is #923's.
+ * Tier 3 is built only with the crate's `tooling` feature (#1057): every
+ * tier 3 export sits behind `#[cfg(feature = "tooling")]`, so the player
+ * package the game ships and npm publishes (`src/public/engine/`,
+ * `engine-rs/pkg-player/`) has none of them. The tooling package
+ * (`engine-rs/pkg/` for the Node suites, `engine-rs/pkg-web-tooling/` for a
+ * `VC_TOOLING=1` build and a dev serve) has them all, and the guard checks
+ * the gates against this table. Argument validation at the boundary is #923's.
  */
 export type BindingTier = 1 | 2 | 3;
 

@@ -36,7 +36,7 @@ let loaded: WasmModule | undefined;
  *  undefined state, so the binding returns errors rather than panicking. */
 export function wasm(): WasmModule {
   if (loaded) return loaded;
-  loaded = checkBinding(createRequire(import.meta.url)(WASM_PKG));
+  loaded = checkBinding(createRequire(import.meta.url)(WASM_PKG), { tooling: true });
   return loaded;
 }
 

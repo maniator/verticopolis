@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { checkEngineBundle, ENGINE_PACKAGE_FILES, precacheManifest, repoRelativeSource, TOOLING_SIM, type EngineBundleInput } from "./engineBundle";
+import { checkEngineBundle, ENGINE_PACKAGE_FILES, glueMethods, precacheManifest, repoRelativeSource, TOOLING_SIM, type EngineBundleInput } from "./engineBundle";
+
+/** Two tier 3 names stand in for the list, so the tests below name them. */
+const TOOLING = ["setMoney", "advanceClock"] as const;
+/** wasm-bindgen glue in the shape it writes: methods one level into the
+ *  class, a static, and a doc comment that names a tier 3 op. */
+const PLAYER_GLUE = ["export class Engine {", "    /**", "     * setMoney(x) is tooling only", "     */", "    build(kind) {", "    }", "    static newGame(mode) {", "    }", "}"].join("\n");
+const TOOLING_GLUE = PLAYER_GLUE.replace("    build(kind) {", "    build(kind) {\n    }\n    setMoney(amount) {\n    }\n    advanceClock(minutes) {");
 
 /** A tooling build that passes: the host, the harnesses' tower and the
  *  engine package precached. */
@@ -9,13 +16,16 @@ function bundle(over: Partial<EngineBundleInput> = {}): EngineBundleInput {
     chunks: [{ file: "assets/main-abc.js", sources: ["src/main.ts", TOOLING_SIM, "node_modules/lit-html/lit-html.js"] }],
     precache: ["index.html", "assets/main-abc.js", ...ENGINE_PACKAGE_FILES],
     enginePackageBuilt: true,
+    engineGlue: TOOLING_GLUE,
+    toolingMethods: TOOLING,
     ...over,
   };
 }
 
-/** A production build that passes: the host and the stand-in. */
+/** A production build that passes: the host, the stand-in and the player
+ *  engine package. */
 function production(over: Partial<EngineBundleInput> = {}): EngineBundleInput {
-  return bundle({ tooling: false, chunks: [{ file: "assets/main-abc.js", sources: ["src/main.ts", "src/game/toolingSimAbsent.ts", "node_modules/lit-html/lit-html.js"] }], ...over });
+  return bundle({ tooling: false, engineGlue: PLAYER_GLUE, chunks: [{ file: "assets/main-abc.js", sources: ["src/main.ts", "src/game/toolingSimAbsent.ts", "node_modules/lit-html/lit-html.js"] }], ...over });
 }
 
 describe("checkEngineBundle", () => {
@@ -70,5 +80,28 @@ describe("precacheManifest", () => {
     expect(precacheManifest("precacheAndRoute(")).toBeNull();
     // An inlined runtime's definition comes first and is skipped.
     expect(precacheManifest('function precacheAndRoute(e,t){x([e])}precacheAndRoute([{url:"a.js",revision:"1"}])')).toEqual(["a.js"]);
+  });
+});
+
+describe("the engine package's tier 3 ops (#1057)", () => {
+  it("refuses a production build whose engine glue defines a tier 3 op", () => {
+    expect(checkEngineBundle(production({ engineGlue: TOOLING_GLUE })).errors).toEqual([
+      "the engine package ships tier 3 ops only the tooling build may carry (setMoney, advanceClock); src/public/engine/ must hold the player build (npm run wasm:build)",
+    ]);
+  });
+
+  it("refuses a tooling build that ships the player package", () => {
+    expect(checkEngineBundle(bundle({ engineGlue: PLAYER_GLUE })).errors).toEqual([
+      "a tooling build ships the player engine package: its glue lacks setMoney, advanceClock, which the tooling tower calls (engine-rs/pkg-web-tooling/ should replace src/public/engine/)",
+    ]);
+  });
+
+  it("skips the glue check for a build with no engine package", () => {
+    expect(checkEngineBundle(production({ engineGlue: null, enginePackageBuilt: false, precache: ["index.html", "assets/main-abc.js"] })).errors).toEqual([]);
+  });
+
+  it("reads only the methods a class defines, not statics or doc text", () => {
+    expect([...glueMethods(TOOLING_GLUE)]).toEqual(["build", "setMoney", "advanceClock"]);
+    expect([...glueMethods(PLAYER_GLUE)]).toEqual(["build"]);
   });
 });

@@ -1,7 +1,10 @@
 /**
  * Build a Rust crate's WASM binding. With no argument it builds the engine
- * into engine-rs/pkg/ for Node and src/public/engine/ for the browser:
- * `cargo rustc` for wasm32 with the `wasm` feature as a cdylib, `wasm-bindgen`
+ * twice. The player build (the `wasm` feature) goes to src/public/engine/ for
+ * the browser and engine-rs/pkg-player/ for Node; the tooling build (`wasm`
+ * and `tooling`, which adds the tier 3 ops the tests and harnesses use) goes to
+ * engine-rs/pkg/ for Node and engine-rs/pkg-web-tooling/ for the browser.
+ * Each is `cargo rustc` for wasm32 as a cdylib, `wasm-bindgen`
  * for the JavaScript glue, and a package.json marking the output CommonJS (the
  * repository is ESM, and wasm-bindgen's Node target emits `require`). For the
  * engine, the declaration wasm-bindgen writes is copied to
@@ -10,7 +13,7 @@
  * copy is stale). The engine build also refreshes src/events/gameplayEvents.d.ts
  * (and the bridge's rules beside it, src/events/gameplayEventRules.ts)
  * from engine-rs/src/gameplay/catalog.json (the same as `npm run gen:events`).
- * The browser target lands in src/public/engine/ with a BUILD.json naming the
+ * Each browser target lands with a BUILD.json naming the
  * sources it came from (see src/wasmhost/packageHash.ts) and the digests of
  * its glue and binary (src/wasmhost/enginePackageRecord.ts) and a
  * THIRD-PARTY.json listing the crates compiled into it (see
@@ -70,20 +73,24 @@ if (which === "engine") {
   if (!rustVersion) throw new Error(`${target.dir}/Cargo.toml declares no rust-version`);
   checkToolchain(crate, rustVersion);
 }
-// The engine's crates and the Rust standard library, with their licenses,
-// gathered before anything is compiled or written, so a crate that cannot be
-// attributed stops the build with the old package still in place (#955).
-// One feature list for the record and the compile, so they describe the same build.
-const FEATURES = "wasm";
-const engineRecord = which === "engine" ? engineThirdParty(crate, FEATURES) : [];
+// The engine is built twice (#1057). The player build (`wasm`) is what ships:
+// src/public/engine/ for the browser and engine-rs/pkg-player/ for the npm
+// package's Node tree. The tooling build (`tooling`, which adds the binding's
+// tier 3 ops, src/engineBinding/exportTiers.ts) is what the test suites and
+// the screenshot and e2e harnesses drive: engine-rs/pkg/ for Node and
+// engine-rs/pkg-web-tooling/ for the browser, which a VC_TOOLING=1 build and
+// a dev serve put in place of src/public/engine/ (vite.config.ts). The other
+// crates have one build, into pkg/.
+const PLAYER_FEATURES = "wasm";
+const TOOLING_FEATURES = "wasm,tooling";
 const run = (cmd: string, args: string[]) => execFileSync(cmd, args, { cwd: crate, stdio: "inherit" });
-// The crate is an rlib; the cdylib is asked for here so the native build
-// stays as it is. The old package goes first, so a failed run leaves no
-// stale package behind for the suite to replay.
-rmSync(resolve(crate, "pkg"), { recursive: true, force: true });
-run("cargo", ["rustc", "--locked", "--release", "--lib", "--target", "wasm32-unknown-unknown", "--features", FEATURES, "--crate-type", "cdylib"]);
 const wasm = `target/wasm32-unknown-unknown/release/${target.lib}.wasm`;
-// The hash of the sources both binaries are stamped with and BUILD.json records.
+/** Compile the cdylib with `features`. The crate is an rlib; the cdylib is
+ *  asked for here so the native build stays as it is. */
+function compile(features: string): void {
+  run("cargo", ["rustc", "--locked", "--release", "--lib", "--target", "wasm32-unknown-unknown", "--features", features, "--crate-type", "cdylib"]);
+}
+// The hash of the sources every binary is stamped with and BUILD.json records.
 // It covers the sources only, so stamping a binary with it cannot change it.
 const sources = which === "engine" ? engineSourceHash(crate) : "";
 /** Append the build metadata section to a binary wasm-bindgen wrote, then read
@@ -94,24 +101,30 @@ function stamp(file: string): void {
   const back = parseBuildMetadata(customSectionsOf(readFileSync(file), BUILD_SECTION));
   if (back.state !== "ok" || back.sourceHash !== sources) throw new Error(`${file} does not carry the ${BUILD_SECTION} section after stamping`);
 }
-run("wasm-bindgen", ["--target", "nodejs", "--out-dir", "pkg", wasm]);
-writeFileSync(resolve(crate, "pkg/package.json"), '{ "type": "commonjs" }\n');
-for (const f of [`${target.lib}.js`, `${target.lib}_bg.wasm`]) {
-  if (!existsSync(resolve(crate, "pkg", f))) throw new Error(`wasm-bindgen did not write ${target.dir}/pkg/${f}`);
+/** The Node target into `dir` (relative to the crate), marked CommonJS (the
+ *  repository is ESM, and wasm-bindgen's Node target emits `require`). */
+function nodePackage(dir: string): void {
+  rmSync(resolve(crate, dir), { recursive: true, force: true });
+  run("wasm-bindgen", ["--target", "nodejs", "--out-dir", dir, wasm]);
+  writeFileSync(resolve(crate, dir, "package.json"), '{ "type": "commonjs" }\n');
+  for (const f of [`${target.lib}.js`, `${target.lib}_bg.wasm`]) {
+    if (!existsSync(resolve(crate, dir, f))) throw new Error(`wasm-bindgen did not write ${target.dir}/${dir}/${f}`);
+  }
+  if (which === "engine") stamp(resolve(crate, dir, `${target.lib}_bg.wasm`));
 }
-if (which === "engine") stamp(resolve(crate, "pkg", `${target.lib}_bg.wasm`));
-if (which === "engine") {
-  // The browser build, served beside the app from src/public/engine/ (the WASM
-  // host loads it through the verified loader). It is build output, not
-  // checked in; Vercel and CI build it (scripts/build-engine-wasm.sh). Its
-  // BUILD.json records a hash of the Rust sources it was built from: CI keys
-  // its cache on that hash, and src/wasmhost/packageHash.test.ts fails when
-  // the sources moved on without a rebuild.
-  const web = resolve(crate, "../src/public/engine");
+/**
+ * The browser target into `web`, with the BUILD.json and THIRD-PARTY.json
+ * the served package carries. Its BUILD.json records a hash of the Rust
+ * sources it was built from: CI keys its cache on that hash, and
+ * src/wasmhost/packageHash.test.ts fails when the sources moved on without a
+ * rebuild. `record` is the crates and standard library compiled in, with
+ * their licenses (#955).
+ */
+function webPackage(web: string, label: string, record: ReturnType<typeof engineThirdParty>): void {
   rmSync(web, { recursive: true, force: true });
   run("wasm-bindgen", ["--target", "web", "--out-dir", web, wasm]);
   for (const f of [ENGINE_GLUE, ENGINE_WASM]) {
-    if (!existsSync(resolve(web, f))) throw new Error(`wasm-bindgen did not write src/public/engine/${f}`);
+    if (!existsSync(resolve(web, f))) throw new Error(`wasm-bindgen did not write ${label}/${f}`);
   }
   // The web target's own declaration is not needed next to the served files.
   rmSync(resolve(web, "verticopolis_engine.d.ts"), { force: true });
@@ -124,15 +137,12 @@ if (which === "engine") {
   // The crate's name and version ride along (#963) so About can name them when
   // the engine never loads; they are not part of the package id.
   const crateRecord = cargoPackage(readFileSync(resolve(crate, "Cargo.toml"), "utf8"));
-  const record = engineBuildRecord(readFileSync(resolve(web, ENGINE_GLUE)), readFileSync(resolve(web, ENGINE_WASM)), sources, sha256Hex, crateRecord);
-  writeFileSync(resolve(web, ENGINE_BUILD_RECORD), `${JSON.stringify(record, null, 2)}\n`);
-  // The crates and the standard library compiled into the package, with
-  // their licenses, so the site's notices can list them without a Rust
-  // toolchain (#955).
+  const build = engineBuildRecord(readFileSync(resolve(web, ENGINE_GLUE)), readFileSync(resolve(web, ENGINE_WASM)), sources, sha256Hex, crateRecord);
+  writeFileSync(resolve(web, ENGINE_BUILD_RECORD), `${JSON.stringify(build, null, 2)}\n`);
   // The record also names the .wasm it describes, so the site build can tell a
   // record from another build of the same sources (or a .wasm copied in).
   const wasmSha = createHash("sha256").update(readFileSync(resolve(web, ENGINE_WASM))).digest("hex");
-  writeFileSync(resolve(web, ENGINE_THIRD_PARTY), `${JSON.stringify({ sources, wasm: wasmSha, crates: engineRecord }, null, 2)}\n`);
+  writeFileSync(resolve(web, ENGINE_THIRD_PARTY), `${JSON.stringify({ sources, wasm: wasmSha, crates: record }, null, 2)}\n`);
   // Every file left in the package must be listed in engineAssets.ts, which
   // says whether the game fetches it at run time (and so whether the service
   // worker must precache it, #985). A new file from wasm-bindgen (a
@@ -142,11 +152,32 @@ if (which === "engine") {
     .filter((e) => !e.isDirectory())
     .map((e) => relative(web, resolve(e.parentPath, e.name)).split("\\").join("/"));
   const unlisted = written.filter((f) => !listed.has(f));
-  if (unlisted.length > 0) throw new Error(`src/public/engine/ holds files src/wasmhost/engineAssets.ts does not list; add each with whether the game fetches it at run time: ${unlisted.join(", ")}`);
+  if (unlisted.length > 0) throw new Error(`${label}/ holds files src/wasmhost/engineAssets.ts does not list; add each with whether the game fetches it at run time: ${unlisted.join(", ")}`);
   const absent = [...listed].filter((f) => !written.includes(f));
-  if (absent.length > 0) throw new Error(`src/wasmhost/engineAssets.ts lists files the build did not write to src/public/engine/: ${absent.join(", ")}`);
-  // The class declaration is the same for both targets; the Node copy is the
-  // committed one (`src/engineBinding/binding.ts` types against it).
+  if (absent.length > 0) throw new Error(`src/wasmhost/engineAssets.ts lists files the build did not write to ${label}/: ${absent.join(", ")}`);
+}
+
+if (which === "engine") {
+  // The crates and the standard library compiled into each build, with their
+  // licenses, gathered before anything is compiled or written, so a crate
+  // that cannot be attributed stops the build with the old packages still in
+  // place (#955). One feature list for each record and its compile, so they
+  // describe the same build.
+  const playerRecord = engineThirdParty(crate, PLAYER_FEATURES);
+  const toolingRecord = engineThirdParty(crate, TOOLING_FEATURES);
+  // The old packages go first, so a failed run leaves no stale package behind
+  // for the suite to replay.
+  for (const dir of ["pkg", "pkg-player", "pkg-web-tooling"]) rmSync(resolve(crate, dir), { recursive: true, force: true });
+  compile(PLAYER_FEATURES);
+  webPackage(resolve(crate, "../src/public/engine"), "src/public/engine", playerRecord);
+  nodePackage("pkg-player");
+  compile(TOOLING_FEATURES);
+  nodePackage("pkg");
+  webPackage(resolve(crate, "pkg-web-tooling"), `${target.dir}/pkg-web-tooling`, toolingRecord);
+  // The class declaration is the same for both targets; the tooling Node copy
+  // is the committed one (`src/engineBinding/binding.ts` types against it),
+  // so the tooling harnesses type against the tier 3 ops the player build
+  // leaves out.
   copyFileSync(resolve(crate, "pkg/verticopolis_engine.d.ts"), resolve(crate, "../src/engineBinding/engine.d.ts"));
   // The gameplay event types and the bridge's runtime rules come from the
   // catalog both engines are held to, so they are refreshed with the
@@ -154,7 +185,9 @@ if (which === "engine") {
   const catalog = checkCatalog(JSON.parse(readFileSync(resolve(crate, "src/gameplay/catalog.json"), "utf8")));
   writeFileSync(resolve(crate, "../src/events/gameplayEvents.d.ts"), renderGameplayEventsDts(catalog));
   writeFileSync(resolve(crate, "../src/events/gameplayEventRules.ts"), renderGameplayEventRules(catalog));
-  console.log("engine-rs/pkg and src/public/engine: built; src/engineBinding/engine.d.ts, src/events/gameplayEvents.d.ts and gameplayEventRules.ts refreshed");
+  console.log("src/public/engine and engine-rs/pkg-player (player build), engine-rs/pkg and engine-rs/pkg-web-tooling (tooling build): built; src/engineBinding/engine.d.ts, src/events/gameplayEvents.d.ts and gameplayEventRules.ts refreshed");
 } else {
+  compile(PLAYER_FEATURES);
+  nodePackage("pkg");
   console.log(`${target.dir}/pkg: built`);
 }

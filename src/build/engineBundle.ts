@@ -39,6 +39,11 @@ export interface EngineBundleInput {
    *  `scripts/verify-precache.ts` has already allowed or stopped, so the
    *  engine's precache entries are only required when the package is there. */
   enginePackageBuilt: boolean;
+  /** The engine glue in `dist/engine/`, or null when the build has none. */
+  engineGlue: string | null;
+  /** The tier 3 ops (`src/engineBinding/toolingMethods.ts`), which only the
+   *  tooling engine package exports (#1057). */
+  toolingMethods: readonly string[];
 }
 
 export interface EngineBundleResult {
@@ -62,7 +67,25 @@ export function checkEngineBundle(input: EngineBundleInput): EngineBundleResult 
   const pre = new Set(input.precache);
   const absent = input.enginePackageBuilt ? ENGINE_PACKAGE_FILES.filter((f) => !pre.has(f)) : [];
   if (absent.length > 0) errors.push(`the build does not precache the engine package (${absent.join(", ")}), so it could not start offline`);
+  if (input.engineGlue !== null) {
+    const methods = glueMethods(input.engineGlue);
+    if (input.tooling) {
+      const missing = input.toolingMethods.filter((m) => !methods.has(m));
+      if (missing.length > 0) errors.push(`a tooling build ships the player engine package: its glue lacks ${missing.join(", ")}, which the tooling tower calls (engine-rs/pkg-web-tooling/ should replace src/public/engine/)`);
+    } else {
+      const shipped = input.toolingMethods.filter((m) => methods.has(m));
+      if (shipped.length > 0) errors.push(`the engine package ships tier 3 ops only the tooling build may carry (${shipped.join(", ")}); src/public/engine/ must hold the player build (npm run wasm:build)`);
+    }
+  }
   return { errors };
+}
+
+/** The method names the wasm-bindgen glue's classes define: a line indented
+ *  one level inside a class (four spaces), a name, then its parameter list.
+ *  Static methods (`static newGame(`) and the module's free functions are
+ *  not matched, and JSDoc text never starts a line that way. */
+export function glueMethods(glue: string): Set<string> {
+  return new Set([...glue.matchAll(/^ {4}([A-Za-z_$][\w$]*)\(/gm)].map((m) => m[1]));
 }
 
 /** A sourcemap source as a repository-relative path: the query suffix a
