@@ -72,10 +72,12 @@ describe("About… (About this game)", () => {
     expect(inDialog("h2").textContent).toContain("About this game");
     inDialog(".help-diagnostics");
     inDialog('a[data-act="privacy"]');
+    inDialog('a[data-act="report"]');
     inDialog('[data-act="replay-onboard"]');
-    // What's new, the release notes and Report a problem live on the Help site
-    // now (its sidebar, under More), so there is no menu in between.
-    for (const act of ["whats-new", "release-notes", "report", "about"]) {
+    // What's new and the release notes live on the Help site now (its sidebar,
+    // under More), so there is no menu in between. Report a problem is a line
+    // in About itself, because only the game can fill in its bug form.
+    for (const act of ["whats-new", "release-notes", "about"]) {
       expect(dialog().querySelector(`[data-act="${act}"]`), `no ${act} row`).toBeNull();
     }
     expect(speed.now()).toBe(0);
@@ -248,6 +250,58 @@ describe("About… (About this game)", () => {
     ui.showHelp();
     expect(say).toHaveBeenCalledWith("The guide could not open. It is at verticopolis.com/help.");
     expect(speed.now()).toBe(3);
+  });
+
+  it("prefills GitHub's bug form from what About shows, with the tower's mode", () => {
+    const { cb } = openAbout();
+    const a = inDialog<HTMLAnchorElement>('a[data-act="report"]');
+    expect(a.target).toBe("_blank");
+    expect(a.rel).toContain("noopener");
+    const url = new URL(a.href);
+    expect(url.origin + url.pathname).toBe("https://github.com/maniator/verticopolis/issues/new");
+    expect(url.searchParams.get("template")).toBe("bug_report.yml");
+    expect(url.searchParams.get("version")).toMatch(/^v/);
+    // The same text Copy diagnostics gives, from the block About shows.
+    expect(url.searchParams.get("diagnostics")).toContain(inDialog(".help-diagnostics-summary").textContent!);
+    expect(cb.getMode).toHaveBeenCalled();
+    expect(url.searchParams.get("mode")).toBe("Classic");
+    expect(url.searchParams.get("platform")).toMatch(/^(Desktop|Mobile \/ tablet)$/);
+  });
+
+  it("says Not sure for the mode on the title screen, where no tower is open", () => {
+    const splash = document.createElement("div");
+    splash.id = "splash";
+    document.body.appendChild(splash);
+    const { cb } = openAbout();
+    expect(new URL(inDialog<HTMLAnchorElement>('a[data-act="report"]').href).searchParams.get("mode")).toBe("Not sure");
+    expect(cb.getMode).not.toHaveBeenCalled();
+    splash.remove();
+  });
+
+  it("opens the bug form in a new tab, holds the pause, and resumes once the player is back", () => {
+    const { speed } = openAbout(3);
+    followNewTab('a[data-act="report"]');
+    expect(dialog().open).toBe(false);
+    expect(speed.now()).toBe(0);
+    leaveAndReturn();
+    expect(speed.now()).toBe(3);
+  });
+
+  it("says reporting needs a connection when offline, and keeps About open", () => {
+    openAbout(3);
+    vi.spyOn(navigator, "onLine", "get").mockReturnValue(false);
+    const a = inDialog<HTMLAnchorElement>('a[data-act="report"]');
+    let followed = true;
+    a.addEventListener("click", (e) => {
+      followed = !e.defaultPrevented;
+      e.preventDefault();
+    });
+    a.click();
+    expect(followed).toBe(false);
+    expect(dialog().open).toBe(true);
+    expect(inDialog(".help-privacy-status").textContent).toBe(
+      "Reporting a problem needs an internet connection. Copy diagnostics now and report it once you are back online.",
+    );
   });
 
   it("marks the privacy link as opened by the game", () => {
