@@ -8,6 +8,10 @@ declare const __APP_SHA__: string;
  *  and perf pipelines). Gates the `window.game` handle: a production build
  *  compiles the publish away entirely (see bootstrap.ts). */
 declare const __TOOLING_BUILD__: boolean;
+/** True only in a Vercel preview deployment's build (`VERCEL_ENV=preview`).
+ *  The page then registers no service worker (see src/build/previewDeploy.ts
+ *  and src/deployTarget.ts). */
+declare const __PREVIEW_DEPLOY__: boolean;
 /** The engine package this shell was built with: its package id and the
  *  digests of the glue and the binary, from src/public/engine/BUILD.json
  *  (see src/wasmhost/enginePackageRecord.ts). Null when the build carries no
