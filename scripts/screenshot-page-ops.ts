@@ -34,10 +34,11 @@ export function pgClearTransients(keepDialogs: boolean): void {
 
 /** Mask the app version with a fixed placeholder just before a capture, wherever
  *  it renders (the splash line `.splash-version` and the help "About" line
- *  `.app-version`), so a routine package.json version bump never churns the
- *  committed pixels. The shipped app still shows the real version; this only
- *  rewrites the DOM at capture time. Idempotent, and a no-op on shots that show
- *  neither element. Runs in the browser. */
+ *  `.app-version`), and About this game's diagnostics values, so a routine
+ *  package.json version bump or a new commit never churns the committed
+ *  pixels. The shipped app still shows the real values; this only rewrites
+ *  the DOM at capture time. Idempotent, and a no-op on shots that show none of
+ *  them. Runs in the browser. */
 export function pgMaskVersion(): void {
   document.querySelectorAll<HTMLElement>(".splash-version, .app-version").forEach((el) => {
     el.textContent = "vX.Y.Z";
@@ -50,6 +51,13 @@ export function pgMaskVersion(): void {
     for (const n of el.parentElement?.childNodes ?? []) {
       if (n.nodeType === Node.TEXT_NODE && / · (Rust|TypeScript) engine/.test(n.textContent ?? "")) n.textContent = n.textContent!.replace(/ · (Rust|TypeScript) engine.*$/, "");
     }
+  });
+  // About this game's engine diagnostics carry the capture time, the commit,
+  // the browser string and the engine's digests, which differ on every run or
+  // engine change. Mask every value so the drift check compares the layout
+  // (the labels and the rows) and not the build it ran on.
+  document.querySelectorAll<HTMLElement>(".help-diagnostics-row dd").forEach((dd) => {
+    dd.textContent = "masked";
   });
 }
 
