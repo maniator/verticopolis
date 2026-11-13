@@ -355,10 +355,12 @@ export function toast(ui: UI, text: string, kind: LogEntry["kind"] = "info"): vo
   }, 3600);
   toastTimers.set(t, hold);
   // Cap the rail: prune the oldest, canceling its pending timer so it can never
-  // fire after the node has left the DOM.
-  while (ui.el.toast.children.length > TOAST_MAX) {
-    const oldest = ui.el.toast.firstElementChild;
-    if (!oldest) break;
+  // fire after the node has left the DOM. A sticky notice (./saveWarning) is
+  // neither counted nor pruned: it leaves only when dismissed or resolved.
+  // One pass over the rail (at most TOAST_MAX + 2 nodes), then prune from it.
+  const fading = Array.from(ui.el.toast.children).filter((node) => !node.classList.contains("toast--sticky"));
+  for (let i = 0; i < fading.length - TOAST_MAX; i++) {
+    const oldest = fading[i];
     const pending = toastTimers.get(oldest);
     if (pending !== undefined) {
       clearTimeout(pending);

@@ -1,6 +1,8 @@
 import type { GameMode, SerializedView } from "../shared/types";
 import type { CalendarKind } from "../shared/engineTypes";
-import { SaveGame, isStorageWriteError, saveFailureMessage } from "../storage/SaveGame";
+import { SaveGame } from "../storage/SaveGame";
+import { isStorageWriteError } from "../storage/saveFailureCopy";
+import { SaveFailureNotice, type SaveWarningSurface } from "./saveFailureNotice";
 import { headerNow, trackAppAction, trackAppActionOnce, trackFileExported, trackFileImported, trackTdtImportRead } from "../analytics";
 import { exportReport, type ExportReport } from "../storage/tdtExportReport";
 import { importReport } from "../storage/tdtImportReport";
@@ -44,6 +46,8 @@ export interface SaveLoadDeps {
    *  already carries (see stampView). */
   getView(): SerializedView | null;
   ui: Pick<UI, "toast" | "sayVisibly" | "downloadFile" | "showImportReport" | "showExportReport">;
+  /** The notice that stays up while saving fails (src/ui/saveWarning.ts); absent in headless tests. */
+  saveWarning?: SaveWarningSurface;
   /** Full-screen crash card (src/ui/crashScreen.ts, wired by main.ts with the
    *  app-side context: version, live sim, frame-error buffer). SaveLoad hands
    *  it only what it owns: the crash shape, the save outcome, and the reload
@@ -90,9 +94,8 @@ const GL_LOSS_STAMP_KEY = "vc-gl-lost-reload";
 export class SaveLoad {
   private autosaveRun: Promise<void> | null = null;
   private autosaveQueued = false;
-  /** A failed autosave has told the player; cleared when one works, so a full
-   *  store does not raise the same toast every 30 seconds. */
-  private autosaveFailureShown = false;
+  /** What the player hears about failed saves; public so the slot saves use it too. */
+  readonly notice = new SaveFailureNotice(() => this.deps);
   /** In-memory shadow of {@link GL_LOSS_STAMP_KEY}, so the repeat guard still
    *  trips when sessionStorage is unavailable (otherwise a flapping GPU would
    *  loop flush, toast, and rebuild forever without ever reaching the crash
@@ -142,14 +145,14 @@ export class SaveLoad {
         }
         throw err;
       }
-      trackAppActionOnce("autosave_failed", "manual");
       // A manual Quick Save must never fail silently: without this catch the
       // throw escapes the button handler as an uncaught error, the player
       // gets no feedback at all, and believes the tower saved. A failed
       // setItem is atomic (it never clobbers), so any prior save is intact.
-      this.deps.ui.toast(saveFailureMessage(err), "bad");
+      this.notice.manualFailed(err);
       return;
     }
+    this.notice.worked();
     if (silent) return;
     // Confirm the manual save landed, and when: a checkmark plus the
     // wall-clock time it was written (real time, not the in-sim clock), so a
@@ -177,14 +180,10 @@ export class SaveLoad {
         // previous async compression was in flight.
         await SaveGame.saveAsync(this.saveText());
       } while (this.autosaveQueued);
-      this.autosaveFailureShown = false;
+      this.notice.worked();
     } catch (err) {
-      // Once per run of failures (#1533), and only where the player can see it: a hidden tab keeps its latch for their return.
       trackAppActionOnce("autosave_failed", "timer");
-      if (!this.autosaveFailureShown && document.visibilityState !== "hidden") {
-        this.autosaveFailureShown = true;
-        this.deps.ui.toast("Autosave is not working. " + saveFailureMessage(err), "bad");
-      }
+      this.notice.backgroundFailed(err);
     }
   }
 

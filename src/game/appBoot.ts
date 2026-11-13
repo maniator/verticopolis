@@ -24,6 +24,7 @@ import { isStandalone } from "../pwaInstall";
 import { initInstallAffordance, splashInstallOffered, activateInstall } from "./installAffordance";
 import { shouldWelcomeFounder } from "../founder";
 import { showTowerPicker } from "./appModals";
+import { clearSaveWarning, showSaveWarning } from "../ui/saveWarning";
 
 /**
  * Constructor collaborators for `GameApp`, split out to keep the class body a
@@ -154,6 +155,11 @@ export function wireControllers(app: GameApp): void {
       downloadFile: (filename, contents) => app.ui.downloadFile(filename, contents),
       showImportReport: (report, cb) => app.ui.showImportReport(report, cb),
       showExportReport: (report, cb) => app.ui.showExportReport(report, cb),
+    },
+    // The notice's Export opens the same export choice the Saves dialog does.
+    saveWarning: {
+      show: (text) => showSaveWarning(app.ui.el.toast, text, () => app.ui.promptExport()),
+      clear: () => clearSaveWarning(app.ui.el.toast),
     },
     // SaveLoad owns the crash shape and the reload action; the app supplies
     // the context only it has (version, the live sim, the frame-error ring).

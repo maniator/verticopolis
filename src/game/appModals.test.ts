@@ -71,13 +71,28 @@ describe("saveToSlot", () => {
       throw new DOMException("quota", "QuotaExceededError");
     });
     const sim = makeSim();
-    const { app, ui } = makeApp(sim);
+    const { app, ui, saveWarning } = makeApp(sim);
     expect(() => saveToSlot(app, 2)).not.toThrow();
     expect(ui.toast).toHaveBeenCalledExactlyOnceWith(
-      "Save failed: storage is full or blocked. Free up space or allow site storage, then try again.",
+      "Save failed: storage is full or blocked. Free up space or allow site storage, or export the tower to a file.",
       "bad",
     );
     expect(trackAppActionOnce).toHaveBeenCalledExactlyOnceWith("autosave_failed", "manual");
+    // A slot is a separate copy: a full store can refuse it while the
+    // autosave still fits, so a slot failure never claims the tower is unsaved.
+    expect(saveWarning.show).not.toHaveBeenCalled();
+  });
+
+  it("toasts every failed slot save, never raising the save-failure notice", () => {
+    const quota = (): never => {
+      throw new DOMException("quota", "QuotaExceededError");
+    };
+    vi.mocked(SaveGame.saveSlot).mockImplementationOnce(quota).mockImplementationOnce(quota);
+    const { app, ui, saveWarning } = makeApp(makeSim());
+    saveToSlot(app, 1);
+    saveToSlot(app, 2);
+    expect(ui.toast).toHaveBeenCalledTimes(2);
+    expect(saveWarning.show).not.toHaveBeenCalled();
   });
 
   it("keeps the raw detail (no storage blame) when a non-storage bug throws instead", () => {

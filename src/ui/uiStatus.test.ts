@@ -8,6 +8,7 @@ import type { Catalog } from "../catalog/catalogTypes";
 import type { GameMode } from "../shared/types";
 import type { UI } from "./UI";
 import { useGermanDefaultLocale } from "../tests/localeStub";
+import { SAVE_WARNING_ID, showSaveWarning } from "./saveWarning";
 import { refitPalette } from "./paletteFit";
 
 // The lock scan asks the Tools window to refit when it shows or hides a tool.
@@ -75,6 +76,16 @@ describe("toast rail", () => {
     expect(vi.getTimerCount()).toBe(TOAST_MAX);
     expect(rail.contains(fading!)).toBe(false);
     expect(rail.firstElementChild?.textContent).toBe("t1");
+  });
+
+  it("never counts or prunes the sticky save-failure notice", () => {
+    const { ui, rail } = makeUI();
+    showSaveWarning(rail, "storage blocked", () => {});
+    for (let i = 0; i < TOAST_MAX + 2; i++) toast(ui, `t${i}`);
+    expect(rail.firstElementChild?.id).toBe(SAVE_WARNING_ID);
+    expect(rail.children.length).toBe(TOAST_MAX + 1);
+    vi.advanceTimersByTime(3600 + 300);
+    expect(rail.children.length).toBe(1); // the notice outlasts every toast
   });
 
   it("a surviving toast holds, fades, then removes itself", () => {
