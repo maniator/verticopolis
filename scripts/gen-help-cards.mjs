@@ -6,8 +6,11 @@
  * head points at them (help-site/src/components/Head.astro, site.mjs cardUrl).
  *
  * The cards are committed to help-site/public/cards/, so the help build needs
- * no browser. src/tests/helpSite.test.ts fails when a page has no card or a
- * card is left over, and help-site.yml checks every built page names its own.
+ * no browser. Each run also records the title and description every card was
+ * drawn from in help-site/share-cards.json (scripts/help-card-pages.mjs).
+ * src/tests/helpSite.test.ts fails when a page has no card, a card is left
+ * over, or a page's title or description no longer matches its card's record,
+ * and help-site.yml checks every built page names its own.
  * Text is live, so render them in the pinned Playwright image, as the
  * screenshots are, to keep the fonts the same:
  *
@@ -16,16 +19,15 @@
  */
 // copies-package: none
 import { chromium } from "playwright";
-import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { dirname, join, relative, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { FONT, GOLD, INDIGO, INK, PLUM, CORAL, TOWER, tower } from "./gen-og-image.mjs";
 import { cardFile } from "../help-site/site.mjs";
+import { CARD_MANIFEST, cardManifest, helpPages } from "./help-card-pages.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const DOCS = join(ROOT, "help-site/src/content/docs");
-const CHANGELOG_PAGE = join(ROOT, "help-site/src/pages/changelog.astro");
 const OUT_DIR = join(ROOT, "help-site/public/cards");
 const SANDBOX_CHROME = "/opt/pw-browsers/chromium-1194/chrome-linux/chrome";
 const EXECUTABLE = process.env.PW_CHROME || (existsSync(SANDBOX_CHROME) ? SANDBOX_CHROME : undefined);
@@ -33,44 +35,6 @@ const EXECUTABLE = process.env.PW_CHROME || (existsSync(SANDBOX_CHROME) ? SANDBO
 const W = 1200;
 const H = 630;
 const GROUND = 520;
-
-/** One front-matter field, unquoted. Pages use plain `key: value` lines. */
-function field(text, key) {
-  const m = text.match(new RegExp(`^${key}:\\s*(.+)$`, "m"));
-  return m ? m[1].trim().replace(/^(["'])(.*)\1$/, "$2") : null;
-}
-
-/** Every page with a card: its slug (as Starlight names it), title and description. */
-export async function helpPages() {
-  const pages = [];
-  async function walk(dir) {
-    for (const entry of await readdir(dir, { withFileTypes: true })) {
-      const path = join(dir, entry.name);
-      if (entry.isDirectory()) await walk(path);
-      else if (/\.mdx?$/.test(entry.name)) {
-        const text = await readFile(path, "utf8");
-        const front = text.match(/^---\n([\s\S]*?)\n---/)?.[1] ?? "";
-        const slug = relative(DOCS, path)
-          .replace(/\\/g, "/")
-          .replace(/\.mdx?$/, "")
-          .replace(/(^|\/)index$/, "");
-        pages.push({ slug, title: field(front, "title"), description: field(front, "description") });
-      }
-    }
-  }
-  await walk(DOCS);
-  // The release notes page is an Astro page with its front matter inline.
-  const changelog = await readFile(CHANGELOG_PAGE, "utf8");
-  pages.push({
-    slug: "changelog",
-    title: changelog.match(/title: "([^"]+)"/)?.[1] ?? null,
-    description: changelog.match(/description: "([^"]+)"/)?.[1] ?? null,
-  });
-  for (const p of pages) {
-    if (!p.title || !p.description) throw new Error(`${p.slug || "index"} has no title or description`);
-  }
-  return pages.sort((a, b) => a.slug.localeCompare(b.slug));
-}
 
 const escapeHtml = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
@@ -121,7 +85,8 @@ function cardHtml(page) {
 
 async function main() {
   const only = process.argv.slice(2);
-  const pages = (await helpPages()).filter((p) => only.length === 0 || only.includes(p.slug));
+  const all = await helpPages();
+  const pages = all.filter((p) => only.length === 0 || only.includes(p.slug));
   if (pages.length === 0) throw new Error(`no help page is named ${only.join(", ")}`);
   await mkdir(OUT_DIR, { recursive: true });
   const browser = await chromium.launch({ executablePath: EXECUTABLE });
@@ -136,6 +101,9 @@ async function main() {
   } finally {
     await browser.close();
   }
+  const previous = existsSync(CARD_MANIFEST) ? JSON.parse(await readFile(CARD_MANIFEST, "utf8")) : {};
+  await writeFile(CARD_MANIFEST, `${JSON.stringify(cardManifest(all, pages, previous), null, 2)}\n`);
+  console.log(`wrote ${CARD_MANIFEST.slice(ROOT.length + 1)}`);
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

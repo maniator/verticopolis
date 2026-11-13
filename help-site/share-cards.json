@@ -1,0 +1,122 @@
+{
+  "building-bulldoze-and-undo.png": {
+    "title": "Bulldoze and undo",
+    "description": "Selling rooms, what you get back, the rooms Classic never lets you remove, and how undo and redo work in Verticopolis."
+  },
+  "building-elevators.png": {
+    "title": "Elevators",
+    "description": "Standard, service and express elevators in Verticopolis, how far each reaches, how many cars to add, stops, schedules and keeping the waits short."
+  },
+  "building-floors-and-lobbies.png": {
+    "title": "Floors and lobbies",
+    "description": "Laying floors, the ground lobby, sky lobbies every fifteen floors, basements and how tall and wide a Verticopolis tower can grow."
+  },
+  "building-limits.png": {
+    "title": "Build limits",
+    "description": "Every cap on what one Verticopolis tower can hold, from the 24 elevator shafts and 64 stair flights to one Metro and one Wedding Hall."
+  },
+  "building-stairs-and-escalators.png": {
+    "title": "Stairs and escalators",
+    "description": "When to use stairs and escalators in Verticopolis, how far people will walk, and the Classic rule that keeps escalators off office floors."
+  },
+  "changelog.png": {
+    "title": "Release notes",
+    "description": "Every Verticopolis update's changes, newest first: the release notes the in-game update prompt shows."
+  },
+  "classic-vs-modern.png": {
+    "title": "Classic and Modern",
+    "description": "The two ways to play Verticopolis. Classic is the 1994 game as it was; Modern keeps it and adds what the original couldn't do. Every difference, side by side."
+  },
+  "controls.png": {
+    "title": "Controls",
+    "description": "Every way to play Verticopolis, with a mouse, by touch on a phone or tablet, or from the keyboard alone."
+  },
+  "first-tower.png": {
+    "title": "Your first tower",
+    "description": "A walk through your first Verticopolis tower, from an empty lot to your first rent, your first star, and what to build next."
+  },
+  "index.png": {
+    "title": "How to Play",
+    "description": "The Verticopolis player's manual. How to build, run and grow a tower, from the first floor to the TOWER rating, with every room, rule and number."
+  },
+  "privacy.png": {
+    "title": "Privacy",
+    "description": "What Verticopolis counts, what it never collects, and where your saves live."
+  },
+  "rooms-food-and-shops.png": {
+    "title": "Food and shops",
+    "description": "Fast food, restaurants, retail shops and Modern's food halls, boutiques and clinics, how they earn from your tower's people and where to put them."
+  },
+  "rooms-homes.png": {
+    "title": "Homes",
+    "description": "Condominiums, studios and apartments in Verticopolis, how they pay, who lives in them and what keeps residents from moving out."
+  },
+  "rooms-hotels.png": {
+    "title": "Hotels",
+    "description": "Hotel rooms, suites and Housekeeping in Verticopolis, how guests pay each night, and how to keep cockroaches out."
+  },
+  "rooms-offices.png": {
+    "title": "Offices",
+    "description": "How offices earn rent, what their workers need, and how to keep them from moving out, in Classic and Modern."
+  },
+  "rooms-services.png": {
+    "title": "Services",
+    "description": "Security, Medical Centers, Recycling, parking and the Metro in Verticopolis, what each one does and which star ratings need them."
+  },
+  "rooms-venues.png": {
+    "title": "Venues",
+    "description": "The cinema and party hall, and Modern's fitness clubs, nightclubs, spas, sky bars, aquatic centers, arcades and daycares, what they earn and how they change the floors around them."
+  },
+  "rooms-wedding-hall.png": {
+    "title": "The Wedding Hall",
+    "description": "How to build the Wedding Hall on top of your tower and pass the VIP's inspection to earn the TOWER rating and win Verticopolis."
+  },
+  "rooms.png": {
+    "title": "Rooms",
+    "description": "Every room, shop, venue and service you can build in Verticopolis, with its price, size and the star rating that unlocks it."
+  },
+  "tower-clock.png": {
+    "title": "Calendar and clock",
+    "description": "How days, weeks, quarters and years pass in Verticopolis, the two calendars, game speeds, and why the clock slows down at lunchtime."
+  },
+  "tower-events.png": {
+    "title": "Events",
+    "description": "Fires, bomb threats, thieves, cockroaches, VIP visits and other surprises in Verticopolis, and how to be ready for each."
+  },
+  "tower-map-and-windows.png": {
+    "title": "Map and windows",
+    "description": "The Verticopolis Map and its Edit, Eval, Pricing, Hotel, Traffic and Occupancy views, the room card, Tower Statistics and the message log."
+  },
+  "tower-money.png": {
+    "title": "Money",
+    "description": "Where a Verticopolis tower's money comes from and where it goes, rent, sales, nightly hotel income, shop takings, upkeep and the quarter."
+  },
+  "tower-people.png": {
+    "title": "People and traffic",
+    "description": "Who moves through a Verticopolis tower and when, the morning, lunch and evening rushes, how people choose routes, and how to read the Traffic view."
+  },
+  "tower-ratings.png": {
+    "title": "Tenant ratings",
+    "description": "How Verticopolis rates every office, home and hotel room, what wears a rating down, what lifts it, and how to stop tenants moving out."
+  },
+  "tower-stars.png": {
+    "title": "Stars and the TOWER",
+    "description": "Every star rating in Verticopolis, the population each needs, the services each asks for, and how to earn the TOWER and win."
+  },
+  "your-towers-importing-exporting.png": {
+    "title": "Importing and exporting",
+    "description": "Move a Verticopolis tower between devices with a .vctower file, bring in a 1994 SimTower .TDT save, and save a Classic tower for the original game."
+  },
+  "your-towers-installing.png": {
+    "title": "Installing and updates",
+    "description": "Install Verticopolis to your home screen or desktop to play offline and fullscreen, and how updates arrive without losing your tower."
+  },
+  "your-towers-saving.png": {
+    "title": "Saving and loading",
+    "description": "How Verticopolis saves your towers, the three save slots and the autosave, exporting a tower to a file, and bringing in a 1994 SimTower save."
+  },
+  "your-towers-settings.png": {
+    "title": "Settings",
+    "description": "The Verticopolis settings for sound, building, reduced motion and the steady clock, and what each one does."
+  }
+}
