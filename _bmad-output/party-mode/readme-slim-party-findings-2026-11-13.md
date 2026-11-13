@@ -45,7 +45,7 @@ know what the game *is* before I click anything. Don't gut it to a link farm.
 
 🎲 **Samus Shepard:** Agreed. Keep a short "what's in it": the rooms, the
 transport, Classic and Modern, the TOWER, events, the soundtrack, the 1994
-saves. Feelings, not tables.
+saves. Feelings over tables.
 
 😤 **Grumbal:** Bullets with no numbers. A number in a bullet is a bug with a
 delay on it.
@@ -72,8 +72,8 @@ list says buried treasure; the help site's Events page never mentions it. The
 engine has it: a basement room on ground nobody dug before has a chance at
 $400,000 to $600,000, at most three finds a tower.
 
-♿ **Wren:** If treasure goes into the manual, say it in words, not just a coin
-emoji. And the README's controls table can go: /help/controls/ has the
+♿ **Wren:** If treasure goes into the manual, say it in words. A coin emoji
+alone tells a screen reader nothing. And the README's controls table can go: /help/controls/ has the
 keyboard-only and touch paths the README never had.
 
 ⏱️ **Tess:** The star-ladder images. The paragraph under them is pipeline

@@ -37,7 +37,8 @@ drawn in code.
   inspection. ([Stars and the TOWER](https://verticopolis.com/help/tower/stars/),
   [Events](https://verticopolis.com/help/tower/events/))
 - **Your towers, kept**: autosave and save slots, `.vctower` files, and the
-  original game's `.TDT` saves in both directions.
+  original game's `.TDT` saves (opened here, and written back out from a
+  Classic tower).
   ([Saving and loading](https://verticopolis.com/help/your-towers/saving/))
 - **Installable and offline** on desktop and phone.
   ([Installing and updates](https://verticopolis.com/help/your-towers/installing/))
