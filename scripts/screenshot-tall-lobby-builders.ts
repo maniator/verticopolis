@@ -17,8 +17,10 @@
 /** A tower with a tall ground lobby, bare floors over it, and in Modern a
  *  tall sky lobby. No rooms: a room just placed is still under construction,
  *  which would hide the hall's ceiling. Options come from `window.__vcShotTallLobby`:
- *  `{ mode: "classic" | "modern", ground: 2 | 3, sky?: 2 | 3 }`. Fails closed
- *  when a lobby does not rise to the height asked. */
+ *  `{ mode: "classic" | "modern", ground: 2 | 3, sky?: 2 | 3, flights?: true }`;
+ *  `flights` adds a stairway and an escalator out of the ground hall (a
+ *  3-star tower, so escalators are unlocked). Fails closed when a lobby does
+ *  not rise to the height asked or a flight is refused. */
 export function buildTallLobbyTower(): void {
   const w = window as unknown as { game: any; __vcShotTallLobby?: any };
   const g = w.game;
@@ -27,6 +29,11 @@ export function buildTallLobbyTower(): void {
   const groundHeight: number = opts.ground ?? 3;
   g.saveLoad.newGame(mode);
   const port = g.enginePort;
+  if (opts.flights) {
+    const save = JSON.parse(port.serialize());
+    save.star = 3;
+    port.restore(JSON.stringify(save));
+  }
   port.setMoney(50_000_000);
   const kind = (k: string): number => g.portCodes.kind(k);
   const W = g.grid.width;
@@ -56,6 +63,12 @@ export function buildTallLobbyTower(): void {
     row("lobby", lobbyInterval, left + 4, right - 4);
     port.setLobbyHeight(1);
     for (let f = lobbyInterval + sky; f < lobbyInterval + sky + 3; f++) row("floor", f, left + 4, right - 4);
+  }
+  if (opts.flights) {
+    // A stairway and an escalator from the hall's floor to the story over it.
+    for (const [k, x] of [["stairs", cx - 14], ["escalator", cx + 4]] as const) {
+      if (port.buildShaft(kind(k), x, 1, 2)[0] !== 1) throw new Error(`the ${k} was refused: ${port.lastReason?.() ?? ""}`);
+    }
   }
   g.syncSim?.();
   const heights: number[] = Array.from(port.lobbyHeights());

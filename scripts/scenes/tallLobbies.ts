@@ -2,7 +2,9 @@
  * Tall lobbies (#308): the stills the Help site's "Tall lobbies" section shows
  * (help-site/src/content/docs/building/floors-and-lobbies.mdx). A Classic
  * 3-story ground hall, a Modern 2-story sky lobby, the Lobby card's height
- * picker, and the phone's Lobby height strip. Every tower comes from
+ * picker, and the phone's Lobby height strip; and for the "Stairs and
+ * escalators" page, the spiral stair and switchback escalator out of a tall
+ * hall. Every tower comes from
  * `buildTallLobbyTower`, which founds it through New Tower and builds with the
  * same engine calls the build tools make; it fails closed when a lobby does
  * not rise. Static towers at a fixed hour, so the PHONE scene stays
@@ -75,6 +77,23 @@ export const TALL_LOBBY_SCENES: Scene[] = [
         name: "tall-lobby-sky",
         clock: 10,
         setup: (page) => frameHall(page, -6, 16, 1.8),
+        wait: 400,
+      },
+    ],
+  },
+  {
+    id: "tall-lobby-flights",
+    outDir: "features",
+    initScript: () => {
+      (window as unknown as { __vcShotTallLobby: unknown }).__vcShotTallLobby = { mode: "classic", ground: 3, flights: true };
+    },
+    build: buildTallLobbyTower,
+    shots: [
+      {
+        // The spiral stair and the switchback escalator climbing the hall.
+        name: "tall-lobby-flights",
+        clock: 10,
+        setup: (page) => frameHall(page, 4, 2.5, 2.2),
         wait: 400,
       },
     ],
