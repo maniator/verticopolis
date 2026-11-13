@@ -1,9 +1,10 @@
-# 🏙️ Verticopolis: a browser SimTower clone
+# 🏙️ Verticopolis™: a browser SimTower clone
 
 **Play it: [verticopolis.com](https://verticopolis.com)** ·
 [How to play](https://verticopolis.com/help/) ·
 [Engine docs](https://docs.verticopolis.com/) ·
-[Release notes](https://verticopolis.com/help/changelog/)
+[Release notes](https://verticopolis.com/help/changelog/) ·
+[Sponsor](https://github.com/sponsors/maniator)
 
 A from-scratch, browser-native homage to the classic **SimTower** (1994): a
 vertical metropolis you build floor by floor. Wire it with elevators, attract
@@ -78,6 +79,13 @@ it in one step.
 The **source code** is **MIT** ([LICENSE](LICENSE)); the original **art and
 audio** are **CC BY 4.0** ([ASSETS-LICENSE](ASSETS-LICENSE.md)). To get involved,
 see **[CONTRIBUTING.md](CONTRIBUTING.md)**.
+
+**Verticopolis™** is the project's trademark. Neither license covers the
+name: you are welcome to copy, change and share the game under its
+licenses, but please give your copy a name of its own.
+
+Verticopolis is free to play and nothing in it is locked. If you would like to
+help keep it going, you can [sponsor it on GitHub](https://github.com/sponsors/maniator).
 
 ---
 

@@ -31,6 +31,7 @@ export const VENDORED_ICON_SOURCES: Record<string, string> = {
   play: "play",
   folder: "folder",
   plus: "plus",
+  heart: "heart",
 };
 
 /** Each icon's SVG path "d" data (currentColor fill lives on the <svg>). */
@@ -62,4 +63,5 @@ export const VENDORED_ICON_PATHS: Record<string, readonly string[]> = {
   play: ["M15 11h-2V9h2zm0 4h-2v-2h2zm-2 2h-2v-2h2zm0-8h-2V7h2zm-2-2H9V5h2zM9 21H7V3h2zm6-8h2v-2h-2zm-6 4h2v2H9z"],
   folder: ["M4 4h6v2H4zm0 14h16v2H4zM20 8h2v10h-2zM2 6h2v12H2zm8 0h10v2H10z"],
   plus: ["M13 11h7v2h-7v7h-2v-7H4v-2h7V4h2v7Z"],
+  heart: ["M13 22h-2v-2h2v2Zm-2-2H9v-2h2v2Zm4 0h-2v-2h2v2Zm-6-2H7v-2h2v2Zm8 0h-2v-2h2v2ZM7 16H5v-2h2v2Zm12 0h-2v-2h2v2ZM5 14H3v-2h2v2Zm16 0h-2v-2h2v2ZM3 12H1V6h2v6Zm20 0h-2V6h2v6ZM13 8h-2V6h2v2ZM5 6H3V4h2v2Zm6 0H9V4h2v2Zm4 0h-2V4h2v2Zm6 0h-2V4h2v2ZM9 4H5V2h4v2Zm10 0h-4V2h4v2Z"],
 };

@@ -48,7 +48,7 @@ export default defineConfig({
   },
   integrations: [
     starlight({
-      title: "Verticopolis Help",
+      title: "Verticopolis™ Help",
       description: "How to build, run and grow a tower in Verticopolis, the free tower building game in your browser.",
       logo: { src: "./src/assets/logo.png", alt: "Verticopolis" },
       favicon: "/favicon.png",

@@ -42,6 +42,13 @@
 .title-screen .ts-tag {
   width: min(78vw, 340px);
 }
+/* The trademark mark beside the wordmark, matching the game's splash. */
+.title-screen .ts-word .tm {
+  font-size: 14px;
+  letter-spacing: 0;
+  stroke: none;
+  fill: var(--splash-wordmark);
+}
 
 /* Room pictures, drawn by the game's own painters (src/scripts/sprites.ts). */
 .vc-sprite {

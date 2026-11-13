@@ -31,7 +31,7 @@ import { VENDORED_ICON_PATHS } from "./iconPaths.generated";
 export type IconName =
   | "brand" | "save" | "sound" | "mute" | "stats" | "map" | "settings" | "inspect" | "bulldoze" | "milestone" | "trophy" | "fire" | "bomb" | "rescue" | "car" | "money" | "security" | "housekeeping" | "cockroach" | "santa" | "garbage" | "warning"
   | "pause" | "speed1" | "speed2" | "speed3" | "undo" | "redo" | "menu" | "update" | "install" | "back"
-  | "play" | "help" | "folder" | "plus";
+  | "play" | "help" | "folder" | "plus" | "heart";
 
 interface IconPath {
   d: string;

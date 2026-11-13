@@ -242,7 +242,7 @@ describe("Onboarding — splash / title screen", () => {
     expect(splash.querySelector(".splash-word")!.getAttribute("aria-label")).toBe("Verticopolis");
     expect(splash.querySelector(".splash-tag")!.getAttribute("aria-label")).toBe("the vertical metropolis");
     // textLength is preserved so the lettering always fits (camelCase SVG attr).
-    expect(splash.querySelector(".splash-word text")!.getAttribute("textLength")).toBe("392");
+    expect(splash.querySelector(".splash-word text")!.getAttribute("textLength")).toBe("380");
     // The skyline and lighting layers are purely decorative.
     expect(splash.querySelector(".splash-skyline")!.getAttribute("aria-hidden")).toBe("true");
     expect(splash.querySelector(".splash-stars")!.getAttribute("aria-hidden")).toBe("true");
