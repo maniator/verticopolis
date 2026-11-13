@@ -62,10 +62,7 @@ impl Engine {
     #[wasm_bindgen(js_name = lobbyRise)]
     pub fn lobby_rise(&self, floor: f64, x: f64) -> f64 {
         match (crate::charges::whole(floor), crate::charges::whole(x)) {
-            (Some(floor), Some(x)) => {
-                self.sim
-                    .tile_stories(crate::facilities::Kind::Lobby, floor, x) as f64
-            }
+            (Some(floor), Some(x)) => self.sim.lobby_rise_at(floor, x) as f64,
             _ => 1.0,
         }
     }

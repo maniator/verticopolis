@@ -199,6 +199,23 @@ describe.skipIf(!hasWasmPackage())("tall lobbies on the Rust engine (#308)", () 
       expect(Array.from(t.port.lobbyHeights())).toEqual([sky, 96, 111, 3, sky, 112, 119, 2]);
     });
 
+    it("prices a strip laid apart from a hall, which bridges back to it, at that hall's height", () => {
+      const { t, sky } = splitHalls();
+      t.engine.chooseAutoBridge(true);
+      // 120..127 lies apart from the two-story hall; the brush bridges 120 back
+      // to it, and the whole strip rises with it, whatever the card asks.
+      expect(preview(t, 124, sky, 1e9, 1)).toMatchObject({ valid: true, stories: 2 });
+      const before = t.engine.money();
+      expect(buildActions(t, 1).paintBrush("lobby", 124, sky).placed).toBeGreaterThan(0);
+      expect(Array.from(t.port.lobbyHeights())).toEqual([sky, 96, 103, 3, sky, 112, 127, 2]);
+      const spent = before - t.engine.money();
+      // On the same tower before the stroke, the ghost asks exactly what the stroke spent.
+      const { t: again } = splitHalls();
+      again.engine.chooseAutoBridge(true);
+      expect(preview(again, 124, sky, spent, 1).valid).toBe(true);
+      expect(preview(again, 124, sky, spent - 1, 1).valid).toBe(false);
+    });
+
     it("previews and builds over each hall to that hall's own height", () => {
       const { t, sky } = splitHalls();
       // Two stories up is the three-story hall's raised story and the story over the two-story hall.

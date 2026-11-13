@@ -313,3 +313,64 @@ fn classic_keeps_one_height_per_floor() {
     // And the raised stories are claimed across the lot.
     assert!(!sim.build(Kind::Floor, 2, 112).ok);
 }
+
+/// Turns bridging on, as a new game has it.
+fn bridging(sim: &mut Simulation) {
+    if !sim.auto_bridge {
+        sim.toggle_auto_bridge();
+    }
+}
+
+// A lobby laid apart from a hall, with bridging on, bridges back to it and
+// rises with it: the quote, the charge and `lobbyRise` all say so.
+#[test]
+fn a_bridged_lobby_tile_rises_with_the_hall_it_reaches_and_pays_for_it() {
+    let mut sim = split_tower();
+    hall(&mut sim, 3, 100..110);
+    bridging(&mut sim);
+    let lobby = Kind::Lobby.facility().cost;
+    let bare = lobby * 3.0 + Kind::Floor.facility().cost;
+    assert_eq!(sim.lobby_rise_at(15, 115), 3);
+    // The tile and the five-tile bridge back to the hall, each three stories.
+    let quote = sim.can_build(Kind::Lobby, 15, 115);
+    assert!(quote.ok, "{:?}", quote.reason);
+    assert_eq!(quote.cost, 6.0 * bare);
+    let before = sim.money;
+    assert!(sim.build(Kind::Lobby, 15, 115).ok);
+    assert_eq!(before - sim.money, quote.cost, "charged what it quoted");
+    assert_eq!(runs(&sim), vec![[15, 100, 115, 3]]);
+}
+
+#[test]
+fn a_tile_bridged_to_two_heights_joins_the_left_hall_and_pays_each_side_its_own() {
+    let mut sim = split_tower();
+    hall(&mut sim, 2, 100..110);
+    hall(&mut sim, 3, 120..130);
+    bridging(&mut sim);
+    let story = |h: f64| Kind::Lobby.facility().cost * h + Kind::Floor.facility().cost;
+    let quote = sim.can_build(Kind::Lobby, 15, 114);
+    assert!(quote.ok, "{:?}", quote.reason);
+    // 110..113 bridge from the left hall at two stories, the tile joins them,
+    // and 115..119 bridge from the right hall at three.
+    assert_eq!(quote.cost, 5.0 * story(2.0) + 5.0 * story(3.0));
+    assert_eq!(sim.lobby_rise_at(15, 114), 2);
+    let before = sim.money;
+    assert!(sim.build(Kind::Lobby, 15, 114).ok);
+    assert_eq!(before - sim.money, quote.cost, "charged what it quoted");
+    assert_eq!(runs(&sim), vec![[15, 100, 114, 2], [15, 115, 129, 3]]);
+}
+
+#[test]
+fn classic_bridges_price_every_tile_at_the_floor_height() {
+    let mut sim = Simulation::new_game(1, GameMode::Classic);
+    sim.money = 1e9;
+    bridging(&mut sim);
+    sim.with_lobby_height(3, |sim| paint(sim, Kind::Lobby, 1, 100..110));
+    let bare = Kind::Lobby.facility().cost * 3.0 + Kind::Floor.facility().cost;
+    let quote = sim.can_build(Kind::Lobby, 1, 115);
+    assert!(quote.ok, "{:?}", quote.reason);
+    assert_eq!(quote.cost, 6.0 * bare);
+    let before = sim.money;
+    assert!(sim.build(Kind::Lobby, 1, 115).ok);
+    assert_eq!(before - sim.money, quote.cost);
+}

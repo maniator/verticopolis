@@ -341,8 +341,15 @@ fn the_lobby_height_a_frontend_sets_raises_the_next_first_lobby() {
     assert_eq!(e.lobby_rise(1.0, 106.0), 3.0, "the hall keeps its height");
     assert_eq!(
         e.lobby_rise(1.0, 130.0),
+        3.0,
+        "a tile apart bridges back to the hall and rises with it"
+    );
+    assert!(e.sim.auto_bridge);
+    e.sim.toggle_auto_bridge();
+    assert_eq!(
+        e.lobby_rise(1.0, 130.0),
         2.0,
-        "a hall of its own takes the height asked"
+        "with bridging off, a hall of its own takes the height asked"
     );
 }
 

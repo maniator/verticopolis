@@ -162,6 +162,17 @@ function quotedBridge(
   return { at, extra, from: left?.kind === substrate ? left.x : at, to: right?.kind === substrate ? right.x : at };
 }
 
+/** `tiles` (in brush order) split into runs of neighboring columns. */
+function lobbyRuns(tiles: readonly number[]): number[][] {
+  const runs: number[][] = [];
+  for (const tx of tiles) {
+    const last = runs[runs.length - 1];
+    if (last && last[last.length - 1] === tx - 1) last.push(tx);
+    else runs.push([tx]);
+  }
+  return runs;
+}
+
 /** Whether `span`'s bridge lays the brush tile at `x`. */
 const bridgeLays = (span: { at: number; from: number; to: number } | undefined, x: number) =>
   span !== undefined && x !== span.at && x > span.from && x < span.to;
@@ -274,9 +285,10 @@ export function updateBuildPreview(app: GameApp, tile: number, floor: number, sh
     let quoted = touching ?? firstLaid ?? tried;
     // A lobby rises as many stories as the engine would lay it here (#308):
     // the asked height on a floor's first lobby, else the floor's own; in
-    // Modern the hall the strip's first tile is laid against (#2068), which
-    // every later tile of the strip then joins.
-    const rise = ghostKind === "lobby" ? app.enginePort.lobbyRise(floor, firstLaid ?? tried) : 1;
+    // Modern the hall the quoted tile is laid against or bridges back to
+    // (#2068), which the strip's other tiles then join.
+    const riseAsked = quoted;
+    const rise = ghostKind === "lobby" ? app.enginePort.lobbyRise(floor, riseAsked) : 1;
     // Plain floor the Lobby brush lays over last, with no tile laid after it
     // and nothing built back to the quoted tile: its quote scans everything
     // the quoted tile's would and its own right side, so it is quoted alone.
@@ -284,9 +296,27 @@ export function updateBuildPreview(app: GameApp, tile: number, floor: number, sh
     if (lastBuilt !== undefined && lastBuiltLaid && lastRunStart === undefined && lastBuilt > quoted && nothingBuiltBackToQuoted) {
       quoted = lastBuilt;
     }
+    const laidTiles = [...brush].filter((tx) => {
+      const built = builtAt(tx);
+      return !brushSkips(kind, built) && !roomBlocks(app, kind, built, floor, tx) && heldUp(app, groundFloor, floor, tx, tallLobbies);
+    });
+    const laid = laidTiles.length;
+    // In Modern a run of laid tiles rises with the hall its first laid tile
+    // meets, the one against the tower (#2068), so a stroke across halls of
+    // different heights prices each run at its own: one engine ask per run
+    // besides the one holding the tile `rise` was asked at.
+    const riseOf = new Map<number, number>();
+    for (const run of lobbyRuns(laidTiles)) {
+      const runRise =
+        ghostKind !== "lobby" || run.includes(riseAsked)
+          ? rise
+          : app.enginePort.lobbyRise(floor, run.find((tx) => touchesTower(app, groundFloor, floor, tx)) ?? run[0]);
+      for (const tx of run) riseOf.set(tx, runRise);
+    }
+    const riseAt = (x: number) => riseOf.get(x) ?? rise;
     const quote = (x: number) => quoteBuild(app.enginePort, app.portCodes, ghostKind, floor, x);
     const can = quote(quoted);
-    const near = quotedBridge(app, catalog, ghostKind, floor, quoted, can, rise);
+    const near = quotedBridge(app, catalog, ghostKind, floor, quoted, can, riseAt(quoted));
     // The first run, when a built tile past its first tile stops the quoted
     // tile's scan left: its first tile scans right only to that built tile.
     const leftEnd = !builtBeforeFirst && firstRunEnd !== undefined && firstRunEnd < quoted ? firstLaid : undefined;
@@ -297,19 +327,16 @@ export function updateBuildPreview(app: GameApp, tile: number, floor: number, sh
     // its scan left stops there.
     let rightEnd: number | undefined;
     if (lastBuilt !== undefined && quoted < lastBuilt) rightEnd = lastRunStart ?? (lastBuiltLaid ? lastBuilt : undefined);
-    const farLeft = leftEnd === undefined ? undefined : quotedBridge(app, catalog, ghostKind, floor, leftEnd, quote(leftEnd), rise);
-    const farRight = rightEnd === undefined ? undefined : quotedBridge(app, catalog, ghostKind, floor, rightEnd, quote(rightEnd), rise);
+    const farLeft = leftEnd === undefined ? undefined : quotedBridge(app, catalog, ghostKind, floor, leftEnd, quote(leftEnd), riseAt(leftEnd));
+    const farRight = rightEnd === undefined ? undefined : quotedBridge(app, catalog, ghostKind, floor, rightEnd, quote(rightEnd), riseAt(rightEnd));
     // A tall lobby pays the lobby price once per story.
-    const overFloor = catalogTileCost(catalog, ghostKind, "a floor tile") * rise;
-    const noFloorYet = catalogTileCost(catalog, ghostKind, "no floor yet") + (rise - 1) * catalogTileCost(catalog, ghostKind, "a floor tile");
-    let laid = 0;
+    const floorTile = catalogTileCost(catalog, ghostKind, "a floor tile");
+    const bareTile = catalogTileCost(catalog, ghostKind, "no floor yet");
     let stripCost = near.extra + (farLeft?.extra ?? 0) + (farRight?.extra ?? 0);
-    for (const tx of brush) {
-      const built = builtAt(tx);
-      if (brushSkips(kind, built) || roomBlocks(app, kind, built, floor, tx) || !heldUp(app, groundFloor, floor, tx, tallLobbies)) continue;
-      laid++;
+    for (const tx of laidTiles) {
       if (bridgeLays(near, tx) || bridgeLays(farLeft, tx) || bridgeLays(farRight, tx)) continue;
-      stripCost += built === undefined ? noFloorYet : overFloor;
+      const r = riseAt(tx);
+      stripCost += builtAt(tx) === undefined ? bareTile + (r - 1) * floorTile : floorTile * r;
     }
     if (laid === 0) stripCost = 0;
     const affordsStrip = app.reader.header.money >= stripCost;

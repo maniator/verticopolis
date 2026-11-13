@@ -67,7 +67,7 @@ function viewOf(t: Tower) {
 function makeApp(
   tool: GameApp["tool"],
   tower: Tower = {},
-  answers: { quote?: (x: number) => { ok: boolean; cost: number }; shaftOk?: boolean; reason?: string; height?: number; rise?: number; walkTop?: number; tallLobbies?: number[] } = {},
+  answers: { quote?: (x: number) => { ok: boolean; cost: number }; shaftOk?: boolean; reason?: string; height?: number; rise?: number | ((x: number) => number); walkTop?: number; tallLobbies?: number[] } = {},
   build: Record<string, ReturnType<typeof vi.fn>> = {},
 ) {
   const enginePort = mockPort({
@@ -78,7 +78,7 @@ function makeApp(
     quoteShaft: () => record("quoteShaft", { ok: answers.shaftOk === false ? 0 : 1 }),
     lastReason: () => answers.reason,
     setLobbyHeight: vi.fn(),
-    lobbyRise: vi.fn(() => answers.rise ?? 1),
+    lobbyRise: vi.fn((_floor: number, x: number) => (typeof answers.rise === "function" ? answers.rise(x) : (answers.rise ?? 1))),
     walkwayTop: vi.fn((_kind: number, _x: number, _bottom: number, top: number) => answers.walkTop ?? top),
     lobbyHeights: vi.fn(() => new Float64Array(answers.tallLobbies ?? [])),
   });
@@ -310,7 +310,7 @@ describe("updateBuildPreview", () => {
       expect(enginePort.setLobbyHeight).toHaveBeenCalledExactlyOnceWith(2);
       const order = (fn: unknown) => vi.mocked(fn as () => void).mock.invocationCallOrder[0];
       expect(order(enginePort.setLobbyHeight)).toBeLessThan(order(enginePort.quoteBuild));
-      // The rise is asked at the strip's first laid tile, the one laid against the hall.
+      // The rise is asked at the quoted tile, the one laid against the hall.
       expect(enginePort.lobbyRise).toHaveBeenCalledExactlyOnceWith(1, 30);
       return raw.engine.preview as { valid: boolean; stories: number };
     };
@@ -333,6 +333,23 @@ describe("updateBuildPreview", () => {
     expect(over.quotes).toBeGreaterThan(0);
     const beside = ghostAt(40);
     expect(beside.preview?.valid ?? false).toBe(false);
+  });
+
+  it("prices each run of a Lobby stroke at the height of the hall it meets (#2068)", () => {
+    // Lobby on 10..27 and 30..31: the brush at 30 lays 28..29 against the
+    // two-story hall on their left and 32..33 against the three-story one.
+    const tower = { structure: { ...run(1, 10, 27, "lobby"), ...run(1, 30, 31, "lobby") } };
+    const bare = (h: number) => BARE_LOBBY + (h - 1) * price("lobby");
+    const rise = (x: number) => (x >= 32 ? 3 : 2);
+    const strip = 2 * bare(2) + 2 * bare(3);
+    const ghostWith = (money: number) => {
+      const { app, raw, enginePort } = makeApp(buildTool("lobby"), { ...tower, money }, { quote: (x) => ({ ok: true, cost: bare(rise(x)) }), rise });
+      updateBuildPreview(app, 30, 1);
+      expect(vi.mocked(enginePort.lobbyRise).mock.calls).toEqual([[1, 28], [1, 32]]);
+      return raw.engine.preview as { valid: boolean; stories: number };
+    };
+    expect(ghostWith(strip)).toMatchObject({ valid: true, stories: 2 });
+    expect(ghostWith(strip - 1)).toMatchObject({ valid: false });
   });
 
   it("the Floor tool's ground ghost asks one story, whatever the Lobby card holds (#308)", () => {
