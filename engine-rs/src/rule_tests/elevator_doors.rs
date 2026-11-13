@@ -88,9 +88,9 @@ fn a_rider_stays_aboard_a_car_passing_their_floor() {
     advance(&mut sim.crowd, 0.1, &mut sim.tower);
     assert_eq!(sim.crowd.people[i].state, PState::Riding);
     // The car runs through floor 4 without stopping: a hundredth short of
-    // it, then just past it, doors shut both times.
+    // it, exactly on it, then just past it, doors shut every time.
     sim.crowd.open_cars.clear();
-    for pos in [3.99, 4.1] {
+    for pos in [3.99, 4.0, 4.1] {
         place_car(&mut sim, id, pos, 1);
         advance(&mut sim.crowd, 0.1, &mut sim.tower);
         assert_eq!(sim.crowd.people[i].state, PState::Riding, "at {pos}");
@@ -147,4 +147,21 @@ fn a_car_ending_a_move_a_hair_short_of_its_stop_lands_on_it() {
     let t = sim.tower.get_transport(id).unwrap();
     assert_eq!(t.car_positions[0], 3.0, "landed on its stop");
     assert_eq!(d.open_cars(), [(id, 0, 3)]);
+}
+
+#[test]
+fn a_parked_car_left_off_its_floor_settles_there_and_takes_riders() {
+    // A save from before cars landed on their stops can hold a parked car a
+    // hair above its home floor. Left there, its doors would open at floor 1
+    // while it stood at 1.04, and the person waiting at floor 1 would never
+    // board.
+    let (mut sim, id, i) = tower_with_rider(1, 5);
+    place_car(&mut sim, id, 1.04, 0);
+    let mut d = ElevatorDispatch::new();
+    d.move_cars(&mut sim.tower, 0.1, &ElevatorCalls::default(), 9, false);
+    let t = sim.tower.get_transport(id).unwrap();
+    assert_eq!(t.car_positions[0], 1.0, "settled on its home floor");
+    d.swap_open_cars(&mut sim.crowd.open_cars);
+    advance(&mut sim.crowd, 0.1, &mut sim.tower);
+    assert_eq!(sim.crowd.people[i].state, PState::Riding);
 }
