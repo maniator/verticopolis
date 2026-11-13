@@ -11,7 +11,8 @@ import { isPrimaryPress, noButtonHeld } from "./overviewMapInput";
  * The listeners sit on the window and look for the title bar with `closest`,
  * so a title bar that lit renders again (the facility card's does) keeps
  * working with no rewiring. A press on a control inside the title bar (the
- * close button, the Map's View dropdown) never starts a move.
+ * close button) never starts a move, and neither does a press below the bar
+ * (the Map's View dropdown sits there).
  *
  * Cost: a press measures the window and its bounds once; each move writes two
  * styles and reads nothing; a resize measures once. Nothing runs per frame.
