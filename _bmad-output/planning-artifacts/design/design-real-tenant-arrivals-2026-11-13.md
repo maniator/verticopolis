@@ -76,33 +76,43 @@ them too.
 
 ## What A costs today (measured)
 
-A scratch probe (kept at the project files, `real-arrivals/`) loaded three
-towers, filled the crowd to a fixed size with lobby and tenant-floor trips,
-and timed `Simulation::tick(0.25)` (one 60 Hz frame at 15 game minutes per
-second) and `frame::frame_view`. Native release build, one core of a 2.1 GHz
-Xeon, 240 steps per row:
+`engine-rs/src/bin/crowd_scale.rs` loads three towers, keeps the crowd
+topped up to a fixed size with lobby and tenant-floor trips, and times
+`Simulation::tick(0.25)` (one 60 Hz frame at 15 game minutes per second) and
+`frame::frame_view` (built once, with the crowd full). Run it with
+`cargo run --release --features conformance --bin crowd_scale`. Native
+release build, one core of a 2.1 GHz Xeon, 240 steps per row, 2026-11-13:
 
-| Tower (population) | People moving | Step, mean | Step, worst | Frame build | Frame size |
-| --- | --- | --- | --- | --- | --- |
-| sixseven_2 (3,219) | 140 (today's cap) | 0.09 ms | 3.2 ms | not captured | not captured |
-| sixseven_2 | 1,000 | 0.35 ms | 3.8 ms | not captured | not captured |
-| sixseven_2 | 5,000 | 2.0 ms | 6.4 ms | not captured | not captured |
-| sixseven_2 | 15,000 | 6.2 ms | 25.2 ms | not captured | not captured |
-| split-tower (495) | 140 | 0.04 ms | 0.3 ms | 0.13 ms | 346 KB |
-| split-tower | 1,000 | 0.16 ms | 0.5 ms | 0.39 ms | 1.4 MB |
-| split-tower | 5,000 | 1.0 ms | 2.5 ms | 2.5 ms | 3.9 MB |
-| large (17,314) | 140 | 0.11 ms | 13.8 ms | 0.91 ms | 2.2 MB |
-| large | 5,000 | 1.4 ms | 10.7 ms | 3.7 ms | 4.7 MB |
-| large | 15,000 | 5.2 ms | 15.3 ms | not captured | not captured |
+
+| Tower (population) | Crowd size | Moving (mean) | Step mean | Step worst | Frame build | Frame size | Route each |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| sixseven_2 (3219) | 0 | 23 | 0.054 ms | 2.615 ms | 0.250 ms | 576 KB | none |
+| sixseven_2 (3219) | 140 | 140 | 0.099 ms | 4.069 ms | 0.269 ms | 592 KB | 23.3 us |
+| sixseven_2 (3219) | 1000 | 1000 | 0.431 ms | 5.378 ms | 0.314 ms | 746 KB | 11.1 us |
+| sixseven_2 (3219) | 5000 | 5000 | 2.062 ms | 7.511 ms | 0.443 ms | 1454 KB | 9.4 us |
+| sixseven_2 (3219) | 15000 | 15000 | 5.916 ms | 10.894 ms | 2.294 ms | 3223 KB | 7.5 us |
+| split-tower (495) | 0 | 0 | 0.008 ms | 0.403 ms | 0.031 ms | 91 KB | none |
+| split-tower (495) | 140 | 125 | 0.027 ms | 0.326 ms | 0.080 ms | 125 KB | 3.4 us |
+| split-tower (495) | 1000 | 894 | 0.223 ms | 0.606 ms | 0.136 ms | 327 KB | 4.2 us |
+| split-tower (495) | 5000 | 4471 | 0.801 ms | 1.455 ms | 0.350 ms | 1269 KB | 3.3 us |
+| split-tower (495) | 15000 | 13414 | 2.589 ms | 5.948 ms | 1.456 ms | 3634 KB | 2.8 us |
+| large (17314) | 0 | 127 | 0.106 ms | 9.853 ms | 0.964 ms | 2057 KB | none |
+| large (17314) | 140 | 140 | 0.082 ms | 8.060 ms | 0.778 ms | 2057 KB | 38.1 us |
+| large (17314) | 1000 | 1000 | 0.242 ms | 8.626 ms | 0.925 ms | 2210 KB | 12.3 us |
+| large (17314) | 5000 | 5000 | 1.552 ms | 12.713 ms | 2.486 ms | 2921 KB | 9.0 us |
+| large (17314) | 15000 | 15000 | 4.565 ms | 13.997 ms | 3.063 ms | 4698 KB | 7.7 us |
 
 What that says:
 
-- **The step grows linearly**, about 0.35 to 0.4 microseconds per moving
+- **The step grows linearly**, about 0.3 to 0.4 microseconds per moving
   person per step. There is no quadratic cliff to fix first.
-- **The frame is the real problem.** `frame_view` writes every person every
-  frame (about 20 numbers each), so 5,000 movers add about 2.5 MB and 2.5 ms
-  to every frame before the renderer touches it.
-- Routing a new trip costs 7 to 13 microseconds, so 15,000 tenants making
+- **The frame grows with every person.** `frame_view` writes every person
+  every frame (about 23 numbers each, about 0.18 KB), so 15,000 people add
+  about 2.6 MB and 2 to 3 ms to every frame before the renderer touches it,
+  and the renderer then reads all of it.
+- The worst steps (8 to 14 ms on the large tower even with no crowd) are the
+  hourly and daily work, not the crowd. They are worth their own look.
+- Routing a new trip costs 3 to 12 microseconds, so 15,000 tenants making
   two trips a day is about 0.3 s spread over a game day. Not a concern.
 - These are native numbers. WASM in a browser and the low-end laptop profile
   are slower, and fast speeds run up to 4 steps a frame
@@ -113,6 +123,38 @@ home is not moving and must cost nothing. A normal rush moves a few hundred
 to a couple of thousand people in a big tower; a transport jam, where most
 office workers are queued at once, is the worst case (5,000 to 9,000 in a
 15,000 tower).
+
+## Drawing a big crowd the way the original does
+
+The owner asked to follow the original here (2026-11-13). What is known:
+
+- The original draws every person as a small silhouette: walking on a floor,
+  standing in a queue beside a shaft (those going up wait on one side, those
+  going down on the other, per player guides), riding in a car, and inside
+  venues (the owner's TOWER7 screenshot, `PK8-T7-screenshot-stage0.png` in
+  the project files, shows shoppers and escalator riders drawn one by one).
+  Stress shows as color: black, then pink, then red (player guides and FAQs).
+- It draws what is in its scrolling tower window. No source or screenshot we
+  have shows a separate cap on people, so the plan reads the window as the
+  limit. This is inferred, and the PC look below checks the one place it
+  matters (a full queue).
+- A hall queue holds up to 40 people per direction per floor and a car up to
+  42 riders (`docs/canon/tdt-byte-map.md`, the queue and car records).
+- Not known: whether every one of 40 queued people is drawn, or the line is
+  cut at the floor's width, and what happens to a 41st person. That is one
+  observation on the owner's PC (a full lobby queue at the morning rush,
+  counting figures against the Elevator Window's red number), added to the
+  PC list below.
+
+So the plan follows it: **no global people cap.** The frame carries every
+person inside the host's view rectangle, the way the original's window does,
+and queues draw as the original lines them up. To keep a zoomed-out view of
+a 15,000-person tower affordable, the frame record per person shrinks to
+what drawing needs (floor, position, look, state, stress), and the route
+details (floors and shafts) leave the frame and are read on demand, by the
+#2092 inspector. The target is a few numbers per person instead of about
+23, so a zoomed-out view of the whole tower stays affordable; `crowd_scale`
+measures it before and after.
 
 ## The plan (option A)
 
@@ -144,27 +186,29 @@ office workers are queued at once, is the worst case (5,000 to 9,000 in a
 - Giving up changes meaning: today a crowd person who waits too long
   vanishes. A tenant cannot vanish, so a give-up sends them back where they
   came from and counts against the unit's evaluation. Whether Classic tenants
-  give up at all is a measurement question (batch R).
+  give up at all is an open question for a later PC look; until then Classic
+  keeps today's patience.
 - The tenants freeze during the bomb search, like the crowd (#2113).
 - The room card says how many are here and how many are on the way, in words.
 - No car speed, stop length or SCAN rule changes. Those wait for the
   original's car timing measurement (#2051).
-- Classic follows the measured original once batch R is in. Until then
-  Classic keeps today's window (arrive from 8 AM, leave from 6 PM), labeled
-  in the code as today's behavior pending batch R, not as canon.
+- The times stay: offices fill from 8 AM and empty from 6 PM on weekdays, as
+  today (owner, 2026-11-13). What changes is that the head count only rises
+  as people get there, so a slow tower fills late and an unreachable office
+  never fills.
 
 ### Performance work that comes first
 
-1. **A scale benchmark.** The probe becomes a committed, ignored test (or a
-   `conformance` bin mode) that prints the table above, so every later PR can
-   show its before and after. It also runs in the browser build for WASM
-   numbers.
-2. **A people budget in the frame.** The frame carries at most a fixed number
-   of people (proposed 2,000), chosen by the host's view rectangle so the
-   people you can see are the ones sent, plus per-floor queue counts so a
-   jam still reads as a crowd. This is the frame layout and the renderer's
-   input, so it is planned with the "Make NPCs look more human" thread and
-   starts after #2116 ships. It is also #2092's renderer budget.
+1. **A scale benchmark.** `crowd_scale` (the table above), so every later
+   PR can show its before and after. WASM numbers in the browser build come
+   next, with the same towers and sizes.
+2. **A view-sized, slimmer frame for people.** As the original does: the
+   frame carries the people inside the host's view rectangle, with no
+   separate cap, and each person's record shrinks to what drawing needs;
+   route details are read on demand. This is the frame layout and the
+   renderer's input, so it is planned with the "Make NPCs look more human"
+   thread and starts after #2116 ships. It is also what #2092's inspector
+   reads.
 3. **Parked tenants.** People inside a unit or outside the tower live outside
    the moving list, so the step costs what the movers cost.
 4. **Per-mover trims where the measurement points.** `elevator_calls`,
@@ -207,19 +251,19 @@ the crate tier.
 
 #2092 wants real residents you can click. Under A, every tenant is already a
 real person with a home, a destination and stress, so #2092 becomes the
-inspector plus the frame fields it reads, built on the people budget from
+inspector plus the on-demand person read, built on the slimmer frame from
 step 2. Decorative walkers (#2091, PR #2104) stay off by default and absent
 in Classic; whether they stay once commuters are real is a later call.
 
 ## PR sequence
 
-1. **Measurement first (PC batch R).** Office arrivals, give-ups, unreachable
-   offices, evening departures and what happens to the 41st person in a full
-   hall queue (the original holds 40 per direction per floor), on the owner's
-   PC, with his go. No code.
-2. **The scale benchmark.** No behavior change.
-3. **The frame's people budget.** After #2116, with the people look thread.
-   Moves the frame layout and the crate version.
+1. **The scale benchmark** (this PR). No behavior change.
+2. **One PC look at the original** (with the owner's go): a full lobby queue
+   at the morning rush, counting the figures drawn against the Elevator
+   Window's red number, and what a 41st person does. No code. It settles how
+   queues are drawn in step 3.
+3. **The view-sized, slimmer people frame.** After #2116, with the people
+   look thread. Moves the frame layout and the crate version.
 4. **Tenant groundwork.** Persistent tenant people, parked, saved, placed by
    the clock rule on old saves. They mirror the clock: no behavior change,
    nothing reads them yet. Tests: round trip, old-save load, determinism,
@@ -242,10 +286,9 @@ search freeze, the removal tests, the saved round-trip test, the room card
 line, labeling the Classic window, measured step times) all carry into
 option A above.
 
-## Open questions for the owner
+## Owner answers (2026-11-13)
 
-1. Run PC batch R before Classic timing changes, or accept today's 8 AM to
-   6 PM window as Classic for now?
-2. Is a 2,000-person frame budget, chosen by what is on screen, acceptable?
-   More people can be drawn later once WASM numbers are in.
-3. Start the scale benchmark now? It changes no behavior.
+1. Keep the times: 8 AM to 6 PM on weekdays.
+2. Draw big crowds the way the original does (above): no global cap, the
+   view is the limit.
+3. Build the scale benchmark now (this PR).
