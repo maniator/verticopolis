@@ -4,9 +4,9 @@ import { skyGlass } from "./lobby";
 
 /**
  * The tall pieces of a tall lobby's open hall (#308): a glazed arched window,
- * a sky lobby's curtain wall of glass, a gilt-framed painting, and globe
- * pendants on long cords. Each is drawn at its real height in the lobby's
- * pixel scale, so the hall gets taller without anything in it stretching.
+ * a sky lobby's curtain wall of glass, and globe pendants on long cords. Each
+ * is drawn at its real height in the lobby's pixel scale, so the hall gets
+ * taller without anything in it stretching.
  */
 
 /** A glazed opening with a gold frame and, when `head` is set, a round
@@ -52,18 +52,6 @@ export function hallGlass(d: DrawCtx, x: number, y: number, w: number, h: number
   skyGlass(ctx, x, y, w, h, lit, seed);
   ctx.fillStyle = "rgba(70,74,92,0.5)";
   for (let ty = 15; ty < h - 4; ty += 15) ctx.fillRect(x, y + ty, w, 1);
-}
-
-/** A gilt-framed oil painting hung high on the ground lobby's wall. */
-export function painting(ctx: CanvasRenderingContext2D, cx: number, y: number): void {
-  ctx.fillStyle = "#C9A24B";
-  ctx.fillRect(cx - 3, y, 7, 9);
-  ctx.fillStyle = "#6E8A6A"; // a landscape: sky, hills, a field
-  ctx.fillRect(cx - 2, y + 1, 5, 7);
-  ctx.fillStyle = "#A9BFC8";
-  ctx.fillRect(cx - 2, y + 1, 5, 3);
-  ctx.fillStyle = "#8E7A4E";
-  ctx.fillRect(cx - 2, y + 6, 5, 2);
 }
 
 /** Three small globe pendants on cords of different lengths, hung from the

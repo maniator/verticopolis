@@ -348,7 +348,7 @@ export function planter(ctx: CanvasRenderingContext2D, cx: number, floorTop: num
 }
 
 /** Wall sconce, warm when the evening lights come on. */
-export function sconce(ctx: CanvasRenderingContext2D, cx: number, y0: number, lit: boolean): void {
+function sconce(ctx: CanvasRenderingContext2D, cx: number, y0: number, lit: boolean): void {
   ctx.fillStyle = "#C9A24B";
   ctx.fillRect(cx - 1, y0 + 12, 3, 1);
   ctx.fillStyle = lit ? "#F8E2B4" : "#8A7A5C";

@@ -20,6 +20,7 @@ function recordingCtx() {
   const ctx = new Proxy({} as Record<string, unknown>, {
     get: (_t, prop) => {
       if (prop === "fillRect") return (x: number, y: number, w: number, h: number) => void log.push(`${fill} ${x},${y} ${w}x${h}`);
+      if (prop === "rect") return (x: number, y: number, w: number, h: number) => void log.push(`clip ${x},${y} ${w}x${h}`);
       if (prop === "createLinearGradient" || prop === "createRadialGradient") return () => ({ addColorStop: () => {} });
       if (prop === "measureText") return () => ({ width: 10 });
       return () => {};
@@ -86,13 +87,24 @@ describe("drawTallLobbyTile", () => {
     expect(bottom).toBeGreaterThan(Y + 3 * STORY - 10);
   });
 
-  it("glazes the ground hall with an arched window taller than a story, and leaves the sky hall to its curtain wall", () => {
-    const frames = (ground: boolean) =>
-      drawn((d) => drawTallLobbyTile(d, 0, Y, TILE, 3 * STORY, 1, ground, 3))
+  it("glazes the ground hall with one wide arched window over the second and third slots, each tile showing its half", () => {
+    const frames = (v: number, ground: boolean) =>
+      drawn((d) => drawTallLobbyTile(d, 0, Y, TILE, 3 * STORY, v, ground, 3))
         .filter((r) => r.startsWith("#C9A24B"))
         .filter((r) => rows(r)[1] - rows(r)[0] > STORY);
-    expect(frames(true)).toHaveLength(1);
-    expect(frames(false)).toHaveLength(0);
+    const left = frames(1, true);
+    const right = frames(2, true);
+    expect(left).toHaveLength(1);
+    // The same window, two tiles wide, drawn from the tile on its left.
+    expect(left[0]).toMatch(new RegExp(`^#C9A24B 1,\\d+ ${2 * TILE - 2}x`));
+    expect(right).toEqual([left[0].replace(" 1,", ` ${1 - TILE},`)]);
+    for (const v of [1, 2]) {
+      const clip = drawn((d) => drawTallLobbyTile(d, 0, Y, TILE, 3 * STORY, v, true, 3)).filter((r) => r.startsWith("clip"));
+      expect(clip, `slot ${v}`).toEqual([`clip 0,${Y} ${TILE}x${2 * STORY + 4}`]);
+    }
+    // No window elsewhere downstairs, and none in a sky hall (its wall is glass).
+    for (const v of [0, 3]) expect(frames(v, true), `slot ${v}`).toEqual([]);
+    for (let v = 0; v < LOBBY_VARIANTS; v++) expect(frames(v, false), `sky slot ${v}`).toEqual([]);
   });
 
   it("stands the console on the hall's floor at its one-story size", () => {
@@ -106,7 +118,7 @@ describe("drawTallLobbyTile", () => {
   });
 
   it("hangs the ground hall's chandelier on a chain from the ceiling into the open space", () => {
-    const slice = drawn((d) => drawTallLobbyTile(d, 0, Y, TILE, 3 * STORY, 2, true, 3));
+    const slice = drawn((d) => drawTallLobbyTile(d, 0, Y, TILE, 3 * STORY, 3, true, 3));
     const hang = Math.round(3 * STORY * 0.3);
     expect(slice).toContain(`#8A7430 ${TILE / 2},${Y + 3} 1x${hang}`);
   });

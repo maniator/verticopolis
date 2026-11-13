@@ -1,6 +1,6 @@
 import type { DrawCtx } from "../common";
 import { layerBreak, layerShell } from "../../pixelSprites/layers";
-import { archedWindow, globePendants, hallGlass, painting } from "./tallLobbyPieces";
+import { archedWindow, globePendants, hallGlass } from "./tallLobbyPieces";
 import {
   chandelier,
   consolePanel,
@@ -15,7 +15,6 @@ import {
   LOBBY_VARIANTS,
   lobbyFloor,
   planter,
-  sconce,
 } from "./lobby";
 
 /**
@@ -26,8 +25,9 @@ import {
  * at the bottom. Nothing is stretched: the tall pieces (columns, arched
  * windows, the curtain wall, the chandelier's chain, the pendants' cords) are
  * drawn at their real height, and the furniture (the console and its lamp,
- * the bench, the planter, the sconces) stands on the floor at the one-story
- * lobby's size.
+ * the bench, the planter) stands on the floor at the one-story lobby's size.
+ * Downstairs the pattern repeats every four tiles: a column, a wide arched
+ * window over two tiles, and a chandelier on a long chain.
  *
  * Over the entrance the doors are the one-story entrance itself, with a tall
  * glass wall above the grand doors and plain marble above the service door.
@@ -104,22 +104,35 @@ export function drawTallLobbyTile(
     layerBreak(ctx);
     fluteColumn(ctx, cx, y0, bottom - y0, ground); // one column, ceiling to floor
   } else if (variant === 1) {
-    if (ground) archedWindow(d, x0 + 1, y0 + 7, ww - 2, lowY + 4 - (y0 + 7), true, variant + y0);
+    if (ground) wideWindowHalf(d, x0, y0, ww, lowY, false);
     consolePanel(ctx, x0, ww, lowY, floorTop, ground, lit); // marks its own split
   } else if (variant === 2) {
+    if (ground) wideWindowHalf(d, x0, y0, ww, lowY, true);
     layerBreak(ctx);
-    if (ground) hallChandelier(d, cx, y0, Math.round((bottom - y0) * 0.3), ww);
-    else {
-      globePendants(d, cx, y0 + 4, lowY + Math.round(storyH * 0.35));
-      planter(ctx, cx, floorTop);
-    }
+    if (!ground) globePendants(d, cx, y0 + 4, lowY + Math.round(storyH * 0.35));
+    planter(ctx, cx, floorTop);
   } else if (variant === 3) {
     if (ground) {
-      painting(ctx, cx, y0 + 10);
-      sconce(ctx, cx, lowY, lit);
-    } else framedPrint(ctx, cx, lowY);
-    layerBreak(ctx);
+      layerBreak(ctx);
+      hallChandelier(d, cx, y0, Math.round((bottom - y0) * 0.3), ww);
+    } else {
+      framedPrint(ctx, cx, lowY);
+      layerBreak(ctx);
+    }
   }
+}
+
+/** One half of the ground hall's wide arched window, which spans the second
+ *  and third pattern slots: the window is drawn whole, two tiles wide, and
+ *  clipped to this tile, so the two halves meet at the shared mullion. */
+function wideWindowHalf(d: DrawCtx, x0: number, y0: number, ww: number, lowY: number, right: boolean): void {
+  const { ctx } = d;
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(x0, y0, ww, lowY + 4 - y0);
+  ctx.clip();
+  archedWindow(d, (right ? x0 - ww : x0) + 1, y0 + 7, 2 * ww - 2, lowY + 4 - (y0 + 7), true, y0);
+  ctx.restore();
 }
 
 /** The ground entrance slice of a tall lobby: the one-story entrance on the
