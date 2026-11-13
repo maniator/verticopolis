@@ -382,7 +382,19 @@ impl ElevatorDispatch {
                     cab: cab_stops,
                 };
                 let pick = |dir: i64| first_answering(&demand, pos, dir, reach, covered);
-                let mut target = pick(dir);
+                // The sweep looks only ahead, so a car parked on a stop whose
+                // call it owns boards the estimate there now, as on arrival.
+                let own_stop =
+                    (rules.parked_owner_boards && was_parked && !stood_down && !staff_only)
+                        .then(|| stop_index(jsmath::round(pos) as i64))
+                        .flatten()
+                        .filter(|&k| {
+                            let (fl, unclaimed) = (stops[k], !has_bit(claimed, k));
+                            let on_it = (fl as f64 - pos).abs() <= AT_STOP_FLOORS;
+                            let estimate = self.waiting.get(&fl).copied().unwrap_or(0.0);
+                            on_it && unclaimed && estimate >= 1.0 && !covered(k)
+                        });
+                let mut target = own_stop.or_else(|| pick(dir));
                 if target.is_none() {
                     dir = -dir;
                     target = pick(dir);

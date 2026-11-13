@@ -46,8 +46,21 @@ impl GameMode {
     /// Whether a car with no home of its own idles at an evenly spread stop
     /// (Modern: the first car at the lobby, the rest up the shaft) instead of
     /// the lobby (Classic). The spread is where the car waits, never a home
-    /// written to the schedule, a save or a .TDT.
+    /// written to the schedule or a save. A save keeps where the car stands,
+    /// though, and a .TDT export takes an unhomed car's home from there, so
+    /// a save exported with the car parked at its spread stop (as Classic:
+    /// a Modern tower is refused) records that stop as its home.
     pub fn spreads_unset_car_homes(self) -> bool {
+        self == GameMode::Modern
+    }
+
+    /// Whether a car parked on a stop whose call it owns boards the riders
+    /// the statistical estimate puts there, opening and dwelling as a car
+    /// that arrives does (Modern: the best-car choice gives a parked car the
+    /// call on its own floor, so no other car comes for it). A Classic car's
+    /// sweep looks only ahead, so it leaves that call to another car of its
+    /// shaft, and a lone Classic car leaves it unanswered, as it always has.
+    pub fn parked_owner_boards_its_floor(self) -> bool {
         self == GameMode::Modern
     }
 }
