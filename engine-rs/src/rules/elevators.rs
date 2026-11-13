@@ -58,7 +58,8 @@ impl GameMode {
     /// the statistical estimate puts there, opening and dwelling as a car
     /// that arrives does (Modern: the best-car choice gives a parked car the
     /// call on its own floor, so no other car comes for it). A Classic car's
-    /// sweep looks only ahead, so another car comes for that call.
+    /// sweep looks only ahead, so it leaves that call to another car of its
+    /// shaft, and a lone Classic car leaves it unanswered, as it always has.
     pub fn parked_owner_boards_its_floor(self) -> bool {
         self == GameMode::Modern
     }

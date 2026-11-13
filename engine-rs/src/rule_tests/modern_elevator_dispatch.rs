@@ -4,8 +4,8 @@
 //!
 //! - Best car: a hall call goes to the one car best placed for it; a car
 //!   already coming within Waiting Car Response floors keeps it outright.
-//! - Spread homes: cars with no home idle spread up the shaft, at run time
-//!   only, and an authored home is kept.
+//! - Spread homes: cars with no home idle spread up the shaft without a
+//!   home being written to the schedule, and an authored home is kept.
 //! - Standard Floor Departure restarts while riders arrive, up to twice the
 //!   setting.
 //!
