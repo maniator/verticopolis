@@ -14,9 +14,8 @@
  * It listens in the capture phase on the canvas itself, which Excalibur also
  * listens on (the default `PointerScope.Canvas`), so it runs first and
  * `stopImmediatePropagation` keeps the event from reaching Excalibur's handler.
- * It also prevents the default action, matching what Excalibur does for every
- * other pointer event on the canvas, so a stray side-button press on the tower
- * does not navigate the page away from the game.
+ * It also prevents the default action, as Excalibur does for every other
+ * pointer event on the canvas.
  */
 
 /** The DOM `PointerEvent.button` codes Excalibur's receiver can map. */
@@ -40,10 +39,13 @@ const GUARDED_EVENTS = ["pointerdown", "pointerup", "pointermove", "pointercance
 
 const guarded = new WeakSet<EventTarget>();
 
+/** `PointerEvent.buttons` when no button is held. */
+const NO_BUTTONS_HELD = 0;
+
 /** True when this event is the last of its pointer: an up with no button
  *  still held, or a cancel. */
 function endsPointer(event: PointerEvent): boolean {
-  return event.type === "pointercancel" || (event.type === "pointerup" && event.buttons === 0);
+  return event.type === "pointercancel" || (event.type === "pointerup" && event.buttons === NO_BUTTONS_HELD);
 }
 
 function swallowUnmappedButton(event: Event): void {
@@ -60,6 +62,9 @@ function swallowUnmappedButton(event: Event): void {
       new PointerEvent(event.type, {
         bubbles: true,
         cancelable: true,
+        // With a view the browser adds the page scroll to pageX and pageY,
+        // which Excalibur reads.
+        view: window,
         pointerId: pointer.pointerId,
         pointerType: pointer.pointerType,
         isPrimary: pointer.isPrimary,
@@ -68,7 +73,7 @@ function swallowUnmappedButton(event: Event): void {
         screenX: pointer.screenX,
         screenY: pointer.screenY,
         button: EXCALIBUR_POINTER_BUTTONS.none,
-        buttons: 0,
+        buttons: NO_BUTTONS_HELD,
       }),
     );
   }

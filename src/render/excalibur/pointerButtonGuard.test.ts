@@ -70,6 +70,8 @@ describe("guardPointerButtons", () => {
 
     expect(ups).toHaveLength(1);
     expect(ups[0]).toMatchObject({ button: EXCALIBUR_POINTER_BUTTONS.none, pointerId: 7, clientX: 30, clientY: 40 });
+    // A view lets the browser add the page scroll to pageX/pageY, which Excalibur reads.
+    expect(ups[0].view).toBe(window);
     expect(() => excaliburMaps(ups[0].button)).not.toThrow();
   });
 
