@@ -286,6 +286,33 @@ describe("updateBuildPreview", () => {
     ]);
   });
 
+  it("floor brush near the tower's edge: the gold ghost stops flush with the floor below (#637)", () => {
+    // Floor 1 is built over 0..11 only; the brush at 12 spans 8..15, and only
+    // 8..11 have a floor under them on floor 2.
+    const tiles = brushTiles(12);
+    expect(tiles[0]).toBeLessThan(11);
+    expect(tiles[tiles.length - 1]).toBeGreaterThan(11);
+    const { app, raw } = makeApp(buildTool("floor"), { structure: run(1, 0, 11, "lobby") });
+    updateBuildPreview(app, 12, 2);
+    expect(raw.engine.preview).toMatchObject({ floor: 2, x: tiles[0], span: 11 - tiles[0] + 1, valid: true });
+  });
+
+  it("floor brush over existing floor: the gold ghost still covers the built tiles it crosses", () => {
+    // Floor 2 is built over 0..11 on a full ground lobby; the brush at 12
+    // spans 8..15 and lays only 12..15, and keeps its left end on the floor.
+    const tiles = brushTiles(12);
+    const { app, raw } = makeApp(buildTool("floor"), { structure: { ...run(1, 0, 40, "lobby"), ...run(2, 0, 11, "floor") } });
+    updateBuildPreview(app, 12, 2);
+    expect(raw.engine.preview).toMatchObject({ x: tiles[0], span: tiles[tiles.length - 1] - tiles[0] + 1, valid: true });
+  });
+
+  it("floor brush out over open air: the red ghost keeps the whole brush", () => {
+    const tiles = brushTiles(30);
+    const { app, raw } = makeApp(buildTool("floor"), { structure: run(1, 0, 11, "lobby") });
+    updateBuildPreview(app, 30, 2);
+    expect(raw.engine.preview).toMatchObject({ x: tiles[0], span: tiles[tiles.length - 1] - tiles[0] + 1, valid: false });
+  });
+
   it("the ground-floor ghost is a lobby, green only when the money covers every tile the brush lays", () => {
     // Lobby on 10..29; the brush at 30 lays 30..33, four bare tiles.
     const tower = { structure: run(1, 10, 29, "lobby") };
