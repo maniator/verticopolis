@@ -9,6 +9,13 @@ describe("Prefs (accessibility preferences)", () => {
     expect(loadPrefs()).toEqual({ reducedMotion: true, colorblindCue: false, steadyClock: true });
   });
 
+  it("round-trips the passers-by switch and drops a non-boolean one", () => {
+    savePrefs({ passersBy: false });
+    expect(loadPrefs()).toEqual({ passersBy: false });
+    localStorage.setItem("vc.prefs", JSON.stringify({ passersBy: "off" }));
+    expect(loadPrefs()).toEqual({});
+  });
+
   it("defaults to {} when absent", () => {
     expect(loadPrefs()).toEqual({});
   });

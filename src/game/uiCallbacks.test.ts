@@ -49,6 +49,8 @@ function makePorts() {
     toggleReducedMotion: vi.fn(() => true),
     toggleSteadyClock: vi.fn(() => true),
     isSteadyClock: vi.fn(() => true),
+    togglePassersBy: vi.fn(() => false),
+    isPassersBy: vi.fn(() => false),
     replayOnboarding: vi.fn(),
     clearBuildRefusal: vi.fn(),
     showStats: vi.fn(),
@@ -146,6 +148,10 @@ describe("createUICallbacks delegates every callback to its port", () => {
     expect(cb.onToggleReducedMotion()).toBe(true);
     expect(cb.onToggleSteadyClock()).toBe(true);
     expect(cb.isSteadyClock()).toBe(true);
+    // The passers-by fakes answer false, so a callback that ignored the port
+    // and answered the default (on) would fail here.
+    expect([cb.onTogglePassersBy(), cb.isPassersBy()]).toEqual([false, false]);
+    expect([vi.mocked(ports.togglePassersBy).mock.calls.length, vi.mocked(ports.isPassersBy).mock.calls.length]).toEqual([1, 1]);
   });
 
   it("the bridging switch is an engine port command that resolves to the engine's answer", async () => {

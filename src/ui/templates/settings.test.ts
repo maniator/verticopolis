@@ -44,6 +44,17 @@ describe("settingsTemplate structure and a11y", () => {
     }
   });
 
+  it("omits the passers-by switch by default (Classic), renders it with its note when shown (Modern)", () => {
+    expect(renderToFragment(settingsTemplate("1.2.3")).querySelector("#set-passers-by")).toBeNull();
+    const frag = renderToFragment(settingsTemplate("1.2.3", false, "", true));
+    const sw = frag.querySelector<HTMLInputElement>("#set-passers-by")!;
+    expect(sw.getAttribute("type")).toBe("checkbox");
+    expect(sw.getAttribute("role")).toBe("switch");
+    expect(sw.getAttribute("aria-describedby")).toBe("note-passers-by");
+    expect(sw.closest("label")!.textContent).toContain("Show decorative passers-by");
+    expect(frag.querySelector("#note-passers-by")!.textContent).toContain("don't affect the game");
+  });
+
   it("omits the Building section by default (Classic), renders it as a switch when shown (Modern)", () => {
     expect(renderToFragment(settingsTemplate("1.2.3")).querySelector("#set-auto-bridge")).toBeNull();
     const frag = renderToFragment(settingsTemplate("1.2.3", true));

@@ -12,6 +12,7 @@ import type { ViewFocus } from "../render/excalibur/TowerEngine";
  */
 
 vi.mock("tone", async () => (await import("./toneRecordingMock")).toneMock());
+vi.mock("./lightSynth", async () => (await import("./toneRecordingMock")).lightSynthMock());
 
 import { beat, graph, resetToneFaults, toneFaults, type NodeRec } from "./toneRecordingMock";
 import { ToneAudioEngine, type SfxName } from "./ToneAudioEngine";
@@ -146,7 +147,7 @@ describe("ToneAudioEngine — full graph driven with a mocked Tone.js", () => {
     // the two percussion voices by their authored tunings.
     const membranes = graph.nodes.filter(
       (n) =>
-        n.kind === "MembraneSynth" &&
+        n.kind === "LightMembraneSynth" &&
         [0.045, 0.008].includes((n.args[0] as { pitchDecay?: number } | undefined)?.pitchDecay ?? -1),
     );
     expect(membranes.length).toBe(2);
@@ -178,7 +179,7 @@ describe("ToneAudioEngine — full graph driven with a mocked Tone.js", () => {
       ).toEqual([]);
     }
     // Contrast: the melody path deliberately DOES pass the warm filters.
-    const poly = graph.nodes.filter((n) => n.kind === "PolySynth");
+    const poly = graph.nodes.filter((n) => n.kind === "LightPolySynth");
     const filtered = poly.some((p) => reachable(p).some((n) => n.kind === "Filter"));
     expect(filtered).toBe(true);
   });
@@ -232,7 +233,7 @@ describe("ToneAudioEngine — full graph driven with a mocked Tone.js", () => {
       { t: 0, midi: 69, dur: 0.5, vel: 0.7, voice: "hook" },
     ];
     for (const ev of evs) expect(() => cb(0, ev)).not.toThrow();
-    const synths = graph.nodes.filter((n) => n.kind === "PolySynth" || n.kind === "Synth");
+    const synths = graph.nodes.filter((n) => n.kind === "LightPolySynth" || n.kind === "LightMonoSynth");
     const freqs = synths
       .flatMap((s) => s.triggers)
       .map((t) => t[0])
@@ -430,6 +431,23 @@ describe("ToneAudioEngine — full graph driven with a mocked Tone.js", () => {
     );
     expect(roomTone, "room-tone pink noise missing").toBeTruthy();
     expect(steepInto(roomTone!)).toBe(true);
+  });
+
+  it("REGRESSION: a steady view re-sends no ramps frame after frame (automation pile-up crackle)", () => {
+    // update() runs about six times a second. Re-sending an unchanged rampTo each time
+    // piled automation events onto the crowd's params until the audio
+    // thread's render cost doubled within a minute of watching a venue.
+    const eng = new ToneAudioEngine();
+    eng.start();
+    const rampCount = () => graph.nodes.reduce((n, r) => n + r.ramps.length, 0);
+    const steady = focus({ zoom: 2.2, dominant: "restaurant", hour: 13, crowd: 0.5 });
+    for (let i = 0; i < 5; i++) eng.update(steady); // settle the scene
+    const settled = rampCount();
+    for (let i = 0; i < 60; i++) eng.update(steady);
+    expect(rampCount()).toBe(settled);
+    // A real change still ramps.
+    eng.update(focus({ zoom: 2.2, dominant: "restaurant", hour: 13, crowd: 0.1 }));
+    expect(rampCount()).toBeGreaterThan(settled);
   });
 
   it("applies each scene's murmur level (the hotel whispers)", () => {

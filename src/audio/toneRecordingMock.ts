@@ -23,6 +23,9 @@ export type NodeRec = {
  *  Transport hands back. Tests clear them in beforeEach. */
 export const beat: { step: null | ((t: number) => void) } = { step: null };
 export const graph: { nodes: NodeRec[] } = { nodes: [] };
+/** Every Tone.setContext call, in order: the context passed and whether the
+ *  previous one was disposed. Cleared by {@link resetToneFaults}. */
+export const contextSwaps: Array<{ context: unknown; disposeOld: boolean }> = [];
 
 /** Ways a test can make the mocked Tone misbehave the way the real one can:
  *  the state every audio context reports, and an error every note trigger
@@ -35,6 +38,7 @@ export const toneFaults: { contextState: string; triggerError: Error | null } = 
 export function resetToneFaults(): void {
   toneFaults.contextState = "running";
   toneFaults.triggerError = null;
+  contextSwaps.length = 0;
 }
 
 /** A self-returning chainable stub for a Tone node: any property access or
@@ -112,7 +116,9 @@ export function toneMock() {
     ToneBufferSource: ctorFor("ToneBufferSource"),
     Oscillator: ctorFor("Oscillator"),
     Context: ctorFor("Context"),
-    setContext: () => {},
+    setContext: (context: unknown, disposeOld = false) => {
+      contextSwaps.push({ context, disposeOld });
+    },
     getTransport: () => ({
       bpm: node(), // chainable: supports both `bpm.value = …` and `bpm.rampTo(…)`
       scheduleRepeat: (cb: (t: number) => void) => ((beat.step = cb), 1),
@@ -123,5 +129,21 @@ export function toneMock() {
     getContext: () => node("Context"),
     start: () => Promise.resolve(),
     now: () => 0,
+  };
+}
+
+/** The module object for `vi.mock("./lightSynth", async () => (await import("./toneRecordingMock")).lightSynthMock())`:
+ *  the light voices record like any other node, under their own class names,
+ *  so a graph test sees every voice, what it was built with, where it
+ *  connects and every note it plays. */
+export function lightSynthMock() {
+  const ctorFor = (kind: string) =>
+    function (...args: unknown[]) {
+      return node(kind, args);
+    };
+  return {
+    LightPolySynth: ctorFor("LightPolySynth"),
+    LightMonoSynth: ctorFor("LightMonoSynth"),
+    LightMembraneSynth: ctorFor("LightMembraneSynth"),
   };
 }

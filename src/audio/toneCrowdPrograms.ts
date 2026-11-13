@@ -1,5 +1,6 @@
 import * as Tone from "tone";
 import { midiToFreq } from "./toneScenes";
+import { LightMembraneSynth, LightMonoSynth, LightPolySynth } from "./lightSynth";
 import {
   PARTY_BPM,
   PARTY_BASS_ROOTS,
@@ -41,11 +42,11 @@ function safe(fn: () => void): void {
 export class PartyBand implements Program {
   private wall: Tone.Filter;
   private gain: Tone.Gain;
-  private kick: Tone.MembraneSynth;
-  private thud: Tone.Synth;
-  private bass: Tone.Synth;
-  private stabs: Tone.PolySynth;
-  private hook: Tone.PolySynth;
+  private kick: LightMembraneSynth;
+  private thud: LightMonoSynth;
+  private bass: LightMonoSynth;
+  private stabs: LightPolySynth;
+  private hook: LightPolySynth;
   private part: Tone.Part | null = null;
 
   constructor(dest: Tone.InputNode) {
@@ -54,24 +55,24 @@ export class PartyBand implements Program {
       this.gain,
     );
     this.gain.connect(dest);
-    this.kick = new Tone.MembraneSynth({ octaves: 4, pitchDecay: 0.04 }).connect(this.wall);
+    this.kick = new LightMembraneSynth({ octaves: 4, pitchDecay: 0.04 }).connect(this.wall);
     this.kick.volume.value = -6;
-    this.thud = new Tone.Synth({
+    this.thud = new LightMonoSynth({
       oscillator: { type: "sine" },
       envelope: { attack: 0.002, decay: 0.06, sustain: 0, release: 0.05 },
     }).connect(this.wall);
     this.thud.volume.value = -14;
-    this.bass = new Tone.Synth({
+    this.bass = new LightMonoSynth({
       oscillator: { type: "triangle" },
       envelope: { attack: 0.006, decay: 0.1, sustain: 0.2, release: 0.08 },
     }).connect(this.wall);
     this.bass.volume.value = -10;
-    this.stabs = new Tone.PolySynth(Tone.Synth, {
+    this.stabs = new LightPolySynth({
       oscillator: { type: "sine" },
       envelope: { attack: 0.004, decay: 0.08, sustain: 0, release: 0.07 },
     }).connect(this.wall);
     this.stabs.volume.value = -18;
-    this.hook = new Tone.PolySynth(Tone.Synth, {
+    this.hook = new LightPolySynth({
       oscillator: { type: "triangle" },
       envelope: { attack: 0.01, decay: 0.25, sustain: 0.1, release: 0.2 },
     }).connect(this.wall);
@@ -141,9 +142,9 @@ export class PartyBand implements Program {
 export class CinemaProgram implements Program {
   private gain: Tone.Gain;
   private muffle: Tone.Filter;
-  private plucks: Tone.PolySynth;
-  private riser: Tone.Synth;
-  private boom: Tone.PolySynth;
+  private plucks: LightPolySynth;
+  private riser: LightMonoSynth;
+  private boom: LightPolySynth;
   private part: Tone.Part | null = null;
   private dramaTimer: ReturnType<typeof setTimeout> | null = null;
   private tick = 1;
@@ -154,17 +155,17 @@ export class CinemaProgram implements Program {
       this.gain,
     );
     this.gain.connect(dest);
-    this.plucks = new Tone.PolySynth(Tone.Synth, {
+    this.plucks = new LightPolySynth({
       oscillator: { type: "triangle" },
       envelope: { attack: 0.02, decay: 0.7, sustain: 0, release: 0.6 },
     }).connect(this.muffle);
     this.plucks.volume.value = -10;
-    this.riser = new Tone.Synth({
+    this.riser = new LightMonoSynth({
       oscillator: { type: "sine" },
       envelope: { attack: CINEMA_RISER.durS, decay: 0.05, sustain: 0, release: 0.05 },
     }).connect(this.muffle);
     this.riser.volume.value = -16;
-    this.boom = new Tone.PolySynth(Tone.Synth, {
+    this.boom = new LightPolySynth({
       oscillator: { type: "sine" },
       envelope: { attack: 0.01, decay: 0.5, sustain: 0, release: 0.4 },
     }).connect(this.muffle);
@@ -193,9 +194,10 @@ export class CinemaProgram implements Program {
     this.dramaTimer = setTimeout(() => {
       safe(() => {
         const now = Tone.now();
-        this.riser.frequency.setValueAtTime(CINEMA_RISER.fromHz, now);
-        this.riser.frequency.linearRampToValueAtTime(CINEMA_RISER.toHz, now + CINEMA_RISER.durS);
+        // The sweep goes on the note just triggered (a light voice's glide
+        // control steers its current note), so it follows the trigger.
         this.riser.triggerAttackRelease(CINEMA_RISER.fromHz, CINEMA_RISER.durS, now, 0.5);
+        this.riser.frequency.linearRampToValueAtTime(CINEMA_RISER.toHz, now + CINEMA_RISER.durS);
         const boomAt = now + CINEMA_RISER.durS + 0.05;
         for (const hz of CINEMA_BOOM_HZ) this.boom.triggerAttackRelease(hz, 1.2, boomAt, hz < 100 ? 0.8 : 0.4);
       });
@@ -224,8 +226,8 @@ export class CinemaProgram implements Program {
  *  platform stays in view, over whatever the layer's platform murmur does. */
 export class MetroProgram implements Program {
   private gain: Tone.Gain;
-  private thumps: Tone.PolySynth;
-  private brake: Tone.Synth;
+  private thumps: LightPolySynth;
+  private brake: LightMonoSynth;
   private rumble: Tone.Noise;
   private rumbleFilter: Tone.Filter;
   private rumbleGain: Tone.Gain;
@@ -235,12 +237,12 @@ export class MetroProgram implements Program {
   constructor(dest: Tone.InputNode) {
     this.gain = new Tone.Gain(0);
     this.gain.connect(dest);
-    this.thumps = new Tone.PolySynth(Tone.Synth, {
+    this.thumps = new LightPolySynth({
       oscillator: { type: "sine" },
       envelope: { attack: 0.006, decay: 0.06, sustain: 0, release: 0.05 },
     }).connect(this.gain);
     this.thumps.volume.value = -8;
-    this.brake = new Tone.Synth({
+    this.brake = new LightMonoSynth({
       oscillator: { type: "sine" },
       envelope: { attack: 0.3, decay: 0.5, sustain: 0, release: 0.3 },
     }).connect(this.gain);
@@ -295,9 +297,8 @@ export class MetroProgram implements Program {
             }, 1800);
             this.timers.add(fade);
           } else if (step.kind === "brake") {
-            this.brake.frequency.setValueAtTime(180, now);
-            this.brake.frequency.linearRampToValueAtTime(120, now + 1);
             this.brake.triggerAttackRelease(180, 1, now, step.gain);
+            this.brake.frequency.linearRampToValueAtTime(120, now + 1);
           } else {
             // The two door thunks land at 95 then 88 Hz, per the spec.
             this.thumps.triggerAttackRelease(doorNum++ % 2 === 0 ? 95 : 88, 0.3, now, step.gain);

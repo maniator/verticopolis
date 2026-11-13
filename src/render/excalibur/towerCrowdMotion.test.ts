@@ -21,7 +21,6 @@ function simFixture(over: Record<string, any> = {}): any {
     crowd: { people: [] },
     clock: { hour: 12, minuteOfDay: 12 * 60, isMorning: () => false, isEvening: () => false, isNight: () => false },
     tower: { revision: 1, units: [] },
-    positionReachable: () => true,
     ...over,
   };
 }
@@ -40,6 +39,8 @@ function eng(over: Record<string, any> = {}): any {
     truckActors: [],
     garageCars: [],
     walkers: [],
+    passersBy: true,
+    reducedMotion: false,
     floorLive: new Map(),
     floorLiveHour: -1,
     floorLiveRev: -1,
@@ -124,26 +125,41 @@ describe("eased car motion wiring (GH #688)", () => {
       HTMLCanvasElement.prototype.getContext = origGetContext;
     }
   });
-
 });
 
-describe("walker busyness gate reads the population once per step (#1234)", () => {
-  it("reads it once over many frames with no step, and once more after a step", () => {
-    let reads = 0;
-    const sim = simFixture({
-      clock: { minutes: 600, hour: 10, minuteOfDay: 600, isMorning: () => false, isEvening: () => false, isNight: () => false },
-    });
-    Object.defineProperty(sim, "population", {
+describe("the passer-by gate walks the rooms once per hour or layout change (#2091)", () => {
+  /** A sim whose `tower.units` read is counted: each read is one occupancy walk. */
+  function countedSim() {
+    let walks = 0;
+    const tower = { revision: 1 } as any;
+    Object.defineProperty(tower, "units", {
       get: () => {
-        reads++;
-        return 400;
+        walks++;
+        return [{ floor: 7, occupants: 16 }];
       },
     });
+    const sim = simFixture({ tower });
+    return { sim, tower, walks: () => walks };
+  }
+  const walker = () => ({ actor: actor(), gfx: gfx(), x0w: 0, x1w: 50, yw: 0, speed: 8, dir: 1, phase: 0, rank: 0.5, floor: 7 });
+
+  it("walks once over many frames, and again after the hour or the layout moves", () => {
+    const { sim, tower, walks } = countedSim();
+    const e = eng({ sim, walkers: [walker()] });
+    for (let frame = 0; frame < 30; frame++) updateMotion(e);
+    expect(walks()).toBe(1);
+    sim.clock.hour = 13;
+    for (let frame = 0; frame < 30; frame++) updateMotion(e);
+    expect(walks()).toBe(2);
+    tower.revision = 2;
+    for (let frame = 0; frame < 30; frame++) updateMotion(e);
+    expect(walks()).toBe(3);
+  });
+
+  it("never walks on a tower with no passers-by", () => {
+    const { sim, walks } = countedSim();
     const e = eng({ sim });
     for (let frame = 0; frame < 30; frame++) updateMotion(e);
-    expect(reads).toBe(1);
-    sim.clock.minutes += 1; // the sim steps
-    for (let frame = 0; frame < 30; frame++) updateMotion(e);
-    expect(reads).toBe(2);
+    expect(walks()).toBe(0);
   });
 });

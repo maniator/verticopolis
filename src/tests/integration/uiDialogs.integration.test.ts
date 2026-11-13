@@ -1825,6 +1825,28 @@ describe("showSettings: the Settings dialog", () => {
     expect(acts).toEqual(["close"]);
   });
 
+  it("shows no passers-by switch in Classic, which draws none", () => {
+    makeUI().ui.showSettings();
+    expect(dialog().querySelector("#set-passers-by")).toBeNull();
+  });
+
+  it("shows the passers-by switch in Modern, and follows its callback", () => {
+    let on = true;
+    const { ui, cb } = makeUI({
+      getCatalog: vi.fn(() => catalogFor("modern")),
+      isPassersBy: vi.fn(() => on),
+      onTogglePassersBy: vi.fn(() => (on = !on)),
+    });
+    ui.showSettings();
+    const sw = dialog().querySelector<HTMLInputElement>("#set-passers-by")!;
+    expect(sw.checked).toBe(true);
+    sw.click();
+    expect(cb.onTogglePassersBy).toHaveBeenCalledTimes(1);
+    expect(sw.checked).toBe(false);
+    sw.click();
+    expect(sw.checked).toBe(true);
+  });
+
   it("explains the 1994 breathing clock in the Steady clock note", () => {
     const { ui } = makeUI();
     ui.showSettings();
