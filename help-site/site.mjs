@@ -10,24 +10,17 @@ export const ENGINE_DOCS = "https://docs.verticopolis.com/";
 
 export const GITHUB_ISSUES = "https://github.com/maniator/verticopolis/issues/new/choose";
 
-/** The share card's alt text, the same words as OG_IMAGE_ALT in the game's
- *  vite.config.ts (src/tests/helpSite.test.ts keeps the two equal). */
-export const OG_IMAGE_ALT =
-  "Verticopolis: an art-deco skyline at dusk with the tagline Build a SimTower-style skyscraper in your browser and a Play free call to action.";
-
 /** The head tags every page of the game's own build shares (SHARED_HEAD_TAGS
- *  in vite.config.ts) that Starlight does not already write: the share card,
- *  the title bar color and the home screen icon. Starlight writes the title,
- *  description, canonical link, og:title, og:type, og:site_name, og:locale and
- *  twitter:card itself. */
+ *  in vite.config.ts) that Starlight does not already write: the share card's
+ *  size, the title bar color and the home screen icon. Starlight writes the
+ *  title, description, canonical link, og:title, og:type, og:site_name,
+ *  og:locale and twitter:card itself, and the Head override
+ *  (src/components/Head.astro) writes each page's own card and its alt text
+ *  ({@link cardUrl}, {@link cardAlt}). */
 export const sharedHead = [
   { tag: "meta", attrs: { name: "robots", content: "index, follow, max-image-preview:large" } },
-  { tag: "meta", attrs: { property: "og:image", content: "https://verticopolis.com/og-image.png" } },
   { tag: "meta", attrs: { property: "og:image:width", content: "1200" } },
   { tag: "meta", attrs: { property: "og:image:height", content: "630" } },
-  { tag: "meta", attrs: { property: "og:image:alt", content: OG_IMAGE_ALT } },
-  { tag: "meta", attrs: { name: "twitter:image", content: "https://verticopolis.com/og-image.png" } },
-  { tag: "meta", attrs: { name: "twitter:image:alt", content: OG_IMAGE_ALT } },
   { tag: "meta", attrs: { name: "theme-color", content: "#000080" } },
   { tag: "link", attrs: { rel: "apple-touch-icon", href: "/apple-touch-icon.png" } },
 ];
@@ -168,6 +161,23 @@ const SECTION_NAMES = {
   tower: "How the tower works",
   "your-towers": "Your towers",
 };
+
+/** A page's share card file, in help-site/public/cards/: the page's slug with
+ *  its slashes as dashes, and `index` for the front page. The cards are drawn
+ *  by scripts/gen-help-cards.mjs and committed. */
+export function cardFile(slug) {
+  return `${slug ? slug.replace(/\//g, "-") : "index"}.png`;
+}
+
+/** The full URL of a page's share card, for og:image and twitter:image. */
+export function cardUrl(slug) {
+  return `${SITE_ORIGIN}${HELP_BASE}/cards/${cardFile(slug)}`;
+}
+
+/** A page's share card alt text: what the picture shows. */
+export function cardAlt(title) {
+  return `${title}, from the Verticopolis player's manual, over an art-deco skyline at dusk.`;
+}
 
 /**
  * The schema.org structured data for one help page, as the object a
