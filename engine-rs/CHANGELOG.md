@@ -15,6 +15,15 @@ raised the version, so they are documentation only.
 There is no entry for 0.17.0, which only
 existed as a step inside a stacked branch.
 
+## 1.28.0 (2026-11-13)
+
+- Modern dispatch assigns each hall call to one on-shift car per step (`GameMode::elevators_send_the_best_car`): a car heading to the call within Waiting Car Response wins outright, else the lowest cost in floors (travel, a wrong-way car's trip out to its farthest promised stop and back plus the span, its dwell left and a dwell per promised stop). The span-less-response reach gate is retired from both modes.
+- Modern cars with no home idle at the lobby (car 0) or stop `i * stops / cars` (`GameMode::spreads_unset_car_homes`); `schedule_facts` reports the same homes, and in both modes reports an unhomed car in a shaft that serves no lobby at its first stop, where dispatch parks it (it said the unserved bottom floor). Runtime only: no save, schedule or `.TDT` change.
+- Standard Floor Departure restarts on arrival in both modes; Modern caps the wait at twice the setting (`GameMode::departure_wait_limit`), replacing `GameMode::departure_wait_restarts_on_arrival`. Every Modern scenario's checkpoints move.
+- `import_tdt` writes each elevator's per-car home floors (record byte 186) as the shaft's `schedule.homeFloors`, snapped to the nearest stop, and `export_tdt` writes the authored `homeFloors` back into those bytes, falling back to the cars' positions. The `.TDT` import case hashes move.
+- Classic dispatch reads Waiting Car Response as the 1994 game does (`GameMode::waiting_car_response_watches_moving_cars`: a parked car leaves a call to an on-shift car heading to it within that many floors) and restarts Standard Floor Departure on each arrival (`GameMode::departure_wait_restarts_on_arrival`), boarding the arrivals against the car's load. Modern keeps its reach reading and fixed dwell. Every Classic scenario's checkpoints move; `ransom-declined-classic` now ticks 288 hours to its first bomb threat.
+- A person boards or leaves a car only while the dispatch lists it open at their floor (`ElevatorDispatch::open_cars`): arrived, dwelling or parked. A car that would end a move within 0.05 of its target lands on it. The conformance lock moves with the crowd and the cars.
+
 ## 1.27.0 (2026-11-12)
 
 - The Modern halo table gains the aquatic center (6 floors, +0.035) and the party hall (3 floors, +0.02), both felt by homes and hotel rooms at every hour, with `AQUATIC_HALO_FLOORS`, `AQUATIC_HALO_MAX`, `PARTY_HALL_HALO_FLOORS` and `PARTY_HALL_HALO_MAX`. A two-story venue's halo counts from its nearer story (`Halo::distance`), and the hourly satisfaction step now reads the table row by row (`Halo::is_felt_at`), so `SatisfactionContext` holds `halo_floors` and `hour` in place of one floor list per venue. The catalog digests move.

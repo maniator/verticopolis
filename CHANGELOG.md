@@ -25,6 +25,18 @@ prompt already tells players it is an engine update and shows the new version.
 Entries below 1.51.1 were curated from the commit history after the fact, so they
 are documentation only: no build that a client fetches carries them.
 
+## 3.5.0
+
+- About… now opens About this game straight away. What's new, the release notes and Report a problem are in Help, and Privacy links to its Help page.
+- In Classic, the bulldozer no longer widens a gap that a tower saved before 3.3.0 already has. Bare floor comes out only from the two ends of the whole floor, and the Floor tool still fills an old gap.
+- Modern: elevators send the car best placed for each call (the nearest by travel, counting the stops it already owes and passing over a car heading the other way), so a far call no longer waits for a parked car and two cars no longer chase one floor. A car already on its way within the shaft's Waiting Car Response keeps the call.
+- Modern: cars with no home of their own wait spread up the shaft (the first at the lobby) instead of stacking on the lobby. Homes you set are kept, and nothing new is written to your save unless you press OK in the schedule dialog, which saves the homes it shows.
+- Modern: a car loading at a floor keeps boarding new arrivals, but leaves after twice its Standard Floor Departure at most.
+- A tower imported from a 1994 SimTower `.TDT` file keeps each elevator car's waiting floor, so idle cars wait where the original game had them instead of all stacking on the lobby, and exporting writes those floors back.
+- Classic: elevators follow the original's two dispatch settings. With a Waiting Car Response set, a parked car stays put while another car of the shaft is already on its way to the call within that many floors, and a car loading at a floor keeps boarding new arrivals for its Standard Floor Departure wait before it leaves (or until it is full).
+- People now get on and off an elevator only when it stops at their floor with its doors open, so you see riders step out of the car instead of hopping on and off a car passing by.
+- An elevator no longer slides past a floor it was about to stop at, and the drawn car keeps closer to where the car really is, so it settles onto each stop.
+
 ## 3.4.0
 
 - The help at /help is now a full player's manual: a page for every kind of room with its price, size, earnings and picture, how building and the tower work, saving, importing and exporting, settings, controls and a walk through your first tower. Every number comes from the game, and Classic and Modern rules are marked where they differ.
