@@ -2,6 +2,8 @@ import { analyticsAdapter, type EventProps } from "./analyticsAdapter";
 import { APP_VERSION } from "./appVersion";
 import { telemetryHostAllowed } from "./telemetry";
 import type { EngagedBy } from "./analyticsEngagement";
+import type { SaveFileFormat, TdtImportReadProps } from "./analyticsFiles";
+import type { PageViewProps } from "./analyticsPageView";
 import type { EngineBuild, EngineKind, EngineStatusReason, EngineStatusTrigger } from "./analyticsEngineStatus";
 import type { GameplayMilestoneId } from "./events/gameplayEvents";
 import type { FallbackStage } from "./wasmhost/engineBoot";
@@ -225,6 +227,25 @@ export interface GameplayEvents {
    *  killed outright never sends it, so the worst loops can be missing: read it
    *  as a lower bound, like the `crash` rows. Counts only. */
   session_crashes: { crashes: number };
+  /** A tower file finished importing: the tower is open (approved 2026-11-13).
+   *  The `import_save` and `import_tdt` app actions count the clicks; this
+   *  counts the arrivals. `format` is `vctower` or `tdt`; `mode`, `star` and
+   *  `population` describe the tower that arrived (`analyticsFiles.ts`). */
+  file_imported: { format: SaveFileFormat; mode: string; star: number; population: number };
+  /** A tower file was written: the download was handed to the browser
+   *  (approved 2026-11-13). Same fields as `file_imported`, for the tower
+   *  exported. A download the browser blocks is not seen. */
+  file_exported: { format: SaveFileFormat; mode: string; star: number; population: number };
+  /** A 1994 `.TDT` read cleanly and its import report is up, before the
+   *  player chooses to open it (approved 2026-11-13). The tower's size and
+   *  every count of what the importer had to drop, clamp or guess, from the
+   *  report's own numbers. Counts and flags only; never a name or a note's
+   *  text. Fields: `analyticsFiles.ts` and `docs/analytics-data-map.md`. */
+  tdt_import_read: TdtImportReadProps;
+  /** Where the page life came from, once at boot (approved 2026-11-13): the
+   *  referrer's host (`$direct` for none), the landing path and the link's
+   *  UTM tags. Never the referrer's path or query. `analyticsPageView.ts`. */
+  "$pageview": PageViewProps;
   /** The reliability instrument (`analyticsEngineStatus.ts`, issue #1081):
    *  which engine this page life runs, whether it fell back and why, and
    *  whether the engine save writer turned itself off. Every value is a code

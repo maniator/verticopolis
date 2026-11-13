@@ -1,14 +1,21 @@
 ---
-// Starlight's own head tags, plus the page's schema.org structured data
+// Starlight's own head tags, plus the page's own share card (site.mjs cardUrl,
+// drawn by scripts/gen-help-cards.mjs) and its schema.org structured data
 // (site.mjs pageJsonLd): the breadcrumb trail, and a WebSite or Article.
 import Default from "@astrojs/starlight/components/Head.astro";
-import { pageJsonLd } from "../../site.mjs";
+import { cardAlt, cardUrl, pageJsonLd } from "../../site.mjs";
 
 const { entry, id } = Astro.locals.starlightRoute;
 const jsonLd = JSON.stringify(
   pageJsonLd({ slug: id, title: entry.data.title, description: entry.data.description ?? "" }),
 ).replace(/</g, "\\u003c");
+const card = cardUrl(id);
+const alt = cardAlt(entry.data.title);
 ---
 
 <Default />
+<meta property="og:image" content={card} />
+<meta property="og:image:alt" content={alt} />
+<meta name="twitter:image" content={card} />
+<meta name="twitter:image:alt" content={alt} />
 <script type="application/ld+json" set:html={jsonLd} />

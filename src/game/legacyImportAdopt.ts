@@ -1,6 +1,7 @@
 import { SLOT_COUNT, SaveGame } from "../storage/SaveGame";
 import type { PortRecord } from "../simport/enginePort";
 import { saveText, swapDone } from "./portLifecycle";
+import { trackFileImported } from "../analytics";
 import type { SaveLoadDeps } from "./saveLoad";
 
 /**
@@ -18,7 +19,7 @@ import type { SaveLoadDeps } from "./saveLoad";
  * `SaveLoad` where its tests live.
  */
 export function adoptConfirmedLegacyImport(
-  deps: Pick<SaveLoadDeps, "enginePort" | "portCodes" | "towerSwapped" | "ui">,
+  deps: Pick<SaveLoadDeps, "enginePort" | "portCodes" | "reader" | "towerSwapped" | "ui">,
   towerName: string,
   flushCurrent: () => void,
   stage: () => PortRecord,
@@ -44,6 +45,7 @@ export function adoptConfirmedLegacyImport(
     return;
   }
   deps.towerSwapped();
+  trackFileImported("tdt", () => deps.reader().header);
   // Auto-save the IMPORTED tower to a fresh slot so a bad import can't clobber
   // anything and the player can always get back to it. "Fresh" is a RAW
   // presence check (hasSlot), never the parse-based listSlots().exists: a

@@ -2,6 +2,7 @@ import { telemetryHostAllowed } from "./telemetry";
 import type { GameplayMilestoneId } from "./events/gameplayEvents";
 import { trackEvent, setCommonProps, type GameplayEvents } from "./analyticsCore";
 import { clearActionLatches } from "./analyticsActions";
+import { trackPageView } from "./analyticsPageView";
 import { noteCrash as reportCrash, releaseCrashThrottle as releaseCrashSlots, takeCrashCount } from "./analyticsCrash";
 import { resetEngineStatus } from "./analyticsEngineStatus";
 
@@ -177,6 +178,7 @@ class GameplaySession {
    *  event stream is anchored to a version. */
   noteBoot(info: GameplayEvents["boot"]): void {
     trackEvent("boot", info);
+    trackPageView();
   }
 
   /** Report a crash (crash-screen moment). Capped and deduplicated per page life;
