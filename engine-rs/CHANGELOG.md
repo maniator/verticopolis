@@ -15,6 +15,21 @@ raised the version, so they are documentation only.
 There is no entry for 0.17.0, which only
 existed as a step inside a stacked branch.
 
+## 1.30.0 (2026-11-13)
+
+- Each crate release is published to crates.io as `verticopolis-engine`, and its WASM build to npm as `@verticopolis/engine` (earlier versions are `@maniator/verticopolis-engine` on GitHub Packages, which gets no new versions).
+- The gameplay event catalog lives inside the crate now, at `engine-rs/src/gameplay/catalog.json`, so the packaged crate builds on its own; `gameplay::CATALOG_JSON` and the conformance lock digest are unchanged.
+- The crate and npm READMEs are short pages that link the full guides on docs.verticopolis.com.
+- While any guard is still out searching for a bomb (`Simulation::bomb_lockdown`, both modes), a step skips the crowd and the cars (no arrivals, walks, rides, car moves or elevator demand) and the hourly housekeeping pass sends no maids. The clock, the hourly and daily rules and the guards' search go on. A bomb nobody searches for freezes nothing. `bombSearch()` adds `lockdown`, so a renderer can tell.
+- During that lockdown every edit is refused with `BOMB_SEARCH_EDIT_REFUSAL` (`Simulation::edit_refusal`): `can_build`, `build`, `paint_brush`, `can_build_transport`, `build_transport`, `remove_facility`, `sell_at`, `add_car`, `remove_car` and `extend_transport` on the crate, the new `edit_stop`, `edit_express_stops`, `edit_clear_stops` and `edit_schedule` (the player's stop and schedule changes, which the binding now routes through), and undo and redo (a refused step is kept for after the search).
+- The conformance lock moves for `ransom-declined-classic`, `ransom-declined-modern` and `ransom-ignored-modern`; the last now waits a day for its search to end before it sells Security. No other scenario, frame-day case or fuzz entry moves.
+- The binding's test and tooling calls (`setMoney`, `setCars`, `startFire`, the bare edits, the clock and seed calls and the rest of tier 3) are built only with the new `tooling` feature, so the shipped game and the npm package no longer carry them.
+- The catalog's `rules` gains `shadedLook` (Modern true, Classic false) and `fedUpWait`, the wait in minutes past which a person is fed up (catalog version 17).
+- The catalog's `rules` gains `decorativePassersBy` (catalog version 16): Classic false, Modern true.
+- Saves are version 9 when they hold a tall lobby: `lobbyHeights` lists one `[floor, x0, x1, height]` entry per hall, and a version 8 `[floor, height]` entry still loads as one height over every lobby tile on that floor.
+- `lobbyHeights()` returns `[floor, x0, x1, height]` quads, `lobbyRise(floor, x)` takes the column, and `walkwayTop(kind, x, bottom, top)` takes the flight's column.
+- In Modern a tall lobby claims the raised stories over its own tiles only, and a shaft skips a raised story only where it passes through a tall hall.
+
 ## 1.29.0 (2026-11-13)
 
 - Modern dispatch: a car parked on a stop whose call it owns (`DispatchRules::parked_owner_boards`, `GameMode::parked_owner_boards_its_floor`) boards the statistical estimate there as an arrival does, opening and dwelling, counting the ride, the load and the origin tally. The best-car choice had given it the call while its sweep only looks ahead, so the estimate on a parked car's floor was never boarded. Classic is unchanged.
