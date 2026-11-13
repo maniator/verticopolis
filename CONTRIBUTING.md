@@ -537,7 +537,7 @@ release with that version's `engine-rs/CHANGELOG.md` section and the built
 WASM package attached (a zip and the npm tarball), never marked Latest, so a
 frontend can depend on the crate at that tag or download the package. The
 crate release then dispatches **Publish engine to registries**
-(`.github/workflows/engine-publish.yml`), which publishes the crate to
+(`.github/workflows/engine-publish.yml`) when registry publishing is on, which publishes the crate to
 crates.io and that tarball to npm as `@verticopolis/engine` (see The
 registries below). A maintainer can
 still tag a commit by hand (`git tag v2.30.0 <commit> && git push origin
@@ -723,8 +723,14 @@ Each crate release publishes the engine to two registries:
   (the `verticopolis` npm organization), with the same version.
 
 When a release PR raises the crate version, `release-tag.yml` creates the
-`engine-v<version>` release with the npm tarball attached and dispatches
+`engine-v<version>` release with the npm tarball attached and, when the
+repository variable `ENGINE_REGISTRY_PUBLISH` is `on`, dispatches
 **Publish engine to registries** (`.github/workflows/engine-publish.yml`).
+The variable is unset for now: publishing is held while the engine and the
+game move to separate repositories, because trusted publishing binds each
+registry to one repository and workflow file. Until the owner sets it, a
+release ships the game and the GitHub releases and leaves the registries
+alone.
 That run checks the version, the tag and the tarball's checksum without any
 credential, then its two publish jobs wait on the `registry` environment,
 whose only reviewer is the owner. Nothing reaches a registry until the owner
