@@ -1,9 +1,9 @@
 //! Housekeeping legibility (housekeeping-overhaul GDD, epic 3), from the
 //! retired `housekeepingLegibility.integration.test.ts`: infestation alerts
 //! name their floors (folded into ranges), the cleanliness overlay tells an
-//! infested room from an unreached one and shades condos as not applicable,
-//! yesterday's report counts the rooms left over, and a maid steps out of her
-//! own station.
+//! infested room from an unreached one and shades condos and Modern rentals
+//! as not applicable, yesterday's report counts the rooms left over, and a
+//! maid steps out of her own station.
 use super::{seeded_game, MID};
 use crate::clock::GameMode;
 use crate::facilities::Kind;
@@ -109,6 +109,31 @@ fn the_cleanliness_overlay_tells_infested_from_unreached_and_shades_condos_na() 
     assert_eq!(unreached.tint, None, "on the red ramp");
     assert_eq!(unreached.severity, 1.0);
     assert_eq!(cell(3, X0 + 6).tint, Some("na"));
+}
+
+#[test]
+fn the_cleanliness_overlay_shades_modern_rentals_na_like_condos() {
+    let mut sim = seeded_game(55, GameMode::Modern);
+    for x in X0..X0 + 30 {
+        assert!(sim.tower.place(Kind::Floor, 2, x).ok);
+    }
+    let studio_x = X0;
+    let apartment_x = X0 + 15;
+    assert!(sim.tower.place(Kind::RentalStudio, 2, studio_x).ok);
+    assert!(sim.tower.place(Kind::RentalApartment, 2, apartment_x).ok);
+    let cells = sim.floor_heatmap(HeatmapMode::Cleanliness);
+    for x in [studio_x, apartment_x] {
+        let c = cells
+            .iter()
+            .find(|c| c.floor == 2 && c.min_x == x)
+            .unwrap_or_else(|| panic!("a cell for the rental at {x}"));
+        assert_eq!(
+            c.tint,
+            Some("na"),
+            "a rental no crew cleans is not applicable"
+        );
+        assert_eq!(c.severity, 0.0, "never on the red ramp");
+    }
 }
 
 #[test]
