@@ -15,6 +15,24 @@ raised the version, so they are documentation only.
 There is no entry for 0.17.0, which only
 existed as a step inside a stacked branch.
 
+## 1.28.0 (2026-11-13)
+
+- Modern dispatch assigns each hall call to one on-shift car per step (`GameMode::elevators_send_the_best_car`): a car heading to the call within Waiting Car Response wins outright, else the lowest cost in floors (travel, a wrong-way car's trip out to its farthest promised stop and back plus the span, its dwell left and a dwell per promised stop). The span-less-response reach gate is retired from both modes.
+- Modern cars with no home idle at the lobby (car 0) or stop `i * stops / cars` (`GameMode::spreads_unset_car_homes`); `schedule_facts` reports the same homes, and in both modes reports an unhomed car in a shaft that serves no lobby at its first stop, where dispatch parks it (it said the unserved bottom floor). Runtime only: no save, schedule or `.TDT` change.
+- Standard Floor Departure restarts on arrival in both modes; Modern caps the wait at twice the setting (`GameMode::departure_wait_limit`), replacing `GameMode::departure_wait_restarts_on_arrival`. Every Modern scenario's checkpoints move.
+- Retail rooms and their retail table rows name each other as in the game's saves (#2044): a room's byte 6 is its row index, the row's byte 1 its logical unit id, byte 11 its style and byte 13 the game's 255 (`tdt::retail`). The import reads the style from the row a room's byte 6 names when that row names it back and carries the 255, else from byte 6, as our older exports wrote it. `TdtRetailRow` gains `row` and `style`; `OutTenant::subtype_idx` becomes `retail_row`. Export hashes in `conformance/tdt-cases.json` move.
+- A theater with no film age exports a party hall and theater table row on its film's first day, so its screen pieces get their 56 people records.
+- The `.TDT` exporter splits each theater floor into a 7-tile screen piece (types 35 and 34) and an auditorium piece (19 and 18). Both name the venue's table row in byte 6; the table names the screen pieces, and each screen piece owns 56 people records (type 18) named by its bytes 8 and 9 (`tdt::venue_people`).
+- The people block's count is the records in use plus at least 256 spare, rounded up to a multiple of 256 (`people_pool_size`), with zero records padding the spare. Export hashes in `conformance/tdt-cases.json` move.
+- `import_tdt` writes each elevator's per-car home floors (record byte 186) as the shaft's `schedule.homeFloors`, snapped to the nearest stop, and `export_tdt` writes the authored `homeFloors` back into those bytes, falling back to the cars' positions. The `.TDT` import case hashes move.
+- Classic dispatch reads Waiting Car Response as the 1994 game does (`GameMode::waiting_car_response_watches_moving_cars`: a parked car leaves a call to an on-shift car heading to it within that many floors) and restarts Standard Floor Departure on each arrival (`GameMode::departure_wait_restarts_on_arrival`), boarding the arrivals against the car's load. Modern keeps its reach reading and fixed dwell. Every Classic scenario's checkpoints move; `ransom-declined-classic` now ticks 288 hours to its first bomb threat.
+- `Simulation::set_lobby_height` and `with_lobby_height` set the height a floor's first lobby rises to, and `Tower::lobby_height`, `tall_lobbies` and `is_tall_lobby_story` read it back (#308).
+- A floor's first lobby asked taller than one story where the mode keeps it one story (a Classic sky lobby) is refused with a reason instead of laid one story high.
+- The binding adds `setLobbyHeight(height)`, `lobbyRise(floor)` (the stories a lobby tile laid there rises), `lobbyHeights()` and `walkwayTop(kind, bottom, top)` (the top a flight out of a tall lobby is built to).
+- A save with a tall lobby is version 8 and carries `lobbyHeights`; a save without one stays version 7.
+- The .TDT importer and exporter read and write the header's ground lobby height and the two- and three-story stair types.
+- A person boards or leaves a car only while the dispatch lists it open at their floor (`ElevatorDispatch::open_cars`): arrived, dwelling or parked. A car that would end a move within 0.05 of its target lands on it. The conformance lock moves with the crowd and the cars.
+
 ## 1.27.0 (2026-11-12)
 
 - The Modern halo table gains the aquatic center (6 floors, +0.035) and the party hall (3 floors, +0.02), both felt by homes and hotel rooms at every hour, with `AQUATIC_HALO_FLOORS`, `AQUATIC_HALO_MAX`, `PARTY_HALL_HALO_FLOORS` and `PARTY_HALL_HALO_MAX`. A two-story venue's halo counts from its nearer story (`Halo::distance`), and the hourly satisfaction step now reads the table row by row (`Halo::is_felt_at`), so `SatisfactionContext` holds `halo_floors` and `hour` in place of one floor list per venue. The catalog digests move.
