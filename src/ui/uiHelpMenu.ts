@@ -7,7 +7,8 @@ import { fromGameHref } from "./fromGame";
 import { isSplashUp } from "../game/interactionState";
 import { isInstalledStandalone } from "./standalone";
 import { trackAppAction } from "../analytics";
-import { engineSuffix } from "../wasmhost/engineLabel";
+import { engineSuffix, versionLine } from "../wasmhost/engineLabel";
+import { bugReportHref, isMobileDevice } from "./bugReport";
 import { liveDiagnostics } from "../wasmhost/engineDiagnosticsLive";
 import type { DiagnosticsReport } from "../wasmhost/engineDiagnostics";
 import { copyText } from "./copyText";
@@ -206,11 +207,38 @@ export function showAbout(ui: UI): void {
   let finishAbout = () => {};
   const { box, finish } = openHelpDialog(
     ui,
-    aboutTemplate(onSplash, appVersion(), { onReplay: () => replay(ui, finishAbout) }, engineSuffix(), diagnostics),
+    aboutTemplate(onSplash, appVersion(), { onReplay: () => replay(ui, finishAbout) }, engineSuffix(), diagnostics, reportHref(ui, onSplash, diagnostics)),
     { actions: { "copy-diagnostics": () => copyDiagnostics(box, diagnostics) } },
   );
   finishAbout = finish;
   wirePrivacyLink(ui, box);
+  wireReportLink(ui, box);
+}
+
+/** GitHub's bug form, prefilled with what About this game shows as it opens. */
+function reportHref(ui: UI, onSplash: boolean, diagnostics: DiagnosticsReport): string {
+  return bugReportHref({
+    versionLine: versionLine(appVersion()),
+    diagnostics: diagnostics.text,
+    userAgent: navigator.userAgent,
+    mobile: isMobileDevice(navigator),
+    mode: onSplash ? null : ui.cb.getMode(),
+  });
+}
+
+/** Report a problem opens GitHub in a new tab and holds the pause until the
+ *  player is back, like the privacy link; offline it says so instead. */
+function wireReportLink(ui: UI, box: HTMLElement): void {
+  const link = box.querySelector<HTMLAnchorElement>('a[data-act="report"]');
+  const status = box.querySelector<HTMLElement>(".help-privacy-status");
+  link?.addEventListener("click", (e) => {
+    if (!navigator.onLine) {
+      e.preventDefault();
+      if (status) status.textContent = "Reporting a problem needs an internet connection. Copy diagnostics now and report it once you are back online.";
+      return;
+    }
+    leaveForTab(ui, e);
+  });
 }
 
 /** The privacy link opens the Help site's page in a new tab and holds the
