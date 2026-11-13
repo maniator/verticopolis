@@ -4,7 +4,7 @@ import { mountAppDom, makeUI } from "../uiFixture";
 import { IDENTITY_FIXTURE } from "../../wasmhost/engineIdentity.fixture";
 
 /**
- * Help's About section carries the engine diagnostics (#963), and its Copy
+ * About this game carries the engine diagnostics (#963), and its Copy
  * diagnostics button works in every state, the engine that never loaded
  * included.
  */

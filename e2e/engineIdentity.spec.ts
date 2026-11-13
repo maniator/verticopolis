@@ -2,7 +2,7 @@
 import { test, expect, type Page, type Route } from "@playwright/test";
 
 /**
- * The engine's identity in Help's About (#963), in a real browser: the
+ * The engine's identity in About this game (#963), in a real browser: the
  * engine's own record, the source hash stamped into its binary next to the
  * one the page was built for, and Copy diagnostics, including when the engine
  * never loaded. A failed load stops the game, so Copy diagnostics is then read

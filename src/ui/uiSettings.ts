@@ -12,7 +12,7 @@ import { engineSuffix } from "../wasmhost/engineLabel";
 /** The Settings dialog: sound levels and the presentation toggles. */
 export function showSettings(ui: UI): void {
   trackAppAction("settings_open");
-  // Same build constant the splash and Help's About line show; masked to a fixed
+  // Same build constant the splash and About this game's line show; masked to a fixed
   // placeholder in screenshots (see pgMaskVersion, which keys on `.app-version`).
   const version = typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "dev";
   // The Building section (the bridging toggle) shows only where the tower's

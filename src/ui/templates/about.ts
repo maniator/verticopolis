@@ -8,7 +8,7 @@ import { helpAboutBody } from "./helpContent";
  * About this game, the window the game panel's About… opens: the version, the
  * engine diagnostics with Copy, Report a problem (GitHub's bug form with this
  * window's facts filled in, src/ui/bugReport.ts), a link to the privacy page,
- * and Replay Getting Started. The controller (src/ui/uiHelpMenu.ts) pauses the tower while it is
+ * and Replay Getting Started. The controller (src/ui/uiHelp.ts) pauses the tower while it is
  * open and wires the actions by `data-act`; this template stays
  * presentational.
  *
@@ -46,7 +46,7 @@ export function aboutTemplate(
       ? html`<p class="help-report"><a data-act="report" href=${reportHref} target="_blank" rel="noopener noreferrer">Report a problem<span class="visually-hidden"> (opens GitHub in a new tab)</span></a>: GitHub's bug form, with this version, the diagnostics, your browser and the tower's mode filled in.</p>`
       : nothing}
     <p class="help-privacy"><a data-act="privacy" href=${PRIVACY_HREF} target="_blank" rel="noopener noreferrer">Privacy<span class="visually-hidden"> (opens in a new tab)</span></a>: what the game counts, what it never collects, and where your saves live.</p>
-    <p class="help-privacy-status" role="status"></p>
+    <p class="help-links-status" role="status"></p>
     <div class="modal-actions"><button class="btn" data-act="replay-onboard" ?disabled=${onSplash} title=${onSplash ? "Start a tower first, then you can replay the intro." : nothing} @click=${actions.onReplay}>Replay Getting Started</button><button class="btn primary" data-act="close" autofocus>Got it</button></div>
   `;
 }

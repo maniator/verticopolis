@@ -17,8 +17,9 @@ import { announceLive } from "../game/liveRegion";
 /**
  * The in-game Help: About this game (the game panel's "About…") and the
  * Classic vs Modern comparison the Tower panel's mode badge opens. The guide
- * (the Help button) is the Help site, opened in a new tab; the release notes,
- * Report a problem and the privacy page live there too. Every one of them
+ * (the Help button) is the Help site, opened in a new tab; the release notes
+ * and the privacy page live there too. About this game also carries Report a
+ * problem, GitHub's bug form prefilled by the game. Every one of them
  * pauses the tower through one {@link HelpPause} per UI, and every close route
  * (the buttons, Esc, the backdrop, the title-bar ✕, another dialog taking the
  * screen, or any other closeModal) ends that pause exactly once. A link that
@@ -230,7 +231,7 @@ function reportHref(ui: UI, onSplash: boolean, diagnostics: DiagnosticsReport): 
  *  player is back, like the privacy link; offline it says so instead. */
 function wireReportLink(ui: UI, box: HTMLElement): void {
   const link = box.querySelector<HTMLAnchorElement>('a[data-act="report"]');
-  const status = box.querySelector<HTMLElement>(".help-privacy-status");
+  const status = box.querySelector<HTMLElement>(".help-links-status");
   link?.addEventListener("click", (e) => {
     if (!navigator.onLine) {
       e.preventDefault();
@@ -247,7 +248,7 @@ function wireReportLink(ui: UI, box: HTMLElement): void {
  *  the link stays put and says where the page is instead. */
 function wirePrivacyLink(ui: UI, box: HTMLElement): void {
   const link = box.querySelector<HTMLAnchorElement>('a[data-act="privacy"]');
-  const status = box.querySelector<HTMLElement>(".help-privacy-status");
+  const status = box.querySelector<HTMLElement>(".help-links-status");
   link?.addEventListener("click", (e) => {
     if (!navigator.onLine) {
       e.preventDefault();

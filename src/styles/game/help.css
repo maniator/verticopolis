@@ -23,15 +23,16 @@
 }
 .help-md td:first-child { font-weight: 700; }
 
-/* The privacy link in About this game, and the line that says where the page
-   is when the game is offline (empty, so it takes no room, until then). */
+/* The privacy link in About this game, and the line that says why Report a
+   problem or the privacy page did not open when the game is offline (empty,
+   so it takes no room, until then). */
 .help-privacy { margin: 12px 0 0; }
-.help-privacy-status {
+.help-links-status {
   margin: 0;
   color: var(--muted);
 }
 
-/* Engine diagnostics in Help's About section (#963): a compact label and value
+/* Engine diagnostics in About this game (#963): a compact label and value
    list the player can read and copy. */
 .help-diagnostics {
   margin: 8px 0;

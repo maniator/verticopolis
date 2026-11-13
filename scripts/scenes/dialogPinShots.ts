@@ -37,7 +37,7 @@ const SHORT = { width: 720, height: 360 };
 
 export const DIALOG_PIN_SHOTS: Shot[] = [
   {
-    name: "02d-help-pinned",
+    name: "02d-about-pinned",
     crop: "#modal .modal-box",
     keepDialogs: true,
     viewport: SHORT,

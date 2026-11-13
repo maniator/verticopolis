@@ -4,7 +4,7 @@ import { mountAppDom, makeUI } from "../uiFixture";
 import { PAUSED_FOR_HELP } from "../../ui/helpPause";
 
 /**
- * In-game Help (src/ui/uiHelpMenu.ts) on the real UI, with the game's
+ * In-game Help (src/ui/uiHelp.ts) on the real UI, with the game's
  * callbacks as spies: About… opens About this game straight away, the tower
  * pauses while it is open, the pause holds while a Help site page is in
  * another tab, and the player's speed comes back once.
@@ -185,7 +185,7 @@ describe("About… (About this game)", () => {
     a.click();
     expect(followed, "the link must not open a tab that cannot load").toBe(false);
     expect(dialog().open).toBe(true);
-    expect(inDialog(".help-privacy-status").textContent).toBe(
+    expect(inDialog(".help-links-status").textContent).toBe(
       "The privacy page needs an internet connection. It is at verticopolis.com/help/privacy.",
     );
     expect(speed.now()).toBe(0);
@@ -299,7 +299,7 @@ describe("About… (About this game)", () => {
     a.click();
     expect(followed).toBe(false);
     expect(dialog().open).toBe(true);
-    expect(inDialog(".help-privacy-status").textContent).toBe(
+    expect(inDialog(".help-links-status").textContent).toBe(
       "Reporting a problem needs an internet connection. Copy diagnostics now and report it once you are back online.",
     );
   });
