@@ -29,7 +29,7 @@ import { bindKeys } from "./game/inputKeys";
 import { SPEEDS, applySpeed } from "./game/frameLoop";
 import { placeSimpleBuild, updateBuildPreview, isTransportTool, pickedAt, clearBuildRefusal, refreshBuildPreview } from "./game/buildPreview";
 import { LobbyHeightChoice, trackLobbyHeightKeys } from "./game/lobbyHeight";
-import { toggleMute, setVolume, toggleReducedMotion, toggleSteadyClock, isSteadyClock, applyReducedMotion } from "./game/audioPrefs";
+import { toggleMute, setVolume, toggleReducedMotion, toggleSteadyClock, isSteadyClock, applyReducedMotion, togglePassersBy, isPassersBy, applyPassersBy } from "./game/audioPrefs";
 import { showStats, showSaves, saveToSlot, loadFromSlot, deleteSlot } from "./game/appModals";
 import { refreshTraffic } from "./game/trafficHud";
 import { onUpdateAvailable } from "./game/updateFlow";
@@ -277,6 +277,7 @@ class GameApp implements GameAppPorts {
     // Accessibility: apply reduced motion now and whenever the OS pref flips.
     applyReducedMotion(this);
     this.reduceMq.addEventListener("change", () => applyReducedMotion(this));
+    applyPassersBy(this);
 
     // First-paint boot flow: onboarding, resume-flag handling, splash, the
     // corrupt-save message, and the autosave timer (see runBootFlow).
@@ -329,6 +330,8 @@ class GameApp implements GameAppPorts {
   toggleReducedMotion(): boolean { return toggleReducedMotion(this); }
   toggleSteadyClock(): boolean { return toggleSteadyClock(this); }
   isSteadyClock(): boolean { return isSteadyClock(this); }
+  togglePassersBy(): boolean { return togglePassersBy(this); }
+  isPassersBy(): boolean { return isPassersBy(this); }
 
   /** Replay the Getting Started onboarding, unless the splash is up. */
   replayOnboarding(): void {

@@ -10,19 +10,17 @@ import { GARBAGE_TRUCK_H } from "../sprites/facilities/vehicles";
 import { metroTrainOffset } from "../metroTrainSchedule";
 import { addMetro } from "./towerMetro";
 import { buildWalkers } from "./towerWalkerBuild";
-import { crowdPopulation } from "./towerPopulation";
 import { carIndicator, type CarIndicator } from "../carIndicator";
 import { stepCarPursuit, type CarDrawState } from "../carMotion";
 import type { PersonView } from "../../simport/view";
 import { FLOOR, TILE } from "../scale";
 import type { TowerEngine } from "./TowerEngine";
 import { applyCrowdCull, reassertCrowdCull } from "./crowdCull";
-import { spiralAngle } from "../sprites/spiralStair";
 
 /**
  * Engine-driven crowd and motion for {@link TowerEngine}: the routed commuter
  * actors, elevator cars, metro train, garbage trucks, garage cars and the
- * ambient walkers. Friend functions taking the engine instance. Extracted from
+ * decorative passers-by. Friend functions taking the engine instance. Extracted from
  * `TowerEngine.ts`; the class keeps thin delegations. Pure code move: the
  * positioning, cadence and Excalibur calls are unchanged.
  */
@@ -30,9 +28,6 @@ import { spiralAngle } from "../sprites/spiralStair";
 /** The empty, idle cab state used to seed a fresh car's graphic. */
 const IDLE_CAR: CarIndicator = { riders: 0, arrow: null, full: false };
 
-/** Per-sim walker reachability verdicts, keyed `floor * 1024 + tileX` and valid
- *  for one `tower.revision`. See {@link walkerReachable}. */
-const walkReachMemos = new WeakMap<object, { revision: number; verdicts: Map<number, boolean> }>();
 
 /** Retained-actor reconciliation tail: kill and forget every entry the
  *  current pass didn't mark as seen. Each reconciler supplies its own
@@ -46,44 +41,22 @@ export function reap<K, V>(map: Map<K, V>, seen: ReadonlySet<K>, dispose: (v: V,
   }
 }
 
-/** A single engine-driven walking figure (lobby/corridor walker or climber). */
+/** A decorative passer-by: a corridor figure that is not a person the engine
+ *  knows about (#2091; built by `buildWalkers`, Modern only). */
 export interface Walker {
   actor: ex.Actor;
   gfx: ex.Canvas;
   x0w: number;
   x1w: number;
-  y0w: number;
-  y1w: number;
+  /** The world y its feet stand on. */
+  yw: number;
   speed: number;
   dir: number;
   phase: number;
-  impatient: boolean;
-  red: boolean;
-  /** A climber on a tall lobby's spiral stair (#308): it winds around the
-   *  pole at `cx`, `r` out, instead of walking straight from x0w to x1w. */
-  spiral?: { cx: number; r: number; stories: number };
-  /** A rider on a tall lobby's switchback escalator (#308): it climbs one
-   *  run a story, turning back at each platform, this many stories. */
-  switchback?: number;
-  /** 0..1 position in the crowd; shown only when the tower is busy enough. */
+  /** 0..1 position in its floor's crowd; shown only when the floor is busy enough. */
   rank: number;
   /** Floor this figure belongs to (for per-floor occupancy gating). */
   floor: number;
-  /** A structural tile of the run this figure paces (a landing tile for a stair
-   *  or escalator climber). Reachability is asked per POSITION, not per floor
-   *  (#647): a gap-split Modern floor can strand one contiguous run while a
-   *  sibling run of the same floor still routes to the lobby, and a floor-level
-   *  probe cannot tell them apart. */
-  tileX: number;
-  /** A climber's OTHER landing (the far end of its flight); every other figure
-   *  repeats `floor`/`tileX`. Both ends have to be reachable for the flight to
-   *  carry traffic, so gating on the bottom alone left climbers walking toward a
-   *  top no route ends at (#665). */
-  altFloor: number;
-  altTileX: number;
-  /** True for corridor loiterers gated on their floor's live occupancy; false
-   *  for lobby/stair figures gated on the whole tower's busyness. */
-  perFloor: boolean;
 }
 
 /** Draw the engine-owned commuters: add/remove/position one actor per live
@@ -274,7 +247,7 @@ export function syncMotion(engine: TowerEngine): void {
 
 
 /** Refresh the per-floor occupancy map (0..1) when the hour or layout changes,
- *  so corridor loiterers appear only where tenants actually are. */
+ *  so decorative passers-by appear only where tenants actually are. */
 function refreshFloorLiveliness(engine: TowerEngine): void {
   const hour = engine.sim.clock.hour;
   const rev = engine.sim.tower.revision;
@@ -288,65 +261,8 @@ function refreshFloorLiveliness(engine: TowerEngine): void {
   engine.floorLive.clear();
   // Scale present occupants to 0..1: ~16 on a floor reads as fully lively (all
   // its loiterers shown); a busier floor shows more, an empty or all-vacant
-  // floor shows none. (How many the fraction reveals scales with the floor's
-  // width, since a corridor's walker count comes from its tile span.)
+  // floor shows none.
   for (const [f, n] of people) engine.floorLive.set(f, Math.min(1, n / 16));
-}
-
-/** True when a commuter could reach the spot this figure paces (#639): a sky
- *  lobby nobody can get to must draw nobody. Reachability and not
- *  `isFloorServed`, because it runs the passenger router, so Classic's walk
- *  budget hides a lobby reachable only by a too-long stair climb (no commuter
- *  spawns for it either) while Modern's served-equals-reachable needs no era
- *  branch. Floor 1 short-circuits to true in the engine, so the main lobby is
- *  untouched.
- *
- *  Asked per POSITION (#647): on a gap-split Modern floor one contiguous run can
- *  be stranded while a sibling run of the same floor still routes to the lobby,
- *  and ambient figures are spawned per run, so a floor-level probe would leave
- *  ghosts on the stranded wing. A gap-free floor is exactly one segment, so this
- *  is identical to the floor-level answer on every Classic tower.
- *
- *  The engine memo only covers the whole-floor probe: `positionReachable` takes
- *  that fast path when a floor has one segment, but runs a fresh passenger BFS
- *  per call once a floor is split. So the verdicts are memoized here too, in a
- *  WeakMap keyed by the sim exactly the way the engine does it, so the per-frame
- *  cost stays a Map lookup however the tower is laid out and a swapped-in sim
- *  gets a fresh entry rather than inheriting the old tower's answers.
- *
- *  A climber is asked about BOTH its landings, and needs both (#665). The probe
- *  already routes THROUGH stairs, so a reachable bottom normally implies a
- *  reachable top; the two only disagree when Classic's walk budget cuts the
- *  flight, and then nobody completes that climb from either side. Gating on the
- *  bottom alone left figures trudging up toward a floor no route ends at. */
-function walkerReachable(engine: TowerEngine, w: Walker): boolean {
-  if (!spotReachable(engine, w.floor, w.tileX)) return false;
-  // A climber is only in traffic when BOTH its landings are reachable: nobody
-  // completes a climb toward a floor no route ends at. Everyone else repeats one
-  // spot; the equality check skips a redundant memo lookup for them (the memo
-  // would answer it anyway, so this is a shortcut, not what avoids a real BFS).
-  if (w.altFloor === w.floor && w.altTileX === w.tileX) return true;
-  return spotReachable(engine, w.altFloor, w.altTileX);
-}
-
-/** One memoized reachability verdict for a `(floor, tileX)` spot. */
-function spotReachable(engine: TowerEngine, floor: number, tileX: number): boolean {
-  const sim = engine.sim;
-  const rev = sim.tower.revision;
-  let memo = walkReachMemos.get(sim);
-  if (!memo || memo.revision !== rev) {
-    memo = { revision: rev, verdicts: new Map() };
-    walkReachMemos.set(sim, memo);
-  }
-  // Tile x is bounded by the lot width (375), so 1024 keeps floor and tile in
-  // their own lanes without a string key on the per-frame path.
-  const key = floor * 1024 + tileX;
-  let hit = memo.verdicts.get(key);
-  if (hit === undefined) {
-    hit = sim.positionReachable(floor, tileX);
-    memo.verdicts.set(key, hit);
-  }
-  return hit;
 }
 
 /** Per-entry eased draw state for the elevator cars (GH #688). Keyed off the
@@ -435,51 +351,24 @@ export function updateMotion(engine: TowerEngine, elapsedMs = 1000 / 60): void {
     const tt = 1 - Math.abs(2 * p - 1); // ping-pong along the deck
     g.actor.pos = ex.vec(g.x0w + tt * (g.x1w - g.x0w), engine.worldYTop(g.floor) + FLOOR - 10);
   }
-  const stress = engine.d.stress ?? 0;
-  // How busy the building looks right now: scales with population so an empty
-  // tower has an empty lobby, and thins out overnight.
-  const night = engine.sim.clock.isNight();
-  const crowd = Math.min(1, crowdPopulation(engine) / 350) * (night ? 0.35 : 1);
-  refreshFloorLiveliness(engine);
+  // A tower with no passers-by (every Classic tower) skips the occupancy walk.
+  if (engine.walkers.length > 0) refreshFloorLiveliness(engine);
+  // The Settings switch (Modern, default on) and reduced motion each hide every
+  // passer-by; reduced motion promises to calm background animation (#2091).
+  const passersShown = engine.passersBy && !engine.reducedMotion;
   for (const w of engine.walkers) {
-    // Corridor loiterers gate on their own floor's live occupancy (so an empty
-    // floor stays empty); lobby/stair figures gate on the whole tower's crowd.
-    const threshold = w.perFloor ? (engine.floorLive.get(w.floor) ?? 0) : crowd;
-    // Lobby and stair figures gate on tower-wide busyness, which says nothing
-    // about whether anyone can get to that floor, so they also need the
-    // reachability check (#639). Corridor loiterers do not: their floor has live
-    // occupants, and stranded tenants are real people who are genuinely there
-    // (a floor can lose its access and keep its leases until they churn out).
-    const visible = w.rank <= threshold && (w.perFloor || walkerReachable(engine, w));
+    // A passer-by shows only while its own floor has live occupants, so an
+    // empty floor stays empty.
+    const visible = passersShown && w.rank <= (engine.floorLive.get(w.floor) ?? 0);
     if (w.actor.graphics.isVisible !== visible) w.actor.graphics.isVisible = visible;
     if (!visible) continue;
     let p = w.phase + (w.dir > 0 ? 0 : 0.5) + anim * w.speed * 0.03;
     p -= Math.floor(p);
-    // Ping-pong 0→1→0 so figures pace back and forth (and stair climbers go
-    // up *and* down) instead of teleporting from the far end back to the
-    // start each loop, the old sawtooth made people look like they spawned on
-    // one side, ran across, then vanished.
+    // Ping-pong 0→1→0 so figures pace back and forth instead of teleporting
+    // from the far end back to the start each loop.
     const tt = 1 - Math.abs(2 * p - 1);
-    const x = climberX(w, tt);
-    w.actor.pos = ex.vec(x, w.y0w + tt * (w.y1w - w.y0w));
-    const red = w.impatient && stress > 0.25;
-    if (red !== w.red) {
-      w.red = red;
-      w.actor.graphics.use(red ? engine.personGfxRed : w.gfx);
-    }
+    // A passer-by never turns amber or red: it has no wait, and a mood color
+    // is how a player spots a real person waiting too long.
+    w.actor.pos = ex.vec(w.x0w + tt * (w.x1w - w.x0w), w.yw);
   }
-}
-
-/** Where a walker stands across its run at `tt` (0 at one end, 1 at the
- *  other): straight across for most, around the pole on a spiral stair, and
- *  back and forth a run a story on a switchback escalator (#308). */
-export function climberX(w: Pick<Walker, "x0w" | "x1w" | "spiral" | "switchback">, tt: number): number {
-  if (w.spiral) return w.spiral.cx + w.spiral.r * Math.sin(spiralAngle(tt, w.spiral.stories));
-  if (w.switchback && w.switchback > 1) {
-    const at = Math.min(tt * w.switchback, w.switchback - 1e-9);
-    const run = Math.floor(at);
-    const u = at - run;
-    return run % 2 === 0 ? w.x0w + u * (w.x1w - w.x0w) : w.x1w - u * (w.x1w - w.x0w);
-  }
-  return w.x0w + tt * (w.x1w - w.x0w);
 }

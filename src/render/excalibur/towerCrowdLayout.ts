@@ -1,10 +1,11 @@
 import { catalogFacility, type Catalog } from "../../catalog/catalogTypes";
 import type { UnitView } from "../../simport/view";
+import type { FacilityKind } from "../../shared/types";
 
 /**
- * Pure layout math for the ambient-walker builder in {@link buildWalkers}. These
- * helpers take plain values (no Excalibur canvas bake), so `buildWalkers` itself
- * can stay on the Playwright tier while the placement rules are unit-tested here.
+ * Pure layout math for the decorative passer-by builder in {@link buildWalkers}.
+ * These helpers take plain values (no Excalibur canvas bake), so the placement
+ * rules are unit-tested here on their own.
  */
 
 /** The x-spans of the UPPER stories of every multi-floor facility (cinema,
@@ -36,19 +37,47 @@ export function lotCovered(rows: Map<number, Array<[number, number]>>, floor: nu
   return false;
 }
 
-/** The world-x stretch a single concourse walker paces. The run [x0w, x1w] is
- *  split into `count` evenly spaced lanes (lane `i` centered at `(i + 0.5) /
- *  count` of the run) so a busy lobby fans figures across the width instead of
- *  piling them at the ping-pong turnaround ends. Each figure paces its own lane
- *  plus a small symmetric overlap, so figures never all sweep the full run and
- *  bunch. Evenly spaced (not an `i * stride mod count` interleave) so it can
- *  never collapse every figure into one lane when the stride shares a factor
- *  with the count. Returns [segX0, segX1] with segX1 >= segX0 for every
- *  count >= 1. */
-export function lobbyLaneSpan(i: number, count: number, x0w: number, x1w: number): [number, number] {
-  const runW = x1w - x0w;
-  const laneFrac = (i + 0.5) / count;
-  const anchor = x0w + laneFrac * runW;
-  const half = Math.min(runW / 2, Math.max(18, runW / count));
-  return [Math.max(x0w, anchor - half), Math.min(x1w, anchor + half)];
+/** How many tiles either side of an elevator shaft stay clear of decorative
+ *  passers-by on every floor it serves: the landing, where the engine's
+ *  waiting riders queue (#2091). About six riders at the engine's queue
+ *  spacing. */
+export const ELEVATOR_LANDING_TILES = 6;
+/** Tiles either side of a stair or escalator footprint that stay clear. */
+export const FLIGHT_LANDING_TILES = 1;
+/** Tiles either side of a shop, restaurant or other commercial room that stay
+ *  clear: its front, where customers come and go. */
+export const SHOP_FRONT_TILES = 2;
+
+interface TrafficTransport {
+  readonly kind: FacilityKind;
+  readonly x: number;
+  readonly width: number;
+  readonly bottom: number;
+  readonly top: number;
+}
+
+/** The lots, keyed by floor, where a player reads real traffic: every elevator
+ *  landing, stair and escalator landing, and commercial front (#2091). A
+ *  decorative passer-by must never stand on one, since it would look like a
+ *  person the engine knows about, waiting where real queues form. */
+export function trafficLots(
+  transports: readonly TrafficTransport[],
+  units: readonly UnitView[],
+  catalog: Catalog,
+): Map<number, Set<number>> {
+  const lots = new Map<number, Set<number>>();
+  const keep = (floor: number, x0: number, x1: number) => {
+    let row = lots.get(floor);
+    if (!row) lots.set(floor, (row = new Set()));
+    for (let x = x0; x <= x1; x++) row.add(x);
+  };
+  for (const t of transports) {
+    // An elevator is the transport with cars (the same test as isElevatorKind).
+    const margin = catalogFacility(catalog, t.kind).maxCars !== null ? ELEVATOR_LANDING_TILES : FLIGHT_LANDING_TILES;
+    for (let f = t.bottom; f <= t.top; f++) keep(f, t.x - margin, t.x + t.width - 1 + margin);
+  }
+  for (const u of units) {
+    if (catalogFacility(catalog, u.kind).commercial) keep(u.floor, u.x - SHOP_FRONT_TILES, u.x + u.width - 1 + SHOP_FRONT_TILES);
+  }
+  return lots;
 }

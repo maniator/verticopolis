@@ -101,6 +101,8 @@ export function makeUI(overrides: Partial<UICallbacks> = {}): { ui: UI; cb: UICa
     onEditAction: vi.fn(),
     onToggleReducedMotion: vi.fn(() => true),
     onToggleSteadyClock: vi.fn(() => true),
+    onTogglePassersBy: vi.fn(() => false),
+    isPassersBy: vi.fn(() => true),
     isSteadyClock: vi.fn(() => false),
     onToggleAutoBridge: vi.fn(async () => true),
     isAutoBridge: vi.fn(() => true),

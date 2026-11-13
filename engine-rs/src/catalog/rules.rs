@@ -34,6 +34,10 @@ pub struct Rules {
     /// lobby always may, up to `max_lobby_height`; when false it is the only
     /// one that can.
     pub tall_sky_lobbies: bool,
+    /// Whether a frontend may draw decorative passers-by, figures that pace
+    /// the corridors but are not people the engine knows about (#2091).
+    /// When false it draws only the engine's own people.
+    pub decorative_passers_by: bool,
     /// The most stories a lobby can rise (#308). A floor's first lobby
     /// placement sets its height, and it never changes after.
     pub max_lobby_height: i64,

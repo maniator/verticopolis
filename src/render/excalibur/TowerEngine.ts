@@ -237,9 +237,9 @@ export class TowerEngine {
    *  all cosmetic: elevator cars and the routed crowd move from sim state, not
    *  `d.anim`, so functional motion keeps running while the animation stops. */
   reducedMotion = false;
-  setReducedMotion(on: boolean): void {
-    overlayFx.setReducedMotion(this, on);
-  }
+  /** Modern's "Show decorative passers-by" switch (#2091): off hides them all. */
+  passersBy = true;
+  setReducedMotion(on: boolean): void { overlayFx.setReducedMotion(this, on); }
 
   /** Frame-clock-derived animation time that only advances while unpaused.
    *  @internal friend-module access (towerOverlay resetDecorativeClock). */

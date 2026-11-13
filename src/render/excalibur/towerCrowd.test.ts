@@ -3,8 +3,7 @@ import { kindFacts } from "../../tests/catalogKinds";
 import * as ex from "excalibur";
 import { FLOOR, TILE } from "../scale";
 import { carIndicator, type CarIndicator } from "../carIndicator";
-import { reap, reconcileCrowd, clearCrowd, clearMotion, updateMotion, climberX } from "./towerCrowd";
-import { spiralAngle } from "../sprites/spiralStair";
+import { reap, reconcileCrowd, clearCrowd, clearMotion, updateMotion } from "./towerCrowd";
 
 /**
  * Engine-driven crowd and motion for the tower renderer. The parts that BAKE
@@ -14,7 +13,7 @@ import { spiralAngle } from "../sprites/spiralStair";
  * actors IS unit-testable with real (drawing-free) `ex.Actor`s and fake
  * graphics: this drives the crowd reconciler, the clear paths, the pure `reap`
  * tail, and updateMotion across cars, the metro train, the garbage truck,
- * garage cars and the ambient walkers, asserting positions/visibility, not just
+ * garage cars and the decorative passers-by, asserting positions/visibility, not just
  * no-throw.
  */
 
@@ -29,7 +28,7 @@ const carKey = (ind: CarIndicator) => `${ind.riders}:${ind.arrow ?? "x"}:${ind.f
 
 /** The fake `sim` the render helpers read, with `over` merged on top. Tests that
  *  need their own units or clock go through this instead of writing a whole `sim`
- *  literal, so a new engine call read by the render layer (`positionReachable`, say)
+ *  literal, so a new engine call read by the render layer
  *  only has to be defaulted in one place. */
 function simFixture(over: Record<string, any> = {}): any {
   return {
@@ -37,9 +36,6 @@ function simFixture(over: Record<string, any> = {}): any {
     crowd: { people: [] },
     clock: { hour: 12, minuteOfDay: 12 * 60, isMorning: () => false, isEvening: () => false, isNight: () => false },
     tower: { revision: 1, units: [] },
-    // Everything is reachable unless a test says otherwise, so the cases that
-    // are not about reachability keep asserting exactly what they always did.
-    positionReachable: () => true,
     ...over,
   };
 }
@@ -60,6 +56,8 @@ function eng(over: Record<string, any> = {}): any {
     truckActors: [],
     garageCars: [],
     walkers: [],
+    passersBy: true,
+    reducedMotion: false,
     floorLive: new Map(),
     floorLiveHour: -1,
     floorLiveRev: -1,
@@ -286,213 +284,70 @@ describe("updateMotion repositions the moving actors", () => {
     updateMotion(eng({ garageCars: [idleCar], displayParkingUse: 0.5 }));
     expect(idleCar.actor.graphics.isVisible).toBe(false);
   });
+});
 
-  it("gates ambient walkers on busyness and reddens impatient ones under stress", () => {
-    const mkWalker = (over: Record<string, unknown>) => {
-      // `...over` lands last, so a hardcoded altFloor here would survive a
-      // `floor` override and quietly probe the wrong storey. Follow the primary
-      // spot unless a case says otherwise, the same way production builds every
-      // figure that is not a climber.
-      const w: Record<string, unknown> = {
-        actor: actor(), gfx: gfx(), x0w: 100, x1w: 200, y0w: -100, y1w: -100,
-        speed: 8, dir: 1, phase: 0.2, impatient: true, red: false, rank: 0.1,
-        floor: 4, tileX: 0, perFloor: false, ...over,
-      };
-      w.altFloor ??= w.floor;
-      w.altTileX ??= w.tileX;
-      return w as any;
-    };
-    const lobbyWalker = mkWalker({});
-    const hiddenWalker = mkWalker({ rank: 5 }); // rank above any threshold -> hidden
-    const floorWalker = mkWalker({ perFloor: true, floor: 7, rank: 0.5 });
-    const e = eng({
-      walkers: [lobbyWalker, hiddenWalker, floorWalker],
-      d: { anim: 3, stress: 1 }, // high stress reddens impatient figures
-      sim: simFixture({
-        tower: { revision: 1, units: [{ floor: 7, occupants: 16 }] }, // fills floorLive for floor 7
-      }),
-    });
+describe("decorative passers-by (#2091)", () => {
+  const mkWalker = (over: Record<string, unknown> = {}) =>
+    ({
+      actor: actor(), gfx: gfx(), x0w: 100, x1w: 200, yw: -100,
+      speed: 8, dir: 1, phase: 0.2, rank: 0.5,
+      floor: 7, ...over,
+    }) as any;
+  /** Floor 7 holds 16 occupants (fully lively); floor 9 holds 4 (a quarter). */
+  const lively = () => simFixture({ tower: { revision: 1, units: [{ floor: 7, occupants: 16 }, { floor: 9, occupants: 4 }] } });
+
+  it("shows a figure only while its own floor has enough live occupants", () => {
+    const busy = mkWalker();
+    const quiet = mkWalker({ floor: 9 }); // rank 0.5 above floor 9's 0.25
+    const firstOnQuiet = mkWalker({ floor: 9, rank: 0.2 });
+    const empty = mkWalker({ floor: 12, rank: 0.01 });
+    const e = eng({ walkers: [busy, quiet, firstOnQuiet, empty], d: { anim: 3, stress: 0 }, sim: lively() });
     updateMotion(e);
-    expect(lobbyWalker.actor.graphics.isVisible).toBe(true);
-    expect(lobbyWalker.red).toBe(true);
-    expect(hiddenWalker.actor.graphics.isVisible).toBe(false);
-    expect(floorWalker.actor.graphics.isVisible).toBe(true); // its floor is lively
-    // The per-floor occupancy cache was populated for the busy floor.
+    expect([busy, quiet, firstOnQuiet, empty].map((w) => w.actor.graphics.isVisible)).toEqual([true, false, true, false]);
     expect(e.floorLive.get(7)).toBeCloseTo(1, 6);
-  });
-});
-
-describe("ambient walkers are gated on reachability (#639)", () => {
-  // The bug: a sky lobby nobody can get to still filled with ambient walkers,
-  // because lobby and stair figures gate only on tower-wide busyness. These run
-  // at population 400, so `crowd` saturates at 1 and busyness alone would show
-  // every one of them; reachability is the only thing that can hide them.
-  /** A walker whose second endpoint defaults to its first, the way production
-   *  builds every non-climber. A climber test sets `altFloor`/`altTileX`
-   *  explicitly; leaving them to follow `floor`/`tileX` here is what keeps the
-   *  single-spot cases honest (a stale default of floor 1 would make every
-   *  walker reachable through the always-reachable ground floor). */
-  const mkWalker = (over: Record<string, unknown> = {}) => {
-    const w: Record<string, unknown> = {
-      actor: actor(), gfx: gfx(), x0w: 100, x1w: 200, y0w: -100, y1w: -100,
-      speed: 8, dir: 1, phase: 0.2, impatient: false, red: false, rank: 0.1,
-      floor: 1, tileX: 0, perFloor: false, ...over,
-    };
-    w.altFloor ??= w.floor;
-    w.altTileX ??= w.tileX;
-    return w as any;
-  };
-
-  it("hides an unreachable sky lobby's walkers and its stair climbers, keeping floor 1", () => {
-    const mainLobby = mkWalker({ floor: 1 });
-    const skyLobby = mkWalker({ floor: 15 });
-    const climber = mkWalker({ floor: 16, altFloor: 17, rank: 0.04 }); // a real 16-to-17 flight
-    const e = eng({
-      walkers: [mainLobby, skyLobby, climber],
-      sim: simFixture({ positionReachable: (f: number) => f === 1 }),
-    });
-    updateMotion(e);
-    expect(mainLobby.actor.graphics.isVisible).toBe(true);
-    expect(skyLobby.actor.graphics.isVisible).toBe(false);
-    // Climbers carry perFloor: false too, so they are the same bug class: a
-    // stair to nowhere must not show anyone walking up it.
-    expect(climber.actor.graphics.isVisible).toBe(false);
+    expect(e.floorLive.get(9)).toBeCloseTo(0.25, 6);
   });
 
-  it("shows the sky lobby once it becomes reachable, per floor not globally", () => {
-    // The acceptance from the issue: "add an elevator to it and walkers appear."
-    const skyLobby = mkWalker({ floor: 15 });
-    const climber = mkWalker({ floor: 16, altFloor: 17, rank: 0.04 });
-    const e = eng({
-      walkers: [skyLobby, climber],
-      sim: simFixture({ positionReachable: (f: number) => f === 1 || f === 15 }),
-    });
-    updateMotion(e);
-    expect(skyLobby.actor.graphics.isVisible).toBe(true);
-    // Floor 16 is still cut off, so the gate is per floor and not a global flag.
-    expect(climber.actor.graphics.isVisible).toBe(false);
-  });
-
-  it("hides only the stranded run of a gap-split floor (#647 segments)", () => {
-    // The case a floor-level probe gets wrong. After #647 the routing node is a
-    // contiguous SEGMENT, so a Modern floor built with a gap can have one wing
-    // routing to the lobby and the other stranded. Ambient figures are spawned
-    // per run, so the two wings must gate independently even though they share
-    // a floor number.
-    const westWing = mkWalker({ floor: 15, tileX: 2 });
-    const strandedEast = mkWalker({ floor: 15, tileX: 40 });
-    const e = eng({
-      walkers: [westWing, strandedEast],
-      sim: simFixture({ positionReachable: (f: number, x: number) => f === 1 || (f === 15 && x < 10) }),
-    });
-    updateMotion(e);
-    expect(westWing.actor.graphics.isVisible).toBe(true);
-    expect(strandedEast.actor.graphics.isVisible).toBe(false);
-  });
-
-  it("hides a climber whose flight is cut off at the top (#665)", () => {
-    // The gate used to ask only about a flight's bottom landing, so a stair from
-    // a reachable floor to one nobody can get to still showed figures trudging
-    // up toward it. Classic's walk budget is what makes the two ends disagree:
-    // the probe routes THROUGH stairs, so a reachable bottom otherwise implies a
-    // reachable top.
-    const cutOffAbove = mkWalker({ floor: 5, tileX: 3, altFloor: 6, altTileX: 3, rank: 0.04 });
-    const usable = mkWalker({ floor: 4, tileX: 3, altFloor: 5, altTileX: 3, rank: 0.04 });
-    const e = eng({
-      walkers: [cutOffAbove, usable],
-      sim: simFixture({ positionReachable: (f: number) => f <= 5 }),
-    });
-    updateMotion(e);
-    expect(cutOffAbove.actor.graphics.isVisible).toBe(false);
-    // A flight with both landings reachable still carries its climbers.
-    expect(usable.actor.graphics.isVisible).toBe(true);
-  });
-
-  it("hides a climber whose flight is cut off at the bottom", () => {
-    // The mirror case. This one does NOT pin AND against the old bottom-only
-    // gate (that gate hid this too, for its own reason); what it pins is AND
-    // against an either-endpoint OR, which would call this flight reachable
-    // through its top and put the climbers back. That is worth a test because
-    // OR is the plausible misreading: the deferral that raised #665 described
-    // the fix that way before the direction was worked through.
-    const cutOffBelow = mkWalker({ floor: 5, tileX: 3, altFloor: 6, altTileX: 3, rank: 0.04 });
-    const e = eng({
-      walkers: [cutOffBelow],
-      sim: simFixture({ positionReachable: (f: number) => f >= 6 }),
-    });
-    updateMotion(e);
-    expect(cutOffBelow.actor.graphics.isVisible).toBe(false);
-  });
-
-  it("asks the engine once per position per revision, and re-asks after a layout change", () => {
-    // `positionReachable` runs a fresh passenger BFS per call once a floor is
-    // split, so the per-frame loop must not call it per walker per frame.
-    const calls: Array<[number, number]> = [];
-    const probe = (f: number, x: number) => (calls.push([f, x]), f !== 15);
-    const e = eng({
-      // Two walkers share a position; a third sits elsewhere on the same floor.
-      walkers: [mkWalker({ floor: 15, tileX: 2 }), mkWalker({ floor: 15, tileX: 2 }), mkWalker({ floor: 15, tileX: 40 })],
-      sim: simFixture({ positionReachable: probe }),
-    });
-    updateMotion(e);
-    updateMotion(e);
-    expect(calls).toEqual([[15, 2], [15, 40]]); // deduped, and not re-asked next frame
-
-    // A transport add/remove bumps the revision, which is exactly when
-    // reachability can change, so the verdicts must be re-asked.
-    calls.length = 0;
-    e.sim.tower.revision = 2;
-    updateMotion(e);
-    expect(calls).toEqual([[15, 2], [15, 40]]);
-  });
-
-  it("leaves corridor loiterers on their existing occupancy gate", () => {
-    // perFloor walkers already gate on floorLive, and a floor with live
-    // occupants is reachable by definition, so they must not pay a second gate.
-    const loiterer = mkWalker({ perFloor: true, floor: 7, rank: 0.5 });
-    const e = eng({
-      walkers: [loiterer],
-      sim: simFixture({
-        positionReachable: () => false, // would hide it if the gate applied
-        tower: { revision: 1, units: [{ floor: 7, occupants: 16 }] },
-      }),
-    });
-    updateMotion(e);
-    expect(loiterer.actor.graphics.isVisible).toBe(true);
-  });
-
-  it("still hides a reachable walker whose rank is above the busyness threshold", () => {
-    // Reachability is an AND with busyness, never a bypass of it.
-    const rankedOut = mkWalker({ floor: 15, rank: 5 });
-    const e = eng({ walkers: [rankedOut], sim: simFixture() });
-    updateMotion(e);
-    expect(rankedOut.actor.graphics.isVisible).toBe(false);
-  });
-});
-
-describe("climberX follows the flight a climber is on", () => {
-  const span = { x0w: 100, x1w: 160 };
-  it("a straight flight crosses once, left to right", () => {
-    expect([0, 0.5, 1].map((t) => climberX(span, t))).toEqual([100, 130, 160]);
-  });
-  it("a switchback runs out and back once per story", () => {
-    const w = { ...span, switchback: 3 };
-    // Each third of the climb is one run: right, then left, then right again.
-    expect(climberX(w, 0)).toBe(100);
-    expect(climberX(w, 1 / 6)).toBeCloseTo(130);
-    expect(climberX(w, 1 / 3 + 1e-9)).toBeCloseTo(160);
-    expect(climberX(w, 0.5)).toBeCloseTo(130);
-    expect(climberX(w, 2 / 3 + 1e-9)).toBeCloseTo(100);
-    expect(climberX(w, 1)).toBeCloseTo(160);
-  });
-  it("a spiral circles the pole on the drawn stair's angle", () => {
-    const w = { ...span, spiral: { cx: 130, r: 12, stories: 2 } };
-    for (const t of [0, 0.2, 0.5, 0.9, 1]) {
-      const x = climberX(w, t);
-      expect(x).toBeCloseTo(130 + 12 * Math.sin(spiralAngle(t, 2)));
-      expect(Math.abs(x - 130)).toBeLessThanOrEqual(12);
+  it("paces back and forth inside its span, on its own floor line", () => {
+    const w = mkWalker();
+    const e = eng({ walkers: [w], sim: lively() });
+    const xs: number[] = [];
+    for (let i = 0; i < 40; i++) {
+      e.d.anim = i * 0.37;
+      updateMotion(e);
+      xs.push(w.actor.pos.x);
+      expect(w.actor.pos.y).toBe(-100);
     }
-    // It starts on the left edge of the stair, not at the pole.
-    expect(climberX(w, 0)).toBeCloseTo(118);
+    expect(Math.min(...xs)).toBeGreaterThanOrEqual(100);
+    expect(Math.max(...xs)).toBeLessThanOrEqual(200);
+    expect(new Set(xs.map((x) => Math.round(x))).size).toBeGreaterThan(5);
+  });
+
+  it("hides every figure when the Settings switch is off", () => {
+    const w = mkWalker();
+    const e = eng({ walkers: [w], passersBy: false, sim: lively() });
+    updateMotion(e);
+    expect(w.actor.graphics.isVisible).toBe(false);
+    e.passersBy = true;
+    updateMotion(e);
+    expect(w.actor.graphics.isVisible).toBe(true);
+  });
+
+  it("hides every figure under reduced motion", () => {
+    const w = mkWalker();
+    const e = eng({ walkers: [w], reducedMotion: true, sim: lively() });
+    updateMotion(e);
+    expect(w.actor.graphics.isVisible).toBe(false);
+  });
+
+  it("never turns a passer-by red, however stressed the tower is", () => {
+    // A mood color tells the player a real person has waited too long; a
+    // passer-by has no wait, so it keeps its own figure.
+    const w = mkWalker();
+    const used = vi.spyOn(w.actor.graphics, "use");
+    const e = eng({ walkers: [w], d: { anim: 1, stress: 1 }, sim: lively() });
+    updateMotion(e);
+    expect(w.actor.graphics.isVisible).toBe(true);
+    expect(used).not.toHaveBeenCalled();
   });
 });

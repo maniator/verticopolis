@@ -76,6 +76,10 @@ fn each_mode_states_its_rules() {
     assert_eq!(c["rules"]["quotesLobbyDistance"], Value::Bool(false));
     assert_eq!(v["rules"]["exportsTo1994"], Value::Bool(false));
     assert_eq!(v["rules"]["quotesLobbyDistance"], Value::Bool(true));
+    // #2091: SimTower had no decorative walkers, so only Modern may draw them.
+    assert!(!classic.decorative_passers_by && modern.decorative_passers_by);
+    assert_eq!(c["rules"]["decorativePassersBy"], Value::Bool(false));
+    assert_eq!(v["rules"]["decorativePassersBy"], Value::Bool(true));
     // #308: only Modern raises a sky lobby; both modes raise the ground one.
     assert!(!classic.tall_sky_lobbies && modern.tall_sky_lobbies);
     assert_eq!(c["rules"]["maxLobbyHeight"], Value::from(3));

@@ -22,6 +22,10 @@ import { html, nothing, type TemplateResult } from "lit-html";
  * child, or scrolled content shows in the band under
  * the strip, outside the dialog's footer, on a phone.
  *
+ * The "Show decorative passers-by" switch shows only where the catalog's
+ * `rules.decorativePassersBy` is true (Modern, #2091): a Classic tower draws
+ * none, so it has nothing to switch.
+ *
  * The Building section shows only where the catalog offers it: `showBuilding` is
  * the tower catalog's `economy.autoBridgeToggleable` (true in Modern), so a
  * tower whose catalog withholds it (every Classic tower) never renders the
@@ -30,7 +34,14 @@ import { html, nothing, type TemplateResult } from "lit-html";
  * `showSettings` reads the live tower state and sets the initial checked
  * value.
  */
-export function settingsTemplate(version: string, showBuilding = false, engine = ""): TemplateResult {
+export function settingsTemplate(version: string, showBuilding = false, engine = "", showPassersBy = false): TemplateResult {
+  const passersBy = showPassersBy
+    ? html`
+      <div class="set-row">
+        <label class="set-switch"><input type="checkbox" id="set-passers-by" role="switch" aria-describedby="note-passers-by"><span>Show decorative passers-by</span></label>
+        <p class="set-note" id="note-passers-by">People who stroll the corridors to make the tower feel lived in. They aren't tenants or visitors and don't affect the game. Reduced motion hides them.</p>
+      </div>`
+    : nothing;
   const building = showBuilding
     ? html`
       <h3>Building</h3>
@@ -55,6 +66,7 @@ export function settingsTemplate(version: string, showBuilding = false, engine =
         <label class="set-switch"><input type="checkbox" id="set-steady-clock" role="switch" aria-describedby="note-steady-clock"><span>Steady clock</span></label>
         <p class="set-note" id="note-steady-clock">As in 1994, the clock normally runs slow through the lunch rush and fast overnight (a full day takes the same real time either way). Turn on for an even pace all day.</p>
       </div>
+      ${passersBy}
       ${building}
       <p class="set-version">Verticopolis <span class="app-version">v${version}</span>${engine}</p>
       <div class="modal-actions"><button class="btn primary" data-act="close" autofocus>Close</button></div>
