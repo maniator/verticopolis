@@ -186,11 +186,17 @@ impl Tower {
         self.span_every(floor, x, w, |t, f, x| !t.structure.contains_key(&(f, x)))
     }
 
-    /// Whether the story `floor` has structure just left of tile `x` and just
-    /// right of the `w` tiles from `x`, so taking those tiles out would leave
-    /// a gap in the middle of it.
+    /// Whether the story `floor` has structure somewhere left of tile `x` and
+    /// somewhere right of the `w` tiles from `x`, so those tiles are not at
+    /// either end of the story and taking them out would leave a gap in the
+    /// middle of it, or widen one a loaded save already has. Asking only for
+    /// the next tile on each side let a saved gap be cut wider one tile at a
+    /// time, since a tile beside the gap has floor on one side only. A sale
+    /// asks it once per structure tile, so the scan of at most one story's
+    /// width (`LOT_WIDTH`) stays off every per-frame path.
     pub(crate) fn floor_on_both_sides(&self, floor: i64, x: i64, w: i64) -> bool {
-        self.structure.contains_key(&(floor, x - 1)) && self.structure.contains_key(&(floor, x + w))
+        let has_floor = |tx: i64| self.structure.contains_key(&(floor, tx));
+        (0..x).any(has_floor) && (x + w..LOT_WIDTH).any(has_floor)
     }
 
     pub fn span_has_floor(&self, floor: i64, x: i64, w: i64) -> bool {

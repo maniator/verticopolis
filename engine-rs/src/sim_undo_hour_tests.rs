@@ -434,6 +434,25 @@ fn a_classic_tile_with_floor_on_both_sides_is_never_offered_for_sale() {
 }
 
 #[test]
+fn a_classic_run_beside_a_saved_gap_is_never_offered_for_sale() {
+    // The run laid again (40..44) ends at a gap the tower already has
+    // (36..40), but floor stays on both sides of the story, so selling the
+    // run would widen the gap.
+    let mut sim = tower_in(GameMode::Classic);
+    let take_out = |sim: &mut super::Simulation, xs: std::ops::Range<i64>| {
+        for x in xs {
+            let id = sim.tower.unit_at(4, x).unwrap().id;
+            sim.tower.remove_unit(id);
+        }
+    };
+    take_out(&mut sim, 40..44);
+    let run = gesture(&mut sim, |s| assert!(s.build(Kind::Floor, 4, 40).ok)).unwrap();
+    take_out(&mut sim, 36..40);
+    an_hour_passes(&mut sim);
+    refused(&mut sim, &run, StepRefused::GroundUsed { sellable: false });
+}
+
+#[test]
 fn a_floor_run_that_reaches_an_end_is_still_offered_for_sale() {
     // The same fill in Modern, and a Classic run laid out to the floor's
     // end, can each be sold tile by tile, so the advice stands.
