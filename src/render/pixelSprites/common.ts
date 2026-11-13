@@ -232,12 +232,13 @@ export interface BuildSpec {
   hardhat?: boolean;
 }
 
-/** Finalized geometry per build (owner-approved). Totals: seated 15, standing
- *  18, walker 24, hi-vis 22 pixels tall. A car's riders have no build: they
+/** Geometry per build. Totals: seated 18, standing 24, walker 24, hi-vis 22
+ *  pixels tall. Standing and seated match the crowd's average person, so
+ *  someone walking into a room keeps their size (#2116). A car's riders have no build: they
  *  are drawn at the size the crowd draws them (`personRider`). */
 export const BUILDS: Record<PersonBuild, BuildSpec> = {
-  seated: { head: 5, torso: 10, legs: 0, width: 6 },
-  standing: { head: 5, torso: 9, legs: 4, width: 6 },
+  seated: { head: 6, torso: 12, legs: 0, width: 6 },
+  standing: { head: 6, torso: 11, legs: 7, width: 6 },
   walker: { head: 5, torso: 13, legs: 6, width: 7 },
   hiVis: { head: 5, torso: 12, legs: 5, width: 7, hardhat: true },
 };
@@ -276,6 +277,26 @@ export function personFigure(ctx: CanvasRenderingContext2D, x: number, footY: nu
 /** A cast member in a build, wearing their own outfit unless a mood colors it. */
 function castFigure(ctx: CanvasRenderingContext2D, x: number, footY: number, build: PersonBuild, seed: number, mood: Mood): void {
   drawPerson(ctx, x, footY, CAST[castIndex(seed)], { lit: false, pose: "stand", empty: true, mood, dims: buildDims(build) });
+}
+
+/** A cast member asleep, lying with their head toward `headX` (`toLeft`
+ *  when the head is at the left end): a head on the pillow at `headY` in
+ *  their own skin and hair, and a blanket `len` pixels long over the body in
+ *  `blanket`. Used by a hotel bed and a condo sofa at night (#2116). */
+export function sleeper(ctx: CanvasRenderingContext2D, headX: number, headY: number, len: number, blanket: string, seed: number, toLeft = true): void {
+  const look = CAST[castIndex(seed)];
+  const hx = Math.round(headX);
+  const hy = Math.round(headY);
+  const bodyX = toLeft ? hx + 4 : hx - Math.max(0, Math.round(len));
+  ctx.fillStyle = blanket;
+  ctx.fillRect(bodyX, hy + 1, Math.max(0, Math.round(len)), 4); // the body under the blanket
+  ctx.fillStyle = shade(blanket, 24);
+  ctx.fillRect(bodyX, hy + 1, Math.max(0, Math.round(len)), 1);
+  ctx.fillStyle = look.skin;
+  ctx.fillRect(hx, hy + 1, 4, 3); // the face, turned up
+  ctx.fillStyle = look.hairStyle === "bald" ? shade(look.skin, -18) : look.hair;
+  ctx.fillRect(toLeft ? hx : hx + 3, hy, 1, 4); // hair on the pillow side
+  ctx.fillRect(hx, hy, 4, 1);
 }
 
 /** Named convenience builds. Each picks its cast member from the seed and
