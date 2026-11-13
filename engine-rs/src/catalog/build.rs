@@ -47,6 +47,8 @@ pub fn catalog(mode: GameMode) -> Catalog {
             quotes_lobby_distance: mode.quotes_lobby_distance(),
             tall_sky_lobbies: mode.raises_sky_lobbies(),
             decorative_passers_by: mode.shows_passers_by(),
+            shaded_look: mode.shaded_look(),
+            fed_up_wait: crate::crowd::STRESS_WAIT,
             max_lobby_height: crate::facilities::MAX_LOBBY_HEIGHT,
         },
         pools: keyed_pools(mode)

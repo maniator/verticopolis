@@ -20,7 +20,7 @@ vi.mock("./buildPreview", () => ({
 
 vi.mock("./frameLoop", () => ({
   runFrame: vi.fn(),
-  SPEEDS: [0, 10, 30, 120],
+  SPEEDS: [0, 3, 15, 50],
 }));
 
 const mockPlaceSimpleBuild = vi.mocked(placeSimpleBuild);

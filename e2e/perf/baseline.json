@@ -3,14 +3,14 @@
     "n": 4000,
     "batch": 40,
     "runs": 5,
-    "medianMs": 0.1,
-    "p95Ms": 0.15999999999985448,
-    "meanMs": 0.10774999999999996
+    "medianMs": 0.07000000000043656,
+    "p95Ms": 0.10750000000043655,
+    "meanMs": 0.07580000000000293
   },
   "simSpeed": {
-    "simMinutesPerRealSecond": 0.486263068319961,
+    "simMinutesPerRealSecond": 0.23437316895961685,
     "cpuThrottle": 4,
-    "speed": 120,
+    "speed": 50,
     "windowMs": 4000,
     "windows": 5
   }

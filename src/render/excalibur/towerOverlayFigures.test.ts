@@ -3,6 +3,7 @@ import { ON_THE_ESCAPE } from "./guardPosition";
 import { FLOOR } from "../scale";
 import { VIEW_ZOOM_MIN } from "../../shared/viewZoom";
 import { drawSearchGuard, drawThief, FIGURE_HEIGHT } from "../sprites/events";
+import { STAFF_LOOK } from "../pixelSprites/people";
 import { drawOverlay, floorFigureScale, floorRoomSpan, guardPosition } from "./towerOverlay";
 
 /**
@@ -80,9 +81,9 @@ describe("a figure walking a floor fits inside it at every zoom", () => {
     for (const zoom of ZOOMS) {
       const { ctx, rects } = rectCtx();
       drawThief(ctx, 100, 300, floorFigureScale(zoom), true);
-      // Both figures drew: the thief's dark coat and the guard's navy uniform.
-      expect(rects.some((r) => r.style === "#232830")).toBe(true);
-      expect(rects.some((r) => r.style === "#274B8F")).toBe(true);
+      // Both figures drew: the thief's dark top and the guard's navy uniform.
+      expect(rects.some((r) => r.style === STAFF_LOOK.thief.top)).toBe(true);
+      expect(rects.some((r) => r.style === STAFF_LOOK.security.top)).toBe(true);
       expect(extent(rects), `zoom ${zoom}`).toBeLessThanOrEqual(FLOOR * zoom + ROUNDING);
     }
   });
@@ -107,6 +108,7 @@ describe("a figure walking a floor fits inside it at every zoom", () => {
       selectedId: null,
       arrowHit: {},
       sim: {
+        mode: "classic",
         weather: "clear",
         clock: { hour: 12, minutes: 20 },
         bombSearch: { deadline: 600, sweeping, searched: [], seq: 1 },
@@ -117,10 +119,10 @@ describe("a figure walking a floor fits inside it at every zoom", () => {
       screenToFloor: (sy: number) => (300 - sy) / (FLOOR * zoom),
     };
     drawOverlay(engine, ctx);
-    // The navy uniform is the guard's own color; nothing else is drawn in it.
-    const uniform = rects.filter((r) => r.style === "#274B8F");
-    expect(uniform.length).toBe(1);
-    expect(uniform[0]!.h).toBeLessThanOrEqual(FLOOR * zoom);
+    // The navy uniform is the guard's own color (its torso and its cap).
+    const uniform = rects.filter((r) => r.style === STAFF_LOOK.security.top);
+    expect(uniform.length).toBeGreaterThan(0);
+    expect(extent(uniform)).toBeLessThanOrEqual(FLOOR * zoom + ROUNDING);
   });
 });
 

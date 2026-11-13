@@ -39,7 +39,7 @@ export interface CatalogTicketPrice {
 
 /** The version of the catalog's shape. It moves when a field is added,
  *  renamed or removed, so a frontend can refuse a shape it does not know. */
-export const CATALOG_VERSION = 16;
+export const CATALOG_VERSION = 17;
 
 /** Every price, size and build rule of one mode. */
 export interface Catalog {
@@ -173,6 +173,13 @@ export interface CatalogRules {
    *  (#2091). When false (Classic, as in SimTower) it draws only the
    *  engine's own people. */
   readonly decorativePassersBy: boolean;
+  /** Whether the frontend draws the lit look (#2097): people lit from the
+   *  upper left with a four-frame walk, and rooms shaded to match. When false
+   *  (Classic) it keeps the flat 1994 look with a two-frame walk. */
+  readonly shadedLook: boolean;
+  /** Seconds a person waits before the wait counts as stress and the
+   *  frontend shows them fed up (red). The same in both modes. */
+  readonly fedUpWait: number;
 }
 
 /** One calendar a tower can run and how it scales the quoted figures. */

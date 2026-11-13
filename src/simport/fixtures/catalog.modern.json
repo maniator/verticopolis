@@ -2442,14 +2442,16 @@
     "buildsWhilePaused": true,
     "decorativePassersBy": true,
     "exportsTo1994": false,
+    "fedUpWait": 25,
     "maxLobbyHeight": 3,
     "previewNamesRefusal": true,
     "quotesLobbyDistance": true,
     "scheduleAssist": true,
+    "shadedLook": true,
     "tallSkyLobbies": true,
     "variantHouseholds": true
   },
-  "version": 16,
+  "version": 17,
   "world": {
     "groundFloor": 1,
     "groundFloorStructure": "lobby",

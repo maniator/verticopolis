@@ -1,11 +1,9 @@
 import * as ex from "excalibur";
 import { Z } from "../depthPlanes";
 import type { HallDoor } from "../lobbyHalls";
-import { SHIRTS } from "../pixelSprites/common";
 import { FLOOR } from "../scale";
 import {
   DOOR_RADIUS,
-  drawPushingWalker,
   drawRevolvingDoorBack,
   drawRevolvingDoorFront,
   drawRevolvingDoorMiddle,
@@ -44,16 +42,7 @@ interface DoorRec {
 export class HallDoorLayer {
   readonly byFloor = new Map<number, DoorRec[]>();
   readonly byKey = new Map<string, DoorRec>();
-  /** The pushing pose, baked on first use by shirt color and direction. */
-  readonly pushGfx = new Map<string, ex.Canvas>();
 }
-
-/** The housekeepers' work uniform, as `towerScene` bakes it. */
-const STAFF_UNIFORM = "#E8E4DA";
-/** The pushing figure's canvas: the walker's 9 px plus room for an arm on
- *  either side, so the body stays centered over the same anchor. */
-const PUSH_W = 13;
-const PERSON_H = 25;
 
 const keyOf = (d: HallDoor) => `${d.floor}:${d.x}:${d.tall}:${d.short}:${d.tallOnLeft}`;
 
@@ -126,21 +115,6 @@ export interface Pusher {
   lastX?: number;
   /** -1 walking left, 1 walking right, 0 not yet seen moving. */
   dir?: number;
-  /** The pose the actor shows, when it is not its own baked figure. */
-  shown?: ex.Canvas;
-}
-
-/** A routed person's figure pushing a door wing, walking `dir`, in their
- *  shirt (or the staff uniform), baked once per color and direction. */
-export function pushingGfx(engine: TowerEngine, p: { staff?: boolean; seed: number }, dir: -1 | 1): ex.Canvas {
-  const fill = p.staff ? STAFF_UNIFORM : SHIRTS[Math.abs(p.seed) % SHIRTS.length];
-  const key = `${fill}:${dir}`;
-  let gfx = engine.hallDoors.pushGfx.get(key);
-  if (!gfx) {
-    gfx = new ex.Canvas({ width: PUSH_W, height: PERSON_H, cache: true, draw: (ctx) => drawPushingWalker(ctx, 3, PERSON_H - 1, fill, dir) });
-    engine.hallDoors.pushGfx.set(key, gfx);
-  }
-  return gfx;
 }
 
 /** Where a person standing on `floor` at world x `wx` is against the doors

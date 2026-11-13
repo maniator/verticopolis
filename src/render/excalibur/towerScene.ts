@@ -21,8 +21,7 @@ import { disposeRegions } from "./towerRegions";
 import { emptyStructPass } from "./towerStructTiles";
 import { clearLongPress } from "./longPress";
 import { NOT_BAKED } from "./sceneBake";
-import { SHIRTS } from "../pixelSprites";
-import { personFigure } from "../pixelSprites/common";
+import { bakePeople } from "./peopleGfx";
 import { FLOOR, TILE } from "../scale";
 import * as overlayFx from "./towerOverlay";
 import * as crowd from "./towerCrowd";
@@ -255,35 +254,10 @@ export function bakeSharedGraphics(engine: TowerEngine): void {
     });
   engine.awningGfx = { left: bakeAwning("left"), right: bakeAwning("right") };
 
-  // The tenant/staff bake recipe. The routed crowd is the tower's foreground
-  // layer, so it uses the finalized `walker` build (24px tall, art bible pages
-  // 06 to 07), the same human scale the repainted rooms draw their standing
-  // occupants at, instead of the legacy half-height figure that read as a
-  // miniature next to a full-scale concourse. `personFigure` takes an explicit
-  // fill, so the one-canvas-per-shirt scheme (indexed by seed) is unchanged.
-  // Geometry: personFigure draws the 1px contact shadow on the bottom canvas
-  // row (footY = PERSON_H - 1) with the feet one pixel above it, and each actor
-  // is anchored bottom-center, so the figure grows upward from the same ground
-  // line the old bake used.
-  const PERSON_W = 9;
-  const PERSON_H = 25; // 24px walker + a 1px contact-shadow row at the foot
-  const PERSON_FOOT = PERSON_H - 1;
-  const PERSON_X = 1; // centers the 7px-wide build in the 9px canvas
-  const bakePerson = (color: string): ex.Canvas =>
-    new ex.Canvas({
-      width: PERSON_W,
-      height: PERSON_H,
-      cache: true,
-      draw: (ctx) => personFigure(ctx, PERSON_X, PERSON_FOOT, "walker", color),
-    });
-  for (const color of SHIRTS) engine.personGfx.push(bakePerson(color));
-  // Housekeepers wear a single work uniform, so staff read at a glance.
-  engine.personGfxStaff = bakePerson("#E8E4DA");
-  // Fed-up figure: the reserved stress red is the whole cue. The waiting crowd
-  // massing red-shirted at an overwhelmed elevator landing reads as "these
-  // tenants are fed up" on its own, so a per-figure "!" badge would only add
-  // noise; the red walker uses the same bake and canvas as every other figure.
-  engine.personGfxRed = bakePerson("#C24A3A");
+  // The moving people (#2097): the cast drawn by `people.ts`, baked lazily per
+  // look, pose, walk frame, mood and facing (`peopleGfx.ts`), so a frame only
+  // looks a figure up. The routed crowd and the passers-by share it.
+  engine.people = bakePeople();
 }
 
 export function fakeStruct(kind: "floor" | "lobby", floor = 1, x = 0): UnitView {

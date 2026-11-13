@@ -38,6 +38,13 @@ pub struct Rules {
     /// the corridors but are not people the engine knows about (#2091).
     /// When false it draws only the engine's own people.
     pub decorative_passers_by: bool,
+    /// Whether a frontend draws the lit look (#2097): people lit from the
+    /// upper left with a four-frame walk, and rooms shaded to match. When
+    /// false it keeps the flat 1994 look, with a two-frame walk.
+    pub shaded_look: bool,
+    /// How long, in seconds, a person waits before the wait counts as stress
+    /// and the frontend shows them fed up (red). The same in both modes.
+    pub fed_up_wait: f64,
     /// The most stories a lobby can rise (#308). A floor's first lobby
     /// placement sets its height, and it never changes after.
     pub max_lobby_height: i64,

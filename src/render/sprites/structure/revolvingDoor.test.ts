@@ -1,9 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { BUILDS } from "../../pixelSprites/common";
 import {
   DOOR_HEIGHT,
   DOOR_RADIUS,
-  drawPushingWalker,
   drawRevolvingDoorBack,
   drawRevolvingDoorFront,
   drawRevolvingDoorMiddle,
@@ -122,15 +120,5 @@ describe("drawRevolvingDoorMiddle and drawRevolvingDoorFront", () => {
     expect(front).toContainEqual(["#6B4426", CX - DOOR_RADIUS - 1, top - 4, 2 * DOOR_RADIUS + 3, 4]);
     expect(front).toContainEqual(["#6B4426", CX - DOOR_RADIUS - 1, top, 1, DOOR_HEIGHT]);
     expect(front).toContainEqual(["#6B4426", CX + DOOR_RADIUS + 1, top, 1, DOOR_HEIGHT]);
-  });
-});
-
-describe("drawPushingWalker", () => {
-  it("puts the pushing arm on the side the walker heads", () => {
-    const fill = "#123456";
-    const arm = (dir: -1 | 1) => recorded((ctx) => drawPushingWalker(ctx, 3, 24, fill, dir)).pop();
-    expect(arm(1)?.slice(0, 2)).toEqual([fill, 3 + BUILDS.walker.width]);
-    expect(arm(-1)?.slice(0, 2)).toEqual([fill, 1]);
-    expect(arm(1)?.slice(3)).toEqual([2, 2]);
   });
 });

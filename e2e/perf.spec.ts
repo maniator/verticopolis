@@ -45,10 +45,10 @@ const A_BATCH = 40;
 // several runs keeps the tolerances below as they are.
 const A_RUNS = 5;
 const CPU_THROTTLE = 4;
-// `speed` is an index into SPEEDS = [0, 10, 30, 120] sim-minutes/second, so the
-// fastest speed (the "120" the plan names) is key 3.
+// `speed` is an index into SPEEDS = [0, 3, 15, 50] sim-minutes/second, so the
+// fastest speed is key 3 (120 until #2097 slowed the buttons).
 const SPEED = 3;
-const SPEED_MINUTES_PER_SEC = 120;
+const SPEED_MINUTES_PER_SEC = 50;
 const SPEED_WINDOW_MS = 4000;
 const SPEED_WINDOWS = 5;
 // Tolerances. (A) median may rise at most 5% and p95 at most 10% (the plan's

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { SPEEDS, runFrame, emitMealRushes, applySpeed } from "./frameLoop";
+import { MAX_STEP_MS } from "../render/excalibur/crowdLook";
 import { decideMealRush } from "./mealRush";
 import { gameplaySession } from "../analytics";
 import * as analyticsActions from "../analyticsActions";
@@ -32,7 +33,19 @@ afterEach(() => {
 
 describe("SPEEDS", () => {
   it("maps the four speed indices to in-game minutes per real second", () => {
-    expect(SPEEDS).toEqual([0, 10, 30, 120]);
+    expect(SPEEDS).toEqual([0, 3, 15, 50]);
+  });
+});
+
+describe("the slowest speed against the render glide", () => {
+  it("keeps the slowest button's longest step inside the glide, even in the lunch slowdown", () => {
+    // The canon clock's slowest period runs at 30 game minutes over 400 of the
+    // day's 2,600 frames (12:00 to 13:00), 0.135 of an even day
+    // (engine-rs/src/tdt/pacing.rs). A one-minute step then lasts this long.
+    const lunchPace = 30 / 400 / (1440 / 2600);
+    const slowestStepMs = 1000 / (SPEEDS[1] * lunchPace);
+    expect(slowestStepMs).toBeGreaterThan(1000);
+    expect(slowestStepMs).toBeLessThanOrEqual(MAX_STEP_MS);
   });
 });
 
@@ -91,7 +104,7 @@ describe("runFrame simulation stepping", () => {
   it("passes the steady clock when the player turned it on, and the fastest speed's pace", () => {
     const { app, raw } = makeApp({ speed: 3, accMinutes: 0 });
     runFrame(app, 1000 / 60);
-    expect(raw.enginePort.advance).toHaveBeenCalledExactlyOnceWith(0, 1000 / 60, 120, true, true);
+    expect(raw.enginePort.advance).toHaveBeenCalledExactlyOnceWith(0, 1000 / 60, SPEEDS[3], true, true);
   });
 
   it("hands a paused game's carry over at no pace, and the engine's answer stands", () => {
@@ -126,7 +139,7 @@ describe("runFrame simulation stepping", () => {
     applySpeed(app, 3);
     expect(raw.accMinutes).toBe(0);
     runFrame(app, 0);
-    expect(raw.enginePort.advance, "the seam already dropped the carry").toHaveBeenCalledExactlyOnceWith(0, 0, 120, true, true);
+    expect(raw.enginePort.advance, "the seam already dropped the carry").toHaveBeenCalledExactlyOnceWith(0, 0, SPEEDS[3], true, true);
   });
 
   it("keeps the carry when the speed is set to the one already running", () => {
@@ -141,7 +154,7 @@ describe("runFrame simulation stepping", () => {
     raw.prefs.steadyClock = false;
     raw.enginePort.advance.mockReturnValueOnce(Float64Array.of(0, 0));
     runFrame(app, 0);
-    expect(raw.enginePort.advance).toHaveBeenCalledExactlyOnceWith(16, 0, 120, false, true);
+    expect(raw.enginePort.advance).toHaveBeenCalledExactlyOnceWith(16, 0, SPEEDS[3], false, true);
     expect(raw.accMinutes).toBe(0);
   });
 
@@ -171,7 +184,7 @@ describe("runFrame simulation stepping", () => {
       const { app, raw } = makeApp({ speed: 3, accMinutes: 0 });
       raw.enginePort.advance.mockReturnValueOnce(Float64Array.of(0, 0));
       runFrame(app, dt);
-      expect(raw.enginePort.advance).toHaveBeenCalledExactlyOnceWith(0, dt, 120, true, true);
+      expect(raw.enginePort.advance).toHaveBeenCalledExactlyOnceWith(0, dt, SPEEDS[3], true, true);
       expect(raw.accMinutes).toBe(0);
     }
   });
