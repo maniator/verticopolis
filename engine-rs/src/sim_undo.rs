@@ -443,6 +443,10 @@ mod ground_tests;
 mod hour_tests;
 
 #[cfg(test)]
+#[path = "sim_undo_floor_end_tests.rs"]
+mod floor_end_tests;
+
+#[cfg(test)]
 #[path = "sim_undo_cleanup_tests.rs"]
 mod cleanup_tests;
 
