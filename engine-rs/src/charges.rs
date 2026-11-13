@@ -190,8 +190,12 @@ impl Simulation {
     }
 
     /// Buys one more car for elevator `id` at [`ADD_CAR_COST`]. Refused at the
-    /// elevator's car limit and when the money is short.
+    /// elevator's car limit, when the money is short and during a bomb
+    /// search ([`edit_refusal`](Simulation::edit_refusal)).
     pub fn add_car(&mut self, id: i64) -> ChargeResult {
+        if let Some(reason) = self.edit_refusal() {
+            return ChargeResult::refuse(reason);
+        }
         let (kind, cars, _, _) = match self.elevator(id, ONLY_ELEVATOR_CARS) {
             Ok(t) => t,
             Err(r) => return r,
@@ -211,8 +215,11 @@ impl Simulation {
     }
 
     /// Sells one car of elevator `id` back for half of [`ADD_CAR_COST`].
-    /// Refused on the last car.
+    /// Refused on the last car and during a bomb search.
     pub fn remove_car(&mut self, id: i64) -> ChargeResult {
+        if let Some(reason) = self.edit_refusal() {
+            return ChargeResult::refuse(reason);
+        }
         let (_, cars, _, _) = match self.elevator(id, ONLY_ELEVATOR_CARS) {
             Ok(t) => t,
             Err(r) => return r,
@@ -286,7 +293,11 @@ impl Simulation {
     /// assert_eq!((grown.bottom, grown.top, grown.added), (1, 6, 3));
     /// ```
     pub fn extend_transport(&mut self, id: i64, end: ExtendEnd, target_floor: i64) -> ExtendResult {
-        let (_, _, bottom, top) = match self.elevator(id, ONLY_ELEVATOR_EXTEND) {
+        let found = match self.edit_refusal() {
+            Some(reason) => Err(ChargeResult::refuse(reason)),
+            None => self.elevator(id, ONLY_ELEVATOR_EXTEND),
+        };
+        let (_, _, bottom, top) = match found {
             Ok(t) => t,
             Err(charge) => {
                 let (bottom, top) = self
@@ -354,12 +365,32 @@ impl Simulation {
         }
     }
 
+    /// Sells whatever stands at a tile: a room first, then a shaft, then the
+    /// floor or lobby tile. Returns whether anything was sold. The refund and
+    /// the refusals are [`remove_facility`](Simulation::remove_facility)'s
+    /// with [`RemovalMethod::Sell`].
+    pub fn sell_at(&mut self, floor: i64, x: i64) -> bool {
+        let t = self.tower.transport_at(floor, x).map(|t| t.id);
+        let u = self.tower.unit_at(floor, x).map(|u| (u.id, u.kind));
+        let id = match (u, t) {
+            (Some((id, kind)), _) if !kind.is_structural() => id,
+            (_, Some(id)) => id,
+            (Some((id, _)), None) => id,
+            (None, None) => return false,
+        };
+        self.remove_facility(id, RemovalMethod::Sell).ok
+    }
+
     /// Removes room or shaft `id` and refunds half its build price (nothing
     /// for a room a fire gutted). `method` says whether the player sold it or
-    /// bulldozed it, for the gameplay event. Refused for a burning room and
+    /// bulldozed it, for the gameplay event. Refused during a bomb search
+    /// ([`edit_refusal`](Simulation::edit_refusal)), for a burning room and
     /// for a room the mode keeps for good. Rooms and shafts share one id
     /// sequence, so `id` names exactly one thing.
     pub fn remove_facility(&mut self, id: i64, method: RemovalMethod) -> ChargeResult {
+        if let Some(reason) = self.edit_refusal() {
+            return ChargeResult::refuse(reason);
+        }
         if let Some(u) = self.tower.get_unit(id) {
             let (kind, state) = (u.kind, u.state);
             if state == UnitState::Fire {

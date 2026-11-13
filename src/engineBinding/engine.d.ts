@@ -506,7 +506,8 @@ export class Engine {
     setCustomersIn(id: number, count: number): boolean;
     /**
      * `setExpressStops(id)`: whether the id names a shaft, as TypeScript's
-     * answers; a shaft's stops are rebuilt, an unknown id changes nothing.
+     * answers; a shaft's stops are rebuilt, an unknown id (or any id while a
+     * bomb search locks edits) changes nothing.
      */
     setExpressStops(id: number): boolean;
     /**

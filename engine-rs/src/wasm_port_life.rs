@@ -323,10 +323,13 @@ impl Engine {
     /// Set an elevator's schedule from its [`SCHEDULE_LEN`] slots.
     pub(crate) fn port_schedule_shaft(&mut self, id: f64, slots: &[f64]) -> Vec<f64> {
         self.reason = None;
+        if let Some(reason) = self.sim.edit_refusal() {
+            return self.refuse(reason, &[]);
+        }
         let (Some(id), Some(raw)) = (whole(id), schedule_json(slots)) else {
             return self.refuse(INVALID_REQUEST, &[]);
         };
-        let done = self.sim.tower.set_schedule(id, &raw);
+        let done = self.sim.edit_schedule(id, &raw);
         self.finish(self.sim.money, done, None, &[])
     }
 

@@ -67,7 +67,7 @@ impl Engine {
             return Ok(false);
         };
         let raw: serde_json::Value = serde_json::from_str(schedule).map_err(|e| e.to_string())?;
-        Ok(self.sim.tower.set_schedule(id, &raw))
+        Ok(self.sim.edit_schedule(id, &raw))
     }
 
     #[cfg(feature = "tooling")]
@@ -92,7 +92,7 @@ impl Engine {
         stop: Option<bool>,
     ) -> bool {
         match (pair(id, floor), stop) {
-            (Some((id, floor)), Some(stop)) => self.sim.tower.set_stop(id, floor, stop),
+            (Some((id, floor)), Some(stop)) => self.sim.edit_stop(id, floor, stop),
             _ => false,
         }
     }

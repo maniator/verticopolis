@@ -274,3 +274,142 @@ fn a_bomb_with_no_security_freezes_nothing_in_classic() {
 fn a_bomb_with_no_security_freezes_nothing_in_modern() {
     assert_no_freeze_without_security(GameMode::Modern);
 }
+
+/// Everything an edit can change: the money, every room and every shaft.
+fn layout(sim: &Simulation) -> (u64, String, String) {
+    (
+        sim.money.to_bits(),
+        format!("{:?}", sim.tower.units),
+        format!("{:?}", sim.tower.transports),
+    )
+}
+
+#[test]
+fn no_edit_lands_while_security_searches() {
+    use super::BOMB_SEARCH_EDIT_REFUSAL as LOCKED;
+    use crate::charges::ExtendEnd;
+    use crate::gameplay::RemovalMethod;
+    use crate::sim_undo_check::StepRefused;
+
+    for mode in [GameMode::Classic, GameMode::Modern] {
+        let mut sim = busy_morning(mode);
+        // One edit made before the threat, to undo during the search.
+        sim.begin_undo_journal("Build Floor");
+        assert!(sim.build(Kind::Floor, 11, 204).ok);
+        let step = sim.end_undo_journal().expect("the build is a step");
+        let office = sim
+            .tower
+            .units
+            .iter()
+            .find(|u| u.kind == Kind::Office)
+            .unwrap()
+            .id;
+        let shaft = sim.tower.transports[0].id;
+        assert!(
+            sim.edit_refusal().is_none(),
+            "{mode:?}: edits land before the threat"
+        );
+
+        decline(&mut sim);
+        assert!(sim.bomb_lockdown());
+        assert_eq!(sim.edit_refusal(), Some(LOCKED));
+        let before = layout(&sim);
+        let quote = sim.can_build(Kind::Office, 11, 164);
+        assert_eq!(
+            (quote.ok, quote.reason.as_deref()),
+            (false, Some(LOCKED)),
+            "{mode:?}: the quote"
+        );
+        assert_eq!(
+            sim.build(Kind::Floor, 11, 205).reason.as_deref(),
+            Some(LOCKED)
+        );
+        let brush = sim.paint_brush(Kind::Floor, 11, &[206, 207]);
+        assert_eq!((brush.placed, brush.reason.as_deref()), (0, Some(LOCKED)));
+        let stairs = sim.can_build_transport(Kind::Stairs, 230, 1, 2);
+        assert_eq!(
+            stairs.reason.as_deref(),
+            Some(LOCKED),
+            "{mode:?}: a shaft's quote"
+        );
+        assert_eq!(
+            sim.build_transport(Kind::Stairs, 230, 1, 2)
+                .reason
+                .as_deref(),
+            Some(LOCKED)
+        );
+        for method in [RemovalMethod::Sell, RemovalMethod::Bulldoze] {
+            let r = sim.remove_facility(office, method);
+            assert_eq!(
+                r.reason.as_deref(),
+                Some(LOCKED),
+                "{mode:?}: {method:?} a room"
+            );
+        }
+        assert!(!sim.sell_at(10, 164), "{mode:?}: a sale by tile");
+        assert_eq!(
+            sim.remove_facility(shaft, RemovalMethod::Bulldoze)
+                .reason
+                .as_deref(),
+            Some(LOCKED)
+        );
+        assert_eq!(sim.add_car(shaft).reason.as_deref(), Some(LOCKED));
+        assert_eq!(sim.remove_car(shaft).reason.as_deref(), Some(LOCKED));
+        sim.begin_extend(shaft);
+        let grown = sim.extend_transport(shaft, ExtendEnd::Up, 11);
+        sim.end_extend();
+        assert_eq!(grown.charge.reason.as_deref(), Some(LOCKED));
+        assert_eq!((grown.bottom, grown.top, grown.added), (1, 10, 0));
+        assert!(!sim.edit_stop(shaft, 5, false), "{mode:?}: a stop");
+        assert!(!sim.edit_express_stops(shaft), "{mode:?}: express stops");
+        assert!(!sim.edit_clear_stops(shaft), "{mode:?}: cleared stops");
+        let schedule = serde_json::json!({ "weekday": vec![2; 24] });
+        assert!(!sim.edit_schedule(shaft, &schedule), "{mode:?}: a schedule");
+        let undo = sim.apply_undo_step(&step).map(|_| ());
+        assert_eq!(undo, Err(StepRefused::BombSearch), "{mode:?}: the undo");
+        assert!(
+            !StepRefused::BombSearch.is_lasting(),
+            "the step is kept for after the search"
+        );
+        assert_eq!(layout(&sim), before, "{mode:?}: nothing changed");
+
+        // Once the search ends, the tower takes edits again.
+        let mut minutes = 0;
+        while sim.bomb_lockdown() && minutes < 6 * 60 {
+            sim.tick(1.0);
+            minutes += 1;
+        }
+        assert!(sim.edit_refusal().is_none(), "{mode:?}: the search ended");
+        assert!(
+            sim.build(Kind::Floor, 11, 205).ok,
+            "{mode:?}: building again"
+        );
+        assert!(sim.edit_stop(shaft, 5, false), "{mode:?}: stops again");
+        assert!(
+            sim.edit_schedule(shaft, &schedule),
+            "{mode:?}: schedules again"
+        );
+    }
+}
+
+#[test]
+fn a_bomb_with_no_security_locks_no_edit() {
+    for mode in [GameMode::Classic, GameMode::Modern] {
+        let mut sim = busy_morning_with(mode, false);
+        decline(&mut sim);
+        assert!(sim.events.bomb.is_some());
+        assert_eq!(
+            sim.edit_refusal(),
+            None,
+            "{mode:?}: nobody searches, nothing locks"
+        );
+        assert!(
+            sim.build(Kind::Floor, 11, 204).ok,
+            "{mode:?}: building goes on"
+        );
+        assert!(
+            sim.build(Kind::Security, 3, 194).ok,
+            "{mode:?}: Security can still be built"
+        );
+    }
+}

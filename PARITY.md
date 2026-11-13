@@ -51,7 +51,7 @@ other does not.
 ## Events & disasters
 - ✅ Fire spreads sideways and up, never down; burned rooms stay gutted until bulldozed
 - ✅ Bomb threats from 4★; the VIP's visits and the TOWER inspection
-- ◑ While Security searches for a bomb, everyone else and every elevator stands still (the owner's recollection; whether the 1994 game does this is still to observe, #349)
+- ◑ While Security searches for a bomb, everyone else and every elevator stands still, and the tower takes no edits (the owner's recollection and call; whether the 1994 game does this is still to observe, #349)
 - ✅ Treasure, thieves, Santa's sleigh (a cameo only) and newspaper headlines
 
 ## Stats & readouts

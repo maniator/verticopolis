@@ -29,10 +29,13 @@ use crate::sim::{LogKind, Simulation};
 
 #[path = "events_bomb_blast.rs"]
 mod blast;
+#[path = "events_bomb_edits.rs"]
+mod edits;
 #[path = "events_bomb_save.rs"]
 mod save;
 #[path = "events_bomb_view.rs"]
 mod view;
+pub use edits::BOMB_SEARCH_EDIT_REFUSAL;
 
 /// Guards each Security office sends out.
 pub const GUARDS_PER_OFFICE: usize = 6;

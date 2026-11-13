@@ -367,3 +367,85 @@ fn walkway_top_reads_the_hall_under_the_flight() {
     );
     assert_eq!(e.walkway_top(stairs, f64::NAN, 1.0, 2.0), 2.0);
 }
+
+/// A search under way: one guard still out on floor 2.
+fn searching(e: &mut Engine) {
+    use crate::events::bomb::{BombSearch, Guard};
+    let now = e.sim.clock.minutes;
+    e.sim.events.bomb = Some(BombSearch {
+        floor: 2,
+        x: 160.0,
+        deadline: now + 300.0,
+        guards: vec![Guard {
+            floor: Some(2),
+            x: Some(150),
+            done_at: now + 240.0,
+            from: 2,
+            route: Vec::new(),
+            start: now,
+            arrive: now,
+        }],
+        searched: Vec::new(),
+        seq: 1,
+    });
+}
+
+#[test]
+fn every_edit_command_is_refused_while_security_searches() {
+    use crate::events::bomb::BOMB_SEARCH_EDIT_REFUSAL as LOCKED;
+    use crate::wasm::port_life::SCHEDULE_LEN;
+    let mut e = engine();
+    for x in 150..200 {
+        assert!(e.sim.tower.place(Kind::Lobby, 1, x).ok);
+        assert!(e.sim.tower.place(Kind::Floor, 2, x).ok);
+        assert!(e.sim.tower.place(Kind::Floor, 3, x).ok);
+    }
+    let r = e.port_build_shaft(code(Kind::ElevatorStandard), 155.0, 1.0, 3.0);
+    assert_eq!(r[STATUS], 1.0, "{:?}", e.last_reason_text());
+    let id = e.sim.tower.transports[0].id as f64;
+    e.port_undo_capture("Build Floor");
+    assert_eq!(e.port_build(code(Kind::Floor), 4.0, 160.0)[STATUS], 1.0);
+    e.port_undo_commit();
+    searching(&mut e);
+    let stops = format!("{:?}", e.sim.tower.transports);
+    let money = e.sim.money;
+    let commands: [(&str, fn(&mut Engine, f64) -> Vec<f64>); 10] = [
+        ("build", |e, _| e.port_build(code(Kind::Floor), 4.0, 161.0)),
+        ("paint", |e, _| {
+            e.port_paint(code(Kind::Floor), 4.0, &[162.0])
+        }),
+        ("shaft", |e, _| {
+            e.port_build_shaft(code(Kind::Stairs), 190.0, 1.0, 2.0)
+        }),
+        ("bulldoze", |e, id| e.port_demolish(id, true)),
+        ("sell a tile", |e, _| {
+            e.port_demolish_tile(2.0, 170.0, false)
+        }),
+        ("add a car", |e, id| e.port_cars(id, true)),
+        ("stop", |e, id| e.port_mark_stop(id, 2.0, false)),
+        ("express stops", |e, id| e.port_express_stops(id)),
+        ("drop stops", |e, id| e.port_drop_stops(id)),
+        ("schedule", |e, id| {
+            e.port_schedule_shaft(id, &[0.0; SCHEDULE_LEN])
+        }),
+    ];
+    for (what, command) in commands {
+        assert_eq!(command(&mut e, id)[STATUS], 0.0, "{what} is refused");
+        assert_eq!(e.last_reason_text().as_deref(), Some(LOCKED), "{what}");
+    }
+    let extend = e.port_extend(id, true, 4.0);
+    assert_eq!(
+        (extend[STATUS], e.last_reason_text().as_deref()),
+        (0.0, Some(LOCKED))
+    );
+    assert_eq!(e.port_undo()[STATUS], 0.0, "the undo is refused");
+    assert_eq!(
+        e.last_reason_text().as_deref(),
+        Some("Can't undo that while Security searches for the bomb.")
+    );
+    assert_eq!(format!("{:?}", e.sim.tower.transports), stops);
+    assert_eq!(e.sim.money, money, "nothing was paid or refunded");
+    // The search over, the kept step undoes.
+    e.sim.events.bomb = None;
+    assert_eq!(e.port_undo()[STATUS], 1.0, "{:?}", e.last_reason_text());
+}

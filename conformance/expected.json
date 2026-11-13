@@ -469,10 +469,10 @@
       {"label":"t+11520","state":"62ffdf1d4cc32a85","crowd":"73dfc5e873f3520c","events":"4f53cda18c2baa0c"},
       {"label":"ransom-demanded","state":"48b04b31c0e66f5f","crowd":"6011c903a827ef25","events":"4f53cda18c2baa0c"},
       {"label":"swept","state":"aa2c16b72ac1bf6d","crowd":"e05411c46880fb75","events":"8776d2c62a248a70"},
-      {"label":"detonated","state":"659a562c07f2628e","crowd":"e05411c46880fb75","events":"1942f343b03d6af5"},
-      {"label":"t+15360","state":"1255965fb2c097cf","crowd":"9010a3fd86fca498","events":"51e0c7adf3f973d8"},
-      {"label":"t+16800","state":"d05a3f344a4786f8","crowd":"e5a700e58da1dba0","events":"4f53cda18c2baa0c"},
-      {"label":"final","state":"d05a3f344a4786f8","crowd":"e5a700e58da1dba0","events":"4f53cda18c2baa0c"}
+      {"label":"detonated","state":"2c963298f524ec65","crowd":"bd4966557544f3fc","events":"a9ff76f2f2b91617"},
+      {"label":"t+16800","state":"79b58b6f5090165c","crowd":"b1aab766f240251d","events":"8776d2c62a248a70"},
+      {"label":"t+18240","state":"5dbba0c7e42dc6d7","crowd":"f70d22f34e8cfb17","events":"e77180e908cff894"},
+      {"label":"final","state":"5dbba0c7e42dc6d7","crowd":"f70d22f34e8cfb17","events":"4f53cda18c2baa0c"}
     ],
     "ransom-paid-modern": [
       {"label":"start","state":"ebb031056522bdb6","crowd":"7cb294222cbe0188","events":"4f53cda18c2baa0c"},
