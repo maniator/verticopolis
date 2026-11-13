@@ -192,8 +192,12 @@ jobs:
       # wait on the `registry` environment, so nothing reaches a registry
       # until the owner approves that run. A run for a version a registry
       # already holds leaves that registry alone, so a re-run is safe.
+      # Publishing is off until the owner turns it on: the step runs only
+      # when the repository variable ENGINE_REGISTRY_PUBLISH is `on`, so a
+      # release ships the game and its GitHub releases without touching a
+      # registry (held while the engine and game repositories are split).
       - name: Hand the crate release to the registry publish
-        if: ${{ steps.pack.outcome == 'success' }}
+        if: ${{ steps.pack.outcome == 'success' && vars.ENGINE_REGISTRY_PUBLISH == 'on' }}
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
@@ -202,3 +206,9 @@ jobs:
           set -euo pipefail
           gh workflow run engine-publish.yml --ref main -f version="$VERSION"
           echo "Dispatched the registry publish for $VERSION; it waits for approval in the registry environment."
+
+      - name: Note that the registry publish is off
+        if: ${{ steps.pack.outcome == 'success' && vars.ENGINE_REGISTRY_PUBLISH != 'on' }}
+        env:
+          VERSION: ${{ steps.versions.outputs.crate }}
+        run: echo "::notice::Registry publishing is off (repository variable ENGINE_REGISTRY_PUBLISH is not 'on'), so $VERSION was not handed to engine-publish.yml."
