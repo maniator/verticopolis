@@ -12,6 +12,8 @@ import {
   markOnboarded,
   clearOnboarded,
 } from "../../ui/Onboarding";
+import { PALETTE_COLLAPSED_CLASS, PALETTE_COLLAPSED_STORAGE_KEY, PALETTE_COLLAPSED_VALUE, wirePaletteCollapse } from "../../ui/paletteCollapse";
+import { PALETTE_FIT_MQ } from "../../ui/paletteFit";
 
 const C = Math.floor(LOT_WIDTH / 2);
 
@@ -472,5 +474,27 @@ describeEngines("Onboarding — tick advances and finishes on real progress", (l
     c.arm(new PortSim(leg, newSeededDraft(1)).port); // seeded: arms at step 1, which pulses the Floor palette item
     expect(document.querySelector('.pal-item[data-kind="floor"]')!.classList.contains("tt-pulse")).toBe(true);
     expect(document.querySelector('.pal-item[data-kind="office"]')!.classList.contains("tt-pulse")).toBe(false);
+  });
+
+  it("on a computer, opens a Tools window the player folded before it pulses a tool there", () => {
+    document.body.innerHTML =
+      '<div id="hint"></div><aside id="palette"><div class="win-title">Tools</div><div class="palette-scroll" id="palette-scroll">' +
+      '<div class="pal-item" data-kind="floor"></div></div></aside><div id="speed"></div>';
+    const win = document.getElementById("palette")!;
+    const stored: Record<string, string> = { [PALETTE_COLLAPSED_STORAGE_KEY]: PALETTE_COLLAPSED_VALUE.collapsed };
+    const store = { getItem: (k: string) => stored[k] ?? null, setItem: (k: string, v: string) => void (stored[k] = v) };
+    wirePaletteCollapse(win, store, () => {});
+    expect(win.classList.contains(PALETTE_COLLAPSED_CLASS)).toBe(true);
+    // The page is on the desktop layout, where the fold shows.
+    vi.stubGlobal("matchMedia", (query: string) => ({ matches: query === PALETTE_FIT_MQ }));
+    const mq = { matches: false, addEventListener() {}, removeEventListener() {} } as unknown as MediaQueryList;
+    try {
+      const c = new OnboardingController({ mq, showHelp() {}, pauseForSplash() {}, chime() {} });
+      c.arm(new PortSim(leg, newSeededDraft(1)).port); // step 1 pulses the Floor tool
+    } finally {
+      vi.unstubAllGlobals();
+    }
+    expect(win.classList.contains(PALETTE_COLLAPSED_CLASS)).toBe(false);
+    expect(document.querySelector('.pal-item[data-kind="floor"]')!.classList.contains("tt-pulse")).toBe(true);
   });
 });

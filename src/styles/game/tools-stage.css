@@ -18,6 +18,11 @@
 .palette-scroll {
   padding: 6px;
 }
+/* The fold button on the Tools title bar is a desktop control (shown in the
+   desktop block below). */
+.pal-collapse {
+  display: none;
+}
 /* Category tabs are a phone-only affordance; desktop shows every group stacked. */
 #palette-tabs {
   display: none;
@@ -102,6 +107,108 @@
 .pal-item.active .pal-name,
 .pal-item.active .pal-cost {
   color: #eef2ff;
+}
+
+/* Folding a category from its header (src/ui/paletteSections.ts), wherever
+   the headers show: the desktop and tablet layouts. The query is the
+   complement of the phone block's, so a fold stored on a desktop never empties
+   a phone's category tab. */
+@media (min-width: 768px) and (min-height: 600px), (min-width: 1024px) {
+  .pal-group > .pal-group-title[data-group] {
+    cursor: pointer;
+  }
+  .pal-group > .pal-group-title[data-group]::before {
+    content: "\25BE"; /* ▾ open */
+    display: inline-block;
+    width: 10px;
+  }
+  .pal-group.pal-folded > .pal-group-title[data-group]::before {
+    content: "\25B8"; /* ▸ folded */
+  }
+  /* The tool in use and a Getting Started pointer stay in view under a
+     folded header. */
+  .pal-group.pal-folded > .pal-item:not(.active, .tt-pulse),
+  .pal-group.pal-folded > .pal-sub {
+    display: none;
+  }
+}
+
+/* Desktop fit (src/ui/paletteFit.ts): when every tool will not fit the window's
+   height, the fit picks compact rows, then two columns, then both, so the
+   desktop Tools window shows its whole list without a scrollbar. The query
+   matches PALETTE_FIT_MQ; phones, sideways phones and tablets keep their own
+   palette layouts and never carry these classes. */
+@media (min-width: 1024px) {
+  #palette.pal-fit-compact .pal-item {
+    padding-block: 2px;
+  }
+  #palette.pal-fit-compact .pal-group-title {
+    margin: 6px 4px 2px;
+  }
+  #palette.pal-fit-compact .pal-sub {
+    margin: 3px 4px 1px;
+  }
+  /* A touch screen on the desktop layout (a tablet held sideways) keeps each
+     compact row at the 24px minimum touch target (WCAG 2.5.8). The fit
+     measures the list, so it still picks the step that fits. */
+  @media (pointer: coarse) {
+    #palette.pal-fit-compact .pal-item {
+      min-height: 24px;
+    }
+  }
+  /* Two columns of the same rows: the window grows by one column's width. */
+  #palette.pal-fit-columns {
+    width: 340px;
+  }
+  #palette.pal-fit-columns .pal-pinned {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: 6px;
+  }
+  #palette.pal-fit-columns .pal-pinned > .pal-group-title {
+    grid-column: 1 / -1;
+  }
+  #palette.pal-fit-columns .pal-groups {
+    column-count: 2;
+    column-gap: 6px;
+  }
+  /* A category stays in one column, under its own header. */
+  #palette.pal-fit-columns .pal-group {
+    break-inside: avoid;
+  }
+  /* Nothing scrolls past a header in this layout, and a sticky header inside
+     a column box can paint over the column beside it. */
+  #palette.pal-fit-columns .pal-group-title {
+    position: static;
+  }
+
+  /* The fold button (src/ui/paletteCollapse.ts), and the folded window: a
+     thin strip of title bar with "Tools" running down it and the button on
+     top, which opens it again. */
+  .pal-collapse {
+    display: inline-block;
+  }
+  #palette.pal-collapsed {
+    width: 26px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  #palette.pal-collapsed > .win-title {
+    flex: 1;
+    justify-content: flex-start;
+    gap: 8px;
+    padding: 3px 2px;
+    writing-mode: vertical-rl;
+  }
+  #palette.pal-collapsed > .win-title > .btn {
+    margin: 0;
+    writing-mode: horizontal-tb;
+    order: -1;
+  }
+  #palette.pal-collapsed > .palette-scroll {
+    display: none;
+  }
 }
 
 /* ---- Stage / canvas ----

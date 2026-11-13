@@ -6,6 +6,10 @@ import type { Tool, UI } from "./UI";
 import { shortMoney } from "./format";
 import { iconTemplate } from "./icons";
 import { isSpaceKey } from "../shared/inputEvents";
+import { watchPaletteFit } from "./paletteFit";
+import { wirePaletteCollapse } from "./paletteCollapse";
+import { applySectionFolds, wireSectionFolds } from "./paletteSections";
+import { browserStorage } from "./overviewMapPrefs";
 
 /**
  * Build-palette construction for {@link UI}, as friend functions taking the UI
@@ -19,10 +23,13 @@ import { isSpaceKey } from "../shared/inputEvents";
  * category tabs (and their "new" pips) in step with what is unlocked.
  *
  * Layout: Inspect/Bulldoze live in a pinned cluster (always visible); every build
- * category is a `.pal-group` section. On desktop all sections stack in a vertical
- * scroll with sticky headers; on a phone a category tab bar shows exactly one
- * section at a time, so reaching a far venue is a tab tap, not a long sideways
- * scroll. Commercial and Leisure carry a labeled "Modern" sub-band.
+ * category is a `.pal-group` section. On desktop and tablet the sections stack
+ * in one list under sticky headers, and each category folds from its header
+ * (paletteSections). On desktop the list also fits the window without
+ * scrolling (compact rows, then two columns, whose headers are not sticky:
+ * paletteFit), and the whole window folds into a strip (paletteCollapse). On
+ * a phone a category tab bar shows exactly one section at a time, so reaching
+ * a far venue is a tab tap, not a long sideways scroll. Commercial and Leisure carry a labeled "Modern" sub-band.
  */
 
 const GROUPS: { title: string; cats: FacilityCategory[] }[] = [
@@ -42,6 +49,20 @@ const tabLayoutWatch = new WeakMap<UI, TabLayoutWatch>();
 
 export function buildPalette(ui: UI): void {
   buildPaletteFrom(ui, ui.cb.getCatalog());
+  // On the desktop layout the Tools window picks compact rows or two columns
+  // when the list would not fit (paletteFit). The lock scan refits it.
+  // Its title bar's button folds the window into a strip (paletteCollapse),
+  // and each category's header folds that category (paletteSections).
+  const storage = browserStorage();
+  const win = paletteWindow(ui);
+  const refit = win ? watchPaletteFit(win) : () => {};
+  wireSectionFolds(ui.el.palette, storage, refit);
+  if (win) wirePaletteCollapse(win, storage, refit);
+}
+
+/** The Tools window (`#palette`), the scroll box around the palette's items. */
+export function paletteWindow(ui: UI): HTMLElement | null {
+  return ui.el.palette.closest<HTMLElement>("#palette");
 }
 
 /** The palette's layout under a catalog: each group's kinds in order, the
@@ -99,6 +120,7 @@ function buildPaletteFrom(ui: UI, catalog: Catalog): void {
   }
 
   ui.el.palette.append(pinned, groups);
+  applySectionFolds(ui.el.palette, browserStorage());
   if (ui.el.paletteTabs) {
     buildTabs(ui, ui.el.paletteTabs);
     // Select a category up front so the mobile content row is never blank between
