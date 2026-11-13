@@ -112,3 +112,15 @@ search's timing, the guards' routes or their drawing change.
 | `security-search-over.png` | The Classic search played out until the guards find the bomb: the guards, the countdown and the glow are gone. |
 | `security-quiet-day.png` | No event running: the lunch crowd moves through the tower and the overlay draws no search. |
 | `security-thief-caught.png` | Security catching a thief: he runs floor 4's rooms from the emergency stairs at their left edge, feet on the floor, with the guard close behind. |
+
+## The desktop Tools window (fitting, folding)
+
+A small Modern tower at five stars, so the Tools window lists every tool, the
+longest list there is (`scripts/scenes/paletteFit.ts`).
+
+| Screenshot | Shows |
+|---|---|
+| `palette-fit-columns.png` | 1280x800: the full list does not fit one column even with its rows closed up, so the window splits into two columns of compact rows. |
+| `palette-fit-compact.png` | The Tools window alone on a 1600x1150 window: compact rows in one column, at the window's usual width. |
+| `palette-sections-folded.png` | 1280x800 with Living, Leisure and Services folded from their headers: the list is short enough for one column of normal rows again. |
+| `palette-folded.png` | 1280x800 with the whole window folded into a strip by its title bar's ◂ button. |
