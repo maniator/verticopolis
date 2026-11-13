@@ -76,31 +76,40 @@ them too.
 
 ## What A costs today (measured)
 
-`engine-rs/src/bin/crowd_scale.rs` loads three towers, keeps the crowd
-topped up to a fixed size with lobby and tenant-floor trips, and times
+`engine-rs/src/bin/crowd_scale.rs` loads three suite towers (TOWER7 is the
+original's own save, through the importer), keeps the crowd topped up to a
+fixed size with lobby and tenant-floor trips, and times
 `Simulation::tick(0.25)` (one 60 Hz frame at 15 game minutes per second) and
 `frame::frame_view` (built once, with the crowd full). Run it with
 `cargo run --release --features conformance --bin crowd_scale`. Native
-release build, one core of a 2.1 GHz Xeon, 240 steps per row, 2026-11-13:
+release build, one core of a 2.1 GHz Xeon, 240 steps per row, 2026-11-13.
+The `large` rows (the web's 17,314-person perf tower) were run by naming
+`../src/tests/perfCompare/towers/large.vctower` on the command line, since
+the crate reads only `engine-rs/` and `conformance/` by default:
 
 
 | Tower (population) | Crowd size | Moving (mean) | Step mean | Step worst | Frame build | Frame size | Route each |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| sixseven_2 (3219) | 0 | 23 | 0.054 ms | 2.615 ms | 0.250 ms | 576 KB | none |
-| sixseven_2 (3219) | 140 | 140 | 0.099 ms | 4.069 ms | 0.269 ms | 592 KB | 23.3 us |
-| sixseven_2 (3219) | 1000 | 1000 | 0.431 ms | 5.378 ms | 0.314 ms | 746 KB | 11.1 us |
-| sixseven_2 (3219) | 5000 | 5000 | 2.062 ms | 7.511 ms | 0.443 ms | 1454 KB | 9.4 us |
-| sixseven_2 (3219) | 15000 | 15000 | 5.916 ms | 10.894 ms | 2.294 ms | 3223 KB | 7.5 us |
-| split-tower (495) | 0 | 0 | 0.008 ms | 0.403 ms | 0.031 ms | 91 KB | none |
-| split-tower (495) | 140 | 125 | 0.027 ms | 0.326 ms | 0.080 ms | 125 KB | 3.4 us |
-| split-tower (495) | 1000 | 894 | 0.223 ms | 0.606 ms | 0.136 ms | 327 KB | 4.2 us |
-| split-tower (495) | 5000 | 4471 | 0.801 ms | 1.455 ms | 0.350 ms | 1269 KB | 3.3 us |
-| split-tower (495) | 15000 | 13414 | 2.589 ms | 5.948 ms | 1.456 ms | 3634 KB | 2.8 us |
-| large (17314) | 0 | 127 | 0.106 ms | 9.853 ms | 0.964 ms | 2057 KB | none |
-| large (17314) | 140 | 140 | 0.082 ms | 8.060 ms | 0.778 ms | 2057 KB | 38.1 us |
-| large (17314) | 1000 | 1000 | 0.242 ms | 8.626 ms | 0.925 ms | 2210 KB | 12.3 us |
-| large (17314) | 5000 | 5000 | 1.552 ms | 12.713 ms | 2.486 ms | 2921 KB | 9.0 us |
-| large (17314) | 15000 | 15000 | 4.565 ms | 13.997 ms | 3.063 ms | 4698 KB | 7.7 us |
+| sixseven_2 (3219) | 0 | 23 | 0.062 ms | 3.233 ms | 0.186 ms | 576 KB | none |
+| sixseven_2 (3219) | 140 | 140 | 0.088 ms | 3.523 ms | 0.349 ms | 592 KB | 18.8 us |
+| sixseven_2 (3219) | 1000 | 1000 | 0.383 ms | 4.048 ms | 0.337 ms | 746 KB | 10.3 us |
+| sixseven_2 (3219) | 5000 | 5000 | 2.131 ms | 6.188 ms | 0.476 ms | 1454 KB | 7.3 us |
+| sixseven_2 (3219) | 15000 | 15000 | 5.714 ms | 11.201 ms | 1.837 ms | 3223 KB | 7.2 us |
+| split-tower (495) | 0 | 0 | 0.006 ms | 0.274 ms | 0.017 ms | 91 KB | none |
+| split-tower (495) | 140 | 125 | 0.024 ms | 0.213 ms | 0.071 ms | 125 KB | 3.1 us |
+| split-tower (495) | 1000 | 894 | 0.129 ms | 0.412 ms | 0.150 ms | 327 KB | 3.0 us |
+| split-tower (495) | 5000 | 4471 | 0.704 ms | 1.186 ms | 0.499 ms | 1269 KB | 3.0 us |
+| split-tower (495) | 15000 | 13414 | 2.875 ms | 5.808 ms | 1.263 ms | 3634 KB | 3.2 us |
+| TOWER7 (4429) | 0 | 123 | 0.135 ms | 3.237 ms | 0.367 ms | 732 KB | none |
+| TOWER7 (4429) | 140 | 143 | 0.110 ms | 2.936 ms | 0.307 ms | 725 KB | 23.4 us |
+| TOWER7 (4429) | 1000 | 1000 | 0.415 ms | 3.501 ms | 0.401 ms | 877 KB | 9.5 us |
+| TOWER7 (4429) | 5000 | 5000 | 2.394 ms | 5.271 ms | 0.565 ms | 1585 KB | 8.0 us |
+| TOWER7 (4429) | 15000 | 15000 | 6.886 ms | 18.071 ms | 2.213 ms | 3344 KB | 7.3 us |
+| large (17314) | 0 | 127 | 0.105 ms | 10.307 ms | 0.847 ms | 2057 KB | none |
+| large (17314) | 140 | 140 | 0.094 ms | 8.958 ms | 0.846 ms | 2057 KB | 31.4 us |
+| large (17314) | 1000 | 1000 | 0.313 ms | 9.710 ms | 0.951 ms | 2210 KB | 11.5 us |
+| large (17314) | 5000 | 5000 | 1.633 ms | 12.489 ms | 1.989 ms | 2921 KB | 8.5 us |
+| large (17314) | 15000 | 15000 | 4.776 ms | 14.175 ms | 3.127 ms | 4698 KB | 7.7 us |
 
 What that says:
 

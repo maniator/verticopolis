@@ -7,7 +7,7 @@
 //!
 //! ```text
 //! cargo run --release --features conformance --bin crowd_scale -- \
-//!     [--steps N] [--dt MINUTES] [--sizes 0,140,1000] [tower.vctower ...]
+//!     [--steps N] [--dt MINUTES] [--sizes 0,140,1000] [tower.vctower|tower.TDT ...]
 //! ```
 //!
 //! With no tower named it runs the three towers the design note measured.
@@ -19,16 +19,20 @@ use std::time::Instant;
 use verticopolis_engine::crowd::spawn::{add, spawn_floors};
 use verticopolis_engine::crowd::PState;
 use verticopolis_engine::frame::frame_view;
-use verticopolis_engine::load::{decode_vctower, deserialize};
+use verticopolis_engine::load::{decode_vctower, deserialize, deserialize_tdt};
 use verticopolis_engine::sim::Simulation;
+use verticopolis_engine::tdt::parse::parse_tdt;
 
 /// The ground lobby, where every benchmark trip starts or ends.
 const GROUND_LOBBY: i64 = 1;
 /// The towers the design note's table measured, relative to the repository.
+/// The crate reads only `engine-rs/` and `conformance/` (`tests/read_boundary.rs`),
+/// so a tower elsewhere, such as the web's perf towers, is named on the
+/// command line.
 const DEFAULT_TOWERS: [&str; 3] = [
-    "conformance/fixtures/sixseven_2.vctower",
-    "conformance/fixtures/split-tower.vctower",
-    "src/tests/perfCompare/towers/large.vctower",
+    "fixtures/sixseven_2.vctower",
+    "fixtures/split-tower.vctower",
+    "fixtures/tdt-reddit/TOWER7.TDT",
 ];
 
 struct Options {
@@ -46,7 +50,9 @@ fn usage() -> ! {
 }
 
 fn parse_options() -> Options {
-    let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+    let suite = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("..")
+        .join("conformance");
     let mut options = Options {
         steps: 240,
         // One 60 Hz frame at 15 game minutes a second.
@@ -74,16 +80,27 @@ fn parse_options() -> Options {
         usage();
     }
     if options.towers.is_empty() {
-        options.towers = DEFAULT_TOWERS.iter().map(|t| repo.join(t)).collect();
+        options.towers = DEFAULT_TOWERS.iter().map(|t| suite.join(t)).collect();
     }
     options
 }
 
+/// A `.vctower`, or a 1994 `.TDT` through the importer.
 fn load(path: &Path) -> Simulation {
-    let text = std::fs::read_to_string(path)
-        .unwrap_or_else(|e| panic!("cannot read {}: {e}", path.display()));
-    let raw = decode_vctower(&text).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
-    deserialize(&raw).unwrap_or_else(|e| panic!("{}: {e}", path.display()))
+    let fail = |e: String| -> ! { panic!("{}: {e}", path.display()) };
+    let bytes = std::fs::read(path).unwrap_or_else(|e| fail(e.to_string()));
+    let is_tdt = path
+        .extension()
+        .is_some_and(|ext| ext.eq_ignore_ascii_case("tdt"));
+    if is_tdt {
+        let name = path.file_name().map(|n| n.to_string_lossy().into_owned());
+        let parsed = parse_tdt(&bytes, name.as_deref().unwrap_or("tower.TDT"))
+            .unwrap_or_else(|e| fail(format!("{e:?}")));
+        return deserialize_tdt(&parsed.save).unwrap_or_else(|e| fail(e));
+    }
+    let text = String::from_utf8(bytes).unwrap_or_else(|e| fail(e.to_string()));
+    let raw = decode_vctower(&text).unwrap_or_else(|e| fail(e));
+    deserialize(&raw).unwrap_or_else(|e| fail(e))
 }
 
 /// The floors a tenant trip can end on: leased offices, homes and hotels.
