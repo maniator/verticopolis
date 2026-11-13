@@ -1,0 +1,38 @@
+---
+// Starlight's header drawn as the shared title bar (title-bar.mjs): the logo
+// and the site's name, search, the button to the game, GitHub and the theme
+// switch. The engine docs and the help site both use it as their Header
+// override, each through its own src/components/Header.astro, which passes
+// its logo, the short name a phone shows, and Starlight's Search and
+// ThemeSelect in the `search` and `theme` slots. This file imports nothing
+// from Starlight: the help site builds it with only its own node_modules
+// installed, and those imports would resolve from this folder. Starlight
+// puts the menu button beside it on pages with a side menu; on a phone
+// GitHub and the theme switch sit at the foot of that menu (Starlight's
+// MobileMenuFooter).
+import type { ImageMetadata } from "astro";
+import { barLinks, siteName } from "../../title-bar.mjs";
+
+interface Props {
+  logo: ImageMetadata;
+  /** The site's name on a phone, such as "Help". */
+  short: string;
+  /** Where the game button goes; the game's own address unless given. */
+  game?: string;
+}
+
+const { logo, short, game } = Astro.props;
+const { siteTitle, siteTitleHref } = Astro.locals.starlightRoute;
+---
+
+<div class="vc-bar">
+  <a href={siteTitleHref} class="site-title vc-bar-title">
+    <img src={logo.src} width={logo.width} height={logo.height} alt="" />
+    <Fragment set:html={siteName(siteTitle, short)} />
+  </a>
+  <div class="vc-bar-search print:hidden"><slot name="search" /></div>
+  <div class="vc-bar-links print:hidden">
+    <Fragment set:html={barLinks({ game })} />
+    <div class="vc-bar-theme"><slot name="theme" /></div>
+  </div>
+</div>

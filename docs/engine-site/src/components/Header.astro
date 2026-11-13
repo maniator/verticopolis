@@ -1,0 +1,14 @@
+---
+// The engine docs' header: the shared title bar (TitleBar.astro), handed
+// Starlight's search and theme switch from this site's own Starlight.
+import Search from "@astrojs/starlight/components/Search.astro";
+import ThemeSelect from "@astrojs/starlight/components/ThemeSelect.astro";
+import TitleBar from "./TitleBar.astro";
+import logo from "../assets/logo.png";
+import { SHORT_TITLE } from "../../site.mjs";
+---
+
+<TitleBar logo={logo} short={SHORT_TITLE}>
+  <Search slot="search" />
+  <ThemeSelect slot="theme" />
+</TitleBar>
