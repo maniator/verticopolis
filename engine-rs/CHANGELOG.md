@@ -15,6 +15,13 @@ raised the version, so they are documentation only.
 There is no entry for 0.17.0, which only
 existed as a step inside a stacked branch.
 
+## 1.29.0 (2026-11-13)
+
+- Modern dispatch: a car parked on a stop whose call it owns (`DispatchRules::parked_owner_boards`, `GameMode::parked_owner_boards_its_floor`) boards the statistical estimate there as an arrival does, opening and dwelling, counting the ride, the load and the origin tally. The best-car choice had given it the call while its sweep only looks ahead, so the estimate on a parked car's floor was never boarded. Classic is unchanged.
+- The conformance lock moves for the sixteen Modern scenarios with elevators, the frame-day golden for the two split-tower saves, the fuzz golden for `smoke-modern-five-star` and the Modern every-transport card text; no Classic scenario, frame-day case, fuzz entry or card moves.
+- Docs: Modern's spread homes are never written to the schedule or a save, but a save keeps where each car stands and a `.TDT` export takes an unhomed car's home from there, so a save exported as Classic with a car parked at its spread stop records that stop as its home (a Modern tower is still refused).
+- A retail room's row in the `.TDT` retail table is written in bytes 6 and 7, low byte first (`tdt::retail::with_row_high`); before, a row past 255 wrapped to an earlier room's. `TdtTenant` gains `row_high` (byte 7), and the import tries the rows 256 apart and keeps the one that names the room back, so files written with one byte still read.
+
 ## 1.28.0 (2026-11-13)
 
 - Modern dispatch assigns each hall call to one on-shift car per step (`GameMode::elevators_send_the_best_car`): a car heading to the call within Waiting Car Response wins outright, else the lowest cost in floors (travel, a wrong-way car's trip out to its farthest promised stop and back plus the span, its dwell left and a dwell per promised stop). The span-less-response reach gate is retired from both modes.

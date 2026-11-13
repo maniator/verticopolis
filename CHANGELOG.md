@@ -25,6 +25,13 @@ prompt already tells players it is an engine update and shows the new version.
 Entries below 1.51.1 were curated from the commit history after the fact, so they
 are documentation only: no build that a client fetches carries them.
 
+## 3.5.1
+
+- In Modern towers, an idle elevator waiting on a floor now picks up the people waiting there instead of leaving them for a car that never comes.
+- In Classic, plain floor left between two sky lobby tiles in an older tower can be bulldozed again from its ends. A lobby beyond a gap no longer keeps it in place, and a floor tile right beside a lobby still stays.
+- Placing stairs or escalators in Firefox no longer freezes the tower view; a sound effect that cannot play is now skipped instead of stopping the game.
+- A tower with more than 256 shops, fast food places and restaurants exports to a .TDT file with every room linked to its own retail row, so each keeps its style on the way back in.
+
 ## 3.5.0
 
 - About… now opens About this game straight away. What's new, the release notes and Report a problem are in Help, and Privacy links to its Help page.
