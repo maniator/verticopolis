@@ -1,4 +1,5 @@
 import { html } from "lit-html";
+import { SAVES_DRAW, type SavesDraw } from "../ui/savesDraw";
 import type { GameApp } from "../main";
 import { SaveGame, type SlotInfo } from "../storage/SaveGame";
 import { scheduleReviewEntry } from "../ui/templates/scheduleReview";
@@ -123,8 +124,10 @@ export async function confirmExterminate(app: GameApp): Promise<void> {
   );
 }
 
-export function showSaves(app: GameApp): void {
-  trackAppAction("saves_open"); // saves manager modal opening
+/** Draw the Saved Towers dialog. Only the player opening it counts as a
+ *  `saves_open`; a redraw from inside the dialog does not (#2161). */
+export function showSaves(app: GameApp, draw: SavesDraw): void {
+  if (draw === SAVES_DRAW.open) trackAppAction("saves_open");
   const rows = SaveGame.listSlots();
   app.ui.showSaves(rows, SaveGame.unreadableBackup(), savesGuard(app, rows));
 }

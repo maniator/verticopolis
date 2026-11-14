@@ -1,4 +1,5 @@
 import type { BulldozeDragPicker, LobbyHeightPicker } from "../ui/templates/toolInfo";
+import type { SavesDraw } from "../ui/savesDraw";
 import { trackAppAction } from "../analytics";
 import { wellFormed } from "../shared/wellFormed";
 import type { UICallbacks, Tool } from "../ui/UI";
@@ -77,7 +78,7 @@ export interface GameAppPorts {
    *  (panelAnchoring reads it as the caption-below signal). */
   clearBuildRefusal(): void;
   showStats(): void;
-  showSaves(): void;
+  showSaves(draw: SavesDraw): void;
   saveToSlot(slot: number): boolean;
   loadFromSlot(slot: number | "auto"): void;
   deleteSlot(slot: number): void;
@@ -164,7 +165,7 @@ export function createUICallbacks(app: GameAppPorts): UICallbacks {
       app.clearBuildRefusal();
       app.inspector.dismiss();
     },
-    onShowSaves: () => app.showSaves(),
+    onShowSaves: (draw) => app.showSaves(draw),
     onSaveSlot: (slot) => app.saveToSlot(slot),
     onLoadSlot: (slot) => app.loadFromSlot(slot),
     onDeleteSlot: (slot) => app.deleteSlot(slot),

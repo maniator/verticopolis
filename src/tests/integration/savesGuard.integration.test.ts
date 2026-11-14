@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mountAppDom, makeUI } from "../uiFixture";
 import type { SlotInfo } from "../../storage/SaveGame";
 import type { SavesGuard, UndoResult } from "../../ui/templates/saves";
+import { SAVES_DRAW } from "../../ui/savesDraw";
 
 /**
  * The Saved Towers overwrite guard in the real dialog: a save over another
@@ -38,7 +39,7 @@ describe("Saved Towers overwrite guard", () => {
     ui.showSaves(slots, null, guard());
     press('[data-save="1"]');
     expect(cb.onSaveSlot).toHaveBeenCalledExactlyOnceWith(1);
-    expect(cb.onShowSaves).toHaveBeenCalledOnce();
+    expect(cb.onShowSaves).toHaveBeenCalledExactlyOnceWith(SAVES_DRAW.redraw); // a redraw, not an open (#2161)
   });
 
   it("saves into an empty slot at once", () => {
@@ -85,7 +86,7 @@ describe("Saved Towers overwrite guard", () => {
     press('[data-save="2"]');
     press('[data-act="yes"]');
     expect(cb.onSaveSlot).toHaveBeenCalledExactlyOnceWith(2);
-    expect(cb.onShowSaves).toHaveBeenCalledOnce();
+    expect(cb.onShowSaves).toHaveBeenCalledExactlyOnceWith(SAVES_DRAW.redraw); // a redraw, not an open (#2161)
   });
 
   it("a failed save leaves the dialog as it is, so the failure said inside it stays on screen", () => {
@@ -123,7 +124,7 @@ describe("Saved Towers overwrite guard", () => {
     ui.showSaves(slots, null, guard({ undo: { slot: 2, towerName: "Old", action: "replaced", run } }));
     press('[data-act="undo"]');
     expect(run).toHaveBeenCalledOnce();
-    expect(cb.onShowSaves).toHaveBeenCalledOnce();
+    expect(cb.onShowSaves).toHaveBeenCalledExactlyOnceWith(SAVES_DRAW.redraw); // a redraw, not an open (#2161)
   });
 
   it("a failed Undo leaves the dialog up, so the failure said inside it stays on screen", () => {
@@ -138,7 +139,7 @@ describe("Saved Towers overwrite guard", () => {
     const { ui, cb } = makeUI();
     ui.showSaves(slots, null, guard({ undo: { slot: 2, towerName: "Old", action: "replaced", run: (): UndoResult => "gone" } }));
     press('[data-act="undo"]');
-    expect(cb.onShowSaves).toHaveBeenCalledOnce();
+    expect(cb.onShowSaves).toHaveBeenCalledExactlyOnceWith(SAVES_DRAW.redraw); // a redraw, not an open (#2161)
   });
 
   it("refuses a save over a slot written since with a save this version can't read", () => {
@@ -147,7 +148,7 @@ describe("Saved Towers overwrite guard", () => {
     ui.showSaves(slots, null, guard({ replaceTarget }));
     press('[data-save="3"]'); // drawn empty
     expect(cb.onSaveSlot).not.toHaveBeenCalled();
-    expect(cb.onShowSaves).toHaveBeenCalledOnce();
+    expect(cb.onShowSaves).toHaveBeenCalledExactlyOnceWith(SAVES_DRAW.redraw); // a redraw, not an open (#2161)
     expect(dialog().textContent).toContain("Slot 3 holds a save this version can't read");
   });
 

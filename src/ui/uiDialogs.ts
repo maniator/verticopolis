@@ -1,4 +1,5 @@
 import type { UI } from "./UI";
+import { SAVES_DRAW } from "./savesDraw";
 import { confirmTemplate, installHelpTemplate, type InstallHelpVariant } from "./templates/confirm";
 import { eventChoiceTemplate } from "./templates/eventChoice";
 import { updatePromptTemplate } from "./templates/updatePrompt";
@@ -69,7 +70,7 @@ export function showSaves(ui: UI, slots: SlotInfo[], unreadable: string | null =
       // A failed write leaves the dialog as it is, with the failure said
       // inside it; a redraw would wipe that line.
       const save = (): void => {
-        if (ui.cb.onSaveSlot(slot)) ui.cb.onShowSaves();
+        if (ui.cb.onSaveSlot(slot)) ui.cb.onShowSaves(SAVES_DRAW.redraw);
       };
       // The confirm may be up a while: check again at Replace, so a slot
       // another tab filled meanwhile with a save this version can't read is
@@ -97,7 +98,7 @@ export function showSaves(ui: UI, slots: SlotInfo[], unreadable: string | null =
   box.querySelectorAll<HTMLElement>("[data-del]").forEach((b) =>
     b.addEventListener("click", () => {
       ui.cb.onDeleteSlot(Number(b.dataset.del));
-      ui.cb.onShowSaves();
+      ui.cb.onShowSaves(SAVES_DRAW.redraw);
     }),
   );
   const undo = guard.undo;
@@ -111,7 +112,7 @@ export function showSaves(ui: UI, slots: SlotInfo[], unreadable: string | null =
           // Redraw unless the write failed: after "gone" the line goes away,
           // and a failure stays said inside the dialog as it is.
           undo: () => {
-            if (undo.run() !== "failed") ui.cb.onShowSaves();
+            if (undo.run() !== "failed") ui.cb.onShowSaves(SAVES_DRAW.redraw);
           },
         }),
     export: () => {
@@ -150,7 +151,7 @@ function replaceTarget(slots: SlotInfo[], guard: SavesGuard, slot: number): Slot
  *  read. The list never offers Save on such a slot, since a newer version may
  *  still open it, so the click redraws the list and says why. */
 function refuseUnreadable(ui: UI, slot: number): void {
-  ui.cb.onShowSaves();
+  ui.cb.onShowSaves(SAVES_DRAW.redraw);
   ui.sayVisibly(`Slot ${slot} holds a save this version can't read, so it can't be saved over. Save to another slot.`);
 }
 
