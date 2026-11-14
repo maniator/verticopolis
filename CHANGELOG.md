@@ -25,6 +25,11 @@ prompt already tells players it is an engine update and shows the new version.
 Entries below 1.51.1 were curated from the commit history after the fact, so they
 are documentation only: no build that a client fetches carries them.
 
+## 3.8.0
+
+- In Modern, a stairway right beside a cinema, party hall, metro station or aquatic center is drawn as a spiral staircase, and an escalator there turns back on a steel landing halfway up. They link the same two floors as before; only the look changes. Classic keeps straight flights, as in 1994.
+- Someone climbing a stack of one-story flights (an escalator up to a deck, then stairs on up from it) is drawn on the flight they are actually riding, instead of staying on the first one.
+
 ## 3.7.4
 
 - A shop, restaurant or theater near a working Metro platform no longer warns that it is too far from a lobby, and does full business, as the 1994 game's basement shops beside the station did.
