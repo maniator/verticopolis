@@ -10,8 +10,9 @@ use crate::load::NEWER_SAVE_REFUSAL;
 use crate::sim::{Simulation, PLAIN_SAVE_VERSION, SAVE_VERSION};
 use serde_json::{json, Value};
 
-/// The newest save version this build writes: 8, for a tower with a tall
-/// lobby (#308); a tower without one is still written at 7.
+/// The newest save version this build writes: 10, for a tower with an
+/// elevator hour held back (#1546); 9 for one with a tall lobby (#308) and
+/// none held, and 7 for any other tower.
 const CURRENT_SAVE_VERSION: i64 = 10;
 
 fn stamped(mut save: Value, app_version: &str) -> Value {

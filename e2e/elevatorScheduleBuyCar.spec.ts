@@ -73,3 +73,43 @@ test("a car bought on a scheduled shaft keeps the cut-back hours, and the dialog
   expect(await hours(page, SHAFT, "weekend")).toEqual(Array(24).fill(6));
   await expectEngineHosted(page);
 });
+
+test("a car sold and bought back leaves a cut-back hour as it was and fills the whole-fleet hours, each day type on its own", async ({ page }) => {
+  await page.goto("/");
+  await page.waitForFunction(() => !!(window as any).game, undefined, { timeout: 30_000 });
+  await page.evaluate((text) => {
+    const g = (window as any).game;
+    g.onboarding.dismissSplash();
+    g.setSpeed(0);
+    return g.saveLoad.importGame(text);
+  }, TOWER);
+  await expect(page.getByText("Tower imported.")).toBeVisible();
+  // Weekdays: 17:00 runs all 5 cars and the rest 3. Weekends: 09:00 is cut back to 4 and the rest run all 5.
+  await page.evaluate((id) => {
+    const port = (window as any).game.enginePort;
+    const slots = Float64Array.from(port.shaftSchedule(id) as Float64Array);
+    for (let h = 0; h < 24; h++) {
+      slots[1 + h] = h === 17 ? 5 : 3;
+      slots[26 + h] = h === 9 ? 4 : 5;
+    }
+    port.scheduleShaft(id, slots);
+    const g = (window as any).game;
+    g.selected = { type: "transport", id };
+    g.engine.selectedId = id;
+    g.refreshEditor();
+  }, SHAFT);
+  const weekday = Array.from({ length: 24 }, (_, h) => (h === 17 ? 5 : 3));
+  const weekend = Array.from({ length: 24 }, (_, h) => (h === 9 ? 4 : 5));
+  expect(await hours(page, SHAFT, "weekday")).toEqual(weekday);
+  expect(await hours(page, SHAFT, "weekend")).toEqual(weekend);
+
+  await page.click('#editor [data-edit="removecar"]');
+  await expect(page.locator('#editor [data-field="cars"]')).toContainText("4 / 8 max");
+  expect(await hours(page, SHAFT, "weekend")).toEqual(Array(24).fill(4));
+
+  // Weekend 09:00 now runs the fleet of 4 only because of the sale, so the car bought back skips it.
+  await page.click('#editor [data-edit="addcar"]');
+  await expect(page.locator('#editor [data-field="cars"]')).toContainText("5 / 8 max");
+  expect(await hours(page, SHAFT, "weekday")).toEqual(weekday);
+  expect(await hours(page, SHAFT, "weekend")).toEqual(weekend);
+});

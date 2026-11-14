@@ -453,7 +453,7 @@ impl Tower {
     /// Whether a shaft's schedule holds an hour back (#1546), which a save
     /// carries as version 10.
     pub fn holds_an_hour_back(&self) -> bool {
-        let held = |t: &Transport| t.schedule.as_ref().is_some_and(|s| s.held_back.is_some());
+        let held = |t: &Transport| t.schedule.as_ref().is_some_and(Schedule::holds_an_hour);
         self.transports.iter().any(held)
     }
 

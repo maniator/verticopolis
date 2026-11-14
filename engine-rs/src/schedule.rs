@@ -151,6 +151,12 @@ impl Schedule {
         }
     }
 
+    /// Whether an hour of either day type is held back (#1546).
+    pub fn holds_an_hour(&self) -> bool {
+        let held = self.held_back.as_ref();
+        held.is_some_and(|h| !h.weekday.is_empty() || !h.weekend.is_empty())
+    }
+
     /// Fits the duty pattern to a fleet that went from `was` cars to `cars`
     /// (#1546). A car bought joins every hour that ran the whole fleet; an
     /// hour the player cut back keeps its count, and so does one held back
@@ -164,7 +170,10 @@ impl Schedule {
             (&mut self.weekday, &mut held.weekday),
             (&mut self.weekend, &mut held.weekend),
         ] {
-            let Some(row) = row else { continue };
+            let Some(row) = row else {
+                hours.clear();
+                continue;
+            };
             for (h, active) in row.iter_mut().enumerate() {
                 let held_here = hours.contains(&h);
                 if cars > was && *active >= was && !held_here {
@@ -173,10 +182,13 @@ impl Schedule {
                     hours.push(h);
                 }
             }
+            // Held only while the hour runs the whole fleet once the clamp
+            // to `cars` applies.
+            hours.retain(|&h| row.get(h).is_some_and(|&active| active >= cars));
             hours.sort_unstable();
         }
-        // `coerce` drops a held hour that is no longer at the fleet's size.
-        self.held_back = Some(held);
+        let holds = !held.weekday.is_empty() || !held.weekend.is_empty();
+        self.held_back = holds.then_some(held);
     }
 
     /// `cloneSchedule` as a save writes it (set keys only).

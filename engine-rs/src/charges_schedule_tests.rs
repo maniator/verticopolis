@@ -223,3 +223,40 @@ fn an_edit_states_every_hour_and_held_hours_stay_only_at_the_fleet_size() {
         })
     );
 }
+
+/// A refit that holds nothing leaves no held list, so the save keeps the
+/// version older builds open (#1546 review).
+#[test]
+fn a_refit_that_holds_nothing_leaves_no_held_list_and_the_old_save_version() {
+    let (mut sim, _, _, _) = four_car_shaft();
+    let mut whole = Schedule {
+        weekday: Some(vec![4; 24]),
+        weekend: Some(vec![4; 24]),
+        waiting_car_response: None,
+        standard_floor_departure: None,
+        home_floors: None,
+        held_back: None,
+    };
+    whole.refit(4, 3);
+    assert_eq!(
+        whole.held_back, None,
+        "a sale that cut no hour back holds none"
+    );
+    whole.refit(3, 4);
+    assert_eq!(whole.held_back, None, "a buy holds nothing");
+    assert!(!whole.holds_an_hour());
+
+    let s = sim.tower.transports[0].schedule.as_mut().unwrap();
+    s.held_back = Some(crate::schedule::HeldBack::default());
+    s.refit(4, 5);
+    assert_eq!(s.held_back, None);
+    let s = sim.tower.transports[0].schedule.as_mut().unwrap();
+    s.held_back = Some(crate::schedule::HeldBack::default());
+    assert!(
+        !sim.tower.holds_an_hour_back(),
+        "an empty held list holds nothing"
+    );
+    let text = sim.save_text();
+    let version = serde_json::from_str::<serde_json::Value>(&text).unwrap()["version"].clone();
+    assert_eq!(version, 7);
+}
