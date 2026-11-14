@@ -41,6 +41,7 @@ mod golden_master;
 mod heatmap;
 mod home_parking;
 mod hotel_late_checkout;
+mod housekeeping_commute;
 mod housekeeping_legibility;
 mod housekeeping_maids;
 mod housekeeping_triage;

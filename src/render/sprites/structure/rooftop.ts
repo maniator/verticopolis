@@ -5,6 +5,8 @@
  * constants); all pure ctx-only draws.
  */
 
+import { TILE } from "../../scale";
+
 /** The hand-tuned base raster of the crane drawing (every coordinate in
  *  drawCrane is authored against this grid; scale, never retune). */
 const CRANE_BASE_W = 128;
@@ -19,6 +21,18 @@ export const CRANE_SCALE = 3;
 /** Canvas size of the rooftop tower-crane graphic (scaled). */
 export const CRANE_W = CRANE_BASE_W * CRANE_SCALE;
 export const CRANE_H = CRANE_BASE_H * CRANE_SCALE;
+/** Where the mast stands across the base raster, and the width of the roof
+ *  pad under it, in base pixels. The jib reaches right, so the mast is left
+ *  of the drawing's middle. */
+const CRANE_BASE_MAST_X = 56;
+const CRANE_BASE_PAD_W = 14;
+/** The mast's x in the scaled crane graphic, as a share of its width: the
+ *  crane actor's anchor, so the mast (not the middle of the jib) stands over
+ *  the roof it is perched on. */
+export const CRANE_MAST_ANCHOR_X = CRANE_BASE_MAST_X / CRANE_BASE_W;
+/** The narrowest roof, in tiles, the crane's pad fits on. A narrower top (a
+ *  spire, a one-tile column) has no room for a crane, so none is shown. */
+export const CRANE_MIN_ROOF_TILES = Math.ceil((CRANE_BASE_PAD_W * CRANE_SCALE) / TILE);
 
 /**
  * Where to perch the rooftop crane along the top floor, in world-tile units
@@ -34,6 +48,13 @@ export const CRANE_H = CRANE_BASE_H * CRANE_SCALE;
  * as a one-wide gap that splits a run.
  */
 export function craneAnchorTile(builtTiles: Iterable<number>): number {
+  return craneRoof(builtTiles).center;
+}
+
+/** The widest run of `builtTiles` (see {@link craneAnchorTile}): its center
+ *  in world-tile units and its width in tiles, which says whether the
+ *  crane's pad fits on it ({@link CRANE_MIN_ROOF_TILES}). */
+export function craneRoof(builtTiles: Iterable<number>): { center: number; width: number } {
   const xs = [...new Set(builtTiles)].sort((a, b) => a - b);
   let bestStart = xs[0];
   let bestEnd = xs[0];
@@ -49,7 +70,7 @@ export function craneAnchorTile(builtTiles: Iterable<number>): number {
     }
   }
   // bestEnd is the last tile index (inclusive); its right edge is bestEnd + 1.
-  return (bestStart + bestEnd + 1) / 2;
+  return { center: (bestStart + bestEnd + 1) / 2, width: bestEnd + 1 - bestStart };
 }
 
 /**
@@ -71,13 +92,13 @@ export function drawCrane(ctx: CanvasRenderingContext2D, t: number, lit: boolean
   ctx.save();
   ctx.scale(CRANE_SCALE, CRANE_SCALE);
   const baseY = CRANE_BASE_H; // canvas bottom sits on the roof line
-  const mx = 56; // mast center
+  const mx = CRANE_BASE_MAST_X; // mast center
   const jibY = 18; // jib chord height
   const steel = "#e0a83c";
   const dark = "#9a6f1e";
   // Roof pad under the mast.
   ctx.fillStyle = "#6b6f78";
-  ctx.fillRect(mx - 7, baseY - 3, 14, 3);
+  ctx.fillRect(mx - CRANE_BASE_PAD_W / 2, baseY - 3, CRANE_BASE_PAD_W, 3);
   // Lattice mast: two chords with X-bracing.
   ctx.fillStyle = steel;
   ctx.fillRect(mx - 3, jibY, 2, baseY - 3 - jibY);

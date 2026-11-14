@@ -13,13 +13,13 @@ mod meal_trips;
 mod staff;
 
 use meal_trips::{push_meal_options, spawn_meal_outbound};
-pub use staff::{max_staff_for, spawn_staff, spawn_step, StaffSpawn};
+pub use staff::spawn_step;
 
 // ---- trips.ts -------------------------------------------------------------
 
 /// `(crowd.nextId * 2654435761) | 0`: a double product (rounded past 2^53,
 /// which an id above about 3.4 million reaches) then ToInt32.
-fn seed_for(next_id: i64) -> i32 {
+pub(super) fn seed_for(next_id: i64) -> i32 {
     let product = next_id as f64 * 2654435761.0;
     product.rem_euclid(4294967296.0) as u32 as i32
 }
@@ -70,6 +70,8 @@ pub fn make_person(
         routine: None,
         linger_for: None,
         from_metro: false,
+        crew_id: None,
+        staff_trip: None,
     };
     crowd.next_id += 1;
     crowd.people.push(person);
@@ -320,8 +322,15 @@ fn list_of(floors: &SpawnFloors, l: List) -> &[i64] {
 
 /// A full crowd spawns no one: `spawn_trips` returns on it before any draw,
 /// and `spawn_step` skips the floor lists on it (#1143 item 4).
+/// The tenants' and visitors' sample is full. Housekeepers on shift are
+/// counted apart: they are in the building all shift, and would otherwise
+/// crowd the tenants out of the picture.
 fn crowd_is_full(crowd: &Crowd) -> bool {
-    crowd.people.len() >= MAX_PEOPLE
+    crowd
+        .people
+        .len()
+        .saturating_sub(crowd.staff_count.max(0) as usize)
+        >= MAX_PEOPLE
 }
 
 pub fn spawn_trips(crowd: &mut Crowd, tower: &mut Tower, clock: &Clock, floors: &SpawnFloors) {

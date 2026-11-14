@@ -25,6 +25,28 @@ prompt already tells players it is an engine update and shows the new version.
 Entries below 1.51.1 were curated from the commit history after the fact, so they
 are documentation only: no build that a client fetches carries them.
 
+## 3.10.4
+
+- Fire escapes now run up every story beside a tall lobby, split-tower halls included, so they no longer break off beside the hall.
+- The roof crane stands with its mast on the middle of the top floor's widest stretch and sits on top of a tall lobby there. A top too narrow for its base, such as a one-tile spire, shows no crane.
+
+## 3.10.3
+
+- Studios and apartments can no longer be built in the basement, the same as condos, hotel rooms and offices. Towers that already have them underground still load and keep them.
+
+## 3.10.2
+
+- Housekeepers now come in through the lobby before their shift and leave through it at the end, and no longer appear at the Housekeeping room or vanish at a hotel room.
+- A housekeeper who finishes a room goes straight on to the nearest dirty one, and rides back to the Housekeeping room only when none is left, so a busy hotel is clean sooner in the afternoon.
+
+## 3.10.1
+
+- The VERTICOPOLIS badge at the top left of the game now carries its ™ mark, like the title screen. So do the version line in Settings and About this game, and the sprite gallery and missing-page titles.
+
+## 3.10.0
+
+- Modern towers can now build up to three Metro stations, all on the same line as the first. Riders split between them, someone going back to the train walks to the nearest one, and one train runs the line, calling at each station in turn.
+
 ## 3.9.0
 
 - Saved Towers asks before a save replaces a tower in an occupied slot, unless it knows that slot holds the tower you're playing: that slot is marked This tower and still saves in one click.

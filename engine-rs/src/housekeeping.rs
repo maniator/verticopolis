@@ -1,10 +1,10 @@
 //! Port of `economy/housekeeping.ts`.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 use crate::crowd::fasthash::FastMap;
-use crate::crowd::spawn::{spawn_staff, StaffSpawn};
 use crate::facilities::Kind;
+use crate::housekeeping_shift::MaidSent;
 use crate::sim::{LogKind, Simulation};
 use crate::tower::{Tower, UnitState};
 
@@ -15,13 +15,13 @@ pub const INFEST_DAYS: i64 = 3;
 /// A housekeeping unit as dispatch reads it: (id, floor, x, width).
 type Crew = (i64, i64, i64, i64);
 /// A dirty hotel room no crew holds yet: (id, floor, x, width, dirtyDays).
-type Candidate = (i64, i64, i64, i64, i64);
+pub(crate) type Candidate = (i64, i64, i64, i64, i64);
 
 /// Each floor's crew order for dispatch, kept from one pass to the next
 /// while the tower revision, the mode and the operational crews stay the
 /// same, since the orders read nothing else (#1143 item 6). Never saved: a
 /// load builds a fresh `Housekeeping`.
-struct CrewOrders {
+pub(crate) struct CrewOrders {
     revision: i64,
     nearest_crew_first: bool,
     crews: Vec<Crew>,
@@ -57,7 +57,7 @@ impl CrewOrders {
     /// one sort, until the key changes, where the TypeScript's
     /// `crewOrderByFloor` sorts once per floor per pass in Modern and the Rust
     /// used to clone the crews for every dirty room and, in Modern, sort them.
-    fn for_floor(&mut self, tower: &Tower, floor: i64) -> &[Crew] {
+    pub(crate) fn for_floor(&mut self, tower: &Tower, floor: i64) -> &[Crew] {
         debug_assert_eq!(self.revision, tower.revision, "orders kept past an edit");
         let (crews, comps, nearest_crew_first) =
             (&self.crews, &self.comps, self.nearest_crew_first);
@@ -81,6 +81,21 @@ impl CrewOrders {
     }
 }
 
+/// The dirty rooms a dispatch works from, read in one walk of the rooms and
+/// kept through the chunks of one step: between chunks only cleaning changes
+/// which rooms are dirty and free, and a room a housekeeper gives back drops
+/// them. The step's end and every hourly pass let them go.
+pub(crate) struct StepRooms {
+    pub(crate) orders: CrewOrders,
+    /// The dirty rooms no crew held when they were read, in dispatch order
+    /// (tower order in Classic, score order in Modern). Rooms taken since
+    /// stay listed; `room_open` says which are still free.
+    pub(crate) candidates: Vec<Candidate>,
+    /// Indexes into `candidates` by floor, for a housekeeper's nearest next
+    /// room.
+    pub(crate) by_floor: BTreeMap<i64, Vec<usize>>,
+}
+
 pub struct Housekeeping {
     /// room id -> (crew id, floor)
     assigned_room: HashMap<i64, (i64, i64)>,
@@ -93,7 +108,10 @@ pub struct Housekeeping {
     pub yesterday: Option<(i64, i64)>,
     /// Day the "can't reach" nudge last fired; -1 before the first.
     nudged_day: i64,
+    /// Day the "can't get in from the lobby" nudge last fired.
+    pub(crate) commute_nudged_day: i64,
     crew_orders: Option<CrewOrders>,
+    pub(crate) step_rooms: Option<StepRooms>,
 }
 
 impl Default for Housekeeping {
@@ -105,7 +123,9 @@ impl Default for Housekeeping {
             cleaned_today: 0,
             yesterday: None,
             nudged_day: -1,
+            commute_nudged_day: -1,
             crew_orders: None,
+            step_rooms: None,
         }
     }
 }
@@ -117,7 +137,31 @@ impl Housekeeping {
         self.floors_busy.clear();
     }
 
-    fn assign_room(&mut self, room_id: i64, crew_id: i64, floor: i64) {
+    /// Whether `crew` has a maid to spare and nobody of theirs on `floor`.
+    pub(crate) fn crew_may_take(&self, crew: i64, floor: i64) -> bool {
+        self.maids_out.get(&crew).copied().unwrap_or(0) < HK_MAIDS_PER_UNIT
+            && !self
+                .floors_busy
+                .get(&crew)
+                .is_some_and(|s| s.contains(&floor))
+    }
+
+    /// Whether a room read for a pass is still dirty and held by no crew.
+    pub(crate) fn room_open(&self, tower: &Tower, room_id: i64) -> bool {
+        !self.assigned_room.contains_key(&room_id)
+            && tower
+                .get_unit(room_id)
+                .is_some_and(|u| u.state == UnitState::Dirty)
+    }
+
+    /// Let the step's rooms go, keeping the crew orders for the next pass.
+    pub(crate) fn drop_step_rooms(&mut self) {
+        if let Some(rooms) = self.step_rooms.take() {
+            self.crew_orders = Some(rooms.orders);
+        }
+    }
+
+    pub(crate) fn assign_room(&mut self, room_id: i64, crew_id: i64, floor: i64) {
         self.assigned_room.insert(room_id, (crew_id, floor));
         *self.maids_out.entry(crew_id).or_insert(0) += 1;
         self.floors_busy.entry(crew_id).or_default().insert(floor);
@@ -287,31 +331,33 @@ impl Simulation {
         }
     }
 
-    fn can_start_new_room(&self) -> bool {
+    pub(crate) fn can_start_new_room(&self) -> bool {
         let s = self.mode.housekeeping_shift();
         let h = self.clock.minute_of_day() / 60.0;
         h >= s.start as f64 && h < s.cutoff
     }
 
-    /// `Housekeeping.dispatch`.
+    /// `Housekeeping.dispatch`, from a fresh read of the rooms: the hourly
+    /// pass, and any caller outside a step's chunks.
     pub fn dispatch_housekeepers(&mut self) {
-        if !self.can_start_new_room() {
-            return;
-        }
-        if self.tower.housekeeping_units() == 0 {
-            return;
+        self.housekeeping.drop_step_rooms();
+        self.dispatch_pass();
+    }
+
+    /// The rooms a pass works from: the step's, when a chunk of this step
+    /// already read them, or one fresh walk of the rooms. None with no
+    /// working crew.
+    pub(crate) fn rooms_for_pass(&mut self) -> Option<StepRooms> {
+        if let Some(rooms) = self.housekeeping.step_rooms.take() {
+            return Some(rooms);
         }
         // The room walk reads live state (dirt, assignments, fires and
         // construction) that changes without a revision bump.
         let (crews, mut candidates) = self.housekeeping.crews_and_rooms(&self.tower);
-        // With no crew or no room the pass would assign, count and log
-        // nothing.
-        if crews.is_empty() || candidates.is_empty() {
-            return;
+        if crews.is_empty() {
+            return None;
         }
         let nearest_crew_first = self.mode.housekeeping_sends_nearest_crew();
-        // Taken out for the pass and put back after the room loop, which has
-        // no early return.
         let mut orders = match self.housekeeping.crew_orders.take() {
             Some(o) if o.holds(&self.tower, nearest_crew_first, &crews) => o,
             _ => CrewOrders::new(&self.tower, nearest_crew_first, crews),
@@ -344,50 +390,59 @@ impl Simulation {
             });
             candidates = scored.into_iter().map(|(_, r)| r).collect();
         }
+        let mut by_floor: BTreeMap<i64, Vec<usize>> = BTreeMap::new();
+        for (k, room) in candidates.iter().enumerate() {
+            by_floor.entry(room.1).or_default().push(k);
+        }
+        Some(StepRooms {
+            orders,
+            candidates,
+            by_floor,
+        })
+    }
+
+    /// One dispatch pass: hand the dirty rooms no crew holds, in dispatch
+    /// order, to the crews' free housekeepers.
+    pub(crate) fn dispatch_pass(&mut self) {
+        if !self.can_start_new_room() || self.tower.housekeeping_units() == 0 {
+            return;
+        }
+        let Some(rooms) = self.rooms_for_pass() else {
+            return;
+        };
+        let StepRooms {
+            mut orders,
+            mut candidates,
+            ..
+        } = rooms;
+        candidates.retain(|room| self.housekeeping.room_open(&self.tower, room.0));
         let mut unreachable = 0;
+        let mut free = self.free_maids();
         for room in &candidates {
             let (rid, rfloor, rx, rw, _) = *room;
             let mut reachable = false;
             let mut transient = false;
             let mut no_route = false;
             for crew in orders.for_floor(&self.tower, rfloor) {
-                let (cid, cfloor, cx, cw) = *crew;
+                let cid = crew.0;
                 reachable = true;
-                if self.housekeeping.maids_out.get(&cid).copied().unwrap_or(0) >= HK_MAIDS_PER_UNIT
-                {
-                    transient = true;
-                    continue;
-                }
-                if self
-                    .housekeeping
-                    .floors_busy
-                    .get(&cid)
-                    .is_some_and(|s| s.contains(&rfloor))
-                {
+                if !self.housekeeping.crew_may_take(cid, rfloor) {
                     transient = true;
                     continue;
                 }
                 // `x + width / 2` as a float, as the TypeScript passes it: a
                 // kept-legacy odd width lands on a half tile.
                 let dest_x = rx as f64 + rw as f64 / 2.0;
-                let from_x = cx as f64 + cw as f64 / 2.0;
-                let sent = spawn_staff(
-                    &mut self.crowd,
-                    &self.tower,
-                    cfloor,
-                    rfloor,
-                    dest_x,
-                    rid,
-                    HK_CLEAN_MINUTES,
-                    Some(from_x),
-                );
-                if sent == StaffSpawn::Full {
-                    transient = true;
-                    break;
-                }
-                if sent == StaffSpawn::NoRoute {
-                    no_route = true;
-                    continue;
+                match self.assign_maid(&mut free, cid, (rid, rfloor, dest_x)) {
+                    MaidSent::Sent => {}
+                    MaidSent::NoneFree => {
+                        transient = true;
+                        continue;
+                    }
+                    MaidSent::NoRoute => {
+                        no_route = true;
+                        continue;
+                    }
                 }
                 self.housekeeping.assign_room(rid, cid, rfloor);
                 break;
@@ -429,46 +484,5 @@ impl Simulation {
 mod housekeeping_dispatch_tests;
 
 #[cfg(test)]
-mod tests {
-    use crate::clock::GameMode;
-    use crate::facilities::Kind;
-    use crate::sim::Simulation;
-    use crate::tower::UnitState;
-
-    #[test]
-    fn the_morning_checkout_latches_yesterdays_shift() {
-        let mut sim = Simulation::new_game(9, GameMode::Classic);
-        sim.money = 1e9;
-        sim.star = 3;
-        for x in 170..200 {
-            assert!(sim.build(Kind::Lobby, 1, x).ok);
-            assert!(sim.build(Kind::Floor, 2, x).ok);
-        }
-        assert!(sim.build(Kind::HotelSingle, 2, 172).ok);
-        assert!(sim.build(Kind::HotelSingle, 2, 180).ok);
-        assert_eq!(sim.housekeeping.yesterday, None);
-        for u in sim
-            .tower
-            .units
-            .iter_mut()
-            .filter(|u| u.kind == Kind::HotelSingle)
-        {
-            u.state = UnitState::Dirty;
-        }
-        sim.housekeeping.cleaned_today = 3;
-        sim.housekeeping_before_checkout();
-        assert_eq!(sim.housekeeping.yesterday, Some((3, 2)));
-        assert_eq!(sim.housekeeping.cleaned_today, 0);
-        // A quiet day latches the zero result too.
-        for u in sim
-            .tower
-            .units
-            .iter_mut()
-            .filter(|u| u.kind == Kind::HotelSingle)
-        {
-            u.state = UnitState::Empty;
-        }
-        sim.housekeeping_before_checkout();
-        assert_eq!(sim.housekeeping.yesterday, Some((0, 0)));
-    }
-}
+#[path = "housekeeping_checkout_tests.rs"]
+mod housekeeping_checkout_tests;

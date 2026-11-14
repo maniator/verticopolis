@@ -160,8 +160,10 @@ fn a_dispatched_maid_steps_out_of_her_station() {
     let hk = sim.tower.place(Kind::Housekeeping, 2, X0 + 8);
     assert!(hk.ok);
     let crew = sim.tower.get_unit(hk.unit_id.unwrap()).unwrap().clone();
+    sim.seat_crews();
     sim.clock.minutes = ONE_PM;
     sim.dispatch_housekeepers();
-    let maid = sim.crowd.people.iter().find(|p| p.staff).expect("a maid");
+    let maid = sim.crowd.people.iter().find(|p| p.clean_unit_id.is_some());
+    let maid = maid.expect("a maid on the room");
     assert_eq!(maid.x, (crew.x as f64) + (crew.width as f64) / 2.0);
 }
