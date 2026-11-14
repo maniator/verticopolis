@@ -1,5 +1,6 @@
 //! Port of `crowd/motion.ts`: the per-slice person state machine.
 
+use super::doors::route_out_nearest;
 use super::landing::{landing_slots, Landings};
 use super::spawn::{inside_x, metro_station_for_platform, pick_x, pick_x_in_segment};
 use super::staff_shift;
@@ -287,13 +288,25 @@ fn transition_to_return(crowd: &mut Crowd, tower: &mut Tower, i: usize) {
         None => crowd.people[i].floors[0],
     };
     let from_x = crowd.people[i].x;
-    let r = crowd.route(
-        tower,
-        venue_floor,
-        origin_floor,
-        Some(from_x),
-        origin.map(|o| o.1 as f64),
-    );
+    // With no room to go back to (a customer from outside, someone whose
+    // room went), leave by the run of the floor nearest the venue that a
+    // route reaches: the lobby under it, not the lot's leftmost (`doors`).
+    let seed = crowd.people[i].seed;
+    let exit = match origin {
+        None => route_out_nearest(crowd, tower, venue_floor, from_x, origin_floor, seed),
+        Some(_) => None,
+    };
+    let exit_x = exit.as_ref().map(|e| e.1);
+    let r = match exit {
+        Some((r, _)) => Some(r),
+        None => crowd.route(
+            tower,
+            venue_floor,
+            origin_floor,
+            Some(from_x),
+            origin.map(|o| o.1 as f64),
+        ),
+    };
     let Some(r) = r else {
         crowd.people[i].returning = true;
         finish(crowd, i, tower);
@@ -313,7 +326,6 @@ fn transition_to_return(crowd: &mut Crowd, tower: &mut Tower, i: usize) {
     p.wait = 0.0;
     p.age = 0.0;
     p.linger = 0.0;
-    let seed = p.seed;
     // The rider steps onto the platform where the last shaft lets them off,
     // or walks there from the venue, and heads for the nearest station.
     let platform_x = p
@@ -331,6 +343,8 @@ fn transition_to_return(crowd: &mut Crowd, tower: &mut Tower, i: usize) {
         crowd.people[i].dest_x = inside_x(crowd, &st, 2) as f64;
     } else if let Some((_, ox)) = origin {
         crowd.people[i].dest_x = pick_x_in_segment(tower, origin_floor, seed, ox) as f64;
+    } else if let Some(x) = exit_x {
+        crowd.people[i].dest_x = x as f64;
     } else {
         crowd.people[i].dest_x = pick_x(tower, origin_floor, seed) as f64;
     }

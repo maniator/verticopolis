@@ -156,6 +156,9 @@ impl Facility {
 }
 
 mod predicates;
+#[cfg(test)]
+pub use predicates::set_walk_ins_for_test;
+pub use predicates::WALK_INS_ON;
 mod table;
 #[doc(hidden)]
 pub use table::FACILITIES;

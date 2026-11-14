@@ -159,15 +159,16 @@ function fourStarEdits(s: PortEditSession): void {
   // A sale and two bulldozes outside any undo step, and the hour after
   // them, which both engines must agree on: the dual run played on after
   // selling a room and bulldozing a link. The escalator is one the crowd
-  // rides. Both engines drop a person whose shaft goes from under them (a
-  // trip's route is not planned again when a shaft goes), so the first
-  // frame of the hour's play that moves the clock drops the people walking
-  // to it. That frame can carry a person to the end of a leg whether or not
+  // rides. Nobody vanishes on foot when a shaft goes from under them
+  // (#2186): someone still setting out turns back and anyone else finds
+  // another way, so after the first frame of the hour's play that moves the
+  // clock, none of the people walking to it still has it ahead on their
+  // route. That frame can carry a person to the end of a leg whether or not
   // the escalator is there, so the check leaves out anyone already on it,
   // and it requires that the people midway on a route that never takes it
   // all stay. Of the people who set out after the bulldoze and are still in
-  // the crowd at the hour's end, some go between its floors, each by a link
-  // that stops at both floors and none by the escalator.
+  // the crowd at the hour's end, some ride and none takes the escalator, and
+  // any who go between its floors each take a link that stops at both.
   s.done("sell the office at floor 2, x 150", "demolish", s.unitAt(2, 150), SELL);
   s.require("the sale takes the office out", !s.hasUnitAt(2, 150));
   s.done("bulldoze the shop at floor 13, x 238", "demolish", s.unitAt(13, 238), BULLDOZE);
@@ -183,12 +184,16 @@ function fourStarEdits(s: PortEditSession): void {
   const since = s.markPeople();
   const afterBulldoze = s.personIds();
   s.require("the bulldoze leaves the people walking to it to the frame loop", walking.every((id) => afterBulldoze.has(id)));
-  const firstMove = s.playReadingFirstMove(60);
-  s.require("the first frame that moves the clock drops the people walking to the escalator", !walking.some((id) => firstMove.has(id)));
+  const firstMoveCrowd = s.playReadingFirstMoveCrowd(60);
+  const firstMove = new Set(firstMoveCrowd.people.map((p) => p.id));
+  const stillHeadedFor = firstMoveCrowd.people.filter((p) => walking.includes(p.id) && p.shafts.slice(p.leg).includes(link.id));
+  s.require("the first frame that moves the clock leaves none of the people walking to the escalator still headed for it", stillHeadedFor.length === 0);
   s.require("the first frame that moves the clock keeps the people midway on a route that never takes the escalator", midway.every((id) => firstMove.has(id)));
   const links = s.shaftsBetween(link.bottom, link.top, since);
   const stopsAtItsFloors = (id: number): boolean => stopsAtBoth(s.shaftById(id), link.bottom, link.top);
-  s.require("someone who set out after the bulldoze goes between its floors", links.length > 0);
+  const riders = s.ridersSince(since);
+  s.require("someone who set out after the bulldoze rides", riders.length > 0);
+  s.require("nobody who set out after the bulldoze takes the escalator", riders.every((shafts) => !shafts.includes(link.id)));
   s.require("each of their legs between its floors takes a link that stops at both floors, and none the escalator", [...new Set(links)].every(stopsAtItsFloors) && !links.includes(link.id));
 
   // A sale and a bulldoze as the tools send them, each its own undo step;

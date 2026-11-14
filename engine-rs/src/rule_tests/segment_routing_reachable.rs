@@ -125,6 +125,8 @@ fn only_the_reachable_venue_shares_the_demand_pool() {
 /// which nobody can reach, and both draw only who is inside.
 #[test]
 fn traffic_sends_shoppers_to_the_reachable_venue_and_none_to_the_stranded_one() {
+    // Walk-ins are off in play (`WALK_INS_ON`); this covers them on.
+    crate::facilities::set_walk_ins_for_test(true);
     let (mut sim, near, far) = stranded_venue();
     for hour in 10..18 {
         at_time(&mut sim, 0, hour);

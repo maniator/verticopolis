@@ -65,6 +65,22 @@ pub fn adjacency<'a>(crowd: &'a mut Crowd, tower: &Tower) -> &'a AdjGraph {
     &crowd.adj.as_ref().unwrap().1
 }
 
+/// The part of the passenger graph each segment lies in (`graph_parts`),
+/// so a caller choosing between several ways in can skip the ones no
+/// route joins without a search each. Built once per tower revision.
+pub fn passenger_parts<'a>(crowd: &'a mut Crowd, tower: &Tower) -> &'a StaffParts {
+    let fresh = !matches!(&crowd.passenger_parts, Some((rev, _)) if *rev == tower.revision);
+    if fresh {
+        let adj = adjacency(crowd, tower);
+        // Sorted, so the labels never follow the map's order.
+        let mut listed: Vec<i64> = adj.keys().copied().collect();
+        listed.sort_unstable();
+        let parts = graph_parts(adj, &listed);
+        crowd.passenger_parts = Some((tower.revision, parts));
+    }
+    &crowd.passenger_parts.as_ref().unwrap().1
+}
+
 /// The staff graph, and for each segment on it the part of the graph it lies
 /// in (see `graph_parts`).
 pub fn staff_adjacency<'a>(crowd: &'a mut Crowd, tower: &Tower) -> (&'a AdjGraph, &'a StaffParts) {
@@ -121,7 +137,7 @@ fn graph_parts(adj: &AdjGraph, listed: &[i64]) -> StaffParts {
 /// Whether `a` and `b` differ and lie in different parts of the staff graph
 /// (or either lies in none). When it holds no route joins them, and on the
 /// tower's graphs, whose edges come in pairs, it holds whenever none does.
-fn parts_split(parts: &StaffParts, a: i64, b: i64) -> bool {
+pub(super) fn parts_split(parts: &StaffParts, a: i64, b: i64) -> bool {
     let pa = parts.get(&a);
     a != b && (pa.is_none() || pa != parts.get(&b))
 }

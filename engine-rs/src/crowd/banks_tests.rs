@@ -86,3 +86,67 @@ fn the_bank_table_reads_each_landing_once_per_stop() {
     });
     assert_eq!(rebuilt, total_stops(&sim));
 }
+
+/// The two-shaft tower with eight cars in each shaft, the first one's
+/// weekday schedule cut to one car all day.
+fn one_shaft_cut_to_one_car() -> (Simulation, Vec<i64>) {
+    let (mut sim, ids) = two_shaft_tower();
+    for t in sim.tower.transports.iter_mut() {
+        t.cars = 8;
+        t.car_positions = vec![1.0; 8];
+        t.car_dir = vec![0; 8];
+    }
+    let one_car = serde_json::json!({ "activeCars": { "weekday": vec![1; 24] } });
+    assert!(sim.tower.set_schedule(ids[0], &one_car));
+    (sim, ids)
+}
+
+/// How many of `n` routes from the lobby to the top floor ride `id`.
+fn rides_on(crowd: &mut Crowd, sim: &Simulation, id: i64, n: usize) -> usize {
+    (0..n)
+        .filter(|_| {
+            let r = crowd.route(&sim.tower, 1, TOP, Some(130.0), Some(130.0));
+            r.expect("a route").shafts == vec![id]
+        })
+        .count()
+}
+
+/// A shaft its schedule has cut to one car takes a one-car share of the
+/// riders, not half of them, so its line does not grow while the eight
+/// cars of the shaft beside it run near empty (the 3.12.0 report: hundreds
+/// queued at a one-car express). Off its schedule's hours it takes half.
+#[test]
+fn twin_shafts_share_riders_by_the_cars_they_run() {
+    let (sim, ids) = one_shaft_cut_to_one_car();
+    let mut crowd = Crowd::new(3);
+    crowd.hour = Some(12);
+    crowd.weekend = false;
+    let n = 1800;
+    let cut = rides_on(&mut crowd, &sim, ids[0], n) as f64 / n as f64;
+    // One car in nine.
+    assert!(
+        (cut - 1.0 / 9.0).abs() < 0.03,
+        "the one-car shaft took {cut:.3}"
+    );
+    // The weekend has no row, so both run all eight cars.
+    crowd.weekend = true;
+    let even = rides_on(&mut crowd, &sim, ids[0], n) as f64 / n as f64;
+    assert!((even - 0.5).abs() < 0.05, "the weekend split was {even:.3}");
+}
+
+/// Shafts running alike draw exactly as the even split always has: one
+/// draw per leg, the same index.
+#[test]
+fn twin_shafts_running_alike_draw_as_before() {
+    let (sim, ids) = two_shaft_tower();
+    let mut crowd = Crowd::new(9);
+    crowd.hour = Some(12);
+    let mut twin = Crowd::new(9);
+    for _ in 0..200 {
+        let r = crowd
+            .route(&sim.tower, 1, TOP, Some(130.0), Some(130.0))
+            .unwrap();
+        let expected = ids[twin.rng.int(0, 1) as usize];
+        assert_eq!(r.shafts, vec![expected]);
+    }
+}

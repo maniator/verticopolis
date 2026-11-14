@@ -2,6 +2,7 @@
 //! which saves never carry. The conformance suite hashes them separately.
 
 pub mod banks;
+pub mod doors;
 pub(crate) mod fasthash;
 pub mod graph;
 pub mod landing;
@@ -241,6 +242,9 @@ pub struct Crowd {
     /// saved: a load builds a fresh crowd.
     pub staff_adj: Option<(i64, AdjGraph, StaffParts)>,
     pub shaft_banks: Option<(i64, HashMap<(Kind, Vec<i64>, Vec<i64>), Vec<i64>>)>,
+    /// The part of the passenger graph each segment lies in, keyed like
+    /// `adj` on the tower revision (`routing::passenger_parts`).
+    pub passenger_parts: Option<(i64, StaffParts)>,
     pub seg_served: Option<(i64, HashSet<i64>)>,
     /// The segments the Classic walk-budget search reaches from a lobby
     /// segment (see `graph.rs`). Built from `adj`, so keyed like it on the
@@ -273,6 +277,8 @@ pub struct Crowd {
     /// (a crowd stepped on its own) leaves every venue open. Set by the
     /// step; never saved.
     pub hour: Option<i64>,
+    /// Whether the step's day is a weekend, for the elevator schedules.
+    pub weekend: bool,
     /// The walk-ins booked for this hour, latest first (`walk_ins`).
     /// Never saved.
     pub walk_ins: Vec<walk_ins::WalkIn>,
@@ -300,6 +306,7 @@ impl Crowd {
             adj: None,
             staff_adj: None,
             shaft_banks: None,
+            passenger_parts: None,
             seg_served: None,
             lobby_reach: None,
             blockbusters: HashSet::new(),
@@ -312,6 +319,7 @@ impl Crowd {
             open_cars: Default::default(),
             queue_cache: None,
             hour: None,
+            weekend: false,
             walk_ins: Vec::new(),
             walk_in_count: 0,
         }

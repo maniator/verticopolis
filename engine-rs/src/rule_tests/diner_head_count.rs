@@ -55,6 +55,8 @@ fn occupants(sim: &Simulation, id: i64) -> i64 {
 
 #[test]
 fn only_venues_people_come_to_count_their_visitors() {
+    // Walk-ins are off in play (`WALK_INS_ON`); this covers them on.
+    crate::facilities::set_walk_ins_for_test(true);
     for kind in [
         Kind::FastFood,
         Kind::Restaurant,
