@@ -13,7 +13,7 @@ import type { TowerEngine } from "./TowerEngine";
 vi.mock("./towerReconcile", async (original) => ({ ...(await original<object>()), syncScene: vi.fn(), syncFacade: vi.fn() }));
 vi.mock("./towerCrowd", async (original) => ({ ...(await original<object>()), syncMotion: vi.fn() }));
 // A swap binds the new tower's world and kinds; these stand-ins hold none.
-vi.mock("../../catalog/towerCatalog", () => ({ towerCatalog: () => ({}) }));
+vi.mock("../../catalog/towerCatalog", () => ({ towerCatalog: () => ({ rules: {} }) }));
 vi.mock("../../presentation/viewWorld", async (original) => ({ ...(await original<object>()), bindViewWorld: vi.fn() }));
 vi.mock("../../presentation/viewKinds", async (original) => ({ ...(await original<object>()), bindViewKinds: vi.fn() }));
 
@@ -88,6 +88,7 @@ function sceneUnderSwap() {
     craneActor: null,
     roomSig: new Map(),
     transportSig: new Map(),
+    windingFlights: new Set(),
     floorLive: new Map(),
     carActors: [],
     trainActors: [],

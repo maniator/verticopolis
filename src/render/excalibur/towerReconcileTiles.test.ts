@@ -28,7 +28,7 @@ vi.mock("./roomSignature", () => ({
   isDeadParking: () => false,
 }));
 vi.mock("../regionPaint", () => ({ paintAnimatedUnit: vi.fn() }));
-vi.mock("../../catalog/towerCatalog", () => ({ towerCatalog: () => ({}) }));
+vi.mock("../../catalog/towerCatalog", () => ({ towerCatalog: () => ({ rules: {} }) }));
 vi.mock("../../catalog/catalogTypes", () => ({ catalogFacility: () => ({ floors: 1 }) }));
 vi.mock("./towerCrowd", () => ({
   clearMotion: vi.fn(),
@@ -112,6 +112,7 @@ function fakeEngine(state: { units: UnitView[]; revision: number; tall?: LobbyHa
     regionUnits: new Map(),
     transportActors: new Map(),
     transportSig: new Map(),
+    windingFlights: new Set(),
     escapeActors: new Map(),
     craneActor: null,
   } as unknown as TowerEngine;

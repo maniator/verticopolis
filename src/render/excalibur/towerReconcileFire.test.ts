@@ -30,7 +30,7 @@ vi.mock("excalibur", async (importOriginal) => {
 vi.mock("./towerScenery", () => ({ syncScenery: vi.fn() }));
 vi.mock("./roomSignature", () => ({ roomSignature: () => "sig", isDeadParking: () => false }));
 vi.mock("../regionPaint", () => ({ paintAnimatedUnit: vi.fn() }));
-vi.mock("../../catalog/towerCatalog", () => ({ towerCatalog: () => ({}) }));
+vi.mock("../../catalog/towerCatalog", () => ({ towerCatalog: () => ({ rules: {} }) }));
 vi.mock("../../catalog/catalogTypes", () => ({ catalogFacility: () => ({ floors: 1 }) }));
 vi.mock("./towerCrowd", () => ({
   reap: <K, V>(map: Map<K, V>, seen: ReadonlySet<K>, dispose: (v: V, k: K) => void): void => {
@@ -84,6 +84,7 @@ function fakeEngine(unit: UnitView): TowerEngine {
     regionUnits: new Map(),
     transportActors: new Map(),
     transportSig: new Map(),
+    windingFlights: new Set(),
     hallDoors: new HallDoorLayer(),
     worldX: (x: number) => x * 16,
     worldYTop: (floor: number) => floor * 16,

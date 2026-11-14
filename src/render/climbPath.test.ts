@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { RUN_FOOT_PX, RUN_HEAD_PX, climbDrawX, climbFlight, climbSpot, leaveFlight, type Climber } from "./climbPath";
-import { TILE } from "./scale";
+import { FLOOR, TILE } from "./scale";
 import { spiralRadius } from "./sprites/spiralStair";
 import type { TransportView } from "../simport/view";
 
@@ -75,6 +75,47 @@ describe("a climber's place on a flight", () => {
     expect(leaveFlight(c)).toBeCloseTo(HEAD, 9);
     expect(leaveFlight(c)).toBeUndefined();
     expect(c.flight).toBeUndefined();
+  });
+
+  // Beside a venue in Modern (venueFlights.ts) a one-story flight winds.
+  it("winds once and a half around the pole on a one-story spiral beside a venue", () => {
+    const t = flight("stairs", 4, 5);
+    const mid = 100 + 8 / 2;
+    const r = spiralRadius(8 * TILE) / TILE;
+    expect(climbSpot(t, 4, true).x).toBeCloseTo(mid - r, 9);
+    // A third of the way up is half a turn round, at the far right.
+    expect(climbSpot(t, 4 + 1 / 3, true).x).toBeCloseTo(mid + r, 9);
+    // The last half turn lands it on the right, as the sprite draws.
+    expect(climbSpot(t, 5, true).x).toBeCloseTo(mid + r, 9);
+    for (let fy = 4; fy <= 5; fy += 0.05) expect(Math.abs(climbSpot(t, fy, true).x - mid)).toBeLessThanOrEqual(r + 1e-9);
+  });
+
+  it("turns back at the landing halfway up a one-story escalator beside a venue", () => {
+    const t = flight("escalator", 4, 5);
+    const turn = 4 + 23 / FLOOR; // the lower run climbs 23 of the story's 45 pixels
+    expect(climbSpot(t, 4, true)).toMatchObject({ x: FOOT, rightward: true });
+    expect(climbSpot(t, turn, true).x).toBeCloseTo(HEAD, 9);
+    expect(climbSpot(t, (turn + 5) / 2, true)).toMatchObject({ rightward: false });
+    expect(climbSpot(t, (turn + 5) / 2, true).x).toBeCloseTo((FOOT + HEAD) / 2, 9);
+    // It arrives at the left of the deck above, where the upper run ends.
+    expect(climbSpot(t, 5, true).x).toBeCloseTo(FOOT, 9);
+    // The same flight not beside a venue keeps its straight run.
+    expect(climbSpot(t, 5).x).toBeCloseTo(HEAD, 9);
+  });
+
+  it("reads whether the flight winds once, when the climb begins", () => {
+    const t = flight("escalator", 4, 5);
+    const c: Climber = {};
+    expect(climbDrawX(c, [t], 104, 4, 5, false, new Set([1]))).toBeCloseTo(FOOT, 9);
+    expect(c.flightWinds).toBe(true);
+    // A venue bulldozed mid-climb does not jump the climber to the other run.
+    expect(climbDrawX(c, [t], 104, 4, 5, false, new Set())).toBeCloseTo(FOOT, 9);
+    leaveFlight(c);
+    expect(c.flightWinds).toBeUndefined();
+    expect(climbDrawX(c, [t], 104, 4, 5, false, new Set())).toBeCloseTo(HEAD, 9);
+    // Without the set (no venues gathered yet) a flight draws straight.
+    const plain: Climber = {};
+    expect(climbDrawX(plain, [t], 104, 4, 5, false)).toBeCloseTo(HEAD, 9);
   });
 
   it("draws a climber with no matching flight where the engine puts them", () => {

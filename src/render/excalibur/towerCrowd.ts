@@ -184,7 +184,7 @@ function positionPerson(engine: TowerEngine, p: PersonView, rec: CrowdActor, loo
   // Use the continuous floor (fy) so a stair/escalator climber animates
   // smoothly between floors; for every other state fy equals the floor.
   // A climber is drawn along the flight's run, not up its middle.
-  const climbX = p.state === "climbing" ? climbDrawX(rec, engine.sim.tower.transports, p.x, p.floor, g.fy, g.toFy < g.fromFy) : undefined;
+  const climbX = p.state === "climbing" ? climbDrawX(rec, engine.sim.tower.transports, p.x, p.floor, g.fy, g.toFy < g.fromFy, engine.windingFlights) : undefined;
   if (climbX !== undefined) g.left = rec.climbLeft === true;
   rec.actor.pos = ex.vec(engine.worldX(climbX ?? g.x), engine.worldYTop(g.fy) + FLOOR - 3);
   // Inside a revolving door between lobby halls (#2068) a walker pushes it:

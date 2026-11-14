@@ -17,6 +17,7 @@ import {
 import { facadeGeometry, type FloorEdge } from "../facadeGeometry";
 import { paintAnimatedUnit } from "../regionPaint";
 import { FLOOR, TILE, TRANSPORT_BAND_FLOORS } from "../scale";
+import { isVenue, venueBox, windingFlights, type VenueBox } from "../venueFlights";
 import { isDeadParking, roomSignature } from "./roomSignature";
 import { reap } from "./towerCrowd";
 import { dropRegionUnit, markRegionUnit } from "./towerRegions";
@@ -91,11 +92,17 @@ export function syncScene(engine: TowerEngine): void {
   // Set here rather than in the per-frame tick because it needs every room.
   let staffed = false;
   const seenR = new Set<number>();
+  // The venues a one-story flight winds beside (`venueFlights.ts`), gathered
+  // on this one walk of the rooms, when the mode draws them at all.
+  const catalog = towerCatalog(engine.sim);
+  const windsBesideVenues = catalog.rules.venueFlights;
+  const venues: VenueBox[] = [];
   // Rebuilt fresh each sync from the one flood-fill read above; the region
   // draw closures read it live at raster time (dead spaces get the red X).
   const deadNow = new Set<number>();
   for (const u of rooms) {
     if (!staffed && isPresent(u)) staffed = true;
+    if (windsBesideVenues && isVenue(u.kind)) venues.push(venueBox(u, catalogFacility(catalog, u.kind).floors));
     seenR.add(u.id);
     const unchained = !parkingOK.has(u.id);
     // Every input the room sprite draws from, hour-dependent bits included
@@ -153,9 +160,13 @@ export function syncScene(engine: TowerEngine): void {
   }
 
   const seenT = new Set<number>();
+  // Whether a flight winds joins its signature, so building, bulldozing,
+  // undoing or redoing a venue beside it restyles it in this same sync.
+  const winding = windingFlights(tower.transports, venues, engine.windingFlights);
   for (const t of tower.transports) {
     seenT.add(t.id);
-    const sig = `${t.bottom}:${t.top}:${t.cars}:${t.kind}:${(t.skipFloors ?? []).join(",")}`;
+    const winds = winding.has(t.id) ? ":winds" : "";
+    const sig = `${t.bottom}:${t.top}:${t.cars}:${t.kind}:${(t.skipFloors ?? []).join(",")}${winds}`;
     const a = engine.transportActors.get(t.id);
     if (!a) {
       addTransport(engine, t);
@@ -341,7 +352,7 @@ function transportGraphic(engine: TowerEngine, t: TransportView, w: number, tota
         engine.d.ctx = ctx;
         // Draw the whole shaft shifted up so only this band lands in-bounds; the
         // rest is clipped. Bands abut seamlessly (each draws the full shaft).
-        drawTransport(ctx, t, 0, -fromTop * FLOOR, w, FLOOR);
+        drawTransport(ctx, t, 0, -fromTop * FLOOR, w, FLOOR, engine.windingFlights.has(t.id));
       },
     });
   if (totalFloors <= TRANSPORT_BAND_FLOORS) return band(0, totalFloors);
