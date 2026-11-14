@@ -25,6 +25,11 @@ prompt already tells players it is an engine update and shows the new version.
 Entries below 1.51.1 were curated from the commit history after the fact, so they
 are documentation only: no build that a client fetches carries them.
 
+## 3.10.9
+
+- Rain now falls only on the open sky and the street around your tower. It no longer streaks across the rooms or the basements, so the inside of the building stays dry, as in the original.
+- On a short or sideways phone screen, the crash card's buttons (Reload game, the downloads and Report a bug) now stay pinned to the bottom of the card while its text scrolls, so the way out is always on screen.
+
 ## 3.10.8
 
 - A mouse let go over a window or outside the game now ends the drag it started, so a build tool no longer stays pressed, painting or bulldozing when the pointer comes back, and the ghost shows again right away.
