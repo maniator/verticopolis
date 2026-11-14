@@ -29,6 +29,7 @@ import { bindKeys } from "./game/inputKeys";
 import { SPEEDS, applySpeed } from "./game/frameLoop";
 import { placeSimpleBuild, updateBuildPreview, isTransportTool, pickedAt, clearBuildRefusal, refreshBuildPreview } from "./game/buildPreview";
 import { LobbyHeightChoice, trackLobbyHeightKeys } from "./game/lobbyHeight";
+import { BulldozeDragChoice } from "./game/bulldozeDrag";
 import { toggleMute, setVolume, toggleReducedMotion, toggleSteadyClock, isSteadyClock, applyReducedMotion, togglePassersBy, isPassersBy, applyPassersBy } from "./game/audioPrefs";
 import { showStats, showSaves, saveToSlot, loadFromSlot, deleteSlot } from "./game/appModals";
 import { refreshTraffic } from "./game/trafficHud";
@@ -151,6 +152,8 @@ class GameApp implements GameAppPorts {
   buildAnchor: { tile: number; floor: number; oTile: number; oFloor: number; lifting: boolean } | null = null;
   /** The lobby tool's height (#308): the card's pick, or Ctrl / Ctrl+Shift held. @internal */
   readonly lobbyHeight = new LobbyHeightChoice();
+  /** What a bulldoze drag clears: one kind (#644) or everything. @internal */
+  readonly bulldozeDrag = new BulldozeDragChoice();
   /** Currently selected facility for the edit panel. @internal */
   selected: { type: "unit" | "transport"; id: number } | null = null;
   /** World cell the hover inspector tooltip is describing, so it can be

@@ -12,8 +12,9 @@ import { render, type TemplateResult } from "lit-html";
 import { iconElement } from "./icons";
 import { mountToolbarIcons } from "./uiToolbarIcons";
 import type { ReviewRow } from "./templates/scheduleReview";
-import { toolInfoFor, BULLDOZE_TOOL_INFO, INSPECT_TOOL_INFO, type LobbyHeightPicker } from "./templates/toolInfo";
-import { lobbyPickerFor, syncLobbyHeightStrip } from "./lobbyHeightStrip";
+import type { BulldozeDragPicker, LobbyHeightPicker } from "./templates/toolInfo";
+import { lobbyPickerFor } from "./lobbyHeightStrip";
+import { renderToolCard } from "./toolCard";
 import * as dialogs from "./uiDialogs";
 import * as help from "./uiHelp";
 import * as panels from "./uiPanels";
@@ -30,6 +31,8 @@ export interface UICallbacks {
   getCatalog(): Catalog;
   /** The lobby tool's height choice (#308), for the Lobby card's picker. */
   lobbyHeight(): LobbyHeightPicker;
+  /** What a bulldoze drag clears, for the Bulldoze card's picker. */
+  bulldozeDrag(): BulldozeDragPicker;
   onSelectTool(tool: Tool): void;
   onSpeed(speed: number): void;
   /** The live game-speed index, so a dialog can pause and restore the tower. */
@@ -219,14 +222,9 @@ export class UI {
     this.tool = tool;
     this.cb.onSelectTool(tool);
     document.querySelectorAll(".pal-item").forEach((x) => x.classList.remove("active"));
-    if (tool.type === "build") {
-      document.querySelector(`.pal-item[data-kind="${tool.kind}"]`)?.classList.add("active");
-      render(toolInfoFor(this.cb.getCatalog(), tool.kind, this.lobbyPicker()), this.el.toolInfo);
-    } else {
-      document.querySelector(`.pal-item[data-tool="${tool.type}"]`)?.classList.add("active");
-      render(tool.type === "bulldoze" ? BULLDOZE_TOOL_INFO : INSPECT_TOOL_INFO, this.el.toolInfo);
-    }
-    syncLobbyHeightStrip(tool, this.cb.getCatalog(), this.lobbyPicker());
+    const item = tool.type === "build" ? `.pal-item[data-kind="${tool.kind}"]` : `.pal-item[data-tool="${tool.type}"]`;
+    document.querySelector(item)?.classList.add("active");
+    renderToolCard(this, tool);
   }
 
   /** The Lobby card's height picker (#308): a pick redraws the card and the phone's strip. */

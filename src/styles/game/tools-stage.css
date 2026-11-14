@@ -231,11 +231,13 @@
   image-rendering: pixelated; /* crisp retro pixels, no blur */
 }
 /* Shown on the phone layout only (media-phone.css). */
-#lobby-height-strip {
+#lobby-height-strip,
+#bulldoze-drag-strip {
   display: none;
 }
-/* The picked lobby height (#308), on the tool card and the phone strip. */
-:is(.ti-lobby-height, #lobby-height-strip) .btn[aria-pressed="true"] {
+/* The picked lobby height (#308) and what a bulldoze drag clears, on the
+   tool card and the phone strips. */
+:is(.ti-lobby-height, #lobby-height-strip, .ti-drag-clears, #bulldoze-drag-strip) .btn[aria-pressed="true"] {
   font-weight: 700;
   box-shadow: var(--bevel-in);
   background: var(--r-title);
