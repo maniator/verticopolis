@@ -4,6 +4,39 @@
 
 use super::*;
 
+/// Whether shop and restaurant customers come in person from outside the
+/// tower (`crowd::walk_ins`). Off for now (owner, 2026-11-14): at full
+/// demand they jammed the elevators of towers built before 3.12.0 and
+/// tenants moved out over congestion. While it is off, those venues count
+/// their customers from demand as 3.11 did, with nobody shown arriving.
+pub const WALK_INS_ON: bool = false;
+
+/// A per-thread stand-in for [`WALK_INS_ON`] in tests.
+#[cfg(test)]
+fn walk_ins_switch() -> &'static std::thread::LocalKey<std::cell::Cell<bool>> {
+    thread_local! {
+        static ON: std::cell::Cell<bool> = const { std::cell::Cell::new(WALK_INS_ON) };
+    }
+    &ON
+}
+
+/// Turns walk-ins on or off for the calling test's thread, so their own
+/// tests keep running while [`WALK_INS_ON`] is off.
+#[cfg(test)]
+pub fn set_walk_ins_for_test(on: bool) {
+    walk_ins_switch().with(|w| w.set(on));
+}
+
+#[cfg(test)]
+fn walk_ins_on() -> bool {
+    walk_ins_switch().with(std::cell::Cell::get)
+}
+
+#[cfg(not(test))]
+fn walk_ins_on() -> bool {
+    WALK_INS_ON
+}
+
 #[doc(hidden)]
 impl Kind {
     #[doc(hidden)]
@@ -79,20 +112,21 @@ impl Kind {
     /// spend per customer but the daycare, whose children are not shoppers.
     /// Each walk-in comes through the lobby or the Metro and rides the cars
     /// like anyone else, and the day's patronage counts the ones who got
-    /// there.
+    /// there. None does while [`WALK_INS_ON`] is off.
     pub fn takes_walk_ins(self) -> bool {
-        matches!(
-            self,
-            Kind::FastFood
-                | Kind::Restaurant
-                | Kind::FoodHall
-                | Kind::Amusements
-                | Kind::BoutiqueBay
-                | Kind::Nightclub
-                | Kind::Spa
-                | Kind::SkyBar
-                | Kind::Shop
-        )
+        walk_ins_on()
+            && matches!(
+                self,
+                Kind::FastFood
+                    | Kind::Restaurant
+                    | Kind::FoodHall
+                    | Kind::Amusements
+                    | Kind::BoutiqueBay
+                    | Kind::Nightclub
+                    | Kind::Spa
+                    | Kind::SkyBar
+                    | Kind::Shop
+            )
     }
 
     #[doc(hidden)]

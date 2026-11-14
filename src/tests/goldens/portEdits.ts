@@ -281,6 +281,15 @@ export class PortEditSession {
     return midRouteAvoiding(this.crowd(), id);
   }
 
+  /** The shafts on the routes of the people who set out after the mark
+   *  and ride at least one shaft. Throws as `shaftsBetween` does. */
+  ridersSince(since: PeopleMark): number[][] {
+    if (this.port.generation() !== since.generation) throw new Error(`${this.caseId}: a swap, undo or redo since the mark can start the crowd's ids again`);
+    return this.crowd()
+      .people.filter((p) => p.id >= since.nextId && p.shafts.length > 0)
+      .map((p) => [...p.shafts]);
+  }
+
   /** The ids of the people in the crowd. */
   personIds(): Set<number> {
     return new Set(this.crowd().people.map((p) => p.id));
@@ -390,9 +399,15 @@ export class PortEditSession {
    *  after its first frame that moves the clock. The session reads them
    *  itself, so no script code runs inside a play. */
   playReadingFirstMove(minutes: number): Set<number> {
-    const read: { crowd?: Set<number> } = {};
+    return new Set(this.playReadingFirstMoveCrowd(minutes).people.map((p) => p.id));
+  }
+
+  /** Play as `play` does, and answer the crowd view after its first frame
+   *  that moves the clock. */
+  playReadingFirstMoveCrowd(minutes: number): CrowdView {
+    const read: { crowd?: CrowdView } = {};
     this.playFrames(minutes, () => {
-      read.crowd ??= this.personIds();
+      read.crowd ??= this.crowd();
     });
     if (read.crowd === undefined) throw new Error(`${this.caseId}: play ${minutes} minutes: the clock never moved`);
     return read.crowd;

@@ -16,6 +16,8 @@
 //!
 //! The bookings live only in the crowd, like everyone in it: a load starts
 //! a fresh crowd and the next hour books again.
+//!
+//! None of this runs while [`crate::facilities::WALK_INS_ON`] is off.
 
 use super::spawn::{add, inside_x, venue_has_room};
 use super::Crowd;
@@ -96,8 +98,14 @@ fn start_walk_in(crowd: &mut Crowd, tower: &Tower, doors: &Entrances, unit_id: i
     }
     let (vx, vw, vf) = (venue.x, venue.width, venue.floor);
     let station = doors.pick(crowd);
-    let from = station.map_or(1, |sid| tower.get_unit(sid).unwrap().floor + 1);
-    let Some(i) = add(crowd, tower, from, vf, None, Some(vx)) else {
+    // From the station's own platform, or the ground lobby nearest the
+    // venue (`add` picks it), so a lot of separate towers is entered under
+    // the venue.
+    let (from, from_x) = match station.and_then(|sid| tower.get_unit(sid)) {
+        Some(st) => (st.floor + 1, Some(st.x + st.width / 2)),
+        None => (1, None),
+    };
+    let Some(i) = add(crowd, tower, from, vf, from_x, Some(vx)) else {
         return;
     };
     crowd.people[i].dest_x = crowd.rng.int(vx, vx + vw - 1) as f64;

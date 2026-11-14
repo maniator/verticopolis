@@ -1,5 +1,6 @@
 //! Port of `crowd/spawn.ts`, `crowd/trips.ts` and `crowd/venueTrips.ts`.
 
+use super::doors;
 use super::meals::MealOrigin;
 use super::routines::push_routine_options;
 pub use super::spawn_floors::{spawn_floors, SpawnFloors};
@@ -21,7 +22,7 @@ pub use staff::spawn_step;
 
 /// `(crowd.nextId * 2654435761) | 0`: a double product (rounded past 2^53,
 /// which an id above about 3.4 million reaches) then ToInt32.
-pub(super) fn seed_for(next_id: i64) -> i32 {
+pub(crate) fn seed_for(next_id: i64) -> i32 {
     let product = next_id as f64 * 2654435761.0;
     product.rem_euclid(4294967296.0) as u32 as i32
 }
@@ -93,8 +94,20 @@ pub fn add(
     to_x: Option<i64>,
 ) -> Option<usize> {
     let seed = seed_for(crowd.next_id);
-    let route_from_x = from_x.unwrap_or_else(|| pick_x(tower, from, seed));
-    let route_to_x = to_x.unwrap_or_else(|| pick_x(tower, to, seed));
+    // An open end takes the run of its floor nearest the trip's other end
+    // (`doors`), so a lobby on a split lot is the one under the trip.
+    let route_from_x = match (from_x, to_x) {
+        (Some(x), _) => x,
+        (None, Some(tx)) => doors::door_x(crowd, tower, from, to, tx as f64, seed),
+        (None, None) => pick_x(tower, from, seed),
+    };
+    let route_to_x = match to_x {
+        Some(x) => x,
+        None if from_x.is_some() => {
+            doors::door_x(crowd, tower, to, from, route_from_x as f64, seed)
+        }
+        None => pick_x(tower, to, seed),
+    };
     let r = crowd.route(
         tower,
         from,
