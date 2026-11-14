@@ -118,8 +118,8 @@ async function nextFrames(page: Page): Promise<void> {
   await page.evaluate(() => new Promise<void>((done) => requestAnimationFrame(() => requestAnimationFrame(() => done()))));
 }
 
-/** The open map at 768 by 600 and 1280 by 720 overlaps none of the sidebar,
- *  the palette or the hint. */
+/** The open map at 768 by 600 and 1280 by 720 overlaps none of the menu bar,
+ *  the status bar, the palette or the hint. */
 async function expectMapClear(page: Page): Promise<void> {
   for (const size of [
     { width: 768, height: 600 },
@@ -131,7 +131,7 @@ async function expectMapClear(page: Page): Promise<void> {
     const overlapping = await page.evaluate(() => {
       const map = document.getElementById("overview-map")!.getBoundingClientRect();
       const others: Record<string, DOMRect> = {};
-      for (const id of ["sidebar", "palette", "hint"]) {
+      for (const id of ["menubar", "statusbar", "palette", "hint"]) {
         const r = document.getElementById(id)?.getBoundingClientRect();
         if (r && r.width > 0 && r.height > 0) others[id] = r;
       }
@@ -220,7 +220,7 @@ test.describe("the map's View dropdown on the desktop", () => {
     await expect.poll(() => page.evaluate(() => (window as any).game.engine.viewState().floor)).toBeGreaterThan(before);
   });
 
-  test("with the dropdown, the open map still clears the sidebar, the palette and the hint", async ({ page }) => {
+  test("with the dropdown, the open map still clears the menu bar, the status bar, the palette and the hint", async ({ page }) => {
     await expectMapClear(page);
   });
 
@@ -295,7 +295,7 @@ test.describe("the map's View dropdown on the desktop", () => {
 test.describe("the map's View dropdown on a touch screen at desktop sizes", () => {
   test.use({ viewport: DESKTOP, hasTouch: true });
 
-  test("with a coarse pointer's taller dropdown, the open map still clears the sidebar, the palette and the hint (#1769)", async ({ page }) => {
+  test("with a coarse pointer's taller dropdown, the open map still clears the menu bar, the status bar, the palette and the hint (#1769)", async ({ page }) => {
     await boot(page);
     expect(await page.evaluate(() => matchMedia("(pointer: coarse)").matches)).toBe(true);
     await expectMapClear(page);

@@ -155,6 +155,7 @@ test.describe("movable windows", () => {
 
   test("a dialog moves by its title bar, stays in the browser window, and opens centered again", async ({ page }) => {
     await boot(page);
+    await page.locator("#mb-tower").click();
     await page.locator("#btn-stats").click();
     const dialog = page.locator("#modal");
     await expect(dialog).toBeVisible();
@@ -165,6 +166,7 @@ test.describe("movable windows", () => {
     expect(moved.y + moved.height).toBeCloseTo(DESKTOP.height, 0);
     await page.keyboard.press("Escape");
     await expect(dialog).toBeHidden();
+    await page.locator("#mb-tower").click();
     await page.locator("#btn-stats").click();
     const reopened = await box(dialog);
     expect(reopened.x).toBeCloseTo(centered.x, 0);

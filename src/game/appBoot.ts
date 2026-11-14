@@ -21,6 +21,7 @@ import { bindEngineBridge } from "../analyticsEngineBridge";
 import { clockOf } from "../simport/headerClock";
 import { bootCommonProps, distributionChannelLabel, platformLabel } from "../analyticsEnrichment";
 import { isStandalone } from "../pwaInstall";
+import { wireMenus } from "./menuWiring";
 import { initInstallAffordance, splashInstallOffered, activateInstall } from "./installAffordance";
 import { shouldWelcomeFounder } from "../founder";
 import { showTowerPicker } from "./appModals";
@@ -260,6 +261,8 @@ export function runBootFlow(app: GameApp, savedAtBoot?: number): void {
   wireOverviewMap(app);
   // The facility card and the dialogs move by their title bars too.
   wireMovableWindows(app);
+  // The Win95 menu bar, its Tower Info and Bulletin windows and the status bar.
+  wireMenus(app);
   // First-run splash + onboarding (chrome only; the engine is untouched).
   app.onboarding = new OnboardingController({
     mq: app.mobileMq,

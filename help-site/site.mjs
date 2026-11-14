@@ -25,7 +25,7 @@ export const sharedHead = [
   { tag: "meta", attrs: { name: "robots", content: "index, follow, max-image-preview:large" } },
   { tag: "meta", attrs: { property: "og:image:width", content: "1200" } },
   { tag: "meta", attrs: { property: "og:image:height", content: "630" } },
-  { tag: "meta", attrs: { name: "theme-color", content: "#000080" } },
+  { tag: "meta", attrs: { name: "theme-color", content: "#c0c0c0" } },
   { tag: "link", attrs: { rel: "apple-touch-icon", href: "/apple-touch-icon.png" } },
 ];
 

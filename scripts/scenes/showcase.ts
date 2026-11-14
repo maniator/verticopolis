@@ -74,9 +74,9 @@ export const SHOWCASE_SCENES: Scene[] = [
         name: "02-about",
         keepDialogs: true,
         setup: async (page) => {
-          // The game panel's About…, which opens About this game (its Help
-          // button opens the Help site in a new tab, which a screenshot cannot
-          // show).
+          // The Help menu's About Verticopolis…, which opens About this game
+          // (its Player's Manual opens the Help site in a new tab, which a
+          // screenshot cannot show).
           await page.evaluate(() => document.getElementById("btn-about")?.click());
           // Fail loudly if the window never opens rather than commit a wrong shot.
           await page.waitForSelector('#modal a[data-act="privacy"]', { timeout: 4000 });
@@ -444,24 +444,28 @@ export const SHOWCASE_SCENES: Scene[] = [
         name: "09b-mobile-stats",
         keepDialogs: true,
         setup: async (page) => {
-          await page.evaluate(() => document.body.classList.add("panels-open"));
-          await page.waitForTimeout(200);
           await page.evaluate(() => document.getElementById("btn-stats")?.click());
         },
         wait: 500,
       },
       {
-        name: "19-mobile-drawer",
+        // The phone's menu bar with its logo, the Window menu open.
+        name: "19-mobile-menu",
         setup: async (page) => {
           await page.evaluate(() => document.querySelector('#modal [data-act="close"]')?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
-          await page.evaluate(() => document.body.classList.add("panels-open"));
+          await page.evaluate(() => document.getElementById("mb-window")?.click());
+          await page.waitForSelector("#mb-window-menu:not([hidden])", { timeout: 4000 });
         },
         wait: 400,
       },
       {
         name: "20-mobile-palette",
         setup: async (page) => {
-          await page.evaluate(() => document.body.classList.remove("panels-open"));
+          // Close the Window menu the last shot left open (its title toggles it).
+          await page.evaluate(() => {
+            const title = document.getElementById("mb-window");
+            if (title?.getAttribute("aria-expanded") === "true") title.click();
+          });
           await page.evaluate(() => {
             // Arm the build palette: pick a build tool so the palette scroller is shown.
             const first = document.querySelector(".pal-item[data-kind]") as HTMLElement | null;

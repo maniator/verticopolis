@@ -4,7 +4,7 @@ import { iconElement, type IconName } from "./icons";
  * Inject the static toolbar and transport icons once at boot (issue #721). The
  * index.html shell carries no glyph now: the emoji controls tofu on a system
  * with no emoji font, and the transport symbols (the play/pause row, undo, redo,
- * the panels menu, update, install, the sub-page Back arrow) looked inconsistent
+ * update, install, the sub-page Back arrow) looked inconsistent
  * sitting beside the new pixel icons. Each button gets its pixel icon here
  * instead, prepended so a button's own label still follows the icon.
  *
@@ -19,15 +19,12 @@ export function mountToolbarIcons(): void {
     document.querySelector(sel)?.prepend(iconElement(name, { size }));
   };
   put(".brand", "brand");
+  put(".menubar-brand", "brand"); // the phone menu bar's compact logo
   put("#btn-save-top", "save");
-  put("#btn-stats", "stats");
-  put("#btn-settings", "settings");
   put("#btn-undo", "undo");
   put("#btn-redo", "redo");
-  put("#panel-toggle", "menu");
   put("#btn-update", "update", 14);
   put("#btn-install", "install", 14);
-  put("#btn-install-menu", "install", 14); // the passive install entry in the game menu
   // The speed row: one icon per level, a pause bar then one/two/three triangles.
   const speed: Partial<Record<string, IconName>> = { "0": "pause", "1": "speed1", "2": "speed2", "3": "speed3" };
   for (const b of document.querySelectorAll<HTMLElement>("#speed button[data-speed]")) {

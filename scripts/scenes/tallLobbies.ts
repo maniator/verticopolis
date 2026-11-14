@@ -57,10 +57,10 @@ export const TALL_LOBBY_SCENES: Scene[] = [
         wait: 400,
       },
       {
-        // The Lobby card with its height picker, set to 3 stories.
+        // The Lobby height strip over the tower, set to 3 stories.
         name: "tall-lobby-picker",
-        crop: "#tool-info",
-        setup: (page) => armLobby(page, "#tool-info", 3),
+        crop: "#lobby-height-strip",
+        setup: (page) => armLobby(page, "#lobby-height-strip", 3),
         wait: 300,
       },
     ],
@@ -134,8 +134,7 @@ export const TALL_LOBBY_SCENES: Scene[] = [
     build: buildTallLobbyTower,
     shots: [
       {
-        // On a phone the Lobby card is in the closed drawer, so arming the
-        // Lobby tool shows the Lobby height strip over the tower.
+        // Arming the Lobby tool shows the Lobby height strip over the tower.
         name: "tall-lobby-phone",
         clock: 10,
         setup: async (page) => {

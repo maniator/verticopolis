@@ -43,6 +43,7 @@ import { gameplaySession } from "./analytics";
 import { adoptToolingSim, followToolingEdit, syncToolingSim, toolingSim } from "./game/toolingSim";
 import type { ToolingTower } from "./game/toolingTower";
 import { followEngineTower, type TowerFollow } from "./game/towerFollow";
+import { arrivalLine } from "./game/arrivalLine";
 import { ViewReader } from "./simport/viewReader";
 import { PortCodes } from "./simport/portCodes";
 import { PortEvents } from "./simport/portEvents";
@@ -284,7 +285,7 @@ class GameApp implements GameAppPorts {
     // swaps: the boot sim is assigned directly (never through adoptSim), and
     // without this the bulletin history a save carries would sit unrendered
     // after a plain page reload, the restore path players hit most.
-    this.ui.resetLog(hudSource(this));
+    this.ui.resetLog(hudSource(this), arrivalLine(this.reader, "returned"));
     void this.engine.start();
 
     // Accessibility: apply reduced motion now and whenever the OS pref flips.

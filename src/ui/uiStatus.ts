@@ -1,6 +1,8 @@
 import type { LogEntry } from "../shared/types";
 import { catalogFacility, type Catalog } from "../catalog/catalogTypes";
 import type { FacilityKind, GameMode } from "../shared/types";
+import { showNewsInStatusBar, showTowerInStatusBar } from "./statusBar";
+import { noteUndoDepth } from "./toolTipStrip";
 import type { EnginePort } from "../simport/enginePort";
 import type { PortCodes } from "../simport/portCodes";
 import { clockOf } from "../simport/headerClock";
@@ -173,6 +175,7 @@ export function update(ui: UI, src: HudSource): void {
   // per-pump call only writes the DOM when the mode changes (e.g. an adoptSim
   // swap into a tower founded the other way).
   setMode(ui, mode);
+  showTowerInStatusBar(src.reader.tower.towerName, mode);
 
   // lit render, not innerHTML: patches the changed text in place each pump, so
   // the grid's nodes keep their identity (E5-S0 gate) instead of a full reparse.
@@ -194,6 +197,7 @@ export function update(ui: UI, src: HudSource): void {
  *  per call; the DOM is written only when a state flips. */
 export function setHistoryButtons(ui: UI, port: Pick<EnginePort, "undoDepths">): void {
   const [undoSteps, redoSteps] = port.undoDepths();
+  noteUndoDepth(undoSteps); // a placement folds the phone's tool card away
   grayWhen(ui.el.undo, undoSteps === 0);
   grayWhen(ui.el.redo, redoSteps === 0);
 }
@@ -298,6 +302,8 @@ function renderLog(ui: UI, src: HudSource): void {
   // long session can't grow it big enough to jank a slow phone. Oldest is the
   // first child under column-reverse.
   while (ui.el.log.childElementCount > LOG_DOM_CAP) ui.el.log.firstElementChild!.remove();
+  // The toast rail already spoke a toasted newest line.
+  showNewsInStatusBar(batch[batch.length - 1].text, document, !toastAt.has(batch.length - 1));
 }
 
 /** The log lines after `seq`, oldest first: the port's `(seq, kindCode,
@@ -326,11 +332,20 @@ function logLine(e: Pick<LogEntry, "text" | "kind">): HTMLDivElement {
 
 /** Adopt a freshly-swapped tower's log baseline (load / import / new / undo /
  *  redo): take its logSeq so we neither replay its old entries as toasts nor
- *  skip its next one against a stale cursor, and rebuild the (bounded) bulletin. */
-export function resetLog(ui: UI, src: HudSource): void {
+ *  skip its next one against a stale cursor, and rebuild the (bounded) bulletin.
+ *  A `greeting` (the game's own arrival line, `game/arrivalLine.ts`) fills an
+ *  otherwise empty Bulletin (a loaded or reloaded tower that brought no
+ *  saved lines, such as a save from before 3.13.0 or a .TDT); a tower whose
+ *  log already speaks (a save's own lines, or a new tower saying how to open
+ *  it) keeps its own words. It is UI-only and never reaches the
+ *  engine's log. */
+export function resetLog(ui: UI, src: HudSource, greeting?: string): void {
   const lines = readLog(src, 0);
   ui.lastLogSeq = lines.length ? lines[lines.length - 1].seq : 0;
-  ui.el.log.replaceChildren(...lines.slice(-LOG_DOM_CAP).map((e) => logLine(e)));
+  const shown: Pick<LogEntry, "text" | "kind">[] = lines.slice(-LOG_DOM_CAP);
+  if (greeting && shown.length === 0) shown.push({ text: greeting, kind: "info" });
+  ui.el.log.replaceChildren(...shown.map((e) => logLine(e)));
+  showNewsInStatusBar(shown[shown.length - 1]?.text ?? "");
 }
 
 /** A transient toast on the toast rail; self-removing, capped at TOAST_MAX. */

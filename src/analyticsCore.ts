@@ -366,8 +366,8 @@ export type AppActionName =
   // completion) cannot attribute (the OS `appinstalled` event names no surface).
   | "install_offer"
   // A tap on a Sponsor link (the GitHub Sponsors tip jar). `detail` carries
-  // which surface: `splash` (the title screen's corner link) or `help` (any
-  // help site link to the Sponsors page). NOT latched, like install_offer. It
+  // which surface: `splash` (the title screen's corner link), `menu` (the
+  // game's Help menu) or `help` (any help site link to the Sponsors page). NOT latched, like install_offer. It
   // counts the tap only; whether anyone went on to sponsor is never known here.
   | "sponsor_click";
 

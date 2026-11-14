@@ -39,6 +39,7 @@
 @import "./styles/game/topbar.css";
 @import "./styles/game/tools-stage.css";
 @import "./styles/game/editor-sidebar.css";
+@import "./styles/game/menubar.css";
 @import "./styles/game/dialogs.css";
 @import "./styles/game/new-tower.css";
 @import "./styles/game/stats-saves.css";
@@ -49,3 +50,4 @@
 @import "./styles/game/media-phone.css";
 @import "./styles/game/media-landscape.css";
 @import "./styles/game/media-tablet-touch.css";
+@import "./styles/game/tool-tip.css";

@@ -217,7 +217,7 @@ test.describe("overview map on the desktop", () => {
     expect(box.stage.bottom - box.hint.bottom).toBeLessThan(16);
   });
 
-  test("the open map clears the sidebar, the palette and the heatmap control and legend", async ({ page }) => {
+  test("the open map clears the menu bar, the status bar, the palette and the hint", async ({ page }) => {
     // The smallest desktop layout (narrower is the phone layout) and 1280 by 720.
     for (const size of [
       { width: 768, height: 600 },
@@ -229,14 +229,14 @@ test.describe("overview map on the desktop", () => {
       const overlaps = await page.evaluate(() => {
         const map = document.getElementById("overview-map")!.getBoundingClientRect();
         const others: Record<string, DOMRect> = {};
-        for (const id of ["sidebar", "palette", "hint"]) {
+        for (const id of ["menubar", "statusbar", "palette", "hint"]) {
           const r = document.getElementById(id)?.getBoundingClientRect();
           if (r && r.width > 0 && r.height > 0) others[id] = r;
         }
         const hit = (r: DOMRect) => r.right > map.left && r.left < map.right && r.bottom > map.top && r.top < map.bottom;
         return { checked: Object.keys(others), overlapping: Object.keys(others).filter((k) => hit(others[k])) };
       });
-      expect(overlaps.checked, `${size.width}x${size.height}`).toEqual(expect.arrayContaining(["sidebar", "palette", "hint"]));
+      expect(overlaps.checked, `${size.width}x${size.height}`).toEqual(expect.arrayContaining(["menubar", "statusbar", "palette", "hint"]));
       expect(overlaps.overlapping, `${size.width}x${size.height}`).toEqual([]);
     }
   });

@@ -3,7 +3,7 @@
 
 /* Tablet block: portrait tablets and the compact 861–1023 band (wide enough to
    dock both columns, tall enough for panels). It keeps the desktop 3-column
-   layout — palette and sidebar stay DOCKED, not the phone strip/drawer — but wraps
+   layout (the palette stays docked rather than becoming the phone strip) but wraps
    the top bar so nothing clips and tightens the columns so the canvas keeps room.
    The base desktop rules apply here except these tweaks. */
 @media (min-width: 768px) and (max-width: 1023px) and (min-height: 600px) {
@@ -26,14 +26,9 @@
     white-space: nowrap;
   }
 
-  /* Both columns stay docked, just tighter, so the canvas keeps ~400px+ at 768px
-     and ~665px at 1023px. No drawer toggle is needed (panels are always visible);
-     #panel-toggle keeps its hidden base default since only the phone block shows it. */
+  /* The palette stays docked, just tighter, so the canvas keeps its room. */
   #palette {
     width: 150px;
-  }
-  #sidebar {
-    width: 200px;
   }
 
   /* Finger-friendly tool rows (the palette is a touch target here, not a

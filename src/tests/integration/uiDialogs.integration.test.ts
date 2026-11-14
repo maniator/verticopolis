@@ -1714,11 +1714,9 @@ describe("wireControls — toolbar buttons route to callbacks (no dead buttons)"
     makeUI();
     const expected: Record<string, string> = {
       "#btn-save-top": "save",
-      "#btn-stats": "stats",
-      "#btn-settings": "settings",
       "#btn-undo": "undo",
       "#btn-redo": "redo",
-      "#panel-toggle": "menu",
+      ".menubar-brand": "brand", // the phone menu bar's compact logo
     };
     for (const [sel, name] of Object.entries(expected)) {
       const icons = document.querySelectorAll<SVGElement>(`${sel} > .vc-icon`);
@@ -1762,17 +1760,6 @@ describe("wireControls — toolbar buttons route to callbacks (no dead buttons)"
     const { cb } = makeUI();
     document.getElementById("btn-save-top")!.click();
     expect(cb.onSave).toHaveBeenCalledOnce();
-  });
-
-  it("the panel toggle opens the mobile drawer; close and scrim shut it", () => {
-    makeUI();
-    document.getElementById("panel-toggle")!.click();
-    expect(document.body.classList.contains("panels-open")).toBe(true);
-    document.getElementById("panel-close")!.click();
-    expect(document.body.classList.contains("panels-open")).toBe(false);
-    document.getElementById("panel-toggle")!.click();
-    document.getElementById("scrim")!.click();
-    expect(document.body.classList.contains("panels-open")).toBe(false);
   });
 
   it("renaming the tower forwards a trimmed name; a blank name falls back to Tower One", () => {
@@ -1918,6 +1905,16 @@ describe("showSettings: the Settings dialog", () => {
     const { ui } = makeUI({ getMode: () => "classic" as const, getCatalog: () => catalogFor("modern") });
     ui.showSettings();
     expect(dialog().querySelector("#set-auto-bridge")).not.toBeNull();
+  });
+
+  it("leaves the bridging switch out on the title screen, where no tower is chosen yet", () => {
+    const splash = document.createElement("div");
+    splash.id = "splash";
+    document.body.append(splash);
+    const { ui } = makeUI({ getCatalog: () => catalogFor("modern") });
+    ui.showSettings();
+    expect(dialog().querySelector("#set-auto-bridge")).toBeNull();
+    splash.remove();
   });
 
   it("follows the callback across toggles for the Modern bridging switch", async () => {

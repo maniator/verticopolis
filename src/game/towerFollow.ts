@@ -1,4 +1,5 @@
 import type { GameApp } from "../main";
+import { arrivalLine } from "./arrivalLine";
 import { dropSeveredGesture } from "./engineWiring";
 import { noteTowerSwap } from "./engineFault";
 import { hudSource } from "./hudSource";
@@ -60,7 +61,9 @@ export function followEngineTower(app: GameApp, follow: TowerFollow): void {
   // Let the keyboard cursor follow (its ghost, an anchor from another tower), rebase the UI
   // log cursor so old entries don't replay as toasts, and refresh the palette's star level.
   app.keyboard.followTower(follow === "step" ? "same tower" : "another tower");
-  app.ui.resetLog(hudSource(app));
+  // A load, an import or a new tower opens its Bulletin with the game's own
+  // first line; an undo step and a tooling restore keep the log as it is.
+  app.ui.resetLog(hudSource(app), follow === "swap" ? arrivalLine(app.reader, "entered") : undefined);
   app.ui.update(hudSource(app));
   if (startsOver) app.lastTrafficTier = 0; // the chip's hysteresis starts over on another tower
   // The Map's Eval and Pricing views read the new tower's tiers on their next open frame.

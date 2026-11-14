@@ -1,0 +1,232 @@
+/* The Win95 menu bar, the status bar, and the Tower Info and Bulletin windows
+   that replaced the right sidebar (index.html; src/ui/menuBar.ts,
+   src/game/menuWiring.ts).
+   Part of the game's stylesheet: src/styles.css imports the parts in order. */
+
+/* ---- Menu bar ---- */
+.menubar {
+  display: flex;
+  align-items: center;
+  flex: none;
+  position: relative;
+  z-index: 30; /* its menus open over the top bar, the stage and its windows */
+  background: var(--r-face);
+  padding: 1px 2px;
+  box-shadow: inset 0 -1px var(--r-shadow);
+  font-family: var(--r-font);
+  font-size: 12px;
+  color: var(--r-ink);
+}
+/* The compact logo: the phone's menu bar only (media-phone.css), where the
+   top bar's wordmark has no row of its own. */
+.menubar-brand {
+  display: none;
+}
+.mb-menu {
+  position: relative;
+}
+.mb-title {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 3px 8px;
+  cursor: default;
+}
+.mb-title u {
+  text-decoration: underline;
+}
+/* An open menu's title presses in, as in Windows 95. */
+.mb-title[aria-expanded="true"] {
+  box-shadow: inset 1px 1px var(--r-shadow), inset -1px -1px var(--r-hi);
+}
+.mb-title:focus-visible,
+.mb-item:focus-visible {
+  outline: 1px dotted var(--r-ink);
+  outline-offset: -3px;
+}
+.mb-pop {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  min-width: 220px;
+  display: flex;
+  flex-direction: column;
+  padding: 3px;
+  background: var(--r-face);
+  box-shadow: var(--bevel-out), var(--win-shadow);
+}
+.mb-pop[hidden] {
+  display: none;
+}
+/* The last menu (Help) opens leftward when the bar is narrow, so it stays on
+   the screen. */
+.mb-menu:last-child .mb-pop {
+  left: auto;
+  right: 0;
+}
+.mb-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  position: relative;
+  font: inherit;
+  color: var(--r-ink);
+  text-align: left;
+  background: none;
+  border: 0;
+  padding: 4px 12px 4px 22px;
+  cursor: default;
+  white-space: nowrap;
+}
+a.mb-item {
+  text-decoration: none;
+}
+.mb-item[hidden] {
+  display: none;
+}
+.mb-item:hover,
+.mb-item:focus-visible {
+  background: var(--r-title);
+  color: var(--r-title-fg);
+}
+.mb-item[aria-disabled="true"] {
+  color: var(--r-shadow);
+  background: none;
+}
+.mb-item[aria-checked="true"]::before {
+  content: "✓";
+  position: absolute;
+  left: 7px;
+}
+.mb-item kbd {
+  font: inherit;
+  opacity: 0.8;
+}
+.mb-sep {
+  border: 0;
+  border-top: 1px solid var(--r-shadow);
+  border-bottom: 1px solid var(--r-hi);
+  margin: 3px 2px;
+}
+.mb-sep[hidden] {
+  display: none;
+}
+
+/* ---- Status bar ---- */
+.statusbar {
+  display: flex;
+  flex: none;
+  /* A fixed height: a message with an icon, or the first message arriving,
+     must not move the stage's edge (the Tools window refits on its height). */
+  box-sizing: border-box;
+  height: 22px;
+  overflow: hidden;
+  gap: 3px;
+  padding: 2px 3px;
+  background: var(--r-face);
+  font-size: 11px;
+  color: var(--r-ink);
+}
+body.statusbar-off .statusbar {
+  display: none;
+}
+.sb-cell {
+  min-width: 0;
+  padding: 2px 6px;
+  line-height: 14px;
+  box-shadow: inset 1px 1px var(--r-shadow), inset -1px -1px var(--r-hi);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sb-cell:empty {
+  display: none;
+}
+.sb-grow {
+  flex: 1;
+}
+.sb-news {
+  max-width: 40%;
+}
+.sb-news .vc-icon {
+  vertical-align: -2px;
+  margin-right: 3px;
+}
+/* The picked tool's card on one line: its name, then its numbers, each set
+   off by a dot. The description and the pickers stay out of the bar: the
+   lobby height and the bulldoze drag choice float over the tower instead. */
+#tool-info > * {
+  display: inline;
+}
+#tool-info > * + *::before {
+  content: " · ";
+}
+#tool-info .ti-name {
+  font-weight: 700;
+  color: var(--r-title);
+}
+/* A tool button under the pointer or the focus explains itself here
+   (src/ui/paletteHints.ts), in place of the picked tool's card. */
+#sb-hint[hidden] {
+  display: none;
+}
+#sb-hint:not([hidden]) + #tool-info {
+  display: none;
+}
+#tool-info p,
+#tool-info .ti-lobby-height,
+#tool-info .ti-drag-clears {
+  display: none;
+}
+
+/* ---- Tower Info and Bulletin windows ---- */
+.float-win {
+  --pad-y: 0px;
+  --pad-x: 8px;
+  --title-gap: 6px;
+  position: absolute;
+  right: 10px;
+  z-index: 2;
+  width: 220px;
+  padding: 0 var(--pad-x) 8px;
+  isolation: isolate;
+}
+.float-win[hidden] {
+  display: none;
+}
+#tower-win {
+  top: 10px;
+}
+#bulletin-win {
+  top: 10px;
+  right: 240px;
+  display: flex;
+  flex-direction: column;
+  max-height: min(260px, calc(100% - 20px));
+}
+#bulletin-win[hidden] {
+  display: none;
+}
+/* The log grows with its lines up to the window's cap, then scrolls. */
+#bulletin-win #log {
+  flex: 0 1 auto;
+  min-height: 0;
+}
+#tower-stats {
+  font-size: 12px;
+  gap: 2px 8px;
+  color: var(--r-ink);
+}
+
+/* ---- The title screen ----
+   The menu bar stays on top of the title screen, as a 1995 program's menu bar
+   sits over its opening screen, and the title screen starts under it
+   (menuWiring.ts publishes --menubar-h and grays the commands that need a
+   tower). */
+body.splash-up .menubar {
+  z-index: 41;
+}
+body.splash-up #splash {
+  top: var(--menubar-h, 0px);
+}
