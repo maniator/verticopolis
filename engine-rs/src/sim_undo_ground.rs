@@ -16,12 +16,13 @@ const GROUND_FLOOR: i64 = 1;
 
 #[path = "sim_undo_lobby.rs"]
 mod lobby;
+pub(crate) use lobby::joined_roots;
 
 pub(crate) struct Ground<'a> {
     tower: &'a Tower,
     leaving: &'a FastSet<i64>,
-    /// The floor and lobby tiles the step puts back, each with the id and
-    /// kind of the unit it puts back there.
+    /// The floor and lobby tiles the step puts back, each with the age
+    /// (`Returns::age_of`) and kind of the unit it puts back there.
     laid: FastMap<(i64, i64), (i64, Kind)>,
     /// The floor and lobby tiles the step takes out and does not lay again,
     /// as (x, floor) in order, so a shaft finds those in its column with a
@@ -41,10 +42,12 @@ pub(crate) struct Ground<'a> {
     /// The ground-floor and basement tiles the step lays that reach no tile
     /// there that stays (`adrift_low_tiles`, #1843).
     adrift: FastSet<(i64, i64)>,
+    /// The roots of the parts the step's lobby tiles joined (`Step::lobby_roots`).
+    lobby_roots: &'a [i64],
 }
 
 impl<'a> Ground<'a> {
-    pub(crate) fn of(tower: &'a Tower, step: &Step, leaving: &'a FastSet<i64>) -> Self {
+    pub(crate) fn of(tower: &'a Tower, step: &'a Step, leaving: &'a FastSet<i64>) -> Self {
         let put_back: Vec<&Unit> = step
             .units
             .iter()
@@ -56,7 +59,7 @@ impl<'a> Ground<'a> {
         let mut laid = FastMap::default();
         for u in put_back.iter().filter(|u| u.kind.is_structural()) {
             for tile in tiles_of(u) {
-                laid.insert(tile, (u.id, u.kind));
+                laid.insert(tile, (tower.returned.age_of(u.id), u.kind));
             }
         }
         let mut lobbies_added = FastMap::default();
@@ -104,6 +107,7 @@ impl<'a> Ground<'a> {
             rooms_leaving,
             station,
             adrift: FastSet::default(),
+            lobby_roots: &step.lobby_roots,
         };
         // The ground-floor and basement tiles the step lays, in step order.
         let low = put_back
@@ -159,18 +163,17 @@ impl<'a> Ground<'a> {
         self.laid.contains_key(&(floor, x)) || self.stays(floor, x)
     }
 
-    /// The id and kind of the unit whose floor or lobby tile holds at
-    /// `tile`, as (floor, x), once the step applies: the one the step puts
-    /// back there, or the tower's that stays. Unit ids only grow, and a unit
-    /// an undo puts back keeps its own, so the id says when the tile was
-    /// built.
+    /// The age (`Returns::age_of`) and kind of the unit whose floor or lobby
+    /// tile holds at `tile`, as (floor, x), once the step applies: the one the
+    /// step puts back there, or the tower's that stays. A unit an undo or redo
+    /// put back keeps its id, so its age says when it last went in (#1846).
     fn built_by(&self, tile: (i64, i64)) -> Option<(i64, Kind)> {
         if let Some(&laid) = self.laid.get(&tile) {
             return Some(laid);
         }
         let id = *self.tower.structure.get(&tile)?;
         let kind = self.tower.struct_kind.get(&tile).copied()?;
-        (!self.leaving.contains(&id)).then_some((id, kind))
+        (!self.leaving.contains(&id)).then_some((self.tower.returned.age_of(id), kind))
     }
 
     /// Whether the tower's floor or lobby tile at (`floor`, `x`) stays,
@@ -382,6 +385,6 @@ impl<'a> Ground<'a> {
 }
 
 /// The tiles floor or lobby unit `u` covers.
-fn tiles_of(u: &Unit) -> impl Iterator<Item = (i64, i64)> + '_ {
+pub(super) fn tiles_of(u: &Unit) -> impl Iterator<Item = (i64, i64)> + '_ {
     (u.x..u.x + u.width).map(move |x| (u.floor, x))
 }

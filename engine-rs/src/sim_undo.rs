@@ -34,6 +34,7 @@
 use crate::facilities::Kind;
 use crate::sim::Simulation;
 use crate::sim_undo_caps::caps_held;
+use crate::sim_undo_ground::joined_roots;
 use crate::tower::{Transport, UnitState};
 use crate::undo::{
     Step, Swap, TransportChange, TransportImage, UnitChange, UnitFacts, UnitImage, UnitUse,
@@ -195,11 +196,13 @@ impl Simulation {
             used_in_gesture: closed.used_then_taken
                 || (closed.took_own_build && self.on_hour_runs != closed.hour_passes),
             hour_passes: closed.hour_passes,
+            lobby_roots: Vec::new(),
         };
         if step.is_empty() {
             return None;
         }
         step.caps_held = caps_held(&self.tower, &step);
+        step.lobby_roots = joined_roots(&self.tower, &step);
         Some(step)
     }
 
@@ -242,6 +245,7 @@ impl Simulation {
             searched_for_treasure: false,
             used_in_gesture: false,
             hour_passes: self.on_hour_runs,
+            lobby_roots: Vec::new(),
         };
         // The shafts as they are now, before the units: putting a lobby back
         // syncs the express stops, and the opposite step must hold each shaft
@@ -280,12 +284,14 @@ impl Simulation {
         self.tower.revision += 1;
         self.tower.meta_revision += 1;
         back.caps_held = caps_held(&self.tower, &back);
+        back.lobby_roots = joined_roots(&self.tower, &back);
         Ok(back)
     }
 
     /// Apply the unit images: every unit a check found where the step
     /// expects it. Answers whether a Wedding Hall went.
     fn apply_unit_images(&mut self, step: &Step, back: &mut Step) -> bool {
+        self.tower.returned.begin_step();
         let mut out = Vec::new();
         let mut put = Vec::new();
         let mut inserts = Vec::new();
@@ -315,6 +321,8 @@ impl Simulation {
                     )
                 }
                 (UnitChange::PutBack(want), None) => {
+                    // The undo check dates the unit by this return (#1846).
+                    self.tower.returned.record(img.id, self.tower.next_id);
                     let unit = want.returning();
                     let entered = UnitUse::of(&unit);
                     inserts.push((img.at, unit));
@@ -472,3 +480,11 @@ mod adrift_tests;
 #[cfg(test)]
 #[path = "sim_undo_root_tests.rs"]
 mod root_tests;
+
+#[cfg(test)]
+#[path = "sim_undo_age_tests.rs"]
+mod age_tests;
+
+#[cfg(test)]
+#[path = "sim_undo_parts_tests.rs"]
+mod parts_tests;

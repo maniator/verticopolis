@@ -11,6 +11,7 @@ fn step(label: &str) -> Step {
         searched_for_treasure: false,
         used_in_gesture: false,
         hour_passes: 0,
+        lobby_roots: Vec::new(),
     }
 }
 

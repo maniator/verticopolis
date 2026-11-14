@@ -118,6 +118,10 @@ pub struct Tower {
     pub(crate) lobby_upgrades: Option<crate::tower_removal::LobbyUpgrades>,
     /// The open undo gesture's journal, while one is open (`undo_journal.rs`).
     pub(crate) journal: Option<Box<crate::undo_journal::Journal>>,
+    /// When each unit an undo or redo put back went back in, so the undo
+    /// check dates it by its return rather than its first build (#1846).
+    /// Never saved or hashed.
+    pub(crate) returned: crate::undo::Returns,
 }
 
 /// The room a loaded game's unit list keeps past its units. A list with no
@@ -163,6 +167,7 @@ impl Tower {
             view: Default::default(),
             lobby_upgrades: None,
             journal: None,
+            returned: Default::default(),
         }
     }
 
