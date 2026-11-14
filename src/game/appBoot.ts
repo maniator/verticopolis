@@ -25,6 +25,8 @@ import { initInstallAffordance, splashInstallOffered, activateInstall } from "./
 import { shouldWelcomeFounder } from "../founder";
 import { showTowerPicker } from "./appModals";
 import { clearSaveWarning, showSaveWarning } from "../ui/saveWarning";
+import { maybeLaunchFireworks } from "../ui/launchFireworks";
+import { reducedMotionActive } from "../storage/Prefs";
 
 /**
  * Constructor collaborators for `GameApp`, split out to keep the class body a
@@ -444,6 +446,10 @@ export function runBootFlow(app: GameApp, savedAtBoot?: number): void {
   // drop the static boot cover: on the splash path it uncovers the identical
   // title sky underneath, on the resume path the running tower.
   hideBootCover();
+
+  // The 4.0 launch fireworks, once per browser profile, over whichever screen
+  // this boot landed on, and not over an unreadable save (src/ui/launchFireworks.ts).
+  maybeLaunchFireworks(app.ui, () => reducedMotionActive(app.prefs, app.reduceMq.matches), app.saveWasCorrupt);
 
   // Tell the player plainly when their save couldn't be read, rather than
   // dropping them into a fresh tower with no explanation. Goes to the bulletin

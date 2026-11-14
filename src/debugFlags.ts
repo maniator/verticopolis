@@ -16,6 +16,9 @@
 export const DEBUG_FLAG = {
   /** The frame statistics overlay (`src/debugHud.ts`). */
   fps: "fps",
+  /** Play the 4.0 launch fireworks on this load (`src/ui/launchFireworks.ts`),
+   *  whatever the version and whether or not they already played. */
+  fireworks: "fireworks",
 } as const;
 
 export type DebugFlag = (typeof DEBUG_FLAG)[keyof typeof DEBUG_FLAG];
