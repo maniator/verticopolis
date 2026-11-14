@@ -15,6 +15,10 @@ raised the version, so they are documentation only.
 There is no entry for 0.17.0, which only
 existed as a step inside a stacked branch.
 
+## 1.30.3 (2026-11-14)
+
+- The far-from-a-lobby trade penalty for venues counts a working Metro platform (the station's middle story) as a place shoppers arrive, in both the hourly takings and the service diagnostics' `lobbyFar` fact.
+
 ## 1.30.2 (2026-11-14)
 
 - A rider no longer gives up while aboard a car: they ride to their floor, and step out of the trip only when their car, their shaft or their floor's stop goes. The conformance lock moves.
