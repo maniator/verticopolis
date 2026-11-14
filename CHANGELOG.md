@@ -25,6 +25,10 @@ prompt already tells players it is an engine update and shows the new version.
 Entries below 1.51.1 were curated from the commit history after the fact, so they
 are documentation only: no build that a client fetches carries them.
 
+## 3.11.1
+
+- Nobody vanishes on the way anymore. Someone who waits too long for their first elevator walks back the way they came and leaves from there, and anyone already partway up the tower, or on the way home, keeps going until they get there. People waiting for an elevator or stairs you bulldoze find another way up, or walk back out if they had only just set out.
+
 ## 3.11.0
 
 - Click or tap a walking person with the Inspect tool to see who they are, why they are out, where they came from, where they are going and how long they have waited, in Classic and Modern.

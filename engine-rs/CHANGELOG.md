@@ -15,6 +15,10 @@ raised the version, so they are documentation only.
 There is no entry for 0.17.0, which only
 existed as a step inside a stacked branch.
 
+## 1.34.1 (2026-11-14)
+
+- Patience no longer removes a visitor or tenant from the crowd. One still on the floor their trip began on turns back (`motion::turn_back`) to where they set out (`Person::start_x`, engine-internal) and leaves there; one past their first ride, or returning, keeps waiting. A shaft that goes from under someone on foot sends them back the same way if they are still setting out, or on by a new route to their trip's last floor (`motion::reroute`); only a rider whose car went, or someone with no way on, leaves the crowd. Housekeepers keep their own rule. The conformance lock, frame days, port edits and fuzz goldens are re-pinned, and the Classic ransom scenario's first threat moved to hour 40.
+
 ## 1.34.0 (2026-11-14)
 
 - `personCard(id)` (and `crowd::trip::trip_facts` in Rust) answers one person's trip: why they are out, where the leg they are on began and ends, and their wait, as the layout's new `personCard` record with its `personPurposes`, `tripPlaces` and `shiftSteps` codes (view layout version 23).
