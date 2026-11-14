@@ -15,6 +15,11 @@ raised the version, so they are documentation only.
 There is no entry for 0.17.0, which only
 existed as a step inside a stacked branch.
 
+## 1.35.1 (2026-11-14)
+
+- Every load path refuses a save with no numeric `minutes` or no `units` list at its top level, with a sentence a player can read; it used to load such a save as an empty tower.
+- An undo or redo step that would put back a ground-floor or basement tile reaching no tile there that stays is refused as `Blocked`.
+
 ## 1.35.0 (2026-11-14)
 
 - `crowd::walk_ins` books each open shop's and restaurant's customers from outside every hour, as many as its demand sends, and starts them at the ground lobby or a served Metro platform, split by what each entrance's transport carries; they are counted apart from the 140-person sample (`Crowd::walk_in_count`, ceiling `MAX_WALK_INS`).
