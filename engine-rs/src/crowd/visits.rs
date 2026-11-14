@@ -353,3 +353,28 @@ fn counts_patronage(kind: Kind) -> bool {
     kind.subtype_list().is_some()
         && crate::economy::retail_spend_per_customer(kind).is_some_and(|s| s > 0.0)
 }
+
+/// Takes person `i` out of the venue's head count as they walk out of it
+/// (or finish, whichever comes first), so a venue counts only who is inside
+/// rather than everyone still on the way home from it.
+pub(super) fn leave_venue(crowd: &mut Crowd, tower: &mut Tower, i: usize) {
+    let p = &crowd.people[i];
+    let Some(vid) = p.venue_unit_id else {
+        return;
+    };
+    let counted_hotel = p.counted_hotel_guest;
+    if let Some((venue, at)) = tower.marked_by_id(vid) {
+        if venue.customers_in.unwrap_or(0) > 0 {
+            venue.set_customers_in(at, Some(venue.customers_in.unwrap_or(0) - 1));
+            venue.sync_visitor_occupants(at);
+            if counted_hotel && venue.hotel_customers_in.unwrap_or(0) > 0 {
+                let n = venue.hotel_customers_in.unwrap_or(0) - 1;
+                venue.set_hotel_customers_in(at, Some(n));
+            }
+            tower.bump_meal_overlay_revision();
+        }
+    }
+    let p = &mut crowd.people[i];
+    p.venue_unit_id = None;
+    p.counted_hotel_guest = false;
+}

@@ -66,6 +66,7 @@ mod move_in_gate_rentals;
 mod move_in_sustainability_gate;
 mod noise_memo;
 mod noise_reach_table;
+mod office_commute;
 mod party_hall_two_floor;
 mod person_census;
 mod person_round_trip;

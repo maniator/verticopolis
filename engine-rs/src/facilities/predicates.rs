@@ -141,6 +141,15 @@ impl Kind {
     }
 
     #[doc(hidden)]
+    /// A kind whose workers come in and go home as people in a `mode` tower
+    /// (`crowd::commuters`): its head count is the workers who got there,
+    /// and the dispatch estimate skips it, since they ride the cars
+    /// themselves. Offices in Modern today.
+    pub fn commutes_in_person(self, mode: crate::clock::GameMode) -> bool {
+        self == Kind::Office && mode.office_workers_commute_in_person()
+    }
+
+    #[doc(hidden)]
     /// `isCommercialKind`.
     pub fn is_commercial(self) -> bool {
         matches!(

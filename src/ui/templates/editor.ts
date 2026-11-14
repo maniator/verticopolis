@@ -6,7 +6,7 @@ import { catalogFacility, catalogFilmRebook, catalogTicketPrice, filmEditAction,
 import type { ScreenDetail, TransportDetail, UnitDetail } from "../../simport/panels";
 import { catalogCalendar, priceOptionsFor, rentPerCollection } from "../catalogPricing";
 import type { CalendarKind } from "../../shared/engineTypes";
-import { hasAccessDiagnostic } from "../../game/cardLines";
+import { hasAccessDiagnostic, occupantsText } from "../../game/cardLines";
 import { rungPickerTemplate, type RungChoice } from "./rungPicker";
 import { floorTag, groupDigits } from "../format";
 
@@ -103,7 +103,7 @@ export function unitEditorTemplate(
     const closed = isTenanted(u) && !catalogOpenAt(f, hour);
     rows.push(kv("Customers", `${u.customersIn ?? 0}${closed ? " (closed)" : ""}`, "customers"));
   } else if (f.population) {
-    rows.push(kv("Occupants", `${u.occupants}/${catalogResidents(f, u.residents)}`, "occupants"));
+    rows.push(kv("Occupants", occupantsText(u.occupants, catalogResidents(f, u.residents), u.workersComing), "occupants"));
   }
   // On mobile the folded-in diagnostics carry the richer access reachability
   // line, so the plain Yes/No row would duplicate it: drop it there. But keep

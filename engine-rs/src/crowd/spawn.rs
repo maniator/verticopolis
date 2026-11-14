@@ -77,6 +77,8 @@ pub fn make_person(
         staff_trip: None,
         errand: None,
         walk_in: false,
+        commuter: false,
+        commute: None,
         start_x: origin_spawn_x as f64,
     };
     crowd.next_id += 1;
@@ -333,15 +335,17 @@ pub(crate) fn weighted_index(r: f64, weights: impl Iterator<Item = f64> + Clone)
     last
 }
 
-/// The tenants' and visitors' sample is full. Housekeepers on shift and
-/// walk-in customers (`walk_ins`) are counted apart: they are real people,
-/// and would otherwise crowd the tenants out of the picture.
+/// The tenants' and visitors' sample is full. Housekeepers on shift,
+/// walk-in customers (`walk_ins`) and office workers on their way
+/// (`commuters`) are counted apart: they are real people, and would
+/// otherwise crowd the rest out of the picture.
 fn crowd_is_full(crowd: &Crowd) -> bool {
     crowd
         .people
         .len()
         .saturating_sub(crowd.staff_count.max(0) as usize)
         .saturating_sub(crowd.walk_in_count.max(0) as usize)
+        .saturating_sub(crowd.commuter_count.max(0) as usize)
         >= MAX_PEOPLE
 }
 
@@ -367,8 +371,11 @@ pub fn spawn_trips(crowd: &mut Crowd, tower: &mut Tower, clock: &Clock, floors: 
         weighted: false,
     };
     let o = &mut options.opts;
-    let lo = !floors.leased_offices.is_empty();
-    let so = !floors.staffed_offices.is_empty();
+    // Modern office workers come and go as real commuters (`commuters`);
+    // Classic offices keep the clock's trips until the 1994 rush is measured.
+    let clock_offices = !tower.mode.office_workers_commute_in_person();
+    let lo = clock_offices && !floors.leased_offices.is_empty();
+    let so = clock_offices && !floors.staffed_offices.is_empty();
     let hm = !floors.homes.is_empty();
     if morning {
         if lo {

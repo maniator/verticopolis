@@ -25,7 +25,6 @@ use std::cell::Cell;
 use std::collections::BTreeSet;
 
 use super::classic::ON_FLOOR;
-use super::CAR_FLOORS_PER_MINUTE;
 use crate::clock::GameMode;
 
 /// The owner of a called stop no on-shift car can answer.
@@ -56,6 +55,8 @@ pub struct DispatchRules {
     /// retired: a parked car answers only calls within the span less that
     /// many floors. Only the test-only plain SCAN profile sets it.
     pub parked_reach_gate: bool,
+    /// How many times faster an express car moves than a standard car.
+    pub express_speed: f64,
 }
 
 impl DispatchRules {
@@ -69,6 +70,7 @@ impl DispatchRules {
             spread_homes: mode.spreads_unset_car_homes(),
             parked_owner_boards: mode.parked_owner_boards_its_floor(),
             parked_reach_gate: false,
+            express_speed: mode.express_speed_factor(),
         }
     }
 
@@ -87,6 +89,7 @@ impl DispatchRules {
             spread_homes: false,
             parked_owner_boards: false,
             parked_reach_gate: true,
+            express_speed: 1.0,
         }
     }
 }
@@ -120,13 +123,15 @@ pub(super) struct CarView {
 
 impl CarView {
     /// A car at `pos` moving `dir` with `dwell_left` minutes of its stop to
-    /// go and the riders' floors `cab`, where each stop takes `stop_minutes`.
+    /// go and the riders' floors `cab`, where each stop takes `stop_minutes`
+    /// and the car covers `floors_per_minute` while it moves.
     pub fn of(
         pos: f64,
         dir: i64,
         dwell_left: f64,
         cab: Option<&BTreeSet<i64>>,
         stop_minutes: f64,
+        floors_per_minute: f64,
     ) -> CarView {
         let farthest = cab.and_then(|c| if dir > 0 { c.last() } else { c.first() });
         let turn = farthest
@@ -138,7 +143,7 @@ impl CarView {
             pos,
             dir,
             turn,
-            owed: (dwell_left + promised * stop_minutes) * CAR_FLOORS_PER_MINUTE,
+            owed: (dwell_left + promised * stop_minutes) * floors_per_minute,
         }
     }
 

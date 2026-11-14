@@ -48,6 +48,14 @@ describe("unit inspector card branches", () => {
     expect(frag.textContent).toContain("Satisfaction: 73%");
   });
 
+  it("an office names the workers still on their way in, and only when some are", () => {
+    const coming = renderToFragment(unitInspector(unit("office", { occupants: 4, workersComing: 2 })));
+    expect(coming.textContent).toContain("Occupants: 4/6, 2 on the way");
+    const settled = renderToFragment(unitInspector(unit("office", { occupants: 6, workersComing: 0 })));
+    expect(settled.textContent).toContain("Occupants: 6/6");
+    expect(settled.textContent).not.toContain("on the way");
+  });
+
   it("hotel lifecycle states read in plain language (dirty / asleep / infested)", () => {
     expect(renderToFragment(unitInspector(unit("hotelSingle", { state: "dirty" }))).textContent).toContain(
       "Status: dirty (awaiting housekeeping)",
