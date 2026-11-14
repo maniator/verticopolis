@@ -5,6 +5,7 @@
  * an injected builder by identity. Keep ERASABLE.
  */
 import { type Scene, PHONE } from "../screenshot-env.ts";
+import { RAIN_SHELTERED_SHOT } from "./rainShots.ts";
 import {
   buildBasement,
   buildCanonTower,
@@ -412,6 +413,7 @@ export const FEATURE_SCENES: Scene[] = [
           });
         },
       },
+      RAIN_SHELTERED_SHOT,
     ],
   },
   // --- Responsive layout (docked-tablet band) ---------------------------------
