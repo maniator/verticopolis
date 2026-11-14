@@ -335,6 +335,13 @@ export class Engine {
      */
     pendingChoice(): string | undefined;
     /**
+     * Person `id`'s trip (#2092) as the layout's `personCard` record: why
+     * they are out, where the leg they are on began and ends, and their
+     * wait. Empty for an id that names nobody in the tower now. Read on
+     * demand while a card is open; the view frame carries none of it.
+     */
+    personCard(id: number): Float64Array;
+    /**
      * Tooling only: `placeBare(kind, floor, x)`, the TypeScript `tower.place`, the bare placement with
      * no charge, star gate or log line. JSON `{ ok, reason?, unitId? }`.
      */

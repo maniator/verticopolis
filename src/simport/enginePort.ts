@@ -406,6 +406,10 @@ export interface EnginePortQueries {
   unitCard(id: number): PortRecord;
   /** Empty for an id that names no shaft. */
   shaftCard(id: number): PortRecord;
+  /** A walking person's trip (#2092): why they are out, where the leg they
+   *  are on began and ends, and their wait. Empty for an id that names
+   *  nobody in the tower now. Read while the person card is open. */
+  personCard(id: number): PortRecord;
   /** The stats screen: the `statsSheet` header, then the sections its last
    *  six slots count. */
   statsSheet(): PortRecord;

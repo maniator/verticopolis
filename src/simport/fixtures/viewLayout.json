@@ -1,5 +1,5 @@
 {
-  "version": 22,
+  "version": 23,
   "header": {
     "minutes": 0,
     "towerRevision": 1,
@@ -521,6 +521,28 @@
       "evalTier",
       "rentTier"
     ],
+    "personCard": [
+      "id",
+      "stateCode",
+      "floor",
+      "x",
+      "staff",
+      "purpose",
+      "returning",
+      "shiftStep",
+      "fromPlace",
+      "fromUnit",
+      "fromKind",
+      "fromFloor",
+      "toPlace",
+      "toUnit",
+      "toKind",
+      "toFloor",
+      "wait",
+      "waitMinutes",
+      "tripWaitMinutes",
+      "shaftId"
+    ],
     "statsSheet": [
       "ratingPopulation",
       "hotelsCountTowardRating",
@@ -786,6 +808,35 @@
     "low",
     "average",
     "high"
+  ],
+  "personPurposes": [
+    "toWork",
+    "fromWork",
+    "leaveHome",
+    "returnHome",
+    "toVenue",
+    "fromVenue",
+    "meal",
+    "visit",
+    "schoolRun",
+    "salesCall",
+    "housekeeping",
+    "unknown"
+  ],
+  "tripPlaces": [
+    "none",
+    "room",
+    "floor",
+    "lobby",
+    "metro"
+  ],
+  "shiftSteps": [
+    "in",
+    "base",
+    "job",
+    "free",
+    "home",
+    "out"
   ],
   "ledgerCats": [
     "offices",

@@ -152,6 +152,7 @@ pub(crate) fn add_panel_records(layout: &mut serde_json::Value) {
     layout["vacateReasons"] = serde_json::json!(VACATE_REASONS);
     layout["evalTiers"] = serde_json::json!(EvalTier::ALL.map(EvalTier::name));
     layout["rentTiers"] = serde_json::json!(RentTier::ALL.map(RentTier::name));
+    super::port_person::add_person_records(layout);
     super::port_reports::add_report_records(layout);
     super::port_render::add_render_records(layout);
 }

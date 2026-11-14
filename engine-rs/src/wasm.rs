@@ -359,6 +359,9 @@ mod port_life;
 #[path = "wasm_port_panels.rs"]
 mod port_panels;
 
+#[path = "wasm_port_person.rs"]
+mod port_person;
+
 #[path = "wasm_port_reports.rs"]
 mod port_reports;
 

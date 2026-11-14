@@ -12,6 +12,7 @@ pub mod routing;
 pub mod spawn;
 pub mod spawn_floors;
 pub mod staff_shift;
+pub mod trip;
 pub mod visits;
 pub mod walk;
 
@@ -116,6 +117,13 @@ pub struct Person {
     /// `Person` shape.
     pub crew_id: Option<i64>,
     pub staff_trip: Option<staff_shift::StaffTrip>,
+    /// Why a plain commute set out (the floor-list trips of `spawn_trips`),
+    /// for the person card (`trip`). Stamped at spawn, draws nothing, and
+    /// the crowd is never saved. Engine-internal: not in the `Person` shape.
+    pub errand: Option<trip::Errand>,
+    /// The tile the person first stood on, so the card can name the room a
+    /// plain commute left. Engine-internal: not in the `Person` shape.
+    pub start_x: f64,
 }
 
 impl Person {

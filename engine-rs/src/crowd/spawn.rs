@@ -3,6 +3,7 @@
 use super::meals::MealOrigin;
 use super::routines::push_routine_options;
 pub use super::spawn_floors::{spawn_floors, SpawnFloors};
+use super::trip::{Errand, ErrandPlace};
 use super::visits::{push_venue_visit_options, spawn_venue_visit, VisitOrigin};
 use super::{Crowd, PState, Person, Route, MAX_PEOPLE, METRO_DWELL_MAX, METRO_DWELL_MIN};
 use crate::clock::Clock;
@@ -72,6 +73,8 @@ pub fn make_person(
         from_metro: false,
         crew_id: None,
         staff_trip: None,
+        errand: None,
+        start_x: origin_spawn_x as f64,
     };
     crowd.next_id += 1;
     crowd.people.push(person);
@@ -184,20 +187,18 @@ pub fn venue_has_room(u: &Unit) -> bool {
 
 // ---- venueTrips.ts ---------------------------------------------------------
 
-fn metro_arrival(crowd: &mut Crowd, tower: &Tower, station: &Unit, to: i64) {
-    let Some(i) = add(crowd, tower, station.floor + 1, to, None, None) else {
-        return;
-    };
+fn metro_arrival(crowd: &mut Crowd, tower: &Tower, station: &Unit, to: i64) -> Option<usize> {
+    let i = add(crowd, tower, station.floor + 1, to, None, None)?;
     crowd.people[i].x = inside_x(crowd, station, 2) as f64;
     crowd.people[i].from_metro = true;
+    Some(i)
 }
 
-fn metro_departure(crowd: &mut Crowd, tower: &Tower, station: &Unit, from: i64) {
-    let Some(i) = add(crowd, tower, from, station.floor + 1, None, None) else {
-        return;
-    };
+fn metro_departure(crowd: &mut Crowd, tower: &Tower, station: &Unit, from: i64) -> Option<usize> {
+    let i = add(crowd, tower, from, station.floor + 1, None, None)?;
     crowd.people[i].dest_x = inside_x(crowd, station, 2) as f64;
     crowd.people[i].linger_for = Some(crowd.rng.int(METRO_DWELL_MIN, METRO_DWELL_MAX) as f64);
+    Some(i)
 }
 
 // ---- spawn.ts --------------------------------------------------------------
@@ -309,6 +310,19 @@ pub(crate) fn weighted_index(r: f64, weights: impl Iterator<Item = f64> + Clone)
         last = i;
     }
     last
+}
+
+/// Stamp the errand of a plain commute just added at `i` (none when the
+/// spawn found no route), for the person card. Draws nothing.
+fn stamp_errand(crowd: &mut Crowd, i: Option<usize>, l: List, inbound: bool) {
+    let place = match l {
+        List::LeasedOffices | List::StaffedOffices => ErrandPlace::Office,
+        List::Homes => ErrandPlace::Home,
+        List::OpenVenues => ErrandPlace::Venue,
+    };
+    if let Some(i) = i {
+        crowd.people[i].errand = Some(Errand { place, inbound });
+    }
 }
 
 fn list_of(floors: &SpawnFloors, l: List) -> &[i64] {
@@ -431,19 +445,28 @@ pub fn spawn_trips(crowd: &mut Crowd, tower: &mut Tower, clock: &Clock, floors: 
                 End::Fixed(f) => f,
                 End::Pick(l) => *crowd.rng.pick(list_of(floors, l)),
             };
-            add(crowd, tower, from, to, None, None);
+            let i = add(crowd, tower, from, to, None, None);
+            // Every floor-list trip runs between a list and the lobby: in
+            // to the list's floor, or out of it.
+            match (*a, *b) {
+                (_, End::Pick(l)) => stamp_errand(crowd, i, l, true),
+                (End::Pick(l), _) => stamp_errand(crowd, i, l, false),
+                _ => {}
+            }
         }
         Opt::MetroArrival(l) => {
             let sid = *crowd.rng.pick(&reachable_metros);
             let to = *crowd.rng.pick(list_of(floors, *l));
             let station = tower.get_unit(sid).unwrap().clone();
-            metro_arrival(crowd, tower, &station, to);
+            let i = metro_arrival(crowd, tower, &station, to);
+            stamp_errand(crowd, i, *l, true);
         }
         Opt::MetroDeparture(l) => {
             let sid = *crowd.rng.pick(&reachable_metros);
             let from = *crowd.rng.pick(list_of(floors, *l));
             let station = tower.get_unit(sid).unwrap().clone();
-            metro_departure(crowd, tower, &station, from);
+            let i = metro_departure(crowd, tower, &station, from);
+            stamp_errand(crowd, i, *l, false);
         }
         Opt::MealOutbound(pi) => {
             let pi = *pi;
