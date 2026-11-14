@@ -9,8 +9,8 @@
     {
       "op": "tick",
       "dt": 60,
-      "times": 40,
-      "checkpointEvery": 10
+      "times": 1000,
+      "checkpointEvery": 250
     },
     {
       "op": "checkpoint",
