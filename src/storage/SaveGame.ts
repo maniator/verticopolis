@@ -25,14 +25,16 @@ import { stampText } from "./saveStamp";
 import { engineSaveText, importObjection, looksLikeTowerSave, readSavedAt } from "./saveTextRead";
 import { slotPopulation } from "./slotCensus";
 import { rememberedSlotInfo } from "./slotInfoMemo";
+import { openSaveStore, saveStore, type SaveStoreKeys } from "./saveStore";
+import { UNREADABLE_KEY } from "./unreadableStash";
 
 /**
- * Persistence. Games are stored in localStorage: one auto-save slot plus a
+ * Persistence. Games are stored in the browser (`saveStore`: IndexedDB with
+ * a localStorage mirror, or localStorage alone): one auto-save slot plus a
  * handful of named manual slots, so the player can keep multiple towers. Also
- * supports export/import of Verticopolis tower files (.vctower) for sharing
- * or backups.
+ * supports export/import of .vctower tower files for sharing or backups.
  *
- * localStorage values are DEFLATE-compressed (see {@link STORE_MAGIC}): a real
+ * Stored values are DEFLATE-compressed (see {@link STORE_MAGIC}): a real
  * late-game tower is hundreds of KB of JSON even in the sparse v3 unit shape,
  * and across the autosave slot plus three manual slots the raw JSON would
  * crowd the ~5MB localStorage quota and risk a failed save on a large tower.
@@ -50,6 +52,29 @@ const SLOT_KEY = (n: number) => `simtower-clone-slot-${n}`;
 export const SLOT_COUNT = 3;
 
 export { UNREADABLE_KEY } from "./unreadableStash";
+
+const SLOT_KEYS = Array.from({ length: SLOT_COUNT }, (_, i) => SLOT_KEY(i + 1));
+/** Whether `key` names one of the manual slots. */
+export const isSlotKey = (key: string): boolean => SLOT_KEYS.includes(key);
+const SAVE_KEYS = [AUTO_KEY, LEGACY_AUTO_KEY, ...SLOT_KEYS, UNREADABLE_KEY];
+
+/** Every key that holds a save, and the keys localStorage mirrors
+ *  (`saveStore`). The first release on IndexedDB mirrors every save, so a
+ *  rollback still finds every tower and what an older build wrote wins here
+ *  when newer; the release after it mirrors only the autosave. */
+export const SAVE_STORE_KEYS: SaveStoreKeys = { managed: SAVE_KEYS, mirrored: SAVE_KEYS };
+
+/** Open the save store before the first save is read (boot). Resolves false
+ *  when the saves stay in localStorage; never rejects. */
+export function openSaves(factory?: IDBFactory): Promise<boolean> {
+  return openSaveStore(SAVE_STORE_KEYS, {
+    factory,
+    savedAt: (value) => {
+      const text = decodeSlotText(value);
+      return text === null ? undefined : parseSavedAt(readSavedAt(text));
+    },
+  });
+}
 
 // Latest-start write token for same-tab async saves. A synchronous save clears
 // the token before it writes, so an older async compression can never commit
@@ -80,7 +105,7 @@ export type TryLoad = (text: SaveText) => boolean;
  *  null for an absent or undecodable slot. Nothing parses the tower here: the
  *  engine does, once. */
 function readSlotText(key: string): SaveText | null {
-  return decodeSlotText(localStorage.getItem(key));
+  return decodeSlotText(saveStore.get(key));
 }
 
 /** {@link readSlotText} on a value already read from storage. */
@@ -102,7 +127,7 @@ function decodeSlotText(raw: string | null): SaveText | null {
 }
 
 export function autosaveKey(): string {
-  return localStorage.getItem(AUTO_KEY) !== null || localStorage.getItem(LEGACY_AUTO_KEY) === null
+  return saveStore.get(AUTO_KEY) !== null || saveStore.get(LEGACY_AUTO_KEY) === null
     ? AUTO_KEY
     : LEGACY_AUTO_KEY;
 }
@@ -207,7 +232,7 @@ export const SaveGame = {
     await this.saveToAsync(AUTO_KEY, text);
   },
   hasSave(): boolean {
-    return localStorage.getItem(AUTO_KEY) !== null || localStorage.getItem(LEGACY_AUTO_KEY) !== null;
+    return saveStore.get(AUTO_KEY) !== null || saveStore.get(LEGACY_AUTO_KEY) !== null;
   },
   /** Load the autosave through `tryLoad`; true when a save loaded. */
   load(tryLoad: TryLoad): boolean {
@@ -235,7 +260,7 @@ export const SaveGame = {
     let refusedKey: string | undefined; // the first key that held an unreadable save
     let newerKey: string | undefined; // the first one the engine said a newer build wrote
     for (const key of [AUTO_KEY, LEGACY_AUTO_KEY]) {
-      if (localStorage.getItem(key) === null) continue; // absent, not corrupt
+      if (saveStore.get(key) === null) continue; // absent, not corrupt
       const text = readSlotText(key); // null ⇒ present but undecodable
       // The engine applies the founder rule: an unstamped stored tower
       // predates the appVersion stamp (pre-2.0). Surface the loaded tower's
@@ -254,8 +279,8 @@ export const SaveGame = {
     return { loaded: false, corrupt, savedAt: undefined, refusedKey, newerKey };
   },
   clear(): void {
-    localStorage.removeItem(AUTO_KEY);
-    localStorage.removeItem(LEGACY_AUTO_KEY);
+    saveStore.remove(AUTO_KEY);
+    saveStore.remove(LEGACY_AUTO_KEY);
   },
   /** Keep an unreadable autosave aside (see `unreadableStash`); true when kept. */
   preserveUnreadable(key: string = autosaveKey(), newer = false): boolean {
@@ -275,7 +300,7 @@ export const SaveGame = {
    *  "free" slot to WRITE must use this, never `listSlots().exists` (which is
    *  parse-based and would offer a possibly-recoverable slot for overwrite). */
   hasSlot(n: number): boolean {
-    return localStorage.getItem(SLOT_KEY(n)) !== null;
+    return saveStore.get(SLOT_KEY(n)) !== null;
   },
   /** Load a manual slot through `tryLoad` (the engine applies the founder
    *  rule); false for an empty, undecodable or refused slot. */
@@ -284,18 +309,18 @@ export const SaveGame = {
     return text !== null && tryLoad(text);
   },
   deleteSlot(n: number): void {
-    localStorage.removeItem(SLOT_KEY(n));
+    saveStore.remove(SLOT_KEY(n));
   },
   /** A manual slot's stored value exactly as it sits in storage (packed, not
    *  decoded), or null for an empty slot. The overwrite guard
    *  (`./slotGuard`) fingerprints it and keeps it whole for Undo. */
   slotRaw(n: number): string | null {
-    return localStorage.getItem(SLOT_KEY(n));
+    return saveStore.get(SLOT_KEY(n));
   },
   /** Put a value read by {@link SaveGame.slotRaw} back into its slot, byte for
    *  byte. Throws as a slot save does when storage refuses the write. */
   restoreSlotRaw(n: number, raw: string): void {
-    localStorage.setItem(SLOT_KEY(n), raw);
+    saveStore.set(SLOT_KEY(n), raw);
   },
 
   /** Metadata for every slot, for the saves manager UI. A loaded or empty slot
@@ -423,18 +448,18 @@ export const SaveGame = {
 
 function writeSlot(key: string, value: string): void {
   if (key !== AUTO_KEY) {
-    localStorage.setItem(key, value);
+    saveStore.set(key, value);
     return;
   }
-  const legacy = localStorage.getItem(LEGACY_AUTO_KEY);
-  const needsQuotaReclaim = legacy !== null && localStorage.getItem(AUTO_KEY) === null;
+  const legacy = saveStore.get(LEGACY_AUTO_KEY);
+  const needsQuotaReclaim = legacy !== null && saveStore.get(AUTO_KEY) === null;
   if (needsQuotaReclaim) {
-    localStorage.removeItem(LEGACY_AUTO_KEY);
+    saveStore.remove(LEGACY_AUTO_KEY);
     try {
       writeAutosaveValue(value);
     } catch (err) {
       try {
-        localStorage.setItem(LEGACY_AUTO_KEY, legacy);
+        saveStore.set(LEGACY_AUTO_KEY, legacy);
       } catch {
         /* best effort: preserve the old key if the migrated write fails */
       }
@@ -450,7 +475,7 @@ function writeSlot(key: string, value: string): void {
     // stale duplicate of an already-persisted tower, so under quota pressure
     // drop it first and retry the write before giving up.
     if (legacy === null) throw err;
-    localStorage.removeItem(LEGACY_AUTO_KEY);
+    saveStore.remove(LEGACY_AUTO_KEY);
     try {
       writeAutosaveValue(value);
     } catch (retryErr) {
@@ -458,7 +483,7 @@ function writeSlot(key: string, value: string): void {
       // primary falls back to the legacy save at load (see loadResult), so
       // the deleted value may be the only readable tower left.
       try {
-        localStorage.setItem(LEGACY_AUTO_KEY, legacy);
+        saveStore.set(LEGACY_AUTO_KEY, legacy);
       } catch {
         /* best effort: quota may still be exhausted */
       }
@@ -466,10 +491,10 @@ function writeSlot(key: string, value: string): void {
     }
     return;
   }
-  if (legacy !== null) localStorage.removeItem(LEGACY_AUTO_KEY);
+  if (legacy !== null) saveStore.remove(LEGACY_AUTO_KEY);
 }
 
 function writeAutosaveValue(value: string): void {
-  localStorage.setItem(AUTO_KEY, value);
+  saveStore.set(AUTO_KEY, value);
 }
 

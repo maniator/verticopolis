@@ -7,6 +7,7 @@ import { initPwaInstall } from "./pwaInstall";
 import { removeLegacyCohortKeys } from "./engineCrash/legacyKeys";
 import { CRASH_RELOAD_LINE, countRustCrash, crashOutcome, markCrashReload, reloadSoon, tabStore } from "./engineCrash/crashReload";
 import { loadWasmEngine, publishRustEngine, rustBootTower } from "./wasmhost/rustEngine";
+import { openSaves } from "./storage/SaveGame";
 import type { BootTower } from "./game/bootTower";
 import { setSlotPopulationReader } from "./storage/slotCensus";
 import { setEngineWriter } from "./storage/vctowerWriter";
@@ -272,7 +273,11 @@ export function bootGame(create: (tower: BootTower) => BootApp): Promise<void> {
     noteEngineAttempt({ build: "wasm-only", ...facts });
     // The cover says so after a short wait, when the package takes a while (#1132).
     const stopLoadingLine = showEngineLoading();
+    // The saves open beside the package (`saveStore`), and both are ready
+    // before the first save is read.
+    const savesOpened = openSaves();
     const booted = await loadBootEngine({ load: (signal, onBuild) => loadWasmEngine(undefined, signal, { onBuild }) });
+    await savesOpened;
     let bootState: EngineBootState = booted.state;
     stopLoadingLine();
     publishBootState(bootState);

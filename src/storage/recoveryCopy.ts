@@ -1,4 +1,5 @@
 import { autosaveKey, UNREADABLE_KEY } from "./SaveGame";
+import { saveStore } from "./saveStore";
 
 /**
  * The text of the recovery copy (#1422 6b, layer 1 of the 3.0 format
@@ -10,7 +11,7 @@ import { autosaveKey, UNREADABLE_KEY } from "./SaveGame";
  */
 export function readRecoveryText(): string | null {
   try {
-    return localStorage.getItem(autosaveKey()) ?? localStorage.getItem(UNREADABLE_KEY);
+    return saveStore.get(autosaveKey()) ?? saveStore.get(UNREADABLE_KEY);
   } catch {
     return null;
   }
