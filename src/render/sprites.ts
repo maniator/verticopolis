@@ -22,8 +22,11 @@ export type { DrawCtx } from "./sprites/common";
 export {
   AWNING_W,
   CRANE_H,
+  CRANE_MAST_ANCHOR_X,
+  CRANE_MIN_ROOF_TILES,
   CRANE_W,
   craneAnchorTile,
+  craneRoof,
   drawAwning,
   drawCrane,
   drawEscapeStairs,

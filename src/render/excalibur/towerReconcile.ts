@@ -7,8 +7,10 @@ import { isPresent } from "../../shared/unitState";
 import type { TransportView, UnitView } from "../../simport/view";
 import {
   CRANE_H,
+  CRANE_MAST_ANCHOR_X,
+  CRANE_MIN_ROOF_TILES,
   CRANE_W,
-  craneAnchorTile,
+  craneRoof,
   AWNING_W,
   drawCrane,
   drawTransport,
@@ -274,9 +276,11 @@ function syncEscapes(engine: TowerEngine, runs: Map<number, FloorEdge[]>): void 
  *  unless the top is demolished back below it, the crane is derived state,
  *  not a latch). No above-ground floors → no crane (empty/basement lots). */
 function syncCrane(engine: TowerEngine, hi: number, topTiles: Set<number>): void {
-  // No above-ground structure on the top row (basement-only/empty lot) or the
-  // tower has topped out at the cap → no crane.
-  if (hi >= viewWorld().maxFloor || topTiles.size === 0) {
+  // No above-ground structure on the top row (basement-only/empty lot), the
+  // tower has topped out at the cap, or the top is too narrow for the
+  // crane's roof pad (a spire) → no crane.
+  const roof = topTiles.size > 0 ? craneRoof(topTiles) : null;
+  if (hi >= viewWorld().maxFloor || !roof || roof.width < CRANE_MIN_ROOF_TILES) {
     if (engine.craneActor) {
       engine.craneActor.kill();
       engine.craneActor = null;
@@ -289,7 +293,9 @@ function syncCrane(engine: TowerEngine, hi: number, topTiles: Set<number>): void
   // a partly-leased office row, leaves the midpoint hovering in the gap
   // between blocks, floating the crane over open sky. For a fully-built row
   // the widest run IS the whole span, so this matches the old midpoint.
-  const pos = ex.vec(craneAnchorTile(topTiles) * TILE, engine.worldYTop(hi));
+  // The mast, not the middle of the drawing, stands over the run's center:
+  // the jib reaches right, so the drawing's middle is right of the mast.
+  const pos = ex.vec(roof.center * TILE, engine.worldYTop(hi));
   if (!engine.craneActor) {
     // cache:true + flagDirty from tick(): the crane re-rasterizes only while
     // the decorative clock advances, so pause/reduced-motion stops the
@@ -304,7 +310,7 @@ function syncCrane(engine: TowerEngine, hi: number, topTiles: Set<number>): void
       pos,
       width: CRANE_W,
       height: CRANE_H,
-      anchor: ex.vec(0.5, 1),
+      anchor: ex.vec(CRANE_MAST_ANCHOR_X, 1),
       z: Z.hang,
     });
     engine.craneActor.graphics.use(engine.craneGfx);
