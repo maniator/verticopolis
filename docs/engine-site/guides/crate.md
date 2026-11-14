@@ -194,8 +194,9 @@ The crate has no default features.
   exactly where the saving game was. Two loads of the same save stay
   identical to each other.
 - **The loader repairs.** A damaged or hand-edited save is coerced the way
-  the web game's loader does; only a file it cannot read is refused, and so
-  is a save from a newer engine.
+  the web game's loader does. It refuses a file it cannot read, a save with
+  no numeric `minutes` or no `units` list at its top level (which would
+  otherwise load as an empty tower), and a save from a newer engine.
 - **Save versions.** A save is version 7 unless it holds a lobby taller
   than one story; then it is version 9 and carries `lobbyHeights`, one
   `[floor, x0, x1, height]` entry per hall, so an engine too old to build

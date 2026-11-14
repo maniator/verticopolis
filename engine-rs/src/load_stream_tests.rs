@@ -225,7 +225,10 @@ fn loader_cases_load_the_same() {
     for case in table["cases"].as_array().unwrap() {
         let input = &case["input"];
         let streams = same(&input.to_string());
-        assert_eq!(streams, is_current(input), "{}", case["name"]);
+        // A save with no numeric `minutes` or no `units` list is refused, by
+        // today's path (#1418).
+        let takes = is_current(input) && crate::load::has_save_shape(input);
+        assert_eq!(streams, takes, "{}", case["id"]);
         took += usize::from(streams);
     }
     assert!(took >= 10, "only {took} loader cases streamed");
@@ -331,8 +334,12 @@ fn order_version_and_mode() {
     assert!(!same(&patched(&save, |m| {
         m.remove("mode");
     })));
-    assert!(same(&patched(&save, |m| {
+    // No `units`, or no numeric `minutes`: today's path refuses it (#1418).
+    assert!(!same(&patched(&save, |m| {
         m.remove("units");
+    })));
+    assert!(!same(&patched(&save, |m| {
+        m.remove("minutes");
     })));
     assert!(same(&patched(&save, |m| m["mode"] = json!("modern"))));
     // A key given again after `units`, other than the two above: its last
