@@ -266,6 +266,7 @@ pub fn spawn_venue_visit(
     if let Some(sid) = origin_station {
         let st = tower.get_unit(sid).unwrap().clone();
         crowd.people[i].x = inside_x(crowd, &st, 2) as f64;
+        crowd.people[i].start_x = crowd.people[i].x;
     }
     if let Some(rid) = origin_room {
         crowd.people[i].origin_unit_id = Some(rid);

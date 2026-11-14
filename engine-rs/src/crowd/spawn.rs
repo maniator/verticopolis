@@ -201,6 +201,7 @@ pub fn venue_has_room(u: &Unit) -> bool {
 fn metro_arrival(crowd: &mut Crowd, tower: &Tower, station: &Unit, to: i64) -> Option<usize> {
     let i = add(crowd, tower, station.floor + 1, to, None, None)?;
     crowd.people[i].x = inside_x(crowd, station, 2) as f64;
+    crowd.people[i].start_x = crowd.people[i].x;
     crowd.people[i].from_metro = true;
     Some(i)
 }

@@ -34,17 +34,25 @@ pub fn advance(crowd: &mut Crowd, dt_sec: f64, tower: &mut Tower) {
         // make them vanish from the cab (3.7.3). Only a wait or a walk can
         // run out of patience.
         if p.age > patience
-            && p.state != PState::ToDest
-            && p.state != PState::Dwelling
-            && p.state != PState::Riding
-            && p.state != PState::Done
+            && matches!(
+                p.state,
+                PState::Waiting | PState::ToShaft | PState::Climbing
+            )
         {
-            if !p.staff {
+            if p.staff {
+                give_up(crowd, i, tower);
+                continue;
+            }
+            // Nobody vanishes (owner, 2026-11-14): someone still on the
+            // floor they set out from walks back and leaves the way they
+            // came. Anyone past their first ride keeps going, since a floor
+            // partway up has no way out.
+            if is_still_setting_out(p) {
                 frustrated += 1;
                 travelling += 1;
+                turn_back(crowd, i);
+                continue;
             }
-            give_up(crowd, i, tower);
-            continue;
         }
         step(crowd, i, dt_sec, tower, &mut landings);
         let p = &crowd.people[i];
@@ -332,9 +340,31 @@ pub(super) fn release_seat(crowd: &mut Crowd, i: usize) {
     crowd.people[i].car_index = None;
 }
 
-/// Someone whose trip cannot go on: out of patience, or their shaft or car
-/// gone. A visitor or tenant leaves the picture; a housekeeper never
-/// vanishes mid-tower and stops where they stand for their next errand.
+/// Whether `p` has not yet left the floor their trip began on, outbound:
+/// waiting for or walking to their first car or flight of stairs.
+fn is_still_setting_out(p: &Person) -> bool {
+    !p.returning
+        && p.leg == 0
+        && matches!(p.state, PState::Waiting | PState::ToShaft)
+        && p.floors.first() == Some(&p.floor)
+}
+
+/// Someone who has waited too long to set out walks back to where they
+/// started and leaves from there (`PState::ToDest` with `returning`, which
+/// ends the trip on arrival), so they go out the way they came in.
+fn turn_back(crowd: &mut Crowd, i: usize) {
+    let p = &mut crowd.people[i];
+    p.state = PState::ToDest;
+    p.returning = true;
+    p.dest_x = p.start_x;
+    p.wait = 0.0;
+    p.linger = 0.0;
+}
+
+/// Someone whose trip cannot go on: a housekeeper out of patience, or
+/// anyone whose shaft or car went. A visitor or tenant leaves the picture;
+/// a housekeeper never vanishes mid-tower and stops where they stand for
+/// their next errand.
 fn give_up(crowd: &mut Crowd, i: usize, tower: &mut Tower) {
     if crowd.people[i].staff_trip.is_some() {
         staff_shift::stuck(crowd, i, tower);
