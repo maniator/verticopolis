@@ -25,6 +25,10 @@ prompt already tells players it is an engine update and shows the new version.
 Entries below 1.51.1 were curated from the commit history after the fact, so they
 are documentation only: no build that a client fetches carries them.
 
+## 3.10.1
+
+- The VERTICOPOLIS badge at the top left of the game now carries its ™ mark, like the title screen. So do the version line in Settings and About this game, and the sprite gallery and missing-page titles.
+
 ## 3.10.0
 
 - Modern towers can now build up to three Metro stations, all on the same line as the first. Riders split between them, someone going back to the train walks to the nearest one, and one train runs the line, calling at each station in turn.
