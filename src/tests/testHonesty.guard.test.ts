@@ -104,6 +104,34 @@ function wholeLoads(source: ts.SourceFile): Array<{ spec: string; kind: "dynamic
 /** The source file an extensionless module path names, if one exists. */
 const sourceOf = (base: string, has: (rel: string) => boolean): string | undefined => [`${base}.ts`, `${base}.tsx`, `${base}/index.ts`].find(has);
 
+/** One module a file loads: the specifier as written, the repo-relative path
+ *  it resolves to (none for a package), and for a runner, the names a static
+ *  import takes from it (null when it takes the whole module). */
+type Load = { raw: string; target: string | null; names: string[] | null };
+
+/** What each file loads, read and parsed once per `read` and shared by every
+ *  test that walks through it: a fixture many tests import is not parsed
+ *  again for each (#1240). */
+const loadsCache = new WeakMap<(rel: string) => string, Map<string, Load[]>>();
+
+function loadsOf(rel: string, read: (rel: string) => string): Load[] {
+  let byFile = loadsCache.get(read);
+  if (!byFile) loadsCache.set(read, (byFile = new Map()));
+  const cached = byFile.get(rel);
+  if (cached) return cached;
+  const text = read(rel);
+  const source = ts.createSourceFile(rel, text, ts.ScriptTarget.Latest, true);
+  const loads = [...scanRuntimeImports(rel, text, source).imports, ...wholeLoads(source)].map(({ spec, kind }): Load => {
+    const target = resolveRelative(rel, spec);
+    // A dynamic import hands back the whole module, so only static named
+    // imports of the probes pass.
+    const names = target && isRunner(target) && kind === "static" ? namedImports(source, spec) : null;
+    return { raw: target ?? spec, target, names };
+  });
+  byFile.set(rel, loads);
+  return loads;
+}
+
 /** How one unit test reaches an engine runner or package, or null when it does
  *  not: the chain of modules from the test to the runner. `has` says whether
  *  a repo-relative file exists. */
@@ -112,17 +140,10 @@ function engineReach(test: string, read: (rel: string) => string, has: (rel: str
   const walk = (rel: string, chain: string[]): string | null => {
     if (seen.has(rel)) return null;
     seen.add(rel);
-    const text = read(rel);
-    const source = ts.createSourceFile(rel, text, ts.ScriptTarget.Latest, true);
-    for (const { spec, kind } of [...scanRuntimeImports(rel, text).imports, ...wholeLoads(source)]) {
-      const target = resolveRelative(rel, spec);
-      const raw = target ?? spec;
+    for (const { raw, target, names } of loadsOf(rel, read)) {
       if (ENGINE_PACKAGES.some((p) => raw.includes(p))) return [...chain, rel, raw].join(" -> ");
       if (!target) continue;
       if (isRunner(target)) {
-        // A dynamic import hands back the whole module, so only static named
-        // imports of the probes pass.
-        const names = kind === "static" ? namedImports(source, spec) : null;
         if (names !== null && names.every((n) => PACKAGE_PROBES.has(n))) continue;
         return [...chain, rel, target].join(" -> ");
       }

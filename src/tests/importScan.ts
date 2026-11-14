@@ -73,11 +73,12 @@ function isEager(options: ts.Expression | undefined): boolean {
 const viteQuery = (spec: string): string => /\?([^#]*)/.exec(spec)?.[1] ?? "";
 
 /** Every runtime import in one file, in source order, with its module
- *  specifier as written (a URL's relative path given its `./`). */
-export function scanRuntimeImports(rel: string, text: string): ImportScan {
+ *  specifier as written (a URL's relative path given its `./`). A caller that
+ *  has already parsed the file passes its `source` (parsed with parent nodes)
+ *  so the file is parsed once. */
+export function scanRuntimeImports(rel: string, text: string, source = ts.createSourceFile(rel, text, ts.ScriptTarget.Latest, true)): ImportScan {
   const imports: RuntimeImport[] = [];
   const unreadable: string[] = [];
-  const source = ts.createSourceFile(rel, text, ts.ScriptTarget.Latest, true);
   const lineOf = (node: ts.Node): string => `${rel}:${source.getLineAndCharacterOfPosition(node.getStart()).line + 1}`;
   const note = (spec: ts.Expression | undefined, kind: ImportKind, at: ts.Node): void => {
     if (spec === undefined || !ts.isStringLiteralLike(spec)) {
