@@ -26,9 +26,11 @@
 //! inserts, looks up, removes and clears; `FastSet` adds and looks up.
 //!
 //! `FastIndexMap` is an `IndexMap` keyed with `FastHasher`. It walks in the
-//! order its keys went in, whatever the hash, so it may be iterated. The
-//! tower's tile maps and the landing lines use these (#2214): the morning
-//! rush asks them a few million times a game day.
+//! order its keys went in, whatever the hash, so it may be iterated.
+//!
+//! The tower's tile maps, the elevator calls, the riders per car and the
+//! landing lines take these too (#2214): the morning rush asks them a few
+//! million times a game day.
 
 use std::collections::{HashMap, HashSet};
 use std::hash::{BuildHasherDefault, Hash, Hasher};

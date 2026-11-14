@@ -203,7 +203,8 @@ impl Tower {
                 }
             }
         }
-        let mut visited: HashSet<(i64, i64)> = HashSet::new();
+        // Only added to and looked up, so it takes the fast hasher (HP-5).
+        let mut visited: crate::crowd::fasthash::FastSet<(i64, i64)> = Default::default();
         let mut reached: HashSet<i64> = HashSet::new();
         while let Some((f, x)) = stack.pop() {
             if !visited.insert((f, x)) {

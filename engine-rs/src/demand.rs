@@ -99,7 +99,7 @@ pub fn compute_demand_map(sim: &mut Simulation) -> DemandMap {
     let mut fraction_by_unit = HashMap::new();
     let mut delivered_by_unit = HashMap::new();
     let mut reachable_venues_by_origin = HashMap::new();
-    let mut reach_cache: HashMap<(i64, i64), bool> = HashMap::new();
+    let mut reach_cache: crate::crowd::fasthash::FastMap<(i64, i64), bool> = Default::default();
     let mode = sim.mode;
     let rooms: Vec<(i64, Kind, i64, i64, UnitState, Option<i64>)> = sim
         .tower
