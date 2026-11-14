@@ -106,9 +106,11 @@ fn twin_shafts_share_the_riders_and_skip_the_one_standing_down() {
 #[test]
 fn a_tower_edit_mid_step_keeps_the_lines_already_joined() {
     let picks_after = |edit: bool| {
+        // Twin expresses: with Modern cars four times as fast, a local
+        // would never win against an express's line here.
         let mut sim = tower(GameMode::Modern, 15);
         shaft(&mut sim, Kind::ElevatorExpress, 4, 1, 15);
-        shaft(&mut sim, Kind::ElevatorStandard, 20, 1, 15);
+        shaft(&mut sim, Kind::ElevatorExpress, 20, 1, 15);
         sim.crowd.begin_step();
         for _ in 0..100 {
             first_shaft(&mut sim, 15);
@@ -186,7 +188,7 @@ fn the_router_follows_the_tower_when_a_shaft_goes() {
 fn the_bound_never_exceeds_the_cheapest_link_per_floor() {
     // Every link costs at least a car's ride per floor it covers, which is
     // what keeps the A* bound from overestimating.
-    let per_floor = floors_bound(0, 1);
+    let per_floor = floors_bound(0, 1, tenths(RIDE_SECONDS_PER_FLOOR));
     assert!(tenths(STAIRS_FLIGHT_SECONDS) >= per_floor);
     assert!(tenths(ESCALATOR_FLIGHT_SECONDS) >= per_floor);
     assert_eq!(per_floor, tenths(RIDE_SECONDS_PER_FLOOR));
@@ -194,6 +196,37 @@ fn the_bound_never_exceeds_the_cheapest_link_per_floor() {
     // a negative link would let the search undercount a route.
     let dwell = DWELL_MINUTES * CROWD_SECONDS_PER_MINUTE;
     assert!(tenths(BOARDING_SECONDS - STOPS_MADE * dwell) >= 0);
+}
+
+#[test]
+fn a_ride_costs_what_the_cars_speed_makes_it() {
+    // Modern cars move faster than the base speed, the express fastest; the
+    // router's rides and round trips follow, and the A* bound takes the
+    // fastest car's floor so it still never overestimates.
+    let mut sim = tower(GameMode::Modern, 15);
+    let express = shaft(&mut sim, Kind::ElevatorExpress, 4, 1, 15);
+    let local = shaft(&mut sim, Kind::ElevatorStandard, 20, 1, 15);
+    let router = build(&sim.tower);
+    let dwell = DWELL_MINUTES * CROWD_SECONDS_PER_MINUTE;
+    for (id, kind) in [
+        (express, Kind::ElevatorExpress),
+        (local, Kind::ElevatorStandard),
+    ] {
+        let speed = GameMode::Modern.speed_of(kind);
+        assert!(speed > 1.0, "{kind:?} moves at the base speed");
+        let stops = sim
+            .tower
+            .stops_of(sim.tower.get_transport(id).unwrap())
+            .len() as f64;
+        let expected = 2.0 * (14.0 * RIDE_SECONDS_PER_FLOOR / speed + stops * dwell);
+        assert_eq!(
+            router.shafts.get(&id).unwrap().round_trip,
+            expected,
+            "{kind:?}"
+        );
+    }
+    let fastest = RIDE_SECONDS_PER_FLOOR / GameMode::Modern.speed_of(Kind::ElevatorExpress);
+    assert_eq!(router.per_floor, (fastest * TENTHS).floor() as i64);
 }
 
 #[test]
@@ -224,22 +257,19 @@ fn a_wide_car_over_a_gap_is_not_a_footbridge() {
 
 #[test]
 fn cars_the_schedule_stands_down_lengthen_the_wait() {
+    // Twin expresses of eight cars each.
     let mut sim = tower(GameMode::Modern, 15);
-    let express = shaft(&mut sim, Kind::ElevatorExpress, 4, 1, 15);
-    let local = shaft(&mut sim, Kind::ElevatorStandard, 20, 1, 15);
-    assert!(sim.tower.set_cars(express, 8));
-    assert!(sim.tower.set_cars(local, 8));
-    sim.crowd.begin_step();
-    assert_eq!(first_shaft(&mut sim, 15), express);
-    // Seven of the express's eight cars stood down: a car comes by an
-    // eighth as often, and the local is quicker.
-    sim.crowd.closed_cars = (1..8).map(|car| (express, car)).collect();
-    sim.crowd.begin_step();
-    assert_eq!(first_shaft(&mut sim, 15), local);
-    // Back in service the next step.
-    sim.crowd.closed_cars.clear();
-    sim.crowd.begin_step();
-    assert_eq!(first_shaft(&mut sim, 15), express);
+    let a = shaft(&mut sim, Kind::ElevatorExpress, 4, 1, 15);
+    let b = shaft(&mut sim, Kind::ElevatorExpress, 20, 1, 15);
+    assert!(sim.tower.set_cars(a, 8));
+    assert!(sim.tower.set_cars(b, 8));
+    // Seven of one shaft's eight cars stood down: a car comes by an eighth
+    // as often, and its twin is quicker, whichever one it is.
+    for (down, up) in [(a, b), (b, a)] {
+        sim.crowd.closed_cars = (1..8).map(|car| (down, car)).collect();
+        sim.crowd.begin_step();
+        assert_eq!(first_shaft(&mut sim, 15), up);
+    }
 }
 
 #[test]

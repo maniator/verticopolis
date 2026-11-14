@@ -46,12 +46,6 @@ fn office_tower(mode: GameMode) -> (Simulation, [i64; 2]) {
     (sim, [a, b])
 }
 
-/// Turns real office commutes on for the test's thread while the answer
-/// lives: they ship switched off (`REAL_OFFICE_COMMUTES_ON`).
-fn switch_on() -> crate::rules::office_commutes_switch::On {
-    crate::rules::office_commutes_switch::turn_on()
-}
-
 fn occupants(sim: &Simulation, id: i64) -> i64 {
     sim.tower.get_unit(id).map_or(0, |u| u.occupants)
 }
@@ -128,7 +122,6 @@ fn set_out_from(w: &Watch, floor: i64) -> i64 {
 
 #[test]
 fn the_evening_rush_is_spread_from_4_to_7() {
-    let _on = switch_on();
     for mode in COMMUTING_MODES {
         let (mut sim, offices) = at_work(mode);
         // 10:30 to 4 PM: nobody leaves during office hours.
@@ -159,7 +152,6 @@ fn the_evening_rush_is_spread_from_4_to_7() {
 
 #[test]
 fn an_office_fills_only_as_its_workers_arrive() {
-    let _on = switch_on();
     for mode in COMMUTING_MODES {
         let (mut sim, offices) = office_tower(mode);
         let w = watch(&mut sim, &offices, 60);
@@ -200,26 +192,20 @@ fn an_office_fills_only_as_its_workers_arrive() {
     }
 }
 
-/// Classic offices, and every office while real commutes are switched off
-/// (as they ship), count their workers by the clock.
+/// Classic offices count their workers by the clock.
 #[test]
 fn classic_offices_keep_the_clocks_head_count() {
-    for (mode, switched_on) in [(GameMode::Classic, true), (GameMode::Modern, false)] {
-        let on = switched_on.then(switch_on);
-        let (mut sim, offices) = office_tower(mode);
-        let w = watch(&mut sim, &offices, 2 * 60 + 1);
-        assert!(w.first.values().all(|f| !f.1), "{mode:?}: no commuters");
-        for id in offices {
-            assert_eq!(occupants(&sim, id), STAFF, "{mode:?}: in at 8 by the clock");
-        }
-        assert!(sim.crowd.desks.is_empty() && sim.crowd.shifts.is_empty());
-        drop(on);
+    let (mut sim, offices) = office_tower(GameMode::Classic);
+    let w = watch(&mut sim, &offices, 2 * 60 + 1);
+    assert!(w.first.values().all(|f| !f.1), "no commuters");
+    for id in offices {
+        assert_eq!(occupants(&sim, id), STAFF, "in at 8 by the clock");
     }
+    assert!(sim.crowd.desks.is_empty() && sim.crowd.shifts.is_empty());
 }
 
 #[test]
 fn no_one_appears_or_vanishes_on_an_office_floor() {
-    let _on = switch_on();
     for mode in COMMUTING_MODES {
         let (mut sim, offices) = office_tower(mode);
         let w = watch(&mut sim, &offices, 24 * 60);
@@ -246,7 +232,6 @@ fn no_one_appears_or_vanishes_on_an_office_floor() {
 
 #[test]
 fn an_office_no_route_reaches_never_fills() {
-    let _on = switch_on();
     let mut sim = served_tower(GameMode::Modern, CalendarKind::RealWorld, TOP);
     for x in LEFT..LEFT + 20 {
         assert!(sim.build(Kind::Floor, TOP + 1, x).ok);
@@ -296,7 +281,6 @@ fn all_left_by_the_lobby(w: &Watch, mode: GameMode) -> usize {
 
 #[test]
 fn a_bulldozed_office_sends_its_workers_out() {
-    let _on = switch_on();
     for mode in COMMUTING_MODES {
         let (mut sim, offices) = at_work(mode);
         assert!(sim.tower.remove_unit(offices[0]).is_some());
@@ -308,7 +292,6 @@ fn a_bulldozed_office_sends_its_workers_out() {
 
 #[test]
 fn an_office_that_loses_its_tenant_sends_its_workers_home() {
-    let _on = switch_on();
     for mode in COMMUTING_MODES {
         let (mut sim, offices) = office_tower(mode);
         for _ in 0..(2 * 60 + 10) {
@@ -341,7 +324,6 @@ fn an_office_that_loses_its_tenant_sends_its_workers_home() {
 
 #[test]
 fn a_loaded_tower_keeps_its_workers_inside_until_they_go_home() {
-    let _on = switch_on();
     let (sim, offices) = at_work(GameMode::Modern);
     // A load keeps the head counts (and the crowd, which is nobody now).
     let mut sim = deserialize(&sim.serialize()).unwrap();
@@ -356,7 +338,6 @@ fn a_loaded_tower_keeps_its_workers_inside_until_they_go_home() {
 
 #[test]
 fn the_elevator_estimate_leaves_office_workers_to_the_crowd() {
-    let _on = switch_on();
     for (mode, estimated) in [(GameMode::Modern, false), (GameMode::Classic, true)] {
         let (mut sim, offices) = office_tower(mode);
         at_time(&mut sim, 0, 8);
@@ -371,7 +352,6 @@ fn the_elevator_estimate_leaves_office_workers_to_the_crowd() {
 
 #[test]
 fn workers_whose_elevator_is_bulldozed_on_the_way_never_vanish() {
-    let _on = switch_on();
     for mode in COMMUTING_MODES {
         let (mut sim, offices) = office_tower(mode);
         // Step to the first minute a worker is riding the only elevator up.
@@ -413,7 +393,6 @@ fn workers_whose_elevator_is_bulldozed_on_the_way_never_vanish() {
 
 #[test]
 fn a_reload_mid_rush_plays_on_as_it_would_have() {
-    let _on = switch_on();
     let (mut sim, offices) = office_tower(GameMode::Modern);
     // 8:30 AM: some workers at their desks, some on the way, more booked.
     for _ in 0..150 {

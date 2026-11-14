@@ -305,3 +305,27 @@ fn housekeepers_take_the_service_elevator_from_their_own_lobby() {
         assert_eq!(tower_of(crowd.people[i].dest_x), 2, "{mode:?}");
     }
 }
+
+/// A Modern office's workers ride in from the lobby under their own tower
+/// and leave by it (`crowd::commuters`), never by another tower's.
+#[test]
+fn office_workers_come_and_go_by_their_own_towers_lobby() {
+    let (mut sim, _) = three_towers(GameMode::Modern);
+    let right = TOWERS[2];
+    let placed = sim.tower.place(Kind::Office, 4, right + 20);
+    let office = placed.unit_id.expect("an office in the right tower");
+    sim.tower.get_unit_mut(office).unwrap().state = UnitState::Occupied;
+    at_time(&mut sim, 0, 6);
+    let mut seen = std::collections::HashMap::new();
+    for _ in 0..13 * 60 {
+        sim.tick(1.0);
+        for p in sim.crowd.people.iter().filter(|p| p.commuter) {
+            seen.entry(p.id).or_insert((p.start_x, p.dest_x, p.floor));
+        }
+    }
+    assert!(seen.len() >= 2, "workers came in and went home: {seen:?}");
+    for (id, (start_x, dest_x, floor)) in seen {
+        let lobby_x = if floor == 1 { start_x } else { dest_x };
+        assert_eq!(tower_of(lobby_x), 2, "worker {id} used another lobby");
+    }
+}

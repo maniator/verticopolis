@@ -126,7 +126,11 @@ fn a_room_keeps_its_width_and_every_field_it_sets() {
 
 #[test]
 fn a_sparse_save_loads_as_its_full_shape_twin_and_round_trips() {
-    let sparse = sample().serialize();
+    let mut sim = sample();
+    // A played Modern tower has a desk for every office with workers in it;
+    // the load squares them the same way, so save, load, save stays put.
+    crate::crowd::commuters::reconcile(&mut sim.crowd, &mut sim.tower);
+    let sparse = sim.serialize();
     let mut full = sparse.clone();
     full["units"] = Value::Array(
         sparse["units"]

@@ -40,7 +40,10 @@ fn busy_morning_with(mode: GameMode, security: bool) -> Simulation {
             u.state = UnitState::Empty;
         }
         if u.kind == Kind::Office {
-            (u.state, u.ever_occupied, u.occupants) = (UnitState::Occupied, true, 6);
+            // Modern workers ride in for real (`crowd::commuters`), so its
+            // offices start empty and their workers make the rush.
+            let staff = if mode == GameMode::Modern { 0 } else { 6 };
+            (u.state, u.ever_occupied, u.occupants) = (UnitState::Occupied, true, staff);
         }
     }
     // On to 8:30 AM on a weekday.

@@ -22,8 +22,6 @@ mod satisfaction;
 mod services;
 
 pub use amenities::*;
-#[cfg(test)]
-pub(crate) use commute::office_commutes_switch;
 pub use commute::{CLASSIC_WAIT_LIMIT, MODERN_WAIT_LIMIT, REAL_OFFICE_COMMUTES_ON};
 pub use economy::*;
 pub use halos::{Halo, HaloEffect};

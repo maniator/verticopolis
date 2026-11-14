@@ -10,12 +10,16 @@
 //! as before: the first hourly pass takes the head counts as the workers
 //! inside (`commuters::reconcile`).
 
+use std::collections::BTreeMap;
+
+use serde::ser::{Serialize, SerializeMap, SerializeSeq, Serializer};
 use serde_json::{json, Map, Value};
 
 use super::commuters::{Desk, Shift};
 use super::save::MAX_SAVED_WALK_INS;
 use super::Crowd;
 use crate::charges::whole;
+use crate::sim_save::Each;
 
 /// The most desks a save restores, one per office: far above the offices
 /// any tower holds, it only bounds what a hand-edited save can make the
@@ -63,7 +67,34 @@ fn shift_from(v: &Value) -> Option<Shift> {
     })
 }
 
+/// The desks as the save streams them: one small row at a time, so a tower
+/// with thousands of offices builds no list of them beside the save's text.
+struct DeskRows<'a>(&'a BTreeMap<i64, Desk>);
+
+impl Serialize for DeskRows<'_> {
+    fn serialize<S: Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+        let mut seq = s.serialize_seq(Some(self.0.len()))?;
+        for (&id, d) in self.0 {
+            seq.serialize_element(&desk_json(id, d))?;
+        }
+        seq.end()
+    }
+}
+
 impl Crowd {
+    /// Writes the desks and the booked commutes into the crowd's save map
+    /// as [`Crowd::commuters_save`] adds them, each only when it holds
+    /// something.
+    pub(crate) fn commuters_write<M: SerializeMap>(&self, m: &mut M) -> Result<(), M::Error> {
+        if !self.desks.is_empty() {
+            m.serialize_entry("desks", &DeskRows(&self.desks))?;
+        }
+        if !self.shifts.is_empty() {
+            m.serialize_entry("shifts", &Each(&self.shifts, shift_json))?;
+        }
+        Ok(())
+    }
+
     /// Adds the desks and the booked commutes to the crowd's save object,
     /// each only when it holds something.
     pub(crate) fn commuters_save(&self, m: &mut Map<String, Value>) {
