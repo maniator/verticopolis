@@ -153,6 +153,8 @@ impl Simulation {
     pub fn on_hour(&mut self) {
         self.on_hour_runs += 1;
         self.update_presence();
+        // Venue staff come in and go home as people (`commuters`).
+        self.crowd.book_commutes(&mut self.tower, &self.clock);
         let hour = self.clock.hour();
         if hour == 8 {
             self.hotel_checkout();

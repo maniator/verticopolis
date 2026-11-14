@@ -3,7 +3,7 @@
 //! venue earns from its live fill instead. Coverage of the unmet-demand
 //! drain is `demand_tests`; the memo is
 //! `diagnostics::memo_tests::the_demand_memo_rebuilds_on_each_key_input_and_holds_within_the_hour`.
-use crate::clock::{Clock, GameMode};
+use crate::clock::GameMode;
 use crate::demand::{compute_demand_map, origin_demand};
 use crate::economy::{commercial_daily_income, daily_traffic_income};
 use crate::facilities::{Kind, LOT_WIDTH};
@@ -11,7 +11,7 @@ use crate::rules::DEMAND_FLOOR_MODERN;
 use crate::sim::Simulation;
 use crate::tower::UnitState;
 
-use super::MID as C;
+use super::{at_time, MID as C};
 
 /// Lays every tile of `floor` from the center out.
 fn lay(sim: &mut Simulation, kind: Kind, floor: i64) {
@@ -163,7 +163,7 @@ fn cinema_takings(customers: i64, blockbuster: bool) -> f64 {
     if blockbuster {
         sim.blockbusters.push(cinema as f64);
     }
-    sim.clock = Clock::new(12.0 * 60.0, sim.clock.calendar);
+    at_time(&mut sim, 0, 12);
     sim.money = 0.0;
     sim.collect_traffic_income();
     sim.money

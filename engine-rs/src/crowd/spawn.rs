@@ -76,6 +76,8 @@ pub fn make_person(
         staff_trip: None,
         errand: None,
         walk_in: false,
+        commuter: false,
+        commute: None,
         start_x: origin_spawn_x as f64,
     };
     crowd.next_id += 1;
@@ -186,7 +188,12 @@ pub fn open_for_visits(kind: Kind, hour: i64) -> bool {
     kind.is_open_at(hour) && (kind.attendance_cap().is_none() || kind.is_open_at((hour + 1) % 24))
 }
 
+/// Whether venue `u` can take one more visitor: its staff are in
+/// (`crowd::commuters`) and it is not full.
 pub fn venue_has_room(u: &Unit) -> bool {
+    if !u.is_staffed() {
+        return false;
+    }
     let pop = u.kind.facility().population;
     if pop > 0 {
         return u.customers_in.unwrap_or(0) < pop;
@@ -317,15 +324,17 @@ pub(crate) fn weighted_index(r: f64, weights: impl Iterator<Item = f64> + Clone)
     last
 }
 
-/// The tenants' and visitors' sample is full. Housekeepers on shift and
-/// walk-in customers (`walk_ins`) are counted apart: they are real people,
-/// and would otherwise crowd the tenants out of the picture.
+/// The tenants' and visitors' sample is full. Housekeepers on shift,
+/// walk-in customers (`walk_ins`) and venue staff on their way
+/// (`commuters`) are counted apart: they are real people, and would
+/// otherwise crowd the rest out of the picture.
 fn crowd_is_full(crowd: &Crowd) -> bool {
     crowd
         .people
         .len()
         .saturating_sub(crowd.staff_count.max(0) as usize)
         .saturating_sub(crowd.walk_in_count.max(0) as usize)
+        .saturating_sub(crowd.commuter_count.max(0) as usize)
         >= MAX_PEOPLE
 }
 

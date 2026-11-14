@@ -89,7 +89,7 @@ fn start_walk_in(crowd: &mut Crowd, tower: &Tower, doors: &Entrances, unit_id: i
     };
     if !venue.kind.takes_walk_ins()
         || !venue.is_tenanted()
-        || !venue.kind.is_open_at(hour)
+        || !venue.open_for_business(hour)
         || !venue_has_room(venue)
     {
         return;
@@ -116,7 +116,7 @@ fn start_walk_in(crowd: &mut Crowd, tower: &Tower, doors: &Entrances, unit_id: i
 /// up into the tower: the ground lobby, and each Metro station whose
 /// platform the riders' transport serves. Walk-ins split between them by
 /// that capacity, so a station with one small elevator gets a small share.
-struct Entrances {
+pub(super) struct Entrances {
     lobby: f64,
     stations: Vec<(i64, f64)>,
     total: f64,
@@ -124,7 +124,7 @@ struct Entrances {
 
 impl Entrances {
     /// The station a walk-in comes in by, or `None` for the ground lobby.
-    fn pick(&self, crowd: &mut Crowd) -> Option<i64> {
+    pub(super) fn pick(&self, crowd: &mut Crowd) -> Option<i64> {
         if self.stations.is_empty() || self.total <= 0.0 {
             return None;
         }
@@ -142,7 +142,7 @@ impl Entrances {
     }
 }
 
-fn entrances(tower: &Tower) -> Entrances {
+pub(super) fn entrances(tower: &Tower) -> Entrances {
     let lobby = boarding_capacity(tower, 1);
     let stations: Vec<(i64, f64)> = tower
         .metro_stations()

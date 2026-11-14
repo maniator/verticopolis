@@ -280,8 +280,11 @@ pub fn place_seated(
 
 /// Puts the clock at `hour` on `day` without ticking (day 0 is a Monday on
 /// the real-world calendar, day 5 a Saturday).
+/// Sets the clock, with every venue staffed at that hour already at work,
+/// as on a tower loaded at that time (`crowd::commuters`).
 pub fn at_time(sim: &mut Simulation, day: i64, hour: i64) {
     sim.clock = Clock::new(((day * 24 + hour) * 60) as f64, sim.clock.calendar);
+    crate::crowd::commuters::staff_at_work(&mut sim.crowd, &mut sim.tower, hour);
 }
 
 /// The decoded save of `conformance/fixtures/<name>.vctower`.

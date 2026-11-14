@@ -282,8 +282,15 @@ fn the_crowd_cap_holds_through_a_lunch_peak() {
         "the staff outnumber the cap, so lunch can press against it"
     );
     at_time(&mut sim, 0, 12);
-    // Walk-ins from outside are counted apart from the sample.
-    let sample = |sim: &Simulation| sim.crowd.people.iter().filter(|p| !p.walk_in).count();
+    // Walk-ins from outside and venue staff on their way are counted apart
+    // from the sample.
+    let sample = |sim: &Simulation| {
+        sim.crowd
+            .people
+            .iter()
+            .filter(|p| !p.walk_in && !p.commuter)
+            .count()
+    };
     let mut peak = 0;
     for _ in 0..180 {
         sim.tick(1.0);

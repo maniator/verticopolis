@@ -199,9 +199,9 @@ pub fn spawn_floors(tower: &Tower, clock: &Clock) -> SpawnFloors {
         } else if u.kind.is_hotel() {
             homes.insert(u.floor);
             hotel_floors.insert(u.floor);
-        } else if u.kind.is_ambient_venue() && u.kind.is_open_at(hour) {
+        } else if u.kind.is_ambient_venue() && u.open_for_business(hour) {
             add_floor(&mut venues_by_kind, u.kind, u.floor);
-        } else if u.kind.attendance_cap().is_some() && u.kind.is_open_at(hour) {
+        } else if u.kind.attendance_cap().is_some() && u.open_for_business(hour) {
             add_floor(&mut venues_by_kind, u.kind, u.floor);
             if u.kind == Kind::Cinema {
                 let pick = ticket_pick_mult(tower.mode, u);
@@ -327,7 +327,7 @@ mod tests {
                 homes.insert(u.floor);
                 hotel_floors.insert(u.floor);
             } else if (u.kind.is_ambient_venue() || u.kind.attendance_cap().is_some())
-                && u.kind.is_open_at(hour)
+                && u.open_for_business(hour)
             {
                 venues_by_kind.entry(u.kind).or_default().insert(u.floor);
             }

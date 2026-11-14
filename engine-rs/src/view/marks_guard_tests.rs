@@ -34,6 +34,7 @@ fn the_frame_and_the_census_read_only_marked_fields() {
             occupants: _,
             customers_in: _,
             hotel_customers_in: _,
+            staff_in,
             out_for_meal: _,
             residents: _,
             visitors_yest: _,
@@ -51,6 +52,7 @@ fn the_frame_and_the_census_read_only_marked_fields() {
         *x += 1;
         *width += 1;
         *satisfaction += 0.5;
+        *staff_in = staff_in.wrapping_add(1);
         *ever_occupied = !*ever_occupied;
         *pending_income += 9.0;
         *rent = Some(rent.unwrap_or(0.0) + 7.0);

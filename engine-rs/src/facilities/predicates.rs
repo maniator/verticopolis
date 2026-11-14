@@ -107,6 +107,37 @@ impl Kind {
     }
 
     #[doc(hidden)]
+    /// The staff a room of this kind keeps at work while it is open, who
+    /// come in and go home as people (`crowd::commuters`); 0 for a kind
+    /// with no staff of its own. A venue opens only once one of them is
+    /// in. The original draws no venue staff, so these are our own.
+    pub fn staff_size(self) -> i64 {
+        match self {
+            Kind::Shop | Kind::BoutiqueBay => 2,
+            Kind::FastFood | Kind::Amusements | Kind::Spa | Kind::SkyBar => 3,
+            Kind::Restaurant | Kind::Nightclub | Kind::Daycare => 4,
+            Kind::Cinema | Kind::PartyHall => 4,
+            Kind::FoodHall | Kind::AquaticCenter => 6,
+            _ => 0,
+        }
+    }
+
+    #[doc(hidden)]
+    /// Whether this kind keeps staff of its own ([`Kind::staff_size`]).
+    pub fn has_staff(self) -> bool {
+        self.staff_size() > 0
+    }
+
+    #[doc(hidden)]
+    /// Whether a venue's staff should be at work at `hour`: while it is
+    /// open, and in the hour before it opens, so they are in by the time
+    /// the doors open. A restaurant's staff go home between lunch and
+    /// dinner.
+    pub fn staffed_at(self, hour: i64) -> bool {
+        self.has_staff() && (self.is_open_at(hour) || self.is_open_at((hour + 1).rem_euclid(24)))
+    }
+
+    #[doc(hidden)]
     /// `isCommercialKind`.
     pub fn is_commercial(self) -> bool {
         matches!(

@@ -118,7 +118,12 @@ pub fn deserialize_owned(raw: Value) -> Result<Simulation, String> {
         }
     }
     debug_assert_eq!(units.len(), kept, "unit_from_value skipped a counted entry");
-    Ok(assemble(&data, units, ids, &written))
+    let mut sim = assemble(&data, units, ids, &written);
+    // A load starts a fresh crowd with every staffed venue's staff at work
+    // (`crowd::commuters`), so the venues open as they were.
+    let hour = sim.clock.hour();
+    crate::crowd::commuters::reconcile(&mut sim.crowd, &mut sim.tower, hour);
+    Ok(sim)
 }
 
 /// The keys `detect_founder` reads off a save.
@@ -242,6 +247,7 @@ pub(crate) fn unit_from_value(u: &Value, modern: bool) -> Option<(Unit, Option<i
         },
         customers_in: None,
         hotel_customers_in: None,
+        staff_in: 0,
         out_for_meal: None,
         residents,
         visitors_yest: if census_follows_the_day(kind) {

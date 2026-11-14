@@ -62,7 +62,7 @@ impl Simulation {
                 }
                 // A venue, shop or restaurant holds the visitors inside it.
                 _ => u.visitor_occupants().or(Some(
-                    if u.state == UnitState::Occupied && u.kind.is_open_at(hour) {
+                    if u.state == UnitState::Occupied && u.open_for_business(hour) {
                         f.population
                     } else {
                         0

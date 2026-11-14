@@ -6,7 +6,7 @@
 //! the station, said it was too far from a lobby and lost half its trade.
 //! Classic counts the platform only while its floor has transport, as the
 //! metro's other help to business does (`metro_help_needs_service`).
-use crate::clock::{Clock, GameMode};
+use crate::clock::GameMode;
 use crate::demand::compute_demand_map;
 use crate::facilities::{Kind, MIN_FLOOR};
 use crate::sim::Simulation;
@@ -14,7 +14,7 @@ use crate::sim_loop::Weather;
 use crate::tower::UnitState;
 
 use super::stocked_services::lay_basement;
-use super::{lay_row, put, MID};
+use super::{at_time, lay_row, put, MID};
 
 /// SimTower's B10, the metro's tunnel row. The platform is the story above.
 const STATION: i64 = MIN_FLOOR;
@@ -105,7 +105,7 @@ fn a_shop_by_a_working_platform_takes_its_full_trade() {
         let shop = put(&mut sim, Kind::Shop, b(7), MID + 10);
         sim.tower.get_unit_mut(shop).unwrap().state = UnitState::Occupied;
         sim.weather = Weather::Clear;
-        sim.clock = Clock::new(12.0 * 60.0, sim.clock.calendar);
+        at_time(&mut sim, 0, 12);
         let frac = compute_demand_map(&mut sim).fraction_by_unit[&shop];
         assert!(frac > 0.0, "the offices reach the shop");
         sim.collect_traffic_income();

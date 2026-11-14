@@ -117,6 +117,19 @@ impl Unit {
     pub fn visible_occupants(&self) -> i64 {
         (self.occupants - self.out_for_meal.unwrap_or(0)).max(0)
     }
+
+    /// Whether the room has the staff to open: always for a kind with no
+    /// staff of its own, and for a venue once one of its staff is in
+    /// (`crowd::commuters`).
+    pub fn is_staffed(&self) -> bool {
+        !self.kind.has_staff() || self.staff_in > 0
+    }
+
+    /// Whether the room is open for business at `hour`: inside its hours,
+    /// and with its staff in.
+    pub fn open_for_business(&self, hour: i64) -> bool {
+        self.kind.is_open_at(hour) && self.is_staffed()
+    }
 }
 
 #[cfg(test)]
@@ -190,6 +203,7 @@ mod tests {
             occupants,
             customers_in: None,
             hotel_customers_in: None,
+            staff_in: 0,
             out_for_meal,
             residents: None,
             visitors_yest: None,

@@ -18,7 +18,7 @@ use crate::load::deserialize;
 use crate::sim::Simulation;
 use crate::tower::UnitState;
 
-use super::{seeded_game, MID as C};
+use super::{at_time, seeded_game, MID as C};
 
 const W: i64 = LOT_WIDTH;
 const OFFICE_WIDTH: i64 = 9;
@@ -265,7 +265,7 @@ fn noon_shop_income(with_recycling: bool) -> f64 {
         }
         assert!(sim.tower.place(Kind::Recycling, -1, 0).ok);
     }
-    sim.clock.minutes = 12.0 * 60.0;
+    at_time(&mut sim, 0, 12);
     sim.money = 0.0;
     sim.collect_traffic_income();
     sim.money
