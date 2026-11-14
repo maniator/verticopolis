@@ -80,7 +80,7 @@ pub fn floor_reachable_from_lobby(crowd: &mut Crowd, tower: &Tower, floor: i64) 
     if floor == 1 {
         return true;
     }
-    for (start, _) in tower.segments_of(floor) {
+    for &(start, _) in tower.segment_runs(floor).iter() {
         if seg_reachable(crowd, tower, seg_id(floor, start)) {
             return true;
         }

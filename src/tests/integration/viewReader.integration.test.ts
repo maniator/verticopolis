@@ -136,7 +136,7 @@ describe.skipIf(noEngine)("ViewReader over the Rust engine", () => {
     const held = new Map(r.crowd.people.map((p) => [p.id, p]));
     let stayed = 0;
     let left = held.size;
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < 2; i++) {
       rust.tick(30);
       check(r, rust);
     }

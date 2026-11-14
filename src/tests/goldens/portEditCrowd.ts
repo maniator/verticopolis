@@ -86,18 +86,3 @@ export function shaftsBetween(view: CrowdView, a: number, b: number, sinceId: nu
   const joins = (from: number, to: number): boolean => (from === a && to === b) || (from === b && to === a);
   return view.people.filter((p) => p.id >= sinceId).flatMap((p) => p.shafts.filter((_, i) => joins(p.floors[i], p.floors[i + 1])));
 }
-
-/** A shaft's floors as the save lists them: its span and the floors it
- *  skips. */
-export interface ShaftStops {
-  readonly bottom: number;
-  readonly top: number;
-  readonly skipFloors?: readonly number[];
-}
-
-/** Whether a shaft stops at a floor, as both engines decide it: inside its
- *  span and not on its skip list. */
-export const stopsAt = (shaft: ShaftStops, floor: number): boolean => floor >= shaft.bottom && floor <= shaft.top && !(shaft.skipFloors ?? []).includes(floor);
-
-/** Whether there is a shaft and it stops at both floors. */
-export const stopsAtBoth = (shaft: ShaftStops | undefined, a: number, b: number): boolean => shaft !== undefined && stopsAt(shaft, a) && stopsAt(shaft, b);

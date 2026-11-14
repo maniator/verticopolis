@@ -4,9 +4,11 @@
 pub mod banks;
 pub mod commuters;
 pub mod doors;
+pub mod expected_time;
 pub(crate) mod fasthash;
 pub mod graph;
 pub mod landing;
+pub mod line_count;
 pub mod meals;
 pub mod motion;
 pub mod routines;
@@ -307,6 +309,12 @@ pub struct Crowd {
     /// the floor they boarded at, for the shaft's origin rings
     /// (`sample_elevator_util`). Never saved.
     pub commuter_boardings: indexmap::IndexMap<i64, indexmap::IndexMap<i64, f64>>,
+    /// The Modern router's transit graph and this step's lines. Never saved.
+    pub router: Option<expected_time::Router>,
+    /// Riders waiting for or walking to each shaft, keyed (shaft, floor), as
+    /// the last motion slice counted them (`line_count::LineCount`). The
+    /// Modern router takes it at the start of each step. Never saved.
+    pub shaft_lines: fasthash::FastMap<(i64, i64), i64>,
 }
 
 impl Crowd {
@@ -350,6 +358,8 @@ impl Crowd {
             commuter_count: 0,
             desk_revision: None,
             commuter_boardings: Default::default(),
+            router: None,
+            shaft_lines: fasthash::FastMap::default(),
         }
     }
 

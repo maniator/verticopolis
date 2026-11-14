@@ -365,11 +365,6 @@ export class PortEditSession {
     return u.id;
   }
 
-  /** The shaft with an id, if the tower has one. */
-  shaftById(id: number): SavedTransport | undefined {
-    return this.save().transports.find((t) => t.id === id);
-  }
-
   /** The floors that hold a lobby tile. */
   lobbyFloors(): ReadonlySet<number> {
     return new Set(this.save().units.flatMap((u) => (u.kind === "lobby" ? [u.floor] : [])));

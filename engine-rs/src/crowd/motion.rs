@@ -26,6 +26,7 @@ pub fn advance(crowd: &mut Crowd, dt_sec: f64, tower: &mut Tower) {
     let mut frustrated = 0;
     let mut travelling = 0;
     let mut landings = landing_slots(crowd, tower);
+    let mut lines = super::line_count::LineCount::new(tower);
     for i in 0..crowd.people.len() {
         crowd.people[i].age += dt_sec;
         let p = &crowd.people[i];
@@ -57,6 +58,7 @@ pub fn advance(crowd: &mut Crowd, dt_sec: f64, tower: &mut Tower) {
         }
         step(crowd, i, dt_sec, tower, &mut landings);
         let p = &crowd.people[i];
+        lines.see(p);
         if !p.staff
             && matches!(
                 p.state,
@@ -75,6 +77,7 @@ pub fn advance(crowd: &mut Crowd, dt_sec: f64, tower: &mut Tower) {
         0.0
     };
     crowd.frustration += (target - crowd.frustration) * (dt_sec * 0.5).min(1.0);
+    crowd.shaft_lines = lines.counted();
     crowd.people.retain(|p| p.state != PState::Done);
 }
 

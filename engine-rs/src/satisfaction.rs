@@ -162,7 +162,7 @@ impl Simulation {
         if !self.tower.is_floor_served(u.floor) {
             return false;
         }
-        if self.tower.segments_of(u.floor).len() <= 1 {
+        if self.tower.segment_runs(u.floor).len() <= 1 {
             return true;
         }
         self.crowd.segment_connected(&self.tower, u.floor, u.x)

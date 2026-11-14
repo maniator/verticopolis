@@ -6,6 +6,7 @@
 //! (`crowd::doors`).
 use crate::clock::{CalendarKind, GameMode};
 use crate::crowd::spawn::{add, pick_x};
+use crate::crowd::staff_shift::{send_out, spawn_commuter, STREET_FLOOR};
 use crate::crowd::PState;
 use crate::facilities::Kind;
 use crate::sim::Simulation;
@@ -200,5 +201,107 @@ fn shoppers_use_the_lobby_under_their_shop() {
             !seen.is_empty() && left > 0,
             "{mode:?}: shoppers came and went"
         );
+    }
+}
+
+/// With walk-ins off, as in play: someone out at a shop in the right tower
+/// whose room was bulldozed meanwhile leaves by the right tower's lobby
+/// (`doors::route_out_nearest`).
+#[test]
+fn someone_whose_room_went_leaves_by_the_lobby_under_them() {
+    for mode in [GameMode::Classic, GameMode::Modern] {
+        let (mut sim, lifts) = three_towers(mode);
+        let c = TOWERS[2];
+        let i = {
+            let Simulation {
+                ref mut crowd,
+                ref tower,
+                ..
+            } = sim;
+            add(crowd, tower, 1, 5, Some(c + 5), Some(c + 22)).expect("a way up")
+        };
+        // A room id nothing in the tower has: the room went while they shopped.
+        sim.crowd.people[i].origin_unit_id = Some(i64::MAX);
+        let id = sim.crowd.people[i].id;
+        let mut left = false;
+        for _ in 0..(2 * 60) {
+            sim.tick(1.0);
+            let Some(p) = sim.crowd.people.iter().find(|p| p.id == id) else {
+                break;
+            };
+            if p.returning {
+                assert_eq!(p.floors, [5, 1], "{mode:?}: straight down");
+                assert_eq!(p.shafts, [lifts[2]], "{mode:?}");
+                assert_eq!(tower_of(p.dest_x), 2, "{mode:?}: out by the right tower");
+                left = true;
+            }
+        }
+        assert!(left, "{mode:?}: they set off home");
+    }
+}
+
+/// A housekeeper comes in by the lobby under their housekeeping room and
+/// leaves by it at the shift's end, on a lot with several separate towers.
+#[test]
+fn housekeepers_come_and_go_by_the_lobby_under_their_room() {
+    for mode in [GameMode::Classic, GameMode::Modern] {
+        let (mut sim, lifts) = three_towers(mode);
+        for (k, &left) in TOWERS.iter().enumerate() {
+            let x = (left + 30) as f64;
+            let Simulation {
+                ref mut crowd,
+                ref mut tower,
+                ..
+            } = sim;
+            assert!(
+                spawn_commuter(crowd, tower, 1, 3, x),
+                "{mode:?}: in to tower {k}"
+            );
+            let i = crowd.people.len() - 1;
+            assert_eq!(crowd.people[i].floors, [STREET_FLOOR, 3], "{mode:?}");
+            assert_eq!(crowd.people[i].shafts, [lifts[k]], "{mode:?}");
+            assert_eq!(
+                tower_of(crowd.people[i].start_x),
+                k,
+                "{mode:?}: in by tower {k}"
+            );
+            // The shift is over and they stand in the housekeeping room.
+            crowd.people[i].floor = 3;
+            crowd.people[i].x = x;
+            send_out(crowd, tower, i);
+            assert_eq!(crowd.people[i].floors, [3, STREET_FLOOR], "{mode:?}");
+            assert_eq!(crowd.people[i].shafts, [lifts[k]], "{mode:?}");
+            assert_eq!(
+                tower_of(crowd.people[i].dest_x),
+                k,
+                "{mode:?}: out by tower {k}"
+            );
+        }
+    }
+}
+
+/// With a service elevator in the right tower, its housekeepers ride it
+/// (the staff network comes first) from the lobby under their room, and
+/// leave by it the same way.
+#[test]
+fn housekeepers_take_the_service_elevator_from_their_own_lobby() {
+    for mode in [GameMode::Classic, GameMode::Modern] {
+        let (mut sim, _) = three_towers(mode);
+        let service = shaft(&mut sim, Kind::ElevatorService, TOWERS[2] + 20, 0, 3);
+        let x = (TOWERS[2] + 30) as f64;
+        let Simulation {
+            ref mut crowd,
+            ref mut tower,
+            ..
+        } = sim;
+        assert!(spawn_commuter(crowd, tower, 1, 3, x), "{mode:?}");
+        let i = crowd.people.len() - 1;
+        assert_eq!(crowd.people[i].shafts, [service], "{mode:?}: staff first");
+        assert_eq!(tower_of(crowd.people[i].start_x), 2, "{mode:?}");
+        crowd.people[i].floor = 3;
+        crowd.people[i].x = x;
+        send_out(crowd, tower, i);
+        assert_eq!(crowd.people[i].shafts, [service], "{mode:?}: out by staff");
+        assert_eq!(tower_of(crowd.people[i].dest_x), 2, "{mode:?}");
     }
 }
