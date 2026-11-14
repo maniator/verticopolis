@@ -34,13 +34,14 @@ test("winning the TOWER shows the congratulations modal", async ({ page }) => {
 });
 
 /**
- * A TOWER save taken while an emergency choice was open loads with both the
- * win and the choice due (#1120). The congratulations used to replace the
- * choice's dialog in the same pass, leaving the freeze latch set, so the game
- * never moved again on any Continue of that save. The choice comes first, the
- * congratulations follow the answer, and time runs after both.
+ * A TOWER save taken while an emergency choice was open loads with the choice
+ * due (#1120). The congratulations used to replace the choice's dialog in the
+ * same pass, leaving the freeze latch set, so the game never moved again on
+ * any Continue of that save. The tower was congratulated where it was won, so
+ * a load does not open them again (#1134): the choice shows, and time runs
+ * once it is answered.
  */
-test("a TOWER save with an open emergency shows the choice, then the congratulations, and keeps running", async ({ page }) => {
+test("a TOWER save with an open emergency shows the choice, not the congratulations again, and keeps running", async ({ page }) => {
   await page.goto("/");
   await page.waitForFunction(() => Boolean((window as unknown as { game?: { saveLoad?: unknown } }).game?.saveLoad));
   await page.evaluate(() => {
@@ -72,15 +73,15 @@ test("a TOWER save with an open emergency shows the choice, then the congratulat
     document.getElementById("splash")?.remove();
     (window as unknown as { game: { speed: number } }).game.speed = 3;
   });
-  await expectChoiceThenCongratsThenRunning(page);
+  await expectChoiceThenRunning(page);
 });
 
 /**
  * The same save loaded mid-session goes through `adoptSim` instead of the boot
- * path, which resets the win latch but not the freeze latches, so it has its
- * own case.
+ * path, which sets the win latch from the tower but not the freeze latches, so
+ * it has its own case.
  */
-test("a TOWER save with an open emergency adopted mid-session shows the choice, then the congratulations, and keeps running", async ({ page }) => {
+test("a TOWER save with an open emergency adopted mid-session shows the choice, not the congratulations again, and keeps running", async ({ page }) => {
   await page.goto("/");
   await page.waitForFunction(() => Boolean((window as unknown as { game?: { saveLoad?: unknown } }).game?.saveLoad));
   await page.evaluate(() => document.getElementById("splash")?.remove());
@@ -93,11 +94,11 @@ test("a TOWER save with an open emergency adopted mid-session shows the choice, 
     g.adoptSim(s);
     g.speed = 3;
   });
-  await expectChoiceThenCongratsThenRunning(page);
+  await expectChoiceThenRunning(page);
 });
 
-/** The choice first with time frozen, the congratulations after the answer, then a moving clock. */
-async function expectChoiceThenCongratsThenRunning(page: Page): Promise<void> {
+/** The choice with time frozen, no congratulations after the answer, then a moving clock. */
+async function expectChoiceThenRunning(page: Page): Promise<void> {
   const modal = page.locator("#modal");
   await expect(modal).toBeVisible();
   const decline = modal.locator('[data-act="decline"]');
@@ -111,13 +112,15 @@ async function expectChoiceThenCongratsThenRunning(page: Page): Promise<void> {
   expect(await minutes()).toBe(frozenAt);
   await expect(decline).toBeVisible();
 
-  // Answering lets the congratulations through.
+  // Answering closes the choice, and the already-won tower is not congratulated again.
   await decline.click();
-  await expect(modal).toContainText("TOWER achieved");
-  await modal.locator('[data-act="close"]').click();
   await expect(modal).toBeHidden();
 
-  // And the clock moves again, measured from after both dialogs are gone.
+  // The clock moves again, measured from after the dialog is gone.
   const afterClose = await minutes();
   await expect.poll(minutes, { timeout: 10_000 }).toBeGreaterThan(afterClose);
+  // The congratulations wait one outcome toast (under 4 s) after an answer,
+  // so by now they would be up if the load had made them due.
+  await page.waitForTimeout(4_500);
+  await expect(modal).toBeHidden();
 }

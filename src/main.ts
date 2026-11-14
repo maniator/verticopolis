@@ -110,6 +110,7 @@ class GameApp implements GameAppPorts {
    *  @internal */
   frameErrors: FrameErrorEntry[] = [];
   /** @internal */ shownWin = false;
+  /** @internal When the TOWER congratulations may open, after an answered emergency's outcome toast (#1134). */ winHeldUntil = -Infinity;
   /** @internal A save existed at boot but couldn't be read; `saveWasNewer`
    *  says a newer build wrote it, `unreadableKept` that it was kept aside. */
   saveWasCorrupt = false;
@@ -233,6 +234,8 @@ class GameApp implements GameAppPorts {
     // for later swaps), or a reloaded 2★-6★ tower would fire a phantom
     // promotion (jingle + star_reached) on frame one.
     this.lastStar = this.reader.header.star;
+    // A reloaded TOWER was congratulated when it was won (#1134).
+    this.shownWin = this.enginePort.evaluatedTower();
     this.renderSim = newRenderSim(this.enginePort, this.reader);
     this.engine = new TowerEngine(this.canvas, this.renderSim, this.reader);
 

@@ -73,6 +73,11 @@ const LOG_DOM_CAP = 300;
 /** Most toasts kept on screen at once, and the most fired in a single render.
  *  A catch-up tick can flush a big batch; only the newest few pop. */
 const TOAST_MAX = 5;
+/** How long a toast holds, and its fade after. */
+const TOAST_HOLD_MS = 3600;
+const TOAST_FADE_MS = 300;
+/** How long a toast is on screen, hold and fade together. */
+export const TOAST_SHOWN_MS = TOAST_HOLD_MS + TOAST_FADE_MS;
 
 /** Pending hold/fade timer for each live toast node, so an early prune (below
  *  the TOAST_MAX cap) can cancel it. Without this a pruned toast keeps its
@@ -350,9 +355,9 @@ export function toast(ui: UI, text: string, kind: LogEntry["kind"] = "info"): vo
       window.setTimeout(() => {
         toastTimers.delete(t);
         t.remove();
-      }, 300),
+      }, TOAST_FADE_MS),
     );
-  }, 3600);
+  }, TOAST_HOLD_MS);
   toastTimers.set(t, hold);
   // Cap the rail: prune the oldest, canceling its pending timer so it can never
   // fire after the node has left the DOM. A sticky notice (./saveWarning) is

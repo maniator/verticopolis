@@ -35,7 +35,11 @@ export function followEngineTower(app: GameApp, follow: TowerFollow): void {
     // over an occupied slot asks first. A slot load names its slot again
     // right after this (appModals' loadedFrom).
     forgetLiveTower();
-    app.shownWin = false;
+    // A tower that arrives already rated TOWER was congratulated where it was
+    // won, so a load does not open the congratulations again (#1134). Only a
+    // win the player sees happen here opens them.
+    app.shownWin = app.enginePort.evaluatedTower();
+    app.winHeldUntil = -Infinity;
     app.accMinutes = 0;
     app.lastMealRushDay = { breakfast: -1, lunch: -1, dinner: -1 };
     app.frameErrors.length = 0;

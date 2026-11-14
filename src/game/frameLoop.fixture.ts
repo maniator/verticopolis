@@ -121,6 +121,7 @@ export function makeApp(over: Record<string, unknown> = {}) {
     lastUiUpdate: -1e9,
     lastStar: 1,
     shownWin: false,
+    winHeldUntil: -Infinity,
     lastMealRushDay: { breakfast: -1, lunch: -1, dinner: -1 } as Record<string, number>,
     ...over,
   };
