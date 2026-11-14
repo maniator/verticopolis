@@ -68,7 +68,7 @@ fn homes(sim: &Simulation) -> Vec<i64> {
 #[test]
 fn a_save_is_stamped_with_the_current_version() {
     assert_eq!(PLAIN_SAVE_VERSION, 7);
-    assert_eq!(tower_with_elevator().serialize()["version"], 7);
+    assert_eq!(tower_with_elevator().serialize_unfolded()["version"], 7);
 }
 
 #[test]

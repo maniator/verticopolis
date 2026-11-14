@@ -61,7 +61,7 @@ fn non_finite_unit_fields_load_as_safe_values() {
 
 #[test]
 fn malformed_entries_drop_and_every_valid_one_survives() {
-    let mut save = sample_game().serialize();
+    let mut save = sample_game().serialize_unfolded();
     let units = save["units"].as_array().unwrap().len();
     let transports = save["transports"].as_array().unwrap().len();
     let list = save["units"].as_array_mut().unwrap();

@@ -66,7 +66,8 @@ pub use values::{
 };
 
 pub fn gather_tower(save: &Value) -> Result<GatheredTower, LegacyExportError> {
-    let Some(raw_units) = save.get("units").and_then(Value::as_array) else {
+    // A version 11 save's floor runs unfold here, one entry per tile.
+    let Some(raw_units) = crate::load::unfolded_units(save) else {
         return Err(LegacyExportError("save.units is not an array".into()));
     };
     gather_units(raw_units, ground_lobby_height(save))

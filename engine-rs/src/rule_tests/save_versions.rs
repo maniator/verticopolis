@@ -10,10 +10,11 @@ use crate::load::NEWER_SAVE_REFUSAL;
 use crate::sim::{Simulation, PLAIN_SAVE_VERSION, SAVE_VERSION};
 use serde_json::{json, Value};
 
-/// The newest save version this build writes: 10, for a tower with an
-/// elevator hour held back (#1546); 9 for one with a tall lobby (#308) and
-/// none held, and 7 for any other tower.
-const CURRENT_SAVE_VERSION: i64 = 10;
+/// The newest save version this build writes: 11, for a tower that lists a
+/// row of plain floor tiles to fold into a run; 10 for one with an elevator
+/// hour held back (#1546) and no such row; 9 for one with a tall lobby (#308)
+/// and neither, and 7 for any other tower.
+const CURRENT_SAVE_VERSION: i64 = 11;
 
 fn stamped(mut save: Value, app_version: &str) -> Value {
     save["appVersion"] = json!(app_version);
@@ -39,12 +40,15 @@ fn an_old_version_migrates_and_a_newer_one_is_refused_whole() {
     assert_eq!(SAVE_VERSION, CURRENT_SAVE_VERSION);
     assert_eq!(PLAIN_SAVE_VERSION, 7);
     let sim = sample_game();
-    let mut save = sim.serialize();
+    let mut save = sim.serialize_unfolded();
     save["version"] = json!(2);
     let loaded = deserialize(&save).expect("an old save migrates");
     assert_eq!(loaded.money, sim.money);
     assert_eq!(loaded.tower.units.len(), sim.tower.units.len());
-    assert_eq!(loaded.serialize()["version"], json!(PLAIN_SAVE_VERSION));
+    assert_eq!(
+        loaded.serialize_unfolded()["version"],
+        json!(PLAIN_SAVE_VERSION)
+    );
     // A newer build's save could carry fields this loader would drop and the
     // next save would write the loss back, so it is refused (#1603).
     save["version"] = json!(SAVE_VERSION + 1);

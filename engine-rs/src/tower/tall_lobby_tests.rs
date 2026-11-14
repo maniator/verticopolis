@@ -238,13 +238,13 @@ fn a_tall_lobby_round_trips_through_the_save_and_only_it_takes_the_tall_lobby_ve
 
     let mut sim = tower(GameMode::Classic, 3);
     floors(&mut sim, 4..=4);
-    let save = sim.serialize();
+    let save = sim.serialize_unfolded();
     assert_eq!(save["version"], json!(TALL_LOBBY_SAVE_VERSION));
     assert_eq!(save["lobbyHeights"], json!([[1, 100, 123, 3]]));
     let back = deserialize(&save).unwrap();
     assert_eq!(back.tower.lobby_height(1), 3);
     assert!(back.tower.has_structure(3, 112));
-    let again = back.serialize();
+    let again = back.serialize_unfolded();
     assert_eq!(again["lobbyHeights"], save["lobbyHeights"]);
     assert_eq!(
         again["units"], save["units"],

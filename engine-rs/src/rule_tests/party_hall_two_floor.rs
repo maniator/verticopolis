@@ -23,7 +23,7 @@ fn a_version_5_save_loads_with_the_hall_on_both_stories() {
     units.extend(pave("floor", 2, 0, 60));
     units.push(json!({ "kind": "partyHall", "floor": 2, "x": 10, "width": hall_width() }));
     let sim = deserialize(&legacy_save(5, units, vec![])).expect("the save loads");
-    assert_eq!(sim.serialize()["version"], PLAIN_SAVE_VERSION);
+    assert_eq!(sim.serialize_unfolded()["version"], PLAIN_SAVE_VERSION);
     let hall = sim
         .tower
         .units

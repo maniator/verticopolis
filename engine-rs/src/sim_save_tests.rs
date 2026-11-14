@@ -11,9 +11,15 @@ use crate::sim::{stamped_save_version, LogKind};
 use std::collections::HashSet;
 
 fn same(sim: &Simulation, what: &str) {
-    let text = reference(sim).to_string();
-    assert_eq!(sim.save_text(), text, "{what}: the text");
-    assert_eq!(sim.serialize().to_string(), text, "{what}: the tree");
+    // The unfolded tree is the reference's shape exactly; the save the
+    // writers write folds floor runs, and both writers fold them the same.
+    assert_eq!(
+        sim.serialize_unfolded().to_string(),
+        reference(sim).to_string(),
+        "{what}: unfolded"
+    );
+    let text = sim.serialize().to_string();
+    assert_eq!(sim.save_text(), text, "{what}: the text and the tree");
 }
 
 /// `serialize()` as it was before #1242, kept verbatim (but for `self`, and
@@ -248,7 +254,7 @@ fn edited_games_write_the_trees_text() {
     sim.milestones = (0..20)
         .map(|i| format!("goal {i} \"\u{1F3E2}\" \\"))
         .collect();
-    let keys: Vec<&str> = sim.save_fields().iter().map(|(k, _)| *k).collect();
+    let keys: Vec<&str> = sim.save_fields(true).iter().map(|(k, _)| *k).collect();
     let distinct: HashSet<&str> = keys.iter().copied().collect();
     assert_eq!(
         (keys.len(), distinct.len()),

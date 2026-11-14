@@ -38,6 +38,7 @@ mod express_basement_stops;
 mod faq_complete;
 mod faq_complete_mechanics;
 mod fixed_step;
+mod floor_run_lockstep;
 mod game_events;
 mod golden_master;
 mod heatmap;

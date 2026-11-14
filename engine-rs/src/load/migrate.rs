@@ -74,7 +74,12 @@ pub fn migrate_save_owned(data: Value) -> Value {
     // version 8 whole-floor entry as every lobby tile on that floor
     // (`Tower::adopt_lobby_heights`), which is the migration, and a save
     // without `heldBack` holds no hour back.
-    if matches!(v(&migrated), Some(7.0) | Some(8.0) | Some(9.0) | Some(10.0)) {
+    // Version 11 folds floor tiles into runs, which the unit readers unfold
+    // (`floor_runs`), so it takes the same step.
+    if matches!(
+        v(&migrated),
+        Some(7.0) | Some(8.0) | Some(9.0) | Some(10.0) | Some(11.0)
+    ) {
         widen_shafts_in_place(&mut migrated);
     }
     migrated

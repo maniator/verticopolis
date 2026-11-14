@@ -132,6 +132,7 @@ fn a_sold_car_clamps_the_pattern_and_a_rebuy_follows_the_inheritance_rule() {
     };
     assert_eq!(held_back(&sim), Some((held(&weekday), held(&weekend))));
     let text = sim.save_text();
+    // The held hour takes version 10 (this tower lists no floor run).
     assert_eq!(
         serde_json::from_str::<serde_json::Value>(&text).unwrap()["version"],
         10

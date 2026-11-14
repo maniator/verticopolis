@@ -19,6 +19,7 @@ use crate::crowd::Crowd;
 use crate::dispatch::ElevatorDispatch;
 use crate::events::{EventSystem, PendingChoice};
 use crate::ledger::{totals_json, Ledger};
+use crate::save_floor_runs::{SavedUnits, FLOOR_RUN_SAVE_VERSION};
 use crate::sim::{stamped_save_version, LogEntry, Simulation, LOG_SAVE_CAP};
 use crate::tower::{Transport, Unit};
 
@@ -28,7 +29,10 @@ enum Field<'a> {
     Owned(Value),
     Borrowed(&'a Value),
     Text(&'a str),
+    /// The units with plain floor tiles folded into runs (`save_floor_runs`).
     Units(&'a [Unit]),
+    /// Every unit's own entry, as a version 10 save lists them.
+    PlainUnits(&'a [Unit]),
     Transports(&'a [Transport]),
     Strings(&'a [String]),
     Ids(&'a [i64]),
@@ -60,7 +64,8 @@ impl Field<'_> {
             Field::Owned(v) => v,
             Field::Borrowed(v) => v.clone(),
             Field::Text(t) => json!(t),
-            Field::Units(us) => Value::Array(us.iter().map(Unit::serialize).collect()),
+            Field::Units(us) => Value::Array(SavedUnits::new(us).collect()),
+            Field::PlainUnits(us) => Value::Array(us.iter().map(Unit::serialize).collect()),
             Field::Transports(ts) => Value::Array(ts.iter().map(Transport::serialize).collect()),
             Field::Strings(ss) => json!(ss),
             Field::Ids(ids) => json!(ids),
@@ -79,7 +84,8 @@ impl Serialize for Field<'_> {
         match self {
             Field::Owned(v) => v.serialize(s),
             Field::Borrowed(v) => v.serialize(s),
-            Field::Units(us) => Each(us, Unit::serialize).serialize(s),
+            Field::Units(us) => s.collect_seq(SavedUnits::new(us)),
+            Field::PlainUnits(us) => Each(us, Unit::serialize).serialize(s),
             Field::Transports(ts) => Each(ts, Transport::serialize).serialize(s),
             // A `Value::String` writes as its string does, a
             // `Value::Number` holding an integer as its digits do, and one
@@ -156,17 +162,19 @@ fn own(k: &'static str, v: Value) -> (&'static str, Field<'static>) {
 impl Simulation {
     /// The save's fields, in the order `serialize` has always written them.
     /// Absent optional fields are left out, which is what the canonical
-    /// writer expects. Each key appears once.
-    fn save_fields(&self) -> Vec<(&'static str, Field<'_>)> {
+    /// writer expects. Each key appears once. `fold` writes plain floor tiles
+    /// as runs and stamps the version that reads them; without it the units
+    /// are listed one by one, as the state view (`snapshot::state_view`)
+    /// reads them, so a conformance digest does not depend on the encoding.
+    fn save_fields(&self, fold: bool) -> Vec<(&'static str, Field<'_>)> {
         let mut m: Vec<(&'static str, Field<'_>)> = Vec::with_capacity(32);
         let tall_lobbies = self.tower.tall_lobby_runs();
-        m.push(own(
-            "version",
-            json!(stamped_save_version(
-                !tall_lobbies.is_empty(),
-                self.tower.holds_an_hour_back()
-            )),
-        ));
+        let version = if fold {
+            self.written_save_version()
+        } else {
+            stamped_save_version(!tall_lobbies.is_empty(), self.tower.holds_an_hour_back())
+        };
+        m.push(own("version", json!(version)));
         m.push(own("seed", json!(self.rng.seed())));
         m.push(own("initialSeed", json!(self.rng.initial_seed)));
         m.push(own("money", json!(self.money)));
@@ -181,7 +189,14 @@ impl Simulation {
             m.push(own("founder", json!(true)));
         }
         m.push(own("lastQuarterMoney", json!(self.last_quarter_money)));
-        m.push(("units", Field::Units(&self.tower.units)));
+        m.push((
+            "units",
+            if fold {
+                Field::Units(&self.tower.units)
+            } else {
+                Field::PlainUnits(&self.tower.units)
+            },
+        ));
         m.push(("transports", Field::Transports(&self.tower.transports)));
         m.push(own("nextId", json!(self.tower.next_id)));
         if let Some(n) = &self.tower.tower_name {
@@ -250,8 +265,42 @@ impl Simulation {
     /// The save tree without the top-level keys in `left_out`, which are
     /// never built.
     pub(crate) fn serialize_without(&self, left_out: &[&str]) -> Value {
+        self.tree(true, left_out)
+    }
+
+    /// The version [`Simulation::serialize`] stamps. A save that folds floor
+    /// tiles into runs is stamped with the version that reads them, so an
+    /// older build refuses it rather than load a run as its first tile alone.
+    pub(crate) fn written_save_version(&self) -> i64 {
+        if self.tower.lists_a_floor_run() {
+            FLOOR_RUN_SAVE_VERSION
+        } else {
+            stamped_save_version(
+                !self.tower.tall_lobby_runs().is_empty(),
+                self.tower.holds_an_hour_back(),
+            )
+        }
+    }
+
+    #[doc(hidden)]
+    /// [`Simulation::serialize`] with every unit listed on its own and the
+    /// version a version 10 writer stamped: the shape the state view and the
+    /// conformance digests read, whatever the save's encoding.
+    pub fn serialize_unfolded(&self) -> Value {
+        self.serialize_unfolded_without(&[])
+    }
+
+    /// [`Simulation::serialize_unfolded`] without the top-level keys in
+    /// `left_out`, which are never built.
+    pub(crate) fn serialize_unfolded_without(&self, left_out: &[&str]) -> Value {
+        self.tree(false, left_out)
+    }
+
+    /// The save tree, folded or not (`save_fields`), without the keys in
+    /// `left_out`.
+    fn tree(&self, fold: bool, left_out: &[&str]) -> Value {
         let mut m = Map::new();
-        for (k, f) in self.save_fields() {
+        for (k, f) in self.save_fields(fold) {
             if !left_out.contains(&k) {
                 m.insert(k.into(), f.into_value());
             }
@@ -283,14 +332,14 @@ impl Simulation {
         // a value that refuses to serialize; every key here is a string, and
         // every value a `Value`, a string, a number, or a map or list of
         // those, so the write cannot fail.
-        serde_json::to_string(&Fields(self.save_fields())).expect("a save writes as JSON")
+        serde_json::to_string(&Fields(self.save_fields(true))).expect("a save writes as JSON")
     }
 
     /// The same text, written into `buf`, so the memory tests can reserve the
     /// buffer first and count only what the write builds beside it.
     #[cfg(test)]
     pub(crate) fn write_save(&self, buf: &mut Vec<u8>) {
-        serde_json::to_writer(buf, &Fields(self.save_fields())).expect("a save writes as JSON");
+        serde_json::to_writer(buf, &Fields(self.save_fields(true))).expect("a save writes as JSON");
     }
 }
 
