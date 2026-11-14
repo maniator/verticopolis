@@ -107,6 +107,10 @@ export function makeApp(over: Record<string, unknown> = {}) {
       isEditorBusy: vi.fn(() => false),
       showEventChoice: vi.fn(),
       congratsTower: vi.fn(),
+      sayVisibly: vi.fn(),
+      // The open dialog holds no work unless a test says so; it is asked
+      // whether the shared dialog is open, as the real precedence is.
+      precedence: { ownsPendingWork: vi.fn((_isOpen: boolean) => false) },
     },
     onboarding: { tick: vi.fn() },
     scheduleReview: { tick: vi.fn() },

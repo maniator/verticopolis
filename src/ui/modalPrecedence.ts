@@ -156,14 +156,25 @@ export function routeNotice(
   precedence: ModalPrecedence,
   text: string,
   toast: (text: string) => void,
+  again = true,
 ): void {
   if (!dialog.open) {
     toast(text);
     return;
   }
-  const box = dialog.querySelector(".modal-box");
-  if (box) mountNotice(box as HTMLElement, text);
-  else precedence.deferNotice(text);
+  // A caller that asks every frame (an emergency waiting behind the dialog)
+  // passes `again` false. It never rebuilds a line already on screen, which
+  // would announce it anew each time, and never replaces another one: that
+  // could be a failure the player has yet to read, gone a frame after it
+  // landed. It is not held for a later body either, since that body could be
+  // the very dialog the caller was waiting for; the next ask finds the new one.
+  const box = dialog.querySelector<HTMLElement>(".modal-box");
+  if (!box) {
+    if (again) precedence.deferNotice(text);
+    return;
+  }
+  if (!again && box.querySelector(":scope > .modal-notice")) return;
+  mountNotice(box, text);
 }
 
 /** Put a notice at the top of a dialog body, under the title bar where the eye

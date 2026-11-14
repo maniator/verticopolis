@@ -72,6 +72,27 @@ export function hasBlockingModal(app: GameApp): boolean {
 }
 
 /**
+ * The open dialog holds something replacing it would destroy: unsaved edits
+ * (the elevator schedule) or a decision still owed (a fidelity report). The
+ * modal precedence classifies every open (`../ui/modalPrecedence`); this asks
+ * it about the dialog on screen. A dialog the game raises on its own (the
+ * emergency choice, the TOWER congratulations) waits while this holds, rather
+ * than wiping the player's work (#1121).
+ *
+ * Guarded like {@link isEditorBusy}: it runs UI code, and `app.ui` may be unset
+ * or may be what just threw. A fault reads as "holds nothing", which is what the
+ * game did before this question existed.
+ */
+export function dialogHoldsWork(app: GameApp): boolean {
+  try {
+    return app.ui?.precedence.ownsPendingWork(isDialogOpen()) ?? false;
+  } catch (err) {
+    console.warn("[interaction] dialogHoldsWork threw; treating the dialog as replaceable:", err);
+    return false;
+  }
+}
+
+/**
  * A live press is held inside the editor card (AD-7): a sub-second local grip
  * rather than a global screen, so it is a predicate. Consumers read it
  * synchronously at the moment of action.
