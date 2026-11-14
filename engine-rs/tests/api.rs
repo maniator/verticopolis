@@ -21,8 +21,8 @@ use verticopolis_engine::load::{
 use verticopolis_engine::sim::Simulation;
 use verticopolis_engine::snapshot::state_view;
 use verticopolis_engine::view::{
-    layout, layout_json, meta_since, structure_view, view_frame, whole_revision, ViewReader,
-    VIEW_LAYOUT_VERSION,
+    layout, layout_json, meta_since, set_people_window, structure_view, view_frame, whole_revision,
+    PeopleWindow, ViewReader, VIEW_LAYOUT_VERSION,
 };
 use verticopolis_engine::{export_tdt, import_tdt};
 
@@ -76,6 +76,9 @@ fn the_host_api_is_in_place() {
     let _ = structure_view;
     let _ = ViewReader::new;
     let _ = ViewReader::frame;
+    let _ = ViewReader::set_people_window;
+    let _ = PeopleWindow::new;
+    let _ = set_people_window;
     let _ = view_frame;
     let _ = (meta_since, whole_revision);
     let _ = Simulation::tower_signature;
