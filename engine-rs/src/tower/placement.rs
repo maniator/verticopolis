@@ -300,26 +300,6 @@ impl Tower {
         }
     }
 
-    /// `removalReason`: why a structure tile cannot be sold. In Classic that
-    /// includes a floor tile with floor on both sides
-    /// ([`GameMode::removes_mid_floor_tiles`](crate::clock::GameMode::removes_mid_floor_tiles)).
-    pub fn removal_reason(&self, id: i64) -> Option<&'static str> {
-        let u = self.get_unit(id)?;
-        if !u.kind.is_structural() {
-            return None;
-        }
-        if u.kind == Kind::Lobby {
-            return Some("Lobby tiles are permanent. The 1994 game does not let you remove them.");
-        }
-        if u.floor >= 1 && !self.structure_span_free(u.floor + 1, u.x, u.width) {
-            return Some("Remove the story above first. Floors can't hang in midair.");
-        }
-        if !self.mode.removes_mid_floor_tiles() && self.floor_on_both_sides(u.floor, u.x, u.width) {
-            return Some(super::MID_FLOOR_GAP);
-        }
-        None
-    }
-
     /// `placeStructureRun`: passes over the tiles until none place.
     pub fn place_structure_run(
         &mut self,

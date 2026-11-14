@@ -119,6 +119,15 @@ impl GameMode {
         self == GameMode::Modern
     }
 
+    /// Whether the bulldozer may take out a sky lobby tile. The 1994 game
+    /// keeps every lobby for good, so Classic refuses. Modern sells a sky
+    /// lobby tile like a floor tile (owner, 2026-11-14), a mistaken tall
+    /// hall included; the ground lobby stays in both modes. Read through
+    /// `Tower::removal_reason`.
+    pub fn removes_lobby_tiles(self) -> bool {
+        self == GameMode::Modern
+    }
+
     /// Whether a placed room of `kind` stays for good: SimTower gives the
     /// player no way to delete housekeeping, security, recycling, the movie
     /// theater or the cathedral (our wedding hall). Modern lets them be sold
