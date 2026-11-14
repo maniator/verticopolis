@@ -15,6 +15,10 @@ raised the version, so they are documentation only.
 There is no entry for 0.17.0, which only
 existed as a step inside a stacked branch.
 
+## 1.34.2 (2026-11-14)
+
+- The `.TDT` importer joins a theater's screen piece (types 35 and 34) only to the auditorium piece (19 and 18) on its right, the way SimTower writes every theater, so theaters built flush side by side stay separate (`tdt::part_merge`). The `theatre-whole` import case in `conformance/tdt-cases.json` now carries its screen pieces on the left; it still imports as one whole theater, and its save hash moves only because the import seed follows the file's bytes.
+
 ## 1.34.1 (2026-11-14)
 
 - Patience no longer removes a visitor or tenant from the crowd. One still on the floor their trip began on turns back (`motion::turn_back`) to where they set out (`Person::start_x`, engine-internal) and leaves there; one past their first ride, or returning, keeps waiting. A shaft that goes from under someone on foot sends them back the same way if they are still setting out, or on by a new route to their trip's last floor (`motion::reroute`); only a rider whose car went, or someone with no way on, leaves the crowd. Housekeepers keep their own rule. The conformance lock, frame days, port edits and fuzz goldens are re-pinned, and the Classic ransom scenario's first threat moved to hour 40.
