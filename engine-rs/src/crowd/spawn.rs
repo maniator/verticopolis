@@ -5,17 +5,19 @@ use super::meals::MealOrigin;
 use super::routines::push_routine_options;
 pub use super::spawn_floors::{spawn_floors, SpawnFloors};
 use super::visits::{push_venue_visit_options, spawn_venue_visit, VisitOrigin};
-use super::{Crowd, PState, Person, Route, MAX_PEOPLE, METRO_DWELL_MAX, METRO_DWELL_MIN};
+use super::{Crowd, PState, Person, Route, MAX_PEOPLE};
 use crate::clock::Clock;
 use crate::facilities::Kind;
 use crate::tower::{Tower, Unit};
 
 mod lists;
 mod meal_trips;
+mod metro_trips;
 mod staff;
 
 use lists::{list_of, stamp_errand, List};
 use meal_trips::{push_meal_options, spawn_meal_outbound};
+use metro_trips::{metro_arrival, metro_departure};
 pub use staff::spawn_step;
 
 // ---- trips.ts -------------------------------------------------------------
@@ -143,7 +145,7 @@ pub fn pick_x(tower: &Tower, floor: i64, seed: i32) -> i64 {
 pub fn pick_x_in_segment(tower: &Tower, floor: i64, seed: i32, anchor_x: i64) -> i64 {
     let mut lo = anchor_x;
     let mut hi = anchor_x;
-    for (start, end) in tower.segments_of(floor) {
+    for &(start, end) in tower.segment_runs(floor).iter() {
         if anchor_x < start {
             break;
         }
@@ -153,17 +155,14 @@ pub fn pick_x_in_segment(tower: &Tower, floor: i64, seed: i32, anchor_x: i64) ->
             break;
         }
     }
-    // The tiles inside [lo, hi] in pickX's order, counted and then indexed
-    // in place rather than copied out.
-    let Some(tiles) = tower.structural_tiles(floor) else {
+    // The tiles inside [lo, hi] in pickX's order, from the per-edit memo.
+    let Some(tiles) = tower.run_tiles(floor, lo, hi) else {
         return anchor_x;
     };
-    let in_run = |x: &&i64| **x >= lo && **x <= hi;
-    let n = tiles.iter().filter(in_run).count();
-    if n == 0 {
+    if tiles.is_empty() {
         return anchor_x;
     }
-    *tiles.iter().filter(in_run).nth(abs_seed(seed) % n).unwrap()
+    tiles[abs_seed(seed) % tiles.len()]
 }
 
 pub fn inside_x(crowd: &mut Crowd, u: &Unit, inset: i64) -> i64 {
@@ -216,21 +215,6 @@ pub fn venue_has_room(u: &Unit) -> bool {
 }
 
 // ---- venueTrips.ts ---------------------------------------------------------
-
-fn metro_arrival(crowd: &mut Crowd, tower: &Tower, station: &Unit, to: i64) -> Option<usize> {
-    let i = add(crowd, tower, station.floor + 1, to, None, None)?;
-    crowd.people[i].x = inside_x(crowd, station, 2) as f64;
-    crowd.people[i].start_x = crowd.people[i].x;
-    crowd.people[i].from_metro = true;
-    Some(i)
-}
-
-fn metro_departure(crowd: &mut Crowd, tower: &Tower, station: &Unit, from: i64) -> Option<usize> {
-    let i = add(crowd, tower, from, station.floor + 1, None, None)?;
-    crowd.people[i].dest_x = inside_x(crowd, station, 2) as f64;
-    crowd.people[i].linger_for = Some(crowd.rng.int(METRO_DWELL_MIN, METRO_DWELL_MAX) as f64);
-    Some(i)
-}
 
 // ---- spawn.ts --------------------------------------------------------------
 

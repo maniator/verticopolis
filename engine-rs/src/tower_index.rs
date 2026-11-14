@@ -292,6 +292,36 @@ impl Tower {
         hit
     }
 
+    /// The structural tiles of `floor` from `lo` to `hi`, in the order
+    /// [`Tower::structural_tiles`] lists them, built once per index key and
+    /// run, or `None` when the floor has none. `pick_x_in_segment` indexes
+    /// into it per spawn instead of walking the floor's tiles.
+    pub(crate) fn run_tiles(&self, floor: i64, lo: i64, hi: i64) -> Option<Arc<[i64]>> {
+        let key = self.index_key();
+        {
+            let mut memo = self.memo.borrow_mut();
+            match &memo.run_tiles {
+                Some((built, _)) if *built == key => {}
+                _ => memo.run_tiles = Some((key, Default::default())),
+            }
+            if let Some(hit) = memo.run_tiles.as_ref().unwrap().1.get(&(floor, lo, hi)) {
+                return Some(hit.clone());
+            }
+        }
+        let tiles = self.structural_tiles(floor)?;
+        let run: Arc<[i64]> = tiles
+            .iter()
+            .copied()
+            .filter(|&x| x >= lo && x <= hi)
+            .collect();
+        if let Some((built, runs)) = self.memo.borrow_mut().run_tiles.as_mut() {
+            if *built == key {
+                runs.insert((floor, lo, hi), run.clone());
+            }
+        }
+        Some(run)
+    }
+
     /// `floorBounds` in `Tower.ts`: the lowest and highest floor any unit
     /// sits on, tiles included, both folded from the ground floor, so an
     /// empty tower reads `(1, 1)`. Behind `highest_floor` and `lowest_floor`,

@@ -6,15 +6,27 @@
 
 use std::collections::{HashMap, HashSet};
 
+use crate::crowd::fasthash::FastMap;
 use crate::economy::visitors::census_follows_the_day;
 use crate::tower::{Unit, UnitState};
+
+/// A floor's runs as the memo shares them (`Tower::segment_runs`).
+pub type Runs = std::sync::Arc<[(i64, i64)]>;
 
 #[derive(Default)]
 pub struct Memo {
     pub served: Option<(i64, HashSet<i64>)>,
     pub stops: HashMap<i64, (i64, Vec<i64>)>,
-    /// Each floor's runs, keyed like the tile index they are built from.
-    pub segs: Option<(crate::tower_index::IndexKey, HashMap<i64, Vec<(i64, i64)>>)>,
+    /// Each floor's runs, keyed like the tile index they are built from,
+    /// shared so a read hands out the list without copying it.
+    pub segs: Option<(crate::tower_index::IndexKey, FastMap<i64, Runs>)>,
+    /// The structural tiles inside one run of a floor, in `structural_tiles`'
+    /// order, keyed by (floor, first tile, last tile) on the same index key,
+    /// so `pick_x_in_segment` indexes a tile instead of walking the floor.
+    pub run_tiles: Option<(
+        crate::tower_index::IndexKey,
+        FastMap<(i64, i64, i64), std::sync::Arc<[i64]>>,
+    )>,
     pub staff: Option<(i64, HashMap<i64, i64>)>,
     pub cols: Option<(i64, HashMap<i64, Vec<(i64, i64)>>)>,
     pub tiles: Option<(crate::tower_index::IndexKey, crate::tower_index::FloorTiles)>,

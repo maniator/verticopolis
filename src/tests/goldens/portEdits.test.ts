@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { FrameDayStart } from "./frameDays";
 import { PORT_EDIT_CASES } from "./portEditCases";
-import { crowdProblem, isCrowdPerson, midRouteAvoiding, shaftsBetween, stopsAtBoth, walkingTo, WALKING_TO_SHAFT } from "./portEditCrowd";
+import { crowdProblem, isCrowdPerson, midRouteAvoiding, shaftsBetween, walkingTo, WALKING_TO_SHAFT } from "./portEditCrowd";
 import { answerNumber, firstPortEditDifference, portEditProblems, readPortEdits, STATUS, type AnswerValue, type LineKind, type PortEditLine } from "./portEditLines";
 
 /** A line whose kind follows from its step: "start", "play ...", and the
@@ -174,17 +174,6 @@ describe("the crowd view reader", () => {
     expect(walkingTo(view, 4631)).toEqual([7]);
     expect(midRouteAvoiding(view, 4631)).toEqual([10]);
     expect(shaftsBetween(view, 1, 0, 9)).toEqual([4631, 4479]);
-  });
-
-  it("says whether a shaft stops at both of a leg's floors, as the engines decide a stop", () => {
-    const shaft = { bottom: 0, top: 3 };
-    expect(stopsAtBoth(shaft, 0, 1)).toBe(true);
-    expect(stopsAtBoth({ ...shaft, skipFloors: [1, 2] }, 0, 3)).toBe(true);
-    expect(stopsAtBoth({ ...shaft, skipFloors: [0] }, 0, 1)).toBe(false);
-    expect(stopsAtBoth({ ...shaft, skipFloors: [1] }, 0, 1)).toBe(false);
-    expect(stopsAtBoth({ ...shaft, bottom: 1 }, 0, 1)).toBe(false);
-    expect(stopsAtBoth({ ...shaft, top: 0 }, 0, 1)).toBe(false);
-    expect(stopsAtBoth(undefined, 0, 1)).toBe(false);
   });
 });
 

@@ -5,8 +5,9 @@
 //! hotel room. The crowd moves them; the simulation's housekeeping
 //! (`housekeeping_shift.rs`) decides where they go next.
 
+use super::doors::{passenger_joins, tiles_nearest};
 use super::motion::{finish, release_seat};
-use super::spawn::{make_person, pick_x, seed_for};
+use super::spawn::{make_person, seed_for};
 use super::{Crowd, PState, Route, StaffResult};
 use crate::tower::Tower;
 
@@ -56,12 +57,25 @@ fn route(
 /// Bring one housekeeper of the crew at (`floor`, `x`) in from the lobby.
 /// False when no route leads from the lobby to the housekeeping room.
 pub fn spawn_commuter(crowd: &mut Crowd, tower: &Tower, crew_id: i64, floor: i64, x: f64) -> bool {
-    // Where the new person will stand, as `add` picks it for a visitor.
-    let street_x = pick_x(tower, STREET_FLOOR, seed_for(crowd.next_id));
-    let street = (STREET_FLOOR, street_x as f64);
-    let Some(r) = route(crowd, tower, Network::Staff, street, (floor, x))
-        .or_else(|| route(crowd, tower, Network::Passenger, street, (floor, x)))
-    else {
+    // Where the new person will stand, as `add` picks it for a visitor: on
+    // a lot with several separate towers, the lobby nearest the
+    // housekeeping room that a route leads from.
+    let seed = seed_for(crowd.next_id);
+    let room = tower.seg_at(floor, Some(x));
+    let mut found = None;
+    for (run, street_x) in tiles_nearest(tower, STREET_FLOOR, x, seed) {
+        let street = (STREET_FLOOR, street_x as f64);
+        let r = route(crowd, tower, Network::Staff, street, (floor, x)).or_else(|| {
+            passenger_joins(crowd, tower, STREET_FLOOR, run, room)
+                .then(|| route(crowd, tower, Network::Passenger, street, (floor, x)))
+                .flatten()
+        });
+        if let Some(r) = r {
+            found = Some((r, street_x));
+            break;
+        }
+    }
+    let Some((r, street_x)) = found else {
         return false;
     };
     let i = make_person(crowd, tower, r, x, Some(street_x));
@@ -109,14 +123,27 @@ pub fn send(
     true
 }
 
-/// Leave through the lobby, or, with no way down, leave from where they
-/// stand.
+/// Leave through the lobby nearest where they stand that a route leads
+/// to, or, with no way down, leave from where they stand.
 pub fn send_out(crowd: &mut Crowd, tower: &mut Tower, i: usize) {
-    let street_x = pick_x(tower, STREET_FLOOR, crowd.people[i].seed) as f64;
-    let to = (STREET_FLOOR, street_x);
-    if !send(crowd, tower, i, Network::Staff, to, StaffTrip::Out)
-        && !send(crowd, tower, i, Network::Passenger, to, StaffTrip::Out)
-    {
+    let (floor, x, seed) = (
+        crowd.people[i].floor,
+        crowd.people[i].x,
+        crowd.people[i].seed,
+    );
+    let here = tower.seg_at(floor, Some(x));
+    let mut out = false;
+    for (run, street_x) in tiles_nearest(tower, STREET_FLOOR, x, seed) {
+        let to = (STREET_FLOOR, street_x as f64);
+        if send(crowd, tower, i, Network::Staff, to, StaffTrip::Out)
+            || (passenger_joins(crowd, tower, STREET_FLOOR, run, here)
+                && send(crowd, tower, i, Network::Passenger, to, StaffTrip::Out))
+        {
+            out = true;
+            break;
+        }
+    }
+    if !out {
         finish(crowd, i, tower);
     }
 }
