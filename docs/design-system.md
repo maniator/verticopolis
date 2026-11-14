@@ -65,7 +65,7 @@ buttons may not).
 ### `.win`: a floating window
 Gray face + `--bevel-out` + `--win-shadow`. Applied to: the modal box, the
 editor card, the inspector card, the hint strip, the onboarding coach card.
-`.win.docked` (palette, sidebar, its panels) keeps the face/bevel but drops
+`.win.docked` (the Tools palette) keeps the face/bevel but drops
 the floating drop shadow.
 
 ### `.win-title`: the title bar
@@ -74,16 +74,16 @@ right via `margin-left: auto`. Every dismissible window wears one; the modal's
 is sticky and full-bleed (negative margins derived from the `--pad-y`/`--pad-x`
 tokens on `.modal-box`; never hand-write those offsets).
 
-Closable windows (the Map, the room card, the hover card and the dialogs) add
+Closable windows (the Map, Tower Info, the Bulletin, the room card, the hover
+card and the dialogs) add
 `.win-closable` and wear the compact bar the Map window introduced: 11px,
 `1px 2px 1px 6px` padding, set 2px inside the window's frame, with a 20 by 18
-✕. The docked panels (the Tools palette, the sidebar) keep the full-size bar.
+✕. The docked Tools palette keeps the full-size bar.
 
 `.win-title.sm` is the explicit mini variant (11px, uppercase, `2px 6px`)
 for section strips inside a window. The statistics dialog's
 Overview/Tenancy/Milestones headers use it. The palette's "Tools" strip is a
-full-size `.win-title`; the sidebar `.panel h3` headers are the same idiom at
-panel scale (10px, uppercase), a deliberate size step-down rather than a divergence.
+full-size `.win-title`.
 
 ### `.well`: sunken white data area
 `--r-hi` + `--bevel-in`. The File Manager idiom: the Bulletin log, the saves
@@ -96,8 +96,20 @@ A well you type into (same recipe + `font: inherit`).
 
 ### `.kv`: key/value grid
 Two columns (`1fr auto`), muted keys, right-aligned tabular values. Used by the
-editor stats, sidebar tower stats, and statistics-dialog columns (milestone
+editor stats, the Tower Info window's stats, and statistics-dialog columns (milestone
 columns override to left-aligned descriptions).
+
+### The menu bar and status bar
+The Windows 95 menu bar (`#menubar`, `src/styles/game/menubar.css`) sits on
+the chrome face above the top bar: 12px titles that press in (`--bevel`-style
+inset) while their menu is open, menus as floating `.win`-style boxes
+(`--bevel-out` + `--win-shadow`) with a navy highlight row, a ✓ for a checked
+item, gray for a disabled one, and etched separators. Behavior follows the
+WAI-ARIA menubar pattern (`src/ui/menuBar.ts`). The status bar
+(`#statusbar`) is a row of sunken cells (`inset` shadow pair) on the face;
+an empty cell hides itself. On a phone the menu bar grows to 14px with
+finger-sized rows and keeps a navy logo badge at its left, and the status
+bar is left out.
 
 ### `.toast` / `.evalbar`
 Toast = small gray alert, left edge colored by kind (`good`/`bad`/`money`).

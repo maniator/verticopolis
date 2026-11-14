@@ -66,6 +66,7 @@ test.describe("dialog chrome", () => {
   });
 
   test("stats dialog matches baseline", async ({ page }) => {
+    await page.click("#mb-tower");
     await page.click("#btn-stats");
     await expect(page.locator("#modal .modal-box")).toHaveScreenshot("stats-dialog.png");
   });

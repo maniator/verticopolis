@@ -1,0 +1,190 @@
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { MenuBar } from "./menuBar";
+
+/** Two menus, the second with a grayed and a hidden item, the way index.html
+ *  lays out `#menubar`. */
+function setup(onOpen = vi.fn()) {
+  document.body.innerHTML = `
+    <nav id="menubar">
+      <div class="mb-menu">
+        <button class="mb-title" id="t-file" aria-expanded="false" aria-controls="m-file"><u>F</u>ile</button>
+        <div class="mb-pop" id="m-file" role="menu" hidden>
+          <button class="mb-item" id="i-new" role="menuitem">New</button>
+          <button class="mb-item" id="i-save" role="menuitem">Save</button>
+        </div>
+      </div>
+      <div class="mb-menu">
+        <button class="mb-title" id="t-edit" aria-expanded="false" aria-controls="m-edit"><u>E</u>dit</button>
+        <div class="mb-pop" id="m-edit" role="menu" hidden>
+          <button class="mb-item" id="i-undo" role="menuitem" aria-disabled="true">Undo</button>
+          <button class="mb-item" id="i-gone" role="menuitem" hidden>Gone</button>
+          <button class="mb-item" id="i-redo" role="menuitem">Redo</button>
+        </div>
+      </div>
+    </nav>
+    <div id="outside"></div>`;
+  const root = document.getElementById("menubar")!;
+  const bar = new MenuBar(root, { onOpen });
+  const $ = (id: string) => document.getElementById(id) as HTMLElement;
+  const key = (el: Element, k: string, init: KeyboardEventInit = {}) =>
+    el.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true, cancelable: true, ...init }));
+  return { bar, $, key, onOpen };
+}
+
+afterEach(() => {
+  document.body.innerHTML = "";
+});
+
+describe("MenuBar", () => {
+  it("a title's click opens its menu, calls onOpen first, and a second click closes it", () => {
+    const { bar, $, onOpen } = setup(vi.fn((menu: HTMLElement) => expect(menu.hidden).toBe(true)));
+    $("t-file").click();
+    expect($("m-file").hidden).toBe(false);
+    expect($("t-file").getAttribute("aria-expanded")).toBe("true");
+    expect(onOpen).toHaveBeenCalledWith($("m-file"));
+    expect(bar.current()).toBe($("t-file"));
+    $("t-file").click();
+    expect($("m-file").hidden).toBe(true);
+    expect($("t-file").getAttribute("aria-expanded")).toBe("false");
+    expect(bar.current()).toBeNull();
+  });
+
+  it("pointing at another title switches menus only while one is open", () => {
+    const { $ } = setup();
+    const point = (el: HTMLElement, pointerType: string) => el.dispatchEvent(new PointerEvent("pointerenter", { pointerType }));
+    point($("t-edit"), "mouse");
+    expect($("m-edit").hidden).toBe(true);
+    $("t-file").click();
+    point($("t-edit"), "mouse");
+    expect($("m-file").hidden).toBe(true);
+    expect($("m-edit").hidden).toBe(false);
+  });
+
+  it("a tap on another title while a menu is open switches to it (a touch's pointerenter does not open and then close it)", () => {
+    const { $ } = setup();
+    $("t-file").click();
+    $("t-edit").dispatchEvent(new PointerEvent("pointerenter", { pointerType: "touch" }));
+    expect($("m-file").hidden).toBe(false);
+    $("t-edit").click();
+    expect($("m-file").hidden).toBe(true);
+    expect($("m-edit").hidden).toBe(false);
+  });
+
+  it("an item's click runs its own handler, then closes the menu; a grayed item keeps it open", () => {
+    const { $ } = setup();
+    const ran = vi.fn(() => expect($("m-file").hidden).toBe(false));
+    $("i-save").addEventListener("click", ran);
+    $("t-file").click();
+    $("i-save").click();
+    expect(ran).toHaveBeenCalledOnce();
+    expect($("m-file").hidden).toBe(true);
+    $("t-edit").click();
+    $("i-undo").click();
+    expect($("m-edit").hidden).toBe(false);
+  });
+
+  it("a press outside the bar only closes the open menu: the press, its pointerup and its click never reach what is under it", () => {
+    const { $ } = setup();
+    const under = vi.fn();
+    for (const type of ["pointerdown", "pointerup", "click"]) $("outside").addEventListener(type, under);
+    $("t-file").click();
+    $("outside").dispatchEvent(new Event("pointerdown", { bubbles: true, cancelable: true }));
+    expect($("m-file").hidden).toBe(true);
+    $("outside").dispatchEvent(new Event("pointerup", { bubbles: true, cancelable: true }));
+    $("outside").click();
+    expect(under).not.toHaveBeenCalled();
+    // The next press, with no menu open, lands as usual.
+    $("outside").dispatchEvent(new Event("pointerdown", { bubbles: true, cancelable: true }));
+    $("outside").click();
+    expect(under).toHaveBeenCalledTimes(2);
+  });
+
+  it("a menu that would run off the window's right edge slides left to fit, never past the left edge", () => {
+    const { $ } = setup();
+    Object.defineProperty(document.documentElement, "clientWidth", { configurable: true, value: 400 });
+    const rect = vi.spyOn($("m-edit"), "getBoundingClientRect").mockReturnValue({ left: 230, right: 450 } as DOMRect);
+    $("t-edit").click();
+    expect($("m-edit").style.translate).toBe("-50px 0");
+    $("t-edit").click();
+    rect.mockReturnValue({ left: 20, right: 450 } as DOMRect);
+    $("t-edit").click();
+    expect($("m-edit").style.translate).toBe("-20px 0");
+    $("t-edit").click();
+    rect.mockReturnValue({ left: 20, right: 240 } as DOMRect);
+    $("t-edit").click();
+    expect($("m-edit").style.translate).toBe("");
+    // @ts-expect-error drop the test's own property, back to jsdom's
+    delete document.documentElement.clientWidth;
+  });
+
+  it("Down on a title opens it on its first item; Up and Down skip grayed and hidden items and wrap", () => {
+    const { $, key } = setup();
+    key($("t-edit"), "ArrowDown");
+    expect($("m-edit").hidden).toBe(false);
+    expect(document.activeElement).toBe($("i-redo")); // Undo is grayed, Gone is hidden
+    key($("i-redo"), "ArrowDown");
+    expect(document.activeElement).toBe($("i-redo"));
+    $("t-file").focus();
+    key($("t-file"), "Enter");
+    expect(document.activeElement).toBe($("i-new"));
+    key($("i-new"), "ArrowUp");
+    expect(document.activeElement).toBe($("i-save"));
+    key($("i-save"), "Home");
+    expect(document.activeElement).toBe($("i-new"));
+    key($("i-new"), "End");
+    expect(document.activeElement).toBe($("i-save"));
+  });
+
+  it("Left and Right in an open menu move to the next menu, wrapping", () => {
+    const { $, key } = setup();
+    key($("t-file"), "ArrowDown");
+    key($("i-new"), "ArrowRight");
+    expect($("m-file").hidden).toBe(true);
+    expect($("m-edit").hidden).toBe(false);
+    key($("i-redo"), "ArrowRight");
+    expect($("m-file").hidden).toBe(false);
+    expect(document.activeElement).toBe($("i-new"));
+  });
+
+  it("Escape closes the menu and gives the focus back to its title", () => {
+    const { $, key } = setup();
+    key($("t-file"), "ArrowDown");
+    key($("i-new"), "Escape");
+    expect($("m-file").hidden).toBe(true);
+    expect(document.activeElement).toBe($("t-file"));
+  });
+
+  it("Tab closes the menu and lets the focus move on", () => {
+    const { $, key } = setup();
+    key($("t-file"), "ArrowDown");
+    const ev = new KeyboardEvent("keydown", { key: "Tab", bubbles: true, cancelable: true });
+    $("i-new").dispatchEvent(ev);
+    expect($("m-file").hidden).toBe(true);
+    expect(ev.defaultPrevented).toBe(false);
+  });
+
+  it("Alt with a title's underlined letter opens that menu; other chords do nothing", () => {
+    const { $, key } = setup();
+    key(document.body, "e", { altKey: true, ctrlKey: true });
+    expect($("m-edit").hidden).toBe(true);
+    key(document.body, "e", { altKey: true });
+    expect($("m-edit").hidden).toBe(false);
+    expect(document.activeElement).toBe($("i-redo"));
+  });
+
+  it("Alt with a letter does nothing while a dialog is open", () => {
+    const { $, key } = setup();
+    const dialog = document.createElement("dialog");
+    dialog.setAttribute("open", "");
+    document.body.append(dialog);
+    key(document.body, "e", { altKey: true });
+    expect($("m-edit").hidden).toBe(true);
+  });
+
+  it("the window losing focus closes the open menu", () => {
+    const { $ } = setup();
+    $("t-file").click();
+    window.dispatchEvent(new Event("blur"));
+    expect($("m-file").hidden).toBe(true);
+  });
+});

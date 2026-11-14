@@ -2,6 +2,7 @@ import type { UI } from "./UI";
 import { settingsTemplate } from "./templates/settings";
 import { trackAppAction } from "../analytics";
 import { engineSuffix } from "../wasmhost/engineLabel";
+import { isSplashUp } from "../game/interactionState";
 
 /**
  * The Settings dialog controller, split out of `uiDialogs.ts` at the
@@ -17,9 +18,11 @@ export function showSettings(ui: UI): void {
   const version = typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "dev";
   // The Building section (the bridging toggle) shows only where the tower's
   // catalog says the player can switch bridging off (Modern); elsewhere
-  // bridging is always on and the section never renders.
+  // bridging is always on and the section never renders. Bridging belongs to a
+  // tower, so the title screen (opened from Options > Settings, with only the
+  // backdrop tower behind it) leaves the section out too.
   const catalog = ui.cb.getCatalog();
-  const bridgingToggleable = catalog.economy.autoBridgeToggleable;
+  const bridgingToggleable = catalog.economy.autoBridgeToggleable && !isSplashUp();
   // The passers-by switch shows only where the catalog lets the mode draw
   // decorative passers-by (Modern); a Classic tower has none to switch (#2091).
   const passersBy = catalog.rules.decorativePassersBy;

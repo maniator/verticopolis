@@ -272,7 +272,9 @@ const SHARED_HEAD_TAGS: HtmlTagDescriptor[] = [
   { tag: "meta", attrs: { name: "twitter:card", content: "summary_large_image" }, injectTo: "head" },
   { tag: "meta", attrs: { name: "twitter:image", content: "https://verticopolis.com/og-image.png" }, injectTo: "head" },
   { tag: "meta", attrs: { name: "twitter:image:alt", content: OG_IMAGE_ALT }, injectTo: "head" },
-  { tag: "meta", attrs: { name: "theme-color", content: "#000080" }, injectTo: "head" },
+  // The Win95 window face (--r-face), so the browser's or the installed app's
+  // bar runs straight into the game's gray menu bar like one window.
+  { tag: "meta", attrs: { name: "theme-color", content: "#c0c0c0" }, injectTo: "head" },
   { tag: "link", attrs: { rel: "icon", href: "./favicon.png", type: "image/png" }, injectTo: "head" },
   { tag: "link", attrs: { rel: "apple-touch-icon", href: "./apple-touch-icon.png" }, injectTo: "head" },
 ];
@@ -413,8 +415,9 @@ export default defineConfig(({ command }) => ({
         name: "Verticopolis",
         short_name: "Verticopolis",
         description: "A browser-native SimTower clone: build a high-rise floor by floor.",
-        theme_color: "#000080",
-        background_color: "#008080",
+        // The Win95 window face (--r-face), matching the game's menu bar.
+        theme_color: "#c0c0c0",
+        background_color: "#c0c0c0",
         display: "standalone",
         orientation: "any",
         start_url: "./",

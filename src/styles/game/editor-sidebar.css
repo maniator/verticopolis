@@ -56,61 +56,12 @@
   display: none;
 }
 
-/* ---- Sidebar (each panel reads as a little window) ---- */
-#sidebar {
-  width: 232px;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  /* Scroll when the panels are taller than the viewport (e.g. a phone held
-     landscape, where it's wide enough to skip the mobile drawer layout). */
-  overflow-y: auto;
-  margin: 6px 6px 6px 0;
-  gap: 6px;
-  padding: 6px;
-}
-/* The drawer close button and dimming scrim are mobile-only. */
-#panel-close,
-#scrim {
-  display: none;
-}
-.panel {
-  padding: 0 8px 8px;
-}
-.panel.grow {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-}
-/* Panel headers are mini title bars — the .win-title idiom at panel scale. */
-.panel h3 {
-  font-size: 10px;
-  text-transform: uppercase;
-  color: var(--r-title-fg);
-  background: var(--r-title);
-  font-weight: 700;
-  margin: 0 -8px 6px;
-  padding: 2px 6px;
-}
-#tool-info {
-  font-size: 12px;
-  line-height: 1.4;
-  color: var(--r-ink);
-}
-#tool-info .ti-name {
-  font-weight: 700;
-  color: var(--r-title);
-}
+/* ---- Tower Info window (index.html #tower-win; the rest of its look is in menubar.css) ---- */
 .name-input {
   width: 100%;
   padding: 4px 6px;
   font-size: 12px;
   margin-bottom: 6px;
-}
-.wide-btn {
-  width: 100%;
-  margin-top: 8px; /* padding stays the .btn default (3px 9px), as shipped */
 }
 /* Rule-set badge: names the active tower's rule-set and, on click, opens the
    Classic vs Modern comparison. A real <button> (keyboard + pointer), styled as
@@ -132,12 +83,6 @@
 .mode-badge.is-classic {
   color: #5a3d00;
 }
-#tower-stats {
-  font-size: 12px;
-  gap: 2px 8px;
-  color: var(--r-ink);
-}
-
 /* ---- Bulletin / event log ---- */
 #log {
   flex: 1;
@@ -162,12 +107,4 @@
 .log-line.money {
   border-color: var(--money);
   color: var(--money);
-}
-.btn-row {
-  display: flex;
-  gap: 6px;
-  margin-bottom: 6px;
-}
-.btn-row .btn {
-  flex: 1; /* padding stays the .btn default (3px 9px), as shipped */
 }

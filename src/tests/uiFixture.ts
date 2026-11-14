@@ -52,7 +52,7 @@ export function mountAppDom(): void {
     </div>
     <button id="audio-toggle">🔊</button>
     <button id="btn-undo"></button><button id="btn-redo"></button>
-    <button id="panel-toggle"></button><button id="panel-close"></button><div id="scrim"></div>
+    <span class="menubar-brand"></span>
     <div id="a11y-live"></div>
     <div id="palette-tabs"></div>
     <div id="palette-scroll"></div>

@@ -8,7 +8,7 @@ import { buildScenarios, unknownScenarios, type Scenario } from "../perfCompare/
 import { startServer, type PerfServer } from "../perfCompare/server";
 import { activityTable, compareArms, comparisonTable, phaseMetrics, type Arm, type ArmRun } from "./analysis";
 import { adoptForInteraction, collectRecord, fastForwardTo, installRecorder, restoreCamera, saveCamera, setPhase } from "./pageRecorder";
-import { finishPhase, PHASES, preparePhase, runPhase, type Viewport } from "./phases";
+import { PHASES, preparePhase, runPhase, type Viewport } from "./phases";
 
 /**
  * `npm run perf:interaction`: how the live game answers a player on a big
@@ -143,7 +143,6 @@ async function runArm(ctx: RunContext, server: PerfServer, arm: Arm, rep: number
       await page.evaluate(setPhase, { name: phase, autosaveAtMs: Math.round(args.phaseMs / 2) });
       acts[phase] = await runPhase(page, phase, args.viewport, args.phaseMs, spots);
       await page.evaluate(setPhase, { name: null });
-      await finishPhase(page, phase);
       await page.evaluate(restoreCamera);
       await page.waitForTimeout(1000);
     }

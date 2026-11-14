@@ -356,9 +356,8 @@ export const FEATURE_SCENES: Scene[] = [
         // Phone-width crop of the same chip. A per-shot viewport resizes only the
         // window; it can't flip isMobile/hasTouch (those are page-creation options,
         // see runScene). That's fine HERE and only here: #topbar reflows purely on
-        // width, with no `pointer: coarse` chrome of its own (the mobile drawer /
-        // #scrim live in separate DOM), so the touch flags wouldn't change these
-        // pixels. A shot that needs real mobile chrome must live in a PHONE-viewport
+        // width, with no `pointer: coarse` chrome of its own, so the touch flags
+        // wouldn't change these pixels. A shot that needs real mobile chrome must live in a PHONE-viewport
         // *scene* instead, not just override the viewport here.
         name: "traffic-chip-mobile",
         crop: "#topbar",

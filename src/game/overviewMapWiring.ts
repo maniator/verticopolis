@@ -171,3 +171,15 @@ export function tickOverviewMap(app: GameApp): void {
 export function touchOverviewMap(app: GameApp): void {
   mapViews.get(app)?.towerTouched();
 }
+
+/** Whether the Map window is open (false on a page without it). The Tower
+ *  menu's check mark reads it as the menu opens. */
+export function overviewMapOpen(app: GameApp): boolean {
+  return windows.get(app)?.isOpen() ?? false;
+}
+
+/** Open or close the Map from the Tower menu, remembered for this layout like
+ *  the window's own button and close box. */
+export function setOverviewMapOpen(app: GameApp, open: boolean): void {
+  windows.get(app)?.setOpen(open, true);
+}

@@ -276,9 +276,7 @@ export function pgDismissSplash(): void {
   }
   const w = window as unknown as { game?: any };
   document.querySelector("#splash [data-splash='continue'], #splash [data-splash='new']")?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-  // Remove only the first-run chrome. #scrim is a PERSISTENT app element (the
-  // mobile drawer's dimming overlay, body.panels-open #scrim); deleting it would
-  // break the mobile-drawer shots, so leave it (it's inert when no panel is open).
+  // Remove only the first-run chrome; every other app element stays.
   for (const id of ["splash", "onboard"]) document.getElementById(id)?.remove();
   document.querySelectorAll("dialog[open]").forEach((d) => (d as HTMLDialogElement).close?.());
   document.querySelectorAll(".tt-pulse").forEach((n) => n.classList.remove("tt-pulse"));

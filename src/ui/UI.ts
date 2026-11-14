@@ -199,11 +199,6 @@ export class UI {
     status.onHistoryClick(this.el.undo, () => this.cb.onUndo(), () => this.cb.undoUnderWay());
     status.onHistoryClick(this.el.redo, () => this.cb.onRedo());
 
-    document.getElementById("panel-toggle")?.addEventListener("click", () => document.body.classList.toggle("panels-open"));
-    const closePanels = () => document.body.classList.remove("panels-open");
-    document.getElementById("panel-close")?.addEventListener("click", closePanels);
-    document.getElementById("scrim")?.addEventListener("click", closePanels);
-
     // Quick Save is the top-bar 💾 (index.html); null-safe so a trimmed DOM that omits it does not throw.
     document.getElementById("btn-save-top")?.addEventListener("click", () => this.cb.onSave());
     document.getElementById("btn-load")!.addEventListener("click", () => this.cb.onShowSaves(SAVES_DRAW.open));
@@ -371,8 +366,8 @@ export class UI {
     status.update(this, src);
   }
 
-  resetLog(src: HudSource): void {
-    status.resetLog(this, src);
+  resetLog(src: HudSource, greeting?: string): void {
+    status.resetLog(this, src, greeting);
   }
 
   toast(text: string, kind: LogEntry["kind"] = "info"): void {
@@ -467,6 +462,7 @@ export class UI {
   showHelp(): void { help.showHelp(this); }
   showAbout(): void { help.showAbout(this); }
   showCompare(): void { help.showCompare(this); }
+  showTowerRules(): void { help.showTowerRules(this); }
 
   showSettings(): void {
     dialogs.showSettings(this);

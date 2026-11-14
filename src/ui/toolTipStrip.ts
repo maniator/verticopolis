@@ -21,6 +21,8 @@ import { html, render, type TemplateResult } from "lit-html";
 
 /** The undo depth the card was first seen at, once a pump has read it. */
 let seenAtDepth: number | undefined;
+/** The card while it is up, so a pump with no card up does no lookup. */
+let upTip: HTMLElement | null = null;
 
 /** Show `card` as the picked tool's card, folding away any card before it. */
 export function showToolTip(card: TemplateResult, doc: Document = document): void {
@@ -31,6 +33,7 @@ export function showToolTip(card: TemplateResult, doc: Document = document): voi
     tip,
   );
   tip.hidden = false;
+  upTip = tip;
   seenAtDepth = undefined;
 }
 
@@ -38,13 +41,13 @@ export function showToolTip(card: TemplateResult, doc: Document = document): voi
 export function hideToolTip(doc: Document = document): void {
   const tip = doc.getElementById("tool-tip");
   if (tip) tip.hidden = true;
+  upTip = null;
 }
 
 /** Fold the card away once the undo depth moves from where the first pump
  *  after the pick saw it: the player placed something (or undid a step). */
 export function noteUndoDepth(depth: number, doc: Document = document): void {
-  const tip = doc.getElementById("tool-tip");
-  if (!tip || tip.hidden) return;
+  if (!upTip || upTip.hidden || upTip.ownerDocument !== doc) return;
   if (seenAtDepth === undefined) seenAtDepth = depth;
   else if (depth !== seenAtDepth) hideToolTip(doc);
 }

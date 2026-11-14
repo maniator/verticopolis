@@ -230,10 +230,37 @@
   touch-action: none; /* we handle pan/zoom ourselves */
   image-rendering: pixelated; /* crisp retro pixels, no blur */
 }
-/* Shown on the phone layout only (media-phone.css). */
-#lobby-height-strip,
-#bulldoze-drag-strip {
+/* The tool strip at the tower's bottom left: the phone's tool card
+   (#tool-tip), then the lobby height strip (#308) or the bulldoze drag strip.
+   The status bar shows the tool card on one line, so the card's choice floats
+   over the tower while the Lobby tool or the bulldozer is armed, on every
+   layout. */
+#tool-strip {
+  position: absolute;
+  left: max(10px, env(safe-area-inset-left));
+  bottom: max(10px, env(safe-area-inset-bottom));
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  max-width: min(360px, calc(100% - 20px));
+  pointer-events: none;
+}
+#tool-strip > * {
+  pointer-events: auto;
+}
+/* A desktop reads the card in the status bar; the phone block shows it. */
+#tool-tip {
   display: none;
+}
+#lobby-height-strip:not([hidden]),
+#bulldoze-drag-strip:not([hidden]) {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px;
+  font-size: 11px;
 }
 /* The picked lobby height (#308) and what a bulldoze drag clears, on the
    tool card and the phone strips. */

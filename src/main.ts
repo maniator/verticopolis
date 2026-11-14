@@ -43,6 +43,7 @@ import { gameplaySession } from "./analytics";
 import { adoptToolingSim, followToolingEdit, syncToolingSim, toolingSim } from "./game/toolingSim";
 import type { ToolingTower } from "./game/toolingTower";
 import { followEngineTower, type TowerFollow } from "./game/towerFollow";
+import { arrivalLine } from "./game/arrivalLine";
 import { ViewReader } from "./simport/viewReader";
 import { PortCodes } from "./simport/portCodes";
 import { PortEvents } from "./simport/portEvents";
@@ -280,9 +281,9 @@ class GameApp implements GameAppPorts {
     // the splash) would briefly see the full locked catalog before the throttled
     // render loop first hides the locked tools, a visible collapse/reflow. It
     // adopts the boot sim's log baseline first, the same way a swap does: the
-    // bulletin history a save carries is rendered, and none of it replays as
-    // toasts over the title screen.
-    showTower(this.ui, hudSource(this));
+    // bulletin history a save carries is rendered, none of it replays as
+    // toasts over the title screen, and an empty one opens with an arrival line.
+    showTower(this.ui, hudSource(this), arrivalLine(this.reader, "returned"));
     void this.engine.start();
 
     // Accessibility: apply reduced motion now and whenever the OS pref flips.
