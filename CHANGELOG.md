@@ -25,6 +25,11 @@ prompt already tells players it is an engine update and shows the new version.
 Entries below 1.51.1 were curated from the commit history after the fact, so they
 are documentation only: no build that a client fetches carries them.
 
+## 3.10.2
+
+- Housekeepers now come in through the lobby before their shift and leave through it at the end, and no longer appear at the Housekeeping room or vanish at a hotel room.
+- A housekeeper who finishes a room goes straight on to the nearest dirty one, and rides back to the Housekeeping room only when none is left, so a busy hotel is clean sooner in the afternoon.
+
 ## 3.10.1
 
 - The VERTICOPOLIS badge at the top left of the game now carries its ™ mark, like the title screen. So do the version line in Settings and About this game, and the sprite gallery and missing-page titles.
