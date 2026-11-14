@@ -98,12 +98,12 @@
       {"step":"play 60 minutes","kind":"play","answer":{"hour":30950},"minute":1857002.0999997498,"state":"4fc3c21c4ab05249","crowd":"851069bece147b6f","events":"4f53cda18c2baa0c","count":0},
       {"step":"play 60 minutes","kind":"play","answer":"end","minute":1857038.0999997498,"state":"bc3c33e50710397b","crowd":"9fd9e59eb01668b3","events":"4f53cda18c2baa0c","count":0},
       {"step":"move the camera again","kind":"command","answer":{"status":1,"delta":0},"minute":1857038.0999997498,"state":"bc05c8a4ef4bedee","crowd":"9fd9e59eb01668b3","events":"4f53cda18c2baa0c","count":0},
-      {"step":"restore the save from before the sale","kind":"swap","answer":{"status":1},"minute":1856978.0999997498,"state":"0498549ec864a0b9","crowd":"0586834569be8bb5","events":"4f53cda18c2baa0c","count":0},
-      {"step":"the camera after the restore","kind":"read","answer":{"tile":200,"floor":20,"zoom":1},"minute":1856978.0999997498,"state":"0498549ec864a0b9","crowd":"0586834569be8bb5","events":"4f53cda18c2baa0c","count":0},
-      {"step":"undo after the restore","kind":"history","answer":{"status":2,"notice":"Nothing to undo."},"minute":1856978.0999997498,"state":"0498549ec864a0b9","crowd":"0586834569be8bb5","events":"4f53cda18c2baa0c","count":0},
-      {"step":"play 120 minutes","kind":"play","answer":{"hour":30950},"minute":1857004.0999997498,"state":"2f569b72d179fd45","crowd":"c2c9d3189bc1a2a4","events":"4f53cda18c2baa0c","count":0},
-      {"step":"play 120 minutes","kind":"play","answer":{"hour":30951},"minute":1857064.0999997498,"state":"91a18a497497fa9b","crowd":"f3dbd92020dec15f","events":"4f53cda18c2baa0c","count":0},
-      {"step":"play 120 minutes","kind":"play","answer":"end","minute":1857104.0999997498,"state":"0be8f2b81a341cfe","crowd":"2719847b829d8e95","events":"4f53cda18c2baa0c","count":0}
+      {"step":"restore the save from before the sale","kind":"swap","answer":{"status":1},"minute":1856978.0999997498,"state":"0498549ec864a0b9","crowd":"7740442f724bc4c3","events":"4f53cda18c2baa0c","count":0},
+      {"step":"the camera after the restore","kind":"read","answer":{"tile":200,"floor":20,"zoom":1},"minute":1856978.0999997498,"state":"0498549ec864a0b9","crowd":"7740442f724bc4c3","events":"4f53cda18c2baa0c","count":0},
+      {"step":"undo after the restore","kind":"history","answer":{"status":2,"notice":"Nothing to undo."},"minute":1856978.0999997498,"state":"0498549ec864a0b9","crowd":"7740442f724bc4c3","events":"4f53cda18c2baa0c","count":0},
+      {"step":"play 120 minutes","kind":"play","answer":{"hour":30950},"minute":1857004.0999997498,"state":"562bcc2bb07cf987","crowd":"859dc1351d6ff179","events":"4f53cda18c2baa0c","count":0},
+      {"step":"play 120 minutes","kind":"play","answer":{"hour":30951},"minute":1857064.0999997498,"state":"c074b3a7a4b9abcd","crowd":"936971f12a03376e","events":"4f53cda18c2baa0c","count":0},
+      {"step":"play 120 minutes","kind":"play","answer":"end","minute":1857104.0999997498,"state":"835400480d99d6bd","crowd":"4eddf354be70c28f","events":"4f53cda18c2baa0c","count":0}
     ],
     "founded Classic game edited before play": [
       {"step":"start","kind":"start","answer":null,"minute":420,"state":"45e3a7a539643790","crowd":"dcc56617b60f174c","events":"61704aba4769df8d","count":1},
