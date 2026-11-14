@@ -352,6 +352,7 @@ impl Serialize for SavedCrowd<'_> {
         for (key, value) in c.save_head() {
             m.serialize_entry(&key, &value)?;
         }
+        c.commuters_write(&mut m)?;
         m.serialize_entry("walkIns", &Each(&c.walk_ins, walk_in_json))?;
         m.serialize_entry("people", &Each(&c.people, Person::save_form))?;
         m.end()
@@ -379,7 +380,7 @@ impl Crowd {
 
     /// The crowd's save values ahead of the walk-ins and the people: the
     /// random stream and counters a step reads back, the hour the last step
-    /// ran in, and the commuters' desks and bookings when there are any.
+    /// ran in. The commuters' desks and bookings follow them.
     fn save_head(&self) -> Map<String, Value> {
         let mut m = Map::new();
         m.insert("nextId".into(), json!(self.next_id));
@@ -399,7 +400,6 @@ impl Crowd {
                 .collect();
             m.insert("lines".into(), json!(rows));
         }
-        self.commuters_save(&mut m);
         m
     }
 
@@ -407,6 +407,7 @@ impl Crowd {
     /// writes.
     pub(crate) fn save_json(&self) -> Value {
         let mut m = self.save_head();
+        self.commuters_save(&mut m);
         let walk_ins = self.walk_ins.iter().map(walk_in_json).collect();
         m.insert("walkIns".into(), Value::Array(walk_ins));
         let people = self.people.iter().map(Person::save_form).collect();

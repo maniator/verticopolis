@@ -122,7 +122,7 @@ fn a_floor_too_full_for_canon_widths_still_loads_valid() {
         x += 12;
     }
     let sim = v1(units);
-    assert_eq!(sim.serialize()["version"], PLAIN_SAVE_VERSION);
+    assert_eq!(sim.serialize_unfolded()["version"], PLAIN_SAVE_VERSION);
     let spans: Vec<(i64, i64)> = of(&sim, Kind::FastFood)
         .iter()
         .map(|u| (u.x, u.width))
@@ -152,7 +152,7 @@ fn a_floor_that_would_float_stays_at_legacy_widths() {
     units.push(room("restaurant", 3, 0, 16));
     units.push(room("office", 3, 16, 9));
     let sim = v1(units);
-    let save = sim.serialize();
+    let save = sim.serialize_unfolded();
     assert_eq!(save["version"], PLAIN_SAVE_VERSION);
     assert_eq!(floating_structure_count(&save), 0);
     assert!(rooms(&sim).iter().all(|r| r.x + r.width <= 30));
@@ -241,7 +241,7 @@ fn the_real_towerone_6_save_migrates_within_the_rules() {
         .map(|u| (u["id"].as_i64().unwrap(), u["width"].as_i64().unwrap_or(-1)))
         .collect();
     let sim = deserialize(&raw).expect("the fixture loads");
-    let save = sim.serialize();
+    let save = sim.serialize_unfolded();
     assert_eq!(save["version"], PLAIN_SAVE_VERSION);
     let rooms = rooms(&sim);
     // Each room sits at its canon width or the width it was saved at.

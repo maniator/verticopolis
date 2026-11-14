@@ -234,13 +234,15 @@ mod tests {
         let mut compared = 0;
         for case in &lock.export {
             let save = export_case_save(case, &lock, &suite).expect("the case's save");
-            let Some(units) = save.get("units").and_then(Value::as_array) else {
+            // The streamed build takes the tower's own units, one per tile,
+            // so a case's floor runs are unfolded for it.
+            let Some(units) = crate::load::unfolded_units(&save) else {
                 continue;
             };
             let mut rest = save.clone();
             rest.as_object_mut().expect("an object").remove("units");
             let whole = build_tdt(&save);
-            let streamed = build_tdt_streamed(&rest, units.iter());
+            let streamed = build_tdt_streamed(&rest, units);
             match (whole, streamed) {
                 (Ok(a), Ok(b)) => {
                     assert_eq!(a.bytes, b.bytes, "{}: the bytes", case.id);

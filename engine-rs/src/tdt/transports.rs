@@ -53,6 +53,11 @@ impl OutTransport {
         if let Some(s) = &self.skip_floors {
             m.insert("skipFloors".into(), json!(s));
         }
+        // The file's basement skips on an express are its own: the marker
+        // tells every loader (`fromSave` included) to keep them.
+        if self.kind == Kind::ElevatorExpress {
+            m.insert("preserveBasementStops".into(), json!(true));
+        }
         Value::Object(m)
     }
 }

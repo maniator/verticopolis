@@ -4,6 +4,7 @@ import { catalogFor } from "../catalogFixture";
 import { wasm } from "../conformance/wasmEngine";
 import { parseEngineIdentity, readEngineIdentity } from "../../wasmhost/engineIdentity";
 import { PortSim, describeEngines, type Leg } from "../portKit/portSim";
+import { unfoldFloorRuns } from "../../shared/floorRuns";
 
 /**
  * Save fields the engine reads and writes back, through the port on both
@@ -15,6 +16,8 @@ import { PortSim, describeEngines, type Leg } from "../portKit/portSim";
  */
 
 type Save = Record<string, unknown> & { units: unknown[] };
+/** A save entry as `unfoldFloorRuns` reads it. */
+type Tile = { id: number; kind: string; x: number; run?: number };
 
 /** The save of a small office tower after five hours on `leg`. */
 function playedSave(leg: Leg): Save {
@@ -166,18 +169,25 @@ describeEngines("save fields the engine keeps across a load", (leg: Leg) => {
     const data = resave(leg, played);
     const population = load(leg, data).state.tower.totalPopulation();
     expect(population, "the office is tenanted, so the population check can fail").toBeGreaterThan(0);
+    // A version 3 save lists every floor tile on its own (floor runs came in
+    // version 11).
+    data.units = unfoldFloorRuns(data.units as Tile[]);
     data.version = 3;
     const beforeUnits = JSON.stringify(data.units);
     const sim = load(leg, data);
     const after = JSON.parse(sim.save()) as Save;
-    // No tall lobby (#308), so the engine stamps the plain format from before tall lobbies.
-    expect(after.version).toBe(7);
-    expect(parseEngineIdentity(readEngineIdentity(wasm()))!.saveVersion).toBeGreaterThan(7);
+    // The office's floor row folds into a run, so the engine stamps the
+    // floor-run version, which is this build's newest.
+    const newest = parseEngineIdentity(readEngineIdentity(wasm()))!.saveVersion;
+    expect(newest).toBeGreaterThan(7);
+    expect(after.version).toBe(newest);
     expect(after.money).toBe(data.money);
     expect(sim.state.tower.totalPopulation()).toBe(population);
-    // Units survive the hop byte-for-byte (only the version stamp changed),
-    // compared in the key order the same engine writes.
-    expect(JSON.stringify(after.units)).toBe(beforeUnits);
+    // Units survive the hop byte-for-byte once the runs are unfolded (only
+    // the version stamp changed), compared in the key order the same engine
+    // writes.
+    expect(after.units.length).toBeLessThan(data.units.length);
+    expect(JSON.stringify(unfoldFloorRuns(after.units as Tile[]))).toBe(beforeUnits);
     expect(after.transports).toEqual(data.transports);
   });
 });

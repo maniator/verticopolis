@@ -86,7 +86,7 @@ pub enum Kind {
     ElevatorStandard,
     /// Service Elevator. Staff only.
     ElevatorService,
-    /// Express Elevator. Stops only at lobbies and the floors it is set to serve, and spans the whole tower.
+    /// Express Elevator. Stops at the lobbies and every basement floor it passes (a basement stop can be turned off), and spans the whole tower.
     ElevatorExpress,
     /// Parking Ramp.
     ParkingRamp,
@@ -436,6 +436,18 @@ pub fn pools_for(mode: crate::clock::GameMode) -> impl Iterator<Item = &'static 
 #[doc(hidden)]
 pub fn is_lobby_floor(floor: i64) -> bool {
     floor == 1 || (floor > 1 && floor % LOBBY_INTERVAL == 0)
+}
+
+/// Whether `floor` is below the ground floor (B1 is floor 0).
+#[doc(hidden)]
+pub fn is_basement(floor: i64) -> bool {
+    floor < 1
+}
+
+/// Whether a stop-list entry names a basement floor. A fraction matches no
+/// floor and is left as the save wrote it.
+pub(crate) fn is_basement_stop(f: f64) -> bool {
+    f.fract() == 0.0 && is_basement(f as i64)
 }
 
 #[doc(hidden)]

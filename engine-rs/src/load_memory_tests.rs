@@ -77,9 +77,11 @@ const OFFICE_XS: std::ops::Range<i64> = 3..360;
 const OFFICE_STEP: usize = 9;
 /// How many blockbuster cinemas and milestones it carries, and the length of
 /// its name and of its pending choice's message: the loader keeps any number
-/// of each, and any length.
+/// of each, and any length. `LONG` also sets where the save's text lands:
+/// about 0.9 MiB, well inside its 1 MiB buffer, so the bounds below do not
+/// sit on the buffer's doubling.
 const MANY: usize = 2_000;
-const LONG: usize = 80_000;
+const LONG: usize = 20_000;
 
 /// The pool a transport kind counts against.
 fn pool_of(kind: Kind) -> &'static Pool {
@@ -296,7 +298,7 @@ fn the_binding_saves_without_the_tree() {
 /// What the save builds beside its text: the top-level values it owns, and
 /// one list element at a time. It measures 4 to 5 KiB on `large_save`,
 /// where any one of its lists, its name or its pending choice held or built
-/// whole takes 80 KiB or more.
+/// whole takes more than `SLACK`.
 const SLACK: isize = 16 << 10;
 
 /// A save's text sits in a buffer under twice its length, and the save

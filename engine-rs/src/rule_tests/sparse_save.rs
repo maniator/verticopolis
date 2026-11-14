@@ -85,7 +85,7 @@ fn reload(save: &Value) -> Simulation {
 
 #[test]
 fn a_plain_floor_tile_writes_only_its_place() {
-    let save = sample().serialize();
+    let save = sample().serialize_unfolded();
     let mut keys: Vec<&String> = unit_of(&save, "floor").keys().collect();
     keys.sort();
     assert_eq!(keys, ["floor", "id", "kind", "x"]);
@@ -126,7 +126,11 @@ fn a_room_keeps_its_width_and_every_field_it_sets() {
 
 #[test]
 fn a_sparse_save_loads_as_its_full_shape_twin_and_round_trips() {
-    let sparse = sample().serialize();
+    let mut sim = sample();
+    // A played Modern tower has a desk for every office with workers in it;
+    // the load squares them the same way, so save, load, save stays put.
+    crate::crowd::commuters::reconcile(&mut sim.crowd, &mut sim.tower);
+    let sparse = sim.serialize();
     let mut full = sparse.clone();
     full["units"] = Value::Array(
         sparse["units"]
@@ -269,7 +273,7 @@ fn a_forged_wide_floor_tile_clamps_and_a_room_keeps_its_width() {
 #[test]
 fn the_real_towerone_6_tower_saves_under_half_its_full_shape() {
     let sim = reload(&fixture_save("towerone_6"));
-    let sparse = sim.serialize();
+    let sparse = sim.serialize_unfolded();
     assert_eq!(sparse["version"], PLAIN_SAVE_VERSION);
     let mut full = sparse.clone();
     full["units"] = Value::Array(
@@ -283,7 +287,7 @@ fn the_real_towerone_6_tower_saves_under_half_its_full_shape() {
     let (sparse_len, full_len) = (sparse.to_string().len(), full.to_string().len());
     assert!(sparse_len * 2 < full_len, "{sparse_len} against {full_len}");
     let reloaded = reload(&sparse);
-    assert_eq!(reloaded.serialize(), sparse);
+    assert_eq!(reloaded.serialize_unfolded(), sparse);
     assert_eq!(reloaded.population(), sim.population());
     assert_eq!(reloaded.money, sim.money);
     assert_eq!(

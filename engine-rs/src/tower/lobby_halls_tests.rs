@@ -249,7 +249,7 @@ fn halls_round_trip_through_the_save_as_runs() {
     let mut sim = split_tower();
     hall(&mut sim, 3, 100..110);
     hall(&mut sim, 2, 111..121);
-    let save = sim.serialize();
+    let save = sim.serialize_unfolded();
     assert_eq!(save["version"], json!(TALL_LOBBY_SAVE_VERSION));
     assert_eq!(
         save["lobbyHeights"],
@@ -257,7 +257,7 @@ fn halls_round_trip_through_the_save_as_runs() {
     );
     let back = deserialize(&save).unwrap();
     assert_eq!(runs(&back), runs(&sim));
-    assert_eq!(back.serialize()["units"], save["units"]);
+    assert_eq!(back.serialize_unfolded()["units"], save["units"]);
 }
 
 /// `sim`'s save with `lobbyHeights` set to `heights` at `version`, loaded.

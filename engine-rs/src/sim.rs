@@ -51,30 +51,30 @@ pub struct MoveIns {
 /// from before tall lobbies refuses rather than drop, and
 /// [`PLAIN_SAVE_VERSION`] otherwise, which every build from version 7 on
 /// still loads. Version 10 adds an elevator schedule's `heldBack` hours
-/// (#1546), which a save carries only when a car sold left a cut-back hour
-/// at the whole fleet's size.
-pub const SAVE_VERSION: i64 = 10;
+/// (#1546), held when a sold car left a cut-back hour at the fleet's size.
+/// Version 11 folds floor tiles into runs (`save_floor_runs`).
+pub const SAVE_VERSION: i64 = 11;
+/// The version a save with a held hour and no floor run is written at.
+pub const HELD_HOURS_SAVE_VERSION: i64 = 10;
 /// The version a save with a tall lobby and no held hour is written at.
 pub const TALL_LOBBY_SAVE_VERSION: i64 = 9;
 /// The version a save with no tall lobby is written at: the format before
 /// `lobbyHeights`, which it does not need.
 pub const PLAIN_SAVE_VERSION: i64 = 7;
 
-/// The version a save with no held hour is stamped with:
-/// [`TALL_LOBBY_SAVE_VERSION`] when it holds a tall lobby,
-/// [`PLAIN_SAVE_VERSION`] when it does not. [`stamped_save_version`] also
-/// weighs the held hours.
+/// A save with no held hour is stamped [`TALL_LOBBY_SAVE_VERSION`] with a tall
+/// lobby, else [`PLAIN_SAVE_VERSION`]; [`stamped_save_version`] also weighs the
+/// held hours.
 pub fn save_version(has_tall_lobby: bool) -> i64 {
     stamped_save_version(has_tall_lobby, false)
 }
 
-/// The version a save is stamped with: [`SAVE_VERSION`] when an elevator
-/// schedule holds an hour back (an older build would run the whole fleet
-/// there), [`TALL_LOBBY_SAVE_VERSION`] when it holds a tall lobby, and
-/// [`PLAIN_SAVE_VERSION`] when it holds neither.
+/// A save with no floor run is stamped [`HELD_HOURS_SAVE_VERSION`] when a
+/// schedule holds an hour back (an older build runs the whole fleet there),
+/// else [`TALL_LOBBY_SAVE_VERSION`] with a tall lobby, else [`PLAIN_SAVE_VERSION`].
 pub fn stamped_save_version(has_tall_lobby: bool, holds_an_hour_back: bool) -> i64 {
     if holds_an_hour_back {
-        SAVE_VERSION
+        HELD_HOURS_SAVE_VERSION
     } else if has_tall_lobby {
         TALL_LOBBY_SAVE_VERSION
     } else {

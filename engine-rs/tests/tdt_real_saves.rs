@@ -375,19 +375,28 @@ fn imported_basement_express_stops_survive_repeated_save_round_trips_for_all_ski
         assert_eq!(twice_skips, expected, "{case}: second reload");
     }
 
-    // Older app-generated shafts do not acquire imported-stop provenance.
+    // A save from before express shafts stopped in the basements (no
+    // marker) loads with every basement stop on and gains the marker; its
+    // own skip above ground stays.
     let mut old = original.clone();
-    old["transports"][index]["skipFloors"] = json!([sky_skip]);
+    old["transports"][index]["skipFloors"] = json!([basement_skip, sky_skip]);
+    // The importer marks every express; an older save has no marker.
+    old["transports"][index]
+        .as_object_mut()
+        .unwrap()
+        .remove("preserveBasementStops");
     let legacy = deserialize(&old).expect("old save");
     let (legacy_marked, legacy_skips) = pick(&legacy);
-    assert!(!legacy_marked);
-    assert!(legacy_skips.contains(&(basement_skip as f64)));
+    assert!(legacy_marked, "the load marks an old express");
+    assert!(!legacy_skips.contains(&(basement_skip as f64)));
+    assert!(legacy_skips.contains(&(sky_skip as f64)));
 
-    // Modern cannot claim imported-Classic basement-stop provenance.
+    // A marked shaft keeps a basement stop the player turned off, in
+    // Modern as in Classic.
     old["mode"] = json!("modern");
     old["transports"][index]["preserveBasementStops"] = json!(true);
     let modern = deserialize(&old).expect("modern save");
     let (modern_marked, modern_skips) = pick(&modern);
-    assert!(!modern_marked);
+    assert!(modern_marked);
     assert!(modern_skips.contains(&(basement_skip as f64)));
 }

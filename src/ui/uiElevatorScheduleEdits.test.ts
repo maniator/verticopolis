@@ -342,11 +342,12 @@ describe("live stop edits", () => {
     expect(ctx.announce).not.toHaveBeenCalled();
   });
 
-  it("shows an express shaft's stops as a fact, with no toggles", () => {
+  it("shows an express shaft's stops above ground as a fact, with no toggles", () => {
     open({ isExpress: true });
     expect(Array.from(dialog().querySelectorAll(".es-hint")).map((p) => p.textContent)).toContain("Serves all lobbies and sky lobbies");
     expect(q("input[type=checkbox]")).toBeNull();
-    expect(q(".es-always")).toBeNull();
+    // Its endpoints and lobbies show the fixed check instead.
+    expect(q(".es-always")).not.toBeNull();
     expect(Array.from(dialog().querySelectorAll("button")).some((b) => b.textContent === "Express (lobbies)")).toBe(false);
   });
 });

@@ -11,9 +11,15 @@ use crate::sim::{stamped_save_version, LogKind};
 use std::collections::HashSet;
 
 fn same(sim: &Simulation, what: &str) {
-    let text = reference(sim).to_string();
-    assert_eq!(sim.save_text(), text, "{what}: the text");
-    assert_eq!(sim.serialize().to_string(), text, "{what}: the tree");
+    // The unfolded tree is the reference's shape exactly; the save the
+    // writers write folds floor runs, and both writers fold them the same.
+    assert_eq!(
+        sim.serialize_unfolded().to_string(),
+        reference(sim).to_string(),
+        "{what}: unfolded"
+    );
+    let text = sim.serialize().to_string();
+    assert_eq!(sim.save_text(), text, "{what}: the text and the tree");
 }
 
 /// `serialize()` as it was before #1242, kept verbatim (but for `self`, and
@@ -248,7 +254,7 @@ fn edited_games_write_the_trees_text() {
     sim.milestones = (0..20)
         .map(|i| format!("goal {i} \"\u{1F3E2}\" \\"))
         .collect();
-    let keys: Vec<&str> = sim.save_fields().iter().map(|(k, _)| *k).collect();
+    let keys: Vec<&str> = sim.save_fields(true).iter().map(|(k, _)| *k).collect();
     let distinct: HashSet<&str> = keys.iter().copied().collect();
     assert_eq!(
         (keys.len(), distinct.len()),
@@ -310,18 +316,28 @@ fn fixture_towers_write_the_trees_text() {
 }
 
 /// The `.TDT` export's split (#1431) holds every field of `serialize()`: the
-/// tree without `units`, and the units as the tree has them.
+/// tree without `units`, and every unit on its own, as the unfolded save
+/// lists them (a row of floor tiles is one run in the tree).
 #[test]
 fn the_save_without_units_and_its_units_are_the_trees_save() {
+    let mut row = played(GameMode::Classic);
+    for x in 160..200 {
+        assert!(row.tower.place(Kind::Lobby, 1, x).ok);
+    }
+    for x in 160..200 {
+        assert!(row.tower.place(Kind::Floor, 2, x).ok);
+    }
+    assert!(row.tower.lists_a_floor_run(), "the row is a floor run");
     for sim in [
         Simulation::new(1, GameMode::Classic, CalendarKind::RealWorld, true),
         played(GameMode::Classic),
         played(GameMode::Modern),
+        row,
     ] {
         let whole = sim.serialize();
         let (mut rest, units) = sim.save_without_units();
         let units: Vec<Value> = units.collect();
-        assert_eq!(Value::Array(units), whole["units"]);
+        assert_eq!(Value::Array(units), sim.serialize_unfolded()["units"]);
         // The `.TDT` export reads neither the people nor the cars' timers.
         assert!(rest.get("crowd").is_none() && rest.get("dispatch").is_none());
         for key in ["units", "crowd", "dispatch"] {

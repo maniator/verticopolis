@@ -84,6 +84,24 @@ describe.skipIf(!hasWasmPackage())("the tooling harnesses' tower", () => {
     expect(events).toEqual(["bulletin", "followEdit"]);
   });
 
+  it("lists and patches each tile of a floor row the save folds into a run", async () => {
+    const { app: a, engine, saved } = app();
+    const sim = toolingSim(a)!;
+    for (let x = 150; x < 200; x++) expect(sim.tower.place("lobby", 1, x), `lobby at ${x}`).toMatchObject({ ok: true });
+    for (let x = 150; x < 200; x++) expect(sim.tower.place("floor", 2, x), `floor at ${x}`).toMatchObject({ ok: true });
+    await Promise.resolve();
+    type Tile = Unit & { x: number; run?: number; label?: string };
+    const floorEntries = () => (saved().units as Tile[]).filter((u) => u.kind === "floor").map((u) => [u.x, u.run ?? 1, u.label ?? null]);
+    expect(floorEntries()).toEqual([[150, 50, null]]);
+    const tiles = sim.tower.units.filter((u) => u.kind === "floor") as unknown as Tile[];
+    expect(tiles.map((u) => u.x)).toEqual(Array.from({ length: 50 }, (_, i) => 150 + i));
+    // The save itself stays as the engine writes it, runs and all.
+    expect(sim.serialize()).toEqual(JSON.parse(engine.serialize()));
+    tiles[25].label = "Mezzanine";
+    await Promise.resolve();
+    expect(floorEntries()).toEqual([[150, 25, null], [175, 1, "Mezzanine"], [176, 24, null]]);
+  });
+
   it("runs a command, a tick and a money write on the engine, with no load", () => {
     const { app: a, restore, saved } = app();
     const sim = toolingSim(a)!;
@@ -247,21 +265,22 @@ describe.skipIf(!hasWasmPackage())("the tooling harnesses' tower", () => {
     const live = toolingSim(a)!;
     const held = bulletin(a.enginePort as unknown as HudSource["port"]);
     expect(held.length).toBeGreaterThan(0);
-    // The load numbers the engine's log from nothing; the lines read before it stay.
+    // The load keeps the engine's saved lines, numbered from 1, and the
+    // bulletin shows the same lines read before it.
     adoptToolingSim(a, live, true);
-    expect(bulletin(a.enginePort as unknown as HudSource["port"])).toEqual([]);
+    expect(bulletin(a.enginePort as unknown as HudSource["port"])).toEqual(held);
     expect(bulletin(a.ui.resetLog.mock.calls[0][0].port)).toEqual(held);
   });
 
-  it("keeps the lines an earlier load dropped when the app's own tower is handed back to it", async () => {
+  it("keeps the bulletin through an edit's load and when the app's own tower is handed back to it", async () => {
     const { app: a } = app();
     const live = toolingSim(a)!;
     const held = bulletin(a.enginePort as unknown as HudSource["port"]);
     expect(held.length).toBeGreaterThan(0);
-    // An edit loads at the end of the task, which numbers the engine's log from nothing.
+    // An edit loads at the end of the task, and the engine keeps the saved lines.
     live.star = 2;
     await Promise.resolve();
-    expect(bulletin(a.enginePort as unknown as HudSource["port"])).toEqual([]);
+    expect(bulletin(a.enginePort as unknown as HudSource["port"])).toEqual(held);
     adoptToolingSim(a, live, true);
     expect(bulletin(a.ui.resetLog.mock.calls[0][0].port)).toEqual(held);
     // A second hand-back still shows them.

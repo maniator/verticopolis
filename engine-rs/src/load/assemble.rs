@@ -153,6 +153,10 @@ pub(crate) fn assemble(
     sim.ledger = Ledger::restore(data.get("ledger"));
     sim.view = coerce_view(data.get("view"));
     sim.log = coerce_log(data.get("log"));
+    // The loaded lines are the newest ones the tower has written, numbered up
+    // to the counter, so a host that reads the lines after 0 (the Bulletin
+    // after a load, an import or an undo) gets every one of them.
+    sim.log_seq = sim.log.len() as i64;
 
     widen_legacy_wedding_hall(&mut units);
     drop_overlapping_units(&mut units, &mut unit_ids);
@@ -251,9 +255,7 @@ pub(crate) fn assemble(
                     .unwrap_or(0.0)
                     .clamp(-MAX_SAFE_INTEGER, MAX_SAFE_INTEGER) as i64,
                 skip_floors,
-                preserve_basement_stops: mode.keeps_preserved_basement_stops()
-                    && kind == Kind::ElevatorExpress
-                    && bottom < 0
+                preserve_basement_stops: kind == Kind::ElevatorExpress
                     && t.get("preserveBasementStops").and_then(Value::as_bool) == Some(true),
                 schedule: Schedule::coerce(t.get("schedule"), cars, bottom, top),
                 rides: 0,
@@ -438,5 +440,9 @@ pub(crate) fn assemble(
     if let Some(cars) = data.get("dispatch") {
         sim.elevators.restore(cars, &sim.tower);
     }
+    // The saved office head counts are the workers at their desks, so a
+    // bulldoze before the first step still sends them out. Both readers
+    // come through here, so they square the desks the same way.
+    crate::crowd::commuters::reconcile(&mut sim.crowd, &mut sim.tower);
     sim
 }

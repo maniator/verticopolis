@@ -65,7 +65,10 @@ fn a_reload_restores_the_bulletin_and_never_replays_it() {
     assert_eq!(texts(&loaded), ["VIP arriving Thursday.", "Office leased."]);
     let kinds: Vec<LogKind> = loaded.log.iter().map(|e| e.kind).collect();
     assert_eq!(kinds, [LogKind::Info, LogKind::Good]);
-    assert_eq!(loaded.log_seq, 0, "restored lines never toast");
+    // The restored lines are numbered up to the counter, so a host reading
+    // the lines after 0 shows them all; the host takes the newest number as
+    // its cursor (`resetLog`), so they never toast.
+    assert_eq!(loaded.log_seq, 2, "the restored lines are numbered 1 and 2");
 }
 
 #[test]

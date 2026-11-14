@@ -200,7 +200,7 @@ shapes for each one.
 | `towerStats()` | The headline counters as JSON: population, money, star rating, offices, condos, hotel rooms, floors, elevators and so on. |
 | `unitAt(floor, x)`, `unitDetail(id)` | The room covering a tile, and the inspector card for one room. |
 | `drainGameplayEvents()` | The gameplay events since the last drain, oldest first, as `[{ name, payload }]` (`facility_placed`, `star_reached`, `fire_started`, `milestone_reached` and the rest). The names and payloads are listed in [`engine-rs/src/gameplay/catalog.json`](https://github.com/maniator/verticopolis/blob/main/engine-rs/src/gameplay/catalog.json). Drain after each frame; the buffer is bounded and `gameplayEventsDropped()` counts what it had to drop. |
-| `logSince(seq)` | The tower's message log after entry `seq`, as `[{ seq, minute, text, kind }]`. |
+| `logSince(seq)` | The tower's message log after entry `seq`, as `[{ seq, minute, text, kind }]`. A loaded tower's saved lines are numbered from 1, so `logSince(0)` lists every one of them. |
 | `viewLayout()`, `viewStructure()`, `viewFrame(full)` | The renderer's view, for a host that draws the tower every frame: the layout names every slot as JSON; the structure (floors, rooms, shafts) and the per-frame state (clock, people, changed rooms, cars) come as flat number arrays read through it. |
 | `personCard(id)` | One walking person's trip, for a host's person card: why they are out (a code in the layout's `personPurposes`), where the leg they are on began and where it ends (each a code in `tripPlaces` with the room's id and kind, or the floor), a housekeeper's step (`shiftSteps`), and their wait. The layout's `personCard` record names the slots. Empty once the person has left the tower. Read it while the card is open; the frame carries none of it. |
 | `setPeopleWindow(floorLo, floorHi, xLo, xHi)` | The floors and tiles on screen, so the next `viewFrame` calls carry only the people there (padded so every rider of a car on screen comes along). A number that is not finite clears it. It is the camera only: the game steps every person and nothing saves it. |
@@ -252,7 +252,12 @@ builds them, for the web game's own tests and tooling.
   A version 8 save, which gave each floor one height, still loads. A save is
   version 10 when an elevator schedule holds back an hour the player cut back
   that a car sold since left at the whole fleet's size, so a car bought back
-  does not join it.
+  does not join it. A save is version 11 when it folds a row of plain floor
+  tiles into one entry: `{"id":43,"kind":"floor","floor":2,"x":167,"run":60}`
+  stands for 60 tiles at x 167 to 226 with ids 43 to 102. Most built towers
+  have such a row, and folding them about halves a large save. Read a save's
+  units through the engine; a tool that reads the JSON itself unfolds each
+  `run` in place.
 
 ## Versioning
 

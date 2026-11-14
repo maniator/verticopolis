@@ -338,7 +338,7 @@ export interface Transport {
   load: number;
   /** Floors this transport is configured NOT to stop at (express service). */
   skipFloors?: number[];
-  /** Only a PC TDT-imported Classic express shaft may preserve authored basement stops. */
+  /** An express whose basement skips are its own (the player's or an imported TDT's); a save without it had them set by the old lobby-only rule, and a load clears them. */
   preserveBasementStops?: boolean;
   /** Optional per-shaft manual schedule (elevator-scheduling, #305); absent means today's automatic dispatch. Type and helpers live in the `elevatorSchedule` leaf. */
   schedule?: ElevatorSchedule;
@@ -361,6 +361,9 @@ export interface SerializedUnit extends Omit<Unit, "width" | "state" | "satisfac
   everOccupied?: boolean;
   pendingIncome?: number;
   label?: string;
+  /** Version 11: on a plain floor tile, how many tiles in a row this entry
+   *  stands for, with the next ids (see `shared/floorRuns`). */
+  run?: number;
 }
 
 /** One bulletin-log line. Lives here (not in Simulation.ts) because the save

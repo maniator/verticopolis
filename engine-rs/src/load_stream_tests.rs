@@ -320,7 +320,9 @@ fn order_version_and_mode() {
     assert!(same(&text.replacen("\"version\":7", "\"version\":8", 1)));
     assert!(same(&text.replacen("\"version\":7", "\"version\":9", 1)));
     assert!(same(&text.replacen("\"version\":7", "\"version\":10", 1)));
-    for version in ["6", "11", "\"7\"", "7.5", "null"] {
+    // 11 too: floor runs, which both readers unfold (`load::floor_runs`).
+    assert!(same(&text.replacen("\"version\":7", "\"version\":11", 1)));
+    for version in ["6", "12", "\"7\"", "7.5", "null"] {
         assert!(!same(&patched(&save, |m| {
             m["version"] = serde_json::from_str(version).unwrap();
         })));

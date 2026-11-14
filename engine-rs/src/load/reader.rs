@@ -34,14 +34,12 @@ pub fn deserialize(raw: &Value) -> Result<Simulation, String> {
 }
 
 /// [`deserialize`] for a save that [`import_tdt`](crate::import_tdt) made from
-/// a 1994 `.TDT` file. It also keeps the basement stops of the original's
-/// express elevators, which a normal load would drop.
+/// a 1994 `.TDT` file. It also keeps the basement floors the original's
+/// express elevators skip, which a normal load of a shaft without
+/// `preserveBasementStops` would turn back on.
 #[doc(hidden)]
 pub fn deserialize_tdt(raw: &Value) -> Result<Simulation, String> {
     let mut sim = deserialize(raw)?;
-    if sim.mode != GameMode::Classic {
-        return Ok(sim);
-    }
     let Some(source) = raw.get("transports").and_then(Value::as_array) else {
         return Ok(sim);
     };
@@ -67,17 +65,28 @@ pub fn deserialize_tdt(raw: &Value) -> Result<Simulation, String> {
             .filter_map(Value::as_f64)
             .filter(|v| v.is_finite())
             .collect();
-        let Some(skips) = shaft.skip_floors.as_mut() else {
-            continue;
-        };
-        // Mark only shafts actually read from the original TDT. The marker
-        // remains on ordinary .vctower saves and is checked during reload.
+        // The load cleared the basement skips and marked the shaft; put back
+        // the ones the file wrote, inside the span. The marker stays on the
+        // .vctower saves made from here, so a reload keeps them.
         shaft.preserve_basement_stops = true;
-        let before = skips.len();
-        // Only remove basement skips added by general load normalization.
-        // Authored underground skips and all above-ground rules survive.
-        skips.retain(|floor| *floor > 0.0 || saved_skips.contains(floor));
-        changed |= skips.len() != before;
+        let (bottom, top) = (shaft.bottom as f64, shaft.top as f64);
+        let have = shaft.skip_floors.as_deref().unwrap_or(&[]);
+        let mut back: Vec<f64> = saved_skips
+            .iter()
+            .copied()
+            .filter(|&floor| crate::facilities::is_basement_stop(floor))
+            .filter(|&floor| floor > bottom && floor < top && !have.contains(&floor))
+            .collect();
+        back.dedup();
+        if back.is_empty() {
+            continue;
+        }
+        // A shaft whose load left no skip list still takes the file's own.
+        let skips = shaft.skip_floors.get_or_insert_with(Vec::new);
+        skips.extend(back);
+        skips.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+        skips.dedup();
+        changed = true;
     }
     if changed {
         sim.tower.revision += 1;
@@ -112,18 +121,21 @@ pub fn deserialize_owned(raw: Value) -> Result<Simulation, String> {
     let written = founder_keys(&raw);
     let mut data = migrate_save_owned(raw);
     let modern = data.get("mode").and_then(Value::as_str) == Some("modern");
+    let runs = reads_floor_runs(version_of(&data));
     let listed = match data.get_mut("units") {
         Some(Value::Array(units)) => std::mem::take(units),
         _ => Vec::new(),
     };
-    // The entries `unit_from_value` keeps, counted before any unit is built,
-    // so a save past the cap is refused first and the rest fill vectors of
-    // their exact size.
-    let kept = listed
-        .iter()
-        .filter(|u| kind_of(u).is_some())
-        .take(UNIT_CAP + 1)
-        .count();
+    // The entries `unit_from_value` keeps, counted before any unit is built
+    // (a floor run counts each of its tiles), so a save past the cap is
+    // refused first and the rest fill vectors of their exact size.
+    let mut kept = 0usize;
+    for u in listed.iter().filter(|u| kind_of(u).is_some()) {
+        kept += listed_units(u, runs);
+        if kept > UNIT_CAP {
+            break;
+        }
+    }
     if kept > UNIT_CAP {
         return Err(format!(
             "This save lists more than {UNIT_CAP} units, more than the whole lot can hold, so it cannot be a real tower."
@@ -132,17 +144,16 @@ pub fn deserialize_owned(raw: Value) -> Result<Simulation, String> {
     let mut units = Vec::with_capacity(kept + unit_list_headroom(kept));
     let mut ids = Vec::with_capacity(kept);
     for entry in listed {
-        if let Some((unit, id)) = unit_from_value(&entry, modern) {
-            units.push(unit);
-            ids.push(id);
-        }
+        each_listed_unit(&entry, runs, |tile| {
+            if let Some((unit, id)) = unit_from_value(tile, modern) {
+                units.push(unit);
+                ids.push(id);
+            }
+            true
+        });
     }
     debug_assert_eq!(units.len(), kept, "unit_from_value skipped a counted entry");
-    let mut sim = assemble(&data, units, ids, &written);
-    // The saved office head counts are the workers at their desks, so a
-    // bulldoze before the first step still sends them out.
-    crate::crowd::commuters::reconcile(&mut sim.crowd, &mut sim.tower);
-    Ok(sim)
+    Ok(assemble(&data, units, ids, &written))
 }
 
 /// The keys `detect_founder` reads off a save.

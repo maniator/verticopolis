@@ -122,6 +122,17 @@ impl Engine {
         self.sim.tower.is_floor_served(floor.into())
     }
 
+    /// Tooling only: the save with every unit listed on its own and the
+    /// version a plain list is stamped with (`Simulation::serialize_unfolded`),
+    /// the form the conformance state view and checkpoint detail hash, so a
+    /// harness that hashes a save itself matches the engine's own hashes
+    /// whatever the floor runs (`save_floor_runs`) fold.
+    #[cfg(feature = "tooling")]
+    #[wasm_bindgen(js_name = serializeUnfolded)]
+    pub fn serialize_unfolded(&self) -> String {
+        self.sim.serialize_unfolded().to_string()
+    }
+
     /// Tooling only: the highest floor anything stands on.
     #[wasm_bindgen(js_name = highestFloor)]
     pub fn highest_floor(&self) -> f64 {
