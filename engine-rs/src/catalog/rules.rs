@@ -42,6 +42,10 @@ pub struct Rules {
     /// upper left with a four-frame walk, and rooms shaded to match. When
     /// false it keeps the flat 1994 look, with a two-frame walk.
     pub shaded_look: bool,
+    /// Whether a frontend draws a one-story stair or escalator beside a
+    /// venue as a spiral staircase or a switchback escalator. Drawing only;
+    /// when false every one-story flight is drawn straight, as in 1994.
+    pub venue_flights: bool,
     /// How long, in seconds, a person waits before the wait counts as stress
     /// and the frontend shows them fed up (red). The same in both modes.
     pub fed_up_wait: f64,
