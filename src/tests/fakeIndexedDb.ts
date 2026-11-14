@@ -105,7 +105,7 @@ class FakeTransaction {
         return;
       }
       for (const change of this.writes) change();
-      this.factory.commits++;
+      if (this.mode === "readwrite") this.factory.commits++;
       this.oncomplete?.();
     }, 0);
   }
@@ -148,7 +148,7 @@ export class FakeIndexedDb {
   lastDb: FakeDatabase | null = null;
   failWrites = false;
   dropWrites = false;
-  /** Transactions that committed, to tell when the store wrote. */
+  /** Read-write transactions that committed, to tell when the store wrote. */
   commits = 0;
   private readonly dbs = new Map<string, { version: number; db: FakeDatabase }>();
 

@@ -300,3 +300,143 @@ describe("another tab", () => {
     expect(saveStore.get("not a save")).toBeNull();
   });
 });
+
+describe("regressions", () => {
+  it("a second open answers true and opens nothing more", async () => {
+    expect(await open()).toBe(true);
+    const db = fake.lastDb;
+    expect(await open()).toBe(true);
+    expect(fake.lastDb).toBe(db);
+  });
+
+  it("keeps a large compressed save byte for byte as its raw bytes", async () => {
+    const bytes = Uint8Array.from({ length: 300_000 }, (_, i) => (i * 7919) % 256);
+    const value = STORE_MAGIC + toBase64(bytes);
+    await open();
+    saveStore.set(SLOT, value);
+    await saveStore.settled();
+    const row = fake.row("verticopolis", "saves", SLOT) as { packed: Uint8Array };
+    expect(row.packed.length).toBe(bytes.length);
+    await reopen();
+    expect(saveStore.get(SLOT)).toBe(value);
+  });
+
+  it("keeps a damaged compressed value as its text, so it reads back byte for byte", async () => {
+    await open();
+    for (const value of [STORE_MAGIC + "not base64!", STORE_MAGIC + "abc", STORE_MAGIC + "QQ==\n"]) {
+      saveStore.set(SLOT, value);
+      await saveStore.settled();
+      expect(fake.row("verticopolis", "saves", SLOT)).toEqual({ text: value });
+      await reopen();
+      expect(saveStore.get(SLOT)).toBe(value);
+    }
+  });
+
+  it("keeps a save that is not compressed as its text", async () => {
+    await open();
+    saveStore.set(SLOT, '{"version":7}');
+    await saveStore.settled();
+    expect(fake.row("verticopolis", "saves", SLOT)).toEqual({ text: '{"version":7}' });
+  });
+
+  it("ignores a database row it did not write, and the localStorage copy stands", async () => {
+    fake.seed("verticopolis", "meta", "migrated-from-localStorage", true);
+    fake.seed("verticopolis", "saves", AUTO, { something: "else" });
+    fake.seed("verticopolis", "saves", STASH, 42);
+    localStorage.setItem(AUTO, "t1:local");
+    await open();
+    expect(saveStore.get(AUTO)).toBe("t1:local");
+    expect(saveStore.get(STASH)).toBeNull();
+  });
+
+  it("writes made before the store opens go to localStorage and are copied in at the first open", async () => {
+    saveStore.set(SLOT, "t1:before");
+    saveStore.set(AUTO, "t1:auto before");
+    await open();
+    expect(saveStore.get(SLOT)).toBe("t1:before");
+    expect(fake.row("verticopolis", "saves", AUTO)).toEqual({ text: "t1:auto before" });
+  });
+
+  it("a copy that fails to land leaves the copy unmarked, so the next boot copies again", async () => {
+    localStorage.setItem(SLOT, "t1:slot");
+    fake.failWrites = true;
+    expect(await open()).toBe(false);
+    expect(fake.row("verticopolis", "meta", "migrated-from-localStorage")).toBeUndefined();
+    fake.failWrites = false;
+    expect(await open()).toBe(true);
+    expect(saveStore.get(SLOT)).toBe("t1:slot");
+  });
+
+  it("a key that is not mirrored keeps its database copy when localStorage has none", async () => {
+    fake.seed("verticopolis", "meta", "migrated-from-localStorage", true);
+    fake.seed("verticopolis", "saves", SLOT, { text: "t1:slot" });
+    await open();
+    expect(saveStore.get(SLOT)).toBe("t1:slot");
+  });
+
+  it("writes nothing at boot when the two copies agree", async () => {
+    fake.seed("verticopolis", "meta", "migrated-from-localStorage", true);
+    fake.seed("verticopolis", "saves", AUTO, { text: "t5:same" });
+    localStorage.setItem(AUTO, "t5:same");
+    const commits = fake.commits;
+    await open();
+    expect(fake.commits).toBe(commits);
+  });
+
+  it("after an upgrade closed it, a write goes to localStorage alone", async () => {
+    await open();
+    fake.lastDb!.onversionchange!();
+    const commits = fake.commits;
+    saveStore.set(AUTO, "t9:after");
+    await saveStore.settled();
+    expect(localStorage.getItem(AUTO)).toBe("t9:after");
+    expect(fake.commits).toBe(commits);
+  });
+
+  it("another tab clearing localStorage drops every mirrored save from memory", async () => {
+    localStorage.setItem(AUTO, "t1:auto");
+    await open();
+    window.dispatchEvent(new StorageEvent("storage", { key: null, storageArea: localStorage }));
+    expect(saveStore.get(AUTO)).toBeNull();
+  });
+
+  it("a storage event from another storage area changes nothing", async () => {
+    localStorage.setItem(AUTO, "t1:auto");
+    await open();
+    window.dispatchEvent(new StorageEvent("storage", { key: AUTO, newValue: "t2:session", storageArea: sessionStorage }));
+    expect(saveStore.get(AUTO)).toBe("t1:auto");
+  });
+
+  it("a cross-tab message without a string key or value changes nothing", async () => {
+    localStorage.setItem(SLOT, "t1:slot");
+    await open();
+    const other = new BroadcastChannel("verticopolis-saves");
+    const probe = new BroadcastChannel("verticopolis-saves");
+    const heard = new Promise<void>((resolve) => {
+      let n = 0;
+      probe.onmessage = () => {
+        if (++n === 2) resolve();
+      };
+    });
+    other.postMessage({ key: 5, value: "x" });
+    other.postMessage({ key: SLOT, value: 7 });
+    await heard;
+    await new Promise((r) => setTimeout(r, 0));
+    other.close();
+    probe.close();
+    expect(saveStore.get(SLOT)).toBe("t1:slot");
+  });
+
+  it("a timed-out open leaves every later write in localStorage alone", async () => {
+    fake.openDelayMs = 40;
+    expect(await openSaveStore(KEYS, { factory: fake.asFactory(), savedAt, timeoutMs: 5 })).toBe(false);
+    await vi.waitFor(() => expect(fake.lastDb?.closed).toBe(true));
+    const commits = fake.commits;
+    saveStore.set(SLOT, "t2:later");
+    await saveStore.settled();
+    expect(localStorage.getItem(SLOT)).toBe("t2:later");
+    expect(saveStore.backend()).toBe("localStorage");
+    expect(fake.commits).toBe(commits);
+    expect(fake.row("verticopolis", "saves", SLOT)).toBeUndefined();
+  });
+});
