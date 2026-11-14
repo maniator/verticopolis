@@ -1,5 +1,6 @@
 /**
- * The pinned-dialog-footer shots, spread into the showcase `first-run` scene.
+ * The pinned-dialog-footer shots, spread into the showcase `first-run` scene,
+ * and the crash card's (spread into its `crash-screen` scene).
  *
  * They live here rather than inline so `scenes/showcase.ts` stays under the
  * file-size guard. Keep ERASABLE (type annotations / `as` only) like the rest
@@ -144,5 +145,48 @@ export const DIALOG_PIN_SHOTS: Shot[] = [
       });
     },
     wait: 300,
+  },
+];
+
+/**
+ * The crash card's pinned buttons (#668), spread into the showcase
+ * `crash-screen` scene after its full-height shot. The card is a bare
+ * `<dialog>` that scrolls itself and swallows Esc, so on a phone held
+ * sideways its buttons are the only way out. Shot at the TOP of the scroll on
+ * a viewport short enough that the card's text overflows by more than the
+ * button row, which is exactly where the buttons used to sit below the fold.
+ */
+const CRASH_SHORT = { width: 720, height: 240 };
+
+export const CRASH_PIN_SHOTS: Shot[] = [
+  {
+    name: "crash-screen-pinned",
+    crop: "dialog#crash-screen",
+    keepDialogs: true,
+    viewport: CRASH_SHORT,
+    drawSettle: true,
+    setup: async (page) => {
+      await page.evaluate(() => {
+        // The scene's first shot leaves the card up; trip it again only if the
+        // runner closed it, the same two-strikes path that shot stages.
+        if (document.querySelector("dialog#crash-screen[open]")) return;
+        const engine = (window as any).game?.engine;
+        if (typeof engine?.onContextLost !== "function") throw new Error("game.engine.onContextLost is not wired");
+        engine.engine?.clock?.stop?.();
+        engine.onContextLost();
+        engine.onContextLost();
+      });
+      await page.waitForSelector("dialog#crash-screen[open]", { timeout: 4000 });
+      await page.evaluate(() => {
+        const card = document.querySelector("dialog#crash-screen") as HTMLElement | null;
+        const strip = card?.querySelector(":scope > .modal-actions") as HTMLElement | null;
+        if (!card || !strip) throw new Error("the crash card did not mount its buttons");
+        card.scrollTop = 0;
+        const left = card.scrollHeight - card.clientHeight;
+        if (left <= strip.offsetHeight) throw new Error("the crash card did not overflow enough for the pin to be doing anything");
+        if (strip.getBoundingClientRect().bottom > card.getBoundingClientRect().bottom + 1) throw new Error("the crash card's buttons are not pinned; this shot would prove nothing");
+      });
+    },
+    wait: 0,
   },
 ];
