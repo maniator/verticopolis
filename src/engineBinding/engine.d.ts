@@ -475,6 +475,14 @@ export class Engine {
      */
     serializeForSync(): string;
     /**
+     * Tooling only: the save with every unit listed on its own and the
+     * version a plain list is stamped with (`Simulation::serialize_unfolded`),
+     * the form the conformance state view and checkpoint detail hash, so a
+     * harness that hashes a save itself matches the engine's own hashes
+     * whatever the floor runs (`save_floor_runs`) fold.
+     */
+    serializeUnfolded(): string;
+    /**
      * `serialize()` as JSON text.
      */
     serialize(): string;

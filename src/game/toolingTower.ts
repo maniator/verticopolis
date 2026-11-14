@@ -1,4 +1,5 @@
 import type { SerializedGame } from "../shared/types";
+import { unfoldFloorRuns } from "../shared/floorRuns";
 
 /**
  * The tower the tooling harnesses (the screenshot scenes and the e2e specs)
@@ -246,6 +247,8 @@ export class ToolingTower {
   save(): SerializedGame {
     if (!this.cached) {
       const save = JSON.parse(this.port.serialize()) as SerializedGame;
+      // A tile folded into a floor run has no entry of its own to patch.
+      save.units = unfoldFloorRuns(save.units);
       const units = new Map((save.units as unknown as SaveRecord[]).map((u) => [u.id, u]));
       const shafts = new Map((save.transports as unknown as SaveRecord[]).map((t) => [t.id, t]));
       for (const [key, fields] of this.patches) {

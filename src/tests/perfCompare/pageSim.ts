@@ -92,7 +92,10 @@ export async function simRun(arg: { name: string; mode: "hosted" | "raw"; engine
             port.tick(dt);
             reader.update();
           },
-          save: () => JSON.parse(port.serialize()) as unknown,
+          // Every floor tile on its own where the build can say so (a
+          // tooling build), so the digest is the conformance state digest
+          // whichever save layout an arm writes.
+          save: () => JSON.parse(typeof (port as { serializeUnfolded?: () => string }).serializeUnfolded === "function" ? (port as unknown as { serializeUnfolded: () => string }).serializeUnfolded() : port.serialize()) as unknown,
           fields: () => {
             const h = reader.header;
             return { minutes: h.minutes, money: h.money, star: h.star, population: h.population, people: reader.crowd.people.length };
@@ -121,7 +124,7 @@ export async function simRun(arg: { name: string; mode: "hosted" | "raw"; engine
       hostedWasm: false,
       d: {
         tick: (dt) => e.tick(dt),
-        save: () => JSON.parse(e.serialize()),
+        save: () => JSON.parse(typeof (e as { serializeUnfolded?: () => string }).serializeUnfolded === "function" ? (e as unknown as { serializeUnfolded: () => string }).serializeUnfolded() : e.serialize()),
         fields: () => {
           // The engine's own view header, as the app's view reads it.
           const l = JSON.parse(e.viewLayout()).header;

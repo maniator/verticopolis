@@ -84,6 +84,24 @@ describe.skipIf(!hasWasmPackage())("the tooling harnesses' tower", () => {
     expect(events).toEqual(["bulletin", "followEdit"]);
   });
 
+  it("lists and patches each tile of a floor row the save folds into a run", async () => {
+    const { app: a, engine, saved } = app();
+    const sim = toolingSim(a)!;
+    for (let x = 150; x < 200; x++) expect(sim.tower.place("lobby", 1, x), `lobby at ${x}`).toMatchObject({ ok: true });
+    for (let x = 150; x < 200; x++) expect(sim.tower.place("floor", 2, x), `floor at ${x}`).toMatchObject({ ok: true });
+    await Promise.resolve();
+    type Tile = Unit & { x: number; run?: number; label?: string };
+    const floorEntries = () => (saved().units as Tile[]).filter((u) => u.kind === "floor").map((u) => [u.x, u.run ?? 1, u.label ?? null]);
+    expect(floorEntries()).toEqual([[150, 50, null]]);
+    const tiles = sim.tower.units.filter((u) => u.kind === "floor") as unknown as Tile[];
+    expect(tiles.map((u) => u.x)).toEqual(Array.from({ length: 50 }, (_, i) => 150 + i));
+    // The save itself stays as the engine writes it, runs and all.
+    expect(sim.serialize()).toEqual(JSON.parse(engine.serialize()));
+    tiles[25].label = "Mezzanine";
+    await Promise.resolve();
+    expect(floorEntries()).toEqual([[150, 25, null], [175, 1, "Mezzanine"], [176, 24, null]]);
+  });
+
   it("runs a command, a tick and a money write on the engine, with no load", () => {
     const { app: a, restore, saved } = app();
     const sim = toolingSim(a)!;

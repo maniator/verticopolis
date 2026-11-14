@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { readCatalog } from "../../engineBinding/catalog";
 import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
+import { unfoldFloorRuns } from "../../shared/floorRuns";
 
 /**
  * The renderer-facing view (facade slice 6a, #1213) through the real
@@ -40,7 +41,7 @@ type Engine = {
   setMoney(amount: number): void;
   free(): void;
 };
-type SaveUnit = { id: number; kind: string; floor: number; x: number; label?: string; subtype?: string };
+type SaveUnit = { id: number; kind: string; floor: number; x: number; label?: string; subtype?: string; run?: number };
 type SaveTransport = { id: number; kind: string; x: number; bottom: number; top: number; cars: number };
 type Save = { units: SaveUnit[]; transports: SaveTransport[] };
 
@@ -74,7 +75,9 @@ function tower(): { engine: Engine; save: Save } {
     const text = built.serialize();
     const engine = wasm().Engine.fromSave(text) as unknown as Engine;
     engines.push(engine);
-    return { engine, save: JSON.parse(text) as Save };
+    const save = JSON.parse(text) as Save;
+    // The view lists each tile the save folds into a floor run.
+    return { engine, save: { ...save, units: unfoldFloorRuns(save.units) } };
   } finally {
     built.free();
   }
