@@ -8,6 +8,7 @@ import { catalogCalendar, priceOptionsFor, rentPerCollection } from "../catalogP
 import type { CalendarKind } from "../../shared/engineTypes";
 import { hasAccessDiagnostic, occupantsText } from "../../game/cardLines";
 import { rungPickerTemplate, type RungChoice } from "./rungPicker";
+import { isBasementFloor } from "../floorLabel";
 import { floorTag, groupDigits } from "../format";
 
 /**
@@ -285,15 +286,16 @@ export function transportEditorTemplate(t: TransportDetail, catalog: Catalog, td
   if (isEl) {
     rows.push(kv("Cars", `${t.cars} / ${maxCars} max`, "cars"));
     rows.push(kv("Capacity", `${t.capacity} riders/trip`, "capacity"));
-    // An express is locked to (sky) lobbies (1994 parity), so it reads a fixed
-    // policy line rather than a free per-floor skip count. A legacy/forged save
-    // may still carry a deliberately skipped lobby (coerceExpressStops preserves
-    // those), so surface that count honestly instead of overstating the policy.
+    // An express stops at the lobbies and at every basement floor it passes
+    // (1994 parity), so it reads a fixed policy line rather than a free
+    // per-floor skip count. A basement stop the player turned off, or a
+    // lobby a legacy save skipped, is counted so the line never overstates.
     // Standard/service keep their configurable stop readout.
     let stops: string;
     if (t.kind === "elevatorExpress") {
-      const skippedLobbies = t.stops.filter((row) => !row.served && row.lobby).length;
-      stops = skippedLobbies ? `lobbies and sky lobbies (${skippedLobbies} skipped)` : "lobbies and sky lobbies";
+      const policy = t.stops.some((row) => isBasementFloor(row.floor)) ? "lobbies and basements" : "lobbies and sky lobbies";
+      const skipped = t.stops.filter((row) => !row.served && (row.lobby || isBasementFloor(row.floor))).length;
+      stops = skipped ? `${policy} (${skipped} skipped)` : policy;
     } else {
       const skipped = t.stops.filter((row) => !row.served).length;
       stops = skipped ? `skips ${skipped} floor${skipped === 1 ? "" : "s"}` : "all floors";

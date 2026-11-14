@@ -335,6 +335,13 @@ describe("transport editor row and action branches", () => {
     expect(frag.querySelector('[data-field="stops"]')!.textContent).toBe("lobbies and sky lobbies (1 skipped)");
   });
 
+  it("express elevator into the basements names them and counts a basement stop turned off", () => {
+    const frag = renderToFragment(transportEditor(transportDetail("elevatorExpress", 3, { bottom: -1, stops: stopRows(-1, 3, [0]) })));
+    expect(frag.querySelector('[data-field="stops"]')!.textContent).toBe("lobbies and basements (1 skipped)");
+    const all = renderToFragment(transportEditor(transportDetail("elevatorExpress", 3, { bottom: -1, stops: stopRows(-1, 3) })));
+    expect(all.querySelector('[data-field="stops"]')!.textContent).toBe("lobbies and basements");
+  });
+
   it("service elevator keeps the elevator rows; an escalator is a fixed-span flight", () => {
     const sFrag = renderToFragment(transportEditor(transportDetail("elevatorService")));
     expect(sFrag.querySelector('[data-field="cars"]')).not.toBeNull();
