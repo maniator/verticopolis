@@ -111,6 +111,54 @@ the crate reads only `engine-rs/` and `conformance/` by default:
 | large (17314) | 5000 | 5000 | 1.633 ms | 12.489 ms | 1.989 ms | 2921 KB | 8.5 us |
 | large (17314) | 15000 | 15000 | 4.776 ms | 14.175 ms | 3.127 ms | 4698 KB | 7.7 us |
 
+
+### The same benchmark as WebAssembly
+
+The same binary built for `wasm32-wasip1` and run under Node 26's V8 (the
+engine Chrome uses), same machine, same towers, 2026-11-14. Build with
+`cargo build --release --features conformance --bin crowd_scale --target
+wasm32-wasip1` and run it with any WASI host that preopens the repository.
+
+| Tower (population) | Crowd size | Moving (mean) | Step mean | Step worst | Frame build | Frame size | Route each |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| sixseven_2 (3219) | 0 | 23 | 0.155 ms | 9.165 ms | 0.378 ms | 576 KB | none |
+| sixseven_2 (3219) | 140 | 140 | 0.131 ms | 4.889 ms | 0.305 ms | 592 KB | 20.9 us |
+| sixseven_2 (3219) | 1000 | 1000 | 0.557 ms | 6.149 ms | 0.237 ms | 746 KB | 12.4 us |
+| sixseven_2 (3219) | 5000 | 5000 | 2.486 ms | 8.394 ms | 0.462 ms | 1454 KB | 10.8 us |
+| sixseven_2 (3219) | 15000 | 15000 | 7.137 ms | 13.190 ms | 1.087 ms | 3223 KB | 8.9 us |
+| split-tower (495) | 0 | 0 | 0.013 ms | 0.703 ms | 0.026 ms | 91 KB | none |
+| split-tower (495) | 140 | 125 | 0.036 ms | 0.339 ms | 0.040 ms | 125 KB | 4.7 us |
+| split-tower (495) | 1000 | 894 | 0.188 ms | 0.595 ms | 0.145 ms | 327 KB | 4.5 us |
+| split-tower (495) | 5000 | 4471 | 1.056 ms | 1.732 ms | 0.290 ms | 1269 KB | 4.7 us |
+| split-tower (495) | 15000 | 13414 | 3.418 ms | 5.991 ms | 1.099 ms | 3634 KB | 4.3 us |
+| TOWER7 (4429) | 0 | 123 | 0.189 ms | 4.828 ms | 0.373 ms | 732 KB | none |
+| TOWER7 (4429) | 140 | 143 | 0.209 ms | 4.768 ms | 0.354 ms | 725 KB | 26.2 us |
+| TOWER7 (4429) | 1000 | 1000 | 0.528 ms | 4.087 ms | 0.364 ms | 877 KB | 9.5 us |
+| TOWER7 (4429) | 5000 | 5000 | 3.016 ms | 7.533 ms | 0.544 ms | 1585 KB | 8.6 us |
+| TOWER7 (4429) | 15000 | 15000 | 7.980 ms | 11.919 ms | 1.062 ms | 3344 KB | 8.7 us |
+| large (17314) | 0 | 127 | 0.094 ms | 9.972 ms | 0.503 ms | 2057 KB | none |
+| large (17314) | 140 | 140 | 0.099 ms | 9.645 ms | 0.505 ms | 2057 KB | 21.9 us |
+| large (17314) | 1000 | 1000 | 0.361 ms | 10.982 ms | 0.774 ms | 2210 KB | 10.9 us |
+| large (17314) | 5000 | 5000 | 1.774 ms | 13.070 ms | 0.982 ms | 2921 KB | 9.7 us |
+| large (17314) | 15000 | 15000 | 6.050 ms | 19.189 ms | 1.673 ms | 4698 KB | 9.5 us |
+
+WebAssembly runs the step at about 1.2 to 1.4 times the native time. The game
+runs the engine on the main thread (`docs/architecture/wasm-worker-host.md`),
+normally one step per frame and at most four, so the step comes straight out
+of the 16.7 ms a 60 Hz frame has:
+
+- Up to about 2,000 people moving: under 1 ms a frame. No visible change.
+- 5,000 moving at once: about 2 to 3.5 ms a frame. 60 fps holds on this
+  machine if drawing keeps up; a low-end laptop at about half this speed
+  spends 5 to 7 ms.
+- 15,000 moving at once (every tenant of a 15,000 tower stuck in a jam): 7 to
+  9 ms a frame with the frame build. That alone pushes a low-end laptop below
+  60 fps, and catch-up frames with several steps make it worse.
+- Not yet measured: the web side's decode of the frame and the drawing of
+  each person, which the people look thread owns. That is likely the larger
+  cost at high counts, and it is what the view-sized, slimmer people frame is
+  for.
+
 What that says:
 
 - **The step grows linearly**, about 0.3 to 0.4 microseconds per moving
