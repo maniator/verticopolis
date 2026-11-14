@@ -45,10 +45,32 @@ impl Simulation {
     /// Whether an operating metro station is helping business: in Classic its
     /// platform floor must also have transport, as in SimTower.
     pub fn metro_helps_business(&self) -> bool {
+        self.shopper_metro_platform().is_some()
+    }
+
+    /// The platform floor where the metro lets shoppers off, while the
+    /// station helps business by this mode's rule (`metro_helps_business`).
+    /// The platform is the station's middle story, so SimTower's station on
+    /// B8 to B10 lets them off on B9.
+    pub fn shopper_metro_platform(&self) -> Option<i64> {
         let need_service = self.mode.metro_help_needs_service();
-        self.tower.units_of_kind(Kind::Metro).any(|u| {
-            u.is_operational() && (!need_service || self.tower.is_metro_platform_served(u))
-        })
+        self.tower
+            .metro_stations()
+            .find(|u| {
+                u.is_operational() && (!need_service || self.tower.is_metro_platform_served(u))
+            })
+            .map(|u| u.floor + 1)
+    }
+
+    /// Floors from `floor` to the nearest place shoppers arrive: a lobby, a
+    /// sky lobby, or `platform`, the metro platform from
+    /// `shopper_metro_platform`. A shop or restaurant more than
+    /// `COMMERCIAL_LOBBY_FLOORS` from all of them takes half its trade. The
+    /// wiki's basement bands follow from the platform counting: B7 to B9
+    /// sit within two floors of B9, while B5 and B6 get no help from it.
+    pub fn shopper_arrival_distance(&self, floor: i64, platform: Option<i64>) -> i64 {
+        let lobby = self.tower.nearest_lobby_floor_distance(floor);
+        platform.map_or(lobby, |p| lobby.min((floor - p).abs()))
     }
 }
 

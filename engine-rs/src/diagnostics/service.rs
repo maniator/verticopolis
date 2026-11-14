@@ -180,7 +180,8 @@ struct RetailServiceFacts {
 }
 
 /// Placement facts for a foot-traffic venue. `lobby_far` is true when the
-/// venue sits more than two floors from the nearest (sky) lobby, which halves
+/// venue sits more than two floors from the nearest (sky) lobby or working
+/// metro platform (`shopper_arrival_distance`), which halves
 /// its trade; it is `None` for any unit that penalty never applies to. It is
 /// not the very-far "lobbyFar" vacate cause tenants carry.
 #[derive(Clone, Copy, Debug, Default, Serialize)]
@@ -274,8 +275,9 @@ impl Simulation {
             && unit.kind != Kind::SkyBar
             && commercial_daily_income(self.mode, unit.kind).is_some()
         {
+            let platform = self.shopper_metro_platform();
             facts.commercial.lobby_far =
-                Some(self.tower.nearest_lobby_floor_distance(unit.floor) > COMMERCIAL_LOBBY_FLOORS);
+                Some(self.shopper_arrival_distance(unit.floor, platform) > COMMERCIAL_LOBBY_FLOORS);
         }
         // Retail policy stays in Rust. Score the Modern catalog's average
         // good day even in Classic, never Classic's higher sellout ceiling.
