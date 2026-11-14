@@ -22,6 +22,67 @@
   overflow-wrap: anywhere;
 }
 .help-md td:first-child { font-weight: 700; }
+/* On a phone the three columns leave the topic column a few letters wide, and
+   the browser split its words mid-word ("Calen dar"). On a screen under
+   540 px wide (where the dialog's body drops under about 460 px) the table
+   becomes a stack of Win95 group boxes instead: the topic sits in the frame's
+   top edge like a legend, and Classic and Modern are labeled lines inside it.
+   Wider screens and the Help site keep the table. A viewport query on
+   purpose: a container query would make .help-md size-contained, and the
+   modal sizes to its content, so the Compare dialog collapsed to a sliver.
+   The labels are fixed words because the table's header row is hidden here. */
+@media (max-width: 539px) {
+  .help-md table,
+  .help-md tbody,
+  .help-md tr,
+  .help-md td {
+    display: block;
+  }
+  .help-md thead { display: none; }
+  .help-md tbody {
+    display: grid;
+    gap: 14px;
+    padding-top: 6px;
+  }
+  .help-md tr {
+    position: relative;
+    padding: 12px 8px 7px;
+    /* The etched Win95 group-box frame: a dark line with a light one inside. */
+    box-shadow:
+      inset 1px 1px var(--r-shadow), inset -1px -1px var(--r-hi),
+      inset 2px 2px var(--r-hi), inset -2px -2px var(--r-shadow);
+  }
+  .help-md td {
+    border-bottom: 0;
+    padding: 0;
+    overflow-wrap: break-word;
+  }
+  .help-md td:first-child {
+    position: absolute;
+    top: -0.75em;
+    left: 6px;
+    padding: 0 4px;
+    background: var(--r-face);
+    overflow-wrap: normal;
+  }
+  .help-md td + td {
+    position: relative;
+    padding-left: 5.4em;
+    margin-top: 3px;
+  }
+  .help-md td + td::before {
+    position: absolute;
+    left: 0;
+    top: 0.1em;
+    font-size: 0.85em;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .help-md td:nth-child(2)::before { content: "Classic"; }
+  .help-md td:nth-child(3)::before { content: "Modern"; }
+}
 
 /* The privacy link in About this game, and the line that says why Report a
    problem or the privacy page did not open when the game is offline (empty,
