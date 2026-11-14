@@ -238,7 +238,9 @@ builds them, for the web game's own tests and tooling.
   fresh, so it does not carry on exactly where the saving game was. Two loads
   of the same save do stay identical to each other.
 - **The loader repairs.** A damaged or hand-edited save is coerced the way the
-  web game's loader does; only a file it cannot read at all is refused.
+  web game's loader does. It refuses a file it cannot read at all, and a save
+  with no numeric `minutes` or no `units` list at its top level, which would
+  otherwise load as an empty tower.
 - **Newer saves are refused.** A save written by a newer engine than the one
   loading it is refused rather than half-read. `engineIdentity()` tells you
   which save version an engine writes. A save is version 7 unless it holds a

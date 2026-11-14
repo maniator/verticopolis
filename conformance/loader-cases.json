@@ -11979,7 +11979,7 @@
      }
     ]
    },
-   "expected": "511b5b8f88725ce8"
+   "expected": "throws"
   },
   {
    "id": "minutes-fraction",
@@ -27164,7 +27164,7 @@
      }
     ]
    },
-   "expected": "a2b46427be7f7ec5"
+   "expected": "throws"
   },
   {
    "id": "legacy-v1-width-unbounded",
@@ -54192,6 +54192,283 @@
     ]
    },
    "expected": "5ddb95e37fe9606a"
+  },
+  {
+   "id": "minutes-missing",
+   "input": {
+    "version": 7,
+    "seed": 2903413569,
+    "initialSeed": 7,
+    "money": 99662000,
+    "star": 1,
+    "mode": "modern",
+    "modernCalendar": "realWorld",
+    "lastQuarterMoney": 99642000,
+    "units": [],
+    "transports": [
+     {
+      "id": 66,
+      "kind": "elevatorStandard",
+      "x": 171,
+      "width": 4,
+      "bottom": 1,
+      "top": 3,
+      "cars": 1,
+      "carPositions": [
+       1
+      ],
+      "carDir": [
+       0
+      ],
+      "load": 0,
+      "carLoad": [
+       0
+      ]
+     },
+     {
+      "id": 67,
+      "kind": "stairs",
+      "x": 189,
+      "width": 8,
+      "bottom": 1,
+      "top": 2,
+      "cars": 0,
+      "carPositions": [],
+      "carDir": [],
+      "load": 0
+     }
+    ],
+    "nextId": 68,
+    "towerName": "Tower One",
+    "builtWeddingHall": false,
+    "evaluatedTower": false,
+    "vipVisitDay": -1,
+    "vipFavorable": false,
+    "vipVisits": 0,
+    "lastVipNagDay": -100,
+    "treasuresFound": 0,
+    "events": {
+     "lastSantaYear": -1,
+     "rngState": 369021,
+     "pending": null
+    },
+    "excavated": [],
+    "blockbusters": [],
+    "milestones": [],
+    "ledger": {
+     "today": {},
+     "history": [
+      {
+       "condos": 160000,
+       "upkeep": -600,
+       "offices": 18600
+      }
+     ]
+    },
+    "log": [
+     {
+      "minute": 1440,
+      "text": "Monthly maintenance paid: $2,000.",
+      "kind": "money"
+     },
+     {
+      "minute": 1440,
+      "text": "Quarterly office rent collected: $20,000 (2 offices).",
+      "kind": "money"
+     },
+     {
+      "minute": 1440,
+      "text": "New tenants: 2 offices leased, 1 condo sold.",
+      "kind": "good"
+     }
+    ]
+   },
+   "expected": "throws"
+  },
+  {
+   "id": "units-missing",
+   "input": {
+    "version": 7,
+    "seed": 2903413569,
+    "initialSeed": 7,
+    "money": 99662000,
+    "star": 1,
+    "minutes": 1860,
+    "mode": "modern",
+    "modernCalendar": "realWorld",
+    "lastQuarterMoney": 99642000,
+    "transports": [
+     {
+      "id": 66,
+      "kind": "elevatorStandard",
+      "x": 171,
+      "width": 4,
+      "bottom": 1,
+      "top": 3,
+      "cars": 1,
+      "carPositions": [
+       1
+      ],
+      "carDir": [
+       0
+      ],
+      "load": 0,
+      "carLoad": [
+       0
+      ]
+     },
+     {
+      "id": 67,
+      "kind": "stairs",
+      "x": 189,
+      "width": 8,
+      "bottom": 1,
+      "top": 2,
+      "cars": 0,
+      "carPositions": [],
+      "carDir": [],
+      "load": 0
+     }
+    ],
+    "nextId": 68,
+    "towerName": "Tower One",
+    "builtWeddingHall": false,
+    "evaluatedTower": false,
+    "vipVisitDay": -1,
+    "vipFavorable": false,
+    "vipVisits": 0,
+    "lastVipNagDay": -100,
+    "treasuresFound": 0,
+    "events": {
+     "lastSantaYear": -1,
+     "rngState": 369021,
+     "pending": null
+    },
+    "excavated": [],
+    "blockbusters": [],
+    "milestones": [],
+    "ledger": {
+     "today": {},
+     "history": [
+      {
+       "condos": 160000,
+       "upkeep": -600,
+       "offices": 18600
+      }
+     ]
+    },
+    "log": [
+     {
+      "minute": 1440,
+      "text": "Monthly maintenance paid: $2,000.",
+      "kind": "money"
+     },
+     {
+      "minute": 1440,
+      "text": "Quarterly office rent collected: $20,000 (2 offices).",
+      "kind": "money"
+     },
+     {
+      "minute": 1440,
+      "text": "New tenants: 2 offices leased, 1 condo sold.",
+      "kind": "good"
+     }
+    ]
+   },
+   "expected": "throws"
+  },
+  {
+   "id": "minutes-and-units-only-nested",
+   "input": {
+    "version": 7,
+    "seed": 2903413569,
+    "initialSeed": 7,
+    "money": 99662000,
+    "star": 1,
+    "mode": "modern",
+    "modernCalendar": "realWorld",
+    "lastQuarterMoney": 99642000,
+    "transports": [
+     {
+      "id": 66,
+      "kind": "elevatorStandard",
+      "x": 171,
+      "width": 4,
+      "bottom": 1,
+      "top": 3,
+      "cars": 1,
+      "carPositions": [
+       1
+      ],
+      "carDir": [
+       0
+      ],
+      "load": 0,
+      "carLoad": [
+       0
+      ]
+     },
+     {
+      "id": 67,
+      "kind": "stairs",
+      "x": 189,
+      "width": 8,
+      "bottom": 1,
+      "top": 2,
+      "cars": 0,
+      "carPositions": [],
+      "carDir": [],
+      "load": 0
+     }
+    ],
+    "nextId": 68,
+    "towerName": "Tower One",
+    "builtWeddingHall": false,
+    "evaluatedTower": false,
+    "vipVisitDay": -1,
+    "vipFavorable": false,
+    "vipVisits": 0,
+    "lastVipNagDay": -100,
+    "treasuresFound": 0,
+    "events": {
+     "lastSantaYear": -1,
+     "rngState": 369021,
+     "pending": null,
+     "minutes": 1860,
+     "units": []
+    },
+    "excavated": [],
+    "blockbusters": [],
+    "milestones": [],
+    "ledger": {
+     "today": {},
+     "history": [
+      {
+       "condos": 160000,
+       "upkeep": -600,
+       "offices": 18600
+      }
+     ]
+    },
+    "log": [
+     {
+      "minute": 1440,
+      "text": "Monthly maintenance paid: $2,000.",
+      "kind": "money"
+     },
+     {
+      "minute": 1440,
+      "text": "Quarterly office rent collected: $20,000 (2 offices).",
+      "kind": "money"
+     },
+     {
+      "minute": 1440,
+      "text": "New tenants: 2 offices leased, 1 condo sold.",
+      "kind": "good"
+     }
+    ]
+   },
+   "expected": "throws"
   }
  ]
 }

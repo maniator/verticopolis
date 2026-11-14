@@ -9,10 +9,25 @@ use crate::tower::Extras;
 pub const NEWER_SAVE_REFUSAL: &str =
     "This save was made by a newer version of Verticopolis. Update the game to load it.";
 
+#[doc(hidden)]
+/// The sentence a save with no numeric `minutes` or no `units` list at its
+/// top level is refused with (#1418).
+pub const NOT_A_SAVE_REFUSAL: &str =
+    "This is not a saved tower: it has no game clock or no list of rooms.";
+
+/// Whether save JSON as written has a numeric `minutes` and a `units` list at
+/// its top level, as every save the game writes does. A file that carries them
+/// only inside another object would load as an empty tower (#1418).
+pub(crate) fn has_save_shape(raw: &Value) -> bool {
+    raw.get("minutes").is_some_and(Value::is_number)
+        && raw.get("units").is_some_and(Value::is_array)
+}
+
 /// Builds a game from save JSON (from [`decode_vctower`] or
 /// [`Simulation::serialize`]). An older save is upgraded first, and damaged
 /// or edited fields are corrected the way the web game's loader corrects
-/// them. Refuses a save from a newer version of the engine, and one it cannot
+/// them. Refuses a save from a newer version of the engine, one with no
+/// numeric `minutes` or no `units` list at its top level, and one it cannot
 /// read, with a sentence a player can read.
 pub fn deserialize(raw: &Value) -> Result<Simulation, String> {
     deserialize_owned(raw.clone())
@@ -86,6 +101,11 @@ pub fn deserialize_owned(raw: Value) -> Result<Simulation, String> {
         if version.is_finite() && version > SAVE_VERSION as f64 {
             return Err(NEWER_SAVE_REFUSAL.into());
         }
+    }
+    // A save without its clock or its rooms would load as an empty tower that
+    // the next save writes over the real one (#1418).
+    if !has_save_shape(&raw) {
+        return Err(NOT_A_SAVE_REFUSAL.into());
     }
     // The founder test reads the save as written, and `assemble` reads
     // nothing else from it, so two keys stand in for it.

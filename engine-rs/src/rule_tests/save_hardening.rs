@@ -75,11 +75,16 @@ fn malformed_entries_drop_and_every_valid_one_survives() {
     let loaded = load(&save);
     assert_eq!(loaded.tower.units.len(), units);
     assert_eq!(loaded.tower.transports.len(), transports);
-    // A container that is not a list at all loads as an empty one.
-    save["units"] = json!(5);
+    // A shaft list that is not a list at all loads as an empty one.
     save["transports"] = json!({ "nope": true });
     let loaded = load(&save);
-    assert!(loaded.tower.units.is_empty() && loaded.tower.transports.is_empty());
+    assert!(loaded.tower.transports.is_empty());
+    // A unit list that is not a list is no tower at all (#1418).
+    save["units"] = json!(5);
+    assert_eq!(
+        deserialize(&save).err().as_deref(),
+        Some(crate::load::NOT_A_SAVE_REFUSAL)
+    );
 }
 
 #[test]

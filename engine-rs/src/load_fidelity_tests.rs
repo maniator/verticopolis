@@ -437,10 +437,19 @@ fn a_null_save_is_refused_as_the_typescript_refuses_it() {
     assert!(refused.contains("null"), "{refused}");
     // The binding's reader gives the same refusal.
     assert_eq!(load_save_text(b"null").err(), Some(refused));
-    // Every other top-level value still loads, as it does in TypeScript.
-    for other in [json!(5), json!([]), json!("abc")] {
-        assert!(deserialize(&other).is_ok());
-        assert!(load_save_text(other.to_string().as_bytes()).is_ok());
+    // Every other value that is no save object is refused too (#1418).
+    for other in [json!(5), json!([]), json!("abc"), json!({})] {
+        let why = deserialize(&other).err();
+        assert_eq!(
+            why.as_deref(),
+            Some(crate::load::NOT_A_SAVE_REFUSAL),
+            "{other}"
+        );
+        assert_eq!(
+            load_save_text(other.to_string().as_bytes()).err(),
+            why,
+            "{other}"
+        );
     }
 }
 

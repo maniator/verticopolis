@@ -28,7 +28,8 @@
 //! other exactly.
 //!
 //! The loader repairs: [`deserialize`] corrects damaged or edited fields the
-//! way the web game's loader does, and refuses only a file it cannot read.
+//! way the web game's loader does. It refuses a file it cannot read, and a
+//! save with no numeric `minutes` or no `units` list at its top level.
 //! The JSON inside the file is what
 //! [`Simulation::serialize`](crate::sim::Simulation::serialize) returns.
 

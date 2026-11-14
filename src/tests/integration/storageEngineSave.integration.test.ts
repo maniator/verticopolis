@@ -136,13 +136,16 @@ describeEngines("save fields the engine keeps across a load", (leg: Leg) => {
     // Legal debt (the sign) round-trips intact.
     expect(resave(leg, { ...data, money: -50_000 }).money).toBe(-50_000);
 
-    // clock: a forged NaN / negative / Infinity / non-number falls back to 0,
-    // which maps to the 07:00 founding time (pins the fallback).
-    for (const bad of [NaN, -100, "600", undefined]) {
-      const sim = load(leg, { ...data, minutes: bad });
-      expect(JSON.parse(sim.save()).minutes, `minutes ${bad}`).toBe(7 * 60);
-      // A ticked-forward load must not throw on any clock consumer.
-      expect(() => sim.tick(60)).not.toThrow();
+    // clock: a forged negative count falls back to 0, which maps to the 07:00
+    // founding time (pins the fallback).
+    const sim = load(leg, { ...data, minutes: -100 });
+    expect(JSON.parse(sim.save()).minutes).toBe(7 * 60);
+    // A ticked-forward load must not throw on any clock consumer.
+    expect(() => sim.tick(60)).not.toThrow();
+    // A clock that is no number (NaN is written as null) leaves no save at
+    // all, which the engine refuses rather than load as an empty tower (#1418).
+    for (const bad of [NaN, "600", undefined]) {
+      expect(() => load(leg, { ...data, minutes: bad }), `minutes ${bad}`).toThrow(/no game clock/);
     }
     for (const bad of [Infinity, -Infinity]) expectInfinityHandled(leg, { ...data, minutes: bad }, (save) => expect(save.minutes, `minutes ${bad}`).toBe(7 * 60));
     // A legitimate fractional minute count round-trips exactly: real play

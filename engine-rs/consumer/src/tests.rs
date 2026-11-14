@@ -73,7 +73,9 @@ fn a_damaged_file_is_refused_not_panicked_on() {
     assert!(decode_vctower("").is_err());
     // A file that decodes but holds damaged fields is not refused: the
     // loader coerces them the way the web game's loader does.
-    assert!(deserialize(&serde_json::json!({ "units": "no" })).is_ok());
+    assert!(deserialize(&serde_json::json!({ "minutes": 0, "units": [], "money": "no" })).is_ok());
+    // One with no clock or no room list is no tower at all (#1418).
+    assert!(deserialize(&serde_json::json!({ "units": "no" })).is_err());
 }
 
 #[test]

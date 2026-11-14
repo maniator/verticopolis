@@ -33,8 +33,9 @@ use crate::clock::GameMode;
 #[cfg(test)]
 use crate::load::deserialize;
 use crate::load::{
-    assemble, deserialize_owned, founder_keys, inflate_vctower, mark_founder_from_loaded_file,
-    parse_save_json, repair_lone_surrogates, unit_from_value, widen_shafts, UNIT_CAP,
+    assemble, deserialize_owned, founder_keys, has_save_shape, inflate_vctower,
+    mark_founder_from_loaded_file, parse_save_json, repair_lone_surrogates, unit_from_value,
+    widen_shafts, UNIT_CAP,
 };
 use crate::sim::Simulation;
 use crate::tower::{unit_list_headroom, Unit};
@@ -134,21 +135,12 @@ fn read_vctower_text(
     mode: Option<&str>,
     need_shape: bool,
 ) -> Result<(Simulation, bool), TowerReadError> {
-    if let Some(Streamed {
-        mut sim,
-        data,
-        had_units,
-    }) = streamed(json, mode)
-    {
-        if need_shape && !(had_units && has_number(&data, "minutes")) {
-            return Err(TowerReadError::NotASave);
-        }
+    if let Some(Streamed { mut sim, data }) = streamed(json, mode) {
         mark_founder_from_loaded_file(&mut sim, &data);
         return Ok((sim, true));
     }
     let mut raw = parse_save_json(json).map_err(|e| TowerReadError::Unparseable(e.to_string()))?;
-    if need_shape && !(raw.get("units").is_some_and(Value::is_array) && has_number(&raw, "minutes"))
-    {
+    if need_shape && !has_save_shape(&raw) {
         return Err(TowerReadError::NotASave);
     }
     if let Some(m) = mode {
@@ -158,11 +150,6 @@ fn read_vctower_text(
     let mut sim = deserialize_owned(raw).map_err(TowerReadError::Refused)?;
     mark_founder_from_loaded_file(&mut sim, &written);
     Ok((sim, false))
-}
-
-/// Whether the save object has `key` holding a number.
-fn has_number(save: &Value, key: &str) -> bool {
-    save.get(key).is_some_and(Value::is_number)
 }
 
 /// A game mode by the name the binding takes, or the binding's message.
@@ -223,22 +210,20 @@ fn streamed(text: &[u8], mode: Option<&str>) -> Option<Streamed> {
     // `deserialize` reads the founder flag from the save as written, which
     // the widening leaves alone, so the migrated keys serve for both.
     let data = Value::Object(rest);
-    let had_units = units.is_some();
-    let (units, ids) = units.unwrap_or_default();
+    // A save with no `units` list or no numeric `minutes` goes to today's
+    // path, which refuses it (#1418).
+    let (units, ids) = units?;
+    if !data.get("minutes").is_some_and(Value::is_number) {
+        return None;
+    }
     let sim = assemble(&data, units, ids, &data);
-    Some(Streamed {
-        sim,
-        data,
-        had_units,
-    })
+    Some(Streamed { sim, data })
 }
 
-/// A save `streamed` took: the game, the migrated save without `units`, and
-/// whether the save had a `units` list at all.
+/// A save `streamed` took: the game, and the migrated save without `units`.
 struct Streamed {
     sim: Simulation,
     data: Value,
-    had_units: bool,
 }
 
 /// Whether the save loads as Modern, when its version and mode (or the mode
