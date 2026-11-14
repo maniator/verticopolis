@@ -2,6 +2,7 @@
 
 use super::landing::{landing_slots, Landings};
 use super::spawn::{inside_x, metro_station_for_platform, pick_x, pick_x_in_segment};
+use super::staff_shift;
 use super::visits::begin_dwell;
 use super::walk::walk_to;
 use super::{
@@ -42,7 +43,7 @@ pub fn advance(crowd: &mut Crowd, dt_sec: f64, tower: &mut Tower) {
                 frustrated += 1;
                 travelling += 1;
             }
-            finish(crowd, i, tower);
+            give_up(crowd, i, tower);
             continue;
         }
         step(crowd, i, dt_sec, tower, &mut landings);
@@ -74,7 +75,7 @@ fn step(crowd: &mut Crowd, i: usize, dt: f64, tower: &mut Tower, landings: &mut 
         PState::ToShaft => {
             let p = &crowd.people[i];
             let Some(shaft) = p.shaft_id.and_then(|id| tower.get_transport(id)) else {
-                return finish(crowd, i, tower);
+                return give_up(crowd, i, tower);
             };
             let (shaft_id, is_elevator) = (shaft.id, shaft.kind.is_elevator());
             // An elevator rider walks straight to the back of the line, and a
@@ -100,7 +101,7 @@ fn step(crowd: &mut Crowd, i: usize, dt: f64, tower: &mut Tower, landings: &mut 
         PState::Climbing => {
             let p = &crowd.people[i];
             let Some(shaft) = p.shaft_id.and_then(|id| tower.get_transport(id)) else {
-                return finish(crowd, i, tower);
+                return give_up(crowd, i, tower);
             };
             let p = &mut crowd.people[i];
             let dest = p.floors[p.leg + 1];
@@ -137,7 +138,7 @@ fn step(crowd: &mut Crowd, i: usize, dt: f64, tower: &mut Tower, landings: &mut 
             crowd.people[i].wait += dt;
             let p = &crowd.people[i];
             let Some(shaft) = p.shaft_id.and_then(|id| tower.get_transport(id)) else {
-                return finish(crowd, i, tower);
+                return give_up(crowd, i, tower);
             };
             let pid = crowd.people[i].id;
             let target = landings
@@ -188,10 +189,10 @@ fn step(crowd: &mut Crowd, i: usize, dt: f64, tower: &mut Tower, landings: &mut 
             // longer stops at, steps out of the trip: no car would ever let
             // them off, and nothing else ends a ride (3.7.3).
             let (Some(shaft), Some(ci)) = (ridden, p.car_index) else {
-                return finish(crowd, i, tower);
+                return give_up(crowd, i, tower);
             };
             if ci as usize >= shaft.car_positions.len() || !shaft.stops_at(dest) {
-                return finish(crowd, i, tower);
+                return give_up(crowd, i, tower);
             }
             let pos = shaft.car_positions[ci as usize];
             // A rider steps off only once the car has stopped at their floor
@@ -224,6 +225,10 @@ fn step(crowd: &mut Crowd, i: usize, dt: f64, tower: &mut Tower, landings: &mut 
         PState::ToDest => {
             let dest_x = crowd.people[i].dest_x;
             if walk_to(&mut crowd.people[i], dest_x, dt, tower) {
+                // A housekeeper's working day decides what comes next.
+                if let Some(trip) = crowd.people[i].staff_trip {
+                    return staff_shift::at_destination(crowd, i, tower, dt, trip);
+                }
                 let p = &mut crowd.people[i];
                 p.linger += dt;
                 if p.linger > p.linger_for.unwrap_or(2.0) {
@@ -310,7 +315,7 @@ fn transition_to_return(crowd: &mut Crowd, tower: &mut Tower, i: usize) {
     crowd.people[i].returning = true;
 }
 
-fn release_seat(crowd: &mut Crowd, i: usize) {
+pub(super) fn release_seat(crowd: &mut Crowd, i: usize) {
     let p = &mut crowd.people[i];
     let (Some(ci), Some(sid)) = (p.car_index, p.shaft_id) else {
         return;
@@ -321,11 +326,30 @@ fn release_seat(crowd: &mut Crowd, i: usize) {
     crowd.people[i].car_index = None;
 }
 
+/// Someone whose trip cannot go on: out of patience, or their shaft or car
+/// gone. A visitor or tenant leaves the picture; a housekeeper never
+/// vanishes mid-tower and stops where they stand for their next errand.
+fn give_up(crowd: &mut Crowd, i: usize, tower: &mut Tower) {
+    if crowd.people[i].staff_trip.is_some() {
+        staff_shift::stuck(crowd, i, tower);
+    } else {
+        finish(crowd, i, tower);
+    }
+}
+
 pub fn finish(crowd: &mut Crowd, i: usize, tower: &mut Tower) {
     release_seat(crowd, i);
     let p = &crowd.people[i];
     if p.staff {
         crowd.staff_count = (crowd.staff_count - 1).max(0);
+        if let Some(crew) = p.crew_id {
+            let left = crowd.crew_roster.get(&crew).map_or(0, |n| n - 1);
+            if left > 0 {
+                crowd.crew_roster.insert(crew, left);
+            } else {
+                crowd.crew_roster.remove(&crew);
+            }
+        }
         if let Some(uid) = p.clean_unit_id {
             let ok = p.state == PState::ToDest;
             crowd.staff_done.push(StaffResult { unit_id: uid, ok });
