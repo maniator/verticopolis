@@ -90,12 +90,41 @@ fn the_diner_mirror_stays_out_of_the_save_and_loads_at_zero() {
     seat(&mut sim, food, 5);
     assert_eq!(occupants(&sim, food), 5);
     let save = sim.serialize();
+    let record = |save: &serde_json::Value, id: i64| {
+        save["units"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|u| u["id"].as_i64() == Some(id))
+            .unwrap()
+            .clone()
+    };
+    assert!(
+        record(&save, food).get("occupants").is_none(),
+        "the save leaves it out"
+    );
     let back = deserialize(&save).unwrap();
     let loaded = back.tower.get_unit(food).unwrap();
     assert_eq!((loaded.customers_in, loaded.occupants), (None, 0));
     // The shop's head count is its own rule, so it saves and loads.
     let full = Kind::Shop.facility().population;
+    assert_eq!(record(&save, shop)["occupants"].as_i64(), Some(full));
     assert_eq!(back.tower.get_unit(shop).unwrap().occupants, full);
+}
+
+#[test]
+fn an_older_save_with_a_diner_head_count_loads_it_at_zero() {
+    // Saves written before this rule carry a fast food's full head count.
+    let (sim, food, _) = food_tower();
+    let mut save = sim.serialize();
+    let units = save["units"].as_array_mut().unwrap();
+    let rec = units
+        .iter_mut()
+        .find(|u| u["id"].as_i64() == Some(food))
+        .unwrap();
+    rec["occupants"] = serde_json::json!(Kind::FastFood.facility().population);
+    let back = deserialize(&save).unwrap();
+    assert_eq!(back.tower.get_unit(food).unwrap().occupants, 0);
 }
 
 #[test]
