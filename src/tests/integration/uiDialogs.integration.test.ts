@@ -2184,16 +2184,21 @@ describe("showStats / congratsTower / showUpdateChip — small dialogs & chrome"
     const catalog = catalogFor("modern");
     const taller = { ...catalog, world: { ...catalog.world, maxFloor: 120 } };
     const { ui } = makeUI({ getCatalog: () => taller });
-    ui.congratsTower();
+    ui.congratsTower(vi.fn());
     expect(dialog().textContent?.replace(/\s+/g, " ")).toContain("wedding hall on the 120th floor");
   });
 
-  it("congratsTower announces the TOWER win and closes cleanly", () => {
+  it("congratsTower announces the TOWER win, closes cleanly, and reports only a replacement (#1134)", () => {
     const { ui } = makeUI();
-    ui.congratsTower();
+    const replaced = vi.fn();
+    ui.congratsTower(replaced);
     expect(dialog().textContent).toContain("TOWER achieved");
     click('[data-act="close"]');
     expect(dialog().open).toBe(false);
+    expect(replaced).not.toHaveBeenCalled();
+    ui.congratsTower(replaced);
+    ui.showEventChoice("A fire has broken out!", "$50,000", vi.fn());
+    expect(replaced).toHaveBeenCalledOnce();
   });
 
   it("showUpdateChip reveals the hidden Update chip and wires its click", () => {

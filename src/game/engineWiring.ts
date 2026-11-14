@@ -12,6 +12,7 @@ import { catalogOf, isUnlocked, quoteShaft } from "./portAccess";
 import { noteFrameError } from "./frameErrors";
 import { engineTrapped, noteEngineThrow } from "./engineFault";
 import { appPlacementPaused, refuseAppPlacementWhilePaused } from "./pausedBuild";
+import { pickPersonAt } from "../render/excalibur/personFocus";
 
 /**
  * Engine wiring and post-context-loss engine rebuild, split out of the `GameApp`
@@ -79,9 +80,16 @@ export function wireEngine(app: GameApp): void {
   // A press-without-drag: select (inspect) or, on touch, run the tool. The
   // picked entity resolves transports by collider hit-test and units by the
   // tower's grid lookup (pickEntityAt).
-  app.engine.onTap = (tile, floor, touch, picked) => {
+  app.engine.onTap = (tile, floor, touch, picked, world) => {
     app.audio.start();
     if (app.tool.type === "inspect") {
+      // A tap or click on a walking figure opens their card (#2092); the
+      // figure wins over the room behind it.
+      const person = pickPersonAt(app.engine, world);
+      if (person !== null) {
+        app.clearSelection();
+        if (app.personCard.open(person)) return;
+      }
       // Touch has no hover stream, so mobile shows ONE panel: the tap opens
       // the editor, which folds in the inspector card's diagnostics on mobile
       // (see refreshEditor / templates/editor). The floating card stays a

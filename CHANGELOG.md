@@ -25,6 +25,31 @@ prompt already tells players it is an engine update and shows the new version.
 Entries below 1.51.1 were curated from the commit history after the fact, so they
 are documentation only: no build that a client fetches carries them.
 
+## 3.11.1
+
+- Nobody vanishes on the way anymore. Someone who waits too long for their first elevator walks back the way they came and leaves from there, and anyone already partway up the tower, or on the way home, keeps going until they get there. People waiting for an elevator or stairs you bulldoze find another way up, or walk back out if they had only just set out.
+
+## 3.11.0
+
+- Click or tap a walking person with the Inspect tool to see who they are, why they are out, where they came from, where they are going and how long they have waited, in Classic and Modern.
+- The person card has a Follow button that keeps the camera on them until you move the view or close the card.
+- People no longer stay in a cinema, party hall, restaurant or other venue after it closes. When it closes, everyone inside heads home through the building, and nobody sets out for a film or a party in its last hour, so a cinema is empty once the midnight show lets out.
+
+## 3.10.9
+
+- Rain now falls only on the open sky and the street around your tower. It no longer streaks across the rooms or the basements, so the inside of the building stays dry, as in the original.
+- On a short or sideways phone screen, the crash card's buttons (Reload game, the downloads and Report a bug) now stay pinned to the bottom of the card while its text scrolls, so the way out is always on screen.
+
+## 3.10.8
+
+- A mouse let go over a window or outside the game now ends the drag it started, so a build tool no longer stays pressed, painting or bulldozing when the pointer comes back, and the ghost shows again right away.
+- Dragging a selected elevator's arrow ends when another room or shaft is selected, so it can't resize the wrong shaft or bill a floor twice.
+- On a touchscreen laptop, a tap made while holding Shift or Space no longer builds or bulldozes, the same as a click with either key held.
+- Near the edge of the tower, the gold ghost for a run of floor or lobby now stops flush with the floor below instead of hanging out over open air. A red ghost still shows the whole brush.
+- Riders on an elevator car you sell now get off at once, so buying the car back, or undoing and redoing, no longer puts them back on board.
+- A fire or bomb threat no longer closes a window that is waiting on you, such as an elevator schedule with unsaved changes: time stops, the window says why, and the emergency opens once you close it.
+- The TOWER congratulations wait for such a window to close, and come back if an emergency interrupts them.
+
 ## 3.10.7
 
 - The Bulldoze card has a **Drag clears** choice. **One kind** (the default) keeps a drag to the kind of thing it started on; **Everything** lets one drag clear all it crosses. On a phone the choice sits in a strip over the tower while the bulldozer is armed.

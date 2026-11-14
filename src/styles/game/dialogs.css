@@ -291,6 +291,28 @@
 dialog.crash-card::backdrop {
   background: rgba(0, 0, 0, 0.55);
 }
+/* The crash card scrolls itself (an open <dialog> is its own scroller) and
+   swallows Esc, so its buttons are the only way out. On a short or landscape
+   phone they pin to the bottom of the card the way a dialog footer does
+   (#668; the #664 rule above covers only .modal-box). A sticky box keeps to
+   the scroller's content box, so it sticks above the card's 16px bottom
+   padding, where it rests at the end of the scroll too: stuck and resting
+   look the same. Its shadows cover the 22px above it (the card's 10px gap
+   plus the row's 12px margin, since flex margins do not collapse) and the
+   padding band below it, where scrolled text would show through, and redraw
+   the card's two bottom bevel rows across that band. Literal offsets, as
+   above: they mirror .crash-card's padding (16px) and gap (10px), the
+   .modal-actions margin (12px) and the bevel in --bevel-out. */
+.crash-card > .modal-actions {
+  position: sticky;
+  bottom: 0;
+  background: var(--panel);
+  box-shadow:
+    0 -22px 0 var(--panel),
+    0 14px 0 var(--panel),
+    0 15px 0 var(--r-shadow),
+    0 16px 0 var(--r-dark);
+}
 .crash-card .crash-status {
   min-height: 1.2em;
   color: var(--muted);

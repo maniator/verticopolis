@@ -103,6 +103,7 @@ impl Simulation {
         let rush = self.rush_factor();
         let population = self.elevators.accumulate(&self.tower, dt_minutes, rush);
         self.crowd.begin_step();
+        self.crowd.hour = Some(self.clock.hour());
         // The renderer's queue projection, built once a step at its start
         // (`Crowd::queue_view`), as the TypeScript loop primes it.
         self.crowd.queue_view(&self.tower);

@@ -12,6 +12,7 @@ pub mod routing;
 pub mod spawn;
 pub mod spawn_floors;
 pub mod staff_shift;
+pub mod trip;
 pub mod visits;
 pub mod walk;
 
@@ -116,6 +117,15 @@ pub struct Person {
     /// `Person` shape.
     pub crew_id: Option<i64>,
     pub staff_trip: Option<staff_shift::StaffTrip>,
+    /// Why a plain commute set out (the floor-list trips of `spawn_trips`),
+    /// for the person card (`trip`). Stamped at spawn, draws nothing, and
+    /// the crowd is never saved. Engine-internal: not in the `Person` shape.
+    pub errand: Option<trip::Errand>,
+    /// The tile the person first stood on, so the card can name the room a
+    /// plain commute left, and so one who gives up before boarding walks back
+    /// there and leaves the way they came (`motion::turn_back`).
+    /// Engine-internal: not in the `Person` shape.
+    pub start_x: f64,
 }
 
 impl Person {
@@ -250,6 +260,11 @@ pub struct Crowd {
     /// The queue projection and the (step, tower revision) it was built
     /// for (`queue_view`, `render_reads.rs`). Never saved.
     pub queue_cache: Option<((i64, i64), crate::render_reads::QueueView)>,
+    /// The clock hour of the step, so a venue's visitors keep its opening
+    /// hours: nobody stays in or walks into a venue after it closes. `None`
+    /// (a crowd stepped on its own) leaves every venue open. Set by the
+    /// step; never saved.
+    pub hour: Option<i64>,
 }
 
 impl Crowd {
@@ -283,6 +298,7 @@ impl Crowd {
             closed_cars: Default::default(),
             open_cars: Default::default(),
             queue_cache: None,
+            hour: None,
         }
     }
 
@@ -345,6 +361,11 @@ impl Crowd {
 
     pub fn begin_step(&mut self) {
         self.step += 1;
+    }
+
+    /// Whether venue `kind` is closed this step, by the step's hour.
+    pub fn venue_closed(&self, kind: Kind) -> bool {
+        self.hour.is_some_and(|h| !kind.is_open_at(h))
     }
 
     pub fn take_staff_results(&mut self) -> Vec<StaffResult> {

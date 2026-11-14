@@ -592,8 +592,11 @@ world, in this order:
    (viewW + pad)) + t * speed) % (viewW + pad) - pad / 2` and y `viewH * top +
    row * viewH * band`, with `%` the floating-point remainder.
 
-On rainy days the game also draws `sky.rain` over the whole view, in front of
-the world and the tower: a `tint` fill, then `count` streaks stroked
+On rainy days the game also draws `sky.rain` in front of the world, over the
+open sky only: the view above the ground line (the bottom of floor 1), less
+each above-ground floor row's runs of built tiles, so no rain falls on the
+building or the basements (a wedding hall's garden crown is open sky). Inside
+that clip it draws a `tint` fill, then `count` streaks stroked
 `lineWidth` wide in `stroke`, streak `i` from x `((i * xMul) >>> 0) % viewW`
 (the product taken as a double, then wrapped to an unsigned 32-bit integer)
 and y `((i * yStep) % viewH + t * speed) % viewH`, to `dx`, `dy` pixels

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import * as ex from "excalibur";
 import { inputEng, ptr } from "./towerInputCamera.fixture";
+import { FLOOR, TILE } from "../scale";
 
 /**
  * The Excalibur pointer gesture handlers registered by bindInput, exercised
@@ -202,7 +203,8 @@ describe("pointer up routing", () => {
     const { e, handlers } = inputEng();
     handlers.down(ptr({ tile: 4, floor: 6, sx: 400, sy: 300 }));
     handlers.up(ptr({ tile: 4, floor: 6, sx: 401, sy: 300 }));
-    expect(e.onTap).toHaveBeenCalledWith(4, 6, false, null);
+    // The release's world point rides along, for a pick finer than a tile (#2092).
+    expect(e.onTap).toHaveBeenCalledWith(4, 6, false, null, ex.vec(4 * TILE, -6 * FLOOR));
   });
 
   it("a long pan is not a tap", () => {
@@ -332,7 +334,7 @@ describe("long-press to peek (touch hold)", () => {
     handlers.up(ptr({ touch: true, tile: 4, floor: 6, sx: 401, sy: 300 }));
     vi.advanceTimersByTime(1000);
     expect(e.onLongPress).not.toHaveBeenCalled();
-    expect(e.onTap).toHaveBeenCalledWith(4, 6, true, null); // still a tap
+    expect(e.onTap).toHaveBeenCalledWith(4, 6, true, null, ex.vec(4 * TILE, -6 * FLOOR)); // still a tap
   });
 
   it("releasing after a peek dismisses it and swallows the tap", () => {

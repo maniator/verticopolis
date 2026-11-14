@@ -1,8 +1,9 @@
+import { stepFollow } from "../render/excalibur/personFocus";
 import type { GameApp } from "../main";
 import { decideMealRush } from "./mealRush";
 import { updateTraffic } from "./trafficHud";
 import { tickInstallAffordance } from "./installAffordance";
-import { hasBlockingModal, isEditorBusy, isEngineStopped, isSplashUp } from "./interactionState";
+import { dialogHoldsWork, hasBlockingModal, isEditorBusy, isEngineStopped, isSplashUp } from "./interactionState";
 import { engineTrapped } from "./engineFault";
 import { positionPanels } from "./panelAnchoring";
 import { tickOverviewMap, touchOverviewMap } from "./overviewMapWiring";
@@ -17,6 +18,9 @@ import { peopleWindow } from "../render/excalibur/peopleWindow";
 /** Real milliseconds between two ticks of the bomb's clock. */
 const BOMB_TICK_MS = 1000;
 let lastBombTickAt = -Infinity;
+
+/** What the player reads in the dialog an emergency is waiting behind. */
+export const CHOICE_WAITING_NOTICE = "An emergency needs your answer. Time is stopped until you close this window.";
 
 /**
  * The per-frame simulation + throttled UI/audio refresh, split out of the
@@ -73,6 +77,8 @@ export function runFrame(app: GameApp, dtMs: number): void {
   // modal freeze returns early on below (fps is a render metric, not a sim-tick
   // one).
   gameplaySession.noteFrame();
+  // A followed person keeps the camera on them, paused or not (#2092).
+  stepFollow(app.engine, dtMs);
   // Fold the engine's gameplay events into analytics (#873 phase 2): builds,
   // stars, emergencies and their answers, pricing and capacity. Drained every
   // frame and ahead of the modal freeze below, so an emergency answered in a
@@ -87,6 +93,19 @@ export function runFrame(app: GameApp, dtMs: number): void {
     // Time stands still, but the camera can still move: the view follows it,
     // so people stand where the player pans to.
     readView(app);
+    return;
+  }
+  // An emergency that rolled while a dialog holds the player's work (unsaved
+  // schedule edits) cannot open over it, since that would throw the work away
+  // (#1121). It waits, and time stops the same way it would with the choice on
+  // screen: left running, the engine would decline the choice on its own at
+  // the next day pass. The player is told why in the dialog itself, and the
+  // choice opens on the first frame after that dialog closes.
+  if (app.reader.header.pendingChoice && dialogHoldsWork(app)) {
+    app.accMinutes = 0;
+    // Asked every frozen frame, so a dialog that replaces itself (a pricing
+    // rung opening from the pricing table) still carries the line.
+    app.ui.sayVisibly(CHOICE_WAITING_NOTICE, "info", false);
     return;
   }
   const minutesPerSecond = SPEEDS[app.speed] ?? 0;
@@ -132,6 +151,8 @@ export function runFrame(app: GameApp, dtMs: number): void {
       // Live stat updates reuse the last engine diagnostic until its inputs change.
       app.refreshEditor(false);
     }
+    // The person card reads the engine again, or lets go once its window closed.
+    if (!isEditorBusy(app)) app.personCard.tick();
     // A jingle on every star promotion (2★–5★), not just the TOWER win. The
     // analytics side is the engine's star_reached, through the bridge. The
     // header is this frame's.
@@ -159,7 +180,9 @@ export function runFrame(app: GameApp, dtMs: number): void {
     const splashUp = isSplashUp();
     // Interactive emergency choice (fire rescue / bomb ransom).
     const pc = header.pendingChoice;
-    if (pc && !hasBlockingModal(app) && !splashUp) {
+    // Not over a dialog holding the player's work either: the freeze at the
+    // top of the next frame holds the choice until that dialog closes (#1121).
+    if (pc && !hasBlockingModal(app) && !splashUp && !dialogHoldsWork(app)) {
       app.shownChoice = true;
       app.audio.sfx("error");
       app.ui.showEventChoice(pc.message, `$${groupDigits(pc.cost)}`, (opt) => {
@@ -196,11 +219,18 @@ export function runFrame(app: GameApp, dtMs: number): void {
     // either one they would wipe its buttons and strand the freeze latch it
     // owns (`shownChoice` or `shownUpdate`), and time would never move again.
     // Both can be latched by the lines above in this very pass: the win day
-    // rolls an emergency, and a loaded TOWER save may carry an open one.
-    if (!app.shownWin && !splashUp && !hasBlockingModal(app) && app.enginePort.evaluatedTower()) {
+    // rolls an emergency, and a loaded TOWER save may carry an open one. They
+    // also wait while a dialog holds the player's work, which they would
+    // otherwise throw away (#1121); the win stays won, so nothing is lost.
+    if (!app.shownWin && !splashUp && !hasBlockingModal(app) && !dialogHoldsWork(app) && app.enginePort.evaluatedTower()) {
       app.shownWin = true;
       app.audio.sfx("promote");
-      app.ui.congratsTower();
+      // An emergency that rolls while they are up replaces them (it latches
+      // its freeze before it opens), and they come back once it is answered
+      // (#1134). Anything the player opens over them themselves stays a close.
+      app.ui.congratsTower(() => {
+        if (hasBlockingModal(app)) app.shownWin = false;
+      });
     }
   }
 

@@ -10,6 +10,7 @@ import type { AudioEngine } from "../audio/Audio";
 import type { SaveLoad } from "./saveLoad";
 import type { EditorActions } from "./editorActions";
 import type { InspectorController } from "./inspector";
+import type { PersonCardController } from "./personCard";
 import { NO_GESTURE } from "./appHistory";
 
 /**
@@ -46,6 +47,8 @@ export interface GameAppPorts {
   >;
   readonly editor: Pick<EditorActions, "handleEditAction" | "renameTower">;
   readonly inspector: Pick<InspectorController, "dismiss">;
+  /** The person card (#2092) takes its own buttons before the editor's. */
+  readonly personCard: Pick<PersonCardController, "handleAction">;
   /** The lobby tool's height choice (#308), which the Lobby card picks. */
   readonly lobbyHeight: LobbyHeightPicker;
   /** What a bulldoze drag clears, which the Bulldoze card picks. */
@@ -131,7 +134,9 @@ export function createUICallbacks(app: GameAppPorts): UICallbacks {
     onUndo: () => void app.undo(),
     onRedo: () => void app.redo(),
     undoUnderWay: () => app.undoGesture() !== NO_GESTURE,
-    onEditAction: (action, root) => app.editor.handleEditAction(action, root),
+    onEditAction: (action, root) => {
+      if (!app.personCard.handleAction(action)) app.editor.handleEditAction(action, root);
+    },
     onToggleReducedMotion: () => app.toggleReducedMotion(),
     onToggleSteadyClock: () => app.toggleSteadyClock(),
     isSteadyClock: () => app.isSteadyClock(),

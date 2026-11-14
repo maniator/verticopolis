@@ -1,8 +1,9 @@
-import { afterEach, describe, it, expect, vi } from "vitest";
+import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
 import { kindFacts } from "../tests/catalogKinds";
 import { positionPanels, selectedScreenRect } from "./panelAnchoring";
 import type { GameApp } from "../main";
 import * as moves from "./movableWindows";
+import * as personFocus from "../render/excalibur/personFocus";
 
 /**
  * Unit coverage for the world-anchoring of the DOM panels. Both functions are
@@ -25,6 +26,8 @@ interface FakeParts {
   buildRefusalShowing?: boolean;
   unit?: { x: number; width: number; floor: number; kind: string } | null;
   transport?: { x: number; width: number; top: number } | null;
+  /** The person the person card is open on (#2092). */
+  personOpen?: number | null;
 }
 
 function makeApp(parts: FakeParts = {}) {
@@ -48,6 +51,7 @@ function makeApp(parts: FakeParts = {}) {
     reader: { header: { mode: "classic" } },
     selectedUnit: () => parts.unit ?? null,
     selectedTransport: () => parts.transport ?? null,
+    personCard: { openId: parts.personOpen ?? null },
   };
   return { app: app as unknown as GameApp, ui };
 }
@@ -293,5 +297,50 @@ describe("positionPanels with a facility card the player moved", () => {
     expect(ui.anchorEditor).not.toHaveBeenCalled();
     expect(ui.clearEditorAnchor).toHaveBeenCalledTimes(1);
     expect(forget).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("positionPanels with the person card open (#2092)", () => {
+  beforeEach(() => vi.spyOn(moves, "forgetEditorPlacement").mockImplementation(() => {}));
+  afterEach(() => vi.restoreAllMocks());
+  const rect = { x: 40, y: 90, w: 6 };
+
+  it("on desktop, anchors the card beside the person's figure", () => {
+    vi.spyOn(moves, "editorPlacedByPlayer").mockReturnValue(false);
+    const spot = vi.spyOn(personFocus, "focusScreenRect").mockReturnValue(rect);
+    const { app, ui } = makeApp({ personOpen: 7, isEditorOpen: true });
+    positionPanels(app);
+    expect(spot).toHaveBeenCalledWith(app.engine);
+    expect(ui.anchorEditor).toHaveBeenCalledWith(rect, 800, 600);
+    expect(ui.clearEditorAnchor).not.toHaveBeenCalled();
+  });
+
+  it("on a phone, keeps the card docked", () => {
+    vi.spyOn(moves, "editorPlacedByPlayer").mockReturnValue(false);
+    const spot = vi.spyOn(personFocus, "focusScreenRect").mockReturnValue(rect);
+    const { app, ui } = makeApp({ personOpen: 7, isEditorOpen: true, matches: true });
+    positionPanels(app);
+    expect(spot).not.toHaveBeenCalled();
+    expect(ui.anchorEditor).not.toHaveBeenCalled();
+    expect(ui.clearEditorAnchor).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps a card the player moved where they put it", () => {
+    vi.spyOn(moves, "editorPlacedByPlayer").mockReturnValue(true);
+    const spot = vi.spyOn(personFocus, "focusScreenRect").mockReturnValue(rect);
+    const { app, ui } = makeApp({ personOpen: 7, isEditorOpen: true });
+    positionPanels(app);
+    expect(spot).not.toHaveBeenCalled();
+    expect(ui.anchorEditor).not.toHaveBeenCalled();
+    expect(ui.clearEditorAnchor).not.toHaveBeenCalled();
+  });
+
+  it("keeps the card where it was once the person has left (no spot to follow)", () => {
+    vi.spyOn(moves, "editorPlacedByPlayer").mockReturnValue(false);
+    vi.spyOn(personFocus, "focusScreenRect").mockReturnValue(null);
+    const { app, ui } = makeApp({ personOpen: 7, isEditorOpen: true });
+    positionPanels(app);
+    expect(ui.anchorEditor).not.toHaveBeenCalled();
+    expect(ui.clearEditorAnchor).not.toHaveBeenCalled();
   });
 });

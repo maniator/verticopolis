@@ -252,7 +252,8 @@ export function skyData() {
       weathers: { cloudy: "overcast", rain: "rain" } satisfies Record<Exclude<WeatherKind, "clear">, Extract<PaintSpec, { p: "cloud" }>["weather"]>,
       list: Array.from({ length: CLOUD_COUNT }, (_, i) => ({ frame: i, ...cloudMotion(cloudSeed(i)) })),
     },
-    // Drawn over the whole view, in front of the world, on rainy days.
+    // Drawn in front of the world on rainy days, over the open sky only:
+    // above the ground line and off the building's floor runs (#638).
     rain: RAIN,
   };
 }

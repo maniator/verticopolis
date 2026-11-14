@@ -34,17 +34,25 @@ pub fn advance(crowd: &mut Crowd, dt_sec: f64, tower: &mut Tower) {
         // make them vanish from the cab (3.7.3). Only a wait or a walk can
         // run out of patience.
         if p.age > patience
-            && p.state != PState::ToDest
-            && p.state != PState::Dwelling
-            && p.state != PState::Riding
-            && p.state != PState::Done
+            && matches!(
+                p.state,
+                PState::Waiting | PState::ToShaft | PState::Climbing
+            )
         {
-            if !p.staff {
+            if p.staff {
+                give_up(crowd, i, tower);
+                continue;
+            }
+            // Nobody vanishes (owner, 2026-11-14): someone still on the
+            // floor they set out from walks back and leaves the way they
+            // came. Anyone past their first ride keeps going, since a floor
+            // partway up has no way out.
+            if is_still_setting_out(p) {
                 frustrated += 1;
                 travelling += 1;
+                turn_back(crowd, i);
+                continue;
             }
-            give_up(crowd, i, tower);
-            continue;
         }
         step(crowd, i, dt_sec, tower, &mut landings);
         let p = &crowd.people[i];
@@ -241,10 +249,16 @@ fn step(crowd: &mut Crowd, i: usize, dt: f64, tower: &mut Tower, landings: &mut 
             }
         }
         PState::Dwelling => {
+            // A venue's visitors leave when it closes, the late show's
+            // audience included, rather than wait inside a dark room.
+            let closed = crowd.people[i]
+                .meal_venue_id
+                .and_then(|id| tower.get_unit(id))
+                .is_some_and(|v| crowd.venue_closed(v.kind));
             let p = &mut crowd.people[i];
             let left = p.dwell_seconds_left.unwrap_or(0.0) - dt;
             p.dwell_seconds_left = Some(left);
-            if left <= 0.0 {
+            if left <= 0.0 || closed {
                 transition_to_return(crowd, tower, i);
             }
         }
@@ -326,15 +340,69 @@ pub(super) fn release_seat(crowd: &mut Crowd, i: usize) {
     crowd.people[i].car_index = None;
 }
 
-/// Someone whose trip cannot go on: out of patience, or their shaft or car
-/// gone. A visitor or tenant leaves the picture; a housekeeper never
-/// vanishes mid-tower and stops where they stand for their next errand.
+/// Whether `p` has not yet left the floor their trip began on, outbound:
+/// waiting for or walking to their first car or flight of stairs.
+fn is_still_setting_out(p: &Person) -> bool {
+    !p.returning
+        && p.leg == 0
+        && p.floor == p.origin_floor
+        && matches!(p.state, PState::Waiting | PState::ToShaft)
+        && p.floors.first() == Some(&p.floor)
+}
+
+/// Someone who has waited too long to set out walks back to where they
+/// started and leaves from there (`PState::ToDest` with `returning`, which
+/// ends the trip on arrival), so they go out the way they came in.
+fn turn_back(crowd: &mut Crowd, i: usize) {
+    let p = &mut crowd.people[i];
+    p.state = PState::ToDest;
+    p.returning = true;
+    p.dest_x = p.start_x;
+    p.wait = 0.0;
+    p.linger = 0.0;
+}
+
+/// Someone whose trip cannot go on: a housekeeper out of patience, or
+/// anyone whose shaft or car went. A housekeeper stops where they stand for
+/// their next errand. Anyone else never vanishes on foot: one still setting
+/// out turns back, and one partway up finds another way to where they were
+/// going. Only a rider whose car went from under them, or one left with no
+/// way on at all, leaves the picture.
 fn give_up(crowd: &mut Crowd, i: usize, tower: &mut Tower) {
     if crowd.people[i].staff_trip.is_some() {
         staff_shift::stuck(crowd, i, tower);
-    } else {
+    } else if is_still_setting_out(&crowd.people[i]) {
+        turn_back(crowd, i);
+    } else if crowd.people[i].state == PState::Riding || !reroute(crowd, i, tower) {
         finish(crowd, i, tower);
     }
+}
+
+/// Sends someone on foot partway through a trip on to the trip's last floor
+/// by a new route from where they stand. `false` when there is none.
+fn reroute(crowd: &mut Crowd, i: usize, tower: &Tower) -> bool {
+    let p = &crowd.people[i];
+    let (from, from_x, dest_x) = (p.floor, p.x, p.dest_x);
+    let Some(&to) = p.floors.last() else {
+        return false;
+    };
+    let Some(r) = crowd.route(tower, from, to, Some(from_x), Some(dest_x)) else {
+        return false;
+    };
+    let p = &mut crowd.people[i];
+    p.state = if r.shafts.is_empty() {
+        PState::ToDest
+    } else {
+        PState::ToShaft
+    };
+    p.shaft_id = r.shafts.first().copied();
+    p.floors = r.floors;
+    p.shafts = r.shafts;
+    p.leg = 0;
+    p.car_index = None;
+    p.fy = from as f64;
+    p.wait = 0.0;
+    true
 }
 
 pub fn finish(crowd: &mut Crowd, i: usize, tower: &mut Tower) {

@@ -9,9 +9,11 @@ use crate::clock::Clock;
 use crate::facilities::Kind;
 use crate::tower::{Tower, Unit};
 
+mod lists;
 mod meal_trips;
 mod staff;
 
+use lists::{list_of, stamp_errand, List};
 use meal_trips::{push_meal_options, spawn_meal_outbound};
 pub use staff::spawn_step;
 
@@ -72,6 +74,8 @@ pub fn make_person(
         from_metro: false,
         crew_id: None,
         staff_trip: None,
+        errand: None,
+        start_x: origin_spawn_x as f64,
     };
     crowd.next_id += 1;
     crowd.people.push(person);
@@ -171,6 +175,16 @@ pub fn metro_station_for_platform(tower: &Tower, platform_floor: i64, x: f64) ->
         .map(|u| u.id)
 }
 
+/// Whether a visitor sets out for a venue of `kind` at `hour`: it is open
+/// now, and a show or party (an attendance venue, whose visit runs an hour
+/// or more) is still on next hour. Nobody heads for a show in its last
+/// hour, so nobody is still on the way, or just sitting down, when it
+/// closes and sends everyone home. A meal is short enough to start in a
+/// restaurant's last hour, like last orders.
+pub fn open_for_visits(kind: Kind, hour: i64) -> bool {
+    kind.is_open_at(hour) && (kind.attendance_cap().is_none() || kind.is_open_at((hour + 1) % 24))
+}
+
 pub fn venue_has_room(u: &Unit) -> bool {
     let pop = u.kind.facility().population;
     if pop > 0 {
@@ -184,31 +198,22 @@ pub fn venue_has_room(u: &Unit) -> bool {
 
 // ---- venueTrips.ts ---------------------------------------------------------
 
-fn metro_arrival(crowd: &mut Crowd, tower: &Tower, station: &Unit, to: i64) {
-    let Some(i) = add(crowd, tower, station.floor + 1, to, None, None) else {
-        return;
-    };
+fn metro_arrival(crowd: &mut Crowd, tower: &Tower, station: &Unit, to: i64) -> Option<usize> {
+    let i = add(crowd, tower, station.floor + 1, to, None, None)?;
     crowd.people[i].x = inside_x(crowd, station, 2) as f64;
+    crowd.people[i].start_x = crowd.people[i].x;
     crowd.people[i].from_metro = true;
+    Some(i)
 }
 
-fn metro_departure(crowd: &mut Crowd, tower: &Tower, station: &Unit, from: i64) {
-    let Some(i) = add(crowd, tower, from, station.floor + 1, None, None) else {
-        return;
-    };
+fn metro_departure(crowd: &mut Crowd, tower: &Tower, station: &Unit, from: i64) -> Option<usize> {
+    let i = add(crowd, tower, from, station.floor + 1, None, None)?;
     crowd.people[i].dest_x = inside_x(crowd, station, 2) as f64;
     crowd.people[i].linger_for = Some(crowd.rng.int(METRO_DWELL_MIN, METRO_DWELL_MAX) as f64);
+    Some(i)
 }
 
 // ---- spawn.ts --------------------------------------------------------------
-
-#[derive(Clone, Copy)]
-enum List {
-    LeasedOffices,
-    StaffedOffices,
-    Homes,
-    OpenVenues,
-}
 
 /// A deferred spawn option: the closures of `spawnTrips`, evaluated only
 /// when picked so the rng draws land in the same order.
@@ -311,17 +316,8 @@ pub(crate) fn weighted_index(r: f64, weights: impl Iterator<Item = f64> + Clone)
     last
 }
 
-fn list_of(floors: &SpawnFloors, l: List) -> &[i64] {
-    match l {
-        List::LeasedOffices => &floors.leased_offices,
-        List::StaffedOffices => &floors.staffed_offices,
-        List::Homes => &floors.homes,
-        List::OpenVenues => &floors.open_venues,
-    }
-}
-
-/// A full crowd spawns no one: `spawn_trips` returns on it before any draw,
-/// and `spawn_step` skips the floor lists on it (#1143 item 4).
+/// Stamp the errand of a plain commute just added at `i` (none when the
+/// spawn found no route), for the floor lists on it (#1143 item 4).
 /// The tenants' and visitors' sample is full. Housekeepers on shift are
 /// counted apart: they are in the building all shift, and would otherwise
 /// crowd the tenants out of the picture.
@@ -431,19 +427,28 @@ pub fn spawn_trips(crowd: &mut Crowd, tower: &mut Tower, clock: &Clock, floors: 
                 End::Fixed(f) => f,
                 End::Pick(l) => *crowd.rng.pick(list_of(floors, l)),
             };
-            add(crowd, tower, from, to, None, None);
+            let i = add(crowd, tower, from, to, None, None);
+            // Every floor-list trip runs between a list and the lobby: in
+            // to the list's floor, or out of it.
+            match (*a, *b) {
+                (_, End::Pick(l)) => stamp_errand(crowd, i, l, true),
+                (End::Pick(l), _) => stamp_errand(crowd, i, l, false),
+                _ => {}
+            }
         }
         Opt::MetroArrival(l) => {
             let sid = *crowd.rng.pick(&reachable_metros);
             let to = *crowd.rng.pick(list_of(floors, *l));
             let station = tower.get_unit(sid).unwrap().clone();
-            metro_arrival(crowd, tower, &station, to);
+            let i = metro_arrival(crowd, tower, &station, to);
+            stamp_errand(crowd, i, *l, true);
         }
         Opt::MetroDeparture(l) => {
             let sid = *crowd.rng.pick(&reachable_metros);
             let from = *crowd.rng.pick(list_of(floors, *l));
             let station = tower.get_unit(sid).unwrap().clone();
-            metro_departure(crowd, tower, &station, from);
+            let i = metro_departure(crowd, tower, &station, from);
+            stamp_errand(crowd, i, *l, false);
         }
         Opt::MealOutbound(pi) => {
             let pi = *pi;

@@ -15,6 +15,15 @@ raised the version, so they are documentation only.
 There is no entry for 0.17.0, which only
 existed as a step inside a stacked branch.
 
+## 1.34.1 (2026-11-14)
+
+- Patience no longer removes a visitor or tenant from the crowd. One still on the floor their trip began on turns back (`motion::turn_back`) to where they set out (`Person::start_x`, engine-internal) and leaves there; one past their first ride, or returning, keeps waiting. A shaft that goes from under someone on foot sends them back the same way if they are still setting out, or on by a new route to their trip's last floor (`motion::reroute`); only a rider whose car went, or someone with no way on, leaves the crowd. Housekeepers keep their own rule. The conformance lock, frame days, port edits and fuzz goldens are re-pinned, and the Classic ransom scenario's first threat moved to hour 40.
+
+## 1.34.0 (2026-11-14)
+
+- `personCard(id)` (and `crowd::trip::trip_facts` in Rust) answers one person's trip: why they are out, where the leg they are on began and ends, and their wait, as the layout's new `personCard` record with its `personPurposes`, `tripPlaces` and `shiftSteps` codes (view layout version 23).
+- A venue's visitors keep its opening hours (`Kind::is_open_at`): a dweller leaves when its venue closes, a visitor who arrives after closing turns back, and meal trips and venue visits start only while the venue is open, and for an attendance venue only while it is still open next hour (`crowd::spawn::open_for_visits`). The step passes its clock hour to the crowd (`Crowd::hour`). The conformance lock, frame days, port edits and fuzz goldens are re-pinned, and the Classic ransom scenario's first threat moved to hour 664.
+
 ## 1.33.4 (2026-11-14)
 
 - A meal venue's head count (fast food, restaurant, food hall; `Kind::is_meal_venue`) is the customers inside it (`customers_in`) while it stands, as party halls and cinemas already count their visitors. Commercial kinds no trip is sent to keep their full head count. Like the attendance venues (`Kind::counts_visitors`), a meal venue's head count is left out of the save, starts at 0 on a load or an undo, and is not added to the elevator waiting estimate, since its diners ride as real people. The conformance lock, frame days, port edits and fuzz goldens are re-pinned, and the Classic ransom scenario's first threat moved to hour 304.

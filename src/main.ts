@@ -20,6 +20,7 @@ import type { SaveLoad } from "./game/saveLoad";
 import { announceLive } from "./game/liveRegion";
 import { isSplashUp } from "./game/interactionState";
 import type { InspectorController } from "./game/inspector";
+import type { PersonCardController } from "./game/personCard";
 import type { KeyboardPlay } from "./game/keyboardPlay";
 import { createUICallbacks, type GameAppPorts } from "./game/uiCallbacks";
 import type { UpdateInfo } from "./pwa";
@@ -204,6 +205,7 @@ class GameApp implements GameAppPorts {
   editor!: EditorActions;
   saveLoad!: SaveLoad;
   inspector!: InspectorController;
+  /** The walking person's card (#2092), in the editor window. @internal */ personCard!: PersonCardController;
   /** @internal */ keyboard!: KeyboardPlay;
 
   /** Undo/redo through the port (see {@link UndoHistory}), built in the
@@ -415,6 +417,7 @@ class GameApp implements GameAppPorts {
     // for a facility whose card was ✕-dismissed (matters on touch, where no
     // hover stream exists between taps to spend the latch).
     this.inspector.resetLatch();
+    this.personCard.close(); // the room or shaft takes the window over
     this.selected = { type: p.type, id: p.id };
     this.refreshEditor();
   }
@@ -430,6 +433,7 @@ class GameApp implements GameAppPorts {
   }
 
   /** @internal */ clearSelection(): void {
+    this.personCard?.close();
     this.selected = null;
     // An extend drag ends with its shaft's selection (#1014).
     endArrowDrag(this.engine);

@@ -462,6 +462,9 @@ export function showUpdateChip(_ui: UI, onClick: () => void): void {
   }
 }
 
-export function congratsTower(ui: UI): void {
-  ui.openModalTemplate(congratsTemplate(ui.cb.getCatalog().world.maxFloor, () => ui.closeModal()), { displaceable: true });
+/** The TOWER congratulations. Informational, so anything may replace them, and
+ *  `onDisplaced` runs when something does (an emergency rolled while they were
+ *  up), so the frame loop can bring them back once the way is clear (#1134). */
+export function congratsTower(ui: UI, onDisplaced: () => void): void {
+  ui.openModalTemplate(congratsTemplate(ui.cb.getCatalog().world.maxFloor, () => ui.closeModal()), { displaceable: true, onDisplaced });
 }

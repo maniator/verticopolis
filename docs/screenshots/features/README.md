@@ -92,6 +92,7 @@ tower running, then the same hook the engine raises when the GPU drops the WebGL
 | Screenshot | Shows |
 |---|---|
 | `crash-screen.png` | The crash card that replaced the silent auto-reload (v1.20.0): what happened, the save status, **Download crash report** (a zip with the crash details and the tower save), **Report a bug** (prefilled GitHub issue form), and **Reload game**. |
+| `crash-screen-pinned.png` | The same card on a short 720x240 window, at the top of its scroll: the buttons stay pinned to the bottom of the card over the text still below the fold (#668). The card swallows Esc, so on a phone held sideways these buttons are the only way out. |
 | `boot-no-webgl.png` | The no-WebGL boot screen (v1.84.4): a fixed full-viewport overlay naming the remedy (enable hardware acceleration or WebGL) with a **Reload** button. Staged by the `boot-no-webgl` scene stubbing the WebGL contexts before boot; pinned in the gallery because this screen once shipped invisible (the live Firefox report). |
 
 ## Security guards (the bomb search and a quiet day)
@@ -124,3 +125,12 @@ longest list there is (`scripts/scenes/paletteFit.ts`).
 | `palette-fit-compact.png` | The Tools window alone on a 1600x1150 window: compact rows in one column, at the window's usual width. |
 | `palette-sections-folded.png` | 1280x800 with Living, Leisure and Services folded from their headers: the list is short enough for one column of normal rows again. |
 | `palette-folded.png` | 1280x800 with the whole window folded into a strip by its title bar's ◂ button. |
+
+## Rain (it falls on the sky, not in the rooms)
+
+Captured from the built app via the unified generator (`scripts/screenshots.ts`, the last shot of the `lobby-awnings`
+scene) on the canon tower at noon, with the weather pinned to rain on the render sim.
+
+| Screenshot | Shows |
+|---|---|
+| `rain-sheltered.png` | The tower's left edge at 2x zoom on a rainy day: the gray tint and the streaks fall on the open sky, the fire escape and the street, and stop at the building's walls and at the ground line, so the rooms stay dry (#638). |

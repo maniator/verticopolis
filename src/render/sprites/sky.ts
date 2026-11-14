@@ -61,7 +61,8 @@ export function cloudMotion(seed: number): { speed: number; row: number; offset:
  *  and y `viewHeight * baseY - sin(p * PI) * viewHeight * lift`. */
 export const SUN_ARC = { rise: 6, set: 18, baseY: 0.62, lift: 0.5 } as const;
 
-/** The rain over the whole view on rainy days: a `tint` fill, then `count`
+/** The rain over the open sky on rainy days (never on the building, #638):
+ *  a `tint` fill, then `count`
  *  streaks stroked `lineWidth` wide in `stroke`. Streak i starts at x
  *  `((i * xMul) >>> 0) % viewW` (the product as a double, then to uint32) and
  *  y `((i * yStep) % viewH + t * speed) % viewH`, and runs `dx`, `dy` px. */

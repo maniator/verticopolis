@@ -1,4 +1,6 @@
+import { drawPersonRing } from "./personFocus";
 import { RAIN } from "../sprites/sky";
+import { clipToOpenSky } from "./rainShelter";
 import { isElevatorKind } from "../../presentation/viewKinds";
 import { catalogFacility } from "../../catalog/catalogTypes";
 import { towerCatalog } from "../../catalog/towerCatalog";
@@ -148,6 +150,7 @@ export function drawOverlay(engine: TowerEngine, ctx: CanvasRenderingContext2D):
   renderThief(engine, ctx);
   drawPreview(engine, ctx);
   drawSelection(engine, ctx);
+  drawPersonRing(engine, ctx);
   drawRuler(engine, ctx);
 }
 
@@ -336,13 +339,20 @@ function renderThief(engine: TowerEngine, ctx: CanvasRenderingContext2D): void {
   drawThief(ctx, x, y, floorFigureScale(engine.cam.zoom), engine.thiefCaught, { frame: strideFrame(lit, thiefX(engine.thiefSpan, p) * TILE, 0), lit });
 }
 
-/** Rain falls in front of the tower on rainy days (overlay layer). */
-function drawRain(engine: TowerEngine, ctx: CanvasRenderingContext2D): void {
+/** Rain falls on the open sky on rainy days (overlay layer), never on the
+ *  building or below the ground (#638). */
+export function drawRain(engine: TowerEngine, ctx: CanvasRenderingContext2D): void {
   if (engine.sim.weather !== "rain") return;
   const W = engine.viewWidth;
   const H = engine.viewHeight;
-  const t = engine.d.anim;
-  // A faint overcast tint over the whole scene.
+  ctx.save();
+  if (clipToOpenSky(engine, ctx, W, H)) paintRain(ctx, W, H, engine.d.anim);
+  ctx.restore();
+}
+
+/** The rain itself, inside whatever clip the caller set. */
+function paintRain(ctx: CanvasRenderingContext2D, W: number, H: number, t: number): void {
+  // A faint overcast tint over the open sky.
   ctx.fillStyle = RAIN.tint;
   ctx.fillRect(0, 0, W, H);
   ctx.strokeStyle = RAIN.stroke;
