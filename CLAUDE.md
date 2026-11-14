@@ -104,8 +104,9 @@ review skill. The BMAD agent rules live in `_bmad-output/project-context.md`.
 - **Declare the version tier in a change note; never edit a version.** A PR that
   changes a deployed path adds `.changes/<branch-slug>.md` with `app:` keyed to
   "would a player notice anything different?" (**major** for a save/compat break
-  or a headline milestone, **minor** as the default for anything a player
-  notices, **patch** for a fix-only re-deploy, **none** for internal-only work),
+  or a headline milestone, **minor** for a new feature (or, for the crate, a
+  new API), **patch** for a bug fix or behavior correction even when a player
+  notices it (owner, 2026-11-14), **none** for internal-only work),
   `crate:` for the engine crate, and the `## Player` / `## Engine` lines. The
   release driver's `npm run release` PR (a `release/` branch) raises the
   versions and writes both changelogs; `scripts/version-check.ts` fails a

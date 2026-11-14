@@ -1,9 +1,9 @@
 //! Housekeeping legibility (housekeeping-overhaul GDD, epic 3), from the
 //! retired `housekeepingLegibility.integration.test.ts`: infestation alerts
 //! name their floors (folded into ranges), the cleanliness overlay tells an
-//! infested room from an unreached one and shades condos as not applicable,
-//! yesterday's report counts the rooms left over, and a maid steps out of her
-//! own station.
+//! infested room from an unreached one and shades condos and Modern rentals
+//! as not applicable, yesterday's report counts the rooms left over, and a
+//! maid steps out of her own station.
 use super::{seeded_game, MID};
 use crate::clock::GameMode;
 use crate::facilities::Kind;
@@ -112,6 +112,31 @@ fn the_cleanliness_overlay_tells_infested_from_unreached_and_shades_condos_na() 
 }
 
 #[test]
+fn the_cleanliness_overlay_shades_modern_rentals_na_like_condos() {
+    let mut sim = seeded_game(55, GameMode::Modern);
+    for x in X0..X0 + 30 {
+        assert!(sim.tower.place(Kind::Floor, 2, x).ok);
+    }
+    let studio_x = X0;
+    let apartment_x = X0 + 15;
+    assert!(sim.tower.place(Kind::RentalStudio, 2, studio_x).ok);
+    assert!(sim.tower.place(Kind::RentalApartment, 2, apartment_x).ok);
+    let cells = sim.floor_heatmap(HeatmapMode::Cleanliness);
+    for x in [studio_x, apartment_x] {
+        let c = cells
+            .iter()
+            .find(|c| c.floor == 2 && c.min_x == x)
+            .unwrap_or_else(|| panic!("a cell for the rental at {x}"));
+        assert_eq!(
+            c.tint,
+            Some("na"),
+            "a rental no crew cleans is not applicable"
+        );
+        assert_eq!(c.severity, 0.0, "never on the red ramp");
+    }
+}
+
+#[test]
 fn the_report_is_empty_before_the_first_checkout_and_counts_the_leftover_after() {
     let mut sim = base_tower(54);
     assert_eq!(sim.housekeeping.yesterday, None);
@@ -135,8 +160,10 @@ fn a_dispatched_maid_steps_out_of_her_station() {
     let hk = sim.tower.place(Kind::Housekeeping, 2, X0 + 8);
     assert!(hk.ok);
     let crew = sim.tower.get_unit(hk.unit_id.unwrap()).unwrap().clone();
+    sim.seat_crews();
     sim.clock.minutes = ONE_PM;
     sim.dispatch_housekeepers();
-    let maid = sim.crowd.people.iter().find(|p| p.staff).expect("a maid");
+    let maid = sim.crowd.people.iter().find(|p| p.clean_unit_id.is_some());
+    let maid = maid.expect("a maid on the room");
     assert_eq!(maid.x, (crew.x as f64) + (crew.width as f64) / 2.0);
 }

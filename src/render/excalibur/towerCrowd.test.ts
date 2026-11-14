@@ -2,13 +2,14 @@ import { describe, it, expect, vi } from "vitest";
 import { kindFacts } from "../../tests/catalogKinds";
 import * as ex from "excalibur";
 import { FLOOR, TILE } from "../scale";
-import { carIndicator, type CarIndicator } from "../carIndicator";
+import { cabFit, carIndicator, type CarIndicator } from "../carIndicator";
 import { reap, reconcileCrowd, clearCrowd, clearMotion, tickCrowdClock, updateMotion } from "./towerCrowd";
 import { Z } from "../depthPlanes";
 import { HallDoorLayer } from "./towerHallDoors";
 import { advanceGlide, figureOf, MAX_STEP_MS, MAX_STRIDE_TILES, newGlide } from "./crowdLook";
 import { FIGURE_H, FIGURE_W } from "./peopleGfx";
 import { castIndex, LOOK } from "../pixelSprites/people";
+import { emptyFlightPass } from "../venueFlights";
 
 /** One drawn frame of `ms`: the step clock, then the crowd pass (the order `TowerEngine.tick` runs them in). */
 function frame(e: any, ms = 1000 / 60): void {
@@ -23,8 +24,8 @@ function frame(e: any, ms = 1000 / 60): void {
  * the Playwright tier. Everything that repositions or reconciles pre-built
  * actors IS unit-testable with real (drawing-free) `ex.Actor`s and fake
  * graphics: this drives the crowd reconciler, the clear paths, the pure `reap`
- * tail, and updateMotion across cars, the metro train, the garbage truck,
- * and garage cars, asserting positions/visibility, not just no-throw (the
+ * tail, and updateMotion across cars, the garbage truck and garage cars,
+ * asserting positions/visibility, not just no-throw (the metro train and the
  * passers-by live in towerCrowdMotion.test.ts).
  */
 
@@ -62,6 +63,7 @@ function eng(over: Record<string, any> = {}): any {
     cam: { zoom: 1 },
     crowdCulled: false,
     crowdActors: new Map(),
+    flightPass: emptyFlightPass(),
     hallDoors: new HallDoorLayer(),
     carActors: [],
     trainActors: [],
@@ -252,33 +254,6 @@ describe("reconcileCrowd draws one actor per live person", () => {
     expect(rec.actor.z).toBe(Z.walking);
   });
 
-  it("gets a rider in and out of a car when the drawn car arrives, not a step early", () => {
-    const person = { id: 1, seed: 0, staff: false, state: "waiting", x: 10, fy: 5, wait: 0 };
-    const e = eng({ sim: { ...eng().sim, crowd: { people: [person] } } });
-    frame(e, 16);
-    frame(e, 484);
-    const rec = e.crowdActors.get(1);
-    // The engine puts them in the car on this step; the drawn car is still
-    // gliding to the landing, so they wait there in sight.
-    Object.assign(person, { state: "riding" });
-    e.sim.clock = { ...e.sim.clock, minutes: 1 };
-    frame(e, 16);
-    frame(e, 100);
-    expect(rec.actor.graphics.isVisible, "while the car is on its way").toBe(true);
-    // The glide ends: they are in the car.
-    frame(e, 1000);
-    expect(rec.actor.graphics.isVisible, "once the car is there").toBe(false);
-    // Out at floor 9: hidden until the drawn car gets there, then standing at the landing.
-    Object.assign(person, { state: "toDest", fy: 9, x: 11 });
-    e.sim.clock = { ...e.sim.clock, minutes: 2 };
-    frame(e, 600);
-    expect(rec.actor.graphics.isVisible, "while the car rides up").toBe(false);
-    e.sim.clock = { ...e.sim.clock, minutes: 3 };
-    frame(e, 600);
-    expect(rec.actor.graphics.isVisible, "the next step").toBe(true);
-    expect(rec.actor.pos.y).toBeCloseTo(-9 * FLOOR + FLOOR - 3, 6);
-  });
-
   it("keeps an even leg cadence at a fast speed instead of strobing", () => {
     const g = newGlide(0, 5, false);
     // A fast step: 30 tiles in two drawn frames.
@@ -302,6 +277,34 @@ describe("reconcileCrowd draws one actor per live person", () => {
     const rec = e.crowdActors.get(1);
     expect(rec.actor.pos.x).toBeCloseTo(30 * TILE, 6);
     expect(rec.actor.pos.y).toBeCloseTo(-9 * FLOOR + FLOOR - 3, 6);
+  });
+
+  it("keeps a riding housekeeper with their car on a fast step, never jumping ahead of it", () => {
+    // A fast car covers three floors in a step: the drawn car glides there
+    // (carMotion), so the rider glides too instead of jumping to the new floor
+    // and hanging in the empty shaft until the car arrives.
+    const person = { id: 1, seed: 0, staff: true, state: "riding", x: 10, fy: 5, wait: 0 };
+    const e = eng({ sim: { ...eng().sim, crowd: { people: [person] } } });
+    frame(e, 16);
+    frame(e, 400); // a step lasts about this long, so the next one glides over it
+    Object.assign(person, { fy: 8 });
+    e.sim.clock = { ...e.sim.clock, minutes: 1 };
+    frame(e, 16);
+    const y = e.crowdActors.get(1).actor.pos.y;
+    const at = (fy: number) => -fy * FLOOR + FLOOR - 3;
+    expect(y).toBeLessThan(at(5));
+    expect(y).toBeGreaterThan(at(8));
+    // The step that lets them off at floor 11 is the car's last glide too.
+    frame(e, 400);
+    Object.assign(person, { state: "toDest", fy: 11 });
+    e.sim.clock = { ...e.sim.clock, minutes: 2 };
+    frame(e, 16);
+    const off = e.crowdActors.get(1).actor.pos.y;
+    expect(off).toBeLessThan(at(8));
+    expect(off).toBeGreaterThan(at(11));
+    // A walker making the same hop is not on a car, so it still jumps.
+    expect(advanceGlideJumps(false)).toBe(true);
+    expect(advanceGlideJumps(true)).toBe(false);
   });
 
   it("vacuums while a housekeeper dwells at a room, and climbs on the stairs", () => {
@@ -404,7 +407,7 @@ describe("updateMotion repositions the moving actors", () => {
   it("moves each elevator car to its live shaft position and repaints on a state change", () => {
     const cap = kindFacts("elevatorStandard").carCapacity ?? 0;
     expect(cap, "a standard elevator car carries passengers").toBeGreaterThan(0);
-    const changedInd = carIndicator(1, cap, cap); // ascending & full: differs from idle
+    const changedInd = carIndicator(1, cap, cap, cabFit(4 * TILE), 0); // ascending & full: differs from idle
     const changedKey = carKey(changedInd);
     const car = {
       actor: actor(),
@@ -426,27 +429,6 @@ describe("updateMotion repositions the moving actors", () => {
     expect(car.actor.pos.x).toBeCloseTo(12 * TILE, 6);
     expect(car.actor.pos.y).toBeCloseTo(-8 * FLOOR, 6);
     expect(car.shown).toBe(changedKey); // adopted the new indicator state
-  });
-
-  it("runs the metro train on game time: in from the left, held, then off the right", () => {
-    const xs: number[] = [];
-    const train = { actor: actor(), u: { x: 20, floor: 3 }, w: 40, shift: (offset: number) => xs.push(offset) };
-    const clockAt = (minute: number, night = false) => ({ hour: Math.floor(minute / 60), minuteOfDay: minute, isMorning: () => false, isEvening: () => false, isNight: () => night });
-    const e = eng({ trainActors: [train] });
-    for (const minute of [12 * 60 + 3, 12 * 60 + 10, 12 * 60 + 23]) {
-      e.sim = { ...e.sim, clock: clockAt(minute) };
-      updateMotion(e);
-    }
-    // The three legs (arrive / hold / depart) put the train at distinct
-    // offsets inside the station-wide canvas: off the left, in place, off the right.
-    expect(xs[0]).toBeLessThan(0);
-    expect(xs[1]).toBe(0);
-    expect(xs[2]).toBeGreaterThan(0);
-    // Overnight it stays inside the tunnel however the animation clock runs.
-    e.sim = { ...e.sim, clock: clockAt(2 * 60 + 10, true) };
-    e.d.anim = 7;
-    updateMotion(e);
-    expect(xs[3]).toBe(-(train.w + 12));
   });
 
   it("shows the garbage truck only during the collection hour at a running plant", () => {
@@ -480,3 +462,10 @@ describe("updateMotion repositions the moving actors", () => {
     expect(idleCar.actor.graphics.isVisible).toBe(false);
   });
 });
+
+/** Whether a three-floor hop on a step's first frame lands at once. */
+function advanceGlideJumps(riding: boolean): boolean {
+  const g = newGlide(10, 5, false);
+  advanceGlide(g, 10, 8, true, 0.25, true, riding);
+  return g.fy === 8;
+}

@@ -91,6 +91,8 @@
     clippy::collapsible_match
 )]
 
+#[cfg(test)]
+mod basement_homes_tests;
 pub mod brush;
 pub mod build;
 pub mod canonical;
@@ -121,6 +123,7 @@ pub mod frame;
 pub mod gameplay;
 #[doc(hidden)]
 pub mod housekeeping;
+pub(crate) mod housekeeping_shift;
 pub mod identity;
 #[doc(hidden)]
 pub mod jsmath;

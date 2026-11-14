@@ -104,3 +104,24 @@ describe("the people cast (#2097)", () => {
     expect(cart("stand")).toBe(0);
   });
 });
+
+describe("a figure lying down (#2116)", () => {
+  it("is the upright figure turned a quarter turn, with no floor shadow", () => {
+    const X = 40;
+    const F = 30;
+    const dims = { legs: 0, torso: 6, head: 6, seated: true, width: 4 };
+    for (const look of CAST) {
+      const upright = recorder();
+      drawPerson(upright.ctx, X, F, look, { lit: false, pose: "stand", empty: true, dims });
+      const lying = recorder();
+      drawPerson(lying.ctx, X, F, look, { lit: false, pose: "stand", empty: true, dims, lying: true });
+      const shadow = (r: { color: string }) => r.color.startsWith("rgba(0,0,0");
+      // Upright cell (column, row) lands at (row, -column - 1) about the foot point.
+      const turned = upright.rects.filter((r) => !shadow(r)).map((r) => ({
+        x: X + (r.y - F), y: F - (r.x - X) - r.w, w: r.h, h: r.w, color: r.color,
+      }));
+      expect(lying.rects).toEqual(turned);
+      expect(lying.rects.some(shadow)).toBe(false);
+    }
+  });
+});

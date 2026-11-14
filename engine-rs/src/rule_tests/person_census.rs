@@ -132,8 +132,14 @@ fn the_lunch_rush_moves_the_overlay_and_never_the_population() {
         assert_eq!(sim.population(), base, "live eaters are not the census");
     }
     assert!(overlay && eating);
-    for _ in 0..120 {
+    // The one elevator is crowded at lunch, so the last eater gets home some
+    // time in the next few hours; until then the overlay counts them.
+    for _ in 0..240 {
+        if sim.tower.associated_population(false) == 0 {
+            break;
+        }
         sim.tick(1.0);
+        assert_eq!(sim.population(), base, "live eaters are not the census");
     }
     assert_eq!(sim.tower.associated_population(false), 0);
     assert_eq!(sim.population(), base);

@@ -69,12 +69,18 @@ export const CARD_TEXT_CASES: readonly string[] = [
  *  before the cards are read, in 10-minute ticks. A shaft's load line needs
  *  riders measured over time, and a save does not carry that measurement, so
  *  the every-transport case plays a morning on the loaded tower, and the
- *  crowded lift a day and a half, past the near-capacity line. */
+ *  crowded lift 35 hours, to its busiest reading. */
 export const CARD_TEXT_PLAY_MINUTES: ReadonlyMap<string, number> = new Map([
   ["every transport", 8 * 60],
-  ["crowded lift", 36 * 60],
+  ["crowded lift", 35 * 60],
 ]);
 export const CARD_TEXT_TICK_MINUTES = 10;
+
+/** The least load the crowded lift must read, in percent. */
+const CROWDED_LIFT_LEAST_LOAD = 80;
+/** The engine's near-capacity line, in percent (`NEAR_CAPACITY_UTILIZATION`
+ *  in `engine-rs/src/panels/elevators.rs`). */
+const NEAR_CAPACITY_PERCENT = 85;
 
 /** Play a case's minutes on an engine that has just loaded its tower. */
 export function playCardTextCase(name: string, tick: (minutes: number) => void): void {
@@ -137,9 +143,18 @@ export function expectRealLines(g: CardTextGolden): void {
   // which its own line says, and both cards leave "Main gripe" out.
   if (is("service rooms, unhappy")) expect(starting("Main gripe:"), `${label}: the unserved office printed a gripe`).toBe(0);
   else if (isOneOf(["lobby distance, unhappy", "winning tower, unhappy"])) expect(starting("Main gripe:"), `${label}: no tenant printed a gripe`).toBeGreaterThan(0);
+  // The crowded lift runs close to full. Riders stay aboard to their floors
+  // since 3.7.3, so its one car stops for each of them and its load peaks
+  // near the engine's near-capacity line: Classic's reads past it, Modern's
+  // just short of it. The card must word the load it reads, near capacity
+  // only above 85%.
   if (is("crowded lift")) {
-    const near = g.transports.flatMap((t) => t.lines).filter((l) => l.includes("Near capacity")).length;
-    expect(near, `${label}: the crowded lift never read near capacity`).toBe(1);
+    const loads = g.transports.flatMap((t) => t.lines).filter((l) => l.startsWith("Avg load:"));
+    const pct = Number(/^Avg load: (\d+)% full/.exec(loads[0] ?? "")?.[1] ?? Number.NaN);
+    expect([loads.length, pct >= CROWDED_LIFT_LEAST_LOAD], `${label}: the crowded lift reads one load, at least ${CROWDED_LIFT_LEAST_LOAD}% full: ${JSON.stringify(loads)}`).toEqual([1, true]);
+    // The card rounds the load, so a load just past the line prints as 85%.
+    const near = loads[0].includes("Near capacity");
+    expect(near ? pct >= NEAR_CAPACITY_PERCENT : pct <= NEAR_CAPACITY_PERCENT, `${label}: the card words a ${pct}% load`).toBe(true);
   }
   const centers = g.units.filter((u) => u.kind === "recycling").map((u) => u.lines);
   const fillOf = (lines: readonly string[]): number =>

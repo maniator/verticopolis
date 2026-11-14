@@ -301,7 +301,8 @@ fn eaters_count_at_the_venue_they_were_sent_to() {
             .crowd
             .people
             .iter()
-            .filter(|p| p.state == PState::Dwelling)
+            // Eaters only: an office worker out on a sales call dwells too.
+            .filter(|p| p.state == PState::Dwelling && p.meal_venue_id.is_some())
         {
             assert_eq!(p.venue_unit_id, Some(food));
             dwelling += 1;
@@ -314,6 +315,8 @@ fn eaters_count_at_the_venue_they_were_sent_to() {
             .count();
         let venue = sim.tower.get_unit(food).unwrap();
         assert_eq!(venue.customers_in.unwrap_or(0), counted as i64);
+        // The room draws the eaters inside it, no stand-ins.
+        assert_eq!(venue.occupants, counted as i64);
         if dwelling > 0 {
             saw_eater = true;
             assert_eq!(

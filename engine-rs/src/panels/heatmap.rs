@@ -183,7 +183,10 @@ impl Simulation {
         let mut out = Vec::new();
         for u in self.tower.room_units() {
             let max_x = u.x + u.width - 1;
-            if u.kind == Kind::Condo && u.is_operational() {
+            // A home no crew cleans (a condo, a Modern rental) is shaded not
+            // applicable, so it never reads as a hotel room the crew cannot
+            // reach (#679).
+            if (u.kind == Kind::Condo || u.kind.is_rental()) && u.is_operational() {
                 out.push(cell(u.floor, u.x, max_x, 0.0, Some("na")));
                 continue;
             }

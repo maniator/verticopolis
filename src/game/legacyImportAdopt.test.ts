@@ -2,12 +2,16 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { trackFileImported } from "../analytics";
 import { SaveGame } from "../storage/SaveGame";
 import { adoptConfirmedLegacyImport } from "./legacyImportAdopt";
+import { __resetSlotGuardForTest, homeSlot } from "../storage/slotGuard";
 
 vi.mock("../analytics", async (importActual) => ({
   ...(await importActual<typeof import("../analytics")>()),
   trackFileImported: vi.fn(),
 }));
-vi.mock("../storage/SaveGame", () => ({ SLOT_COUNT: 3, SaveGame: { hasSlot: vi.fn(() => false), saveSlot: vi.fn() } }));
+vi.mock("../storage/SaveGame", () => ({
+  SLOT_COUNT: 3,
+  SaveGame: { hasSlot: vi.fn(() => false), saveSlot: vi.fn(), slotRaw: vi.fn((n: number) => `VCZ1:slot ${n}`) },
+}));
 vi.mock("./portLifecycle", async (importActual) => ({
   ...(await importActual<typeof import("./portLifecycle")>()),
   saveText: vi.fn(() => "SAVE"),
@@ -53,5 +57,15 @@ describe("adopting a confirmed .TDT import", () => {
     expect(refusedStage.deps.towerSwapped).not.toHaveBeenCalled();
     expect(refusedAdopt.deps.towerSwapped).not.toHaveBeenCalled();
     expect(trackFileImported).not.toHaveBeenCalled();
+  });
+
+  it("makes the slot the copy went into the imported tower's own, so saving there asks nothing", () => {
+    __resetSlotGuardForTest();
+    vi.mocked(SaveGame.hasSlot).mockImplementation((n) => n === 1); // slot 1 is taken
+    const { deps } = setup();
+    adoptConfirmedLegacyImport(deps, "Old Tower", () => {}, () => OK);
+    expect(SaveGame.saveSlot).toHaveBeenCalledExactlyOnceWith(2, "SAVE");
+    expect(homeSlot((n) => `VCZ1:slot ${n}`)).toBe(2);
+    vi.mocked(SaveGame.hasSlot).mockImplementation(() => false);
   });
 });

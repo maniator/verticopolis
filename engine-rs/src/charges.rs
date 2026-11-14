@@ -408,7 +408,7 @@ impl Simulation {
             let refund = if state == UnitState::Gutted {
                 0.0
             } else {
-                kind.resale_refund()
+                self.tower.sale_refund(u)
             };
             // A sold condo belongs to its household: removing it buys the
             // unit back at the price it sold for, as an owner leaving does
