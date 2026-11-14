@@ -136,7 +136,7 @@ export class TowerEngine {
    *  @internal friend-module access (towerInputCamera / towerOverlay). */
   arrowHit: { up?: ScreenRect; down?: ScreenRect } = {};
   /** Active extend-arrow drag end. @internal (towerInputCamera/towerScene). */
-  arrowDrag: { end: "up" | "down" } | null = null;
+  arrowDrag: { end: "up" | "down"; shaft: number | null } | null = null;
 
   // Excalibur pointer gesture state. Contacts are tracked by their NATIVE
   // pointer id (stablePointerId), never Excalibur's public id: Excalibur 0.32

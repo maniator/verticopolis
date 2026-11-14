@@ -2,6 +2,7 @@ import { createAppHistory, type AppHistory } from "./game/appHistory";
 import type { FacilityKind } from "./shared/types";
 import type { TransportView, UnitView } from "./simport/view";
 import { TowerEngine, type Picked } from "./render/excalibur/TowerEngine";
+import { endArrowDrag } from "./render/excalibur/pressLifecycle";
 import { AudioEngine } from "./audio/Audio";
 import { SaveGame } from "./storage/SaveGame";
 import { loadPrefs, type Prefs } from "./storage/Prefs";
@@ -26,6 +27,7 @@ import type { FrameErrorEntry } from "./game/crashReport";
 import { wireControllers, runBootFlow } from "./game/appBoot";
 import { wireEngine } from "./game/engineWiring";
 import { bindKeys } from "./game/inputKeys";
+import { watchLostRelease } from "./game/lostRelease";
 import { SPEEDS, applySpeed } from "./game/frameLoop";
 import { placeSimpleBuild, updateBuildPreview, isTransportTool, pickedAt, clearBuildRefusal, refreshBuildPreview } from "./game/buildPreview";
 import { LobbyHeightChoice, trackLobbyHeightKeys } from "./game/lobbyHeight";
@@ -263,6 +265,8 @@ class GameApp implements GameAppPorts {
 
     wireEngine(this);
     bindKeys(this);
+    // A tower press let go off the canvas, or cut off by a blur, ends (#1014).
+    watchLostRelease(this);
     trackLobbyHeightKeys(this.lobbyHeight, window);
     this.lobbyHeight.onChange(() => refreshBuildPreview(this));
     // Prime the UI once before the first paint. The palette starts with every
@@ -427,6 +431,8 @@ class GameApp implements GameAppPorts {
 
   /** @internal */ clearSelection(): void {
     this.selected = null;
+    // An extend drag ends with its shaft's selection (#1014).
+    endArrowDrag(this.engine);
     this.engine.selectedId = null;
     this.ui.hideEditor();
   }
