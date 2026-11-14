@@ -241,10 +241,16 @@ fn step(crowd: &mut Crowd, i: usize, dt: f64, tower: &mut Tower, landings: &mut 
             }
         }
         PState::Dwelling => {
+            // A venue's visitors leave when it closes, the late show's
+            // audience included, rather than wait inside a dark room.
+            let closed = crowd.people[i]
+                .meal_venue_id
+                .and_then(|id| tower.get_unit(id))
+                .is_some_and(|v| crowd.venue_closed(v.kind));
             let p = &mut crowd.people[i];
             let left = p.dwell_seconds_left.unwrap_or(0.0) - dt;
             p.dwell_seconds_left = Some(left);
-            if left <= 0.0 {
+            if left <= 0.0 || closed {
                 transition_to_return(crowd, tower, i);
             }
         }

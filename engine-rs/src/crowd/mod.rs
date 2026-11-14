@@ -250,6 +250,11 @@ pub struct Crowd {
     /// The queue projection and the (step, tower revision) it was built
     /// for (`queue_view`, `render_reads.rs`). Never saved.
     pub queue_cache: Option<((i64, i64), crate::render_reads::QueueView)>,
+    /// The clock hour of the step, so a venue's visitors keep its opening
+    /// hours: nobody stays in or walks into a venue after it closes. `None`
+    /// (a crowd stepped on its own) leaves every venue open. Set by the
+    /// step; never saved.
+    pub hour: Option<i64>,
 }
 
 impl Crowd {
@@ -283,6 +288,7 @@ impl Crowd {
             closed_cars: Default::default(),
             open_cars: Default::default(),
             queue_cache: None,
+            hour: None,
         }
     }
 
@@ -345,6 +351,11 @@ impl Crowd {
 
     pub fn begin_step(&mut self) {
         self.step += 1;
+    }
+
+    /// Whether venue `kind` is closed this step, by the step's hour.
+    pub fn venue_closed(&self, kind: Kind) -> bool {
+        self.hour.is_some_and(|h| !kind.is_open_at(h))
     }
 
     pub fn take_staff_results(&mut self) -> Vec<StaffResult> {
