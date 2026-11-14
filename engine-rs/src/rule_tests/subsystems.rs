@@ -60,7 +60,9 @@ fn at(pos: f64, floor: i64) -> bool {
 #[test]
 fn a_car_climbs_toward_a_floor_with_waiting_passengers() {
     let (mut tower, id) = tower_with_elevator(10);
-    let office = tower.place(Kind::Office, 8, 10).unit_id.unwrap();
+    // A condo: an office's workers ride as crowd people, outside the
+    // dispatch's estimate.
+    let office = tower.place(Kind::Condo, 8, 10).unit_id.unwrap();
     let u = tower.get_unit_mut(office).unwrap();
     u.state = UnitState::Occupied;
     u.occupants = 6;

@@ -36,7 +36,8 @@ impl Reference {
         });
         let served = tower.served_floors();
         for u in tower.room_units() {
-            if u.kind.attendance_cap().is_some() {
+            // Office workers ride as real people (`crowd::commuters`).
+            if u.kind.attendance_cap().is_some() || u.kind.commutes_in_person() {
                 continue;
             }
             if u.occupants <= 0 || !served.contains(&u.floor) {

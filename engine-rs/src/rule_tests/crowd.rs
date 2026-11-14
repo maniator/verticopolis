@@ -48,6 +48,15 @@ fn open_standing_cars(sim: &mut Simulation) {
 
 /// `crowd.update(dt, tower, clock)`: one spawn step and one motion step on
 /// a clear day, with no cars moved (the ones standing on a floor open).
+/// Books the office workers' arrivals and departures for the hour the
+/// clock is in (`crowd::commuters`), as the hourly pass does, and moves the
+/// clock to the end of that hour so every booking is due.
+fn book_the_hour(sim: &mut Simulation) {
+    sim.crowd.book_commutes(&mut sim.tower, &sim.clock);
+    let end = (sim.clock.minutes / 60.0).floor() * 60.0 + 59.0;
+    sim.clock = crate::clock::Clock::new(end, sim.clock.calendar);
+}
+
 fn pump(sim: &mut Simulation, dt_sec: f64, steps: usize) {
     for _ in 0..steps {
         open_standing_cars(sim);
@@ -146,6 +155,7 @@ fn morning_commuters_ride_real_routes_to_built_tiles() {
     let (mut sim, _) = tower_with_elevator(8);
     place_seated(&mut sim, Kind::Office, 5, 0, UnitState::Occupied, 0);
     at_time(&mut sim, 0, 8);
+    book_the_hour(&mut sim);
     pump(&mut sim, 0.05, 600);
     assert!(!sim.crowd.people.is_empty());
     assert!((0.0..=1.0).contains(&sim.crowd.frustration));
@@ -165,6 +175,7 @@ fn drawn_by(kind: Kind, occupants: i64, day: i64, hour: i64) -> usize {
     let (mut sim, _) = tower_with_elevator(8);
     place_seated(&mut sim, kind, 5, 0, UnitState::Occupied, occupants);
     at_time(&mut sim, day, hour);
+    book_the_hour(&mut sim);
     pump(&mut sim, 0.05, 400);
     sim.crowd.people.len()
 }
@@ -304,6 +315,7 @@ fn a_rider_whose_car_is_trimmed_away_steps_off() {
     let (mut sim, ev) = tower_with_elevator(8);
     place_seated(&mut sim, Kind::Office, 5, 0, UnitState::Occupied, 0);
     at_time(&mut sim, 0, 8);
+    book_the_hour(&mut sim);
     let mut rider = None;
     for _ in 0..4000 {
         pump(&mut sim, 0.05, 1);

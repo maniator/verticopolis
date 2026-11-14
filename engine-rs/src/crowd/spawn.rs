@@ -76,6 +76,8 @@ pub fn make_person(
         staff_trip: None,
         errand: None,
         walk_in: false,
+        commuter: false,
+        commute: None,
         start_x: origin_spawn_x as f64,
     };
     crowd.next_id += 1;
@@ -317,15 +319,17 @@ pub(crate) fn weighted_index(r: f64, weights: impl Iterator<Item = f64> + Clone)
     last
 }
 
-/// The tenants' and visitors' sample is full. Housekeepers on shift and
-/// walk-in customers (`walk_ins`) are counted apart: they are real people,
-/// and would otherwise crowd the tenants out of the picture.
+/// The tenants' and visitors' sample is full. Housekeepers on shift,
+/// walk-in customers (`walk_ins`) and office workers on their way
+/// (`commuters`) are counted apart: they are real people, and would
+/// otherwise crowd the rest out of the picture.
 fn crowd_is_full(crowd: &Crowd) -> bool {
     crowd
         .people
         .len()
         .saturating_sub(crowd.staff_count.max(0) as usize)
         .saturating_sub(crowd.walk_in_count.max(0) as usize)
+        .saturating_sub(crowd.commuter_count.max(0) as usize)
         >= MAX_PEOPLE
 }
 
@@ -335,7 +339,6 @@ pub fn spawn_trips(crowd: &mut Crowd, tower: &mut Tower, clock: &Clock, floors: 
     }
     let morning = clock.is_morning();
     let evening = clock.is_evening();
-    let day = !morning && !evening && !clock.is_night();
     let reachable_metros: Vec<i64> = floors
         .metro_stations
         .iter()
@@ -351,48 +354,24 @@ pub fn spawn_trips(crowd: &mut Crowd, tower: &mut Tower, clock: &Clock, floors: 
         weighted: false,
     };
     let o = &mut options.opts;
-    let lo = !floors.leased_offices.is_empty();
-    let so = !floors.staffed_offices.is_empty();
     let hm = !floors.homes.is_empty();
-    if morning {
-        if lo {
-            o.push(Opt::Trip(End::Fixed(1), End::Pick(List::LeasedOffices)));
-        }
-        if hm {
-            o.push(Opt::Trip(End::Pick(List::Homes), End::Fixed(1)));
-        }
+    if morning && hm {
+        o.push(Opt::Trip(End::Pick(List::Homes), End::Fixed(1)));
         if has_metro {
-            if lo {
-                o.push(Opt::MetroArrival(List::LeasedOffices));
-            }
-            if hm {
-                o.push(Opt::MetroDeparture(List::Homes));
-            }
+            o.push(Opt::MetroDeparture(List::Homes));
         }
-    } else if evening {
-        if so {
-            o.push(Opt::Trip(End::Pick(List::StaffedOffices), End::Fixed(1)));
-        }
-        if hm {
-            o.push(Opt::Trip(End::Fixed(1), End::Pick(List::Homes)));
-        }
+    } else if evening && hm {
+        o.push(Opt::Trip(End::Fixed(1), End::Pick(List::Homes)));
         if has_metro {
-            if so {
-                o.push(Opt::MetroDeparture(List::StaffedOffices));
-            }
-            if hm {
-                o.push(Opt::MetroArrival(List::Homes));
-            }
+            o.push(Opt::MetroArrival(List::Homes));
         }
-    } else if day && lo && crowd.rng.chance(0.3) {
-        o.push(Opt::Trip(End::Fixed(1), End::Pick(List::LeasedOffices)));
     }
-    // No one-way trip runs to or from a shop, restaurant or other open
-    // venue: one that did walked to the venue's floor, stood a game minute
-    // and vanished there (or appeared there and walked out). Their
-    // customers come and go as real round trips instead: walk-ins
-    // (`walk_ins`), meal trips and venue visits, each staying its
-    // `dwell_seconds_range`.
+    // No one-way trip runs to or from an office, a shop, a restaurant or
+    // another open venue: one that did walked to the floor, stood a game
+    // minute and vanished there (or appeared there and walked out). Office
+    // workers come and go as real commuters instead (`commuters`), and a
+    // venue's customers as walk-ins (`walk_ins`), meal trips and venue
+    // visits, each staying its `dwell_seconds_range`.
 
     push_meal_options(crowd, tower, clock, floors, &mut options);
     push_venue_visit_options(crowd, tower, clock, floors, &mut options);

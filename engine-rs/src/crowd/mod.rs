@@ -2,6 +2,7 @@
 //! which saves never carry. The conformance suite hashes them separately.
 
 pub mod banks;
+pub mod commuters;
 pub(crate) mod fasthash;
 pub mod graph;
 pub mod landing;
@@ -125,6 +126,12 @@ pub struct Person {
     /// `Crowd::walk_in_count` instead of the 140-person sample.
     /// Engine-internal: not in the `Person` shape.
     pub walk_in: bool,
+    /// An office worker on their way in or out (`commuters`), counted in
+    /// `Crowd::commuter_count` instead of the 140-person sample, and the
+    /// office and direction while the desk still owes for the trip.
+    /// Engine-internal: not in the `Person` shape.
+    pub commuter: bool,
+    pub commute: Option<commuters::Commute>,
     /// Why a plain commute set out (the floor-list trips of `spawn_trips`),
     /// for the person card (`trip`). Stamped at spawn, draws nothing, and
     /// the crowd is never saved. Engine-internal: not in the `Person` shape.
@@ -278,6 +285,22 @@ pub struct Crowd {
     pub walk_ins: Vec<walk_ins::WalkIn>,
     /// The walk-ins in the crowd, on their way or inside.
     pub walk_in_count: i64,
+    /// Each office's workers: inside, on the way in, booked to leave
+    /// (`commuters`), by office id. Never saved: a load takes the saved
+    /// head counts as the workers inside.
+    pub desks: std::collections::BTreeMap<i64, commuters::Desk>,
+    /// The office arrivals and departures booked for this hour, latest
+    /// first (`commuters`). Never saved.
+    pub shifts: Vec<commuters::Shift>,
+    /// The commuting workers in the crowd, on their way in or out.
+    pub commuter_count: i64,
+    /// The tower revision the desks were last squared with, or `None`
+    /// before the first time (`commuters::reconcile`).
+    pub desk_revision: Option<i64>,
+    /// Commuting workers who boarded an elevator this hour, by shaft and
+    /// the floor they boarded at, for the shaft's origin rings
+    /// (`sample_elevator_util`). Never saved.
+    pub commuter_boardings: HashMap<i64, indexmap::IndexMap<i64, f64>>,
 }
 
 impl Crowd {
@@ -314,6 +337,11 @@ impl Crowd {
             hour: None,
             walk_ins: Vec::new(),
             walk_in_count: 0,
+            desks: Default::default(),
+            shifts: Vec::new(),
+            commuter_count: 0,
+            desk_revision: None,
+            commuter_boardings: HashMap::new(),
         }
     }
 
@@ -439,51 +467,5 @@ impl Crowd {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn commute_stress_lists_each_floor_in_order() {
-        let mut crowd = Crowd::new(1);
-        assert_eq!(crowd.commute_stress_json(), json!([]));
-        assert_eq!(crowd.commute_revision, 0);
-        crowd.record_commute(7, 40.0);
-        crowd.record_commute(3, 65.0);
-        crowd.record_commute(7, 80.0);
-        assert_eq!(crowd.commute_revision, 3);
-        // The first sample seeds the average; the second moves it by the alpha.
-        let seventh = 40.0 + (80.0 - 40.0) * COMMUTE_STRESS_ALPHA;
-        assert_eq!(
-            crowd.commute_stress_json(),
-            json!([[3, 65.0], [7, seventh]])
-        );
-    }
-
-    #[test]
-    fn seeding_replaces_the_averages_and_refuses_malformed_rows() {
-        let mut crowd = Crowd::new(1);
-        crowd.record_commute(9, 12.0);
-        crowd
-            .seed_commute_stress(&json!([[7, 40.5], [-1, 3.0]]))
-            .expect("rows in the written shape seed");
-        assert_eq!(crowd.commute_stress_json(), json!([[-1, 3.0], [7, 40.5]]));
-        assert_eq!(
-            crowd.commute_revision, 1,
-            "seeding leaves the revision alone"
-        );
-        for bad in [
-            json!({}),
-            json!([[1]]),
-            json!([[1.5, 2.0]]),
-            json!([[1, "x"]]),
-            json!([[1, 2.0], [1, 3.0]]),
-        ] {
-            assert!(crowd.seed_commute_stress(&bad).is_err(), "{bad}");
-        }
-        assert_eq!(
-            crowd.commute_stress_json(),
-            json!([[-1, 3.0], [7, 40.5]]),
-            "a refusal changes nothing"
-        );
-    }
-}
+#[path = "commute_stress_tests.rs"]
+mod tests;

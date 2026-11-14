@@ -158,8 +158,9 @@ impl ElevatorDispatch {
             if u.is_present() {
                 pop += u.census_count();
             }
-            // A venue's visitors ride as real people, so they are not waiting.
-            if u.kind.counts_visitors() || u.occupants <= 0 {
+            // A venue's visitors and an office's workers ride as real
+            // people, so they are not waiting.
+            if u.kind.counts_visitors() || u.kind.commutes_in_person() || u.occupants <= 0 {
                 continue;
             }
             let Ok(slot) = served.binary_search(&u.floor) else {

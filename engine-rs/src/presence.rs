@@ -27,6 +27,11 @@ impl Simulation {
         let evening = self.clock.is_evening();
         for i in self.tower.room_indices() {
             let (u, at) = self.tower.marked(i);
+            // An office counts the workers who got to their desks
+            // (`crowd::commuters`), not the clock.
+            if u.kind.commutes_in_person() {
+                continue;
+            }
             let f = u.kind.facility();
             if u.is_dormant() {
                 if u.state == UnitState::Empty && f.attendance.is_some() {
@@ -38,11 +43,6 @@ impl Simulation {
             }
             // `None` leaves the head count as it is.
             let occupants = match u.kind {
-                Kind::Office => Some(if !weekend && (8..18).contains(&hour) {
-                    f.population
-                } else {
-                    0
-                }),
                 Kind::Condo | Kind::RentalApartment => Some(if night || evening || weekend {
                     u.resident_count()
                 } else {

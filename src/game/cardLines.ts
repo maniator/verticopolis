@@ -26,6 +26,17 @@ export function hasAccessDiagnostic(catalog: Catalog, u: { readonly kind: Facili
   return f.population > 0 || f.dailyIncome !== null;
 }
 
+/**
+ * The people a tenant room's card counts: those inside against its full
+ * count, and for an office the workers still on their way in, booked or
+ * walking ("4/6, 2 on the way"). An office counts only the workers who got
+ * to their desks, so a slow tower fills late and the card says why.
+ */
+export function occupantsText(occupants: number, full: number, workersComing: number | null): string {
+  const coming = workersComing !== null && workersComing > 0 ? `, ${workersComing} on the way` : "";
+  return `${occupants}/${full}${coming}`;
+}
+
 /** Format a measured passenger-elevator load for the hover card and mobile
  * editor. The engine supplies the load and its near-capacity verdict; the frontend only words them.
  * Staff-only service elevators, stairs and escalators provide no load reading. */

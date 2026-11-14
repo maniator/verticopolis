@@ -48,6 +48,7 @@ const OFFICE = record("unitCard", {
   screen2Policy: NaN,
   screen2Days: NaN,
   screen2Tier: NaN,
+  workersComing: 2,
 });
 
 const CINEMA = record("unitCard", { id: 12, kindCode: code("kinds", "cinema"), rent: NaN, vacateReason: NaN, filmPolicy: code("filmPolicies", "blockbuster"), blockbuster: 1, filmDays: 4, filmTier: code("filmTiers", "classic"), ticketPrice: code("ticketPrices", "premium"), screen2Policy: NaN, screen2Days: 0, screen2Tier: code("filmTiers", "blockbuster") });
@@ -86,6 +87,7 @@ describe("Cards.unit", () => {
       filmTier: null,
       ticketPrice: null,
       screen2: null,
+      workersComing: 2,
     });
     expect(vi.mocked(port.unitCard).mock.calls).toEqual([[10]]);
     expect(vi.mocked(port.unitLabel).mock.calls).toEqual([[10]]);

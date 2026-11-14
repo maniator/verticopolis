@@ -1,5 +1,5 @@
 {
-  "version": 23,
+  "version": 24,
   "header": {
     "minutes": 0,
     "towerRevision": 1,
@@ -491,7 +491,8 @@
       "ticketPrice",
       "screen2Policy",
       "screen2Days",
-      "screen2Tier"
+      "screen2Tier",
+      "workersComing"
     ],
     "shaftCard": [
       "id",

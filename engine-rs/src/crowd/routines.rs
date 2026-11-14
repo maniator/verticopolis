@@ -42,7 +42,10 @@ pub fn push_routine_options(
             options.push_school_return();
         }
     }
+    // A weekday errand: a worker still walking out on a weekend morning
+    // makes no call.
     if sales_call > 0.0
+        && !clock.is_weekend()
         && !floors.staffed_offices.is_empty()
         && (SALES_CALL_START..SALES_CALL_END).contains(&hour)
         && passes(crowd, sales_call)

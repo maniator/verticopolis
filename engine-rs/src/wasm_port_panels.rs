@@ -76,9 +76,11 @@ pub(crate) const VACATE_REASONS: [&str; 12] = [
 /// #1932, #1950). `ticketPrice` is a Modern theater's ticket price by code
 /// (`ticketPrices`, #1950). `screen2Policy`, `screen2Days` and
 /// `screen2Tier` are a Modern theater's second screen, read like the first
-/// screen's slots, and NaN where the theater runs one screen (#1950). The
-/// label and subtype come from `unitLabel` and `unitSubtype`.
-pub(crate) const UNIT_CARD: [&str; 26] = [
+/// screen's slots, and NaN where the theater runs one screen (#1950).
+/// `workersComing` is the workers on their way to an office, booked or
+/// walking (`crowd::commuters`), and NaN on any other kind. The label and
+/// subtype come from `unitLabel` and `unitSubtype`.
+pub(crate) const UNIT_CARD: [&str; 27] = [
     "id",
     "kindCode",
     "floor",
@@ -105,6 +107,7 @@ pub(crate) const UNIT_CARD: [&str; 26] = [
     "screen2Policy",
     "screen2Days",
     "screen2Tier",
+    "workersComing",
 ];
 
 /// `shaftCard`'s header. `utilization` is NaN when the shaft has no reading.
@@ -329,6 +332,11 @@ impl Engine {
             second.map_or(f64::NAN, |f| code_of(&FILM_POLICIES, f.policy)),
             second.map_or(f64::NAN, |f| f.days_shown() as f64),
             second.map_or(f64::NAN, |f| film_tier_code(f.tier)),
+            if u.kind.commutes_in_person() {
+                crate::crowd::commuters::coming_to(&self.sim.crowd, u.id) as f64
+            } else {
+                f64::NAN
+            },
         ]
     }
 

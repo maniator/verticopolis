@@ -4,6 +4,7 @@ import { isCommercialKind, isElevatorKind } from "../../presentation/viewKinds";
 import { catalogFacility, catalogOpenAt, catalogResidents, type Catalog } from "../../catalog/catalogTypes";
 import type { TransportDetail, UnitDetail } from "../../simport/panels";
 import { floorTag } from "../format";
+import { occupantsText } from "../../game/cardLines";
 
 /**
  * The hover inspector card bodies (E6-S2), pure functions of (card, catalog, hour),
@@ -65,7 +66,7 @@ export function unitInspectorTemplate(u: UnitDetail, catalog: Catalog, hour: num
   let peopleLine: TemplateResult | typeof nothing = nothing;
   if ((isCommercialKind(u.kind) && f.population > 0) || f.attendance !== null)
     peopleLine = html`<div>Customers: ${u.customersIn ?? 0}${closed ? " (closed)" : ""}</div>`;
-  else if (f.population) peopleLine = html`<div>Occupants: ${u.occupants}/${catalogResidents(f, u.residents)}</div>`;
+  else if (f.population) peopleLine = html`<div>Occupants: ${occupantsText(u.occupants, catalogResidents(f, u.residents), u.workersComing)}</div>`;
   return html`<h4 class="win-title">${title}</h4><div>${labelIsExtra ? html`${u.label}<br />` : nothing}${
     u.floor >= 1 ? `Floor ${u.floor}` : `B${1 - u.floor}`
   }</div><div>Status: ${statusText}</div>${peopleLine}${diagnostics}<div>Satisfaction: ${Math.round(u.satisfaction * 100)}%</div>`;

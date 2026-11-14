@@ -107,6 +107,15 @@ impl Kind {
     }
 
     #[doc(hidden)]
+    /// A kind whose workers come in and go home as people
+    /// (`crowd::commuters`): its head count is the workers who got there,
+    /// and the dispatch estimate skips it, since they ride the cars
+    /// themselves. Offices today.
+    pub fn commutes_in_person(self) -> bool {
+        self == Kind::Office
+    }
+
+    #[doc(hidden)]
     /// `isCommercialKind`.
     pub fn is_commercial(self) -> bool {
         matches!(
