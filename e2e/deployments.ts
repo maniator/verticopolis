@@ -44,6 +44,8 @@ export interface Deployments {
   reissueWorker(on: boolean): void;
   /** Answer every `/engine/` request from `which` whatever `serve()` picked, as a deploy that lands between the worker script and the engine files does; `null` ends it. */
   engineFrom(which: Deployment | null): void;
+  /** Answer `/index.html` (the page the installing worker precaches, not the `/` a player opens) from `which` whatever `serve()` picked, as a deploy that lands mid-install does; `null` ends it. */
+  pageFrom(which: Deployment | null): void;
   /** Cut the connection on requests the way a dropped network does (the worker's own requests too, which Playwright's offline flag does not cut): the engine files only, or everything; `null` ends it. */
   failNetwork(scope: "engine" | "all" | null): void;
   /** Append a script tag to the HTML page, as the Vercel toolbar does for a signed-in team member and as an antivirus web shield does. */
@@ -191,6 +193,7 @@ export async function startDeployments(distDir = fileURLToPath(new URL("../dist"
   let workerReissued = false;
   let pageRewritten = false;
   let engineOverride: Deployment | null = null;
+  let pageOverride: Deployment | null = null;
   let networkFails: "engine" | "all" | null = null;
   const requests: Deployments["requests"] = [];
 
@@ -200,7 +203,7 @@ export async function startDeployments(distDir = fileURLToPath(new URL("../dist"
     const target = req.url ?? "/";
     // Origin-form only, one leading slash, nothing that names a drive or stream.
     const path = /^\/(?!\/)/.test(target) ? new URL(target, "http://localhost").pathname : "/\0";
-    const from = engineOverride && path.startsWith("/engine/") ? engineOverride : current;
+    const from = engineOverride && path.startsWith("/engine/") ? engineOverride : pageOverride && path === "/index.html" ? pageOverride : current;
     const root = roots[from];
     requests.push({ path, from });
     if (networkFails === "all" || (networkFails === "engine" && path.startsWith("/engine/"))) {
@@ -249,6 +252,9 @@ export async function startDeployments(distDir = fileURLToPath(new URL("../dist"
     },
     engineFrom: (which) => {
       engineOverride = which;
+    },
+    pageFrom: (which) => {
+      pageOverride = which;
     },
     failNetwork: (scope) => {
       networkFails = scope;

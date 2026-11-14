@@ -7,7 +7,7 @@ import { execSync } from "node:child_process";
 import { VitePWA } from "vite-plugin-pwa";
 import { notesForVersion, recentReleaseNotes, type ReleaseNotes } from "./src/changelog";
 import { PACKAGE_STYLESHEET, isPackagePath } from "./src/build/thirdPartyNotices";
-import { entryWithIntegrity, precacheIntegrityTransform, readExpectedPackage } from "./src/build/enginePackageBuild";
+import { entryWithIntegrity, pageLastTransform, precacheIntegrityTransform, readExpectedPackage } from "./src/build/enginePackageBuild";
 import { MAX_RELEASES, type BuildFingerprint } from "./src/pwaUpdateInfo";
 import { ENGINE_PRELOAD_FILES, enginePreloadAttrs } from "./src/build/enginePreload";
 import { ENGINE_BUILD_RECORD, ENGINE_DIR } from "./src/wasmhost/enginePackageNames";
@@ -556,7 +556,7 @@ export default defineConfig(({ command }) => ({
           // host's own 404 rather than the game shell, same as the file below it.
           /\.well-known/,
         ],
-        manifestTransforms: [precacheIntegrityTransform(() => builtDistDir)],
+        manifestTransforms: [precacheIntegrityTransform(() => builtDistDir), pageLastTransform],
         cleanupOutdatedCaches: true,
         // Excalibur's bundle is comfortably large; lift the precache ceiling.
         maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,
