@@ -28,6 +28,13 @@ npm run preview    # serve that build on http://localhost:4173
 it can't cache-poison reloads). `npm run build` must succeed. It is one of the
 quality gates below.
 
+Add `?debug=fps` to the game's URL (on a dev server, a preview or the live
+site) for a small frame statistics overlay in the bottom-left corner: frames
+per second, frame, update and draw time, and Excalibur's draw calls and drawn
+images for the last frame. It is a DOM box, so it adds nothing to the draw
+calls it counts, and it loads as its own chunk only when the flag is on.
+`?debug=all` turns on every debug flag (`src/debugFlags.ts`).
+
 ## Quality gates
 
 Run all four before pushing; they must be green. CI

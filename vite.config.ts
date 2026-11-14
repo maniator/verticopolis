@@ -505,11 +505,13 @@ export default defineConfig(({ command }) => ({
         // chunks stay precached for the in-game Help window offline.
         // `404.html` and its entry chunk (`notFound-*.js`) are the host's
         // "page not found" page, which only the network ever serves.
+        // `debugHud-*.js` is the `?debug=fps` overlay (#645), a developer
+        // tool that only the network serves.
         // `icon-1024x1024.png` is the DESKTOP icns master (#761), not part of
         // the game shell: the PWA needs nothing that large, so it stays out
         // of every web player's offline precache (a review catch on the PR
         // that added it).
-        globIgnores: ["**/gallery*", "**/404.html", "**/notFound-*.js", "**/preview*", "**/og-image*", "help/**", "**/icon-1024x1024.png", "**/sw-navigation-fallback.js"],
+        globIgnores: ["**/gallery*", "**/404.html", "**/notFound-*.js", "**/preview*", "**/og-image*", "help/**", "**/icon-1024x1024.png", "**/sw-navigation-fallback.js", "**/debugHud-*.js"],
         // The worker's own helper, loaded by importScripts and updated with it,
         // so it stays out of the precache.
         importScripts: ["sw-navigation-fallback.js"],

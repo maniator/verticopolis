@@ -23,6 +23,8 @@ import { copyEngineDiagnostics } from "./engineDiagnosticsCopy";
 import { downloadEngineFailureArchive } from "./engineCrash/failureArchive";
 import { pageControlled, repairOffered } from "./wasmhost/engineRepair";
 import { runEngineRepair } from "./engineRepairControl";
+import { DEBUG_FLAG, debugFlagOn } from "./debugFlags";
+import type { FrameStatsLike } from "./debugHud";
 
 /**
  * Boot entry split out of `main.ts` (the `GameApp` composition root). Keeps the
@@ -41,6 +43,8 @@ interface BootApp {
   setSpeed?(speed: number): void;
   reader?: { header: { minutes: number } };
   speed?: number;
+  /** The tower renderer once a tower is open; the `?debug=fps` overlay reads its frame stats. */
+  engine?: { engine: { stats: { prevFrame: FrameStatsLike } } };
 }
 
 /** The renderer needs WebGL; some in-app file viewers don't provide it. */
@@ -379,6 +383,11 @@ export function bootGame(create: (tower: BootTower) => BootApp): Promise<void> {
       // still reach anything client-side; this closes the handed-out path.
       if (import.meta.env.DEV || __TOOLING_BUILD__) {
         (window as unknown as { game: BootApp }).game = app;
+      }
+      // `?debug=fps` loads the frame statistics overlay (#645). The module is
+      // a lazy chunk, so a session without the flag never downloads it.
+      if (debugFlagOn(location.search, DEBUG_FLAG.fps)) {
+        void import("./debugHud").then((hud) => hud.mountDebugHud(() => app.engine?.engine));
       }
       // Register the service worker so the game is installable and offline-ready.
       // On a new build: prompt the player (never force a reload), see
