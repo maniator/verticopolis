@@ -34,7 +34,8 @@ TypeScript `.vctower` reader or writer outside the named allowances.
 
 `src/storage/saveStore.ts` keeps every save in an IndexedDB database
 (`verticopolis`, object store `saves`), a compressed save as its raw deflate
-bytes. Boot opens it beside the engine package and reads every save into
+bytes (a value whose bytes would not give back the same text, such as a
+damaged save kept aside, is kept as its text). Boot opens it beside the engine package and reads every save into
 memory, so the save code stays synchronous; a write updates memory at once and
 reaches the database in the background, in order. The first open copies the
 `localStorage` saves in, reads them back, and only then marks the copy done.

@@ -64,8 +64,20 @@ interface Open {
 let open: Open | null = null;
 const failureListeners = new Set<(err: unknown, key: string) => void>();
 
+/** A value as the database keeps it: a compressed save as its raw bytes when
+ *  they give back the very same text, anything else (a damaged save kept
+ *  aside, base64 written another way) as its text, so every value reads back
+ *  byte for byte. */
 function toStored(value: string): Stored {
-  return value.startsWith(STORE_MAGIC) ? { packed: fromBase64(value.slice(STORE_MAGIC.length)) } : { text: value };
+  if (!value.startsWith(STORE_MAGIC)) return { text: value };
+  const b64 = value.slice(STORE_MAGIC.length);
+  try {
+    const packed = fromBase64(b64);
+    if (toBase64(packed) === b64) return { packed };
+  } catch {
+    // Not base64 at all: kept as text below.
+  }
+  return { text: value };
 }
 
 function fromStored(stored: unknown): string | null {
@@ -218,10 +230,12 @@ function leave(): void {
   if (typeof window !== "undefined") window.removeEventListener("storage", heardLocal);
 }
 
-/** Another tab wrote a mirrored key to localStorage. */
+/** Another tab wrote a mirrored key to localStorage, or cleared it (a null
+ *  key), which deletes every mirrored save. */
 function heardLocal(e: StorageEvent): void {
-  if (!open || e.key === null || e.storageArea !== localStorage || !open.keys.mirrored.includes(e.key)) return;
-  heard({ key: e.key, value: e.newValue });
+  if (!open || e.storageArea !== localStorage) return;
+  if (e.key === null) for (const key of open.keys.mirrored) open.values.delete(key);
+  else if (open.keys.mirrored.includes(e.key)) heard({ key: e.key, value: e.newValue });
 }
 
 /** The database and every managed key's value, or null (see {@link openSaveStore}). */
