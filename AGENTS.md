@@ -79,6 +79,18 @@ building, and review. The skills are available to **both Claude Code**
 Copilot** (`.agents/skills/` + custom agents in `.github/agents/*.agent.md`).
 When unsure where to start, run **`bmad-help`** and let it route you.
 
+There is one copy of the skills, in `.agents/skills/`. `.claude/skills` is a
+committed symlink to it (#827), because Claude Code reads skills only from
+`.claude/skills` and follows a symlink there; add or edit a skill under
+`.agents/skills/` and both tools see it. `src/tests/skillsSymlink.guard.test.ts`
+fails if `.claude/skills` becomes a real directory again. On Windows, git checks
+a symlink out as a small text file unless symlinks are on: enable Developer
+Mode (or run as administrator), then clone with `git clone -c core.symlinks=true`
+(or set `git config core.symlinks true` and run `git checkout -- .claude/skills`
+in an existing clone). A BMAD reinstall or upgrade that writes `.claude/skills` back as a
+directory fails that guard; keep its `.agents/skills` output and restore the link
+with `rm -rf .claude/skills && ln -s ../.agents/skills .claude/skills`.
+
 Follow the lifecycle; each phase feeds the next. Don't jump to code for a
 feature that hasn't been specced; don't spec when a quick fix will do.
 

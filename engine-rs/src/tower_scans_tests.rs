@@ -465,3 +465,26 @@ fn the_metro_floor_follows_the_station_alone() {
     tower.reindex();
     assert_eq!(tower.metro_floor(), Some(-3));
 }
+
+/// `metro_stations` is memoized by id on the same key as `metro_floor`, so
+/// the hourly takings never walk the rooms to find a station.
+#[test]
+fn the_metro_station_memo_follows_the_stations_alone() {
+    let ids = |tower: &Tower| tower.metro_stations().map(|u| u.id).collect::<Vec<_>>();
+    let mut tower = basement_tower();
+    assert!(ids(&tower).is_empty());
+    let station = must(tower.place(Kind::Metro, -3, 100));
+    assert_eq!(ids(&tower), [station]);
+    // A planted answer survives other placements, so nothing walked the rooms.
+    let shop = must(tower.place(Kind::Shop, -2, 20));
+    let key = tower.memo.borrow().metro_changes;
+    tower.memo.get_mut().metro_ids = Some((key, vec![shop].into()));
+    let other = must(tower.place(Kind::Shop, -2, 60));
+    tower.remove_units(&[other]);
+    assert_eq!(ids(&tower), [shop]);
+    let at = tower.units.iter().position(|u| u.id == station).unwrap();
+    let gone = tower.remove_units(&[station]);
+    assert!(ids(&tower).is_empty());
+    tower.insert_units_at(vec![(at, gone[0].clone())]);
+    assert_eq!(ids(&tower), [station]);
+}

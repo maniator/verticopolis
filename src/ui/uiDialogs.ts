@@ -3,7 +3,7 @@ import { confirmTemplate, installHelpTemplate, type InstallHelpVariant } from ".
 import { eventChoiceTemplate } from "./templates/eventChoice";
 import { updatePromptTemplate } from "./templates/updatePrompt";
 import { TOWER_FILE_MAGIC } from "../storage/saveCompression";
-import { savesTemplate } from "./templates/saves";
+import { NO_GUARD, replaceSlotTemplate, savesTemplate, type SavesGuard } from "./templates/saves";
 import { newTowerTemplate } from "./templates/newTower";
 import { exportConfirmTemplate, importReportTemplate, exportReportTemplate } from "./templates/reports";
 import { statsModalTemplate } from "./templates/stats";
@@ -59,13 +59,32 @@ export function showScheduleReview(ui: UI, rows: readonly ReviewRow[], handlers:
   if (focus) box.querySelector<HTMLElement>(`[data-act="${focus}"]`)?.focus();
 }
 
-/** Saves manager: auto-save + numbered slots, plus export/import. */
-export function showSaves(ui: UI, slots: SlotInfo[], unreadable: string | null = null): void {
-  const box = ui.openModalTemplate(savesTemplate(slots, unreadable !== null), { displaceable: true });
+/** Saves manager: auto-save + numbered slots, plus export/import. `guard`
+ *  keeps a save off another tower by accident (see {@link SavesGuard}). */
+export function showSaves(ui: UI, slots: SlotInfo[], unreadable: string | null = null, guard: SavesGuard = NO_GUARD): void {
+  const box = ui.openModalTemplate(savesTemplate(slots, unreadable !== null, guard), { displaceable: true });
   box.querySelectorAll<HTMLElement>("[data-save]").forEach((b) =>
     b.addEventListener("click", () => {
-      ui.cb.onSaveSlot(Number(b.dataset.save));
-      ui.cb.onShowSaves();
+      const slot = Number(b.dataset.save);
+      // A failed write leaves the dialog as it is, with the failure said
+      // inside it; a redraw would wipe that line.
+      const save = (): void => {
+        if (ui.cb.onSaveSlot(slot)) ui.cb.onShowSaves();
+      };
+      // The confirm may be up a while: check again at Replace, so a slot
+      // another tab filled meanwhile with a save this version can't read is
+      // still refused.
+      const saveIfReadable = (): void => {
+        const now = replaceTarget(slots, guard, slot);
+        if (now && !now.exists) refuseUnreadable(ui, slot);
+        else save();
+      };
+      // A slot that holds a tower other than the live one asks first. The
+      // live tower's own slot and an empty slot save at once.
+      const target = replaceTarget(slots, guard, slot);
+      if (target && !target.exists) refuseUnreadable(ui, slot);
+      else if (target) confirmReplace(ui, target, guard.liveName, saveIfReadable, () => showSaves(ui, slots, unreadable, guard));
+      else save();
     }),
   );
   box.querySelectorAll<HTMLElement>("[data-load]").forEach((b) =>
@@ -81,10 +100,20 @@ export function showSaves(ui: UI, slots: SlotInfo[], unreadable: string | null =
       ui.cb.onShowSaves();
     }),
   );
+  const undo = guard.undo;
   // Close the saves dialog first: <dialog>'s top layer paints over the toast
   // rail, so export feedback would be invisible behind the open modal, and
   // the confirm dialog / file picker replace it rather than stacking on it.
   ui.wireActions(box, {
+    ...(undo === null
+      ? {}
+      : {
+          // Redraw unless the write failed: after "gone" the line goes away,
+          // and a failure stays said inside the dialog as it is.
+          undo: () => {
+            if (undo.run() !== "failed") ui.cb.onShowSaves();
+          },
+        }),
     export: () => {
       ui.closeModal();
       confirmExport(ui);
@@ -107,6 +136,39 @@ export function showSaves(ui: UI, slots: SlotInfo[], unreadable: string | null =
           },
         }),
   });
+}
+
+/** The row a save into `slot` replaces, or null when it saves at once: the
+ *  guard's answer from storage when it has one, else the drawn list's. */
+function replaceTarget(slots: SlotInfo[], guard: SavesGuard, slot: number): SlotInfo | null {
+  if (guard.replaceTarget) return guard.replaceTarget(slot);
+  const drawn = slots.find((s) => s.slot === slot);
+  return drawn?.exists && slot !== guard.home ? drawn : null;
+}
+
+/** A slot written since the list was drawn holds a save this version can't
+ *  read. The list never offers Save on such a slot, since a newer version may
+ *  still open it, so the click redraws the list and says why. */
+function refuseUnreadable(ui: UI, slot: number): void {
+  ui.cb.onShowSaves();
+  ui.sayVisibly(`Slot ${slot} holds a save this version can't read, so it can't be saved over. Save to another slot.`);
+}
+
+/** Ask before a save replaces the tower in `target`. Cancel is the default
+ *  button and takes focus, and it goes back to the Saved Towers list as it
+ *  was drawn (nothing changed); Replace saves and redraws the list, which then
+ *  offers Undo. */
+function confirmReplace(ui: UI, target: SlotInfo, liveName: string, save: () => void, back: () => void): void {
+  // Displaceable: a report that arrives while it is up may take its place,
+  // since closing it loses nothing (it is the same as Cancel).
+  const box = ui.openModalTemplate(
+    replaceSlotTemplate(target, liveName, {
+      onCancel: back,
+      onReplace: save,
+    }),
+    { displaceable: true },
+  );
+  box.querySelector<HTMLElement>('[data-act="no"]')?.focus();
 }
 
 /** The file name of a downloaded unreadable autosave. */

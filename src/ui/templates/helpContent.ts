@@ -13,5 +13,5 @@ import { html, type TemplateResult } from "lit-html";
  *  site root on the web, where the file sits beside `index.html`); a page at
  *  a deeper path passes the root-relative one. */
 export function helpAboutBody(version: string, engine = "", licensesHref = "third-party-notices.txt"): TemplateResult {
-  return html`<p style="color:var(--muted)">An unofficial, from-scratch homage to SimTower (1994). Original code and art; no ripped assets. Not affiliated with or endorsed by Maxis / OPeNBooK / Vivarium.<br />Verticopolis <span class="app-version">v${version}</span>${engine}</p><p class="help-licenses"><a href=${licensesHref} target="_blank" rel="noopener noreferrer">Third-party licenses<span class="visually-hidden"> (opens in a new tab)</span></a></p>`;
+  return html`<p style="color:var(--muted)">An unofficial, from-scratch homage to SimTower (1994). Original code and art; no ripped assets. Not affiliated with or endorsed by Maxis / OPeNBooK / Vivarium.<br />Verticopolis™ <span class="app-version">v${version}</span>${engine}</p><p class="help-licenses"><a href=${licensesHref} target="_blank" rel="noopener noreferrer">Third-party licenses<span class="visually-hidden"> (opens in a new tab)</span></a></p>`;
 }

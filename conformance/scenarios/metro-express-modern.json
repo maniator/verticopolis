@@ -26,7 +26,7 @@
       "floor": -7,
       "x": 165,
       "expectFail": true,
-      "reason": "Only 1 Metro Station allowed per tower."
+      "reason": "Something is already here."
     },
     {
       "op": "checkpoint",

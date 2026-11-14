@@ -13,13 +13,13 @@ mod meal_trips;
 mod staff;
 
 use meal_trips::{push_meal_options, spawn_meal_outbound};
-pub use staff::{max_staff_for, spawn_staff, spawn_step, StaffSpawn};
+pub use staff::spawn_step;
 
 // ---- trips.ts -------------------------------------------------------------
 
 /// `(crowd.nextId * 2654435761) | 0`: a double product (rounded past 2^53,
 /// which an id above about 3.4 million reaches) then ToInt32.
-fn seed_for(next_id: i64) -> i32 {
+pub(super) fn seed_for(next_id: i64) -> i32 {
     let product = next_id as f64 * 2654435761.0;
     product.rem_euclid(4294967296.0) as u32 as i32
 }
@@ -70,6 +70,8 @@ pub fn make_person(
         routine: None,
         linger_for: None,
         from_metro: false,
+        crew_id: None,
+        staff_trip: None,
     };
     crowd.next_id += 1;
     crowd.people.push(person);
@@ -147,14 +149,25 @@ pub fn inside_x(crowd: &mut Crowd, u: &Unit, inset: i64) -> i64 {
     crowd.rng.int(lo, hi)
 }
 
-pub fn metro_station_for_platform(tower: &Tower, platform_floor: i64) -> Option<i64> {
+/// The metro station whose platform is `platform_floor` nearest to `x`, the
+/// one a rider at `x` walks to. A Modern tower may run several stations on
+/// one platform; the first built wins a tie, so a tower with one station
+/// always gets that one.
+pub fn metro_station_for_platform(tower: &Tower, platform_floor: i64, x: f64) -> Option<i64> {
     if platform_floor >= 1 {
         return None;
     }
+    let walk = |u: &Unit| {
+        let (left, right) = (u.x as f64, (u.x + u.width) as f64);
+        (left - x).max(x - right).max(0.0)
+    };
     tower
-        .units
-        .iter()
-        .find(|u| u.kind == Kind::Metro && u.floor + 1 == platform_floor)
+        .metro_stations()
+        .filter(|u| u.floor + 1 == platform_floor)
+        .fold(None, |best: Option<&Unit>, u| match best {
+            Some(b) if walk(b) <= walk(u) => Some(b),
+            _ => Some(u),
+        })
         .map(|u| u.id)
 }
 
@@ -309,8 +322,15 @@ fn list_of(floors: &SpawnFloors, l: List) -> &[i64] {
 
 /// A full crowd spawns no one: `spawn_trips` returns on it before any draw,
 /// and `spawn_step` skips the floor lists on it (#1143 item 4).
+/// The tenants' and visitors' sample is full. Housekeepers on shift are
+/// counted apart: they are in the building all shift, and would otherwise
+/// crowd the tenants out of the picture.
 fn crowd_is_full(crowd: &Crowd) -> bool {
-    crowd.people.len() >= MAX_PEOPLE
+    crowd
+        .people
+        .len()
+        .saturating_sub(crowd.staff_count.max(0) as usize)
+        >= MAX_PEOPLE
 }
 
 pub fn spawn_trips(crowd: &mut Crowd, tower: &mut Tower, clock: &Clock, floors: &SpawnFloors) {

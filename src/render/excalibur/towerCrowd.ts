@@ -7,14 +7,16 @@ import type { FacilityKind } from "../../shared/types";
 import { isOperational } from "../../shared/unitState";
 import { drawCar, drawGarbageTruck, drawStreetCar } from "../sprites";
 import { GARBAGE_TRUCK_H } from "../sprites/facilities/vehicles";
-import { metroTrainOffset } from "../metroTrainSchedule";
-import { addMetro } from "./towerMetro";
+import { metroTrainAt } from "../metroTrainSchedule";
+import { addMetros } from "./towerMetro";
 import { buildWalkers } from "./towerWalkerBuild";
-import { carIndicator, type CarIndicator } from "../carIndicator";
+import { cabFit, carIndicator, type CarIndicator } from "../carIndicator";
+import { cabRidersOf, ridersAboard } from "./cabRiders";
 import { glideCar, newCarDraw, type CarDrawState } from "../carMotion";
 import type { PersonView } from "../../simport/view";
 import { FLOOR, TILE } from "../scale";
 import type { TowerEngine } from "./TowerEngine";
+import { climbDrawX, leaveFlight, type Climber } from "../climbPath";
 import { applyCrowdCull, reassertCrowdCull } from "./crowdCull";
 import { FIGURE_ANCHOR, FIGURE_H, FIGURE_W } from "./peopleGfx";
 import { advanceGlide, figureKey, newGlide, newStepClock, stepProgress, strideFrame, tickStepClock, type Glide, type StepClock } from "./crowdLook";
@@ -68,7 +70,7 @@ export interface Walker {
 
 /** One drawn person: the actor, its glide between the engine's positions, and
  *  the bake it shows (`figureKey`), so the graphic swaps only on a change. */
-export interface CrowdActor extends Pusher {
+export interface CrowdActor extends Pusher, Climber {
   actor: ex.Actor;
   glide: Glide;
   key: number;
@@ -137,9 +139,12 @@ export function reconcileCrowd(engine: TowerEngine): void {
 }
 
 function positionPerson(engine: TowerEngine, p: PersonView, rec: CrowdActor, look: CrowdLook): void {
-  if (p.state !== "waiting" || p.floor !== rec.shaftFloor) rec.shaftMid = undefined;
   const inCar = ridingHidden(p);
+  // A rider walking into the car keeps the shaft found while they waited.
+  const boarding = inCar && !rec.inCar;
+  if ((p.state !== "waiting" && !boarding) || p.floor !== rec.shaftFloor) rec.shaftMid = undefined;
   const wasShown = rec.actor.graphics.isVisible;
+  let doorX: number | undefined;
   // Getting in or out shows when the drawn car gets there: the cars glide
   // over the same step, so the change waits for the step's glide to end (or
   // the next step to land) instead of happening while the car is drawn a
@@ -147,21 +152,28 @@ function positionPerson(engine: TowerEngine, p: PersonView, rec: CrowdActor, loo
   if (rec.inCar !== inCar) {
     rec.boardStep ??= look.clock.steps;
     if (look.progress < 1 && look.clock.steps === rec.boardStep) {
-      if (wasShown !== !rec.inCar) rec.actor.graphics.isVisible = !rec.inCar;
-      // Still waiting at the landing for the drawn car: hold the figure.
-      if (!rec.inCar) return;
-      // Still in the drawn car: stay hidden, and follow the engine.
-      advanceGlide(rec.glide, p.x, p.fy, look.clock.stepped, look.progress, false);
-      return;
-    }
-    rec.inCar = inCar;
+      // Getting on: walk from the line into the car's door, reaching it as
+      // the step's glide ends and the figure is hidden.
+      if (!rec.inCar) doorX = rec.shaftMid ?? p.x;
+      else {
+        // Still in the drawn car: stay hidden, and follow the engine.
+        if (wasShown) rec.actor.graphics.isVisible = false;
+        advanceGlide(rec.glide, p.x, p.fy, look.clock.stepped, look.progress, false);
+        return;
+      }
+    } else rec.inCar = inCar;
   }
-  rec.boardStep = undefined;
+  if (doorX === undefined) rec.boardStep = undefined;
   const hidden = rec.inCar;
   if (wasShown !== !hidden) rec.actor.graphics.isVisible = !hidden;
+  // Off a stairway or escalator, the walk starts from the landing.
+  if (p.state !== "climbing") {
+    const landing = leaveFlight(rec);
+    if (landing !== undefined) rec.glide.x = landing;
+  }
   // A hidden rider still follows the engine, so it reappears where it gets
   // out instead of gliding there from the floor it boarded on.
-  advanceGlide(rec.glide, p.x, p.fy, look.clock.stepped, look.progress, wasShown && !hidden);
+  advanceGlide(rec.glide, doorX ?? p.x, p.fy, look.clock.stepped, look.progress, wasShown && !hidden, p.state === "riding");
   // A rider leaves no trail for the doors: their next step on foot is
   // measured from where they get out, not where they got in.
   if (hidden) {
@@ -171,7 +183,10 @@ function positionPerson(engine: TowerEngine, p: PersonView, rec: CrowdActor, loo
   const g = rec.glide;
   // Use the continuous floor (fy) so a stair/escalator climber animates
   // smoothly between floors; for every other state fy equals the floor.
-  rec.actor.pos = ex.vec(engine.worldX(g.x), engine.worldYTop(g.fy) + FLOOR - 3);
+  // A climber is drawn along the flight's run, not up its middle.
+  const climbX = p.state === "climbing" ? climbDrawX(rec, engine.sim.tower.transports, p.x, p.floor, g.fy, g.toFy < g.fromFy, engine.flightPass.winding) : undefined;
+  if (climbX !== undefined) g.left = rec.climbLeft === true;
+  rec.actor.pos = ex.vec(engine.worldX(climbX ?? g.x), engine.worldYTop(g.fy) + FLOOR - 3);
   // Inside a revolving door between lobby halls (#2068) a walker pushes it:
   // walking left they pass behind its center post, walking right in front.
   const onFloor = g.fy === p.floor;
@@ -273,9 +288,7 @@ export function syncMotion(engine: TowerEngine): void {
       engine.carActors.push(entry);
     }
   }
-  for (const u of engine.sim.tower.units) {
-    if (u.kind === "metro") addMetro(engine, u);
-  }
+  addMetros(engine, engine.sim.tower.units.filter((u) => u.kind === "metro"));
   // Garbage trucks: one per recycling center, parked off-screen until the
   // collection hour (updateMotion drives them in and out along the bottom
   // story, exactly the metro-train pattern).
@@ -377,6 +390,7 @@ export function updateMotion(engine: TowerEngine, elapsedMs = 1000 / 60): void {
   // sibling reconcileCrowd pass.
   if (applyCrowdCull(engine)) return;
   const anim = engine.d.anim;
+  const aboard = cabRidersOf(engine, clock.stepped);
   for (const c of engine.carActors) {
     const target = c.t.carPositions[c.i];
     let drawn = carDrawStates.get(c);
@@ -391,12 +405,10 @@ export function updateMotion(engine: TowerEngine, elapsedMs = 1000 / 60): void {
     if (typeof c.t.bottom === "number" && drawn.pos < c.t.bottom) drawn.pos = c.t.bottom;
     if (typeof c.t.top === "number" && drawn.pos > c.t.top) drawn.pos = c.t.top;
     c.actor.pos = ex.vec(engine.worldX(c.t.x), -drawn.pos * FLOOR);
-    // Indicator state (riders bucket scaled to capacity, direction lantern,
-    // FULL) is derived by the tested carIndicator helper; the cab graphic is
-    // cached per state so we only redraw when the state actually changes.
-    const load = c.t.carLoad?.[c.i] ?? 0;
-    const dir = c.t.carDir?.[c.i] ?? 0;
-    const ind = carIndicator(dir, load, catalogFacility(towerCatalog(engine.sim), c.t.kind).carCapacity ?? 0);
+    // carIndicator turns the boarded riders, the lantern and FULL into the
+    // cab's state; its graphic is cached per state and redrawn on a change.
+    const [load, cap] = [c.t.carLoad?.[c.i] ?? 0, catalogFacility(towerCatalog(engine.sim), c.t.kind).carCapacity ?? 0];
+    const ind = carIndicator(c.t.carDir?.[c.i] ?? 0, load, cap, cabFit(c.w), ridersAboard(aboard, c.t.id, c.i));
     // The cab's riders change when the drawn car gets there, on the same rule
     // as the people getting in or out (`positionPerson`), so nobody shows in
     // the cab and on the landing at once, or in neither.
@@ -412,11 +424,11 @@ export function updateMotion(engine: TowerEngine, elapsedMs = 1000 / 60): void {
       } else cabChangeStep.set(c, since);
     }
   }
-  // The metro train runs on GAME time like the garbage truck: one call per
-  // daytime hour, none overnight, and pausing the game holds it where it is.
+  // The metro's one train per line runs on GAME time like the garbage truck:
+  // a run per daytime hour, none overnight, held while the game is paused.
   for (const tr of engine.trainActors) {
     const c = engine.sim.clock;
-    tr.shift(metroTrainOffset(c.minuteOfDay, tr.w + 12, c.isNight()));
+    tr.shift(metroTrainAt(c.minuteOfDay, tr.line, tr.w + 12, c.isNight()) - tr.line[tr.stop]);
   }
   // The garbage truck runs on GAME time (the collection is a sim event, not
   // ambience): during the collection hour it drives in along the center's

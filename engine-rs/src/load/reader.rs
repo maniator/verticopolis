@@ -235,7 +235,7 @@ pub(crate) fn unit_from_value(u: &Value, modern: bool) -> Option<(Unit, Option<i
         } else {
             num(u.get("satisfaction"), 1.0).min(1.0).max(0.0)
         },
-        occupants: if kind.attendance_cap().is_some() || kind.is_structural() {
+        occupants: if kind.counts_visitors() || kind.is_structural() {
             0
         } else {
             num(u.get("occupants"), 0.0).clamp(0.0, MAX_SAFE_INTEGER) as i64

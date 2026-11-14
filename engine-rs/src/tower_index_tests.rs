@@ -2,7 +2,7 @@
 //! answer equals the walk it replaced, after each kind of layout edit.
 
 use crate::clock::GameMode;
-use crate::crowd::spawn::{max_staff_for, pick_x, pick_x_in_segment};
+use crate::crowd::spawn::{pick_x, pick_x_in_segment};
 use crate::facilities::Kind;
 use crate::housekeeping::HK_MAIDS_PER_UNIT;
 use crate::sim::Simulation;
@@ -261,7 +261,7 @@ fn rooms_on_a_floor_past_the_slots_keep_their_order() {
     assert!(super::FloorRooms::new(&[]).on(1).is_empty());
 }
 
-/// `maxStaffFor` as the walk over every unit counted it.
+/// The crews times their maids, as a walk over every unit counts them.
 fn walked_staff_ceiling(tower: &Tower) -> i64 {
     let crews = tower
         .units
@@ -273,9 +273,15 @@ fn walked_staff_ceiling(tower: &Tower) -> i64 {
 
 fn assert_ceiling(tower: &Tower, crews: i64) {
     assert_eq!(walked_staff_ceiling(tower), crews * HK_MAIDS_PER_UNIT);
-    assert_eq!(max_staff_for(tower), crews * HK_MAIDS_PER_UNIT);
+    assert_eq!(
+        tower.housekeeping_units() * HK_MAIDS_PER_UNIT,
+        crews * HK_MAIDS_PER_UNIT
+    );
     // The second read is a memo hit and must give the same answer.
-    assert_eq!(max_staff_for(tower), crews * HK_MAIDS_PER_UNIT);
+    assert_eq!(
+        tower.housekeeping_units() * HK_MAIDS_PER_UNIT,
+        crews * HK_MAIDS_PER_UNIT
+    );
 }
 
 #[test]
@@ -300,7 +306,7 @@ fn the_staff_ceiling_follows_every_crew_edit() {
     assert_eq!(tower.units.len(), count);
     assert_ceiling(&tower, 0);
     // Unit state is not an input: a crew under construction or gutted by a
-    // fire still counts, as `maxStaffFor` counts every housekeeping unit. A
+    // fire still counts, as the crew count takes every housekeeping unit. A
     // state change keeps the memo, and a rebuild in each state counts the
     // same.
     let crew = must(tower.place(Kind::Housekeeping, 4, 100));
@@ -338,7 +344,10 @@ fn a_reload_recounts_the_staff_ceiling() {
         (count, revision)
     );
     assert_eq!(walked_staff_ceiling(&sim.tower), HK_MAIDS_PER_UNIT);
-    assert_eq!(max_staff_for(&sim.tower), 2 * HK_MAIDS_PER_UNIT);
+    assert_eq!(
+        sim.tower.housekeeping_units() * HK_MAIDS_PER_UNIT,
+        2 * HK_MAIDS_PER_UNIT
+    );
     sim.tower.reindex();
     assert_ceiling(&sim.tower, 1);
 }

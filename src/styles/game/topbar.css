@@ -35,6 +35,16 @@
   color: #ffd24a; /* window-gold POLIS */
   font-weight: 700;
 }
+/* The trademark mark on the in-game badge (owner, 2026-11-13; see the splash
+   wordmark's .tm): small and raised beside the lettering. Relative positioning
+   lifts it without growing the line box, so the badge keeps its height. */
+.brand .brand-tm {
+  position: relative;
+  top: -0.45em;
+  margin-left: 1px;
+  font-size: 0.6em;
+  font-weight: 400;
+}
 #status {
   display: flex;
   flex: 1;
