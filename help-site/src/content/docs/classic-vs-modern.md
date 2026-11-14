@@ -19,6 +19,7 @@ Every tower runs one of two sets of rules. You choose when you found the tower, 
 | Monthly costs | The 1994 bills | Adds overhead on each room and a tax on unsold condos |
 | Tenant moods | Noise or too few shops hold a rating down but never empty a room | Problems bite in proportion: a noisy neighbor can wear a tenant down to notice, and so can too few shops nearby. Nearby venues can lift a home. ([Tenant ratings](/help/tower/ratings/)) |
 | Parking | Any spare space serves every office | Counted per office and per home, halved by a Metro ([Services](/help/rooms/services/#parking)) |
+| Metro stations | One per tower | Up to three on one line ([Services](/help/rooms/services/#more-than-one-station)) |
 | Climbing | Nobody walks more than 4 flights of stairs or 7 of escalator | People climb as far as they must ([Stairs and escalators](/help/building/stairs-and-escalators/)) |
 | Escalators | Never to an office floor | Anywhere |
 | Elevator schedules | The hour-by-hour grid | Adds presets, auto-tune and advice ([Elevators](/help/building/elevators/)) |

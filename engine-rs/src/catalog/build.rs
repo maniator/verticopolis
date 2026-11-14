@@ -89,7 +89,7 @@ fn facility_entry(mode: GameMode, kind: Kind) -> FacilityEntry {
         available: f.available_in(mode),
         build_minutes: if transport { 0.0 } else { kind.build_minutes() },
         resale_refund: kind.resale_refund(),
-        build_cap: build_cap(kind),
+        build_cap: build_cap_in(mode, kind),
         pool: pool_key(mode, kind),
         max_span: transport.then(|| kind.max_span()),
         fixed_span: kind.is_fixed_span(),

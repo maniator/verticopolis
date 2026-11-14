@@ -8,7 +8,7 @@ import { isOperational } from "../../shared/unitState";
 import { drawCar, drawGarbageTruck, drawStreetCar } from "../sprites";
 import { GARBAGE_TRUCK_H } from "../sprites/facilities/vehicles";
 import { metroTrainOffset } from "../metroTrainSchedule";
-import { addMetro } from "./towerMetro";
+import { addMetros } from "./towerMetro";
 import { buildWalkers } from "./towerWalkerBuild";
 import { cabFit, carIndicator, type CarIndicator } from "../carIndicator";
 import { cabRidersOf, ridersAboard } from "./cabRiders";
@@ -288,9 +288,7 @@ export function syncMotion(engine: TowerEngine): void {
       engine.carActors.push(entry);
     }
   }
-  for (const u of engine.sim.tower.units) {
-    if (u.kind === "metro") addMetro(engine, u);
-  }
+  addMetros(engine, engine.sim.tower.units.filter((u) => u.kind === "metro"));
   // Garbage trucks: one per recycling center, parked off-screen until the
   // collection hour (updateMotion drives them in and out along the bottom
   // story, exactly the metro-train pattern).

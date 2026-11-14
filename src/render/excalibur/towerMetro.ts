@@ -8,15 +8,39 @@ import { METRO_PORTAL_W, METRO_TRAIN_H, drawMetroPortal, drawMetroTrain } from "
 import type { TowerEngine } from "./TowerEngine";
 
 /**
- * The metro's moving and tunnel parts: the train, the tunnel row either side of
- * the 30-wide station, and the portals where the train disappears into it.
+ * The metro's moving and tunnel parts: each station's train and the portals
+ * where it disappears, and the tunnel row along the stations' bottom story.
  * Friend functions taking the engine, like the rest of `towerCrowd`.
  */
 
-/** The station's train, tunnel row and portals. The car sits on the track just
- *  below the platform edge: its base is 3px off the station floor and it stands
+/** Every station's train and portals, and one tunnel along their row. A Modern
+ *  tower may run several stations on one line, so the tunnel is laid once, in
+ *  the gaps the stations leave. */
+export function addMetros(engine: TowerEngine, stations: readonly UnitView[]): void {
+  for (const u of stations) addMetro(engine, u);
+  const rows = new Map<number, UnitView[]>();
+  for (const u of stations) rows.set(u.floor, [...(rows.get(u.floor) ?? []), u]);
+  for (const [floor, onRow] of rows) addTunnel(engine, floor, tunnelSpans(onRow, viewWorld().lotWidth));
+}
+
+/** The tile spans `[from, to)` of a station row the tunnel fills: the whole lot
+ *  less every station's footprint. SimTower lays the tunnel on both sides of its
+ *  one station out to the lot's edges. */
+export function tunnelSpans(stations: readonly { x: number; width: number }[], lotWidth: number): [number, number][] {
+  const spans: [number, number][] = [];
+  let from = 0;
+  for (const u of [...stations].sort((a, b) => a.x - b.x)) {
+    if (u.x > from) spans.push([from, u.x]);
+    from = Math.max(from, u.x + u.width);
+  }
+  if (from < lotWidth) spans.push([from, lotWidth]);
+  return spans;
+}
+
+/** The station's train and portals. The car sits on the track just below the
+ *  platform edge: its base is 3px off the station floor and it stands
  *  METRO_TRAIN_H tall. */
-export function addMetro(engine: TowerEngine, u: UnitView): void {
+function addMetro(engine: TowerEngine, u: UnitView): void {
   const w = u.width * TILE - 6;
   const trainY = engine.worldYTop(u.floor) + FLOOR - 3 - METRO_TRAIN_H;
   // The consist is baked once; the actor stays on the station and its canvas
@@ -37,18 +61,16 @@ export function addMetro(engine: TowerEngine, u: UnitView): void {
     cv.flagDirty();
   };
   engine.trainActors.push({ actor: a, u, w, shift });
-  addTunnel(engine, u);
   addPortals(engine, u, trainY);
 }
 
-/** SimTower lays the tunnel along the station's bottom story on both sides, out
- *  to the lot's edges. Tiles are phase-aligned to the world x so every span
- *  carries the same pattern, each under the texture-size limit. */
-function addTunnel(engine: TowerEngine, u: UnitView): void {
-  const y = engine.worldYTop(u.floor);
-  const lotEnd = viewWorld().lotWidth * TILE;
-  const sides: [number, number][] = [[0, engine.worldX(u.x)], [engine.worldX(u.x + u.width), lotEnd]];
-  for (const [from, to] of sides) {
+/** The tunnel along the stations' bottom story, over the tile `spans` from
+ *  `tunnelSpans`. Tiles are phase-aligned to the world x so every span carries
+ *  the same pattern, each under the texture-size limit. */
+function addTunnel(engine: TowerEngine, floor: number, spans: readonly [number, number][]): void {
+  const y = engine.worldYTop(floor);
+  for (const [fromTile, toTile] of spans) {
+    const [from, to] = [engine.worldX(fromTile), engine.worldX(toTile)];
     for (let x = from; x < to; ) {
       const tileStart = Math.floor(x / METRO_TUNNEL_TILE) * METRO_TUNNEL_TILE;
       const end = Math.min(tileStart + METRO_TUNNEL_TILE, to);

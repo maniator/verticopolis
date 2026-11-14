@@ -53,6 +53,7 @@ describe("the Classic and Modern summary", () => {
     rainCrowdFactor: "rain thins the crowd less",
     hotelDaytimePresence: "late checkouts", // #304
     quarterlyRentScale: "The whole quarter's rent every three days",
+    metroStationCap: "Up to three on one line", // build_cap_in, Modern runs several stations
   };
 
   it("classifies every mode rule the engine's catalog publishes (test-path backstop)", () => {

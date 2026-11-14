@@ -19,6 +19,14 @@ impl GameMode {
         self == GameMode::Modern
     }
 
+    /// Whether a tower may hold more than one metro station
+    /// (`facilities::MODERN_METRO_STATION_CAP`): Modern does, all on one
+    /// line; Classic keeps SimTower's single station. Read through
+    /// `facilities::build_cap_in`.
+    pub fn builds_several_metro_stations(self) -> bool {
+        self == GameMode::Modern
+    }
+
     /// Whether party halls and theaters share one cap of 16
     /// (`facilities::CLASSIC_VENUE_POOL`, #1932): Classic does, as the 1994
     /// save keeps one table of 16 records for both; Modern caps each kind at

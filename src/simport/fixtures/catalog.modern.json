@@ -2209,7 +2209,7 @@
       "attendance": null,
       "available": true,
       "basement": true,
-      "buildCap": 1,
+      "buildCap": 3,
       "buildMinutes": 480,
       "carCapacity": null,
       "category": "special",
