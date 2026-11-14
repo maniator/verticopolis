@@ -42,7 +42,12 @@ pub fn push_routine_options(
             options.push_school_return();
         }
     }
+    // A weekday errand: a commuting worker still walking out on a weekend
+    // morning makes no call. Offices that count by the clock are empty on
+    // weekends anyway, so only commuting towers need the check.
+    let commuters_out = clock.is_weekend() && tower.mode.office_workers_commute_in_person();
     if sales_call > 0.0
+        && !commuters_out
         && !floors.staffed_offices.is_empty()
         && (SALES_CALL_START..SALES_CALL_END).contains(&hour)
         && passes(crowd, sales_call)

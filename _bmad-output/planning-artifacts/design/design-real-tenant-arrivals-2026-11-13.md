@@ -413,6 +413,26 @@ in Classic; whether they stay once commuters are real is a later call.
    before-and-after (lunch traffic follows staffed offices); a test for each
    removal case (bulldoze, transport deleted mid-ride, eviction mid-trip,
    mode switch).
+   Built (2026-11-14) as `crowd::commuters`, lighter than steps 3 and 4
+   assumed: an office's workers inside are its saved head count, and the
+   workers on the way are crowd people booked hour by hour (like the
+   walk-ins), never saved. A load takes the saved head count as the workers
+   inside and re-books whoever was on the way, from the lobby or the Metro,
+   the next hour. The bookings draw from the crowd's random stream, not a
+   stream of their own. Workers who give up on the way in go back out and
+   are booked again the next hour; on the way out, they go back to their
+   desk and leave later. The office card reads "4/6, 2 on the way".
+   Merged switched off (owner, 2026-11-14, `REAL_OFFICE_COMMUTES_ON`). With
+   it on, only Modern offices commute, the rush is spread (arrive 7 to 10
+   AM, leave 4 to 7 PM) and Modern express cars move 4x. Classic waits for
+   the PC run of the original's rush and car timing: on the nine real 1990s
+   saves a full rush jammed the shared elevators. On the owner's own Modern
+   tower (about 4,950 office workers) the package kept only 56% of its
+   tenants over four days against 100% today: only about 2,100 workers
+   reached their desks by noon and 451 offices gave notice over commute
+   waits. All Modern cars 2x kept 92%, 4x kept 88%, so speed alone does not
+   fix it; the cars board too few people per stop. It turns on once that
+   tower keeps 95% after the stop fix (#2061) and the line-counting router.
 6. **Venues draw and earn from real visitors, and their staff commute.**
    Restaurants, fast food, shops and the other commercial rooms are paid for
    the visitors who actually came (the meal venues already draw only those

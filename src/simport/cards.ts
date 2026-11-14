@@ -93,6 +93,7 @@ export class Cards {
       filmTier: named<FilmTier>(l.filmTiers, r[at.filmTier]),
       ticketPrice: named<TicketPrice>(l.ticketPrices, r[at.ticketPrice]),
       screen2: this.secondScreen(r),
+      workersComing: nullable(r[at.workersComing]),
     };
   }
 

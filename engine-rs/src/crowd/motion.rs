@@ -1,10 +1,11 @@
 //! Port of `crowd/motion.ts`: the per-slice person state machine.
 
+use super::commuters;
 use super::doors::route_out_nearest;
 use super::landing::{landing_slots, Landings};
 use super::spawn::{inside_x, metro_station_for_platform, pick_x, pick_x_in_segment};
 use super::staff_shift;
-use super::visits::begin_dwell;
+use super::visits::{begin_dwell, leave_venue};
 use super::walk::walk_to;
 use super::{
     Crowd, PState, Person, StaffResult, GIVE_UP, RIDE_SECONDS_PER_FLOOR, STAFF_GIVE_UP, STRESS_WAIT,
@@ -178,13 +179,21 @@ fn step(crowd: &mut Crowd, i: usize, dt: f64, tower: &mut Tower, landings: &mut 
                     continue;
                 }
                 crowd.car_riders.insert(key, n + 1);
-                boarded = Some((shaft.id, ci as i64));
+                boarded = Some((shaft.id, ci as i64, shaft.kind.is_elevator()));
                 break;
             }
             // The shaft is read in place above, and the ride is noted once
             // the read ends.
-            if let Some((shaft_id, ci)) = boarded {
+            if let Some((shaft_id, ci, elevator)) = boarded {
                 tower.note_ride(shaft_id);
+                if crowd.people[i].commuter && elevator {
+                    *crowd
+                        .commuter_boardings
+                        .entry(shaft_id)
+                        .or_default()
+                        .entry(floor)
+                        .or_insert(0.0) += 1.0;
+                }
                 let p = &mut crowd.people[i];
                 p.car_index = Some(ci);
                 p.state = PState::Riding;
@@ -243,6 +252,10 @@ fn step(crowd: &mut Crowd, i: usize, dt: f64, tower: &mut Tower, landings: &mut 
                 let p = &mut crowd.people[i];
                 p.linger += dt;
                 if p.linger > p.linger_for.unwrap_or(2.0) {
+                    // An office worker sits down at their desk, or leaves.
+                    if let Some(c) = p.commute {
+                        return commuters::at_destination(crowd, i, tower, c);
+                    }
                     if (p.origin_unit_id.is_some() || p.meal_venue_id.is_some()) && !p.returning {
                         begin_dwell(crowd, tower, i);
                     } else {
@@ -429,6 +442,7 @@ fn reroute(crowd: &mut Crowd, i: usize, tower: &Tower) -> bool {
 
 pub fn finish(crowd: &mut Crowd, i: usize, tower: &mut Tower) {
     release_seat(crowd, i);
+    commuters::on_finish(crowd, i);
     let p = &crowd.people[i];
     if p.walk_in {
         crowd.walk_in_count = (crowd.walk_in_count - 1).max(0);
@@ -469,29 +483,4 @@ pub fn finish(crowd: &mut Crowd, i: usize, tower: &mut Tower) {
     }
     leave_venue(crowd, tower, i);
     crowd.people[i].state = PState::Done;
-}
-
-/// Takes person `i` out of the venue's head count as they walk out of it
-/// (or finish, whichever comes first), so a venue counts only who is inside
-/// rather than everyone still on the way home from it.
-fn leave_venue(crowd: &mut Crowd, tower: &mut Tower, i: usize) {
-    let p = &crowd.people[i];
-    let Some(vid) = p.venue_unit_id else {
-        return;
-    };
-    let counted_hotel = p.counted_hotel_guest;
-    if let Some((venue, at)) = tower.marked_by_id(vid) {
-        if venue.customers_in.unwrap_or(0) > 0 {
-            venue.set_customers_in(at, Some(venue.customers_in.unwrap_or(0) - 1));
-            venue.sync_visitor_occupants(at);
-            if counted_hotel && venue.hotel_customers_in.unwrap_or(0) > 0 {
-                let n = venue.hotel_customers_in.unwrap_or(0) - 1;
-                venue.set_hotel_customers_in(at, Some(n));
-            }
-            tower.bump_meal_overlay_revision();
-        }
-    }
-    let p = &mut crowd.people[i];
-    p.venue_unit_id = None;
-    p.counted_hotel_guest = false;
 }

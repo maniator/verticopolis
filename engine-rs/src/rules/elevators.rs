@@ -12,6 +12,11 @@ use crate::clock::GameMode;
 /// while riders keep arriving.
 const MODERN_DEPARTURE_WAIT_LIMIT: f64 = 2.0;
 
+/// How many times faster a Modern express car moves than a standard car.
+/// The owner picked it on 2026-11-14 so office workers who ride in for real
+/// reach the upper floors of a tall Modern tower in time for work.
+const MODERN_EXPRESS_SPEED: f64 = 4.0;
+
 #[doc(hidden)]
 impl GameMode {
     /// Whether Waiting Car Response watches the moving cars, as in the 1994
@@ -62,5 +67,18 @@ impl GameMode {
     /// shaft, and a lone Classic car leaves it unanswered, as it always has.
     pub fn parked_owner_boards_its_floor(self) -> bool {
         self == GameMode::Modern
+    }
+
+    /// How many times faster an express car moves than a standard or service
+    /// car. Classic express cars move at the standard speed, as no measured
+    /// figure for the original says otherwise. Modern express cars move four
+    /// times as fast, so a 75-floor trip takes about 23 game minutes, once
+    /// real office commutes are on (`REAL_OFFICE_COMMUTES_ON`): the speed
+    /// came with them and stays off with them.
+    pub fn express_speed_factor(self) -> f64 {
+        match self {
+            GameMode::Modern if super::commute::real_office_commutes_on() => MODERN_EXPRESS_SPEED,
+            _ => 1.0,
+        }
     }
 }

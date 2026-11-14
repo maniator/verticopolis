@@ -4,6 +4,7 @@
 use std::collections::BTreeSet;
 
 use super::*;
+use crate::dispatch::CAR_FLOORS_PER_MINUTE;
 
 const STOPS: [i64; 20] = [
     1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
@@ -11,11 +12,11 @@ const STOPS: [i64; 20] = [
 const SPAN: f64 = 19.0;
 
 fn parked(pos: f64) -> CarView {
-    CarView::of(pos, 0, 0.0, None, 0.8)
+    CarView::of(pos, 0, 0.0, None, 0.8, CAR_FLOORS_PER_MINUTE)
 }
 
 fn moving(pos: f64, dir: i64) -> CarView {
-    CarView::of(pos, dir, 0.0, None, 0.8)
+    CarView::of(pos, dir, 0.0, None, 0.8, CAR_FLOORS_PER_MINUTE)
 }
 
 /// A shaft over `STOPS` with `cars` on shift.
@@ -44,12 +45,30 @@ fn the_rules_follow_the_mode() {
     assert!(!modern.parked_car_yields && modern.best_car && modern.spread_homes);
     assert!(modern.parked_owner_boards);
     assert_eq!(modern.departure_limit, Some(2.0));
+    // The faster Modern express ships switched off with real office
+    // commutes (`REAL_OFFICE_COMMUTES_ON`).
+    assert_eq!((classic.express_speed, modern.express_speed), (1.0, 1.0));
+    let _on = crate::rules::office_commutes_switch::turn_on();
+    let switched_on = |mode| DispatchRules::for_mode(mode).express_speed;
+    assert_eq!(switched_on(GameMode::Classic), 1.0);
+    assert_eq!(switched_on(GameMode::Modern), 4.0);
     for rules in [classic, modern] {
         assert!(rules.departure_restarts && !rules.parked_reach_gate);
     }
     let scan = DispatchRules::plain_scan();
     assert!(scan.parked_reach_gate && !scan.departure_restarts && !scan.best_car);
     assert!(!scan.parked_owner_boards);
+    assert_eq!(scan.express_speed, 1.0);
+}
+
+#[test]
+fn owed_time_counts_in_the_floors_the_car_covers() {
+    // A dwelling express car four times as fast owes four times the floors
+    // for the same minutes, so its cost stays a measure of time.
+    let slow = CarView::of(9.0, 0, 10.0, None, 0.8, CAR_FLOORS_PER_MINUTE);
+    let fast = CarView::of(9.0, 0, 10.0, None, 0.8, CAR_FLOORS_PER_MINUTE * 4.0);
+    assert_eq!(slow.owed, 10.0 * CAR_FLOORS_PER_MINUTE);
+    assert_eq!(fast.owed, 4.0 * slow.owed);
 }
 
 #[test]
@@ -72,15 +91,18 @@ fn an_unset_home_is_the_lobby_unless_spread() {
 #[test]
 fn a_car_view_turns_at_its_farthest_promised_stop_ahead() {
     let cab: BTreeSet<i64> = [4, 12, 18].into_iter().collect();
-    let up = CarView::of(10.0, 1, 0.5, Some(&cab), 0.8);
+    let up = CarView::of(10.0, 1, 0.5, Some(&cab), 0.8, CAR_FLOORS_PER_MINUTE);
     assert_eq!(up.turn, 18.0);
     // Half a minute of dwell left and three promised stops of 0.8 minutes.
     assert!((up.owed - (0.5 + 3.0 * 0.8) * CAR_FLOORS_PER_MINUTE).abs() < 1e-12);
-    let down = CarView::of(10.0, -1, 0.0, Some(&cab), 0.8);
+    let down = CarView::of(10.0, -1, 0.0, Some(&cab), 0.8, CAR_FLOORS_PER_MINUTE);
     assert_eq!(down.turn, 4.0);
     // Nothing promised ahead: the car turns where it stands.
     let past: BTreeSet<i64> = [4].into_iter().collect();
-    assert_eq!(CarView::of(10.0, 1, 0.0, Some(&past), 0.8).turn, 10.0);
+    assert_eq!(
+        CarView::of(10.0, 1, 0.0, Some(&past), 0.8, CAR_FLOORS_PER_MINUTE).turn,
+        10.0
+    );
     assert_eq!(parked(7.0).turn, 7.0);
     assert_eq!(parked(7.0).owed, 0.0);
 }
@@ -109,10 +131,10 @@ fn a_car_moving_away_yields_to_a_farther_parked_car() {
 fn promised_stops_and_dwell_cost_a_car_the_call() {
     let cab: BTreeSet<i64> = (11..=19).collect();
     // Car 0 is nearer but owes nine stops on the way; car 1 is free.
-    let busy = CarView::of(9.0, 1, 0.0, Some(&cab), 0.8);
+    let busy = CarView::of(9.0, 1, 0.0, Some(&cab), 0.8, CAR_FLOORS_PER_MINUTE);
     assert_eq!(owner_of(&[busy, parked(4.0)], 10, None), 1);
     // A long dwell left counts the same way.
-    let dwelling = CarView::of(9.0, 0, 10.0, None, 0.8);
+    let dwelling = CarView::of(9.0, 0, 10.0, None, 0.8, CAR_FLOORS_PER_MINUTE);
     assert_eq!(owner_of(&[dwelling, parked(4.0)], 10, None), 1);
 }
 
@@ -121,7 +143,7 @@ fn a_car_already_coming_within_the_response_wins_outright() {
     // Car 1 is parked a floor away, car 0 is coming from five floors down
     // with a full cab: within a response of 6 the coming car keeps the call.
     let cab: BTreeSet<i64> = (11..=19).collect();
-    let coming = CarView::of(5.0, 1, 0.0, Some(&cab), 0.8);
+    let coming = CarView::of(5.0, 1, 0.0, Some(&cab), 0.8, CAR_FLOORS_PER_MINUTE);
     let cars = [coming, parked(11.0)];
     assert_eq!(owner_of(&cars, 10, Some(6.0)), 0);
     // Outside the response it is the plain score again.
@@ -148,4 +170,67 @@ fn a_stop_keeps_the_owner_it_was_first_given() {
     // Nobody on shift: the calls stay unowned.
     best.start(STOPS.len(), None, SPAN);
     assert_eq!(best.owner(k3, 3), NO_CAR);
+}
+
+/// How far the express and the standard car climb in one 2.5-minute chunk
+/// toward a call at the top of a 40-floor `mode` tower, each car starting
+/// parked at the lobby.
+fn climbs(mode: GameMode) -> (f64, f64) {
+    use crate::crowd::ElevatorCalls;
+    use crate::dispatch::ElevatorDispatch;
+    use crate::facilities::Kind;
+    use crate::tower::Tower;
+    let mut tower = Tower::new();
+    tower.mode = mode;
+    let lobby = Kind::Lobby.facility().width;
+    for x in (100..140).step_by(lobby as usize) {
+        assert!(tower.place(Kind::Lobby, 1, x).ok);
+    }
+    for floor in 2..=40 {
+        for x in 100..140 {
+            assert!(tower.place(Kind::Floor, floor, x).ok);
+        }
+    }
+    let standard = tower.place_transport(Kind::ElevatorStandard, 110, 1, 30);
+    let express = tower.place_transport(Kind::ElevatorExpress, 120, 1, 40);
+    let ids = [standard.unit_id.unwrap(), express.unit_id.unwrap()];
+    let mut calls = ElevatorCalls::default();
+    for (id, top) in ids.into_iter().zip([30, 40]) {
+        let t = tower.transports.iter_mut().find(|t| t.id == id).unwrap();
+        t.skip_floors = None;
+        t.cars = 1;
+        (t.car_positions, t.car_dir) = (vec![1.0], vec![0]);
+        calls.hall.entry(id).or_default().insert(top, 1.0);
+    }
+    tower.reindex();
+    ElevatorDispatch::new().move_cars(&mut tower, 2.5, &calls, 10, false);
+    let at = |id| {
+        tower
+            .transports
+            .iter()
+            .find(|t| t.id == id)
+            .unwrap()
+            .car_positions[0]
+            - 1.0
+    };
+    (at(ids[0]), at(ids[1]))
+}
+
+#[test]
+fn a_switched_on_modern_express_climbs_four_times_as_far() {
+    // Off, as it ships: both modes' express cars climb at the standard speed.
+    for mode in [GameMode::Classic, GameMode::Modern] {
+        let (standard, express) = climbs(mode);
+        assert!(standard > 0.0, "{mode:?}: the standard car set off");
+        assert_eq!(express, standard, "{mode:?}");
+    }
+    let _on = crate::rules::office_commutes_switch::turn_on();
+    let (standard, express) = climbs(GameMode::Classic);
+    assert_eq!(express, standard, "Classic keeps one speed");
+    let (standard, express) = climbs(GameMode::Modern);
+    assert!(standard > 0.0);
+    assert!(
+        (express - 4.0 * standard).abs() < 1e-9,
+        "{standard} vs {express}"
+    );
 }

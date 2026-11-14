@@ -25,8 +25,14 @@ impl Simulation {
         let hour = self.clock.hour();
         let night = self.clock.is_night();
         let evening = self.clock.is_evening();
+        let mode = self.tower.mode;
         for i in self.tower.room_indices() {
             let (u, at) = self.tower.marked(i);
+            // A Modern office counts the workers who got to their desks
+            // (`crowd::commuters`), not the clock.
+            if u.kind.commutes_in_person(mode) {
+                continue;
+            }
             let f = u.kind.facility();
             if u.is_dormant() {
                 if u.state == UnitState::Empty && f.attendance.is_some() {

@@ -6,6 +6,7 @@ use std::collections::{BTreeMap, HashMap};
 use indexmap::IndexMap;
 
 use crate::crowd::ElevatorCalls;
+use crate::facilities::Kind;
 use crate::jsmath;
 use crate::schedule::Schedule;
 use crate::tower::Tower;
@@ -158,8 +159,10 @@ impl ElevatorDispatch {
             if u.is_present() {
                 pop += u.census_count();
             }
-            // A venue's visitors ride as real people, so they are not waiting.
-            if u.kind.counts_visitors() || u.occupants <= 0 {
+            // A venue's visitors and an office's workers ride as real
+            // people, so they are not waiting.
+            if u.kind.counts_visitors() || u.kind.commutes_in_person(tower.mode) || u.occupants <= 0
+            {
                 continue;
             }
             let Ok(slot) = served.binary_search(&u.floor) else {
@@ -232,6 +235,11 @@ impl ElevatorDispatch {
             let span = (t.top - t.bottom) as f64;
             let cars = t.cars as usize;
             let wait_limit = rules.departure_limit.map(|m| m * shaft_dwell);
+            let floors_per_minute = if kind == Kind::ElevatorExpress {
+                CAR_FLOORS_PER_MINUTE * rules.express_speed
+            } else {
+                CAR_FLOORS_PER_MINUTE
+            };
             let dwell = self.car_dwell.entry(id).or_default();
             let seen = self.car_seen.entry(id).or_default();
             let held = self.car_held.entry(id).or_default();
@@ -273,8 +281,14 @@ impl ElevatorDispatch {
                 for j in 0..active_count.min(cars) {
                     let cab = cabs.and_then(|c| c.get(&(j as i64)));
                     let (pos, dir) = (t.car_positions[j], t.car_dir[j]);
-                    self.best
-                        .push(CarView::of(pos, dir, dwell[j], cab, shaft_dwell));
+                    self.best.push(CarView::of(
+                        pos,
+                        dir,
+                        dwell[j],
+                        cab,
+                        shaft_dwell,
+                        floors_per_minute,
+                    ));
                 }
             }
             for i in 0..cars {
@@ -299,7 +313,7 @@ impl ElevatorDispatch {
                         t.car_positions[i] = home;
                         t.car_dir[i] = 0;
                     } else {
-                        let step = dt * CAR_FLOORS_PER_MINUTE;
+                        let step = dt * floors_per_minute;
                         let dir = if home > cur { 1 } else { -1 };
                         let np = if (home - cur).abs() <= step {
                             home
@@ -346,7 +360,7 @@ impl ElevatorDispatch {
                         continue;
                     }
                 }
-                let v = car_dt * CAR_FLOORS_PER_MINUTE;
+                let v = car_dt * floors_per_minute;
                 let mut pos = t.car_positions[i];
                 let was_parked = t.car_dir[i] == 0;
                 let mut dir = if t.car_dir[i] == 0 { 1 } else { t.car_dir[i] };

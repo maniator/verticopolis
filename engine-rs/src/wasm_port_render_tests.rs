@@ -80,6 +80,8 @@ fn waiter(id: i64, shaft: i64, floor: i64, wait: f64, staff: bool) -> Person {
         staff_trip: None,
         errand: None,
         walk_in: false,
+        commuter: false,
+        commute: None,
         start_x: 0.0,
     }
 }
