@@ -15,6 +15,10 @@ raised the version, so they are documentation only.
 There is no entry for 0.17.0, which only
 existed as a step inside a stacked branch.
 
+## 1.32.0 (2026-11-14)
+
+- The catalog's `rules` block adds `venueFlights` (Modern `true`, Classic `false`, `GameMode::winds_venue_flights`): whether a frontend draws a one-story flight beside a venue as a spiral staircase or a switchback escalator. Drawing only. Catalog version 18; the catalog digests move for this field alone.
+
 ## 1.31.0 (2026-11-14)
 
 - `setPeopleWindow(floorLo, floorHi, xLo, xHi)` (and `ViewReader::set_people_window` with a `view::PeopleWindow` in the crate) makes `viewFrame` carry only the people on screen, padded so every rider of a car on screen comes along; a number that is not finite clears it.
