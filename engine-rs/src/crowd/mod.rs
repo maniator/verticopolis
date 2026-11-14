@@ -15,6 +15,7 @@ pub mod staff_shift;
 pub mod trip;
 pub mod visits;
 pub mod walk;
+pub mod walk_ins;
 
 use std::collections::{BTreeSet, HashMap, HashSet};
 
@@ -26,6 +27,9 @@ use crate::tower::Tower;
 
 pub const CROWD_SECONDS_PER_MINUTE: f64 = 2.0;
 pub const WALK_SPEED: f64 = 6.0;
+/// The crowd's old car size. A car now holds as many riders as its kind
+/// ([`Kind::car_capacity`]); this stays for code that named it.
+#[deprecated(note = "a car holds its kind's `Kind::car_capacity`")]
 pub const CAR_CAPACITY: i64 = 12;
 pub const MAX_PEOPLE: usize = 140;
 pub const EAT_SECONDS_MIN: i64 = 30 * 2;
@@ -117,6 +121,10 @@ pub struct Person {
     /// `Person` shape.
     pub crew_id: Option<i64>,
     pub staff_trip: Option<staff_shift::StaffTrip>,
+    /// A customer who came in from outside (`walk_ins`), counted in
+    /// `Crowd::walk_in_count` instead of the 140-person sample.
+    /// Engine-internal: not in the `Person` shape.
+    pub walk_in: bool,
     /// Why a plain commute set out (the floor-list trips of `spawn_trips`),
     /// for the person card (`trip`). Stamped at spawn, draws nothing, and
     /// the crowd is never saved. Engine-internal: not in the `Person` shape.
@@ -265,6 +273,11 @@ pub struct Crowd {
     /// (a crowd stepped on its own) leaves every venue open. Set by the
     /// step; never saved.
     pub hour: Option<i64>,
+    /// The walk-ins booked for this hour, latest first (`walk_ins`).
+    /// Never saved.
+    pub walk_ins: Vec<walk_ins::WalkIn>,
+    /// The walk-ins in the crowd, on their way or inside.
+    pub walk_in_count: i64,
 }
 
 impl Crowd {
@@ -299,6 +312,8 @@ impl Crowd {
             open_cars: Default::default(),
             queue_cache: None,
             hour: None,
+            walk_ins: Vec::new(),
+            walk_in_count: 0,
         }
     }
 

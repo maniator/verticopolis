@@ -58,8 +58,8 @@ describe("the harnesses' scenarios", () => {
       const { people } = run(save, 720, (n) => (peak = Math.max(peak, n)));
       return { peak, end: people };
     };
-    expect(peakOverADay(JSON.stringify(loadFixtureSave("conformance/fixtures/split-tower.vctower")))).toEqual({ peak: 27, end: 0 });
-    expect(peakOverADay(buildScenarios(["small"])[0].save).peak).toBe(140);
+    expect(peakOverADay(JSON.stringify(loadFixtureSave("conformance/fixtures/split-tower.vctower")))).toEqual({ peak: 40, end: 0 });
+    expect(peakOverADay(buildScenarios(["small"])[0].save).peak).toBe(186);
   }, 120_000);
 
   it.skipIf(needsEngine)("loads every tower in the engine and runs two in-game hours on it", () => {

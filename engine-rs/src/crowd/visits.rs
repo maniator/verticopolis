@@ -321,7 +321,16 @@ pub fn begin_dwell(crowd: &mut Crowd, tower: &mut Tower, i: usize) {
             crowd.people[i].counted_hotel_guest = true;
             v.set_hotel_customers_in(at, Some(v.hotel_customers_in.unwrap_or(0) + 1));
         }
+        // A venue whose customers come in person counts each one at the
+        // door, so Today's patronage is who really came.
+        if kind.takes_walk_ins() && counts_patronage(kind) {
+            let mut tally = v.extras_mut();
+            tally.patronage_today = Some(tally.patronage_today.unwrap_or(0.0) + 1.0);
+        }
         tower.bump_meal_overlay_revision();
+    } else if crowd.people[i].walk_in {
+        // A walk-in who finds the venue full goes back out.
+        crowd.people[i].dwell_seconds_left = Some(0.0);
     } else if let Some(cap) = cap {
         let gate = if kind == Kind::WeddingHall {
             operational
@@ -336,4 +345,11 @@ pub fn begin_dwell(crowd: &mut Crowd, tower: &mut Tower, i: usize) {
             tower.bump_meal_overlay_revision();
         }
     }
+}
+
+/// Whether `kind` keeps a patronage tally: a venue with subtypes and a
+/// spend per customer (`collect_traffic_income`'s retail test).
+fn counts_patronage(kind: Kind) -> bool {
+    kind.subtype_list().is_some()
+        && crate::economy::retail_spend_per_customer(kind).is_some_and(|s| s > 0.0)
 }

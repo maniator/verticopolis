@@ -28,6 +28,9 @@ impl Simulation {
         let is_weekend = self.clock.is_weekend();
         let hour = self.clock.hour();
         let mode = self.mode;
+        // The walk-ins booked below arrive over the rest of this hour.
+        let walk_in_from = self.clock.minutes;
+        let walk_in_until = (walk_in_from / 60.0).floor() * 60.0 + 60.0;
         for i in self.tower.room_indices() {
             let (kind, floor, x, id, state) = {
                 let u = &self.tower.units[i];
@@ -116,16 +119,20 @@ impl Simulation {
             let is_retail = kind.subtype_list().is_some() && spend.is_some_and(|s| s > 0.0);
             if is_retail {
                 let cust_per_hour = daily / (spend.unwrap() * open_h);
+                let expected =
+                    cust_per_hour * frac * rain_mult * lobby_mult * weekend_mult * traffic_factor;
                 let mut tally = u.extras_mut();
-                tally.patronage_today = Some(
-                    tally.patronage_today.unwrap_or(0.0)
-                        + cust_per_hour
-                            * frac
-                            * rain_mult
-                            * lobby_mult
-                            * weekend_mult
-                            * traffic_factor,
-                );
+                if kind.takes_walk_ins() {
+                    // These customers come in person, as many as demand
+                    // sends (owner, 2026-11-14): the hour's share is booked
+                    // as walk-ins, and each one counts as it arrives
+                    // (`visits::begin_dwell`).
+                    tally.patronage_today.get_or_insert(0.0);
+                    self.crowd
+                        .book_walk_ins(id, expected, walk_in_from, walk_in_until);
+                } else {
+                    tally.patronage_today = Some(tally.patronage_today.unwrap_or(0.0) + expected);
+                }
             }
             if u.pending_income >= 1.0 {
                 let earned = u.pending_income.floor();
@@ -140,6 +147,7 @@ impl Simulation {
                 }
             }
         }
+        self.crowd.sort_walk_ins();
     }
 
     /// `hotelCheckout`: the 08:00 event.

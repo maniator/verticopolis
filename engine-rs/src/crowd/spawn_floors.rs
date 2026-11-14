@@ -68,7 +68,6 @@ pub struct SpawnFloors {
     pub leased_offices: Vec<i64>,
     pub staffed_offices: Vec<i64>,
     pub homes: Vec<i64>,
-    pub open_venues: Vec<i64>,
     pub condo_floors: Vec<i64>,
     pub household_floors: Vec<i64>,
     pub hotel_floors: Vec<i64>,
@@ -150,7 +149,6 @@ pub fn spawn_floors(tower: &Tower, clock: &Clock) -> SpawnFloors {
     let mut leased = FloorList::default();
     let mut staffed = FloorList::default();
     let mut homes = FloorList::default();
-    let mut venues = FloorList::default();
     let mut metro_stations: Vec<i64> = Vec::new();
     let mut condo_floors = FloorList::default();
     let mut household_floors = FloorList::default();
@@ -202,7 +200,6 @@ pub fn spawn_floors(tower: &Tower, clock: &Clock) -> SpawnFloors {
             homes.insert(u.floor);
             hotel_floors.insert(u.floor);
         } else if u.kind.is_ambient_venue() && u.kind.is_open_at(hour) {
-            venues.insert(u.floor);
             add_floor(&mut venues_by_kind, u.kind, u.floor);
         } else if u.kind.attendance_cap().is_some() && u.kind.is_open_at(hour) {
             add_floor(&mut venues_by_kind, u.kind, u.floor);
@@ -225,7 +222,6 @@ pub fn spawn_floors(tower: &Tower, clock: &Clock) -> SpawnFloors {
         leased_offices: leased.floors,
         staffed_offices: staffed.floors,
         homes: homes.floors,
-        open_venues: venues.floors,
         condo_floors: condo_floors.floors,
         household_floors: household_floors.floors,
         hotel_floors: hotel_floors.floors,
@@ -269,7 +265,7 @@ mod tests {
     /// cannot catch a rule bug; when a rule changes on purpose, delete it
     /// rather than edit both.
     struct Before {
-        lists: [Vec<i64>; 7],
+        lists: [Vec<i64>; 6],
         staff_floors: Vec<(Kind, i64)>,
         venues_by_kind: HashMap<Kind, Vec<i64>>,
         units_by_floor: HashMap<i64, Vec<i64>>,
@@ -282,7 +278,6 @@ mod tests {
         let mut leased: IndexSet<i64> = IndexSet::new();
         let mut staffed: IndexSet<i64> = IndexSet::new();
         let mut homes: IndexSet<i64> = IndexSet::new();
-        let mut venues: IndexSet<i64> = IndexSet::new();
         let mut metro_stations: Vec<i64> = Vec::new();
         let mut condo_floors: IndexSet<i64> = IndexSet::new();
         let mut household_floors: IndexSet<i64> = IndexSet::new();
@@ -331,10 +326,9 @@ mod tests {
             } else if u.kind.is_hotel() {
                 homes.insert(u.floor);
                 hotel_floors.insert(u.floor);
-            } else if u.kind.is_ambient_venue() && u.kind.is_open_at(hour) {
-                venues.insert(u.floor);
-                venues_by_kind.entry(u.kind).or_default().insert(u.floor);
-            } else if u.kind.attendance_cap().is_some() && u.kind.is_open_at(hour) {
+            } else if (u.kind.is_ambient_venue() || u.kind.attendance_cap().is_some())
+                && u.kind.is_open_at(hour)
+            {
                 venues_by_kind.entry(u.kind).or_default().insert(u.floor);
             }
         }
@@ -344,7 +338,6 @@ mod tests {
                 list(leased),
                 list(staffed),
                 list(homes),
-                list(venues),
                 list(condo_floors),
                 list(household_floors),
                 list(hotel_floors),
@@ -359,8 +352,8 @@ mod tests {
         }
     }
 
-    /// The lists answer as before; which of the ten outputs had anything in.
-    fn assert_as_before(tower: &Tower, clock: &Clock) -> [bool; 10] {
+    /// The lists answer as before; which of the nine outputs had anything in.
+    fn assert_as_before(tower: &Tower, clock: &Clock) -> [bool; 9] {
         let at = format!("day {} hour {}", clock.day(), clock.hour());
         let now = spawn_floors(tower, clock);
         let was = before(tower, clock);
@@ -368,7 +361,6 @@ mod tests {
             &now.leased_offices,
             &now.staffed_offices,
             &now.homes,
-            &now.open_venues,
             &now.condo_floors,
             &now.household_floors,
             &now.hotel_floors,
@@ -386,21 +378,21 @@ mod tests {
             let was = was.units_by_floor.get(&floor).map_or(&[][..], |v| v);
             assert_eq!(now.units_on(floor), was, "{at}: floor {floor}");
         }
-        let mut filled = [false; 10];
+        let mut filled = [false; 9];
         for (i, list) in lists.iter().enumerate() {
             filled[i] = !list.is_empty();
         }
-        filled[7] = !now.staff_floors.is_empty();
-        filled[8] = !now.metro_stations.is_empty();
-        filled[9] = !now.venues_by_kind.0.is_empty();
+        filled[6] = !now.staff_floors.is_empty();
+        filled[7] = !now.metro_stations.is_empty();
+        filled[8] = !now.venues_by_kind.0.is_empty();
         filled
     }
 
     #[test]
     fn the_fixture_towers_list_the_floors_as_before() {
         let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../conformance/fixtures/");
-        let mut filled = [false; 10];
-        let mut seen = |now: [bool; 10]| {
+        let mut filled = [false; 9];
+        let mut seen = |now: [bool; 9]| {
             for (seen, now) in filled.iter_mut().zip(now) {
                 *seen |= now;
             }
@@ -435,7 +427,7 @@ mod tests {
         }
         // Every output had floors at some point, so none was compared only
         // empty against empty.
-        assert_eq!(filled, [true; 10]);
+        assert_eq!(filled, [true; 9]);
     }
 
     #[test]

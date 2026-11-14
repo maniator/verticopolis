@@ -169,17 +169,35 @@ fn drawn_by(kind: Kind, occupants: i64, day: i64, hour: i64) -> usize {
     sim.crowd.people.len()
 }
 
+/// The customers a fast food on floor 5, over two staffed offices on
+/// floor 3, books from outside at `hour`, and the people the crowd then
+/// draws over 400 short steps.
+fn fast_food_customers(hour: i64) -> (usize, usize) {
+    let (mut sim, _) = tower_with_elevator(8);
+    let staff = Kind::Office.facility().population;
+    for x in [0, 9] {
+        place_seated(&mut sim, Kind::Office, 3, x, UnitState::Occupied, staff);
+    }
+    let shop = place_seated(&mut sim, Kind::FastFood, 5, 0, UnitState::Occupied, 0);
+    at_time(&mut sim, 0, hour);
+    sim.crowd.walk_ins.clear();
+    sim.collect_traffic_income();
+    let booked = sim
+        .crowd
+        .walk_ins
+        .iter()
+        .filter(|w| w.unit_id == shop)
+        .count();
+    pump(&mut sim, 0.05, 400);
+    let walk_ins = sim.crowd.people.iter().filter(|p| p.walk_in).count();
+    (booked, walk_ins)
+}
+
 #[test]
 fn nobody_visits_a_closed_venue() {
-    assert_eq!(
-        drawn_by(Kind::FastFood, 0, 0, 3),
-        0,
-        "fast food is shut at 03:00"
-    );
-    assert!(
-        drawn_by(Kind::FastFood, 0, 0, 12) > 0,
-        "and draws visitors at noon"
-    );
+    assert_eq!(fast_food_customers(3), (0, 0), "fast food is shut at 03:00");
+    let (booked, _) = fast_food_customers(12);
+    assert!(booked > 0, "and books customers at noon");
 }
 
 #[test]

@@ -229,15 +229,19 @@ const LUNCH_FIRST_X: i64 = 10;
 const LUNCH_STRIP_WIDTH: i64 = 120;
 const OFFICE_WIDTH: i64 = 9;
 const OFFICE_STAFF: i64 = 6;
+/// The lunch-peak tower's food floor: high enough that the offices under it
+/// send more diners than the crowd holds (the tower's other trips no longer
+/// top the crowd up).
+const LUNCH_VENUE_FLOOR: i64 = 12;
 
 #[test]
 fn the_crowd_cap_holds_through_a_lunch_peak() {
-    let mut sim = strip_tower(2024, GameMode::Modern, LUNCH_STRIP_WIDTH, VENUE_FLOOR);
-    shaft(&mut sim, Kind::ElevatorStandard, 4, 1, VENUE_FLOOR);
+    let mut sim = strip_tower(2024, GameMode::Modern, LUNCH_STRIP_WIDTH, LUNCH_VENUE_FLOOR);
+    shaft(&mut sim, Kind::ElevatorStandard, 4, 1, LUNCH_VENUE_FLOOR);
     place_seated(
         &mut sim,
         Kind::FastFood,
-        VENUE_FLOOR,
+        LUNCH_VENUE_FLOOR,
         LUNCH_FIRST_X,
         UnitState::Occupied,
         0,
@@ -245,12 +249,12 @@ fn the_crowd_cap_holds_through_a_lunch_peak() {
     place_seated(
         &mut sim,
         Kind::Restaurant,
-        VENUE_FLOOR,
+        LUNCH_VENUE_FLOOR,
         LUNCH_FIRST_X + 30,
         UnitState::Occupied,
         0,
     );
-    for floor in OFFICE_FLOOR..VENUE_FLOOR {
+    for floor in OFFICE_FLOOR..LUNCH_VENUE_FLOOR {
         for i in 0..LUNCH_OFFICES_PER_FLOOR {
             let x = LUNCH_FIRST_X + i * OFFICE_WIDTH;
             place_seated(
@@ -271,18 +275,20 @@ fn the_crowd_cap_holds_through_a_lunch_peak() {
         .count() as i64;
     assert_eq!(
         offices,
-        LUNCH_OFFICES_PER_FLOOR * (VENUE_FLOOR - OFFICE_FLOOR)
+        LUNCH_OFFICES_PER_FLOOR * (LUNCH_VENUE_FLOOR - OFFICE_FLOOR)
     );
     assert!(
         (offices * OFFICE_STAFF) as usize > MAX_PEOPLE,
         "the staff outnumber the cap, so lunch can press against it"
     );
     at_time(&mut sim, 0, 12);
+    // Walk-ins from outside are counted apart from the sample.
+    let sample = |sim: &Simulation| sim.crowd.people.iter().filter(|p| !p.walk_in).count();
     let mut peak = 0;
     for _ in 0..180 {
         sim.tick(1.0);
-        peak = peak.max(sim.crowd.people.len());
-        assert!(sim.crowd.people.len() <= MAX_PEOPLE);
+        peak = peak.max(sample(&sim));
+        assert!(sample(&sim) <= MAX_PEOPLE);
     }
     assert_eq!(peak, MAX_PEOPLE, "the lunch filled the crowd to its cap");
 }

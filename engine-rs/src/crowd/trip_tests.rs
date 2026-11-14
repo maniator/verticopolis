@@ -103,8 +103,6 @@ fn every_errand_names_its_purpose() {
         (ErrandPlace::Office, false, Purpose::FromWork),
         (ErrandPlace::Home, true, Purpose::ReturnHome),
         (ErrandPlace::Home, false, Purpose::LeaveHome),
-        (ErrandPlace::Venue, true, Purpose::ToVenue),
-        (ErrandPlace::Venue, false, Purpose::FromVenue),
     ];
     let mut t = tower3();
     let i = person(&mut t.sim, (1, 30), (2, 11));

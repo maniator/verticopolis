@@ -275,5 +275,6 @@ fn a_breakfast_hotel_guest_is_counted_at_the_venue_and_flagged() {
     for _ in 0..240 {
         sim.tick(1.0);
     }
-    assert_eq!(tallies(&sim), (0, 0));
+    // The guests have eaten and gone; walk-ins from outside may still be in.
+    assert_eq!(tallies(&sim).1, 0);
 }

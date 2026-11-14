@@ -21,14 +21,14 @@ const STATION: i64 = MIN_FLOOR;
 const PLATFORM: i64 = STATION + 1;
 
 /// Basement floor `n` (B1 is floor 0).
-const fn b(n: i64) -> i64 {
+pub(super) const fn b(n: i64) -> i64 {
     1 - n
 }
 
 /// A tower with a ground lobby, floor 2, a basement down to B10 and a metro
 /// station on B8 to B10. One elevator runs from B7 to floor 2. With
 /// `platform_served`, a second runs from the platform to the lobby.
-fn metro_tower(mode: GameMode, platform_served: bool) -> Simulation {
+pub(super) fn metro_tower(mode: GameMode, platform_served: bool) -> Simulation {
     let mut sim = Simulation::new_game(1, mode);
     sim.money = 1e12;
     sim.star = 5;
@@ -109,10 +109,10 @@ fn a_shop_by_a_working_platform_takes_its_full_trade() {
         let frac = compute_demand_map(&mut sim).fraction_by_unit[&shop];
         assert!(frac > 0.0, "the offices reach the shop");
         sim.collect_traffic_income();
-        // The day's shoppers so far, before the takings round to whole
-        // dollars; it carries the same multipliers as the takings.
-        let shoppers = sim.tower.get_unit(shop).unwrap().extras().patronage_today;
-        shoppers.unwrap() / frac
+        // The hour's takings, paid out and still pending: the shoppers
+        // come in person now, so the takings carry the trade's multipliers.
+        let u = sim.tower.get_unit(shop).unwrap();
+        (u.extras().profit_today.unwrap_or(0.0) + u.pending_income) / frac
     };
     let full = take_per_demand(true);
     let halved = take_per_demand(false);

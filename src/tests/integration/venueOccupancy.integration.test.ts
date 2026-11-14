@@ -10,12 +10,10 @@ const facility = (kind: FacilityKind) => catalogFacility(catalogFor("modern"), k
 
 /**
  * Guards commercial venue occupant behavior:
- *   - A meal venue's occupants (fast food, restaurant, food hall) are the
- *     customers inside it (`customersIn`), the people who walked in and have
- *     not left, so the room draws the people who are really there. An open
- *     one nobody has reached shows 0.
- *   - A retail shop gets no visitor trips yet, so while open it draws its
- *     full population; otherwise it would draw empty all day.
+ *   - A meal venue's or a shop's occupants are the customers inside it
+ *     (`customersIn`), the people who walked or rode in and have not left,
+ *     so the room draws the people who are really there. An open one nobody
+ *     has reached shows 0.
  *   - A venue with nobody inside shows 0 outside its open hours too.
  *   - Population values (the most customers a venue holds) scale with
  *     footprint: shop 20, fastFood 25, restaurant 35.
@@ -105,12 +103,12 @@ describeEngines("an open venue's occupants are the customers inside it", (leg: L
     expect(occupants()).toBe(customers());
   });
 
-  it("a shop, which no trip is sent to yet, draws its full population at 14:00", () => {
+  it("a shop's occupants are its walk-in customers at 14:00", () => {
     const { sim, venue, customers, triggerHour, occupants } = venueFixture(leg, "shop", 13);
     sim.setCustomersIn(venue().id, 2);
     triggerHour();
     expect(customers()).toBe(2);
-    expect(occupants()).toBe(facility("shop").population);
+    expect(occupants()).toBe(2);
   });
 });
 
@@ -217,16 +215,17 @@ describeEngines("a venue's first open hour", (leg: Leg) => {
     expect(occupants()).toBeLessThan(facility("fastFood").population);
   });
 
-  it("an empty (never-visited) shop is lit in the same hour traffic first opens it", () => {
-    // No trip goes to a shop yet, so the economy stamps its full population
-    // at the empty-to-occupied flip rather than leave it dark all hour.
-    const { venue, triggerHour, occupants } = venueFixture(leg, "shop", 9, (draft, id) => {
+  it("an empty (never-visited) shop opens in the hour traffic first reaches it, with no stand-in crowd", () => {
+    // A shop draws the walk-in customers inside it, and nobody has arrived
+    // yet when the economy flips it occupied.
+    const { venue, customers, triggerHour, occupants } = venueFixture(leg, "shop", 9, (draft, id) => {
       const unit = draft.tower.units.find((u) => u.id === id)!;
       unit.state = "empty";
       unit.occupants = 0;
     }); // shop opens at 10
     triggerHour(); // crosses into 10:00: traffic flips it occupied
     expect(venue().state).toBe("occupied");
-    expect(occupants()).toBe(facility("shop").population);
+    expect(occupants()).toBe(customers());
+    expect(occupants()).toBeLessThan(facility("shop").population);
   });
 });
