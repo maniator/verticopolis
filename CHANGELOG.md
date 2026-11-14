@@ -25,6 +25,38 @@ prompt already tells players it is an engine update and shows the new version.
 Entries below 1.51.1 were curated from the commit history after the fact, so they
 are documentation only: no build that a client fetches carries them.
 
+## 3.13.0
+
+- People stay in the tower when you reload a save: everyone walking, waiting, riding, eating, shopping or cleaning picks up where they were, and the elevators carry on mid-stop, instead of the building emptying and filling again from the lobby. If the game hits an engine error and reloads itself, that one reload still starts the tower empty, so the error is not replayed.
+- Modern: sky bridges. Lay lobby across the open air between two towers' sky lobbies on the same floor, up to 24 tiles, and people walk across to use either tower's elevators. A bridge tile costs twice a lobby tile and carries nothing, and the bulldozer never leaves part of a bridge hanging.
+- Modern: bulldozing any tile of a sky bridge takes the whole bridge down, so a bridge is never left in pieces, and it waits while anyone is walking across. Undo puts the whole bridge back.
+- People headed across a floor that was cut in two find another way from where they stand, instead of jumping over the gap.
+- Modern: people pick the quickest way up, counting the line at each elevator, so when the express line gets long some riders take the locals or the stairs instead.
+- Opening the Saved Towers dialog is counted once per visit in the anonymous usage stats. Saving, deleting or undoing inside it no longer counts as another open.
+- The "too little parking" hint now reminds you that basements can run wider than the tower above.
+- The help pages now explain how deep and how wide basements can go, and how far one floor of parking goes.
+- The elevator schedule's unsaved-changes warning now says what the second press does, so screen readers announce it when Esc is pressed.
+- When you import a tower, the file window now shows only `.vctower` and `.TDT` files wherever your browser can filter them.
+- On a phone, the Classic vs Modern comparison shows each topic as its own box with Classic and Modern lines, so topic names no longer break in the middle of a word.
+- In Modern towers, office workers now really come to work: each one rides in from the lobby or the Metro between 7 and 10 AM, counts once they reach their desk, and goes home between 4 and 7 PM. An office's card shows who is still on the way.
+- Modern elevators move twice as fast, and express elevators four times as fast, so the morning rush gets everyone to work.
+- Busy hours in big towers run smoother: the game does less work for each person waiting at an elevator.
+- On a lot with several separate towers, housekeepers come in and go home by the lobby under their Housekeeping room.
+- Metro riders head up from, and back down to, the part of the platform their station stands on.
+- Express elevators now stop at every basement floor they pass, in Classic and Modern, as in the original. Above ground they still stop only at lobbies.
+- A basement stop on an express can be turned off and back on in the elevator's Schedule window, and a saved tower keeps the choice. The elevator card's Stops line now reads "lobbies and basements" for an express that reaches below ground, with a count of the stops turned off.
+- An express elevator in a tower saved before this update loads with all of its basement stops on, and a `.TDT` tower keeps the basement stops its file has, however it is opened.
+- The Bulletin shows a tower's earlier messages again after you open a saved tower, import a tower file or reload the page. It came up empty before.
+- Your towers are now also kept in the browser's database for the site, where a compressed tower takes a third less room. The game still writes a copy to the site storage it used before, so going back to an older version finds every tower, and boot takes whichever copy is newer.
+- Saves and exported towers are much smaller, often under half their old size, and play exactly the same. A tower saved by this version needs this version or newer to open.
+
+### Contributors
+
+- jay23606 wrote the screen reader announcement for the elevator schedule's Esc guard (#2017, #670).
+- HongPong asked for a frame rate overlay, which is now `?debug=fps` (#645).
+- trvorth extended the room-capacity honesty sweep to every populated room look (#2198, #833).
+- janegaisinsky1 reported that parking felt too small, which led to the clearer parking hint and help pages (#2212).
+
 ## 3.12.3
 
 - Selling an elevator car and buying it back no longer puts the whole fleet on the hours you had cut back. An hour you set to run fewer cars keeps its count, even when the sale left it at the shaft's size, and pressing OK in the Schedule window keeps it that way until you set the hour to a new count.

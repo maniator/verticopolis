@@ -15,6 +15,23 @@ raised the version, so they are documentation only.
 There is no entry for 0.17.0, which only
 existed as a step inside a stacked branch.
 
+## 1.38.0 (2026-11-14)
+
+- A save carries the crowd (`crowd`: every person, the crowd's id source and random stream, the commute-stress averages and the walk-ins booked for the hour) and the elevator cars' timers mid-stop (`dispatch`), and a load rebuilds the venue, meal and housekeeping counts from the people, so the people and the cars carry on where they were. The crowd also keeps the last step's hour, the Modern router's line counts, and the office commuters' desks and bookings when there are any. The elevator panels' hourly figures, the day's move-in report and the rooms cleaned today still start over on a load. Older saves load with an empty crowd as before, and older builds ignore both keys.
+- The conformance state hash leaves out `crowd` and `dispatch`; the crowd hash now holds through a `reload`.
+- Modern places a lobby tile over open air on a sky lobby floor as a sky bridge tile when a sky lobby closes the gap on both sides within `SKYBRIDGE_MAX_SPAN` tiles; `Tower::is_skybridge_tile` reports one. A bridge carries no story or shaft, costs twice a lobby tile, and Classic placement is unchanged.
+- `remove_facility` on a sky bridge tile removes every tile of that bridge and refuses while people walk on it; undo refuses the same way (`StepRefused::Crossing`). A walker whose target lies on another run of their floor reroutes from where they stand.
+- Modern routes each trip by its expected time (wait, line, ride and climb) on a transit graph with an A* search; Classic keeps the fewest-rides route.
+- `rules::REAL_OFFICE_COMMUTES_ON` is now `true`: Modern office workers commute as people (`crowd::commuters`), and the test-only switch is gone. Classic offices keep the clock's head count.
+- Modern standard and service cars move at twice the base speed (`GameMode::car_speed_factor`, `DispatchRules::car_speed`) and express cars at four times (`GameMode::express_speed_factor`).
+- The unit detail JSON adds `workersComing`, matching the `unitCard` slot: the workers on their way to a Modern office, null on any other kind.
+- A housekeeper's commute uses the street floor's run nearest their room that a route reaches, and a Metro rider's trip starts or ends at the station's own run of the platform; a lot with one street run and one platform run is unchanged, so the conformance lock does not move.
+- An express shaft stops at every basement floor it spans in both modes, and `setStop` accepts a basement floor on an express. Every express now writes `preserveBasementStops: true` into the save; a save without it loads with its basement skips cleared and gains it. `importTdt` writes the marker on each express, so `fromSave` keeps the file's basement skips too.
+- The conformance lock moves: `fixture-sixseven` and `holidays-classic` (the sixseven tower, whose express runs from B5) move their crowd hashes, and `holidays-classic` its events; the other moved scenarios change only their state hash (the marker in the save), and a new `express-basements-classic` scenario covers building, toggling, shortening, extending and reloading a basement express. `loader-cases.json`, `tdt-cases.json` (11 import save hashes for the marker, and the two sixseven export cases) and `frame-days.json` move with it.
+- A loaded tower numbers its saved log lines from 1 up to the log counter, so `logSince(0)` and the port's `logAfter(0)` list every line the save carried. They answered nothing before, since the counter restarted at 0.
+- Save version 11 folds a row of plain floor tiles into its first tile with a `run` count (`FLOOR_RUN_KEY`, `FLOOR_RUN_SAVE_VERSION`); both loaders unfold it, and a tower with no such row keeps its old version stamp.
+- `HELD_HOURS_SAVE_VERSION` names version 10, and `Simulation::serialize_unfolded` (the tooling binding's `serializeUnfolded()`) writes every unit on its own with the old stamp, the form the state view and its digests hash, so conformance digests do not move.
+
 ## 1.37.0 (2026-11-14)
 
 - Real office commutes (`crowd::commuters`) land switched off behind `rules::REAL_OFFICE_COMMUTES_ON`, so the game plays as before. When on, Modern office workers walk in at the lobby or ride in on the Metro over 7 to 10 AM on weekdays, leave over 4 to 7 PM, and an office counts only the workers at their desks; Modern express cars move four times as fast (`GameMode::express_speed_factor`). Classic offices keep the clock's head count either way.
