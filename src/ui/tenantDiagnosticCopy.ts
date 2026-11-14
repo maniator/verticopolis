@@ -66,10 +66,10 @@ export function gripeCopy(f: GripeCopyFacts): string | undefined {
     return `trash piling up: recycling handles ${shareOf(f.coverage)} of the tower. Build another Recycling Center.`;
   }
   if (f.cause === "homeParking") {
-    return `too little parking: the spaces left after hotel suites cover ${shareOf(f.coverage)} of what offices and homes need. Add parking spaces chained to a ramp.`;
+    return `too little parking: the spaces left after hotel suites cover ${shareOf(f.coverage)} of what offices and homes need. Add parking spaces chained to a ramp; basements can run wider than the tower above.`;
   }
   if (f.cause === "parking") {
-    return `too little parking: the spaces left after hotel suites cover ${shareOf(f.coverage)} of the office workers. Add parking spaces chained to a ramp.`;
+    return `too little parking: the spaces left after hotel suites cover ${shareOf(f.coverage)} of the office workers. Add parking spaces chained to a ramp; basements can run wider than the tower above.`;
   }
   // Access, long walk and lobby distance use dedicated diagnostic lines.
   return undefined;
