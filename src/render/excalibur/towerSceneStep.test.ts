@@ -5,6 +5,7 @@ import { followStep, setSim } from "./towerScene";
 import { runSceneSync } from "./towerSyncSchedule";
 import { NOT_BAKED } from "./sceneBake";
 import { HallDoorLayer } from "./towerHallDoors";
+import { emptyFlightPass } from "../venueFlights";
 import { bindViewWorld, viewWorld } from "../../presentation/viewWorld";
 import type { RenderSim } from "../renderSim";
 import type { TowerEngine } from "./TowerEngine";
@@ -88,7 +89,7 @@ function sceneUnderSwap() {
     craneActor: null,
     roomSig: new Map(),
     transportSig: new Map(),
-    windingFlights: new Set(),
+    flightPass: emptyFlightPass(),
     floorLive: new Map(),
     carActors: [],
     trainActors: [],

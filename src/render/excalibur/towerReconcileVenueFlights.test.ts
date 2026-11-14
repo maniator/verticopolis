@@ -5,6 +5,8 @@ import { syncScene } from "./towerReconcile";
 import { emptyStructPass } from "./towerStructTiles";
 import { HallDoorLayer } from "./towerHallDoors";
 import { NO_TALL_HALLS } from "../lobbyHalls";
+import { emptyFlightPass } from "../venueFlights";
+import { drawTransport } from "../sprites";
 
 // Flights beside a venue (venueFlights.ts): the reconcile gathers the venues
 // on its walk of the rooms and restyles a flight the sync a venue appears or
@@ -30,6 +32,7 @@ vi.mock("excalibur", async (importOriginal) => {
 vi.mock("./towerScenery", () => ({ syncScenery: vi.fn() }));
 vi.mock("./roomSignature", () => ({ roomSignature: () => "sig", isDeadParking: () => false }));
 vi.mock("../regionPaint", () => ({ paintAnimatedUnit: vi.fn() }));
+vi.mock("../sprites", async (importOriginal) => ({ ...(await importOriginal<typeof import("../sprites")>()), drawTransport: vi.fn() }));
 const rules = { venueFlights: true };
 vi.mock("../../catalog/towerCatalog", () => ({ towerCatalog: () => ({ rules }) }));
 vi.mock("../../catalog/catalogTypes", () => ({ catalogFacility: (_: unknown, kind: string) => ({ floors: kind === "cinema" ? 2 : 1 }) }));
@@ -53,20 +56,32 @@ const lift = { id: 41, kind: "elevatorStandard", x: 96, width: 4, bottom: 2, top
 
 /** Just the engine surface `syncScene` reads: `units` and `transports` are
  *  live arrays, and an edit bumps the revision the way the view does. */
-function fakeEngine(units: UnitView[]): TowerEngine & { sim: { tower: { units: UnitView[]; revision: number } } } {
+type FakeEngine = TowerEngine & { sim: { tower: { units: UnitView[]; revision: number } } };
+
+function fakeSim(units: UnitView[]) {
   return {
-    sim: {
-      tower: {
-        units,
-        revision: 1,
-        getUnit: (id: number) => units.find((u) => u.id === id),
-        transports: [stairs, lift],
-        functionalParkingSet: () => new Set<number>(),
-        tallLobbies: () => NO_TALL_HALLS,
-      },
-      parkingUsage: () => 0,
-      recyclingFill: () => 0,
+    tower: {
+      units,
+      revision: 1,
+      getUnit: (id: number) => units.find((u) => u.id === id),
+      transports: [stairs, lift],
+      functionalParkingSet: () => new Set<number>(),
+      tallLobbies: () => NO_TALL_HALLS,
     },
+    parkingUsage: () => 0,
+    recyclingFill: () => 0,
+  };
+}
+
+/** The canvas the actor of flight `id` draws, run on a stand-in context. */
+function rasterOf(engine: TowerEngine, id: number): void {
+  const actor = engine.transportActors.get(id) as unknown as { graphics: { use: { mock: { calls: [{ options: { draw: (ctx: unknown) => void } }][] } } } };
+  actor.graphics.use.mock.calls[0][0].options.draw({});
+}
+
+function fakeEngine(units: UnitView[]): FakeEngine {
+  return {
+    sim: fakeSim(units),
     engine: { add: vi.fn() },
     d: {},
     litState: false,
@@ -78,11 +93,11 @@ function fakeEngine(units: UnitView[]): TowerEngine & { sim: { tower: { units: U
     regionUnits: new Map(),
     transportActors: new Map(),
     transportSig: new Map(),
-    windingFlights: new Set(),
+    flightPass: emptyFlightPass(),
     hallDoors: new HallDoorLayer(),
     worldX: (x: number) => x * 16,
     worldYTop: (floor: number) => floor * 16,
-  } as unknown as TowerEngine & { sim: { tower: { units: UnitView[]; revision: number } } };
+  } as unknown as FakeEngine;
 }
 
 describe("a flight beside a venue restyles with the venue", () => {
@@ -93,7 +108,7 @@ describe("a flight beside a venue restyles with the venue", () => {
   it("winds the stairway against the cinema's wall and leaves the elevator alone", () => {
     const engine = fakeEngine([cinema]);
     syncScene(engine);
-    expect([...engine.windingFlights]).toEqual([40]);
+    expect([...engine.flightPass.winding]).toEqual([40]);
     expect(engine.transportSig.get(40)).toMatch(/:winds$/);
     expect(engine.transportSig.get(41)).not.toMatch(/winds/);
   });
@@ -129,7 +144,45 @@ describe("a flight beside a venue restyles with the venue", () => {
     rules.venueFlights = false;
     const engine = fakeEngine([cinema]);
     syncScene(engine);
-    expect(engine.windingFlights.size).toBe(0);
+    expect(engine.flightPass.winding.size).toBe(0);
     expect(engine.transportSig.get(40)).not.toMatch(/winds/);
+  });
+
+  it("leaves the flights alone on a sync where the structure and the mode stayed put", () => {
+    const engine = fakeEngine([cinema]);
+    syncScene(engine);
+    engine.transportSig.set(40, "left as it was");
+    syncScene(engine);
+    expect(engine.transportSig.get(40)).toBe("left as it was");
+    engine.sim.tower.revision++;
+    syncScene(engine);
+    expect(engine.transportSig.get(40)).toMatch(/:winds$/);
+  });
+
+  it("straightens the flights when the mode stops winding them, with the same revision", () => {
+    const engine = fakeEngine([cinema]);
+    syncScene(engine);
+    rules.venueFlights = false;
+    syncScene(engine);
+    expect(engine.flightPass.winding.size).toBe(0);
+    expect(engine.transportSig.get(40)).not.toMatch(/winds/);
+  });
+
+  it("restyles the flights for a swapped-in tower at the same revision (a load)", () => {
+    const engine = fakeEngine([cinema]);
+    syncScene(engine);
+    rules.venueFlights = false;
+    (engine as { sim: unknown }).sim = fakeSim([cinema]);
+    syncScene(engine);
+    expect(engine.transportSig.get(40)).not.toMatch(/winds/);
+  });
+
+  it("rasters a flight in the style its signature recorded, even after the set moves", () => {
+    const engine = fakeEngine([cinema]);
+    syncScene(engine);
+    engine.flightPass.winding.clear();
+    vi.mocked(drawTransport).mockClear();
+    rasterOf(engine, 40);
+    expect(vi.mocked(drawTransport).mock.calls[0][6]).toBe(true);
   });
 });

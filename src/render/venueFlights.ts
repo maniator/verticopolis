@@ -47,6 +47,27 @@ export function venueBox(u: Pick<UnitView, "floor" | "x" | "width">, stories: nu
 
 type Flight = Pick<TransportView, "kind" | "x" | "width" | "bottom" | "top">;
 
+/** What the winding set was last worked out from (`towerReconcile`
+ *  `syncScene`): the sim, the tower revision, the view's room and flight
+ *  lists, and whether the mode winds flights at all. Every input of the set is
+ *  structural, so a sync that finds the same key (an hour flip, a lighting
+ *  flip, a meal-overlay change) keeps the set and the flight actors as they
+ *  are. A null sim makes the next sync work it out again. */
+export interface FlightPass {
+  sim: unknown;
+  revision: number;
+  units: unknown;
+  transports: unknown;
+  winds: boolean;
+  /** The ids of the flights that wind, refilled in place. */
+  readonly winding: Set<number>;
+}
+
+/** A key no sync matches, so the next one fills the set and the actors. */
+export function emptyFlightPass(): FlightPass {
+  return { sim: null, revision: Number.NaN, units: null, transports: null, winds: false, winding: new Set<number>() };
+}
+
 /** Whether `t` is a one-story stairway or escalator standing beside `v`: it
  *  touches the venue's left or right wall, and both of its floors are inside
  *  the venue's stories, so it climbs alongside the venue the whole way. */
@@ -58,8 +79,9 @@ export function besideVenue(t: Flight, v: VenueBox): boolean {
 }
 
 /** Fills `out` with the ids of the flights in `transports` that wind beside
- *  one of `venues`, and returns it. Runs once per scene sync, never per frame:
- *  a tower holds at most 64 flights and a few dozen venues. */
+ *  one of `venues`, and returns it. Runs only when the structure or the mode
+ *  moves (`FlightPass`), never per frame: a tower holds at most 64 flights
+ *  and a few dozen venues. */
 export function windingFlights(transports: ReadonlyArray<TransportView>, venues: ReadonlyArray<VenueBox>, out: Set<number>): Set<number> {
   out.clear();
   if (venues.length === 0) return out;

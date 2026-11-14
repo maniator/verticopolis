@@ -186,7 +186,7 @@ export class TowerEngine {
   roomSig = new Map<number, string>();
   transportActors = new Map<number, ex.Actor>();
   transportSig = new Map<number, string>();
-  windingFlights = new Set<number>(); // flights beside a venue (venueFlights.ts), per sync
+  flightPass = reconcile.emptyFlightPass(); // flights beside a venue (venueFlights.ts), per structure
   // Engine-animated actors, regenerated when the layout changes.
   carActors: {
     actor: ex.Actor;

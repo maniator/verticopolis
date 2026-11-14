@@ -5,6 +5,7 @@ import { syncScene } from "./towerReconcile";
 import { markRegionUnit } from "./towerRegions";
 import { disposeScene } from "./towerScene";
 import { emptyStructPass } from "./towerStructTiles";
+import { emptyFlightPass } from "../venueFlights";
 import { HallDoorLayer, relightHallDoors, syncHallDoors } from "./towerHallDoors";
 import { lobbyHalls, NO_TALL_HALLS, type LobbyHalls } from "../lobbyHalls";
 import { bindViewWorld, viewWorld } from "../../presentation/viewWorld";
@@ -112,7 +113,7 @@ function fakeEngine(state: { units: UnitView[]; revision: number; tall?: LobbyHa
     regionUnits: new Map(),
     transportActors: new Map(),
     transportSig: new Map(),
-    windingFlights: new Set(),
+    flightPass: emptyFlightPass(),
     escapeActors: new Map(),
     craneActor: null,
   } as unknown as TowerEngine;

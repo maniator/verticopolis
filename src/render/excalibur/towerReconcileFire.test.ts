@@ -5,6 +5,7 @@ import { syncScene } from "./towerReconcile";
 import { markRegionUnit } from "./towerRegions";
 import { paintAnimatedUnit } from "../regionPaint";
 import { emptyStructPass } from "./towerStructTiles";
+import { emptyFlightPass } from "../venueFlights";
 import { HallDoorLayer } from "./towerHallDoors";
 import { NO_TALL_HALLS } from "../lobbyHalls";
 import { NOT_BAKED } from "./sceneBake";
@@ -84,7 +85,7 @@ function fakeEngine(unit: UnitView): TowerEngine {
     regionUnits: new Map(),
     transportActors: new Map(),
     transportSig: new Map(),
-    windingFlights: new Set(),
+    flightPass: emptyFlightPass(),
     hallDoors: new HallDoorLayer(),
     worldX: (x: number) => x * 16,
     worldYTop: (floor: number) => floor * 16,
