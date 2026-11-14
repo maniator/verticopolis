@@ -25,6 +25,13 @@ prompt already tells players it is an engine update and shows the new version.
 Entries below 1.51.1 were curated from the commit history after the fact, so they
 are documentation only: no build that a client fetches carries them.
 
+## 3.12.3
+
+- Selling an elevator car and buying it back no longer puts the whole fleet on the hours you had cut back. An hour you set to run fewer cars keeps its count, even when the sale left it at the shaft's size, and pressing OK in the Schedule window keeps it that way until you set the hour to a new count.
+- The elevator Schedule window now says how many cars are on shift at the chosen hour apart from how many are installed, such as "3 on shift at 17:00, 4 installed".
+- Undo no longer refuses, and drops, taking out a lobby tile you had built back with redo, when the basement beside it went in while that tile was out.
+- Undo no longer refuses, and drops, taking out lobby tiles that joined two parts of the ground floor a sale had divided, when each part still stands on its own older lobby.
+
 ## 3.12.2
 
 - Fixed people in a lot of separate towers joined only by a basement heading down through the basement and across to the leftmost tower's lobby to leave. Everyone now goes in and out by the lobby under their own tower when its transport reaches it.

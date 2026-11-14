@@ -15,6 +15,12 @@ raised the version, so they are documentation only.
 There is no entry for 0.17.0, which only
 existed as a step inside a stacked branch.
 
+## 1.36.0 (2026-11-14)
+
+- A car sold now holds back each hour the player cut back that the sale leaves at the whole fleet's size (`Schedule::held_back`, the new `HeldBack` type, `Schedule::refit`), so a car bought back joins only the hours that ran every car. A player's schedule edit that names no `heldBack` (`Tower::set_schedule`) keeps each held hour whose count it leaves as it was, and drops one it sets to another count.
+- Save version 10 adds a schedule's `heldBack` hours. A save carries it, and is stamped 10, only when an hour is held back; every other save keeps version 7 or 9. `stamped_save_version(has_tall_lobby, holds_an_hour_back)` gives the version a save is stamped with; `save_version` keeps its one argument and answers for a save with no held hour.
+- The undo check dates a unit an undo or redo put back by its return rather than its first build (#1846), and a step that takes out ground-floor lobby tiles passes a run that reaches the root of a part those tiles joined when they went in (#1848). Both only allow undos the check used to refuse; nothing it refused before for a real reason now applies.
+
 ## 1.35.2 (2026-11-14)
 
 - A trip with an open end on a floor of several runs (a lot of separate ground lobbies) starts or ends in the run nearest its other end that a route reaches (`crowd::doors`), trying the next nearest when Classic's walk budget refuses one; a floor with one run picks the tile it always did. `routing::passenger_parts` caches the passenger graph's parts per tower revision so the choice skips runs no route could join without a search.
