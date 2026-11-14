@@ -40,6 +40,10 @@ export function toolInfoTemplate(
     f.population
       ? html`<div>${isCommercial ? `Customers: up to ${f.population}` : `Capacity: ${f.population}`}</div>`
       : nothing
+  }${
+    groundFloorLobbyCost !== undefined
+      ? html`<div class="ti-ground">Level 1: lobby, $${groupDigits(groundFloorLobbyCost)}/tile</div>`
+      : nothing
   }<p style="margin-top:6px;color:var(--muted)">${f.description}</p>${
     groundFloorLobbyCost !== undefined
       ? html`<p style="margin-top:6px;color:var(--muted)">On the ground floor (level 1) this lays a lobby, $${groupDigits(groundFloorLobbyCost)} per tile.</p>`
@@ -97,7 +101,7 @@ export function bulldozeToolInfo(drag: BulldozeDragPicker): TemplateResult {
     drag.clears === "one kind"
       ? "A drag removes only the kind of thing it starts on, so a sweep along a floor leaves the elevators and rooms it crosses."
       : "A drag removes everything it crosses that can come out.";
-  return html`<div class="ti-name">Bulldoze</div><p style="color:var(--muted)">Click a room or shaft to sell it for half its cost.</p><div class="ti-drag-clears" role="group" aria-label="Drag clears">Drag clears: ${bulldozeDragButtons(drag)}</div><p style="margin-top:6px;color:var(--muted)">${hint}</p>`;
+  return html`<div class="ti-name">Bulldoze</div><p style="color:var(--muted)">${TOOL_DESCRIPTION.bulldoze}</p><div class="ti-drag-clears" role="group" aria-label="Drag clears">Drag clears: ${bulldozeDragButtons(drag)}</div><p style="margin-top:6px;color:var(--muted)">${hint}</p>`;
 }
 
 /** The two "Drag clears" buttons, the picked one pressed. Shared by the
@@ -113,7 +117,14 @@ export function bulldozeDragButtons(drag: BulldozeDragPicker): TemplateResult[] 
   );
 }
 
-export const INSPECT_TOOL_INFO: TemplateResult = html`<div class="ti-name">Inspect</div><p style="color:var(--muted)">Hover the tower to read a facility's status.</p>`;
+/** What the Inspect and Bulldoze tools do, for their cards and their palette
+ *  buttons' descriptions. */
+export const TOOL_DESCRIPTION = {
+  inspect: "Hover the tower to read a facility's status.",
+  bulldoze: "Click a room or shaft to sell it for half its cost.",
+} as const;
+
+export const INSPECT_TOOL_INFO: TemplateResult = html`<div class="ti-name">Inspect</div><p style="color:var(--muted)">${TOOL_DESCRIPTION.inspect}</p>`;
 
 /** The ground-floor price on the card: what the tool lays on the ground floor
  *  when that differs from the tool's own kind (the Floor tool lays a lobby).

@@ -1,0 +1,74 @@
+/* The phone's tool card (#tool-tip, src/ui/toolTipStrip.ts): a phone has no
+   status bar, so a pick shows the tool's name and numbers on one row and its
+   description and notes under it, cut to two lines (one on a short landscape
+   phone, about 72px and 48px tall in all). The first placement, its close
+   button or the next pick folds it away. The lobby height and drag clears
+   pickers stay in their own strips under it, so the card leaves them out.
+   Part of the game's stylesheet: src/styles.css imports the parts in order,
+   after the phone blocks, with the same queries as GameApp.mobileMq. */
+@media (max-width: 767px), (max-width: 1023px) and (max-height: 599px) {
+  /* Clear of the Map pill in the stage's bottom right corner. */
+  #tool-strip {
+    max-width: min(360px, calc(100% - 84px));
+  }
+  #tool-tip:not([hidden]) {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    padding: 4px 4px 4px 8px;
+    font-size: 12px;
+    line-height: 16px;
+  }
+  #tool-tip .tt-body {
+    flex: 1;
+    min-width: 0;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+    overflow: hidden;
+  }
+  #tool-tip .tt-body > * {
+    display: inline;
+    margin: 0 !important;
+  }
+  #tool-tip .tt-body > div + div::before {
+    content: " · ";
+  }
+  #tool-tip .ti-name {
+    font-weight: 700;
+    color: var(--r-title);
+  }
+  #tool-tip .tt-body > p::before {
+    content: " ";
+  }
+  /* The description starts the second row. */
+  #tool-tip .tt-body > p:first-of-type::before {
+    content: "\A";
+    white-space: pre;
+  }
+  /* The bar's short ground-floor segment: the card has the full sentence. */
+  #tool-tip .ti-ground,
+  #tool-tip .ti-lobby-height,
+  #tool-tip .ti-drag-clears {
+    display: none !important;
+  }
+  #tool-tip .tt-close {
+    order: 1;
+    flex: none;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    font: inherit;
+    background: var(--r-face);
+    box-shadow: var(--bevel-out);
+    border: 0;
+    color: var(--r-ink);
+  }
+}
+@media (max-width: 1023px) and (max-height: 299.98px) and (orientation: landscape) {
+  #tool-tip .tt-body {
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+  }
+}
