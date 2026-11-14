@@ -159,6 +159,14 @@ describe("sw-navigation-fallback.js (#1345)", () => {
       expect(await (await answer).text()).toBe(rewritten);
     });
 
+    it("skips a link that is no URL, as a host's rewrite could add, and still checks the rest", async () => {
+      const broken = `${html("main-1.js")}<a href="http://">help</a>`;
+      const kept = await fetchThroughScript("installing", pageRequest(), undefined, { body: broken, stored: thisBuild });
+      expect(await (await kept.answer).text()).toBe(broken);
+      const other = await fetchThroughScript("installing", pageRequest(), undefined, { body: `${html("main-2.js")}<a href="http://">help</a>`, stored: thisBuild });
+      await expect(other.answer).rejects.toThrow(/from another build/);
+    });
+
     it("counts only Workbox's precache, so a file kept in another cache does not pass", async () => {
       const stored = { [PRECACHE]: [], "runtime-assets": thisBuild[PRECACHE] };
       const { answer } = await fetchThroughScript("installing", pageRequest(), undefined, { body: html("main-1.js"), stored });

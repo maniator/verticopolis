@@ -51,20 +51,28 @@
  * rewrite adds its own script and names no `assets/` file, so it passes.
  * The precache can still hold an older build's files until this worker
  * activates, so the check is for a page newer than the worker, the one a
- * deploy brings; a rollback that lands mid-install is not caught.
+ * deploy brings; a rollback that lands mid-install is not caught (#2206).
  */
 (function () {
   var nativeFetch = self.fetch;
   var isPage = function (url) {
     return /\.html?$/i.test(new URL(url).pathname);
   };
-  // The same-origin `assets/` files the page's `src` and `href` attributes name.
+  // The same-origin `assets/` files the page's `src` and `href` attributes
+  // name. The build checks the page with the same pattern
+  // (`pageAssetsMissing` in src/build/enginePackageBuild.ts). A value that is
+  // no URL, as a host's rewrite could add, names no file of the build.
   var assetsNamed = function (html, pageUrl) {
     var found = [];
     var attribute = /\b(?:src|href)\s*=\s*["']([^"']+)["']/gi;
     var match;
     while ((match = attribute.exec(html)) !== null) {
-      var url = new URL(match[1], pageUrl);
+      var url;
+      try {
+        url = new URL(match[1], pageUrl);
+      } catch (notAUrl) {
+        continue;
+      }
       if (url.origin === new URL(pageUrl).origin && /\/assets\//.test(url.pathname)) found.push(url.href);
     }
     return found;

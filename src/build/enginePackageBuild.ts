@@ -141,6 +141,31 @@ export function pageLastTransform(entries: ManifestEntry[]): { manifest: Manifes
   return { manifest: [...entries.filter((e) => !isPage(e)), ...entries.filter(isPage)], warnings: [] };
 }
 
+/** The `src` and `href` attribute values of a page, the pattern
+ *  `sw-navigation-fallback.js` reads the installing page with (#1949). */
+export const PAGE_FILE_ATTRIBUTE = /\b(?:src|href)\s*=\s*["']([^"']+)["']/gi;
+
+/** The same-origin `assets/` files the built page names (`named`, as
+ *  manifest URLs) and those of them the precache manifest leaves out
+ *  (`missing`). The installing worker refuses a page that names a file it
+ *  does not precache (#1949), so a build with one missing would fail every
+ *  install, and a page that names none would mean the worker's check passes
+ *  everything. */
+export function pageAssetsMissing(html: string, manifestUrls: ReadonlySet<string>): { named: string[]; missing: string[] } {
+  const base = new URL("https://page.invalid/index.html");
+  const named = new Set<string>();
+  for (const match of html.matchAll(PAGE_FILE_ATTRIBUTE)) {
+    let url: URL;
+    try {
+      url = new URL(match[1], base);
+    } catch {
+      continue;
+    }
+    if (url.origin === base.origin && /\/assets\//.test(url.pathname)) named.add(url.pathname.replace(/^\//, ""));
+  }
+  return { named: [...named], missing: [...named].filter((u) => !manifestUrls.has(u)) };
+}
+
 /** `key: "value"` in a flat object literal, quoted or bare key, either quote,
  *  and only as a whole key (`baseurl` does not match `url`). The value is group 2. */
 const KEY = (key: string) => new RegExp(`(?:^|[{,\\s])["']?${key}["']?\\s*:\\s*(["'])(.*?)\\1`);

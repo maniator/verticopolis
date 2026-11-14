@@ -16,7 +16,7 @@ import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from "n
 import { fileURLToPath } from "node:url";
 import { dirname, isAbsolute, posix, relative, resolve, sep } from "node:path";
 import { AUDIO_ENGINE_CHUNK, AUDIO_RUNTIME_FILES } from "../src/audio/audioAssets.ts";
-import { engineDistProblems, manifestIntegrityProblems, shellProblems, shellRevisionProblems } from "../src/build/enginePackageBuild.ts";
+import { engineDistProblems, manifestIntegrityProblems, pageAssetsMissing, shellProblems, shellRevisionProblems } from "../src/build/enginePackageBuild.ts";
 import { enginePreloadProblems } from "../src/build/enginePreload.ts";
 import { ALLOW_NO_ENGINE, missingEngine, precacheFile } from "../src/precacheEntry.ts";
 import { ENGINE_BUILD_ONLY_FILES, ENGINE_DIR, ENGINE_GLUE, ENGINE_RUNTIME_FILES, ENGINE_WASM, glueLoads } from "../src/wasmhost/engineAssets.ts";
@@ -165,6 +165,13 @@ if (!/importScripts\(\s*["']sw-navigation-fallback\.js["']/.test(sw)) fail("dist
 const pageAt = urls.indexOf("index.html");
 const assetsAfterPage = urls.slice(pageAt + 1).filter((u) => u.startsWith("assets/"));
 if (pageAt === -1 || assetsAfterPage.length > 0) fail(`index.html must come after every assets/ file in the precache manifest, so the installing worker can check the page against them; after it: ${assetsAfterPage.join(", ") || "(no index.html entry)"}`);
+// The worker refuses a page that names an assets/ file it does not precache, so
+// one the manifest leaves out (a glob that misses its type, a chunk past the
+// size cap) would fail every install, and a page that names none would leave
+// the check passing everything.
+const pageFiles = pageAssetsMissing(readFileSync(resolve(DIST, "index.html"), "utf8"), new Set(urls));
+if (pageFiles.named.length === 0) fail("dist/index.html names no assets/ file the installing worker's check can read (#1949)");
+if (pageFiles.missing.length > 0) fail(`dist/index.html names assets/ files the precache manifest leaves out, so every worker install would be refused: ${pageFiles.missing.join(", ")}`);
 if (!existsSync(resolve(DIST, "sw-navigation-fallback.js"))) fail("dist/sw-navigation-fallback.js is missing, so the worker would not install");
 if (seen.has("sw-navigation-fallback.js")) fail("sw-navigation-fallback.js is in the precache manifest; the worker imports it, so it must stay out of it");
 // The Help site at /help (release notes included) always comes from the

@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { DEV_SKIP_MARKER, ENGINE_BUILD_RECORD, ENGINE_DIR, ENGINE_GLUE, ENGINE_WASM } from "../wasmhost/enginePackageNames";
 import { engineBuildRecord } from "../wasmhost/enginePackageRecord";
-import { ENGINE_REVISION_SUFFIX, INTEGRITY_FILES, engineDistProblems, engineRevision, entryWithIntegrity, pageLastTransform, precacheIntegrityTransform, integrityOf, manifestIntegrity, manifestIntegrityProblems, manifestRevisions, readExpectedPackage, revisionsOf, shellProblems, shellRevisionProblems } from "./enginePackageBuild";
+import { ENGINE_REVISION_SUFFIX, INTEGRITY_FILES, engineDistProblems, engineRevision, entryWithIntegrity, PAGE_FILE_ATTRIBUTE, pageAssetsMissing, pageLastTransform, precacheIntegrityTransform, integrityOf, manifestIntegrity, manifestIntegrityProblems, manifestRevisions, readExpectedPackage, revisionsOf, shellProblems, shellRevisionProblems } from "./enginePackageBuild";
 
 const sha = (d: Uint8Array | string) => createHash("sha256").update(d).digest("hex");
 const md5 = (d: Uint8Array | string) => createHash("md5").update(d).digest("hex");
@@ -82,6 +82,26 @@ describe("pageLastTransform (#1949)", () => {
   it("leaves a manifest without the page as it was", () => {
     const entries = [{ url: "a.js", revision: null, size: 1 }];
     expect(pageLastTransform(entries).manifest).toEqual(entries);
+  });
+});
+
+describe("pageAssetsMissing (#1949)", () => {
+  const page = '<script type="module" src="./assets/main-1.js"></script><link rel="modulepreload" href="/assets/vendor-1.js"><link rel="preload" as="font" href="assets/x.ttf"><link rel="icon" href="splash.svg"><script src="https://cdn.example/assets/lib.js"></script><a href="http://">';
+
+  it("names the page's own assets/ files as manifest URLs and the ones the manifest leaves out", () => {
+    const { named, missing } = pageAssetsMissing(page, new Set(["assets/main-1.js", "assets/vendor-1.js", "splash.svg"]));
+    expect(named).toEqual(["assets/main-1.js", "assets/vendor-1.js", "assets/x.ttf"]);
+    expect(missing).toEqual(["assets/x.ttf"]);
+  });
+
+  it("finds nothing missing when the manifest has every file, and nothing named on a page without them", () => {
+    expect(pageAssetsMissing(page, new Set(["assets/main-1.js", "assets/vendor-1.js", "assets/x.ttf"])).missing).toEqual([]);
+    expect(pageAssetsMissing("<html><body></body></html>", new Set()).named).toEqual([]);
+  });
+
+  it("reads the page with the same pattern as the installing worker", () => {
+    const worker = readFileSync(join(process.cwd(), "src/public/sw-navigation-fallback.js"), "utf8");
+    expect(worker).toContain(`var attribute = ${PAGE_FILE_ATTRIBUTE.toString()};`);
   });
 });
 
