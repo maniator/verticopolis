@@ -67,7 +67,12 @@ export function wireEngine(app: GameApp): void {
   // also zooms). Before this, a floor/lobby/parking drag only ever panned on
   // touch, so mobile couldn't paint a run at all. On mouse the pan key
   // (Space or Shift, resolved in towerInputCamera) pans with any tool armed.
-  app.engine.classifyDown = (button, touch, panKey) => classifyGesture(catalogOf(app), app.tool, button, touch, panKey);
+  // The pan key as the latest press went down, which its tap reads (#589).
+  let pressPanKey = false;
+  app.engine.classifyDown = (button, touch, panKey) => {
+    pressPanKey = panKey;
+    return classifyGesture(catalogOf(app), app.tool, button, touch, panKey);
+  };
   // Space pans only while the game follows it (inputKeys), read per press.
   app.engine.spacePanKey = (press) => app.spacePanKey(press);
 
@@ -85,6 +90,9 @@ export function wireEngine(app: GameApp): void {
       return;
     }
     if (!touch) return; // mouse pan-taps with a build/bulldoze tool do nothing
+    // A held pan key (Space or Shift on a touchscreen laptop) promises the
+    // press only pans, so its tap builds and bulldozes nothing either (#589).
+    if (pressPanKey) return;
     // A mode that refuses building while paused (Classic, #1936) places nothing.
     if (app.tool.type === "build" && refuseAppPlacementWhilePaused(app)) return;
     app.captureUndo(app.tool.type === "bulldoze" ? "Bulldoze" : `Build ${catalogFacility(catalogOf(app), app.tool.kind).name}`);
