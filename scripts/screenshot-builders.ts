@@ -21,6 +21,8 @@
  *     overlay/tablet builders folded in from the old shot-*.mjs generators.
  *   - `screenshot-tall-lobby-builders.ts`: `buildTallLobbyTower`, the tall
  *     lobby (#308) towers for the Help site.
+ *   - `screenshot-metro-builders.ts`: `buildMetroLineTower`, a Modern line of
+ *     three metro stations.
  *
  * Keep re-exports only here (erasable): no enums / namespaces / parameter
  * properties.
@@ -33,3 +35,4 @@ export * from "./screenshot-compare-builders.ts";
 export * from "./screenshot-scene-builders.ts";
 export * from "./screenshot-security-builders.ts";
 export * from "./screenshot-tall-lobby-builders.ts";
+export * from "./screenshot-metro-builders.ts";
