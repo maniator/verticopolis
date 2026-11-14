@@ -24,8 +24,8 @@ function frame(e: any, ms = 1000 / 60): void {
  * the Playwright tier. Everything that repositions or reconciles pre-built
  * actors IS unit-testable with real (drawing-free) `ex.Actor`s and fake
  * graphics: this drives the crowd reconciler, the clear paths, the pure `reap`
- * tail, and updateMotion across cars, the metro train, the garbage truck,
- * and garage cars, asserting positions/visibility, not just no-throw (the
+ * tail, and updateMotion across cars, the garbage truck and garage cars,
+ * asserting positions/visibility, not just no-throw (the metro train and the
  * passers-by live in towerCrowdMotion.test.ts).
  */
 
@@ -429,27 +429,6 @@ describe("updateMotion repositions the moving actors", () => {
     expect(car.actor.pos.x).toBeCloseTo(12 * TILE, 6);
     expect(car.actor.pos.y).toBeCloseTo(-8 * FLOOR, 6);
     expect(car.shown).toBe(changedKey); // adopted the new indicator state
-  });
-
-  it("runs the metro train on game time: in from the left, held, then off the right", () => {
-    const xs: number[] = [];
-    const train = { actor: actor(), u: { x: 20, floor: 3 }, w: 40, shift: (offset: number) => xs.push(offset) };
-    const clockAt = (minute: number, night = false) => ({ hour: Math.floor(minute / 60), minuteOfDay: minute, isMorning: () => false, isEvening: () => false, isNight: () => night });
-    const e = eng({ trainActors: [train] });
-    for (const minute of [12 * 60 + 3, 12 * 60 + 10, 12 * 60 + 23]) {
-      e.sim = { ...e.sim, clock: clockAt(minute) };
-      updateMotion(e);
-    }
-    // The three legs (arrive / hold / depart) put the train at distinct
-    // offsets inside the station-wide canvas: off the left, in place, off the right.
-    expect(xs[0]).toBeLessThan(0);
-    expect(xs[1]).toBe(0);
-    expect(xs[2]).toBeGreaterThan(0);
-    // Overnight it stays inside the tunnel however the animation clock runs.
-    e.sim = { ...e.sim, clock: clockAt(2 * 60 + 10, true) };
-    e.d.anim = 7;
-    updateMotion(e);
-    expect(xs[3]).toBe(-(train.w + 12));
   });
 
   it("shows the garbage truck only during the collection hour at a running plant", () => {

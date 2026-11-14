@@ -287,8 +287,15 @@ fn transition_to_return(crowd: &mut Crowd, tower: &mut Tower, i: usize) {
     p.age = 0.0;
     p.linger = 0.0;
     let seed = p.seed;
+    // The rider steps onto the platform where the last shaft lets them off,
+    // or walks there from the venue, and heads for the nearest station.
+    let platform_x = p
+        .shafts
+        .last()
+        .and_then(|&sid| tower.get_transport(sid))
+        .map_or(from_x, |t| t.x as f64);
     let station = if origin.is_none() {
-        metro_station_for_platform(tower, origin_floor)
+        metro_station_for_platform(tower, origin_floor, platform_x)
     } else {
         None
     };

@@ -2209,7 +2209,7 @@
       "attendance": null,
       "available": true,
       "basement": true,
-      "buildCap": 1,
+      "buildCap": 3,
       "buildMinutes": 480,
       "carCapacity": null,
       "category": "special",
@@ -2449,8 +2449,8 @@
     "scheduleAssist": true,
     "shadedLook": true,
     "tallSkyLobbies": true,
-    "venueFlights": true,
-    "variantHouseholds": true
+    "variantHouseholds": true,
+    "venueFlights": true
   },
   "version": 18,
   "world": {

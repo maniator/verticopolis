@@ -147,14 +147,25 @@ pub fn inside_x(crowd: &mut Crowd, u: &Unit, inset: i64) -> i64 {
     crowd.rng.int(lo, hi)
 }
 
-pub fn metro_station_for_platform(tower: &Tower, platform_floor: i64) -> Option<i64> {
+/// The metro station whose platform is `platform_floor` nearest to `x`, the
+/// one a rider at `x` walks to. A Modern tower may run several stations on
+/// one platform; the first built wins a tie, so a tower with one station
+/// always gets that one.
+pub fn metro_station_for_platform(tower: &Tower, platform_floor: i64, x: f64) -> Option<i64> {
     if platform_floor >= 1 {
         return None;
     }
+    let walk = |u: &Unit| {
+        let (left, right) = (u.x as f64, (u.x + u.width) as f64);
+        (left - x).max(x - right).max(0.0)
+    };
     tower
-        .units
-        .iter()
-        .find(|u| u.kind == Kind::Metro && u.floor + 1 == platform_floor)
+        .metro_stations()
+        .filter(|u| u.floor + 1 == platform_floor)
+        .fold(None, |best: Option<&Unit>, u| match best {
+            Some(b) if walk(b) <= walk(u) => Some(b),
+            _ => Some(u),
+        })
         .map(|u| u.id)
 }
 

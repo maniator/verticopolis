@@ -35,8 +35,8 @@ pub(crate) struct Ground<'a> {
     /// The room tiles the step takes out on each row a room it takes out
     /// stands on.
     rooms_leaving: FastMap<i64, i64>,
-    /// The floor the metro station stands on once the step applies: the
-    /// tower's, unless the step takes it out, or the one the step puts back.
+    /// The row the metro stations stand on once the step applies: that of a
+    /// station the step leaves standing, else that of one it puts back.
     station: Option<i64>,
 }
 
@@ -63,7 +63,6 @@ impl<'a> Ground<'a> {
         // One walk over the units the step takes out.
         let (mut taken, mut lobbies_taken) = (Vec::new(), Vec::new());
         let mut rooms_leaving = FastMap::default();
-        let mut station_leaves = false;
         let taken_out = step
             .units
             .iter()
@@ -84,17 +83,14 @@ impl<'a> Ground<'a> {
                 for row in u.floor..u.floor + u.kind.floors() {
                     *rooms_leaving.get_or_insert_with(row, || 0) += u.width;
                 }
-                station_leaves |= u.kind == Kind::Metro;
             }
         }
         taken.sort_unstable();
-        let station = match tower.metro_floor() {
-            Some(floor) if !station_leaves => Some(floor),
-            _ => put_back
-                .iter()
-                .find(|u| u.kind == Kind::Metro)
-                .map(|u| u.floor),
-        };
+        let station = tower
+            .metro_stations()
+            .find(|u| !leaving.contains(&u.id))
+            .or_else(|| put_back.iter().copied().find(|u| u.kind == Kind::Metro))
+            .map(|u| u.floor);
         Ground {
             tower,
             leaving,
@@ -182,7 +178,7 @@ impl<'a> Ground<'a> {
                 && (u.x..u.x + u.width).all(|x| self.holds(f, x))
         });
         let site = if u.kind == Kind::Metro {
-            self.clear_for_station(u.floor)
+            self.station == Some(u.floor) && self.clear_for_station(u.floor)
         } else {
             self.station.is_none_or(|station| u.floor > station)
         };
@@ -190,11 +186,19 @@ impl<'a> Ground<'a> {
     }
 
     /// Whether nothing the step leaves stands below `row`, and no room it
-    /// leaves stands on that row, so a station can stand there. A unit the step
-    /// puts back below the row, or a room it puts back on it, is refused on its
-    /// own.
+    /// leaves stands on that row but the other metro stations, so a station
+    /// can stand there beside them. A unit the step puts back below the row,
+    /// or a room it puts back on it, is refused on its own.
     fn clear_for_station(&self, row: i64) -> bool {
-        if self.rooms_stay_on(row) {
+        let staying_stations: i64 = self
+            .tower
+            .metro_stations()
+            .filter(|u| u.floor == row && !self.leaving.contains(&u.id))
+            .map(|u| u.width)
+            .sum();
+        let on_row = self.tower.room_tiles.get(&row).copied().unwrap_or(0);
+        let leaving = self.rooms_leaving.get(&row).copied().unwrap_or(0);
+        if on_row - leaving > staying_stations {
             return false;
         }
         // Every room stands on floor, so the floor tiles say where the

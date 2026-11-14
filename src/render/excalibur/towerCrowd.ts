@@ -7,8 +7,8 @@ import type { FacilityKind } from "../../shared/types";
 import { isOperational } from "../../shared/unitState";
 import { drawCar, drawGarbageTruck, drawStreetCar } from "../sprites";
 import { GARBAGE_TRUCK_H } from "../sprites/facilities/vehicles";
-import { metroTrainOffset } from "../metroTrainSchedule";
-import { addMetro } from "./towerMetro";
+import { metroTrainAt } from "../metroTrainSchedule";
+import { addMetros } from "./towerMetro";
 import { buildWalkers } from "./towerWalkerBuild";
 import { cabFit, carIndicator, type CarIndicator } from "../carIndicator";
 import { cabRidersOf, ridersAboard } from "./cabRiders";
@@ -288,9 +288,7 @@ export function syncMotion(engine: TowerEngine): void {
       engine.carActors.push(entry);
     }
   }
-  for (const u of engine.sim.tower.units) {
-    if (u.kind === "metro") addMetro(engine, u);
-  }
+  addMetros(engine, engine.sim.tower.units.filter((u) => u.kind === "metro"));
   // Garbage trucks: one per recycling center, parked off-screen until the
   // collection hour (updateMotion drives them in and out along the bottom
   // story, exactly the metro-train pattern).
@@ -426,11 +424,11 @@ export function updateMotion(engine: TowerEngine, elapsedMs = 1000 / 60): void {
       } else cabChangeStep.set(c, since);
     }
   }
-  // The metro train runs on GAME time like the garbage truck: one call per
-  // daytime hour, none overnight, and pausing the game holds it where it is.
+  // The metro's one train per line runs on GAME time like the garbage truck:
+  // a run per daytime hour, none overnight, held while the game is paused.
   for (const tr of engine.trainActors) {
     const c = engine.sim.clock;
-    tr.shift(metroTrainOffset(c.minuteOfDay, tr.w + 12, c.isNight()));
+    tr.shift(metroTrainAt(c.minuteOfDay, tr.line, tr.w + 12, c.isNight()) - tr.line[tr.stop]);
   }
   // The garbage truck runs on GAME time (the collection is a sim event, not
   // ambience): during the collection hour it drives in along the center's

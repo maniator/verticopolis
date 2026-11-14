@@ -66,37 +66,6 @@ impl Tower {
         n
     }
 
-    /// The metro rules: SimTower's station is three stories on B8 to B10 with
-    /// its tunnel along the bottom row, and nothing can be built below it. The
-    /// bottom basement row holds only the station and its tunnel.
-    fn metro_reason(&self, kind: Kind, floor: i64) -> Option<String> {
-        if kind == Kind::Metro {
-            if self.floor_bounds().0 < floor {
-                return Some(
-                    "Nothing can be built below the metro station. Clear the floors under it first."
-                        .into(),
-                );
-            }
-            if self.floor_has_room(floor) {
-                return Some("The metro's bottom row is its tunnel. Clear it first.".into());
-            }
-            return None;
-        }
-        let structural = kind.is_structural();
-        if let Some(station) = self.metro_floor() {
-            if floor < station {
-                return Some("Nothing can be built below the metro station.".into());
-            }
-            if floor == station && !structural {
-                return Some("The metro's bottom row is its tunnel.".into());
-            }
-        }
-        if floor == MIN_FLOOR && !structural {
-            return Some("The bottom basement row is only for the metro tunnel.".into());
-        }
-        None
-    }
-
     fn room_placement_reason(
         &self,
         kind: Kind,

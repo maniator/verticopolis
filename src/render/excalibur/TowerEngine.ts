@@ -23,13 +23,13 @@ import { beginFrame } from "./towerFrame";
 import { drainRegions, type RegionRec } from "./towerRegions";
 import { NOT_BAKED } from "./sceneBake";
 import type { CrowdActor, Walker } from "./towerCrowd";
+import type { MetroTrain } from "./towerMetro";
 import type { PeopleGraphics } from "./peopleGfx";
 import type { ViewFocus, Picked, ScreenRect } from "./towerInputCamera";
 
 export { FLOOR, TILE };
-// The camera zoom range lives in its friend-module now; re-exported here so
-// every existing consumer keeps importing it from this file. The exported
-// `ViewFocus`/`Picked` shapes are unchanged.
+// The camera zoom range lives in its friend-module; re-exported so consumers
+// keep importing it (and the `ViewFocus`/`Picked` shapes) from this file.
 export { MIN_ZOOM, MAX_ZOOM } from "./towerInputCamera";
 export type { ViewFocus, Picked } from "./towerInputCamera";
 
@@ -200,7 +200,7 @@ export class TowerEngine {
     gfx: Map<string, ex.Canvas>;
     shown: string;
   }[] = [];
-  trainActors: { actor: ex.Actor; u: UnitView; w: number; shift: (offset: number) => void }[] = [];
+  trainActors: MetroTrain[] = [];
   /** The metro's tunnel row, either side of the station. */
   tunnelActors: ex.Actor[] = [];
   /** The pre-dawn garbage truck: one per recycling center, visible only during
