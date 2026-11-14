@@ -22,7 +22,7 @@ pub(crate) use modern::{idle_home, DispatchRules};
 use modern::{BestCars, CarView};
 
 pub const CAR_FLOORS_PER_MINUTE: f64 = 0.8;
-const DWELL_MINUTES: f64 = 0.8;
+pub(crate) const DWELL_MINUTES: f64 = 0.8;
 /// How close, in floors, a car counts as standing at a stop: the stop
 /// search looks past a stop this near, so a car that ends a move this near
 /// its target lands on it instead of skipping it.

@@ -3,6 +3,7 @@
 use std::collections::HashMap;
 
 use super::banks::balance_shafts;
+use super::expected_time;
 use super::fasthash::{FastMap, FastSet};
 use super::{AdjGraph, Crowd, Edge, ElevatorCalls, PState, Route, StaffParts};
 use crate::facilities::{LOT_WIDTH, MIN_FLOOR};
@@ -208,6 +209,16 @@ pub fn route(
     let b = tower.seg_at(to_floor, to_x);
     if let Some(decided) = off_run_pair(a, b, from_floor, from_x, to_floor, to_x) {
         return decided.map(|r| balance_shafts(crowd, tower, r));
+    }
+    if tower.mode.routes_by_expected_time() {
+        // No random bank pick here: the search already takes the shorter of
+        // two like shafts' lines, and each rider joining one sends the next
+        // to its twin. A coin toss could send a rider to the long line, or to
+        // a shaft whose cars the schedule stood down.
+        let mut r = expected_time::fastest_path(crowd, tower, a, b)?;
+        to_real_floors(&mut r);
+        expected_time::join_line(crowd, &r);
+        return Some(r);
     }
     let mut r = passenger_path(crowd, tower, a, b)?;
     to_real_floors(&mut r);
