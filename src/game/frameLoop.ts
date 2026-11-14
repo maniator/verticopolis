@@ -13,6 +13,7 @@ import { drainEngineEvents } from "../analyticsEngineBridge";
 import { hudSource } from "./hudSource";
 import { calendarOf } from "../simport/headerClock";
 import { groupDigits } from "../ui/format";
+import { TOAST_SHOWN_MS } from "../ui/uiStatus";
 import { peopleWindow } from "../render/excalibur/peopleWindow";
 
 /** Real milliseconds between two ticks of the bomb's clock. */
@@ -26,7 +27,7 @@ export const CHOICE_WAITING_NOTICE = "An emergency needs your answer. Time is st
  * The per-frame simulation + throttled UI/audio refresh, split out of the
  * `GameApp` class. `runFrame(app, dtMs)` is called from the engine's `onUpdate`
  * (wrapped in the frame-error guard in engineWiring). It reads and writes
- * frame-loop latch state (`accMinutes`, `lastStar`, `shownWin`, `lastMealRushDay`)
+ * frame-loop latch state (`accMinutes`, `lastStar`, `shownWin`, `winHeldUntil`, `lastMealRushDay`)
  * ON `app`, so `adoptSim`'s reset of those fields stays authoritative. Behavior
  * unchanged from the former `GameApp.update`/`emitMealRushes`.
  */
@@ -193,6 +194,9 @@ export function runFrame(app: GameApp, dtMs: number): void {
         // has answered (the port answers at once), so no frame sees the choice still pending and asks again.
         try {
           app.enginePort.answerChoice(opt === "accept");
+          // The answer's outcome toast shows first: the congratulations' dialog
+          // would paint over it (#1134).
+          app.winHeldUntil = (globalThis.performance ? performance.now() : 0) + TOAST_SHOWN_MS;
           // A declined bomb threat guts rooms at once, with no move of the
           // rooms, so the Map's Eval and Pricing views read again.
           touchOverviewMap(app);
@@ -222,7 +226,10 @@ export function runFrame(app: GameApp, dtMs: number): void {
     // rolls an emergency, and a loaded TOWER save may carry an open one. They
     // also wait while a dialog holds the player's work, which they would
     // otherwise throw away (#1121); the win stays won, so nothing is lost.
-    if (!app.shownWin && !splashUp && !hasBlockingModal(app) && !dialogHoldsWork(app) && app.enginePort.evaluatedTower()) {
+    // After an answered emergency they wait until its outcome toast has gone,
+    // since their dialog would cover it (#1134).
+    const winHeld = now < app.winHeldUntil;
+    if (!app.shownWin && !winHeld && !splashUp && !hasBlockingModal(app) && !dialogHoldsWork(app) && app.enginePort.evaluatedTower()) {
       app.shownWin = true;
       app.audio.sfx("promote");
       // An emergency that rolls while they are up replaces them (it latches

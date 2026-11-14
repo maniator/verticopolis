@@ -10,6 +10,7 @@ import { newViewReader } from "../../game/portAccess";
 import { portOf } from "../../game/cardKit.fixture";
 import { draftFromSave, draftTower, type Draft } from "../portKit/drafts";
 import { noEngine } from "../portKit/rustEngine";
+import { TOAST_SHOWN_MS } from "../../ui/uiStatus";
 
 /**
  * The TOWER congratulations and the dialogs that freeze time (#1120).
@@ -24,7 +25,9 @@ import { noEngine } from "../portKit/rustEngine";
  * This drives the real frame loop, the real `UI` dialog and the Rust engine
  * loaded from a save that carries both flags, so the same file also proves
  * the engine carries the save's open choice and its TOWER rating through a
- * frame.
+ * frame. The app starts with the win not yet congratulated (`shownWin`
+ * false), as on the win day itself: a tower that arrives already rated TOWER
+ * through a load counts as congratulated (#1134, `followSwapTraffic.test.ts`).
  */
 
 vi.mock("../../game/trafficHud", () => ({ updateTraffic: vi.fn() }));
@@ -89,6 +92,15 @@ function makeApp(sim: Draft, ui: UI) {
   return { app: app as unknown as GameApp, raw: app };
 }
 
+/** The answer's outcome toast has had its time on screen: the congratulations
+ *  wait for it, since their dialog would cover it (#1134). */
+function pastOutcomeToast(app: GameApp, raw: { lastUiUpdate: number }): void {
+  pass(app, raw);
+  expect(showingCongrats(), "the outcome toast is still on screen").toBe(false);
+  const later = performance.now() + TOAST_SHOWN_MS;
+  vi.spyOn(performance, "now").mockReturnValue(later);
+}
+
 /** One throttled pass: the UI refresh is rate limited by wall clock. */
 function pass(app: GameApp, raw: { lastUiUpdate: number }): void {
   raw.lastUiUpdate = -1e9;
@@ -100,6 +112,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.restoreAllMocks();
   document.body.innerHTML = "";
 });
 
@@ -131,6 +144,7 @@ describe.skipIf(noEngine)("a TOWER save with an open emergency", () => {
     expect(raw.shownChoice).toBe(false);
     expect(choiceOf(sim)).toBeNull();
     expect(hasBlockingModal(app)).toBe(false);
+    pastOutcomeToast(app, raw);
     pass(app, raw);
     expect(showingCongrats()).toBe(true);
     expect(raw.shownWin).toBe(true);
@@ -157,6 +171,7 @@ describe.skipIf(noEngine)("a TOWER save with an open emergency", () => {
     await new Promise((r) => setTimeout(r, 0));
     expect(raw.shownChoice).toBe(false);
     expect(choiceOf(sim)).toBeNull();
+    pastOutcomeToast(app, raw);
     pass(app, raw);
     expect(showingCongrats()).toBe(true);
     click('[data-act="close"]');
@@ -227,6 +242,7 @@ describe.skipIf(noEngine)("a TOWER save with an open emergency, under a dialog t
     click('[data-act="decline"]');
     await new Promise((r) => setTimeout(r, 0));
     expect(choiceOf(sim)).toBeNull();
+    pastOutcomeToast(app, raw);
     pass(app, raw);
     expect(showingCongrats()).toBe(true);
   });

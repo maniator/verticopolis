@@ -5,6 +5,7 @@ import { decideMealRush } from "./mealRush";
 import { gameplaySession } from "../analytics";
 import * as analyticsActions from "../analyticsActions";
 import { makeApp, makeSim } from "./frameLoop.fixture";
+import { TOAST_SHOWN_MS } from "../ui/uiStatus";
 
 /**
  * These pin the per-frame simulation + throttled UI/audio refresh (`runFrame`)
@@ -333,6 +334,25 @@ describe("runFrame TOWER congratulations", () => {
     expect(raw.shownWin).toBe(true);
     expect(raw.ui.congratsTower).toHaveBeenCalledTimes(1);
     expect(raw.audio.sfx).toHaveBeenCalledWith("promote");
+  });
+
+  it("waits for an answered emergency's outcome toast to go before opening (#1134)", () => {
+    const clock = vi.spyOn(performance, "now").mockReturnValue(10_000);
+    const sim = makeSim({ evaluatedTower: true, pendingChoice: { message: "Fire!", cost: 5000 } });
+    const { app, raw } = makeApp({ sim });
+    runFrame(app, 16);
+    const answer = raw.ui.showEventChoice.mock.calls[0][2] as (opt: string) => void;
+    answer("decline");
+    expect(raw.enginePort.answerChoice).toHaveBeenCalledExactlyOnceWith(false);
+    sim.pendingChoice = null; // the engine resolved it
+    raw.lastUiUpdate = -1e9;
+    runFrame(app, 16);
+    expect(raw.ui.congratsTower, "the outcome toast is still on screen").not.toHaveBeenCalled();
+    clock.mockReturnValue(10_000 + TOAST_SHOWN_MS);
+    raw.lastUiUpdate = -1e9;
+    runFrame(app, 16);
+    expect(raw.ui.congratsTower).toHaveBeenCalledTimes(1);
+    clock.mockRestore();
   });
 
   it("suppresses the TOWER congrats behind the splash", () => {

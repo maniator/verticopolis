@@ -18,8 +18,9 @@ import type { TrafficTier } from "../presentation/traffic";
  */
 
 /** @param stepRaises whether reading the engine finds a raised tower revision,
- *  as the Rust engine's undo and redo steps always leave it. */
-function standIn(tier: TrafficTier, stepRaises = true) {
+ *  as the Rust engine's undo and redo steps always leave it.
+ *  @param won whether the tower the engine holds is already rated TOWER. */
+function standIn(tier: TrafficTier, stepRaises = true, won = false) {
   const tower = { revision: 41 };
   return {
     lastTrafficTier: tier,
@@ -42,7 +43,7 @@ function standIn(tier: TrafficTier, stepRaises = true) {
     renderSim: undefined as unknown,
     // followSwap builds the renderer's view over these two: the layout's heat
     // tables and the reader's tower, crowd and header are all it reads up front.
-    enginePort: { viewLayout: () => JSON.stringify({ heatModes: [], heatTints: [] }) },
+    enginePort: { viewLayout: () => JSON.stringify({ heatModes: [], heatTints: [] }), evaluatedTower: vi.fn(() => won) },
     reader: { update: vi.fn(() => void (tower.revision += stepRaises ? 1 : 0)), tower, crowd: { people: [] }, header: { star: 1 } },
     keyboard: { followTower: vi.fn() },
     ui: { resetLog: vi.fn(), update: vi.fn(), showInspector: vi.fn() },
@@ -77,6 +78,16 @@ describe("followSwap and the tower's latches", () => {
         { breakfast: -1, lunch: -1, dinner: -1 },
         [],
       ]);
+    }
+  });
+
+  it("counts a tower that arrives already rated TOWER as congratulated, so a load does not open them again (#1134)", () => {
+    for (const follow of ["swap", "restore"] as const) {
+      const app = standIn(0, true, true);
+      app.shownWin = false;
+      GameApp.prototype.followSwap.call(app as unknown as GameApp, follow);
+      expect(app.shownWin, follow).toBe(true);
+      expect(app.enginePort.evaluatedTower, follow).toHaveBeenCalled();
     }
   });
 
