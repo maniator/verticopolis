@@ -116,6 +116,39 @@ export function oldAnchorRedirects(helpIds) {
 }
 
 /**
+ * Whether a link points at the Sponsors page, so the help site's click
+ * listener can count it as a `sponsor_click` app action (detail "help"). It
+ * matches the sidebar's "Sponsor Verticopolis" entry and any page text that
+ * links the same address, with or without a trailing slash or query.
+ */
+export function isSponsorLink(href) {
+  try {
+    const url = new URL(href);
+    return url.origin + url.pathname.replace(/\/+$/, "") === SPONSOR_URL;
+  } catch {
+    return false;
+  }
+}
+
+/** `MouseEvent.button` for the middle (wheel) button, the one that opens a
+ *  link in a new tab; the right button's `auxclick` opens a menu instead. */
+const MIDDLE_BUTTON = 1;
+
+/**
+ * The help site's `click` and `auxclick` listener for Sponsor taps: it calls
+ * `track` once for a click, keyboard Enter or middle-click on any link to the
+ * Sponsors page (the sidebar entry or a page's own text), and never for a
+ * right-click or any other link. The link itself opens as before.
+ */
+export function sponsorTapListener(track) {
+  return (e) => {
+    if (e.type === "auxclick" && e.button !== MIDDLE_BUTTON) return;
+    const link = e.target?.closest?.("a[href]");
+    if (link && isSponsorLink(link.href)) track();
+  };
+}
+
+/**
  * The analytics landing a page view counts as: `page_changelog` on the release
  * notes, `page_help` on any other page, or null for a step from one help page
  * to another (a referrer under /help on the same site), so a visit counts once

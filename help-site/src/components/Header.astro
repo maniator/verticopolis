@@ -23,7 +23,7 @@ import logo from "../assets/logo.png";
   import { backToOpenGame, takeFromGameFlag } from "../../../src/ui/fromGame";
   import { injectVercelTelemetry } from "../../../src/telemetry";
   import { trackAppAction } from "../../../src/analytics";
-  import { helpPageDetail, landingAction } from "../../site.mjs";
+  import { helpPageDetail, landingAction, sponsorTapListener } from "../../site.mjs";
 
   injectVercelTelemetry();
   const landing = landingAction(location.pathname, document.referrer, location.origin);
@@ -31,6 +31,11 @@ import logo from "../assets/logo.png";
   // Every page view, landing or not, names its page, so the help pages
   // people read show up in PostHog and not only where they arrived.
   trackAppAction("help_page_view", helpPageDetail(location.pathname));
+  // A tap on any link to the Sponsors page counts once as sponsor_click
+  // (help-site/site.mjs sponsorTapListener); the link itself opens as before.
+  const noteSponsorTap = sponsorTapListener(() => trackAppAction("sponsor_click", "help"));
+  document.addEventListener("click", noteSponsorTap);
+  document.addEventListener("auxclick", noteSponsorTap);
   if (takeFromGameFlag(location, history)) {
     // The title bar's game button and the front page's Play button: the
     // game is already open in another tab. The bar writes its label twice

@@ -364,7 +364,12 @@ export type AppActionName =
   // tap is a deliberate, low-volume action, so the raw per-surface count is the
   // signal, and it is the engagement half of the funnel that `install_app` (the
   // completion) cannot attribute (the OS `appinstalled` event names no surface).
-  | "install_offer";
+  | "install_offer"
+  // A tap on a Sponsor link (the GitHub Sponsors tip jar). `detail` carries
+  // which surface: `splash` (the title screen's corner link) or `help` (any
+  // help site link to the Sponsors page). NOT latched, like install_offer. It
+  // counts the tap only; whether anyone went on to sponsor is never known here.
+  | "sponsor_click";
 
 /**
  * Cross-cutting props merged into EVERY event: the platform and

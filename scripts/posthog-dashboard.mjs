@@ -537,6 +537,11 @@ function buildInsights(ids) {
       query: trends([series("app_action", "Page views")], { breakdown: "detail", display: "ActionsBar", where: [inAction(["help_page_view"])] }),
     },
     {
+      name: "Sponsor link taps",
+      description: "Taps on a link to the GitHub Sponsors page (app_action sponsor_click), split by where (detail: splash for the title screen, help for the help site), production. The tap only: whether anyone sponsored is not known. The Android app shows no Sponsor link.",
+      query: trends([series("app_action", "Sponsor taps")], { breakdown: "detail", display: "ActionsBar", where: [inAction(["sponsor_click"])] }),
+    },
+    {
       name: "Mute toggles by state",
       description: "app_action mute split by the new state (on / off), so the share of sessions that play muted is visible, production.",
       query: trends([series("app_action", "Mute toggles")], { breakdown: "detail", display: "ActionsPie", where: [inAction(["mute"])] }),

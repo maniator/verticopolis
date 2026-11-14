@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
-import { HELP_BASE, OLD_ANCHORS, SPONSOR_URL, cardAlt, cardFile, cardUrl, helpPageDetail, landingAction, oldAnchorRedirects, pageJsonLd, sharedHead, sidebar, type SidebarEntry } from "../../help-site/site.mjs";
+import { HELP_BASE, OLD_ANCHORS, SPONSOR_URL, cardAlt, cardFile, cardUrl, helpPageDetail, isSponsorLink, landingAction, sponsorTapListener, oldAnchorRedirects, pageJsonLd, sharedHead, sidebar, type SidebarEntry } from "../../help-site/site.mjs";
 import { catalogFor } from "./catalogFixture";
 import { SPONSOR_URL as GAME_SPONSOR_URL } from "../ui/splashTemplate";
 import { HELP_PAGES_DIR } from "../build/helpMarkdown";
@@ -357,5 +357,57 @@ describe("the link check", () => {
       ["/help/rooms/", '<h2 id="spa">Spa</h2><a href="/help/">home</a><a href="/help/catalog.json">data</a><a href="https://example.com/">out</a>'],
     ]);
     expect(brokenLinks(pages)).toEqual(["/help/ → /help/rooms/#nope (no such section)", "/help/ → /help/gone/ (no such page)"]);
+  });
+});
+
+describe("isSponsorLink (the help site's sponsor_click listener)", () => {
+  it("matches the Sponsors page with or without a trailing slash, query or hash", () => {
+    expect(isSponsorLink(SPONSOR_URL)).toBe(true);
+    expect(isSponsorLink(`${SPONSOR_URL}/`)).toBe(true);
+    expect(isSponsorLink(`${SPONSOR_URL}?o=esb`)).toBe(true);
+    expect(isSponsorLink(`${SPONSOR_URL}#tiers`)).toBe(true);
+  });
+
+  it("ignores every other link, including look-alike paths and hosts", () => {
+    expect(isSponsorLink("https://github.com/maniator/verticopolis")).toBe(false);
+    expect(isSponsorLink("https://github.com/sponsors/maniatorx")).toBe(false);
+    expect(isSponsorLink("https://github.com/sponsors")).toBe(false);
+    expect(isSponsorLink("https://example.com/sponsors/maniator")).toBe(false);
+    expect(isSponsorLink("/help/privacy/")).toBe(false);
+    expect(isSponsorLink("")).toBe(false);
+  });
+});
+
+describe("sponsorTapListener (the help site's sponsor_click listener)", () => {
+  /** A link the listener's event lands on (or inside). */
+  function linkTo(href: string): HTMLAnchorElement {
+    const a = document.createElement("a");
+    a.href = href;
+    a.append(document.createElement("span"));
+    return a;
+  }
+  function tap(type: "click" | "auxclick", target: Element, button = 0): MouseEvent {
+    const e = new MouseEvent(type, { button });
+    Object.defineProperty(e, "target", { value: target });
+    return e;
+  }
+
+  it("counts a click, or a middle-click, on a Sponsors link or anything inside it", () => {
+    const track = vi.fn();
+    const listen = sponsorTapListener(track);
+    const sponsor = linkTo(SPONSOR_URL);
+    listen(tap("click", sponsor));
+    listen(tap("click", sponsor.firstElementChild!));
+    listen(tap("auxclick", sponsor, 1));
+    expect(track).toHaveBeenCalledTimes(3);
+  });
+
+  it("ignores a right-click, other links and clicks outside any link", () => {
+    const track = vi.fn();
+    const listen = sponsorTapListener(track);
+    listen(tap("auxclick", linkTo(SPONSOR_URL), 2));
+    listen(tap("click", linkTo("https://github.com/maniator/verticopolis")));
+    listen(tap("click", document.createElement("p")));
+    expect(track).not.toHaveBeenCalled();
   });
 });
