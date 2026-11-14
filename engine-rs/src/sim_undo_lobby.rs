@@ -1,9 +1,61 @@
 //! The lobby rule of the ground a step leaves (`sim_undo_ground.rs`): a
 //! step that takes out ground-floor lobby tiles leaves nothing laid since
 //! hanging from them.
-use super::{Ground, GROUND_FLOOR};
+use super::{tiles_of, Ground, GROUND_FLOOR};
 use crate::crowd::fasthash::{FastMap, FastSet};
 use crate::facilities::{Kind, LOT_WIDTH};
+use crate::tower::Tower;
+use crate::undo::{Step, UnitChange};
+
+/// The root of each part of the tower the ground-floor lobby tiles `step`
+/// takes out joined, as unit ids: the oldest ground-floor tile (by
+/// `Tower::age_of`) of each part of ground-floor and basement tiles beside
+/// them, flooded through the tower's tiles without them. Read once the tiles
+/// stand, as the gesture that laid them closes or a redo puts them back, so
+/// the step that takes them out knows each part stood on its own root before
+/// (#1848). One flood over the low tiles, once per such step.
+pub(crate) fn joined_roots(tower: &Tower, step: &Step) -> Vec<i64> {
+    let tiles: Vec<(i64, i64)> = step
+        .units
+        .iter()
+        .filter(|img| matches!(img.change, UnitChange::TakeOut(_)))
+        .filter_map(|img| tower.get_unit(img.id))
+        .filter(|u| u.kind == Kind::Lobby && u.floor == GROUND_FLOOR)
+        .flat_map(tiles_of)
+        .collect();
+    let piece: FastSet<(i64, i64)> = tiles.iter().copied().collect();
+    let mut seen: FastSet<(i64, i64)> = FastSet::default();
+    let mut roots = Vec::new();
+    for start in tiles.iter().flat_map(|&tile| beside(tile)) {
+        if start.0 > GROUND_FLOOR || piece.contains(&start) || !tower.structure.contains_key(&start)
+        {
+            continue;
+        }
+        if !seen.insert(start) {
+            continue;
+        }
+        let mut root: Option<(i64, i64)> = None;
+        let mut met = vec![start];
+        let mut next = 0;
+        while let Some(&tile) = met.get(next) {
+            next += 1;
+            let id = tower.structure[&tile];
+            if tile.0 == GROUND_FLOOR && root.is_none_or(|(age, _)| tower.age_of(id) < age) {
+                root = Some((tower.age_of(id), id));
+            }
+            for near in beside(tile) {
+                let low = near.0 <= GROUND_FLOOR && !piece.contains(&near);
+                if low && tower.structure.contains_key(&near) && seen.insert(near) {
+                    met.push(near);
+                }
+            }
+        }
+        roots.extend(root.map(|(_, id)| id));
+    }
+    roots.sort_unstable();
+    roots.dedup();
+    roots
+}
 
 impl Ground<'_> {
     /// Whether the ground floor and the basement still hang from the tower once
@@ -17,7 +69,8 @@ impl Ground<'_> {
     /// ground-floor tile of their part (`root_of`): in play the tower's first
     /// lobby tile, which no sale takes out, unless a sale parted the ground
     /// floor. A run with a tile built since the piece must reach that root,
-    /// when it is older than the piece; a run all built before the piece hung
+    /// when it is older than the piece, or a root of a part the piece joined
+    /// when it went in (`Step::lobby_roots`); a run all built before the piece hung
     /// from something else and is left as it was. One run with a ground-floor
     /// lobby tile may stand on its own, as a tower's first lobby tile does,
     /// where no older ground-floor tile of the part stays, nor comes back with
@@ -58,7 +111,10 @@ impl Ground<'_> {
             }
         }
         let structure = &self.tower.structure;
-        let Some(&oldest) = piece.iter().filter_map(|tile| structure.get(tile)).min() else {
+        // Ages, not ids: a lobby tile a redo put back dates from its return
+        // (`Tower::age_of`, #1846).
+        let ages = piece.iter().filter_map(|tile| structure.get(tile));
+        let Some(oldest) = ages.map(|&id| self.tower.age_of(id)).min() else {
             return true;
         };
         let mut runs = Runs::default();
@@ -91,12 +147,26 @@ impl Ground<'_> {
                 return true;
             }
             let run = &runs.found[index];
-            let reaches = root.is_some_and(|(_, x)| runs.of((GROUND_FLOOR, x)) == Some(index));
+            let reaches = root.is_some_and(|(_, x)| runs.of((GROUND_FLOOR, x)) == Some(index))
+                || self.reaches_a_joined_root(index, &runs);
             let founds = || root.is_none() && !older_laid && run.on_lobby;
             reaches
                 || !run.built_since
                 || (founds() && self.stands_first(oldest, index, &runs, &mut offered))
         })
+    }
+
+    /// Whether run `index` reaches a root of a part the piece's tiles joined
+    /// when they went in (`Step::lobby_roots`) that stays: the part stood on
+    /// it before the tiles came, so it stands on it again once they go
+    /// (#1848). A part a sale divided since reaches none of them.
+    fn reaches_a_joined_root(&self, index: usize, runs: &Runs) -> bool {
+        self.lobby_roots
+            .iter()
+            .filter(|id| !self.leaving.contains(id))
+            .filter_map(|&id| self.tower.get_unit(id))
+            .flat_map(tiles_of)
+            .any(|tile| runs.of(tile) == Some(index))
     }
 
     /// Walks the run of ground-floor and basement tiles that hold from
@@ -164,9 +234,10 @@ impl Ground<'_> {
     /// Where the tower has no tile before the step, the flood crosses none and
     /// a bridge joins none: a tile the step lays there was out all the time
     /// since the edits it undoes, so nothing built since hung from it. The runs
-    /// share one root, so where the piece, or a tile the step lays again beside
+    /// share one root; where the piece, or a tile the step lays again beside
     /// it, joined parts a sale had divided, a run in a part without the oldest
-    /// root counts as cut off from it, which only refuses more (#1848).
+    /// root passes when it reaches the root its own part stood on before the
+    /// piece went in (`reaches_a_joined_root`, #1848).
     fn root_of(
         &self,
         runs: &Runs,
@@ -189,8 +260,9 @@ impl Ground<'_> {
                 .get(&tile)
                 .filter(|&id| !self.leaving.contains(id));
             if let Some(&id) = stays.filter(|_| tile.0 == GROUND_FLOOR) {
-                if root.is_none_or(|(old, _)| id < old) {
-                    root = Some((id, tile.1));
+                let age = self.tower.age_of(id);
+                if root.is_none_or(|(old, _)| age < old) {
+                    root = Some((age, tile.1));
                 }
             }
             for near in beside(tile) {

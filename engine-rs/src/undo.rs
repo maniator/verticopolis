@@ -238,6 +238,11 @@ pub(crate) struct Step {
     /// adds under, when it was made: a tower that came in over a cap may be
     /// left as far over as the edit found it (`sim_undo_check.rs`).
     pub(crate) caps_held: Vec<CapHeld>,
+    /// The units that were the roots of the parts of the tower the step's
+    /// ground-floor lobby tiles joined when they went in
+    /// (`sim_undo_lobby::joined_roots`): taking the tiles out leaves each
+    /// part standing on its own root again (#1848).
+    pub(crate) lobby_roots: Vec<i64>,
 }
 
 impl Step {
