@@ -75,6 +75,7 @@ export function notesForVersion(
     if (tok.type === "heading" && tok.depth === 2) {
       if (inSection) break; // reached the next version's section
       inSection = headingNamesVersion(tok.text, version);
+      underCredits = false; // each version's section starts outside its credits
       continue;
     }
     if (tok.type === "heading") underCredits = isCreditsHeading(tok as Tokens.Heading);
@@ -116,6 +117,7 @@ export function contributorsForVersion(changelog: string, version: string): stri
     if (tok.type === "heading" && tok.depth === 2) {
       if (inSection) break;
       inSection = headingNamesVersion(tok.text, version);
+      underCredits = false;
       continue;
     }
     if (!inSection) continue;

@@ -6,6 +6,7 @@ import {
   contributorLines,
   highestLevel,
   insertSection,
+  notesKeptForCredits,
   parseNote,
   readNotes,
   setCargoVersion,
@@ -34,6 +35,14 @@ describe("change notes", () => {
     expect(contributorLines([a, b])).toEqual(["trvorth extended the room-capacity sweep (#2198).", "Sam reported it (#670)."]);
     expect(() => parseNote(note("app: none\ncrate: none", "## Contributors\n- No period"), "c.md")).toThrow(/period/);
     expect(() => parseNote(note("app: none\ncrate: none", "## Contributors\n- A.\n## Contributors\n- B.\n"), "c.md")).toThrow(/twice/);
+  });
+
+  it("keeps a credit-only note when the release does not move the app", () => {
+    const credit = parseNote(note("app: none\ncrate: none", "## Contributors\n- Sam helped (#1).\n"), "credit.md");
+    const engine = parseNote(note("app: none\ncrate: patch", "## Engine\n- A fix.\n## Contributors\n- Ana helped (#2).\n"), "engine.md");
+    const plain = parseNote(note("app: none\ncrate: none"), "plain.md");
+    expect(notesKeptForCredits([credit, engine, plain], false).map((n) => n.file)).toEqual(["credit.md"]);
+    expect(notesKeptForCredits([credit, engine, plain], true)).toEqual([]);
   });
 
   it("reads the optional readmes line, and only as unchanged", () => {

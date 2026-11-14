@@ -350,6 +350,15 @@ describe("contributors", () => {
     expect(allReleaseNotes(creditsOnly)).toEqual([{ version: "4.0.0", notes: ["A note."] }]);
   });
 
+  it("reads an older section's notes, not credits, below a credited one", () => {
+    expect(notesForVersion(CREDITED, "3.12.3")).toEqual(["Old note."]);
+    expect(recentReleaseNotes(CREDITED, "4.0.0", 10).map((r) => r.version)).toEqual(["4.0.0", "3.12.3"]);
+    const twoCredited = CREDITED.replace("- Old note.\n", "- Old note.\n\n### Contributors\n\n- Ana helped.\n\n## 3.12.2\n\n- Older note.\n");
+    expect(contributorsForVersion(twoCredited, "3.12.3")).toEqual(["Ana helped."]);
+    expect(contributorsForVersion(twoCredited, "3.12.2")).toEqual([]);
+    expect(notesForVersion(twoCredited, "3.12.2")).toEqual(["Older note."]);
+  });
+
   it("prints escaped credit lines for the GitHub release, so no name pings anyone", () => {
     const lines = releaseCreditLines(CREDITED, "4.0.0");
     expect(lines.slice(0, 3)).toEqual(["", "### Contributors", ""]);

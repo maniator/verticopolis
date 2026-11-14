@@ -33,7 +33,9 @@ crate: none   # major | minor | patch | none
   note's credits once, under `### Contributors` after the version's notes in
   `CHANGELOG.md` (and in `engine-rs/CHANGELOG.md` when the crate moves). The
   GitHub release and the help site's release notes show them; the update
-  prompt does not.
+  prompt does not. A release that does not move the app keeps a note that
+  moves neither version and credits someone, so its lines wait for the next
+  app release.
 - Each line is one `- ` bullet ending with a period. Leave out a section with
   no lines. An app level other than `none` needs at least one Player line.
 - A note that is already on `main` belongs to the PR that merged it. A

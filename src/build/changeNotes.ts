@@ -162,6 +162,16 @@ export function changelogVersions(changelog: string): string[] {
   return [...changelog.replace(/\r\n/g, "\n").matchAll(/^## (\d+\.\d+\.\d+)\b/gm)].map((m) => m[1]);
 }
 
+/**
+ * The notes a release must keep because their credits went nowhere: when the
+ * app does not move, CHANGELOG.md gets no section, so a note that moves
+ * neither version and credits someone waits for the next app release.
+ */
+export function notesKeptForCredits(notes: readonly ChangeNote[], appMoved: boolean): ChangeNote[] {
+  if (appMoved) return [];
+  return notes.filter((n) => n.crate === "none" && n.contributors.length > 0);
+}
+
 /** The notes' Contributors lines, each once, in note order. */
 export function contributorLines(notes: readonly ChangeNote[]): string[] {
   return [...new Set(notes.flatMap((n) => n.contributors))];

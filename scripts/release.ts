@@ -28,6 +28,7 @@ import {
   CHANGES_DIR,
   bumpVersion,
   contributorLines,
+  notesKeptForCredits,
   highestLevel,
   insertSection,
   readNotes,
@@ -105,7 +106,9 @@ if (crateNow !== crate.version) {
   node(["scripts/engine-compat.ts"]);
 }
 
-for (const n of pending) unlinkSync(path(`${CHANGES_DIR}/${n.file}`));
+const kept = new Set(notesKeptForCredits(pending, app !== appWas).map((n) => n.file));
+if (kept.size > 0) console.warn(`release: the app does not move, so ${[...kept].join(", ")} stay for the next app release, which credits their Contributors lines`);
+for (const n of pending) if (!kept.has(n.file)) unlinkSync(path(`${CHANGES_DIR}/${n.file}`));
 console.log(
-  `release: app ${appWas} -> ${app} (${named ? "named" : appLevel}), crate ${crate.version} -> ${crateNow} (${crateLevel}), ${pending.length} notes consumed (${pending.map((n) => n.file).join(", ")}). Review the changelogs, commit, and open the PR from release/${app}.`,
+  `release: app ${appWas} -> ${app} (${named ? "named" : appLevel}), crate ${crate.version} -> ${crateNow} (${crateLevel}), ${pending.length - kept.size} notes consumed (${pending.filter((n) => !kept.has(n.file)).map((n) => n.file).join(", ")}). Review the changelogs, commit, and open the PR from release/${app}.`,
 );
