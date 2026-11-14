@@ -259,6 +259,39 @@ measures it before and after.
   as people get there, so a slow tower fills late and an unreachable office
   never fills.
 
+### Venues: the visitors who are really there
+
+The owner asked (2026-11-14) that party halls, restaurants, shops and the
+other venues show the people who are actually inside. Today that holds for
+some venues only:
+
+- **Party halls, cinemas, wedding halls and the aquatic center** already do.
+  Their figures and their take come from the visitors who walked in
+  (`customers_in`, copied to the head count by `sync_attendance_occupants`).
+- **Restaurants, fast food, shops and the other commercial rooms** do not.
+  While open, the room draws its full complement (`economy/traffic.rs` sets
+  the head count to the catalog's population), and the take follows the
+  demand estimate (`demand_map.fraction_by_unit`). Crowd people who walk in
+  are counted in `customers_in`, but nothing draws or pays from that count.
+
+The rules for venues:
+
+- A venue draws the visitors inside it and no more: the head count is
+  `customers_in`, the people who arrived and have not left. An open
+  restaurant nobody reached draws empty.
+- Visitors who are tenants (office lunch, and later residents and hotel
+  guests going out to eat or shop) are the real tenant people from the steps
+  above. Visitors from outside stay spawned, but without the 140 cap, so how
+  many come follows the demand estimate and each one walks and rides there.
+- A venue's take follows the visitors who came. Whether the 1994 game pays a
+  shop or restaurant per customer is checked on the owner's PC before this
+  PR (added to the PC look), and the rule follows what it shows.
+- Both modes. The room art already draws from the head count, so no
+  renderer change.
+- The economy moves for every tower with commercial rooms, so this PR
+  carries a headless before-and-after of income, the conformance lock and
+  the crate version.
+
 ### Performance work that comes first
 
 1. **A scale benchmark.** `crowd_scale` (the table above), so every later
@@ -326,7 +359,8 @@ in Classic; whether they stay once commuters are real is a later call.
 1. **The scale benchmark** (this PR). No behavior change.
 2. **One PC look at the original** (with the owner's go): a full lobby queue
    at the morning rush, counting the figures drawn against the Elevator
-   Window's red number, and what a 41st person does. No code. It settles how
+   Window's red number, and what a 41st person does. No code. The same session
+   checks whether a shop's or restaurant's income follows its customer count. It settles how
    queues are drawn in step 3.
 3. **The view-sized, slimmer people frame.** After #2116, with the people
    look thread. Moves the frame layout and the crate version.
@@ -340,8 +374,12 @@ in Classic; whether they stay once commuters are real is a later call.
    before-and-after (lunch traffic follows staffed offices); a test for each
    removal case (bulldoze, transport deleted mid-ride, eviction mid-trip,
    mode switch).
-6. **Homes, then hotels**, one PR each.
-7. **#2092**, the inspector.
+6. **Venues draw and earn from real visitors.** Restaurants, fast food,
+   shops and the other commercial rooms show and are paid for the visitors
+   who actually came (see "Venues" above); the halls and cinemas already
+   do. After offices, so office lunch visitors are real people.
+7. **Homes, then hotels**, one PR each.
+8. **#2092**, the inspector.
 
 ## Party review
 
