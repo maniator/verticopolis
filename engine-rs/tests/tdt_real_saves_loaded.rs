@@ -328,6 +328,10 @@ fn rooms_in(save: &Value) -> Vec<Room> {
 
 /// A state a played tower holds that a 1994 file cannot carry, with what the
 /// room re-imports as. Anything else that differs is a regression.
+fn is_burned(state: &str) -> bool {
+    matches!(state, "fire" | "gutted")
+}
+
 fn is_known_state_loss(kind: &str, ours: &str, back: &str) -> bool {
     match (kind, ours, back) {
         // An event room that is running has no state in the file (#1500).
@@ -374,8 +378,11 @@ fn a_played_save_reopens_and_exports_with_every_shaft_and_room_where_it_stood() 
             "{name} shaft kind, column, span and skipped floors after export"
         );
         let back = rooms_in(&again);
-        assert_eq!(back.len(), rooms.len(), "{name} rooms after export");
-        for (ours, theirs) in rooms.iter().zip(&back) {
+        // A room on fire or gutted by one has no place in the file, and the
+        // export leaves it out on purpose (`SkipReason::Burned`).
+        let standing: Vec<&Room> = rooms.iter().filter(|r| !is_burned(&r.4)).collect();
+        assert_eq!(back.len(), standing.len(), "{name} rooms after export");
+        for (ours, theirs) in standing.into_iter().zip(&back) {
             assert_eq!(
                 (&ours.0, ours.1, ours.2, ours.3),
                 (&theirs.0, theirs.1, theirs.2, theirs.3),

@@ -36,7 +36,7 @@ export function notFoundPageTemplate(path: string, fromGame = false): TemplateRe
     </nav>
   `;
   return pageShell({
-    title: "Verticopolis: Page not found",
+    title: "Verticopolis™: Page not found",
     backHref: "/",
     main: body,
     // The body lists the pages as buttons; repeating them in the title bar

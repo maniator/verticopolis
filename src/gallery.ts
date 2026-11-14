@@ -232,7 +232,7 @@ injectVercelTelemetry();
 trackAppAction("page_gallery"); // landing on the standalone /gallery page (host-gated inside)
 render(
   pageShell({
-    title: "Verticopolis: Sprite Gallery",
+    title: "Verticopolis™: Sprite Gallery",
     backHref: "/",
     main: html`
       <div class="page-lede">

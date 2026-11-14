@@ -82,8 +82,10 @@ fn each_floor_order_matches_the_per_room_sort_it_replaces() {
     }
 }
 
-/// Sets the clock an hour into the shift, when dispatch may start rooms.
+/// Sets the clock an hour into the shift, when dispatch may start rooms,
+/// with every crew's maids in at their housekeeping room.
 fn in_shift(sim: &mut Simulation) {
+    sim.seat_crews();
     let start = sim.mode.housekeeping_shift().start as f64;
     sim.clock.minutes = (start + 1.0) * 60.0;
 }

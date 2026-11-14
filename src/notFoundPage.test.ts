@@ -30,6 +30,7 @@ describe("notFoundPageTemplate", () => {
   it("frames the page in the retro shell with Back to game pointing at the game", () => {
     const frag = renderToFragment(notFoundPageTemplate("/x"));
     expect(frag.querySelector(".page-win .win-title")?.textContent).toContain("Page not found");
+    expect(frag.querySelector(".page-win .win-title")?.textContent).toContain("Verticopolis™");
     const back = [...frag.querySelectorAll('[data-act="back-to-game"]')];
     expect(back.length).toBeGreaterThan(0);
     for (const a of back) expect(a.getAttribute("href")).toBe("/");

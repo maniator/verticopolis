@@ -66,8 +66,10 @@ fn stairs(sim: &mut Simulation, x: i64, bottom: i64) {
     );
 }
 
-/// The rooms maids were sent to, in spawn order.
+/// The rooms maids were sent to, in the order they were sent (the crew's
+/// free maids go out lowest id first).
 fn dispatch(sim: &mut Simulation) -> Vec<i64> {
+    sim.seat_crews();
     sim.clock.minutes = MIDSHIFT;
     sim.dispatch_housekeepers();
     sim.crowd

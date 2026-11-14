@@ -32,7 +32,7 @@ use crate::economy::{
     MAINTENANCE_PER_CAR_MONTHLY, NIGHTCLUB_DJ_MONTHLY, REAL_WORLD_MAINT_PERIOD_DAYS,
 };
 use crate::facilities::{
-    build_cap, ground_floor_structure_kind, no_basement, pools_for, Kind, Pool, FACILITIES,
+    build_cap_in, ground_floor_structure_kind, no_basement, pools_for, Kind, Pool, FACILITIES,
     LOBBY_INTERVAL, LOT_WIDTH, MAX_FLOOR, MIN_FLOOR, POOLED_CAPS,
 };
 use crate::rules::{RentModel, MAX_HOUSEHOLD};
@@ -55,7 +55,7 @@ pub use rules::Rules;
 
 /// The version of the catalog's shape. It moves when a field is added,
 /// renamed or removed, so a frontend can refuse a shape it does not know.
-pub const CATALOG_VERSION: u32 = 17;
+pub const CATALOG_VERSION: u32 = 18;
 
 /// Every price, size and build rule of one mode.
 #[derive(Clone, Debug, PartialEq, Serialize)]

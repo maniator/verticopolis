@@ -286,6 +286,17 @@ export const SaveGame = {
   deleteSlot(n: number): void {
     localStorage.removeItem(SLOT_KEY(n));
   },
+  /** A manual slot's stored value exactly as it sits in storage (packed, not
+   *  decoded), or null for an empty slot. The overwrite guard
+   *  (`./slotGuard`) fingerprints it and keeps it whole for Undo. */
+  slotRaw(n: number): string | null {
+    return localStorage.getItem(SLOT_KEY(n));
+  },
+  /** Put a value read by {@link SaveGame.slotRaw} back into its slot, byte for
+   *  byte. Throws as a slot save does when storage refuses the write. */
+  restoreSlotRaw(n: number, raw: string): void {
+    localStorage.setItem(SLOT_KEY(n), raw);
+  },
 
   /** Metadata for every slot, for the saves manager UI. A loaded or empty slot
    *  whose stored values and census reader hold reuses its last row. */

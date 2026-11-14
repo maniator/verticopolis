@@ -42,7 +42,7 @@ export const INSTANCE_METHODS = [
   "previewRentBatch", "validateTransport", "placeTransportDryRun",
   // The panel getters (facade slice 6b) and the engine view (slice 6a).
   "towerStats", "statsReport", "housekeepingCoverage", "unitDetail", "transportDetail",
-  "floorHeatmap", "peakCongestionHotspot", "onboardingFacts", "viewStructure", "viewFrame",
+  "floorHeatmap", "peakCongestionHotspot", "onboardingFacts", "viewStructure", "viewFrame", "setPeopleWindow",
   "unitMetaSince", "towerSignature", "diagnosticFacts",
   // The camera and tower name a host reads once per engine (slice 7a).
   "view", "towerName",

@@ -7,8 +7,10 @@ import { isPresent } from "../../shared/unitState";
 import type { TransportView, UnitView } from "../../simport/view";
 import {
   CRANE_H,
+  CRANE_MAST_ANCHOR_X,
+  CRANE_MIN_ROOF_TILES,
   CRANE_W,
-  craneAnchorTile,
+  craneRoof,
   AWNING_W,
   drawCrane,
   drawTransport,
@@ -18,6 +20,8 @@ import { facadeGeometry, type FloorEdge } from "../facadeGeometry";
 import { setRainShelter } from "./rainShelter";
 import { paintAnimatedUnit } from "../regionPaint";
 import { FLOOR, TILE, TRANSPORT_BAND_FLOORS } from "../scale";
+import { isVenue, venueBox, windingFlights, type VenueBox } from "../venueFlights";
+export { emptyFlightPass } from "../venueFlights";
 import { isDeadParking, roomSignature } from "./roomSignature";
 import { reap } from "./towerCrowd";
 import { dropRegionUnit, markRegionUnit } from "./towerRegions";
@@ -92,11 +96,26 @@ export function syncScene(engine: TowerEngine): void {
   // Set here rather than in the per-frame tick because it needs every room.
   let staffed = false;
   const seenR = new Set<number>();
+  // The flights' look (span, cars, stops, and whether they wind beside a
+  // venue, `venueFlights.ts`) moves only with the structure or the mode, so
+  // the venues are gathered on this one walk of the rooms, and the flights
+  // reconciled, only when that key moved since the last sync.
+  const catalog = towerCatalog(engine.sim);
+  const windsBesideVenues = catalog.rules.venueFlights;
+  const flights = engine.flightPass;
+  const flightsStale =
+    flights.sim !== engine.sim ||
+    flights.revision !== tower.revision ||
+    flights.units !== tower.units ||
+    flights.transports !== tower.transports ||
+    flights.winds !== windsBesideVenues;
+  const venues: VenueBox[] | null = flightsStale && windsBesideVenues ? [] : null;
   // Rebuilt fresh each sync from the one flood-fill read above; the region
   // draw closures read it live at raster time (dead spaces get the red X).
   const deadNow = new Set<number>();
   for (const u of rooms) {
     if (!staffed && isPresent(u)) staffed = true;
+    if (venues !== null && isVenue(u.kind)) venues.push(venueBox(u, catalogFacility(catalog, u.kind).floors));
     seenR.add(u.id);
     const unchained = !parkingOK.has(u.id);
     // Every input the room sprite draws from, hour-dependent bits included
@@ -153,18 +172,36 @@ export function syncScene(engine: TowerEngine): void {
     }
   }
 
+  if (!flightsStale) return;
+  syncTransports(engine, tower.transports, windingFlights(tower.transports, venues ?? NO_VENUES, flights.winding));
+  flights.sim = engine.sim;
+  flights.revision = tower.revision;
+  flights.units = tower.units;
+  flights.transports = tower.transports;
+  flights.winds = windsBesideVenues;
+}
+
+const NO_VENUES: readonly VenueBox[] = [];
+
+/** Reconcile the shaft and flight actors to `transports`. Whether a flight
+ *  winds (`winding`) joins its signature, so building, bulldozing, undoing or
+ *  redoing a venue beside it restyles it in the same sync. Runs only when the
+ *  structure or the mode moved (`FlightPass`): every input here is structural,
+ *  and every transport edit bumps the tower revision. */
+function syncTransports(engine: TowerEngine, transports: ReadonlyArray<TransportView>, winding: ReadonlySet<number>): void {
   const seenT = new Set<number>();
-  for (const t of tower.transports) {
+  for (const t of transports) {
     seenT.add(t.id);
-    const sig = `${t.bottom}:${t.top}:${t.cars}:${t.kind}:${(t.skipFloors ?? []).join(",")}`;
+    const winds = winding.has(t.id);
+    const sig = `${t.bottom}:${t.top}:${t.cars}:${t.kind}:${(t.skipFloors ?? []).join(",")}${winds ? ":winds" : ""}`;
     const a = engine.transportActors.get(t.id);
     if (!a) {
-      addTransport(engine, t);
+      addTransport(engine, t, winds);
       engine.transportSig.set(t.id, sig);
     } else if (engine.transportSig.get(t.id) !== sig) {
       a.kill();
       engine.transportActors.delete(t.id);
-      addTransport(engine, t);
+      addTransport(engine, t, winds);
       engine.transportSig.set(t.id, sig);
     }
   }
@@ -184,11 +221,13 @@ export function syncFacade(engine: TowerEngine): void {
   // Above-ground silhouette + top-row tiles in ONE pass over the units:
   // escape stairs read the per-floor edges, the crane reads the top row's
   // built columns. (Every story of a multi-floor room counts, so a two-story
-  // cinema at the edge still gets stairs on its upper row.)
-  const hi = engine.sim.tower.highestFloor;
-  const { runs, topTiles } = facadeGeometry(engine.sim.tower.units, hi, towerCatalog(engine.sim));
+  // cinema at the edge still gets stairs on its upper row, and so does every
+  // raised story of a tall lobby hall.)
+  const tower = engine.sim.tower;
+  const hi = tower.highestFloor;
+  const { runs, topFloor, topTiles } = facadeGeometry(tower.units, hi, towerCatalog(engine.sim), tower.tallLobbies());
   syncEscapes(engine, runs);
-  syncCrane(engine, hi, topTiles);
+  syncCrane(engine, topFloor, topTiles);
   setRainShelter(engine, runs);
 }
 
@@ -240,9 +279,11 @@ function syncEscapes(engine: TowerEngine, runs: Map<number, FloorEdge[]>): void 
  *  unless the top is demolished back below it, the crane is derived state,
  *  not a latch). No above-ground floors → no crane (empty/basement lots). */
 function syncCrane(engine: TowerEngine, hi: number, topTiles: Set<number>): void {
-  // No above-ground structure on the top row (basement-only/empty lot) or the
-  // tower has topped out at the cap → no crane.
-  if (hi >= viewWorld().maxFloor || topTiles.size === 0) {
+  // No above-ground structure on the top row (basement-only/empty lot), the
+  // tower has topped out at the cap, or the top is too narrow for the
+  // crane's roof pad (a spire) → no crane.
+  const roof = topTiles.size > 0 ? craneRoof(topTiles) : null;
+  if (hi >= viewWorld().maxFloor || !roof || roof.width < CRANE_MIN_ROOF_TILES) {
     if (engine.craneActor) {
       engine.craneActor.kill();
       engine.craneActor = null;
@@ -255,7 +296,9 @@ function syncCrane(engine: TowerEngine, hi: number, topTiles: Set<number>): void
   // a partly-leased office row, leaves the midpoint hovering in the gap
   // between blocks, floating the crane over open sky. For a fully-built row
   // the widest run IS the whole span, so this matches the old midpoint.
-  const pos = ex.vec(craneAnchorTile(topTiles) * TILE, engine.worldYTop(hi));
+  // The mast, not the middle of the drawing, stands over the run's center:
+  // the jib reaches right, so the drawing's middle is right of the mast.
+  const pos = ex.vec(roof.center * TILE, engine.worldYTop(hi));
   if (!engine.craneActor) {
     // cache:true + flagDirty from tick(): the crane re-rasterizes only while
     // the decorative clock advances, so pause/reduced-motion stops the
@@ -270,7 +313,7 @@ function syncCrane(engine: TowerEngine, hi: number, topTiles: Set<number>): void
       pos,
       width: CRANE_W,
       height: CRANE_H,
-      anchor: ex.vec(0.5, 1),
+      anchor: ex.vec(CRANE_MAST_ANCHOR_X, 1),
       z: Z.hang,
     });
     engine.craneActor.graphics.use(engine.craneGfx);
@@ -317,11 +360,11 @@ function addRoom(engine: TowerEngine, u: UnitView): void {
   engine.animatedRooms.set(u.id, a);
 }
 
-function addTransport(engine: TowerEngine, t: TransportView): void {
+function addTransport(engine: TowerEngine, t: TransportView, winds: boolean): void {
   const w = t.width * TILE;
   const totalFloors = t.top - t.bottom + 1;
   const h = totalFloors * FLOOR;
-  const gfx = transportGraphic(engine, t, w, totalFloors);
+  const gfx = transportGraphic(engine, t, w, totalFloors, winds);
   engine.transportActors.set(t.id, addBoxActor(engine, ex.vec(engine.worldX(t.x), engine.worldYTop(t.top)), w, h, Z.transport, gfx));
 }
 
@@ -333,7 +376,7 @@ function addTransport(engine: TowerEngine, t: TransportView): void {
  * each its own small cached Canvas, composed onto one GraphicsGroup, a single
  * actor, so the rest of the engine (sync, removal, collider) is unchanged.
  */
-function transportGraphic(engine: TowerEngine, t: TransportView, w: number, totalFloors: number): ex.Graphic {
+function transportGraphic(engine: TowerEngine, t: TransportView, w: number, totalFloors: number, winds: boolean): ex.Graphic {
   const band = (fromTop: number, floors: number): ex.Canvas =>
     new ex.Canvas({
       width: w,
@@ -344,7 +387,9 @@ function transportGraphic(engine: TowerEngine, t: TransportView, w: number, tota
         engine.d.ctx = ctx;
         // Draw the whole shaft shifted up so only this band lands in-bounds; the
         // rest is clipped. Bands abut seamlessly (each draws the full shaft).
-        drawTransport(ctx, t, 0, -fromTop * FLOOR, w, FLOOR);
+        // `winds` is the style the signature was built from, so a re-raster
+        // (a lost GL context) always matches the signature.
+        drawTransport(ctx, t, 0, -fromTop * FLOOR, w, FLOOR, winds);
       },
     });
   if (totalFloors <= TRANSPORT_BAND_FLOORS) return band(0, totalFloors);

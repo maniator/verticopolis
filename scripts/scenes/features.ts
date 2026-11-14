@@ -5,11 +5,13 @@
  * an injected builder by identity. Keep ERASABLE.
  */
 import { type Scene, PHONE } from "../screenshot-env.ts";
+import { RAIN_SHELTERED_SHOT } from "./rainShots.ts";
 import {
   buildBasement,
   buildCanonTower,
   buildCleanlinessTower,
   buildHotspotTower,
+  buildMetroLineTower,
   buildOverlayTower,
   buildStatsTower,
   buildTabletTower,
@@ -281,6 +283,40 @@ export const FEATURE_SCENES: Scene[] = [
       },
     ],
   },
+  // --- Modern metro line: three stations, one train calling at each in turn ----
+  {
+    id: "metro-line",
+    outDir: "features",
+    build: buildMetroLineTower,
+    assertUnits: 50,
+    viewport: { width: 1600, height: 560 },
+    shots: (
+      [
+        // Three stations: the train calls at the west one from :06 to :16,
+        // the middle one from :22 to :32 and the east one from :38 to :48
+        // (metroLineTimes), so each shot finds it at one platform only.
+        ["metro-line-west", 12 + 10 / 60, 0],
+        ["metro-line-middle", 12 + 26 / 60, 1],
+        ["metro-line-east", 12 + 42 / 60, 2],
+      ] as const
+    ).map(([name, hour, calling]) => ({
+      name,
+      setup: async (page) => {
+        await page.evaluate(pgStepNoDraw, 240);
+        await page.evaluate(pgSetClock, hour);
+        // Center on the station the train is calling at, so the Map window
+        // never hides it; its neighbors show their empty platforms.
+        await page.evaluate((stop) => {
+          const g = (window as any).game;
+          const stations = g.sim.tower.units.filter((u: any) => u.kind === "metro").sort((a: any, b: any) => a.x - b.x);
+          const u = stations[stop];
+          g.engine.setCamera(u.x + u.width / 2, -3, 1);
+        }, calling);
+        await page.evaluate(pgStep, 3);
+      },
+      wait: 0,
+    })),
+  },
   // --- Traffic HUD chip (desktop + mobile) ------------------------------------
   {
     id: "traffic",
@@ -377,27 +413,7 @@ export const FEATURE_SCENES: Scene[] = [
           });
         },
       },
-      {
-        // Rain falls on the open sky and the street, never on the rooms or
-        // the basements (#638). The weather is a presentation input on the
-        // read model with no command to set it, so the shot pins it on the
-        // render sim it draws from. Last in the scene, since nothing unpins it.
-        name: "rain-sheltered",
-        clock: 12,
-        wait: 500,
-        setup: async (page) => {
-          await page.evaluate(() => {
-            const g = (window as any).game;
-            Object.defineProperty(g.engine.sim, "weather", { get: () => "rain", configurable: true });
-            if (g.engine.sim.weather !== "rain") throw new Error("the rain-sheltered shot could not pin the weather to rain");
-            let min = Infinity;
-            for (const u of g.sim.tower.units) {
-              if (u.kind === "lobby" && u.floor === 1) min = Math.min(min, u.x);
-            }
-            g.engine.setCamera(min, 3, 2);
-          });
-        },
-      },
+      RAIN_SHELTERED_SHOT,
     ],
   },
   // --- Responsive layout (docked-tablet band) ---------------------------------

@@ -292,6 +292,9 @@ export interface EnginePortView {
   viewStructure(): Float64Array;
   /** A fresh copy the caller owns, per frame. */
   viewFrame(full: boolean): Float64Array;
+  /** The floors and tiles the next frames send people for (the camera, padded
+   *  for riders); a number that is not finite clears it, and every person goes. */
+  setPeopleWindow(floorLo: number, floorHi: number, xLo: number, xHi: number): void;
   /** `[revision, full, ids...]`: the rooms whose label or subtype changed. */
   unitMetaChanged(since: number): PortRecord;
   unitLabel(id: number): string | undefined;

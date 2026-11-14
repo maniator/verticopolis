@@ -1,12 +1,13 @@
 //! Time-simulated maids: the shift windows per mode (Classic from noon with
 //! the 16:30 cutoff, Modern from 08:00), the staff network of service
 //! elevators and stairs (escalators carry no staff), six maids per crew and
-//! one per floor at a time cycling through a floor's rooms, the staff pool
-//! sized by the built crews, and the cleaning dwell. Crew choice and order
+//! one per floor at a time cycling through a floor's rooms, the crew that
+//! walks in from the lobby at the start of the shift, and the cleaning
+//! dwell. Crew choice and order
 //! on a split network are covered by `housekeeping_dispatch_tests`; the
 //! morning checkout latch by `housekeeping::tests::the_morning_checkout_latches_yesterdays_shift`.
 use crate::clock::GameMode;
-use crate::crowd::spawn::{max_staff_for, spawn_staff, StaffSpawn};
+use crate::crowd::staff_shift::{StaffTrip, STREET_FLOOR};
 use crate::crowd::CROWD_SECONDS_PER_MINUTE;
 use crate::facilities::Kind;
 use crate::housekeeping::{HK_CLEAN_MINUTES, HK_MAIDS_PER_UNIT};
@@ -53,8 +54,15 @@ fn state(sim: &Simulation, id: i64) -> UnitState {
     sim.tower.get_unit(id).unwrap().state
 }
 
+/// Housekeepers in the building.
 fn maids(sim: &Simulation) -> usize {
     sim.crowd.people.iter().filter(|p| p.staff).count()
+}
+
+/// Housekeepers out on a room.
+fn at_work(sim: &Simulation) -> usize {
+    let on_a_room = |p: &&crate::crowd::Person| p.clean_unit_id.is_some();
+    sim.crowd.people.iter().filter(on_a_room).count()
 }
 
 fn hours(sim: &mut Simulation, n: usize) {
@@ -68,11 +76,14 @@ fn classic_maids_start_at_noon_and_not_at_the_morning_checkout() {
     let mut sim = base_tower(31, GameMode::Classic);
     let room = dirty_room(&mut sim, 2, X0);
     place(&mut sim, Kind::Housekeeping, 2, X0 + 8);
-    hours(&mut sim, 4); // 07:00 to 11:00
-    assert_eq!(state(&sim, room), UnitState::Dirty);
+    hours(&mut sim, 2); // 07:00 to 09:00
     assert_eq!(maids(&sim), 0);
-    hours(&mut sim, 1); // crossing noon dispatches
+    hours(&mut sim, 2); // the crew comes in at 10:00, two hours early
     assert!(maids(&sim) > 0);
+    assert_eq!(at_work(&sim), 0, "and waits for noon");
+    assert_eq!(state(&sim, room), UnitState::Dirty);
+    hours(&mut sim, 1); // crossing noon dispatches
+    assert!(at_work(&sim) > 0);
     hours(&mut sim, 1);
     assert_eq!(state(&sim, room), UnitState::Empty);
 }
@@ -82,12 +93,13 @@ fn classic_dispatch_starts_no_room_after_the_1630_cutoff() {
     let mut sim = base_tower(32, GameMode::Classic);
     dirty_room(&mut sim, 2, X0);
     place(&mut sim, Kind::Housekeeping, 2, X0 + 8);
+    sim.seat_crews();
     sim.clock.minutes = 16.0 * HOUR + 45.0;
     sim.dispatch_housekeepers();
-    assert_eq!(maids(&sim), 0);
+    assert_eq!(at_work(&sim), 0);
     sim.clock.minutes = 16.0 * HOUR + 15.0;
     sim.dispatch_housekeepers();
-    assert!(maids(&sim) > 0);
+    assert_eq!(at_work(&sim), 1);
 }
 
 #[test]
@@ -136,10 +148,11 @@ fn a_crew_fields_at_most_six_maids_one_per_floor() {
         dirty_room(&mut sim, floor, X0);
     }
     place(&mut sim, Kind::Housekeeping, 9, X0 + 8);
+    sim.seat_crews();
     sim.clock.minutes = 13.0 * HOUR;
     sim.dispatch_housekeepers();
     // Seven reachable dirty rooms on seven floors, six maids out.
-    assert_eq!(maids(&sim) as i64, HK_MAIDS_PER_UNIT);
+    assert_eq!(at_work(&sim) as i64, HK_MAIDS_PER_UNIT);
 }
 
 #[test]
@@ -150,58 +163,49 @@ fn one_maid_takes_a_floors_two_rooms_in_turn() {
     place(&mut sim, Kind::Housekeeping, 2, X0 + 8);
     hours(&mut sim, 5);
     assert_eq!(sim.clock.hour(), 12);
-    assert_eq!(maids(&sim), 1, "one maid per floor per crew");
-    // Within the hour she cleans the first, is released, and the release
-    // sends her straight on to the second.
-    hours(&mut sim, 1);
+    // The crew walks in at noon and one maid at a time works the floor: she
+    // cleans the first room and goes straight on to the second.
+    for _ in 0..60 {
+        sim.tick(1.0);
+        assert!(at_work(&sim) <= 1, "one maid per floor per crew");
+    }
     assert_eq!(state(&sim, a), UnitState::Empty);
     assert_eq!(state(&sim, b), UnitState::Empty);
 }
 
 #[test]
-fn the_staff_pool_is_the_built_crews_and_holds_while_a_crew_burns() {
+fn the_crew_walks_in_from_the_lobby_at_the_start_of_the_shift() {
     let mut sim = base_tower(39, GameMode::Classic);
-    assert_eq!(max_staff_for(&sim.tower), 0);
     let crew = place(&mut sim, Kind::Housekeeping, 2, X0 + 8);
-    slab(&mut sim, 3);
-    place(&mut sim, Kind::Housekeeping, 3, X0 + 8);
-    assert_eq!(max_staff_for(&sim.tower), 2 * HK_MAIDS_PER_UNIT);
-    sim.tower.get_unit_mut(crew).unwrap().state = UnitState::Fire;
-    assert_eq!(max_staff_for(&sim.tower), 2 * HK_MAIDS_PER_UNIT);
-    assert!(sim.tower.remove_unit(crew).is_some());
-    assert_eq!(max_staff_for(&sim.tower), HK_MAIDS_PER_UNIT);
+    sim.clock.minutes = 12.0 * HOUR;
+    sim.bring_in_crews();
+    let staff: Vec<_> = sim.crowd.people.iter().filter(|p| p.staff).collect();
+    assert_eq!(staff.len() as i64, HK_MAIDS_PER_UNIT);
+    for p in &staff {
+        assert_eq!(p.floor, STREET_FLOOR, "they start in the lobby");
+        assert_eq!(p.crew_id, Some(crew));
+        assert_eq!(p.staff_trip, Some(StaffTrip::In));
+    }
+    // A second call at the next hour tops the crew up and adds no one.
+    sim.bring_in_crews();
+    assert_eq!(maids(&sim) as i64, HK_MAIDS_PER_UNIT);
+    assert_eq!(sim.crowd.crew_roster.get(&crew), Some(&HK_MAIDS_PER_UNIT));
 }
 
 #[test]
-fn an_eleventh_crew_lifts_the_pool_past_the_old_fixed_64() {
+fn a_crew_the_lobby_cannot_reach_stays_home_with_a_note() {
     let mut sim = base_tower(40, GameMode::Classic);
-    for floor in 3..=12 {
-        slab(&mut sim, floor);
-    }
-    for floor in 2..=12 {
-        place(&mut sim, Kind::Housekeeping, floor, X0 + 8);
-    }
-    let pool = 11 * HK_MAIDS_PER_UNIT;
-    assert_eq!(max_staff_for(&sim.tower), pool);
-    let room = dirty_room(&mut sim, 2, X0);
-    let x = X0 as f64;
-    sim.crowd.staff_count = 64;
-    let send = |sim: &mut Simulation| {
-        spawn_staff(
-            &mut sim.crowd,
-            &sim.tower,
-            2,
-            2,
-            x,
-            room,
-            HK_CLEAN_MINUTES,
-            None,
-        )
-    };
-    assert_eq!(send(&mut sim), StaffSpawn::Sent);
-    assert_eq!(send(&mut sim), StaffSpawn::Sent);
-    assert_eq!(sim.crowd.staff_count, pool);
-    assert_eq!(send(&mut sim), StaffSpawn::Full);
+    slab(&mut sim, 3);
+    place(&mut sim, Kind::Housekeeping, 3, X0 + 8);
+    sim.clock.minutes = 12.0 * HOUR;
+    sim.bring_in_crews();
+    sim.bring_in_crews();
+    assert_eq!(maids(&sim), 0);
+    let notes = sim
+        .log
+        .iter()
+        .filter(|e| e.text.contains("can't get from the lobby"));
+    assert_eq!(notes.count(), 1, "one note a day");
 }
 
 #[test]
@@ -209,9 +213,11 @@ fn a_maid_carries_the_cleaning_hold() {
     let mut sim = base_tower(37, GameMode::Classic);
     dirty_room(&mut sim, 2, X0);
     place(&mut sim, Kind::Housekeeping, 2, X0 + 8);
+    sim.seat_crews();
     sim.clock.minutes = 13.0 * HOUR;
     sim.dispatch_housekeepers();
-    let maid = sim.crowd.people.iter().find(|p| p.staff).expect("a maid");
+    let maid = sim.crowd.people.iter().find(|p| p.clean_unit_id.is_some());
+    let maid = maid.expect("a maid on the room");
     assert_eq!(
         maid.linger_for,
         Some(HK_CLEAN_MINUTES * CROWD_SECONDS_PER_MINUTE)

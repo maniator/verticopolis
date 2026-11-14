@@ -3,7 +3,7 @@
   "mode": "modern",
   "units": [
     {"id":1002,"kind":"shop","floor":3,"lines":["Access: reachable from the lobby.","Today's patronage: 0 customers","Local demand: 25% of capacity.","The tower has more retail than its shoppers fill; add homes, or hold off on new venues, to lift every venue.","Just opened, no data yet."]},
-    {"id":1003,"kind":"shop","floor":7,"lines":["Access: reachable from the lobby.","Shoppers: too far from a lobby. Traffic is halved. Keep it within 2 floors of the ground or a sky lobby (every 15th floor).","Today's patronage: 0 customers","Local demand: 25% of capacity.","The tower has more retail than its shoppers fill; add homes, or hold off on new venues, to lift every venue.","Just opened, no data yet."]},
+    {"id":1003,"kind":"shop","floor":7,"lines":["Access: reachable from the lobby.","Shoppers: too far from a lobby. Traffic is halved. Keep it within 2 floors of the ground, a sky lobby (every 15th floor) or a working Metro platform.","Today's patronage: 0 customers","Local demand: 25% of capacity.","The tower has more retail than its shoppers fill; add homes, or hold off on new venues, to lift every venue.","Just opened, no data yet."]},
     {"id":1004,"kind":"skyBar","floor":8,"lines":["Access: reachable from the lobby."]},
     {"id":1005,"kind":"office","floor":7,"lines":["Access: reachable from the lobby."]}
   ],
