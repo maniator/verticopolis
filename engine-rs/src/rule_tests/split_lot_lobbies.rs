@@ -120,6 +120,30 @@ fn a_lobby_cut_off_from_the_trip_gives_way_to_the_next_nearest() {
     assert_eq!(tower_of(dest_x), 1, "out by the middle tower, the nearest");
 }
 
+/// A lobby the passenger graph joins but a route cannot reach (Classic's
+/// walk budget refuses five stair flights in a row) gives way to the next
+/// nearest one that a route does reach, so the trip is never dropped.
+#[test]
+fn a_lobby_past_the_walk_budget_gives_way_to_the_next_nearest() {
+    let (mut sim, lifts) = three_towers(GameMode::Classic);
+    // The right tower's elevator serves only B1 and the top floor, and a
+    // run of stairs climbs from its lobby to the top, one flight a floor.
+    for floor in 1..TOP {
+        assert!(sim.tower.set_stop(lifts[2], floor, false));
+        shaft(&mut sim, Kind::Stairs, TOWERS[2] + 30, floor, floor + 1);
+    }
+    let Simulation {
+        ref mut crowd,
+        ref tower,
+        ..
+    } = sim;
+    let i = add(crowd, tower, TOP, 1, Some(TOWERS[2] + 20), None).expect("a way down");
+    let (floors, shafts, _, dest_x) = trip(&sim, i);
+    assert_eq!(floors, vec![TOP, 0, 1]);
+    assert_eq!(shafts, vec![lifts[2], lifts[1]]);
+    assert_eq!(tower_of(dest_x), 1, "out by the middle tower");
+}
+
 /// One lobby run answers exactly as before: the seed's tile anywhere on it.
 #[test]
 fn a_single_lobby_picks_the_same_tile_as_before() {

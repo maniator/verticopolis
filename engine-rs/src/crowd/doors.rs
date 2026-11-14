@@ -11,7 +11,7 @@
 //! A floor with one run answers as before.
 
 use super::routing::{parts_split, passenger_parts};
-use super::spawn::{pick_x, pick_x_in_segment};
+use super::spawn::pick_x_in_segment;
 use super::{Crowd, Route};
 use crate::tower::Tower;
 
@@ -53,31 +53,35 @@ pub fn route_out_nearest(
     to: i64,
     seed: i32,
 ) -> Option<(Route, i64)> {
-    let fixed = tower.seg_at(from, Some(from_x));
-    for run in candidate_runs(crowd, tower, to, from_x, fixed) {
-        let x = pick_x_in_segment(tower, to, seed, run.0);
-        if let Some(r) = crowd.route(tower, from, to, Some(from_x), Some(x as f64)) {
+    route_open_end(crowd, tower, to, (from, from_x), false, seed)
+}
+
+/// A route for a trip with one end fixed at (`fixed.0`, `fixed.1`) and the
+/// other open on `open`: the open end tries each run of `open` the
+/// passenger graph joins to the fixed end, nearest first, and takes the
+/// first one a route reaches (Classic's walk budget can refuse a joined
+/// run). Answers the route and the open end's tile. `None` when `open` has
+/// one run (or none) or no run routes: the caller then routes as it always
+/// has. `open_is_from` says which end of the trip is open.
+pub fn route_open_end(
+    crowd: &mut Crowd,
+    tower: &Tower,
+    open: i64,
+    (fixed_floor, fixed_x): (i64, f64),
+    open_is_from: bool,
+    seed: i32,
+) -> Option<(Route, i64)> {
+    let fixed = tower.seg_at(fixed_floor, Some(fixed_x));
+    for run in candidate_runs(crowd, tower, open, fixed_x, fixed) {
+        let x = pick_x_in_segment(tower, open, seed, run.0);
+        let r = if open_is_from {
+            crowd.route(tower, open, fixed_floor, Some(x as f64), Some(fixed_x))
+        } else {
+            crowd.route(tower, fixed_floor, open, Some(fixed_x), Some(x as f64))
+        };
+        if let Some(r) = r {
             return Some((r, x));
         }
     }
     None
-}
-
-/// The tile of `floor` for the open end of a trip whose other end is
-/// (`other`, `other_x`): in the run of `floor` nearest `other_x` that a
-/// route joins to it. With one run, or none joined, the seed's tile
-/// anywhere on the floor, as `pick_x` always chose.
-pub fn door_x(
-    crowd: &mut Crowd,
-    tower: &Tower,
-    floor: i64,
-    other: i64,
-    other_x: f64,
-    seed: i32,
-) -> i64 {
-    let fixed = tower.seg_at(other, Some(other_x));
-    match candidate_runs(crowd, tower, floor, other_x, fixed).first() {
-        Some(run) => pick_x_in_segment(tower, floor, seed, run.0),
-        None => pick_x(tower, floor, seed),
-    }
 }

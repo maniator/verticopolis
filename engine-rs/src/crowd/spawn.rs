@@ -95,26 +95,29 @@ pub fn add(
 ) -> Option<usize> {
     let seed = seed_for(crowd.next_id);
     // An open end takes the run of its floor nearest the trip's other end
-    // (`doors`), so a lobby on a split lot is the one under the trip.
-    let route_from_x = match (from_x, to_x) {
-        (Some(x), _) => x,
-        (None, Some(tx)) => doors::door_x(crowd, tower, from, to, tx as f64, seed),
-        (None, None) => pick_x(tower, from, seed),
+    // that a route reaches (`doors`), so a lobby on a split lot is the one
+    // under the trip. A floor with one run picks the tile it always did.
+    let open = match (from_x, to_x) {
+        (None, Some(tx)) => doors::route_open_end(crowd, tower, from, (to, tx as f64), true, seed),
+        (Some(fx), None) => doors::route_open_end(crowd, tower, to, (from, fx as f64), false, seed),
+        _ => None,
     };
-    let route_to_x = match to_x {
-        Some(x) => x,
-        None if from_x.is_some() => {
-            doors::door_x(crowd, tower, to, from, route_from_x as f64, seed)
+    let (r, route_from_x, route_to_x) = match (open, from_x, to_x) {
+        (Some((r, x)), None, Some(tx)) => (r, x, tx),
+        (Some((r, x)), Some(fx), _) => (r, fx, x),
+        _ => {
+            let route_from_x = from_x.unwrap_or_else(|| pick_x(tower, from, seed));
+            let route_to_x = to_x.unwrap_or_else(|| pick_x(tower, to, seed));
+            let r = crowd.route(
+                tower,
+                from,
+                to,
+                Some(route_from_x as f64),
+                Some(route_to_x as f64),
+            )?;
+            (r, route_from_x, route_to_x)
         }
-        None => pick_x(tower, to, seed),
     };
-    let r = crowd.route(
-        tower,
-        from,
-        to,
-        Some(route_from_x as f64),
-        Some(route_to_x as f64),
-    )?;
     Some(make_person(
         crowd,
         tower,
