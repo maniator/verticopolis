@@ -1,56 +1,12 @@
-//! Staff spawning and the step that drives it.
+//! The step that spawns the crowd's trips. Housekeepers come in for their
+//! shift instead (`crowd/staff_shift.rs`).
 
-use crate::housekeeping::HK_MAIDS_PER_UNIT;
-
-use super::{crowd_is_full, make_person, spawn_trips};
+use super::{crowd_is_full, spawn_trips};
 use crate::clock::Clock;
 use crate::crowd::spawn_floors::spawn_floors;
-use crate::crowd::{Crowd, CROWD_SECONDS_PER_MINUTE};
+use crate::crowd::Crowd;
 use crate::sim_loop::{weather_for, Weather};
 use crate::tower::Tower;
-
-#[derive(Debug, PartialEq, Eq)]
-pub enum StaffSpawn {
-    Sent,
-    Full,
-    NoRoute,
-}
-
-pub fn spawn_staff(
-    crowd: &mut Crowd,
-    tower: &Tower,
-    from: i64,
-    to: i64,
-    dest_x: f64,
-    clean_unit_id: i64,
-    clean_minutes: f64,
-    from_x: Option<f64>,
-) -> StaffSpawn {
-    if crowd.staff_count >= max_staff_for(tower) {
-        return StaffSpawn::Full;
-    }
-    let Some(r) = crowd.staff_route(tower, from, to, from_x, Some(dest_x)) else {
-        return StaffSpawn::NoRoute;
-    };
-    let i = make_person(crowd, tower, r, dest_x, None);
-    let p = &mut crowd.people[i];
-    if let Some(fx) = from_x {
-        p.x = fx;
-    }
-    p.staff = true;
-    p.clean_unit_id = Some(clean_unit_id);
-    p.linger_for = Some(clean_minutes * CROWD_SECONDS_PER_MINUTE);
-    crowd.staff_count += 1;
-    StaffSpawn::Sent
-}
-
-/// `maxStaffFor`. It runs for every staff spawn attempt inside
-/// housekeeping's loop over rooms and crews, so the crews come from a
-/// memoized count (`Tower::housekeeping_units`, keyed on revision and unit
-/// count) where the TypeScript keeps `staffCeiling` per revision (#1143).
-pub fn max_staff_for(tower: &Tower) -> i64 {
-    tower.housekeeping_units() * HK_MAIDS_PER_UNIT
-}
 
 /// `spawnStep`. `population` is the tower's `totalPopulation` as the step's
 /// dispatch pass summed it; nothing between that pass and this call changes

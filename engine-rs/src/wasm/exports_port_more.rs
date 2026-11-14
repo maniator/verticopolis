@@ -85,6 +85,18 @@ impl Engine {
         crate::view::view_frame(&self.sim, full.as_bool() == Some(true))
     }
 
+    // The people window of the frame above (`view::PeopleWindow`): from the
+    // next `viewFrame` on, its people are only those within floors
+    // `floorLo..=floorHi` and tiles `xLo..=xHi`, padded so every rider of a
+    // car on screen comes along. A number that is not finite, or an empty
+    // range, clears it, and every person goes again. The camera only: the
+    // game steps every person whatever it is, and nothing saves it.
+    #[wasm_bindgen(js_name = setPeopleWindow)]
+    pub fn set_people_window(&self, floor_lo: f64, floor_hi: f64, x_lo: f64, x_hi: f64) {
+        let window = crate::view::PeopleWindow::new(floor_lo, floor_hi, x_lo, x_hi);
+        crate::view::set_people_window(&self.sim, window);
+    }
+
     // The labels and subtypes changed after the meta revision `since`, as
     // JSON `{ revision, full, units: [[id, label, subtype], ...] }`
     // (`view::meta_since`). Read raw: a `since` of 0, or of anything but a

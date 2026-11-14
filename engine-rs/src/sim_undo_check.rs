@@ -37,9 +37,9 @@ use crate::tower::{Transport, Unit, UnitState};
 use crate::undo::{puts_back, Step, TransportChange, UnitChange, UnitFacts, UnitUse};
 
 /// Why a step was not applied. Nothing changed. `sellable` says the player
-/// can sell the build instead, which a lobby tile and a Classic permanent
-/// room no fire gutted never allow, and a burning room allows only once the
-/// fire is out.
+/// can sell the build instead, which a lobby tile the mode keeps and a
+/// Classic permanent room no fire gutted never allow, and a burning room
+/// allows only once the fire is out.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum StepRefused {
     /// The step needs more cash than the tower has.
@@ -406,11 +406,13 @@ impl Simulation {
     }
 
     /// Whether the player could sell unit `u` instead of undoing its build,
-    /// as `Simulation::remove_facility` lets them: a lobby tile stays for
-    /// good, a burning unit waits for the fire, and a Classic permanent
-    /// room stays unless a fire gutted it.
+    /// as `Simulation::remove_facility` lets them: a lobby tile the mode
+    /// keeps stays for good (`Tower::lobby_stays`), a burning unit waits for
+    /// the fire, and a Classic permanent room stays unless a fire gutted it.
     fn sells(&self, u: &Unit) -> bool {
-        u.kind != Kind::Lobby && u.state != UnitState::Fire && !self.stays_for_good(u.kind, u.state)
+        !self.tower.lobby_stays(u)
+            && u.state != UnitState::Fire
+            && !self.stays_for_good(u.kind, u.state)
     }
 
     /// Whether each shaft `step` gives another span or other cars still

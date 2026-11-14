@@ -285,10 +285,11 @@
   #hint {
     display: none;
   }
-  /* The lobby height strip (#308): the tool card is in the drawer here, so
-     the 1 / 2 / 3 story choice floats over the tower while the Lobby tool is
-     armed. */
-  #lobby-height-strip:not([hidden]) {
+  /* The lobby height strip (#308) and the bulldoze drag strip: the tool
+     card is in the drawer here, so its choice floats over the tower while
+     the Lobby tool or the bulldozer is armed. */
+  #lobby-height-strip:not([hidden]),
+  #bulldoze-drag-strip:not([hidden]) {
     display: flex;
     position: absolute;
     left: max(10px, env(safe-area-inset-left));

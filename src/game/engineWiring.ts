@@ -1,4 +1,6 @@
 import type { GameApp } from "../main";
+import type { FacilityKind } from "../shared/types";
+import { dragRemoves } from "./bulldozeDrag";
 import { TowerEngine } from "../render/excalibur/TowerEngine";
 import { catalogFacility } from "../catalog/catalogTypes";
 import { snapX } from "../ui/placement";
@@ -42,6 +44,10 @@ interface DragGesture {
   /** The drag's paint run stopped because the game paused in a mode that
    *  refuses building while paused (#1936), and said so once. */
   pausedNoted?: boolean;
+  /** The kind a bulldoze drag first touched (#644). Unless the Bulldoze card
+   *  says a drag clears everything, the drag removes only this kind, so a
+   *  sweep across a floor's tiles leaves the elevator it crosses. */
+  bulldozes?: FacilityKind;
 }
 
 export function wireEngine(app: GameApp): void {
@@ -121,6 +127,7 @@ export function wireEngine(app: GameApp): void {
       drag = { gesture: app.undoGesture(), generation: app.enginePort.generation() };
     }
     if (app.tool.type === "bulldoze") {
+      if (picked && drag) drag.bulldozes = picked.kind;
       app.build.bulldozePicked(picked);
     } else if (app.tool.type === "build") {
       // Simple placements (strip paint, two-floor flight, room) happen on
@@ -161,7 +168,11 @@ export function wireEngine(app: GameApp): void {
       return;
     }
     if (app.tool.type === "bulldoze") {
-      if (dragActs()) app.build.bulldozePicked(picked, true); // drag: blocked tiles fail silently
+      if (!dragActs() || !picked || !drag) return;
+      // A drag removes only the kind it first touched (#644), unless the
+      // player picked Everything on the Bulldoze card.
+      drag.bulldozes ??= picked.kind;
+      if (dragRemoves(app.bulldozeDrag.clears, drag.bulldozes, picked.kind)) app.build.bulldozePicked(picked, true); // drag: blocked tiles fail silently
       return;
     }
     if (app.tool.type !== "build") return;

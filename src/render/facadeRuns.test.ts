@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { facadeGeometry } from "./facadeGeometry";
+import { lobbyHalls } from "./lobbyHalls";
 import { catalogFor } from "../tests/catalogFixture";
 import type { FacilityKind, Unit } from "../shared/types";
 
@@ -42,5 +43,52 @@ describe("the facade's runs: one per tower on each floor", () => {
       { min: 100, max: 120 },
       { min: 121, max: 140 },
     ]);
+  });
+});
+
+/**
+ * A tall lobby hall (#308) rises through the stories above its floor, and the
+ * fire escapes climb past them the way they climb past a normal floor. The
+ * catalog gives every lobby one story, so the hall's height comes from the
+ * engine's `lobbyHeights()` quads (`[floor, x0, x1, height]`).
+ */
+describe("the facade's runs beside a tall lobby hall", () => {
+  it("hangs escapes on every raised story of a 3-story sky lobby", () => {
+    const units = [...tiles(29, 100, 139), ...tiles(30, 100, 139, "lobby"), ...tiles(33, 100, 139)];
+    const { runs } = facadeGeometry(units, 33, MODERN, lobbyHalls([30, 100, 139, 3]));
+    for (const f of [30, 31, 32]) expect(runs.get(f)).toEqual([{ min: 100, max: 140 }]);
+    expect(runs.get(33)).toEqual([{ min: 100, max: 140 }]);
+  });
+
+  it("raises only the hall's own columns in a split tower", () => {
+    // Floor 45: a 2-story hall on the left tower, a 3-story hall in the
+    // middle tower, and a one-story lobby on the right tower.
+    const units = [...tiles(45, 10, 29, "lobby"), ...tiles(45, 50, 89, "lobby"), ...tiles(45, 120, 139, "lobby")];
+    const { runs } = facadeGeometry(units, 47, MODERN, lobbyHalls([45, 10, 29, 2, 45, 50, 89, 3]));
+    expect(runs.get(45)).toEqual([
+      { min: 10, max: 30 },
+      { min: 50, max: 90 },
+      { min: 120, max: 140 },
+    ]);
+    expect(runs.get(46)).toEqual([
+      { min: 10, max: 30 },
+      { min: 50, max: 90 },
+    ]);
+    expect(runs.get(47)).toEqual([{ min: 50, max: 90 }]);
+  });
+
+  it("hangs escapes on the side of a taller hall that stands past a shorter one", () => {
+    // A 3-story hall joined to a one-story hall: the raised stories end at
+    // the tall hall's own edge, where the revolving-door wall stands.
+    const units = [...tiles(30, 100, 119, "lobby"), ...tiles(30, 120, 139, "lobby")];
+    const { runs } = facadeGeometry(units, 32, MODERN, lobbyHalls([30, 120, 139, 3]));
+    expect(runs.get(30)).toEqual([{ min: 100, max: 140 }]);
+    expect(runs.get(31)).toEqual([{ min: 120, max: 140 }]);
+    expect(runs.get(32)).toEqual([{ min: 120, max: 140 }]);
+  });
+
+  it("keeps a lobby one story when no tall hall covers it", () => {
+    const { runs } = facadeGeometry(tiles(30, 100, 139, "lobby"), 30, MODERN);
+    expect(runs.has(31)).toBe(false);
   });
 });

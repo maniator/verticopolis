@@ -232,12 +232,13 @@ export interface BuildSpec {
   hardhat?: boolean;
 }
 
-/** Finalized geometry per build (owner-approved). Totals: seated 15, standing
- *  18, walker 24, hi-vis 22 pixels tall. A car's riders have no build: they
+/** Geometry per build. Totals: seated 18, standing 24, walker 24, hi-vis 22
+ *  pixels tall. Standing and seated match the crowd's average person, so
+ *  someone walking into a room keeps their size (#2116). A car's riders have no build: they
  *  are drawn at the size the crowd draws them (`personRider`). */
 export const BUILDS: Record<PersonBuild, BuildSpec> = {
-  seated: { head: 5, torso: 10, legs: 0, width: 6 },
-  standing: { head: 5, torso: 9, legs: 4, width: 6 },
+  seated: { head: 6, torso: 12, legs: 0, width: 6 },
+  standing: { head: 6, torso: 11, legs: 7, width: 6 },
   walker: { head: 5, torso: 13, legs: 6, width: 7 },
   hiVis: { head: 5, torso: 12, legs: 5, width: 7, hardhat: true },
 };
@@ -276,6 +277,36 @@ export function personFigure(ctx: CanvasRenderingContext2D, x: number, footY: nu
 /** A cast member in a build, wearing their own outfit unless a mood colors it. */
 function castFigure(ctx: CanvasRenderingContext2D, x: number, footY: number, build: PersonBuild, seed: number, mood: Mood): void {
   drawPerson(ctx, x, footY, CAST[castIndex(seed)], { lit: false, pose: "stand", empty: true, mood, dims: buildDims(build) });
+}
+
+/** A cast member asleep on their back, drawn with the same head, hair and
+ *  face as the day figures (#2116): the head on the pillow with its crown at
+ *  `headX + 1`, the face turned up, and a blanket in `blanket` pulled to the
+ *  chin over the body. The sleeper fills rows `headY - 1` to `headY + 5`
+ *  and columns `headX - 1` to `headX + 4 + len` (a bed shorter than six
+ *  pixels of blanket still gets three). Used by a hotel bed and a condo sofa
+ *  at night. */
+export function sleeper(ctx: CanvasRenderingContext2D, headX: number, headY: number, len: number, blanket: string, seed: number): void {
+  const hx = Math.round(headX);
+  const hy = Math.round(headY);
+  // The head takes six columns; the blanket runs from the chin to the end.
+  const blanketX = hx + 7;
+  const blanketLen = Math.max(3, Math.round(len) - 3);
+  // A seated build lying down: no legs, and a body that ends inside the
+  // blanket. The crown sits head + neck + torso + lap (8 + torso) pixels
+  // left of the foot point, so the foot point goes that far right of it.
+  const torso = Math.max(1, blanketLen - 2);
+  const dims: Dims = { legs: 0, torso, head: 6, seated: true, width: 4 };
+  // Nightclothes: a plain top, so no tie, stripe or badge reaches past a
+  // short body and out from under the blanket.
+  const look = { ...CAST[castIndex(seed)], topKind: "sweater", hiVis: false, badge: false } as const;
+  drawPerson(ctx, hx + 9 + torso, hy + 6, look, { lit: false, empty: true, pose: "stand", lying: true, dims });
+  ctx.fillStyle = blanket;
+  ctx.fillRect(blanketX, hy - 1, blanketLen, 7);
+  ctx.fillStyle = shade(blanket, 24); // the turned-down edge at the chin
+  ctx.fillRect(blanketX, hy - 1, 1, 7);
+  ctx.fillStyle = shade(blanket, -18); // the fold where it meets the bed
+  ctx.fillRect(blanketX + 1, hy + 5, blanketLen - 1, 1);
 }
 
 /** Named convenience builds. Each picks its cast member from the seed and

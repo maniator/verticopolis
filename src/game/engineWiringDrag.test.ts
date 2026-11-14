@@ -3,6 +3,7 @@ import type { GameApp } from "../main";
 import { wireEngine } from "./engineWiring";
 import { placeSimpleBuild, isPaintTool, isTransportTool } from "./buildPreview";
 import { NO_GESTURE } from "./appHistory";
+import { BulldozeDragChoice } from "./bulldozeDrag";
 
 /**
  * A build or bulldoze drag changes the tower only inside the undo gesture its
@@ -48,6 +49,7 @@ function makeApp(tool: Record<string, unknown>) {
     audio: { start: vi.fn() },
     keyboard: { pointerDrew: vi.fn(), followTower: vi.fn() },
     tool,
+    bulldozeDrag: new BulldozeDragChoice(),
     build: {
       bulldozePicked: vi.fn(),
       clearPaint: vi.fn(),
@@ -223,5 +225,83 @@ describe("a drag whose undo gesture closed", () => {
     hooks.onActionUp!();
     expect(app.build.tryBuildTransport).toHaveBeenCalledWith("elevatorStandard", 10, 1, 3);
     expect(app.commitUndo).toHaveBeenCalledOnce();
+  });
+});
+
+describe("a bulldoze drag removes only the kind it first touched (#644)", () => {
+  const FLOOR_TILE = (x: number) => ({ type: "unit", id: 0, kind: "floor", cell: { floor: 2, x } });
+  const SHAFT = { type: "transport", id: 9, kind: "elevatorStandard" };
+  const OFFICE = { type: "unit", id: 4, kind: "office" };
+
+  it("sweeps a floor's tiles and leaves the elevator it crosses", () => {
+    const { app, hooks } = makeApp({ type: "bulldoze" });
+    hooks.onActionDown!(5, 2, false, FLOOR_TILE(5));
+    hooks.onActionMove!(6, 2, SHAFT);
+    hooks.onActionMove!(7, 2, OFFICE);
+    hooks.onActionMove!(8, 2, FLOOR_TILE(8));
+    expect(vi.mocked(app.build.bulldozePicked).mock.calls.map(([p]) => p)).toEqual([FLOOR_TILE(5), FLOOR_TILE(8)]);
+  });
+
+  it("removes the elevator when the drag starts on it, and nothing else", () => {
+    const { app, hooks } = makeApp({ type: "bulldoze" });
+    hooks.onActionDown!(6, 2, false, SHAFT);
+    hooks.onActionMove!(7, 2, FLOOR_TILE(7));
+    expect(vi.mocked(app.build.bulldozePicked).mock.calls.map(([p]) => p)).toEqual([SHAFT]);
+  });
+
+  it("takes the kind of the first thing it reaches when it starts on empty sky", () => {
+    const { app, hooks } = makeApp({ type: "bulldoze" });
+    hooks.onActionDown!(1, 2, false, null);
+    hooks.onActionMove!(2, 2, null);
+    hooks.onActionMove!(3, 2, OFFICE);
+    hooks.onActionMove!(4, 2, SHAFT);
+    hooks.onActionMove!(5, 2, { ...OFFICE, id: 5 });
+    expect(vi.mocked(app.build.bulldozePicked).mock.calls.slice(1).map(([p]) => p)).toEqual([OFFICE, { ...OFFICE, id: 5 }]);
+  });
+
+  it("starts fresh on the next press", () => {
+    const { app, hooks } = makeApp({ type: "bulldoze" });
+    hooks.onActionDown!(5, 2, false, FLOOR_TILE(5));
+    hooks.onActionUp!();
+    hooks.onActionDown!(6, 2, false, SHAFT);
+    expect(app.build.bulldozePicked).toHaveBeenLastCalledWith(SHAFT);
+  });
+});
+
+describe("a bulldoze drag sweeps more than one thing", () => {
+  const LOBBY_TILE = (x: number) => ({ type: "unit", id: 0, kind: "lobby", cell: { floor: 15, x } });
+  const FLOOR_TILE = (x: number) => ({ type: "unit", id: 0, kind: "floor", cell: { floor: 15, x } });
+  const SHAFT = { type: "transport", id: 9, kind: "elevatorExpress" };
+  const OFFICE = { type: "unit", id: 4, kind: "office" };
+  const swept = (app: ReturnType<typeof makeApp>["app"]) => vi.mocked(app.build.bulldozePicked).mock.calls.map(([p]) => p);
+
+  it("clears every sky lobby tile it crosses, past the shaft in the hall", () => {
+    const { app, hooks } = makeApp({ type: "bulldoze" });
+    hooks.onActionDown!(100, 15, false, LOBBY_TILE(100));
+    for (const x of [101, 102, 103]) hooks.onActionMove!(x, 15, LOBBY_TILE(x));
+    hooks.onActionMove!(104, 15, SHAFT);
+    hooks.onActionMove!(105, 15, LOBBY_TILE(105));
+    expect(swept(app)).toEqual([100, 101, 102, 103, 105].map(LOBBY_TILE));
+  });
+
+  it("clears everything it crosses once the Bulldoze card says Everything", () => {
+    const { app, hooks } = makeApp({ type: "bulldoze" });
+    app.bulldozeDrag.pick("everything");
+    hooks.onActionDown!(100, 15, false, LOBBY_TILE(100));
+    hooks.onActionMove!(101, 15, SHAFT);
+    hooks.onActionMove!(102, 15, OFFICE);
+    hooks.onActionMove!(103, 15, FLOOR_TILE(103));
+    hooks.onActionMove!(104, 15, LOBBY_TILE(104));
+    expect(swept(app)).toEqual([LOBBY_TILE(100), SHAFT, OFFICE, FLOOR_TILE(103), LOBBY_TILE(104)]);
+  });
+
+  it("goes back to one kind when the card says One kind again", () => {
+    const { app, hooks } = makeApp({ type: "bulldoze" });
+    app.bulldozeDrag.pick("everything");
+    app.bulldozeDrag.pick("one kind");
+    hooks.onActionDown!(100, 15, false, LOBBY_TILE(100));
+    hooks.onActionMove!(101, 15, SHAFT);
+    hooks.onActionMove!(102, 15, LOBBY_TILE(102));
+    expect(swept(app)).toEqual([LOBBY_TILE(100), LOBBY_TILE(102)]);
   });
 });

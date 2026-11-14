@@ -41,6 +41,12 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 30
     steps:
+      # `.claude/skills` is a committed symlink to `.agents/skills` (#827).
+      # Git for Windows checks a symlink out as a text file unless this is on;
+      # the runner is an administrator, so it can create the link.
+      - name: Check out symlinks as links
+        run: git config --global core.symlinks true
+
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
