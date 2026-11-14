@@ -307,7 +307,11 @@ pub struct Transport {
     /// does, so a hand-edited fraction re-saves unchanged and never matches a
     /// floor.
     pub skip_floors: Option<Vec<f64>>,
-    /// True only for imported Classic PC TDT express shafts; persisted in saves.
+    /// `preserveBasementStops`: an express whose basement skips are its own
+    /// (the player's, or an imported TDT's). Every express built or loaded
+    /// since express elevators began serving the basements carries it; a
+    /// load clears the basement skips of a shaft without it, which the old
+    /// lobby-only rule had set.
     pub preserve_basement_stops: bool,
     pub schedule: Option<Schedule>,
     /// How many times anyone has gotten on: a car's boarding, a rider stepping

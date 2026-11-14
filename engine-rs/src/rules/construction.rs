@@ -73,13 +73,6 @@ impl GameMode {
         self == GameMode::Modern
     }
 
-    /// Whether an express elevator keeps the below-lobby stops a loaded
-    /// tower asked it to keep (`preserveBasementStops`, set by a PC TDT
-    /// import). Classic honors it; Modern ignores the flag.
-    pub fn keeps_preserved_basement_stops(self) -> bool {
-        self == GameMode::Classic
-    }
-
     /// Whether a lobby on `floor` may rise more than one story (#308). The
     /// PC original raises only the ground lobby, to two stories with Ctrl
     /// or three with Ctrl+Shift held at its first placement (the Read Me

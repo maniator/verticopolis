@@ -157,7 +157,7 @@ impl Tower {
             car_load: None,
             load: 0,
             skip_floors: None,
-            preserve_basement_stops: false,
+            preserve_basement_stops: kind == Kind::ElevatorExpress,
             schedule: None,
             rides: 0,
         };
@@ -178,39 +178,6 @@ impl Tower {
         }
     }
 
-    /// `setExpressStops`: skip every non-lobby floor strictly inside the span.
-    pub fn set_express_stops(&mut self, id: i64) {
-        let lobbies = self.lobby_floors();
-        let Some(i) = self.transport_index_edit(id) else {
-            return;
-        };
-        let (bottom, top) = (self.transports[i].bottom, self.transports[i].top);
-        let skip: Vec<f64> = (bottom + 1..top)
-            .filter(|fl| !lobbies.contains(fl))
-            .map(|fl| fl as f64)
-            .collect();
-        self.transports[i].skip_floors = Some(skip);
-        self.revision += 1;
-        if self.transports[i].schedule.is_some() {
-            let stops = self.stops_of(&self.transports[i]);
-            let t = &mut self.transports[i];
-            t.schedule = Some(t.schedule.as_ref().unwrap().snap_homes_to_stops(&stops));
-        }
-    }
-
-    pub fn sync_express_stops_for_floor(&mut self, floor: i64) {
-        let has_lobby = self.floor_has_lobby(floor);
-        let ids: Vec<i64> = self
-            .transports
-            .iter()
-            .filter(|t| t.kind == Kind::ElevatorExpress && t.bottom < floor && floor < t.top)
-            .map(|t| t.id)
-            .collect();
-        for id in ids {
-            self.set_stop(id, floor, has_lobby);
-        }
-    }
-
     pub fn set_stop(&mut self, id: i64, floor: i64, stop: bool) -> bool {
         let Some(i) = self.transport_index_edit(id) else {
             return false;
@@ -222,7 +189,8 @@ impl Tower {
         if floor == t.bottom || floor == t.top {
             return true;
         }
-        let lobby_only = t.kind == Kind::ElevatorExpress && !self.floor_has_lobby(floor);
+        let lobby_only =
+            t.kind == Kind::ElevatorExpress && !is_basement(floor) && !self.floor_has_lobby(floor);
         let in_tall_lobby = self.raised_lobby_at(floor, t.x, t.width).is_some();
         if stop && (lobby_only || in_tall_lobby) {
             return false;
@@ -344,7 +312,8 @@ impl Tower {
         }
         if kind == Kind::ElevatorExpress {
             // Keep old strict-interior choices, drop the new endpoints, and
-            // skip newly interior non-lobby floors. Former endpoints no longer
+            // skip newly interior non-lobby floors above the basements.
+            // Former endpoints no longer
             // qualify for an unconditional stop after an extension.
             let mut skip: Vec<f64> = Vec::new();
             for &f in self.transports[i].skip_floors.as_deref().unwrap_or(&[]) {
@@ -359,7 +328,7 @@ impl Tower {
                     continue;
                 }
                 let f = fl as f64;
-                if !self.floor_has_lobby(fl) && !skip.contains(&f) {
+                if !is_basement(fl) && !self.floor_has_lobby(fl) && !skip.contains(&f) {
                     skip.push(f);
                 }
             }

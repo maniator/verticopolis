@@ -34,6 +34,7 @@ mod elevator_waiting_floors;
 mod elevator_width_migration;
 mod elevator_width_migration_load;
 mod event_fx;
+mod express_basement_stops;
 mod faq_complete;
 mod faq_complete_mechanics;
 mod fixed_step;

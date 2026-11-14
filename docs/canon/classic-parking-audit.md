@@ -49,7 +49,7 @@ These stay separate. Evidence for one is not evidence for another, and no implem
 | H5 | Suite demand counts occupied suites, not built suites | Counts built suites |
 | H6 | Missing office parking lowers office evaluation, at some ratio of offices to stalls | Halves move-in only |
 | H7 | Evaluation damage persists after the cause is fixed | Not modeled |
-| H8 | Express elevators stop at every underground floor | Our loader strips the file's basement express stops |
+| H8 | Express elevators stop at every underground floor | Fixed in #2221: an express stops at every basement floor it passes, and a loaded `.TDT` keeps the file's own basement stops |
 
 ## What the engine does today
 
@@ -190,7 +190,7 @@ The full spec is `release-3.0/classic-parking/pc-experiments-parking-spec-2026-1
 
 Each step applies only if an experiment shows the rule. They are separate changes in separate PRs, and none touches Modern.
 
-1. **Express basement stops (H8, P8).** Stop `coerce_express_stops` and `set_express_stops` from dropping underground stops for Classic, to match MAN and the file. This is a loader and rule fix with its own risk (row 24 of `classic-shop-audit.md`) and it must land before step 2 or any rule that reads the service of a floor. Compatibility: changes reachability of basement floors for any imported or saved Classic tower that has an express over its basements, usually toward more service. The conformance lock and the catalog digest may move.
+1. **Express basement stops (H8, P8). Done in #2221, in both modes.** Stop `coerce_express_stops` and `set_express_stops` from dropping underground stops for Classic, to match MAN and the file. This is a loader and rule fix with its own risk (row 24 of `classic-shop-audit.md`) and it must land before step 2 or any rule that reads the service of a floor. Compatibility: changes reachability of basement floors for any imported or saved Classic tower that has an express over its basements, usually toward more service. The conformance lock and the catalog digest may move.
 2. **Transport to the garage floor (H2), only if E2 shows it.** Filter the working-stall set by whether the stall's floor is in the served-floor set the tower already memoizes per revision (`is_floor_served`). No per-guest search and no new state. Cost: one hash lookup per stall the flood reaches, at most 512 stalls, and the flood itself is the part worth memoizing per revision if profiling asks for it (hot-path checklist applies). Compatibility: after step 1 the nine real saves lose no stalls. A save with an unserved garage floor would read short on its next load, so the existing suite-parking toast and the stats "working" count must say why, and the change takes the next app version because players can notice it.
 3. **Ramp column to the lobby (H1), only if E2 shows it.** This is #307, with its safeguards unchanged: a healing migration that builds the missing ramp so no existing parking dies, one spatial change per load, one honest toast, and no legacy flag in the flood. It does not ride with step 2 unless the experiments show the two are one rule.
 4. **Occupied demand (H5) and office evaluation (H6)**, only if E6 and E7 show them. Demand by occupied suites is a count over units the shortage test already walks. An office evaluation term reads the same shortage flag in `satisfaction_step`.

@@ -11,7 +11,6 @@ fn each_named_rule_answers_per_mode() {
     for mode in MODES {
         let classic = mode == GameMode::Classic;
         assert_eq!(mode.reserves_top_floor_for_wedding_hall(), classic);
-        assert_eq!(mode.keeps_preserved_basement_stops(), classic);
         assert_eq!(mode.lets_player_choose_calendar(), !classic);
         assert_eq!(mode.escalators_on_office_floors(), !classic);
         assert_eq!(mode.housekeeping_sends_nearest_crew(), !classic);

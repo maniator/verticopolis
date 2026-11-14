@@ -134,7 +134,7 @@ describeWithCodec("imported TDT basement express stop persistence", () => {
     }
   });
 
-  it("preserves zero/mixed skips twice without changing older or Modern saves", () => {
+  it("preserves zero/mixed skips twice, and an older save loads with its basement stops on", () => {
     const source = load("TOWER7.TDT").save;
     const index = source.transports.findIndex((t) =>
       t.kind === "elevatorExpress" && t.bottom <= -2 && t.top > 4);
@@ -160,15 +160,22 @@ describeWithCodec("imported TDT basement express stop persistence", () => {
         expect(after?.preserveBasementStops).toBe(true);
       }
     }
+    // A save from before express elevators stopped at every basement (no
+    // marker) loads with its basement stops on and the marker set; the
+    // skip above ground stays.
     const legacy = structuredClone(source);
-    legacy.transports[index].skipFloors = [sky];
+    legacy.transports[index].skipFloors = [baseline, sky];
+    // The importer marks every express; an older save has no marker.
+    delete legacy.transports[index].preserveBasementStops;
     const oldShaft = loaded(legacy).transports.find((t) => t.id === original.id);
-    expect(oldShaft?.preserveBasementStops).toBeUndefined();
-    expect(oldShaft?.skipFloors).toContain(baseline);
+    expect(oldShaft?.preserveBasementStops).toBe(true);
+    expect(oldShaft?.skipFloors).not.toContain(baseline);
+    expect(oldShaft?.skipFloors).toContain(sky);
+    // Modern keeps a marked shaft's basement skip as Classic does.
     legacy.mode = "modern";
     legacy.transports[index].preserveBasementStops = true;
     const modern = loaded(legacy).transports.find((t) => t.id === original.id);
-    expect(modern?.preserveBasementStops).toBeUndefined();
+    expect(modern?.preserveBasementStops).toBe(true);
     expect(modern?.skipFloors).toContain(baseline);
   });
 });

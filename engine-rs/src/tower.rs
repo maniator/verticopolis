@@ -9,6 +9,7 @@ use crate::crowd::fasthash::FastMap;
 use crate::facilities::*;
 use crate::lot::Lot;
 
+mod express_stops;
 mod lobby_halls;
 mod metro;
 mod placement;
@@ -424,47 +425,6 @@ impl Tower {
         self.reindex_transports();
         *self.memo.borrow_mut() = Default::default();
         self.revision += 1;
-    }
-
-    /// `coerceExpressStops()`: re-assert the lobby-only express rule on load.
-    pub fn coerce_express_stops(&mut self) {
-        let mut changed = false;
-        for i in 0..self.transports.len() {
-            if self.transports[i].kind != Kind::ElevatorExpress {
-                continue;
-            }
-            let (bottom, top) = (self.transports[i].bottom, self.transports[i].top);
-            let mut skip: Vec<f64> = self.transports[i].skip_floors.clone().unwrap_or_default();
-            // Never infer PC TDT provenance from skip-list signs. An authentic
-            // file can skip none, some, or all underground floors.
-            let keep_basement_stops = self.mode.keeps_preserved_basement_stops()
-                && bottom < 0
-                && self.transports[i].preserve_basement_stops;
-            for fl in bottom + 1..top {
-                if keep_basement_stops && fl <= 0 {
-                    continue;
-                }
-                if !self.floor_has_lobby(fl) && !skip.contains(&(fl as f64)) {
-                    skip.push(fl as f64);
-                }
-            }
-            skip.retain(|&f| f != bottom as f64 && f != top as f64);
-            let mut next: Vec<f64> = Vec::new();
-            for f in skip {
-                if !next.contains(&f) {
-                    next.push(f);
-                }
-            }
-            next.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-            let before = self.transports[i].skip_floors.clone().unwrap_or_default();
-            if next != before {
-                self.transports[i].skip_floors = Some(next);
-                changed = true;
-            }
-        }
-        if changed {
-            self.revision += 1;
-        }
     }
 }
 

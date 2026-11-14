@@ -251,9 +251,7 @@ pub(crate) fn assemble(
                     .unwrap_or(0.0)
                     .clamp(-MAX_SAFE_INTEGER, MAX_SAFE_INTEGER) as i64,
                 skip_floors,
-                preserve_basement_stops: mode.keeps_preserved_basement_stops()
-                    && kind == Kind::ElevatorExpress
-                    && bottom < 0
+                preserve_basement_stops: kind == Kind::ElevatorExpress
                     && t.get("preserveBasementStops").and_then(Value::as_bool) == Some(true),
                 schedule: Schedule::coerce(t.get("schedule"), cars, bottom, top),
                 rides: 0,

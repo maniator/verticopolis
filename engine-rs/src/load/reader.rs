@@ -34,14 +34,12 @@ pub fn deserialize(raw: &Value) -> Result<Simulation, String> {
 }
 
 /// [`deserialize`] for a save that [`import_tdt`](crate::import_tdt) made from
-/// a 1994 `.TDT` file. It also keeps the basement stops of the original's
-/// express elevators, which a normal load would drop.
+/// a 1994 `.TDT` file. It also keeps the basement floors the original's
+/// express elevators skip, which a normal load of a shaft without
+/// `preserveBasementStops` would turn back on.
 #[doc(hidden)]
 pub fn deserialize_tdt(raw: &Value) -> Result<Simulation, String> {
     let mut sim = deserialize(raw)?;
-    if sim.mode != GameMode::Classic {
-        return Ok(sim);
-    }
     let Some(source) = raw.get("transports").and_then(Value::as_array) else {
         return Ok(sim);
     };
@@ -67,17 +65,28 @@ pub fn deserialize_tdt(raw: &Value) -> Result<Simulation, String> {
             .filter_map(Value::as_f64)
             .filter(|v| v.is_finite())
             .collect();
-        let Some(skips) = shaft.skip_floors.as_mut() else {
-            continue;
-        };
-        // Mark only shafts actually read from the original TDT. The marker
-        // remains on ordinary .vctower saves and is checked during reload.
+        // The load cleared the basement skips and marked the shaft; put back
+        // the ones the file wrote, inside the span. The marker stays on the
+        // .vctower saves made from here, so a reload keeps them.
         shaft.preserve_basement_stops = true;
-        let before = skips.len();
-        // Only remove basement skips added by general load normalization.
-        // Authored underground skips and all above-ground rules survive.
-        skips.retain(|floor| *floor > 0.0 || saved_skips.contains(floor));
-        changed |= skips.len() != before;
+        let (bottom, top) = (shaft.bottom as f64, shaft.top as f64);
+        let have = shaft.skip_floors.as_deref().unwrap_or(&[]);
+        let mut back: Vec<f64> = saved_skips
+            .iter()
+            .copied()
+            .filter(|&floor| crate::facilities::is_basement_stop(floor))
+            .filter(|&floor| floor > bottom && floor < top && !have.contains(&floor))
+            .collect();
+        back.dedup();
+        if back.is_empty() {
+            continue;
+        }
+        // A shaft whose load left no skip list still takes the file's own.
+        let skips = shaft.skip_floors.get_or_insert_with(Vec::new);
+        skips.extend(back);
+        skips.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+        skips.dedup();
+        changed = true;
     }
     if changed {
         sim.tower.revision += 1;
