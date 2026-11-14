@@ -19,6 +19,14 @@ impl GameMode {
         self == GameMode::Modern
     }
 
+    /// Whether a tower may hold more than one metro station
+    /// (`facilities::MODERN_METRO_STATION_CAP`): Modern does, all on one
+    /// line; Classic keeps SimTower's single station. Read through
+    /// `facilities::build_cap_in`.
+    pub fn builds_several_metro_stations(self) -> bool {
+        self == GameMode::Modern
+    }
+
     /// Whether party halls and theaters share one cap of 16
     /// (`facilities::CLASSIC_VENUE_POOL`, #1932): Classic does, as the 1994
     /// save keeps one table of 16 records for both; Modern caps each kind at
@@ -108,6 +116,15 @@ impl GameMode {
     /// either end inward. Modern allows the gap. Read through
     /// `Tower::removal_reason`.
     pub fn removes_mid_floor_tiles(self) -> bool {
+        self == GameMode::Modern
+    }
+
+    /// Whether the bulldozer may take out a sky lobby tile. The 1994 game
+    /// keeps every lobby for good, so Classic refuses. Modern sells a sky
+    /// lobby tile like a floor tile (owner, 2026-11-14), a mistaken tall
+    /// hall included; the ground lobby stays in both modes. Read through
+    /// `Tower::removal_reason`.
+    pub fn removes_lobby_tiles(self) -> bool {
         self == GameMode::Modern
     }
 

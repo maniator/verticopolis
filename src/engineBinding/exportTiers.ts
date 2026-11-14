@@ -279,6 +279,9 @@ export const BINDING_EXPORT_TIERS = {
   // The view's frame reader remembers what it last sent, so a second caller
   // would see only what moved since the host's read: the host's alone.
   viewFrame: LOOP,
+  // The people window of that reader's frames: the host's camera, set each
+  // frame before the read.
+  setPeopleWindow: LOOP,
   free: LOOP,
 
   // The tooling harnesses' reads (src/game/toolingTower.ts, #1875 step 4): a

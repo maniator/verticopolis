@@ -106,7 +106,7 @@ describe("pointer down routing", () => {
       arrowHit: { up: { x: 380, y: 280, w: 40, h: 40 } },
     });
     handlers.down(ptr({ sx: 400, sy: 300 }));
-    expect(e.arrowDrag).toEqual({ end: "up" });
+    expect(e.arrowDrag).toEqual({ end: "up", shaft: null });
     expect(e.gesture).toBeNull();
   });
 
@@ -126,7 +126,7 @@ describe("pointer down routing", () => {
   it("a second finger forming a pinch ends a live arrow drag and clears previews", () => {
     const { e, handlers } = inputEng({ onExtendEnd: vi.fn() });
     handlers.down(ptr({ pointerId: 1, sx: 100, sy: 100 })); // single
-    e.arrowDrag = { end: "down" };
+    e.arrowDrag = { end: "down", shaft: null };
     handlers.down(ptr({ pointerId: 2, sx: 300, sy: 300 })); // pinch-start
     expect(e.onExtendEnd).toHaveBeenCalledTimes(1);
     expect(e.arrowDrag).toBeNull();
@@ -179,7 +179,7 @@ describe("pointer move routing", () => {
 
   it("an arrow drag extends toward the dragged-to floor", () => {
     const { e, handlers } = inputEng({ onExtendTo: vi.fn() });
-    e.arrowDrag = { end: "up" };
+    e.arrowDrag = { end: "up", shaft: null };
     handlers.move(ptr({ sx: 400, sy: 120 }));
     expect(e.onExtendTo).toHaveBeenCalledTimes(1);
     expect(e.onExtendTo.mock.calls[0][0]).toBe("up");
@@ -227,7 +227,7 @@ describe("pointer up routing", () => {
       onExtendEnd: vi.fn(),
       sim: { tower: { getTransport: () => ({ top: 20, bottom: 4 }), unitAt: () => undefined } },
     });
-    e.arrowDrag = { end: "up" };
+    e.arrowDrag = { end: "up", shaft: 5 };
     e.moved = 0;
     handlers.up(ptr({ sx: 400, sy: 300 }));
     expect(e.onExtendTo).toHaveBeenCalledWith("up", 21); // top + 1
@@ -257,7 +257,7 @@ describe("pointer up routing", () => {
       arrowHit: { up: { x: 380, y: 280, w: 40, h: 40 } },
     });
     handlers.down(ptr({ sx: 400, sy: 300, touch: true }));
-    expect(e.arrowDrag, "the touch landed on the arrow").toEqual({ end: "up" });
+    expect(e.arrowDrag, "the touch landed on the arrow").toEqual({ end: "up", shaft: 5 });
     handlers.cancel(ptr({ sx: 400, sy: 300, touch: true }));
     expect([e.onExtendTo.mock.calls.length, e.onExtendEnd.mock.calls.length]).toEqual([0, 1]);
     expect(e.arrowDrag).toBeNull();

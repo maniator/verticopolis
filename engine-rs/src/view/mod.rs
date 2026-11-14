@@ -40,6 +40,7 @@ mod signature;
 mod structure;
 #[cfg(any(feature = "wasm", test))]
 mod tally;
+mod window;
 
 use std::cell::RefCell;
 
@@ -55,6 +56,7 @@ pub use structure::structure_view;
 pub(crate) use tally::TallyPasses;
 #[cfg(any(feature = "wasm", test))]
 pub(crate) use tally::{CensusTally, RecyclingCounts};
+pub use window::{PeopleWindow, FLOOR_PAD};
 
 use crate::sim::Simulation;
 
@@ -83,6 +85,14 @@ impl Default for ViewState {
 /// first one's read. `full` asks for every room.
 pub fn view_frame(sim: &Simulation, full: bool) -> Vec<f64> {
     sim.tower.view.reader.borrow_mut().frame(sim, full)
+}
+
+#[doc(hidden)]
+/// Set the people window of the tower's own reader (the binding's), so its
+/// frames carry only the people a view draws; `None` sends every person.
+/// The window stays with the reader, so a new tower starts with none.
+pub fn set_people_window(sim: &Simulation, window: Option<PeopleWindow>) {
+    sim.tower.view.reader.borrow_mut().set_people_window(window);
 }
 
 #[cfg(test)]

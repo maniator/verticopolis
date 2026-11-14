@@ -403,11 +403,19 @@ impl Simulation {
             self.tower.remove_transport(id);
         }
         for (k, want) in put {
+            let mut shrank = false;
             if let Some(t) = self.tower.get_transport_mut(want.id) {
+                let before = t.car_positions.len();
                 t.take_config_from(want);
+                shrank = t.car_positions.len() < before;
                 if let TransportChange::Restore { left, .. } = &mut back.transports[k].change {
                     **left = t.clone();
                 }
+            }
+            // A step that takes cars away lets their riders off now, as a
+            // sale does, so the opposite step cannot seat them again (#855).
+            if shrank {
+                self.let_off_riders_past_fleet(want.id);
             }
         }
         inserts.sort_by_key(|&(at, _)| at);

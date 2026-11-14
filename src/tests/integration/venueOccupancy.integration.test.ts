@@ -10,12 +10,15 @@ const facility = (kind: FacilityKind) => catalogFacility(catalogFor("modern"), k
 
 /**
  * Guards commercial venue occupant behavior:
- *   - A tenanted venue shows `f.population` as its ambient occupant count
- *     during open hours (for the renderer heatmap and lit-window sprite).
- *   - The same venue shows 0 outside its open hours so the heatmap goes dark
- *     after closing time.
- *   - Population values scale with footprint:
- *     shop 20, fastFood 25, restaurant 35.
+ *   - A meal venue's occupants (fast food, restaurant, food hall) are the
+ *     customers inside it (`customersIn`), the people who walked in and have
+ *     not left, so the room draws the people who are really there. An open
+ *     one nobody has reached shows 0.
+ *   - A retail shop gets no visitor trips yet, so while open it draws its
+ *     full population; otherwise it would draw empty all day.
+ *   - A venue with nobody inside shows 0 outside its open hours too.
+ *   - Population values (the most customers a venue holds) scale with
+ *     footprint: shop 20, fastFood 25, restaurant 35.
  */
 
 function setHour(sim: Draft, hour: number): void {
@@ -51,7 +54,15 @@ function venueFixture(leg: Leg, kind: "fastFood" | "restaurant" | "shop", hour: 
   setHour(draft, hour);
   const sim = new PortSim(leg, draft);
   const venue = () => sim.state.tower.units.find((u) => u.id === id)!;
-  return { sim, venue, triggerHour: () => sim.tick(60) };
+  // The live customer tally lives outside the state view; the room card reads it.
+  const customers = () => {
+    const n = sim.unitCard(id).customersIn;
+    return Number.isNaN(n) ? 0 : n;
+  };
+  // A venue that counts its visitors leaves its head count out of the save,
+  // so the head count is read from the room card too.
+  const occupants = () => sim.unitCard(id).occupants;
+  return { sim, venue, customers, occupants, triggerHour: () => sim.tick(60) };
 }
 
 // ---- Population values match footprint ----------------------------------------
@@ -78,23 +89,28 @@ describe("commercial venue population values scale with footprint", () => {
 
 // ---- Occupants during open hours ----------------------------------------------
 
-describeEngines("occupants equals f.population while venue is open", (leg: Leg) => {
-  it("fast food is open at 12:00 and shows its population", () => {
-    const { venue, triggerHour } = venueFixture(leg, "fastFood", 11); // positioned just before target
+describeEngines("an open venue's occupants are the customers inside it", (leg: Leg) => {
+  it("fast food is open at 12:00 and shows its customers, not its population", () => {
+    const { sim, venue, customers, triggerHour, occupants } = venueFixture(leg, "fastFood", 11); // positioned just before target
+    sim.setCustomersIn(venue().id, 3);
     triggerHour(); // fires onHour -> updatePresence at hour 12
-    expect(venue().occupants).toBe(facility("fastFood").population);
+    expect(occupants()).toBeGreaterThan(0);
+    expect(occupants()).toBe(customers());
+    expect(occupants()).toBeLessThan(facility("fastFood").population);
   });
 
-  it("restaurant is open at 12:00 (lunch window) and shows its population", () => {
-    const { venue, triggerHour } = venueFixture(leg, "restaurant", 11);
+  it("restaurant open at 12:00 (lunch window) with nobody inside shows 0", () => {
+    const { customers, triggerHour, occupants } = venueFixture(leg, "restaurant", 11);
     triggerHour();
-    expect(venue().occupants).toBe(facility("restaurant").population);
+    expect(occupants()).toBe(customers());
   });
 
-  it("shop is open at 14:00 and shows its population", () => {
-    const { venue, triggerHour } = venueFixture(leg, "shop", 13);
+  it("a shop, which no trip is sent to yet, draws its full population at 14:00", () => {
+    const { sim, venue, customers, triggerHour, occupants } = venueFixture(leg, "shop", 13);
+    sim.setCustomersIn(venue().id, 2);
     triggerHour();
-    expect(venue().occupants).toBe(facility("shop").population);
+    expect(customers()).toBe(2);
+    expect(occupants()).toBe(facility("shop").population);
   });
 });
 
@@ -102,51 +118,60 @@ describeEngines("occupants equals f.population while venue is open", (leg: Leg) 
 
 describeEngines("occupants is 0 while venue is closed, even when tenanted", (leg: Leg) => {
   it("fast food is closed at 4:00 (before 7am open)", () => {
-    const { venue, triggerHour } = venueFixture(leg, "fastFood", 3);
+    const { triggerHour, occupants } = venueFixture(leg, "fastFood", 3);
     triggerHour();
-    expect(venue().occupants).toBe(0);
+    expect(occupants()).toBe(0);
   });
 
   it("restaurant is closed at 9:00 (between lunch and dinner windows)", () => {
-    const { venue, triggerHour } = venueFixture(leg, "restaurant", 8);
+    const { triggerHour, occupants } = venueFixture(leg, "restaurant", 8);
     triggerHour();
-    expect(venue().occupants).toBe(0);
+    expect(occupants()).toBe(0);
   });
 
   it("shop is closed at 22:00 (after 21:00 close)", () => {
-    const { venue, triggerHour } = venueFixture(leg, "shop", 21);
+    const { triggerHour, occupants } = venueFixture(leg, "shop", 21);
     triggerHour();
-    expect(venue().occupants).toBe(0);
+    expect(occupants()).toBe(0);
+  });
+
+  it("a closed fast food still draws the diners finishing a meal inside", () => {
+    const { sim, venue, customers, occupants, triggerHour } = venueFixture(leg, "fastFood", 3);
+    sim.setCustomersIn(venue().id, 2);
+    triggerHour(); // 4:00, closed
+    expect(customers()).toBe(2);
+    expect(occupants()).toBe(2);
   });
 
   it("a tenanted-but-closed venue shows 0, not its population", () => {
     // Restaurant is only open 11-14 and 17-23; confirm zero at 3am.
-    const { venue, triggerHour } = venueFixture(leg, "restaurant", 2);
+    const { venue, triggerHour, occupants } = venueFixture(leg, "restaurant", 2);
     expect(venue().state).toBe("occupied");
     triggerHour();
-    expect(venue().occupants).toBe(0);
+    expect(occupants()).toBe(0);
   });
 });
 
 // ---- Transition at boundary ---------------------------------------------------
 
-describeEngines("occupants flips at open/close hour boundaries", (leg: Leg) => {
-  it("fast food goes dark after 22:00 and lights up again at 7:00", () => {
-    // Inside open window: 21:00 (22-1)
-    const { sim, venue, triggerHour } = venueFixture(leg, "fastFood", 20);
+describeEngines("occupants follow the customers across the open and close hours", (leg: Leg) => {
+  it("fast food shows its customers at 21:00, nobody after closing, and nobody at its 7:00 opening", () => {
+    const { sim, venue, customers, triggerHour, occupants } = venueFixture(leg, "fastFood", 20);
+    sim.setCustomersIn(venue().id, 4);
     triggerHour(); // now at hour 21
-    expect(venue().occupants).toBe(facility("fastFood").population);
+    expect(occupants()).toBe(customers());
 
-    // Past close: advance one more hour to 22:00
+    // Past close: the customers leave and the room empties with them.
+    sim.setCustomersIn(venue().id, 0);
     triggerHour();
-    expect(venue().occupants).toBe(0);
+    expect(occupants()).toBe(0);
 
-    // Re-open at 7:00: the engine runs through the night to 6:00, then steps
-    // into the hour that opens the venue.
+    // Re-open at 7:00: the room opens empty; nobody appears until someone walks in.
     sim.tick(8 * 60);
     expect(sim.state.clock.hour).toBe(6);
     triggerHour(); // now at hour 7
-    expect(venue().occupants).toBe(facility("fastFood").population);
+    expect(occupants()).toBe(customers());
+    expect(occupants()).toBeLessThan(facility("fastFood").population);
   });
 });
 
@@ -176,19 +201,32 @@ describeEngines("v2 spatial congestion reads live customers, never the commercia
   });
 });
 
-describeEngines("a venue's first open hour shows its ambient crowd", (leg: Leg) => {
+describeEngines("a venue's first open hour", (leg: Leg) => {
+  it("an empty (never-visited) fast food opens in the hour traffic first reaches it, with no stand-in crowd", () => {
+    // updatePresence runs before collectTrafficIncome inside one onHour; the
+    // economy flips the venue occupied at its first open hour. A meal venue
+    // draws the customers inside it, and nobody has arrived yet.
+    const { venue, customers, triggerHour, occupants } = venueFixture(leg, "fastFood", 6, (draft, id) => {
+      const unit = draft.tower.units.find((u) => u.id === id)!;
+      unit.state = "empty";
+      unit.occupants = 0;
+    }); // fast food opens at 7
+    triggerHour(); // crosses into 7:00: traffic flips it occupied
+    expect(venue().state).toBe("occupied");
+    expect(occupants()).toBe(customers());
+    expect(occupants()).toBeLessThan(facility("fastFood").population);
+  });
+
   it("an empty (never-visited) shop is lit in the same hour traffic first opens it", () => {
-    // updatePresence runs before collectTrafficIncome inside one onHour, so a
-    // newly built venue used to spend its whole first open hour occupied but
-    // with 0 occupants (dark windows, cold heatmap, no statistical demand).
-    // The economy now stamps the ambient crowd at the empty-to-occupied flip.
-    const { venue, triggerHour } = venueFixture(leg, "shop", 9, (draft, id) => {
+    // No trip goes to a shop yet, so the economy stamps its full population
+    // at the empty-to-occupied flip rather than leave it dark all hour.
+    const { venue, triggerHour, occupants } = venueFixture(leg, "shop", 9, (draft, id) => {
       const unit = draft.tower.units.find((u) => u.id === id)!;
       unit.state = "empty";
       unit.occupants = 0;
     }); // shop opens at 10
     triggerHour(); // crosses into 10:00: traffic flips it occupied
     expect(venue().state).toBe("occupied");
-    expect(venue().occupants).toBe(facility("shop").population);
+    expect(occupants()).toBe(facility("shop").population);
   });
 });

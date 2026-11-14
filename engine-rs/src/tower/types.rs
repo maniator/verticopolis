@@ -209,7 +209,7 @@ impl Unit {
         if self.satisfaction != 1.0 {
             m.insert("satisfaction".into(), json!(self.satisfaction));
         }
-        if self.occupants != 0 && f.attendance.is_none() {
+        if self.occupants != 0 && !self.kind.counts_visitors() {
             m.insert("occupants".into(), json!(self.occupants));
         }
         if self.ever_occupied {

@@ -66,37 +66,6 @@ impl Tower {
         n
     }
 
-    /// The metro rules: SimTower's station is three stories on B8 to B10 with
-    /// its tunnel along the bottom row, and nothing can be built below it. The
-    /// bottom basement row holds only the station and its tunnel.
-    fn metro_reason(&self, kind: Kind, floor: i64) -> Option<String> {
-        if kind == Kind::Metro {
-            if self.floor_bounds().0 < floor {
-                return Some(
-                    "Nothing can be built below the metro station. Clear the floors under it first."
-                        .into(),
-                );
-            }
-            if self.floor_has_room(floor) {
-                return Some("The metro's bottom row is its tunnel. Clear it first.".into());
-            }
-            return None;
-        }
-        let structural = kind.is_structural();
-        if let Some(station) = self.metro_floor() {
-            if floor < station {
-                return Some("Nothing can be built below the metro station.".into());
-            }
-            if floor == station && !structural {
-                return Some("The metro's bottom row is its tunnel.".into());
-            }
-        }
-        if floor == MIN_FLOOR && !structural {
-            return Some("The bottom basement row is only for the metro tunnel.".into());
-        }
-        None
-    }
-
     fn room_placement_reason(
         &self,
         kind: Kind,
@@ -329,26 +298,6 @@ impl Tower {
             reason: None,
             unit_id: Some(id),
         }
-    }
-
-    /// `removalReason`: why a structure tile cannot be sold. In Classic that
-    /// includes a floor tile with floor on both sides
-    /// ([`GameMode::removes_mid_floor_tiles`](crate::clock::GameMode::removes_mid_floor_tiles)).
-    pub fn removal_reason(&self, id: i64) -> Option<&'static str> {
-        let u = self.get_unit(id)?;
-        if !u.kind.is_structural() {
-            return None;
-        }
-        if u.kind == Kind::Lobby {
-            return Some("Lobby tiles are permanent. The 1994 game does not let you remove them.");
-        }
-        if u.floor >= 1 && !self.structure_span_free(u.floor + 1, u.x, u.width) {
-            return Some("Remove the story above first. Floors can't hang in midair.");
-        }
-        if !self.mode.removes_mid_floor_tiles() && self.floor_on_both_sides(u.floor, u.x, u.width) {
-            return Some(super::MID_FLOOR_GAP);
-        }
-        None
     }
 
     /// `placeStructureRun`: passes over the tiles until none place.

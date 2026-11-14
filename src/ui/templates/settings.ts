@@ -68,7 +68,7 @@ export function settingsTemplate(version: string, showBuilding = false, engine =
       </div>
       ${passersBy}
       ${building}
-      <p class="set-version">Verticopolis <span class="app-version">v${version}</span>${engine}</p>
+      <p class="set-version">Verticopolis™ <span class="app-version">v${version}</span>${engine}</p>
       <div class="modal-actions"><button class="btn primary" data-act="close" autofocus>Close</button></div>
     `;
 }

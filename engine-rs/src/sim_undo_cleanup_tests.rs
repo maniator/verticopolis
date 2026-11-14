@@ -116,6 +116,56 @@ fn the_riders_of_a_car_or_a_shaft_a_step_takes_away_get_off() {
     assert!(!anyone_rides(&sim, id), "off the shaft");
 }
 
+/// Where the person on board is now: their state and the car they hold.
+fn rider(sim: &Simulation) -> (PState, Option<i64>) {
+    let p = sim.crowd.people.last().unwrap();
+    (p.state, p.car_index)
+}
+
+#[test]
+fn a_car_sold_and_bought_back_before_a_step_does_not_seat_its_rider_again() {
+    let mut sim = tower();
+    let id = lift(&mut sim);
+    assert!(sim.add_car(id).ok);
+    on_board(&mut sim, id, 1);
+    let sold = sim.set_cars(id, 1);
+    assert!(sold, "the second car is sold");
+    // No motion step runs between the two edits, as with the game paused.
+    assert_eq!(rider(&sim), (PState::Done, None), "off the car at the sale");
+    assert_eq!(sim.crowd.car_riders[&(id, 1)], 0, "and its seat free");
+    assert!(sim.set_cars(id, 2), "a car bought back");
+    assert_eq!(rider(&sim), (PState::Done, None), "not on the new car");
+    assert!(!anyone_rides(&sim, id));
+}
+
+#[test]
+fn a_rider_on_a_car_the_fleet_keeps_stays_on_board() {
+    let mut sim = tower();
+    let id = lift(&mut sim);
+    assert!(sim.set_cars(id, 3));
+    on_board(&mut sim, id, 1);
+    assert!(sim.set_cars(id, 2), "the third car is sold");
+    assert_eq!(rider(&sim), (PState::Riding, Some(1)));
+    assert_eq!(sim.crowd.car_riders[&(id, 1)], 1);
+}
+
+#[test]
+fn an_undo_that_takes_a_car_away_lets_its_rider_off_before_the_redo() {
+    let mut sim = tower();
+    let id = lift(&mut sim);
+    let car = gesture(&mut sim, |s| assert!(s.add_car(id).ok)).unwrap();
+    on_board(&mut sim, id, 1);
+    let redo = sim.apply_undo_step(&car).unwrap();
+    assert_eq!(rider(&sim), (PState::Done, None), "off the car at the undo");
+    sim.apply_undo_step(&redo).unwrap();
+    assert_eq!(
+        sim.tower.get_transport(id).unwrap().cars,
+        2,
+        "the car is back"
+    );
+    assert_eq!(rider(&sim), (PState::Done, None), "and its rider is not");
+}
+
 #[test]
 fn a_shaft_put_back_comes_back_with_its_cars_empty() {
     let mut sim = tower();

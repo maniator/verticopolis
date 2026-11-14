@@ -1,4 +1,6 @@
 import type { GameApp } from "../main";
+import type { FacilityKind } from "../shared/types";
+import { dragRemoves } from "./bulldozeDrag";
 import { TowerEngine } from "../render/excalibur/TowerEngine";
 import { catalogFacility } from "../catalog/catalogTypes";
 import { snapX } from "../ui/placement";
@@ -42,6 +44,10 @@ interface DragGesture {
   /** The drag's paint run stopped because the game paused in a mode that
    *  refuses building while paused (#1936), and said so once. */
   pausedNoted?: boolean;
+  /** The kind a bulldoze drag first touched (#644). Unless the Bulldoze card
+   *  says a drag clears everything, the drag removes only this kind, so a
+   *  sweep across a floor's tiles leaves the elevator it crosses. */
+  bulldozes?: FacilityKind;
 }
 
 export function wireEngine(app: GameApp): void {
@@ -61,7 +67,12 @@ export function wireEngine(app: GameApp): void {
   // also zooms). Before this, a floor/lobby/parking drag only ever panned on
   // touch, so mobile couldn't paint a run at all. On mouse the pan key
   // (Space or Shift, resolved in towerInputCamera) pans with any tool armed.
-  app.engine.classifyDown = (button, touch, panKey) => classifyGesture(catalogOf(app), app.tool, button, touch, panKey);
+  // The pan key as the latest press went down, which its tap reads (#589).
+  let pressPanKey = false;
+  app.engine.classifyDown = (button, touch, panKey) => {
+    pressPanKey = panKey;
+    return classifyGesture(catalogOf(app), app.tool, button, touch, panKey);
+  };
   // Space pans only while the game follows it (inputKeys), read per press.
   app.engine.spacePanKey = (press) => app.spacePanKey(press);
 
@@ -79,6 +90,9 @@ export function wireEngine(app: GameApp): void {
       return;
     }
     if (!touch) return; // mouse pan-taps with a build/bulldoze tool do nothing
+    // A held pan key (Space or Shift on a touchscreen laptop) promises the
+    // press only pans, so its tap builds and bulldozes nothing either (#589).
+    if (pressPanKey) return;
     // A mode that refuses building while paused (Classic, #1936) places nothing.
     if (app.tool.type === "build" && refuseAppPlacementWhilePaused(app)) return;
     app.captureUndo(app.tool.type === "bulldoze" ? "Bulldoze" : `Build ${catalogFacility(catalogOf(app), app.tool.kind).name}`);
@@ -113,6 +127,7 @@ export function wireEngine(app: GameApp): void {
       drag = { gesture: app.undoGesture(), generation: app.enginePort.generation() };
     }
     if (app.tool.type === "bulldoze") {
+      if (picked && drag) drag.bulldozes = picked.kind;
       app.build.bulldozePicked(picked);
     } else if (app.tool.type === "build") {
       // Simple placements (strip paint, two-floor flight, room) happen on
@@ -153,7 +168,11 @@ export function wireEngine(app: GameApp): void {
       return;
     }
     if (app.tool.type === "bulldoze") {
-      if (dragActs()) app.build.bulldozePicked(picked, true); // drag: blocked tiles fail silently
+      if (!dragActs() || !picked || !drag) return;
+      // A drag removes only the kind it first touched (#644), unless the
+      // player picked Everything on the Bulldoze card.
+      drag.bulldozes ??= picked.kind;
+      if (dragRemoves(app.bulldozeDrag.clears, drag.bulldozes, picked.kind)) app.build.bulldozePicked(picked, true); // drag: blocked tiles fail silently
       return;
     }
     if (app.tool.type !== "build") return;

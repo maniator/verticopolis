@@ -2,6 +2,7 @@ import { createAppHistory, type AppHistory } from "./game/appHistory";
 import type { FacilityKind } from "./shared/types";
 import type { TransportView, UnitView } from "./simport/view";
 import { TowerEngine, type Picked } from "./render/excalibur/TowerEngine";
+import { endArrowDrag } from "./render/excalibur/pressLifecycle";
 import { AudioEngine } from "./audio/Audio";
 import { SaveGame } from "./storage/SaveGame";
 import { loadPrefs, type Prefs } from "./storage/Prefs";
@@ -26,9 +27,11 @@ import type { FrameErrorEntry } from "./game/crashReport";
 import { wireControllers, runBootFlow } from "./game/appBoot";
 import { wireEngine } from "./game/engineWiring";
 import { bindKeys } from "./game/inputKeys";
+import { watchLostRelease } from "./game/lostRelease";
 import { SPEEDS, applySpeed } from "./game/frameLoop";
 import { placeSimpleBuild, updateBuildPreview, isTransportTool, pickedAt, clearBuildRefusal, refreshBuildPreview } from "./game/buildPreview";
 import { LobbyHeightChoice, trackLobbyHeightKeys } from "./game/lobbyHeight";
+import { BulldozeDragChoice } from "./game/bulldozeDrag";
 import { toggleMute, setVolume, toggleReducedMotion, toggleSteadyClock, isSteadyClock, applyReducedMotion, togglePassersBy, isPassersBy, applyPassersBy } from "./game/audioPrefs";
 import { showStats, showSaves, saveToSlot, loadFromSlot, deleteSlot } from "./game/appModals";
 import { refreshTraffic } from "./game/trafficHud";
@@ -151,6 +154,8 @@ class GameApp implements GameAppPorts {
   buildAnchor: { tile: number; floor: number; oTile: number; oFloor: number; lifting: boolean } | null = null;
   /** The lobby tool's height (#308): the card's pick, or Ctrl / Ctrl+Shift held. @internal */
   readonly lobbyHeight = new LobbyHeightChoice();
+  /** What a bulldoze drag clears: one kind (#644) or everything. @internal */
+  readonly bulldozeDrag = new BulldozeDragChoice();
   /** Currently selected facility for the edit panel. @internal */
   selected: { type: "unit" | "transport"; id: number } | null = null;
   /** World cell the hover inspector tooltip is describing, so it can be
@@ -260,6 +265,8 @@ class GameApp implements GameAppPorts {
 
     wireEngine(this);
     bindKeys(this);
+    // A tower press let go off the canvas, or cut off by a blur, ends (#1014).
+    watchLostRelease(this);
     trackLobbyHeightKeys(this.lobbyHeight, window);
     this.lobbyHeight.onChange(() => refreshBuildPreview(this));
     // Prime the UI once before the first paint. The palette starts with every
@@ -346,7 +353,7 @@ class GameApp implements GameAppPorts {
   // Stats + save-slot modal commands, bodies in game/appModals.ts.
   showStats(): void { void showStats(this); }
   showSaves(): void { showSaves(this); }
-  saveToSlot(slot: number): void { saveToSlot(this, slot); }
+  saveToSlot(slot: number): boolean { return saveToSlot(this, slot); }
   loadFromSlot(slot: number | "auto"): void { loadFromSlot(this, slot); }
   deleteSlot(slot: number): void { deleteSlot(this, slot); }
 
@@ -424,6 +431,8 @@ class GameApp implements GameAppPorts {
 
   /** @internal */ clearSelection(): void {
     this.selected = null;
+    // An extend drag ends with its shaft's selection (#1014).
+    endArrowDrag(this.engine);
     this.engine.selectedId = null;
     this.ui.hideEditor();
   }

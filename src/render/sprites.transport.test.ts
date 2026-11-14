@@ -180,6 +180,39 @@ describe("transport, crane & event sprites paint", () => {
     expect(one.log.some((l) => l.includes("#241E14"))).toBe(true);
   });
 
+  // Beside a venue in Modern (venueFlights.ts) a one-story flight winds.
+  it("a one-story flight beside a venue is a spiral, and an escalator turns back halfway up", () => {
+    const steel = (log: string[]) =>
+      log.flatMap((l, i) => (l === "fillStyle=#6A6E76" ? [log.slice(i + 1).find((m) => m.startsWith("fillRect:"))] : []))
+        .filter((l): l is string => l !== undefined)
+        .map((l) => JSON.parse(l.slice("fillRect:".length)) as number[]);
+    const stair = spyCtx();
+    drawTransport(stair.ctx, transport({ kind: "stairs", bottom: 1, top: 2, width: 8 }), 0, 0, 88, FLOOR, true);
+    // The spiral's brass pole cap, and no straight flight's dark stringer.
+    expect(stair.log.filter((l) => l === "fillStyle=#C9A24B")).toHaveLength(1);
+    expect(stair.log.some((l) => l.includes("#241E14"))).toBe(false);
+
+    const esc = spyCtx();
+    drawTransport(esc.ctx, transport({ kind: "escalator", bottom: 1, top: 2, width: 8 }), 0, 0, 88, FLOOR, true);
+    // Two runs in the one story band: the upper one mirrored to climb back,
+    // and one steel landing at the turn, at the right, halfway up the band.
+    expect(esc.log.filter((l) => l === "scale:[-1,1]")).toHaveLength(1);
+    const landings = steel(esc.log).filter((r) => r[3] === 6);
+    expect(landings).toHaveLength(1);
+    expect(landings[0][0]).toBeGreaterThan(88 / 2);
+    expect(landings[0][1]).toBe(Math.floor(FLOOR + FLOOR / 2) - 12);
+
+    // The same flights not beside a venue stay straight and identical to before.
+    for (const kind of ["stairs", "escalator"] as const) {
+      const plain = spyCtx();
+      const unset = spyCtx();
+      drawTransport(plain.ctx, transport({ kind, bottom: 1, top: 2, width: 8 }), 0, 0, 88, FLOOR, false);
+      drawTransport(unset.ctx, transport({ kind, bottom: 1, top: 2, width: 8 }), 0, 0, 88, FLOOR);
+      expect(plain.sig()).toBe(unset.sig());
+      expect(plain.log.includes("scale:[-1,1]")).toBe(false);
+    }
+  });
+
   it("the wedding hall paints its five-floor wedding hall into the full rect", () => {
     // Floor 100's venue draws into whatever w x h rect the caller gives; drive
     // it at the two-floor (88px) height to prove the arch, aisle, and couple

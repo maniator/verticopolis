@@ -8,7 +8,9 @@
  *
  * The list is as long as the tower has structure runs, rooms and shafts (about
  * 3,000 marks for the large perf fixture's 43,000 units), because the view
- * already joins floor and lobby tiles into runs.
+ * already joins floor and lobby tiles into runs. A lobby hall taller than one
+ * story (#308, #2068) adds one lobby mark that covers its raised stories, so
+ * the map shows the hall at its full height as the tower view draws it.
  *
  * Painting order is the list's order: structure first, then rooms over it, then
  * shafts and stairs over both. The unit of a rectangle is the map's device pixel
@@ -16,6 +18,7 @@
  */
 import type { FacilityKind } from "../../shared/types";
 import type { StructureRunView, TransportView, UnitView } from "../../simport/view";
+import type { HallRun } from "../lobbyHalls";
 import { snappedBlock, type MapLayout, type MapRect } from "./geometry";
 
 /** Which painting layer a mark belongs to. */
@@ -31,12 +34,15 @@ export interface MapMark {
 /** What the draw list reads from the view. `floorsOf` is the kind's height in
  *  floors, read from the engine's catalog by the caller through
  *  `findViewKind(kind)?.floors` in `src/presentation/viewKinds.ts` (the map
- *  holds no facility table of its own). It is asked once per kind per build. */
+ *  holds no facility table of its own). It is asked once per kind per build.
+ *  `tallLobbies` is the engine's lobby halls taller than one story
+ *  (`RenderTower.tallLobbies().runs`), asked once per build. */
 export interface MapSource {
   readonly structure: ReadonlyArray<Pick<StructureRunView, "kind" | "floor" | "x" | "width" | "count">>;
   readonly rooms: ReadonlyArray<Pick<UnitView, "kind" | "floor" | "x" | "width">>;
   readonly transports: ReadonlyArray<Pick<TransportView, "kind" | "x" | "width" | "bottom" | "top">>;
   floorsOf(kind: FacilityKind): number;
+  tallLobbies(): ReadonlyArray<HallRun>;
 }
 
 /**
@@ -80,6 +86,15 @@ export function buildMapDrawList(layout: MapLayout, source: MapSource): MapMark[
     if (!(run.count >= 1) || !Number.isFinite(run.count)) continue;
     const rect = snappedBlock(layout, run.x, run.width * run.count, run.floor, 1);
     if (rect) bucket(structure, run.kind).push({ layer: "structure", kind: run.kind, rect });
+  }
+  // A tall hall's lobby tiles sit on its floor alone, so the runs above drew
+  // one story of it. The hall's own mark covers every story, columns `x0` to
+  // `x1` both included. It overlaps the one-story run under it with the same
+  // solid lobby fill, which changes no pixel there.
+  for (const hall of source.tallLobbies()) {
+    if (!(hall.height > 1) || !(hall.x1 >= hall.x0)) continue;
+    const rect = snappedBlock(layout, hall.x0, hall.x1 - hall.x0 + 1, hall.floor, Math.floor(hall.height));
+    if (rect) bucket(structure, "lobby").push({ layer: "structure", kind: "lobby", rect });
   }
   for (const room of source.rooms) {
     const rect = snappedBlock(layout, room.x, room.width, room.floor, floorsFor(source, room.kind, heights));

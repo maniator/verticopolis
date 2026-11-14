@@ -25,6 +25,111 @@ prompt already tells players it is an engine update and shows the new version.
 Entries below 1.51.1 were curated from the commit history after the fact, so they
 are documentation only: no build that a client fetches carries them.
 
+## 3.10.7
+
+- The Bulldoze card has a **Drag clears** choice. **One kind** (the default) keeps a drag to the kind of thing it started on; **Everything** lets one drag clear all it crosses. On a phone the choice sits in a strip over the tower while the bulldozer is armed.
+- A bulldoze drag now removes only the kind of thing it started on, so sweeping across a floor no longer takes out the elevator or the rooms it crosses. A single click still removes anything.
+
+## 3.10.6
+
+- Fast food, restaurants and food halls now show only the diners who are actually inside, and a quiet one looks quiet. They used to draw a full room whenever they were open.
+
+## 3.10.5
+
+- Modern: the bulldozer now takes out a sky lobby a tile at a time, tall halls included, for half of what each tile cost. The ground lobby stays, and Classic keeps every lobby as in 1994.
+- The bulldozer no longer takes the last floor tile out from under an elevator, stairway or escalator, which left the shaft hanging in midair.
+- Undo no longer takes a tall lobby out from under a floor you built on top of it.
+
+## 3.10.4
+
+- Fire escapes now run up every story beside a tall lobby, split-tower halls included, so they no longer break off beside the hall.
+- The roof crane stands with its mast on the middle of the top floor's widest stretch and sits on top of a tall lobby there. A top too narrow for its base, such as a one-tile spire, shows no crane.
+
+## 3.10.3
+
+- Studios and apartments can no longer be built in the basement, the same as condos, hotel rooms and offices. Towers that already have them underground still load and keep them.
+
+## 3.10.2
+
+- Housekeepers now come in through the lobby before their shift and leave through it at the end, and no longer appear at the Housekeeping room or vanish at a hotel room.
+- A housekeeper who finishes a room goes straight on to the nearest dirty one, and rides back to the Housekeeping room only when none is left, so a busy hotel is clean sooner in the afternoon.
+
+## 3.10.1
+
+- The VERTICOPOLIS badge at the top left of the game now carries its ™ mark, like the title screen. So do the version line in Settings and About this game, and the sprite gallery and missing-page titles.
+
+## 3.10.0
+
+- Modern towers can now build up to three Metro stations, all on the same line as the first. Riders split between them, someone going back to the train walks to the nearest one, and one train runs the line, calling at each station in turn.
+
+## 3.9.0
+
+- Saved Towers asks before a save replaces a tower in an occupied slot, unless it knows that slot holds the tower you're playing: that slot is marked This tower and still saves in one click.
+- A replaced or deleted slot can be put back with Undo.
+- A slot save that fails now says so inside Saved Towers, where a message used to be hidden behind the dialog.
+- Hotel guests and condo residents asleep at night are drawn as the same people you see by day, with their own face and hair on the pillow, instead of an older flat sketch.
+- A housekeeper riding an elevator stays inside the car at fast speeds, instead of jumping ahead of it and floating in the empty shaft.
+
+## 3.8.0
+
+- In Modern, a stairway right beside a cinema, party hall, metro station or aquatic center is drawn as a spiral staircase, and an escalator there turns back on a steel landing halfway up. They link the same two floors as before; only the look changes. Classic keeps straight flights, as in 1994.
+- Someone climbing a stack of one-story flights (an escalator up to a deck, then stairs on up from it) is drawn on the flight they are actually riding, instead of staying on the first one.
+
+## 3.7.4
+
+- A shop, restaurant or theater near a working Metro platform no longer warns that it is too far from a lobby, and does full business, as the 1994 game's basement shops beside the station did.
+
+## 3.7.3
+
+- Elevator cars show only the people who actually stepped in, one figure each, so a car no longer looks full with nobody aboard.
+- People riding an elevator stay aboard to their floor and step off there, instead of vanishing from the car partway through a slow ride.
+
+## 3.7.2
+
+- A shop or restaurant just above a tall lobby no longer says it is too far from a lobby. Distance to a tall lobby now counts from its top story, for tenants' ratings too.
+- People headed for an elevator walk straight to the back of its line and wait there, instead of stepping into the shaft and walking back out. When a car comes, they walk from the line into it instead of vanishing from where they stood.
+- An elevator car shows one figure for each passenger, as many as fit in the cab, so a whole line that gets on fills it.
+- People in rooms are drawn at the same size as people in the halls.
+- Hotel guests and condo residents sleep under a blanket at night instead of disappearing.
+- People on stairs and escalators climb along the flight from one landing to the other, instead of rising straight up its middle. On a tall lobby they wind around the spiral stair and turn back at each switchback platform.
+
+## 3.7.1
+
+- Elevator cars and people move smoothly again at every speed, instead of shaking as they did in 3.7.0.
+
+## 3.7.0
+
+- The title screen has a Sponsor link in its top-left corner, and the help site has a new Supporting Verticopolis section. The game stays free, with nothing locked.
+- The Verticopolis name now carries its ™ mark on the title screen, the help site, page titles and the pictures shown when a link is shared.
+- A Modern tower on the short 1994 calendar now shows each office's and apartment's rent as it actually arrives (a $10,000 office pays $333 every three days), with the rate you set beside it, instead of a figure it never pays.
+- When the game can't save your tower (a private window, blocked site storage or a full disk), a notice now stays on screen with the likely cause and an Export button, and it clears itself once saving works again.
+- While Security searches for a bomb, the tower stands still: elevators stop and tenants and visitors wait where they are until the bomb is found or goes off. Only the guards move. You can't build, bulldoze, sell, change an elevator, or undo and redo until the search ends. A tower with no Security to search keeps running and takes edits as usual.
+- The Map now shows a tall lobby at its full height instead of a one-floor strip.
+- On a phone, the room and elevator card now moves too: drag it by its blue title bar, and it goes back under the tools when you close it.
+- Drag the Map, the room and elevator card, and any dialog by its blue title bar to move it out of the way. The Map remembers where you put it, and a double-click on a title bar puts a window back.
+- The room and elevator card, the hover card and every dialog now wear the Map's compact title bar and close button, so the closable windows match.
+- The Map's View menu is bigger and easier to read on a computer.
+- The Map button in the corner of the tower view is bigger, with a map icon, so it is easy to find and to click.
+- People look like people: a varied cast of builds, skin tones, hair, outfits and things in hand, in both modes. Classic draws them flat; Modern lights them from the upper left.
+- People walk smoothly instead of hopping between game steps, with a walk cycle while they move.
+- Waiting people show how long they have waited: they check the time, then put their hands on their hips in amber, then throw their arms up in red.
+- Elevator cars glide between floors at every speed instead of stopping short and catching up, and people get in and out when the car is at their floor, at the same moment the cab's riders change.
+- People keep their size inside an elevator car, and waiting people face the elevator they are waiting for.
+- Housekeepers push their cart between rooms and vacuum while they clean one. The crew is six different people in one uniform.
+- The three game speeds are slower so you can watch people walk: 3, 15 and 50 game minutes a second (they were 10, 30 and 120). A game day takes 8 minutes, 96 seconds or 29 seconds.
+- When shown, decorative passers-by walk only the corridors of occupied floors in Modern, at half the old count, and stay off lobbies, stairs, escalators and the space in front of elevators and shops.
+- Classic towers no longer show decorative passers-by, matching the original.
+- Decorative passers-by are now off unless you turn on "Show decorative passers-by" in Settings (Modern only), and reduced motion hides them.
+- Decorative passers-by no longer turn red when the tower is stressed, so red always means a real person has waited too long.
+- A revolving door between lobby halls no longer jumps a turn when someone gets out of an elevator or off a flight right beside it.
+- The Help site's Tall lobbies section shows two Modern halls side by side with the door between them, by day and by night.
+- In Modern, each lobby hall keeps its own height, so a three-story hall and a two-story hall can stand side by side on one floor.
+- Where two lobby halls of different heights meet, a wooden revolving door now turns as people walk through it, in either direction at once.
+- A floor built beside a tall lobby hall no longer blocks it, and a shaft beside the hall still stops on every floor.
+- On a desktop window, the Tools list now fits without scrolling: when every tool will not fit, its rows get tighter, and on a short window it splits into two columns.
+- Click a group's name in the Tools window (Commercial, Living and so on) to fold its tools away, and click it again to bring them back. The game remembers which groups you folded.
+- The desktop Tools window has a button on its title bar that folds it into a thin strip to give the tower more room, and opens it again. The game remembers your choice.
+
 ## 3.6.0
 
 - The How to Play manual has a new page, Differences from the 1994 game, listing where a Classic tower plays like SimTower and where it doesn't yet.

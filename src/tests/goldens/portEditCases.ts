@@ -31,6 +31,9 @@ const BOTTOM = false;
 const SKIP_FLOOR = false; // markStop: the floor's stop off
 const ONLY_DEFAULT_PRICED = true; // rentBatch: leave custom prices alone
 const AUTO_BRIDGE_ON = true;
+/** Five-minute steps the four-star case may play while it waits for the
+ *  escalator to carry someone (a game day is 288 of them). */
+const ESCALATOR_WAIT_STEPS = 288;
 
 const span = (from: number, to: number) => Array.from({ length: to - from }, (_, i) => from + i);
 
@@ -139,6 +142,14 @@ function fourStarEdits(s: PortEditSession): void {
   s.done("move the camera", "setCamera", 180, 12, 1.5);
   s.readJson("the camera", (p) => p.view());
   s.play(60);
+  // Riders keep to their cars (3.7.3), so the crowd's rush can leave nobody
+  // on the escalator for a while: play on in short steps until someone walks
+  // to it and someone is midway on a route that never takes it, as the
+  // checks below need.
+  const escalator = s.shaftAt(1, 234).id;
+  for (let wait = 0; wait < ESCALATOR_WAIT_STEPS && !(s.walkingTo(escalator).length > 0 && s.midRouteAvoiding(escalator).length > 0); wait++) {
+    s.play(5);
+  }
 
   s.done("clear the tower's name", "nameTower", null);
   s.read("the tower's name", (p) => p.towerName());

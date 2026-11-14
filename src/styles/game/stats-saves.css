@@ -155,6 +155,29 @@ ul.slots .slot-actions .btn {
 .slot-file--alone {
   border-top: 0;
 }
+/* The live tower's own slot: a small sunken label after the slot's name, so
+   the one row that saves without asking is easy to find. */
+.slot-tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 5px;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--ink);
+  background: var(--panel-light);
+  box-shadow: var(--bevel-in);
+}
+/* The one-step Undo line under the slots, after a replace or a delete. */
+.slot-undo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0 0;
+}
+.slot-undo .btn {
+  padding: 3px 10px;
+  font-size: 11px;
+}
 .slot-actions {
   display: flex;
   gap: 6px;

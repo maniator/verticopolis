@@ -9,6 +9,8 @@
  * Pricing views read the engine's room tiers through one reader built on the
  * app's port, which stays the same engine object for the page life, and the
  * Traffic and Occupancy views read its heat cells through the renderer's sim.
+ * The Edit view reads the tall lobby halls there too, so a hall shows at its
+ * full height (#308).
  * The player drags the window by its title bar, and the spot they choose is
  * kept per layout class (`ui/overviewMapSpot.ts`).
  */
@@ -16,6 +18,7 @@ import type { GameApp } from "../main";
 import type { FacilityKind } from "../shared/types";
 import { findViewKind } from "../presentation/viewKinds";
 import { NO_ROOM_TIERS, RoomTierReader, type RoomTiers } from "../simport/roomTiers";
+import type { HallRun } from "../render/lobbyHalls";
 import { FLOOR, TILE } from "../render/scale";
 import { browserStorage, type MapLayoutClass } from "../ui/overviewMapPrefs";
 import { rememberMapSpot, storedMapSpot } from "../ui/overviewMapSpot";
@@ -71,6 +74,18 @@ function guardedHeat(app: GameApp): MapHeatSource {
   };
 }
 
+/** The lobby halls taller than one story, with the same engine guards: none
+ *  once the engine stopped or trapped (every lobby then draws one story). */
+function guardedHalls(app: GameApp): readonly HallRun[] {
+  if (engineTrapped() || isEngineStopped()) return [];
+  try {
+    return app.engine.sim.tower.tallLobbies().runs;
+  } catch (error) {
+    if (noteEngineThrow(error)) return [];
+    throw error;
+  }
+}
+
 /** Build the window for `app`, once (a second call does nothing). Call after
  *  the engine exists. */
 export function wireOverviewMap(app: GameApp): void {
@@ -114,6 +129,7 @@ export function wireOverviewMap(app: GameApp): void {
     },
     moveCamera: (center) => app.engine.applyView({ tile: center.tile, floor: center.floor }),
     floorsOf,
+    tallLobbies: () => guardedHalls(app),
     isPhone: () => app.mobileMq.matches,
     storage,
     views,

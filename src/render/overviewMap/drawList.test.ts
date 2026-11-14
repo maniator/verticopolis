@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import type { FacilityKind } from "../../shared/types";
 import { SKY_HEADROOM_FLOORS } from "../cameraBounds";
 import { buildMapDrawList, type MapSource } from "./drawList";
@@ -16,7 +16,7 @@ const HEIGHTS: Partial<Record<FacilityKind, number>> = { weddingHall: 5, metro: 
 const floorsOf = (k: FacilityKind): number => HEIGHTS[k] ?? 1;
 
 function source(over: Partial<MapSource> = {}): MapSource {
-  return { structure: [], rooms: [], transports: [], floorsOf, ...over };
+  return { structure: [], rooms: [], transports: [], floorsOf, tallLobbies: () => [], ...over };
 }
 
 describe("buildMapDrawList", () => {
@@ -27,6 +27,28 @@ describe("buildMapDrawList", () => {
   it("puts a floor run at its real tile and floor, one mark for the whole run", () => {
     const marks = buildMapDrawList(layout, source({ structure: [{ kind: "floor", floor: 3, x: 100, width: 5, count: 8 }] }));
     expect(marks).toEqual([{ layer: "structure", kind: "floor", rect: { x: 100, y: yOfLine(3), w: 40, h: 3 } }]);
+  });
+
+  it("draws a tall lobby hall over every story it rises, columns x0 to x1 both included (#308)", () => {
+    // The big-lobby save: a 3-story ground hall whose tiles sit on floor 1 alone.
+    const tallLobbies = vi.fn(() => [{ floor: 1, x0: 100, x1: 139, height: 3 }]);
+    const marks = buildMapDrawList(layout, source({ structure: [{ kind: "lobby", floor: 1, x: 100, width: 1, count: 40 }], tallLobbies }));
+    expect(tallLobbies).toHaveBeenCalledTimes(1);
+    expect(marks).toEqual([
+      { layer: "structure", kind: "lobby", rect: { x: 100, y: yOfLine(1), w: 40, h: 3 } },
+      { layer: "structure", kind: "lobby", rect: { x: 100, y: yOfLine(3), w: 40, h: 9 } },
+    ]);
+  });
+
+  it("draws a lobby one story where no tall hall covers it, and skips a hall that is not tall or has no columns", () => {
+    const structure = [{ kind: "lobby" as const, floor: 1, x: 0, width: 1, count: 20 }];
+    const halls = [
+      { floor: 1, x0: 0, x1: 9, height: 1 },
+      { floor: 1, x0: 9, x1: 0, height: 3 },
+      { floor: 1, x0: 0, x1: 9, height: NaN },
+    ];
+    const marks = buildMapDrawList(layout, source({ structure, tallLobbies: () => halls }));
+    expect(marks).toEqual([{ layer: "structure", kind: "lobby", rect: { x: 0, y: yOfLine(1), w: 20, h: 3 } }]);
   });
 
   it("draws a room on the floor it stands on", () => {

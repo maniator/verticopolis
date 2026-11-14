@@ -1,6 +1,6 @@
 [package]
 name = "verticopolis-engine"
-version = "1.29.0"
+version = "1.33.4"
 edition = "2021"
 rust-version = "1.97"
 license = "MIT"
@@ -34,6 +34,11 @@ path = "src/lib.rs"
 [[bin]]
 name = "conformance"
 path = "src/bin/conformance.rs"
+required-features = ["conformance"]
+
+[[bin]]
+name = "crowd_scale"
+path = "src/bin/crowd_scale.rs"
 required-features = ["conformance"]
 
 [[bin]]

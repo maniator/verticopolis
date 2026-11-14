@@ -82,6 +82,11 @@ export function ptr(opts: {
   shift?: boolean;
   ctrl?: boolean;
   meta?: boolean;
+  /** The DOM event's `isPrimary`: a first contact (a mouse, a pen, a first
+   *  finger). Left out, the press reads as neither. */
+  primary?: boolean;
+  /** The DOM event's `buttons` (0 is no button held). Left out, unknown. */
+  buttons?: number;
 }): unknown {
   const tile = opts.tile ?? 10;
   const floor = opts.floor ?? 5;
@@ -89,7 +94,15 @@ export function ptr(opts: {
     button: opts.button ?? ex.PointerButton.Left,
     pointerType: opts.touch ? "Touch" : "Mouse",
     pointerId: opts.pointerId ?? 1,
-    nativeEvent: { pointerId: opts.pointerId ?? 1, shiftKey: opts.shift ?? false, ctrlKey: opts.ctrl ?? false, metaKey: opts.meta ?? false },
+    nativeEvent: {
+      pointerId: opts.pointerId ?? 1,
+      pointerType: opts.touch ? "touch" : "mouse",
+      isPrimary: opts.primary,
+      buttons: opts.buttons,
+      shiftKey: opts.shift ?? false,
+      ctrlKey: opts.ctrl ?? false,
+      metaKey: opts.meta ?? false,
+    },
     worldPos: ex.vec(tile * TILE, -floor * FLOOR),
     screenPos: { x: opts.sx ?? 400, y: opts.sy ?? 300 },
   };

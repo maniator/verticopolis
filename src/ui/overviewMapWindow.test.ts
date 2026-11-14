@@ -204,6 +204,16 @@ describe("overview map window: frames (CAP-6)", () => {
     expect(sync.mock.results.map((x) => x.value)).toEqual([false, true]);
   });
 
+  it("draws a tall lobby hall at its full height from the halls it is given, read once per rebuild (#308)", () => {
+    const tallLobbies = vi.fn(() => [{ floor: 1, x0: 100, x1: 149, height: 3 }]);
+    const r = rig({ tallLobbies });
+    const model = (r.win as unknown as { model: { marks: ReadonlyArray<{ kind: string; rect: { h: number } }> } }).model;
+    r.win.frame();
+    expect(tallLobbies).toHaveBeenCalledTimes(1);
+    const [oneStory, hall] = model.marks.filter((m) => m.kind === "lobby");
+    expect(hall.rect.h).toBeGreaterThan(oneStory.rect.h * 2);
+  });
+
   it("does nothing at all while closed", () => {
     const r = rig({ phone: true });
     const source = vi.fn(() => r.source);

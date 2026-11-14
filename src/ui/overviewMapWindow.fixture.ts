@@ -45,7 +45,7 @@ export interface Rig {
 
 /** A window in a 200 by 288 CSS px body at a pixel ratio of 1, so map pixels
  *  are CSS pixels and the layout is `CROP`. */
-export function rig(opts: { phone?: boolean; stored?: string; views?: OverviewMapViews } = {}): Rig {
+export function rig(opts: { phone?: boolean; stored?: string; views?: OverviewMapViews; tallLobbies?: OverviewMapDeps["tallLobbies"] } = {}): Rig {
   document.body.innerHTML = '<section id="stage"><canvas id="view"></canvas></section>';
   const stage = document.getElementById("stage")!;
   const storage = new MemoryStore();
@@ -71,6 +71,7 @@ export function rig(opts: { phone?: boolean; stored?: string; views?: OverviewMa
       cam.posY = -c.floor * FLOOR;
     },
     floorsOf: () => 1,
+    tallLobbies: opts.tallLobbies,
     isPhone: () => phone.value,
     storage: storage as unknown as Storage,
     views: opts.views ?? null,

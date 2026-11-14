@@ -24,7 +24,10 @@ export type { EntranceKind } from "./structure/lobby";
 export {
   CRANE_W,
   CRANE_H,
+  CRANE_MAST_ANCHOR_X,
+  CRANE_MIN_ROOF_TILES,
   craneAnchorTile,
+  craneRoof,
   drawCrane,
   ESCAPE_W,
   drawEscapeStairs,

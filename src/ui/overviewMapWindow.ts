@@ -94,6 +94,7 @@ export class OverviewMapWindow {
       boxHeight: 1,
       topReserve: 0,
       floorsOf: deps.floorsOf,
+      tallLobbies: () => deps.tallLobbies?.() ?? [],
     };
     // First in the stage: positioned, it still paints over the world canvas,
     // and the inspector and editor cards after it paint over it.

@@ -4,6 +4,7 @@ import { noteTowerSwap } from "./engineFault";
 import { hudSource } from "./hudSource";
 import { touchOverviewMap } from "./overviewMapWiring";
 import { newRenderSim } from "./portAccess";
+import { forgetLiveTower } from "../storage/slotGuard";
 
 /** How the app follows the tower the engine holds now. A `"swap"` (a load, a new tower, an
  *  import, a tooling swap) is another tower. A `"restore"` (a tooling harness's tower) is too,
@@ -30,6 +31,10 @@ export function followEngineTower(app: GameApp, follow: TowerFollow): void {
   // report's entries (a report pairs them with the current tower's save). A step keeps them:
   // it is the same tower, and time does not go back.
   if (follow !== "step") {
+    // No manual slot is known to hold the tower that arrived, so saving it
+    // over an occupied slot asks first. A slot load names its slot again
+    // right after this (appModals' loadedFrom).
+    forgetLiveTower();
     app.shownWin = false;
     app.accMinutes = 0;
     app.lastMealRushDay = { breakfast: -1, lunch: -1, dinner: -1 };

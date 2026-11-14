@@ -7,7 +7,8 @@ import { wheelZoomDelta } from "../../shared/inputEvents";
 import { clampCameraY, fitZoom } from "../cameraBounds";
 import { stablePointerId } from "../pinchTracker";
 import { FLOOR, TILE } from "../scale";
-import { armLongPress, cancelLongPressOnMove, clearLongPress, finishLongPress } from "./longPress";
+import { armLongPress, cancelLongPressOnMove, finishLongPress } from "./longPress";
+import { cancelPress, endPress, isFirstContact, movesWithButtonUp } from "./pressLifecycle";
 import type { TowerEngine } from "./TowerEngine";
 import { towerCatalog } from "../../catalog/towerCatalog";
 
@@ -122,24 +123,15 @@ export function pickEntityAt(engine: TowerEngine, world: ex.Vector): Picked | nu
 }
 
 function pointerDown(engine: TowerEngine, ev: ex.PointerEvent): void {
+  // A primary press while a press is still open: that one lost its release (#1014).
+  if (isFirstContact(ev.nativeEvent)) cancelPress(engine);
   const contact = engine.tracker.down(stablePointerId(ev.pointerId, ev.nativeEvent), ev.screenPos.x, ev.screenPos.y);
   if (contact === "pinch-start") {
-    // End a live extend-arrow drag here, else pointerMove's arrowDrag branch
-    // resumes it (with a positional jump) after the pinch hands to a pan.
-    if (engine.arrowDrag) {
-      engine.onExtendEnd?.();
-      engine.arrowDrag = null;
-    }
-    // A second finger is a camera gesture, never a peek: cancel a pending
-    // hold and dismiss a showing peek (resetting the latch) so the pinch takes
-    // over and the survivor's release still seeds a pan, not a swallowed tap.
-    clearLongPress(engine);
-    if (engine.longPressFired) {
-      engine.longPressFired = false;
-      engine.onLongPressEnd?.();
-    }
-    if (engine.gesture === "action") engine.onActionCancel?.(); // it never releases
-    engine.gesture = null;
+    // A second finger is a camera gesture: end the press it interrupts (an
+    // extend drag pointerMove would resume with a jump, a pending or showing
+    // peek, a tool press that never releases), so the pinch takes over and the
+    // survivor's release seeds a pan, never a swallowed tap.
+    endPress(engine);
     engine.preview = null;
     engine.transportPreview = null;
     return;
@@ -167,7 +159,7 @@ function pointerDown(engine: TowerEngine, ev: ex.PointerEvent): void {
     else if (inRect(engine.arrowHit.down)) end = "down";
     if (end) {
       // A plain click extends one floor (on pointer-up); a drag goes floor-by-floor.
-      engine.arrowDrag = { end };
+      engine.arrowDrag = { end, shaft: engine.selectedId };
       engine.gesture = null;
       return;
     }
@@ -190,6 +182,8 @@ function pointerDown(engine: TowerEngine, ev: ex.PointerEvent): void {
 
 function pointerMove(engine: TowerEngine, ev: ex.PointerEvent): void {
   const pid = stablePointerId(ev.pointerId, ev.nativeEvent);
+  // The pressing mouse back with its button up let go off the canvas (#1014).
+  if (engine.tracker.tracks(pid) && movesWithButtonUp(ev.nativeEvent)) cancelPress(engine);
   const mv = engine.tracker.move(pid, ev.screenPos.x, ev.screenPos.y);
   if (engine.tracker.pinching) {
     if (mv) {
@@ -204,6 +198,8 @@ function pointerMove(engine: TowerEngine, ev: ex.PointerEvent): void {
   // (hybrid hardware) moves without pressing, and letting it through would
   // cancel a touch's pending peek or drive its gesture at the mouse position.
   if (engine.tracker.size > 0 && !engine.tracker.tracks(pid)) return;
+  // A drag lives as long as its shaft's selection: another pick ends it (#1014).
+  if (engine.arrowDrag && engine.arrowDrag.shaft !== engine.selectedId) cancelPress(engine);
   if (engine.arrowDrag) {
     engine.moved += Math.abs(ev.screenPos.y - engine.lastSy);
     engine.lastSy = ev.screenPos.y;
@@ -425,11 +421,11 @@ function censusCrowd(
       if (!def) continue; // a kind the catalog no longer knows: skip, never throw
       const unitCap = def.population > 0 ? def.population : (def.attendance ?? 0);
       if (unitCap > 0) {
-        // Population>0 commercial venues (restaurant, fast food, shop) stamp
-        // `occupants` to the full catalog population while open, so their live
-        // fill is `customersIn` (the routed-customer tally). Attendance venues
-        // (cinema, party hall) mirror `customersIn` into `occupants`, and every
-        // other kind owns `occupants` via updatePresence, so both read it.
+        // Population>0 commercial venues read `customersIn` (the routed-
+        // customer tally; a shop still draws its full population while open).
+        // Attendance venues (cinema, party hall) mirror `customersIn` into
+        // `occupants`, and every other kind owns `occupants` via
+        // updatePresence, so both read it.
         // (`customersIn` is not persisted: just after a save load a busy venue
         // reads empty for the seconds the crowd system takes to re-route diners
         // in. That is honest and self-heals; see the ambience backlog.)
