@@ -15,6 +15,10 @@ raised the version, so they are documentation only.
 There is no entry for 0.17.0, which only
 existed as a step inside a stacked branch.
 
+## 1.31.0 (2026-11-14)
+
+- `setPeopleWindow(floorLo, floorHi, xLo, xHi)` (and `ViewReader::set_people_window` with a `view::PeopleWindow` in the crate) makes `viewFrame` carry only the people on screen, padded so every rider of a car on screen comes along; a number that is not finite clears it.
+
 ## 1.30.3 (2026-11-14)
 
 - The far-from-a-lobby trade penalty for venues counts a working Metro platform (the station's middle story) as a place shoppers arrive, in both the hourly takings and the service diagnostics' `lobbyFar` fact.
