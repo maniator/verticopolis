@@ -25,6 +25,14 @@ prompt already tells players it is an engine update and shows the new version.
 Entries below 1.51.1 were curated from the commit history after the fact, so they
 are documentation only: no build that a client fetches carries them.
 
+## 3.12.1
+
+- A tower already rated TOWER no longer shows the congratulations again every time it loads.
+- After you answer a fire or bomb emergency on the day you win TOWER, the congratulations wait until you have read the outcome.
+- A tower file or stored save that is missing its clock or its list of rooms is refused instead of loading as an empty tower.
+- Undo no longer puts back a ground-floor or basement tile with nothing beside, above or below it.
+- A mouse's back and forward side buttons no longer act as a left click on the tower.
+
 ## 3.12.0
 
 - Shops and restaurants now get real customers from the city. Each one walks in at the ground lobby or gets off the Metro, rides your elevators to the shop and leaves the same way, so a shop draws only the people really inside it, and Today's patronage counts who actually got there.
