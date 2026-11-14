@@ -17,3 +17,4 @@ crate: none
 - Rest the pointer on a tool, or tab to it, and the status bar says what it does. On a phone, picking a tool shows a small card with its price and what it does until you place it.
 - A tower you load or come back to whose Bulletin has no saved messages yet opens it with a line saying so, so it is never blank.
 - Menus stay on screen on a phone, and a tap that closes a menu no longer builds on the tower under it.
+- The first time you open version 4, a short fireworks show welcomes you, with links to get started and to see what is new. The welcome stays until you close it, and once you do it does not show again.

@@ -26,6 +26,8 @@ import { initInstallAffordance, splashInstallOffered, activateInstall } from "./
 import { shouldWelcomeFounder } from "../founder";
 import { showTowerPicker } from "./appModals";
 import { clearSaveWarning, showSaveWarning } from "../ui/saveWarning";
+import { maybeLaunchFireworks } from "../ui/launchFireworks";
+import { reducedMotionActive } from "../storage/Prefs";
 
 /**
  * Constructor collaborators for `GameApp`, split out to keep the class body a
@@ -261,8 +263,7 @@ export function runBootFlow(app: GameApp, savedAtBoot?: number): void {
   wireOverviewMap(app);
   // The facility card and the dialogs move by their title bars too.
   wireMovableWindows(app);
-  // The Win95 menu bar, its Tower Info and Bulletin windows and the status bar.
-  wireMenus(app);
+  wireMenus(app); // the menu bar, its Tower Info and Bulletin windows, the status bar
   // First-run splash + onboarding (chrome only; the engine is untouched).
   app.onboarding = new OnboardingController({
     mq: app.mobileMq,
@@ -456,6 +457,9 @@ export function runBootFlow(app: GameApp, savedAtBoot?: number): void {
   // drop the static boot cover: on the splash path it uncovers the identical
   // title sky underneath, on the resume path the running tower.
   hideBootCover();
+
+  // The welcome fireworks, each boot until the player closes them, never over an unreadable save.
+  maybeLaunchFireworks(app.ui, () => reducedMotionActive(app.prefs, app.reduceMq.matches), app.saveWasCorrupt);
 
   // Tell the player plainly when their save couldn't be read, rather than
   // dropping them into a fresh tower with no explanation. Goes to the bulletin
