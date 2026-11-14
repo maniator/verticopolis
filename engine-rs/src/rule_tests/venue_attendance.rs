@@ -350,13 +350,14 @@ fn matinee_visitors_fill_the_cinema_and_the_mirror_follows() {
     assert_eq!(occupants(&sim, cinema), tally(&sim, cinema));
 }
 
-/// The cinema-bound visitors 1000 spawn draws send at 14:00, with an open
-/// shop on floor 2 as the competing daytime trip, the crowd and the house
-/// emptied after each draw so neither cap binds. The cinema charges ticket
-/// price `price` (#1950).
+/// The cinema-bound visitors 1000 spawn draws send at 14:00, with a second
+/// cinema on floor 2, at Normal and no blockbuster, as the competing visit
+/// (an open shop no longer sends one-way trips to compete), the crowd and
+/// both houses emptied after each draw so no cap binds. The cinema charges
+/// ticket price `price` (#1950).
 fn cinema_draws(blockbuster: bool, price: &str) -> usize {
     let (mut sim, cinema) = cinema_tower();
-    for x in 40..60 {
+    for x in 40..80 {
         for floor in 1..=3 {
             let kind = if floor == LOBBY {
                 Kind::Lobby
@@ -366,7 +367,7 @@ fn cinema_draws(blockbuster: bool, price: &str) -> usize {
             assert!(sim.tower.place(kind, floor, x).ok);
         }
     }
-    place_seated(&mut sim, Kind::Shop, 2, 44, UnitState::Occupied, 0);
+    let rival = place_seated(&mut sim, Kind::Cinema, 2, 40, UnitState::Occupied, 0);
     at_time(&mut sim, 0, 14);
     if blockbuster {
         sim.crowd.blockbusters.insert(cinema);
@@ -383,13 +384,15 @@ fn cinema_draws(blockbuster: bool, price: &str) -> usize {
             .filter(|p| p.meal_venue_id == Some(cinema))
             .count();
         sim.crowd.people.clear();
-        sim.tower.get_unit_mut(cinema).unwrap().customers_in = None;
+        for id in [cinema, rival] {
+            sim.tower.get_unit_mut(id).unwrap().customers_in = None;
+        }
     }
     sent
 }
 
-/// A blockbuster lists its cinema's visit twice, so more draws go to it:
-/// against the shop's one trip, two thirds of the draws instead of half.
+/// A blockbuster lists its cinema's visit twice and weighs its seat 2 to 1,
+/// so more draws go to it than to the ordinary film beside it.
 #[test]
 fn a_blockbuster_draws_more_visits_than_an_ordinary_film() {
     let (plain, boosted) = (cinema_draws(false, "normal"), cinema_draws(true, "normal"));

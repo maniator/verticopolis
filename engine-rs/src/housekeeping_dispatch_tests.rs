@@ -7,7 +7,7 @@ use std::collections::HashMap;
 
 use super::{CrewOrders, Housekeeping, HK_MAIDS_PER_UNIT};
 use crate::clock::GameMode;
-use crate::crowd::{ElevatorCalls, CAR_CAPACITY};
+use crate::crowd::ElevatorCalls;
 use crate::facilities::Kind;
 use crate::schedule::Schedule;
 use crate::sim::Simulation;
@@ -380,7 +380,8 @@ fn maids_never_board_a_car_the_schedule_has_parked() {
         in_shift(&mut sim);
         // The running car is full for the first stretch, so the maids at the
         // crew's floor have only the parked cars to step into.
-        sim.crowd.car_riders.insert((id, 0), CAR_CAPACITY);
+        let full = sim.tower.transports[0].kind.car_capacity() as i64;
+        sim.crowd.car_riders.insert((id, 0), full);
         let tick = |sim: &mut Simulation, steps: usize| {
             for _ in 0..steps {
                 sim.tick(0.5);

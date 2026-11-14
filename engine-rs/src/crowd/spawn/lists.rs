@@ -10,7 +10,6 @@ pub(super) enum List {
     LeasedOffices,
     StaffedOffices,
     Homes,
-    OpenVenues,
 }
 
 /// Stamp the errand of a plain commute just added at `i` (none when the
@@ -19,7 +18,6 @@ pub(super) fn stamp_errand(crowd: &mut Crowd, i: Option<usize>, l: List, inbound
     let place = match l {
         List::LeasedOffices | List::StaffedOffices => ErrandPlace::Office,
         List::Homes => ErrandPlace::Home,
-        List::OpenVenues => ErrandPlace::Venue,
     };
     if let Some(i) = i {
         crowd.people[i].errand = Some(Errand { place, inbound });
@@ -31,6 +29,5 @@ pub(super) fn list_of(floors: &SpawnFloors, l: List) -> &[i64] {
         List::LeasedOffices => &floors.leased_offices,
         List::StaffedOffices => &floors.staffed_offices,
         List::Homes => &floors.homes,
-        List::OpenVenues => &floors.open_venues,
     }
 }

@@ -2,7 +2,8 @@
 //! `personRoundTrip.integration.test.ts`: a diner leaving thins their room's
 //! visible head count (never its place_seated count), a same-floor trip walks, the
 //! overlay drains once everyone is back, a bulldozed origin strands no one
-//! (before or during the return leg), the dwell runs 30 to 60 game minutes
+//! (before or during the return leg) and sends its diners out by the lobby,
+//! the dwell runs 30 to 60 game minutes
 //! before the route turns for home, an unreachable venue draws nobody, the
 //! eaters count at the venue they were sent to, and a lone fast food never
 //! holds more than its catalog population.
@@ -167,6 +168,37 @@ fn bulldozing_the_origin_mid_dwell_strands_nobody() {
         sim.tick(1.0);
     }
     assert_eq!(stranded_from(&sim, origin), 0);
+}
+
+/// A diner whose office is bulldozed mid-meal walks out through the ground
+/// lobby when the meal ends, rather than vanish at the fast food.
+#[test]
+fn a_diner_whose_office_is_bulldozed_leaves_by_the_lobby() {
+    let (mut sim, _, _) = office_and_fast_food();
+    let origin = origin_of(&mut sim, 60, |p| p.state == PState::Dwelling);
+    let diners: Vec<i64> = sim
+        .crowd
+        .people
+        .iter()
+        .filter(|p| p.origin_unit_id == Some(origin) && p.state == PState::Dwelling)
+        .map(|p| p.id)
+        .collect();
+    assert!(!diners.is_empty());
+    assert!(sim.tower.remove_unit(origin).is_some());
+    let mut last_floor = std::collections::HashMap::new();
+    for _ in 0..(MEAL_DWELL_MINUTES.1 as usize + 30) {
+        sim.tick(1.0);
+        for p in sim.crowd.people.iter().filter(|p| diners.contains(&p.id)) {
+            last_floor.insert(p.id, p.floor);
+        }
+    }
+    for id in &diners {
+        assert!(
+            sim.crowd.people.iter().all(|p| p.id != *id),
+            "{id} is still out"
+        );
+        assert_eq!(last_floor[id], 1, "{id} left from the lobby");
+    }
 }
 
 #[test]

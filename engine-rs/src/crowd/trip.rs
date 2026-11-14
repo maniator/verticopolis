@@ -19,7 +19,6 @@ use crate::tower::Tower;
 pub enum ErrandPlace {
     Office,
     Home,
-    Venue,
 }
 
 impl ErrandPlace {
@@ -29,7 +28,6 @@ impl ErrandPlace {
         match self {
             ErrandPlace::Office => kind == Kind::Office,
             ErrandPlace::Home => kind == Kind::Condo || kind.is_rental() || kind.is_hotel(),
-            ErrandPlace::Venue => kind.is_ambient_venue(),
         }
     }
 }
@@ -49,7 +47,11 @@ pub enum Purpose {
     FromWork,
     LeaveHome,
     ReturnHome,
+    /// Kept in the published list of names, but no trip carries it now:
+    /// the one-way venue trips that did are gone, and a venue's customers
+    /// travel as a [`Purpose::Meal`] or a [`Purpose::Visit`].
     ToVenue,
+    /// As [`Purpose::ToVenue`]: no trip carries it now.
     FromVenue,
     Meal,
     Visit,
@@ -98,8 +100,6 @@ impl Purpose {
             (ErrandPlace::Office, false) => Purpose::FromWork,
             (ErrandPlace::Home, true) => Purpose::ReturnHome,
             (ErrandPlace::Home, false) => Purpose::LeaveHome,
-            (ErrandPlace::Venue, true) => Purpose::ToVenue,
-            (ErrandPlace::Venue, false) => Purpose::FromVenue,
         }
     }
 }

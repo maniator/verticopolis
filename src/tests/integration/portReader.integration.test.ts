@@ -73,7 +73,12 @@ describe.skipIf(noEngine)("ViewReader on the engine", () => {
     }
     expect(r.header.minutes).toBe(look(e).clock.minutes);
     expect(r.crowd.people.length).toBe(look(e).crowd.people.length);
-    expect(plain(r.rooms.map((u) => [u.state, u.occupants]))).toEqual(plain(roomsOf(e).map((u) => [u.state, u.occupants])));
+    // A save leaves a venue's head count out (it is the customers inside,
+    // never saved), so the fast food's is read from the people dwelling in it.
+    const inside = (id: number) =>
+      (look(e).crowd.people as { state: string; mealVenueId?: number }[]).filter((p) => p.state === "dwelling" && p.mealVenueId === id).length;
+    const want = roomsOf(e).map((u) => [u.state, u.kind === "fastFood" ? inside(u.id) : u.occupants]);
+    expect(plain(r.rooms.map((u) => [u.state, u.occupants]))).toEqual(plain(want));
   });
 
   it("finds the nearest structure tile on each side, where a bridge scan stops", () => {

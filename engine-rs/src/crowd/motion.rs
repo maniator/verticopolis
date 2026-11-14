@@ -6,8 +6,7 @@ use super::staff_shift;
 use super::visits::begin_dwell;
 use super::walk::walk_to;
 use super::{
-    Crowd, PState, Person, StaffResult, CAR_CAPACITY, GIVE_UP, RIDE_SECONDS_PER_FLOOR,
-    STAFF_GIVE_UP, STRESS_WAIT,
+    Crowd, PState, Person, StaffResult, GIVE_UP, RIDE_SECONDS_PER_FLOOR, STAFF_GIVE_UP, STRESS_WAIT,
 };
 use crate::jsmath;
 use crate::tower::Tower;
@@ -170,8 +169,11 @@ fn step(crowd: &mut Crowd, i: usize, dt: f64, tower: &mut Tower, landings: &mut 
                 if crowd.closed_cars.binary_search(&key).is_ok() {
                     continue;
                 }
+                // A car holds as many as its kind does (21 standard, 17
+                // service, 42 express), the original's cab sizes: the
+                // customers from outside ride one to one beside the tenants.
                 let n = crowd.car_riders.get(&key).copied().unwrap_or(0);
-                if n >= CAR_CAPACITY {
+                if n >= shaft.kind.car_capacity() as i64 {
                     continue;
                 }
                 crowd.car_riders.insert(key, n + 1);
@@ -267,17 +269,23 @@ fn step(crowd: &mut Crowd, i: usize, dt: f64, tower: &mut Tower, landings: &mut 
 }
 
 fn transition_to_return(crowd: &mut Crowd, tower: &mut Tower, i: usize) {
+    leave_venue(crowd, tower, i);
     let origin = crowd.people[i]
         .origin_unit_id
         .and_then(|id| tower.get_unit(id))
         .map(|u| (u.floor, u.x));
-    if origin.is_none() && crowd.people[i].origin_unit_id.is_some() {
+    // Someone whose room was bulldozed while they were out leaves the
+    // tower by the ground lobby rather than vanish at the venue.
+    let home_gone = origin.is_none() && crowd.people[i].origin_unit_id.is_some();
+    if home_gone {
         crowd.people[i].origin_unit_id = None;
-        finish(crowd, i, tower);
-        return;
     }
     let venue_floor = crowd.people[i].floor;
-    let origin_floor = origin.map(|o| o.0).unwrap_or(crowd.people[i].floors[0]);
+    let origin_floor = match origin {
+        Some(o) => o.0,
+        None if home_gone => 1,
+        None => crowd.people[i].floors[0],
+    };
     let from_x = crowd.people[i].x;
     let r = crowd.route(
         tower,
@@ -408,6 +416,9 @@ fn reroute(crowd: &mut Crowd, i: usize, tower: &Tower) -> bool {
 pub fn finish(crowd: &mut Crowd, i: usize, tower: &mut Tower) {
     release_seat(crowd, i);
     let p = &crowd.people[i];
+    if p.walk_in {
+        crowd.walk_in_count = (crowd.walk_in_count - 1).max(0);
+    }
     if p.staff {
         crowd.staff_count = (crowd.staff_count - 1).max(0);
         if let Some(crew) = p.crew_id {
@@ -422,10 +433,11 @@ pub fn finish(crowd: &mut Crowd, i: usize, tower: &mut Tower) {
             let ok = p.state == PState::ToDest;
             crowd.staff_done.push(StaffResult { unit_id: uid, ok });
         }
-    } else {
+    } else if !p.walk_in {
         // A trip from a lobby or a Metro platform belongs to the tenant at
         // its other end (#1971): the morning commuter's wait lands on the
-        // office floor, not the lobby or the platform.
+        // office floor, not the lobby or the platform. A customer from
+        // outside is no tenant, so their wait stresses no floor.
         let tenant_floor = match p.floors.last() {
             Some(&dest) if p.from_metro || tower.floor_has_lobby(p.origin_floor) => dest,
             _ => p.origin_floor,
@@ -441,23 +453,31 @@ pub fn finish(crowd: &mut Crowd, i: usize, tower: &mut Tower) {
             }
         }
     }
-    let p = &crowd.people[i];
-    if let Some(vid) = p.venue_unit_id {
-        let counted_hotel = p.counted_hotel_guest;
-        if let Some((venue, at)) = tower.marked_by_id(vid) {
-            if venue.customers_in.unwrap_or(0) > 0 {
-                venue.set_customers_in(at, Some(venue.customers_in.unwrap_or(0) - 1));
-                venue.sync_visitor_occupants(at);
-                if counted_hotel && venue.hotel_customers_in.unwrap_or(0) > 0 {
-                    let n = venue.hotel_customers_in.unwrap_or(0) - 1;
-                    venue.set_hotel_customers_in(at, Some(n));
-                }
-                tower.bump_meal_overlay_revision();
-            }
-        }
-        let p = &mut crowd.people[i];
-        p.venue_unit_id = None;
-        p.counted_hotel_guest = false;
-    }
+    leave_venue(crowd, tower, i);
     crowd.people[i].state = PState::Done;
+}
+
+/// Takes person `i` out of the venue's head count as they walk out of it
+/// (or finish, whichever comes first), so a venue counts only who is inside
+/// rather than everyone still on the way home from it.
+fn leave_venue(crowd: &mut Crowd, tower: &mut Tower, i: usize) {
+    let p = &crowd.people[i];
+    let Some(vid) = p.venue_unit_id else {
+        return;
+    };
+    let counted_hotel = p.counted_hotel_guest;
+    if let Some((venue, at)) = tower.marked_by_id(vid) {
+        if venue.customers_in.unwrap_or(0) > 0 {
+            venue.set_customers_in(at, Some(venue.customers_in.unwrap_or(0) - 1));
+            venue.sync_visitor_occupants(at);
+            if counted_hotel && venue.hotel_customers_in.unwrap_or(0) > 0 {
+                let n = venue.hotel_customers_in.unwrap_or(0) - 1;
+                venue.set_hotel_customers_in(at, Some(n));
+            }
+            tower.bump_meal_overlay_revision();
+        }
+    }
+    let p = &mut crowd.people[i];
+    p.venue_unit_id = None;
+    p.counted_hotel_guest = false;
 }

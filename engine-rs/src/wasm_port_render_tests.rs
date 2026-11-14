@@ -79,6 +79,7 @@ fn waiter(id: i64, shaft: i64, floor: i64, wait: f64, staff: bool) -> Person {
         crew_id: None,
         staff_trip: None,
         errand: None,
+        walk_in: false,
         start_x: 0.0,
     }
 }
