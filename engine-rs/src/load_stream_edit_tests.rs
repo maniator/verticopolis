@@ -27,8 +27,9 @@ const JSON_BYTES: &[u8] = b"{}[],:\"0-.e\\ ";
 /// 167 became 142 when shops took real walk-in customers: their head count
 /// is the customers inside too, so the base saves' shops save other head
 /// counts and the seeded edits fall on different bytes. No reader
-/// disagreement came with it.
-const STREAMED: usize = 142;
+/// disagreement came with it. It went back to 167 when walk-ins were
+/// turned off again (`WALK_INS_ON`).
+const STREAMED: usize = 167;
 
 /// Seeded edits of engine saves, a few bytes each: dropped, inserted,
 /// changed or copied, or the text cut short. Whatever comes out, both

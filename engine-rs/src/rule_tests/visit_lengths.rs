@@ -88,6 +88,8 @@ fn two_days(sim: &mut Simulation) -> Seen {
 
 #[test]
 fn no_one_appears_or_vanishes_on_a_venues_floor() {
+    // Walk-ins are off in play (`WALK_INS_ON`); this covers them on.
+    crate::facilities::set_walk_ins_for_test(true);
     for mode in [GameMode::Classic, GameMode::Modern] {
         let (mut sim, cinema, shop) = venue_tower(mode);
         let seen = two_days(&mut sim);
@@ -108,6 +110,8 @@ fn no_one_appears_or_vanishes_on_a_venues_floor() {
 
 #[test]
 fn a_film_lasts_90_to_120_minutes_and_a_shop_visit_30_to_60() {
+    // Walk-ins are off in play (`WALK_INS_ON`); this covers them on.
+    crate::facilities::set_walk_ins_for_test(true);
     for mode in [GameMode::Classic, GameMode::Modern] {
         let (mut sim, cinema, shop) = venue_tower(mode);
         let seen = two_days(&mut sim);

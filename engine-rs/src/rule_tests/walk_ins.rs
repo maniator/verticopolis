@@ -39,6 +39,8 @@ fn shop_customers(sim: &Simulation, shop: i64) -> (i64, i64, f64) {
 
 #[test]
 fn shoppers_walk_in_from_the_lobby_and_count_at_the_door() {
+    // Walk-ins are off in play (`WALK_INS_ON`); this covers them on.
+    crate::facilities::set_walk_ins_for_test(true);
     let (mut sim, shop) = shop_tower(7);
     at_time(&mut sim, 0, 10);
     let mut seen = std::collections::HashSet::new();
@@ -106,6 +108,8 @@ fn day_of_bookings(office_floors: i64) -> (usize, f64) {
 
 #[test]
 fn a_day_books_as_many_shoppers_as_demand_sends() {
+    // Walk-ins are off in play (`WALK_INS_ON`); this covers them on.
+    crate::facilities::set_walk_ins_for_test(true);
     let (busy, busy_frac) = day_of_bookings(10);
     let (quiet, quiet_frac) = day_of_bookings(5);
     assert!(busy_frac > quiet_frac && quiet_frac > 0.0);
@@ -119,6 +123,8 @@ fn a_day_books_as_many_shoppers_as_demand_sends() {
 
 #[test]
 fn walk_ins_leave_room_for_the_tenants_sample() {
+    // Walk-ins are off in play (`WALK_INS_ON`); this covers them on.
+    crate::facilities::set_walk_ins_for_test(true);
     let (mut sim, shop) = shop_tower(3);
     at_time(&mut sim, 0, 12);
     for _ in 0..30 {
@@ -133,6 +139,8 @@ fn walk_ins_leave_room_for_the_tenants_sample() {
 
 #[test]
 fn a_shop_that_closes_takes_no_more_bookings_and_its_shoppers_go_home() {
+    // Walk-ins are off in play (`WALK_INS_ON`); this covers them on.
+    crate::facilities::set_walk_ins_for_test(true);
     let (mut sim, shop) = shop_tower(5);
     at_time(&mut sim, 0, 20);
     for _ in 0..(3 * 60) {
@@ -150,6 +158,8 @@ fn a_shop_that_closes_takes_no_more_bookings_and_its_shoppers_go_home() {
 
 #[test]
 fn shoppers_split_between_the_lobby_and_a_served_metro_platform() {
+    // Walk-ins are off in play (`WALK_INS_ON`); this covers them on.
+    crate::facilities::set_walk_ins_for_test(true);
     use super::metro_shoppers::{b, metro_tower};
     let mut sim = metro_tower(GameMode::Classic, true);
     for x in [10, 30, 50, 70] {

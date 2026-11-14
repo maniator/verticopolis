@@ -195,6 +195,8 @@ fn fast_food_customers(hour: i64) -> (usize, usize) {
 
 #[test]
 fn nobody_visits_a_closed_venue() {
+    // Walk-ins are off in play (`WALK_INS_ON`); this covers them on.
+    crate::facilities::set_walk_ins_for_test(true);
     assert_eq!(fast_food_customers(3), (0, 0), "fast food is shut at 03:00");
     let (booked, _) = fast_food_customers(12);
     assert!(booked > 0, "and books customers at noon");
