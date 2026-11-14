@@ -245,7 +245,10 @@ builds them, for the web game's own tests and tooling.
   loading it is refused rather than half-read. `engineIdentity()` tells you
   which save version an engine writes. A save is version 7 unless it holds a
   lobby taller than one story, which makes it version 9 (one entry per hall).
-  A version 8 save, which gave each floor one height, still loads.
+  A version 8 save, which gave each floor one height, still loads. A save is
+  version 10 when an elevator schedule holds back an hour the player cut back
+  that a car sold since left at the whole fleet's size, so a car bought back
+  does not join it.
 
 ## Versioning
 

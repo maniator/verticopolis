@@ -202,7 +202,11 @@ The crate has no default features.
   `[floor, x0, x1, height]` entry per hall, so an engine too old to build
   one refuses it instead of loading a one-story lobby. Version 8 gave each
   floor one height (`[floor, height]`); it loads here with that height on
-  every lobby tile of the floor. All three load here.
+  every lobby tile of the floor. A save is version 10 when an elevator
+  schedule holds an hour back (`heldBack`, `Schedule::held_back`): an hour
+  the player cut back that a car sold since left at the whole fleet's size,
+  which a car bought back does not join. An older engine would run the
+  whole fleet there, so it refuses the save. All four load here.
 
 ## Proving conformance
 

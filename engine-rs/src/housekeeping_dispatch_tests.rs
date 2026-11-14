@@ -367,6 +367,7 @@ fn maids_never_board_a_car_the_schedule_has_parked() {
             waiting_car_response: None,
             standard_floor_departure: None,
             home_floors: Some(vec![5, 2, 2]),
+            held_back: None,
         });
         // The running car waits at the top, so the parked two are the cars
         // standing at the crew's floor when the maids arrive.
@@ -428,6 +429,7 @@ fn a_stood_down_car_finishes_its_riders_and_takes_no_more() {
         waiting_car_response: None,
         standard_floor_departure: None,
         home_floors: None,
+        held_back: None,
     });
     let calls = ElevatorCalls::default();
     sim.elevators

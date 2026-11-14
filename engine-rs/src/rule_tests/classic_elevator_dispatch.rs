@@ -52,6 +52,7 @@ pub(super) fn schedule(response: Option<f64>) -> Schedule {
         waiting_car_response: response,
         standard_floor_departure: None,
         home_floors: Some(vec![1, 1]),
+        held_back: None,
     }
 }
 

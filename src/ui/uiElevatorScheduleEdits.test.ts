@@ -51,11 +51,12 @@ describe("the count strip", () => {
   it("selects the evening hour on a weekday open and edits it with the docked stepper", () => {
     const { ctx, apply } = open({ ux: CLASSIC_UX });
     expect(selected()).toEqual(["weekday 17:00, 4 of 4 cars"]);
-    expect(text(".es-fleet")).toBe("4 of 4");
+    expect(text(".es-fleet"), "on shift at the hour apart from the installed fleet (#1546)").toBe("4 on shift at 17:00, 4 installed");
     expect(stepper("more cars").disabled).toBe(true);
     stepper("fewer cars").click();
     expect(selected()).toEqual(["weekday 17:00, 3 of 4 cars"]);
     expect(text(".es-strip-step .es-val")).toBe("3 cars");
+    expect(text(".es-fleet")).toBe("3 on shift at 17:00, 4 installed");
     expect(ctx.facts.mock.lastCall![0].activeCars!.weekday![17]).toBe(3);
     ok();
     expect(saved(apply).activeCars.weekday).toEqual(row(CARS).map((v, h) => (h === 17 ? 3 : v)));

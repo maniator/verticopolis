@@ -36,6 +36,7 @@ fn a_bought_car_inherits_the_authored_pattern_and_keeps_it_through_a_save() {
         waiting_car_response: None,
         standard_floor_departure: None,
         home_floors: None,
+        held_back: None,
     });
     assert!(sim.add_car(lift).ok);
     assert!(sim.add_car(lift).ok);
@@ -69,6 +70,7 @@ fn four_car_shaft() -> (Simulation, i64, Vec<i64>, Vec<i64>) {
         waiting_car_response: None,
         standard_floor_departure: None,
         home_floors: Some(vec![1, 2, 1, 2]),
+        held_back: None,
     });
     (sim, lift, weekday, weekend)
 }
@@ -114,17 +116,110 @@ fn a_sold_car_clamps_the_pattern_and_a_rebuy_follows_the_inheritance_rule() {
     );
     assert_eq!(installed(&loaded, lift), (2, 2, vec![1, 2]));
 
-    // Buying one back: the hours that now run the whole fleet of 2 run 3.
+    // The hours the player cut back that the sales left at the fleet's size
+    // are held back (#1546), and the save keeps them as version 10.
+    let held =
+        |row: &[i64]| -> Vec<usize> { (0..24).filter(|&h| (2..4).contains(&row[h])).collect() };
+    let held_back = |sim: &Simulation| {
+        let s = sim
+            .tower
+            .get_transport(lift)
+            .unwrap()
+            .schedule
+            .clone()
+            .unwrap();
+        s.held_back.map(|h| (h.weekday, h.weekend))
+    };
+    assert_eq!(held_back(&sim), Some((held(&weekday), held(&weekend))));
+    let text = sim.save_text();
+    assert_eq!(
+        serde_json::from_str::<serde_json::Value>(&text).unwrap()["version"],
+        10
+    );
+    assert_eq!(
+        held_back(&load_save_text(text.as_bytes()).unwrap()),
+        held_back(&sim)
+    );
+
+    // Buying one back: only the hours that ran the whole fleet run 3. A
+    // held-back hour keeps the 2 the sale left it, and stops being held once
+    // that is below the fleet.
     assert!(sim.add_car(lift).ok);
     let regrown = |row: &[i64]| -> Vec<i64> {
-        clamp(row, 2)
-            .iter()
-            .map(|n| if *n == 2 { 3 } else { *n })
+        row.iter()
+            .map(|n| if *n == 4 { 3 } else { (*n).min(2) })
             .collect()
     };
     assert_eq!(pattern(&sim, lift), (regrown(&weekday), regrown(&weekend)));
+    assert_eq!(held_back(&sim), None);
+    let text = sim.save_text();
+    assert_eq!(
+        serde_json::from_str::<serde_json::Value>(&text).unwrap()["version"],
+        7
+    );
 
     // The last car is never sold.
     assert!(sim.tower.set_cars(lift, 1));
     assert_eq!(sim.remove_car(lift), ChargeResult::refuse(LAST_CAR));
+}
+
+/// A player's edit states what each hour runs, so it drops the held hours; a
+/// schedule that lists them, as a save does, keeps the ones at the fleet's
+/// size and drops the rest (#1546).
+#[test]
+fn an_edit_states_every_hour_and_held_hours_stay_only_at_the_fleet_size() {
+    let (mut sim, lift, _, _) = four_car_shaft();
+    assert!(sim.remove_car(lift).ok);
+    let held = sim
+        .tower
+        .get_transport(lift)
+        .unwrap()
+        .schedule
+        .clone()
+        .unwrap();
+    assert!(
+        held.held_back.is_some(),
+        "the sale held the 3-car hours back"
+    );
+
+    let mut edit = held.to_json();
+    edit.as_object_mut().unwrap().remove("heldBack");
+    assert!(sim.tower.set_schedule(lift, &edit));
+    let after = sim
+        .tower
+        .get_transport(lift)
+        .unwrap()
+        .schedule
+        .clone()
+        .unwrap();
+    assert_eq!(after.held_back, None);
+    assert_eq!(
+        (after.weekday, after.weekend),
+        (held.weekday.clone(), held.weekend.clone())
+    );
+
+    // Hour 1 runs the fleet of 3 on weekdays, hour 0 runs 3 and hour 2 runs
+    // 2: only the whole, in-range hours at the fleet's size are kept, once.
+    let mut listed = held.to_json();
+    listed["heldBack"] = serde_json::json!({
+        "weekday": [1, 1, 0, 2, 24, -1, 1.5, "1", null],
+        "weekend": "every hour"
+    });
+    assert!(sim.tower.set_schedule(lift, &listed));
+    let after = sim
+        .tower
+        .get_transport(lift)
+        .unwrap()
+        .schedule
+        .clone()
+        .unwrap();
+    let weekday = held.weekday.clone().unwrap();
+    assert_eq!((weekday[0], weekday[1], weekday[2]), (3, 3, 2));
+    assert_eq!(
+        after.held_back,
+        Some(crate::schedule::HeldBack {
+            weekday: vec![0, 1],
+            weekend: vec![]
+        })
+    );
 }

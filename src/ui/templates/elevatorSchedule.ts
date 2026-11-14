@@ -219,7 +219,7 @@ function stripTemplate(ctx: SchedCtx, state: SchedState, h: SchedHandlers): Temp
   return html`
     <div class="es-strip-wrap">
       <div class="es-strip-head"><span class="es-heading">Cars on shift by hour</span>
-        <span class="es-fleet">${n} of ${ctx.cars}</span></div>
+        <span class="es-fleet">${n} on shift at ${hh(state.selectedHour)}, ${ctx.cars} installed</span></div>
       <div class="es-strip">
         <div class="es-strip-inner">
           <div class="es-strip-bars" role="group" aria-label="Cars on shift by hour, ${state.day}">

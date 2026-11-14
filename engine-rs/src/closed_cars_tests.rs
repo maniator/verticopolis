@@ -32,6 +32,7 @@ fn closed_cars_are_ascending_for_shafts_saved_out_of_id_order() {
             waiting_car_response: None,
             standard_floor_departure: None,
             home_floors: None,
+            held_back: None,
         });
     }
     // The saved order puts the higher id first.

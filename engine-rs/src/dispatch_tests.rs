@@ -45,9 +45,8 @@ const TALL_X: i64 = 172;
 
 /// `scenario` with an express shaft from floor 1 to floor 80 beside the
 /// others. Placing an express skips every floor without a lobby, so the
-/// shaft's skip list is cleared, as a loaded save can have it, and the
-/// tower reindexed: the shaft then stops at all 80 floors, past one 64-bit
-/// word.
+/// shaft's skip list is cleared, as a loaded save can have it, and the tower
+/// reindexed: the shaft then stops at all 80 floors, past one 64-bit word.
 fn tall_scenario() -> Tower {
     let mut tower = scenario();
     for floor in 23..=80 {
@@ -99,6 +98,7 @@ fn scenario() -> Tower {
         waiting_car_response: Some(3.0),
         standard_floor_departure: None,
         home_floors: Some(vec![15, 18, 21]),
+        held_back: None,
     });
     for t in &mut tower.transports {
         t.cars = 8;

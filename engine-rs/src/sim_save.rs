@@ -16,7 +16,7 @@ use serde_json::{json, Map, Value};
 
 use crate::events::{EventSystem, PendingChoice};
 use crate::ledger::{totals_json, Ledger};
-use crate::sim::{save_version, LogEntry, Simulation, LOG_SAVE_CAP};
+use crate::sim::{stamped_save_version, LogEntry, Simulation, LOG_SAVE_CAP};
 use crate::tower::{Transport, Unit};
 
 /// One top-level value of the save. The lists stay borrowed until they are
@@ -152,7 +152,10 @@ impl Simulation {
         let tall_lobbies = self.tower.tall_lobby_runs();
         m.push(own(
             "version",
-            json!(save_version(!tall_lobbies.is_empty())),
+            json!(stamped_save_version(
+                !tall_lobbies.is_empty(),
+                self.tower.holds_an_hour_back()
+            )),
         ));
         m.push(own("seed", json!(self.rng.seed())));
         m.push(own("initialSeed", json!(self.rng.initial_seed)));

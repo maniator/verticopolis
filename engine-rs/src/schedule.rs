@@ -14,6 +14,62 @@ pub struct Schedule {
     pub waiting_car_response: Option<f64>,
     pub standard_floor_departure: Option<f64>,
     pub home_floors: Option<Vec<i64>>,
+    /// The hours the player cut back that a car sold since left at the whole
+    /// fleet's size (#1546). Saved as `heldBack`; `None` when there are none.
+    pub held_back: Option<HeldBack>,
+}
+
+/// The hours of each day type, `0..24` in ascending order, that run fewer
+/// cars than the shaft has by the player's choice though their count equals
+/// the fleet, because a sale clamped them to it (#1546). A car bought back
+/// does not join such an hour, as it joins one that runs every car
+/// ([`Schedule::refit`]). Only an hour whose count is the fleet's size is
+/// listed: one below it is cut back on its face.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct HeldBack {
+    pub weekday: Vec<usize>,
+    pub weekend: Vec<usize>,
+}
+
+impl HeldBack {
+    /// The hours `raw` lists for a row, kept where the row exists and runs
+    /// the whole fleet of `cars`, in order and once each.
+    fn coerce_hours(raw: Option<&Value>, row: Option<&Vec<i64>>, cars: i64) -> Vec<usize> {
+        let (Some(list), Some(row)) = (raw.and_then(Value::as_array), row) else {
+            return Vec::new();
+        };
+        let mut hours: Vec<usize> = list
+            .iter()
+            .filter_map(|v| finite(Some(v)))
+            .filter(|h| h.fract() == 0.0 && (0.0..SCHEDULE_HOURS as f64).contains(h))
+            .map(|h| h as usize)
+            .filter(|&h| row.get(h) == Some(&cars))
+            .collect();
+        hours.sort_unstable();
+        hours.dedup();
+        hours
+    }
+
+    /// `heldBack` as a save writes it, `None` when it lists no hour.
+    fn coerce(raw: Option<&Value>, s: &Schedule, cars: i64) -> Option<HeldBack> {
+        let r = raw?.as_object()?;
+        let held = HeldBack {
+            weekday: Self::coerce_hours(r.get("weekday"), s.weekday.as_ref(), cars),
+            weekend: Self::coerce_hours(r.get("weekend"), s.weekend.as_ref(), cars),
+        };
+        (!held.weekday.is_empty() || !held.weekend.is_empty()).then_some(held)
+    }
+
+    fn to_json(&self) -> Value {
+        let mut m = Map::new();
+        if !self.weekday.is_empty() {
+            m.insert("weekday".into(), json!(self.weekday));
+        }
+        if !self.weekend.is_empty() {
+            m.insert("weekend".into(), json!(self.weekend));
+        }
+        Value::Object(m)
+    }
 }
 
 fn finite(v: Option<&Value>) -> Option<f64> {
@@ -52,6 +108,7 @@ impl Schedule {
             waiting_car_response: None,
             standard_floor_departure: None,
             home_floors: None,
+            held_back: None,
         };
         if let Some(a) = r.get("activeCars").and_then(Value::as_object) {
             if let Some(w) = a.get("weekday").and_then(Value::as_array) {
@@ -86,11 +143,40 @@ impl Schedule {
                 );
             }
         }
+        out.held_back = HeldBack::coerce(r.get("heldBack"), &out, cars);
         if out.is_empty() {
             None
         } else {
             Some(out)
         }
+    }
+
+    /// Fits the duty pattern to a fleet that went from `was` cars to `cars`
+    /// (#1546). A car bought joins every hour that ran the whole fleet; an
+    /// hour the player cut back keeps its count, and so does one held back
+    /// at the fleet's size. A car sold clamps each hour to the new fleet
+    /// ([`Schedule::coerce`] does), and an hour cut back below the old fleet
+    /// that the clamp leaves at the new one is held back, so a car bought
+    /// back does not turn it into a whole-fleet hour.
+    pub fn refit(&mut self, was: i64, cars: i64) {
+        let mut held = self.held_back.take().unwrap_or_default();
+        for (row, hours) in [
+            (&mut self.weekday, &mut held.weekday),
+            (&mut self.weekend, &mut held.weekend),
+        ] {
+            let Some(row) = row else { continue };
+            for (h, active) in row.iter_mut().enumerate() {
+                let held_here = hours.contains(&h);
+                if cars > was && *active >= was && !held_here {
+                    *active = cars;
+                } else if cars < was && !held_here && *active < was && *active >= cars {
+                    hours.push(h);
+                }
+            }
+            hours.sort_unstable();
+        }
+        // `coerce` drops a held hour that is no longer at the fleet's size.
+        self.held_back = Some(held);
     }
 
     /// `cloneSchedule` as a save writes it (set keys only).
@@ -114,6 +200,9 @@ impl Schedule {
         }
         if let Some(h) = &self.home_floors {
             m.insert("homeFloors".into(), json!(h));
+        }
+        if let Some(h) = &self.held_back {
+            m.insert("heldBack".into(), h.to_json());
         }
         Value::Object(m)
     }

@@ -12,7 +12,7 @@ use serde_json::{json, Value};
 
 /// The newest save version this build writes: 8, for a tower with a tall
 /// lobby (#308); a tower without one is still written at 7.
-const CURRENT_SAVE_VERSION: i64 = 9;
+const CURRENT_SAVE_VERSION: i64 = 10;
 
 fn stamped(mut save: Value, app_version: &str) -> Value {
     save["appVersion"] = json!(app_version);
