@@ -2,7 +2,8 @@
 //! `crowd.integration.test.ts`: routes over one shaft, a transfer, a stair
 //! hop and the trivial and missing routes; a rider delivered to a floor the
 //! demand model never calls; who spawns when (closed venues, an unstaffed
-//! office, a weekend office tower); a rider whose car is trimmed away; and
+//! office, a weekend office tower); a rider whose car is trimmed away; a
+//! rider out of patience in the car riding on to their floor; and
 //! the tick moving the crowd on its own. The route memo's refresh after
 //! each layout edit is also `crowd::graph::tests::the_memo_follows_each_layout_edit`.
 //! The suite's `reset` case is n/a in Rust: there is no `Crowd::reset`, a
@@ -195,6 +196,89 @@ fn an_office_tower_draws_no_trips_on_a_weekend() {
     assert!(sim.clock.is_weekend());
     pump(&mut sim, 0.05, 400);
     assert!(sim.crowd.people.is_empty());
+}
+
+/// A rider out of patience once aboard still rides to their floor: giving
+/// up in the car made them vanish from the cab (3.7.3).
+#[test]
+fn a_rider_out_of_patience_in_the_car_rides_to_their_floor() {
+    let (mut sim, _) = tower_with_elevator(20);
+    at_time(&mut sim, 0, 12);
+    let route = sim.crowd.route(&sim.tower, 1, 18, None, None).unwrap();
+    make_person(&mut sim.crowd, &sim.tower, route, 30.0, Some(5));
+    let id = sim.crowd.people[0].id;
+    let (mut boarded, mut delivered) = (false, false);
+    for _ in 0..600 {
+        let calls = sim.crowd.elevator_calls(&sim.tower);
+        sim.elevators
+            .move_cars(&mut sim.tower, 1.0, &calls, 12, false);
+        sim.elevators.swap_closed_cars(&mut sim.crowd.closed_cars);
+        sim.elevators.swap_open_cars(&mut sim.crowd.open_cars);
+        advance(&mut sim.crowd, CROWD_SECONDS_PER_MINUTE, &mut sim.tower);
+        let p = sim
+            .crowd
+            .people
+            .iter_mut()
+            .find(|p| p.id == id)
+            .expect("the rider gave up and vanished");
+        if p.state == PState::Riding {
+            // Far past any patience: the rider must stay aboard anyway.
+            p.age = 1.0e9;
+            boarded = true;
+        }
+        if boarded && p.state == PState::ToDest {
+            assert_eq!(p.floor, 18, "the rider stepped off at their own floor");
+            delivered = true;
+            break;
+        }
+    }
+    assert!(boarded, "the rider never boarded");
+    assert!(delivered, "the rider never reached floor 18");
+}
+
+#[test]
+fn a_rider_whose_floor_stops_being_a_stop_steps_out_of_the_trip() {
+    let (mut sim, ev) = tower_with_elevator(20);
+    at_time(&mut sim, 0, 12);
+    let route = sim.crowd.route(&sim.tower, 1, 18, None, None).unwrap();
+    make_person(&mut sim.crowd, &sim.tower, route, 30.0, Some(5));
+    let id = sim.crowd.people[0].id;
+    let ride = |sim: &mut crate::sim::Simulation| {
+        let calls = sim.crowd.elevator_calls(&sim.tower);
+        sim.elevators
+            .move_cars(&mut sim.tower, 1.0, &calls, 12, false);
+        sim.elevators.swap_closed_cars(&mut sim.crowd.closed_cars);
+        sim.elevators.swap_open_cars(&mut sim.crowd.open_cars);
+        advance(&mut sim.crowd, CROWD_SECONDS_PER_MINUTE, &mut sim.tower);
+    };
+    let riding = |sim: &crate::sim::Simulation| {
+        sim.crowd
+            .people
+            .iter()
+            .any(|p| p.id == id && p.state == PState::Riding)
+    };
+    for _ in 0..600 {
+        if riding(&sim) {
+            break;
+        }
+        ride(&mut sim);
+    }
+    assert!(riding(&sim), "the rider boarded");
+    // Riders never give up aboard, so a ride to a floor no car stops at
+    // would never end: the rider steps out of the trip instead.
+    assert!(
+        sim.tower.set_stop(ev, 18, false),
+        "floor 18 stops being a stop"
+    );
+    ride(&mut sim);
+    assert!(
+        sim.crowd.people.iter().all(|p| p.id != id),
+        "the rider left the car that can no longer let them off"
+    );
+    assert!(
+        sim.crowd.car_riders.values().all(|&n| n == 0),
+        "the rider gave up their seat"
+    );
 }
 
 #[test]

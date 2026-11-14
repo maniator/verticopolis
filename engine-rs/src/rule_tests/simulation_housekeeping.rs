@@ -8,10 +8,10 @@
 //! `housekeeping_dispatch_tests`; the service car missing from the tenant
 //! floor lists in `dispatch_tests::the_served_list_follows_stairs_past_the_elevators_and_skips_service_cars`.
 use crate::clock::GameMode;
-use crate::crowd::spawn::{spawn_staff, StaffSpawn};
 use crate::crowd::PState;
 use crate::dispatch::ElevatorDispatch;
 use crate::facilities::Kind;
+use crate::housekeeping_shift::MaidSent;
 use crate::sim::Simulation;
 use crate::tower::UnitState;
 
@@ -200,19 +200,21 @@ fn a_staff_call_reaches_only_the_shaft_the_maid_uses() {
             .place_transport(Kind::ElevatorService, X0 + 12, 1, 5)
             .ok
     );
-    assert!(sim.tower.place(Kind::Housekeeping, 3, X0 + 8).ok);
-    let sent = spawn_staff(
-        &mut sim.crowd,
-        &sim.tower,
-        3,
-        5,
-        (X0 + 2) as f64,
-        12345,
-        8.0,
-        None,
-    );
-    assert!(matches!(sent, StaffSpawn::Sent));
-    let maid = sim.crowd.people.iter_mut().find(|p| p.staff).unwrap();
+    let crew = sim
+        .tower
+        .place(Kind::Housekeeping, 3, X0 + 8)
+        .unit_id
+        .unwrap();
+    sim.seat_crews();
+    let mut free = sim.free_maids();
+    let sent = sim.assign_maid(&mut free, crew, (12345, 5, (X0 + 2) as f64));
+    assert_eq!(sent, MaidSent::Sent);
+    let maid = sim
+        .crowd
+        .people
+        .iter_mut()
+        .find(|p| p.clean_unit_id.is_some());
+    let maid = maid.unwrap();
     maid.state = PState::Waiting;
     let used = maid.shaft_id.unwrap();
     let calls = sim.crowd.elevator_calls(&sim.tower);

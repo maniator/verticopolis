@@ -187,8 +187,8 @@ impl Engine {
 
     /// Tooling only: set a unit's live customer tally (`customersIn`), which
     /// no save carries, so a test can fill a venue to capacity mid-run, with
-    /// the follow-ups a counted arrival makes (an attendance venue's occupants
-    /// mirror, the meal overlay revision). False for an unknown unit or a
+    /// the follow-ups a counted arrival makes (an attendance or meal venue's
+    /// occupants mirror, the meal overlay revision). False for an unknown unit or a
     /// count that is not a whole number from 0 to [`MAX_TOOL_OCCUPANTS`];
     /// nothing changes then. The unit's kind and its venue cap are not
     /// checked: any unit takes the stamp, at any count in that range.
@@ -201,10 +201,11 @@ impl Engine {
         let Some((unit, at)) = whole_id(id).and_then(|id| self.sim.tower.marked_by_id(id)) else {
             return false;
         };
-        // What a counted arrival does after its increment: an attendance
-        // venue mirrors the tally into its occupants, and the meal overlay moves.
+        // What a counted arrival does after its increment: an attendance or
+        // meal venue mirrors the tally into its occupants, and the meal
+        // overlay moves.
         unit.set_customers_in(at, Some(count as i64));
-        unit.sync_attendance_occupants(at);
+        unit.sync_visitor_occupants(at);
         self.sim.tower.bump_meal_overlay_revision();
         true
     }
