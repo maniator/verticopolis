@@ -15,6 +15,12 @@ raised the version, so they are documentation only.
 There is no entry for 0.17.0, which only
 existed as a step inside a stacked branch.
 
+## 1.35.2 (2026-11-14)
+
+- A trip with an open end on a floor of several runs (a lot of separate ground lobbies) starts or ends in the run nearest its other end that a route reaches (`crowd::doors`), trying the next nearest when Classic's walk budget refuses one; a floor with one run picks the tile it always did. `routing::passenger_parts` caches the passenger graph's parts per tower revision so the choice skips runs no route could join without a search.
+- `balance_shafts` weights each shaft of a bank by the cars its schedule keeps on shift at the crowd's hour (`Crowd::weekend` joins `Crowd::hour`); a bank whose shafts run alike draws exactly as before.
+- `Kind::takes_walk_ins` answers false while `facilities::WALK_INS_ON` is off, which turns off the outside customers and restores the demand-counted patronage and dispatch estimate for those kinds. The conformance lock and goldens are re-pinned.
+
 ## 1.35.1 (2026-11-14)
 
 - Every load path refuses a save with no numeric `minutes` or no `units` list at its top level, with a sentence a player can read; it used to load such a save as an empty tower.
