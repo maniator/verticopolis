@@ -120,12 +120,17 @@ fn only_the_reachable_venue_shares_the_demand_pool() {
     assert!(!map.fraction_by_unit.contains_key(&far));
 }
 
+/// Nobody is sent to a retail shop yet, so an open, reachable one still draws
+/// its full head count (`Kind::is_meal_venue` keeps it on that rule), and the
+/// stranded one, which nobody can reach, stays empty.
 #[test]
 fn traffic_fills_the_reachable_venue_and_leaves_the_stranded_one_empty() {
     let (mut sim, near, far) = stranded_venue();
     at_time(&mut sim, 0, 12);
     sim.collect_traffic_income();
-    assert!(sim.tower.get_unit(near).unwrap().occupants > 0);
+    let full = Kind::Shop.facility().population;
+    assert!(full > 0);
+    assert_eq!(sim.tower.get_unit(near).unwrap().occupants, full);
     assert_eq!(sim.tower.get_unit(far).unwrap().occupants, 0);
 }
 

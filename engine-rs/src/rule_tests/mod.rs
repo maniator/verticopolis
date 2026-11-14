@@ -23,6 +23,7 @@ mod crowd;
 mod demand_pools;
 mod demographic_routines;
 mod diagnostics_towers;
+mod diner_head_count;
 mod dominant_gripe;
 mod economy_depth;
 mod elevator_dispatch_balancing;

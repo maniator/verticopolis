@@ -425,11 +425,11 @@ function censusCrowd(
       if (!def) continue; // a kind the catalog no longer knows: skip, never throw
       const unitCap = def.population > 0 ? def.population : (def.attendance ?? 0);
       if (unitCap > 0) {
-        // Population>0 commercial venues (restaurant, fast food, shop) stamp
-        // `occupants` to the full catalog population while open, so their live
-        // fill is `customersIn` (the routed-customer tally). Attendance venues
-        // (cinema, party hall) mirror `customersIn` into `occupants`, and every
-        // other kind owns `occupants` via updatePresence, so both read it.
+        // Population>0 commercial venues read `customersIn` (the routed-
+        // customer tally; a shop still draws its full population while open).
+        // Attendance venues (cinema, party hall) mirror `customersIn` into
+        // `occupants`, and every other kind owns `occupants` via
+        // updatePresence, so both read it.
         // (`customersIn` is not persisted: just after a save load a busy venue
         // reads empty for the seconds the crowd system takes to re-route diners
         // in. That is honest and self-heals; see the ambience backlog.)
