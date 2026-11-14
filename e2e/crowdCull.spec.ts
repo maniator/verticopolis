@@ -40,10 +40,14 @@ test("zoom cull hides the moving layer, restores it, and survives a rebuild", as
     // empty map. Speed stays 0 afterward, so the crowd holds still.
     // The render reads the crowd from the app's view of the engine, which a
     // frame refreshes; no frame runs inside this loop, so refresh it here.
-    // Passers-by show only on a floor with tenants in (#2091), so also wait for
-    // an office floor to have someone at work.
+    // Passers-by show only on a floor with tenants in (#2091), in step with
+    // how many are in: a passer-by of rank r shows once its floor holds 16 * r
+    // people. Office workers now commute in one by one, so wait until some
+    // passer-by's floor holds enough people for it to show.
     const walking = () => (g.reader.update(), g.engine.sim.crowd.people.some((p: any) => p.state !== "riding"));
-    const atWork = () => g.engine.sim.tower.units.some((u: any) => u.floor >= 3 && u.occupants > 0);
+    const inOn = (floor: number) =>
+      g.engine.sim.tower.units.reduce((n: number, u: any) => (u.floor === floor ? n + u.occupants : n), 0);
+    const atWork = () => g.engine.walkers.some((w: any) => inOn(w.floor) >= 16 * w.rank);
     const ready = () => walking() && atWork();
     for (let minute = 0; minute < 24 * 60 && !ready(); minute++) g.sim.tick(1);
     if (!ready()) throw new Error("no one walked the tower while anyone was at work, in a day");

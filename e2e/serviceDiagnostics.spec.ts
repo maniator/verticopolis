@@ -42,8 +42,11 @@ test.describe("Rust service diagnostics in the real browser", () => {
     expect(status).toEqual({ wasm: true, hasStructuredPort: true });
   }
 
-  /** Fifteen floors of occupied offices on one single-car shaft at 7 AM, so
-   *  the morning rush loads the car. Self-contained: it runs in the page. */
+  /** Twenty-one floors of occupied offices on one single-car shaft at 7 AM, so
+   *  the morning rush loads the car. Self-contained: it runs in the page.
+   *  The tower is Classic: Modern office workers commute in person on cars
+   *  twice as fast, which drains the rush before the hourly average climbs
+   *  past the warning line. */
   const utilizedPassengerLift: FixtureBuilder<{ readonly shaftId: number }> = (start, mode) => {
     const sim = start(11, mode);
     sim.money = 1e9;
@@ -51,14 +54,14 @@ test.describe("Rust service diagnostics in the real browser", () => {
     sim.clock.minutes = 7 * 60;
     for (let x = 150; x < 240; x++) {
       if (!sim.tower.place("lobby", 1, x).ok) throw new Error(`fixture lobby at ${x}`);
-      for (let floor = 2; floor <= 16; floor++) {
+      for (let floor = 2; floor <= 22; floor++) {
         if (!sim.tower.place("floor", floor, x).ok) throw new Error(`fixture floor ${floor} at ${x}`);
       }
     }
-    const shaft = sim.tower.placeTransport("elevatorStandard", 165, 1, 16);
+    const shaft = sim.tower.placeTransport("elevatorStandard", 165, 1, 22);
     if (!shaft.ok || shaft.transportId === undefined) throw new Error("fixture failed to build the passenger shaft");
     if (!sim.tower.setCars(shaft.transportId, 1)) throw new Error("fixture failed to set the shaft to one car");
-    for (let floor = 2; floor <= 16; floor++) {
+    for (let floor = 2; floor <= 22; floor++) {
       for (let x = 150; x < 240; x += 9) {
         const room = sim.tower.place("office", floor, x);
         if (!room.ok || room.unitId === undefined) throw new Error(`fixture failed to build office at ${floor}/${x}`);
@@ -71,7 +74,7 @@ test.describe("Rust service diagnostics in the real browser", () => {
   };
 
   test("desktop inspector and the mobile editor show the real Rust passenger-elevator load warning", async ({ page }) => {
-    const built = await buildInPage(page, utilizedPassengerLift, "modern");
+    const built = await buildInPage(page, utilizedPassengerLift, "classic");
     const fixture = { save: built.save, id: built.shaftId, kind: "elevatorStandard" };
     await loadFixture(page, fixture.save);
     const readout = await page.evaluate(({ id }) => {
