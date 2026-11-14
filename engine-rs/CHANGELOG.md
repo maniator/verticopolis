@@ -15,6 +15,10 @@ raised the version, so they are documentation only.
 There is no entry for 0.17.0, which only
 existed as a step inside a stacked branch.
 
+## 1.33.4 (2026-11-14)
+
+- A meal venue's head count (fast food, restaurant, food hall; `Kind::is_meal_venue`) is the customers inside it (`customers_in`) while it stands, as party halls and cinemas already count their visitors. Commercial kinds no trip is sent to keep their full head count. Like the attendance venues (`Kind::counts_visitors`), a meal venue's head count is left out of the save, starts at 0 on a load or an undo, and is not added to the elevator waiting estimate, since its diners ride as real people. The conformance lock, frame days, port edits and fuzz goldens are re-pinned, and the Classic ransom scenario's first threat moved to hour 304.
+
 ## 1.33.3 (2026-11-14)
 
 - `Tower::removal_reason` lets a Modern sky lobby tile go (`GameMode::removes_lobby_tiles`), keeps the ground lobby in both modes, checks the story above a tall hall's top, and refuses a floor or lobby tile a shaft needs in its column.
