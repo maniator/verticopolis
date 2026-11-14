@@ -2449,9 +2449,10 @@
     "scheduleAssist": true,
     "shadedLook": true,
     "tallSkyLobbies": true,
-    "variantHouseholds": true
+    "variantHouseholds": true,
+    "venueFlights": true
   },
-  "version": 17,
+  "version": 18,
   "world": {
     "groundFloor": 1,
     "groundFloorStructure": "lobby",

@@ -85,6 +85,11 @@ fn each_mode_states_its_rules() {
     assert!(!classic.shaded_look && modern.shaded_look);
     assert_eq!(c["rules"]["shadedLook"], Value::Bool(false));
     assert_eq!(v["rules"]["shadedLook"], Value::Bool(true));
+    // Modern winds a one-story flight beside a venue; Classic draws it
+    // straight, as SimTower did.
+    assert!(!classic.venue_flights && modern.venue_flights);
+    assert_eq!(c["rules"]["venueFlights"], Value::Bool(false));
+    assert_eq!(v["rules"]["venueFlights"], Value::Bool(true));
     assert_eq!(classic.fed_up_wait, crate::crowd::STRESS_WAIT);
     assert_eq!(
         v["rules"]["fedUpWait"],

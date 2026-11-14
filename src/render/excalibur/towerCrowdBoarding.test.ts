@@ -4,6 +4,7 @@ import { FLOOR, TILE } from "../scale";
 import { figureOf } from "./crowdLook";
 import { reconcileCrowd, tickCrowdClock } from "./towerCrowd";
 import { HallDoorLayer } from "./towerHallDoors";
+import { emptyFlightPass } from "../venueFlights";
 
 /**
  * Getting on and off an elevator: the crowd pass shows a rider boarding or
@@ -29,6 +30,7 @@ function eng(people: unknown[], transports: unknown[] = []): any {
     cam: { zoom: 1 },
     crowdCulled: false,
     crowdActors: new Map(),
+    flightPass: emptyFlightPass(),
     hallDoors: new HallDoorLayer(),
     paused: false,
     people: { get: vi.fn((_key: number) => gfx()) },

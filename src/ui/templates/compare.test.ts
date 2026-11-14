@@ -34,6 +34,7 @@ describe("the Classic and Modern summary", () => {
     maxLobbyHeight: null, // the same 3-story cap in both modes
     decorativePassersBy: "Decorative passers-by stroll busy corridors", // #2091
     shadedLook: "People lit from the upper left, in shaded rooms", // #2097
+    venueFlights: "Spiral stairs and switchback escalators beside venues",
     fedUpWait: null, // the same wait turns a person red in both modes
   };
   const RULE_TO_HELP: Record<string, string | null> = {
