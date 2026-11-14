@@ -2,7 +2,7 @@
 //! step puts back keep the tower within each kind's cap and each shared
 //! pool, as building them again would (`Tower::cap_reason`).
 #![cfg_attr(not(feature = "wasm"), allow(dead_code))]
-use crate::facilities::{build_cap, pools_for, Kind, FACILITIES};
+use crate::facilities::{build_cap_in, pools_for, Kind, FACILITIES};
 use crate::tower::Tower;
 use crate::undo::{Step, TransportChange, UnitChange};
 
@@ -62,7 +62,7 @@ fn caps_raised(tower: &Tower, step: &Step) -> Vec<Raised> {
     let added = kinds_added(tower, step);
     let own = FACILITIES.iter().filter_map(|f| {
         let n = added[f.kind as usize];
-        let limit = build_cap(f.kind).filter(|_| n > 0)?;
+        let limit = build_cap_in(tower.mode, f.kind).filter(|_| n > 0)?;
         Some(Raised {
             cap: CapKey::Kind(f.kind),
             limit,

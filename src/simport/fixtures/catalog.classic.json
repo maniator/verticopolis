@@ -2078,8 +2078,8 @@
     "scheduleAssist": false,
     "shadedLook": false,
     "tallSkyLobbies": false,
-    "venueFlights": false,
-    "variantHouseholds": false
+    "variantHouseholds": false,
+    "venueFlights": false
   },
   "version": 18,
   "world": {

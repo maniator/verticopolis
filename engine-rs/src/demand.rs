@@ -52,6 +52,9 @@ impl Simulation {
     /// station helps business by this mode's rule (`metro_helps_business`).
     /// The platform is the station's middle story, so SimTower's station on
     /// B8 to B10 lets them off on B9.
+    /// A Modern tower's several stations all stand on one row
+    /// (`Tower::metro_reason`) and share that platform, so any one of them
+    /// that helps business makes it count, and more stations do not widen it.
     pub fn shopper_metro_platform(&self) -> Option<i64> {
         let need_service = self.mode.metro_help_needs_service();
         self.tower

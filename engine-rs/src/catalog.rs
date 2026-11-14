@@ -32,7 +32,7 @@ use crate::economy::{
     MAINTENANCE_PER_CAR_MONTHLY, NIGHTCLUB_DJ_MONTHLY, REAL_WORLD_MAINT_PERIOD_DAYS,
 };
 use crate::facilities::{
-    build_cap, ground_floor_structure_kind, no_basement, pools_for, Kind, Pool, FACILITIES,
+    build_cap_in, ground_floor_structure_kind, no_basement, pools_for, Kind, Pool, FACILITIES,
     LOBBY_INTERVAL, LOT_WIDTH, MAX_FLOOR, MIN_FLOOR, POOLED_CAPS,
 };
 use crate::rules::{RentModel, MAX_HOUSEHOLD};

@@ -23,6 +23,8 @@
  *     lobby (#308) towers for the Help site.
  *   - `screenshot-venue-flights-builders.ts`: `buildVenueFlightsTower`, flights
  *     beside a cinema and the metro for the Help site.
+ *   - `screenshot-metro-builders.ts`: `buildMetroLineTower`, a Modern line of
+ *     three metro stations.
  *
  * Keep re-exports only here (erasable): no enums / namespaces / parameter
  * properties.
@@ -36,3 +38,4 @@ export * from "./screenshot-scene-builders.ts";
 export * from "./screenshot-security-builders.ts";
 export * from "./screenshot-tall-lobby-builders.ts";
 export * from "./screenshot-venue-flights-builders.ts";
+export * from "./screenshot-metro-builders.ts";
