@@ -122,7 +122,7 @@ fn every_rider_of_a_car_at_the_window_edge_is_in_the_frame() {
     assert_eq!(ids(&reader.frame(&sim, false)), riders);
 }
 
-/// The window is the camera, not the game: the tower's own reader keeps it
+/// The window belongs to the camera: the tower's own reader keeps it
 /// between frames, and stepping is the same with or without it.
 #[test]
 fn the_tower_reader_keeps_the_window_and_the_game_ignores_it() {

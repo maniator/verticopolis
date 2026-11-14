@@ -1,9 +1,10 @@
 //! The people window: the part of the tower a view draws, so its frame
 //! carries only the people there (`ViewReader::set_people_window`). The 1994
 //! game draws every person in its scrolling window and none outside it; a
-//! view does the same here, so the frame grows with the screen, not with the
-//! crowd. The window is the host's camera, never game state: it is not saved
-//! and not hashed, and the simulation steps every person whatever it is.
+//! view does the same here, so the frame's size follows the screen and stays
+//! flat as the crowd grows. The window is the host's camera and no part of
+//! the game: it is not saved and not hashed, and the simulation steps every
+//! person whatever it is.
 
 use crate::crowd::Person;
 use crate::tower::Transport;

@@ -44,7 +44,8 @@ export function applySpeed(app: GameApp, s: number): void {
 }
 
 /** Read this frame's view. Its people are the ones on screen (the camera's
- *  people window), so the frame grows with the view, not with the crowd. */
+ *  people window), so the frame's size follows the screen and stays flat as
+ *  the crowd grows. */
 function readView(app: GameApp): void {
   const w = peopleWindow(app.engine);
   app.enginePort.setPeopleWindow(w.floorLo, w.floorHi, w.xLo, w.xHi);

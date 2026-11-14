@@ -18,8 +18,8 @@ type Camera = Pick<TowerEngine, "screenToTile" | "screenToFloor" | "viewWidth" |
 
 /** The part of the tower on screen, plus {@link WINDOW_MARGIN}. The 1994 game
  *  draws every person in its scrolling window and none outside it, so the
- *  frame carries the people the view shows and grows with the screen, not
- *  with the crowd. */
+ *  frame carries the people the view shows: its size follows the screen and
+ *  stays flat as the crowd grows. */
 export function peopleWindow(camera: Camera): PeopleWindow {
   return {
     floorLo: camera.screenToFloor(camera.viewHeight) - WINDOW_MARGIN.floors,
