@@ -23,6 +23,9 @@ import { copyEngineDiagnostics } from "./engineDiagnosticsCopy";
 import { downloadEngineFailureArchive } from "./engineCrash/failureArchive";
 import { pageControlled, repairOffered } from "./wasmhost/engineRepair";
 import { runEngineRepair } from "./engineRepairControl";
+import { DEBUG_FLAG, debugFlagOn, storedDebugFlags } from "./debugFlags";
+import { PREVIEW_DEPLOY } from "./deployTarget";
+import type { FrameStatsLike } from "./debugHud";
 
 /**
  * Boot entry split out of `main.ts` (the `GameApp` composition root). Keeps the
@@ -41,6 +44,8 @@ interface BootApp {
   setSpeed?(speed: number): void;
   reader?: { header: { minutes: number } };
   speed?: number;
+  /** The tower renderer once a tower is open; the `?debug=fps` overlay reads its frame stats. */
+  engine?: { engine: { stats: { prevFrame: FrameStatsLike } } };
 }
 
 /** The renderer needs WebGL; some in-app file viewers don't provide it. */
@@ -379,6 +384,18 @@ export function bootGame(create: (tower: BootTower) => BootApp): Promise<void> {
       // still reach anything client-side; this closes the handed-out path.
       if (import.meta.env.DEV || __TOOLING_BUILD__) {
         (window as unknown as { game: BootApp }).game = app;
+      }
+      // `?debug=fps` loads the frame statistics overlay (#645). The module is
+      // a lazy chunk, so a session without the flag never downloads it. It is
+      // kept out of the precache, so an offline start cannot load it: the catch
+      // keeps that miss out of the unhandled-rejection error analytics. A
+      // preview or staging deploy and the dev server also honor the stored
+      // `vc-debug` list (src/debugFlags.ts); production reads only the URL.
+      const storedDebug = storedDebugFlags(PREVIEW_DEPLOY || import.meta.env.DEV);
+      if (debugFlagOn(location.search, DEBUG_FLAG.fps, storedDebug)) {
+        void import("./debugHud")
+          .then((hud) => hud.mountDebugHud(() => app.engine?.engine))
+          .catch((err: unknown) => console.warn("debug HUD did not load", err));
       }
       // Register the service worker so the game is installable and offline-ready.
       // On a new build: prompt the player (never force a reload), see
