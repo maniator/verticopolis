@@ -49,6 +49,9 @@ impl Tower {
         if u.kind == Kind::Lobby && u.floor == GROUND_FLOOR {
             return Some(GROUND_LOBBY_STAYS);
         }
+        if let Some(r) = self.skybridge_removal_reason(u) {
+            return Some(r);
+        }
         let stories = self.unit_stories(u);
         if u.floor >= GROUND_FLOOR && !self.structure_span_free(u.floor + stories, u.x, u.width) {
             return Some(STORY_ABOVE_STANDS);

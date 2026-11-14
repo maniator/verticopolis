@@ -13,12 +13,15 @@ mod lobby_halls;
 mod metro;
 mod placement;
 mod removal;
+mod skybridge;
 mod tall_lobby;
 mod transports;
 mod types;
 mod undoing;
 
 pub use lobby_halls::HallRun;
+pub use skybridge::SKYBRIDGE_MAX_SPAN;
+pub(crate) use skybridge::{Row as BridgeRow, SKYBRIDGE_PRICE_FACTOR};
 pub use types::{Extras, ExtrasMut, PlaceResult, ResizeResult, Transport, Unit, UnitState};
 
 /// The refusal for a Classic floor tile with floor on both sides: taking it
@@ -294,8 +297,13 @@ impl Tower {
         })
     }
 
+    /// Whether a shaft over `w` columns from `x` has a floor or lobby tile
+    /// to stand on at `floor`. A sky bridge tile does not count: a bridge
+    /// carries no shaft.
     pub fn shaft_has_structure_at(&self, floor: i64, x: i64, w: i64) -> bool {
-        (0..w).any(|i| self.structure.contains_key(&(floor, x + i)))
+        (0..w).any(|i| {
+            self.structure.contains_key(&(floor, x + i)) && !self.is_skybridge_tile(floor, x + i)
+        })
     }
 
     // ---- registration ----------------------------------------------------

@@ -128,6 +128,14 @@ impl GameMode {
         self == GameMode::Modern
     }
 
+    /// Whether a row of lobby tiles may cross open air on a sky lobby floor
+    /// between two wings (a sky bridge, `tower/skybridge.rs`). Modern
+    /// does (sky bridge design, owner 2026-11-14); Classic keeps SimTower's
+    /// rule that every tile stands on the story below.
+    pub fn builds_skybridges(self) -> bool {
+        self == GameMode::Modern
+    }
+
     /// Whether a placed room of `kind` stays for good: SimTower gives the
     /// player no way to delete housekeeping, security, recycling, the movie
     /// theater or the cathedral (our wedding hall). Modern lets them be sold

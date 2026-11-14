@@ -132,12 +132,15 @@ impl Tower {
     /// The height a lobby `w` tiles wide laid at `(floor, x)` gets. In
     /// Classic, the floor's ([`Self::placement_lobby_height`]). In Modern,
     /// the height of the hall it is laid against, the left one first, or
-    /// the height asked for when it stands on its own (#2068).
+    /// the height asked for when it stands on its own (#2068). A sky bridge
+    /// tile is one story, beside a tall hall too: it sits beside the hall
+    /// as a hall of its own (`tower/skybridge.rs`).
     pub(crate) fn placement_lobby_height_at(&self, floor: i64, x: i64, w: i64) -> i64 {
         if !self.mode.lobby_height_per_hall() {
             return self.placement_lobby_height(floor);
         }
-        if !self.mode.raises_lobby_on(floor) {
+        let bridge = self.lays_skybridge_at(floor, x) && self.floor_has_lobby(floor);
+        if !self.mode.raises_lobby_on(floor) || bridge {
             return 1;
         }
         let beside = |col: i64| self.hall_at(floor, col).map(|u| self.unit_stories(u));

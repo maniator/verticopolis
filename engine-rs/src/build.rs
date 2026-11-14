@@ -110,9 +110,13 @@ impl Simulation {
     /// lobby placed where there is no floor yet pays for that floor too
     /// ([`pays_for_floor`]); a lobby over a floor tile turns it into lobby
     /// for the lobby's price alone.
+    /// A sky bridge tile, a lobby tile over open air, costs
+    /// `SKYBRIDGE_PRICE_FACTOR` times a lobby tile on a story.
     fn structure_tile_cost(&self, kind: Kind, floor: i64, x: i64, stories: i64) -> f64 {
         if self.tower.has_structure(floor, x) {
             kind.facility().cost * stories as f64
+        } else if kind == Kind::Lobby && self.tower.lays_skybridge_at(floor, x) {
+            bare_tile_cost(kind, stories) * crate::tower::SKYBRIDGE_PRICE_FACTOR
         } else {
             bare_tile_cost(kind, stories)
         }

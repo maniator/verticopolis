@@ -4,8 +4,10 @@ use super::{PlaceResult, Tower, Unit, UnitState};
 use crate::facilities::*;
 
 impl Tower {
+    /// Whether `w` tiles from `x` on `floor` have a story under every one.
+    /// A sky bridge carries no story, so its tiles do not count.
     fn rests_on_story_below(&self, floor: i64, x: i64, w: i64) -> bool {
-        self.span_has_floor(floor - 1, x, w)
+        self.span_has_floor(floor - 1, x, w) && !self.span_has_skybridge(floor - 1, x, w)
     }
 
     pub fn is_supported(&self, floor: i64, x: i64, w: i64) -> bool {
@@ -163,7 +165,12 @@ impl Tower {
             if let Some(r) = self.structure_taken_reason(kind, floor, x, f.width) {
                 return PlaceResult::fail(r);
             }
-            if !self.is_supported(floor, x, f.width) {
+            let bridge = kind == Kind::Lobby && self.bridges_floor(floor);
+            if bridge && !self.is_supported(floor, x, f.width) {
+                if let Some(r) = self.skybridge_reason(floor, x, f.width) {
+                    return PlaceResult::fail(r);
+                }
+            } else if !self.is_supported(floor, x, f.width) {
                 return PlaceResult::fail(if floor >= 2 {
                     "Floors and lobbies must sit on the story below: no floating overhangs."
                 } else {
@@ -394,7 +401,10 @@ impl Tower {
         let mut here = [false; LOT_WIDTH as usize];
         for fl in floor..(floor + hgt).min(self.lot().top_floor() + 1) {
             let supportable = |tx: i64, below: &[bool]| -> bool {
-                fl < 2 || self.structure.contains_key(&(fl - 1, tx)) || below[tx as usize]
+                fl < 2
+                    || (self.structure.contains_key(&(fl - 1, tx))
+                        && !self.is_skybridge_tile(fl - 1, tx))
+                    || below[tx as usize]
             };
             let mut tx = x - 1;
             while tx >= 0 {

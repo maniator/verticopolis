@@ -224,3 +224,7 @@ mod tests;
 #[cfg(test)]
 #[path = "wasm_port_undo_refusal_tests.rs"]
 mod refusal_tests;
+
+#[cfg(test)]
+#[path = "wasm_port_skybridge_tests.rs"]
+mod skybridge_tests;

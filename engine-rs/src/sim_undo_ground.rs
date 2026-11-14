@@ -197,6 +197,21 @@ impl<'a> Ground<'a> {
         self.tower.lobby_tile_count(floor) + added > 0
     }
 
+    /// Whether lobby tile `u` stands as a sky bridge once the step applies:
+    /// over open air on a floor a bridge may cross, hanging from a wing's
+    /// lobby across a gap a lobby closes (`Tower::skybridge_reason`).
+    fn bridges(&self, u: &Unit) -> bool {
+        if u.kind != Kind::Lobby || !self.tower.bridges_floor(u.floor) {
+            return false;
+        }
+        let floor = u.floor;
+        let row = crate::tower::BridgeRow {
+            kind_at: |x| self.built_by((floor, x)).map(|(_, kind)| kind),
+            rests: |x| self.holds(floor - 1, x),
+        };
+        (u.x..u.x + u.width).all(|x| row.fault(x).is_none())
+    }
+
     /// Whether the step leaves a room tile on `row`.
     fn rooms_stay_on(&self, row: i64) -> bool {
         let on_row = self.tower.room_tiles.get(&row).copied().unwrap_or(0);
@@ -223,7 +238,7 @@ impl<'a> Ground<'a> {
             let rests = if u.floor <= GROUND_FLOOR {
                 tiles_of(u).all(|tile| !self.adrift.contains(&tile))
             } else {
-                (u.x..u.x + u.width).all(|x| self.holds(u.floor - 1, x))
+                (u.x..u.x + u.width).all(|x| self.holds(u.floor - 1, x)) || self.bridges(u)
             };
             let concourse = u.kind == Kind::Lobby && is_sky_lobby_floor(u.floor);
             return rests
