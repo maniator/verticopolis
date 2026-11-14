@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { SAVES_DRAW } from "../ui/savesDraw";
 import { showSaves, saveToSlot, loadFromSlot, deleteSlot, showTowerPicker, loadFromSplash, undoSlot } from "./appModals";
 import { __resetSlotGuardForTest, forgetLiveTower, homeSlot, pendingUndo, rememberHome } from "../storage/slotGuard";
 import type { SavesGuard } from "../ui/templates/saves";
@@ -72,11 +73,21 @@ beforeEach(() => {
 });
 
 describe("showSaves", () => {
+  it("counts saves_open when the player opens the dialog, not when it redraws itself (#2161)", () => {
+    const { app, ui } = makeApp(makeSim());
+    showSaves(app, SAVES_DRAW.open);
+    expect(trackAppAction).toHaveBeenCalledExactlyOnceWith("saves_open");
+    vi.mocked(trackAppAction).mockClear();
+    showSaves(app, SAVES_DRAW.redraw);
+    expect(trackAppAction).not.toHaveBeenCalled();
+    expect(ui.showSaves).toHaveBeenCalledTimes(2); // the redraw still draws the list
+  });
+
   it("passes the SaveGame slot listing and the kept unreadable autosave to the UI", () => {
     const sim = makeSim();
     const { app, ui } = makeApp(sim);
     vi.mocked(SaveGame.listSlots).mockReturnValueOnce([{ slot: "auto", exists: false, present: false }]);
-    showSaves(app);
+    showSaves(app, SAVES_DRAW.open);
     expect(SaveGame.listSlots).toHaveBeenCalledTimes(1);
     expect(ui.showSaves).toHaveBeenCalledExactlyOnceWith([{ slot: "auto", exists: false, present: false }], "VCTOWER1\nkept", {
       home: null,
@@ -89,10 +100,10 @@ describe("showSaves", () => {
   it("passes the live tower's home slot while that slot still holds what it saved", () => {
     const { app, ui } = makeApp(makeSim());
     saveToSlot(app, 2);
-    showSaves(app);
+    showSaves(app, SAVES_DRAW.open);
     expect(ui.showSaves.mock.calls[0][2]).toMatchObject({ home: 2 });
     store(2, "written by another tab", "Other");
-    showSaves(app);
+    showSaves(app, SAVES_DRAW.open);
     expect(ui.showSaves.mock.calls[1][2]).toMatchObject({ home: null });
   });
 
@@ -102,7 +113,7 @@ describe("showSaves", () => {
     store(1, "VCZ1:tower x", "Tower X");
     rememberHome(1, "VCZ1:tower x");
     const { app, ui } = makeApp(makeSim()); // the live tower is "Fake"
-    showSaves(app);
+    showSaves(app, SAVES_DRAW.open);
     expect(ui.showSaves.mock.calls[0][2]).toMatchObject({ home: null });
     saveToSlot(app, 1); // so a save there is a replace, with an Undo
     expect(pendingUndo(SaveGame.slotRaw)).toMatchObject({ slot: 1, towerName: "Tower X", action: "replaced" });
@@ -117,7 +128,7 @@ describe("the overwrite guard's Undo", () => {
     const { app, ui } = makeApp(makeSim());
     saveToSlot(app, 1);
     expect(stored.get(1)).toBe("packed:SAVE TEXT");
-    showSaves(app);
+    showSaves(app, SAVES_DRAW.open);
     const undo = guardShown(ui).undo!;
     expect(undo).toMatchObject({ slot: 1, towerName: "Old Tower", action: "replaced" });
     expect(undo.run()).toBe("back");
@@ -161,7 +172,7 @@ describe("the overwrite guard's Undo", () => {
     const { app, ui } = makeApp(makeSim());
     deleteSlot(app, 2);
     expect(stored.has(2)).toBe(false);
-    showSaves(app);
+    showSaves(app, SAVES_DRAW.open);
     expect(guardShown(ui).undo).toMatchObject({ slot: 2, towerName: "Gone Tower", action: "deleted" });
     expect(undoSlot(app)).toBe("back");
     expect(stored.get(2)).toBe("VCZ1:deleted tower");
@@ -197,14 +208,14 @@ const guardShownOf = (ui: ReturnType<typeof makeApp>["ui"]): SavesGuard => ui.sh
 describe("the guard's click-time answer", () => {
   it("asks for a slot holding another tower, read from storage now, not from the drawn list", () => {
     const { app, ui } = makeApp(makeSim());
-    showSaves(app); // drawn with every slot empty
+    showSaves(app, SAVES_DRAW.open); // drawn with every slot empty
     store(3, "VCZ1:written by another tab", "Other");
     expect(guardShownOf(ui).replaceTarget!(3)).toMatchObject({ slot: 3, towerName: "Other" });
   });
 
   it("answers with an unreadable row for a slot this version can't read, so the dialog never saves over it at once", () => {
     const { app, ui } = makeApp(makeSim());
-    showSaves(app);
+    showSaves(app, SAVES_DRAW.open);
     stored.set(3, "VCZ9:from a newer build"); // written since, and listed as not existing
     vi.mocked(SaveGame.listSlots).mockReturnValueOnce([{ slot: 3, exists: false, present: true }]);
     expect(guardShownOf(ui).replaceTarget!(3)).toEqual({ slot: 3, exists: false, present: true });
@@ -213,7 +224,7 @@ describe("the guard's click-time answer", () => {
   it("saves at once into an empty slot or the live tower's own", () => {
     const { app, ui } = makeApp(makeSim());
     saveToSlot(app, 1);
-    showSaves(app);
+    showSaves(app, SAVES_DRAW.open);
     expect(guardShownOf(ui).replaceTarget!(1)).toBeNull();
     expect(guardShownOf(ui).replaceTarget!(2)).toBeNull();
   });
@@ -239,7 +250,7 @@ describe("the live tower's home slot follows loads", () => {
     expect(homeSlot(SaveGame.slotRaw)).toBe(2);
     loadFromSlot(app, "auto");
     expect(homeSlot(SaveGame.slotRaw)).toBeNull();
-    showSaves(app);
+    showSaves(app, SAVES_DRAW.open);
     expect(guardShownOf(ui).replaceTarget!(2)).toMatchObject({ slot: 2 }); // so saving over Y asks
   });
 

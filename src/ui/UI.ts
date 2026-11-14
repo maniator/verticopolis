@@ -16,6 +16,7 @@ import type { BulldozeDragPicker, LobbyHeightPicker } from "./templates/toolInfo
 import { lobbyPickerFor } from "./lobbyHeightStrip";
 import { renderToolCard } from "./toolCard";
 import * as dialogs from "./uiDialogs";
+import { SAVES_DRAW, type SavesDraw } from "./savesDraw";
 import * as help from "./uiHelp";
 import * as panels from "./uiPanels";
 import * as status from "./uiStatus";
@@ -78,7 +79,7 @@ export interface UICallbacks {
   onReplayOnboarding(): void;
   onRenameTower(name: string): void;
   onShowStats(): void;
-  onShowSaves(): void;
+  onShowSaves(draw: SavesDraw): void;
   /** The inspector card's ✕ was clicked — dismiss it and latch it closed. */
   onInspectorClose(): void;
   onSaveSlot(slot: number): boolean;
@@ -205,7 +206,7 @@ export class UI {
 
     // Quick Save is the top-bar 💾 (index.html); null-safe so a trimmed DOM that omits it does not throw.
     document.getElementById("btn-save-top")?.addEventListener("click", () => this.cb.onSave());
-    document.getElementById("btn-load")!.addEventListener("click", () => this.cb.onShowSaves());
+    document.getElementById("btn-load")!.addEventListener("click", () => this.cb.onShowSaves(SAVES_DRAW.open));
     document.getElementById("btn-new")!.addEventListener("click", () => this.promptNewTower());
     document.getElementById("btn-settings")!.addEventListener("click", () => this.showSettings());
     document.getElementById("btn-help")!.addEventListener("click", () => this.showHelp());

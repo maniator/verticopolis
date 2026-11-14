@@ -1,4 +1,5 @@
 import { createAppHistory, type AppHistory } from "./game/appHistory";
+import type { SavesDraw } from "./ui/savesDraw";
 import type { FacilityKind } from "./shared/types";
 import type { TransportView, UnitView } from "./simport/view";
 import { TowerEngine, type Picked } from "./render/excalibur/TowerEngine";
@@ -357,7 +358,7 @@ class GameApp implements GameAppPorts {
 
   // Stats + save-slot modal commands, bodies in game/appModals.ts.
   showStats(): void { void showStats(this); }
-  showSaves(): void { showSaves(this); }
+  showSaves(draw: SavesDraw): void { showSaves(this, draw); }
   saveToSlot(slot: number): boolean { return saveToSlot(this, slot); }
   loadFromSlot(slot: number | "auto"): void { loadFromSlot(this, slot); }
   deleteSlot(slot: number): void { deleteSlot(this, slot); }

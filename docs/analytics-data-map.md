@@ -121,6 +121,10 @@ These are lower bounds like every client event: a failure that kills the tab, or
 a blocked relay, reports nothing. `docs/analytics-measurement-status.md` rows 8
 to 10 and 24 say what they can and cannot support.
 
+## Saved Towers opens
+
+`app_action` `saves_open` counts the player opening the Saved Towers dialog from the game panel's Saves… button. Up to 3.12.3 it also fired each time the open dialog redrew its list (after a slot save, a delete, an Undo or a refused save), so one visit could count several times; from the next release it counts opens only (#2161). Compare across that release with care. No saved insight or dashboard tile read it when it changed (checked 2026-11-14). The title screen's picker counts separately as `splash_load_open`.
+
 ## Sponsor link taps
 
 `app_action` `sponsor_click` counts a tap on a link to the GitHub Sponsors page (owner, 2026-11-14). `detail` is `splash` for the title screen's corner link or `help` for any help site link to that page (the sidebar's "Sponsor Verticopolis" entry and the front page's text). It is the tap only: whether anyone went on to sponsor is never known here, and the Android app shows no Sponsor link. It is not latched, so read taps, or sessions that tapped, and say which. A click, keyboard Enter or middle-click counts; a link opened from the right-click menu does not. The "Sponsor link taps" dashboard tile splits it by `detail`.

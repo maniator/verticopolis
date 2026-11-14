@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
 import { rustScheduleEngine } from "../fixtures/autoTuneDouble";
+import { SAVES_DRAW } from "../../ui/savesDraw";
 import { describe, it, expect, vi, beforeEach, afterEach, afterAll } from "vitest";
 import { HudTower, pump, rebaseLog } from "../../ui/hud.fixture";
 import { towerCatalog, useTowerCatalogSource } from "../../catalog/towerCatalog";
@@ -1743,7 +1744,8 @@ describe("wireControls — toolbar buttons route to callbacks (no dead buttons)"
     document.getElementById("btn-stats")!.click();
     expect(cb.onUndo).toHaveBeenCalledOnce();
     expect(cb.onRedo).toHaveBeenCalledOnce();
-    expect(cb.onShowSaves).toHaveBeenCalledOnce();
+    // The Saves… button is the player opening the dialog: no redraw reason (#2161).
+    expect(cb.onShowSaves).toHaveBeenCalledExactlyOnceWith(SAVES_DRAW.open);
     expect(cb.onShowStats).toHaveBeenCalledOnce();
   });
 
@@ -2029,7 +2031,7 @@ describe("showSaves — the save-slot manager", () => {
     ui.showSaves(slots);
     dialog().querySelector<HTMLElement>('[data-save="2"]')!.click();
     expect(cb.onSaveSlot).toHaveBeenCalledWith(2);
-    expect(cb.onShowSaves).toHaveBeenCalledOnce(); // re-render
+    expect(cb.onShowSaves).toHaveBeenCalledExactlyOnceWith(SAVES_DRAW.redraw); // re-render, not an open (#2161)
 
     ui.showSaves(slots);
     dialog().querySelector<HTMLElement>('[data-load="1"]')!.click();
@@ -2039,6 +2041,7 @@ describe("showSaves — the save-slot manager", () => {
     ui.showSaves(slots);
     dialog().querySelector<HTMLElement>('[data-del="1"]')!.click();
     expect(cb.onDeleteSlot).toHaveBeenCalledWith(1);
+    expect(cb.onShowSaves).toHaveBeenLastCalledWith(SAVES_DRAW.redraw);
   });
 
   it("downloads a kept unreadable autosave, a tower file when it is one, closing the dialog first", () => {

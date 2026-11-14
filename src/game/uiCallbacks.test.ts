@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
+import { SAVES_DRAW } from "../ui/savesDraw";
 import { catalogFor } from "../tests/catalogFixture";
 import type { GameMode } from "../shared/types";
 import { createUICallbacks, type GameAppPorts } from "./uiCallbacks";
@@ -203,8 +204,11 @@ describe("createUICallbacks delegates every callback to its port", () => {
   it("save slots: show, save, load (incl. auto), delete", () => {
     const { ports } = makePorts();
     const cb = createUICallbacks(ports);
-    cb.onShowSaves();
+    cb.onShowSaves(SAVES_DRAW.open);
     expect(ports.showSaves).toHaveBeenCalledTimes(1);
+    // A redraw from inside the dialog passes its reason through (#2161).
+    cb.onShowSaves(SAVES_DRAW.redraw);
+    expect(ports.showSaves).toHaveBeenLastCalledWith(SAVES_DRAW.redraw);
     cb.onSaveSlot(2);
     expect(ports.saveToSlot).toHaveBeenCalledWith(2);
     // Each invocation delegates exactly once; assert counts so a double-fire or a
