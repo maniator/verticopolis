@@ -15,6 +15,46 @@ raised the version, so they are documentation only.
 There is no entry for 0.17.0, which only
 existed as a step inside a stacked branch.
 
+## 1.33.4 (2026-11-14)
+
+- A meal venue's head count (fast food, restaurant, food hall; `Kind::is_meal_venue`) is the customers inside it (`customers_in`) while it stands, as party halls and cinemas already count their visitors. Commercial kinds no trip is sent to keep their full head count. Like the attendance venues (`Kind::counts_visitors`), a meal venue's head count is left out of the save, starts at 0 on a load or an undo, and is not added to the elevator waiting estimate, since its diners ride as real people. The conformance lock, frame days, port edits and fuzz goldens are re-pinned, and the Classic ransom scenario's first threat moved to hour 304.
+
+## 1.33.3 (2026-11-14)
+
+- `Tower::removal_reason` lets a Modern sky lobby tile go (`GameMode::removes_lobby_tiles`), keeps the ground lobby in both modes, checks the story above a tall hall's top, and refuses a floor or lobby tile a shaft needs in its column.
+- `remove_facility` refunds a tall lobby tile half its price on each story it rises.
+- An undo or redo that takes a tall lobby tile out is refused while a story stands on top of the hall, as a sale is.
+
+## 1.33.2 (2026-11-14)
+
+- Studios and apartments join the kinds that cannot be placed underground (`no_basement` in the catalog), so every home follows one rule. Saves that already hold basement studios or apartments still load.
+
+## 1.33.1 (2026-11-14)
+
+- Housekeepers are shift workers in the crowd: each crew's six walk in from the lobby two hours before the shift (and at any later hour on duty a crew is short, as after a load), by the staff route when one reaches the lobby and the passenger route when not, chain rooms on the staff route (a housekeeper who just finished a room takes the nearest dirty room their crew may take), ride home when nothing is left, and leave through the lobby when the shift ends. A housekeeper whose trip breaks stops where they stand and is sent on instead of leaving the crowd.
+- Housekeepers on shift no longer count toward the crowd's 140-person sample. A housekeeper who finishes a room is sent on after the crowd chunk they finished in, from the dirty rooms read once per step; one dispatch pass per step serves those waiting at their housekeeping rooms, and the hourly pass reads the rooms fresh.
+- The conformance lock moves, since housekeepers now travel in the crowd and the rooms clean at different minutes; the Classic ransom scenario now reaches its bomb threat after 376 hourly ticks.
+
+## 1.33.0 (2026-11-14)
+
+- `build_cap_in(mode, kind)` gives a tower's cap per mode, and the Modern catalog publishes a Metro `buildCap` of 3. Every station stands on the first station's row, undo puts a station back beside another, and a returning rider walks to the station nearest their shaft.
+
+## 1.32.0 (2026-11-14)
+
+- The catalog's `rules` block adds `venueFlights` (Modern `true`, Classic `false`, `GameMode::winds_venue_flights`): whether a frontend draws a one-story flight beside a venue as a spiral staircase or a switchback escalator. Drawing only. Catalog version 18; the catalog digests move for this field alone.
+
+## 1.31.0 (2026-11-14)
+
+- `setPeopleWindow(floorLo, floorHi, xLo, xHi)` (and `ViewReader::set_people_window` with a `view::PeopleWindow` in the crate) makes `viewFrame` carry only the people on screen, padded so every rider of a car on screen comes along; a number that is not finite clears it.
+
+## 1.30.3 (2026-11-14)
+
+- The far-from-a-lobby trade penalty for venues counts a working Metro platform (the station's middle story) as a place shoppers arrive, in both the hourly takings and the service diagnostics' `lobbyFar` fact.
+
+## 1.30.2 (2026-11-14)
+
+- A rider no longer gives up while aboard a car: they ride to their floor, and step out of the trip only when their car, their shaft or their floor's stop goes. The conformance lock moves.
+
 ## 1.30.1 (2026-11-13)
 
 - `Tower::nearest_lobby_floor_distance` counts a tall lobby hall (#308) on every story it fills, so a floor over a 3-story hall on floor 30 is one floor from it (it was three). The commercial lobby penalty, its card fact `commercial.lobbyFar`, the tenant lobby-distance drain and the card's `lobbyDistance` all read it. One-story lobbies and floors below a hall are unchanged, and no conformance scenario moves.

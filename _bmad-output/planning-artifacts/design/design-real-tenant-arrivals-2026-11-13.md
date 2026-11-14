@@ -165,8 +165,13 @@ What that says:
   person per step. There is no quadratic cliff to fix first.
 - **The frame grows with every person.** `frame_view` writes every person
   every frame (about 23 numbers each, about 0.18 KB), so 15,000 people add
-  about 2.6 MB and 2 to 3 ms to every frame before the renderer touches it,
-  and the renderer then reads all of it.
+  about 2.6 MB and 2 to 3 ms to every frame before the renderer touches it.
+  Correction (2026-11-14): the web game reads the view's frame
+  (`view::ViewReader`), which already sends 8 numbers per person and only
+  the rooms that changed. Measured with the same towers, 15,000 people cost
+  it 0.2 to 0.3 ms and about 940 KB. `frame_view` is the suites' read. So
+  the engine's frame was never the web's bottleneck; the cost that grows is
+  the browser's: decoding every record, and one drawn figure per person.
 - The worst steps (8 to 14 ms on the large tower even with no crowd) are the
   hourly and daily work, not the crowd. They are worth their own look.
 - Routing a new trip costs 3 to 12 microseconds, so 15,000 tenants making
@@ -234,6 +239,13 @@ measures it before and after.
 - A trip starts from the tower's entrances: the ground lobby, a Metro
   platform, or (Modern) a parking space for homes with parking. The share
   between them follows today's spawn weights, not a new tuning.
+- Nobody appears or vanishes inside the tower (owner, 2026-11-14). Every
+  tenant comes in through an entrance and leaves through one, and a trip
+  inside the tower runs from one room to another; a person is created only
+  at an entrance or inside their own unit and removed only there. Each
+  tenant PR carries a test that walks a day and checks every arrival and
+  departure against that rule. Staff and visitors get the same audit in the
+  people look work.
 - A tenant with no route does not arrive. The room card says why (the
   existing unreachable copy).
 - Riders already use real cars and real calls. A unit whose people travel
@@ -254,6 +266,58 @@ measures it before and after.
   as people get there, so a slow tower fills late and an unreachable office
   never fills.
 
+### Venues: the visitors who are really there
+
+The owner asked (2026-11-14) that party halls, restaurants, shops and the
+other venues show the people who are actually inside. Today that holds for
+some venues only:
+
+- **Party halls, cinemas, wedding halls and the aquatic center** already do.
+  Their figures and their take come from the visitors who walked in
+  (`customers_in`, copied to the head count by `sync_attendance_occupants`).
+- **Restaurants, fast food, shops and the other commercial rooms** do not.
+  While open, the room draws its full complement (`economy/traffic.rs` sets
+  the head count to the catalog's population), and the take follows the
+  demand estimate (`demand_map.fraction_by_unit`). Crowd people who walk in
+  are counted in `customers_in`, but nothing draws or pays from that count.
+
+The rules for venues:
+
+- A venue draws the visitors inside it and no more: the head count is
+  `customers_in`, the people who arrived and have not left. An open
+  restaurant nobody reached draws empty.
+  Done on 2026-11-14 for the meal venues (fast food, restaurants, food
+  halls), ahead of the rest of this step: their head count is now
+  `customers_in` (`Unit::visitor_occupants`, gated by `Kind::is_meal_venue`),
+  so the art, the elevator demand estimate and the room card agree. Today's
+  diners are still the 140-person crowd, so they look emptier in a big tower
+  until tenants go out to eat. Retail shops, boutique bays, amusements, spas,
+  nightclubs, sky bars and the daycare get no visitor trips at all yet, so
+  they keep drawing a full house: the owner's tattoo parlor (a boutique bay)
+  still reads Customers 0. They switch to `customers_in` in the same PR that
+  first sends shoppers to them, or they would draw empty all day.
+- Visitors who are tenants (office lunch, and later residents and hotel
+  guests going out to eat or shop) are the real tenant people from the steps
+  above. Visitors from outside stay spawned, but without the 140 cap, so how
+  many come follows the demand estimate and each one walks and rides there.
+- Venue workers commute like office workers (owner, 2026-11-14). Every shop,
+  restaurant, fast food, hall and cinema has staff who are tenant people of
+  that room: they come in through an entrance before it opens and leave
+  after it closes, and a venue opens only once its staff are in. How many
+  staff each kind has goes in the catalog, checked against the original on
+  the owner's PC where it shows. Security guards and the medical center's
+  staff commute the same way. Housekeepers are designed first in the people
+  look work, and every other worker follows that design, so the tower has
+  one worker model.
+- A venue's take follows the visitors who came. Whether the 1994 game pays a
+  shop or restaurant per customer is checked on the owner's PC before this
+  PR (added to the PC look), and the rule follows what it shows.
+- Both modes. The room art already draws from the head count, so no
+  renderer change.
+- The economy moves for every tower with commercial rooms, so this PR
+  carries a headless before-and-after of income, the conformance lock and
+  the crate version.
+
 ### Performance work that comes first
 
 1. **A scale benchmark.** `crowd_scale` (the table above), so every later
@@ -262,7 +326,11 @@ measures it before and after.
 2. **A view-sized, slimmer frame for people.** As the original does: the
    frame carries the people inside the host's view rectangle, with no
    separate cap, and each person's record shrinks to what drawing needs;
-   route details are read on demand. This is the frame layout and the
+   route details are read on demand. The view's frame already had the slim
+   record (8 numbers, no route), so this step is the people window
+   (`setPeopleWindow`, 2026-11-14): the web sends its camera each frame and
+   gets back only the people on screen, padded so every rider of a car on
+   screen comes along, as the people look thread asked. This is the frame layout and the
    renderer's input, so it is planned with the "Make NPCs look more human"
    thread and starts after #2116 ships. It is also what #2092's inspector
    reads.
@@ -289,6 +357,10 @@ the old rule survives, so every existing save opens. The groundwork PR
 settles the `SAVE_VERSION` question and ships a test that saves at 7:45 AM
 with people mid trip, loads, steps two game hours and matches the run that
 never saved, plus a fixture proving a 3.7.0 save opens.
+
+Each tenant keeps one person id for as long as they live or work in the
+tower, saved with them, so a later Modern feature can let the player name
+people (owner idea, 2026-11-14, not planned yet).
 
 ### Determinism
 
@@ -317,7 +389,8 @@ in Classic; whether they stay once commuters are real is a later call.
 1. **The scale benchmark** (this PR). No behavior change.
 2. **One PC look at the original** (with the owner's go): a full lobby queue
    at the morning rush, counting the figures drawn against the Elevator
-   Window's red number, and what a 41st person does. No code. It settles how
+   Window's red number, and what a 41st person does. No code. The same session
+   checks whether a shop's or restaurant's income follows its customer count. It settles how
    queues are drawn in step 3.
 3. **The view-sized, slimmer people frame.** After #2116, with the people
    look thread. Moves the frame layout and the crate version.
@@ -331,8 +404,15 @@ in Classic; whether they stay once commuters are real is a later call.
    before-and-after (lunch traffic follows staffed offices); a test for each
    removal case (bulldoze, transport deleted mid-ride, eviction mid-trip,
    mode switch).
-6. **Homes, then hotels**, one PR each.
-7. **#2092**, the inspector.
+6. **Venues draw and earn from real visitors, and their staff commute.**
+   Restaurants, fast food, shops and the other commercial rooms are paid for
+   the visitors who actually came (the meal venues already draw only those
+   visitors; shops switch over when shoppers are first sent to them),
+   and every venue's staff come in before opening and leave after closing
+   (see "Venues" above). After offices, so office lunch visitors are real
+   people.
+7. **Homes, then hotels**, one PR each.
+8. **#2092**, the inspector.
 
 ## Party review
 

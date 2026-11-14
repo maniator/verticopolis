@@ -21,8 +21,12 @@ const PINNED: Record<string, Nonzero> = {
   // Riders boarding only cars stopped at their floor (#2051) lit one fire in
   // these two and a half years; Classic's 1994 dispatch rules (#2049) put the
   // run on another seeded path, which lit none; riders walking straight to
-  // their place in line (#2116) put it on a path that lights one again.
-  "scenarios/holidays-classic.json": { santaFxSeq: 2, thiefSeq: 1, thiefCaught: 1, thiefFloor: 77, fires: 1, firesGutRooms: 3 },
+  // their place in line (#2116) put it on a path that lights one again;
+  // riders staying aboard to their floors (3.7.3) put it on one that lights
+  // none, and later dispatch changes lit three again; meal venues drawing only
+  // their real diners (#2160) move the cars onto a path that lights none. The
+  // fire sites stay pinned by the events and fire-rescue runs.
+  "scenarios/holidays-classic.json": { santaFxSeq: 2, thiefSeq: 1, thiefCaught: 1, thiefFloor: 77 },
   "scenarios/events-classic.json": { explosionSeq: 1, explosionFloor: 5, explosionX: 174.5, thiefFloor: 1, fires: 1, firesGutRooms: 1, bombs: 1 },
   // After the direct threat detonates, a second threat is called in during
   // the last two days, with Security sold and nobody to search (#1973).

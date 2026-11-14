@@ -1,6 +1,6 @@
 {
   "id": "amenities-modern",
-  "description": "The Modern tower-one at four stars (the towerone fixture with star raised to four and the treasury filled) builds the Modern amenities the basement and ground floor have room for (a nightclub and a daycare two floors under the lowest condos, a fitness club, a spa, a clinic, a food hall, an amusement arcade, a boutique bay, a sky bar and two rentals), puts the express shaft on an authored schedule whose home floors are not express stops so they snap to the nearest lobby, and runs ten days at hour ticks across the monthly maintenance roll: condo households relocate, nightclub noise and the amenity halos reach the satisfaction step and its vacate reasons, and the rental studio leases (the apartment stays empty across the run).",
+  "description": "The Modern tower-one at four stars (the towerone fixture with star raised to four and the treasury filled) builds the Modern amenities the basement has room for (a nightclub and a daycare two floors under the lowest condos, a fitness club, a spa, a clinic, a food hall, an amusement arcade, a boutique bay and a sky bar), adds two rentals above ground, where homes must stand (a studio on floor 2 and an apartment on floor 58, which no transport reaches), puts the express shaft on an authored schedule whose home floors are not express stops so they snap to the nearest lobby, and runs ten days at hour ticks across the monthly maintenance roll: condo households relocate, nightclub noise and the amenity halos reach the satisfaction step and its vacate reasons, and the rental studio leases (the apartment stays empty across the run).",
   "start": {
     "fixture": "conformance/fixtures/towerone-star4.vctower",
     "mode": "modern"
@@ -63,13 +63,13 @@
     {
       "op": "build",
       "kind": "rentalStudio",
-      "floor": -3,
-      "x": 133
+      "floor": 2,
+      "x": 89
     },
     {
       "op": "build",
       "kind": "rentalApartment",
-      "floor": -3,
+      "floor": 58,
       "x": 145
     },
     {

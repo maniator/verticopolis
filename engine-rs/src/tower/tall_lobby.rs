@@ -3,7 +3,8 @@
 //! A tall lobby is lobby units each covering the stories above their floor
 //! as well: the tower's structure index holds the lobby on every story it
 //! covers, so nothing else can be built there, the story above it stands on
-//! it, and like any lobby it can never be removed. Only its own floor counts
+//! it, and like any lobby it stays unless Modern's bulldozer takes a sky
+//! hall's tile (`Tower::removal_reason`). Only its own floor counts
 //! as a lobby floor (`lobby_tiles`), though the distance to a lobby counts
 //! from every story the hall fills (`nearest_lobby_floor_distance`), so the
 //! floor over a tall hall is next to it. The stories it rises through are no
@@ -182,7 +183,7 @@ impl Tower {
 
     /// Why a floor's first lobby, asked to rise, cannot be laid here: the
     /// mode keeps this floor's lobby one story. Refused rather than laid one
-    /// story high, since a lobby can never be removed and the player asked
+    /// story high, since a Classic lobby is never removed and the player asked
     /// for a taller one. `None` once the floor holds a lobby (every later
     /// tile takes its height) or when the height asked is one story.
     fn lobby_cannot_rise_reason(&self, floor: i64) -> Option<String> {

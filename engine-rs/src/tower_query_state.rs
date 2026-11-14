@@ -26,6 +26,10 @@ pub struct Memo {
     )>,
     /// The metro station's floor, keyed on `metro_changes` when it was found.
     pub metro_floor: Option<(u64, Option<i64>)>,
+    /// The metro stations' ids, keyed on `metro_changes` like `metro_floor`,
+    /// so the hourly takings find them without walking the rooms. A tower
+    /// builds one, but a loaded save is not held to the build cap.
+    pub metro_ids: Option<(u64, std::sync::Arc<[i64]>)>,
     /// Raised each time a station registers or unregisters, so placing any
     /// other unit leaves `metro_floor` standing.
     pub metro_changes: u64,

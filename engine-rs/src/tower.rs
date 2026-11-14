@@ -10,7 +10,9 @@ use crate::facilities::*;
 use crate::lot::Lot;
 
 mod lobby_halls;
+mod metro;
 mod placement;
+mod removal;
 mod tall_lobby;
 mod transports;
 mod types;
@@ -42,7 +44,7 @@ pub(crate) fn span_has_floor_on_both_sides(
 /// Whether the story has floor on the left of the tile at `x`, by Classic's
 /// floor end rule: plain floor stands anywhere left of it, or the tiles
 /// touching it on the left, unbroken by a gap, hold a lobby tile (owner
-/// ruling, 2026-11-13, on #2062). Lobby tiles are never removed, so counting
+/// ruling, 2026-11-13, on #2062). Classic never removes a lobby tile, so counting
 /// one beyond a gap would trap the plain floor between it and the far end
 /// for good; a lobby the tile touches still counts, so a floor tile right
 /// beside a lobby is not an end. Plain floor anywhere counts, so the tiles
@@ -375,7 +377,7 @@ impl Tower {
     // ---- placement rules -------------------------------------------------
 
     pub fn cap_reason(&self, kind: Kind) -> Option<String> {
-        if let Some(single) = build_cap(kind) {
+        if let Some(single) = build_cap_in(self.mode, kind) {
             if self.count_kind(kind) >= single {
                 let f = kind.facility();
                 return Some(format!(

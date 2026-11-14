@@ -65,4 +65,13 @@ impl GameMode {
     pub fn shaded_look(self) -> bool {
         self == GameMode::Modern
     }
+
+    /// Whether a frontend draws a one-story stair beside a venue (a cinema,
+    /// party hall, metro station or aquatic center) as a spiral staircase and
+    /// such an escalator as a switchback (Modern). Drawing only: the flight
+    /// links the same two floors either way. SimTower drew every one-story
+    /// flight straight, so Classic does too.
+    pub fn winds_venue_flights(self) -> bool {
+        self == GameMode::Modern
+    }
 }

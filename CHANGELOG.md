@@ -25,6 +25,65 @@ prompt already tells players it is an engine update and shows the new version.
 Entries below 1.51.1 were curated from the commit history after the fact, so they
 are documentation only: no build that a client fetches carries them.
 
+## 3.10.7
+
+- The Bulldoze card has a **Drag clears** choice. **One kind** (the default) keeps a drag to the kind of thing it started on; **Everything** lets one drag clear all it crosses. On a phone the choice sits in a strip over the tower while the bulldozer is armed.
+- A bulldoze drag now removes only the kind of thing it started on, so sweeping across a floor no longer takes out the elevator or the rooms it crosses. A single click still removes anything.
+
+## 3.10.6
+
+- Fast food, restaurants and food halls now show only the diners who are actually inside, and a quiet one looks quiet. They used to draw a full room whenever they were open.
+
+## 3.10.5
+
+- Modern: the bulldozer now takes out a sky lobby a tile at a time, tall halls included, for half of what each tile cost. The ground lobby stays, and Classic keeps every lobby as in 1994.
+- The bulldozer no longer takes the last floor tile out from under an elevator, stairway or escalator, which left the shaft hanging in midair.
+- Undo no longer takes a tall lobby out from under a floor you built on top of it.
+
+## 3.10.4
+
+- Fire escapes now run up every story beside a tall lobby, split-tower halls included, so they no longer break off beside the hall.
+- The roof crane stands with its mast on the middle of the top floor's widest stretch and sits on top of a tall lobby there. A top too narrow for its base, such as a one-tile spire, shows no crane.
+
+## 3.10.3
+
+- Studios and apartments can no longer be built in the basement, the same as condos, hotel rooms and offices. Towers that already have them underground still load and keep them.
+
+## 3.10.2
+
+- Housekeepers now come in through the lobby before their shift and leave through it at the end, and no longer appear at the Housekeeping room or vanish at a hotel room.
+- A housekeeper who finishes a room goes straight on to the nearest dirty one, and rides back to the Housekeeping room only when none is left, so a busy hotel is clean sooner in the afternoon.
+
+## 3.10.1
+
+- The VERTICOPOLIS badge at the top left of the game now carries its ™ mark, like the title screen. So do the version line in Settings and About this game, and the sprite gallery and missing-page titles.
+
+## 3.10.0
+
+- Modern towers can now build up to three Metro stations, all on the same line as the first. Riders split between them, someone going back to the train walks to the nearest one, and one train runs the line, calling at each station in turn.
+
+## 3.9.0
+
+- Saved Towers asks before a save replaces a tower in an occupied slot, unless it knows that slot holds the tower you're playing: that slot is marked This tower and still saves in one click.
+- A replaced or deleted slot can be put back with Undo.
+- A slot save that fails now says so inside Saved Towers, where a message used to be hidden behind the dialog.
+- Hotel guests and condo residents asleep at night are drawn as the same people you see by day, with their own face and hair on the pillow, instead of an older flat sketch.
+- A housekeeper riding an elevator stays inside the car at fast speeds, instead of jumping ahead of it and floating in the empty shaft.
+
+## 3.8.0
+
+- In Modern, a stairway right beside a cinema, party hall, metro station or aquatic center is drawn as a spiral staircase, and an escalator there turns back on a steel landing halfway up. They link the same two floors as before; only the look changes. Classic keeps straight flights, as in 1994.
+- Someone climbing a stack of one-story flights (an escalator up to a deck, then stairs on up from it) is drawn on the flight they are actually riding, instead of staying on the first one.
+
+## 3.7.4
+
+- A shop, restaurant or theater near a working Metro platform no longer warns that it is too far from a lobby, and does full business, as the 1994 game's basement shops beside the station did.
+
+## 3.7.3
+
+- Elevator cars show only the people who actually stepped in, one figure each, so a car no longer looks full with nobody aboard.
+- People riding an elevator stay aboard to their floor and step off there, instead of vanishing from the car partway through a slow ride.
+
 ## 3.7.2
 
 - A shop or restaurant just above a tall lobby no longer says it is too far from a lobby. Distance to a tall lobby now counts from its top story, for tenants' ratings too.

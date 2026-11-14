@@ -102,3 +102,26 @@ pub fn matches_meal_origin_kind(u: &Unit, bucket: MealOrigin) -> bool {
 pub fn outbound_weight(t: f64) -> f64 {
     (2.0 * (0.6 - t)).clamp(0.0, 1.0)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::MealWindow;
+    use crate::facilities::FACILITIES;
+
+    /// `Kind::is_meal_venue` names exactly the kinds some meal window sends
+    /// people to, so a room that draws its diners always has diners who can
+    /// come, and no other kind.
+    #[test]
+    fn meal_venues_are_the_kinds_meal_windows_send_people_to() {
+        let windows = [
+            MealWindow::Breakfast,
+            MealWindow::Lunch,
+            MealWindow::Dinner,
+            MealWindow::LateNight,
+        ];
+        for f in FACILITIES.iter() {
+            let sent_to = windows.iter().any(|w| w.venues().contains(&f.kind));
+            assert_eq!(f.kind.is_meal_venue(), sent_to, "{:?}", f.kind);
+        }
+    }
+}

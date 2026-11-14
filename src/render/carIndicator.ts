@@ -7,9 +7,9 @@
 export type CarArrow = "up" | "down" | null;
 
 export interface CarIndicator {
-  /** Riders to draw: one figure per passenger aboard, up to as many as the
-   *  cab has room for (`cabFit`), so the line that boards is the crowd in the
-   *  cab (#2116). A fuller cab shows its FULL sign. */
+  /** Riders to draw: one figure per person who walked into the cab, up to as
+   *  many as it has room for (`cabFit`), so the line that boards is the crowd
+   *  in the cab (#2116). The car's load never adds figures (3.7.3). */
   riders: number;
   /** Direction lantern: which way the car is moving, or null when idle. */
   arrow: CarArrow;
@@ -31,18 +31,19 @@ export function cabFit(cabWidth: number): number {
 /**
  * Map an elevator car's live state to its cab indicators.
  * @param dir  −1 descending, 0 idle, +1 ascending
- * @param load passengers currently aboard
+ * @param load the engine's car load (the traffic model's head count), for FULL
  * @param cap  car capacity
  * @param fit  rider figures the cab has room for (`cabFit`)
+ * @param aboard people the crowd shows boarding this car (`countCabRiders`)
  */
-export function carIndicator(dir: number, load: number, cap: number, fit: number): CarIndicator {
+export function carIndicator(dir: number, load: number, cap: number, fit: number, aboard: number): CarIndicator {
   // Treat any non-finite input as a safe default so a stray NaN can never leak
   // into a cache key or the draw call.
   const validCap = Number.isFinite(cap) && cap > 0;
   const safeLoad = Number.isFinite(load) ? Math.max(0, load) : 0;
   const safeDir = Number.isFinite(dir) ? dir : 0;
   const room = Number.isFinite(fit) ? Math.max(0, Math.floor(fit)) : 0;
-  const riders = Math.min(room, Math.round(safeLoad));
+  const riders = Number.isFinite(aboard) ? Math.min(room, Math.max(0, Math.floor(aboard))) : 0;
   let arrow: CarArrow = null;
   if (safeDir > 0) arrow = "up";
   else if (safeDir < 0) arrow = "down";

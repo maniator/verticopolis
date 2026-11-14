@@ -7,10 +7,10 @@ import { figureOf } from "./crowdLook";
 /**
  * The elevator-car glide as WIRED into the renderer (GH #688, #2097): glide
  * persistence across frames, the shaft-span clamp, and the draw-state
- * carry-over across a syncMotion rebuild; and the decorative passers-by
- * (#2091). Split from towerCrowd.test.ts to respect the file-size guard; the
- * pure glide math is pinned in ../carMotion.test.ts, and the fixtures here
- * mirror the sibling's.
+ * carry-over across a syncMotion rebuild; the decorative passers-by (#2091);
+ * and the metro's one train per line. Split from towerCrowd.test.ts to respect
+ * the file-size guard; the pure glide math is pinned in ../carMotion.test.ts,
+ * and the fixtures here mirror the sibling's.
  */
 
 const gfx = () => ({ width: 9, height: 25 }) as ex.Graphic;
@@ -26,6 +26,12 @@ function simFixture(over: Record<string, any> = {}): any {
     tower: { revision: 1, units: [] },
     ...over,
   };
+}
+
+/** A tenant riding at the middle of a shaft at floor `fy`, as the engine
+ *  places riders (`Riding` in crowd/motion.rs). */
+function rider(id: number, x: number, fy: number): any {
+  return { id, seed: id, state: "riding", x, floor: Math.round(fy), fy, wait: 0 };
 }
 
 /** The sibling suite's fake engine, trimmed to what the motion paths read. */
@@ -140,7 +146,8 @@ describe("a cab's riders change with the people getting in and out (#2097)", () 
       syncMotion(e);
       updateMotion(e, 1);
       const idle = e.carActors[0].shown;
-      t.carLoad[0] = 6; // riders got in on this step
+      // Six people walked in on this step: they ride at the shaft's middle.
+      e.sim.crowd = { people: [1, 2, 3, 4, 5, 6].map((id) => rider(id, 14, 5)) };
       e.sim.clock = { ...e.sim.clock, minutes: 1 };
       updateMotion(e, 1);
       expect(e.carActors[0].shown).toBe(idle); // the step's glide is still running
@@ -150,6 +157,43 @@ describe("a cab's riders change with the people getting in and out (#2097)", () 
       syncMotion(e); // a structural edit rebuilds the cab, idle
       updateMotion(e, 1);
       expect(e.carActors[0].shown).toBe(loaded);
+    } finally {
+      HTMLCanvasElement.prototype.getContext = origGetContext;
+    }
+  });
+});
+
+describe("a cab draws the people who boarded it, never the car's load (3.7.3)", () => {
+  it("keeps a loaded car with nobody aboard empty, and fills it as riders board and leave", () => {
+    const origGetContext = HTMLCanvasElement.prototype.getContext;
+    HTMLCanvasElement.prototype.getContext = function (this: HTMLCanvasElement) {
+      return new Proxy({ canvas: this }, { get: (t, p) => (p in t ? (t as any)[p] : () => undefined), set: () => true });
+    } as any;
+    try {
+      const t = { id: 7, kind: "elevatorStandard", x: 12, width: 4, bottom: 1, top: 20, cars: 2, carPositions: [5, 15], carDir: [0, 0], carLoad: [0, 0] };
+      const e = eng({ sim: simFixture({ tower: { revision: 1, units: [], transports: [t] } }) });
+      syncMotion(e);
+      updateMotion(e, 1);
+      const empty = e.carActors[0].shown;
+      expect(empty.startsWith("0:")).toBe(true);
+      // The traffic model fills both cars with nobody on the landing: no figures.
+      let minute = 1;
+      const step = (people: any[]) => {
+        t.carDir = [1, 1];
+        e.sim.crowd = { people };
+        e.sim.clock = { ...e.sim.clock, minutes: minute++ };
+        updateMotion(e, 1);
+        updateMotion(e, 4000);
+      };
+      t.carLoad = [16, 16];
+      step([]);
+      expect(e.carActors.map((c: any) => c.shown.split(":")[0])).toEqual(["0", "0"]);
+      // Two board the low car and one the high car: each cab shows its own.
+      step([rider(1, 14, 5), rider(2, 14, 5), rider(3, 14, 15), { ...rider(4, 14, 5), state: "waiting" }]);
+      expect(e.carActors.map((c: any) => c.shown.split(":")[0])).toEqual(["2", "1"]);
+      // They step off at their floors; the load is still there and draws nobody.
+      step([]);
+      expect(e.carActors.map((c: any) => c.shown.split(":")[0])).toEqual(["0", "0"]);
     } finally {
       HTMLCanvasElement.prototype.getContext = origGetContext;
     }
@@ -316,5 +360,52 @@ describe("a bomb search clears the decorative passers-by and garage cars", () =>
     updateMotion(eng({ sim: morning(search), walkers: [w], garageCars: [g], displayParkingUse: 1 }));
     expect(w.actor.graphics.isVisible).toBe(true);
     expect(g.actor.graphics.isVisible).toBe(true);
+  });
+});
+
+describe("the metro train", () => {
+  it("runs the metro train on game time: in from the left, held, then off the right", () => {
+    const xs: number[] = [];
+    const train = { actor: actor(), u: { x: 20, floor: 3 }, w: 40, line: [0], stop: 0, shift: (offset: number) => xs.push(offset) };
+    const clockAt = (minute: number, night = false) => ({ hour: Math.floor(minute / 60), minuteOfDay: minute, isMorning: () => false, isEvening: () => false, isNight: () => night });
+    const e = eng({ trainActors: [train] });
+    for (const minute of [12 * 60 + 3, 12 * 60 + 10, 12 * 60 + 23]) {
+      e.sim = { ...e.sim, clock: clockAt(minute) };
+      updateMotion(e);
+    }
+    // The three legs (arrive / hold / depart) put the train at distinct
+    // offsets inside the station-wide canvas: off the left, in place, off the right.
+    expect(xs[0]).toBeLessThan(0);
+    expect(xs[1]).toBe(0);
+    expect(xs[2]).toBeGreaterThan(0);
+    // Overnight it stays inside the tunnel however the animation clock runs.
+    e.sim = { ...e.sim, clock: clockAt(2 * 60 + 10, true) };
+    e.d.anim = 7;
+    updateMotion(e);
+    expect(xs[3]).toBe(-(train.w + 12));
+  });
+
+  it("shows one train per line: only the station it is calling at has it", () => {
+    const shifts: number[][] = [[], []];
+    const station = (x: number, stop: number) => ({
+      actor: actor(),
+      u: { x, floor: -9 },
+      w: 40,
+      line: [100, 500],
+      stop,
+      shift: (offset: number) => shifts[stop].push(offset),
+    });
+    const e = eng({ trainActors: [station(100, 0), station(500, 1)] });
+    const clockAt = (minute: number) => ({ hour: 12, minuteOfDay: 12 * 60 + minute, isMorning: () => false, isEvening: () => false, isNight: () => false });
+    for (const minute of [10, 30]) {
+      e.sim = { ...e.sim, clock: clockAt(minute) };
+      updateMotion(e);
+    }
+    // At 12:10 the train stands in the west station, out of sight of the east
+    // one; by 12:30 it has run on and stands in the east station.
+    expect(shifts[0][0]).toBe(0);
+    expect(Math.abs(shifts[1][0])).toBeGreaterThanOrEqual(52);
+    expect(shifts[1][1]).toBe(0);
+    expect(Math.abs(shifts[0][1])).toBeGreaterThanOrEqual(52);
   });
 });

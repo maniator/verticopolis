@@ -557,17 +557,18 @@ to one question: would a player notice anything different?
 - **major** (`X.0.0`): the save format or compatibility breaks (an old tower
   would no longer load), or a deliberate headline/milestone release. Rare and
   intentional, never incidental.
-- **minor** (`x.Y.0`): the default player-facing bump. A player would notice
-  something new or changed: a feature, a balance shift, or a visible fix.
-- **patch** (`x.y.Z`): a fix-only follow-up or a re-deploy with no new
-  player-facing capability (a hotfix to an already-shipped release).
+- **minor** (`x.Y.0`): something new a player can use or see: a feature, a
+  new room, setting or tool, or a balance shift.
+- **patch** (`x.y.Z`): a bug fix or a behavior correction with nothing new
+  added, even one a player notices (a room that drew the wrong people, a
+  wrong figure, a hotfix to an already-shipped release).
 - **no bump**: internal-only work with no player-observable effect at all (pure
   refactor, identical-behavior perf, tests, docs, tooling, CI).
 
-The old "minor for a capability, patch for a fix" split is retired; it sorted
-changes by how they were built rather than by what a player feels, so the
-minor/patch line kept coming down to a judgment call. Sort by player impact
-instead, and the question answers itself.
+The owner set this split on 2026-11-14, replacing the earlier "minor for any
+visible change" rule: a fix stays a patch however visible it is, and minor is
+kept for new features. The same split holds for the engine crate (below): a
+new API is minor, a fix or a behavior correction is patch.
 
 A player-facing change whose note says `app: none` (or has no note) is a review
 finding: the splash (and the update prompt's build-id line) would otherwise
