@@ -246,7 +246,8 @@ impl Simulation {
 
     /// At the top of an hour on duty: bring every working crew up to
     /// strength from the lobby (two hours before the shift, a crew built
-    /// mid-shift, or a game loaded mid-shift, since saves carry no people).
+    /// mid-shift, or a game loaded mid-shift from a save written before saves
+    /// carried people).
     pub(crate) fn bring_in_crews(&mut self) {
         let crews: Vec<(i64, i64, f64)> = self
             .tower

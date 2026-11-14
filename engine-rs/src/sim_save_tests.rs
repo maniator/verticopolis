@@ -16,8 +16,9 @@ fn same(sim: &Simulation, what: &str) {
     assert_eq!(sim.serialize().to_string(), text, "{what}: the tree");
 }
 
-/// `serialize()` as it was before #1242, kept verbatim (but for `self`) as
-/// the reference both writers must match.
+/// `serialize()` as it was before #1242, kept verbatim (but for `self`, and
+/// the crowd and the cars' timers added since) as the reference both writers
+/// must match.
 fn reference(sim: &Simulation) -> Value {
     let mut m = Map::new();
     let tall_lobbies = sim.tower.tall_lobbies();
@@ -79,6 +80,9 @@ fn reference(sim: &Simulation) -> Value {
     m.insert("blockbusters".into(), json!(sim.blockbusters));
     m.insert("milestones".into(), json!(sim.milestones));
     m.insert("ledger".into(), sim.ledger.serialize());
+    // Added since: the people and the cars' timers (`crowd::save`).
+    m.insert("crowd".into(), sim.crowd.save_json());
+    m.insert("dispatch".into(), sim.elevators.save_json());
     if let Some(v) = &sim.view {
         m.insert("view".into(), v.clone());
     }
@@ -187,6 +191,27 @@ fn edited_games_write_the_trees_text() {
     u.pending_income = 1e21;
     u.label = "Desk \u{0} \u{7f} \u{FFFD}".into();
     u.rent = Some(0.1 + 0.2);
+    // A person whose numbers a writer can spell differently, and crowd
+    // values no game reaches.
+    let mut p = sim
+        .crowd
+        .people
+        .first()
+        .cloned()
+        .expect("played() has people out");
+    p.fy = 0.1 + 0.2;
+    p.x = -0.0;
+    p.wait = 1e21;
+    p.age = 5e-324;
+    p.dwell_seconds_left = Some(f64::NAN);
+    p.linger_for = Some(f64::INFINITY);
+    sim.crowd.people.push(p);
+    sim.crowd.spawn_acc = f64::NAN;
+    sim.crowd.frustration = -0.0;
+    sim.crowd.walk_ins.push(crate::crowd::walk_ins::WalkIn {
+        at: 0.1 + 0.2,
+        unit_id: -4,
+    });
     // The log's ring keeps no more lines than the save does, so the lines
     // past the save's cap go in directly.
     for i in 0..LOG_SAVE_CAP + 5 {
@@ -227,7 +252,7 @@ fn edited_games_write_the_trees_text() {
     let distinct: HashSet<&str> = keys.iter().copied().collect();
     assert_eq!(
         (keys.len(), distinct.len()),
-        (31, 31),
+        (33, 33),
         "every field once: {keys:?}"
     );
     same(&sim, "an edited game");
@@ -297,10 +322,14 @@ fn the_save_without_units_and_its_units_are_the_trees_save() {
         let (mut rest, units) = sim.save_without_units();
         let units: Vec<Value> = units.collect();
         assert_eq!(Value::Array(units), whole["units"]);
-        rest.as_object_mut()
-            .unwrap()
-            .insert("units".into(), whole["units"].clone());
-        // The keys come back in the tree's order once `units` is put in its place.
+        // The `.TDT` export reads neither the people nor the cars' timers.
+        assert!(rest.get("crowd").is_none() && rest.get("dispatch").is_none());
+        for key in ["units", "crowd", "dispatch"] {
+            rest.as_object_mut()
+                .unwrap()
+                .insert(key.into(), whole[key].clone());
+        }
+        // The same keys and values once the three are put back.
         assert_eq!(
             rest.as_object().unwrap().keys().len(),
             whole.as_object().unwrap().keys().len()

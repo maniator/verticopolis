@@ -171,8 +171,15 @@ fn a_game_loaded_mid_shift_brings_its_crew_in_from_the_lobby() {
     let (mut sim, crew) = hotel(64);
     let room = dirty_room(&mut sim, 4);
     sim.tick(6.0 * HOUR + 30.0);
-    let mut loaded = crate::load::deserialize(&sim.serialize()).expect("the save loads");
-    assert!(staff(&loaded).is_empty(), "saves carry no people");
+    // A save keeps the crew where they stand.
+    let kept = crate::load::deserialize(&sim.serialize()).expect("the save loads");
+    assert!(!staff(&sim).is_empty());
+    assert_eq!(staff(&kept), staff(&sim), "the crew comes back as it stood");
+    // A save from before saves carried people has nobody in the building.
+    let mut old = sim.serialize();
+    old.as_object_mut().unwrap().remove("crowd");
+    let mut loaded = crate::load::deserialize(&old).expect("the save loads");
+    assert!(staff(&loaded).is_empty(), "an old save carries no people");
     loaded.tick(30.0);
     let arrived = loaded
         .crowd

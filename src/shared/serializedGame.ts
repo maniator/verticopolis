@@ -116,4 +116,13 @@ export interface SerializedGame {
    * Simulation.ts), so a loaded tower keeps its message history instead of
    * opening with an empty panel. Absent in older saves (empty log). */
   log?: LogEntry[];
+  /** Everyone in the tower as they stood (walking, waiting, riding, at a
+   * venue, cleaning), so a reload keeps them. The engine owns the shape
+   * (`engine-rs/src/crowd/save.rs`); absent in older saves, which load with
+   * nobody in the building. */
+  crowd?: unknown;
+  /** The elevator cars' timers mid-stop and the waiting estimate per floor,
+   * so the cars carry on after a reload. The engine owns the shape
+   * (`engine-rs/src/dispatch_save.rs`); absent in older saves. */
+  dispatch?: unknown;
 }

@@ -21,9 +21,10 @@
 //! check's sets (the units and shafts a step takes out, the tiles it lays)
 //! use them too: they are only written and looked up.
 //!
-//! `FastMap` and `FastSet` offer no iteration: their order would follow the
-//! hash, so a result that read it could differ between builds. `FastMap`
-//! inserts, looks up, removes and clears; `FastSet` adds and looks up.
+//! `FastMap` and `FastSet` offer no iteration in hash order: it would follow
+//! the hash, so a result that read it could differ between builds. `FastMap`
+//! inserts, looks up, removes and clears, and lists its entries only sorted
+//! by key (`sorted`, for a save); `FastSet` adds and looks up.
 //!
 //! `FastIndexMap` is an `IndexMap` keyed with `FastHasher`. It walks in the
 //! order its keys went in, whatever the hash, so it may be iterated.
@@ -158,6 +159,20 @@ impl<K: Hash + Eq, V> FastMap<K, V> {
     #[inline]
     pub fn clear(&mut self) {
         self.0.clear()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    /// The entries sorted by key, so the order never follows the hash.
+    pub fn sorted(&self) -> Vec<(&K, &V)>
+    where
+        K: Ord,
+    {
+        let mut entries: Vec<(&K, &V)> = self.0.iter().collect();
+        entries.sort_unstable_by(|a, b| a.0.cmp(b.0));
+        entries
     }
 
     /// For checks that an index matches its list (tests, and debug builds'

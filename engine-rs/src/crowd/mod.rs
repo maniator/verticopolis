@@ -1,8 +1,11 @@
-//! Port of `src/engine/Crowd.ts` and `crowd/person.ts`: the drawn people,
-//! which saves never carry. The conformance suite hashes them separately.
+//! Port of `src/engine/Crowd.ts` and `crowd/person.ts`: the people in the
+//! tower. A save carries them (`save`); the conformance suite hashes them as
+//! their own channel.
 
+pub(crate) mod adopt;
 pub mod banks;
 pub mod commuters;
+pub(crate) mod commuters_save;
 pub mod doors;
 pub mod expected_time;
 pub(crate) mod fasthash;
@@ -13,6 +16,7 @@ pub mod meals;
 pub mod motion;
 pub mod routines;
 pub mod routing;
+pub(crate) mod save;
 pub mod spawn;
 pub mod spawn_floors;
 pub mod staff_shift;
@@ -137,7 +141,7 @@ pub struct Person {
     pub commute: Option<commuters::Commute>,
     /// Why a plain commute set out (the floor-list trips of `spawn_trips`),
     /// for the person card (`trip`). Stamped at spawn, draws nothing, and
-    /// the crowd is never saved. Engine-internal: not in the `Person` shape.
+    /// saved with the person. Engine-internal: not in the `Person` shape.
     pub errand: Option<trip::Errand>,
     /// The tile the person first stood on, so the card can name the room a
     /// plain commute left, and so one who gives up before boarding walks back
@@ -248,7 +252,7 @@ pub struct Crowd {
     pub adj: Option<(i64, AdjGraph)>,
     /// The staff graph and the part of it each segment lies in, built
     /// together and keyed on the tower revision (`staff_adjacency`). Never
-    /// saved: a load builds a fresh crowd.
+    /// saved: a load builds it again.
     pub staff_adj: Option<(i64, AdjGraph, StaffParts)>,
     pub shaft_banks: Option<(i64, HashMap<(Kind, Vec<i64>, Vec<i64>), Vec<i64>>)>,
     /// The part of the passenger graph each segment lies in, keyed like
@@ -257,7 +261,7 @@ pub struct Crowd {
     pub seg_served: Option<(i64, HashSet<i64>)>,
     /// The segments the Classic walk-budget search reaches from a lobby
     /// segment (see `graph.rs`). Built from `adj`, so keyed like it on the
-    /// tower revision; a load builds a fresh `Crowd`.
+    /// tower revision; never saved.
     pub lobby_reach: Option<(i64, HashSet<i64>)>,
     pub blockbusters: HashSet<i64>,
     pub staff_done: Vec<StaffResult>,
@@ -284,23 +288,26 @@ pub struct Crowd {
     /// The clock hour of the step, so a venue's visitors keep its opening
     /// hours: nobody stays in or walks into a venue after it closes. `None`
     /// (a crowd stepped on its own) leaves every venue open. Set by the
-    /// step; never saved.
+    /// step, and saved with the crowd as the last step left it.
     pub hour: Option<i64>,
     /// Whether the step's day is a weekend, for the elevator schedules.
+    /// Saved with the crowd, as `hour` is.
     pub weekend: bool,
-    /// The walk-ins booked for this hour, latest first (`walk_ins`).
-    /// Never saved.
+    /// The walk-ins booked for this hour, latest first (`walk_ins`), saved
+    /// with the crowd.
     pub walk_ins: Vec<walk_ins::WalkIn>,
     /// The walk-ins in the crowd, on their way or inside.
     pub walk_in_count: i64,
     /// Each office's workers: inside, on the way in, booked to leave
-    /// (`commuters`), by office id. Never saved: a load takes the saved
-    /// head counts as the workers inside.
+    /// (`commuters`), by office id. Saved with the crowd
+    /// (`commuters_save.rs`); a save without them takes the head counts as
+    /// the workers inside.
     pub desks: std::collections::BTreeMap<i64, commuters::Desk>,
     /// The office arrivals and departures booked for this hour, latest
-    /// first (`commuters`). Never saved.
+    /// first (`commuters`). Saved with the crowd (`commuters_save.rs`).
     pub shifts: Vec<commuters::Shift>,
-    /// The commuting workers in the crowd, on their way in or out.
+    /// The commuting workers in the crowd, on their way in or out. Counted
+    /// again from the people on load.
     pub commuter_count: i64,
     /// The tower revision the desks were last squared with, or `None`
     /// before the first time (`commuters::reconcile`).
@@ -313,7 +320,8 @@ pub struct Crowd {
     pub router: Option<expected_time::Router>,
     /// Riders waiting for or walking to each shaft, keyed (shaft, floor), as
     /// the last motion slice counted them (`line_count::LineCount`). The
-    /// Modern router takes it at the start of each step. Never saved.
+    /// Modern router takes it at the start of each step. Saved with the
+    /// crowd as `lines`, so a reloaded step routes as the live one would.
     pub shaft_lines: fasthash::FastMap<(i64, i64), i64>,
 }
 
@@ -386,8 +394,8 @@ impl Crowd {
     }
 
     /// Replace the commute-stress averages with `[[floor, seconds], ...]`
-    /// rows, the shape [`Crowd::commute_stress_json`] writes: a host seeds
-    /// them at attach, since no save carries them (#1083). The revision is
+    /// rows, the shape [`Crowd::commute_stress_json`] writes: a save carries
+    /// them in its crowd, and a host may seed them at attach (#1083). The revision is
     /// left alone. Refuses rows that are not whole floors with finite
     /// seconds, or that name a floor twice, and then changes nothing.
     pub fn seed_commute_stress(&mut self, rows: &Value) -> Result<(), String> {

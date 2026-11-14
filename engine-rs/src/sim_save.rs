@@ -14,6 +14,9 @@
 use serde::ser::{Serialize, SerializeMap, Serializer};
 use serde_json::{json, Map, Value};
 
+use crate::crowd::save::SavedCrowd;
+use crate::crowd::Crowd;
+use crate::dispatch::ElevatorDispatch;
 use crate::events::{EventSystem, PendingChoice};
 use crate::ledger::{totals_json, Ledger};
 use crate::sim::{stamped_save_version, LogEntry, Simulation, LOG_SAVE_CAP};
@@ -33,6 +36,8 @@ enum Field<'a> {
     Ledger(&'a Ledger),
     Events(&'a EventSystem),
     Log(&'a [LogEntry]),
+    Crowd(&'a Crowd),
+    Dispatch(&'a ElevatorDispatch),
 }
 
 fn log_entry(e: &LogEntry) -> Value {
@@ -41,7 +46,7 @@ fn log_entry(e: &LogEntry) -> Value {
 
 /// A list written as `Value::Array` writes its elements, each element's
 /// `Value` built in turn: the same sequence calls with the same length.
-struct Each<'a, T, F>(&'a [T], F);
+pub(crate) struct Each<'a, T, F>(pub(crate) &'a [T], pub(crate) F);
 
 impl<T, F: Fn(&T) -> Value> Serialize for Each<'_, T, F> {
     fn serialize<S: Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
@@ -63,6 +68,8 @@ impl Field<'_> {
             Field::Ledger(l) => l.serialize(),
             Field::Events(e) => e.save_state(),
             Field::Log(es) => Value::Array(es.iter().map(log_entry).collect()),
+            Field::Crowd(c) => c.save_json(),
+            Field::Dispatch(d) => d.save_json(),
         }
     }
 }
@@ -107,6 +114,9 @@ impl Serialize for Field<'_> {
                 m.end()
             }
             Field::Log(es) => Each(es, log_entry).serialize(s),
+            Field::Crowd(c) => SavedCrowd(c).serialize(s),
+            // A few numbers per car and per floor, so one small tree.
+            Field::Dispatch(d) => d.save_json().serialize(s),
         }
     }
 }
@@ -148,7 +158,7 @@ impl Simulation {
     /// Absent optional fields are left out, which is what the canonical
     /// writer expects. Each key appears once.
     fn save_fields(&self) -> Vec<(&'static str, Field<'_>)> {
-        let mut m: Vec<(&'static str, Field<'_>)> = Vec::with_capacity(31);
+        let mut m: Vec<(&'static str, Field<'_>)> = Vec::with_capacity(32);
         let tall_lobbies = self.tower.tall_lobby_runs();
         m.push(own(
             "version",
@@ -202,6 +212,11 @@ impl Simulation {
         m.push(("blockbusters", Field::Floats(&self.blockbusters)));
         m.push(("milestones", Field::Strings(&self.milestones)));
         m.push(("ledger", Field::Ledger(&self.ledger)));
+        // Everyone in the tower as they stand, so a reload keeps them
+        // (`crowd::save`).
+        m.push(("crowd", Field::Crowd(&self.crowd)));
+        // The cars' timers mid-stop, so the riders' cars carry on too.
+        m.push(("dispatch", Field::Dispatch(&self.elevators)));
         if let Some(v) = &self.view {
             m.push(("view", Field::Borrowed(v)));
         }
@@ -229,9 +244,17 @@ impl Simulation {
     /// assert_eq!(save["version"], PLAIN_SAVE_VERSION);
     /// ```
     pub fn serialize(&self) -> Value {
+        self.serialize_without(&[])
+    }
+
+    /// The save tree without the top-level keys in `left_out`, which are
+    /// never built.
+    pub(crate) fn serialize_without(&self, left_out: &[&str]) -> Value {
         let mut m = Map::new();
         for (k, f) in self.save_fields() {
-            m.insert(k.into(), f.into_value());
+            if !left_out.contains(&k) {
+                m.insert(k.into(), f.into_value());
+            }
         }
         Value::Object(m)
     }
@@ -243,14 +266,9 @@ impl Simulation {
     /// `Value` `serialize()` holds for it.
     #[cfg_attr(not(feature = "wasm"), allow(dead_code))]
     pub(crate) fn save_without_units(&self) -> (Value, impl Iterator<Item = Value> + '_) {
-        let mut m = Map::new();
-        for (k, f) in self.save_fields() {
-            if k != "units" {
-                m.insert(k.into(), f.into_value());
-            }
-        }
+        // The `.TDT` format has no place for the crowd or the cars' timers.
         (
-            Value::Object(m),
+            self.serialize_without(&["units", "crowd", "dispatch"]),
             self.tower.units.iter().map(Unit::serialize),
         )
     }

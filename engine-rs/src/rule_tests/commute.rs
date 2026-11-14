@@ -87,7 +87,7 @@ fn staff_never_count_toward_tenant_stress() {
 }
 
 #[test]
-fn the_same_seed_builds_the_same_averages_and_a_save_keeps_none() {
+fn the_same_seed_builds_the_same_averages_and_a_save_keeps_them() {
     let snap = |sim: &Simulation| {
         let mut rows: Vec<_> = sim
             .crowd
@@ -105,11 +105,12 @@ fn the_same_seed_builds_the_same_averages_and_a_save_keeps_none() {
     }
     assert!(!snap(&a).is_empty());
     assert_eq!(snap(&a), snap(&b));
-    assert!(deserialize(&a.serialize())
-        .unwrap()
-        .crowd
-        .commute_wait_by_floor
-        .is_empty());
+    let save = a.serialize();
+    assert_eq!(snap(&deserialize(&save).unwrap()), snap(&a));
+    // A save from before saves carried the crowd keeps none.
+    let mut old = save;
+    old.as_object_mut().unwrap().remove("crowd");
+    assert!(snap(&deserialize(&old).unwrap()).is_empty());
 }
 
 #[test]

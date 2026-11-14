@@ -256,8 +256,10 @@ pub struct Simulation {
     #[doc(hidden)]
     /// Unit ids under construction, in insertion order.
     pub constructing: IndexSet<i64>,
-    // ---- transient loop state (never saved) ----
+    // ---- loop state ----
     #[doc(hidden)]
+    /// The cars mid-stop and the waiting estimate per floor, saved as
+    /// `dispatch` (`dispatch_save.rs`).
     pub elevators: ElevatorDispatch,
     #[doc(hidden)]
     /// `elevatorUtil` / `elevatorHourly` / `elevatorOrigins` (never saved).

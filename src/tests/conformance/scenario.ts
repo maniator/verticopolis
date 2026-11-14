@@ -271,11 +271,17 @@ function apply(e: ScenarioEngine, c: Command, emit: (label: string) => void, clo
       // A save round trip must lose nothing the save carries. The events go
       // first: a binding's reload frees the engine it replaces.
       const before = e.stateView();
+      const crowdBefore = e.crowdDigest();
       carry(drainChecked(e));
       const loaded = e.reload();
       if (reloadChanged(before, loaded.stateView())) {
         loaded.free?.();
         throw new Error("reload changed the saved state");
+      }
+      // Everyone in the tower comes back as they stood.
+      if (loaded.crowdDigest() !== crowdBefore) {
+        loaded.free?.();
+        throw new Error("reload changed the crowd");
       }
       return loaded;
     }

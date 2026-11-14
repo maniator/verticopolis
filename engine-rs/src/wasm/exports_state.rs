@@ -306,8 +306,8 @@ impl Engine {
     }
 
     /// `crowd.commuteStressByFloor`: the per-origin-floor commute-stress
-    /// average as JSON `[[floor, seconds], ...]`, by floor. No save carries
-    /// it; it rebuilds as trips finish, as on the TypeScript engine.
+    /// average as JSON `[[floor, seconds], ...]`, by floor. A save carries
+    /// it with the crowd; a save without one starts empty and fills as trips finish.
     #[wasm_bindgen(js_name = commuteStress)]
     pub fn commute_stress(&self) -> String {
         self.sim.crowd.commute_stress_json().to_string()

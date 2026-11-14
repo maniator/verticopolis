@@ -277,6 +277,10 @@ fn run_scenario_inner(
                     if reload_changed(&before, &state_view(&loaded)) {
                         return Err(failed("reload changed the saved state".into()));
                     }
+                    // Everyone in the tower comes back as they stood.
+                    if loaded.crowd.view() != sim.crowd.view() {
+                        return Err(failed("reload changed the crowd".into()));
+                    }
                     sim = loaded;
                 }
                 other => apply(&mut sim, other, i)?,

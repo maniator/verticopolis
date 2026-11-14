@@ -119,8 +119,8 @@ export class Engine {
     commuteStressRevision(): number;
     /**
      * `crowd.commuteStressByFloor`: the per-origin-floor commute-stress
-     * average as JSON `[[floor, seconds], ...]`, by floor. No save carries
-     * it; it rebuilds as trips finish, as on the TypeScript engine.
+     * average as JSON `[[floor, seconds], ...]`, by floor. A save carries
+     * it with the crowd; a save without one starts empty and fills as trips finish.
      */
     commuteStress(): string;
     congestion(): number;

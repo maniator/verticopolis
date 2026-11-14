@@ -143,7 +143,7 @@ fn a_hotel_guest_counted_at_a_bulldozed_venue_still_balances_its_room() {
 }
 
 #[test]
-fn a_load_mid_visit_starts_every_tally_at_zero_forged_saves_included() {
+fn a_load_mid_visit_counts_every_tally_from_the_people_forged_saves_included() {
     let mut sim = mixed_tower();
     at_hour(&mut sim, 18);
     let hall = unit_id(&sim, Kind::PartyHall);
@@ -170,20 +170,37 @@ fn a_load_mid_visit_starts_every_tally_at_zero_forged_saves_included() {
         .units
         .iter()
         .any(|u| u.out_for_meal.unwrap_or(0) > 0));
-    let mut save = sim.serialize();
-    for unit in save["units"].as_array_mut().unwrap() {
+    let tallies = |s: &Simulation| -> Vec<(i64, i64, i64, i64)> {
+        s.tower
+            .units
+            .iter()
+            .map(|u| {
+                let count = |n: Option<i64>| n.unwrap_or(0);
+                let (inside, guests) = (count(u.customers_in), count(u.hotel_customers_in));
+                (u.id, inside, guests, count(u.out_for_meal))
+            })
+            .collect()
+    };
+    // Tallies a hand edit writes into the rooms are never read: a load
+    // counts the visitors and the diners out from the people the save
+    // carries.
+    let mut forged = sim.serialize();
+    for unit in forged["units"].as_array_mut().unwrap() {
         unit["customersIn"] = 999.into();
         unit["hotelCustomersIn"] = 999.into();
         unit["outForMeal"] = 999.into();
     }
-    for raw in [sim.serialize(), save] {
+    for raw in [sim.serialize(), forged.clone()] {
         let loaded = deserialize(&raw).unwrap();
-        assert!(loaded.crowd.people.is_empty());
-        for u in &loaded.tower.units {
-            assert_eq!(u.customers_in.unwrap_or(0), 0, "{:?}", u.kind);
-            assert_eq!(u.hotel_customers_in.unwrap_or(0), 0, "{:?}", u.kind);
-            assert_eq!(u.out_for_meal.unwrap_or(0), 0, "{:?}", u.kind);
-        }
+        assert_eq!(loaded.crowd.people.len(), sim.crowd.people.len());
+        assert_eq!(tallies(&loaded), tallies(&sim));
+    }
+    // A save from before saves carried people starts every tally at zero.
+    forged.as_object_mut().unwrap().remove("crowd");
+    let loaded = deserialize(&forged).unwrap();
+    assert!(loaded.crowd.people.is_empty());
+    for (id, inside, guests, out) in tallies(&loaded) {
+        assert_eq!((inside, guests, out), (0, 0, 0), "room {id}");
     }
 }
 
