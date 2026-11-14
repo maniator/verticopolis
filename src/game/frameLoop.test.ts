@@ -64,6 +64,14 @@ describe("runFrame freeze path", () => {
     expect(raw.enginePort.advance).not.toHaveBeenCalled();
   });
 
+  it("still reads the view under a modal, so people stand where the camera pans", () => {
+    const { app, raw } = makeApp({ shownChoice: true, accMinutes: 12 });
+    runFrame(app, 1000);
+    expect(raw.enginePort.advance).not.toHaveBeenCalled();
+    expect(raw.enginePort.setPeopleWindow).toHaveBeenCalledExactlyOnceWith(9, 41, -2, 102);
+    expect(raw.reader.update).toHaveBeenCalledTimes(1);
+  });
+
   it("stops time for good once a wasm-only build has stopped on its engine, whatever the speed", () => {
     const { app, raw } = makeApp({ accMinutes: 7 });
     const stop = document.createElement("div");

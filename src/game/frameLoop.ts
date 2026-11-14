@@ -43,6 +43,14 @@ export function applySpeed(app: GameApp, s: number): void {
   app.speed = s;
 }
 
+/** Read this frame's view. Its people are the ones on screen (the camera's
+ *  people window), so the frame grows with the view, not with the crowd. */
+function readView(app: GameApp): void {
+  const w = peopleWindow(app.engine);
+  app.enginePort.setPeopleWindow(w.floorLo, w.floorHi, w.xLo, w.xHi);
+  app.reader.update();
+}
+
 export function runFrame(app: GameApp, dtMs: number): void {
   // The game stopped on its engine (a wasm-only build's engine that did not
   // start, or a Rust engine that trapped): no engine holds the tower, so
@@ -75,6 +83,9 @@ export function runFrame(app: GameApp, dtMs: number): void {
   // player lose game-hours at high speed while it waits for their answer.
   if (hasBlockingModal(app)) {
     app.accMinutes = 0;
+    // Time stands still, but the camera can still move: the view follows it,
+    // so people stand where the player pans to.
+    readView(app);
     return;
   }
   const minutesPerSecond = SPEEDS[app.speed] ?? 0;
@@ -96,11 +107,8 @@ export function runFrame(app: GameApp, dtMs: number): void {
     throw err;
   }
   // The view follows every frame, so the header, the HUD and the painters
-  // read this frame's tower. Its people are the ones on screen, so the frame
-  // grows with the view, not with the crowd.
-  const w = peopleWindow(app.engine);
-  app.enginePort.setPeopleWindow(w.floorLo, w.floorHi, w.xLo, w.xHi);
-  app.reader.update();
+  // read this frame's tower.
+  readView(app);
   emitMealRushes(app, minutesBeforeTicks);
 
   // Throttle the comparatively expensive DOM/audio updates (~6Hz) so a busy
