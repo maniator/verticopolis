@@ -28,25 +28,45 @@ function install() {
   return { FakeFetchEvent, answered, fetchStub };
 }
 
-/** A stand-in worker global with its own `fetch` spy, in the given lifecycle state (`null`: no `self.serviceWorker`). */
-function workerScope(state: string | null) {
-  const nativeFetch = vi.fn(async (_input: Request | string, _init?: RequestInit) => new Response("ok"));
-  const scope: { fetch: (input: Request | string, init?: RequestInit) => Promise<Response>; serviceWorker?: { state: string } } = { fetch: nativeFetch };
+/** A stand-in Cache Storage: each cache name holds the URLs listed for it, matched without their query. */
+function fakeCaches(stored: Record<string, string[]>) {
+  const bare = (url: string) => url.split("?")[0];
+  const opened: string[] = [];
+  return {
+    opened,
+    keys: async () => Object.keys(stored),
+    open: async (name: string) => {
+      opened.push(name);
+      return {
+        match: async (url: string, options?: { ignoreSearch?: boolean }) => {
+          expect(options?.ignoreSearch, "a revisioned key carries a query").toBe(true);
+          return stored[name].map(bare).includes(bare(url)) ? new Response("cached") : undefined;
+        },
+      };
+    },
+  };
+}
+
+/** A stand-in worker global with its own `fetch` spy answering `body`, in the given lifecycle state (`null`: no `self.serviceWorker`). */
+function workerScope(state: string | null, body = "ok", stored: Record<string, string[]> = {}, status = 200) {
+  const nativeFetch = vi.fn(async (_input: Request | string, _init?: RequestInit) => new Response(body, { status }));
+  const scope: { fetch: (input: Request | string, init?: RequestInit) => Promise<Response>; serviceWorker?: { state: string }; caches: ReturnType<typeof fakeCaches> } = { fetch: nativeFetch, caches: fakeCaches(stored) };
   if (state !== null) scope.serviceWorker = { state };
   return Object.assign(scope, { nativeFetch });
 }
 
-/** Run the script in a worker scope and return what its patched `fetch` hands the browser. */
-async function fetchThroughScript(state: string | null, request: Request, init?: RequestInit) {
-  const scope = workerScope(state);
+/** Run the script in a worker scope and return what its patched `fetch` hands the browser, and what it answers. */
+async function fetchThroughScript(state: string | null, request: Request, init?: RequestInit, page?: { body: string; stored: Record<string, string[]>; status?: number }) {
+  const scope = workerScope(state, page?.body, page?.stored, page?.status);
   class FakeFetchEvent {
     respondWith(): void {}
   }
   new Function("FetchEvent", "fetch", "self", SCRIPT)(FakeFetchEvent, scope.fetch, scope);
-  await scope.fetch(request, init);
+  const answer = scope.fetch(request, init);
+  await answer.catch(() => undefined);
   expect(scope.nativeFetch).toHaveBeenCalledTimes(1);
   const [sent, sentInit] = scope.nativeFetch.mock.calls[0];
-  return { sent: sent as Request, sentInit };
+  return { sent: sent as Request, sentInit, answer, caches: scope.caches };
 }
 
 const nav: Req = { mode: "navigate", url: "https://game.test/" };
@@ -113,6 +133,43 @@ describe("sw-navigation-fallback.js (#1345)", () => {
     const request = new Request("https://game.test/index.html", { integrity: PAGE_SRI });
     const { sent } = await fetchThroughScript(null, request);
     expect(sent).toBe(request);
+  });
+
+  describe("a page from another build fails the install (#1949)", () => {
+    const PRECACHE = "workbox-precache-v2-https://game.test/";
+    const pageRequest = () => new Request("https://game.test/index.html", { integrity: PAGE_SRI });
+    const html = (...names: string[]) => `<html><head>${names.map((n) => `<script type="module" src="./assets/${n}"></script>`).join("")}<link rel="stylesheet" href="./assets/main-1.css"></head></html>`;
+    const thisBuild = { [PRECACHE]: ["https://game.test/assets/main-1.js", "https://game.test/assets/vendor-1.js", "https://game.test/assets/main-1.css", "https://game.test/index.html?__WB_REVISION__=abc"] };
+
+    it("stores a page whose `assets/` files are all in the precache, as the server sent it", async () => {
+      const { answer, caches } = await fetchThroughScript("installing", pageRequest(), undefined, { body: html("main-1.js", "vendor-1.js"), stored: thisBuild });
+      const response = await answer;
+      expect(await response.text()).toBe(html("main-1.js", "vendor-1.js"));
+      expect(caches.opened, "every file is looked up").toHaveLength(3);
+    });
+
+    it("refuses a page that names a file this worker does not precache", async () => {
+      const { answer } = await fetchThroughScript("installing", pageRequest(), undefined, { body: html("main-2.js", "vendor-1.js"), stored: thisBuild });
+      await expect(answer).rejects.toThrow(/from another build/);
+    });
+
+    it("lets a host's rewrite through: its script is not one of the build's files", async () => {
+      const rewritten = `${html("main-1.js")}<script async src="https://toolbar.example/live.js" data-host-toolbar="true"></script>`;
+      const { answer } = await fetchThroughScript("installing", pageRequest(), undefined, { body: rewritten, stored: thisBuild });
+      expect(await (await answer).text()).toBe(rewritten);
+    });
+
+    it("counts only Workbox's precache, so a file kept in another cache does not pass", async () => {
+      const stored = { [PRECACHE]: [], "runtime-assets": thisBuild[PRECACHE] };
+      const { answer } = await fetchThroughScript("installing", pageRequest(), undefined, { body: html("main-1.js"), stored });
+      await expect(answer).rejects.toThrow(/from another build/);
+    });
+
+    it("hands a failed response to Workbox unread, which fails the install on its own", async () => {
+      const { answer, caches } = await fetchThroughScript("installing", pageRequest(), undefined, { body: html("main-2.js"), stored: thisBuild, status: 503 });
+      expect((await answer).status).toBe(503);
+      expect(caches.opened).toEqual([]);
+    });
   });
 
   it("is plain script a worker can import: no module syntax", () => {

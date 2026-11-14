@@ -160,6 +160,11 @@ if (integrity.length > 0) fail(`the precache manifest's integrity is not sound: 
 // with the worker, so the worker must import it and the precache must not
 // list it.
 if (!/importScripts\(\s*["']sw-navigation-fallback\.js["']/.test(sw)) fail("dist/sw.js does not import sw-navigation-fallback.js, so a navigation that fails its integrity would show a blank page");
+// The worker checks the page it installs against the `assets/` files already
+// in the precache, which holds only when Workbox stores them first (#1949).
+const pageAt = urls.indexOf("index.html");
+const assetsAfterPage = urls.slice(pageAt + 1).filter((u) => u.startsWith("assets/"));
+if (pageAt === -1 || assetsAfterPage.length > 0) fail(`index.html must come after every assets/ file in the precache manifest, so the installing worker can check the page against them; after it: ${assetsAfterPage.join(", ") || "(no index.html entry)"}`);
 if (!existsSync(resolve(DIST, "sw-navigation-fallback.js"))) fail("dist/sw-navigation-fallback.js is missing, so the worker would not install");
 if (seen.has("sw-navigation-fallback.js")) fail("sw-navigation-fallback.js is in the precache manifest; the worker imports it, so it must stay out of it");
 // The Help site at /help (release notes included) always comes from the

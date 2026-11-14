@@ -316,3 +316,39 @@ test("an update still installs when the host rewrites the HTML page", async ({ b
     await context?.close();
   }
 });
+
+/**
+ * A deploy that lands while a worker installs must not leave the next build's
+ * page beside this build's files (#1949). The installing worker fetches the
+ * page without its integrity, so a host's rewrite still passes (above), and
+ * refuses a page that names `assets/` files it does not precache: an offline
+ * cold start on that page would ask for scripts the cache never stored. The
+ * next install, with the page back to its own build, goes through.
+ */
+test("an install refuses the next build's page, and the next install stores its own", async ({ browser }) => {
+  let context: BrowserContext | undefined;
+  try {
+    context = await browser.newContext({ baseURL: deployments.origin });
+    const page = await context.newPage();
+    deployments.pageFrom("B");
+    await page.goto("/");
+    await expect.poll(() => deployments.requests.some((r) => r.path === "/index.html" && r.from === "B"), { message: "the installing worker fetched B's page", timeout: 30_000 }).toBe(true);
+    const workerState = () =>
+      page.evaluate(async () => {
+        const r = await navigator.serviceWorker.getRegistration();
+        return r && (r.installing || r.waiting || r.active) ? "a worker" : "no worker";
+      });
+    await expect.poll(workerState, { message: "the install was refused", timeout: 30_000 }).toBe("no worker");
+    expect(await page.evaluate(() => navigator.serviceWorker.controller), "nothing controls the page").toBeNull();
+    expect(await page.evaluate(async () => (await caches.match("index.html", { ignoreSearch: true })) ?? null), "B's page was not stored").toBeNull();
+
+    deployments.pageFrom(null);
+    await installWorker(page);
+    await page.reload();
+    await expectControlledWithEngine(page);
+    await expectCacheIs(page, "A");
+  } finally {
+    deployments.pageFrom(null);
+    await context?.close();
+  }
+});

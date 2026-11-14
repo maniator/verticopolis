@@ -127,6 +127,20 @@ export function precacheIntegrityTransform(distDir: string | (() => string)) {
   });
 }
 
+/**
+ * Moves the HTML page after every other file of the build in the precache
+ * manifest (Workbox appends the plugin's web manifest after the transforms;
+ * the page names no `assets/` file there). Workbox installs the entries one at
+ * a time in manifest order, so when the installing worker fetches the page,
+ * every `assets/` file it precaches is already in the cache, and
+ * `sw-navigation-fallback.js` can refuse a page that names files from another
+ * build (#1949).
+ */
+export function pageLastTransform(entries: ManifestEntry[]): { manifest: ManifestEntry[]; warnings: string[] } {
+  const isPage = (e: ManifestEntry) => e.url.replace(/^\.?\//, "") === "index.html";
+  return { manifest: [...entries.filter((e) => !isPage(e)), ...entries.filter(isPage)], warnings: [] };
+}
+
 /** `key: "value"` in a flat object literal, quoted or bare key, either quote,
  *  and only as a whole key (`baseurl` does not match `url`). The value is group 2. */
 const KEY = (key: string) => new RegExp(`(?:^|[{,\\s])["']?${key}["']?\\s*:\\s*(["'])(.*?)\\1`);
