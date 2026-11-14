@@ -12,7 +12,9 @@
  * when a note has a crate level it raises the crate in `engine-rs/Cargo.toml`
  * and the three `Cargo.lock` files that pin it (the crate, its consumer check
  * and the bench), writes the `engine-rs/CHANGELOG.md` section from
- * the Engine lines and runs `npm run engine:compat`. Then it deletes the notes.
+ * the Engine lines and runs `npm run engine:compat`. The notes' Contributors
+ * lines go under a `### Contributors` heading in each section it writes. Then
+ * it deletes the notes.
  * The rules are in `src/build/changeNotes.ts`; CI checks the result with
  * `scripts/version-check.ts`.
  *
@@ -25,6 +27,7 @@ import { fileURLToPath } from "node:url";
 import {
   CHANGES_DIR,
   bumpVersion,
+  contributorLines,
   highestLevel,
   insertSection,
   readNotes,
@@ -67,6 +70,9 @@ const pending = notes as NonNullable<typeof notes>;
 const branch = execFileSync("git", ["rev-parse", "--abbrev-ref", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
 if (!branch.startsWith("release/")) console.warn(`release: on ${branch}; CI checks a release only on a release/ branch`);
 
+const credits = contributorLines(pending);
+// The engine changelog thanks only the people whose notes moved the crate.
+const engineCredits = contributorLines(pending.filter((n) => n.crate !== "none"));
 const appLevel = highestLevel(pending.map((n) => n.app));
 const crateLevel = highestLevel(pending.map((n) => n.crate));
 const appWas = (JSON.parse(read("package.json")) as { version: string }).version;
@@ -81,7 +87,7 @@ if (named !== undefined) {
 if (app !== appWas) {
   npm(["version", app, "--no-git-tag-version"]);
   const lines = pending.flatMap((n) => n.player);
-  write("CHANGELOG.md", insertSection(read("CHANGELOG.md"), app, lines));
+  write("CHANGELOG.md", insertSection(read("CHANGELOG.md"), app, lines, credits));
   if (lines.length > MAX_NOTES) console.warn(`release: ${lines.length} player lines; the update prompt shows ${MAX_NOTES}, so merge some of them in CHANGELOG.md`);
   const long = lines.filter((l) => l.length > MAX_NOTE_LEN).length;
   if (long > 0) console.warn(`release: ${long} player line(s) over ${MAX_NOTE_LEN} characters; the update prompt would cut them, so split them in CHANGELOG.md`);
@@ -95,7 +101,7 @@ if (crateNow !== crate.version) {
   write("engine-rs/Cargo.toml", setCargoVersion(read("engine-rs/Cargo.toml"), crateNow));
   for (const lock of ["engine-rs/Cargo.lock", "engine-rs/consumer/Cargo.lock", "engine-bench/Cargo.lock"]) write(lock, setLockVersion(read(lock), crate.name, crateNow));
   const changelog = "engine-rs/CHANGELOG.md";
-  write(changelog, insertSection(read(changelog), `${crateNow} (${date})`, pending.flatMap((n) => n.engine)));
+  write(changelog, insertSection(read(changelog), `${crateNow} (${date})`, pending.flatMap((n) => n.engine), engineCredits));
   node(["scripts/engine-compat.ts"]);
 }
 

@@ -70,13 +70,15 @@ export function notesForVersion(
   caps: { maxNotes: number; maxLen: number } = { maxNotes: MAX_NOTES, maxLen: MAX_NOTE_LEN },
 ): string[] {
   let inSection = false;
+  let underCredits = false;
   for (const tok of marked.lexer(changelog)) {
     if (tok.type === "heading" && tok.depth === 2) {
       if (inSection) break; // reached the next version's section
       inSection = headingNamesVersion(tok.text, version);
       continue;
     }
-    if (inSection && tok.type === "list") {
+    if (tok.type === "heading") underCredits = isCreditsHeading(tok as Tokens.Heading);
+    if (inSection && tok.type === "list" && !underCredits) {
       const notes: string[] = [];
       for (const item of tok.items) {
         const text = plainText(item.tokens).trim();
@@ -94,6 +96,43 @@ export function notesForVersion(
 export interface ReleaseNotes {
   version: string;
   notes: string[];
+  /** The section's `### Contributors` list, when it has one. */
+  contributors?: string[];
+}
+
+/** The heading a release section credits its contributors under. */
+const CONTRIBUTORS_HEADING = "Contributors";
+
+/**
+ * The `### Contributors` list of the `## <version>` section, as plain text,
+ * or `[]` when the section credits no one. The release driver writes it after
+ * the player notes (`insertSection` in src/build/changeNotes.ts), so the
+ * update prompt, which reads only the first list, never shows it.
+ */
+export function contributorsForVersion(changelog: string, version: string): string[] {
+  let inSection = false;
+  let underCredits = false;
+  for (const tok of marked.lexer(changelog)) {
+    if (tok.type === "heading" && tok.depth === 2) {
+      if (inSection) break;
+      inSection = headingNamesVersion(tok.text, version);
+      continue;
+    }
+    if (!inSection) continue;
+    if (tok.type === "heading") underCredits = isCreditsHeading(tok as Tokens.Heading);
+    else if (underCredits && tok.type === "list") return listLines(tok as Tokens.List);
+  }
+  return [];
+}
+
+/** Whether a heading opens a section's `### Contributors` list. */
+function isCreditsHeading(tok: Tokens.Heading): boolean {
+  return tok.depth === 3 && tok.text.trim() === CONTRIBUTORS_HEADING;
+}
+
+/** A list's top-level items as plain text, empty ones dropped. */
+function listLines(list: Tokens.List): string[] {
+  return list.items.map((item) => plainText(item.tokens).trim()).filter((n) => n.length > 0);
 }
 
 /** The version a `## <heading>` names (its first token, without `[ ]` or a leading `v`). */
@@ -170,6 +209,19 @@ export function releaseNoteLines(changelog: string, version: string): string[] {
 }
 
 /**
+ * The release page's credits for `version`: a `### Contributors` heading and
+ * one escaped bullet per {@link contributorsForVersion} line, after a blank
+ * line, or `[]` when the version credits no one. Escaping keeps an `@name`
+ * from pinging anyone. The GitHub release workflow prints these after the
+ * notes.
+ */
+export function releaseCreditLines(changelog: string, version: string): string[] {
+  const credits = contributorsForVersion(changelog, version);
+  if (credits.length === 0) return [];
+  return ["", `### ${CONTRIBUTORS_HEADING}`, "", ...credits.map((c) => `- ${escapeMarkdown(c.replace(/\s+/g, " "))}`)];
+}
+
+/**
  * Every version's player notes, newest first, as the release notes page
  * (`/help/changelog`) shows them: each `## <version>` section with at least
  * one bullet, every top-level bullet whole (no {@link MAX_NOTES} or
@@ -180,18 +232,32 @@ export function releaseNoteLines(changelog: string, version: string): string[] {
 export function allReleaseNotes(changelog: string): ReleaseNotes[] {
   const out: ReleaseNotes[] = [];
   let version: string | undefined;
+  let entry: ReleaseNotes | undefined;
   let taken = false;
+  let underCredits = false;
   for (const tok of marked.lexer(changelog)) {
     if (tok.type === "heading" && tok.depth === 2) {
       version = headingVersion(tok.text);
+      entry = undefined;
       taken = false;
+      underCredits = false;
       continue;
     }
-    if (tok.type !== "list" || version === undefined || taken) continue;
+    if (tok.type === "heading") underCredits = isCreditsHeading(tok as Tokens.Heading);
+    if (tok.type !== "list" || version === undefined) continue;
+    if (underCredits) {
+      // One pass: the credits attach to the entry this section already made.
+      const credits = listLines(tok as Tokens.List);
+      if (entry !== undefined && entry.contributors === undefined && credits.length > 0) entry.contributors = credits;
+      continue;
+    }
+    if (taken) continue;
     // The first list under a heading is the section's notes, as in notesForVersion.
     taken = true;
-    const notes = (tok as Tokens.List).items.map((item) => plainText(item.tokens).trim()).filter((n) => n.length > 0);
-    if (notes.length > 0) out.push({ version, notes });
+    const notes = listLines(tok as Tokens.List);
+    if (notes.length === 0) continue;
+    entry = { version, notes };
+    out.push(entry);
   }
   return out;
 }

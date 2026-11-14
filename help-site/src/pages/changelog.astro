@@ -4,6 +4,8 @@
 // CHANGELOG.md at build time through the game's own reader (allReleaseNotes in
 // src/changelog.ts), so the page and the prompt cannot disagree. Each version is
 // a section whose id is the version, so /help/changelog#3.2.0 links to it.
+// A release that credits people lists them after its notes, under
+// "Contributors".
 //
 // Plain text only, as in the prompt: the reader flattens each note and Astro
 // escapes it, so no markup from the file reaches the page.
@@ -40,6 +42,16 @@ const releases = allReleaseNotes(changelog);
             <li>{n}</li>
           ))}
         </ul>
+        {r.contributors && (
+          <>
+            <h3>Contributors</h3>
+            <ul>
+              {r.contributors.map((c) => (
+                <li>{c}</li>
+              ))}
+            </ul>
+          </>
+        )}
       </section>
     ))
   }

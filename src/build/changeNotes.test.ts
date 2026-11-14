@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import {
   bumpVersion,
   changelogVersions,
+  contributorLines,
   highestLevel,
   insertSection,
   parseNote,
@@ -23,7 +24,16 @@ describe("change notes", () => {
       note("app: minor   # what a player notices\ncrate: patch", "## Player\n- Elevators skip empty floors.\n\n## Engine\n- `frame()` adds a count.\n"),
       "my-branch.md",
     );
-    expect(n).toEqual({ file: "my-branch.md", app: "minor", crate: "patch", player: ["Elevators skip empty floors."], engine: ["`frame()` adds a count."] });
+    expect(n).toEqual({ file: "my-branch.md", app: "minor", crate: "patch", player: ["Elevators skip empty floors."], engine: ["`frame()` adds a count."], contributors: [] });
+  });
+
+  it("reads Contributors lines at any level, and credits each person once", () => {
+    const a = parseNote(note("app: none\ncrate: none", "## Contributors\n- trvorth extended the room-capacity sweep (#2198).\n"), "a.md");
+    expect(a.contributors).toEqual(["trvorth extended the room-capacity sweep (#2198)."]);
+    const b = parseNote(note("app: patch\ncrate: none", "## Player\n- A fix.\n## Contributors\n- trvorth extended the room-capacity sweep (#2198).\n- Sam reported it (#670).\n"), "b.md");
+    expect(contributorLines([a, b])).toEqual(["trvorth extended the room-capacity sweep (#2198).", "Sam reported it (#670)."]);
+    expect(() => parseNote(note("app: none\ncrate: none", "## Contributors\n- No period"), "c.md")).toThrow(/period/);
+    expect(() => parseNote(note("app: none\ncrate: none", "## Contributors\n- A.\n## Contributors\n- B.\n"), "c.md")).toThrow(/twice/);
   });
 
   it("reads the optional readmes line, and only as unchanged", () => {
@@ -87,6 +97,12 @@ describe("change notes", () => {
       expect(insertSection(crlf, "2.90.0", ["New."])).toContain("## 2.90.0\r\n\r\n- New.\r\n\r\n## 2.89.1");
       expect(() => insertSection(changelog, "2.89.1", [])).toThrow(/already has/);
       expect(() => insertSection(changelog, "next", [])).toThrow(/version/);
+    });
+
+    it("lists credits under a Contributors heading after the bullets", () => {
+      expect(insertSection(changelog, "2.90.0", ["New."], ["Sam reported it (#670)."])).toContain(
+        "## 2.90.0\n\n- New.\n\n### Contributors\n\n- Sam reported it (#670).\n\n## 2.89.1",
+      );
     });
 
     it("appends when the file has no section yet", () => {

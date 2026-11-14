@@ -82,6 +82,7 @@ jobs:
       # Each note is plain text, so releaseNoteLines escapes its Markdown
       # characters and the page shows it as the prompt does.
       # A version with no player notes (an internal build) gets a plain line.
+      # The section's Contributors list follows the notes (releaseCreditLines).
       - name: Write the release notes
         env:
           TAG: ${{ github.event.inputs.tag || github.ref_name }}
@@ -92,6 +93,7 @@ jobs:
             echo "::notice::CHANGELOG.md has no player notes for ${TAG#v}; the release notes are a plain line."
             echo "Verticopolis ${TAG}." > release/notes.md
           fi
+          VERSION="${TAG#v}" npx tsx -e 'import { readFileSync } from "node:fs"; import { releaseCreditLines } from "./src/changelog.ts"; for (const line of releaseCreditLines(readFileSync("CHANGELOG.md", "utf8"), process.env.VERSION ?? "")) console.log(line);' >> release/notes.md
           printf '\nThe sprite atlas for this version (%s, with its SHA-256 checksum) is attached to this release by a separate workflow; see docs/atlas.md.\n' "verticopolis-atlas-${TAG}.zip" >> release/notes.md
 
       - name: Publish the release
