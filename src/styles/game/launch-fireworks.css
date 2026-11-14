@@ -1,0 +1,17 @@
+/* The version 4 welcome fireworks (src/ui/launchFireworks.ts). The welcome
+   itself is the shared #modal; this canvas sits inside that dialog, fixed to
+   the viewport under the window's box and over the dimmed backdrop, so the
+   fireworks show through the backdrop and close with the dialog. A low-
+   resolution canvas scaled up without smoothing gives the chunky 1990s pixel.
+   Part of the game's stylesheet: src/styles.css imports the parts in order. */
+
+#modal > .launch-fireworks-sky {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: -1;
+  pointer-events: none;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
