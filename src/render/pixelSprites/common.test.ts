@@ -15,6 +15,7 @@ import {
   personWalker,
   personRider,
   personHiVis,
+  sleeper,
   type PersonBuild,
 } from "./common";
 import { CAST, castIndex, drawPerson } from "./people";
@@ -243,5 +244,59 @@ describe("pixelSprites/common person family and palette", () => {
     for (const k of newKeys) expect(RESERVED_COLORS as readonly string[]).not.toContain(PAL[k]);
     // No shirt may be any reserved color (the stress-red case is the load-bearing one).
     for (const s of SHIRTS) expect(RESERVED_COLORS as readonly string[]).not.toContain(s);
+  });
+});
+
+describe("a sleeper (#2116)", () => {
+  /** Every rectangle painted, with its color. */
+  function rects() {
+    const out: { x: number; y: number; w: number; h: number; color: string }[] = [];
+    const ctx = {
+      fillStyle: "",
+      fillRect(x: number, y: number, w: number, h: number) {
+        out.push({ x, y, w, h, color: String(ctx.fillStyle) });
+      },
+    };
+    return { ctx: ctx as unknown as CanvasRenderingContext2D, out };
+  }
+  const EYE = "#2A2228";
+  const BLANKET = "#123456"; // in no look, so the blanket is the one rect in it
+
+  it("draws the cast member's own head and face on the pillow, at the day figures' size", () => {
+    for (let seed = 0; seed < CAST.length; seed++) {
+      const look = CAST[castIndex(seed)];
+      const { ctx, out } = rects();
+      sleeper(ctx, 10, 20, 14, BLANKET, seed);
+      // The day head is five columns by six rows; lying, its middle block is
+      // four columns by five rows in the look's skin, with the look's eye.
+      expect(out.some((r) => r.color === look.skin && r.w === 4 && r.h === 5)).toBe(true);
+      expect(out.some((r) => r.color === EYE && r.w === 1 && r.h === 1)).toBe(true);
+    }
+  });
+
+  it("keeps the body under the blanket and stays in its footprint on the bed", () => {
+    const headX = 10;
+    const headY = 20;
+    for (const len of [4, 7, 10, 30]) {
+      for (let seed = 0; seed < CAST.length; seed++) {
+        const look = CAST[castIndex(seed)];
+        const { ctx, out } = rects();
+        sleeper(ctx, headX, headY, len, BLANKET, seed);
+        const blanket = out.find((r) => r.color === BLANKET);
+        expect(blanket, "the blanket is drawn").toBeDefined();
+        const b = blanket!;
+        // The outfit (top and trousers) never shows past the blanket.
+        for (const r of out.filter((q) => q.color === look.top || q.color === look.bottom)) {
+          expect(r.x >= b.x && r.x + r.w <= b.x + b.w && r.y >= b.y && r.y + r.h <= b.y + b.h, `len ${len}: ${JSON.stringify(r)}`).toBe(true);
+        }
+        // Everything lands in the footprint the bed and the sofa leave for it.
+        for (const r of out) {
+          expect(r.x).toBeGreaterThanOrEqual(headX - 1);
+          expect(r.x + r.w).toBeLessThanOrEqual(headX + 4 + Math.max(len, 6));
+          expect(r.y).toBeGreaterThanOrEqual(headY - 1);
+          expect(r.y + r.h).toBeLessThanOrEqual(headY + 6);
+        }
+      }
+    }
   });
 });

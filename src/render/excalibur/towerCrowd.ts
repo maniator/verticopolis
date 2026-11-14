@@ -173,7 +173,7 @@ function positionPerson(engine: TowerEngine, p: PersonView, rec: CrowdActor, loo
   }
   // A hidden rider still follows the engine, so it reappears where it gets
   // out instead of gliding there from the floor it boarded on.
-  advanceGlide(rec.glide, doorX ?? p.x, p.fy, look.clock.stepped, look.progress, wasShown && !hidden);
+  advanceGlide(rec.glide, doorX ?? p.x, p.fy, look.clock.stepped, look.progress, wasShown && !hidden, p.state === "riding");
   // A rider leaves no trail for the doors: their next step on foot is
   // measured from where they get out, not where they got in.
   if (hidden) {

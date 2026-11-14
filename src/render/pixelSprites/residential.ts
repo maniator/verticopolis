@@ -301,7 +301,7 @@ export function condo(d: RoomCtx, u: UnitView, x: number, y: number, w: number, 
       fill(ctx, base + 20, floorY - 12, 8, 3, "#9A7A8A");
       if (home) personSeated(ctx, base + Math.round(sofaW * 0.4), floorY - 1, (u.id * 5) | 0);
       // In the small hours a resident sleeps on the sofa under a blanket.
-      else if (asleepHome) sleeperFigure(ctx, base + 3, floorY - 14, sofaW - 10, "#5A6E8C", (u.id * 5) | 0);
+      else if (asleepHome) sleeperFigure(ctx, base + 3, floorY - 16, sofaW - 10, "#5A6E8C", (u.id * 5) | 0); // lying on the seat
       bevelBox(ctx, base + sofaW + 6, floorY - 6, 14, 6, PAL.walnut); // coffee table
       fill(ctx, base + sofaW + 9, floorY - 8, 2, 2, PAL.white); // vase
       lamp(base - 8);
