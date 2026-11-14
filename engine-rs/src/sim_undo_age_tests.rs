@@ -29,3 +29,20 @@ fn a_lobby_tile_a_redo_put_back_is_dated_by_its_return() {
     assert!(sim.tower.unit_at(1, 70).is_none());
     assert!(sim.tower.unit_at(0, 70).is_some());
 }
+
+#[test]
+fn units_two_steps_put_back_between_the_same_builds_never_tie() {
+    // Basement laid under a lobby tile, both undone and redone in turn with no
+    // build between the redos: the basement came back after the lobby tile,
+    // so once a step that took it out is dropped, the lobby tile's undo must
+    // not leave it touching nothing.
+    let mut sim = tower();
+    let lobby = gesture(&mut sim, |s| assert!(s.build(Kind::Lobby, 1, 70).ok)).unwrap();
+    let basement = gesture(&mut sim, |s| assert!(s.build(Kind::Floor, 0, 70).ok)).unwrap();
+    let redo_basement = sim.apply_undo_step(&basement).unwrap();
+    let redo_lobby = sim.apply_undo_step(&lobby).unwrap();
+    let undo_lobby = sim.apply_undo_step(&redo_lobby).unwrap();
+    let _dropped = sim.apply_undo_step(&redo_basement).unwrap();
+    assert!(sim.tower.unit_at(0, 70).is_some());
+    super::check_tests::refused(&mut sim, &undo_lobby, super::StepRefused::Blocked);
+}

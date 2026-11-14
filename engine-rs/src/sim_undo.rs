@@ -291,6 +291,7 @@ impl Simulation {
     /// Apply the unit images: every unit a check found where the step
     /// expects it. Answers whether a Wedding Hall went.
     fn apply_unit_images(&mut self, step: &Step, back: &mut Step) -> bool {
+        self.tower.returned.begin_step();
         let mut out = Vec::new();
         let mut put = Vec::new();
         let mut inserts = Vec::new();
@@ -321,7 +322,7 @@ impl Simulation {
                 }
                 (UnitChange::PutBack(want), None) => {
                     // The undo check dates the unit by this return (#1846).
-                    self.tower.returned.insert(img.id, self.tower.next_id);
+                    self.tower.returned.record(img.id, self.tower.next_id);
                     let unit = want.returning();
                     let entered = UnitUse::of(&unit);
                     inserts.push((img.at, unit));

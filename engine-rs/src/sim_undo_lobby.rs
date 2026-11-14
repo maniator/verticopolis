@@ -9,11 +9,13 @@ use crate::undo::{Step, UnitChange};
 
 /// The root of each part of the tower the ground-floor lobby tiles `step`
 /// takes out joined, as unit ids: the oldest ground-floor tile (by
-/// `Tower::age_of`) of each part of ground-floor and basement tiles beside
+/// `Returns::age_of`) of each part of ground-floor and basement tiles beside
 /// them, flooded through the tower's tiles without them. Read once the tiles
 /// stand, as the gesture that laid them closes or a redo puts them back, so
 /// the step that takes them out knows each part stood on its own root before
-/// (#1848). One flood over the low tiles, once per such step.
+/// (#1848). Other low tiles the step takes out stay in the flood, so where
+/// they link two parts only the older root is kept, which only refuses more
+/// (#2210). One flood over the low tiles, once per such step.
 pub(crate) fn joined_roots(tower: &Tower, step: &Step) -> Vec<i64> {
     let tiles: Vec<(i64, i64)> = step
         .units
@@ -40,8 +42,9 @@ pub(crate) fn joined_roots(tower: &Tower, step: &Step) -> Vec<i64> {
         while let Some(&tile) = met.get(next) {
             next += 1;
             let id = tower.structure[&tile];
-            if tile.0 == GROUND_FLOOR && root.is_none_or(|(age, _)| tower.age_of(id) < age) {
-                root = Some((tower.age_of(id), id));
+            if tile.0 == GROUND_FLOOR && root.is_none_or(|(age, _)| tower.returned.age_of(id) < age)
+            {
+                root = Some((tower.returned.age_of(id), id));
             }
             for near in beside(tile) {
                 let low = near.0 <= GROUND_FLOOR && !piece.contains(&near);
@@ -112,9 +115,9 @@ impl Ground<'_> {
         }
         let structure = &self.tower.structure;
         // Ages, not ids: a lobby tile a redo put back dates from its return
-        // (`Tower::age_of`, #1846).
+        // (`Returns::age_of`, #1846).
         let ages = piece.iter().filter_map(|tile| structure.get(tile));
-        let Some(oldest) = ages.map(|&id| self.tower.age_of(id)).min() else {
+        let Some(oldest) = ages.map(|&id| self.tower.returned.age_of(id)).min() else {
             return true;
         };
         let mut runs = Runs::default();
@@ -260,7 +263,7 @@ impl Ground<'_> {
                 .get(&tile)
                 .filter(|&id| !self.leaving.contains(id));
             if let Some(&id) = stays.filter(|_| tile.0 == GROUND_FLOOR) {
-                let age = self.tower.age_of(id);
+                let age = self.tower.returned.age_of(id);
                 if root.is_none_or(|(old, _)| age < old) {
                     root = Some((age, tile.1));
                 }

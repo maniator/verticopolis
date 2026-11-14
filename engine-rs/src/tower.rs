@@ -118,10 +118,10 @@ pub struct Tower {
     pub(crate) lobby_upgrades: Option<crate::tower_removal::LobbyUpgrades>,
     /// The open undo gesture's journal, while one is open (`undo_journal.rs`).
     pub(crate) journal: Option<Box<crate::undo_journal::Journal>>,
-    /// The `next_id` each unit an undo or redo put back met when it went back
-    /// in, by unit id, so the undo check dates it by its return rather than
-    /// its first build (`Tower::age_of`, #1846). Never saved or hashed.
-    pub(crate) returned: FastMap<i64, i64>,
+    /// When each unit an undo or redo put back went back in, so the undo
+    /// check dates it by its return rather than its first build (#1846).
+    /// Never saved or hashed.
+    pub(crate) returned: crate::undo::Returns,
 }
 
 /// The room a loaded game's unit list keeps past its units. A list with no
@@ -465,19 +465,6 @@ impl Tower {
         if changed {
             self.revision += 1;
         }
-    }
-}
-
-impl Tower {
-    /// When unit `id` last went into the tower, as a number that orders
-    /// builds and returns: twice its id for a unit standing since its build,
-    /// and one less than twice the `next_id` it met for one an undo or redo
-    /// put back, so it comes after every unit built before its return and
-    /// before every unit built since (#1846).
-    pub(crate) fn age_of(&self, id: i64) -> i64 {
-        self.returned
-            .get(&id)
-            .map_or(id.saturating_mul(2), |&next| next.saturating_mul(2) - 1)
     }
 }
 

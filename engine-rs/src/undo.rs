@@ -33,6 +33,7 @@
 //! (`Transport::rides`). So an undo is never a way to sell a used build
 //! back at its full price.
 #![cfg_attr(not(feature = "wasm"), allow(dead_code))]
+use crate::crowd::fasthash::FastMap;
 use crate::economy::screens::screen_policies;
 use crate::sim_undo_caps::CapHeld;
 use crate::tower::{Transport, Unit, UnitState};
@@ -251,6 +252,49 @@ impl Step {
     #[cfg(test)]
     pub(crate) fn weight(&self) -> usize {
         self.units.len() + self.transports.len()
+    }
+}
+
+/// How far apart two builds' ages sit (`Returns::age_of`): room for every
+/// step count a `u32` holds between them.
+const AGE_SPAN: i64 = u32::MAX as i64 + 1;
+
+/// When each unit an undo or redo put back went back into the tower, as an
+/// age that orders builds and returns (#1846): a unit standing since its
+/// build is `id * AGE_SPAN`, and one put back is placed after every unit
+/// built before its return, before every unit built since, and after every
+/// unit an earlier step put back, so no two steps' returns tie. The units
+/// one step puts back share an age, since the opposite step takes them out
+/// together.
+#[derive(Default)]
+pub(crate) struct Returns {
+    ages: FastMap<i64, i64>,
+    /// Steps applied so far: orders returns between the same two builds.
+    steps: i64,
+}
+
+impl Returns {
+    /// A step starts putting units back.
+    pub(crate) fn begin_step(&mut self) {
+        self.steps += 1;
+    }
+
+    /// Unit `id` went back in while the next unit to be built is `next_id`.
+    pub(crate) fn record(&mut self, id: i64, next_id: i64) {
+        let between = self.steps.clamp(1, AGE_SPAN - 1);
+        self.ages.insert(
+            id,
+            (next_id - 1)
+                .saturating_mul(AGE_SPAN)
+                .saturating_add(between),
+        );
+    }
+
+    /// When unit `id` last went into the tower, as an age that orders builds
+    /// and returns.
+    pub(crate) fn age_of(&self, id: i64) -> i64 {
+        let built = || id.saturating_mul(AGE_SPAN);
+        self.ages.get(&id).copied().unwrap_or_else(built)
     }
 }
 

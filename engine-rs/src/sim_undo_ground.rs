@@ -22,7 +22,7 @@ pub(crate) struct Ground<'a> {
     tower: &'a Tower,
     leaving: &'a FastSet<i64>,
     /// The floor and lobby tiles the step puts back, each with the age
-    /// (`Tower::age_of`) and kind of the unit it puts back there.
+    /// (`Returns::age_of`) and kind of the unit it puts back there.
     laid: FastMap<(i64, i64), (i64, Kind)>,
     /// The floor and lobby tiles the step takes out and does not lay again,
     /// as (x, floor) in order, so a shaft finds those in its column with a
@@ -59,7 +59,7 @@ impl<'a> Ground<'a> {
         let mut laid = FastMap::default();
         for u in put_back.iter().filter(|u| u.kind.is_structural()) {
             for tile in tiles_of(u) {
-                laid.insert(tile, (tower.age_of(u.id), u.kind));
+                laid.insert(tile, (tower.returned.age_of(u.id), u.kind));
             }
         }
         let mut lobbies_added = FastMap::default();
@@ -163,7 +163,7 @@ impl<'a> Ground<'a> {
         self.laid.contains_key(&(floor, x)) || self.stays(floor, x)
     }
 
-    /// The age (`Tower::age_of`) and kind of the unit whose floor or lobby
+    /// The age (`Returns::age_of`) and kind of the unit whose floor or lobby
     /// tile holds at `tile`, as (floor, x), once the step applies: the one the
     /// step puts back there, or the tower's that stays. A unit an undo or redo
     /// put back keeps its id, so its age says when it last went in (#1846).
@@ -173,7 +173,7 @@ impl<'a> Ground<'a> {
         }
         let id = *self.tower.structure.get(&tile)?;
         let kind = self.tower.struct_kind.get(&tile).copied()?;
-        (!self.leaving.contains(&id)).then_some((self.tower.age_of(id), kind))
+        (!self.leaving.contains(&id)).then_some((self.tower.returned.age_of(id), kind))
     }
 
     /// Whether the tower's floor or lobby tile at (`floor`, `x`) stays,

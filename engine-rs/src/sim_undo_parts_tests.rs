@@ -94,3 +94,19 @@ fn a_tile_the_undo_lays_again_does_not_take_the_far_part_off_its_root() {
     assert!(sim.tower.unit_at(1, 103).is_none());
     assert!(sim.tower.unit_at(0, 103).is_some());
 }
+
+#[test]
+fn a_redo_of_lobby_tiles_that_join_two_parts_records_both_roots() {
+    let mut sim = two_parts();
+    let joined = gesture(&mut sim, |s| build(s, Kind::Lobby, 1, [106, 107])).unwrap();
+    let redo = sim.apply_undo_step(&joined).unwrap();
+    let again = sim.apply_undo_step(&redo).unwrap();
+    assert_eq!(
+        again.lobby_roots.len(),
+        2,
+        "the redo's undo knows both roots"
+    );
+    build(&mut sim, Kind::Floor, 0, 109..112);
+    let back = sim.apply_undo_step(&again);
+    assert!(back.is_ok(), "{back:?}");
+}
