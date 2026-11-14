@@ -25,6 +25,13 @@ prompt already tells players it is an engine update and shows the new version.
 Entries below 1.51.1 were curated from the commit history after the fact, so they
 are documentation only: no build that a client fetches carries them.
 
+## 3.12.2
+
+- Fixed people in a lot of separate towers joined only by a basement heading down through the basement and across to the leftmost tower's lobby to leave. Everyone now goes in and out by the lobby under their own tower when its transport reaches it.
+- Fixed a shaft you cut to fewer cars on its schedule taking as many riders as the full shaft beside it. Riders now split between twin shafts by the cars each has running, so a one-car shaft no longer builds a line for hours.
+- Shop and restaurant customers from the city are off for now. At full demand they jammed the elevators of towers built before 3.12.0 and tenants moved out over congestion. Shops count their customers from demand as they did before 3.12.0, and the customers come back once their numbers suit the transport.
+- An update that installs while a new version is being published no longer stores the newer version's page with the older version's files, which could leave the game unable to start offline.
+
 ## 3.12.1
 
 - A tower already rated TOWER no longer shows the congratulations again every time it loads.
