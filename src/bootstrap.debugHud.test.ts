@@ -20,6 +20,13 @@ vi.mock("./wasmhost/rustEngine", async (importOriginal) => {
 // for it so the tests can see whether boot mounted it and what a failure does.
 const hudStub = vi.hoisted(() => ({ mount: vi.fn() }));
 vi.mock("./debugHud", () => ({ mountDebugHud: hudStub.mount }));
+// The build-time preview flag, swapped per test like pwaPreview.test.ts does.
+const deploy = vi.hoisted(() => ({ preview: false }));
+vi.mock("./deployTarget", () => ({
+  get PREVIEW_DEPLOY() {
+    return deploy.preview;
+  },
+}));
 
 /** Make hasWebGL() see a real GL context (happy-dom canvas returns null). */
 function stubWebGL(): void {
@@ -35,8 +42,11 @@ describe("the ?debug=fps overlay (#645)", () => {
     vi.restoreAllMocks();
     document.body.innerHTML = "";
     delete (window as unknown as { game?: unknown }).game;
+    vi.unstubAllEnvs();
     history.replaceState(null, "", "/");
     hudStub.mount.mockReset();
+    localStorage.clear();
+    deploy.preview = false;
   });
 
   it("is not loaded without the flag", async () => {
@@ -78,5 +88,34 @@ describe("the ?debug=fps overlay (#645)", () => {
     } finally {
       process.off("unhandledRejection", unhandled);
     }
+  });
+
+  describe("the stored vc-debug list", () => {
+    it("mounts on a preview or staging deploy without the URL flag", async () => {
+      vi.stubEnv("DEV", false);
+      deploy.preview = true;
+      localStorage.setItem("vc-debug", "fps");
+      stubWebGL();
+      await bootGame(() => ({ onUpdateAvailable: vi.fn() }));
+      await vi.dynamicImportSettled();
+      expect(hudStub.mount).toHaveBeenCalledTimes(1);
+    });
+
+    it("mounts on the dev server", async () => {
+      localStorage.setItem("vc-debug", "all");
+      stubWebGL();
+      await bootGame(() => ({ onUpdateAvailable: vi.fn() }));
+      await vi.dynamicImportSettled();
+      expect(hudStub.mount).toHaveBeenCalledTimes(1);
+    });
+
+    it("is ignored in production, where only the URL flag works", async () => {
+      vi.stubEnv("DEV", false);
+      localStorage.setItem("vc-debug", "fps");
+      stubWebGL();
+      await bootGame(() => ({ onUpdateAvailable: vi.fn() }));
+      await vi.dynamicImportSettled();
+      expect(hudStub.mount).not.toHaveBeenCalled();
+    });
   });
 });

@@ -33,7 +33,10 @@ site) for a small frame statistics overlay in the bottom-left corner: frames
 per second, frame, update and draw time, and Excalibur's draw calls and drawn
 images for the last frame. It is a DOM box, so it adds nothing to the draw
 calls it counts, and it loads as its own chunk only when the flag is on.
-`?debug=all` turns on every debug flag (`src/debugFlags.ts`).
+`?debug=all` turns on every debug flag (`src/debugFlags.ts`). On a dev server,
+a branch preview or staging, `localStorage.setItem("vc-debug", "fps")` in the
+console keeps the overlay on across reloads without the query string
+(`removeItem` turns it off); production ignores the stored key.
 
 ## Quality gates
 

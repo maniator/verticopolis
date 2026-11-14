@@ -23,7 +23,8 @@ import { copyEngineDiagnostics } from "./engineDiagnosticsCopy";
 import { downloadEngineFailureArchive } from "./engineCrash/failureArchive";
 import { pageControlled, repairOffered } from "./wasmhost/engineRepair";
 import { runEngineRepair } from "./engineRepairControl";
-import { DEBUG_FLAG, debugFlagOn } from "./debugFlags";
+import { DEBUG_FLAG, debugFlagOn, storedDebugFlags } from "./debugFlags";
+import { PREVIEW_DEPLOY } from "./deployTarget";
 import type { FrameStatsLike } from "./debugHud";
 
 /**
@@ -387,8 +388,11 @@ export function bootGame(create: (tower: BootTower) => BootApp): Promise<void> {
       // `?debug=fps` loads the frame statistics overlay (#645). The module is
       // a lazy chunk, so a session without the flag never downloads it. It is
       // kept out of the precache, so an offline start cannot load it: the catch
-      // keeps that miss out of the unhandled-rejection error analytics.
-      if (debugFlagOn(location.search, DEBUG_FLAG.fps)) {
+      // keeps that miss out of the unhandled-rejection error analytics. A
+      // preview or staging deploy and the dev server also honor the stored
+      // `vc-debug` list (src/debugFlags.ts); production reads only the URL.
+      const storedDebug = storedDebugFlags(PREVIEW_DEPLOY || import.meta.env.DEV);
+      if (debugFlagOn(location.search, DEBUG_FLAG.fps, storedDebug)) {
         void import("./debugHud")
           .then((hud) => hud.mountDebugHud(() => app.engine?.engine))
           .catch((err: unknown) => console.warn("debug HUD did not load", err));
