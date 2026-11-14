@@ -25,6 +25,15 @@ prompt already tells players it is an engine update and shows the new version.
 Entries below 1.51.1 were curated from the commit history after the fact, so they
 are documentation only: no build that a client fetches carries them.
 
+## 3.12.0
+
+- Shops and restaurants now get real customers from the city. Each one walks in at the ground lobby or gets off the Metro, rides your elevators to the shop and leaves the same way, so a shop draws only the people really inside it, and Today's patronage counts who actually got there.
+- Elevator cars now fill to their real size (21 in a standard car, 42 in an express), so lines clear faster in busy towers.
+- As many outside customers come as a shop's trade draws, with no daily limit. A shop your elevators can't get people to in time counts fewer visitors toward your population.
+- Fixed people who walked to a shop's or venue's floor, stood about a minute and vanished there (or appeared there out of nowhere). Every visitor now comes in through the lobby or the Metro, stays for the visit (a film 90 to 120 minutes, a meal or a browse 30 to 60) and leaves the same way.
+- A shop, restaurant or venue now counts a customer out as they walk out its door, so it draws only the people really inside and frees the seat for the next one at once.
+- Someone out for a meal or a visit whose room was bulldozed meanwhile now leaves by the ground lobby instead of vanishing at the venue.
+
 ## 3.11.3
 
 - The person card no longer says someone left the tower when they only walked into their office, home or another room at the end of the trip. It now says where they went in, and keeps "Left the tower" for people who walk out through the lobby or the Metro.
