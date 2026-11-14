@@ -7,10 +7,10 @@ import { figureOf } from "./crowdLook";
 /**
  * The elevator-car glide as WIRED into the renderer (GH #688, #2097): glide
  * persistence across frames, the shaft-span clamp, and the draw-state
- * carry-over across a syncMotion rebuild; and the decorative passers-by
- * (#2091). Split from towerCrowd.test.ts to respect the file-size guard; the
- * pure glide math is pinned in ../carMotion.test.ts, and the fixtures here
- * mirror the sibling's.
+ * carry-over across a syncMotion rebuild; the decorative passers-by (#2091);
+ * and the metro's one train per line. Split from towerCrowd.test.ts to respect
+ * the file-size guard; the pure glide math is pinned in ../carMotion.test.ts,
+ * and the fixtures here mirror the sibling's.
  */
 
 const gfx = () => ({ width: 9, height: 25 }) as ex.Graphic;
@@ -360,5 +360,52 @@ describe("a bomb search clears the decorative passers-by and garage cars", () =>
     updateMotion(eng({ sim: morning(search), walkers: [w], garageCars: [g], displayParkingUse: 1 }));
     expect(w.actor.graphics.isVisible).toBe(true);
     expect(g.actor.graphics.isVisible).toBe(true);
+  });
+});
+
+describe("the metro train", () => {
+  it("runs the metro train on game time: in from the left, held, then off the right", () => {
+    const xs: number[] = [];
+    const train = { actor: actor(), u: { x: 20, floor: 3 }, w: 40, line: [0], stop: 0, shift: (offset: number) => xs.push(offset) };
+    const clockAt = (minute: number, night = false) => ({ hour: Math.floor(minute / 60), minuteOfDay: minute, isMorning: () => false, isEvening: () => false, isNight: () => night });
+    const e = eng({ trainActors: [train] });
+    for (const minute of [12 * 60 + 3, 12 * 60 + 10, 12 * 60 + 23]) {
+      e.sim = { ...e.sim, clock: clockAt(minute) };
+      updateMotion(e);
+    }
+    // The three legs (arrive / hold / depart) put the train at distinct
+    // offsets inside the station-wide canvas: off the left, in place, off the right.
+    expect(xs[0]).toBeLessThan(0);
+    expect(xs[1]).toBe(0);
+    expect(xs[2]).toBeGreaterThan(0);
+    // Overnight it stays inside the tunnel however the animation clock runs.
+    e.sim = { ...e.sim, clock: clockAt(2 * 60 + 10, true) };
+    e.d.anim = 7;
+    updateMotion(e);
+    expect(xs[3]).toBe(-(train.w + 12));
+  });
+
+  it("shows one train per line: only the station it is calling at has it", () => {
+    const shifts: number[][] = [[], []];
+    const station = (x: number, stop: number) => ({
+      actor: actor(),
+      u: { x, floor: -9 },
+      w: 40,
+      line: [100, 500],
+      stop,
+      shift: (offset: number) => shifts[stop].push(offset),
+    });
+    const e = eng({ trainActors: [station(100, 0), station(500, 1)] });
+    const clockAt = (minute: number) => ({ hour: 12, minuteOfDay: 12 * 60 + minute, isMorning: () => false, isEvening: () => false, isNight: () => false });
+    for (const minute of [10, 30]) {
+      e.sim = { ...e.sim, clock: clockAt(minute) };
+      updateMotion(e);
+    }
+    // At 12:10 the train stands in the west station, out of sight of the east
+    // one; by 12:30 it has run on and stands in the east station.
+    expect(shifts[0][0]).toBe(0);
+    expect(Math.abs(shifts[1][0])).toBeGreaterThanOrEqual(52);
+    expect(shifts[1][1]).toBe(0);
+    expect(Math.abs(shifts[0][1])).toBeGreaterThanOrEqual(52);
   });
 });

@@ -358,7 +358,8 @@ impl Category {
 }
 
 #[doc(hidden)]
-/// `BUILD_CAPS`.
+/// `BUILD_CAPS`: SimTower's caps, which Classic keeps. Read a tower's caps
+/// through `build_cap_in`, which adds the mode's exceptions.
 pub fn build_cap(kind: Kind) -> Option<i64> {
     match kind {
         Kind::Metro => Some(1),
@@ -369,6 +370,21 @@ pub fn build_cap(kind: Kind) -> Option<i64> {
         Kind::PartyHall => Some(16),
         Kind::AquaticCenter => Some(8),
         _ => None,
+    }
+}
+
+/// The most metro stations a Modern tower may hold. SimTower allowed one, as
+/// Classic does; Modern lets a long platform have a station at each end and
+/// one between, all on the first station's row (`Tower::metro_reason`).
+pub const MODERN_METRO_STATION_CAP: i64 = 3;
+
+#[doc(hidden)]
+/// The most a tower in `mode` may hold of `kind` alone: `build_cap`, except
+/// where the mode allows more (several metro stations in Modern).
+pub fn build_cap_in(mode: crate::clock::GameMode, kind: Kind) -> Option<i64> {
+    match kind {
+        Kind::Metro if mode.builds_several_metro_stations() => Some(MODERN_METRO_STATION_CAP),
+        _ => build_cap(kind),
     }
 }
 

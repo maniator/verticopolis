@@ -53,6 +53,7 @@ mod loader_cases;
 mod lobby_distance;
 mod meal_cadence;
 mod metro_shoppers;
+mod metro_stations;
 mod mode_rules;
 mod modern_amenity_halos;
 mod modern_economy;

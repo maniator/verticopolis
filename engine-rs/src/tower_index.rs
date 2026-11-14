@@ -311,8 +311,8 @@ impl Tower {
         bounds
     }
 
-    /// The floor a metro station stands on, its bottom row, when the tower
-    /// has one. Placement asks it for every tile a drag, a brush, a bridge or
+    /// The floor the metro stations stand on, their bottom row, when the
+    /// tower has one. Every station stands on the same row (`metro_reason`). Placement asks it for every tile a drag, a brush, a bridge or
     /// an extend lays, so it is memoized until a station registers or
     /// unregisters (`Memo::metro_changes`): a revision key would walk every
     /// unit again after each tile.
@@ -332,8 +332,9 @@ impl Tower {
 
     /// The tower's metro stations, in room order, memoized by id on
     /// `Memo::metro_changes`, so the hourly takings read their live state
-    /// without walking the rooms. The build cap allows one, but a loaded
-    /// save is not held to it.
+    /// without walking the rooms. Classic's build cap allows one and
+    /// Modern's `MODERN_METRO_STATION_CAP`, but a loaded save is not held to
+    /// either.
     pub(crate) fn metro_stations(&self) -> impl Iterator<Item = &Unit> + '_ {
         let key = self.memo.borrow().metro_changes;
         let cached = self.memo.borrow().metro_ids.clone();

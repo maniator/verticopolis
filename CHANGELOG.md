@@ -25,6 +25,18 @@ prompt already tells players it is an engine update and shows the new version.
 Entries below 1.51.1 were curated from the commit history after the fact, so they
 are documentation only: no build that a client fetches carries them.
 
+## 3.10.0
+
+- Modern towers can now build up to three Metro stations, all on the same line as the first. Riders split between them, someone going back to the train walks to the nearest one, and one train runs the line, calling at each station in turn.
+
+## 3.9.0
+
+- Saved Towers asks before a save replaces a tower in an occupied slot, unless it knows that slot holds the tower you're playing: that slot is marked This tower and still saves in one click.
+- A replaced or deleted slot can be put back with Undo.
+- A slot save that fails now says so inside Saved Towers, where a message used to be hidden behind the dialog.
+- Hotel guests and condo residents asleep at night are drawn as the same people you see by day, with their own face and hair on the pillow, instead of an older flat sketch.
+- A housekeeper riding an elevator stays inside the car at fast speeds, instead of jumping ahead of it and floating in the empty shaft.
+
 ## 3.8.0
 
 - In Modern, a stairway right beside a cinema, party hall, metro station or aquatic center is drawn as a spiral staircase, and an escalator there turns back on a steel landing halfway up. They link the same two floors as before; only the look changes. Classic keeps straight flights, as in 1994.

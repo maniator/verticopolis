@@ -10,6 +10,7 @@ use crate::facilities::*;
 use crate::lot::Lot;
 
 mod lobby_halls;
+mod metro;
 mod placement;
 mod tall_lobby;
 mod transports;
@@ -375,7 +376,7 @@ impl Tower {
     // ---- placement rules -------------------------------------------------
 
     pub fn cap_reason(&self, kind: Kind) -> Option<String> {
-        if let Some(single) = build_cap(kind) {
+        if let Some(single) = build_cap_in(self.mode, kind) {
             if self.count_kind(kind) >= single {
                 let f = kind.facility();
                 return Some(format!(
