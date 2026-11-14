@@ -3,7 +3,7 @@ import type { PersonDetail } from "../../simport/personCards";
 import { catalogFacility } from "../../catalog/catalogTypes";
 import { catalogFor } from "../../tests/catalogFixture";
 import { renderToFragment } from "../testing/litTestUtils";
-import { PERSON_FOLLOW_ACTION, personCardTemplate, personNow, personRole, personWhy, placeWords, type PersonCardInput } from "./personCard";
+import { PERSON_FOLLOW_ACTION, goneWords, personCardTemplate, personNow, personRole, personWhy, placeWords, type PersonCardInput } from "./personCard";
 
 const catalog = catalogFor("classic");
 
@@ -59,6 +59,43 @@ describe("the person card", () => {
     expect(field(f, "now")).toBe("Left the tower");
     expect(f.querySelector(`[data-edit="${PERSON_FOLLOW_ACTION}"]`)).toBeNull();
     expect(f.textContent).toContain("They left the tower.");
+  });
+
+  it("says they went inside when the trip ended at their room, not that they left", () => {
+    // Followed up the elevator to their office on 55: the engine lets them
+    // go once they walk in, and the card must not call that leaving.
+    const office = { place: "room", id: 7, kind: "office", floor: 55 } as const;
+    const f = card({ gone: true, person: person({ state: "toDest", floor: 55, to: office }) });
+    expect(field(f, "now")).toBe("Went inside");
+    expect(field(f, "gone")).toBe(`They reached ${catalogFacility(catalog, "office").name}, floor 55.`);
+    expect(f.textContent).not.toContain("left the tower");
+    expect(f.querySelector(`[data-edit="${PERSON_FOLLOW_ACTION}"]`)).toBeNull();
+  });
+});
+
+describe("what became of someone the engine let go", () => {
+  const condo = { place: "room", id: 3, kind: "condo", floor: 20 } as const;
+
+  it("lets them out only through the ground lobby or the Metro", () => {
+    const home = person({ purpose: "fromWork", floor: 1, from: { place: "room", id: 7, kind: "office", floor: 12 }, to: { place: "lobby", floor: 1 } });
+    expect(goneWords(home, catalog)).toEqual({ now: "Left the tower", note: "They left the tower." });
+    const metro = person({ floor: -2, from: condo, to: { place: "metro", floor: -2 } });
+    expect(goneWords(metro, catalog).now).toBe("Left the tower");
+  });
+
+  it("says they arrived at a floor or a sky lobby", () => {
+    expect(goneWords(person({ floor: 30, to: { place: "floor", floor: 30 } }), catalog)).toEqual({ now: "Arrived", note: "They reached Floor 30." });
+    expect(goneWords(person({ floor: 15, to: { place: "lobby", floor: 15 } }), catalog).note).toBe("They reached Sky lobby, floor 15.");
+  });
+
+  it("sends someone who turned back home to where they set out from", () => {
+    const turned = person({ purpose: "leaveHome", returning: true, floor: 20, from: condo, to: { place: "lobby", floor: 1 } });
+    expect(goneWords(turned, catalog)).toEqual({ now: "Went back", note: `They went back to ${catalogFacility(catalog, "condo").name}, floor 20.` });
+  });
+
+  it("falls back to leaving when neither end is on their floor", () => {
+    expect(goneWords(person({ state: "riding", floor: 33 }), catalog).now).toBe("Left the tower");
+    expect(goneWords(person({ floor: 4, from: { place: "none" }, to: { place: "none" } }), catalog).now).toBe("Left the tower");
   });
 
   it("names a housekeeper's base and step", () => {
