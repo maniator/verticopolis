@@ -20,7 +20,7 @@
 //! yet) asks the caller for a full save, which primes the mirror again. The
 //! simulation is never changed: the units are lent out of the tower only
 //! while the rest of the save is written.
-use serde_json::{Map, Value};
+use serde_json::{json, Map, Value};
 
 use crate::sim::Simulation;
 use crate::tower::Unit;
@@ -46,19 +46,18 @@ impl SaveMirror {
     pub fn full(&mut self, sim: &Simulation) -> String {
         let save = sim.serialize();
         self.clear();
-        // The save writes every unit in tower order; pair them only when the
-        // counts agree, or leave the mirror unprimed (no delta, full saves).
-        if let Some(saved) = save.get("units").and_then(Value::as_array) {
-            let units = &sim.tower.units;
-            if saved.len() == units.len() {
-                let rooms = sim.tower.room_index();
-                self.rooms.reserve(rooms.len());
-                for &i in rooms.iter() {
-                    self.rooms.push((units[i].clone(), saved[i].to_string()));
-                }
-                self.key = Some(sim.tower.index_key());
-            }
+        // A room's save entry is its own `Unit::serialize()` (only plain
+        // floor tiles fold into runs, `save_floor_runs`), so the mirror is
+        // primed from the rooms themselves rather than by position in the
+        // saved list, which a floor run shortens.
+        let units = &sim.tower.units;
+        let rooms = sim.tower.room_index();
+        self.rooms.reserve(rooms.len());
+        for &i in rooms.iter() {
+            self.rooms
+                .push((units[i].clone(), units[i].serialize().to_string()));
         }
+        self.key = Some(sim.tower.index_key());
         save.to_string()
     }
 
@@ -103,6 +102,9 @@ impl SaveMirror {
         }
         // The rest of the save, written with the units lent out of the tower
         // so they are not serialized a second time, and put straight back.
+        // The version is read first: the floor runs it counts are in the
+        // units.
+        let version = sim.written_save_version();
         let units = std::mem::take(&mut sim.tower.units);
         let rest = sim.serialize();
         sim.tower.units = units;
@@ -111,6 +113,7 @@ impl SaveMirror {
             return None;
         };
         rest.remove("units");
+        rest.insert("version".into(), json!(version));
         let mut out = Map::new();
         out.insert("units".into(), Value::Array(changed));
         out.insert("rest".into(), Value::Object(rest));

@@ -20,10 +20,12 @@ use serde_json::Value;
 
 use crate::sim::Simulation;
 
-/// The saved game ([`Simulation::serialize`]) without the log messages' text
+/// The saved game with every unit listed on its own
+/// ([`Simulation::serialize_unfolded`], so the floor-run encoding never moves
+/// a hash), without the log messages' text
 /// and the pending choice's message, so wording changes never move a hash.
 pub fn state_view(sim: &Simulation) -> Value {
-    let mut v = sim.serialize();
+    let mut v = sim.serialize_unfolded();
     if let Some(log) = v.get_mut("log").and_then(Value::as_array_mut) {
         for e in log {
             if let Some(o) = e.as_object_mut() {

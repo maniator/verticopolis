@@ -54,7 +54,7 @@ pub fn checkpoint_detail(sim: &Simulation, label: &str) -> CheckpointDetail {
         .iter()
         .map(|e| json!({ "minute": e.minute, "text": e.text, "kind": e.kind.as_str() }))
         .collect();
-    let save = match sim.serialize() {
+    let save = match sim.serialize_unfolded() {
         Value::Object(m) => m.iter().map(|(k, v)| (k.clone(), digest(v))).collect(),
         other => BTreeMap::from([("(save)".to_string(), digest(&other))]),
     };

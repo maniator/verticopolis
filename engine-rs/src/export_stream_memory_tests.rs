@@ -21,7 +21,10 @@ fn a_large_vctower_export_peaks_near_its_text() {
         "3.0.0",
         NOW,
     ));
-    let len = sim.save_text().len() as isize;
+    // Measured against the save's text with every unit on its own, the size
+    // these bounds were set on: floor runs (`save_floor_runs`) shrink the
+    // written text, not what the export holds while it writes.
+    let len = sim.serialize_unfolded().to_string().len() as isize;
     let (tree_bytes, tree_peak, _) = measure(|| {
         let mut save = sim.serialize();
         stamp_save(&mut save, "3.0.0", NOW).unwrap();
@@ -40,9 +43,11 @@ fn a_large_vctower_export_peaks_near_its_text() {
         peak <= 7 * len / 2,
         "the export peaked at {peak} bytes for {len} of text"
     );
+    // Floor runs shrank the tree too, so the tree path is held against the
+    // export's own peak rather than the text.
     assert!(
-        tree_peak >= 12 * len,
-        "the tree path peaked at only {tree_peak} bytes for {len} of text"
+        tree_peak >= 3 * peak,
+        "the tree path peaked at only {tree_peak} bytes against the export's {peak}"
     );
 }
 
@@ -54,7 +59,10 @@ fn a_large_tdt_export_peaks_below_the_tree_path() {
         &sim.save_without_units().0,
         std::iter::empty::<Value>(),
     ));
-    let len = sim.save_text().len() as isize;
+    // Measured against the save's text with every unit on its own, the size
+    // these bounds were set on: floor runs (`save_floor_runs`) shrink the
+    // written text, not what the export holds while it writes.
+    let len = sim.serialize_unfolded().to_string().len() as isize;
     let (tree_built, tree_peak, _) = measure(|| build_tdt(&sim.serialize()));
     let (built, peak, _) = measure(|| {
         let (rest, units) = sim.save_without_units();
@@ -75,8 +83,10 @@ fn a_large_tdt_export_peaks_below_the_tree_path() {
         peak <= 2 * len,
         "the export peaked at {peak} bytes for {len} of text"
     );
+    // The tree path reads the folded save and unfolds its runs one tile at a
+    // time, so it is held against the export's own peak rather than the text.
     assert!(
-        tree_peak >= 6 * len,
-        "the tree path peaked at only {tree_peak} bytes for {len} of text"
+        tree_peak >= 2 * peak,
+        "the tree path peaked at only {tree_peak} bytes against the export's {peak}"
     );
 }

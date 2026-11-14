@@ -253,7 +253,7 @@ fn a_car_direction_reads_as_minus_one_zero_or_one() {
 
 /// The tower's save at version 1, edited, for the v1 to v5 checks.
 fn v1(edit: impl FnOnce(&mut Value)) -> Value {
-    let mut save = tower().serialize();
+    let mut save = tower().serialize_unfolded();
     edit(&mut save);
     save["version"] = json!(1);
     save

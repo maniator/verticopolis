@@ -66,6 +66,9 @@ pub struct Memo {
     )>,
     /// The tall lobby halls (`Tower::tall_lobby_runs`), per revision (#2068).
     pub tall_runs: Option<(i64, std::sync::Arc<[crate::tower::HallRun]>)>,
+    /// Whether the unit list holds a floor run the save folds
+    /// (`Tower::lists_a_floor_run`), per revision.
+    pub floor_run: Option<(crate::tower_index::IndexKey, bool)>,
 }
 
 // ---- unit state predicates (types.ts) --------------------------------------

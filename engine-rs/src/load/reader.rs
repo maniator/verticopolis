@@ -112,18 +112,21 @@ pub fn deserialize_owned(raw: Value) -> Result<Simulation, String> {
     let written = founder_keys(&raw);
     let mut data = migrate_save_owned(raw);
     let modern = data.get("mode").and_then(Value::as_str) == Some("modern");
+    let runs = reads_floor_runs(version_of(&data));
     let listed = match data.get_mut("units") {
         Some(Value::Array(units)) => std::mem::take(units),
         _ => Vec::new(),
     };
-    // The entries `unit_from_value` keeps, counted before any unit is built,
-    // so a save past the cap is refused first and the rest fill vectors of
-    // their exact size.
-    let kept = listed
-        .iter()
-        .filter(|u| kind_of(u).is_some())
-        .take(UNIT_CAP + 1)
-        .count();
+    // The entries `unit_from_value` keeps, counted before any unit is built
+    // (a floor run counts each of its tiles), so a save past the cap is
+    // refused first and the rest fill vectors of their exact size.
+    let mut kept = 0usize;
+    for u in listed.iter().filter(|u| kind_of(u).is_some()) {
+        kept += listed_units(u, runs);
+        if kept > UNIT_CAP {
+            break;
+        }
+    }
     if kept > UNIT_CAP {
         return Err(format!(
             "This save lists more than {UNIT_CAP} units, more than the whole lot can hold, so it cannot be a real tower."
@@ -132,10 +135,13 @@ pub fn deserialize_owned(raw: Value) -> Result<Simulation, String> {
     let mut units = Vec::with_capacity(kept + unit_list_headroom(kept));
     let mut ids = Vec::with_capacity(kept);
     for entry in listed {
-        if let Some((unit, id)) = unit_from_value(&entry, modern) {
-            units.push(unit);
-            ids.push(id);
-        }
+        each_listed_unit(&entry, runs, |tile| {
+            if let Some((unit, id)) = unit_from_value(tile, modern) {
+                units.push(unit);
+                ids.push(id);
+            }
+            true
+        });
     }
     debug_assert_eq!(units.len(), kept, "unit_from_value skipped a counted entry");
     let mut sim = assemble(&data, units, ids, &written);

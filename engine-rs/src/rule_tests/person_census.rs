@@ -204,7 +204,7 @@ fn a_load_starts_every_crowd_tally_at_zero_and_stamps_version_7() {
     let (mut sim, office, food) = office_and_fast_food();
     set_customers(&mut sim, food, 7);
     set_out(&mut sim, office, 3);
-    let save = sim.serialize();
+    let save = sim.serialize_unfolded();
     assert_eq!(PLAIN_SAVE_VERSION, 7);
     assert_eq!(save["version"], PLAIN_SAVE_VERSION);
     let back = deserialize(&save).unwrap();

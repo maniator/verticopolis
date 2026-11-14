@@ -138,7 +138,7 @@ fn a_lobby_tile_between_source_and_tenant_shields_it_after_a_load() {
         let office = put(&mut base, Kind::Office, 2, 40);
         put(&mut base, Kind::FastFood, 2, 40 + width(Kind::Office) + 7);
         let shield_x = 40 + width(Kind::Office) + 2;
-        let mut raw = base.serialize();
+        let mut raw = base.serialize_unfolded();
         if shield {
             let tile = raw["units"]
                 .as_array_mut()

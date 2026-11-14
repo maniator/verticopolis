@@ -67,7 +67,7 @@ fn every_sixseven_elevator_widens_in_place_with_no_overlap() {
 #[test]
 fn the_sixseven_save_loads_widened_and_runs_an_hour() {
     let mut sim = deserialize(&fixture_save("sixseven_2")).expect("the fixture loads");
-    let saved = sim.serialize();
+    let saved = sim.serialize_unfolded();
     assert_eq!(saved["version"], PLAIN_SAVE_VERSION);
     let list = saved["transports"].as_array().unwrap();
     for (kind, w) in [("elevatorStandard", 4), ("elevatorExpress", 6)] {

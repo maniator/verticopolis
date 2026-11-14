@@ -33,9 +33,9 @@ use crate::clock::GameMode;
 #[cfg(test)]
 use crate::load::deserialize;
 use crate::load::{
-    assemble, deserialize_owned, founder_keys, has_save_shape, inflate_vctower,
-    mark_founder_from_loaded_file, parse_save_json, repair_lone_surrogates, unit_from_value,
-    widen_shafts, UNIT_CAP,
+    assemble, deserialize_owned, each_listed_unit, founder_keys, has_save_shape, inflate_vctower,
+    mark_founder_from_loaded_file, parse_save_json, reads_floor_runs, repair_lone_surrogates,
+    unit_from_value, widen_shafts, UNIT_CAP,
 };
 use crate::sim::Simulation;
 use crate::tower::{unit_list_headroom, Unit};
@@ -46,8 +46,11 @@ use crate::tower::{unit_list_headroom, Unit};
 /// fails until then). Version 8 is version 7 with `lobbyHeights` (#308),
 /// version 9 lists them per hall (#2068), and version 10 adds an elevator
 /// schedule's `heldBack` hours (#1546); `assemble` reads every shape, so all
-/// four take the same step.
-const STREAMED_VERSION: f64 = 10.0;
+/// four take the same step. Version 11 folds floor tiles into runs, which
+/// `Units` unfolds (`load::floor_runs`), and takes the same step too.
+const STREAMED_VERSION: f64 = 11.0;
+/// Version 10, still read here: a schedule's held hours, and no floor run.
+const HELD_HOURS_STREAMED_VERSION: f64 = 10.0;
 /// Version 9, still read here: a tall lobby per hall, and no held hour.
 const TALL_LOBBY_STREAMED_VERSION: f64 = 9.0;
 /// Version 8, still read here: its whole-floor `lobbyHeights` entries are
@@ -202,7 +205,7 @@ fn streamed(text: &[u8], mode: Option<&str>) -> Option<Streamed> {
     if let Some(m) = mode {
         rest.insert("mode".into(), Value::String(m.to_string()));
     }
-    // `migrate_save` on a version 7, 8 or 9 save: the shaft widening, nothing else.
+    // `migrate_save` on a version 7 to 11 save: the shaft widening, nothing else.
     let widened = rest
         .get("transports")
         .and_then(Value::as_array)
@@ -235,6 +238,7 @@ fn current_mode(rest: &Map<String, Value>, forced: Option<bool>) -> Option<bool>
     let version = rest.get("version").and_then(Value::as_f64);
     let taken = [
         STREAMED_VERSION,
+        HELD_HOURS_STREAMED_VERSION,
         TALL_LOBBY_STREAMED_VERSION,
         FLOOR_HEIGHTS_STREAMED_VERSION,
         PLAIN_STREAMED_VERSION,
@@ -298,6 +302,7 @@ impl<'de> Visitor<'de> for TopVisitor<'_> {
                 };
                 units = Some(map.next_value_seed(Units {
                     modern,
+                    runs: reads_floor_runs(rest.get("version").and_then(Value::as_f64)),
                     hint: units_hint(self.text),
                 })?);
             } else if units.is_some() && (key == "version" || key == "mode") {
@@ -315,6 +320,8 @@ impl<'de> Visitor<'de> for TopVisitor<'_> {
 /// units and their saved ids in two vectors as `assemble` takes them.
 struct Units {
     modern: bool,
+    /// Whether the save's version writes floor runs, which are unfolded here.
+    runs: bool,
     hint: usize,
 }
 
@@ -336,113 +343,32 @@ impl<'de> Visitor<'de> for Units {
     fn visit_seq<A: SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
         let mut units = Vec::with_capacity(self.hint + unit_list_headroom(self.hint));
         let mut ids = Vec::with_capacity(self.hint);
+        let mut past_cap = false;
         while let Some(entry) = seq.next_element::<Value>()? {
-            let Some((unit, id)) = unit_from_value(&entry, self.modern) else {
-                continue;
-            };
-            // One more and `deserialize` refuses the save, in its own words.
-            if units.len() == UNIT_CAP {
+            each_listed_unit(&entry, self.runs, |tile| {
+                let Some((unit, id)) = unit_from_value(tile, self.modern) else {
+                    return true;
+                };
+                // One more and `deserialize` refuses the save, in its own words.
+                if units.len() == UNIT_CAP {
+                    past_cap = true;
+                    return false;
+                }
+                units.push(unit);
+                ids.push(id);
+                true
+            });
+            if past_cap {
                 return Err(decline());
             }
-            units.push(unit);
-            ids.push(id);
         }
         Ok((units, ids))
     }
 }
 
-/// The shortest unit entry the game writes, `{"id":1,"kind":"floor","floor":1,"x":0}`
-/// and its comma, is 40 bytes, so a save the game writes lists fewer units
-/// than its length over this many bytes. The bound sits below 40 so that a
-/// hand-made save of entries down to 24 bytes still gets all its room up
-/// front; one of shorter entries (the shortest that loads, `{"kind":"spa"}`,
-/// is 14 bytes) is counted low, and its vectors regrow as it loads.
-const MIN_UNIT_BYTES: usize = 24;
-
-/// How many objects with at least one key the save's top-level `units` array
-/// lists (only such an object can become a unit), counted off the text
-/// without parsing it, capped at `UNIT_CAP` and at the text's length over
-/// `MIN_UNIT_BYTES`. The unit vectors get that much room up front, since a
-/// regrowing vector holds its old and new buffers at once, so on a save the
-/// game writes they never regrow. The room is at most one unit and its id per
-/// `MIN_UNIT_BYTES` bytes of text, and at most `UNIT_CAP` of them, whatever
-/// the text holds: a hand-made text whose `units` lists objects that do not
-/// become units still reserves it, and so does one that turns out malformed
-/// before the reader declines it (#1243). Only that capacity depends on the
-/// count: a text it miscounts (a hand-made one, or one that spells `units`
-/// with an escape) loads the same game, with more or less spare room while it
-/// loads.
-fn units_hint(text: &[u8]) -> usize {
-    let mut depth = 0usize;
-    let mut i = 0;
-    while i < text.len() {
-        match text[i] {
-            b'"' => {
-                let end = string_end(text, i);
-                if depth == 1 && text.get(i + 1..end - 1) == Some(&b"units"[..]) {
-                    let colon = skip_space(text, end);
-                    let open = skip_space(text, colon + 1);
-                    if text.get(colon) == Some(&b':') && text.get(open) == Some(&b'[') {
-                        return objects(text, open).min(text.len() / MIN_UNIT_BYTES);
-                    }
-                }
-                i = end;
-                continue;
-            }
-            b'{' | b'[' => depth += 1,
-            b'}' | b']' => depth = depth.saturating_sub(1),
-            _ => {}
-        }
-        i += 1;
-    }
-    0
-}
-
-/// The objects with at least one key listed directly in the array that opens
-/// at `open`, up to `UNIT_CAP`.
-fn objects(text: &[u8], open: usize) -> usize {
-    let (mut depth, mut count) = (0usize, 0usize);
-    let mut i = open + 1;
-    while i < text.len() && count < UNIT_CAP {
-        match text[i] {
-            b'"' => {
-                i = string_end(text, i);
-                continue;
-            }
-            b'{' if depth == 0 => {
-                count += usize::from(text.get(skip_space(text, i + 1)) != Some(&b'}'));
-                depth += 1;
-            }
-            b'{' | b'[' => depth += 1,
-            b']' | b'}' if depth == 0 => break,
-            b']' | b'}' => depth -= 1,
-            _ => {}
-        }
-        i += 1;
-    }
-    count
-}
-
-/// The index just past the string that opens at `start`, or the text's end.
-fn string_end(text: &[u8], start: usize) -> usize {
-    let mut i = start + 1;
-    while i < text.len() {
-        match text[i] {
-            b'\\' => i += 2,
-            b'"' => return i + 1,
-            _ => i += 1,
-        }
-    }
-    text.len()
-}
-
-/// The first index at or after `i` that is not JSON whitespace.
-fn skip_space(text: &[u8], mut i: usize) -> usize {
-    while matches!(text.get(i), Some(b' ' | b'\t' | b'\n' | b'\r')) {
-        i += 1;
-    }
-    i
-}
+#[path = "load_stream_hint.rs"]
+mod hint;
+pub(crate) use hint::*;
 
 #[cfg(test)]
 #[path = "load_stream_tests.rs"]
