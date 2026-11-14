@@ -39,7 +39,7 @@ export interface CatalogTicketPrice {
 
 /** The version of the catalog's shape. It moves when a field is added,
  *  renamed or removed, so a frontend can refuse a shape it does not know. */
-export const CATALOG_VERSION = 17;
+export const CATALOG_VERSION = 18;
 
 /** Every price, size and build rule of one mode. */
 export interface Catalog {
@@ -177,6 +177,11 @@ export interface CatalogRules {
    *  upper left with a four-frame walk, and rooms shaded to match. When false
    *  (Classic) it keeps the flat 1994 look with a two-frame walk. */
   readonly shadedLook: boolean;
+  /** Whether the frontend draws a one-story stair beside a venue (cinema,
+   *  party hall, metro station, aquatic center) as a spiral staircase and an
+   *  escalator there as a switchback. Drawing only. When false (Classic) every
+   *  one-story flight is straight, as in 1994. */
+  readonly venueFlights: boolean;
   /** Seconds a person waits before the wait counts as stress and the
    *  frontend shows them fed up (red). The same in both modes. */
   readonly fedUpWait: number;

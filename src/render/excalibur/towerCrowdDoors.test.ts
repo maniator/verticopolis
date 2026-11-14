@@ -6,6 +6,7 @@ import { DOOR_RADIUS } from "../sprites/structure/revolvingDoor";
 import { figureOf, MAX_STEP_MS } from "./crowdLook";
 import { reconcileCrowd, tickCrowdClock } from "./towerCrowd";
 import { HallDoorLayer } from "./towerHallDoors";
+import { emptyFlightPass } from "../venueFlights";
 
 /** One drawn frame of `ms`: the step clock, then the crowd pass (the order `TowerEngine.tick` runs them in). */
 function frame(e: any, ms = 1000 / 60): void {
@@ -31,6 +32,7 @@ function eng(): any {
     cam: { zoom: 1 },
     crowdCulled: false,
     crowdActors: new Map(),
+    flightPass: emptyFlightPass(),
     hallDoors: new HallDoorLayer(),
     paused: false,
     people: { get: vi.fn((_key: number) => gfx()) },

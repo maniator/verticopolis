@@ -2078,9 +2078,10 @@
     "scheduleAssist": false,
     "shadedLook": false,
     "tallSkyLobbies": false,
+    "venueFlights": false,
     "variantHouseholds": false
   },
-  "version": 17,
+  "version": 18,
   "world": {
     "groundFloor": 1,
     "groundFloorStructure": "lobby",

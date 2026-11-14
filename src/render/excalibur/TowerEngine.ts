@@ -186,6 +186,7 @@ export class TowerEngine {
   roomSig = new Map<number, string>();
   transportActors = new Map<number, ex.Actor>();
   transportSig = new Map<number, string>();
+  flightPass = reconcile.emptyFlightPass(); // flights beside a venue (venueFlights.ts), per structure
   // Engine-animated actors, regenerated when the layout changes.
   carActors: {
     actor: ex.Actor;
@@ -443,7 +444,6 @@ export class TowerEngine {
   setCamera(tileX: number, floor: number, zoom: number): void {
     camera.setCamera(this, tileX, floor, zoom);
   }
-
   focus(): ViewFocus {
     return camera.focus(this);
   }

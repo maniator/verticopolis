@@ -9,6 +9,7 @@ import { HallDoorLayer } from "./towerHallDoors";
 import { advanceGlide, figureOf, MAX_STEP_MS, MAX_STRIDE_TILES, newGlide } from "./crowdLook";
 import { FIGURE_H, FIGURE_W } from "./peopleGfx";
 import { castIndex, LOOK } from "../pixelSprites/people";
+import { emptyFlightPass } from "../venueFlights";
 
 /** One drawn frame of `ms`: the step clock, then the crowd pass (the order `TowerEngine.tick` runs them in). */
 function frame(e: any, ms = 1000 / 60): void {
@@ -62,6 +63,7 @@ function eng(over: Record<string, any> = {}): any {
     cam: { zoom: 1 },
     crowdCulled: false,
     crowdActors: new Map(),
+    flightPass: emptyFlightPass(),
     hallDoors: new HallDoorLayer(),
     carActors: [],
     trainActors: [],
