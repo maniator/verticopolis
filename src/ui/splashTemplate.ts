@@ -2,6 +2,7 @@ import { html, nothing, type TemplateResult } from "lit-html";
 import { iconTemplate } from "./icons";
 import { versionLine } from "../wasmhost/engineLabel";
 import { platformLabel } from "../analyticsEnrichment";
+import { trackAppAction } from "../analytics";
 
 /**
  * The "Metropolis Dusk" splash/title-screen body, split out of the onboarding
@@ -48,6 +49,20 @@ export function sponsorOffered(storage: () => Storage = () => sessionStorage): b
   }
   return !remembered && platformLabel() !== "twa";
 }
+
+/** Count a tap on the splash's Sponsor link as the `sponsor_click` app action
+ *  (`detail` "splash"): a click, a keyboard Enter, or a middle-click (which
+ *  fires `auxclick` instead of `click`). It records the tap only: the link still
+ *  opens GitHub Sponsors in a new tab, and nothing about the sponsorship is
+ *  known here. */
+function noteSponsorClick(e: MouseEvent): void {
+  if (e.type === "auxclick" && e.button !== MIDDLE_BUTTON) return;
+  trackAppAction("sponsor_click", "splash");
+}
+
+/** `MouseEvent.button` for the middle (wheel) button, the one that opens a
+ *  link in a new tab; the right button's `auxclick` opens a menu instead. */
+const MIDDLE_BUTTON = 1;
 
 /** Click handlers the splash template binds through lit `@click`. `onToggleMute`
  *  is optional: when a caller can't toggle (no audio port), it is undefined, lit
@@ -164,6 +179,6 @@ export function splashTemplate(hasSave: boolean, premise: string, muted: boolean
          nags, and unlocks nothing. Rendered last so it ends the Tab order, and
          left out of the Android app (see sponsorOffered). -->
     ${sponsorOffered()
-      ? html`<a class="splash-sponsor" data-splash="sponsor" href=${SPONSOR_URL} target="_blank" rel="noopener noreferrer" title="Verticopolis is free. Sponsoring helps keep it going.">${iconTemplate("heart", { size: 14 })}Sponsor</a>`
+      ? html`<a class="splash-sponsor" data-splash="sponsor" href=${SPONSOR_URL} target="_blank" rel="noopener noreferrer" title="Verticopolis is free. Sponsoring helps keep it going." @click=${noteSponsorClick} @auxclick=${noteSponsorClick}>${iconTemplate("heart", { size: 14 })}Sponsor</a>`
       : nothing}`;
 }
