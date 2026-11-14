@@ -1,6 +1,6 @@
 import { html } from "lit-html";
 import type { GameApp } from "../main";
-import { SaveGame } from "../storage/SaveGame";
+import { SaveGame, type SlotInfo } from "../storage/SaveGame";
 import { scheduleReviewEntry } from "../ui/templates/scheduleReview";
 import { canCallExterminator, statsScreen, statsTemplate } from "../ui/templates/stats";
 import { trackAppAction } from "../analytics";
@@ -9,6 +9,9 @@ import { statsReport } from "../simport/statsSheet";
 import { catalogOf } from "./portAccess";
 import { NEWER_SAVE_REFUSAL, loadStored, newerSaveRefused, saveText } from "./portLifecycle";
 import { groupDigits } from "../ui/format";
+import { dropUndo, homeSlot, keepForUndo, pendingUndo, rememberHome, rememberHomePrint, slotFingerprint } from "../storage/slotGuard";
+import { saveFailureMessage } from "../storage/saveFailureCopy";
+import type { SavesGuard, UndoResult } from "../ui/templates/saves";
 
 /**
  * The tower-statistics modal, its exterminator action, and the manual save-slot
@@ -122,11 +125,84 @@ export async function confirmExterminate(app: GameApp): Promise<void> {
 
 export function showSaves(app: GameApp): void {
   trackAppAction("saves_open"); // saves manager modal opening
-  app.ui.showSaves(SaveGame.listSlots(), SaveGame.unreadableBackup());
+  const rows = SaveGame.listSlots();
+  app.ui.showSaves(rows, SaveGame.unreadableBackup(), savesGuard(app, rows));
 }
 
-/** Save the live tower into a manual slot, stamping the live camera view. */
-export function saveToSlot(app: GameApp, slot: number): void {
+/** The overwrite guard's view for the Saved Towers dialog: the live tower's
+ *  own slot, its name, and the one step of Undo (`storage/slotGuard`).
+ *  `rows` is the listing the dialog draws, read once per open. */
+function savesGuard(app: GameApp, rows: readonly SlotInfo[]): SavesGuard {
+  const undo = pendingUndo(SaveGame.slotRaw);
+  return {
+    home: liveHome(app, rows),
+    liveName: liveName(app),
+    undo: undo && { slot: undo.slot, towerName: undo.towerName, action: undo.action, run: () => undoSlot(app) },
+    replaceTarget: (slot) => replaceTarget(app, slot),
+  };
+}
+
+/** Whether a save into `slot` must ask first, read from storage at the click
+ *  (the dialog's list may be stale when another tab wrote since): the slot's
+ *  row when it holds anything other than the live tower, null when it is
+ *  empty or the live tower's own. A save this version can't read comes back
+ *  as a row that does not `exist`, and the dialog refuses to save over it, as
+ *  the list does (`SaveGame.hasSlot`). */
+function replaceTarget(app: GameApp, slot: number): SlotInfo | null {
+  if (SaveGame.slotRaw(slot) === null) return null;
+  const rows = SaveGame.listSlots();
+  if (liveHome(app, rows) === slot) return null;
+  return rows.find((s) => s.slot === slot) ?? { slot, exists: false, present: true };
+}
+
+/** The live tower's name as the dialogs show it. */
+const liveName = (app: GameApp): string => app.reader.tower.towerName || "Tower";
+
+/** The name the tower in `slot` was saved under, from a listing the caller
+ *  read once for its whole command (`SaveGame.listSlots`). */
+function savedName(rows: readonly SlotInfo[], slot: number): string {
+  return rows.find((s) => s.slot === slot)?.towerName || "Tower";
+}
+
+/** The live tower's own slot: the one this page remembers, and only while
+ *  the tower saved there has the live tower's name, as a second check on the
+ *  fingerprint. A renamed tower asks once, and its next save makes the slot
+ *  home again. */
+function liveHome(app: GameApp, rows: readonly SlotInfo[]): number | null {
+  const home = homeSlot(SaveGame.slotRaw);
+  return home !== null && savedName(rows, home) === liveName(app) ? home : null;
+}
+
+/** Put back the tower the last replace or delete took out of its slot.
+ *  "gone" when the slot has changed since, so there is nothing to put back.
+ *  A refused write is said inside the open dialog, since a toast would sit
+ *  behind it, and the step stays for another try. */
+export function undoSlot(app: GameApp): UndoResult {
+  const undo = pendingUndo(SaveGame.slotRaw);
+  if (!undo) return "gone";
+  try {
+    SaveGame.restoreSlotRaw(undo.slot, undo.raw);
+  } catch (err) {
+    app.ui.sayVisibly(saveFailureMessage(err));
+    return "failed";
+  }
+  dropUndo();
+  app.ui.toast(`${undo.towerName} is back in slot ${undo.slot}.`, "good");
+  return "back";
+}
+
+/** Save the live tower into a manual slot, stamping the live camera view. A
+ *  save over a slot that held another tower keeps that tower for one Undo;
+ *  either way the slot becomes the live tower's own. False when the write
+ *  failed, which is said where the player can see it (inside the open
+ *  Saved Towers dialog, which then stays as it is). */
+export function saveToSlot(app: GameApp, slot: number): boolean {
+  const before = SaveGame.slotRaw(slot);
+  let replaced: string | null = null;
+  if (before !== null) {
+    const rows = SaveGame.listSlots();
+    if (liveHome(app, rows) !== slot) replaced = savedName(rows, slot);
+  }
   try {
     // Manual slots carry the view too: stamp the live camera the same way
     // SaveLoad does for the autosave and exports. Inside the try on purpose:
@@ -138,10 +214,16 @@ export function saveToSlot(app: GameApp, slot: number): void {
     // toast success on a failed write (the throw would otherwise escape the
     // slot button's click handler with no player feedback at all).
     app.saveLoad.notice.slotFailed(err);
-    return;
+    return false;
   }
   trackAppAction("save_slot"); // manual slot write succeeded
+  const after = SaveGame.slotRaw(slot);
+  const print = after === null ? null : slotFingerprint(after);
+  if (replaced !== null && before !== null && print !== null)
+    keepForUndo({ slot, towerName: replaced, action: "replaced", raw: before, left: print });
+  rememberHomePrint(slot, print);
   app.ui.toast(`Saved to slot ${slot}.`, "good");
+  return true;
 }
 
 /** Load a manual slot (or the autosave) and adopt it as the live tower. */
@@ -155,6 +237,7 @@ export function loadFromSlot(app: GameApp, slot: number | "auto"): void {
     return loaded;
   };
   if (slot === "auto" ? SaveGame.load(load) : SaveGame.loadSlot(slot, load)) {
+    loadedFrom(slot);
     trackAppAction("load_slot"); // slot (or autosave) adopted as the live tower
     app.ui.toast("Tower loaded.", "good");
   } else {
@@ -234,12 +317,25 @@ export function loadFromSplash(app: GameApp, slot: number | "auto"): boolean {
     trackAppAction("load_failed");
     return false;
   }
+  loadedFrom(slot);
   trackAppAction("load_slot"); // slot (or autosave) adopted as the live tower
   return true;
 }
 
+/** After a load, a manual slot is the loaded tower's home. The autosave names
+ *  none: the swap already forgot the old home (`followEngineTower`), and the
+ *  autosave, which every tab shares and which trails the live tower by up to
+ *  30 seconds, may hold another tower than the one that slot had. */
+function loadedFrom(slot: number | "auto"): void {
+  if (slot !== "auto") rememberHome(slot, SaveGame.slotRaw(slot));
+}
+
+/** Delete a manual slot, keeping its tower for one Undo. */
 export function deleteSlot(app: GameApp, slot: number): void {
+  const before = SaveGame.slotRaw(slot);
+  const name = before === null ? null : savedName(SaveGame.listSlots(), slot);
   SaveGame.deleteSlot(slot);
+  if (before !== null && name !== null) keepForUndo({ slot, towerName: name, action: "deleted", raw: before, left: null });
   trackAppAction("delete_save"); // slot cleared
   app.ui.toast(`Deleted slot ${slot}.`, "info");
 }

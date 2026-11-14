@@ -73,9 +73,10 @@ export interface DrawOptions {
   readonly empty?: boolean;
   /** Override the leg, torso and head heights, to fit a room's builds. */
   readonly dims?: Dims;
-  /** Size, for a figure drawn on the overlay at the camera's zoom; every rect
-   *  still lands on whole pixels. */
+  /** Size, for a figure drawn on the overlay at the camera's zoom; every rect still lands on whole pixels. */
   readonly scale?: number;
+  /** A sleeper on their back, head left, face up: upright cell (col, row) lands at (row, -col - 1), no shadow. */
+  readonly lying?: boolean;
 }
 
 export interface Dims {
@@ -211,7 +212,8 @@ export function drawPerson(ctx: CanvasRenderingContext2D, x: number, foot: numbe
   const size = (d: number) => Math.max(1, Math.round(d * s));
   const px = (c: string, dx: number, dy: number, w = 1, h = 1) => {
     ctx.fillStyle = c;
-    ctx.fillRect(X + at(dx), F + at(dy), size(w), size(h));
+    if (o.lying) ctx.fillRect(X + at(dy), F - at(dx) - size(w), size(h), size(w));
+    else ctx.fillRect(X + at(dx), F + at(dy), size(w), size(h));
   };
   const lit = o.lit;
   const frame = o.frame ?? 1;
@@ -227,11 +229,11 @@ export function drawPerson(ctx: CanvasRenderingContext2D, x: number, foot: numbe
   const ox = 1; // room for the back arm on the left
 
   // Contact shadow: one hard row when flat, a soft two-row pool when lit.
-  if (lit) {
+  if (!o.lying && lit) {
     px("rgba(0,0,0,0.18)", -1, 0, W + 4, 1);
     px("rgba(0,0,0,0.10)", -2, 0, W + 6, 1);
     px("rgba(0,0,0,0.10)", 0, 1, W + 2, 1);
-  } else {
+  } else if (!o.lying) {
     px("rgba(0,0,0,0.24)", -1, 0, W + 3, 1);
   }
 

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { GameApp } from "../main";
 import { noteTowerSwap, runningTowerStage } from "./engineFault";
+import { homeSlot, rememberHome } from "../storage/slotGuard";
 
 // Loading main.ts boots the game at module scope; this test only needs the
 // class, so the boot is stubbed out.
@@ -193,5 +194,23 @@ describe("followSwap and a drag under way", () => {
       expect(order[order.length - 1], follow).toBe(`follow: ${follow === "step" ? "same tower" : "another tower"}`);
       expect(order.slice(0, -1).sort(), `${follow}: everything before the follow`).toEqual(["inspector", "refusal card", "reset"]);
     }
+  });
+});
+
+describe("followSwap and the live tower's save slot", () => {
+  it("forgets the home slot on another tower, so saving it over an occupied slot asks first", () => {
+    for (const follow of ["swap", "restore"] as const) {
+      rememberHome(2, "VCZ1:old tower");
+      const app = standIn(1);
+      GameApp.prototype.followSwap.call(app as unknown as GameApp, follow);
+      expect(homeSlot(() => "VCZ1:old tower"), follow).toBeNull();
+    }
+  });
+
+  it("keeps it on an undo or redo step of the same tower", () => {
+    rememberHome(2, "VCZ1:this tower");
+    const app = standIn(1);
+    GameApp.prototype.followSwap.call(app as unknown as GameApp, "step");
+    expect(homeSlot(() => "VCZ1:this tower")).toBe(2);
   });
 });
