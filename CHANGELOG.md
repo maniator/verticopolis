@@ -25,6 +25,11 @@ prompt already tells players it is an engine update and shows the new version.
 Entries below 1.51.1 were curated from the commit history after the fact, so they
 are documentation only: no build that a client fetches carries them.
 
+## 3.7.3
+
+- Elevator cars show only the people who actually stepped in, one figure each, so a car no longer looks full with nobody aboard.
+- People riding an elevator stay aboard to their floor and step off there, instead of vanishing from the car partway through a slow ride.
+
 ## 3.7.2
 
 - A shop or restaurant just above a tall lobby no longer says it is too far from a lobby. Distance to a tall lobby now counts from its top story, for tenants' ratings too.

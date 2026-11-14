@@ -15,6 +15,10 @@ raised the version, so they are documentation only.
 There is no entry for 0.17.0, which only
 existed as a step inside a stacked branch.
 
+## 1.30.2 (2026-11-14)
+
+- A rider no longer gives up while aboard a car: they ride to their floor, and step out of the trip only when their car, their shaft or their floor's stop goes. The conformance lock moves.
+
 ## 1.30.1 (2026-11-13)
 
 - `Tower::nearest_lobby_floor_distance` counts a tall lobby hall (#308) on every story it fills, so a floor over a 3-story hall on floor 30 is one floor from it (it was three). The commercial lobby penalty, its card fact `commercial.lobbyFar`, the tenant lobby-distance drain and the card's `lobbyDistance` all read it. One-story lobbies and floors below a hall are unchanged, and no conformance scenario moves.
