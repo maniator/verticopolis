@@ -121,6 +121,7 @@ pub mod frame;
 pub mod gameplay;
 #[doc(hidden)]
 pub mod housekeeping;
+pub(crate) mod housekeeping_shift;
 pub mod identity;
 #[doc(hidden)]
 pub mod jsmath;

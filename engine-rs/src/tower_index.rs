@@ -241,9 +241,10 @@ impl Tower {
         census
     }
 
-    /// How many housekeeping units the tower has: the crews behind
-    /// `maxStaffFor`'s ceiling (`staffCeiling` in `crowd/spawn.ts`). Read
-    /// from the census, since a housekeeping unit is never a tile.
+    /// How many housekeeping units the tower has, for the housekeeping
+    /// passes' early return (it was `maxStaffFor`'s ceiling, `staffCeiling`
+    /// in `crowd/spawn.ts`, before housekeepers came in for their shift).
+    /// Read from the census, since a housekeeping unit is never a tile.
     pub(crate) fn housekeeping_units(&self) -> i64 {
         self.census().kinds[Kind::Housekeeping as usize]
     }

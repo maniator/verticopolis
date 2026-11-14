@@ -9,9 +9,10 @@
 //! `segmentRoutingMealRush.integration.test.ts`.
 use crate::clock::GameMode;
 use crate::crowd::motion::advance;
-use crate::crowd::spawn::{spawn_staff, StaffSpawn};
+use crate::crowd::CROWD_SECONDS_PER_MINUTE;
 use crate::demand::compute_demand_map;
 use crate::facilities::Kind;
+use crate::housekeeping_shift::MaidSent;
 use crate::sim::Simulation;
 use crate::tower::UnitState;
 
@@ -33,25 +34,23 @@ fn center(sim: &Simulation, id: i64) -> f64 {
     u.x as f64 + u.width as f64 / 2.0
 }
 
-/// Sends a maid from `crew` to clean `room` (one game-minute of work) and
+/// Sends a maid seated at `crew` to clean `room` (one game-minute of work) and
 /// steps the crowd until the job reports. Returns whether it completed and
 /// every column a maid stood on upstairs.
 fn send_maid(sim: &mut Simulation, crew: i64, room: i64, steps: usize) -> (bool, Vec<i64>) {
-    let (to_x, from_x) = (center(sim, room), center(sim, crew));
-    let sent = spawn_staff(
-        &mut sim.crowd,
-        &sim.tower,
-        2,
-        2,
-        to_x,
-        room,
-        1.0,
-        Some(from_x),
-    );
-    assert!(
-        matches!(sent, StaffSpawn::Sent),
-        "a route to the room's run exists"
-    );
+    sim.seat_crews();
+    let mut free = sim.free_maids();
+    let sent = sim.assign_maid(&mut free, crew, (room, 2, center(sim, room)));
+    assert_eq!(sent, MaidSent::Sent, "a route to the room's run exists");
+    // One game-minute of work keeps the walk the test.
+    for p in sim
+        .crowd
+        .people
+        .iter_mut()
+        .filter(|p| p.clean_unit_id == Some(room))
+    {
+        p.linger_for = Some(CROWD_SECONDS_PER_MINUTE);
+    }
     let mut columns = Vec::new();
     for _ in 0..steps {
         advance(&mut sim.crowd, 3.0, &mut sim.tower);

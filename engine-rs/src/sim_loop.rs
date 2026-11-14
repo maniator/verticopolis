@@ -126,6 +126,7 @@ impl Simulation {
         );
         let move_minutes = dt_minutes.min(CROWD_MAX_STEP / CROWD_SECONDS_PER_MINUTE);
         let mut left = move_minutes;
+        let mut staff_moved = false;
         while left > 0.0 {
             let chunk = left.min(2.5);
             let calls = self.crowd.elevator_calls(&self.tower);
@@ -139,15 +140,12 @@ impl Simulation {
                 chunk * CROWD_SECONDS_PER_MINUTE,
                 &mut self.tower,
             );
+            // The rooms cleaned, and where the housekeepers who came free go
+            // next, chunk by chunk so a long step loses no time between rooms.
+            staff_moved |= self.staff_after_chunk();
             left -= chunk;
         }
-        let staff_jobs = self.crowd.take_staff_results();
-        for job in &staff_jobs {
-            self.on_housekeeper_result(job.unit_id, job.ok);
-        }
-        if !staff_jobs.is_empty() {
-            self.dispatch_housekeepers();
-        }
+        self.staff_after_step(staff_moved);
     }
 
     #[doc(hidden)]
@@ -162,14 +160,18 @@ impl Simulation {
             self.hotel_late_checkout();
         }
         let shift = self.mode.housekeeping_shift();
+        // Crews come in two hours early, and none sets out during a bomb
+        // search, when everyone but the guards stands still.
+        if self.crews_on_duty() && !self.bomb_lockdown() {
+            self.bring_in_crews();
+        }
         if hour >= shift.start && hour < shift.end {
             self.resolve_extermination();
-            // A maid sent out during a bomb search would appear and stand
-            // still; the crews go out once the search ends.
             if !self.bomb_lockdown() {
                 self.dispatch_housekeepers();
             }
         }
+        self.send_idle_crews_out();
         self.update_satisfaction();
         self.attempt_move_ins();
         self.collect_traffic_income();
