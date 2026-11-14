@@ -279,6 +279,34 @@ describe("reconcileCrowd draws one actor per live person", () => {
     expect(rec.actor.pos.y).toBeCloseTo(-9 * FLOOR + FLOOR - 3, 6);
   });
 
+  it("keeps a riding housekeeper with their car on a fast step, never jumping ahead of it", () => {
+    // A fast car covers three floors in a step: the drawn car glides there
+    // (carMotion), so the rider glides too instead of jumping to the new floor
+    // and hanging in the empty shaft until the car arrives.
+    const person = { id: 1, seed: 0, staff: true, state: "riding", x: 10, fy: 5, wait: 0 };
+    const e = eng({ sim: { ...eng().sim, crowd: { people: [person] } } });
+    frame(e, 16);
+    frame(e, 400); // a step lasts about this long, so the next one glides over it
+    Object.assign(person, { fy: 8 });
+    e.sim.clock = { ...e.sim.clock, minutes: 1 };
+    frame(e, 16);
+    const y = e.crowdActors.get(1).actor.pos.y;
+    const at = (fy: number) => -fy * FLOOR + FLOOR - 3;
+    expect(y).toBeLessThan(at(5));
+    expect(y).toBeGreaterThan(at(8));
+    // The step that lets them off at floor 11 is the car's last glide too.
+    frame(e, 400);
+    Object.assign(person, { state: "toDest", fy: 11 });
+    e.sim.clock = { ...e.sim.clock, minutes: 2 };
+    frame(e, 16);
+    const off = e.crowdActors.get(1).actor.pos.y;
+    expect(off).toBeLessThan(at(8));
+    expect(off).toBeGreaterThan(at(11));
+    // A walker making the same hop is not on a car, so it still jumps.
+    expect(advanceGlideJumps(false)).toBe(true);
+    expect(advanceGlideJumps(true)).toBe(false);
+  });
+
   it("vacuums while a housekeeper dwells at a room, and climbs on the stairs", () => {
     const e = eng({ sim: { ...eng().sim, crowd: { people: [
       { id: 1, seed: 0, staff: true, state: "dwelling", x: 10, fy: 5, wait: 0 },
@@ -455,3 +483,10 @@ describe("updateMotion repositions the moving actors", () => {
     expect(idleCar.actor.graphics.isVisible).toBe(false);
   });
 });
+
+/** Whether a three-floor hop on a step's first frame lands at once. */
+function advanceGlideJumps(riding: boolean): boolean {
+  const g = newGlide(10, 5, false);
+  advanceGlide(g, 10, 8, true, 0.25, true, riding);
+  return g.fy === 8;
+}

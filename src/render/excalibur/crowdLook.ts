@@ -1,4 +1,5 @@
 import { LOOKS, walkFrame, type Mood, type Pose } from "../pixelSprites/people";
+import { SNAP_FLOORS as CAR_SNAP_FLOORS } from "../carMotion";
 
 /**
  * What a moving figure shows this frame (#2097), as pure functions of the
@@ -187,6 +188,9 @@ export interface Glide {
   left: boolean;
   /** Tiles walked so far along the floor, for the walk cycle. */
   walked: number;
+  /** Whether the last step was on a car, so the step that lets the rider off
+   *  glides by the car's rule too. */
+  rode: boolean;
 }
 
 /** A move shorter than this (tiles) is a shuffle, such as a waiting line
@@ -198,17 +202,23 @@ export const SNAP_TILES = 40;
 export const SNAP_FLOORS = 1.5;
 
 export function newGlide(x: number, fy: number, left: boolean): Glide {
-  return { fromX: x, toX: x, fromFy: fy, toFy: fy, x, fy, left, walked: 0 };
+  return { fromX: x, toX: x, fromFy: fy, toFy: fy, x, fy, left, walked: 0, rode: false };
 }
 
 /**
  * Move a glide on: on a step, start from where the figure is drawn now toward
  * the engine's new position, or jump there when the hop is too far to be a
- * walk; then draw it `progress` of the way.
+ * walk; then draw it `progress` of the way. A person `riding` a car moves
+ * with it, so they jump only when the drawn car does (`carMotion`), on the
+ * step they get out included: on the walkers' shorter limit a fast car's
+ * rider jumped ahead of it and hung in the empty shaft until it caught up.
  */
-export function advanceGlide(g: Glide, x: number, fy: number, stepped: boolean, progress: number, show: boolean): void {
+export function advanceGlide(g: Glide, x: number, fy: number, stepped: boolean, progress: number, show: boolean, riding = false): void {
   if (stepped || x !== g.toX || fy !== g.toFy) {
-    const jump = !show || Math.abs(x - g.x) > SNAP_TILES || Math.abs(fy - g.fy) > SNAP_FLOORS;
+    // The step a rider gets out on is the car's last glide to their floor.
+    const snapFloors = riding || g.rode ? CAR_SNAP_FLOORS : SNAP_FLOORS;
+    g.rode = riding;
+    const jump = !show || Math.abs(x - g.x) > SNAP_TILES || Math.abs(fy - g.fy) > snapFloors;
     g.fromX = jump ? x : g.x;
     g.fromFy = jump ? fy : g.fy;
     g.toX = x;

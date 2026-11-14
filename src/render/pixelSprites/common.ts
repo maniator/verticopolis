@@ -279,24 +279,34 @@ function castFigure(ctx: CanvasRenderingContext2D, x: number, footY: number, bui
   drawPerson(ctx, x, footY, CAST[castIndex(seed)], { lit: false, pose: "stand", empty: true, mood, dims: buildDims(build) });
 }
 
-/** A cast member asleep, lying with their head toward `headX` (`toLeft`
- *  when the head is at the left end): a head on the pillow at `headY` in
- *  their own skin and hair, and a blanket `len` pixels long over the body in
- *  `blanket`. Used by a hotel bed and a condo sofa at night (#2116). */
-export function sleeper(ctx: CanvasRenderingContext2D, headX: number, headY: number, len: number, blanket: string, seed: number, toLeft = true): void {
-  const look = CAST[castIndex(seed)];
+/** A cast member asleep on their back, drawn with the same head, hair and
+ *  face as the day figures (#2116): the head on the pillow with its crown at
+ *  `headX + 1`, the face turned up, and a blanket in `blanket` pulled to the
+ *  chin over the body. The sleeper fills rows `headY - 1` to `headY + 5`
+ *  and columns `headX - 1` to `headX + 4 + len` (a bed shorter than six
+ *  pixels of blanket still gets three). Used by a hotel bed and a condo sofa
+ *  at night. */
+export function sleeper(ctx: CanvasRenderingContext2D, headX: number, headY: number, len: number, blanket: string, seed: number): void {
   const hx = Math.round(headX);
   const hy = Math.round(headY);
-  const bodyX = toLeft ? hx + 4 : hx - Math.max(0, Math.round(len));
+  // The head takes six columns; the blanket runs from the chin to the end.
+  const blanketX = hx + 7;
+  const blanketLen = Math.max(3, Math.round(len) - 3);
+  // A seated build lying down: no legs, and a body that ends inside the
+  // blanket. The crown sits head + neck + torso + lap (8 + torso) pixels
+  // left of the foot point, so the foot point goes that far right of it.
+  const torso = Math.max(1, blanketLen - 2);
+  const dims: Dims = { legs: 0, torso, head: 6, seated: true, width: 4 };
+  // Nightclothes: a plain top, so no tie, stripe or badge reaches past a
+  // short body and out from under the blanket.
+  const look = { ...CAST[castIndex(seed)], topKind: "sweater", hiVis: false, badge: false } as const;
+  drawPerson(ctx, hx + 9 + torso, hy + 6, look, { lit: false, empty: true, pose: "stand", lying: true, dims });
   ctx.fillStyle = blanket;
-  ctx.fillRect(bodyX, hy + 1, Math.max(0, Math.round(len)), 4); // the body under the blanket
-  ctx.fillStyle = shade(blanket, 24);
-  ctx.fillRect(bodyX, hy + 1, Math.max(0, Math.round(len)), 1);
-  ctx.fillStyle = look.skin;
-  ctx.fillRect(hx, hy + 1, 4, 3); // the face, turned up
-  ctx.fillStyle = look.hairStyle === "bald" ? shade(look.skin, -18) : look.hair;
-  ctx.fillRect(toLeft ? hx : hx + 3, hy, 1, 4); // hair on the pillow side
-  ctx.fillRect(hx, hy, 4, 1);
+  ctx.fillRect(blanketX, hy - 1, blanketLen, 7);
+  ctx.fillStyle = shade(blanket, 24); // the turned-down edge at the chin
+  ctx.fillRect(blanketX, hy - 1, 1, 7);
+  ctx.fillStyle = shade(blanket, -18); // the fold where it meets the bed
+  ctx.fillRect(blanketX + 1, hy + 5, blanketLen - 1, 1);
 }
 
 /** Named convenience builds. Each picks its cast member from the seed and
