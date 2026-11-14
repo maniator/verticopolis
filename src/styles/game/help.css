@@ -84,6 +84,14 @@
   .help-md td:nth-child(3)::before { content: "Modern"; }
 }
 
+/* Tower > This Tower's Rules: the same table, cut to the column this tower
+   plays by. The page's paragraphs speak of both rule sets, so they go too;
+   the dialog's own lead line names the tower and its rules. */
+.tower-rules p { display: none; }
+.tower-rules[data-rules="classic"] :is(th, td):nth-child(3),
+.tower-rules[data-rules="modern"] :is(th, td):nth-child(2) { display: none; }
+.tower-rules-lead { margin: 0 0 4px; }
+
 /* The privacy link in About this game, and the line that says why Report a
    problem or the privacy page did not open when the game is offline (empty,
    so it takes no room, until then). */
