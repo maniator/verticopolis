@@ -25,6 +25,19 @@ prompt already tells players it is an engine update and shows the new version.
 Entries below 1.51.1 were curated from the commit history after the fact, so they
 are documentation only: no build that a client fetches carries them.
 
+## 3.7.2
+
+- A shop or restaurant just above a tall lobby no longer says it is too far from a lobby. Distance to a tall lobby now counts from its top story, for tenants' ratings too.
+- People headed for an elevator walk straight to the back of its line and wait there, instead of stepping into the shaft and walking back out. When a car comes, they walk from the line into it instead of vanishing from where they stood.
+- An elevator car shows one figure for each passenger, as many as fit in the cab, so a whole line that gets on fills it.
+- People in rooms are drawn at the same size as people in the halls.
+- Hotel guests and condo residents sleep under a blanket at night instead of disappearing.
+- People on stairs and escalators climb along the flight from one landing to the other, instead of rising straight up its middle. On a tall lobby they wind around the spiral stair and turn back at each switchback platform.
+
+## 3.7.1
+
+- Elevator cars and people move smoothly again at every speed, instead of shaking as they did in 3.7.0.
+
 ## 3.7.0
 
 - The title screen has a Sponsor link in its top-left corner, and the help site has a new Supporting Verticopolis section. The game stays free, with nothing locked.

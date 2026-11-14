@@ -255,11 +255,31 @@ impl Tower {
         pop
     }
 
-    /// `nearestLobbyFloorDistance`.
+    /// `nearestLobbyFloorDistance`: how many floors `floor` sits from the
+    /// nearest lobby. A tall lobby (#308) counts on every story its hall
+    /// fills, so the floor just above a three-story hall is one floor from
+    /// it, the same as the floor above a one-story lobby. Without this a
+    /// shop over a tall sky lobby read as three floors away and lost half
+    /// its trade. One visit per lobby floor, and one ordered lookup for its
+    /// tallest hall only when the tower has a tall hall at all.
     pub fn nearest_lobby_floor_distance(&self, floor: i64) -> i64 {
+        let any_tall = !self.tall_lobby_tiles.is_empty();
         let mut best = (floor - 1).abs();
-        for lf in self.lobby_tiles.keys() {
-            let d = (floor - lf).abs();
+        for &lf in self.lobby_tiles.keys() {
+            let top = if any_tall {
+                // Every tall hall on `lf`, the tallest last.
+                self.tall_lobby_tiles
+                    .range((lf, i64::MIN)..=(lf, i64::MAX))
+                    .next_back()
+                    .map_or(lf, |(&(_, height), _)| lf + height - 1)
+            } else {
+                lf
+            };
+            let d = if floor > top {
+                floor - top
+            } else {
+                (lf - floor).max(0)
+            };
             if d < best {
                 best = d;
             }

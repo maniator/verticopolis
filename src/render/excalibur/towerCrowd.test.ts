@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { kindFacts } from "../../tests/catalogKinds";
 import * as ex from "excalibur";
 import { FLOOR, TILE } from "../scale";
-import { carIndicator, type CarIndicator } from "../carIndicator";
+import { cabFit, carIndicator, type CarIndicator } from "../carIndicator";
 import { reap, reconcileCrowd, clearCrowd, clearMotion, tickCrowdClock, updateMotion } from "./towerCrowd";
 import { Z } from "../depthPlanes";
 import { HallDoorLayer } from "./towerHallDoors";
@@ -175,14 +175,19 @@ describe("reconcileCrowd draws one actor per live person", () => {
   it("glides between the engine's positions and walks while it moves, instead of hopping", () => {
     const person = { id: 1, seed: 0, staff: false, state: "toDest", x: 10, fy: 5, wait: 0 };
     const e = eng({ sim: { ...eng().sim, crowd: { people: [person] } } });
-    frame(e, 16);
-    // A sim step moves the person 12 tiles at once, as the slowest speed does.
-    person.x = 22;
+    // A step every ten frames, the first one standing still.
+    for (let i = 0; i < 10; i++) frame(e, 16);
     e.sim.clock = { ...e.sim.clock, minutes: 1 };
     frame(e, 16);
+    for (let i = 0; i < 9; i++) frame(e, 16);
+    // A sim step moves the person 12 tiles at once, as the slowest speed does.
+    person.x = 22;
+    e.sim.clock = { ...e.sim.clock, minutes: 2 };
+    frame(e, 16);
     const rec = e.crowdActors.get(1);
-    // The step's frame draws where the figure was; the glide starts from there.
-    expect(rec.actor.pos.x).toBeCloseTo(10 * TILE, 6);
+    // The step's own frame already draws a tenth of the way (the frame is
+    // part of the step), so the figure never holds still for a frame.
+    expect(rec.actor.pos.x).toBeCloseTo(11.2 * TILE, 6);
     frame(e, 16);
     const first = rec.actor.pos.x;
     expect(first).toBeGreaterThan(10 * TILE);
@@ -199,7 +204,7 @@ describe("reconcileCrowd draws one actor per live person", () => {
     // Arrived, it stops walking; heading back, it turns around.
     expect(figureOf(rec.key).pose).toBe("stand");
     person.x = 16;
-    e.sim.clock = { ...e.sim.clock, minutes: 2 };
+    e.sim.clock = { ...e.sim.clock, minutes: 3 };
     frame(e, 16);
     expect(figureOf(rec.key)).toMatchObject({ pose: "walk", left: true });
   });
@@ -209,13 +214,15 @@ describe("reconcileCrowd draws one actor per live person", () => {
     const e = eng({ sim: { ...eng().sim, crowd: { people: [person] } } });
     // Two steps 2 s apart, as the bottom speed runs in the lunch slowdown.
     frame(e, 16);
-    frame(e, 1968);
+    frame(e, 1984);
     person.x = 16;
     e.sim.clock = { ...e.sim.clock, minutes: 1 };
     frame(e, 16);
     const rec = e.crowdActors.get(1);
-    // Half a second into a 2 s step: a quarter of the way, still walking.
-    for (let i = 0; i < 5; i++) frame(e, 100);
+    // Half a second into a 2 s step (its own frame counts): a quarter of the
+    // way, still walking.
+    for (let i = 0; i < 4; i++) frame(e, 100);
+    frame(e, 84);
     expect(rec.actor.pos.x).toBeCloseTo(11.5 * TILE, 6);
     expect(figureOf(rec.key).pose).toBe("walk");
     // Paused, the figure holds where it is.
@@ -243,32 +250,6 @@ describe("reconcileCrowd draws one actor per live person", () => {
     person.state = "toShaft";
     frame(e, 16);
     expect(rec.actor.z).toBe(Z.walking);
-  });
-
-  it("gets a rider in and out of a car when the drawn car arrives, not a step early", () => {
-    const person = { id: 1, seed: 0, staff: false, state: "waiting", x: 10, fy: 5, wait: 0 };
-    const e = eng({ sim: { ...eng().sim, crowd: { people: [person] } } });
-    frame(e, 16);
-    const rec = e.crowdActors.get(1);
-    // The engine puts them in the car on this step; the drawn car is still
-    // gliding to the landing, so they wait there in sight.
-    Object.assign(person, { state: "riding" });
-    e.sim.clock = { ...e.sim.clock, minutes: 1 };
-    frame(e, 500);
-    frame(e, 100);
-    expect(rec.actor.graphics.isVisible, "while the car is on its way").toBe(true);
-    // The glide ends: they are in the car.
-    frame(e, 1000);
-    expect(rec.actor.graphics.isVisible, "once the car is there").toBe(false);
-    // Out at floor 9: hidden until the drawn car gets there, then standing at the landing.
-    Object.assign(person, { state: "toDest", fy: 9, x: 11 });
-    e.sim.clock = { ...e.sim.clock, minutes: 2 };
-    frame(e, 600);
-    expect(rec.actor.graphics.isVisible, "while the car rides up").toBe(false);
-    e.sim.clock = { ...e.sim.clock, minutes: 3 };
-    frame(e, 600);
-    expect(rec.actor.graphics.isVisible, "the next step").toBe(true);
-    expect(rec.actor.pos.y).toBeCloseTo(-9 * FLOOR + FLOOR - 3, 6);
   });
 
   it("keeps an even leg cadence at a fast speed instead of strobing", () => {
@@ -396,7 +377,7 @@ describe("updateMotion repositions the moving actors", () => {
   it("moves each elevator car to its live shaft position and repaints on a state change", () => {
     const cap = kindFacts("elevatorStandard").carCapacity ?? 0;
     expect(cap, "a standard elevator car carries passengers").toBeGreaterThan(0);
-    const changedInd = carIndicator(1, cap, cap); // ascending & full: differs from idle
+    const changedInd = carIndicator(1, cap, cap, cabFit(4 * TILE)); // ascending & full: differs from idle
     const changedKey = carKey(changedInd);
     const car = {
       actor: actor(),

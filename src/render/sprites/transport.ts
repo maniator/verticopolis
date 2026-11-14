@@ -4,7 +4,7 @@ import type { FacilityKind } from "../../shared/types";
 import type { TransportView } from "../../simport/view";
 import { personRider } from "../pixelSprites/common";
 import { layerBreak, layerEnd } from "../pixelSprites/layers";
-import type { CarArrow } from "../carIndicator";
+import { RIDER_STEP, type CarArrow } from "../carIndicator";
 import { shade, shadeAlpha } from "./common";
 import { drawSpiralStair } from "./spiralStair";
 
@@ -428,13 +428,12 @@ export function drawCar(
   // front (depth layers, `pixelSprites/layers.ts`). The floor band stays on
   // the back: the riders stand on it (#999).
   layerBreak(ctx);
-  // Riders stand on the cab floor as the 17px rider silhouette, packed tighter
-  // as the car fills so a crowded cab reads at a glance. `riders` is the car's
-  // load from the caller; the passenger FILL reconciliation is the people-system
-  // spec's overlay behind the E6 seam, not redefined here.
+  // Riders stand on the cab floor at their size on the floor, one per
+  // passenger up to the cab's room (`cabFit`), packed tighter as the car fills
+  // so a crowded cab reads at a glance.
   const rc = Math.max(0, Math.floor(riders));
   if (rc > 0) {
-    const gap = Math.max(3, Math.min(7, (cw - 8) / rc));
+    const gap = Math.max(RIDER_STEP, Math.min(7, (cw - 8) / rc));
     for (let p = 0; p < rc; p++) {
       const rx = 3 + p * gap;
       if (rx > cw - 5) break; // never overflow the cab

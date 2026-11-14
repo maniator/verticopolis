@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import type { Unit } from "../../shared/types";
 import { drawRoom } from "../pixelSprites";
 import { geoVariant, RESERVED_COLORS, type RoomCtx } from "./common";
+import { CAST, castIndex } from "./people";
 import { FLOOR, TILE } from "../scale";
 import { APARTMENT_WALLS, CONDO_PICTURES, CONDO_WALLS, HOTEL_WALLS, OFFICE_WALLS, RENTAL_PICTURES, STUDIO_WALLS, SUITE_WALLS } from "./residential.looks";
 
@@ -216,6 +217,34 @@ describe("occupancy is honest (maps to roomOccupants, no ghost people)", () => {
     const lateNight = spyCtx();
     drawRoom(room(lateNight.ctx, { hour: 2, lit: true }), unit({ kind: "condo", width: 16, floor: 10, x: 20, occupants: 3 }), 0, 0, 16 * TILE, FLOOR);
     expect(peopleCount(lateNight.log)).toBe(0); // asleep: no one "up"
+  });
+
+  it("shows the residents and guests asleep in the small hours, and nobody in an empty room", () => {
+    // A living-room condo (the sofa layout) at 2 AM: someone sleeps on the sofa.
+    const condo = (occupants: number) => {
+      for (let x = 0; x < 400; x++) {
+        const u = unit({ kind: "condo", width: 16, floor: 10, x, occupants });
+        if (geoVariant(u, 3, 5) <= 2) return u;
+      }
+      throw new Error("no living-room condo");
+    };
+    const asleep = (draw: (ctx: CanvasRenderingContext2D) => void) => {
+      const s = spyCtx();
+      draw(s.ctx);
+      return s.log.filter((l) => l.startsWith("fillRect:")).length;
+    };
+    const sofaHome = condo(2);
+    const withSleeper = asleep((ctx) => drawRoom(room(ctx, { hour: 2, lit: true }), sofaHome, 0, 0, 16 * TILE, FLOOR));
+    const nobodyHome = asleep((ctx) => drawRoom(room(ctx, { hour: 2, lit: true }), { ...sofaHome, occupants: 0 }, 0, 0, 16 * TILE, FLOOR));
+    expect(withSleeper).toBeGreaterThan(nobodyHome);
+    const sleeper = spyCtx();
+    drawRoom(room(sleeper.ctx, { hour: 2, lit: true }), sofaHome, 0, 0, 16 * TILE, FLOOR);
+    expect(sleeper.log).toContain(`fillStyle=${CAST[castIndex((sofaHome.id * 5) | 0)].skin}`);
+    // A hotel guest asleep shows their face on the pillow; an empty asleep room does not.
+    const guest = spyCtx();
+    const hotel = unit({ kind: "hotelSingle", width: 4, floor: 12, x: 30, state: "asleep", occupants: 1 });
+    drawRoom(room(guest.ctx, { hour: 2 }), hotel, 0, 0, 4 * TILE, FLOOR);
+    expect(guest.log).toContain(`fillStyle=${CAST[castIndex((hotel.id * 7) | 0)].skin}`);
   });
 });
 
