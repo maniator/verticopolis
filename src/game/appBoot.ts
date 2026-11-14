@@ -215,8 +215,10 @@ export function wireControllers(app: GameApp): void {
       app.onboarding.arm(app.enginePort);
     },
   });
-  // A manual slot lives in IndexedDB alone, and its write lands after the
-  // dialog said "Saved": a write that fails there is said like a refused slot.
+  // This release mirrors every slot in localStorage, so a slot write that
+  // fails is refused there, at once, and this never fires. Once a slot leaves
+  // the mirror its database write lands after the dialog said "Saved", and a
+  // write that fails there is said like a refused slot.
   saveStore.onFailure((err, key) => {
     if (isSlotKey(key)) app.saveLoad.notice.slotFailed(err);
   });

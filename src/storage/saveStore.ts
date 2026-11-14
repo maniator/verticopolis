@@ -13,7 +13,9 @@ import { fromBase64, STORE_MAGIC, toBase64 } from "./saveCompression";
  * store is plain localStorage, as every save was before.
  *
  * The `mirrored` keys are also written to localStorage on every write, and at
- * boot the newer of the two copies wins (a tie goes to the database). A tab
+ * boot the newer of the two copies wins (a tie goes to the database); a key
+ * localStorage no longer holds was deleted outside the store and leaves the
+ * database too. A tab
  * the system kills right after a write still has the save there, and a build
  * from before this one still finds the player's towers. The game mirrors
  * every save for the first release on IndexedDB (rollback safety, see
@@ -24,7 +26,9 @@ import { fromBase64, STORE_MAGIC, toBase64 } from "./saveCompression";
  * A compressed save (`VCZ1:` and base64) is kept in IndexedDB as its raw
  * deflate bytes, a third smaller than the base64 text. Another tab of the game
  * hears every write over a BroadcastChannel and updates its memory, as tabs
- * once shared localStorage.
+ * once shared localStorage; a tab writing localStorage alone is heard through
+ * the `storage` event. A later build that upgrades the database closes this
+ * connection, and the tab goes back to localStorage.
  */
 
 const DB_NAME = "verticopolis";
@@ -124,11 +128,13 @@ async function writeAll(db: IDBDatabase, entries: readonly (readonly [string, st
   await committed(tx);
 }
 
-function localValue(key: string): string | null {
+/** `key`'s localStorage value, or undefined when localStorage cannot be read
+ *  (so an unreadable store is never taken for one that lost the key). */
+function localValue(key: string): string | null | undefined {
   try {
     return localStorage.getItem(key);
   } catch {
-    return null;
+    return undefined;
   }
 }
 
@@ -142,7 +148,7 @@ async function migrate(db: IDBDatabase, keys: SaveStoreKeys): Promise<boolean> {
   if ((await done(tx.objectStore(META).get(MIGRATED))) === true) return true;
   const copied = keys.managed.flatMap((key) => {
     const value = localValue(key);
-    return value === null ? [] : [[key, value] as const];
+    return value === null || value === undefined ? [] : [[key, value] as const];
   });
   await writeAll(db, copied);
   const back = await readAll(db, keys.managed);
@@ -188,9 +194,34 @@ export async function openSaveStore(keys: SaveStoreKeys, opts: OpenOptions): Pro
   }
   if (!answer) return false;
   const channel = typeof BroadcastChannel === "undefined" ? null : new BroadcastChannel(CHANNEL);
-  open = { db: answer.db, values: answer.values, keys, channel, pending: Promise.resolve(), failed: undefined };
+  const o: Open = { db: answer.db, values: answer.values, keys, channel, pending: Promise.resolve(), failed: undefined };
+  open = o;
   if (channel) channel.onmessage = (e: MessageEvent<{ key?: unknown; value?: unknown }>) => heard(e.data);
+  // A tab whose store is not open (an older build, an open that timed out)
+  // writes localStorage alone; its writes of a mirrored key reach memory here.
+  if (typeof window !== "undefined") window.addEventListener("storage", heardLocal);
+  // A later build that upgrades the database waits for every open
+  // connection to close: this one closes at once and the tab goes back to
+  // localStorage, which holds every mirrored save.
+  o.db.onversionchange = () => {
+    if (open === o) leave();
+  };
   return true;
+}
+
+/** Close the database and go back to localStorage. */
+function leave(): void {
+  if (!open) return;
+  open.channel?.close();
+  open.db.close();
+  open = null;
+  if (typeof window !== "undefined") window.removeEventListener("storage", heardLocal);
+}
+
+/** Another tab wrote a mirrored key to localStorage. */
+function heardLocal(e: StorageEvent): void {
+  if (!open || e.key === null || e.storageArea !== localStorage || !open.keys.mirrored.includes(e.key)) return;
+  heard({ key: e.key, value: e.newValue });
 }
 
 /** The database and every managed key's value, or null (see {@link openSaveStore}). */
@@ -203,11 +234,19 @@ async function connect(factory: IDBFactory, keys: SaveStoreKeys, opts: OpenOptio
       return null;
     }
     const values = await readAll(db, keys.managed);
-    const repairs: [string, string][] = [];
+    const repairs: [string, string | null][] = [];
     for (const key of keys.mirrored) {
       const local = localValue(key);
       const stored = values.get(key);
-      if (local === null || local === stored) continue;
+      if (local === undefined || local === stored) continue;
+      // Every write of a mirrored key reaches localStorage first, so a key it
+      // no longer holds was deleted outside the store (an older build after a
+      // rollback, a tab whose store did not open): the database copy goes too.
+      if (local === null) {
+        values.delete(key);
+        repairs.push([key, null]);
+        continue;
+      }
       const localAt = opts.savedAt(local);
       const storedAt = stored === undefined ? undefined : opts.savedAt(stored);
       // A tie, or a copy whose time cannot be read, goes to the database.
@@ -298,8 +337,6 @@ export const saveStore = {
 
 /** Close the store and go back to localStorage, for tests. */
 export function closeSaveStoreForTests(): void {
-  open?.channel?.close();
-  open?.db.close();
-  open = null;
+  leave();
   failureListeners.clear();
 }

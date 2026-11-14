@@ -122,6 +122,23 @@ describe("the autosave's two copies", () => {
     }
   });
 
+  it("deletes the database copy of a key localStorage no longer holds", async () => {
+    fake.seed("verticopolis", "saves", AUTO, { text: "t5:deleted by an older build" });
+    await open();
+    expect(saveStore.get(AUTO)).toBeNull();
+    expect(fake.row("verticopolis", "saves", AUTO)).toBeUndefined();
+  });
+
+  it("keeps the database copy when localStorage cannot be read", async () => {
+    fake.seed("verticopolis", "saves", AUTO, { text: "t5:db" });
+    vi.spyOn(localStorage, "getItem").mockImplementationOnce(() => {
+      throw new DOMException("blocked", "SecurityError");
+    });
+    await open();
+    expect(saveStore.get(AUTO)).toBe("t5:db");
+    expect(fake.row("verticopolis", "saves", AUTO)).toEqual({ text: "t5:db" });
+  });
+
   it("takes localStorage's over a database copy whose time cannot be read", async () => {
     fake.seed("verticopolis", "saves", AUTO, { text: "no time" });
     localStorage.setItem(AUTO, "t1:local");
@@ -239,6 +256,26 @@ describe("a database write that fails", () => {
 });
 
 describe("another tab", () => {
+  it("that writes localStorage alone reaches this tab's memory for a mirrored key", async () => {
+    await open();
+    const tell = (key: string, newValue: string | null) => window.dispatchEvent(new StorageEvent("storage", { key, newValue, storageArea: localStorage }));
+    tell(AUTO, "t8:an older build's tab");
+    expect(saveStore.get(AUTO)).toBe("t8:an older build's tab");
+    tell(SLOT, "t9:not mirrored here");
+    expect(saveStore.get(SLOT)).toBeNull();
+    tell(AUTO, null);
+    expect(saveStore.get(AUTO)).toBeNull();
+  });
+
+  it("that upgrades the database makes this one close and go back to localStorage", async () => {
+    await open();
+    localStorage.setItem(AUTO, "t3:auto");
+    fake.lastDb!.onversionchange!();
+    expect(fake.lastDb!.closed).toBe(true);
+    expect(saveStore.backend()).toBe("localStorage");
+    expect(saveStore.get(AUTO)).toBe("t3:auto");
+  });
+
   it("updates this tab's memory when it writes or deletes a save", async () => {
     await open();
     const other = new BroadcastChannel("verticopolis-saves");

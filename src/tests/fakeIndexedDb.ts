@@ -114,6 +114,8 @@ class FakeTransaction {
 class FakeDatabase {
   readonly stores = new Map<string, Map<IDBValidKey, unknown>>();
   closed = false;
+  /** What a later build's upgrade calls on every open connection. */
+  onversionchange: (() => void) | null = null;
   readonly objectStoreNames = { contains: (name: string) => this.stores.has(name) };
 
   constructor(private readonly factory: FakeIndexedDb) {}

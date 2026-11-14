@@ -41,7 +41,8 @@ reaches the database in the background, in order. The first open copies the
 
 For the first release on IndexedDB every save is also written to
 `localStorage`, and at boot the newer copy of each wins (a tie goes to the
-database). A tab killed right after a write still has the save, and a rollback
+database); a key `localStorage` no longer holds was deleted outside the store,
+and its database copy is deleted too. A tab killed right after a write still has the save, and a rollback
 to a build from before the store still finds every tower; what that build
 writes wins here on the next boot when it is newer. The release after it
 keeps only the autosave in `localStorage`; a slot that leaves the mirror
@@ -49,7 +50,10 @@ reports a database write that fails later through `saveStore.onFailure`, said
 like a refused slot. When IndexedDB will not open (some private windows), the
 store is plain `localStorage`, as before; so it is when the database does not
 answer within 4 seconds. Another tab hears each write over a
-`BroadcastChannel`.
+`BroadcastChannel`, and a tab writing `localStorage` alone (an older build, a
+store that did not open) through the `storage` event. A later build that
+upgrades the database (`onversionchange`) closes this tab's connection, and
+the tab goes back to `localStorage`.
 
 `e2e/saveRoundTrip.spec.ts` checks the towers come back from IndexedDB alone,
 the same game, after a reload.

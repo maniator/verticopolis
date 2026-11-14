@@ -85,7 +85,7 @@ test("the engine loads the autosave, plays, saves, reloads and downloads it as a
   expect(await page.evaluate(() => JSON.stringify((window as any).game.reader.header)), "every header figure matches the exported tower").toBe(exported.header);
 });
 
-test("the towers come back from IndexedDB alone after a reload, the same game", async ({ page }) => {
+test("the towers come back from IndexedDB after a reload, the same game", async ({ page }) => {
   await boot(page, "/");
   // A built tower, so the check covers rooms, transport and people.
   await page.evaluate((text) => (window as any).game.saveLoad.importGame(text), OLD_FILE);
@@ -103,8 +103,9 @@ test("the towers come back from IndexedDB alone after a reload, the same game", 
   expect(saves[`idb:${SLOT_1_KEY}`], "the slot reached IndexedDB").toBe(saves[`ls:${SLOT_1_KEY}`]);
   // IndexedDB keeps the deflate bytes; the text the game reads back is the one it wrote.
   expect(saves[`idb:${AUTO_KEY}`]).toMatch(/^VCZ1:/);
-  // Without the localStorage copies, boot can only read the database.
-  await page.evaluate((keys) => keys.forEach((k) => localStorage.removeItem(k)), [AUTO_KEY, SLOT_1_KEY]);
+  // Put another tower, with no save time, in the localStorage copies: the
+  // database copy is the one with a time, so boot must take it from there.
+  await page.evaluate(([keys, other]) => (keys as string[]).forEach((k) => localStorage.setItem(k, other as string)), [[AUTO_KEY, SLOT_1_KEY], OLD_SAVE] as const);
   await page.reload();
   await page.waitForFunction(() => !!(window as any).game && !!(window as any).__vcEngine?.status?.hosted, undefined, { timeout: 30_000 });
   await page.evaluate(() => (window as any).game.setSpeed(0));
