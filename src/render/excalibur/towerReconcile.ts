@@ -17,6 +17,7 @@ import {
   ESCAPE_W,
 } from "../sprites";
 import { facadeGeometry, type FloorEdge } from "../facadeGeometry";
+import { setRainShelter } from "./rainShelter";
 import { paintAnimatedUnit } from "../regionPaint";
 import { FLOOR, TILE, TRANSPORT_BAND_FLOORS } from "../scale";
 import { isVenue, venueBox, windingFlights, type VenueBox } from "../venueFlights";
@@ -212,7 +213,8 @@ function syncTransports(engine: TowerEngine, transports: ReadonlyArray<Transport
 
 /**
  * Reconcile the building's exterior dressing, escape stairs and the roof
- * crane, to the tower silhouette. Runs only on structural changes (like
+ * crane, to the tower silhouette, and record it as the rain's shelter. Runs
+ * only on structural changes (like
  * syncMotion): the silhouette can't move on an hour tick or a lighting flip.
  */
 export function syncFacade(engine: TowerEngine): void {
@@ -226,6 +228,7 @@ export function syncFacade(engine: TowerEngine): void {
   const { runs, topFloor, topTiles } = facadeGeometry(tower.units, hi, towerCatalog(engine.sim), tower.tallLobbies());
   syncEscapes(engine, runs);
   syncCrane(engine, topFloor, topTiles);
+  setRainShelter(engine, runs);
 }
 
 /** Reconcile the exterior facade segments hung off both sides of each run of
