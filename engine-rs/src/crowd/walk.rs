@@ -1,6 +1,7 @@
 //! Port of `crowd/walk.ts`.
 
-use super::{Person, WALK_SPEED};
+use super::motion::{give_up, reroute};
+use super::{Crowd, Person, WALK_SPEED};
 use crate::jsmath;
 use crate::tower::Tower;
 
@@ -27,4 +28,26 @@ pub fn walk_to(p: &mut Person, target_x: f64, dt: f64, tower: &Tower) -> bool {
     }
     p.x += dir * step;
     false
+}
+
+/// Whether the place `p` walks toward at `target_x` stands on another run of
+/// their floor than the one under them, so no walk along the floor reaches
+/// it: a sky bridge or the floor between was bulldozed while they were on
+/// their way. The ground floor is left to the street (`crowd::street`).
+pub fn way_is_cut(p: &Person, target_x: f64, tower: &Tower) -> bool {
+    if p.floor == 1 {
+        return false;
+    }
+    let here = tower.run_at(p.floor, jsmath::round(p.x) as i64);
+    let there = tower.run_at(p.floor, jsmath::round(target_x) as i64);
+    here.is_some() && there.is_some() && here != there
+}
+
+/// Someone whose way along the floor was cut finds another way from where
+/// they stand, and never steps over the gap. A housekeeper, or anyone with
+/// no other way, gives up as a stuck walker does.
+pub fn find_another_way(crowd: &mut Crowd, i: usize, tower: &mut Tower) {
+    if crowd.people[i].staff_trip.is_some() || !reroute(crowd, i, tower) {
+        give_up(crowd, i, tower);
+    }
 }

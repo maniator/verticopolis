@@ -9,10 +9,12 @@
 //! that a sky lobby closes on the far side within [`SKYBRIDGE_MAX_SPAN`]
 //! tiles, so a bridge never juts into the sky. While one is half built, each
 //! piece hangs from the wing it started from. A bridge is one story high,
-//! beside a tall lobby hall too. The bulldozer takes a tile
-//! only where no piece would be left hanging from nothing, and leaves a
-//! wing's lobby tile standing while a bridge hangs from it. Classic has no
-//! bridges, as in 1994 (`GameMode::builds_skybridges`).
+//! beside a tall lobby hall too. The bulldozer takes a bridge whole, every
+//! tile from wing to wing (or to a half bridge's open end), so it never cuts
+//! one in two, and only while nobody is crossing it
+//! (`Simulation::remove_skybridge`); it leaves a wing's lobby tile standing
+//! while a bridge hangs from it. Classic has no bridges, as in 1994
+//! (`GameMode::builds_skybridges`).
 
 use super::{Tower, Unit};
 use crate::facilities::{is_sky_lobby_floor, Kind, LOT_WIDTH};
@@ -39,9 +41,9 @@ pub(crate) const SPAN_TOO_LONG: &str = "A sky bridge spans at most 24 tiles of o
 pub(crate) const BRIDGE_HANGS_HERE: &str =
     "A sky bridge hangs from this lobby. Bulldoze the bridge first.";
 
-/// The refusal for selling a bridge tile that holds up the rest of a piece.
-pub(crate) const PIECE_WOULD_FALL: &str =
-    "The bridge beyond this tile would fall. Bulldoze it from the open end.";
+/// The refusal for bulldozing a bridge while people walk on it.
+pub(crate) const PEOPLE_CROSSING: &str =
+    "People are crossing this sky bridge. Bulldoze it once they are across.";
 
 /// One floor's tiles as a bridge sees them: what stands at a column, and
 /// whether a story stands under it.
@@ -110,13 +112,13 @@ impl<K: Fn(i64) -> Option<Kind>, R: Fn(i64) -> bool> Row<K, R> {
         (right - left - 1 > SKYBRIDGE_MAX_SPAN).then_some(SPAN_TOO_LONG)
     }
 
-    /// Whether selling the bridge tile at `x` leaves a piece of bridge
-    /// beside it hanging from nothing.
-    pub fn leaves_a_piece_hanging(&self, x: i64) -> bool {
-        [-1, 1].into_iter().any(|step| {
-            let end = self.past_bridge(x, step);
-            end != x + step && !self.is_anchor(end)
-        })
+    /// The columns of the bridge that the bridge tiles in `cols` belong to,
+    /// from the tile after one wing to the tile before the other wing (or
+    /// the open end), or `None` when no column in `cols` is a bridge tile.
+    pub fn bridge_around(&self, cols: std::ops::Range<i64>) -> Option<std::ops::Range<i64>> {
+        let first = cols.clone().find(|&c| self.is_bridge(c))?;
+        let last = cols.rev().find(|&c| self.is_bridge(c))?;
+        Some(self.past_bridge(first, -1) + 1..self.past_bridge(last, 1))
     }
 }
 
@@ -162,19 +164,36 @@ impl Tower {
         (x..x + w).find_map(|c| row.fault(c))
     }
 
-    /// Why the bulldozer leaves floor or lobby tile `u` for a bridge's sake,
-    /// or `None`.
+    /// The columns of the whole bridge that lobby tile `u` is part of, or
+    /// `None` when `u` is no bridge tile. The bulldozer takes them together.
+    pub(crate) fn skybridge_of(&self, u: &Unit) -> Option<std::ops::Range<i64>> {
+        if u.kind != Kind::Lobby || !self.bridges_floor(u.floor) {
+            return None;
+        }
+        self.bridge_row(u.floor).bridge_around(u.x..u.x + u.width)
+    }
+
+    /// The ids of the units on `cols` of `floor`, each once, left to right.
+    pub(crate) fn units_on(&self, floor: i64, cols: std::ops::Range<i64>) -> Vec<i64> {
+        let mut ids: Vec<i64> = Vec::new();
+        for id in cols.filter_map(|c| self.unit_at(floor, c).map(|u| u.id)) {
+            if ids.last() != Some(&id) {
+                ids.push(id);
+            }
+        }
+        ids
+    }
+
+    /// Why the bulldozer leaves lobby tile `u` for a bridge's sake, or
+    /// `None`. A bridge tile is no reason: the bulldozer takes its bridge
+    /// whole, which leaves no piece hanging.
     pub(crate) fn skybridge_removal_reason(&self, u: &Unit) -> Option<&'static str> {
         if u.kind != Kind::Lobby || !self.bridges_floor(u.floor) {
             return None;
         }
         let row = self.bridge_row(u.floor);
-        let tiles = u.x..u.x + u.width;
-        if tiles.clone().any(|c| row.is_bridge(c)) {
-            return tiles
-                .clone()
-                .any(|c| row.leaves_a_piece_hanging(c))
-                .then_some(PIECE_WOULD_FALL);
+        if (u.x..u.x + u.width).any(|c| row.is_bridge(c)) {
+            return None;
         }
         let beside = [u.x - 1, u.x + u.width];
         beside

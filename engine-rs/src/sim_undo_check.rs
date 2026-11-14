@@ -75,6 +75,8 @@ pub(crate) enum StepRefused {
     SearchedForTreasure { sellable: bool },
     /// A room the step would take out is burning.
     OnFire,
+    /// People are walking on a sky bridge tile the step would take out.
+    Crossing,
     /// Security is searching for a bomb, and the tower takes no edits until
     /// the search ends ([`edit_refusal`](crate::sim::Simulation::edit_refusal)).
     BombSearch,
@@ -114,7 +116,10 @@ impl StepRefused {
     pub(crate) fn is_lasting(self) -> bool {
         !matches!(
             self,
-            StepRefused::NotEnoughMoney | StepRefused::OnFire | StepRefused::BombSearch
+            StepRefused::NotEnoughMoney
+                | StepRefused::OnFire
+                | StepRefused::BombSearch
+                | StepRefused::Crossing
         )
     }
 }
@@ -239,6 +244,12 @@ impl Simulation {
                         tiles.used |= hour_passed;
                     }
                     tiles.blocked |= hangs;
+                    let cols = now.x..now.x + now.width;
+                    if self.tower.span_has_skybridge(now.floor, now.x, now.width)
+                        && self.walkers_on(now.floor, cols)
+                    {
+                        found.add(StepRefused::Crossing);
+                    }
                 }
                 (UnitChange::TakeOut(held), Some(now)) => {
                     sale.note(|| self.sells(now));

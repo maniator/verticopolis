@@ -22,7 +22,7 @@ mod undoing;
 
 pub use lobby_halls::HallRun;
 pub use skybridge::SKYBRIDGE_MAX_SPAN;
-pub(crate) use skybridge::{Row as BridgeRow, SKYBRIDGE_PRICE_FACTOR};
+pub(crate) use skybridge::{Row as BridgeRow, PEOPLE_CROSSING, SKYBRIDGE_PRICE_FACTOR};
 pub use types::{Extras, ExtrasMut, PlaceResult, ResizeResult, Transport, Unit, UnitState};
 
 /// The refusal for a Classic floor tile with floor on both sides: taking it

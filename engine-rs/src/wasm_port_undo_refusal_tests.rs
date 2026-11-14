@@ -311,6 +311,10 @@ fn each_refusal_reads_as_the_player_sees_it() {
             StepRefused::OnFire,
             "Can't undo that while the room is on fire.",
         ),
+        (
+            StepRefused::Crossing,
+            "Can't undo that while people are crossing the sky bridge.",
+        ),
     ];
     let drops = [
         (

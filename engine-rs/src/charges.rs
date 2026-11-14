@@ -100,7 +100,7 @@ impl ChargeResult {
         }
     }
 
-    fn paid(delta: f64) -> ChargeResult {
+    pub(crate) fn paid(delta: f64) -> ChargeResult {
         ChargeResult {
             ok: true,
             reason: None,
@@ -392,6 +392,9 @@ impl Simulation {
             return ChargeResult::refuse(reason);
         }
         if let Some(u) = self.tower.get_unit(id) {
+            if let Some(cols) = self.tower.skybridge_of(u) {
+                return self.remove_skybridge(u.floor, cols, method);
+            }
             let (kind, state) = (u.kind, u.state);
             if state == UnitState::Fire {
                 return ChargeResult::refuse(format!(

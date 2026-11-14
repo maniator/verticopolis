@@ -205,6 +205,9 @@ pub(crate) fn refusal(why: StepRefused, verb: &str) -> String {
             )
         }
         StepRefused::OnFire => format!("Can't {verb} that while the room is on fire."),
+        StepRefused::Crossing => {
+            format!("Can't {verb} that while people are crossing the sky bridge.")
+        }
         StepRefused::BombSearch => {
             format!("Can't {verb} that while Security searches for the bomb.")
         }
