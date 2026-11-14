@@ -25,6 +25,10 @@ prompt already tells players it is an engine update and shows the new version.
 Entries below 1.51.1 were curated from the commit history after the fact, so they
 are documentation only: no build that a client fetches carries them.
 
+## 3.10.3
+
+- Studios and apartments can no longer be built in the basement, the same as condos, hotel rooms and offices. Towers that already have them underground still load and keep them.
+
 ## 3.10.2
 
 - Housekeepers now come in through the lobby before their shift and leave through it at the end, and no longer appear at the Housekeeping room or vanish at a hotel room.

@@ -15,6 +15,10 @@ raised the version, so they are documentation only.
 There is no entry for 0.17.0, which only
 existed as a step inside a stacked branch.
 
+## 1.33.2 (2026-11-14)
+
+- Studios and apartments join the kinds that cannot be placed underground (`no_basement` in the catalog), so every home follows one rule. Saves that already hold basement studios or apartments still load.
+
 ## 1.33.1 (2026-11-14)
 
 - Housekeepers are shift workers in the crowd: each crew's six walk in from the lobby two hours before the shift (and at any later hour on duty a crew is short, as after a load), by the staff route when one reaches the lobby and the passenger route when not, chain rooms on the staff route (a housekeeper who just finished a room takes the nearest dirty room their crew may take), ride home when nothing is left, and leave through the lobby when the shift ends. A housekeeper whose trip breaks stops where they stand and is sent on instead of leaving the crowd.
