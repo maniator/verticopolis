@@ -385,9 +385,13 @@ export function bootGame(create: (tower: BootTower) => BootApp): Promise<void> {
         (window as unknown as { game: BootApp }).game = app;
       }
       // `?debug=fps` loads the frame statistics overlay (#645). The module is
-      // a lazy chunk, so a session without the flag never downloads it.
+      // a lazy chunk, so a session without the flag never downloads it. It is
+      // kept out of the precache, so an offline start cannot load it: the catch
+      // keeps that miss out of the unhandled-rejection error analytics.
       if (debugFlagOn(location.search, DEBUG_FLAG.fps)) {
-        void import("./debugHud").then((hud) => hud.mountDebugHud(() => app.engine?.engine));
+        void import("./debugHud")
+          .then((hud) => hud.mountDebugHud(() => app.engine?.engine))
+          .catch((err: unknown) => console.warn("debug HUD did not load", err));
       }
       // Register the service worker so the game is installable and offline-ready.
       // On a new build: prompt the player (never force a reload), see
