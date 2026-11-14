@@ -316,18 +316,28 @@ fn fixture_towers_write_the_trees_text() {
 }
 
 /// The `.TDT` export's split (#1431) holds every field of `serialize()`: the
-/// tree without `units`, and the units as the tree has them.
+/// tree without `units`, and every unit on its own, as the unfolded save
+/// lists them (a row of floor tiles is one run in the tree).
 #[test]
 fn the_save_without_units_and_its_units_are_the_trees_save() {
+    let mut row = played(GameMode::Classic);
+    for x in 160..200 {
+        assert!(row.tower.place(Kind::Lobby, 1, x).ok);
+    }
+    for x in 160..200 {
+        assert!(row.tower.place(Kind::Floor, 2, x).ok);
+    }
+    assert!(row.tower.lists_a_floor_run(), "the row is a floor run");
     for sim in [
         Simulation::new(1, GameMode::Classic, CalendarKind::RealWorld, true),
         played(GameMode::Classic),
         played(GameMode::Modern),
+        row,
     ] {
         let whole = sim.serialize();
         let (mut rest, units) = sim.save_without_units();
         let units: Vec<Value> = units.collect();
-        assert_eq!(Value::Array(units), whole["units"]);
+        assert_eq!(Value::Array(units), sim.serialize_unfolded()["units"]);
         // The `.TDT` export reads neither the people nor the cars' timers.
         assert!(rest.get("crowd").is_none() && rest.get("dispatch").is_none());
         for key in ["units", "crowd", "dispatch"] {
