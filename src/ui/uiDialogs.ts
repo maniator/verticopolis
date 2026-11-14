@@ -223,7 +223,7 @@ export function newTowerModal(
       found: () => {
         const picked = box.querySelector<HTMLInputElement>('input[name="nt-mode"]:checked')?.value;
         const mode: GameMode = picked === "modern" ? "modern" : "classic";
-        // The calendar choice and the "no bridging" option only apply to Modern;
+        // The calendar choice and the bridging switch only apply to Modern;
         // Classic is always canon and always bridges, so a Classic founding pins
         // the harmless defaults regardless of the Modern sub-picker.
         let modernCalendar: CalendarKind = "realWorld";
@@ -231,7 +231,9 @@ export function newTowerModal(
         if (mode === "modern") {
           const pickedCal = box.querySelector<HTMLInputElement>('input[name="nt-cal"]:checked')?.value;
           if (pickedCal === "canon") modernCalendar = "canon";
-          startUnbridged = box.querySelector<HTMLInputElement>('input[name="nt-unbridged"]')?.checked === true;
+          // "Bridge floors between rooms" starts checked, as in Settings; only
+          // a box the player cleared founds the tower unbridged.
+          startUnbridged = box.querySelector<HTMLInputElement>('input[name="nt-bridged"]')?.checked === false;
         }
         ui.closeModal();
         opts.onFound(mode, modernCalendar, startUnbridged);

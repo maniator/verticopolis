@@ -73,7 +73,7 @@ export function newTowerTemplate(hasSave: boolean): TemplateResult {
            </div>
            <div class="nt-building" role="group" aria-labelledby="nt-building-label">
              <span class="nt-sublabel" id="nt-building-label">Building</span>
-             <label class="nt-cal-opt"><input type="checkbox" name="nt-unbridged" /> <b>Don't bridge floors between rooms</b>: rooms still lay their own floor beneath them, but the game won't fill the walkway across a gap to a neighbor, so you can keep separate sections. You can change this any time in Settings.</label>
+             <label class="nt-cal-opt"><input type="checkbox" name="nt-bridged" checked /> <b>Bridge floors between rooms</b>: a room or floor dropped near existing structure fills the walkway between them. Turn it off to keep separate sections apart; rooms still lay their own floor beneath them. You can change this any time in Settings.</label>
            </div>
          </div>
        </div>

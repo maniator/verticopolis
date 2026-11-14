@@ -1353,23 +1353,32 @@ describe("newTowerModal — the rule-set picker", () => {
     expect(onFound).toHaveBeenCalledWith("modern", "canon", false);
   });
 
-  it("passes Modern start-unbridged when the no-bridging checkbox is ticked", () => {
+  it("Bridge floors between rooms starts checked, worded as in Settings", () => {
+    const { ui } = makeUI();
+    ui.newTowerModal({ hasSave: false, onFound: vi.fn() });
+    const box = dialog().querySelector<HTMLInputElement>('input[name="nt-bridged"]')!;
+    expect(box.checked).toBe(true);
+    expect(box.closest("label")!.textContent).toContain("Bridge floors between rooms");
+    expect(dialog().textContent).not.toContain("Don't bridge");
+  });
+
+  it("passes Modern start-unbridged when Bridge floors between rooms is cleared", () => {
     const onFound = vi.fn();
     const { ui } = makeUI();
     ui.newTowerModal({ hasSave: false, onFound });
     dialog().querySelector<HTMLInputElement>('input[value="modern"]')!.checked = true;
-    dialog().querySelector<HTMLInputElement>('input[name="nt-unbridged"]')!.checked = true;
+    dialog().querySelector<HTMLInputElement>('input[name="nt-bridged"]')!.checked = false;
     click('[data-act="found"]');
     expect(onFound).toHaveBeenCalledWith("modern", "realWorld", true);
   });
 
-  it("ignores the no-bridging checkbox when founding Classic", () => {
-    // The no-bridging option is Modern-only; a Classic founding pins false even
-    // if the (Modern-only) checkbox was somehow ticked.
+  it("ignores the bridging checkbox when founding Classic", () => {
+    // The bridging switch is Modern-only; a Classic founding pins bridged even
+    // if the (Modern-only) checkbox was somehow cleared.
     const onFound = vi.fn();
     const { ui } = makeUI();
     ui.newTowerModal({ hasSave: false, onFound });
-    dialog().querySelector<HTMLInputElement>('input[name="nt-unbridged"]')!.checked = true;
+    dialog().querySelector<HTMLInputElement>('input[name="nt-bridged"]')!.checked = false;
     click('[data-act="found"]');
     expect(onFound).toHaveBeenCalledWith("classic", "realWorld", false);
   });
