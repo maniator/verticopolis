@@ -207,7 +207,13 @@ The crate has no default features.
   the player cut back that a car sold since left at the whole fleet's size,
   which a car bought back does not join. A player's edit keeps a held hour
   whose count it leaves as it was. An older engine would run the
-  whole fleet there, so it refuses the save. All four load here.
+  whole fleet there, so it refuses the save. A save is version 11 when it
+  folds a row of plain floor tiles (each next tile one to the right with
+  the next id, and nothing on it but `id`, `kind`, `floor` and `x`) into
+  the first tile's entry with a `run` count (`FLOOR_RUN_KEY`,
+  `save_floor_runs`); the loaders unfold it in place, so the unit list
+  comes back as a version 10 writer listed it. A save takes the oldest of
+  these versions that reads it whole. All five load here.
 
 ## Proving conformance
 

@@ -1,11 +1,11 @@
 {
   "crateVersion": "1.37.0",
   "lockDigest": "c829ad95720e738a",
-  "saveVersion": 10,
+  "saveVersion": 11,
   "oldestSaveVersion": 1,
   "frameLayoutVersion": 1,
   "viewLayoutVersion": 24,
   "catalogVersion": 18,
   "identitySchema": 1,
-  "interfaceDigest": "56494a1efc24fdcc"
+  "interfaceDigest": "52cae4e7254f6eae"
 }

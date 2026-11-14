@@ -248,7 +248,12 @@ builds them, for the web game's own tests and tooling.
   A version 8 save, which gave each floor one height, still loads. A save is
   version 10 when an elevator schedule holds back an hour the player cut back
   that a car sold since left at the whole fleet's size, so a car bought back
-  does not join it.
+  does not join it. A save is version 11 when it folds a row of plain floor
+  tiles into one entry: `{"id":43,"kind":"floor","floor":2,"x":167,"run":60}`
+  stands for 60 tiles at x 167 to 226 with ids 43 to 102. Most built towers
+  have such a row, and folding them about halves a large save. Read a save's
+  units through the engine; a tool that reads the JSON itself unfolds each
+  `run` in place.
 
 ## Versioning
 
