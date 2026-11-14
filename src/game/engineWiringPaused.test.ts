@@ -26,10 +26,12 @@ vi.mock("./buildPreview", () => ({
 }));
 
 vi.mock("./frameLoop", () => ({ runFrame: vi.fn(), SPEEDS: [0, 3, 15, 50] }));
+// No walking figure under any tap here, so Inspect falls through to the room (#2092).
+vi.mock("../render/excalibur/personFocus", () => ({ pickPersonAt: vi.fn(() => null) }));
 
 interface Hooks {
   classifyDown?: (button: number, touch: boolean, panKey: boolean) => string;
-  onTap?: (tile: number, floor: number, touch: boolean, picked: unknown) => void;
+  onTap?: (tile: number, floor: number, touch: boolean, picked: unknown, world?: unknown) => void;
   onActionDown?: (tile: number, floor: number, touch: boolean, picked: unknown) => void;
   onActionMove?: (tile: number, floor: number, picked: unknown) => void;
   onActionUp?: () => void;

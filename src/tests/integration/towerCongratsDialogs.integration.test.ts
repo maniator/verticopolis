@@ -73,6 +73,7 @@ function makeApp(sim: Draft, ui: UI) {
     ui,
     onboarding: { tick: vi.fn() },
     scheduleReview: { tick: vi.fn() },
+    personCard: { tick: vi.fn() },
     selected: null,
     refreshEditor: vi.fn(),
     lastUiUpdate: -1e9,

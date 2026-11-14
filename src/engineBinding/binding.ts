@@ -59,7 +59,7 @@ export const INSTANCE_METHODS = [
   "setBackdrop", "unitMetaChanged", "unitLabel", "unitSubtype", "logAfter", "logText", "logLine",
   "scheduleShaft",
   // PR 1c's panel queries.
-  "heatCells", "crewCoverage", "unitCard", "shaftCard",
+  "heatCells", "crewCoverage", "unitCard", "shaftCard", "personCard",
   // PR 1d's report queries and file members.
   "statsSheet", "unitFacts", "serviceDiagnostics", "loadVctower", "exportVctower", "loadTdt", "tdtNote", "tdtTowerName",
   "adoptTdt", "tdtExport", "tdtFile",

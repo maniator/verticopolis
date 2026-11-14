@@ -1,3 +1,4 @@
+import { drawPersonRing } from "./personFocus";
 import { RAIN } from "../sprites/sky";
 import { clipToOpenSky } from "./rainShelter";
 import { isElevatorKind } from "../../presentation/viewKinds";
@@ -149,6 +150,7 @@ export function drawOverlay(engine: TowerEngine, ctx: CanvasRenderingContext2D):
   renderThief(engine, ctx);
   drawPreview(engine, ctx);
   drawSelection(engine, ctx);
+  drawPersonRing(engine, ctx);
   drawRuler(engine, ctx);
 }
 

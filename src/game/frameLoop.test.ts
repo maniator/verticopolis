@@ -241,6 +241,17 @@ describe("runFrame throttled UI/audio block", () => {
     runFrame(app, 16);
     expect(raw.refreshEditor).not.toHaveBeenCalled();
   });
+
+  it("ticks the person card on the UI tick, and not mid-press (#2092)", () => {
+    const idle = makeApp({ speed: 0 });
+    idle.raw.ui.isEditorBusy = vi.fn(() => false);
+    runFrame(idle.app, 16);
+    expect(idle.raw.personCard.tick).toHaveBeenCalledTimes(1);
+    const busy = makeApp({ speed: 0 });
+    busy.raw.ui.isEditorBusy = vi.fn(() => true);
+    runFrame(busy.app, 16);
+    expect(busy.raw.personCard.tick).not.toHaveBeenCalled();
+  });
 });
 
 describe("runFrame star-promotion jingle", () => {

@@ -2,6 +2,7 @@ import type { GameApp } from "../main";
 import { catalogFacility } from "../catalog/catalogTypes";
 import { catalogOf } from "./portAccess";
 import { editorPlacedByPlayer, forgetEditorPlacement } from "./movableWindows";
+import { focusScreenRect } from "../render/excalibur/personFocus";
 
 /**
  * World-anchoring for the DOM panels (selected-facility editor, hover
@@ -34,6 +35,13 @@ export function positionPanels(app: GameApp): void {
         editorAnchored = true;
       }
     }
+  } else if (app.personCard.openId !== null && app.ui.isEditorOpen()) {
+    // The person card rides beside its person on desktop, like a room's,
+    // and stays where it last was once they leave (no spot to follow).
+    const placed = editorPlacedByPlayer(app);
+    const r = mobile || placed ? null : focusScreenRect(app.engine);
+    if (r) app.ui.anchorEditor(r, vw, vh);
+    editorAnchored = !mobile || placed;
   }
   const inspectorAnchored = !!app.inspectAnchor && app.ui.isInspectorOpen();
   if (inspectorAnchored && app.inspectAnchor) {

@@ -1,3 +1,4 @@
+import { stepFollow } from "../render/excalibur/personFocus";
 import type { GameApp } from "../main";
 import { decideMealRush } from "./mealRush";
 import { updateTraffic } from "./trafficHud";
@@ -76,6 +77,8 @@ export function runFrame(app: GameApp, dtMs: number): void {
   // modal freeze returns early on below (fps is a render metric, not a sim-tick
   // one).
   gameplaySession.noteFrame();
+  // A followed person keeps the camera on them, paused or not (#2092).
+  stepFollow(app.engine, dtMs);
   // Fold the engine's gameplay events into analytics (#873 phase 2): builds,
   // stars, emergencies and their answers, pricing and capacity. Drained every
   // frame and ahead of the modal freeze below, so an emergency answered in a
@@ -148,6 +151,8 @@ export function runFrame(app: GameApp, dtMs: number): void {
       // Live stat updates reuse the last engine diagnostic until its inputs change.
       app.refreshEditor(false);
     }
+    // The person card reads the engine again, or lets go once its window closed.
+    if (!isEditorBusy(app)) app.personCard.tick();
     // A jingle on every star promotion (2★–5★), not just the TOWER win. The
     // analytics side is the engine's star_reached, through the bridge. The
     // header is this frame's.

@@ -1,11 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { GameApp } from "../main";
 import { wireEngine } from "./engineWiring";
-import { PortCodes } from "../simport/portCodes";
-import { code, mockPort, record } from "../tests/portKit/mockPort";
+import { code, record } from "../tests/portKit/mockPort";
 import { placeSimpleBuild, isTransportTool, isPaintTool, updateBuildPreview, touchBuildLiftFloors } from "./buildPreview";
 import { runFrame } from "./frameLoop";
 import { noteEngineThrow, watchEngineTraps } from "./engineFault";
+import { flush, makeApp } from "./engineWiring.fixture";
+import { pickPersonAt } from "../render/excalibur/personFocus";
 
 /** Headless wireEngine callback tests; rebuildEngine has separate tests. */
 
@@ -18,6 +18,9 @@ vi.mock("./buildPreview", () => ({
   clearBuildRefusal: vi.fn(),
 }));
 
+vi.mock("../render/excalibur/personFocus", () => ({
+  pickPersonAt: vi.fn(() => null),
+}));
 vi.mock("./frameLoop", () => ({
   runFrame: vi.fn(),
   SPEEDS: [0, 3, 15, 50],
@@ -29,75 +32,6 @@ const mockIsPaintTool = vi.mocked(isPaintTool);
 const mockUpdateBuildPreview = vi.mocked(updateBuildPreview);
 const mockLift = vi.mocked(touchBuildLiftFloors);
 const mockRunFrame = vi.mocked(runFrame);
-
-interface FakeEngine {
-  classifyDown?: (...a: unknown[]) => unknown;
-  spacePanKey?: (press?: Event) => boolean;
-  onTap?: (tile: number, floor: number, touch: boolean, picked: unknown) => void;
-  onActionDown?: (tile: number, floor: number, touch: boolean, picked: unknown) => void;
-  onActionMove?: (tile: number, floor: number, picked: unknown) => void;
-  onActionUp?: () => void;
-  onHover?: (tile: number, floor: number, picked: unknown) => void;
-  onLongPress?: (tile: number, floor: number, picked: unknown) => void;
-  onLongPressEnd?: () => void;
-  onSecondary?: (picked: unknown) => void;
-  onExtendTo?: (end: unknown, target: unknown) => void;
-  onExtendEnd?: () => void;
-  onUpdate?: (ms: number) => void;
-  onFrameError?: (err: unknown) => void;
-  halted?: boolean;
-  onContextLost?: () => void;
-  preview?: unknown;
-  transportPreview?: unknown;
-}
-
-/** Let the settled command promises run their follow-ups (the undo commit). */
-const flush = () => new Promise((r) => setTimeout(r, 0));
-
-function makeApp(toolOver: Record<string, unknown> = {}) {
-  const engine: FakeEngine = {};
-  const canvas = document.createElement("canvas");
-  // A drag latch (generation) and a shaft quote; the real answers: shaftPreview.integration.test.ts.
-  const enginePort = mockPort({ generation: () => 1, quoteShaft: () => record("quoteShaft", { ok: 1 }), lastReason: () => undefined });
-  const portCodes = new PortCodes(mockPort());
-  const reader = { unlocked: vi.fn(() => true), header: { mode: "classic" } };
-  const app = {
-    engine,
-    enginePort,
-    portCodes,
-    reader,
-    canvas,
-    audio: { start: vi.fn() },
-    keyboard: { pointerDrew: vi.fn(), followTower: vi.fn() },
-    tool: { type: "inspect", kind: "office", ...toolOver },
-    build: {
-      bulldozePicked: vi.fn(async () => {}),
-      clearPaint: vi.fn(),
-      seedPaint: vi.fn(async () => {}),
-      paintFloorRun: vi.fn(),
-      tryBuildTransport: vi.fn(),
-    },
-    sim: {
-      tower: { placeTransportDryRun: vi.fn(() => true) },
-      isUnlocked: vi.fn(() => true),
-    },
-    ui: { toast: vi.fn(), setInspectorPeek: vi.fn() },
-    editor: { extendSelectedTo: vi.fn(), endExtend: vi.fn(() => true) },
-    inspector: { inspectPicked: vi.fn(), hide: vi.fn(), resetLatch: vi.fn() },
-    saveLoad: { recoverFromContextLoss: vi.fn() },
-    selectPicked: vi.fn(),
-    captureUndo: vi.fn(),
-    commitUndo: vi.fn(),
-    discardUndo: vi.fn(),
-    undoGesture: vi.fn(() => 1),
-    mobileMq: { matches: false },
-    paintAnchor: null as unknown,
-    buildAnchor: null as unknown,
-    transportStart: null as unknown,
-    frameErrors: [] as Array<{ at: string; message: string }>,
-  };
-  return app as unknown as GameApp & typeof app & { engine: FakeEngine };
-}
 
 beforeEach(() => {
   mockPlaceSimpleBuild.mockReturnValue({} as never);
@@ -153,6 +87,30 @@ describe("onTap", () => {
     const picked = { id: "u1" };
     app.engine.onTap!(3, 4, false, picked);
     expect(app.audio.start).toHaveBeenCalled();
+    expect(app.selectPicked).toHaveBeenCalledWith(picked);
+    expect(app.personCard.open).not.toHaveBeenCalled();
+  });
+
+  it("inspect tool opens the card of a walking figure ahead of the room behind it", () => {
+    const app = makeApp({ type: "inspect" });
+    wireEngine(app);
+    vi.mocked(pickPersonAt).mockReturnValueOnce(42);
+    const world = { x: 31, y: -40 };
+    app.engine.onTap!(3, 4, true, { id: "u1" }, world);
+    // The figure is picked at the tap's own world point, finer than its tile.
+    expect(pickPersonAt).toHaveBeenCalledWith(app.engine, world);
+    expect(app.clearSelection).toHaveBeenCalled();
+    expect(app.personCard.open).toHaveBeenCalledWith(42);
+    expect(app.selectPicked).not.toHaveBeenCalled();
+  });
+
+  it("a figure that left before the card opened falls back to the room", () => {
+    const app = makeApp({ type: "inspect" });
+    wireEngine(app);
+    vi.mocked(pickPersonAt).mockReturnValueOnce(42);
+    app.personCard.open.mockReturnValueOnce(false);
+    const picked = { id: "u1" };
+    app.engine.onTap!(3, 4, false, picked);
     expect(app.selectPicked).toHaveBeenCalledWith(picked);
   });
 

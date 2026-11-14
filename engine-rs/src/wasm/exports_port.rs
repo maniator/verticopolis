@@ -179,6 +179,14 @@ impl Engine {
     pub fn shaft_card(&self, id: f64) -> Vec<f64> {
         self.port_shaft_card(id)
     }
+    /// Person `id`'s trip (#2092) as the layout's `personCard` record: why
+    /// they are out, where the leg they are on began and ends, and their
+    /// wait. Empty for an id that names nobody in the tower now. Read on
+    /// demand while a card is open; the view frame carries none of it.
+    #[wasm_bindgen(js_name = personCard)]
+    pub fn person_card(&self, id: f64) -> Vec<f64> {
+        self.port_person_card(id)
+    }
     /// The Map's Eval and Pricing read (#343 S7): one `roomTier` row (`id`,
     /// `floor`, `x`, `evalTier`, `rentTier`) for each room that carries an
     /// evaluation or a rent level, in the view's room order, with codes from

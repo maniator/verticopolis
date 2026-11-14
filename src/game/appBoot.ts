@@ -43,6 +43,7 @@ import { APP_VERSION } from "../appVersion";
 import { touchOverviewMap, wireOverviewMap } from "./overviewMapWiring";
 import { wireMovableWindows } from "./movableWindows";
 import { refuseAppPlacementWhilePaused } from "./pausedBuild";
+import { createPersonCard } from "./personCardWiring";
 export { APP_VERSION };
 
 /** Classify why this boot happened, for the analytics boot snapshot. Mirrors
@@ -84,6 +85,7 @@ export function wireControllers(app: GameApp): void {
     lobbyHeight: () => app.lobbyHeight.height,
   });
   app.cardKit = createCardKit(app);
+  app.personCard = createPersonCard(app);
   app.inspector = new InspectorController({
     kit: () => app.cardKit,
     reader: () => app.reader,
