@@ -4,6 +4,7 @@ import { startDeployments, type Deployments } from "./deployments";
 import { engineEntries, expectEngineIs, newContext } from "./engineDeployHelpers";
 import { tamperCache } from "./engineCacheHelpers";
 import { expectControlledWithEngine, hostedGame, installWorker, lobbyAt } from "./offlineHelpers";
+import { storedSave } from "./helpers";
 
 /**
  * Repair engine files next to a save, a lost connection and a second tab (#985,
@@ -33,7 +34,7 @@ test.afterEach(() => {
 const repairButton = (page: Page) => page.locator('#engine-failure [data-act="repair-engine"]');
 const status = (page: Page) => page.locator("#engine-failure .engine-failure-repair-status");
 const refused = (page: Page) => page.waitForFunction(() => (window as any).__vcEngineBoot?.failure?.reason === "package-mismatch", undefined, { timeout: 60_000 });
-const slotStored = (page: Page) => page.evaluate(() => localStorage.getItem("simtower-clone-slot-1") !== null);
+const slotStored = async (page: Page) => (await storedSave(page, "simtower-clone-slot-1")) !== null;
 const bootFailure = (page: Page) => page.evaluate(() => (window as any).__vcEngineBoot?.failure ?? null);
 
 /** The first build installed and controlling this page, on the engine. */

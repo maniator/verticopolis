@@ -16,6 +16,7 @@ import { test, expect, type Page } from "@playwright/test";
 import { MAP_OPEN_STORAGE_KEY, MAP_OPEN_VALUE } from "../src/ui/overviewMapPrefs";
 import type { FixtureBuilder, FixtureTower } from "../src/tests/fixtures/serviceDiagnostics.fixture";
 import type { GameMode } from "../src/shared/types";
+import { storedSave as storedSaveIn, storedSavesInPage } from "../src/build/storedSaves";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -321,4 +322,29 @@ export function fitCamera(): void {
   const desired = e.viewHeight / (floors * FLOOR);
   e.zoomAt(desired / cur, g.grid.width * 0, e.viewHeight / 2); // vertical fit; recenter next
   e.center();
+}
+
+/**
+ * Every save the page keeps, keyed by where it sits (`src/build/storedSaves.ts`).
+ * Call it after the game booted. The database takes a write a moment after
+ * the game made it, so this reads until two reads in a row agree and the
+ * autosave's two copies match.
+ */
+export async function storedSaves(page: Page): Promise<Record<string, string>> {
+  const mirrored = ["verticopolis-save", "simtower-clone-save"];
+  let last = "";
+  for (let tries = 0; ; tries++) {
+    const saves = await page.evaluate(storedSavesInPage);
+    const now = JSON.stringify(saves);
+    const hasDb = Object.keys(saves).some((k) => k.startsWith("idb:"));
+    const agree = !hasDb || mirrored.every((k) => saves[`idb:${k}`] === saves[`ls:${k}`]);
+    if (tries >= 100 || (agree && now === last)) return saves;
+    last = now;
+    await page.waitForTimeout(50);
+  }
+}
+
+/** One save as the game reads it: the store's copy, else localStorage's. */
+export async function storedSave(page: Page, key: string): Promise<string | null> {
+  return storedSaveIn(await storedSaves(page), key);
 }

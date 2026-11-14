@@ -1,5 +1,6 @@
 import { STORE_MAGIC } from "./saveCompression";
 import { toTowerFile } from "./towerFileCodec";
+import { saveStore } from "./saveStore";
 
 /**
  * Backup key for an autosave that couldn't be read at boot. A truly corrupt
@@ -19,13 +20,13 @@ export const UNREADABLE_KEY = "simtower-clone-unreadable";
  * player.
  */
 export function stashUnreadable(key: string, newer = false): boolean {
-  const raw = localStorage.getItem(key);
+  const raw = saveStore.get(key);
   if (raw === null) return false;
   try {
-    const held = localStorage.getItem(UNREADABLE_KEY);
+    const held = saveStore.get(UNREADABLE_KEY);
     if (held === raw) return true;
     if (held !== null && !newer) return false;
-    localStorage.setItem(UNREADABLE_KEY, raw);
+    saveStore.set(UNREADABLE_KEY, raw);
     return true;
   } catch {
     return false;
@@ -39,7 +40,7 @@ export function stashUnreadable(key: string, newer = false): boolean {
  * stored.
  */
 export function stashedText(): string | null {
-  const raw = localStorage.getItem(UNREADABLE_KEY);
+  const raw = saveStore.get(UNREADABLE_KEY);
   if (raw === null || !raw.startsWith(STORE_MAGIC)) return raw;
   const file = toTowerFile(raw, true);
   return file.ok ? file.text : raw;

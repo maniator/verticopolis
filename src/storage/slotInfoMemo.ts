@@ -1,3 +1,4 @@
+import { saveStore } from "./saveStore";
 import { slotCensusEpoch } from "./slotCensus";
 import type { SlotInfo } from "./slotInfo";
 
@@ -43,7 +44,7 @@ function sameList<T>(a: readonly T[], b: readonly T[]): boolean {
  * next one.
  */
 export function rememberedSlotInfo(slot: SlotInfo["slot"], keys: readonly string[], read: (raws: readonly (string | null)[]) => SlotInfo): SlotInfo {
-  const raws = keys.map((key) => localStorage.getItem(key));
+  const raws = keys.map((key) => saveStore.get(key));
   // Read the epoch BEFORE `read`: a census trap inside `read` removes the
   // reader (raising the epoch), and a row stored under the older epoch is then
   // read again on the next open, with no census.

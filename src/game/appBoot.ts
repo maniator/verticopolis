@@ -40,6 +40,8 @@ import { clearSaveWarning, showSaveWarning } from "../ui/saveWarning";
 // re-exported because the boot snapshot below reads it, and the alias stays so
 // the suites that import it from here keep resolving.
 import { APP_VERSION } from "../appVersion";
+import { saveStore } from "../storage/saveStore";
+import { isSlotKey } from "../storage/SaveGame";
 import { touchOverviewMap, wireOverviewMap } from "./overviewMapWiring";
 import { wireMovableWindows } from "./movableWindows";
 import { refuseAppPlacementWhilePaused } from "./pausedBuild";
@@ -212,6 +214,13 @@ export function wireControllers(app: GameApp): void {
     armOnboarding: () => {
       app.onboarding.arm(app.enginePort);
     },
+  });
+  // This release mirrors every slot in localStorage, so a slot write that
+  // fails is refused there, at once, and this never fires. Once a slot leaves
+  // the mirror its database write lands after the dialog said "Saved", and a
+  // write that fails there is said like a refused slot.
+  saveStore.onFailure((err, key) => {
+    if (isSlotKey(key)) app.saveLoad.notice.slotFailed(err);
   });
   app.keyboard = new KeyboardPlay({
     enginePort: () => app.enginePort,
