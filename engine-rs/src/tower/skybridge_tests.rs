@@ -3,6 +3,7 @@
 
 use super::*;
 use crate::clock::GameMode;
+use crate::crowd::spawn::add;
 use crate::gameplay::RemovalMethod;
 use crate::sim::Simulation;
 
@@ -138,7 +139,7 @@ fn sell(sim: &mut Simulation, x: i64) -> Option<String> {
 }
 
 #[test]
-fn the_bulldozer_never_leaves_a_piece_hanging_from_nothing() {
+fn the_bulldozer_takes_a_bridge_whole() {
     let mut sim = towers(GameMode::Modern, GAP, SKY);
     sim.paint_brush(Kind::Lobby, SKY, &gap_tiles(GAP));
     // A wing's lobby tile stays while a bridge hangs from it.
@@ -146,17 +147,46 @@ fn the_bulldozer_never_leaves_a_piece_hanging_from_nothing() {
         sell(&mut sim, LEFT.end - 1).as_deref(),
         Some(BRIDGE_HANGS_HERE)
     );
-    // A tile in the middle comes out: each half hangs from its own wing.
-    let middle = LEFT.end + 5;
-    assert_eq!(sell(&mut sim, middle), None);
-    // Now the tile next to the left wing holds up the left half.
-    assert_eq!(sell(&mut sim, LEFT.end).as_deref(), Some(PIECE_WOULD_FALL));
-    // From the open end inward, the half comes out tile by tile.
-    for x in (LEFT.end..middle).rev() {
-        assert_eq!(sell(&mut sim, x), None, "{x}");
-    }
-    // With its bridge gone, the wing's lobby tile sells again.
+    // Any tile of it takes the whole bridge, wing to wing, and pays back
+    // each tile's sale price.
+    let money = sim.money;
+    let tile = sim.tower.unit_at(SKY, LEFT.end + 5).unwrap().clone();
+    let each = sim.tower.sale_refund(&tile);
+    assert_eq!(sell(&mut sim, LEFT.end + 5), None);
+    assert!(gap_tiles(GAP)
+        .into_iter()
+        .all(|x| sim.tower.unit_at(SKY, x).is_none()));
+    assert_eq!(sim.money - money, each * GAP as f64);
+    // The wings keep their sky lobbies, and the left one's edge sells again.
+    assert!(sim.tower.unit_at(SKY, right_wing(GAP).start).is_some());
     assert_eq!(sell(&mut sim, LEFT.end - 1), None);
+}
+
+#[test]
+fn the_bulldozer_takes_a_half_bridge_to_its_open_end() {
+    let mut sim = towers(GameMode::Modern, GAP, SKY);
+    let half: Vec<i64> = gap_tiles(GAP).into_iter().take(4).collect();
+    sim.paint_brush(Kind::Lobby, SKY, &half);
+    assert_eq!(sell(&mut sim, LEFT.end + 3), None);
+    assert!(half.iter().all(|&x| sim.tower.unit_at(SKY, x).is_none()));
+}
+
+#[test]
+fn nobody_is_left_on_open_air() {
+    let mut sim = towers(GameMode::Modern, GAP, SKY);
+    sim.paint_brush(Kind::Lobby, SKY, &gap_tiles(GAP));
+    // Someone walks along the bridge toward the left wing.
+    let from = Some(LEFT.end + 2);
+    let at = add(&mut sim.crowd, &sim.tower, SKY, SKY, from, Some(LEFT.start));
+    let at = at.expect("a walk along floor 15");
+    sim.crowd.people[at].x = (LEFT.end + 2) as f64;
+    assert_eq!(
+        sell(&mut sim, LEFT.end + 7).as_deref(),
+        Some(PEOPLE_CROSSING)
+    );
+    assert!(sim.tower.is_skybridge_tile(SKY, LEFT.end + 2));
+    sim.crowd.people[at].x = (LEFT.end - 3) as f64;
+    assert_eq!(sell(&mut sim, LEFT.end + 7), None);
 }
 
 #[test]

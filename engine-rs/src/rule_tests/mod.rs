@@ -93,6 +93,7 @@ mod simulation_housekeeping;
 mod simulation_retail;
 mod simulation_sky_lobby;
 mod simulation_transport;
+mod skybridge_walkers;
 mod skylobby_transfer;
 mod sparse_save;
 pub(crate) mod stocked_services;

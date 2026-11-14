@@ -6,7 +6,7 @@ use super::landing::{landing_slots, Landings};
 use super::spawn::{inside_x, metro_station_for_platform, pick_x, pick_x_in_segment};
 use super::staff_shift;
 use super::visits::{begin_dwell, leave_venue};
-use super::walk::walk_to;
+use super::walk::{find_another_way, walk_to, way_is_cut};
 use super::{
     Crowd, PState, Person, StaffResult, GIVE_UP, RIDE_SECONDS_PER_FLOOR, STAFF_GIVE_UP, STRESS_WAIT,
 };
@@ -97,6 +97,9 @@ fn step(crowd: &mut Crowd, i: usize, dt: f64, tower: &mut Tower, landings: &mut 
             } else {
                 shaft.x as f64 + shaft.width as f64 / 2.0
             };
+            if way_is_cut(p, target_x, tower) {
+                return find_another_way(crowd, i, tower);
+            }
             let p = &mut crowd.people[i];
             if walk_to(p, target_x, dt, tower) {
                 if is_elevator {
@@ -247,6 +250,9 @@ fn step(crowd: &mut Crowd, i: usize, dt: f64, tower: &mut Tower, landings: &mut 
         }
         PState::ToDest => {
             let dest_x = crowd.people[i].dest_x;
+            if way_is_cut(&crowd.people[i], dest_x, tower) {
+                return find_another_way(crowd, i, tower);
+            }
             if walk_to(&mut crowd.people[i], dest_x, dt, tower) {
                 // A housekeeper's working day decides what comes next.
                 if let Some(trip) = crowd.people[i].staff_trip {
@@ -406,7 +412,7 @@ fn turn_back(crowd: &mut Crowd, i: usize) {
 /// out turns back, and one partway up finds another way to where they were
 /// going. Only a rider whose car went from under them, or one left with no
 /// way on at all, leaves the picture.
-fn give_up(crowd: &mut Crowd, i: usize, tower: &mut Tower) {
+pub(super) fn give_up(crowd: &mut Crowd, i: usize, tower: &mut Tower) {
     if crowd.people[i].staff_trip.is_some() {
         staff_shift::stuck(crowd, i, tower);
     } else if is_still_setting_out(&crowd.people[i]) {
@@ -418,7 +424,7 @@ fn give_up(crowd: &mut Crowd, i: usize, tower: &mut Tower) {
 
 /// Sends someone on foot partway through a trip on to the trip's last floor
 /// by a new route from where they stand. `false` when there is none.
-fn reroute(crowd: &mut Crowd, i: usize, tower: &Tower) -> bool {
+pub(super) fn reroute(crowd: &mut Crowd, i: usize, tower: &Tower) -> bool {
     let p = &crowd.people[i];
     let (from, from_x, dest_x) = (p.floor, p.x, p.dest_x);
     let Some(&to) = p.floors.last() else {

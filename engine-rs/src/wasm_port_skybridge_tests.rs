@@ -51,12 +51,15 @@ fn undo_and_redo_take_a_bridge_down_and_put_it_back() {
     assert_eq!(bridge_tiles(&e), 0);
     assert_eq!(e.port_redo()[STATUS], 1.0, "{:?}", e.last_reason_text());
     assert_eq!(bridge_tiles(&e), 10);
-    // Selling the middle of it, then undoing the sale, puts the tile back.
+    // Bulldozing the middle takes the whole bridge, and one undo puts it all
+    // back; a redo takes it all again.
     let middle = e.sim.tower.unit_at(SKY, LEFT.end + 5).unwrap().id;
     e.port_undo_capture("Bulldoze");
     assert!(e.sim.remove_facility(middle, RemovalMethod::Bulldoze).ok);
     e.port_undo_commit();
-    assert_eq!(bridge_tiles(&e), 9);
+    assert_eq!(bridge_tiles(&e), 0);
     assert_eq!(e.port_undo()[STATUS], 1.0, "{:?}", e.last_reason_text());
     assert_eq!(bridge_tiles(&e), 10);
+    assert_eq!(e.port_redo()[STATUS], 1.0, "{:?}", e.last_reason_text());
+    assert_eq!(bridge_tiles(&e), 0);
 }
