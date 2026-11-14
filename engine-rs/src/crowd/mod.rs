@@ -122,7 +122,9 @@ pub struct Person {
     /// the crowd is never saved. Engine-internal: not in the `Person` shape.
     pub errand: Option<trip::Errand>,
     /// The tile the person first stood on, so the card can name the room a
-    /// plain commute left. Engine-internal: not in the `Person` shape.
+    /// plain commute left, and so one who gives up before boarding walks back
+    /// there and leaves the way they came (`motion::turn_back`).
+    /// Engine-internal: not in the `Person` shape.
     pub start_x: f64,
 }
 
