@@ -25,6 +25,10 @@ prompt already tells players it is an engine update and shows the new version.
 Entries below 1.51.1 were curated from the commit history after the fact, so they
 are documentation only: no build that a client fetches carries them.
 
+## 3.7.4
+
+- A shop, restaurant or theater near a working Metro platform no longer warns that it is too far from a lobby, and does full business, as the 1994 game's basement shops beside the station did.
+
 ## 3.7.3
 
 - Elevator cars show only the people who actually stepped in, one figure each, so a car no longer looks full with nobody aboard.
