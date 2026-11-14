@@ -877,9 +877,9 @@ describe("export/import — file downloads and the file picker, no copy-paste pa
     vi.spyOn(HTMLInputElement.prototype, "click").mockImplementation(() => {});
     openImportPicker(ui);
     const input = document.getElementById("import-file") as HTMLInputElement;
-    // The accept list offers exactly .vctower + the legacy .tdt extension,
-    // pinned in full so no other extension can sneak back in.
-    expect(input.accept).toBe(".vctower,application/octet-stream,.tdt,.TDT");
+    // On a desktop the accept list offers exactly .vctower + the legacy .tdt
+    // extension, pinned in full so no other entry can sneak back in.
+    expect(input.accept).toBe(".vctower,.tdt,.TDT");
     const file = new File([new Uint8Array([0x00, 0x24, 1, 2])], "MYTOWER.TDT");
     Object.defineProperty(input, "files", { value: [file], configurable: true });
     input.onchange!(new Event("change"));
