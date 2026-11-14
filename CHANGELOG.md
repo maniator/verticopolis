@@ -25,6 +25,10 @@ prompt already tells players it is an engine update and shows the new version.
 Entries below 1.51.1 were curated from the commit history after the fact, so they
 are documentation only: no build that a client fetches carries them.
 
+## 3.11.3
+
+- The person card no longer says someone left the tower when they only walked into their office, home or another room at the end of the trip. It now says where they went in, and keeps "Left the tower" for people who walk out through the lobby or the Metro.
+
 ## 3.11.2
 
 - Two theaters built side by side now come back as two theaters after a .TDT export and import, instead of one double-width theater.
