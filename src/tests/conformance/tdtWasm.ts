@@ -45,7 +45,8 @@ const bytesOf = (input: ArrayBuffer | Uint8Array): Uint8Array => (input instance
 
 /** Read a `.TDT` file the way the game does. The report and facts come from the
  *  engine's load; the save is the importer's own output, before an engine
- *  adopts it and normalizes it (an express shaft stops only at lobbies, a
+ *  adopts it and normalizes it (an express shaft stops only at lobbies above
+ *  the ground, a
  *  default state or zero count is left out). */
 export function parseTDT(input: ArrayBuffer | Uint8Array, filename: string): ParsedTdt {
   const engine = wasm().Engine.newGame(1, "classic");

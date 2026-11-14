@@ -6,7 +6,7 @@ import type { AssistedPreset, AutoTuneStatus } from "../../simport/enginePort";
 // floorLabel is a DOM-free pure helper in its own module (so the schedule
 // formatter can reuse it without pulling in lit-html); re-exported here so
 // existing importers and tests keep their `./elevatorSchedule` path.
-import { floorLabel } from "../floorLabel";
+import { floorLabel, isBasementFloor } from "../floorLabel";
 export { floorLabel };
 
 /**
@@ -284,19 +284,50 @@ function steppersTemplate(state: SchedState, h: SchedHandlers): TemplateResult {
     <p class="es-hint">Longer holds a car at each stop; fewer trips, steadier loading.</p>`;
 }
 
+/** The express caption: its fixed policy, naming the basements when the span
+ *  reaches them (an express stops at every basement floor it passes), and
+ *  offering the toggle only when a basement row has one (not an endpoint). */
+function expressCaption(floors: readonly FloorRow[]): string {
+  if (!floors.some((f) => isBasementFloor(f.floor))) return "Serves all lobbies and sky lobbies";
+  return floors.some((f) => isBasementFloor(f.floor) && !f.endpoint)
+    ? "Stops at every lobby and basement floor; a basement stop can be turned off"
+    : "Stops at every lobby and basement floor";
+}
+
+/** One row's Serve cell. Endpoints always stop; a standard or service shaft
+ *  toggles every other floor; an express toggles a basement floor or a skipped
+ *  lobby, shows the always-on check on a served lobby, and nothing on the
+ *  floors it passes above ground. */
+function serveCellTemplate(ctx: SchedCtx, f: FloorRow, h: SchedHandlers): TemplateResult {
+  if (f.endpoint) {
+    return html`<span class="es-cell-serve es-always" title="The top and bottom stay connected: endpoints always stop">✓</span>`;
+  }
+  const toggles = !ctx.isExpress || isBasementFloor(f.floor) || (f.lobby && !f.served);
+  if (toggles) {
+    return html`<span class="es-cell-serve"><input type="checkbox" aria-label="Serve floor ${floorLabel(f.floor)}"
+      .checked=${live(f.served)} @change=${(e: Event) => h.onServe(f.floor, (e.target as HTMLInputElement).checked)} /></span>`;
+  }
+  if (f.lobby) {
+    return html`<span class="es-cell-serve es-always" title="An express always stops at its lobbies">✓</span>`;
+  }
+  return html`<span class="es-cell-serve" title="An express stops only at lobbies above ground"></span>`;
+}
+
 /** The floors grid: the dialog's primary surface (spec §4 as amended §16), one row
  *  per span floor descending, with the folded-in Serve stop toggle, the derived base
  *  marker, and one numbered chip per car (pressed on its home row; pressing a hollow
- *  chip moves that car here). Express renders a caption instead of Serve toggles
- *  (its stops are lobbies by construction: a caption reads as a fact, a grayed
- *  control reads as a bug). */
+ *  chip moves that car here). An express reads its policy as a caption and
+ *  toggles only the stops it may skip: a basement floor, or a lobby a legacy
+ *  save skipped (so it can come back). Its served lobbies show the always-on
+ *  check, and the floors it passes above ground show no control (a caption
+ *  reads as a fact, a grayed control reads as a bug). */
 function floorsTemplate(ctx: SchedCtx, state: SchedState, h: SchedHandlers): TemplateResult {
   const homes = state.schedule.homeFloors;
   const baseLabel = state.base === 1 ? "Home all cars at the lobby" : `Home all cars at Floor ${floorLabel(state.base)}`;
   return html`
     <div class="es-floors">
       <div class="es-row es-heading-row"><span class="es-heading">Serviced floors and home cars</span></div>
-      ${ctx.isExpress ? html`<p class="es-hint">Serves all lobbies and sky lobbies</p>` : nothing}
+      ${ctx.isExpress ? html`<p class="es-hint">${expressCaption(state.floors)}</p>` : nothing}
       <div class="es-row es-quick">
         ${ctx.isExpress
           ? nothing
@@ -308,20 +339,12 @@ function floorsTemplate(ctx: SchedCtx, state: SchedState, h: SchedHandlers): Tem
       <div class="es-grid" role="group" aria-label="Serviced floors and per-car home floors">
         <div class="es-grid-head es-grid-row" aria-hidden="true">
           <span class="es-cell-floor">Floor</span>
-          ${ctx.isExpress ? nothing : html`<span class="es-cell-serve">Serve</span>`}
+          <span class="es-cell-serve">Serve</span>
           <span class="es-cell-cars">Home car(s)</span>
         </div>
         ${state.floors.map((f) => {
           const isBase = f.floor === state.base;
-          // Express shafts have no per-floor serve column at all; on the rest,
-          // endpoints render the always-on check and other floors the checkbox.
-          let serveCell: TemplateResult | typeof nothing = nothing;
-          if (!ctx.isExpress) {
-            serveCell = f.endpoint
-              ? html`<span class="es-cell-serve es-always" title="The top and bottom stay connected: endpoints always stop">✓</span>`
-              : html`<span class="es-cell-serve"><input type="checkbox" aria-label="Serve floor ${floorLabel(f.floor)}"
-                    .checked=${live(f.served)} @change=${(e: Event) => h.onServe(f.floor, (e.target as HTMLInputElement).checked)} /></span>`;
-          }
+          const serveCell = serveCellTemplate(ctx, f, h);
           return html`
           <div class="es-grid-row${f.served ? "" : " es-skipped"}">
             <span class="es-cell-floor">${isBase ? html`<span class="es-base" title="Base floor: unhomed cars wait here">◎</span>` : nothing}${floorLabel(f.floor)}${f.lobby ? html`<span class="es-lobby-mark" title="Lobby floor">L</span>` : nothing}${state.originFloors.includes(f.floor) ? html`<span class="es-origin" role="img" aria-label="Demand hotspot: many riders board here at the busiest ${state.day} hour" title="Demand hotspot: many riders board here at the busiest ${state.day} hour">▲</span>` : nothing}</span>

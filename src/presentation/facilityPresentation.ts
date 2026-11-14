@@ -121,7 +121,7 @@ export const FACILITY_PRESENTATION: Readonly<Record<FacilityKind, FacilityPresen
   },
   elevatorExpress: {
     color: "#3a3a8a",
-    description: "Stops only at lobbies and sky lobbies. Essential for very tall towers.",
+    description: "Stops at lobbies, sky lobbies and every basement floor. Essential for very tall towers.",
   },
   parkingRamp: {
     color: "#6a6a6a",

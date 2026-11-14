@@ -28,13 +28,23 @@ fn hash(id: &str) -> String {
 }
 
 #[test]
-fn marked_imported_basement_stops_differ_from_legacy_and_modern_coercion() {
+fn an_express_keeps_its_own_basement_stops_and_drops_the_old_rules() {
+    // A marked shaft's basement skips are its own: the imported file's
+    // skip at B3 (floor -2) stays.
     let marked = hash("transport-classic-basement-imported-empty");
-    let legacy = hash("transport-classic-basement-legacy-empty");
-    assert_ne!(marked, legacy);
     assert_ne!(marked, hash("transport-classic-basement-imported-mixed"));
-    assert_eq!(hash("transport-classic-basement-marker-string"), legacy);
-    assert_ne!(hash("transport-modern-basement-marker-ignored"), marked);
+    // A save from before expresses served the basements carries no marker,
+    // and its basement skips were the old lobby-only rule's: they go, and
+    // the shaft loads as a marked one that stops at every basement floor.
+    // A marker that is not `true` counts as none.
+    assert_eq!(hash("transport-classic-basement-legacy-skips"), marked);
+    assert_eq!(hash("transport-classic-basement-legacy-empty"), marked);
+    assert_eq!(hash("transport-classic-basement-marker-string"), marked);
+    // Modern follows the same rule.
+    assert_eq!(
+        hash("transport-modern-basement-legacy-skips"),
+        hash("transport-modern-basement-marked-empty")
+    );
 }
 
 #[test]

@@ -25,9 +25,10 @@ const PINNED: Record<string, Nonzero> = {
   // riders staying aboard to their floors (3.7.3) put it on one that lights
   // none, and later dispatch changes lit three again; meal venues drawing only
   // their real diners (#2160) move the cars onto a path that lights none, and
-  // walk-ins switched off (3.12.2) onto one that lights one again. The fire
-  // sites stay pinned by the events and fire-rescue runs.
-  "scenarios/holidays-classic.json": { santaFxSeq: 2, thiefSeq: 1, thiefCaught: 1, thiefFloor: 77, fires: 1, firesGutRooms: 1 },
+  // walk-ins switched off (3.12.2) onto one that lights one again, and
+  // express elevators stopping at every basement floor onto one that lights
+  // none. The fire sites stay pinned by the events and fire-rescue runs.
+  "scenarios/holidays-classic.json": { santaFxSeq: 2, thiefSeq: 1, thiefCaught: 1, thiefFloor: 77 },
   "scenarios/events-classic.json": { explosionSeq: 1, explosionFloor: 5, explosionX: 174.5, thiefFloor: 1, fires: 1, firesGutRooms: 1, bombs: 1 },
   // After the direct threat detonates, a second threat is called in during
   // the last two days, with Security sold and nobody to search (#1973).
