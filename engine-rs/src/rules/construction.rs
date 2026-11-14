@@ -112,11 +112,12 @@ impl GameMode {
         self == GameMode::Modern
     }
 
-    /// Whether the bulldozer may take out a sky lobby tile. The 1994 game
-    /// keeps every lobby for good, so Classic refuses. Modern sells a sky
-    /// lobby tile like a floor tile (owner, 2026-11-14), a mistaken tall
-    /// hall included; the ground lobby stays in both modes. Read through
-    /// `Tower::removal_reason`.
+    /// Whether the bulldozer may take out a lobby tile. The 1994 game keeps
+    /// every lobby for good, so Classic refuses. Modern sells a lobby tile
+    /// like a floor tile (owner, 2026-11-14), a mistaken tall hall included,
+    /// and a ground lobby tile too, so a merged ground lobby can be split
+    /// into two towers' front doors; the tower's last ground lobby tile
+    /// stays. Read through `Tower::removal_reason`.
     pub fn removes_lobby_tiles(self) -> bool {
         self == GameMode::Modern
     }
@@ -126,6 +127,15 @@ impl GameMode {
     /// does (sky bridge design, owner 2026-11-14); Classic keeps SimTower's
     /// rule that every tile stands on the story below.
     pub fn builds_skybridges(self) -> bool {
+        self == GameMode::Modern
+    }
+
+    /// Whether a ground lobby tile may be laid apart from the rest of the
+    /// tower, with open ground between: the front door of another tower on
+    /// the lot. Modern allows it (owner, 2026-11-14), since several towers
+    /// on one lot are Modern's; Classic keeps one tower, so a ground tile
+    /// has to touch what stands. Read through `Tower::can_place`.
+    pub fn lays_ground_lobbies_apart(self) -> bool {
         self == GameMode::Modern
     }
 

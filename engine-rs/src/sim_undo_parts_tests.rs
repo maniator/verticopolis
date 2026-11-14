@@ -59,17 +59,18 @@ fn lobby_tiles_that_joined_two_parts_leave_each_on_its_own_root() {
 
 #[test]
 fn a_part_a_sale_divided_since_the_lobby_tiles_still_refuses() {
-    // The lobby tile joined one part. Since then a floor tile went in beside
-    // it and a sale parted the basement past it from that part, so what is
-    // past it hangs only from the tile and reaches no root it joined.
+    // The lobby tile joined one part. Since then basement went in past it
+    // and a sale parted the basement under it from that part, so what is
+    // past it hangs only from the tile and reaches no root it joined. The
+    // run is basement alone: a run with a ground lobby tile would stand as
+    // its own tower's front door, since Modern lays ground lobbies apart.
     let mut sim = lot();
     build(&mut sim, Kind::Lobby, 1, 100..107);
     build(&mut sim, Kind::Floor, 0, 105..111);
     let joined = gesture(&mut sim, |s| build(s, Kind::Lobby, 1, [107])).unwrap();
     assert_eq!(joined.lobby_roots.len(), 1, "one part beside it");
-    build(&mut sim, Kind::Floor, 1, [108]);
+    build(&mut sim, Kind::Floor, 0, [111]);
     sell_at(&mut sim, 0, 106);
-    sell_at(&mut sim, 0, 107);
     refused(&mut sim, &joined, StepRefused::Blocked);
 }
 

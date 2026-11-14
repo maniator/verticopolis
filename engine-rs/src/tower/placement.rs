@@ -1,5 +1,6 @@
 //! Placing rooms and structure, and the support rules behind it.
 
+use super::removal::GROUND_FLOOR;
 use super::{PlaceResult, Tower, Unit, UnitState};
 use crate::facilities::*;
 
@@ -30,6 +31,15 @@ impl Tower {
             }
         }
         false
+    }
+
+    /// Whether a `kind` tile on `floor` may stand on open ground, apart
+    /// from the rest of the tower: a ground lobby tile in a mode that lays
+    /// them apart (`GameMode::lays_ground_lobbies_apart`), the front door of
+    /// another tower on the lot. The first tile of a tower is always a
+    /// ground lobby; this is for the ones after it.
+    fn opens_ground_lobby(&self, kind: Kind, floor: i64) -> bool {
+        kind == Kind::Lobby && floor == GROUND_FLOOR && self.mode.lays_ground_lobbies_apart()
     }
 
     pub fn span_connects(&self, floor: i64, x: i64, w: i64, hgt: i64) -> bool {
@@ -170,7 +180,8 @@ impl Tower {
                 if let Some(r) = self.skybridge_reason(floor, x, f.width) {
                     return PlaceResult::fail(r);
                 }
-            } else if !self.is_supported(floor, x, f.width) {
+            } else if !self.is_supported(floor, x, f.width) && !self.opens_ground_lobby(kind, floor)
+            {
                 return PlaceResult::fail(if floor >= 2 {
                     "Floors and lobbies must sit on the story below: no floating overhangs."
                 } else {

@@ -149,11 +149,15 @@ fn a_classic_room_that_stays_for_good_is_never_offered_with_its_floor() {
 }
 
 #[test]
-fn a_lobby_tile_is_never_offered_for_sale() {
-    let mut sim = tower();
-    let step = gesture(&mut sim, |s| assert!(s.build(Kind::Lobby, 1, 70).ok)).unwrap();
-    an_hour_passes(&mut sim);
-    refused(&mut sim, &step, StepRefused::GroundUsed { sellable: false });
+fn a_lobby_tile_is_offered_for_sale_only_where_the_mode_sells_one() {
+    // Classic keeps every lobby tile; Modern sells a ground lobby tile that
+    // is not the tower's last (`GameMode::removes_lobby_tiles`).
+    for (mode, sellable) in [(GameMode::Classic, false), (GameMode::Modern, true)] {
+        let mut sim = tower_in(mode);
+        let step = gesture(&mut sim, |s| assert!(s.build(Kind::Lobby, 1, 70).ok)).unwrap();
+        an_hour_passes(&mut sim);
+        refused(&mut sim, &step, StepRefused::GroundUsed { sellable });
+    }
 }
 
 #[test]
