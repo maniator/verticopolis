@@ -29,9 +29,13 @@ pub fn advance(crowd: &mut Crowd, dt_sec: f64, tower: &mut Tower) {
         let p = &crowd.people[i];
         let patience = (if p.staff { STAFF_GIVE_UP } else { GIVE_UP })
             + trip_floors(p) as f64 * RIDE_SECONDS_PER_FLOOR;
+        // Someone aboard a car rides it to their floor: giving up there would
+        // make them vanish from the cab (3.7.3). Only a wait or a walk can
+        // run out of patience.
         if p.age > patience
             && p.state != PState::ToDest
             && p.state != PState::Dwelling
+            && p.state != PState::Riding
             && p.state != PState::Done
         {
             if !p.staff {
@@ -98,7 +102,6 @@ fn step(crowd: &mut Crowd, i: usize, dt: f64, tower: &mut Tower, landings: &mut 
             let Some(shaft) = p.shaft_id.and_then(|id| tower.get_transport(id)) else {
                 return finish(crowd, i, tower);
             };
-            let shaft = shaft.clone();
             let p = &mut crowd.people[i];
             let dest = p.floors[p.leg + 1];
             let mut dir = jsmath::sign(dest as f64 - p.fy);
@@ -118,14 +121,14 @@ fn step(crowd: &mut Crowd, i: usize, dt: f64, tower: &mut Tower, landings: &mut 
                 p.leg += 1;
                 if p.leg >= p.shafts.len() {
                     p.state = PState::ToDest;
-                    p.x = tower.alight_x(&shaft, dest, p.dest_x);
+                    p.x = tower.alight_x(shaft, dest, p.dest_x);
                 } else {
                     p.shaft_id = Some(p.shafts[p.leg]);
                     let next = tower.get_transport(p.shafts[p.leg]);
                     let toward = next
                         .map(|n| n.x as f64 + n.width as f64 / 2.0)
                         .unwrap_or(p.dest_x);
-                    p.x = tower.alight_x(&shaft, dest, toward);
+                    p.x = tower.alight_x(shaft, dest, toward);
                     p.state = PState::ToShaft;
                 }
             }
@@ -136,7 +139,6 @@ fn step(crowd: &mut Crowd, i: usize, dt: f64, tower: &mut Tower, landings: &mut 
             let Some(shaft) = p.shaft_id.and_then(|id| tower.get_transport(id)) else {
                 return finish(crowd, i, tower);
             };
-            let shaft = shaft.clone();
             let pid = crowd.people[i].id;
             let target = landings
                 .slots
@@ -145,6 +147,7 @@ fn step(crowd: &mut Crowd, i: usize, dt: f64, tower: &mut Tower, landings: &mut 
                 .unwrap_or(shaft.x as f64 + shaft.width as f64 / 2.0);
             walk_to(&mut crowd.people[i], target, dt, tower);
             let floor = crowd.people[i].floor;
+            let mut boarded = None;
             for ci in 0..shaft.cars as usize {
                 // Only a car standing here with its doors open takes riders,
                 // never one passing the floor. A car not on the floor is
@@ -163,26 +166,34 @@ fn step(crowd: &mut Crowd, i: usize, dt: f64, tower: &mut Tower, landings: &mut 
                     continue;
                 }
                 crowd.car_riders.insert(key, n + 1);
-                tower.note_ride(shaft.id);
+                boarded = Some((shaft.id, ci as i64));
+                break;
+            }
+            // The shaft is read in place above, and the ride is noted once
+            // the read ends.
+            if let Some((shaft_id, ci)) = boarded {
+                tower.note_ride(shaft_id);
                 let p = &mut crowd.people[i];
-                p.car_index = Some(ci as i64);
+                p.car_index = Some(ci);
                 p.state = PState::Riding;
                 p.trip_wait += p.wait;
                 p.wait = 0.0;
-                break;
             }
         }
         PState::Riding => {
             let p = &crowd.people[i];
-            let shaft = p.shaft_id.and_then(|id| tower.get_transport(id)).cloned();
-            let (Some(shaft), Some(ci)) = (shaft, p.car_index) else {
+            let dest = p.floors[p.leg + 1];
+            let ridden = p.shaft_id.and_then(|id| tower.get_transport(id));
+            // A rider whose car or shaft went, or whose floor the shaft no
+            // longer stops at, steps out of the trip: no car would ever let
+            // them off, and nothing else ends a ride (3.7.3).
+            let (Some(shaft), Some(ci)) = (ridden, p.car_index) else {
                 return finish(crowd, i, tower);
             };
-            if ci as usize >= shaft.car_positions.len() {
+            if ci as usize >= shaft.car_positions.len() || !shaft.stops_at(dest) {
                 return finish(crowd, i, tower);
             }
             let pos = shaft.car_positions[ci as usize];
-            let dest = crowd.people[i].floors[crowd.people[i].leg + 1];
             // A rider steps off only once the car has stopped at their floor
             // with its doors open, never from a car passing it.
             let arrived = pos == dest as f64 && crowd.door_open(shaft.id, ci, dest);
@@ -190,7 +201,7 @@ fn step(crowd: &mut Crowd, i: usize, dt: f64, tower: &mut Tower, landings: &mut 
             p.fy = pos;
             p.x = shaft.x as f64 + shaft.width as f64 / 2.0;
             let d = dest as f64;
-            if arrived && shaft.stops_at(dest) {
+            if arrived {
                 release_seat(crowd, i);
                 let p = &mut crowd.people[i];
                 p.floor = dest;
@@ -198,14 +209,14 @@ fn step(crowd: &mut Crowd, i: usize, dt: f64, tower: &mut Tower, landings: &mut 
                 p.leg += 1;
                 if p.leg >= p.shafts.len() {
                     p.state = PState::ToDest;
-                    p.x = tower.alight_x(&shaft, dest, p.dest_x);
+                    p.x = tower.alight_x(shaft, dest, p.dest_x);
                 } else {
                     p.shaft_id = Some(p.shafts[p.leg]);
                     let next = tower.get_transport(p.shafts[p.leg]);
                     let toward = next
                         .map(|n| n.x as f64 + n.width as f64 / 2.0)
                         .unwrap_or(p.dest_x);
-                    p.x = tower.alight_x(&shaft, dest, toward);
+                    p.x = tower.alight_x(shaft, dest, toward);
                     p.state = PState::ToShaft;
                 }
             }

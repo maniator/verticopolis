@@ -11,6 +11,7 @@ import { metroTrainOffset } from "../metroTrainSchedule";
 import { addMetro } from "./towerMetro";
 import { buildWalkers } from "./towerWalkerBuild";
 import { cabFit, carIndicator, type CarIndicator } from "../carIndicator";
+import { cabRidersOf, ridersAboard } from "./cabRiders";
 import { glideCar, newCarDraw, type CarDrawState } from "../carMotion";
 import type { PersonView } from "../../simport/view";
 import { FLOOR, TILE } from "../scale";
@@ -391,6 +392,7 @@ export function updateMotion(engine: TowerEngine, elapsedMs = 1000 / 60): void {
   // sibling reconcileCrowd pass.
   if (applyCrowdCull(engine)) return;
   const anim = engine.d.anim;
+  const aboard = cabRidersOf(engine, clock.stepped);
   for (const c of engine.carActors) {
     const target = c.t.carPositions[c.i];
     let drawn = carDrawStates.get(c);
@@ -405,12 +407,10 @@ export function updateMotion(engine: TowerEngine, elapsedMs = 1000 / 60): void {
     if (typeof c.t.bottom === "number" && drawn.pos < c.t.bottom) drawn.pos = c.t.bottom;
     if (typeof c.t.top === "number" && drawn.pos > c.t.top) drawn.pos = c.t.top;
     c.actor.pos = ex.vec(engine.worldX(c.t.x), -drawn.pos * FLOOR);
-    // Indicator state (riders bucket scaled to capacity, direction lantern,
-    // FULL) is derived by the tested carIndicator helper; the cab graphic is
-    // cached per state so we only redraw when the state actually changes.
-    const load = c.t.carLoad?.[c.i] ?? 0;
-    const dir = c.t.carDir?.[c.i] ?? 0;
-    const ind = carIndicator(dir, load, catalogFacility(towerCatalog(engine.sim), c.t.kind).carCapacity ?? 0, cabFit(c.w));
+    // carIndicator turns the boarded riders, the lantern and FULL into the
+    // cab's state; its graphic is cached per state and redrawn on a change.
+    const [load, cap] = [c.t.carLoad?.[c.i] ?? 0, catalogFacility(towerCatalog(engine.sim), c.t.kind).carCapacity ?? 0];
+    const ind = carIndicator(c.t.carDir?.[c.i] ?? 0, load, cap, cabFit(c.w), ridersAboard(aboard, c.t.id, c.i));
     // The cab's riders change when the drawn car gets there, on the same rule
     // as the people getting in or out (`positionPerson`), so nobody shows in
     // the cab and on the landing at once, or in neither.

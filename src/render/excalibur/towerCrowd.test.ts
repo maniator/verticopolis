@@ -377,7 +377,7 @@ describe("updateMotion repositions the moving actors", () => {
   it("moves each elevator car to its live shaft position and repaints on a state change", () => {
     const cap = kindFacts("elevatorStandard").carCapacity ?? 0;
     expect(cap, "a standard elevator car carries passengers").toBeGreaterThan(0);
-    const changedInd = carIndicator(1, cap, cap, cabFit(4 * TILE)); // ascending & full: differs from idle
+    const changedInd = carIndicator(1, cap, cap, cabFit(4 * TILE), 0); // ascending & full: differs from idle
     const changedKey = carKey(changedInd);
     const car = {
       actor: actor(),
