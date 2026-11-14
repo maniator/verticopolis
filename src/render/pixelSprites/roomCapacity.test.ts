@@ -372,18 +372,34 @@ describe("the showpiece rooms draw their crowd honestly", () => {
   // used to roll a hash per seat and count a skipped seat against the occupancy
   // anyway, so people who were in the room were never drawn. Staff are named
   // separately because they are not occupants.
+  //
+  // The sweep covers every populated look, not only the five the first pass
+  // rewired: the VR lounge, mini golf bay, weight floor, boxing gym and climbing
+  // wall were asserted for CAPACITY alone, so an empty one of those rooms drew
+  // nobody and nothing caught a ghost member (#833).
+  //
+  // A look's seat count caps the crowd it can draw, so the expectation is
+  // min(present, seats). The five looks above seat more than the sweep's largest
+  // occupancy and leave the cap off; the VR lounge (3 pods), mini golf bay (9
+  // places) and the three single-member formats state theirs.
   it.each([
     ["skyBar", { kind: "skyBar" }, 12, peopleCount, 1],
     ["nightclub", { kind: "nightclub" }, 20, peopleCount, 1],
     ["daycare children", { kind: "daycare" }, 12, childCount, 0],
     ["yoga studio", { kind: "fitnessClub", subtype: "Yoga Studio" }, 16, peopleCount, 0],
     ["spin studio", { kind: "fitnessClub", subtype: "Spin Studio" }, 16, peopleCount, 0],
-  ] as [string, Partial<Unit>, number, (log: string[]) => number, number][])(
-    "a %s draws exactly its visitors, plus its staff",
-    (_label, over, tiles, measure, staff) => {
+    ["VR lounge", { kind: "amusements", subtype: "VR Lounge" }, 12, peopleCount, 0, 3],
+    ["mini golf", { kind: "amusements", subtype: "Mini Golf" }, 12, peopleCount, 0, 9],
+    ["weight floor", { kind: "fitnessClub", subtype: "Weight Floor" }, 16, peopleCount, 0, 1],
+    ["boxing gym", { kind: "fitnessClub", subtype: "Boxing Gym" }, 16, peopleCount, 0, 1],
+    ["climbing wall", { kind: "fitnessClub", subtype: "Climbing Wall" }, 16, peopleCount, 0, 1],
+  ] as [string, Partial<Unit>, number, (log: string[]) => number, number, number?][])(
+    "a %s draws min(visitors, seats), plus its staff",
+    (_label, over, tiles, measure, staff, seats) => {
+      const cap = seats ?? Infinity;
       for (const present of [0, 1, 2, 3, 5, 8]) {
         const drawn = new Set(sweep({ ...over, occupants: present }, tiles, measure));
-        expect(drawn, `${present} present`).toEqual(new Set([present + (present > 0 ? staff : 0)]));
+        expect(drawn, `${present} present`).toEqual(new Set([Math.min(present, cap) + (present > 0 ? staff : 0)]));
       }
     },
   );
