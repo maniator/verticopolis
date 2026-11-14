@@ -1,5 +1,6 @@
 import { html, type TemplateResult } from "lit-html";
 import * as classicVsModern from "../../../help-site/src/content/docs/classic-vs-modern.md";
+import type { GameMode } from "../../shared/types";
 import { fromGameHref } from "../fromGame";
 
 /**
@@ -42,6 +43,25 @@ export function compareModalTemplate(): TemplateResult {
   return html`
       <h2>Classic vs Modern</h2>
       ${compareTemplate()}
+      <div class="modal-actions"><button class="btn primary" data-act="close" autofocus>Got it</button></div>
+    `;
+}
+
+/** The rule set's name as the rules dialog says it. */
+const RULES_NAME: Readonly<Record<GameMode, string>> = { classic: "Classic", modern: "Modern" };
+
+/**
+ * Tower > This Tower's Rules: the same table as {@link compareTemplate}, cut
+ * down to this tower's own column (`.tower-rules[data-rules]` in
+ * `help.css` hides the other column and the page's intro), under a line that
+ * names the tower and its rules. The name is lit-html text, never markup.
+ */
+export function towerRulesModalTemplate(name: string, mode: GameMode): TemplateResult {
+  const rules = RULES_NAME[mode];
+  return html`
+      <h2>This Tower's Rules</h2>
+      <p class="tower-rules-lead">${name || "Your tower"} plays by <b>${rules}</b> rules, chosen when it was founded. Here is what that means.</p>
+      <div class="help-md tower-rules" data-rules=${mode} @click=${openLinksInNewTab}>${classicVsModern.intro()}</div>
       <div class="modal-actions"><button class="btn primary" data-act="close" autofocus>Got it</button></div>
     `;
 }
