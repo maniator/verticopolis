@@ -247,9 +247,10 @@ fn the_canon_calendar_splits_its_weekend_day_too() {
     assert_eq!(weekday[9], 0.0);
 }
 
-/// An occupied office on floor 5 whose staff the cars board.
+/// An occupied condo on floor 5 whose residents the cars board (an
+/// office's workers ride as crowd people, outside the estimate).
 fn busy_office(sim: &mut Simulation) {
-    let id = sim.tower.place(Kind::Office, 5, 2).unit_id.unwrap();
+    let id = sim.tower.place(Kind::Condo, 5, 2).unit_id.unwrap();
     let u = sim.tower.get_unit_mut(id).unwrap();
     u.state = UnitState::Occupied;
     u.occupants = 8;

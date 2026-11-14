@@ -159,10 +159,11 @@ function fourStarEdits(s: PortEditSession): void {
   // A sale and two bulldozes outside any undo step, and the hour after
   // them, which both engines must agree on: the dual run played on after
   // selling a room and bulldozing a link. The escalator is one the crowd
-  // rides. Both engines drop a person whose shaft goes from under them (a
-  // trip's route is not planned again when a shaft goes), so the first
-  // frame of the hour's play that moves the clock drops the people walking
-  // to it. That frame can carry a person to the end of a leg whether or not
+  // rides. Nobody keeps walking to a shaft that went from under them
+  // (#2186): someone still setting out turns back, someone partway finds
+  // another route, and only someone with no way on leaves the picture, so
+  // after the first frame of the hour's play that moves the clock nobody
+  // is walking to it. That frame can carry a person to the end of a leg whether or not
   // the escalator is there, so the check leaves out anyone already on it,
   // and it requires that the people midway on a route that never takes it
   // all stay. Of the people who set out after the bulldoze and are still in
@@ -183,8 +184,8 @@ function fourStarEdits(s: PortEditSession): void {
   const since = s.markPeople();
   const afterBulldoze = s.personIds();
   s.require("the bulldoze leaves the people walking to it to the frame loop", walking.every((id) => afterBulldoze.has(id)));
-  const firstMove = s.playReadingFirstMove(60);
-  s.require("the first frame that moves the clock drops the people walking to the escalator", !walking.some((id) => firstMove.has(id)));
+  const [firstMove, stillWalking] = s.playReadingFirstMoveOf(60, () => [s.personIds(), s.walkingTo(link.id)] as const);
+  s.require("the first frame that moves the clock leaves nobody walking to the escalator", !walking.some((id) => stillWalking.includes(id)));
   s.require("the first frame that moves the clock keeps the people midway on a route that never takes the escalator", midway.every((id) => firstMove.has(id)));
   const links = s.shaftsBetween(link.bottom, link.top, since);
   const stopsAtItsFloors = (id: number): boolean => stopsAtBoth(s.shaftById(id), link.bottom, link.top);

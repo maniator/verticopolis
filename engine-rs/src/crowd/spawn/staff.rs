@@ -4,7 +4,7 @@
 use super::{crowd_is_full, spawn_trips};
 use crate::clock::Clock;
 use crate::crowd::spawn_floors::spawn_floors;
-use crate::crowd::walk_ins;
+use crate::crowd::{commuters, walk_ins};
 use crate::crowd::Crowd;
 use crate::sim_loop::{weather_for, Weather};
 use crate::tower::Tower;
@@ -35,6 +35,7 @@ pub fn spawn_step(
         1.0
     };
     walk_ins::start_walk_ins(crowd, tower, clock);
+    commuters::start_commutes(crowd, tower, clock);
     crowd.spawn_acc += dt_sec * time_rate * pop_factor * weather_factor;
     if crowd.spawn_acc < 1.0 {
         return;

@@ -4,9 +4,12 @@
 //! diagnostics read. Sampling only: no rng, nothing read back into behavior,
 //! and never saved (a load starts every ring empty, as on the TypeScript side).
 
+use std::collections::HashMap;
+
 use indexmap::IndexMap;
 use serde_json::{json, Value};
 
+use crate::crowd::PState;
 use crate::sim::Simulation;
 
 pub const ORIGIN_HOURS: usize = 24;
@@ -103,7 +106,24 @@ impl Simulation {
     pub fn sample_elevator_util(&mut self) {
         let hour = self.clock.hour().rem_euclid(24) as usize;
         let weekend = self.clock.is_weekend();
-        let boardings = self.elevators.drain_boardings();
+        let mut boardings = self.elevators.drain_boardings();
+        // Office workers ride as people, outside the dispatch's estimate
+        // (`crowd::commuters`), so their boardings and the seats they fill
+        // join the estimate's here: a shaft full of commuters reads full.
+        for (shaft, floors) in std::mem::take(&mut self.crowd.commuter_boardings) {
+            let tally = boardings.entry(shaft).or_default();
+            for (floor, n) in floors {
+                *tally.entry(floor).or_insert(0.0) += n;
+            }
+        }
+        let mut commuters_aboard: HashMap<i64, f64> = HashMap::new();
+        for p in &self.crowd.people {
+            if p.commuter && p.state == PState::Riding {
+                if let Some(shaft) = p.shaft_id {
+                    *commuters_aboard.entry(shaft).or_insert(0.0) += 1.0;
+                }
+            }
+        }
         let prev_minutes = self.clock.minutes - 60.0;
         let origin_hour = ((prev_minutes / 60.0).floor() as i64).rem_euclid(24);
         let cal = &self.clock.calendar;
@@ -121,7 +141,8 @@ impl Simulation {
                 .car_load
                 .as_ref()
                 .map(|l| l.iter().fold(0.0, |sum, n| sum + n))
-                .unwrap_or(0.0);
+                .unwrap_or(0.0)
+                + commuters_aboard.get(&t.id).copied().unwrap_or(0.0);
             let frac = if cap > 0.0 {
                 (load / cap).min(1.0)
             } else {

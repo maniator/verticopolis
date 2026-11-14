@@ -118,7 +118,11 @@ pub fn deserialize_owned(raw: Value) -> Result<Simulation, String> {
         }
     }
     debug_assert_eq!(units.len(), kept, "unit_from_value skipped a counted entry");
-    Ok(assemble(&data, units, ids, &written))
+    let mut sim = assemble(&data, units, ids, &written);
+    // The saved office head counts are the workers at their desks, so a
+    // bulldoze before the first step still sends them out.
+    crate::crowd::commuters::reconcile(&mut sim.crowd, &mut sim.tower);
+    Ok(sim)
 }
 
 /// The keys `detect_founder` reads off a save.

@@ -390,12 +390,20 @@ export class PortEditSession {
    *  after its first frame that moves the clock. The session reads them
    *  itself, so no script code runs inside a play. */
   playReadingFirstMove(minutes: number): Set<number> {
-    const read: { crowd?: Set<number> } = {};
+    return this.playReadingFirstMoveOf(minutes, () => this.personIds());
+  }
+
+  /** `read`'s answer after the first frame of `play(minutes)` that moves
+   *  the clock. */
+  playReadingFirstMoveOf<T>(minutes: number, read: () => T): T {
+    const seen: { value?: T } = {};
+    let moved = false;
     this.playFrames(minutes, () => {
-      read.crowd ??= this.personIds();
+      if (!moved) seen.value = read();
+      moved = true;
     });
-    if (read.crowd === undefined) throw new Error(`${this.caseId}: play ${minutes} minutes: the clock never moved`);
-    return read.crowd;
+    if (!moved) throw new Error(`${this.caseId}: play ${minutes} minutes: the clock never moved`);
+    return seen.value as T;
   }
 
   /** `play`'s frames; `onMove` runs after each frame that moves the clock. */

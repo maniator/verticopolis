@@ -40,6 +40,7 @@ export function unitDetail(mode: GameMode, kind: FacilityKind, over: Partial<Uni
     filmTier: null,
     ticketPrice: null,
     screen2: null,
+    workersComing: null,
     ...over,
   } satisfies Omit<UnitDetail, "price">;
   const price = over.price ?? unitPrice(catalog, { kind, rent: base.rent ?? undefined, noRate: base.noRate });

@@ -2,6 +2,7 @@
 
 use super::landing::{landing_slots, Landings};
 use super::spawn::{inside_x, metro_station_for_platform, pick_x, pick_x_in_segment};
+use super::commuters;
 use super::staff_shift;
 use super::visits::begin_dwell;
 use super::walk::walk_to;
@@ -177,13 +178,21 @@ fn step(crowd: &mut Crowd, i: usize, dt: f64, tower: &mut Tower, landings: &mut 
                     continue;
                 }
                 crowd.car_riders.insert(key, n + 1);
-                boarded = Some((shaft.id, ci as i64));
+                boarded = Some((shaft.id, ci as i64, shaft.kind.is_elevator()));
                 break;
             }
             // The shaft is read in place above, and the ride is noted once
             // the read ends.
-            if let Some((shaft_id, ci)) = boarded {
+            if let Some((shaft_id, ci, elevator)) = boarded {
                 tower.note_ride(shaft_id);
+                if crowd.people[i].commuter && elevator {
+                    *crowd
+                        .commuter_boardings
+                        .entry(shaft_id)
+                        .or_default()
+                        .entry(floor)
+                        .or_insert(0.0) += 1.0;
+                }
                 let p = &mut crowd.people[i];
                 p.car_index = Some(ci);
                 p.state = PState::Riding;
@@ -242,6 +251,10 @@ fn step(crowd: &mut Crowd, i: usize, dt: f64, tower: &mut Tower, landings: &mut 
                 let p = &mut crowd.people[i];
                 p.linger += dt;
                 if p.linger > p.linger_for.unwrap_or(2.0) {
+                    // An office worker sits down at their desk, or leaves.
+                    if let Some(c) = p.commute {
+                        return commuters::at_destination(crowd, i, tower, c);
+                    }
                     if (p.origin_unit_id.is_some() || p.meal_venue_id.is_some()) && !p.returning {
                         begin_dwell(crowd, tower, i);
                     } else {
@@ -415,6 +428,7 @@ fn reroute(crowd: &mut Crowd, i: usize, tower: &Tower) -> bool {
 
 pub fn finish(crowd: &mut Crowd, i: usize, tower: &mut Tower) {
     release_seat(crowd, i);
+    commuters::on_finish(crowd, i);
     let p = &crowd.people[i];
     if p.walk_in {
         crowd.walk_in_count = (crowd.walk_in_count - 1).max(0);

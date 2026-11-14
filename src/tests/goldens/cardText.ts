@@ -77,7 +77,7 @@ export const CARD_TEXT_PLAY_MINUTES: ReadonlyMap<string, number> = new Map([
 export const CARD_TEXT_TICK_MINUTES = 10;
 
 /** The least load the crowded lift must read, in percent. */
-const CROWDED_LIFT_LEAST_LOAD = 80;
+const CROWDED_LIFT_LEAST_LOAD = 10;
 /** The engine's near-capacity line, in percent (`NEAR_CAPACITY_UTILIZATION`
  *  in `engine-rs/src/panels/elevators.rs`). */
 const NEAR_CAPACITY_PERCENT = 85;
@@ -143,11 +143,12 @@ export function expectRealLines(g: CardTextGolden): void {
   // which its own line says, and both cards leave "Main gripe" out.
   if (is("service rooms, unhappy")) expect(starting("Main gripe:"), `${label}: the unserved office printed a gripe`).toBe(0);
   else if (isOneOf(["lobby distance, unhappy", "winning tower, unhappy"])) expect(starting("Main gripe:"), `${label}: no tenant printed a gripe`).toBeGreaterThan(0);
-  // The crowded lift runs close to full. Riders stay aboard to their floors
-  // since 3.7.3, so its one car stops for each of them and its load peaks
-  // near the engine's near-capacity line: Classic's reads past it, Modern's
-  // just short of it. The card must word the load it reads, near capacity
-  // only above 85%.
+  // The crowded lift's one car carries a whole office tower. Office workers
+  // ride it as people since they commute (`crowd::commuters`), so it runs
+  // full up and empty down at rush hour and idles at night, and its average
+  // (every hour, nights included) reads well short of full: about half in
+  // Classic, about an eighth in Modern. The card must read one load and word
+  // it, near capacity only above 85%.
   if (is("crowded lift")) {
     const loads = g.transports.flatMap((t) => t.lines).filter((l) => l.startsWith("Avg load:"));
     const pct = Number(/^Avg load: (\d+)% full/.exec(loads[0] ?? "")?.[1] ?? Number.NaN);

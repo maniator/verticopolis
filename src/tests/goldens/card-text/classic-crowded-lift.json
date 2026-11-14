@@ -154,6 +154,6 @@
     {"id":1591,"kind":"office","floor":16,"lines":["Access: reachable from the lobby.","Too far from any lobby. Satisfaction sinks until tenants give notice. Clear floor 15 and build the sky lobby there to lift these tenants.","Giving notice: overcrowded vertical transport. Leaves in under 17 hour(s).","Fix the cause and get satisfaction to 40% to keep them (now 0%)."]}
   ],
   "transports": [
-    {"id":1441,"kind":"elevatorStandard","lines":["Avg load: 82% full"]}
+    {"id":1441,"kind":"elevatorStandard","lines":["Avg load: 52% full"]}
   ]
 }
