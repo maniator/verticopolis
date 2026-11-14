@@ -81,11 +81,18 @@ fn is_plain_floor_entry(unit: &Unit, entry: &Value) -> bool {
 pub(crate) struct SavedUnits<'a> {
     units: &'a [Unit],
     next: usize,
+    /// The entry of the unit at `next`, when a run already serialized it to
+    /// see whether it could join and it could not, so it is not written twice.
+    pending: Option<Value>,
 }
 
 impl<'a> SavedUnits<'a> {
     pub(crate) fn new(units: &'a [Unit]) -> Self {
-        SavedUnits { units, next: 0 }
+        SavedUnits {
+            units,
+            next: 0,
+            pending: None,
+        }
     }
 }
 
@@ -95,7 +102,7 @@ impl Iterator for SavedUnits<'_> {
     fn next(&mut self) -> Option<Value> {
         let first = self.units.get(self.next)?;
         self.next += 1;
-        let mut entry = first.serialize();
+        let mut entry = self.pending.take().unwrap_or_else(|| first.serialize());
         if !is_plain_floor_entry(first, &entry) {
             return Some(entry);
         }
@@ -103,10 +110,14 @@ impl Iterator for SavedUnits<'_> {
         while let Some(unit) = self.units.get(self.next) {
             // A run never holds more tiles than the lot is wide: the loader
             // reads a longer one as its first tile alone.
-            let joins = tiles < LOT_WIDTH as usize
-                && could_continue_run(&self.units[self.next - 1], unit)
-                && is_plain_floor_entry(unit, &unit.serialize());
-            if !joins {
+            if tiles >= LOT_WIDTH as usize || !could_continue_run(&self.units[self.next - 1], unit)
+            {
+                break;
+            }
+            let next_entry = unit.serialize();
+            if !is_plain_floor_entry(unit, &next_entry) {
+                // A labeled tile ends the run and opens the next entry.
+                self.pending = Some(next_entry);
                 break;
             }
             tiles += 1;

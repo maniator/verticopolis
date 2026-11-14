@@ -280,8 +280,9 @@ impl Simulation {
     /// The save as a tree without its `units`, and the units as `Value`s one
     /// at a time: the `.TDT` export reads the units as they come and the
     /// rest from the tree (`build_tdt_streamed`, #1431), so a save of
-    /// thousands of units is never a tree beside the game. Each unit is the
-    /// `Value` `serialize()` holds for it.
+    /// thousands of units is never a tree beside the game. Each unit comes on
+    /// its own, as `serialize_unfolded()` lists it, with no floor run to
+    /// unfold; the rest carries the version `serialize()` stamps.
     #[cfg_attr(not(feature = "wasm"), allow(dead_code))]
     pub(crate) fn save_without_units(&self) -> (Value, impl Iterator<Item = Value> + '_) {
         let mut m = Map::new();
