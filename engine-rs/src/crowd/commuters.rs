@@ -25,9 +25,12 @@
 //!
 //! The crowd keeps each office's workers in a [`Desk`]: who is inside, who
 //! is on the way in and who is booked to leave. The office's `occupants`
-//! mirrors `inside`. Workers on the way are crowd people and are never
-//! saved: a load starts a fresh crowd, takes the saved head counts as the
-//! workers inside, and the next hour books whoever is missing.
+//! mirrors `inside`. The save keeps the workers on the way with the rest of
+//! the crowd, and the desks and the hour's bookings beside them
+//! (`commuters_save.rs`). A save without them (an older one, or the boot
+//! after an engine crash) starts with nobody on the way: the load takes the
+//! saved head counts as the workers inside, and the next hour books whoever
+//! is missing.
 
 use std::collections::BTreeMap;
 
@@ -187,6 +190,12 @@ impl Crowd {
         }
         self.desks
             .retain(|_, d| d.inside > 0 || d.coming > 0 || d.going > 0);
+        self.sort_shifts();
+    }
+
+    /// Orders the booked arrivals and departures latest first, so the next
+    /// one due is last (`start_commutes` pops it).
+    pub(crate) fn sort_shifts(&mut self) {
         self.shifts.sort_by(|a, b| {
             b.at.total_cmp(&a.at)
                 .then_with(|| b.office_id.cmp(&a.office_id))

@@ -132,10 +132,11 @@ impl Kind {
     #[doc(hidden)]
     /// A kind whose head count mirrors the visitors inside it (an
     /// attendance venue, a [`Kind::is_meal_venue`] or a kind that
-    /// [`Kind::takes_walk_ins`]). The count lives only
-    /// in the unsaved `customers_in`, so a save leaves the head count out, a
-    /// load and an undo start it at 0, and the dispatch estimate skips it,
-    /// since those visitors ride as real people.
+    /// [`Kind::takes_walk_ins`]). The count lives
+    /// in the unsaved `customers_in`, which a load counts again from the
+    /// visitors the save's crowd carries (`crowd::save`) and an undo starts
+    /// at 0, and the dispatch estimate skips it, since those visitors ride
+    /// as real people.
     pub fn counts_visitors(self) -> bool {
         self.attendance_cap().is_some() || self.is_meal_venue() || self.takes_walk_ins()
     }

@@ -338,16 +338,20 @@ Labels are unique within a scenario. Each checkpoint records three hashes:
 - `state`: the saved game (what `serialize()` returns) with prose removed: each
   log entry drops `text` and a pending event choice drops `message`, and every
   other field of both stays. Prose is player copy with locale-formatted money,
-  so it is not part of the contract.
+  so it is not part of the contract. The save's `crowd` (the people) and
+  `dispatch` (the elevator cars' timers mid-stop) are left out too: the
+  people are hashed in their own channel, below.
 - `crowd`: `{ "nextId": n, "rng": s, "people": [...] }`, the crowd's person id
   source, its random stream's current state as an unsigned 32-bit integer, and
-  every live person in order. Saves never carry the crowd, so it gets its own
-  channel. A new game starts the crowd empty with `nextId` 1 and its stream
-  seeded with the game seed. Seeding a Mulberry32 stream sets its state to the
-  seed, or to 1 when the seed is 0. A load (a fixture start or `reload`) does
-  the same with the save's `seed` field, the main stream's state when it was
-  saved, which the engine always writes as a whole number from 0 to
-  4294967295.
+  every live person in order. A new game starts the crowd empty with `nextId`
+  1 and its stream seeded with the game seed. Seeding a Mulberry32 stream sets
+  its state to the seed, or to 1 when the seed is 0. A load (a fixture start
+  or `reload`) restores the crowd the save's `crowd` key carries, its people,
+  `nextId` and stream state exactly, so a `reload` leaves this hash as it was.
+  A save without the key (the fixtures, and every save from before people
+  were saved) starts the crowd empty with its stream seeded from the save's
+  `seed` field, the main stream's state when it was saved, which the engine
+  always writes as a whole number from 0 to 4294967295.
 - `events`: the gameplay events the engine emitted since the previous
   checkpoint (since the start for `start`), drained at the checkpoint, as the
   array `[{ "name", "payload" }, ...]` in emission order. A new game's `start`

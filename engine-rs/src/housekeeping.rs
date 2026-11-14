@@ -161,6 +161,11 @@ impl Housekeeping {
         }
     }
 
+    /// The crew holding `room_id`, and the room's floor, while one does.
+    pub(crate) fn room_holder(&self, room_id: i64) -> Option<(i64, i64)> {
+        self.assigned_room.get(&room_id).copied()
+    }
+
     pub(crate) fn assign_room(&mut self, room_id: i64, crew_id: i64, floor: i64) {
         self.assigned_room.insert(room_id, (crew_id, floor));
         *self.maids_out.entry(crew_id).or_insert(0) += 1;

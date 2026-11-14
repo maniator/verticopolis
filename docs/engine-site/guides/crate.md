@@ -189,10 +189,14 @@ The crate has no default features.
   `rules.exports_to_1994` is true (Classic); a Modern tower is refused. Each
   elevator car's waiting floor travels both ways as the shaft's
   `schedule.homeFloors`.
-- **A save holds the tower, not the moment.** The people in the building and
-  the elevator cars restart on load, so a loaded game does not carry on
-  exactly where the saving game was. Two loads of the same save stay
-  identical to each other.
+- **A save holds the moment.** The save's `crowd` carries everyone in the
+  building as they stand (walking, waiting, riding, at a venue, cleaning),
+  and its `dispatch` carries the elevator cars' timers mid-stop, so a loaded
+  game's people and cars carry on where they were. A few readings start
+  over on a load: the elevator panels' hourly figures, the day's move-in
+  report and the rooms cleaned today. A save from before
+  the crowd was saved loads with nobody in the building, and the tower fills
+  again from the lobby. The `.TDT` format carries neither.
 - **The loader repairs.** A damaged or hand-edited save is coerced the way
   the web game's loader does. It refuses a file it cannot read, a save with
   no numeric `minutes` or no `units` list at its top level (which would

@@ -433,5 +433,10 @@ pub(crate) fn assemble(
     sim.last_hour = sim.clock.hour();
     sim.adopt_milestones();
     sim.founder = detect_founder(raw);
+    // Last, once the tower is whole: the people point at its rooms and cars.
+    sim.adopt_saved_crowd(data.get("crowd"));
+    if let Some(cars) = data.get("dispatch") {
+        sim.elevators.restore(cars, &sim.tower);
+    }
     sim
 }

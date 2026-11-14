@@ -18,6 +18,9 @@ use classic::{first_answering, moving_car_covers, Boarding};
 
 #[path = "dispatch_modern.rs"]
 mod modern;
+
+#[path = "dispatch_save.rs"]
+mod save;
 pub(crate) use modern::{idle_home, DispatchRules};
 use modern::{BestCars, CarView};
 

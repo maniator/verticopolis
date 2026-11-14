@@ -86,6 +86,48 @@ export function crashOutcome(count: number | null): CrashOutcome {
   return count !== null && !crashReloadsSpent(count) ? "reload" : "stop";
 }
 
+/** Set by a crash that reloads, and taken by the boot that follows: that one
+ *  load of the autosave starts with nobody in the building (#2209). The save
+ *  carries the people and the cars' timers, so replaying them could replay
+ *  the very steps that trapped, and the tab's second crash stops the game. */
+export const CRASH_FRESH_CROWD_KEY = "vc.crashFreshCrowd";
+
+/** Ask the next boot of this tab to load the autosave without its people. */
+export function markCrashReload(store: KeyValueStore | null): void {
+  writeChecked(store, CRASH_FRESH_CROWD_KEY, true);
+}
+
+/** Whether this boot follows a crash reload. Clears the request, so only the
+ *  one boot after the crash leaves the people out. */
+export function takeCrashReload(store: KeyValueStore | null): boolean {
+  try {
+    const asked = store?.getItem(CRASH_FRESH_CROWD_KEY) === "true";
+    if (asked) store?.setItem(CRASH_FRESH_CROWD_KEY, "false");
+    return asked;
+  } catch {
+    return false;
+  }
+}
+
+/** The save keys that hold the people and the cars mid-stop. */
+const SAVED_PEOPLE_KEYS = ["crowd", "dispatch"] as const;
+
+/** `text` without the people and the cars' timers, so the tower loads as a
+ *  save from before people were saved did. Text that is not a save object
+ *  comes back unchanged, for the engine to refuse as before. */
+export function withoutSavedPeople(text: string): string {
+  try {
+    const data: unknown = JSON.parse(text);
+    if (typeof data !== "object" || data === null || Array.isArray(data)) return text;
+    const save = data as Record<string, unknown>;
+    if (!SAVED_PEOPLE_KEYS.some((key) => key in save)) return text;
+    for (const key of SAVED_PEOPLE_KEYS) delete save[key];
+    return JSON.stringify(save);
+  } catch {
+    return text;
+  }
+}
+
 /** The cover line while the page reloads after a crash. */
 export const CRASH_RELOAD_LINE = "The Rust engine hit an error. Reloading your tower from its last autosave.";
 

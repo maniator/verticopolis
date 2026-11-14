@@ -413,7 +413,7 @@ export class PortSim {
     this.changed();
   }
 
-  /** The live crowd, which no save carries: a copy of each person as the
+  /** The live crowd: a copy of each person as the
    *  conformance crowd view writes it (an unset optional field is absent). */
   people(): Person[] {
     return this.leaf.crowdView().people;

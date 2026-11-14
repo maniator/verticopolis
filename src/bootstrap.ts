@@ -5,7 +5,7 @@ import { startGameplaySession, trackAppActionOnce } from "./analytics";
 import { installErrorTracking } from "./analyticsErrors";
 import { initPwaInstall } from "./pwaInstall";
 import { removeLegacyCohortKeys } from "./engineCrash/legacyKeys";
-import { CRASH_RELOAD_LINE, countRustCrash, crashOutcome, reloadSoon, tabStore } from "./engineCrash/crashReload";
+import { CRASH_RELOAD_LINE, countRustCrash, crashOutcome, markCrashReload, reloadSoon, tabStore } from "./engineCrash/crashReload";
 import { loadWasmEngine, publishRustEngine, rustBootTower } from "./wasmhost/rustEngine";
 import type { BootTower } from "./game/bootTower";
 import { setSlotPopulationReader } from "./storage/slotCensus";
@@ -370,6 +370,8 @@ export function bootGame(create: (tower: BootTower) => BootApp): Promise<void> {
         if (outcome === "stop") showEngineFailure(bootState);
         else {
           showCrashReload(CRASH_RELOAD_LINE);
+          // The reload loads the autosave without its people (#2209).
+          markCrashReload(tabStore());
           reloadSoon();
         }
       });

@@ -15,8 +15,9 @@ export const DEFAULT_SCENARIOS: readonly ScenarioName[] = ["small", "medium", "l
 /**
  * The towers the harnesses run (issue #972; #1270 added three). Each one is a
  * committed save, decoded here in Node and handed unchanged to the page, so
- * every run starts from the same bytes. None carries a crowd (saves never
- * do), so each run grows its crowd from the same empty start.
+ * every run starts from the same bytes. None carries a crowd (each was
+ * written before saves carried one), so each run grows its crowd from the
+ * same empty start.
  */
 export interface Scenario {
   name: ScenarioName;

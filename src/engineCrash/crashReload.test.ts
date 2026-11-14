@@ -1,10 +1,14 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import {
+  CRASH_FRESH_CROWD_KEY,
   CRASH_LOOP_PAGES,
   countRustCrash,
   crashOutcome,
   crashReloadsSpent,
+  markCrashReload,
   RUST_CRASHES_KEY,
+  takeCrashReload,
+  withoutSavedPeople,
 } from "./crashReload";
 
 beforeEach(() => sessionStorage.clear());
@@ -65,5 +69,40 @@ describe("what a crash does", () => {
     expect(crashOutcome(CRASH_LOOP_PAGES)).toBe("stop");
     expect(crashOutcome(CRASH_LOOP_PAGES + 1)).toBe("stop");
     expect(crashOutcome(null)).toBe("stop");
+  });
+});
+
+describe("the boot after a crash reload (#2209)", () => {
+  it("is asked for once: the request is taken by the next boot only", () => {
+    expect(takeCrashReload(sessionStorage)).toBe(false);
+    markCrashReload(sessionStorage);
+    expect(sessionStorage.getItem(CRASH_FRESH_CROWD_KEY)).toBe("true");
+    expect(takeCrashReload(sessionStorage)).toBe(true);
+    expect(takeCrashReload(sessionStorage)).toBe(false);
+  });
+
+  it("reads no request where storage is missing or throws", () => {
+    expect(takeCrashReload(null)).toBe(false);
+    const throwing = {
+      getItem: () => {
+        throw new Error("denied");
+      },
+      setItem: () => {
+        throw new Error("denied");
+      },
+    };
+    expect(() => markCrashReload(throwing)).not.toThrow();
+    expect(takeCrashReload(throwing)).toBe(false);
+  });
+
+  it("drops the people and the cars' timers from a save and keeps the rest", () => {
+    const save = { version: 10, money: 5, crowd: { people: [{ id: 1 }] }, dispatch: { cars: [] }, housekeeping: { cleanedToday: 3 } };
+    expect(JSON.parse(withoutSavedPeople(JSON.stringify(save)))).toEqual({ version: 10, money: 5, housekeeping: { cleanedToday: 3 } });
+  });
+
+  it("leaves text that is not a save object, or has no people, as it was", () => {
+    for (const text of ["not json", "[1,2]", "null", "3", '{"money": 5}']) {
+      expect(withoutSavedPeople(text)).toBe(text);
+    }
   });
 });

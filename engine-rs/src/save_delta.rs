@@ -3,7 +3,8 @@
 //! the room records whose save form differs from the last one it was sent,
 //! and the save's other top-level keys (ledger, events state, RNG state,
 //! milestones and the rest), which are small. The transports ride in that
-//! remainder whole, since their car fields move every step.
+//! remainder whole, since their car fields move every step, and so do the
+//! crowd and the cars' timers (`crowd::save`), which move every step too.
 //!
 //! The mirror holds every room unit as last sent, in tower order: a copy of
 //! the record and its save form. Floor and lobby tiles, which are about 93%

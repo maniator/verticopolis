@@ -12,6 +12,7 @@ use crate::clock::{CalendarKind, GameMode};
 use crate::crowd::PState;
 use crate::facilities::Kind;
 use crate::load::deserialize;
+use crate::load_stream::load_save_text;
 use crate::sim::Simulation;
 use crate::tower::UnitState;
 
@@ -342,7 +343,7 @@ fn an_office_that_loses_its_tenant_sends_its_workers_home() {
 fn a_loaded_tower_keeps_its_workers_inside_until_they_go_home() {
     let _on = switch_on();
     let (sim, offices) = at_work(GameMode::Modern);
-    // A load starts a fresh crowd; the saved head counts stay.
+    // A load keeps the head counts (and the crowd, which is nobody now).
     let mut sim = deserialize(&sim.serialize()).unwrap();
     assert!(sim.tower.remove_unit(offices[0]).is_some());
     let w = watch(&mut sim, &offices[1..], 9 * 60 + 15);
@@ -407,5 +408,30 @@ fn workers_whose_elevator_is_bulldozed_on_the_way_never_vanish() {
             sim.crowd.commuter_count, on_the_way,
             "{mode:?}: the count matches the crowd"
         );
+    }
+}
+
+#[test]
+fn a_reload_mid_rush_plays_on_as_it_would_have() {
+    let _on = switch_on();
+    let (mut sim, offices) = office_tower(GameMode::Modern);
+    // 8:30 AM: some workers at their desks, some on the way, more booked.
+    for _ in 0..150 {
+        sim.tick(1.0);
+    }
+    assert!(sim.crowd.commuter_count > 0, "workers on the way");
+    assert!(!sim.crowd.shifts.is_empty(), "arrivals booked");
+    let mut loaded = load_save_text(sim.save_text().as_bytes()).unwrap();
+    assert_eq!(loaded.crowd.desks, sim.crowd.desks);
+    assert_eq!(loaded.crowd.shifts, sim.crowd.shifts);
+    assert_eq!(loaded.crowd.commuter_count, sim.crowd.commuter_count);
+    for _ in 0..90 {
+        sim.tick(1.0);
+        loaded.tick(1.0);
+    }
+    assert_eq!(loaded.crowd.view(), sim.crowd.view());
+    assert_eq!(loaded.crowd.desks, sim.crowd.desks);
+    for id in offices {
+        assert_eq!(occupants(&loaded, id), occupants(&sim, id));
     }
 }

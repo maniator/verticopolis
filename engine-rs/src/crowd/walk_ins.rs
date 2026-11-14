@@ -14,8 +14,9 @@
 //! They split between the lobby and the stations by what each entrance's
 //! transport can carry.
 //!
-//! The bookings live only in the crowd, like everyone in it: a load starts
-//! a fresh crowd and the next hour books again.
+//! The bookings are saved with the crowd (`save.rs`), so a reload keeps
+//! the rest of the hour's arrivals. A save without them starts with none,
+//! and the next hour books again.
 //!
 //! None of this runs while [`crate::facilities::WALK_INS_ON`] is off.
 

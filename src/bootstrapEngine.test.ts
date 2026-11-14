@@ -41,7 +41,7 @@ import { setSlotPopulationReader, slotPopulation } from "./storage/slotCensus";
 import { setEngineWriter } from "./storage/vctowerWriter";
 import { EngineBootError } from "./wasmhost/engineBoot";
 import { engineTrapped, noteEngineThrow, watchEngineTraps } from "./game/engineFault";
-import { countRustCrash, reloadSoon } from "./engineCrash/crashReload";
+import { CRASH_FRESH_CROWD_KEY, countRustCrash, reloadSoon } from "./engineCrash/crashReload";
 
 /** A save's text for the export calls: the writer under test is a stub that
  *  never reads it, so a hand-written save stands in for an engine's. */
@@ -191,6 +191,7 @@ describe("bootGame engine", () => {
     // The game stops behind the line, as behind the failure message, until the reload.
     expect(document.getElementById("engine-failure")?.getAttribute("data-stage")).toBe("reload");
     expect(reloadSoon).toHaveBeenCalledOnce();
+    expect(sessionStorage.getItem(CRASH_FRESH_CROWD_KEY), "the next boot loads without people (#2209)").toBe("true");
     expect(setSpeed).toHaveBeenCalledWith(0);
     expect(error).toHaveBeenCalledWith(`[wasm] ${message}`);
     await SaveGame.export(SAVE_TEXT);
