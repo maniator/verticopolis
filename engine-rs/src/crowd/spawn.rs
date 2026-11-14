@@ -174,6 +174,16 @@ pub fn metro_station_for_platform(tower: &Tower, platform_floor: i64, x: f64) ->
         .map(|u| u.id)
 }
 
+/// Whether a visitor sets out for a venue of `kind` at `hour`: it is open
+/// now, and a show or party (an attendance venue, whose visit runs an hour
+/// or more) is still on next hour. Nobody heads for a show in its last
+/// hour, so nobody is still on the way, or just sitting down, when it
+/// closes and sends everyone home. A meal is short enough to start in a
+/// restaurant's last hour, like last orders.
+pub fn open_for_visits(kind: Kind, hour: i64) -> bool {
+    kind.is_open_at(hour) && (kind.attendance_cap().is_none() || kind.is_open_at((hour + 1) % 24))
+}
+
 pub fn venue_has_room(u: &Unit) -> bool {
     let pop = u.kind.facility().population;
     if pop > 0 {

@@ -1,6 +1,6 @@
 //! Meal trips out of a floor for lunch and dinner.
 
-use super::{add, venue_has_room, MealPool, Opt, Options};
+use super::{add, open_for_visits, venue_has_room, MealPool, Opt, Options};
 use crate::clock::Clock;
 use crate::crowd::meals::{
     matches_meal_origin_kind, meal_window_for, outbound_weight, staff_on_shift, MealOrigin,
@@ -111,7 +111,7 @@ pub(super) fn spawn_meal_outbound(
             let u = tower.get_unit(id).unwrap();
             venue_kinds.contains(&u.kind)
                 && u.is_tenanted()
-                && u.kind.is_open_at(hour)
+                && open_for_visits(u.kind, hour)
                 && venue_has_room(u)
         })
         .collect();

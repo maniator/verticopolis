@@ -1,7 +1,9 @@
 //! Port of `crowd/visits.ts`: attendance round trips and the dwell entry.
 
 use super::meals::matches_meal_origin_kind;
-use super::spawn::{add, inside_x, venue_has_room, weighted_index, Options, SpawnFloors};
+use super::spawn::{
+    add, inside_x, open_for_visits, venue_has_room, weighted_index, Options, SpawnFloors,
+};
 use super::{dwell_seconds_range, Crowd, PState};
 use crate::clock::Clock;
 use crate::economy::tickets::ticket_pick_mult;
@@ -172,7 +174,7 @@ pub fn spawn_venue_visit(
     hour: i64,
     origin: VisitOrigin,
 ) {
-    if !kind.is_open_at(hour) {
+    if !open_for_visits(kind, hour) {
         return;
     }
     let Some(rows) = visit_origins(kind) else {
@@ -286,7 +288,12 @@ pub fn begin_dwell(crowd: &mut Crowd, tower: &mut Tower, i: usize) {
     let (min, max) = dwell_seconds_range(venue_kind);
     crowd.people[i].dwell_seconds_left = Some(crowd.rng.int(min, max) as f64);
     let Some(vid) = venue_id else { return };
-    if tower.get_unit(vid).is_none() {
+    let Some(venue) = tower.get_unit(vid) else {
+        return;
+    };
+    // Someone who reaches a venue after it closed turns straight back.
+    if crowd.venue_closed(venue.kind) {
+        crowd.people[i].dwell_seconds_left = Some(0.0);
         return;
     }
     let (kind, tenanted, operational, customers) = {

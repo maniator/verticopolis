@@ -346,3 +346,4 @@ pub fn rng_state_where(script: impl Fn(&mut crate::rng::Rng) -> bool) -> u32 {
         })
         .unwrap()
 }
+mod venue_closing;
