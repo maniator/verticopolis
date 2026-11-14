@@ -25,6 +25,11 @@ prompt already tells players it is an engine update and shows the new version.
 Entries below 1.51.1 were curated from the commit history after the fact, so they
 are documentation only: no build that a client fetches carries them.
 
+## 3.10.7
+
+- The Bulldoze card has a **Drag clears** choice. **One kind** (the default) keeps a drag to the kind of thing it started on; **Everything** lets one drag clear all it crosses. On a phone the choice sits in a strip over the tower while the bulldozer is armed.
+- A bulldoze drag now removes only the kind of thing it started on, so sweeping across a floor no longer takes out the elevator or the rooms it crosses. A single click still removes anything.
+
 ## 3.10.6
 
 - Fast food, restaurants and food halls now show only the diners who are actually inside, and a quiet one looks quiet. They used to draw a full room whenever they were open.
