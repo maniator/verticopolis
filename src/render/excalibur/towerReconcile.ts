@@ -217,11 +217,13 @@ export function syncFacade(engine: TowerEngine): void {
   // Above-ground silhouette + top-row tiles in ONE pass over the units:
   // escape stairs read the per-floor edges, the crane reads the top row's
   // built columns. (Every story of a multi-floor room counts, so a two-story
-  // cinema at the edge still gets stairs on its upper row.)
-  const hi = engine.sim.tower.highestFloor;
-  const { runs, topTiles } = facadeGeometry(engine.sim.tower.units, hi, towerCatalog(engine.sim));
+  // cinema at the edge still gets stairs on its upper row, and so does every
+  // raised story of a tall lobby hall.)
+  const tower = engine.sim.tower;
+  const hi = tower.highestFloor;
+  const { runs, topFloor, topTiles } = facadeGeometry(tower.units, hi, towerCatalog(engine.sim), tower.tallLobbies());
   syncEscapes(engine, runs);
-  syncCrane(engine, hi, topTiles);
+  syncCrane(engine, topFloor, topTiles);
 }
 
 /** Reconcile the exterior facade segments hung off both sides of each run of
