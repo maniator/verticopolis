@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { DEV_SKIP_MARKER, ENGINE_BUILD_RECORD, ENGINE_DIR, ENGINE_GLUE, ENGINE_WASM } from "../wasmhost/enginePackageNames";
 import { engineBuildRecord } from "../wasmhost/enginePackageRecord";
-import { ENGINE_REVISION_SUFFIX, INTEGRITY_FILES, engineDistProblems, engineRevision, entryWithIntegrity, precacheIntegrityTransform, integrityOf, manifestIntegrity, manifestIntegrityProblems, manifestRevisions, readExpectedPackage, revisionsOf, shellProblems, shellRevisionProblems } from "./enginePackageBuild";
+import { ENGINE_REVISION_SUFFIX, INTEGRITY_FILES, engineDistProblems, engineRevision, entryWithIntegrity, pageLastTransform, precacheIntegrityTransform, integrityOf, manifestIntegrity, manifestIntegrityProblems, manifestRevisions, readExpectedPackage, revisionsOf, shellProblems, shellRevisionProblems } from "./enginePackageBuild";
 
 const sha = (d: Uint8Array | string) => createHash("sha256").update(d).digest("hex");
 const md5 = (d: Uint8Array | string) => createHash("md5").update(d).digest("hex");
@@ -67,6 +67,21 @@ describe("readExpectedPackage", () => {
   it("gives a dev serve or a test null even for a good record", () => {
     expect(readExpectedPackage(pkg(), "other")).toBeNull();
     expect(readExpectedPackage(pkg({ record: null }), "other")).toBeNull();
+  });
+});
+
+describe("pageLastTransform (#1949)", () => {
+  it("moves the page after every other file and keeps their order", () => {
+    const entries = ["splash.svg", "./index.html", "assets/main-1.js", "engine/BUILD.json", "assets/vendor-1.js"].map((url) => ({ url, revision: null, size: 1 }));
+    const { manifest, warnings } = pageLastTransform(entries);
+    expect(manifest.map((e) => e.url)).toEqual(["splash.svg", "assets/main-1.js", "engine/BUILD.json", "assets/vendor-1.js", "./index.html"]);
+    expect(manifest[4], "the entry itself is kept").toBe(entries[1]);
+    expect(warnings).toEqual([]);
+  });
+
+  it("leaves a manifest without the page as it was", () => {
+    const entries = [{ url: "a.js", revision: null, size: 1 }];
+    expect(pageLastTransform(entries).manifest).toEqual(entries);
   });
 });
 
