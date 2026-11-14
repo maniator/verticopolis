@@ -83,13 +83,13 @@ pub struct Tower {
     pub allows_escalator_on_office_floors: bool,
     /// The rule set the tower was founded under (`tower.rules.mode`).
     pub mode: GameMode,
-    pub(crate) structure: HashMap<(i64, i64), i64>,
-    pub(crate) struct_kind: HashMap<(i64, i64), Kind>,
-    pub(crate) rooms: HashMap<(i64, i64), i64>,
+    pub(crate) structure: FastMap<(i64, i64), i64>,
+    pub(crate) struct_kind: FastMap<(i64, i64), Kind>,
+    pub(crate) rooms: FastMap<(i64, i64), i64>,
     /// Unit id to its index in `units` (`FastMap`: never iterated).
     pub(crate) by_id: FastMap<i64, usize>,
     /// `transportsById`: shaft id to its index in `transports`.
-    pub(crate) transport_by_id: HashMap<i64, usize>,
+    pub(crate) transport_by_id: FastMap<i64, usize>,
     /// Lobby tiles counted by the floor they are laid on. Ordered, so a walk
     /// over the lobby floors is the same on every run.
     pub(crate) lobby_tiles: BTreeMap<i64, i64>,
@@ -152,11 +152,11 @@ impl Tower {
             revision: 0,
             allows_escalator_on_office_floors: false,
             mode: GameMode::Classic,
-            structure: HashMap::new(),
-            struct_kind: HashMap::new(),
-            rooms: HashMap::new(),
+            structure: FastMap::default(),
+            struct_kind: FastMap::default(),
+            rooms: FastMap::default(),
             by_id: FastMap::default(),
-            transport_by_id: HashMap::new(),
+            transport_by_id: FastMap::default(),
             lobby_tiles: BTreeMap::new(),
             tall_lobby_tiles: BTreeMap::new(),
             requested_lobby_height: 1,

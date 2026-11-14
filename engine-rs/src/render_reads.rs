@@ -4,7 +4,7 @@
 //! in `crowd/routing.ts`). The renderer reads the fills once per scene sync
 //! and the queue once per frame.
 
-use indexmap::IndexMap;
+use crate::crowd::fasthash::FastIndexMap;
 
 use crate::crowd::{Crowd, PState, STRESS_WAIT};
 use crate::facilities::Kind;
@@ -24,7 +24,7 @@ pub struct QueueLanding {
 /// shaft then car index, in tower order.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct QueueView {
-    pub landings: IndexMap<i64, IndexMap<i64, QueueLanding>>,
+    pub landings: FastIndexMap<i64, FastIndexMap<i64, QueueLanding>>,
     pub boarded: Vec<(i64, Vec<i64>)>,
 }
 
@@ -110,7 +110,8 @@ impl Crowd {
     /// the transports for the cars. A landing counts only an elevator's
     /// waiters on a floor it stops at, and on a staff-only shaft only staff.
     fn build_queue_view(&self, tower: &Tower) -> QueueView {
-        let mut landings: IndexMap<i64, IndexMap<i64, QueueLanding>> = IndexMap::new();
+        let mut landings: FastIndexMap<i64, FastIndexMap<i64, QueueLanding>> =
+            FastIndexMap::default();
         for p in &self.people {
             let Some(shaft_id) = p.shaft_id else { continue };
             if p.state != PState::Waiting {

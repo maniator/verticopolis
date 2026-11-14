@@ -12,7 +12,8 @@
 //! `catalog::charge_tests::a_maintenance_period_charges_the_quoted_upkeep`,
 //! and the unsold condo's hold tax and overhead (a sold one exempt) by
 //! `catalog::charge_tests::overhead_and_the_condo_hold_tax_follow_the_quote`.
-use std::collections::{BTreeSet, HashMap};
+use crate::crowd::fasthash::FastMap;
+use std::collections::BTreeSet;
 
 use crate::crowd::ElevatorCalls;
 use crate::dispatch::ElevatorDispatch;
@@ -101,7 +102,7 @@ fn idle_cars_park_at_the_lobby_with_no_demand() {
 fn a_real_waiting_person_is_served_with_no_statistical_demand() {
     let (mut tower, id) = tower_with_elevator(10);
     let mut calls = ElevatorCalls::default();
-    calls.hall.insert(id, HashMap::from([(7, 1.0)]));
+    calls.hall.insert(id, FastMap::from_iter([(7, 1.0)]));
     let mut d = ElevatorDispatch::new();
     let mut served = false;
     for _ in 0..100 {
@@ -121,10 +122,10 @@ fn a_cars_own_rider_stop_is_served_when_another_car_claims_the_floor() {
     // Car 1 carries a rider bound for floor 9, which is also a hall call that
     // car 0 (moved first each step) would otherwise claim every step.
     let mut calls = ElevatorCalls::default();
-    calls.hall.insert(id, HashMap::from([(9, 1.0)]));
+    calls.hall.insert(id, FastMap::from_iter([(9, 1.0)]));
     calls
         .cab
-        .insert(id, HashMap::from([(1, BTreeSet::from([9]))]));
+        .insert(id, FastMap::from_iter([(1, BTreeSet::from([9]))]));
     let mut d = ElevatorDispatch::new();
     let mut delivered = false;
     for _ in 0..100 {

@@ -295,8 +295,11 @@ fn a_rider_whose_floor_stops_being_a_stop_steps_out_of_the_trip() {
         sim.crowd.people.iter().all(|p| p.id != id),
         "the rider left the car that can no longer let them off"
     );
+    let seated = |t: &crate::tower::Transport| {
+        (0..t.cars).any(|i| sim.crowd.car_riders.get(&(t.id, i)).is_some_and(|&n| n > 0))
+    };
     assert!(
-        sim.crowd.car_riders.values().all(|&n| n == 0),
+        !sim.tower.transports.iter().any(seated),
         "the rider gave up their seat"
     );
 }

@@ -24,6 +24,11 @@
 //! `FastMap` and `FastSet` offer no iteration: their order would follow the
 //! hash, so a result that read it could differ between builds. `FastMap`
 //! inserts, looks up, removes and clears; `FastSet` adds and looks up.
+//!
+//! `FastIndexMap` is an `IndexMap` keyed with `FastHasher`. It walks in the
+//! order its keys went in, whatever the hash, so it may be iterated. The
+//! tower's tile maps and the landing lines use these (#2214): the morning
+//! rush asks them a few million times a game day.
 
 use std::collections::{HashMap, HashSet};
 use std::hash::{BuildHasherDefault, Hash, Hasher};
@@ -104,6 +109,9 @@ impl Hasher for FastHasher {
 
 type Build = BuildHasherDefault<FastHasher>;
 
+/// An `IndexMap` keyed with `FastHasher`: it walks in insertion order.
+pub type FastIndexMap<K, V> = indexmap::IndexMap<K, V, Build>;
+
 /// A map keyed with `FastHasher` that can only be written and looked up.
 pub struct FastMap<K, V>(HashMap<K, V, Build>);
 
@@ -150,10 +158,16 @@ impl<K: Hash + Eq, V> FastMap<K, V> {
         self.0.clear()
     }
 
-    /// For tests that check an index against its list.
-    #[cfg(test)]
+    /// For checks that an index matches its list (tests, and debug builds'
+    /// asserts).
     pub(crate) fn len(&self) -> usize {
         self.0.len()
+    }
+}
+
+impl<K: Hash + Eq, V> FromIterator<(K, V)> for FastMap<K, V> {
+    fn from_iter<I: IntoIterator<Item = (K, V)>>(entries: I) -> Self {
+        Self(entries.into_iter().collect())
     }
 }
 

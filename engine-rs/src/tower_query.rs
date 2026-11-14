@@ -352,7 +352,7 @@ impl Tower {
             let mut memo = self.memo.borrow_mut();
             match &memo.segs {
                 Some((built, _)) if *built == key => {}
-                _ => memo.segs = Some((key, HashMap::new())),
+                _ => memo.segs = Some((key, Default::default())),
             }
             if let Some(v) = memo.segs.as_ref().unwrap().1.get(&floor) {
                 return v.clone();

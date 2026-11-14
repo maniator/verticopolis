@@ -8,7 +8,8 @@
 //! moving cars. And a car that ended a move within 0.05 of its target never
 //! arrived: the stop search looks past a stop that near, so the car turned
 //! away or ran on without dwelling.
-use std::collections::{BTreeSet, HashMap};
+use crate::crowd::fasthash::FastMap;
+use std::collections::BTreeSet;
 
 use crate::clock::GameMode;
 use crate::crowd::motion::advance;
@@ -51,7 +52,7 @@ fn place_car(sim: &mut Simulation, id: i64, pos: f64, dir: i64) {
 /// A cab call to `floor` for car 0 of shaft `id`, and nothing else.
 fn cab_call(id: i64, floor: i64) -> ElevatorCalls {
     let mut calls = ElevatorCalls::default();
-    let cab = HashMap::from([(0, BTreeSet::from([floor]))]);
+    let cab = FastMap::from_iter([(0, BTreeSet::from([floor]))]);
     calls.cab.insert(id, cab);
     calls
 }
@@ -139,7 +140,7 @@ fn a_car_ending_a_move_a_hair_short_of_its_stop_lands_on_it() {
     // would turn it around if it ever looked past 3.
     place_car(&mut sim, id, 2.9, 1);
     let mut calls = cab_call(id, 3);
-    calls.hall.insert(id, HashMap::from([(2, 3.0)]));
+    calls.hall.insert(id, FastMap::from_iter([(2, 3.0)]));
     let mut d = ElevatorDispatch::new();
     // A step that covers 0.06 of the 0.1 left: moved by that much, the car
     // would stop 0.04 short, inside the search's reach, and never arrive.

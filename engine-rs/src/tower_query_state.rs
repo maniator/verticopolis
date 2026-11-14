@@ -14,7 +14,10 @@ pub struct Memo {
     pub served: Option<(i64, HashSet<i64>)>,
     pub stops: HashMap<i64, (i64, Vec<i64>)>,
     /// Each floor's runs, keyed like the tile index they are built from.
-    pub segs: Option<(crate::tower_index::IndexKey, HashMap<i64, Vec<(i64, i64)>>)>,
+    pub segs: Option<(
+        crate::tower_index::IndexKey,
+        crate::crowd::fasthash::FastMap<i64, Vec<(i64, i64)>>,
+    )>,
     pub staff: Option<(i64, HashMap<i64, i64>)>,
     pub cols: Option<(i64, HashMap<i64, Vec<(i64, i64)>>)>,
     pub tiles: Option<(crate::tower_index::IndexKey, crate::tower_index::FloorTiles)>,
@@ -45,6 +48,13 @@ pub struct Memo {
         std::sync::Arc<crate::tower_index::FloorRooms>,
     )>,
     pub floors: crate::tower_index::FloorsMemo,
+    /// Each landing's waiting line (`crowd::landing::line_at`), keyed by the
+    /// shaft's x and width and the floor, per edit: the built floor it
+    /// measures changes only with an edit (#2214).
+    pub landing_lines: Option<(
+        crate::tower_index::IndexKey,
+        crate::crowd::fasthash::FastMap<(i64, i64, i64), crate::crowd::landing::Line>,
+    )>,
     /// The tall lobby halls (`Tower::tall_lobby_runs`), per revision (#2068).
     pub tall_runs: Option<(i64, std::sync::Arc<[crate::tower::HallRun]>)>,
 }

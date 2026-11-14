@@ -439,8 +439,14 @@ fn a_stood_down_car_finishes_its_riders_and_takes_no_more() {
     // answers no hall call on the way, and stays closed to boarding.
     let start = sim.tower.transports[0].car_positions[1];
     let mut calls = ElevatorCalls::default();
-    calls.cab.entry(id).or_default().insert(1, [4].into());
-    calls.hall.entry(id).or_default().insert(2, 5.0);
+    calls
+        .cab
+        .get_or_insert_with(id, Default::default)
+        .insert(1, [4].into());
+    calls
+        .hall
+        .get_or_insert_with(id, Default::default)
+        .insert(2, 5.0);
     for _ in 0..3 {
         sim.elevators
             .move_cars(&mut sim.tower, 1.0, &calls, 12, false);

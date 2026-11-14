@@ -218,7 +218,14 @@ fn a_staff_call_reaches_only_the_shaft_the_maid_uses() {
     maid.state = PState::Waiting;
     let used = maid.shaft_id.unwrap();
     let calls = sim.crowd.elevator_calls(&sim.tower);
-    assert_eq!(calls.hall.keys().copied().collect::<Vec<_>>(), vec![used]);
+    for t in &sim.tower.transports {
+        assert_eq!(
+            calls.hall.contains_key(&t.id),
+            t.id == used,
+            "shaft {}",
+            t.id
+        );
+    }
     let services: Vec<i64> = sim
         .tower
         .transports
