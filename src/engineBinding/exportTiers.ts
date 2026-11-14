@@ -320,6 +320,8 @@ export const BINDING_EXPORT_TIERS = {
   // The tooling harnesses' bare placements (src/game/toolingTower.ts, #1875 step 4).
   placeBare: T3,
   placeTransportBare: T3,
+  // The save as the conformance hashes read it, every floor tile on its own.
+  serializeUnfolded: T3,
 } as const satisfies Record<BindingExport, TierEntry>;
 
 /** The exports wasm-bindgen writes itself, which the Rust sources never name. */

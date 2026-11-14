@@ -361,6 +361,9 @@ export interface SerializedUnit extends Omit<Unit, "width" | "state" | "satisfac
   everOccupied?: boolean;
   pendingIncome?: number;
   label?: string;
+  /** Version 11: on a plain floor tile, how many tiles in a row this entry
+   *  stands for, with the next ids (see `shared/floorRuns`). */
+  run?: number;
 }
 
 /** One bulletin-log line. Lives here (not in Simulation.ts) because the save

@@ -31,7 +31,12 @@ describe.skipIf(!hasWasmPackage())("rollback rehearsal on the real engine", () =
 
   it("makes a candidate-written save from a vctower and from an original .TDT", () => {
     expect(saves.map((s) => s.name).sort()).toEqual([...ONLY].sort());
-    for (const s of saves) expect(JSON.parse(s.text)).toMatchObject({ version: 7, units: expect.any(Array) });
+    // A tower with a floor row in id order is written with floor runs
+    // (version 11); one with none keeps the plain stamp (7).
+    const versions = saves.map((s) => (JSON.parse(s.text) as { version: number }).version);
+    for (const s of saves) expect(JSON.parse(s.text), s.name).toMatchObject({ units: expect.any(Array) });
+    expect(versions.every((v) => v === 7 || v === 11), versions.join()).toBe(true);
+    expect(versions).toContain(11);
   });
 
   it("passes when the previous engine is the same build", () => {

@@ -82,7 +82,8 @@ export function wasmFxSlots(handle: WasmEngine): Record<FxSlot, number> {
  *  The sequence is the frame header's `logSeq`, read through the host's own decoder. */
 export function wasmCheckpointDetail(handle: WasmEngine): Omit<CheckpointDetail, "label"> {
   const entries = JSON.parse(handle.logSince(LOG_FROM_START)) as LogEntry[];
-  const save = JSON.parse(handle.serialize()) as Record<string, unknown>;
+  // Every floor tile on its own, as the native detail hashes it.
+  const save = JSON.parse(handle.serializeUnfolded()) as Record<string, unknown>;
   return {
     money: handle.money(),
     log: {

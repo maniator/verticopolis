@@ -20,12 +20,13 @@ async function browserDigest(save: unknown): Promise<string> {
   return digestStashed("k");
 }
 
-/** The engine's save and state digest for `save`, after `steps` two-minute ticks. */
+/** The engine's save (every floor tile on its own, as the harness stashes
+ *  it) and state digest for `save`, after `steps` two-minute ticks. */
 function engineOn(save: string, steps = 0): { save: unknown; digest: string } {
   const engine = wasm().Engine.fromSave(save);
   try {
     for (let i = 0; i < steps; i++) engine.tick(2);
-    return { save: JSON.parse(engine.serialize()), digest: engine.stateDigest() };
+    return { save: JSON.parse(engine.serializeUnfolded()), digest: engine.stateDigest() };
   } finally {
     engine.free();
   }
@@ -69,7 +70,7 @@ describe("stashSave", () => {
       const e = wasm().Engine.newGame(3, "modern");
       try {
         expect(e.loadSave(text)[0]).toBe(1);
-        return JSON.parse(e.serialize());
+        return JSON.parse(e.serializeUnfolded());
       } finally {
         e.free();
       }

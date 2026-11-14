@@ -13,5 +13,5 @@ export const TOOLING_METHODS = [
   "setMoney", "setCars", "resizeTransport", "removeUnit", "removeTransport", "startFire",
   "bombThreat", "evaluateStar", "setClock", "setUnitState", "setCustomersIn", "setWeather",
   "clearRetailTallies", "startFireAt", "vacateUnit", "setUnitRent", "advanceClock",
-  "seedLoopMemos", "seedElevatorTelemetry", "placeBare", "placeTransportBare",
+  "seedLoopMemos", "seedElevatorTelemetry", "placeBare", "placeTransportBare", "serializeUnfolded",
 ] as const;
