@@ -39,6 +39,7 @@ function makePorts() {
     },
     editor: { handleEditAction: vi.fn(), renameTower: vi.fn(async () => {}) },
     inspector: { dismiss: vi.fn() },
+    personCard: { handleAction: vi.fn((action: string) => action === "person:follow") },
     handleSelectTool: vi.fn(),
     setSpeed: vi.fn(),
     getSpeed: vi.fn(() => 1),
@@ -147,7 +148,16 @@ describe("createUICallbacks delegates every callback to its port", () => {
     const cb = createUICallbacks(ports);
     const root = document.createElement("div");
     cb.onEditAction("rename", root);
+    expect(ports.personCard.handleAction).toHaveBeenCalledWith("rename");
     expect(ports.editor.handleEditAction).toHaveBeenCalledWith("rename", root);
+  });
+
+  it("a person card button stays with the person card", () => {
+    const { ports } = makePorts();
+    const cb = createUICallbacks(ports);
+    cb.onEditAction("person:follow", document.createElement("div"));
+    expect(ports.personCard.handleAction).toHaveBeenCalledWith("person:follow");
+    expect(ports.editor.handleEditAction).not.toHaveBeenCalled();
   });
 
   it("prefs toggles pass their new state through", () => {

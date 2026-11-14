@@ -277,7 +277,7 @@ function pointerUp(engine: TowerEngine, ev: ex.PointerEvent, how: "release" | "c
   if (engine.gesture === "pan") {
     // Touch taps jitter more than mouse clicks, so allow a larger slop.
     if (engine.moved < (engine.downTouch ? 14 : 5) && how === "release") {
-      engine.onTap?.(tile, floor, ev.pointerType === "Touch", pickEntityAt(engine, ev.worldPos));
+      engine.onTap?.(tile, floor, ev.pointerType === "Touch", pickEntityAt(engine, ev.worldPos), ev.worldPos);
     }
   } else if (engine.gesture === "action") {
     if (how === "cancel") engine.onActionCancel?.();
