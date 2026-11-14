@@ -2,7 +2,15 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { marked } from "marked";
-import { allReleaseNotes, escapeMarkdown, notesForVersion, recentReleaseNotes, releaseNoteLines } from "./changelog";
+import {
+  allReleaseNotes,
+  contributorsForVersion,
+  escapeMarkdown,
+  notesForVersion,
+  recentReleaseNotes,
+  releaseCreditLines,
+  releaseNoteLines,
+} from "./changelog";
 import { MAX_NOTES, MAX_NOTE_LEN, MAX_RELEASES } from "./pwaUpdateInfo";
 
 /**
@@ -299,5 +307,63 @@ Prose between two lists.
     for (const r of all) {
       expect(r.notes).toEqual(notesForVersion(real, r.version, { maxNotes: Infinity, maxLen: Infinity }));
     }
+  });
+});
+
+describe("contributors", () => {
+  const CREDITED = `# Changelog
+
+## 4.0.0
+
+- A menu bar replaces the sidebar.
+
+### Contributors
+
+- Sam reported the Esc discard guard (#670).
+- @trvorth extended the room-capacity sweep (#2198).
+
+## 3.12.3
+
+- Old note.
+`;
+
+  it("reads the Contributors list of the matching section only", () => {
+    expect(contributorsForVersion(CREDITED, "4.0.0")).toEqual(["Sam reported the Esc discard guard (#670).", "@trvorth extended the room-capacity sweep (#2198)."]);
+    expect(contributorsForVersion(CREDITED, "3.12.3")).toEqual([]);
+  });
+
+  it("keeps the credits out of the update prompt's notes", () => {
+    expect(notesForVersion(CREDITED, "4.0.0")).toEqual(["A menu bar replaces the sidebar."]);
+  });
+
+  it("gives the release notes page each version's credits", () => {
+    expect(allReleaseNotes(CREDITED)).toEqual([
+      { version: "4.0.0", notes: ["A menu bar replaces the sidebar."], contributors: ["Sam reported the Esc discard guard (#670).", "@trvorth extended the room-capacity sweep (#2198)."] },
+      { version: "3.12.3", notes: ["Old note."] },
+    ]);
+  });
+
+  it("never reads a credits-only section's list as its notes", () => {
+    const creditsOnly = "# Changelog\n\n## 4.0.1\n\n### Contributors\n\n- Sam helped.\n\n## 4.0.0\n\n- A note.\n";
+    expect(notesForVersion(creditsOnly, "4.0.1")).toEqual([]);
+    expect(contributorsForVersion(creditsOnly, "4.0.1")).toEqual(["Sam helped."]);
+    expect(allReleaseNotes(creditsOnly)).toEqual([{ version: "4.0.0", notes: ["A note."] }]);
+  });
+
+  it("reads an older section's notes, not credits, below a credited one", () => {
+    expect(notesForVersion(CREDITED, "3.12.3")).toEqual(["Old note."]);
+    expect(recentReleaseNotes(CREDITED, "4.0.0", 10).map((r) => r.version)).toEqual(["4.0.0", "3.12.3"]);
+    const twoCredited = CREDITED.replace("- Old note.\n", "- Old note.\n\n### Contributors\n\n- Ana helped.\n\n## 3.12.2\n\n- Older note.\n");
+    expect(contributorsForVersion(twoCredited, "3.12.3")).toEqual(["Ana helped."]);
+    expect(contributorsForVersion(twoCredited, "3.12.2")).toEqual([]);
+    expect(notesForVersion(twoCredited, "3.12.2")).toEqual(["Older note."]);
+  });
+
+  it("prints escaped credit lines for the GitHub release, so no name pings anyone", () => {
+    const lines = releaseCreditLines(CREDITED, "4.0.0");
+    expect(lines.slice(0, 3)).toEqual(["", "### Contributors", ""]);
+    expect(lines[4]).toBe(`- ${escapeMarkdown("@trvorth extended the room-capacity sweep (#2198).")}`);
+    expect(lines[4]).not.toContain("@trvorth");
+    expect(releaseCreditLines(CREDITED, "3.12.3")).toEqual([]);
   });
 });

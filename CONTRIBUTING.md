@@ -595,6 +595,12 @@ version. A note already on `main` belongs to the PR that merged it, so a
 follow-up from the same branch name adds `.changes/<branch-slug>-2.md` (the
 version check refuses an edit to a pending note outside a release PR).
 
+Credit the people outside the project who helped. When a PR comes from a
+community author, fixes an issue someone outside the project reported, or
+uses someone's testing, its note adds a `## Contributors` line naming them
+and what they did. The release lists those credits under the version's notes
+on the GitHub release and on the help site's release notes page.
+
 The release driver cuts a release:
 
 1. Branch `release/<version>` off an up-to-date `main`.

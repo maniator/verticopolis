@@ -11,6 +11,8 @@
  *     - Elevators now skip floors with nobody waiting.
  *     ## Engine
  *     - (only when `crate` is not none) what changed in the engine's contract.
+ *     ## Contributors
+ *     - (optional, any level) who to thank and for what.
  *
  * `app` and `crate` take `major`, `minor`, `patch` or `none`, by the tier rules
  * in CONTRIBUTING.md "Versioning". `readmes: unchanged` says the PR changes the
@@ -47,15 +49,20 @@ export interface ChangeNote {
   player: string[];
   /** Lines for `engine-rs/CHANGELOG.md`. */
   engine: string[];
+  /** Who to thank in the release notes: a community author, reporter or
+   *  tester, by the name they go by, and what they did. */
+  contributors: string[];
   /** `readmes: unchanged`: the engine READMEs were checked and still hold. */
   readmesUnchanged?: boolean;
 }
 
 /** A note's file name: a branch slug, lower case, ending in `.md`. */
 const NOTE_NAME = /^[a-z0-9][a-z0-9._-]*\.md$/;
-const SECTIONS = new Map<string, "player" | "engine">([
+type Section = "player" | "engine" | "contributors";
+const SECTIONS = new Map<string, Section>([
   ["## Player", "player"],
   ["## Engine", "engine"],
+  ["## Contributors", "contributors"],
 ]);
 const EM_DASH = "—";
 
@@ -95,9 +102,9 @@ export function parseNote(text: string, file: string): ChangeNote {
   }
   if (levels.app === undefined) fail("the front matter has no app level");
   if (levels.crate === undefined) fail("the front matter has no crate level");
-  const note: ChangeNote = { file, app: levels.app as Level, crate: levels.crate as Level, player: [], engine: [] };
+  const note: ChangeNote = { file, app: levels.app as Level, crate: levels.crate as Level, player: [], engine: [], contributors: [] };
   if (readmesUnchanged) note.readmesUnchanged = true;
-  let section: "player" | "engine" | null = null;
+  let section: Section | null = null;
   const seen = new Set<string>();
   for (const raw of lines.slice(close + 1)) {
     const line = raw.trimEnd();
@@ -109,12 +116,12 @@ export function parseNote(text: string, file: string): ChangeNote {
       section = heading;
       continue;
     }
-    if (section === null) fail(`"${line}" comes before a "## Player" or "## Engine" heading`);
+    if (section === null) fail(`"${line}" comes before a "## Player", "## Engine" or "## Contributors" heading`);
     if (!line.startsWith("- ") || line.trim() === "-") fail(`"${line}" is not a one-line "- " bullet`);
     const bullet = line.slice(2).trim();
     if (!bullet.endsWith(".")) fail(`"${bullet}" does not end with a period`);
     if (bullet.includes(EM_DASH)) fail(`"${bullet}" has an em-dash`);
-    note[section as "player" | "engine"].push(bullet);
+    note[section as Section].push(bullet);
   }
   if (note.app === "none" && note.player.length > 0) fail("Player lines need an app level other than none");
   if (note.crate === "none" && note.engine.length > 0) fail("Engine lines need a crate level other than none");
@@ -156,15 +163,33 @@ export function changelogVersions(changelog: string): string[] {
 }
 
 /**
- * The changelog with a new section above the newest one. `heading` is the text
- * after `## `; it must name a version the file does not have yet.
+ * The notes a release must keep because their credits went nowhere: when the
+ * app does not move, CHANGELOG.md gets no section, so a note that moves
+ * neither version and credits someone waits for the next app release.
  */
-export function insertSection(changelog: string, heading: string, bullets: readonly string[]): string {
+export function notesKeptForCredits(notes: readonly ChangeNote[], appMoved: boolean): ChangeNote[] {
+  if (appMoved) return [];
+  return notes.filter((n) => n.crate === "none" && n.contributors.length > 0);
+}
+
+/** The notes' Contributors lines, each once, in note order. */
+export function contributorLines(notes: readonly ChangeNote[]): string[] {
+  return [...new Set(notes.flatMap((n) => n.contributors))];
+}
+
+/**
+ * The changelog with a new section above the newest one. `heading` is the text
+ * after `## `; it must name a version the file does not have yet. `credits`
+ * go under a `### Contributors` heading after the bullets, so the update
+ * prompt, which reads only the section's first list, never shows them.
+ */
+export function insertSection(changelog: string, heading: string, bullets: readonly string[], credits: readonly string[] = []): string {
   const version = /^\d+\.\d+\.\d+/.exec(heading)?.[0];
   if (!version) throw new Error(`"${heading}" does not start with a version`);
   if (changelogVersions(changelog).includes(version)) throw new Error(`the changelog already has a ${version} section`);
   const eol = changelog.includes("\r\n") ? "\r\n" : "\n";
-  const section = [`## ${heading}`, "", ...bullets.map((b) => `- ${b}`), "", ""].join(eol);
+  const thanks = credits.length > 0 ? ["### Contributors", "", ...credits.map((c) => `- ${c}`), ""] : [];
+  const section = [`## ${heading}`, "", ...bullets.map((b) => `- ${b}`), "", ...thanks, ""].join(eol);
   const at = changelog.search(/^## /m);
   if (at < 0) return `${changelog.replace(/\s*$/, "")}${eol}${eol}${section}`;
   return changelog.slice(0, at) + section + changelog.slice(at);
