@@ -25,12 +25,14 @@ impl Simulation {
         if self.walkers_on(floor, cols.clone()) {
             return ChargeResult::refuse(PEOPLE_CROSSING);
         }
-        let mut refund = 0.0;
-        for id in self.tower.units_on(floor, cols) {
-            if let Some(u) = self.tower.get_unit(id) {
-                refund += self.tower.sale_refund(u);
-            }
-            self.tower.remove_unit(id);
+        let ids = self.tower.units_on(floor, cols);
+        let refund: f64 = ids
+            .iter()
+            .filter_map(|&id| self.tower.get_unit(id))
+            .map(|u| self.tower.sale_refund(u))
+            .sum();
+        // One batch removal reindexes the tower once for the whole bridge.
+        for _ in self.tower.remove_units(&ids) {
             self.gameplay.push(GameplayEvent::FacilityRemoved {
                 kind: Kind::Lobby,
                 method,
