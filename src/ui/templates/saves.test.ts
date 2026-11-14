@@ -1,6 +1,6 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import type { SlotInfo } from "../../storage/SaveGame";
-import { savesTemplate } from "./saves";
+import { replaceSlotTemplate, savesTemplate, type SavesGuard } from "./saves";
 import { renderToFragment } from "../testing/litTestUtils";
 
 /**
@@ -145,5 +145,79 @@ describe("savesTemplate population", () => {
     const row = renderToFragment(savesTemplate(slots)).querySelector(".slot")!;
     expect(row.textContent).not.toContain("pop");
     expect(row.textContent).toContain("$5,000");
+  });
+});
+
+describe("savesTemplate overwrite guard", () => {
+  const filled = (slot: number, towerName: string): SlotInfo => ({ slot, exists: true, present: true, towerName, star: 2, funds: 1000, savedAt: AT });
+  const guard = (over: Partial<SavesGuard> = {}): SavesGuard => ({ home: null, liveName: "Live", undo: null, ...over });
+
+  it("tags the live tower's own slot and keeps its Save one click", () => {
+    const frag = renderToFragment(savesTemplate([filled(1, "Mine"), filled(2, "Other")], false, guard({ home: 1 })));
+    const [mine, other] = [...frag.querySelectorAll(".slot")];
+    expect(mine.querySelector(".slot-tag")?.textContent).toBe("This tower");
+    const save = mine.querySelector('[data-save="1"]')!;
+    expect(save.textContent).toBe("Save");
+    expect(save.classList.contains("primary")).toBe(true);
+    expect(other.querySelector(".slot-tag")).toBeNull();
+  });
+
+  it("says Replace… on every other occupied slot, and plain Save on an empty one", () => {
+    const frag = renderToFragment(savesTemplate([filled(1, "Mine"), filled(2, "Other"), { slot: 3, exists: false, present: false }], false, guard({ home: 1 })));
+    const replace = frag.querySelector('[data-save="2"]')!;
+    expect(replace.textContent).toBe("Replace…");
+    expect(replace.getAttribute("aria-label")).toBe("Replace the tower in Slot 2");
+    expect(frag.querySelector('[data-save="3"]')!.textContent).toBe("Save");
+  });
+
+  it("with no home slot known, every occupied slot says Replace… and none is tagged", () => {
+    const frag = renderToFragment(savesTemplate([filled(1, "A"), filled(2, "B")]));
+    expect([...frag.querySelectorAll("[data-save]")].map((b) => b.textContent)).toEqual(["Replace…", "Replace…"]);
+    expect(frag.querySelector(".slot-tag")).toBeNull();
+  });
+
+  it("shows the Undo line naming the tower and the slot, only when there is one", () => {
+    expect(renderToFragment(savesTemplate([filled(1, "A")], false, guard())).querySelector('[data-act="undo"]')).toBeNull();
+    const replaced = renderToFragment(
+      savesTemplate([filled(1, "A")], false, guard({ undo: { slot: 1, towerName: "Old <b>One</b>", action: "replaced", run: vi.fn() } })),
+    );
+    expect(replaced.querySelector(".slot-undo")?.textContent).toContain("Replaced Old <b>One</b> in Slot 1.");
+    expect(replaced.querySelector(".slot-undo b")?.children).toHaveLength(0); // the name is text, not markup
+    const deleted = renderToFragment(savesTemplate([filled(1, "A")], false, guard({ undo: { slot: 2, towerName: "Gone", action: "deleted", run: vi.fn() } })));
+    expect(deleted.querySelector(".slot-undo")?.textContent).toContain("Deleted Gone from Slot 2.");
+    expect(deleted.querySelector('[data-act="undo"]')?.getAttribute("aria-label")).toBe("Undo: put Gone back in Slot 2");
+  });
+});
+
+describe("replaceSlotTemplate", () => {
+  const target: SlotInfo = { slot: 2, exists: true, present: true, towerName: "Saved Tower", star: 3, population: 1200, funds: 5000, savedAt: AT, day: 40 };
+
+  it("names both towers: the saved one with its summary, the live one by name", () => {
+    const frag = renderToFragment(replaceSlotTemplate(target, "Live Tower", { onCancel: vi.fn(), onReplace: vi.fn() }));
+    expect(frag.querySelector("h2")?.textContent).toBe("Replace Slot 2?");
+    expect(frag.querySelector(".slot-detail")?.textContent).toContain("Saved Tower");
+    expect(frag.querySelector(".slot-detail")?.textContent).toContain("Day 40");
+    expect(frag.textContent).toContain("replaces it with Live Tower, the tower you're playing now");
+    expect(frag.textContent).not.toContain("same name");
+  });
+
+  it("puts Cancel first as the default button and Replace second as the dangerous one", () => {
+    const onCancel = vi.fn();
+    const onReplace = vi.fn();
+    const frag = renderToFragment(replaceSlotTemplate(target, "Live Tower", { onCancel, onReplace }));
+    const buttons = [...frag.querySelectorAll(".modal-actions .btn")] as HTMLButtonElement[];
+    expect(buttons.map((b) => b.textContent)).toEqual(["Cancel", "Replace"]);
+    expect(buttons[0].classList.contains("primary")).toBe(true);
+    expect(buttons[1].classList.contains("danger")).toBe(true);
+    buttons[0].click();
+    expect(onCancel).toHaveBeenCalledOnce();
+    expect(onReplace).not.toHaveBeenCalled();
+    buttons[1].click();
+    expect(onReplace).toHaveBeenCalledOnce();
+  });
+
+  it("warns when the two towers share a name", () => {
+    const frag = renderToFragment(replaceSlotTemplate(target, "Saved Tower", { onCancel: vi.fn(), onReplace: vi.fn() }));
+    expect(frag.textContent).toContain("They have the same name, so check the date and population.");
   });
 });

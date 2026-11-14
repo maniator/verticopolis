@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { showSaves, saveToSlot, loadFromSlot, deleteSlot, showTowerPicker, loadFromSplash } from "./appModals";
+import { showSaves, saveToSlot, loadFromSlot, deleteSlot, showTowerPicker, loadFromSplash, undoSlot } from "./appModals";
+import { __resetSlotGuardForTest, forgetLiveTower, homeSlot, pendingUndo, rememberHome } from "../storage/slotGuard";
+import type { SavesGuard } from "../ui/templates/saves";
 import { SaveGame } from "../storage/SaveGame";
 import { makeApp, makeSim } from "./appModals.fixture";
 import { trackAppAction, trackAppActionOnce } from "../analytics";
@@ -31,11 +33,35 @@ vi.mock("../storage/SaveGame", async (importActual) => {
       load: vi.fn(),
       loadSlot: vi.fn(),
       deleteSlot: vi.fn(),
+      slotRaw: vi.fn(),
+      restoreSlotRaw: vi.fn(),
     },
   };
 });
 
+/** The manual slots' stored values, behind the mocked SaveGame's raw reads,
+ *  writes and deletes, so the real overwrite guard (`storage/slotGuard`) sees
+ *  what each command left. A slot save stores its text with a `packed:` mark. */
+const stored = new Map<number, string>();
+/** The tower name each stored slot lists under. */
+const names = new Map<number, string>();
+const store = (slot: number, raw: string, name: string): void => {
+  stored.set(slot, raw);
+  names.set(slot, name);
+};
+
 beforeEach(() => {
+  __resetSlotGuardForTest();
+  stored.clear();
+  names.clear();
+  vi.mocked(SaveGame.slotRaw).mockReset().mockImplementation((n) => stored.get(n) ?? null);
+  vi.mocked(SaveGame.restoreSlotRaw).mockReset().mockImplementation((n, raw) => void stored.set(n, raw));
+  vi.mocked(SaveGame.saveSlot).mockReset().mockImplementation((n, text) => store(n, `packed:${text}`, "Fake"));
+  vi.mocked(SaveGame.deleteSlot).mockImplementation((n) => void stored.delete(n));
+  vi.mocked(SaveGame.listSlots).mockImplementation(() => [
+    { slot: "auto", exists: false, present: false },
+    ...[...stored.keys()].map((slot) => ({ slot, exists: true, present: true, towerName: names.get(slot) })),
+  ]);
   vi.mocked(SaveGame.listSlots).mockClear();
   vi.mocked(SaveGame.saveSlot).mockClear();
   vi.mocked(SaveGame.load).mockClear();
@@ -49,9 +75,190 @@ describe("showSaves", () => {
   it("passes the SaveGame slot listing and the kept unreadable autosave to the UI", () => {
     const sim = makeSim();
     const { app, ui } = makeApp(sim);
+    vi.mocked(SaveGame.listSlots).mockReturnValueOnce([{ slot: "auto", exists: false, present: false }]);
     showSaves(app);
     expect(SaveGame.listSlots).toHaveBeenCalledTimes(1);
-    expect(ui.showSaves).toHaveBeenCalledExactlyOnceWith([{ slot: "auto", exists: false }], "VCTOWER1\nkept");
+    expect(ui.showSaves).toHaveBeenCalledExactlyOnceWith([{ slot: "auto", exists: false, present: false }], "VCTOWER1\nkept", {
+      home: null,
+      liveName: "Fake",
+      undo: null,
+      replaceTarget: expect.any(Function),
+    });
+  });
+
+  it("passes the live tower's home slot while that slot still holds what it saved", () => {
+    const { app, ui } = makeApp(makeSim());
+    saveToSlot(app, 2);
+    showSaves(app);
+    expect(ui.showSaves.mock.calls[0][2]).toMatchObject({ home: 2 });
+    store(2, "written by another tab", "Other");
+    showSaves(app);
+    expect(ui.showSaves.mock.calls[1][2]).toMatchObject({ home: null });
+  });
+
+  it("does not call a slot home when its tower has another name than the live one", () => {
+    // A reload boots the autosave, which another tab may have filled with a
+    // different tower; the remembered slot still holds this tab's old one.
+    store(1, "VCZ1:tower x", "Tower X");
+    rememberHome(1, "VCZ1:tower x");
+    const { app, ui } = makeApp(makeSim()); // the live tower is "Fake"
+    showSaves(app);
+    expect(ui.showSaves.mock.calls[0][2]).toMatchObject({ home: null });
+    saveToSlot(app, 1); // so a save there is a replace, with an Undo
+    expect(pendingUndo(SaveGame.slotRaw)).toMatchObject({ slot: 1, towerName: "Tower X", action: "replaced" });
+  });
+});
+
+describe("the overwrite guard's Undo", () => {
+  const guardShown = (ui: ReturnType<typeof makeApp>["ui"]): SavesGuard => ui.showSaves.mock.lastCall![2] as SavesGuard;
+
+  it("keeps the tower a save replaced, and Undo puts it back byte for byte", () => {
+    store(1, "VCZ1:old tower", "Old Tower");
+    const { app, ui } = makeApp(makeSim());
+    saveToSlot(app, 1);
+    expect(stored.get(1)).toBe("packed:SAVE TEXT");
+    showSaves(app);
+    const undo = guardShown(ui).undo!;
+    expect(undo).toMatchObject({ slot: 1, towerName: "Old Tower", action: "replaced" });
+    expect(undo.run()).toBe("back");
+    expect(SaveGame.restoreSlotRaw).toHaveBeenCalledExactlyOnceWith(1, "VCZ1:old tower");
+    expect(stored.get(1)).toBe("VCZ1:old tower");
+    expect(ui.toast).toHaveBeenLastCalledWith("Old Tower is back in slot 1.", "good");
+    // Used up, and the slot is no longer the live tower's.
+    expect(pendingUndo(SaveGame.slotRaw)).toBeNull();
+    expect(homeSlot(SaveGame.slotRaw)).toBeNull();
+  });
+
+  it("keeps nothing when the save goes into the live tower's own slot", () => {
+    store(1, "VCZ1:this tower earlier", "Fake");
+    rememberHome(1, "VCZ1:this tower earlier");
+    const { app } = makeApp(makeSim());
+    saveToSlot(app, 1);
+    expect(pendingUndo(SaveGame.slotRaw)).toBeNull();
+    expect(homeSlot(SaveGame.slotRaw)).toBe(1);
+  });
+
+  it("keeps nothing when the slot was empty, and the slot becomes home", () => {
+    const { app } = makeApp(makeSim());
+    saveToSlot(app, 3);
+    expect(pendingUndo(SaveGame.slotRaw)).toBeNull();
+    expect(homeSlot(SaveGame.slotRaw)).toBe(3);
+  });
+
+  it("keeps nothing and claims no home when the save fails", () => {
+    store(1, "VCZ1:old tower", "Old Tower");
+    vi.mocked(SaveGame.saveSlot).mockImplementationOnce(() => {
+      throw new DOMException("quota", "QuotaExceededError");
+    });
+    const { app } = makeApp(makeSim());
+    saveToSlot(app, 1);
+    expect(pendingUndo(SaveGame.slotRaw)).toBeNull();
+    expect(homeSlot(SaveGame.slotRaw)).toBeNull();
+  });
+
+  it("keeps a deleted tower, and Undo puts it back", () => {
+    store(2, "VCZ1:deleted tower", "Gone Tower");
+    const { app, ui } = makeApp(makeSim());
+    deleteSlot(app, 2);
+    expect(stored.has(2)).toBe(false);
+    showSaves(app);
+    expect(guardShown(ui).undo).toMatchObject({ slot: 2, towerName: "Gone Tower", action: "deleted" });
+    expect(undoSlot(app)).toBe("back");
+    expect(stored.get(2)).toBe("VCZ1:deleted tower");
+  });
+
+  it("says so inside the open dialog when storage refuses the Undo, and keeps the step", () => {
+    store(2, "VCZ1:deleted tower", "Gone Tower");
+    const { app, ui } = makeApp(makeSim());
+    deleteSlot(app, 2);
+    vi.mocked(SaveGame.restoreSlotRaw).mockImplementationOnce(() => {
+      throw new DOMException("quota", "QuotaExceededError");
+    });
+    vi.mocked(trackAppActionOnce).mockClear();
+    expect(undoSlot(app)).toBe("failed");
+    expect(ui.sayVisibly).toHaveBeenCalledExactlyOnceWith(expect.stringContaining("Save failed"));
+    expect(trackAppActionOnce).not.toHaveBeenCalled(); // an Undo is not an autosave failure
+    expect(pendingUndo(SaveGame.slotRaw)).not.toBeNull();
+  });
+
+  it("does nothing once the slot holds something else", () => {
+    store(2, "VCZ1:deleted tower", "Gone Tower");
+    const { app } = makeApp(makeSim());
+    deleteSlot(app, 2);
+    saveToSlot(app, 2); // the empty slot takes the live tower
+    expect(undoSlot(app)).toBe("gone");
+    expect(SaveGame.restoreSlotRaw).not.toHaveBeenCalled();
+    expect(stored.get(2)).toBe("packed:SAVE TEXT");
+  });
+});
+
+const guardShownOf = (ui: ReturnType<typeof makeApp>["ui"]): SavesGuard => ui.showSaves.mock.lastCall![2] as SavesGuard;
+
+describe("the guard's click-time answer", () => {
+  it("asks for a slot holding another tower, read from storage now, not from the drawn list", () => {
+    const { app, ui } = makeApp(makeSim());
+    showSaves(app); // drawn with every slot empty
+    store(3, "VCZ1:written by another tab", "Other");
+    expect(guardShownOf(ui).replaceTarget!(3)).toMatchObject({ slot: 3, towerName: "Other" });
+  });
+
+  it("answers with an unreadable row for a slot this version can't read, so the dialog never saves over it at once", () => {
+    const { app, ui } = makeApp(makeSim());
+    showSaves(app);
+    stored.set(3, "VCZ9:from a newer build"); // written since, and listed as not existing
+    vi.mocked(SaveGame.listSlots).mockReturnValueOnce([{ slot: 3, exists: false, present: true }]);
+    expect(guardShownOf(ui).replaceTarget!(3)).toEqual({ slot: 3, exists: false, present: true });
+  });
+
+  it("saves at once into an empty slot or the live tower's own", () => {
+    const { app, ui } = makeApp(makeSim());
+    saveToSlot(app, 1);
+    showSaves(app);
+    expect(guardShownOf(ui).replaceTarget!(1)).toBeNull();
+    expect(guardShownOf(ui).replaceTarget!(2)).toBeNull();
+  });
+});
+
+describe("the live tower's home slot follows loads", () => {
+  it("a manual slot load makes that slot home", () => {
+    store(2, "VCZ1:tower two", "Two");
+    vi.mocked(SaveGame.loadSlot).mockImplementationOnce((_slot, load) => load("TOWER"));
+    const { app } = makeApp(makeSim());
+    loadFromSlot(app, 2);
+    expect(homeSlot(SaveGame.slotRaw)).toBe(2);
+  });
+
+  it("an autosave load names no home: the shared autosave may hold another tower than the slot", () => {
+    // Load slot 2 (tower Y), then the Auto-save row, which still holds tower X.
+    store(2, "VCZ1:tower y", "Fake");
+    vi.mocked(SaveGame.loadSlot).mockImplementationOnce((_slot, load) => load("Y"));
+    vi.mocked(SaveGame.load).mockImplementationOnce((load) => load("X"));
+    const { app, ui, followSwap } = makeApp(makeSim());
+    followSwap.mockImplementation(() => forgetLiveTower()); // as followEngineTower does
+    loadFromSlot(app, 2);
+    expect(homeSlot(SaveGame.slotRaw)).toBe(2);
+    loadFromSlot(app, "auto");
+    expect(homeSlot(SaveGame.slotRaw)).toBeNull();
+    showSaves(app);
+    expect(guardShownOf(ui).replaceTarget!(2)).toMatchObject({ slot: 2 }); // so saving over Y asks
+  });
+
+  it("a failed load leaves the home alone", () => {
+    store(1, "VCZ1:this tower", "Fake");
+    rememberHome(1, "VCZ1:this tower");
+    store(2, "VCZ1:tower two", "Two");
+    vi.mocked(SaveGame.loadSlot).mockImplementationOnce((_slot, load) => load("BAD"));
+    const { app } = makeApp(makeSim());
+    loadFromSlot(app, 2);
+    expect(homeSlot(SaveGame.slotRaw)).toBe(1);
+  });
+
+  it("a title-screen slot load makes that slot home too", () => {
+    store(3, "VCZ1:tower three", "Three");
+    vi.mocked(SaveGame.loadSlot).mockImplementationOnce((_slot, load) => load("TOWER"));
+    const { app } = makeApp(makeSim());
+    expect(loadFromSplash(app, 3)).toBe(true);
+    expect(homeSlot(SaveGame.slotRaw)).toBe(3);
   });
 });
 
@@ -66,24 +273,26 @@ describe("saveToSlot", () => {
     expect(ui.toast).toHaveBeenCalledExactlyOnceWith("Saved to slot 2.", "good");
   });
 
-  it("surfaces a storage failure honestly: failure toast, no success toast, no escaped throw (AUD-010)", () => {
+  it("surfaces a storage failure honestly inside the open dialog: no success toast, no escaped throw (AUD-010)", () => {
     vi.mocked(SaveGame.saveSlot).mockImplementationOnce(() => {
       throw new DOMException("quota", "QuotaExceededError");
     });
     const sim = makeSim();
     const { app, ui, saveWarning } = makeApp(sim);
-    expect(() => saveToSlot(app, 2)).not.toThrow();
-    expect(ui.toast).toHaveBeenCalledExactlyOnceWith(
+    expect(saveToSlot(app, 2)).toBe(false); // so the dialog keeps the line on screen
+    // Said inside the Saved Towers dialog the save came from: its top layer
+    // would hide a toast.
+    expect(ui.sayVisibly).toHaveBeenCalledExactlyOnceWith(
       "Save failed: storage is full or blocked. Free up space or allow site storage, or export the tower to a file.",
-      "bad",
     );
+    expect(ui.toast).not.toHaveBeenCalled();
     expect(trackAppActionOnce).toHaveBeenCalledExactlyOnceWith("autosave_failed", "manual");
     // A slot is a separate copy: a full store can refuse it while the
     // autosave still fits, so a slot failure never claims the tower is unsaved.
     expect(saveWarning.show).not.toHaveBeenCalled();
   });
 
-  it("toasts every failed slot save, never raising the save-failure notice", () => {
+  it("says every failed slot save, never raising the save-failure notice", () => {
     const quota = (): never => {
       throw new DOMException("quota", "QuotaExceededError");
     };
@@ -91,7 +300,7 @@ describe("saveToSlot", () => {
     const { app, ui, saveWarning } = makeApp(makeSim());
     saveToSlot(app, 1);
     saveToSlot(app, 2);
-    expect(ui.toast).toHaveBeenCalledTimes(2);
+    expect(ui.sayVisibly).toHaveBeenCalledTimes(2);
     expect(saveWarning.show).not.toHaveBeenCalled();
   });
 
@@ -102,7 +311,7 @@ describe("saveToSlot", () => {
     const sim = makeSim();
     const { app, ui } = makeApp(sim);
     expect(() => saveToSlot(app, 4)).not.toThrow();
-    expect(ui.toast).toHaveBeenCalledExactlyOnceWith("Save failed: serialize exploded", "bad");
+    expect(ui.sayVisibly).toHaveBeenCalledExactlyOnceWith("Save failed: serialize exploded");
   });
 });
 

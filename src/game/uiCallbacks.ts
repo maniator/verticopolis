@@ -73,7 +73,7 @@ export interface GameAppPorts {
   clearBuildRefusal(): void;
   showStats(): void;
   showSaves(): void;
-  saveToSlot(slot: number): void;
+  saveToSlot(slot: number): boolean;
   loadFromSlot(slot: number | "auto"): void;
   deleteSlot(slot: number): void;
 }
