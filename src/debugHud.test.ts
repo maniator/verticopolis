@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { DEBUG_HUD_ID, DEBUG_HUD_REFRESH_MS, debugHudText, mountDebugHud, type FrameStatsLike } from "./debugHud";
+import { DEBUG_HUD_ID, DEBUG_HUD_REFRESH_MS, DEBUG_HUD_VIEW_ID, debugHudText, mountDebugHud, type FrameStatsLike } from "./debugHud";
 
 const frame = (fps: number, drawCalls: number): FrameStatsLike => ({
   fps,
@@ -48,6 +48,35 @@ describe("mounting the debug HUD (#645)", () => {
     expect(box.style.position).toBe("fixed");
     expect(box.style.pointerEvents).toBe("none");
     expect(box.getAttribute("aria-hidden")).toBe("true");
+    stop();
+  });
+
+  it("sits in the game view's bottom-left corner and follows it on refresh", () => {
+    vi.useFakeTimers();
+    const view = document.createElement("canvas");
+    view.id = DEBUG_HUD_VIEW_ID;
+    document.body.append(view);
+    const rect = { left: 180, bottom: 900, width: 1000, height: 850 };
+    vi.spyOn(view, "getBoundingClientRect").mockImplementation(() => rect as DOMRect);
+    vi.spyOn(document.documentElement, "clientHeight", "get").mockReturnValue(1000);
+    const stop = mountDebugHud(() => undefined);
+    const box = document.getElementById(DEBUG_HUD_ID)!;
+    expect([box.style.left, box.style.bottom]).toEqual(["184px", "104px"]);
+    // A phone rotating moves the view; the next refresh moves the box with it.
+    Object.assign(rect, { left: 0, bottom: 600 });
+    vi.advanceTimersByTime(DEBUG_HUD_REFRESH_MS);
+    expect([box.style.left, box.style.bottom]).toEqual(["4px", "404px"]);
+    stop();
+    vi.restoreAllMocks();
+  });
+
+  it("falls back to the page's corner while the view has no size", () => {
+    const view = document.createElement("canvas");
+    view.id = DEBUG_HUD_VIEW_ID;
+    document.body.append(view);
+    const stop = mountDebugHud(() => undefined);
+    const box = document.getElementById(DEBUG_HUD_ID)!;
+    expect([box.style.left, box.style.bottom]).toEqual(["4px", "4px"]);
     stop();
   });
 

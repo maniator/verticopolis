@@ -9,6 +9,11 @@
  * times a second. The renderer is looked up on every read, so a rebuilt engine
  * (after a lost WebGL context) or a tower opened after the title screen is
  * picked up without remounting.
+ *
+ * The box sits in the bottom-left corner of the game view (the `#view`
+ * canvas), placed again on every refresh, so on a phone, in either
+ * orientation, it covers the tower and leaves the toolbars and build palette
+ * clear.
  */
 
 /** The fields of an Excalibur frame statistics record the overlay reads. */
@@ -27,6 +32,12 @@ export const DEBUG_HUD_REFRESH_MS = 250;
 
 /** The overlay element's id. */
 export const DEBUG_HUD_ID = "debug-hud";
+
+/** The game view the overlay sits on (the canvas in src/index.html). */
+export const DEBUG_HUD_VIEW_ID = "view";
+
+/** The gap between the overlay and the view's corner, in CSS pixels. */
+const CORNER_GAP_PX = 4;
 
 /** Stops the overlay that is up, so a second mount replaces the first. */
 let stopActive: (() => void) | undefined;
@@ -61,9 +72,12 @@ export function mountDebugHud(source: StatsSource, doc: Document = document): ()
     background: "rgba(0, 0, 0, 0.7)",
     pointerEvents: "none",
     whiteSpace: "pre",
+    width: "max-content",
+    maxWidth: "none",
   });
   const refresh = (): void => {
     box.textContent = debugHudText(source()?.stats.prevFrame);
+    placeOnView(box, doc);
   };
   refresh();
   doc.body.append(box);
@@ -75,4 +89,18 @@ export function mountDebugHud(source: StatsSource, doc: Document = document): ()
   };
   stopActive = stop;
   return stop;
+}
+
+/** Move the box to the view's bottom-left corner; with no laid-out view it
+ *  stays in the page's bottom-left corner. */
+function placeOnView(box: HTMLElement, doc: Document): void {
+  const view = doc.getElementById(DEBUG_HUD_VIEW_ID)?.getBoundingClientRect();
+  const pageHeight = doc.documentElement.clientHeight;
+  if (!view || view.width === 0 || view.height === 0) {
+    box.style.left = `${CORNER_GAP_PX}px`;
+    box.style.bottom = `${CORNER_GAP_PX}px`;
+    return;
+  }
+  box.style.left = `${Math.round(view.left) + CORNER_GAP_PX}px`;
+  box.style.bottom = `${Math.max(0, Math.round(pageHeight - view.bottom)) + CORNER_GAP_PX}px`;
 }
