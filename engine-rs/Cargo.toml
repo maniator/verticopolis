@@ -37,6 +37,11 @@ path = "src/bin/conformance.rs"
 required-features = ["conformance"]
 
 [[bin]]
+name = "crowd_scale"
+path = "src/bin/crowd_scale.rs"
+required-features = ["conformance"]
+
+[[bin]]
 name = "dump"
 path = "src/bin/dump.rs"
 required-features = ["conformance"]
