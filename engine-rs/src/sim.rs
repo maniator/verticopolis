@@ -45,21 +45,38 @@ pub struct MoveIns {
 /// The newest save format version this engine writes. It loads every older
 /// version back to the oldest one [`crate::identity::identity`] names.
 ///
-/// Version 8 adds one key, `lobbyHeights` (#308), so a save is stamped with
-/// the oldest version that reads it whole ([`save_version`]): 8 when it
-/// holds a tall lobby, which a build from before tall lobbies refuses rather
-/// than drop, and [`PLAIN_SAVE_VERSION`] otherwise, which every build from
-/// version 7 on still loads.
-pub const SAVE_VERSION: i64 = 9;
+/// Version 8 adds one key, `lobbyHeights` (#308), and version 9 lists it
+/// per hall (#2068), so a save is stamped with the oldest version that reads
+/// it whole ([`save_version`]): 9 when it holds a tall lobby, which a build
+/// from before tall lobbies refuses rather than drop, and
+/// [`PLAIN_SAVE_VERSION`] otherwise, which every build from version 7 on
+/// still loads. Version 10 adds an elevator schedule's `heldBack` hours
+/// (#1546), which a save carries only when a car sold left a cut-back hour
+/// at the whole fleet's size.
+pub const SAVE_VERSION: i64 = 10;
+/// The version a save with a tall lobby and no held hour is written at.
+pub const TALL_LOBBY_SAVE_VERSION: i64 = 9;
 /// The version a save with no tall lobby is written at: the format before
 /// `lobbyHeights`, which it does not need.
 pub const PLAIN_SAVE_VERSION: i64 = 7;
 
-/// The version a save is stamped with: [`SAVE_VERSION`] when it holds a tall
-/// lobby, [`PLAIN_SAVE_VERSION`] when it does not.
+/// The version a save with no held hour is stamped with:
+/// [`TALL_LOBBY_SAVE_VERSION`] when it holds a tall lobby,
+/// [`PLAIN_SAVE_VERSION`] when it does not. [`stamped_save_version`] also
+/// weighs the held hours.
 pub fn save_version(has_tall_lobby: bool) -> i64 {
-    if has_tall_lobby {
+    stamped_save_version(has_tall_lobby, false)
+}
+
+/// The version a save is stamped with: [`SAVE_VERSION`] when an elevator
+/// schedule holds an hour back (an older build would run the whole fleet
+/// there), [`TALL_LOBBY_SAVE_VERSION`] when it holds a tall lobby, and
+/// [`PLAIN_SAVE_VERSION`] when it holds neither.
+pub fn stamped_save_version(has_tall_lobby: bool, holds_an_hour_back: bool) -> i64 {
+    if holds_an_hour_back {
         SAVE_VERSION
+    } else if has_tall_lobby {
+        TALL_LOBBY_SAVE_VERSION
     } else {
         PLAIN_SAVE_VERSION
     }

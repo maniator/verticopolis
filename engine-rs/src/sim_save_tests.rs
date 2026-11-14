@@ -7,7 +7,7 @@ use crate::facilities::Kind;
 use crate::ledger::{DayTotals, LEDGER_CATS, WINDOW};
 use crate::load::{decode_vctower, deserialize};
 use crate::load_stream::read_save;
-use crate::sim::{save_version, LogKind};
+use crate::sim::{stamped_save_version, LogKind};
 use std::collections::HashSet;
 
 fn same(sim: &Simulation, what: &str) {
@@ -23,7 +23,10 @@ fn reference(sim: &Simulation) -> Value {
     let tall_lobbies = sim.tower.tall_lobbies();
     m.insert(
         "version".into(),
-        json!(save_version(!tall_lobbies.is_empty())),
+        json!(stamped_save_version(
+            !tall_lobbies.is_empty(),
+            sim.tower.holds_an_hour_back()
+        )),
     );
     m.insert("seed".into(), json!(sim.rng.seed()));
     m.insert("initialSeed".into(), json!(sim.rng.initial_seed));

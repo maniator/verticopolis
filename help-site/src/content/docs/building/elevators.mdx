@@ -48,6 +48,8 @@ Inspect a standard elevator to see its stops. You can turn off a floor the shaft
 
 Each shaft has a **schedule**: how many of its cars run in each hour of a weekday and of a weekend, which floor each car goes home to when it's idle, and how long a car waits at a floor before it leaves. The default works for most shafts. When a shaft is swamped at nine and idle at noon, the schedule is where to fix it. When two shafts of the same kind serve the same floors, riders split between them by the cars each one has running, so a shaft you cut to one car for the hour gets a one-car share.
 
+A car you add joins only the hours that already run every car. An hour you cut back keeps its count, and so does one you cut back before you sold a car, so taking a car off and adding it again never puts the whole fleet back on your quiet hours. Pressing OK in the Schedule window keeps that; setting the hour to a new count is what changes it.
+
 <span class="vc-mode">Classic</span> The schedule is the raw hour-by-hour grid, set by hand, as in 1994.
 
 <span class="vc-mode">Modern</span> The schedule also offers presets for common jobs, a one-tap auto-tune from the waits it has measured, and advice on which hours the shaft has too many or too few cars running.

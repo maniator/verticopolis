@@ -44,9 +44,12 @@ use crate::tower::{unit_list_headroom, Unit};
 /// migration step is the one `streamed` applies, so a new save version means
 /// a new review of this file (the `streamed_version_is_the_save_version` test
 /// fails until then). Version 8 is version 7 with `lobbyHeights` (#308),
-/// and version 9 lists them per hall (#2068); `assemble` reads both shapes,
-/// so all three take the same step.
-const STREAMED_VERSION: f64 = 9.0;
+/// version 9 lists them per hall (#2068), and version 10 adds an elevator
+/// schedule's `heldBack` hours (#1546); `assemble` reads every shape, so all
+/// four take the same step.
+const STREAMED_VERSION: f64 = 10.0;
+/// Version 9, still read here: a tall lobby per hall, and no held hour.
+const TALL_LOBBY_STREAMED_VERSION: f64 = 9.0;
 /// Version 8, still read here: its whole-floor `lobbyHeights` entries are
 /// the per-hall migration `assemble` applies.
 const FLOOR_HEIGHTS_STREAMED_VERSION: f64 = 8.0;
@@ -232,6 +235,7 @@ fn current_mode(rest: &Map<String, Value>, forced: Option<bool>) -> Option<bool>
     let version = rest.get("version").and_then(Value::as_f64);
     let taken = [
         STREAMED_VERSION,
+        TALL_LOBBY_STREAMED_VERSION,
         FLOOR_HEIGHTS_STREAMED_VERSION,
         PLAIN_STREAMED_VERSION,
     ];

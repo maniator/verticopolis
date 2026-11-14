@@ -5,7 +5,7 @@
 use crate::clock::GameMode;
 use crate::facilities::Kind;
 use crate::load::{deserialize, deserialize_tdt};
-use crate::sim::{Simulation, PLAIN_SAVE_VERSION, SAVE_VERSION};
+use crate::sim::{Simulation, PLAIN_SAVE_VERSION, TALL_LOBBY_SAVE_VERSION};
 use crate::{export_tdt, import_tdt};
 use serde_json::{json, Value};
 
@@ -231,7 +231,7 @@ fn stairs_and_escalators_climb_the_whole_lobby() {
 }
 
 #[test]
-fn a_tall_lobby_round_trips_through_the_save_and_only_it_takes_the_newest_version() {
+fn a_tall_lobby_round_trips_through_the_save_and_only_it_takes_the_tall_lobby_version() {
     let plain = tower(GameMode::Classic, 1).serialize();
     assert_eq!(plain["version"], json!(PLAIN_SAVE_VERSION));
     assert!(plain.get("lobbyHeights").is_none());
@@ -239,7 +239,7 @@ fn a_tall_lobby_round_trips_through_the_save_and_only_it_takes_the_newest_versio
     let mut sim = tower(GameMode::Classic, 3);
     floors(&mut sim, 4..=4);
     let save = sim.serialize();
-    assert_eq!(save["version"], json!(SAVE_VERSION));
+    assert_eq!(save["version"], json!(TALL_LOBBY_SAVE_VERSION));
     assert_eq!(save["lobbyHeights"], json!([[1, 100, 123, 3]]));
     let back = deserialize(&save).unwrap();
     assert_eq!(back.tower.lobby_height(1), 3);
@@ -256,7 +256,7 @@ fn a_tall_lobby_round_trips_through_the_save_and_only_it_takes_the_newest_versio
 fn load_with(sim: &Simulation, heights: Value) -> Simulation {
     let mut save = sim.serialize();
     save["lobbyHeights"] = heights;
-    save["version"] = json!(SAVE_VERSION);
+    save["version"] = json!(TALL_LOBBY_SAVE_VERSION);
     deserialize(&save).unwrap()
 }
 

@@ -68,11 +68,13 @@ pub fn migrate_save_owned(data: Value) -> Value {
     }
     // `load_stream.rs` applies this step to a current save on its own, so a
     // step added here for version 7 goes there too.
-    // Version 8 is version 7 with `lobbyHeights` (#308), and version 9
-    // lists them per hall (#2068). Neither needs a step of its own: the
-    // loader reads a version 8 whole-floor entry as every lobby tile on that
-    // floor (`Tower::adopt_lobby_heights`), which is the migration.
-    if matches!(v(&migrated), Some(7.0) | Some(8.0) | Some(9.0)) {
+    // Version 8 is version 7 with `lobbyHeights` (#308), version 9 lists
+    // them per hall (#2068), and version 10 adds a schedule's `heldBack`
+    // hours (#1546). None needs a step of its own: the loader reads a
+    // version 8 whole-floor entry as every lobby tile on that floor
+    // (`Tower::adopt_lobby_heights`), which is the migration, and a save
+    // without `heldBack` holds no hour back.
+    if matches!(v(&migrated), Some(7.0) | Some(8.0) | Some(9.0) | Some(10.0)) {
         widen_shafts_in_place(&mut migrated);
     }
     migrated

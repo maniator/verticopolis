@@ -315,10 +315,12 @@ fn order_version_and_mode() {
         "{},\"mode\":\"classic\"}}",
         &text[..text.len() - 1]
     )));
-    // 8 and 9 stream too: 7 with `lobbyHeights` (#308), per floor and per hall (#2068).
+    // 8, 9 and 10 stream too: 7 with `lobbyHeights` (#308), per floor and
+    // per hall (#2068), and with `heldBack` hours (#1546).
     assert!(same(&text.replacen("\"version\":7", "\"version\":8", 1)));
     assert!(same(&text.replacen("\"version\":7", "\"version\":9", 1)));
-    for version in ["6", "10", "\"7\"", "7.5", "null"] {
+    assert!(same(&text.replacen("\"version\":7", "\"version\":10", 1)));
+    for version in ["6", "11", "\"7\"", "7.5", "null"] {
         assert!(!same(&patched(&save, |m| {
             m["version"] = serde_json::from_str(version).unwrap();
         })));

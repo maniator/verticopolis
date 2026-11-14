@@ -428,10 +428,9 @@ impl Tower {
             return false;
         }
         self.revision += 1;
-        let (cars, bottom, top) = {
-            let t = &self.transports[i];
-            (t.cars, t.bottom, t.top)
-        };
+        let t = &self.transports[i];
+        let (cars, bottom, top) = (t.cars, t.bottom, t.top);
+        let raw = &Schedule::keeping_untouched_held(raw, t.schedule.as_ref());
         // A legacy save may keep a home floor that later stop rules would
         // otherwise snap. Editing only the active-car rows must preserve it.
         let previous_homes = self.transports[i]
@@ -448,6 +447,13 @@ impl Tower {
             }
         });
         true
+    }
+
+    /// Whether a shaft's schedule holds an hour back (#1546), which a save
+    /// carries as version 10.
+    pub fn holds_an_hour_back(&self) -> bool {
+        let held = |t: &Transport| t.schedule.as_ref().is_some_and(Schedule::holds_an_hour);
+        self.transports.iter().any(held)
     }
 
     pub fn set_cars(&mut self, id: i64, cars: i64) -> bool {
@@ -480,18 +486,10 @@ impl Tower {
         }
         let was = t.cars;
         t.cars = cars;
-        // A car bought joins the shaft's duty pattern (#1546): an hour that
-        // ran every car runs the new fleet, and every other hour (cut back,
-        // or off shift) stays as the player set it.
-        if let Some(s) = t.schedule.as_mut().filter(|_| cars > was) {
-            for row in [&mut s.weekday, &mut s.weekend].into_iter().flatten() {
-                for active in row.iter_mut().filter(|a| **a >= was) {
-                    *active = cars;
-                }
-            }
-        }
-        if t.schedule.is_some() {
-            let raw = t.schedule.as_ref().unwrap().to_json();
+        // The duty pattern follows the fleet (#1546, `Schedule::refit`).
+        if let Some(s) = t.schedule.as_mut() {
+            s.refit(was, cars);
+            let raw = s.to_json();
             t.schedule = Schedule::coerce(Some(&raw), t.cars, t.bottom, t.top);
         }
         self.revision += 1;

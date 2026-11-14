@@ -6,7 +6,7 @@
 use crate::clock::GameMode;
 use crate::facilities::Kind;
 use crate::load::deserialize;
-use crate::sim::{Simulation, SAVE_VERSION};
+use crate::sim::{Simulation, TALL_LOBBY_SAVE_VERSION};
 use serde_json::{json, Value};
 
 /// Paints `kind` over `xs` on `floor` in brush-sized strokes; every tile lays.
@@ -250,7 +250,7 @@ fn halls_round_trip_through_the_save_as_runs() {
     hall(&mut sim, 3, 100..110);
     hall(&mut sim, 2, 111..121);
     let save = sim.serialize();
-    assert_eq!(save["version"], json!(SAVE_VERSION));
+    assert_eq!(save["version"], json!(TALL_LOBBY_SAVE_VERSION));
     assert_eq!(
         save["lobbyHeights"],
         json!([[15, 100, 109, 3], [15, 111, 120, 2]])
@@ -275,7 +275,7 @@ fn a_version_8_floor_height_loads_as_one_hall_over_every_lobby_tile() {
     let back = load_with(&sim, 8, json!([[15, 3]]));
     assert_eq!(runs(&back), vec![[15, 100, 119, 3]]);
     let again = back.serialize();
-    assert_eq!(again["version"], json!(SAVE_VERSION));
+    assert_eq!(again["version"], json!(TALL_LOBBY_SAVE_VERSION));
     assert_eq!(again["lobbyHeights"], json!([[15, 100, 119, 3]]));
 }
 
