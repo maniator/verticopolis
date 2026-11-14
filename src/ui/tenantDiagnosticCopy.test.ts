@@ -13,10 +13,16 @@ describe("service shortfall gripe copy", () => {
     expect(gripeCopy({ cause: "parking", coverage: 0.25 })).toContain("cover 25% of the office workers");
   });
 
+  it("tells both parking lines that a garage can run past the tower (#2212)", () => {
+    for (const cause of ["parking", "homeParking"] as const) {
+      expect(gripeCopy({ cause, coverage: 0.25 })).toMatch(/; basements can run wider than the tower above\.$/);
+    }
+  });
+
   it("names home parking against what offices and homes need together (#1973)", () => {
     const line = gripeCopy({ cause: "homeParking", coverage: 0.25000000000000006 });
     expect(line).toBe(
-      "too little parking: the spaces left after hotel suites cover 25% of what offices and homes need. Add parking spaces chained to a ramp.",
+      "too little parking: the spaces left after hotel suites cover 25% of what offices and homes need. Add parking spaces chained to a ramp; basements can run wider than the tower above.",
     );
     expect(line).not.toContain("office workers");
   });
