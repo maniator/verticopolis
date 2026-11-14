@@ -62,18 +62,16 @@ pub const TALL_LOBBY_SAVE_VERSION: i64 = 9;
 /// `lobbyHeights`, which it does not need.
 pub const PLAIN_SAVE_VERSION: i64 = 7;
 
-/// The version a save with no held hour is stamped with:
-/// [`TALL_LOBBY_SAVE_VERSION`] when it holds a tall lobby,
-/// [`PLAIN_SAVE_VERSION`] when it does not. [`stamped_save_version`] also
-/// weighs the held hours.
+/// A save with no held hour is stamped [`TALL_LOBBY_SAVE_VERSION`] with a tall
+/// lobby, else [`PLAIN_SAVE_VERSION`]; [`stamped_save_version`] also weighs the
+/// held hours.
 pub fn save_version(has_tall_lobby: bool) -> i64 {
     stamped_save_version(has_tall_lobby, false)
 }
 
-/// The version a save with no floor run is stamped with:
-/// [`HELD_HOURS_SAVE_VERSION`] when an elevator schedule holds an hour back
-/// (an older build would run the whole fleet there), [`TALL_LOBBY_SAVE_VERSION`]
-/// when it holds a tall lobby, [`PLAIN_SAVE_VERSION`] when it holds neither.
+/// A save with no floor run is stamped [`HELD_HOURS_SAVE_VERSION`] when a
+/// schedule holds an hour back (an older build runs the whole fleet there),
+/// else [`TALL_LOBBY_SAVE_VERSION`] with a tall lobby, else [`PLAIN_SAVE_VERSION`].
 pub fn stamped_save_version(has_tall_lobby: bool, holds_an_hour_back: bool) -> i64 {
     if holds_an_hour_back {
         HELD_HOURS_SAVE_VERSION
