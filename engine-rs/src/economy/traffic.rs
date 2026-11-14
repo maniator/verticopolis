@@ -23,7 +23,8 @@ impl Simulation {
         let demand_map = crate::demand::compute_demand_map(self);
         let mut reach_cache: HashMap<(i64, i64), bool> = HashMap::new();
         let rain = self.weather == Weather::Rain;
-        let rain_metro_relief = rain && self.metro_helps_business();
+        let metro_platform = self.shopper_metro_platform();
+        let rain_metro_relief = rain && metro_platform.is_some();
         let is_weekend = self.clock.is_weekend();
         let hour = self.clock.hour();
         let mode = self.mode;
@@ -90,7 +91,7 @@ impl Simulation {
             };
             let lobby_mult = if kind.is_commercial()
                 && kind != Kind::SkyBar
-                && self.tower.nearest_lobby_floor_distance(floor) > COMMERCIAL_LOBBY_FLOORS
+                && self.shopper_arrival_distance(floor, metro_platform) > COMMERCIAL_LOBBY_FLOORS
             {
                 COMMERCIAL_LOBBY_FAR_MULT
             } else {

@@ -330,6 +330,24 @@ impl Tower {
         floor
     }
 
+    /// The tower's metro stations, in room order, memoized by id on
+    /// `Memo::metro_changes`, so the hourly takings read their live state
+    /// without walking the rooms. The build cap allows one, but a loaded
+    /// save is not held to it.
+    pub(crate) fn metro_stations(&self) -> impl Iterator<Item = &Unit> + '_ {
+        let key = self.memo.borrow().metro_changes;
+        let cached = self.memo.borrow().metro_ids.clone();
+        let ids = match cached {
+            Some((built, ids)) if built == key => ids,
+            _ => {
+                let ids: Arc<[i64]> = self.units_of_kind(Kind::Metro).map(|u| u.id).collect();
+                self.memo.borrow_mut().metro_ids = Some((key, ids.clone()));
+                ids
+            }
+        };
+        (0..ids.len()).filter_map(move |i| self.get_unit(ids[i]))
+    }
+
     /// The served and lobby floors in ascending order, so dispatch can
     /// binary search them instead of hashing every room's floor each step
     /// and sorting the lobby floors on every call. Built once per revision.
