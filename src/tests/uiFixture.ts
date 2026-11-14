@@ -114,7 +114,7 @@ export function makeUI(overrides: Partial<UICallbacks> = {}): { ui: UI; cb: UICa
     onShowStats: vi.fn(),
     onShowSaves: vi.fn(),
     onInspectorClose: vi.fn(),
-    onSaveSlot: vi.fn(),
+    onSaveSlot: vi.fn(() => true),
     onLoadSlot: vi.fn(),
     onDeleteSlot: vi.fn(),
     ...overrides,

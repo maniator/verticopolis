@@ -2,6 +2,7 @@ import { SLOT_COUNT, SaveGame } from "../storage/SaveGame";
 import type { PortRecord } from "../simport/enginePort";
 import { saveText, swapDone } from "./portLifecycle";
 import { trackFileImported } from "../analytics";
+import { rememberHome } from "../storage/slotGuard";
 import type { SaveLoadDeps } from "./saveLoad";
 
 /**
@@ -66,6 +67,15 @@ export function adoptConfirmedLegacyImport(
     }
   } catch {
     slotWriteFailed = true; // quota/disabled storage, NOT "slots full"
+  }
+  // That slot holds the imported tower now, so saving it there again asks
+  // nothing. Outside the write's try: a failed read here is not a failed copy.
+  if (savedTo !== null) {
+    try {
+      rememberHome(savedTo, SaveGame.slotRaw(savedTo));
+    } catch {
+      /* not remembered: saving there asks first */
+    }
   }
   // "info" keeps this bulletin log-only: renderLog also toasts "good" entries,
   // and the explicit success toast below already covers that.
