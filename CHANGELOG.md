@@ -25,6 +25,12 @@ prompt already tells players it is an engine update and shows the new version.
 Entries below 1.51.1 were curated from the commit history after the fact, so they
 are documentation only: no build that a client fetches carries them.
 
+## 3.11.0
+
+- Click or tap a walking person with the Inspect tool to see who they are, why they are out, where they came from, where they are going and how long they have waited, in Classic and Modern.
+- The person card has a Follow button that keeps the camera on them until you move the view or close the card.
+- People no longer stay in a cinema, party hall, restaurant or other venue after it closes. When it closes, everyone inside heads home through the building, and nobody sets out for a film or a party in its last hour, so a cinema is empty once the midnight show lets out.
+
 ## 3.10.9
 
 - Rain now falls only on the open sky and the street around your tower. It no longer streaks across the rooms or the basements, so the inside of the building stays dry, as in the original.
