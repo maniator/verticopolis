@@ -249,10 +249,11 @@ fn only_basement_laid_after_the_lobby_tile_holds_its_undo_back() {
 }
 
 #[test]
-fn a_basement_tile_the_step_puts_back_is_left_as_it_was() {
+fn a_hanging_basement_tile_goes_back_only_where_it_touches_what_stays() {
     // A gesture lays two lobby tiles and, under the second, sells a tile
-    // of hanging basement and lays a new one: the undo puts the old one
-    // back, hanging as it did.
+    // of hanging basement and lays a new one. The undo puts the old one
+    // back only where nothing laid since hangs from the new one, and only
+    // where it touches a tile that stays (#1843).
     let mut sim = tower();
     for x in 69..72 {
         assert!(sim.tower.place(Kind::Floor, 0, x).ok);
@@ -271,11 +272,11 @@ fn a_basement_tile_the_step_puts_back_is_left_as_it_was() {
     // it.
     assert!(sim.tower.place(Kind::Floor, -1, 71).ok);
     refused(&mut sim, &step, StepRefused::Blocked);
+    // Without it, the old tile would come back touching nothing: the tiles
+    // beside it leave with the step, and it hung from nothing before.
     let below = sim.tower.unit_at(-1, 71).unwrap().id;
     assert!(sim.tower.remove_unit(below).is_some());
-    sim.apply_undo_step(&step)
-        .expect("the old basement tile goes back as it was");
-    assert_eq!(sim.tower.unit_at(0, 71).unwrap().id, old);
+    refused(&mut sim, &step, StepRefused::Blocked);
 }
 
 #[test]

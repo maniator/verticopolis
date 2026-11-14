@@ -265,7 +265,7 @@ struct Run {
 }
 
 /// The tiles beside `tile`, as (floor, x): left, right, below and above.
-fn beside((floor, x): (i64, i64)) -> [(i64, i64); 4] {
+pub(super) fn beside((floor, x): (i64, i64)) -> [(i64, i64); 4] {
     [
         (floor, x - 1),
         (floor, x + 1),

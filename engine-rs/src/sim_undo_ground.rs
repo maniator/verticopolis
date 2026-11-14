@@ -38,6 +38,9 @@ pub(crate) struct Ground<'a> {
     /// The row the metro stations stand on once the step applies: that of a
     /// station the step leaves standing, else that of one it puts back.
     station: Option<i64>,
+    /// The ground-floor and basement tiles the step lays that reach no tile
+    /// there that stays (`adrift_low_tiles`, #1843).
+    adrift: FastSet<(i64, i64)>,
 }
 
 impl<'a> Ground<'a> {
@@ -91,7 +94,7 @@ impl<'a> Ground<'a> {
             .find(|u| !leaving.contains(&u.id))
             .or_else(|| put_back.iter().copied().find(|u| u.kind == Kind::Metro))
             .map(|u| u.floor);
-        Ground {
+        let mut ground = Ground {
             tower,
             leaving,
             laid,
@@ -100,7 +103,56 @@ impl<'a> Ground<'a> {
             lobbies_added,
             rooms_leaving,
             station,
+            adrift: FastSet::default(),
+        };
+        // The ground-floor and basement tiles the step lays, in step order.
+        let low = put_back
+            .iter()
+            .filter(|u| u.kind.is_structural() && u.floor <= GROUND_FLOOR)
+            .flat_map(|u| tiles_of(u))
+            .collect();
+        ground.adrift = ground.adrift_low_tiles(low);
+        ground
+    }
+
+    /// The ground-floor and basement tiles the step lays that reach no tile
+    /// there that stays, through tiles beside, above or below each other that
+    /// it lays too. A tile there hangs from one beside, above or below it, as
+    /// its build asked (`Tower::is_supported`), so a tile put back after its
+    /// neighbors went comes back touching nothing (#1843). Where no
+    /// ground-floor tile stays at all, the tiles the step lays on the ground
+    /// floor stand on their own, as a tower's first lobby does, and what they
+    /// reach is held. `low` holds the ground-floor and basement tiles the step
+    /// lays. One walk over them, plus one row of the lot.
+    fn adrift_low_tiles(&self, low: Vec<(i64, i64)>) -> FastSet<(i64, i64)> {
+        if low.is_empty() {
+            return FastSet::default();
         }
+        let laid_low = |tile: &(i64, i64)| tile.0 <= GROUND_FLOOR && self.laid.contains_key(tile);
+        let stays_low = |(floor, x): (i64, i64)| {
+            floor <= GROUND_FLOOR && !self.laid.contains_key(&(floor, x)) && self.stays(floor, x)
+        };
+        let first = !(0..LOT_WIDTH).any(|x| stays_low((GROUND_FLOOR, x)));
+        let mut met: Vec<(i64, i64)> = low
+            .iter()
+            .copied()
+            .filter(|&tile| {
+                (first && tile.0 == GROUND_FLOOR) || lobby::beside(tile).into_iter().any(stays_low)
+            })
+            .collect();
+        let mut held: FastSet<(i64, i64)> = met.iter().copied().collect();
+        let mut next = 0;
+        while let Some(&tile) = met.get(next) {
+            next += 1;
+            for near in lobby::beside(tile) {
+                if laid_low(&near) && held.insert(near) {
+                    met.push(near);
+                }
+            }
+        }
+        low.into_iter()
+            .filter(|tile| !held.contains(tile))
+            .collect()
     }
 
     fn holds(&self, floor: i64, x: i64) -> bool {
@@ -155,8 +207,8 @@ impl<'a> Ground<'a> {
     /// floor (`Tower::can_place`). A floor tile may go back on a sky lobby
     /// floor beside a room, or beside a lobby the lobby brush left there,
     /// though `Tower::can_place` refuses a new one beside a lobby. A tile on
-    /// the ground floor or below is asked for no neighbor here, though its
-    /// build asked for a tile beside, above or below it (#1843). A room has
+    /// the ground floor or below must reach a tile there that stays, through
+    /// the tiles beside, above or below it (`adrift_low_tiles`, #1843). A room has
     /// floor under every tile, as its build laid (`Tower::ensure_floor_under`),
     /// sits on no sky lobby floor that holds a lobby (so never on a lobby tile,
     /// which goes only on those floors and the ground floor, where no room
@@ -165,8 +217,11 @@ impl<'a> Ground<'a> {
     /// nothing below it and no room on its row.
     pub(crate) fn under_room(&self, u: &Unit) -> bool {
         if u.kind.is_structural() {
-            let rests =
-                u.floor <= GROUND_FLOOR || (u.x..u.x + u.width).all(|x| self.holds(u.floor - 1, x));
+            let rests = if u.floor <= GROUND_FLOOR {
+                tiles_of(u).all(|tile| !self.adrift.contains(&tile))
+            } else {
+                (u.x..u.x + u.width).all(|x| self.holds(u.floor - 1, x))
+            };
             let concourse = u.kind == Kind::Lobby && is_sky_lobby_floor(u.floor);
             return rests
                 && !(concourse && self.rooms_stay_on(u.floor))
