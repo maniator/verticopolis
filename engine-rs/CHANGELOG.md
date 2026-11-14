@@ -15,6 +15,12 @@ raised the version, so they are documentation only.
 There is no entry for 0.17.0, which only
 existed as a step inside a stacked branch.
 
+## 1.33.3 (2026-11-14)
+
+- `Tower::removal_reason` lets a Modern sky lobby tile go (`GameMode::removes_lobby_tiles`), keeps the ground lobby in both modes, checks the story above a tall hall's top, and refuses a floor or lobby tile a shaft needs in its column.
+- `remove_facility` refunds a tall lobby tile half its price on each story it rises.
+- An undo or redo that takes a tall lobby tile out is refused while a story stands on top of the hall, as a sale is.
+
 ## 1.33.2 (2026-11-14)
 
 - Studios and apartments join the kinds that cannot be placed underground (`no_basement` in the catalog), so every home follows one rule. Saves that already hold basement studios or apartments still load.
