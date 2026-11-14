@@ -143,5 +143,6 @@ this. That's the line: Classic shows what 1994 shows.
 
 - **Classic or not.** Kenji: Classic shows what 1994 shows, so straight flights
   there. Samus: it's presentation, show it in both. Room's lean: Modern only.
+  **Decided by Naftali (2026-11-14): Modern only.**
 - **Reading one** (taller flights beside venues) is a bigger, separate change
   with a save and export story; the room recommends not doing it.
