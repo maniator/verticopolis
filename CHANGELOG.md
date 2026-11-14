@@ -25,6 +25,12 @@ prompt already tells players it is an engine update and shows the new version.
 Entries below 1.51.1 were curated from the commit history after the fact, so they
 are documentation only: no build that a client fetches carries them.
 
+## 3.10.5
+
+- Modern: the bulldozer now takes out a sky lobby a tile at a time, tall halls included, for half of what each tile cost. The ground lobby stays, and Classic keeps every lobby as in 1994.
+- The bulldozer no longer takes the last floor tile out from under an elevator, stairway or escalator, which left the shaft hanging in midair.
+- Undo no longer takes a tall lobby out from under a floor you built on top of it.
+
 ## 3.10.4
 
 - Fire escapes now run up every story beside a tall lobby, split-tower halls included, so they no longer break off beside the hall.
