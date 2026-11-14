@@ -466,5 +466,9 @@ mod cleanup_tests;
 mod site_tests;
 
 #[cfg(test)]
+#[path = "sim_undo_adrift_tests.rs"]
+mod adrift_tests;
+
+#[cfg(test)]
 #[path = "sim_undo_root_tests.rs"]
 mod root_tests;

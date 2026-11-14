@@ -16,7 +16,7 @@ use crate::tower::UnitState;
 use crate::undo::Step;
 
 /// Lay `kind` on `floor` from x 75 to 84 as one gesture.
-fn laid(sim: &mut Simulation, kind: Kind, floor: i64) -> Step {
+pub(super) fn laid(sim: &mut Simulation, kind: Kind, floor: i64) -> Step {
     gesture(sim, |s| {
         for x in 75..85 {
             let r = s.build(kind, floor, x);
