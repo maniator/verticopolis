@@ -15,6 +15,11 @@ raised the version, so they are documentation only.
 There is no entry for 0.17.0, which only
 existed as a step inside a stacked branch.
 
+## 1.37.0 (2026-11-14)
+
+- Real office commutes (`crowd::commuters`) land switched off behind `rules::REAL_OFFICE_COMMUTES_ON`, so the game plays as before. When on, Modern office workers walk in at the lobby or ride in on the Metro over 7 to 10 AM on weekdays, leave over 4 to 7 PM, and an office counts only the workers at their desks; Modern express cars move four times as fast (`GameMode::express_speed_factor`). Classic offices keep the clock's head count either way.
+- `unitCard` adds a `workersComing` slot (the view layout goes to 24). It reads empty while real office commutes are off.
+
 ## 1.36.0 (2026-11-14)
 
 - A car sold now holds back each hour the player cut back that the sale leaves at the whole fleet's size (`Schedule::held_back`, the new `HeldBack` type, `Schedule::refit`), so a car bought back joins only the hours that ran every car. A player's schedule edit that names no `heldBack` (`Tower::set_schedule`) keeps each held hour whose count it leaves as it was, and drops one it sets to another count.
