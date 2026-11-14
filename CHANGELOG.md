@@ -25,6 +25,16 @@ prompt already tells players it is an engine update and shows the new version.
 Entries below 1.51.1 were curated from the commit history after the fact, so they
 are documentation only: no build that a client fetches carries them.
 
+## 3.10.8
+
+- A mouse let go over a window or outside the game now ends the drag it started, so a build tool no longer stays pressed, painting or bulldozing when the pointer comes back, and the ghost shows again right away.
+- Dragging a selected elevator's arrow ends when another room or shaft is selected, so it can't resize the wrong shaft or bill a floor twice.
+- On a touchscreen laptop, a tap made while holding Shift or Space no longer builds or bulldozes, the same as a click with either key held.
+- Near the edge of the tower, the gold ghost for a run of floor or lobby now stops flush with the floor below instead of hanging out over open air. A red ghost still shows the whole brush.
+- Riders on an elevator car you sell now get off at once, so buying the car back, or undoing and redoing, no longer puts them back on board.
+- A fire or bomb threat no longer closes a window that is waiting on you, such as an elevator schedule with unsaved changes: time stops, the window says why, and the emergency opens once you close it.
+- The TOWER congratulations wait for such a window to close, and come back if an emergency interrupts them.
+
 ## 3.10.7
 
 - The Bulldoze card has a **Drag clears** choice. **One kind** (the default) keeps a drag to the kind of thing it started on; **Everything** lets one drag clear all it crosses. On a phone the choice sits in a strip over the tower while the bulldozer is armed.
