@@ -497,8 +497,8 @@ export class Engine {
     /**
      * Tooling only: set a unit's live customer tally (`customersIn`), which
      * no save carries, so a test can fill a venue to capacity mid-run, with
-     * the follow-ups a counted arrival makes (an attendance venue's occupants
-     * mirror, the meal overlay revision). False for an unknown unit or a
+     * the follow-ups a counted arrival makes (an attendance or meal venue's
+     * occupants mirror, the meal overlay revision). False for an unknown unit or a
      * count that is not a whole number from 0 to [`MAX_TOOL_OCCUPANTS`];
      * nothing changes then. The unit's kind and its venue cap are not
      * checked: any unit takes the stamp, at any count in that range.
@@ -533,6 +533,7 @@ export class Engine {
      * read raw (#996), as for `sellAt`.
      */
     setNoRate(id: number): boolean;
+    setPeopleWindow(floor_lo: number, floor_hi: number, x_lo: number, x_hi: number): void;
     setRent(id: number, target: number): Float64Array;
     /**
      * `Tower.setSchedule(id, schedule)` with the schedule as JSON text. The

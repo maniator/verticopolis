@@ -48,7 +48,7 @@ pub(super) fn party_hall_tower() -> (Simulation, i64, i64) {
 pub(super) fn attend(sim: &mut Simulation, id: i64, n: i64) {
     let (u, at) = sim.tower.marked_by_id(id).unwrap();
     u.customers_in = Some(n);
-    u.sync_attendance_occupants(at);
+    u.sync_visitor_occupants(at);
 }
 
 pub(super) fn tally(sim: &Simulation, id: i64) -> i64 {

@@ -10,7 +10,9 @@ use crate::facilities::*;
 use crate::lot::Lot;
 
 mod lobby_halls;
+mod metro;
 mod placement;
+mod removal;
 mod tall_lobby;
 mod transports;
 mod types;
@@ -42,7 +44,7 @@ pub(crate) fn span_has_floor_on_both_sides(
 /// Whether the story has floor on the left of the tile at `x`, by Classic's
 /// floor end rule: plain floor stands anywhere left of it, or the tiles
 /// touching it on the left, unbroken by a gap, hold a lobby tile (owner
-/// ruling, 2026-11-13, on #2062). Lobby tiles are never removed, so counting
+/// ruling, 2026-11-13, on #2062). Classic never removes a lobby tile, so counting
 /// one beyond a gap would trap the plain floor between it and the far end
 /// for good; a lobby the tile touches still counts, so a floor tile right
 /// beside a lobby is not an end. Plain floor anywhere counts, so the tiles
@@ -88,7 +90,9 @@ pub struct Tower {
     pub(crate) by_id: FastMap<i64, usize>,
     /// `transportsById`: shaft id to its index in `transports`.
     pub(crate) transport_by_id: HashMap<i64, usize>,
-    pub(crate) lobby_tiles: HashMap<i64, i64>,
+    /// Lobby tiles counted by the floor they are laid on. Ordered, so a walk
+    /// over the lobby floors is the same on every run.
+    pub(crate) lobby_tiles: BTreeMap<i64, i64>,
     /// The tall lobby tiles (#308, #2068) counted by `(floor, height)`.
     /// Each lobby unit carries its own height (`Extras::lobby_stories`);
     /// `register` and `unregister` keep this count, so the floors that hold
@@ -149,7 +153,7 @@ impl Tower {
             rooms: HashMap::new(),
             by_id: FastMap::default(),
             transport_by_id: HashMap::new(),
-            lobby_tiles: HashMap::new(),
+            lobby_tiles: BTreeMap::new(),
             tall_lobby_tiles: BTreeMap::new(),
             requested_lobby_height: 1,
             room_tiles: HashMap::new(),
@@ -211,9 +215,7 @@ impl Tower {
 
     /// `lobbyFloors()`: ascending.
     pub fn lobby_floors(&self) -> Vec<i64> {
-        let mut v: Vec<i64> = self.lobby_tiles.keys().copied().collect();
-        v.sort();
-        v
+        self.lobby_tiles.keys().copied().collect()
     }
 
     pub fn count_kind(&self, kind: Kind) -> i64 {
@@ -342,7 +344,12 @@ impl Tower {
             }
         }
         if u.kind == Kind::Lobby {
-            Self::dec_count(&mut self.lobby_tiles, u.floor, u.width);
+            if let Some(c) = self.lobby_tiles.get_mut(&u.floor) {
+                *c -= u.width;
+                if *c <= 0 {
+                    self.lobby_tiles.remove(&u.floor);
+                }
+            }
             if hgt > 1 {
                 let key = (u.floor, hgt);
                 if let Some(c) = self.tall_lobby_tiles.get_mut(&key) {
@@ -370,7 +377,7 @@ impl Tower {
     // ---- placement rules -------------------------------------------------
 
     pub fn cap_reason(&self, kind: Kind) -> Option<String> {
-        if let Some(single) = build_cap(kind) {
+        if let Some(single) = build_cap_in(self.mode, kind) {
             if self.count_kind(kind) >= single {
                 let f = kind.facility();
                 return Some(format!(

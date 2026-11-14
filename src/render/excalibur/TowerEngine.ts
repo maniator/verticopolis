@@ -23,13 +23,13 @@ import { beginFrame } from "./towerFrame";
 import { drainRegions, type RegionRec } from "./towerRegions";
 import { NOT_BAKED } from "./sceneBake";
 import type { CrowdActor, Walker } from "./towerCrowd";
+import type { MetroTrain } from "./towerMetro";
 import type { PeopleGraphics } from "./peopleGfx";
 import type { ViewFocus, Picked, ScreenRect } from "./towerInputCamera";
 
 export { FLOOR, TILE };
-// The camera zoom range lives in its friend-module now; re-exported here so
-// every existing consumer keeps importing it from this file. The exported
-// `ViewFocus`/`Picked` shapes are unchanged.
+// The camera zoom range lives in its friend-module; re-exported so consumers
+// keep importing it (and the `ViewFocus`/`Picked` shapes) from this file.
 export { MIN_ZOOM, MAX_ZOOM } from "./towerInputCamera";
 export type { ViewFocus, Picked } from "./towerInputCamera";
 
@@ -186,6 +186,7 @@ export class TowerEngine {
   roomSig = new Map<number, string>();
   transportActors = new Map<number, ex.Actor>();
   transportSig = new Map<number, string>();
+  flightPass = reconcile.emptyFlightPass(); // flights beside a venue (venueFlights.ts), per structure
   // Engine-animated actors, regenerated when the layout changes.
   carActors: {
     actor: ex.Actor;
@@ -199,7 +200,7 @@ export class TowerEngine {
     gfx: Map<string, ex.Canvas>;
     shown: string;
   }[] = [];
-  trainActors: { actor: ex.Actor; u: UnitView; w: number; shift: (offset: number) => void }[] = [];
+  trainActors: MetroTrain[] = [];
   /** The metro's tunnel row, either side of the station. */
   tunnelActors: ex.Actor[] = [];
   /** The pre-dawn garbage truck: one per recycling center, visible only during
@@ -443,7 +444,6 @@ export class TowerEngine {
   setCamera(tileX: number, floor: number, zoom: number): void {
     camera.setCamera(this, tileX, floor, zoom);
   }
-
   focus(): ViewFocus {
     return camera.focus(this);
   }

@@ -87,8 +87,9 @@ export const SHARDS: Record<string, string[]> = {
   // + onboarding + the desktop install-affordance shot (a live engine tower with
   // the topbar Install chip surfaced, drawSettle; SPEC-pwa-install).
   // ...plus the three tall lobby scenes (#308): small frozen towers, one or
-  // two shots each, about 11s together.
-  engine: ["engine", "metro", "first-run", "first-run-mobile", "preview-rooms", "install-affordance", "tall-lobby-classic", "tall-lobby-modern-sky", "tall-lobby-split-halls", "tall-lobby-flights", "tall-lobby-phone"],
+  // two shots each, about 11s together, and the venue flights tower (two
+  // shots of one small frozen tower), and the metro line (three shots).
+  engine: ["engine", "metro", "metro-line", "first-run", "first-run-mobile", "preview-rooms", "install-affordance", "tall-lobby-classic", "tall-lobby-modern-sky", "tall-lobby-split-halls", "tall-lobby-flights", "tall-lobby-phone", "venue-flights"],
   // ~71s before the Tools window fit: anchored by the tablet shots (the
   // heaviest drawSettle scene) plus the small scenes + the mobile
   // install-affordance shot (its engine-tower sibling) + the overview Map

@@ -139,10 +139,13 @@ jobs:
         with:
           persist-credentials: false
 
+      # The npm cache matters here: the browser jobs wait on this job, and
+      # its uncached install took most of its minute and a half.
       - name: Use Node.js (from .nvmrc)
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: ".nvmrc"
+          cache: "npm"
 
       - uses: ./.github/actions/engine-wasm
         with:
@@ -506,12 +509,15 @@ jobs:
   # project) on a tooling build. The `e2e-serial` job above runs the
   # serial project: pixel baselines, the perf gate and the engine-status specs.
   e2e-general:
-    # It runs in three shards on three runners, since one worker on one runner
+    # It runs in four shards on four runners, since one worker on one runner
     # took 13 to 18 minutes, the longest job on a pull request. Each shard
     # keeps one worker (see playwright.config.ts), so the specs keep the timing
-    # they expect. The e2e-general-result job below reports the three shards
-    # as one e2e-general check, which is required.
-    name: e2e-general (shard ${{ matrix.shard }} of 3)
+    # they expect. The spec files are split by measured time
+    # (scripts/e2e-shards.ts), not by Playwright's count-based --shard, which
+    # put the slow specs together: two shards took about 7 minutes and the
+    # third 3. The e2e-general-result job below reports the four shards as one
+    # e2e-general check, which is required.
+    name: e2e-general (shard ${{ matrix.shard }} of 4)
     needs: [changes, resolve-image, engine-wasm]
     # As the e2e-serial job: skipped only for a prose-only change.
     if: ${{ !cancelled() && needs.changes.outputs.code != 'false' }}
@@ -520,7 +526,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3]
+        shard: [1, 2, 3, 4]
     permissions:
       contents: read
     container:
@@ -584,21 +590,26 @@ jobs:
           mkdir -p "$GITHUB_WORKSPACE/dist"
           tar -C "$GITHUB_WORKSPACE/dist" -xzf tooling-dist.tgz
 
-      # Playwright decides which shard gets milestones.spec.ts, so the shard
-      # that lists it is the one whose upload must find the shots.
-      - name: Does this shard run the milestone spec
+      # Every shard lists the whole suite with the filters it runs and
+      # computes the same split, so each spec file runs on exactly one shard
+      # (src/tests/ci/e2eShards.ts). The shard that gets milestones.spec.ts is
+      # the one whose upload must find the shots.
+      - name: Pick this shard's spec files
         id: milestones
         shell: bash
         run: |
-          npx playwright test --project=chromium --grep-invert @perf --shard=${{ matrix.shard }}/3 --list > "$RUNNER_TEMP/shard-list.txt"
-          if grep -q 'milestones\.spec\.ts' "$RUNNER_TEMP/shard-list.txt"; then
+          # The JSON goes to a file, so nothing a spec prints while it loads
+          # can mix into it.
+          PLAYWRIGHT_JSON_OUTPUT_NAME="$RUNNER_TEMP/suite-list.json" npx playwright test --project=chromium --grep-invert @perf --list --reporter=json
+          node scripts/e2e-shards.ts plan "$RUNNER_TEMP/suite-list.json" ${{ matrix.shard }} 4 "$RUNNER_TEMP/shard-files.txt"
+          if grep -qx 'milestones\.spec\.ts' "$RUNNER_TEMP/shard-files.txt"; then
             echo "here=true" >> "$GITHUB_OUTPUT"
           else
             echo "here=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Run end-to-end tests (general suite)
-        run: npx playwright test --project=chromium --grep-invert @perf --shard=${{ matrix.shard }}/3
+        run: npx playwright test --project=chromium --grep-invert @perf --test-list "$RUNNER_TEMP/shard-files.txt"
 
       # Per-run visual proof of the ★-progression. milestones.spec.ts writes to
       # the untracked e2e/output/ dir (never the committed, human-blessed
@@ -620,7 +631,7 @@ jobs:
           path: test-results/
           if-no-files-found: ignore
 
-  # One check for the three browser-suite shards: green when every shard
+  # One check for the four browser-suite shards: green when every shard
   # passed, or when the suite was skipped on purpose (a prose-only change);
   # red when a shard failed or was cancelled, or when the
   # shards were skipped because a job they need failed. It does not run when

@@ -5,6 +5,7 @@ import { followStep, setSim } from "./towerScene";
 import { runSceneSync } from "./towerSyncSchedule";
 import { NOT_BAKED } from "./sceneBake";
 import { HallDoorLayer } from "./towerHallDoors";
+import { emptyFlightPass } from "../venueFlights";
 import { bindViewWorld, viewWorld } from "../../presentation/viewWorld";
 import type { RenderSim } from "../renderSim";
 import type { TowerEngine } from "./TowerEngine";
@@ -13,7 +14,7 @@ import type { TowerEngine } from "./TowerEngine";
 vi.mock("./towerReconcile", async (original) => ({ ...(await original<object>()), syncScene: vi.fn(), syncFacade: vi.fn() }));
 vi.mock("./towerCrowd", async (original) => ({ ...(await original<object>()), syncMotion: vi.fn() }));
 // A swap binds the new tower's world and kinds; these stand-ins hold none.
-vi.mock("../../catalog/towerCatalog", () => ({ towerCatalog: () => ({}) }));
+vi.mock("../../catalog/towerCatalog", () => ({ towerCatalog: () => ({ rules: {} }) }));
 vi.mock("../../presentation/viewWorld", async (original) => ({ ...(await original<object>()), bindViewWorld: vi.fn() }));
 vi.mock("../../presentation/viewKinds", async (original) => ({ ...(await original<object>()), bindViewKinds: vi.fn() }));
 
@@ -88,6 +89,7 @@ function sceneUnderSwap() {
     craneActor: null,
     roomSig: new Map(),
     transportSig: new Map(),
+    flightPass: emptyFlightPass(),
     floorLive: new Map(),
     carActors: [],
     trainActors: [],

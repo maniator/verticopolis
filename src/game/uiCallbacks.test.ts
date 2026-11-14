@@ -23,6 +23,7 @@ function makePorts() {
   const ports: GameAppPorts = {
     getCatalog: vi.fn(() => catalogFor("classic")),
     lobbyHeight: { picked: 2, pick: vi.fn() },
+    bulldozeDrag: { clears: "everything", pick: vi.fn() },
     reader,
     enginePort: { flipAutoBridge: vi.fn(() => Float64Array.of(1, 0, 0)), autoBridge: vi.fn(() => true) } as unknown as EnginePort,
     portCodes: new PortCodes(mockPort()),
@@ -119,6 +120,13 @@ describe("createUICallbacks delegates every callback to its port", () => {
     vi.mocked(ports.getCatalog).mockReturnValue(catalogFor("modern"));
     expect(cb.getCatalog().mode).toBe("modern");
     expect(ports.getCatalog).toHaveBeenCalledTimes(2);
+  });
+
+  it("hands the Bulldoze card the app's own drag choice", () => {
+    const { ports } = makePorts();
+    const cb = createUICallbacks(ports);
+    expect(cb.bulldozeDrag()).toBe(ports.bulldozeDrag);
+    expect(cb.bulldozeDrag().clears).toBe("everything");
   });
 
   it("audio: toggle, mute state, volume set and read", () => {

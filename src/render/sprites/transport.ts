@@ -4,8 +4,9 @@ import type { FacilityKind } from "../../shared/types";
 import type { TransportView } from "../../simport/view";
 import { personRider } from "../pixelSprites/common";
 import { layerBreak, layerEnd } from "../pixelSprites/layers";
-import type { CarArrow } from "../carIndicator";
+import { RIDER_STEP, type CarArrow } from "../carIndicator";
 import { shade, shadeAlpha } from "./common";
+import { drawEscalatorHalfTurn, drawEscalatorRun, drawEscalatorSwitchback } from "./escalator";
 import { drawSpiralStair } from "./spiralStair";
 
 // ---- Transport ----------------------------------------------------------
@@ -17,6 +18,11 @@ export function drawTransport(
   topY: number,
   w: number,
   floorH: number,
+  /** Whether this one-story flight stands beside a venue and winds
+   *  (`venueFlights.ts`): a spiral stair, or an escalator that turns back
+   *  halfway up. Ignored for an elevator and for a flight out of a tall lobby,
+   *  which winds anyway. */
+  winds = false,
 ): void {
   const color = facilityColor(t.kind);
   const height = (t.top - t.bottom + 1) * floorH;
@@ -35,8 +41,10 @@ export function drawTransport(
     // A flight out of a tall lobby (#308) climbs the whole hall, as the
     // original's two- and three-story stairs do: a spiral up the hall, since
     // one straight flight that tall reads as a ladder.
+    // Beside a venue in Modern, a one-story flight is a spiral too
+    // (`venueFlights.ts`).
     const span = t.top - t.bottom;
-    if (span > 1) {
+    if (span > 1 || (winds && span === 1)) {
       drawSpiralStair(ctx, sx, w, topY + floorH, topY + (span + 1) * floorH, span);
       return;
     }
@@ -54,9 +62,15 @@ export function drawTransport(
     // behind it. One diagonal run per floor pair, confined to the departure
     // band, rising to the second-floor landing (the top band is the landing).
     // Out of a tall lobby (#308), a switchback up the whole hall.
+    // Beside a venue in Modern, a one-story escalator turns back halfway up
+    // (`venueFlights.ts`).
     const span = t.top - t.bottom;
     if (span > 1) {
       drawEscalatorSwitchback(ctx, sx, w, topY, floorH, span);
+      return;
+    }
+    if (winds && span === 1) {
+      drawEscalatorHalfTurn(ctx, sx, w, topY + floorH, topY + 2 * floorH);
       return;
     }
     for (let fl = 1; fl <= span; fl++) {
@@ -234,128 +248,6 @@ function drawStairFlight(ctx: CanvasRenderingContext2D, sx: number, w: number, b
   newel(x0, railY(x0), Math.round(line(x0)) + depth);
 }
 
-/** An escalator up a tall lobby (#308): one run a story, each turning back
- *  the way the last came, from a steel platform at the turn held up by a
- *  post to the hall floor. The bottom run climbs left to right like a
- *  one-story escalator. Drawn strictly inside `[sx, sx + w]`. */
-function drawEscalatorSwitchback(ctx: CanvasRenderingContext2D, sx: number, w: number, topY: number, floorH: number, stories: number): void {
-  const hallFloor = topY + (stories + 1) * floorH;
-  for (let k = 0; k < stories; k++) {
-    const bandTop = topY + (stories - k) * floorH;
-    if (k % 2 === 0) {
-      drawEscalatorRun(ctx, sx, w, bandTop, bandTop + floorH);
-    } else {
-      // Mirrored about the shaft's middle, so this run climbs right to left.
-      ctx.save();
-      ctx.translate(2 * sx + w, 0);
-      ctx.scale(-1, 1);
-      drawEscalatorRun(ctx, sx, w, bandTop, bandTop + floorH);
-      ctx.restore();
-    }
-  }
-  // A platform at each turn, on the side the run below arrives at.
-  for (let k = 1; k < stories; k++) {
-    const y = topY + (stories - k + 1) * floorH;
-    const right = k % 2 === 1;
-    const pw = 14;
-    const px = right ? sx + w - 2 - pw : sx + 2;
-    const deck = y - 12;
-    ctx.fillStyle = "#3A3E46"; // the post down to the hall floor
-    ctx.fillRect(px + Math.floor(pw / 2) - 1, deck + 6, 3, hallFloor - deck - 6);
-    ctx.fillStyle = "#6A6E76"; // steel deck
-    ctx.fillRect(px, deck, pw, 6);
-    ctx.fillStyle = "#8A8E96"; // lit edge
-    ctx.fillRect(px, deck, pw, 1);
-    ctx.fillStyle = "#2A2D33"; // shaded underside
-    ctx.fillRect(px, deck + 5, pw, 1);
-    ctx.fillStyle = "#1A1D24"; // guard rail along the deck
-    ctx.fillRect(px, deck - 9, pw, 2);
-    ctx.fillRect(right ? px + pw - 2 : px, deck - 9, 2, 9);
-  }
-}
-
-/** One escalator run: a clean inclined belt of metallic warm-gray steps with
- *  legible amber step edges, a glass side balustrade with a dark moving handrail,
- *  and comb-plate landings top and bottom. Confined to the band
- *  `[bandTop, bandBottom)` like the stair flight and drawn strictly inside
- *  `[sx, sx + w]`. Structure only, NO baked rider: the engine's routed sims ride
- *  over it, so an empty tower shows a bare, unoccupied run. Integer coordinates. */
-function drawEscalatorRun(ctx: CanvasRenderingContext2D, sx: number, w: number, bandTop: number, bandBottom: number): void {
-  const railH = 10; // handrail height above the belt top
-  const beltThk = 8; // belt thickness
-  const x0 = sx + 10; // bottom landing on the left
-  const x1 = sx + w - 12; // top landing on the right
-  if (x1 - x0 < 8) return;
-  // Keep the belt inside the band: the belt is `beltThk` thick below the incline
-  // line, so its top clears the band bottom by that much (a run that leaked past
-  // bandBottom would paint onto the floor below).
-  const yBot = bandBottom - beltThk - 2; // belt top at the lower deck
-  // The belt top and top landing reach the arrival deck (bandTop) so the run
-  // connects to the second floor; the handrail is clamped below the deck.
-  const yTop = bandTop + 2; // belt top at the upper deck
-  if (yBot - yTop < 6) return;
-  const line = (x: number) => yBot - ((x - x0) / (x1 - x0)) * (yBot - yTop);
-  // Soft drop shadow under the belt. Height 1 so the deepest column (at x0, where
-  // line === yBot) ends on bandBottom - 1 and never paints the bandBottom row,
-  // which belongs to the floor below.
-  ctx.fillStyle = "rgba(0,0,0,0.28)";
-  for (let x = x0; x < x1; x++) ctx.fillRect(x + 1, Math.round(line(x)) + beltThk + 1, 1, 1);
-  // The metal belt: a mid-gray band with a light top edge and a dark underside.
-  for (let x = x0; x <= x1; x++) {
-    const t = Math.round(line(x));
-    ctx.fillStyle = "#6E747C";
-    ctx.fillRect(x, t, 1, beltThk);
-    ctx.fillStyle = "#9AA0A8"; // lit top edge of the belt
-    ctx.fillRect(x, t, 1, 1);
-    ctx.fillStyle = "#3A3E46"; // dark underside
-    ctx.fillRect(x, t + beltThk - 1, 1, 1);
-  }
-  // Step edges: a dark groove with a bright amber nose, evenly spaced, so the
-  // moving steps read at a glance.
-  for (let x = x0 + 2; x < x1; x += 4) {
-    const t = Math.round(line(x));
-    ctx.fillStyle = "#3A3E46";
-    ctx.fillRect(x, t + 1, 1, beltThk - 2);
-    ctx.fillStyle = "#F0C24A";
-    ctx.fillRect(x - 1, t + 1, 1, beltThk - 2);
-  }
-  // Glass side balustrade with a dark moving handrail on top. The rail is clamped
-  // so it never rises above the arrival deck (bandTop): near the top it levels
-  // onto the landing and ends in a short newel, so the run reads as reaching the
-  // second floor.
-  const railTop = (x: number) => Math.max(bandTop, Math.round(line(x)) - railH);
-  ctx.fillStyle = "rgba(191,208,224,0.18)";
-  for (let x = x0; x <= x1; x++) {
-    const rt = railTop(x);
-    ctx.fillRect(x, rt, 1, Math.max(1, Math.round(line(x)) - rt));
-  }
-  for (let x = x0; x <= x1; x++) {
-    const rt = railTop(x);
-    ctx.fillStyle = "#1A1D24";
-    ctx.fillRect(x, rt, 1, 2);
-    ctx.fillStyle = "#4A4E56"; // handrail highlight
-    ctx.fillRect(x, rt, 1, 1);
-  }
-  // Comb-plate landings top and bottom, inside [sx, sx + w]. The top comb plate
-  // sits on bandTop (the arrival deck), so the run lands flush on the second floor.
-  ctx.fillStyle = "#6A6E76";
-  ctx.fillRect(sx + 2, yBot - 2, x0 - sx - 2, 5);
-  ctx.fillStyle = "#8A8E96";
-  ctx.fillRect(sx + 2, yBot - 2, x0 - sx - 2, 1);
-  const rlx = x1;
-  const rlw = sx + w - 2 - x1;
-  ctx.fillStyle = "#6A6E76";
-  ctx.fillRect(rlx, bandTop, rlw, 5);
-  ctx.fillStyle = "#8A8E96";
-  ctx.fillRect(rlx, bandTop, rlw, 1);
-  ctx.fillStyle = "#3A3E46";
-  ctx.fillRect(rlx, bandTop + 5, rlw, 1);
-  // Newel where the handrail meets the top landing, drawn AFTER the landing so it
-  // stands proud of it rather than being overpainted.
-  ctx.fillStyle = "#1A1D24";
-  ctx.fillRect(x1 - 1, bandTop, 2, Math.min(8, yBot - bandTop));
-}
-
 /** A single elevator car graphic, drawn at (0,0) into a w×floorH rect, carrying
  *  `riders` passengers. `arrow` is the direction lantern (null when idle) and
  *  `full` flags a car at capacity. `kind` dresses the cab per elevator type
@@ -428,13 +320,12 @@ export function drawCar(
   // front (depth layers, `pixelSprites/layers.ts`). The floor band stays on
   // the back: the riders stand on it (#999).
   layerBreak(ctx);
-  // Riders stand on the cab floor as the 17px rider silhouette, packed tighter
-  // as the car fills so a crowded cab reads at a glance. `riders` is the car's
-  // load from the caller; the passenger FILL reconciliation is the people-system
-  // spec's overlay behind the E6 seam, not redefined here.
+  // Riders stand on the cab floor at their size on the floor, one per
+  // passenger up to the cab's room (`cabFit`), packed tighter as the car fills
+  // so a crowded cab reads at a glance.
   const rc = Math.max(0, Math.floor(riders));
   if (rc > 0) {
-    const gap = Math.max(3, Math.min(7, (cw - 8) / rc));
+    const gap = Math.max(RIDER_STEP, Math.min(7, (cw - 8) / rc));
     for (let p = 0; p < rc; p++) {
       const rx = 3 + p * gap;
       if (rx > cw - 5) break; // never overflow the cab

@@ -202,6 +202,7 @@ shapes for each one.
 | `drainGameplayEvents()` | The gameplay events since the last drain, oldest first, as `[{ name, payload }]` (`facility_placed`, `star_reached`, `fire_started`, `milestone_reached` and the rest). The names and payloads are listed in [`engine-rs/src/gameplay/catalog.json`](https://github.com/maniator/verticopolis/blob/main/engine-rs/src/gameplay/catalog.json). Drain after each frame; the buffer is bounded and `gameplayEventsDropped()` counts what it had to drop. |
 | `logSince(seq)` | The tower's message log after entry `seq`, as `[{ seq, minute, text, kind }]`. |
 | `viewLayout()`, `viewStructure()`, `viewFrame(full)` | The renderer's view, for a host that draws the tower every frame: the layout names every slot as JSON; the structure (floors, rooms, shafts) and the per-frame state (clock, people, changed rooms, cars) come as flat number arrays read through it. |
+| `setPeopleWindow(floorLo, floorHi, xLo, xHi)` | The floors and tiles on screen, so the next `viewFrame` calls carry only the people there (padded so every rider of a car on screen comes along). A number that is not finite clears it. It is the camera only: the game steps every person and nothing saves it. |
 | `serialize()` | The whole game as save JSON. |
 | `stateDigest()` | A short hash of the game state. Two engines that agree on it hold the same game. |
 

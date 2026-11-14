@@ -308,6 +308,7 @@ pub fn begin_dwell(crowd: &mut Crowd, tower: &mut Tower, i: usize) {
             .is_some_and(|u| u.kind.is_hotel());
         let (v, at) = tower.marked_by_id(vid).unwrap();
         v.set_customers_in(at, Some(customers + 1));
+        v.sync_visitor_occupants(at);
         if origin_is_hotel {
             crowd.people[i].counted_hotel_guest = true;
             v.set_hotel_customers_in(at, Some(v.hotel_customers_in.unwrap_or(0) + 1));
@@ -323,7 +324,7 @@ pub fn begin_dwell(crowd: &mut Crowd, tower: &mut Tower, i: usize) {
             crowd.people[i].venue_unit_id = Some(vid);
             let (v, at) = tower.marked_by_id(vid).unwrap();
             v.set_customers_in(at, Some(customers + 1));
-            v.sync_attendance_occupants(at);
+            v.sync_visitor_occupants(at);
             tower.bump_meal_overlay_revision();
         }
     }
