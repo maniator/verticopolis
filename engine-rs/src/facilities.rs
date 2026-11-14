@@ -450,17 +450,14 @@ pub fn ground_floor_structure_kind(kind: Kind, floor: i64) -> Kind {
 }
 
 #[doc(hidden)]
-/// `NO_BASEMENT_KINDS`.
+/// Whether `kind` is kept above ground (`NO_BASEMENT_KINDS`). SimTower builds
+/// offices, condos and hotel rooms above ground only, and housekeeping with
+/// the hotel. Every home follows the condo, so Modern's studios and
+/// apartments stay above ground too: no home of any kind goes underground.
 pub fn no_basement(kind: Kind) -> bool {
-    matches!(
-        kind,
-        Kind::Office
-            | Kind::Condo
-            | Kind::HotelSingle
-            | Kind::HotelDouble
-            | Kind::HotelSuite
-            | Kind::Housekeeping
-    )
+    let home = kind == Kind::Condo || kind.is_rental();
+    let hotel = kind.is_hotel() || kind == Kind::Housekeeping;
+    home || hotel || kind == Kind::Office
 }
 
 #[doc(hidden)]

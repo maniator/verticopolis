@@ -91,6 +91,8 @@
     clippy::collapsible_match
 )]
 
+#[cfg(test)]
+mod basement_homes_tests;
 pub mod brush;
 pub mod build;
 pub mod canonical;
