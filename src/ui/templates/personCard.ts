@@ -20,7 +20,9 @@ export type PersonMood = "content" | "impatient" | "fedUp";
 export interface PersonCardInput {
   /** The last card the engine answered. */
   person: PersonDetail;
-  /** True once the engine no longer knows them: they left the tower. */
+  /** True once the engine no longer knows them: they reached the end of
+   *  their trip and went inside, or walked out of the tower. `person` is
+   *  then the last card it answered, which says which (`goneWords`). */
   gone: boolean;
   catalog: Catalog;
   /** The kind of `person.shaftId`, when it still stands. */
@@ -147,22 +149,43 @@ export function personNow(p: PersonDetail, shaftName: string | null): string {
   }
 }
 
+/** What became of someone the engine has let go, from the last card it
+ *  answered: the Now row and the note under it. A trip ends where the
+ *  person stood, so the end on their floor is where they went. Reaching a
+ *  room or a floor means they went inside; only the ground lobby and the
+ *  Metro lead out of the tower. Someone who turned back went back to where
+ *  they set out from. */
+export function goneWords(p: PersonDetail, catalog: Catalog): { now: string; note: string } {
+  const left = { now: "Left the tower", note: "They left the tower." };
+  const onFloor = (t: TripPlace): boolean => t.place !== "none" && t.floor === p.floor;
+  const leadsOut = (t: TripPlace): boolean => t.place === "metro" || (t.place === "lobby" && t.floor === 1);
+  if (onFloor(p.to)) {
+    if (leadsOut(p.to)) return left;
+    return { now: p.to.place === "room" ? "Went inside" : "Arrived", note: `They reached ${placeWords(p.to, catalog)}.` };
+  }
+  if (onFloor(p.from) && !leadsOut(p.from)) {
+    return { now: "Went back", note: `They went back to ${placeWords(p.from, catalog)}.` };
+  }
+  return left;
+}
+
 const kv = (label: string, value: string, field: string): TemplateResult =>
   html`<span class="k">${label}</span><span class="v" data-field=${field}>${value}</span>`;
 
 export function personCardTemplate(input: PersonCardInput): TemplateResult {
   const { person: p, catalog, gone } = input;
   const shaftName = input.shaftKind ? catalogFacility(catalog, input.shaftKind).name : null;
+  const end = gone ? goneWords(p, catalog) : null;
   const rows = [
     kv("Why", personWhy(p), "why"),
     kv(p.staff ? "Works from" : "From", placeWords(p.from, catalog), "from"),
     kv(p.staff ? "Heading to" : "To", placeWords(p.to, catalog), "to"),
-    kv("Now", gone ? "Left the tower" : personNow(p, shaftName), "now"),
+    kv("Now", end ? end.now : personNow(p, shaftName), "now"),
     kv("Waited", `${Math.round(p.tripWaitMinutes)} min this trip`, "waited"),
     kv("Mood", MOOD_WORDS[input.mood], "mood"),
   ];
-  const follow = gone
-    ? html`<div class="ed-row"><span class="ed-note">They left the tower.</span></div>`
+  const follow = end
+    ? html`<div class="ed-row"><span class="ed-note" data-field="gone">${end.note}</span></div>`
     : html`<div class="ed-row">
         <button type="button" class="btn" data-edit=${PERSON_FOLLOW_ACTION}>
           ${input.following ? "Stop following" : "Follow"}

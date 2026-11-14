@@ -91,6 +91,18 @@ describe("PersonCardController", () => {
     expect(d.person).toHaveBeenCalledTimes(3);
   });
 
+  it("says where they went in when the engine lets them go at the end of the trip", () => {
+    // Followed up the elevator to floor 12: they walk off and go in.
+    const d = deps([person(), person({ state: "toDest", x: 9, floor: 12 }), undefined]);
+    const c = new PersonCardController(d);
+    c.open(5);
+    c.tick();
+    c.tick();
+    expect(shown(d)).toContain("They reached Floor 12.");
+    expect(shown(d)).not.toContain("left the tower");
+    expect(d.setFollow).toHaveBeenLastCalledWith(false);
+  });
+
   it("rings the person again on a view rebuilt after a lost graphics context", () => {
     const d = deps([person()]);
     const c = new PersonCardController(d);
