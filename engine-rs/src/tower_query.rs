@@ -347,12 +347,19 @@ impl Tower {
 
     /// `segmentsOf`: the contiguous structural runs on a floor.
     pub fn segments_of(&self, floor: i64) -> Vec<(i64, i64)> {
+        self.segment_runs(floor).to_vec()
+    }
+
+    /// The contiguous structural runs on a floor, left to right, as the
+    /// per-edit memo shares them: a read copies no list, so the per-person
+    /// lookups (`seg_at`, `run_at`, the lobby a trip uses) allocate nothing.
+    pub(crate) fn segment_runs(&self, floor: i64) -> crate::tower_query_state::Runs {
         {
             let key = self.index_key();
             let mut memo = self.memo.borrow_mut();
             match &memo.segs {
                 Some((built, _)) if *built == key => {}
-                _ => memo.segs = Some((key, HashMap::new())),
+                _ => memo.segs = Some((key, Default::default())),
             }
             if let Some(v) = memo.segs.as_ref().unwrap().1.get(&floor) {
                 return v.clone();
@@ -377,6 +384,7 @@ impl Tower {
                 _ => runs.push((x, x)),
             }
         }
+        let runs: crate::tower_query_state::Runs = runs.into();
         self.memo
             .borrow_mut()
             .segs
@@ -389,7 +397,7 @@ impl Tower {
 
     /// `segmentStartX`.
     pub fn segment_start_x(&self, floor: i64, x: i64) -> i64 {
-        for (start, end) in self.segments_of(floor) {
+        for &(start, end) in self.segment_runs(floor).iter() {
             if x < start {
                 break;
             }
@@ -405,7 +413,7 @@ impl Tower {
     /// ever matches, so it maps to a sentinel here.
     pub fn seg_at(&self, floor: i64, x: Option<f64>) -> i64 {
         if let Some(x) = x {
-            for (start, end) in self.segments_of(floor) {
+            for &(start, end) in self.segment_runs(floor).iter() {
                 if x < start as f64 {
                     break;
                 }
@@ -418,13 +426,13 @@ impl Tower {
             }
             return seg_id(floor, x as i64);
         }
-        let runs = self.segments_of(floor);
+        let runs = self.segment_runs(floor);
         seg_id(floor, runs.first().map(|r| r.0).unwrap_or(0))
     }
 
     /// `runAt` (crowd/walk.ts).
     pub fn run_at(&self, floor: i64, x: i64) -> Option<(i64, i64)> {
-        for run in self.segments_of(floor) {
+        for &run in self.segment_runs(floor).iter() {
             if x < run.0 {
                 return None;
             }
@@ -478,7 +486,7 @@ impl Tower {
 
     /// `lobbySegs` (crowd/segmentGraph.ts).
     pub fn lobby_segs(&self) -> Vec<i64> {
-        let runs = self.segments_of(1);
+        let runs = self.segment_runs(1);
         if runs.is_empty() {
             vec![seg_id(1, 0)]
         } else {

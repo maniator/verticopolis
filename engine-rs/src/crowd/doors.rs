@@ -11,7 +11,7 @@
 //! A floor with one run answers as before.
 
 use super::routing::{parts_split, passenger_parts};
-use super::spawn::pick_x_in_segment;
+use super::spawn::{pick_x, pick_x_in_segment};
 use super::{Crowd, Route};
 use crate::tower::Tower;
 
@@ -31,10 +31,11 @@ fn candidate_runs(
     anchor_x: f64,
     fixed: i64,
 ) -> Vec<(i64, i64)> {
-    let mut runs = tower.segments_of(floor);
-    if runs.len() <= 1 {
+    let shared = tower.segment_runs(floor);
+    if shared.len() <= 1 {
         return Vec::new();
     }
+    let mut runs = shared.to_vec();
     let parts = passenger_parts(crowd, tower);
     runs.retain(|&(start, _)| !parts_split(parts, fixed, crate::tower_query::seg_id(floor, start)));
     runs.sort_by(|&a, &b| distance_to_run(anchor_x, a).total_cmp(&distance_to_run(anchor_x, b)));
@@ -84,4 +85,47 @@ pub fn route_open_end(
         }
     }
     None
+}
+
+/// The tiles of `floor` to try, nearest `anchor_x` first, for a trip whose
+/// end there is open but whose network the passenger graph does not
+/// describe (a housekeeper's commute, which keeps to the staff network when
+/// it can): one tile in each run, the seed's tile in it, worked out only
+/// when the caller gets to that run. Each comes with its run's first tile,
+/// for [`passenger_joins`]. A floor with one run (or none) yields only the
+/// tile `pick_x` always picked, with no run, and copies nothing.
+pub fn tiles_nearest(
+    tower: &Tower,
+    floor: i64,
+    anchor_x: f64,
+    seed: i32,
+) -> impl Iterator<Item = (Option<i64>, i64)> + '_ {
+    let shared = tower.segment_runs(floor);
+    let (single, mut runs) = if shared.len() <= 1 {
+        (Some(pick_x(tower, floor, seed)), Vec::new())
+    } else {
+        (None, shared.to_vec())
+    };
+    runs.sort_by(|&a, &b| distance_to_run(anchor_x, a).total_cmp(&distance_to_run(anchor_x, b)));
+    single.map(|x| (None, x)).into_iter().chain(
+        runs.into_iter()
+            .map(move |(start, _)| (Some(start), pick_x_in_segment(tower, floor, seed, start))),
+    )
+}
+
+/// Whether a passenger route may join the run of `floor` starting at
+/// `run_start` to the segment `other`: false only when the passenger graph
+/// puts them in different parts, so the search would fail. No run (a floor
+/// with one) always may.
+pub fn passenger_joins(
+    crowd: &mut Crowd,
+    tower: &Tower,
+    floor: i64,
+    run_start: Option<i64>,
+    other: i64,
+) -> bool {
+    run_start.is_none_or(|start| {
+        let parts = passenger_parts(crowd, tower);
+        !parts_split(parts, other, crate::tower_query::seg_id(floor, start))
+    })
 }

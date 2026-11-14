@@ -3,7 +3,6 @@ import type { EnginePort } from "../../simport/enginePort";
 import { scheduleSlots } from "../../simport/scheduleSlots";
 import { canonicalJson } from "../conformance/canonical";
 import { dumpRoot, type FrameDayStart } from "./frameDays";
-import { stopsAtBoth } from "./portEditCrowd";
 import type { PortEditLine } from "./portEditLines";
 import { PortEditSession, type PortEditLeg } from "./portEdits";
 
@@ -167,8 +166,10 @@ function fourStarEdits(s: PortEditSession): void {
   // the escalator is there, so the check leaves out anyone already on it,
   // and it requires that the people midway on a route that never takes it
   // all stay. Of the people who set out after the bulldoze and are still in
-  // the crowd at the hour's end, some ride and none takes the escalator, and
-  // any who go between its floors each take a link that stops at both.
+  // the crowd at the hour's end, some ride and none takes the escalator. (A
+  // check that their legs between its floors take a link stopping at both
+  // was dropped: nobody in this hour rides between those floors, so it
+  // could never fail.)
   s.done("sell the office at floor 2, x 150", "demolish", s.unitAt(2, 150), SELL);
   s.require("the sale takes the office out", !s.hasUnitAt(2, 150));
   s.done("bulldoze the shop at floor 13, x 238", "demolish", s.unitAt(13, 238), BULLDOZE);
@@ -189,12 +190,9 @@ function fourStarEdits(s: PortEditSession): void {
   const stillHeadedFor = firstMoveCrowd.people.filter((p) => walking.includes(p.id) && p.shafts.slice(p.leg).includes(link.id));
   s.require("the first frame that moves the clock leaves none of the people walking to the escalator still headed for it", stillHeadedFor.length === 0);
   s.require("the first frame that moves the clock keeps the people midway on a route that never takes the escalator", midway.every((id) => firstMove.has(id)));
-  const links = s.shaftsBetween(link.bottom, link.top, since);
-  const stopsAtItsFloors = (id: number): boolean => stopsAtBoth(s.shaftById(id), link.bottom, link.top);
   const riders = s.ridersSince(since);
   s.require("someone who set out after the bulldoze rides", riders.length > 0);
   s.require("nobody who set out after the bulldoze takes the escalator", riders.every((shafts) => !shafts.includes(link.id)));
-  s.require("each of their legs between its floors takes a link that stops at both floors, and none the escalator", [...new Set(links)].every(stopsAtItsFloors) && !links.includes(link.id));
 
   // A sale and a bulldoze as the tools send them, each its own undo step;
   // the lobby is refused and keeps no step.
