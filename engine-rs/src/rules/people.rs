@@ -10,6 +10,12 @@ impl GameMode {
         self == GameMode::Classic
     }
 
+    /// Whether a rider takes the route with the shortest expected trip, lines
+    /// included (`crowd::expected_time`), rather than the fewest rides.
+    pub fn routes_by_expected_time(self) -> bool {
+        self == GameMode::Modern
+    }
+
     pub fn rain_crowd_factor(self) -> f64 {
         match self {
             GameMode::Classic => 0.5,

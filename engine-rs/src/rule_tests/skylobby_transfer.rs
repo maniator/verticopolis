@@ -130,21 +130,31 @@ fn stairs_after_an_express_and_two_expresses_end_to_end_route_in_both_modes() {
     }
 }
 
+/// Both modes ride the same locals in a tower with no express. One floor up
+/// is the exception: Classic takes the first-listed way (the local), while
+/// Modern counts the trip's expected time and takes the escalator, which
+/// needs no wait for a car (`crowd::expected_time`).
 #[test]
 fn a_tower_with_no_express_routes_the_same_in_both_modes() {
     let locals = |mode| {
         let mut sim = base_tower(mode, 20, &[]);
-        shaft(&mut sim, Kind::ElevatorStandard, 4, 1, 10);
+        let low = shaft(&mut sim, Kind::ElevatorStandard, 4, 1, 10);
         shaft(&mut sim, Kind::ElevatorStandard, 10, 10, 20);
-        shaft(&mut sim, Kind::Escalator, 16, 1, 2);
-        sim
+        let escalator = shaft(&mut sim, Kind::Escalator, 16, 1, 2);
+        (sim, low, escalator)
     };
-    let (mut classic, mut modern) = (locals(GameMode::Classic), locals(GameMode::Modern));
-    for (from, to) in [(1, 2), (1, 10), (1, 18), (2, 20), (18, 1), (20, 2)] {
+    let (mut classic, low, escalator) = locals(GameMode::Classic);
+    let (mut modern, ..) = locals(GameMode::Modern);
+    for (from, to) in [(1, 10), (1, 18), (2, 20), (18, 1), (20, 2)] {
         let gated = route(&mut classic, from, to);
         assert!(gated.is_some(), "{from} to {to}");
         assert_eq!(gated, route(&mut modern, from, to), "{from} to {to}");
     }
+    assert_eq!(route(&mut classic, 1, 2), Some((vec![1, 2], vec![low])));
+    assert_eq!(
+        route(&mut modern, 1, 2),
+        Some((vec![1, 2], vec![escalator]))
+    );
 }
 
 #[test]
