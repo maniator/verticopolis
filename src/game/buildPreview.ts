@@ -345,7 +345,19 @@ export function updateBuildPreview(app: GameApp, tile: number, floor: number, sh
     const valid = laid > 0 && can.ok && affordsStrip;
     let reason: string | undefined;
     if (!valid && catalog.rules.previewNamesRefusal && (!can.ok || laid > 0)) reason = can.ok ? NOT_ENOUGH_MONEY : can.reason;
-    app.engine.preview = { kind: ghostKind, floor, x: left, span, valid, reason, stories: rise };
+    // A gold ghost stops at the brush's last tile that is built or laid, so
+    // near the tower's edge it ends flush with the floor below instead of
+    // hanging over open air the click leaves alone (#637); a red one keeps
+    // the whole brush.
+    let ghostX = left;
+    let ghostEnd = left + span - 1;
+    if (valid) {
+      const covered = [...brush].filter((tx) => builtAt(tx) !== undefined || laidTiles.includes(tx));
+      ghostX = covered[0];
+      ghostEnd = covered[covered.length - 1];
+    }
+    const ghostSpan = ghostEnd - ghostX + 1;
+    app.engine.preview = { kind: ghostKind, floor, x: ghostX, span: ghostSpan, valid, reason, stories: rise };
     app.engine.transportPreview = null;
     if (showReasonCard) updateBuildRefusal(app, reason, floor, left + Math.floor(span / 2));
     else clearBuildRefusal(app);
