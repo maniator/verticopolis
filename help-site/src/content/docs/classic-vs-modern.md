@@ -13,6 +13,7 @@ Every tower runs one of two sets of rules. You choose when you found the tower, 
 | --- | --- | --- |
 | Rooms | The 1994 list | Adds the [Food Hall](/help/rooms/food-and-shops/#foodHall), [Boutique Bay](/help/rooms/food-and-shops/#boutiqueBay), [Clinic](/help/rooms/food-and-shops/#clinic), new [venues](/help/rooms/venues/) and [rental homes](/help/rooms/homes/#rentalApartment) |
 | Calendar | 3-day weeks, 3-day quarters, 12-day years | The real-world calendar or the 1994 one, your choice ([Calendar and clock](/help/tower/clock/)) |
+| Office workers | Fill the offices at 8 AM by the clock | Ride in from the lobby or the Metro over 7 to 10 AM, and count once they reach their desks ([Offices](/help/rooms/offices/#getting-to-work)) |
 | Office rent | The whole quarter's rent every three days | Smoothed, so a tower earns the same each day on either calendar ([Money](/help/tower/money/)) |
 | Setting rents | A four-step ladder, plus No Rate | A slider |
 | Condos | A family of three, sold for good | Households of two to five, where a bigger household pays more, and families sometimes move away ([Homes](/help/rooms/homes/#condo)) |
@@ -22,6 +23,7 @@ Every tower runs one of two sets of rules. You choose when you found the tower, 
 | Metro stations | One per tower | Up to three on one line ([Services](/help/rooms/services/#more-than-one-station)) |
 | Climbing | Nobody walks more than 4 flights of stairs or 7 of escalator | People climb as far as they must ([Stairs and escalators](/help/building/stairs-and-escalators/)) |
 | Escalators | Never to an office floor | Anywhere |
+| Elevator speed | One speed for every car, express included | Cars twice as fast, express cars four times ([Elevators](/help/building/elevators/#express-elevators-and-sky-lobbies)) |
 | Elevator schedules | The hour-by-hour grid | Adds presets, auto-tune and advice ([Elevators](/help/building/elevators/)) |
 | Building while paused | Not allowed | Allowed |
 | Tall lobbies | Only the ground lobby can rise 2 or 3 stories | Sky lobbies can rise too ([Floors and lobbies](/help/building/floors-and-lobbies/#tall-lobbies)) |

@@ -260,16 +260,16 @@ fn riders_and_walkers_count_on_the_shaft_they_use() {
     assert!(rides_after_three_days(Kind::Escalator, 2) > 0, "walkers");
 }
 
-/// The dispatch's riders, with nobody in the crowd: the people in an office
+/// The dispatch's riders, with nobody in the crowd: the people in a condo
 /// the shaft serves fill its halls, and the car that takes them on is
 /// ridden.
 #[test]
 fn the_dispatch_counts_the_riders_it_takes_on() {
     let mut sim = tower();
     let id = lift(&mut sim);
-    assert!(sim.build(Kind::Office, 3, 30).ok);
-    let office = sim.tower.unit_at(3, 30).unwrap().id;
-    sim.tower.get_unit_mut(office).unwrap().occupants = 6;
+    assert!(sim.build(Kind::Condo, 3, 30).ok);
+    let condo = sim.tower.unit_at(3, 30).unwrap().id;
+    sim.tower.get_unit_mut(condo).unwrap().occupants = 3;
     let calls = ElevatorCalls::default();
     for _ in 0..100 {
         sim.elevators.accumulate(&sim.tower, 2.5, 1.0);

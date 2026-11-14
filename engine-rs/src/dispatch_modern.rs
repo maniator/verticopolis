@@ -55,7 +55,9 @@ pub struct DispatchRules {
     /// retired: a parked car answers only calls within the span less that
     /// many floors. Only the test-only plain SCAN profile sets it.
     pub parked_reach_gate: bool,
-    /// How many times faster an express car moves than a standard car.
+    /// How many times the base speed a standard or service car moves.
+    pub car_speed: f64,
+    /// How many times the base speed an express car moves.
     pub express_speed: f64,
 }
 
@@ -70,6 +72,7 @@ impl DispatchRules {
             spread_homes: mode.spreads_unset_car_homes(),
             parked_owner_boards: mode.parked_owner_boards_its_floor(),
             parked_reach_gate: false,
+            car_speed: mode.car_speed_factor(),
             express_speed: mode.express_speed_factor(),
         }
     }
@@ -89,6 +92,7 @@ impl DispatchRules {
             spread_homes: false,
             parked_owner_boards: false,
             parked_reach_gate: true,
+            car_speed: 1.0,
             express_speed: 1.0,
         }
     }

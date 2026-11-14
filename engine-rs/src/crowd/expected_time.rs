@@ -8,12 +8,11 @@
 //! A route's cost is in tenths of a crowd second, so the search adds whole
 //! numbers. Each ride costs a boarding cost, the expected wait for a car
 //! (half the time between cars, plus the line ahead over the seats a round
-//! trip of every car brings), the ride per floor and a share of a dwell at
-//! each stop it passes. Each flight of stairs or escalator costs a fixed
-//! climb. The lines are the people waiting for or walking to a car as the
-//! last motion slice counted them, and each rider routed in the step joins
-//! the line they picked, so people setting out together spread out instead of all taking
-//! the line that was shortest when the step began.
+//! trip of every car brings), the ride per floor at the car's speed and a
+//! share of a dwell at each stop it passes. A flight costs a fixed climb.
+//! The lines are the people waiting for or walking to a car as the last
+//! motion slice counted them, and each rider routed in the step joins the
+//! line they picked, so people setting out together spread out.
 //!
 //! The search runs on a transit graph: a segment boards a shaft at one of
 //! its stops, a car rides stop to stop, and a rider steps off onto a
@@ -27,10 +26,7 @@ use std::collections::BinaryHeap;
 
 use super::fasthash::FastMap;
 use super::{Crowd, Route, CROWD_SECONDS_PER_MINUTE, RIDE_SECONDS_PER_FLOOR};
-use crate::dispatch::DWELL_MINUTES;
-use crate::facilities::Kind;
-use crate::tower::Tower;
-use crate::tower_query::floor_of_seg;
+use crate::{dispatch::DWELL_MINUTES, facilities::Kind, tower::Tower, tower_query::floor_of_seg};
 
 /// Costs are kept in tenths of a crowd second.
 const TENTHS: f64 = 10.0;
@@ -100,6 +96,8 @@ struct Shaft {
 /// fresh crowd.
 pub struct Router {
     revision: i64,
+    /// The fastest car's ride per floor in tenths, rounded down (`floors_bound`).
+    per_floor: i64,
     /// Each node, and the place of each in that list.
     nodes: Vec<Node>,
     place: FastMap<Node, u32>,
@@ -169,6 +167,7 @@ fn build(tower: &Tower) -> Router {
     let mut g = Places::default();
     let mut shafts: FastMap<i64, Shaft> = FastMap::default();
     let dwell = DWELL_MINUTES * CROWD_SECONDS_PER_MINUTE;
+    let mut per_floor = RIDE_SECONDS_PER_FLOOR; // under every flight's climb per floor
     let passengers = tower.transports.iter();
     for t in passengers.filter(|t| !t.kind.is_staff_only_transport()) {
         let stops = tower.stops_of(t);
@@ -192,8 +191,10 @@ fn build(tower: &Tower) -> Router {
             }
             continue;
         }
+        let ride = RIDE_SECONDS_PER_FLOOR / tower.mode.speed_of(t.kind);
+        per_floor = per_floor.min(ride);
         let span = (t.top - t.bottom).max(1) as f64;
-        let round_trip = 2.0 * (span * RIDE_SECONDS_PER_FLOOR + stops.len() as f64 * dwell);
+        let round_trip = 2.0 * (span * ride + stops.len() as f64 * dwell);
         let shaft = Shaft {
             round_trip,
             capacity: t.kind.car_capacity().max(1.0),
@@ -223,7 +224,7 @@ fn build(tower: &Tower) -> Router {
                     continue;
                 };
                 let ahead = Node::Car(t.id, next, way);
-                let hop = (to - floor).abs() as f64 * RIDE_SECONDS_PER_FLOOR + passed;
+                let hop = (to - floor).abs() as f64 * ride + passed;
                 for &s in here {
                     let on = Move::Board { shaft: t.id, floor };
                     g.add(Node::Segment(s), ahead, to, board + hop, on);
@@ -235,8 +236,10 @@ fn build(tower: &Tower) -> Router {
         }
     }
     let n = g.nodes.len();
-    let exit = exit_costs(&g, &shafts);
+    let per_floor = (per_floor * TENTHS).floor() as i64;
+    let exit = exit_costs(&g, &shafts, per_floor);
     Router {
+        per_floor,
         revision: tower.revision,
         nodes: g.nodes,
         place: g.place,
@@ -259,7 +262,7 @@ fn build(tower: &Tower) -> Router {
 /// the bound adds it. Keeping it at or under each link's own cost beyond
 /// its floors keeps the bound consistent, so A* still finds the cheapest
 /// route (`the_exit_bound_never_overtakes_a_link`).
-fn exit_costs(g: &Places, shafts: &FastMap<i64, Shaft>) -> Vec<i64> {
+fn exit_costs(g: &Places, shafts: &FastMap<i64, Shaft>, per_floor: i64) -> Vec<i64> {
     let floor_of = |p: usize| match g.nodes[p] {
         Node::Segment(s) => Some(floor_of_seg(s)),
         Node::Car(..) => None,
@@ -274,7 +277,7 @@ fn exit_costs(g: &Places, shafts: &FastMap<i64, Shaft>) -> Vec<i64> {
                     Move::Board { shaft, .. } => tenths(least_headway(&shafts[&shaft])),
                     _ => 0,
                 };
-                l.tenths + wait - floors_bound(floor, l.floor)
+                l.tenths + wait - floors_bound(floor, l.floor, per_floor)
             });
             least.min().unwrap_or(0).max(0)
         })
@@ -340,11 +343,10 @@ fn stand_down(router: &mut Router, closed: &[(i64, i64)]) {
     }
 }
 
-/// The least any route can cost from a node at `floor` to floor `to`: every
-/// ride and flight costs at least a car's ride per floor. It never
-/// overestimates, so the route found is still the cheapest.
-fn floors_bound(floor: i64, to: i64) -> i64 {
-    ((floor - to).abs() as f64 * RIDE_SECONDS_PER_FLOOR * TENTHS).floor() as i64
+/// The least any route can cost from `floor` to `to`: every ride and flight
+/// costs at least `per_floor` whole tenths a floor, so it never overestimates.
+fn floors_bound(floor: i64, to: i64, per_floor: i64) -> i64 {
+    (floor - to).abs() * per_floor
 }
 
 /// The A* bound from the node at `place`, standing at `floor`, to the
@@ -356,7 +358,7 @@ fn bound_to(router: &Router, (place, floor): (u32, i64), (goal, to_floor): (u32,
     } else {
         router.exit[place as usize]
     };
-    floors_bound(floor, to_floor) + exit
+    floors_bound(floor, to_floor, router.per_floor) + exit
 }
 
 /// What `l` costs, the wait and the line at a boarding included: half the

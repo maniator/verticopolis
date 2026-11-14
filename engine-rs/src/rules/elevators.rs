@@ -12,9 +12,15 @@ use crate::clock::GameMode;
 /// while riders keep arriving.
 const MODERN_DEPARTURE_WAIT_LIMIT: f64 = 2.0;
 
-/// How many times faster a Modern express car moves than a standard car.
-/// The owner picked it on 2026-11-14 so office workers who ride in for real
-/// reach the upper floors of a tall Modern tower in time for work.
+/// How many times faster than a Classic car a Modern standard or service car
+/// moves. The owner picked it on 2026-11-14 so office workers who ride in for
+/// real reach their desks: with it and the line-counting router, the owner's
+/// own tower of about 4,950 office workers keeps all its tenants.
+const MODERN_CAR_SPEED: f64 = 2.0;
+
+/// How many times faster than a Classic car a Modern express car moves:
+/// twice a Modern standard car, so a 75-floor trip takes about 23 game
+/// minutes (owner, 2026-11-14).
 const MODERN_EXPRESS_SPEED: f64 = 4.0;
 
 #[doc(hidden)]
@@ -69,16 +75,35 @@ impl GameMode {
         self == GameMode::Modern
     }
 
-    /// How many times faster an express car moves than a standard or service
-    /// car. Classic express cars move at the standard speed, as no measured
+    /// How many times faster than the base speed a standard or service car
+    /// moves. Classic cars move at the base speed. Modern cars move twice as
+    /// fast while real office commutes are on (`REAL_OFFICE_COMMUTES_ON`):
+    /// the speed came with them and goes with them.
+    pub fn car_speed_factor(self) -> f64 {
+        match self {
+            GameMode::Modern if super::commute::real_office_commutes_on() => MODERN_CAR_SPEED,
+            _ => 1.0,
+        }
+    }
+
+    /// How many times faster than the base speed an express car moves.
+    /// Classic express cars move at the standard speed, as no measured
     /// figure for the original says otherwise. Modern express cars move four
-    /// times as fast, so a 75-floor trip takes about 23 game minutes, once
-    /// real office commutes are on (`REAL_OFFICE_COMMUTES_ON`): the speed
-    /// came with them and stays off with them.
+    /// times as fast (twice a Modern standard car) while real office
+    /// commutes are on.
     pub fn express_speed_factor(self) -> f64 {
         match self {
             GameMode::Modern if super::commute::real_office_commutes_on() => MODERN_EXPRESS_SPEED,
             _ => 1.0,
+        }
+    }
+
+    /// How many times faster than the base speed a car of `kind` moves: the
+    /// express factor for an express, the standard one for any other car.
+    pub fn speed_of(self, kind: crate::facilities::Kind) -> f64 {
+        match kind {
+            crate::facilities::Kind::ElevatorExpress => self.express_speed_factor(),
+            _ => self.car_speed_factor(),
         }
     }
 }

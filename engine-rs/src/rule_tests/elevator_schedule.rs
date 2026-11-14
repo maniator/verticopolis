@@ -247,9 +247,10 @@ fn the_canon_calendar_splits_its_weekend_day_too() {
     assert_eq!(weekday[9], 0.0);
 }
 
-/// An occupied office on floor 5 whose staff the cars board.
-fn busy_office(sim: &mut Simulation) {
-    let id = sim.tower.place(Kind::Office, 5, 2).unit_id.unwrap();
+/// An occupied condo on floor 5 whose residents the cars board. (A Modern
+/// office's workers ride in as real people, outside the dispatch's estimate.)
+fn busy_condo(sim: &mut Simulation) {
+    let id = sim.tower.place(Kind::Condo, 5, 2).unit_id.unwrap();
     let u = sim.tower.get_unit_mut(id).unwrap();
     u.state = UnitState::Occupied;
     u.occupants = 8;
@@ -274,7 +275,7 @@ fn origin_mass(slot: &indexmap::IndexMap<i64, f64>) -> f64 {
 fn boardings_fold_into_the_hour_they_happened_in() {
     let mut sim = tower_with_elevator();
     let id = shaft(&sim).id;
-    busy_office(&mut sim);
+    busy_condo(&mut sim);
     sim.clock.minutes = 8.0 * HOUR;
     board(&mut sim, 240);
     sim.clock.minutes = 9.0 * HOUR;
@@ -303,7 +304,7 @@ fn boardings_fold_into_the_hour_they_happened_in() {
 fn a_midnight_drain_files_under_yesterdays_last_hour_and_day_type() {
     let mut sim = tower_with_elevator();
     let id = shaft(&sim).id;
-    busy_office(&mut sim);
+    busy_condo(&mut sim);
     sim.clock.minutes = 6.0 * DAY + 23.0 * HOUR; // Sunday 23:00
     assert!(sim.clock.is_weekend());
     board(&mut sim, 60);

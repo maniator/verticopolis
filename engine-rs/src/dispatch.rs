@@ -235,11 +235,12 @@ impl ElevatorDispatch {
             let span = (t.top - t.bottom) as f64;
             let cars = t.cars as usize;
             let wait_limit = rules.departure_limit.map(|m| m * shaft_dwell);
-            let floors_per_minute = if kind == Kind::ElevatorExpress {
-                CAR_FLOORS_PER_MINUTE * rules.express_speed
-            } else {
-                CAR_FLOORS_PER_MINUTE
-            };
+            let floors_per_minute = CAR_FLOORS_PER_MINUTE
+                * if kind == Kind::ElevatorExpress {
+                    rules.express_speed
+                } else {
+                    rules.car_speed
+                };
             let dwell = self.car_dwell.entry(id).or_default();
             let seen = self.car_seen.entry(id).or_default();
             let held = self.car_held.entry(id).or_default();

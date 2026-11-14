@@ -45,20 +45,17 @@ fn the_rules_follow_the_mode() {
     assert!(!modern.parked_car_yields && modern.best_car && modern.spread_homes);
     assert!(modern.parked_owner_boards);
     assert_eq!(modern.departure_limit, Some(2.0));
-    // The faster Modern express ships switched off with real office
-    // commutes (`REAL_OFFICE_COMMUTES_ON`).
-    assert_eq!((classic.express_speed, modern.express_speed), (1.0, 1.0));
-    let _on = crate::rules::office_commutes_switch::turn_on();
-    let switched_on = |mode| DispatchRules::for_mode(mode).express_speed;
-    assert_eq!(switched_on(GameMode::Classic), 1.0);
-    assert_eq!(switched_on(GameMode::Modern), 4.0);
+    // Modern cars move twice the base speed and its express cars four
+    // times, with real office commutes (`REAL_OFFICE_COMMUTES_ON`).
+    assert_eq!((classic.car_speed, classic.express_speed), (1.0, 1.0));
+    assert_eq!((modern.car_speed, modern.express_speed), (2.0, 4.0));
     for rules in [classic, modern] {
         assert!(rules.departure_restarts && !rules.parked_reach_gate);
     }
     let scan = DispatchRules::plain_scan();
     assert!(scan.parked_reach_gate && !scan.departure_restarts && !scan.best_car);
     assert!(!scan.parked_owner_boards);
-    assert_eq!(scan.express_speed, 1.0);
+    assert_eq!((scan.car_speed, scan.express_speed), (1.0, 1.0));
 }
 
 #[test]
@@ -220,20 +217,12 @@ fn climbs(mode: GameMode) -> (f64, f64) {
 }
 
 #[test]
-fn a_switched_on_modern_express_climbs_four_times_as_far() {
-    // Off, as it ships: both modes' express cars climb at the standard speed.
-    for mode in [GameMode::Classic, GameMode::Modern] {
-        let (standard, express) = climbs(mode);
-        assert!(standard > 0.0, "{mode:?}: the standard car set off");
-        assert_eq!(express, standard, "{mode:?}");
-    }
-    let _on = crate::rules::office_commutes_switch::turn_on();
-    let (standard, express) = climbs(GameMode::Classic);
-    assert_eq!(express, standard, "Classic keeps one speed");
+fn modern_cars_climb_twice_and_express_four_times_as_far_as_classic() {
+    let (classic, classic_express) = climbs(GameMode::Classic);
+    assert!(classic > 0.0, "the Classic car set off");
+    assert_eq!(classic_express, classic, "Classic keeps one speed");
     let (standard, express) = climbs(GameMode::Modern);
-    assert!(standard > 0.0);
-    assert!(
-        (express - 4.0 * standard).abs() < 1e-9,
-        "{standard} vs {express}"
-    );
+    let near = |a: f64, b: f64| (a - b).abs() < 1e-9;
+    assert!(near(standard, 2.0 * classic), "{classic} vs {standard}");
+    assert!(near(express, 4.0 * classic), "{classic} vs {express}");
 }

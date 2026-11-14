@@ -433,6 +433,12 @@ in Classic; whether they stay once commuters are real is a later call.
    waits. All Modern cars 2x kept 92%, 4x kept 88%, so speed alone does not
    fix it; the cars board too few people per stop. It turns on once that
    tower keeps 95% after the stop fix (#2061) and the line-counting router.
+   **On (owner, 2026-11-14, #2214):** the jam was routing more than boarding.
+   Nearly the whole rush lined up for one street-lobby shaft (850 waiting)
+   while its twin held 12. With the line-counting router (#2203) the owner's
+   tower kept 92%; with Modern cars twice as fast (express four times) it
+   kept 100% over four days, and split-tower-4 kept 92%. The owner chose
+   router plus cars 2x, and commutes turn on for Modern.
 6. **Venues draw and earn from real visitors, and their staff commute.**
    Restaurants, fast food, shops and the other commercial rooms are paid for
    the visitors who actually came (the meal venues already draw only those
