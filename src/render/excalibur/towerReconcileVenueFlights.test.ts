@@ -168,13 +168,28 @@ describe("a flight beside a venue restyles with the venue", () => {
     expect(engine.transportSig.get(40)).not.toMatch(/winds/);
   });
 
-  it("restyles the flights for a swapped-in tower at the same revision (a load)", () => {
+  it("reconciles the flights again for a swapped-in sim, even with the same lists and revision (a load)", () => {
     const engine = fakeEngine([cinema]);
     syncScene(engine);
-    rules.venueFlights = false;
-    (engine as { sim: unknown }).sim = fakeSim([cinema]);
+    engine.transportSig.set(40, "left as it was");
+    const swapped = { ...engine.sim, tower: { ...engine.sim.tower } };
+    (engine as { sim: unknown }).sim = swapped;
     syncScene(engine);
-    expect(engine.transportSig.get(40)).not.toMatch(/winds/);
+    expect(engine.transportSig.get(40)).toMatch(/:winds$/);
+  });
+
+  it("reconciles the flights again when the view hands over a new room or flight list", () => {
+    const engine = fakeEngine([cinema]);
+    syncScene(engine);
+    engine.transportSig.set(40, "left as it was");
+    engine.sim.tower.units = [...engine.sim.tower.units];
+    syncScene(engine);
+    expect(engine.transportSig.get(40)).toMatch(/:winds$/);
+    engine.transportSig.set(40, "left as it was");
+    const tower = engine.sim.tower as unknown as { transports: TransportView[] };
+    tower.transports = [...tower.transports];
+    syncScene(engine);
+    expect(engine.transportSig.get(40)).toMatch(/:winds$/);
   });
 
   it("rasters a flight in the style its signature recorded, even after the set moves", () => {
