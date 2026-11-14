@@ -15,6 +15,10 @@ raised the version, so they are documentation only.
 There is no entry for 0.17.0, which only
 existed as a step inside a stacked branch.
 
+## 1.33.0 (2026-11-14)
+
+- `build_cap_in(mode, kind)` gives a tower's cap per mode, and the Modern catalog publishes a Metro `buildCap` of 3. Every station stands on the first station's row, undo puts a station back beside another, and a returning rider walks to the station nearest their shaft.
+
 ## 1.32.0 (2026-11-14)
 
 - The catalog's `rules` block adds `venueFlights` (Modern `true`, Classic `false`, `GameMode::winds_venue_flights`): whether a frontend draws a one-story flight beside a venue as a spiral staircase or a switchback escalator. Drawing only. Catalog version 18; the catalog digests move for this field alone.
