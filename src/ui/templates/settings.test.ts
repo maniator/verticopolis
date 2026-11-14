@@ -106,6 +106,6 @@ describe("settingsTemplate escapes the interpolated version as text", () => {
     const hostile = `<img src=x onerror="alert(1)">`;
     const frag = renderToFragment(settingsTemplate(hostile));
     expect(frag.querySelector("img")).toBeNull();
-    expect(frag.textContent).toContain(`Verticopolis v${hostile}`);
+    expect(frag.textContent).toContain(`Verticopolis™ v${hostile}`);
   });
 });
