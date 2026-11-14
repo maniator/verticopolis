@@ -25,6 +25,10 @@ prompt already tells players it is an engine update and shows the new version.
 Entries below 1.51.1 were curated from the commit history after the fact, so they
 are documentation only: no build that a client fetches carries them.
 
+## 3.10.0
+
+- Modern towers can now build up to three Metro stations, all on the same line as the first. Riders split between them, someone going back to the train walks to the nearest one, and one train runs the line, calling at each station in turn.
+
 ## 3.9.0
 
 - Saved Towers asks before a save replaces a tower in an occupied slot, unless it knows that slot holds the tower you're playing: that slot is marked This tower and still saves in one click.
