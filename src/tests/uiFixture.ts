@@ -81,6 +81,7 @@ export function makeUI(overrides: Partial<UICallbacks> = {}): { ui: UI; cb: UICa
   const cb: UICallbacks = {
     getCatalog: vi.fn(() => classic),
     lobbyHeight: vi.fn(() => ({ picked: 1, pick: vi.fn() })),
+    bulldozeDrag: vi.fn(() => ({ clears: "one kind" as const, pick: vi.fn() })),
     onSelectTool: vi.fn(),
     onSpeed: vi.fn((s: number) => {
       speed = s;

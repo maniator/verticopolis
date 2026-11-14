@@ -1,4 +1,4 @@
-import type { LobbyHeightPicker } from "../ui/templates/toolInfo";
+import type { BulldozeDragPicker, LobbyHeightPicker } from "../ui/templates/toolInfo";
 import { trackAppAction } from "../analytics";
 import { wellFormed } from "../shared/wellFormed";
 import type { UICallbacks, Tool } from "../ui/UI";
@@ -48,6 +48,8 @@ export interface GameAppPorts {
   readonly inspector: Pick<InspectorController, "dismiss">;
   /** The lobby tool's height choice (#308), which the Lobby card picks. */
   readonly lobbyHeight: LobbyHeightPicker;
+  /** What a bulldoze drag clears, which the Bulldoze card picks. */
+  readonly bulldozeDrag: BulldozeDragPicker;
 
   handleSelectTool(tool: Tool): void;
   setSpeed(speed: number): void;
@@ -91,6 +93,7 @@ export function createUICallbacks(app: GameAppPorts): UICallbacks {
   return {
     getCatalog: () => app.getCatalog(),
     lobbyHeight: () => app.lobbyHeight,
+    bulldozeDrag: () => app.bulldozeDrag,
     onSelectTool: (tool) => app.handleSelectTool(tool),
     onSpeed: (speed) => app.setSpeed(speed),
     getSpeed: () => app.getSpeed(),
