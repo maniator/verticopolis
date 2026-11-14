@@ -167,6 +167,15 @@ describe("runFrame simulation stepping", () => {
     expect(raw.reader.update.mock.invocationCallOrder[0]).toBeGreaterThan(raw.enginePort.advance.mock.invocationCallOrder[0]);
   });
 
+  it("sends the camera's people window before it reads the view", () => {
+    const { app, raw } = makeApp({ speed: 3, accMinutes: 0, lastUiUpdate: Infinity });
+    runFrame(app, 1000 / 60);
+    // The fixture's camera shows tiles 0 to 100 and floors 10 to 40; the
+    // window adds two tiles and one floor on each side.
+    expect(raw.enginePort.setPeopleWindow).toHaveBeenCalledExactlyOnceWith(9, 41, -2, 102);
+    expect(raw.enginePort.setPeopleWindow.mock.invocationCallOrder[0]).toBeLessThan(raw.reader.update.mock.invocationCallOrder[0]);
+  });
+
   it("judges no meal rush across a swap since the last frame", () => {
     const { app, raw } = makeApp({ speed: 3, prefs: { steadyClock: false } });
     runFrame(app, 1000 / 60);

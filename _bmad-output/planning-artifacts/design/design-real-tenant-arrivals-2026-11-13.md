@@ -165,8 +165,13 @@ What that says:
   person per step. There is no quadratic cliff to fix first.
 - **The frame grows with every person.** `frame_view` writes every person
   every frame (about 23 numbers each, about 0.18 KB), so 15,000 people add
-  about 2.6 MB and 2 to 3 ms to every frame before the renderer touches it,
-  and the renderer then reads all of it.
+  about 2.6 MB and 2 to 3 ms to every frame before the renderer touches it.
+  Correction (2026-11-14): the web game reads the view's frame
+  (`view::ViewReader`), which already sends 8 numbers per person and only
+  the rooms that changed. Measured with the same towers, 15,000 people cost
+  it 0.2 to 0.3 ms and about 940 KB. `frame_view` is the suites' read. So
+  the engine's frame was never the web's bottleneck; the cost that grows is
+  the browser's: decoding every record, and one drawn figure per person.
 - The worst steps (8 to 14 ms on the large tower even with no crowd) are the
   hourly and daily work, not the crowd. They are worth their own look.
 - Routing a new trip costs 3 to 12 microseconds, so 15,000 tenants making
@@ -262,7 +267,11 @@ measures it before and after.
 2. **A view-sized, slimmer frame for people.** As the original does: the
    frame carries the people inside the host's view rectangle, with no
    separate cap, and each person's record shrinks to what drawing needs;
-   route details are read on demand. This is the frame layout and the
+   route details are read on demand. The view's frame already had the slim
+   record (8 numbers, no route), so this step is the people window
+   (`setPeopleWindow`, 2026-11-14): the web sends its camera each frame and
+   gets back only the people on screen, padded so every rider of a car on
+   screen comes along, as the people look thread asked. This is the frame layout and the
    renderer's input, so it is planned with the "Make NPCs look more human"
    thread and starts after #2116 ships. It is also what #2092's inspector
    reads.

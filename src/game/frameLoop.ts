@@ -12,6 +12,7 @@ import { drainEngineEvents } from "../analyticsEngineBridge";
 import { hudSource } from "./hudSource";
 import { calendarOf } from "../simport/headerClock";
 import { groupDigits } from "../ui/format";
+import { peopleWindow } from "../render/excalibur/peopleWindow";
 
 /** Real milliseconds between two ticks of the bomb's clock. */
 const BOMB_TICK_MS = 1000;
@@ -95,7 +96,10 @@ export function runFrame(app: GameApp, dtMs: number): void {
     throw err;
   }
   // The view follows every frame, so the header, the HUD and the painters
-  // read this frame's tower.
+  // read this frame's tower. Its people are the ones on screen, so the frame
+  // grows with the view, not with the crowd.
+  const w = peopleWindow(app.engine);
+  app.enginePort.setPeopleWindow(w.floorLo, w.floorHi, w.xLo, w.xHi);
   app.reader.update();
   emitMealRushes(app, minutesBeforeTicks);
 

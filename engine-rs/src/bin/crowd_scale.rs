@@ -2,8 +2,11 @@
 //! in `_bmad-output/planning-artifacts/design/design-real-tenant-arrivals-2026-11-13.md`
 //! (every tenant a walker). It loads each tower, keeps the crowd topped up
 //! to a fixed size with trips between the ground lobby and the tenant
-//! floors, and times `Simulation::tick` and `frame::frame_view`. The top-up
-//! is outside the timed part. Run it in a release build:
+//! floors, and times `Simulation::tick`, `frame::frame_view` (every person
+//! with their route, as the suites read it) and the view's frame
+//! (`view::ViewReader`, the web game's read) with every person and with only
+//! the people on one screen at the lobby. The top-up is outside the timed
+//! part. Run it in a release build:
 //!
 //! ```text
 //! cargo run --release --features conformance --bin crowd_scale -- \
@@ -22,9 +25,14 @@ use verticopolis_engine::frame::frame_view;
 use verticopolis_engine::load::{decode_vctower, deserialize, deserialize_tdt};
 use verticopolis_engine::sim::Simulation;
 use verticopolis_engine::tdt::parse::parse_tdt;
+use verticopolis_engine::view::{PeopleWindow, ViewReader};
 
 /// The ground lobby, where every benchmark trip starts or ends.
 const GROUND_LOBBY: i64 = 1;
+/// One screen at zoom 1 on a 1366 by 768 display: 137 tiles of 10 pixels
+/// across, 17 floors of 45 pixels up.
+const SCREEN_TILES: f64 = 137.0;
+const SCREEN_FLOORS: f64 = 17.0;
 /// The towers the design note's table measured, relative to the repository.
 /// The crate reads only `engine-rs/` and `conformance/` (`tests/read_boundary.rs`),
 /// so a tower elsewhere, such as the web's perf towers, is named on the
@@ -119,7 +127,42 @@ struct Row {
     moving: usize,
     frame_ms: f64,
     frame_kb: usize,
+    view_ms: f64,
+    view_kb: usize,
+    screen_ms: f64,
+    screen_kb: usize,
+    screen_people: usize,
     route_us: Option<f64>,
+}
+
+/// The screen a player watches the rush from: the ground floor at its
+/// bottom, centered on the tower's shafts (their middles' mean).
+fn lobby_screen(sim: &Simulation) -> Option<PeopleWindow> {
+    let shafts = &sim.tower.transports;
+    let center = if shafts.is_empty() {
+        0.0
+    } else {
+        shafts
+            .iter()
+            .map(|t| t.x as f64 + t.width as f64 / 2.0)
+            .sum::<f64>()
+            / shafts.len() as f64
+    };
+    let bottom = GROUND_LOBBY as f64 - 1.0;
+    PeopleWindow::new(
+        bottom,
+        bottom + SCREEN_FLOORS,
+        center - SCREEN_TILES / 2.0,
+        center + SCREEN_TILES / 2.0,
+    )
+}
+
+/// The time one call of `read` takes and the size of what it returns.
+fn timed(read: impl FnOnce() -> Vec<f64>) -> (f64, usize, Vec<f64>) {
+    let t = Instant::now();
+    let v = read();
+    let ms = t.elapsed().as_secs_f64() * 1000.0;
+    (ms, v.len() * std::mem::size_of::<f64>() / 1024, v)
 }
 
 /// The trips the top-up has started, and the time their routing took.
@@ -174,15 +217,28 @@ fn measure(path: &Path, size: usize, options: &Options, dests: &[i64]) -> Row {
     // The frame is built with the crowd at full size, as a host would read
     // it between steps.
     top_up.fill(&mut sim, size, dests);
-    let t = Instant::now();
-    let frame = frame_view(&sim);
-    let frame_ms = t.elapsed().as_secs_f64() * 1000.0;
+    let (frame_ms, frame_kb, _) = timed(|| frame_view(&sim));
+    // Each reader sends every room on its first frame, so the second frame
+    // is the one timed: the one a host reads between two steps.
+    let mut all = ViewReader::new();
+    all.frame(&sim, false);
+    let (view_ms, view_kb, _) = timed(|| all.frame(&sim, false));
+    let mut screen = ViewReader::new();
+    screen.set_people_window(lobby_screen(&sim));
+    screen.frame(&sim, false);
+    let (screen_ms, screen_kb, v) = timed(|| screen.frame(&sim, false));
+    let screen_people = v[verticopolis_engine::view::layout::header::PEOPLE] as usize;
     Row {
         step_mean_ms: step_total / options.steps as f64,
         step_worst_ms: step_worst,
         moving: moving_total / options.steps,
         frame_ms,
-        frame_kb: frame.len() * std::mem::size_of::<f64>() / 1024,
+        frame_kb,
+        view_ms,
+        view_kb,
+        screen_ms,
+        screen_kb,
+        screen_people,
         route_us: (top_up.routes > 0).then(|| top_up.seconds * 1e6 / top_up.routes as f64),
     }
 }
@@ -193,8 +249,8 @@ fn main() {
         "{} steps of {} game minutes per row; the frame is built once, after the last step, with the crowd topped up.\n",
         options.steps, options.dt_minutes
     );
-    println!("| Tower (population) | Crowd size | Moving (mean) | Step mean | Step worst | Frame build | Frame size | Route each |");
-    println!("| --- | --- | --- | --- | --- | --- | --- | --- |");
+    println!("| Tower (population) | Crowd size | Moving (mean) | Step mean | Step worst | frameView | View frame, all | View frame, one screen (people) | Route each |");
+    println!("| --- | --- | --- | --- | --- | --- | --- | --- | --- |");
     for path in &options.towers {
         let base = load(path);
         let dests = tenant_floors(&base);
@@ -204,7 +260,7 @@ fn main() {
         );
         let label = format!("{name} ({})", base.tower.total_population());
         if dests.is_empty() {
-            println!("| {label} | no tenant floors | | | | | | |");
+            println!("| {label} | no tenant floors | | | | | | | |");
             continue;
         }
         for &size in &options.sizes {
@@ -213,8 +269,17 @@ fn main() {
                 .route_us
                 .map_or_else(|| "none".to_string(), |us| format!("{us:.1} us"));
             println!(
-                "| {label} | {size} | {} | {:.3} ms | {:.3} ms | {:.3} ms | {} KB | {route} |",
-                row.moving, row.step_mean_ms, row.step_worst_ms, row.frame_ms, row.frame_kb
+                "| {label} | {size} | {} | {:.3} ms | {:.3} ms | {:.3} ms, {} KB | {:.3} ms, {} KB | {:.3} ms, {} KB ({}) | {route} |",
+                row.moving,
+                row.step_mean_ms,
+                row.step_worst_ms,
+                row.frame_ms,
+                row.frame_kb,
+                row.view_ms,
+                row.view_kb,
+                row.screen_ms,
+                row.screen_kb,
+                row.screen_people
             );
         }
     }

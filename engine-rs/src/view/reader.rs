@@ -8,6 +8,7 @@
 use std::sync::Arc;
 
 use super::layout::{HEADER, PERSON_RECORD, UNIT_RECORD};
+use super::window::PeopleWindow;
 use crate::frame::{person_state_code, push_transports, transports_len, unit_fields, weather_code};
 use crate::sim::Simulation;
 use crate::tower::Unit;
@@ -25,12 +26,22 @@ pub struct ViewReader {
     seq: u64,
     marked: Vec<usize>,
     changed: Vec<f64>,
+    /// The part of the tower the view draws; `None` sends every person.
+    window: Option<PeopleWindow>,
 }
 
 impl ViewReader {
     /// A reader that has sent nothing, so its first frame is full.
     pub fn new() -> ViewReader {
         ViewReader::default()
+    }
+
+    /// Send only the people in `window` from the next frame on, or every
+    /// person with `None` (the default). The rooms and the cars still go in
+    /// full: the window trims only the people, the record that grows with
+    /// the crowd.
+    pub fn set_people_window(&mut self, window: Option<PeopleWindow>) {
+        self.window = window;
     }
 
     /// The dynamic frame as one flat number array.
@@ -47,7 +58,9 @@ impl ViewReader {
     ///
     /// Then `people` records of `PERSON_RECORD`, every person in the crowd
     /// as [`crate::frame::frame_view`] sends them: id, seed, staff (0 or 1), state, floor, x,
-    /// fy, wait. Then `units` room records of `UNIT_RECORD`:
+    /// fy, wait. With a people window set ([`ViewReader::set_people_window`])
+    /// they are only the people in it, padded so every rider of a car on
+    /// screen comes along ([`PeopleWindow::padded`]), in crowd order. Then `units` room records of `UNIT_RECORD`:
     /// the room's slot (its position in the structural snapshot's room list),
     /// then state, occupants, customersIn, hotelCustomersIn, outForMeal (an
     /// absent counter is -1). Then every transport as [`crate::frame::frame_view`] writes it.
@@ -129,10 +142,15 @@ impl ViewReader {
         self.seq += 1;
         let population = self.population;
         let people = &sim.crowd.people;
-        let size = HEADER
-            + people.len() * PERSON_RECORD
-            + self.changed.len()
-            + transports_len(&tower.transports);
+        let window = self.window.map(|w| w.padded(&tower.transports));
+        let shown = |p: &&crate::crowd::Person| window.is_none_or(|w| w.holds(p));
+        // Counted first, so the frame is still one allocation at its size.
+        let sent = match window {
+            None => people.len(),
+            Some(_) => people.iter().filter(shown).count(),
+        };
+        let size =
+            HEADER + sent * PERSON_RECORD + self.changed.len() + transports_len(&tower.transports);
         let mut v = Vec::with_capacity(size);
         let fx = &sim.fx;
         let clock = &sim.clock;
@@ -170,7 +188,7 @@ impl ViewReader {
             rooms.len() as f64,
             if full { 1.0 } else { 0.0 },
             self.seq as f64,
-            people.len() as f64,
+            sent as f64,
             (self.changed.len() / UNIT_RECORD) as f64,
             tower.transports.len() as f64,
             clock.day() as f64,
@@ -184,7 +202,7 @@ impl ViewReader {
             fx.thief.x as f64,
         ]);
         debug_assert_eq!(v.len(), HEADER);
-        for p in people {
+        for p in people.iter().filter(shown) {
             v.extend_from_slice(&[
                 p.id as f64,
                 p.seed as f64,

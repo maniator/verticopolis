@@ -6,7 +6,7 @@ use verticopolis_engine::frame::{
     TRANSPORT_FIXED, UNIT_RECORD, UNKNOWN_ROUTINE,
 };
 use verticopolis_engine::sim::Simulation;
-use verticopolis_engine::view::{layout, meta_since, structure_view, ViewReader};
+use verticopolis_engine::view::{layout, meta_since, structure_view, PeopleWindow, ViewReader};
 
 /// Read the per-frame view the way a renderer would (`frame_view`, see
 /// `src/frame.rs` for the layout): the header must agree with the
@@ -138,6 +138,19 @@ pub fn read_view(sim: &Simulation) -> Result<(), String> {
         return Err(format!(
             "an unchanged frame resent {} rooms",
             again[header::UNITS]
+        ));
+    }
+    // A people window far below the tower sends nobody; clearing it sends
+    // the whole crowd again.
+    reader.set_people_window(PeopleWindow::new(-1e6, -1e6 + 1.0, 0.0, 1.0));
+    let windowed = reader.frame(sim, false);
+    reader.set_people_window(None);
+    let all = reader.frame(sim, false);
+    let sent = [windowed[header::PEOPLE], all[header::PEOPLE]];
+    if sent != [0.0, sim.crowd.people.len() as f64] {
+        return Err(format!(
+            "the people window sent {sent:?} of {} people",
+            sim.crowd.people.len()
         ));
     }
     let meta = meta_since(&sim.tower, None);

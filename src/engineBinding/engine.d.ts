@@ -533,6 +533,7 @@ export class Engine {
      * read raw (#996), as for `sellAt`.
      */
     setNoRate(id: number): boolean;
+    setPeopleWindow(floor_lo: number, floor_hi: number, x_lo: number, x_hi: number): void;
     setRent(id: number, target: number): Float64Array;
     /**
      * `Tower.setSchedule(id, schedule)` with the schedule as JSON text. The
