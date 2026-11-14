@@ -78,7 +78,7 @@ export interface UICallbacks {
   onShowSaves(): void;
   /** The inspector card's ✕ was clicked — dismiss it and latch it closed. */
   onInspectorClose(): void;
-  onSaveSlot(slot: number): void;
+  onSaveSlot(slot: number): boolean;
   onLoadSlot(slot: number | "auto"): void;
   onDeleteSlot(slot: number): void;
 }
@@ -427,8 +427,8 @@ export class UI {
     dialogs.showScheduleReview(this, rows, handlers, focus);
   }
 
-  showSaves(slots: SlotInfo[], unreadable: string | null = null): void {
-    dialogs.showSaves(this, slots, unreadable);
+  showSaves(slots: SlotInfo[], unreadable: string | null = null, guard?: Parameters<typeof dialogs.showSaves>[3]): void {
+    dialogs.showSaves(this, slots, unreadable, guard);
   }
 
   showTowerPicker(ctx: dialogs.TowerPickerCtx): void {

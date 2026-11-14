@@ -346,7 +346,7 @@ class GameApp implements GameAppPorts {
   // Stats + save-slot modal commands, bodies in game/appModals.ts.
   showStats(): void { void showStats(this); }
   showSaves(): void { showSaves(this); }
-  saveToSlot(slot: number): void { saveToSlot(this, slot); }
+  saveToSlot(slot: number): boolean { return saveToSlot(this, slot); }
   loadFromSlot(slot: number | "auto"): void { loadFromSlot(this, slot); }
   deleteSlot(slot: number): void { deleteSlot(this, slot); }
 
