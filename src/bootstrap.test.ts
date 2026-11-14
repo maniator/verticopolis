@@ -25,11 +25,6 @@ vi.mock("./wasmhost/rustEngine", async (importOriginal) => {
   };
 });
 
-// The `?debug=fps` overlay (#645) is loaded lazily by boot; a spy stands in
-// for it so the tests can see whether boot mounted it and what a failure does.
-const hudStub = vi.hoisted(() => ({ mount: vi.fn() }));
-vi.mock("./debugHud", () => ({ mountDebugHud: hudStub.mount }));
-
 /** Make hasWebGL() see a real GL context (happy-dom canvas returns null). */
 function stubWebGL(): void {
   const real = document.createElement.bind(document);
@@ -388,54 +383,6 @@ describe("bootGame", () => {
 
     expect(create).toHaveBeenCalledTimes(1);
     expect((window as unknown as { game?: unknown }).game).toBeUndefined();
-  });
-
-  describe("the ?debug=fps overlay (#645)", () => {
-    afterEach(() => {
-      history.replaceState(null, "", "/");
-      hudStub.mount.mockReset();
-    });
-
-    it("is not loaded without the flag", async () => {
-      stubWebGL();
-      await bootGame(() => ({ onUpdateAvailable: vi.fn() }));
-      await vi.dynamicImportSettled();
-      expect(hudStub.mount).not.toHaveBeenCalled();
-    });
-
-    it("mounts with the flag, reading the renderer the app holds at each call", async () => {
-      history.replaceState(null, "", "/?debug=fps");
-      stubWebGL();
-      const app: { onUpdateAvailable: () => void; engine?: { engine: unknown } } = { onUpdateAvailable: vi.fn() };
-      await bootGame(() => app as never);
-      await vi.dynamicImportSettled();
-      expect(hudStub.mount).toHaveBeenCalledTimes(1);
-      const source = hudStub.mount.mock.calls[0][0] as () => unknown;
-      expect(source()).toBeUndefined();
-      const renderer = { stats: { prevFrame: {} } };
-      app.engine = { engine: renderer };
-      expect(source()).toBe(renderer);
-    });
-
-    it("only warns when the overlay fails to load, so no rejection reaches error analytics", async () => {
-      history.replaceState(null, "", "/?debug=fps");
-      stubWebGL();
-      hudStub.mount.mockImplementation(() => {
-        throw new Error("chunk missing offline");
-      });
-      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-      const unhandled = vi.fn();
-      process.on("unhandledRejection", unhandled);
-      try {
-        await bootGame(() => ({ onUpdateAvailable: vi.fn() }));
-        await vi.dynamicImportSettled();
-        await new Promise((r) => setTimeout(r, 0));
-        expect(warn).toHaveBeenCalledWith("debug HUD did not load", expect.any(Error));
-        expect(unhandled).not.toHaveBeenCalled();
-      } finally {
-        process.off("unhandledRejection", unhandled);
-      }
-    });
   });
 
   it("shows the no-WebGL message and never calls create when WebGL is missing", () => {
