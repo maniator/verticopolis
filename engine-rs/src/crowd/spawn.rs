@@ -3,16 +3,17 @@
 use super::meals::MealOrigin;
 use super::routines::push_routine_options;
 pub use super::spawn_floors::{spawn_floors, SpawnFloors};
-use super::trip::{Errand, ErrandPlace};
 use super::visits::{push_venue_visit_options, spawn_venue_visit, VisitOrigin};
 use super::{Crowd, PState, Person, Route, MAX_PEOPLE, METRO_DWELL_MAX, METRO_DWELL_MIN};
 use crate::clock::Clock;
 use crate::facilities::Kind;
 use crate::tower::{Tower, Unit};
 
+mod lists;
 mod meal_trips;
 mod staff;
 
+use lists::{list_of, stamp_errand, List};
 use meal_trips::{push_meal_options, spawn_meal_outbound};
 pub use staff::spawn_step;
 
@@ -213,14 +214,6 @@ fn metro_departure(crowd: &mut Crowd, tower: &Tower, station: &Unit, from: i64) 
 
 // ---- spawn.ts --------------------------------------------------------------
 
-#[derive(Clone, Copy)]
-enum List {
-    LeasedOffices,
-    StaffedOffices,
-    Homes,
-    OpenVenues,
-}
-
 /// A deferred spawn option: the closures of `spawnTrips`, evaluated only
 /// when picked so the rng draws land in the same order.
 enum Opt {
@@ -323,29 +316,7 @@ pub(crate) fn weighted_index(r: f64, weights: impl Iterator<Item = f64> + Clone)
 }
 
 /// Stamp the errand of a plain commute just added at `i` (none when the
-/// spawn found no route), for the person card. Draws nothing.
-fn stamp_errand(crowd: &mut Crowd, i: Option<usize>, l: List, inbound: bool) {
-    let place = match l {
-        List::LeasedOffices | List::StaffedOffices => ErrandPlace::Office,
-        List::Homes => ErrandPlace::Home,
-        List::OpenVenues => ErrandPlace::Venue,
-    };
-    if let Some(i) = i {
-        crowd.people[i].errand = Some(Errand { place, inbound });
-    }
-}
-
-fn list_of(floors: &SpawnFloors, l: List) -> &[i64] {
-    match l {
-        List::LeasedOffices => &floors.leased_offices,
-        List::StaffedOffices => &floors.staffed_offices,
-        List::Homes => &floors.homes,
-        List::OpenVenues => &floors.open_venues,
-    }
-}
-
-/// A full crowd spawns no one: `spawn_trips` returns on it before any draw,
-/// and `spawn_step` skips the floor lists on it (#1143 item 4).
+/// spawn found no route), for the floor lists on it (#1143 item 4).
 /// The tenants' and visitors' sample is full. Housekeepers on shift are
 /// counted apart: they are in the building all shift, and would otherwise
 /// crowd the tenants out of the picture.
