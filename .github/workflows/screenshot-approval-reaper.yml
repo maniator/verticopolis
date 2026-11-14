@@ -1,20 +1,27 @@
-# Reaps the "Action required" zombie runs the screenshot drift-check leaves behind.
+# Cancels the runs a pull request leaves behind once it closes, plus the
+# "Action required" zombie runs the screenshot drift-check parks.
+#
+# Workflow concurrency cancels a pull request's older run only when a newer run
+# joins the same group, which takes a new push. Merging or closing the pull
+# request starts no such run (the merge's push to main has its own group), so
+# every run still going on the closed pull request's branch kept running or
+# queued until it finished, holding runners that open pull requests and the
+# release were waiting for. On close, this cancels every queued, running or
+# waiting `pull_request` run for that branch from the same repository, and every
+# `push` run on that branch when it is not main. It never touches its own run.
 #
 # The drift-check's `commit-on-approval` job runs in the gated `screenshot-approval`
 # environment, so every push that has gallery drift parks a run "waiting" for a
-# reviewer. Only the final run before merge is ever approved; merging or closing the
-# PR does not clear the earlier parked runs, and workflow concurrency does not reap a
-# run that is waiting on a deployment reviewer. Left alone they pile up into pages of
-# stale "Action required" entries in the Actions tab.
-#
-# This reaper cancels those parked runs (cancelling needs only `actions: write`; the
-# GITHUB_TOKEN is not a `screenshot-approval` reviewer, so it cannot approve or reject
-# the deployment, but cancelling the run resolves the same "waiting" state, with
-# force-cancel as a fallback). It runs when a PR closes, and on a weekly sweep for any
-# that slip through (e.g. a branch deleted without a close event, or an aborted run).
-# The sweep never touches a run whose PR is still open, and if it cannot even list the
-# open PRs it skips rather than risk cancelling a legitimately pending approval.
-name: Screenshot approval reaper
+# reviewer. Only the final run before merge is ever approved, and workflow
+# concurrency does not reap a run that is waiting on a deployment reviewer.
+# Cancelling needs only `actions: write`; the GITHUB_TOKEN is not a
+# `screenshot-approval` reviewer, so it cannot approve or reject the deployment,
+# but cancelling the run resolves the same "waiting" state, with force-cancel as
+# a fallback. A weekly sweep catches parked runs that slip through (e.g. a branch
+# deleted without a close event, or an aborted run). The sweep never touches a
+# run whose PR is still open, and if it cannot even list the open PRs it skips
+# rather than risk cancelling a legitimately pending approval.
+name: Closed pull request reaper
 
 on:
   pull_request:
@@ -39,13 +46,16 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Cancel stale screenshot-approval runs
+      - name: Cancel a closed pull request's runs, or sweep parked approvals
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           EVENT: ${{ github.event_name }}
           PR_BRANCH: ${{ github.event.pull_request.head.ref }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          SELF_RUN: ${{ github.run_id }}
+          CLOSED_AT: ${{ github.event.pull_request.closed_at }}
         # No `-e`: this is best-effort cleanup, so a single failed API call must not
         # abort the run. Each call carries its own fallback.
         run: |
@@ -62,11 +72,26 @@ jobs:
           }
 
           if [ "$EVENT" = "pull_request" ]; then
-            echo "PR #${PR_NUMBER} closed; cancelling its waiting drift-check runs on ${PR_BRANCH}"
-            ids=$(gh run list --repo "$REPO" --workflow pr-drift-check.yml \
-              --branch "$PR_BRANCH" --status waiting --limit 100 \
-              --json databaseId --jq '.[].databaseId' 2>/dev/null || true)
-            for id in $ids; do echo "  cancel run ${id}"; cancel_run "$id"; done
+            echo "PR #${PR_NUMBER} closed; cancelling its unfinished runs on ${PR_BRANCH}"
+            # Only runs from the pull request's own repository count, since a
+            # fork's branch name can match one of ours, and a `push` run counts
+            # only from this repository and never on main. A run created after
+            # the close belongs to new work on a reused branch name, so it is
+            # kept. A run whose repository is gone (null) is kept too.
+            for status in queued in_progress waiting requested pending; do
+              ids=$(gh api --method GET "repos/$REPO/actions/runs" \
+                -f branch="$PR_BRANCH" -f status="$status" -f per_page=100 2>/dev/null \
+                | jq -r --argjson self "$SELF_RUN" --arg closed "$CLOSED_AT" \
+                    --arg head "$HEAD_REPO" --arg repo "$REPO" '
+                  .workflow_runs[]
+                  | select(.id != $self and .created_at < $closed)
+                  | select(.head_repository.full_name == $head)
+                  | select(.event == "pull_request"
+                      or (.event == "push" and .head_branch != "main"
+                          and .head_repository.full_name == $repo))
+                  | .id' 2>/dev/null || true)
+              for id in $ids; do echo "  cancel ${status} run ${id}"; cancel_run "$id"; done
+            done
           else
             echo "Weekly sweep: cancelling waiting drift-check runs whose PR is not open"
             # Fail SAFE: if the open-PR list can't be fetched, skip the sweep rather
