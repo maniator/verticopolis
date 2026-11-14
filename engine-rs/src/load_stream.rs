@@ -101,6 +101,14 @@ pub fn load_vctower_text(text: &str, mode: Option<&str>) -> Result<Simulation, S
     read_vctower(text, mode).map(|(sim, _)| sim)
 }
 
+/// `Engine.fromVctowerBytes`: [`load_vctower_text`] for a file's bytes, which
+/// reads the binary `VCTOWER2` file too. The same game, or the same error
+/// message, as `decode_vctower_bytes`, `override_mode`, `deserialize` and
+/// `mark_founder_from_loaded_file` in turn.
+pub fn load_vctower_bytes(bytes: &[u8], mode: Option<&str>) -> Result<Simulation, String> {
+    read_vctower_json(&crate::load::inflate_vctower_bytes(bytes)?, mode).map(|(sim, _)| sim)
+}
+
 /// `load_vctower_text`, and whether the streamed reader took the file.
 fn read_vctower(text: &str, mode: Option<&str>) -> Result<(Simulation, bool), String> {
     read_vctower_json(&inflate_vctower(text)?, mode)

@@ -46,7 +46,7 @@
 //! | Draw the tower | [`view`]: [`structure_view`](view::structure_view), [`ViewReader`](view::ViewReader), [`meta_since`](view::meta_since); or the older flat [`frame`] |
 //! | React to what happened | [`gameplay`]: drain `sim.gameplay` after each frame |
 //! | Show prices and rules | [`catalog::catalog`] |
-//! | Save and load | [`load`]: [`encode_simulation_vctower`](load::encode_simulation_vctower), [`decode_vctower`](load::decode_vctower), [`deserialize`](load::deserialize) |
+//! | Save and load | [`load`]: [`encode_simulation_vctower`](load::encode_simulation_vctower), [`decode_vctower`](load::decode_vctower), [`decode_vctower_bytes`](load::decode_vctower_bytes), [`deserialize`](load::deserialize) |
 //! | Open a 1994 save | [`import_tdt`], [`export_tdt`] |
 //! | Name the engine | [`identity::identity`] |
 //! | Compare two games | [`canonical::digest`] of [`snapshot::state_view`] |

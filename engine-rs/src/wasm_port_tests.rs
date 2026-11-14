@@ -172,7 +172,7 @@ fn office(e: &Engine) -> f64 {
 
 /// The exported layout's hash; raise `VIEW_LAYOUT_VERSION` (and append its
 /// pin in `view/layout_tests.rs`) in the same commit as any change here.
-const EXPORTED_LAYOUT_PIN: &str = "bc5b79df53652e79";
+const EXPORTED_LAYOUT_PIN: &str = "1bc4e54a86d166d6";
 
 #[test]
 fn the_exported_layout_is_pinned() {

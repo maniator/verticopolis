@@ -61,7 +61,7 @@ export const INSTANCE_METHODS = [
   // PR 1c's panel queries.
   "heatCells", "crewCoverage", "unitCard", "shaftCard", "personCard",
   // PR 1d's report queries and file members.
-  "statsSheet", "unitFacts", "serviceDiagnostics", "loadVctower", "exportVctower", "loadTdt", "tdtNote", "tdtTowerName",
+  "statsSheet", "unitFacts", "serviceDiagnostics", "loadVctower", "exportVctower", "loadVctowerBytes", "exportVctowerBytes", "loadTdt", "tdtNote", "tdtTowerName",
   "adoptTdt", "tdtExport", "tdtFile",
   // PR 5's frame step and render queries.
   "advance", "congestion", "floorCongestion", "queueView", "parkingSet", "parkingUsage", "recyclingFill", "positionReachable",
@@ -83,7 +83,7 @@ export const INSTANCE_METHODS = [
 ] as const satisfies readonly (keyof WasmEngine)[];
 /** The tier 3 ops only the tooling build exports (`toolingMethods.ts`). */
 export const TOOLING_METHODS = TOOLING_METHOD_NAMES satisfies readonly (keyof WasmEngine)[];
-export const STATIC_METHODS = ["newGame", "fromSave", "fromVctower"] as const satisfies readonly (keyof typeof Engine)[];
+export const STATIC_METHODS = ["newGame", "fromSave", "fromVctower", "fromVctowerBytes"] as const satisfies readonly (keyof typeof Engine)[];
 
 // Every method of the declared class (the dispose symbol aside) and every
 // static has to be in the lists above, or the binding gained one the check

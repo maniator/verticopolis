@@ -158,7 +158,7 @@ fails CI until that page and the example host follow.
 | Reference data | `catalog::catalog(mode)`: every price, size, cap and rule a frontend shows |
 | Identity | `identity::identity()`: the crate version and the save, layout, catalog and conformance versions it speaks |
 | State hash | `canonical::digest(&snapshot::state_view(&sim))` |
-| Saves | `load::encode_simulation_vctower`, `load::decode_vctower`, `load::deserialize`, `import_tdt`, `export_tdt` |
+| Saves | `load::encode_simulation_vctower`, `load::encode_simulation_vctower_binary`, `load::decode_vctower`, `load::decode_vctower_bytes`, `load::deserialize`, `import_tdt`, `export_tdt` |
 
 Read rules, prices and caps from the catalog rather than copying them into
 your code. Many other items are `pub` so the tests can reach them; they are
@@ -181,7 +181,12 @@ The crate has no default features.
   and exports. `encode_simulation_vctower(&sim, app_version, saved_at_ms)`
   writes the same bytes the web game writes for the same game. The engine
   has no clock and no build name, so you pass both.
-- **Loading** is `decode_vctower`, then `deserialize`, then
+  `encode_simulation_vctower_binary` writes the binary file the web game
+  exports from 4.0 (`VCTOWER2`, a newline, then the raw deflate bytes, a
+  quarter smaller).
+- **Loading** is `decode_vctower` (or `decode_vctower_bytes`, which reads a
+  file's bytes of either kind; read a file as bytes, since a binary file is
+  not UTF-8), then `deserialize`, then
   `mark_founder_from_loaded_file`, which keeps the status the web game gives
   a tower saved before build stamps existed.
 - **`.TDT`** is the 1994 SimTower format: `import_tdt(bytes, filename)` reads

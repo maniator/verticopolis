@@ -47,6 +47,35 @@ fn a_vctower_round_trips_and_a_stamped_one_is_no_founders() {
 }
 
 #[test]
+fn a_binary_vctower_is_the_same_game_and_its_refusal_is_the_players_sentence() {
+    let mut e = built(GameMode::Modern);
+    let before = e.sim.serialize();
+    let text = e.port_export_vctower("3.0.0", 1.7e12).unwrap();
+    let bytes = e.port_export_vctower_bytes("3.0.0", 1.7e12).unwrap();
+    assert!(bytes.starts_with(b"VCTOWER2\n"));
+    assert!(
+        bytes.len() * 4 < text.len() * 3 + 64,
+        "a quarter smaller than the text"
+    );
+    let generation = e.generation;
+    assert_eq!(
+        e.port_load_vctower_bytes(&bytes),
+        vec![1.0, (generation + 1) as f64]
+    );
+    assert_eq!(e.sim.serialize(), before, "the same game");
+    // The text file reads through the bytes member too.
+    assert_eq!(e.port_load_vctower_bytes(text.as_bytes())[0], 1.0);
+    assert_eq!(e.sim.serialize(), before);
+    assert_eq!(e.port_export_vctower_bytes("1.9.0", 1.7e12), None);
+    assert!(e.reason.is_some());
+    assert_eq!(e.port_load_vctower_bytes(b"VCTOWER2\n\x00")[0], 0.0);
+    assert_eq!(
+        e.reason.as_deref(),
+        Some(crate::vctower_import::DAMAGED_FILE)
+    );
+}
+
+#[test]
 fn a_tdt_round_trips_through_stage_and_adopt() {
     let mut e = built(GameMode::Classic);
     let r = e.port_tdt_export();

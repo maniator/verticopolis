@@ -86,6 +86,14 @@ impl Engine {
         Ok(Engine::of(sim))
     }
 
+    /// `fromVctower` for a file's bytes, which opens the binary `.vctower`
+    /// file (`VCTOWER2`) as well as the text one.
+    #[wasm_bindgen(js_name = fromVctowerBytes)]
+    pub fn from_vctower_bytes(bytes: &[u8], mode: Option<String>) -> Result<Engine, JsError> {
+        let sim = crate::load_stream::load_vctower_bytes(bytes, mode.as_deref()).map_err(err)?;
+        Ok(Engine::of(sim))
+    }
+
     /// `serialize()` as JSON text.
     pub fn serialize(&self) -> String {
         self.sim.save_text()

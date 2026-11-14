@@ -25,8 +25,8 @@ use serde_json::{json, Value};
 
 use crate::canonical::{js_json, js_key_rank, write_js_json, write_js_string};
 use crate::load::{
-    check_stamp, encode_vctower, pack_json, parse_int, parse_save_json, repair_lone_surrogates,
-    stamp_save,
+    check_stamp, encode_vctower, pack_json_as, parse_int, parse_save_json, repair_lone_surrogates,
+    stamp_save, Frame,
 };
 
 /// `encodeVctower(saveJson, appVersion, savedAtMs)`: the `.vctower` file for
@@ -40,8 +40,8 @@ pub fn encode_vctower_text(
     saved_at_ms: f64,
 ) -> Result<Vec<u8>, String> {
     match read_top(text) {
-        Some(top) => write_file(top, app_version, saved_at_ms),
-        None => tree_path(text, app_version, saved_at_ms),
+        Some(top) => write_file(top, app_version, saved_at_ms, Frame::Text),
+        None => tree_path(text, app_version, saved_at_ms, Frame::Text),
     }
 }
 
@@ -53,20 +53,38 @@ pub fn encode_vctower_string(
     app_version: &str,
     saved_at_ms: f64,
 ) -> Result<Vec<u8>, String> {
+    encode_vctower_string_as(text, app_version, saved_at_ms, Frame::Text)
+}
+
+/// [`encode_vctower_string`] in either frame.
+pub(crate) fn encode_vctower_string_as(
+    text: String,
+    app_version: &str,
+    saved_at_ms: f64,
+    frame: Frame,
+) -> Result<Vec<u8>, String> {
     match read_top(text.as_bytes()) {
         Some(top) => {
             drop(text);
-            write_file(top, app_version, saved_at_ms)
+            write_file(top, app_version, saved_at_ms, frame)
         }
-        None => tree_path(text.as_bytes(), app_version, saved_at_ms),
+        None => tree_path(text.as_bytes(), app_version, saved_at_ms, frame),
     }
 }
 
 /// Today's path: the whole save as a tree.
-fn tree_path(text: &[u8], app_version: &str, saved_at_ms: f64) -> Result<Vec<u8>, String> {
+fn tree_path(
+    text: &[u8],
+    app_version: &str,
+    saved_at_ms: f64,
+    frame: Frame,
+) -> Result<Vec<u8>, String> {
     let mut save = parse_save_json(text).map_err(|e| format!("save: {e}"))?;
     stamp_save(&mut save, app_version, saved_at_ms)?;
-    encode_vctower(&save)
+    match frame {
+        Frame::Text => encode_vctower(&save),
+        Frame::Binary => pack_json_as(&js_json(&save), frame),
+    }
 }
 
 /// Where a top-level value's text is.
@@ -200,7 +218,12 @@ fn read_top(text: &[u8]) -> Option<Top> {
 
 /// The stamped file from a text that was read: `stamp_save`'s checks, its
 /// stamp, and the container.
-fn write_file(mut top: Top, app_version: &str, saved_at_ms: f64) -> Result<Vec<u8>, String> {
+fn write_file(
+    mut top: Top,
+    app_version: &str,
+    saved_at_ms: f64,
+    frame: Frame,
+) -> Result<Vec<u8>, String> {
     // `stamp_save`'s checks, in its order. The text parsed, so a save that is
     // not an object never gets here.
     if !top.minutes_is_number || !top.units_listed {
@@ -243,7 +266,7 @@ fn write_file(mut top: Top, app_version: &str, saved_at_ms: f64) -> Result<Vec<u
     }
     json.push('}');
     drop(top);
-    pack_json(&json)
+    pack_json_as(&json, frame)
 }
 
 #[cfg(test)]

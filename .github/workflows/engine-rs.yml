@@ -26,6 +26,7 @@ on:
       - "src/tests/integration/conformanceWasmLoadFidelity.integration.test.ts"
       - "src/tests/integration/conformanceWasmCanBuild.integration.test.ts"
       - "src/tests/integration/conformanceWasmVctower.integration.test.ts"
+      - "src/tests/integration/conformanceWasmBinaryVctower.integration.test.ts"
       - "src/tests/integration/conformanceWasmSaves.integration.test.ts"
       - "src/tests/integration/chargeBindingRaw.integration.test.ts"
       - "src/tests/integration/panelGettersWasm.integration.test.ts"

@@ -101,6 +101,7 @@ pub(crate) fn add_file_records(layout: &mut Value) {
     records["loadTdt"] = serde_json::json!(&LOAD_TDT[..]);
     records["adoptTdt"] = serde_json::json!(["status", "generation"]);
     records["loadVctower"] = serde_json::json!(["status", "generation"]);
+    records["loadVctowerBytes"] = serde_json::json!(["status", "generation"]);
     records["tdtExport"] = serde_json::json!(TDT_EXPORT);
 }
 
@@ -197,6 +198,37 @@ impl Engine {
                 self.swap_record(true)
             }
             Err(e) => self.refuse_swap(e),
+        }
+    }
+
+    /// [`Self::port_load_vctower`] for a file's bytes: a binary file
+    /// (`VCTOWER2`) is read as it is, and any other as its UTF-8 text.
+    pub(crate) fn port_load_vctower_bytes(&mut self, bytes: &[u8]) -> Vec<f64> {
+        self.reason = None;
+        match crate::vctower_import::import_vctower_bytes(bytes) {
+            Ok(next) => {
+                self.adopt(next);
+                self.swap_record(true)
+            }
+            Err(e) => self.refuse_swap(e),
+        }
+    }
+
+    /// The current tower as a binary `.vctower` file (`VCTOWER2`), stamped as
+    /// [`Self::port_export_vctower`] stamps it; undefined, with the reason in
+    /// `lastReason()`, for a build name or time the stamp refuses.
+    pub(crate) fn port_export_vctower_bytes(
+        &mut self,
+        app_version: &str,
+        saved_at_ms: f64,
+    ) -> Option<Vec<u8>> {
+        self.reason = None;
+        match crate::load::encode_simulation_vctower_binary(&self.sim, app_version, saved_at_ms) {
+            Ok(bytes) => Some(bytes),
+            Err(e) => {
+                self.reason = Some(e);
+                None
+            }
         }
     }
 

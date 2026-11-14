@@ -1,9 +1,11 @@
 //! The `.vctower` the player opens is read, or refused in the player's words
 //! (#1498). Each refusal here is a sentence the page shows as it is.
-use crate::load::{encode_vctower, TOWER_FILE_MAGIC};
+use crate::load::{
+    encode_simulation_vctower, encode_simulation_vctower_binary, encode_vctower, TOWER_FILE_MAGIC,
+};
 use crate::vctower_import::{
-    import_vctower, DAMAGED_FILE, NEWER_FILE_REFUSAL, NOT_A_TOWER_FILE, NOT_A_TOWER_SAVE,
-    TOO_LARGE_FILE,
+    import_vctower, import_vctower_bytes, DAMAGED_FILE, NEWER_FILE_REFUSAL, NOT_A_TOWER_FILE,
+    NOT_A_TOWER_SAVE, TOO_LARGE_FILE,
 };
 use base64::Engine as _;
 use flate2::{write::DeflateEncoder, Compression};
@@ -62,7 +64,7 @@ fn a_file_that_is_no_tower_file_is_refused() {
 #[test]
 fn a_later_container_version_asks_for_an_update() {
     for text in [
-        "VCTOWER2\nabc",
+        "VCTOWER3\nabc",
         "VCTOWER10\n",
         "VCTOWER17\nnot a payload",
         "  VCTOWER99",
@@ -227,4 +229,114 @@ fn a_byte_order_mark_and_loose_base64_still_load_and_bad_text_in_a_string_is_dam
     assert!(import_vctower(&url_safe).is_ok(), "the URL-safe alphabet");
     let bad_string = b"{\"minutes\":0,\"units\":[],\"name\":\"\xff\"}";
     assert_eq!(refusal(&file_of(bad_string)), DAMAGED_FILE);
+}
+
+/// The raw deflate of `payload` as a binary file.
+fn binary_of(payload: &[u8]) -> Vec<u8> {
+    let mut z = DeflateEncoder::new(Vec::new(), Compression::fast());
+    z.write_all(payload).expect("deflates");
+    [b"VCTOWER2\n".as_slice(), &z.finish().expect("finishes")].concat()
+}
+
+fn byte_refusal(bytes: &[u8]) -> String {
+    import_vctower_bytes(bytes).err().expect("refused")
+}
+
+#[test]
+fn a_binary_file_is_the_text_files_game_a_quarter_smaller() {
+    let text = String::from_utf8(encode_vctower(&tower()).expect("packs")).expect("text");
+    let sim = import_vctower(&text).expect("loads");
+    let as_text = encode_simulation_vctower(&sim, "3.0.0", 1_750_000_000_000.0).expect("writes");
+    let as_binary =
+        encode_simulation_vctower_binary(&sim, "3.0.0", 1_750_000_000_000.0).expect("writes");
+    assert!(as_binary.starts_with(b"VCTOWER2\n"));
+    // The same deflate bytes, without the base64.
+    let b64 = std::str::from_utf8(&as_text[TOWER_FILE_MAGIC.len() + 1..as_text.len() - 1])
+        .expect("base64");
+    let packed = base64::engine::general_purpose::STANDARD
+        .decode(b64)
+        .expect("decodes");
+    assert_eq!(&as_binary[9..], packed.as_slice());
+    let from_text = import_vctower_bytes(&as_text).expect("the text file reads as bytes too");
+    let from_binary = import_vctower_bytes(&as_binary).expect("the binary file loads");
+    assert_eq!(
+        from_binary.serialize(),
+        from_text.serialize(),
+        "the same game"
+    );
+    assert!(
+        from_binary.founder && sim.founder,
+        "the founder mark carries, as in the text file"
+    );
+}
+
+#[test]
+fn a_binary_file_that_cannot_be_read_says_why() {
+    assert_eq!(byte_refusal(b"VCTOWER2"), DAMAGED_FILE, "no newline");
+    assert_eq!(
+        byte_refusal(b"VCTOWER2\r\n\x01\x02"),
+        DAMAGED_FILE,
+        "a newline an editor changed"
+    );
+    assert_eq!(
+        byte_refusal(b"VCTOWER2\n\xff\xfe\xfd"),
+        DAMAGED_FILE,
+        "no deflate stream"
+    );
+    assert_eq!(byte_refusal(&binary_of(b"not json")), DAMAGED_FILE);
+    assert_eq!(
+        byte_refusal(&binary_of(b"{\"minutes\":0}")),
+        NOT_A_TOWER_SAVE
+    );
+    // Read as text, a binary file's bytes have changed: damaged, not newer.
+    assert_eq!(refusal("VCTOWER2\nabc"), DAMAGED_FILE);
+    // A later binary version is not UTF-8 either, and its stamp still asks for an update.
+    assert_eq!(byte_refusal(b"VCTOWER3\n\xff\x00"), NEWER_FILE_REFUSAL);
+    // A later version whose number starts with 2 is newer, not a damaged VCTOWER2.
+    assert_eq!(byte_refusal(b"VCTOWER21\n\xff\x00"), NEWER_FILE_REFUSAL);
+    assert_eq!(byte_refusal(b"VCTOWER20\nabc"), NEWER_FILE_REFUSAL);
+    assert_eq!(byte_refusal(b"\xff\xfe junk"), NOT_A_TOWER_FILE);
+    assert_eq!(byte_refusal(b"VCTOWER0\n\xff"), NOT_A_TOWER_FILE);
+}
+
+#[test]
+fn a_binary_file_past_the_cap_is_too_large() {
+    let huge = vec![0u8; 48 * 1024 * 1024 + 1];
+    assert_eq!(
+        byte_refusal(&[b"VCTOWER2\n".as_slice(), &huge].concat()),
+        TOO_LARGE_FILE
+    );
+}
+
+#[test]
+fn a_host_reads_the_binary_file_as_it_reads_the_text_one() {
+    use crate::load::decode_vctower_bytes;
+    use crate::load_stream::{load_vctower_bytes, load_vctower_text};
+    let text = String::from_utf8(encode_vctower(&tower()).expect("packs")).expect("text");
+    let sim = import_vctower(&text).expect("loads");
+    let as_text = encode_simulation_vctower(&sim, "3.0.0", 1_750_000_000_000.0).expect("writes");
+    let as_binary =
+        encode_simulation_vctower_binary(&sim, "3.0.0", 1_750_000_000_000.0).expect("writes");
+    let text_file = std::str::from_utf8(&as_text).expect("text");
+    // The crate's decoder: the same save JSON from either file.
+    let save = crate::load::decode_vctower(text_file).expect("decodes");
+    assert_eq!(decode_vctower_bytes(&as_binary).expect("decodes"), save);
+    assert_eq!(decode_vctower_bytes(&as_text).expect("decodes"), save);
+    // `Engine.fromVctowerBytes`: the same game, with the mode set as asked.
+    for mode in [None, Some("modern")] {
+        let from_text = load_vctower_text(text_file, mode).expect("loads");
+        let from_binary = load_vctower_bytes(&as_binary, mode).expect("loads");
+        assert_eq!(from_binary.serialize(), from_text.serialize());
+    }
+    assert!(decode_vctower_bytes(b"VCTOWER2").is_err(), "no newline");
+    assert_eq!(
+        decode_vctower_bytes(b"VCTOWER21\n\xff").unwrap_err(),
+        "not a VCTOWER1 or VCTOWER2 file",
+        "a later version is not read as a binary file"
+    );
+    assert!(decode_vctower_bytes(b"\xff\xfe").is_err(), "not a file");
+    assert!(
+        load_vctower_bytes(b"VCTOWER2\n\xff", None).is_err(),
+        "no deflate"
+    );
 }

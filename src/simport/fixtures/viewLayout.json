@@ -1,5 +1,5 @@
 {
-  "version": 24,
+  "version": 25,
   "header": {
     "minutes": 0,
     "towerRevision": 1,
@@ -709,6 +709,10 @@
       "generation"
     ],
     "loadVctower": [
+      "status",
+      "generation"
+    ],
+    "loadVctowerBytes": [
       "status",
       "generation"
     ],
