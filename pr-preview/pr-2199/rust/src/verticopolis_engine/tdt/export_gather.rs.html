@@ -1,0 +1,1005 @@
+<!DOCTYPE html><html lang="en"><head><meta name="robots" content="noindex"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/tdt/export_gather.rs`."><title>export_gather.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../static.files/rustdoc-17e0aaed.css"><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="verticopolis_engine" data-themes="" data-resource-suffix="" data-rustdoc-version="1.97.0 (2d8144b78 2026-07-07)" data-channel="1.97.0" data-search-js="search-fd9372ac.js" data-stringdex-js="stringdex-2da4960a.js" data-settings-js="settings-170eb4bf.js" ><script src="../../../static.files/storage-41dd4d93.js"></script><script defer src="../../../static.files/src-script-813739b1.js"></script><script defer src="../../../src-files.js"></script><script defer src="../../../static.files/main-fcd733ba.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-f7c3ffd8.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-044be391.svg"><style>
+/* Retro (Windows 3.1 / SimTower) design tokens: the single source of the
+   palette, font, bevels, and shadow. This is the ONLY place --r-face and its
+   siblings are declared; styles.css (the game) and retro-page.css (standalone
+   pages like /help and the gallery) both @import it, so no page re-declares the
+   palette. Change the theme here once. */
+:root {
+  /* Semantic tokens. The first four are ALIASES of the chrome tokens below —
+     they read better at usage sites ("body text", "highlight") and can never
+     diverge from the theme. */
+  --bg: var(--r-desktop);
+  --panel: var(--r-face);
+  --ink: var(--r-ink);       /* body text */
+  --accent: var(--r-title);  /* navy — titles & highlights */
+  --panel-light: #d7d7d7;
+  --muted: #2f2f38;       /* secondary text — dark enough to read on gray */
+  --good: #15722e;
+  --bad: #b01023;
+  --bad-ink: #9a0e1f;     /* danger text small enough to need AA 4.5:1 on gray chrome */
+  --money: #005000; /* dark forest green: >=4.5:1 WCAG AA on the #c0c0c0 stat chip (#0a6e26 was 3.53:1, below AA) */
+  --line: #7a7a7a;
+  /* Win3.1 chrome tokens + the signature two-pixel bevels. Swap to re-theme. */
+  --r-face: #c0c0c0;
+  --r-shadow: #808080;
+  --r-dark: #000000;
+  --r-light: #dfdfdf;
+  --r-hi: #ffffff;
+  --r-title: #000080;
+  --r-title-fg: #ffffff;
+  --r-ink: #000000;
+  --r-desktop: #008080;
+  --r-font: "MS Sans Serif", "Tahoma", "Geneva", "Segoe UI", sans-serif;
+  --bevel-out: inset -1px -1px var(--r-dark), inset 1px 1px var(--r-hi),
+    inset -2px -2px var(--r-shadow), inset 2px 2px var(--r-light);
+  --bevel-in: inset 1px 1px var(--r-dark), inset -1px -1px var(--r-hi),
+    inset 2px 2px var(--r-shadow), inset -2px -2px var(--r-light);
+  /* Floating windows cast one hard shadow. */
+  --win-shadow: 2px 2px 0 rgba(0, 0, 0, 0.4);
+  /* The Classic rent-rung chip fills (1994's Blue/Green/Yellow/Red levels).
+     Chosen to read on gray chrome and to stay clear of every reserved sprite
+     state-cue literal; hexes proposed in ux-pricing-split-editor §1.3, pending
+     the pixel-art party's ratification. No Rate has no token: absence of a
+     price is absence of a fill (the chip renders hollow). */
+  --rung-vlow: #2048b0;
+  --rung-low: #1e7a2e;
+  --rung-avg: #c8a000;
+  --rung-high: #b02020;
+  /* The title screen ("Metropolis Dusk"): the game's splash and boot cover
+     (styles/game/splash.css) and the docs site's landing page share these, so
+     the two skies never drift. The splash is box art, not Win 3.1 chrome, and
+     keeps its own colors. */
+  --splash-sky: linear-gradient(#161634 0%, #241f4c 34%, #5b3560 62%, #c65a63 86%, #ef8560 100%);
+  --splash-amber: #ffc94a;   /* POLIS, the primary plate, the focus ring */
+  --splash-sun: radial-gradient(circle, #ffe6a0 0%, var(--splash-amber) 52%, #f18f4b 100%);
+  --splash-sun-glow: rgba(255, 179, 87, 0.26);
+  --splash-building: #201643;
+  --splash-cream: #e6dcc0;   /* the plates and the corner buttons' glyphs */
+  --splash-plate-ink: #20204a;
+  --splash-ink: #0d0d10;     /* plate borders and the skyline's outlines */
+  --splash-wordmark: #f7f1e4; /* VERTICO */
+  --splash-tagline: #ffd9a8;
+  --splash-premise: #e7ddf5;
+}
+
+/* The shared title bar (title-bar.mjs): the help site, the engine docs and
+   the Rust API reference all draw it with these classes. It sits on the navy
+   title bar each surface already paints (theme.css's .header, rustdoc's
+   .vc-header), so the colors here are the bar's own: white on navy, and the
+   game's bevelled gray button. The breakpoint is Starlight's own (50rem),
+   where its side menu turns into the phone's menu button. */
+
+.vc-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--sl-nav-gap, 1rem);
+  height: 100%;
+  min-width: 0;
+}
+
+/* The logo and the site's name, as Starlight's SiteTitle draws them. */
+.vc-bar-title {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex: 0 1 auto;
+  min-width: 0;
+  font-size: var(--sl-text-h4, 1.25rem);
+  font-weight: 700;
+  color: var(--r-title-fg);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.vc-bar-title:hover {
+  color: var(--r-title-fg);
+}
+.vc-bar-title img {
+  flex: none;
+  width: auto;
+  height: calc(var(--sl-nav-height, 4rem) - 2 * var(--sl-nav-pad-y, 0.75rem));
+  image-rendering: pixelated;
+  box-shadow: var(--bevel-out);
+}
+.vc-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.vc-bar-search {
+  display: flex;
+  flex: 1 1 auto;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+.vc-bar-links {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 1rem;
+}
+
+/* The game's bevelled button on the navy bar. */
+.vc-bar-game {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 4px 12px;
+  font-size: 0.875rem;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--r-ink);
+  text-decoration: none;
+  white-space: nowrap;
+  background: var(--r-face);
+  box-shadow: var(--bevel-out);
+}
+.vc-bar-game:hover {
+  color: var(--r-ink);
+}
+.vc-bar-game:active {
+  box-shadow: var(--bevel-in);
+}
+
+.vc-bar-github {
+  display: inline-flex;
+  padding: 0.25rem;
+  color: var(--r-title-fg);
+}
+.vc-bar-github:hover {
+  color: var(--r-light);
+}
+
+/* The theme switch, after a divider, as Starlight's header sets it. */
+.vc-bar-theme {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+.vc-bar-theme::before {
+  content: "";
+  height: 2rem;
+  border-inline-start: 1px solid var(--r-shadow);
+}
+
+.vc-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* A label written twice (twoLengths): the full one on a wide screen. */
+.vc-short {
+  display: none;
+}
+
+@media (max-width: 49.99rem) {
+  /* A phone: the short name and label, the full ones for screen readers. */
+  .vc-full {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+  .vc-short {
+    display: inline;
+  }
+  .vc-bar-title {
+    gap: 0.5rem;
+  }
+  .vc-bar-links {
+    gap: 0.75rem;
+  }
+  /* GitHub and the theme switch move to the foot of the phone's menu. */
+  .vc-bar-github,
+  .vc-bar-theme {
+    display: none;
+  }
+}
+
+@media (min-width: 50rem) {
+  .vc-bar-search {
+    justify-content: center;
+  }
+}
+
+/* The Rust API reference under /rust/ (cargo doc's own pages) in the docs
+   site's look: the game's palette and font from retro-tokens.css, the site's
+   navy title bar, and the site's side menu above the crate's own items, drawn
+   like src/styles/theme.css draws Starlight's. scripts/rustdoc-chrome.mjs
+   puts this in each page's head after retro-tokens.css, and rustdoc's own
+   variables do most of the rest. Code keeps rustdoc's monospace fonts. */
+
+:root {
+  --font-family: var(--r-font);
+  --vc-bar-height: 4rem;
+  --desktop-sidebar-width: 300px;
+}
+:root[data-theme="light"],
+:root:not([data-theme]) {
+  --main-background-color: var(--r-hi);
+  --main-color: var(--r-ink);
+  --sidebar-background-color: var(--r-face);
+  --sidebar-background-color-hover: #d7d7d7;
+  --sidebar-border-color: var(--r-shadow);
+  --sidebar-link-color: var(--r-title);
+  --sidebar-current-link-background-color: #d7d7d7;
+  --link-color: var(--r-title);
+  --mod-link-color: var(--r-title);
+  --keyword-link-color: var(--r-title);
+  --assoc-item-link-color: var(--r-title);
+  --headings-border-bottom-color: var(--r-shadow);
+  --border-color: var(--r-shadow);
+  --search-input-focused-border-color: var(--r-title);
+  --search-tab-button-selected-border-top-color: var(--r-title);
+  --code-block-background-color: #f0f0f0;
+}
+:root[data-theme="dark"],
+:root[data-theme="ayu"] {
+  --main-background-color: #0a1f1f;
+  --main-color: #eafcfb;
+  --sidebar-background-color: #05403f;
+  --sidebar-background-color-hover: #0b4f4e;
+  --sidebar-border-color: #1d4a49;
+  --sidebar-link-color: #bff3f3;
+  --sidebar-current-link-background-color: #0b4f4e;
+  --link-color: #7fe0e0;
+  --mod-link-color: #7fe0e0;
+  --headings-border-bottom-color: #1d4a49;
+  --border-color: #1d4a49;
+  --code-block-background-color: #163636;
+  --search-input-focused-border-color: #7fe0e0;
+}
+
+/* rustdoc's current item: a sunken white row with navy text, so the navy
+   selected row stays the site menu's "Rust API reference". */
+.sidebar .current {
+  background: var(--r-hi);
+  box-shadow: var(--bevel-in);
+}
+:root[data-theme="dark"] .sidebar .current,
+:root[data-theme="ayu"] .sidebar .current {
+  background: #0a1f1f;
+}
+.sidebar .current,
+.sidebar .current a {
+  color: var(--sidebar-link-color);
+  font-weight: 700;
+}
+
+/* ---- The title bar: Starlight's header -------------------------------- */
+
+/* The bar takes a row of its own above rustdoc's sidebar and page. */
+.rustdoc {
+  flex-wrap: wrap;
+}
+.rustdoc > main {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.vc-header {
+  flex: 0 0 100%;
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  height: var(--vc-bar-height);
+  padding: 0.75rem 1.5rem;
+  box-sizing: border-box;
+  background: var(--r-title);
+  color: var(--r-title-fg);
+  font-family: var(--r-font);
+}
+.vc-header .vc-bar {
+  flex: 1;
+  justify-content: space-between;
+}
+.vc-header a:focus-visible,
+rustdoc-topbar .vc-bar-title:focus-visible,
+rustdoc-topbar .vc-bar-links a:focus-visible {
+  outline: 2px solid #ffc94a;
+  outline-offset: 1px;
+}
+.vc-site-menu a:focus-visible,
+.vc-site-menu summary:focus-visible {
+  outline: 2px solid var(--r-title);
+  outline-offset: 1px;
+}
+
+/* ---- The side menu: Starlight's, as the game's Tools panel ------------- */
+
+/* Before the script moves it into the sidebar (or with scripts off), the
+   menu waits off screen; the title bar still links home. */
+.rustdoc > .vc-site-menu {
+  display: none;
+}
+.sidebar {
+  top: var(--vc-bar-height);
+  height: calc(100vh - var(--vc-bar-height));
+  border-right: 2px solid var(--r-shadow);
+}
+.vc-site-menu {
+  padding: 1rem 1rem 0.75rem 1.5rem;
+  border-bottom: 2px solid var(--sidebar-border-color);
+  font-family: var(--r-font);
+  font-size: 1rem;
+}
+.vc-site-menu ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.vc-site-menu li {
+  margin: 0;
+}
+.vc-site-menu a {
+  display: block;
+  padding: 0.3em 0.75em;
+  color: var(--main-color);
+  text-decoration: none;
+}
+.sidebar .vc-site-menu a:hover {
+  background: var(--sidebar-background-color-hover);
+}
+.vc-site-menu .vc-top > a {
+  padding-inline: 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+.vc-site-menu details {
+  margin: 0.5rem 0;
+}
+/* Group labels as the Tools panel draws them: small, uppercase, spaced. */
+.vc-site-menu summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.3em 0;
+  cursor: pointer;
+  list-style: none;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--sidebar-link-color);
+}
+.vc-site-menu summary::-webkit-details-marker {
+  display: none;
+}
+.vc-site-menu summary::after {
+  content: "";
+  width: 0.45em;
+  height: 0.45em;
+  margin-inline-end: 0.5rem;
+  border: solid currentColor;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+.vc-site-menu details:not([open]) summary::after {
+  transform: rotate(-45deg);
+}
+.vc-site-menu details ul {
+  margin-inline-start: 0.1rem;
+  border-inline-start: 1px solid var(--sidebar-border-color);
+}
+.vc-site-menu details a {
+  margin-inline-start: 0.75rem;
+}
+/* The current page is the selected row: navy, white text, square. */
+.sidebar .vc-site-menu a[aria-current="page"],
+.sidebar .vc-site-menu a[aria-current="page"]:hover {
+  background: var(--r-title);
+  color: var(--r-title-fg);
+  font-weight: 600;
+}
+
+/* A source page pins rustdoc's file-list button to the window's top left,
+   which is the title bar's logo here, so it sits just below the bar. */
+.src #sidebar-button {
+  top: calc(var(--vc-bar-height) + 8px);
+}
+
+/* GitHub closes the menu only where the title bar hides it (title-bar.css,
+   below Starlight's 50rem), which includes widths where rustdoc still shows
+   its desktop sidebar. */
+.vc-menu-github {
+  display: none;
+}
+@media (max-width: 49.99rem) {
+  .vc-menu-github {
+    display: block;
+  }
+}
+
+@media (max-width: 700px) {
+  :root {
+    --vc-bar-height: 3.5rem;
+    --topbar-height: var(--vc-bar-height);
+  }
+  .vc-header {
+    padding-inline: 1rem;
+  }
+  rustdoc-topbar {
+    top: var(--vc-bar-height);
+  }
+
+  /* One bar: once the script has copied the title and the links into
+     rustdoc's top bar (rustdoc-chrome.mjs), that bar is the navy title bar,
+     holding the site's title, the game button, rustdoc's settings and help,
+     and the one menu button at its right, where Starlight puts its own. The
+     crate's name it showed is the page's own heading just below. With
+     rustdoc's "hide sidebar" setting on, rustdoc hides its top bar, so the
+     title bar stays. */
+  .vc-one-bar:not(.hide-sidebar) .vc-header {
+    display: none;
+  }
+  .vc-one-bar rustdoc-topbar {
+    top: 0;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0 1rem;
+    box-sizing: border-box;
+    background: var(--r-title);
+    color: var(--r-title-fg);
+  }
+  .vc-one-bar rustdoc-topbar > h2 {
+    display: none;
+  }
+  .vc-one-bar rustdoc-topbar .vc-bar-title {
+    flex: 1 1 auto;
+    font-size: 1.125rem;
+  }
+  .vc-one-bar rustdoc-topbar .vc-bar-title img {
+    height: 2rem;
+  }
+  .vc-one-bar rustdoc-topbar .settings-menu,
+  .vc-one-bar rustdoc-topbar .help-menu {
+    order: 1;
+  }
+  .vc-one-bar rustdoc-topbar .settings-menu > a,
+  .vc-one-bar rustdoc-topbar .help-menu > a {
+    width: 2rem;
+    height: 2rem;
+  }
+  .vc-one-bar rustdoc-topbar .settings-menu > a::before,
+  .vc-one-bar rustdoc-topbar .help-menu > a::before {
+    margin: 0;
+    filter: invert(1);
+  }
+  .vc-one-bar rustdoc-topbar .settings-menu > a:hover,
+  .vc-one-bar rustdoc-topbar .help-menu > a:hover {
+    background: transparent;
+  }
+  /* rustdoc's menu button as Starlight's: the game's bevelled gray button. */
+  .vc-one-bar rustdoc-topbar .sidebar-menu-toggle {
+    order: 2;
+    flex: none;
+    width: 2rem;
+    min-width: 2rem;
+    height: 2rem;
+    padding: 0;
+    background: var(--r-face);
+    box-shadow: var(--bevel-out);
+  }
+  /* Three ink bars, the size of Starlight's menu icon. */
+  .vc-one-bar rustdoc-topbar .sidebar-menu-toggle::before {
+    content: "";
+    display: block;
+    width: 1rem;
+    height: 2px;
+    margin: auto;
+    background: var(--r-ink);
+    box-shadow: 0 -5px 0 var(--r-ink), 0 5px 0 var(--r-ink);
+    filter: none;
+    opacity: 1;
+  }
+  .vc-one-bar rustdoc-topbar .sidebar-menu-toggle:active {
+    box-shadow: var(--bevel-in);
+  }
+}
+</style>
+
+</head><body class="rustdoc src"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><header class="vc-header"><div class="vc-bar"><a class="vc-bar-title" href="/pr-preview/pr-2199/"><img src="/pr-preview/pr-2199/favicon.png" alt="" width="40" height="40"><span class="vc-name" translate="no"><span class="vc-full">Verticopolis engine</span><span class="vc-short" aria-hidden="true">Engine docs</span></span></a><div class="vc-bar-links"><a class="vc-bar-game" href="https://verticopolis.com/" data-game-link><span class="vc-full">Play the game</span><span class="vc-short" aria-hidden="true">Play</span></a><a class="vc-bar-github" href="https://github.com/maniator/verticopolis"><span class="vc-sr-only">GitHub</span><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M12 .3a12 12 0 0 0-3.8 23.38c.6.12.83-.26.83-.57L9 21.07c-3.34.72-4.04-1.61-4.04-1.61-.55-1.39-1.34-1.76-1.34-1.76-1.08-.74.09-.73.09-.73 1.2.09 1.83 1.24 1.83 1.24 1.08 1.83 2.81 1.3 3.5 1 .1-.78.42-1.31.76-1.61-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.14-.3-.54-1.52.1-3.18 0 0 1-.32 3.3 1.23a11.5 11.5 0 0 1 6 0c2.28-1.55 3.29-1.23 3.29-1.23.64 1.66.24 2.88.12 3.18a4.65 4.65 0 0 1 1.23 3.22c0 4.61-2.8 5.63-5.48 5.92.42.36.81 1.1.81 2.22l-.01 3.29c0 .31.2.69.82.57A12 12 0 0 0 12 .3Z"/></svg></a></div></div></header>
+<nav class="vc-site-menu" aria-label="Docs"><ul><li class="vc-top"><a href="/pr-preview/pr-2199/">Overview</a></li><li><details open><summary>Guides</summary><ul><li><a href="/pr-preview/pr-2199/javascript/">JavaScript package</a></li><li><a href="/pr-preview/pr-2199/crate/">Rust crate</a></li><li><a href="/pr-preview/pr-2199/api/">Host API guide</a></li><li><a href="/pr-preview/pr-2199/conformance/">Conformance suite</a></li></ul></details></li><li><details open><summary>Reference</summary><ul><li><a href="/pr-preview/pr-2199/rust/verticopolis_engine/" aria-current="page">Rust API reference</a></li><li><a href="/pr-preview/pr-2199/changelog/">Engine changelog</a></li></ul></details></li><li class="vc-top"><a href="https://verticopolis.com/">Play Verticopolis</a></li><li class="vc-top vc-menu-github"><a href="https://github.com/maniator/verticopolis">GitHub</a></li></ul></nav>
+
+<nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><h1><div class="sub-heading">verticopolis_engine/tdt/</div>export_gather.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap digits-3"><pre class="rust"><code><a href=#1 id=1 data-nosnippet>1</a><span class="doccomment">//! The gather pass of the `.TDT` export (`tdtExportGather.ts`): walk the
+<a href=#2 id=2 data-nosnippet>2</a>//! serialized tower into per-floor tenant records, paving spans, header
+<a href=#3 id=3 data-nosnippet>3</a>//! aggregate counts and a people census, without writing any bytes.
+<a href=#4 id=4 data-nosnippet>4</a>//!
+<a href=#5 id=5 data-nosnippet>5</a>//! The input is the save as JSON, which is any JavaScript value the
+<a href=#6 id=6 data-nosnippet>6</a>//! TypeScript exporter would accept, so each field is read the way its
+<a href=#7 id=7 data-nosnippet>7</a>//! TypeScript site reads it. There are three readers, and they are
+<a href=#8 id=8 data-nosnippet>8</a>//! deliberately different:
+<a href=#9 id=9 data-nosnippet>9</a>//!
+<a href=#10 id=10 data-nosnippet>10</a>//! - `js_finite` is `Number.isFinite(v)`, which never coerces: a string, a
+<a href=#11 id=11 data-nosnippet>11</a>//!   boolean or `null` is simply not a finite number. It serves every site
+<a href=#12 id=12 data-nosnippet>12</a>//!   that guards with `Number.isFinite` (`money`, `lastQuarterMoney`, `star`,
+<a href=#13 id=13 data-nosnippet>13</a>//!   the view's `tile` and `floor`, a transport's `x`, `bottom`, `top`,
+<a href=#14 id=14 data-nosnippet>14</a>//!   `cars` and `carPositions`, a household's `residents`, and the extent of
+<a href=#15 id=15 data-nosnippet>15</a>//!   a room that writes no record) and the `skipFloors` `Set`, whose
+<a href=#16 id=16 data-nosnippet>16</a>//!   SameValueZero membership only a number can satisfy.
+<a href=#17 id=17 data-nosnippet>17</a>//! - `js_num` is `Number(v)`, for the sites that do arithmetic on the raw
+<a href=#18 id=18 data-nosnippet>18</a>//!   value and so coerce it: a unit's `occupants` (`Math.max(occupants, 1)`),
+<a href=#19 id=19 data-nosnippet>19</a>//!   its `rent` (`rent - anchor` in `classFromRent`), and the clock's
+<a href=#20 id=20 data-nosnippet>20</a>//!   `minutes` (`minutes % 1440`, read in `encoder.rs`).
+<a href=#21 id=21 data-nosnippet>21</a>//! - `js_num_raw_site` serves the three unit fields the TypeScript gather
+<a href=#22 id=22 data-nosnippet>22</a>//!   keeps raw: a unit's `floor`, `x` and `width`. It is the reading those
+<a href=#23 id=23 data-nosnippet>23</a>//!   sites had before round 3 of the #881 review, kept on purpose; see its
+<a href=#24 id=24 data-nosnippet>24</a>//!   own doc for where it parts from `Number()` (#884).
+<a href=#25 id=25 data-nosnippet>25</a>//!
+<a href=#26 id=26 data-nosnippet>26</a>//! A NaN in the live save crosses the WASM surface as JSON `null`, so `null`
+<a href=#27 id=27 data-nosnippet>27</a>//! is the shape these sites see most: `Number.isFinite(null)` is false, while
+<a href=#28 id=28 data-nosnippet>28</a>//! `Number(null)` is 0, which is why `js_finite` and the coercing readers
+<a href=#29 id=29 data-nosnippet>29</a>//! cannot be swapped. Floors are keyed as doubles (`FloorKey`), the way the
+<a href=#30 id=30 data-nosnippet>30</a>//! TypeScript `Map`s key a numeric floor. A floor that is not a number (a
+<a href=#31 id=31 data-nosnippet>31</a>//! forged save only; the loader keeps floors finite) keys the TypeScript
+<a href=#32 id=32 data-nosnippet>32</a>//! `Map` by its raw value and is coerced here by `js_num_raw_site`, so those
+<a href=#33 id=33 data-nosnippet>33</a>//! saves write different bytes (#884).
+<a href=#34 id=34 data-nosnippet>34</a>
+<a href=#35 id=35 data-nosnippet>35</a></span><span class="kw">use </span>std::borrow::Borrow;
+<a href=#36 id=36 data-nosnippet>36</a>
+<a href=#37 id=37 data-nosnippet>37</a><span class="kw">use </span>indexmap::IndexMap;
+<a href=#38 id=38 data-nosnippet>38</a><span class="kw">use </span>serde_json::Value;
+<a href=#39 id=39 data-nosnippet>39</a>
+<a href=#40 id=40 data-nosnippet>40</a><span class="kw">use </span><span class="kw">super</span>::export_tables::{class_from_rent, kind_tenant, part_stack, OutTenant};
+<a href=#41 id=41 data-nosnippet>41</a><span class="kw">use </span><span class="kw">super</span>::format::{
+<a href=#42 id=42 data-nosnippet>42</a>    population_class, TDT_FLOOR_OFFSET, TDT_POPULATION_CLASSES <span class="kw">as </span>POPULATION_CLASSES,
+<a href=#43 id=43 data-nosnippet>43</a>    TDT_RETAIL_SLOTS,
+<a href=#44 id=44 data-nosnippet>44</a>};
+<a href=#45 id=45 data-nosnippet>45</a><span class="kw">use </span><span class="kw">super</span>::tables::{
+<a href=#46 id=46 data-nosnippet>46</a>    is_priced, rent_from_class, HOTEL_ASLEEP_FLAG, HOTEL_DIRTY_FLAG, HOTEL_OCCUPANT_MASK,
+<a href=#47 id=47 data-nosnippet>47</a>    HOTEL_STAY_VACANT,
+<a href=#48 id=48 data-nosnippet>48</a>};
+<a href=#49 id=49 data-nosnippet>49</a><span class="kw">use </span><span class="kw">super</span>::venue_people::split_theatre;
+<a href=#50 id=50 data-nosnippet>50</a><span class="kw">use </span><span class="kw">super</span>::venues::OutVenueHalf;
+<a href=#51 id=51 data-nosnippet>51</a><span class="kw">use </span><span class="kw">super</span>::LegacyExportError;
+<a href=#52 id=52 data-nosnippet>52</a><span class="kw">use </span><span class="kw">crate</span>::econ::rent_config;
+<a href=#53 id=53 data-nosnippet>53</a><span class="kw">use </span><span class="kw">crate</span>::economy::visitors::showing_draw;
+<a href=#54 id=54 data-nosnippet>54</a><span class="kw">use </span><span class="kw">crate</span>::facilities::{is_lobby_floor, Kind, LOT_WIDTH, MAX_LOBBY_HEIGHT};
+<a href=#55 id=55 data-nosnippet>55</a>
+<a href=#56 id=56 data-nosnippet>56</a><span class="kw">mod </span>gathered;
+<a href=#57 id=57 data-nosnippet>57</a><span class="kw">mod </span>lobby_height;
+<a href=#58 id=58 data-nosnippet>58</a><span class="kw">mod </span>normalize;
+<a href=#59 id=59 data-nosnippet>59</a><span class="kw">pub use </span>lobby_height::ground_lobby_height;
+<a href=#60 id=60 data-nosnippet>60</a><span class="kw">mod </span>values;
+<a href=#61 id=61 data-nosnippet>61</a>
+<a href=#62 id=62 data-nosnippet>62</a><span class="kw">pub use </span>gathered::{ExportCounts, ExportHeaderCounts, GatheredRoom, GatheredTower, SkipReason};
+<a href=#63 id=63 data-nosnippet>63</a><span class="kw">use </span>normalize::{fits_tdt_rows, is_present, norm, resident_count};
+<a href=#64 id=64 data-nosnippet>64</a><span class="kw">pub use </span>values::{
+<a href=#65 id=65 data-nosnippet>65</a>    car_homes, js_finite, js_max, js_min, js_num, js_num_raw_site, js_truthy, FloorKey,
+<a href=#66 id=66 data-nosnippet>66</a>};
+<a href=#67 id=67 data-nosnippet>67</a>
+<a href=#68 id=68 data-nosnippet>68</a><span class="kw">pub fn </span>gather_tower(save: <span class="kw-2">&amp;</span>Value) -&gt; <span class="prelude-ty">Result</span>&lt;GatheredTower, LegacyExportError&gt; {
+<a href=#69 id=69 data-nosnippet>69</a>    <span class="kw">let </span><span class="prelude-val">Some</span>(raw_units) = save.get(<span class="string">"units"</span>).and_then(Value::as_array) <span class="kw">else </span>{
+<a href=#70 id=70 data-nosnippet>70</a>        <span class="kw">return </span><span class="prelude-val">Err</span>(LegacyExportError(<span class="string">"save.units is not an array"</span>.into()));
+<a href=#71 id=71 data-nosnippet>71</a>    };
+<a href=#72 id=72 data-nosnippet>72</a>    gather_units(raw_units, ground_lobby_height(save))
+<a href=#73 id=73 data-nosnippet>73</a>}
+<a href=#74 id=74 data-nosnippet>74</a>
+<a href=#75 id=75 data-nosnippet>75</a><span class="doccomment">/// [`gather_tower`] over the save's unit entries as they come, each read on
+<a href=#76 id=76 data-nosnippet>76</a>/// its own and dropped before the next, so the caller need not hold the
+<a href=#77 id=77 data-nosnippet>77</a>/// `units` array whole (#1431). `lobby_height` is the ground lobby's height
+<a href=#78 id=78 data-nosnippet>78</a>/// ([`ground_lobby_height`]): its lobby tiles rise through that many stories,
+<a href=#79 id=79 data-nosnippet>79</a>/// which the file paves as lobby above them.
+<a href=#80 id=80 data-nosnippet>80</a></span><span class="kw">pub fn </span>gather_units&lt;U: Borrow&lt;Value&gt;&gt;(
+<a href=#81 id=81 data-nosnippet>81</a>    raw_units: <span class="kw">impl </span>IntoIterator&lt;Item = U&gt;,
+<a href=#82 id=82 data-nosnippet>82</a>    lobby_height: i64,
+<a href=#83 id=83 data-nosnippet>83</a>) -&gt; <span class="prelude-ty">Result</span>&lt;GatheredTower, LegacyExportError&gt; {
+<a href=#84 id=84 data-nosnippet>84</a>    <span class="kw">let </span><span class="kw-2">mut </span>tenants_by_tdt: IndexMap&lt;FloorKey, Vec&lt;OutTenant&gt;&gt; = IndexMap::new();
+<a href=#85 id=85 data-nosnippet>85</a>    <span class="kw">let </span><span class="kw-2">mut </span>extents: IndexMap&lt;FloorKey, (f64, f64)&gt; = IndexMap::new();
+<a href=#86 id=86 data-nosnippet>86</a>    <span class="kw">let </span><span class="kw-2">mut </span>covered_tiles: IndexMap&lt;FloorKey, Vec&lt;bool&gt;&gt; = IndexMap::new();
+<a href=#87 id=87 data-nosnippet>87</a>    <span class="kw">let </span><span class="kw-2">mut </span>retail_rows: Vec&lt;(f64, i64)&gt; = <span class="macro">vec!</span>[];
+<a href=#88 id=88 data-nosnippet>88</a>    <span class="kw">let </span>widen =
+<a href=#89 id=89 data-nosnippet>89</a>        |extents: <span class="kw-2">&amp;mut </span>IndexMap&lt;FloorKey, (f64, f64)&gt;, floor: f64, left: f64, right: f64| {
+<a href=#90 id=90 data-nosnippet>90</a>            <span class="kw">match </span>extents.get_mut(<span class="kw-2">&amp;</span>FloorKey::of(floor)) {
+<a href=#91 id=91 data-nosnippet>91</a>                <span class="prelude-val">None </span>=&gt; {
+<a href=#92 id=92 data-nosnippet>92</a>                    extents.insert(FloorKey::of(floor), (left, right));
+<a href=#93 id=93 data-nosnippet>93</a>                }
+<a href=#94 id=94 data-nosnippet>94</a>                <span class="prelude-val">Some</span>(e) =&gt; {
+<a href=#95 id=95 data-nosnippet>95</a>                    e.<span class="number">0 </span>= js_min(e.<span class="number">0</span>, left);
+<a href=#96 id=96 data-nosnippet>96</a>                    e.<span class="number">1 </span>= js_max(e.<span class="number">1</span>, right);
+<a href=#97 id=97 data-nosnippet>97</a>                }
+<a href=#98 id=98 data-nosnippet>98</a>            }
+<a href=#99 id=99 data-nosnippet>99</a>        };
+<a href=#100 id=100 data-nosnippet>100</a>    <span class="kw">let </span>push_tenant =
+<a href=#101 id=101 data-nosnippet>101</a>        |tenants: <span class="kw-2">&amp;mut </span>IndexMap&lt;FloorKey, Vec&lt;OutTenant&gt;&gt;, floor: f64, t: OutTenant| {
+<a href=#102 id=102 data-nosnippet>102</a>            tenants
+<a href=#103 id=103 data-nosnippet>103</a>                .entry(FloorKey::of(floor + TDT_FLOOR_OFFSET <span class="kw">as </span>f64))
+<a href=#104 id=104 data-nosnippet>104</a>                .or_default()
+<a href=#105 id=105 data-nosnippet>105</a>                .extend(split_theatre(t));
+<a href=#106 id=106 data-nosnippet>106</a>        };
+<a href=#107 id=107 data-nosnippet>107</a>
+<a href=#108 id=108 data-nosnippet>108</a>    <span class="kw">let </span><span class="kw-2">mut </span>counts = ExportCounts::default();
+<a href=#109 id=109 data-nosnippet>109</a>    <span class="kw">let </span><span class="kw-2">mut </span>header = ExportHeaderCounts::default();
+<a href=#110 id=110 data-nosnippet>110</a>    <span class="kw">let </span><span class="kw-2">mut </span>has_ground_lobby = <span class="bool-val">false</span>;
+<a href=#111 id=111 data-nosnippet>111</a>    <span class="comment">// The stories above the ground floor a tall ground lobby rises through.
+<a href=#112 id=112 data-nosnippet>112</a>    </span><span class="kw">let </span>raised = <span class="number">2</span>..<span class="number">1 </span>+ lobby_height.clamp(<span class="number">1</span>, MAX_LOBBY_HEIGHT);
+<a href=#113 id=113 data-nosnippet>113</a>    <span class="kw">let </span><span class="kw-2">mut </span>people_pop = <span class="number">0.0</span>;
+<a href=#114 id=114 data-nosnippet>114</a>    <span class="kw">let </span><span class="kw-2">mut </span>class_pop = [<span class="number">0.0</span>; POPULATION_CLASSES];
+<a href=#115 id=115 data-nosnippet>115</a>    <span class="kw">let </span>add_residents =
+<a href=#116 id=116 data-nosnippet>116</a>        |people_pop: <span class="kw-2">&amp;mut </span>f64, class_pop: <span class="kw-2">&amp;mut </span>[f64; POPULATION_CLASSES], u: <span class="kw-2">&amp;</span>GatheredRoom| {
+<a href=#117 id=117 data-nosnippet>117</a>            <span class="kw">let </span>r = resident_count(u);
+<a href=#118 id=118 data-nosnippet>118</a>            <span class="kw">if </span>r.is_finite() {
+<a href=#119 id=119 data-nosnippet>119</a>                <span class="kw-2">*</span>people_pop += r;
+<a href=#120 id=120 data-nosnippet>120</a>                <span class="kw">if let </span><span class="prelude-val">Some</span>(class) = population_class(u.kind) {
+<a href=#121 id=121 data-nosnippet>121</a>                    class_pop[class] += r;
+<a href=#122 id=122 data-nosnippet>122</a>                }
+<a href=#123 id=123 data-nosnippet>123</a>            }
+<a href=#124 id=124 data-nosnippet>124</a>        };
+<a href=#125 id=125 data-nosnippet>125</a>
+<a href=#126 id=126 data-nosnippet>126</a>    <span class="kw">let </span><span class="kw-2">mut </span>rooms: Vec&lt;GatheredRoom&gt; = <span class="macro">vec!</span>[];
+<a href=#127 id=127 data-nosnippet>127</a>    <span class="kw">for </span>raw <span class="kw">in </span>raw_units {
+<a href=#128 id=128 data-nosnippet>128</a>        <span class="kw">let </span><span class="kw-2">mut </span>u = norm(raw.borrow())<span class="question-mark">?</span>;
+<a href=#129 id=129 data-nosnippet>129</a>        <span class="kw">if </span>u.kind == Kind::Floor || u.kind == Kind::Lobby {
+<a href=#130 id=130 data-nosnippet>130</a>            <span class="kw">if </span>u.kind == Kind::Lobby &amp;&amp; u.floor == <span class="number">1.0 </span>&amp;&amp; u.state != <span class="string">"fire" </span>&amp;&amp; u.state != <span class="string">"gutted" </span>{
+<a href=#131 id=131 data-nosnippet>131</a>                has_ground_lobby = <span class="bool-val">true</span>;
+<a href=#132 id=132 data-nosnippet>132</a>            }
+<a href=#133 id=133 data-nosnippet>133</a>            widen(<span class="kw-2">&amp;mut </span>extents, u.floor, u.x, u.x + u.width);
+<a href=#134 id=134 data-nosnippet>134</a>            <span class="kw">if </span>u.kind == Kind::Lobby &amp;&amp; u.floor == <span class="number">1.0 </span>{
+<a href=#135 id=135 data-nosnippet>135</a>                <span class="kw">for </span>story <span class="kw">in </span>raised.clone() {
+<a href=#136 id=136 data-nosnippet>136</a>                    widen(<span class="kw-2">&amp;mut </span>extents, story <span class="kw">as </span>f64, u.x, u.x + u.width);
+<a href=#137 id=137 data-nosnippet>137</a>                }
+<a href=#138 id=138 data-nosnippet>138</a>            }
+<a href=#139 id=139 data-nosnippet>139</a>            <span class="kw">continue</span>;
+<a href=#140 id=140 data-nosnippet>140</a>        }
+<a href=#141 id=141 data-nosnippet>141</a>        <span class="kw">let </span>burned = u.state == <span class="string">"fire" </span>|| u.state == <span class="string">"gutted"</span>;
+<a href=#142 id=142 data-nosnippet>142</a>        <span class="kw">let </span>stories = u.kind.floors() <span class="kw">as </span>f64;
+<a href=#143 id=143 data-nosnippet>143</a>        <span class="kw">let </span>fits = fits_tdt_rows(u.kind, u.floor, stories);
+<a href=#144 id=144 data-nosnippet>144</a>        <span class="kw">let </span>mappable = kind_tenant(u.kind).is_some() || part_stack(u.kind).is_some();
+<a href=#145 id=145 data-nosnippet>145</a>        u.skip_reason = <span class="kw">if </span>!fits {
+<a href=#146 id=146 data-nosnippet>146</a>            <span class="prelude-val">Some</span>(SkipReason::OutOfRange)
+<a href=#147 id=147 data-nosnippet>147</a>        } <span class="kw">else if </span>burned {
+<a href=#148 id=148 data-nosnippet>148</a>            <span class="prelude-val">Some</span>(SkipReason::Burned)
+<a href=#149 id=149 data-nosnippet>149</a>        } <span class="kw">else if </span>!mappable {
+<a href=#150 id=150 data-nosnippet>150</a>            <span class="prelude-val">Some</span>(SkipReason::Unmappable)
+<a href=#151 id=151 data-nosnippet>151</a>        } <span class="kw">else </span>{
+<a href=#152 id=152 data-nosnippet>152</a>            <span class="prelude-val">None
+<a href=#153 id=153 data-nosnippet>153</a>        </span>};
+<a href=#154 id=154 data-nosnippet>154</a>        u.emitted = !burned &amp;&amp; fits &amp;&amp; mappable;
+<a href=#155 id=155 data-nosnippet>155</a>        <span class="kw">let </span>clamp = |v: f64| js_max(<span class="number">0.0</span>, js_min(LOT_WIDTH <span class="kw">as </span>f64, v));
+<a href=#156 id=156 data-nosnippet>156</a>        <span class="kw">let </span><span class="kw-2">mut </span>left = <span class="number">0.0</span>;
+<a href=#157 id=157 data-nosnippet>157</a>        <span class="kw">let </span><span class="kw-2">mut </span>right = <span class="number">0.0</span>;
+<a href=#158 id=158 data-nosnippet>158</a>        <span class="kw">if </span>u.emitted {
+<a href=#159 id=159 data-nosnippet>159</a>            left = u.x;
+<a href=#160 id=160 data-nosnippet>160</a>            right = u.x + u.width;
+<a href=#161 id=161 data-nosnippet>161</a>        } <span class="kw">else if </span>u.coords_finite {
+<a href=#162 id=162 data-nosnippet>162</a>            left = clamp(u.x);
+<a href=#163 id=163 data-nosnippet>163</a>            right = clamp(u.x + u.width);
+<a href=#164 id=164 data-nosnippet>164</a>        }
+<a href=#165 id=165 data-nosnippet>165</a>        <span class="kw">let </span>emitted = u.emitted;
+<a href=#166 id=166 data-nosnippet>166</a>        <span class="kw">let </span>(floor, kind) = (u.floor, u.kind);
+<a href=#167 id=167 data-nosnippet>167</a>        rooms.push(u);
+<a href=#168 id=168 data-nosnippet>168</a>        <span class="kw">if </span>!emitted &amp;&amp; right &lt;= left {
+<a href=#169 id=169 data-nosnippet>169</a>            <span class="kw">continue</span>;
+<a href=#170 id=170 data-nosnippet>170</a>        }
+<a href=#171 id=171 data-nosnippet>171</a>        <span class="kw">let </span><span class="kw-2">mut </span>fl = floor;
+<a href=#172 id=172 data-nosnippet>172</a>        <span class="kw">while </span>fl &lt; floor + kind.floors() <span class="kw">as </span>f64 {
+<a href=#173 id=173 data-nosnippet>173</a>            widen(<span class="kw-2">&amp;mut </span>extents, fl, left, right);
+<a href=#174 id=174 data-nosnippet>174</a>            <span class="comment">// A floor so large that `fl + 1` is `fl` would loop forever (as
+<a href=#175 id=175 data-nosnippet>175</a>            // the TypeScript does); stop after the one story it can name.
+<a href=#176 id=176 data-nosnippet>176</a>            </span><span class="kw">if </span>fl + <span class="number">1.0 </span>== fl {
+<a href=#177 id=177 data-nosnippet>177</a>                <span class="kw">break</span>;
+<a href=#178 id=178 data-nosnippet>178</a>            }
+<a href=#179 id=179 data-nosnippet>179</a>            fl += <span class="number">1.0</span>;
+<a href=#180 id=180 data-nosnippet>180</a>        }
+<a href=#181 id=181 data-nosnippet>181</a>    }
+<a href=#182 id=182 data-nosnippet>182</a>
+<a href=#183 id=183 data-nosnippet>183</a>    <span class="kw">for </span>idx <span class="kw">in </span><span class="number">0</span>..rooms.len() {
+<a href=#184 id=184 data-nosnippet>184</a>        <span class="kw">let </span>u = <span class="kw-2">&amp;</span>rooms[idx];
+<a href=#185 id=185 data-nosnippet>185</a>        <span class="kw">if </span>!u.emitted {
+<a href=#186 id=186 data-nosnippet>186</a>            <span class="kw">match </span>u.skip_reason {
+<a href=#187 id=187 data-nosnippet>187</a>                <span class="prelude-val">Some</span>(SkipReason::OutOfRange) =&gt; counts.out_of_range += <span class="number">1</span>,
+<a href=#188 id=188 data-nosnippet>188</a>                <span class="prelude-val">Some</span>(SkipReason::Burned) =&gt; counts.burned_out += <span class="number">1</span>,
+<a href=#189 id=189 data-nosnippet>189</a>                <span class="kw">_ </span>=&gt; {}
+<a href=#190 id=190 data-nosnippet>190</a>            }
+<a href=#191 id=191 data-nosnippet>191</a>            <span class="kw">continue</span>;
+<a href=#192 id=192 data-nosnippet>192</a>        }
+<a href=#193 id=193 data-nosnippet>193</a>        <span class="kw">let </span>construction = u.state == <span class="string">"construction"</span>;
+<a href=#194 id=194 data-nosnippet>194</a>        <span class="kw">let </span>tenanted = u.state == <span class="string">"occupied" </span>|| u.state == <span class="string">"moving_in" </span>|| u.state == <span class="string">"vacating"</span>;
+<a href=#195 id=195 data-nosnippet>195</a>        <span class="kw">let </span><span class="kw-2">mut </span>status: i64 = <span class="number">0</span>;
+<a href=#196 id=196 data-nosnippet>196</a>        <span class="kw">if </span>!construction {
+<a href=#197 id=197 data-nosnippet>197</a>            <span class="kw">if </span>(u.kind == Kind::Office || u.kind == Kind::Condo) &amp;&amp; tenanted {
+<a href=#198 id=198 data-nosnippet>198</a>                status = <span class="number">1</span>;
+<a href=#199 id=199 data-nosnippet>199</a>                counts.occupied += <span class="number">1</span>;
+<a href=#200 id=200 data-nosnippet>200</a>                add_residents(<span class="kw-2">&amp;mut </span>people_pop, <span class="kw-2">&amp;mut </span>class_pop, u);
+<a href=#201 id=201 data-nosnippet>201</a>            } <span class="kw">else if </span>u.kind.is_commercial() &amp;&amp; u.kind.facility().population &gt; <span class="number">0 </span>{
+<a href=#202 id=202 data-nosnippet>202</a>                <span class="kw">if </span>is_present(<span class="kw-2">&amp;</span>u.state) {
+<a href=#203 id=203 data-nosnippet>203</a>                    add_residents(<span class="kw-2">&amp;mut </span>people_pop, <span class="kw-2">&amp;mut </span>class_pop, u);
+<a href=#204 id=204 data-nosnippet>204</a>                }
+<a href=#205 id=205 data-nosnippet>205</a>            } <span class="kw">else if </span>u.kind.is_hotel() {
+<a href=#206 id=206 data-nosnippet>206</a>                <span class="comment">// The file's infested bit (`HOTEL_INFESTED_FLAG`) is not our
+<a href=#207 id=207 data-nosnippet>207</a>                // infested state: the original clears it from a vacant or dirty
+<a href=#208 id=208 data-nosnippet>208</a>                // room after about a minute of Fast Mode (PC run, #1629), so an infested room
+<a href=#209 id=209 data-nosnippet>209</a>                // goes out as the dirty room the original can work with.
+<a href=#210 id=210 data-nosnippet>210</a>                </span><span class="kw">if </span>u.state == <span class="string">"dirty" </span>|| u.state == <span class="string">"infested" </span>{
+<a href=#211 id=211 data-nosnippet>211</a>                    status = HOTEL_DIRTY_FLAG;
+<a href=#212 id=212 data-nosnippet>212</a>                } <span class="kw">else if </span>u.state == <span class="string">"asleep" </span>{
+<a href=#213 id=213 data-nosnippet>213</a>                    <span class="kw">let </span>guests = js_min(js_max(u.occupants, <span class="number">1.0</span>), HOTEL_OCCUPANT_MASK <span class="kw">as </span>f64);
+<a href=#214 id=214 data-nosnippet>214</a>                    status = HOTEL_ASLEEP_FLAG | <span class="kw">super</span>::byte_writer::to_int32(guests);
+<a href=#215 id=215 data-nosnippet>215</a>                } <span class="kw">else if </span>tenanted || u.ever_occupied {
+<a href=#216 id=216 data-nosnippet>216</a>                    <span class="comment">// A room that has been rented and sits clean and empty.
+<a href=#217 id=217 data-nosnippet>217</a>                    // The original's own saves write it as stay state 3; a
+<a href=#218 id=218 data-nosnippet>218</a>                    // bare 1 (no stay state) is read as a sleeping guest and
+<a href=#219 id=219 data-nosnippet>219</a>                    // rewritten to 0x10 when the game saves.
+<a href=#220 id=220 data-nosnippet>220</a>                    </span>status = HOTEL_STAY_VACANT;
+<a href=#221 id=221 data-nosnippet>221</a>                }
+<a href=#222 id=222 data-nosnippet>222</a>                <span class="kw">if </span>status != <span class="number">0 </span>{
+<a href=#223 id=223 data-nosnippet>223</a>                    counts.hotel_states += <span class="number">1</span>;
+<a href=#224 id=224 data-nosnippet>224</a>                    add_residents(<span class="kw-2">&amp;mut </span>people_pop, <span class="kw-2">&amp;mut </span>class_pop, u);
+<a href=#225 id=225 data-nosnippet>225</a>                    <span class="comment">// The finance block counts the guests in the rooms, so a
+<a href=#226 id=226 data-nosnippet>226</a>                    // dirty or booked room, which the census counts for the
+<a href=#227 id=227 data-nosnippet>227</a>                    // people block, holds none there.
+<a href=#228 id=228 data-nosnippet>228</a>                    </span><span class="kw">if let </span><span class="prelude-val">Some</span>(class) = population_class(u.kind) {
+<a href=#229 id=229 data-nosnippet>229</a>                        class_pop[class] -= resident_count(u);
+<a href=#230 id=230 data-nosnippet>230</a>                        <span class="kw">if </span>u.state == <span class="string">"asleep" </span>{
+<a href=#231 id=231 data-nosnippet>231</a>                            class_pop[class] +=
+<a href=#232 id=232 data-nosnippet>232</a>                                js_min(js_max(u.occupants, <span class="number">1.0</span>), HOTEL_OCCUPANT_MASK <span class="kw">as </span>f64);
+<a href=#233 id=233 data-nosnippet>233</a>                        }
+<a href=#234 id=234 data-nosnippet>234</a>                    }
+<a href=#235 id=235 data-nosnippet>235</a>                }
+<a href=#236 id=236 data-nosnippet>236</a>            }
+<a href=#237 id=237 data-nosnippet>237</a>            <span class="kw">if </span>(u.kind == Kind::Office || u.kind == Kind::Condo) &amp;&amp; !tenanted &amp;&amp; u.ever_occupied {
+<a href=#238 id=238 data-nosnippet>238</a>                counts.vacancy_history_lost += <span class="number">1</span>;
+<a href=#239 id=239 data-nosnippet>239</a>            }
+<a href=#240 id=240 data-nosnippet>240</a>        } <span class="kw">else </span>{
+<a href=#241 id=241 data-nosnippet>241</a>            counts.construction += <span class="number">1</span>;
+<a href=#242 id=242 data-nosnippet>242</a>        }
+<a href=#243 id=243 data-nosnippet>243</a>        <span class="kw">let </span>rent_defined = u.rent.is_some();
+<a href=#244 id=244 data-nosnippet>244</a>        <span class="kw">let </span>rent_num = u.rent.as_ref().map(|v| js_num(<span class="prelude-val">Some</span>(v)));
+<a href=#245 id=245 data-nosnippet>245</a>        <span class="kw">let </span>rent_class = <span class="kw">if </span>u.no_rate &amp;&amp; is_priced(u.kind) {
+<a href=#246 id=246 data-nosnippet>246</a>            <span class="number">4
+<a href=#247 id=247 data-nosnippet>247</a>        </span>} <span class="kw">else </span>{
+<a href=#248 id=248 data-nosnippet>248</a>            class_from_rent(u.kind, <span class="kw">if </span>rent_defined { rent_num } <span class="kw">else </span>{ <span class="prelude-val">None </span>})
+<a href=#249 id=249 data-nosnippet>249</a>        };
+<a href=#250 id=250 data-nosnippet>250</a>        <span class="kw">if let </span><span class="prelude-val">Some</span>(band) = rent_config(u.kind) {
+<a href=#251 id=251 data-nosnippet>251</a>            <span class="kw">if </span>!u.no_rate {
+<a href=#252 id=252 data-nosnippet>252</a>                <span class="kw">let </span>effective = <span class="kw">match </span><span class="kw-2">&amp;</span>u.rent {
+<a href=#253 id=253 data-nosnippet>253</a>                    <span class="prelude-val">None </span>| <span class="prelude-val">Some</span>(Value::Null) =&gt; band.default,
+<a href=#254 id=254 data-nosnippet>254</a>                    <span class="prelude-val">Some</span>(v) =&gt; js_num(<span class="prelude-val">Some</span>(v)),
+<a href=#255 id=255 data-nosnippet>255</a>                };
+<a href=#256 id=256 data-nosnippet>256</a>                <span class="kw">let </span>back = rent_from_class(u.kind, rent_class);
+<a href=#257 id=257 data-nosnippet>257</a>                <span class="kw">if </span>back.is_some_and(|b| b != effective) {
+<a href=#258 id=258 data-nosnippet>258</a>                    counts.rents_snapped += <span class="number">1</span>;
+<a href=#259 id=259 data-nosnippet>259</a>                }
+<a href=#260 id=260 data-nosnippet>260</a>            }
+<a href=#261 id=261 data-nosnippet>261</a>        }
+<a href=#262 id=262 data-nosnippet>262</a>        <span class="kw">if </span>u.label
+<a href=#263 id=263 data-nosnippet>263</a>            .as_deref()
+<a href=#264 id=264 data-nosnippet>264</a>            .is_some_and(|l| !l.is_empty() &amp;&amp; l != u.kind.facility().name)
+<a href=#265 id=265 data-nosnippet>265</a>        {
+<a href=#266 id=266 data-nosnippet>266</a>            counts.names_dropped += <span class="number">1</span>;
+<a href=#267 id=267 data-nosnippet>267</a>        }
+<a href=#268 id=268 data-nosnippet>268</a>        <span class="kw">if </span>u.kind == Kind::Parking {
+<a href=#269 id=269 data-nosnippet>269</a>            counts.parking_stalls += <span class="number">1</span>;
+<a href=#270 id=270 data-nosnippet>270</a>        }
+<a href=#271 id=271 data-nosnippet>271</a>        <span class="kw">match </span>u.kind {
+<a href=#272 id=272 data-nosnippet>272</a>            Kind::Recycling =&gt; header.recycling += <span class="number">1</span>,
+<a href=#273 id=273 data-nosnippet>273</a>            Kind::Shop | Kind::Restaurant | Kind::FastFood =&gt; header.commercial += <span class="number">1</span>,
+<a href=#274 id=274 data-nosnippet>274</a>            Kind::Security =&gt; header.security += <span class="number">1</span>,
+<a href=#275 id=275 data-nosnippet>275</a>            Kind::Medical =&gt; header.medical += <span class="number">1</span>,
+<a href=#276 id=276 data-nosnippet>276</a>            Kind::PartyHall | Kind::Cinema =&gt; header.hall_cinema += <span class="number">1</span>,
+<a href=#277 id=277 data-nosnippet>277</a>            <span class="kw">_ </span>=&gt; {}
+<a href=#278 id=278 data-nosnippet>278</a>        }
+<a href=#279 id=279 data-nosnippet>279</a>
+<a href=#280 id=280 data-nosnippet>280</a>        <span class="kw">if let </span><span class="prelude-val">Some</span>(stack) = part_stack(u.kind) {
+<a href=#281 id=281 data-nosnippet>281</a>            <span class="kw">if </span>u.kind == Kind::WeddingHall {
+<a href=#282 id=282 data-nosnippet>282</a>                <span class="comment">// The cathedral stands on floor 100 with its bottom part and rises
+<a href=#283 id=283 data-nosnippet>283</a>                // four floors above it, the top part last.
+<a href=#284 id=284 data-nosnippet>284</a>                </span><span class="kw">for </span>(i, <span class="kw-2">&amp;</span>part) <span class="kw">in </span>stack.iter().rev().enumerate() {
+<a href=#285 id=285 data-nosnippet>285</a>                    <span class="kw">let </span>fl = u.floor + i <span class="kw">as </span>f64;
+<a href=#286 id=286 data-nosnippet>286</a>                    widen(<span class="kw-2">&amp;mut </span>extents, fl, u.x, u.x + u.width);
+<a href=#287 id=287 data-nosnippet>287</a>                    push_tenant(
+<a href=#288 id=288 data-nosnippet>288</a>                        <span class="kw-2">&amp;mut </span>tenants_by_tdt,
+<a href=#289 id=289 data-nosnippet>289</a>                        fl,
+<a href=#290 id=290 data-nosnippet>290</a>                        OutTenant {
+<a href=#291 id=291 data-nosnippet>291</a>                            left: u.x,
+<a href=#292 id=292 data-nosnippet>292</a>                            right: u.x + u.width,
+<a href=#293 id=293 data-nosnippet>293</a>                            type_id: <span class="kw">if </span>construction { -part } <span class="kw">else </span>{ part },
+<a href=#294 id=294 data-nosnippet>294</a>                            status: <span class="number">0</span>,
+<a href=#295 id=295 data-nosnippet>295</a>                            rent_class,
+<a href=#296 id=296 data-nosnippet>296</a>                            retail_row: <span class="prelude-val">None</span>,
+<a href=#297 id=297 data-nosnippet>297</a>                            draw: <span class="number">0</span>,
+<a href=#298 id=298 data-nosnippet>298</a>                            venue: <span class="prelude-val">None</span>,
+<a href=#299 id=299 data-nosnippet>299</a>                        },
+<a href=#300 id=300 data-nosnippet>300</a>                    );
+<a href=#301 id=301 data-nosnippet>301</a>                }
+<a href=#302 id=302 data-nosnippet>302</a>            } <span class="kw">else </span>{
+<a href=#303 id=303 data-nosnippet>303</a>                <span class="kw">for </span>(i, <span class="kw-2">&amp;</span>part) <span class="kw">in </span>stack.iter().enumerate() {
+<a href=#304 id=304 data-nosnippet>304</a>                    push_tenant(
+<a href=#305 id=305 data-nosnippet>305</a>                        <span class="kw-2">&amp;mut </span>tenants_by_tdt,
+<a href=#306 id=306 data-nosnippet>306</a>                        u.floor + i <span class="kw">as </span>f64,
+<a href=#307 id=307 data-nosnippet>307</a>                        OutTenant {
+<a href=#308 id=308 data-nosnippet>308</a>                            left: u.x,
+<a href=#309 id=309 data-nosnippet>309</a>                            right: u.x + u.width,
+<a href=#310 id=310 data-nosnippet>310</a>                            type_id: <span class="kw">if </span>construction { -part } <span class="kw">else </span>{ part },
+<a href=#311 id=311 data-nosnippet>311</a>                            status: <span class="number">0</span>,
+<a href=#312 id=312 data-nosnippet>312</a>                            rent_class,
+<a href=#313 id=313 data-nosnippet>313</a>                            retail_row: <span class="prelude-val">None</span>,
+<a href=#314 id=314 data-nosnippet>314</a>                            draw: exported_film_draw(u),
+<a href=#315 id=315 data-nosnippet>315</a>                            venue: venue_half(u, idx, i == <span class="number">1</span>, construction),
+<a href=#316 id=316 data-nosnippet>316</a>                        },
+<a href=#317 id=317 data-nosnippet>317</a>                    );
+<a href=#318 id=318 data-nosnippet>318</a>                }
+<a href=#319 id=319 data-nosnippet>319</a>            }
+<a href=#320 id=320 data-nosnippet>320</a>            counts.rooms += <span class="number">1</span>;
+<a href=#321 id=321 data-nosnippet>321</a>            <span class="kw">continue</span>;
+<a href=#322 id=322 data-nosnippet>322</a>        }
+<a href=#323 id=323 data-nosnippet>323</a>
+<a href=#324 id=324 data-nosnippet>324</a>        <span class="kw">let </span><span class="prelude-val">Some</span>(id) = kind_tenant(u.kind) <span class="kw">else </span>{
+<a href=#325 id=325 data-nosnippet>325</a>            <span class="kw">continue</span>;
+<a href=#326 id=326 data-nosnippet>326</a>        };
+<a href=#327 id=327 data-nosnippet>327</a>        <span class="kw">let </span>sub_idx: i64 = <span class="kw">match </span>(<span class="kw-2">&amp;</span>u.subtype, u.kind.subtype_list()) {
+<a href=#328 id=328 data-nosnippet>328</a>            (<span class="prelude-val">Some</span>(name), <span class="prelude-val">Some</span>(list)) =&gt; list
+<a href=#329 id=329 data-nosnippet>329</a>                .iter()
+<a href=#330 id=330 data-nosnippet>330</a>                .position(|s| s == name)
+<a href=#331 id=331 data-nosnippet>331</a>                .map(|i| i <span class="kw">as </span>i64)
+<a href=#332 id=332 data-nosnippet>332</a>                .unwrap_or(-<span class="number">1</span>),
+<a href=#333 id=333 data-nosnippet>333</a>            <span class="kw">_ </span>=&gt; -<span class="number">1</span>,
+<a href=#334 id=334 data-nosnippet>334</a>        };
+<a href=#335 id=335 data-nosnippet>335</a>        <span class="kw">let </span>retail = <span class="macro">matches!</span>(u.kind, Kind::Shop | Kind::FastFood | Kind::Restaurant);
+<a href=#336 id=336 data-nosnippet>336</a>        <span class="kw">let </span>retail_row =
+<a href=#337 id=337 data-nosnippet>337</a>            (retail &amp;&amp; retail_rows.len() &lt; TDT_RETAIL_SLOTS).then_some(retail_rows.len() <span class="kw">as </span>i64);
+<a href=#338 id=338 data-nosnippet>338</a>        push_tenant(
+<a href=#339 id=339 data-nosnippet>339</a>            <span class="kw-2">&amp;mut </span>tenants_by_tdt,
+<a href=#340 id=340 data-nosnippet>340</a>            u.floor,
+<a href=#341 id=341 data-nosnippet>341</a>            OutTenant {
+<a href=#342 id=342 data-nosnippet>342</a>                left: u.x,
+<a href=#343 id=343 data-nosnippet>343</a>                right: u.x + u.width,
+<a href=#344 id=344 data-nosnippet>344</a>                type_id: <span class="kw">if </span>construction { -id } <span class="kw">else </span>{ id },
+<a href=#345 id=345 data-nosnippet>345</a>                status,
+<a href=#346 id=346 data-nosnippet>346</a>                rent_class,
+<a href=#347 id=347 data-nosnippet>347</a>                retail_row,
+<a href=#348 id=348 data-nosnippet>348</a>                draw: <span class="number">0</span>,
+<a href=#349 id=349 data-nosnippet>349</a>                venue: <span class="prelude-val">None</span>,
+<a href=#350 id=350 data-nosnippet>350</a>            },
+<a href=#351 id=351 data-nosnippet>351</a>        );
+<a href=#352 id=352 data-nosnippet>352</a>        <span class="kw">if </span>retail_row.is_some() {
+<a href=#353 id=353 data-nosnippet>353</a>            retail_rows.push((u.floor + TDT_FLOOR_OFFSET <span class="kw">as </span>f64, sub_idx.max(<span class="number">0</span>)));
+<a href=#354 id=354 data-nosnippet>354</a>        } <span class="kw">else if </span>retail {
+<a href=#355 id=355 data-nosnippet>355</a>            counts.retail_rows_dropped += <span class="number">1</span>;
+<a href=#356 id=356 data-nosnippet>356</a>        }
+<a href=#357 id=357 data-nosnippet>357</a>        counts.rooms += <span class="number">1</span>;
+<a href=#358 id=358 data-nosnippet>358</a>    }
+<a href=#359 id=359 data-nosnippet>359</a>
+<a href=#360 id=360 data-nosnippet>360</a>    <span class="comment">// Coverage for the paving pass, from the records actually emitted.
+<a href=#361 id=361 data-nosnippet>361</a>    </span><span class="kw">let </span>clamp_tile = |v: f64| -&gt; usize {
+<a href=#362 id=362 data-nosnippet>362</a>        <span class="kw">let </span>v = <span class="kw">if </span>v.is_finite() { v } <span class="kw">else </span>{ <span class="number">0.0 </span>};
+<a href=#363 id=363 data-nosnippet>363</a>        v.floor().min(LOT_WIDTH <span class="kw">as </span>f64).max(<span class="number">0.0</span>) <span class="kw">as </span>usize
+<a href=#364 id=364 data-nosnippet>364</a>    };
+<a href=#365 id=365 data-nosnippet>365</a>    <span class="kw">for </span>(tdt, records) <span class="kw">in </span><span class="kw-2">&amp;</span>tenants_by_tdt {
+<a href=#366 id=366 data-nosnippet>366</a>        <span class="kw">let </span>floor = tdt.value() - TDT_FLOOR_OFFSET <span class="kw">as </span>f64;
+<a href=#367 id=367 data-nosnippet>367</a>        <span class="kw">for </span>r <span class="kw">in </span>records {
+<a href=#368 id=368 data-nosnippet>368</a>            <span class="kw">let </span>lo = clamp_tile(r.left);
+<a href=#369 id=369 data-nosnippet>369</a>            <span class="kw">let </span>hi = clamp_tile(r.right).max(lo);
+<a href=#370 id=370 data-nosnippet>370</a>            <span class="kw">if </span>hi == lo {
+<a href=#371 id=371 data-nosnippet>371</a>                <span class="kw">continue</span>;
+<a href=#372 id=372 data-nosnippet>372</a>            }
+<a href=#373 id=373 data-nosnippet>373</a>            <span class="kw">let </span>set = covered_tiles
+<a href=#374 id=374 data-nosnippet>374</a>                .entry(FloorKey::of(floor))
+<a href=#375 id=375 data-nosnippet>375</a>                .or_insert_with(|| <span class="macro">vec!</span>[<span class="bool-val">false</span>; LOT_WIDTH <span class="kw">as </span>usize + <span class="number">1</span>]);
+<a href=#376 id=376 data-nosnippet>376</a>            <span class="kw">for </span>cell <span class="kw">in </span><span class="kw-2">&amp;mut </span>set[lo..hi] {
+<a href=#377 id=377 data-nosnippet>377</a>                <span class="kw-2">*</span>cell = <span class="bool-val">true</span>;
+<a href=#378 id=378 data-nosnippet>378</a>            }
+<a href=#379 id=379 data-nosnippet>379</a>        }
+<a href=#380 id=380 data-nosnippet>380</a>    }
+<a href=#381 id=381 data-nosnippet>381</a>
+<a href=#382 id=382 data-nosnippet>382</a>    <span class="comment">// Paving spans: each floor's extent minus the tiles under a record, one
+<a href=#383 id=383 data-nosnippet>383</a>    // record per contiguous run; lobby floors type 24, others type 0.
+<a href=#384 id=384 data-nosnippet>384</a>    </span><span class="kw">const </span>TDT_LOBBY_TYPE: i64 = <span class="number">24</span>;
+<a href=#385 id=385 data-nosnippet>385</a>    <span class="kw">const </span>TDT_FLOOR_TYPE: i64 = <span class="number">0</span>;
+<a href=#386 id=386 data-nosnippet>386</a>    <span class="kw">let </span>extent_list: Vec&lt;(FloorKey, (f64, f64))&gt; = extents.iter().map(|(k, v)| (<span class="kw-2">*</span>k, <span class="kw-2">*</span>v)).collect();
+<a href=#387 id=387 data-nosnippet>387</a>    <span class="kw">for </span>(key, ext) <span class="kw">in </span>extent_list {
+<a href=#388 id=388 data-nosnippet>388</a>        <span class="kw">let </span>floor = key.value();
+<a href=#389 id=389 data-nosnippet>389</a>        <span class="kw">if </span>!fits_tdt_rows(Kind::Floor, floor, <span class="number">1.0</span>) {
+<a href=#390 id=390 data-nosnippet>390</a>            <span class="kw">continue</span>;
+<a href=#391 id=391 data-nosnippet>391</a>        }
+<a href=#392 id=392 data-nosnippet>392</a>        <span class="comment">// A tall ground lobby's raised stories are paved as lobby too: our
+<a href=#393 id=393 data-nosnippet>393</a>        // reading of the format, where the game writes type 24 on every
+<a href=#394 id=394 data-nosnippet>394</a>        // tile of a lobby story (to confirm on the PC, #308).
+<a href=#395 id=395 data-nosnippet>395</a>        </span><span class="kw">let </span>lobby = floor.fract() == <span class="number">0.0
+<a href=#396 id=396 data-nosnippet>396</a>            </span>&amp;&amp; (is_lobby_floor(floor <span class="kw">as </span>i64) || raised.contains(<span class="kw-2">&amp;</span>(floor <span class="kw">as </span>i64)));
+<a href=#397 id=397 data-nosnippet>397</a>        <span class="kw">let </span>covered = covered_tiles.get(<span class="kw-2">&amp;</span>key);
+<a href=#398 id=398 data-nosnippet>398</a>        <span class="kw">let </span>lo = clamp_tile(ext.<span class="number">0</span>);
+<a href=#399 id=399 data-nosnippet>399</a>        <span class="kw">let </span>hi = clamp_tile(ext.<span class="number">1</span>).max(lo);
+<a href=#400 id=400 data-nosnippet>400</a>        <span class="kw">let </span><span class="kw-2">mut </span>run_start: <span class="prelude-ty">Option</span>&lt;usize&gt; = <span class="prelude-val">None</span>;
+<a href=#401 id=401 data-nosnippet>401</a>        <span class="kw">let </span>flush = |run_start: <span class="kw-2">&amp;mut </span><span class="prelude-ty">Option</span>&lt;usize&gt;,
+<a href=#402 id=402 data-nosnippet>402</a>                     end: usize,
+<a href=#403 id=403 data-nosnippet>403</a>                     tenants: <span class="kw-2">&amp;mut </span>IndexMap&lt;FloorKey, Vec&lt;OutTenant&gt;&gt;| {
+<a href=#404 id=404 data-nosnippet>404</a>            <span class="kw">let </span><span class="prelude-val">Some</span>(start) = <span class="kw-2">*</span>run_start <span class="kw">else </span>{
+<a href=#405 id=405 data-nosnippet>405</a>                <span class="kw">return</span>;
+<a href=#406 id=406 data-nosnippet>406</a>            };
+<a href=#407 id=407 data-nosnippet>407</a>            push_tenant(
+<a href=#408 id=408 data-nosnippet>408</a>                tenants,
+<a href=#409 id=409 data-nosnippet>409</a>                floor,
+<a href=#410 id=410 data-nosnippet>410</a>                OutTenant {
+<a href=#411 id=411 data-nosnippet>411</a>                    left: start <span class="kw">as </span>f64,
+<a href=#412 id=412 data-nosnippet>412</a>                    right: end <span class="kw">as </span>f64,
+<a href=#413 id=413 data-nosnippet>413</a>                    type_id: <span class="kw">if </span>lobby {
+<a href=#414 id=414 data-nosnippet>414</a>                        TDT_LOBBY_TYPE
+<a href=#415 id=415 data-nosnippet>415</a>                    } <span class="kw">else </span>{
+<a href=#416 id=416 data-nosnippet>416</a>                        TDT_FLOOR_TYPE
+<a href=#417 id=417 data-nosnippet>417</a>                    },
+<a href=#418 id=418 data-nosnippet>418</a>                    status: <span class="kw">if </span>lobby { <span class="number">0 </span>} <span class="kw">else </span>{ <span class="number">2 </span>},
+<a href=#419 id=419 data-nosnippet>419</a>                    rent_class: <span class="number">4</span>,
+<a href=#420 id=420 data-nosnippet>420</a>                    retail_row: <span class="prelude-val">None</span>,
+<a href=#421 id=421 data-nosnippet>421</a>                    draw: <span class="number">0</span>,
+<a href=#422 id=422 data-nosnippet>422</a>                    venue: <span class="prelude-val">None</span>,
+<a href=#423 id=423 data-nosnippet>423</a>                },
+<a href=#424 id=424 data-nosnippet>424</a>            );
+<a href=#425 id=425 data-nosnippet>425</a>            <span class="kw-2">*</span>run_start = <span class="prelude-val">None</span>;
+<a href=#426 id=426 data-nosnippet>426</a>        };
+<a href=#427 id=427 data-nosnippet>427</a>        <span class="kw">for </span>x_tile <span class="kw">in </span>lo..hi {
+<a href=#428 id=428 data-nosnippet>428</a>            <span class="kw">if </span>covered.is_some_and(|set| set[x_tile]) {
+<a href=#429 id=429 data-nosnippet>429</a>                flush(<span class="kw-2">&amp;mut </span>run_start, x_tile, <span class="kw-2">&amp;mut </span>tenants_by_tdt);
+<a href=#430 id=430 data-nosnippet>430</a>            } <span class="kw">else if </span>run_start.is_none() {
+<a href=#431 id=431 data-nosnippet>431</a>                run_start = <span class="prelude-val">Some</span>(x_tile);
+<a href=#432 id=432 data-nosnippet>432</a>            }
+<a href=#433 id=433 data-nosnippet>433</a>        }
+<a href=#434 id=434 data-nosnippet>434</a>        flush(<span class="kw-2">&amp;mut </span>run_start, hi, <span class="kw-2">&amp;mut </span>tenants_by_tdt);
+<a href=#435 id=435 data-nosnippet>435</a>    }
+<a href=#436 id=436 data-nosnippet>436</a>
+<a href=#437 id=437 data-nosnippet>437</a>    <span class="prelude-val">Ok</span>(GatheredTower {
+<a href=#438 id=438 data-nosnippet>438</a>        tenants_by_tdt,
+<a href=#439 id=439 data-nosnippet>439</a>        extents,
+<a href=#440 id=440 data-nosnippet>440</a>        retail_rows,
+<a href=#441 id=441 data-nosnippet>441</a>        counts,
+<a href=#442 id=442 data-nosnippet>442</a>        header,
+<a href=#443 id=443 data-nosnippet>443</a>        ground_lobby_height: <span class="kw">if </span>has_ground_lobby {
+<a href=#444 id=444 data-nosnippet>444</a>            lobby_height.clamp(<span class="number">1</span>, MAX_LOBBY_HEIGHT)
+<a href=#445 id=445 data-nosnippet>445</a>        } <span class="kw">else </span>{
+<a href=#446 id=446 data-nosnippet>446</a>            <span class="number">0
+<a href=#447 id=447 data-nosnippet>447</a>        </span>},
+<a href=#448 id=448 data-nosnippet>448</a>        people_pop,
+<a href=#449 id=449 data-nosnippet>449</a>        class_pop,
+<a href=#450 id=450 data-nosnippet>450</a>        rooms,
+<a href=#451 id=451 data-nosnippet>451</a>    })
+<a href=#452 id=452 data-nosnippet>452</a>}
+<a href=#453 id=453 data-nosnippet>453</a>
+<a href=#454 id=454 data-nosnippet>454</a><span class="attr">#[cfg(test)]
+<a href=#455 id=455 data-nosnippet>455</a></span><span class="kw">mod </span>tests;
+<a href=#456 id=456 data-nosnippet>456</a>
+<a href=#457 id=457 data-nosnippet>457</a><span class="doccomment">/// The venue table's half for a finished hall or theatre (#1932), a theatre
+<a href=#458 id=458 data-nosnippet>458</a>/// with no film age counting as a film on its first day; `None` for every
+<a href=#459 id=459 data-nosnippet>459</a>/// other record.
+<a href=#460 id=460 data-nosnippet>460</a></span><span class="kw">fn </span>venue_half(
+<a href=#461 id=461 data-nosnippet>461</a>    u: <span class="kw-2">&amp;</span>GatheredRoom,
+<a href=#462 id=462 data-nosnippet>462</a>    room: usize,
+<a href=#463 id=463 data-nosnippet>463</a>    upper: bool,
+<a href=#464 id=464 data-nosnippet>464</a>    construction: bool,
+<a href=#465 id=465 data-nosnippet>465</a>) -&gt; <span class="prelude-ty">Option</span>&lt;OutVenueHalf&gt; {
+<a href=#466 id=466 data-nosnippet>466</a>    <span class="kw">let </span>film_days = <span class="kw">match </span>u.kind {
+<a href=#467 id=467 data-nosnippet>467</a>        <span class="comment">// A theater built today has shown its film no mornings yet.
+<a href=#468 id=468 data-nosnippet>468</a>        </span>Kind::Cinema =&gt; <span class="prelude-val">Some</span>(u.film_days.unwrap_or(<span class="number">0</span>)),
+<a href=#469 id=469 data-nosnippet>469</a>        Kind::PartyHall =&gt; <span class="prelude-val">None</span>,
+<a href=#470 id=470 data-nosnippet>470</a>        <span class="kw">_ </span>=&gt; <span class="kw">return </span><span class="prelude-val">None</span>,
+<a href=#471 id=471 data-nosnippet>471</a>    };
+<a href=#472 id=472 data-nosnippet>472</a>    (!construction).then_some(OutVenueHalf {
+<a href=#473 id=473 data-nosnippet>473</a>        room,
+<a href=#474 id=474 data-nosnippet>474</a>        upper,
+<a href=#475 id=475 data-nosnippet>475</a>        film_days,
+<a href=#476 id=476 data-nosnippet>476</a>        film_classic: u.film_classic,
+<a href=#477 id=477 data-nosnippet>477</a>        auditorium: <span class="bool-val">false</span>,
+<a href=#478 id=478 data-nosnippet>478</a>    })
+<a href=#479 id=479 data-nosnippet>479</a>}
+<a href=#480 id=480 data-nosnippet>480</a>
+<a href=#481 id=481 data-nosnippet>481</a><span class="doccomment">/// The draw byte a theatre writes (#1932): the draw its film had last night,
+<a href=#482 id=482 data-nosnippet>482</a>/// the age before this morning's step (a theatre that has not seen a morning
+<a href=#483 id=483 data-nosnippet>483</a>/// shows a new film's draw, and a classic's tops out at 1). Every other room
+<a href=#484 id=484 data-nosnippet>484</a>/// writes 0.
+<a href=#485 id=485 data-nosnippet>485</a></span><span class="kw">fn </span>exported_film_draw(u: <span class="kw-2">&amp;</span>GatheredRoom) -&gt; i64 {
+<a href=#486 id=486 data-nosnippet>486</a>    <span class="kw">if </span>u.kind != Kind::Cinema {
+<a href=#487 id=487 data-nosnippet>487</a>        <span class="kw">return </span><span class="number">0</span>;
+<a href=#488 id=488 data-nosnippet>488</a>    }
+<a href=#489 id=489 data-nosnippet>489</a>    showing_draw((u.film_days.unwrap_or(<span class="number">0</span>) - <span class="number">1</span>).max(<span class="number">0</span>), u.film_classic)
+<a href=#490 id=490 data-nosnippet>490</a>}
+</code></pre></div></section></main><script>(function(){var d=document.documentElement,m=document.querySelector(".vc-site-menu"),s=document.querySelector("nav.sidebar");if(m&&s){s.insertBefore(m,s.firstChild);d.classList.add("vc-menu-in-sidebar");}var t=document.querySelector("rustdoc-topbar"),b=document.querySelector(".vc-header .vc-bar");if(t&&b){for(var i=0;i<b.children.length;i++)t.appendChild(b.children[i].cloneNode(true));d.classList.add("vc-one-bar");}})();</script>
+
+</body></html>

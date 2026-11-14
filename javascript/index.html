@@ -1,0 +1,468 @@
+<!DOCTYPE html><html lang="en" dir="ltr" data-theme="dark" data-has-toc data-has-sidebar class="astro-g5ptsecz"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><title>JavaScript package | Verticopolis engine</title><link rel="canonical" href="https://docs.verticopolis.com/javascript/"/><link rel="sitemap" href="/sitemap-index.xml"/><link rel="shortcut icon" href="/favicon.png" type="image/png"/><meta name="generator" content="Astro v7.4.12"/><meta name="generator" content="Starlight v0.42.7"/><meta property="og:title" content="JavaScript package"/><meta property="og:type" content="article"/><meta property="og:url" content="https://docs.verticopolis.com/javascript/"/><meta property="og:locale" content="en"/><meta property="og:description" content="Install and call the engine's WebAssembly build from Node or the browser."/><meta property="og:site_name" content="Verticopolis engine"/><meta name="twitter:card" content="summary_large_image"/><meta name="description" content="Install and call the engine's WebAssembly build from Node or the browser."/><script>
+	window.StarlightThemeProvider = (() => {
+		const storedTheme =
+			typeof localStorage !== 'undefined' && localStorage.getItem('starlight-theme');
+		const theme =
+			storedTheme ||
+			(window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+		document.documentElement.dataset.theme = theme === 'light' ? 'light' : 'dark';
+		return {
+			updatePickers(theme = storedTheme || 'auto') {
+				document.querySelectorAll('starlight-theme-select').forEach((picker) => {
+					const select = picker.querySelector('select');
+					if (select) select.value = theme;
+					/** @type {HTMLTemplateElement | null} */
+					const tmpl = document.querySelector(`#theme-icons`);
+					const newIcon = tmpl && tmpl.content.querySelector('.' + theme);
+					if (newIcon) {
+						const oldIcon = picker.querySelector('svg.label-icon');
+						if (oldIcon) {
+							oldIcon.replaceChildren(...newIcon.cloneNode(true).childNodes);
+						}
+					}
+				});
+			},
+		};
+	})();
+</script><template id="theme-icons"><svg aria-hidden="true" class="light astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M5 12a1 1 0 0 0-1-1H3a1 1 0 0 0 0 2h1a1 1 0 0 0 1-1Zm.64 5-.71.71a1 1 0 0 0 0 1.41 1 1 0 0 0 1.41 0l.71-.71A1 1 0 0 0 5.64 17ZM12 5a1 1 0 0 0 1-1V3a1 1 0 0 0-2 0v1a1 1 0 0 0 1 1Zm5.66 2.34a1 1 0 0 0 .7-.29l.71-.71a1 1 0 1 0-1.41-1.41l-.66.71a1 1 0 0 0 0 1.41 1 1 0 0 0 .66.29Zm-12-.29a1 1 0 0 0 1.41 0 1 1 0 0 0 0-1.41l-.71-.71a1.004 1.004 0 1 0-1.43 1.41l.73.71ZM21 11h-1a1 1 0 0 0 0 2h1a1 1 0 0 0 0-2Zm-2.64 6A1 1 0 0 0 17 18.36l.71.71a1 1 0 0 0 1.41 0 1 1 0 0 0 0-1.41l-.76-.66ZM12 6.5a5.5 5.5 0 1 0 5.5 5.5A5.51 5.51 0 0 0 12 6.5Zm0 9a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7Zm0 3.5a1 1 0 0 0-1 1v1a1 1 0 0 0 2 0v-1a1 1 0 0 0-1-1Z"/></svg><svg aria-hidden="true" class="dark astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M21.64 13a1 1 0 0 0-1.05-.14 8.049 8.049 0 0 1-3.37.73 8.15 8.15 0 0 1-8.14-8.1 8.59 8.59 0 0 1 .25-2A1 1 0 0 0 8 2.36a10.14 10.14 0 1 0 14 11.69 1 1 0 0 0-.36-1.05Zm-9.5 6.69A8.14 8.14 0 0 1 7.08 5.22v.27a10.15 10.15 0 0 0 10.14 10.14 9.784 9.784 0 0 0 2.1-.22 8.11 8.11 0 0 1-7.18 4.32v-.04Z"/></svg><svg aria-hidden="true" class="auto astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M21 14h-1V7a3 3 0 0 0-3-3H7a3 3 0 0 0-3 3v7H3a1 1 0 0 0-1 1v2a3 3 0 0 0 3 3h14a3 3 0 0 0 3-3v-2a1 1 0 0 0-1-1ZM6 7a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v7H6V7Zm14 10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-1h16v1Z"/></svg></template><link rel="stylesheet" href="/_astro/print.ehPL0gv-.css" media="print"><link rel="stylesheet" href="/_astro/common.BAgQrgvR.css"><style>@layer starlight.components{svg:where(.astro-hkc32dio){color:var(--sl-icon-color);font-size:var(--sl-icon-size,1em);width:1em;height:1em;overflow:visible}}
+</style><script type="module" src="/_astro/page.cNngjUgL.js"></script></head><body class="astro-g5ptsecz"><a class="sl-skip-link astro-qb7clj6f" href="#_top">Skip to content</a><div class="page sl-flex astro-yntsjkba"><header class="header astro-yntsjkba"><div class="vc-bar"><a href="/" class="site-title vc-bar-title"><img src="/_astro/logo.C84ECWbg.png" width="1024" height="1024" alt=""><span class="vc-name" translate="no"><span class="vc-full">Verticopolis engine</span><span class="vc-short" aria-hidden="true">Engine docs</span></span></a><div class="vc-bar-search print:hidden"><site-search class=" astro-b5kgnn7o" data-translations="{&quot;placeholder&quot;:&quot;Search&quot;}"><button data-open-modal disabled aria-label="Search" aria-keyshortcuts="Control+K" class="astro-b5kgnn7o"><svg aria-hidden="true" class="astro-b5kgnn7o astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M21.71 20.29 18 16.61A9 9 0 1 0 16.61 18l3.68 3.68a.999.999 0 0 0 1.42 0 1 1 0 0 0 0-1.39ZM11 18a7 7 0 1 1 0-14 7 7 0 0 1 0 14Z"/></svg><span class="sl-hidden md:sl-block astro-b5kgnn7o" aria-hidden="true">Search</span><kbd class="sl-hidden md:sl-flex astro-b5kgnn7o" style="display: none;"><kbd class="astro-b5kgnn7o">Ctrl</kbd><kbd class="astro-b5kgnn7o">K</kbd></kbd></button><dialog style="padding:0" aria-label="Search" class="astro-b5kgnn7o"><div class="dialog-frame sl-flex astro-b5kgnn7o"><button data-close-modal class="sl-flex md:sl-hidden astro-b5kgnn7o">Cancel</button><div class="search-container astro-b5kgnn7o"><div id="starlight__search" class="astro-b5kgnn7o"></div></div></div></dialog></site-search><script>
+	(() => {
+		const openBtn = document.querySelector('button[data-open-modal]');
+		const shortcut = openBtn?.querySelector('kbd');
+		if (!openBtn || !(shortcut instanceof HTMLElement)) return;
+		const platformKey = shortcut.querySelector('kbd');
+		if (platformKey && /(Mac|iPhone|iPod|iPad)/i.test(navigator.platform)) {
+			platformKey.textContent = '⌘';
+			openBtn.setAttribute('aria-keyshortcuts', 'Meta+K');
+		}
+		shortcut.style.display = '';
+	})();
+</script><script type="module" src="/_astro/Search.astro_astro_type_script_index_0_lang.CHGOufdi.js"></script></div><div class="vc-bar-links print:hidden"><a class="vc-bar-game" href="https://verticopolis.com/" data-game-link><span class="vc-full">Play the game</span><span class="vc-short" aria-hidden="true">Play</span></a><a class="vc-bar-github" href="https://github.com/maniator/verticopolis"><span class="vc-sr-only">GitHub</span><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M12 .3a12 12 0 0 0-3.8 23.38c.6.12.83-.26.83-.57L9 21.07c-3.34.72-4.04-1.61-4.04-1.61-.55-1.39-1.34-1.76-1.34-1.76-1.08-.74.09-.73.09-.73 1.2.09 1.83 1.24 1.83 1.24 1.08 1.83 2.81 1.3 3.5 1 .1-.78.42-1.31.76-1.61-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.14-.3-.54-1.52.1-3.18 0 0 1-.32 3.3 1.23a11.5 11.5 0 0 1 6 0c2.28-1.55 3.29-1.23 3.29-1.23.64 1.66.24 2.88.12 3.18a4.65 4.65 0 0 1 1.23 3.22c0 4.61-2.8 5.63-5.48 5.92.42.36.81 1.1.81 2.22l-.01 3.29c0 .31.2.69.82.57A12 12 0 0 0 12 .3Z"/></svg></a><div class="vc-bar-theme"><starlight-theme-select><label style="--sl-select-width: 6.25em" class="astro-2z5xp7gb"><span class="sr-only astro-2z5xp7gb">Select theme</span><svg aria-hidden="true" class="icon label-icon astro-2z5xp7gb astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M21 14h-1V7a3 3 0 0 0-3-3H7a3 3 0 0 0-3 3v7H3a1 1 0 0 0-1 1v2a3 3 0 0 0 3 3h14a3 3 0 0 0 3-3v-2a1 1 0 0 0-1-1ZM6 7a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v7H6V7Zm14 10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-1h16v1Z"/></svg><select autocomplete="off" class="astro-2z5xp7gb"><option value="dark" class="astro-2z5xp7gb">Dark</option><option value="light" class="astro-2z5xp7gb">Light</option><option value="auto" selected class="astro-2z5xp7gb">Auto</option></select><svg aria-hidden="true" class="icon caret astro-2z5xp7gb astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M17 9.17a1 1 0 0 0-1.41 0L12 12.71 8.46 9.17a1 1 0 1 0-1.41 1.42l4.24 4.24a1.002 1.002 0 0 0 1.42 0L17 10.59a1.002 1.002 0 0 0 0-1.42Z"/></svg></label></starlight-theme-select><script>
+	StarlightThemeProvider.updatePickers();
+</script><script type="module">var e=`starlight-theme`,t=e=>e===`auto`||e===`dark`||e===`light`?e:`auto`,n=()=>t(typeof localStorage<`u`&&localStorage.getItem(e));function r(t){typeof localStorage<`u`&&localStorage.setItem(e,t===`light`||t===`dark`?t:``)}var i=()=>matchMedia(`(prefers-color-scheme: light)`).matches?`light`:`dark`;function a(e){StarlightThemeProvider.updatePickers(e),document.documentElement.dataset.theme=e===`auto`?i():e,r(e)}matchMedia(`(prefers-color-scheme: light)`).addEventListener(`change`,()=>{n()===`auto`&&a(`auto`)});var o=class extends HTMLElement{constructor(){super(),a(n()),this.querySelector(`select`)?.addEventListener(`change`,e=>{e.currentTarget instanceof HTMLSelectElement&&a(t(e.currentTarget.value))})}};customElements.define(`starlight-theme-select`,o);</script></div></div></div></header><nav class="sidebar print:hidden astro-yntsjkba" aria-label="Main"><button popovertarget="starlight__sidebar" class="sl-menu-button sl-flex md:sl-hidden print:hidden astro-r2osgdlg"><svg aria-hidden="true" class="open-menu astro-r2osgdlg astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M3 8h18a1 1 0 1 0 0-2H3a1 1 0 0 0 0 2Zm18 8H3a1 1 0 0 0 0 2h18a1 1 0 0 0 0-2Zm0-5H3a1 1 0 0 0 0 2h18a1 1 0 0 0 0-2Z"/></svg><svg aria-hidden="true" class="close-menu astro-r2osgdlg astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="m13.41 12 6.3-6.29a1.004 1.004 0 1 0-1.42-1.42L12 10.59l-6.29-6.3a1.004 1.004 0 0 0-1.42 1.42l6.3 6.29-6.3 6.29a1 1 0 0 0 0 1.42.998.998 0 0 0 1.42 0l6.29-6.3 6.29 6.3a.999.999 0 0 0 1.42 0 1 1 0 0 0 0-1.42L13.41 12Z"/></svg><span class="sr-only astro-r2osgdlg">Menu</span></button><script type="module">var e=class extends HTMLElement{constructor(){super();let e=matchMedia(`(min-width: 50em)`),t=()=>{this.popover=e.matches?null:`auto`};t(),e.addEventListener(`change`,()=>t()),this.addEventListener(`toggle`,({newState:e})=>this.trapFocus(e===`open`))}trapFocus(e){document.querySelectorAll(`.main-frame, .sl-skip-link`).forEach(t=>{t.toggleAttribute(`inert`,e)})}};customElements.define(`sl-sidebar-pane`,e);</script><script type="module">var e=class extends HTMLElement{constructor(){super();let e=this.querySelector(`select`);e&&(e.addEventListener(`change`,e=>{e.currentTarget instanceof HTMLSelectElement&&(window.location.pathname=e.currentTarget.value)}),window.addEventListener(`pageshow`,t=>{if(!t.persisted)return;let n=e.querySelector(`option[selected]`)?.index;n!==e.selectedIndex&&(e.selectedIndex=n??0)}))}};customElements.define(`starlight-lang-select`,e);</script><sl-sidebar-pane popover id="starlight__sidebar" class="sidebar-pane astro-yntsjkba"><div class="sidebar-content sl-flex astro-yntsjkba"><sl-sidebar-state-persist data-hash="1q3769r" class="astro-ipdry5cl"><script aria-hidden="true">
+		(() => {
+			try {
+				if (!matchMedia('(min-width: 50em)').matches) return;
+				/** @type {HTMLElement | null} */
+				const target = document.querySelector('sl-sidebar-state-persist');
+				const state = JSON.parse(sessionStorage.getItem('sl-sidebar-state') || '0');
+				if (!target || !state || target.dataset.hash !== state.hash) return;
+				window._starlightScrollRestore = state.scroll;
+				customElements.define(
+					'sl-sidebar-restore',
+					class SidebarRestore extends HTMLElement {
+						connectedCallback() {
+							try {
+								const idx = parseInt(this.dataset.index || '');
+								const details = this.closest('details');
+								if (details && typeof state.open[idx] === 'boolean') details.open = state.open[idx];
+							} catch {}
+						}
+					}
+				);
+			} catch {}
+		})();
+	</script><ul class="top-level astro-rmhv4bp6"><li class="astro-rmhv4bp6"><a href="/" class="large astro-rmhv4bp6"><span class="astro-rmhv4bp6">Overview</span></a></li><li class="astro-rmhv4bp6"><details open class="astro-rmhv4bp6"><summary class="astro-rmhv4bp6"><span class="group-label astro-rmhv4bp6"><span class="large astro-rmhv4bp6">Guides</span></span><svg aria-hidden="true" class="caret astro-rmhv4bp6 astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.25rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></summary><sl-sidebar-restore data-index="0"></sl-sidebar-restore><ul class="astro-rmhv4bp6"><li class="astro-rmhv4bp6"><a href="/javascript/" aria-current="page" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">JavaScript package</span></a></li><li class="astro-rmhv4bp6"><a href="/crate/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Rust crate</span></a></li><li class="astro-rmhv4bp6"><a href="/api/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Host API guide</span></a></li><li class="astro-rmhv4bp6"><a href="/conformance/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Conformance suite</span></a></li></ul></details></li><li class="astro-rmhv4bp6"><details open class="astro-rmhv4bp6"><summary class="astro-rmhv4bp6"><span class="group-label astro-rmhv4bp6"><span class="large astro-rmhv4bp6">Reference</span></span><svg aria-hidden="true" class="caret astro-rmhv4bp6 astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.25rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></summary><sl-sidebar-restore data-index="1"></sl-sidebar-restore><ul class="astro-rmhv4bp6"><li class="astro-rmhv4bp6"><a href="/rust/verticopolis_engine/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Rust API reference</span></a></li><li class="astro-rmhv4bp6"><a href="/changelog/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Engine changelog</span></a></li></ul></details></li><li class="astro-rmhv4bp6"><a href="https://verticopolis.com/" class="large astro-rmhv4bp6"><span class="astro-rmhv4bp6">Play Verticopolis</span></a></li></ul><script aria-hidden="true">
+		(() => {
+			const scroller = document.getElementById('starlight__sidebar');
+			if (!window._starlightScrollRestore || !scroller) return;
+			scroller.scrollTop = window._starlightScrollRestore;
+			delete window._starlightScrollRestore;
+		})();
+	</script></sl-sidebar-state-persist><div class="md:sl-hidden"><div class="mobile-preferences sl-flex astro-p4azlveh"><div class="social-icons astro-p4azlveh"><a href="https://github.com/maniator/verticopolis" rel="me" class="sl-flex astro-n2mnl6yq"><span class="sr-only astro-n2mnl6yq">GitHub</span><svg aria-hidden="true" class="astro-n2mnl6yq astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M12 .3a12 12 0 0 0-3.8 23.38c.6.12.83-.26.83-.57L9 21.07c-3.34.72-4.04-1.61-4.04-1.61-.55-1.39-1.34-1.76-1.34-1.76-1.08-.74.09-.73.09-.73 1.2.09 1.83 1.24 1.83 1.24 1.08 1.83 2.81 1.3 3.5 1 .1-.78.42-1.31.76-1.61-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.14-.3-.54-1.52.1-3.18 0 0 1-.32 3.3 1.23a11.5 11.5 0 0 1 6 0c2.28-1.55 3.29-1.23 3.29-1.23.64 1.66.24 2.88.12 3.18a4.65 4.65 0 0 1 1.23 3.22c0 4.61-2.8 5.63-5.48 5.92.42.36.81 1.1.81 2.22l-.01 3.29c0 .31.2.69.82.57A12 12 0 0 0 12 .3Z"/></svg></a></div><starlight-theme-select><label style="--sl-select-width: 6.25em" class="astro-2z5xp7gb"><span class="sr-only astro-2z5xp7gb">Select theme</span><svg aria-hidden="true" class="icon label-icon astro-2z5xp7gb astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M21 14h-1V7a3 3 0 0 0-3-3H7a3 3 0 0 0-3 3v7H3a1 1 0 0 0-1 1v2a3 3 0 0 0 3 3h14a3 3 0 0 0 3-3v-2a1 1 0 0 0-1-1ZM6 7a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v7H6V7Zm14 10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-1h16v1Z"/></svg><select autocomplete="off" class="astro-2z5xp7gb"><option value="dark" class="astro-2z5xp7gb">Dark</option><option value="light" class="astro-2z5xp7gb">Light</option><option value="auto" selected class="astro-2z5xp7gb">Auto</option></select><svg aria-hidden="true" class="icon caret astro-2z5xp7gb astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M17 9.17a1 1 0 0 0-1.41 0L12 12.71 8.46 9.17a1 1 0 1 0-1.41 1.42l4.24 4.24a1.002 1.002 0 0 0 1.42 0L17 10.59a1.002 1.002 0 0 0 0-1.42Z"/></svg></label></starlight-theme-select><script>
+	StarlightThemeProvider.updatePickers();
+</script></div></div></div></sl-sidebar-pane></nav><div class="main-frame astro-yntsjkba"><script type="module">var e=document.getElementById(`starlight__sidebar`),t=e?.querySelector(`sl-sidebar-state-persist`),n=`sl-sidebar-state`,r=()=>{let r=[],i=t?.dataset.hash||``;try{let e=sessionStorage.getItem(n),t=JSON.parse(e||`{}`);Array.isArray(t.open)&&t.hash===i&&(r=t.open)}catch{}return{hash:i,open:r,scroll:e?.scrollTop||0}},i=e=>{try{sessionStorage.setItem(n,JSON.stringify(e))}catch{}},a=()=>i(r()),o=(e,t)=>{let n=r();n.open[t]=e,i(n)};t?.addEventListener(`click`,e=>{if(!(e.target instanceof Element))return;let t=e.target.closest(`summary`)?.closest(`details`);if(!t)return;let n=t.querySelector(`sl-sidebar-restore`),r=parseInt(n?.dataset.index||``);isNaN(r)||o(!t.open,r)}),addEventListener(`visibilitychange`,()=>{document.visibilityState===`hidden`&&a()});</script><div class="lg:sl-flex astro-lrzkfocr"><aside class="right-sidebar-container print:hidden astro-lrzkfocr"><div class="right-sidebar astro-lrzkfocr"><div class="lg:sl-hidden astro-qok35upx"><mobile-starlight-toc data-min-h="2" data-max-h="3" class="astro-66cqc7ze"><nav aria-labelledby="starlight__on-this-page--mobile" class="astro-66cqc7ze"><details id="starlight__mobile-toc" class="astro-66cqc7ze"><summary id="starlight__on-this-page--mobile" class="sl-flex astro-66cqc7ze"><span class="toggle sl-flex astro-66cqc7ze">On this page<svg aria-hidden="true" class="caret astro-66cqc7ze astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></span><span class="display-current astro-66cqc7ze"></span></summary><div class="dropdown astro-66cqc7ze"><ul class="isMobile astro-jugkfwgx" style="--depth: 0;"><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#_top" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">Overview</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#what-is-in-the-package" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">What is in the package</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#install" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">Install</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#quick-start-node" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">Quick start (Node)</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#quick-start-browser" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">Quick start (browser)</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#how-the-engine-talks" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">How the engine talks</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#api-reference" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">API reference</span></a><ul class="isMobile astro-jugkfwgx" style="--depth: 1;"><li style="--depth: 1;" class="astro-jugkfwgx"><a href="#starting-and-loading-a-game" style="--depth: 1;" class="astro-jugkfwgx"><span style="--depth: 1;" class="astro-jugkfwgx">Starting and loading a game</span></a></li><li style="--depth: 1;" class="astro-jugkfwgx"><a href="#running-time" style="--depth: 1;" class="astro-jugkfwgx"><span style="--depth: 1;" class="astro-jugkfwgx">Running time</span></a></li><li style="--depth: 1;" class="astro-jugkfwgx"><a href="#player-commands" style="--depth: 1;" class="astro-jugkfwgx"><span style="--depth: 1;" class="astro-jugkfwgx">Player commands</span></a></li><li style="--depth: 1;" class="astro-jugkfwgx"><a href="#reading-the-game" style="--depth: 1;" class="astro-jugkfwgx"><span style="--depth: 1;" class="astro-jugkfwgx">Reading the game</span></a></li><li style="--depth: 1;" class="astro-jugkfwgx"><a href="#reference-data-and-identity" style="--depth: 1;" class="astro-jugkfwgx"><span style="--depth: 1;" class="astro-jugkfwgx">Reference data and identity</span></a></li></ul></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#saves" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">Saves</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#versioning" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">Versioning</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#stability" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">Stability</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#using-the-rust-crate-instead" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">Using the Rust crate instead</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#license" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">License</span></a></li></ul></div></details></nav></mobile-starlight-toc><script type="module" src="/_astro/MobileTableOfContents.astro_astro_type_script_index_0_lang.C3fM4Kra.js"></script></div><div class="right-sidebar-panel sl-hidden lg:sl-block astro-qok35upx"><div class="sl-container astro-qok35upx"><starlight-toc data-min-h="2" data-max-h="3"><nav aria-labelledby="starlight__on-this-page"><h2 id="starlight__on-this-page">On this page</h2><ul class="astro-jugkfwgx" style="--depth: 0;"><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#_top" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">Overview</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#what-is-in-the-package" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">What is in the package</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#install" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">Install</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#quick-start-node" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">Quick start (Node)</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#quick-start-browser" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">Quick start (browser)</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#how-the-engine-talks" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">How the engine talks</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#api-reference" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">API reference</span></a><ul class="astro-jugkfwgx" style="--depth: 1;"><li style="--depth: 1;" class="astro-jugkfwgx"><a href="#starting-and-loading-a-game" style="--depth: 1;" class="astro-jugkfwgx"><span style="--depth: 1;" class="astro-jugkfwgx">Starting and loading a game</span></a></li><li style="--depth: 1;" class="astro-jugkfwgx"><a href="#running-time" style="--depth: 1;" class="astro-jugkfwgx"><span style="--depth: 1;" class="astro-jugkfwgx">Running time</span></a></li><li style="--depth: 1;" class="astro-jugkfwgx"><a href="#player-commands" style="--depth: 1;" class="astro-jugkfwgx"><span style="--depth: 1;" class="astro-jugkfwgx">Player commands</span></a></li><li style="--depth: 1;" class="astro-jugkfwgx"><a href="#reading-the-game" style="--depth: 1;" class="astro-jugkfwgx"><span style="--depth: 1;" class="astro-jugkfwgx">Reading the game</span></a></li><li style="--depth: 1;" class="astro-jugkfwgx"><a href="#reference-data-and-identity" style="--depth: 1;" class="astro-jugkfwgx"><span style="--depth: 1;" class="astro-jugkfwgx">Reference data and identity</span></a></li></ul></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#saves" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">Saves</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#versioning" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">Versioning</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#stability" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">Stability</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#using-the-rust-crate-instead" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">Using the Rust crate instead</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#license" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">License</span></a></li></ul></nav></starlight-toc><script type="module" src="/_astro/TableOfContents.astro_astro_type_script_index_0_lang.BpJaGz7G.js"></script></div></div></div></aside><div class="main-pane astro-lrzkfocr"><main data-pagefind-body class="astro-g5ptsecz" lang="en" dir="ltr"><div class="content-panel astro-a7po4psb"><div class="sl-container astro-a7po4psb"><h1 id="_top" class="astro-bebwqqxs">JavaScript package</h1></div></div><div class="content-panel astro-a7po4psb"><div class="sl-container astro-a7po4psb"><div class="sl-markdown-content"><p><a href="https://www.npmjs.com/package/@verticopolis/engine"><code dir="auto">@verticopolis/engine</code></a>
+is the <a href="https://verticopolis.com">Verticopolis</a> simulation engine, compiled to
+WebAssembly. It is the same engine the web game runs: every rule, price, cap,
+command, save format and gameplay event of the tower simulation. Your code
+owns everything a player sees and hears (rendering, audio, UI, input) and
+drives the engine through the calls below.</p>
+<p>The engine is written in Rust in
+<a href="https://github.com/maniator/verticopolis/tree/main/engine-rs"><code dir="auto">engine-rs/</code></a>
+of the Verticopolis repository. This package is its JavaScript binding, built
+by <a href="https://github.com/rustwasm/wasm-bindgen">wasm-bindgen</a> once per engine
+release.</p>
+<ul>
+<li><a href="#what-is-in-the-package">What is in the package</a></li>
+<li><a href="#install">Install</a></li>
+<li><a href="#quick-start-node">Quick start (Node)</a></li>
+<li><a href="#quick-start-browser">Quick start (browser)</a></li>
+<li><a href="#how-the-engine-talks">How the engine talks</a></li>
+<li><a href="#api-reference">API reference</a></li>
+<li><a href="#saves">Saves</a></li>
+<li><a href="#versioning">Versioning</a></li>
+<li><a href="#stability">Stability</a></li>
+<li><a href="#using-the-rust-crate-instead">Using the Rust crate instead</a></li>
+<li><a href="#license">License</a></li>
+</ul>
+<div class="sl-heading-wrapper level-h2"><h2 id="what-is-in-the-package">What is in the package</h2><a class="sl-anchor-link" href="#what-is-in-the-package"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “What is in the package”</span></a></div>
+<table>
+<thead>
+<tr>
+<th>Path</th>
+<th>What it is</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code dir="auto">node/</code></td>
+<td>The Node build (CommonJS, also importable from ES modules). It loads the <code dir="auto">.wasm</code> file next to it synchronously when you <code dir="auto">require</code> it. This is the package’s <code dir="auto">main</code>.</td>
+</tr>
+<tr>
+<td><code dir="auto">node/verticopolis_engine.d.ts</code></td>
+<td>The TypeScript declarations, with a doc comment on most calls. <code dir="auto">web/verticopolis_engine.d.ts</code> declares the same calls plus the browser build’s loader.</td>
+</tr>
+<tr>
+<td><code dir="auto">web/</code></td>
+<td>The browser build (an ES module). Call its default export once to load the <code dir="auto">.wasm</code> before you use anything else.</td>
+</tr>
+<tr>
+<td><code dir="auto">web/BUILD.json</code></td>
+<td>The build record: the engine version, a hash of the Rust sources it was built from and a SHA-256 for each file.</td>
+</tr>
+<tr>
+<td><code dir="auto">web/THIRD-PARTY.json</code></td>
+<td>The licenses of the Rust crates compiled into the <code dir="auto">.wasm</code>.</td>
+</tr>
+<tr>
+<td><code dir="auto">CHANGELOG.md</code></td>
+<td>The engine changelog, one section per version.</td>
+</tr>
+</tbody>
+</table>
+<p>Both builds come from the same Rust source at the same version and run the
+same simulation.</p>
+<p>For TypeScript, the declarations use <code dir="auto">Symbol.dispose</code>, so include
+<code dir="auto">esnext.disposable</code> (or <code dir="auto">esnext</code>) in your <code dir="auto">lib</code> setting, or turn on
+<code dir="auto">skipLibCheck</code>.</p>
+<div class="sl-heading-wrapper level-h2"><h2 id="install">Install</h2><a class="sl-anchor-link" href="#install"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “Install”</span></a></div>
+<div class="expressive-code"><link rel="stylesheet" href="/_astro/ec.w36nc.css"><script type="module" src="/_astro/ec.0vx5m.js"></script><figure class="frame is-terminal not-content"><figcaption class="header"><span class="title"></span><span class="sr-only">Terminal window</span></figcaption><pre data-language="sh"><code><div class="ec-line"><div class="code"><span style="--0:#82AAFF;--1:#3B61B0">npm</span><span style="--0:#D6DEEB;--1:#403F53"> </span><span style="--0:#ECC48D;--1:#3B61B0">install</span><span style="--0:#D6DEEB;--1:#403F53"> </span><span style="--0:#ECC48D;--1:#3B61B0">@verticopolis/engine</span></div></div></code></pre><div class="copy"><div aria-live="polite"></div><button title="Copy to clipboard" data-copied="Copied!" data-code="npm install @verticopolis/engine"><div></div></button></div></figure></div>
+<p>The package is on <a href="https://www.npmjs.com/package/@verticopolis/engine">npm</a>
+and needs no token or registry setting. Each version is published from the
+repository’s release workflow with an
+<a href="https://docs.npmjs.com/generating-provenance-statements">npm provenance statement</a>,
+so <code dir="auto">npm audit signatures</code> can check that the package was built from the
+tagged commit.</p>
+<p>Each engine release also attaches the same two builds as a zip, with a
+SHA-256 checksum, to its GitHub release
+(<a href="https://github.com/maniator/verticopolis/releases?q=engine-v"><code dir="auto">engine-v&lt;version&gt;</code></a>),
+for anyone who would rather not use a registry. Versions released before the
+package moved to npm were published only to GitHub Packages, as
+<code dir="auto">@maniator/verticopolis-engine</code>, and stay there.</p>
+<div class="sl-heading-wrapper level-h2"><h2 id="quick-start-node">Quick start (Node)</h2><a class="sl-anchor-link" href="#quick-start-node"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “Quick start (Node)”</span></a></div>
+<div class="expressive-code"><figure class="frame not-content"><figcaption class="header"></figcaption><pre data-language="js"><code><div class="ec-line"><div class="code"><span style="--0:#C792EA;--1:#8844AE">const { </span><span style="--0:#82AAFF;--1:#3B61B0">Engine</span><span style="--0:#C792EA;--1:#8844AE">, </span><span style="--0:#82AAFF;--1:#3B61B0">catalog</span><span style="--0:#C792EA;--1:#8844AE"> } = </span><span style="--0:#82AAFF;--1:#3B61B0">require</span><span style="--0:#D6DEEB;--1:#403F53">(</span><span style="--0:#D9F5DD;--1:#111111">"</span><span style="--0:#ECC48D;--1:#984E4D">@verticopolis/engine</span><span style="--0:#D9F5DD;--1:#111111">"</span><span style="--0:#D6DEEB;--1:#403F53">);</span></div></div><div class="ec-line"><div class="code"><span style="--0:#919F9F;--1:#5D6376">// or: import { Engine, catalog } from "@verticopolis/engine";</span></div></div><div class="ec-line"><div class="code">
+</div></div><div class="ec-line"><div class="code"><span style="--0:#919F9F;--1:#5D6376">// A new Classic game from seed 42.</span></div></div><div class="ec-line"><div class="code"><span style="--0:#C792EA;--1:#8844AE">const </span><span style="--0:#82AAFF;--1:#3B61B0">engine</span><span style="--0:#C792EA;--1:#8844AE"> = </span><span style="--0:#7FDBCA;--1:#096E72">Engine</span><span style="--0:#C792EA;--1:#8844AE">.</span><span style="--0:#82AAFF;--1:#3B61B0">newGame</span><span style="--0:#D6DEEB;--1:#403F53">(</span><span style="--0:#F78C6C;--1:#AA0982">42</span><span style="--0:#C792EA;--1:#8844AE">, </span><span style="--0:#D9F5DD;--1:#111111">"</span><span style="--0:#ECC48D;--1:#984E4D">classic</span><span style="--0:#D9F5DD;--1:#111111">"</span><span style="--0:#D6DEEB;--1:#403F53">);</span></div></div><div class="ec-line"><div class="code"><span style="--0:#7FDBCA;--1:#096E72">console</span><span style="--0:#C792EA;--1:#8844AE">.</span><span style="--0:#82AAFF;--1:#3B61B0">log</span><span style="--0:#D6DEEB;--1:#403F53">(</span><span style="--0:#7FDBCA;--1:#096E72">engine</span><span style="--0:#C792EA;--1:#8844AE">.</span><span style="--0:#82AAFF;--1:#3B61B0">money</span><span style="--0:#D6DEEB;--1:#403F53">()); </span><span style="--0:#919F9F;--1:#5D6376">// 2000000</span></div></div><div class="ec-line"><div class="code">
+</div></div><div class="ec-line"><div class="code"><span style="--0:#919F9F;--1:#5D6376">// Look up the office in the catalog, then lay a lobby under it and build it.</span></div></div><div class="ec-line"><div class="code"><span style="--0:#C792EA;--1:#8844AE">const </span><span style="--0:#82AAFF;--1:#3B61B0">facilities</span><span style="--0:#C792EA;--1:#8844AE"> = </span><span style="--0:#7FDBCA;--1:#096E72">Object</span><span style="--0:#C792EA;--1:#8844AE">.</span><span style="--0:#82AAFF;--1:#3B61B0">values</span><span style="--0:#D6DEEB;--1:#403F53">(</span><span style="--0:#82AAFF;--1:#3B61B0">JSON</span><span style="--0:#C792EA;--1:#8844AE">.</span><span style="--0:#82AAFF;--1:#3B61B0">parse</span><span style="--0:#D6DEEB;--1:#403F53">(</span><span style="--0:#82AAFF;--1:#3B61B0">catalog</span><span style="--0:#D6DEEB;--1:#403F53">(</span><span style="--0:#D9F5DD;--1:#111111">"</span><span style="--0:#ECC48D;--1:#984E4D">classic</span><span style="--0:#D9F5DD;--1:#111111">"</span><span style="--0:#D6DEEB;--1:#403F53">))</span><span style="--0:#C792EA;--1:#8844AE">.</span><span style="--0:#7FDBCA;--1:#096E72">facilities</span><span style="--0:#D6DEEB;--1:#403F53">);</span></div></div><div class="ec-line"><div class="code"><span style="--0:#C792EA;--1:#8844AE">const </span><span style="--0:#82AAFF;--1:#3B61B0">office</span><span style="--0:#C792EA;--1:#8844AE"> = </span><span style="--0:#7FDBCA;--1:#096E72">facilities</span><span style="--0:#C792EA;--1:#8844AE">.</span><span style="--0:#82AAFF;--1:#3B61B0">find</span><span style="--0:#D6DEEB;--1:#403F53">(</span><span style="--0:#D9F5DD;--1:#111111">(</span><span style="--0:#D7DBE0;--1:#403F53">f</span><span style="--0:#D9F5DD;--1:#111111">)</span><span style="--0:#C792EA;--1:#8844AE"> =&gt; </span><span style="--0:#7FDBCA;--1:#096E72">f</span><span style="--0:#C792EA;--1:#8844AE">.</span><span style="--0:#7FDBCA;--1:#096E72">key</span><span style="--0:#C792EA;--1:#8844AE"> === </span><span style="--0:#D9F5DD;--1:#111111">"</span><span style="--0:#ECC48D;--1:#984E4D">office</span><span style="--0:#D9F5DD;--1:#111111">"</span><span style="--0:#D6DEEB;--1:#403F53">);</span></div></div><div class="ec-line"><div class="code"><span style="--0:#C792EA;--1:#8844AE">for</span><span style="--0:#D6DEEB;--1:#403F53"> (</span><span style="--0:#C792EA;--1:#8844AE">let </span><span style="--0:#D7DBE0;--1:#403F53">x</span><span style="--0:#C792EA;--1:#8844AE"> = </span><span style="--0:#F78C6C;--1:#AA0982">10</span><span style="--1:#403F53"><span style="--0:#D6DEEB">; </span><span style="--0:#D7DBE0">x</span><span style="--0:#D6DEEB"> </span></span><span style="--0:#C792EA;--1:#8844AE">&lt;</span><span style="--0:#D6DEEB;--1:#403F53"> </span><span style="--0:#F78C6C;--1:#AA0982">10</span><span style="--0:#D6DEEB;--1:#403F53"> </span><span style="--0:#C792EA;--1:#8844AE">+</span><span style="--0:#D6DEEB;--1:#403F53"> </span><span style="--0:#7FDBCA;--1:#096E72">office</span><span style="--0:#C792EA;--1:#8844AE">.</span><span style="--0:#7FDBCA;--1:#096E72">width</span><span style="--1:#403F53"><span style="--0:#D6DEEB">; </span><span style="--0:#D7DBE0">x</span></span><span style="--0:#C792EA;--1:#8844AE">++</span><span style="--0:#D6DEEB;--1:#403F53">) </span><span style="--0:#7FDBCA;--1:#096E72">engine</span><span style="--0:#C792EA;--1:#8844AE">.</span><span style="--0:#82AAFF;--1:#3B61B0">build</span><span style="--0:#D6DEEB;--1:#403F53">(</span><span style="--0:#D9F5DD;--1:#111111">"</span><span style="--0:#ECC48D;--1:#984E4D">lobby</span><span style="--0:#D9F5DD;--1:#111111">"</span><span style="--0:#D6DEEB;--1:#403F53">, </span><span style="--0:#F78C6C;--1:#AA0982">1</span><span style="--1:#403F53"><span style="--0:#D6DEEB">, </span><span style="--0:#D7DBE0">x</span><span style="--0:#D6DEEB">);</span></span></div></div><div class="ec-line"><div class="code">
+</div></div><div class="ec-line"><div class="code"><span style="--0:#7FDBCA;--1:#096E72">console</span><span style="--0:#C792EA;--1:#8844AE">.</span><span style="--0:#82AAFF;--1:#3B61B0">log</span><span style="--0:#D6DEEB;--1:#403F53">(</span><span style="--0:#7FDBCA;--1:#096E72">engine</span><span style="--0:#C792EA;--1:#8844AE">.</span><span style="--0:#82AAFF;--1:#3B61B0">canBuild</span><span style="--0:#D6DEEB;--1:#403F53">(</span><span style="--0:#D9F5DD;--1:#111111">"</span><span style="--0:#ECC48D;--1:#984E4D">office</span><span style="--0:#D9F5DD;--1:#111111">"</span><span style="--0:#D6DEEB;--1:#403F53">, </span><span style="--0:#F78C6C;--1:#AA0982">2</span><span style="--0:#D6DEEB;--1:#403F53">, </span><span style="--0:#F78C6C;--1:#AA0982">10</span><span style="--0:#D6DEEB;--1:#403F53">)); </span><span style="--0:#919F9F;--1:#5D6376">// {"ok":true,"cost":44500.0}</span></div></div><div class="ec-line"><div class="code"><span style="--0:#7FDBCA;--1:#096E72">console</span><span style="--0:#C792EA;--1:#8844AE">.</span><span style="--0:#82AAFF;--1:#3B61B0">log</span><span style="--0:#D6DEEB;--1:#403F53">(</span><span style="--0:#7FDBCA;--1:#096E72">engine</span><span style="--0:#C792EA;--1:#8844AE">.</span><span style="--0:#82AAFF;--1:#3B61B0">build</span><span style="--0:#D6DEEB;--1:#403F53">(</span><span style="--0:#D9F5DD;--1:#111111">"</span><span style="--0:#ECC48D;--1:#984E4D">office</span><span style="--0:#D9F5DD;--1:#111111">"</span><span style="--0:#D6DEEB;--1:#403F53">, </span><span style="--0:#F78C6C;--1:#AA0982">2</span><span style="--0:#D6DEEB;--1:#403F53">, </span><span style="--0:#F78C6C;--1:#AA0982">10</span><span style="--0:#D6DEEB;--1:#403F53">)); </span><span style="--0:#919F9F;--1:#5D6376">// {"ok":true}</span></div></div><div class="ec-line"><div class="code">
+</div></div><div class="ec-line"><div class="code"><span style="--0:#919F9F;--1:#5D6376">// Run one game day, one minute at a time.</span></div></div><div class="ec-line"><div class="code"><span style="--0:#C792EA;--1:#8844AE">for</span><span style="--0:#D6DEEB;--1:#403F53"> (</span><span style="--0:#C792EA;--1:#8844AE">let </span><span style="--0:#D7DBE0;--1:#403F53">minute</span><span style="--0:#C792EA;--1:#8844AE"> = </span><span style="--0:#F78C6C;--1:#AA0982">0</span><span style="--1:#403F53"><span style="--0:#D6DEEB">; </span><span style="--0:#D7DBE0">minute</span><span style="--0:#D6DEEB"> </span></span><span style="--0:#C792EA;--1:#8844AE">&lt;</span><span style="--0:#D6DEEB;--1:#403F53"> </span><span style="--0:#F78C6C;--1:#AA0982">24</span><span style="--0:#D6DEEB;--1:#403F53"> </span><span style="--0:#C792EA;--1:#8844AE">*</span><span style="--0:#D6DEEB;--1:#403F53"> </span><span style="--0:#F78C6C;--1:#AA0982">60</span><span style="--1:#403F53"><span style="--0:#D6DEEB">; </span><span style="--0:#D7DBE0">minute</span></span><span style="--0:#C792EA;--1:#8844AE">++</span><span style="--0:#D6DEEB;--1:#403F53">) </span><span style="--0:#7FDBCA;--1:#096E72">engine</span><span style="--0:#C792EA;--1:#8844AE">.</span><span style="--0:#82AAFF;--1:#3B61B0">tick</span><span style="--0:#D6DEEB;--1:#403F53">(</span><span style="--0:#F78C6C;--1:#AA0982">1</span><span style="--0:#D6DEEB;--1:#403F53">);</span></div></div><div class="ec-line"><div class="code">
+</div></div><div class="ec-line"><div class="code"><span style="--0:#C792EA;--1:#8844AE">for</span><span style="--0:#D6DEEB;--1:#403F53"> (</span><span style="--0:#C792EA;--1:#8844AE">const </span><span style="--0:#82AAFF;--1:#3B61B0">event</span><span style="--0:#C792EA;--1:#8844AE"> </span><span style="--0:#7FDBCA;--1:#096E72">of</span><span style="--0:#D6DEEB;--1:#403F53"> </span><span style="--0:#82AAFF;--1:#3B61B0">JSON</span><span style="--0:#C792EA;--1:#8844AE">.</span><span style="--0:#82AAFF;--1:#3B61B0">parse</span><span style="--0:#D6DEEB;--1:#403F53">(</span><span style="--0:#7FDBCA;--1:#096E72">engine</span><span style="--0:#C792EA;--1:#8844AE">.</span><span style="--0:#82AAFF;--1:#3B61B0">drainGameplayEvents</span><span style="--0:#D6DEEB;--1:#403F53">())) {</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#7FDBCA;--1:#096E72">console</span><span style="--0:#C792EA;--1:#8844AE">.</span><span style="--0:#82AAFF;--1:#3B61B0">log</span><span style="--0:#D6DEEB;--1:#403F53">(</span><span style="--0:#7FDBCA;--1:#096E72">event</span><span style="--0:#C792EA;--1:#8844AE">.</span><span style="--0:#7FDBCA;--1:#096E72">name</span><span style="--0:#D6DEEB;--1:#403F53">, </span><span style="--0:#7FDBCA;--1:#096E72">event</span><span style="--0:#C792EA;--1:#8844AE">.</span><span style="--0:#7FDBCA;--1:#096E72">payload</span><span style="--0:#D6DEEB;--1:#403F53">);</span></div></div><div class="ec-line"><div class="code"><span style="--0:#D6DEEB;--1:#403F53">}</span></div></div><div class="ec-line"><div class="code"><span style="--0:#7FDBCA;--1:#096E72">console</span><span style="--0:#C792EA;--1:#8844AE">.</span><span style="--0:#82AAFF;--1:#3B61B0">log</span><span style="--0:#D6DEEB;--1:#403F53">(</span><span style="--0:#82AAFF;--1:#3B61B0">JSON</span><span style="--0:#C792EA;--1:#8844AE">.</span><span style="--0:#82AAFF;--1:#3B61B0">parse</span><span style="--0:#D6DEEB;--1:#403F53">(</span><span style="--0:#7FDBCA;--1:#096E72">engine</span><span style="--0:#C792EA;--1:#8844AE">.</span><span style="--0:#82AAFF;--1:#3B61B0">towerStats</span><span style="--0:#D6DEEB;--1:#403F53">()));</span></div></div><div class="ec-line"><div class="code">
+</div></div><div class="ec-line"><div class="code"><span style="--0:#919F9F;--1:#5D6376">// Save it as a .vctower file the web game can open.</span></div></div><div class="ec-line"><div class="code"><span style="--0:#C792EA;--1:#8844AE">const </span><span style="--0:#82AAFF;--1:#3B61B0">file</span><span style="--0:#C792EA;--1:#8844AE"> = </span><span style="--0:#7FDBCA;--1:#096E72">engine</span><span style="--0:#C792EA;--1:#8844AE">.</span><span style="--0:#82AAFF;--1:#3B61B0">exportVctower</span><span style="--0:#D6DEEB;--1:#403F53">(</span><span style="--0:#D9F5DD;--1:#111111">"</span><span style="--0:#ECC48D;--1:#984E4D">my-host 1.0.0</span><span style="--0:#D9F5DD;--1:#111111">"</span><span style="--0:#C792EA;--1:#8844AE">, </span><span style="--0:#7FDBCA;--1:#096E72">Date</span><span style="--0:#C792EA;--1:#8844AE">.</span><span style="--0:#82AAFF;--1:#3B61B0">now</span><span style="--0:#D6DEEB;--1:#403F53">());</span></div></div><div class="ec-line"><div class="code">
+</div></div><div class="ec-line"><div class="code"><span style="--0:#7FDBCA;--1:#096E72">engine</span><span style="--0:#C792EA;--1:#8844AE">.</span><span style="--0:#82AAFF;--1:#3B61B0">free</span><span style="--0:#D6DEEB;--1:#403F53">();</span></div></div></code></pre><div class="copy"><div aria-live="polite"></div><button title="Copy to clipboard" data-copied="Copied!" data-code="const { Engine, catalog } = require(&quot;@verticopolis/engine&quot;);// or: import { Engine, catalog } from &quot;@verticopolis/engine&quot;;// A new Classic game from seed 42.const engine = Engine.newGame(42, &quot;classic&quot;);console.log(engine.money()); // 2000000// Look up the office in the catalog, then lay a lobby under it and build it.const facilities = Object.values(JSON.parse(catalog(&quot;classic&quot;)).facilities);const office = facilities.find((f) => f.key === &quot;office&quot;);for (let x = 10; x < 10 + office.width; x++) engine.build(&quot;lobby&quot;, 1, x);console.log(engine.canBuild(&quot;office&quot;, 2, 10)); // {&quot;ok&quot;:true,&quot;cost&quot;:44500.0}console.log(engine.build(&quot;office&quot;, 2, 10)); // {&quot;ok&quot;:true}// Run one game day, one minute at a time.for (let minute = 0; minute < 24 * 60; minute++) engine.tick(1);for (const event of JSON.parse(engine.drainGameplayEvents())) {  console.log(event.name, event.payload);}console.log(JSON.parse(engine.towerStats()));// Save it as a .vctower file the web game can open.const file = engine.exportVctower(&quot;my-host 1.0.0&quot;, Date.now());engine.free();"><div></div></button></div></figure></div>
+<div class="sl-heading-wrapper level-h2"><h2 id="quick-start-browser">Quick start (browser)</h2><a class="sl-anchor-link" href="#quick-start-browser"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “Quick start (browser)”</span></a></div>
+<p>The browser build is an ES module that fetches its <code dir="auto">.wasm</code> file next to it.
+Bundlers that understand <code dir="auto">new URL("...", import.meta.url)</code> (Vite, webpack 5,
+Parcel, esbuild with a loader) copy the file for you.</p>
+<div class="expressive-code"><figure class="frame not-content"><figcaption class="header"></figcaption><pre data-language="js"><code><div class="ec-line"><div class="code"><span style="--0:#C792EA;--1:#8844AE">import</span><span style="--0:#D6DEEB;--1:#403F53"> init, { Engine } </span><span style="--0:#C792EA;--1:#8844AE">from</span><span style="--0:#D6DEEB;--1:#403F53"> </span><span style="--0:#D9F5DD;--1:#111111">"</span><span style="--0:#ECC48D;--1:#984E4D">@verticopolis/engine/web/verticopolis_engine.js</span><span style="--0:#D9F5DD;--1:#111111">"</span><span style="--0:#D6DEEB;--1:#403F53">;</span></div></div><div class="ec-line"><div class="code">
+</div></div><div class="ec-line"><div class="code"><span style="--0:#C792EA;--1:#8844AE">await</span><span style="--0:#D6DEEB;--1:#403F53"> </span><span style="--0:#82AAFF;--1:#3B61B0">init</span><span style="--0:#D6DEEB;--1:#403F53">(); </span><span style="--0:#919F9F;--1:#5D6376">// once, before any other call</span></div></div><div class="ec-line"><div class="code">
+</div></div><div class="ec-line"><div class="code"><span style="--0:#C792EA;--1:#8844AE">const </span><span style="--0:#82AAFF;--1:#3B61B0">engine</span><span style="--0:#C792EA;--1:#8844AE"> = </span><span style="--0:#7FDBCA;--1:#096E72">Engine</span><span style="--0:#C792EA;--1:#8844AE">.</span><span style="--0:#82AAFF;--1:#3B61B0">newGame</span><span style="--0:#D6DEEB;--1:#403F53">(</span><span style="--0:#7FDBCA;--1:#096E72">Date</span><span style="--0:#C792EA;--1:#8844AE">.</span><span style="--0:#82AAFF;--1:#3B61B0">now</span><span style="--0:#D6DEEB;--1:#403F53">()</span><span style="--0:#C792EA;--1:#8844AE"> &gt;&gt;&gt; </span><span style="--0:#F78C6C;--1:#AA0982">0</span><span style="--0:#C792EA;--1:#8844AE">, </span><span style="--0:#D9F5DD;--1:#111111">"</span><span style="--0:#ECC48D;--1:#984E4D">modern</span><span style="--0:#D9F5DD;--1:#111111">"</span><span style="--0:#D6DEEB;--1:#403F53">);</span></div></div></code></pre><div class="copy"><div aria-live="polite"></div><button title="Copy to clipboard" data-copied="Copied!" data-code="import init, { Engine } from &quot;@verticopolis/engine/web/verticopolis_engine.js&quot;;await init(); // once, before any other callconst engine = Engine.newGame(Date.now() >>> 0, &quot;modern&quot;);"><div></div></button></div></figure></div>
+<p><code dir="auto">init</code> also takes the <code dir="auto">.wasm</code> location or its bytes,
+<code dir="auto">init({ module_or_path: url })</code>, when you serve the file yourself, and
+<code dir="auto">initSync({ module: bytes })</code> loads it synchronously from bytes you already
+hold.</p>
+<div class="sl-heading-wrapper level-h2"><h2 id="how-the-engine-talks">How the engine talks</h2><a class="sl-anchor-link" href="#how-the-engine-talks"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “How the engine talks”</span></a></div>
+<ul>
+<li><strong>One <code dir="auto">Engine</code> is one game.</strong> Create one with <code dir="auto">Engine.newGame</code>,
+<code dir="auto">Engine.fromVctower</code> or <code dir="auto">Engine.fromSave</code>. It lives in WebAssembly memory
+that JavaScript’s garbage collector does not see, so call <code dir="auto">free()</code> when you
+are done with it (or declare it with <code dir="auto">using</code>, since it implements
+<code dir="auto">Symbol.dispose</code>).</li>
+<li><strong>Structured answers are JSON text.</strong> Calls that answer with a record return
+a string; <code dir="auto">JSON.parse</code> it. Calls that take a structured argument take it as
+JSON text too.</li>
+<li><strong>Commands answer instead of throwing.</strong> A command a player could make
+returns <code dir="auto">{ "ok": true }</code> or <code dir="auto">{ "ok": false, "reason": "..." }</code>, where
+<code dir="auto">reason</code> is a sentence you can show a player. Money-moving commands add the
+amount moved. An argument of the wrong shape (a fractional id, an unknown
+end or method) is refused, never rounded into a different request. Loading
+and file calls (<code dir="auto">fromVctower</code>, <code dir="auto">importTdt</code>, an unknown mode) throw a
+JavaScript <code dir="auto">Error</code> whose message is readable by a player.</li>
+<li><strong>The engine does no I/O.</strong> It reads no file, clock, network or console. You
+pass in time (<code dir="auto">tick</code>), files (as text or bytes) and timestamps, and you get
+bytes back to store wherever you like.</li>
+<li><strong>It is deterministic.</strong> The same seed, the same commands and the same
+sequence of <code dir="auto">tick</code> calls give the same game, on any machine and in either
+build.</li>
+<li><strong>Coordinates.</strong> <code dir="auto">floor</code> counts up from the ground floor, which is <code dir="auto">1</code>.
+Floor <code dir="auto">0</code> and below are basements, down to <code dir="auto">-9</code>, and the top floor is
+<code dir="auto">100</code>.
+Lobbies go on the ground floor and every 15th floor above it. <code dir="auto">x</code> is a tile
+column, from <code dir="auto">0</code> to the lot width less one (<code dir="auto">375</code> tiles). The catalog’s
+<code dir="auto">world</code> record carries these numbers, so read them from there.</li>
+<li><strong>Modes.</strong> <code dir="auto">"classic"</code> follows the 1994 original; <code dir="auto">"modern"</code> adds the
+facilities and rules the original did not have. The catalog marks each
+facility that is Modern-only.</li>
+<li><strong>Pause.</strong> The engine has no paused state: pausing means your frontend
+stops calling <code dir="auto">tick</code>, and a build still applies while it is stopped. The
+catalog’s <code dir="auto">rules.buildsWhilePaused</code> says whether the mode allows that.
+Classic does not, as in the original, so a Classic frontend refuses new
+placement while paused.</li>
+</ul>
+<div class="sl-heading-wrapper level-h2"><h2 id="api-reference">API reference</h2><a class="sl-anchor-link" href="#api-reference"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “API reference”</span></a></div>
+<p>The table lists the calls a frontend needs. The doc comments in
+<code dir="auto">node/verticopolis_engine.d.ts</code> give the exact argument rules and answer
+shapes for each one.</p>
+<div class="sl-heading-wrapper level-h3"><h3 id="starting-and-loading-a-game">Starting and loading a game</h3><a class="sl-anchor-link" href="#starting-and-loading-a-game"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “Starting and loading a game”</span></a></div>
+<table>
+<thead>
+<tr>
+<th>Call</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code dir="auto">Engine.newGame(seed, mode, modernCalendar?, startUnbridged?)</code></td>
+<td>A new tower. <code dir="auto">seed</code> is a 32-bit unsigned integer; <code dir="auto">mode</code> is <code dir="auto">"classic"</code> or <code dir="auto">"modern"</code>; <code dir="auto">modernCalendar</code> is <code dir="auto">"realWorld"</code> (the default) or <code dir="auto">"canon"</code>.</td>
+</tr>
+<tr>
+<td><code dir="auto">Engine.fromVctower(text, mode?)</code></td>
+<td>Open a <code dir="auto">.vctower</code> file the way the web game does: decode, migrate older saves and load. <code dir="auto">mode</code> overrides the save’s mode.</td>
+</tr>
+<tr>
+<td><code dir="auto">Engine.fromSave(json)</code></td>
+<td>Load the save JSON that <code dir="auto">serialize()</code> returns.</td>
+</tr>
+<tr>
+<td><code dir="auto">importTdt(bytes, filename)</code></td>
+<td>Read a 1994 SimTower <code dir="auto">.TDT</code> file. Answers <code dir="auto">{ save, warnings }</code>; pass <code dir="auto">JSON.stringify(save)</code> to <code dir="auto">Engine.fromSave</code>.</td>
+</tr>
+</tbody>
+</table>
+<div class="sl-heading-wrapper level-h3"><h3 id="running-time">Running time</h3><a class="sl-anchor-link" href="#running-time"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “Running time”</span></a></div>
+<table>
+<thead>
+<tr>
+<th>Call</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code dir="auto">tick(dtMinutes)</code></td>
+<td>Advance the game by <code dir="auto">dtMinutes</code> game minutes. Any size works: the engine cuts it into steps that never skip an hour boundary. How fast game time runs against real time is your choice.</td>
+</tr>
+</tbody>
+</table>
+<div class="sl-heading-wrapper level-h3"><h3 id="player-commands">Player commands</h3><a class="sl-anchor-link" href="#player-commands"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “Player commands”</span></a></div>
+<table>
+<thead>
+<tr>
+<th>Call</th>
+<th>Answers</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code dir="auto">canBuild(kind, floor, x)</code></td>
+<td>The dry run of <code dir="auto">build</code>: <code dir="auto">{ ok, reason?, cost }</code>, with the full price (floor tiles and bridging included).</td>
+</tr>
+<tr>
+<td><code dir="auto">build(kind, floor, x)</code></td>
+<td>Place a facility with its left edge at <code dir="auto">x</code>. <code dir="auto">{ ok, reason? }</code>. <code dir="auto">kind</code> is a catalog <code dir="auto">key</code> such as <code dir="auto">"office"</code>, <code dir="auto">"condo"</code> or <code dir="auto">"hotelSingle"</code>.</td>
+</tr>
+<tr>
+<td><code dir="auto">paintBrush(kind, floor, tilesJson)</code></td>
+<td>Lay floor or lobby tiles along a stroke in one command. <code dir="auto">{ placed, reason? }</code>.</td>
+</tr>
+<tr>
+<td><code dir="auto">setLobbyHeight(height)</code>, <code dir="auto">lobbyRise(floor, x)</code>, <code dir="auto">lobbyHeights()</code></td>
+<td>How many stories (1 to 3) a new lobby rises from now on, where the mode lets that floor’s lobby rise (the catalog’s <code dir="auto">rules.tallSkyLobbies</code>; the ground lobby always may), how many a lobby tile laid at <code dir="auto">(floor, x)</code> would rise now, and every lobby hall taller than one story as flat <code dir="auto">[floor, x0, x1, height, ...]</code> quads, <code dir="auto">x1</code> being the hall’s last column. In Classic a floor has one lobby height, set by its first lobby. In Modern each hall keeps its own: a tile laid against a hall takes that hall’s height, a tile that closes a gap takes the left hall’s, and a new hall takes the asked height, so halls of different heights can stand side by side. A first lobby asked taller where it cannot rise is refused, with a reason. A lobby’s height never changes once built, and it costs the lobby price per story.</td>
+</tr>
+<tr>
+<td><code dir="auto">walkwayTop(kind, x, bottom, top)</code></td>
+<td>The top a stairway or escalator at column <code dir="auto">x</code> asked from <code dir="auto">bottom</code> to <code dir="auto">top</code> is built to: out of a tall lobby (in Modern, the hall under the flight) a one-story flight climbs the whole lobby, so a build preview can draw the flight a click lays. <code dir="auto">top</code> for any other kind or span.</td>
+</tr>
+<tr>
+<td><code dir="auto">buildTransport(kind, x, bottom, top)</code></td>
+<td>Place stairs, an escalator or an elevator shaft between two floors. <code dir="auto">{ ok, reason? }</code>.</td>
+</tr>
+<tr>
+<td><code dir="auto">validateTransport(kind, x, bottom, top)</code></td>
+<td>The same check without building.</td>
+</tr>
+<tr>
+<td><code dir="auto">addCar(id)</code>, <code dir="auto">removeCar(id)</code></td>
+<td>Add or remove an elevator car, charging or refunding it. <code dir="auto">{ ok, reason?, delta }</code>.</td>
+</tr>
+<tr>
+<td><code dir="auto">extendTransport(id, end, targetFloor)</code></td>
+<td>Stretch a shaft <code dir="auto">"up"</code> or <code dir="auto">"down"</code>, billing the new floors.</td>
+</tr>
+<tr>
+<td><code dir="auto">removeFacility(id, method)</code></td>
+<td>Sell or bulldoze a unit or shaft by id (<code dir="auto">"sell"</code> or <code dir="auto">"bulldoze"</code>), paying the refund. <code dir="auto">{ ok, reason?, delta }</code>.</td>
+</tr>
+<tr>
+<td><code dir="auto">sellAt(floor, x)</code></td>
+<td>Remove whatever covers a tile. <code dir="auto">true</code> when something went.</td>
+</tr>
+<tr>
+<td><code dir="auto">adjustRent(id, dir)</code>, <code dir="auto">priceUnit(id, target)</code>, <code dir="auto">setNoRate(id)</code></td>
+<td>Change a room’s rent: one step up (<code dir="auto">1</code>) or down (<code dir="auto">-1</code>), a chosen price, or off the market.</td>
+</tr>
+<tr>
+<td><code dir="auto">pendingChoice()</code>, <code dir="auto">resolveChoice(accept)</code></td>
+<td>A question the game is asking the player (a ransom, a VIP), as <code dir="auto">{ kind, cost, message }</code>, and the answer to it.</td>
+</tr>
+<tr>
+<td><code dir="auto">setTowerName(name)</code>, <code dir="auto">towerName()</code></td>
+<td>The tower’s name.</td>
+</tr>
+</tbody>
+</table>
+<div class="sl-heading-wrapper level-h3"><h3 id="reading-the-game">Reading the game</h3><a class="sl-anchor-link" href="#reading-the-game"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “Reading the game”</span></a></div>
+<table>
+<thead>
+<tr>
+<th>Call</th>
+<th>What it answers</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code dir="auto">money()</code>, <code dir="auto">mode()</code></td>
+<td>The balance and the mode.</td>
+</tr>
+<tr>
+<td><code dir="auto">towerStats()</code></td>
+<td>The headline counters as JSON: population, money, star rating, offices, condos, hotel rooms, floors, elevators and so on.</td>
+</tr>
+<tr>
+<td><code dir="auto">unitAt(floor, x)</code>, <code dir="auto">unitDetail(id)</code></td>
+<td>The room covering a tile, and the inspector card for one room.</td>
+</tr>
+<tr>
+<td><code dir="auto">drainGameplayEvents()</code></td>
+<td>The gameplay events since the last drain, oldest first, as <code dir="auto">[{ name, payload }]</code> (<code dir="auto">facility_placed</code>, <code dir="auto">star_reached</code>, <code dir="auto">fire_started</code>, <code dir="auto">milestone_reached</code> and the rest). The names and payloads are listed in <a href="https://github.com/maniator/verticopolis/blob/main/engine-rs/src/gameplay/catalog.json"><code dir="auto">engine-rs/src/gameplay/catalog.json</code></a>. Drain after each frame; the buffer is bounded and <code dir="auto">gameplayEventsDropped()</code> counts what it had to drop.</td>
+</tr>
+<tr>
+<td><code dir="auto">logSince(seq)</code></td>
+<td>The tower’s message log after entry <code dir="auto">seq</code>, as <code dir="auto">[{ seq, minute, text, kind }]</code>.</td>
+</tr>
+<tr>
+<td><code dir="auto">viewLayout()</code>, <code dir="auto">viewStructure()</code>, <code dir="auto">viewFrame(full)</code></td>
+<td>The renderer’s view, for a host that draws the tower every frame: the layout names every slot as JSON; the structure (floors, rooms, shafts) and the per-frame state (clock, people, changed rooms, cars) come as flat number arrays read through it.</td>
+</tr>
+<tr>
+<td><code dir="auto">personCard(id)</code></td>
+<td>One walking person’s trip, for a host’s person card: why they are out (a code in the layout’s <code dir="auto">personPurposes</code>), where the leg they are on began and where it ends (each a code in <code dir="auto">tripPlaces</code> with the room’s id and kind, or the floor), a housekeeper’s step (<code dir="auto">shiftSteps</code>), and their wait. The layout’s <code dir="auto">personCard</code> record names the slots. Empty once the person has left the tower. Read it while the card is open; the frame carries none of it.</td>
+</tr>
+<tr>
+<td><code dir="auto">setPeopleWindow(floorLo, floorHi, xLo, xHi)</code></td>
+<td>The floors and tiles on screen, so the next <code dir="auto">viewFrame</code> calls carry only the people there (padded so every rider of a car on screen comes along). A number that is not finite clears it. It is the camera only: the game steps every person and nothing saves it.</td>
+</tr>
+<tr>
+<td><code dir="auto">serialize()</code></td>
+<td>The whole game as save JSON.</td>
+</tr>
+<tr>
+<td><code dir="auto">stateDigest()</code></td>
+<td>A short hash of the game state. Two engines that agree on it hold the same game.</td>
+</tr>
+</tbody>
+</table>
+<div class="sl-heading-wrapper level-h3"><h3 id="reference-data-and-identity">Reference data and identity</h3><a class="sl-anchor-link" href="#reference-data-and-identity"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “Reference data and identity”</span></a></div>
+<table>
+<thead>
+<tr>
+<th>Call</th>
+<th>What it answers</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code dir="auto">catalog(mode)</code></td>
+<td>Every price, size, build cap and rule a frontend shows, for one mode, as JSON: <code dir="auto">facilities</code> (one entry per kind, with its <code dir="auto">key</code>, <code dir="auto">name</code>, <code dir="auto">width</code>, <code dir="auto">cost</code>, <code dir="auto">minStar</code> and so on), <code dir="auto">world</code>, <code dir="auto">economy</code>, <code dir="auto">pools</code> (caps several kinds share; Classic adds one for party halls and theaters together) and <code dir="auto">rules</code>. Read rules from here rather than copying them into your code.</td>
+</tr>
+<tr>
+<td><code dir="auto">engineIdentity()</code></td>
+<td>Which engine this is and which contracts it speaks: the crate version, the save version it writes and the oldest it loads, the frame layout version, the catalog version with a digest per mode, and the conformance lock digest.</td>
+</tr>
+</tbody>
+</table>
+<p>The binding exports more than this table. The rest are the web game’s own
+plumbing: packed number-array answers its host decodes. They can change in
+any release, so build on the calls above. The test hooks and raw edits that
+skip the game’s charges (<code dir="auto">setMoney</code>, <code dir="auto">setCars</code>, <code dir="auto">startFire</code> and the like) are
+not in the published package at all: only the crate’s <code dir="auto">tooling</code> feature
+builds them, for the web game’s own tests and tooling.</p>
+<div class="sl-heading-wrapper level-h2"><h2 id="saves">Saves</h2><a class="sl-anchor-link" href="#saves"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “Saves”</span></a></div>
+<ul>
+<li><strong><code dir="auto">.vctower</code></strong> is the native save format, and what the web game imports and
+exports. Write one with <code dir="auto">exportVctower(appVersion, savedAtMs)</code> and open one
+with <code dir="auto">Engine.fromVctower(text)</code>. <code dir="auto">appVersion</code> names your build; it is stored
+in the file. If you already hold save JSON, <code dir="auto">encodeVctower(json, appVersion, savedAtMs)</code> writes the same file.</li>
+<li><strong><code dir="auto">.TDT</code></strong> is the 1994 SimTower format. <code dir="auto">importTdt(bytes, filename)</code> reads
+one and <code dir="auto">exportTdt(saveJson)</code> writes one, for towers the old format can
+hold. The catalog’s <code dir="auto">rules.exportsTo1994</code> says which mode’s towers those
+are (Classic); a Modern tower is refused. Each elevator car’s waiting floor
+travels both ways as the shaft’s <code dir="auto">schedule.homeFloors</code>.</li>
+<li><strong>A save holds the tower, not the moment.</strong> The people walking around and
+the elevator cars’ positions are not saved; a loaded game starts them
+fresh, so it does not carry on exactly where the saving game was. Two loads
+of the same save do stay identical to each other.</li>
+<li><strong>The loader repairs.</strong> A damaged or hand-edited save is coerced the way the
+web game’s loader does. It refuses a file it cannot read at all, and a save
+with no numeric <code dir="auto">minutes</code> or no <code dir="auto">units</code> list at its top level, which would
+otherwise load as an empty tower.</li>
+<li><strong>Newer saves are refused.</strong> A save written by a newer engine than the one
+loading it is refused rather than half-read. <code dir="auto">engineIdentity()</code> tells you
+which save version an engine writes. A save is version 7 unless it holds a
+lobby taller than one story, which makes it version 9 (one entry per hall).
+A version 8 save, which gave each floor one height, still loads.</li>
+</ul>
+<div class="sl-heading-wrapper level-h2"><h2 id="versioning">Versioning</h2><a class="sl-anchor-link" href="#versioning"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “Versioning”</span></a></div>
+<p>The package version is the engine crate’s version (<code dir="auto">engine-rs/Cargo.toml</code>),
+which is separate from the web game’s version. Each engine release:</p>
+<ul>
+<li>publishes this package at that version;</li>
+<li>tags the repository <code dir="auto">engine-v&lt;version&gt;</code> and publishes a GitHub release with
+that version’s changelog section and the zipped builds;</li>
+<li>adds a section to the <a href="/changelog/">changelog</a>,
+written for people who build on the engine.</li>
+</ul>
+<p>The version goes up when the engine’s contract moves: the conformance lock
+(simulation behavior), the save version, the frame or view layout, the
+catalog, the identity record, or the binding’s declarations. A change that
+keeps all of these, such as a speed-up, does not raise the version on its
+own; it ships with the next release.</p>
+<p>To pin exactly, depend on an exact version (<code dir="auto">"1.24.0"</code>, not <code dir="auto">"^1.24.0"</code>): see
+<a href="#stability">Stability</a>.</p>
+<div class="sl-heading-wrapper level-h2"><h2 id="stability">Stability</h2><a class="sl-anchor-link" href="#stability"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “Stability”</span></a></div>
+<ul>
+<li><strong>No semver promise yet.</strong> Until the engine’s compatibility policy is
+written (<a href="https://github.com/maniator/verticopolis/issues/893">#893</a>), a
+minor version can change a call’s shape or the game’s behavior. Pin an
+exact version and read the changelog before you move.</li>
+<li><strong>The conformance lock is the contract.</strong> Every change to the simulation
+lands with an updated
+<a href="/conformance/"><code dir="auto">conformance/expected.json</code></a>,
+the recorded state hashes of a suite of scripted games. An engine at a
+given version replays that suite exactly.</li>
+<li><strong>The calls in the API reference change only on purpose,</strong> with a
+changelog line. Everything else the binding exports is internal.</li>
+</ul>
+<div class="sl-heading-wrapper level-h2"><h2 id="using-the-rust-crate-instead">Using the Rust crate instead</h2><a class="sl-anchor-link" href="#using-the-rust-crate-instead"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “Using the Rust crate instead”</span></a></div>
+<p>A Rust host (a native client, a server, a tool) can depend on the crate,
+<a href="https://crates.io/crates/verticopolis-engine"><code dir="auto">verticopolis-engine</code></a>,
+directly instead of on this package:</p>
+<div class="expressive-code"><figure class="frame is-terminal not-content"><figcaption class="header"><span class="title"></span><span class="sr-only">Terminal window</span></figcaption><pre data-language="sh"><code><div class="ec-line"><div class="code"><span style="--0:#82AAFF;--1:#3B61B0">cargo</span><span style="--0:#D6DEEB;--1:#403F53"> </span><span style="--0:#ECC48D;--1:#3B61B0">add</span><span style="--0:#D6DEEB;--1:#403F53"> </span><span style="--0:#ECC48D;--1:#3B61B0">verticopolis-engine</span></div></div></code></pre><div class="copy"><div aria-live="polite"></div><button title="Copy to clipboard" data-copied="Copied!" data-code="cargo add verticopolis-engine"><div></div></button></div></figure></div>
+<p>The <a href="/crate/">Rust crate guide</a>
+has a Rust quick start, and
+<a href="/api/"><code dir="auto">engine-rs/API.md</code></a>
+is the full guide: the Rust calls, the conformance harness a host uses to
+prove it runs the real simulation, and the build metadata.</p>
+<div class="sl-heading-wrapper level-h2"><h2 id="license">License</h2><a class="sl-anchor-link" href="#license"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “License”</span></a></div>
+<p>MIT. See <a href="https://github.com/maniator/verticopolis/blob/main/LICENSE"><code dir="auto">LICENSE</code></a>. The licenses of the Rust crates compiled
+into the WebAssembly are in <code dir="auto">web/THIRD-PARTY.json</code>.</p>
+</div><footer class="sl-flex astro-ddtxxk7k"><div class="meta sl-flex astro-ddtxxk7k"></div><div class="pagination-links print:hidden astro-b5raizh3" dir="ltr"><a href="/" rel="prev" class="astro-b5raizh3"><svg aria-hidden="true" class="astro-b5raizh3 astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.5rem;"><path d="M17 11H9.41l3.3-3.29a1.004 1.004 0 1 0-1.42-1.42l-5 5a1 1 0 0 0-.21.33 1 1 0 0 0 0 .76 1 1 0 0 0 .21.33l5 5a1.002 1.002 0 0 0 1.639-.325 1 1 0 0 0-.219-1.095L9.41 13H17a1 1 0 0 0 0-2Z"/></svg><span class="astro-b5raizh3">Previous<br class="astro-b5raizh3"><span class="link-title astro-b5raizh3">Overview</span></span></a><a href="/crate/" rel="next" class="astro-b5raizh3"><svg aria-hidden="true" class="astro-b5raizh3 astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.5rem;"><path d="M17.92 11.62a1.001 1.001 0 0 0-.21-.33l-5-5a1.003 1.003 0 1 0-1.42 1.42l3.3 3.29H7a1 1 0 0 0 0 2h7.59l-3.3 3.29a1.002 1.002 0 0 0 .325 1.639 1 1 0 0 0 1.095-.219l5-5a1 1 0 0 0 .21-.33 1 1 0 0 0 0-.76Z"/></svg><span class="astro-b5raizh3">Next<br class="astro-b5raizh3"><span class="link-title astro-b5raizh3">Rust crate</span></span></a></div></footer></div></div></main></div></div></div></div></body></html>

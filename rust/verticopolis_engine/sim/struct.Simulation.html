@@ -1,0 +1,895 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="One game of Verticopolis."><title>Simulation in verticopolis_engine::sim - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../static.files/rustdoc-17e0aaed.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="verticopolis_engine" data-themes="" data-resource-suffix="" data-rustdoc-version="1.97.0 (2d8144b78 2026-07-07)" data-channel="1.97.0" data-search-js="search-fd9372ac.js" data-stringdex-js="stringdex-2da4960a.js" data-settings-js="settings-170eb4bf.js" ><script src="../../static.files/storage-41dd4d93.js"></script><script defer src="sidebar-items.js"></script><script defer src="../../static.files/main-fcd733ba.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-f7c3ffd8.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-044be391.svg"><style>
+/* Retro (Windows 3.1 / SimTower) design tokens: the single source of the
+   palette, font, bevels, and shadow. This is the ONLY place --r-face and its
+   siblings are declared; styles.css (the game) and retro-page.css (standalone
+   pages like /help and the gallery) both @import it, so no page re-declares the
+   palette. Change the theme here once. */
+:root {
+  /* Semantic tokens. The first four are ALIASES of the chrome tokens below —
+     they read better at usage sites ("body text", "highlight") and can never
+     diverge from the theme. */
+  --bg: var(--r-desktop);
+  --panel: var(--r-face);
+  --ink: var(--r-ink);       /* body text */
+  --accent: var(--r-title);  /* navy — titles & highlights */
+  --panel-light: #d7d7d7;
+  --muted: #2f2f38;       /* secondary text — dark enough to read on gray */
+  --good: #15722e;
+  --bad: #b01023;
+  --bad-ink: #9a0e1f;     /* danger text small enough to need AA 4.5:1 on gray chrome */
+  --money: #005000; /* dark forest green: >=4.5:1 WCAG AA on the #c0c0c0 stat chip (#0a6e26 was 3.53:1, below AA) */
+  --line: #7a7a7a;
+  /* Win3.1 chrome tokens + the signature two-pixel bevels. Swap to re-theme. */
+  --r-face: #c0c0c0;
+  --r-shadow: #808080;
+  --r-dark: #000000;
+  --r-light: #dfdfdf;
+  --r-hi: #ffffff;
+  --r-title: #000080;
+  --r-title-fg: #ffffff;
+  --r-ink: #000000;
+  --r-desktop: #008080;
+  --r-font: "MS Sans Serif", "Tahoma", "Geneva", "Segoe UI", sans-serif;
+  --bevel-out: inset -1px -1px var(--r-dark), inset 1px 1px var(--r-hi),
+    inset -2px -2px var(--r-shadow), inset 2px 2px var(--r-light);
+  --bevel-in: inset 1px 1px var(--r-dark), inset -1px -1px var(--r-hi),
+    inset 2px 2px var(--r-shadow), inset -2px -2px var(--r-light);
+  /* Floating windows cast one hard shadow. */
+  --win-shadow: 2px 2px 0 rgba(0, 0, 0, 0.4);
+  /* The Classic rent-rung chip fills (1994's Blue/Green/Yellow/Red levels).
+     Chosen to read on gray chrome and to stay clear of every reserved sprite
+     state-cue literal; hexes proposed in ux-pricing-split-editor §1.3, pending
+     the pixel-art party's ratification. No Rate has no token: absence of a
+     price is absence of a fill (the chip renders hollow). */
+  --rung-vlow: #2048b0;
+  --rung-low: #1e7a2e;
+  --rung-avg: #c8a000;
+  --rung-high: #b02020;
+  /* The title screen ("Metropolis Dusk"): the game's splash and boot cover
+     (styles/game/splash.css) and the docs site's landing page share these, so
+     the two skies never drift. The splash is box art, not Win 3.1 chrome, and
+     keeps its own colors. */
+  --splash-sky: linear-gradient(#161634 0%, #241f4c 34%, #5b3560 62%, #c65a63 86%, #ef8560 100%);
+  --splash-amber: #ffc94a;   /* POLIS, the primary plate, the focus ring */
+  --splash-sun: radial-gradient(circle, #ffe6a0 0%, var(--splash-amber) 52%, #f18f4b 100%);
+  --splash-sun-glow: rgba(255, 179, 87, 0.26);
+  --splash-building: #201643;
+  --splash-cream: #e6dcc0;   /* the plates and the corner buttons' glyphs */
+  --splash-plate-ink: #20204a;
+  --splash-ink: #0d0d10;     /* plate borders and the skyline's outlines */
+  --splash-wordmark: #f7f1e4; /* VERTICO */
+  --splash-tagline: #ffd9a8;
+  --splash-premise: #e7ddf5;
+}
+
+/* The shared title bar (title-bar.mjs): the help site, the engine docs and
+   the Rust API reference all draw it with these classes. It sits on the navy
+   title bar each surface already paints (theme.css's .header, rustdoc's
+   .vc-header), so the colors here are the bar's own: white on navy, and the
+   game's bevelled gray button. The breakpoint is Starlight's own (50rem),
+   where its side menu turns into the phone's menu button. */
+
+.vc-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--sl-nav-gap, 1rem);
+  height: 100%;
+  min-width: 0;
+}
+
+/* The logo and the site's name, as Starlight's SiteTitle draws them. */
+.vc-bar-title {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex: 0 1 auto;
+  min-width: 0;
+  font-size: var(--sl-text-h4, 1.25rem);
+  font-weight: 700;
+  color: var(--r-title-fg);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.vc-bar-title:hover {
+  color: var(--r-title-fg);
+}
+.vc-bar-title img {
+  flex: none;
+  width: auto;
+  height: calc(var(--sl-nav-height, 4rem) - 2 * var(--sl-nav-pad-y, 0.75rem));
+  image-rendering: pixelated;
+  box-shadow: var(--bevel-out);
+}
+.vc-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.vc-bar-search {
+  display: flex;
+  flex: 1 1 auto;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+.vc-bar-links {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 1rem;
+}
+
+/* The game's bevelled button on the navy bar. */
+.vc-bar-game {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 4px 12px;
+  font-size: 0.875rem;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--r-ink);
+  text-decoration: none;
+  white-space: nowrap;
+  background: var(--r-face);
+  box-shadow: var(--bevel-out);
+}
+.vc-bar-game:hover {
+  color: var(--r-ink);
+}
+.vc-bar-game:active {
+  box-shadow: var(--bevel-in);
+}
+
+.vc-bar-github {
+  display: inline-flex;
+  padding: 0.25rem;
+  color: var(--r-title-fg);
+}
+.vc-bar-github:hover {
+  color: var(--r-light);
+}
+
+/* The theme switch, after a divider, as Starlight's header sets it. */
+.vc-bar-theme {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+.vc-bar-theme::before {
+  content: "";
+  height: 2rem;
+  border-inline-start: 1px solid var(--r-shadow);
+}
+
+.vc-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* A label written twice (twoLengths): the full one on a wide screen. */
+.vc-short {
+  display: none;
+}
+
+@media (max-width: 49.99rem) {
+  /* A phone: the short name and label, the full ones for screen readers. */
+  .vc-full {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+  .vc-short {
+    display: inline;
+  }
+  .vc-bar-title {
+    gap: 0.5rem;
+  }
+  .vc-bar-links {
+    gap: 0.75rem;
+  }
+  /* GitHub and the theme switch move to the foot of the phone's menu. */
+  .vc-bar-github,
+  .vc-bar-theme {
+    display: none;
+  }
+}
+
+@media (min-width: 50rem) {
+  .vc-bar-search {
+    justify-content: center;
+  }
+}
+
+/* The Rust API reference under /rust/ (cargo doc's own pages) in the docs
+   site's look: the game's palette and font from retro-tokens.css, the site's
+   navy title bar, and the site's side menu above the crate's own items, drawn
+   like src/styles/theme.css draws Starlight's. scripts/rustdoc-chrome.mjs
+   puts this in each page's head after retro-tokens.css, and rustdoc's own
+   variables do most of the rest. Code keeps rustdoc's monospace fonts. */
+
+:root {
+  --font-family: var(--r-font);
+  --vc-bar-height: 4rem;
+  --desktop-sidebar-width: 300px;
+}
+:root[data-theme="light"],
+:root:not([data-theme]) {
+  --main-background-color: var(--r-hi);
+  --main-color: var(--r-ink);
+  --sidebar-background-color: var(--r-face);
+  --sidebar-background-color-hover: #d7d7d7;
+  --sidebar-border-color: var(--r-shadow);
+  --sidebar-link-color: var(--r-title);
+  --sidebar-current-link-background-color: #d7d7d7;
+  --link-color: var(--r-title);
+  --mod-link-color: var(--r-title);
+  --keyword-link-color: var(--r-title);
+  --assoc-item-link-color: var(--r-title);
+  --headings-border-bottom-color: var(--r-shadow);
+  --border-color: var(--r-shadow);
+  --search-input-focused-border-color: var(--r-title);
+  --search-tab-button-selected-border-top-color: var(--r-title);
+  --code-block-background-color: #f0f0f0;
+}
+:root[data-theme="dark"],
+:root[data-theme="ayu"] {
+  --main-background-color: #0a1f1f;
+  --main-color: #eafcfb;
+  --sidebar-background-color: #05403f;
+  --sidebar-background-color-hover: #0b4f4e;
+  --sidebar-border-color: #1d4a49;
+  --sidebar-link-color: #bff3f3;
+  --sidebar-current-link-background-color: #0b4f4e;
+  --link-color: #7fe0e0;
+  --mod-link-color: #7fe0e0;
+  --headings-border-bottom-color: #1d4a49;
+  --border-color: #1d4a49;
+  --code-block-background-color: #163636;
+  --search-input-focused-border-color: #7fe0e0;
+}
+
+/* rustdoc's current item: a sunken white row with navy text, so the navy
+   selected row stays the site menu's "Rust API reference". */
+.sidebar .current {
+  background: var(--r-hi);
+  box-shadow: var(--bevel-in);
+}
+:root[data-theme="dark"] .sidebar .current,
+:root[data-theme="ayu"] .sidebar .current {
+  background: #0a1f1f;
+}
+.sidebar .current,
+.sidebar .current a {
+  color: var(--sidebar-link-color);
+  font-weight: 700;
+}
+
+/* ---- The title bar: Starlight's header -------------------------------- */
+
+/* The bar takes a row of its own above rustdoc's sidebar and page. */
+.rustdoc {
+  flex-wrap: wrap;
+}
+.rustdoc > main {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.vc-header {
+  flex: 0 0 100%;
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  height: var(--vc-bar-height);
+  padding: 0.75rem 1.5rem;
+  box-sizing: border-box;
+  background: var(--r-title);
+  color: var(--r-title-fg);
+  font-family: var(--r-font);
+}
+.vc-header .vc-bar {
+  flex: 1;
+  justify-content: space-between;
+}
+.vc-header a:focus-visible,
+rustdoc-topbar .vc-bar-title:focus-visible,
+rustdoc-topbar .vc-bar-links a:focus-visible {
+  outline: 2px solid #ffc94a;
+  outline-offset: 1px;
+}
+.vc-site-menu a:focus-visible,
+.vc-site-menu summary:focus-visible {
+  outline: 2px solid var(--r-title);
+  outline-offset: 1px;
+}
+
+/* ---- The side menu: Starlight's, as the game's Tools panel ------------- */
+
+/* Before the script moves it into the sidebar (or with scripts off), the
+   menu waits off screen; the title bar still links home. */
+.rustdoc > .vc-site-menu {
+  display: none;
+}
+.sidebar {
+  top: var(--vc-bar-height);
+  height: calc(100vh - var(--vc-bar-height));
+  border-right: 2px solid var(--r-shadow);
+}
+.vc-site-menu {
+  padding: 1rem 1rem 0.75rem 1.5rem;
+  border-bottom: 2px solid var(--sidebar-border-color);
+  font-family: var(--r-font);
+  font-size: 1rem;
+}
+.vc-site-menu ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.vc-site-menu li {
+  margin: 0;
+}
+.vc-site-menu a {
+  display: block;
+  padding: 0.3em 0.75em;
+  color: var(--main-color);
+  text-decoration: none;
+}
+.sidebar .vc-site-menu a:hover {
+  background: var(--sidebar-background-color-hover);
+}
+.vc-site-menu .vc-top > a {
+  padding-inline: 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+.vc-site-menu details {
+  margin: 0.5rem 0;
+}
+/* Group labels as the Tools panel draws them: small, uppercase, spaced. */
+.vc-site-menu summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.3em 0;
+  cursor: pointer;
+  list-style: none;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--sidebar-link-color);
+}
+.vc-site-menu summary::-webkit-details-marker {
+  display: none;
+}
+.vc-site-menu summary::after {
+  content: "";
+  width: 0.45em;
+  height: 0.45em;
+  margin-inline-end: 0.5rem;
+  border: solid currentColor;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+.vc-site-menu details:not([open]) summary::after {
+  transform: rotate(-45deg);
+}
+.vc-site-menu details ul {
+  margin-inline-start: 0.1rem;
+  border-inline-start: 1px solid var(--sidebar-border-color);
+}
+.vc-site-menu details a {
+  margin-inline-start: 0.75rem;
+}
+/* The current page is the selected row: navy, white text, square. */
+.sidebar .vc-site-menu a[aria-current="page"],
+.sidebar .vc-site-menu a[aria-current="page"]:hover {
+  background: var(--r-title);
+  color: var(--r-title-fg);
+  font-weight: 600;
+}
+
+/* A source page pins rustdoc's file-list button to the window's top left,
+   which is the title bar's logo here, so it sits just below the bar. */
+.src #sidebar-button {
+  top: calc(var(--vc-bar-height) + 8px);
+}
+
+/* GitHub closes the menu only where the title bar hides it (title-bar.css,
+   below Starlight's 50rem), which includes widths where rustdoc still shows
+   its desktop sidebar. */
+.vc-menu-github {
+  display: none;
+}
+@media (max-width: 49.99rem) {
+  .vc-menu-github {
+    display: block;
+  }
+}
+
+@media (max-width: 700px) {
+  :root {
+    --vc-bar-height: 3.5rem;
+    --topbar-height: var(--vc-bar-height);
+  }
+  .vc-header {
+    padding-inline: 1rem;
+  }
+  rustdoc-topbar {
+    top: var(--vc-bar-height);
+  }
+
+  /* One bar: once the script has copied the title and the links into
+     rustdoc's top bar (rustdoc-chrome.mjs), that bar is the navy title bar,
+     holding the site's title, the game button, rustdoc's settings and help,
+     and the one menu button at its right, where Starlight puts its own. The
+     crate's name it showed is the page's own heading just below. With
+     rustdoc's "hide sidebar" setting on, rustdoc hides its top bar, so the
+     title bar stays. */
+  .vc-one-bar:not(.hide-sidebar) .vc-header {
+    display: none;
+  }
+  .vc-one-bar rustdoc-topbar {
+    top: 0;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0 1rem;
+    box-sizing: border-box;
+    background: var(--r-title);
+    color: var(--r-title-fg);
+  }
+  .vc-one-bar rustdoc-topbar > h2 {
+    display: none;
+  }
+  .vc-one-bar rustdoc-topbar .vc-bar-title {
+    flex: 1 1 auto;
+    font-size: 1.125rem;
+  }
+  .vc-one-bar rustdoc-topbar .vc-bar-title img {
+    height: 2rem;
+  }
+  .vc-one-bar rustdoc-topbar .settings-menu,
+  .vc-one-bar rustdoc-topbar .help-menu {
+    order: 1;
+  }
+  .vc-one-bar rustdoc-topbar .settings-menu > a,
+  .vc-one-bar rustdoc-topbar .help-menu > a {
+    width: 2rem;
+    height: 2rem;
+  }
+  .vc-one-bar rustdoc-topbar .settings-menu > a::before,
+  .vc-one-bar rustdoc-topbar .help-menu > a::before {
+    margin: 0;
+    filter: invert(1);
+  }
+  .vc-one-bar rustdoc-topbar .settings-menu > a:hover,
+  .vc-one-bar rustdoc-topbar .help-menu > a:hover {
+    background: transparent;
+  }
+  /* rustdoc's menu button as Starlight's: the game's bevelled gray button. */
+  .vc-one-bar rustdoc-topbar .sidebar-menu-toggle {
+    order: 2;
+    flex: none;
+    width: 2rem;
+    min-width: 2rem;
+    height: 2rem;
+    padding: 0;
+    background: var(--r-face);
+    box-shadow: var(--bevel-out);
+  }
+  /* Three ink bars, the size of Starlight's menu icon. */
+  .vc-one-bar rustdoc-topbar .sidebar-menu-toggle::before {
+    content: "";
+    display: block;
+    width: 1rem;
+    height: 2px;
+    margin: auto;
+    background: var(--r-ink);
+    box-shadow: 0 -5px 0 var(--r-ink), 0 5px 0 var(--r-ink);
+    filter: none;
+    opacity: 1;
+  }
+  .vc-one-bar rustdoc-topbar .sidebar-menu-toggle:active {
+    box-shadow: var(--bevel-in);
+  }
+}
+</style>
+
+</head><body class="rustdoc struct"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><header class="vc-header"><div class="vc-bar"><a class="vc-bar-title" href="/"><img src="/favicon.png" alt="" width="40" height="40"><span class="vc-name" translate="no"><span class="vc-full">Verticopolis engine</span><span class="vc-short" aria-hidden="true">Engine docs</span></span></a><div class="vc-bar-links"><a class="vc-bar-game" href="https://verticopolis.com/" data-game-link><span class="vc-full">Play the game</span><span class="vc-short" aria-hidden="true">Play</span></a><a class="vc-bar-github" href="https://github.com/maniator/verticopolis"><span class="vc-sr-only">GitHub</span><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M12 .3a12 12 0 0 0-3.8 23.38c.6.12.83-.26.83-.57L9 21.07c-3.34.72-4.04-1.61-4.04-1.61-.55-1.39-1.34-1.76-1.34-1.76-1.08-.74.09-.73.09-.73 1.2.09 1.83 1.24 1.83 1.24 1.08 1.83 2.81 1.3 3.5 1 .1-.78.42-1.31.76-1.61-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.14-.3-.54-1.52.1-3.18 0 0 1-.32 3.3 1.23a11.5 11.5 0 0 1 6 0c2.28-1.55 3.29-1.23 3.29-1.23.64 1.66.24 2.88.12 3.18a4.65 4.65 0 0 1 1.23 3.22c0 4.61-2.8 5.63-5.48 5.92.42.36.81 1.1.81 2.22l-.01 3.29c0 .31.2.69.82.57A12 12 0 0 0 12 .3Z"/></svg></a></div></div></header>
+<nav class="vc-site-menu" aria-label="Docs"><ul><li class="vc-top"><a href="/">Overview</a></li><li><details open><summary>Guides</summary><ul><li><a href="/javascript/">JavaScript package</a></li><li><a href="/crate/">Rust crate</a></li><li><a href="/api/">Host API guide</a></li><li><a href="/conformance/">Conformance suite</a></li></ul></details></li><li><details open><summary>Reference</summary><ul><li><a href="/rust/verticopolis_engine/" aria-current="page">Rust API reference</a></li><li><a href="/changelog/">Engine changelog</a></li></ul></details></li><li class="vc-top"><a href="https://verticopolis.com/">Play Verticopolis</a></li><li class="vc-top vc-menu-github"><a href="https://github.com/maniator/verticopolis">GitHub</a></li></ul></nav>
+
+<rustdoc-topbar><h2><a href="#">Simulation</a></h2></rustdoc-topbar><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../../verticopolis_engine/index.html">verticopolis_<wbr>engine</a><span class="version">1.35.1</span></h2></div><div class="sidebar-elems"><section id="rustdoc-toc"><h2 class="location"><a href="#">Simulation</a></h2><h3><a href="#fields">Fields</a></h3><ul class="block structfield"><li><a href="#structfield.auto_bridge" title="auto_bridge">auto_bridge</a></li><li><a href="#structfield.clock" title="clock">clock</a></li><li><a href="#structfield.crowd" title="crowd">crowd</a></li><li><a href="#structfield.events" title="events">events</a></li><li><a href="#structfield.founder" title="founder">founder</a></li><li><a href="#structfield.gameplay" title="gameplay">gameplay</a></li><li><a href="#structfield.log" title="log">log</a></li><li><a href="#structfield.milestones" title="milestones">milestones</a></li><li><a href="#structfield.mode" title="mode">mode</a></li><li><a href="#structfield.modern_calendar" title="modern_calendar">modern_calendar</a></li><li><a href="#structfield.money" title="money">money</a></li><li><a href="#structfield.star" title="star">star</a></li><li><a href="#structfield.tower" title="tower">tower</a></li></ul><h3><a href="#implementations">Associated Functions</a></h3><ul class="block method"><li><a href="#method.new_game" title="new_game">new_game</a></li><li><a href="#method.new_game_with" title="new_game_with">new_game_with</a></li></ul><h3><a href="#implementations">Methods</a></h3><ul class="block method"><li><a href="#method.add_car" title="add_car">add_car</a></li><li><a href="#method.adjust_rent" title="adjust_rent">adjust_rent</a></li><li><a href="#method.apply_rent_batch" title="apply_rent_batch">apply_rent_batch</a></li><li><a href="#method.begin_extend" title="begin_extend">begin_extend</a></li><li><a href="#method.book_film" title="book_film">book_film</a></li><li><a href="#method.build" title="build">build</a></li><li><a href="#method.build_transport" title="build_transport">build_transport</a></li><li><a href="#method.can_build" title="can_build">can_build</a></li><li><a href="#method.can_build_transport" title="can_build_transport">can_build_transport</a></li><li><a href="#method.change_film" title="change_film">change_film</a></li><li><a href="#method.edit_clear_stops" title="edit_clear_stops">edit_clear_stops</a></li><li><a href="#method.edit_express_stops" title="edit_express_stops">edit_express_stops</a></li><li><a href="#method.edit_refusal" title="edit_refusal">edit_refusal</a></li><li><a href="#method.edit_schedule" title="edit_schedule">edit_schedule</a></li><li><a href="#method.edit_stop" title="edit_stop">edit_stop</a></li><li><a href="#method.end_extend" title="end_extend">end_extend</a></li><li><a href="#method.extend_transport" title="extend_transport">extend_transport</a></li><li><a href="#method.lobby_rise_at" title="lobby_rise_at">lobby_rise_at</a></li><li><a href="#method.paint_brush" title="paint_brush">paint_brush</a></li><li><a href="#method.population" title="population">population</a></li><li><a href="#method.price_unit" title="price_unit">price_unit</a></li><li><a href="#method.rebook_spent_films" title="rebook_spent_films">rebook_spent_films</a></li><li><a href="#method.remove_car" title="remove_car">remove_car</a></li><li><a href="#method.remove_facility" title="remove_facility">remove_facility</a></li><li><a href="#method.resolve_choice" title="resolve_choice">resolve_choice</a></li><li><a href="#method.sell_at" title="sell_at">sell_at</a></li><li><a href="#method.serialize" title="serialize">serialize</a></li><li><a href="#method.set_film_policy" title="set_film_policy">set_film_policy</a></li><li><a href="#method.set_lobby_height" title="set_lobby_height">set_lobby_height</a></li><li><a href="#method.set_no_rate" title="set_no_rate">set_no_rate</a></li><li><a href="#method.set_screen_policy" title="set_screen_policy">set_screen_policy</a></li><li><a href="#method.set_ticket_price" title="set_ticket_price">set_ticket_price</a></li><li><a href="#method.tick" title="tick">tick</a></li><li><a href="#method.toggle_auto_bridge" title="toggle_auto_bridge">toggle_auto_bridge</a></li><li><a href="#method.tower_signature" title="tower_signature">tower_signature</a></li><li><a href="#method.with_lobby_height" title="with_lobby_height">with_lobby_height</a></li></ul><h3><a href="#trait-implementations">Trait Implementations</a></h3><ul class="block trait-implementation"><li><a href="#impl-StepSim-for-Simulation" title="StepSim">StepSim</a></li></ul><h3><a href="#synthetic-implementations">Auto Trait Implementations</a></h3><ul class="block synthetic-implementation"><li><a href="#impl-Freeze-for-Simulation" title="!Freeze">!Freeze</a></li><li><a href="#impl-RefUnwindSafe-for-Simulation" title="!RefUnwindSafe">!RefUnwindSafe</a></li><li><a href="#impl-Sync-for-Simulation" title="!Sync">!Sync</a></li><li><a href="#impl-Send-for-Simulation" title="Send">Send</a></li><li><a href="#impl-Unpin-for-Simulation" title="Unpin">Unpin</a></li><li><a href="#impl-UnsafeUnpin-for-Simulation" title="UnsafeUnpin">UnsafeUnpin</a></li><li><a href="#impl-UnwindSafe-for-Simulation" title="UnwindSafe">UnwindSafe</a></li></ul><h3><a href="#blanket-implementations">Blanket Implementations</a></h3><ul class="block blanket-implementation"><li><a href="#impl-Any-for-T" title="Any">Any</a></li><li><a href="#impl-Borrow%3CT%3E-for-T" title="Borrow&#60;T&#62;">Borrow&#60;T&#62;</a></li><li><a href="#impl-BorrowMut%3CT%3E-for-T" title="BorrowMut&#60;T&#62;">BorrowMut&#60;T&#62;</a></li><li><a href="#impl-From%3CT%3E-for-T" title="From&#60;T&#62;">From&#60;T&#62;</a></li><li><a href="#impl-Into%3CU%3E-for-T" title="Into&#60;U&#62;">Into&#60;U&#62;</a></li><li><a href="#impl-Same-for-T" title="Same">Same</a></li><li><a href="#impl-TryFrom%3CU%3E-for-T" title="TryFrom&#60;U&#62;">TryFrom&#60;U&#62;</a></li><li><a href="#impl-TryInto%3CU%3E-for-T" title="TryInto&#60;U&#62;">TryInto&#60;U&#62;</a></li></ul></section><div id="rustdoc-modnav"><h2><a href="index.html">In verticopolis_<wbr>engine::<wbr>sim</a></h2></div></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><div class="width-limiter"><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><div class="rustdoc-breadcrumbs"><a href="../index.html">verticopolis_engine</a>::<wbr><a href="index.html">sim</a></div><h1>Struct <span class="struct">Simulation</span>&nbsp;<button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"><a class="src" href="../../src/verticopolis_engine/sim.rs.html#172-298">Source</a> </span></div><pre class="rust item-decl"><code>pub struct Simulation {<details class="toggle type-contents-toggle"><summary class="hideme"><span>Show 13 fields</span></summary>
+    pub mode: <a class="enum" href="../clock/enum.GameMode.html" title="enum verticopolis_engine::clock::GameMode">GameMode</a>,
+    pub modern_calendar: <a class="enum" href="../clock/enum.CalendarKind.html" title="enum verticopolis_engine::clock::CalendarKind">CalendarKind</a>,
+    pub auto_bridge: <a class="primitive" href="https://doc.rust-lang.org/1.97.0/std/primitive.bool.html">bool</a>,
+    pub founder: <a class="primitive" href="https://doc.rust-lang.org/1.97.0/std/primitive.bool.html">bool</a>,
+    pub clock: <a class="struct" href="../clock/struct.Clock.html" title="struct verticopolis_engine::clock::Clock">Clock</a>,
+    pub crowd: Crowd,
+    pub events: <a class="struct" href="../events/struct.EventSystem.html" title="struct verticopolis_engine::events::EventSystem">EventSystem</a>,
+    pub tower: Tower,
+    pub money: <a class="primitive" href="https://doc.rust-lang.org/1.97.0/std/primitive.f64.html">f64</a>,
+    pub star: <a class="primitive" href="https://doc.rust-lang.org/1.97.0/std/primitive.i64.html">i64</a>,
+    pub milestones: <a class="struct" href="https://doc.rust-lang.org/1.97.0/alloc/vec/struct.Vec.html" title="struct alloc::vec::Vec">Vec</a>&lt;<a class="struct" href="https://doc.rust-lang.org/1.97.0/alloc/string/struct.String.html" title="struct alloc::string::String">String</a>&gt;,
+    pub log: <a class="struct" href="https://doc.rust-lang.org/1.97.0/alloc/vec/struct.Vec.html" title="struct alloc::vec::Vec">Vec</a>&lt;<a class="struct" href="struct.LogEntry.html" title="struct verticopolis_engine::sim::LogEntry">LogEntry</a>&gt;,
+    pub gameplay: <a class="struct" href="../gameplay/struct.GameplayEvents.html" title="struct verticopolis_engine::gameplay::GameplayEvents">GameplayEvents</a>,
+    <span class="comment">/* private fields */</span>
+</details>}</code></pre><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>One game of Verticopolis.</p>
+<p>Start one with <a href="struct.Simulation.html#method.new_game" title="associated function verticopolis_engine::sim::Simulation::new_game"><code>Simulation::new_game</code></a>, or load one from a save with
+<a href="../load/fn.deserialize.html" title="fn verticopolis_engine::load::deserialize"><code>crate::load::deserialize</code></a>. Advance it with <a href="struct.Simulation.html#method.tick" title="method verticopolis_engine::sim::Simulation::tick"><code>Simulation::tick</code></a> and
+change it only through its commands (<a href="struct.Simulation.html#method.build" title="method verticopolis_engine::sim::Simulation::build"><code>build</code></a>,
+<a href="struct.Simulation.html#method.add_car" title="method verticopolis_engine::sim::Simulation::add_car"><code>add_car</code></a>, <a href="struct.Simulation.html#method.adjust_rent" title="method verticopolis_engine::sim::Simulation::adjust_rent"><code>adjust_rent</code></a>
+and the rest), which apply the rules, charge the money and refuse what a
+player could not do. The public fields are for reading; writing one skips
+those rules.</p>
+<p>A renderer reads the tower through <a href="../view/index.html" title="mod verticopolis_engine::view"><code>crate::view</code></a> or <a href="../frame/index.html" title="mod verticopolis_engine::frame"><code>crate::frame</code></a>,
+and an analytics or achievements layer drains <a href="struct.Simulation.html#structfield.gameplay" title="field verticopolis_engine::sim::Simulation::gameplay"><code>Simulation::gameplay</code></a>.</p>
+</div></details><h2 id="fields" class="fields section-header">Fields<a href="#fields" class="anchor">§</a></h2><span id="structfield.mode" class="structfield section-header"><a href="#structfield.mode" class="anchor field">§</a><code>mode: <a class="enum" href="../clock/enum.GameMode.html" title="enum verticopolis_engine::clock::GameMode">GameMode</a></code></span><div class="docblock"><p>The game mode, fixed when the game starts.</p>
+</div><span id="structfield.modern_calendar" class="structfield section-header"><a href="#structfield.modern_calendar" class="anchor field">§</a><code>modern_calendar: <a class="enum" href="../clock/enum.CalendarKind.html" title="enum verticopolis_engine::clock::CalendarKind">CalendarKind</a></code></span><div class="docblock"><p>The calendar a Modern game runs on. A Classic game always runs the canon
+calendar.</p>
+</div><span id="structfield.auto_bridge" class="structfield section-header"><a href="#structfield.auto_bridge" class="anchor field">§</a><code>auto_bridge: <a class="primitive" href="https://doc.rust-lang.org/1.97.0/std/primitive.bool.html">bool</a></code></span><div class="docblock"><p>Whether a new floor joins the floor next to it automatically. Only a
+Modern game can turn this off (<a href="struct.Simulation.html#method.toggle_auto_bridge" title="method verticopolis_engine::sim::Simulation::toggle_auto_bridge"><code>Simulation::toggle_auto_bridge</code></a>).</p>
+</div><span id="structfield.founder" class="structfield section-header"><a href="#structfield.founder" class="anchor field">§</a><code>founder: <a class="primitive" href="https://doc.rust-lang.org/1.97.0/std/primitive.bool.html">bool</a></code></span><div class="docblock"><p>Whether the tower was started before saves carried a build stamp. The
+web game shows these towers a founder badge.</p>
+</div><span id="structfield.clock" class="structfield section-header"><a href="#structfield.clock" class="anchor field">§</a><code>clock: <a class="struct" href="../clock/struct.Clock.html" title="struct verticopolis_engine::clock::Clock">Clock</a></code></span><div class="docblock"><p>The game clock: day, hour, minute, quarter and year.</p>
+</div><span id="structfield.crowd" class="structfield section-header"><a href="#structfield.crowd" class="anchor field">§</a><code>crowd: Crowd</code></span><div class="docblock"><p>The people moving through the tower.</p>
+</div><span id="structfield.events" class="structfield section-header"><a href="#structfield.events" class="anchor field">§</a><code>events: <a class="struct" href="../events/struct.EventSystem.html" title="struct verticopolis_engine::events::EventSystem">EventSystem</a></code></span><div class="docblock"><p>Emergencies, and the choice waiting for the player’s answer.</p>
+</div><span id="structfield.tower" class="structfield section-header"><a href="#structfield.tower" class="anchor field">§</a><code>tower: Tower</code></span><div class="docblock"><p>The tower: its floors, rooms and transport. A renderer reads it through
+<a href="../view/index.html" title="mod verticopolis_engine::view"><code>crate::view</code></a> instead of walking it.</p>
+</div><span id="structfield.money" class="structfield section-header"><a href="#structfield.money" class="anchor field">§</a><code>money: <a class="primitive" href="https://doc.rust-lang.org/1.97.0/std/primitive.f64.html">f64</a></code></span><div class="docblock"><p>The player’s money, in dollars. It can go negative.</p>
+</div><span id="structfield.star" class="structfield section-header"><a href="#structfield.star" class="anchor field">§</a><code>star: <a class="primitive" href="https://doc.rust-lang.org/1.97.0/std/primitive.i64.html">i64</a></code></span><div class="docblock"><p>The tower’s rating: 1 to 5 stars, and 6 once it is a TOWER.</p>
+</div><span id="structfield.milestones" class="structfield section-header"><a href="#structfield.milestones" class="anchor field">§</a><code>milestones: <a class="struct" href="https://doc.rust-lang.org/1.97.0/alloc/vec/struct.Vec.html" title="struct alloc::vec::Vec">Vec</a>&lt;<a class="struct" href="https://doc.rust-lang.org/1.97.0/alloc/string/struct.String.html" title="struct alloc::string::String">String</a>&gt;</code></span><div class="docblock"><p>The milestone ids the tower has reached, in the order it reached them.
+The ids are stable across versions.</p>
+</div><span id="structfield.log" class="structfield section-header"><a href="#structfield.log" class="anchor field">§</a><code>log: <a class="struct" href="https://doc.rust-lang.org/1.97.0/alloc/vec/struct.Vec.html" title="struct alloc::vec::Vec">Vec</a>&lt;<a class="struct" href="struct.LogEntry.html" title="struct verticopolis_engine::sim::LogEntry">LogEntry</a>&gt;</code></span><div class="docblock"><p>The recent messages, oldest first, at most <a href="constant.LOG_RING_CAP.html" title="constant verticopolis_engine::sim::LOG_RING_CAP"><code>LOG_RING_CAP</code></a>.
+<a href="../frame/fn.log_since.html" title="fn verticopolis_engine::frame::log_since"><code>crate::frame::log_since</code></a> returns the ones after a sequence number.</p>
+</div><span id="structfield.gameplay" class="structfield section-header"><a href="#structfield.gameplay" class="anchor field">§</a><code>gameplay: <a class="struct" href="../gameplay/struct.GameplayEvents.html" title="struct verticopolis_engine::gameplay::GameplayEvents">GameplayEvents</a></code></span><div class="docblock"><p>The gameplay events since the host last drained them. Call
+<code>sim.gameplay.drain()</code> after each frame. Never saved.</p>
+</div><h2 id="implementations" class="section-header">Implementations<a href="#implementations" class="anchor">§</a></h2><div id="implementations-list"><details class="toggle implementors-toggle" open><summary><section id="impl-Simulation" class="impl"><a class="src rightside" href="../../src/verticopolis_engine/brush.rs.html#39-209">Source</a><a href="#impl-Simulation" class="anchor">§</a><h3 class="code-header">impl <a class="struct" href="struct.Simulation.html" title="struct verticopolis_engine::sim::Simulation">Simulation</a></h3></section></summary><div class="impl-items"><details class="toggle method-toggle" open><summary><section id="method.lobby_rise_at" class="method"><a class="src rightside" href="../../src/verticopolis_engine/brush.rs.html#114-121">Source</a><h4 class="code-header">pub fn <a href="#method.lobby_rise_at" class="fn">lobby_rise_at</a>(&amp;self, floor: <a class="primitive" href="https://doc.rust-lang.org/1.97.0/std/primitive.i64.html">i64</a>, x: <a class="primitive" href="https://doc.rust-lang.org/1.97.0/std/primitive.i64.html">i64</a>) -&gt; <a class="primitive" href="https://doc.rust-lang.org/1.97.0/std/primitive.i64.html">i64</a></h4></section></summary><div class="docblock"><p>How many stories a lobby tile laid at <code>(floor, x)</code> now rises, with
+the bridge the engine would lay for it when bridging is on: what
+<a href="struct.Simulation.html#method.can_build" title="method verticopolis_engine::sim::Simulation::can_build"><code>Self::can_build</code></a> prices it at, and what <code>lobbyRise</code> reports.</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="method.with_lobby_height" class="method"><a class="src rightside" href="../../src/verticopolis_engine/brush.rs.html#141-151">Source</a><h4 class="code-header">pub fn <a href="#method.with_lobby_height" class="fn">with_lobby_height</a>&lt;T&gt;(
+    &amp;mut self,
+    height: <a class="primitive" href="https://doc.rust-lang.org/1.97.0/std/primitive.i64.html">i64</a>,
+    run: impl <a class="trait" href="https://doc.rust-lang.org/1.97.0/core/ops/function/trait.FnOnce.html" title="trait core::ops::function::FnOnce">FnOnce</a>(&amp;mut <a class="struct" href="struct.Simulation.html" title="struct verticopolis_engine::sim::Simulation">Simulation</a>) -&gt; T,
+) -&gt; T</h4></section></summary><div class="docblock"><p>Runs <code>run</code> with <code>height</code> as the height a floor’s first lobby
+placement asks for (#308), so a lobby built, quoted or brushed inside
+it on a floor that holds no lobby yet rises that many stories, where
+the mode lets that floor’s lobby rise. A floor that holds a lobby
+keeps its height whatever is asked. Outside it, a first lobby is one
+story. The height is clamped to 1 through
+<a href="../facilities/constant.MAX_LOBBY_HEIGHT.html" title="constant verticopolis_engine::facilities::MAX_LOBBY_HEIGHT"><code>MAX_LOBBY_HEIGHT</code></a>.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>verticopolis_engine::clock::GameMode;
+<span class="kw">use </span>verticopolis_engine::facilities::Kind;
+<span class="kw">use </span>verticopolis_engine::sim::Simulation;
+
+<span class="kw">let </span><span class="kw-2">mut </span>sim = Simulation::new_game(<span class="number">1</span>, GameMode::Classic);
+<span class="kw">let </span>tiles: Vec&lt;i64&gt; = (<span class="number">100</span>..<span class="number">104</span>).collect();
+sim.with_lobby_height(<span class="number">2</span>, |sim| sim.paint_brush(Kind::Lobby, <span class="number">1</span>, <span class="kw-2">&amp;</span>tiles));
+<span class="macro">assert_eq!</span>(sim.tower.lobby_height(<span class="number">1</span>), <span class="number">2</span>);</code></pre></div></div></details><details class="toggle method-toggle" open><summary><section id="method.set_lobby_height" class="method"><a class="src rightside" href="../../src/verticopolis_engine/brush.rs.html#158-160">Source</a><h4 class="code-header">pub fn <a href="#method.set_lobby_height" class="fn">set_lobby_height</a>(&amp;mut self, height: <a class="primitive" href="https://doc.rust-lang.org/1.97.0/std/primitive.i64.html">i64</a>)</h4></section></summary><div class="docblock"><p>Sets the height a floor’s first lobby placement asks for until it is
+set again, as a frontend’s lobby tool holds its choice between
+clicks; <a href="struct.Simulation.html#method.with_lobby_height" title="method verticopolis_engine::sim::Simulation::with_lobby_height"><code>Self::with_lobby_height</code></a> is the scoped form. Clamped to 1
+through <a href="../facilities/constant.MAX_LOBBY_HEIGHT.html" title="constant verticopolis_engine::facilities::MAX_LOBBY_HEIGHT"><code>MAX_LOBBY_HEIGHT</code></a>.
+Tool state only: never saved, and a loaded tower starts at 1.</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="method.paint_brush" class="method"><a class="src rightside" href="../../src/verticopolis_engine/brush.rs.html#182-208">Source</a><h4 class="code-header">pub fn <a href="#method.paint_brush" class="fn">paint_brush</a>(
+    &amp;mut self,
+    kind: <a class="enum" href="../facilities/enum.Kind.html" title="enum verticopolis_engine::facilities::Kind">Kind</a>,
+    floor: <a class="primitive" href="https://doc.rust-lang.org/1.97.0/std/primitive.i64.html">i64</a>,
+    tiles: &amp;[<a class="primitive" href="https://doc.rust-lang.org/1.97.0/std/primitive.i64.html">i64</a>],
+) -&gt; <a class="struct" href="../brush/struct.BrushResult.html" title="struct verticopolis_engine::brush::BrushResult">BrushResult</a></h4></section></summary><div class="docblock"><p>Lays <code>kind</code> (floor or lobby) on each tile column in <code>tiles</code> on
+<code>floor</code>, charging as that many <a href="struct.Simulation.html#method.build" title="method verticopolis_engine::sim::Simulation::build"><code>build</code></a> calls
+would, in one command. It skips a tile that already carries <code>kind</code>,
+and tries a refused tile again once a neighbor it needed is laid, so
+the order of <code>tiles</code> does not matter.</p>
+<p>A lobby brush also turns plain floor into lobby (a sky lobby). Any
+other kind, or more than <a href="../brush/constant.BRUSH_TILE_LIMIT.html" title="constant verticopolis_engine::brush::BRUSH_TILE_LIMIT"><code>BRUSH_TILE_LIMIT</code></a> tiles, lays nothing and
+answers <code>INVALID_REQUEST</code>.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>verticopolis_engine::clock::GameMode;
+<span class="kw">use </span>verticopolis_engine::facilities::Kind;
+<span class="kw">use </span>verticopolis_engine::sim::Simulation;
+
+<span class="kw">let </span><span class="kw-2">mut </span>sim = Simulation::new_game(<span class="number">1</span>, GameMode::Classic);
+<span class="kw">let </span>tiles: Vec&lt;i64&gt; = (<span class="number">100</span>..<span class="number">124</span>).collect();
+<span class="kw">let </span>laid = sim.paint_brush(Kind::Lobby, <span class="number">1</span>, <span class="kw-2">&amp;</span>tiles);
+<span class="macro">assert_eq!</span>(laid.placed, <span class="number">24</span>);</code></pre></div></div></details></div></details><details class="toggle implementors-toggle" open><summary><section id="impl-Simulation-1" class="impl"><a class="src rightside" href="../../src/verticopolis_engine/build.rs.html#92-487">Source</a><a href="#impl-Simulation-1" class="anchor">§</a><h3 class="code-header">impl <a class="struct" href="struct.Simulation.html" title="struct verticopolis_engine::sim::Simulation">Simulation</a></h3></section></summary><div class="impl-items"><details class="toggle method-toggle" open><summary><section id="method.toggle_auto_bridge" class="method"><a class="src rightside" href="../../src/verticopolis_engine/build.rs.html#96-101">Source</a><h4 class="code-header">pub fn <a href="#method.toggle_auto_bridge" class="fn">toggle_auto_bridge</a>(&amp;mut self) -&gt; <a class="primitive" href="https://doc.rust-lang.org/1.97.0/std/primitive.bool.html">bool</a></h4></section></summary><div class="docblock"><p>Turns automatic floor bridging off or on, and returns the new setting.
+Only a Modern game can turn it off; a Classic game always bridges and
+this returns <code>true</code>.</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="method.can_build" class="method"><a class="src rightside" href="../../src/verticopolis_engine/build.rs.html#135-254">Source</a><h4 class="code-header">pub fn <a href="#method.can_build" class="fn">can_build</a>(&amp;self, kind: <a class="enum" href="../facilities/enum.Kind.html" title="enum verticopolis_engine::facilities::Kind">Kind</a>, floor: <a class="primitive" href="https://doc.rust-lang.org/1.97.0/std/primitive.i64.html">i64</a>, x: <a class="primitive" href="https://doc.rust-lang.org/1.97.0/std/primitive.i64.html">i64</a>) -&gt; <a class="struct" href="../build/struct.CanBuild.html" title="struct verticopolis_engine::build::CanBuild">CanBuild</a></h4></section></summary><div class="docblock"><p>The dry run <a href="struct.Simulation.html#method.build" title="method verticopolis_engine::sim::Simulation::build"><code>build</code></a> makes first: whether a
+<code>kind</code> at <code>(floor, x)</code> would be placed, why not, and its full price.
+Changes nothing.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>verticopolis_engine::clock::GameMode;
+<span class="kw">use </span>verticopolis_engine::facilities::Kind;
+<span class="kw">use </span>verticopolis_engine::sim::Simulation;
+
+<span class="kw">let </span>sim = Simulation::new_game(<span class="number">1</span>, GameMode::Classic);
+<span class="kw">let </span>quote = sim.can_build(Kind::Lobby, <span class="number">1</span>, <span class="number">100</span>);
+<span class="macro">assert!</span>(quote.ok);
+<span class="macro">assert!</span>(quote.cost &gt; <span class="number">0.0</span>);</code></pre></div></div></details><details class="toggle method-toggle" open><summary><section id="method.build" class="method"><a class="src rightside" href="../../src/verticopolis_engine/build.rs.html#278-383">Source</a><h4 class="code-header">pub fn <a href="#method.build" class="fn">build</a>(&amp;mut self, kind: <a class="enum" href="../facilities/enum.Kind.html" title="enum verticopolis_engine::facilities::Kind">Kind</a>, floor: <a class="primitive" href="https://doc.rust-lang.org/1.97.0/std/primitive.i64.html">i64</a>, x: <a class="primitive" href="https://doc.rust-lang.org/1.97.0/std/primitive.i64.html">i64</a>) -&gt; <a class="struct" href="../build/struct.BuildResult.html" title="struct verticopolis_engine::build::BuildResult">BuildResult</a></h4></section></summary><div class="docblock"><p>Places a floor tile, a lobby tile or a room with its left edge at
+tile <code>x</code> and its bottom on <code>floor</code>, and charges for it.</p>
+<p>A room needs a floor under each of its tiles or bridges the gap when
+<a href="struct.Simulation.html#structfield.auto_bridge" title="field verticopolis_engine::sim::Simulation::auto_bridge"><code>auto_bridge</code></a> is on, paying for the floor it
+lays. Floors and lobbies are laid one tile at a time; to lay a run, call
+<a href="struct.Simulation.html#method.paint_brush" title="method verticopolis_engine::sim::Simulation::paint_brush"><code>paint_brush</code></a>. A refused build changes
+nothing. Floor 1 is the ground floor and basements are 0 and below.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>verticopolis_engine::clock::GameMode;
+<span class="kw">use </span>verticopolis_engine::facilities::Kind;
+<span class="kw">use </span>verticopolis_engine::sim::Simulation;
+
+<span class="kw">let </span><span class="kw-2">mut </span>sim = Simulation::new_game(<span class="number">1</span>, GameMode::Classic);
+<span class="macro">assert!</span>(sim.build(Kind::Lobby, <span class="number">1</span>, <span class="number">100</span>).ok);
+
+<span class="comment">// Offices open at one star, but not on a bare lot five floors up.
+</span><span class="kw">let </span>refused = sim.build(Kind::Office, <span class="number">5</span>, <span class="number">300</span>);
+<span class="macro">assert!</span>(!refused.ok);
+<span class="macro">println!</span>(<span class="string">"{}"</span>, refused.reason.unwrap());</code></pre></div></div></details><details class="toggle method-toggle" open><summary><section id="method.can_build_transport" class="method"><a class="src rightside" href="../../src/verticopolis_engine/build.rs.html#394-435">Source</a><h4 class="code-header">pub fn <a href="#method.can_build_transport" class="fn">can_build_transport</a>(
+    &amp;self,
+    kind: <a class="enum" href="../facilities/enum.Kind.html" title="enum verticopolis_engine::facilities::Kind">Kind</a>,
+    x: <a class="primitive" href="https://doc.rust-lang.org/1.97.0/std/primitive.i64.html">i64</a>,
+    bottom: <a class="primitive" href="https://doc.rust-lang.org/1.97.0/std/primitive.i64.html">i64</a>,
+    top: <a class="primitive" href="https://doc.rust-lang.org/1.97.0/std/primitive.i64.html">i64</a>,
+) -&gt; <a class="struct" href="../build/struct.CanBuild.html" title="struct verticopolis_engine::build::CanBuild">CanBuild</a></h4></section></summary><div class="docblock"><p>The dry run <a href="struct.Simulation.html#method.build_transport" title="method verticopolis_engine::sim::Simulation::build_transport"><code>build_transport</code></a> makes
+first: whether a shaft of <code>kind</code> at <code>x</code> spanning <code>bottom..=top</code> would
+be placed, why not, and its full price. Changes nothing.</p>
+<p>An elevator costs the catalog <code>cost</code> plus <code>transportFloorCost</code> for
+each floor past its first; stairs and escalators cost the catalog
+<code>cost</code>. Refusals come in the build’s order: not unlocked yet, then
+money, then placement. The price is only a shaft’s price for a
+transport kind with <code>top</code> above <code>bottom</code>; anything else is refused.</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="method.build_transport" class="method"><a class="src rightside" href="../../src/verticopolis_engine/build.rs.html#460-486">Source</a><h4 class="code-header">pub fn <a href="#method.build_transport" class="fn">build_transport</a>(
+    &amp;mut self,
+    kind: <a class="enum" href="../facilities/enum.Kind.html" title="enum verticopolis_engine::facilities::Kind">Kind</a>,
+    x: <a class="primitive" href="https://doc.rust-lang.org/1.97.0/std/primitive.i64.html">i64</a>,
+    bottom: <a class="primitive" href="https://doc.rust-lang.org/1.97.0/std/primitive.i64.html">i64</a>,
+    top: <a class="primitive" href="https://doc.rust-lang.org/1.97.0/std/primitive.i64.html">i64</a>,
+) -&gt; <a class="struct" href="../build/struct.BuildResult.html" title="struct verticopolis_engine::build::BuildResult">BuildResult</a></h4></section></summary><div class="docblock"><p>Places an elevator, stairs or an escalator with its left edge at tile
+<code>x</code>, serving floors <code>bottom</code> to <code>top</code>, and charges for it. A new
+elevator starts with one car for every six floors it serves, up to its
+kind’s limit; <a href="struct.Simulation.html#method.add_car" title="method verticopolis_engine::sim::Simulation::add_car"><code>add_car</code></a> adds more. Stairs and
+escalators span exactly two floors.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>verticopolis_engine::clock::GameMode;
+<span class="kw">use </span>verticopolis_engine::facilities::Kind;
+<span class="kw">use </span>verticopolis_engine::sim::Simulation;
+
+<span class="kw">let </span><span class="kw-2">mut </span>sim = Simulation::new_game(<span class="number">1</span>, GameMode::Classic);
+<span class="kw">for </span>x <span class="kw">in </span><span class="number">100</span>..<span class="number">124 </span>{
+    sim.build(Kind::Lobby, <span class="number">1</span>, x);
+}
+<span class="kw">for </span>floor <span class="kw">in </span><span class="number">2</span>..=<span class="number">4 </span>{
+    <span class="kw">for </span>x <span class="kw">in </span><span class="number">100</span>..<span class="number">124 </span>{
+        sim.build(Kind::Floor, floor, x);
+    }
+}
+<span class="kw">let </span>shaft = sim.build_transport(Kind::ElevatorStandard, <span class="number">110</span>, <span class="number">1</span>, <span class="number">4</span>);
+<span class="macro">assert!</span>(shaft.ok, <span class="string">"{:?}"</span>, shaft.reason);</code></pre></div></div></details></div></details><details class="toggle implementors-toggle" open><summary><section id="impl-Simulation-2" class="impl"><a class="src rightside" href="../../src/verticopolis_engine/charges.rs.html#179-481">Source</a><a href="#impl-Simulation-2" class="anchor">§</a><h3 class="code-header">impl <a class="struct" href="struct.Simulation.html" title="struct verticopolis_engine::sim::Simulation">Simulation</a></h3></section></summary><div class="impl-items"><details class="toggle method-toggle" open><summary><section id="method.add_car" class="method"><a class="src rightside" href="../../src/verticopolis_engine/charges.rs.html#195-215">Source</a><h4 class="code-header">pub fn <a href="#method.add_car" class="fn">add_car</a>(&amp;mut self, id: <a class="primitive" href="https://doc.rust-lang.org/1.97.0/std/primitive.i64.html">i64</a>) -&gt; <a class="struct" href="../charges/struct.ChargeResult.html" title="struct verticopolis_engine::charges::ChargeResult">ChargeResult</a></h4></section></summary><div class="docblock"><p>Buys one more car for elevator <code>id</code> at <a href="../charges/constant.ADD_CAR_COST.html" title="constant verticopolis_engine::charges::ADD_CAR_COST"><code>ADD_CAR_COST</code></a>. Refused at the
+elevator’s car limit, when the money is short and during a bomb
+search (<a href="struct.Simulation.html#method.edit_refusal" title="method verticopolis_engine::sim::Simulation::edit_refusal"><code>edit_refusal</code></a>).</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="method.remove_car" class="method"><a class="src rightside" href="../../src/verticopolis_engine/charges.rs.html#219-234">Source</a><h4 class="code-header">pub fn <a href="#method.remove_car" class="fn">remove_car</a>(&amp;mut self, id: <a class="primitive" href="https://doc.rust-lang.org/1.97.0/std/primitive.i64.html">i64</a>) -&gt; <a class="struct" href="../charges/struct.ChargeResult.html" title="struct verticopolis_engine::charges::ChargeResult">ChargeResult</a></h4></section></summary><div class="docblock"><p>Sells one car of elevator <code>id</code> back for half of <a href="../charges/constant.ADD_CAR_COST.html" title="constant verticopolis_engine::charges::ADD_CAR_COST"><code>ADD_CAR_COST</code></a>.
+Refused on the last car and during a bomb search.</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="method.begin_extend" class="method"><a class="src rightside" href="../../src/verticopolis_engine/charges.rs.html#241-250">Source</a><h4 class="code-header">pub fn <a href="#method.begin_extend" class="fn">begin_extend</a>(&amp;mut self, id: <a class="primitive" href="https://doc.rust-lang.org/1.97.0/std/primitive.i64.html">i64</a>) -&gt; <a class="primitive" href="https://doc.rust-lang.org/1.97.0/std/primitive.bool.html">bool</a></h4></section></summary><div class="docblock"><p>Starts a drag that stretches elevator <code>id</code>. Until
+<a href="struct.Simulation.html#method.end_extend" title="method verticopolis_engine::sim::Simulation::end_extend"><code>end_extend</code></a>, the
+<a href="struct.Simulation.html#method.extend_transport" title="method verticopolis_engine::sim::Simulation::extend_transport"><code>extend_transport</code></a> calls bill each floor
+once, however far the player drags back and forth. Returns <code>false</code>
+when <code>id</code> is not an elevator.</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="method.end_extend" class="method"><a class="src rightside" href="../../src/verticopolis_engine/charges.rs.html#265-267">Source</a><h4 class="code-header">pub fn <a href="#method.end_extend" class="fn">end_extend</a>(&amp;mut self)</h4></section></summary><div class="docblock"><p>Ends the drag <a href="struct.Simulation.html#method.begin_extend" title="method verticopolis_engine::sim::Simulation::begin_extend"><code>begin_extend</code></a> started.</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="method.extend_transport" class="method"><a class="src rightside" href="../../src/verticopolis_engine/charges.rs.html#295-366">Source</a><h4 class="code-header">pub fn <a href="#method.extend_transport" class="fn">extend_transport</a>(
+    &amp;mut self,
+    id: <a class="primitive" href="https://doc.rust-lang.org/1.97.0/std/primitive.i64.html">i64</a>,
+    end: <a class="enum" href="../charges/enum.ExtendEnd.html" title="enum verticopolis_engine::charges::ExtendEnd">ExtendEnd</a>,
+    target_floor: <a class="primitive" href="https://doc.rust-lang.org/1.97.0/std/primitive.i64.html">i64</a>,
+) -&gt; <a class="struct" href="../charges/struct.ExtendResult.html" title="struct verticopolis_engine::charges::ExtendResult">ExtendResult</a></h4></section></summary><div class="docblock"><p>Moves one end of elevator <code>id</code> toward <code>target_floor</code>, charging
+<a href="../charges/constant.TRANSPORT_FLOOR_COST.html" title="constant verticopolis_engine::charges::TRANSPORT_FLOOR_COST"><code>TRANSPORT_FLOOR_COST</code></a> for each new floor. It grows only as far as
+the money pays for. During a drag, a floor already paid for is not
+billed again.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>verticopolis_engine::charges::ExtendEnd;
+<span class="kw">use </span>verticopolis_engine::clock::GameMode;
+<span class="kw">use </span>verticopolis_engine::facilities::Kind;
+<span class="kw">use </span>verticopolis_engine::sim::Simulation;
+
+<span class="kw">let </span><span class="kw-2">mut </span>sim = Simulation::new_game(<span class="number">1</span>, GameMode::Classic);
+<span class="kw">for </span>floor <span class="kw">in </span><span class="number">1</span>..=<span class="number">6 </span>{
+    <span class="kw">let </span>kind = <span class="kw">if </span>floor == <span class="number">1 </span>{ Kind::Lobby } <span class="kw">else </span>{ Kind::Floor };
+    <span class="kw">for </span>x <span class="kw">in </span><span class="number">100</span>..<span class="number">124 </span>{
+        sim.build(kind, floor, x);
+    }
+}
+sim.build_transport(Kind::ElevatorStandard, <span class="number">110</span>, <span class="number">1</span>, <span class="number">3</span>);
+<span class="kw">let </span>id = sim.tower.transports[<span class="number">0</span>].id;
+
+sim.begin_extend(id);
+<span class="kw">let </span>grown = sim.extend_transport(id, ExtendEnd::Up, <span class="number">6</span>);
+sim.end_extend();
+<span class="macro">assert_eq!</span>((grown.bottom, grown.top, grown.added), (<span class="number">1</span>, <span class="number">6</span>, <span class="number">3</span>));</code></pre></div></div></details><details class="toggle method-toggle" open><summary><section id="method.sell_at" class="method"><a class="src rightside" href="../../src/verticopolis_engine/charges.rs.html#372-382">Source</a><h4 class="code-header">pub fn <a href="#method.sell_at" class="fn">sell_at</a>(&amp;mut self, floor: <a class="primitive" href="https://doc.rust-lang.org/1.97.0/std/primitive.i64.html">i64</a>, x: <a class="primitive" href="https://doc.rust-lang.org/1.97.0/std/primitive.i64.html">i64</a>) -&gt; <a class="primitive" href="https://doc.rust-lang.org/1.97.0/std/primitive.bool.html">bool</a></h4></section></summary><div class="docblock"><p>Sells whatever stands at a tile: a room first, then a shaft, then the
+floor or lobby tile. Returns whether anything was sold. The refund and
+the refusals are <a href="struct.Simulation.html#method.remove_facility" title="method verticopolis_engine::sim::Simulation::remove_facility"><code>remove_facility</code></a>’s
+with <a href="../gameplay/enum.RemovalMethod.html#variant.Sell" title="variant verticopolis_engine::gameplay::RemovalMethod::Sell"><code>RemovalMethod::Sell</code></a>.</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="method.remove_facility" class="method"><a class="src rightside" href="../../src/verticopolis_engine/charges.rs.html#390-457">Source</a><h4 class="code-header">pub fn <a href="#method.remove_facility" class="fn">remove_facility</a>(
+    &amp;mut self,
+    id: <a class="primitive" href="https://doc.rust-lang.org/1.97.0/std/primitive.i64.html">i64</a>,
+    method: <a class="enum" href="../gameplay/enum.RemovalMethod.html" title="enum verticopolis_engine::gameplay::RemovalMethod">RemovalMethod</a>,
+) -&gt; <a class="struct" href="../charges/struct.ChargeResult.html" title="struct verticopolis_engine::charges::ChargeResult">ChargeResult</a></h4></section></summary><div class="docblock"><p>Removes room or shaft <code>id</code> and refunds half its build price (nothing
+for a room a fire gutted). <code>method</code> says whether the player sold it or
+bulldozed it, for the gameplay event. Refused during a bomb search
+(<a href="struct.Simulation.html#method.edit_refusal" title="method verticopolis_engine::sim::Simulation::edit_refusal"><code>edit_refusal</code></a>), for a burning room and
+for a room the mode keeps for good. Rooms and shafts share one id
+sequence, so <code>id</code> names exactly one thing.</p>
+</div></details></div></details><details class="toggle implementors-toggle" open><summary><section id="impl-Simulation-3" class="impl"><a class="src rightside" href="../../src/verticopolis_engine/economy/screens.rs.html#151-298">Source</a><a href="#impl-Simulation-3" class="anchor">§</a><h3 class="code-header">impl <a class="struct" href="struct.Simulation.html" title="struct verticopolis_engine::sim::Simulation">Simulation</a></h3></section></summary><div class="impl-items"><details class="toggle method-toggle" open><summary><section id="method.change_film" class="method"><a class="src rightside" href="../../src/verticopolis_engine/economy/screens.rs.html#155-157">Source</a><h4 class="code-header">pub fn <a href="#method.change_film" class="fn">change_film</a>(
+    &amp;mut self,
+    id: <a class="primitive" href="https://doc.rust-lang.org/1.97.0/std/primitive.i64.html">i64</a>,
+    tier: FilmTier,
+) -&gt; <a class="enum" href="https://doc.rust-lang.org/1.97.0/core/result/enum.Result.html" title="enum core::result::Result">Result</a>&lt;<a class="primitive" href="https://doc.rust-lang.org/1.97.0/std/primitive.f64.html">f64</a>, <a class="enum" href="../events/enum.FilmRefusal.html" title="enum verticopolis_engine::events::FilmRefusal">FilmRefusal</a>&gt;</h4></section></summary><div class="docblock"><p>Shows a <code>tier</code> film on cinema <code>id</code>’s first screen (<a href="struct.Simulation.html#method.book_film" title="method verticopolis_engine::sim::Simulation::book_film"><code>book_film</code></a>).</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="method.book_film" class="method"><a class="src rightside" href="../../src/verticopolis_engine/economy/screens.rs.html#164-212">Source</a><h4 class="code-header">pub fn <a href="#method.book_film" class="fn">book_film</a>(
+    &amp;mut self,
+    id: <a class="primitive" href="https://doc.rust-lang.org/1.97.0/std/primitive.i64.html">i64</a>,
+    screen: <a class="primitive" href="https://doc.rust-lang.org/1.97.0/std/primitive.usize.html">usize</a>,
+    tier: FilmTier,
+) -&gt; <a class="enum" href="https://doc.rust-lang.org/1.97.0/core/result/enum.Result.html" title="enum core::result::Result">Result</a>&lt;<a class="primitive" href="https://doc.rust-lang.org/1.97.0/std/primitive.f64.html">f64</a>, <a class="enum" href="../events/enum.FilmRefusal.html" title="enum verticopolis_engine::events::FilmRefusal">FilmRefusal</a>&gt;</h4></section></summary><div class="docblock"><p>Shows a <code>tier</code> film on screen <code>screen</code> (from 0) of cinema <code>id</code>:
+charges the price (the <a href="../catalog/fn.catalog.html" title="fn verticopolis_engine::catalog::catalog"><code>catalog</code></a>’s <code>films</code>)
+and starts the film on its first day. Returns the price paid, or why
+the film did not change (a tier the mode does not offer is
+<code>Unavailable</code>, a screen the theater does not run is <code>NoScreen</code>).</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="method.set_film_policy" class="method"><a class="src rightside" href="../../src/verticopolis_engine/economy/screens.rs.html#218-220">Source</a><h4 class="code-header">pub fn <a href="#method.set_film_policy" class="fn">set_film_policy</a>(&amp;mut self, id: <a class="primitive" href="https://doc.rust-lang.org/1.97.0/std/primitive.i64.html">i64</a>, policy: &amp;<a class="primitive" href="https://doc.rust-lang.org/1.97.0/std/primitive.str.html">str</a>) -&gt; <a class="enum" href="https://doc.rust-lang.org/1.97.0/core/option/enum.Option.html" title="enum core::option::Option">Option</a>&lt;&amp;'static <a class="primitive" href="https://doc.rust-lang.org/1.97.0/std/primitive.str.html">str</a>&gt;</h4></section></summary><div class="docblock"><p>Sets the film cinema <code>id</code>’s first screen books again once its film is
+spent (<a href="struct.Simulation.html#method.set_screen_policy" title="method verticopolis_engine::sim::Simulation::set_screen_policy"><code>set_screen_policy</code></a>).</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="method.set_screen_policy" class="method"><a class="src rightside" href="../../src/verticopolis_engine/economy/screens.rs.html#227-253">Source</a><h4 class="code-header">pub fn <a href="#method.set_screen_policy" class="fn">set_screen_policy</a>(
+    &amp;mut self,
+    id: <a class="primitive" href="https://doc.rust-lang.org/1.97.0/std/primitive.i64.html">i64</a>,
+    screen: <a class="primitive" href="https://doc.rust-lang.org/1.97.0/std/primitive.usize.html">usize</a>,
+    policy: &amp;<a class="primitive" href="https://doc.rust-lang.org/1.97.0/std/primitive.str.html">str</a>,
+) -&gt; <a class="enum" href="https://doc.rust-lang.org/1.97.0/core/option/enum.Option.html" title="enum core::option::Option">Option</a>&lt;&amp;'static <a class="primitive" href="https://doc.rust-lang.org/1.97.0/std/primitive.str.html">str</a>&gt;</h4></section></summary><div class="docblock"><p>Sets the film screen <code>screen</code> (from 0) of cinema <code>id</code> books again once
+its film is spent (Modern): <code>auto</code> or <code>feature</code> (a feature),
+<code>revival</code>, <code>blockbuster</code>, or <code>off</code>. Returns the policy set, or <code>None</code>
+when <code>id</code> is not a cinema, the theater runs no such screen, or
+<code>policy</code> is none of the five.</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="method.rebook_spent_films" class="method"><a class="src rightside" href="../../src/verticopolis_engine/economy/screens.rs.html#260-297">Source</a><h4 class="code-header">pub fn <a href="#method.rebook_spent_films" class="fn">rebook_spent_films</a>(&amp;mut self)</h4></section></summary><div class="docblock"><p>Where the mode rebooks spent films (Modern), each screen of an open
+theater whose film is spent books its policy’s film again, and pays
+for it. Runs after the day’s rollover, so the spent film’s last night
+is counted first. A screen that cannot pay keeps its spent film, and
+the log says so on the morning the film is spent.</p>
+</div></details></div></details><details class="toggle implementors-toggle" open><summary><section id="impl-Simulation-4" class="impl"><a class="src rightside" href="../../src/verticopolis_engine/economy/tickets.rs.html#111-129">Source</a><a href="#impl-Simulation-4" class="anchor">§</a><h3 class="code-header">impl <a class="struct" href="struct.Simulation.html" title="struct verticopolis_engine::sim::Simulation">Simulation</a></h3></section></summary><div class="impl-items"><details class="toggle method-toggle" open><summary><section id="method.set_ticket_price" class="method"><a class="src rightside" href="../../src/verticopolis_engine/economy/tickets.rs.html#117-128">Source</a><h4 class="code-header">pub fn <a href="#method.set_ticket_price" class="fn">set_ticket_price</a>(&amp;mut self, id: <a class="primitive" href="https://doc.rust-lang.org/1.97.0/std/primitive.i64.html">i64</a>, key: &amp;<a class="primitive" href="https://doc.rust-lang.org/1.97.0/std/primitive.str.html">str</a>) -&gt; <a class="enum" href="https://doc.rust-lang.org/1.97.0/core/option/enum.Option.html" title="enum core::option::Option">Option</a>&lt;&amp;'static <a class="primitive" href="https://doc.rust-lang.org/1.97.0/std/primitive.str.html">str</a>&gt;</h4></section></summary><div class="docblock"><p>Sets the ticket price cinema <code>id</code> charges (Modern): one of the mode’s
+steps (the <a href="../catalog/fn.catalog.html" title="fn verticopolis_engine::catalog::catalog"><code>catalog</code></a>’s <code>ticketPrices</code>).
+Returns the step set, or <code>None</code> when <code>id</code> is not a cinema or the mode
+lists no step named <code>key</code>. Normal is stored as no step at all, so a
+theater back at Normal saves as it did before it had a price.</p>
+</div></details></div></details><details class="toggle implementors-toggle" open><summary><section id="impl-Simulation-5" class="impl"><a class="src rightside" href="../../src/verticopolis_engine/events_bomb_edits.rs.html#13-55">Source</a><a href="#impl-Simulation-5" class="anchor">§</a><h3 class="code-header">impl <a class="struct" href="struct.Simulation.html" title="struct verticopolis_engine::sim::Simulation">Simulation</a></h3></section></summary><div class="impl-items"><details class="toggle method-toggle" open><summary><section id="method.edit_refusal" class="method"><a class="src rightside" href="../../src/verticopolis_engine/events_bomb_edits.rs.html#19-21">Source</a><h4 class="code-header">pub fn <a href="#method.edit_refusal" class="fn">edit_refusal</a>(&amp;self) -&gt; <a class="enum" href="https://doc.rust-lang.org/1.97.0/core/option/enum.Option.html" title="enum core::option::Option">Option</a>&lt;&amp;'static <a class="primitive" href="https://doc.rust-lang.org/1.97.0/std/primitive.str.html">str</a>&gt;</h4></section></summary><div class="docblock"><p>Why the tower can’t be edited now, or <code>None</code> when it can. While a
+<a href="struct.Simulation.html#method.bomb_lockdown" title="method verticopolis_engine::sim::Simulation::bomb_lockdown"><code>bomb_lockdown</code></a> holds, every build,
+sale, bulldoze, elevator change, undo and redo is refused with
+[<code>BOMB_SEARCH_EDIT_REFUSAL</code>]. A bomb nobody searches for locks
+nothing, as it freezes nothing.</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="method.edit_stop" class="method"><a class="src rightside" href="../../src/verticopolis_engine/events_bomb_edits.rs.html#26-28">Source</a><h4 class="code-header">pub fn <a href="#method.edit_stop" class="fn">edit_stop</a>(&amp;mut self, id: <a class="primitive" href="https://doc.rust-lang.org/1.97.0/std/primitive.i64.html">i64</a>, floor: <a class="primitive" href="https://doc.rust-lang.org/1.97.0/std/primitive.i64.html">i64</a>, stop: <a class="primitive" href="https://doc.rust-lang.org/1.97.0/std/primitive.bool.html">bool</a>) -&gt; <a class="primitive" href="https://doc.rust-lang.org/1.97.0/std/primitive.bool.html">bool</a></h4></section></summary><div class="docblock"><p>A player’s stop change on elevator <code>id</code>
+(<a href="crate::tower::Tower::set_stop"><code>Tower::set_stop</code></a>): whether it was
+made. Refused, changing nothing, while the tower takes no edits.</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="method.edit_express_stops" class="method"><a class="src rightside" href="../../src/verticopolis_engine/events_bomb_edits.rs.html#34-40">Source</a><h4 class="code-header">pub fn <a href="#method.edit_express_stops" class="fn">edit_express_stops</a>(&amp;mut self, id: <a class="primitive" href="https://doc.rust-lang.org/1.97.0/std/primitive.i64.html">i64</a>) -&gt; <a class="primitive" href="https://doc.rust-lang.org/1.97.0/std/primitive.bool.html">bool</a></h4></section></summary><div class="docblock"><p>A player’s express stops for shaft <code>id</code>
+(<a href="crate::tower::Tower::set_express_stops"><code>Tower::set_express_stops</code></a>):
+whether <code>id</code> names a shaft and the stops were set. Refused, changing
+nothing, while the tower takes no edits.</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="method.edit_clear_stops" class="method"><a class="src rightside" href="../../src/verticopolis_engine/events_bomb_edits.rs.html#45-47">Source</a><h4 class="code-header">pub fn <a href="#method.edit_clear_stops" class="fn">edit_clear_stops</a>(&amp;mut self, id: <a class="primitive" href="https://doc.rust-lang.org/1.97.0/std/primitive.i64.html">i64</a>) -&gt; <a class="primitive" href="https://doc.rust-lang.org/1.97.0/std/primitive.bool.html">bool</a></h4></section></summary><div class="docblock"><p>A player clearing shaft <code>id</code>’s skipped stops
+(<a href="crate::tower::Tower::clear_stops"><code>Tower::clear_stops</code></a>). Refused,
+changing nothing, while the tower takes no edits.</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="method.edit_schedule" class="method"><a class="src rightside" href="../../src/verticopolis_engine/events_bomb_edits.rs.html#52-54">Source</a><h4 class="code-header">pub fn <a href="#method.edit_schedule" class="fn">edit_schedule</a>(&amp;mut self, id: <a class="primitive" href="https://doc.rust-lang.org/1.97.0/std/primitive.i64.html">i64</a>, raw: &amp;<a class="enum" href="https://docs.rs/serde_json/1.0.151/serde_json/value/enum.Value.html" title="enum serde_json::value::Value">Value</a>) -&gt; <a class="primitive" href="https://doc.rust-lang.org/1.97.0/std/primitive.bool.html">bool</a></h4></section></summary><div class="docblock"><p>A player’s schedule for elevator <code>id</code>
+(<a href="crate::tower::Tower::set_schedule"><code>Tower::set_schedule</code></a>). Refused,
+changing nothing, while the tower takes no edits.</p>
+</div></details></div></details><details class="toggle implementors-toggle" open><summary><section id="impl-Simulation-6" class="impl"><a class="src rightside" href="../../src/verticopolis_engine/events.rs.html#121-433">Source</a><a href="#impl-Simulation-6" class="anchor">§</a><h3 class="code-header">impl <a class="struct" href="struct.Simulation.html" title="struct verticopolis_engine::sim::Simulation">Simulation</a></h3></section></summary><div class="impl-items"><details class="toggle method-toggle" open><summary><section id="method.resolve_choice" class="method"><a class="src rightside" href="../../src/verticopolis_engine/events.rs.html#171-173">Source</a><h4 class="code-header">pub fn <a href="#method.resolve_choice" class="fn">resolve_choice</a>(&amp;mut self, accept: <a class="primitive" href="https://doc.rust-lang.org/1.97.0/std/primitive.bool.html">bool</a>)</h4></section></summary><div class="docblock"><p>Answers the <a href="../events/struct.EventSystem.html#structfield.pending" title="field verticopolis_engine::events::EventSystem::pending">pending choice</a>: <code>true</code> pays, <code>false</code>
+declines. Accepting without the money to pay counts as declining. Does
+nothing when no choice is pending. A declined fire spreads until it
+burns out; a declined bomb threat starts the search for the bomb.</p>
+</div></details></div></details><details class="toggle implementors-toggle" open><summary><section id="impl-Simulation-7" class="impl"><a class="src rightside" href="../../src/verticopolis_engine/rent.rs.html#108-325">Source</a><a href="#impl-Simulation-7" class="anchor">§</a><h3 class="code-header">impl <a class="struct" href="struct.Simulation.html" title="struct verticopolis_engine::sim::Simulation">Simulation</a></h3></section></summary><div class="impl-items"><details class="toggle method-toggle" open><summary><section id="method.apply_rent_batch" class="method"><a class="src rightside" href="../../src/verticopolis_engine/rent.rs.html#126-137">Source</a><h4 class="code-header">pub fn <a href="#method.apply_rent_batch" class="fn">apply_rent_batch</a>(
+    &amp;mut self,
+    kind: <a class="enum" href="../facilities/enum.Kind.html" title="enum verticopolis_engine::facilities::Kind">Kind</a>,
+    target: <a class="enum" href="../rent/enum.BatchTarget.html" title="enum verticopolis_engine::rent::BatchTarget">BatchTarget</a>,
+    only_default_priced: <a class="primitive" href="https://doc.rust-lang.org/1.97.0/std/primitive.bool.html">bool</a>,
+) -&gt; <a class="enum" href="https://doc.rust-lang.org/1.97.0/core/option/enum.Option.html" title="enum core::option::Option">Option</a>&lt;<a class="struct" href="../rent/struct.BatchRentResult.html" title="struct verticopolis_engine::rent::BatchRentResult">BatchRentResult</a>&gt;</h4></section></summary><div class="docblock"><p>Sets the price of every room of <code>kind</code> to <code>target</code>. With
+<code>only_default_priced</code>, rooms the player priced themselves keep their
+price. Returns <code>None</code>, changing nothing, for a kind that has no price,
+for <a href="../rent/enum.BatchTarget.html#variant.NoRate" title="variant verticopolis_engine::rent::BatchTarget::NoRate"><code>BatchTarget::NoRate</code></a> in Modern, or for a price that is not a
+finite number.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>verticopolis_engine::clock::GameMode;
+<span class="kw">use </span>verticopolis_engine::facilities::Kind;
+<span class="kw">use </span>verticopolis_engine::rent::BatchTarget;
+<span class="kw">use </span>verticopolis_engine::sim::Simulation;
+
+<span class="kw">let </span><span class="kw-2">mut </span>sim = Simulation::new_game(<span class="number">1</span>, GameMode::Modern);
+<span class="kw">let </span>none = sim.apply_rent_batch(Kind::Office, BatchTarget::Default, <span class="bool-val">false</span>).unwrap();
+<span class="macro">assert_eq!</span>(none.matched, <span class="number">0</span>);
+<span class="macro">assert!</span>(sim.apply_rent_batch(Kind::Lobby, BatchTarget::Default, <span class="bool-val">false</span>).is_none());</code></pre></div></div></details><details class="toggle method-toggle" open><summary><section id="method.price_unit" class="method"><a class="src rightside" href="../../src/verticopolis_engine/rent.rs.html#250-279">Source</a><h4 class="code-header">pub fn <a href="#method.price_unit" class="fn">price_unit</a>(&amp;mut self, id: <a class="primitive" href="https://doc.rust-lang.org/1.97.0/std/primitive.i64.html">i64</a>, target: <a class="primitive" href="https://doc.rust-lang.org/1.97.0/std/primitive.f64.html">f64</a>) -&gt; <a class="enum" href="https://doc.rust-lang.org/1.97.0/core/option/enum.Option.html" title="enum core::option::Option">Option</a>&lt;<a class="primitive" href="https://doc.rust-lang.org/1.97.0/std/primitive.f64.html">f64</a>&gt;</h4></section></summary><div class="docblock"><p>Sets room <code>id</code>’s price to <code>target</code> (snapped to a rung in Classic, kept
+inside the band in Modern) and puts it back on the market. Returns the
+price it set, or <code>None</code> for a room with no price, a sold condo or a
+<code>target</code> that is not a finite number.</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="method.set_no_rate" class="method"><a class="src rightside" href="../../src/verticopolis_engine/rent.rs.html#284-302">Source</a><h4 class="code-header">pub fn <a href="#method.set_no_rate" class="fn">set_no_rate</a>(&amp;mut self, id: <a class="primitive" href="https://doc.rust-lang.org/1.97.0/std/primitive.i64.html">i64</a>) -&gt; <a class="primitive" href="https://doc.rust-lang.org/1.97.0/std/primitive.bool.html">bool</a></h4></section></summary><div class="docblock"><p>Takes room <code>id</code> off the market, so it takes no new tenants. Classic
+only, as in the original. Returns <code>false</code> for a room that cannot be,
+such as a sold condo or any room in Modern.</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="method.adjust_rent" class="method"><a class="src rightside" href="../../src/verticopolis_engine/rent.rs.html#307-324">Source</a><h4 class="code-header">pub fn <a href="#method.adjust_rent" class="fn">adjust_rent</a>(&amp;mut self, id: <a class="primitive" href="https://doc.rust-lang.org/1.97.0/std/primitive.i64.html">i64</a>, dir: <a class="primitive" href="https://doc.rust-lang.org/1.97.0/std/primitive.i64.html">i64</a>) -&gt; <a class="enum" href="https://doc.rust-lang.org/1.97.0/core/option/enum.Option.html" title="enum core::option::Option">Option</a>&lt;<a class="primitive" href="https://doc.rust-lang.org/1.97.0/std/primitive.f64.html">f64</a>&gt;</h4></section></summary><div class="docblock"><p>Moves room <code>id</code>’s price up (<code>dir</code> 1) or down (<code>dir</code> -1) by one rung in
+Classic or one step in Modern. Returns the new price, or <code>None</code> as
+<a href="struct.Simulation.html#method.price_unit" title="method verticopolis_engine::sim::Simulation::price_unit"><code>price_unit</code></a> does.</p>
+</div></details></div></details><details class="toggle implementors-toggle" open><summary><section id="impl-Simulation-8" class="impl"><a class="src rightside" href="../../src/verticopolis_engine/sim.rs.html#300-481">Source</a><a href="#impl-Simulation-8" class="anchor">§</a><h3 class="code-header">impl <a class="struct" href="struct.Simulation.html" title="struct verticopolis_engine::sim::Simulation">Simulation</a></h3></section></summary><div class="impl-items"><details class="toggle method-toggle" open><summary><section id="method.population" class="method"><a class="src rightside" href="../../src/verticopolis_engine/sim.rs.html#384-386">Source</a><h4 class="code-header">pub fn <a href="#method.population" class="fn">population</a>(&amp;self) -&gt; <a class="primitive" href="https://doc.rust-lang.org/1.97.0/std/primitive.i64.html">i64</a></h4></section></summary><div class="docblock"><p>How many people live and work in the tower: the number the star
+ratings count.</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="method.new_game" class="method"><a class="src rightside" href="../../src/verticopolis_engine/sim.rs.html#437-439">Source</a><h4 class="code-header">pub fn <a href="#method.new_game" class="fn">new_game</a>(seed: <a class="primitive" href="https://doc.rust-lang.org/1.97.0/std/primitive.u32.html">u32</a>, mode: <a class="enum" href="../clock/enum.GameMode.html" title="enum verticopolis_engine::clock::GameMode">GameMode</a>) -&gt; <a class="struct" href="struct.Simulation.html" title="struct verticopolis_engine::sim::Simulation">Simulation</a></h4></section></summary><div class="docblock"><p>Starts a new game: an empty lot, <a href="constant.STARTING_MONEY.html" title="constant verticopolis_engine::sim::STARTING_MONEY"><code>STARTING_MONEY</code></a>, 07:00 on day 0.</p>
+<p>The same <code>seed</code> and the same commands give the same game. A Modern
+game gets the real-world calendar and automatic floor bridging; use
+<a href="struct.Simulation.html#method.new_game_with" title="associated function verticopolis_engine::sim::Simulation::new_game_with"><code>Simulation::new_game_with</code></a> to choose them.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>verticopolis_engine::clock::GameMode;
+<span class="kw">use </span>verticopolis_engine::sim::Simulation;
+
+<span class="kw">let </span>sim = Simulation::new_game(<span class="number">7</span>, GameMode::Modern);
+<span class="macro">assert_eq!</span>(sim.star, <span class="number">1</span>);
+<span class="macro">assert_eq!</span>(sim.population(), <span class="number">0</span>);</code></pre></div></div></details><details class="toggle method-toggle" open><summary><section id="method.new_game_with" class="method"><a class="src rightside" href="../../src/verticopolis_engine/sim.rs.html#452-466">Source</a><h4 class="code-header">pub fn <a href="#method.new_game_with" class="fn">new_game_with</a>(
+    seed: <a class="primitive" href="https://doc.rust-lang.org/1.97.0/std/primitive.u32.html">u32</a>,
+    mode: <a class="enum" href="../clock/enum.GameMode.html" title="enum verticopolis_engine::clock::GameMode">GameMode</a>,
+    modern_calendar: <a class="enum" href="../clock/enum.CalendarKind.html" title="enum verticopolis_engine::clock::CalendarKind">CalendarKind</a>,
+    start_unbridged: <a class="primitive" href="https://doc.rust-lang.org/1.97.0/std/primitive.bool.html">bool</a>,
+) -&gt; <a class="struct" href="struct.Simulation.html" title="struct verticopolis_engine::sim::Simulation">Simulation</a></h4></section></summary><div class="docblock"><p>Starts a new game with a choice of calendar and bridging. Both apply
+to a Modern game only: a Classic game always runs the canon calendar
+with bridging on, whatever these say.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>verticopolis_engine::clock::{CalendarKind, GameMode};
+<span class="kw">use </span>verticopolis_engine::sim::Simulation;
+
+<span class="kw">let </span>sim = Simulation::new_game_with(<span class="number">7</span>, GameMode::Modern, CalendarKind::Canon, <span class="bool-val">true</span>);
+<span class="macro">assert!</span>(!sim.auto_bridge);</code></pre></div></div></details></div></details><details class="toggle implementors-toggle" open><summary><section id="impl-Simulation-9" class="impl"><a class="src rightside" href="../../src/verticopolis_engine/sim_loop.rs.html#34-314">Source</a><a href="#impl-Simulation-9" class="anchor">§</a><h3 class="code-header">impl <a class="struct" href="struct.Simulation.html" title="struct verticopolis_engine::sim::Simulation">Simulation</a></h3></section></summary><div class="impl-items"><details class="toggle method-toggle" open><summary><section id="method.tick" class="method"><a class="src rightside" href="../../src/verticopolis_engine/sim_loop.rs.html#53-67">Source</a><h4 class="code-header">pub fn <a href="#method.tick" class="fn">tick</a>(&amp;mut self, dt_minutes: <a class="primitive" href="https://doc.rust-lang.org/1.97.0/std/primitive.f64.html">f64</a>)</h4></section></summary><div class="docblock"><p>Advances the game by <code>dt_minutes</code> game minutes.</p>
+<p>Any <code>dt</code> works: the engine splits it into steps of at most 30 minutes
+that never cross an hour, so hourly rules always run. The same seed,
+the same commands and the same sequence of <code>dt</code> give the same game.
+A host that runs on display frames should let
+<a href="../fixed_step/struct.FrameStepper.html" title="struct verticopolis_engine::fixed_step::FrameStepper"><code>FrameStepper</code></a> choose the <code>dt</code>, so
+the tower comes out the same at any frame rate.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>verticopolis_engine::clock::GameMode;
+<span class="kw">use </span>verticopolis_engine::sim::Simulation;
+
+<span class="kw">let </span><span class="kw-2">mut </span>sim = Simulation::new_game(<span class="number">1</span>, GameMode::Classic);
+<span class="kw">let </span>day = sim.clock.day();
+sim.tick(<span class="number">24.0 </span>* <span class="number">60.0</span>);
+<span class="macro">assert_eq!</span>(sim.clock.day(), day + <span class="number">1</span>);</code></pre></div></div></details></div></details><details class="toggle implementors-toggle" open><summary><section id="impl-Simulation-10" class="impl"><a class="src rightside" href="../../src/verticopolis_engine/sim_save.rs.html#146-274">Source</a><a href="#impl-Simulation-10" class="anchor">§</a><h3 class="code-header">impl <a class="struct" href="struct.Simulation.html" title="struct verticopolis_engine::sim::Simulation">Simulation</a></h3></section></summary><div class="impl-items"><details class="toggle method-toggle" open><summary><section id="method.serialize" class="method"><a class="src rightside" href="../../src/verticopolis_engine/sim_save.rs.html#228-234">Source</a><h4 class="code-header">pub fn <a href="#method.serialize" class="fn">serialize</a>(&amp;self) -&gt; <a class="enum" href="https://docs.rs/serde_json/1.0.151/serde_json/value/enum.Value.html" title="enum serde_json::value::Value">Value</a></h4></section></summary><div class="docblock"><p>The whole game as save JSON, the object a <code>.vctower</code> file wraps.</p>
+<p>A host that edits or inspects the save uses this, then
+<a href="../load/fn.stamp_save.html" title="fn verticopolis_engine::load::stamp_save"><code>crate::load::stamp_save</code></a> and <a href="../load/fn.encode_vctower.html" title="fn verticopolis_engine::load::encode_vctower"><code>crate::load::encode_vctower</code></a> to
+write the file. To go straight to the file’s bytes, use
+<a href="../load/fn.encode_simulation_vctower.html" title="fn verticopolis_engine::load::encode_simulation_vctower"><code>crate::load::encode_simulation_vctower</code></a>.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>verticopolis_engine::clock::GameMode;
+<span class="kw">use </span>verticopolis_engine::sim::{Simulation, PLAIN_SAVE_VERSION};
+
+<span class="kw">let </span>sim = Simulation::new_game(<span class="number">3</span>, GameMode::Classic);
+<span class="kw">let </span>save = sim.serialize();
+<span class="comment">// A tower with no tall lobby is stamped with the version before them.
+</span><span class="macro">assert_eq!</span>(save[<span class="string">"version"</span>], PLAIN_SAVE_VERSION);</code></pre></div></div></details></div></details><details class="toggle implementors-toggle" open><summary><section id="impl-Simulation-11" class="impl"><a class="src rightside" href="../../src/verticopolis_engine/view/signature.rs.html#11-31">Source</a><a href="#impl-Simulation-11" class="anchor">§</a><h3 class="code-header">impl <a class="struct" href="struct.Simulation.html" title="struct verticopolis_engine::sim::Simulation">Simulation</a></h3></section></summary><div class="impl-items"><details class="toggle method-toggle" open><summary><section id="method.tower_signature" class="method"><a class="src rightside" href="../../src/verticopolis_engine/view/signature.rs.html#28-30">Source</a><h4 class="code-header">pub fn <a href="#method.tower_signature" class="fn">tower_signature</a>(&amp;self) -&gt; <a class="primitive" href="https://doc.rust-lang.org/1.97.0/std/primitive.u64.html">u64</a></h4></section></summary><div class="docblock"><p>A fingerprint of the tower, for undo: read it before and after a
+command, and the command changed the tower exactly when the two differ
+(barring a 64-bit collision). Money is not part of it; compare that
+beside it. It walks every room and shaft, so read it once per
+command; it is too slow to read every frame.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>verticopolis_engine::clock::GameMode;
+<span class="kw">use </span>verticopolis_engine::facilities::Kind;
+<span class="kw">use </span>verticopolis_engine::sim::Simulation;
+
+<span class="kw">let </span><span class="kw-2">mut </span>sim = Simulation::new_game(<span class="number">1</span>, GameMode::Classic);
+<span class="kw">let </span>before = sim.tower_signature();
+sim.build(Kind::Lobby, <span class="number">1</span>, <span class="number">100</span>);
+<span class="macro">assert_ne!</span>(sim.tower_signature(), before);</code></pre></div></div></details></div></details></div><h2 id="trait-implementations" class="section-header">Trait Implementations<a href="#trait-implementations" class="anchor">§</a></h2><div id="trait-implementations-list"><details class="toggle implementors-toggle" open><summary><section id="impl-StepSim-for-Simulation" class="impl"><a class="src rightside" href="../../src/verticopolis_engine/fixed_step.rs.html#54-61">Source</a><a href="#impl-StepSim-for-Simulation" class="anchor">§</a><h3 class="code-header">impl <a class="trait" href="../fixed_step/trait.StepSim.html" title="trait verticopolis_engine::fixed_step::StepSim">StepSim</a> for <a class="struct" href="struct.Simulation.html" title="struct verticopolis_engine::sim::Simulation">Simulation</a></h3></section></summary><div class="impl-items"><details class="toggle method-toggle" open><summary><section id="method.step" class="method trait-impl"><a class="src rightside" href="../../src/verticopolis_engine/fixed_step.rs.html#55-57">Source</a><a href="#method.step" class="anchor">§</a><h4 class="code-header">fn <a href="../fixed_step/trait.StepSim.html#tymethod.step" class="fn">step</a>(&amp;mut self, dt_minutes: <a class="primitive" href="https://doc.rust-lang.org/1.97.0/std/primitive.f64.html">f64</a>)</h4></section></summary><div class='docblock'>Advances the game by <code>dt_minutes</code>.</div></details><details class="toggle method-toggle" open><summary><section id="method.minute_of_day" class="method trait-impl"><a class="src rightside" href="../../src/verticopolis_engine/fixed_step.rs.html#58-60">Source</a><a href="#method.minute_of_day" class="anchor">§</a><h4 class="code-header">fn <a href="../fixed_step/trait.StepSim.html#tymethod.minute_of_day" class="fn">minute_of_day</a>(&amp;self) -&gt; <a class="primitive" href="https://doc.rust-lang.org/1.97.0/std/primitive.f64.html">f64</a></h4></section></summary><div class='docblock'>The game clock’s minute of the day, 0 up to 1,440.</div></details></div></details></div><h2 id="synthetic-implementations" class="section-header">Auto Trait Implementations<a href="#synthetic-implementations" class="anchor">§</a></h2><div id="synthetic-implementations-list"><section id="impl-Freeze-for-Simulation" class="impl"><a href="#impl-Freeze-for-Simulation" class="anchor">§</a><h3 class="code-header">impl !<a class="trait" href="https://doc.rust-lang.org/1.97.0/core/marker/trait.Freeze.html" title="trait core::marker::Freeze">Freeze</a> for <a class="struct" href="struct.Simulation.html" title="struct verticopolis_engine::sim::Simulation">Simulation</a></h3></section><section id="impl-RefUnwindSafe-for-Simulation" class="impl"><a href="#impl-RefUnwindSafe-for-Simulation" class="anchor">§</a><h3 class="code-header">impl !<a class="trait" href="https://doc.rust-lang.org/1.97.0/core/panic/unwind_safe/trait.RefUnwindSafe.html" title="trait core::panic::unwind_safe::RefUnwindSafe">RefUnwindSafe</a> for <a class="struct" href="struct.Simulation.html" title="struct verticopolis_engine::sim::Simulation">Simulation</a></h3></section><section id="impl-Send-for-Simulation" class="impl"><a href="#impl-Send-for-Simulation" class="anchor">§</a><h3 class="code-header">impl <a class="trait" href="https://doc.rust-lang.org/1.97.0/core/marker/trait.Send.html" title="trait core::marker::Send">Send</a> for <a class="struct" href="struct.Simulation.html" title="struct verticopolis_engine::sim::Simulation">Simulation</a></h3></section><section id="impl-Sync-for-Simulation" class="impl"><a href="#impl-Sync-for-Simulation" class="anchor">§</a><h3 class="code-header">impl !<a class="trait" href="https://doc.rust-lang.org/1.97.0/core/marker/trait.Sync.html" title="trait core::marker::Sync">Sync</a> for <a class="struct" href="struct.Simulation.html" title="struct verticopolis_engine::sim::Simulation">Simulation</a></h3></section><section id="impl-Unpin-for-Simulation" class="impl"><a href="#impl-Unpin-for-Simulation" class="anchor">§</a><h3 class="code-header">impl <a class="trait" href="https://doc.rust-lang.org/1.97.0/core/marker/trait.Unpin.html" title="trait core::marker::Unpin">Unpin</a> for <a class="struct" href="struct.Simulation.html" title="struct verticopolis_engine::sim::Simulation">Simulation</a></h3></section><section id="impl-UnsafeUnpin-for-Simulation" class="impl"><a href="#impl-UnsafeUnpin-for-Simulation" class="anchor">§</a><h3 class="code-header">impl <a class="trait" href="https://doc.rust-lang.org/1.97.0/core/marker/trait.UnsafeUnpin.html" title="trait core::marker::UnsafeUnpin">UnsafeUnpin</a> for <a class="struct" href="struct.Simulation.html" title="struct verticopolis_engine::sim::Simulation">Simulation</a></h3></section><section id="impl-UnwindSafe-for-Simulation" class="impl"><a href="#impl-UnwindSafe-for-Simulation" class="anchor">§</a><h3 class="code-header">impl <a class="trait" href="https://doc.rust-lang.org/1.97.0/core/panic/unwind_safe/trait.UnwindSafe.html" title="trait core::panic::unwind_safe::UnwindSafe">UnwindSafe</a> for <a class="struct" href="struct.Simulation.html" title="struct verticopolis_engine::sim::Simulation">Simulation</a></h3></section></div><h2 id="blanket-implementations" class="section-header">Blanket Implementations<a href="#blanket-implementations" class="anchor">§</a></h2><div id="blanket-implementations-list"><details class="toggle implementors-toggle"><summary><section id="impl-Any-for-T" class="impl"><a class="src rightside" href="https://doc.rust-lang.org/1.97.0/src/core/any.rs.html#141">Source</a><a href="#impl-Any-for-T" class="anchor">§</a><h3 class="code-header">impl&lt;T&gt; <a class="trait" href="https://doc.rust-lang.org/1.97.0/core/any/trait.Any.html" title="trait core::any::Any">Any</a> for T<div class="where">where
+    T: 'static + ?<a class="trait" href="https://doc.rust-lang.org/1.97.0/core/marker/trait.Sized.html" title="trait core::marker::Sized">Sized</a>,</div></h3></section></summary><div class="impl-items"><details class="toggle method-toggle" open><summary><section id="method.type_id" class="method trait-impl"><a class="src rightside" href="https://doc.rust-lang.org/1.97.0/src/core/any.rs.html#142">Source</a><a href="#method.type_id" class="anchor">§</a><h4 class="code-header">fn <a href="https://doc.rust-lang.org/1.97.0/core/any/trait.Any.html#tymethod.type_id" class="fn">type_id</a>(&amp;self) -&gt; <a class="struct" href="https://doc.rust-lang.org/1.97.0/core/any/struct.TypeId.html" title="struct core::any::TypeId">TypeId</a></h4></section></summary><div class='docblock'>Gets the <code>TypeId</code> of <code>self</code>. <a href="https://doc.rust-lang.org/1.97.0/core/any/trait.Any.html#tymethod.type_id">Read more</a></div></details></div></details><details class="toggle implementors-toggle"><summary><section id="impl-Borrow%3CT%3E-for-T" class="impl"><a class="src rightside" href="https://doc.rust-lang.org/1.97.0/src/core/borrow.rs.html#212">Source</a><a href="#impl-Borrow%3CT%3E-for-T" class="anchor">§</a><h3 class="code-header">impl&lt;T&gt; <a class="trait" href="https://doc.rust-lang.org/1.97.0/core/borrow/trait.Borrow.html" title="trait core::borrow::Borrow">Borrow</a>&lt;T&gt; for T<div class="where">where
+    T: ?<a class="trait" href="https://doc.rust-lang.org/1.97.0/core/marker/trait.Sized.html" title="trait core::marker::Sized">Sized</a>,</div></h3></section></summary><div class="impl-items"><details class="toggle method-toggle" open><summary><section id="method.borrow" class="method trait-impl"><a class="src rightside" href="https://doc.rust-lang.org/1.97.0/src/core/borrow.rs.html#214">Source</a><a href="#method.borrow" class="anchor">§</a><h4 class="code-header">fn <a href="https://doc.rust-lang.org/1.97.0/core/borrow/trait.Borrow.html#tymethod.borrow" class="fn">borrow</a>(&amp;self) -&gt; <a class="primitive" href="https://doc.rust-lang.org/1.97.0/std/primitive.reference.html">&amp;T</a></h4></section></summary><div class='docblock'>Immutably borrows from an owned value. <a href="https://doc.rust-lang.org/1.97.0/core/borrow/trait.Borrow.html#tymethod.borrow">Read more</a></div></details></div></details><details class="toggle implementors-toggle"><summary><section id="impl-BorrowMut%3CT%3E-for-T" class="impl"><a class="src rightside" href="https://doc.rust-lang.org/1.97.0/src/core/borrow.rs.html#221">Source</a><a href="#impl-BorrowMut%3CT%3E-for-T" class="anchor">§</a><h3 class="code-header">impl&lt;T&gt; <a class="trait" href="https://doc.rust-lang.org/1.97.0/core/borrow/trait.BorrowMut.html" title="trait core::borrow::BorrowMut">BorrowMut</a>&lt;T&gt; for T<div class="where">where
+    T: ?<a class="trait" href="https://doc.rust-lang.org/1.97.0/core/marker/trait.Sized.html" title="trait core::marker::Sized">Sized</a>,</div></h3></section></summary><div class="impl-items"><details class="toggle method-toggle" open><summary><section id="method.borrow_mut" class="method trait-impl"><a class="src rightside" href="https://doc.rust-lang.org/1.97.0/src/core/borrow.rs.html#222">Source</a><a href="#method.borrow_mut" class="anchor">§</a><h4 class="code-header">fn <a href="https://doc.rust-lang.org/1.97.0/core/borrow/trait.BorrowMut.html#tymethod.borrow_mut" class="fn">borrow_mut</a>(&amp;mut self) -&gt; <a class="primitive" href="https://doc.rust-lang.org/1.97.0/std/primitive.reference.html">&amp;mut T</a></h4></section></summary><div class='docblock'>Mutably borrows from an owned value. <a href="https://doc.rust-lang.org/1.97.0/core/borrow/trait.BorrowMut.html#tymethod.borrow_mut">Read more</a></div></details></div></details><details class="toggle implementors-toggle"><summary><section id="impl-From%3CT%3E-for-T" class="impl"><a class="src rightside" href="https://doc.rust-lang.org/1.97.0/src/core/convert/mod.rs.html#786">Source</a><a href="#impl-From%3CT%3E-for-T" class="anchor">§</a><h3 class="code-header">impl&lt;T&gt; <a class="trait" href="https://doc.rust-lang.org/1.97.0/core/convert/trait.From.html" title="trait core::convert::From">From</a>&lt;T&gt; for T</h3></section></summary><div class="impl-items"><details class="toggle method-toggle" open><summary><section id="method.from" class="method trait-impl"><a class="src rightside" href="https://doc.rust-lang.org/1.97.0/src/core/convert/mod.rs.html#789">Source</a><a href="#method.from" class="anchor">§</a><h4 class="code-header">fn <a href="https://doc.rust-lang.org/1.97.0/core/convert/trait.From.html#tymethod.from" class="fn">from</a>(t: T) -&gt; T</h4></section></summary><div class="docblock"><p>Returns the argument unchanged.</p>
+</div></details></div></details><details class="toggle implementors-toggle"><summary><section id="impl-Into%3CU%3E-for-T" class="impl"><a class="src rightside" href="https://doc.rust-lang.org/1.97.0/src/core/convert/mod.rs.html#768-770">Source</a><a href="#impl-Into%3CU%3E-for-T" class="anchor">§</a><h3 class="code-header">impl&lt;T, U&gt; <a class="trait" href="https://doc.rust-lang.org/1.97.0/core/convert/trait.Into.html" title="trait core::convert::Into">Into</a>&lt;U&gt; for T<div class="where">where
+    U: <a class="trait" href="https://doc.rust-lang.org/1.97.0/core/convert/trait.From.html" title="trait core::convert::From">From</a>&lt;T&gt;,</div></h3></section></summary><div class="impl-items"><details class="toggle method-toggle" open><summary><section id="method.into" class="method trait-impl"><a class="src rightside" href="https://doc.rust-lang.org/1.97.0/src/core/convert/mod.rs.html#778">Source</a><a href="#method.into" class="anchor">§</a><h4 class="code-header">fn <a href="https://doc.rust-lang.org/1.97.0/core/convert/trait.Into.html#tymethod.into" class="fn">into</a>(self) -&gt; U</h4></section></summary><div class="docblock"><p>Calls <code>U::from(self)</code>.</p>
+<p>That is, this conversion is whatever the implementation of
+<code><a href="https://doc.rust-lang.org/1.97.0/core/convert/trait.From.html" title="trait core::convert::From">From</a>&lt;T&gt; for U</code> chooses to do.</p>
+</div></details></div></details><details class="toggle implementors-toggle"><summary><section id="impl-Same-for-T" class="impl"><a class="src rightside" href="https://docs.rs/typenum/1.20.1/src/typenum/type_operators.rs.html#34">Source</a><a href="#impl-Same-for-T" class="anchor">§</a><h3 class="code-header">impl&lt;T&gt; <a class="trait" href="https://docs.rs/typenum/1.20.1/typenum/type_operators/trait.Same.html" title="trait typenum::type_operators::Same">Same</a> for T</h3></section></summary><div class="impl-items"><details class="toggle" open><summary><section id="associatedtype.Output" class="associatedtype trait-impl"><a class="src rightside" href="https://docs.rs/typenum/1.20.1/src/typenum/type_operators.rs.html#35">Source</a><a href="#associatedtype.Output" class="anchor">§</a><h4 class="code-header">type <a href="https://docs.rs/typenum/1.20.1/typenum/type_operators/trait.Same.html#associatedtype.Output" class="associatedtype">Output</a> = T</h4></section></summary><div class='docblock'>Should always be <code>Self</code></div></details></div></details><details class="toggle implementors-toggle"><summary><section id="impl-TryFrom%3CU%3E-for-T" class="impl"><a class="src rightside" href="https://doc.rust-lang.org/1.97.0/src/core/convert/mod.rs.html#828-830">Source</a><a href="#impl-TryFrom%3CU%3E-for-T" class="anchor">§</a><h3 class="code-header">impl&lt;T, U&gt; <a class="trait" href="https://doc.rust-lang.org/1.97.0/core/convert/trait.TryFrom.html" title="trait core::convert::TryFrom">TryFrom</a>&lt;U&gt; for T<div class="where">where
+    U: <a class="trait" href="https://doc.rust-lang.org/1.97.0/core/convert/trait.Into.html" title="trait core::convert::Into">Into</a>&lt;T&gt;,</div></h3></section></summary><div class="impl-items"><details class="toggle" open><summary><section id="associatedtype.Error-1" class="associatedtype trait-impl"><a class="src rightside" href="https://doc.rust-lang.org/1.97.0/src/core/convert/mod.rs.html#832">Source</a><a href="#associatedtype.Error-1" class="anchor">§</a><h4 class="code-header">type <a href="https://doc.rust-lang.org/1.97.0/core/convert/trait.TryFrom.html#associatedtype.Error" class="associatedtype">Error</a> = <a class="enum" href="https://doc.rust-lang.org/1.97.0/core/convert/enum.Infallible.html" title="enum core::convert::Infallible">Infallible</a></h4></section></summary><div class='docblock'>The type returned in the event of a conversion error.</div></details><details class="toggle method-toggle" open><summary><section id="method.try_from" class="method trait-impl"><a class="src rightside" href="https://doc.rust-lang.org/1.97.0/src/core/convert/mod.rs.html#835">Source</a><a href="#method.try_from" class="anchor">§</a><h4 class="code-header">fn <a href="https://doc.rust-lang.org/1.97.0/core/convert/trait.TryFrom.html#tymethod.try_from" class="fn">try_from</a>(value: U) -&gt; <a class="enum" href="https://doc.rust-lang.org/1.97.0/core/result/enum.Result.html" title="enum core::result::Result">Result</a>&lt;T, &lt;T as <a class="trait" href="https://doc.rust-lang.org/1.97.0/core/convert/trait.TryFrom.html" title="trait core::convert::TryFrom">TryFrom</a>&lt;U&gt;&gt;::<a class="associatedtype" href="https://doc.rust-lang.org/1.97.0/core/convert/trait.TryFrom.html#associatedtype.Error" title="type core::convert::TryFrom::Error">Error</a>&gt;</h4></section></summary><div class='docblock'>Performs the conversion.</div></details></div></details><details class="toggle implementors-toggle"><summary><section id="impl-TryInto%3CU%3E-for-T" class="impl"><a class="src rightside" href="https://doc.rust-lang.org/1.97.0/src/core/convert/mod.rs.html#812-814">Source</a><a href="#impl-TryInto%3CU%3E-for-T" class="anchor">§</a><h3 class="code-header">impl&lt;T, U&gt; <a class="trait" href="https://doc.rust-lang.org/1.97.0/core/convert/trait.TryInto.html" title="trait core::convert::TryInto">TryInto</a>&lt;U&gt; for T<div class="where">where
+    U: <a class="trait" href="https://doc.rust-lang.org/1.97.0/core/convert/trait.TryFrom.html" title="trait core::convert::TryFrom">TryFrom</a>&lt;T&gt;,</div></h3></section></summary><div class="impl-items"><details class="toggle" open><summary><section id="associatedtype.Error" class="associatedtype trait-impl"><a class="src rightside" href="https://doc.rust-lang.org/1.97.0/src/core/convert/mod.rs.html#816">Source</a><a href="#associatedtype.Error" class="anchor">§</a><h4 class="code-header">type <a href="https://doc.rust-lang.org/1.97.0/core/convert/trait.TryInto.html#associatedtype.Error" class="associatedtype">Error</a> = &lt;U as <a class="trait" href="https://doc.rust-lang.org/1.97.0/core/convert/trait.TryFrom.html" title="trait core::convert::TryFrom">TryFrom</a>&lt;T&gt;&gt;::<a class="associatedtype" href="https://doc.rust-lang.org/1.97.0/core/convert/trait.TryFrom.html#associatedtype.Error" title="type core::convert::TryFrom::Error">Error</a></h4></section></summary><div class='docblock'>The type returned in the event of a conversion error.</div></details><details class="toggle method-toggle" open><summary><section id="method.try_into" class="method trait-impl"><a class="src rightside" href="https://doc.rust-lang.org/1.97.0/src/core/convert/mod.rs.html#819">Source</a><a href="#method.try_into" class="anchor">§</a><h4 class="code-header">fn <a href="https://doc.rust-lang.org/1.97.0/core/convert/trait.TryInto.html#tymethod.try_into" class="fn">try_into</a>(self) -&gt; <a class="enum" href="https://doc.rust-lang.org/1.97.0/core/result/enum.Result.html" title="enum core::result::Result">Result</a>&lt;U, &lt;U as <a class="trait" href="https://doc.rust-lang.org/1.97.0/core/convert/trait.TryFrom.html" title="trait core::convert::TryFrom">TryFrom</a>&lt;T&gt;&gt;::<a class="associatedtype" href="https://doc.rust-lang.org/1.97.0/core/convert/trait.TryFrom.html#associatedtype.Error" title="type core::convert::TryFrom::Error">Error</a>&gt;</h4></section></summary><div class='docblock'>Performs the conversion.</div></details></div></details></div></section></div></main><script>(function(){var d=document.documentElement,m=document.querySelector(".vc-site-menu"),s=document.querySelector("nav.sidebar");if(m&&s){s.insertBefore(m,s.firstChild);d.classList.add("vc-menu-in-sidebar");}var t=document.querySelector("rustdoc-topbar"),b=document.querySelector(".vc-header .vc-bar");if(t&&b){for(var i=0;i<b.children.length;i++)t.appendChild(b.children[i].cloneNode(true));d.classList.add("vc-one-bar");}})();</script>
+
+</body></html>

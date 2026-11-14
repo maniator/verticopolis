@@ -1,0 +1,847 @@
+<!DOCTYPE html><html lang="en"><head><meta name="robots" content="noindex"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/sim_undo_ground.rs`."><title>sim_undo_ground.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../static.files/rustdoc-17e0aaed.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="verticopolis_engine" data-themes="" data-resource-suffix="" data-rustdoc-version="1.97.0 (2d8144b78 2026-07-07)" data-channel="1.97.0" data-search-js="search-fd9372ac.js" data-stringdex-js="stringdex-2da4960a.js" data-settings-js="settings-170eb4bf.js" ><script src="../../static.files/storage-41dd4d93.js"></script><script defer src="../../static.files/src-script-813739b1.js"></script><script defer src="../../src-files.js"></script><script defer src="../../static.files/main-fcd733ba.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-f7c3ffd8.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-044be391.svg"><style>
+/* Retro (Windows 3.1 / SimTower) design tokens: the single source of the
+   palette, font, bevels, and shadow. This is the ONLY place --r-face and its
+   siblings are declared; styles.css (the game) and retro-page.css (standalone
+   pages like /help and the gallery) both @import it, so no page re-declares the
+   palette. Change the theme here once. */
+:root {
+  /* Semantic tokens. The first four are ALIASES of the chrome tokens below —
+     they read better at usage sites ("body text", "highlight") and can never
+     diverge from the theme. */
+  --bg: var(--r-desktop);
+  --panel: var(--r-face);
+  --ink: var(--r-ink);       /* body text */
+  --accent: var(--r-title);  /* navy — titles & highlights */
+  --panel-light: #d7d7d7;
+  --muted: #2f2f38;       /* secondary text — dark enough to read on gray */
+  --good: #15722e;
+  --bad: #b01023;
+  --bad-ink: #9a0e1f;     /* danger text small enough to need AA 4.5:1 on gray chrome */
+  --money: #005000; /* dark forest green: >=4.5:1 WCAG AA on the #c0c0c0 stat chip (#0a6e26 was 3.53:1, below AA) */
+  --line: #7a7a7a;
+  /* Win3.1 chrome tokens + the signature two-pixel bevels. Swap to re-theme. */
+  --r-face: #c0c0c0;
+  --r-shadow: #808080;
+  --r-dark: #000000;
+  --r-light: #dfdfdf;
+  --r-hi: #ffffff;
+  --r-title: #000080;
+  --r-title-fg: #ffffff;
+  --r-ink: #000000;
+  --r-desktop: #008080;
+  --r-font: "MS Sans Serif", "Tahoma", "Geneva", "Segoe UI", sans-serif;
+  --bevel-out: inset -1px -1px var(--r-dark), inset 1px 1px var(--r-hi),
+    inset -2px -2px var(--r-shadow), inset 2px 2px var(--r-light);
+  --bevel-in: inset 1px 1px var(--r-dark), inset -1px -1px var(--r-hi),
+    inset 2px 2px var(--r-shadow), inset -2px -2px var(--r-light);
+  /* Floating windows cast one hard shadow. */
+  --win-shadow: 2px 2px 0 rgba(0, 0, 0, 0.4);
+  /* The Classic rent-rung chip fills (1994's Blue/Green/Yellow/Red levels).
+     Chosen to read on gray chrome and to stay clear of every reserved sprite
+     state-cue literal; hexes proposed in ux-pricing-split-editor §1.3, pending
+     the pixel-art party's ratification. No Rate has no token: absence of a
+     price is absence of a fill (the chip renders hollow). */
+  --rung-vlow: #2048b0;
+  --rung-low: #1e7a2e;
+  --rung-avg: #c8a000;
+  --rung-high: #b02020;
+  /* The title screen ("Metropolis Dusk"): the game's splash and boot cover
+     (styles/game/splash.css) and the docs site's landing page share these, so
+     the two skies never drift. The splash is box art, not Win 3.1 chrome, and
+     keeps its own colors. */
+  --splash-sky: linear-gradient(#161634 0%, #241f4c 34%, #5b3560 62%, #c65a63 86%, #ef8560 100%);
+  --splash-amber: #ffc94a;   /* POLIS, the primary plate, the focus ring */
+  --splash-sun: radial-gradient(circle, #ffe6a0 0%, var(--splash-amber) 52%, #f18f4b 100%);
+  --splash-sun-glow: rgba(255, 179, 87, 0.26);
+  --splash-building: #201643;
+  --splash-cream: #e6dcc0;   /* the plates and the corner buttons' glyphs */
+  --splash-plate-ink: #20204a;
+  --splash-ink: #0d0d10;     /* plate borders and the skyline's outlines */
+  --splash-wordmark: #f7f1e4; /* VERTICO */
+  --splash-tagline: #ffd9a8;
+  --splash-premise: #e7ddf5;
+}
+
+/* The shared title bar (title-bar.mjs): the help site, the engine docs and
+   the Rust API reference all draw it with these classes. It sits on the navy
+   title bar each surface already paints (theme.css's .header, rustdoc's
+   .vc-header), so the colors here are the bar's own: white on navy, and the
+   game's bevelled gray button. The breakpoint is Starlight's own (50rem),
+   where its side menu turns into the phone's menu button. */
+
+.vc-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--sl-nav-gap, 1rem);
+  height: 100%;
+  min-width: 0;
+}
+
+/* The logo and the site's name, as Starlight's SiteTitle draws them. */
+.vc-bar-title {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex: 0 1 auto;
+  min-width: 0;
+  font-size: var(--sl-text-h4, 1.25rem);
+  font-weight: 700;
+  color: var(--r-title-fg);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.vc-bar-title:hover {
+  color: var(--r-title-fg);
+}
+.vc-bar-title img {
+  flex: none;
+  width: auto;
+  height: calc(var(--sl-nav-height, 4rem) - 2 * var(--sl-nav-pad-y, 0.75rem));
+  image-rendering: pixelated;
+  box-shadow: var(--bevel-out);
+}
+.vc-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.vc-bar-search {
+  display: flex;
+  flex: 1 1 auto;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+.vc-bar-links {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 1rem;
+}
+
+/* The game's bevelled button on the navy bar. */
+.vc-bar-game {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 4px 12px;
+  font-size: 0.875rem;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--r-ink);
+  text-decoration: none;
+  white-space: nowrap;
+  background: var(--r-face);
+  box-shadow: var(--bevel-out);
+}
+.vc-bar-game:hover {
+  color: var(--r-ink);
+}
+.vc-bar-game:active {
+  box-shadow: var(--bevel-in);
+}
+
+.vc-bar-github {
+  display: inline-flex;
+  padding: 0.25rem;
+  color: var(--r-title-fg);
+}
+.vc-bar-github:hover {
+  color: var(--r-light);
+}
+
+/* The theme switch, after a divider, as Starlight's header sets it. */
+.vc-bar-theme {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+.vc-bar-theme::before {
+  content: "";
+  height: 2rem;
+  border-inline-start: 1px solid var(--r-shadow);
+}
+
+.vc-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* A label written twice (twoLengths): the full one on a wide screen. */
+.vc-short {
+  display: none;
+}
+
+@media (max-width: 49.99rem) {
+  /* A phone: the short name and label, the full ones for screen readers. */
+  .vc-full {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+  .vc-short {
+    display: inline;
+  }
+  .vc-bar-title {
+    gap: 0.5rem;
+  }
+  .vc-bar-links {
+    gap: 0.75rem;
+  }
+  /* GitHub and the theme switch move to the foot of the phone's menu. */
+  .vc-bar-github,
+  .vc-bar-theme {
+    display: none;
+  }
+}
+
+@media (min-width: 50rem) {
+  .vc-bar-search {
+    justify-content: center;
+  }
+}
+
+/* The Rust API reference under /rust/ (cargo doc's own pages) in the docs
+   site's look: the game's palette and font from retro-tokens.css, the site's
+   navy title bar, and the site's side menu above the crate's own items, drawn
+   like src/styles/theme.css draws Starlight's. scripts/rustdoc-chrome.mjs
+   puts this in each page's head after retro-tokens.css, and rustdoc's own
+   variables do most of the rest. Code keeps rustdoc's monospace fonts. */
+
+:root {
+  --font-family: var(--r-font);
+  --vc-bar-height: 4rem;
+  --desktop-sidebar-width: 300px;
+}
+:root[data-theme="light"],
+:root:not([data-theme]) {
+  --main-background-color: var(--r-hi);
+  --main-color: var(--r-ink);
+  --sidebar-background-color: var(--r-face);
+  --sidebar-background-color-hover: #d7d7d7;
+  --sidebar-border-color: var(--r-shadow);
+  --sidebar-link-color: var(--r-title);
+  --sidebar-current-link-background-color: #d7d7d7;
+  --link-color: var(--r-title);
+  --mod-link-color: var(--r-title);
+  --keyword-link-color: var(--r-title);
+  --assoc-item-link-color: var(--r-title);
+  --headings-border-bottom-color: var(--r-shadow);
+  --border-color: var(--r-shadow);
+  --search-input-focused-border-color: var(--r-title);
+  --search-tab-button-selected-border-top-color: var(--r-title);
+  --code-block-background-color: #f0f0f0;
+}
+:root[data-theme="dark"],
+:root[data-theme="ayu"] {
+  --main-background-color: #0a1f1f;
+  --main-color: #eafcfb;
+  --sidebar-background-color: #05403f;
+  --sidebar-background-color-hover: #0b4f4e;
+  --sidebar-border-color: #1d4a49;
+  --sidebar-link-color: #bff3f3;
+  --sidebar-current-link-background-color: #0b4f4e;
+  --link-color: #7fe0e0;
+  --mod-link-color: #7fe0e0;
+  --headings-border-bottom-color: #1d4a49;
+  --border-color: #1d4a49;
+  --code-block-background-color: #163636;
+  --search-input-focused-border-color: #7fe0e0;
+}
+
+/* rustdoc's current item: a sunken white row with navy text, so the navy
+   selected row stays the site menu's "Rust API reference". */
+.sidebar .current {
+  background: var(--r-hi);
+  box-shadow: var(--bevel-in);
+}
+:root[data-theme="dark"] .sidebar .current,
+:root[data-theme="ayu"] .sidebar .current {
+  background: #0a1f1f;
+}
+.sidebar .current,
+.sidebar .current a {
+  color: var(--sidebar-link-color);
+  font-weight: 700;
+}
+
+/* ---- The title bar: Starlight's header -------------------------------- */
+
+/* The bar takes a row of its own above rustdoc's sidebar and page. */
+.rustdoc {
+  flex-wrap: wrap;
+}
+.rustdoc > main {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.vc-header {
+  flex: 0 0 100%;
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  height: var(--vc-bar-height);
+  padding: 0.75rem 1.5rem;
+  box-sizing: border-box;
+  background: var(--r-title);
+  color: var(--r-title-fg);
+  font-family: var(--r-font);
+}
+.vc-header .vc-bar {
+  flex: 1;
+  justify-content: space-between;
+}
+.vc-header a:focus-visible,
+rustdoc-topbar .vc-bar-title:focus-visible,
+rustdoc-topbar .vc-bar-links a:focus-visible {
+  outline: 2px solid #ffc94a;
+  outline-offset: 1px;
+}
+.vc-site-menu a:focus-visible,
+.vc-site-menu summary:focus-visible {
+  outline: 2px solid var(--r-title);
+  outline-offset: 1px;
+}
+
+/* ---- The side menu: Starlight's, as the game's Tools panel ------------- */
+
+/* Before the script moves it into the sidebar (or with scripts off), the
+   menu waits off screen; the title bar still links home. */
+.rustdoc > .vc-site-menu {
+  display: none;
+}
+.sidebar {
+  top: var(--vc-bar-height);
+  height: calc(100vh - var(--vc-bar-height));
+  border-right: 2px solid var(--r-shadow);
+}
+.vc-site-menu {
+  padding: 1rem 1rem 0.75rem 1.5rem;
+  border-bottom: 2px solid var(--sidebar-border-color);
+  font-family: var(--r-font);
+  font-size: 1rem;
+}
+.vc-site-menu ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.vc-site-menu li {
+  margin: 0;
+}
+.vc-site-menu a {
+  display: block;
+  padding: 0.3em 0.75em;
+  color: var(--main-color);
+  text-decoration: none;
+}
+.sidebar .vc-site-menu a:hover {
+  background: var(--sidebar-background-color-hover);
+}
+.vc-site-menu .vc-top > a {
+  padding-inline: 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+.vc-site-menu details {
+  margin: 0.5rem 0;
+}
+/* Group labels as the Tools panel draws them: small, uppercase, spaced. */
+.vc-site-menu summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.3em 0;
+  cursor: pointer;
+  list-style: none;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--sidebar-link-color);
+}
+.vc-site-menu summary::-webkit-details-marker {
+  display: none;
+}
+.vc-site-menu summary::after {
+  content: "";
+  width: 0.45em;
+  height: 0.45em;
+  margin-inline-end: 0.5rem;
+  border: solid currentColor;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+.vc-site-menu details:not([open]) summary::after {
+  transform: rotate(-45deg);
+}
+.vc-site-menu details ul {
+  margin-inline-start: 0.1rem;
+  border-inline-start: 1px solid var(--sidebar-border-color);
+}
+.vc-site-menu details a {
+  margin-inline-start: 0.75rem;
+}
+/* The current page is the selected row: navy, white text, square. */
+.sidebar .vc-site-menu a[aria-current="page"],
+.sidebar .vc-site-menu a[aria-current="page"]:hover {
+  background: var(--r-title);
+  color: var(--r-title-fg);
+  font-weight: 600;
+}
+
+/* A source page pins rustdoc's file-list button to the window's top left,
+   which is the title bar's logo here, so it sits just below the bar. */
+.src #sidebar-button {
+  top: calc(var(--vc-bar-height) + 8px);
+}
+
+/* GitHub closes the menu only where the title bar hides it (title-bar.css,
+   below Starlight's 50rem), which includes widths where rustdoc still shows
+   its desktop sidebar. */
+.vc-menu-github {
+  display: none;
+}
+@media (max-width: 49.99rem) {
+  .vc-menu-github {
+    display: block;
+  }
+}
+
+@media (max-width: 700px) {
+  :root {
+    --vc-bar-height: 3.5rem;
+    --topbar-height: var(--vc-bar-height);
+  }
+  .vc-header {
+    padding-inline: 1rem;
+  }
+  rustdoc-topbar {
+    top: var(--vc-bar-height);
+  }
+
+  /* One bar: once the script has copied the title and the links into
+     rustdoc's top bar (rustdoc-chrome.mjs), that bar is the navy title bar,
+     holding the site's title, the game button, rustdoc's settings and help,
+     and the one menu button at its right, where Starlight puts its own. The
+     crate's name it showed is the page's own heading just below. With
+     rustdoc's "hide sidebar" setting on, rustdoc hides its top bar, so the
+     title bar stays. */
+  .vc-one-bar:not(.hide-sidebar) .vc-header {
+    display: none;
+  }
+  .vc-one-bar rustdoc-topbar {
+    top: 0;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0 1rem;
+    box-sizing: border-box;
+    background: var(--r-title);
+    color: var(--r-title-fg);
+  }
+  .vc-one-bar rustdoc-topbar > h2 {
+    display: none;
+  }
+  .vc-one-bar rustdoc-topbar .vc-bar-title {
+    flex: 1 1 auto;
+    font-size: 1.125rem;
+  }
+  .vc-one-bar rustdoc-topbar .vc-bar-title img {
+    height: 2rem;
+  }
+  .vc-one-bar rustdoc-topbar .settings-menu,
+  .vc-one-bar rustdoc-topbar .help-menu {
+    order: 1;
+  }
+  .vc-one-bar rustdoc-topbar .settings-menu > a,
+  .vc-one-bar rustdoc-topbar .help-menu > a {
+    width: 2rem;
+    height: 2rem;
+  }
+  .vc-one-bar rustdoc-topbar .settings-menu > a::before,
+  .vc-one-bar rustdoc-topbar .help-menu > a::before {
+    margin: 0;
+    filter: invert(1);
+  }
+  .vc-one-bar rustdoc-topbar .settings-menu > a:hover,
+  .vc-one-bar rustdoc-topbar .help-menu > a:hover {
+    background: transparent;
+  }
+  /* rustdoc's menu button as Starlight's: the game's bevelled gray button. */
+  .vc-one-bar rustdoc-topbar .sidebar-menu-toggle {
+    order: 2;
+    flex: none;
+    width: 2rem;
+    min-width: 2rem;
+    height: 2rem;
+    padding: 0;
+    background: var(--r-face);
+    box-shadow: var(--bevel-out);
+  }
+  /* Three ink bars, the size of Starlight's menu icon. */
+  .vc-one-bar rustdoc-topbar .sidebar-menu-toggle::before {
+    content: "";
+    display: block;
+    width: 1rem;
+    height: 2px;
+    margin: auto;
+    background: var(--r-ink);
+    box-shadow: 0 -5px 0 var(--r-ink), 0 5px 0 var(--r-ink);
+    filter: none;
+    opacity: 1;
+  }
+  .vc-one-bar rustdoc-topbar .sidebar-menu-toggle:active {
+    box-shadow: var(--bevel-in);
+  }
+}
+</style>
+
+</head><body class="rustdoc src"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><header class="vc-header"><div class="vc-bar"><a class="vc-bar-title" href="/pr-preview/pr-2199/"><img src="/pr-preview/pr-2199/favicon.png" alt="" width="40" height="40"><span class="vc-name" translate="no"><span class="vc-full">Verticopolis engine</span><span class="vc-short" aria-hidden="true">Engine docs</span></span></a><div class="vc-bar-links"><a class="vc-bar-game" href="https://verticopolis.com/" data-game-link><span class="vc-full">Play the game</span><span class="vc-short" aria-hidden="true">Play</span></a><a class="vc-bar-github" href="https://github.com/maniator/verticopolis"><span class="vc-sr-only">GitHub</span><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M12 .3a12 12 0 0 0-3.8 23.38c.6.12.83-.26.83-.57L9 21.07c-3.34.72-4.04-1.61-4.04-1.61-.55-1.39-1.34-1.76-1.34-1.76-1.08-.74.09-.73.09-.73 1.2.09 1.83 1.24 1.83 1.24 1.08 1.83 2.81 1.3 3.5 1 .1-.78.42-1.31.76-1.61-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.14-.3-.54-1.52.1-3.18 0 0 1-.32 3.3 1.23a11.5 11.5 0 0 1 6 0c2.28-1.55 3.29-1.23 3.29-1.23.64 1.66.24 2.88.12 3.18a4.65 4.65 0 0 1 1.23 3.22c0 4.61-2.8 5.63-5.48 5.92.42.36.81 1.1.81 2.22l-.01 3.29c0 .31.2.69.82.57A12 12 0 0 0 12 .3Z"/></svg></a></div></div></header>
+<nav class="vc-site-menu" aria-label="Docs"><ul><li class="vc-top"><a href="/pr-preview/pr-2199/">Overview</a></li><li><details open><summary>Guides</summary><ul><li><a href="/pr-preview/pr-2199/javascript/">JavaScript package</a></li><li><a href="/pr-preview/pr-2199/crate/">Rust crate</a></li><li><a href="/pr-preview/pr-2199/api/">Host API guide</a></li><li><a href="/pr-preview/pr-2199/conformance/">Conformance suite</a></li></ul></details></li><li><details open><summary>Reference</summary><ul><li><a href="/pr-preview/pr-2199/rust/verticopolis_engine/" aria-current="page">Rust API reference</a></li><li><a href="/pr-preview/pr-2199/changelog/">Engine changelog</a></li></ul></details></li><li class="vc-top"><a href="https://verticopolis.com/">Play Verticopolis</a></li><li class="vc-top vc-menu-github"><a href="https://github.com/maniator/verticopolis">GitHub</a></li></ul></nav>
+
+<nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><h1><div class="sub-heading">verticopolis_engine/</div>sim_undo_ground.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap digits-3"><pre class="rust"><code><a href=#1 id=1 data-nosnippet>1</a><span class="doccomment">//! The ground a step leaves (`sim_undo_check.rs`): the tower's floor and
+<a href=#2 id=2 data-nosnippet>2</a>//! lobby tiles, less those of the units the step takes out, with those of
+<a href=#3 id=3 data-nosnippet>3</a>//! the units it puts back. A room, a shaft or the metro station the step
+<a href=#4 id=4 data-nosnippet>4</a>//! puts back must stand where building it could, a floor or lobby tile
+<a href=#5 id=5 data-nosnippet>5</a>//! where its story and the station let it, and what the step leaves
+<a href=#6 id=6 data-nosnippet>6</a>//! standing must keep standing. The lobby rule, that taking out a
+<a href=#7 id=7 data-nosnippet>7</a>//! ground-floor lobby tile leaves nothing laid since hanging, has its own
+<a href=#8 id=8 data-nosnippet>8</a>//! file (`sim_undo_lobby.rs`).
+<a href=#9 id=9 data-nosnippet>9</a></span><span class="kw">use </span><span class="kw">crate</span>::crowd::fasthash::{FastMap, FastSet};
+<a href=#10 id=10 data-nosnippet>10</a><span class="kw">use </span><span class="kw">crate</span>::facilities::{is_sky_lobby_floor, Kind, LOT_WIDTH, MIN_FLOOR};
+<a href=#11 id=11 data-nosnippet>11</a><span class="kw">use </span><span class="kw">crate</span>::tower::{floor_left_of, floor_right_of, Tower, Transport, Unit};
+<a href=#12 id=12 data-nosnippet>12</a><span class="kw">use </span><span class="kw">crate</span>::undo::{Step, UnitChange};
+<a href=#13 id=13 data-nosnippet>13</a>
+<a href=#14 id=14 data-nosnippet>14</a><span class="doccomment">/// The floor the lobby concourse runs along.
+<a href=#15 id=15 data-nosnippet>15</a></span><span class="kw">const </span>GROUND_FLOOR: i64 = <span class="number">1</span>;
+<a href=#16 id=16 data-nosnippet>16</a>
+<a href=#17 id=17 data-nosnippet>17</a><span class="attr">#[path = <span class="string">"sim_undo_lobby.rs"</span>]
+<a href=#18 id=18 data-nosnippet>18</a></span><span class="kw">mod </span>lobby;
+<a href=#19 id=19 data-nosnippet>19</a>
+<a href=#20 id=20 data-nosnippet>20</a><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct </span>Ground&lt;<span class="lifetime">'a</span>&gt; {
+<a href=#21 id=21 data-nosnippet>21</a>    tower: <span class="kw-2">&amp;</span><span class="lifetime">'a </span>Tower,
+<a href=#22 id=22 data-nosnippet>22</a>    leaving: <span class="kw-2">&amp;</span><span class="lifetime">'a </span>FastSet&lt;i64&gt;,
+<a href=#23 id=23 data-nosnippet>23</a>    <span class="doccomment">/// The floor and lobby tiles the step puts back, each with the id and
+<a href=#24 id=24 data-nosnippet>24</a>    /// kind of the unit it puts back there.
+<a href=#25 id=25 data-nosnippet>25</a>    </span>laid: FastMap&lt;(i64, i64), (i64, Kind)&gt;,
+<a href=#26 id=26 data-nosnippet>26</a>    <span class="doccomment">/// The floor and lobby tiles the step takes out and does not lay again,
+<a href=#27 id=27 data-nosnippet>27</a>    /// as (x, floor) in order, so a shaft finds those in its column with a
+<a href=#28 id=28 data-nosnippet>28</a>    /// search.
+<a href=#29 id=29 data-nosnippet>29</a>    </span>taken: Vec&lt;(i64, i64)&gt;,
+<a href=#30 id=30 data-nosnippet>30</a>    <span class="doccomment">/// Where on the ground floor the step takes out a lobby tile and does
+<a href=#31 id=31 data-nosnippet>31</a>    /// not lay a tile again.
+<a href=#32 id=32 data-nosnippet>32</a>    </span>lobbies_taken: Vec&lt;i64&gt;,
+<a href=#33 id=33 data-nosnippet>33</a>    <span class="doccomment">/// The lobby tiles the step adds to each floor, less those it takes out.
+<a href=#34 id=34 data-nosnippet>34</a>    </span>lobbies_added: FastMap&lt;i64, i64&gt;,
+<a href=#35 id=35 data-nosnippet>35</a>    <span class="doccomment">/// The room tiles the step takes out on each row a room it takes out
+<a href=#36 id=36 data-nosnippet>36</a>    /// stands on.
+<a href=#37 id=37 data-nosnippet>37</a>    </span>rooms_leaving: FastMap&lt;i64, i64&gt;,
+<a href=#38 id=38 data-nosnippet>38</a>    <span class="doccomment">/// The row the metro stations stand on once the step applies: that of a
+<a href=#39 id=39 data-nosnippet>39</a>    /// station the step leaves standing, else that of one it puts back.
+<a href=#40 id=40 data-nosnippet>40</a>    </span>station: <span class="prelude-ty">Option</span>&lt;i64&gt;,
+<a href=#41 id=41 data-nosnippet>41</a>}
+<a href=#42 id=42 data-nosnippet>42</a>
+<a href=#43 id=43 data-nosnippet>43</a><span class="kw">impl</span>&lt;<span class="lifetime">'a</span>&gt; Ground&lt;<span class="lifetime">'a</span>&gt; {
+<a href=#44 id=44 data-nosnippet>44</a>    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>of(tower: <span class="kw-2">&amp;</span><span class="lifetime">'a </span>Tower, step: <span class="kw-2">&amp;</span>Step, leaving: <span class="kw-2">&amp;</span><span class="lifetime">'a </span>FastSet&lt;i64&gt;) -&gt; <span class="self">Self </span>{
+<a href=#45 id=45 data-nosnippet>45</a>        <span class="kw">let </span>put_back: Vec&lt;<span class="kw-2">&amp;</span>Unit&gt; = step
+<a href=#46 id=46 data-nosnippet>46</a>            .units
+<a href=#47 id=47 data-nosnippet>47</a>            .iter()
+<a href=#48 id=48 data-nosnippet>48</a>            .filter_map(|img| <span class="kw">match </span><span class="kw-2">&amp;</span>img.change {
+<a href=#49 id=49 data-nosnippet>49</a>                UnitChange::PutBack(u) =&gt; <span class="prelude-val">Some</span>(u),
+<a href=#50 id=50 data-nosnippet>50</a>                <span class="kw">_ </span>=&gt; <span class="prelude-val">None</span>,
+<a href=#51 id=51 data-nosnippet>51</a>            })
+<a href=#52 id=52 data-nosnippet>52</a>            .collect();
+<a href=#53 id=53 data-nosnippet>53</a>        <span class="kw">let </span><span class="kw-2">mut </span>laid = FastMap::default();
+<a href=#54 id=54 data-nosnippet>54</a>        <span class="kw">for </span>u <span class="kw">in </span>put_back.iter().filter(|u| u.kind.is_structural()) {
+<a href=#55 id=55 data-nosnippet>55</a>            <span class="kw">for </span>tile <span class="kw">in </span>tiles_of(u) {
+<a href=#56 id=56 data-nosnippet>56</a>                laid.insert(tile, (u.id, u.kind));
+<a href=#57 id=57 data-nosnippet>57</a>            }
+<a href=#58 id=58 data-nosnippet>58</a>        }
+<a href=#59 id=59 data-nosnippet>59</a>        <span class="kw">let </span><span class="kw-2">mut </span>lobbies_added = FastMap::default();
+<a href=#60 id=60 data-nosnippet>60</a>        <span class="kw">for </span>u <span class="kw">in </span>put_back.iter().filter(|u| u.kind == Kind::Lobby) {
+<a href=#61 id=61 data-nosnippet>61</a>            <span class="kw-2">*</span>lobbies_added.get_or_insert_with(u.floor, || <span class="number">0</span>) += u.width;
+<a href=#62 id=62 data-nosnippet>62</a>        }
+<a href=#63 id=63 data-nosnippet>63</a>        <span class="comment">// One walk over the units the step takes out.
+<a href=#64 id=64 data-nosnippet>64</a>        </span><span class="kw">let </span>(<span class="kw-2">mut </span>taken, <span class="kw-2">mut </span>lobbies_taken) = (Vec::new(), Vec::new());
+<a href=#65 id=65 data-nosnippet>65</a>        <span class="kw">let </span><span class="kw-2">mut </span>rooms_leaving = FastMap::default();
+<a href=#66 id=66 data-nosnippet>66</a>        <span class="kw">let </span>taken_out = step
+<a href=#67 id=67 data-nosnippet>67</a>            .units
+<a href=#68 id=68 data-nosnippet>68</a>            .iter()
+<a href=#69 id=69 data-nosnippet>69</a>            .filter(|img| <span class="macro">matches!</span>(img.change, UnitChange::TakeOut(<span class="kw">_</span>)))
+<a href=#70 id=70 data-nosnippet>70</a>            .filter_map(|img| tower.get_unit(img.id));
+<a href=#71 id=71 data-nosnippet>71</a>        <span class="kw">for </span>u <span class="kw">in </span>taken_out {
+<a href=#72 id=72 data-nosnippet>72</a>            <span class="kw">if </span>u.kind.is_structural() {
+<a href=#73 id=73 data-nosnippet>73</a>                <span class="kw">for </span>(floor, x) <span class="kw">in </span>tiles_of(u).filter(|tile| !laid.contains_key(tile)) {
+<a href=#74 id=74 data-nosnippet>74</a>                    taken.push((x, floor));
+<a href=#75 id=75 data-nosnippet>75</a>                    <span class="kw">if </span>u.kind == Kind::Lobby &amp;&amp; floor == GROUND_FLOOR {
+<a href=#76 id=76 data-nosnippet>76</a>                        lobbies_taken.push(x);
+<a href=#77 id=77 data-nosnippet>77</a>                    }
+<a href=#78 id=78 data-nosnippet>78</a>                }
+<a href=#79 id=79 data-nosnippet>79</a>                <span class="kw">if </span>u.kind == Kind::Lobby {
+<a href=#80 id=80 data-nosnippet>80</a>                    <span class="kw-2">*</span>lobbies_added.get_or_insert_with(u.floor, || <span class="number">0</span>) -= u.width;
+<a href=#81 id=81 data-nosnippet>81</a>                }
+<a href=#82 id=82 data-nosnippet>82</a>            } <span class="kw">else </span>{
+<a href=#83 id=83 data-nosnippet>83</a>                <span class="kw">for </span>row <span class="kw">in </span>u.floor..u.floor + u.kind.floors() {
+<a href=#84 id=84 data-nosnippet>84</a>                    <span class="kw-2">*</span>rooms_leaving.get_or_insert_with(row, || <span class="number">0</span>) += u.width;
+<a href=#85 id=85 data-nosnippet>85</a>                }
+<a href=#86 id=86 data-nosnippet>86</a>            }
+<a href=#87 id=87 data-nosnippet>87</a>        }
+<a href=#88 id=88 data-nosnippet>88</a>        taken.sort_unstable();
+<a href=#89 id=89 data-nosnippet>89</a>        <span class="kw">let </span>station = tower
+<a href=#90 id=90 data-nosnippet>90</a>            .metro_stations()
+<a href=#91 id=91 data-nosnippet>91</a>            .find(|u| !leaving.contains(<span class="kw-2">&amp;</span>u.id))
+<a href=#92 id=92 data-nosnippet>92</a>            .or_else(|| put_back.iter().copied().find(|u| u.kind == Kind::Metro))
+<a href=#93 id=93 data-nosnippet>93</a>            .map(|u| u.floor);
+<a href=#94 id=94 data-nosnippet>94</a>        Ground {
+<a href=#95 id=95 data-nosnippet>95</a>            tower,
+<a href=#96 id=96 data-nosnippet>96</a>            leaving,
+<a href=#97 id=97 data-nosnippet>97</a>            laid,
+<a href=#98 id=98 data-nosnippet>98</a>            taken,
+<a href=#99 id=99 data-nosnippet>99</a>            lobbies_taken,
+<a href=#100 id=100 data-nosnippet>100</a>            lobbies_added,
+<a href=#101 id=101 data-nosnippet>101</a>            rooms_leaving,
+<a href=#102 id=102 data-nosnippet>102</a>            station,
+<a href=#103 id=103 data-nosnippet>103</a>        }
+<a href=#104 id=104 data-nosnippet>104</a>    }
+<a href=#105 id=105 data-nosnippet>105</a>
+<a href=#106 id=106 data-nosnippet>106</a>    <span class="kw">fn </span>holds(<span class="kw-2">&amp;</span><span class="self">self</span>, floor: i64, x: i64) -&gt; bool {
+<a href=#107 id=107 data-nosnippet>107</a>        <span class="self">self</span>.laid.contains_key(<span class="kw-2">&amp;</span>(floor, x)) || <span class="self">self</span>.stays(floor, x)
+<a href=#108 id=108 data-nosnippet>108</a>    }
+<a href=#109 id=109 data-nosnippet>109</a>
+<a href=#110 id=110 data-nosnippet>110</a>    <span class="doccomment">/// The id and kind of the unit whose floor or lobby tile holds at
+<a href=#111 id=111 data-nosnippet>111</a>    /// `tile`, as (floor, x), once the step applies: the one the step puts
+<a href=#112 id=112 data-nosnippet>112</a>    /// back there, or the tower's that stays. Unit ids only grow, and a unit
+<a href=#113 id=113 data-nosnippet>113</a>    /// an undo puts back keeps its own, so the id says when the tile was
+<a href=#114 id=114 data-nosnippet>114</a>    /// built.
+<a href=#115 id=115 data-nosnippet>115</a>    </span><span class="kw">fn </span>built_by(<span class="kw-2">&amp;</span><span class="self">self</span>, tile: (i64, i64)) -&gt; <span class="prelude-ty">Option</span>&lt;(i64, Kind)&gt; {
+<a href=#116 id=116 data-nosnippet>116</a>        <span class="kw">if let </span><span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span>laid) = <span class="self">self</span>.laid.get(<span class="kw-2">&amp;</span>tile) {
+<a href=#117 id=117 data-nosnippet>117</a>            <span class="kw">return </span><span class="prelude-val">Some</span>(laid);
+<a href=#118 id=118 data-nosnippet>118</a>        }
+<a href=#119 id=119 data-nosnippet>119</a>        <span class="kw">let </span>id = <span class="kw-2">*</span><span class="self">self</span>.tower.structure.get(<span class="kw-2">&amp;</span>tile)<span class="question-mark">?</span>;
+<a href=#120 id=120 data-nosnippet>120</a>        <span class="kw">let </span>kind = <span class="self">self</span>.tower.struct_kind.get(<span class="kw-2">&amp;</span>tile).copied()<span class="question-mark">?</span>;
+<a href=#121 id=121 data-nosnippet>121</a>        (!<span class="self">self</span>.leaving.contains(<span class="kw-2">&amp;</span>id)).then_some((id, kind))
+<a href=#122 id=122 data-nosnippet>122</a>    }
+<a href=#123 id=123 data-nosnippet>123</a>
+<a href=#124 id=124 data-nosnippet>124</a>    <span class="doccomment">/// Whether the tower's floor or lobby tile at (`floor`, `x`) stays,
+<a href=#125 id=125 data-nosnippet>125</a>    /// which is all a sale of what the step takes out leaves there.
+<a href=#126 id=126 data-nosnippet>126</a>    </span><span class="kw">fn </span>stays(<span class="kw-2">&amp;</span><span class="self">self</span>, floor: i64, x: i64) -&gt; bool {
+<a href=#127 id=127 data-nosnippet>127</a>        <span class="self">self</span>.tower
+<a href=#128 id=128 data-nosnippet>128</a>            .structure
+<a href=#129 id=129 data-nosnippet>129</a>            .get(<span class="kw-2">&amp;</span>(floor, x))
+<a href=#130 id=130 data-nosnippet>130</a>            .is_some_and(|id| !<span class="self">self</span>.leaving.contains(id))
+<a href=#131 id=131 data-nosnippet>131</a>    }
+<a href=#132 id=132 data-nosnippet>132</a>
+<a href=#133 id=133 data-nosnippet>133</a>    <span class="doccomment">/// Whether the step lays one of the tiles of floor or lobby tile `u`
+<a href=#134 id=134 data-nosnippet>134</a>    /// again.
+<a href=#135 id=135 data-nosnippet>135</a>    </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>lays_again(<span class="kw-2">&amp;</span><span class="self">self</span>, u: <span class="kw-2">&amp;</span>Unit) -&gt; bool {
+<a href=#136 id=136 data-nosnippet>136</a>        tiles_of(u).any(|tile| <span class="self">self</span>.laid.contains_key(<span class="kw-2">&amp;</span>tile))
+<a href=#137 id=137 data-nosnippet>137</a>    }
+<a href=#138 id=138 data-nosnippet>138</a>
+<a href=#139 id=139 data-nosnippet>139</a>    <span class="doccomment">/// Whether `floor` has a lobby tile once the step applies.
+<a href=#140 id=140 data-nosnippet>140</a>    </span><span class="kw">fn </span>has_lobby(<span class="kw-2">&amp;</span><span class="self">self</span>, floor: i64) -&gt; bool {
+<a href=#141 id=141 data-nosnippet>141</a>        <span class="kw">let </span>added = <span class="self">self</span>.lobbies_added.get(<span class="kw-2">&amp;</span>floor).copied().unwrap_or(<span class="number">0</span>);
+<a href=#142 id=142 data-nosnippet>142</a>        <span class="self">self</span>.tower.lobby_tile_count(floor) + added &gt; <span class="number">0
+<a href=#143 id=143 data-nosnippet>143</a>    </span>}
+<a href=#144 id=144 data-nosnippet>144</a>
+<a href=#145 id=145 data-nosnippet>145</a>    <span class="doccomment">/// Whether the step leaves a room tile on `row`.
+<a href=#146 id=146 data-nosnippet>146</a>    </span><span class="kw">fn </span>rooms_stay_on(<span class="kw-2">&amp;</span><span class="self">self</span>, row: i64) -&gt; bool {
+<a href=#147 id=147 data-nosnippet>147</a>        <span class="kw">let </span>on_row = <span class="self">self</span>.tower.room_tiles.get(<span class="kw-2">&amp;</span>row).copied().unwrap_or(<span class="number">0</span>);
+<a href=#148 id=148 data-nosnippet>148</a>        on_row &gt; <span class="self">self</span>.rooms_leaving.get(<span class="kw-2">&amp;</span>row).copied().unwrap_or(<span class="number">0</span>)
+<a href=#149 id=149 data-nosnippet>149</a>    }
+<a href=#150 id=150 data-nosnippet>150</a>
+<a href=#151 id=151 data-nosnippet>151</a>    <span class="doccomment">/// Whether unit `u` stands where the build rules let it. A floor or lobby
+<a href=#152 id=152 data-nosnippet>152</a>    /// tile stands on the metro station's row or above it, and above the ground
+<a href=#153 id=153 data-nosnippet>153</a>    /// floor rests on the story below, as `Tower::is_supported` asks; a lobby
+<a href=#154 id=154 data-nosnippet>154</a>    /// tile goes back on a sky lobby floor only where no room stays on that
+<a href=#155 id=155 data-nosnippet>155</a>    /// floor (`Tower::can_place`). A floor tile may go back on a sky lobby
+<a href=#156 id=156 data-nosnippet>156</a>    /// floor beside a room, or beside a lobby the lobby brush left there,
+<a href=#157 id=157 data-nosnippet>157</a>    /// though `Tower::can_place` refuses a new one beside a lobby. A tile on
+<a href=#158 id=158 data-nosnippet>158</a>    /// the ground floor or below is asked for no neighbor here, though its
+<a href=#159 id=159 data-nosnippet>159</a>    /// build asked for a tile beside, above or below it (#1843). A room has
+<a href=#160 id=160 data-nosnippet>160</a>    /// floor under every tile, as its build laid (`Tower::ensure_floor_under`),
+<a href=#161 id=161 data-nosnippet>161</a>    /// sits on no sky lobby floor that holds a lobby (so never on a lobby tile,
+<a href=#162 id=162 data-nosnippet>162</a>    /// which goes only on those floors and the ground floor, where no room
+<a href=#163 id=163 data-nosnippet>163</a>    /// goes), and stands above the station's row (`metro_reason`). A wedding
+<a href=#164 id=164 data-nosnippet>164</a>    /// hall's upper story stands above the top slab. The station itself has
+<a href=#165 id=165 data-nosnippet>165</a>    /// nothing below it and no room on its row.
+<a href=#166 id=166 data-nosnippet>166</a>    </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>under_room(<span class="kw-2">&amp;</span><span class="self">self</span>, u: <span class="kw-2">&amp;</span>Unit) -&gt; bool {
+<a href=#167 id=167 data-nosnippet>167</a>        <span class="kw">if </span>u.kind.is_structural() {
+<a href=#168 id=168 data-nosnippet>168</a>            <span class="kw">let </span>rests =
+<a href=#169 id=169 data-nosnippet>169</a>                u.floor &lt;= GROUND_FLOOR || (u.x..u.x + u.width).all(|x| <span class="self">self</span>.holds(u.floor - <span class="number">1</span>, x));
+<a href=#170 id=170 data-nosnippet>170</a>            <span class="kw">let </span>concourse = u.kind == Kind::Lobby &amp;&amp; is_sky_lobby_floor(u.floor);
+<a href=#171 id=171 data-nosnippet>171</a>            <span class="kw">return </span>rests
+<a href=#172 id=172 data-nosnippet>172</a>                &amp;&amp; !(concourse &amp;&amp; <span class="self">self</span>.rooms_stay_on(u.floor))
+<a href=#173 id=173 data-nosnippet>173</a>                &amp;&amp; <span class="self">self</span>.station.is_none_or(|station| u.floor &gt;= station);
+<a href=#174 id=174 data-nosnippet>174</a>        }
+<a href=#175 id=175 data-nosnippet>175</a>        <span class="kw">let </span>stories = <span class="self">self</span>.tower.lot().slab_stories(u.kind, u.floor);
+<a href=#176 id=176 data-nosnippet>176</a>        <span class="kw">let </span>floored = (u.floor..u.floor + stories).all(|f| {
+<a href=#177 id=177 data-nosnippet>177</a>            !(is_sky_lobby_floor(f) &amp;&amp; <span class="self">self</span>.has_lobby(f))
+<a href=#178 id=178 data-nosnippet>178</a>                &amp;&amp; (u.x..u.x + u.width).all(|x| <span class="self">self</span>.holds(f, x))
+<a href=#179 id=179 data-nosnippet>179</a>        });
+<a href=#180 id=180 data-nosnippet>180</a>        <span class="kw">let </span>site = <span class="kw">if </span>u.kind == Kind::Metro {
+<a href=#181 id=181 data-nosnippet>181</a>            <span class="self">self</span>.station == <span class="prelude-val">Some</span>(u.floor) &amp;&amp; <span class="self">self</span>.clear_for_station(u.floor)
+<a href=#182 id=182 data-nosnippet>182</a>        } <span class="kw">else </span>{
+<a href=#183 id=183 data-nosnippet>183</a>            <span class="self">self</span>.station.is_none_or(|station| u.floor &gt; station)
+<a href=#184 id=184 data-nosnippet>184</a>        };
+<a href=#185 id=185 data-nosnippet>185</a>        floored &amp;&amp; site
+<a href=#186 id=186 data-nosnippet>186</a>    }
+<a href=#187 id=187 data-nosnippet>187</a>
+<a href=#188 id=188 data-nosnippet>188</a>    <span class="doccomment">/// Whether nothing the step leaves stands below `row`, and no room it
+<a href=#189 id=189 data-nosnippet>189</a>    /// leaves stands on that row but the other metro stations, so a station
+<a href=#190 id=190 data-nosnippet>190</a>    /// can stand there beside them. A unit the step puts back below the row,
+<a href=#191 id=191 data-nosnippet>191</a>    /// or a room it puts back on it, is refused on its own.
+<a href=#192 id=192 data-nosnippet>192</a>    </span><span class="kw">fn </span>clear_for_station(<span class="kw-2">&amp;</span><span class="self">self</span>, row: i64) -&gt; bool {
+<a href=#193 id=193 data-nosnippet>193</a>        <span class="kw">let </span>staying_stations: i64 = <span class="self">self
+<a href=#194 id=194 data-nosnippet>194</a>            </span>.tower
+<a href=#195 id=195 data-nosnippet>195</a>            .metro_stations()
+<a href=#196 id=196 data-nosnippet>196</a>            .filter(|u| u.floor == row &amp;&amp; !<span class="self">self</span>.leaving.contains(<span class="kw-2">&amp;</span>u.id))
+<a href=#197 id=197 data-nosnippet>197</a>            .map(|u| u.width)
+<a href=#198 id=198 data-nosnippet>198</a>            .sum();
+<a href=#199 id=199 data-nosnippet>199</a>        <span class="kw">let </span>on_row = <span class="self">self</span>.tower.room_tiles.get(<span class="kw-2">&amp;</span>row).copied().unwrap_or(<span class="number">0</span>);
+<a href=#200 id=200 data-nosnippet>200</a>        <span class="kw">let </span>leaving = <span class="self">self</span>.rooms_leaving.get(<span class="kw-2">&amp;</span>row).copied().unwrap_or(<span class="number">0</span>);
+<a href=#201 id=201 data-nosnippet>201</a>        <span class="kw">if </span>on_row - leaving &gt; staying_stations {
+<a href=#202 id=202 data-nosnippet>202</a>            <span class="kw">return </span><span class="bool-val">false</span>;
+<a href=#203 id=203 data-nosnippet>203</a>        }
+<a href=#204 id=204 data-nosnippet>204</a>        <span class="comment">// Every room stands on floor, so the floor tiles say where the
+<a href=#205 id=205 data-nosnippet>205</a>        // units are.
+<a href=#206 id=206 data-nosnippet>206</a>        </span><span class="kw">let </span>lowest = <span class="self">self</span>.tower.floor_bounds().<span class="number">0</span>.max(MIN_FLOOR);
+<a href=#207 id=207 data-nosnippet>207</a>        (lowest..row).all(|floor| (<span class="number">0</span>..LOT_WIDTH).all(|x| !<span class="self">self</span>.holds(floor, x)))
+<a href=#208 id=208 data-nosnippet>208</a>    }
+<a href=#209 id=209 data-nosnippet>209</a>
+<a href=#210 id=210 data-nosnippet>210</a>    <span class="doccomment">/// Whether shaft `t` has floor or lobby in its column on every story it
+<a href=#211 id=211 data-nosnippet>211</a>    /// spans, as `Tower::validate_transport` asks.
+<a href=#212 id=212 data-nosnippet>212</a>    </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>under_shaft(<span class="kw-2">&amp;</span><span class="self">self</span>, t: <span class="kw-2">&amp;</span>Transport) -&gt; bool {
+<a href=#213 id=213 data-nosnippet>213</a>        (t.bottom..=t.top).all(|f| (t.x..t.x + t.width).any(|x| <span class="self">self</span>.holds(f, x)))
+<a href=#214 id=214 data-nosnippet>214</a>    }
+<a href=#215 id=215 data-nosnippet>215</a>
+<a href=#216 id=216 data-nosnippet>216</a>    <span class="doccomment">/// Whether shaft `t`, which stood on the tower's tiles, still has floor
+<a href=#217 id=217 data-nosnippet>217</a>    /// or lobby in its column on each story where the step takes a tile
+<a href=#218 id=218 data-nosnippet>218</a>    /// from under it.
+<a href=#219 id=219 data-nosnippet>219</a>    </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>still_under_shaft(<span class="kw-2">&amp;</span><span class="self">self</span>, t: <span class="kw-2">&amp;</span>Transport) -&gt; bool {
+<a href=#220 id=220 data-nosnippet>220</a>        <span class="self">self</span>.under_shaft_where(t, |floor, x| <span class="self">self</span>.holds(floor, x))
+<a href=#221 id=221 data-nosnippet>221</a>    }
+<a href=#222 id=222 data-nosnippet>222</a>
+<a href=#223 id=223 data-nosnippet>223</a>    <span class="doccomment">/// Whether shaft `t` would still have that floor once the player sold
+<a href=#224 id=224 data-nosnippet>224</a>    /// what the step takes out: a sale lays no tile.
+<a href=#225 id=225 data-nosnippet>225</a>    </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>still_under_shaft_once_sold(<span class="kw-2">&amp;</span><span class="self">self</span>, t: <span class="kw-2">&amp;</span>Transport) -&gt; bool {
+<a href=#226 id=226 data-nosnippet>226</a>        <span class="self">self</span>.under_shaft_where(t, |floor, x| <span class="self">self</span>.stays(floor, x))
+<a href=#227 id=227 data-nosnippet>227</a>    }
+<a href=#228 id=228 data-nosnippet>228</a>
+<a href=#229 id=229 data-nosnippet>229</a>    <span class="doccomment">/// Whether shaft `t` has a tile that `holds` in its column on each
+<a href=#230 id=230 data-nosnippet>230</a>    /// story where the step takes a tile from under it. Each column of the
+<a href=#231 id=231 data-nosnippet>231</a>    /// shaft is a run of `taken`, found by a search.
+<a href=#232 id=232 data-nosnippet>232</a>    </span><span class="kw">fn </span>under_shaft_where(<span class="kw-2">&amp;</span><span class="self">self</span>, t: <span class="kw-2">&amp;</span>Transport, holds: <span class="kw">impl </span>Fn(i64, i64) -&gt; bool) -&gt; bool {
+<a href=#233 id=233 data-nosnippet>233</a>        <span class="kw">let </span>columns = t.x..t.x + t.width;
+<a href=#234 id=234 data-nosnippet>234</a>        columns.clone().all(|x| {
+<a href=#235 id=235 data-nosnippet>235</a>            <span class="kw">let </span>from = <span class="self">self</span>.taken.partition_point(|<span class="kw-2">&amp;</span>tile| tile &lt; (x, t.bottom));
+<a href=#236 id=236 data-nosnippet>236</a>            <span class="kw">let </span>to = <span class="self">self</span>.taken.partition_point(|<span class="kw-2">&amp;</span>tile| tile &lt;= (x, t.top));
+<a href=#237 id=237 data-nosnippet>237</a>            <span class="comment">// A shaft whose span runs backward has no tiles under it.
+<a href=#238 id=238 data-nosnippet>238</a>            </span><span class="self">self</span>.taken
+<a href=#239 id=239 data-nosnippet>239</a>                .get(from..to)
+<a href=#240 id=240 data-nosnippet>240</a>                .unwrap_or_default()
+<a href=#241 id=241 data-nosnippet>241</a>                .iter()
+<a href=#242 id=242 data-nosnippet>242</a>                .all(|<span class="kw-2">&amp;</span>(<span class="kw">_</span>, f)| columns.clone().any(|x| holds(f, x)))
+<a href=#243 id=243 data-nosnippet>243</a>        })
+<a href=#244 id=244 data-nosnippet>244</a>    }
+<a href=#245 id=245 data-nosnippet>245</a>
+<a href=#246 id=246 data-nosnippet>246</a>    <span class="doccomment">/// Whether the player could sell floor tile `u`, with the other tiles
+<a href=#247 id=247 data-nosnippet>247</a>    /// the step takes out, by the floor rule a sale keeps to
+<a href=#248 id=248 data-nosnippet>248</a>    /// (`Tower::removal_reason`): in a mode that keeps floors whole
+<a href=#249 id=249 data-nosnippet>249</a>    /// ([`GameMode::removes_mid_floor_tiles`](crate::clock::GameMode::removes_mid_floor_tiles)),
+<a href=#250 id=250 data-nosnippet>250</a>    /// the sales take each run of leaving tiles from one of its ends, by
+<a href=#251 id=251 data-nosnippet>251</a>    /// [`floor_left_of`] and [`floor_right_of`] over the tiles that stay, as
+<a href=#252 id=252 data-nosnippet>252</a>    /// `Tower::floor_on_both_sides` asks of a sale. So a gap a save already
+<a href=#253 id=253 data-nosnippet>253</a>    /// has is no end, and a lobby a run touches holds it in. A run still
+<a href=#254 id=254 data-nosnippet>254</a>    /// standing is plain floor on one side of every other run on its story,
+<a href=#255 id=255 data-nosnippet>255</a>    /// so the sales start at the story's two ends and work inward: the run
+<a href=#256 id=256 data-nosnippet>256</a>    /// of `u` comes out once every run from one end of the story through it
+<a href=#257 id=257 data-nosnippet>257</a>    /// can come out toward that end. Only the run's first tile asks, for the
+<a href=#258 id=258 data-nosnippet>258</a>    /// whole run, and the others answer yes, since the step is sellable only
+<a href=#259 id=259 data-nosnippet>259</a>    /// when every tile is.
+<a href=#260 id=260 data-nosnippet>260</a>    </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>sells_from_an_end(<span class="kw-2">&amp;</span><span class="self">self</span>, u: <span class="kw-2">&amp;</span>Unit) -&gt; bool {
+<a href=#261 id=261 data-nosnippet>261</a>        <span class="kw">if </span><span class="self">self</span>.tower.mode.removes_mid_floor_tiles() || <span class="self">self</span>.leaves(u.floor, u.x - <span class="number">1</span>) {
+<a href=#262 id=262 data-nosnippet>262</a>            <span class="kw">return </span><span class="bool-val">true</span>;
+<a href=#263 id=263 data-nosnippet>263</a>        }
+<a href=#264 id=264 data-nosnippet>264</a>        <span class="comment">// The run ends at the first tile past `u` that does not leave.
+<a href=#265 id=265 data-nosnippet>265</a>        </span><span class="kw">let </span>run_end = (u.x + u.width..LOT_WIDTH)
+<a href=#266 id=266 data-nosnippet>266</a>            .find(|<span class="kw-2">&amp;</span>x| !<span class="self">self</span>.leaves(u.floor, x))
+<a href=#267 id=267 data-nosnippet>267</a>            .unwrap_or(LOT_WIDTH);
+<a href=#268 id=268 data-nosnippet>268</a>        <span class="self">self</span>.comes_out_leftward(u.floor, u.x) || <span class="self">self</span>.comes_out_rightward(u.floor, run_end)
+<a href=#269 id=269 data-nosnippet>269</a>    }
+<a href=#270 id=270 data-nosnippet>270</a>
+<a href=#271 id=271 data-nosnippet>271</a>    <span class="doccomment">/// Whether every run of leaving tiles on `floor`, from the lot's left
+<a href=#272 id=272 data-nosnippet>272</a>    /// edge through the run that starts at `start`, can come out from its
+<a href=#273 id=273 data-nosnippet>273</a>    /// left end: none has floor on its left by [`floor_left_of`]. No plain
+<a href=#274 id=274 data-nosnippet>274</a>    /// floor that stays is left of the run at `start`, so none is left of an
+<a href=#275 id=275 data-nosnippet>275</a>    /// earlier run, and an earlier run has floor on its left only where a
+<a href=#276 id=276 data-nosnippet>276</a>    /// tile that stays touches it.
+<a href=#277 id=277 data-nosnippet>277</a>    </span><span class="kw">fn </span>comes_out_leftward(<span class="kw-2">&amp;</span><span class="self">self</span>, floor: i64, start: i64) -&gt; bool {
+<a href=#278 id=278 data-nosnippet>278</a>        !floor_left_of(start, |x| <span class="self">self</span>.kind_staying(floor, x))
+<a href=#279 id=279 data-nosnippet>279</a>            &amp;&amp; !(<span class="number">0</span>..start).any(|x| <span class="self">self</span>.stays(floor, x) &amp;&amp; <span class="self">self</span>.leaves(floor, x + <span class="number">1</span>))
+<a href=#280 id=280 data-nosnippet>280</a>    }
+<a href=#281 id=281 data-nosnippet>281</a>
+<a href=#282 id=282 data-nosnippet>282</a>    <span class="doccomment">/// Whether every run of leaving tiles on `floor`, from the run that
+<a href=#283 id=283 data-nosnippet>283</a>    /// ends before `end` through the lot's right edge, can come out from its
+<a href=#284 id=284 data-nosnippet>284</a>    /// right end, by [`floor_right_of`] and the reasoning of
+<a href=#285 id=285 data-nosnippet>285</a>    /// `comes_out_leftward`.
+<a href=#286 id=286 data-nosnippet>286</a>    </span><span class="kw">fn </span>comes_out_rightward(<span class="kw-2">&amp;</span><span class="self">self</span>, floor: i64, end: i64) -&gt; bool {
+<a href=#287 id=287 data-nosnippet>287</a>        !floor_right_of(end, |x| <span class="self">self</span>.kind_staying(floor, x))
+<a href=#288 id=288 data-nosnippet>288</a>            &amp;&amp; !(end..LOT_WIDTH).any(|x| <span class="self">self</span>.stays(floor, x) &amp;&amp; <span class="self">self</span>.leaves(floor, x - <span class="number">1</span>))
+<a href=#289 id=289 data-nosnippet>289</a>    }
+<a href=#290 id=290 data-nosnippet>290</a>
+<a href=#291 id=291 data-nosnippet>291</a>    <span class="doccomment">/// Whether the tower's floor or lobby tile at (`floor`, `x`) is one the
+<a href=#292 id=292 data-nosnippet>292</a>    /// step takes out.
+<a href=#293 id=293 data-nosnippet>293</a>    </span><span class="kw">fn </span>leaves(<span class="kw-2">&amp;</span><span class="self">self</span>, floor: i64, x: i64) -&gt; bool {
+<a href=#294 id=294 data-nosnippet>294</a>        <span class="self">self</span>.tower
+<a href=#295 id=295 data-nosnippet>295</a>            .structure
+<a href=#296 id=296 data-nosnippet>296</a>            .get(<span class="kw-2">&amp;</span>(floor, x))
+<a href=#297 id=297 data-nosnippet>297</a>            .is_some_and(|id| <span class="self">self</span>.leaving.contains(id))
+<a href=#298 id=298 data-nosnippet>298</a>    }
+<a href=#299 id=299 data-nosnippet>299</a>
+<a href=#300 id=300 data-nosnippet>300</a>    <span class="doccomment">/// The kind of the tower's floor or lobby tile at (`floor`, `x`) when it
+<a href=#301 id=301 data-nosnippet>301</a>    /// stays, which is all a sale of what the step takes out leaves there.
+<a href=#302 id=302 data-nosnippet>302</a>    </span><span class="kw">fn </span>kind_staying(<span class="kw-2">&amp;</span><span class="self">self</span>, floor: i64, x: i64) -&gt; <span class="prelude-ty">Option</span>&lt;Kind&gt; {
+<a href=#303 id=303 data-nosnippet>303</a>        <span class="self">self</span>.tower
+<a href=#304 id=304 data-nosnippet>304</a>            .structure_kind_at(floor, x)
+<a href=#305 id=305 data-nosnippet>305</a>            .filter(|<span class="kw">_</span>| <span class="self">self</span>.stays(floor, x))
+<a href=#306 id=306 data-nosnippet>306</a>    }
+<a href=#307 id=307 data-nosnippet>307</a>
+<a href=#308 id=308 data-nosnippet>308</a>    <span class="doccomment">/// Whether taking out floor or lobby tile `u` leaves everything it held
+<a href=#309 id=309 data-nosnippet>309</a>    /// up standing, by the rules a sale keeps to (`Tower::removal_reason`):
+<a href=#310 id=310 data-nosnippet>310</a>    /// no room stays on its tiles, and from the ground floor up no story
+<a href=#311 id=311 data-nosnippet>311</a>    /// stays above it, unless the step lays the tile again. The story above
+<a href=#312 id=312 data-nosnippet>312</a>    /// a tall lobby tile is the one over its hall, since the stories it
+<a href=#313 id=313 data-nosnippet>313</a>    /// rises through are its own, and a tile the step lays again in its
+<a href=#314 id=314 data-nosnippet>314</a>    /// place holds only its own story, so it never holds that one up.
+<a href=#315 id=315 data-nosnippet>315</a>    </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>leaves_nothing_hanging_from(<span class="kw-2">&amp;</span><span class="self">self</span>, u: <span class="kw-2">&amp;</span>Unit) -&gt; bool {
+<a href=#316 id=316 data-nosnippet>316</a>        <span class="kw">let </span>above = <span class="self">self</span>.tower.unit_stories(u);
+<a href=#317 id=317 data-nosnippet>317</a>        tiles_of(u).all(|(f, x)| {
+<a href=#318 id=318 data-nosnippet>318</a>            <span class="kw">let </span>room_stays = <span class="self">self
+<a href=#319 id=319 data-nosnippet>319</a>                </span>.tower
+<a href=#320 id=320 data-nosnippet>320</a>                .rooms
+<a href=#321 id=321 data-nosnippet>321</a>                .get(<span class="kw-2">&amp;</span>(f, x))
+<a href=#322 id=322 data-nosnippet>322</a>                .is_some_and(|id| !<span class="self">self</span>.leaving.contains(id));
+<a href=#323 id=323 data-nosnippet>323</a>            (above == <span class="number">1 </span>&amp;&amp; <span class="self">self</span>.laid.contains_key(<span class="kw-2">&amp;</span>(f, x)))
+<a href=#324 id=324 data-nosnippet>324</a>                || (!room_stays &amp;&amp; !(f &gt;= GROUND_FLOOR &amp;&amp; <span class="self">self</span>.holds(f + above, x)))
+<a href=#325 id=325 data-nosnippet>325</a>        })
+<a href=#326 id=326 data-nosnippet>326</a>    }
+<a href=#327 id=327 data-nosnippet>327</a>}
+<a href=#328 id=328 data-nosnippet>328</a>
+<a href=#329 id=329 data-nosnippet>329</a><span class="doccomment">/// The tiles floor or lobby unit `u` covers.
+<a href=#330 id=330 data-nosnippet>330</a></span><span class="kw">fn </span>tiles_of(u: <span class="kw-2">&amp;</span>Unit) -&gt; <span class="kw">impl </span>Iterator&lt;Item = (i64, i64)&gt; + <span class="lifetime">'_ </span>{
+<a href=#331 id=331 data-nosnippet>331</a>    (u.x..u.x + u.width).map(<span class="kw">move </span>|x| (u.floor, x))
+<a href=#332 id=332 data-nosnippet>332</a>}
+</code></pre></div></section></main><script>(function(){var d=document.documentElement,m=document.querySelector(".vc-site-menu"),s=document.querySelector("nav.sidebar");if(m&&s){s.insertBefore(m,s.firstChild);d.classList.add("vc-menu-in-sidebar");}var t=document.querySelector("rustdoc-topbar"),b=document.querySelector(".vc-header .vc-bar");if(t&&b){for(var i=0;i<b.children.length;i++)t.appendChild(b.children[i].cloneNode(true));d.classList.add("vc-one-bar");}})();</script>
+
+</body></html>

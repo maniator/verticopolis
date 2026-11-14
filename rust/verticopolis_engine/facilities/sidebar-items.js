@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["LOBBY_INTERVAL","LOT_WIDTH","MAX_FLOOR","MAX_LOBBY_HEIGHT","MIN_FLOOR","MODERN_METRO_STATION_CAP"],"enum":["Kind"],"fn":["pools_for"],"static":["CLASSIC_VENUE_POOL"]};

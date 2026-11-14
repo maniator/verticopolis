@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["GAMEPLAY_RING_CAP"],"enum":["EmergencyDecision","EmergencyKind","EmergencySource","GameplayEvent","RemovalMethod"],"fn":["check_catalog","check_event"],"static":["CATALOG_JSON"],"struct":["GameplayEvents"]};

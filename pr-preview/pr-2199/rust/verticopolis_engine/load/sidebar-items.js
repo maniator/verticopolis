@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["TOWER_FILE_MAGIC"],"fn":["decode_vctower","deserialize","deserialize_owned","encode_simulation_vctower","encode_vctower","mark_founder_from_loaded_file","stamp_save"]};

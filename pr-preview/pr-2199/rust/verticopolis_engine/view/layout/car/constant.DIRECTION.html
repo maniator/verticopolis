@@ -1,0 +1,515 @@
+<!DOCTYPE html><html lang="en"><head><meta name="robots" content="noindex"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="API documentation for the Rust `DIRECTION` constant in crate `verticopolis_engine`."><title>DIRECTION in verticopolis_engine::view::layout::car - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../../static.files/rustdoc-17e0aaed.css"><meta name="rustdoc-vars" data-root-path="../../../../" data-static-root-path="../../../../static.files/" data-current-crate="verticopolis_engine" data-themes="" data-resource-suffix="" data-rustdoc-version="1.97.0 (2d8144b78 2026-07-07)" data-channel="1.97.0" data-search-js="search-fd9372ac.js" data-stringdex-js="stringdex-2da4960a.js" data-settings-js="settings-170eb4bf.js" ><script src="../../../../static.files/storage-41dd4d93.js"></script><script defer src="sidebar-items.js"></script><script defer src="../../../../static.files/main-fcd733ba.js"></script><noscript><link rel="stylesheet" href="../../../../static.files/noscript-f7c3ffd8.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../../../static.files/favicon-044be391.svg"><style>
+/* Retro (Windows 3.1 / SimTower) design tokens: the single source of the
+   palette, font, bevels, and shadow. This is the ONLY place --r-face and its
+   siblings are declared; styles.css (the game) and retro-page.css (standalone
+   pages like /help and the gallery) both @import it, so no page re-declares the
+   palette. Change the theme here once. */
+:root {
+  /* Semantic tokens. The first four are ALIASES of the chrome tokens below —
+     they read better at usage sites ("body text", "highlight") and can never
+     diverge from the theme. */
+  --bg: var(--r-desktop);
+  --panel: var(--r-face);
+  --ink: var(--r-ink);       /* body text */
+  --accent: var(--r-title);  /* navy — titles & highlights */
+  --panel-light: #d7d7d7;
+  --muted: #2f2f38;       /* secondary text — dark enough to read on gray */
+  --good: #15722e;
+  --bad: #b01023;
+  --bad-ink: #9a0e1f;     /* danger text small enough to need AA 4.5:1 on gray chrome */
+  --money: #005000; /* dark forest green: >=4.5:1 WCAG AA on the #c0c0c0 stat chip (#0a6e26 was 3.53:1, below AA) */
+  --line: #7a7a7a;
+  /* Win3.1 chrome tokens + the signature two-pixel bevels. Swap to re-theme. */
+  --r-face: #c0c0c0;
+  --r-shadow: #808080;
+  --r-dark: #000000;
+  --r-light: #dfdfdf;
+  --r-hi: #ffffff;
+  --r-title: #000080;
+  --r-title-fg: #ffffff;
+  --r-ink: #000000;
+  --r-desktop: #008080;
+  --r-font: "MS Sans Serif", "Tahoma", "Geneva", "Segoe UI", sans-serif;
+  --bevel-out: inset -1px -1px var(--r-dark), inset 1px 1px var(--r-hi),
+    inset -2px -2px var(--r-shadow), inset 2px 2px var(--r-light);
+  --bevel-in: inset 1px 1px var(--r-dark), inset -1px -1px var(--r-hi),
+    inset 2px 2px var(--r-shadow), inset -2px -2px var(--r-light);
+  /* Floating windows cast one hard shadow. */
+  --win-shadow: 2px 2px 0 rgba(0, 0, 0, 0.4);
+  /* The Classic rent-rung chip fills (1994's Blue/Green/Yellow/Red levels).
+     Chosen to read on gray chrome and to stay clear of every reserved sprite
+     state-cue literal; hexes proposed in ux-pricing-split-editor §1.3, pending
+     the pixel-art party's ratification. No Rate has no token: absence of a
+     price is absence of a fill (the chip renders hollow). */
+  --rung-vlow: #2048b0;
+  --rung-low: #1e7a2e;
+  --rung-avg: #c8a000;
+  --rung-high: #b02020;
+  /* The title screen ("Metropolis Dusk"): the game's splash and boot cover
+     (styles/game/splash.css) and the docs site's landing page share these, so
+     the two skies never drift. The splash is box art, not Win 3.1 chrome, and
+     keeps its own colors. */
+  --splash-sky: linear-gradient(#161634 0%, #241f4c 34%, #5b3560 62%, #c65a63 86%, #ef8560 100%);
+  --splash-amber: #ffc94a;   /* POLIS, the primary plate, the focus ring */
+  --splash-sun: radial-gradient(circle, #ffe6a0 0%, var(--splash-amber) 52%, #f18f4b 100%);
+  --splash-sun-glow: rgba(255, 179, 87, 0.26);
+  --splash-building: #201643;
+  --splash-cream: #e6dcc0;   /* the plates and the corner buttons' glyphs */
+  --splash-plate-ink: #20204a;
+  --splash-ink: #0d0d10;     /* plate borders and the skyline's outlines */
+  --splash-wordmark: #f7f1e4; /* VERTICO */
+  --splash-tagline: #ffd9a8;
+  --splash-premise: #e7ddf5;
+}
+
+/* The shared title bar (title-bar.mjs): the help site, the engine docs and
+   the Rust API reference all draw it with these classes. It sits on the navy
+   title bar each surface already paints (theme.css's .header, rustdoc's
+   .vc-header), so the colors here are the bar's own: white on navy, and the
+   game's bevelled gray button. The breakpoint is Starlight's own (50rem),
+   where its side menu turns into the phone's menu button. */
+
+.vc-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--sl-nav-gap, 1rem);
+  height: 100%;
+  min-width: 0;
+}
+
+/* The logo and the site's name, as Starlight's SiteTitle draws them. */
+.vc-bar-title {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex: 0 1 auto;
+  min-width: 0;
+  font-size: var(--sl-text-h4, 1.25rem);
+  font-weight: 700;
+  color: var(--r-title-fg);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.vc-bar-title:hover {
+  color: var(--r-title-fg);
+}
+.vc-bar-title img {
+  flex: none;
+  width: auto;
+  height: calc(var(--sl-nav-height, 4rem) - 2 * var(--sl-nav-pad-y, 0.75rem));
+  image-rendering: pixelated;
+  box-shadow: var(--bevel-out);
+}
+.vc-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.vc-bar-search {
+  display: flex;
+  flex: 1 1 auto;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+.vc-bar-links {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 1rem;
+}
+
+/* The game's bevelled button on the navy bar. */
+.vc-bar-game {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 4px 12px;
+  font-size: 0.875rem;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--r-ink);
+  text-decoration: none;
+  white-space: nowrap;
+  background: var(--r-face);
+  box-shadow: var(--bevel-out);
+}
+.vc-bar-game:hover {
+  color: var(--r-ink);
+}
+.vc-bar-game:active {
+  box-shadow: var(--bevel-in);
+}
+
+.vc-bar-github {
+  display: inline-flex;
+  padding: 0.25rem;
+  color: var(--r-title-fg);
+}
+.vc-bar-github:hover {
+  color: var(--r-light);
+}
+
+/* The theme switch, after a divider, as Starlight's header sets it. */
+.vc-bar-theme {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+.vc-bar-theme::before {
+  content: "";
+  height: 2rem;
+  border-inline-start: 1px solid var(--r-shadow);
+}
+
+.vc-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* A label written twice (twoLengths): the full one on a wide screen. */
+.vc-short {
+  display: none;
+}
+
+@media (max-width: 49.99rem) {
+  /* A phone: the short name and label, the full ones for screen readers. */
+  .vc-full {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+  .vc-short {
+    display: inline;
+  }
+  .vc-bar-title {
+    gap: 0.5rem;
+  }
+  .vc-bar-links {
+    gap: 0.75rem;
+  }
+  /* GitHub and the theme switch move to the foot of the phone's menu. */
+  .vc-bar-github,
+  .vc-bar-theme {
+    display: none;
+  }
+}
+
+@media (min-width: 50rem) {
+  .vc-bar-search {
+    justify-content: center;
+  }
+}
+
+/* The Rust API reference under /rust/ (cargo doc's own pages) in the docs
+   site's look: the game's palette and font from retro-tokens.css, the site's
+   navy title bar, and the site's side menu above the crate's own items, drawn
+   like src/styles/theme.css draws Starlight's. scripts/rustdoc-chrome.mjs
+   puts this in each page's head after retro-tokens.css, and rustdoc's own
+   variables do most of the rest. Code keeps rustdoc's monospace fonts. */
+
+:root {
+  --font-family: var(--r-font);
+  --vc-bar-height: 4rem;
+  --desktop-sidebar-width: 300px;
+}
+:root[data-theme="light"],
+:root:not([data-theme]) {
+  --main-background-color: var(--r-hi);
+  --main-color: var(--r-ink);
+  --sidebar-background-color: var(--r-face);
+  --sidebar-background-color-hover: #d7d7d7;
+  --sidebar-border-color: var(--r-shadow);
+  --sidebar-link-color: var(--r-title);
+  --sidebar-current-link-background-color: #d7d7d7;
+  --link-color: var(--r-title);
+  --mod-link-color: var(--r-title);
+  --keyword-link-color: var(--r-title);
+  --assoc-item-link-color: var(--r-title);
+  --headings-border-bottom-color: var(--r-shadow);
+  --border-color: var(--r-shadow);
+  --search-input-focused-border-color: var(--r-title);
+  --search-tab-button-selected-border-top-color: var(--r-title);
+  --code-block-background-color: #f0f0f0;
+}
+:root[data-theme="dark"],
+:root[data-theme="ayu"] {
+  --main-background-color: #0a1f1f;
+  --main-color: #eafcfb;
+  --sidebar-background-color: #05403f;
+  --sidebar-background-color-hover: #0b4f4e;
+  --sidebar-border-color: #1d4a49;
+  --sidebar-link-color: #bff3f3;
+  --sidebar-current-link-background-color: #0b4f4e;
+  --link-color: #7fe0e0;
+  --mod-link-color: #7fe0e0;
+  --headings-border-bottom-color: #1d4a49;
+  --border-color: #1d4a49;
+  --code-block-background-color: #163636;
+  --search-input-focused-border-color: #7fe0e0;
+}
+
+/* rustdoc's current item: a sunken white row with navy text, so the navy
+   selected row stays the site menu's "Rust API reference". */
+.sidebar .current {
+  background: var(--r-hi);
+  box-shadow: var(--bevel-in);
+}
+:root[data-theme="dark"] .sidebar .current,
+:root[data-theme="ayu"] .sidebar .current {
+  background: #0a1f1f;
+}
+.sidebar .current,
+.sidebar .current a {
+  color: var(--sidebar-link-color);
+  font-weight: 700;
+}
+
+/* ---- The title bar: Starlight's header -------------------------------- */
+
+/* The bar takes a row of its own above rustdoc's sidebar and page. */
+.rustdoc {
+  flex-wrap: wrap;
+}
+.rustdoc > main {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.vc-header {
+  flex: 0 0 100%;
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  height: var(--vc-bar-height);
+  padding: 0.75rem 1.5rem;
+  box-sizing: border-box;
+  background: var(--r-title);
+  color: var(--r-title-fg);
+  font-family: var(--r-font);
+}
+.vc-header .vc-bar {
+  flex: 1;
+  justify-content: space-between;
+}
+.vc-header a:focus-visible,
+rustdoc-topbar .vc-bar-title:focus-visible,
+rustdoc-topbar .vc-bar-links a:focus-visible {
+  outline: 2px solid #ffc94a;
+  outline-offset: 1px;
+}
+.vc-site-menu a:focus-visible,
+.vc-site-menu summary:focus-visible {
+  outline: 2px solid var(--r-title);
+  outline-offset: 1px;
+}
+
+/* ---- The side menu: Starlight's, as the game's Tools panel ------------- */
+
+/* Before the script moves it into the sidebar (or with scripts off), the
+   menu waits off screen; the title bar still links home. */
+.rustdoc > .vc-site-menu {
+  display: none;
+}
+.sidebar {
+  top: var(--vc-bar-height);
+  height: calc(100vh - var(--vc-bar-height));
+  border-right: 2px solid var(--r-shadow);
+}
+.vc-site-menu {
+  padding: 1rem 1rem 0.75rem 1.5rem;
+  border-bottom: 2px solid var(--sidebar-border-color);
+  font-family: var(--r-font);
+  font-size: 1rem;
+}
+.vc-site-menu ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.vc-site-menu li {
+  margin: 0;
+}
+.vc-site-menu a {
+  display: block;
+  padding: 0.3em 0.75em;
+  color: var(--main-color);
+  text-decoration: none;
+}
+.sidebar .vc-site-menu a:hover {
+  background: var(--sidebar-background-color-hover);
+}
+.vc-site-menu .vc-top > a {
+  padding-inline: 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+.vc-site-menu details {
+  margin: 0.5rem 0;
+}
+/* Group labels as the Tools panel draws them: small, uppercase, spaced. */
+.vc-site-menu summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.3em 0;
+  cursor: pointer;
+  list-style: none;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--sidebar-link-color);
+}
+.vc-site-menu summary::-webkit-details-marker {
+  display: none;
+}
+.vc-site-menu summary::after {
+  content: "";
+  width: 0.45em;
+  height: 0.45em;
+  margin-inline-end: 0.5rem;
+  border: solid currentColor;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+.vc-site-menu details:not([open]) summary::after {
+  transform: rotate(-45deg);
+}
+.vc-site-menu details ul {
+  margin-inline-start: 0.1rem;
+  border-inline-start: 1px solid var(--sidebar-border-color);
+}
+.vc-site-menu details a {
+  margin-inline-start: 0.75rem;
+}
+/* The current page is the selected row: navy, white text, square. */
+.sidebar .vc-site-menu a[aria-current="page"],
+.sidebar .vc-site-menu a[aria-current="page"]:hover {
+  background: var(--r-title);
+  color: var(--r-title-fg);
+  font-weight: 600;
+}
+
+/* A source page pins rustdoc's file-list button to the window's top left,
+   which is the title bar's logo here, so it sits just below the bar. */
+.src #sidebar-button {
+  top: calc(var(--vc-bar-height) + 8px);
+}
+
+/* GitHub closes the menu only where the title bar hides it (title-bar.css,
+   below Starlight's 50rem), which includes widths where rustdoc still shows
+   its desktop sidebar. */
+.vc-menu-github {
+  display: none;
+}
+@media (max-width: 49.99rem) {
+  .vc-menu-github {
+    display: block;
+  }
+}
+
+@media (max-width: 700px) {
+  :root {
+    --vc-bar-height: 3.5rem;
+    --topbar-height: var(--vc-bar-height);
+  }
+  .vc-header {
+    padding-inline: 1rem;
+  }
+  rustdoc-topbar {
+    top: var(--vc-bar-height);
+  }
+
+  /* One bar: once the script has copied the title and the links into
+     rustdoc's top bar (rustdoc-chrome.mjs), that bar is the navy title bar,
+     holding the site's title, the game button, rustdoc's settings and help,
+     and the one menu button at its right, where Starlight puts its own. The
+     crate's name it showed is the page's own heading just below. With
+     rustdoc's "hide sidebar" setting on, rustdoc hides its top bar, so the
+     title bar stays. */
+  .vc-one-bar:not(.hide-sidebar) .vc-header {
+    display: none;
+  }
+  .vc-one-bar rustdoc-topbar {
+    top: 0;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0 1rem;
+    box-sizing: border-box;
+    background: var(--r-title);
+    color: var(--r-title-fg);
+  }
+  .vc-one-bar rustdoc-topbar > h2 {
+    display: none;
+  }
+  .vc-one-bar rustdoc-topbar .vc-bar-title {
+    flex: 1 1 auto;
+    font-size: 1.125rem;
+  }
+  .vc-one-bar rustdoc-topbar .vc-bar-title img {
+    height: 2rem;
+  }
+  .vc-one-bar rustdoc-topbar .settings-menu,
+  .vc-one-bar rustdoc-topbar .help-menu {
+    order: 1;
+  }
+  .vc-one-bar rustdoc-topbar .settings-menu > a,
+  .vc-one-bar rustdoc-topbar .help-menu > a {
+    width: 2rem;
+    height: 2rem;
+  }
+  .vc-one-bar rustdoc-topbar .settings-menu > a::before,
+  .vc-one-bar rustdoc-topbar .help-menu > a::before {
+    margin: 0;
+    filter: invert(1);
+  }
+  .vc-one-bar rustdoc-topbar .settings-menu > a:hover,
+  .vc-one-bar rustdoc-topbar .help-menu > a:hover {
+    background: transparent;
+  }
+  /* rustdoc's menu button as Starlight's: the game's bevelled gray button. */
+  .vc-one-bar rustdoc-topbar .sidebar-menu-toggle {
+    order: 2;
+    flex: none;
+    width: 2rem;
+    min-width: 2rem;
+    height: 2rem;
+    padding: 0;
+    background: var(--r-face);
+    box-shadow: var(--bevel-out);
+  }
+  /* Three ink bars, the size of Starlight's menu icon. */
+  .vc-one-bar rustdoc-topbar .sidebar-menu-toggle::before {
+    content: "";
+    display: block;
+    width: 1rem;
+    height: 2px;
+    margin: auto;
+    background: var(--r-ink);
+    box-shadow: 0 -5px 0 var(--r-ink), 0 5px 0 var(--r-ink);
+    filter: none;
+    opacity: 1;
+  }
+  .vc-one-bar rustdoc-topbar .sidebar-menu-toggle:active {
+    box-shadow: var(--bevel-in);
+  }
+}
+</style>
+
+</head><body class="rustdoc constant"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><header class="vc-header"><div class="vc-bar"><a class="vc-bar-title" href="/pr-preview/pr-2199/"><img src="/pr-preview/pr-2199/favicon.png" alt="" width="40" height="40"><span class="vc-name" translate="no"><span class="vc-full">Verticopolis engine</span><span class="vc-short" aria-hidden="true">Engine docs</span></span></a><div class="vc-bar-links"><a class="vc-bar-game" href="https://verticopolis.com/" data-game-link><span class="vc-full">Play the game</span><span class="vc-short" aria-hidden="true">Play</span></a><a class="vc-bar-github" href="https://github.com/maniator/verticopolis"><span class="vc-sr-only">GitHub</span><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M12 .3a12 12 0 0 0-3.8 23.38c.6.12.83-.26.83-.57L9 21.07c-3.34.72-4.04-1.61-4.04-1.61-.55-1.39-1.34-1.76-1.34-1.76-1.08-.74.09-.73.09-.73 1.2.09 1.83 1.24 1.83 1.24 1.08 1.83 2.81 1.3 3.5 1 .1-.78.42-1.31.76-1.61-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.14-.3-.54-1.52.1-3.18 0 0 1-.32 3.3 1.23a11.5 11.5 0 0 1 6 0c2.28-1.55 3.29-1.23 3.29-1.23.64 1.66.24 2.88.12 3.18a4.65 4.65 0 0 1 1.23 3.22c0 4.61-2.8 5.63-5.48 5.92.42.36.81 1.1.81 2.22l-.01 3.29c0 .31.2.69.82.57A12 12 0 0 0 12 .3Z"/></svg></a></div></div></header>
+<nav class="vc-site-menu" aria-label="Docs"><ul><li class="vc-top"><a href="/pr-preview/pr-2199/">Overview</a></li><li><details open><summary>Guides</summary><ul><li><a href="/pr-preview/pr-2199/javascript/">JavaScript package</a></li><li><a href="/pr-preview/pr-2199/crate/">Rust crate</a></li><li><a href="/pr-preview/pr-2199/api/">Host API guide</a></li><li><a href="/pr-preview/pr-2199/conformance/">Conformance suite</a></li></ul></details></li><li><details open><summary>Reference</summary><ul><li><a href="/pr-preview/pr-2199/rust/verticopolis_engine/" aria-current="page">Rust API reference</a></li><li><a href="/pr-preview/pr-2199/changelog/">Engine changelog</a></li></ul></details></li><li class="vc-top"><a href="https://verticopolis.com/">Play Verticopolis</a></li><li class="vc-top vc-menu-github"><a href="https://github.com/maniator/verticopolis">GitHub</a></li></ul></nav>
+
+<rustdoc-topbar><h2><a href="#">DIRECTION</a></h2></rustdoc-topbar><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../../../../verticopolis_engine/index.html">verticopolis_<wbr>engine</a><span class="version">1.35.0</span></h2></div><div class="sidebar-elems"><div id="rustdoc-modnav"><h2><a href="index.html">In verticopolis_<wbr>engine::<wbr>view::<wbr>layout::<wbr>car</a></h2></div></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><div class="width-limiter"><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><div class="rustdoc-breadcrumbs"><a href="../../../index.html">verticopolis_engine</a>::<wbr><a href="../../index.html">view</a>::<wbr><a href="../index.html">layout</a>::<wbr><a href="index.html">car</a></div><h1>Constant <span class="constant">DIRECTION</span>&nbsp;<button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"><a class="src" href="../../../../src/verticopolis_engine/view/layout.rs.html#126">Source</a> </span></div><pre class="rust item-decl"><code>pub const DIRECTION: <a class="primitive" href="https://doc.rust-lang.org/1.97.0/std/primitive.usize.html">usize</a> = 2;</code></pre></section></div></main><script>(function(){var d=document.documentElement,m=document.querySelector(".vc-site-menu"),s=document.querySelector("nav.sidebar");if(m&&s){s.insertBefore(m,s.firstChild);d.classList.add("vc-menu-in-sidebar");}var t=document.querySelector("rustdoc-topbar"),b=document.querySelector(".vc-header .vc-bar");if(t&&b){for(var i=0;i<b.children.length;i++)t.appendChild(b.children[i].cloneNode(true));d.classList.add("vc-one-bar");}})();</script>
+
+</body></html>

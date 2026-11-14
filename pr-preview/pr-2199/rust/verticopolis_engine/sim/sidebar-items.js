@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["LOG_RING_CAP","PLAIN_SAVE_VERSION","SAVE_VERSION","STARTING_MONEY"],"enum":["LogKind"],"fn":["save_version"],"struct":["LogEntry","Simulation"]};

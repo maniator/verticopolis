@@ -1,0 +1,296 @@
+<!DOCTYPE html><html lang="en" dir="ltr" data-theme="dark" data-has-toc data-has-sidebar class="astro-g5ptsecz"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><title>Host API guide | Verticopolis engine</title><link rel="canonical" href="https://docs.verticopolis.com/api/"/><link rel="sitemap" href="/sitemap-index.xml"/><link rel="shortcut icon" href="/favicon.png" type="image/png"/><meta name="generator" content="Astro v7.4.12"/><meta name="generator" content="Starlight v0.42.7"/><meta property="og:title" content="Host API guide"/><meta property="og:type" content="article"/><meta property="og:url" content="https://docs.verticopolis.com/api/"/><meta property="og:locale" content="en"/><meta property="og:description" content="Every call a Rust frontend makes, in full."/><meta property="og:site_name" content="Verticopolis engine"/><meta name="twitter:card" content="summary_large_image"/><meta name="description" content="Every call a Rust frontend makes, in full."/><script>
+	window.StarlightThemeProvider = (() => {
+		const storedTheme =
+			typeof localStorage !== 'undefined' && localStorage.getItem('starlight-theme');
+		const theme =
+			storedTheme ||
+			(window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+		document.documentElement.dataset.theme = theme === 'light' ? 'light' : 'dark';
+		return {
+			updatePickers(theme = storedTheme || 'auto') {
+				document.querySelectorAll('starlight-theme-select').forEach((picker) => {
+					const select = picker.querySelector('select');
+					if (select) select.value = theme;
+					/** @type {HTMLTemplateElement | null} */
+					const tmpl = document.querySelector(`#theme-icons`);
+					const newIcon = tmpl && tmpl.content.querySelector('.' + theme);
+					if (newIcon) {
+						const oldIcon = picker.querySelector('svg.label-icon');
+						if (oldIcon) {
+							oldIcon.replaceChildren(...newIcon.cloneNode(true).childNodes);
+						}
+					}
+				});
+			},
+		};
+	})();
+</script><template id="theme-icons"><svg aria-hidden="true" class="light astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M5 12a1 1 0 0 0-1-1H3a1 1 0 0 0 0 2h1a1 1 0 0 0 1-1Zm.64 5-.71.71a1 1 0 0 0 0 1.41 1 1 0 0 0 1.41 0l.71-.71A1 1 0 0 0 5.64 17ZM12 5a1 1 0 0 0 1-1V3a1 1 0 0 0-2 0v1a1 1 0 0 0 1 1Zm5.66 2.34a1 1 0 0 0 .7-.29l.71-.71a1 1 0 1 0-1.41-1.41l-.66.71a1 1 0 0 0 0 1.41 1 1 0 0 0 .66.29Zm-12-.29a1 1 0 0 0 1.41 0 1 1 0 0 0 0-1.41l-.71-.71a1.004 1.004 0 1 0-1.43 1.41l.73.71ZM21 11h-1a1 1 0 0 0 0 2h1a1 1 0 0 0 0-2Zm-2.64 6A1 1 0 0 0 17 18.36l.71.71a1 1 0 0 0 1.41 0 1 1 0 0 0 0-1.41l-.76-.66ZM12 6.5a5.5 5.5 0 1 0 5.5 5.5A5.51 5.51 0 0 0 12 6.5Zm0 9a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7Zm0 3.5a1 1 0 0 0-1 1v1a1 1 0 0 0 2 0v-1a1 1 0 0 0-1-1Z"/></svg><svg aria-hidden="true" class="dark astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M21.64 13a1 1 0 0 0-1.05-.14 8.049 8.049 0 0 1-3.37.73 8.15 8.15 0 0 1-8.14-8.1 8.59 8.59 0 0 1 .25-2A1 1 0 0 0 8 2.36a10.14 10.14 0 1 0 14 11.69 1 1 0 0 0-.36-1.05Zm-9.5 6.69A8.14 8.14 0 0 1 7.08 5.22v.27a10.15 10.15 0 0 0 10.14 10.14 9.784 9.784 0 0 0 2.1-.22 8.11 8.11 0 0 1-7.18 4.32v-.04Z"/></svg><svg aria-hidden="true" class="auto astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M21 14h-1V7a3 3 0 0 0-3-3H7a3 3 0 0 0-3 3v7H3a1 1 0 0 0-1 1v2a3 3 0 0 0 3 3h14a3 3 0 0 0 3-3v-2a1 1 0 0 0-1-1ZM6 7a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v7H6V7Zm14 10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-1h16v1Z"/></svg></template><link rel="stylesheet" href="/_astro/print.ehPL0gv-.css" media="print"><link rel="stylesheet" href="/_astro/common.BAgQrgvR.css"><style>@layer starlight.components{svg:where(.astro-hkc32dio){color:var(--sl-icon-color);font-size:var(--sl-icon-size,1em);width:1em;height:1em;overflow:visible}}
+</style><script type="module" src="/_astro/page.cNngjUgL.js"></script></head><body class="astro-g5ptsecz"><a class="sl-skip-link astro-qb7clj6f" href="#_top">Skip to content</a><div class="page sl-flex astro-yntsjkba"><header class="header astro-yntsjkba"><div class="vc-bar"><a href="/" class="site-title vc-bar-title"><img src="/_astro/logo.C84ECWbg.png" width="1024" height="1024" alt=""><span class="vc-name" translate="no"><span class="vc-full">Verticopolis engine</span><span class="vc-short" aria-hidden="true">Engine docs</span></span></a><div class="vc-bar-search print:hidden"><site-search class=" astro-b5kgnn7o" data-translations="{&quot;placeholder&quot;:&quot;Search&quot;}"><button data-open-modal disabled aria-label="Search" aria-keyshortcuts="Control+K" class="astro-b5kgnn7o"><svg aria-hidden="true" class="astro-b5kgnn7o astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M21.71 20.29 18 16.61A9 9 0 1 0 16.61 18l3.68 3.68a.999.999 0 0 0 1.42 0 1 1 0 0 0 0-1.39ZM11 18a7 7 0 1 1 0-14 7 7 0 0 1 0 14Z"/></svg><span class="sl-hidden md:sl-block astro-b5kgnn7o" aria-hidden="true">Search</span><kbd class="sl-hidden md:sl-flex astro-b5kgnn7o" style="display: none;"><kbd class="astro-b5kgnn7o">Ctrl</kbd><kbd class="astro-b5kgnn7o">K</kbd></kbd></button><dialog style="padding:0" aria-label="Search" class="astro-b5kgnn7o"><div class="dialog-frame sl-flex astro-b5kgnn7o"><button data-close-modal class="sl-flex md:sl-hidden astro-b5kgnn7o">Cancel</button><div class="search-container astro-b5kgnn7o"><div id="starlight__search" class="astro-b5kgnn7o"></div></div></div></dialog></site-search><script>
+	(() => {
+		const openBtn = document.querySelector('button[data-open-modal]');
+		const shortcut = openBtn?.querySelector('kbd');
+		if (!openBtn || !(shortcut instanceof HTMLElement)) return;
+		const platformKey = shortcut.querySelector('kbd');
+		if (platformKey && /(Mac|iPhone|iPod|iPad)/i.test(navigator.platform)) {
+			platformKey.textContent = '⌘';
+			openBtn.setAttribute('aria-keyshortcuts', 'Meta+K');
+		}
+		shortcut.style.display = '';
+	})();
+</script><script type="module" src="/_astro/Search.astro_astro_type_script_index_0_lang.CHGOufdi.js"></script></div><div class="vc-bar-links print:hidden"><a class="vc-bar-game" href="https://verticopolis.com/" data-game-link><span class="vc-full">Play the game</span><span class="vc-short" aria-hidden="true">Play</span></a><a class="vc-bar-github" href="https://github.com/maniator/verticopolis"><span class="vc-sr-only">GitHub</span><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M12 .3a12 12 0 0 0-3.8 23.38c.6.12.83-.26.83-.57L9 21.07c-3.34.72-4.04-1.61-4.04-1.61-.55-1.39-1.34-1.76-1.34-1.76-1.08-.74.09-.73.09-.73 1.2.09 1.83 1.24 1.83 1.24 1.08 1.83 2.81 1.3 3.5 1 .1-.78.42-1.31.76-1.61-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.14-.3-.54-1.52.1-3.18 0 0 1-.32 3.3 1.23a11.5 11.5 0 0 1 6 0c2.28-1.55 3.29-1.23 3.29-1.23.64 1.66.24 2.88.12 3.18a4.65 4.65 0 0 1 1.23 3.22c0 4.61-2.8 5.63-5.48 5.92.42.36.81 1.1.81 2.22l-.01 3.29c0 .31.2.69.82.57A12 12 0 0 0 12 .3Z"/></svg></a><div class="vc-bar-theme"><starlight-theme-select><label style="--sl-select-width: 6.25em" class="astro-2z5xp7gb"><span class="sr-only astro-2z5xp7gb">Select theme</span><svg aria-hidden="true" class="icon label-icon astro-2z5xp7gb astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M21 14h-1V7a3 3 0 0 0-3-3H7a3 3 0 0 0-3 3v7H3a1 1 0 0 0-1 1v2a3 3 0 0 0 3 3h14a3 3 0 0 0 3-3v-2a1 1 0 0 0-1-1ZM6 7a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v7H6V7Zm14 10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-1h16v1Z"/></svg><select autocomplete="off" class="astro-2z5xp7gb"><option value="dark" class="astro-2z5xp7gb">Dark</option><option value="light" class="astro-2z5xp7gb">Light</option><option value="auto" selected class="astro-2z5xp7gb">Auto</option></select><svg aria-hidden="true" class="icon caret astro-2z5xp7gb astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M17 9.17a1 1 0 0 0-1.41 0L12 12.71 8.46 9.17a1 1 0 1 0-1.41 1.42l4.24 4.24a1.002 1.002 0 0 0 1.42 0L17 10.59a1.002 1.002 0 0 0 0-1.42Z"/></svg></label></starlight-theme-select><script>
+	StarlightThemeProvider.updatePickers();
+</script><script type="module">var e=`starlight-theme`,t=e=>e===`auto`||e===`dark`||e===`light`?e:`auto`,n=()=>t(typeof localStorage<`u`&&localStorage.getItem(e));function r(t){typeof localStorage<`u`&&localStorage.setItem(e,t===`light`||t===`dark`?t:``)}var i=()=>matchMedia(`(prefers-color-scheme: light)`).matches?`light`:`dark`;function a(e){StarlightThemeProvider.updatePickers(e),document.documentElement.dataset.theme=e===`auto`?i():e,r(e)}matchMedia(`(prefers-color-scheme: light)`).addEventListener(`change`,()=>{n()===`auto`&&a(`auto`)});var o=class extends HTMLElement{constructor(){super(),a(n()),this.querySelector(`select`)?.addEventListener(`change`,e=>{e.currentTarget instanceof HTMLSelectElement&&a(t(e.currentTarget.value))})}};customElements.define(`starlight-theme-select`,o);</script></div></div></div></header><nav class="sidebar print:hidden astro-yntsjkba" aria-label="Main"><button popovertarget="starlight__sidebar" class="sl-menu-button sl-flex md:sl-hidden print:hidden astro-r2osgdlg"><svg aria-hidden="true" class="open-menu astro-r2osgdlg astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M3 8h18a1 1 0 1 0 0-2H3a1 1 0 0 0 0 2Zm18 8H3a1 1 0 0 0 0 2h18a1 1 0 0 0 0-2Zm0-5H3a1 1 0 0 0 0 2h18a1 1 0 0 0 0-2Z"/></svg><svg aria-hidden="true" class="close-menu astro-r2osgdlg astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="m13.41 12 6.3-6.29a1.004 1.004 0 1 0-1.42-1.42L12 10.59l-6.29-6.3a1.004 1.004 0 0 0-1.42 1.42l6.3 6.29-6.3 6.29a1 1 0 0 0 0 1.42.998.998 0 0 0 1.42 0l6.29-6.3 6.29 6.3a.999.999 0 0 0 1.42 0 1 1 0 0 0 0-1.42L13.41 12Z"/></svg><span class="sr-only astro-r2osgdlg">Menu</span></button><script type="module">var e=class extends HTMLElement{constructor(){super();let e=matchMedia(`(min-width: 50em)`),t=()=>{this.popover=e.matches?null:`auto`};t(),e.addEventListener(`change`,()=>t()),this.addEventListener(`toggle`,({newState:e})=>this.trapFocus(e===`open`))}trapFocus(e){document.querySelectorAll(`.main-frame, .sl-skip-link`).forEach(t=>{t.toggleAttribute(`inert`,e)})}};customElements.define(`sl-sidebar-pane`,e);</script><script type="module">var e=class extends HTMLElement{constructor(){super();let e=this.querySelector(`select`);e&&(e.addEventListener(`change`,e=>{e.currentTarget instanceof HTMLSelectElement&&(window.location.pathname=e.currentTarget.value)}),window.addEventListener(`pageshow`,t=>{if(!t.persisted)return;let n=e.querySelector(`option[selected]`)?.index;n!==e.selectedIndex&&(e.selectedIndex=n??0)}))}};customElements.define(`starlight-lang-select`,e);</script><sl-sidebar-pane popover id="starlight__sidebar" class="sidebar-pane astro-yntsjkba"><div class="sidebar-content sl-flex astro-yntsjkba"><sl-sidebar-state-persist data-hash="1q3769r" class="astro-ipdry5cl"><script aria-hidden="true">
+		(() => {
+			try {
+				if (!matchMedia('(min-width: 50em)').matches) return;
+				/** @type {HTMLElement | null} */
+				const target = document.querySelector('sl-sidebar-state-persist');
+				const state = JSON.parse(sessionStorage.getItem('sl-sidebar-state') || '0');
+				if (!target || !state || target.dataset.hash !== state.hash) return;
+				window._starlightScrollRestore = state.scroll;
+				customElements.define(
+					'sl-sidebar-restore',
+					class SidebarRestore extends HTMLElement {
+						connectedCallback() {
+							try {
+								const idx = parseInt(this.dataset.index || '');
+								const details = this.closest('details');
+								if (details && typeof state.open[idx] === 'boolean') details.open = state.open[idx];
+							} catch {}
+						}
+					}
+				);
+			} catch {}
+		})();
+	</script><ul class="top-level astro-rmhv4bp6"><li class="astro-rmhv4bp6"><a href="/" class="large astro-rmhv4bp6"><span class="astro-rmhv4bp6">Overview</span></a></li><li class="astro-rmhv4bp6"><details open class="astro-rmhv4bp6"><summary class="astro-rmhv4bp6"><span class="group-label astro-rmhv4bp6"><span class="large astro-rmhv4bp6">Guides</span></span><svg aria-hidden="true" class="caret astro-rmhv4bp6 astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.25rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></summary><sl-sidebar-restore data-index="0"></sl-sidebar-restore><ul class="astro-rmhv4bp6"><li class="astro-rmhv4bp6"><a href="/javascript/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">JavaScript package</span></a></li><li class="astro-rmhv4bp6"><a href="/crate/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Rust crate</span></a></li><li class="astro-rmhv4bp6"><a href="/api/" aria-current="page" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Host API guide</span></a></li><li class="astro-rmhv4bp6"><a href="/conformance/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Conformance suite</span></a></li></ul></details></li><li class="astro-rmhv4bp6"><details open class="astro-rmhv4bp6"><summary class="astro-rmhv4bp6"><span class="group-label astro-rmhv4bp6"><span class="large astro-rmhv4bp6">Reference</span></span><svg aria-hidden="true" class="caret astro-rmhv4bp6 astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.25rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></summary><sl-sidebar-restore data-index="1"></sl-sidebar-restore><ul class="astro-rmhv4bp6"><li class="astro-rmhv4bp6"><a href="/rust/verticopolis_engine/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Rust API reference</span></a></li><li class="astro-rmhv4bp6"><a href="/changelog/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Engine changelog</span></a></li></ul></details></li><li class="astro-rmhv4bp6"><a href="https://verticopolis.com/" class="large astro-rmhv4bp6"><span class="astro-rmhv4bp6">Play Verticopolis</span></a></li></ul><script aria-hidden="true">
+		(() => {
+			const scroller = document.getElementById('starlight__sidebar');
+			if (!window._starlightScrollRestore || !scroller) return;
+			scroller.scrollTop = window._starlightScrollRestore;
+			delete window._starlightScrollRestore;
+		})();
+	</script></sl-sidebar-state-persist><div class="md:sl-hidden"><div class="mobile-preferences sl-flex astro-p4azlveh"><div class="social-icons astro-p4azlveh"><a href="https://github.com/maniator/verticopolis" rel="me" class="sl-flex astro-n2mnl6yq"><span class="sr-only astro-n2mnl6yq">GitHub</span><svg aria-hidden="true" class="astro-n2mnl6yq astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M12 .3a12 12 0 0 0-3.8 23.38c.6.12.83-.26.83-.57L9 21.07c-3.34.72-4.04-1.61-4.04-1.61-.55-1.39-1.34-1.76-1.34-1.76-1.08-.74.09-.73.09-.73 1.2.09 1.83 1.24 1.83 1.24 1.08 1.83 2.81 1.3 3.5 1 .1-.78.42-1.31.76-1.61-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.14-.3-.54-1.52.1-3.18 0 0 1-.32 3.3 1.23a11.5 11.5 0 0 1 6 0c2.28-1.55 3.29-1.23 3.29-1.23.64 1.66.24 2.88.12 3.18a4.65 4.65 0 0 1 1.23 3.22c0 4.61-2.8 5.63-5.48 5.92.42.36.81 1.1.81 2.22l-.01 3.29c0 .31.2.69.82.57A12 12 0 0 0 12 .3Z"/></svg></a></div><starlight-theme-select><label style="--sl-select-width: 6.25em" class="astro-2z5xp7gb"><span class="sr-only astro-2z5xp7gb">Select theme</span><svg aria-hidden="true" class="icon label-icon astro-2z5xp7gb astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M21 14h-1V7a3 3 0 0 0-3-3H7a3 3 0 0 0-3 3v7H3a1 1 0 0 0-1 1v2a3 3 0 0 0 3 3h14a3 3 0 0 0 3-3v-2a1 1 0 0 0-1-1ZM6 7a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v7H6V7Zm14 10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-1h16v1Z"/></svg><select autocomplete="off" class="astro-2z5xp7gb"><option value="dark" class="astro-2z5xp7gb">Dark</option><option value="light" class="astro-2z5xp7gb">Light</option><option value="auto" selected class="astro-2z5xp7gb">Auto</option></select><svg aria-hidden="true" class="icon caret astro-2z5xp7gb astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M17 9.17a1 1 0 0 0-1.41 0L12 12.71 8.46 9.17a1 1 0 1 0-1.41 1.42l4.24 4.24a1.002 1.002 0 0 0 1.42 0L17 10.59a1.002 1.002 0 0 0 0-1.42Z"/></svg></label></starlight-theme-select><script>
+	StarlightThemeProvider.updatePickers();
+</script></div></div></div></sl-sidebar-pane></nav><div class="main-frame astro-yntsjkba"><script type="module">var e=document.getElementById(`starlight__sidebar`),t=e?.querySelector(`sl-sidebar-state-persist`),n=`sl-sidebar-state`,r=()=>{let r=[],i=t?.dataset.hash||``;try{let e=sessionStorage.getItem(n),t=JSON.parse(e||`{}`);Array.isArray(t.open)&&t.hash===i&&(r=t.open)}catch{}return{hash:i,open:r,scroll:e?.scrollTop||0}},i=e=>{try{sessionStorage.setItem(n,JSON.stringify(e))}catch{}},a=()=>i(r()),o=(e,t)=>{let n=r();n.open[t]=e,i(n)};t?.addEventListener(`click`,e=>{if(!(e.target instanceof Element))return;let t=e.target.closest(`summary`)?.closest(`details`);if(!t)return;let n=t.querySelector(`sl-sidebar-restore`),r=parseInt(n?.dataset.index||``);isNaN(r)||o(!t.open,r)}),addEventListener(`visibilitychange`,()=>{document.visibilityState===`hidden`&&a()});</script><div class="lg:sl-flex astro-lrzkfocr"><aside class="right-sidebar-container print:hidden astro-lrzkfocr"><div class="right-sidebar astro-lrzkfocr"><div class="lg:sl-hidden astro-qok35upx"><mobile-starlight-toc data-min-h="2" data-max-h="3" class="astro-66cqc7ze"><nav aria-labelledby="starlight__on-this-page--mobile" class="astro-66cqc7ze"><details id="starlight__mobile-toc" class="astro-66cqc7ze"><summary id="starlight__on-this-page--mobile" class="sl-flex astro-66cqc7ze"><span class="toggle sl-flex astro-66cqc7ze">On this page<svg aria-hidden="true" class="caret astro-66cqc7ze astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></span><span class="display-current astro-66cqc7ze"></span></summary><div class="dropdown astro-66cqc7ze"><ul class="isMobile astro-jugkfwgx" style="--depth: 0;"><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#_top" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">Overview</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#depending-on-the-engine" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">Depending on the engine</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#the-host-api" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">The host API</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#build-metadata-supplied-by-the-hosts-packaging" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">Build metadata (supplied by the host’s packaging)</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#stability" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">Stability</span></a></li></ul></div></details></nav></mobile-starlight-toc><script type="module" src="/_astro/MobileTableOfContents.astro_astro_type_script_index_0_lang.C3fM4Kra.js"></script></div><div class="right-sidebar-panel sl-hidden lg:sl-block astro-qok35upx"><div class="sl-container astro-qok35upx"><starlight-toc data-min-h="2" data-max-h="3"><nav aria-labelledby="starlight__on-this-page"><h2 id="starlight__on-this-page">On this page</h2><ul class="astro-jugkfwgx" style="--depth: 0;"><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#_top" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">Overview</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#depending-on-the-engine" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">Depending on the engine</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#the-host-api" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">The host API</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#build-metadata-supplied-by-the-hosts-packaging" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">Build metadata (supplied by the host’s packaging)</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#stability" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">Stability</span></a></li></ul></nav></starlight-toc><script type="module" src="/_astro/TableOfContents.astro_astro_type_script_index_0_lang.BpJaGz7G.js"></script></div></div></div></aside><div class="main-pane astro-lrzkfocr"><main data-pagefind-body class="astro-g5ptsecz" lang="en" dir="ltr"><div class="content-panel astro-a7po4psb"><div class="sl-container astro-a7po4psb"><h1 id="_top" class="astro-bebwqqxs">Host API guide</h1></div></div><div class="content-panel astro-a7po4psb"><div class="sl-container astro-a7po4psb"><div class="sl-markdown-content"><p><code dir="auto">verticopolis-engine</code> is the whole simulation: rules, commands, state,
+saves and gameplay events. A frontend owns everything a player sees and
+hears (rendering, audio, UI, input, presentation) and drives the engine
+through the calls below. Frontends may differ. Simulations may not: a host
+proves it runs the real simulation by replaying the conformance suite
+(<code dir="auto">../conformance/</code>).</p>
+<p><code dir="auto">consumer/</code> is a working example and the CI gate for this page: a crate
+outside the engine that depends on it by path and makes every tier 1 call
+below. The <code dir="auto">consumer</code> job in <code dir="auto">.github/workflows/engine-rs.yml</code> runs in the
+official Rust container image, which has no Node.js, from a checkout
+holding only <code dir="auto">engine-rs/</code> and <code dir="auto">conformance/</code>. It copies <code dir="auto">consumer/</code> out of
+the checkout and builds, tests and runs the copy there, depending on the
+engine by an absolute path. The same job runs the engine’s own tests and
+the full referee from that checkout. The plan this page belongs to is issue
+#980.</p>
+<p>What that proves today: the engine builds, passes its tests and runs with
+no web game and no Node.js, and a crate in another directory, reaching this
+repository only through its dependency line and the conformance directory
+it is given, can drive it and replay every conformance scenario, the ones
+that start from a saved tower (<code dir="auto">conformance/fixtures/</code>) included, from a
+copy of the suite under another directory name. The job builds that crate
+against the packaged crate (<code dir="auto">cargo package</code>, what crates.io receives), so
+the library needs nothing outside <code dir="auto">engine-rs/</code>. What it does not prove yet:
+that the suite ships with the crate; a host reads it from a checkout of the
+repository at the release tag (#893).</p>
+<div class="sl-heading-wrapper level-h2"><h2 id="depending-on-the-engine">Depending on the engine</h2><a class="sl-anchor-link" href="#depending-on-the-engine"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “Depending on the engine”</span></a></div>
+<p>One of these:</p>
+<div class="expressive-code"><link rel="stylesheet" href="/_astro/ec.w36nc.css"><script type="module" src="/_astro/ec.0vx5m.js"></script><figure class="frame not-content"><figcaption class="header"></figcaption><pre data-language="toml"><code><div class="ec-line"><div class="code"><span style="--0:#D6DEEB;--1:#403F53">[dependencies]</span></div></div><div class="ec-line"><div class="code"><span style="--0:#919F9F;--1:#5F636F"># From crates.io, pinned exactly (no semver promise yet; see Stability):</span></div></div><div class="ec-line"><div class="code"><span style="--0:#C5E478;--1:#3B61B0">verticopolis-engine</span><span style="--0:#D6DEEB;--1:#403F53"> = </span><span style="--0:#D9F5DD;--1:#111111">"</span><span style="--0:#ECC48D;--1:#984E4D">=&lt;version&gt;</span><span style="--0:#D9F5DD;--1:#111111">"</span></div></div></code></pre><div class="copy"><div aria-live="polite"></div><button title="Copy to clipboard" data-copied="Copied!" data-code="[dependencies]# From crates.io, pinned exactly (no semver promise yet; see Stability):verticopolis-engine = &quot;=<version>&quot;"><div></div></button></div></figure></div>
+<div class="expressive-code"><figure class="frame not-content"><figcaption class="header"></figcaption><pre data-language="toml"><code><div class="ec-line"><div class="code"><span style="--0:#D6DEEB;--1:#403F53">[dependencies]</span></div></div><div class="ec-line"><div class="code"><span style="--0:#919F9F;--1:#5F636F"># From a checkout of this repository:</span></div></div><div class="ec-line"><div class="code"><span style="--0:#C5E478;--1:#3B61B0">verticopolis-engine</span><span style="--0:#D6DEEB;--1:#403F53"> = { </span><span style="--0:#C5E478;--1:#3B61B0">path</span><span style="--0:#D6DEEB;--1:#403F53"> = </span><span style="--0:#D9F5DD;--1:#111111">"</span><span style="--0:#ECC48D;--1:#984E4D">../verticopolis/engine-rs</span><span style="--0:#D9F5DD;--1:#111111">"</span><span style="--0:#D6DEEB;--1:#403F53"> }</span></div></div></code></pre><div class="copy"><div aria-live="polite"></div><button title="Copy to clipboard" data-copied="Copied!" data-code="[dependencies]# From a checkout of this repository:verticopolis-engine = { path = &quot;../verticopolis/engine-rs&quot; }"><div></div></button></div></figure></div>
+<div class="expressive-code"><figure class="frame not-content"><figcaption class="header"></figcaption><pre data-language="toml"><code><div class="ec-line"><div class="code"><span style="--0:#D6DEEB;--1:#403F53">[dependencies]</span></div></div><div class="ec-line"><div class="code"><span style="--0:#919F9F;--1:#5F636F"># Pinned to a commit:</span></div></div><div class="ec-line"><div class="code"><span style="--0:#C5E478;--1:#3B61B0">verticopolis-engine</span><span style="--0:#D6DEEB;--1:#403F53"> = { </span><span style="--0:#C5E478;--1:#3B61B0">git</span><span style="--0:#D6DEEB;--1:#403F53"> = </span><span style="--0:#D9F5DD;--1:#111111">"</span><span style="--0:#ECC48D;--1:#984E4D">https://github.com/maniator/verticopolis</span><span style="--0:#D9F5DD;--1:#111111">"</span><span style="--0:#D6DEEB;--1:#403F53">, </span><span style="--0:#C5E478;--1:#3B61B0">rev</span><span style="--0:#D6DEEB;--1:#403F53"> = </span><span style="--0:#D9F5DD;--1:#111111">"</span><span style="--0:#ECC48D;--1:#984E4D">&lt;sha&gt;</span><span style="--0:#D9F5DD;--1:#111111">"</span><span style="--0:#D6DEEB;--1:#403F53"> }</span></div></div></code></pre><div class="copy"><div aria-live="polite"></div><button title="Copy to clipboard" data-copied="Copied!" data-code="[dependencies]# Pinned to a commit:verticopolis-engine = { git = &quot;https://github.com/maniator/verticopolis&quot;, rev = &quot;<sha>&quot; }"><div></div></button></div></figure></div>
+<p>The crate has no default features. The <code dir="auto">wasm</code> feature is the JavaScript
+binding (<code dir="auto">src/wasm.rs</code> and <code dir="auto">src/wasm/</code>) and a native host leaves it off. The <code dir="auto">tooling</code>
+feature turns <code dir="auto">wasm</code> on and adds the binding’s test and tooling calls (its
+tier 3 in <code dir="auto">src/engineBinding/exportTiers.ts</code>, #1057), which only the web
+game’s tests and tooling build; the shipped game and the npm package leave
+it off. The <code dir="auto">conformance</code>
+feature is the harness that replays the lock (tier 2 below); a host turns
+it on only to prove conformance, as <code dir="auto">consumer/</code> does:</p>
+<div class="expressive-code"><figure class="frame not-content"><figcaption class="header"></figcaption><pre data-language="toml"><code><div class="ec-line"><div class="code"><span style="--0:#C5E478;--1:#3B61B0">verticopolis-engine</span><span style="--0:#D6DEEB;--1:#403F53"> = { </span><span style="--0:#C5E478;--1:#3B61B0">git</span><span style="--0:#D6DEEB;--1:#403F53"> = </span><span style="--0:#D9F5DD;--1:#111111">"</span><span style="--0:#ECC48D;--1:#984E4D">https://github.com/maniator/verticopolis</span><span style="--0:#D9F5DD;--1:#111111">"</span><span style="--0:#D6DEEB;--1:#403F53">, </span><span style="--0:#C5E478;--1:#3B61B0">rev</span><span style="--0:#D6DEEB;--1:#403F53"> = </span><span style="--0:#D9F5DD;--1:#111111">"</span><span style="--0:#ECC48D;--1:#984E4D">&lt;sha&gt;</span><span style="--0:#D9F5DD;--1:#111111">"</span><span style="--0:#D6DEEB;--1:#403F53">, </span><span style="--0:#C5E478;--1:#3B61B0">features</span><span style="--0:#D6DEEB;--1:#403F53"> = [</span><span style="--0:#D9F5DD;--1:#111111">"</span><span style="--0:#ECC48D;--1:#984E4D">conformance</span><span style="--0:#D9F5DD;--1:#111111">"</span><span style="--0:#D6DEEB;--1:#403F53">] }</span></div></div></code></pre><div class="copy"><div aria-live="polite"></div><button title="Copy to clipboard" data-copied="Copied!" data-code="verticopolis-engine = { git = &quot;https://github.com/maniator/verticopolis&quot;, rev = &quot;<sha>&quot;, features = [&quot;conformance&quot;] }"><div></div></button></div></figure></div>
+<p>The JavaScript binding’s exports carry tiers of their own, separate from
+the crate tiers on this page: player commands, restores and reads, and the
+raw edit, test and seed ops that skip the charge rules. The table is
+<code dir="auto">src/engineBinding/exportTiers.ts</code>; a new export picks a tier there, and
+<code dir="auto">src/tests/bindingExportTiers.guard.test.ts</code> keeps the third tier out of the
+game’s UI (#946).</p>
+<p>The build needs the Rust toolchain in <code dir="auto">Cargo.toml</code> (<code dir="auto">rust-version</code>) and
+the <code dir="auto">engine-rs/</code> and <code dir="auto">conformance/</code> directories (the event catalog is
+compiled in from there). It needs no Node.js, no npm and nothing else from
+the web game. Because the crate reads <code dir="auto">../conformance/</code> at compile time, it
+builds from a checkout of the whole repository (which a path or git
+dependency gives you) and cannot be packaged on its own yet (#893).</p>
+<p>A game does no IO. The simulation reads no file, clock, environment,
+console or network, and spawns no thread or process; the host passes in
+bytes, time and its build name. The one exception is a short list of
+conformance harness functions in <code dir="auto">scenario.rs</code>, <code dir="auto">suite.rs</code> and
+<code dir="auto">tdt/referee.rs</code>, which read the scenario and fixture files they are
+pointed at. All three modules are compiled only with the <code dir="auto">conformance</code>
+feature, so the library a host links by default reads no file at all. The
+rest of each file is checked like any other library code.
+<code dir="auto">tests/independence.rs</code> scans the library source for those services (by
+path, grouped import, macro and foreign-function block), refuses a build
+script for the engine itself, data (<code dir="auto">include_str!</code>, <code dir="auto">include_bytes!</code>) from
+outside <code dir="auto">engine-rs/</code> and <code dir="auto">conformance/</code>, and code (<code dir="auto">include!</code>, <code dir="auto">#[path]</code>)
+from anything but a <code dir="auto">.rs</code> file under <code dir="auto">src/</code> outside <code dir="auto">src/bin/</code>, and fails
+when the engine’s or the consumer’s <code dir="auto">Cargo.lock</code> names
+a crate nobody reviewed for host access. It also checks that the harness
+modules and every binary sit behind the <code dir="auto">conformance</code> feature.
+<code dir="auto">tests/read_boundary.rs</code> checks the Rust files under <code dir="auto">src/</code>, <code dir="auto">tests/</code> and
+<code dir="auto">consumer/src/</code> (<code dir="auto">tests/independence.rs</code> and <code dir="auto">tests/read_boundary.rs</code>
+aside, whose examples climb on purpose): a <code dir="auto">..</code> path leads only to
+<code dir="auto">conformance/</code>. Both read source text, so they catch the ordinary
+spellings; review still owns the rest, and the sparse CI job is the proof
+for a path that steps up another way (<code dir="auto">Path::parent</code>, <code dir="auto">ancestors</code>).</p>
+<div class="sl-heading-wrapper level-h2"><h2 id="the-host-api">The host API</h2><a class="sl-anchor-link" href="#the-host-api"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “The host API”</span></a></div>
+<p>These are the calls a frontend makes (tier 1 in #980). <code dir="auto">consumer/</code> calls
+each of them, and <code dir="auto">tests/api.rs</code> names each one in a build with default
+features, so a rename or a removal fails CI until this page and the
+consumer follow, and none of them needs the harness. The last row is
+tier 2, the harness a host uses to prove conformance.</p>
+<table>
+<thead>
+<tr>
+<th>Need</th>
+<th>Call</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Start a game</td>
+<td><code dir="auto">sim::Simulation::new_game(seed, GameMode::Classic)</code>, or <code dir="auto">new_game_with(seed, mode, calendar, start_unbridged)</code></td>
+</tr>
+<tr>
+<td>Advance time</td>
+<td><code dir="auto">sim.tick(dt_minutes)</code>: any <code dir="auto">dt</code>, split into steps that never skip an hour. Same seed, same commands and the same sequence of <code dir="auto">dt</code> give the same game</td>
+</tr>
+<tr>
+<td>Drive time from frames</td>
+<td><code dir="auto">stepper.advance(&amp;mut sim, dt_ms, minutes_per_second, steady_clock, step)</code> on a <code dir="auto">fixed_step::FrameStepper::default()</code>: the frame loop the web host runs, for a Rust host that drives the engine itself. It owes each frame’s minutes (paced by the canon day curve, or flat with the steady clock), caps the carry at <code dir="auto">MAX_CATCHUP_MINUTES</code>, and cuts what is owed into whole quanta sized from the sim’s own clock (<code dir="auto">quantum_for</code>, at most <code dir="auto">MAX_STEPS_PER_FRAME</code> a frame), so the tower is the same at any frame rate. Use it instead of choosing your own <code dir="auto">dt</code>. Given the same frames, the ticks it cuts and the carry it keeps match the browser’s frame loop bit for bit (<code dir="auto">engine-rs/tests/data/fixed-step-cases.json</code> records them). Two kinds of rule live in the browser’s host, outside that loop: Excalibur turns any frame over 200 ms into 1 ms before the loop sees it, and the host zeroes the carry (<code dir="auto">stepper.acc_minutes = 0.0</code>) when the player changes speed (even when the change is undone before the next frame) or toggles the steady clock, while a blocking modal is open, and once the engine has stopped. A host that wants the browser’s tower applies these before calling <code dir="auto">advance</code></td>
+</tr>
+<tr>
+<td>Quote a placement</td>
+<td><code dir="auto">sim.can_build(kind, floor, x)</code>: <code dir="auto">{ ok, reason, cost }</code>, the dry run <code dir="auto">build</code> makes, with the full price. <code dir="auto">sim.can_build_transport(kind, x, bottom, top)</code> is the same for a shaft, the dry run <code dir="auto">build_transport</code> makes: an elevator costs the catalog <code dir="auto">cost</code> plus <code dir="auto">transportFloorCost</code> for each floor past its first, stairs and escalators the catalog <code dir="auto">cost</code>. The price is a shaft’s only when the kind is a transport and <code dir="auto">top</code> is above <code dir="auto">bottom</code>; the engine refuses anything else</td>
+</tr>
+<tr>
+<td>Player commands</td>
+<td><code dir="auto">build</code>, <code dir="auto">build_transport</code>, <code dir="auto">sell_at</code>, <code dir="auto">toggle_auto_bridge</code> (<code dir="auto">build.rs</code>); <code dir="auto">paint_brush</code> (<code dir="auto">brush.rs</code>), the floor and lobby brush as one command, with <code dir="auto">set_lobby_height</code> and the scoped <code dir="auto">with_lobby_height</code> choosing how many stories (1 to 3) a floor’s first lobby rises (#308); <code dir="auto">add_car</code>, <code dir="auto">remove_car</code>, <code dir="auto">extend_transport</code>, <code dir="auto">remove_facility</code> (<code dir="auto">charges.rs</code>), which charge or refund and report the money moved, with <code dir="auto">begin_extend</code> and <code dir="auto">end_extend</code> around a drag so <code dir="auto">extend_transport</code> bills a wiggle once against the engine-held mark; <code dir="auto">adjust_rent</code>, <code dir="auto">set_no_rate</code>, <code dir="auto">price_unit</code>, <code dir="auto">apply_rent_batch</code> (<code dir="auto">rent.rs</code>); <code dir="auto">resolve_choice</code>, <code dir="auto">set_film_policy</code> (<code dir="auto">events.rs</code>)</td>
+</tr>
+<tr>
+<td>Read state</td>
+<td>the public fields (<code dir="auto">money</code>, <code dir="auto">star</code>, <code dir="auto">clock</code>, <code dir="auto">tower</code>, <code dir="auto">crowd</code>, <code dir="auto">log</code>, …) and <code dir="auto">population()</code>; read them, never write them</td>
+</tr>
+<tr>
+<td>Read a frame</td>
+<td><code dir="auto">frame::frame_view(&amp;sim)</code>: every value a renderer reads between two structural syncs (clock, money, rating, effects, then one record per person, per unit and per shaft with its cars) as one flat <code dir="auto">Vec&lt;f64&gt;</code>, laid out in <code dir="auto">src/frame.rs</code>. Read it by name: the slots in <code dir="auto">frame::header</code>, <code dir="auto">frame::person</code>, <code dir="auto">frame::unit</code>, <code dir="auto">frame::transport</code> and <code dir="auto">frame::car</code> (<code dir="auto">frame::header::MONEY</code>, <code dir="auto">frame::person::ROUTINE</code>, …), and the record widths <code dir="auto">FRAME_HEADER</code>, <code dir="auto">PERSON_FIXED</code>, <code dir="auto">UNIT_RECORD</code>, <code dir="auto">TRANSPORT_FIXED</code> and <code dir="auto">CAR_RECORD</code>; a routine code of <code dir="auto">UNKNOWN_ROUTINE</code> means the engine has a routine the layout does not name yet, and a decoder should refuse it. <code dir="auto">frame::log_since(&amp;sim, seq)</code> returns the log entries numbered after <code dir="auto">seq</code>. The JavaScript binding passes the same frame across as one typed array</td>
+</tr>
+<tr>
+<td>Read the view</td>
+<td>The renderer-facing view (facade slice 6a, #1213), for a host that keeps no copy of the simulation: <code dir="auto">view::structure_view(&amp;sim)</code>, the structural snapshot (the floor bounds, the mode and calendar, the scene seed, the rooms by slot, the floor and lobby tiles as runs by floor and x, the shafts with their skipped floors), read again when <code dir="auto">tower.revision</code> moves and after a load, whose tower starts its revisions over; <code dir="auto">view::ViewReader::new()</code> and <code dir="auto">reader.frame(&amp;sim, full)</code>, the dynamic frame (the header, the people, the rooms whose fields changed since that reader’s last frame, every room on its first frame, after a structural change, on another tower or when <code dir="auto">full</code> asks, and the cars; from half the rooms’ worth of marks, or when the tower’s mark log dropped marks that reader had not read, it compares every room instead, which sends the same rooms), read every rendered frame (the engine marks a room when its own commands and tick change it, so a host that writes a unit’s fields itself passes <code dir="auto">full</code> on its next frame); <code dir="auto">reader.set_people_window(view::PeopleWindow::new(floor_lo, floor_hi, x_lo, x_hi))</code> makes its frames carry only the people a view shows, padded a floor and half the widest shaft so every rider of a car on screen comes along (<code dir="auto">None</code> sends every person; the window is the camera, never saved or hashed); <code dir="auto">view::meta_since(&amp;sim.tower, since)</code>, the labels and subtypes changed after a meta revision, read when <code dir="auto">tower.meta_revision</code> moves (a tower starts at meta revision 1, so <code dir="auto">None</code> or 0 lists them all, and a <code dir="auto">since</code> holds for one tower only); <code dir="auto">sim.tower_signature()</code>, a pure fingerprint of the fields the tower half of undo’s signature reads, equal at two reads when those fields are (one walk over the units and shafts, a per-command read). Read them by name: the slots and widths in <code dir="auto">view::layout</code> (<code dir="auto">view::layout::header::POPULATION</code>, <code dir="auto">view::layout::RUN_RECORD</code>, …), all of them with the kind, state, weather, mode and calendar codes as JSON from <code dir="auto">view::layout_json()</code>, versioned by <code dir="auto">VIEW_LAYOUT_VERSION</code>. The JavaScript binding’s <code dir="auto">viewStructure</code>, <code dir="auto">viewFrame</code>, <code dir="auto">setPeopleWindow</code>, <code dir="auto">unitMetaSince</code>, <code dir="auto">towerSignature</code> (a <code dir="auto">bigint</code>) and <code dir="auto">viewLayout</code> wrap these, with one frame reader per engine, whose frames the header’s <code dir="auto">frameSeq</code> numbers</td>
+</tr>
+<tr>
+<td>Gameplay events</td>
+<td><code dir="auto">sim.gameplay.drain()</code> after each frame; <code dir="auto">to_json()</code> on each event; names and payloads are listed in <code dir="auto">engine-rs/src/gameplay/catalog.json</code> (<code dir="auto">gameplay::CATALOG_JSON</code>, checked with <code dir="auto">check_event</code>). The buffer holds <code dir="auto">GAMEPLAY_RING_CAP</code> events and counts any it had to drop in <code dir="auto">sim.gameplay.dropped</code></td>
+</tr>
+<tr>
+<td>Reference data</td>
+<td><code dir="auto">catalog::catalog(mode)</code>: prices, sizes, caps and rules per facility kind, versioned by <code dir="auto">CATALOG_VERSION</code></td>
+</tr>
+<tr>
+<td>Identity</td>
+<td><code dir="auto">identity::identity()</code> (<code dir="auto">engineIdentity()</code> in the binding): schema, crate name and version, <code dir="auto">SAVE_VERSION</code> and the oldest save version loaded, <code dir="auto">FRAME_LAYOUT_VERSION</code>, <code dir="auto">CATALOG_VERSION</code> with each mode’s digest, and the conformance lock digest. It holds no build hash: a hash of the sources cannot be compiled into them, so the packaging supplies it as build metadata (below). The crate version goes up with the conformance lock, <code dir="auto">SAVE_VERSION</code>, the frame layout, view layout, catalog and identity record versions, and <code dir="auto">src/engineBinding/engine.d.ts</code> (<code dir="auto">compat-record.json</code>, guarded by <code dir="auto">src/tests/engineCompat.guard.test.ts</code>); the guard does not see the Rust <code dir="auto">pub</code> API, so a change there is a review call (<code dir="auto">CONTRIBUTING.md</code>, Versioning)</td>
+</tr>
+<tr>
+<td>Snapshot hash</td>
+<td><code dir="auto">canonical::digest(&amp;snapshot::state_view(&amp;sim))</code>: the hashed view the conformance lock pins (with the <code dir="auto">conformance</code> feature, <code dir="auto">scenario::state_view</code> names the same function)</td>
+</tr>
+<tr>
+<td>Save</td>
+<td><code dir="auto">load::encode_simulation_vctower(&amp;sim, app_version, saved_at_ms)</code>: the <code dir="auto">.vctower</code> bytes the web game writes. A host that holds the save JSON (<code dir="auto">sim.serialize()</code>) gets the same file from <code dir="auto">load::stamp_save(&amp;mut save, app_version, saved_at_ms)</code> then <code dir="auto">load::encode_vctower(&amp;save)</code></td>
+</tr>
+<tr>
+<td>Load</td>
+<td><code dir="auto">load::decode_vctower(text)</code>, then <code dir="auto">load::deserialize(&amp;save)</code>, then <code dir="auto">load::mark_founder_from_loaded_file(&amp;mut sim, &amp;save)</code>, which marks a file with no build stamp as a founder’s tower the way the web game does (skip it and a host drops that status on its next save)</td>
+</tr>
+<tr>
+<td>1994 saves</td>
+<td><code dir="auto">import_tdt(bytes, filename)</code> and <code dir="auto">export_tdt(save_json)</code></td>
+</tr>
+<tr>
+<td>Conformance (tier 2, the <code dir="auto">conformance</code> feature)</td>
+<td><code dir="auto">scenario::Scenario::parse</code> and <code dir="auto">scenario::run_scenario(&amp;scenario, suite)</code>, compared with <code dir="auto">expected.json</code> (as <code dir="auto">consumer/</code> does for every scenario), or <code dir="auto">cargo run --features conformance --bin conformance</code> from this directory for the whole suite. <code dir="auto">suite</code> is the conformance directory under any name (before stage 4 these runners took the repository root; a scenario that starts from a fixture now refuses a root, with a message naming the mistake, and a new-game scenario reads nothing from the suite): a scenario names its fixture <code dir="auto">conformance/fixtures/...</code>, and <code dir="auto">suite::fixture_path</code> reads that first step as the suite itself and refuses a name that leaves it</td>
+</tr>
+</tbody>
+</table>
+<p>Two behaviors a host should know:</p>
+<ul>
+<li><strong>A save holds the tower and leaves out the live crowd and the elevator
+dispatch.</strong> A loaded game restarts both, so it does not track the game
+that wrote the save. Two loads of the same save do track each other
+exactly.</li>
+<li><strong>The loader repairs.</strong> <code dir="auto">deserialize</code> coerces damaged or forged fields
+the way the web game’s loader does; it refuses only what it cannot read
+(<code dir="auto">decode_vctower</code> refuses a file that is not a <code dir="auto">.vctower</code>).</li>
+</ul>
+<div class="sl-heading-wrapper level-h2"><h2 id="build-metadata-supplied-by-the-hosts-packaging">Build metadata (supplied by the host’s packaging)</h2><a class="sl-anchor-link" href="#build-metadata-supplied-by-the-hosts-packaging"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “Build metadata (supplied by the host’s packaging)”</span></a></div>
+<p>The identity record is everything the engine knows about itself. Which
+sources a build came from is not among those facts, so the packaging supplies
+it, and nothing in the engine reads it or requires it:</p>
+<div class="expressive-code"><figure class="frame not-content"><figcaption class="header"></figcaption><pre data-language="json"><code><div class="ec-line"><div class="code"><span style="--0:#D6DEEB;--1:#403F53">{ </span><span style="--0:#7FDBCA;--1:#096E72">"schema"</span><span style="--0:#D6DEEB;--1:#403F53">: </span><span style="--0:#F78C6C;--1:#AA0982">1</span><span style="--0:#D6DEEB;--1:#403F53">, </span><span style="--0:#7FDBCA;--1:#096E72">"sourceHash"</span><span style="--0:#D6DEEB;--1:#403F53">: </span><span style="--0:#D9F5DD;--1:#111111">"</span><span style="--0:#C789D6;--1:#7C5686">&lt;64 lowercase hex digits&gt;</span><span style="--0:#D9F5DD;--1:#111111">"</span><span style="--0:#D6DEEB;--1:#403F53"> }</span></div></div></code></pre><div class="copy"><div aria-live="polite"></div><button title="Copy to clipboard" data-copied="Copied!" data-code="{ &quot;schema&quot;: 1, &quot;sourceHash&quot;: &quot;<64 lowercase hex digits>&quot; }"><div></div></button></div></figure></div>
+<p><code dir="auto">sourceHash</code> is the SHA-256 over the engine’s Rust sources and the files they
+include (<code dir="auto">engineSourceHash</code> in <code dir="auto">src/wasmhost/packageHash.ts</code>). A packager
+outside the web build computes the same value as follows. Take every file under
+the crate directory except <code dir="auto">target/</code>, <code dir="auto">pkg/</code>, hidden names, names ending in <code dir="auto">~</code>
+and Markdown files, plus every file a plain <code dir="auto">include_str!("...")</code> or
+<code dir="auto">include_bytes!("...")</code> names. Label each file with its path relative to the
+crate directory, using <code dir="auto">/</code> (a file outside the crate is labeled
+<code dir="auto">../conformance/...</code>). Sort the labels
+by UTF-16 code unit. For each file in that order, feed the SHA-256 the label, a
+zero byte, the file with each CRLF read as LF (a file containing a zero byte is taken as it is), and a zero byte.
+The hex digest, in lowercase, is the value. That makes the hash a fact about
+the sources; a compiled binary’s own digest is a separate one (the package id
+in <code dir="auto">BUILD.json</code>). The web build writes the object, as UTF-8 JSON,
+into a custom section named <code dir="auto">verticopolis.build</code> of each <code dir="auto">.wasm</code>
+(<code dir="auto">scripts/wasm-build.ts</code>, right after wasm-bindgen and before any digest is
+taken), and the page reads it back from the compiled module
+(<code dir="auto">src/wasmhost/engineLoad.ts</code>). A native Rust or Godot host supplies the same
+object its own way, for example a file its build step writes next to the library or a constant it links in, and a frontend that shows
+both shows them side by side. A missing or malformed object is reported as
+unavailable, never as a failure of the engine.</p>
+<div class="sl-heading-wrapper level-h2"><h2 id="stability">Stability</h2><a class="sl-anchor-link" href="#stability"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “Stability”</span></a></div>
+<ul>
+<li><strong>No semver promise yet.</strong> Each crate release is published to crates.io
+as <code dir="auto">verticopolis-engine</code> and tagged <code dir="auto">engine-v&lt;version&gt;</code>; a consumer pins an
+exact version, a tag or a commit. Each crate release also publishes the
+WASM build to npm as <code dir="auto">@verticopolis/engine</code>. The version goes up with the
+conformance lock, the save, frame layout, view layout, catalog and
+identity record versions and the binding declaration (<code dir="auto">src/compat-record.json</code>, held by
+<code dir="auto">src/tests/engineCompat.guard.test.ts</code>; the Rust <code dir="auto">pub</code> API is a review
+call). The compatibility policy is #893.</li>
+<li><strong>The lock is the contract.</strong> Any change to simulation behavior lands
+with a regenerated <code dir="auto">conformance/expected.json</code> in the same pull request,
+and that diff is what a consumer must take on a pin bump. A host that
+replays the lock at its pinned commit runs the same simulation as the web
+game at that commit.</li>
+<li><strong>Tier 1 above</strong> changes only on purpose, in a pull request that updates
+this page and <code dir="auto">consumer/</code> with it.</li>
+<li><strong>The conformance harness</strong> (<code dir="auto">scenario</code>, <code dir="auto">suite</code>, <code dir="auto">tdt::referee</code> and
+<code dir="auto">src/bin/</code>) is tier 2, behind the <code dir="auto">conformance</code> feature: usable to replay
+the lock, and changed only with the suite it replays.</li>
+<li><strong>Everything else is internal</strong> (tier 3), even where it is <code dir="auto">pub</code>, and the
+Rust API reference hides it (<code dir="auto">#[doc(hidden)]</code>). It is public so the tests
+can reach it. Calling a per-phase step (<code dir="auto">collect_rent</code>, <code dir="auto">pay_maintenance</code>,
+<code dir="auto">start_fire</code>, <code dir="auto">maybe_random_event</code>, and the like), a raw edit (<code dir="auto">set_cars</code>
+and <code dir="auto">resize_transport</code> change a shaft without charging; they exist to
+replay another engine’s edits) or writing a field skips the rules a
+command applies, and any of them can change in any commit.</li>
+<li><strong>Not covered yet</strong> (stages in #980): tier 2 is behind its feature and
+tier 1 is pinned by name, but tier 3 is still <code dir="auto">pub</code>, hidden from the
+reference but not from the compiler (narrowing it to <code dir="auto">pub(crate)</code>, and
+getters for the fields a host reads, are the rest of stage 4), and the web host still runs its own TypeScript fixed-step driver (the Rust
+one in <code dir="auto">fixed_step</code> is matched to it by recorded frame sequences, and the web
+host does not call it yet; #867).</li>
+</ul>
+</div><footer class="sl-flex astro-ddtxxk7k"><div class="meta sl-flex astro-ddtxxk7k"></div><div class="pagination-links print:hidden astro-b5raizh3" dir="ltr"><a href="/crate/" rel="prev" class="astro-b5raizh3"><svg aria-hidden="true" class="astro-b5raizh3 astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.5rem;"><path d="M17 11H9.41l3.3-3.29a1.004 1.004 0 1 0-1.42-1.42l-5 5a1 1 0 0 0-.21.33 1 1 0 0 0 0 .76 1 1 0 0 0 .21.33l5 5a1.002 1.002 0 0 0 1.639-.325 1 1 0 0 0-.219-1.095L9.41 13H17a1 1 0 0 0 0-2Z"/></svg><span class="astro-b5raizh3">Previous<br class="astro-b5raizh3"><span class="link-title astro-b5raizh3">Rust crate</span></span></a><a href="/conformance/" rel="next" class="astro-b5raizh3"><svg aria-hidden="true" class="astro-b5raizh3 astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.5rem;"><path d="M17.92 11.62a1.001 1.001 0 0 0-.21-.33l-5-5a1.003 1.003 0 1 0-1.42 1.42l3.3 3.29H7a1 1 0 0 0 0 2h7.59l-3.3 3.29a1.002 1.002 0 0 0 .325 1.639 1 1 0 0 0 1.095-.219l5-5a1 1 0 0 0 .21-.33 1 1 0 0 0 0-.76Z"/></svg><span class="astro-b5raizh3">Next<br class="astro-b5raizh3"><span class="link-title astro-b5raizh3">Conformance suite</span></span></a></div></footer></div></div></main></div></div></div></div></body></html>
