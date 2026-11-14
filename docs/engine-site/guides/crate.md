@@ -205,7 +205,8 @@ The crate has no default features.
   every lobby tile of the floor. A save is version 10 when an elevator
   schedule holds an hour back (`heldBack`, `Schedule::held_back`): an hour
   the player cut back that a car sold since left at the whole fleet's size,
-  which a car bought back does not join. An older engine would run the
+  which a car bought back does not join. A player's edit keeps a held hour
+  whose count it leaves as it was. An older engine would run the
   whole fleet there, so it refuses the save. All four load here.
 
 ## Proving conformance

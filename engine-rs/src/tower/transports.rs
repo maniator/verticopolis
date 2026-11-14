@@ -428,10 +428,9 @@ impl Tower {
             return false;
         }
         self.revision += 1;
-        let (cars, bottom, top) = {
-            let t = &self.transports[i];
-            (t.cars, t.bottom, t.top)
-        };
+        let t = &self.transports[i];
+        let (cars, bottom, top) = (t.cars, t.bottom, t.top);
+        let raw = &Schedule::keeping_untouched_held(raw, t.schedule.as_ref());
         // A legacy save may keep a home floor that later stop rules would
         // otherwise snap. Editing only the active-car rows must preserve it.
         let previous_homes = self.transports[i]

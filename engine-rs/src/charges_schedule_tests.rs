@@ -163,60 +163,79 @@ fn a_sold_car_clamps_the_pattern_and_a_rebuy_follows_the_inheritance_rule() {
     assert_eq!(sim.remove_car(lift), ChargeResult::refuse(LAST_CAR));
 }
 
-/// A player's edit states what each hour runs, so it drops the held hours; a
+/// A player's edit keeps the held hours whose counts it leaves as they were,
+/// so pressing OK changes nothing, and drops one it sets to another count; a
 /// schedule that lists them, as a save does, keeps the ones at the fleet's
 /// size and drops the rest (#1546).
 #[test]
-fn an_edit_states_every_hour_and_held_hours_stay_only_at_the_fleet_size() {
+fn an_edit_keeps_untouched_held_hours_and_held_hours_stay_only_at_the_fleet_size() {
     let (mut sim, lift, _, _) = four_car_shaft();
     assert!(sim.remove_car(lift).ok);
-    let held = sim
-        .tower
-        .get_transport(lift)
-        .unwrap()
-        .schedule
+    let schedule = |sim: &Simulation| {
+        sim.tower
+            .get_transport(lift)
+            .unwrap()
+            .schedule
+            .clone()
+            .unwrap()
+    };
+    let held = schedule(&sim);
+    let was = held
+        .held_back
         .clone()
-        .unwrap();
-    assert!(
-        held.held_back.is_some(),
-        "the sale held the 3-car hours back"
-    );
+        .expect("the sale held the 3-car hours back");
+    assert!(!was.weekday.is_empty() && !was.weekend.is_empty());
 
+    // OK with nothing changed: every held hour stays held.
     let mut edit = held.to_json();
     edit.as_object_mut().unwrap().remove("heldBack");
     assert!(sim.tower.set_schedule(lift, &edit));
-    let after = sim
-        .tower
-        .get_transport(lift)
-        .unwrap()
-        .schedule
-        .clone()
-        .unwrap();
-    assert_eq!(after.held_back, None);
-    assert_eq!(
-        (after.weekday, after.weekend),
-        (held.weekday.clone(), held.weekend.clone())
-    );
+    assert_eq!(schedule(&sim).held_back, Some(was.clone()));
 
-    // Hour 1 runs the fleet of 3 on weekdays, hour 0 runs 3 and hour 2 runs
-    // 2: only the whole, in-range hours at the fleet's size are kept, once.
+    // The player sets the first held weekday hour to 2: it stops being held,
+    // and every other held hour stays.
+    let first = was.weekday[0];
+    edit["activeCars"]["weekday"][first] = serde_json::json!(2);
+    assert!(sim.tower.set_schedule(lift, &edit));
+    let after = schedule(&sim);
+    let mut weekday = was.weekday.clone();
+    weekday.remove(0);
+    assert_eq!(
+        after.held_back,
+        Some(crate::schedule::HeldBack {
+            weekday,
+            weekend: was.weekend.clone()
+        })
+    );
+    assert_eq!(after.weekday.as_ref().unwrap()[first], 2);
+
+    // A car bought back joins neither the held hours nor the one set to 2.
+    assert!(sim.add_car(lift).ok);
+    let bought = schedule(&sim);
+    for &h in &was.weekend {
+        assert_eq!(
+            bought.weekend.as_ref().unwrap()[h],
+            3,
+            "weekend {h} stays held at 3"
+        );
+    }
+    assert_eq!(bought.weekday.as_ref().unwrap()[first], 2);
+
+    // On a fresh shaft sold to 3: hour 1 runs the fleet of 3 on weekdays,
+    // hour 0 runs 3 and hour 2 runs 2, so only the whole, in-range hours at
+    // the fleet's size are kept, once.
+    let (mut sim, lift, _, _) = four_car_shaft();
+    assert!(sim.remove_car(lift).ok);
     let mut listed = held.to_json();
     listed["heldBack"] = serde_json::json!({
         "weekday": [1, 1, 0, 2, 24, -1, 1.5, "1", null],
         "weekend": "every hour"
     });
     assert!(sim.tower.set_schedule(lift, &listed));
-    let after = sim
-        .tower
-        .get_transport(lift)
-        .unwrap()
-        .schedule
-        .clone()
-        .unwrap();
     let weekday = held.weekday.clone().unwrap();
     assert_eq!((weekday[0], weekday[1], weekday[2]), (3, 3, 2));
     assert_eq!(
-        after.held_back,
+        schedule(&sim).held_back,
         Some(crate::schedule::HeldBack {
             weekday: vec![0, 1],
             weekend: vec![]

@@ -106,6 +106,10 @@ test("a car sold and bought back leaves a cut-back hour as it was and fills the 
   await page.click('#editor [data-edit="removecar"]');
   await expect(page.locator('#editor [data-field="cars"]')).toContainText("4 / 8 max");
   expect(await hours(page, SHAFT, "weekend")).toEqual(Array(24).fill(4));
+  // Opening the Schedule window and pressing OK changes no hour, so it keeps the held one held.
+  await page.click('#editor [data-edit="schedule"]');
+  await page.click('#modal [data-act="apply"]');
+  await expect(page.locator("#modal .es-body")).toHaveCount(0);
 
   // Weekend 09:00 now runs the fleet of 4 only because of the sale, so the car bought back skips it.
   await page.click('#editor [data-edit="addcar"]');

@@ -151,6 +151,44 @@ impl Schedule {
         }
     }
 
+    /// A player's edit (`raw`, which names no `heldBack`) with the held hours
+    /// of the schedule it replaces, `before`, whose counts it leaves as they
+    /// were, so pressing OK or changing something else keeps them held; an
+    /// hour the edit sets to another count stops being held (#1546). An edit
+    /// that names `heldBack`, as a save does, is taken as it is.
+    pub(crate) fn keeping_untouched_held(raw: &Value, before: Option<&Schedule>) -> Value {
+        let Some((before, held)) = before.and_then(|b| Some((b, b.held_back.as_ref()?))) else {
+            return raw.clone();
+        };
+        if raw.get("heldBack").is_some() {
+            return raw.clone();
+        }
+        let untouched = |day: &str, row: &Option<Vec<i64>>, hours: &[usize]| -> Vec<usize> {
+            let edited = raw
+                .get("activeCars")
+                .and_then(|a| a.get(day))
+                .and_then(Value::as_array);
+            let same = |h: usize| match (edited, row) {
+                (Some(e), Some(r)) => {
+                    e.get(h).and_then(Value::as_f64) == r.get(h).map(|&n| n as f64)
+                }
+                // An edit without the row leaves it as it was.
+                (None, _) => true,
+                (Some(_), None) => false,
+            };
+            hours.iter().copied().filter(|&h| same(h)).collect()
+        };
+        let mut out = raw.clone();
+        if let Some(map) = out.as_object_mut() {
+            let kept = HeldBack {
+                weekday: untouched("weekday", &before.weekday, &held.weekday),
+                weekend: untouched("weekend", &before.weekend, &held.weekend),
+            };
+            map.insert("heldBack".into(), kept.to_json());
+        }
+        out
+    }
+
     /// Whether an hour of either day type is held back (#1546).
     pub fn holds_an_hour(&self) -> bool {
         let held = self.held_back.as_ref();
