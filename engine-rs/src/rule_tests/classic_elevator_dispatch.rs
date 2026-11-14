@@ -11,7 +11,8 @@
 //!
 //! Modern's best-car dispatch, which folds Waiting Car Response into its
 //! choice, is `rule_tests::modern_elevator_dispatch`.
-use std::collections::{BTreeSet, HashMap};
+use crate::crowd::fasthash::FastMap;
+use std::collections::BTreeSet;
 
 use crate::clock::GameMode;
 use crate::crowd::ElevatorCalls;
@@ -72,7 +73,7 @@ fn parked_car_answers_calls(mode: GameMode, response: f64, from: f64, call_floor
     let mut calls = ElevatorCalls::default();
     let hall = call_floors.iter().map(|&f| (f, 1.0)).collect();
     calls.hall.insert(id, hall);
-    let rider = HashMap::from([(1, BTreeSet::from([TOP]))]);
+    let rider = FastMap::from_iter([(1, BTreeSet::from([TOP]))]);
     calls.cab.insert(id, rider);
     let mut d = ElevatorDispatch::new();
     for _ in 0..3 {
@@ -128,7 +129,9 @@ pub(super) fn stay_at_the_call(mode: GameMode, newcomers: bool) -> (usize, bool)
     s.home_floors = Some(vec![1]);
     let (mut tower, id) = shaft_tower(mode, 1, s);
     let mut calls = ElevatorCalls::default();
-    calls.hall.insert(id, HashMap::from([(CALL_FLOOR, 1.0)]));
+    calls
+        .hall
+        .insert(id, FastMap::from_iter([(CALL_FLOOR, 1.0)]));
     let mut d = ElevatorDispatch::new();
     let (mut run, mut longest, mut arrived, mut left) = (0, 0, false, false);
     for _ in 0..120 {

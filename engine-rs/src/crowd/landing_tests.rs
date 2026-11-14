@@ -1,7 +1,7 @@
 //! The landing lines: a rider walks straight to the back of the line and
 //! never into the shaft and back out again (#2116).
 
-use super::{landing_slots, line_at, slot_x, Landings};
+use super::{landing_slots, line_at, measure_line, slot_x, Landings};
 use crate::clock::GameMode;
 use crate::crowd::motion::advance;
 use crate::crowd::spawn::make_person;
@@ -141,5 +141,46 @@ fn two_riders_arriving_in_one_slice_take_two_places() {
         get(id_b).state,
         PState::ToShaft,
         "the first took the front place, so the second walks on to the next"
+    );
+}
+
+#[test]
+fn a_landing_line_follows_the_floor_built_beside_it() {
+    // Floor 2 runs from x 100 to 159: the shaft at 150 has more built floor
+    // on its left, so its line runs left.
+    let mut sim = Simulation::new_game(5, GameMode::Classic);
+    sim.money = 1e12;
+    for x in 100..200 {
+        assert!(sim.tower.place(Kind::Lobby, 1, x).ok);
+    }
+    for x in 100..160 {
+        assert!(sim.tower.place(Kind::Floor, 2, x).ok);
+    }
+    assert!(
+        sim.tower
+            .place_transport(Kind::ElevatorStandard, 150, 1, 2)
+            .ok
+    );
+    let t = sim.tower.transports.last().unwrap().clone();
+    assert_eq!(
+        line_at(&sim.tower, &t, 2).side,
+        -1.0,
+        "the longer run is on the left"
+    );
+    // The line is kept per edit, so laying floor to the right is seen: both
+    // runs now reach the full 30 tiles and the tie goes right.
+    for x in 160..200 {
+        assert!(sim.tower.place(Kind::Floor, 2, x).ok);
+    }
+    let line = line_at(&sim.tower, &t, 2);
+    assert_eq!(
+        (line.side, line.run),
+        (1.0, 30.0),
+        "the edit moved the line"
+    );
+    assert_eq!(
+        line,
+        measure_line(&sim.tower, &t, 2),
+        "kept equals measured"
     );
 }

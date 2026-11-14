@@ -200,7 +200,10 @@ fn climbs(mode: GameMode) -> (f64, f64) {
         t.skip_floors = None;
         t.cars = 1;
         (t.car_positions, t.car_dir) = (vec![1.0], vec![0]);
-        calls.hall.entry(id).or_default().insert(top, 1.0);
+        calls
+            .hall
+            .get_or_insert_with(id, Default::default)
+            .insert(top, 1.0);
     }
     tower.reindex();
     ElevatorDispatch::new().move_cars(&mut tower, 2.5, &calls, 10, false);

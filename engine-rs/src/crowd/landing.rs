@@ -1,8 +1,6 @@
 //! Port of `crowd/landing.ts`: the landing queue slots.
 
-use indexmap::IndexMap;
-
-use super::fasthash::FastMap;
+use super::fasthash::{FastIndexMap, FastMap};
 use super::{Crowd, PState};
 use crate::tower::{Tower, Transport};
 
@@ -30,8 +28,35 @@ pub struct Line {
 }
 
 /// The line beside `shaft` on `floor`: on the side with more built floor,
-/// the right one on a tie.
+/// the right one on a tie. Each motion slice asks it for every landing with a
+/// line, so it is kept per tower edit (`Memo::landing_lines`, #2214).
 pub fn line_at(tower: &Tower, shaft: &Transport, floor: i64) -> Line {
+    let key = tower.index_key();
+    let slot = (shaft.x, shaft.width, floor);
+    if let Some((built, lines)) = &tower.memo.borrow().landing_lines {
+        if *built == key {
+            if let Some(line) = lines.get(&slot) {
+                return *line;
+            }
+        }
+    }
+    let line = measure_line(tower, shaft, floor);
+    let mut memo = tower.memo.borrow_mut();
+    match &mut memo.landing_lines {
+        Some((built, lines)) if *built == key => {
+            lines.insert(slot, line);
+        }
+        _ => {
+            let mut lines = FastMap::default();
+            lines.insert(slot, line);
+            memo.landing_lines = Some((key, lines));
+        }
+    }
+    line
+}
+
+/// `line_at` measured from the built floor beside the shaft.
+fn measure_line(tower: &Tower, shaft: &Transport, floor: i64) -> Line {
     let left_face = shaft.x;
     let right_face = shaft.x + shaft.width;
     let left_run = built_run(tower, floor, left_face - 1, -1);
@@ -89,7 +114,7 @@ impl Landings {
 pub fn landing_slots(crowd: &Crowd, tower: &Tower) -> Landings {
     let mut out = Landings::default();
     // (shaft, floor) -> (person index list)
-    let mut groups: IndexMap<(i64, i64), Vec<usize>> = IndexMap::new();
+    let mut groups: FastIndexMap<(i64, i64), Vec<usize>> = FastIndexMap::default();
     for (i, p) in crowd.people.iter().enumerate() {
         if p.state != PState::Waiting {
             continue;

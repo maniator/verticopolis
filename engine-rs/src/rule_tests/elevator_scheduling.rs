@@ -13,7 +13,7 @@
 //! `dispatch_tests::dispatch_matches_the_hashed_reference_step_for_step`;
 //! staff riding a parked car is
 //! `housekeeping_dispatch_tests::maids_never_board_a_car_the_schedule_has_parked`.
-use std::collections::HashMap;
+use crate::crowd::fasthash::FastMap;
 
 use crate::clock::GameMode;
 use crate::crowd::ElevatorCalls;
@@ -70,7 +70,7 @@ fn hall_calls(id: i64, floors: &[i64]) -> ElevatorCalls {
     let mut calls = ElevatorCalls::default();
     calls.hall.insert(
         id,
-        floors.iter().map(|&f| (f, 1.0)).collect::<HashMap<_, _>>(),
+        floors.iter().map(|&f| (f, 1.0)).collect::<FastMap<_, _>>(),
     );
     calls
 }

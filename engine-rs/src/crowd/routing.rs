@@ -386,10 +386,8 @@ pub fn elevator_calls(crowd: &Crowd, tower: &Tower) -> ElevatorCalls {
     let mut bump = |shaft: i64, floor: i64| {
         *calls
             .hall
-            .entry(shaft)
-            .or_default()
-            .entry(floor)
-            .or_insert(0.0) += 1.0;
+            .get_or_insert_with(shaft, Default::default)
+            .get_or_insert_with(floor, || 0.0) += 1.0;
     };
     for p in &crowd.people {
         let Some(sid) = p.shaft_id else { continue };
@@ -401,10 +399,8 @@ pub fn elevator_calls(crowd: &Crowd, tower: &Tower) -> ElevatorCalls {
             };
             calls
                 .cab
-                .entry(sid)
-                .or_default()
-                .entry(p.car_index.unwrap())
-                .or_default()
+                .get_or_insert_with(sid, Default::default)
+                .get_or_insert_with(p.car_index.unwrap(), Default::default)
                 .insert(dest);
         } else if p.staff && p.state == PState::ToShaft {
             if let Some(shaft) = tower.get_transport(sid) {

@@ -13,7 +13,6 @@ use crate::schedule::Schedule;
 use crate::sim::Simulation;
 use crate::tower::{PlaceResult, Tower, UnitState};
 
-#[cfg(test)]
 #[path = "dispatch_reference_tests.rs"]
 mod reference;
 use reference::Reference;
@@ -124,7 +123,7 @@ fn random_calls(tower: &Tower, rng: &mut Lcg) -> ElevatorCalls {
     let mut calls = ElevatorCalls::default();
     for t in &tower.transports {
         if rng.next(4) > 0 {
-            let hall = calls.hall.entry(t.id).or_default();
+            let hall = calls.hall.get_or_insert_with(t.id, Default::default);
             for _ in 0..rng.next(6) {
                 // Floors off the span and fractions below one are in range.
                 let floor = t.bottom - 2 + rng.next((t.top - t.bottom + 5) as u64) as i64;
@@ -132,10 +131,11 @@ fn random_calls(tower: &Tower, rng: &mut Lcg) -> ElevatorCalls {
             }
         }
         if rng.next(3) > 0 {
-            let cab = calls.cab.entry(t.id).or_default();
+            let cab = calls.cab.get_or_insert_with(t.id, Default::default);
             for _ in 0..rng.next(5) {
                 let floor = t.bottom - 1 + rng.next((t.top - t.bottom + 3) as u64) as i64;
-                cab.entry(rng.next(10) as i64).or_default().insert(floor);
+                let car = rng.next(10) as i64;
+                cab.get_or_insert_with(car, Default::default).insert(floor);
             }
         }
     }
@@ -314,7 +314,7 @@ fn dispatch_matches_the_hashed_reference_step_for_step() {
             // Calls high in the tall shaft, half the time, keep its cars
             // working past its 64th stop.
             if step % 40 < 20 {
-                let hall = calls.hall.entry(tall_id).or_default();
+                let hall = calls.hall.get_or_insert_with(tall_id, Default::default);
                 for floor in (66..=80).step_by(7) {
                     hall.insert(floor, 2.0);
                 }

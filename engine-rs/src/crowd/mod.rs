@@ -226,8 +226,8 @@ pub type StaffParts = fasthash::FastMap<i64, i64>;
 /// A car's cab floors are an ordered set, so dispatch reads them in floor order.
 #[derive(Default)]
 pub struct ElevatorCalls {
-    pub hall: HashMap<i64, HashMap<i64, f64>>,
-    pub cab: HashMap<i64, HashMap<i64, BTreeSet<i64>>>,
+    pub hall: fasthash::FastMap<i64, fasthash::FastMap<i64, f64>>,
+    pub cab: fasthash::FastMap<i64, fasthash::FastMap<i64, BTreeSet<i64>>>,
 }
 
 pub struct StaffResult {
@@ -241,7 +241,7 @@ pub struct Crowd {
     pub next_id: i64,
     pub spawn_acc: f64,
     /// Riders aboard each car, keyed (shaft, car).
-    pub car_riders: HashMap<(i64, i64), i64>,
+    pub car_riders: fasthash::FastMap<(i64, i64), i64>,
     pub frustration: f64,
     pub commute_wait_by_floor: HashMap<i64, f64>,
     pub commute_revision: u32,
@@ -330,7 +330,7 @@ impl Crowd {
             rng: Rng::new(seed),
             next_id: 1,
             spawn_acc: 0.0,
-            car_riders: HashMap::new(),
+            car_riders: fasthash::FastMap::default(),
             frustration: 0.0,
             commute_wait_by_floor: HashMap::new(),
             commute_revision: 0,
