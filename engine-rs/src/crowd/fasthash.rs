@@ -129,6 +129,11 @@ impl<K: Hash + Eq, V> FastMap<K, V> {
         self.0.contains_key(key)
     }
 
+    #[inline]
+    pub fn get_mut(&mut self, key: &K) -> Option<&mut V> {
+        self.0.get_mut(key)
+    }
+
     /// The value at `key`, made by `make` the first time.
     #[inline]
     pub fn get_or_insert_with(&mut self, key: K, make: impl FnOnce() -> V) -> &mut V {

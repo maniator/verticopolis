@@ -142,7 +142,12 @@ fn pools_caps_and_spans_follow_canon() {
     for e in c.facilities.iter().filter(|e| e.transport) {
         assert_eq!(e.build_minutes, 0.0, "{}", e.key);
     }
-    assert_eq!(entry(&c, "metro").build_cap, Some(1));
+    // Modern runs up to three stations on one line; Classic keeps one.
+    assert_eq!(entry(&c, "metro").build_cap, Some(3));
+    assert_eq!(
+        entry(&catalog(GameMode::Classic), "metro").build_cap,
+        Some(1)
+    );
     let office = entry(&c, "office");
     assert_eq!(
         (

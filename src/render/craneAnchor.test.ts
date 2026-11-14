@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { craneAnchorTile } from "./sprites";
 import { facadeGeometry } from "./facadeGeometry";
+import { lobbyHalls } from "./lobbyHalls";
 import { catalogFor } from "../tests/catalogFixture";
 import type { FacilityKind, Unit } from "../shared/types";
 
@@ -124,6 +125,24 @@ describe("facadeGeometry and the wedding hall's garden crown", () => {
   it("gives the crane no tiles on a tower topped by the hall", () => {
     const units = [...tiles(100, 144, 268), ...tiles(100, 192, 192, "weddingHall", 28)];
     expect(facadeGeometry(units, 104, withTallHall).topTiles.size).toBe(0);
+  });
+});
+
+describe("facadeGeometry and a tall lobby hall on the top floor", () => {
+  // The engine's highest floor is the hall's own floor (30); its raised
+  // stories rise to 32, so the crane stands on the hall's roof.
+  it("moves the crane up to the top story of the hall", () => {
+    const units = [...tiles(29, 100, 139), ...tiles(30, 110, 129, "lobby")];
+    const { topFloor, topTiles } = facadeGeometry(units, 30, MODERN, lobbyHalls([30, 110, 129, 3]));
+    expect(topFloor).toBe(32);
+    expect([...topTiles].sort((a, b) => a - b)).toEqual(range(110, 129));
+  });
+
+  it("keeps the crane on the highest floor when no hall rises past it", () => {
+    const units = [...tiles(29, 100, 139), ...tiles(30, 110, 129, "lobby")];
+    const { topFloor, topTiles } = facadeGeometry(units, 30, MODERN);
+    expect(topFloor).toBe(30);
+    expect(topTiles.size).toBe(20);
   });
 });
 

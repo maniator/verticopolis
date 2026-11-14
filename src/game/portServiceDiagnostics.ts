@@ -120,11 +120,11 @@ export function retailDisplayLines(c: ServiceDiagnosticFacts["retail"]): Lines {
   return out;
 }
 
-/** Shoppers: a venue more than two floors from a (sky) lobby loses half its
- *  trade. Rust decides whether it applies; this only words it. */
+/** Shoppers: a venue more than two floors from a (sky) lobby and from a
+ *  working metro platform loses half its trade. Rust decides whether it applies; this only words it. */
 export function commercialLobbyLines(c: ServiceDiagnosticFacts["commercial"]): Lines {
   if (c.lobbyFar !== true) return [];
-  return [html`<div style="color:${bad}">Shoppers: too far from a lobby. Traffic is halved. Keep it within 2 floors of the ground or a sky lobby (every 15th floor).</div>`];
+  return [html`<div style="color:${bad}">Shoppers: too far from a lobby. Traffic is halved. Keep it within 2 floors of the ground, a sky lobby (every 15th floor) or a working Metro platform.</div>`];
 }
 
 /** The service lines split by where the card puts them (see

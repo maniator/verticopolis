@@ -68,7 +68,8 @@ function makeApp(sim: Draft, ui: UI) {
     portCodes: new PortCodes(enginePort),
     accMinutes: 0,
     audio: { update: vi.fn(), sfx: vi.fn(), setMusicDucked: vi.fn() },
-    engine: { focus: vi.fn(() => ({})) },
+    // The camera shows the whole tower, so the frame carries every person.
+    engine: { focus: vi.fn(() => ({})), viewWidth: 1, viewHeight: 1, screenToTile: (sx: number) => (sx === 0 ? -1e6 : 1e6), screenToFloor: (sy: number) => (sy === 0 ? 1e6 : -1e6) },
     ui,
     onboarding: { tick: vi.fn() },
     scheduleReview: { tick: vi.fn() },

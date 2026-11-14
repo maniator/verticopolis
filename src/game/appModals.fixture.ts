@@ -86,6 +86,7 @@ export function makeApp(sim: SimShape) {
     showSaves: vi.fn(),
     showTowerPicker: vi.fn(),
     toast: vi.fn(),
+    sayVisibly: vi.fn(),
   };
   const engine = { viewState: vi.fn(() => ({ tile: 40, floor: 3, zoom: 2 })) };
   /** The save-failure notice surface; the latch in front of it is the real one. */

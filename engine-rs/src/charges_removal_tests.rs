@@ -1,4 +1,5 @@
-//! Tests for the rooms `remove_facility` keeps: Classic's permanent rooms and the lobby.
+//! Tests for the rooms `remove_facility` keeps: Classic's permanent rooms and the ground
+//! lobby. The sky lobby rules are in `tower/removal_tests.rs`.
 use super::*;
 use crate::clock::GameMode;
 
@@ -41,7 +42,7 @@ fn modern_housekeeping_can_be_sold() {
 }
 
 #[test]
-fn lobby_tiles_cannot_be_removed_in_either_mode() {
+fn ground_lobby_tiles_cannot_be_removed_in_either_mode() {
     for mode in [GameMode::Classic, GameMode::Modern] {
         let mut sim = tower_in(mode);
         let lobby = sim.tower.unit_at(1, 20).unwrap().id;

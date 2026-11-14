@@ -241,9 +241,10 @@ impl Tower {
         census
     }
 
-    /// How many housekeeping units the tower has: the crews behind
-    /// `maxStaffFor`'s ceiling (`staffCeiling` in `crowd/spawn.ts`). Read
-    /// from the census, since a housekeeping unit is never a tile.
+    /// How many housekeeping units the tower has, for the housekeeping
+    /// passes' early return (it was `maxStaffFor`'s ceiling, `staffCeiling`
+    /// in `crowd/spawn.ts`, before housekeepers came in for their shift).
+    /// Read from the census, since a housekeeping unit is never a tile.
     pub(crate) fn housekeeping_units(&self) -> i64 {
         self.census().kinds[Kind::Housekeeping as usize]
     }
@@ -311,8 +312,8 @@ impl Tower {
         bounds
     }
 
-    /// The floor a metro station stands on, its bottom row, when the tower
-    /// has one. Placement asks it for every tile a drag, a brush, a bridge or
+    /// The floor the metro stations stand on, their bottom row, when the
+    /// tower has one. Every station stands on the same row (`metro_reason`). Placement asks it for every tile a drag, a brush, a bridge or
     /// an extend lays, so it is memoized until a station registers or
     /// unregisters (`Memo::metro_changes`): a revision key would walk every
     /// unit again after each tile.
@@ -328,6 +329,25 @@ impl Tower {
         let floor = self.units_of_kind(Kind::Metro).next().map(|u| u.floor);
         self.memo.borrow_mut().metro_floor = Some((key, floor));
         floor
+    }
+
+    /// The tower's metro stations, in room order, memoized by id on
+    /// `Memo::metro_changes`, so the hourly takings read their live state
+    /// without walking the rooms. Classic's build cap allows one and
+    /// Modern's `MODERN_METRO_STATION_CAP`, but a loaded save is not held to
+    /// either.
+    pub(crate) fn metro_stations(&self) -> impl Iterator<Item = &Unit> + '_ {
+        let key = self.memo.borrow().metro_changes;
+        let cached = self.memo.borrow().metro_ids.clone();
+        let ids = match cached {
+            Some((built, ids)) if built == key => ids,
+            _ => {
+                let ids: Arc<[i64]> = self.units_of_kind(Kind::Metro).map(|u| u.id).collect();
+                self.memo.borrow_mut().metro_ids = Some((key, ids.clone()));
+                ids
+            }
+        };
+        (0..ids.len()).filter_map(move |i| self.get_unit(ids[i]))
     }
 
     /// The served and lobby floors in ascending order, so dispatch can

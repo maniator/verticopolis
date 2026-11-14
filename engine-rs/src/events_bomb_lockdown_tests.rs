@@ -189,8 +189,10 @@ fn dirty_hotel_before_the_shift() -> (Simulation, i64) {
     (sim, room)
 }
 
+/// Housekeepers sent to a room.
 fn maids(sim: &Simulation) -> usize {
-    sim.crowd.people.iter().filter(|p| p.staff).count()
+    let on_a_room = |p: &&crate::crowd::Person| p.clean_unit_id.is_some();
+    sim.crowd.people.iter().filter(on_a_room).count()
 }
 
 #[test]

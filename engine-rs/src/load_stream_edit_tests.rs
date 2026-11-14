@@ -18,7 +18,12 @@ const JSON_BYTES: &[u8] = b"{}[],:\"0-.e\\ ";
 /// base saves' one car now ends at 1.0 (was 1.04), with a different load and
 /// direction, so the seeded edits fall on different bytes. No reader
 /// disagreement came with it.
-const STREAMED: usize = 144;
+///
+/// 144 became 167 when shops and restaurants started counting the customers
+/// inside them as their head count: the base saves' venues now save other
+/// head counts, so the seeded edits fall on different bytes. No reader
+/// disagreement came with it.
+const STREAMED: usize = 167;
 
 /// Seeded edits of engine saves, a few bytes each: dropped, inserted,
 /// changed or copied, or the text cut short. Whatever comes out, both

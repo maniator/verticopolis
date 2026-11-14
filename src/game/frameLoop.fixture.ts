@@ -25,6 +25,7 @@ export function fakeEnginePort(sim: SpiedSim) {
     // the carry it was given, unless a test answers otherwise.
     advance: vi.fn((owed: number, _dtMs: number, _minutesPerSecond: number, _steadyClock: boolean, _step: boolean) => Float64Array.of(0, owed)),
     hotspot: vi.fn(() => Float64Array.of(0, NaN)),
+    setPeopleWindow: vi.fn((_floorLo: number, _floorHi: number, _xLo: number, _xHi: number) => undefined),
     evaluatedTower: vi.fn(() => sim.evaluatedTower === true),
     answerChoice: vi.fn((accept: boolean) => {
       (sim.resolveChoice as (opt: string) => void)(accept ? "accept" : "decline");
@@ -98,7 +99,7 @@ export function makeApp(over: Record<string, unknown> = {}) {
     portCodes,
     accMinutes: 0,
     audio: { update: vi.fn(), sfx: vi.fn(), setMusicDucked: vi.fn() },
-    engine: { focus: vi.fn(() => ({})) },
+    engine: { focus: vi.fn(() => ({})), viewWidth: 800, viewHeight: 600, screenToTile: vi.fn((sx: number) => sx / 8), screenToFloor: vi.fn((sy: number) => 40 - sy / 20) },
     reader: fakeReader(sim),
     ui: {
       update: vi.fn(),

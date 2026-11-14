@@ -1,9 +1,8 @@
 //! Port of `crowd/motion.ts`: the per-slice person state machine.
 
-use std::collections::HashMap;
-
-use super::landing::landing_slots;
+use super::landing::{landing_slots, Landings};
 use super::spawn::{inside_x, metro_station_for_platform, pick_x, pick_x_in_segment};
+use super::staff_shift;
 use super::visits::begin_dwell;
 use super::walk::walk_to;
 use super::{
@@ -25,25 +24,29 @@ fn trip_floors(p: &Person) -> i64 {
 pub fn advance(crowd: &mut Crowd, dt_sec: f64, tower: &mut Tower) {
     let mut frustrated = 0;
     let mut travelling = 0;
-    let slots = landing_slots(crowd, tower);
+    let mut landings = landing_slots(crowd, tower);
     for i in 0..crowd.people.len() {
         crowd.people[i].age += dt_sec;
         let p = &crowd.people[i];
         let patience = (if p.staff { STAFF_GIVE_UP } else { GIVE_UP })
             + trip_floors(p) as f64 * RIDE_SECONDS_PER_FLOOR;
+        // Someone aboard a car rides it to their floor: giving up there would
+        // make them vanish from the cab (3.7.3). Only a wait or a walk can
+        // run out of patience.
         if p.age > patience
             && p.state != PState::ToDest
             && p.state != PState::Dwelling
+            && p.state != PState::Riding
             && p.state != PState::Done
         {
             if !p.staff {
                 frustrated += 1;
                 travelling += 1;
             }
-            finish(crowd, i, tower);
+            give_up(crowd, i, tower);
             continue;
         }
-        step(crowd, i, dt_sec, tower, &slots);
+        step(crowd, i, dt_sec, tower, &mut landings);
         let p = &crowd.people[i];
         if !p.staff
             && matches!(
@@ -66,21 +69,28 @@ pub fn advance(crowd: &mut Crowd, dt_sec: f64, tower: &mut Tower) {
     crowd.people.retain(|p| p.state != PState::Done);
 }
 
-fn step(crowd: &mut Crowd, i: usize, dt: f64, tower: &mut Tower, slots: &HashMap<i64, f64>) {
+fn step(crowd: &mut Crowd, i: usize, dt: f64, tower: &mut Tower, landings: &mut Landings) {
     let state = crowd.people[i].state;
     match state {
         PState::ToShaft => {
             let p = &crowd.people[i];
             let Some(shaft) = p.shaft_id.and_then(|id| tower.get_transport(id)) else {
-                return finish(crowd, i, tower);
+                return give_up(crowd, i, tower);
             };
-            let target_x = shaft.x as f64 + shaft.width as f64 / 2.0;
             let (shaft_id, is_elevator) = (shaft.id, shaft.kind.is_elevator());
+            // An elevator rider walks straight to the back of the line, and a
+            // climber to the middle of the stairs or the escalator (#2116).
+            let target_x = if is_elevator {
+                landings.back_of_line(tower, shaft, p.floor)
+            } else {
+                shaft.x as f64 + shaft.width as f64 / 2.0
+            };
             let p = &mut crowd.people[i];
             if walk_to(p, target_x, dt, tower) {
                 if is_elevator {
                     p.state = PState::Waiting;
                     p.wait = 0.0;
+                    landings.join(shaft_id, p.floor);
                 } else {
                     p.state = PState::Climbing;
                     p.wait = 0.0;
@@ -91,9 +101,8 @@ fn step(crowd: &mut Crowd, i: usize, dt: f64, tower: &mut Tower, slots: &HashMap
         PState::Climbing => {
             let p = &crowd.people[i];
             let Some(shaft) = p.shaft_id.and_then(|id| tower.get_transport(id)) else {
-                return finish(crowd, i, tower);
+                return give_up(crowd, i, tower);
             };
-            let shaft = shaft.clone();
             let p = &mut crowd.people[i];
             let dest = p.floors[p.leg + 1];
             let mut dir = jsmath::sign(dest as f64 - p.fy);
@@ -113,14 +122,14 @@ fn step(crowd: &mut Crowd, i: usize, dt: f64, tower: &mut Tower, slots: &HashMap
                 p.leg += 1;
                 if p.leg >= p.shafts.len() {
                     p.state = PState::ToDest;
-                    p.x = tower.alight_x(&shaft, dest, p.dest_x);
+                    p.x = tower.alight_x(shaft, dest, p.dest_x);
                 } else {
                     p.shaft_id = Some(p.shafts[p.leg]);
                     let next = tower.get_transport(p.shafts[p.leg]);
                     let toward = next
                         .map(|n| n.x as f64 + n.width as f64 / 2.0)
                         .unwrap_or(p.dest_x);
-                    p.x = tower.alight_x(&shaft, dest, toward);
+                    p.x = tower.alight_x(shaft, dest, toward);
                     p.state = PState::ToShaft;
                 }
             }
@@ -129,16 +138,17 @@ fn step(crowd: &mut Crowd, i: usize, dt: f64, tower: &mut Tower, slots: &HashMap
             crowd.people[i].wait += dt;
             let p = &crowd.people[i];
             let Some(shaft) = p.shaft_id.and_then(|id| tower.get_transport(id)) else {
-                return finish(crowd, i, tower);
+                return give_up(crowd, i, tower);
             };
-            let shaft = shaft.clone();
             let pid = crowd.people[i].id;
-            let target = slots
+            let target = landings
+                .slots
                 .get(&pid)
                 .copied()
                 .unwrap_or(shaft.x as f64 + shaft.width as f64 / 2.0);
             walk_to(&mut crowd.people[i], target, dt, tower);
             let floor = crowd.people[i].floor;
+            let mut boarded = None;
             for ci in 0..shaft.cars as usize {
                 // Only a car standing here with its doors open takes riders,
                 // never one passing the floor. A car not on the floor is
@@ -157,26 +167,34 @@ fn step(crowd: &mut Crowd, i: usize, dt: f64, tower: &mut Tower, slots: &HashMap
                     continue;
                 }
                 crowd.car_riders.insert(key, n + 1);
-                tower.note_ride(shaft.id);
+                boarded = Some((shaft.id, ci as i64));
+                break;
+            }
+            // The shaft is read in place above, and the ride is noted once
+            // the read ends.
+            if let Some((shaft_id, ci)) = boarded {
+                tower.note_ride(shaft_id);
                 let p = &mut crowd.people[i];
-                p.car_index = Some(ci as i64);
+                p.car_index = Some(ci);
                 p.state = PState::Riding;
                 p.trip_wait += p.wait;
                 p.wait = 0.0;
-                break;
             }
         }
         PState::Riding => {
             let p = &crowd.people[i];
-            let shaft = p.shaft_id.and_then(|id| tower.get_transport(id)).cloned();
-            let (Some(shaft), Some(ci)) = (shaft, p.car_index) else {
-                return finish(crowd, i, tower);
+            let dest = p.floors[p.leg + 1];
+            let ridden = p.shaft_id.and_then(|id| tower.get_transport(id));
+            // A rider whose car or shaft went, or whose floor the shaft no
+            // longer stops at, steps out of the trip: no car would ever let
+            // them off, and nothing else ends a ride (3.7.3).
+            let (Some(shaft), Some(ci)) = (ridden, p.car_index) else {
+                return give_up(crowd, i, tower);
             };
-            if ci as usize >= shaft.car_positions.len() {
-                return finish(crowd, i, tower);
+            if ci as usize >= shaft.car_positions.len() || !shaft.stops_at(dest) {
+                return give_up(crowd, i, tower);
             }
             let pos = shaft.car_positions[ci as usize];
-            let dest = crowd.people[i].floors[crowd.people[i].leg + 1];
             // A rider steps off only once the car has stopped at their floor
             // with its doors open, never from a car passing it.
             let arrived = pos == dest as f64 && crowd.door_open(shaft.id, ci, dest);
@@ -184,7 +202,7 @@ fn step(crowd: &mut Crowd, i: usize, dt: f64, tower: &mut Tower, slots: &HashMap
             p.fy = pos;
             p.x = shaft.x as f64 + shaft.width as f64 / 2.0;
             let d = dest as f64;
-            if arrived && shaft.stops_at(dest) {
+            if arrived {
                 release_seat(crowd, i);
                 let p = &mut crowd.people[i];
                 p.floor = dest;
@@ -192,14 +210,14 @@ fn step(crowd: &mut Crowd, i: usize, dt: f64, tower: &mut Tower, slots: &HashMap
                 p.leg += 1;
                 if p.leg >= p.shafts.len() {
                     p.state = PState::ToDest;
-                    p.x = tower.alight_x(&shaft, dest, p.dest_x);
+                    p.x = tower.alight_x(shaft, dest, p.dest_x);
                 } else {
                     p.shaft_id = Some(p.shafts[p.leg]);
                     let next = tower.get_transport(p.shafts[p.leg]);
                     let toward = next
                         .map(|n| n.x as f64 + n.width as f64 / 2.0)
                         .unwrap_or(p.dest_x);
-                    p.x = tower.alight_x(&shaft, dest, toward);
+                    p.x = tower.alight_x(shaft, dest, toward);
                     p.state = PState::ToShaft;
                 }
             }
@@ -207,6 +225,10 @@ fn step(crowd: &mut Crowd, i: usize, dt: f64, tower: &mut Tower, slots: &HashMap
         PState::ToDest => {
             let dest_x = crowd.people[i].dest_x;
             if walk_to(&mut crowd.people[i], dest_x, dt, tower) {
+                // A housekeeper's working day decides what comes next.
+                if let Some(trip) = crowd.people[i].staff_trip {
+                    return staff_shift::at_destination(crowd, i, tower, dt, trip);
+                }
                 let p = &mut crowd.people[i];
                 p.linger += dt;
                 if p.linger > p.linger_for.unwrap_or(2.0) {
@@ -270,8 +292,15 @@ fn transition_to_return(crowd: &mut Crowd, tower: &mut Tower, i: usize) {
     p.age = 0.0;
     p.linger = 0.0;
     let seed = p.seed;
+    // The rider steps onto the platform where the last shaft lets them off,
+    // or walks there from the venue, and heads for the nearest station.
+    let platform_x = p
+        .shafts
+        .last()
+        .and_then(|&sid| tower.get_transport(sid))
+        .map_or(from_x, |t| t.x as f64);
     let station = if origin.is_none() {
-        metro_station_for_platform(tower, origin_floor)
+        metro_station_for_platform(tower, origin_floor, platform_x)
     } else {
         None
     };
@@ -286,7 +315,7 @@ fn transition_to_return(crowd: &mut Crowd, tower: &mut Tower, i: usize) {
     crowd.people[i].returning = true;
 }
 
-fn release_seat(crowd: &mut Crowd, i: usize) {
+pub(super) fn release_seat(crowd: &mut Crowd, i: usize) {
     let p = &mut crowd.people[i];
     let (Some(ci), Some(sid)) = (p.car_index, p.shaft_id) else {
         return;
@@ -297,11 +326,30 @@ fn release_seat(crowd: &mut Crowd, i: usize) {
     crowd.people[i].car_index = None;
 }
 
+/// Someone whose trip cannot go on: out of patience, or their shaft or car
+/// gone. A visitor or tenant leaves the picture; a housekeeper never
+/// vanishes mid-tower and stops where they stand for their next errand.
+fn give_up(crowd: &mut Crowd, i: usize, tower: &mut Tower) {
+    if crowd.people[i].staff_trip.is_some() {
+        staff_shift::stuck(crowd, i, tower);
+    } else {
+        finish(crowd, i, tower);
+    }
+}
+
 pub fn finish(crowd: &mut Crowd, i: usize, tower: &mut Tower) {
     release_seat(crowd, i);
     let p = &crowd.people[i];
     if p.staff {
         crowd.staff_count = (crowd.staff_count - 1).max(0);
+        if let Some(crew) = p.crew_id {
+            let left = crowd.crew_roster.get(&crew).map_or(0, |n| n - 1);
+            if left > 0 {
+                crowd.crew_roster.insert(crew, left);
+            } else {
+                crowd.crew_roster.remove(&crew);
+            }
+        }
         if let Some(uid) = p.clean_unit_id {
             let ok = p.state == PState::ToDest;
             crowd.staff_done.push(StaffResult { unit_id: uid, ok });
@@ -331,7 +379,7 @@ pub fn finish(crowd: &mut Crowd, i: usize, tower: &mut Tower) {
         if let Some((venue, at)) = tower.marked_by_id(vid) {
             if venue.customers_in.unwrap_or(0) > 0 {
                 venue.set_customers_in(at, Some(venue.customers_in.unwrap_or(0) - 1));
-                venue.sync_attendance_occupants(at);
+                venue.sync_visitor_occupants(at);
                 if counted_hotel && venue.hotel_customers_in.unwrap_or(0) > 0 {
                     let n = venue.hotel_customers_in.unwrap_or(0) - 1;
                     venue.set_hotel_customers_in(at, Some(n));

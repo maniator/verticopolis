@@ -39,6 +39,7 @@ function printed(parts: {
 describe("engine-owned keyed service diagnostic presentation", () => {
   it("words the far-from-lobby shopper warning only when Rust says it applies", () => {
     expect(printed({ commercial: { lobbyFar: true } })).toContain("Shoppers: too far from a lobby. Traffic is halved.");
+    expect(printed({ commercial: { lobbyFar: true } })).toContain("or a working Metro platform.");
     expect(printed({ commercial: { lobbyFar: false } })).not.toContain("Shoppers:");
     expect(printed()).not.toContain("Shoppers:");
   });

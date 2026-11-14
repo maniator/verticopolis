@@ -10,6 +10,7 @@ import {
   buildCanonTower,
   buildCleanlinessTower,
   buildHotspotTower,
+  buildMetroLineTower,
   buildOverlayTower,
   buildStatsTower,
   buildTabletTower,
@@ -280,6 +281,40 @@ export const FEATURE_SCENES: Scene[] = [
         wait: 0, // the clock pin and a few frames are the last move, so the train sits where it set it
       },
     ],
+  },
+  // --- Modern metro line: three stations, one train calling at each in turn ----
+  {
+    id: "metro-line",
+    outDir: "features",
+    build: buildMetroLineTower,
+    assertUnits: 50,
+    viewport: { width: 1600, height: 560 },
+    shots: (
+      [
+        // Three stations: the train calls at the west one from :06 to :16,
+        // the middle one from :22 to :32 and the east one from :38 to :48
+        // (metroLineTimes), so each shot finds it at one platform only.
+        ["metro-line-west", 12 + 10 / 60, 0],
+        ["metro-line-middle", 12 + 26 / 60, 1],
+        ["metro-line-east", 12 + 42 / 60, 2],
+      ] as const
+    ).map(([name, hour, calling]) => ({
+      name,
+      setup: async (page) => {
+        await page.evaluate(pgStepNoDraw, 240);
+        await page.evaluate(pgSetClock, hour);
+        // Center on the station the train is calling at, so the Map window
+        // never hides it; its neighbors show their empty platforms.
+        await page.evaluate((stop) => {
+          const g = (window as any).game;
+          const stations = g.sim.tower.units.filter((u: any) => u.kind === "metro").sort((a: any, b: any) => a.x - b.x);
+          const u = stations[stop];
+          g.engine.setCamera(u.x + u.width / 2, -3, 1);
+        }, calling);
+        await page.evaluate(pgStep, 3);
+      },
+      wait: 0,
+    })),
   },
   // --- Traffic HUD chip (desktop + mobile) ------------------------------------
   {

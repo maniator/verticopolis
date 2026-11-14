@@ -1,6 +1,6 @@
 import type { UnitView } from "../../simport/view";
 import { isLateHour } from "../lateNight";
-import { PAL, SKIN, ceilingFixture, dado, geoVariant, maybeMirrored, personSeated, roomGlow, roomOccupants, shade, vacancy, windowView, type RoomCtx } from "./common";
+import { PAL, ceilingFixture, dado, geoVariant, maybeMirrored, personSeated, roomGlow, roomOccupants, shade, sleeper as sleeperFigure, vacancy, windowView, type RoomCtx } from "./common";
 import { artRow, authoredWidth, screenLength } from "./artScale";
 import { bevelBox, ceilingCap, curtain, downlights, fill, framedArt, glow, interiorWall, plankFloor } from "./dollhouse";
 import { layerBreak, layerEnd } from "./layers";
@@ -207,6 +207,8 @@ export function condo(d: RoomCtx, u: UnitView, x: number, y: number, w: number, 
   if (u.state === "empty") return vacancy(ctx, x, y, w, h, vacancyLabel);
   // Residents are "up" only when home and not asleep in the small hours.
   const home = roomOccupants(u) > 0 && !isLateHour(d.hour);
+  // Home but asleep: the living room's sofa shows a sleeper (#2116).
+  const asleepHome = roomOccupants(u) > 0 && isLateHour(d.hour);
   // Geo-seeded variety, geometry first: three true layouts (living, dining with a
   // kitchenette, a study), any of them mirrored, over warm plaster and maple. The
   // standing lamp appears in every layout so the home-glow signal survives.
@@ -298,6 +300,8 @@ export function condo(d: RoomCtx, u: UnitView, x: number, y: number, w: number, 
       fill(ctx, base + 6, floorY - 12, 8, 3, "#9A7A8A"); // cushions
       fill(ctx, base + 20, floorY - 12, 8, 3, "#9A7A8A");
       if (home) personSeated(ctx, base + Math.round(sofaW * 0.4), floorY - 1, (u.id * 5) | 0);
+      // In the small hours a resident sleeps on the sofa under a blanket.
+      else if (asleepHome) sleeperFigure(ctx, base + 3, floorY - 16, sofaW - 10, "#5A6E8C", (u.id * 5) | 0); // lying on the seat
       bevelBox(ctx, base + sofaW + 6, floorY - 6, 14, 6, PAL.walnut); // coffee table
       fill(ctx, base + sofaW + 9, floorY - 8, 2, 2, PAL.white); // vase
       lamp(base - 8);
@@ -376,8 +380,8 @@ export function hotel(d: RoomCtx, u: UnitView, x: number, y: number, w: number, 
     fill(ctx, bx + 5, top + 1, pw, 1, "#FFFFFF");
     if (pillows > 1) fill(ctx, bx + 5, top + 5, 5, 2, "#FBF7EC");
     if (asleep && sleeper < roomOccupants(u)) {
-      fill(ctx, bx + Math.round(bw * 0.32), top + 3, Math.round(bw * 0.55), 6, PAL.hotelRed); // blanket
-      fill(ctx, bx + 6, top + 1, 3, 3, SKIN[(u.id + sleeper) % SKIN.length]); // sleeper head
+      // The guest asleep: their head on the pillow, the body under the duvet.
+      sleeperFigure(ctx, bx + 5, top + 1, bw - 10, PAL.hotelRed, (u.id * 7 + sleeper * 31) | 0);
     } else if (soiled) {
       fill(ctx, bx + 5, top + 1, Math.round(bw * 0.8), 7, "#B8A98A"); // rumpled bedding
       fill(ctx, bx + 7, top + 2, Math.round(bw * 0.4), 2, "#A89878");

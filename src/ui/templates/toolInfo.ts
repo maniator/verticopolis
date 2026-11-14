@@ -4,6 +4,7 @@ import { isCommercialKind } from "../../presentation/viewKinds";
 import { facilityDescription } from "../../presentation/facilityPresentation";
 import type { FacilityKind } from "../../shared/types";
 import { groupDigits } from "../format";
+import type { DragClears } from "../../game/bulldozeDrag";
 
 /**
  * The tool-info panel bodies (E5-S2). `UI.selectTool` renders one of these
@@ -84,7 +85,33 @@ export function lobbyHeightButtons(catalog: Catalog, lobby: LobbyHeightPicker): 
   );
 }
 
-export const BULLDOZE_TOOL_INFO: TemplateResult = html`<div class="ti-name">Bulldoze</div><p style="color:var(--muted)">Click a room or shaft to sell it for half its cost.</p>`;
+/** The Bulldoze card's "Drag clears" choice: one kind (#644), or everything. */
+export interface BulldozeDragPicker {
+  readonly clears: DragClears;
+  pick(clears: DragClears): void;
+}
+
+/** The Bulldoze card: what a click sells, and what a drag clears. */
+export function bulldozeToolInfo(drag: BulldozeDragPicker): TemplateResult {
+  const hint =
+    drag.clears === "one kind"
+      ? "A drag removes only the kind of thing it starts on, so a sweep along a floor leaves the elevators and rooms it crosses."
+      : "A drag removes everything it crosses that can come out.";
+  return html`<div class="ti-name">Bulldoze</div><p style="color:var(--muted)">Click a room or shaft to sell it for half its cost.</p><div class="ti-drag-clears" role="group" aria-label="Drag clears">Drag clears: ${bulldozeDragButtons(drag)}</div><p style="margin-top:6px;color:var(--muted)">${hint}</p>`;
+}
+
+/** The two "Drag clears" buttons, the picked one pressed. Shared by the
+ *  Bulldoze card and the phone's strip. */
+export function bulldozeDragButtons(drag: BulldozeDragPicker): TemplateResult[] {
+  const choices: readonly [DragClears, string][] = [
+    ["one kind", "One kind"],
+    ["everything", "Everything"],
+  ];
+  return choices.map(
+    ([clears, label]) =>
+      html`<button type="button" class="btn${drag.clears === clears ? " es-on" : ""}" aria-pressed=${drag.clears === clears} @click=${() => drag.pick(clears)}>${label}</button>`,
+  );
+}
 
 export const INSPECT_TOOL_INFO: TemplateResult = html`<div class="ti-name">Inspect</div><p style="color:var(--muted)">Hover the tower to read a facility's status.</p>`;
 

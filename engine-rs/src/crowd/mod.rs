@@ -11,6 +11,7 @@ pub mod routines;
 pub mod routing;
 pub mod spawn;
 pub mod spawn_floors;
+pub mod staff_shift;
 pub mod visits;
 pub mod walk;
 
@@ -110,6 +111,11 @@ pub struct Person {
     /// the tenant floor it heads for (#1971). Engine-internal: not in the
     /// `Person` shape.
     pub from_metro: bool,
+    /// The housekeeping room a housekeeper works from, and where they are in
+    /// their working day (`staff_shift`). Engine-internal: not in the
+    /// `Person` shape.
+    pub crew_id: Option<i64>,
+    pub staff_trip: Option<staff_shift::StaffTrip>,
 }
 
 impl Person {
@@ -225,6 +231,12 @@ pub struct Crowd {
     pub blockbusters: HashSet<i64>,
     pub staff_done: Vec<StaffResult>,
     pub staff_count: i64,
+    /// Housekeepers who reached their housekeeping room or finished a room
+    /// this step, by person id, for the shift to send on (`staff_shift`).
+    pub staff_ready: Vec<i64>,
+    /// Housekeepers in the building, by the housekeeping room they work
+    /// from.
+    pub crew_roster: HashMap<i64, i64>,
     pub step: i64,
     /// The cars the schedule has stood down, as (shaft id, car index),
     /// ascending: a person waiting at a floor does not board one, even one
@@ -265,6 +277,8 @@ impl Crowd {
             blockbusters: HashSet::new(),
             staff_done: Vec::new(),
             staff_count: 0,
+            staff_ready: Vec::new(),
+            crew_roster: HashMap::new(),
             step: 0,
             closed_cars: Default::default(),
             open_cars: Default::default(),
