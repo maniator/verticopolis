@@ -379,7 +379,7 @@ pub fn finish(crowd: &mut Crowd, i: usize, tower: &mut Tower) {
         if let Some((venue, at)) = tower.marked_by_id(vid) {
             if venue.customers_in.unwrap_or(0) > 0 {
                 venue.set_customers_in(at, Some(venue.customers_in.unwrap_or(0) - 1));
-                venue.sync_attendance_occupants(at);
+                venue.sync_visitor_occupants(at);
                 if counted_hotel && venue.hotel_customers_in.unwrap_or(0) > 0 {
                     let n = venue.hotel_customers_in.unwrap_or(0) - 1;
                     venue.set_hotel_customers_in(at, Some(n));

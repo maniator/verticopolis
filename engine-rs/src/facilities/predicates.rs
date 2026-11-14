@@ -64,6 +64,27 @@ impl Kind {
     }
 
     #[doc(hidden)]
+    /// A kind a meal trip can be sent to (every `MealWindow::venues` list),
+    /// so the customers inside it are people who walked or rode in. The
+    /// other commercial kinds get no visitor trips yet.
+    pub fn is_meal_venue(self) -> bool {
+        matches!(
+            self,
+            Kind::FastFood | Kind::Restaurant | Kind::FoodHall | Kind::Cinema
+        )
+    }
+
+    #[doc(hidden)]
+    /// A kind whose head count mirrors the visitors inside it (an
+    /// attendance venue or a [`Kind::is_meal_venue`]). The count lives only
+    /// in the unsaved `customers_in`, so a save leaves the head count out, a
+    /// load and an undo start it at 0, and the dispatch estimate skips it,
+    /// since those visitors ride as real people.
+    pub fn counts_visitors(self) -> bool {
+        self.attendance_cap().is_some() || self.is_meal_venue()
+    }
+
+    #[doc(hidden)]
     /// `isCommercialKind`.
     pub fn is_commercial(self) -> bool {
         matches!(

@@ -239,6 +239,13 @@ measures it before and after.
 - A trip starts from the tower's entrances: the ground lobby, a Metro
   platform, or (Modern) a parking space for homes with parking. The share
   between them follows today's spawn weights, not a new tuning.
+- Nobody appears or vanishes inside the tower (owner, 2026-11-14). Every
+  tenant comes in through an entrance and leaves through one, and a trip
+  inside the tower runs from one room to another; a person is created only
+  at an entrance or inside their own unit and removed only there. Each
+  tenant PR carries a test that walks a day and checks every arrival and
+  departure against that rule. Staff and visitors get the same audit in the
+  people look work.
 - A tenant with no route does not arrive. The room card says why (the
   existing unreachable copy).
 - Riders already use real cars and real calls. A unit whose people travel
@@ -279,10 +286,29 @@ The rules for venues:
 - A venue draws the visitors inside it and no more: the head count is
   `customers_in`, the people who arrived and have not left. An open
   restaurant nobody reached draws empty.
+  Done on 2026-11-14 for the meal venues (fast food, restaurants, food
+  halls), ahead of the rest of this step: their head count is now
+  `customers_in` (`Unit::visitor_occupants`, gated by `Kind::is_meal_venue`),
+  so the art, the elevator demand estimate and the room card agree. Today's
+  diners are still the 140-person crowd, so they look emptier in a big tower
+  until tenants go out to eat. Retail shops, boutique bays, amusements, spas,
+  nightclubs, sky bars and the daycare get no visitor trips at all yet, so
+  they keep drawing a full house: the owner's tattoo parlor (a boutique bay)
+  still reads Customers 0. They switch to `customers_in` in the same PR that
+  first sends shoppers to them, or they would draw empty all day.
 - Visitors who are tenants (office lunch, and later residents and hotel
   guests going out to eat or shop) are the real tenant people from the steps
   above. Visitors from outside stay spawned, but without the 140 cap, so how
   many come follows the demand estimate and each one walks and rides there.
+- Venue workers commute like office workers (owner, 2026-11-14). Every shop,
+  restaurant, fast food, hall and cinema has staff who are tenant people of
+  that room: they come in through an entrance before it opens and leave
+  after it closes, and a venue opens only once its staff are in. How many
+  staff each kind has goes in the catalog, checked against the original on
+  the owner's PC where it shows. Security guards and the medical center's
+  staff commute the same way. Housekeepers are designed first in the people
+  look work, and every other worker follows that design, so the tower has
+  one worker model.
 - A venue's take follows the visitors who came. Whether the 1994 game pays a
   shop or restaurant per customer is checked on the owner's PC before this
   PR (added to the PC look), and the rule follows what it shows.
@@ -332,6 +358,10 @@ settles the `SAVE_VERSION` question and ships a test that saves at 7:45 AM
 with people mid trip, loads, steps two game hours and matches the run that
 never saved, plus a fixture proving a 3.7.0 save opens.
 
+Each tenant keeps one person id for as long as they live or work in the
+tower, saved with them, so a later Modern feature can let the player name
+people (owner idea, 2026-11-14, not planned yet).
+
 ### Determinism
 
 Tenant people take their trip decisions from their own random stream, so the
@@ -374,10 +404,13 @@ in Classic; whether they stay once commuters are real is a later call.
    before-and-after (lunch traffic follows staffed offices); a test for each
    removal case (bulldoze, transport deleted mid-ride, eviction mid-trip,
    mode switch).
-6. **Venues draw and earn from real visitors.** Restaurants, fast food,
-   shops and the other commercial rooms show and are paid for the visitors
-   who actually came (see "Venues" above); the halls and cinemas already
-   do. After offices, so office lunch visitors are real people.
+6. **Venues draw and earn from real visitors, and their staff commute.**
+   Restaurants, fast food, shops and the other commercial rooms are paid for
+   the visitors who actually came (the meal venues already draw only those
+   visitors; shops switch over when shoppers are first sent to them),
+   and every venue's staff come in before opening and leave after closing
+   (see "Venues" above). After offices, so office lunch visitors are real
+   people.
 7. **Homes, then hotels**, one PR each.
 8. **#2092**, the inspector.
 

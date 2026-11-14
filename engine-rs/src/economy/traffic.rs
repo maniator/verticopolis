@@ -40,7 +40,6 @@ impl Simulation {
                 continue;
             }
             let attendance_cap = kind.attendance_cap();
-            let attends = attendance_cap.is_some();
             let key = (floor, self.tower.segment_start_x(floor, x));
             let draws = match reach_cache.get(&key) {
                 Some(&h) => h,
@@ -53,22 +52,16 @@ impl Simulation {
             if !draws || !kind.is_open_at(hour) {
                 if state == UnitState::Occupied {
                     let (u, at) = self.tower.marked(i);
-                    if attends {
-                        u.sync_attendance_occupants(at);
-                    } else {
-                        u.set_occupants(at, 0);
-                    }
+                    let occupants = u.visitor_occupants().unwrap_or(0);
+                    u.set_occupants(at, occupants);
                 }
                 continue;
             }
             {
                 let (u, at) = self.tower.marked(i);
                 u.set_state(at, UnitState::Occupied);
-                if attends {
-                    u.sync_attendance_occupants(at);
-                } else {
-                    u.set_occupants(at, kind.facility().population);
-                }
+                let occupants = u.visitor_occupants().unwrap_or(kind.facility().population);
+                u.set_occupants(at, occupants);
             }
             let customers = self.tower.units[i].customers_in.unwrap_or(0);
             let frac = match attendance_cap {

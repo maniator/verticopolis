@@ -159,17 +159,17 @@ describeEngines("setCustomersIn: refusals and the attendance mirror", (leg: Leg)
     expect(customersIn(sim, ff)).toBe(Number.MAX_SAFE_INTEGER);
   });
 
-  it("mirrors the tally into an attendance venue's occupants, and leaves a plain venue's occupants alone", () => {
+  it("mirrors the tally into the occupants of an attendance venue and of a plain one", () => {
     const { sim, hall, ff } = withPartyHall(leg);
     expect(facility("partyHall").attendance, "the party hall keeps attendance").not.toBeNull();
     expect(facility("fastFood").attendance, "the fast food keeps none").toBeNull();
-    const ffOccupants = occupants(sim, ff);
     sim.setCustomersIn(hall, 5);
     expect(customersIn(sim, hall)).toBe(5);
     expect(occupants(sim, hall), "the hall's occupants follow its tally").toBe(5);
     sim.setCustomersIn(ff, 4);
     expect(customersIn(sim, ff)).toBe(4);
-    expect(occupants(sim, ff), "the fast food's occupants are not the tally").toBe(ffOccupants);
+    // A meal venue draws the diners inside it, so its occupants follow the tally too.
+    expect(occupants(sim, ff), "the fast food's occupants follow its tally").toBe(4);
   });
 
   it("makes a later setup throw, since its reload from the save would drop the stamp", () => {

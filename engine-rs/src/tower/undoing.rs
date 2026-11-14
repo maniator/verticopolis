@@ -25,7 +25,7 @@ impl Unit {
     /// with it, so their counts start empty, and a venue's attendance is
     /// read again from them, as a load does (`load/reader.rs`).
     pub(crate) fn returning(&self) -> Unit {
-        let counted = self.kind.attendance_cap().is_some() || self.kind.is_structural();
+        let counted = self.kind.counts_visitors() || self.kind.is_structural();
         Unit {
             customers_in: None,
             hotel_customers_in: None,
