@@ -345,6 +345,7 @@ pub(super) fn release_seat(crowd: &mut Crowd, i: usize) {
 fn is_still_setting_out(p: &Person) -> bool {
     !p.returning
         && p.leg == 0
+        && p.floor == p.origin_floor
         && matches!(p.state, PState::Waiting | PState::ToShaft)
         && p.floors.first() == Some(&p.floor)
 }
@@ -362,15 +363,46 @@ fn turn_back(crowd: &mut Crowd, i: usize) {
 }
 
 /// Someone whose trip cannot go on: a housekeeper out of patience, or
-/// anyone whose shaft or car went. A visitor or tenant leaves the picture;
-/// a housekeeper never vanishes mid-tower and stops where they stand for
-/// their next errand.
+/// anyone whose shaft or car went. A housekeeper stops where they stand for
+/// their next errand. Anyone else never vanishes on foot: one still setting
+/// out turns back, and one partway up finds another way to where they were
+/// going. Only a rider whose car went from under them, or one left with no
+/// way on at all, leaves the picture.
 fn give_up(crowd: &mut Crowd, i: usize, tower: &mut Tower) {
     if crowd.people[i].staff_trip.is_some() {
         staff_shift::stuck(crowd, i, tower);
-    } else {
+    } else if is_still_setting_out(&crowd.people[i]) {
+        turn_back(crowd, i);
+    } else if crowd.people[i].state == PState::Riding || !reroute(crowd, i, tower) {
         finish(crowd, i, tower);
     }
+}
+
+/// Sends someone on foot partway through a trip on to the trip's last floor
+/// by a new route from where they stand. `false` when there is none.
+fn reroute(crowd: &mut Crowd, i: usize, tower: &Tower) -> bool {
+    let p = &crowd.people[i];
+    let (from, from_x, dest_x) = (p.floor, p.x, p.dest_x);
+    let Some(&to) = p.floors.last() else {
+        return false;
+    };
+    let Some(r) = crowd.route(tower, from, to, Some(from_x), Some(dest_x)) else {
+        return false;
+    };
+    let p = &mut crowd.people[i];
+    p.state = if r.shafts.is_empty() {
+        PState::ToDest
+    } else {
+        PState::ToShaft
+    };
+    p.shaft_id = r.shafts.first().copied();
+    p.floors = r.floors;
+    p.shafts = r.shafts;
+    p.leg = 0;
+    p.car_index = None;
+    p.fy = from as f64;
+    p.wait = 0.0;
+    true
 }
 
 pub fn finish(crowd: &mut Crowd, i: usize, tower: &mut Tower) {

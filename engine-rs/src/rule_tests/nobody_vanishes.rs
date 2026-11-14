@@ -102,3 +102,31 @@ fn someone_on_the_way_home_keeps_going() {
     let p = find(&sim, id).expect("nobody vanishes on the way home");
     assert_eq!((p.floor, p.state), (4, PState::Waiting));
 }
+
+#[test]
+fn someone_whose_first_shaft_goes_turns_back() {
+    let (mut sim, shaft) = tower();
+    let id = impatient(&mut sim, shaft, vec![1, 4], 0);
+    sim.crowd.people[0].age = 0.0;
+    assert!(sim.tower.remove_transport(shaft).is_some());
+    advance(&mut sim.crowd, 0.5, &mut sim.tower);
+    let p = find(&sim, id).expect("they turn back instead of vanishing");
+    assert_eq!((p.state, p.returning, p.floor), (PState::ToDest, true, 1));
+}
+
+#[test]
+fn someone_partway_up_whose_shaft_goes_finds_another_way() {
+    let (mut sim, shaft) = tower();
+    let placed = sim.tower.place_transport(Kind::ElevatorStandard, 110, 1, 4);
+    assert!(placed.ok, "{:?}", placed.reason);
+    let other = sim.tower.transports.last().unwrap().id;
+    let id = impatient(&mut sim, shaft, vec![1, 2, 4], 1);
+    sim.crowd.people[0].age = 0.0;
+    assert!(sim.tower.remove_transport(shaft).is_some());
+    advance(&mut sim.crowd, 0.5, &mut sim.tower);
+    let p = find(&sim, id).expect("nobody vanishes partway up");
+    assert_eq!(p.floor, 2);
+    assert_eq!(p.shaft_id, Some(other), "they head for the other elevator");
+    assert_eq!(p.floors.last(), Some(&4), "still bound for their floor");
+    assert!(!p.returning);
+}
