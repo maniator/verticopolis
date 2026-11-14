@@ -153,6 +153,10 @@ pub(crate) fn assemble(
     sim.ledger = Ledger::restore(data.get("ledger"));
     sim.view = coerce_view(data.get("view"));
     sim.log = coerce_log(data.get("log"));
+    // The loaded lines are the newest ones the tower has written, numbered up
+    // to the counter, so a host that reads the lines after 0 (the Bulletin
+    // after a load, an import or an undo) gets every one of them.
+    sim.log_seq = sim.log.len() as i64;
 
     widen_legacy_wedding_hall(&mut units);
     drop_overlapping_units(&mut units, &mut unit_ids);

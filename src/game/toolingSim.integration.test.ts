@@ -265,21 +265,22 @@ describe.skipIf(!hasWasmPackage())("the tooling harnesses' tower", () => {
     const live = toolingSim(a)!;
     const held = bulletin(a.enginePort as unknown as HudSource["port"]);
     expect(held.length).toBeGreaterThan(0);
-    // The load numbers the engine's log from nothing; the lines read before it stay.
+    // The load keeps the engine's saved lines, numbered from 1, and the
+    // bulletin shows the same lines read before it.
     adoptToolingSim(a, live, true);
-    expect(bulletin(a.enginePort as unknown as HudSource["port"])).toEqual([]);
+    expect(bulletin(a.enginePort as unknown as HudSource["port"])).toEqual(held);
     expect(bulletin(a.ui.resetLog.mock.calls[0][0].port)).toEqual(held);
   });
 
-  it("keeps the lines an earlier load dropped when the app's own tower is handed back to it", async () => {
+  it("keeps the bulletin through an edit's load and when the app's own tower is handed back to it", async () => {
     const { app: a } = app();
     const live = toolingSim(a)!;
     const held = bulletin(a.enginePort as unknown as HudSource["port"]);
     expect(held.length).toBeGreaterThan(0);
-    // An edit loads at the end of the task, which numbers the engine's log from nothing.
+    // An edit loads at the end of the task, and the engine keeps the saved lines.
     live.star = 2;
     await Promise.resolve();
-    expect(bulletin(a.enginePort as unknown as HudSource["port"])).toEqual([]);
+    expect(bulletin(a.enginePort as unknown as HudSource["port"])).toEqual(held);
     adoptToolingSim(a, live, true);
     expect(bulletin(a.ui.resetLog.mock.calls[0][0].port)).toEqual(held);
     // A second hand-back still shows them.

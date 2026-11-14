@@ -415,3 +415,7 @@ impl Engine {
 #[cfg(test)]
 #[path = "wasm_port_life_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "wasm_port_log_tests.rs"]
+mod log_tests;

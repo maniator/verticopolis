@@ -36,10 +36,6 @@ interface ToolingApp {
 
 const towers = new WeakMap<ToolingApp, ToolingTower>();
 
-/** The bulletin lines the app's tower logged before its last load, which
- *  numbered the engine's log from nothing (see {@link adoptToolingSim}). */
-const earlier = new WeakMap<ToolingApp, LogLine[]>();
-
 /** The app's engine as the tower drives it: the Rust binding, whose tooling
  *  members the port does not declare. */
 const engineOf = (app: ToolingApp): ToolingEngine => app.enginePort as unknown as ToolingEngine;
@@ -51,11 +47,10 @@ export function toolingSim(app: ToolingApp): ToolingTower | undefined {
   if (!tower) {
     tower = new ToolingTower(() => engineOf(app), {
       // The bulletin reads the engine's new lines first: a load numbers the
-      // log from nothing, so the next read would skip them.
+      // saved lines from 1 again, so the next read would skip them.
       beforeLoad: () => {
         app.reader.update();
         app.ui.update({ reader: app.reader, codes: app.portCodes, port: app.enginePort });
-        earlier.set(app, [...(earlier.get(app) ?? []), ...linesOf(app.enginePort)]);
       },
       afterLoad: () => app.followEdit(),
       afterCommand: () => app.reader.update(),
@@ -81,12 +76,6 @@ export function adoptToolingSim(app: ToolingApp, built: ToolingTower, keepCamera
   const port = engineOf(app);
   const from = built.port;
   const live = towers.get(app);
-  // The bulletin shows the lines the tower logged since it was made, as the
-  // TypeScript tower's did. They are read before any load, which numbers an
-  // engine's log from nothing: the engine the harness built the tower on
-  // holds them until then. The app's own tower also logged the lines its
-  // earlier loads dropped from the engine.
-  const lines = [...(built === live ? (earlier.get(app) ?? []) : []), ...linesOf(from as unknown as EnginePort)];
   if (built !== live) {
     // A tower from off the app keeps its edits: its own engine takes them
     // first, so it reads the same after the swap. What the app's tower still
@@ -96,41 +85,18 @@ export function adoptToolingSim(app: ToolingApp, built: ToolingTower, keepCamera
   }
   built.loadInto(port, built.saveText(), from);
   app.followSwap(keepCamera ? "restore" : "swap");
-  // The app's tower is now the adopted one, and these are its lines so far.
-  earlier.set(app, lines);
-  app.ui.resetLog({ reader: app.reader, codes: app.portCodes, port: logOf(lines) });
+  // The save carries the tower's log, so the app's engine now holds the
+  // lines the tower logged (the newest 300), and the bulletin shows them.
+  app.ui.resetLog({ reader: app.reader, codes: app.portCodes, port: app.enginePort });
   app.ui.lastLogSeq = app.reader.header.logSeq;
-}
-
-/** One bulletin line as the engine's log records it: its fields after the
- *  sequence number, and its text. */
-interface LogLine {
-  readonly fields: readonly [number, number];
-  readonly text: string | undefined;
-}
-
-/** The lines an engine has logged, held as they are now. */
-function linesOf(port: EnginePort): LogLine[] {
-  const rec = port.logAfter(0);
-  const lines: LogLine[] = [];
-  for (let i = 0; i + 2 < rec.length; i += 3) lines.push({ fields: [rec[i + 1], rec[i + 2]], text: port.logText(rec[i]) });
-  return lines;
-}
-
-/** Held lines as a log the bulletin reads after a load has numbered the
- *  engine's log from nothing. They are numbered again from 1, in order. */
-function logOf(lines: readonly LogLine[]): HudSource["port"] {
-  const rec = Float64Array.from(lines.flatMap((line, i) => [i + 1, ...line.fields]));
-  // resetLog reads only these two members.
-  return { logAfter: () => rec, logText: (seq: number) => lines[seq - 1]?.text } as unknown as HudSource["port"];
 }
 
 /** The app after a hand edit reached the Rust engine as a load: the renderer
  *  draws the engine's tower again with the camera kept, and the rest stays as
  *  an edit in place leaves it (the selection, the latches). The load forgets
  *  the engine's undo steps, as every adopted tower does, so the undo trail
- *  starts again after a hand edit. A load numbers the engine's log from
- *  nothing, so the bulletin keeps the lines it shows and its cursor moves to
+ *  starts again after a hand edit. A load numbers the saved log lines from
+ *  1 again, so the bulletin keeps the lines it shows and its cursor moves to
  *  the engine's count, from which the next line is read. */
 export function followToolingEdit(app: {
   readonly enginePort: EnginePort;
