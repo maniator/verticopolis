@@ -1,3 +1,4 @@
+import * as ex from "excalibur";
 import type { TowerEngine } from "./TowerEngine";
 import { finishLongPress } from "./longPress";
 
@@ -63,4 +64,13 @@ export function movesWithButtonUp(native: unknown): boolean {
  *  still tracked lost its release (#1014). A second finger is not primary. */
 export function isFirstContact(native: unknown): boolean {
   return (native as NativePointer | undefined)?.isPrimary === true;
+}
+
+/** A mouse button the tower has no use for: the back and forward side buttons
+ *  and any other extra one, which Excalibur reports as an unknown button. The
+ *  tower read them as a left click, so the back button placed rooms (#2073);
+ *  their press and release are ignored. A touch also reports an unknown
+ *  button and stays a press. */
+export function isUnusedMouseButton(ev: Pick<ex.PointerEvent, "button" | "pointerType">): boolean {
+  return ev.pointerType === ex.PointerType.Mouse && ev.button === ex.PointerButton.Unknown;
 }

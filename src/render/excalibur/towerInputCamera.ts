@@ -8,7 +8,7 @@ import { clampCameraY, fitZoom } from "../cameraBounds";
 import { stablePointerId } from "../pinchTracker";
 import { FLOOR, TILE } from "../scale";
 import { armLongPress, cancelLongPressOnMove, finishLongPress } from "./longPress";
-import { cancelPress, endPress, isFirstContact, movesWithButtonUp } from "./pressLifecycle";
+import { cancelPress, endPress, isFirstContact, isUnusedMouseButton, movesWithButtonUp } from "./pressLifecycle";
 import type { TowerEngine } from "./TowerEngine";
 import { towerCatalog } from "../../catalog/towerCatalog";
 
@@ -123,6 +123,7 @@ export function pickEntityAt(engine: TowerEngine, world: ex.Vector): Picked | nu
 }
 
 function pointerDown(engine: TowerEngine, ev: ex.PointerEvent): void {
+  if (isUnusedMouseButton(ev)) return; // a side button is no press (#2073)
   // A primary press while a press is still open: that one lost its release (#1014).
   if (isFirstContact(ev.nativeEvent)) cancelPress(engine);
   const contact = engine.tracker.down(stablePointerId(ev.pointerId, ev.nativeEvent), ev.screenPos.x, ev.screenPos.y);
@@ -234,6 +235,7 @@ function pointerMove(engine: TowerEngine, ev: ex.PointerEvent): void {
 }
 
 function pointerUp(engine: TowerEngine, ev: ex.PointerEvent, how: "release" | "cancel"): void {
+  if (isUnusedMouseButton(ev)) return; // nor its release (#2073)
   const pid = stablePointerId(ev.pointerId, ev.nativeEvent);
   // Same ownership rule as pointerMove: a release from a pointer that never
   // pressed here (a mouse press begun off-canvas) must not end the tracked
