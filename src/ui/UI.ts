@@ -42,7 +42,7 @@ export interface UICallbacks {
   onLoad(): void;
   onExport(): void;
   /** A picked file's text contents — a `.vctower` export. */
-  onImport(data: string): void;
+  onImport(data: string | Uint8Array): void;
   /** A picked binary legacy save (original SimTower `.TDT`), as raw bytes. */
   onImportLegacy(buffer: ArrayBuffer, filename: string): void;
   /** Export the live tower as an original 1994 SimTower save (.TDT). */

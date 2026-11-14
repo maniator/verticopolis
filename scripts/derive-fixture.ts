@@ -8,14 +8,14 @@
  */
 import { readFileSync, writeFileSync } from "node:fs";
 import { deflate } from "../src/storage/saveCompression";
-import { decodeVctower } from "../src/storage/vctowerContainer";
+import { decodeVctowerFile } from "../src/storage/vctowerContainer";
 
 const [src, dst, patchText] = process.argv.slice(2);
 if (!src || !dst || !patchText) {
   console.error("usage: derive-fixture <source.vctower> <target.vctower> '<json patch>'");
   process.exit(2);
 }
-const save = decodeVctower(readFileSync(src, "utf8")) as Record<string, unknown>;
+const save = decodeVctowerFile(readFileSync(src), src) as Record<string, unknown>;
 const patch = JSON.parse(patchText) as unknown;
 if (!patch || typeof patch !== "object" || Array.isArray(patch)) {
   console.error("the patch must be a JSON object");

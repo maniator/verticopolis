@@ -388,4 +388,18 @@ describe("SaveLoad .vctower import", () => {
     await saves.importGame("not a tower");
     expect(trackFileImported).toHaveBeenCalledOnce();
   });
+
+  it("hands a binary file's bytes to the bytes member and text to the text member", async () => {
+    const loadVctower = vi.fn(() => Float64Array.of(1, 0));
+    const loadVctowerBytes = vi.fn(() => Float64Array.of(1, 1));
+    const { saves, deps } = setup({ loadVctower, loadVctowerBytes });
+    const bytes = new TextEncoder().encode("VCTOWER2\nxx");
+    await saves.importGame(bytes);
+    expect(loadVctowerBytes).toHaveBeenCalledExactlyOnceWith(bytes);
+    expect(loadVctower).not.toHaveBeenCalled();
+    await saves.importGame("VCTOWER1\nxx");
+    expect(loadVctower).toHaveBeenCalledExactlyOnceWith("VCTOWER1\nxx");
+    expect(loadVctowerBytes).toHaveBeenCalledOnce();
+    expect(deps.towerSwapped).toHaveBeenCalledTimes(2);
+  });
 });

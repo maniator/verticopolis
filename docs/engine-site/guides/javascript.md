@@ -164,6 +164,7 @@ shapes for each one.
 | --- | --- |
 | `Engine.newGame(seed, mode, modernCalendar?, startUnbridged?)` | A new tower. `seed` is a 32-bit unsigned integer; `mode` is `"classic"` or `"modern"`; `modernCalendar` is `"realWorld"` (the default) or `"canon"`. |
 | `Engine.fromVctower(text, mode?)` | Open a `.vctower` file the way the web game does: decode, migrate older saves and load. `mode` overrides the save's mode. |
+| `Engine.fromVctowerBytes(bytes, mode?)` | `fromVctower` for a file's bytes (a `Uint8Array`): it also opens the binary `.vctower` file the web game writes. |
 | `Engine.fromSave(json)` | Load the save JSON that `serialize()` returns. |
 | `importTdt(bytes, filename)` | Read a 1994 SimTower `.TDT` file. Answers `{ save, warnings }`; pass `JSON.stringify(save)` to `Engine.fromSave`. |
 
@@ -228,6 +229,13 @@ builds them, for the web game's own tests and tooling.
   with `Engine.fromVctower(text)`. `appVersion` names your build; it is stored
   in the file. If you already hold save JSON, `encodeVctower(json, appVersion,
   savedAtMs)` writes the same file.
+- **The binary `.vctower`** is what the web game exports from 4.0: the line
+  `VCTOWER2`, a newline, then the same deflate bytes without the base64, a
+  quarter smaller. `exportVctowerBytes(appVersion, savedAtMs)` writes one as
+  a `Uint8Array`; `Engine.fromVctowerBytes(bytes)` and
+  `loadVctowerBytes(bytes)` read either kind. Read a file the player picks as
+  bytes, never as text: decoding a binary file as text changes it, and the
+  text readers refuse it as damaged.
 - **`.TDT`** is the 1994 SimTower format. `importTdt(bytes, filename)` reads
   one and `exportTdt(saveJson)` writes one, for towers the old format can
   hold. The catalog's `rules.exportsTo1994` says which mode's towers those

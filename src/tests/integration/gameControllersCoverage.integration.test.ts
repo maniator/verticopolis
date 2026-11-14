@@ -16,6 +16,7 @@ import type { Tool } from "../../ui/UI";
 import { kitOf, portOf, unitEditor, transportEditor, editorPortDeps, inspectorPortDeps } from "../../game/cardKit.fixture";
 import { render, type TemplateResult } from "lit-html";
 import { SaveGame } from "../../storage/SaveGame";
+import { toBase64 } from "../../storage/saveCompression";
 import type { ExportReport } from "../../storage/tdtExportReport";
 import type { ImportReport } from "../../storage/tdtImportReport";
 import { buildTdt } from "../fixtures/tdtBuilder";
@@ -1199,9 +1200,13 @@ describe.skipIf(noEngine)("SaveLoad (persistence, update flush, GPU-loss recover
       await saveLoad.exportGame();
       expect(f.downloads).toHaveLength(1);
       expect(f.downloads[0].filename).toBe("vertic-opolis.vctower");
-      // The controller's contract is "download exactly what SaveGame.export
-      // produces"; the container format itself is pinned by storage.test.ts.
-      expect(f.downloads[0].contents).toBe(await SaveGame.export(saveOf(sim)));
+      // The controller downloads the engine's binary file of the live tower,
+      // stamped as SaveGame.export stamps the text file: the same deflate
+      // bytes without the base64 (the format is pinned by the engine's tests).
+      const file = f.downloads[0].contents as Uint8Array;
+      const text = await SaveGame.export(saveOf(sim));
+      expect(new TextDecoder().decode(file.subarray(0, 9))).toBe("VCTOWER2\n");
+      expect(toBase64(file.subarray(9))).toBe(text.slice(text.indexOf("\n") + 1).trim());
     } finally {
       vi.useRealTimers();
     }
@@ -1213,7 +1218,7 @@ describe.skipIf(noEngine)("SaveLoad (persistence, update flush, GPU-loss recover
   it("exportGame toasts the engine's refusal instead of swallowing it (main.ts fires it with `void`)", async () => {
     // The engine refuses the file (a stamp it rejects, a save past the cap):
     // the controller surfaces its reason as a toast and downloads nothing.
-    const write = vi.spyOn(portOf(sim), "exportVctower").mockReturnValue(undefined);
+    const write = vi.spyOn(portOf(sim), "exportVctowerBytes").mockReturnValue(undefined);
     const reason = vi.spyOn(portOf(sim), "lastReason").mockReturnValue("This tower's save data is larger than 32 MB, the most a save can hold.");
     try {
       await saveLoad.exportGame();

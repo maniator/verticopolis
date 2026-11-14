@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { SaveGame } from "../storage/SaveGame";
 import { SMALL_TOWER_SAVE } from "../tests/fixtures/handSaves";
 import { mockPort } from "../tests/portKit/mockPort";
-import { SWAP_REFUSED, TRAPPED_SAVE_REFUSED, exportFileText, loadStored, saveText, swapDone } from "./portLifecycle";
+import { SWAP_REFUSED, TRAPPED_SAVE_REFUSED, exportFile, loadStored, saveText, swapDone } from "./portLifecycle";
 import { noteEngineThrow, watchEngineTraps } from "./engineFault";
 
 /**
@@ -66,41 +66,42 @@ describe("saveText", () => {
   });
 });
 
-describe("exportFileText", () => {
+describe("exportFile", () => {
   const stamp = { appVersion: "2.0.0", savedAt: 1_700_000_000_000 };
   const calls: string[] = [];
-  const portWith = (file: string | undefined, reason?: string) => ({
+  const FILE = new TextEncoder().encode("VCTOWER2\nQQ");
+  const portWith = (file: Uint8Array | undefined, reason?: string) => ({
     setCamera: vi.fn(() => (calls.push("camera"), new Float64Array())),
-    exportVctower: vi.fn(() => (calls.push("write"), file)),
+    exportVctowerBytes: vi.fn(() => (calls.push("write"), file)),
     lastReason: () => reason,
   });
 
   it("stamps the camera, then asks the engine for the file with the build and time", () => {
     calls.length = 0;
-    const port = portWith("VCTOWER1\nQQ==\n");
-    expect(exportFileText(port, { tile: 5, floor: 2, zoom: 1 }, stamp)).toBe("VCTOWER1\nQQ==\n");
+    const port = portWith(FILE);
+    expect(exportFile(port, { tile: 5, floor: 2, zoom: 1 }, stamp)).toBe(FILE);
     expect(calls).toEqual(["camera", "write"]);
-    expect(port.exportVctower).toHaveBeenCalledWith("2.0.0", 1_700_000_000_000);
+    expect(port.exportVctowerBytes).toHaveBeenCalledWith("2.0.0", 1_700_000_000_000);
   });
 
   it("stamps nothing without a camera", () => {
-    const port = portWith("x");
-    exportFileText(port, null, stamp);
+    const port = portWith(FILE);
+    exportFile(port, null, stamp);
     expect(port.setCamera).not.toHaveBeenCalled();
   });
 
   it("throws the engine's reason when it writes no file, or the stock line without one", () => {
-    expect(() => exportFileText(portWith(undefined, "too big"), null, stamp)).toThrow("too big");
-    expect(() => exportFileText(portWith(undefined), null, stamp)).toThrow("The tower could not be exported.");
+    expect(() => exportFile(portWith(undefined, "too big"), null, stamp)).toThrow("too big");
+    expect(() => exportFile(portWith(undefined), null, stamp)).toThrow("The tower could not be exported.");
   });
 
   it("asks a trapped engine for nothing (#1422)", () => {
-    const port = portWith("x");
+    const port = portWith(FILE);
     watchEngineTraps(() => {});
     try {
       expect(noteEngineThrow(new WebAssembly.RuntimeError("unreachable"))).toBe(true);
-      expect(() => exportFileText(port, { tile: 1, floor: 1, zoom: 1 }, stamp)).toThrow(TRAPPED_SAVE_REFUSED);
-      expect(port.exportVctower).not.toHaveBeenCalled();
+      expect(() => exportFile(port, { tile: 1, floor: 1, zoom: 1 }, stamp)).toThrow(TRAPPED_SAVE_REFUSED);
+      expect(port.exportVctowerBytes).not.toHaveBeenCalled();
       expect(port.setCamera).not.toHaveBeenCalled();
     } finally {
       watchEngineTraps(null);
@@ -111,16 +112,16 @@ describe("exportFileText", () => {
     const trap = new WebAssembly.RuntimeError("unreachable");
     const port = {
       setCamera: vi.fn(() => new Float64Array()),
-      exportVctower: vi.fn((): string => {
+      exportVctowerBytes: vi.fn((): Uint8Array => {
         throw trap;
       }),
       lastReason: () => undefined,
     };
     watchEngineTraps(() => {});
     try {
-      expect(() => exportFileText(port, null, stamp)).toThrow(trap);
-      expect(() => exportFileText(port, null, stamp)).toThrow(TRAPPED_SAVE_REFUSED);
-      expect(port.exportVctower).toHaveBeenCalledTimes(1);
+      expect(() => exportFile(port, null, stamp)).toThrow(trap);
+      expect(() => exportFile(port, null, stamp)).toThrow(TRAPPED_SAVE_REFUSED);
+      expect(port.exportVctowerBytes).toHaveBeenCalledTimes(1);
     } finally {
       watchEngineTraps(null);
     }

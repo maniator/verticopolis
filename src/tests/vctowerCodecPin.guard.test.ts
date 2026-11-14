@@ -116,11 +116,11 @@ describe("the Rust codec pin (#1522 item 1)", () => {
 
   it("the player's import and export reach the engine's four codec members", () => {
     const saveLoad = code(FILES.find((f) => f.rel === "src/game/saveLoad.ts")!.text);
-    for (const call of ["port.loadVctower(", "exportFileText(port", "port.loadTdt(", "port.tdtExport("]) {
+    for (const call of ["port.loadVctower(", "port.loadVctowerBytes(", "exportFile(port", "port.loadTdt(", "port.tdtExport("]) {
       expect(saveLoad, call).toContain(call);
     }
     const lifecycle = code(FILES.find((f) => f.rel === "src/game/portLifecycle.ts")!.text);
-    expect(lifecycle).toContain("port.exportVctower(");
+    expect(lifecycle).toContain("port.exportVctowerBytes(");
   });
 
   it("nothing in src/storage parses or writes a 1994 file", () => {

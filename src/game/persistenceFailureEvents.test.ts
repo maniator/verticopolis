@@ -186,7 +186,7 @@ describe("an export that writes no file reports export_failed (#1655)", () => {
   it("reports an engine that throws on a .vctower export as `save`, and a good export as nothing", async () => {
     const bad = makeLoad({
       setCamera: () => {},
-      exportVctower: () => {
+      exportVctowerBytes: () => {
         throw new Error("memory access out of bounds");
       },
       towerName: () => "Tower",
@@ -203,7 +203,7 @@ describe("an export that writes no file reports export_failed (#1655)", () => {
       vi.mocked(trackAppAction).mockClear();
       const odd = makeLoad({
         setCamera: () => {},
-        exportVctower: () => {
+        exportVctowerBytes: () => {
           throw thrown;
         },
         towerName: () => "Tower",
@@ -214,7 +214,7 @@ describe("an export that writes no file reports export_failed (#1655)", () => {
     }
 
     vi.mocked(trackAppAction).mockClear();
-    const good = makeLoad({ setCamera: () => {}, exportVctower: () => "VCTOWER1\nabc", towerName: () => "Tower" });
+    const good = makeLoad({ setCamera: () => {}, exportVctowerBytes: () => new TextEncoder().encode("VCTOWER2\nabc"), towerName: () => "Tower" });
     await good.load.exportGame();
     expect(trackAppAction).not.toHaveBeenCalled();
     expect(good.ui.downloadFile).toHaveBeenCalledOnce();
