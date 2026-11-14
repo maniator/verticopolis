@@ -30,6 +30,8 @@ function pgUntilSomeoneWalksTheStreet(max: number): number {
   for (let m = 1; m <= max; m++) {
     g.enginePort.tick(1);
     if (onStreet()) {
+      // Both lobbies and the street between them (the Map is closed after).
+      g.engine.setCamera(Math.round((gapFrom + gapTo) / 2), 3, 1.25);
       g.reader.update();
       return m;
     }
@@ -40,6 +42,9 @@ function pgUntilSomeoneWalksTheStreet(max: number): number {
 async function walkerOnTheStreet(page: Page): Promise<void> {
   const ran = await page.evaluate(pgUntilSomeoneWalksTheStreet, MAX_MINUTES);
   if (ran < 0) throw new Error(`split-lot-street: nobody walked the street in ${MAX_MINUTES} minutes`);
+  // The Map would cover the right tower's lobby.
+  if (await page.isVisible("#overview-map")) await page.click("#overview-map .overview-map-close");
+  await page.waitForSelector("#overview-map", { state: "hidden" });
 }
 
 export const SPLIT_LOT_SCENES: Scene[] = [

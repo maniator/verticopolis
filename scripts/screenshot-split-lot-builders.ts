@@ -68,7 +68,7 @@ export function buildSplitLotTower(): void {
   c.minutes = c.minutes - c.minuteOfDay + 12 * 60;
   s.evaluateStar();
   g.engine.setSim(g.enginePort.sim ? s : (g.syncSim(), g.renderSim));
-  g.engine.setCamera(cx, 2.5, 1.6);
+  g.engine.setCamera(cx + 6, 3, 1.25);
   g.speed = 0;
   g.engine.paused = false;
 }
