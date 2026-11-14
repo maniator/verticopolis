@@ -1,6 +1,9 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render } from "lit-html";
+import { trackAppAction } from "../analytics";
 import { SPONSOR_URL, TWA_SESSION_KEY, splashTemplate, sponsorOffered, type SplashHandlers } from "./splashTemplate";
+
+vi.mock("../analytics", () => ({ trackAppAction: vi.fn() }));
 
 /**
  * The splash's Sponsor link and the wordmark's trademark mark (owner,
@@ -21,6 +24,7 @@ function mount(): HTMLElement {
 
 const startUrl = window.location.href;
 afterEach(() => {
+  vi.mocked(trackAppAction).mockClear();
   document.body.replaceChildren();
   window.history.replaceState(null, "", startUrl);
   sessionStorage.removeItem(TWA_SESSION_KEY);
@@ -38,6 +42,28 @@ describe("the splash's Sponsor link", () => {
     expect(link.textContent!.trim()).toBe("Sponsor");
     const focusables = host.querySelectorAll("button, a[href]");
     expect(focusables[focusables.length - 1]).toBe(link);
+  });
+
+  it("counts each tap as a sponsor_click from the splash, and only on a tap", () => {
+    const host = mount();
+    expect(trackAppAction).not.toHaveBeenCalled();
+    const link = host.querySelector<HTMLAnchorElement>('[data-splash="sponsor"]')!;
+    // Keep jsdom from trying to follow the link; the handler runs either way.
+    link.addEventListener("click", (e) => e.preventDefault());
+    link.click();
+    link.click();
+    expect(vi.mocked(trackAppAction).mock.calls).toEqual([
+      ["sponsor_click", "splash"],
+      ["sponsor_click", "splash"],
+    ]);
+  });
+
+  it("counts a middle-click (auxclick) but not a right-click", () => {
+    const link = mount().querySelector<HTMLAnchorElement>('[data-splash="sponsor"]')!;
+    link.dispatchEvent(new MouseEvent("auxclick", { bubbles: true, button: 2 }));
+    expect(trackAppAction).not.toHaveBeenCalled();
+    link.dispatchEvent(new MouseEvent("auxclick", { bubbles: true, button: 1 }));
+    expect(vi.mocked(trackAppAction).mock.calls).toEqual([["sponsor_click", "splash"]]);
   });
 
   it("is left out of the Android app (a ?src=twa launch), with the rest of the screen unchanged", () => {

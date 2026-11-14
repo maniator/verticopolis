@@ -10,6 +10,8 @@ export type SidebarEntry =
   | { slug: string }
   | { label: string; items: SidebarEntry[] };
 export const sidebar: SidebarEntry[];
+export function isSponsorLink(href: string): boolean;
+export function sponsorTapListener(track: () => void): (e: MouseEvent) => void;
 export function landingAction(pathname: string, referrer: string, origin: string): "page_help" | "page_changelog" | null;
 /** The page a help page view reports: "rooms/hotels", "home" or "other". */
 export function helpPageDetail(pathname: string): string;
