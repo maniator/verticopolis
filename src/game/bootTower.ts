@@ -1,3 +1,4 @@
+import { takeCrashReload, tabStore, withoutSavedPeople } from "../engineCrash/crashReload";
 import type { EnginePort } from "../simport/enginePort";
 import { SaveGame } from "../storage/SaveGame";
 import { loadStored, newerSaveRefused } from "./portLifecycle";
@@ -27,10 +28,14 @@ export interface BootTower {
 export const BOOT_SEED = Date.parse("2024-01-01");
 
 /** Load the stored tower into `port`, which holds a fresh tower. The fresh
- *  tower's events never reach the loaded one (`setBackdrop`). */
-export function bootTower(port: EnginePort): BootTower {
+ *  tower's events never reach the loaded one (`setBackdrop`). The boot after
+ *  an engine crash (`afterCrash`) loads it without the people the save
+ *  carries, so the steps that trapped are not replayed. */
+export function bootTower(port: EnginePort, afterCrash: boolean = takeCrashReload(tabStore())): BootTower {
   port.setBackdrop(true);
-  const boot = SaveGame.loadResult(loadStored(port), () => newerSaveRefused(port));
+  const load = loadStored(port);
+  const tryLoad = afterCrash ? (text: string) => load(withoutSavedPeople(text)) : load;
+  const boot = SaveGame.loadResult(tryLoad, () => newerSaveRefused(port));
   port.setBackdrop(false);
   const { refusedKey, newerKey, ...rest } = boot;
   return { port, ...rest, newer: newerKey !== undefined, stashKey: newerKey ?? refusedKey };
