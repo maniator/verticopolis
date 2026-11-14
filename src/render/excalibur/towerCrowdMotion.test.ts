@@ -28,6 +28,12 @@ function simFixture(over: Record<string, any> = {}): any {
   };
 }
 
+/** A tenant riding at the middle of a shaft at floor `fy`, as the engine
+ *  places riders (`Riding` in crowd/motion.rs). */
+function rider(id: number, x: number, fy: number): any {
+  return { id, seed: id, state: "riding", x, floor: Math.round(fy), fy, wait: 0 };
+}
+
 /** The sibling suite's fake engine, trimmed to what the motion paths read. */
 function eng(over: Record<string, any> = {}): any {
   return {
@@ -140,7 +146,8 @@ describe("a cab's riders change with the people getting in and out (#2097)", () 
       syncMotion(e);
       updateMotion(e, 1);
       const idle = e.carActors[0].shown;
-      t.carLoad[0] = 6; // riders got in on this step
+      // Six people walked in on this step: they ride at the shaft's middle.
+      e.sim.crowd = { people: [1, 2, 3, 4, 5, 6].map((id) => rider(id, 14, 5)) };
       e.sim.clock = { ...e.sim.clock, minutes: 1 };
       updateMotion(e, 1);
       expect(e.carActors[0].shown).toBe(idle); // the step's glide is still running
@@ -150,6 +157,43 @@ describe("a cab's riders change with the people getting in and out (#2097)", () 
       syncMotion(e); // a structural edit rebuilds the cab, idle
       updateMotion(e, 1);
       expect(e.carActors[0].shown).toBe(loaded);
+    } finally {
+      HTMLCanvasElement.prototype.getContext = origGetContext;
+    }
+  });
+});
+
+describe("a cab draws the people who boarded it, never the car's load (3.7.3)", () => {
+  it("keeps a loaded car with nobody aboard empty, and fills it as riders board and leave", () => {
+    const origGetContext = HTMLCanvasElement.prototype.getContext;
+    HTMLCanvasElement.prototype.getContext = function (this: HTMLCanvasElement) {
+      return new Proxy({ canvas: this }, { get: (t, p) => (p in t ? (t as any)[p] : () => undefined), set: () => true });
+    } as any;
+    try {
+      const t = { id: 7, kind: "elevatorStandard", x: 12, width: 4, bottom: 1, top: 20, cars: 2, carPositions: [5, 15], carDir: [0, 0], carLoad: [0, 0] };
+      const e = eng({ sim: simFixture({ tower: { revision: 1, units: [], transports: [t] } }) });
+      syncMotion(e);
+      updateMotion(e, 1);
+      const empty = e.carActors[0].shown;
+      expect(empty.startsWith("0:")).toBe(true);
+      // The traffic model fills both cars with nobody on the landing: no figures.
+      let minute = 1;
+      const step = (people: any[]) => {
+        t.carDir = [1, 1];
+        e.sim.crowd = { people };
+        e.sim.clock = { ...e.sim.clock, minutes: minute++ };
+        updateMotion(e, 1);
+        updateMotion(e, 4000);
+      };
+      t.carLoad = [16, 16];
+      step([]);
+      expect(e.carActors.map((c: any) => c.shown.split(":")[0])).toEqual(["0", "0"]);
+      // Two board the low car and one the high car: each cab shows its own.
+      step([rider(1, 14, 5), rider(2, 14, 5), rider(3, 14, 15), { ...rider(4, 14, 5), state: "waiting" }]);
+      expect(e.carActors.map((c: any) => c.shown.split(":")[0])).toEqual(["2", "1"]);
+      // They step off at their floors; the load is still there and draws nobody.
+      step([]);
+      expect(e.carActors.map((c: any) => c.shown.split(":")[0])).toEqual(["0", "0"]);
     } finally {
       HTMLCanvasElement.prototype.getContext = origGetContext;
     }
