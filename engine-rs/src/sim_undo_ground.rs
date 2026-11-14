@@ -304,16 +304,20 @@ impl<'a> Ground<'a> {
     /// Whether taking out floor or lobby tile `u` leaves everything it held
     /// up standing, by the rules a sale keeps to (`Tower::removal_reason`):
     /// no room stays on its tiles, and from the ground floor up no story
-    /// stays above it, unless the step lays the tile again.
+    /// stays above it, unless the step lays the tile again. The story above
+    /// a tall lobby tile is the one over its hall, since the stories it
+    /// rises through are its own, and a tile the step lays again in its
+    /// place holds only its own story, so it never holds that one up.
     pub(crate) fn leaves_nothing_hanging_from(&self, u: &Unit) -> bool {
+        let above = self.tower.unit_stories(u);
         tiles_of(u).all(|(f, x)| {
             let room_stays = self
                 .tower
                 .rooms
                 .get(&(f, x))
                 .is_some_and(|id| !self.leaving.contains(id));
-            self.laid.contains_key(&(f, x))
-                || (!room_stays && !(f >= GROUND_FLOOR && self.holds(f + 1, x)))
+            (above == 1 && self.laid.contains_key(&(f, x)))
+                || (!room_stays && !(f >= GROUND_FLOOR && self.holds(f + above, x)))
         })
     }
 }
