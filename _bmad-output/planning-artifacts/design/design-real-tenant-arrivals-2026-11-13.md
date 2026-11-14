@@ -292,10 +292,19 @@ The rules for venues:
   so the art, the elevator demand estimate and the room card agree. Today's
   diners are still the 140-person crowd, so they look emptier in a big tower
   until tenants go out to eat. Retail shops, boutique bays, amusements, spas,
-  nightclubs, sky bars and the daycare get no visitor trips at all yet, so
-  they keep drawing a full house: the owner's tattoo parlor (a boutique bay)
-  still reads Customers 0. They switch to `customers_in` in the same PR that
-  first sends shoppers to them, or they would draw empty all day.
+  nightclubs and sky bars got no visitor trips at first, so they drew a full
+  house while reading Customers 0. Since the walk-ins PR (2026-11-14) every
+  shop and restaurant also takes customers from outside (`crowd::walk_ins`):
+  each hour books its share of the day's visitors at the full demand rate
+  (owner, 2026-11-14, chosen over the original's 25 to 50 a day after both
+  were measured), and each walk-in enters at the ground lobby or a served
+  Metro platform, split by what each entrance's transport carries. They are
+  counted apart from the 140-person sample, under a 4,000 ceiling, and
+  Today's patronage counts them at the door; income stays on the estimate.
+  The daycare keeps its full house until its children are real. The old
+  one-way trips to and from open venues (stand a game minute on the floor,
+  then finish there) were removed in the same PR: they broke the
+  no-vanishing rule.
 - Visitors who are tenants (office lunch, and later residents and hotel
   guests going out to eat or shop) are the real tenant people from the steps
   above. Visitors from outside stay spawned, but without the 140 cap, so how
