@@ -33,6 +33,8 @@ pub mod stamp;
 pub mod tables;
 pub mod tail;
 #[cfg(test)]
+mod theater_flush_tests;
+#[cfg(test)]
 mod theatre_tests;
 pub mod transports;
 pub mod types;

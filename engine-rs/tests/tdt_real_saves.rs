@@ -134,6 +134,36 @@ fn hotel_rooms_arrive_with_guests_exactly_where_the_file_counts_them() {
     }
 }
 
+/// (file, theaters). Every theater in these files is a 7-tile screen piece
+/// with its auditorium on the right, 31 tiles in all; none sits flush
+/// against another.
+const THEATERS: [(&str, usize); 9] = [
+    ("TOWER1.TDT", 0),
+    ("TOWER2.TDT", 6),
+    ("TOWER3.TDT", 4),
+    ("TOWER4.TDT", 4),
+    ("TOWER5.TDT", 0),
+    ("TOWER6.TDT", 4),
+    ("TOWER7.TDT", 4),
+    ("TOWER8.TDT", 0),
+    ("MYTOWER.TDT", 2),
+];
+
+#[test]
+fn each_theater_arrives_whole_from_its_screen_and_auditorium_pieces() {
+    for (name, count) in THEATERS {
+        let save = import_save(name);
+        let widths: Vec<i64> = save["units"]
+            .as_array()
+            .expect("units")
+            .iter()
+            .filter(|u| u["kind"] == "cinema")
+            .map(|u| u["width"].as_i64().expect("width"))
+            .collect();
+        assert_eq!(widths, vec![31; count], "{name} theaters");
+    }
+}
+
 /// Left edges of the stalls on one floor of an imported save, with the ramp's.
 fn parking_row(save: &serde_json::Value, floor: i64) -> (Vec<i64>, Vec<i64>) {
     let at = |kind: &str| -> Vec<i64> {

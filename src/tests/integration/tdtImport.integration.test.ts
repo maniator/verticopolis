@@ -329,9 +329,10 @@ describeWithCodec("parseTDT: golden mappings", () => {
   it("a whole theatre (halves + screen halves) merges into ONE cinema", () => {
     const { save } = parse({
       floors: [
-        // Bottom story: hall + adjacent screen; top story: their upper halves.
-        { index: 20, tenants: [{ left: 100, right: 127, type: 19 }, { left: 127, right: 131, type: 35 }] },
-        { index: 21, tenants: [{ left: 100, right: 127, type: 18 }, { left: 127, right: 131, type: 34 }] },
+        // Each story: a 7-tile screen piece on the left and the auditorium on
+        // its right, as every theater in the real saves is written.
+        { index: 20, tenants: [{ left: 100, right: 107, type: 35 }, { left: 107, right: 131, type: 19 }] },
+        { index: 21, tenants: [{ left: 100, right: 107, type: 34 }, { left: 107, right: 131, type: 18 }] },
       ],
     });
     const cinemas = save.units.filter((u) => u.kind === "cinema");
