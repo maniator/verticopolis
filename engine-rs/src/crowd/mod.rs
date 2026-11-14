@@ -20,6 +20,7 @@ pub(crate) mod save;
 pub mod spawn;
 pub mod spawn_floors;
 pub mod staff_shift;
+pub mod street;
 pub mod trip;
 pub mod visits;
 pub mod walk;

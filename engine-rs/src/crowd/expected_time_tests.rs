@@ -26,6 +26,17 @@ fn tower(mode: GameMode, top: i64) -> Simulation {
     sim
 }
 
+/// Lays a basement under the lobby and past it, and a second ground lobby
+/// on it at 50 to 69, apart from the first by open ground.
+fn apart(sim: &mut Simulation) {
+    for x in 0..70 {
+        assert!(sim.tower.place(Kind::Floor, 0, x).ok, "B1 at {x}");
+    }
+    for x in 50..70 {
+        assert!(sim.tower.place(Kind::Lobby, 1, x).ok, "lobby at {x}");
+    }
+}
+
 /// The shaft a rider from floor 1 to `to` takes first, routed now.
 fn first_shaft(sim: &mut Simulation, to: i64) -> i64 {
     let r = sim
@@ -283,6 +294,10 @@ fn the_exit_bound_never_overtakes_a_link() {
     shaft(&mut sim, Kind::ElevatorStandard, 16, 15, 20);
     shaft(&mut sim, Kind::Escalator, 24, 1, 2);
     shaft(&mut sim, Kind::Stairs, 30, 15, 16);
+    // A second ground lobby apart from the first, over a basement, and an
+    // elevator in it: the street joins the two.
+    apart(&mut sim);
+    shaft(&mut sim, Kind::ElevatorStandard, 60, 0, 1);
     sim.crowd.begin_step();
     let router = fresh(&mut sim.crowd, &sim.tower);
     // Each node's floor: a segment's own, a car's from the links into it.
@@ -307,6 +322,7 @@ fn the_exit_bound_never_overtakes_a_link() {
         .map(|(p, _)| p as u32)
         .collect();
     let mut checked = 0;
+    let mut streets = 0;
     let mut exits_above_zero = 0;
     for &goal in &goals {
         let to_floor = floor_of_seg(segment(router, goal));
@@ -317,6 +333,7 @@ fn the_exit_bound_never_overtakes_a_link() {
                 let to = bound_to(router, (l.to, l.floor), (goal, to_floor));
                 assert!(from <= least(l) + to, "node {p} to {} toward {goal}", l.to);
                 checked += 1;
+                streets += usize::from(matches!(l.how, Move::Street));
             }
         }
     }
@@ -324,6 +341,38 @@ fn the_exit_bound_never_overtakes_a_link() {
         exits_above_zero += usize::from(*e > 0);
     }
     assert!(checked > 1000, "only {checked} links checked");
+    assert!(streets > 0, "the street's links were checked");
     // The bound does add something, or this test pins nothing.
     assert!(exits_above_zero > 0);
+}
+
+#[test]
+fn the_street_joins_ground_lobbies_that_do_not_touch() {
+    for mode in [GameMode::Classic, GameMode::Modern] {
+        let mut sim = tower(mode, 15);
+        apart(&mut sim);
+        let r = sim.crowd.route(&sim.tower, 1, 1, Some(5.0), Some(60.0));
+        if mode.walks_the_street() {
+            let r = r.expect("a walk along the street");
+            assert_eq!(r.floors, vec![1], "{mode:?}: no ride");
+            assert!(r.shafts.is_empty(), "{mode:?}");
+        } else {
+            assert!(r.is_none(), "{mode:?}: no way across");
+        }
+    }
+}
+
+#[test]
+fn someone_on_the_street_finds_a_way_from_the_nearest_lobby() {
+    let mut sim = tower(GameMode::Modern, 15);
+    apart(&mut sim);
+    for x in 50..70 {
+        assert!(sim.tower.place(Kind::Floor, 2, x).ok, "floor 2 at {x}");
+    }
+    let up = shaft(&mut sim, Kind::ElevatorStandard, 60, 1, 2);
+    // Out on the open ground between the lobbies, nearer the right one.
+    let r = sim.crowd.route(&sim.tower, 1, 2, Some(47.5), Some(60.0));
+    let r = r.expect("a way on from the street");
+    assert_eq!(r.floors, vec![1, 2]);
+    assert_eq!(r.shafts, vec![up]);
 }

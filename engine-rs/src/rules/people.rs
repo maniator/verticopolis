@@ -16,6 +16,14 @@ impl GameMode {
         self == GameMode::Modern
     }
 
+    /// Whether people walk the street between two ground lobbies that do not
+    /// touch, out of one and along the sidewalk into the other, as part of a
+    /// trip (`crowd::street`). Classic keeps to the 1994 game, where a trip
+    /// goes only through the tower.
+    pub fn walks_the_street(self) -> bool {
+        self == GameMode::Modern
+    }
+
     pub fn rain_crowd_factor(self) -> f64 {
         match self {
             GameMode::Classic => 0.5,

@@ -25,6 +25,8 @@
  *     beside a cinema and the metro for the Help site.
  *   - `screenshot-metro-builders.ts`: `buildMetroLineTower`, a Modern line of
  *     three metro stations.
+ *   - `screenshot-split-lot-builders.ts`: `buildSplitLotTower`, two Modern
+ *     towers on separate ground lobbies, joined by the street.
  *
  * Keep re-exports only here (erasable): no enums / namespaces / parameter
  * properties.
@@ -39,3 +41,4 @@ export * from "./screenshot-security-builders.ts";
 export * from "./screenshot-tall-lobby-builders.ts";
 export * from "./screenshot-venue-flights-builders.ts";
 export * from "./screenshot-metro-builders.ts";
+export * from "./screenshot-split-lot-builders.ts";
