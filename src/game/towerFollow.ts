@@ -2,6 +2,7 @@ import type { GameApp } from "../main";
 import { dropSeveredGesture } from "./engineWiring";
 import { noteTowerSwap } from "./engineFault";
 import { hudSource } from "./hudSource";
+import { showTower } from "../ui/uiStatus";
 import { touchOverviewMap } from "./overviewMapWiring";
 import { newRenderSim } from "./portAccess";
 import { forgetLiveTower } from "../storage/slotGuard";
@@ -60,8 +61,7 @@ export function followEngineTower(app: GameApp, follow: TowerFollow): void {
   // Let the keyboard cursor follow (its ghost, an anchor from another tower), rebase the UI
   // log cursor so old entries don't replay as toasts, and refresh the palette's star level.
   app.keyboard.followTower(follow === "step" ? "same tower" : "another tower");
-  app.ui.resetLog(hudSource(app));
-  app.ui.update(hudSource(app));
+  showTower(app.ui, hudSource(app));
   if (startsOver) app.lastTrafficTier = 0; // the chip's hysteresis starts over on another tower
   // The Map's Eval and Pricing views read the new tower's tiers on their next open frame.
   touchOverviewMap(app);

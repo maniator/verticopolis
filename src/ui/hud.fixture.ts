@@ -2,7 +2,7 @@ import type { GameMode } from "../shared/types";
 import { PortCodes } from "../simport/portCodes";
 import { mockPort, record } from "../tests/portKit/mockPort";
 import type { UI } from "./UI";
-import type { HudSource } from "./uiStatus";
+import { showTower, type HudSource } from "./uiStatus";
 
 /** A log line as the HUD reads it back. */
 type LogKind = "info" | "good" | "bad" | "money";
@@ -91,4 +91,9 @@ export function pump(ui: UI, tower: HudTower): void {
 /** Rebase the UI's log cursor on `tower`, as a tower swap does. */
 export function rebaseLog(ui: UI, tower: HudTower): void {
   ui.resetLog(sourceOf(tower));
+}
+
+/** Draw `tower` as one the UI has not shown yet, the way boot and a swap do. */
+export function show(ui: UI, tower: HudTower): void {
+  showTower(ui, sourceOf(tower));
 }

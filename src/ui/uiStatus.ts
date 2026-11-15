@@ -333,6 +333,15 @@ export function resetLog(ui: UI, src: HudSource): void {
   ui.el.log.replaceChildren(...lines.slice(-LOG_DOM_CAP).map((e) => logLine(e)));
 }
 
+/** Draw a tower the UI has not shown yet (the boot tower, or one swapped in):
+ *  take its log as already read, then refresh the HUD. The order matters. A
+ *  refresh before the rebase reads the tower's whole saved log as new lines and
+ *  toasts its newest good and bad ones, over the title screen at boot. */
+export function showTower(ui: Pick<UI, "resetLog" | "update">, src: HudSource): void {
+  ui.resetLog(src);
+  ui.update(src);
+}
+
 /** A transient toast on the toast rail; self-removing, capped at TOAST_MAX. */
 export function toast(ui: UI, text: string, kind: LogEntry["kind"] = "info"): void {
   const t = document.createElement("div");
