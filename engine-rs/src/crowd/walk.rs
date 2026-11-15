@@ -47,6 +47,17 @@ pub fn way_is_cut(p: &Person, target_x: f64, tower: &Tower) -> bool {
     here.is_some() && there.is_some() && here != there
 }
 
+/// Where a walker on their own run of the floor reaches a shaft or flight
+/// whose columns `x .. x + width` stand over a gap: the column nearest
+/// `target_x` on the walker's side. `None` when no column of it stands on
+/// the walker's run, so the gap really cuts them off from it.
+pub fn reach_on_run(p: &Person, x: i64, width: i64, target_x: f64, tower: &Tower) -> Option<f64> {
+    let (start, end) = tower.run_at(p.floor, jsmath::round(p.x) as i64)?;
+    let first = x.max(start);
+    let last = (x + width - 1).min(end);
+    (first <= last).then(|| target_x.clamp(first as f64, last as f64))
+}
+
 /// Someone whose way along the floor was cut finds another way from where
 /// they stand, and never steps over the gap. A housekeeper, or anyone with
 /// no other way, gives up as a stuck walker does.
