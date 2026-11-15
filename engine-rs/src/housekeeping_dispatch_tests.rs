@@ -152,7 +152,8 @@ fn dispatch_once(mode: GameMode) -> (Simulation, HashMap<i64, i64>, [i64; 3], [i
     let sent = sim
         .housekeeping
         .assigned_room
-        .iter()
+        .sorted()
+        .into_iter()
         .map(|(room, (crew, _))| (*room, *crew))
         .collect();
     (sim, sent, crews, rooms)

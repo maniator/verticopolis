@@ -11,7 +11,6 @@
 //! the access states by `access_reads_each_connection_state`; an unserved
 //! office printing no Main gripe by the card-text sweep's
 //! "service rooms, unhappy" case (`cardTextParity.integration.test.ts`).
-use std::collections::HashMap;
 
 use crate::clock::GameMode;
 use crate::demand::{unmet_coverage, DemandMap};
@@ -264,8 +263,8 @@ fn coverage_0_from_the_tenants_own_far_floor_reads_its_floor_unreachable() {
 /// none when it is not an origin), and `built` retail venues in the tower.
 fn demand(share: f64, reachable: Option<i64>, built: i64) -> DemandMap {
     DemandMap {
-        fraction_by_unit: HashMap::new(),
-        delivered_by_unit: HashMap::new(),
+        fraction_by_unit: Default::default(),
+        delivered_by_unit: Default::default(),
         reachable_venues_by_origin: reachable.map(|n| (1, n)).into_iter().collect(),
         share,
         retail_venue_count: built,

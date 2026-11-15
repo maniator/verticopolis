@@ -11,6 +11,7 @@
 
 use std::collections::HashSet;
 
+use super::fasthash::FastSet;
 use super::routing::{adjacency, walk_budget_step, WalkState};
 use super::{AdjGraph, Crowd};
 use crate::tower::Tower;
@@ -35,7 +36,7 @@ fn seg_reachable(crowd: &mut Crowd, tower: &Tower, target: i64) -> bool {
 /// from some lobby segment: one search from all of them at once, with the
 /// router's own step, so a state is reached here exactly when one of the
 /// single-origin searches would reach it.
-fn walk_budget_reach<'a>(crowd: &'a mut Crowd, tower: &Tower) -> &'a HashSet<i64> {
+fn walk_budget_reach<'a>(crowd: &'a mut Crowd, tower: &Tower) -> &'a FastSet<i64> {
     let fresh = !matches!(&crowd.lobby_reach, Some((rev, _)) if *rev == tower.revision);
     if fresh {
         let origins = tower.lobby_segs();
@@ -45,9 +46,9 @@ fn walk_budget_reach<'a>(crowd: &'a mut Crowd, tower: &Tower) -> &'a HashSet<i64
     &crowd.lobby_reach.as_ref().unwrap().1
 }
 
-fn closure_under_walk_budget(adj: &AdjGraph, origins: &[i64]) -> HashSet<i64> {
+fn closure_under_walk_budget(adj: &AdjGraph, origins: &[i64]) -> FastSet<i64> {
     let mut seen: HashSet<WalkState> = HashSet::new();
-    let mut segs: HashSet<i64> = HashSet::new();
+    let mut segs: FastSet<i64> = FastSet::default();
     let mut frontier: Vec<WalkState> = Vec::new();
     for &s in origins {
         let origin: WalkState = (s, 0, None);
@@ -88,10 +89,10 @@ pub fn floor_reachable_from_lobby(crowd: &mut Crowd, tower: &Tower, floor: i64) 
     false
 }
 
-fn connected_set<'a>(crowd: &'a mut Crowd, tower: &Tower) -> &'a HashSet<i64> {
+fn connected_set<'a>(crowd: &'a mut Crowd, tower: &Tower) -> &'a FastSet<i64> {
     let fresh = !matches!(&crowd.seg_served, Some((rev, _)) if *rev == tower.revision);
     if fresh {
-        let mut seen: HashSet<i64> = HashSet::new();
+        let mut seen: FastSet<i64> = FastSet::default();
         let mut frontier: Vec<i64> = Vec::new();
         for s1 in tower.lobby_segs() {
             if seen.insert(s1) {
@@ -191,7 +192,7 @@ mod tests {
         }
         // The answers came from this revision's memo for the mode, and
         // Modern never builds the walk-budget set.
-        let current = |memo: &Option<(i64, HashSet<i64>)>| matches!(memo, Some((rev, _)) if *rev == tower.revision);
+        let current = |memo: &Option<(i64, FastSet<i64>)>| matches!(memo, Some((rev, _)) if *rev == tower.revision);
         if tower.mode.walkway_willingness_applies() {
             assert!(current(&crowd.lobby_reach));
         } else {

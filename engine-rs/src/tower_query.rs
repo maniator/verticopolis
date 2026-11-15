@@ -188,47 +188,47 @@ impl Tower {
 
     /// `functionalParkingSet`: parking-space ids chained to a ramp.
     pub fn functional_parking_set(&self) -> HashSet<i64> {
-        let usable = |u: Option<&Unit>| {
-            u.is_some_and(|u| {
-                matches!(u.kind, Kind::Parking | Kind::ParkingRamp) && u.is_operational()
-            })
-        };
-        let mut stack: Vec<(i64, i64)> = Vec::new();
-        // A ramp is a room, never a tile, so the room index lists every seed
-        // in the order the full unit walk did (#1237).
-        for u in self.room_units() {
-            if u.kind == Kind::ParkingRamp && u.is_operational() {
-                for i in 0..u.width {
-                    stack.push((u.floor, u.x + i));
-                }
-            }
-        }
-        let mut visited: crate::crowd::fasthash::FastSet<(i64, i64)> = Default::default();
-        let mut reached: HashSet<i64> = HashSet::new();
-        while let Some((f, x)) = stack.pop() {
-            if !visited.insert((f, x)) {
-                continue;
-            }
-            let u = self.room_at(f, x);
-            if !usable(u) {
-                continue;
-            }
-            let u = u.unwrap();
-            if u.kind == Kind::Parking {
-                reached.insert(u.id);
-            }
-            stack.push((f, x - 1));
-            stack.push((f, x + 1));
-            if u.kind == Kind::ParkingRamp {
-                stack.push((f - 1, x));
-                stack.push((f + 1, x));
-            }
-        }
-        reached
+        self.reached_parking().into_iter().collect()
     }
 
     pub fn functional_parking_spots(&self) -> i64 {
-        self.functional_parking_set().len() as i64
+        self.reached_parking().len() as i64
+    }
+
+    /// Each parking space a working ramp reaches, once: a fill room by room
+    /// from the ramps, a ramp also reaching the floors above and below it.
+    fn reached_parking(&self) -> Vec<i64> {
+        let usable =
+            |u: &Unit| matches!(u.kind, Kind::Parking | Kind::ParkingRamp) && u.is_operational();
+        let mut stack: Vec<(i64, i64)> = Vec::new();
+        // A ramp is a room, so the room index lists every seed (#1237).
+        for u in self.room_units() {
+            if u.kind == Kind::ParkingRamp && u.is_operational() {
+                stack.push((u.floor, u.x));
+            }
+        }
+        let mut visited = crate::crowd::fasthash::FastSet::default();
+        let mut reached = Vec::new();
+        while let Some((f, x)) = stack.pop() {
+            let Some(u) = self.room_at(f, x).filter(|u| usable(u)) else {
+                continue;
+            };
+            if !visited.insert(u.id) {
+                continue; // the room was filled from another tile
+            }
+            if u.kind == Kind::Parking {
+                reached.push(u.id);
+            }
+            stack.push((f, u.x - 1));
+            stack.push((f, u.x + u.width));
+            if u.kind == Kind::ParkingRamp {
+                for c in u.x..u.x + u.width {
+                    stack.push((f - 1, c));
+                    stack.push((f + 1, c));
+                }
+            }
+        }
+        reached
     }
 
     /// `totalPopulation`.
@@ -260,29 +260,28 @@ impl Tower {
     /// fills, so the floor just above a three-story hall is one floor from
     /// it, the same as the floor above a one-story lobby. Without this a
     /// shop over a tall sky lobby read as three floors away and lost half
-    /// its trade. One visit per lobby floor, and one ordered lookup for its
-    /// tallest hall only when the tower has a tall hall at all.
+    /// its trade. Both lists run up the tower, so one walk of each finds
+    /// every lobby floor's tallest hall (a floor's halls come tallest last).
     pub fn nearest_lobby_floor_distance(&self, floor: i64) -> i64 {
-        let any_tall = !self.tall_lobby_tiles.is_empty();
         let mut best = (floor - 1).abs();
+        let mut tall = self.tall_lobby_tiles.keys().peekable();
         for &lf in self.lobby_tiles.keys() {
-            let top = if any_tall {
-                // Every tall hall on `lf`, the tallest last.
-                self.tall_lobby_tiles
-                    .range((lf, i64::MIN)..=(lf, i64::MAX))
-                    .next_back()
-                    .map_or(lf, |(&(_, height), _)| lf + height - 1)
-            } else {
-                lf
-            };
+            let mut top = lf;
+            while let Some(&&(hall, height)) = tall.peek() {
+                if hall > lf {
+                    break;
+                }
+                if hall == lf {
+                    top = lf + height - 1;
+                }
+                tall.next();
+            }
             let d = if floor > top {
                 floor - top
             } else {
                 (lf - floor).max(0)
             };
-            if d < best {
-                best = d;
-            }
+            best = best.min(d);
         }
         best
     }

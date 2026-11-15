@@ -1,7 +1,6 @@
 //! Port of `sim/demand.ts`: the commercial demand pool.
 
-use std::collections::HashMap;
-
+use crate::crowd::fasthash::FastMap;
 use crate::facilities::Kind;
 use crate::sim::Simulation;
 use crate::tower::{Unit, UnitState};
@@ -9,9 +8,9 @@ use crate::tower::{Unit, UnitState};
 pub const RECYCLING_POP_PER_CENTER: f64 = 2500.0;
 
 pub struct DemandMap {
-    pub fraction_by_unit: HashMap<i64, f64>,
-    pub delivered_by_unit: HashMap<i64, f64>,
-    pub reachable_venues_by_origin: HashMap<i64, i64>,
+    pub fraction_by_unit: FastMap<i64, f64>,
+    pub delivered_by_unit: FastMap<i64, f64>,
+    pub reachable_venues_by_origin: FastMap<i64, i64>,
     pub share: f64,
     pub retail_venue_count: i64,
     pub pool: f64,
@@ -96,10 +95,10 @@ fn tower_demand_bonus(sim: &Simulation) -> f64 {
 
 /// `computeDemandMap`.
 pub fn compute_demand_map(sim: &mut Simulation) -> DemandMap {
-    let mut fraction_by_unit = HashMap::new();
-    let mut delivered_by_unit = HashMap::new();
-    let mut reachable_venues_by_origin = HashMap::new();
-    let mut reach_cache: crate::crowd::fasthash::FastMap<(i64, i64), bool> = Default::default();
+    let mut fraction_by_unit = FastMap::default();
+    let mut delivered_by_unit = FastMap::default();
+    let mut reachable_venues_by_origin = FastMap::default();
+    let mut reach_cache: FastMap<(i64, i64), bool> = Default::default();
     let mode = sim.mode;
     let rooms: Vec<(i64, Kind, i64, i64, UnitState, Option<i64>)> = sim
         .tower

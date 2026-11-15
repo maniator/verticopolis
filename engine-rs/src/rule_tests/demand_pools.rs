@@ -61,7 +61,9 @@ fn the_pool_is_conserved_across_the_venues_it_reaches() {
     let pool = 4.0 * origin_demand(&sim, Kind::Office, None, 1.0);
     let delivered: f64 = compute_demand_map(&mut sim)
         .delivered_by_unit
-        .values()
+        .sorted()
+        .into_iter()
+        .map(|(_, v)| v)
         .sum();
     assert!((delivered - pool).abs() < 1e-6, "{delivered} of {pool}");
 }

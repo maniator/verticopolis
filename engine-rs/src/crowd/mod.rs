@@ -249,7 +249,7 @@ pub struct Crowd {
     /// Riders aboard each car, keyed (shaft, car).
     pub car_riders: fasthash::FastMap<(i64, i64), i64>,
     pub frustration: f64,
-    pub commute_wait_by_floor: HashMap<i64, f64>,
+    pub commute_wait_by_floor: fasthash::FastMap<i64, f64>,
     pub commute_revision: u32,
     pub adj: Option<(i64, AdjGraph)>,
     /// The staff graph and the part of it each segment lies in, built
@@ -260,11 +260,11 @@ pub struct Crowd {
     /// The part of the passenger graph each segment lies in, keyed like
     /// `adj` on the tower revision (`routing::passenger_parts`).
     pub passenger_parts: Option<(i64, StaffParts)>,
-    pub seg_served: Option<(i64, HashSet<i64>)>,
+    pub seg_served: Option<(i64, fasthash::FastSet<i64>)>,
     /// The segments the Classic walk-budget search reaches from a lobby
     /// segment (see `graph.rs`). Built from `adj`, so keyed like it on the
     /// tower revision; never saved.
-    pub lobby_reach: Option<(i64, HashSet<i64>)>,
+    pub lobby_reach: Option<(i64, fasthash::FastSet<i64>)>,
     pub blockbusters: HashSet<i64>,
     pub staff_done: Vec<StaffResult>,
     pub staff_count: i64,
@@ -335,7 +335,7 @@ impl Crowd {
             spawn_acc: 0.0,
             car_riders: fasthash::FastMap::default(),
             frustration: 0.0,
-            commute_wait_by_floor: HashMap::new(),
+            commute_wait_by_floor: Default::default(),
             commute_revision: 0,
             adj: None,
             staff_adj: None,
@@ -397,7 +397,7 @@ impl Crowd {
     pub fn seed_commute_stress(&mut self, rows: &Value) -> Result<(), String> {
         let bad =
             || "commuteStress must be [[floor, seconds], ...] with each floor once".to_string();
-        let mut seeded = HashMap::new();
+        let mut seeded = fasthash::FastMap::default();
         for row in rows.as_array().ok_or_else(bad)? {
             let pair = row.as_array().filter(|p| p.len() == 2).ok_or_else(bad)?;
             let floor = pair[0]
@@ -415,12 +415,12 @@ impl Crowd {
 
     /// The commute-stress averages as `[[floor, seconds], ...]`, by floor.
     pub fn commute_stress_json(&self) -> Value {
-        let mut rows: Vec<(i64, f64)> = self
+        let rows: Vec<(i64, f64)> = self
             .commute_wait_by_floor
-            .iter()
+            .sorted()
+            .into_iter()
             .map(|(&f, &w)| (f, w))
             .collect();
-        rows.sort_by_key(|r| r.0);
         json!(rows)
     }
 

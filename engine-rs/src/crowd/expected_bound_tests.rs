@@ -3,6 +3,7 @@
 //! that change no way up, and kept under its cap.
 
 use super::bound::{least_cost, BOUND_CELLS};
+use super::costs::cost_of;
 use super::tests::{apart, first_shaft, tower};
 use super::*;
 use crate::clock::GameMode;

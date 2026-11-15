@@ -298,7 +298,7 @@ pub struct Simulation {
     pub reach_memo: (i64, HashMap<i64, bool>),
     #[doc(hidden)]
     /// `noiseMemo`: unit id to `noiseAfflicted`, keyed by tower revision.
-    pub noise_memo: (i64, HashMap<i64, bool>),
+    pub noise_memo: (i64, crate::crowd::fasthash::FastMap<i64, bool>),
     #[doc(hidden)]
     /// The inspector's demand map memo (never saved; see
     /// `diagnostics/memo.rs`).
@@ -384,7 +384,7 @@ impl Simulation {
             metro_platform_nudged: false,
             extermination_room_ids: None,
             reach_memo: (-1, HashMap::new()),
-            noise_memo: (-1, HashMap::new()),
+            noise_memo: (-1, Default::default()),
             diag_memo: Default::default(),
             view: None,
             gameplay: GameplayEvents::default(),

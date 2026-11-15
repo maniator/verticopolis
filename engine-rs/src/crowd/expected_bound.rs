@@ -98,6 +98,7 @@ impl Toward {
     /// same however much further an earlier search went, and so are the
     /// routes, which keeps a reload routing as the game it saved did. `None`
     /// once the search is over and the goal cannot be reached from `place`.
+    #[inline]
     pub(super) fn ahead(&self, place: u32, radius: u32) -> Option<u32> {
         match self.least[place as usize] {
             UNREACHABLE if self.open.is_empty() => None,
