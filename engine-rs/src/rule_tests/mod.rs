@@ -39,6 +39,7 @@ mod faq_complete;
 mod faq_complete_mechanics;
 mod fixed_step;
 mod floor_run_lockstep;
+mod full_car_passes;
 mod game_events;
 mod gap_flight_walkers;
 mod golden_master;

@@ -55,6 +55,9 @@ pub struct DispatchRules {
     /// retired: a parked car answers only calls within the span less that
     /// many floors. Only the test-only plain SCAN profile sets it.
     pub parked_reach_gate: bool,
+    /// A car its riders fill owns no hall call and starts no wait over for
+    /// a rider who cannot board.
+    pub full_car_passes: bool,
     /// How many times the base speed a standard or service car moves.
     pub car_speed: f64,
     /// How many times the base speed an express car moves.
@@ -72,6 +75,7 @@ impl DispatchRules {
             spread_homes: mode.spreads_unset_car_homes(),
             parked_owner_boards: mode.parked_owner_boards_its_floor(),
             parked_reach_gate: false,
+            full_car_passes: mode.full_cars_pass_hall_calls(),
             car_speed: mode.car_speed_factor(),
             express_speed: mode.express_speed_factor(),
         }
@@ -92,6 +96,7 @@ impl DispatchRules {
             spread_homes: false,
             parked_owner_boards: false,
             parked_reach_gate: true,
+            full_car_passes: false,
             car_speed: 1.0,
             express_speed: 1.0,
         }
@@ -123,6 +128,8 @@ pub(super) struct CarView {
     /// The floors' worth of time the car already owes: its dwell left and a
     /// dwell for each stop it has promised a rider.
     pub owed: f64,
+    /// Its riders fill it, so it answers no hall call (`full_car_passes`).
+    pub full: bool,
 }
 
 impl CarView {
@@ -148,6 +155,7 @@ impl CarView {
             dir,
             turn,
             owed: (dwell_left + promised * stop_minutes) * floors_per_minute,
+            full: false,
         }
     }
 
@@ -194,9 +202,9 @@ impl BestCars {
         (self.response, self.wrong_way) = (response, wrong_way);
     }
 
-    /// Adds the next on-shift car.
-    pub fn push(&mut self, car: CarView) {
-        self.cars.push(car);
+    /// Adds the next on-shift car, `full` when its riders fill it.
+    pub fn push(&mut self, car: CarView, full: bool) {
+        self.cars.push(CarView { full, ..car });
     }
 
     /// The car that answers the call at stop `k` on `floor`, or `NO_CAR`
@@ -217,7 +225,7 @@ impl BestCars {
 fn best_car(cars: &[CarView], floor: f64, response: Option<f64>, wrong_way: f64) -> usize {
     let mut coming: Option<(f64, usize)> = None;
     let mut cheapest: Option<(f64, usize)> = None;
-    for (j, car) in cars.iter().enumerate() {
+    for (j, car) in cars.iter().enumerate().filter(|(_, car)| !car.full) {
         let dist = (floor - car.pos).abs();
         if response.is_some_and(|r| car.heading_to(floor) && dist <= r)
             && coming.is_none_or(|(d, _)| dist < d)

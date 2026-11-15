@@ -24,7 +24,7 @@ fn shaft(cars: &[CarView], response: Option<f64>) -> BestCars {
     let mut best = BestCars::default();
     best.start(STOPS.len(), response, SPAN);
     for &car in cars {
-        best.push(car);
+        best.push(car, false);
     }
     best
 }
@@ -158,11 +158,11 @@ fn a_stop_keeps_the_owner_it_was_first_given() {
     assert_eq!(best.owner(k3, 3), 0);
     assert_eq!(best.owner(k18, 18), 1);
     // A car added after the answer does not change it.
-    best.push(parked(3.0));
+    best.push(parked(3.0), false);
     assert_eq!(best.owner(k3, 3), 0);
     // A new step starts every stop over.
     best.start(STOPS.len(), None, SPAN);
-    best.push(parked(20.0));
+    best.push(parked(20.0), false);
     assert_eq!(best.owner(k3, 3), 0);
     // Nobody on shift: the calls stay unowned.
     best.start(STOPS.len(), None, SPAN);

@@ -75,6 +75,16 @@ impl GameMode {
         self == GameMode::Modern
     }
 
+    /// Whether a car its riders fill passes the hall calls on its way and
+    /// stops only where someone aboard gets off (Modern), so another car
+    /// takes those calls. A Classic car stops for every call it answers,
+    /// full or not, as it always has here: no source we have says what the
+    /// 1994 game's full cars did, and a Classic crowd is too small to fill
+    /// a car today.
+    pub fn full_cars_pass_hall_calls(self) -> bool {
+        self == GameMode::Modern
+    }
+
     /// How many times faster than the base speed a standard or service car
     /// moves. Classic cars move at the base speed. Modern cars move twice as
     /// fast while real office commutes are on (`REAL_OFFICE_COMMUTES_ON`):
