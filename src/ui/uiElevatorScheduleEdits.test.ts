@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   CARS,
   CLASSIC_UX,
+  FACTS,
   button,
   cancel,
   chipAt,
@@ -26,6 +27,9 @@ import {
  * chips, the Advanced fold, and OK and Cancel. What the dialog does with each
  * engine answer is in `uiElevatorSchedule.test.ts`.
  */
+
+/** A strip with one car on shift, so "All cars" changes it. */
+const PART_STAFFED = { activeCars: { weekday: row(1), weekend: row(0) } };
 
 afterEach(() => {
   vi.useRealTimers();
@@ -391,7 +395,7 @@ describe("OK and Cancel", () => {
   });
 
   it("asks before discarding edits, and any edit disarms the ask", () => {
-    const { apply } = open();
+    const { apply } = open({ current: PART_STAFFED });
     press(".es-allcars");
     expect(q(".modal-warn")?.getAttribute("role")).toBe("status");
     cancel();
@@ -407,7 +411,7 @@ describe("OK and Cancel", () => {
   });
 
   it("routes Esc through the same guard", () => {
-    open();
+    open({ current: PART_STAFFED });
     press(".es-allcars");
     const esc = new Event("cancel", { cancelable: true });
     dialog().dispatchEvent(esc);
@@ -422,13 +426,35 @@ describe("OK and Cancel", () => {
   });
 
   it("routes a backdrop click through the guard and ignores clicks inside", () => {
-    open();
+    open({ current: PART_STAFFED });
     press(".es-allcars");
     q(".es-body")!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     expect(text('[data-act="close"]')).toBe("Cancel");
     dialog().dispatchEvent(new MouseEvent("click", { bubbles: true }));
     expect(text('[data-act="close"]')).toBe("Discard changes?");
     dialog().dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(dialog().open).toBe(false);
+  });
+
+  it("leaves the dialog clean after a press that changed nothing (#669)", () => {
+    const { apply } = open(); // every car already runs every hour
+    press(".es-allcars");
+    expect(q(".modal-warn")).toBeNull();
+    cancel();
+    expect(dialog().open).toBe(false);
+    expect(apply).not.toHaveBeenCalled();
+  });
+
+  it("measures an edit against the homes a stop edit snapped, not the opening ones", async () => {
+    const { ctx } = open();
+    // Skipping a floor re-homes the cars: the engine snaps them on the stored
+    // schedule too, so the snapped homes are the new baseline.
+    ctx.facts.mockReturnValue({ ...FACTS, homeFloors: [4, 4, 4, 4] });
+    await toggleServe(3, false);
+    expect(homesShown()).toEqual(["4:1", "4:2", "4:3", "4:4"]);
+    press(".es-allcars"); // still a no-op on the full strip
+    expect(q(".modal-warn")).toBeNull();
+    cancel();
     expect(dialog().open).toBe(false);
   });
 });
