@@ -100,14 +100,14 @@ describe("the first version that sends the codes", () => {
   });
 
   it("names the export codes the game sends in the vocabulary, and export_failed in the data map", () => {
-    const core = read("analyticsCore.ts");
+    const core = read("analyticsAppActions.ts");
     const map = read("../docs/analytics-data-map.md");
     for (const code of EXPORT_ACTIONS) expect(core).toContain(`| "${code}"`);
     expect(map).toContain("`export_failed`");
   });
 
   it("names the three codes the game sends, in the vocabulary and the data map", () => {
-    const core = read("analyticsCore.ts");
+    const core = read("analyticsAppActions.ts");
     const map = read("../docs/analytics-data-map.md");
     for (const code of ["autosave_failed", "load_failed", "import_failed"]) {
       expect(core).toContain(`| "${code}"`);

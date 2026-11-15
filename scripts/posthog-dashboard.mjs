@@ -640,6 +640,18 @@ function buildInsights(ids) {
         where: [inAction(["window_close", "window_move", "welcome_shown", "welcome_close", "welcome_link"])],
       }),
     },
+    // The 1994 desk (docs/ui/desk-windows.md): its app_action codes.
+    {
+      name: "The desk: windows, taskbar and Control Panel",
+      description:
+        "app_action for the 1994 desk on a computer: desk_shown (once per page life it comes up), desk_window (<window>_<verb>, such as map_min or tower_max), desk_start (the Verticopolis menu's item) and desk_control (the Control Panel icon), production.",
+      query: trends([series("app_action", "Actions")], {
+        breakdown: ["action", "detail"],
+        display: "ActionsTable",
+        breakdownLimit: 60,
+        where: [inAction(["desk_shown", "desk_window", "desk_start", "desk_control"])],
+      }),
+    },
     {
       name: "Mute toggles by state",
       description: "app_action mute split by the new state (on / off), so the share of sessions that play muted is visible, production.",

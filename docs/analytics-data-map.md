@@ -207,16 +207,21 @@ never the name).
 
 | Field | Values | Meaning |
 | --- | --- | --- |
-| `menu` | `file`, `edit`, `tower`, `window` (up to 4.2), `options`, `help` | The menu opened, picked from, or open when the trip ended |
+| `menu` | `file`, `edit`, `tower`, `window` (up to 4.2, and the 1994 desk's own Window menu after it), `options`, `help` | The menu opened, picked from, or open when the trip ended |
 | `via` (open) | `click`, `keys`, `alt` | A click on a title, the keyboard on a focused title, or Alt with the underlined letter |
 | `via` (pick) | `pointer`, `keys` | A mouse, pen or finger, or the keyboard |
 | `screen` | `title`, `tower` | Over the title screen, or over a tower |
-| `item` | `new_tower`, `quick_save`, `close`, `import`, `export`, `install_app`, `undo`, `redo`, `tower_info`, `map`, `statistics`, `rename`, `fire_rescue`, `exterminator`, `rules`, `tools`, `bulletin`, `status_bar`, `full_screen`, `settings`, `sound`, `screen_saver`, `manual`, `compare`, `replay`, `sponsor`, `about`, `other` | The item, by a code that does not change with its label (`MENU_ITEM_CODES`) |
+| `item` | `new_tower`, `quick_save`, `close`, `import`, `export`, `install_app`, `undo`, `redo`, `tower_info`, `map`, `statistics`, `rename`, `fire_rescue`, `exterminator`, `rules`, `tools`, `bulletin`, `status_bar`, `full_screen`, `settings`, `sound`, `screen_saver`, `manual`, `compare`, `replay`, `sponsor`, `about`, `window_tools`, `window_info`, `window_map`, `window_bulletin`, `window_tower_info`, `other` | The item, by a code that does not change with its label (`MENU_ITEM_CODES`) |
 | `browsed` | a count | Menus the trip showed, the last one included |
 | `after` | an `item` code or `none` | The page life's previous real pick, so a breakdown shows what follows what without a paths query. A grayed click never becomes the next pick's `after` |
 | `grayed` | `true`, `false` | The item was grayed out, so nothing happened |
 | `state` | `on`, `off` | A checkmark item's new state (Tower Info, Map, Tools, Bulletin, Status Bar, Full Screen, Sound); absent on the others and on a grayed click |
 | `how` | `outside`, `escape`, `tab`, `title`, `blur` | How a trip ended with no pick: a press outside the menus, Escape, Tab, the open menu's own title, or the window losing focus |
+
+The 1994 desk (owner, 2026-11-15) has a Window menu of its own, with
+`window_*` codes so its picks never mix with the Tower and Options items of
+the same windows; on the desk, Status Bar and Full Screen move into it and keep
+their codes, with `menu` reading `window`.
 
 Version 4.3 removed the Window menu (party and owner, 2026-11-15): Bulletin
 moved to Tower, and Tools, Status Bar and Full Screen to Options. They kept
@@ -263,6 +268,10 @@ The windows and cards that came with the menu bar report through `app_action`:
 | `screensaver_start` | `idle`, `return` or `preview` | The screen saver came up: the paused tower sat untouched for the wait, the player came back to the tab after the wait, or the dialog's Preview |
 | `screensaver_end` | `under_1m`, `1_5m` or `over_5m` | The screen saver ended, with how long it was up as a bucket |
 | `screensaver_set` | `night`, `stars`, `express`, `endless`, `marquee` or `none` | The Screen Saver dialog's OK, with the saver picked |
+| `desk_shown` | none | The 1994 desk came up on a computer (once per page life) |
+| `desk_window` | `<window>_<verb>`: windows `tower`, `info`, `tools`, `map`, `bulletin`, `tower_info`, `control_panel`; verbs `min`, `restore`, `max`, `unmax`, `resize`, `move` | A desk window's title-bar button or size grip, or its first move in a page life (`docs/ui/desk-windows.md`) |
+| `desk_start` | the menu item it ran (`btn-new`, `mb-import`, `btn-help`, `mb-screensaver`, `desk-control-panel`, `btn-settings`, `btn-about`, `mb-close`) | A pick on the taskbar's Verticopolis menu |
+| `desk_control` | `display`, `sounds` or `settings` | A Control Panel icon (the Screen Saver dialog, sound on or off, or Settings) |
 
 ## `engine_status`
 

@@ -63,12 +63,23 @@
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
-    <!-- Boot cover: paints the title sky from the first frame so a cold load
-         never flashes the empty game before the engine and splash mount. Removed
+    <!-- Boot cover, the startup screen: paints the title sky from the first
+         frame so a cold load never flashes the empty game before the engine and
+         splash mount. It opens at night and the sun comes up while the game
+         loads (owner, 2026-11-15), ending on the title screen's own sky. Removed
          by the boot flow once the splash is up (or by the fallback boot paths).
          The inline background is a solid fallback for the sliver before the
          stylesheet applies; styles.css upgrades it to the shared gradient. -->
-    <div id="boot-cover" aria-hidden="true" style="position: fixed; inset: 0; z-index: 50; background-color: #161634"></div>
+    <div id="boot-cover" aria-hidden="true" style="position: fixed; inset: 0; z-index: 50; background-color: #161634">
+      <div class="boot-night"></div>
+      <div class="boot-stars"></div>
+      <div class="boot-sun"></div>
+      <div class="boot-brand">
+        <svg class="splash-word" viewBox="0 0 400 66"><text x="194" y="52" text-anchor="middle" textLength="380" lengthAdjust="spacingAndGlyphs"><tspan class="a">VERTICO</tspan><tspan class="b">POLIS</tspan></text><text class="tm" x="386" y="24">™</text></svg>
+        <svg class="splash-tag" viewBox="0 0 360 20"><text x="180" y="15" text-anchor="middle" textLength="330" lengthAdjust="spacingAndGlyphs">THE VERTICAL METROPOLIS</text></svg>
+      </div>
+      <div class="boot-bar"><i></i></div>
+    </div>
     <div id="a11y-live" class="visually-hidden" aria-live="polite" role="status"></div>
     <div id="app">
       <!-- Indexable page heading and intro. Visually hidden (the game's own
@@ -145,6 +156,22 @@
             <button type="button" role="menuitem" class="mb-item" id="mb-exterminator" hidden>Call Exterminator…</button>
             <hr class="mb-sep" />
             <button type="button" role="menuitem" class="mb-item" id="mb-rules">This Tower's Rules…</button>
+          </div>
+        </div>
+        <!-- The 1994 desk's Window menu (src/ui/desk/, owner 2026-11-15): each
+             item brings its window up, closed or minimized, and is checked
+             while it is open. On the desk, Status Bar and Full Screen move in
+             here from Options below the separator; off the desk the menu is
+             left out and Options keeps them. -->
+        <div class="mb-menu mb-desk-only">
+          <button type="button" class="mb-title" id="mb-window" aria-haspopup="menu" aria-expanded="false" aria-controls="mb-window-menu"><u>W</u>indow</button>
+          <div class="mb-pop" id="mb-window-menu" role="menu" aria-labelledby="mb-window" hidden>
+            <button type="button" role="menuitemcheckbox" class="mb-item" id="mb-dw-tools" data-desk-win="tools" aria-checked="true">Tools</button>
+            <button type="button" role="menuitemcheckbox" class="mb-item" id="mb-dw-info" data-desk-win="info" aria-checked="true">Info</button>
+            <button type="button" role="menuitemcheckbox" class="mb-item" id="mb-dw-map" data-desk-win="map" aria-checked="false">Map</button>
+            <button type="button" role="menuitemcheckbox" class="mb-item" id="mb-dw-bulletin" data-desk-win="bulletin" aria-checked="false">Bulletin</button>
+            <button type="button" role="menuitemcheckbox" class="mb-item" id="mb-dw-tower-info" data-desk-win="towerInfo" aria-checked="false">Tower Info</button>
+            <hr class="mb-sep" />
           </div>
         </div>
         <div class="mb-menu">

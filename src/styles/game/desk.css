@@ -1,0 +1,439 @@
+/* The 1994 desk (src/ui/desk/, owner 2026-11-15): on a computer every part
+   of the game is its own window on a teal desktop with a taskbar. Every rule
+   here is scoped to body.desk or to the desk's own classes, so phones,
+   tablets, small windows and the title screen keep today's layout.
+   Part of the game's stylesheet: src/styles.css imports the parts in order. */
+
+body.desk #app {
+  position: relative;
+  background: var(--r-desktop);
+}
+/* The tower, Tools and Info moved out into windows; the empty row goes. */
+body.desk #main {
+  display: none;
+}
+.desk-area {
+  position: absolute;
+  inset: 0 0 28px 0;
+  overflow: hidden;
+  /* The windows stack inside the desk; the taskbar stays over all of them. */
+  isolation: isolate;
+  z-index: 0;
+}
+
+/* ---- Every desk window ---- */
+body.desk .desk-win {
+  position: absolute;
+  right: auto;
+  bottom: auto;
+  margin: 0;
+}
+body.desk .desk-win[hidden] {
+  display: none;
+}
+/* Minimized: off the screen but still laid out, so the tower's canvas keeps
+   its size (and nothing re-lays out) while it waits on the taskbar. */
+body.desk .desk-win.desk-minimized {
+  visibility: hidden;
+}
+/* The window without the focus wears a gray title bar, as in 1995. */
+body.desk .desk-win:not(.desk-active) > .win-title {
+  background: var(--r-shadow);
+  color: var(--r-face);
+}
+/* One chrome for every desk window: the full window shadow (Tools drops its
+   docked look), and a title bar 2 px inside the frame with the same height,
+   type, icon and buttons, whether the desk or the game drew the window. */
+body.desk .desk-win.win {
+  box-shadow: var(--bevel-out), var(--win-shadow);
+}
+body.desk .desk-win > .win-title {
+  box-sizing: border-box;
+  min-height: 18px;
+  margin: calc(2px - var(--pad-y)) calc(2px - var(--pad-x)) var(--title-gap);
+  gap: 2px;
+  font-size: 11px;
+  padding: 1px 2px 1px 3px;
+}
+body.desk .desk-win > .win-title > .btn.xs {
+  width: 18px;
+  min-width: 0;
+  height: 16px;
+  padding: 0;
+  font-size: 11px;
+  line-height: 1;
+}
+/* The title bar's buttons sit together at its right end. */
+body.desk .desk-win > .win-title > .btn {
+  margin-left: 0;
+}
+body.desk .desk-win > .win-title > .btn:first-of-type {
+  margin-left: auto;
+}
+body.desk .desk-win > .win-title > .desk-btn {
+  width: 18px;
+  min-width: 0;
+  height: 16px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+body.desk .desk-win > .win-title > .desk-btn-close {
+  margin-left: 2px;
+}
+body.desk .desk-win > .win-title > .desk-btn-min:first-of-type {
+  margin-left: auto;
+}
+.desk-btn svg {
+  fill: var(--r-ink);
+}
+.desk-title-icon {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  image-rendering: pixelated;
+}
+.desk-title-text {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+/* The size grip at the bottom right corner. */
+.desk-grip {
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  width: 13px;
+  height: 13px;
+  cursor: nwse-resize;
+  background: linear-gradient(135deg, transparent 0 45%, var(--r-hi) 45% 52%, var(--r-shadow) 52% 60%, transparent 60% 70%, var(--r-hi) 70% 77%, var(--r-shadow) 77% 85%, transparent 85%);
+  z-index: 3;
+}
+#palette > .desk-grip {
+  cursor: ns-resize;
+}
+body.desk .desk-win.desk-maximized > .desk-grip {
+  display: none;
+}
+/* A resize's dotted outline: the window takes the size on release. */
+.desk-outline {
+  position: absolute;
+  z-index: 100000;
+  pointer-events: none;
+  box-sizing: border-box;
+  padding: 3px;
+  background: repeating-conic-gradient(#000 0 25%, #fff 0 50%) 0 0 / 2px 2px;
+  /* Older engines know only the prefixed mask; without either the outline
+     would draw as a solid block, so the prefixed pair comes first. */
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+}
+
+/* ---- The desk's own frames: the tower and Info ---- */
+.desk-frame {
+  --pad-y: 3px;
+  --pad-x: 3px;
+  --title-gap: 2px;
+  display: flex;
+  flex-direction: column;
+  padding: var(--pad-y) var(--pad-x);
+}
+.desk-frame > .desk-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+/* The tower window: the menu bar, the tower and the status bar. A menu that
+   opens comes up over the small windows, as a menu always did. */
+#desk-win-tower:has(.mb-pop:not([hidden])) {
+  z-index: 100000 !important;
+}
+#desk-win-tower #stage {
+  flex: 1;
+  margin: 2px 0;
+}
+#desk-win-tower .menubar-brand {
+  display: none;
+}
+#desk-win-tower.desk-maximized {
+  box-shadow: none;
+}
+/* Info: SimTower's strip across the top of the desk (owner, 2026-11-15),
+   the meters in a row and the speed buttons at its end, wrapping under them
+   on a narrow desk. The desk sets its width from the layout. */
+body.desk #topbar {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  box-shadow: none;
+  padding: 3px;
+  gap: 4px;
+}
+body.desk #topbar .brand {
+  display: none;
+}
+/* The meters and the speed buttons share one wrapping row. */
+body.desk #status {
+  display: contents;
+}
+body.desk #status > .stat {
+  flex: 1 1 auto;
+  padding: 2px 6px;
+}
+body.desk #speed {
+  flex: none;
+  flex-wrap: nowrap;
+}
+/* The tray's speaker has the sound and File > Save saves, so Info keeps to
+   the clock's six buttons on one row and ends right under them. */
+body.desk #speed > #audio-toggle,
+body.desk #speed > #btn-save-top {
+  display: none;
+}
+
+/* ---- Tools and the small windows ---- */
+body.desk #palette {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+body.desk #palette > .palette-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+body.desk #palette > .win-title .pal-collapse {
+  display: none;
+}
+/* A closed Tools window is not drawn; Options > Tools opens it again. */
+body.desk #palette.pal-collapsed {
+  display: none;
+}
+
+/* ---- The taskbar ---- */
+.desk-taskbar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 2px 0;
+  background: var(--r-face);
+  box-shadow: inset 0 1px var(--r-light), inset 0 2px var(--r-hi);
+  font-family: var(--r-font);
+  font-size: 11px;
+  color: var(--r-ink);
+}
+.desk-start,
+.desk-task {
+  height: 22px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 6px;
+  border: 0;
+  background: var(--r-face);
+  box-shadow: var(--bevel-out);
+  font: inherit;
+  color: inherit;
+  cursor: default;
+  white-space: nowrap;
+}
+.desk-start {
+  font-weight: 700;
+  flex: none;
+}
+.desk-start img,
+.desk-task img {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  image-rendering: pixelated;
+}
+.desk-start.on,
+.desk-task.on {
+  box-shadow: var(--bevel-in);
+}
+.desk-task.on {
+  font-weight: 700;
+  background: repeating-conic-gradient(var(--r-hi) 0 25%, var(--r-face) 0 50%) 0 0 / 2px 2px;
+}
+.desk-tasks {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  gap: 3px;
+}
+.desk-task {
+  flex: 0 1 160px;
+  min-width: 36px;
+  overflow: hidden;
+}
+.desk-task span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.desk-start:focus-visible,
+.desk-task:focus-visible,
+.desk-tray-sound:focus-visible {
+  outline: 1px dotted var(--r-ink);
+  outline-offset: -4px;
+}
+.desk-tray {
+  height: 22px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px 0 6px;
+  flex: none;
+  box-shadow: inset 1px 1px var(--r-shadow), inset -1px -1px var(--r-hi);
+}
+.desk-tray-sound {
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: 0;
+  cursor: default;
+  background: center / 13px 14px no-repeat url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 13 14' shape-rendering='crispEdges'%3E%3Cpath d='M1 5h3v4H1zM4 3h1v8H4zM5 2h1v10H5zM6 1h1v12H6zM9 4h1v1H9zM10 5h1v4h-1zM9 9h1v1H9z'/%3E%3C/svg%3E");
+}
+.desk-tray-sound.muted {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 13 14' shape-rendering='crispEdges'%3E%3Cpath d='M1 5h3v4H1zM4 3h1v8H4zM5 2h1v10H5zM6 1h1v12H6z'/%3E%3Cpath fill='%23c00000' d='M8 4h1v1H8zM9 5h1v1H9zM10 6h1v1h-1zM11 7h1v1h-1zM11 4h1v1h-1zM9 7h1v1H9zM8 8h1v1H8z'/%3E%3C/svg%3E");
+}
+.desk-tray-clock {
+  font-variant-numeric: tabular-nums;
+}
+/* The Verticopolis button's menu, with the name down its side. */
+.desk-start-menu {
+  position: absolute;
+  left: 2px;
+  bottom: 27px;
+  display: flex;
+  min-width: 210px;
+  padding: 3px;
+  background: var(--r-face);
+  box-shadow: var(--bevel-out), var(--win-shadow);
+}
+.desk-start-menu[hidden] {
+  display: none;
+}
+.desk-start-stripe {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  background: var(--r-title);
+  color: var(--r-face);
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: 0.04em;
+  padding: 8px 3px;
+}
+.desk-start-stripe b {
+  color: #ffd24a;
+}
+.desk-start-list {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding-left: 2px;
+}
+.desk-start-list .mb-item {
+  padding: 6px 16px 6px 10px;
+}
+
+/* The Window menu is the desk's alone; on the desk, Options has no Tools
+   (it never folds there) and Status Bar and Full Screen move to Window, so
+   the line above them goes too. */
+body:not(.desk) .mb-desk-only,
+body.desk #mb-display-sep {
+  display: none;
+}
+
+/* A window's menu: a right-click on its taskbar button or title bar. */
+.desk-win-menu {
+  position: fixed;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  min-width: 140px;
+  padding: 3px;
+  background: var(--r-face);
+  box-shadow: var(--bevel-out), var(--win-shadow);
+}
+.desk-win-menu[hidden] {
+  display: none;
+}
+.desk-win-menu .mb-item {
+  padding: 4px 16px 4px 18px;
+}
+.desk-win-menu .mb-item:disabled,
+.desk-win-menu .mb-item:disabled:hover {
+  background: none;
+  color: var(--r-shadow);
+  text-shadow: 1px 1px var(--r-light);
+}
+
+/* A finger drags a window by its title bar and grip too (`?desk=on`). */
+body.desk .desk-win > .win-title,
+.desk-grip {
+  touch-action: none;
+}
+
+/* ---- The Control Panel ---- */
+#desk-win-control {
+  width: 300px;
+}
+.desk-control-icons {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+  padding: 10px 6px;
+  margin: 2px 0;
+  background: #fff;
+  box-shadow: var(--bevel-in);
+}
+.desk-control-icon {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 2px;
+  border: 0;
+  background: none;
+  font: 11px var(--r-font);
+  color: var(--r-ink);
+  cursor: default;
+}
+.desk-control-icon:hover span,
+.desk-control-icon:focus-visible span {
+  background: var(--r-title);
+  color: var(--r-title-fg);
+}
+.desk-control-icon:focus-visible {
+  outline: 1px dotted var(--r-ink);
+  outline-offset: -1px;
+}
+.desk-control-status {
+  padding: 2px 4px;
+  font: 11px var(--r-font);
+  color: var(--r-ink);
+  box-shadow: inset 1px 1px var(--r-shadow), inset -1px -1px var(--r-hi);
+}
+/* The tray's Control Panel icon: a small monitor. */
+.desk-tray-display {
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: 0;
+  cursor: default;
+  background: center / 14px 14px no-repeat url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14' shape-rendering='crispEdges'%3E%3Cpath d='M1 1h12v9H1z' fill='%23000'/%3E%3Cpath d='M2 2h10v7H2z' fill='%23008080'/%3E%3Cpath d='M5 10h4v2H5zM3 12h8v1H3z' fill='%23000'/%3E%3C/svg%3E");
+}
+.desk-tray-display:focus-visible {
+  outline: 1px dotted var(--r-ink);
+}

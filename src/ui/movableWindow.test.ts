@@ -87,6 +87,18 @@ describe("MovableWindow", () => {
     expect(placed.mock.calls).toEqual([[{ x: 200, y: 200 }]]);
   });
 
+  it("tells another hearer each move and each trip home, until it unhooks", () => {
+    const { title, mover } = setup();
+    const heard = vi.fn<(spot: Spot | null) => void>();
+    const unhook = mover.hear(heard);
+    drag(title, -300, -200);
+    title.dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
+    expect(heard.mock.calls).toEqual([[{ x: 200, y: 200 }], [null]]);
+    unhook();
+    drag(title, -100, -100);
+    expect(heard).toHaveBeenCalledTimes(2);
+  });
+
   it("stops at the stage's edges", () => {
     const { win, title } = setup();
     drag(title, 5000, 5000);

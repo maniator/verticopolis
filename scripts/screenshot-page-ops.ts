@@ -59,6 +59,13 @@ export function pgMaskVersion(): void {
   document.querySelectorAll<HTMLElement>(".help-diagnostics-row dd").forEach((dd) => {
     dd.textContent = "masked";
   });
+  // The 1994 desk's tray clock shows the real time. A copy with a fixed time
+  // takes its place, so the taskbar's minute tick writes to the old one.
+  document.querySelectorAll<HTMLElement>(".desk-tray-clock").forEach((clock) => {
+    const fixed = clock.cloneNode(false) as HTMLElement;
+    fixed.textContent = "4:34 PM";
+    clock.replaceWith(fixed);
+  });
 }
 
 /** Assert Settings modal content visibility for screenshot captures.

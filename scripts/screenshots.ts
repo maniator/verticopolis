@@ -238,6 +238,8 @@ async function runScene(browser: Browser, scene: Scene): Promise<void> {
         }
       });
     }
+    // The 1994 desk a computer gets by default shows only in the `desk` scenes.
+    if (!scene.desk) await page.addInitScript(() => localStorage.setItem("vc-desk", "off"));
     if (scene.initScript) await page.addInitScript(scene.initScript);
     await installShotHelpers(page);
     await page.goto(scene.route ? `${BASE}/${scene.route}` : BASE, { waitUntil: "networkidle" });
@@ -335,6 +337,8 @@ async function runScene(browser: Browser, scene: Scene): Promise<void> {
       if ((await page.evaluate(pgAdoptTestClock)) !== "adopted") {
         throw new Error("test-clock adoption failed on the game page");
       }
+      // The startup screen's sunrise ends and its cover fades on its own clock.
+      await page.waitForFunction(() => !document.getElementById("boot-cover"), null, { timeout: READY_TIMEOUT_MS });
       if (!scene.keepSplash) await page.evaluate(pgDismissSplash);
       await beginSettleStep(page, "before the scene build");
       if (scene.build) await page.evaluate(scene.build);

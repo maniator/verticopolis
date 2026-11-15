@@ -1,0 +1,183 @@
+/* The title screen on the 1994 desk (src/ui/desk/deskTitle.ts, owner's pick
+   2026-11-15): on a computer the title screen sits in a Verticopolis window on
+   the teal desk, with the dusk poster on top and its buttons in a gray bar
+   below, and the taskbar along the bottom. Everything here is scoped to
+   body.desk-title, so phones and tablets keep today's title screen.
+   Part of the game's stylesheet: src/styles.css imports the parts in order. */
+
+body.desk-title {
+  /* The window's size and its corner, centered on the desk above the taskbar. */
+  --title-w: 640px;
+  --title-h: 470px;
+  --title-x: calc(50vw - var(--title-w) / 2);
+  --title-y: max(0px, calc((100vh - 28px - var(--title-h)) / 2));
+  /* The poster's top and height inside the window. */
+  --poster-top: 44px;
+  --poster-h: 300px;
+}
+/* The desk behind the window covers the game underneath it. */
+body.desk-title::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 39;
+  background: var(--r-desktop);
+}
+body.desk-title #splash {
+  top: var(--title-y);
+  left: var(--title-x);
+  right: auto;
+  bottom: auto;
+  width: var(--title-w);
+  height: var(--title-h);
+  box-sizing: border-box;
+  justify-content: flex-start;
+  padding: calc(var(--poster-top) + 20px) 16px 0;
+  background:
+    var(--splash-sky) 3px var(--poster-top) / calc(100% - 6px) var(--poster-h) no-repeat,
+    var(--r-face);
+  box-shadow: var(--bevel-out), var(--win-shadow);
+}
+/* The window's title bar, the menu bar under it and the taskbar. */
+.desk-title-bar {
+  position: fixed;
+  z-index: 41;
+  top: calc(var(--title-y) + 3px);
+  left: calc(var(--title-x) + 3px);
+  width: calc(var(--title-w) - 6px);
+  height: 18px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 0 3px;
+  background: var(--r-title);
+  color: var(--r-title-fg);
+  font: 700 11px var(--r-font);
+}
+.desk-title-bar img {
+  image-rendering: pixelated;
+}
+body.desk-title .menubar {
+  position: fixed;
+  z-index: 41;
+  top: calc(var(--title-y) + 22px);
+  left: calc(var(--title-x) + 3px);
+  width: calc(var(--title-w) - 6px);
+  box-sizing: border-box;
+}
+body.desk-title .desk-taskbar-title {
+  position: fixed;
+  z-index: 41;
+}
+
+/* ---- The poster: the dusk art, kept inside the window ---- */
+body.desk-title .splash-stars {
+  top: var(--poster-top);
+  left: 3px;
+  right: 3px;
+  bottom: auto;
+  height: 150px;
+}
+/* Sits behind the skyline and ends at the poster's bottom edge, its glow
+   kept off the gray bar. */
+body.desk-title .splash-sun {
+  top: calc(var(--poster-top) + var(--poster-h) - 30px);
+  width: 150px;
+  height: 150px;
+  box-shadow: none;
+  /* The 45px that would hang below the poster are cut away. */
+  clip-path: inset(0 0 45px 0);
+}
+body.desk-title .splash-skyline {
+  top: calc(var(--poster-top) + var(--poster-h) - 120px);
+  left: 3px;
+  right: 3px;
+  bottom: auto;
+  width: calc(100% - 6px);
+  height: 120px;
+}
+body.desk-title .splash-word {
+  width: 360px;
+}
+body.desk-title .splash-tag {
+  width: 300px;
+  margin-top: 6px;
+}
+body.desk-title .splash-premise {
+  margin-top: 10px;
+  font-size: 13px;
+}
+body.desk-title .splash-mute,
+body.desk-title .splash-install,
+body.desk-title .splash-sponsor {
+  top: calc(var(--poster-top) + 8px);
+  min-height: 30px;
+  font-size: 13px;
+}
+body.desk-title .splash-mute {
+  right: 11px;
+  min-width: 30px;
+  font-size: 16px;
+}
+body.desk-title .splash-install {
+  right: 48px;
+  padding: 0 10px;
+}
+body.desk-title .splash-sponsor {
+  left: 11px;
+  padding: 0 10px;
+}
+
+/* ---- The gray bar under the poster: 1995 buttons ---- */
+body.desk-title .splash-actions {
+  position: absolute;
+  top: calc(var(--poster-top) + var(--poster-h) + 14px);
+  left: 0;
+  right: 0;
+  margin: 0;
+  gap: 8px;
+}
+body.desk-title .splash-btn {
+  min-width: 112px;
+  min-height: 26px;
+  padding: 3px 12px;
+  font: 12px var(--r-font);
+  color: var(--r-ink);
+  background: var(--r-face);
+  border: 0;
+  border-radius: 0;
+  box-shadow: var(--bevel-out);
+  text-decoration: none;
+  text-shadow: none;
+}
+body.desk-title .splash-btn:active {
+  box-shadow: var(--bevel-in);
+}
+/* The default button wears the black ring, as Enter would press it. */
+body.desk-title .splash-btn.primary {
+  font-weight: 700;
+  outline: 1px solid var(--r-ink);
+}
+body.desk-title .splash-btn:focus-visible {
+  outline: 1px dotted var(--r-ink);
+  outline-offset: -4px;
+}
+body.desk-title .splash-attrib {
+  position: absolute;
+  top: calc(var(--poster-top) + var(--poster-h) + 56px);
+  left: 24px;
+  right: 24px;
+  max-width: none;
+  margin: 0;
+  color: var(--r-ink);
+  text-shadow: none;
+}
+body.desk-title .splash-version,
+body.desk-title .splash-founder {
+  bottom: 8px;
+  font-size: 11px;
+}
+body.desk-title .splash-version {
+  color: var(--r-shadow);
+}
