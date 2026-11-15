@@ -569,6 +569,11 @@ function buildInsights(ids) {
       query: trends([series("app_action", "Help menu picks")], { breakdown: "detail", display: "ActionsBar", where: [inAction(["help_menu_pick"])] }),
     },
     {
+      name: "Page not found",
+      description: "The 404 page (app_action not_found_view, detail game or help for whose missing page it was) and where people went from it (not_found_pick, detail game, manual, changelog, rooms, close or taskbar), production. The missing address is never sent.",
+      query: trends([series("app_action", "Actions")], { breakdown: ["action", "detail"], display: "ActionsTable", where: [inAction(["not_found_view", "not_found_pick"])] }),
+    },
+    {
       name: "Sponsor link taps",
       description: "Taps on a link to the GitHub Sponsors page (app_action sponsor_click), split by where (detail: splash for the title screen, menu for the menu bar's Help menu, help for the help site), production. The tap only: whether anyone sponsored is not known. The Android app shows no Sponsor link.",
       query: trends([series("app_action", "Sponsor taps")], { breakdown: "detail", display: "ActionsBar", where: [inAction(["sponsor_click"])] }),

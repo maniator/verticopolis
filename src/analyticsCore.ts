@@ -363,6 +363,9 @@ export type AppActionName =
   | "help_page_view"
   // A help site menu bar pick; `detail` = its data-help-item code (MenuBar.astro).
   | "help_menu_pick"
+  // The 404 page (src/notFoundPage.ts): a view (detail game or help) and a pick (its NotFoundPick).
+  | "not_found_view"
+  | "not_found_pick"
   // Preference toggles (detail carries the new on/off state).
   | "mute"
   | "reduced_motion"

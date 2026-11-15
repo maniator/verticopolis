@@ -182,6 +182,17 @@ renames a file on the player's computer (owner, 2026-11-15).
 
 `app_action` `sponsor_click` counts a tap on a link to the GitHub Sponsors page (owner, 2026-11-14). `detail` is `splash` for the title screen's corner link, `menu` for the menu bar's Help > Sponsor Verticopolis, or `help` for any help site link to that page (the sidebar's "Sponsor Verticopolis" entry and the front page's text). It is the tap only: whether anyone went on to sponsor is never known here, and the Android app shows no Sponsor link. It is not latched, so read taps, or sessions that tapped, and say which. A click, keyboard Enter or middle-click counts; a link opened from the right-click menu does not. The "Sponsor link taps" dashboard tile splits it by `detail`.
 
+## Page not found
+
+The "page not found" page (`src/404.html`) reports two `app_action` codes, so a broken link people follow shows up beside the pages that work. Neither carries the missing address: a mistyped path can hold anything a person typed or pasted.
+
+| `action` | `detail` | When |
+| --- | --- | --- |
+| `not_found_view` | `game` or `help` | The page opened for a missing address on the game's site or the manual's (help.verticopolis.com, or /help on a build that serves the manual there) |
+| `not_found_pick` | `game`, `manual`, `changelog`, `rooms`, `close` or `taskbar` | One of its buttons (Play the game, Player's Manual, Release notes, Every room), the window's close box, or the taskbar's Verticopolis button. A click, keyboard Enter or middle-click counts; a link opened from the right-click menu does not |
+
+The "Page not found" dashboard tile splits both by `detail`. Read picks against views for the share of lost visitors who went on.
+
 ## The menu bar
 
 Three events follow the version 4 menu bar (owner, 2026-11-14), from

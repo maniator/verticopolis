@@ -17,6 +17,7 @@
  *   - scenes/classic-vs-modern.ts: the CAP-8 paired escalator-on-office stills.
  *   - scenes/milestones.ts: the star-rank growth set + the TOWER capstone.
  *   - scenes/boot-fallback.ts: the no-WebGL boot screen (staged boot failure).
+ *   - scenes/notFound.ts: the "page not found" page, for the game and the manual.
  *   - scenes/security.ts: Security guards during a bomb search and on a quiet day.
  *   - scenes/tallLobbies.ts: tall lobbies (#308) for the Help site.
  *   - scenes/venueFlights.ts: spiral stairs and switchback escalators beside venues.
@@ -35,6 +36,7 @@ import { SCHEDULE_SCENES } from "./scenes/schedule.ts";
 import { CLASSIC_VS_MODERN_SCENES } from "./scenes/classic-vs-modern.ts";
 import { MILESTONE_SCENES } from "./scenes/milestones.ts";
 import { BOOT_FALLBACK_SCENES } from "./scenes/boot-fallback.ts";
+import { NOT_FOUND_SCENES } from "./scenes/notFound.ts";
 import { INSTALL_SCENES } from "./scenes/install.ts";
 import { RENTAL_SCENES } from "./scenes/rental.ts";
 import { FOUNDER_SCENES } from "./scenes/founder.ts";
@@ -55,6 +57,7 @@ export const SCENES: Scene[] = [
   ...CLASSIC_VS_MODERN_SCENES,
   ...MILESTONE_SCENES,
   ...BOOT_FALLBACK_SCENES,
+  ...NOT_FOUND_SCENES,
   ...INSTALL_SCENES,
   ...RENTAL_SCENES,
   ...FOUNDER_SCENES,
