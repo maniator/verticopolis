@@ -39,6 +39,7 @@ export const MENU_ITEM_CODES = {
   "mb-fullscreen": "full_screen",
   "btn-settings": "settings",
   "mb-sound": "sound",
+  "mb-screensaver": "screen_saver",
   "btn-help": "manual",
   "mb-compare": "compare",
   "mb-replay": "replay",

@@ -390,7 +390,17 @@ export type AppActionName =
   | "window_move"
   | "welcome_shown"
   | "welcome_close"
-  | "welcome_link";
+  | "welcome_link"
+  // The screen saver (party 2026-11-15). `screensaver_start` is one coming
+  // up, `detail` `idle` (the paused tower sat untouched for the wait),
+  // `return` (the player came back to the tab after the wait) or `preview`
+  // (the dialog's Preview). `screensaver_end` is it ending, `detail` how long
+  // it was up: `under_1m`, `1_5m` or `over_5m`. `screensaver_set` is the
+  // dialog's OK, `detail` the saver picked (`night`, `stars`, `express`,
+  // `endless`, `marquee`) or `none`.
+  | "screensaver_start"
+  | "screensaver_end"
+  | "screensaver_set";
 
 /**
  * Cross-cutting props merged into EVERY event: the platform and
