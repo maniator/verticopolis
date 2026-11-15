@@ -2,24 +2,27 @@
 //! tile refunds.
 //!
 //! A lobby tile stays for good in Classic, as in the 1994 game. Modern lets
-//! the bulldozer take a sky lobby tile, a tall hall's included, under the
-//! rules a floor tile keeps to; the ground lobby, the tower's front door,
-//! stays in both modes (party findings
+//! the bulldozer take a lobby tile, a tall hall's included, under the rules
+//! a floor tile keeps to (party findings
 //! `_bmad-output/party-mode/modern-lobby-bulldoze-party-findings-2026-11-14.md`).
+//! That takes in the ground lobby (owner, 2026-11-14), so a ground lobby
+//! bridged across open ground can be split into two towers' front doors,
+//! but the tower's last ground lobby tile stays.
 
 use super::{Tower, Unit};
 use crate::facilities::Kind;
 
 /// The floor the ground lobby stands on.
-const GROUND_FLOOR: i64 = 1;
+pub(super) const GROUND_FLOOR: i64 = 1;
 
 /// The Classic refusal for any lobby tile.
 pub(crate) const LOBBY_PERMANENT: &str =
     "Lobby tiles are permanent. The 1994 game does not let you remove them.";
 
-/// The refusal for a ground lobby tile in a mode that sells sky lobby tiles.
+/// The refusal for the last ground lobby tile in a mode that sells lobby
+/// tiles.
 pub(crate) const GROUND_LOBBY_STAYS: &str =
-    "The ground lobby is the tower's front door, so it stays.";
+    "The ground lobby is the tower's front door, so its last tile stays.";
 
 /// The refusal for a tile whose story above still stands on it.
 pub(crate) const STORY_ABOVE_STANDS: &str =
@@ -33,10 +36,10 @@ impl Tower {
     /// `removalReason`: why a structure tile cannot be sold. A lobby tile
     /// stays unless the mode sells lobby tiles
     /// ([`GameMode::removes_lobby_tiles`](crate::clock::GameMode::removes_lobby_tiles)),
-    /// and the ground lobby always stays. A tile, a tall hall's every story
-    /// with it, comes out only with nothing on the story over it and no
-    /// shaft left without floor in its column. In Classic that includes a
-    /// floor tile with floor on both sides
+    /// and the last ground lobby tile always stays. A tile, a tall hall's
+    /// every story with it, comes out only with nothing on the story over
+    /// it and no shaft left without floor in its column. In Classic that
+    /// includes a floor tile with floor on both sides
     /// ([`GameMode::removes_mid_floor_tiles`](crate::clock::GameMode::removes_mid_floor_tiles)).
     pub fn removal_reason(&self, id: i64) -> Option<&'static str> {
         let u = self.get_unit(id)?;
@@ -46,7 +49,7 @@ impl Tower {
         if u.kind == Kind::Lobby && !self.mode.removes_lobby_tiles() {
             return Some(LOBBY_PERMANENT);
         }
-        if u.kind == Kind::Lobby && u.floor == GROUND_FLOOR {
+        if self.is_last_ground_lobby(u) {
             return Some(GROUND_LOBBY_STAYS);
         }
         if let Some(r) = self.skybridge_removal_reason(u) {
@@ -66,10 +69,20 @@ impl Tower {
     }
 
     /// Whether lobby tile `u` stays for good, whatever stands around it: in
-    /// a mode that keeps every lobby, or on the ground floor. Undo's advice
-    /// to sell a build instead reads it, so the two cannot disagree.
+    /// a mode that keeps every lobby, or as the tower's last ground lobby
+    /// tile. Undo's advice to sell a build instead reads it, so the two
+    /// cannot disagree.
     pub(crate) fn lobby_stays(&self, u: &Unit) -> bool {
-        u.kind == Kind::Lobby && (!self.mode.removes_lobby_tiles() || u.floor == GROUND_FLOOR)
+        u.kind == Kind::Lobby && (!self.mode.removes_lobby_tiles() || self.is_last_ground_lobby(u))
+    }
+
+    /// Whether `u` is a ground lobby tile and every ground lobby tile the
+    /// tower has: the front door no tower can do without. A tall ground
+    /// hall tile is one unit, so its count is its width.
+    fn is_last_ground_lobby(&self, u: &Unit) -> bool {
+        u.kind == Kind::Lobby
+            && u.floor == GROUND_FLOOR
+            && self.lobby_tile_count(GROUND_FLOOR) <= u.width
     }
 
     /// Whether taking out structure tile `u`, `stories` high, leaves some
@@ -108,3 +121,7 @@ impl Tower {
 #[cfg(test)]
 #[path = "removal_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "ground_lobbies_tests.rs"]
+mod ground_lobbies_tests;

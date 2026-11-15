@@ -78,8 +78,10 @@ impl Ground<'_> {
     /// lobby tile may stand on its own, as a tower's first lobby tile does,
     /// where no older ground-floor tile of the part stays, nor comes back with
     /// the step outside that run; no other run with a tile built since may be
-    /// left then. No sale takes a lobby tile out, so this rule is the check's
-    /// own; a floor tile taken out without one keeps to the sale's rule
+    /// left then. Where ground lobbies may stand apart
+    /// (`GameMode::lays_ground_lobbies_apart`), any run with a ground-floor
+    /// lobby tile stands on its own, as its build let it. A floor tile taken
+    /// out without a lobby tile keeps to the sale's rule
     /// (`Tower::removal_reason`), which lets what it held go.
     pub(crate) fn lobbies_leave_nothing_hanging(&self) -> bool {
         if self.lobbies_taken.is_empty() {
@@ -153,7 +155,11 @@ impl Ground<'_> {
             let reaches = root.is_some_and(|(_, x)| runs.of((GROUND_FLOOR, x)) == Some(index))
                 || self.reaches_a_joined_root(index, &runs);
             let founds = || root.is_none() && !older_laid && run.on_lobby;
+            // Where ground lobbies may stand apart, a run on a ground lobby
+            // tile is a tower's front door of its own, as its build was.
+            let apart = self.tower.mode.lays_ground_lobbies_apart() && run.on_lobby;
             reaches
+                || apart
                 || !run.built_since
                 || (founds() && self.stands_first(oldest, index, &runs, &mut offered))
         })

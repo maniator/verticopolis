@@ -1,9 +1,10 @@
 //! The bulldozer and lobby tiles (party findings 2026-11-14): Classic keeps
-//! every lobby, Modern sells a sky lobby tile like a floor tile, a tall hall
-//! tile for half its price per story, and the ground lobby stays in both
-//! modes. No floor or lobby tile comes out from under a shaft that needs it.
+//! every lobby, Modern sells a lobby tile like a floor tile, a tall hall
+//! tile for half its price per story, and keeps the tower's last ground
+//! lobby tile (owner, 2026-11-14). No floor or lobby tile comes out from
+//! under a shaft that needs it.
 
-use super::{GROUND_LOBBY_STAYS, LOBBY_PERMANENT, SHAFT_STANDS_HERE, STORY_ABOVE_STANDS};
+use super::{LOBBY_PERMANENT, SHAFT_STANDS_HERE, STORY_ABOVE_STANDS};
 use crate::clock::GameMode;
 use crate::facilities::Kind;
 use crate::gameplay::RemovalMethod;
@@ -70,12 +71,13 @@ fn classic_keeps_every_lobby_tile() {
 }
 
 #[test]
-fn modern_keeps_the_ground_lobby_and_sells_a_sky_lobby_tile() {
+fn modern_sells_a_sky_lobby_tile_and_keeps_ground_lobby_under_a_story() {
     let mut sim = tower(GameMode::Modern);
     sky_hall(&mut sim, 1, 120..124);
+    // The ground lobby sells in Modern too, but not from under floor 2.
     assert_eq!(
         bulldoze(&mut sim, 1, 123, 0.0).as_deref(),
-        Some(GROUND_LOBBY_STAYS)
+        Some(STORY_ABOVE_STANDS)
     );
     let half = Kind::Lobby.resale_refund();
     assert_eq!(bulldoze(&mut sim, SKY, 123, half), None);

@@ -350,14 +350,15 @@ export function describeEngineContract(name: string, make: MakeEngine): void {
       for (const s of [brushed, oneByOne]) must(s, (p) => p.chooseAutoBridge(false), "bridging off");
       drain(brushed.port);
       drain(oneByOne.port);
-      // Without bridging, a lobby tile must touch the tower: each pass lays
+      // Without bridging, a basement tile must touch the tower (a Modern
+      // ground lobby may stand apart, a basement may not): each pass lays
       // the one tile next to the last, so three passes lay all three.
-      const lobby = run(brushed, (p) => p.paintTiles(kind("lobby"), 1, Float64Array.of(right + 2, right + 1, right)), "the lobby brush");
-      const passes = [right + 2, right + 1, right, right + 2, right + 1, right + 2];
-      const builds = passes.map((x) => run(oneByOne, (p) => p.buildAt(kind("lobby"), 1, x), `lobby at ${x}`));
+      const basement = run(brushed, (p) => p.paintTiles(kind("floor"), 0, Float64Array.of(right + 1, right, right - 1)), "the basement brush");
+      const passes = [right + 1, right, right - 1, right + 1, right, right + 1];
+      const builds = passes.map((x) => run(oneByOne, (p) => p.buildAt(kind("floor"), 0, x), `basement at ${x}`));
       expect(builds.map(done)).toEqual([false, false, true, false, true, true]);
-      expect([done(lobby), slot("paintTiles", lobby, "placed")]).toEqual([true, 3]);
-      expect(delta(lobby)).toBe(builds.reduce((sum, b) => sum + delta(b), 0));
+      expect([done(basement), slot("paintTiles", basement, "placed")]).toEqual([true, 3]);
+      expect(delta(basement)).toBe(builds.reduce((sum, b) => sum + delta(b), 0));
 
       const floor = must(brushed, (p) => p.paintTiles(kind("floor"), 2, Float64Array.of(right - 1, right - 1, right - 2)), "the floor brush");
       const single = [right - 1, right - 2].map((x) => must(oneByOne, (p) => p.buildAt(kind("floor"), 2, x), `floor at ${x}`));

@@ -126,7 +126,8 @@ impl<'a> Ground<'a> {
     /// neighbors went comes back touching nothing (#1843). Where no
     /// ground-floor tile stays at all, the tiles the step lays on the ground
     /// floor stand on their own, as a tower's first lobby does, and what they
-    /// reach is held. `low` holds the ground-floor and basement tiles the step
+    /// reach is held; so does a ground lobby tile it lays where ground
+    /// lobbies may stand apart (`GameMode::lays_ground_lobbies_apart`). `low` holds the ground-floor and basement tiles the step
     /// lays. One walk over them, plus one row of the lot.
     fn adrift_low_tiles(&self, low: Vec<(i64, i64)>) -> FastSet<(i64, i64)> {
         if low.is_empty() {
@@ -137,12 +138,17 @@ impl<'a> Ground<'a> {
             floor <= GROUND_FLOOR && !self.laid.contains_key(&(floor, x)) && self.stays(floor, x)
         };
         let first = !(0..LOT_WIDTH).any(|x| stays_low((GROUND_FLOOR, x)));
+        // Where ground lobbies may stand apart, a ground lobby tile the step
+        // lays stands on its own, as its build let it.
+        let apart = self.tower.mode.lays_ground_lobbies_apart();
+        let stands_alone = |tile: &(i64, i64)| {
+            tile.0 == GROUND_FLOOR
+                && (first || (apart && self.laid.get(tile).is_some_and(|l| l.1 == Kind::Lobby)))
+        };
         let mut met: Vec<(i64, i64)> = low
             .iter()
             .copied()
-            .filter(|&tile| {
-                (first && tile.0 == GROUND_FLOOR) || lobby::beside(tile).into_iter().any(stays_low)
-            })
+            .filter(|&tile| stands_alone(&tile) || lobby::beside(tile).into_iter().any(stays_low))
             .collect();
         let mut held: FastSet<(i64, i64)> = met.iter().copied().collect();
         let mut next = 0;

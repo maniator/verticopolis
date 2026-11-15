@@ -5,15 +5,23 @@
 //! where no ground-floor tile of that part older than the lobby tiles stays,
 //! nor comes back with the step outside that run.
 use super::check_tests::{refused, sell};
-use super::tests::{gesture, tower};
+use super::tests::{gesture, tower, tower_in};
 use super::StepRefused;
 use crate::clock::GameMode;
 use crate::facilities::Kind;
 use crate::sim::Simulation;
 
-/// An empty lot, where a first lobby tile stands on its own.
+/// An empty Modern lot, where a first lobby tile stands on its own.
 fn lot() -> Simulation {
-    let mut sim = Simulation::new_game(1, GameMode::Modern);
+    lot_in(GameMode::Modern)
+}
+
+/// An empty lot in `mode`. Classic keeps one tower, so a ground lobby run
+/// stands on its own only as the tower's first; Modern lays ground lobbies
+/// apart (`GameMode::lays_ground_lobbies_apart`), so any run with a ground
+/// lobby tile stands as its own tower's front door.
+fn lot_in(mode: GameMode) -> Simulation {
+    let mut sim = Simulation::new_game(1, mode);
     sim.money = 1e9;
     sim.star = 5;
     sim
@@ -21,7 +29,7 @@ fn lot() -> Simulation {
 
 #[test]
 fn the_first_lobby_tile_comes_out_from_under_one_run_left_standing() {
-    let mut sim = lot();
+    let mut sim = lot_in(GameMode::Classic);
     let first = gesture(&mut sim, |s| assert!(s.build(Kind::Lobby, 1, 100).ok)).unwrap();
     // The run touches the lobby tile beside it and below it, and is offered
     // the place once.
@@ -34,26 +42,26 @@ fn the_first_lobby_tile_comes_out_from_under_one_run_left_standing() {
         .expect("the lobby left stands as a tower's first tile does");
     assert!(sim.tower.unit_at(1, 100).is_none());
     // Two runs left apart: only one of them could be a tower's first.
-    let mut sim = lot();
+    let mut sim = lot_in(GameMode::Classic);
     let first = gesture(&mut sim, |s| assert!(s.build(Kind::Lobby, 1, 100).ok)).unwrap();
     assert!(sim.tower.place(Kind::Lobby, 1, 101).ok);
     assert!(sim.tower.place(Kind::Lobby, 1, 99).ok);
     refused(&mut sim, &first, StepRefused::Blocked);
     // Basement alone could start no tower.
-    let mut sim = lot();
+    let mut sim = lot_in(GameMode::Classic);
     let first = gesture(&mut sim, |s| assert!(s.build(Kind::Lobby, 1, 100).ok)).unwrap();
     assert!(sim.tower.place(Kind::Floor, 0, 100).ok);
     refused(&mut sim, &first, StepRefused::Blocked);
     // A tower starts with a lobby tile, so a run with only plain floor on
     // the ground floor, as a tower saved before shafts stopped laying it
     // there can hold, could start no tower.
-    let mut sim = lot();
+    let mut sim = lot_in(GameMode::Classic);
     let first = gesture(&mut sim, |s| assert!(s.build(Kind::Lobby, 1, 100).ok)).unwrap();
     assert!(sim.tower.place(Kind::Floor, 1, 101).ok);
     refused(&mut sim, &first, StepRefused::Blocked);
     // A floor tile the step lays again is as old as it was, so a run apart
     // from it was never the tower's first.
-    let mut sim = lot();
+    let mut sim = lot_in(GameMode::Classic);
     let first = sim.tower.place(Kind::Lobby, 1, 100).unit_id.unwrap();
     assert!(sim.tower.place(Kind::Floor, 1, 101).ok);
     assert!(sim.tower.remove_unit(first).is_some());
@@ -67,10 +75,33 @@ fn the_first_lobby_tile_comes_out_from_under_one_run_left_standing() {
     refused(&mut sim, &lobby, StepRefused::Blocked);
     // While the tower's first lobby tile stays in the part the lobby tile
     // stood in, no run left apart from it stands as a first.
-    let mut sim = tower();
+    let mut sim = tower_in(GameMode::Classic);
     let lobby = gesture(&mut sim, |s| assert!(s.build(Kind::Lobby, 1, 70).ok)).unwrap();
     assert!(sim.tower.place(Kind::Lobby, 1, 71).ok);
     refused(&mut sim, &lobby, StepRefused::Blocked);
+}
+
+#[test]
+fn a_lobby_run_left_apart_stands_on_its_own_in_modern() {
+    // The runs Classic refuses as no tower's first above: Modern lays ground
+    // lobbies apart, so each run with a ground lobby tile is a front door.
+    let mut sim = lot();
+    let first = gesture(&mut sim, |s| assert!(s.build(Kind::Lobby, 1, 100).ok)).unwrap();
+    assert!(sim.tower.place(Kind::Lobby, 1, 101).ok);
+    assert!(sim.tower.place(Kind::Lobby, 1, 99).ok);
+    sim.apply_undo_step(&first).expect("two front doors");
+    assert!(sim.tower.unit_at(1, 100).is_none());
+    assert_eq!(sim.tower.segment_runs(1).len(), 2);
+    let mut sim = tower();
+    let lobby = gesture(&mut sim, |s| assert!(s.build(Kind::Lobby, 1, 70).ok)).unwrap();
+    assert!(sim.tower.place(Kind::Lobby, 1, 71).ok);
+    sim.apply_undo_step(&lobby)
+        .expect("71 is a front door of its own");
+    // Basement alone still starts no tower.
+    let mut sim = lot();
+    let first = gesture(&mut sim, |s| assert!(s.build(Kind::Lobby, 1, 100).ok)).unwrap();
+    assert!(sim.tower.place(Kind::Floor, 0, 100).ok);
+    refused(&mut sim, &first, StepRefused::Blocked);
 }
 
 #[test]
@@ -328,7 +359,7 @@ fn a_lobby_tile_joined_to_the_tower_through_the_basement_keeps_its_root() {
     // The lobby tile reaches the old lobby only through the basement under
     // the gap beside it, and a lobby tile laid beyond it since hangs from
     // it alone, so that one is no tower's first.
-    let mut sim = tower();
+    let mut sim = tower_in(GameMode::Classic);
     for x in 69..72 {
         assert!(sim.tower.place(Kind::Floor, 0, x).ok);
     }
@@ -371,7 +402,7 @@ fn a_part_of_the_ground_floor_a_sale_parted_may_stand_on_its_own() {
 }
 
 /// What a gesture does to an old ground-floor tile.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 enum OldTile {
     Stays,
     Brushed,
@@ -379,13 +410,16 @@ enum OldTile {
 }
 
 #[test]
-fn an_old_tile_the_step_lays_again_beyond_a_link_starts_no_tower() {
+fn a_lobby_run_beyond_a_link_stands_on_its_own_in_modern() {
     // Sales parted an old floor tile on the basement from the first lobby.
     // The gesture laid a lobby tile apart on the basement and a basement link
     // toward the old tile, and a lobby run laid since hangs from both. The
     // old tile is older than the gesture's lobby tile whether it stays or
     // the undo lays it again where the gesture brushed a lobby over it or
-    // sold it, so the run is no tower's first in any of them.
+    // sold it, so the run is no tower's first in any of them. Modern lays
+    // ground lobbies apart, though, so the run needs no first: it stands as
+    // its own tower's front door, as it could have been built (only Modern
+    // switches bridging off, so Classic never lays this tower).
     for old_tile in [OldTile::Stays, OldTile::Brushed, OldTile::Sold] {
         let mut sim = lot();
         assert!(!sim.toggle_auto_bridge());
@@ -418,7 +452,12 @@ fn an_old_tile_the_step_lays_again_beyond_a_link_starts_no_tower() {
         .unwrap();
         assert!(sim.build(Kind::Lobby, 1, 106).ok);
         assert!(sim.build(Kind::Floor, 1, 107).ok);
-        refused(&mut sim, &lobby, StepRefused::Blocked);
+        // The run laid since has ground lobby tiles, and Modern lays ground
+        // lobbies apart, so it stands as its own tower's front door.
+        sim.apply_undo_step(&lobby)
+            .unwrap_or_else(|e| panic!("{old_tile:?}: {e:?}"));
+        assert!(sim.tower.unit_at(1, 105).is_none(), "{old_tile:?}");
+        assert_eq!(sim.tower.unit_at(1, 106).unwrap().kind, Kind::Lobby);
     }
 }
 
