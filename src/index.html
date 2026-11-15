@@ -104,12 +104,24 @@
           <button type="button" class="mb-title" id="mb-file" aria-haspopup="menu" aria-expanded="false" aria-controls="mb-file-menu"><u>F</u>ile</button>
           <div class="mb-pop" id="mb-file-menu" role="menu" aria-labelledby="mb-file" hidden>
             <button type="button" role="menuitem" class="mb-item" id="btn-new">New Tower…</button>
-            <button type="button" role="menuitem" class="mb-item" id="btn-load">Saves…</button>
-            <button type="button" role="menuitem" class="mb-item" id="mb-quick-save">Quick Save</button>
+            <button type="button" role="menuitem" class="mb-item" id="mb-import">Open…<kbd>Ctrl+O</kbd></button>
+            <!-- Load: the Auto-save and each filled slot, filled in as the
+                 File menu opens (src/game/loadMenu.ts). -->
+            <div class="mb-sub" role="none">
+              <button type="button" role="menuitem" class="mb-item mb-sub-title" id="mb-load" aria-haspopup="menu" aria-expanded="false" aria-controls="mb-load-menu">Load</button>
+              <div class="mb-pop mb-subpop" id="mb-load-menu" role="menu" aria-labelledby="mb-load" hidden>
+                <button type="button" role="menuitem" class="mb-item" id="mb-load-auto" data-load-slot="auto" hidden>Auto-save</button>
+                <button type="button" role="menuitem" class="mb-item" id="mb-load-1" data-load-slot="1" hidden>Slot 1</button>
+                <button type="button" role="menuitem" class="mb-item" id="mb-load-2" data-load-slot="2" hidden>Slot 2</button>
+                <button type="button" role="menuitem" class="mb-item" id="mb-load-3" data-load-slot="3" hidden>Slot 3</button>
+                <button type="button" role="menuitem" class="mb-item" id="mb-load-none" aria-disabled="true">No saved towers yet</button>
+              </div>
+            </div>
+            <button type="button" role="menuitem" class="mb-item" id="btn-load">Saved Towers…</button>
             <button type="button" role="menuitem" class="mb-item" id="mb-close">Close</button>
             <hr class="mb-sep" />
-            <button type="button" role="menuitem" class="mb-item" id="mb-import">Import from file…</button>
-            <button type="button" role="menuitem" class="mb-item" id="mb-export">Export to file…</button>
+            <button type="button" role="menuitem" class="mb-item" id="mb-quick-save">Save<kbd>Ctrl+S</kbd></button>
+            <button type="button" role="menuitem" class="mb-item" id="mb-export">Save As…<kbd>Ctrl+Shift+S</kbd></button>
             <!-- The passive home of the install offer: present only when the
                  app can be installed and is not already (the controller
                  toggles hidden). -->
@@ -207,7 +219,7 @@
           <button class="btn" data-speed="3" title="Fast" aria-label="Fast speed"></button>
           <button class="btn" id="btn-undo" title="Undo (Ctrl+Z)" aria-label="Undo"></button>
           <button class="btn" id="btn-redo" title="Redo (Ctrl+Shift+Z)" aria-label="Redo"></button>
-          <button class="btn" id="btn-save-top" title="Quick Save" aria-label="Quick Save"></button>
+          <button class="btn" id="btn-save-top" title="Save (Ctrl+S)" aria-label="Save"></button>
           <button class="btn" id="audio-toggle" title="Toggle sound" aria-label="Mute sound" aria-pressed="false"></button>
           <button class="btn" id="btn-update" title="An update is ready. Tap to review." aria-label="An update is ready. Tap to review." hidden><span class="btn-label">Update</span></button>
           <button class="btn" id="btn-install" title="Install Verticopolis: play offline, fullscreen, from your home screen." aria-label="Install Verticopolis" hidden><span class="btn-label">Install</span></button>

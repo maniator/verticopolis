@@ -1,5 +1,6 @@
 import { html, nothing, type TemplateResult } from "lit-html";
 import type { SlotInfo } from "../../storage/SaveGame";
+import { slotLabel, SLOT_NAME_MAX } from "../../storage/slotLabels";
 import { groupDigits } from "../format";
 
 /**
@@ -17,7 +18,7 @@ import { groupDigits } from "../format";
  * or delete gets an Undo line under the list.
  *
  * This is a STATIC structure only. The row buttons (`data-save`/`data-load`/
- * `data-del`) and the footer actions (export/import/close) are wired imperatively
+ * `data-del`/`data-rename`) and the footer's Close are wired imperatively
  * by the controller (`showSaves`) after mount, unchanged by this migration, so the
  * re-render-on-save flow keeps routing exactly as before.
  */
@@ -30,8 +31,6 @@ export function savesTemplate(slots: SlotInfo[], keptUnreadable = false, guard: 
       ${guard.undo ? undoNote(guard.undo) : nothing}
       ${keptUnreadable ? keptUnreadableNote : nothing}
       <div class="modal-actions">
-        <button class="btn" data-act="export">Export to file…</button>
-        <button class="btn" data-act="import">Import from file…</button>
         <button class="btn primary" data-act="close">Close</button>
       </div>`;
 }
@@ -95,7 +94,7 @@ export function replaceSlotTemplate(
       <p>${name} already holds a saved tower:</p>
       <div class="slots well"><div class="slot"><div class="slot-head">${slotDetail(target)}</div></div></div>
       <p>Saving here replaces it with <b>${liveName}</b>, the tower you're playing now.${sameName ? " They have the same name, so check the date and population." : ""}
-        To keep both, save to an empty slot or use Export to file.</p>
+        To keep both, save to an empty slot or use Save As.</p>
       <div class="modal-actions"><button class="btn primary" data-act="no" @click=${actions.onCancel}>Cancel</button><button class="btn danger" data-act="yes" @click=${actions.onReplace}>Replace</button></div>`;
 }
 
@@ -103,16 +102,17 @@ export function replaceSlotTemplate(
  *  The player can download it, and a save from a newer version imports from
  *  that file once the game is updated. */
 const keptUnreadableNote = html`<p class="slot-detail slot-unreadable">
-    An autosave this version couldn't read is kept. If a newer version of the game wrote it, update the game, then use Import from file.
+    An autosave this version couldn't read is kept. If a newer version of the game wrote it, update the game, then open the file with Open.
     <button class="btn" data-act="unreadable">Download unreadable save</button>
   </p>`;
 
 const fmtWhen = (ms?: number): string =>
   ms ? new Date(ms).toLocaleString([], { dateStyle: "short", timeStyle: "short" }) : "";
 
-/** Human name for a slot, shared with the title screen's picker. */
+/** Human name for a slot, shared with the title screen's picker and File >
+ *  Load: the name the player gave it, or its number. */
 export function slotName(s: SlotInfo): string {
-  return s.slot === "auto" ? "Auto-save" : `Slot ${s.slot}`;
+  return s.slot === "auto" ? "Auto-save" : (slotLabel(s.slot) ?? `Slot ${s.slot}`);
 }
 
 /**
@@ -165,6 +165,8 @@ function slotRow(s: SlotInfo, home: number | null): TemplateResult {
   const saveBtn = s.slot === "auto" || unreadable ? nothing : saveButton(s.slot, name, s.exists, isHome);
   const tag = isHome ? html` <span class="slot-tag">This tower</span>` : nothing;
   const loadBtn = s.exists ? html`<button class="btn" data-load="${s.slot}">Load</button>` : nothing;
+  // Every numbered slot can be named, an empty one too: the name is the slot's.
+  const renameBtn = s.slot === "auto" ? nothing : html`<button class="btn" data-rename="${s.slot}" aria-label="Rename ${name}">Rename…</button>`;
   const delBtn =
     (s.exists || unreadable) && s.slot !== "auto"
       ? html`<button class="btn danger" data-del="${s.slot}" aria-label="Delete save slot ${s.slot}">✕</button>`
@@ -173,7 +175,7 @@ function slotRow(s: SlotInfo, home: number | null): TemplateResult {
   // and a list whose children are not listitems is invalid ARIA: the semantics
   // are dropped, so the label and the item count a screen reader would announce
   // go with them. The two roles ship together or neither does.
-  return html`<div class="slot" role="listitem"><div class="slot-head"><b>${name}</b>${tag}${detail}</div><div class="slot-actions">${saveBtn}${loadBtn}${delBtn}</div></div>`;
+  return html`<div class="slot" role="listitem"><div class="slot-head"><b>${name}</b>${tag}${detail}</div><div class="slot-actions">${saveBtn}${loadBtn}${renameBtn}${delBtn}</div></div>`;
 }
 
 /** A manual slot's save button: one click into an empty slot or the live
@@ -182,4 +184,24 @@ function saveButton(slot: number | "auto", name: string, occupied: boolean, isHo
   if (isHome) return html`<button class="btn primary" data-save="${slot}">Save</button>`;
   if (occupied) return html`<button class="btn" data-save="${slot}" aria-label="Replace the tower in ${name}">Replace…</button>`;
   return html`<button class="btn" data-save="${slot}">Save</button>`;
+}
+
+/**
+ * Rename a save slot. The field starts with the slot's name, if it has one;
+ * OK with it empty gives the slot back its number. Cancel, Esc and the ✕
+ * keep the name as it was.
+ */
+export function slotRenameTemplate(slot: number, actions: { onCancel: () => void; onSave: (name: string) => void }): TemplateResult {
+  const current = slotLabel(slot) ?? "";
+  const save = (e: Event): void => {
+    e.preventDefault();
+    const field = (e.currentTarget as HTMLElement).closest(".slot-rename")?.querySelector<HTMLInputElement>("input");
+    actions.onSave(field?.value ?? "");
+  };
+  return html`<form class="slot-rename" @submit=${save}>
+      <h2>Rename Slot ${slot}</h2>
+      <label>Name for slot ${slot}<br /><input class="field" name="slot-name" maxlength=${SLOT_NAME_MAX} .value=${current} placeholder="Slot ${slot}" autocomplete="off" /></label>
+      <p class="slot-when">Leave it empty to call it Slot ${slot} again. The tower inside keeps its own name.</p>
+      <div class="modal-actions"><button type="button" class="btn" data-act="cancel" @click=${actions.onCancel}>Cancel</button><button type="submit" class="btn primary" data-act="ok">OK</button></div>
+    </form>`;
 }

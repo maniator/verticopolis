@@ -18,7 +18,7 @@ describe("save-failure notice", () => {
     expect(box.getAttribute("role")).toBe("alert");
     expect(box.querySelector(".save-warning-title")?.textContent).toBe("Your tower isn't being saved");
     expect(box.querySelector(".save-warning-text")?.textContent).toBe("Storage is blocked.");
-    expect([...box.querySelectorAll("button")].map((b) => b.textContent)).toEqual(["Export tower…", "Dismiss"]);
+    expect([...box.querySelectorAll("button")].map((b) => b.textContent)).toEqual(["Save As…", "Dismiss"]);
   });
 
   it("rewords the notice already up instead of adding a second", () => {

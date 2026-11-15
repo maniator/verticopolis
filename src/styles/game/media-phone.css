@@ -49,6 +49,17 @@
   .mb-item[aria-checked="true"]::before {
     left: 9px;
   }
+  /* No room beside the File menu on a phone: File > Load opens in place,
+     under its title and set in, and pushes the items below it down. */
+  .mb-pop.mb-subpop {
+    position: static;
+    min-width: 0;
+    padding: 0 0 0 14px;
+    box-shadow: none;
+  }
+  .mb-sub-title[aria-expanded="true"]::after {
+    content: "\25BE";
+  }
   /* The status bar is a desktop strip; a phone keeps the tower its room, and
      the Bulletin window has the news. */
   .statusbar,

@@ -14,6 +14,8 @@ vi.mock("./overviewMapWiring", () => ({
 }));
 vi.mock("../ui/uiImport", () => importer);
 vi.mock("./titleScreen", () => closer);
+const loads = vi.hoisted(() => ({ fill: vi.fn(), wire: vi.fn() }));
+vi.mock("./loadMenu", () => ({ fillLoadMenu: loads.fill, wireLoadMenu: loads.wire }));
 vi.mock("../ui/movableWindow", () => ({ MovableWindow: movable }));
 vi.mock("../ui/splashTemplate", () => ({ SPONSOR_URL: "https://sponsor.example/", sponsorOffered: () => sponsor.offered }));
 vi.mock("../analytics", () => ({ trackAppAction: sponsor.track }));
@@ -31,6 +33,7 @@ vi.mock("../ui/overviewMapPrefs", () => ({
   }),
 }));
 
+import * as fileShortcuts from "./fileShortcuts";
 import { MENU_WINDOW, NO_FULL_SCREEN, STATUS_BAR_HIDDEN_CLASS, STATUS_BAR_KEY, toggleFullScreen, wireMenus } from "./menuWiring";
 
 /** The menu bar's items as index.html has them, plus the windows and the
@@ -104,6 +107,38 @@ describe("wireMenus", () => {
     expect(wireMenus(app)).toBeNull();
     document.body.innerHTML = "";
     expect(wireMenus(app)).toBeNull();
+  });
+
+  it("hands File > Open…, Save and Save As… to their keys", () => {
+    const shortcuts = vi.spyOn(fileShortcuts, "wireFileShortcuts").mockImplementation(() => {});
+    const { app, ui } = fakeApp();
+    wireMenus(app);
+    expect(shortcuts).toHaveBeenCalledOnce();
+    const keys = shortcuts.mock.calls[0][0];
+    keys.open();
+    keys.save();
+    keys.saveAs();
+    expect(importer.openImport).toHaveBeenCalledWith(ui);
+    expect(ui.cb.onSave).toHaveBeenCalledOnce();
+    expect(ui.promptExport).toHaveBeenCalledOnce();
+    // Each key reports its item's menu_pick, as a shortcut with no trip.
+    const report = shortcuts.mock.calls[0][2]!;
+    report("saveAs", false);
+    report("save", true);
+    expect(menus.pick.mock.calls.map(([p]) => [p.item, p.via, p.browsed, p.grayed, p.menu])).toEqual([
+      ["export", "shortcut", 0, false, "file"],
+      ["quick_save", "shortcut", 0, true, "file"],
+    ]);
+    shortcuts.mockRestore();
+  });
+
+  it("wires File > Load to the app and refills it each time the File menu opens", () => {
+    const { app } = fakeApp();
+    const bar = wireMenus(app)!;
+    expect(loads.wire).toHaveBeenCalledWith(app);
+    loads.fill.mockClear();
+    bar.open($("mb-file") as HTMLButtonElement, false);
+    expect(loads.fill).toHaveBeenCalledOnce();
   });
 
   it("routes File, Edit, Tower, Options and Help items to the game", () => {

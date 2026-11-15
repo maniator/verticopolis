@@ -9,6 +9,8 @@ import { trackAppAction } from "../analytics";
 import { menuItemCodeOf, menuNameOf, trackMenuDismiss, trackMenuOpen, trackMenuPick, type MenuScreen } from "../analyticsMenus";
 import { isEngineStopped, isSplashUp } from "./interactionState";
 import { closeTower } from "./titleScreen";
+import { wireFileShortcuts, type FileCommands } from "./fileShortcuts";
+import { fillLoadMenu, wireLoadMenu } from "./loadMenu";
 import { overviewMapOpen, setOverviewMapOpen } from "./overviewMapWiring";
 
 /**
@@ -77,6 +79,9 @@ export const ON_TITLE_SCREEN: Readonly<Record<string, string>> = {
   "btn-load": "load",
   "mb-sound": "mute",
 };
+
+/** The File item each File key runs, for its `menu_pick`. */
+const FILE_KEY_ITEMS: Readonly<Record<keyof FileCommands, string>> = { open: "mb-import", save: "mb-quick-save", saveAs: "mb-export" };
 
 /** The stored value for a window or bar the player left open, and closed. */
 const SHOWN = { open: "open", closed: "closed" } as const;
@@ -163,11 +168,14 @@ export function wireMenus(app: GameApp): MenuBar | null {
     remember(storage, STATUS_BAR_KEY, open);
   });
 
-  // File.
-  on("mb-quick-save", () => ui.cb.onSave());
+  // File: Open…, Save and Save As… also answer to their keys.
+  const file = { open: () => openImport(ui), save: () => ui.cb.onSave(), saveAs: () => ui.promptExport() };
+  on("mb-quick-save", file.save);
   on("mb-close", () => closeTower(app));
-  on("mb-import", () => openImport(ui));
-  on("mb-export", () => ui.promptExport());
+  on("mb-import", file.open);
+  on("mb-export", file.saveAs);
+  wireFileShortcuts(file, window, reportKey);
+  wireLoadMenu(app);
   // Edit: the toolbar's own buttons, so the gray-out and the gesture rules hold.
   on("mb-undo", () => ui.el.undo?.click());
   on("mb-redo", () => ui.el.redo?.click());
@@ -199,7 +207,8 @@ export function wireMenus(app: GameApp): MenuBar | null {
     "click",
     (e) => {
       const item = e.target instanceof Element ? e.target.closest<HTMLElement>(".mb-item") : null;
-      if (!item) return;
+      // A submenu's title only opens its submenu (ui/menuBar.ts): not a pick.
+      if (!item || item.matches(".mb-sub-title")) return;
       reportPick(item, e);
       if (item.getAttribute("aria-disabled") === "true") {
         e.preventDefault();
@@ -220,7 +229,7 @@ export function wireMenus(app: GameApp): MenuBar | null {
   /** One `menu_pick`, while a menu is open (a script's click is not a pick). */
   function reportPick(item: HTMLElement, e: MouseEvent): void {
     const open = bar.current();
-    const menu = menuNameOf(item.closest("[role='menu']")?.id ?? "");
+    const menu = menuNameOf(item.closest(".mb-pop:not(.mb-subpop)")?.id ?? "");
     if (!open || !menu) return;
     const grayed = item.getAttribute("aria-disabled") === "true";
     const checked = item.getAttribute("aria-checked");
@@ -236,6 +245,13 @@ export function wireMenus(app: GameApp): MenuBar | null {
     });
   }
 
+  /** A File key reports the same `menu_pick` as its item, `via: "shortcut"`,
+   *  with no trip behind it. A save key on the title screen is grayed, as the
+   *  item is. */
+  function reportKey(command: keyof FileCommands, grayed: boolean): void {
+    trackMenuPick({ menu: "file", item: menuItemCodeOf(FILE_KEY_ITEMS[command]), via: "shortcut", screen: screen(), browsed: 0, grayed });
+  }
+
   const bar = new MenuBar(root, {
     onTrip: (title, via) => {
       const menu = menuNameOf(title.id);
@@ -245,7 +261,8 @@ export function wireMenus(app: GameApp): MenuBar | null {
       const menu = menuNameOf(title.id);
       if (menu) trackMenuDismiss({ menu, how, screen: screen(), browsed });
     },
-    onOpen: () => {
+    onOpen: (menu) => {
+      if (menu.id === "mb-file-menu") fillLoadMenu();
       check("mb-win-tools", !document.getElementById("palette")?.classList.contains(PALETTE_COLLAPSED_CLASS));
       check("mb-win-map", overviewMapOpen(app));
       for (const w of floating) check(w.item, !!w.win && !w.win.hidden);

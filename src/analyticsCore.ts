@@ -310,6 +310,9 @@ export type AppActionName =
   | "save_slot"
   | "load_slot"
   | "delete_save"
+  // A save slot named in Saved Towers… (owner, 2026-11-15). `detail` is
+  // `named` or `cleared`; never the name, which the player wrote.
+  | "rename_slot"
   | "export_save"
   | "import_save"
   | "export_tdt"

@@ -91,7 +91,7 @@ describe("towerPickerTemplate carries no write controls (CAP-2)", () => {
     expect(frag.querySelector('[data-act="export"]')).toBeNull();
     const labels = Array.from(frag.querySelectorAll("button")).map((b) => b.textContent?.trim());
     expect(labels).not.toContain("Save");
-    expect(labels).not.toContain("Export to file");
+    expect(labels).not.toContain("Save As…");
     expect(labels.filter((l) => l === "Load")).toHaveLength(2);
   });
 });

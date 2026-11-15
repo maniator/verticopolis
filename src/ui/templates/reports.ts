@@ -30,13 +30,13 @@ export function exportConfirmTemplate(exportsTo1994: boolean): TemplateResult {
     ? html`You can also save it for the original 1994 game (<b>.TDT</b>); a summary of what carries over shows first. <b>Still experimental</b>: verified to load in the real game for smaller Classic towers.`
     : html`Saving for the original 1994 game (<b>.TDT</b>) is <b>Classic towers only</b>: the 1994 rule set cannot hold Modern mechanics.`;
   return html`
-      <h2>Export tower?</h2>
+      <h2>Save As</h2>
       <p>Your tower will be packed into a <b>${TOWER_FILE_EXT}</b> file and downloaded.</p>
       <p style="color:var(--muted);font-size:12px">${legacyLine}</p>
       <div class="modal-actions">
         <button class="btn" data-act="close">Cancel</button>
         <button class="btn" data-act="legacy" ?disabled=${!exportsTo1994} title=${exportsTo1994 ? nothing : "Classic towers only"}>For SimTower (1994)…</button>
-        <button class="btn primary" data-act="export" autofocus>Export</button>
+        <button class="btn primary" data-act="export" autofocus>Save ${TOWER_FILE_EXT}</button>
       </div>`;
 }
 

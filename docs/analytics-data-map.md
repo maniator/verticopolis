@@ -126,7 +126,9 @@ to 10 and 24 say what they can and cannot support.
 
 ## Saved Towers opens
 
-`app_action` `saves_open` counts the player opening the Saved Towers dialog from the game panel's Saves… button. Up to 3.12.3 it also fired each time the open dialog redrew its list (after a slot save, a delete, an Undo or a refused save), so one visit could count several times; from the next release it counts opens only (#2161). Compare across that release with care. No saved insight or dashboard tile read it when it changed (checked 2026-11-14). The title screen's picker counts separately as `splash_load_open`.
+`app_action` `saves_open` counts the player opening the Saved Towers dialog (File > Saved Towers…). Up to 3.12.3 it also fired each time the open dialog redrew its list (after a slot save, a delete, an Undo or a refused save), so one visit could count several times; from the next release it counts opens only (#2161). Compare across that release with care. No saved insight or dashboard tile read it when it changed (checked 2026-11-14). The title screen's picker counts separately as `splash_load_open`.
+
+`app_action` `rename_slot` counts a save slot named from the dialog's Rename… (version 4.1). `detail` is `named`, or `cleared` when the name was emptied and the slot went back to its number. The name is the player's own text and is never sent.
 
 ## Sponsor link taps
 
@@ -148,14 +150,23 @@ never the name).
 | --- | --- | --- |
 | `menu` | `file`, `edit`, `tower`, `window`, `options`, `help` | The menu opened, picked from, or open when the trip ended |
 | `via` (open) | `click`, `keys`, `alt` | A click on a title, the keyboard on a focused title, or Alt with the underlined letter |
-| `via` (pick) | `pointer`, `keys` | A mouse, pen or finger, or the keyboard |
+| `via` (pick) | `pointer`, `keys`, `shortcut` | A mouse, pen or finger, or the keyboard in the menu; `shortcut` is a File key (Ctrl+O, Ctrl+S or Ctrl+Shift+S, from version 4.1) pressed with no menu open |
 | `screen` | `title`, `tower` | Over the title screen, or over a tower |
-| `item` | `new_tower`, `saves`, `quick_save`, `close`, `import`, `export`, `install_app`, `undo`, `redo`, `tower_info`, `map`, `statistics`, `rename`, `rules`, `tools`, `bulletin`, `status_bar`, `full_screen`, `settings`, `sound`, `screen_saver`, `manual`, `compare`, `replay`, `sponsor`, `about`, `other` | The item, by a code that does not change with its label (`MENU_ITEM_CODES`) |
+| `item` | `new_tower`, `saves`, `load_auto`, `load_slot_1`, `load_slot_2`, `load_slot_3`, `quick_save`, `close`, `import`, `export`, `install_app`, `undo`, `redo`, `tower_info`, `map`, `statistics`, `rename`, `rules`, `tools`, `bulletin`, `status_bar`, `full_screen`, `settings`, `sound`, `screen_saver`, `manual`, `compare`, `replay`, `sponsor`, `about`, `other` | The item, by a code that does not change with its label (`MENU_ITEM_CODES`) |
 | `browsed` | a count | Menus the trip showed, the last one included |
 | `after` | an `item` code or `none` | The page life's previous real pick, so a breakdown shows what follows what without a paths query. A grayed click never becomes the next pick's `after` |
 | `grayed` | `true`, `false` | The item was grayed out, so nothing happened |
 | `state` | `on`, `off` | A checkmark item's new state (Tower Info, Map, Tools, Bulletin, Status Bar, Full Screen, Sound); absent on the others and on a grayed click |
 | `how` | `outside`, `escape`, `tab`, `title`, `blur` | How a trip ended with no pick: a press outside the menus, Escape, Tab, the open menu's own title, or the window losing focus |
+
+Version 4.1 renamed the File items and kept their codes, so a series runs on
+across the rename: `import` is Open…, `export` is Save As…, `quick_save` is
+Save, and `saves` is Saved Towers…. File > Load lists the saves: `load_auto` is
+its Auto-save item and `load_slot_1` to `load_slot_3` the numbered slots. Opening the Load submenu sends nothing; only a pick from it does. A File
+key sends the pick its item would, with `via: "shortcut"`, `browsed: 0` and no
+`menu_open` before it; a save key on the title screen sends `grayed: true`, as
+the grayed item does. Over an open dialog, after the engine stopped, or on a
+held key's repeats, a key sends nothing.
 
 The commands keep their own events too, so Settings from the menu sends
 `menu_pick` `settings` and then `app_action` `settings_open`. Count the menu's

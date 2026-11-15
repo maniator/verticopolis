@@ -7,46 +7,50 @@ Your towers live in your own browser, on your own device. The game keeps them in
 
 ## The autosave and the slots
 
-The game saves the tower you're playing every 30 seconds, on its own, into the **Auto-save**. When you come back, **Continue** on the opening screen picks up where you left off.
+The game saves the tower you're playing every 30 seconds, on its own, into the **Auto-save**. When you come back, **Continue** on the opening screen picks up where you left off. **File > Save** (Ctrl+S, or the 💾 button) saves into the Auto-save right away.
 
 **File > Close** saves the tower you're playing into the Auto-save and goes back to the opening screen, the way a program closes a document. **Continue** brings the tower back, paused. If the game can't save it (say, the browser's storage is full), the tower stays open and the game tells you, so nothing is lost.
 
-**Saved Towers** (**File > Saves…**) also has three numbered slots. **Save** puts the tower you're playing into a slot, and **Load** brings one back. The slots are handy for keeping a copy before you try something risky, or for running more than one tower.
+**Saved Towers** (**File > Saved Towers…**) also has three numbered slots. **Save** puts the tower you're playing into a slot, and **Load** brings one back. The slots are handy for keeping a copy before you try something risky, or for running more than one tower.
+
+**File > Load** is the quick way back: it lists the Auto-save and each slot that holds a tower, by the slot's name and the tower's, and picking one loads it. It works from the opening screen too. On a phone, Load opens under its own name in the File menu; tap it again to fold it away.
+
+**Rename…** gives a slot a name of your own, up to 28 letters, like "Before the metro". The name belongs to the slot, so it stays when you save a different tower there, and the tower inside keeps its own name. Leave the name empty to call it Slot 1 (or 2, or 3) again.
 
 Each slot shows its tower's name, whether it's Classic or Modern, its rating, population and funds, and when it was saved.
 
 ## Saving over another tower
 
-The slot that holds the tower you're playing is marked **This tower**, and its **Save** button saves right away. A slot holding any other tower says **Replace…** instead. Click it and the game asks first, showing the tower already in the slot and the one you're playing. **Cancel** is the default button, so pressing Enter or Esc keeps the saved tower. To keep both, save to an empty slot or use **File > Export to file…**.
+The slot that holds the tower you're playing is marked **This tower**, and its **Save** button saves right away. A slot holding any other tower says **Replace…** instead. Click it and the game asks first, showing the tower already in the slot and the one you're playing. **Cancel** is the default button, so pressing Enter or Esc keeps the saved tower. To keep both, save to an empty slot or use **File > Save As…**.
 
 When the game starts, after you load the Auto-save, or after you rename your tower, it can't be sure which slot is yours, so it asks the first time. After you save to a slot or load one, that slot is marked **This tower**.
 
 Replaced or deleted a tower by mistake? An **Undo** line appears under the slots and puts it back. Only the last replace or delete can be undone. Undo goes away if you save something else into that slot or reload the page, and Undo for a replace also goes away when you load or start another tower.
 
-## Exporting to a file
+## Saving to a file
 
-**File > Export to file…** packs your tower into a `.vctower` file and downloads it. That file is the way to:
+**File > Save As…** (Ctrl+Shift+S) packs your tower into a `.vctower` file and downloads it. That file is the way to:
 
 - keep a backup somewhere safe,
 - move a tower to another device or browser, or
 - share it with a friend.
 
-**File > Import from file…** (or **Load from a file…** on the opening screen) brings a `.vctower` back in.
+**File > Open…** (Ctrl+O, or **Load from a file…** on the opening screen) brings a `.vctower` back in.
 
-Because saves live in your browser, clearing your browsing data for the site deletes them. Export anything you'd hate to lose. [Importing and exporting](/help/your-towers/importing-exporting/) has the details.
+Because saves live in your browser, clearing your browsing data for the site deletes them. Save anything you'd hate to lose to a file with **File > Save As…**. [Importing and exporting](/help/your-towers/importing-exporting/) has the details.
 
 ## Towers from the 1994 game
 
-Have an old SimTower save? Load its `.TDT` file the same way, with **Load from a file**. The game reads the tower and lists what it brought over, and anything it couldn't. A 1994 tower comes in as a <span class="vc-mode">Classic</span> tower.
+Have an old SimTower save? Open its `.TDT` file the same way, with **File > Open…** or **Load from a file…**. The game reads the tower and lists what it brought over, and anything it couldn't. A 1994 tower comes in as a <span class="vc-mode">Classic</span> tower.
 
-You can also go the other way. Export a Classic tower and choose **For SimTower (1994)** to download a `.TDT` file the original game can open. This is still experimental: it's known to work for smaller towers. A Modern tower can't be saved for 1994, since the original has no room for the things Modern adds. See [Importing and exporting](/help/your-towers/importing-exporting/#towers-from-1994-importing-a-tdt) for what carries over each way.
+You can also go the other way. Choose **File > Save As…** on a Classic tower, then **For SimTower (1994)…**, to download a `.TDT` file the original game can open. This is still experimental: it's known to work for smaller towers. A Modern tower can't be saved for 1994, since the original has no room for the things Modern adds. See [Importing and exporting](/help/your-towers/importing-exporting/#towers-from-1994-importing-a-tdt) for what carries over each way.
 
 ## If something goes wrong
 
-- **"Your tower isn't being saved."** This notice stays in the top corner when the game can't write its saves. Most often the browser won't keep site data: a private or incognito window, site storage turned off for the site, or a disk that's full. Click **Export tower…** to save the tower to a `.vctower` file right away, then play in a normal window with site storage allowed and load the file back in. The notice goes away by itself once saving works again (the game tells you so), and **Dismiss** hides it until the next time saving fails. A slot's **Save** button and the 💾 **Quick Save** button also say at once when a save didn't work.
+- **"Your tower isn't being saved."** This notice stays in the top corner when the game can't write its saves. Most often the browser won't keep site data: a private or incognito window, site storage turned off for the site, or a disk that's full. Click **Save As…** to save the tower to a `.vctower` file right away, then play in a normal window with site storage allowed and load the file back in. The notice goes away by itself once saving works again (the game tells you so), and **Dismiss** hides it until the next time saving fails. A slot's **Save** button and **File > Save** (the 💾 button) also say at once when a save didn't work.
 - **A save this version can't read.** If a newer version of the game wrote it, update the game (see [Installing and updates](/help/your-towers/installing/)) and try again. The game keeps the unreadable save aside, and **Download unreadable save** gives you a copy to attach to a bug report.
 - **If the game stops.** If the game engine crashes, the game reloads your tower from its last autosave. If it crashes again, it stops and says so. Your saves are still on your device, and **Reload** tries again. On a small or sideways screen the card's text scrolls, and its buttons stay at the bottom where you can reach them.
-- **Something's wrong in a tower.** Please [report it](https://github.com/maniator/verticopolis/issues/new/choose), and attach the exported tower if you can.
+- **Something's wrong in a tower.** Please [report it](https://github.com/maniator/verticopolis/issues/new/choose), and attach the tower's `.vctower` file (**File > Save As…**) if you can.
 
 ## See also
 
