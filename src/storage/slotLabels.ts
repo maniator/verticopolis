@@ -1,9 +1,9 @@
 /**
- * The names a player gives the save slots (owner, 2026-11-15: "Full set plus
- * slot names"). A slot's name is the slot's own, apart from the name of the
- * tower saved in it, so it stays when the slot is saved over or emptied. It
- * is a device preference, kept beside the saves in its own key: it never
- * travels in a tower file and never touches the save format.
+ * The names a player gave the save slots in 4.1 and 4.2 (owner, 2026-11-15: "Full set
+ * plus slot names"), read once when the slots are copied into My Towers
+ * (`fileSpaceMigrate.ts`), where each name becomes its file's. The slots and
+ * their names are no longer written: this reads what those versions left, and the key
+ * stays for a build that still shows slots.
  */
 
 const KEY = "vc.slotNames";
@@ -48,20 +48,4 @@ export function cleanSlotName(name: string): string {
 /** The name the player gave slot `n`, if any. */
 export function slotLabel(n: number): string | undefined {
   return storedNames()[String(n)];
-}
-
-/** Name slot `n`; an empty name gives it back its number. Returns false when
- *  the browser refused the write. */
-export function setSlotLabel(n: number, name: string): boolean {
-  const names = { ...storedNames() };
-  const clean = cleanSlotName(name);
-  if (clean) names[String(n)] = clean;
-  else delete names[String(n)];
-  try {
-    if (Object.keys(names).length) localStorage.setItem(KEY, JSON.stringify(names));
-    else localStorage.removeItem(KEY);
-    return true;
-  } catch {
-    return false;
-  }
 }

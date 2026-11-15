@@ -1,9 +1,11 @@
 // @vitest-environment happy-dom
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { SlotInfo } from "../storage/SaveGame";
+import type { TowerFileEntry } from "../storage/fileSpace";
 
 const fake = vi.hoisted(() => ({
   slots: [] as SlotInfo[],
+  files: [] as TowerFileEntry[],
   listThrows: false,
   splash: false,
   loaded: true,
@@ -18,54 +20,65 @@ vi.mock("../storage/SaveGame", () => ({
     },
   },
 }));
+vi.mock("../storage/fileSpace", () => ({ fileSpace: { list: () => fake.files } }));
 vi.mock("./interactionState", () => ({ isSplashUp: () => fake.splash }));
 vi.mock("./appModals", () => ({ loadFromSplash: fake.loadFromSplash }));
 vi.mock("./titleScreen", () => ({ welcomeFounder: fake.welcomeFounder }));
 
 import type { GameApp } from "../main";
-import { fillLoadMenu, LOAD_FAILED, loadItemText, wireLoadMenu } from "./loadMenu";
+import { autoItemText, fileItemText, fillLoadMenu, LOAD_FAILED, wireLoadMenu } from "./loadMenu";
 
-const row = (slot: SlotInfo["slot"], towerName?: string, exists = true): SlotInfo => ({ slot, exists, present: true, towerName });
+const auto = (towerName?: string, exists = true): SlotInfo => ({ slot: "auto", exists, present: true, towerName });
+const file = (n: number, kind: TowerFileEntry["kind"] = "tower"): TowerFileEntry => ({ id: `id${n}`, name: `Tower ${n}`, kind, size: 10, modified: n });
 
 let root: HTMLElement;
 let app: { ui: { cb: { onLoadSlot: ReturnType<typeof vi.fn> }; sayVisibly: ReturnType<typeof vi.fn> } };
+const commands = { openFile: vi.fn(), more: vi.fn() };
 
 beforeEach(() => {
-  Object.assign(fake, { slots: [], listThrows: false, splash: false, loaded: true });
+  Object.assign(fake, { slots: [], files: [], listThrows: false, splash: false, loaded: true });
   fake.loadFromSplash.mockReset().mockImplementation(() => fake.loaded);
   fake.welcomeFounder.mockReset();
+  commands.openFile.mockReset();
+  commands.more.mockReset();
   root = document.createElement("div");
+  const fileItems = [1, 2, 3, 4, 5].map((n) => `<button id="mb-load-file-${n}" data-load-file="" hidden></button>`).join("");
   root.innerHTML = `<div id="mb-load-menu">
-    <button id="mb-load-auto" data-load-slot="auto" hidden>Auto-save</button>
-    <button id="mb-load-1" data-load-slot="1" hidden>Slot 1</button>
-    <button id="mb-load-2" data-load-slot="2" hidden>Slot 2</button>
-    <button id="mb-load-3" data-load-slot="3" hidden>Slot 3</button>
+    <button id="mb-load-auto" hidden>Auto-save</button>
+    ${fileItems}
+    <button id="mb-load-more" hidden>More…</button>
     <button id="mb-load-none" aria-disabled="true">No saved towers yet</button>
   </div>`;
   app = { ui: { cb: { onLoadSlot: vi.fn() }, sayVisibly: vi.fn() } };
-  wireLoadMenu(app as unknown as GameApp, root);
+  wireLoadMenu(app as unknown as GameApp, commands, root);
 });
 
 const item = (id: string) => root.querySelector<HTMLElement>(`#${id}`)!;
-const shown = () => [...root.querySelectorAll<HTMLElement>("button")].filter((b) => !b.hidden).map((b) => b.textContent);
+const shown = () => [...root.querySelectorAll<HTMLElement>("button")].filter((b) => !b.hidden).map((b) => b.textContent?.trim());
 
 describe("File > Load", () => {
-  it("names each save and its tower", () => {
-    expect(loadItemText(row("auto", "Sky Hotel"))).toBe("Auto-save: Sky Hotel");
-    expect(loadItemText(row(2, "Pine Plaza"))).toBe("Slot 2: Pine Plaza");
-    expect(loadItemText(row(1))).toBe("Slot 1: Tower");
+  it("names the Auto-save by its tower, and a 1994 file as one", () => {
+    expect(autoItemText(auto("Sky Hotel"))).toBe("Auto-save: Sky Hotel");
+    expect(autoItemText(auto())).toBe("Auto-save: Tower");
+    expect(fileItemText(file(1))).toBe("Tower 1");
+    expect(fileItemText(file(2, "tdt"))).toBe("Tower 2 (1994)");
   });
 
-  it("lists the Auto-save and each filled slot, and hides the empty ones", () => {
-    fake.slots = [row("auto", "Sky Hotel"), row(1, undefined, false), row(2, "Pine Plaza"), row(3, undefined, false)];
+  it("lists the Auto-save and the newest files, in the folder's order", () => {
+    fake.slots = [auto("Sky Hotel")];
+    fake.files = [file(9), file(8, "tdt")];
     fillLoadMenu(root);
-    expect(shown()).toEqual(["Auto-save: Sky Hotel", "Slot 2: Pine Plaza"]);
+    expect(shown()).toEqual(["Auto-save: Sky Hotel", "Tower 9", "Tower 8 (1994)"]);
+  });
+
+  it("shows five files, then More…", () => {
+    fake.files = [6, 5, 4, 3, 2, 1].map((n) => file(n));
+    fillLoadMenu(root);
+    expect(shown()).toEqual(["Tower 6", "Tower 5", "Tower 4", "Tower 3", "Tower 2", "More…"]);
   });
 
   it("shows the grayed line when there is nothing to load, or storage is blocked", () => {
-    fake.slots = [row("auto", "Sky Hotel")];
-    fillLoadMenu(root);
-    fake.slots = [row("auto", undefined, false), row(1, undefined, false)];
+    fake.slots = [auto("Sky", false)];
     fillLoadMenu(root);
     expect(shown()).toEqual(["No saved towers yet"]);
     fake.listThrows = true;
@@ -73,17 +86,25 @@ describe("File > Load", () => {
     expect(shown()).toEqual(["No saved towers yet"]);
   });
 
-  it("in a tower, loads the picked save the way Saved Towers… does", () => {
-    item("mb-load-2").click();
+  it("opens a listed file by its id, and More… opens the Open window", () => {
+    fake.files = [file(1), file(2)];
+    fillLoadMenu(root);
+    item("mb-load-file-2").click();
+    item("mb-load-more").click();
+    expect(commands.openFile).toHaveBeenCalledWith("id2");
+    expect(commands.more).toHaveBeenCalledOnce();
+  });
+
+  it("in a tower, loads the Auto-save the tower's own way", () => {
     item("mb-load-auto").click();
-    expect(app.ui.cb.onLoadSlot.mock.calls).toEqual([[2], ["auto"]]);
+    expect(app.ui.cb.onLoadSlot).toHaveBeenCalledWith("auto");
     expect(fake.loadFromSplash).not.toHaveBeenCalled();
   });
 
   it("on the title screen, loads through the title screen and welcomes a founder once the tower arrives", () => {
     fake.splash = true;
-    item("mb-load-1").click();
-    expect(fake.loadFromSplash).toHaveBeenCalledWith(app, 1);
+    item("mb-load-auto").click();
+    expect(fake.loadFromSplash).toHaveBeenCalledWith(app, "auto");
     expect(fake.welcomeFounder).toHaveBeenCalledWith(app);
     expect(app.ui.cb.onLoadSlot).not.toHaveBeenCalled();
   });

@@ -297,7 +297,7 @@ describe("SaveLoad legacy files", () => {
     expect(vi.mocked(trackFileExported).mock.calls[0][1]()).toEqual(HEADER);
   });
 
-  it("the import report's Open tower adopts through the confirmed flow, which re-stages the same file", async () => {
+  it("the import report's Open tower adopts its own file through the confirmed flow", async () => {
     const { saves, port, deps } = setup({
       prepareTdt: () => Promise.resolve(),
       loadTdt: () => Float64Array.of(1, 0),
@@ -314,7 +314,7 @@ describe("SaveLoad legacy files", () => {
       vi.mocked(importFacts).mock.results[0].value,
     );
     cb.onOpen();
-    const [, name, flush, restage] = vi.mocked(adoptConfirmedLegacyImport).mock
+    const [, name, flush, file] = vi.mocked(adoptConfirmedLegacyImport).mock
       .calls[0];
     expect(name).toBe("Old Tower");
     flush();
@@ -322,12 +322,11 @@ describe("SaveLoad legacy files", () => {
       SaveGame.save,
       "the flush is the pre-update save",
     ).toHaveBeenCalledExactlyOnceWith("SAVE");
-    restage();
-    expect(port.loadTdt).toHaveBeenCalledTimes(2);
-    expect(port.loadTdt).toHaveBeenLastCalledWith(
-      new Uint8Array(buffer),
-      "OLD.TDT",
-    );
+    expect(port.loadTdt).toHaveBeenCalledOnce();
+    expect(file, "the confirmed report's own file goes along").toEqual({
+      bytes: new Uint8Array(buffer),
+      filename: "OLD.TDT",
+    });
   });
 });
 

@@ -16,6 +16,8 @@ import type { Tool } from "../../ui/UI";
 import { kitOf, portOf, unitEditor, transportEditor, editorPortDeps, inspectorPortDeps } from "../../game/cardKit.fixture";
 import { render, type TemplateResult } from "lit-html";
 import { SaveGame } from "../../storage/SaveGame";
+import { closeFileSpaceForTests, fileSpace } from "../../storage/fileSpace";
+import { FakeIndexedDb } from "../fakeIndexedDb";
 import { toBase64 } from "../../storage/saveCompression";
 import type { ExportReport } from "../../storage/tdtExportReport";
 import type { ImportReport } from "../../storage/tdtImportReport";
@@ -34,7 +36,7 @@ import { hasWasmPackage } from "../conformance/wasmEngine";
 /** The `.TDT` tests read and write files through the Rust package, so they run
  *  where it is built (CI builds it for every project). */
 const itTdt = (name: string, body: () => Promise<void>) => it.skipIf(!hasWasmPackage())(name, body);
-import { saveOf, loadAuto, loadSlotSim, withPorts } from "../fixtures/saveText";
+import { saveOf, loadAuto, withPorts } from "../fixtures/saveText";
 import { showGraphicsRecovery } from "../../ui/graphicsRecovery";
 import { isRecoveringGraphics } from "../../game/interactionState";
 
@@ -1113,6 +1115,7 @@ describe.skipIf(noEngine)("SaveLoad (persistence, update flush, GPU-loss recover
   afterEach(() => {
     vi.unstubAllGlobals();
     document.getElementById("splash")?.remove();
+    closeFileSpaceForTests();
   });
 
   /** The test DOM's location.reload is a navigation no-op, so swap the global
@@ -1300,14 +1303,36 @@ describe.skipIf(noEngine)("SaveLoad (persistence, update flush, GPU-loss recover
     expect(report.star).toBe(3);
 
     // Confirming adopts the tower, flushes the OLD tower to the autosave, and
-    // copies the import to the first free manual slot.
+    // keeps the 1994 file, byte for byte, in My Towers.
     sim.money = 777; // make the pre-import tower recognizable
+    await fileSpace.open(new FakeIndexedDb().asFactory());
     open();
     expect(adopted).toEqual([sim]);
     expect(adopted[0].money).toBe(1_234_500);
     expect(loadAuto()!.money).toBe(777); // current tower kept safe
-    expect(loadSlotSim(1)!.money).toBe(1_234_500); // fresh-slot copy
-    expect(last(f.toasts)).toEqual({ text: "Tower imported and saved to slot 1.", kind: "good" });
+    await vi.waitFor(() => expect(last(f.toasts)).toEqual({ text: 'Tower imported. The 1994 file is in My Towers as "LEGACY".', kind: "good" }));
+    const kept = fileSpace.list();
+    expect(kept.map((e) => [e.name, e.kind])).toEqual([["LEGACY", "tdt"]]);
+    expect(await fileSpace.read(kept[0].id)).toEqual(bytes);
+  });
+
+  itTdt("importLegacy: the same 1994 file opened again is not kept twice", async () => {
+    await fileSpace.open(new FakeIndexedDb().asFactory());
+    const bytes = buildTdt({ balance: 111 });
+    await saveLoad.importLegacy(bytes.slice().buffer as ArrayBuffer, "TWICE.TDT");
+    f.importReports[0].open();
+    await vi.waitFor(() => expect(fileSpace.list()).toHaveLength(1));
+    await saveLoad.importLegacy(bytes.slice().buffer as ArrayBuffer, "TWICE.TDT");
+    f.importReports[1].open();
+    await vi.waitFor(() => expect(f.toasts.filter((t) => t.text.includes("My Towers"))).toHaveLength(2));
+    expect(fileSpace.list().map((e) => e.name)).toEqual(["TWICE"]);
+  });
+
+  itTdt("importLegacy: with My Towers closed, the import still opens and says how to keep it", async () => {
+    await saveLoad.importLegacy(buildTdt().buffer as ArrayBuffer, "NOFOLDER.TDT");
+    f.importReports[0].open();
+    expect(adopted).toHaveLength(1);
+    await vi.waitFor(() => expect(last(f.toasts)).toEqual({ text: "Tower imported. Use File > Save As… to keep it.", kind: "good" }));
   });
 
   itTdt("importLegacy: each report opens its own file, whatever was read after it", async () => {
@@ -1319,27 +1344,6 @@ describe.skipIf(noEngine)("SaveLoad (persistence, update flush, GPU-loss recover
     f.importReports[1].open();
     expect(adopted).toHaveLength(2);
     expect(sim.money).toBe(22_200);
-  });
-
-  itTdt("importLegacy: a corrupt-but-present slot is NOT treated as free (raw presence wins)", async () => {
-    // A slot whose payload no longer parses may still be recoverable by a
-    // later build; the import's fresh-slot copy must skip it, not reuse it.
-    localStorage.setItem("simtower-clone-slot-1", "VCZ1:not-really-deflate");
-    await saveLoad.importLegacy(buildTdt().buffer as ArrayBuffer, "CAREFUL.TDT");
-    f.importReports[0].open();
-    expect(localStorage.getItem("simtower-clone-slot-1")).toBe("VCZ1:not-really-deflate");
-    expect(loadSlotSim(2)).not.toBeNull(); // landed on the next raw-free slot
-    expect(last(f.toasts).text).toBe("Tower imported and saved to slot 2.");
-  });
-
-  itTdt("importLegacy: with every slot full, nothing is overwritten and the toast says so", async () => {
-    for (let n = 1; n <= 3; n++) SaveGame.saveSlot(n, saveOf(sim));
-    const before = [1, 2, 3].map((n) => localStorage.getItem(`simtower-clone-slot-${n}`));
-    await saveLoad.importLegacy(buildTdt().buffer as ArrayBuffer, "FULL.TDT");
-    f.importReports[0].open();
-    expect(adopted).toHaveLength(1);
-    expect([1, 2, 3].map((n) => localStorage.getItem(`simtower-clone-slot-${n}`))).toEqual(before);
-    expect(last(f.toasts).text).toMatch(/All save slots are full/);
   });
 
   it("first mid-game context loss: autosave written, then in-place recovery is attempted (no crash screen)", () => {

@@ -1,3 +1,4 @@
+import { openFileSpace, wireTowerDrop } from "./fileSpaceCommands";
 import type { GameApp } from "../main";
 import { BuildActions } from "./buildActions";
 import { EditorActions } from "./editorActions";
@@ -45,8 +46,6 @@ import { reducedMotionActive } from "../storage/Prefs";
 // re-exported because the boot snapshot below reads it, and the alias stays so
 // the suites that import it from here keep resolving.
 import { APP_VERSION } from "../appVersion";
-import { saveStore } from "../storage/saveStore";
-import { isSlotKey } from "../storage/SaveGame";
 import { touchOverviewMap, wireOverviewMap } from "./overviewMapWiring";
 import { wireMovableWindows } from "./movableWindows";
 import { refuseAppPlacementWhilePaused } from "./pausedBuild";
@@ -221,13 +220,6 @@ export function wireControllers(app: GameApp): void {
       app.onboarding.arm(app.enginePort);
     },
   });
-  // This release mirrors every slot in localStorage, so a slot write that
-  // fails is refused there, at once, and this never fires. Once a slot leaves
-  // the mirror its database write lands after the dialog said "Saved", and a
-  // write that fails there is said like a refused slot.
-  saveStore.onFailure((err, key) => {
-    if (isSlotKey(key)) app.saveLoad.notice.slotFailed(err);
-  });
   app.keyboard = new KeyboardPlay({
     enginePort: () => app.enginePort,
     portCodes: () => app.portCodes,
@@ -267,6 +259,8 @@ export function runBootFlow(app: GameApp, savedAtBoot?: number): void {
   // The facility card and the dialogs move by their title bars too.
   wireMovableWindows(app);
   wireMenus(app); // the menu bar, its Tower Info and Bulletin windows, the status bar
+  void openFileSpace(app); // My Towers, and the one-time copy of the save slots
+  wireTowerDrop(app); // a tower file dropped on the game opens
   wireScreenSaver(app); // Options > Screen Saver… and its idle and return triggers
   // A help page the game opened asks whether the game is still running before
   // its Back to game closes its window (src/ui/fromGame.ts).

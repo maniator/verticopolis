@@ -1,7 +1,7 @@
 import type { GameApp } from "../main";
 import { shouldWelcomeFounder } from "../founder";
 import { activateInstall, splashInstallOffered } from "./installAffordance";
-import { showTowerPicker } from "./appModals";
+import { showOpenDialog } from "./fileSpaceCommands";
 import { isEngineStopped, isSplashUp } from "./interactionState";
 
 /**
@@ -66,11 +66,11 @@ export function showTitleScreen(app: GameApp, hasSave: boolean): void {
       app.ui.toast("Welcome back. Press Play to resume.", "info");
       founderWelcome(); // one-time thank-you once they land in the tower
     },
-    // The load-only tower picker (SPEC-splash-load-tower). Offered on every
-    // boot, not just when `hasSave`: the manual slots are invisible to
-    // `hasSave` (it reads the autosave keys alone), and the picker's file row
-    // is the only way a fresh install or a new device gets its towers back.
-    onLoadTower: () => showTowerPicker(app, founderWelcome),
+    // The Open window over My Towers (owner, 2026-11-15). Offered on every
+    // boot, not just when `hasSave`: My Towers is invisible to `hasSave` (it
+    // reads the autosave keys alone), and the window's "From a file on your
+    // computer…" is how a new device gets its towers back.
+    onLoadTower: () => showOpenDialog(app),
     onNewTower: (dismiss) => {
       // The rule-set picker (Classic vs Modern) warns that New Tower abandons
       // the current tower only when one is continuable (`hasSave`); on a

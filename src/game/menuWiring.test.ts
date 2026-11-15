@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { GameApp } from "../main";
 
 const map = vi.hoisted(() => ({ open: false, set: vi.fn() }));
-const importer = vi.hoisted(() => ({ openImport: vi.fn() }));
+const files = vi.hoisted(() => ({ showOpenDialog: vi.fn(), showSaveAsDialog: vi.fn(), openFile: vi.fn() }));
 const store = vi.hoisted(() => new Map<string, string>());
 const movable = vi.hoisted(() => vi.fn());
 const sponsor = vi.hoisted(() => ({ offered: true, track: vi.fn() }));
@@ -12,7 +12,7 @@ vi.mock("./overviewMapWiring", () => ({
   overviewMapOpen: () => map.open,
   setOverviewMapOpen: map.set,
 }));
-vi.mock("../ui/uiImport", () => importer);
+vi.mock("./fileSpaceCommands", () => files);
 vi.mock("./titleScreen", () => closer);
 const loads = vi.hoisted(() => ({ fill: vi.fn(), wire: vi.fn() }));
 vi.mock("./loadMenu", () => ({ fillLoadMenu: loads.fill, wireLoadMenu: loads.wire }));
@@ -118,9 +118,9 @@ describe("wireMenus", () => {
     keys.open();
     keys.save();
     keys.saveAs();
-    expect(importer.openImport).toHaveBeenCalledWith(ui);
+    expect(files.showOpenDialog).toHaveBeenCalledWith(app);
     expect(ui.cb.onSave).toHaveBeenCalledOnce();
-    expect(ui.promptExport).toHaveBeenCalledOnce();
+    expect(files.showSaveAsDialog).toHaveBeenCalledWith(app);
     // A key that ran reports app_action file_key, and never a menu_pick: no
     // menu was opened. A grayed key (Save on the title screen) reports nothing.
     const report = shortcuts.mock.calls[0][2]!;
@@ -141,7 +141,12 @@ describe("wireMenus", () => {
   it("wires File > Load to the app and refills it each time the File menu opens", () => {
     const { app } = fakeApp();
     const bar = wireMenus(app)!;
-    expect(loads.wire).toHaveBeenCalledWith(app);
+    expect(loads.wire).toHaveBeenCalledWith(app, expect.anything());
+    const [, commands] = loads.wire.mock.calls[0] as [unknown, { openFile(id: string): void; more(): void }];
+    commands.openFile("f1");
+    commands.more();
+    expect(files.openFile).toHaveBeenCalledWith(app, "f1");
+    expect(files.showOpenDialog).toHaveBeenCalledWith(app);
     loads.fill.mockClear();
     bar.open($("mb-file") as HTMLButtonElement, false);
     expect(loads.fill).toHaveBeenCalledOnce();
@@ -163,8 +168,8 @@ describe("wireMenus", () => {
     $("mb-replay").click();
     expect(ui.cb.onSave).toHaveBeenCalledOnce();
     expect(closer.closeTower).toHaveBeenCalledWith(app);
-    expect(importer.openImport).toHaveBeenCalledWith(ui);
-    expect(ui.promptExport).toHaveBeenCalledOnce();
+    expect(files.showOpenDialog).toHaveBeenCalledWith(app);
+    expect(files.showSaveAsDialog).toHaveBeenCalledWith(app);
     expect(undo).toHaveBeenCalledOnce(); // the toolbar's own button, so its rules hold
     expect(ui.showTowerRules).toHaveBeenCalledOnce(); // this tower's column, not the whole comparison
     expect(ui.showCompare).toHaveBeenCalledOnce();
@@ -330,10 +335,10 @@ describe("wireMenus", () => {
     splash.remove();
   });
 
-  it("on the title screen, Import opens the file chooser at once instead of the Load Tower picker", () => {
-    const { app, ui } = fakeApp();
+  it("on the title screen, Open shows the Open window itself, without pressing the title screen's Load Tower", () => {
+    const { app } = fakeApp();
     const bar = wireMenus(app)!;
-    importer.openImport.mockClear();
+    files.showOpenDialog.mockClear();
     const splashLoad = vi.fn();
     const splash = document.createElement("div");
     splash.id = "splash";
@@ -342,7 +347,7 @@ describe("wireMenus", () => {
     splash.querySelector("button")!.addEventListener("click", splashLoad);
     bar.open($("mb-file") as HTMLButtonElement, false);
     $("mb-import").click();
-    expect(importer.openImport).toHaveBeenCalledExactlyOnceWith(ui);
+    expect(files.showOpenDialog).toHaveBeenCalledExactlyOnceWith(app);
     expect(splashLoad).not.toHaveBeenCalled();
     splash.remove();
   });

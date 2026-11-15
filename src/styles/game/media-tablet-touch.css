@@ -43,9 +43,6 @@
    (.xs) are exempt — 36px squares inflate every navy bar (the production
    "giant close button" bug); Esc/backdrop/hover-away still dismiss. */
 @media (pointer: coarse) {
-  ul.slots .slot-actions .btn {
-    min-height: 48px;
-  }
   .modal-actions .btn,
   .modal-box .btn:not(.xs),
   #editor .ed-row .btn,

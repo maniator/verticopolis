@@ -1,5 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
-import { SAVES_DRAW } from "../ui/savesDraw";
+const files = vi.hoisted(() => ({ saveCurrentFile: vi.fn(), keepOpenedFile: vi.fn() }));
+vi.mock("./fileSpaceCommands", () => ({ saveCurrentFile: files.saveCurrentFile }));
+vi.mock("./fileKeep", () => ({ keepOpenedFile: files.keepOpenedFile }));
 import { catalogFor } from "../tests/catalogFixture";
 import type { GameMode } from "../shared/types";
 import { createUICallbacks, type GameAppPorts } from "./uiCallbacks";
@@ -26,7 +28,11 @@ function makePorts() {
     lobbyHeight: { picked: 2, pick: vi.fn() },
     bulldozeDrag: { clears: "everything", pick: vi.fn() },
     reader,
-    enginePort: { flipAutoBridge: vi.fn(() => Float64Array.of(1, 0, 0)), autoBridge: vi.fn(() => true) } as unknown as EnginePort,
+    enginePort: {
+      flipAutoBridge: vi.fn(() => Float64Array.of(1, 0, 0)),
+      autoBridge: vi.fn(() => true),
+      generation: vi.fn(() => 1),
+    } as unknown as EnginePort,
     portCodes: new PortCodes(mockPort()),
     audio: { muted: true, musicVolume: 0.4, ambienceVolume: 0.7, sfxVolume: 0.6 },
     saveLoad: {
@@ -57,10 +63,7 @@ function makePorts() {
     replayOnboarding: vi.fn(),
     clearBuildRefusal: vi.fn(),
     showStats: vi.fn(),
-    showSaves: vi.fn(),
-    saveToSlot: vi.fn(),
     loadFromSlot: vi.fn(),
-    deleteSlot: vi.fn(),
   };
   return { ports, reader };
 }
@@ -105,6 +108,29 @@ describe("createUICallbacks delegates every callback to its port", () => {
     expect(ports.saveLoad.exportLegacy).toHaveBeenCalledTimes(1);
     cb.onNew("modern", "realWorld", true);
     expect(ports.saveLoad.newGame).toHaveBeenCalledExactlyOnceWith("modern", "realWorld", true);
+  });
+
+  it("File > Save also writes the tower's My Towers file", () => {
+    const { ports } = makePorts();
+    files.saveCurrentFile.mockClear();
+    createUICallbacks(ports).onSave();
+    expect(ports.saveLoad.save).toHaveBeenCalledOnce();
+    expect(files.saveCurrentFile).toHaveBeenCalledOnce();
+  });
+
+  it("keeps a picked tower file in My Towers only once the tower it holds arrived", async () => {
+    const { ports } = makePorts();
+    const generation = vi.mocked(ports.enginePort.generation);
+    const from = { name: "Spire.vctower", bytes: Uint8Array.of(1) };
+    const cb = createUICallbacks(ports);
+    files.keepOpenedFile.mockClear();
+    generation.mockReturnValueOnce(1).mockReturnValueOnce(1);
+    cb.onImport("refused", from);
+    await vi.waitFor(() => expect(generation).toHaveBeenCalledTimes(2));
+    expect(files.keepOpenedFile).not.toHaveBeenCalled();
+    generation.mockReturnValueOnce(1).mockReturnValueOnce(2);
+    cb.onImport("opened", from);
+    await vi.waitFor(() => expect(files.keepOpenedFile).toHaveBeenCalledExactlyOnceWith("Spire.vctower", from.bytes, "tower"));
   });
 
   it("getMode reads the reader's header per call, so an adoptSim-style swap is seen", () => {
@@ -201,25 +227,9 @@ describe("createUICallbacks delegates every callback to its port", () => {
     expect(ports.clearBuildRefusal).toHaveBeenCalledTimes(1);
   });
 
-  it("save slots: show, save, load (incl. auto), delete", () => {
+  it("loads the Auto-save through the app", () => {
     const { ports } = makePorts();
-    const cb = createUICallbacks(ports);
-    cb.onShowSaves(SAVES_DRAW.open);
-    expect(ports.showSaves).toHaveBeenCalledTimes(1);
-    // A redraw from inside the dialog passes its reason through (#2161).
-    cb.onShowSaves(SAVES_DRAW.redraw);
-    expect(ports.showSaves).toHaveBeenLastCalledWith(SAVES_DRAW.redraw);
-    cb.onSaveSlot(2);
-    expect(ports.saveToSlot).toHaveBeenCalledWith(2);
-    // Each invocation delegates exactly once; assert counts so a double-fire or a
-    // wrong-arg first call cannot hide behind a later matching call.
-    cb.onLoadSlot(1);
-    expect(ports.loadFromSlot).toHaveBeenCalledTimes(1);
-    expect(ports.loadFromSlot).toHaveBeenLastCalledWith(1);
-    cb.onLoadSlot("auto");
-    expect(ports.loadFromSlot).toHaveBeenCalledTimes(2);
-    expect(ports.loadFromSlot).toHaveBeenLastCalledWith("auto");
-    cb.onDeleteSlot(3);
-    expect(ports.deleteSlot).toHaveBeenCalledWith(3);
+    createUICallbacks(ports).onLoadSlot("auto");
+    expect(ports.loadFromSlot).toHaveBeenCalledExactlyOnceWith("auto");
   });
 });

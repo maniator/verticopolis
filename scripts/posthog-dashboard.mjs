@@ -500,17 +500,28 @@ function buildInsights(ids) {
     },
     {
       name: "Persistence actions (save / export / import / TDT)",
-      description: "app_action restricted to the persistence surface, by action, production. Who saves/exports/uses the TDT round-trip, in aggregate.",
+      description:
+        "app_action restricted to the persistence surface, by action, production. Who saves/exports/uses the TDT round-trip, in aggregate. save_slot, delete_save and rename_slot are the old numbered save slots, which no build from 4.3 sends; the My Towers tile follows them.",
       query: trends([series("app_action", "Actions")], {
         breakdown: "action",
         display: "ActionsBar",
-        where: [inAction(["quick_save", "save_slot", "load_slot", "delete_save", "rename_slot", "export_save", "import_save", "export_tdt", "import_tdt"])],
+        where: [inAction(["quick_save", "save_slot", "load_slot", "delete_save", "rename_slot", "file_save", "file_open", "export_save", "import_save", "export_tdt", "import_tdt"])],
+      }),
+    },
+    {
+      name: "My Towers (Open, Save As, files)",
+      description:
+        "The My Towers folder from 4.3, by action, production: windows opened (files_open), files opened by kind (file_open), saved (file_save: new, replace, or current from File > Save), added (file_add: picked once it opened, or dropped on a window), files dropped on the game (file_dropped), renamed, duplicated, deleted, writes refused (file_failed: full or error), and the one-time copy of the old save slots (files_copied). Codes only, never a file's name. See docs/analytics-data-map.md, My Towers.",
+      query: trends([series("app_action", "Actions")], {
+        breakdown: "action",
+        display: "ActionsBar",
+        where: [inAction(["files_open", "file_open", "file_save", "file_add", "file_dropped", "file_rename", "file_copy", "file_delete", "file_failed", "files_copied"])],
       }),
     },
     {
       name: "Persistence failures (counts, not rates)",
       description:
-        "autosave_failed, load_failed, import_failed and export_failed events, by action, production (#1533, #1701). These are COUNTS. A rate needs attempts: imports have them (import_save, import_tdt) and slot loads have them (load_slot plus load_failed); autosave has none, so its rate is unavailable, and an export's attempts are sent at the click, so no export rate is printed. scripts/engine-reliability.mjs prints the rates and bounds. Only builds from 2.78.4 send the first three codes and only builds from 2.78.10 send export_failed (the tile has no version filter, so read it from the 2026-11-03 deploy), so an earlier range reads Not measurable, not zero. See docs/analytics-measurement-status.md.",
+        "autosave_failed, load_failed, import_failed and export_failed events, by action, production (#1533, #1701). These are COUNTS. A rate needs attempts: imports have them (import_save, import_tdt) and Auto-save loads have them (load_slot plus load_failed; up to 4.2 the numbered slots counted too); autosave has none, so its rate is unavailable, and an export's attempts are sent at the click, so no export rate is printed. scripts/engine-reliability.mjs prints the rates and bounds. Only builds from 2.78.4 send the first three codes and only builds from 2.78.10 send export_failed (the tile has no version filter, so read it from the 2026-11-03 deploy), so an earlier range reads Not measurable, not zero. See docs/analytics-measurement-status.md.",
       query: trends([series("app_action", "Failures")], {
         breakdown: "action",
         display: "ActionsBar",
@@ -523,7 +534,7 @@ function buildInsights(ids) {
       query: trends([series("app_action", "Actions")], {
         breakdown: "platform",
         display: "ActionsTable",
-        where: [inAction(["quick_save", "save_slot", "export_save", "import_save", "export_tdt", "import_tdt"])],
+        where: [inAction(["quick_save", "save_slot", "file_save", "export_save", "import_save", "export_tdt", "import_tdt"])],
       }),
     },
     {

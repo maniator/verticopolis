@@ -29,26 +29,19 @@ export async function pgShowReturningSplash(page: Page): Promise<void> {
 }
 
 /**
- * Open the load-only tower picker over the title screen with one row of every
- * variant. The slot metadata is synthetic and fixed (a pinned `savedAt`, so the
- * rendered timestamp cannot drift between runs); nothing here writes storage.
+ * Two towers in My Towers, then File > Open… (Ctrl+O) over whatever is on
+ * screen, so the Open window shows rows rather than its empty line. The files
+ * hold the scene's own boot tower under two fixed names, and their Modified
+ * time is the pinned clock (`screenshot-page-ops.ts`), so the pixels hold
+ * still between runs. The scene's browser profile is its own, so nothing
+ * carries into another scene.
  */
-export async function pgShowTowerPicker(page: Page): Promise<void> {
-  await page.evaluate(() => {
+export async function pgShowOpenWindow(page: Page): Promise<void> {
+  await page.evaluate(async () => {
     const g = (window as unknown as { game?: any }).game;
-    const AT = 1_700_000_000_000;
-    g.ui.showTowerPicker({
-      getSlots: () => ({
-        storageBlocked: false,
-        slots: [
-          { slot: "auto", exists: true, present: true, towerName: "Verticopolis", star: 3, population: 1840, funds: 2_450_000, savedAt: AT, mode: "classic", day: 96 },
-          { slot: 1, exists: true, present: true, towerName: "Harbour Point", star: 2, population: 620, funds: 810_000, savedAt: AT, mode: "modern", day: 41 },
-          { slot: 2, exists: false, present: true },
-          { slot: 3, exists: false, present: false },
-        ],
-      }),
-      onLoad: () => true,
-    });
+    await g.saveFile("Harbour Point");
+    await g.saveFile("Sky Hotel");
   });
-  await page.waitForSelector("#modal .slots", { timeout: 4000 });
+  await page.keyboard.press("Control+o");
+  await page.waitForSelector("#modal .fd", { timeout: 4000 });
 }

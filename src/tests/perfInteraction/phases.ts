@@ -108,13 +108,13 @@ async function zoom(page: Page, vp: Viewport, end: number): Promise<PhaseActions
   return { actions: k, effective: null };
 }
 
-/** Open and close the Statistics, Saves and Settings dialogs, one a second.
+/** Open and close the Statistics, Open and Settings windows, one a second.
  *  A dialog counts as opened only when one is open after the click. */
 async function panels(page: Page, end: number): Promise<PhaseActions> {
   // Each dialog's menu title, then its item, the way a player picks it.
   const dialogs = [
     ["#mb-tower", "#btn-stats"],
-    ["#mb-file", "#btn-load"],
+    ["#mb-file", "#mb-import"],
     ["#mb-options", "#btn-settings"],
   ] as const;
   const tick = pacer(page, 500);

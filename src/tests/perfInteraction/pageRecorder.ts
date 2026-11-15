@@ -280,7 +280,7 @@ export function officeCount(): number {
   return n;
 }
 
-/** Whether a dialog is open (Statistics, Saves and Settings open `#modal`). */
+/** Whether a dialog is open (Statistics, Open and Settings open `#modal`). */
 export function dialogOpen(): boolean {
   return document.querySelector("dialog[open]") !== null;
 }

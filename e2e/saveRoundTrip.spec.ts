@@ -2,7 +2,7 @@
 import { readFileSync } from "node:fs";
 import { deflateRawSync, inflateRawSync } from "node:zlib";
 import { test, expect, type Page } from "@playwright/test";
-import { storedSave, storedSaves } from "./helpers";
+import { storedSave, storedSaves, storedTowerFile } from "./helpers";
 
 /**
  * The save paths in a real browser on the Rust engine (#1596, from the checks
@@ -20,6 +20,7 @@ test.use({ storageState: { cookies: [], origins: [] }, serviceWorkers: "block" }
 const AUTO_KEY = "verticopolis-save";
 const LEGACY_AUTO_KEY = "simtower-clone-save";
 const UNREADABLE_KEY = "simtower-clone-unreadable";
+/** A save slot from 4.2 or earlier: My Towers copies it in once and leaves the key alone. */
 const SLOT_1_KEY = "simtower-clone-slot-1";
 /** A save from save format version 1, in the file container. */
 const OLD_FILE = readFileSync(new URL("../conformance/fixtures/towerone-star1.vctower", import.meta.url), "utf8");
@@ -97,27 +98,27 @@ test("the towers come back from IndexedDB after a reload, the same game", async 
   // from the file. Asking for a whole game hour timed out on a slow runner,
   // where every frame over 200 ms feeds the clock only 1 ms.
   await playAndSave(page, imported);
-  // A slot too, so the check covers more than the autosave.
-  await page.evaluate(() => (window as any).game.saveToSlot(1));
+  // A My Towers file too, so the check covers more than the autosave.
+  const fileId = await page.evaluate(() => (window as any).game.saveFile("Round trip") as Promise<string>);
   // The engine's whole state, parsed so a number reads the same however it was written.
   const engine = async () => JSON.parse(await page.evaluate(() => (window as any).__vcEngine.port.serialize() as string)) as unknown;
   const before = await engine();
   expect((before as { units: unknown[] }).units.length).toBeGreaterThan(0);
   const saves = await storedSaves(page);
   expect(saves[`idb:${AUTO_KEY}`], "the autosave reached IndexedDB").toBe(saves[`ls:${AUTO_KEY}`]);
-  expect(saves[`idb:${SLOT_1_KEY}`], "the slot reached IndexedDB").toBe(saves[`ls:${SLOT_1_KEY}`]);
+  expect(await storedTowerFile(page, fileId), "the My Towers file reached IndexedDB").toBe(true);
   // IndexedDB keeps the deflate bytes; the text the game reads back is the one it wrote.
   expect(saves[`idb:${AUTO_KEY}`]).toMatch(/^VCZ1:/);
   // Put another tower, with no save time, in the localStorage copies: the
   // database copy is the one with a time, so boot must take it from there.
-  await page.evaluate(([keys, other]) => (keys as string[]).forEach((k) => localStorage.setItem(k, other as string)), [[AUTO_KEY, SLOT_1_KEY], OLD_SAVE] as const);
+  await page.evaluate(([keys, other]) => (keys as readonly string[]).forEach((k) => localStorage.setItem(k, other as string)), [[AUTO_KEY], OLD_SAVE] as const);
   await page.reload();
   await page.waitForFunction(() => !!(window as any).game && !!(window as any).__vcEngine?.status?.hosted, undefined, { timeout: 30_000 });
   await page.evaluate(() => (window as any).game.setSpeed(0));
   expect(await engine(), "the autosave from IndexedDB is the same game").toEqual(before);
-  expect(await storedSave(page, SLOT_1_KEY)).toBe(saves[`idb:${SLOT_1_KEY}`]);
-  await page.evaluate(() => (window as any).game.loadFromSlot(1));
-  expect(await engine(), "the slot from IndexedDB is the same game").toEqual(before);
+  await page.evaluate((id) => (window as any).game.openFile(id), fileId);
+  await page.evaluate(() => (window as any).game.setSpeed(0));
+  expect(await engine(), "the My Towers file from IndexedDB is the same game").toEqual(before);
 });
 
 test("a tower file saved by a newer version is refused and changes nothing", async ({ page }) => {
@@ -137,7 +138,7 @@ test("a tower file saved by a newer version is refused and changes nothing", asy
 test("an older version's autosave loads, a failed import changes nothing, and an older file imports", async ({ page }) => {
   const old = JSON.parse(OLD_SAVE) as { version: number; money: number };
   expect(old.version).toBe(1);
-  // A manual slot too, so the import check below covers more than the autosave.
+  // An old save slot too, so the import check below covers more than the autosave.
   await seed(page, { [LEGACY_AUTO_KEY]: OLD_SAVE, [SLOT_1_KEY]: OLD_SAVE });
   await boot(page, "/");
   await page.waitForFunction((money) => (window as any).game.reader.header.money === money, old.money, { timeout: 10_000 });
@@ -200,9 +201,9 @@ test("an unreadable autosave is kept, not overwritten, and downloads as it was s
   expect(autosave, "the new tower was written to the autosave slot").not.toBe(unreadable);
   expect(autosave).toMatch(/^VCZ1:/);
   expect(await storedSave(page, UNREADABLE_KEY)).toBe(unreadable);
-  // The kept text downloads from Saved Towers exactly as it was stored.
-  await page.evaluate(() => (window as any).game.showSaves());
-  const [download] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Download unreadable save" }).click()]);
+  // The kept text downloads from the Open window exactly as it was stored.
+  await page.keyboard.press("Control+o");
+  const [download] = await Promise.all([page.waitForEvent("download"), page.locator(".fd-kept").getByRole("button", { name: "Download it" }).click()]);
   // Text that starts like a tower file is named as one, so Import from file takes it after an update.
   expect(download.suggestedFilename()).toBe("verticopolis-unreadable-save.vctower");
   expect(readFileSync((await download.path())!, "utf8")).toBe(unreadable);

@@ -1,10 +1,7 @@
 import type { UI } from "./UI";
-import { SAVES_DRAW } from "./savesDraw";
 import { confirmTemplate, installHelpTemplate, type InstallHelpVariant } from "./templates/confirm";
 import { eventChoiceTemplate } from "./templates/eventChoice";
 import { updatePromptTemplate } from "./templates/updatePrompt";
-import { TOWER_FILE_MAGIC } from "../storage/saveCompression";
-import { NO_GUARD, replaceSlotTemplate, savesTemplate, type SavesGuard } from "./templates/saves";
 import { newTowerTemplate } from "./templates/newTower";
 import { exportConfirmTemplate, importReportTemplate, exportReportTemplate } from "./templates/reports";
 import { statsModalTemplate } from "./templates/stats";
@@ -13,12 +10,10 @@ import { congratsTemplate } from "./templates/congrats";
 import type { TemplateResult } from "lit-html";
 import type { GameMode } from "../shared/types";
 import type { CalendarKind } from "../shared/engineTypes";
-import type { SlotInfo } from "../storage/SaveGame";
 import type { ImportReport } from "../storage/tdtImportReport";
 import type { ExportReport } from "../storage/tdtExportReport";
 import type { UpdateInfo } from "../pwa";
 import { isInstalledStandalone } from "./standalone";
-import { renameSlot } from "./slotRename";
 
 /**
  * Dialog and modal controllers for {@link UI}, as friend functions taking the
@@ -35,16 +30,12 @@ export { showBatchPricingDialog, type BatchPricingDialogCtx, type BatchPricingDi
 // The elevator Schedule dialog controller likewise lives in its own module.
 export { showElevatorScheduleDialog, type ScheduleDialogCtx } from "./uiElevatorSchedule";
 
-// The title-screen tower picker likewise lives in its own module.
-export { showTowerPicker, type TowerPickerCtx } from "./uiTowerPicker";
-
 // The Settings controller lives in its own module (readable-size ceiling);
 // re-exported so `UI.showSettings` is unchanged.
 export { showSettings } from "./uiSettings";
 
-// The file-picker entry point lives in its own module so the tower picker can
-// reach it without importing this one (which re-exports the tower picker, and
-// would therefore form a cycle). Re-exported so existing callers are unchanged.
+// The file-picker entry point lives in its own module; re-exported so
+// existing callers are unchanged.
 export { openImport } from "./uiImport";
 
 export function showStats(ui: UI, body: TemplateResult, handlers: Record<string, () => void> = {}): void {
@@ -59,115 +50,6 @@ export function showScheduleReview(ui: UI, rows: readonly ReviewRow[], handlers:
   // A redraw after a choice replaces the button that was pressed; keep the player's place.
   if (focus) box.querySelector<HTMLElement>(`[data-act="${focus}"]`)?.focus();
 }
-
-/** Saves manager: auto-save + numbered slots, plus export/import. `guard`
- *  keeps a save off another tower by accident (see {@link SavesGuard}). */
-export function showSaves(ui: UI, slots: SlotInfo[], unreadable: string | null = null, guard: SavesGuard = NO_GUARD): void {
-  const box = ui.openModalTemplate(savesTemplate(slots, unreadable !== null, guard), { displaceable: true });
-  box.querySelectorAll<HTMLElement>("[data-save]").forEach((b) =>
-    b.addEventListener("click", () => {
-      const slot = Number(b.dataset.save);
-      // A failed write leaves the dialog as it is, with the failure said
-      // inside it; a redraw would wipe that line.
-      const save = (): void => {
-        if (ui.cb.onSaveSlot(slot)) ui.cb.onShowSaves(SAVES_DRAW.redraw);
-      };
-      // The confirm may be up a while: check again at Replace, so a slot
-      // another tab filled meanwhile with a save this version can't read is
-      // still refused.
-      const saveIfReadable = (): void => {
-        const now = replaceTarget(slots, guard, slot);
-        if (now && !now.exists) refuseUnreadable(ui, slot);
-        else save();
-      };
-      // A slot that holds a tower other than the live one asks first. The
-      // live tower's own slot and an empty slot save at once.
-      const target = replaceTarget(slots, guard, slot);
-      if (target && !target.exists) refuseUnreadable(ui, slot);
-      else if (target) confirmReplace(ui, target, guard.liveName, saveIfReadable, () => showSaves(ui, slots, unreadable, guard));
-      else save();
-    }),
-  );
-  box.querySelectorAll<HTMLElement>("[data-load]").forEach((b) =>
-    b.addEventListener("click", () => {
-      const v = b.dataset.load!;
-      ui.cb.onLoadSlot(v === "auto" ? "auto" : Number(v));
-      ui.closeModal();
-    }),
-  );
-  box.querySelectorAll<HTMLElement>("[data-rename]").forEach((b) => b.addEventListener("click", () => renameSlot(ui, Number(b.dataset.rename))));
-  box.querySelectorAll<HTMLElement>("[data-del]").forEach((b) =>
-    b.addEventListener("click", () => {
-      ui.cb.onDeleteSlot(Number(b.dataset.del));
-      ui.cb.onShowSaves(SAVES_DRAW.redraw);
-    }),
-  );
-  const undo = guard.undo;
-  // File > Open… and Save As… are the way to and from a file (owner,
-  // 2026-11-15), so the footer holds Close alone.
-  ui.wireActions(box, {
-    ...(undo === null
-      ? {}
-      : {
-          // Redraw unless the write failed: after "gone" the line goes away,
-          // and a failure stays said inside the dialog as it is.
-          undo: () => {
-            if (undo.run() !== "failed") ui.cb.onShowSaves(SAVES_DRAW.redraw);
-          },
-        }),
-    // The kept text downloads with no engine involved. A compressed save comes
-    // as a `.vctower` the game imports once it is updated; anything else is a
-    // .txt, a file type GitHub accepts on an issue. The button exists only
-    // when text is kept, and closes the dialog first, as export does, so a
-    // failure toast is not hidden behind it.
-    ...(unreadable === null
-      ? {}
-      : {
-          unreadable: () => {
-            ui.closeModal();
-            ui.downloadFile(unreadable.startsWith(TOWER_FILE_MAGIC) ? UNREADABLE_TOWER_FILENAME : UNREADABLE_SAVE_FILENAME, unreadable);
-          },
-        }),
-  });
-}
-
-/** The row a save into `slot` replaces, or null when it saves at once: the
- *  guard's answer from storage when it has one, else the drawn list's. */
-function replaceTarget(slots: SlotInfo[], guard: SavesGuard, slot: number): SlotInfo | null {
-  if (guard.replaceTarget) return guard.replaceTarget(slot);
-  const drawn = slots.find((s) => s.slot === slot);
-  return drawn?.exists && slot !== guard.home ? drawn : null;
-}
-
-/** A slot written since the list was drawn holds a save this version can't
- *  read. The list never offers Save on such a slot, since a newer version may
- *  still open it, so the click redraws the list and says why. */
-function refuseUnreadable(ui: UI, slot: number): void {
-  ui.cb.onShowSaves(SAVES_DRAW.redraw);
-  ui.sayVisibly(`Slot ${slot} holds a save this version can't read, so it can't be saved over. Save to another slot.`);
-}
-
-/** Ask before a save replaces the tower in `target`. Cancel is the default
- *  button and takes focus, and it goes back to the Saved Towers list as it
- *  was drawn (nothing changed); Replace saves and redraws the list, which then
- *  offers Undo. */
-function confirmReplace(ui: UI, target: SlotInfo, liveName: string, save: () => void, back: () => void): void {
-  // Displaceable: a report that arrives while it is up may take its place,
-  // since closing it loses nothing (it is the same as Cancel).
-  const box = ui.openModalTemplate(
-    replaceSlotTemplate(target, liveName, {
-      onCancel: back,
-      onReplace: save,
-    }),
-    { displaceable: true },
-  );
-  box.querySelector<HTMLElement>('[data-act="no"]')?.focus();
-}
-
-/** The file name of a downloaded unreadable autosave. */
-export const UNREADABLE_SAVE_FILENAME = "verticopolis-unreadable-save.txt";
-/** The file name when the kept save downloads as a tower file. */
-export const UNREADABLE_TOWER_FILENAME = "verticopolis-unreadable-save.vctower";
 
 /** Open the Add-to-Home-Screen how-to (SPEC-pwa-install CAP-3 / CAP-5). The
  *  install controller calls this directly (keeping UI.ts under its size ceiling);

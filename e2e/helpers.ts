@@ -348,3 +348,33 @@ export async function storedSaves(page: Page): Promise<Record<string, string>> {
 export async function storedSave(page: Page, key: string): Promise<string | null> {
   return storedSaveIn(await storedSaves(page), key);
 }
+
+/** Whether My Towers (the `verticopolis-files` database) holds file `id`'s
+ *  bytes, read straight from the database rather than through the game. */
+export async function storedTowerFile(page: Page, id: string): Promise<boolean> {
+  return page.evaluate(
+    (fileId) =>
+      new Promise<boolean>((resolve) => {
+        const req = indexedDB.open("verticopolis-files");
+        req.onerror = () => resolve(false);
+        req.onsuccess = () => {
+          const db = req.result;
+          if (!db.objectStoreNames.contains("bodies")) {
+            db.close();
+            resolve(false);
+            return;
+          }
+          const get = db.transaction("bodies", "readonly").objectStore("bodies").get(fileId);
+          get.onsuccess = () => {
+            db.close();
+            resolve(get.result instanceof Uint8Array && get.result.length > 0);
+          };
+          get.onerror = () => {
+            db.close();
+            resolve(false);
+          };
+        };
+      }),
+    id,
+  );
+}

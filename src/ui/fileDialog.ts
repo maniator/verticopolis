@@ -1,0 +1,367 @@
+import { render } from "lit-html";
+import { html } from "lit-html";
+import type { UI } from "./UI";
+import { cleanFileName, type TowerFileEntry } from "../storage/fileSpace";
+import {
+  fileDialogTemplate,
+  rowDomId,
+  type FileAsk,
+  type FileDialogMode,
+  type FileDialogView,
+  type FileFilter,
+  type FileRow,
+  type FileSortKey,
+} from "./templates/fileDialog";
+
+/**
+ * The controller for the Open and Save As windows over My Towers
+ * (`templates/fileDialog.ts`). It keeps the window's state (the selection,
+ * the typed name, the filter and sort, a question asked in place, a rename
+ * under way) and draws the body again on each change, and on each change to
+ * the folder from this tab or another while it is open. What a command does
+ * to the folder or the tower is the caller's (`FileDialogCtx`), so this file
+ * holds no storage and no engine.
+ *
+ * Keys in the list: arrows, Home and End move; Enter opens or saves; F2
+ * renames; Delete deletes; Ctrl+C and Ctrl+V copy and paste a tower (the
+ * paste is a copy beside it); the context menu key or Shift+F10 opens the
+ * right-click menu. Tower files dropped on the window are added to the folder.
+ */
+
+/** A line the window shows under its fields. */
+export interface FileNote {
+  readonly text: string;
+  readonly kind: "bad" | "info";
+}
+
+export interface FileDialogCtx {
+  readonly mode: FileDialogMode;
+  /** The name the File name box starts with. */
+  readonly initialName: string;
+  /** The Auto-save row (Open only), or null when there is none. */
+  auto(): FileRow | null;
+  files(): readonly TowerFileEntry[];
+  usage(): { count: number; bytes: number };
+  onChange(listener: () => void): () => void;
+  /** Open a row. The window is closed before this runs, since an import may
+   *  open a window of its own. */
+  open(row: FileRow): void;
+  /** Save the tower as `name`, replacing a file of that name (the window has
+   *  asked). Null once saved; the window then closes. */
+  save(name: string): Promise<FileNote | null>;
+  rename(id: string, name: string): Promise<FileNote | null>;
+  duplicate(id: string): Promise<FileNote | null>;
+  remove(id: string): Promise<FileNote | null>;
+  /** Files dropped on the window. */
+  add(files: readonly File[]): Promise<FileNote | null>;
+  /** The way to or from a file on the device. The window is closed first. */
+  fromComputer(): void;
+  /** Download the autosave this version couldn't read, when one is kept
+   *  (Open only). The window is closed first, so a failure is seen. */
+  downloadKept: (() => void) | null;
+}
+
+/** The tower Copy put on the clipboard, by id. Kept between openings, as a
+ *  desktop's clipboard is. */
+let copied: string | null = null;
+
+/** Forget the clipboard, for tests. */
+export function clearFileClipboardForTests(): void {
+  copied = null;
+}
+
+const TYPE_ORDER: Readonly<Record<FileRow["type"], number>> = { auto: 0, tower: 1, tdt: 2 };
+
+/** The rows a window shows: the Auto-save first, then the files that pass
+ *  the filter, in the chosen order. */
+export function fileRows(auto: FileRow | null, files: readonly TowerFileEntry[], filter: FileFilter, sort: FileDialogView["sort"]): FileRow[] {
+  const rows: FileRow[] = files
+    .filter((f) => filter === "all" || f.kind === filter)
+    .map((f) => ({ id: f.id, name: f.name, type: f.kind, size: f.size, modified: f.modified }));
+  const by: Record<FileSortKey, (a: FileRow, b: FileRow) => number> = {
+    name: (a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base", numeric: true }),
+    type: (a, b) => TYPE_ORDER[a.type] - TYPE_ORDER[b.type],
+    size: (a, b) => (a.size ?? 0) - (b.size ?? 0),
+    modified: (a, b) => (a.modified ?? 0) - (b.modified ?? 0),
+  };
+  rows.sort((a, b) => (sort.down ? -1 : 1) * by[sort.key](a, b) || by.name(a, b));
+  return auto && filter === "all" ? [auto, ...rows] : rows;
+}
+
+/** Whether a drag carries files from the device. */
+const carriesFiles = (e: DragEvent): boolean => !!e.dataTransfer && Array.from(e.dataTransfer.types).includes("Files");
+
+export function showFileDialog(ui: Pick<UI, "openModalTemplate" | "closeModal">, ctx: FileDialogCtx): void {
+  const opening = ctx.mode === "open";
+  const state = {
+    selected: null as string | null,
+    name: ctx.initialName,
+    filter: "all" as FileFilter,
+    sort: { key: "modified" as FileSortKey, down: true },
+    line: null as FileNote | null,
+    ask: null as FileAsk | null,
+    renaming: null as string | null,
+    menu: null as FileDialogView["menu"],
+    busy: false,
+    dropping: false,
+  };
+  const box = ui.openModalTemplate(html`<h2>${opening ? "Open" : "Save As"}</h2><div class="fd-host"></div>`, { displaceable: opening });
+  const host = box.querySelector<HTMLElement>(".fd-host")!;
+  box.classList.add("fd-window");
+  let rows: FileRow[] = [];
+
+  const rowOf = (id: string | null) => rows.find((r) => r.id === id) ?? null;
+  const fileOf = (id: string | null) => {
+    const r = rowOf(id);
+    return r && r.type !== "auto" ? r : null;
+  };
+
+  function draw(): void {
+    if (!box.isConnected) {
+      off();
+      return;
+    }
+    rows = fileRows(opening ? ctx.auto() : null, ctx.files(), state.filter, state.sort);
+    if (state.selected !== null && !rowOf(state.selected)) state.selected = null;
+    const view = { ...state, mode: ctx.mode, rows, usage: ctx.usage(), canPaste: copied !== null, kept: ctx.downloadKept !== null };
+    render(fileDialogTemplate(view, handlers), host);
+  }
+  const off = ctx.onChange(draw);
+
+  function set(change: Partial<typeof state>): void {
+    Object.assign(state, change);
+    draw();
+  }
+
+  /** Run a folder command with the buttons grayed, then show its note. */
+  async function run(command: () => Promise<FileNote | null>): Promise<FileNote | null> {
+    set({ busy: true, line: null, menu: null });
+    let note: FileNote | null;
+    try {
+      note = await command();
+    } catch (err) {
+      note = { text: err instanceof Error ? err.message : String(err), kind: "bad" };
+    }
+    if (box.isConnected) set({ busy: false, line: note });
+    return note;
+  }
+
+  function select(id: string): void {
+    const r = rowOf(id);
+    if (!r) return;
+    set({ selected: id, name: r.name, menu: null, line: null });
+    document.getElementById(rowDomId(id))?.scrollIntoView?.({ block: "nearest" });
+  }
+
+  function activate(id: string): void {
+    const r = rowOf(id);
+    if (!r) return;
+    if (opening) {
+      ui.closeModal();
+      ctx.open(r);
+      return;
+    }
+    if (r.type === "auto") return;
+    set({ selected: id, name: r.name });
+    primary();
+  }
+
+  function primary(): void {
+    if (state.busy || state.ask) return;
+    const name = cleanFileName(state.name);
+    if (!name) {
+      set({ line: { text: "Type a name for the tower.", kind: "bad" } });
+      return;
+    }
+    const match = rows.find((r) => r.name.toLocaleLowerCase() === name.toLocaleLowerCase());
+    if (opening) {
+      if (match) activate(match.id);
+      else set({ line: { text: `There's no tower named "${name}" in My Towers.`, kind: "bad" } });
+      return;
+    }
+    const taken = ctx.files().some((f) => f.name.toLocaleLowerCase() === name.toLocaleLowerCase());
+    if (taken) set({ ask: { kind: "replace", name } });
+    else void save(name);
+  }
+
+  async function save(name: string): Promise<void> {
+    const note = await run(() => ctx.save(name));
+    if (note === null && box.isConnected) ui.closeModal();
+  }
+
+  function answer(yes: boolean): void {
+    const ask = state.ask;
+    set({ ask: null });
+    if (!yes || !ask) return;
+    if (ask.kind === "replace") void save(ask.name);
+    else {
+      const target = fileOf(state.selected);
+      if (target) void run(() => ctx.remove(target.id));
+    }
+  }
+
+  function startRename(): void {
+    const target = fileOf(state.selected);
+    if (!target || state.busy) return;
+    set({ renaming: target.id, menu: null, line: null });
+    const input = host.querySelector<HTMLInputElement>(".fd-rename");
+    input?.focus();
+    input?.select();
+  }
+
+  function renameDone(value: string | null): void {
+    const id = state.renaming;
+    if (id === null) return;
+    set({ renaming: null });
+    focusList();
+    const was = rowOf(id);
+    if (value === null || !was || cleanFileName(value) === was.name) return;
+    void run(() => ctx.rename(id, value)).then((note) => {
+      if (note === null && box.isConnected) set({ name: cleanFileName(value) });
+    });
+  }
+
+  function remove(): void {
+    const target = fileOf(state.selected);
+    if (target && !state.busy) set({ ask: { kind: "delete", name: target.name }, menu: null });
+  }
+
+  function copy(): void {
+    const target = fileOf(state.selected);
+    if (!target) return;
+    copied = target.id;
+    set({ line: { text: `Copied "${target.name}". Paste makes a copy of it here.`, kind: "info" }, menu: null });
+  }
+
+  function paste(): void {
+    const id = copied;
+    if (id === null || state.busy) return;
+    if (!ctx.files().some((f) => f.id === id)) {
+      copied = null;
+      set({ line: { text: "The tower you copied has been deleted.", kind: "bad" } });
+      return;
+    }
+    void run(() => ctx.duplicate(id));
+  }
+
+  function duplicate(): void {
+    const target = fileOf(state.selected);
+    if (target && !state.busy) void run(() => ctx.duplicate(target.id));
+  }
+
+  function focusList(): void {
+    host.querySelector<HTMLElement>(".fd-rows")?.focus();
+  }
+
+  function listKey(e: KeyboardEvent): void {
+    const at = rows.findIndex((r) => r.id === state.selected);
+    const move = (i: number) => {
+      e.preventDefault();
+      const r = rows[Math.max(0, Math.min(rows.length - 1, i))];
+      if (r) select(r.id);
+    };
+    const ctrl = e.ctrlKey || e.metaKey;
+    if (e.key === "ArrowDown") move(at + 1);
+    else if (e.key === "ArrowUp") move(at < 0 ? 0 : at - 1);
+    else if (e.key === "Home") move(0);
+    else if (e.key === "End") move(rows.length - 1);
+    else if (e.key === "Enter" && state.selected) {
+      e.preventDefault();
+      activate(state.selected);
+    } else if (e.key === "F2") {
+      e.preventDefault();
+      startRename();
+    } else if (e.key === "Delete") {
+      e.preventDefault();
+      remove();
+    } else if (ctrl && e.key.toLowerCase() === "c") {
+      e.preventDefault();
+      copy();
+    } else if (ctrl && e.key.toLowerCase() === "v") {
+      e.preventDefault();
+      paste();
+    } else if ((e.key === "ContextMenu" || (e.shiftKey && e.key === "F10")) && state.selected) {
+      e.preventDefault();
+      const rect = document.getElementById(rowDomId(state.selected))?.getBoundingClientRect();
+      openMenu(state.selected, rect ? rect.left + 24 : 0, rect ? rect.bottom : 0);
+    }
+  }
+
+  /** The menu opens at the pointer, placed within the window's body. */
+  function openMenu(id: string, x: number, y: number): void {
+    const frame = (host.querySelector(".fd") ?? box).getBoundingClientRect();
+    set({ selected: id, name: rowOf(id)?.name ?? state.name, menu: { id, x: x - frame.left, y: y - frame.top } });
+    host.querySelector<HTMLElement>(".fd-menu .mb-item")?.focus();
+  }
+
+  const handlers = {
+    select,
+    activate,
+    name: (value: string) => {
+      const r = rowOf(state.selected);
+      set({ name: value, selected: r && r.name === value ? r.id : null, line: null });
+    },
+    filter: (value: FileFilter) => set({ filter: value }),
+    sort: (key: FileSortKey) => set({ sort: { key, down: state.sort.key === key ? !state.sort.down : key === "modified" } }),
+    primary,
+    cancel: () => ui.closeModal(),
+    rename: startRename,
+    renameDone,
+    copy,
+    paste,
+    duplicate,
+    remove,
+    answer,
+    openMenu,
+    closeMenu: () => {
+      if (state.menu) set({ menu: null });
+    },
+    listKey,
+    fromComputer: () => {
+      ui.closeModal();
+      ctx.fromComputer();
+    },
+    downloadKept: () => {
+      ui.closeModal();
+      ctx.downloadKept?.();
+    },
+  };
+
+  // Esc closes what is open inside the window before the window itself.
+  box.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape" || !(state.menu || state.ask)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    set({ menu: null, ask: null });
+    focusList();
+  });
+  box.addEventListener("dragenter", (e) => {
+    if (!carriesFiles(e)) return;
+    e.preventDefault();
+    if (!state.dropping) set({ dropping: true });
+  });
+  box.addEventListener("dragover", (e) => {
+    if (!carriesFiles(e)) return;
+    e.preventDefault();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
+  });
+  box.addEventListener("dragleave", (e) => {
+    if (state.dropping && !(e.relatedTarget instanceof Node && box.contains(e.relatedTarget))) set({ dropping: false });
+  });
+  box.addEventListener("drop", (e) => {
+    if (!carriesFiles(e)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    set({ dropping: false });
+    const files = Array.from(e.dataTransfer?.files ?? []);
+    if (files.length > 0) void run(() => ctx.add(files));
+  });
+
+  draw();
+  if (opening) focusList();
+  else {
+    const input = host.querySelector<HTMLInputElement>("#fd-name");
+    input?.focus();
+    input?.select();
+  }
+}

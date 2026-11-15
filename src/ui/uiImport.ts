@@ -141,7 +141,16 @@ export function isBinaryTowerFile(bytes: Uint8Array): boolean {
   return bytes.length >= BINARY_TOWER_FILE.length && BINARY_TOWER_FILE.every((b, i) => bytes[i] === b);
 }
 
-function readPickedFile(ui: UI, file: File): void {
+/** A text tower file's bytes as text. BOM sniffing keeps the old readAsText
+ *  behavior, so a UTF-16 re-save still decodes. */
+export function decodeTowerText(b: Uint8Array): string {
+  if (b.length >= 2 && b[0] === 0xff && b[1] === 0xfe) return new TextDecoder("utf-16le").decode(b);
+  if (b.length >= 2 && b[0] === 0xfe && b[1] === 0xff) return new TextDecoder("utf-16be").decode(b);
+  return new TextDecoder().decode(b); // UTF-8; strips a UTF-8 BOM itself
+}
+
+/** Open a file picked or dropped from the device. */
+export function readPickedFile(ui: UI, file: File): void {
   const reader = new FileReader();
   // A file that vanishes or errors mid-read must not fail silently: the
   // launching dialog is already gone by the time the read runs.
@@ -149,21 +158,17 @@ function readPickedFile(ui: UI, file: File): void {
   // Every pick is read as bytes and routed through ONE heuristic
   // (looksLikeLegacyTower): extension first, then the header-magic sniff, so a
   // renamed original save still lands on the legacy importer. Everything else
-  // decodes as text for the .vctower path. BOM sniffing preserves the old
-  // readAsText behavior (UTF-16 re-saves must keep decoding).
-  const decodeText = (b: Uint8Array): string => {
-    if (b.length >= 2 && b[0] === 0xff && b[1] === 0xfe) return new TextDecoder("utf-16le").decode(b);
-    if (b.length >= 2 && b[0] === 0xfe && b[1] === 0xff) return new TextDecoder("utf-16be").decode(b);
-    return new TextDecoder().decode(b); // UTF-8; strips a UTF-8 BOM itself
-  };
+  // decodes as text for the .vctower path. The file's name and bytes go along,
+  // so a tower that opens is kept in My Towers.
   reader.onload = () => {
     const buffer = reader.result as ArrayBuffer;
     const bytes = new Uint8Array(buffer);
+    const from = { name: file.name, bytes };
     if (looksLikeLegacyTower(file.name, bytes)) ui.cb.onImportLegacy(buffer, file.name);
     // A binary tower file goes to the engine as it is: decoding it as text
     // would change its bytes.
-    else if (isBinaryTowerFile(bytes)) ui.cb.onImport(bytes);
-    else ui.cb.onImport(decodeText(bytes));
+    else if (isBinaryTowerFile(bytes)) ui.cb.onImport(bytes, from);
+    else ui.cb.onImport(decodeTowerText(bytes), from);
   };
   reader.readAsArrayBuffer(file);
 }

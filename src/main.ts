@@ -1,5 +1,4 @@
 import { createAppHistory, type AppHistory } from "./game/appHistory";
-import type { SavesDraw } from "./ui/savesDraw";
 import type { FacilityKind } from "./shared/types";
 import type { TransportView, UnitView } from "./simport/view";
 import { TowerEngine, type Picked } from "./render/excalibur/TowerEngine";
@@ -35,7 +34,8 @@ import { placeSimpleBuild, updateBuildPreview, isTransportTool, pickedAt, clearB
 import { LobbyHeightChoice, trackLobbyHeightKeys } from "./game/lobbyHeight";
 import { BulldozeDragChoice } from "./game/bulldozeDrag";
 import { toggleMute, setVolume, toggleReducedMotion, toggleSteadyClock, isSteadyClock, applyReducedMotion, togglePassersBy, isPassersBy, applyPassersBy } from "./game/audioPrefs";
-import { showStats, showSaves, saveToSlot, loadFromSlot, deleteSlot } from "./game/appModals";
+import { showStats, loadFromSlot } from "./game/appModals";
+import { openFile, saveFile } from "./game/fileSpaceCommands";
 import { refreshTraffic } from "./game/trafficHud";
 import { onUpdateAvailable } from "./game/updateFlow";
 import { bootGame } from "./bootstrap";
@@ -355,12 +355,13 @@ class GameApp implements GameAppPorts {
     }
   }
 
-  // Stats + save-slot modal commands, bodies in game/appModals.ts.
+  // Stats, Auto-save and My Towers commands, bodies in game/appModals.ts and game/fileSpaceCommands.ts.
   showStats(): void { void showStats(this); }
-  showSaves(draw: SavesDraw): void { showSaves(this, draw); }
-  saveToSlot(slot: number): boolean { return saveToSlot(this, slot); }
-  loadFromSlot(slot: number | "auto"): void { loadFromSlot(this, slot); }
-  deleteSlot(slot: number): void { deleteSlot(this, slot); }
+  loadFromSlot(slot: "auto"): void { loadFromSlot(this, slot); }
+  /** Save the tower in My Towers as `name` (File > Save As…); answers its id. */
+  saveFile(name: string): Promise<string> { return saveFile(this, name); }
+  /** Open My Towers file `id` (File > Load); settles once the tower is in. */
+  openFile(id: string): Promise<void> { return openFile(this, id); }
 
   /** Set the game speed (index into {@link SPEEDS}): updates the engine's pause
    *  state and the toolbar's active button. The single place the three concerns

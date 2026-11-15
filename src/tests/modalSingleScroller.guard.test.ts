@@ -223,9 +223,11 @@ describe("one scroll container per dialog", () => {
     // notes (#1897): the owner asked for a long log to scroll in place, and
     // its cap (min(200px, 22vh)) keeps that small dialog under the box's
     // 82vh, so in practice only one scroller is live. The same reasoning as
-    // the .es-grid well (#513).
+    // the .es-grid well (#513). So is the Open and Save As windows' file list
+    // (owner, 2026-11-15, the classic Open dialog): a list box that scrolls
+    // in place, capped at min(15em, 40vh) (min(18em, 46vh) on a phone).
     const scrollers = ALL_RULES.filter((r) => !r.conditional && inDialogSubtree(r.selector) && scrollsVertically(r.body));
-    expect(scrollers.map((r) => r.selector)).toEqual([".modal-box", ".whatsnew-log"]);
+    expect(scrollers.map((r) => r.selector)).toEqual([".modal-box", ".whatsnew-log", ".fd-rows"]);
   });
 
   it("lets media blocks re-scroll only the ratified schedule-grid well", () => {

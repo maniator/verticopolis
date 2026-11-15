@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { GameApp } from "../main";
 import { noteTowerSwap, runningTowerStage } from "./engineFault";
-import { homeSlot, rememberHome } from "../storage/slotGuard";
+import { currentFileId, setCurrentFile } from "./currentFile";
 
 // Loading main.ts boots the game at module scope; this test only needs the
 // class, so the boot is stubbed out.
@@ -221,20 +221,20 @@ describe("followSwap and a drag under way", () => {
   });
 });
 
-describe("followSwap and the live tower's save slot", () => {
-  it("forgets the home slot on another tower, so saving it over an occupied slot asks first", () => {
+describe("followSwap and the live tower's My Towers file", () => {
+  it("forgets the file on another tower, so File > Save writes only the Auto-save", () => {
     for (const follow of ["swap", "restore"] as const) {
-      rememberHome(2, "VCZ1:old tower");
+      setCurrentFile("old tower");
       const app = standIn(1);
       GameApp.prototype.followSwap.call(app as unknown as GameApp, follow);
-      expect(homeSlot(() => "VCZ1:old tower"), follow).toBeNull();
+      expect(currentFileId(), follow).toBeNull();
     }
   });
 
   it("keeps it on an undo or redo step of the same tower", () => {
-    rememberHome(2, "VCZ1:this tower");
+    setCurrentFile("this tower");
     const app = standIn(1);
     GameApp.prototype.followSwap.call(app as unknown as GameApp, "step");
-    expect(homeSlot(() => "VCZ1:this tower")).toBe(2);
+    expect(currentFileId()).toBe("this tower");
   });
 });

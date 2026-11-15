@@ -83,8 +83,6 @@ export function makeApp(sim: SimShape) {
   const ui = {
     showStats: vi.fn(),
     confirmModal: vi.fn(),
-    showSaves: vi.fn(),
-    showTowerPicker: vi.fn(),
     toast: vi.fn(),
     sayVisibly: vi.fn(),
   };

@@ -7,8 +7,8 @@ import type { UI } from "../ui/UI";
  * The .vctower export flow, split out of `saveLoad.ts` at the 500-line guard
  * when the single-flight latch landed (GH #760). `SaveLoad.exportGame` is a
  * thin delegation here, so the latch guards the choke point every export
- * converges on: the saves dialog's Export button opens `confirmExport` (in
- * uiDialogs), whose two choices are `.vctower` (via `onExport` -> `exportGame`
+ * converges on: Save As's "To a file on your computer…" opens `confirmExport`
+ * (in uiDialogs), whose two choices are `.vctower` (via `onExport` -> `exportGame`
  * -> `runExportFlow`) and the legacy `.TDT` (via `onExportLegacy`, whose
  * download runs through {@link runLegacyDownload}). Both formats share the one
  * latch, so neither can be re-fired while the other is still building.

@@ -3,7 +3,6 @@ import { MenuBar } from "../ui/menuBar";
 import { MovableWindow } from "../ui/movableWindow";
 import { browserStorage } from "../ui/overviewMapPrefs";
 import { PALETTE_COLLAPSE_BUTTON_ID, PALETTE_COLLAPSED_CLASS } from "../ui/paletteCollapse";
-import { openImport } from "../ui/uiImport";
 import { SPONSOR_URL, sponsorOffered } from "../ui/splashTemplate";
 import { trackAppAction } from "../analytics";
 import { menuItemCodeOf, menuNameOf, trackMenuDismiss, trackMenuOpen, trackMenuPick, type MenuScreen } from "../analyticsMenus";
@@ -11,12 +10,13 @@ import { isEngineStopped, isSplashUp } from "./interactionState";
 import { closeTower } from "./titleScreen";
 import { wireFileShortcuts, type FileCommands } from "./fileShortcuts";
 import { fillLoadMenu, wireLoadMenu } from "./loadMenu";
+import { openFile, showOpenDialog, showSaveAsDialog } from "./fileSpaceCommands";
 import { overviewMapOpen, setOverviewMapOpen } from "./overviewMapWiring";
 import { callFireRescue } from "./fireRescueCall";
 
 /**
  * The menu bar's commands (index.html `#menubar`, behavior in
- * `ui/menuBar.ts`). The items whose ids predate the bar (btn-new, btn-load,
+ * `ui/menuBar.ts`). The items whose ids predate the bar (btn-new,
  * btn-settings, btn-stats, btn-help, btn-about, btn-install-menu) keep the
  * click handlers `UI.wireControls` gives them; this wires the rest: Quick
  * Save, Close, Import, Export, Undo and Redo, Rename, Call Fire Rescue, the rules, the windows the
@@ -73,12 +73,11 @@ export const NEEDS_A_TOWER = [
 ] as const;
 
 /** On the title screen these items press the title screen's own button, so it
- *  leaves the way it always does (and the mute glyph stays in step). Import is
- *  not among them: it opens the file chooser straight away, as the Load Tower
- *  picker's own "Choose file…" does from the title screen. */
+ *  leaves the way it always does (and the mute glyph stays in step). Open is
+ *  not among them: it opens the Open window straight away, as the title
+ *  screen's Load Tower does. */
 export const ON_TITLE_SCREEN: Readonly<Record<string, string>> = {
   "btn-new": "new",
-  "btn-load": "load",
   "mb-sound": "mute",
 };
 
@@ -174,14 +173,15 @@ export function wireMenus(app: GameApp): MenuBar | null {
     remember(storage, STATUS_BAR_KEY, open);
   });
 
-  // File: Open…, Save and Save As… also answer to their keys.
-  const file = { open: () => openImport(ui), save: () => ui.cb.onSave(), saveAs: () => ui.promptExport() };
+  // File: Open…, Save and Save As… also answer to their keys. Open and Save
+  // As show My Towers (fileSpaceCommands.ts).
+  const file = { open: () => showOpenDialog(app), save: () => ui.cb.onSave(), saveAs: () => showSaveAsDialog(app) };
   on("mb-quick-save", file.save);
   on("mb-close", () => closeTower(app));
   on("mb-import", file.open);
   on("mb-export", file.saveAs);
   wireFileShortcuts(file, window, reportKey);
-  wireLoadMenu(app);
+  wireLoadMenu(app, { openFile: (id) => void openFile(app, id), more: file.open });
   // Edit: the toolbar's own buttons, so the gray-out and the gesture rules hold.
   on("mb-undo", () => ui.el.undo?.click());
   on("mb-redo", () => ui.el.redo?.click());

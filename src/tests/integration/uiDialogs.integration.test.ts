@@ -1,6 +1,5 @@
 // @vitest-environment happy-dom
 import { rustScheduleEngine } from "../fixtures/autoTuneDouble";
-import { SAVES_DRAW } from "../../ui/savesDraw";
 import { describe, it, expect, vi, beforeEach, afterEach, afterAll } from "vitest";
 import { HudTower, pump, rebaseLog } from "../../ui/hud.fixture";
 import { towerCatalog, useTowerCatalogSource } from "../../catalog/towerCatalog";
@@ -151,15 +150,6 @@ describe("wireActions — the anti-dead-button contract", () => {
     expect(recover).toHaveBeenCalledOnce();
     expect(review).toHaveBeenCalledOnce();
     ui.showScheduleReview([]); // no rows: only Close, and no focus request
-    click('[data-act="close"]');
-    expect(dialog().open).toBe(false);
-  });
-
-  it("Saved Towers keeps Close alone at the bottom: Open… and Save As… live in the File menu", () => {
-    const { ui } = makeUI();
-    ui.showSaves([]);
-    expect([...dialog().querySelectorAll(".modal-actions .btn")].map((b) => b.textContent)).toEqual(["Close"]);
-    expect(dialog().querySelector('[data-act="export"], [data-act="import"]')).toBeNull();
     click('[data-act="close"]');
     expect(dialog().open).toBe(false);
   });
@@ -618,15 +608,15 @@ describe("aria-labelledby across the real dialogs: every modal names itself for 
     expect(titleFor().textContent).toContain("Emergency");
   });
 
-  it("swapping from one modal straight into another (saves → export confirm) relabels instead of stacking a stale id", () => {
+  it("swapping from one modal straight into another (settings → export confirm) relabels instead of stacking a stale id", () => {
     const { ui } = makeUI();
-    ui.showSaves([]);
-    expect(titleFor().textContent).toContain("Saved Towers");
+    ui.showSettings();
+    expect(titleFor().textContent).toContain("Settings");
     const labelId = dialog().getAttribute("aria-labelledby")!;
     ui.promptExport();
     expect(titleFor().textContent).toContain("Save As");
     // Same shared id, but now only one element in the whole document carries
-    // it: the saves dialog's old title node is gone, not orphaned.
+    // it: the settings dialog's old title node is gone, not orphaned.
     expect(dialog().getAttribute("aria-labelledby")).toBe(labelId);
     expect(document.querySelectorAll(`#${labelId}`).length).toBe(1);
   });
@@ -850,7 +840,7 @@ describe("export/import — file downloads and the file picker, no copy-paste pa
     expect(input.accept.startsWith(".vctower")).toBe(true);
   });
 
-  it("a tower file picked from Open… routes to onImport", async () => {
+  it("a tower file picked from Open… routes to onImport, with the file it came from", async () => {
     const { ui, cb } = makeUI();
     vi.spyOn(HTMLInputElement.prototype, "click").mockImplementation(() => {});
     openImportPicker(ui);
@@ -858,7 +848,9 @@ describe("export/import — file downloads and the file picker, no copy-paste pa
     const file = new File(["VCTOWER1\npayload"], "tower.vctower");
     Object.defineProperty(input, "files", { value: [file], configurable: true });
     input.onchange!(new Event("change"));
-    await vi.waitFor(() => expect(cb.onImport).toHaveBeenCalledExactlyOnceWith("VCTOWER1\npayload"));
+    // The file's name and exact bytes go along, so My Towers can keep it once it opens.
+    const from = { name: "tower.vctower", bytes: new TextEncoder().encode("VCTOWER1\npayload") };
+    await vi.waitFor(() => expect(cb.onImport).toHaveBeenCalledExactlyOnceWith("VCTOWER1\npayload", from));
   });
 
   it("a picked .TDT legacy save is read as bytes and routed to onImportLegacy", async () => {
@@ -893,7 +885,7 @@ describe("export/import — file downloads and the file picker, no copy-paste pa
     const file = new File([bytes], "tower.vctower");
     Object.defineProperty(input, "files", { value: [file], configurable: true });
     input.onchange!(new Event("change"));
-    await vi.waitFor(() => expect(cb.onImport).toHaveBeenCalledExactlyOnceWith(text));
+    await vi.waitFor(() => expect(cb.onImport).toHaveBeenCalledExactlyOnceWith(text, { name: "tower.vctower", bytes }));
     expect(cb.onImportLegacy).not.toHaveBeenCalled();
   });
 
@@ -1735,12 +1727,9 @@ describe("wireControls — toolbar buttons route to callbacks (no dead buttons)"
     const { cb } = makeUI();
     document.getElementById("btn-undo")!.click();
     document.getElementById("btn-redo")!.click();
-    document.getElementById("btn-load")!.click();
     document.getElementById("btn-stats")!.click();
     expect(cb.onUndo).toHaveBeenCalledOnce();
     expect(cb.onRedo).toHaveBeenCalledOnce();
-    // The Saves… button is the player opening the dialog: no redraw reason (#2161).
-    expect(cb.onShowSaves).toHaveBeenCalledExactlyOnceWith(SAVES_DRAW.open);
     expect(cb.onShowStats).toHaveBeenCalledOnce();
   });
 
@@ -1987,183 +1976,6 @@ describe("showSettings: the Settings dialog", () => {
     expect(dialog().open).toBe(true);
     click('[data-act="close"]');
     expect(dialog().open).toBe(false);
-  });
-});
-
-describe("showSaves — the save-slot manager", () => {
-  const slots = [
-    { slot: "auto" as const, exists: true, present: true, towerName: "Auto Twr", star: 2, population: 300, funds: 50000, savedAt: 1_700_000_000_000 },
-    { slot: 1, exists: true, present: true, towerName: "One", star: 6, population: 15000, funds: 1_000_000, savedAt: 1_700_000_000_000 },
-    { slot: 2, exists: false, present: false },
-  ];
-
-  it("renders one row per slot with the right actions (auto: no Save/Delete; empty: Save only)", () => {
-    const { ui } = makeUI();
-    ui.showSaves(slots);
-    const rows = dialog().querySelectorAll(".slot");
-    expect(rows).toHaveLength(3);
-    // Auto row: has Load, but no Save and no Delete.
-    const auto = rows[0];
-    expect(auto.querySelector("[data-save]")).toBeNull();
-    expect(auto.querySelector('[data-load="auto"]')).not.toBeNull();
-    expect(auto.querySelector("[data-del]")).toBeNull();
-    // Filled numbered slot: Save + Load + Delete, and a 6★ tower reads TOWER.
-    const one = rows[1];
-    expect(one.querySelector('[data-save="1"]')).not.toBeNull();
-    expect(one.querySelector('[data-load="1"]')).not.toBeNull();
-    expect(one.querySelector('[data-del="1"]')).not.toBeNull();
-    expect(one.textContent).toContain("TOWER");
-    // Empty slot: Save only, no Load/Delete, and reads "empty".
-    const two = rows[2];
-    expect(two.querySelector('[data-save="2"]')).not.toBeNull();
-    expect(two.querySelector("[data-load]")).toBeNull();
-    expect(two.textContent).toContain("empty");
-  });
-
-  it("Save writes the slot and re-opens the manager; Load loads and closes; Delete deletes and re-opens", () => {
-    const { ui, cb } = makeUI();
-    ui.showSaves(slots);
-    dialog().querySelector<HTMLElement>('[data-save="2"]')!.click();
-    expect(cb.onSaveSlot).toHaveBeenCalledWith(2);
-    expect(cb.onShowSaves).toHaveBeenCalledExactlyOnceWith(SAVES_DRAW.redraw); // re-render, not an open (#2161)
-
-    ui.showSaves(slots);
-    dialog().querySelector<HTMLElement>('[data-load="1"]')!.click();
-    expect(cb.onLoadSlot).toHaveBeenCalledWith(1);
-    expect(dialog().open).toBe(false); // Load closes the manager
-
-    ui.showSaves(slots);
-    dialog().querySelector<HTMLElement>('[data-del="1"]')!.click();
-    expect(cb.onDeleteSlot).toHaveBeenCalledWith(1);
-    expect(cb.onShowSaves).toHaveBeenLastCalledWith(SAVES_DRAW.redraw);
-  });
-
-  it("downloads a kept unreadable autosave, a tower file when it is one, closing the dialog first", () => {
-    const { ui } = makeUI();
-    const download = vi.spyOn(ui, "downloadFile").mockReturnValue(true);
-    ui.showSaves(slots);
-    expect(dialog().querySelector('[data-act="unreadable"]')).toBeNull();
-    ui.showSaves(slots, "VCTOWER1\nkept");
-    dialog().querySelector<HTMLElement>('[data-act="unreadable"]')!.click();
-    expect(dialog().open).toBe(false);
-    expect(download).toHaveBeenCalledExactlyOnceWith("verticopolis-unreadable-save.vctower", "VCTOWER1\nkept");
-    download.mockClear();
-    ui.showSaves(slots, "plain kept text");
-    dialog().querySelector<HTMLElement>('[data-act="unreadable"]')!.click();
-    expect(download).toHaveBeenCalledExactlyOnceWith("verticopolis-unreadable-save.txt", "plain kept text");
-  });
-
-  it("the Auto-save Load routes the special 'auto' slot id", () => {
-    const { ui, cb } = makeUI();
-    ui.showSaves(slots);
-    dialog().querySelector<HTMLElement>('[data-load="auto"]')!.click();
-    expect(cb.onLoadSlot).toHaveBeenCalledWith("auto");
-  });
-});
-
-/**
- * The title screen's load-only tower picker controller
- * (SPEC-splash-load-tower CAP-3 / CAP-5). Row rendering is pinned in
- * `src/ui/templates/towerPicker.test.ts`; this covers the wiring the
- * controller owns.
- */
-describe("showTowerPicker — the title-screen load picker", () => {
-  const present = [
-    { slot: "auto" as const, exists: true, present: true, towerName: "Auto Twr", star: 2, population: 300, funds: 50000, savedAt: 1_700_000_000_000 },
-    { slot: 1, exists: false, present: false },
-  ];
-
-  it("loads a slot AND closes the dialog: adoption only takes the splash down", () => {
-    // Adoption dismisses the title screen, but the shared <dialog> is a
-    // separate surface in the top layer. Leaving it open would drop the player
-    // onto their tower behind a live modal that also paints over the
-    // "Press play to resume" toast.
-    const { ui } = makeUI();
-    const onLoad = vi.fn(() => true);
-    ui.showTowerPicker({ getSlots: () => ({ slots: present, storageBlocked: false }), onLoad });
-    dialog().querySelector<HTMLElement>('[data-picker="load"]')!.click();
-    expect(onLoad).toHaveBeenCalledWith("auto");
-    expect(dialog().open).toBe(false);
-  });
-
-  it("re-renders in place on repeated failures, never stacking a second picker", () => {
-    const { ui } = makeUI();
-    ui.showTowerPicker({ getSlots: () => ({ slots: present, storageBlocked: false }), onLoad: () => false });
-    for (let i = 0; i < 3; i++) dialog().querySelector<HTMLElement>('[data-picker="load"]')!.click();
-    expect(dialog().querySelectorAll(".modal-box")).toHaveLength(1);
-    expect(dialog().querySelectorAll('[data-picker="back"]')).toHaveLength(1);
-  });
-
-  it("says storage is BLOCKED rather than claiming nothing is saved", () => {
-    // The player may have four towers on this device that the browser will not
-    // hand over. Claiming they are gone is the same lie the unreadable-slot row
-    // exists to avoid.
-    const { ui } = makeUI();
-    ui.showTowerPicker({ getSlots: () => ({ slots: [], storageBlocked: true }), onLoad: () => true });
-    const line = dialog().querySelector(".picker-none")!.textContent!;
-    expect(line).toContain("blocking saved data");
-    expect(line).not.toContain("No towers saved");
-    expect(dialog().querySelector('[data-picker="file"]')).not.toBeNull(); // still the way in
-  });
-
-  it("returns focus to the Load Tower plate when Back closes the picker", () => {
-    const { ui } = makeUI();
-    document.body.insertAdjacentHTML(
-      "beforeend",
-      '<div id="splash"><button data-splash="load">Load Tower</button></div>',
-    );
-    ui.showTowerPicker({ getSlots: () => ({ slots: present, storageBlocked: false }), onLoad: () => true });
-    dialog().querySelector<HTMLElement>('[data-picker="back"]')!.click();
-    expect(document.activeElement?.getAttribute("data-splash")).toBe("load");
-    document.getElementById("splash")!.remove();
-  });
-
-  it("re-renders with an inline error, staying open, when a load fails", () => {
-    // CAP-5: a failed load must not cost the player the title screen. The
-    // reason renders IN the dialog rather than as a toast, because the title
-    // screen paints over the toast rail.
-    const { ui } = makeUI();
-    ui.showTowerPicker({ getSlots: () => ({ slots: present, storageBlocked: false }), onLoad: () => false });
-    dialog().querySelector<HTMLElement>('[data-picker="load"]')!.click();
-    expect(dialog().open).toBe(true);
-    expect(dialog().querySelector(".picker-error")!.textContent).toContain("couldn't be read");
-  });
-
-  it("re-reads storage on every render, so a re-render is never stale", () => {
-    const { ui } = makeUI();
-    const getSlots = vi.fn(() => ({ slots: present, storageBlocked: false }));
-    ui.showTowerPicker({ getSlots, onLoad: () => false });
-    expect(getSlots).toHaveBeenCalledOnce();
-    dialog().querySelector<HTMLElement>('[data-picker="load"]')!.click();
-    expect(getSlots).toHaveBeenCalledTimes(2);
-  });
-
-  it("the file row closes the dialog and hands off to the OS picker", async () => {
-    const { ui, cb } = makeUI();
-    // Restored explicitly: this file has no global restoreMocks, so a leaked
-    // no-op click() on the prototype would silently break later tests.
-    const clickSpy = vi.spyOn(HTMLInputElement.prototype, "click").mockImplementation(() => {});
-    ui.showTowerPicker({ getSlots: () => ({ slots: present, storageBlocked: false }), onLoad: () => true });
-    dialog().querySelector<HTMLElement>('[data-picker="file"]')!.click();
-    // Same reason the saves manager yields: the .TDT fidelity report refuses to
-    // open while another modal is live.
-    expect(dialog().open).toBe(false);
-    const input = document.getElementById("import-file") as HTMLInputElement;
-    expect(input.accept.startsWith(".vctower")).toBe(true);
-    const file = new File(["VCTOWER1\npayload"], "tower.vctower");
-    Object.defineProperty(input, "files", { value: [file], configurable: true });
-    input.onchange!(new Event("change"));
-    await vi.waitFor(() => expect(cb.onImport).toHaveBeenCalledExactlyOnceWith("VCTOWER1\npayload"));
-    clickSpy.mockRestore();
-  });
-
-  it("Back closes the picker and nothing else", () => {
-    const { ui } = makeUI();
-    const onLoad = vi.fn(() => true);
-    ui.showTowerPicker({ getSlots: () => ({ slots: present, storageBlocked: false }), onLoad });
-    dialog().querySelector<HTMLElement>('[data-picker="back"]')!.click();
-    expect(dialog().open).toBe(false);
-    expect(onLoad).not.toHaveBeenCalled();
   });
 });
 
@@ -3351,49 +3163,6 @@ describe.skipIf(noEngine)("showElevatorScheduleDialog — the per-shaft Schedule
     dialog().querySelector<HTMLButtonElement>(".es-autotune")!.click();
     // The announce names the days actually tuned (#466): only the weekday is warm here.
     expect(announce).toHaveBeenLastCalledWith("Auto-tuned the weekday schedule and staging to measured demand.");
-  });
-});
-
-describe("Saved Towers rows (mode chip + in-game day)", () => {
-  it("shows a coerced rule-set chip and the day on every existing slot; empty slots get neither", () => {
-    const { ui } = makeUI();
-    ui.showSaves([
-      { slot: "auto", exists: true, present: true, towerName: "Old Faithful", star: 3, population: 900, funds: 1000, savedAt: 1, mode: "classic", day: 42 },
-      { slot: 1, exists: true, present: true, towerName: "New Ways", star: 2, population: 400, funds: 500, savedAt: 1, mode: "modern", day: 7 },
-      { slot: 2, exists: false, present: false },
-    ]);
-    const rows = Array.from(dialog().querySelectorAll(".slot"));
-    expect(rows[0].querySelector(".nt-badge")!.textContent).toBe("Classic");
-    expect(rows[0].querySelector(".nt-badge.alt")).toBeNull(); // classic uses the muted badge
-    expect(rows[1].querySelector(".nt-badge.alt")!.textContent).toBe("Modern");
-    // Structural pins on the when-line, not substring scans of the whole row.
-    expect(rows[0].querySelector(".slot-when")!.textContent).toMatch(/\bDay 42\b/);
-    expect(rows[1].querySelector(".slot-when")!.textContent).toMatch(/\bDay 7\b/);
-    expect(rows[2].querySelector(".nt-badge")).toBeNull();
-    expect(rows[2].querySelector(".slot-when")).toBeNull(); // empty rows carry no when-line at all
-  });
-
-  it("omits the day when the save's minutes were malformed, keeping the timestamp", () => {
-    const { ui } = makeUI();
-    ui.showSaves([
-      { slot: 1, exists: true, present: true, towerName: "T", star: 1, population: 0, funds: 0, savedAt: 1700000000000, mode: "classic" },
-    ]);
-    const when = dialog().querySelector(".slot-when")!.textContent!;
-    expect(when).not.toMatch(/\bDay\b/);
-    expect(when.length).toBeGreaterThan(0); // the fmtWhen timestamp still renders
-  });
-
-  it("a non-numeric day smuggled past the types never reaches the template raw", () => {
-    const { ui } = makeUI();
-    ui.showSaves([
-      // A hostile producer bypassing SlotInfo's types (the storage layer
-      // already bounds day; this pins the render-side finiteness guard).
-      { slot: 1, exists: true, present: true, towerName: "T", star: 1, population: 0, funds: 0, savedAt: 1, mode: "classic", day: "<img>" as unknown as number },
-    ]);
-    const when = dialog().querySelector(".slot-when")!.textContent!;
-    expect(when).not.toContain("<img>");
-    expect(dialog().querySelector(".slot-when img")).toBeNull();
-    expect(when).not.toMatch(/\bDay\b/);
   });
 });
 
