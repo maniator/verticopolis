@@ -1,6 +1,5 @@
 import type { Catalog } from "../catalog/catalogTypes";
 import type { LogEntry } from "../shared/types";
-import type { SlotInfo } from "../storage/SaveGame";
 import type { ExportReport } from "../storage/tdtExportReport";
 import type { ImportReport } from "../storage/tdtImportReport";
 import type { FacilityKind, GameMode } from "../shared/types";
@@ -16,7 +15,6 @@ import type { BulldozeDragPicker, LobbyHeightPicker } from "./templates/toolInfo
 import { lobbyPickerFor } from "./lobbyHeightStrip";
 import { renderToolCard } from "./toolCard";
 import * as dialogs from "./uiDialogs";
-import { SAVES_DRAW, type SavesDraw } from "./savesDraw";
 import * as help from "./uiHelp";
 import * as panels from "./uiPanels";
 import * as status from "./uiStatus";
@@ -41,8 +39,8 @@ export interface UICallbacks {
   onSave(): void;
   onLoad(): void;
   onExport(): void;
-  /** A picked file's text contents — a `.vctower` export. */
-  onImport(data: string | Uint8Array): void;
+  /** A picked `.vctower`'s contents, and the picked file (kept in My Towers once it opens). */
+  onImport(data: string | Uint8Array, from?: { name: string; bytes: Uint8Array }): void;
   /** A picked binary legacy save (original SimTower `.TDT`), as raw bytes. */
   onImportLegacy(buffer: ArrayBuffer, filename: string): void;
   /** Export the live tower as an original 1994 SimTower save (.TDT). */
@@ -79,12 +77,10 @@ export interface UICallbacks {
   onReplayOnboarding(): void;
   onRenameTower(name: string): void;
   onShowStats(): void;
-  onShowSaves(draw: SavesDraw): void;
   /** The inspector card's ✕ was clicked — dismiss it and latch it closed. */
   onInspectorClose(): void;
-  onSaveSlot(slot: number): boolean;
-  onLoadSlot(slot: number | "auto"): void;
-  onDeleteSlot(slot: number): void;
+  /** Load the Auto-save (File > Load, the Open window's Auto-save row). */
+  onLoadSlot(slot: "auto"): void;
 }
 
 /**
@@ -201,7 +197,6 @@ export class UI {
 
     // Quick Save is the top-bar 💾 (index.html); null-safe so a trimmed DOM that omits it does not throw.
     document.getElementById("btn-save-top")?.addEventListener("click", () => this.cb.onSave());
-    document.getElementById("btn-load")!.addEventListener("click", () => this.cb.onShowSaves(SAVES_DRAW.open));
     document.getElementById("btn-new")!.addEventListener("click", () => this.promptNewTower());
     document.getElementById("btn-settings")!.addEventListener("click", () => this.showSettings());
     document.getElementById("btn-help")!.addEventListener("click", () => this.showHelp());
@@ -425,14 +420,6 @@ export class UI {
 
   showScheduleReview(rows: readonly ReviewRow[], handlers: Record<string, () => void> = {}, focus?: string): void {
     dialogs.showScheduleReview(this, rows, handlers, focus);
-  }
-
-  showSaves(slots: SlotInfo[], unreadable: string | null = null, guard?: Parameters<typeof dialogs.showSaves>[3]): void {
-    dialogs.showSaves(this, slots, unreadable, guard);
-  }
-
-  showTowerPicker(ctx: dialogs.TowerPickerCtx): void {
-    dialogs.showTowerPicker(this, ctx);
   }
 
   showBatchPricingDialog(ctx: dialogs.BatchPricingDialogCtx, cb: dialogs.BatchPricingDialogCb): void {

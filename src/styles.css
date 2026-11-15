@@ -43,6 +43,7 @@
 @import "./styles/game/dialogs.css";
 @import "./styles/game/new-tower.css";
 @import "./styles/game/stats-saves.css";
+@import "./styles/game/file-dialog.css";
 @import "./styles/game/elevator-schedule.css";
 @import "./styles/game/help.css";
 @import "./styles/game/splash.css";

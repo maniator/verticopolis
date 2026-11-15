@@ -39,17 +39,6 @@ export class SaveFailureNotice {
    *  fields are assigned. */
   constructor(private readonly deps: () => SaveNoticeDeps) {}
 
-  /** A slot save the player asked for failed: a line only, said inside the
-   *  Saved Towers dialog the save came from (a toast would sit behind it).
-   *  A slot is a separate copy, so a full store can refuse a slot while the
-   *  autosave, written in place, still fits; the notice would then claim the
-   *  tower is not being saved when it is. Storage blocked outright fails the
-   *  autosave too, and that raises the notice. */
-  slotFailed(err: unknown): void {
-    trackAppActionOnce("autosave_failed", "manual");
-    this.deps().ui.sayVisibly(saveFailureMessage(err));
-  }
-
   /** A Quick Save failed. It writes the autosave, so the notice goes up too. */
   manualFailed(err: unknown): void {
     trackAppActionOnce("autosave_failed", "manual");

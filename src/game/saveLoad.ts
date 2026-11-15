@@ -468,7 +468,7 @@ export class SaveLoad {
       // The engine stages one file at a time, so the confirmation stages its
       // own file again: a second read finished meanwhile cannot swap in.
       onOpen: () =>
-        adoptConfirmedLegacyImport(this.deps, report.towerName, () => this.saveBeforeUpdate(), () => port.loadTdt(bytes, filename)),
+        adoptConfirmedLegacyImport(this.deps, report.towerName, () => this.saveBeforeUpdate(), { bytes, filename }),
       // Sent once the report is on screen: one dropped while it waits is not a read.
       onShown: () => trackTdtImportRead(facts),
     });

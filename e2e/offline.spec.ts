@@ -19,12 +19,12 @@ import { expectAudioFromWorker, expectControlledWithEngine, expectSoundsAfterGes
 test.setTimeout(90_000);
 test.afterEach(async ({ page }) => expectEngineHosted(page));
 
-/** Advance the clock on the engine, build, save to a slot and load it back. */
+/** Advance the clock on the engine, build, save to My Towers and load it back. */
 async function playSaveAndLoad(page: Page): Promise<void> {
   await page.evaluate(() => (window as any).game.setSpeed(1));
   const before = await page.evaluate(() => (window as any).game.sim.clock.minutes as number);
   await page.waitForFunction((b) => (window as any).game.sim.clock.minutes > b + 5, before, { timeout: 30_000 });
-  const built = await page.evaluate(() => {
+  const built = await page.evaluate(async () => {
     const g = (window as any).game;
     g.setSpeed(0);
     g.sim.money = 1e9;
@@ -32,13 +32,13 @@ async function playSaveAndLoad(page: Page): Promise<void> {
     (window as any).game.syncSim();
     const host = (window as any).__vcEngine;
     const lobbyAt = (x: number) => (JSON.parse(host.port.serialize()).units as { kind: string; x: number }[]).some((u) => u.kind === "lobby" && u.x === x);
-    g.saveToSlot(1);
+    const id = await g.saveFile("Offline test");
     // A change after the save, which the load must undo (it lands in the
     // engine first, so a load that did nothing would leave it there).
     const after = g.sim.build("lobby", 1, 200).ok;
     g.syncSim();
     const beforeLoad = lobbyAt(200);
-    g.loadFromSlot(1);
+    await g.openFile(id);
     return {
       ok,
       after,

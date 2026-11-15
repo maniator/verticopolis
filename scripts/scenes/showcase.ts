@@ -15,7 +15,7 @@ import {
   pgDismissSplash,
   pgSetClock,
 } from "../screenshot-builders.ts";
-import { pgShowReturningSplash, pgShowTowerPicker } from "./returningPlayerPage.ts";
+import { pgShowOpenWindow, pgShowReturningSplash } from "./returningPlayerPage.ts";
 import { CRASH_PIN_SHOTS, DIALOG_PIN_SHOTS } from "./dialogPinShots.ts";
 
 export const SHOWCASE_SCENES: Scene[] = [
@@ -96,17 +96,14 @@ export const SHOWCASE_SCENES: Scene[] = [
         wait: 300,
       },
       {
-        name: "02c-saves",
+        name: "02c-open",
         keepDialogs: true,
         setup: async (page) => {
-          // Quick-save first so the dialog shows a populated slot, then open
-          // it; this is the only home of Export/Import, so the gallery must
-          // show that footer.
-          await page.evaluate(() => {
-            document.getElementById("btn-save-top")?.click();
-            document.getElementById("btn-load")?.click();
-          });
-          await page.waitForSelector("#modal .slots", { timeout: 4000 });
+          // Quick-save first so the window shows the Auto-save row above the
+          // My Towers files.
+          await page.evaluate(() => document.getElementById("btn-save-top")?.click());
+          // The Settings shot before this one leaves its window open.
+          await pgShowOpenWindow(page, true);
         },
         wait: 300,
       },
@@ -169,13 +166,10 @@ export const SHOWCASE_SCENES: Scene[] = [
         wait: 400,
       },
       {
-        // The load-only tower picker (SPEC-splash-load-tower). Staged with
-        // synthetic slot metadata rather than real saves so every row variant
-        // is on screen at once (loadable, present-but-unreadable, empty) and
-        // the pixels do not depend on what a previous shot happened to write.
+        // Load Tower on the title screen opens File > Open… over it.
         name: "00c-load-tower",
         keepDialogs: true,
-        setup: pgShowTowerPicker,
+        setup: pgShowOpenWindow,
         wait: 300,
       },
     ],

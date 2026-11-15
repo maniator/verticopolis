@@ -40,7 +40,8 @@ drawn in code.
 - **Stars, events and the TOWER**: fires, bomb threats, the VIP and the final
   inspection. ([Stars and the TOWER](https://verticopolis.com/help/tower/stars/),
   [Events](https://verticopolis.com/help/tower/events/))
-- **Your towers, kept**: autosave and save slots, `.vctower` files, and the
+- **Your towers, kept**: the Auto-save, a My Towers folder with classic Open
+  and Save As windows, `.vctower` files, and the
   original game's `.TDT` saves (opened here, and written back out from a
   Classic tower).
   ([Saving and loading](https://verticopolis.com/help/your-towers/saving/))

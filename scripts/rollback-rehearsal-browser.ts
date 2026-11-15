@@ -9,7 +9,8 @@
  *   the exact form the game stores them (`VCZ1:` and the base64 of the raw
  *   deflate of the stamped save), in the autosave key and the three slots.
  * - `verify` opens the origin as the build that is deployed now, reads what the
- *   title screen's tower picker shows for each stored tower, and optionally
+ *   title screen's tower picker (or, from 4.3, its Open window) shows for each
+ *   stored tower, and optionally
  *   continues into the game for a while, then diffs the stored saves against
  *   the seeded ones: a field the running build dropped from a save it rewrote
  *   is a loss.
@@ -173,9 +174,26 @@ export async function verifyProfile(opts: BrowserOptions & { savesDir: string; p
       if (held) heldNow.set(s.key, held);
     }
     const load = page.locator('[data-splash="load"]');
+    const picker = page.locator('ul[aria-label="Towers you can load"]');
+    const openWindow = page.locator("#modal .fd");
     if (await load.count()) {
       await load.click();
-      await page.locator('ul[aria-label="Towers you can load"]').waitFor({ timeout: 10_000 });
+      await picker.or(openWindow).first().waitFor({ timeout: 10_000 });
+    }
+    if (await openWindow.count()) {
+      // From 4.3, Load Tower opens File > Open…: the Auto-save's row, and the
+      // slots copied into My Towers as files named for their towers. A row
+      // shows a name, type, size and time, so the check is the tower's name.
+      await page.locator("#modal .fd-row").first().waitFor({ timeout: 10_000 });
+      const texts = await page.locator("#modal .fd-row").allInnerTexts();
+      for (const s of seeds) {
+        const expected = expectedRow(heldNow.get(s.key) ?? s.save);
+        const shown = texts.find((t) => (s.key === AUTO_KEY ? t.includes("Auto-save") : true) && t.includes(expected.name));
+        rows.push({ label: s.label, expected, shown: shown?.replace(/\s+/g, " "), ok: shown !== undefined });
+        if (shown === undefined) problems.push(`${s.label}: the Open window lists no row for ${expected.name}`);
+      }
+      await page.keyboard.press("Escape");
+    } else if (await picker.count()) {
       const texts = await page.locator('ul[aria-label="Towers you can load"] .slot').allInnerTexts();
       for (const s of seeds) {
         const expected = expectedRow(heldNow.get(s.key) ?? s.save);

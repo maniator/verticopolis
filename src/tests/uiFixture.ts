@@ -62,7 +62,6 @@ export function mountAppDom(): void {
     <div id="tower-stats"></div>
     <button id="btn-stats"></button>
     <div id="log"></div>
-    <button id="btn-load"></button>
     <button id="btn-save-top"></button>
     <button id="btn-settings"></button>
     <button id="btn-new"></button><button id="btn-help"></button><button id="btn-about"></button>
@@ -113,11 +112,8 @@ export function makeUI(overrides: Partial<UICallbacks> = {}): { ui: UI; cb: UICa
     onReplayOnboarding: vi.fn(),
     onRenameTower: vi.fn(),
     onShowStats: vi.fn(),
-    onShowSaves: vi.fn(),
     onInspectorClose: vi.fn(),
-    onSaveSlot: vi.fn(() => true),
     onLoadSlot: vi.fn(),
-    onDeleteSlot: vi.fn(),
     ...overrides,
   };
   return { ui: new UI(cb), cb };

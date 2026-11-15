@@ -20,11 +20,13 @@ export type MenuName = (typeof MENU_NAMES)[number];
 /** Each menu item's element id and the code its events carry. */
 export const MENU_ITEM_CODES = {
   "btn-new": "new_tower",
-  "btn-load": "saves",
   "mb-load-auto": "load_auto",
-  "mb-load-1": "load_slot_1",
-  "mb-load-2": "load_slot_2",
-  "mb-load-3": "load_slot_3",
+  "mb-load-file-1": "load_file_1",
+  "mb-load-file-2": "load_file_2",
+  "mb-load-file-3": "load_file_3",
+  "mb-load-file-4": "load_file_4",
+  "mb-load-file-5": "load_file_5",
+  "mb-load-more": "load_more",
   "mb-quick-save": "quick_save",
   "mb-close": "close",
   "mb-import": "import",

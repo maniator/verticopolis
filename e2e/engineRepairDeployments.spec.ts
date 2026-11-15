@@ -4,7 +4,7 @@ import { startDeployments, type Deployments } from "./deployments";
 import { engineEntries, expectEngineIs, newContext } from "./engineDeployHelpers";
 import { tamperCache } from "./engineCacheHelpers";
 import { expectControlledWithEngine, hostedGame, installWorker, lobbyAt } from "./offlineHelpers";
-import { storedSave } from "./helpers";
+import { storedTowerFile } from "./helpers";
 
 /**
  * Repair engine files next to a save, a lost connection and a second tab (#985,
@@ -34,7 +34,6 @@ test.afterEach(() => {
 const repairButton = (page: Page) => page.locator('#engine-failure [data-act="repair-engine"]');
 const status = (page: Page) => page.locator("#engine-failure .engine-failure-repair-status");
 const refused = (page: Page) => page.waitForFunction(() => (window as any).__vcEngineBoot?.failure?.reason === "package-mismatch", undefined, { timeout: 60_000 });
-const slotStored = async (page: Page) => (await storedSave(page, "simtower-clone-slot-1")) !== null;
 const bootFailure = (page: Page) => page.evaluate(() => (window as any).__vcEngineBoot?.failure ?? null);
 
 /** The first build installed and controlling this page, on the engine. */
@@ -54,20 +53,20 @@ test("a repair leaves a save that was made online, and the repaired engine loads
   try {
     const page = await context.newPage();
     await installedFirst(page);
-    const built = await page.evaluate(() => {
+    const built = await page.evaluate(async () => {
       const g = (window as any).game;
       g.sim.money = 1e9;
       const ok = g.sim.build("lobby", 1, 160).ok;
       (window as any).game.syncSim();
-      g.saveToSlot(1);
+      const id = (await g.saveFile("Repair test")) as string;
       // The page now saves its tower when it goes to the background, which a
-      // reload does. This test is about the slot, so keep the page's own tower
-      // out of the autosave and let the reload start a new one.
+      // reload does. This test is about the My Towers file, so keep the page's
+      // own tower out of the autosave and let the reload start a new one.
       g.saveLoad.save = () => {};
-      return ok;
+      return { ok, id };
     });
-    expect(built, "the lobby was built before the save").toBe(true);
-    expect(await slotStored(page), "slot 1 holds the save before the damage").toBe(true);
+    expect(built.ok, "the lobby was built before the save").toBe(true);
+    expect(await storedTowerFile(page, built.id), "My Towers holds the save before the damage").toBe(true);
 
     await tamperCache(page, "wasm", "salt");
     await page.reload();
@@ -77,15 +76,15 @@ test("a repair leaves a save that was made online, and the repaired engine loads
     await page.reload();
     await hostedGame(page);
     await expectEngineIs(deployments, page, "A");
-    // The save sits in its slot, not in the page: a new game has no lobby yet,
-    // so an autosave of the old tower cannot stand in for the slot.
-    expect(await slotStored(page), "slot 1 still holds the save after the repair").toBe(true);
+    // The save sits in My Towers, not in the page: a new game has no lobby
+    // yet, so an autosave of the old tower cannot stand in for the file.
+    expect(await storedTowerFile(page, built.id), "My Towers still holds the save after the repair").toBe(true);
     expect(await lobbyAt(page, 160), "the booted game does not already hold the lobby").toBe(false);
 
-    const loaded = await page.evaluate(() => {
-      (window as any).game.loadFromSlot(1);
+    const loaded = await page.evaluate(async (id) => {
+      await (window as any).game.openFile(id);
       return (JSON.parse((window as any).__vcEngine.port.serialize()).units as { kind: string; x: number }[]).some((u) => u.kind === "lobby" && u.x === 160);
-    });
+    }, built.id);
     expect(loaded, "the save made before the repair loads on the repaired engine").toBe(true);
     expect(await lobbyAt(page, 160)).toBe(true);
   } finally {

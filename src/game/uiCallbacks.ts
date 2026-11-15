@@ -1,5 +1,6 @@
+import { saveCurrentFile } from "./fileSpaceCommands";
+import { keepOpenedFile } from "./fileKeep";
 import type { BulldozeDragPicker, LobbyHeightPicker } from "../ui/templates/toolInfo";
-import type { SavesDraw } from "../ui/savesDraw";
 import { trackAppAction } from "../analytics";
 import { wellFormed } from "../shared/wellFormed";
 import type { UICallbacks, Tool } from "../ui/UI";
@@ -78,10 +79,7 @@ export interface GameAppPorts {
    *  (panelAnchoring reads it as the caption-below signal). */
   clearBuildRefusal(): void;
   showStats(): void;
-  showSaves(draw: SavesDraw): void;
-  saveToSlot(slot: number): boolean;
-  loadFromSlot(slot: number | "auto"): void;
-  deleteSlot(slot: number): void;
+  loadFromSlot(slot: "auto"): void;
 }
 
 /**
@@ -104,15 +102,20 @@ export function createUICallbacks(app: GameAppPorts): UICallbacks {
     onSave: () => {
       trackAppAction("quick_save");
       app.saveLoad.save();
+      // The tower's My Towers file too, when it was opened from or saved to one.
+      void saveCurrentFile();
     },
     onLoad: () => app.saveLoad.load(),
     onExport: () => {
       trackAppAction("export_save");
       void app.saveLoad.exportGame();
     },
-    onImport: (data) => {
+    onImport: (data, from) => {
       trackAppAction("import_save");
-      void app.saveLoad.importGame(data);
+      const before = app.enginePort.generation();
+      void app.saveLoad.importGame(data).then(() => {
+        if (from && app.enginePort.generation() !== before) void keepOpenedFile(from.name, from.bytes, "tower");
+      });
     },
     onImportLegacy: (buffer, filename) => {
       trackAppAction("import_tdt");
@@ -165,9 +168,6 @@ export function createUICallbacks(app: GameAppPorts): UICallbacks {
       app.clearBuildRefusal();
       app.inspector.dismiss();
     },
-    onShowSaves: (draw) => app.showSaves(draw),
-    onSaveSlot: (slot) => app.saveToSlot(slot),
     onLoadSlot: (slot) => app.loadFromSlot(slot),
-    onDeleteSlot: (slot) => app.deleteSlot(slot),
   };
 }

@@ -6,7 +6,7 @@ import { hudSource } from "./hudSource";
 import { showTower } from "../ui/uiStatus";
 import { touchOverviewMap } from "./overviewMapWiring";
 import { newRenderSim } from "./portAccess";
-import { forgetLiveTower } from "../storage/slotGuard";
+import { forgetCurrentFile } from "./currentFile";
 
 /** How the app follows the tower the engine holds now. A `"swap"` (a load, a new tower, an
  *  import, a tooling swap) is another tower. A `"restore"` (a tooling harness's tower) is too,
@@ -33,10 +33,9 @@ export function followEngineTower(app: GameApp, follow: TowerFollow): void {
   // report's entries (a report pairs them with the current tower's save). A step keeps them:
   // it is the same tower, and time does not go back.
   if (follow !== "step") {
-    // No manual slot is known to hold the tower that arrived, so saving it
-    // over an occupied slot asks first. A slot load names its slot again
-    // right after this (appModals' loadedFrom).
-    forgetLiveTower();
+    // It is not the My Towers file the last tower was: File > Save writes
+    // only the Auto-save until it is opened from or saved to one.
+    forgetCurrentFile();
     // A tower that arrives already rated TOWER was congratulated where it was
     // won, so a load does not open the congratulations again (#1134). Only a
     // win the player sees happen here opens them.

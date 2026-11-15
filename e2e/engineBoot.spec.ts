@@ -104,7 +104,7 @@ test.describe("starts on the WASM engine", () => {
   test("saves, reloads and replays the same tower deterministically on the engine", async ({ page }) => {
     await page.goto("/");
     await hostedGame(page);
-    const setup = await page.evaluate(() => {
+    const setup = await page.evaluate(async () => {
       const g = (window as any).game;
       g.setSpeed(0);
       g.sim.money = 1e9;
@@ -113,37 +113,40 @@ test.describe("starts on the WASM engine", () => {
       for (let f = 2; f <= 3; f++) for (let x = 150; x < 175; x++) built.push(g.sim.build("floor", f, x).ok);
       built.push(g.sim.build("office", 2, 152).ok, g.sim.build("office", 3, 152).ok);
       built.push(g.sim.buildTransport("elevatorStandard", 168, 1, 3).ok);
-      g.saveToSlot(1);
-      return { built: built.every(Boolean), digest: (window as any).__vcEngine.port.stateDigest() as string };
+      const id = (await g.saveFile("Replay test")) as string;
+      // Read after the save: a tower file carries the camera, which the save
+      // stamps into the tower first.
+      const digest = (window as any).__vcEngine.port.stateDigest() as string;
+      return { built: built.every(Boolean), digest, id };
     });
     expect(setup.built, "the setup tower built").toBe(true);
 
     // Two runs of the same two days from the same save land on the same state.
     const run = () =>
-      page.evaluate(() => {
+      page.evaluate(async (id) => {
         const g = (window as any).game;
-        g.loadFromSlot(1);
+        await g.openFile(id);
         const engine = () => (window as any).__vcEngine.port;
         const start = engine().stateDigest() as string;
         for (let i = 0; i < 96; i++) g.enginePort.tick(30);
         return { start, end: engine().stateDigest() as string, minutes: g.sim.clock.minutes as number };
-      });
+      }, setup.id);
     const first = await run();
     const second = await run();
     expect(first.start).toBe(setup.digest);
     expect(second).toEqual(first);
     expect(first.end).not.toBe(first.start);
 
-    // The save outlives the page: a reload boots the engine again and the slot
-    // loads the same state.
+    // The save outlives the page: a reload boots the engine again and the
+    // My Towers file loads the same state.
     await page.reload();
     await hostedGame(page);
-    const reloaded = await page.evaluate(() => {
+    const reloaded = await page.evaluate(async (id) => {
       const g = (window as any).game;
       g.setSpeed(0);
-      g.loadFromSlot(1);
+      await g.openFile(id);
       return (window as any).__vcEngine.port.stateDigest() as string;
-    });
+    }, setup.id);
     expect(reloaded).toBe(setup.digest);
   });
 });

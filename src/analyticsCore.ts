@@ -307,16 +307,27 @@ export type BombOutcome = "paid" | "found" | "exploded";
 export type AppActionName =
   // Persistence. The FACT only, never tower contents or the fidelity report.
   | "quick_save"
-  | "save_slot"
+  // The Auto-save loaded (File > Load, or its row in the Open window).
+  // 4.2 and earlier also sent save_slot, delete_save, rename_slot and this
+  // for the numbered slots; My Towers replaced them (owner, 2026-11-15).
   | "load_slot"
-  | "delete_save"
-  // A save slot named in Saved Towers… (owner, 2026-11-15). `detail` is
-  // `named` or `cleared`; never the name, which the player wrote.
-  | "rename_slot"
   // A File key that ran its command (version 4.1): `detail` is `open`
   // (Ctrl+O), `save` (Ctrl+S) or `save_as` (Ctrl+Shift+S). Keys are not
   // menu trips, so they never send a menu_pick.
   | "file_key"
+  // My Towers, the Open and Save As windows (owner, 2026-11-15). Codes and
+  // counts only, never a file's name; each `detail` is in the data map's
+  // "My Towers" section (docs/analytics-data-map.md).
+  | "files_open"
+  | "file_open"
+  | "file_save"
+  | "file_add"
+  | "file_dropped"
+  | "file_rename"
+  | "file_copy"
+  | "file_delete"
+  | "file_failed"
+  | "files_copied"
   | "export_save"
   | "import_save"
   | "export_tdt"
@@ -342,12 +353,6 @@ export type AppActionName =
   // engine diagnostics, the privacy link); help_open is the manual itself.
   | "about_open"
   | "compare_open"
-  | "saves_open"
-  // The TITLE SCREEN's load-only tower picker. Deliberately its own action, not
-  // saves_open: a first-run player reaches this from the splash, and folding it
-  // into the in-game manager's funnel would dilute that funnel with
-  // title-screen browsing and leave the two impossible to separate later.
-  | "splash_load_open"
   | "stats_open"
   | "replay_onboarding"
   | "page_help"

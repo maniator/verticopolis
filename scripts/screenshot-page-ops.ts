@@ -152,9 +152,9 @@ export function pgAdoptTestClock(): "adopted" | "none" | "failed" {
       /* non-writable in a hardened Chromium: leave real time; the resets below still help */
     }
     // Pin Date.now() too. It never drives the sim clock, but the app stamps a
-    // save's savedAt with it (SaveGame.saveTime) and the Saves dialog renders
-    // that stamp (UI.showSaves), so a shot that quick-saves and opens the dialog
-    // (first-run/02c-saves) would show a wall-clock time that differs every run.
+    // save's savedAt with it (SaveGame.saveTime) and the Open window renders
+    // a file's Modified time, so a shot that saves and opens the window
+    // (first-run/02c-open) would show a wall-clock time that differs every run.
     // A fixed epoch makes the rendered timestamp byte-stable. Constant (not the
     // stepped clock) is right here: nothing in a capture measures Date.now()
     // deltas, and a fixed absolute time is what the dialog should show.
@@ -162,7 +162,7 @@ export function pgAdoptTestClock(): "adopted" | "none" | "failed" {
       const FIXED_NOW = 1_704_067_200_000; // 2024-01-01T00:00:00Z, a stable stamp
       Object.defineProperty(Date, "now", { configurable: true, value: () => FIXED_NOW });
     } catch {
-      /* non-writable: leave real time; only the Saves-dialog timestamp is affected */
+      /* non-writable: leave real time; only the Open window's times are affected */
     }
     try {
       g.lastUiUpdate = 0;

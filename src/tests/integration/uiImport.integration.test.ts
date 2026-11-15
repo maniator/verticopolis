@@ -71,7 +71,7 @@ describe("import picker: only tower files, filtered where the platform can", () 
       { description: "Tower files (.vctower, .TDT)", accept: { [TOWER_PICKER_MIME]: [".vctower", ".tdt"] } },
     ]);
     expect(TOWER_PICKER_MIME).toBe("application/x-verticopolis-tower");
-    await vi.waitFor(() => expect(cb.onImport).toHaveBeenCalledExactlyOnceWith("VCTOWER1\npayload"));
+    await vi.waitFor(() => expect(cb.onImport).toHaveBeenCalledExactlyOnceWith("VCTOWER1\npayload", { name: "tower.vctower", bytes: new TextEncoder().encode("VCTOWER1\npayload") }));
     expect(click).not.toHaveBeenCalled();
   });
 

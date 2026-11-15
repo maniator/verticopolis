@@ -124,13 +124,36 @@ These are lower bounds like every client event: a failure that kills the tab, or
 a blocked relay, reports nothing. `docs/analytics-measurement-status.md` rows 8
 to 10 and 24 say what they can and cannot support.
 
-## Saved Towers opens
+## My Towers (Open, Save As, Load)
 
-`app_action` `saves_open` counts the player opening the Saved Towers dialog (File > Saved Towers…). Up to 3.12.3 it also fired each time the open dialog redrew its list (after a slot save, a delete, an Undo or a refused save), so one visit could count several times; from the next release it counts opens only (#2161). Compare across that release with care. No saved insight or dashboard tile read it when it changed (checked 2026-11-14). The title screen's picker counts separately as `splash_load_open`.
+Version 4.3 replaced Saved Towers… and its three numbered slots with My Towers,
+a folder of tower files kept on the device (owner, 2026-11-15). Each event is
+an `app_action` with a code, or a count, in `detail`. A file's name is the
+player's own text and is never sent, and neither is a tower's contents.
 
-`app_action` `file_key` counts a File key that ran its command (version 4.1): `detail` is `open` (Ctrl+O, or Cmd+O on a Mac), `save` (Ctrl+S) or `save_as` (Ctrl+Shift+S). A key pressed in a text box, over a dialog, after the engine stopped, as a held key's repeat, or for a save on the title screen runs nothing and sends nothing. Its command's own event follows (`quick_save`, `export_save` and the rest), so a command's total stays the command's own event; `file_key` says how many of them came from the keys.
+| `action` | `detail` | When |
+| --- | --- | --- |
+| `files_open` | `open` or `save_as` | The Open or Save As window opened (File > Open…, Save As…, Load > More…, the title screen's Load Tower) |
+| `file_open` | `tower`, `tdt` or `auto` | A row opened: a tower file, a 1994 `.TDT` file, or the Auto-save |
+| `file_save` | `new`, `replace` or `current` | The tower written into My Towers: under a new name, over a file the player agreed to replace, or into the live tower's own file by File > Save |
+| `file_add` | `picked` or `drop` | A file added to My Towers: `picked` once a file opened from the device has loaded, `drop` for a file dropped onto the Open or Save As window |
+| `file_dropped` | none | A file dropped on the game itself, to open as a picked file does |
+| `file_rename` | none | A file renamed |
+| `file_copy` | none | A file duplicated (Duplicate, or Copy then Paste) |
+| `file_delete` | none | A file deleted |
+| `file_failed` | `full` or `error` | A write to My Towers refused: the device is out of room, or another error |
+| `files_copied` | a count | Once per device: the old save slots copied into My Towers, and how many |
 
-`app_action` `rename_slot` counts a save slot named from the dialog's Rename… (version 4.1). `detail` is `named`, or `cleared` when the name was emptied and the slot went back to its number. The name is the player's own text and is never sent.
+`load_slot` still counts the Auto-save loading as the live tower (File > Load,
+or its row in the Open window), and `load_failed` a load that failed. Up to
+4.2 the slots sent `save_slot`, `delete_save`, `rename_slot`, `saves_open`
+(the Saved Towers window) and `splash_load_open` (the title screen's picker);
+no build from 4.3 sends them, so a series that reads them stops there. A
+`file_open` is not also an `import_save` or `import_tdt`: those still count
+files picked from the device. A tower that opens sends `file_imported` either
+way.
+
+`app_action` `file_key` counts a File key that ran its command (version 4.1): `detail` is `open` (Ctrl+O, or Cmd+O on a Mac), `save` (Ctrl+S) or `save_as` (Ctrl+Shift+S). A key pressed in a text box, over a dialog, after the engine stopped, as a held key's repeat, or for a save on the title screen runs nothing and sends nothing. Its command's own event follows (`quick_save`, `files_open` and the rest), so a command's total stays the command's own event; `file_key` says how many of them came from the keys.
 
 ## Sponsor link taps
 
@@ -154,7 +177,7 @@ never the name).
 | `via` (open) | `click`, `keys`, `alt` | A click on a title, the keyboard on a focused title, or Alt with the underlined letter |
 | `via` (pick) | `pointer`, `keys` | A mouse, pen or finger, or the keyboard |
 | `screen` | `title`, `tower` | Over the title screen, or over a tower |
-| `item` | `new_tower`, `saves`, `load_auto`, `load_slot_1`, `load_slot_2`, `load_slot_3`, `quick_save`, `close`, `import`, `export`, `install_app`, `undo`, `redo`, `tower_info`, `map`, `statistics`, `rename`, `fire_rescue`, `rules`, `tools`, `bulletin`, `status_bar`, `full_screen`, `settings`, `sound`, `screen_saver`, `manual`, `compare`, `replay`, `sponsor`, `about`, `other` | The item, by a code that does not change with its label (`MENU_ITEM_CODES`) |
+| `item` | `new_tower`, `load_auto`, `load_file_1` to `load_file_5`, `load_more`, `quick_save`, `close`, `import`, `export`, `install_app`, `undo`, `redo`, `tower_info`, `map`, `statistics`, `rename`, `fire_rescue`, `rules`, `tools`, `bulletin`, `status_bar`, `full_screen`, `settings`, `sound`, `screen_saver`, `manual`, `compare`, `replay`, `sponsor`, `about`, `other` | The item, by a code that does not change with its label (`MENU_ITEM_CODES`) |
 | `browsed` | a count | Menus the trip showed, the last one included |
 | `after` | an `item` code or `none` | The page life's previous real pick, so a breakdown shows what follows what without a paths query. A grayed click never becomes the next pick's `after` |
 | `grayed` | `true`, `false` | The item was grayed out, so nothing happened |
@@ -163,8 +186,10 @@ never the name).
 
 Version 4.1 renamed the File items and kept their codes, so a series runs on
 across the rename: `import` is Open…, `export` is Save As…, `quick_save` is
-Save, and `saves` is Saved Towers…. File > Load lists the saves: `load_auto` is
-its Auto-save item and `load_slot_1` to `load_slot_3` the numbered slots. Opening the Load submenu sends nothing; only a pick from it does. The File
+Save, and `saves` was Saved Towers… (gone in 4.3). File > Load lists the
+Auto-save as `load_auto`, the five newest My Towers files as `load_file_1` to
+`load_file_5` (newest first) and More… as `load_more`; up to 4.2 it listed
+the numbered slots as `load_slot_1` to `load_slot_3`. Opening the Load submenu sends nothing; only a pick from it does. The File
 keys are not menu trips, so they send no `menu_pick` and the menu funnels count
 menus only: a key that ran sends `app_action` `file_key` (below), and the
 command then sends its own event as from the menu.

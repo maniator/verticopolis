@@ -8,7 +8,7 @@ import { SaveLoad } from "../../game/saveLoad";
 import { buildTDT, parseTDT } from "../conformance/tdtWasm";
 import { hasWasmPackage } from "../conformance/wasmEngine";
 import { buildTdt, sampleTowerSpec } from "../fixtures/tdtBuilder";
-import { loadAuto, loadSlotSim, withPorts } from "../fixtures/saveText";
+import { loadAuto, withPorts } from "../fixtures/saveText";
 import { draftTower, type Draft } from "../portKit/drafts";
 import { noEngine } from "../portKit/rustEngine";
 import type { EnginePort } from "../../simport/enginePort";
@@ -136,13 +136,11 @@ describe.skipIf(noEngine)("SaveLoad stamps the live camera onto the CURRENT towe
     const buf = buildTdt({ ...sampleTowerSpec(), viewX: words.x, viewY: words.y });
     await saveLoad.importLegacy(buf.buffer as ArrayBuffer, "MOVED.TDT");
     importReports[0].open();
-    // The adopted tower and its fresh-slot copy carry the FILE's view
-    // (zoomless, fractional: the words quantize to 8px/36px).
+    // The adopted tower carries the FILE's view (zoomless, fractional: the
+    // words quantize to 8px/36px). My Towers keeps the 1994 file's own bytes.
     expect(viewOf(adopted[0])!.zoom).toBeUndefined();
     expect(viewOf(adopted[0])!.tile).toBeCloseTo(200, 1);
     expect(viewOf(adopted[0])!.floor).toBeCloseTo(20, 1);
-    expect(viewOf(loadSlotSim(1))!.tile).toBeCloseTo(200, 1);
-    expect(viewOf(loadSlotSim(1))!.floor).toBeCloseTo(20, 1);
     // The previous tower's autosave flush carries the live camera.
     expect(viewOf(loadAuto())).toEqual(camera);
   });
