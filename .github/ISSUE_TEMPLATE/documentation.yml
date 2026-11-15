@@ -5,12 +5,12 @@ body:
   - type: markdown
     attributes:
       value: |
-        For writing that is wrong, unclear or missing: a section of the game's Help that no longer matches the game, the project's README or setup steps, or a page on the [engine docs site](https://docs.verticopolis.com). For something the game does wrong, use the Bug report. For a difference from the 1994 original, use the SimTower parity report.
+        For writing that is wrong, unclear or missing: a page of the game's Player's Manual (Help > Player's Manual) that no longer matches the game, the project's README or setup steps, or a page on the [engine docs site](https://docs.verticopolis.com). For something the game does wrong, use the Bug report. For a difference from the 1994 original, use the SimTower parity report.
   - type: input
     id: location
     attributes:
       label: Where is it?
-      description: File and section, a Help section, or a link (e.g. README.md → "Play", Help → "Going further", a docs.verticopolis.com page).
+      description: File and section, a Help section, or a link (e.g. README.md → "Play", a Player's Manual page from Help > Player's Manual, a docs.verticopolis.com page).
       placeholder: README.md → Play
     validations:
       required: true

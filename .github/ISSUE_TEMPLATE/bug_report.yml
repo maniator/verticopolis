@@ -5,12 +5,12 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thanks for reporting a bug! Please check the [live game](https://verticopolis.com) first, since it may already be fixed. The version line on the title screen (also in Settings, and in the game's About…) tells us which version you played.
+        Thanks for reporting a bug! Please check the [live game](https://verticopolis.com) first, since it may already be fixed. The version line on the title screen (also in **Options > Settings…** and **Help > About Verticopolis…**) tells us which version you played.
   - type: input
     id: version
     attributes:
       label: Build version
-      description: The whole version line from the title screen, Settings or the game's About…. Report a problem there fills it in.
+      description: The whole version line from the title screen, Options > Settings… or Help > About Verticopolis…. Report a problem in About fills it in.
       placeholder: "v3.1.0 · Rust engine 1.25.0 (1a2b3c4d5e6f)"
     validations:
       required: true
@@ -18,7 +18,7 @@ body:
     id: diagnostics
     attributes:
       label: Engine diagnostics
-      description: Optional. Report a problem in the game's About… fills it in; otherwise open About…, press Copy diagnostics and paste the result here. It names the engine build, the package and source hashes this page expects next to the ones the engine reports, and where and why the engine stopped if it did. It helps most when the game stopped or reloaded after an engine crash.
+      description: Optional. Report a problem in Help > About Verticopolis… fills it in; otherwise open that window, press Copy diagnostics and paste the result here. It names the engine build, the package and source hashes this page expects next to the ones the engine reports, and where and why the engine stopped if it did. It helps most when the game stopped or reloaded after an engine crash.
       render: shell
     validations:
       required: false
@@ -35,7 +35,8 @@ body:
     attributes:
       label: Steps to reproduce
       description: >-
-        How can we reproduce it? A saved tower helps. GitHub does not accept `.vctower` files, so
+        How can we reproduce it? Write menu commands as a path from the menu bar, like File > Close or
+        Tower > Statistics…. A saved tower helps. GitHub does not accept `.vctower` files, so
         drag in the crash-report `.zip` if the game gave you one (it already holds your tower), or
         put the `.vctower` export in a `.zip`, or rename it to end in `.txt`, before attaching it.
       value: |
