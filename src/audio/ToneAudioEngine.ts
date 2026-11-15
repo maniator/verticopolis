@@ -19,6 +19,7 @@ import { usePlaybackContext } from "./toneContext";
 import { programFor, type Program, type ProgramKind, type TrackVoice } from "./toneTracks";
 import { CrowdLayer } from "./toneCrowd";
 import { LightMonoSynth, LightPolySynth } from "./lightSynth";
+import { FirstCueLatch } from "./firstCueLatch";
 
 /** Audio context states with a stopped clock, where a cue cannot sound:
  *  autoplay not yet allowed or the tab backgrounded ("suspended"), Safari's
@@ -112,6 +113,7 @@ export class ToneAudioEngine {
   ambienceVolume = 1;
   sfxVolume = 1;
   started = false;
+  private readonly firstCue = new FirstCueLatch<SfxName>();
 
   /** Lazily create the audio graph. Must be called from a user gesture. */
   start(): void {
@@ -130,7 +132,9 @@ export class ToneAudioEngine {
       usePlaybackContext(); // before any node is built
       // Inside a user gesture, so resuming is allowed. Swallow rejections
       // (autoplay/permission) so a blocked context can't surface as unhandled.
-      Tone.start().catch(() => {});
+      // A cue fired before the unlock lands waits for it (`FirstCueLatch`).
+      this.firstCue.begin();
+      Tone.start().then(() => this.sfxIfAny(this.firstCue.release()), () => this.firstCue.release());
 
       this.master = new Tone.Gain(this.muted ? 0 : 0.35).toDestination();
 
@@ -419,11 +423,15 @@ export class ToneAudioEngine {
       // A context that is not running (autoplay still blocked, a backgrounded
       // tab) has a frozen clock: nothing would sound, and every cue would pile
       // up on one start time. update() nudges it back to life each frame.
-      if (SILENT_CONTEXT_STATES.has(Tone.getContext().state)) return;
+      if (SILENT_CONTEXT_STATES.has(Tone.getContext().state)) return this.firstCue.hold(name);
       playSfx(this.sfxVoices, name);
     } catch {
       /* drop this cue; the next one schedules fresh */
     }
+  }
+
+  private sfxIfAny(name: SfxName | null): void {
+    if (name) this.sfx(name);
   }
 
   dispose(): void {
