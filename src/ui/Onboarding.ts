@@ -102,7 +102,7 @@ export const ONBOARD_STEPS: OnboardStep[] = [
   {
     id: "play",
     title: "Press Play & wait",
-    sub: "Hit Play. A tenant moves in within a day or two. Rent lands each quarter.",
+    sub: "Hit Play. A tenant moves in within a day or two and starts paying rent.",
     hintDesktop: "Press Play in the top bar and let time run.",
     hintMobile: "Tap Play in the top bar and let time run.",
     pulse: '#speed button[data-speed="1"]',

@@ -177,9 +177,21 @@ describe("unit editor row and action branches", () => {
       expect(rentCell(unit("office", { price: 10_000 }, "modern"), "modern", "canon")).toBe("$333 (the $10,000 rate scaled to a 3-day quarter)");
     });
 
-    it("Modern on the real-world calendar and Classic: an office shows its whole rent", () => {
-      expect(rentCell(unit("office", { price: 10_000 }, "modern"), "modern", "realWorld")).toBe("$10,000");
-      expect(rentCell(unit("office", { price: 10_000 }, "modern"), "modern")).toBe("$10,000");
+    it("Modern on the real-world calendar: an office shows what lands each 30-day month (#2255)", () => {
+      expect(rentCell(unit("office", { price: 10_000 }, "modern"), "modern", "realWorld")).toBe("$3,333 (the $10,000 rate scaled to a 30-day month)");
+      expect(rentCell(unit("office", { price: 10_000 }, "modern"), "modern")).toBe("$3,333 (the $10,000 rate scaled to a 30-day month)");
+    });
+
+    it("an office's rent is labeled by when it lands: monthly on Modern's real-world calendar, quarterly otherwise (#2255)", () => {
+      const label = (mode: GameMode, calendar: CalendarKind) =>
+        renderToFragment(unitEditor(unit("office", { price: 10_000 }, mode), { mode, calendar })).textContent;
+      expect(label("modern", "realWorld")).toContain("Monthly rent");
+      expect(label("modern", "realWorld")).not.toContain("Quarterly rent");
+      expect(label("modern", "canon")).toContain("Quarterly rent");
+      expect(label("classic", "canon")).toContain("Quarterly rent");
+    });
+
+    it("Classic: an office shows its whole rent", () => {
       expect(rentCell(unit("office", { price: 10_000 }), "classic", "canon")).toBe("$10,000");
     });
 

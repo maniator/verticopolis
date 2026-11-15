@@ -14,7 +14,7 @@ Every tower runs one of two sets of rules. You choose when you found the tower, 
 | Rooms | The 1994 list | Adds the [Food Hall](/help/rooms/food-and-shops/#foodHall), [Boutique Bay](/help/rooms/food-and-shops/#boutiqueBay), [Clinic](/help/rooms/food-and-shops/#clinic), new [venues](/help/rooms/venues/) and [rental homes](/help/rooms/homes/#rentalApartment) |
 | Calendar | 3-day weeks, 3-day quarters, 12-day years | The real-world calendar or the 1994 one, your choice ([Calendar and clock](/help/tower/clock/)) |
 | Office workers | Fill the offices at 8 AM by the clock | Ride in from the lobby or the Metro over 7 to 10 AM, and count once they reach their desks ([Offices](/help/rooms/offices/#getting-to-work)) |
-| Office rent | The whole quarter's rent every three days | Smoothed, so a tower earns the same each day on either calendar ([Money](/help/tower/money/)) |
+| Office rent | The whole quarter's rent every three days | Smoothed, so a tower earns the same each day on either calendar, and paid monthly on the real-world calendar ([Money](/help/tower/money/)) |
 | Setting rents | A four-step ladder, plus No Rate | A slider |
 | Condos | A family of three, sold for good | Households of two to five, where a bigger household pays more, and families sometimes move away ([Homes](/help/rooms/homes/#condo)) |
 | Monthly costs | The 1994 bills | Adds overhead on each room and a tax on unsold condos |

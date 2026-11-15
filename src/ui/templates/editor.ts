@@ -68,14 +68,20 @@ const editorShell = (
   html`${keyed(key, html`${titleBar(name)}<div class="ed-stats kv">${rows}</div>${diagnostics}${actions}`)}`;
 
 /** A quarterly or monthly rent as one collection pays it on the tower's
- *  calendar (#2107). Where the calendar scales the rent (Modern on the short
- *  1994 calendar), the card leads with what lands each collection and names
+ *  calendar (#2107). Where the calendar scales the rent (Modern, which
+ *  collects a quarterly rent every maintenance period, #2255), the card leads with what lands each collection and names
  *  the rate the price controls set, so a $10,000 office reads "$333" rather
  *  than a figure it never pays. */
+/** Modern's real-world calendar pays lease rent each month, not each quarter (#2255). */
+function leaseLandsMonthly(calendar: CatalogCalendar): boolean {
+  return calendar.leasePeriodDays !== calendar.quarterDays;
+}
+
 function rentLine(cadence: CatalogRentCadence, price: number, calendar: CatalogCalendar): string {
   const paid = rentPerCollection(cadence, price, calendar);
   if (paid === price) return `$${groupDigits(price)}`;
-  const period = cadence === "quarterly" ? `${calendar.quarterDays}-day quarter` : `${calendar.maintenancePeriodDays}-day month`;
+  const leaseUnit = leaseLandsMonthly(calendar) ? "month" : "quarter";
+  const period = cadence === "quarterly" ? `${calendar.leasePeriodDays}-day ${leaseUnit}` : `${calendar.maintenancePeriodDays}-day month`;
   return `$${groupDigits(paid)} (the $${groupDigits(price)} rate scaled to a ${period})`;
 }
 
@@ -139,7 +145,7 @@ export function unitEditorTemplate(
     let label = "Quarterly rent";
     if (u.kind === "condo") label = "Sale price";
     else if (isHotelKind(u.kind)) label = "Room rate";
-    else if (rcfg.cadence === "maintenancePeriod") label = "Monthly rent";
+    else if (rcfg.cadence === "maintenancePeriod" || leaseLandsMonthly(catalogCalendar(catalog, calendar))) label = "Monthly rent";
     // For a SOLD condo the "Sale price" is what it actually fetched, the
     // household-scaled amount (and exactly what the buy-back will reclaim), not
     // the base asking. householdPrice falls back to the base when there's no

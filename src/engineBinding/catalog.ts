@@ -107,6 +107,7 @@ const FILM_REBOOK: Shape = { policy: (v) => typeof v === "string", film: (v) => 
 const CALENDAR: Shape = {
   key: oneOf("realWorld", "canon"),
   quarterDays: size,
+  leasePeriodDays: size,
   maintenancePeriodDays: size,
   maintenanceScale: positive,
   quarterlyRentScale: positive,

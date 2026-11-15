@@ -55,7 +55,8 @@ export function catalogCalendar(catalog: Catalog, chosen: CalendarKind | undefin
  *  times its `maintenanceScale`, and a sale or a nightly rate as it is. The
  *  engine scales each collection by the same factors the catalog publishes,
  *  so on Modern's short 1994 calendar a $10,000 office lands $333 each
- *  three-day quarter. This is one room's share: the engine rounds each kind's
+ *  three-day quarter, and on its real-world calendar $3,333 each 30-day
+ *  month (#2255). This is one room's share: the engine rounds each kind's
  *  total once, so 36 such offices land $12,000, not 36 times $333. */
 export function rentPerCollection(cadence: CatalogRentCadence, price: number, calendar: CatalogCalendar): number {
   if (cadence === "quarterly") return Math.round(price * calendar.quarterlyRentScale);

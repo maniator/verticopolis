@@ -193,9 +193,13 @@ impl Simulation {
             b.0 += rent_of(u.kind, u.rent, u.no_rate);
             b.1 += 1;
         }
-        let scale = self
-            .mode
-            .quarterly_rent_scale(self.clock.calendar.quarter_days);
+        let calendar = self.clock.calendar;
+        let scale = self.mode.quarterly_rent_scale(&calendar);
+        let period = if self.mode.lease_period_days(&calendar) == calendar.quarter_days {
+            LeasePeriod::Quarter
+        } else {
+            LeasePeriod::Month
+        };
         for (kind, (sum, n)) in sums {
             let amt = jsmath::round(sum * scale);
             if amt <= 0.0 {
@@ -203,18 +207,30 @@ impl Simulation {
             }
             self.money += amt;
             self.record_money(ledger_cat_for(kind).unwrap_or("upkeep"), amt);
-            let msg = lease_message(kind, amt, n);
+            let msg = lease_message(period, kind, amt, n);
             self.emit(&msg, LogKind::Money);
         }
     }
 }
 
-/// The quarterly lease line (`LEASE_MESSAGE` in `EconomySystem.ts`).
-pub(crate) fn lease_message(kind: Kind, amt: f64, n: i64) -> String {
+/// How often a lease collection lands, for the bulletin line's wording.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum LeasePeriod {
+    Quarter,
+    Month,
+}
+
+/// The lease line (`LEASE_MESSAGE` in `EconomySystem.ts`): "Quarterly" on a
+/// quarterly collection, "Monthly" on Modern's real-world monthly one.
+pub(crate) fn lease_message(period: LeasePeriod, kind: Kind, amt: f64, n: i64) -> String {
     let plural = if n > 1 { "s" } else { "" };
+    let cadence = match period {
+        LeasePeriod::Quarter => "Quarterly",
+        LeasePeriod::Month => "Monthly",
+    };
     match kind {
         Kind::Office => format!(
-            "Quarterly office rent collected: ${} ({n} offices).",
+            "{cadence} office rent collected: ${} ({n} offices).",
             with_thousands(amt)
         ),
         Kind::FitnessClub => format!(
@@ -245,32 +261,37 @@ mod message_tests {
     fn rent_lines_word_their_counts_as_typescript_does() {
         // The TypeScript templates (EconomySystem.ts LEASE_MESSAGE, rentalIncome.ts).
         assert_eq!(
-            lease_message(Kind::Office, 1520000.0, 152),
+            lease_message(LeasePeriod::Quarter, Kind::Office, 1520000.0, 152),
             "Quarterly office rent collected: $1,520,000 (152 offices)."
         );
         // The TypeScript office line never drops its plural.
         assert_eq!(
-            lease_message(Kind::Office, 10000.0, 1),
+            lease_message(LeasePeriod::Quarter, Kind::Office, 10000.0, 1),
             "Quarterly office rent collected: $10,000 (1 offices)."
+        );
+        // Modern's real-world calendar collects office rent monthly (#2255).
+        assert_eq!(
+            lease_message(LeasePeriod::Month, Kind::Office, 80000.0, 24),
+            "Monthly office rent collected: $80,000 (24 offices)."
         );
         assert_eq!(
             crate::build::treasure_message(452311.0),
             "💰 Excavation crews unearthed buried treasure worth $452,311!"
         );
         assert_eq!(
-            lease_message(Kind::FitnessClub, 30000.0, 1),
+            lease_message(LeasePeriod::Quarter, Kind::FitnessClub, 30000.0, 1),
             "Fitness Club membership dues collected: $30,000 (1 club)."
         );
         assert_eq!(
-            lease_message(Kind::FitnessClub, 60000.0, 2),
+            lease_message(LeasePeriod::Quarter, Kind::FitnessClub, 60000.0, 2),
             "Fitness Club membership dues collected: $60,000 (2 clubs)."
         );
         assert_eq!(
-            lease_message(Kind::Clinic, 1500.0, 1),
+            lease_message(LeasePeriod::Quarter, Kind::Clinic, 1500.0, 1),
             "Clinic lease collected: $1,500 (1 clinic)."
         );
         assert_eq!(
-            lease_message(Kind::Clinic, 3000.0, 2),
+            lease_message(LeasePeriod::Quarter, Kind::Clinic, 3000.0, 2),
             "Clinic lease collected: $3,000 (2 clinics)."
         );
         assert_eq!(

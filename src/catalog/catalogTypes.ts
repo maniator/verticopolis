@@ -39,7 +39,7 @@ export interface CatalogTicketPrice {
 
 /** The version of the catalog's shape. It moves when a field is added,
  *  renamed or removed, so a frontend can refuse a shape it does not know. */
-export const CATALOG_VERSION = 19;
+export const CATALOG_VERSION = 20;
 
 /** Every price, size and build rule of one mode. */
 export interface Catalog {
@@ -203,14 +203,15 @@ export interface CatalogRules {
 export interface CatalogCalendar {
   /** As a save names it. */
   readonly key: CalendarKind;
-  /** Days per quarter, when quarterly rent lands. */
+  /** Days per quarter. */
   readonly quarterDays: number;
+  /** Days between lease rent collections: the quarter in Classic, the maintenance period in Modern (#2255). */
+  readonly leasePeriodDays: number;
   /** Days between maintenance charges (and monthly rent collections). */
   readonly maintenancePeriodDays: number;
-  /** What a `...Monthly` figure and a monthly rent are multiplied by on each
-   *  maintenance period. */
+  /** What a `...Monthly` figure and a monthly rent are multiplied by on each maintenance period. */
   readonly maintenanceScale: number;
-  /** What a quarterly rent is multiplied by when the quarter lands. */
+  /** What a quarterly rent is multiplied by on each lease collection. */
   readonly quarterlyRentScale: number;
 }
 
@@ -226,7 +227,7 @@ export interface CatalogPool {
 }
 
 /** When a price is collected: `quarterly` (offices and the lease amenities,
- *  scaled by the calendar's `quarterlyRentScale`), `maintenancePeriod` (rental
+ *  every `leasePeriodDays`, scaled by the calendar's `quarterlyRentScale`), `maintenancePeriod` (rental
  *  living, every maintenance period, scaled by `maintenanceScale`), `sale` (a
  *  condo, once) or `nightly` (hotel rooms). */
 export type CatalogRentCadence = "quarterly" | "maintenancePeriod" | "sale" | "nightly";

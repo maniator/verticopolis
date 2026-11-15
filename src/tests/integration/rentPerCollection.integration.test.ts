@@ -19,7 +19,7 @@ import { engineFromSave, noEngine } from "../portKit/rustEngine";
 
 const MINUTES_PER_DAY = 1440;
 const MINUTES_PER_HOUR = 60;
-const RENT_LINE = /^Quarterly office rent collected: \$([\d,]+) \((\d+) offices?\)\.$/;
+const RENT_LINE = /^(?:Quarterly|Monthly) office rent collected: \$([\d,]+) \((\d+) offices?\)\.$/;
 const RENTAL_LINE = /^Monthly rent collected: \$([\d,]+) \((\d+) rentals?\)\.$/;
 
 type Save = { minutes: number; units: Record<string, unknown>[]; log: { text: string }[] };
@@ -65,7 +65,7 @@ function nextCollection(engine: ClockedEngine, periodDays: number, line: RegExp 
 describe.skipIf(noEngine)("the room card's quarterly rent against the engine's collection (#2107)", () => {
   const cases: { mode: "classic" | "modern"; calendar: CalendarKind; scaled: boolean }[] = [
     { mode: "modern", calendar: "canon", scaled: true },
-    { mode: "modern", calendar: "realWorld", scaled: false },
+    { mode: "modern", calendar: "realWorld", scaled: true },
     { mode: "classic", calendar: "canon", scaled: false },
   ];
   for (const { mode, calendar, scaled } of cases) {
@@ -75,10 +75,11 @@ describe.skipIf(noEngine)("the room card's quarterly rent against the engine's c
       const cal = catalogCalendar(catalog, calendar);
       const price = new Cards(engine, newViewReader(engine)).unit(office)!.price;
       const shown = rentPerCollection("quarterly", price, cal);
-      const collected = nextCollection(engine, cal.quarterDays);
+      const collected = nextCollection(engine, cal.leasePeriodDays);
       expect(collected.count).toBe(1);
       expect(collected.amount).toBe(shown);
-      // The short calendar is the case the report met: the rate is not what lands.
+      // Modern lands a share of the rate each collection: the short calendar
+      // (#2107) and the real-world calendar's monthly rent (#2255).
       if (scaled) expect(collected.amount).toBeLessThan(price);
       else expect(collected.amount).toBe(price);
     });
