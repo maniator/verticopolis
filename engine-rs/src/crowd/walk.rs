@@ -99,3 +99,61 @@ pub(super) fn take_route(crowd: &mut Crowd, i: usize, r: Route) {
     p.fy = from as f64;
     p.wait = 0.0;
 }
+
+/// A rider whose car stopped going their way: the car or shaft went, or the
+/// floor they ride to stopped being a stop. Nobody vanishes from the cab
+/// (#2324): a rider whose floor stopped being a stop rides on to the stop
+/// nearest it and goes on from there by a new route. A rider whose car went,
+/// or with no way on from any stop, steps out of the trip as before (3.7.3).
+pub(super) fn ride_on_or_step_out(crowd: &mut Crowd, i: usize, tower: &mut Tower) {
+    if !ride_to_nearest_stop(crowd, i, tower) {
+        give_up(crowd, i, tower);
+    }
+}
+
+/// Points a rider whose floor stopped being a stop at the car's stop nearest
+/// that floor (of two as near, the one nearer the car), with a new route on
+/// from there to the trip's last floor. `false` when the car is gone, the
+/// shaft stops nowhere, or no route leads on.
+fn ride_to_nearest_stop(crowd: &mut Crowd, i: usize, tower: &Tower) -> bool {
+    let p = &crowd.people[i];
+    let Some(shaft) = p.shaft_id.and_then(|id| tower.get_transport(id)) else {
+        return false;
+    };
+    let Some(&car) = p
+        .car_index
+        .and_then(|ci| shaft.car_positions.get(ci as usize))
+    else {
+        return false;
+    };
+    let (leg, dest_x) = (p.leg, p.dest_x);
+    let (Some(&dest), Some(&to)) = (p.floors.get(leg + 1), p.floors.last()) else {
+        return false;
+    };
+    let nearness = |s: i64| ((s - dest).abs(), (s as f64 - car).abs());
+    let Some(stop) = tower.stops_of(shaft).into_iter().min_by(|&a, &b| {
+        let (da, ca) = nearness(a);
+        let (db, cb) = nearness(b);
+        da.cmp(&db).then(ca.total_cmp(&cb)).then(a.cmp(&b))
+    }) else {
+        return false;
+    };
+    let on = if stop == to {
+        Route {
+            floors: vec![stop],
+            shafts: Vec::new(),
+        }
+    } else {
+        let x = shaft.x as f64 + shaft.width as f64 / 2.0;
+        match crowd.route(tower, stop, to, Some(x), Some(dest_x)) {
+            Some(r) => r,
+            None => return false,
+        }
+    };
+    let p = &mut crowd.people[i];
+    p.floors.truncate(leg + 1);
+    p.floors.extend(on.floors);
+    p.shafts.truncate(leg + 1);
+    p.shafts.extend(on.shafts);
+    true
+}

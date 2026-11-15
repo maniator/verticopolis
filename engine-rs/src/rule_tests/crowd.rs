@@ -3,7 +3,8 @@
 //! hop and the trivial and missing routes; a rider delivered to a floor the
 //! demand model never calls; who spawns when (closed venues, an unstaffed
 //! office, a weekend office tower); a rider whose car is trimmed away; a
-//! rider out of patience in the car riding on to their floor; and
+//! rider out of patience in the car riding on to their floor; a rider whose
+//! floor stops being a stop riding on to the nearest one (#2324); and
 //! the tick moving the crowd on its own. The route memo's refresh after
 //! each layout edit is also `crowd::graph::tests::the_memo_follows_each_layout_edit`.
 //! The suite's `reset` case is n/a in Rust: there is no `Crowd::reset`, a
@@ -256,21 +257,73 @@ fn a_rider_out_of_patience_in_the_car_rides_to_their_floor() {
     assert!(delivered, "the rider never reached floor 18");
 }
 
+/// Steps the cars and the crowd one minute, as the tick does.
+fn ride(sim: &mut Simulation) {
+    let calls = sim.crowd.elevator_calls(&sim.tower);
+    sim.elevators
+        .move_cars(&mut sim.tower, 1.0, &calls, 12, false);
+    sim.elevators.swap_closed_cars(&mut sim.crowd.closed_cars);
+    sim.elevators.swap_open_cars(&mut sim.crowd.open_cars);
+    advance(&mut sim.crowd, CROWD_SECONDS_PER_MINUTE, &mut sim.tower);
+}
+
+/// A rider whose floor stops being a stop mid-ride stays aboard, gets off
+/// at the stop nearest it and walks the stairs up the last floor (#2324):
+/// nobody vanishes from the cab.
 #[test]
-fn a_rider_whose_floor_stops_being_a_stop_steps_out_of_the_trip() {
+fn a_rider_whose_floor_stops_being_a_stop_rides_on_to_the_nearest_stop() {
+    let (mut sim, ev) = tower_with_elevator(20);
+    shaft(&mut sim, Kind::Stairs, 20, 17, 18);
+    at_time(&mut sim, 0, 12);
+    let route = sim.crowd.route(&sim.tower, 1, 18, None, None).unwrap();
+    assert_eq!(route.shafts, vec![ev], "the trip is one ride to 18");
+    make_person(&mut sim.crowd, &sim.tower, route, 30.0, Some(5));
+    let id = sim.crowd.people[0].id;
+    let rider = |sim: &Simulation| sim.crowd.people.iter().find(|p| p.id == id).cloned();
+    for _ in 0..600 {
+        if rider(&sim).is_some_and(|p| p.state == PState::Riding) {
+            break;
+        }
+        ride(&mut sim);
+    }
+    assert!(
+        rider(&sim).is_some_and(|p| p.state == PState::Riding),
+        "the rider boarded"
+    );
+    assert!(
+        sim.tower.set_stop(ev, 18, false),
+        "floor 18 stops being a stop"
+    );
+    let (mut off_at, mut delivered) = (None, false);
+    for _ in 0..600 {
+        ride(&mut sim);
+        let p = rider(&sim).expect("the rider stayed in the tower");
+        if off_at.is_none() && p.state != PState::Riding {
+            off_at = Some(p.floor);
+        }
+        if p.state == PState::ToDest {
+            assert_eq!(p.floor, 18, "the rider walked up to their own floor");
+            delivered = true;
+            break;
+        }
+    }
+    assert_eq!(
+        off_at,
+        Some(17),
+        "the rider got off at the stop nearest 18, below it"
+    );
+    assert!(delivered, "the rider never reached floor 18");
+}
+
+/// With no way on from any stop (no stairs here), the rider still steps
+/// out of the trip, as a ride to a floor no car stops at would never end.
+#[test]
+fn a_rider_whose_floor_stops_being_a_stop_with_no_way_on_steps_out() {
     let (mut sim, ev) = tower_with_elevator(20);
     at_time(&mut sim, 0, 12);
     let route = sim.crowd.route(&sim.tower, 1, 18, None, None).unwrap();
     make_person(&mut sim.crowd, &sim.tower, route, 30.0, Some(5));
     let id = sim.crowd.people[0].id;
-    let ride = |sim: &mut crate::sim::Simulation| {
-        let calls = sim.crowd.elevator_calls(&sim.tower);
-        sim.elevators
-            .move_cars(&mut sim.tower, 1.0, &calls, 12, false);
-        sim.elevators.swap_closed_cars(&mut sim.crowd.closed_cars);
-        sim.elevators.swap_open_cars(&mut sim.crowd.open_cars);
-        advance(&mut sim.crowd, CROWD_SECONDS_PER_MINUTE, &mut sim.tower);
-    };
     let riding = |sim: &crate::sim::Simulation| {
         sim.crowd
             .people
@@ -284,8 +337,6 @@ fn a_rider_whose_floor_stops_being_a_stop_steps_out_of_the_trip() {
         ride(&mut sim);
     }
     assert!(riding(&sim), "the rider boarded");
-    // Riders never give up aboard, so a ride to a floor no car stops at
-    // would never end: the rider steps out of the trip instead.
     assert!(
         sim.tower.set_stop(ev, 18, false),
         "floor 18 stops being a stop"
