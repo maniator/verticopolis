@@ -65,10 +65,10 @@ const state = (over: Partial<SchedState> = {}): SchedState => ({
   advancedOpen: false,
   cancelArmed: false,
   floors: [
-    { floor: 4, served: true, lobby: false },
-    { floor: 3, served: true, lobby: false },
-    { floor: 2, served: false, lobby: false },
-    { floor: 1, served: true, lobby: true },
+    { floor: 4, served: true, lobby: false, toggles: true },
+    { floor: 3, served: true, lobby: false, toggles: true },
+    { floor: 2, served: false, lobby: false, toggles: true },
+    { floor: 1, served: true, lobby: true, toggles: true },
   ],
   base: 1,
   schedule: {
@@ -188,7 +188,8 @@ describe("elevatorScheduleTemplate: floors grid (the fold-in surface)", () => {
   });
 
   it("express above ground renders the caption, no toggles and no bulk stop buttons", () => {
-    const frag = renderToFragment(elevatorScheduleTemplate(ctx({ isExpress: true }), state(), noop));
+    const floors = state().floors.map((f) => ({ ...f, toggles: false }));
+    const frag = renderToFragment(elevatorScheduleTemplate(ctx({ isExpress: true }), state({ floors }), noop));
     expect(frag.textContent).toContain("Serves all lobbies and sky lobbies");
     expect(frag.querySelector(".es-grid input[type=checkbox]")).toBeNull();
     // The served lobby shows the always-on check; the floors it passes show nothing.
@@ -201,12 +202,12 @@ describe("elevatorScheduleTemplate: floors grid (the fold-in surface)", () => {
   it("express toggles each basement stop and a skipped lobby, nothing else", () => {
     const onServe = vi.fn();
     const floors = [
-      { floor: 15, served: true, lobby: true, endpoint: true },
-      { floor: 8, served: false, lobby: false },
-      { floor: 1, served: true, lobby: true },
-      { floor: 0, served: false, lobby: false },
-      { floor: -1, served: true, lobby: false },
-      { floor: -2, served: true, lobby: false, endpoint: true },
+      { floor: 15, served: true, lobby: true, endpoint: true, toggles: false },
+      { floor: 8, served: false, lobby: false, toggles: false },
+      { floor: 1, served: true, lobby: true, toggles: false },
+      { floor: 0, served: false, lobby: false, toggles: true },
+      { floor: -1, served: true, lobby: false, toggles: true },
+      { floor: -2, served: true, lobby: false, endpoint: true, toggles: false },
     ];
     const frag = renderToFragment(elevatorScheduleTemplate(ctx({ isExpress: true }), state({ floors }), { ...noop, onServe }));
     expect(frag.textContent).toContain("Stops at every lobby and basement floor; a basement stop can be turned off");
@@ -218,21 +219,45 @@ describe("elevatorScheduleTemplate: floors grid (the fold-in surface)", () => {
     expect(onServe).toHaveBeenCalledWith(0, true);
     // A lobby a legacy save skipped gets its toggle back.
     const legacy = renderToFragment(
-      elevatorScheduleTemplate(ctx({ isExpress: true }), state({ floors: [{ floor: 15, served: false, lobby: true }] }), noop),
+      elevatorScheduleTemplate(ctx({ isExpress: true }), state({ floors: [{ floor: 15, served: false, lobby: true, toggles: true }] }), noop),
     );
     expect(legacy.querySelector(".es-grid input[type=checkbox]")!.getAttribute("aria-label")).toBe("Serve floor 15");
   });
 
   it("express whose only basement is its bottom end offers no basement toggle", () => {
     const floors = [
-      { floor: 15, served: true, lobby: true, endpoint: true },
-      { floor: 1, served: true, lobby: true },
-      { floor: 0, served: true, lobby: false, endpoint: true },
+      { floor: 15, served: true, lobby: true, endpoint: true, toggles: false },
+      { floor: 1, served: true, lobby: true, toggles: false },
+      { floor: 0, served: true, lobby: false, endpoint: true, toggles: false },
     ];
     const frag = renderToFragment(elevatorScheduleTemplate(ctx({ isExpress: true }), state({ floors }), noop));
     const caption = Array.from(frag.querySelectorAll(".es-hint")).map((p) => p.textContent);
     expect(caption).toContain("Stops at every lobby and basement floor");
     expect(frag.querySelector(".es-grid input[type=checkbox]")).toBeNull();
+  });
+
+  it("a Classic express toggles every floor the engine allows and states the original's rule", () => {
+    const onServe = vi.fn();
+    const floors = [
+      { floor: 19, served: false, lobby: false, endpoint: true, toggles: false },
+      { floor: 16, served: false, lobby: false, toggles: false },
+      { floor: 15, served: true, lobby: false, toggles: true },
+      { floor: 1, served: true, lobby: true, endpoint: true, toggles: true },
+      { floor: 0, served: false, lobby: false, endpoint: true, toggles: true },
+    ];
+    const frag = renderToFragment(
+      elevatorScheduleTemplate(ctx({ isExpress: true, classicExpress: true }), state({ floors }), { ...noop, onServe }),
+    );
+    const caption = Array.from(frag.querySelectorAll(".es-hint")).map((p) => p.textContent);
+    expect(caption).toContain("Stops at the ground floor, every 15th floor and every basement; any of those stops can be turned off");
+    const boxes = Array.from(frag.querySelectorAll<HTMLInputElement>(".es-grid input[type=checkbox]"));
+    expect(boxes.map((b) => b.getAttribute("aria-label"))).toEqual(["Serve floor 15", "Serve floor 1", "Serve floor B1"]);
+    expect(boxes.map((b) => b.checked)).toEqual([true, true, false]);
+    boxes[0].checked = false;
+    boxes[0].dispatchEvent(new Event("change"));
+    expect(onServe).toHaveBeenCalledWith(15, false);
+    // The top end off a 15th floor is passed, not stopped at: no check, no toggle.
+    expect(frag.querySelectorAll(".es-grid .es-always")).toHaveLength(0);
   });
 
   it("the editor card retirement is total: no Configure stops surface remains", () => {

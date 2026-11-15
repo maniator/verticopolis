@@ -257,6 +257,8 @@ pub(crate) fn assemble(
                 skip_floors,
                 preserve_basement_stops: kind == Kind::ElevatorExpress
                     && t.get("preserveBasementStops").and_then(Value::as_bool) == Some(true),
+                classic_express_stops: kind == Kind::ElevatorExpress
+                    && t.get("classicExpressStops").and_then(Value::as_bool) == Some(true),
                 schedule: Schedule::coerce(t.get("schedule"), cars, bottom, top),
                 rides: 0,
             };

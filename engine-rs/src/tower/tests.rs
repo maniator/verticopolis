@@ -368,6 +368,7 @@ fn express_with_skips(bottom: i64, top: i64, skips: Option<Vec<f64>>) -> Transpo
         load: 0,
         skip_floors: skips,
         preserve_basement_stops: false,
+        classic_express_stops: false,
         schedule: None,
         rides: 0,
     }

@@ -52,8 +52,10 @@ export const FACTS: ScheduleFacts = {
 export const PRESET: PresetProposal = { status: "available", weekday: row(2), weekend: row(3), homeFloors: [4, 4, 4, 4] };
 
 /** Live stop rows for floors `bottom` to `top`, descending, with spies for the
- *  edits. `refuse` lists floors whose toggle the port ignores. */
-export function stopsPort(top = TOP, lobbies: readonly number[] = [1], refuse: readonly number[] = [], bottom = 1) {
+ *  edits. `refuse` lists floors whose toggle the port ignores. `express` marks
+ *  the rows the way the engine marks a Modern express's: a toggle on a
+ *  basement, or on a lobby only while it is skipped. */
+export function stopsPort(top = TOP, lobbies: readonly number[] = [1], refuse: readonly number[] = [], bottom = 1, express = false) {
   const span = top - bottom + 1;
   const every = (): Set<number> => new Set(Array.from({ length: span }, (_, i) => bottom + i));
   let served = every();
@@ -63,6 +65,10 @@ export function stopsPort(top = TOP, lobbies: readonly number[] = [1], refuse: r
       served: served.has(floor),
       lobby: lobbies.includes(floor),
       endpoint: floor === bottom || floor === top,
+      toggles:
+        floor !== bottom &&
+        floor !== top &&
+        (!express || floor < 1 || (lobbies.includes(floor) && !served.has(floor))),
     })),
   );
   return {
@@ -109,7 +115,7 @@ export function open(over: Partial<Omit<ScheduleDialogCtx, keyof Answers>> & Ans
     cars: CARS,
     bottom: 1,
     top: TOP,
-    stops: stopsPort(),
+    stops: stopsPort(TOP, [1], [], 1, over.isExpress ?? false),
     autoTune: vi.fn<ScheduleDialogCtx["autoTune"]>(() => autoTune),
     facts: vi.fn<ScheduleDialogCtx["facts"]>(() => facts),
     preset: vi.fn<ScheduleDialogCtx["preset"]>(() => preset),

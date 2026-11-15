@@ -57,6 +57,7 @@ pub fn catalog(mode: GameMode) -> Catalog {
             decorative_passers_by: mode.shows_passers_by(),
             shaded_look: mode.shaded_look(),
             venue_flights: mode.winds_venue_flights(),
+            express_stops_on_15th_floors: mode.express_stops_on_15th_floors(),
             fed_up_wait: crate::crowd::STRESS_WAIT,
             max_lobby_height: crate::facilities::MAX_LOBBY_HEIGHT,
         },

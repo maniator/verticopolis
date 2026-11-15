@@ -24,6 +24,7 @@ Every tower runs one of two sets of rules. You choose when you found the tower, 
 | Climbing | Nobody walks more than 4 flights of stairs or 7 of escalator | People climb as far as they must ([Stairs and escalators](/help/building/stairs-and-escalators/)) |
 | Towers side by side | Joined only through the building, as in 1994 | People walk the street between ground lobbies ([People and traffic](/help/tower/people/#how-people-get-around)) |
 | Escalators | Never to an office floor | Anywhere |
+| Express stops | The ground floor, every 15th floor and every basement, each one switchable; placed reaching the ground floor or a 15th floor | Lobbies, every basement and both ends, placed anywhere ([Elevators](/help/building/elevators/#express-elevators-and-sky-lobbies)) |
 | Elevator speed | One speed for every car, express included | Cars twice as fast, express cars four times ([Elevators](/help/building/elevators/#express-elevators-and-sky-lobbies)) |
 | Elevator shafts | 24 per tower, as in 1994 | 48 per tower ([Build limits](/help/building/limits/#transport)) |
 | Full elevator cars | Stop at every call they answer | Pass a waiting floor and stop only to let riders off ([Elevators](/help/building/elevators/#keeping-the-waits-short)) |

@@ -313,6 +313,13 @@ pub struct Transport {
     /// load clears the basement skips of a shaft without it, which the old
     /// lobby-only rule had set.
     pub preserve_basement_stops: bool,
+    /// `classicExpressStops`: a Classic express whose skips already follow
+    /// the original's rule (the ground floor, every 15th floor and every
+    /// basement may stop). Its skips on those floors are the player's or an
+    /// imported TDT's own. A load re-asserts the rule on a shaft without it,
+    /// dropping the skips the old lobby-only rule set on a 15th floor with
+    /// no lobby (#1527).
+    pub classic_express_stops: bool,
     pub schedule: Option<Schedule>,
     /// How many times anyone has gotten on: a car's boarding, a rider stepping
     /// into a car, a walker starting up the stairs or an escalator. It only
@@ -345,6 +352,9 @@ impl Transport {
         }
         if self.preserve_basement_stops {
             m.insert("preserveBasementStops".into(), json!(true));
+        }
+        if self.classic_express_stops {
+            m.insert("classicExpressStops".into(), json!(true));
         }
         if let Some(s) = &self.schedule {
             if !s.is_empty() {

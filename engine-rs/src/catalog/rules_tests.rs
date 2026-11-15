@@ -90,6 +90,10 @@ fn each_mode_states_its_rules() {
     assert!(!classic.venue_flights && modern.venue_flights);
     assert_eq!(c["rules"]["venueFlights"], Value::Bool(false));
     assert_eq!(v["rules"]["venueFlights"], Value::Bool(true));
+    // A Classic express keeps the 1994 game's stops (#1527).
+    assert!(classic.express_stops_on_15th_floors && !modern.express_stops_on_15th_floors);
+    assert_eq!(c["rules"]["expressStopsOn15thFloors"], Value::Bool(true));
+    assert_eq!(v["rules"]["expressStopsOn15thFloors"], Value::Bool(false));
     assert_eq!(classic.fed_up_wait, crate::crowd::STRESS_WAIT);
     assert_eq!(
         v["rules"]["fedUpWait"],

@@ -53,8 +53,8 @@ const OFFICE = record("unitCard", {
 
 const CINEMA = record("unitCard", { id: 12, kindCode: code("kinds", "cinema"), rent: NaN, vacateReason: NaN, filmPolicy: code("filmPolicies", "blockbuster"), blockbuster: 1, filmDays: 4, filmTier: code("filmTiers", "classic"), ticketPrice: code("ticketPrices", "premium"), screen2Policy: NaN, screen2Days: 0, screen2Tier: code("filmTiers", "blockbuster") });
 
-/** A stop row: floor, then the served, lobby and endpoint flags. */
-const stop = (floor: number, served: number, lobby: number, endpoint: number) => [floor, served, lobby, endpoint];
+/** A stop row: floor, then the served, lobby, endpoint and toggles flags. */
+const stop = (floor: number, served: number, lobby: number, endpoint: number, toggles: number) => [floor, served, lobby, endpoint, toggles];
 
 describe("Cards.unit", () => {
   it("decodes the unit card, reading its label and subtype", () => {
@@ -123,15 +123,15 @@ describe("Cards.shaft", () => {
       [HOURS + 20, [1, 3, 7]],
     ]);
     const rings = Array.from({ length: 2 * HOURS }, (_, ring) => filled.get(ring) ?? [0]).flat();
-    const tail = [...weekday, ...weekend, ...stop(3, 1, 0, 1), ...stop(2, 0, 0, 0), ...stop(1, 1, 1, 1), ...rings];
+    const tail = [...weekday, ...weekend, ...stop(3, 1, 0, 1, 0), ...stop(2, 0, 0, 0, 1), ...stop(1, 1, 1, 1, 0), ...rings];
     const port = mockPort({ generation: () => 1, shaftCard: () => record("shaftCard", { ...head, hourly: 1, stops: 3, origins: 1 }, tail) });
     const card = new Cards(port, readerAt(1, 0)).shaft(20)!;
     expect([card.id, card.kind, card.x, card.width, card.bottom, card.top, card.cars, card.capacity, card.utilization, card.nearCapacity]).toEqual([20, "elevatorStandard", 162, 4, 1, 3, 2, 42, 0.5, true]);
     expect(card.hourly).toEqual({ weekday, weekend });
     expect(card.stops).toEqual([
-      { floor: 3, served: true, lobby: false, endpoint: true },
-      { floor: 2, served: false, lobby: false, endpoint: false },
-      { floor: 1, served: true, lobby: true, endpoint: true },
+      { floor: 3, served: true, lobby: false, endpoint: true, toggles: false },
+      { floor: 2, served: false, lobby: false, endpoint: false, toggles: true },
+      { floor: 1, served: true, lobby: true, endpoint: true, toggles: false },
     ]);
     expect([card.origins!.weekday[8], card.origins!.weekend[20], card.origins!.weekday[0]]).toEqual([[[1, 5], [2, 3]], [[3, 7]], []]);
     expect([card.origins!.weekday.length, card.origins!.weekend.length]).toEqual([HOURS, HOURS]);

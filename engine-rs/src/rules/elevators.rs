@@ -25,6 +25,16 @@ const MODERN_EXPRESS_SPEED: f64 = 4.0;
 
 #[doc(hidden)]
 impl GameMode {
+    /// Whether an express elevator keeps the 1994 game's stops (Classic,
+    /// #1527): the ground floor, every 15th floor whether or not a lobby is
+    /// built there, and every basement, each of which can be turned off and
+    /// no other floor turned on; an end off those floors is passed, and the
+    /// shaft has to reach the ground floor or a 15th floor. Modern stops at
+    /// its lobbies, every basement and both ends, and places anywhere.
+    pub fn express_stops_on_15th_floors(self) -> bool {
+        self == GameMode::Classic
+    }
+
     /// Whether Waiting Car Response watches the moving cars, as in the 1994
     /// game: a waiting car stays parked while a car of its shaft, already
     /// heading toward the call, is within that many floors of it. Modern

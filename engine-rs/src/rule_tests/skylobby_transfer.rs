@@ -1,12 +1,14 @@
 //! Express transfers at any express stop, in both modes (#509), from the
-//! retired `skylobbyTransfer.integration.test.ts`: the 1994 original changes
-//! from an express to a local at a plain floor that ends the express, so
-//! routing does too; transfers at a sky lobby, the ground lobby, a plain
-//! shared local stop, between stairs and an express and between two
-//! expresses all route; a tower with no express routes the same in both
-//! modes; the reachability probe agrees with the route and draws nothing
-//! from the crowd's generator; and turning the transfer floor into a sky
-//! lobby keeps the route.
+//! retired `skylobbyTransfer.integration.test.ts`: riders change from an
+//! express to a local at a plain floor where the express stops (a Classic
+//! express stops at a 15th floor with no lobby; a Modern one at its plain
+//! end), and a Classic express does not stop at an end off a 15th floor
+//! (the parity run on SimTower 1.0, #1527); transfers at a sky lobby, the
+//! ground lobby, a plain shared local stop, between stairs and an express
+//! and between two expresses all route; a tower with no express routes the
+//! same in both modes; the reachability probe agrees with the route and
+//! draws nothing from the crowd's generator; and turning the transfer floor
+//! into a sky lobby keeps the route.
 use crate::clock::{CalendarKind, GameMode};
 use crate::crowd::Crowd;
 use crate::facilities::Kind;
@@ -36,28 +38,40 @@ fn route(sim: &mut Simulation, from: i64, to: i64) -> Option<(Vec<i64>, Vec<i64>
     Some((r.floors, r.shafts))
 }
 
-/// An express from 1 to 20 (20 a plain floor) and a local from 20 to 25.
+/// The plain floor an express from the ground stops at and ends on: a 15th
+/// floor in Classic (whose express stops only there above the lobby), any
+/// floor in Modern.
+fn plain_hub(mode: GameMode) -> i64 {
+    match mode {
+        GameMode::Classic => 15,
+        GameMode::Modern => 20,
+    }
+}
+
+/// An express from 1 to the plain hub floor and a local from the hub to 25.
 fn plain_hub_tower(mode: GameMode) -> (Simulation, i64, i64) {
+    let hub = plain_hub(mode);
     let mut sim = base_tower(mode, 25, &[]);
-    let express = shaft(&mut sim, Kind::ElevatorExpress, 4, 1, 20);
-    let local = shaft(&mut sim, Kind::ElevatorStandard, 10, 20, 25);
+    let express = shaft(&mut sim, Kind::ElevatorExpress, 4, 1, hub);
+    let local = shaft(&mut sim, Kind::ElevatorStandard, 10, hub, 25);
     (sim, express, local)
 }
 
 #[test]
 fn an_express_to_local_transfer_at_a_plain_express_end_routes_in_both_modes() {
     for mode in MODES {
+        let hub = plain_hub(mode);
         let (mut sim, express, local) = plain_hub_tower(mode);
         let (floors, shafts) = route(&mut sim, 1, 25).expect("routes");
         assert_eq!(shafts, vec![express, local], "{mode:?}");
-        assert!(floors.contains(&20), "{mode:?} changes at floor 20");
+        assert!(floors.contains(&hub), "{mode:?} changes at floor {hub}");
         assert_eq!(
-            route(&mut sim, 1, 20).unwrap().1,
+            route(&mut sim, 1, hub).unwrap().1,
             vec![express],
             "a direct ride"
         );
         assert_eq!(
-            route(&mut sim, 20, 25).unwrap().1,
+            route(&mut sim, hub, 25).unwrap().1,
             vec![local],
             "a local hop"
         );
@@ -96,35 +110,50 @@ fn a_local_to_local_transfer_at_a_plain_floor_routes_in_both_modes() {
     }
 }
 
-/// With a local beside the express to floor 20, the fewest-ride search takes
-/// the first-listed shaft off floor 1 (the express) and then the upper local.
+/// With a local beside the express to plain floor 15, the fewest-ride search
+/// takes the first-listed shaft off floor 1 (the express) and then the
+/// upper local.
 #[test]
 fn classic_finds_the_two_ride_route_through_a_plain_express_end() {
     let mut sim = base_tower(GameMode::Classic, 25, &[]);
-    let express = shaft(&mut sim, Kind::ElevatorExpress, 4, 1, 20);
-    shaft(&mut sim, Kind::ElevatorStandard, 10, 1, 20);
-    let high = shaft(&mut sim, Kind::ElevatorStandard, 16, 20, 25);
+    let express = shaft(&mut sim, Kind::ElevatorExpress, 4, 1, 15);
+    shaft(&mut sim, Kind::ElevatorStandard, 10, 1, 15);
+    let high = shaft(&mut sim, Kind::ElevatorStandard, 16, 15, 25);
     let (floors, shafts) = route(&mut sim, 1, 25).unwrap();
     assert_eq!(shafts, vec![express, high]);
-    assert!(floors.contains(&20));
+    assert!(floors.contains(&15));
+}
+
+/// A Classic express does not stop at an end off a 15th floor, so riders
+/// cannot change to a local there; it still stops at the 15th floor it
+/// passes, lobby or not (the parity run on SimTower 1.0, #1527).
+#[test]
+fn a_classic_express_passes_its_end_off_a_15th_floor() {
+    let mut sim = base_tower(GameMode::Classic, 25, &[]);
+    let express = shaft(&mut sim, Kind::ElevatorExpress, 4, 1, 20);
+    shaft(&mut sim, Kind::ElevatorStandard, 10, 20, 25);
+    assert_eq!(route(&mut sim, 1, 15), Some((vec![1, 15], vec![express])));
+    assert_eq!(route(&mut sim, 1, 20), None, "no stop at floor 20");
+    assert_eq!(route(&mut sim, 1, 25), None, "no change to the local");
 }
 
 #[test]
 fn stairs_after_an_express_and_two_expresses_end_to_end_route_in_both_modes() {
     for mode in MODES {
+        let hub = plain_hub(mode);
         let mut sim = base_tower(mode, 25, &[]);
-        shaft(&mut sim, Kind::ElevatorExpress, 4, 1, 20);
-        shaft(&mut sim, Kind::Stairs, 10, 20, 21);
+        shaft(&mut sim, Kind::ElevatorExpress, 4, 1, hub);
+        shaft(&mut sim, Kind::Stairs, 10, hub, hub + 1);
         assert!(
-            route(&mut sim, 1, 21).is_some(),
+            route(&mut sim, 1, hub + 1).is_some(),
             "{mode:?} express then stairs"
         );
 
         let mut sim = base_tower(mode, 35, &[]);
-        shaft(&mut sim, Kind::ElevatorExpress, 4, 1, 20);
-        shaft(&mut sim, Kind::ElevatorExpress, 10, 20, 35);
+        shaft(&mut sim, Kind::ElevatorExpress, 4, 1, hub);
+        shaft(&mut sim, Kind::ElevatorExpress, 10, hub, 30);
         assert!(
-            route(&mut sim, 1, 35).is_some(),
+            route(&mut sim, 1, 30).is_some(),
             "{mode:?} express to express"
         );
     }
@@ -169,7 +198,7 @@ fn the_reachability_probe_agrees_with_the_route_and_draws_nothing() {
     }
     let (sim, _, _) = plain_hub_tower(GameMode::Classic);
     let (mut probe, mut untouched) = (Crowd::new(4242), Crowd::new(4242));
-    assert!(probe.reachable(&sim.tower, 1, 20, None, None));
+    assert!(probe.reachable(&sim.tower, 1, plain_hub(GameMode::Classic), None, None));
     assert_eq!(probe.rng.int(0, 1_000_000), untouched.rng.int(0, 1_000_000));
 }
 

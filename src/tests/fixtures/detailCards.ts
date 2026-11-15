@@ -51,7 +51,7 @@ export function unitDetail(mode: GameMode, kind: FacilityKind, over: Partial<Uni
 export function stopRows(bottom: number, top: number, skipped: readonly number[] = []): StopRow[] {
   const rows: StopRow[] = [];
   for (let floor = top; floor >= bottom; floor--) {
-    rows.push({ floor, served: !skipped.includes(floor), lobby: floor === 1, endpoint: floor === top || floor === bottom });
+    rows.push({ floor, served: !skipped.includes(floor), lobby: floor === 1, endpoint: floor === top || floor === bottom, toggles: floor !== top && floor !== bottom });
   }
   return rows;
 }

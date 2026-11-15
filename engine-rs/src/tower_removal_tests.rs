@@ -13,9 +13,10 @@ use crate::tower::Tower;
 
 /// A lobby on floor 1, plain floor on 2 to 14 over columns 150 to 209 and
 /// on 15 to 31 over 150 to 199, an express shaft from 1 to 31 and sky lobby
-/// runs on 15 and 30. The same tower every call.
+/// runs on 15 and 30. The same tower every call. It is a Modern tower, whose
+/// express stops follow the lobbies, so removing them moves the stops.
 fn tower() -> Simulation {
-    let mut sim = Simulation::new_game(7, GameMode::Classic);
+    let mut sim = Simulation::new_game(7, GameMode::Modern);
     sim.money = 1e9;
     sim.star = 3;
     for x in 150..210 {

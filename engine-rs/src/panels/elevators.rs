@@ -116,11 +116,13 @@ impl Simulation {
             (t.bottom..=t.top)
                 .rev()
                 .map(|fl| {
+                    let is_served = served.binary_search(&fl).is_ok();
                     json!({
                         "floor": fl,
-                        "served": served.binary_search(&fl).is_ok(),
+                        "served": is_served,
                         "lobby": lobbies.contains(&fl),
                         "endpoint": fl == t.bottom || fl == t.top,
+                        "toggles": self.tower.stop_toggles(t, fl, is_served),
                     })
                 })
                 .collect()

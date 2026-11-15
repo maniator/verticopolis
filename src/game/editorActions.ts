@@ -121,7 +121,7 @@ export class EditorActions {
     const stops = {
       read: () => [...(liveShaft()?.stops ?? [])],
       // The engine decides each refusal (an endpoint always stops, an express
-      // serves only lobby floors); a refused or no-op toggle leaves the tower
+      // serves only the floors its rule allows); a refused or no-op toggle leaves the tower
       // as it was, so its commit records no undo step.
       setServe: (floor: number, serve: boolean) => (stopsCommand((e) => e.markStop(id, floor, serve), false), Promise.resolve()),
       expressStops: () => (stopsCommand((e) => e.expressStops(id), true), Promise.resolve()),
@@ -134,6 +134,7 @@ export class EditorActions {
         title: `Schedule: ${catalogFacility(kit.catalog(), t.kind).name} (floors ${t.bottom}-${t.top})`,
         ux: scheduleDialogUX(kit.catalog().rules),
         isExpress: t.kind === "elevatorExpress",
+        classicExpress: t.kind === "elevatorExpress" && kit.catalog().rules.expressStopsOn15thFloors,
         cars: t.cars,
         bottom: t.bottom,
         top: t.top,

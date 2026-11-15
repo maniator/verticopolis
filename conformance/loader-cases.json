@@ -5004,7 +5004,7 @@
      }
     ]
    },
-   "expected": "ea3e1178da78f5d3"
+   "expected": "1c19c8cf93e1e2f0"
   },
   {
    "id": "transport-classic-basement-legacy-empty",
@@ -5502,7 +5502,7 @@
      }
     ]
    },
-   "expected": "ea3e1178da78f5d3"
+   "expected": "1c19c8cf93e1e2f0"
   },
   {
    "id": "transport-classic-basement-imported-mixed",
@@ -6004,7 +6004,7 @@
      }
     ]
    },
-   "expected": "8eebb68c2ae970ce"
+   "expected": "c061b812238de024"
   },
   {
    "id": "transport-classic-basement-marker-string",
@@ -6505,7 +6505,7 @@
      }
     ]
    },
-   "expected": "ea3e1178da78f5d3"
+   "expected": "1c19c8cf93e1e2f0"
   },
   {
    "id": "transport-classic-basement-legacy-skips",
@@ -7008,7 +7008,7 @@
      }
     ]
    },
-   "expected": "ea3e1178da78f5d3"
+   "expected": "1c19c8cf93e1e2f0"
   },
   {
    "id": "transport-modern-basement-marked-empty",

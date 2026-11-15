@@ -134,7 +134,7 @@ pub(crate) const SHAFT_CARD: [&str; 13] = [
 ];
 
 /// One stop row of `shaftCard`.
-pub(crate) const STOP_ROW: [&str; 4] = ["floor", "served", "lobby", "endpoint"];
+pub(crate) const STOP_ROW: [&str; 5] = ["floor", "served", "lobby", "endpoint", "toggles"];
 
 /// One row of `roomTiers`, which repeats it for each room that carries an
 /// evaluation or a rent level: the room's id and anchor tile, then its tier
@@ -224,11 +224,13 @@ fn shaft_card(sim: &Simulation, id: i64) -> Option<Vec<f64>> {
         let lobbies = sim.tower.lobby_floors();
         let served = t.stop_floors();
         for fl in (t.bottom..=t.top).rev() {
+            let is_served = served.binary_search(&fl).is_ok();
             r.extend_from_slice(&[
                 fl as f64,
-                flag(served.binary_search(&fl).is_ok()),
+                flag(is_served),
                 flag(lobbies.binary_search(&fl).is_ok()),
                 flag(fl == t.bottom || fl == t.top),
+                flag(sim.tower.stop_toggles(t, fl, is_served)),
             ]);
         }
     }
