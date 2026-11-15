@@ -102,7 +102,8 @@ export const SHOWCASE_SCENES: Scene[] = [
           // Quick-save first so the window shows the Auto-save row above the
           // My Towers files.
           await page.evaluate(() => document.getElementById("btn-save-top")?.click());
-          await pgShowOpenWindow(page);
+          // The Settings shot before this one leaves its window open.
+          await pgShowOpenWindow(page, true);
         },
         wait: 300,
       },

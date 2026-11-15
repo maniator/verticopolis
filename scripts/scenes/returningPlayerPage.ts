@@ -36,12 +36,15 @@ export async function pgShowReturningSplash(page: Page): Promise<void> {
  * still between runs. The scene's browser profile is its own, so nothing
  * carries into another scene.
  */
-export async function pgShowOpenWindow(page: Page): Promise<void> {
+export async function pgShowOpenWindow(page: Page, viaMenu = false): Promise<void> {
   await page.evaluate(async () => {
     const g = (window as unknown as { game?: any }).game;
     await g.saveFile("Harbour Point");
     await g.saveFile("Sky Hotel");
   });
-  await page.keyboard.press("Control+o");
+  // Ctrl+O waits while a dialog is open; the menu item replaces it, as a
+  // click on File > Open… over Settings does.
+  if (viaMenu) await page.evaluate(() => document.getElementById("mb-import")?.click());
+  else await page.keyboard.press("Control+o");
   await page.waitForSelector("#modal .fd", { timeout: 4000 });
 }
