@@ -14,6 +14,7 @@ import { overviewMapOpen, setOverviewMapOpen } from "./overviewMapWiring";
 import { callFireRescue } from "./fireRescueCall";
 import { confirmExterminate } from "./appModals";
 import { TOWER_CALL_ITEM, showTowerCalls, towerCalls, type TowerCalls } from "./towerCallItems";
+import { fitFullScreenItem } from "./fullScreenItem";
 
 /**
  * The menu bar's commands (index.html `#menubar`, behavior in
@@ -299,6 +300,8 @@ export function wireMenus(app: GameApp): MenuBar | null {
       for (const w of floating) check(w.item, !!w.win && !w.win.hidden);
       check("mb-win-statusbar", !document.body.classList.contains(STATUS_BAR_HIDDEN_CLASS));
       check("mb-fullscreen", !!document.fullscreenElement);
+      // The installed app on a phone is not offered Full Screen (fullScreenItem.ts).
+      fitFullScreenItem(app.mobileMq?.matches ?? false);
       check("mb-sound", !ui.cb.isMuted());
       grayLike("mb-undo", ui.el.undo);
       grayLike("mb-redo", ui.el.redo);

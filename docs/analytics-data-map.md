@@ -195,6 +195,14 @@ the move, and expect no new `menu: window` rows. It also took Edit and Tower,
 and File's Save, Save As and Close, Options' Tools and Status Bar and Help's
 Replay, off the title screen, so `screen: title` rows for those end there.
 
+Options > Full Screen is left out of the installed app on a phone (owner,
+2026-11-15; `src/game/fullScreenItem.ts`). The common `display` property
+(`standalone` or `browser`) already rides on every `menu_pick`, so the
+"Menu bar: Full Screen by display mode" tile splits `full_screen` picks by it
+and by `state`: from the release that carries the change, rows from phones in
+`standalone` stop, while tablets, computers and browser tabs run on. No new
+event or field was added.
+
 Version 4.1 renamed the File items and kept their codes, so a series runs on
 across the rename: `import` is Open…, `export` is Save As…, `quick_save` is
 Save, and `saves` was Saved Towers… (gone in 4.3). File > Load (4.1 and 4.2)
