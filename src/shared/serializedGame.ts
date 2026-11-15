@@ -130,4 +130,9 @@ export interface SerializedGame {
    * reload. The engine owns the shape (`engine-rs/src/housekeeping_save.rs`);
    * absent while there is nothing to tally and in older saves. */
   housekeeping?: unknown;
+  /** The day's move-ins so far (offices, condos, hotel rooms and rentals let),
+   * so the evening's "New tenants:" line counts the whole day after a reload.
+   * The engine owns the shape (`engine-rs/src/churn/move_ins_save.rs`); absent
+   * while nobody has moved in since the last report and in older saves. */
+  moveIns?: unknown;
 }

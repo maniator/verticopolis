@@ -14,6 +14,7 @@ use crate::tower::UnitState;
 use crate::rules::{CLASSIC_HOUSEHOLD, HOUSEHOLD_SIZES};
 
 mod move_in;
+mod move_ins_save;
 mod names;
 
 /// `CongestionBindingClass` (sim/gripe.ts): the transport class whose shaft

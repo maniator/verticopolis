@@ -245,11 +245,12 @@ builds them, for the web game's own tests and tooling.
   building as they stand (walking, waiting, riding, at a venue, cleaning),
   its `dispatch` carries the elevator cars' timers mid-stop, and its
   `housekeeping` carries the rooms cleaned today, yesterday's shift and the
-  days its nudges last fired, so a loaded game's people, cars and crews
-  carry on where they were. The elevator panels' hourly figures and the
-  day's move-in report start over on a load. A save from before the crowd
+  days its nudges last fired, and its `moveIns` carries the day's move-ins
+  so far, so a loaded game's people, cars and crews carry on where they
+  were and the evening's move-in report counts the whole day. The elevator
+  panels' hourly figures start over on a load. A save from before the crowd
   was saved loads with nobody in the building, and the tower fills again
-  from the lobby. The `.TDT` format carries none of the three.
+  from the lobby. The `.TDT` format carries none of the four.
 - **The loader repairs.** A damaged or hand-edited save is coerced the way the
   web game's loader does. It refuses a file it cannot read at all, and a save
   with no numeric `minutes` or no `units` list at its top level, which would

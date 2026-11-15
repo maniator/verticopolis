@@ -23,7 +23,8 @@ fn same(sim: &Simulation, what: &str) {
 }
 
 /// `serialize()` as it was before #1242, kept verbatim (but for `self`, and
-/// the crowd, the cars' timers and the housekeeping tallies added since) as
+/// the crowd, the cars' timers, the housekeeping tallies and the day's
+/// move-ins added since) as
 /// the reference both writers
 /// must match.
 fn reference(sim: &Simulation) -> Value {
@@ -92,6 +93,9 @@ fn reference(sim: &Simulation) -> Value {
     m.insert("dispatch".into(), sim.elevators.save_json());
     if let Some(tallies) = sim.housekeeping.save_json() {
         m.insert("housekeeping".into(), tallies);
+    }
+    if let Some(move_ins) = sim.move_ins_today.save_json() {
+        m.insert("moveIns".into(), move_ins);
     }
     if let Some(v) = &sim.view {
         m.insert("view".into(), v.clone());
@@ -259,11 +263,12 @@ fn edited_games_write_the_trees_text() {
         .map(|i| format!("goal {i} \"\u{1F3E2}\" \\"))
         .collect();
     sim.housekeeping.yesterday = Some((12, 3));
+    sim.move_ins_today.rentals = 2;
     let keys: Vec<&str> = sim.save_fields(true).iter().map(|(k, _)| *k).collect();
     let distinct: HashSet<&str> = keys.iter().copied().collect();
     assert_eq!(
         (keys.len(), distinct.len()),
-        (34, 34),
+        (35, 35),
         "every field once: {keys:?}"
     );
     same(&sim, "an edited game");
@@ -344,8 +349,8 @@ fn the_save_without_units_and_its_units_are_the_trees_save() {
         let units: Vec<Value> = units.collect();
         assert_eq!(Value::Array(units), sim.serialize_unfolded()["units"]);
         // The `.TDT` export reads neither the people, the cars' timers nor
-        // the housekeeping tallies.
-        let left_out = ["units", "crowd", "dispatch", "housekeeping"];
+        // the housekeeping tallies or the day's move-ins.
+        let left_out = ["units", "crowd", "dispatch", "housekeeping", "moveIns"];
         assert!(left_out.iter().all(|k| rest.get(k).is_none()));
         for key in left_out {
             if let Some(v) = whole.get(key) {

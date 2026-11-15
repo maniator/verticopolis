@@ -242,7 +242,7 @@ Commands run in order. Units and shafts are named by a tile they cover
 | `clearStops` | `floor`, `x` | Every floor stops again on the shaft at that tile (an express keeps its lobby-only rule). |
 | `setStop` | `floor`, `x`, `stopFloor`, `stop` | Serve or skip `stopFloor` on the shaft at that tile; an error outside the span or for an express stop off a lobby. |
 | `priceUnit` | `floor`, `x`, `target` | Set the unit's price to `target` through the one choke point every price write takes; an error when the unit is not repriceable. |
-| `reload` | | Save the game and load the save (`serialize()`, a JSON round trip, `deserialize`), replacing the running engine. The hashed `state` view must come back unchanged, and so must the crowd; a difference is an error. The save carries the people, the elevator cars' timers and the housekeeping tallies, so the game plays on as it would have. |
+| `reload` | | Save the game and load the save (`serialize()`, a JSON round trip, `deserialize`), replacing the running engine. The hashed `state` view must come back unchanged, and so must the crowd; a difference is an error. The save carries the people, the elevator cars' timers, the housekeeping tallies and the day's move-ins, so the game plays on as it would have. |
 | `tick` | `dt`, `times?`, `checkpointEvery?` | Call `tick(dt)` `times` times (default 1). All three are whole positive numbers. After every `checkpointEvery`th call, take a checkpoint labeled `t+<minutes>`, where minutes counts every tick's `dt` since the start of the scenario. |
 | `checkpoint` | `label` | Take a checkpoint. |
 

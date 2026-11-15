@@ -237,6 +237,11 @@ impl Simulation {
         if let Some(tallies) = self.housekeeping.save_json() {
             m.push(own("housekeeping", tallies));
         }
+        // The day's move-ins so far, so the evening's "New tenants:" line
+        // counts the whole day after a reload (`churn/move_ins_save.rs`).
+        if let Some(move_ins) = self.move_ins_today.save_json() {
+            m.push(own("moveIns", move_ins));
+        }
         if let Some(v) = &self.view {
             m.push(("view", Field::Borrowed(v)));
         }
@@ -321,10 +326,10 @@ impl Simulation {
     /// unfold; the rest carries the version `serialize()` stamps.
     #[cfg_attr(not(feature = "wasm"), allow(dead_code))]
     pub(crate) fn save_without_units(&self) -> (Value, impl Iterator<Item = Value> + '_) {
-        // The `.TDT` format has no place for the crowd, the cars' timers or
-        // the housekeeping tallies.
+        // The `.TDT` format has no place for the crowd, the cars' timers,
+        // the housekeeping tallies or the day's move-ins.
         (
-            self.serialize_without(&["units", "crowd", "dispatch", "housekeeping"]),
+            self.serialize_without(&["units", "crowd", "dispatch", "housekeeping", "moveIns"]),
             self.tower.units.iter().map(Unit::serialize),
         )
     }

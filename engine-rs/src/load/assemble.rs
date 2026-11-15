@@ -443,6 +443,9 @@ pub(crate) fn assemble(
     if let Some(tallies) = data.get("housekeeping") {
         sim.housekeeping.restore_tallies(tallies);
     }
+    if let Some(move_ins) = data.get("moveIns") {
+        sim.move_ins_today = crate::sim::MoveIns::from_save(move_ins);
+    }
     // The saved office head counts are the workers at their desks, so a
     // bulldoze before the first step still sends them out. Both readers
     // come through here, so they square the desks the same way.
