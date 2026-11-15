@@ -1,33 +1,23 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { carIndicator } from "../carIndicator";
+import { carIndicator, type CarIndicator } from "../carIndicator";
 import { castIndex } from "../pixelSprites/people";
 import { cabRiderX } from "../sprites/transport";
 import { FLOOR } from "../scale";
-import { CAB_GFX_KEEP, cabWant, carGfx, carKey, IDLE_CAR, paintCab, type CabGfxEntry } from "./cabGraphics";
-import { RIDER_FOOT, RIDER_X, type CabParts } from "./cabParts";
+import { CabGraphic, cabWant, carKey, IDLE_CAR, type CabGfxEntry } from "./cabGraphics";
+import { RIDER_FOOT, RIDER_H, RIDER_W, RIDER_X, type CabParts } from "./cabParts";
 import type { CabLoad } from "./cabRiders";
 import { figureKey } from "./crowdLook";
 
-// No 2D canvas here: a stand-in canvas keeps the draw callback, so a test can
-// run it and see what the cab is asked to draw, and the cab's parts are
-// stand-in pictures that name what they are.
-vi.mock("excalibur", async (importOriginal) => {
-  const real = await importOriginal<typeof import("excalibur")>();
-  class FakeCanvas {
-    flagDirty = vi.fn();
-    constructor(readonly options: { width: number; height: number; draw: (ctx: unknown) => void }) {}
-  }
-  return { ...real, Canvas: FakeCanvas };
-});
+// The cab's parts are stand-in pictures that name what they are, so a test
+// can read what a cab draws, and where.
 const parts = {
   back: vi.fn((kind: string, w: number) => `back:${kind}:${w}`),
   front: vi.fn((w: number, arrow: string | null, full: boolean) => `front:${w}:${arrow}:${full}`),
+  empty: vi.fn((kind: string, w: number, arrow: string | null, full: boolean) => `empty:${kind}:${w}:${arrow}:${full}`),
   rider: vi.fn((figure: number) => `rider:${figure}`),
 };
-vi.mock("./cabParts", async (importOriginal) => ({ ...(await importOriginal<object>()), cabParts: () => parts }));
-
-type Fake = { flagDirty: ReturnType<typeof vi.fn>; options: { draw: (ctx: unknown) => void } };
-const entry = (): CabGfxEntry => ({ w: 40, kind: "elevatorStandard", gfx: new Map() });
+const cabOf = (ind: CarIndicator = IDLE_CAR, w = 40) => new CabGraphic({ w, kind: "elevatorStandard" }, ind, parts as unknown as CabParts);
+const entry = (): CabGfxEntry => ({ w: 40, kind: "elevatorStandard" });
 /** Rider `seed`'s standing figure, as the crowd draws them. */
 const fig = (seed: number) => figureKey(castIndex(seed), "stand", 1, "content", false, false);
 /** A cab carrying the people with these seeds, standing in the crowd's looks. */
@@ -35,72 +25,93 @@ const carrying = (...seeds: number[]) => {
   const figures = seeds.map(fig);
   return carIndicator(0, 0, 16, 11, figures.length, figures, figures.join(","));
 };
-/** What a cab canvas copies in, in order. */
-function painted(draw: (ctx: unknown) => void): string[] {
+/** What a cab draws in one frame at (x, y), in order: each picture with its
+ *  source cut (when cut) and where it lands. */
+function drawn(cab: CabGraphic, x = 0, y = 0): string[] {
   const out: string[] = [];
-  draw({ drawImage: (img: string, x: number, y: number) => out.push(`${img}@${x},${y}`) });
+  const ctx = {
+    drawImage: (img: string, ...a: number[]) => out.push(a.length === 2 ? `${img}@${a[0]},${a[1]}` : `${img}[${a[0]}+${a[2]}x${a[3]}]@${a[4]},${a[5]}`),
+  };
+  (cab as unknown as { _drawImage(c: unknown, x: number, y: number): void })._drawImage(ctx, x, y);
   return out;
 }
-/** The riders a painting copies in. */
-const ridersIn = (calls: string[]) => calls.filter((c) => c.startsWith("rider:")).map((c) => Number(c.slice(6, c.indexOf("@"))));
+/** The riders a frame draws. */
+const ridersIn = (calls: string[]) => calls.filter((c) => c.startsWith("rider:")).map((c) => Number(c.slice(6, c.indexOf("["))));
+const foot = FLOOR - 3 - RIDER_FOOT;
+const slotX = (cw: number, rc: number, p: number) => Math.round(cabRiderX(cw, rc, p) ?? NaN) - RIDER_X;
+/** Rider `p` of `rc` in a cab `cw` wide drawn at (x, y): the part of their
+ *  picture inside the cab's walls, where a painted cab put it. */
+function inSlot(figure: number, cw: number, rc: number, p: number, x = 0, y = 0): string {
+  const left = slotX(cw, rc, p);
+  const sx = Math.max(0, -left);
+  const w = Math.min(RIDER_W, cw - left) - sx;
+  return `rider:${figure}[${sx}+${w}x${RIDER_H}]@${x + left + sx},${y + foot}`;
+}
 
 beforeEach(() => vi.clearAllMocks());
 
 describe("cab graphics", () => {
-  it("keys a cab by who is in it, so two loads of the same size never share a drawing", () => {
+  it("keys a cab by who is in it, so two loads of the same size never share a state", () => {
     expect(carKey(carrying(5))).not.toBe(carKey(carrying(8)));
     expect(carKey(carrying(5))).toBe(carKey(carrying(5)));
     expect(carKey(IDLE_CAR)).not.toBe(carKey(carrying(5)));
   });
 
-  it("paints the back, each rider's own figure in their slot, then the front", () => {
-    const calls = painted((ctx) => paintCab(ctx as CanvasRenderingContext2D, parts as unknown as CabParts, entry(), carrying(5, 8), [fig(5), fig(8)]));
-    const foot = FLOOR - 3 - RIDER_FOOT;
-    expect(calls).toEqual([
-      "back:elevatorStandard:40@0,0",
-      `rider:${fig(5)}@${Math.round(cabRiderX(40, 2, 0) ?? NaN) - RIDER_X},${foot}`,
-      `rider:${fig(8)}@${Math.round(cabRiderX(40, 2, 1) ?? NaN) - RIDER_X},${foot}`,
-      "front:40:null:false@0,0",
+  it("draws the back, each rider's own figure in their slot, then the front, where the car stands", () => {
+    expect(drawn(cabOf(carrying(5, 8)), 100, 50)).toEqual([
+      "back:elevatorStandard:40@100,50",
+      inSlot(fig(5), 40, 2, 0, 100, 50),
+      inSlot(fig(8), 40, 2, 1, 100, 50),
+      "front:40:null:false@100,50",
     ]);
     // Only as many as the cab has room for.
-    const one = painted((ctx) => paintCab(ctx as CanvasRenderingContext2D, parts as unknown as CabParts, entry(), { ...carrying(5, 8), riders: 1 }, [fig(5), fig(8)]));
-    expect(ridersIn(one)).toEqual([fig(5)]);
+    expect(ridersIn(drawn(cabOf({ ...carrying(5, 8), riders: 1 })))).toEqual([fig(5)]);
   });
 
-  it("puts the riders' own figures in the cab's drawing", () => {
-    const cv = carGfx(entry(), carrying(5, 8)) as unknown as Fake;
-    expect(ridersIn(painted(cv.options.draw))).toEqual([fig(5), fig(8)]);
+  it("cuts a rider standing against the cab's walls at the walls, as a painted cab did", () => {
+    // The first slot's picture starts left of the cab, and in a narrow cab the
+    // last one runs past the right wall.
+    expect(slotX(40, 2, 0)).toBeLessThan(0);
+    expect(drawn(cabOf(carrying(5, 8)))[1]).toBe(`rider:${fig(5)}[${-slotX(40, 2, 0)}+${RIDER_W + slotX(40, 2, 0)}x${RIDER_H}]@0,${foot}`);
+    const w = 14;
+    const last = slotX(w, 2, 1);
+    expect(last + RIDER_W).toBeGreaterThan(w);
+    expect(drawn(cabOf(carrying(5, 8), w))[2]).toBe(`rider:${fig(8)}[0+${w - last}x${RIDER_H}]@${last},${foot}`);
   });
 
-  it("draws the riders who were aboard when the state was set, even if the count moves on first", () => {
+  it("shows new riders by pointing at their pictures, painting nothing and keeping no copy per car", () => {
+    const cab = cabOf(carrying(5));
+    vi.clearAllMocks();
+    cab.show(carrying(8, 9));
+    // Only the shared parts are looked up; the cab itself makes nothing.
+    expect(parts.back).not.toHaveBeenCalled();
+    expect(parts.rider.mock.calls).toEqual([[fig(8)], [fig(9)]]);
+    expect(ridersIn(drawn(cab))).toEqual([fig(8), fig(9)]);
+    // Fewer riders next time: the ones who left are not drawn.
+    cab.show(carrying(3));
+    expect(ridersIn(drawn(cab))).toEqual([fig(3)]);
+    cab.show(IDLE_CAR);
+    expect(ridersIn(drawn(cab))).toEqual([]);
+  });
+
+  it("draws the riders who were aboard when the state was shown, even if the count moves on", () => {
     const ind = carrying(5);
-    const cv = carGfx(entry(), ind) as unknown as Fake;
+    const cab = cabOf(ind);
     (ind.figures as number[])[0] = fig(8); // the next step's recount
-    expect(ridersIn(painted(cv.options.draw))).toEqual([fig(5)]);
+    expect(ridersIn(drawn(cab))).toEqual([fig(5)]);
   });
 
-  it("reuses a kept drawing when the same state shows again", () => {
-    const e = entry();
-    const first = carGfx(e, carrying(5));
-    carGfx(e, IDLE_CAR);
-    expect(carGfx(e, carrying(5))).toBe(first);
-    expect(e.gfx.size).toBe(2);
+  it("draws an empty cab as one picture, with the lantern and FULL from the state", () => {
+    const cab = cabOf();
+    expect(drawn(cab, 7, 9)).toEqual(["empty:elevatorStandard:40:null:false@7,9"]);
+    cab.show(carIndicator(1, 16, 16, 11, 0));
+    expect(drawn(cab)).toEqual(["empty:elevatorStandard:40:up:true@0,0"]);
+    cab.show({ ...carrying(5), arrow: "up", full: true });
+    expect(drawn(cab)[2]).toBe("front:40:up:true@0,0");
   });
 
-  it("keeps a few states per car and redraws the oldest canvas for the new riders instead of making another", () => {
-    const e = entry();
-    const made = Array.from({ length: CAB_GFX_KEEP }, (_, i) => carGfx(e, carrying(i + 1)));
-    expect(new Set(made).size).toBe(CAB_GFX_KEEP);
-    // Showing the first state again makes the second the oldest.
-    carGfx(e, carrying(1));
-    const oldest = made[1] as unknown as Fake;
-    const next = carGfx(e, carrying(99));
-    expect(next).toBe(oldest); // recycled, not a new canvas
-    expect(oldest.flagDirty).toHaveBeenCalledTimes(1);
-    expect(e.gfx.size).toBe(CAB_GFX_KEEP);
-    expect(e.gfx.has(carKey(carrying(2)))).toBe(false);
-    expect(e.gfx.get(carKey(carrying(99)))).toBe(oldest);
-    expect(ridersIn(painted(oldest.options.draw))).toEqual([fig(99)]);
+  it("clones into a cab showing the same state", () => {
+    expect(drawn(cabOf(carrying(5, 8)).clone())).toEqual(drawn(cabOf(carrying(5, 8))));
   });
 });
 

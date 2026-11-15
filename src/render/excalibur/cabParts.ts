@@ -6,17 +6,19 @@ import { FLOOR } from "../scale";
 import { figureOf } from "./crowdLook";
 
 /**
- * The pieces a cab is put together from, each painted once and kept: the
- * cab's back and front for each kind, width, lantern and FULL, and each
- * rider's standing figure. A cab whose riders change is redrawn by copying
- * these few pictures instead of painting the cab and every rider again
- * pixel by pixel, so a car that takes on new people costs less to redraw
- * than the bare cab did.
+ * The pieces a cab is put together from, each painted once and kept for the
+ * whole tower: the cab's back and front for each kind, width, lantern and
+ * FULL, and each rider's standing figure. Every cab draws these same pictures
+ * (`CabGraphic`), so each is painted and sent to the GPU once, and a car whose
+ * riders change paints nothing.
  */
 export interface CabParts {
-  back(kind: FacilityKind, w: number): CanvasImageSource;
-  front(w: number, arrow: CarArrow, full: boolean): CanvasImageSource;
-  rider(figure: number): CanvasImageSource;
+  back(kind: FacilityKind, w: number): HTMLCanvasElement;
+  front(w: number, arrow: CarArrow, full: boolean): HTMLCanvasElement;
+  /** A cab with nobody aboard, its back and front in one picture, so the
+   *  most common cab costs one image to draw. */
+  empty(kind: FacilityKind, w: number, arrow: CarArrow, full: boolean): HTMLCanvasElement;
+  rider(figure: number): HTMLCanvasElement;
 }
 
 /** Where a rider's body starts and their feet stand in their picture: room
@@ -24,8 +26,8 @@ export interface CabParts {
  *  build. */
 export const RIDER_X = 4;
 export const RIDER_FOOT = 26;
-const RIDER_W = 16;
-const RIDER_H = 29;
+export const RIDER_W = 16;
+export const RIDER_H = 29;
 
 /** Paint the standing figure `figure` names (`figureKey`) at its spot. */
 export function paintRider(ctx: CanvasRenderingContext2D, figure: number): void {
@@ -42,12 +44,13 @@ function picture(w: number, h: number, paint: (ctx: CanvasRenderingContext2D) =>
   return cv;
 }
 
-/** The parts, made on first use. A tower has three cab kinds, two widths and
- *  six lantern states, and the cast stands in three moods, flat or shaded, so
- *  each cache stays a few dozen pictures. */
+/** The parts, made on first use. A tower has three cab kinds, a few widths
+ *  and six lantern states, and the cast stands in three moods, flat or
+ *  shaded, so each cache stays a few dozen pictures. */
 export function canvasCabParts(): CabParts {
   const backs = new Map<string, HTMLCanvasElement>();
   const fronts = new Map<string, HTMLCanvasElement>();
+  const empties = new Map<string, HTMLCanvasElement>();
   const riders = new Map<number, HTMLCanvasElement>();
   const cabW = (w: number) => Math.max(1, Math.round(w));
   return {
@@ -61,6 +64,18 @@ export function canvasCabParts(): CabParts {
       const key = `${w}:${arrow ?? "x"}:${full ? "f" : "e"}`;
       let cv = fronts.get(key);
       if (!cv) fronts.set(key, (cv = picture(cabW(w), FLOOR, (ctx) => drawCarFront(ctx, w, FLOOR, arrow, full))));
+      return cv;
+    },
+    empty(kind, w, arrow, full) {
+      const key = `${kind}:${w}:${arrow ?? "x"}:${full ? "f" : "e"}`;
+      let cv = empties.get(key);
+      if (!cv) {
+        const paint = (ctx: CanvasRenderingContext2D) => {
+          drawCarBack(ctx, w, FLOOR, kind);
+          drawCarFront(ctx, w, FLOOR, arrow, full);
+        };
+        empties.set(key, (cv = picture(cabW(w), FLOOR, paint)));
+      }
       return cv;
     },
     rider(figure) {
