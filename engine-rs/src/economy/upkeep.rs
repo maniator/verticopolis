@@ -6,7 +6,7 @@ use super::films::{fills_blockbuster_slot, theater_audience};
 use super::screens::{put_screens, screens};
 use super::visitors::{
     climb_steps, counts_set_audience, expected_visitors, served_visitors, set_audience,
-    NEW_FILM_DRAW,
+    venue_day_ends_in_the_morning, NEW_FILM_DRAW,
 };
 use super::{
     is_overhead_kind, ledger_cat_for, rental_message, service_maintenance_monthly,
@@ -115,11 +115,11 @@ impl Simulation {
         self.emit(&rental_message(amt, n), LogKind::Money);
     }
 
-    /// `rollOverRetailDay`: each venue's day ends, and a party hall or theatre
-    /// open through the night starts counting its audience (#1500).
+    /// `rollOverRetailDay`: at midnight a restaurant's day ends, and a party
+    /// hall or theatre open through the night starts counting its audience
+    /// (#1500). A shop's and a fast food's day ends in the morning instead
+    /// ([`Self::roll_over_morning_venues`]).
     pub fn roll_over_retail_day(&mut self) {
-        // The day that just ended: its weekend sets the venues' caps.
-        let ended_weekend = self.clock.is_weekend_on(self.clock.day() - 1);
         // Rooms only: the tower's floor tiles never carry a venue.
         let rooms = self.tower.room_index();
         // The theaters whose film fills a blockbuster slot tonight.
@@ -155,9 +155,36 @@ impl Simulation {
                 }
                 continue;
             }
-            if u.kind.subtype_list().is_none() {
+            if u.kind.subtype_list().is_none() || venue_day_ends_in_the_morning(u.kind) {
                 continue;
             }
+            self.close_venue_day(i);
+        }
+        self.blockbusters = full_houses;
+    }
+
+    /// A shop's and a fast food's day ends when shops open, about 10:00, as
+    /// in the original (#1500): its served count, and the census that reads
+    /// it, change then, not at midnight.
+    pub fn roll_over_morning_venues(&mut self) {
+        let rooms = self.tower.room_index();
+        for &i in rooms.iter() {
+            let u = &self.tower.units[i];
+            if u.is_operational() && venue_day_ends_in_the_morning(u.kind) {
+                self.close_venue_day(i);
+            }
+        }
+    }
+
+    /// Ends the day of the shop, fast food or restaurant at unit index `i`:
+    /// its served count follows the day's expected visitors and patronage,
+    /// and today's tallies become yesterday's. The day that ended is the
+    /// calendar day before today, whose weekend sets the caps, for a venue
+    /// whose day ends at midnight and for one whose day ends at 10:00.
+    fn close_venue_day(&mut self, i: usize) {
+        let ended_weekend = self.clock.is_weekend_on(self.clock.day() - 1);
+        {
+            let u = &self.tower.units[i];
             let tally = u.extras();
             let has_data = tally.patronage_today.is_some()
                 || tally.patronage_yest.is_some()
@@ -166,24 +193,24 @@ impl Simulation {
                 // An imported venue arrives with its count alone (#1500).
                 || u.visitors_yest.is_some();
             if !has_data {
-                continue;
+                return;
             }
-            let served_before = u.visitors_yest.map(i64::from);
-            let steps = climb_steps(self.rng.initial_seed, self.clock.day() - 1, u.id);
-            let (u, at) = self.tower.marked(i);
-            if let Some(expected) = expected_visitors(u.kind, ended_weekend, served_before, steps) {
-                let patronage = u.extras().patronage_today.unwrap_or(0.0);
-                let served = served_visitors(expected, patronage);
-                // Served never exceeds a cap, and every cap fits a byte.
-                u.set_visitors_yest(at, Some(u8::try_from(served).unwrap_or(u8::MAX)));
-            }
-            let mut tally = u.extras_mut();
-            tally.patronage_yest = Some(tally.patronage_today.unwrap_or(0.0));
-            tally.patronage_today = Some(0.0);
-            tally.profit_yest = Some(tally.profit_today.unwrap_or(0.0));
-            tally.profit_today = Some(0.0);
         }
-        self.blockbusters = full_houses;
+        let u = &self.tower.units[i];
+        let served_before = u.visitors_yest.map(i64::from);
+        let steps = climb_steps(self.rng.initial_seed, self.clock.day() - 1, u.id);
+        let (u, at) = self.tower.marked(i);
+        if let Some(expected) = expected_visitors(u.kind, ended_weekend, served_before, steps) {
+            let patronage = u.extras().patronage_today.unwrap_or(0.0);
+            let served = served_visitors(expected, patronage);
+            // Served never exceeds a cap, and every cap fits a byte.
+            u.set_visitors_yest(at, Some(u8::try_from(served).unwrap_or(u8::MAX)));
+        }
+        let mut tally = u.extras_mut();
+        tally.patronage_yest = Some(tally.patronage_today.unwrap_or(0.0));
+        tally.patronage_today = Some(0.0);
+        tally.profit_yest = Some(tally.profit_today.unwrap_or(0.0));
+        tally.profit_today = Some(0.0);
     }
 }
 

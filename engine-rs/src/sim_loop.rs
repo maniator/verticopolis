@@ -164,6 +164,13 @@ impl Simulation {
         if hour == 8 {
             self.hotel_checkout();
         }
+        let today = self.clock.day();
+        if hour == crate::economy::visitors::MORNING_VENUE_DAY_ENDS_AT_HOUR
+            && self.morning_venue_day != today
+        {
+            self.morning_venue_day = today;
+            self.roll_over_morning_venues();
+        }
         if (14..17).contains(&hour) {
             self.hotel_late_checkout();
         }

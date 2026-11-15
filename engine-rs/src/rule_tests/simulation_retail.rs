@@ -193,9 +193,11 @@ fn tallies(sim: &Simulation, id: i64) -> [Option<f64>; 4] {
 }
 
 #[test]
-fn a_venue_tallies_its_day_and_rolls_it_over_at_midnight() {
+fn a_venue_tallies_its_day_and_rolls_it_over_when_shops_open() {
+    // A shop's day ends at 10:00 (#1500): from 07:00, 28 hours is 11:00 the
+    // next day.
     let (mut full, shop) = venue(Kind::Shop, true);
-    hours(&mut full, 24);
+    hours(&mut full, 28);
     let [_, yest, _, profit] = tallies(&full, shop);
     assert!(yest.unwrap_or(0.0) > 0.0 && profit.unwrap_or(0.0) > 0.0);
 
@@ -237,7 +239,7 @@ fn an_idle_venue_and_every_other_kind_keep_no_tallies() {
 #[test]
 fn tallies_survive_a_save_and_load_hardened() {
     let (mut sim, shop) = venue(Kind::Shop, true);
-    hours(&mut sim, 26);
+    hours(&mut sim, 28);
     let loaded = deserialize(&sim.serialize()).unwrap();
     let [t, y, _, p] = tallies(&sim, shop);
     let [lt, ly, _, lp] = tallies(&loaded, shop);

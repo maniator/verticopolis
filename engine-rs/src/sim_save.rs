@@ -192,6 +192,11 @@ impl Simulation {
             m.push(own("founder", json!(true)));
         }
         m.push(own("lastQuarterMoney", json!(self.last_quarter_money)));
+        // Before 10:00 the shops' day is still open from yesterday's 10:00; a
+        // save without the mark loads as a day already closed (#1500).
+        if self.morning_venue_day != self.clock.day() {
+            m.push(own("morningVenueDay", json!(self.morning_venue_day)));
+        }
         // A first-day game's hour, maintenance and quarter marks, so a
         // reload bills as the unsaved game would (`sim_period_marks.rs`).
         if let Some(marks) = self.period_marks_json() {

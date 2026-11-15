@@ -242,14 +242,11 @@ pub struct Simulation {
     /// `"floor:x"` keys in insertion order.
     pub excavated: Vec<String>,
     #[doc(hidden)]
-    /// The cinemas booked for a blockbuster this month, by id, as the save
-    /// carries them (a forged save may hold a fraction).
+    /// This month's blockbuster cinemas by id, as saved (a forged save may hold a fraction).
     pub blockbusters: Vec<f64>,
-    /// The milestone ids the tower has reached, in the order it reached them.
-    /// The ids are stable across versions.
+    /// The milestone ids reached, in order. The ids are stable across versions.
     pub milestones: Vec<String>,
-    /// The recent messages, oldest first, at most [`LOG_RING_CAP`].
-    /// [`crate::frame::log_since`] returns the ones after a sequence number.
+    /// The recent messages, oldest first, at most [`LOG_RING_CAP`] ([`crate::frame::log_since`]).
     pub log: Vec<LogEntry>,
     #[doc(hidden)]
     pub log_seq: i64,
@@ -258,8 +255,7 @@ pub struct Simulation {
     pub constructing: IndexSet<i64>,
     // ---- loop state ----
     #[doc(hidden)]
-    /// The cars mid-stop and the waiting estimate per floor, saved as
-    /// `dispatch` (`dispatch_save.rs`).
+    /// The cars mid-stop and each floor's wait estimate, saved as `dispatch`.
     pub elevators: ElevatorDispatch,
     #[doc(hidden)]
     /// `elevatorUtil` / `elevatorHourly` / `elevatorOrigins` (never saved).
@@ -275,6 +271,9 @@ pub struct Simulation {
     pub last_hour: i64,
     #[doc(hidden)]
     pub last_day: i64,
+    #[doc(hidden)]
+    /// The day whose 10:00 last closed the shops' day (#1500); an old save loads as today.
+    pub morning_venue_day: i64,
     #[doc(hidden)]
     pub last_month: i64,
     #[doc(hidden)]
@@ -373,6 +372,7 @@ impl Simulation {
             fx: FxState::default(),
             last_hour: -1,
             last_day: 0,
+            morning_venue_day: -1,
             last_month: -1,
             last_quarter: -1,
             on_hour_runs: 0,
