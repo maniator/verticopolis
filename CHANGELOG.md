@@ -35,7 +35,6 @@ are documentation only: no build that a client fetches carries them.
 - The Map now shows the open air between buildings, such as two Modern towers on one lot, as a gap you can see on a computer or a phone. A gap of a few tiles used to vanish, so the buildings ran together.
 - A tower saved on its first day and reloaded now pays its first maintenance and collects its first office rent at the end of that day, as it would have without the reload.
 - Modern towers run smoother at the morning and evening rush: finding each person's quickest way up takes about half the work it did, so a busy office tower keeps up at top speed.
-- Modern towers with long elevator lines run faster: the game works out each line's wait once a step instead of at every look, and reuses a route it has just found while nobody has joined a line since.
 - Metro riders now arrive on a real train too. Someone coming in by the Metro, office workers included, steps off the train while it stands at the platform, rather than appearing on an empty platform between trains. A worker due between trains comes on the next one, and the Metro brings as many riders a day as before.
 
 ## 4.0.0
