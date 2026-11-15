@@ -200,7 +200,7 @@ describe("the Save As window", () => {
     show("saveAs");
     expect(rowNames()).not.toContain("Auto-save (Sky)");
     button("Save").click();
-    expect(ctx.save).toHaveBeenCalledExactlyOnceWith("Sky");
+    expect(ctx.save).toHaveBeenCalledExactlyOnceWith("Sky", false);
     await settle();
     expect(ui.closeModal).toHaveBeenCalledOnce();
   });
@@ -214,7 +214,7 @@ describe("the Save As window", () => {
     expect(q(".fd-ask").textContent).toContain(`"alpha" already exists. Replace it?`);
     expect(ctx.save).not.toHaveBeenCalled();
     button("Replace").click();
-    expect(ctx.save).toHaveBeenCalledExactlyOnceWith("alpha");
+    expect(ctx.save).toHaveBeenCalledExactlyOnceWith("alpha", true);
   });
 
   it("refuses an empty name", () => {

@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { FakeIndexedDb } from "../tests/fakeIndexedDb";
 import {
   cleanFileName,
@@ -88,6 +88,14 @@ describe("fileSpace", () => {
     expect(fileSpace.list()).toEqual([second]);
     expect(fileSpace.find("spire")).toEqual(second);
     expect(await fileSpace.read(first.id)).toEqual(bytes(9, 9));
+  });
+
+  it("refuses to replace when asked to keep what is there, and changes nothing", async () => {
+    await open();
+    const first = await fileSpace.save("Spire", "tower", bytes(1), 10);
+    await expect(fileSpace.save("spire", "tower", bytes(9, 9), 20, false)).rejects.toThrow(`A tower named "Spire" already exists.`);
+    expect(fileSpace.list()).toEqual([first]);
+    expect(await fileSpace.read(first.id)).toEqual(bytes(1));
   });
 
   it("refuses an empty name", async () => {
@@ -252,5 +260,47 @@ describe("fileSpace.add", () => {
     expect(blank.name).toBe("Tower");
     expect(await fileSpace.read(first.id)).toEqual(bytes(1));
     expect(fileSpace.usage().count).toBe(3);
+  });
+});
+
+describe("two tabs writing before they hear each other", () => {
+  type Module = typeof import("./fileSpace");
+  /** A tab: its own copy of the module, on the same database. */
+  const tab = async (): Promise<Module> => {
+    vi.resetModules();
+    const m = (await import("./fileSpace")) as Module;
+    expect(await m.fileSpace.open(fake.asFactory())).toBe(true);
+    return m;
+  };
+  const tabs: Module[] = [];
+  afterEach(() => tabs.splice(0).forEach((m) => m.closeFileSpaceForTests()));
+  const names = async () => {
+    const fresh = await tab();
+    tabs.push(fresh);
+    return fresh.fileSpace.list().map((e) => e.name).sort();
+  };
+
+  it("keeps both tabs' files and every body", async () => {
+    const [a, b] = [await tab(), await tab()];
+    tabs.push(a, b);
+    await a.fileSpace.add("From A", "tower", bytes(1));
+    // Tab B still lists nothing when it writes.
+    expect(b.fileSpace.list()).toEqual([]);
+    const fromB = await b.fileSpace.add("From B", "tower", bytes(2));
+    expect(await names()).toEqual(["From A", "From B"]);
+    expect(b.fileSpace.list().map((e) => e.name).sort()).toEqual(["From A", "From B"]);
+    expect(await b.fileSpace.read(fromB.id)).toEqual(bytes(2));
+  });
+
+  it("names, renames, copies and deletes against the list on disk", async () => {
+    const [a, b] = [await tab(), await tab()];
+    tabs.push(a, b);
+    const kept = await b.fileSpace.add("Spire", "tower", bytes(3));
+    const fromA = await a.fileSpace.add("Spire", "tower", bytes(4));
+    expect(fromA.name).toBe("Spire (2)");
+    await expect(b.fileSpace.rename(kept.id, "spire (2)")).rejects.toThrow(`A tower named "spire (2)" already exists.`);
+    await b.fileSpace.duplicate(kept.id);
+    await b.fileSpace.remove(kept.id);
+    expect(await names()).toEqual(["Copy of Spire", "Spire (2)"]);
   });
 });

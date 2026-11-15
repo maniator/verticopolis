@@ -220,7 +220,9 @@ export function showOpenDialog(app: GameApp): void {
  *  name, and make it the live tower's file. */
 async function saveTowerAs(app: GameApp, name: string, why: "new" | "replace" | "current"): Promise<TowerFileEntry> {
   const bytes = exportFile(app.enginePort, app.engine.viewState(), currentStamp());
-  const entry = await fileSpace.save(name, "tower", bytes);
+  // A "new" save never replaces: a file of that name another tab just made
+  // refuses the write, and the window asks again.
+  const entry = await fileSpace.save(name, "tower", bytes, Date.now(), why !== "new");
   setCurrentFile(entry.id);
   trackAppAction("file_save", why);
   return entry;
@@ -248,9 +250,9 @@ export function showSaveAsDialog(app: GameApp): void {
     initialName: currentFile()?.name ?? cleanFileName(app.enginePort.towerName() ?? ""),
     auto: () => null,
     open: () => {},
-    save: async (name) => {
+    save: async (name, replace) => {
       try {
-        const entry = await saveTowerAs(app, name, fileSpace.find(name) ? "replace" : "new");
+        const entry = await saveTowerAs(app, name, replace ? "replace" : "new");
         app.ui.toast(`Saved "${entry.name}" in My Towers.`, "good");
         return null;
       } catch (err) {

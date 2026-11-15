@@ -140,12 +140,22 @@ describe("saving into My Towers", () => {
   it("Save As writes the tower's file bytes, toasts, and makes it the live tower's file", async () => {
     showSaveAsDialog(app as unknown as GameApp);
     expect(lastCtx().initialName).toBe("Sky Hotel");
-    expect(await lastCtx().save("Sky Hotel")).toBeNull();
+    expect(await lastCtx().save("Sky Hotel", false)).toBeNull();
     const [f] = fileSpace.list();
     expect(await fileSpace.read(f.id)).toEqual(Uint8Array.of(7, 7, 7));
     expect(currentFileId()).toBe(f.id);
     expect(app.ui.toast).toHaveBeenCalledWith(`Saved "Sky Hotel" in My Towers.`, "good");
     expect(m.track).toHaveBeenCalledWith("file_save", "new");
+  });
+
+  it("a new name another tab took meanwhile is refused, and replaced once asked", async () => {
+    showSaveAsDialog(app as unknown as GameApp);
+    const other = await fileSpace.save("Spire", "tower", BINARY);
+    expect(await lastCtx().save("spire", false)).toEqual({ text: `A tower named "Spire" already exists.`, kind: "bad" });
+    expect(await fileSpace.read(other.id)).toEqual(BINARY);
+    expect(await lastCtx().save("spire", true)).toBeNull();
+    expect(await fileSpace.read(other.id)).toEqual(Uint8Array.of(7, 7, 7));
+    expect(m.track).toHaveBeenCalledWith("file_save", "replace");
   });
 
   it("Save As downloads instead while My Towers is closed", () => {

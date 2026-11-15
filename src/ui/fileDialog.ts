@@ -46,9 +46,10 @@ export interface FileDialogCtx {
   /** Open a row. The window is closed before this runs, since an import may
    *  open a window of its own. */
   open(row: FileRow): void;
-  /** Save the tower as `name`, replacing a file of that name (the window has
-   *  asked). Null once saved; the window then closes. */
-  save(name: string): Promise<FileNote | null>;
+  /** Save the tower as `name`. `replace` is true once the window has asked
+   *  about a file of that name; false refuses one that appeared meanwhile.
+   *  Null once saved; the window then closes. */
+  save(name: string, replace: boolean): Promise<FileNote | null>;
   rename(id: string, name: string): Promise<FileNote | null>;
   duplicate(id: string): Promise<FileNote | null>;
   remove(id: string): Promise<FileNote | null>;
@@ -181,11 +182,11 @@ export function showFileDialog(ui: Pick<UI, "openModalTemplate" | "closeModal">,
     }
     const taken = ctx.files().some((f) => f.name.toLocaleLowerCase() === name.toLocaleLowerCase());
     if (taken) set({ ask: { kind: "replace", name } });
-    else void save(name);
+    else void save(name, false);
   }
 
-  async function save(name: string): Promise<void> {
-    const note = await run(() => ctx.save(name));
+  async function save(name: string, replace: boolean): Promise<void> {
+    const note = await run(() => ctx.save(name, replace));
     if (note === null && box.isConnected) ui.closeModal();
   }
 
@@ -193,7 +194,7 @@ export function showFileDialog(ui: Pick<UI, "openModalTemplate" | "closeModal">,
     const ask = state.ask;
     set({ ask: null });
     if (!yes || !ask) return;
-    if (ask.kind === "replace") void save(ask.name);
+    if (ask.kind === "replace") void save(ask.name, true);
     else {
       const target = fileOf(state.selected);
       if (target) void run(() => ctx.remove(target.id));

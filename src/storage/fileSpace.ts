@@ -129,22 +129,53 @@ function queue<T>(o: Open, write: () => Promise<T>): Promise<T> {
   return run;
 }
 
-/** Write the new list (and a body, or a body's removal) in one transaction. */
-async function commit(o: Open, entries: TowerFileEntry[], body?: { id: string; bytes: Uint8Array | null }): Promise<void> {
-  const tx = o.db.transaction([META, BODIES], "readwrite");
-  if (body) {
-    if (body.bytes) tx.objectStore(BODIES).put(body.bytes, body.id);
-    else tx.objectStore(BODIES).delete(body.id);
-  }
-  tx.objectStore(META).put(entries, INDEX);
-  try {
-    await committed(tx);
-  } catch (err) {
-    throw asWriteError(err);
-  }
-  o.entries = entries;
-  o.channel?.postMessage("changed");
-  changed();
+/** A write's plan: the new list, a body to put (or remove with `null`), and
+ *  what the write answers. */
+interface Change<T> {
+  readonly entries: TowerFileEntry[];
+  readonly body?: { readonly id: string; readonly bytes: Uint8Array | null };
+  readonly result: T;
+}
+
+/**
+ * Run one write in one readwrite transaction that reads the list first, so
+ * the plan always starts from the list as it is on disk: another tab's write
+ * that this tab has not heard of yet is kept, never overwritten (#2319
+ * review). `bodyOf` also reads that file's bytes for the plan. A plan that
+ * throws writes nothing and the write rejects with its error.
+ */
+function update<T>(o: Open, plan: (list: TowerFileEntry[], body: Uint8Array | null) => Change<T>, bodyOf?: string): Promise<T> {
+  return queue(o, async () => {
+    const tx = o.db.transaction([META, BODIES], "readwrite");
+    const out: { change: Change<T> | null; refused: unknown } = { change: null, refused: null };
+    const indexReq = tx.objectStore(META).get(INDEX);
+    const bodyReq = bodyOf === undefined ? null : tx.objectStore(BODIES).get(bodyOf);
+    // Requests in one transaction answer in order, so the last one's answer
+    // comes after every read the plan needs.
+    (bodyReq ?? indexReq).onsuccess = () => {
+      let change: Change<T>;
+      try {
+        change = plan(readIndex(indexReq.result), bodyReq?.result instanceof Uint8Array ? bodyReq.result : null);
+      } catch (err) {
+        out.refused = err;
+        return;
+      }
+      if (change.body?.bytes) tx.objectStore(BODIES).put(change.body.bytes, change.body.id);
+      else if (change.body) tx.objectStore(BODIES).delete(change.body.id);
+      tx.objectStore(META).put(change.entries, INDEX);
+      out.change = change;
+    };
+    try {
+      await committed(tx);
+    } catch (err) {
+      throw asWriteError(err);
+    }
+    if (!out.change) throw out.refused ?? new Error("The tower folder's write was aborted.");
+    o.entries = out.change.entries;
+    o.channel?.postMessage("changed");
+    changed();
+    return out.change.result;
+  });
 }
 
 function newId(): string {
@@ -257,34 +288,35 @@ export const fileSpace = {
   },
   /**
    * Write `bytes` as the file `name`. A file with that name (in any case) is
-   * replaced, keeping its place; the caller asks the player first. Rejects
-   * with {@link FileSpaceFullError} when the device has no room, and nothing
+   * replaced, keeping its place; the caller asks the player first. With
+   * `replace` false, a file of that name on disk (one another tab just made,
+   * say) rejects with {@link FileNameTakenError} instead. Rejects with
+   * {@link FileSpaceFullError} when the device has no room, and nothing
    * changes then.
    */
-  save(name: string, kind: TowerFileKind, bytes: Uint8Array, modified = Date.now()): Promise<TowerFileEntry> {
+  save(name: string, kind: TowerFileKind, bytes: Uint8Array, modified = Date.now(), replace = true): Promise<TowerFileEntry> {
     const o = need();
     const clean = cleanFileName(name);
     if (!clean) return Promise.reject(new Error("Type a name for the tower."));
-    return queue(o, async () => {
-      const old = o.entries.find((e) => sameName(e.name, clean));
+    return update(o, (list) => {
+      const old = list.find((e) => sameName(e.name, clean));
+      if (old && !replace) throw new FileNameTakenError(old.name);
       const entry: TowerFileEntry = { id: old?.id ?? newId(), name: clean, kind, size: bytes.byteLength, modified };
-      const entries = old ? o.entries.map((e) => (e.id === old.id ? entry : e)) : [...o.entries, entry];
-      await commit(o, entries, { id: entry.id, bytes });
-      return entry;
+      const entries = old ? list.map((e) => (e.id === old.id ? entry : e)) : [...list, entry];
+      return { entries, body: { id: entry.id, bytes }, result: entry };
     });
   },
   /**
    * Add `bytes` as a new file, under `name` or, when that is taken, the first
-   * free "name (2)" and up, so nothing is replaced. The name is picked inside
-   * the write queue, after every write before it.
+   * free "name (2)" and up, so nothing is replaced. The name is picked from
+   * the list as the write reads it.
    */
   add(name: string, kind: TowerFileKind, bytes: Uint8Array, modified = Date.now()): Promise<TowerFileEntry> {
     const o = need();
     const clean = cleanFileName(name) || "Tower";
-    return queue(o, async () => {
-      const entry: TowerFileEntry = { id: newId(), name: freeName(clean, o.entries), kind, size: bytes.byteLength, modified };
-      await commit(o, [...o.entries, entry], { id: entry.id, bytes });
-      return entry;
+    return update(o, (list) => {
+      const entry: TowerFileEntry = { id: newId(), name: freeName(clean, list), kind, size: bytes.byteLength, modified };
+      return { entries: [...list, entry], body: { id: entry.id, bytes }, result: entry };
     });
   },
   /** Give file `id` a new name; rejects with {@link FileNameTakenError} when
@@ -293,43 +325,32 @@ export const fileSpace = {
     const o = need();
     const clean = cleanFileName(name);
     if (!clean) return Promise.reject(new Error("Type a name for the tower."));
-    return queue(o, async () => {
-      const entry = o.entries.find((e) => e.id === id);
+    return update(o, (list) => {
+      const entry = list.find((e) => e.id === id);
       if (!entry) throw new Error("That tower is gone.");
-      if (o.entries.some((e) => e.id !== id && sameName(e.name, clean))) throw new FileNameTakenError(clean);
+      if (list.some((e) => e.id !== id && sameName(e.name, clean))) throw new FileNameTakenError(clean);
       const renamed = { ...entry, name: clean };
-      await commit(
-        o,
-        o.entries.map((e) => (e.id === id ? renamed : e)),
-      );
-      return renamed;
+      return { entries: list.map((e) => (e.id === id ? renamed : e)), result: renamed };
     });
   },
   /** A copy of file `id` beside it, named "Copy of …" (then "Copy (2) of …"
    *  and up) so it never replaces another file. */
   duplicate(id: string): Promise<TowerFileEntry> {
     const o = need();
-    return queue(o, async () => {
-      const entry = o.entries.find((e) => e.id === id);
-      if (!entry) throw new Error("That tower is gone.");
-      const tx = o.db.transaction(BODIES, "readonly");
-      const bytes = await done(tx.objectStore(BODIES).get(id));
-      if (!(bytes instanceof Uint8Array)) throw new Error("That tower is gone.");
-      const name = copyName(entry.name, o.entries);
-      const copy: TowerFileEntry = { ...entry, id: newId(), name, modified: Date.now() };
-      await commit(o, [...o.entries, copy], { id: copy.id, bytes });
-      return copy;
-    });
+    return update(
+      o,
+      (list, bytes) => {
+        const entry = list.find((e) => e.id === id);
+        if (!entry || !bytes) throw new Error("That tower is gone.");
+        const copy: TowerFileEntry = { ...entry, id: newId(), name: copyName(entry.name, list), modified: Date.now() };
+        return { entries: [...list, copy], body: { id: copy.id, bytes }, result: copy };
+      },
+      id,
+    );
   },
   remove(id: string): Promise<void> {
     const o = need();
-    return queue(o, () =>
-      commit(
-        o,
-        o.entries.filter((e) => e.id !== id),
-        { id, bytes: null },
-      ),
-    );
+    return update(o, (list) => ({ entries: list.filter((e) => e.id !== id), body: { id, bytes: null }, result: undefined }));
   },
   /**
    * Add `files` (each under a free name) and set the flag `key`, all in one
