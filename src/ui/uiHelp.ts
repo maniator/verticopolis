@@ -2,7 +2,7 @@ import type { TemplateResult } from "lit-html";
 import type { UI } from "./UI";
 import { HelpPause, PAUSED_FOR_HELP } from "./helpPause";
 import { aboutTemplate } from "./templates/about";
-import { compareModalTemplate } from "./templates/compare";
+import { compareModalTemplate, towerRulesModalTemplate } from "./templates/compare";
 import { fromGameHref } from "./fromGame";
 import { isSplashUp } from "../game/interactionState";
 import { isInstalledStandalone } from "./standalone";
@@ -13,6 +13,7 @@ import { liveDiagnostics } from "../wasmhost/engineDiagnosticsLive";
 import type { DiagnosticsReport } from "../wasmhost/engineDiagnostics";
 import { copyText } from "./copyText";
 import { announceLive } from "../game/liveRegion";
+import { isGameMode } from "../shared/types";
 
 /**
  * The in-game Help: About this game (the game panel's "About…") and the
@@ -267,6 +268,17 @@ function wirePrivacyLink(ui: UI, box: HTMLElement): void {
 export function showCompare(ui: UI): void {
   trackAppAction("compare_open");
   openHelpDialog(ui, compareModalTemplate(), { displaceable: false });
+}
+
+/** Tower > This Tower's Rules: the comparison cut to the column this tower
+ *  plays by, read from the mode badge the status pump keeps current
+ *  (`uiStatus.setMode`). */
+export function showTowerRules(ui: UI): void {
+  const mode = ui.el.modeBadge.dataset.mode;
+  // Before the first status pass names the rules, the whole comparison.
+  if (!isGameMode(mode)) return showCompare(ui);
+  trackAppAction("compare_open");
+  openHelpDialog(ui, towerRulesModalTemplate(ui.el.towerName.value, mode), { displaceable: false });
 }
 
 /**

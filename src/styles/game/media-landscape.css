@@ -2,7 +2,7 @@
    Part of the game's stylesheet: src/styles.css imports the parts in order. */
 
 /* Landscape phone block: a phone held sideways matches the phone block above
-   (short and under 1024px wide) and keeps its drawer, but its scarce axis is
+   (short and under 1024px wide), but its scarce axis is
    height. The bottom tool strip and the two-line stat chips left
    the world view a thin band (151px of a 352px Pixel screen), so here the
    tools become a docked column on the left, the stat chips go to one line, and
@@ -12,9 +12,14 @@
    window's shape, so an on-screen keyboard or a split screen that makes the
    window taller than wide switches back to the portrait phone layout. */
 @media (max-width: 1023px) and (max-height: 599px) and (orientation: landscape) {
-  /* The buttons keep the first row to themselves, ending at the menu button,
-     and the stat chips share the row under them (two lines at 852px where
-     the phone layout took three), as the phone block already orders them. */
+  /* Height is the scarce axis here, so the menu bar's titles keep their
+     width for a finger but give back the phone block's extra height. */
+  .mb-title {
+    padding: 3px 7px;
+  }
+  /* The buttons keep the first row to themselves, and the stat chips share
+     the row under them (two lines at 852px where the phone layout took
+     three), as the phone block already orders them. */
   #topbar {
     align-items: center;
     gap: 4px 6px;

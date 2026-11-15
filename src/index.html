@@ -91,6 +91,85 @@
           <a href="https://github.com/maniator/verticopolis">github.com/maniator/verticopolis</a>.
         </p>
       </noscript>
+      <!-- The Win95 menu bar (src/ui/menuBar.ts drives it, src/game/menuWiring.ts
+           wires the items). Every game command that lived in the old right
+           sidebar is an item here; the ids the dialogs and tests know
+           (btn-new, btn-load, btn-settings, btn-stats, btn-help, btn-about,
+           btn-install-menu) moved with them. A menu stays [hidden] until its
+           title opens it. On a phone the bar takes the logo's row and shows
+           the logo as a compact badge at its left end. -->
+      <nav id="menubar" class="menubar" aria-label="Game menu">
+        <span class="menubar-brand" aria-hidden="true"></span>
+        <div class="mb-menu">
+          <button type="button" class="mb-title" id="mb-file" aria-haspopup="menu" aria-expanded="false" aria-controls="mb-file-menu"><u>F</u>ile</button>
+          <div class="mb-pop" id="mb-file-menu" role="menu" aria-labelledby="mb-file" hidden>
+            <button type="button" role="menuitem" class="mb-item" id="btn-new">New Tower…</button>
+            <button type="button" role="menuitem" class="mb-item" id="btn-load">Saves…</button>
+            <button type="button" role="menuitem" class="mb-item" id="mb-quick-save">Quick Save</button>
+            <button type="button" role="menuitem" class="mb-item" id="mb-close">Close</button>
+            <hr class="mb-sep" />
+            <button type="button" role="menuitem" class="mb-item" id="mb-import">Import from file…</button>
+            <button type="button" role="menuitem" class="mb-item" id="mb-export">Export to file…</button>
+            <!-- The passive home of the install offer: present only when the
+                 app can be installed and is not already (the controller
+                 toggles hidden). -->
+            <hr class="mb-sep mb-install-sep" hidden />
+            <button type="button" role="menuitem" class="mb-item" id="btn-install-menu" hidden>Install app</button>
+          </div>
+        </div>
+        <div class="mb-menu">
+          <button type="button" class="mb-title" id="mb-edit" aria-haspopup="menu" aria-expanded="false" aria-controls="mb-edit-menu"><u>E</u>dit</button>
+          <div class="mb-pop" id="mb-edit-menu" role="menu" aria-labelledby="mb-edit" hidden>
+            <button type="button" role="menuitem" class="mb-item" id="mb-undo">Undo<kbd>Ctrl+Z</kbd></button>
+            <button type="button" role="menuitem" class="mb-item" id="mb-redo">Redo<kbd>Ctrl+Y</kbd></button>
+          </div>
+        </div>
+        <div class="mb-menu">
+          <button type="button" class="mb-title" id="mb-tower" aria-haspopup="menu" aria-expanded="false" aria-controls="mb-tower-menu"><u>T</u>ower</button>
+          <div class="mb-pop" id="mb-tower-menu" role="menu" aria-labelledby="mb-tower" hidden>
+            <button type="button" role="menuitemcheckbox" class="mb-item" id="mb-win-tower" aria-checked="false">Tower Info</button>
+            <button type="button" role="menuitemcheckbox" class="mb-item" id="mb-win-map" aria-checked="false">Map</button>
+            <hr class="mb-sep" />
+            <button type="button" role="menuitem" class="mb-item" id="btn-stats">Statistics…</button>
+            <button type="button" role="menuitem" class="mb-item" id="mb-rename">Rename Tower…</button>
+            <hr class="mb-sep" />
+            <button type="button" role="menuitem" class="mb-item" id="mb-rules">This Tower's Rules…</button>
+          </div>
+        </div>
+        <div class="mb-menu">
+          <button type="button" class="mb-title" id="mb-window" aria-haspopup="menu" aria-expanded="false" aria-controls="mb-window-menu"><u>W</u>indow</button>
+          <div class="mb-pop" id="mb-window-menu" role="menu" aria-labelledby="mb-window" hidden>
+            <button type="button" role="menuitemcheckbox" class="mb-item" id="mb-win-tools" aria-checked="true">Tools</button>
+            <button type="button" role="menuitemcheckbox" class="mb-item" id="mb-win-bulletin" aria-checked="false">Bulletin</button>
+            <button type="button" role="menuitemcheckbox" class="mb-item mb-desktop-only" id="mb-win-statusbar" aria-checked="true">Status Bar</button>
+            <hr class="mb-sep mb-fullscreen-sep" />
+            <button type="button" role="menuitemcheckbox" class="mb-item" id="mb-fullscreen" aria-checked="false">Full Screen</button>
+          </div>
+        </div>
+        <div class="mb-menu">
+          <button type="button" class="mb-title" id="mb-options" aria-haspopup="menu" aria-expanded="false" aria-controls="mb-options-menu"><u>O</u>ptions</button>
+          <div class="mb-pop" id="mb-options-menu" role="menu" aria-labelledby="mb-options" hidden>
+            <button type="button" role="menuitem" class="mb-item" id="btn-settings">Settings…</button>
+            <button type="button" role="menuitemcheckbox" class="mb-item" id="mb-sound" aria-checked="true">Sound</button>
+          </div>
+        </div>
+        <div class="mb-menu">
+          <button type="button" class="mb-title" id="mb-help" aria-haspopup="menu" aria-expanded="false" aria-controls="mb-help-menu"><u>H</u>elp</button>
+          <div class="mb-pop" id="mb-help-menu" role="menu" aria-labelledby="mb-help" hidden>
+            <!-- Player's Manual opens the Help site in a new tab. -->
+            <button type="button" role="menuitem" class="mb-item" id="btn-help">Player's Manual</button>
+            <button type="button" role="menuitem" class="mb-item" id="mb-compare">Classic vs Modern</button>
+            <button type="button" role="menuitem" class="mb-item" id="mb-replay">Replay Getting Started</button>
+            <hr class="mb-sep" />
+            <!-- Sponsor opens GitHub Sponsors in a new tab; menuWiring.ts sets
+                 its address and shows it everywhere but the Android app. -->
+            <a role="menuitem" class="mb-item" id="mb-sponsor" target="_blank" rel="noopener noreferrer" hidden>Sponsor Verticopolis</a>
+            <!-- About opens About this game: the version, the diagnostics,
+                 Report a problem and the privacy link. -->
+            <button type="button" role="menuitem" class="mb-item" id="btn-about">About Verticopolis…</button>
+          </div>
+        </div>
+      </nav>
       <header id="topbar">
         <div class="brand"><span>VERTICO<b>POLIS</b><span class="brand-tm">™</span></span></div>
         <div id="status">
@@ -129,7 +208,6 @@
           <button class="btn" id="btn-redo" title="Redo (Ctrl+Shift+Z)" aria-label="Redo"></button>
           <button class="btn" id="btn-save-top" title="Quick Save" aria-label="Quick Save"></button>
           <button class="btn" id="audio-toggle" title="Toggle sound" aria-label="Mute sound" aria-pressed="false"></button>
-          <button class="btn" id="panel-toggle" title="Show/hide panels" aria-label="Show/hide panels"></button>
           <button class="btn" id="btn-update" title="An update is ready. Tap to review." aria-label="An update is ready. Tap to review." hidden><span class="btn-label">Update</span></button>
           <button class="btn" id="btn-install" title="Install Verticopolis: play offline, fullscreen, from your home screen." aria-label="Install Verticopolis" hidden><span class="btn-label">Install</span></button>
         </div>
@@ -148,54 +226,43 @@
           <div id="inspector" class="win win-closable hidden"></div>
           <div id="editor" class="win win-closable hidden"></div>
           <div id="toast-wrap" role="status" aria-live="polite" aria-atomic="false"></div>
-          <div id="lobby-height-strip" class="win" role="group" aria-label="Lobby height" hidden></div>
-          <div id="bulldoze-drag-strip" class="win" role="group" aria-label="Drag clears" hidden></div>
-        </section>
-
-        <aside id="sidebar" class="win docked">
-          <button id="panel-close" class="panel-close btn" title="Close panels" aria-label="Close panels">✕</button>
-          <div class="panel win docked">
-            <h3>Selected</h3>
-            <div id="tool-info">Pick a facility from the left.</div>
+          <!-- The picked tool's card on a phone, then its lobby height or
+               bulldoze drag choice (src/ui/toolTipStrip.ts, toolCard.ts). -->
+          <div id="tool-strip">
+            <div id="tool-tip" class="win" hidden></div>
+            <div id="lobby-height-strip" class="win" role="group" aria-label="Lobby height" hidden></div>
+            <div id="bulldoze-drag-strip" class="win" role="group" aria-label="Drag clears" hidden></div>
           </div>
-          <div class="panel win docked">
-            <h3>Tower</h3>
+          <!-- Tower Info and Bulletin: small windows over the tower, opened
+               from the Tower menu (src/game/menuWiring.ts), like the Map. -->
+          <section id="tower-win" class="float-win win win-closable" aria-labelledby="tower-win-title" hidden>
+            <div class="win-title"><span id="tower-win-title">Tower Info</span><button type="button" class="btn xs" data-close="tower-win" aria-label="Close Tower Info">✕</button></div>
             <input id="tower-name" class="name-input field" maxlength="28" aria-label="Tower name" />
             <!-- Seed carries no data-mode on purpose: uiStatus.setMode owns it and
                  its dirty-gate keys on it. Do NOT hardcode data-mode here (a
                  data-mode="classic" seed would skip the first Modern-boot repaint). -->
             <button id="btn-mode" class="mode-badge is-classic btn" type="button" title="This tower's rule-set. Click for the full Classic vs Modern comparison.">This tower: Classic</button>
             <div id="tower-stats" class="kv"></div>
-            <button id="btn-stats" class="wide-btn btn">Full Statistics…</button>
-          </div>
-          <div class="panel grow win docked">
-            <h3>Bulletin</h3>
+          </section>
+          <section id="bulletin-win" class="float-win win win-closable" aria-labelledby="bulletin-win-title" hidden>
+            <div class="win-title"><span id="bulletin-win-title">Bulletin</span><button type="button" class="btn xs" data-close="bulletin-win" aria-label="Close Bulletin">✕</button></div>
             <div id="log" class="well" role="log" aria-live="polite" aria-label="Tower bulletin"></div>
-          </div>
-          <div class="panel win docked">
-            <h3>Game</h3>
-            <!-- Quick Save lives in the top bar (💾, next to the audio toggle);
-                 this panel keeps the save MANAGER and the tower-level actions. -->
-            <div class="btn-row">
-              <button class="btn" id="btn-load">Saves…</button>
-              <button class="btn" id="btn-settings">Settings…</button>
-            </div>
-            <div class="btn-row">
-              <button class="btn" id="btn-new">New Tower…</button>
-              <button class="btn" id="btn-help">Help</button>
-            </div>
-            <!-- Help opens the player's manual (the Help site) in a new tab.
-                 About… opens About this game: the version, the diagnostics,
-                 Report a problem, the privacy link and Replay Getting Started. -->
-            <button class="btn wide-btn" id="btn-about">About…</button>
-            <!-- The permanent, passive home of the install offer: present only
-                 when the app can be installed and is not already installed
-                 (the controller toggles hidden). -->
-            <button class="btn wide-btn" id="btn-install-menu" hidden>Install app</button>
-          </div>
-        </aside>
+          </section>
+        </section>
+
       </main>
-      <div id="scrim" aria-hidden="true"></div>
+      <!-- The Win95 status bar: the picked tool, the tower and its rules, and
+           the newest bulletin line. Desktop only (Window > Status Bar). -->
+      <footer id="statusbar" class="statusbar">
+        <div id="sb-hint" class="sb-cell sb-grow" aria-hidden="true" hidden></div>
+        <div id="tool-info" class="sb-cell sb-grow">Pick a facility from the left.</div>
+        <div id="sb-tower" class="sb-cell"></div>
+        <div id="sb-news" class="sb-cell sb-news" aria-hidden="true"></div>
+      </footer>
+      <!-- The newest bulletin line for a screen reader while the Bulletin
+           window is closed (src/ui/statusBar.ts). Outside the status bar, so
+           hiding the bar, or a phone, never silences it. -->
+      <div id="sb-news-live" class="visually-hidden" role="status" aria-live="polite"></div>
     </div>
 
     <!-- accept is set by UI.openImport from the shared TOWER_FILE_EXT constant. -->

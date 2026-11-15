@@ -1,6 +1,6 @@
 import { html, render } from "lit-html";
-import { facilityColor } from "../presentation/facilityPresentation";
-import { catalogFacility, type Catalog, type CatalogFacility } from "../catalog/catalogTypes";
+import { facilityColor, facilityDescription } from "../presentation/facilityPresentation";
+import { catalogFacility, type Catalog } from "../catalog/catalogTypes";
 import type { FacilityCategory, FacilityKind } from "../shared/types";
 import type { Tool, UI } from "./UI";
 import { shortMoney } from "./format";
@@ -10,6 +10,8 @@ import { watchPaletteFit } from "./paletteFit";
 import { wirePaletteCollapse } from "./paletteCollapse";
 import { applySectionFolds, wireSectionFolds } from "./paletteSections";
 import { browserStorage } from "./overviewMapPrefs";
+import { descriptionId, wirePaletteHints } from "./paletteHints";
+import { TOOL_DESCRIPTION } from "./templates/toolInfo";
 
 /**
  * Build-palette construction for {@link UI}, as friend functions taking the UI
@@ -57,6 +59,7 @@ export function buildPalette(ui: UI): void {
   const win = paletteWindow(ui);
   const refit = win ? watchPaletteFit(win) : () => {};
   wireSectionFolds(ui.el.palette, storage, refit);
+  wirePaletteHints(ui.el.palette);
   if (win) wirePaletteCollapse(win, storage, refit);
 }
 
@@ -306,20 +309,25 @@ function toolButton(ui: UI, type: "inspect" | "bulldoze", label: string, color: 
   // trusted catalog constants); the container's a11y wiring stays imperative in
   // makeActivatable so a future re-render can't drop its listeners.
   render(
-    html`<span class="pal-swatch" style="background:${color}"></span><span class="pal-name">${iconTemplate(type, { size: 14, className: "pal-ic" })}${label}</span>`,
+    html`<span class="pal-swatch" style="background:${color}"></span><span class="pal-name">${iconTemplate(type, { size: 14, className: "pal-ic" })}${label}</span><span class="pal-desc" id=${descriptionId(type)} hidden>${TOOL_DESCRIPTION[type]}</span>`,
     item,
   );
+  item.setAttribute("aria-describedby", descriptionId(type));
   makeActivatable(item, label, () => ui.selectTool({ type } as Tool));
   return item;
 }
 
-/** A facility button's swatch, name and price, and its spoken label. */
-function labelFacility(item: HTMLElement, kind: FacilityKind, f: CatalogFacility): void {
+/** A facility button's swatch, name and price, its spoken label, and its
+ *  description: hidden, read as the button's accessible description and by
+ *  the status bar's hint while the pointer or the focus rests on it. */
+function labelFacility(item: HTMLElement, kind: FacilityKind, catalog: Catalog): void {
+  const f = catalogFacility(catalog, kind);
   render(
-    html`<span class="pal-swatch" style="background:${facilityColor(kind)}"></span><span class="pal-name">${f.name}</span><span class="pal-cost">$${shortMoney(f.cost)}</span>`,
+    html`<span class="pal-swatch" style="background:${facilityColor(kind)}"></span><span class="pal-name">${f.name}</span><span class="pal-cost">$${shortMoney(f.cost)}</span><span class="pal-desc" id=${descriptionId(kind)} hidden>${facilityDescription(kind, catalog.world)}</span>`,
     item,
   );
   item.setAttribute("aria-label", `${f.name}, $${shortMoney(f.cost)}`);
+  item.setAttribute("aria-describedby", descriptionId(kind));
 }
 
 /** Redraw the palette from `catalog`: the status pump calls this when the
@@ -335,7 +343,7 @@ export function relabelPalette(ui: UI, catalog: Catalog): void {
   ui.paletteCatalog = catalog;
   ui.el.palette.querySelectorAll<HTMLElement>(".pal-item[data-kind]").forEach((item) => {
     const kind = item.dataset.kind as FacilityKind;
-    labelFacility(item, kind, catalogFacility(catalog, kind));
+    labelFacility(item, kind, catalog);
   });
   // The lock classes follow the catalog's `available` and `minStar`, which a
   // new catalog may state differently: clear the scan key so the pump's next
@@ -349,7 +357,7 @@ function facilityButton(ui: UI, catalog: Catalog, kind: FacilityKind, group: str
   item.className = modern ? "pal-item pal-mod" : "pal-item";
   item.dataset.kind = kind;
   item.dataset.group = group;
-  labelFacility(item, kind, f);
+  labelFacility(item, kind, catalog);
   // Locked facilities are hidden from the palette entirely (parity with the
   // original), so a visible button is never locked, no locked toast path.
   // (A visible button may still be unaffordable; the engine build guard, not

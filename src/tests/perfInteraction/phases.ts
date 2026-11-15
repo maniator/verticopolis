@@ -48,37 +48,14 @@ function spot(vp: Viewport, i: number): { x: number; y: number } {
   return { x: vp.width * (0.25 + ((i * 37) % 50) / 100), y: vp.height * (0.3 + ((i * 53) % 40) / 100) };
 }
 
-/** Whether `selector`'s center sits past the right edge of the window: on a
- *  narrow window the side panel slides off screen. */
-async function offScreen(page: Page, selector: string): Promise<boolean> {
-  const box = await (await page.$(selector))?.boundingBox();
-  const vp = page.viewportSize();
-  return Boolean(box && vp && box.x + box.width / 2 > vp.width);
-}
-
-/** Click the side panel's toggle, when the layout shows one. A failed click
- *  does not stop the run, but its cause is written to stderr, so a phase that
- *  then opens no dialog can be traced back to it. */
-async function togglePanel(page: Page): Promise<void> {
-  const toggle = await page.$("#panel-toggle");
-  if (toggle && (await toggle.isVisible())) {
-    await toggle.click({ timeout: 2000, force: true }).catch((e: unknown) => {
-      process.stderr.write(`perf:interaction: warning: side panel toggle click failed: ${e instanceof Error ? e.message.split("\n")[0] : String(e)}\n`);
-    });
-  }
-  await pause(page, 300);
-}
-
 async function clickIfVisible(page: Page, selector: string, timeout = 2000): Promise<boolean> {
   const el = await page.$(selector);
   if (!el || !(await el.isVisible())) return false;
-  // The side panel scrolls, so its lower buttons can sit below the fold, as a
+  // The palette scrolls, so its lower tools can sit below the fold, as a
   // player would scroll to them. Visibility is checked above; `force` skips
   // Playwright's wait for the element to hold still across frames, which a
   // slow page may not meet in time.
   await el.scrollIntoViewIfNeeded({ timeout }).catch(() => {});
-  // A player opens an off-screen side panel first.
-  if (await offScreen(page, selector)) await togglePanel(page);
   return el.click({ timeout, force: true }).then(
     () => true,
     () => false,
@@ -134,12 +111,18 @@ async function zoom(page: Page, vp: Viewport, end: number): Promise<PhaseActions
 /** Open and close the Statistics, Saves and Settings dialogs, one a second.
  *  A dialog counts as opened only when one is open after the click. */
 async function panels(page: Page, end: number): Promise<PhaseActions> {
-  const dialogs = ["#btn-stats", "#btn-load", "#btn-settings"];
+  // Each dialog's menu title, then its item, the way a player picks it.
+  const dialogs = [
+    ["#mb-tower", "#btn-stats"],
+    ["#mb-file", "#btn-load"],
+    ["#mb-options", "#btn-settings"],
+  ] as const;
   const tick = pacer(page, 500);
   let opened = 0;
   let i = 0;
   for (; Date.now() < end; i++) {
-    await clickIfVisible(page, dialogs[i % dialogs.length]);
+    const [menu, item] = dialogs[i % dialogs.length];
+    if (await clickIfVisible(page, menu)) await clickIfVisible(page, item);
     await tick();
     if (await page.evaluate(dialogOpen)) {
       opened++;
@@ -151,24 +134,12 @@ async function panels(page: Page, end: number): Promise<PhaseActions> {
 }
 
 /** What a phase needs done before its window opens, so it is not in the
- *  phase's numbers: for the panels phase, the side panel opened on a narrow
- *  window; for the build phase, the screen points where an office places
- *  (none found falls back to points across the view, and the report's placed
- *  count shows it). */
+ *  phase's numbers: for the build phase, the screen points where an office
+ *  places (none found falls back to points across the view, and the report's
+ *  placed count shows it). */
 export async function preparePhase(page: Page, name: PhaseName): Promise<{ x: number; y: number }[]> {
-  if (name === "panels" && (await offScreen(page, "#btn-stats"))) await togglePanel(page);
   if (name !== "build") return [];
   return page.evaluate(officeSpots, { max: 40 });
-}
-
-/** Undo what `preparePhase` changed in the layout once the window closed: a
- *  side panel left open over a narrow window would hide the palette the build
- *  phase needs. The toggle shows only on a narrow window, so a docked panel is
- *  left alone. */
-export async function finishPhase(page: Page, name: PhaseName): Promise<void> {
-  if (name !== "panels") return;
-  const toggle = await page.$("#panel-toggle");
-  if (toggle && (await toggle.isVisible()) && !(await offScreen(page, "#btn-stats"))) await togglePanel(page);
 }
 
 /** Place an office and undo it, once a second, cycling through `spots`.

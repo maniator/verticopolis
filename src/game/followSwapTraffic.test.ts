@@ -21,7 +21,7 @@ import type { TrafficTier } from "../presentation/traffic";
  *  as the Rust engine's undo and redo steps always leave it.
  *  @param won whether the tower the engine holds is already rated TOWER. */
 function standIn(tier: TrafficTier, stepRaises = true, won = false) {
-  const tower = { revision: 41 };
+  const tower = { revision: 41, towerName: "Skyspire" };
   return {
     lastTrafficTier: tier,
     frameErrors: [{ at: "t", message: "old tower" }],
@@ -44,11 +44,24 @@ function standIn(tier: TrafficTier, stepRaises = true, won = false) {
     // followSwap builds the renderer's view over these two: the layout's heat
     // tables and the reader's tower, crowd and header are all it reads up front.
     enginePort: { viewLayout: () => JSON.stringify({ heatModes: [], heatTints: [] }), evaluatedTower: vi.fn(() => won) },
-    reader: { update: vi.fn(() => void (tower.revision += stepRaises ? 1 : 0)), tower, crowd: { people: [] }, header: { star: 1 } },
+    reader: { update: vi.fn(() => void (tower.revision += stepRaises ? 1 : 0)), tower, rooms: [{}], structure: [], crowd: { people: [] }, header: { star: 1 } },
     keyboard: { followTower: vi.fn() },
     ui: { resetLog: vi.fn(), update: vi.fn(), showInspector: vi.fn() },
   };
 }
+
+describe("followSwap and the Bulletin's first line", () => {
+  it("opens another tower's Bulletin with the game's arrival line, and keeps the log as it is on a step or a restore", () => {
+    const app = standIn(0);
+    GameApp.prototype.followSwap.call(app as unknown as GameApp);
+    expect(app.ui.resetLog).toHaveBeenCalledWith(expect.anything(), "Loaded Skyspire.");
+    for (const follow of ["restore", "step"] as const) {
+      const kept = standIn(0);
+      GameApp.prototype.followSwap.call(kept as unknown as GameApp, follow);
+      expect(kept.ui.resetLog, follow).toHaveBeenCalledWith(expect.anything(), undefined);
+    }
+  });
+});
 
 describe("followSwap and the traffic chip", () => {
   it("starts the chip's hysteresis over on another tower", () => {

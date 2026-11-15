@@ -5,10 +5,10 @@ import type { UI } from "./UI";
 /**
  * The Bulldoze card's "Drag clears" choice and the phone's strip for it. A
  * bulldoze drag removes only the kind it starts on by default (#644); the
- * player can pick Everything so one drag clears all it crosses. On a phone
- * the tool card sits in the ☰ drawer, so while the bulldozer is armed a small
- * strip over the tower offers the same choice. The stylesheet shows it on
- * the phone layout only, like the lobby height strip.
+ * player can pick Everything so one drag clears all it crosses. The tool
+ * card shows on one line in the status bar, with no room for the choice, so
+ * while the bulldozer is armed a small strip over the tower offers it, on
+ * every layout, like the lobby height strip.
  */
 
 /** The card's and the strip's picker for `ui`: a pick redraws both. */

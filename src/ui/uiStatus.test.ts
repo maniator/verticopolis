@@ -3,7 +3,7 @@ import { PortCodes } from "../simport/portCodes";
 import type { SimView } from "../simport/view";
 import { catalogFor } from "../tests/catalogFixture";
 import { mockPort, record } from "../tests/portKit/mockPort";
-import { onHistoryClick, setHistoryButtons, toast, update, type HudSource } from "./uiStatus";
+import { clearToasts, onHistoryClick, resetLog, setHistoryButtons, toast, update, type HudSource } from "./uiStatus";
 import type { Catalog } from "../catalog/catalogTypes";
 import type { GameMode } from "../shared/types";
 import type { UI } from "./UI";
@@ -101,6 +101,18 @@ describe("toast rail", () => {
     expect(vi.getTimerCount()).toBe(0);
   });
 
+  it("clearToasts empties the rail and its timers but keeps the sticky notice", () => {
+    const { ui, rail } = makeUI();
+    showSaveWarning(rail, "storage blocked", () => {});
+    toast(ui, "a");
+    toast(ui, "b");
+    vi.advanceTimersByTime(3600); // "a" and "b" are mid-fade, removal timers pending
+    toast(ui, "c");
+    clearToasts(ui);
+    expect(Array.from(rail.children, (n) => n.id)).toEqual([SAVE_WARNING_ID]);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
   it("runs only the survivors' timers to completion (pruned timers are gone)", () => {
     const { ui, rail } = makeUI();
     for (let i = 0; i < TOAST_MAX + 2; i++) toast(ui, `t${i}`);
@@ -162,6 +174,30 @@ function hud(header: Partial<typeof HEADER> = {}) {
   const ui = { el, cb: { getCatalog: () => catalog }, paletteCatalog: catalog, paletteScanKey: scanKey, lastLogSeq: h.logSeq, tool: { type: "inspect" }, setTowerName: () => {}, lobbyPicker: () => undefined } as unknown as UI;
   return { ui, el };
 }
+
+describe("resetLog", () => {
+  it("opens the Bulletin with the arrival line on top of an empty engine log, and shows it in the status bar", () => {
+    document.body.innerHTML = `<span id="sb-news"></span>`;
+    const { ui, el } = hud();
+    resetLog(ui, source().src, "Loaded Skyspire.");
+    expect(el.log.textContent).toBe("Loaded Skyspire.");
+    expect(el.log.lastElementChild!.className).toBe("log-line info");
+    expect(ui.lastLogSeq).toBe(0); // the engine's cursor, untouched by the game's line
+    expect(document.getElementById("sb-news")!.textContent).toBe("Loaded Skyspire.");
+    resetLog(ui, source().src);
+    expect(el.log.childElementCount).toBe(0); // an undo step adds no line
+    document.body.innerHTML = "";
+  });
+
+  it("leaves a log the engine already wrote (a new tower's welcome) as its own words", () => {
+    const { ui, el } = hud();
+    const { src } = source();
+    const port = { ...src.port, logAfter: () => Float64Array.from([7, 0, 420]), logText: () => "Welcome! Lay a lobby." };
+    resetLog(ui, { ...src, port } as HudSource, "Skyspire is open for business.");
+    expect(el.log.textContent).toBe("Welcome! Lay a lobby.");
+    expect(ui.lastLogSeq).toBe(7);
+  });
+});
 
 describe("update", () => {
   afterEach(() => {

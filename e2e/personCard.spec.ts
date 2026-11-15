@@ -74,10 +74,15 @@ test("a click with Inspect opens a walking person's card, and Follow keeps the c
       const s = rec && e.engine.worldToScreenCoordinates(rec.actor.pos);
       const box = (document.getElementById("view") as HTMLCanvasElement).getBoundingClientRect();
       const inside = !!s && s.x >= 0 && s.x <= box.width && s.y >= 0 && s.y <= box.height;
-      // The spot and the view size ride along, so a failure says where they were.
-      return { onScreen: inside, at: s && { x: s.x, y: s.y }, view: { w: box.width, h: box.height } };
+      // The spot, the view size, the camera and the button ride along, so a
+      // failure says where they were and whether the follow still held.
+      const cam = { x: Math.round(e.cam.pos.x), y: Math.round(e.cam.pos.y), zoom: e.cam.zoom };
+      const button = document.querySelector("#editor .ed-row .btn[data-edit]")?.textContent?.trim() ?? null;
+      return { onScreen: inside, at: s && { x: Math.round(s.x), y: Math.round(s.y) }, view: { w: box.width, h: box.height }, cam, button };
     }, open);
-  await expect.poll(onScreen).toMatchObject({ onScreen: true });
+  // objectContaining prints the whole record on a failure; toMatchObject would
+  // print only the onScreen line.
+  await expect.poll(onScreen).toEqual(expect.objectContaining({ onScreen: true }));
   await expect(editor.getByRole("button", { name: "Stop following" })).toBeVisible();
 
   // With the clock running and the person moving, the follow holds.

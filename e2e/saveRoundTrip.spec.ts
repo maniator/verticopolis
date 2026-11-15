@@ -48,7 +48,7 @@ async function playAndSave(page: Page, after: number): Promise<number> {
     g.onboarding.dismissSplash();
     g.setSpeed(3);
   });
-  await page.waitForFunction((m) => (window as any).game.reader.header.minutes > m, after, { timeout: 30_000 });
+  await page.waitForFunction((m) => (window as any).game.reader.header.minutes > m, after, { timeout: 45_000 });
   return page.evaluate(() => {
     const g = (window as any).game;
     g.setSpeed(0);
@@ -93,7 +93,10 @@ test("the towers come back from IndexedDB after a reload, the same game", async 
   await page.evaluate((text) => (window as any).game.saveLoad.importGame(text), OLD_FILE);
   await expect(page.getByText("Tower imported.")).toBeVisible();
   const imported = await page.evaluate(() => (window as any).game.reader.header.minutes as number);
-  await playAndSave(page, imported + 60);
+  // Any time played will do: the save below must hold a tower that moved on
+  // from the file. Asking for a whole game hour timed out on a slow runner,
+  // where every frame over 200 ms feeds the clock only 1 ms.
+  await playAndSave(page, imported);
   // A slot too, so the check covers more than the autosave.
   await page.evaluate(() => (window as any).game.saveToSlot(1));
   // The engine's whole state, parsed so a number reads the same however it was written.
@@ -140,6 +143,16 @@ test("an older version's autosave loads, a failed import changes nothing, and an
   await page.waitForFunction((money) => (window as any).game.reader.header.money === money, old.money, { timeout: 10_000 });
   await page.evaluate(() => (window as any).game.onboarding.dismissSplash());
   const live = () => page.evaluate(() => (window as any).__vcEngine.port.serialize() as string);
+  // Hold the 30-second autosave while the refusals run: on a slow runner the
+  // loop below outlasts it, and a timer save rewrites the stored saves (and
+  // stamps the camera into the live tower) whether or not an import touched
+  // anything. Pause too, so the tower the checks compare stands still.
+  await page.evaluate(() => {
+    const g = (window as any).game;
+    g.setSpeed(0);
+    g.__heldAutosave = g.saveLoad.autosave;
+    g.saveLoad.autosave = () => Promise.resolve();
+  });
   const before = await page.evaluate(() => (window as any).game.reader.header.minutes as number);
   const towerBefore = await live();
   const storedBefore = await storedSaves(page);
@@ -161,6 +174,10 @@ test("an older version's autosave loads, a failed import changes nothing, and an
     // Every stored save is byte for byte what it was.
     expect(await storedSaves(page)).toEqual(storedBefore);
   }
+  await page.evaluate(() => {
+    const g = (window as any).game;
+    g.saveLoad.autosave = g.__heldAutosave;
+  });
   // Change the tower, so the import below has something to replace.
   await playAndSave(page, before);
   const moved = await page.evaluate(() => (window as any).game.reader.header.minutes as number);

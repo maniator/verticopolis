@@ -178,6 +178,19 @@ export function pgAdoptTestClock(): "adopted" | "none" | "failed" {
   return "adopted";
 }
 
+/** Wait two frames, so a ResizeObserver callback the page has queued (Excalibur
+ *  sizing its canvas to the stage, DisplayMode.FillContainer) runs now. Those
+ *  callbacks come on the browser's schedule, not the stepped clock: a stage
+ *  that changed size before a settle (the Tools window widening to two columns
+ *  when a setup unlocks tools) would otherwise resize the canvas at a
+ *  wall-dependent moment, sometimes after the settle's final draw, which
+ *  clears the canvas and leaves the stage blank in the capture. Observers
+ *  deliver before paint, and the stopped clock advances no sim or animation
+ *  time. Runs in the browser. */
+export function pgFlushFrames(): Promise<void> {
+  return new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r())));
+}
+
 /** Step the adopted TestClock forward `frames` whole 60fps frames. Returns
  *  whether stepping happened, so the runner can fall back to a real wait on
  *  pages that have no engine clock (gallery/preview route pages, composite
@@ -276,9 +289,7 @@ export function pgDismissSplash(): void {
   }
   const w = window as unknown as { game?: any };
   document.querySelector("#splash [data-splash='continue'], #splash [data-splash='new']")?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-  // Remove only the first-run chrome. #scrim is a PERSISTENT app element (the
-  // mobile drawer's dimming overlay, body.panels-open #scrim); deleting it would
-  // break the mobile-drawer shots, so leave it (it's inert when no panel is open).
+  // Remove only the first-run chrome; every other app element stays.
   for (const id of ["splash", "onboard"]) document.getElementById(id)?.remove();
   document.querySelectorAll("dialog[open]").forEach((d) => (d as HTMLDialogElement).close?.());
   document.querySelectorAll(".tt-pulse").forEach((n) => n.classList.remove("tt-pulse"));

@@ -21,10 +21,12 @@ import { bindEngineBridge } from "../analyticsEngineBridge";
 import { clockOf } from "../simport/headerClock";
 import { bootCommonProps, distributionChannelLabel, platformLabel } from "../analyticsEnrichment";
 import { isStandalone } from "../pwaInstall";
-import { initInstallAffordance, splashInstallOffered, activateInstall } from "./installAffordance";
-import { shouldWelcomeFounder } from "../founder";
-import { showTowerPicker } from "./appModals";
+import { wireMenus } from "./menuWiring";
+import { initInstallAffordance } from "./installAffordance";
+import { showTitleScreen, welcomeFounder } from "./titleScreen";
 import { clearSaveWarning, showSaveWarning } from "../ui/saveWarning";
+import { maybeLaunchFireworks } from "../ui/launchFireworks";
+import { reducedMotionActive } from "../storage/Prefs";
 
 /**
  * Constructor collaborators for `GameApp`, split out to keep the class body a
@@ -260,6 +262,7 @@ export function runBootFlow(app: GameApp, savedAtBoot?: number): void {
   wireOverviewMap(app);
   // The facility card and the dialogs move by their title bars too.
   wireMovableWindows(app);
+  wireMenus(app); // the menu bar, its Tower Info and Bulletin windows, the status bar
   // First-run splash + onboarding (chrome only; the engine is untouched).
   app.onboarding = new OnboardingController({
     mq: app.mobileMq,
@@ -368,16 +371,8 @@ export function runBootFlow(app: GameApp, savedAtBoot?: number): void {
   });
 
   // The 2.0 "Ground floor" recognition (party 2026-07-23): the STATUS lives on
-  // the loaded tower (`founder()`, set at load from a pre-2.0 save and persisted),
-  // so it travels with the tower and a brand-new 2.0 tower never carries it. Here
-  // we only fire the one-time welcome, once per profile, when a ground-floor tower
-  // lands back on screen (on whichever boot path this turns out to be).
-  const welcomeFounder = (): void => {
-    if (app.enginePort.founder() && shouldWelcomeFounder()) {
-      app.ui.toast("Welcome back. You got in on the ground floor, before 2.0. Thanks for building with us.", "good");
-    }
-  };
-
+  // the loaded tower (`founder()`), so it travels with the tower; here only the
+  // one-time welcome fires, once per profile (`welcomeFounder`, titleScreen.ts).
   if (resolveBootScreen({ hadReadableSave: app.hadReadableSave, justUpdated, justRecovered }) === "resume") {
     // An app-initiated resume reload (update or GPU-crash recovery): drop the
     // player straight back into their tower, skipping the title screen. Land
@@ -391,68 +386,22 @@ export function runBootFlow(app: GameApp, savedAtBoot?: number): void {
       justUpdated ? `Updated to v${APP_VERSION}. Press Play to resume.` : "Welcome back. Press Play to resume.",
       "info",
     );
-    welcomeFounder();
+    welcomeFounder(app);
   } else {
     // Every other boot (cold reopen, a manual reload, first run, or a
     // corrupt/unreadable save) shows the title screen. `hasSave` reflects
     // READABILITY, not mere presence, so the splash only promises "Continue"
     // when a real tower sits behind it, never over a fresh boot sim.
-    const hasSave = app.hadReadableSave;
-    // With no save the boot tower is only the title screen's backdrop, and the
-    // player's own tower comes from New Tower: the backdrop's events (its
-    // founding first) are left behind when that tower takes over.
-    if (!hasSave) app.events.setBackdrop(true);
-    app.onboarding.showSplash({
-      hasSave,
-      // The splash mute is a second view of the ONE persisted master mute
-      // (SPEC-splash-mute CAP-2): it drives the same toggleMute the topbar
-      // button does, which also keeps the topbar glyph in sync for when the
-      // splash dismisses into the game.
-      muted: () => app.audio.muted,
-      onToggleMute: () => app.toggleMute(),
-      // The persistent splash install button (SPEC-pwa-install CAP-5): offered to
-      // a not-standalone browser session, routed through the SAME activation the
-      // in-game surfaces use (native prompt where captured, else an honest
-      // how-to).
-      installOffered: () => splashInstallOffered(),
-      onInstall: () => void activateInstall(app, "splash").catch(() => {}),
-      // The 2.0 "Ground floor" badge (party 2026-07-23): a small, quiet mark by the
-      // version, shown only when the loaded tower predates 2.0 (`founder()`).
-      founder: () => app.enginePort.founder(),
-      onContinue: () => {
-        // Only rendered when `hasSave`. teardownSplash() resumes the engine to
-        // play speed, so re-pause: a returning player lands back in their tower
-        // paused, the ▶ Play control being the single resume (as in the reload
-        // path above).
-        app.setSpeed(0);
-        app.ui.toast("Welcome back. Press Play to resume.", "info");
-        welcomeFounder(); // one-time thank-you once they land in the tower
-      },
-      // The load-only tower picker (SPEC-splash-load-tower). Offered on every
-      // boot, not just when `hasSave`: the manual slots are invisible to
-      // `hasSave` (it reads the autosave keys alone), and the picker's file row
-      // is the only way a fresh install or a new device gets its towers back.
-      onLoadTower: () => showTowerPicker(app, welcomeFounder),
-      onNewTower: (dismiss) => {
-        // The rule-set picker (Classic vs Modern) warns that New Tower abandons
-        // the current tower only when one is continuable (`hasSave`); on a
-        // corrupt / first-run boot there's nothing to lose, so it shows no
-        // warning.
-        app.ui.newTowerModal({
-          hasSave,
-          onFound: (mode, modernCalendar, startUnbridged) => {
-            dismiss();
-            app.saveLoad.newGame(mode, modernCalendar, startUnbridged);
-          },
-        });
-      },
-    });
+    showTitleScreen(app, app.hadReadableSave);
   }
 
   // The first real screen (the splash, or the resumed tower) is now mounted, so
   // drop the static boot cover: on the splash path it uncovers the identical
   // title sky underneath, on the resume path the running tower.
   hideBootCover();
+
+  // The welcome fireworks, each boot until the player closes them, never over an unreadable save.
+  maybeLaunchFireworks(app.ui, () => reducedMotionActive(app.prefs, app.reduceMq.matches), app.saveWasCorrupt);
 
   // Tell the player plainly when their save couldn't be read, rather than
   // dropping them into a fresh tower with no explanation. Goes to the bulletin

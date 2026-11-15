@@ -303,8 +303,7 @@
    load-bearing once the title screen could reach the importer
    (SPEC-splash-load-tower CAP-3): a rejected .vctower or .TDT reports through a
    toast. Scoped to the splash-up class rather than applied unconditionally, so
-   the rail's stacking against the mobile drawer (#sidebar, z 40) and its scrim
-   is left exactly as it was. No ancestor of the rail creates a stacking context
+   the rail's usual stacking is left exactly as it was. No ancestor of the rail creates a stacking context
    (#stage is position:relative with z-index auto), so this competes with
    #splash directly. */
 body.splash-up #toast-wrap { z-index: 45; }

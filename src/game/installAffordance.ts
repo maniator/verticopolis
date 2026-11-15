@@ -8,7 +8,7 @@ import { isSplashUp } from "./interactionState";
  * The install-affordance controller (SPEC-pwa-install). Ties the browser install
  * seam ({@link initPwaInstall}) to three surfaces:
  *
- *  - the Game-panel "Install app" entry (`#btn-install-menu`): the passive home,
+ *  - the File menu's "Install app" item (`#btn-install-menu`): the passive home,
  *    shown whenever the app is installable and not installed. The browser's own
  *    install offer is a one-shot, so on Chrome/Edge the entry hides after the
  *    player uses (or dismisses) the prompt and reappears if the browser offers

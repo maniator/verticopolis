@@ -1,7 +1,7 @@
 /* ---- Overview MAP window (#343) ----
    A small window in #stage: the desktop body is 200 by 288 CSS px, the
    retail map's size. On desktop it sits at the stage's bottom-right corner,
-   clear of the sidebar, the palette and the toasts (top-right). On a phone it is a card
+   clear of the palette, the Tower Info and Bulletin windows and the toasts (top-right). On a phone it is a card
    at the top-left of the world view, inside the safe-area insets, about
    150 px wide and never taller than half the world view (a phone held
    sideways lets it take about two thirds, keeping its shape: the landscape
@@ -147,8 +147,7 @@
   /* While the Getting Started card (z 25, across the top of a phone) is up
      and the Map is open, the Map card sits above it and keeps its close button.
      The inspector, the editor and the toasts come later in the stage at the
-     same level, so they still paint over the card, and the drawer stays above
-     them all. With the Map closed nothing changes. */
+     same level, so they still paint over the card. With the Map closed nothing changes. */
   body:has(> #onboard.onboard--mobile) #stage:has(> .overview-map:not([hidden])) > :is(.overview-map, #inspector, #editor, #toast-wrap) {
     z-index: 26;
   }

@@ -4,11 +4,10 @@ import { lobbyHeightButtons, toolInfoFor, type LobbyHeightPicker } from "./templ
 import type { UI } from "./UI";
 
 /**
- * The phone's lobby height strip (#308). On a phone the tool card sits in
- * the ☰ drawer, out of sight while the player builds, so while the Lobby
- * tool is armed a small strip over the tower offers the same 1 / 2 / 3 story
- * choice. The stylesheet shows it on the phone layout only; on a wider
- * screen the Lobby card's picker is in view and the strip stays hidden.
+ * The lobby height strip (#308). The tool card shows on one line in the
+ * status bar, with no room for a picker, so while the Lobby tool is armed a
+ * small strip over the tower offers the 1 / 2 / 3 story choice, on every
+ * layout.
  */
 
 /** The Lobby card's and the strip's height picker for `ui`: a pick redraws

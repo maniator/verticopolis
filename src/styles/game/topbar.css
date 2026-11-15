@@ -161,7 +161,6 @@
 #speed button[data-speed] .vc-icon,
 #btn-undo .vc-icon,
 #btn-redo .vc-icon,
-#panel-toggle .vc-icon,
 #btn-save-top .vc-icon,
 #audio-toggle .vc-icon,
 .splash-mute .vc-icon,
@@ -179,9 +178,6 @@
 #speed .btn.active {
   font-weight: 700;
   box-shadow: var(--bevel-in);
-}
-#panel-toggle {
-  display: none;
 }
 
 /* A placement refused while paused (Classic, #1936) points at Play for a moment. */

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { compareTemplate } from "./compare";
+import { compareTemplate, towerRulesModalTemplate } from "./compare";
 import { renderToFragment } from "../testing/litTestUtils";
 import type { CatalogRules } from "../../catalog/catalogTypes";
 import { catalogFor } from "../../tests/catalogFixture";
@@ -108,5 +108,24 @@ describe("a manual link in the summary", () => {
     expect(click.defaultPrevented).toBe(true);
     expect(open).toHaveBeenCalledWith("/help/tower/clock/?from=game", "_blank", "noopener");
     host.remove();
+  });
+});
+
+describe("This Tower's Rules", () => {
+  it("names the tower and its rules, and marks the table with the column to keep", () => {
+    for (const mode of ["classic", "modern"] as const) {
+      const frag = renderToFragment(towerRulesModalTemplate("Skyspire", mode));
+      const lead = frag.querySelector(".tower-rules-lead")!.textContent!.replace(/\s+/g, " ");
+      expect(lead).toContain(`Skyspire plays by ${mode === "classic" ? "Classic" : "Modern"} rules`);
+      expect(frag.querySelector(".tower-rules")!.getAttribute("data-rules")).toBe(mode);
+      expect(frag.querySelector(".tower-rules table")).not.toBeNull();
+    }
+  });
+
+  it("shows a name with markup in it as text, and says Your tower with no name", () => {
+    const frag = renderToFragment(towerRulesModalTemplate("<b>x</b>", "modern"));
+    expect(frag.querySelector(".tower-rules-lead b")!.textContent).toBe("Modern");
+    expect(frag.querySelector(".tower-rules-lead")!.textContent).toContain("<b>x</b> plays by");
+    expect(renderToFragment(towerRulesModalTemplate("", "classic")).querySelector(".tower-rules-lead")!.textContent).toContain("Your tower plays by");
   });
 });
