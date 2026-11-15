@@ -102,7 +102,7 @@ export function replaceSlotTemplate(
  *  The player can download it, and a save from a newer version imports from
  *  that file once the game is updated. */
 const keptUnreadableNote = html`<p class="slot-detail slot-unreadable">
-    An autosave this version couldn't read is kept. If a newer version of the game wrote it, update the game, then open the file with Open.
+    An autosave this version couldn't read is kept. If a newer version of the game wrote it, update the game, then open the file with File > Open….
     <button class="btn" data-act="unreadable">Download unreadable save</button>
   </p>`;
 

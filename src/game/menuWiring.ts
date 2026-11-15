@@ -80,8 +80,12 @@ export const ON_TITLE_SCREEN: Readonly<Record<string, string>> = {
   "mb-sound": "mute",
 };
 
-/** The File item each File key runs, for its `menu_pick`. */
-const FILE_KEY_ITEMS: Readonly<Record<keyof FileCommands, string>> = { open: "mb-import", save: "mb-quick-save", saveAs: "mb-export" };
+/** The File items that need a live engine: Close saves the tower first, Open
+ *  hands a file to it, Save and Save As read the tower from it. */
+const ENGINE_FILE_ITEMS = ["mb-close", "mb-import", "mb-quick-save", "mb-export"] as const;
+
+/** The `detail` a File key reports as `app_action` `file_key`. */
+const FILE_KEY_DETAIL: Readonly<Record<keyof FileCommands, string>> = { open: "open", save: "save", saveAs: "save_as" };
 
 /** The stored value for a window or bar the player left open, and closed. */
 const SHOWN = { open: "open", closed: "closed" } as const;
@@ -245,11 +249,10 @@ export function wireMenus(app: GameApp): MenuBar | null {
     });
   }
 
-  /** A File key reports the same `menu_pick` as its item, `via: "shortcut"`,
-   *  with no trip behind it. A save key on the title screen is grayed, as the
-   *  item is. */
+  /** A File key that ran reports `app_action` `file_key`, never a
+   *  `menu_pick`: no menu was opened, so the menu funnels stay menu trips. */
   function reportKey(command: keyof FileCommands, grayed: boolean): void {
-    trackMenuPick({ menu: "file", item: menuItemCodeOf(FILE_KEY_ITEMS[command]), via: "shortcut", screen: screen(), browsed: 0, grayed });
+    if (!grayed) trackAppAction("file_key", FILE_KEY_DETAIL[command]);
   }
 
   const bar = new MenuBar(root, {
@@ -277,7 +280,11 @@ export function wireMenus(app: GameApp): MenuBar | null {
         else if (id !== "mb-undo" && id !== "mb-redo") document.getElementById(id)?.removeAttribute("aria-disabled");
       }
       // A tower the game stopped on cannot be saved, so it cannot be closed either.
-      if (isEngineStopped()) document.getElementById("mb-close")?.setAttribute("aria-disabled", "true");
+      // Nor can it be opened over, saved or saved as (the File keys refuse them too).
+      // Open is the one of them the title screen allows, so it ungrays here.
+      const stopped = isEngineStopped();
+      if (stopped) for (const id of ENGINE_FILE_ITEMS) document.getElementById(id)?.setAttribute("aria-disabled", "true");
+      else document.getElementById("mb-import")?.removeAttribute("aria-disabled");
       // The Tools fold exists on the desktop layout only.
       const tools = document.getElementById("mb-win-tools");
       if (tools) tools.hidden = !document.getElementById(PALETTE_COLLAPSE_BUTTON_ID)?.offsetParent;

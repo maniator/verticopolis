@@ -58,7 +58,7 @@ export type MenuItemCode = (typeof MENU_ITEM_CODES)[keyof typeof MENU_ITEM_CODES
  *  focused title, or Alt with a title's underlined letter. */
 export type MenuOpenVia = "click" | "keys" | "alt";
 /** How an item was picked: a pointer (mouse, pen or finger) or the keyboard. */
-export type MenuPickVia = "pointer" | "keys" | "shortcut";
+export type MenuPickVia = "pointer" | "keys";
 /** How a trip ended without a pick: a press outside the menus, Escape, Tab,
  *  a click on the open menu's own title, or the window losing focus. */
 export type MenuDismissHow = "outside" | "escape" | "tab" | "title" | "blur";

@@ -121,14 +121,20 @@ describe("wireMenus", () => {
     expect(importer.openImport).toHaveBeenCalledWith(ui);
     expect(ui.cb.onSave).toHaveBeenCalledOnce();
     expect(ui.promptExport).toHaveBeenCalledOnce();
-    // Each key reports its item's menu_pick, as a shortcut with no trip.
+    // A key that ran reports app_action file_key, and never a menu_pick: no
+    // menu was opened. A grayed key (Save on the title screen) reports nothing.
     const report = shortcuts.mock.calls[0][2]!;
+    sponsor.track.mockClear();
+    report("open", false);
     report("saveAs", false);
+    report("save", false);
     report("save", true);
-    expect(menus.pick.mock.calls.map(([p]) => [p.item, p.via, p.browsed, p.grayed, p.menu])).toEqual([
-      ["export", "shortcut", 0, false, "file"],
-      ["quick_save", "shortcut", 0, true, "file"],
+    expect(sponsor.track.mock.calls).toEqual([
+      ["file_key", "open"],
+      ["file_key", "save_as"],
+      ["file_key", "save"],
     ]);
+    expect(menus.pick).not.toHaveBeenCalled();
     shortcuts.mockRestore();
   });
 
@@ -248,16 +254,17 @@ describe("wireMenus", () => {
     expect($("mb-redo").hasAttribute("aria-disabled")).toBe(false);
   });
 
-  it("Close grays out once the game stopped on its engine, and comes back with a live tower", () => {
+  it("Close, Open, Save and Save As gray out once the game stopped on its engine, and come back with a live tower", () => {
     const { app } = fakeApp();
     const bar = wireMenus(app)!;
+    const files = ["mb-close", "mb-import", "mb-quick-save", "mb-export"];
     document.body.insertAdjacentHTML("beforeend", '<div id="engine-failure"></div>');
     bar.open($("mb-file") as HTMLButtonElement, false);
-    expect($("mb-close").getAttribute("aria-disabled")).toBe("true");
+    expect(files.map((id) => $(id).getAttribute("aria-disabled"))).toEqual(["true", "true", "true", "true"]);
     bar.close(false);
     $("engine-failure").remove();
     bar.open($("mb-file") as HTMLButtonElement, false);
-    expect($("mb-close").hasAttribute("aria-disabled")).toBe(false);
+    expect(files.map((id) => $(id).hasAttribute("aria-disabled"))).toEqual([false, false, false, false]);
   });
 
   it("Sponsor links to the tip jar and counts a tap from the menu; the Android app leaves it out", () => {

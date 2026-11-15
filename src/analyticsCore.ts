@@ -313,6 +313,10 @@ export type AppActionName =
   // A save slot named in Saved Towers… (owner, 2026-11-15). `detail` is
   // `named` or `cleared`; never the name, which the player wrote.
   | "rename_slot"
+  // A File key that ran its command (version 4.1): `detail` is `open`
+  // (Ctrl+O), `save` (Ctrl+S) or `save_as` (Ctrl+Shift+S). Keys are not
+  // menu trips, so they never send a menu_pick.
+  | "file_key"
   | "export_save"
   | "import_save"
   | "export_tdt"
