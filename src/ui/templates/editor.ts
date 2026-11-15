@@ -1,4 +1,5 @@
 import { html, nothing, type TemplateResult } from "lit-html";
+import { iconTemplate } from "../icons";
 import { keyed } from "lit-html/directives/keyed.js";
 import { isOperational, isTenanted } from "../../shared/unitState";
 import { isCommercialKind, isHotelKind } from "../../presentation/viewKinds";
@@ -36,7 +37,7 @@ const titleBar = (name: string): TemplateResult =>
   html`<h4 class="win-title">${name}<button type="button" class="ed-close btn xs" aria-label="Close">✕</button></h4>`;
 
 /** One key/value stat row. `field` marks the cells that carry live values. */
-const kv = (label: string, value: unknown, field?: string): TemplateResult =>
+const kv = (label: string | TemplateResult, value: unknown, field?: string): TemplateResult =>
   html`<span class="k">${label}</span><span class="v" data-field=${field ?? nothing}>${value}</span>`;
 
 /** A theater's screens, the first from its own fields: none off a cinema,
@@ -178,7 +179,11 @@ export function unitEditorTemplate(
   }
   if (u.state === "gutted") {
     rows.push(kv("Scrap value", "$0"));
-    rows.push(kv("⚠", "Gutted: bulldoze and rebuild."));
+    // The pixel warning icon, not the bare glyph: this panel is not a
+    // message rail, so no emoji mapper runs on it, and a bare U+26A0 shows as
+    // a missing-glyph box on a system without symbol fonts (#794). The icon is
+    // hidden from screen readers, so a hidden word keeps the spoken cue.
+    rows.push(kv(html`${iconTemplate("warning")}<span class="visually-hidden">Warning</span>`, "Gutted: bulldoze and rebuild."));
   } else {
     rows.push(kv("Resale value", `$${groupDigits(f.resaleRefund)}`));
   }
