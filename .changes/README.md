@@ -47,7 +47,9 @@ crate: none   # major | minor | patch | none
 
 The release driver cuts a release with `npm run release` on a
 `release/<version>` branch. It raises each version by the highest pending
-level, writes both changelogs from the notes, runs `npm run engine:compat`
+level, writes both changelogs from the notes (the app changelog lists the
+notes with the highest app level first, so a headline note opens the
+version's section and the update prompt), runs `npm run engine:compat`
 when the crate moves, and deletes the notes. Production deploys wait while a
 note with a level other than `none` is pending
 (`scripts/vercel-ignore-build.sh`), so a player never gets new behavior under

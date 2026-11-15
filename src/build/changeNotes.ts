@@ -144,6 +144,15 @@ export function highestLevel(levels: readonly Level[]): Level {
   return levels.reduce<Level>((a, b) => (LEVELS.indexOf(b) > LEVELS.indexOf(a) ? b : a), "none");
 }
 
+/**
+ * The notes with the highest app level first, so a release's headline (the
+ * major note of a named release, say) opens its changelog section and the
+ * update prompt. Notes of one level keep their file order.
+ */
+export function headlineFirst<T extends Pick<ChangeNote, "app">>(notes: readonly T[]): T[] {
+  return [...notes].sort((a, b) => LEVELS.indexOf(b.app) - LEVELS.indexOf(a.app));
+}
+
 const PLAIN_SEMVER = /^(\d+)\.(\d+)\.(\d+)$/;
 
 /** `version` raised by `level`, the way `npm version <level>` raises it. */
