@@ -38,7 +38,7 @@ body:
         How can we reproduce it? Write menu commands as a path from the menu bar, like File > Close or
         Tower > Statistics…. A saved tower helps. GitHub does not accept `.vctower` files, so
         drag in the crash-report `.zip` if the game gave you one (it already holds your tower), or
-        put the `.vctower` export in a `.zip`, or rename it to end in `.txt`, before attaching it.
+        put the `.vctower` file (File > Save As…) in a `.zip`, or rename it to end in `.txt`, before attaching it.
       value: |
         1.
         2.

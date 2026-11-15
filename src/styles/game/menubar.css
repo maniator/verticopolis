@@ -103,6 +103,22 @@ a.mb-item {
   font: inherit;
   opacity: 0.8;
 }
+/* A submenu (File > Load) opens to the right of its title, its first item
+   level with the title. The arrow marks the title as one. */
+.mb-sub {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+.mb-sub-title::after {
+  content: "\25B8";
+}
+.mb-pop.mb-subpop {
+  top: -3px;
+  left: 100%;
+  right: auto;
+  min-width: 200px;
+}
 .mb-sep {
   border: 0;
   border-top: 1px solid var(--r-shadow);

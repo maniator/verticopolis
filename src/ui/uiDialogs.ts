@@ -18,6 +18,7 @@ import type { ImportReport } from "../storage/tdtImportReport";
 import type { ExportReport } from "../storage/tdtExportReport";
 import type { UpdateInfo } from "../pwa";
 import { isInstalledStandalone } from "./standalone";
+import { renameSlot } from "./slotRename";
 
 /**
  * Dialog and modal controllers for {@link UI}, as friend functions taking the
@@ -45,7 +46,6 @@ export { showSettings } from "./uiSettings";
 // reach it without importing this one (which re-exports the tower picker, and
 // would therefore form a cycle). Re-exported so existing callers are unchanged.
 export { openImport } from "./uiImport";
-import { openImport } from "./uiImport";
 
 export function showStats(ui: UI, body: TemplateResult, handlers: Record<string, () => void> = {}): void {
   const box = ui.openModalTemplate(statsModalTemplate(body), { displaceable: true });
@@ -95,6 +95,7 @@ export function showSaves(ui: UI, slots: SlotInfo[], unreadable: string | null =
       ui.closeModal();
     }),
   );
+  box.querySelectorAll<HTMLElement>("[data-rename]").forEach((b) => b.addEventListener("click", () => renameSlot(ui, Number(b.dataset.rename))));
   box.querySelectorAll<HTMLElement>("[data-del]").forEach((b) =>
     b.addEventListener("click", () => {
       ui.cb.onDeleteSlot(Number(b.dataset.del));
@@ -102,9 +103,8 @@ export function showSaves(ui: UI, slots: SlotInfo[], unreadable: string | null =
     }),
   );
   const undo = guard.undo;
-  // Close the saves dialog first: <dialog>'s top layer paints over the toast
-  // rail, so export feedback would be invisible behind the open modal, and
-  // the confirm dialog / file picker replace it rather than stacking on it.
+  // File > Open… and Save As… are the way to and from a file (owner,
+  // 2026-11-15), so the footer holds Close alone.
   ui.wireActions(box, {
     ...(undo === null
       ? {}
@@ -115,14 +115,6 @@ export function showSaves(ui: UI, slots: SlotInfo[], unreadable: string | null =
             if (undo.run() !== "failed") ui.cb.onShowSaves(SAVES_DRAW.redraw);
           },
         }),
-    export: () => {
-      ui.closeModal();
-      confirmExport(ui);
-    },
-    import: () => {
-      ui.closeModal();
-      openImport(ui);
-    },
     // The kept text downloads with no engine involved. A compressed save comes
     // as a `.vctower` the game imports once it is updated; anything else is a
     // .txt, a file type GitHub accepts on an issue. The button exists only

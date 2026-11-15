@@ -8,6 +8,7 @@ import { catalogFor } from "../catalogFixture";
 import { html, type TemplateResult } from "lit-html";
 import { finishModal, MODAL_TITLE_ID } from "../../ui/uiModal";
 import type { UI } from "../../ui/UI";
+import { openImport } from "../../ui/uiImport";
 import { mountAppDom, makeUI } from "../uiFixture";
 import { setMode } from "../../ui/uiStatus";
 import { priceOptionsFor } from "../../ui/catalogPricing";
@@ -96,16 +97,9 @@ const click = (sel: string): void => {
   el!.click();
 };
 
-/** The Saves dialog is the only entry to export/import: open it, click the
- *  footer action (which closes it and opens the confirm dialog / picker). */
-const openExportConfirm = (ui: UI): void => {
-  ui.showSaves([]);
-  click('[data-act="export"]');
-};
-const openImportPicker = (ui: UI): void => {
-  ui.showSaves([]);
-  click('[data-act="import"]');
-};
+/** File > Save As… and File > Open… (the menu bar calls these). */
+const openExportConfirm = (ui: UI): void => ui.promptExport();
+const openImportPicker = (ui: UI): void => openImport(ui);
 
 beforeEach(() => {
   mountAppDom();
@@ -161,15 +155,13 @@ describe("wireActions — the anti-dead-button contract", () => {
     expect(dialog().open).toBe(false);
   });
 
-  it("binds caller-supplied [data-act] handlers (saves dialog export opens the confirm dialog)", () => {
-    const { ui, cb } = makeUI();
+  it("Saved Towers keeps Close alone at the bottom: Open… and Save As… live in the File menu", () => {
+    const { ui } = makeUI();
     ui.showSaves([]);
-    click('[data-act="export"]');
-    // The handler ran — it swapped the saves dialog for the export confirm —
-    // but nothing is exported until the player clicks Export in there.
-    expect(cb.onExport).not.toHaveBeenCalled();
-    click('[data-act="export"]'); // the confirm dialog's own primary
-    expect(cb.onExport).toHaveBeenCalledTimes(1);
+    expect([...dialog().querySelectorAll(".modal-actions .btn")].map((b) => b.textContent)).toEqual(["Close"]);
+    expect(dialog().querySelector('[data-act="export"], [data-act="import"]')).toBeNull();
+    click('[data-act="close"]');
+    expect(dialog().open).toBe(false);
   });
 
   it("throws at wiring time when a handler's [data-act] button is missing", () => {
@@ -631,8 +623,8 @@ describe("aria-labelledby across the real dialogs: every modal names itself for 
     ui.showSaves([]);
     expect(titleFor().textContent).toContain("Saved Towers");
     const labelId = dialog().getAttribute("aria-labelledby")!;
-    click('[data-act="export"]');
-    expect(titleFor().textContent).toContain("Export tower?");
+    ui.promptExport();
+    expect(titleFor().textContent).toContain("Save As");
     // Same shared id, but now only one element in the whole document carries
     // it: the saves dialog's old title node is gone, not orphaned.
     expect(dialog().getAttribute("aria-labelledby")).toBe(labelId);
@@ -813,7 +805,7 @@ describe("export/import — file downloads and the file picker, no copy-paste pa
     expect(dialog().open).toBe(true);
     expect(cb.onExport).not.toHaveBeenCalled(); // nothing serialized yet
     const primary = dialog().querySelector('[data-act="export"]')!;
-    expect(primary.textContent).toBe("Export"); // not a generic "Confirm"
+    expect(primary.textContent).toBe("Save .vctower"); // not a generic "Confirm"
     expect(primary.classList.contains("primary")).toBe(true); // one primary per dialog
     click('[data-act="close"]'); // cancel → still no export
     expect(cb.onExport).not.toHaveBeenCalled();
@@ -847,7 +839,7 @@ describe("export/import — file downloads and the file picker, no copy-paste pa
     expect(cb.onExport).toHaveBeenCalledTimes(1);
   });
 
-  it("Import (from the Saves dialog) goes straight to the file picker, no textarea, accepting .vctower first", () => {
+  it("Open… goes straight to the file picker, no textarea, accepting .vctower first", () => {
     const { ui } = makeUI();
     const picker = vi.spyOn(HTMLInputElement.prototype, "click").mockImplementation(() => {});
     openImportPicker(ui);
@@ -858,14 +850,10 @@ describe("export/import — file downloads and the file picker, no copy-paste pa
     expect(input.accept.startsWith(".vctower")).toBe(true);
   });
 
-  it("the Saved Towers dialog closes when the picker launches, and a picked tower file routes to onImport", async () => {
+  it("a tower file picked from Open… routes to onImport", async () => {
     const { ui, cb } = makeUI();
     vi.spyOn(HTMLInputElement.prototype, "click").mockImplementation(() => {});
-    ui.showSaves([]); // launch the picker from the Saved Towers dialog
-    click('[data-act="import"]');
-    // The dialog's top layer would paint over any import feedback — it yields
-    // to the picker immediately rather than lingering underneath it.
-    expect(dialog().open).toBe(false);
+    openImportPicker(ui);
     const input = document.getElementById("import-file") as HTMLInputElement;
     const file = new File(["VCTOWER1\npayload"], "tower.vctower");
     Object.defineProperty(input, "files", { value: [file], configurable: true });

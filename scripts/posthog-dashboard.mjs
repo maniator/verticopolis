@@ -504,7 +504,7 @@ function buildInsights(ids) {
       query: trends([series("app_action", "Actions")], {
         breakdown: "action",
         display: "ActionsBar",
-        where: [inAction(["quick_save", "save_slot", "load_slot", "delete_save", "export_save", "import_save", "export_tdt", "import_tdt"])],
+        where: [inAction(["quick_save", "save_slot", "load_slot", "delete_save", "rename_slot", "export_save", "import_save", "export_tdt", "import_tdt"])],
       }),
     },
     {

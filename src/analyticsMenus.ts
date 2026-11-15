@@ -21,6 +21,10 @@ export type MenuName = (typeof MENU_NAMES)[number];
 export const MENU_ITEM_CODES = {
   "btn-new": "new_tower",
   "btn-load": "saves",
+  "mb-load-auto": "load_auto",
+  "mb-load-1": "load_slot_1",
+  "mb-load-2": "load_slot_2",
+  "mb-load-3": "load_slot_3",
   "mb-quick-save": "quick_save",
   "mb-close": "close",
   "mb-import": "import",
