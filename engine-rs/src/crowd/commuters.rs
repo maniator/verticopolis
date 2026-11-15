@@ -21,7 +21,9 @@
 //! in full each hour. A slow tower fills late, and an office no route
 //! reaches never fills. Workers who give up on the way in go back
 //! out and are booked again the next hour; one who gives up on the way
-//! out goes back to the desk and leaves later.
+//! out goes back to the desk and leaves later, unless the desk was taken
+//! meanwhile, when they head out again. An office never holds more workers
+//! than its population.
 //!
 //! The crowd keeps each office's workers in a [`Desk`]: who is inside, who
 //! is on the way in and who is booked to leave. The office's `occupants`
@@ -370,14 +372,22 @@ fn exit(crowd: &mut Crowd, tower: &Tower, doors: &Entrances) -> (i64, Option<i64
 }
 
 /// A commuting worker at the end of a walk. On the way in, they sit down
-/// at their desk (or, with the office gone, head back out); on the way
+/// at their desk (or, with the office gone or full, head back out); on the way
 /// out, they leave the tower; one who turned back on the way out goes back
 /// to their desk.
+///
+/// Nobody sits down in an office that is already full: a worker who turned
+/// back on the way out may find their desk taken by one booked while they
+/// were gone, and heads out again instead. An office never holds more than
+/// its workers, so a save's head counts are always ones a load keeps.
 pub fn at_destination(crowd: &mut Crowd, i: usize, tower: &mut Tower, c: Commute) {
     let returning = crowd.people[i].returning;
-    let usable = working_office(tower, c.office_id).is_some();
+    let inside = crowd.desks.get(&c.office_id).map_or(0, |d| d.inside);
+    // A desk to sit at: the office stands, has a tenant, and is not full.
+    let free_desk =
+        working_office(tower, c.office_id).is_some_and(|u| inside < u.kind.facility().population);
     match (c.inbound, returning) {
-        (true, false) if usable => {
+        (true, false) if free_desk => {
             let d = crowd.desks.entry(c.office_id).or_default();
             d.coming = (d.coming - 1).max(0);
             d.inside += 1;
@@ -393,7 +403,7 @@ pub fn at_destination(crowd: &mut Crowd, i: usize, tower: &mut Tower, c: Commute
             stamp(crowd, i, c.office_id, false);
             send_out(crowd, i, tower);
         }
-        (false, true) if usable => {
+        (false, true) if free_desk => {
             let d = crowd.desks.entry(c.office_id).or_default();
             d.inside += 1;
             let inside = d.inside;
