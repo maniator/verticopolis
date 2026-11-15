@@ -26,11 +26,11 @@ const viewOf = (sim: Draft | null): SerializedView | undefined => sim?.serialize
  * engine-rs/src/load/coerce.rs.
  */
 
-/** Decode a `.vctower` container without DecompressionStream (env-agnostic). */
-function decodeVctower(text: string): SerializedGame {
-  const b64 = text.slice(text.indexOf("\n") + 1).trim();
-  const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
-  return JSON.parse(new TextDecoder().decode(inflateSync(bytes))) as SerializedGame;
+/** Decode a binary `.vctower` (`VCTOWER2`, a newline, the raw deflate bytes)
+ *  without DecompressionStream (env-agnostic). */
+function decodeVctower(file: Uint8Array): SerializedGame {
+  expect(new TextDecoder().decode(file.subarray(0, 9))).toBe("VCTOWER2\n");
+  return JSON.parse(new TextDecoder().decode(inflateSync(file.subarray(9)))) as SerializedGame;
 }
 
 /** The New Tower default view words (header 0x26/0x28). */
@@ -105,7 +105,7 @@ describe.skipIf(noEngine)("SaveLoad stamps the live camera onto the CURRENT towe
   });
 
   it("exportGame() stamps the view into the .vctower payload", async () => {
-    let file = "";
+    let file: Uint8Array = new Uint8Array();
     saveLoad = new SaveLoad(withPorts({
       getSim: () => sim,
       getView: () => ({ ...camera }),
@@ -114,7 +114,7 @@ describe.skipIf(noEngine)("SaveLoad stamps the live camera onto the CURRENT towe
         toast: () => {},
         sayVisibly: vi.fn(),
         downloadFile: (_name, contents) => {
-          file = contents as string;
+          file = contents as Uint8Array;
           return true;
         },
         showImportReport: () => {},

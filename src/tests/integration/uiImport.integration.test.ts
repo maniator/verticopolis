@@ -75,6 +75,18 @@ describe("import picker: only tower files, filtered where the platform can", () 
     expect(click).not.toHaveBeenCalled();
   });
 
+  it("a binary tower file goes to onImport as its bytes, untouched by a text decode", async () => {
+    const { ui, cb } = makeUI();
+    // Bytes that are not UTF-8: a text decode would change them.
+    const bytes = Uint8Array.of(...new TextEncoder().encode("VCTOWER2\n"), 0xff, 0xfe, 0x00, 0x80);
+    const file = new File([bytes], "tower.vctower");
+    pickerWindow.showOpenFilePicker = vi.fn().mockResolvedValue([{ getFile: () => Promise.resolve(file) }]);
+    vi.spyOn(HTMLInputElement.prototype, "click").mockImplementation(() => {});
+    openImport(ui);
+    await vi.waitFor(() => expect(cb.onImport).toHaveBeenCalledTimes(1));
+    expect(Array.from(vi.mocked(cb.onImport).mock.calls[0][0] as Uint8Array)).toEqual(Array.from(bytes));
+  });
+
   it("a .TDT from the native picker routes to onImportLegacy", async () => {
     const { ui, cb } = makeUI();
     const file = new File([new Uint8Array([0x00, 0x24, 1, 2])], "MYTOWER.TDT");

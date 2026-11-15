@@ -435,6 +435,11 @@ export interface EnginePortFiles {
   /** The tower as `.vctower` text; undefined, with `lastReason()`, when the
    *  stamp refuses the build name or the time. */
   exportVctower(appVersion: string, savedAtMs: number): string | undefined;
+  /** `loadVctower` for a file's bytes, the binary `VCTOWER2` file included. */
+  loadVctowerBytes(bytes: Uint8Array): PortRecord;
+  /** The tower as a binary `.vctower` file (`VCTOWER2`); undefined, with
+   *  `lastReason()`, when the stamp refuses the build name or the time. */
+  exportVctowerBytes(appVersion: string, savedAtMs: number): Uint8Array | undefined;
   /** Reads and stages a `.TDT` file and answers its report's numbers; the
    *  live tower is untouched until `adoptTdt`. */
   loadTdt(bytes: Uint8Array, filename: string): PortRecord;

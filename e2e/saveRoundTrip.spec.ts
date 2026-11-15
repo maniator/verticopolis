@@ -10,7 +10,7 @@ import { storedSave, storedSaves } from "./helpers";
  * an older version's autosave loads into the engine at boot; a failed import
  * leaves the tower and every stored save byte for byte alone; an unreadable
  * autosave is kept, is not overwritten by a later autosave, and downloads
- * exactly as stored; and the tower downloads as a `VCTOWER1` file. Any save
+ * exactly as stored; and the tower downloads as a binary `VCTOWER2` file. Any save
  * the engine's loader refuses blocks the flip to 3.0, so these stay.
  */
 test.setTimeout(90_000);
@@ -59,7 +59,7 @@ async function playAndSave(page: Page, after: number): Promise<number> {
 
 const clockReads = (page: Page, minutes: number) => page.waitForFunction((m) => (window as any).game.reader.header.minutes === m, minutes, { timeout: 10_000 });
 
-test("the engine loads the autosave, plays, saves, reloads and downloads it as a VCTOWER1 file", async ({ page }) => {
+test("the engine loads the autosave, plays, saves, reloads and downloads it as a binary VCTOWER2 file", async ({ page }) => {
   await boot(page, "/");
   const first = await playAndSave(page, 0);
   await page.reload();
@@ -70,8 +70,10 @@ test("the engine loads the autosave, plays, saves, reloads and downloads it as a
   await page.waitForFunction(() => !!(window as any).game && !!(window as any).__vcEngine?.status?.hosted, undefined, { timeout: 30_000 });
   await clockReads(page, second);
   const [download] = await Promise.all([page.waitForEvent("download"), page.evaluate(() => (window as any).game.saveLoad.exportGame())]);
-  const file = readFileSync((await download.path())!, "utf8");
-  expect(file.startsWith("VCTOWER1\n")).toBe(true);
+  const file = readFileSync((await download.path())!);
+  expect(file.subarray(0, 9).toString("latin1")).toBe("VCTOWER2\n");
+  // The raw deflate bytes: no base64 line.
+  expect(inflateRawSync(file.subarray(9)).toString().startsWith("{")).toBe(true);
   // The exported bytes load: play on, then import the file and the tower is the one that was exported.
   const exported = await page.evaluate(() => {
     const h = (window as any).game.reader.header;
@@ -79,7 +81,7 @@ test("the engine loads the autosave, plays, saves, reloads and downloads it as a
   });
   await playAndSave(page, second);
   expect(await page.evaluate(() => (window as any).game.reader.header.minutes)).toBeGreaterThan(exported.minutes);
-  await page.evaluate((text) => (window as any).game.saveLoad.importGame(text), file);
+  await page.evaluate((bytes) => (window as any).game.saveLoad.importGame(Uint8Array.from(bytes)), Array.from(file));
   await expect(page.getByText("Tower imported.")).toBeVisible();
   await clockReads(page, exported.minutes);
   expect(await page.evaluate(() => JSON.stringify((window as any).game.reader.header)), "every header figure matches the exported tower").toBe(exported.header);
@@ -148,7 +150,7 @@ test("an older version's autosave loads, a failed import changes nothing, and an
   const refusals: [string, RegExp][] = [
     ["not a tower", /Not a Verticopolis tower file\./],
     [damaged, /This tower file is damaged and can't be read\./],
-    ["VCTOWER2\nabc", /This tower file was made by a newer version of Verticopolis\. Update the game to load it\./],
+    ["VCTOWER3\nabc", /This tower file was made by a newer version of Verticopolis\. Update the game to load it\./],
     [`VCTOWER1\n${deflateRawSync('{"minutes":"0","units":[]}').toString("base64")}`, /Not a valid tower save file\./],
   ];
   for (const [text, message] of refusals) {

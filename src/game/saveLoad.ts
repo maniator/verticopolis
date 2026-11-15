@@ -12,7 +12,7 @@ import { shouldArm } from "../ui/Onboarding";
 import type { EnginePort } from "../simport/enginePort";
 import type { PortCodes } from "../simport/portCodes";
 import type { ViewReader } from "../simport/viewReader";
-import { NEWER_SAVE_REFUSAL, SWAP_REFUSED, exportFileText, loadStored, newerSaveRefused, saveText, stampCamera, swapDone } from "./portLifecycle";
+import { NEWER_SAVE_REFUSAL, SWAP_REFUSED, exportFile, loadStored, newerSaveRefused, saveText, stampCamera, swapDone } from "./portLifecycle";
 import { currentStamp } from "../storage/saveStamp";
 import { exportFacts, importFacts } from "../simport/tdtRecords";
 import { isCrashed, isEngineStopped, isSplashUp } from "./interactionState";
@@ -372,7 +372,7 @@ export class SaveLoad {
   exportGame(): Promise<void> {
     return runExportFlow(this.deps, () => {
       const port = this.deps.enginePort();
-      return { file: exportFileText(port, this.deps.getView(), currentStamp()), towerName: port.towerName() };
+      return { file: exportFile(port, this.deps.getView(), currentStamp()), towerName: port.towerName() };
     });
   }
 
@@ -421,13 +421,14 @@ export class SaveLoad {
     });
   }
 
-  async importGame(data: string): Promise<void> {
+  /** Import a `.vctower` file: a binary one as bytes, text as text (`uiImport.ts`). */
+  async importGame(data: string | Uint8Array): Promise<void> {
     try {
       // The engine reads the file and says why it refuses one, in the
       // player's words (`vctower_import.rs`); the page only shows it. The
       // founder rule for a file without a build stamp is the engine's too.
       const port = this.deps.enginePort();
-      const loaded = port.loadVctower(data);
+      const loaded = typeof data === "string" ? port.loadVctower(data) : port.loadVctowerBytes(data);
       if (loaded[0] !== 1) throw new Error(port.lastReason() ?? SWAP_REFUSED);
       this.deps.towerSwapped();
       trackFileImported("vctower", () => this.deps.reader().header);

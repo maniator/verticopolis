@@ -52,7 +52,7 @@ export function resetExportFlowForTests(): void {
 }
 
 /**
- * Hand the player their tower as a compressed .vctower file.
+ * Hand the player their tower as a compressed .vctower file (binary, `VCTOWER2`).
  *
  * Single-flight (GH #760): a second run while the first is still compressing
  * would stack a second download. Reentry is a quiet no-op, since the first
@@ -68,7 +68,7 @@ export function resetExportFlowForTests(): void {
  */
 export async function runExportFlow(
   deps: ExportFlowDeps,
-  save: () => { readonly file: string | Promise<string>; readonly towerName: string | undefined },
+  save: () => { readonly file: string | Uint8Array | Promise<string | Uint8Array>; readonly towerName: string | undefined },
 ): Promise<void> {
   if (latchOwner !== 0) return;
   const run = ++nextRun;
@@ -91,7 +91,8 @@ export async function runExportFlow(
     // would contradict it.
     if (!deps.ui.downloadFile(SaveGame.exportFilename(towerName), file)) return;
     trackFileExported("vctower", header);
-    // The container is pure ASCII, so string length == bytes on disk.
+    // A binary file's length is its size on disk, and the text container is
+    // pure ASCII, so its string length is too.
     const size = `${(file.length / 1024).toFixed(1)} KB`;
     deps.ui.toast(
       timedOut

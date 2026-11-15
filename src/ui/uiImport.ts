@@ -133,6 +133,14 @@ function openInputPicker(ui: UI): void {
   input.click();
 }
 
+/** `VCTOWER2` and a newline: a binary `.vctower` file. */
+const BINARY_TOWER_FILE = new TextEncoder().encode("VCTOWER2\n");
+
+/** Whether `bytes` start as a binary `.vctower` file does. */
+export function isBinaryTowerFile(bytes: Uint8Array): boolean {
+  return bytes.length >= BINARY_TOWER_FILE.length && BINARY_TOWER_FILE.every((b, i) => bytes[i] === b);
+}
+
 function readPickedFile(ui: UI, file: File): void {
   const reader = new FileReader();
   // A file that vanishes or errors mid-read must not fail silently: the
@@ -152,6 +160,9 @@ function readPickedFile(ui: UI, file: File): void {
     const buffer = reader.result as ArrayBuffer;
     const bytes = new Uint8Array(buffer);
     if (looksLikeLegacyTower(file.name, bytes)) ui.cb.onImportLegacy(buffer, file.name);
+    // A binary tower file goes to the engine as it is: decoding it as text
+    // would change its bytes.
+    else if (isBinaryTowerFile(bytes)) ui.cb.onImport(bytes);
     else ui.cb.onImport(decodeText(bytes));
   };
   reader.readAsArrayBuffer(file);

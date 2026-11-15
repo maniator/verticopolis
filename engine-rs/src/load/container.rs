@@ -13,6 +13,42 @@ pub fn decode_vctower(text: &str) -> Result<Value, String> {
     parse_save_json(&inflate_vctower(text)?).map_err(|e| format!("json: {e}"))
 }
 
+/// [`decode_vctower`] for a file's bytes, which reads the binary file too: a
+/// `VCTOWER2` file (the stamp, a newline and the raw deflate bytes) is read
+/// as it is, and any other file as its UTF-8 text.
+pub fn decode_vctower_bytes(bytes: &[u8]) -> Result<Value, String> {
+    parse_save_json(&inflate_vctower_bytes(bytes)?).map_err(|e| format!("json: {e}"))
+}
+
+/// The save text inside a `.vctower` file of either kind, as
+/// [`decode_vctower_bytes`] parses it.
+pub(crate) fn inflate_vctower_bytes(bytes: &[u8]) -> Result<Vec<u8>, String> {
+    match binary_stamp(bytes) {
+        Some(after) => {
+            let packed = after
+                .strip_prefix(b"\n")
+                .ok_or("not a VCTOWER2 file: no newline after the stamp")?;
+            inflate_packed(packed).map_err(|e| match e {
+                InflateError::NotAContainer => "not a VCTOWER2 file".to_string(),
+                InflateError::ExpandsTooFar => EXPANDS_TOO_FAR.to_string(),
+                InflateError::Damaged(why) => why,
+            })
+        }
+        None => match std::str::from_utf8(bytes) {
+            Ok(text) => inflate_vctower(text),
+            Err(_) => Err("not a VCTOWER1 or VCTOWER2 file".to_string()),
+        },
+    }
+}
+
+/// What follows the `VCTOWER2` stamp of a binary file, or `None` when the
+/// bytes carry another stamp. `VCTOWER20` and the like name later versions,
+/// so the stamp counts only when no digit follows it.
+pub(crate) fn binary_stamp(bytes: &[u8]) -> Option<&[u8]> {
+    let after = bytes.strip_prefix(TOWER_FILE_MAGIC_BINARY.as_bytes())?;
+    (!after.first().is_some_and(u8::is_ascii_digit)).then_some(after)
+}
+
 /// Why the save text could not be taken out of a `.vctower` container.
 pub(crate) enum InflateError {
     /// The text does not start with the `VCTOWER1` stamp.
@@ -39,10 +75,16 @@ pub(crate) fn inflate_container(text: &str) -> Result<Vec<u8>, InflateError> {
     if !trimmed.starts_with(TOWER_FILE_MAGIC) {
         return Err(InflateError::NotAContainer);
     }
-    let packed = lenient_base64(&trimmed[TOWER_FILE_MAGIC.len()..]);
+    inflate_packed(&lenient_base64(&trimmed[TOWER_FILE_MAGIC.len()..]))
+}
+
+/// The save JSON inside a file's deflate bytes, capped at
+/// `MAX_SAVE_INFLATED_BYTES`: the payload of a `VCTOWER1` file once its
+/// base64 is read, or of a `VCTOWER2` file as it is.
+pub(crate) fn inflate_packed(packed: &[u8]) -> Result<Vec<u8>, InflateError> {
     use std::io::Read;
     let mut out = Vec::new();
-    flate2::read::DeflateDecoder::new(&packed[..])
+    flate2::read::DeflateDecoder::new(packed)
         .take(MAX_SAVE_INFLATED_BYTES + 1)
         .read_to_end(&mut out)
         .map_err(|e| InflateError::Damaged(format!("inflate: {e}")))?;
@@ -138,9 +180,23 @@ pub(crate) fn repair_lone_surrogates(text: &[u8]) -> Option<Vec<u8>> {
     })
 }
 
-/// The first line of every `.vctower` file, naming the format and its
-/// version.
+/// The first line of every `.vctower` text file, naming the format and its
+/// version: the deflate bytes follow as one line of base64.
 pub const TOWER_FILE_MAGIC: &str = "VCTOWER1";
+
+/// The first line of a binary `.vctower` file: the raw deflate bytes follow
+/// the newline as they are, a quarter smaller than the base64 of
+/// [`TOWER_FILE_MAGIC`].
+pub const TOWER_FILE_MAGIC_BINARY: &str = "VCTOWER2";
+
+/// How a file frames its deflate bytes.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Frame {
+    /// `VCTOWER1`, a newline, the base64, a newline.
+    Text,
+    /// `VCTOWER2`, a newline, the raw deflate bytes.
+    Binary,
+}
 
 /// Writes save JSON as `.vctower` file bytes, as given. To write a player's
 /// tower, stamp it first with [`stamp_save`], or use
@@ -154,6 +210,11 @@ pub fn encode_vctower(save: &Value) -> Result<Vec<u8>, String> {
 /// the base64 framing of [`encode_vctower`], shared with the streamed writer
 /// (`export_stream`) so the two cannot frame differently.
 pub(crate) fn pack_json(json: &str) -> Result<Vec<u8>, String> {
+    pack_json_as(json, Frame::Text)
+}
+
+/// [`pack_json`] in either frame.
+pub(crate) fn pack_json_as(json: &str, frame: Frame) -> Result<Vec<u8>, String> {
     if json.len() as u64 > MAX_SAVE_INFLATED_BYTES {
         return Err(format!(
             "This tower's save data is larger than {} MB, the most a save can hold.",
@@ -161,6 +222,13 @@ pub(crate) fn pack_json(json: &str) -> Result<Vec<u8>, String> {
         ));
     }
     let packed = crate::fflate::deflate_level1(json.as_bytes());
+    if frame == Frame::Binary {
+        let mut out = Vec::with_capacity(TOWER_FILE_MAGIC_BINARY.len() + 1 + packed.len());
+        out.extend_from_slice(TOWER_FILE_MAGIC_BINARY.as_bytes());
+        out.push(b'\n');
+        out.extend_from_slice(&packed);
+        return Ok(out);
+    }
     let b64 = base64::engine::general_purpose::STANDARD.encode(packed);
     let mut out = Vec::with_capacity(TOWER_FILE_MAGIC.len() + b64.len() + 2);
     out.extend_from_slice(TOWER_FILE_MAGIC.as_bytes());
@@ -219,6 +287,23 @@ pub fn encode_simulation_vctower(
     saved_at_ms: f64,
 ) -> Result<Vec<u8>, String> {
     crate::export_stream::encode_vctower_string(sim.save_text(), app_version, saved_at_ms)
+}
+
+/// [`encode_simulation_vctower`] as a binary `.vctower` file
+/// ([`TOWER_FILE_MAGIC_BINARY`]): the same stamped save and deflate bytes,
+/// without the base64, so the file is a quarter smaller. A build from before
+/// the binary file refuses it as a file from a newer version.
+pub fn encode_simulation_vctower_binary(
+    sim: &Simulation,
+    app_version: &str,
+    saved_at_ms: f64,
+) -> Result<Vec<u8>, String> {
+    crate::export_stream::encode_vctower_string_as(
+        sim.save_text(),
+        app_version,
+        saved_at_ms,
+        Frame::Binary,
+    )
 }
 
 /// `Buffer.from(b64, "base64")`: decoding stops at the first `=`, every

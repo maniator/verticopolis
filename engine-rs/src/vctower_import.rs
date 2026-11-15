@@ -3,13 +3,16 @@
 //! TypeScript run here, in front of the same loader every save goes through,
 //! so the engine alone decides what a tower file is.
 
-use crate::load::{inflate_container, is_js_whitespace, js_trim, InflateError, TOWER_FILE_MAGIC};
+use crate::load::{
+    binary_stamp, inflate_container, inflate_packed, is_js_whitespace, js_trim, InflateError,
+    TOWER_FILE_MAGIC,
+};
 use crate::load_stream::{read_tower_file_json, TowerReadError};
 use crate::sim::Simulation;
 
 /// Not a `VCTOWER` file at all.
 pub const NOT_A_TOWER_FILE: &str = "Not a Verticopolis tower file.";
-/// A container from a later format version (`VCTOWER2` and up).
+/// A container from a later format version (`VCTOWER3` and up).
 pub const NEWER_FILE_REFUSAL: &str =
     "This tower file was made by a newer version of Verticopolis. Update the game to load it.";
 /// The container is ours but its contents cannot be read.
@@ -39,6 +42,11 @@ pub fn import_vctower(text: &str) -> Result<Simulation, String> {
     }
     let trimmed = js_trim(text);
     let digits = stamp_digits(trimmed).ok_or(NOT_A_TOWER_FILE)?;
+    if digits == "2" {
+        // A binary file that reached the text reader was decoded as text,
+        // which changes its bytes: it reads only through `import_vctower_bytes`.
+        return Err(DAMAGED_FILE.into());
+    }
     if !trimmed.starts_with(TOWER_FILE_MAGIC) {
         return if is_later_version(digits) {
             Err(NEWER_FILE_REFUSAL.into())
@@ -64,6 +72,39 @@ pub fn import_vctower(text: &str) -> Result<Simulation, String> {
     })
 }
 
+/// The bytes of a `.vctower` file the player opened, read into a game: a
+/// binary file (`VCTOWER2`, then a newline and the raw deflate bytes) is read
+/// here, and any other file goes to [`import_vctower`] as its UTF-8 text. A
+/// file that is not UTF-8 and names no later version is no tower file.
+pub fn import_vctower_bytes(bytes: &[u8]) -> Result<Simulation, String> {
+    if bytes.len() > MAX_FILE_TEXT_BYTES {
+        return Err(TOO_LARGE_FILE.into());
+    }
+    if let Some(after) = binary_stamp(bytes) {
+        let packed = after.strip_prefix(b"\n").ok_or(DAMAGED_FILE)?;
+        let json = inflate_packed(packed).map_err(|e| match e {
+            InflateError::ExpandsTooFar => TOO_LARGE_FILE,
+            InflateError::NotAContainer | InflateError::Damaged(_) => DAMAGED_FILE,
+        })?;
+        return read_tower_file_json(&json).map_err(|e| match e {
+            TowerReadError::Unparseable(_) => DAMAGED_FILE.to_string(),
+            TowerReadError::NotASave => NOT_A_TOWER_SAVE.to_string(),
+            TowerReadError::Refused(why) => why,
+        });
+    }
+    match std::str::from_utf8(bytes) {
+        Ok(text) => import_vctower(text),
+        // A later binary version is not UTF-8 either: its stamp says so.
+        Err(_) => {
+            let head = String::from_utf8_lossy(&bytes[..bytes.len().min(32)]);
+            match stamp_digits(&head) {
+                Some(digits) if is_later_version(digits) => Err(NEWER_FILE_REFUSAL.into()),
+                _ => Err(NOT_A_TOWER_FILE.into()),
+            }
+        }
+    }
+}
+
 /// The digits right after `VCTOWER`, as the file starts with them.
 fn stamp_digits(trimmed: &str) -> Option<&str> {
     let rest = trimmed.strip_prefix("VCTOWER")?;
@@ -71,10 +112,11 @@ fn stamp_digits(trimmed: &str) -> Option<&str> {
     (len > 0).then(|| &rest[..len])
 }
 
-/// Whether the digits name a version after 1: no leading zero (`VCTOWER0` and
-/// `VCTOWER01` name no version) and not 1 itself.
+/// Whether the digits name a version after the two this build reads: no
+/// leading zero (`VCTOWER0` and `VCTOWER01` name no version), and neither 1
+/// nor 2.
 fn is_later_version(digits: &str) -> bool {
-    !digits.starts_with('0') && digits != "1"
+    !digits.starts_with('0') && digits != "1" && digits != "2"
 }
 
 /// Whether a file that starts `VCTOWER1` but is no version 1 file names a

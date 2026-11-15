@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { deflateSync } from "fflate";
-import { decodeVctower } from "../storage/vctowerContainer";
+import { decodeVctower, decodeVctowerFile } from "../storage/vctowerContainer";
 
 /**
  * The `.vctower` container decode used by `tools/simtower/vctower-to-tdt.ts`.
@@ -123,5 +123,45 @@ describe("vctower container decode", () => {
     // "7z", and this decoder cannot try a non-v1 payload to find out.
     expect(() => decodeVctower("VCTOWER27zzzz", "amb.vctower")).toThrow(/the exact version cannot be read/);
     expect(() => decodeVctower("VCTOWER27zzzz", "amb.vctower")).not.toThrow(/VCTOWER27;/);
+  });
+});
+
+/** A binary `.vctower` file: the `VCTOWER2` stamp, a newline, then raw DEFLATE. */
+const binaryFile = (obj: unknown, head = "VCTOWER2\n"): Uint8Array =>
+  new Uint8Array([...new TextEncoder().encode(head), ...deflateSync(new TextEncoder().encode(JSON.stringify(obj)))]);
+const binaryHead = (rest: Iterable<number>): Uint8Array => new Uint8Array([...new TextEncoder().encode("VCTOWER2\n"), ...rest]);
+
+describe("vctower file decode, from bytes", () => {
+  it("reads a binary file", () => {
+    expect(decodeVctowerFile(binaryFile({ towerName: "Binary" }))).toEqual({ towerName: "Binary" });
+  });
+
+  it("reads a text file from its bytes as the text decoder does", () => {
+    const text = pack({ towerName: "Text" });
+    expect(decodeVctowerFile(new TextEncoder().encode(text))).toEqual(decodeVctower(text));
+  });
+
+  it("gives the same save from a binary file and a text file of one tower", () => {
+    const tower = { towerName: "Same", filler: "a".repeat(4096) };
+    expect(decodeVctowerFile(binaryFile(tower))).toEqual(decodeVctowerFile(new TextEncoder().encode(pack(tower))));
+  });
+
+  it("names a later version whose number starts with 2 instead of calling it damaged", () => {
+    const later = binaryFile({ towerName: "Later" }, "VCTOWER21\n");
+    expect(() => decodeVctowerFile(later, "later.vctower")).toThrow(/later\.vctower: unsupported \.vctower version \(VCTOWER21;/);
+    expect(() => decodeVctowerFile(later, "later.vctower")).not.toThrow(/damaged/);
+  });
+
+  it("reports a damaged binary payload against its file", () => {
+    expect(() => decodeVctowerFile(binaryHead([0xff, 0x00, 0x12]), "bad.vctower")).toThrow(/bad\.vctower: damaged \.vctower payload/);
+  });
+
+  it("refuses a binary decompression bomb instead of allocating it", () => {
+    const bomb = binaryHead(deflateSync(new Uint8Array(40 * 1024 * 1024)));
+    expect(() => decodeVctowerFile(bomb, "bomb.vctower")).toThrow(/bomb\.vctower: this \.vctower expands to more data/);
+  });
+
+  it("refuses bytes that are not a tower file", () => {
+    expect(() => decodeVctowerFile(new Uint8Array([0xff, 0xfe, 0x00]), "junk")).toThrow(/junk: not a \.vctower file/);
   });
 });

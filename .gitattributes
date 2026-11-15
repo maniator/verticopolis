@@ -26,3 +26,5 @@
 # conformance digests pin their exact bytes, so git must never rewrite their
 # line endings, in either direction. -text keeps them diffable.
 *.vctower -text
+# Binary tower files (VCTOWER2), committed byte for byte.
+conformance/fixtures/binary/*.vctower binary

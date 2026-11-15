@@ -14,7 +14,7 @@ import { basename, resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { SerializedGame } from "../../src/shared/types";
 import { buildTDT } from "../../src/tests/conformance/tdtWasm";
-import { decodeVctower } from "../../src/storage/vctowerContainer";
+import { decodeVctowerFile } from "../../src/storage/vctowerContainer";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SAVES = resolve(HERE, "saves");
@@ -39,7 +39,7 @@ function main() {
     // Wrap the WHOLE per-input body (decode included): a bad base64 / JSON /
     // magic on one file should skip that file, not abort the rest of the batch.
     try {
-      const save = decodeVctower(readFileSync(input, "utf8"), input) as SerializedGame;
+      const save = decodeVctowerFile(readFileSync(input), input) as SerializedGame;
       const label = `${basename(input)}  [${save.towerName ?? "?"}, ${save.mode ?? "classic"} mode, ${save.star ?? "?"}★]`;
       const built = buildTDT(save);
       const name = outName(input, i);

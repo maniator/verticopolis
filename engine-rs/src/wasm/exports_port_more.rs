@@ -238,3 +238,20 @@ impl Engine {
         self.sim.tower.tower_name.clone()
     }
 }
+
+/// The binary `.vctower` file members (`wasm_port_files.rs`).
+#[wasm_bindgen]
+impl Engine {
+    /// `loadVctower` for a file's bytes: a binary file (`VCTOWER2`) is read as
+    /// it is, any other as its UTF-8 text.
+    #[wasm_bindgen(js_name = loadVctowerBytes)]
+    pub fn load_vctower_bytes(&mut self, bytes: &[u8]) -> Vec<f64> {
+        self.port_load_vctower_bytes(bytes)
+    }
+    /// The tower as a binary `.vctower` file, stamped as `exportVctower`
+    /// stamps it; undefined, with the reason in `lastReason()`, on a refusal.
+    #[wasm_bindgen(js_name = exportVctowerBytes)]
+    pub fn export_vctower_bytes(&mut self, app_version: &str, saved_at_ms: f64) -> Option<Vec<u8>> {
+        self.port_export_vctower_bytes(app_version, saved_at_ms)
+    }
+}

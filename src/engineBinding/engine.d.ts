@@ -169,6 +169,11 @@ export class Engine {
     evaluateStar(): void;
     evaluatedTower(): boolean;
     eventText(i: number): string | undefined;
+    /**
+     * The tower as a binary `.vctower` file, stamped as `exportVctower`
+     * stamps it; undefined, with the reason in `lastReason()`, on a refusal.
+     */
+    exportVctowerBytes(app_version: string, saved_at_ms: number): Uint8Array | undefined;
     exportVctower(app_version: string, saved_at_ms: number): string | undefined;
     expressStops(id: number): Float64Array;
     extendShaft(id: number, up: boolean, target_floor: number): Float64Array;
@@ -225,6 +230,11 @@ export class Engine {
      */
     static fromSave(text: string, markers?: string | null): Engine;
     /**
+     * `fromVctower` for a file's bytes, which opens the binary `.vctower`
+     * file (`VCTOWER2`) as well as the text one.
+     */
+    static fromVctowerBytes(bytes: Uint8Array, mode?: string | null): Engine;
+    /**
      * The import path for a `.vctower` file: decode, migrate and load, then
      * mark a save from before 2.0 as a founder's tower. `mode`, when given,
      * overwrites the save's mode before loading, as a scenario start does.
@@ -267,6 +277,11 @@ export class Engine {
     lastReason(): string | undefined;
     loadSave(text: string): Float64Array;
     loadTdt(bytes: Uint8Array, filename: string): Float64Array;
+    /**
+     * `loadVctower` for a file's bytes: a binary file (`VCTOWER2`) is read as
+     * it is, any other as its UTF-8 text.
+     */
+    loadVctowerBytes(bytes: Uint8Array): Float64Array;
     loadVctower(text: string): Float64Array;
     /**
      * `lobbyHeights()` (#308, #2068): every lobby hall taller than one

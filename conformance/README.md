@@ -109,6 +109,16 @@ a founder's tower, 19,806 units, 194 KB): the largest fixture, kept unedited as
 a real save the engines have to load and replay the same way. The owner agreed
 to commit it on 2026-10-20.
 
+The fixtures above are text files (`VCTOWER1`), and they stay text: they are
+the proof that every file a player exported before the binary file still
+opens. `conformance/fixtures/binary/` holds binary files (`VCTOWER2`), each
+written by the engine from the text fixture of the same name. They pin the
+other promise: a binary file a player exports today opens, as the same game,
+in every later version. Never rewrite one to follow a change in the writer;
+a change that cannot read it breaks players' files.
+`conformanceWasmBinaryVctower.integration.test.ts` loads each against its
+text twin.
+
 ## The loader table
 
 `loader-cases.json` is the referee for `deserialize` on saves no engine writes:

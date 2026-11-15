@@ -100,3 +100,26 @@ export function decodeVctower(text: string, label = "vctower"): unknown {
     `${label}: unsupported .vctower version (not VCTOWER1; the version digits run into the payload with no separating newline, so the exact version cannot be read)`,
   );
 }
+
+/** The stamp and newline that open a binary `.vctower` file (`VCTOWER2`). */
+const BINARY_HEAD = "VCTOWER2\n";
+
+/**
+ * Parse a `.vctower` file's bytes into its save object, whichever kind the
+ * game wrote: the binary file (`VCTOWER2`, a newline, then the raw DEFLATE
+ * bytes) or the text file `decodeVctower` reads. A digit after the `2`
+ * (`VCTOWER21`) names a later version, so only the exact stamp and newline
+ * read as binary; anything else goes to the text decoder, which names it.
+ */
+export function decodeVctowerFile(bytes: Uint8Array, label = "vctower"): unknown {
+  const head = new TextDecoder("latin1").decode(bytes.subarray(0, BINARY_HEAD.length));
+  if (head !== BINARY_HEAD) return decodeVctower(new TextDecoder().decode(bytes), label);
+  try {
+    return parseSaveJson(new TextDecoder("utf-8", { fatal: true }).decode(inflateCapped(bytes.subarray(BINARY_HEAD.length))));
+  } catch (e) {
+    if (e instanceof SaveTooLargeError) {
+      throw new Error(`${label}: this .vctower expands to more data than we will hold; it looks crafted, not saved.`);
+    }
+    throw new Error(`${label}: damaged .vctower payload (${e instanceof Error ? e.message : String(e)})`);
+  }
+}
