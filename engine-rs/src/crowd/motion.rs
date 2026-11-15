@@ -6,7 +6,9 @@ use super::landing::{landing_slots, Landings};
 use super::spawn::{inside_x, metro_station_for_platform, pick_x, pick_x_in_segment};
 use super::staff_shift;
 use super::visits::{begin_dwell, leave_venue};
-use super::walk::{find_another_way, reach_on_run, reroute, walk_to, way_is_cut};
+use super::walk::{
+    find_another_way, is_still_setting_out, reach_on_run, reroute, turn_back, walk_to, way_is_cut,
+};
 use super::{
     Crowd, PState, Person, StaffResult, GIVE_UP, RIDE_SECONDS_PER_FLOOR, STAFF_GIVE_UP, STRESS_WAIT,
 };
@@ -143,6 +145,10 @@ fn step(crowd: &mut Crowd, i: usize, dt: f64, tower: &mut Tower, landings: &mut 
                 p.fy = dest as f64;
                 p.floor = dest;
                 p.leg += 1;
+                if super::walk::stepped_off_short(p, shaft) {
+                    p.x = tower.alight_x(shaft, dest, p.dest_x);
+                    return super::walk::find_way_on(crowd, i, tower);
+                }
                 if p.leg >= p.shafts.len() {
                     p.state = PState::ToDest;
                     p.x = tower.alight_x(shaft, dest, p.dest_x);
@@ -221,7 +227,7 @@ fn step(crowd: &mut Crowd, i: usize, dt: f64, tower: &mut Tower, landings: &mut 
             let ridden = p.shaft_id.and_then(|id| tower.get_transport(id));
             // A rider whose car or shaft went steps out of the trip (3.7.3);
             // one whose floor stopped being a stop rides on to the nearest
-            // stop instead, as no car would ever let them off there (#2324).
+            // stop, gets off there and finds a new way on (#2324).
             let (Some(shaft), Some(ci)) = (ridden, p.car_index) else {
                 return give_up(crowd, i, tower);
             };
@@ -242,6 +248,10 @@ fn step(crowd: &mut Crowd, i: usize, dt: f64, tower: &mut Tower, landings: &mut 
                 p.floor = dest;
                 p.fy = d;
                 p.leg += 1;
+                if super::walk::stepped_off_short(p, shaft) {
+                    p.x = tower.alight_x(shaft, dest, p.dest_x);
+                    return super::walk::find_way_on(crowd, i, tower);
+                }
                 if p.leg >= p.shafts.len() {
                     p.state = PState::ToDest;
                     p.x = tower.alight_x(shaft, dest, p.dest_x);
@@ -414,28 +424,6 @@ pub(super) fn release_seat(crowd: &mut Crowd, i: usize) {
         }
     }
     crowd.people[i].car_index = None;
-}
-
-/// Whether `p` has not yet left the floor their trip began on, outbound:
-/// waiting for or walking to their first car or flight of stairs.
-fn is_still_setting_out(p: &Person) -> bool {
-    !p.returning
-        && p.leg == 0
-        && p.floor == p.origin_floor
-        && matches!(p.state, PState::Waiting | PState::ToShaft)
-        && p.floors.first() == Some(&p.floor)
-}
-
-/// Someone who has waited too long to set out walks back to where they
-/// started and leaves from there (`PState::ToDest` with `returning`, which
-/// ends the trip on arrival), so they go out the way they came in.
-fn turn_back(crowd: &mut Crowd, i: usize) {
-    let p = &mut crowd.people[i];
-    p.state = PState::ToDest;
-    p.returning = true;
-    p.dest_x = p.start_x;
-    p.wait = 0.0;
-    p.linger = 0.0;
 }
 
 /// Someone whose trip cannot go on: a housekeeper out of patience, or

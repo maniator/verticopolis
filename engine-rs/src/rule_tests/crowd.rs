@@ -12,6 +12,7 @@
 use crate::clock::GameMode;
 use crate::crowd::motion::advance;
 use crate::crowd::spawn::{make_person, spawn_step};
+use crate::crowd::staff_shift::StaffTrip;
 use crate::crowd::{PState, CROWD_SECONDS_PER_MINUTE};
 use crate::facilities::Kind;
 use crate::sim::Simulation;
@@ -315,43 +316,102 @@ fn a_rider_whose_floor_stops_being_a_stop_rides_on_to_the_nearest_stop() {
     assert!(delivered, "the rider never reached floor 18");
 }
 
-/// With no way on from any stop (no stairs here), the rider still steps
-/// out of the trip, as a ride to a floor no car stops at would never end.
+/// A housekeeper on a job whose floor stops being a service stop gets off
+/// at the nearest service stop and finds the way on over the staff network
+/// (the stairs), never boarding a passenger car (#2324).
 #[test]
-fn a_rider_whose_floor_stops_being_a_stop_with_no_way_on_steps_out() {
+fn a_housekeeper_whose_floor_stops_being_a_stop_stays_on_the_staff_network() {
+    let (mut sim, passenger) = tower_with_elevator(20);
+    let service = shaft(&mut sim, Kind::ElevatorService, 12, 1, 20);
+    shaft(&mut sim, Kind::Stairs, 20, 17, 18);
+    at_time(&mut sim, 0, 12);
+    let route = sim
+        .crowd
+        .staff_route(&sim.tower, 1, 18, None, None)
+        .unwrap();
+    assert_eq!(
+        route.shafts,
+        vec![service],
+        "the job is one service ride to 18"
+    );
+    make_person(&mut sim.crowd, &sim.tower, route, 30.0, Some(5));
+    let id = sim.crowd.people[0].id;
+    let p = &mut sim.crowd.people[0];
+    p.staff = true;
+    p.staff_trip = Some(StaffTrip::Job);
+    let rider = |sim: &Simulation| sim.crowd.people.iter().find(|p| p.id == id).cloned();
+    for _ in 0..600 {
+        if rider(&sim).is_some_and(|p| p.state == PState::Riding) {
+            break;
+        }
+        ride(&mut sim);
+    }
+    assert!(
+        rider(&sim).is_some_and(|p| p.state == PState::Riding),
+        "the housekeeper boarded"
+    );
+    assert!(
+        sim.tower.set_stop(service, 18, false),
+        "18 stops being a service stop"
+    );
+    let mut delivered = false;
+    for _ in 0..600 {
+        ride(&mut sim);
+        let p = rider(&sim).expect("the housekeeper stayed in the tower");
+        assert!(
+            !p.shafts.contains(&passenger),
+            "the housekeeper took a passenger car"
+        );
+        if p.state == PState::ToDest && p.floor == 18 {
+            delivered = true;
+            break;
+        }
+    }
+    assert!(delivered, "the housekeeper never walked up to floor 18");
+}
+
+/// With no way on from the stop they get off at (no stairs here), the
+/// rider leaves through the ground lobby, as one who turns back does: they
+/// ride back down rather than vanish (#2324).
+#[test]
+fn a_rider_whose_floor_stops_being_a_stop_with_no_way_on_leaves_by_the_lobby() {
     let (mut sim, ev) = tower_with_elevator(20);
     at_time(&mut sim, 0, 12);
     let route = sim.crowd.route(&sim.tower, 1, 18, None, None).unwrap();
     make_person(&mut sim.crowd, &sim.tower, route, 30.0, Some(5));
     let id = sim.crowd.people[0].id;
-    let riding = |sim: &crate::sim::Simulation| {
-        sim.crowd
-            .people
-            .iter()
-            .any(|p| p.id == id && p.state == PState::Riding)
-    };
+    let rider = |sim: &Simulation| sim.crowd.people.iter().find(|p| p.id == id).cloned();
     for _ in 0..600 {
-        if riding(&sim) {
+        if rider(&sim).is_some_and(|p| p.state == PState::Riding) {
             break;
         }
         ride(&mut sim);
     }
-    assert!(riding(&sim), "the rider boarded");
+    assert!(
+        rider(&sim).is_some_and(|p| p.state == PState::Riding),
+        "the rider boarded"
+    );
     assert!(
         sim.tower.set_stop(ev, 18, false),
         "floor 18 stops being a stop"
     );
-    ride(&mut sim);
-    assert!(
-        sim.crowd.people.iter().all(|p| p.id != id),
-        "the rider left the car that can no longer let them off"
-    );
-    let seated = |t: &crate::tower::Transport| {
-        (0..t.cars).any(|i| sim.crowd.car_riders.get(&(t.id, i)).is_some_and(|&n| n > 0))
-    };
-    assert!(
-        !sim.tower.transports.iter().any(seated),
-        "the rider gave up their seat"
+    let (mut off_at_17, mut left_from) = (false, None);
+    for _ in 0..1200 {
+        let before = rider(&sim);
+        ride(&mut sim);
+        match rider(&sim) {
+            Some(p) => off_at_17 |= p.floor == 17 && p.state != PState::Riding,
+            None => {
+                left_from = before.map(|p| (p.floor, p.state, p.returning));
+                break;
+            }
+        }
+    }
+    assert!(off_at_17, "the rider got off at 17, the stop nearest 18");
+    assert_eq!(
+        left_from,
+        Some((1, PState::ToDest, true)),
+        "the rider left the tower on foot from the ground lobby"
     );
 }
 

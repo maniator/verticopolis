@@ -54,6 +54,23 @@ fn route(
     }
 }
 
+/// The way on for a housekeeper on `trip` from `from` to `to`: over the
+/// staff network, and for the way in or out over the passenger network too,
+/// as `spawn_commuter` and `send_out` route them (#2324).
+pub fn way_on(
+    crowd: &mut Crowd,
+    tower: &Tower,
+    trip: StaffTrip,
+    from: (i64, f64),
+    to: (i64, f64),
+) -> Option<Route> {
+    route(crowd, tower, Network::Staff, from, to).or_else(|| {
+        matches!(trip, StaffTrip::In | StaffTrip::Out)
+            .then(|| route(crowd, tower, Network::Passenger, from, to))
+            .flatten()
+    })
+}
+
 /// Bring one housekeeper of the crew at (`floor`, `x`) in from the lobby.
 /// False when no route leads from the lobby to the housekeeping room.
 pub fn spawn_commuter(crowd: &mut Crowd, tower: &Tower, crew_id: i64, floor: i64, x: f64) -> bool {
