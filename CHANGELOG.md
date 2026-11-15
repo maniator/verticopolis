@@ -25,6 +25,41 @@ prompt already tells players it is an engine update and shows the new version.
 Entries below 1.51.1 were curated from the commit history after the fact, so they
 are documentation only: no build that a client fetches carries them.
 
+## 4.0.0
+
+- Verticopolis 4.0: a classic 90s-style menu bar replaces the panel on the right. File, Edit, Tower, Window, Options and Help hold every command that was there, so the tower gets the whole width of the screen.
+- A status bar along the bottom shows the tool you picked, the tower's name and rules, and the newest Bulletin message. Hide it from the Window menu.
+- Tower Info and the Map open from the Tower menu, and the Bulletin from the Window menu. They are small windows you can drag where you like, and the game remembers which ones you left open. On a computer the Bulletin starts open.
+- Window > Full Screen fills the screen with the game. On an iPhone, where a web page can't do that, the game explains how to add it to your home screen.
+- On a phone, the menu bar replaces the ☰ drawer and keeps the Verticopolis logo at its left.
+- The lobby height and bulldoze drag choices show in a strip over the tower on every screen.
+- Help > Sponsor Verticopolis opens the GitHub Sponsors tip jar (not in the Android app).
+- The installed app's title bar and the browser bar on a phone now use the same classic window gray as the menu bar.
+- The menu bar is on the title screen too. Commands that need a tower stay grayed until you start or load one.
+- Tower > This Tower's Rules shows the rules your tower plays by, instead of the whole Classic vs Modern table.
+- Founding a Modern tower now asks "Bridge floors between rooms" with the box checked, worded as in Settings, instead of a "Don't bridge" box that read backwards.
+- Rest the pointer on a tool, or tab to it, and the status bar says what it does. On a phone, picking a tool shows a small card with its price and what it does until you place it.
+- A tower you load or come back to whose Bulletin has no saved messages yet opens it with a line saying so, so it is never blank.
+- Menus stay on screen on a phone, and a tap that closes a menu no longer builds on the tower under it.
+- The first time you open version 4, a short fireworks show welcomes you, with links to get started and to see what is new. The welcome stays until you close it, and once you do it does not show again.
+- Following a person keeps up on a slow computer or phone. Before, a device drawing fewer than five frames a second barely moved the camera toward them.
+- File > Close saves your tower and takes you back to the opening screen, where Continue brings it back.
+- Modern towers can now build 48 elevator shafts instead of 24, still one limit shared by standard, service and express elevators. A lot with several towers has room to give each one its own banks. Classic keeps the original 24, and stairs and escalators keep their 64 in both modes.
+- Housekeeping's morning report counts every room cleaned the day before, even when you reloaded the tower mid-day, and the stats screen keeps yesterday's shift through a reload. A housekeeping warning shown once today stays quiet after a reload. Right after a reload, people no longer wait for an elevator car the schedule has taken out of service.
+- In Modern, an office worker who gives up waiting for a ride home and walks back no longer squeezes a seventh worker into a full office, so a tower saved during the morning rush plays on exactly as it would have.
+- On Modern's real-world calendar, offices, clinics and fitness clubs now pay a third of their quarterly rent every month, on the same day as the monthly bills. A new tower no longer waits 90 days for its first rent while the overhead drains its cash, and the office line in Stats stops sliding between quarters (#2255). Classic and Modern's short 1994 calendar are unchanged.
+- The evening "New tenants:" report counts everyone who moved in that day, even when you reloaded the tower mid-day.
+- The title screen no longer pops your tower's latest bulletin news as toasts when you reopen the game. The news is still in the tower's bulletin.
+- The Player's Manual and the bug report form now point to the menu bar's commands (Edit > Undo, Tower > Map, File > Export to file… and the rest) where they still named old buttons.
+- On a phone, picking a tool no longer covers the bottom of the tower with a card about it. The tool's button already shows its name and price.
+- Metro riders now leave on a real train. Someone heading home by the Metro waits on the platform until the train pulls in and boards it, rather than disappearing on an empty platform.
+- Trains run once an hour from 6 AM through the 8 PM hour. A rider who reaches the platform after the last train goes up to the ground lobby and leaves by the street, and a Metro visitor finishing a visit at night heads straight for the lobby.
+- Fixed people jumping along the floor to an elevator line. When the line beside an elevator filled the floor right up to its end, people joining it, and people already in it, could leap up to 46 tiles in an instant. They now walk there like everyone else.
+
+### Contributors
+
+- ibiller reported Modern's slow first rent and the sliding office income, with their tower attached (#2255).
+
 ## 3.15.0
 
 - Fixed people standing still forever beside an escalator, stairway or elevator that stands over a gap in their floor. They now step onto it from their own side of the gap, so a sky lobby with a gap under an escalator no longer fills up with a crowd that never leaves, and busy towers like that run much faster.

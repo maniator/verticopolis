@@ -15,6 +15,25 @@ raised the version, so they are documentation only.
 There is no entry for 0.17.0, which only
 existed as a step inside a stacked branch.
 
+## 1.41.0 (2026-11-15)
+
+- A save carries the housekeeping tallies (`housekeeping`: `cleanedToday`, `yesterday` as cleaned and left dirty, and `nudgedDay` and `commuteNudgedDay`, the days the "can't reach" and "can't get in" nudges last fired), written only once there is something to keep. Older saves load with fresh tallies as before, and older builds ignore the key. The conformance state hash and the `.TDT` export leave it out.
+- The crowd's save carries the elevator cars the schedule has stood down (`closedCars`, written only when there are some), so the router's first routes after a load skip them as the unbroken game's would (#2229).
+- An office loads with no more workers at their desks than it holds, and a save's commuter desks are capped the same way, so a hand-edited head count cannot send extra workers home (#2230). A load keeps the desks of offices that are gone only while their workers fit under the people a save may hold (10,000), so a forged save cannot walk tens of thousands of workers out in one pass.
+- A commuting worker who reaches a full office heads out again instead of sitting down (`crowd::commuters::at_destination`), so an office's head count never passes its population. A turned-back worker could find their desk taken by a replacement the hourly pass booked while they were away; the office then held 7, and since the loader caps a head count at the population (#2240) a save reloaded mid-rush played differently from the unbroken game (#2267).
+- Modern collects lease rent (offices, clinics, fitness clubs) every maintenance period, scaled to that period's share of a real-world quarter; Classic still collects it each quarter. On the real-world calendar the bulletin line reads "Monthly office rent collected" (#2255).
+- Each catalog calendar publishes `leasePeriodDays`, the days between two lease collections, and its `quarterlyRentScale` is now the share one collection pays; catalog version 20.
+- Modern's elevator pool holds 48 shafts (`facilities::MODERN_ELEVATOR_SHAFT_CAP`, `MODERN_POOLED_CAPS`, `transport_pools(mode)`, `transport_cap(mode)`, `GameMode::builds_more_elevator_shafts`), so the catalog's Modern `elevators` pool reads 48 and a Modern save keeps up to 112 transports on load. Classic's pools are unchanged.
+- A save carries the day's move-ins so far (`moveIns`: `offices`, `condos`, `rooms`, `fitness`, `clinic` and `rentals`, each written only above zero, and the key only when one is), so the day's report after a reload matches the unbroken game's (#2256). Older saves load with the counts at zero as before, and older builds ignore the key. The conformance state hash and the `.TDT` export leave it out; the lock moved only for the two fixtures whose scenarios reload, where the report line now appears as it would unbroken.
+- A crowd member who ends a walk inside a Metro station on its platform floor waits for the line's train (`crowd::metro_train`) and leaves only while it stands at that station; after the day's last call they route to the nearest ground floor run. `Crowd::minute` (never saved) carries the game minute each crowd chunk ends on. A crowd stepped on its own (no minute) keeps the old ending.
+- The catalog publishes the timetable as `world.metroTrain` (`firstHour`, `lastHour`, `legMinutes`, `dwellMinutes`, `runMinutes`); catalog version 19. The web renderer draws the train from it, so the drawn train and the riders who board it keep one timetable.
+- The conformance lock, catalog digests, frame-days goldens and the catalog fixtures move; no save layout changes.
+- `crowd::walk::walk_to` walks a walker whose target lies past the end of their run to that end at walking speed, instead of putting them there at once. The conformance lock and the frame-days goldens move; no save layout changes.
+
+### Contributors
+
+- ibiller reported Modern's slow first rent and the sliding office income, with their tower attached (#2255).
+
 ## 1.40.0 (2026-11-15)
 
 - A walker whose shaft or flight stands over a gap in their floor walks to its nearest column on their own run instead of finding another way that leads back to the same shaft every step (`crowd::walk::reach_on_run`).
