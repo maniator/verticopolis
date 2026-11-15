@@ -133,7 +133,9 @@ impl Simulation {
         }
         let roll = self.rng.next();
         let fire_chance = self.fire_chance();
-        if self.events.active.is_empty() && roll < fire_chance {
+        // The Security scan runs last, so it costs nothing on the days no fire rolls.
+        let fire_allowed = || !self.mode.fire_needs_security() || self.has_any(Kind::Security);
+        if roll < fire_chance && self.events.active.is_empty() && fire_allowed() {
             self.start_fire();
             if !self.events.active.is_empty() {
                 self.offer_fire_rescue();

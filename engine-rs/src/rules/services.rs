@@ -57,4 +57,11 @@ impl GameMode {
     pub fn ransom_needs_security(self) -> bool {
         self == GameMode::Classic
     }
+
+    /// Whether a fire needs Security in the tower before it can start: the
+    /// SimTower manual has fires, like terrorists, strike only a tower with
+    /// security personnel (#1889). Modern towers can burn without it.
+    pub fn fire_needs_security(self) -> bool {
+        self == GameMode::Classic
+    }
 }
