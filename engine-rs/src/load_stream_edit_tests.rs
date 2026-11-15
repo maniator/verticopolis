@@ -36,8 +36,10 @@ const JSON_BYTES: &[u8] = b"{}[],:\"0-.e\\ ";
 /// it. 154 became 153 when the crowd started carrying the last step's hour,
 /// and 153 became 136 when saves started carrying the housekeeping
 /// tallies (`housekeeping`), for the same reason. 136 became 141 when they
-/// started carrying the day's move-ins (`moveIns`), again for that reason.
-const STREAMED: usize = 141;
+/// started carrying the day's move-ins (`moveIns`), again for that reason,
+/// and 141 became 155 when a first-day game's saves started carrying its
+/// period marks (`periodMarks`), the base saves being first-day games.
+const STREAMED: usize = 155;
 
 /// Seeded edits of engine saves, a few bytes each: dropped, inserted,
 /// changed or copied, or the text cut short. Whatever comes out, both

@@ -8,14 +8,25 @@ import { PortSim, describeEngines, type Leg } from "../portKit/portSim";
 /** The Modern carrying costs (operating overhead and the condo hold-tax), on
  *  both engines. Moved from modernEconomy.integration.test.ts and
  *  economyDepth.integration.test.ts, where they ran on the sampled v1 model;
- *  the engine runs the hourly model only, and one month of ticks from day 0
- *  still crosses exactly one month boundary. Kept apart from those files so
+ *  the engine runs the hourly model only. A new game pays its opening bill
+ *  when its first day ends, and a draft (a new game's save) keeps that bill
+ *  due, so each test plays that day before it measures; one month of ticks
+ *  from day 1 then crosses exactly one month boundary. Kept apart from those files so
  *  their plain tests keep the WASM parity runs. Each block keeps the month
  *  length its source file used. */
 
 const C = Math.floor(LOT_WIDTH / 2);
 const MONTH_30_DAYS = 60 * 24 * 30;
 const MONTH_31_DAYS = 60 * 24 * 31;
+const ONE_DAY = 60 * 24;
+
+/** A sim on the draft with its opening bill paid, so the next month of
+ *  ticks pays one monthly bill. */
+function pastOpeningBill(leg: Leg, draft: ReturnType<typeof newSeededDraft>): PortSim {
+  const sim = new PortSim(leg, draft);
+  sim.tick(ONE_DAY);
+  return sim;
+}
 /** The Modern economy the engine publishes: the overhead per leasable unit
  *  and the condo hold-tax rate. */
 const MODERN = catalogFor("modern");
@@ -41,7 +52,7 @@ describeEngines(
       lay(draft, "floor", 2); // deliberately NO elevator to floor 2 → unserved
       draft.tower.place("office", 2, C); // held, vacant → overhead candidate, earns nothing
       draft.tower.place("condo", 2, C + 10); // unsold, unreachable → hold-tax candidate, never sells
-      const sim = new PortSim(leg, draft);
+      const sim = pastOpeningBill(leg, draft);
       const before = sim.state.money;
       sim.tick(MONTH_30_DAYS); // crosses exactly one month boundary → payMaintenance once
       return before - sim.state.money;
@@ -79,7 +90,7 @@ describeEngines(
       // 5 empty offices, NO elevator → unserved → they stay vacant (no move-in),
       // no rent (quarterly + occupancy), no cars/services → overhead is the only cost.
       for (let i = 0; i < 5; i++) draft.tower.place("office", 2, i * 9);
-      const sim = new PortSim(leg, draft);
+      const sim = pastOpeningBill(leg, draft);
       const before = sim.state.money;
       sim.tick(MONTH_31_DAYS); // crosses one month boundary → payMaintenance once
       expect(before - sim.state.money).toBe(

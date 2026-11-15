@@ -22,7 +22,7 @@ const MINUTES_PER_HOUR = 60;
 const RENT_LINE = /^(?:Quarterly|Monthly) office rent collected: \$([\d,]+) \((\d+) offices?\)\.$/;
 const RENTAL_LINE = /^Monthly rent collected: \$([\d,]+) \((\d+) rentals?\)\.$/;
 
-type Save = { minutes: number; units: Record<string, unknown>[]; log: { text: string }[] };
+type Save = { minutes: number; units: Record<string, unknown>[]; log: { text: string }[]; periodMarks?: unknown };
 /** The tooling build's raw clock move, which the test engine carries and the
  *  game's port does not declare (as `wasmHostLogText.integration.test.ts`
  *  uses it). */
@@ -45,6 +45,11 @@ function towerWithTenant(mode: "classic" | "modern", calendar: CalendarKind, kin
   for (const u of save.units) {
     if (u.id === id) Object.assign(u, { state: "occupied", everOccupied: true, occupants: 6 });
   }
+  // A new game still owes its opening rent and bills, and `advanceClock`
+  // jumps past the day that would pay them. Without the saved marks the
+  // tower takes its clock's, as one whose opening collection is behind it,
+  // so the next period's end is the only collection.
+  delete save.periodMarks;
   return { engine: engineFromSave(JSON.stringify(save)) as ClockedEngine, id };
 }
 

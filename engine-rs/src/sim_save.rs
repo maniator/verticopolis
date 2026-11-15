@@ -189,6 +189,11 @@ impl Simulation {
             m.push(own("founder", json!(true)));
         }
         m.push(own("lastQuarterMoney", json!(self.last_quarter_money)));
+        // A first-day game's hour, maintenance and quarter marks, so a
+        // reload bills as the unsaved game would (`sim_period_marks.rs`).
+        if let Some(marks) = self.period_marks_json() {
+            m.push(own("periodMarks", marks));
+        }
         m.push((
             "units",
             if fold {
@@ -327,9 +332,16 @@ impl Simulation {
     #[cfg_attr(not(feature = "wasm"), allow(dead_code))]
     pub(crate) fn save_without_units(&self) -> (Value, impl Iterator<Item = Value> + '_) {
         // The `.TDT` format has no place for the crowd, the cars' timers,
-        // the housekeeping tallies or the day's move-ins.
+        // the housekeeping tallies, the day's move-ins or the period marks.
         (
-            self.serialize_without(&["units", "crowd", "dispatch", "housekeeping", "moveIns"]),
+            self.serialize_without(&[
+                "units",
+                "crowd",
+                "dispatch",
+                "housekeeping",
+                "moveIns",
+                "periodMarks",
+            ]),
             self.tower.units.iter().map(Unit::serialize),
         )
     }

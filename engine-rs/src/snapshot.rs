@@ -25,12 +25,19 @@ use crate::sim::Simulation;
 /// a hash), without the log messages' text and the pending choice's message,
 /// so wording changes never move a hash, and without the crowd, which the
 /// conformance suite hashes as its own channel ([`crate::crowd::Crowd::view`]),
-/// the cars' timers mid-stop, the housekeeping tallies or the day's move-ins,
-/// which the hash has never held. The tallies show in the hash through what
-/// they decide: whether the morning checkout line, the housekeeping nudges
-/// and the evening's "New tenants:" line are logged.
+/// the cars' timers mid-stop, the housekeeping tallies, the day's move-ins or
+/// a first-day game's period marks, which the hash has never held. They show
+/// in the hash through what they decide: whether the morning checkout line,
+/// the housekeeping nudges and the evening's "New tenants:" line are logged,
+/// and the money the first day's end bills.
 pub fn state_view(sim: &Simulation) -> Value {
-    let mut v = sim.serialize_unfolded_without(&["crowd", "dispatch", "housekeeping", "moveIns"]);
+    let mut v = sim.serialize_unfolded_without(&[
+        "crowd",
+        "dispatch",
+        "housekeeping",
+        "moveIns",
+        "periodMarks",
+    ]);
     if let Some(log) = v.get_mut("log").and_then(Value::as_array_mut) {
         for e in log {
             if let Some(o) = e.as_object_mut() {

@@ -51,6 +51,11 @@ test("zoom cull hides the moving layer, restores it, and survives a rebuild", as
     const ready = () => walking() && atWork();
     for (let minute = 0; minute < 24 * 60 && !ready(); minute++) g.sim.tick(1);
     if (!ready()) throw new Error("no one walked the tower while anyone was at work, in a day");
+    // The render reads each floor's tenants once an hour, and the first
+    // commuters can come in during the hour a frame already read (a new
+    // game runs its first hour's rules on its first step), so drop that
+    // reading as a rebuild does.
+    g.engine.floorLiveHour = -1;
     g.engine.paused = false;
   });
   // Let one frame pass at a normal zoom so the moving layer exists and shows.

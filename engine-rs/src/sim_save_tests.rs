@@ -51,6 +51,9 @@ fn reference(sim: &Simulation) -> Value {
         m.insert("founder".into(), json!(true));
     }
     m.insert("lastQuarterMoney".into(), json!(sim.last_quarter_money));
+    if let Some(marks) = sim.period_marks_json() {
+        m.insert("periodMarks".into(), marks);
+    }
     m.insert(
         "units".into(),
         Value::Array(sim.tower.units.iter().map(|u| u.serialize()).collect()),
@@ -264,11 +267,12 @@ fn edited_games_write_the_trees_text() {
         .collect();
     sim.housekeeping.yesterday = Some((12, 3));
     sim.move_ins_today.rentals = 2;
+    sim.last_month = -1;
     let keys: Vec<&str> = sim.save_fields(true).iter().map(|(k, _)| *k).collect();
     let distinct: HashSet<&str> = keys.iter().copied().collect();
     assert_eq!(
         (keys.len(), distinct.len()),
-        (35, 35),
+        (36, 36),
         "every field once: {keys:?}"
     );
     same(&sim, "an edited game");
@@ -349,8 +353,15 @@ fn the_save_without_units_and_its_units_are_the_trees_save() {
         let units: Vec<Value> = units.collect();
         assert_eq!(Value::Array(units), sim.serialize_unfolded()["units"]);
         // The `.TDT` export reads neither the people, the cars' timers nor
-        // the housekeeping tallies or the day's move-ins.
-        let left_out = ["units", "crowd", "dispatch", "housekeeping", "moveIns"];
+        // the housekeeping tallies, the day's move-ins or the period marks.
+        let left_out = [
+            "units",
+            "crowd",
+            "dispatch",
+            "housekeeping",
+            "moveIns",
+            "periodMarks",
+        ];
         assert!(left_out.iter().all(|k| rest.get(k).is_none()));
         for key in left_out {
             if let Some(v) = whole.get(key) {
