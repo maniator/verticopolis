@@ -34,6 +34,7 @@ use super::walk_ins::WalkIn;
 use super::{Crowd, PState, Person};
 use crate::charges::whole;
 use crate::facilities::{LOT_WIDTH, MAX_FLOOR, MIN_FLOOR};
+use crate::save_entry::{entry_tree, EntryValue, SaveEntries, Scalar, WrittenAll};
 use crate::sim_save::Each;
 
 /// The most people a save restores. A working tower holds at most the
@@ -133,77 +134,7 @@ impl Person {
     /// unset optional ones left out. The seed is not written: every person's
     /// seed is the one their id gives ([`seed_for`]).
     pub(crate) fn save_form(&self) -> Value {
-        let mut m = Map::new();
-        m.insert("id".into(), json!(self.id));
-        m.insert("state".into(), json!(self.state.as_str()));
-        m.insert("floor".into(), json!(self.floor));
-        m.insert("fy".into(), json!(self.fy));
-        m.insert("x".into(), json!(self.x));
-        m.insert("startX".into(), json!(self.start_x));
-        m.insert("floors".into(), json!(self.floors));
-        m.insert("originFloor".into(), json!(self.origin_floor));
-        m.insert("shafts".into(), json!(self.shafts));
-        m.insert("leg".into(), json!(self.leg));
-        if let Some(v) = self.shaft_id {
-            m.insert("shaftId".into(), json!(v));
-        }
-        if let Some(v) = self.car_index {
-            m.insert("carIndex".into(), json!(v));
-        }
-        m.insert("destX".into(), json!(self.dest_x));
-        m.insert("wait".into(), json!(self.wait));
-        m.insert("tripWait".into(), json!(self.trip_wait));
-        m.insert("age".into(), json!(self.age));
-        m.insert("linger".into(), json!(self.linger));
-        let flags = [
-            ("staff", self.staff),
-            ("countedHotelGuest", self.counted_hotel_guest),
-            ("returning", self.returning),
-            ("fromMetro", self.from_metro),
-            ("walkIn", self.walk_in),
-        ];
-        for (key, set) in flags {
-            if set {
-                m.insert(key.into(), json!(true));
-            }
-        }
-        let ids = [
-            ("cleanUnitId", self.clean_unit_id),
-            ("mealVenueId", self.meal_venue_id),
-            ("venueUnitId", self.venue_unit_id),
-            ("originUnitId", self.origin_unit_id),
-            ("crewId", self.crew_id),
-        ];
-        for (key, id) in ids {
-            if let Some(id) = id {
-                m.insert(key.into(), json!(id));
-            }
-        }
-        if let Some(v) = self.dwell_seconds_left {
-            m.insert("dwellSecondsLeft".into(), json!(v));
-        }
-        if let Some(v) = self.linger_for {
-            m.insert("lingerFor".into(), json!(v));
-        }
-        if let Some(v) = self.routine {
-            m.insert("routine".into(), json!(v));
-        }
-        if let Some(t) = self.staff_trip {
-            m.insert("staffTrip".into(), json!(t.as_str()));
-        }
-        if let Some(e) = self.errand {
-            m.insert(
-                "errand".into(),
-                json!({ "place": e.place.as_str(), "inbound": e.inbound }),
-            );
-        }
-        if let Some(c) = self.commute {
-            m.insert(
-                "commute".into(),
-                json!({ "officeId": c.office_id, "inbound": c.inbound }),
-            );
-        }
-        Value::Object(m)
+        entry_tree(self)
     }
 
     /// The person a save wrote, or `None` when the entry is not one the
@@ -345,8 +276,89 @@ fn walk_in_json(w: &WalkIn) -> Value {
     json!({ "at": w.at, "unitId": w.unit_id })
 }
 
+impl SaveEntries for Person {
+    fn save_entries<E>(
+        &self,
+        mut put: impl FnMut(&'static str, EntryValue<'_>) -> Result<(), E>,
+    ) -> Result<(), E> {
+        put("id", EntryValue::Int(self.id))?;
+        put("state", EntryValue::Text(self.state.as_str()))?;
+        put("floor", EntryValue::Int(self.floor))?;
+        put("fy", EntryValue::Float(self.fy))?;
+        put("x", EntryValue::Float(self.x))?;
+        put("startX", EntryValue::Float(self.start_x))?;
+        put("floors", EntryValue::Ints(&self.floors))?;
+        put("originFloor", EntryValue::Int(self.origin_floor))?;
+        put("shafts", EntryValue::Ints(&self.shafts))?;
+        // A leg index is far below `i64::MAX`.
+        put("leg", EntryValue::Int(self.leg as i64))?;
+        if let Some(v) = self.shaft_id {
+            put("shaftId", EntryValue::Int(v))?;
+        }
+        if let Some(v) = self.car_index {
+            put("carIndex", EntryValue::Int(v))?;
+        }
+        put("destX", EntryValue::Float(self.dest_x))?;
+        put("wait", EntryValue::Float(self.wait))?;
+        put("tripWait", EntryValue::Float(self.trip_wait))?;
+        put("age", EntryValue::Float(self.age))?;
+        put("linger", EntryValue::Float(self.linger))?;
+        let flags = [
+            ("staff", self.staff),
+            ("countedHotelGuest", self.counted_hotel_guest),
+            ("returning", self.returning),
+            ("fromMetro", self.from_metro),
+            ("walkIn", self.walk_in),
+        ];
+        for (key, set) in flags {
+            if set {
+                put(key, EntryValue::True)?;
+            }
+        }
+        let ids = [
+            ("cleanUnitId", self.clean_unit_id),
+            ("mealVenueId", self.meal_venue_id),
+            ("venueUnitId", self.venue_unit_id),
+            ("originUnitId", self.origin_unit_id),
+            ("crewId", self.crew_id),
+        ];
+        for (key, id) in ids {
+            if let Some(id) = id {
+                put(key, EntryValue::Int(id))?;
+            }
+        }
+        if let Some(v) = self.dwell_seconds_left {
+            put("dwellSecondsLeft", EntryValue::Float(v))?;
+        }
+        if let Some(v) = self.linger_for {
+            put("lingerFor", EntryValue::Float(v))?;
+        }
+        if let Some(v) = self.routine {
+            put("routine", EntryValue::Text(v))?;
+        }
+        if let Some(t) = self.staff_trip {
+            put("staffTrip", EntryValue::Text(t.as_str()))?;
+        }
+        if let Some(e) = self.errand {
+            let place = Scalar::Text(e.place.as_str());
+            put(
+                "errand",
+                EntryValue::Pair("place", place, "inbound", Scalar::Bool(e.inbound)),
+            )?;
+        }
+        if let Some(c) = self.commute {
+            let office = Scalar::Int(c.office_id);
+            put(
+                "commute",
+                EntryValue::Pair("officeId", office, "inbound", Scalar::Bool(c.inbound)),
+            )?;
+        }
+        Ok(())
+    }
+}
+
 /// The crowd as the save writes it: [`Crowd::save_json`]'s object, each
-/// person written and dropped in turn.
+/// person written straight to the save (`save_entry`).
 pub(crate) struct SavedCrowd<'a>(pub &'a Crowd);
 
 impl Serialize for SavedCrowd<'_> {
@@ -358,7 +370,7 @@ impl Serialize for SavedCrowd<'_> {
         }
         c.commuters_write(&mut m)?;
         m.serialize_entry("walkIns", &Each(&c.walk_ins, walk_in_json))?;
-        m.serialize_entry("people", &Each(&c.people, Person::save_form))?;
+        m.serialize_entry("people", &WrittenAll(&c.people))?;
         m.end()
     }
 }
@@ -471,3 +483,7 @@ impl Crowd {
 #[cfg(test)]
 #[path = "save_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "save_entry_tests.rs"]
+mod entry_tests;

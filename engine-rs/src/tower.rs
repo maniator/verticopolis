@@ -19,11 +19,13 @@ mod tall_lobby;
 mod transports;
 mod types;
 mod undoing;
+mod unit_save;
 
 pub use lobby_halls::HallRun;
 pub use skybridge::SKYBRIDGE_MAX_SPAN;
 pub(crate) use skybridge::{Row as BridgeRow, PEOPLE_CROSSING, SKYBRIDGE_PRICE_FACTOR};
 pub use types::{Extras, ExtrasMut, PlaceResult, ResizeResult, Transport, Unit, UnitState};
+pub(crate) use unit_save::SavedUnit;
 
 /// The refusal for a Classic floor tile with floor on both sides: taking it
 /// out would leave a gap the story above could not be built across.
