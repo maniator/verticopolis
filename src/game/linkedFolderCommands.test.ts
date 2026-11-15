@@ -184,7 +184,10 @@ describe("the Auto-save copy in the linked folder", () => {
 
   it("waits to write while the folder needs the browser's OK or the tower can't be saved", async () => {
     m.folder.state.mockImplementation(() => ({ name: "Towers", access: "prompt" }));
-    expect((await place().setMirror(true))?.kind).toBe("info");
+    expect(await place().setMirror(true)).toEqual({
+      text: `The Auto-save will be copied to "Towers" once your browser allows the folder.`,
+      kind: "info",
+    });
     m.folder.state.mockImplementation(() => ({ name: "Towers", access: "granted" }));
     m.live.mockReturnValue(false);
     await place().setMirror(true);

@@ -268,6 +268,41 @@ describe("saving", () => {
   });
 });
 
+describe("the link's id", () => {
+  it("is new for every link, kept across a reload, and gone after Unlink", async () => {
+    expect(linkedFolder.linkId(), "nothing linked").toBeNull();
+    await link(fakeFolder("Towers", {}));
+    const first = linkedFolder.linkId();
+    expect(first).toEqual(expect.any(String));
+    reload();
+    expect(linkedFolder.linkId(), "the same link after a reload").toBe(first);
+    await link(fakeFolder("Towers", {}));
+    expect(linkedFolder.linkId(), "a folder of the same name linked again").not.toBe(first);
+    await linkedFolder.unlink();
+    expect(linkedFolder.linkId()).toBeNull();
+  });
+
+  it("stays this page's once the folder is read back, when another tab links a folder", async () => {
+    await link(fakeFolder("Towers", {}));
+    const mine = linkedFolder.linkId();
+    reload();
+    await linkedFolder.refresh();
+    localStorage.setItem("verticopolis-linked-folder-link", "another tab's link");
+    expect(linkedFolder.linkId(), "the id this page read with the folder").toBe(mine);
+  });
+
+  it("is made once for a folder linked before links had ids, and kept", async () => {
+    await link(fakeFolder("Towers", {}));
+    localStorage.removeItem("verticopolis-linked-folder-link");
+    reload();
+    const made = linkedFolder.linkId();
+    expect(made).toEqual(expect.any(String));
+    expect(linkedFolder.linkId()).toBe(made);
+    reload();
+    expect(linkedFolder.linkId()).toBe(made);
+  });
+});
+
 describe("reading and copying", () => {
   it("reads a file's bytes, and answers null for one gone from the disk", async () => {
     const folder = fakeFolder("Towers", { "Sky.vctower": [4, 5] });

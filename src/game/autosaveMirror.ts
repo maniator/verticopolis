@@ -1,9 +1,10 @@
 import type { GameApp } from "../main";
 import { trackAppActionOnce } from "../analytics";
 import { linkedFolder } from "../storage/linkedFolder";
+import { packSave } from "../storage/savePacker";
 import { currentStamp } from "../storage/saveStamp";
 import { autosaveLive } from "./autosaveSchedule";
-import { exportFile } from "./portLifecycle";
+import { saveBytes } from "./portLifecycle";
 
 /**
  * A copy of the Auto-save in the folder linked on the player's computer
@@ -19,7 +20,15 @@ import { exportFile } from "./portLifecycle";
  * starts copying again once Open or Save As shows the folder. Its first write
  * in a folder takes "Auto-save", or "Auto-save (2)" and up when a file of that
  * name is there already, so it never replaces a file it didn't write; after
- * that it writes the same file. Linking another folder starts a new file.
+ * that it writes the same file. The file is remembered with the link it was
+ * written through ({@link linkedFolder.linkId}), so linking another folder,
+ * even one with a file of that name, starts a new file.
+ *
+ * The file is the binary `.vctower` Save As writes (`VCTOWER2`, a newline,
+ * then the raw DEFLATE of the stamped save), built from the same stamped
+ * bytes the autosave asks the engine for and packed in the save packer's
+ * worker, so the copy adds no compression to the frame. The engine's own
+ * file export compresses on the main thread (about 19 ms on a large tower).
  */
 
 /** Where the setting and the copy's file are kept. */
@@ -34,16 +43,20 @@ interface MirrorPref {
   /** The file the copy writes, once it has written one in this folder. Kept
    *  while the copy is off, so turning it on again writes the same file. */
   readonly file: string | null;
+  /** The link the file was written through: a file from another link is
+   *  another folder's, so it is never written over. */
+  readonly link: string | null;
 }
 
-const OFF: MirrorPref = { on: false, file: null };
+const OFF: MirrorPref = { on: false, file: null, link: null };
 
 function readPref(): MirrorPref {
   try {
     const raw = localStorage.getItem(KEY);
     if (raw === null) return OFF;
-    const pref = JSON.parse(raw) as { on?: unknown; file?: unknown };
-    return { on: pref.on === true, file: typeof pref.file === "string" ? pref.file : null };
+    const pref = JSON.parse(raw) as { on?: unknown; file?: unknown; link?: unknown };
+    const text = (v: unknown) => (typeof v === "string" ? v : null);
+    return { on: pref.on === true, file: text(pref.file), link: text(pref.link) };
   } catch {
     return OFF;
   }
@@ -75,7 +88,18 @@ export function setMirror(on: boolean): void {
 /** Forget the copy's file, so the next copy starts a new one: another folder
  *  may hold a file of that name that the game didn't write. */
 export function forgetMirrorFile(): void {
-  writePref({ ...readPref(), file: null });
+  writePref({ ...readPref(), file: null, link: null });
+}
+
+/** The stamp and newline that open a binary `.vctower` file. */
+const BINARY_HEAD = new TextEncoder().encode("VCTOWER2\n");
+
+/** A binary `.vctower` file around `packed`, the raw DEFLATE of a save. */
+export function vctowerFileOf(packed: Uint8Array): Uint8Array {
+  const file = new Uint8Array(BINARY_HEAD.length + packed.length);
+  file.set(BINARY_HEAD);
+  file.set(packed, BINARY_HEAD.length);
+  return file;
 }
 
 /**
@@ -92,12 +116,17 @@ export async function mirrorAutosave(app: Pick<GameApp, "enginePort" | "engine">
   if (!force && now - lastCopy < MIRROR_EVERY_MS) return false;
   copying = true;
   lastCopy = now;
+  const link = linkedFolder.linkId();
   try {
-    const bytes = exportFile(app.enginePort, app.engine.viewState(), currentStamp());
-    if (pref.file !== null) await linkedFolder.saveOver(pref.file, bytes);
+    const save = saveBytes(app.enginePort, app.engine.viewState(), currentStamp());
+    const bytes = vctowerFileOf((await packSave(save)).packed);
+    // Unlinked or linked again while the save packed: this file was for the
+    // folder that was linked then.
+    if (link === null || linkedFolder.linkId() !== link || linkedFolder.state()?.access !== "granted") return false;
+    if (pref.file !== null && pref.link === link) await linkedFolder.saveOver(pref.file, bytes);
     else {
       const entry = await linkedFolder.saveNew(MIRROR_NAME, bytes);
-      writePref({ ...readPref(), file: entry.id });
+      if (linkedFolder.linkId() === link) writePref({ ...readPref(), file: entry.id, link });
     }
     return true;
   } catch {

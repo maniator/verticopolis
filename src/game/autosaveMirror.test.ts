@@ -3,23 +3,30 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const m = vi.hoisted(() => ({
   once: vi.fn(),
   live: vi.fn(() => true),
-  exportFile: vi.fn(() => Uint8Array.of(9, 9)),
+  saveBytes: vi.fn(() => new TextEncoder().encode('{"name":"Sky","savedAt":5,"appVersion":"t"}')),
   access: "granted" as string | null,
+  link: "L1" as string | null,
   saveOver: vi.fn(async (id: string) => ({ id, name: "x", kind: "tower", size: 2, modified: 0 })),
-  saveNew: vi.fn(async (name: string) => ({ id: `${name} (2).vctower`, name: `${name} (2)`, kind: "tower", size: 2, modified: 0 })),
+  saveNew: vi.fn(async (name: string, _bytes?: Uint8Array) => ({ id: `${name} (2).vctower`, name: `${name} (2)`, kind: "tower", size: 2, modified: 0 })),
 }));
 vi.mock("../analytics", () => ({ trackAppActionOnce: m.once }));
 vi.mock("./autosaveSchedule", () => ({ autosaveLive: m.live }));
-vi.mock("./portLifecycle", () => ({ exportFile: m.exportFile }));
+vi.mock("./portLifecycle", () => ({ saveBytes: m.saveBytes }));
 vi.mock("../storage/linkedFolder", () => ({
   linkedFolder: {
     state: () => (m.access === null ? null : { name: "Towers", access: m.access }),
+    linkId: () => m.link,
     saveOver: m.saveOver,
     saveNew: m.saveNew,
   },
 }));
 
+import { decodeVctowerFile } from "../storage/vctowerContainer";
 import { forgetMirrorFile, MIRROR_EVERY_MS, MIRROR_NAME, mirrorAutosave, mirrorOn, resetMirrorForTests, setMirror } from "./autosaveMirror";
+
+/** The save a written file holds. */
+const holds = (bytes: unknown) => decodeVctowerFile(bytes as Uint8Array);
+const SAVE = { name: "Sky", savedAt: 5, appVersion: "t" };
 
 const app = { enginePort: {}, engine: { viewState: () => null } } as never;
 
@@ -28,6 +35,7 @@ beforeEach(() => {
   localStorage.clear();
   resetMirrorForTests();
   m.access = "granted";
+  m.link = "L1";
   m.live.mockReturnValue(true);
 });
 
@@ -35,7 +43,7 @@ describe("the Auto-save copy in the linked folder", () => {
   it("is off until the player turns it on, and writes nothing while off", async () => {
     expect(mirrorOn()).toBe(false);
     expect(await mirrorAutosave(app, 0)).toBe(false);
-    expect(m.exportFile).not.toHaveBeenCalled();
+    expect(m.saveBytes).not.toHaveBeenCalled();
     setMirror(true);
     expect(mirrorOn()).toBe(true);
   });
@@ -43,9 +51,9 @@ describe("the Auto-save copy in the linked folder", () => {
   it("starts a new file that never replaces one it didn't write, then writes that same file", async () => {
     setMirror(true);
     expect(await mirrorAutosave(app, 0)).toBe(true);
-    expect(m.saveNew).toHaveBeenCalledExactlyOnceWith(MIRROR_NAME, Uint8Array.of(9, 9));
+    expect(m.saveNew).toHaveBeenCalledExactlyOnceWith(MIRROR_NAME, expect.any(Uint8Array));
     expect(await mirrorAutosave(app, MIRROR_EVERY_MS)).toBe(true);
-    expect(m.saveOver).toHaveBeenCalledExactlyOnceWith("Auto-save (2).vctower", Uint8Array.of(9, 9));
+    expect(m.saveOver).toHaveBeenCalledExactlyOnceWith("Auto-save (2).vctower", expect.any(Uint8Array));
     expect(m.saveNew).toHaveBeenCalledOnce();
   });
 
@@ -54,7 +62,7 @@ describe("the Auto-save copy in the linked folder", () => {
     await mirrorAutosave(app, 1000);
     expect(await mirrorAutosave(app, 1000 + MIRROR_EVERY_MS - 1)).toBe(false);
     expect(await mirrorAutosave(app, 1000 + MIRROR_EVERY_MS - 1, true)).toBe(true);
-    expect(m.exportFile).toHaveBeenCalledTimes(2);
+    expect(m.saveBytes).toHaveBeenCalledTimes(2);
   });
 
   it("never asks the browser: it waits while the folder isn't open with its OK", async () => {
@@ -63,14 +71,14 @@ describe("the Auto-save copy in the linked folder", () => {
     expect(await mirrorAutosave(app, 0)).toBe(false);
     m.access = null;
     expect(await mirrorAutosave(app, 0)).toBe(false);
-    expect(m.exportFile).not.toHaveBeenCalled();
+    expect(m.saveBytes).not.toHaveBeenCalled();
   });
 
   it("writes nothing while the tower may not be autosaved", async () => {
     setMirror(true);
     m.live.mockReturnValue(false);
     expect(await mirrorAutosave(app, 0, true)).toBe(false);
-    expect(m.exportFile).not.toHaveBeenCalled();
+    expect(m.saveBytes).not.toHaveBeenCalled();
   });
 
   it("counts a failure once and tries again on the next minute", async () => {
@@ -101,6 +109,45 @@ describe("the Auto-save copy in the linked folder", () => {
     setMirror(true);
     await mirrorAutosave(app, 0);
     expect(m.saveNew).toHaveBeenCalledOnce();
-    expect(m.saveOver).toHaveBeenCalledExactlyOnceWith("Auto-save (2).vctower", Uint8Array.of(9, 9));
+    expect(m.saveOver).toHaveBeenCalledExactlyOnceWith("Auto-save (2).vctower", expect.any(Uint8Array));
+  });
+
+  it("writes the binary .vctower Save As writes, holding the stamped autosave bytes", async () => {
+    setMirror(true);
+    await mirrorAutosave(app, 0);
+    const file = m.saveNew.mock.calls[0]![1]!;
+    expect(new TextDecoder().decode(file.subarray(0, 9))).toBe("VCTOWER2\n");
+    expect(holds(file)).toEqual(SAVE);
+  });
+
+  it("never writes over a file remembered for another link, even one of the same name", async () => {
+    setMirror(true);
+    await mirrorAutosave(app, 0);
+    m.link = "L2";
+    await mirrorAutosave(app, MIRROR_EVERY_MS);
+    expect(m.saveOver).not.toHaveBeenCalled();
+    expect(m.saveNew).toHaveBeenCalledTimes(2);
+  });
+
+  it("drops a copy whose folder was unlinked or linked again while the save packed", async () => {
+    setMirror(true);
+    m.saveBytes.mockImplementationOnce(() => {
+      m.link = "L2";
+      return new TextEncoder().encode(JSON.stringify(SAVE));
+    });
+    expect(await mirrorAutosave(app, 0)).toBe(false);
+    expect(m.saveNew).not.toHaveBeenCalled();
+  });
+
+  it("remembers no file when another folder was linked while the first one was written", async () => {
+    setMirror(true);
+    m.saveNew.mockImplementationOnce(async (name: string) => {
+      m.link = "L2";
+      return { id: `${name}.vctower`, name, kind: "tower", size: 2, modified: 0 };
+    });
+    await mirrorAutosave(app, 0);
+    await mirrorAutosave(app, MIRROR_EVERY_MS);
+    expect(m.saveOver).not.toHaveBeenCalled();
+    expect(m.saveNew).toHaveBeenCalledTimes(2);
   });
 });

@@ -130,9 +130,14 @@ export function linkedPlace(app: GameApp): LinkedPlaceCtx | null {
       setMirror(on);
       trackAppAction("folder_mirror", on ? "on" : "off");
       if (!on) return { text: `The Auto-save is no longer copied to "${name}". The copy there stays.`, kind: "info" };
-      // Write it now, so the player sees the file arrive. A folder waiting for
-      // the browser's OK, or a tower that can't be saved yet, starts later.
-      if (linkedFolder.state()?.access === "granted" && autosaveLive() && !(await mirrorAutosave(app, Date.now(), true))) {
+      // The copy never asks the browser, so a folder still waiting for its
+      // OK gets the copy only once a window has the OK.
+      if (linkedFolder.state()?.access !== "granted") {
+        return { text: `The Auto-save will be copied to "${name}" once your browser allows the folder.`, kind: "info" };
+      }
+      // Write it now, so the player sees the file arrive. A tower that can't
+      // be saved yet starts later.
+      if (autosaveLive() && !(await mirrorAutosave(app, Date.now(), true))) {
         return { text: `Couldn't copy the Auto-save to "${name}". The game tries again every minute.`, kind: "bad" };
       }
       return { text: `The Auto-save is copied to "${name}" every minute while you play.`, kind: "info" };

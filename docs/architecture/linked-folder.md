@@ -51,8 +51,14 @@ kept in localStorage (`verticopolis-autosave-mirror`).
   written, never read back on its own; the player opens it from the folder
   like any tower.
 - After a timer autosave (`startAutosave`'s `afterTick`), the game writes the
-  live tower's `.vctower`, the bytes Save As writes, at most once a minute.
-  It costs nothing while the copy is off; while on, one export a minute.
+  live tower as a binary `.vctower` (`VCTOWER2`, a newline, then the raw
+  DEFLATE of the stamped save), at most once a minute. It costs nothing while
+  the copy is off. While on, it asks the engine for the same stamped bytes the
+  autosave stores (`saveBytes`, about 2 ms on the split-tower-4 fixture) and
+  packs them in the save packer's worker, so no compression runs on the frame.
+  The engine's own file export compresses on the main thread (median 19 ms on
+  split-tower-4, 10 ms on the large fixture), which is why the copy does not
+  use it.
 - It writes only while the folder is open this visit with the browser's OK.
   It never asks the browser and never reads the handle back on its own (see
   Permission below), so after a restart it starts again once Open or Save As
@@ -60,8 +66,11 @@ kept in localStorage (`verticopolis-autosave-mirror`).
 - Its first write in a folder takes `Auto-save.vctower`, or `Auto-save (2)`
   and up when the list or the disk has that name (`linkedFolder.saveNew`), so
   it never replaces a file it didn't write. It then writes that same file
-  (`saveOver`), remembered beside the setting. Linking another folder or
-  unlinking forgets the file; unlinking also turns the copy off. Turning it
+  (`saveOver`), remembered beside the setting together with the link's id
+  (`linkedFolder.linkId`, made new by every link). A file remembered for
+  another link is never written over, even when the new folder has a file of
+  that name, and a copy whose folder was unlinked or linked again while it
+  packed is dropped. Unlinking also turns the copy off. Turning it
   off leaves the file in the folder.
 - A failed write says nothing on screen (the in-browser Auto-save worked or
   told the player itself) and tries again a minute later; it is counted once a
