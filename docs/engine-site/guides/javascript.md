@@ -243,8 +243,9 @@ builds them, for the web game's own tests and tooling.
   are (Classic); a Modern tower is refused. Each elevator car's waiting floor
   travels both ways as the shaft's `schedule.homeFloors`.
 - **A save holds the moment.** The save's `crowd` carries everyone in the
-  building as they stand (walking, waiting, riding, at a venue, cleaning),
-  its `dispatch` carries the elevator cars' timers mid-stop, and its
+  building as they stand (walking, waiting, riding, at a venue, cleaning)
+  and, in a Modern tower, how long riders have lately waited at each
+  elevator stop (`waitsSeen`, which the routes weigh), its `dispatch` carries the elevator cars' timers mid-stop, and its
   `housekeeping` carries the rooms cleaned today, yesterday's shift and the
   days its nudges last fired, and its `moveIns` carries the day's move-ins
   so far, so a loaded game's people, cars and crews carry on where they
@@ -253,7 +254,8 @@ builds them, for the web game's own tests and tooling.
   first maintenance and office rent as it would have unsaved. The elevator
   panels' hourly figures start over on a load. A save from before the crowd
   was saved loads with nobody in the building, and the tower fills again
-  from the lobby. The `.TDT` format carries none of the four.
+  from the lobby; one from before `waitsSeen` starts with no waits
+  remembered. The `.TDT` format carries none of the four.
 - **The loader repairs.** A damaged or hand-edited save is coerced the way the
   web game's loader does. It refuses a file it cannot read at all, and a save
   with no numeric `minutes` or no `units` list at its top level, which would

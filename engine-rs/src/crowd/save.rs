@@ -380,11 +380,17 @@ impl Crowd {
         if self.weekend {
             m.insert("weekend".into(), json!(true));
         }
-        if !self.shaft_lines.is_empty() {
-            let rows: Vec<[i64; 3]> = (self.shaft_lines.sorted().into_iter())
-                .map(|(&(shaft, floor), line)| [shaft, floor, line.riders])
-                .collect();
+        // A line nobody stands in holds only a remembered wait, which
+        // `waitsSeen` carries.
+        let rows: Vec<[i64; 3]> = (self.shaft_lines.sorted().into_iter())
+            .filter(|(_, line)| line.riders > 0)
+            .map(|(&(shaft, floor), line)| [shaft, floor, line.riders])
+            .collect();
+        if !rows.is_empty() {
             m.insert("lines".into(), json!(rows));
+        }
+        if !self.waits_seen.is_empty() {
+            m.insert("waitsSeen".into(), self.waits_seen_json());
         }
         if !self.closed_cars.is_empty() {
             m.insert("closedCars".into(), json!(self.closed_cars));
@@ -426,6 +432,7 @@ impl Crowd {
         self.weekend = o.get("weekend") == Some(&Value::Bool(true));
         self.restore_lines(o.get("lines"));
         self.restore_closed_cars(o.get("closedCars"));
+        self.restore_waits_seen(o.get("waitsSeen"));
         self.commuters_restore(o);
         if let Some(rows) = o.get("commuteStress") {
             // A malformed list keeps the empty averages a load starts with.

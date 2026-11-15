@@ -318,10 +318,11 @@ pub struct Crowd {
     pub commuter_boardings: indexmap::IndexMap<i64, indexmap::IndexMap<i64, f64>>,
     /// The Modern router's transit graph and this step's lines. Never saved.
     pub router: Option<expected_time::Router>,
-    /// Each shaft's line, keyed (shaft, floor), as the last motion slice
-    /// counted it (`line_count::LineCount`), for the Modern router's next
-    /// step. Its riders are saved as `lines`; a load counts the waits again.
+    /// Each shaft's line, keyed (shaft, floor), as the last motion slice counted it
+    /// (`line_count`), for the Modern router's next step. Its riders are saved as `lines`.
     pub shaft_lines: fasthash::FastMap<(i64, i64), line_count::Line>,
+    /// The waits Modern riders had at each stop, fading (`waits_seen`). Saved as `waitsSeen`.
+    pub waits_seen: line_count::waits_seen::WaitsSeen,
 }
 
 impl Crowd {
@@ -369,6 +370,7 @@ impl Crowd {
             commuter_boardings: Default::default(),
             router: None,
             shaft_lines: fasthash::FastMap::default(),
+            waits_seen: Default::default(),
         }
     }
 

@@ -80,7 +80,7 @@ pub fn advance(crowd: &mut Crowd, dt_sec: f64, tower: &mut Tower) {
         0.0
     };
     crowd.frustration += (target - crowd.frustration) * (dt_sec * 0.5).min(1.0);
-    super::expected_time::keep_lines(crowd, lines.counted());
+    super::line_count::waits_seen::keep_lines(crowd, lines.counted(), dt_sec);
     crowd.people.retain(|p| p.state != PState::Done);
 }
 
@@ -196,8 +196,7 @@ fn step(crowd: &mut Crowd, i: usize, dt: f64, tower: &mut Tower, landings: &mut 
                 boarded = Some((shaft.id, ci as i64, shaft.kind.is_elevator()));
                 break;
             }
-            // The shaft is read in place above, and the ride is noted once
-            // the read ends.
+            // The ride is noted once the shaft's read above ends.
             if let Some((shaft_id, ci, elevator)) = boarded {
                 tower.note_ride(shaft_id);
                 if crowd.people[i].commuter && elevator {
@@ -208,6 +207,7 @@ fn step(crowd: &mut Crowd, i: usize, dt: f64, tower: &mut Tower, landings: &mut 
                         .entry(floor)
                         .or_insert(0.0) += 1.0;
                 }
+                super::line_count::waits_seen::note_boarding(crowd, tower, elevator, i);
                 let p = &mut crowd.people[i];
                 p.car_index = Some(ci);
                 p.state = PState::Riding;
