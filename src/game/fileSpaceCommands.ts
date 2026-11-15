@@ -33,7 +33,8 @@ import { exportFile } from "./portLifecycle";
  *
  * Analytics (`docs/analytics-data-map.md`): `app_action` `files_open`
  * (`open`, `open_key`, `open_title` or `save_as`: see `OPEN_DETAIL`), `file_open` (`tower`, `tdt` or `auto`), `file_save`
- * (`new`, `replace` or `current`), `file_add` (`picked` or `drop`),
+ * (`new`, `replace` or `current`), `file_add` (`picked`, `drop` or
+ * `folder`),
  * `file_rename`, `file_copy`, `file_delete`, and `file_failed` (`full` or
  * `error`), plus `files_copied` once with the number of slots copied in.
  * Codes and counts only: a name is the player's own text and is never sent.
