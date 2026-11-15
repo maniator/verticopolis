@@ -49,3 +49,14 @@ export function folderIcon(): SVGTemplateResult {
     <path d="M2 6h12" stroke="#fff4a0" />
   </svg>`;
 }
+
+/** The warning sign of a message box that asks before a step that can't be
+ *  taken back: a yellow triangle with a black "!", on a 32-pixel grid. */
+export function warningIcon(): SVGTemplateResult {
+  return svg`<svg class="fd-ask-icon" viewBox="0 0 32 32" width="32" height="32" aria-hidden="true" shape-rendering="crispEdges">
+    <path d="M16 2.5 30.5 29.5h-29z" fill="#ffd400" stroke=${INK} stroke-linejoin="miter" />
+    <path d="M3.5 28.5h26" stroke=${SHADE} />
+    <rect x="14" y="10" width="4" height="11" fill=${INK} />
+    <rect x="14" y="23" width="4" height="4" fill=${INK} />
+  </svg>`;
+}

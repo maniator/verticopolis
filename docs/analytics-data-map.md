@@ -134,6 +134,7 @@ player's own text and is never sent, and neither is a tower's contents.
 | `action` | `detail` | When |
 | --- | --- | --- |
 | `files_open` | `open`, `open_key`, `open_title` or `save_as` | The Open or Save As window opened. Open says where the player asked: `open` for File > Open… in the menu, `open_key` for its Ctrl+O key, and `open_title` for the title screen's Open Tower… button (called Load Tower up to 4.2). `save_as` is File > Save As… |
+| `files_waited` | `open` or `save_as` | That window opened while My Towers was still getting ready (its first open on the device, or the old slots still copying in); it said "Opening My Towers…" and filled in once ready. Before 4.3 shipped, File > Open… showed the device's file picker at that moment |
 | `file_open` | `tower`, `tdt` or `auto` | A row opened: a tower file, a 1994 `.TDT` file, or the Auto-save |
 | `file_save` | `new`, `replace` or `current` | The tower written into My Towers: under a new name, over a file the player agreed to replace, or into the live tower's own file by File > Save |
 | `file_add` | `picked` or `drop` | A file added to My Towers: `picked` once a file opened from the device has loaded, `drop` for a file dropped onto the Open or Save As window |
@@ -141,6 +142,7 @@ player's own text and is never sent, and neither is a tower's contents.
 | `file_rename` | none | A file renamed |
 | `file_copy` | none | A file duplicated (Duplicate, or Copy then Paste) |
 | `file_delete` | none | A file deleted |
+| `file_ask` | `replace` or `delete` | The window asked in its message box before replacing or deleting a file. A Yes goes on to `file_save` `replace` or `file_delete`, so the asks a player declined are the asks less those |
 | `file_failed` | `full` or `error` | A write to My Towers refused: the device is out of room, or another error |
 | `files_copied` | a count | Once per device: the old save slots copied into My Towers, and how many |
 

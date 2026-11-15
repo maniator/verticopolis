@@ -330,6 +330,8 @@ export type AppActionName =
   | "file_delete"
   | "file_failed"
   | "files_copied"
+  | "files_waited"
+  | "file_ask"
   | "export_save"
   | "import_save"
   | "export_tdt"

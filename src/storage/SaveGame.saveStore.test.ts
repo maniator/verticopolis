@@ -7,6 +7,7 @@ import { closeSaveStoreForTests, saveStore } from "./saveStore";
 import { inflateCapped, STORE_MAGIC, toBase64 } from "./saveCompression";
 import { resetSavePackerForTests } from "./savePacker";
 import { stampText } from "./saveStamp";
+import { toTowerFile } from "./towerFileCodec";
 
 /**
  * SaveGame through the save store, on a real tower: every read and write the
@@ -82,6 +83,17 @@ describe("SaveGame on the save store", () => {
     expect({ auto: autosaveText(), slot: slotText(1), slots: SaveGame.listSlots() }).toEqual(before);
     expect(fake.row("verticopolis", "saves", AUTO_KEY)).toHaveProperty("packed");
     expect(fake.row("verticopolis", "saves", SLOT_1)).toHaveProperty("packed");
+  });
+
+  it("lists the Auto-save's size as its stored value's length, the size of its .vctower within the header", async () => {
+    await openSaves(fake.asFactory());
+    SaveGame.save(renamed("Sized"));
+    const stored = saveStore.get(AUTO_KEY)!;
+    const auto = SaveGame.listSlots().find((s) => s.slot === "auto")!;
+    expect(auto.size).toBe(stored.length);
+    const file = toTowerFile(stored);
+    expect(file.ok && Math.abs(file.text.length - stored.length)).toBeLessThanOrEqual(5);
+    expect(SaveGame.listSlots().find((s) => s.slot === 1)?.size, "an empty slot has no size").toBeUndefined();
   });
 
   it("an autosave comes back from the database byte for byte after a reload, over a stale localStorage copy", async () => {

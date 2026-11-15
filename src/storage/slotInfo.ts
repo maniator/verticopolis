@@ -20,6 +20,10 @@ export interface SlotInfo {
    * {@link SaveGame.hasSlot}.
    */
   present: boolean;
+  /** Bytes the save that loads takes in storage (its stored value's length:
+   *  a compressed value is base64 and shares its payload with the `.vctower`
+   *  file), for the Open window's Size column. Absent for no readable save. */
+  size?: number;
   towerName?: string;
   star?: number;
   population?: number;

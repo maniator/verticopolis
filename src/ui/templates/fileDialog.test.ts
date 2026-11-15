@@ -15,6 +15,7 @@ const view = (over: Partial<FileDialogView> = {}): FileDialogView => ({
   filter: "all",
   sort: { key: "modified", down: true },
   usage: { count: 2, bytes: 2348 },
+  loading: false,
   line: null,
   ask: null,
   renaming: null,

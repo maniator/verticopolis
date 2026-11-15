@@ -511,11 +511,11 @@ function buildInsights(ids) {
     {
       name: "My Towers (Open, Save As, files)",
       description:
-        "The My Towers folder from 4.3, by action, production: windows opened (files_open), files opened by kind (file_open), saved (file_save: new, replace, or current from File > Save), added (file_add: picked once it opened, or dropped on a window), files dropped on the game (file_dropped), renamed, duplicated, deleted, writes refused (file_failed: full or error), and the one-time copy of the old save slots (files_copied). Codes only, never a file's name. See docs/analytics-data-map.md, My Towers.",
+        "The My Towers folder from 4.3, by action, production: windows opened (files_open), files opened by kind (file_open), saved (file_save: new, replace, or current from File > Save), added (file_add: picked once it opened, or dropped on a window), files dropped on the game (file_dropped), renamed, duplicated, deleted, writes refused (file_failed: full or error), the one-time copy of the old save slots (files_copied), windows that opened while My Towers was still getting ready (files_waited), and the questions before a replace or delete (file_ask: replace or delete). Codes only, never a file's name. See docs/analytics-data-map.md, My Towers.",
       query: trends([series("app_action", "Actions")], {
         breakdown: "action",
         display: "ActionsBar",
-        where: [inAction(["files_open", "file_open", "file_save", "file_add", "file_dropped", "file_rename", "file_copy", "file_delete", "file_failed", "files_copied"])],
+        where: [inAction(["files_open", "files_waited", "file_open", "file_save", "file_ask", "file_add", "file_dropped", "file_rename", "file_copy", "file_delete", "file_failed", "files_copied"])],
       }),
     },
     {

@@ -41,16 +41,35 @@ import { exportFile } from "./portLifecycle";
 let live: GameApp | null = null;
 /** Settles once the folder has opened (or refused) and the slots are in. */
 let ready: Promise<void> = Promise.resolve();
+/** False while {@link ready} has not settled. */
+let settled = true;
 
 /** Open the folder and copy the save slots in once. Never rejects. */
 export function openFileSpace(app: GameApp): Promise<void> {
   live = app;
+  settled = false;
   ready = (async () => {
-    if (!(await fileSpace.open())) return;
-    const copied = await copySlotsOnce();
-    if (copied > 0) trackAppAction("files_copied", String(copied));
+    try {
+      if (!(await fileSpace.open())) return;
+      const copied = await copySlotsOnce();
+      if (copied > 0) trackAppAction("files_copied", String(copied));
+    } finally {
+      settled = true;
+    }
   })();
   return ready;
+}
+
+/**
+ * Whether File > Open… and Save As… show their window: once the folder is
+ * open, and also while it is still opening or the slots are still being
+ * copied in. The first open on a device can take a moment on a phone, and a
+ * window shown then fills in when the folder is ready; falling back to the
+ * device's picker then hid every tower (#2319 on staging). Only a folder that
+ * refused (a private window) sends the player to the picker.
+ */
+function folderUsable(): boolean {
+  return fileSpace.isOpen() || fileSpace.isOpening() || !settled;
 }
 
 /** The My Towers file the live tower is, if any. */
@@ -92,12 +111,15 @@ export async function openFile(app: GameApp, id: string): Promise<void> {
   if (f) await openRow(app, { id: f.id, name: f.name, type: f.kind, size: f.size, modified: f.modified });
 }
 
-/** The Auto-save's row, when there is a readable one. */
+/** The Auto-save's row, whenever one is stored. One that did not read now
+ *  (the population check can fail on a phone short of memory) still shows,
+ *  under its plain name; opening it says why if it won't load. */
 function autoRow(): FileRow | null {
   try {
     const auto = SaveGame.listSlots().find((s) => s.slot === "auto");
-    if (!auto?.exists) return null;
-    return { id: "auto", name: `Auto-save (${auto.towerName || "Tower"})`, type: "auto", modified: auto.savedAt };
+    if (!auto?.exists && !auto?.present) return null;
+    const name = auto.exists ? `Auto-save (${auto.towerName || "Tower"})` : "Auto-save";
+    return { id: "auto", name, type: "auto", size: auto.size, modified: auto.savedAt };
   } catch {
     return null;
   }
@@ -141,7 +163,18 @@ function folderCommands() {
   return {
     files: () => fileSpace.list(),
     usage: () => fileSpace.usage(),
-    onChange: (listener: () => void) => fileSpace.onChange(listener),
+    loading: () => !settled,
+    onChange: (listener: () => void) => {
+      const off = fileSpace.onChange(listener);
+      // Draw once more when the folder and the slot copy settle, whether or
+      // not they changed the list.
+      let on = true;
+      if (!settled) void ready.then(() => on && listener());
+      return () => {
+        on = false;
+        off();
+      };
+    },
     rename: async (id: string, name: string) => {
       try {
         await fileSpace.rename(id, name);
@@ -171,6 +204,7 @@ function folderCommands() {
       }
     },
     add: addDropped,
+    asked: (kind: "replace" | "delete") => trackAppAction("file_ask", kind),
   };
 }
 
@@ -212,11 +246,12 @@ export const OPEN_DETAIL: Readonly<Record<OpenFrom, string>> = {
  *  closed (a private window that refuses storage). `from` says where the
  *  player asked for it, for the analytics. */
 export function showOpenDialog(app: GameApp, from: OpenFrom): void {
-  if (!fileSpace.isOpen()) {
+  if (!folderUsable()) {
     openImport(app.ui);
     return;
   }
   trackAppAction("files_open", OPEN_DETAIL[from]);
+  if (!settled) trackAppAction("files_waited", "open");
   showFileDialog(app.ui, {
     mode: "open",
     initialName: "",
@@ -253,11 +288,12 @@ export async function saveFile(app: GameApp, name: string): Promise<string> {
 /** File > Save As…: the Save As window, or the download while My Towers is
  *  closed. */
 export function showSaveAsDialog(app: GameApp): void {
-  if (!fileSpace.isOpen()) {
+  if (!folderUsable()) {
     app.ui.promptExport();
     return;
   }
   trackAppAction("files_open", "save_as");
+  if (!settled) trackAppAction("files_waited", "save_as");
   showFileDialog(app.ui, {
     mode: "saveAs",
     initialName: currentFile()?.name ?? cleanFileName(app.enginePort.towerName() ?? ""),

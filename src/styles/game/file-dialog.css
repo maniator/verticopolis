@@ -144,8 +144,7 @@
 .fd-line-bad {
   color: var(--bad-ink);
 }
-.fd-tools,
-.fd-ask {
+.fd-tools {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
@@ -157,8 +156,47 @@
 .fd-on-phone {
   display: none;
 }
-.fd-ask > span {
-  flex: 1 1 14em;
+/* A question (Replace, Delete) as a 1995 message box: centered over the
+   window on a layer that takes every click until it is answered. */
+.fd-ask-layer {
+  position: absolute;
+  inset: -4px;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  background: rgb(0 0 0 / 0.3);
+}
+.fd-ask {
+  width: min(340px, 100%);
+}
+.fd-ask.win > .win-title {
+  margin: 2px 2px 0;
+  padding: 2px 6px;
+  font-size: 11px;
+}
+.fd-ask-body {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 14px 14px 6px;
+}
+.fd-ask-icon {
+  flex: none;
+}
+.modal-box .fd-ask-body p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.fd-ask-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 14px 12px;
+}
+.fd-ask-buttons .btn {
+  min-width: 6.5em;
 }
 
 /* The right-click menu, placed at the pointer inside the window. */

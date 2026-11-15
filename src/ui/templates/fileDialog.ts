@@ -2,7 +2,7 @@ import { html, nothing, type TemplateResult } from "lit-html";
 import { classMap } from "lit-html/directives/class-map.js";
 import { live } from "lit-html/directives/live.js";
 import { FILE_NAME_MAX } from "../../storage/fileSpace";
-import { fileIcon, folderIcon } from "../fileIcons";
+import { fileIcon, folderIcon, warningIcon } from "../fileIcons";
 
 /**
  * The Open and Save As windows over My Towers (owner, 2026-11-15, layout A):
@@ -27,7 +27,7 @@ export interface FileRow {
   readonly modified?: number;
 }
 
-/** A question the window asks in place, over its buttons. */
+/** A question the window asks in a message box on top of itself. */
 export interface FileAsk {
   readonly kind: "replace" | "delete";
   readonly name: string;
@@ -42,6 +42,8 @@ export interface FileDialogView {
   readonly filter: FileFilter;
   readonly sort: { readonly key: FileSortKey; readonly down: boolean };
   readonly usage: { readonly count: number; readonly bytes: number };
+  /** My Towers is still opening, or the old save slots are still coming in. */
+  readonly loading: boolean;
   readonly line: { readonly text: string; readonly kind: "bad" | "info" } | null;
   readonly ask: FileAsk | null;
   readonly renaming: string | null;
@@ -124,7 +126,7 @@ export function fileDialogTemplate(v: FileDialogView, h: FileDialogHandlers): Te
       <div class="fd-where">
         <span class="fd-where-label">${opening ? "Look in:" : "Save in:"}</span>
         <span class="fd-folder field">${folderIcon()}My Towers</span>
-        <span class="fd-usage">${usageText(v.usage)}</span>
+        <span class="fd-usage">${v.loading ? "Opening My Towers…" : usageText(v.usage)}</span>
       </div>
       <div class="fd-list well" @click=${h.closeMenu}>
         <div class="fd-head" role="presentation">
@@ -151,7 +153,7 @@ export function fileDialogTemplate(v: FileDialogView, h: FileDialogHandlers): Te
               h.primary();
             }
           }} />
-        <button type="button" class="btn primary fd-primary" ?disabled=${v.busy} @click=${h.primary}>${opening ? "Open" : "Save"}</button>
+        <button type="button" class="btn primary fd-primary" ?disabled=${v.busy || v.loading} @click=${h.primary}>${opening ? "Open" : "Save"}</button>
         <label class="fd-label" for="fd-type">${opening ? "Files of type:" : "Save as type:"}</label>
         ${opening
           ? html`<select id="fd-type" class="field fd-type" .value=${v.filter}
@@ -162,7 +164,8 @@ export function fileDialogTemplate(v: FileDialogView, h: FileDialogHandlers): Te
         <button type="button" class="btn fd-cancel" @click=${h.cancel}>Cancel</button>
       </div>
       ${v.line ? html`<p class=${`fd-line fd-line-${v.line.kind}`} role="alert">${v.line.text}</p>` : nothing}
-      ${v.ask ? askBar(v.ask, h) : tools(opening, fileSelected, v, h)}
+      ${tools(opening, fileSelected, v, h)}
+      ${v.ask ? askBox(v.ask, h) : nothing}
     </div>`;
 }
 
@@ -182,6 +185,7 @@ function sortMark(v: FileDialogView, key: FileSortKey): string {
 }
 
 function emptyText(v: FileDialogView): string {
+  if (v.loading) return "Opening My Towers…";
   if (v.filter !== "all") return "No towers of this type.";
   return v.mode === "open" ? "No towers yet. Add one from a file, or drop it here." : "No towers yet.";
 }
@@ -232,12 +236,29 @@ function tools(opening: boolean, fileSelected: boolean, v: FileDialogView, h: Fi
   </div>`;
 }
 
-function askBar(ask: FileAsk, h: FileDialogHandlers): TemplateResult {
+/**
+ * The question as a 1995 message box: a small window with its own title bar,
+ * a warning sign, the question and Yes and No, centered over the window on a
+ * layer that blocks everything under it until it is answered (owner,
+ * 2026-11-15: a strip along the bottom was easy to miss).
+ */
+function askBox(ask: FileAsk, h: FileDialogHandlers): TemplateResult {
   const replacing = ask.kind === "replace";
-  return html`<div class="fd-ask" role="alertdialog" aria-label=${replacing ? "Replace tower" : "Delete tower"}>
-    <span>${replacing ? `"${ask.name}" already exists. Replace it?` : `Delete "${ask.name}"? This can't be undone.`}</span>
-    <button type="button" class="btn primary" data-fd-ask="yes" @click=${() => h.answer(true)}>${replacing ? "Replace" : "Delete"}</button>
-    <button type="button" class="btn" @click=${() => h.answer(false)}>Cancel</button>
+  const [title, line1, line2] = replacing
+    ? ["Save As", `"${ask.name}" already exists.`, "Do you want to replace it?"]
+    : ["Confirm File Delete", `Are you sure you want to delete "${ask.name}"?`, "It can't be undone."];
+  return html`<div class="fd-ask-layer" @click=${(e: Event) => e.stopPropagation()}>
+    <div class="win fd-ask" role="alertdialog" aria-modal="true" aria-labelledby="fd-ask-title" aria-describedby="fd-ask-text">
+      <div class="win-title" id="fd-ask-title">${title}</div>
+      <div class="fd-ask-body">
+        ${warningIcon()}
+        <p id="fd-ask-text">${line1}<br />${line2}</p>
+      </div>
+      <div class="fd-ask-buttons">
+        <button type="button" class="btn" data-fd-ask="yes" @click=${() => h.answer(true)}>Yes</button>
+        <button type="button" class="btn" data-fd-ask="no" @click=${() => h.answer(false)}>No</button>
+      </div>
+    </div>
   </div>`;
 }
 

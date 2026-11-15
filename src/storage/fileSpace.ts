@@ -227,6 +227,8 @@ async function connect(factory: IDBFactory): Promise<boolean> {
     const channel = typeof BroadcastChannel === "undefined" ? null : new BroadcastChannel(CHANNEL);
     const o: Open = { db, entries: await loadIndex(db), channel, pending: Promise.resolve() };
     open = o;
+    // A window shown while the folder was still opening fills in now.
+    changed();
     if (channel)
       channel.onmessage = () => {
         void loadIndex(db).then((entries) => {
@@ -245,7 +247,6 @@ async function connect(factory: IDBFactory): Promise<boolean> {
     };
     return true;
   } catch {
-    opening = null;
     return false;
   }
 }
@@ -255,13 +256,25 @@ export const fileSpace = {
    *  private windows), and the folder stays closed. Never rejects. */
   open(factory?: IDBFactory): Promise<boolean> {
     if (open) return Promise.resolve(true);
+    if (opening) return opening;
     const f = factory ?? (typeof indexedDB === "undefined" ? undefined : indexedDB);
     if (!f) return Promise.resolve(false);
-    opening ??= connect(f);
-    return opening;
+    // A refusal (even one the factory throws at once) clears `opening` after
+    // it is set, so the folder never looks as if it is still opening.
+    const attempt: Promise<boolean> = connect(f).then((ok) => {
+      if (!ok && opening === attempt) opening = null;
+      return ok;
+    });
+    opening = attempt;
+    return attempt;
   },
   isOpen(): boolean {
     return open !== null;
+  },
+  /** Whether the folder is still opening (the first open on a device can
+   *  take a moment on a phone). */
+  isOpening(): boolean {
+    return open === null && opening !== null;
   },
   /** Every file, newest first; empty while the folder is closed. */
   list(): TowerFileEntry[] {
