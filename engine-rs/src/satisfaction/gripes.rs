@@ -1,11 +1,19 @@
 //! Why a tenant is unhappy: the nightclub noise and the dominant gripe.
 
+use super::shortfall::{HOME_PARKING_CAUSE, PARKING_CAUSE, TRASH_CAUSE};
 use super::{noise_base_erosion_for, StepResult};
 use crate::econ::{rent_config, rent_of};
 use crate::facilities::Kind;
 use crate::rules::{Drain, NIGHTCLUB_NOISE_FLOORS};
 use crate::sim::Simulation;
 use crate::tower::Unit;
+
+/// Whether a nightclub's noise halo reaches a tenant of `kind`: homes and
+/// guest rooms, the kinds whose rating the halo drains (`dominant_gripe`
+/// names it for them, and the gripe card says so).
+pub(crate) fn feels_nightclub_halo(kind: Kind) -> bool {
+    matches!(kind, Kind::Condo | Kind::RentalApartment) || kind.is_hotel()
+}
 
 #[doc(hidden)]
 impl Simulation {
@@ -150,5 +158,44 @@ impl Simulation {
 
     pub fn vacate_cause(&self, u: &Unit, r: &StepResult) -> &'static str {
         self.dominant_gripe(u, r).unwrap_or("access")
+    }
+
+    /// The cause a tenant leaving at the end of its notice is named for: the
+    /// cause it gave notice for while that still holds, or else whatever
+    /// wears it down now (#550). A player who fixed the rent while the floor
+    /// stayed too far from a lobby sees the tenant leave for the lobby, not
+    /// for the rent. With nothing wrong now, the stamped cause stays: the
+    /// tenant is leaving because the rating has not climbed back yet.
+    pub(crate) fn departure_cause(
+        &self,
+        u: &Unit,
+        r: &StepResult,
+        stamped: &'static str,
+    ) -> &'static str {
+        if self.stamped_cause_holds(u, r, stamped) {
+            stamped
+        } else {
+            self.dominant_gripe(u, r).unwrap_or(stamped)
+        }
+    }
+
+    /// Whether the cause a notice was stamped with still wears the tenant
+    /// down. A cause this pass does not know (a relocation, or a name a
+    /// later build added) counts as holding, so it is never replaced.
+    fn stamped_cause_holds(&self, u: &Unit, r: &StepResult, stamped: &'static str) -> bool {
+        match stamped {
+            "access" | "noTransport" => !r.served,
+            "congestion" => u.floor != 1 && r.cong > 1.0,
+            "rent" => rent_config(u.kind)
+                .is_some_and(|cfg| cfg.over_neutral(rent_of(u.kind, u.rent, u.no_rate))),
+            "transportFar" => u.floor != 1 && r.far_walk,
+            "lobbyFar" => r.lobby_far,
+            "noise" => r.noisy || (feels_nightclub_halo(u.kind) && self.near_nightclub(u.floor)),
+            "unmetDemand" => r.unmet_demand,
+            TRASH_CAUSE | PARKING_CAUSE | HOME_PARKING_CAUSE => {
+                r.service_short.is_some_and(|s| s.cause == stamped)
+            }
+            _ => true,
+        }
     }
 }

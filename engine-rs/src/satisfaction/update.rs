@@ -69,7 +69,8 @@ impl Simulation {
                         w.satisfaction = w.satisfaction.max(NOISE_CAP);
                     }
                 } else if self.clock.minutes >= u.extras().vacate_at.unwrap_or(0.0) {
-                    let reason = u.extras().vacate_reason.unwrap_or("access");
+                    let stamped = u.extras().vacate_reason.unwrap_or("access");
+                    let reason = self.departure_cause(&u, &r, stamped);
                     self.vacate(i, reason);
                 }
             } else if lease_tenant && u.satisfaction <= 0.0 {

@@ -16,8 +16,8 @@ use crate::satisfaction::shortfall::{
     ServiceShort, ServiceShortfalls, HOME_PARKING_CAUSE, PARKING_CAUSE, TRASH_CAUSE,
 };
 use crate::satisfaction::{
-    fresh_tenant_need, names_gripe, StepResult, GRIPE_WARN, SERVED_RECOVERY, TRANSPORT_FAR_TILES,
-    VACATE_RESCIND,
+    feels_nightclub_halo, fresh_tenant_need, names_gripe, StepResult, GRIPE_WARN, SERVED_RECOVERY,
+    TRANSPORT_FAR_TILES, VACATE_RESCIND,
 };
 use crate::sim::Simulation;
 use crate::tower::{Tower, Unit, UnitState};
@@ -71,8 +71,9 @@ pub struct GripeFacts {
     /// Unmet demand: the retail coverage the cause was judged on.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub coverage: Option<f64>,
-    /// Unmet demand at coverage 0: whether the unit's own floor is
-    /// reachable (when it is not, the access line already says so).
+    /// Unmet demand at coverage 0: whether the unit's own stretch of its
+    /// floor is reachable (when it is not, the access line already says so).
+    /// A floor split by a gap is read at the unit, as routing reads it (#663).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub floor_reachable: Option<bool>,
 }
@@ -395,14 +396,12 @@ impl Simulation {
             }
             "noise" => {
                 g.adjacent = Some(self.noise_afflicted(u));
-                let halo =
-                    matches!(u.kind, Kind::Condo | Kind::RentalApartment) || u.kind.is_hotel();
-                g.club = Some(halo && self.near_nightclub(u.floor));
+                g.club = Some(feels_nightclub_halo(u.kind) && self.near_nightclub(u.floor));
             }
             "unmetDemand" => {
                 g.coverage = cov;
                 if cov == Some(0.0) {
-                    g.floor_reachable = Some(self.floor_reachable(u.floor));
+                    g.floor_reachable = Some(self.position_reachable(u.floor, u.x));
                 }
             }
             TRASH_CAUSE | PARKING_CAUSE | HOME_PARKING_CAUSE => {
