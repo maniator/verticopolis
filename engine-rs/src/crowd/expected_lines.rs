@@ -17,6 +17,7 @@ pub fn join_line(crowd: &mut Crowd, r: &Route) {
                 .waiting
                 .get_or_insert_with((shaft, floor), Line::default)
                 .riders += 1;
+            router.step_costs.joined(shaft, floor);
         }
     }
 }

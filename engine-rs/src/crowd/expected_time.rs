@@ -87,6 +87,8 @@ struct Link {
     /// The cost apart from any line, in tenths of a second.
     tenths: i64,
     how: Move,
+    /// The number of the line it boards at (`NO_LINE` if none).
+    line: u32,
 }
 
 /// One elevator shaft's numbers for its wait.
@@ -139,6 +141,7 @@ pub struct Router {
     /// The cars in service this step of each shaft the schedule stood cars
     /// down on; a shaft not listed has all its cars running.
     running: FastMap<i64, f64>,
+    step_costs: StepCosts,
 }
 
 fn tenths(seconds: f64) -> i64 {
@@ -150,6 +153,7 @@ fn link(to: u32, seconds: f64, how: Move) -> Link {
         to,
         tenths: tenths(seconds),
         how,
+        line: NO_LINE,
     }
 }
 
@@ -256,6 +260,7 @@ fn build(tower: &Tower) -> Router {
     }
     let n = g.nodes.len();
     let into = Inbound::of(&g.nodes, &g.links, &shafts);
+    let step_costs = number_lines(&mut g.links);
     Router {
         revision: tower.revision,
         nodes: g.nodes,
@@ -274,6 +279,7 @@ fn build(tower: &Tower) -> Router {
         waiting: FastMap::default(),
         spare: FastMap::default(),
         running: FastMap::default(),
+        step_costs,
     }
 }
 
@@ -320,6 +326,7 @@ fn fresh<'a>(crowd: &'a mut Crowd, tower: &Tower) -> &'a mut Router {
 /// still counts one, as the fewest-rides search would still send riders to
 /// it.
 fn stand_down(router: &mut Router, closed: &[(i64, i64)]) {
+    router.step_costs.all_changed();
     router.running.clear();
     let mut at = 0;
     while at < closed.len() {
@@ -367,11 +374,15 @@ fn cheapest(router: &mut Router, from: i64, to: i64) -> Option<Route> {
     }
     let start = *router.place.get(&Node::Segment(from))?;
     let goal = *router.place.get(&Node::Segment(to))?;
+    if let Some(kept) = router.step_costs.route(start, goal) {
+        return kept.clone();
+    }
     let found = search(router, start, goal);
     let route = found.then(|| walk_back(router, start, goal));
     for p in router.touched.drain(..) {
         router.best[p as usize] = i64::MAX;
     }
+    router.step_costs.keep_route(start, goal, &route);
     route
 }
 
@@ -404,7 +415,7 @@ fn search(router: &mut Router, start: u32, goal: u32) -> bool {
         }
         for i in 0..router.links[at as usize].len() {
             let l = router.links[at as usize][i];
-            let next = cost + cost_of(router, &l);
+            let next = cost + line_cost(router, &l);
             let Some(ahead) = bound.ahead(l.to, radius) else {
                 continue;
             };
@@ -471,7 +482,10 @@ pub use lines::{join_line, keep_lines, spare_lines};
 
 #[path = "expected_bound.rs"]
 mod bound;
+#[path = "expected_costs.rs"]
+mod costs;
 use bound::{bound_toward, carry_bounds, keep_bound, BoundScratch, Inbound, Toward, UNREACHABLE};
+use costs::{line_cost, number_lines, StepCosts, NO_LINE};
 
 #[cfg(test)]
 #[path = "expected_time_tests.rs"]
