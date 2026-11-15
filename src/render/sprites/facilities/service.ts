@@ -65,12 +65,12 @@ export function drawSecurity(d: DrawCtx, u: Pick<UnitView, "kind" | "floor" | "x
       Fu(mx + 1, my + 1, monW - 2, 1, "#2A4A3A");
     }
   }
-  // The key rack and the red alarm light hang on the wall. They sit clear of
-  // the console, the guard and the badge, so drawing them first changes no
-  // pixel and keeps them on the shell.
-  const rackX = 70;
-  F(rackX, 8, 8, 5, "#5A4A36");
-  for (let k = 0; k < 4; k++) Fu(rackX + 1 + k * 2, 13, 1, 2, "#D8B05A"); // key rack pins, one object repeated
+  // The red alarm light hangs on the wall with the key rack below it, clear of
+  // the light's glow. Both sit clear of the console, the guard and the badge,
+  // so drawing them first changes no pixel and keeps them on the shell.
+  const rackX = 70, rackY = 14;
+  F(rackX, rackY, 8, 5, "#5A4A36");
+  for (let k = 0; k < 4; k++) Fu(rackX + 1 + k * 2, rackY + 5, 1, 2, "#D8B05A"); // key rack pins, one object repeated
   F(W - 8, 7, 4, 4, "#E85D5D");
   glow(F, W - 6, 9, "#FF6B6B");
   layerBreak(ctx); // the shell ends; the console, guard and badge follow
@@ -100,9 +100,11 @@ export function drawMedical(d: DrawCtx, u: Pick<UnitView, "kind" | "floor" | "x"
   const lamp = roomGlow(d.lit);
   wallp(F, 0, 0, W, fy, "#EDE9E2", true);
   floorb(F, 0, fy, W, 6, "#CFD6D2");
-  for (let lx = 22; lx < W; lx += 40) {
-    F(lx, 2, 9, 2, lamp);
-    glow(F, lx + 4, 5, lamp);
+  // Four ceiling lamps on a 40px pitch, 15px in from both walls. Each lamp is
+  // as wide as the glow's widest ring, so the glow sits centered on it.
+  for (let lx = 15; lx < W; lx += 40) {
+    Fu(lx, 2, 10, 2, lamp);
+    glow(Fu, lx + 5, 5, lamp);
   }
   // Red cross sign. Both bars are centered on the panel and all four arms
   // reach 3px past the crossing, so the cross sits straight and even.
@@ -116,19 +118,20 @@ export function drawMedical(d: DrawCtx, u: Pick<UnitView, "kind" | "floor" | "x"
   F(25, fy - 9, bedW, 1, "#F0F4F8");
   F(27, fy - 12, 6, 3, SKIN[0]);
   F(27, fy - 13, 6, 1, "#3A2E28");
-  F(32, fy - 10, 15, 3, "#BFD0DE");
+  F(33, fy - 10, 14, 3, "#BFD0DE"); // the blanket starts past the head
   F(24, 10, 1, fy - 16, "#B8BCC0");
   F(24, 10, 25, 1, "#B8BCC0");
   F(49, 12, 4, fy - 18, "#9FC0C8", 0.6);
-  // Heart monitor with a green trace.
-  box(F, 58, fy - 16, 13, 10, "#20242C");
-  F(60, fy - 14, 9, 6, "#0E241A");
-  F(60, fy - 11, 2, 1, "#6bd47a");
-  F(62, fy - 12, 1, 3, "#6bd47a");
-  F(63, fy - 10, 2, 1, "#6bd47a");
-  F(65, fy - 13, 1, 5, "#6bd47a");
-  F(66, fy - 11, 3, 1, "#6bd47a");
-  glow(F, 65, fy - 11, "#3ADF6A");
+  // Heart monitor with a green trace, 1px clear of the IV bag.
+  const monX = 59;
+  box(F, monX, fy - 16, 13, 10, "#20242C");
+  F(monX + 2, fy - 14, 9, 6, "#0E241A");
+  F(monX + 2, fy - 11, 2, 1, "#6bd47a");
+  F(monX + 4, fy - 12, 1, 3, "#6bd47a");
+  F(monX + 5, fy - 10, 2, 1, "#6bd47a");
+  F(monX + 7, fy - 13, 1, 5, "#6bd47a");
+  F(monX + 8, fy - 11, 3, 1, "#6bd47a");
+  glow(F, monX + 7, fy - 11, "#3ADF6A");
   // IV stand.
   F(55, fy - 16, 1, 16, "#B8BCC0");
   F(53, fy - 18, 5, 3, "#CFE0FF", 0.8);
@@ -156,9 +159,10 @@ export function drawMedical(d: DrawCtx, u: Pick<UnitView, "kind" | "floor" | "x"
   F(125, fy - 3, 2, 2, "#1A1D24");
   // Second exam bed.
   box(F, 131, fy - 9, bedW, 9, "#DCE2E8");
+  F(131, fy - 9, bedW, 1, "#F0F4F8");
   F(133, fy - 12, 6, 3, SKIN[1]);
   F(133, fy - 13, 6, 1, "#3A2E28");
-  F(138, fy - 10, 15, 3, "#BFD0DE");
+  F(139, fy - 10, 14, 3, "#BFD0DE");
 }
 
 // ---- Housekeeping -----------------------------------------------------------
@@ -182,13 +186,14 @@ export function drawHousekeeping(d: DrawCtx, u: Pick<UnitView, "kind" | "floor" 
     F(shelfX + 2, 9 + r * 8, shelfW - 4, 1, "#7A664C");
     for (let k = 0; k < 4; k++) Fu(shelfX + 2 + k * 6, 10 + r * 8, 5, 5, linens[(k + r) % 4]);
   }
-  // Teal supply cart with towels and spray bottles, plus its wheels.
-  const cartX = 40, cartW = 18;
+  // Teal supply cart with towels and spray bottles, plus its wheels. The
+  // towels and bottles each keep a 1px gap, so no item hides another.
+  const cartX = 41, cartW = 18;
   box(F, cartX, fy - 10, cartW, 8, "#3E8E8E");
-  for (let k = 0; k < 2; k++) F(cartX + 2 + k * 6, fy - 14, 5, 4, k ? "#CFE0FF" : "#F4F0EC");
-  for (let k = 0; k < 2; k++) F(cartX + 12 + k * 3, fy - 13, 2, 3, k ? "#5db4e8" : "#E85D5D");
-  F(cartX, fy - 2, 2, 2, "#1A1D24");
-  F(cartX + cartW - 2, fy - 2, 2, 2, "#1A1D24");
+  for (let k = 0; k < 2; k++) Fu(cartX + 2 + k * 5, fy - 14, 4, 4, k ? "#CFE0FF" : "#F4F0EC");
+  for (let k = 0; k < 2; k++) Fu(cartX + 12 + k * 3, fy - 13, 2, 3, k ? "#5db4e8" : "#E85D5D");
+  Fu(cartX, fy - 2, 2, 2, "#1A1D24");
+  Fu(cartX + cartW - 2, fy - 2, 2, 2, "#1A1D24");
   // Mop and bucket. The towel rack drawn next covers the bucket and the lower
   // handle; the mop head and the top of the handle (rows 23 to 27) show above
   // it. Kept as authored: moving them would change approved art.
@@ -200,10 +205,11 @@ export function drawHousekeeping(d: DrawCtx, u: Pick<UnitView, "kind" | "floor" 
   // 2px inside each end, the carcass bevel included.
   const rackX = W - 20, rackW = 14;
   box(F, rackX, fy - 9, rackW, 9, "#B8A47E");
-  for (let k = 0; k < 4; k++) F(rackX + 2 + k * 3, fy - 9, 1, 9, "#9A8460");
+  for (let k = 0; k < 4; k++) Fu(rackX + 2 + k * 3, fy - 9, 1, 9, "#9A8460");
   F(rackX + 2, fy - 11, 10, 3, "#F4F0EC");
-  // Standing housekeeper by the cart (the teal cart carries the uniform read).
-  personStanding(ctx, sx(35), sy(fy), staffSeed(u) * 3 + 3);
+  // Standing housekeeper by the cart (the teal cart carries the uniform read),
+  // 1px clear of its bevel and wheel.
+  personStanding(ctx, sx(33), sy(fy), staffSeed(u) * 3 + 3);
   layerEnd(ctx); // the ceiling light belongs to the shell but draws last
   ceilingFixture(ctx, x, y, w, d.lit);
 }

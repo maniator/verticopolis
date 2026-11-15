@@ -27,7 +27,7 @@ export function drawParking(d: DrawCtx, u: UnitView, x: number, y: number, w: nu
   const ctx = d.ctx;
   const RW = 4 * TILE;
   const RH = FLOOR;
-  const { F } = refMap(ctx, x, y, w, h, RW, RH);
+  const { F, Fu } = refMap(ctx, x, y, w, h, RW, RH);
   const W = RW;
   const fy = RH - 6;
   // Concrete deck, ceiling beam and pipe, support pillar, painted stall lines.
@@ -52,13 +52,15 @@ export function drawParking(d: DrawCtx, u: UnitView, x: number, y: number, w: nu
     const body = ACCENTS[u.id % ACCENTS.length];
     // The body, roof, wheels, lamp and shadow are placed off `cx`/`cw`, so the
     // two wheels keep equal end margins whatever the body width becomes; the
-    // two windows sit on their own fixed pitch from `cx`.
-    const cx = 13;
+    // two windows sit on their own fixed pitch from `cx`. Centered between the
+    // stall lines (x 9 and W - 4), it leaves 1px clear of each.
+    const cx = 11;
     const cw = 24;
     box(F, cx, fy - 9, cw, 7, body);
     F(cx + 3, fy - 13, cw - 6, 5, shade(body, -24));
-    for (let k = 0; k < 2; k++) F(cx + 5 + k * 8, fy - 12, 6, 3, "#CFE4FF");
-    for (const wo of [1, cw - 5]) F(cx + wo, fy - 3, 4, 3, "#1A1D24");
+    // Repeated objects (windows, wheels) take the uniform fill.
+    for (let k = 0; k < 2; k++) Fu(cx + 5 + k * 8, fy - 12, 6, 3, "#CFE4FF");
+    for (const wo of [1, cw - 5]) Fu(cx + wo, fy - 3, 4, 3, "#1A1D24");
     F(cx + cw - 2, fy - 8, 2, 2, "#FFE27A");
     F(cx + 2, fy + 2, cw - 4, 1, "#000000", 0.25);
   }
@@ -93,7 +95,9 @@ export function drawDeadParkingX(ctx: CanvasRenderingContext2D, x: number, y: nu
 export function drawParkingRamp(ctx: CanvasRenderingContext2D, u: UnitView, x: number, y: number, w: number, h: number): void {
   const RW = 16 * TILE;
   const RH = FLOOR;
-  const { F } = refMap(ctx, x, y, w, h, RW, RH);
+  // Repeated objects (joists, chevrons, hazard stripes, wheels) take the
+  // uniform fill `Fu`, so off the shipped size every copy keeps one size.
+  const { F, Fu } = refMap(ctx, x, y, w, h, RW, RH);
   const W = RW;
   // The ramp reads as a raised driving surface via a shaded slab, a dark void
   // beneath, and a support column, so it is visibly the anchor that spaces
@@ -113,17 +117,15 @@ export function drawParkingRamp(ctx: CanvasRenderingContext2D, u: UnitView, x: n
   F(0, 4, W, 1, "#2E3238");
   const pipeX = 15;
   const pipeW = 131;
-  const joists = 10;
-  // Rounded per joist rather than stepped by a fixed pitch, so the run closes
-  // on the pipe's last pixel. The gaps alternate between 14 and 15 pixels. A
-  // true single pitch is possible (11 joists at 13 also close on the pipe's
-  // end), but that moves approved art, so it waits on the art row
-  // `service-sprite-polish-10x45`.
-  for (let k = 0; k < joists; k++) F(pipeX + Math.round((k * (pipeW - 1)) / (joists - 1)), 5, 1, 2, "#34383E");
+  // Eleven joists on one 13px pitch: the run starts on the pipe's first pixel
+  // and closes on its last (15 + 10 x 13 = 145).
+  const joists = 11;
+  const joistPitch = (pipeW - 1) / (joists - 1);
+  for (let k = 0; k < joists; k++) Fu(pipeX + k * joistPitch, 5, 1, 2, "#34383E");
   F(pipeX, 6, pipeW, 1, "#6C7684");
   F(pipeX, 8, pipeW, 1, "#4A525C");
   for (let k = 0; k < 4; k++) F(36 + k * 29, 4, 1, 2, "#34383E");
-  F(84, 10, 61, 1, "#5B6470");
+  F(84, 10, pipeX + pipeW - 84, 1, "#5B6470"); // the conduit ends where the pipe does
   // Under-ramp void and support column. The column's top follows the slab's
   // near edge, so it meets the slab instead of stopping a pixel under it. At
   // the foot the near edge reaches the floor and the void closes to nothing.
@@ -145,13 +147,15 @@ export function drawParkingRamp(ctx: CanvasRenderingContext2D, u: UnitView, x: n
     F(px, farEdge(px) + 5, 1, 1, "#4C5058");
   }
   // Descending chevrons mark the direction of travel. Their y comes from the
-  // slab itself, so they ride the slope instead of drifting off it.
+  // slab itself, so they ride the slope instead of drifting off it. An 18px
+  // pitch drops the slab almost exactly 4px per chevron (18 x 19 / 85), so
+  // they step down evenly: 4, 4, 4.
   for (let k = 0; k < 4; k++) {
-    const px = 36 + k * 20;
+    const px = 38 + k * 18;
     const py = farEdge(px) + 4;
-    F(px - 3, py - 3, 5, 2, "#D9BE55");
-    F(px - 3, py + 1, 5, 2, "#D9BE55");
-    F(px + 1, py - 1, 2, 2, "#D9BE55");
+    Fu(px - 3, py - 3, 5, 2, "#D9BE55");
+    Fu(px - 3, py + 1, 5, 2, "#D9BE55");
+    Fu(px + 1, py - 1, 2, 2, "#D9BE55");
   }
   // Ramp-mouth portal (cars descend from above).
   F(rampX0 - 9, 12, 9, 12, "#24282E");
@@ -164,21 +168,23 @@ export function drawParkingRamp(ctx: CanvasRenderingContext2D, u: UnitView, x: n
   // Blue P roundel.
   const signX = 127;
   const signW = 11;
-  for (const hx of [signX + 3, signX + signW - 3]) F(hx, 4, 1, 5, "#34383E");
+  // The hangers sit 3px in from each side of the roundel.
+  for (const hx of [signX + 3, signX + signW - 4]) F(hx, 4, 1, 5, "#34383E");
   F(signX, 9, signW, 11, "#2F5DA8");
   F(signX, 9, signW, 1, "#1E3E76");
   F(signX + 3, 11, 2, 7, "#EDEFF2");
   F(signX + 3, 11, 5, 1, "#EDEFF2");
   F(signX + 7, 12, 1, 2, "#EDEFF2");
   F(signX + 3, 14, 5, 1, "#EDEFF2");
-  // Pillars with hazard bands.
+  // Pillars with hazard bands: three dark stripes, so the band alternates
+  // evenly across the pillar's six columns.
   for (const px of [5, 145]) {
     F(px, 8, 6, ground - 8, "#4A4E56");
     F(px, 8, 1, ground - 8, "#5C606A");
     F(px + 5, 8, 1, ground - 8, "#34383E");
     F(px - 1, ground - 2, 8, 2, "#4A4E56");
     F(px, 28, 6, 4, "#D9BE55");
-    for (let k = 0; k < 2; k++) F(px + 1 + k * 2, 28, 1, 4, "#2E3238");
+    for (let k = 0; k < 3; k++) Fu(px + 1 + k * 2, 28, 1, 4, "#2E3238");
   }
   // Foundation, oil, lane arrow, stall divider, and a second-car nose.
   F(0, RH - 3, W, 2, "#3E424A");
@@ -186,7 +192,7 @@ export function drawParkingRamp(ctx: CanvasRenderingContext2D, u: UnitView, x: n
   F(127, ground - 2, 11, 2, "#2C3036");
   F(111, 37, 5, 1, "#9AA0A8");
   F(109, 36, 2, 3, "#9AA0A8");
-  F(144, 34, 1, ground - 34, "#9AA0A8");
+  F(143, 34, 1, ground - 34, "#9AA0A8"); // 1px clear of the pillar and the car
   F(W - 7, 33, 7, 5, "#6E6A62");
   F(W - 5, 36, 4, 4, "#16181C");
   F(W - 4, 36, 2, 1, "#6A6E76");
@@ -198,10 +204,6 @@ export function drawParkingRamp(ctx: CanvasRenderingContext2D, u: UnitView, x: n
   const carX = 122;
   const carW = 20;
   F(carX + 1, ground, carW - 2, 1, "#2C3036");
-  for (const wo of [3, carW - 8]) {
-    F(carX + wo, 36, 5, 4, "#16181C");
-    F(carX + wo + 1, 36, 3, 1, "#6A6E76");
-  }
   F(carX, 33, carW, 5, "#5D7FA6");
   F(carX, 33, carW, 1, "#7E9EC0");
   F(carX, 38, carW, 1, "#3E5876");
@@ -210,7 +212,13 @@ export function drawParkingRamp(ctx: CanvasRenderingContext2D, u: UnitView, x: n
   F(carX + 6, 29, carW - 12, 3, "#AEBFD4");
   // A 2px center post splits the windscreen into two panes of equal width.
   F(carX + carW / 2 - 1, 29, 2, 3, "#5D7FA6");
+  // The wheels go on after the body, so their hubs show, and rest on the deck.
+  for (const wo of [3, carW - 8]) {
+    Fu(carX + wo, 38, 5, 3, "#16181C");
+    Fu(carX + wo + 1, 39, 3, 1, "#6A6E76");
+  }
+  // Head and tail lamps sit on the body's own end columns.
   F(carX, 36, 1, 1, "#E7D9A6");
-  F(carX + carW, 36, 1, 1, "#C98A3A");
+  F(carX + carW - 1, 36, 1, 1, "#C98A3A");
   void u;
 }
