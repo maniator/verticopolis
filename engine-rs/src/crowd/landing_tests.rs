@@ -118,10 +118,11 @@ fn a_rider_joining_a_line_heads_for_the_place_behind_it() {
         lowest >= slot_x(line, 1, 2),
         "the second rider walked past the back of the line: {lowest}"
     );
-    let slots = landing_slots(&sim.crowd, &sim.tower).slots;
-    assert_eq!(slots.get(&id_first).copied().unwrap(), slot_x(line, 0, 2));
+    let slots = landing_slots(&sim.crowd, &sim.tower);
+    let at = |id: i64| sim.crowd.people.iter().position(|p| p.id == id).unwrap();
+    assert_eq!(slots.slot(at(id_first)).unwrap(), slot_x(line, 0, 2));
     assert_eq!(
-        slots.get(&id_second).copied().unwrap(),
+        slots.slot(at(id_second)).unwrap(),
         p.x,
         "the place it walked to is its slot"
     );

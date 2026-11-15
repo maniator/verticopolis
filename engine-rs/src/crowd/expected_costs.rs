@@ -1,15 +1,16 @@
-//! What the Modern router (`expected_time`) has already worked out this
-//! step, kept until the lines it read change: each line's cost at a
-//! boarding, and the routes it found. A search reads a boarding's cost at
-//! every visit, three map lookups each, and the riders who weigh another
-//! way after an hour in one line (`line_count`) ask the same route one
-//! after another while nobody joins a line. What is kept is what the
-//! search would work out again, so the routes are the same (hot-path
-//! HP-8: the record names this as the equivalent).
+//! What a link costs the Modern router (`expected_time`, `cost_of`), and
+//! what the router has already worked out this step, kept until the lines
+//! it read change: each line's cost at a boarding, and the routes it found.
+//! A search reads a boarding's cost at every visit, three map lookups each,
+//! and the riders who weigh another way after an hour in one line
+//! (`line_count`) ask the same route one after another while nobody joins
+//! a line. What is kept is what the search would work out again, so the
+//! routes are the same (hot-path HP-8: the record names this as the
+//! equivalent).
 
 use super::super::fasthash::FastMap;
 use super::super::Route;
-use super::{cost_of, Link, Move, Router};
+use super::{tenths, Link, Move, Router};
 
 /// `Link::line` of a link that boards no car.
 pub(super) const NO_LINE: u32 = u32::MAX;
@@ -86,8 +87,32 @@ impl StepCosts {
     }
 }
 
+/// What `l` costs, the wait and the line at a boarding included: half the
+/// time between cars, plus the line ahead over the seats a round trip of
+/// every car in service brings, or the longest anyone in that line has
+/// already waited when that is longer (a line the cars arrive at full, say
+/// below a shaft that fills on the floors above, moves slower than its
+/// length says).
+pub(super) fn cost_of(router: &Router, l: &Link) -> i64 {
+    let Move::Board { shaft, floor } = l.how else {
+        return l.tenths;
+    };
+    let line = router
+        .waiting
+        .get(&(shaft, floor))
+        .copied()
+        .unwrap_or_default();
+    let s = &router.shafts[&shaft];
+    let cars = s.cars.max(1) as f64;
+    let running = router.running.get(&shaft).copied().unwrap_or(cars);
+    let headway = s.round_trip / (2.0 * running);
+    let expected = headway + line.riders as f64 / (running * s.capacity) * s.round_trip;
+    l.tenths + tenths(expected.max(line.oldest))
+}
+
 /// What `l` costs (`cost_of`), its line's share worked out once until the
 /// line changes.
+#[inline]
 pub(super) fn line_cost(router: &mut Router, l: &Link) -> i64 {
     if l.line == NO_LINE {
         return l.tenths;

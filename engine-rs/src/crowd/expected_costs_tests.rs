@@ -2,8 +2,8 @@
 //! would work out again: each line's cost, and each route.
 
 use super::super::tests::tower;
-use super::super::{cost_of, fastest_path, join_line, Router};
-use super::line_cost;
+use super::super::{fastest_path, join_line, Router};
+use super::{cost_of, line_cost};
 use crate::clock::GameMode;
 use crate::crowd::line_count::Line;
 use crate::crowd::routing::plan;

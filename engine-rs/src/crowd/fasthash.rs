@@ -197,7 +197,8 @@ impl<K: Hash + Eq, V> Index<&K> for FastMap<K, V> {
     }
 }
 
-/// A set keyed with `FastHasher` that can only be added to and looked up.
+/// A set keyed with `FastHasher`. It hands out no iterator, so nothing can
+/// read its order.
 pub struct FastSet<T>(HashSet<T, Build>);
 
 impl<T> Default for FastSet<T> {
@@ -216,6 +217,16 @@ impl<T: Hash + Eq> FastSet<T> {
     #[inline]
     pub fn contains(&self, value: &T) -> bool {
         self.0.contains(value)
+    }
+
+    /// Takes `value` out; whether it was there.
+    #[inline]
+    pub fn remove(&mut self, value: &T) -> bool {
+        self.0.remove(value)
+    }
+
+    pub fn clear(&mut self) {
+        self.0.clear();
     }
 }
 

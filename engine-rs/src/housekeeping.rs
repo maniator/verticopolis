@@ -1,8 +1,8 @@
 //! Port of `economy/housekeeping.ts`.
 
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::BTreeMap;
 
-use crate::crowd::fasthash::FastMap;
+use crate::crowd::fasthash::{FastMap, FastSet};
 use crate::facilities::Kind;
 use crate::housekeeping_shift::MaidSent;
 use crate::sim::{LogKind, Simulation};
@@ -98,9 +98,10 @@ pub(crate) struct StepRooms {
 
 pub struct Housekeeping {
     /// room id -> (crew id, floor)
-    assigned_room: HashMap<i64, (i64, i64)>,
-    maids_out: HashMap<i64, i64>,
-    floors_busy: HashMap<i64, HashSet<i64>>,
+    assigned_room: FastMap<i64, (i64, i64)>,
+    maids_out: FastMap<i64, i64>,
+    /// (crew id, floor) for each floor a crew has a maid on.
+    floors_busy: FastSet<(i64, i64)>,
     cleaned_today: i64,
     /// `hkYesterday`: yesterday's shift result (rooms cleaned, rooms left
     /// dirty), latched at the morning checkout; `None` before the first one.
@@ -118,9 +119,9 @@ pub struct Housekeeping {
 impl Default for Housekeeping {
     fn default() -> Self {
         Housekeeping {
-            assigned_room: HashMap::new(),
-            maids_out: HashMap::new(),
-            floors_busy: HashMap::new(),
+            assigned_room: FastMap::default(),
+            maids_out: FastMap::default(),
+            floors_busy: FastSet::default(),
             cleaned_today: 0,
             yesterday: None,
             nudged_day: -1,
@@ -141,10 +142,7 @@ impl Housekeeping {
     /// Whether `crew` has a maid to spare and nobody of theirs on `floor`.
     pub(crate) fn crew_may_take(&self, crew: i64, floor: i64) -> bool {
         self.maids_out.get(&crew).copied().unwrap_or(0) < HK_MAIDS_PER_UNIT
-            && !self
-                .floors_busy
-                .get(&crew)
-                .is_some_and(|s| s.contains(&floor))
+            && !self.floors_busy.contains(&(crew, floor))
     }
 
     /// Whether a room read for a pass is still dirty and held by no crew.
@@ -169,8 +167,8 @@ impl Housekeeping {
 
     pub(crate) fn assign_room(&mut self, room_id: i64, crew_id: i64, floor: i64) {
         self.assigned_room.insert(room_id, (crew_id, floor));
-        *self.maids_out.entry(crew_id).or_insert(0) += 1;
-        self.floors_busy.entry(crew_id).or_default().insert(floor);
+        *self.maids_out.get_or_insert_with(crew_id, || 0) += 1;
+        self.floors_busy.insert((crew_id, floor));
     }
 
     fn release_assignment(&mut self, room_id: i64) {
@@ -183,9 +181,7 @@ impl Housekeeping {
         } else {
             self.maids_out.remove(&crew_id);
         }
-        if let Some(s) = self.floors_busy.get_mut(&crew_id) {
-            s.remove(&floor);
-        }
+        self.floors_busy.remove(&(crew_id, floor));
     }
 
     /// What a dispatch pass works from, in one walk of the rooms in tower

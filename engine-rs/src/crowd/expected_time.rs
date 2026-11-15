@@ -126,9 +126,9 @@ pub struct Router {
     best: Vec<i64>,
     prev: Vec<(u32, Move)>,
     touched: Vec<u32>,
-    /// The open nodes: (cost plus bound, push order, place, cost). Kept
+    /// The open nodes: (cost plus bound, push order, place, cost), kept
     /// between searches so a search allocates nothing (hot-path HP-3).
-    heap: BinaryHeap<Reverse<(i64, u64, u32, i64)>>,
+    heap: BinaryHeap<Reverse<(i64, u32, u32, i64)>>,
     /// The bound search's scratch, kept the same way.
     bound_scratch: BoundScratch,
     shafts: FastMap<i64, Shaft>,
@@ -340,29 +340,6 @@ fn stand_down(router: &mut Router, closed: &[(i64, i64)]) {
     }
 }
 
-/// What `l` costs, the wait and the line at a boarding included: half the
-/// time between cars, plus the line ahead over the seats a round trip of
-/// every car in service brings, or the longest anyone in that line has
-/// already waited when that is longer (a line the cars arrive at full, say
-/// below a shaft that fills on the floors above, moves slower than its
-/// length says).
-fn cost_of(router: &Router, l: &Link) -> i64 {
-    let Move::Board { shaft, floor } = l.how else {
-        return l.tenths;
-    };
-    let line = router
-        .waiting
-        .get(&(shaft, floor))
-        .copied()
-        .unwrap_or_default();
-    let s = &router.shafts[&shaft];
-    let cars = s.cars.max(1) as f64;
-    let running = router.running.get(&shaft).copied().unwrap_or(cars);
-    let headway = s.round_trip / (2.0 * running);
-    let expected = headway + line.riders as f64 / (running * s.capacity) * s.round_trip;
-    l.tenths + tenths(expected.max(line.oldest))
-}
-
 /// The cheapest route from segment `from` to segment `to`. Ties go to the
 /// node reached first, in the graph's built order.
 fn cheapest(router: &mut Router, from: i64, to: i64) -> Option<Route> {
@@ -400,7 +377,7 @@ fn search(router: &mut Router, start: u32, goal: u32) -> bool {
     }
     let mut heap = std::mem::take(&mut router.heap);
     heap.clear();
-    let mut order = 0_u64;
+    let mut order = 0_u32;
     router.best[start as usize] = 0;
     router.touched.push(start);
     heap.push(Reverse((i64::from(radius), order, start, 0_i64)));
@@ -415,10 +392,14 @@ fn search(router: &mut Router, start: u32, goal: u32) -> bool {
         }
         for i in 0..router.links[at as usize].len() {
             let l = router.links[at as usize][i];
-            let next = cost + line_cost(router, &l);
             let Some(ahead) = bound.ahead(l.to, radius) else {
                 continue;
             };
+            // A link costs at least its own share: no line to price past it.
+            if router.best[l.to as usize] <= cost + l.tenths {
+                continue;
+            }
+            let next = cost + line_cost(router, &l);
             if router.best[l.to as usize] <= next {
                 continue;
             }

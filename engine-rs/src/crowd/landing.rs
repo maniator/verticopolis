@@ -82,16 +82,23 @@ pub fn slot_x(line: Line, rank: usize, n: usize) -> f64 {
 }
 
 /// Where everyone waits this slice: each waiting elevator rider's tile x by
-/// person id, and each landing's line with how many stand in it, so a rider
-/// still walking up can head for the back of the line (#2116). Both are
-/// only looked up, never walked, so they use the fast hasher (hot-path HP-5).
+/// their place in `Crowd::people` (nobody leaves the list until the slice
+/// ends), and each landing's line with how many stand in it, so a rider
+/// still walking up can head for the back of the line (#2116). The lines
+/// are only looked up, never walked, so they use the fast hasher (HP-5).
 #[derive(Default)]
 pub struct Landings {
-    pub slots: FastMap<i64, f64>,
+    slots: Vec<Option<f64>>,
     pub lines: FastMap<(i64, i64), (Line, usize)>,
 }
 
 impl Landings {
+    /// Where the rider at `people[i]` stands in their line, if they wait for
+    /// an elevator.
+    pub fn slot(&self, i: usize) -> Option<f64> {
+        self.slots.get(i).copied().flatten()
+    }
+
     /// The place at the back of the line at `shaft` on `floor`, where the next
     /// rider to arrive will stand.
     pub fn back_of_line(&mut self, tower: &Tower, shaft: &Transport, floor: i64) -> f64 {
@@ -112,36 +119,39 @@ impl Landings {
 
 /// Every waiting elevator rider's place, and the lines they stand in.
 pub fn landing_slots(crowd: &Crowd, tower: &Tower) -> Landings {
-    let mut out = Landings::default();
-    // (shaft, floor) -> (person index list)
+    let mut out = Landings {
+        slots: vec![None; crowd.people.len()],
+        lines: FastMap::default(),
+    };
+    // (shaft, floor) -> person index list, the shaft read once per line.
     let mut groups: FastIndexMap<(i64, i64), Vec<usize>> = FastIndexMap::default();
     for (i, p) in crowd.people.iter().enumerate() {
         if p.state != PState::Waiting {
             continue;
         }
         let Some(sid) = p.shaft_id else { continue };
-        let Some(shaft) = tower.get_transport(sid) else {
-            continue;
-        };
-        if !shaft.kind.is_elevator() {
-            continue;
-        }
         groups.entry((sid, p.floor)).or_default().push(i);
     }
-    for ((sid, floor), mut idx) in groups {
-        let shaft = tower.get_transport(sid).unwrap();
-        idx.sort_by(|&a, &b| {
-            let pa = &crowd.people[a];
-            let pb = &crowd.people[b];
-            pb.wait
-                .partial_cmp(&pa.wait)
+    // Each rider's (wait, id, place), sorted longest wait first.
+    let mut line_up: Vec<(f64, i64, usize)> = Vec::new();
+    for ((sid, floor), idx) in groups {
+        let Some(shaft) = tower.get_transport(sid).filter(|s| s.kind.is_elevator()) else {
+            continue;
+        };
+        line_up.clear();
+        line_up.extend(
+            idx.iter()
+                .map(|&i| (crowd.people[i].wait, crowd.people[i].id, i)),
+        );
+        line_up.sort_by(|a, b| {
+            b.0.partial_cmp(&a.0)
                 .unwrap_or(std::cmp::Ordering::Equal)
-                .then(pa.id.cmp(&pb.id))
+                .then(a.1.cmp(&b.1))
         });
         let line = line_at(tower, shaft, floor);
-        let n = idx.len();
-        for (rank, &i) in idx.iter().enumerate() {
-            out.slots.insert(crowd.people[i].id, slot_x(line, rank, n));
+        let n = line_up.len();
+        for (rank, &(_, _, i)) in line_up.iter().enumerate() {
+            out.slots[i] = Some(slot_x(line, rank, n));
         }
         out.lines.insert((sid, floor), (line, n));
     }

@@ -89,14 +89,12 @@ fn staff_never_count_toward_tenant_stress() {
 #[test]
 fn the_same_seed_builds_the_same_averages_and_a_save_keeps_them() {
     let snap = |sim: &Simulation| {
-        let mut rows: Vec<_> = sim
-            .crowd
+        sim.crowd
             .commute_wait_by_floor
-            .iter()
+            .sorted()
+            .into_iter()
             .map(|(f, w)| (*f, *w))
-            .collect();
-        rows.sort_by_key(|row| row.0);
-        rows
+            .collect::<Vec<_>>()
     };
     let (mut a, mut b) = (commuter_tower(1), commuter_tower(1));
     for _ in 0..200 {

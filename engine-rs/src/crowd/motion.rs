@@ -163,11 +163,8 @@ fn step(crowd: &mut Crowd, i: usize, dt: f64, tower: &mut Tower, landings: &mut 
             let Some(shaft) = p.shaft_id.and_then(|id| tower.get_transport(id)) else {
                 return give_up(crowd, i, tower);
             };
-            let pid = crowd.people[i].id;
             let target = landings
-                .slots
-                .get(&pid)
-                .copied()
+                .slot(i)
                 .unwrap_or(shaft.x as f64 + shaft.width as f64 / 2.0);
             walk_to(&mut crowd.people[i], target, dt, tower);
             let floor = crowd.people[i].floor;
