@@ -11,7 +11,7 @@ function fakeFolder(name: string, files: Record<string, number[]>, dirs: string[
   const writes: { name: string; bytes: Uint8Array }[] = [];
   const failNextWrite = { on: false };
   const writer = (file: string) => {
-    let pending: Uint8Array | null = null;
+    let pending: Uint8Array<ArrayBuffer> | null = null;
     return {
       write: vi.fn(async (b: Uint8Array) => {
         if (failNextWrite.on) {
