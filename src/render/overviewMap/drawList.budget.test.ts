@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import type { FacilityKind } from "../../shared/types";
 import { SKY_HEADROOM_FLOORS } from "../cameraBounds";
 import { buildMapDrawList, type MapSource } from "./drawList";
+import { buildMapGaps } from "./gaps";
 import { fitLayout, mapExtent } from "./geometry";
 import { paintMapMarks, type MapPaintContext, type PatternSource } from "./paint";
 
@@ -79,18 +80,31 @@ describe("overview map budget on a large tower", () => {
   it("paints exactly one rectangle per mark", () => {
     const marks = buildMapDrawList(layout, tower);
     const ctx = countingCtx();
-    expect(paintMapMarks(ctx, layout.width, layout.height, marks, patterns)).toBe(marks.length);
+    expect(paintMapMarks(ctx, layout.width, layout.height, marks, [], patterns)).toBe(marks.length);
     expect(ctx.fills).toBe(marks.length);
   });
 
   it("changes the fill style about once per kind and layer, far less than once per room", () => {
     const marks = buildMapDrawList(layout, tower);
     const ctx = countingCtx();
-    paintMapMarks(ctx, layout.width, layout.height, marks, patterns);
+    paintMapMarks(ctx, layout.width, layout.height, marks, [], patterns);
     const kinds = new Set(marks.map((m) => m.kind)).size;
     // Each kind has a patterned and a plain variant, and the shafts add a few switches.
     expect(ctx.styleSets).toBeLessThan(kinds * 2 + 3 * 8 + 90);
     expect(ctx.styleSets).toBeLessThan(marks.length / 10);
+  });
+
+  it("finds the gaps of a tower split in two with one rectangle per gap, not one per floor", () => {
+    // Every floor of the tower as two buildings, columns 180 to 189 open.
+    const split = {
+      ...tower,
+      structure: tower.structure.flatMap((r) => [{ ...r, x: 0, count: 20 }, { ...r, x: 190, count: 20 }]),
+      rooms: tower.rooms.filter((room) => room.x + room.width <= 180 || room.x >= 190),
+      floorsOf: () => 1,
+    };
+    const gaps = buildMapGaps(layout, split, 8);
+    expect(gaps).toHaveLength(1);
+    expect(gaps[0].h).toBeGreaterThan(layout.height / 2);
   });
 
   it("rebuilds and paints in a few milliseconds (median of 15 after a warm-up, generous CI ceiling)", () => {
@@ -99,7 +113,8 @@ describe("overview map budget on a large tower", () => {
     for (let i = 0; i < 15; i++) {
       const t0 = performance.now();
       const marks = buildMapDrawList(layout, tower);
-      paintMapMarks(countingCtx(), layout.width, layout.height, marks, patterns);
+      const gaps = buildMapGaps(layout, tower, 8);
+      paintMapMarks(countingCtx(), layout.width, layout.height, marks, gaps, patterns);
       times.push(performance.now() - t0);
     }
     times.sort((a, b) => a - b);

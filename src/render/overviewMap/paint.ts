@@ -14,6 +14,7 @@
  */
 import { mapStyleFor, patternInk, type MapPattern } from "./style";
 import type { MapMark } from "./drawList";
+import type { MapRect } from "./geometry";
 
 /** The slice of a 2D context the painter uses. */
 export interface MapPaintContext {
@@ -112,30 +113,48 @@ export function createPatternSource(makeCanvas: () => HTMLCanvasElement, target:
 export const MIN_PATTERN_SIDE = PATTERN_TILE;
 
 /**
- * Clear the map and paint `marks` in order. Returns how many `fillRect` calls
- * the marks took, which the budget tests read.
+ * Clear the map and paint `marks` in order, with the gaps between buildings
+ * (`buildMapGaps`) cleared again after the rooms and before the shafts, so
+ * the backdrop shows through them and a shaft beside one draws whole.
+ * Returns how many `fillRect` calls the marks took, which the budget tests
+ * read.
  */
 export function paintMapMarks(
   ctx: MapPaintContext,
   width: number,
   height: number,
   marks: ReadonlyArray<MapMark>,
+  gaps: ReadonlyArray<MapRect>,
   patterns: PatternSource,
 ): number {
   ctx.clearRect(0, 0, width, height);
-  return paintMarkRange(ctx, marks, 0, marks.length, patterns);
+  const shafts = transportStart(marks);
+  const fills = paintMarkRange(ctx, marks, 0, shafts, patterns);
+  clearGaps(ctx, gaps);
+  return fills + paintMarkRange(ctx, marks, shafts, marks.length, patterns);
 }
 
 /**
- * Paint the draw list's transport marks again, over what a view painted on
- * the rooms, so a shaft stays as the Edit view draws it. The draw list puts
- * the transports last, so this walks back over them alone. Returns how many
- * `fillRect` calls it took.
+ * Clear the gaps between buildings and paint the draw list's transport marks
+ * again, over what a view painted on the rooms, so the gaps and the shafts
+ * stay as the Edit view draws them. The draw list puts the transports last,
+ * so this walks back over them alone. Returns how many `fillRect` calls it
+ * took.
  */
-export function paintTransportMarks(ctx: MapPaintContext, marks: ReadonlyArray<MapMark>, patterns: PatternSource): number {
+export function paintGapsAndShafts(ctx: MapPaintContext, marks: ReadonlyArray<MapMark>, gaps: ReadonlyArray<MapRect>, patterns: PatternSource): number {
+  clearGaps(ctx, gaps);
+  return paintMarkRange(ctx, marks, transportStart(marks), marks.length, patterns);
+}
+
+/** Where the trailing run of transport marks starts (`marks.length` for none). */
+function transportStart(marks: ReadonlyArray<MapMark>): number {
   let start = marks.length;
   while (start > 0 && marks[start - 1].layer === "transport") start--;
-  return paintMarkRange(ctx, marks, start, marks.length, patterns);
+  return start;
+}
+
+function clearGaps(ctx: MapPaintContext, gaps: ReadonlyArray<MapRect>): void {
+  for (const gap of gaps) ctx.clearRect(gap.x, gap.y, gap.w, gap.h);
 }
 
 /** Paint `marks[from]` up to `marks[to - 1]` in order. */

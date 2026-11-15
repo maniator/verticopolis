@@ -16,7 +16,7 @@ function view(highestFloor = 20, over: Partial<MapViewInput> = {}): MapViewInput
 }
 
 function input(v: MapViewInput, over: Partial<MapFrameInput> = {}): MapFrameInput {
-  return { view: v, world: WORLD, skyFloors: SKY_HEADROOM_FLOORS, boxWidth: 150, boxHeight: 300, topReserve: 0, floorsOf: () => 1, tallLobbies: () => [], ...over };
+  return { view: v, world: WORLD, skyFloors: SKY_HEADROOM_FLOORS, boxWidth: 150, boxHeight: 300, topReserve: 0, minGapPx: 0, floorsOf: () => 1, tallLobbies: () => [], ...over };
 }
 
 const cam = (line = 10) => ({ posX: 187 * TILE, posY: -line * FLOOR, zoom: 1, viewWidth: 1000, viewHeight: 14 * FLOOR });
@@ -40,6 +40,20 @@ describe("OverviewMapModel.sync", () => {
     expect(m.marks.filter((mark) => mark.kind === "lobby")).toHaveLength(1);
     expect(m.sync(input(v, { tallLobbies }))).toBe(false);
     expect(tallLobbies).toHaveBeenCalledTimes(1);
+  });
+
+  it("finds the gap between two towers with the draw list, and widens it again when the minimum changes", () => {
+    const m = new OverviewMapModel();
+    // Two towers on floor 1 with two tiles of open ground between them.
+    const v = view(20, { structure: [{ kind: "lobby", floor: 1, x: 100, width: 1, count: 50 }, { kind: "lobby", floor: 1, x: 152, width: 1, count: 50 }] });
+    expect(m.sync(input(v, { minGapPx: 1 }))).toBe(true);
+    expect(m.gaps).toHaveLength(1);
+    expect(m.gaps[0].w).toBeGreaterThanOrEqual(1);
+    expect(m.sync(input(v, { minGapPx: 1 }))).toBe(false);
+    expect(m.sync(input(v, { minGapPx: 8 }))).toBe(true);
+    expect(m.gaps[0].w).toBe(8);
+    m.reset();
+    expect(m.gaps).toEqual([]);
   });
 
   it("does not rebuild when a new tower object keeps the same arrays", () => {
