@@ -18,13 +18,26 @@ fi
 
 bash scripts/build-engine-wasm.sh
 
+# Where the player's manual is served. Production puts it at the root of its
+# own host, help.verticopolis.com (vercel.json serves that host from
+# dist/help/ and sends verticopolis.com/help there), so the installed app opens
+# it in the browser over the running game. Every other deploy keeps it under
+# /help on its own host. A project variable may set VC_HELP_ORIGIN for one
+# branch to try the manual's host on a preview. The game's links to the manual
+# (src/helpAddress.ts) and the manual's own build (help-site/site.mjs) both
+# read it.
+if [ -z "${VC_HELP_ORIGIN:-}" ] && [ "${VERCEL_ENV:-}" = "production" ]; then
+  export VC_HELP_ORIGIN="https://help.verticopolis.com"
+fi
+echo "vercel-build: the manual is served from ${VC_HELP_ORIGIN:-/help on this host}"
+
 # Every build is the Rust-only build: the Rust engine is the only engine, with
 # no cohort, no runtime switch and no TypeScript fallback (see
 # src/build/engineBundle.ts).
 npm run build
 
-# The player help site at /help (help-site/, Astro + Starlight) builds into
-# dist/help/ after the game, from the same Markdown the game's Help window reads.
+# The player help site (help-site/, Astro + Starlight) builds into dist/help/
+# after the game, from the same Markdown the game's Help window reads.
 npm ci --prefix help-site
 npm run build --prefix help-site
 

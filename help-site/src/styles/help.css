@@ -136,3 +136,33 @@
   /* Leave room for the sticky bars and the room's own heading above the box. */
   scroll-margin-top: calc(var(--sl-nav-height, 4rem) + var(--sl-mobile-toc-height, 0rem) + 4rem);
 }
+
+/* The game's menu bar (src/styles/menu-bar.css) as the top row of the fixed
+   header, above the navy title bar, where the game draws it: the header grows
+   by the bar's height, and the title bar and the phone's menu button keep
+   their old size and move down under it. */
+:root {
+  --vc-menubar-h: 24px;
+  --sl-nav-height: calc(3.5rem + var(--vc-menubar-h));
+}
+@media (min-width: 50rem) {
+  :root {
+    --sl-nav-height: calc(4rem + var(--vc-menubar-h));
+  }
+}
+.header {
+  padding-top: calc(var(--sl-nav-pad-y) + var(--vc-menubar-h));
+}
+.vc-bar-title img {
+  height: calc(var(--sl-nav-height) - var(--vc-menubar-h) - 2 * var(--sl-nav-pad-y));
+}
+.sl-menu-button {
+  top: calc(var(--vc-menubar-h) + (var(--sl-nav-height) - var(--vc-menubar-h) - var(--sl-menu-button-size)) / 2);
+}
+.help-menubar {
+  position: absolute;
+  inset-inline: 0;
+  top: 0;
+  height: var(--vc-menubar-h);
+  box-sizing: border-box;
+}

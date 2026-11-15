@@ -68,13 +68,13 @@ test("offline, Help and About's privacy link say where the page is and open no t
   await context.setOffline(true);
   try {
     await pickFromHelp(page, "#btn-help");
-    await expect(page.getByText("The manual needs an internet connection. It is at verticopolis.com/help.").first()).toBeVisible();
+    await expect(page.getByText("The manual needs an internet connection. It is at help.verticopolis.com.").first()).toBeVisible();
 
     await pickFromHelp(page, "#btn-about");
     const about = page.getByRole("dialog", { name: /About this game/ });
     await about.locator('a[data-act="privacy"]').click();
     await expect(about.locator(".help-links-status")).toHaveText(
-      "The privacy page needs an internet connection. It is at verticopolis.com/help/privacy.",
+      "The privacy page needs an internet connection. It is at help.verticopolis.com/privacy.",
     );
     await expect(about).toBeVisible();
     expect(popups).toEqual([]);

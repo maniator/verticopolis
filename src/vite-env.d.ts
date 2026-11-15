@@ -8,6 +8,10 @@ declare const __APP_SHA__: string;
  *  and perf pipelines). Gates the `window.game` handle: a production build
  *  compiles the publish away entirely (see bootstrap.ts). */
 declare const __TOOLING_BUILD__: boolean;
+/** The player's manual's own host (`https://help.verticopolis.com`) in a
+ *  production build, or "" where it is served under /help on the game's host
+ *  (see src/helpAddress.ts). */
+declare const __HELP_ORIGIN__: string;
 /** True when the engine this run serves is the tooling package, with the
  *  binding's tier 3 ops (#1057): a tooling build, or a dev serve that found
  *  `engine-rs/pkg-web-tooling/`. The boot check asks for those ops only then. */

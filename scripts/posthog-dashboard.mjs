@@ -555,13 +555,18 @@ function buildInsights(ids) {
     },
     {
       name: "Standalone page landings (help, gallery & release notes)",
-      description: "Landings on the /help, /gallery and /help/changelog pages (app_action page_help / page_gallery / page_changelog), production. These pages report nowhere else in PostHog.",
+      description: "Landings on the manual (help.verticopolis.com), its release notes (help.verticopolis.com/changelog/) and /gallery (app_action page_help / page_changelog / page_gallery), production. These pages report nowhere else in PostHog.",
       query: trends([series("app_action", "Landings")], { breakdown: "action", display: "ActionsBar", where: [inAction(["page_help", "page_gallery", "page_changelog"])] }),
     },
     {
       name: "Help pages viewed",
-      description: "Every help site page view (app_action help_page_view), split by page (detail: the path under /help, home for the front page), production. Landings alone (one per visit) are in the \"Standalone page landings\" tile.",
+      description: "Every help site page view (app_action help_page_view), split by page (detail: the page's path on help.verticopolis.com, home for the front page), production. Landings alone (one per visit) are in the \"Standalone page landings\" tile.",
       query: trends([series("app_action", "Page views")], { breakdown: "detail", display: "ActionsBar", where: [inAction(["help_page_view"])] }),
+    },
+    {
+      name: "Help menu picks",
+      description: "Picks on the help site's menu bar (app_action help_menu_pick), split by item (detail: game, print, find, copy_link, theme_light, theme_dark, theme_auto, whats_new, report or sponsor), production.",
+      query: trends([series("app_action", "Help menu picks")], { breakdown: "detail", display: "ActionsBar", where: [inAction(["help_menu_pick"])] }),
     },
     {
       name: "Sponsor link taps",

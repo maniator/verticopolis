@@ -58,7 +58,7 @@ function backdrop() {
 
 /** The card's page: the backdrop, the wordmark, the title, the description and the address. */
 function cardHtml(page) {
-  const path = `verticopolis.com/help/${page.slug ? `${page.slug}/` : ""}`;
+  const path = `help.verticopolis.com/${page.slug ? `${page.slug}/` : ""}`;
   return `<!doctype html><html><head><meta charset="utf-8"><style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body { width: ${W}px; height: ${H}px; overflow: hidden; font-family: ${FONT}; }

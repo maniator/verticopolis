@@ -45,6 +45,8 @@ permissions:
 env:
   PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
   PRODUCTION_URL: https://verticopolis.com
+  # The player's manual's own host (scripts/vercel-build.sh, vercel.json).
+  HELP_URL: https://help.verticopolis.com
 
 jobs:
   # Decides whether to deploy, without the production environment's secrets.
@@ -316,14 +318,21 @@ jobs:
           # Every file of the build, byte for byte, as production serves it.
           # Source maps are left out: production answers 403 to them (the
           # project keeps them from the public), though the list and the
-          # release zip still carry them.
+          # release zip still carry them. The manual (dist/help/) is served
+          # from its own host, help.verticopolis.com, at the root
+          # (vercel.json), and verticopolis.com/help only redirects there,
+          # so its files are checked on that host.
           bad=0
           checked=0
           while read -r want path; do
             case "$path" in *.map) continue ;; esac
+            case "$path" in
+              help/*) url="$HELP_URL/${path#help/}" ;;
+              *) url="$PRODUCTION_URL/$path" ;;
+            esac
             checked=$((checked + 1))
-            got="$(curl -fsS --compressed --max-time 30 "$PRODUCTION_URL/$path" | sha256sum | cut -d' ' -f1 || true)"
-            if [ "$got" != "$want" ]; then echo "::error::$PRODUCTION_URL/$path does not match the build."; bad=$((bad + 1)); fi
+            got="$(curl -fsS --compressed --max-time 30 "$url" | sha256sum | cut -d' ' -f1 || true)"
+            if [ "$got" != "$want" ]; then echo "::error::$url does not match the build."; bad=$((bad + 1)); fi
           done < web-SHA256SUMS
           if [ "$checked" = 0 ]; then echo "::error::The build's checksum list names no file to check."; exit 1; fi
           if [ "$bad" != 0 ]; then echo "::error::$bad of $checked files differ from the build."; exit 1; fi

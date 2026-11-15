@@ -1,5 +1,6 @@
 import { html, type TemplateResult } from "lit-html";
 import { fromGameHref } from "../fromGame";
+import { helpUrl } from "../../helpAddress";
 
 /**
  * The one-time version 4 welcome (`src/ui/launchFireworks.ts`), in the shared
@@ -19,7 +20,7 @@ export const WELCOME_LINKS = {
 } as const;
 
 function helpLink(link: { label: string; href: string }): TemplateResult {
-  return html`<a href=${fromGameHref(link.href)} target="_blank" rel="noopener noreferrer">${link.label}<span class="visually-hidden"> (opens in a new tab)</span></a>`;
+  return html`<a href=${fromGameHref(helpUrl(link.href))} target="_blank" rel="noopener noreferrer">${link.label}<span class="visually-hidden"> (opens in a new tab)</span></a>`;
 }
 
 export function welcomeModalTemplate(): TemplateResult {

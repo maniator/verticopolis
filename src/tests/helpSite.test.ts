@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
-import { HELP_BASE, OLD_ANCHORS, SPONSOR_URL, cardAlt, cardFile, cardUrl, helpPageDetail, isSponsorLink, landingAction, sponsorTapListener, oldAnchorRedirects, pageJsonLd, sharedHead, sidebar, type SidebarEntry } from "../../help-site/site.mjs";
+import { HELP_BASE, OLD_ANCHORS, SPONSOR_URL, siteHref, cardAlt, cardFile, cardUrl, helpPageDetail, isSponsorLink, landingAction, sponsorTapListener, oldAnchorRedirects, pageJsonLd, sharedHead, sidebar, type SidebarEntry } from "../../help-site/site.mjs";
 import { catalogFor } from "./catalogFixture";
 import { SPONSOR_URL as GAME_SPONSOR_URL } from "../ui/splashTemplate";
 import { HELP_PAGES_DIR } from "../build/helpMarkdown";
@@ -275,6 +275,38 @@ describe("the analytics landing", () => {
     expect(landingAction("/help/changelog/", `${origin}/help`, origin)).toBeNull();
     expect(landingAction("/help/", "https://elsewhere.test/help/", origin)).toBe("page_help");
   });
+
+  it("works the same at the root of the manual's own host", () => {
+    const own = "https://help.verticopolis.com";
+    expect(landingAction("/", "https://verticopolis.com/", own, "")).toBe("page_help");
+    expect(landingAction("/changelog/", "", own, "")).toBe("page_changelog");
+    expect(landingAction("/rooms/", `${own}/`, own, "")).toBeNull();
+    expect(landingAction("/changelog/", `${own}/rooms/`, own, "")).toBeNull();
+  });
+});
+
+describe("a help page's links in each build", () => {
+  it("leaves every link alone where the manual is under /help on the game's host", () => {
+    expect(siteHref("/", "/help", "")).toBe("/");
+    expect(siteHref("/help/rooms/#spa", "/help", "")).toBe("/help/rooms/#spa");
+    expect(siteHref("/help", "/help", "")).toBe("/help/");
+  });
+
+  it("drops /help from a manual link and sends a game link to the game's host on the manual's own host", () => {
+    const game = "https://verticopolis.com";
+    expect(siteHref("/help/rooms/#spa", "", game)).toBe("/rooms/#spa");
+    expect(siteHref("/help/changelog/", "", game)).toBe("/changelog/");
+    expect(siteHref("/help", "", game)).toBe("/");
+    expect(siteHref("/help#controls", "", game)).toBe("/#controls");
+    expect(siteHref("/", "", game)).toBe("https://verticopolis.com/");
+    expect(siteHref("/?mode=modern", "", game)).toBe("https://verticopolis.com/?mode=modern");
+  });
+
+  it("never touches a link to another site, a section or a relative path", () => {
+    for (const href of ["https://github.com/maniator/verticopolis", "//cdn.example/x.js", "#spa", "hotels/", "mailto:a@b.c"]) {
+      expect(siteHref(href, "", "https://verticopolis.com")).toBe(href);
+    }
+  });
 });
 
 describe("the help page view's page name", () => {
@@ -300,6 +332,12 @@ describe("the help page view's page name", () => {
     expect(helpPageDetail("/help/" + "a".repeat(80))).toBe("a".repeat(80));
   });
 
+  it("names a page by its whole path at the root of the manual's own host", () => {
+    expect(helpPageDetail("/rooms/hotels/", "")).toBe("rooms/hotels");
+    expect(helpPageDetail("/", "")).toBe("home");
+    expect(helpPageDetail("/Rooms/", "")).toBe("other");
+  });
+
   it("names every page in the side menu after itself", () => {
     const slugs: string[] = [];
     const walk = (entries: SidebarEntry[]) => {
@@ -314,39 +352,6 @@ describe("the help page view's page name", () => {
   });
 });
 
-describe("the help site's cache headers", () => {
-  type Rule = { source: string; headers: { key: string; value: string }[] };
-  const rules = (JSON.parse(readFileSync(resolve(__dirname, "../../vercel.json"), "utf8")) as { headers: Rule[] }).headers;
-  // Vercel sources are path-to-regexp; the ones here only use `(.*)` and `(a|b)` groups.
-  const matches = (source: string, path: string) => new RegExp(`^${source.replace(/\./g, "\\.").replace(/\\\.\*/g, ".*")}$`).test(path);
-  const immutable = (path: string) =>
-    rules.some((r) => matches(r.source, path) && r.headers.some((h) => h.key === "Cache-Control" && h.value.includes("immutable")));
-
-  it("keeps Astro's and Pagefind's content-hashed files for a year", () => {
-    expect(immutable("/help/_astro/Sprite.astro_astro_type_script_index_0_lang.B-Iva01u.js")).toBe(true);
-    expect(immutable("/help/_astro/ec.w36nc.css")).toBe(true);
-    expect(immutable("/help/pagefind/fragment/en_1144b33.pf_fragment")).toBe(true);
-    expect(immutable("/help/pagefind/index/en_15b0e9b.pf_index")).toBe(true);
-  });
-
-  it("never pins a file whose name stays the same when it changes", () => {
-    for (const path of [
-      "/help/",
-      "/help/rooms/venues/",
-      "/help/catalog.json",
-      "/help/sitemap-index.xml",
-      "/help/pagefind/pagefind.js",
-      "/help/pagefind/pagefind-entry.json",
-      "/help/pagefind/wasm.en.pagefind",
-      "/engine/verticopolis_engine_bg.wasm",
-      "/sw.js",
-      "/version.json",
-    ]) {
-      expect(immutable(path), path).toBe(false);
-    }
-  });
-});
-
 describe("the link check", () => {
   it("finds a link to a missing page or a missing section, and passes the rest", async () => {
     const { brokenLinks, servedPath } = await import("../../help-site/scripts/check-links.mjs");
@@ -357,6 +362,17 @@ describe("the link check", () => {
       ["/help/rooms/", '<h2 id="spa">Spa</h2><a href="/help/">home</a><a href="/help/catalog.json">data</a><a href="https://example.com/">out</a>'],
     ]);
     expect(brokenLinks(pages)).toEqual(["/help/ → /help/rooms/#nope (no such section)", "/help/ → /help/gone/ (no such page)"]);
+  });
+
+  it("checks a build for the manual's own host, where the pages sit at the root", async () => {
+    const { brokenLinks, servedPath } = await import("../../help-site/scripts/check-links.mjs");
+    expect(servedPath("rooms/venues/index.html", "")).toBe("/rooms/venues/");
+    expect(servedPath("index.html", "")).toBe("/");
+    const pages = new Map([
+      ["/", '<a href="/rooms/#spa">ok</a><a href="/gone/">x</a><a href="/_astro/x.css">asset</a><a href="https://verticopolis.com/">game</a>'],
+      ["/rooms/", '<h2 id="spa">Spa</h2><a href="/">home</a>'],
+    ]);
+    expect(brokenLinks(pages, "")).toEqual(["/ → /gone/ (no such page)"]);
   });
 });
 

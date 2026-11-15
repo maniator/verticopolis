@@ -186,7 +186,7 @@ describe("About… (About this game)", () => {
     expect(followed, "the link must not open a tab that cannot load").toBe(false);
     expect(dialog().open).toBe(true);
     expect(inDialog(".help-links-status").textContent).toBe(
-      "The privacy page needs an internet connection. It is at verticopolis.com/help/privacy.",
+      "The privacy page needs an internet connection. It is at help.verticopolis.com/privacy.",
     );
     expect(speed.now()).toBe(0);
     inDialog<HTMLButtonElement>('[data-act="close"]').click();
@@ -238,7 +238,7 @@ describe("About… (About this game)", () => {
     const say = vi.spyOn(ui, "sayVisibly");
     ui.showHelp();
     expect(open).not.toHaveBeenCalled();
-    expect(say).toHaveBeenCalledWith("The manual needs an internet connection. It is at verticopolis.com/help.");
+    expect(say).toHaveBeenCalledWith("The manual needs an internet connection. It is at help.verticopolis.com.");
     expect(speed.now()).toBe(3);
   });
 
@@ -248,7 +248,7 @@ describe("About… (About this game)", () => {
     vi.spyOn(window, "open").mockReturnValue(null);
     const say = vi.spyOn(ui, "sayVisibly");
     ui.showHelp();
-    expect(say).toHaveBeenCalledWith("The guide could not open. It is at verticopolis.com/help.");
+    expect(say).toHaveBeenCalledWith("The guide could not open. It is at help.verticopolis.com.");
     expect(speed.now()).toBe(3);
   });
 

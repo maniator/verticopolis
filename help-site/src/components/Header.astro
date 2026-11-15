@@ -1,8 +1,10 @@
 ---
-// The help site's header: the shared title bar (docs/engine-site's
+// The help site's header: the game's menu bar on top (MenuBar.astro), then
+// the shared title bar (docs/engine-site's
 // TitleBar.astro, the same bar the engine docs and the Rust API reference
 // draw), handed this site's own Starlight search and theme switch, with its
-// game button pointed at the game on this same origin. In a
+// game button pointed at the game (verticopolis.com from the manual's own
+// host, this same host in a /help build). In a
 // tab the game opened (?from=game, src/ui/fromGame.ts) that button and the
 // front page's Play button both read Back to game and close this tab instead
 // of loading a second copy of the game; the note below says so when the
@@ -11,10 +13,13 @@
 import Search from "@astrojs/starlight/components/Search.astro";
 import ThemeSelect from "@astrojs/starlight/components/ThemeSelect.astro";
 import TitleBar from "../../../docs/engine-site/src/components/TitleBar.astro";
+import MenuBar from "./MenuBar.astro";
 import logo from "../assets/logo.png";
+import { siteHref } from "../../site.mjs";
 ---
 
-<TitleBar logo={logo} short="Help" game="/">
+<MenuBar />
+<TitleBar logo={logo} short="Help" game={siteHref("/")}>
   <Search slot="search" />
   <ThemeSelect slot="theme" />
 </TitleBar>
@@ -26,12 +31,15 @@ import logo from "../assets/logo.png";
   import { trackAppAction } from "../../../src/analytics";
   import { helpPageDetail, landingAction, sponsorTapListener } from "../../site.mjs";
 
+  // The site's base as Astro built it: "" at the root of the manual's own
+  // host, "/help" on the game's.
+  const base = import.meta.env.BASE_URL.replace(/\/+$/, "");
   injectPageTelemetry();
-  const landing = landingAction(location.pathname, document.referrer, location.origin);
+  const landing = landingAction(location.pathname, document.referrer, location.origin, base);
   if (landing) trackAppAction(landing);
   // Every page view, landing or not, names its page, so the help pages
   // people read show up in PostHog and not only where they arrived.
-  trackAppAction("help_page_view", helpPageDetail(location.pathname));
+  trackAppAction("help_page_view", helpPageDetail(location.pathname, base));
   // A tap on any link to the Sponsors page counts once as sponsor_click
   // (help-site/site.mjs sponsorTapListener); the link itself opens as before.
   const noteSponsorTap = sponsorTapListener(() => trackAppAction("sponsor_click", "help"));

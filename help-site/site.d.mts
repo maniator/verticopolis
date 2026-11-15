@@ -1,6 +1,11 @@
 // Types for site.mjs, for the TypeScript test that reads it
 // (src/tests/helpSite.test.ts).
+export const HELP_ORIGIN: string;
 export const HELP_BASE: string;
+export const GAME_ORIGIN: string;
+export const SITE_ORIGIN: string;
+/** A link as the help pages write it (/ for the game, /help/... for the manual) as this build serves it. */
+export function siteHref(href: string, base?: string, gameOrigin?: string): string;
 export const ENGINE_DOCS: string;
 export const GITHUB_ISSUES: string;
 export const SPONSOR_URL: string;
@@ -12,9 +17,9 @@ export type SidebarEntry =
 export const sidebar: SidebarEntry[];
 export function isSponsorLink(href: string): boolean;
 export function sponsorTapListener(track: () => void): (e: MouseEvent) => void;
-export function landingAction(pathname: string, referrer: string, origin: string): "page_help" | "page_changelog" | null;
+export function landingAction(pathname: string, referrer: string, origin: string, base?: string): "page_help" | "page_changelog" | null;
 /** The page a help page view reports: "rooms/hotels", "home" or "other". */
-export function helpPageDetail(pathname: string): string;
+export function helpPageDetail(pathname: string, base?: string): string;
 /** Where each section of the old one-page /help went. */
 export const OLD_ANCHORS: Record<string, string>;
 export function oldAnchorRedirects(helpIds: Record<string, string>): string;

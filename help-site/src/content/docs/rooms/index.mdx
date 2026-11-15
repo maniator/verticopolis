@@ -5,6 +5,7 @@ description: Every room, shop, venue and service you can build in Verticopolis, 
 
 import RoomTable from "../../../components/RoomTable.astro";
 import Sprite from "../../../components/Sprite.astro";
+import { siteHref } from "../../../../site.mjs";
 
 A tower is only as good as what you put in it. Offices pay the bills, homes and hotels fill the upper floors with people, shops and restaurants feed them, and a handful of services keep the whole place safe, clean and growing. This part of the manual takes each kind of room in turn: what it costs, what it earns, what its tenants ask of you, and how it changes the rooms around it.
 
@@ -13,13 +14,13 @@ Every number here comes straight from the game, so when the game changes, these 
 ## The rooms, a page at a time
 
 <div class="vc-sprite-row">
-  <a href="/help/rooms/offices/"><Sprite kind="office" small caption="Offices" /></a>
-  <a href="/help/rooms/homes/"><Sprite kind="condo" small caption="Homes" /></a>
-  <a href="/help/rooms/hotels/"><Sprite kind="hotelDouble" state="occupied" small caption="Hotels" /></a>
-  <a href="/help/rooms/food-and-shops/"><Sprite kind="fastFood" small caption="Food and shops" /></a>
-  <a href="/help/rooms/venues/"><Sprite kind="partyHall" small caption="Venues" /></a>
-  <a href="/help/rooms/services/"><Sprite kind="security" small caption="Services" /></a>
-  <a href="/help/rooms/wedding-hall/"><Sprite kind="weddingHall" small caption="The Wedding Hall" /></a>
+  <a href={siteHref("/help/rooms/offices/")}><Sprite kind="office" small caption="Offices" /></a>
+  <a href={siteHref("/help/rooms/homes/")}><Sprite kind="condo" small caption="Homes" /></a>
+  <a href={siteHref("/help/rooms/hotels/")}><Sprite kind="hotelDouble" state="occupied" small caption="Hotels" /></a>
+  <a href={siteHref("/help/rooms/food-and-shops/")}><Sprite kind="fastFood" small caption="Food and shops" /></a>
+  <a href={siteHref("/help/rooms/venues/")}><Sprite kind="partyHall" small caption="Venues" /></a>
+  <a href={siteHref("/help/rooms/services/")}><Sprite kind="security" small caption="Services" /></a>
+  <a href={siteHref("/help/rooms/wedding-hall/")}><Sprite kind="weddingHall" small caption="The Wedding Hall" /></a>
 </div>
 
 - **[Offices](/help/rooms/offices/)** pay rent by the quarter and bring the weekday crowd.
