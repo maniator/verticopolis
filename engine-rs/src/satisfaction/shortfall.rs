@@ -296,7 +296,7 @@ impl Simulation {
         };
         ServiceShortfalls {
             demanded_in: Some(self.mode),
-            population: self.tower.total_population() as f64,
+            population: self.recycling_population() as f64,
             recycling_capacity: recycling_capacity_of(self.recycling_centers()),
             parking_need,
             parking_capacity,

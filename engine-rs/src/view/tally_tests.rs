@@ -12,7 +12,7 @@ use crate::tower::UnitState;
 fn counted(sim: &Simulation) -> RecyclingCounts {
     RecyclingCounts {
         centers: sim.recycling_centers(),
-        population: sim.tower.total_population(),
+        population: sim.recycling_population(),
     }
 }
 
@@ -24,7 +24,7 @@ fn two_present_rooms(sim: &Simulation) -> (usize, usize) {
         .room_index()
         .iter()
         .copied()
-        .filter(|&i| sim.tower.units[i].census_share() > 0)
+        .filter(|&i| sim.tower.units[i].recycling_census_share() > 0)
         .collect::<Vec<_>>()
         .into_iter();
     (present.next().unwrap(), present.next().unwrap())
@@ -72,7 +72,7 @@ fn a_read_with_a_few_marks_visits_only_the_marked_rooms() {
     assert_eq!(tally.counts(&sim.tower), counted(&sim));
     let (marked, hidden) = two_present_rooms(&sim);
     let kept = counted(&sim);
-    let marked_share = sim.tower.units[marked].census_share();
+    let marked_share = sim.tower.units[marked].recycling_census_share();
     empty_unmarked(&mut sim, hidden);
     set_marked(&mut sim, marked, UnitState::Empty);
     let got = tally.counts(&sim.tower);

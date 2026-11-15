@@ -232,3 +232,116 @@ fn the_vip_crowns_a_finished_tower_and_returns_to_a_short_one() {
         }
     }
 }
+
+/// A tower with a working recycling center in the basement, a shop on floor
+/// 3 and, in Modern, a nightclub on floor 2, every room open.
+fn venue_tower(mode: GameMode) -> Simulation {
+    let mut sim = Simulation::new(1, mode, CalendarKind::RealWorld, false);
+    for x in 0..LOT_WIDTH {
+        assert!(sim.tower.place(Kind::Lobby, 1, x).ok);
+    }
+    for floor in [0, -1, 2, 3] {
+        for x in 0..LOT_WIDTH {
+            let r = sim.tower.place(Kind::Floor, floor, x);
+            assert!(r.ok, "floor {floor} x {x}: {:?}", r.reason);
+        }
+    }
+    let mut placed = vec![sim.tower.place(Kind::Recycling, -1, 0)];
+    if mode == GameMode::Modern {
+        placed.push(sim.tower.place(Kind::Nightclub, 2, 40));
+    }
+    placed.push(sim.tower.place(Kind::Shop, 3, 0));
+    for r in placed {
+        assert!(r.ok, "{:?}", r.reason);
+        sim.tower.get_unit_mut(r.unit_id.unwrap()).unwrap().state = UnitState::Occupied;
+    }
+    sim
+}
+
+fn set_customers(sim: &mut Simulation, kind: Kind, n: i64) {
+    let id = sim.tower.units.iter().find(|u| u.kind == kind).unwrap().id;
+    sim.tower.get_unit_mut(id).unwrap().customers_in = Some(n);
+}
+
+#[test]
+fn a_modern_venue_crowd_cannot_flip_the_recycling_gate() {
+    // #358: the nightclub's census is the customers inside right now, so
+    // the total population swings with the crowd. Recycling plans for the
+    // population without them: a crowd far past one center's 2,500 leaves
+    // the gate met and the bins as full as before.
+    let mut sim = venue_tower(GameMode::Modern);
+    sim.star = 4;
+    sim.clock.minutes += 12.0 * 60.0; // noon, so the bins hold something
+    set_customers(&mut sim, Kind::Shop, 0);
+    set_customers(&mut sim, Kind::Nightclub, 0);
+    assert_eq!(sim.recycling_centers(), 1);
+    let quiet_total = sim.tower.total_population();
+    let quiet = sim.recycling_population();
+    let quiet_fill = sim.recycling_fill();
+    assert!(quiet_fill > 0.0 || quiet == 0);
+    assert!(sim.recycling_demand_met());
+
+    set_customers(&mut sim, Kind::Nightclub, 3000);
+    assert_eq!(
+        sim.tower.total_population(),
+        quiet_total + 3000,
+        "the census still counts the crowd"
+    );
+    assert_eq!(sim.recycling_population(), quiet);
+    assert!(
+        sim.recycling_demand_met(),
+        "the crowd flipped the 4-star recycling gate"
+    );
+    assert_eq!(sim.recycling_fill(), quiet_fill);
+    assert_eq!(sim.service_shortfalls().trash(), None);
+}
+
+#[test]
+fn a_classic_tower_plans_recycling_for_its_whole_population() {
+    // Every Classic room's census follows the day or counts the people who
+    // live or work there, so nothing is left out.
+    let mut sim = venue_tower(GameMode::Classic);
+    let shop = sim
+        .tower
+        .units
+        .iter()
+        .find(|u| u.kind == Kind::Shop)
+        .unwrap()
+        .id;
+    sim.tower.get_unit_mut(shop).unwrap().visitors_yest = Some(20);
+    assert_eq!(sim.tower.total_population(), 20);
+    assert_eq!(sim.recycling_population(), sim.tower.total_population());
+}
+
+#[test]
+fn the_recycling_share_is_the_census_share_except_for_a_live_venue() {
+    // `recycling_census_share` decides in one pass what `census_share`
+    // decides through `census_count` and `live_load`; this keeps the copy
+    // from drifting, for every kind and for a room present or not.
+    use crate::economy::visitors::census_counts_live_customers;
+    use crate::facilities::FACILITIES;
+    use crate::tower::UnitState;
+    let sim = venue_tower(GameMode::Modern);
+    let template = sim.tower.room_units().next().unwrap().clone();
+    for f in FACILITIES.iter() {
+        for state in [UnitState::Occupied, UnitState::Empty] {
+            let mut u = template.clone();
+            u.kind = f.kind;
+            u.state = state;
+            u.visitors_yest = Some(17);
+            u.customers_in = Some(23);
+            u.occupants = 9;
+            let expected = if census_counts_live_customers(f.kind) {
+                0
+            } else {
+                u.census_share()
+            };
+            assert_eq!(
+                u.recycling_census_share(),
+                expected,
+                "{} ({state:?})",
+                f.name
+            );
+        }
+    }
+}

@@ -48,7 +48,7 @@ impl Simulation {
         if cap == 0.0 {
             return 0.0;
         }
-        self.recycling_fill_of(self.tower.total_population(), cap)
+        self.recycling_fill_of(self.recycling_population(), cap)
     }
 
     /// The fill for `population` against `capacity` at this minute of the
