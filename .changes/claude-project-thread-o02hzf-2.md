@@ -18,3 +18,4 @@ crate: none
 - A tower you load or come back to whose Bulletin has no saved messages yet opens it with a line saying so, so it is never blank.
 - Menus stay on screen on a phone, and a tap that closes a menu no longer builds on the tower under it.
 - The first time you open version 4, a short fireworks show welcomes you, with links to get started and to see what is new. The welcome stays until you close it, and once you do it does not show again.
+- Following a person keeps up on a slow computer or phone. Before, a device drawing fewer than five frames a second barely moved the camera toward them.

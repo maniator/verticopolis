@@ -22,6 +22,8 @@ interface Focus {
   /** Where the follow last left the camera, so a move by anything else (a
    *  drag, the keyboard, the Map) hands it back to the player. */
   cam: { x: number; y: number; zoom: number } | null;
+  /** The page time of the follow's last step, so it glides by wall time. */
+  steppedAt: number | null;
 }
 
 const focus = new WeakMap<TowerEngine, Focus>();
@@ -33,6 +35,11 @@ const PICK_SLOP_PX = 6;
  *  left after one second. Small enough to glide, large enough to keep up
  *  with a rider in an express car. */
 const FOLLOW_LEFT_AFTER_SECOND = 0.02;
+/** The longest frame one step of the follow catches up, so the camera
+ *  glides on a slow device and does not leap after a stalled tab. */
+const FOLLOW_STEP_CAP_MS = 250;
+/** The first step's length, before there is a last step to measure from. */
+const FOLLOW_FIRST_STEP_MS = 1000 / 60;
 /** A pan, or any other camera move, of more than this (screen pixels) takes
  *  the camera back. */
 const FOLLOW_PAN_SLOP_PX = 14;
@@ -69,7 +76,7 @@ export function pickPersonAt(engine: TowerEngine, world: ex.Vector): number | nu
 }
 
 export function focusPerson(engine: TowerEngine, id: number): void {
-  focus.set(engine, { id, follow: false, at: null, cam: null });
+  focus.set(engine, { id, follow: false, at: null, cam: null, steppedAt: null });
 }
 
 /** The engine's own word on where the picked person is, from their card. */
@@ -91,6 +98,7 @@ export function setFollow(engine: TowerEngine, on: boolean): void {
   if (f) {
     f.follow = on;
     f.cam = null;
+    f.steppedAt = null;
   }
 }
 
@@ -125,18 +133,26 @@ function movedByPlayer(engine: TowerEngine, f: Focus): boolean {
 }
 
 /** One frame of the follow: a pan, or any other move of the camera, hands it
- *  back to the player; otherwise the camera glides toward the person. */
-export function stepFollow(engine: TowerEngine, elapsedMs: number): void {
+ *  back to the player; otherwise the camera glides toward the person.
+ *
+ *  `nowMs` is the page's clock (`performance.now()`), and the glide runs on
+ *  the time since the last step. The engine's frame time is not used: the
+ *  render clock turns any frame over 200 ms into 1 ms, so on a device that
+ *  draws slower than five frames a second the camera would barely move. */
+export function stepFollow(engine: TowerEngine, nowMs: number): void {
   const f = focus.get(engine);
   if (!f?.follow) return;
   if ((engine.gesture === "pan" && engine.moved > FOLLOW_PAN_SLOP_PX) || movedByPlayer(engine, f)) {
     f.follow = false;
     f.cam = null;
+    f.steppedAt = null;
     return;
   }
+  const elapsedMs = f.steppedAt === null ? FOLLOW_FIRST_STEP_MS : Math.min(Math.max(0, nowMs - f.steppedAt), FOLLOW_STEP_CAP_MS);
+  f.steppedAt = nowMs;
   const spot = focusSpot(engine);
   if (!spot) return;
-  const keep = Math.pow(FOLLOW_LEFT_AFTER_SECOND, Math.max(0, elapsedMs) / 1000);
+  const keep = Math.pow(FOLLOW_LEFT_AFTER_SECOND, elapsedMs / 1000);
   const target = ex.vec(spot.x, spot.y - FIGURE_H / 2);
   const pos = engine.cam.pos;
   const x = target.x + (pos.x - target.x) * keep;
