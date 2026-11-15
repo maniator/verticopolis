@@ -184,6 +184,122 @@ describe("the Open window", () => {
     expect(downloadKept).toHaveBeenCalledOnce();
   });
 
+  it("opens a right-click menu on a row whose items act on that row, and Esc closes it first", () => {
+    show("open");
+    q("#fd-row-a").dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true, clientX: 40, clientY: 60 }));
+    const items = () => [...box!.querySelectorAll<HTMLButtonElement>(".fd-menu .mb-item")];
+    expect(items().map((b) => [b.textContent, b.getAttribute("aria-disabled")])).toEqual([
+      ["Open", "false"],
+      ["Rename", "false"],
+      ["Copy", "false"],
+      ["Paste", "true"],
+      ["Duplicate", "false"],
+      ["Delete", "false"],
+    ]);
+    expect(q<HTMLInputElement>("#fd-name").value).toBe("Alpha");
+    items()[3].click();
+    expect(box!.querySelector(".fd-menu")).toBeNull();
+    expect(ctx.duplicate).not.toHaveBeenCalled();
+    q("#fd-row-a").dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true }));
+    items()[4].click();
+    expect(ctx.duplicate).toHaveBeenCalledExactlyOnceWith("a");
+    q("#fd-row-a").dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true }));
+    key(q(".fd-menu"), "Escape");
+    expect(box!.querySelector(".fd-menu")).toBeNull();
+    expect(box!.isConnected).toBe(true);
+  });
+
+  it("offers only Open and Paste on the Auto-save's menu, opened with Shift+F10", () => {
+    show("open");
+    q("#fd-row-auto").click();
+    key(q(".fd-rows"), "F10", { shiftKey: true });
+    expect([...box!.querySelectorAll(".fd-menu .mb-item")].map((b) => b.textContent)).toEqual(["Open", "Paste"]);
+    q(".fd-menu .mb-item").click();
+    expect(ctx.open).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ id: "auto" }));
+  });
+
+  it("deletes and renames from the menu, and a click on the list closes it", () => {
+    show("open");
+    const menuItem = (text: string) => [...box!.querySelectorAll<HTMLButtonElement>(".fd-menu .mb-item")].find((b) => b.textContent === text)!;
+    q("#fd-row-c").dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true }));
+    q(".fd-list").click();
+    expect(box!.querySelector(".fd-menu")).toBeNull();
+    q("#fd-row-c").dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true }));
+    menuItem("Delete").click();
+    expect(q(".fd-ask").textContent).toContain(`Delete "charlie 10"?`);
+    q(".fd-ask .btn:not([data-fd-ask])").click();
+    expect(box!.querySelector(".fd-ask")).toBeNull();
+    q("#fd-row-c").dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true }));
+    menuItem("Copy").click();
+    expect(q(".fd-line").textContent).toBe(`Copied "charlie 10". Paste makes a copy of it here.`);
+    q("#fd-row-c").dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true }));
+    menuItem("Rename").click();
+    expect(q<HTMLInputElement>(".fd-rename").value).toBe("charlie 10");
+  });
+
+  it("drops a rename on Esc, and keeps one typed before the box loses focus", () => {
+    show("open");
+    q("#fd-row-a").click();
+    key(q(".fd-rows"), "F2");
+    key(q(".fd-rename"), "Escape");
+    expect(box!.querySelector(".fd-rename")).toBeNull();
+    expect(ctx.rename).not.toHaveBeenCalled();
+    button("Rename").click();
+    const input = q<HTMLInputElement>(".fd-rename");
+    input.value = "Alpha";
+    input.dispatchEvent(new Event("blur"));
+    expect(ctx.rename).not.toHaveBeenCalled();
+    button("Rename").click();
+    q<HTMLInputElement>(".fd-rename").value = "Aleph";
+    q(".fd-rename").dispatchEvent(new Event("blur"));
+    expect(ctx.rename).toHaveBeenCalledExactlyOnceWith("a", "Aleph");
+  });
+
+  it("sorts on a column click, reverses on a second, and filters by type", () => {
+    show("open");
+    q(".fd-col-name").click();
+    expect(rowNames()).toEqual(["Auto-save (Sky)", "Alpha", "Bravo", "charlie 10"]);
+    expect(q(".fd-col-name").textContent).toBe("Name ▲");
+    q(".fd-col-name").click();
+    expect(rowNames()).toEqual(["Auto-save (Sky)", "charlie 10", "Bravo", "Alpha"]);
+    const type = q<HTMLSelectElement>("#fd-type");
+    type.value = "tdt";
+    type.dispatchEvent(new Event("change"));
+    expect(rowNames()).toEqual(["Bravo"]);
+    files = [];
+    listeners.forEach((l) => l());
+    expect(q(".fd-empty").textContent).toBe("No towers of this type.");
+  });
+
+  it("jumps with Home, End and the up arrow", () => {
+    show("open");
+    const list = q(".fd-rows");
+    key(list, "End");
+    expect(q("#fd-row-a").getAttribute("aria-selected")).toBe("true");
+    key(list, "ArrowUp");
+    expect(q("#fd-row-c").getAttribute("aria-selected")).toBe("true");
+    key(list, "Home");
+    expect(q("#fd-row-auto").getAttribute("aria-selected")).toBe("true");
+    expect(q<HTMLInputElement>("#fd-name").value).toBe("Auto-save (Sky)");
+  });
+
+  it("shows where to drop while tower files are dragged over, and hides it when they leave", () => {
+    show("open");
+    const drag = (type: string) => {
+      const e = new Event(type, { bubbles: true, cancelable: true }) as DragEvent;
+      Object.defineProperty(e, "dataTransfer", { value: { types: ["Files"], files: [], dropEffect: "none" } });
+      q(".fd").dispatchEvent(e);
+      return e;
+    };
+    drag("dragenter");
+    expect(q(".fd-drop-note").textContent).toBe("Drop tower files here to add them to My Towers");
+    const over = drag("dragover");
+    expect(over.defaultPrevented).toBe(true);
+    expect(over.dataTransfer!.dropEffect).toBe("copy");
+    drag("dragleave");
+    expect(box!.querySelector(".fd-drop-note")).toBeNull();
+  });
+
   it("redraws when the folder changes in another tab, and stops listening once closed", () => {
     show("open");
     files = [...files, entry("d", "Delta", 99)];
