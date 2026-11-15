@@ -135,6 +135,15 @@ export const LINKED_FOLDER_SCENES: Scene[] = [
         },
       }),
       still({
+        // Saving under a taken name: the next free number is offered first,
+        // the way Windows does, beside Replace and Cancel.
+        name: "linked-folder-replace",
+        setup: async (page) => {
+          await page.locator("#modal .fd-primary").click();
+          await page.waitForSelector("#modal .fd-ask", { timeout: 2000 });
+        },
+      }),
+      still({
         // File > Open… starts in the folder last used. A picked row offers
         // Duplicate only: no Rename or Delete on the player's own files.
         name: "linked-folder-open",
