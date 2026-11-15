@@ -10,7 +10,7 @@ import {
 } from "./analyticsAdapter";
 import { sendToRelay } from "./analyticsRelay";
 import { gameplaySession } from "./analytics";
-import { injectVercelTelemetry } from "./telemetry";
+import { injectPageTelemetry } from "./telemetry";
 
 // Keep the real transports inert so this file can assert that a swapped-in stub
 // takes over the whole surface: under the stub, none of these wire calls fires.
@@ -140,7 +140,7 @@ describe("analytics adapter seam", () => {
   });
 
   it("routes the page inject through the active adapter, not the vendor", () => {
-    injectVercelTelemetry();
+    injectPageTelemetry();
     expect(stub.injects).toBe(1);
     expect(injectSpeedInsights).not.toHaveBeenCalled();
     expect(injectWebAnalytics).not.toHaveBeenCalled();
@@ -149,7 +149,7 @@ describe("analytics adapter seam", () => {
   it("restores the default adapter cleanly, re-reaching the real transports", () => {
     setAnalyticsAdapter(restore); // put the production (relay) adapter back
     gameplaySession.noteStar(5);
-    injectVercelTelemetry();
+    injectPageTelemetry();
     // With the default adapter active again, the real transports are reached and
     // the stub sees nothing more: custom events go relay-only, and the page
     // inject carries the kept page-level pair (Speed Insights, then the

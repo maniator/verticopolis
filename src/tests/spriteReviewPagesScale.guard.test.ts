@@ -51,7 +51,7 @@ vi.mock("../render/sprites", () => ({
 }));
 // The gallery reports a page landing and injects host telemetry on import.
 // Neither belongs in a unit run.
-vi.mock("../telemetry", () => ({ injectVercelTelemetry: () => {} }));
+vi.mock("../telemetry", () => ({ injectPageTelemetry: () => {} }));
 vi.mock("../analytics", () => ({ trackAppAction: () => {} }));
 // The gallery reads the Rust engine's catalog before it draws. This run has no
 // engine package, so the engine's stand-in answers with the Rust catalog's

@@ -5,7 +5,7 @@ import type { DrawCtx } from "./render/sprites";
 import { drawRoomPortrait, drawTransportPortrait } from "./render/roomPortrait";
 import { pageShell } from "./ui/templates/pageShell";
 import { takeFromGameFlag } from "./ui/fromGame";
-import { injectVercelTelemetry } from "./telemetry";
+import { injectPageTelemetry } from "./telemetry";
 import { trackAppAction } from "./analytics";
 import { bindViewWorld } from "./presentation/viewWorld";
 import { bindViewKinds } from "./presentation/viewKinds";
@@ -228,7 +228,7 @@ function layoutItems(items: GalleryItem[]): { placed: Array<{ item: GalleryItem;
 // Render the shared retro page shell (title bar, Back to game, sibling nav) and
 // report the same host-gated telemetry the game and /help report, then draw the
 // catalog into the shell's canvas.
-injectVercelTelemetry();
+injectPageTelemetry();
 trackAppAction("page_gallery"); // landing on the standalone /gallery page (host-gated inside)
 render(
   pageShell({

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { injectVercelTelemetry, telemetryHostAllowed } from "./telemetry";
+import { injectPageTelemetry, telemetryHostAllowed } from "./telemetry";
 import { injectSpeedInsights } from "@vercel/speed-insights";
 import { inject as injectWebAnalytics } from "@vercel/analytics";
 
@@ -15,7 +15,7 @@ vi.mock("@vercel/analytics", () => ({ inject: vi.fn() }));
  * pair) only where the Vercel endpoints exist
  * (production + preview) and never throws past its caller.
  */
-describe("injectVercelTelemetry host gate", () => {
+describe("injectPageTelemetry host gate", () => {
   const localhost = "http://localhost:3000/";
 
   afterEach(() => {
@@ -26,35 +26,35 @@ describe("injectVercelTelemetry host gate", () => {
 
   it("injects on the production host", () => {
     window.location.href = "https://verticopolis.com/";
-    injectVercelTelemetry();
+    injectPageTelemetry();
     expect(injectSpeedInsights).toHaveBeenCalledTimes(1);
     expect(injectWebAnalytics).toHaveBeenCalledTimes(1);
   });
 
   it("injects on a Vercel preview host too", () => {
     window.location.href = "https://feature-branch.vercel.app/";
-    injectVercelTelemetry();
+    injectPageTelemetry();
     expect(injectSpeedInsights).toHaveBeenCalledTimes(1);
     expect(injectWebAnalytics).toHaveBeenCalledTimes(1);
   });
 
   it("injects on a custom-suffix preview subdomain (*.preview.verticopolis.com)", () => {
     window.location.href = "https://branch.preview.verticopolis.com/";
-    injectVercelTelemetry();
+    injectPageTelemetry();
     expect(injectSpeedInsights).toHaveBeenCalledTimes(1);
     expect(injectWebAnalytics).toHaveBeenCalledTimes(1);
   });
 
   it("injects on the canonical absolute FQDN (trailing dot)", () => {
     window.location.href = "https://verticopolis.com./";
-    injectVercelTelemetry();
+    injectPageTelemetry();
     expect(injectSpeedInsights).toHaveBeenCalledTimes(1);
     expect(injectWebAnalytics).toHaveBeenCalledTimes(1);
   });
 
   it("skips on any other host (localhost, preview server)", () => {
     window.location.href = localhost;
-    injectVercelTelemetry();
+    injectPageTelemetry();
     expect(injectSpeedInsights).not.toHaveBeenCalled();
     expect(injectWebAnalytics).not.toHaveBeenCalled();
   });
@@ -65,7 +65,7 @@ describe("injectVercelTelemetry host gate", () => {
     // (a phishing mirror, a staging alias) gets no inject: this one ends with
     // `.evil.example`, not `.verticopolis.com`.
     window.location.href = "https://verticopolis.com.evil.example/";
-    injectVercelTelemetry();
+    injectPageTelemetry();
     expect(injectSpeedInsights).not.toHaveBeenCalled();
     expect(injectWebAnalytics).not.toHaveBeenCalled();
   });
@@ -76,7 +76,7 @@ describe("injectVercelTelemetry host gate", () => {
     // future edit dropping the dot fails here instead of silently regressing.
     for (const host of ["https://evilverticopolis.com/", "https://notverticopolis.com/"]) {
       window.location.href = host;
-      injectVercelTelemetry();
+      injectPageTelemetry();
       expect(injectSpeedInsights).not.toHaveBeenCalled();
       expect(injectWebAnalytics).not.toHaveBeenCalled();
     }
@@ -87,7 +87,7 @@ describe("injectVercelTelemetry host gate", () => {
     vi.mocked(injectSpeedInsights).mockImplementationOnce(() => {
       throw new Error("telemetry down");
     });
-    expect(() => injectVercelTelemetry()).not.toThrow();
+    expect(() => injectPageTelemetry()).not.toThrow();
   });
 });
 

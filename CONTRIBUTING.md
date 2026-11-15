@@ -239,7 +239,9 @@ Verticopolis has **two test tiers**:
   through the `window.game` tooling API. That handle exists only in dev serves
   and `VC_TOOLING=1` builds; a production build compiles it away so shipped
   sessions carry no console handle into the sim. Run it with `npm run e2e`
-  after a tooling build (`VC_TOOLING=1 npm run build`).
+  after a tooling build (`VC_TOOLING=1 npm run build`). Against a production
+  build the run stops at once in its global setup (`e2e/global-setup.ts`) with
+  a message naming `VC_TOOLING=1`, instead of every spec timing out.
   There is one build and two Playwright projects, split by how the specs need
   the machine (see [`playwright.config.ts`](./playwright.config.ts)):
   `chromium-serial` holds the pinned visual/perf checks (`engineIdentity`,
