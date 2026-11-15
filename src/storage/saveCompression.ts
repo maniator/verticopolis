@@ -9,8 +9,8 @@ import { wellFormed } from "../shared/wellFormed";
  * deflate at level 1 (see `SaveGame.saveTo`), because a localStorage write can
  * run right before a reload where an async flush could be lost, and the
  * `.vctower` export uses the same so the engine's writer can match its bits.
- * `saveToAsync` compresses with the native CompressionStream, off the main
- * thread. Reading
+ * `saveToAsync` compresses with the native CompressionStream in a worker
+ * (`savePacker.ts`), off the main thread. Reading
  * a `.vctower` file (`SaveGame.importText`) inflates with the native
  * DecompressionStream. Untrusted input is always inflated behind a size cap so a
  * decompression bomb can't hang the tab.
@@ -151,7 +151,12 @@ export function parseSaveJson(text: string): unknown {
  * engine's writer (`load::encode_vctower`) refuses at the same bound.
  */
 export function encodeSaveJson(json: string): Uint8Array {
-  const bytes = new TextEncoder().encode(json);
+  return checkSaveBytes(new TextEncoder().encode(json));
+}
+
+/** The save's UTF-8 bytes back, or the refusal {@link encodeSaveJson} gives a
+ *  save past the cap, for bytes the engine wrote (`saveBytes`). */
+export function checkSaveBytes(bytes: Uint8Array): Uint8Array {
   if (bytes.length > MAX_SAVE_INFLATED_BYTES) {
     throw new SaveTooLargeError("This tower's save data is larger than 32 MB, the most a save can hold.");
   }

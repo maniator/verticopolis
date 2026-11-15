@@ -1145,7 +1145,12 @@ describe.skipIf(noEngine)("SaveLoad (persistence, update flush, GPU-loss recover
     let releaseFirst!: () => void;
     const savedMoney: number[] = [];
     const spy = vi.spyOn(SaveGame, "saveAsync").mockImplementation(async (s) => {
-      savedMoney.push((JSON.parse(s) as { money: number }).money);
+      // The engine hands the autosave its stamped bytes, never a text.
+      if (typeof s === "string") throw new Error("the autosave was handed a text");
+      const save = JSON.parse(new TextDecoder().decode(s())) as { money: number; savedAt: unknown; appVersion: unknown };
+      expect(typeof save.savedAt).toBe("number");
+      expect(typeof save.appVersion).toBe("string");
+      savedMoney.push(save.money);
       if (savedMoney.length === 1) await new Promise<void>((resolve) => (releaseFirst = resolve));
     });
     try {

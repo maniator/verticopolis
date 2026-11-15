@@ -12,7 +12,7 @@ import { shouldArm } from "../ui/Onboarding";
 import type { EnginePort } from "../simport/enginePort";
 import type { PortCodes } from "../simport/portCodes";
 import type { ViewReader } from "../simport/viewReader";
-import { NEWER_SAVE_REFUSAL, SWAP_REFUSED, exportFile, loadStored, newerSaveRefused, saveText, stampCamera, swapDone } from "./portLifecycle";
+import { NEWER_SAVE_REFUSAL, SWAP_REFUSED, exportFile, loadStored, newerSaveRefused, saveBytes, saveText, stampCamera, swapDone } from "./portLifecycle";
 import { currentStamp } from "../storage/saveStamp";
 import { exportFacts, importFacts } from "../simport/tdtRecords";
 import { isCrashed, isEngineStopped, isSplashUp } from "./interactionState";
@@ -178,9 +178,9 @@ export class SaveLoad {
     try {
       do {
         this.autosaveQueued = false;
-        // Re-stamp per iteration: the camera may have moved while the
-        // previous async compression was in flight.
-        await SaveGame.saveAsync(this.saveText());
+        // Re-stamp per iteration: the camera may have moved while the previous
+        // async compression was in flight. The engine hands over stamped bytes.
+        await SaveGame.saveAsync(() => saveBytes(this.deps.enginePort(), this.deps.getView(), currentStamp()));
       } while (this.autosaveQueued);
       this.notice.worked();
     } catch (err) {

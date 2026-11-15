@@ -6,20 +6,20 @@ import type { SlotInfo } from "./slotInfo";
 // it keeps working.
 export type { SlotInfo } from "./slotInfo";
 import {
+  checkSaveBytes,
   compressionDecodeSupported,
   compressionEncodeSupported,
-  deflate,
   encodeSaveJson,
   fromBase64,
   inflate,
   inflateCapped,
   parseSaveJson,
   STORE_MAGIC,
-  toBase64,
   TOWER_FILE_MAGIC,
   TowerTooLargeError,
 } from "./saveCompression";
 import { packVctower, payloadLine } from "./vctowerWriter";
+import { packHere, PackerLostError, packSave } from "./savePacker";
 import { stashedText, stashUnreadable } from "./unreadableStash";
 import { stampText } from "./saveStamp";
 import { engineSaveText, importObjection, looksLikeTowerSave, readSavedAt } from "./saveTextRead";
@@ -34,16 +34,11 @@ import { UNREADABLE_KEY } from "./unreadableStash";
  * handful of named manual slots, so the player can keep multiple towers. Also
  * supports export/import of .vctower tower files for sharing or backups.
  *
- * Stored values are DEFLATE-compressed (see {@link STORE_MAGIC}): a real
- * late-game tower is hundreds of KB of JSON even in the sparse v3 unit shape,
- * and across the autosave slot plus three manual slots the raw JSON would
- * crowd the ~5MB localStorage quota and risk a failed save on a large tower.
- * Compressed, each slot lands around 100-120KB. The compression is
- * synchronous (fflate) on purpose: saving happens at boot, on a timer, and —
- * critically — right before a reload in the crash-recovery / update paths,
- * where an async write could be interrupted mid-flush and lose the tower. The
- * .vctower FILE export packs with the same fflate level 1, so every writer, and
- * the engine's, writes the same bits.
+ * Stored values are DEFLATE-compressed (see {@link STORE_MAGIC}), about
+ * 100-120KB a slot for a late-game tower. The flushes before a reload (crash
+ * recovery, update, tab hide) compress synchronously with fflate level 1, so
+ * the write lands before the page goes; the timer autosave packs in a worker
+ * (`savePacker`). Every .vctower writer, the engine's too, writes the same bits.
  */
 
 const AUTO_KEY = "verticopolis-save";
@@ -228,8 +223,9 @@ export const SaveGame = {
   save(text: SaveText): void {
     this.saveTo(AUTO_KEY, text);
   },
-  async saveAsync(text: SaveText): Promise<void> {
-    await this.saveToAsync(AUTO_KEY, text);
+  /** Autosave `save` (its text, or a maker of the engine's stamped bytes). */
+  async saveAsync(save: SaveText | (() => Uint8Array)): Promise<void> {
+    await this.saveToAsync(AUTO_KEY, save);
   },
   hasSave(): boolean {
     return saveStore.get(AUTO_KEY) !== null || saveStore.get(LEGACY_AUTO_KEY) !== null;
@@ -360,21 +356,24 @@ export const SaveGame = {
     // an async write could be lost.
     writeSlot(key, this.packSync(text));
   },
-  async saveToAsync(key: string, text: SaveText): Promise<void> {
-    if (!compressionEncodeSupported()) {
-      this.saveTo(key, text);
-      return;
-    }
+  async saveToAsync(key: string, save: SaveText | (() => Uint8Array)): Promise<void> {
+    if (typeof save === "string" && !compressionEncodeSupported()) return this.saveTo(key, save);
     // Encode (and refuse an oversized save) before claiming the token: a
     // refused save leaves no token behind, so an older save of the same slot
-    // still in flight commits instead of the slot keeping neither.
-    const bytes = encodeSaveJson(stampText(text).json);
+    // still in flight commits instead of the slot keeping neither. The engine's
+    // bytes come stamped; packing moves them to a worker (`savePacker`), and a
+    // worker that dies with them has the save made again and packed here.
+    const make = () => (typeof save === "string" ? encodeSaveJson(stampText(save).json) : checkSaveBytes(save()));
+    const bytes = make();
     const token = {};
     latestAsyncSave = token;
-    const packed = await deflate(bytes);
+    const { packed, base64 } = await packSave(bytes).catch((err: unknown) => {
+      if (err instanceof PackerLostError) return packHere(make());
+      throw err;
+    });
     if (latestAsyncSave !== token) return;
     latestAsyncSave = null;
-    writeSlot(key, STORE_MAGIC + toBase64(packed));
+    writeSlot(key, STORE_MAGIC + base64, packed);
   },
 
   /** Serialize the tower into the .vctower container (see TOWER_FILE_MAGIC). */
@@ -446,9 +445,10 @@ export const SaveGame = {
   importObjection,
 };
 
-function writeSlot(key: string, value: string): void {
+/** Store `value` under `key`; `packed`, when given, is its deflate bytes (see `saveStore.set`). */
+function writeSlot(key: string, value: string, packed?: Uint8Array): void {
   if (key !== AUTO_KEY) {
-    saveStore.set(key, value);
+    saveStore.set(key, value, packed);
     return;
   }
   const legacy = saveStore.get(LEGACY_AUTO_KEY);
@@ -456,7 +456,7 @@ function writeSlot(key: string, value: string): void {
   if (needsQuotaReclaim) {
     saveStore.remove(LEGACY_AUTO_KEY);
     try {
-      writeAutosaveValue(value);
+      writeAutosaveValue(value, packed);
     } catch (err) {
       try {
         saveStore.set(LEGACY_AUTO_KEY, legacy);
@@ -468,7 +468,7 @@ function writeSlot(key: string, value: string): void {
     return;
   }
   try {
-    writeAutosaveValue(value);
+    writeAutosaveValue(value, packed);
   } catch (err) {
     // Both keys can coexist (multi-tab, or an older build re-writing the
     // legacy key after this build migrated it). The legacy value is usually a
@@ -477,7 +477,7 @@ function writeSlot(key: string, value: string): void {
     if (legacy === null) throw err;
     saveStore.remove(LEGACY_AUTO_KEY);
     try {
-      writeAutosaveValue(value);
+      writeAutosaveValue(value, packed);
     } catch (retryErr) {
       // If the retry fails too, put the legacy value back: an unreadable
       // primary falls back to the legacy save at load (see loadResult), so
@@ -494,7 +494,7 @@ function writeSlot(key: string, value: string): void {
   if (legacy !== null) saveStore.remove(LEGACY_AUTO_KEY);
 }
 
-function writeAutosaveValue(value: string): void {
-  saveStore.set(AUTO_KEY, value);
+function writeAutosaveValue(value: string, packed?: Uint8Array): void {
+  saveStore.set(AUTO_KEY, value, packed);
 }
 

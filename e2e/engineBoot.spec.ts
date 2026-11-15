@@ -279,12 +279,13 @@ test.describe("never falls back to the TypeScript engine", () => {
       return { text: localStorage.getItem("verticopolis-save"), minutes: g.reader.header.minutes as number };
     });
     expect(saved.text).not.toBeNull();
-    // The engine traps inside the autosave's serialize, and every later call
-    // on it throws, as a poisoned wasm-bindgen object does.
+    // The engine traps inside the autosave's save (`saveBytes`, the stamped
+    // save the autosave asks for), and every later call on it throws, as a
+    // poisoned wasm-bindgen object does.
     await page.evaluate(() => {
       const engine = (window as any).__vcEngine.port;
       const proto = Object.getPrototypeOf(engine);
-      Object.defineProperty(engine, "serialize", {
+      Object.defineProperty(engine, "saveBytes", {
         value: () => {
           for (const key of Object.getOwnPropertyNames(proto)) {
             if (key === "constructor" || typeof Object.getOwnPropertyDescriptor(proto, key)?.value !== "function") continue;
