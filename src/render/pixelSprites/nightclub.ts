@@ -23,7 +23,7 @@ const BEAMS = ["#F0409A", "#40C0F0", "#70E060", "#F0A040", "#B060F0"]; // club l
 /** A stable per-room seed from GEOGRAPHY (floor, x), so the crowd and light
  *  colors survive a save/export/import (which renumbers `u.id`). */
 function figureSeed(u: Pick<UnitView, "floor" | "x">): number {
-  return (u.floor * 131 + u.x * 17) | 0;
+  return (u.floor * 131 + u.x * 17) >>> 0;
 }
 
 export function nightclub(d: RoomCtx, u: UnitView, x: number, y: number, w: number, h: number): void {

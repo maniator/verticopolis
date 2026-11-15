@@ -42,7 +42,7 @@ export const BOUTIQUE_LOOKS: Record<string, BoutiqueLook> = {
 /** A stable per-room seed from GEOGRAPHY (floor, x), so the figures and prop
  *  colors survive a save/export/import (which renumbers `u.id`). */
 function figureSeed(u: Pick<UnitView, "floor" | "x">): number {
-  return (u.floor * 131 + u.x * 17) | 0;
+  return (u.floor * 131 + u.x * 17) >>> 0;
 }
 
 const GARMENT_HUES = ["#C0506A", "#4A7AA8", "#5AA868", "#D8A03A", "#8A5AB0", "#D06A3A"];

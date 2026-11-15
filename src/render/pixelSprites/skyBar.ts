@@ -32,7 +32,7 @@ const BAR_INSET = 3;
 /** A stable per-room seed from GEOGRAPHY (floor, x), so the crowd, bottles, and
  *  skyline survive a save/export/import (which renumbers `u.id`). */
 function figureSeed(u: Pick<UnitView, "floor" | "x">): number {
-  return (u.floor * 167 + u.x * 29) | 0;
+  return (u.floor * 167 + u.x * 29) >>> 0;
 }
 
 export function skyBar(d: RoomCtx, u: UnitView, x: number, y: number, w: number, h: number): void {

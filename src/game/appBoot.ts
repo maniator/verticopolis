@@ -336,7 +336,6 @@ export function runBootFlow(app: GameApp, savedAtBoot?: number): void {
       bootCommonProps({
         platform,
         distributionChannel: distributionChannelLabel(platform),
-        version: APP_VERSION,
         onboarded: isOnboarded(),
         tenureDay: app.reader ? clockOf(app.reader.header).day : undefined,
         savedAt: savedAtBoot,

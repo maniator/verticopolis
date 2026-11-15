@@ -24,7 +24,7 @@ const SHELF = "#B07A46";
 /** A stable per-room seed from GEOGRAPHY (floor, x), so the children and toys
  *  survive a save/export/import (which renumbers `u.id`). */
 function figureSeed(u: Pick<UnitView, "floor" | "x">): number {
-  return (u.floor * 137 + u.x * 19) | 0;
+  return (u.floor * 137 + u.x * 19) >>> 0;
 }
 
 /** A small child: a shorter body than the adult silhouette, in a bright smock. */

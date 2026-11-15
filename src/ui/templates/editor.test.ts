@@ -119,6 +119,11 @@ describe("unit editor row and action branches", () => {
     const gutted = renderToFragment(unitEditor(unit("office", { state: "gutted" })));
     expect(gutted.textContent).toContain("Scrap value");
     expect(gutted.textContent).toContain("Gutted: bulldoze and rebuild.");
+    // The warning is the pixel icon, never the bare glyph that can show as a
+    // missing-glyph box (#794).
+    expect(gutted.querySelector('.k svg[data-icon="warning"]')).not.toBeNull();
+    expect(gutted.querySelector(".k .visually-hidden")!.textContent).toBe("Warning");
+    expect(gutted.textContent).not.toContain("⚠");
     expect(gutted.textContent).not.toContain("Resale value");
     const offMarket = renderToFragment(unitEditor(unit("office", { noRate: true })));
     expect(offMarket.querySelector('[data-field="rent"]')!.textContent).toBe("No Rate");

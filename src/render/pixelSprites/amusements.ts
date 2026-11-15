@@ -40,7 +40,7 @@ export const AMUSEMENTS_LOOKS: Record<string, AmusementsLook> = {
 /** A stable per-room seed from GEOGRAPHY (floor, x), so the crowd and screen
  *  colors survive a save/export/import (which renumbers `u.id`). */
 function figureSeed(u: Pick<UnitView, "floor" | "x">): number {
-  return (u.floor * 131 + u.x * 17) | 0;
+  return (u.floor * 131 + u.x * 17) >>> 0;
 }
 
 /** The five arcade screen hues, a cheerful spread that keeps the dark room lively. */
