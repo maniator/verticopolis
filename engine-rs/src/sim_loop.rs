@@ -190,8 +190,7 @@ impl Simulation {
     #[doc(hidden)]
     pub fn on_day(&mut self) {
         self.weather = weather_for(self.clock.day());
-        let period =
-            (self.clock.day() as f64 / self.clock.calendar.maint_period_days as f64).floor() as i64;
+        let period = self.maintenance_period();
         let lease_monthly = self.mode.lease_rent_lands_monthly();
         let mut lease_due = false;
         if period != self.last_month {

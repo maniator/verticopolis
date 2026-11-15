@@ -428,11 +428,11 @@ pub(crate) fn assemble(
     }
     sim.weather = weather_for(sim.clock.day());
     sim.last_day = sim.clock.day();
-    sim.last_quarter = sim.clock.quarter();
     sim.last_quarter_money = num(data.get("lastQuarterMoney"), 0.0);
-    sim.last_month =
-        (sim.clock.day() as f64 / sim.clock.calendar.maint_period_days as f64).floor() as i64;
-    sim.last_hour = sim.clock.hour();
+    sim.set_marks_from_clock();
+    if let Some(marks) = data.get("periodMarks") {
+        sim.restore_period_marks(marks);
+    }
     sim.adopt_milestones();
     sim.founder = detect_founder(raw);
     // Last, once the tower is whole: the people point at its rooms and cars.

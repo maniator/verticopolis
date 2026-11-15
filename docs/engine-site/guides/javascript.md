@@ -247,7 +247,9 @@ builds them, for the web game's own tests and tooling.
   `housekeeping` carries the rooms cleaned today, yesterday's shift and the
   days its nudges last fired, and its `moveIns` carries the day's move-ins
   so far, so a loaded game's people, cars and crews carry on where they
-  were and the evening's move-in report counts the whole day. The elevator
+  were and the evening's move-in report counts the whole day. A save from a
+  game's first day also carries `periodMarks`, so that day's end bills the
+  first maintenance and office rent as it would have unsaved. The elevator
   panels' hourly figures start over on a load. A save from before the crowd
   was saved loads with nobody in the building, and the tower fills again
   from the lobby. The `.TDT` format carries none of the four.

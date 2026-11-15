@@ -135,4 +135,9 @@ export interface SerializedGame {
    * The engine owns the shape (`engine-rs/src/churn/move_ins_save.rs`); absent
    * while nobody has moved in since the last report and in older saves. */
   moveIns?: unknown;
+  /** A first-day game's hour, maintenance-period and quarter marks that the
+   * clock does not give, so a reload bills the first day's end as the unsaved
+   * game would. The engine owns the shape (`engine-rs/src/sim_period_marks.rs`);
+   * absent from the second day on and in older saves. */
+  periodMarks?: unknown;
 }

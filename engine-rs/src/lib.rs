@@ -195,6 +195,7 @@ pub mod services;
 pub mod sim;
 #[doc(hidden)]
 pub mod sim_loop;
+mod sim_period_marks;
 mod sim_save;
 pub mod snapshot;
 #[doc(hidden)]
