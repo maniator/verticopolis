@@ -324,16 +324,16 @@ export const linkedFolder = {
     const same = towers.find((e) => e.name === name) ?? towers.find((e) => e.name.toLocaleLowerCase() === clean.toLocaleLowerCase());
     if (same && !replace) throw new FileNameTakenError(clean);
     if (same) return writeFile(folder, same.id, bytes);
-    // A file another program wrote since the list was read is never replaced
-    // without asking either: the tower goes in as "name (2)" and up instead,
-    // the first such name free on disk.
-    const taken = [...towers];
-    let pick = clean;
-    while (await exists(folder, `${pick}.vctower`)) {
-      taken.push({ id: "", name: pick, kind: "tower", size: 0, modified: 0 });
-      pick = freeName(clean, taken);
-    }
-    return writeFile(folder, `${pick}.vctower`, bytes);
+    return writeFresh(folder, clean, towers, bytes);
+  },
+
+  /** Save under `name`, or the first "name (2)" and up free in the list and
+   *  on disk, never over any file (the Auto-save copy's first write). */
+  async saveNew(name: string, bytes: Uint8Array): Promise<TowerFileEntry> {
+    const folder = need();
+    const clean = cleanFileName(name);
+    if (!clean) throw new Error("Type a name for the tower.");
+    return writeFresh(folder, clean, folder.entries.filter((e) => e.kind === "tower"), bytes);
   },
 
   /** Write `bytes` over the file `id` itself, by its name on disk, for File >
@@ -354,6 +354,19 @@ export const linkedFolder = {
     return writeFile(folder, `${name}${ext}`, bytes);
   },
 };
+
+/** Write a new file `clean.vctower`, or the first "clean (2)" and up that
+ *  neither `towers` nor the disk has: a file another program wrote since the
+ *  list was read is never replaced without asking. */
+async function writeFresh(folder: Linked, clean: string, towers: readonly TowerFileEntry[], bytes: Uint8Array): Promise<TowerFileEntry> {
+  const taken = [...towers];
+  let pick = freeName(clean, taken);
+  while (await exists(folder, `${pick}.vctower`)) {
+    taken.push({ id: "", name: pick, kind: "tower", size: 0, modified: 0 });
+    pick = freeName(clean, taken);
+  }
+  return writeFile(folder, `${pick}.vctower`, bytes);
+}
 
 /** Whether the folder holds a file named `filename` right now. */
 async function exists(folder: Linked, filename: string): Promise<boolean> {

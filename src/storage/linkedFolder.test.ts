@@ -232,6 +232,23 @@ describe("saving", () => {
     expect(folder.writes).toEqual([{ name: "Sky (3).vctower", bytes: new Uint8Array([2]) }]);
   });
 
+  it("saves a new file without asking, numbered past a listed tower and a file only on disk (the Auto-save copy)", async () => {
+    const folder = fakeFolder("Towers", { "Auto-save.vctower": [1] });
+    await link(folder);
+    folder.disk.set("Auto-save (2).vctower", { bytes: new Uint8Array([6]), modified: 1 });
+    const entry = await linkedFolder.saveNew("Auto-save", new Uint8Array([3]));
+    expect(entry.id).toBe("Auto-save (3).vctower");
+    expect(folder.disk.get("Auto-save.vctower")!.bytes).toEqual(new Uint8Array([1]));
+    expect(folder.disk.get("Auto-save (2).vctower")!.bytes).toEqual(new Uint8Array([6]));
+    expect(folder.writes).toEqual([{ name: "Auto-save (3).vctower", bytes: new Uint8Array([3]) }]);
+  });
+
+  it("saves a new file under its own name when nothing has it", async () => {
+    const folder = fakeFolder("Towers", {});
+    await link(folder);
+    expect((await linkedFolder.saveNew("Auto-save", new Uint8Array([3]))).id).toBe("Auto-save.vctower");
+  });
+
   it("saves beside a 1994 file of the same name without touching it", async () => {
     const folder = fakeFolder("Towers", { "TOWER2.TDT": [9] });
     await link(folder);

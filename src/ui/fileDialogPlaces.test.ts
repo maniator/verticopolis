@@ -13,6 +13,7 @@ let folder: LinkedFolderState | null;
 let linked: { [K in keyof LinkedPlaceCtx]: LinkedPlaceCtx[K] extends (...a: never[]) => unknown ? ReturnType<typeof vi.fn> & LinkedPlaceCtx[K] : LinkedPlaceCtx[K] };
 let ctx: FileDialogCtx & { [K in "open" | "save" | "duplicate" | "rename" | "remove" | "add"]: ReturnType<typeof vi.fn> };
 let changed: (() => void)[];
+let mirroring: boolean;
 
 const ok = async (): Promise<FileNote | null> => null;
 
@@ -38,6 +39,11 @@ function makeLinked(): typeof linked {
     unlink: vi.fn(async () => {
       folder = null;
       return null;
+    }),
+    mirror: vi.fn(() => mirroring),
+    setMirror: vi.fn(async (on: boolean) => {
+      mirroring = on;
+      return { text: on ? "copied" : "no longer copied", kind: "info" as const };
     }),
     open: vi.fn(),
     save: vi.fn(ok),
@@ -79,6 +85,7 @@ const settle = () => new Promise((r) => setTimeout(r, 0));
 beforeEach(() => {
   box = null;
   changed = [];
+  mirroring = false;
   folder = null;
   linked = makeLinked();
   resetFilePlaceForTests();
@@ -151,6 +158,33 @@ describe("the Look in box", () => {
     expect(linked.unlink).toHaveBeenCalledOnce();
     expect(q(".fd-look-now").textContent).toContain("My Towers");
     expect(box!.textContent).toContain(`Unlinked "Towers". Its files are still there.`);
+  });
+
+  it("offers the Auto-save copy as a check item between Link and Unlink, and turns it on and off", async () => {
+    folder = { name: "Towers", access: "granted" };
+    show("open", { startIn: "linked" });
+    q(".fd-look").click();
+    expect(lookItems().slice(-3)).toEqual(["Link a different folder…", "Keep the Auto-save here too", 'Unlink "Towers"its files stay']);
+    const item = () => q(".fd-mirror");
+    expect(item().getAttribute("role")).toBe("menuitemcheckbox");
+    expect(item().getAttribute("aria-checked")).toBe("false");
+    item().click();
+    await settle();
+    expect(linked.setMirror).toHaveBeenLastCalledWith(true);
+    expect(box!.querySelector(".fd-look-pop")).toBeNull();
+    expect(box!.textContent).toContain("copied");
+    q(".fd-look").click();
+    expect(item().getAttribute("aria-checked")).toBe("true");
+    expect(item().textContent).toContain("✓");
+    item().click();
+    await settle();
+    expect(linked.setMirror).toHaveBeenLastCalledWith(false);
+  });
+
+  it("offers no Auto-save copy while no folder is linked", () => {
+    show("open");
+    q(".fd-look").click();
+    expect(box!.querySelector(".fd-mirror")).toBeNull();
   });
 });
 

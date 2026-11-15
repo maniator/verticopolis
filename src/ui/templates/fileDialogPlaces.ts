@@ -19,6 +19,8 @@ export interface LinkedView {
   readonly name: string;
   /** False until the browser has the player's OK for this visit. */
   readonly allowed: boolean;
+  /** The Auto-save is copied there too (`game/autosaveMirror.ts`). */
+  readonly mirror: boolean;
 }
 
 export interface PlacesView {
@@ -40,6 +42,8 @@ export interface PlacesHandlers {
   choose(place: FilePlace): void;
   link(): void;
   unlink(): void;
+  /** Turn the Auto-save copy in the linked folder on or off. */
+  toggleMirror(): void;
 }
 
 function placeLabel(v: PlacesView, place: FilePlace): TemplateResult {
@@ -70,11 +74,21 @@ export function placesTemplate(v: PlacesView, h: PlacesHandlers): TemplateResult
           <div class="fd-look-sep" role="separator"></div>
           ${v.canLink
             ? html`${item(html`${linkFolderIcon()}<span>${v.linked ? "Link a different folder…" : `Link a folder on this ${v.where}…`}</span>`, h.link)}
+              ${v.linked ? mirrorItem(v.linked.mirror, v.busy, h.toggleMirror) : nothing}
               ${v.linked ? item(html`<span class="fd-icon-pad"></span><span>Unlink "${v.linked.name}"</span><span class="fd-look-sub">its files stay</span>`, h.unlink) : nothing}`
             : item(html`<span class="fd-icon-pad"></span><span>This browser can't link a folder</span>`, () => {}, { quiet: true }, false)}
         </div>`
       : nothing}
   </div>`;
+}
+
+/** The check item that keeps a copy of the Auto-save in the linked folder. */
+function mirrorItem(on: boolean, busy: boolean, toggle: () => void): TemplateResult {
+  return html`<button type="button" role="menuitemcheckbox" class="fd-look-item fd-mirror" aria-checked=${on ? "true" : "false"} ?disabled=${busy}
+    @click=${(e: Event) => {
+      e.stopPropagation();
+      toggle();
+    }}><span class="fd-icon-pad fd-check" aria-hidden="true">${on ? "✓" : ""}</span><span>Keep the Auto-save here too</span></button>`;
 }
 
 /** The list's note while the browser wants the player's OK for the linked

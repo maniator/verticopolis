@@ -5,6 +5,8 @@ const m = vi.hoisted(() => ({
   track: vi.fn(),
   exportFile: vi.fn(() => Uint8Array.of(7, 7, 7)),
   canLink: true,
+  live: vi.fn(() => true),
+  mirror: { on: false, forget: vi.fn(), set: vi.fn(), copy: vi.fn(async () => true) },
   folder: {
     state: vi.fn(() => ({ name: "Towers", access: "granted" }) as { name: string; access: string } | null),
     list: vi.fn(() => []),
@@ -24,6 +26,13 @@ const m = vi.hoisted(() => ({
 vi.mock("../analytics", () => ({ trackAppAction: m.track }));
 vi.mock("./portLifecycle", () => ({ exportFile: m.exportFile }));
 vi.mock("../storage/linkedFolder", () => ({ canLinkFolder: () => m.canLink, linkedFolder: m.folder }));
+vi.mock("./autosaveSchedule", () => ({ autosaveLive: m.live }));
+vi.mock("./autosaveMirror", () => ({
+  mirrorOn: () => m.mirror.on,
+  setMirror: m.mirror.set,
+  forgetMirrorFile: m.mirror.forget,
+  mirrorAutosave: m.mirror.copy,
+}));
 
 import type { GameApp } from "../main";
 import type { FileRow } from "../ui/templates/fileDialog";
@@ -54,6 +63,8 @@ beforeEach(() => {
   m.folder.state.mockImplementation(() => ({ name: "Towers", access: "granted" }));
   m.folder.allow.mockImplementation(async () => "granted");
   m.folder.read.mockImplementation(async () => BINARY);
+  m.live.mockReturnValue(true);
+  m.mirror.copy.mockImplementation(async () => true);
   setCurrentFile(null);
   app = makeApp();
 });
@@ -155,6 +166,50 @@ describe("the linked folder in the Open and Save As windows", () => {
     expect(await place().duplicate("A.vctower")).toBeNull();
     expect(m.folder.duplicate).toHaveBeenCalledExactlyOnceWith("A.vctower");
     expect(m.track).toHaveBeenCalledWith("folder_copy");
+  });
+});
+
+describe("the Auto-save copy in the linked folder", () => {
+  it("turns on, writes the copy now, and says how often it is written", async () => {
+    expect(await place().setMirror(true)).toEqual({ text: `The Auto-save is copied to "Towers" every minute while you play.`, kind: "info" });
+    expect(m.mirror.set).toHaveBeenCalledExactlyOnceWith(true);
+    expect(m.mirror.copy).toHaveBeenCalledExactlyOnceWith(app, expect.any(Number), true);
+    expect(m.track).toHaveBeenCalledWith("folder_mirror", "on");
+  });
+
+  it("says when the first copy failed", async () => {
+    m.mirror.copy.mockResolvedValueOnce(false);
+    expect((await place().setMirror(true))?.kind).toBe("bad");
+  });
+
+  it("waits to write while the folder needs the browser's OK or the tower can't be saved", async () => {
+    m.folder.state.mockImplementation(() => ({ name: "Towers", access: "prompt" }));
+    expect((await place().setMirror(true))?.kind).toBe("info");
+    m.folder.state.mockImplementation(() => ({ name: "Towers", access: "granted" }));
+    m.live.mockReturnValue(false);
+    await place().setMirror(true);
+    expect(m.mirror.copy).not.toHaveBeenCalled();
+  });
+
+  it("turns off and says the copy stays", async () => {
+    expect(await place().setMirror(false)).toEqual({ text: `The Auto-save is no longer copied to "Towers". The copy there stays.`, kind: "info" });
+    expect(m.mirror.set).toHaveBeenCalledExactlyOnceWith(false);
+    expect(m.mirror.copy).not.toHaveBeenCalled();
+    expect(m.track).toHaveBeenCalledWith("folder_mirror", "off");
+  });
+
+  it("starts a new copy file when another folder is linked, and not when the picker is cancelled", async () => {
+    m.folder.link.mockResolvedValueOnce(false);
+    await place().link();
+    expect(m.mirror.forget).not.toHaveBeenCalled();
+    await place().link();
+    expect(m.mirror.forget).toHaveBeenCalledOnce();
+  });
+
+  it("stops copying and forgets the file on unlink", async () => {
+    await place().unlink();
+    expect(m.mirror.set).toHaveBeenCalledExactlyOnceWith(false);
+    expect(m.mirror.forget).toHaveBeenCalledOnce();
   });
 });
 

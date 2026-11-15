@@ -10,6 +10,7 @@ import { KeyboardPlay } from "./keyboardPlay";
 import { catalogOf, isUnlocked } from "./portAccess";
 import { attemptContextRecovery } from "./contextRecovery";
 import { autosaveIfLive, startAutosave } from "./autosaveSchedule";
+import { mirrorAutosave } from "./autosaveMirror";
 import { showCrashScreen } from "../ui/crashScreen";
 import { showGraphicsRecovery } from "../ui/graphicsRecovery";
 import { OnboardingController, isOnboarded } from "../ui/Onboarding";
@@ -416,8 +417,9 @@ export function runBootFlow(app: GameApp, savedAtBoot?: number): void {
 
   // Autosave periodically, but never while the first-run splash is up, so an
   // idle first visit can't persist the throwaway boot sim (which would flip
-  // hasSave() true for a tower the player never started).
-  startAutosave(app.saveLoad);
+  // hasSave() true for a tower the player never started). A player who asked
+  // for it also gets a copy in their linked folder (autosaveMirror.ts).
+  startAutosave(app.saveLoad, () => void mirrorAutosave(app));
 }
 
 /** What the player is told when a stored save could not be read. The corrupt

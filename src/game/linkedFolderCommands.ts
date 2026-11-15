@@ -7,6 +7,8 @@ import type { FileNote } from "../ui/fileDialog";
 import type { LinkedPlaceCtx } from "../ui/fileDialogPlaces";
 import type { FileRow } from "../ui/templates/fileDialog";
 import { decodeTowerText, isBinaryTowerFile } from "../ui/uiImport";
+import { autosaveLive } from "./autosaveSchedule";
+import { forgetMirrorFile, mirrorAutosave, mirrorOn, setMirror } from "./autosaveMirror";
 import { currentLinkedFile, setCurrentLinkedFile } from "./currentFile";
 import { exportFile } from "./portLifecycle";
 
@@ -21,8 +23,9 @@ import { exportFile } from "./portLifecycle";
  * Analytics (`docs/analytics-data-map.md`, "Linked folder"): `app_action`
  * `folder_link` (`linked`, `cancel` or `refused`), `folder_allow` (`granted`
  * or `denied`), `folder_unlink`, `folder_open` (`tower` or `tdt`),
- * `folder_save` (`new`, `replace` or `current`), `folder_copy` and
- * `folder_failed`. Codes only, never a folder's or a file's name.
+ * `folder_save` (`new`, `replace` or `current`), `folder_copy`,
+ * `folder_failed` and `folder_mirror` (`on`, `off`, or `failed` once a visit,
+ * `autosaveMirror.ts`). Codes only, never a folder's or a file's name.
  */
 
 /** A failed folder step in the player's words. */
@@ -92,6 +95,8 @@ export function linkedPlace(app: GameApp): LinkedPlaceCtx | null {
           // A new folder may hold a file of the same name: File > Save must
           // never write over it without asking.
           if (linked && currentLinkedFile() !== null) setCurrentLinkedFile(null);
+          // Nor may the Auto-save copy: it starts a new file there.
+          if (linked) forgetMirrorFile();
           return linked ? "linked" : "cancel";
         },
         (err: unknown) => {
@@ -111,11 +116,26 @@ export function linkedPlace(app: GameApp): LinkedPlaceCtx | null {
       try {
         await linkedFolder.unlink();
         if (currentLinkedFile() !== null) setCurrentLinkedFile(null);
+        setMirror(false);
+        forgetMirrorFile();
         trackAppAction("folder_unlink");
         return null;
       } catch (err) {
         return folderFailed(err);
       }
+    },
+    mirror: () => mirrorOn(),
+    setMirror: async (on) => {
+      const name = linkedFolder.state()?.name ?? "the linked folder";
+      setMirror(on);
+      trackAppAction("folder_mirror", on ? "on" : "off");
+      if (!on) return { text: `The Auto-save is no longer copied to "${name}". The copy there stays.`, kind: "info" };
+      // Write it now, so the player sees the file arrive. A folder waiting for
+      // the browser's OK, or a tower that can't be saved yet, starts later.
+      if (linkedFolder.state()?.access === "granted" && autosaveLive() && !(await mirrorAutosave(app, Date.now(), true))) {
+        return { text: `Couldn't copy the Auto-save to "${name}". The game tries again every minute.`, kind: "bad" };
+      }
+      return { text: `The Auto-save is copied to "${name}" every minute while you play.`, kind: "info" };
     },
     open: (row) => void openLinkedRow(app, row),
     save: async (name, replace) => {

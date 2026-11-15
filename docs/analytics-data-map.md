@@ -172,6 +172,7 @@ name are the player's own text and are never sent.
 | `folder_save` | `new`, `replace` or `current` | The tower written into the folder: under a new name, over a tower file the player agreed to replace, or into the live tower's own file by File > Save |
 | `folder_copy` | none | A file in the folder duplicated |
 | `folder_failed` | none | A folder step failed: the browser refused access, the disk was full, a name was taken, or another error |
+| `folder_mirror` | `on`, `off` or `failed` | The player turned the Auto-save copy in the folder on or off (Keep the Auto-save here too), or a copy failed to write. `failed` is latched once a page life, since the copy retries every minute; a copy that worked sends nothing |
 
 There is no `folder_delete` or `folder_rename`: the game never deletes or
 renames a file on the player's computer (owner, 2026-11-15).
