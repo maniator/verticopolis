@@ -32,7 +32,10 @@ pub(super) fn widen_shafts_in_place(data: &mut Value) {
 }
 
 /// The transports `widen_legacy_elevator_shafts` writes back, or `None` when
-/// the list is longer than the pools hold and it leaves the save as it is.
+/// the list is longer than Classic's pools hold and it leaves the save as it
+/// is. A longer list comes from a Modern tower with its wider elevator pool
+/// (`MODERN_POOLED_CAPS`), built long after shafts were widened, so it has
+/// no narrow shaft to widen.
 pub(crate) fn widen_shafts(transports: &[Value]) -> Option<Vec<Value>> {
     let pool_cap: i64 = POOLED_CAPS.iter().map(|p| p.cap).sum();
     if transports.len() as i64 > pool_cap {

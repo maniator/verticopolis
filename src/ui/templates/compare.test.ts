@@ -56,6 +56,7 @@ describe("the Classic and Modern summary", () => {
     hotelDaytimePresence: "late checkouts", // #304
     quarterlyRentScale: "The whole quarter's rent every three days",
     metroStationCap: "Up to three on one line", // build_cap_in, Modern runs several stations
+    elevatorShaftCap: "48 per tower", // transport_pools, Modern's wider elevator pool
     laysGroundLobbiesApart: "Several, each on its own stretch of ground lobby",
     removesLobbyTiles: "Any lobby tile sells; the lot keeps its last ground lobby tile",
   };

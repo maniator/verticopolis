@@ -10,7 +10,7 @@ use super::StepRefused;
 use crate::crowd::spawn::make_person;
 use crate::crowd::{motion, PState, Route};
 use crate::events::PendingChoice;
-use crate::facilities::{Kind, POOLED_CAPS};
+use crate::facilities::{transport_pools, Kind};
 use crate::sim::Simulation;
 use crate::tower::UnitState;
 
@@ -279,7 +279,7 @@ fn a_shaft_is_never_put_back_past_its_pooled_cap() {
                 assert!(sim.tower.place(Kind::Floor, floor, x).ok);
             }
         }
-        let cap = POOLED_CAPS
+        let cap = transport_pools(sim.tower.mode)
             .iter()
             .find(|p| p.kinds.contains(&kinds[0]))
             .unwrap()

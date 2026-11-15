@@ -27,6 +27,14 @@ impl GameMode {
         self == GameMode::Modern
     }
 
+    /// Whether a tower may hold more elevator shafts than SimTower's 24
+    /// (`facilities::MODERN_POOLED_CAPS`): Modern allows 48, still one pool
+    /// for standard, service and express; Classic keeps the 1994 limit.
+    /// Read through `facilities::transport_pools`.
+    pub fn builds_more_elevator_shafts(self) -> bool {
+        self == GameMode::Modern
+    }
+
     /// Whether party halls and theaters share one cap of 16
     /// (`facilities::CLASSIC_VENUE_POOL`, #1932): Classic does, as the 1994
     /// save keeps one table of 16 records for both; Modern caps each kind at
