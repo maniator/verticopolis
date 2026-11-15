@@ -134,8 +134,9 @@ fn a_crowd_without_commuters_writes_no_desks_or_bookings() {
 fn the_modern_routers_lines_come_back_for_the_next_step() {
     let lines = json!([[9, 4, 2], [3, 1, 5], [4, 2, 0], [1, "x", 2], [5, 5]]);
     let sim = load_with_crowd(json!({ "lines": lines }));
-    assert_eq!(sim.crowd.shaft_lines.get(&(3, 1)), Some(&5));
-    assert_eq!(sim.crowd.shaft_lines.get(&(9, 4)), Some(&2));
+    let riders = |key| sim.crowd.shaft_lines.get(&key).map(|l| l.riders);
+    assert_eq!(riders((3, 1)), Some(5));
+    assert_eq!(riders((9, 4)), Some(2));
     assert_eq!(sim.crowd.shaft_lines.get(&(4, 2)), None, "a line of nobody");
     // Written back in key order, whatever order the map holds them in.
     let crowd = &sim.serialize()["crowd"];
