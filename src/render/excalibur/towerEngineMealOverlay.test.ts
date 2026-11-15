@@ -17,12 +17,12 @@ function fakeEngine(updateMotion: () => void, reconcileCrowd: () => void): any {
     sim: {
       clock: { hour: 12, isNight: () => false, isEvening: () => false },
       tower: { revision: 7, mealOverlayRevision: 1 },
-      congestion: () => 1,
+      congestion: vi.fn(() => 1),
       // The tick threads the read-only queue projection onto d.elevatorQueue;
       // stub the memoized view so this whitebox tick harness has one to read.
       crowd: { queueView: () => ({ landings: new Map(), boarded: new Map() }) },
     },
-    d: { lit: false, anim: 0, hour: 12, stress: 0 },
+    d: { lit: false, anim: 0, hour: 12 },
     craneGfx: null,
     paused: true,
     reducedMotion: false,
@@ -76,5 +76,16 @@ describe("TowerEngine meal-overlay repaint trigger", () => {
     expect(syncScene).not.toHaveBeenCalled();
     expect(updateMotion).not.toHaveBeenCalled();
     expect(reconcileCrowd).not.toHaveBeenCalled();
+  });
+
+  it("asks the engine for no tower-wide congestion reading on a frame (#338)", () => {
+    // The reading builds the per-floor map (a walk over every room plus the
+    // parking flood) and changes with every step, so a per-frame read rebuilt
+    // it on every running frame for a value no sprite drew.
+    const fake = fakeEngine(vi.fn(), vi.fn());
+    fake.paused = false;
+    (TowerEngine.prototype as any).runTick.call(fake, 16);
+    (TowerEngine.prototype as any).runTick.call(fake, 16);
+    expect(fake.sim.congestion).not.toHaveBeenCalled();
   });
 });
