@@ -7,23 +7,23 @@ use crate::jsmath;
 use crate::tower::Tower;
 
 /// Walk toward a tile x on the current floor; true once arrived. A walker
-/// stops at the end of their run, except on the street floor in a mode
-/// that walks the street, where they carry on along the sidewalk
-/// (`crowd::street`).
+/// whose target lies past the end of their run walks to that end and
+/// stops there, at walking speed like any other step (nobody jumps along
+/// the floor), except on the street floor in a mode that walks the street,
+/// where they carry on along the sidewalk (`crowd::street`).
 pub fn walk_to(p: &mut Person, target_x: f64, dt: f64, tower: &Tower) -> bool {
+    let mut target_x = target_x;
     let dir = jsmath::sign(target_x - p.x);
     if dir != 0.0 && !walks_off_run(tower, p.floor) {
         if let Some((start, end)) = tower.run_at(p.floor, jsmath::round(p.x) as i64) {
             if dir > 0.0 && target_x > end as f64 {
-                p.x = end as f64;
-                return true;
-            }
-            if dir < 0.0 && target_x < start as f64 {
-                p.x = start as f64;
-                return true;
+                target_x = end as f64;
+            } else if dir < 0.0 && target_x < start as f64 {
+                target_x = start as f64;
             }
         }
     }
+    let dir = jsmath::sign(target_x - p.x);
     let dx = target_x - p.x;
     let step = WALK_SPEED * dt;
     if dx.abs() <= step {
