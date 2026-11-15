@@ -19,6 +19,8 @@ use crate::tower::Tower;
 pub enum ErrandPlace {
     Office,
     Home,
+    /// A venue's staff on their way to or from work (`commuters`).
+    Work,
 }
 
 impl ErrandPlace {
@@ -27,6 +29,7 @@ impl ErrandPlace {
     pub fn fits(self, kind: Kind) -> bool {
         match self {
             ErrandPlace::Office => kind == Kind::Office,
+            ErrandPlace::Work => kind.has_staff(),
             ErrandPlace::Home => kind == Kind::Condo || kind.is_rental() || kind.is_hotel(),
         }
     }
@@ -38,6 +41,15 @@ impl ErrandPlace {
 pub struct Errand {
     pub place: ErrandPlace,
     pub inbound: bool,
+}
+
+impl Errand {
+    /// Whether this is a venue's own staff on the way to or from work.
+    /// Their waits stress no floor: the offices and homes on a floor judge
+    /// their own trips, not the shop staff's (`motion::finish`).
+    pub fn on_the_job(errand: Option<Errand>) -> bool {
+        errand.is_some_and(|e| e.place == ErrandPlace::Work)
+    }
 }
 
 /// Why a person is out, as the card says it.
@@ -96,8 +108,8 @@ impl Purpose {
 
     fn of_errand(e: Errand) -> Purpose {
         match (e.place, e.inbound) {
-            (ErrandPlace::Office, true) => Purpose::ToWork,
-            (ErrandPlace::Office, false) => Purpose::FromWork,
+            (ErrandPlace::Office | ErrandPlace::Work, true) => Purpose::ToWork,
+            (ErrandPlace::Office | ErrandPlace::Work, false) => Purpose::FromWork,
             (ErrandPlace::Home, true) => Purpose::ReturnHome,
             (ErrandPlace::Home, false) => Purpose::LeaveHome,
         }

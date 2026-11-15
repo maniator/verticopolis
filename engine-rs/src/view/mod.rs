@@ -102,6 +102,9 @@ mod census_reads_tests;
 #[path = "frame_tests.rs"]
 mod frame_tests;
 #[cfg(test)]
+#[path = "kind_writes_tests.rs"]
+mod kind_writes_tests;
+#[cfg(test)]
 #[path = "layout_tests.rs"]
 mod layout_tests;
 #[cfg(test)]

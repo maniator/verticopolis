@@ -160,7 +160,13 @@ describe.skipIf(noEngine)("PortRenderSim on the engine", () => {
       expect(r.peakCongestion()).toBeGreaterThanOrEqual(r.congestion());
       for (const m of MODES) expect(Array.isArray(r.floorHeatmap(m)), m).toBe(true);
     }
-    // Ten hours on, tenants have moved in and the lobby has a crowd.
+    // Within two days a guest has checked in and the lobby has had a crowd.
+    // Check-ins and the venues' hours (each opens once its staff are in)
+    // move with the seed, so the hour can vary.
+    for (let i = 0; i < 40 && (r.population === 0 || r.congestion() === 0); i++) {
+      engine.tick(75);
+      reader.update();
+    }
     expect(r.population).toBeGreaterThan(0);
     expect(r.congestion()).toBeGreaterThan(0);
     expect(r.floorHeatmap("occupancy").length).toBeGreaterThan(0);

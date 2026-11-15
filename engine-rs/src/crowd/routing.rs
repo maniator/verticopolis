@@ -1,10 +1,9 @@
 //! Port of `crowd/routing.ts`: adjacency graphs, BFS routing, elevator calls.
 
-use std::collections::HashMap;
-
 use super::banks::balance_shafts;
 use super::expected_time;
 use super::fasthash::{FastMap, FastSet};
+use super::seg_set::SegSet;
 use super::street::street_start;
 use super::{AdjGraph, Crowd, Edge, ElevatorCalls, PState, Route, StaffParts};
 use crate::facilities::{LOT_WIDTH, MIN_FLOOR};
@@ -18,7 +17,7 @@ fn build_adjacency<'a>(
     tower: &Tower,
     transports: impl Iterator<Item = &'a Transport>,
 ) -> (AdjGraph, Vec<i64>) {
-    let mut adj: AdjGraph = HashMap::new();
+    let mut adj = AdjGraph::default();
     let mut listed: Vec<i64> = Vec::new();
     for t in transports {
         let stops = tower.stops_of(t);
@@ -30,7 +29,7 @@ fn build_adjacency<'a>(
         let seg_lists: Vec<Vec<i64>> = stops.iter().map(|&fl| tower.landing_segs(t, fl)).collect();
         for ai in 0..stops.len() {
             for &a_seg in &seg_lists[ai] {
-                let list = adj.entry(a_seg).or_insert_with(|| {
+                let list = adj.get_or_insert_with(a_seg, || {
                     listed.push(a_seg);
                     Vec::new()
                 });
@@ -75,8 +74,7 @@ pub fn passenger_parts<'a>(crowd: &'a mut Crowd, tower: &Tower) -> &'a StaffPart
     if fresh {
         let adj = adjacency(crowd, tower);
         // Sorted, so the labels never follow the map's order.
-        let mut listed: Vec<i64> = adj.keys().copied().collect();
-        listed.sort_unstable();
+        let listed: Vec<i64> = adj.sorted().into_iter().map(|(&s, _)| s).collect();
         let parts = graph_parts(adj, &listed);
         crowd.passenger_parts = Some((tower.revision, parts));
     }
@@ -152,12 +150,15 @@ pub fn passenger_path(
     to_seg: i64,
 ) -> Option<Route> {
     let walk_budget = tower.mode.walkway_willingness_applies();
+    let mut seen = std::mem::take(&mut crowd.route_seen);
     let adj = adjacency(crowd, tower);
-    if walk_budget {
+    let route = if walk_budget {
         bfs_route_walk_budget(adj, from_seg, to_seg)
     } else {
-        bfs_route(adj, from_seg, to_seg)
-    }
+        bfs_route_in(adj, from_seg, to_seg, &mut seen)
+    };
+    crowd.route_seen = seen;
+    route
 }
 
 fn to_real_floors(r: &mut Route) {
@@ -272,21 +273,29 @@ pub fn staff_route(
     if let Some(decided) = off_run_pair(a, b, from_floor, from_x, to_floor, to_x) {
         return decided.map(|r| balance_shafts(crowd, tower, r));
     }
+    let mut seen = std::mem::take(&mut crowd.route_seen);
     let (adj, parts) = staff_adjacency(crowd, tower);
     // A search between two parts of the staff graph visits all of the
     // first one before it gives up, and dispatch keeps asking for such
     // routes: a floor-level staff link can leave a room's segment off the
     // crew's network (#1143 item 6). The parts answer that without a search.
-    if parts_split(parts, a, b) {
-        return None;
-    }
-    let mut r = bfs_route(adj, a, b)?;
+    let found = (!parts_split(parts, a, b))
+        .then(|| bfs_route_in(adj, a, b, &mut seen))
+        .flatten();
+    crowd.route_seen = seen;
+    let mut r = found?;
     to_real_floors(&mut r);
     Some(balance_shafts(crowd, tower, r))
 }
 
 /// Fewest-edges BFS; the first-listed edge wins a level tie.
 pub fn bfs_route(adj: &AdjGraph, from: i64, to: i64) -> Option<Route> {
+    bfs_route_in(adj, from, to, &mut SegSet::default())
+}
+
+/// `bfs_route` with the seen set the crowd keeps between searches.
+fn bfs_route_in(adj: &AdjGraph, from: i64, to: i64, seen: &mut SegSet) -> Option<Route> {
+    seen.clear();
     if from == to {
         return Some(Route {
             floors: vec![from],
@@ -294,7 +303,6 @@ pub fn bfs_route(adj: &AdjGraph, from: i64, to: i64) -> Option<Route> {
         });
     }
     let mut prev: FastMap<i64, (i64, i64)> = FastMap::default();
-    let mut seen: FastSet<i64> = FastSet::default();
     seen.insert(from);
     let mut frontier = vec![from];
     while !frontier.is_empty() {

@@ -263,6 +263,7 @@ impl Tower {
             occupants: 0,
             customers_in: None,
             hotel_customers_in: None,
+            staff_in: 0,
             out_for_meal: None,
             residents: None,
             visitors_yest: None,

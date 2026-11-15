@@ -73,7 +73,7 @@ fn the_commuters_desks_and_bookings_come_back() {
     let sim = load_with_crowd(crowd);
     let worker = &sim.crowd.people[0];
     let commute = Commute {
-        office_id: 4,
+        workplace_id: 4,
         inbound: true,
     };
     assert_eq!(worker.commute, Some(commute));
@@ -96,7 +96,7 @@ fn the_commuters_desks_and_bookings_come_back() {
     // train); one that does not read drops the row.
     let shift = |at, inbound, station| Shift {
         at,
-        office_id: 4,
+        workplace_id: 4,
         inbound,
         station,
     };

@@ -157,10 +157,16 @@ fn station_underfoot(crowd: &Crowd, i: usize, tower: &Tower) -> Option<(usize, u
     if p.floor >= 1 || p.state != PState::ToDest {
         return None;
     }
-    let station = tower
-        .metro_stations()
-        .find(|u| u.floor + 1 == p.floor && p.x >= u.x as f64 && p.x < (u.x + u.width) as f64)?;
-    Some(place_on_line(tower, station))
+    // One pass over the line: stations on a floor never overlap, so the
+    // ones starting at or left of the rider are the one underfoot and every
+    // stop before it.
+    let (mut underfoot, mut left, mut stops) = (false, 0, 0);
+    for u in tower.metro_stations().filter(|u| u.floor + 1 == p.floor) {
+        stops += 1;
+        left += usize::from(u.x as f64 <= p.x);
+        underfoot |= p.x >= u.x as f64 && p.x < (u.x + u.width) as f64;
+    }
+    underfoot.then(|| (left - 1, stops))
 }
 
 /// Person `i` has ended a walk and is about to leave the picture. Answers
@@ -224,7 +230,7 @@ pub(super) fn hold_for_train(
     crowd: &mut Crowd,
     tower: &Tower,
     now: f64,
-    office_id: i64,
+    workplace_id: i64,
     sid: i64,
 ) -> bool {
     let Some((pulls_in, stands)) = next_call_at(tower, now, sid) else {
@@ -233,7 +239,7 @@ pub(super) fn hold_for_train(
     // They step off over the first half of the train's stop.
     let held = Shift {
         at: pulls_in + crowd.rng.next() * stands / 2.0,
-        office_id,
+        workplace_id,
         inbound: true,
         station: Some(sid),
     };

@@ -4,6 +4,7 @@
 
 use std::collections::{HashMap, HashSet};
 
+use crate::crowd::fasthash::FastMap;
 use crate::facilities::*;
 use crate::tower::{Tower, Transport, Unit};
 
@@ -54,10 +55,8 @@ impl Tower {
             }
         }
         let s = t.stop_floors();
-        self.memo
-            .borrow_mut()
-            .stops
-            .insert(t.id, (self.revision, s.clone()));
+        let entry = (self.revision, s.clone());
+        self.memo.borrow_mut().stops.insert(t.id, entry);
         s
     }
 
@@ -66,7 +65,7 @@ impl Tower {
     pub fn served_floors(&self) -> HashSet<i64> {
         self.fill_served();
         let memo = self.memo.borrow();
-        let (_, served) = memo.served.as_ref().expect("fill_served built it");
+        let (_, served, _) = memo.served.as_ref().expect("fill_served built it");
         served.clone()
     }
 
@@ -77,7 +76,7 @@ impl Tower {
     /// transports still unjoined on each sweep (#1237). The closure is the
     /// one the TypeScript fixpoint reaches, and the set is only queried.
     fn fill_served(&self) {
-        if matches!(&self.memo.borrow().served, Some((rev, _)) if *rev == self.revision) {
+        if matches!(&self.memo.borrow().served, Some((rev, ..)) if *rev == self.revision) {
             return;
         }
         let mut pending: Vec<Vec<i64>> = self
@@ -100,7 +99,8 @@ impl Tower {
                 false
             });
         }
-        self.memo.borrow_mut().served = Some((self.revision, reachable));
+        let fast = reachable.iter().copied().collect();
+        self.memo.borrow_mut().served = Some((self.revision, reachable, fast));
     }
 
     /// `isFloorServed`, read from the memo without copying the set (#859,
@@ -111,7 +111,7 @@ impl Tower {
         }
         self.fill_served();
         let memo = self.memo.borrow();
-        let (_, served) = memo.served.as_ref().expect("fill_served built it");
+        let (.., served) = memo.served.as_ref().expect("fill_served built it");
         served.contains(&floor)
     }
 
@@ -297,7 +297,7 @@ impl Tower {
             }
         }
         let served = self.served_floors();
-        let mut m: HashMap<i64, Vec<(i64, i64)>> = HashMap::new();
+        let mut m: FastMap<i64, Vec<(i64, i64)>> = FastMap::default();
         for t in &self.transports {
             if t.kind.is_staff_only_transport() {
                 continue;
@@ -307,7 +307,7 @@ impl Tower {
                     continue;
                 }
                 let span = (t.x.max(0), (t.x + t.width).min(LOT_WIDTH));
-                m.entry(fl).or_default().push(span);
+                m.get_or_insert_with(fl, Vec::new).push(span);
             }
         }
         let out = m.get(&floor).cloned().unwrap_or_default();
@@ -461,26 +461,26 @@ impl Tower {
         segs
     }
 
-    /// `alightX`.
+    /// `alightX`. One walk of the shaft's tiles finds the structural tile
+    /// nearest `toward_x` and whether they span two walkways (more than one
+    /// `landing_segs`), with no landing list built.
     pub fn alight_x(&self, t: &Transport, floor: i64, toward_x: f64) -> f64 {
         let center = t.x as f64 + t.width as f64 / 2.0;
-        if self.landing_segs(t, floor).len() <= 1 {
-            return center;
-        }
-        let mut best = center;
-        let mut best_dist = f64::INFINITY;
-        for i in 0..t.width {
-            let c = t.x + i;
-            if !self.has_structure(floor, c) {
-                continue;
-            }
+        let (mut first_run, mut two_walkways) = (None, false);
+        let (mut best, mut best_dist) = (center, f64::INFINITY);
+        for c in (t.x..t.x + t.width).filter(|&c| self.has_structure(floor, c)) {
+            let run = self.segment_start_x(floor, c);
+            two_walkways |= *first_run.get_or_insert(run) != run;
             let d = (c as f64 - toward_x).abs();
             if d < best_dist {
-                best_dist = d;
-                best = c as f64;
+                (best, best_dist) = (c as f64, d);
             }
         }
-        best
+        if two_walkways {
+            best
+        } else {
+            center
+        }
     }
 
     /// `lobbySegs` (crowd/segmentGraph.ts).

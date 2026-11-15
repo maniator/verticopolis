@@ -9,8 +9,6 @@
 //! memoized on the same key, so the set answers exactly as fresh searches
 //! over that graph would.
 
-use std::collections::HashSet;
-
 use super::fasthash::FastSet;
 use super::routing::{adjacency, walk_budget_step, WalkState};
 use super::{AdjGraph, Crowd};
@@ -47,7 +45,7 @@ fn walk_budget_reach<'a>(crowd: &'a mut Crowd, tower: &Tower) -> &'a FastSet<i64
 }
 
 fn closure_under_walk_budget(adj: &AdjGraph, origins: &[i64]) -> FastSet<i64> {
-    let mut seen: HashSet<WalkState> = HashSet::new();
+    let mut seen: FastSet<WalkState> = FastSet::default();
     let mut segs: FastSet<i64> = FastSet::default();
     let mut frontier: Vec<WalkState> = Vec::new();
     for &s in origins {
@@ -129,6 +127,7 @@ mod tests {
     use crate::facilities::{Kind, LOT_WIDTH, MAX_FLOOR, MIN_FLOOR};
     use crate::sim::Simulation;
     use crate::tower_query::{floor_of_seg, NO_SEGMENT};
+    use std::collections::HashSet;
 
     /// `segReachable` as it was before the memo: one route search per
     /// lobby segment.
@@ -161,7 +160,7 @@ mod tests {
             };
             segs.extend(xs.into_iter().map(|x| tower.seg_at(floor, Some(x as f64))));
         }
-        for (&from, edges) in adjacency(crowd, tower) {
+        for (&from, edges) in adjacency(crowd, tower).sorted() {
             segs.push(from);
             segs.extend(edges.iter().map(|e| e.f));
         }

@@ -18,7 +18,7 @@ fn edge(f: i64) -> Edge {
 fn parts_never_split_a_pair_the_search_joins() {
     // 1 and 2 both ways, 2 and 3 one way only, 4 and 5 both ways, and 6
     // listed with no edge (a transport with one stop).
-    let mut adj: AdjGraph = HashMap::new();
+    let mut adj = AdjGraph::default();
     adj.insert(1, vec![edge(2)]);
     adj.insert(2, vec![edge(1), edge(3)]);
     adj.insert(4, vec![edge(5)]);

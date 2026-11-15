@@ -24,10 +24,11 @@ impl Simulation {
         let mut sat_ctx: Option<SatisfactionContext> = None;
         let evening = self.clock.is_evening();
         for i in self.tower.room_indices() {
-            let u = self.tower.units[i].clone();
+            let u = &self.tower.units[i];
             if u.state != UnitState::Empty || u.no_rate {
                 continue;
             }
+            let u = u.clone();
             let f = u.kind.facility();
             if f.population == 0 && !u.kind.is_hotel() {
                 continue;

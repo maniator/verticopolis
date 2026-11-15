@@ -1,6 +1,7 @@
 //! Assembling a `Simulation` once the units are read.
 
 use super::*;
+use crate::crowd::commuters_save::CrowdMarks;
 use crate::rules::RentModel;
 
 /// The rest of `deserialize` once the units are read: `data` is the migrated
@@ -454,9 +455,12 @@ pub(crate) fn assemble(
     if let Some(move_ins) = data.get("moveIns") {
         sim.move_ins_today = crate::sim::MoveIns::from_save(move_ins);
     }
-    // The saved office head counts are the workers at their desks, so a
-    // bulldoze before the first step still sends them out. Both readers
-    // come through here, so they square the desks the same way.
-    crate::crowd::commuters::reconcile(&mut sim.crowd, &mut sim.tower);
+    // The saved office head counts are the workers at their desks, and an
+    // edit the game had not squared yet (`desksStale`) is squared at the
+    // first step. Both readers come through here, so they square the desks
+    // the same way.
+    let marks = CrowdMarks::read(data.get("crowd"));
+    let hour = sim.clock.hour();
+    crate::crowd::commuters_save::restore_desks(&mut sim.crowd, &mut sim.tower, hour, marks);
     sim
 }

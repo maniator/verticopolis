@@ -37,6 +37,10 @@ fn walk_ins_on() -> bool {
     WALK_INS_ON
 }
 
+/// How many hours before a venue opens its crew is called in
+/// (`Kind::staffed_at`).
+const CREW_CALL_AHEAD: i64 = 4;
+
 #[doc(hidden)]
 impl Kind {
     #[doc(hidden)]
@@ -139,6 +143,47 @@ impl Kind {
     /// as real people.
     pub fn counts_visitors(self) -> bool {
         self.attendance_cap().is_some() || self.is_meal_venue() || self.takes_walk_ins()
+    }
+
+    #[doc(hidden)]
+    /// The staff a room of this kind keeps at work while it is open, who
+    /// come in and go home as people in a Modern tower (`crowd::commuters`);
+    /// 0 for a kind with no staff of its own. The original draws no venue
+    /// staff, so these are our own.
+    pub fn staff_size(self) -> i64 {
+        match self {
+            Kind::Shop | Kind::BoutiqueBay => 2,
+            Kind::FastFood | Kind::Amusements | Kind::Spa | Kind::SkyBar => 3,
+            Kind::Restaurant | Kind::Nightclub | Kind::Daycare => 4,
+            Kind::Cinema | Kind::PartyHall => 4,
+            Kind::FoodHall | Kind::AquaticCenter => 6,
+            _ => 0,
+        }
+    }
+
+    #[doc(hidden)]
+    /// Whether this kind keeps staff of its own ([`Kind::staff_size`]).
+    pub fn has_staff(self) -> bool {
+        self.staff_size() > 0
+    }
+
+    #[doc(hidden)]
+    /// Whether a venue's staff should be at work at `hour`: while it is
+    /// open, and from four hours before it opens (`CREW_CALL_AHEAD`), so a
+    /// shop that opens at 10 has its crew ride in at 6, before the office
+    /// rush. A break of four hours or less, such as a restaurant's between
+    /// lunch and dinner, keeps them in.
+    pub fn staffed_at(self, hour: i64) -> bool {
+        self.has_staff()
+            && (0..=CREW_CALL_AHEAD).any(|d| self.is_open_at((hour + d).rem_euclid(24)))
+    }
+
+    #[doc(hidden)]
+    /// Whether a room of this kind in a `mode` tower opens only once its
+    /// staff have come in (`crowd::commuters`): a venue with staff, in a
+    /// tower whose staff commute in person.
+    pub fn waits_for_staff(self, mode: crate::clock::GameMode) -> bool {
+        self.has_staff() && mode.venue_staff_commute_in_person()
     }
 
     #[doc(hidden)]

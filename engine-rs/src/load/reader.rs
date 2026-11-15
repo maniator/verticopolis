@@ -292,6 +292,7 @@ pub(crate) fn unit_from_value(u: &Value, modern: bool) -> Option<(Unit, Option<i
         },
         customers_in: None,
         hotel_customers_in: None,
+        staff_in: 0,
         out_for_meal: None,
         residents,
         visitors_yest: if census_follows_the_day(kind) {

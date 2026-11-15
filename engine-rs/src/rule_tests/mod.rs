@@ -113,6 +113,7 @@ mod venue_attendance;
 mod venue_cap;
 mod venue_day_close;
 mod venue_origins;
+mod venue_staff;
 mod walking_penalties;
 mod walkway_willingness;
 mod waste_and_parking;
@@ -292,9 +293,11 @@ pub fn place_seated(
 }
 
 /// Puts the clock at `hour` on `day` without ticking (day 0 is a Monday on
-/// the real-world calendar, day 5 a Saturday).
+/// the real-world calendar, day 5 a Saturday). A Modern venue's staff are
+/// at work if it is staffed then, as they would be had the hours passed.
 pub fn at_time(sim: &mut Simulation, day: i64, hour: i64) {
     sim.clock = Clock::new(((day * 24 + hour) * 60) as f64, sim.clock.calendar);
+    crate::crowd::workplace::staff_at_work(&mut sim.crowd, &mut sim.tower, hour);
 }
 
 /// The decoded save of `conformance/fixtures/<name>.vctower`.

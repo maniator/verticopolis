@@ -475,11 +475,11 @@ pub fn finish(crowd: &mut Crowd, i: usize, tower: &mut Tower) {
             let ok = p.state == PState::ToDest;
             crowd.staff_done.push(StaffResult { unit_id: uid, ok });
         }
-    } else if !p.walk_in {
+    } else if !p.walk_in && !super::trip::Errand::on_the_job(p.errand) {
         // A trip from a lobby or a Metro platform belongs to the tenant at
         // its other end (#1971): the morning commuter's wait lands on the
         // office floor, not the lobby or the platform. A customer from
-        // outside is no tenant, so their wait stresses no floor.
+        // outside is no tenant, so their wait stresses no floor; nor do staff.
         let tenant_floor = match p.floors.last() {
             Some(&dest) if p.from_metro || tower.floor_has_lobby(p.origin_floor) => dest,
             _ => p.origin_floor,

@@ -15,6 +15,7 @@
 use serde::ser::{Serialize, SerializeMap, Serializer};
 use serde_json::{json, Map, Value};
 
+use crate::crowd::commuters_save::CrowdMarks;
 use crate::crowd::save::SavedCrowd;
 use crate::crowd::Crowd;
 use crate::dispatch::ElevatorDispatch;
@@ -41,7 +42,8 @@ enum Field<'a> {
     Ledger(&'a Ledger),
     Events(&'a EventSystem),
     Log(&'a [LogEntry]),
-    Crowd(&'a Crowd),
+    /// The crowd, and the marks beside its desks.
+    Crowd(&'a Crowd, CrowdMarks),
     Dispatch(&'a ElevatorDispatch),
 }
 
@@ -74,7 +76,7 @@ impl Field<'_> {
             Field::Ledger(l) => l.serialize(),
             Field::Events(e) => e.save_state(),
             Field::Log(es) => Value::Array(es.iter().map(log_entry).collect()),
-            Field::Crowd(c) => c.save_json(),
+            Field::Crowd(c, marks) => c.save_json(marks),
             Field::Dispatch(d) => d.save_json(),
         }
     }
@@ -123,7 +125,7 @@ impl Serialize for Field<'_> {
                 m.end()
             }
             Field::Log(es) => Each(es, log_entry).serialize(s),
-            Field::Crowd(c) => SavedCrowd(c).serialize(s),
+            Field::Crowd(c, marks) => SavedCrowd(c, *marks).serialize(s),
             // A few numbers per car and per floor, so one small tree.
             Field::Dispatch(d) => d.save_json().serialize(s),
         }
@@ -163,6 +165,11 @@ fn own(k: &'static str, v: Value) -> (&'static str, Field<'static>) {
 }
 
 impl Simulation {
+    /// The marks the save writes beside the crowd's desks (`CrowdMarks`).
+    pub(crate) fn crowd_marks(&self) -> CrowdMarks {
+        CrowdMarks::of(&self.crowd, &self.tower, self.clock.hour())
+    }
+
     /// The save's fields, in the order `serialize` has always written them.
     /// Absent optional fields are left out, which is what the canonical
     /// writer expects. Each key appears once. `fold` writes plain floor tiles
@@ -242,7 +249,7 @@ impl Simulation {
         m.push(("ledger", Field::Ledger(&self.ledger)));
         // Everyone in the tower as they stand, so a reload keeps them
         // (`crowd::save`).
-        m.push(("crowd", Field::Crowd(&self.crowd)));
+        m.push(("crowd", Field::Crowd(&self.crowd, self.crowd_marks())));
         // The cars' timers mid-stop, so the riders' cars carry on too.
         m.push(("dispatch", Field::Dispatch(&self.elevators)));
         // Today's rooms cleaned and yesterday's shift, so the checkout line

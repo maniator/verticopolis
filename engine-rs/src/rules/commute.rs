@@ -53,4 +53,13 @@ impl GameMode {
     pub fn office_workers_commute_in_person(self) -> bool {
         self == GameMode::Modern && real_office_commutes_on()
     }
+
+    /// Whether a venue's staff (`Kind::staff_size`) come in and go home as
+    /// people, and the venue opens only once one of them is in. Modern
+    /// only, with the office commutes (owner, 2026-11-14: nobody appears or
+    /// vanishes in the tower). The original draws no venue staff, so
+    /// Classic venues open by the clock.
+    pub fn venue_staff_commute_in_person(self) -> bool {
+        self.office_workers_commute_in_person()
+    }
 }

@@ -6,7 +6,7 @@ use super::routines::push_routine_options;
 pub use super::spawn_floors::{spawn_floors, SpawnFloors};
 use super::visits::{push_venue_visit_options, spawn_venue_visit, VisitOrigin};
 use super::{Crowd, PState, Person, Route, MAX_PEOPLE};
-use crate::clock::Clock;
+use crate::clock::{Clock, GameMode};
 use crate::facilities::Kind;
 use crate::tower::{Tower, Unit};
 
@@ -204,7 +204,13 @@ pub fn open_for_visits(kind: Kind, hour: i64) -> bool {
     kind.is_open_at(hour) && (kind.attendance_cap().is_none() || kind.is_open_at((hour + 1) % 24))
 }
 
-pub fn venue_has_room(u: &Unit) -> bool {
+/// Whether venue `u` in a `mode` tower can take one more visitor: its
+/// staff are in, where it waits for them (`crowd::commuters`), and it is
+/// not full.
+pub fn venue_has_room(u: &Unit, mode: GameMode) -> bool {
+    if u.kind.waits_for_staff(mode) && u.staff_in == 0 {
+        return false;
+    }
     let pop = u.kind.facility().population;
     if pop > 0 {
         return u.customers_in.unwrap_or(0) < pop;
@@ -321,8 +327,8 @@ pub(crate) fn weighted_index(r: f64, weights: impl Iterator<Item = f64> + Clone)
 }
 
 /// The tenants' and visitors' sample is full. Housekeepers on shift,
-/// walk-in customers (`walk_ins`) and office workers on their way
-/// (`commuters`) are counted apart: they are real people, and would
+/// walk-in customers (`walk_ins`) and office workers and venue staff on
+/// their way (`commuters`) are counted apart: they are real people, and would
 /// otherwise crowd the rest out of the picture.
 fn crowd_is_full(crowd: &Crowd) -> bool {
     crowd

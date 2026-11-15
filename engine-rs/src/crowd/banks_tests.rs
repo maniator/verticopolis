@@ -55,11 +55,12 @@ fn two_shafts_over_the_same_floors_share_every_bank() {
     assert!(stops >= 2, "the shaft serves {stops} stops");
     let banks = shaft_banks(&mut crowd, &sim.tower);
     // One key per ordered pair of distinct stops, and both shafts in each.
-    assert_eq!(banks.len(), stops * (stops - 1));
-    for (key, bank) in banks {
+    let entries = banks.entries();
+    assert_eq!(entries.len(), stops * (stops - 1));
+    for (key, bank) in entries {
         assert_eq!(key.0, Kind::ElevatorStandard);
         assert_ne!(key.1, key.2, "a leg never starts and ends on one landing");
-        assert_eq!(bank, &ids, "{key:?}");
+        assert_eq!(bank, &ids[..], "{key:?}");
     }
 }
 

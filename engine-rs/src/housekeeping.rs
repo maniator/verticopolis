@@ -419,9 +419,14 @@ impl Simulation {
         } = rooms;
         candidates.retain(|room| self.housekeeping.room_open(&self.tower, room.0));
         let mut unreachable = 0;
-        let mut free = self.free_maids();
+        let (mut free, mut free_left) = self.free_maids_counted();
         for room in &candidates {
             let (rid, rfloor, rx, rw, _) = *room;
+            if free_left == 0 {
+                // Every crew answers busy: no room goes out, and one no crew serves is unreachable.
+                unreachable += usize::from(orders.for_floor(&self.tower, rfloor).is_empty());
+                continue;
+            }
             let mut reachable = false;
             let mut transient = false;
             let mut no_route = false;
@@ -436,7 +441,7 @@ impl Simulation {
                 // kept-legacy odd width lands on a half tile.
                 let dest_x = rx as f64 + rw as f64 / 2.0;
                 match self.assign_maid(&mut free, cid, (rid, rfloor, dest_x)) {
-                    MaidSent::Sent => {}
+                    MaidSent::Sent => free_left -= 1,
                     MaidSent::NoneFree => {
                         transient = true;
                         continue;

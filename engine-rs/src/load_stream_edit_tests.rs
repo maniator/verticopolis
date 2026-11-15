@@ -41,8 +41,10 @@ const JSON_BYTES: &[u8] = b"{}[],:\"0-.e\\ ";
 /// period marks (`periodMarks`), the base saves being first-day games.
 /// 155 became 144 when a save before 10:00 started carrying the day the
 /// shops' day last closed (`morningVenueDay`, #1500), the base saves being
-/// first-day games at 07:00, for that reason again.
-const STREAMED: usize = 144;
+/// first-day games at 07:00, for that reason again. 144 became 153 when
+/// Modern venue staff started commuting (#2238): the base saves gained
+/// their desks and marks, and the edits shift again.
+const STREAMED: usize = 153;
 
 /// Seeded edits of engine saves, a few bytes each: dropped, inserted,
 /// changed or copied, or the text cut short. Whatever comes out, both

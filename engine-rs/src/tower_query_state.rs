@@ -6,7 +6,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use crate::crowd::fasthash::FastMap;
+use crate::crowd::fasthash::{FastMap, FastSet};
 use crate::economy::visitors::census_follows_the_day;
 use crate::tower::{Unit, UnitState};
 
@@ -15,8 +15,10 @@ pub type Runs = std::sync::Arc<[(i64, i64)]>;
 
 #[derive(Default)]
 pub struct Memo {
-    pub served: Option<(i64, HashSet<i64>)>,
-    pub stops: HashMap<i64, (i64, Vec<i64>)>,
+    /// The served floors, as `served_floors` hands them out and as a set
+    /// `is_floor_served` asks without the default hasher's cost.
+    pub served: Option<(i64, HashSet<i64>, FastSet<i64>)>,
+    pub stops: FastMap<i64, (i64, Vec<i64>)>,
     /// Each floor's runs, keyed like the tile index they are built from,
     /// shared so a read hands out the list without copying it.
     pub segs: Option<(crate::tower_index::IndexKey, FastMap<i64, Runs>)>,
@@ -28,7 +30,7 @@ pub struct Memo {
         FastMap<(i64, i64, i64), std::sync::Arc<[i64]>>,
     )>,
     pub staff: Option<(i64, HashMap<i64, i64>)>,
-    pub cols: Option<(i64, HashMap<i64, Vec<(i64, i64)>>)>,
+    pub cols: Option<(i64, FastMap<i64, Vec<(i64, i64)>>)>,
     pub tiles: Option<(crate::tower_index::IndexKey, crate::tower_index::FloorTiles)>,
     pub bounds: Option<(crate::tower_index::IndexKey, (i64, i64))>,
     /// Each floor's built extent for the overlays, per revision (#1237).
@@ -139,6 +141,13 @@ impl Unit {
     pub fn visible_occupants(&self) -> i64 {
         (self.occupants - self.out_for_meal.unwrap_or(0)).max(0)
     }
+
+    /// Whether the room is open for business at `hour` in a `mode` tower:
+    /// inside its hours, and, for a venue whose staff commute in person
+    /// (`Kind::waits_for_staff`), once one of its staff is in.
+    pub fn open_for_business(&self, hour: i64, mode: crate::clock::GameMode) -> bool {
+        self.kind.is_open_at(hour) && (!self.kind.waits_for_staff(mode) || self.staff_in > 0)
+    }
 }
 
 #[cfg(test)]
@@ -212,6 +221,7 @@ mod tests {
             occupants,
             customers_in: None,
             hotel_customers_in: None,
+            staff_in: 0,
             out_for_meal,
             residents: None,
             visitors_yest: None,

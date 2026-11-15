@@ -131,7 +131,9 @@ describe.skipIf(noEngine)("ViewReader over the Rust engine", () => {
   it("keeps a person's object by id, for one generation", () => {
     const rust = built();
     const r = newViewReader(rust);
-    rust.tick(480);
+    // By 5 PM the cinema, finished at 2 PM, has its staff in and its first
+    // audience coming and going.
+    rust.tick(600);
     check(r, rust);
     const held = new Map(r.crowd.people.map((p) => [p.id, p]));
     let stayed = 0;

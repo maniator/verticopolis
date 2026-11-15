@@ -98,8 +98,8 @@ fn start_walk_in(
     };
     if !venue.kind.takes_walk_ins()
         || !venue.is_tenanted()
-        || !venue.kind.is_open_at(hour)
-        || !venue_has_room(venue)
+        || !venue.open_for_business(hour, tower.mode)
+        || !venue_has_room(venue, tower.mode)
     {
         return;
     }
