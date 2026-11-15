@@ -25,6 +25,11 @@ prompt already tells players it is an engine update and shows the new version.
 Entries below 1.51.1 were curated from the commit history after the fact, so they
 are documentation only: no build that a client fetches carries them.
 
+## 4.5.1
+
+- Fixed help.verticopolis.com and old /help links opening the game's title screen instead of the Player's Manual in a browser that visited that address while it was being set up. The page now clears the leftover game files and reloads the manual by itself.
+- A link to a page that does not exist now opens a message box on the 1994 desk, with the sunrise skyline and buttons back to the game and the Player's Manual. On the manual's own site the manual comes first.
+
 ## 4.5.0
 
 - The Player's Manual now has the game's menu bar across the top, as in the game: File goes back to the game or prints the page, Edit finds a page or copies its link, Options picks light, dark or your device's look, and Help has What's New, Report a Problem and Sponsor.
