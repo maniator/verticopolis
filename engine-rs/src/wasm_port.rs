@@ -62,7 +62,7 @@ pub(crate) const ONBOARDING_FLAGS: [u8; 5] = [
 ];
 
 /// Each command's own slots after [`DELTA`], for the view layout.
-pub(crate) const COMMAND_RECORDS: [(&str, &[&str]); 29] = [
+pub(crate) const COMMAND_RECORDS: [(&str, &[&str]); 30] = [
     ("buildAt", &[]),
     ("paintTiles", &["placed"]),
     ("buildShaft", &[]),
@@ -92,6 +92,7 @@ pub(crate) const COMMAND_RECORDS: [(&str, &[&str]); 29] = [
     ("nameTower", &[]),
     ("logLine", &[]),
     ("scheduleShaft", &[]),
+    ("callFireRescue", &["cost"]),
 ];
 
 /// Each query record's slots, for the view layout.
@@ -338,6 +339,18 @@ impl Engine {
                 self.refuse("funds", &[cost, rooms as f64])
             }
             Err(other) => self.refuse(other.reason(), &[0.0, 0.0]),
+        }
+    }
+
+    /// Put the fire-rescue offer up again while a fire burns (Options > Call
+    /// Fire Rescue), with its price. "none" with no fire, "pending" while a
+    /// choice already waits; both carry 0. The offer itself charges nothing.
+    pub(crate) fn port_call_fire_rescue(&mut self) -> Vec<f64> {
+        self.reason = None;
+        let before = self.sim.money;
+        match self.sim.call_fire_rescue() {
+            Ok(cost) => self.finish(before, true, None, &[cost]),
+            Err(why) => self.refuse(why.reason(), &[0.0]),
         }
     }
 

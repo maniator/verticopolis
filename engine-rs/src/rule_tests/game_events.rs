@@ -249,3 +249,56 @@ fn a_quiet_day_may_print_a_headline() {
     assert_eq!(sim.events.count(), 0);
     assert!(sim.events.pending.is_none());
 }
+
+/// Options > Call Fire Rescue (manual p.62): a declined offer can be called
+/// again for as long as the fire burns, at the same price, and paying it then
+/// puts the fire out. With no fire, or with a choice already up, the call is
+/// refused and changes nothing.
+#[test]
+fn a_declined_rescue_can_be_called_again_while_the_fire_burns() {
+    use crate::events::FireRescueRefusal;
+    let mut sim = office_tower(GameMode::Classic, 3, true);
+    assert_eq!(sim.call_fire_rescue(), Err(FireRescueRefusal::None));
+    assert!(sim.events.pending.is_none());
+
+    let office = sim
+        .tower
+        .units
+        .iter()
+        .find(|u| u.kind == Kind::Office)
+        .unwrap()
+        .id;
+    assert!(sim.start_fire_at(office));
+    let offered = sim
+        .events
+        .pending
+        .as_ref()
+        .expect("the outbreak offers the rescue")
+        .cost;
+    assert_eq!(sim.call_fire_rescue(), Err(FireRescueRefusal::Pending));
+
+    sim.resolve_choice(false);
+    assert!(sim.events.pending.is_none());
+    assert!(
+        sim.events.active.contains(&office),
+        "a declined fire still burns"
+    );
+
+    let money = sim.money;
+    assert_eq!(sim.call_fire_rescue(), Ok(offered));
+    let again = sim
+        .events
+        .pending
+        .as_ref()
+        .expect("the call puts the offer up again");
+    assert_eq!((again.kind, again.cost), ("fireRescue", offered));
+    assert_eq!(sim.money, money, "calling only offers; the answer pays");
+
+    sim.resolve_choice(true);
+    assert!(
+        sim.events.active.is_empty(),
+        "the paid rescue puts the fire out"
+    );
+    assert_eq!(sim.money, money - offered);
+    assert_eq!(sim.call_fire_rescue(), Err(FireRescueRefusal::None));
+}

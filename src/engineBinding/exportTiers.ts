@@ -167,6 +167,7 @@ export const BINDING_EXPORT_TIERS = {
   changeCars: T1,
   extendShaft: T1,
   bookExterminator: T1,
+  callFireRescue: T1,
   setCamera: T1,
   setFilm: T1,
   changeFilm: T1,

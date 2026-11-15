@@ -18,6 +18,7 @@ use crate::tower::UnitState;
 
 #[path = "events_fire.rs"]
 mod fire;
+pub use fire::FireRescueRefusal;
 
 #[path = "events_bomb.rs"]
 #[doc(hidden)]
@@ -286,7 +287,7 @@ impl Simulation {
         chance
     }
 
-    fn fire_rescue_cost(&self) -> f64 {
+    pub(crate) fn fire_rescue_cost(&self) -> f64 {
         (150_000.0 + ((self.star - 2).max(0) as f64) * 120_000.0).min(500_000.0)
     }
 

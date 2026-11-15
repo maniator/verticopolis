@@ -154,7 +154,7 @@ never the name).
 | `via` (open) | `click`, `keys`, `alt` | A click on a title, the keyboard on a focused title, or Alt with the underlined letter |
 | `via` (pick) | `pointer`, `keys` | A mouse, pen or finger, or the keyboard |
 | `screen` | `title`, `tower` | Over the title screen, or over a tower |
-| `item` | `new_tower`, `saves`, `load_auto`, `load_slot_1`, `load_slot_2`, `load_slot_3`, `quick_save`, `close`, `import`, `export`, `install_app`, `undo`, `redo`, `tower_info`, `map`, `statistics`, `rename`, `rules`, `tools`, `bulletin`, `status_bar`, `full_screen`, `settings`, `sound`, `screen_saver`, `manual`, `compare`, `replay`, `sponsor`, `about`, `other` | The item, by a code that does not change with its label (`MENU_ITEM_CODES`) |
+| `item` | `new_tower`, `saves`, `load_auto`, `load_slot_1`, `load_slot_2`, `load_slot_3`, `quick_save`, `close`, `import`, `export`, `install_app`, `undo`, `redo`, `tower_info`, `map`, `statistics`, `rename`, `fire_rescue`, `rules`, `tools`, `bulletin`, `status_bar`, `full_screen`, `settings`, `sound`, `screen_saver`, `manual`, `compare`, `replay`, `sponsor`, `about`, `other` | The item, by a code that does not change with its label (`MENU_ITEM_CODES`) |
 | `browsed` | a count | Menus the trip showed, the last one included |
 | `after` | an `item` code or `none` | The page life's previous real pick, so a breakdown shows what follows what without a paths query. A grayed click never becomes the next pick's `after` |
 | `grayed` | `true`, `false` | The item was grayed out, so nothing happened |

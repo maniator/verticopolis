@@ -2,11 +2,9 @@
 
 use wasm_bindgen::prelude::*;
 
-/// The engine's port (facade slice 7, the owner's 2026-10-28 redesign): the
-/// game calls these on `Engine` directly, every argument a number and every
-/// answer a number or a record of numbers, with no JSON. A command answers
-/// its result record (status, the balance's change, its own slots); a
-/// refusal's text is `lastReason()`. The logic is in `wasm_port.rs`.
+/// The engine's port (facade slice 7): numbers in, a record of numbers out
+/// (status, the balance's change, its own slots), no JSON; a refusal's text
+/// is `lastReason()`. The logic is in `wasm_port.rs`.
 use super::{port, Engine};
 
 // This low-frequency inspector API deliberately returns a keyed JS object.
@@ -20,13 +18,11 @@ extern "C" {
 
 #[wasm_bindgen]
 impl Engine {
-    // The view's layout (facade slice 6a, #1213) as JSON: the version,
-    // every slot and width of the dynamic frame and the structural snapshot
-    // by name, the kind, state, weather, mode and calendar codes
-    // (`view::layout_json`), and the port's records and codes
-    // (`port::exported_layout`). A host checks it on load and refuses a
-    // version or width it does not know. An instance member, so `Engine`
-    // itself satisfies the port's interface.
+    // The view's layout (#1213) as JSON: the version, every slot and width of
+    // the frame and the structural snapshot by name, the codes
+    // (`view::layout_json`) and the port's records (`port::exported_layout`).
+    // A host refuses a version or width it does not know. An instance member,
+    // so `Engine` itself satisfies the port's interface.
     #[wasm_bindgen(js_name = viewLayout)]
     pub fn instance_view_layout(&self) -> String {
         port::exported_layout().to_string()
@@ -115,6 +111,10 @@ impl Engine {
     #[wasm_bindgen(js_name = bookExterminator)]
     pub fn book_exterminator(&mut self) -> Vec<f64> {
         self.port_book_exterminator()
+    }
+    #[wasm_bindgen(js_name = callFireRescue)]
+    pub fn call_fire_rescue(&mut self) -> Vec<f64> {
+        self.port_call_fire_rescue()
     }
     #[wasm_bindgen(js_name = setCamera)]
     pub fn set_camera(&mut self, tile: f64, floor: f64, zoom: f64) -> Vec<f64> {

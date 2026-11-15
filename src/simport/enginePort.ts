@@ -354,6 +354,8 @@ export interface EnginePortCommands {
   setTicketPrice(id: number, priceCode: number): PortRecord;
   rerollUnit(id: number): PortRecord;
   bookExterminator(): PortRecord;
+  /** Put the fire rescue offer up again while a fire burns, with its `cost`; "none" or "pending" (#1889). */
+  callFireRescue(): PortRecord;
   answerChoice(accept: boolean): PortRecord;
   chooseAutoBridge(value: boolean): PortRecord;
   flipAutoBridge(): PortRecord;
@@ -420,11 +422,9 @@ export interface EnginePortQueries {
   /** The Map's Eval and Pricing read (#343 S7): one `roomTier` row (id,
    *  floor, x, then codes from `evalTiers` and `rentTiers`) per room that
    *  carries an evaluation or a rent level, in the view's room order. One
-   *  pass over the rooms, read through `RoomTierReader` (`roomTiers.ts`):
-   *  S8 reads only on the triggers the Map SPEC lists (the Cost bullet of its
-   *  S7 section), and not more than once a frame. Only the Rust engine answers it: the
-   *  TypeScript reference has no Map views, and a reader takes its absence
-   *  as no rows. */
+   *  pass over the rooms, read through `RoomTierReader` (`roomTiers.ts`) only
+   *  on the Map SPEC's triggers (its S7 Cost bullet), at most once a frame. A
+   *  reader takes the member's absence as no rows. */
   roomTiers?(): PortRecord;
 }
 

@@ -1,7 +1,6 @@
 ---
 app: patch
 crate: patch
-readmes: unchanged
 ---
 ## Player
 - In Classic towers, fires now start only once the tower has Security, as in the 1994 game. Modern towers can still catch fire without it.
