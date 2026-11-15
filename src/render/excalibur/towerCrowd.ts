@@ -10,7 +10,7 @@ import { metroTrainAt } from "../metroTrainSchedule";
 import { addMetros } from "./towerMetro";
 import { buildWalkers } from "./towerWalkerBuild";
 import { cabLoad, cabRidersOf } from "./cabRiders";
-import { cabWant, carGfx, carKey, IDLE_CAR } from "./cabGraphics";
+import { CabGraphic, cabWant, carKey, IDLE_CAR } from "./cabGraphics";
 import { glideCar, newCarDraw, type CarDrawState } from "../carMotion";
 import type { PersonView } from "../../simport/view";
 import { FLOOR, TILE } from "../scale";
@@ -244,13 +244,13 @@ export function syncMotion(engine: TowerEngine): void {
     if (!isElevatorKind(t.kind)) continue;
     const w = t.width * TILE;
     for (let i = 0; i < t.cars; i++) {
-      // Cab graphics are built lazily and kept by indicator state (who rides,
-      // direction lantern, FULL), a few per car (`cabGraphics.ts`).
-      const gfx = new Map<string, ex.Graphic>();
+      // One graphic per car, drawn from the tower's shared cab parts; a new
+      // state only points it at other parts (`cabGraphics.ts`).
+      const cab = new CabGraphic({ w, kind: t.kind }, IDLE_CAR);
       const a = new ex.Actor({ pos: ex.vec(engine.worldX(t.x), -t.carPositions[i] * FLOOR), width: w, height: FLOOR, anchor: ex.vec(0, 0), z: Z.cab });
-      a.graphics.use(carGfx({ w, kind: t.kind, gfx }, IDLE_CAR));
+      a.graphics.use(cab);
       engine.engine.add(a);
-      const entry = { actor: a, t, i, w, kind: t.kind, gfx, shown: carKey(IDLE_CAR) };
+      const entry = { actor: a, t, i, w, kind: t.kind, cab, shown: carKey(IDLE_CAR) };
       const prev = carried.get(`${t.id}:${i}`);
       if (prev) carDrawStates.set(entry, prev);
       freshCabs.add(entry);
@@ -377,8 +377,8 @@ export function updateMotion(engine: TowerEngine, elapsedMs = 1000 / 60): void {
     if (typeof c.t.top === "number" && drawn.pos > c.t.top) drawn.pos = c.t.top;
     c.actor.pos = ex.vec(engine.worldX(c.t.x), -drawn.pos * FLOOR);
     // The boarded riders, the lantern and FULL make the cab's state
-    // (`cabWant`, worked out again only when one changes); its graphic is
-    // kept per state and redrawn on a change.
+    // (`cabWant`, worked out again only when one changes); the cab's graphic
+    // then shows it from the shared parts, with nothing painted.
     const cap = catalogFacility(catalog, c.t.kind).carCapacity ?? 0;
     const want = cabWant(c, c.t.carDir?.[c.i] ?? 0, c.t.carLoad?.[c.i] ?? 0, cap, cabLoad(aboard, c.t.id, c.i));
     // The cab's riders change when the drawn car gets there, on the same rule
@@ -392,7 +392,7 @@ export function updateMotion(engine: TowerEngine, elapsedMs = 1000 / 60): void {
       if (progress >= 1 || clock.steps > since || fresh) {
         c.shown = key;
         cabChangeStep.delete(c);
-        c.actor.graphics.use(carGfx(c, want.ind));
+        c.cab.show(want.ind);
       } else cabChangeStep.set(c, since);
     }
   }

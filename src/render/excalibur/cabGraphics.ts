@@ -5,41 +5,37 @@ import { cabRiderFoot, cabRiderX } from "../sprites/transport";
 import { cabFit, carIndicator, NO_FIGURES, type CarIndicator } from "../carIndicator";
 import { loadFigures, type CabLoad } from "./cabRiders";
 import { FLOOR } from "../scale";
-import { cabParts, RIDER_FOOT, RIDER_X, type CabParts } from "./cabParts";
+import { cabParts, RIDER_FOOT, RIDER_H, RIDER_W, RIDER_X, type CabParts } from "./cabParts";
 
 /**
- * The cab graphics of one elevator car: one canvas per state the cab shows
- * (who is aboard, the lantern, FULL), made when the state first shows and
- * kept for the next time it does. A cab's riders are real people now, so its
- * states no longer repeat the way a bare head count did; past
- * `CAB_GFX_KEEP` states the one shown longest ago is redrawn as the new one,
- * so a busy car never piles up canvases or makes a new one per stop.
+ * The graphic of one elevator car. It paints nothing of its own: each frame
+ * it lays the shared, already painted parts (`cabParts.ts`) on top of each
+ * other, the cab's back, each rider's standing figure in their slot and the
+ * cab's front, or one picture of the whole cab while it is empty. A cab's riders are real people, so its looks rarely repeat;
+ * when they change, the car only points at other parts, with no new canvas,
+ * no paint and no texture upload. Each part is painted and uploaded once for
+ * the whole tower.
  */
 
 /** The empty, idle cab state used to seed a fresh car's graphic. */
 export const IDLE_CAR: CarIndicator = { riders: 0, figures: NO_FIGURES, cast: "", arrow: null, full: false };
 
-/** The most cab states one car keeps drawn: the empty cab each way and idle,
- *  plus the loads it shows most recently. */
-export const CAB_GFX_KEEP = 8;
-
-/** What a car's graphic cache reads of the car. */
+/** What a car's cab state reads of the car. */
 export interface CabGfxEntry {
   readonly w: number;
   /** Elevator kind, so each cab wears its type's look (`cabParts.ts`). */
   readonly kind: FacilityKind;
-  /** The cab's canvases by state (`carKey`), least recently shown first. */
-  readonly gfx: Map<string, ex.Graphic>;
   /** The state the car's inputs last asked for (`cabWant`). */
   want?: CabWant;
 }
 
 /** One drawn elevator car: car `i` of shaft `t`, moved along it each frame
- *  and wearing the graphic of the state it shows (`shown`, a `carKey`). */
+ *  and drawing the state it shows (`shown`, a `carKey`) with `cab`. */
 export interface CabActor extends CabGfxEntry {
   readonly actor: ex.Actor;
   readonly t: TransportView;
   readonly i: number;
+  readonly cab: CabGraphic;
   shown: string;
 }
 
@@ -70,83 +66,92 @@ export function cabWant(entry: CabGfxEntry, dir: number, load: number, cap: numb
   return next;
 }
 
-/** Stable cache key for a cab graphic's indicator state. */
+/** Stable key for a cab's indicator state: who rides, the lantern and FULL. */
 export function carKey(ind: CarIndicator): string {
   return `${ind.riders}:${ind.arrow ?? "x"}:${ind.full ? "f" : "e"}:${ind.cast}`;
 }
 
-/** Paint a cab from its parts (`cabParts.ts`): its back, each rider's own
- *  standing figure in their slot (`cabRiderX`, the same as `drawCar`'s), and
- *  its front over them. `figures` are the riders, `riders` of them drawn. */
-export function paintCab(
-  ctx: CanvasRenderingContext2D,
-  parts: CabParts,
-  cab: Pick<CabGfxEntry, "w" | "kind">,
-  ind: Pick<CarIndicator, "riders" | "arrow" | "full">,
-  figures: readonly number[],
-): void {
-  ctx.drawImage(parts.back(cab.kind, cab.w), 0, 0);
-  const cw = Math.max(1, Math.round(cab.w));
-  const rc = Math.min(ind.riders, figures.length);
-  const foot = Math.round(cabRiderFoot(FLOOR)) - RIDER_FOOT;
-  for (let p = 0; p < rc; p++) {
-    const rx = cabRiderX(cw, rc, p);
-    if (rx === null) break;
-    ctx.drawImage(parts.rider(figures[p]), Math.round(rx) - RIDER_X, foot);
+/** Where a rider's picture lands in the cab and how much of it shows: the
+ *  slot `drawCar` uses (`cabRiderX`), cut to the cab's walls the way a
+ *  painted cab cut it. */
+interface RiderSlot {
+  sx: number;
+  dx: number;
+  w: number;
+}
+
+export class CabGraphic extends ex.Graphic {
+  private readonly parts: CabParts;
+  private readonly kind: FacilityKind;
+  private readonly cabW: number;
+  private readonly cw: number;
+  private readonly foot = Math.round(cabRiderFoot(FLOOR)) - RIDER_FOOT;
+  private readonly back: HTMLCanvasElement;
+  private front: HTMLCanvasElement;
+  /** The whole cab in one picture while nobody is aboard. */
+  private empty: HTMLCanvasElement | null = null;
+  /** The riders' pictures and slots; the first `count` entries are drawn.
+   *  The arrays keep their length, so a new load writes over them. */
+  private readonly riders: HTMLCanvasElement[] = [];
+  private readonly slots: RiderSlot[] = [];
+  private count = 0;
+  private ind: CarIndicator;
+
+  constructor(cab: Pick<CabGfxEntry, "w" | "kind">, ind: CarIndicator = IDLE_CAR, parts: CabParts = cabParts()) {
+    const cw = Math.max(1, Math.round(cab.w));
+    super({ width: cw, height: FLOOR });
+    this.parts = parts;
+    this.kind = cab.kind;
+    this.cabW = cab.w;
+    this.cw = cw;
+    this.back = parts.back(cab.kind, cab.w);
+    this.front = parts.front(cab.w, ind.arrow, ind.full);
+    this.ind = ind;
+    this.show(ind);
   }
-  ctx.drawImage(parts.front(cab.w, ind.arrow, ind.full), 0, 0);
-}
 
-/** What a cab canvas draws. The riders are copied when the state is set: the
- *  canvas draws on its first frame on screen, and by then the crowd's count
- *  may have moved on to the next riders. */
-interface CabDraw {
-  ind: CarIndicator;
-  figures: number[];
-}
-
-/** The state each canvas made here draws, so a recycled one draws its new one. */
-const drawsState = new WeakMap<ex.Graphic, CabDraw>();
-
-function newCabCanvas(entry: CabGfxEntry, ind: CarIndicator): ex.Canvas {
-  const state: CabDraw = { ind, figures: ind.figures.slice(0, ind.riders) };
-  const cv = new ex.Canvas({
-    width: entry.w,
-    height: FLOOR,
-    cache: true,
-    draw: (ctx) => paintCab(ctx, cabParts(), entry, state.ind, state.figures),
-  });
-  drawsState.set(cv, state);
-  return cv;
-}
-
-/** Get-or-create the cab graphic for a given indicator state. Keying and
- *  drawing both derive from the one {@link CarIndicator} plus the entry's
- *  fixed kind; the key can skip the kind only because each cache map belongs
- *  to a single car whose shaft never changes kind (any rebuild goes through
- *  syncMotion, which recreates the entry). */
-export function carGfx(entry: CabGfxEntry, ind: CarIndicator): ex.Graphic {
-  const key = carKey(ind);
-  const kept = entry.gfx.get(key);
-  if (kept) {
-    // Shown again: it moves to the back of the line to be redrawn.
-    entry.gfx.delete(key);
-    entry.gfx.set(key, kept);
-    return kept;
-  }
-  let cv: ex.Graphic | undefined;
-  if (entry.gfx.size >= CAB_GFX_KEEP) {
-    const [oldKey, old] = entry.gfx.entries().next().value as [string, ex.Graphic];
-    entry.gfx.delete(oldKey);
-    const state = drawsState.get(old);
-    if (state) {
-      state.ind = ind;
-      state.figures = ind.figures.slice(0, ind.riders);
-      (old as ex.Canvas).flagDirty();
-      cv = old;
+  /** Show state `ind`: its lantern and FULL, and its riders standing in the
+   *  cab. Looks up kept parts only; nothing is painted here. */
+  show(ind: CarIndicator): void {
+    this.ind = ind;
+    this.front = this.parts.front(this.cabW, ind.arrow, ind.full);
+    const rc = Math.min(ind.riders, ind.figures.length);
+    let n = 0;
+    for (let p = 0; p < rc; p++) {
+      const rx = cabRiderX(this.cw, rc, p);
+      if (rx === null) break;
+      const left = Math.round(rx) - RIDER_X;
+      const sx = left < 0 ? -left : 0;
+      const w = Math.min(RIDER_W, this.cw - left) - sx;
+      if (w <= 0) continue;
+      this.riders[n] = this.parts.rider(ind.figures[p]);
+      const slot = this.slots[n] ?? (this.slots[n] = { sx: 0, dx: 0, w: 0 });
+      slot.sx = sx;
+      slot.dx = left + sx;
+      slot.w = w;
+      n++;
     }
+    this.count = n;
+    this.empty = n === 0 ? this.parts.empty(this.kind, this.cabW, ind.arrow, ind.full) : null;
   }
-  cv ??= newCabCanvas(entry, ind);
-  entry.gfx.set(key, cv);
-  return cv;
+
+  protected _drawImage(ctx: ex.ExcaliburGraphicsContext, x: number, y: number): void {
+    if (this.empty) {
+      ctx.drawImage(this.empty, x, y);
+      return;
+    }
+    ctx.drawImage(this.back, x, y);
+    for (let p = 0; p < this.count; p++) {
+      const s = this.slots[p];
+      ctx.drawImage(this.riders[p], s.sx, 0, s.w, RIDER_H, x + s.dx, y + this.foot, s.w, RIDER_H);
+    }
+    ctx.drawImage(this.front, x, y);
+  }
+
+  clone(): CabGraphic {
+    const copy = new CabGraphic({ w: this.cabW, kind: this.kind }, this.ind, this.parts);
+    const options = this.cloneGraphicOptions();
+    copy.opacity = options.opacity ?? 1;
+    return copy;
+  }
 }

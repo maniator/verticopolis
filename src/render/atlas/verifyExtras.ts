@@ -17,7 +17,7 @@ import type { SampleResult } from "./verify";
  * The non-room half of the atlas check, run beside `verify.ts`: each case
  * composes atlas frames the way a frontend would and compares them with the
  * game's own draw call, made with the arguments the game passes
- * (`towerReconcile.transportGraphic`, `towerCrowd.carGfx`,
+ * (`towerReconcile.transportGraphic`, `cabGraphics.CabGraphic`,
  * `towerScene.bakeSharedGraphics`, `towerScene.skyColor`). The shaft case
  * rebuilds a whole express shaft, skip floor included, from its floor pieces.
  */

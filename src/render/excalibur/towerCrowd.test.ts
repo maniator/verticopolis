@@ -360,7 +360,7 @@ describe("zoom cull skips the per-frame loops (CAP-1's cost mechanism)", () => {
       actor: actor(),
       t: { x: 12, kind: "elevatorStandard", carPositions: [8], carLoad: [0], carDir: [0] },
       i: 0, seed: 0, w: 4 * TILE, kind: "elevatorStandard",
-      gfx: new Map<string, ex.Graphic>(), shown: "0:x:e:",
+      cab: { show: vi.fn() }, shown: "0:x:e:",
     };
     const e = eng({ carActors: [car], cam: { zoom: 0.06 } });
     updateMotion(e);
@@ -404,7 +404,7 @@ describe("zoom cull skips the per-frame loops (CAP-1's cost mechanism)", () => {
 });
 
 describe("updateMotion repositions the moving actors", () => {
-  it("moves each elevator car to its live shaft position and repaints on a state change", () => {
+  it("moves each elevator car to its live shaft position and shows a changed state", () => {
     const cap = kindFacts("elevatorStandard").carCapacity ?? 0;
     expect(cap, "a standard elevator car carries passengers").toBeGreaterThan(0);
     const changedInd = carIndicator(1, cap, cap, cabFit(4 * TILE), 0); // ascending & full: differs from idle
@@ -416,19 +416,22 @@ describe("updateMotion repositions the moving actors", () => {
       seed: 0,
       w: 4 * TILE,
       kind: "elevatorStandard",
-      // Pre-seed the cached graphic for the new state so carGfx never bakes a Canvas.
-      gfx: new Map<string, ex.Graphic>([[changedKey, gfx()]]),
-      shown: "0:x:e:", // idle: forces the "state changed" repaint branch
+      cab: { show: vi.fn() },
+      shown: "0:x:e:", // idle: forces the "state changed" branch
     };
     const e = eng({ carActors: [car] });
     updateMotion(e, 1);
     // The riders change once the drawn car gets there, with the people
     // getting in and out (the step's glide ends, or the next step comes).
     expect(car.shown).toBe("0:x:e:");
+    expect(car.cab.show).not.toHaveBeenCalled();
     updateMotion(e, MAX_STEP_MS);
     expect(car.actor.pos.x).toBeCloseTo(12 * TILE, 6);
     expect(car.actor.pos.y).toBeCloseTo(-8 * FLOOR, 6);
     expect(car.shown).toBe(changedKey); // adopted the new indicator state
+    // The cab's one graphic shows it: no new graphic for the actor.
+    expect(car.cab.show).toHaveBeenCalledTimes(1);
+    expect(carKey(car.cab.show.mock.calls[0][0])).toBe(changedKey);
   });
 
   it("shows the garbage truck only during the collection hour at a running plant", () => {
