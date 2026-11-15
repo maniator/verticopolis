@@ -230,11 +230,11 @@
   touch-action: none; /* we handle pan/zoom ourselves */
   image-rendering: pixelated; /* crisp retro pixels, no blur */
 }
-/* The tool strip at the tower's bottom left: the phone's tool card
-   (#tool-tip), then the lobby height strip (#308) or the bulldoze drag strip.
-   The status bar shows the tool card on one line, so the card's choice floats
-   over the tower while the Lobby tool or the bulldozer is armed, on every
-   layout. */
+/* The tool strip at the tower's bottom left: the lobby height strip (#308)
+   or the bulldoze drag strip. The status bar shows the tool card on one line
+   (a phone shows no card at all, owner 2026-11-15), so the card's choice
+   floats over the tower while the Lobby tool or the bulldozer is armed, on
+   every layout. */
 #tool-strip {
   position: absolute;
   left: max(10px, env(safe-area-inset-left));
@@ -249,10 +249,6 @@
 }
 #tool-strip > * {
   pointer-events: auto;
-}
-/* A desktop reads the card in the status bar; the phone block shows it. */
-#tool-tip {
-  display: none;
 }
 #lobby-height-strip:not([hidden]),
 #bulldoze-drag-strip:not([hidden]) {

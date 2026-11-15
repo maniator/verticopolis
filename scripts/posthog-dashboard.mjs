@@ -584,12 +584,12 @@ function buildInsights(ids) {
     },
     {
       name: "Version 4 windows and welcome",
-      description: "app_action for the windows and cards that came with the menu bar: window_close and window_move (detail tower or bulletin), tool_card_close, welcome_shown, welcome_close (detail ok, x, escape, backdrop, displaced) and welcome_link (first_tower, modes, whats_new), production.",
+      description: "app_action for the windows and cards that came with the menu bar: window_close and window_move (detail tower or bulletin), welcome_shown, welcome_close (detail ok, x, escape, backdrop, displaced) and welcome_link (first_tower, modes, whats_new), production.",
       query: trends([series("app_action", "Actions")], {
         breakdown: ["action", "detail"],
         display: "ActionsTable",
         breakdownLimit: 40,
-        where: [inAction(["window_close", "window_move", "tool_card_close", "welcome_shown", "welcome_close", "welcome_link"])],
+        where: [inAction(["window_close", "window_move", "welcome_shown", "welcome_close", "welcome_link"])],
       }),
     },
     {
