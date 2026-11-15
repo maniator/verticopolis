@@ -144,8 +144,9 @@ player's own text and is never sent, and neither is a tower's contents.
 | `file_failed` | `full` or `error` | A write to My Towers refused: the device is out of room, or another error |
 | `files_copied` | a count | Once per device: the old save slots copied into My Towers, and how many |
 
-`load_slot` still counts the Auto-save loading as the live tower (File > Load,
-or its row in the Open window), and `load_failed` a load that failed. Up to
+`load_slot` still counts the Auto-save loading as the live tower (its row in
+the Open window; File > Load in 4.1 and 4.2), and `load_failed` a load that
+failed. Up to
 4.2 the slots sent `save_slot`, `delete_save`, `rename_slot`, `saves_open`
 (the Saved Towers window) and `splash_load_open` (the title screen's picker);
 no build from 4.3 sends them, so a series that reads them stops there. A
@@ -177,7 +178,7 @@ never the name).
 | `via` (open) | `click`, `keys`, `alt` | A click on a title, the keyboard on a focused title, or Alt with the underlined letter |
 | `via` (pick) | `pointer`, `keys` | A mouse, pen or finger, or the keyboard |
 | `screen` | `title`, `tower` | Over the title screen, or over a tower |
-| `item` | `new_tower`, `load_auto`, `load_file_1` to `load_file_5`, `load_more`, `quick_save`, `close`, `import`, `export`, `install_app`, `undo`, `redo`, `tower_info`, `map`, `statistics`, `rename`, `fire_rescue`, `rules`, `tools`, `bulletin`, `status_bar`, `full_screen`, `settings`, `sound`, `screen_saver`, `manual`, `compare`, `replay`, `sponsor`, `about`, `other` | The item, by a code that does not change with its label (`MENU_ITEM_CODES`) |
+| `item` | `new_tower`, `quick_save`, `close`, `import`, `export`, `install_app`, `undo`, `redo`, `tower_info`, `map`, `statistics`, `rename`, `fire_rescue`, `rules`, `tools`, `bulletin`, `status_bar`, `full_screen`, `settings`, `sound`, `screen_saver`, `manual`, `compare`, `replay`, `sponsor`, `about`, `other` | The item, by a code that does not change with its label (`MENU_ITEM_CODES`) |
 | `browsed` | a count | Menus the trip showed, the last one included |
 | `after` | an `item` code or `none` | The page life's previous real pick, so a breakdown shows what follows what without a paths query. A grayed click never becomes the next pick's `after` |
 | `grayed` | `true`, `false` | The item was grayed out, so nothing happened |
@@ -186,10 +187,10 @@ never the name).
 
 Version 4.1 renamed the File items and kept their codes, so a series runs on
 across the rename: `import` is Open…, `export` is Save As…, `quick_save` is
-Save, and `saves` was Saved Towers… (gone in 4.3). File > Load lists the
-Auto-save as `load_auto`, the five newest My Towers files as `load_file_1` to
-`load_file_5` (newest first) and More… as `load_more`; up to 4.2 it listed
-the numbered slots as `load_slot_1` to `load_slot_3`. Opening the Load submenu sends nothing; only a pick from it does. The File
+Save, and `saves` was Saved Towers… (gone in 4.3). File > Load (4.1 and 4.2)
+sent `load_auto` and `load_slot_1` to `load_slot_3`; 4.3 removed it, and the
+Auto-save and every tower open from the Open window (`files_open`,
+`file_open`, `load_slot`). The File
 keys are not menu trips, so they send no `menu_pick` and the menu funnels count
 menus only: a key that ran sends `app_action` `file_key` (below), and the
 command then sends its own event as from the menu.

@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { GameApp } from "../main";
 
 const map = vi.hoisted(() => ({ open: false, set: vi.fn() }));
-const files = vi.hoisted(() => ({ showOpenDialog: vi.fn(), showSaveAsDialog: vi.fn(), openFile: vi.fn() }));
+const files = vi.hoisted(() => ({ showOpenDialog: vi.fn(), showSaveAsDialog: vi.fn() }));
 const store = vi.hoisted(() => new Map<string, string>());
 const movable = vi.hoisted(() => vi.fn());
 const sponsor = vi.hoisted(() => ({ offered: true, track: vi.fn() }));
@@ -14,8 +14,6 @@ vi.mock("./overviewMapWiring", () => ({
 }));
 vi.mock("./fileSpaceCommands", () => files);
 vi.mock("./titleScreen", () => closer);
-const loads = vi.hoisted(() => ({ fill: vi.fn(), wire: vi.fn() }));
-vi.mock("./loadMenu", () => ({ fillLoadMenu: loads.fill, wireLoadMenu: loads.wire }));
 vi.mock("../ui/movableWindow", () => ({ MovableWindow: movable }));
 vi.mock("../ui/splashTemplate", () => ({ SPONSOR_URL: "https://sponsor.example/", sponsorOffered: () => sponsor.offered }));
 vi.mock("../analytics", () => ({ trackAppAction: sponsor.track }));
@@ -136,20 +134,6 @@ describe("wireMenus", () => {
     ]);
     expect(menus.pick).not.toHaveBeenCalled();
     shortcuts.mockRestore();
-  });
-
-  it("wires File > Load to the app and refills it each time the File menu opens", () => {
-    const { app } = fakeApp();
-    const bar = wireMenus(app)!;
-    expect(loads.wire).toHaveBeenCalledWith(app, expect.anything());
-    const [, commands] = loads.wire.mock.calls[0] as [unknown, { openFile(id: string): void; more(): void }];
-    commands.openFile("f1");
-    commands.more();
-    expect(files.openFile).toHaveBeenCalledWith(app, "f1");
-    expect(files.showOpenDialog).toHaveBeenCalledWith(app);
-    loads.fill.mockClear();
-    bar.open($("mb-file") as HTMLButtonElement, false);
-    expect(loads.fill).toHaveBeenCalledOnce();
   });
 
   it("routes File, Edit, Tower, Options and Help items to the game", () => {

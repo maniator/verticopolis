@@ -307,7 +307,7 @@ export type BombOutcome = "paid" | "found" | "exploded";
 export type AppActionName =
   // Persistence. The FACT only, never tower contents or the fidelity report.
   | "quick_save"
-  // The Auto-save loaded (File > Load, or its row in the Open window).
+  // The Auto-save loaded (its row in the Open window; File > Load up to 4.2).
   // 4.2 and earlier also sent save_slot, delete_save, rename_slot and this
   // for the numbered slots; My Towers replaced them (owner, 2026-11-15).
   | "load_slot"

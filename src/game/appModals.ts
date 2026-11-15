@@ -119,8 +119,8 @@ export async function confirmExterminate(app: GameApp): Promise<void> {
   );
 }
 
-/** Load the Auto-save and adopt it as the live tower (File > Load, the Open
- *  window's Auto-save row). */
+/** Load the Auto-save and adopt it as the live tower (the Open window's
+ *  Auto-save row). */
 export function loadFromSlot(app: GameApp, slot: "auto"): void {
   // The engine loads the save and the app follows the swap.
   const swap = loadStored(app.enginePort, () => app.followSwap());

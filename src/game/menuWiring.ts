@@ -9,8 +9,7 @@ import { menuItemCodeOf, menuNameOf, trackMenuDismiss, trackMenuOpen, trackMenuP
 import { isEngineStopped, isSplashUp } from "./interactionState";
 import { closeTower } from "./titleScreen";
 import { wireFileShortcuts, type FileCommands } from "./fileShortcuts";
-import { fillLoadMenu, wireLoadMenu } from "./loadMenu";
-import { openFile, showOpenDialog, showSaveAsDialog } from "./fileSpaceCommands";
+import { showOpenDialog, showSaveAsDialog } from "./fileSpaceCommands";
 import { overviewMapOpen, setOverviewMapOpen } from "./overviewMapWiring";
 import { callFireRescue } from "./fireRescueCall";
 
@@ -181,7 +180,6 @@ export function wireMenus(app: GameApp): MenuBar | null {
   on("mb-import", file.open);
   on("mb-export", file.saveAs);
   wireFileShortcuts(file, window, reportKey);
-  wireLoadMenu(app, { openFile: (id) => void openFile(app, id), more: file.open });
   // Edit: the toolbar's own buttons, so the gray-out and the gesture rules hold.
   on("mb-undo", () => ui.el.undo?.click());
   on("mb-redo", () => ui.el.redo?.click());
@@ -214,8 +212,7 @@ export function wireMenus(app: GameApp): MenuBar | null {
     "click",
     (e) => {
       const item = e.target instanceof Element ? e.target.closest<HTMLElement>(".mb-item") : null;
-      // A submenu's title only opens its submenu (ui/menuBar.ts): not a pick.
-      if (!item || item.matches(".mb-sub-title")) return;
+      if (!item) return;
       reportPick(item, e);
       if (item.getAttribute("aria-disabled") === "true") {
         e.preventDefault();
@@ -236,7 +233,7 @@ export function wireMenus(app: GameApp): MenuBar | null {
   /** One `menu_pick`, while a menu is open (a script's click is not a pick). */
   function reportPick(item: HTMLElement, e: MouseEvent): void {
     const open = bar.current();
-    const menu = menuNameOf(item.closest(".mb-pop:not(.mb-subpop)")?.id ?? "");
+    const menu = menuNameOf(item.closest(".mb-pop")?.id ?? "");
     if (!open || !menu) return;
     const grayed = item.getAttribute("aria-disabled") === "true";
     const checked = item.getAttribute("aria-checked");
@@ -267,8 +264,7 @@ export function wireMenus(app: GameApp): MenuBar | null {
       const menu = menuNameOf(title.id);
       if (menu) trackMenuDismiss({ menu, how, screen: screen(), browsed });
     },
-    onOpen: (menu) => {
-      if (menu.id === "mb-file-menu") fillLoadMenu();
+    onOpen: () => {
       check("mb-win-tools", !document.getElementById("palette")?.classList.contains(PALETTE_COLLAPSED_CLASS));
       check("mb-win-map", overviewMapOpen(app));
       for (const w of floating) check(w.item, !!w.win && !w.win.hidden);

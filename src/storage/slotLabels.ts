@@ -8,7 +8,7 @@
 
 const KEY = "vc.slotNames";
 
-/** The longest slot name, so a name fits on one line in File > Load. */
+/** The longest slot name 4.1 and 4.2 let a player type. */
 export const SLOT_NAME_MAX = 28;
 
 /** The last stored text and the names read from it, so a menu that lists the
