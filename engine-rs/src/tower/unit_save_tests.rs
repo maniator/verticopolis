@@ -122,6 +122,7 @@ fn same(u: &Unit, what: &str) {
         want.to_string(),
         "{what}: the text"
     );
+    assert_eq!(u.save_text(), want.to_string(), "{what}: save_text");
     let saved = SavedUnit { unit: u, run: None };
     assert_eq!(
         serde_json::to_string(&saved).unwrap(),

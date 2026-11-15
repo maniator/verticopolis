@@ -21,7 +21,7 @@
 //! yet) asks the caller for a full save, which primes the mirror again. The
 //! simulation is never changed: the units are lent out of the tower only
 //! while the rest of the save is written.
-use serde_json::{json, Map, Value};
+use serde_json::{json, Value};
 
 use crate::sim::Simulation;
 use crate::tower::Unit;
@@ -55,8 +55,7 @@ impl SaveMirror {
         let rooms = sim.tower.room_index();
         self.rooms.reserve(rooms.len());
         for &i in rooms.iter() {
-            self.rooms
-                .push((units[i].clone(), units[i].serialize().to_string()));
+            self.rooms.push((units[i].clone(), units[i].save_text()));
         }
         self.key = Some(sim.tower.index_key());
         save.to_string()
@@ -89,12 +88,11 @@ impl SaveMirror {
             if unit == copy {
                 continue;
             }
-            let saved = unit.serialize();
-            let text = saved.to_string();
+            let text = unit.save_text();
             *copy = unit.clone();
             if text != *sent {
+                changed.push(text.clone());
                 *sent = text;
-                changed.push(saved);
             }
         }
         if order_changed {
@@ -115,10 +113,23 @@ impl SaveMirror {
         };
         rest.remove("units");
         rest.insert("version".into(), json!(version));
-        let mut out = Map::new();
-        out.insert("units".into(), Value::Array(changed));
-        out.insert("rest".into(), Value::Object(rest));
-        Some(Value::Object(out).to_string())
+        // The text `{"units":[..],"rest":{..}}` as a tree of the two would
+        // write it, with each changed record's text as the mirror holds it.
+        let rest = Value::Object(rest).to_string();
+        let mut out = String::with_capacity(
+            rest.len() + changed.iter().map(|t| t.len() + 1).sum::<usize>() + 20,
+        );
+        out.push_str("{\"units\":[");
+        for (n, text) in changed.iter().enumerate() {
+            if n > 0 {
+                out.push(',');
+            }
+            out.push_str(text);
+        }
+        out.push_str("],\"rest\":");
+        out.push_str(&rest);
+        out.push('}');
+        Some(out)
     }
 }
 

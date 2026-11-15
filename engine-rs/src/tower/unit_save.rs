@@ -1,6 +1,7 @@
 //! A unit's save entry (`serializeUnit` in sim/coerce.ts), walked once
 //! (`SaveEntries`) and read as a tree ([`Unit::serialize`]), written straight
-//! to the save text ([`SavedUnit`], see `save_entry`), or counted
+//! to the save text ([`SavedUnit`], [`Unit::save_text`], see `save_entry`),
+//! or counted
 //! ([`Unit::saves_only_position`]), so the three never disagree on a key or
 //! the rule that leaves it out.
 
@@ -8,7 +9,7 @@ use serde::ser::{Serialize, SerializeMap, Serializer};
 use serde_json::Value;
 
 use super::types::{Unit, UnitState};
-use crate::save_entry::{entry_tree, EntryValue, SaveEntries};
+use crate::save_entry::{entry_tree, EntryValue, SaveEntries, Written};
 use crate::save_floor_runs::FLOOR_RUN_KEY;
 
 impl SaveEntries for Unit {
@@ -114,6 +115,13 @@ impl Unit {
     /// `serializeUnit` (sim/coerce.ts): the unit's save entry as a tree.
     pub fn serialize(&self) -> Value {
         entry_tree(self)
+    }
+
+    /// The unit's save entry as JSON text, the text [`Unit::serialize`]'s
+    /// tree writes, with no tree built. For the callers that only send the
+    /// text on (`unitAt`, the tooling reads, the save delta).
+    pub fn save_text(&self) -> String {
+        serde_json::to_string(&Written(self)).expect("a save entry writes to a string")
     }
 
     /// Whether the unit's save entry holds nothing but `id`, `kind`, `floor`

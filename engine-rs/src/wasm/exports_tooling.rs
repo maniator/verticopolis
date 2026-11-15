@@ -74,10 +74,7 @@ impl Engine {
     /// Tooling only: unit `id` serialized as the save would, or null.
     #[wasm_bindgen(js_name = unitRecord)]
     pub fn unit_record(&self, id: i32) -> Option<String> {
-        self.sim
-            .tower
-            .get_unit(id.into())
-            .map(|u| u.serialize().to_string())
+        self.sim.tower.get_unit(id.into()).map(|u| u.save_text())
     }
 
     /// Tooling only: shaft `id` serialized as the save would, or null.
@@ -96,7 +93,7 @@ impl Engine {
         self.sim
             .tower
             .room_at(floor.into(), x.into())
-            .map(|u| u.serialize().to_string())
+            .map(|u| u.save_text())
     }
 
     /// Tooling only: the kind of the structure tile (a floor or a lobby) at
