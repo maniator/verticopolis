@@ -4,6 +4,7 @@ import {
   bumpVersion,
   changelogVersions,
   contributorLines,
+  headlineFirst,
   highestLevel,
   insertSection,
   notesKeptForCredits,
@@ -78,6 +79,18 @@ describe("change notes", () => {
     ["x.md", note("app: patch\ncrate: none"), /at least one Player line/],
   ])("refuses %s with %s", (file, text, why) => {
     expect(() => parseNote(text, file)).toThrow(why);
+  });
+
+  it("puts the highest app level first and keeps file order within a level", () => {
+    const notes = [
+      { file: "a.md", app: "patch" },
+      { file: "b.md", app: "minor" },
+      { file: "c.md", app: "none" },
+      { file: "d.md", app: "major" },
+      { file: "e.md", app: "minor" },
+    ] as const;
+    expect(headlineFirst(notes).map((n) => n.file)).toEqual(["d.md", "b.md", "e.md", "a.md", "c.md"]);
+    expect(notes.map((n) => n.file)).toEqual(["a.md", "b.md", "c.md", "d.md", "e.md"]);
   });
 
   it("orders levels and raises a version the way npm version does", () => {

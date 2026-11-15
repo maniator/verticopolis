@@ -29,6 +29,7 @@ import {
   bumpVersion,
   contributorLines,
   notesKeptForCredits,
+  headlineFirst,
   highestLevel,
   insertSection,
   readNotes,
@@ -87,7 +88,9 @@ if (named !== undefined) {
 
 if (app !== appWas) {
   npm(["version", app, "--no-git-tag-version"]);
-  const lines = pending.flatMap((n) => n.player);
+  // The headline note (the highest app level) leads, so a player who reads
+  // only the top line of the update prompt or the changelog sees it.
+  const lines = headlineFirst(pending).flatMap((n) => n.player);
   write("CHANGELOG.md", insertSection(read("CHANGELOG.md"), app, lines, credits));
   if (lines.length > MAX_NOTES) console.warn(`release: ${lines.length} player lines; the update prompt shows ${MAX_NOTES}, so merge some of them in CHANGELOG.md`);
   const long = lines.filter((l) => l.length > MAX_NOTE_LEN).length;
