@@ -121,7 +121,7 @@ manifest, `src/audio/audioAssets.test.ts` fails when a sound file ships or the
 source names one without listing it, and `e2e/offline.spec.ts` plays today's
 sounds from the cache with the network off. `verify-precache.ts` also fails
 the build when the whole precache passes its budget
-(`PRECACHE_BUDGET_BYTES`, 4 MiB today), so a new sound file has to fit.
+(`PRECACHE_BUDGET_BYTES`, 6 MiB today), so a new sound file has to fit.
 
 While the chunk loads, a second `start()` returns early. A `generation`
 counter guards the load window, so a `dispose()` mid-flight cannot resurrect a
@@ -373,7 +373,7 @@ owner audition. If it is picked up, these constraints already apply:
   `src/public/audio/` is not listed, when the source names an `audio/...`
   path that is not listed, or when it builds one from pieces; the build's
   `verify-precache.ts` fails when a listed file is not precached or the
-  precache passes its 4 MiB budget.
+  precache passes its 6 MiB budget.
 - **It is an mp3.** The Workbox `globPatterns` in `vite.config.ts` precache
   `mp3` and no other audio type, and `audioAssets.test.ts` rejects a listed
   file the glob does not cover.

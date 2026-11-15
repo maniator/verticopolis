@@ -28,8 +28,12 @@ const SW = resolve(DIST, "sw.js");
  *  engine (2026-10-13); the headroom is for ordinary growth. Crossing it should
  *  be a deliberate call: raise this with the reason. Raised from 4 MiB to
  *  4.5 MiB with tall lobbies (#308, 2026-11-12): 3.3.0 sat just under 4 MiB,
- *  and the tall lobby rules and art took it 34 KiB over. */
-const PRECACHE_BUDGET_BYTES = 4.5 * 1024 * 1024;
+ *  and the tall lobby rules and art took it 34 KiB over. Raised to 6 MiB with
+ *  the Metro jam fix (#2272, 2026-11-15): 4.0 plus the screen saver sat just
+ *  under 4.5 MiB and the fix took it 9 KiB over. The owner floated 10 MB; the
+ *  web room's party chose 6 MiB so crossing it still makes someone stop
+ *  (_bmad-output/party-mode/install-budget-party-findings-2026-11-15.md). */
+const PRECACHE_BUDGET_BYTES = 6 * 1024 * 1024;
 
 /** Icons that must each appear exactly once (kept in sync with src/public/). */
 const REQUIRED_ICONS = [
