@@ -249,6 +249,31 @@ describe("service sprites on the grid they are authored for", () => {
     expect(new Set(fam.map((r) => `${r.w}x${r.h}`)).size).toBe(1);
   });
 
+  it.each([
+    ["the retired 11 by 44 footprint's", REF_TILE / TILE, REF_FLOOR / FLOOR],
+    ["three quarters", 0.75, 0.75],
+    ["one and a quarter", 1.25, 1.25],
+    ["one and a half", 1.5, 1.5],
+  ] as const)("keeps every filled rect inside its canvas at %s scale", (_label, kx, ky) => {
+    // Off identity `Fu` rounds a size on its own, so a repeated object at the
+    // room's far edge can round past it (the recycling hazard tape at 0.75 and
+    // 1.25, its right-wall rib at 1.5); the fill cuts it back to the edge. The
+    // full lot and a full plant are drawn so the car and the pile are covered.
+    // Figures keep their own pixel size, so a room squeezed well below 0.75
+    // can still clip a head; no caller draws one that small.
+    for (const sp of SPRITES) {
+      const w = Math.round(sp.tiles * TILE * kx);
+      const h = Math.round(sp.floors * FLOOR * ky);
+      const r = recorder();
+      const state = { ...dc(r.ctx), parkingUse: 1, recycleFill: 1 };
+      if (sp.name === "parking") drawParking(state, UNIT, 0, 0, w, h);
+      else if (sp.name === "recycling") drawRecycling(state, UNIT, 0, 0, w, h);
+      else sp.draw(r.ctx, w, h);
+      const outside = r.rects.filter((q) => q.x < 0 || q.y < 0 || q.x + q.w > w || q.y + q.h > h);
+      expect(outside.map((q) => `${sp.name} ${q.x},${q.y} ${q.w}x${q.h} ${q.c}`)).toEqual([]);
+    }
+  });
+
   it("pins the grid the references are authored on", () => {
     // The bounds guard above only fails when the grid SHRINKS: if TILE or FLOOR
     // grows, the derived canvas grows with it and the authored rects still fit,

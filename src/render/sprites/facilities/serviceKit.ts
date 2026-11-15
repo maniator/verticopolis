@@ -68,10 +68,16 @@ export function refMap(ctx: CanvasRenderingContext2D, x: number, y: number, w: n
   /** Uniform-size fill. Position maps exactly as `F` does; the SIZE comes from
    *  the authored size scaled and rounded on its own, so it cannot vary with the
    *  sub-pixel position of the rect. At identity this rounds to the authored
-   *  size, so it is byte-identical to `F`. */
+   *  size, so it is byte-identical to `F`. Off identity, a rect rounded up at
+   *  the room's far edge is cut back to that edge, so it never paints past the
+   *  room into its neighbor. */
   const Fu: Fill = (rx, ry, rw, rh, color, alpha = 1) => {
     if (rw <= 0 || rh <= 0) return;
-    paint(sx(rx), sy(ry), Math.max(1, Math.round((rw * w) / RW)), Math.max(1, Math.round((rh * h) / RH)), color, alpha);
+    const x0 = sx(rx);
+    const y0 = sy(ry);
+    const pw = Math.min(Math.max(1, Math.round((rw * w) / RW)), sx(RW) - x0);
+    const ph = Math.min(Math.max(1, Math.round((rh * h) / RH)), sy(RH) - y0);
+    if (pw > 0 && ph > 0) paint(x0, y0, pw, ph, color, alpha);
   };
   return { F, Fu, sx, sy };
 }

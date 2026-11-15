@@ -98,24 +98,31 @@ export function skyBar(d: RoomCtx, u: UnitView, x: number, y: number, w: number,
   // stools in front of it. The bartender is staff, not one of the room's
   // occupants, so he does not come off the stool count. Stools sit closer
   // together than a figure is wide, so a patron partly overlapping him is
-  // inherent here and always was. Sharing a patron's exact column is not, since
-  // the two then read as one person rather than two, so he takes the next column
-  // along. He dodges EVERY stool, taken or not, so where he stands depends on
-  // the room alone: the atlas bakes a crowd by adding patrons one at a time,
-  // and a bartender who stepped aside only once a stool filled would move
-  // between two of those steps. The walk is bounded by the row it steps through.
-  if (occ > 0) {
-    const heads = new Set(stools);
-    // Whole pixels, so at a half-pixel origin he still lands on a stool column
-    // when he should dodge it.
-    let bartX = Math.round(barX + Math.round(barW / 2) - 3);
-    for (let step = 0; step <= stools.length && heads.has(bartX); step++) bartX++;
-    personStanding(ctx, bartX, floorY - 6, seed + 2);
-  }
+  // inherent here and always was. Standing within a pixel of a patron's column
+  // is not, since the two then read as one person rather than two, so he stands
+  // halfway between the two stools that straddle the counter's middle. He
+  // places himself against EVERY stool, taken or not, so where he stands
+  // depends on the room alone: the atlas bakes a crowd by adding patrons one at
+  // a time, and a bartender who stepped aside only once a stool filled would
+  // move between two of those steps.
+  if (occ > 0) personStanding(ctx, bartenderX(stools, barX + Math.round(barW / 2) - 3), floorY - 6, seed + 2);
   stools.forEach((sx, i) => {
     if (!taken.has(i)) return;
     personSeated(ctx, sx, floorY - 1, seed + i * 11);
     ctx.fillStyle = shade(COUNTER, -18); // the stool
     ctx.fillRect(sx + 1, floorY - 1, 2, 1);
   });
+}
+
+/** Where the bartender stands: halfway between the two stools that straddle
+ *  `mid` (the pair at the nearer end when `mid` is past the row), so he keeps
+ *  clear of both their columns. With fewer than two stools he stands at `mid`,
+ *  or one column along when that is a stool's. Whole pixels, so at a
+ *  half-pixel origin the result is still a column the stools can be told from. */
+export function bartenderX(stools: readonly number[], mid: number): number {
+  const at = Math.round(mid);
+  if (stools.length < 2) return stools.includes(at) ? at + 1 : at;
+  let right = stools.findIndex((s) => s > at);
+  if (right <= 0) right = right === 0 ? 1 : stools.length - 1;
+  return Math.floor((stools[right - 1] + stools[right]) / 2);
 }

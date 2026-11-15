@@ -39,20 +39,22 @@ export function drawRecycling(d: DrawCtx, u: UnitView, x: number, y: number, w: 
   // Concrete hall: walls, roof ribs, girders, and a service pipe. The full-width
   // bands stay on the edge-derived fill so they meet without a seam; the ribs,
   // studs and pipe brackets are repeated objects and take the uniform one. The
-  // hall is ten bays of 20, with a rib on each bay's left edge (none on the
-  // right wall, x 200).
+  // hall is ten bays of 20, with a rib on each bay's left edge and one more on
+  // the right wall, so both walls end on a rib.
   const ribPitch = W / 10;
   F(0, 0, W, H, "#6C6C64");
   F(0, 0, W, Math.round(H * 0.5), "#75756B");
   for (let px = 0; px < W; px += ribPitch) Fu(px, 2, 1, deck - 2, "#5A5A52");
+  Fu(W - 1, 2, 1, deck - 2, "#5A5A52");
   for (let py = 10; py < deck; py += 11) F(0, py, W, 1, "#616159");
   for (let px = 6; px < W; px += ribPitch) Fu(px, 12, 1, 1, "#8A8A80");
   F(0, 3, W, 2, "#7A8088");
   F(0, 3, W, 1, "#9AA0A8");
-  // Pipe brackets on a 28px pitch from x 6. The run leaves a wider margin at
-  // the right wall than the left.
-  const bracketPitch = 28, brackets = Math.floor((W - 12) / bracketPitch) + 1;
-  for (let b = 0; b < brackets; b++) Fu(Math.round(6 + b * bracketPitch), 2, 2, 4, "#5A6068");
+  // Fourteen pipe brackets on a 14px pitch from x 8: the last one ends 8px
+  // from the right wall, the same margin as the first.
+  const bracketX0 = 8, bracketW = 2, brackets = 14;
+  const bracketPitch = (W - 2 * bracketX0 - bracketW) / (brackets - 1);
+  for (let b = 0; b < brackets; b++) Fu(bracketX0 + b * bracketPitch, 2, bracketW, 4, "#5A6068");
   F(0, 7, W, 3, "#565C64");
   F(0, 7, W, 1, "#6A727A");
   // Compactor housing with a peek of sorted waste.
@@ -62,12 +64,13 @@ export function drawRecycling(d: DrawCtx, u: UnitView, x: number, y: number, w: 
   F(9, 33, 10, 3, "#33373D");
   F(11, 35, 3, 3, "#3A4232");
   F(15, 35, 3, 3, "#4A5A3A");
-  // Warm hooded work lamps over the line.
-  for (const lx of [42, 136]) {
-    F(lx, 10, 1, 3, "#3A3E44");
-    F(lx - 3, 13, 7, 3, "#2A2E34");
-    F(lx - 2, 15, 5, 1, "#F8E2B4");
-    glow(F, lx, 18, "#F8E2B4");
+  // Warm hooded work lamps, one each side of the sorting sign, the same 42px
+  // in from either wall.
+  for (const lx of [42, W - 1 - 42]) {
+    Fu(lx, 10, 1, 3, "#3A3E44");
+    Fu(lx - 3, 13, 7, 3, "#2A2E34");
+    Fu(lx - 2, 15, 5, 1, "#F8E2B4");
+    glow(Fu, lx, 18, "#F8E2B4");
   }
   // Overhead sorting sign. The glyph run is centered off the board width, so
   // the eleven letters keep matching margins at both ends.
@@ -81,14 +84,18 @@ export function drawRecycling(d: DrawCtx, u: UnitView, x: number, y: number, w: 
   layerBreak(ctx);
   // Conveyor belt carrying baled recyclables (no reserved red bale). The bale
   // run and the carried items stop at the belt's end cap, so a narrower belt
-  // drops bales and items.
+  // drops bales and items. The bales are centered between the two caps, so the
+  // run leaves the same gap to each.
   const by = deck - 24;
   const beltX = 24, beltW = 109;
   const beltEnd = beltX + beltW - 2; // the end cap's left edge
   F(beltX, by, beltW, 6, "#3A3E44");
   F(beltX, by, beltW, 1, "#4E545C");
   F(beltX, by + 5, beltW, 1, "#242830");
-  for (let bx = beltX + 2; bx + 3 <= beltEnd; bx += 6) Fu(bx, by + 1, 3, 4, "#2E323A"); // baled recyclables
+  const baleW = 3, balePitch = 6, runX = beltX + 2, runW = beltEnd - runX;
+  const bales = Math.floor((runW - 2 + balePitch - baleW) / balePitch); // at least 1px clear of each cap
+  const baleInset = Math.floor((runW - ((bales - 1) * balePitch + baleW)) / 2);
+  for (let i = 0; i < bales; i++) Fu(runX + baleInset + i * balePitch, by + 1, baleW, 4, "#2E323A"); // baled recyclables
   F(beltX - 2, by - 1, 4, 8, "#4A4E54");
   F(beltX + beltW - 2, by - 1, 4, 8, "#4A4E54");
   const items = ["#4E7A4A", "#3E6A9E", "#C8A24A", "#C87A32", "#DCDCE0", "#8C5A3A"];
@@ -115,7 +122,8 @@ export function drawRecycling(d: DrawCtx, u: UnitView, x: number, y: number, w: 
     ["#3E6AAE", "#2A4E86"],
     ["#D8B23A", "#B08A2A"],
   ];
-  const binW = 15;
+  // 16 wide, so the 8px arrow glyph and the 6px lid both sit centered.
+  const binW = 16;
   bins.forEach((c, i) => {
     const bx = 27 + i * (binW + 3);
     // One bin repeated along the deck, arrow glyph and all, so the whole
@@ -138,11 +146,11 @@ export function drawRecycling(d: DrawCtx, u: UnitView, x: number, y: number, w: 
       F(bx2 + 8, by2, 1, 7, "#7A5A38");
     }
   }
-  // Compacted cubes waiting by the baler. The pile stops short of them
-  // (`RECYCLING_CUBES_X` in recyclingLook.ts), so a full pile never half
-  // covers a cube.
+  // Compacted cubes waiting by the baler, the nearest one RECYCLING_CUBE_GAP px
+  // clear of its left bevel. The pile stops short of them (`RECYCLING_CUBES_X`
+  // in recyclingLook.ts), so a full pile never half covers a cube.
   for (let i = 0; i < RECYCLING_CUBES; i++) {
-    const gx2 = cx - RECYCLING_CUBE_GAP - i * RECYCLING_CUBE_W;
+    const gx2 = cx - RECYCLING_CUBE_GAP - (i + 1) * RECYCLING_CUBE_W;
     Fu(gx2, deck - 5, RECYCLING_CUBE_W, 5, i % 2 ? "#3A4232" : "#2F3628");
     Fu(gx2 + 2, deck - 6, 2, 2, "#FFFFFF", 0.28);
   }
