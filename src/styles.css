@@ -39,6 +39,7 @@
 @import "./styles/game/topbar.css";
 @import "./styles/game/tools-stage.css";
 @import "./styles/game/editor-sidebar.css";
+@import "./styles/menu-bar.css";
 @import "./styles/game/menubar.css";
 @import "./styles/game/dialogs.css";
 @import "./styles/game/new-tower.css";

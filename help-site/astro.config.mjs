@@ -66,6 +66,7 @@ export default defineConfig({
         join(repo, "src/styles/retro-tokens.css"),
         join(repo, "docs/engine-site/src/styles/theme.css"),
         join(repo, "docs/engine-site/src/styles/title-bar.css"),
+        join(repo, "src/styles/menu-bar.css"),
         "./src/styles/help.css",
       ],
       head: [...sharedHead, { tag: "script", content: oldAnchorRedirects(OLD_ANCHORS) }],
