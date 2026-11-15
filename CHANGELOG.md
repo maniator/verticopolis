@@ -25,6 +25,13 @@ prompt already tells players it is an engine update and shows the new version.
 Entries below 1.51.1 were curated from the commit history after the fact, so they
 are documentation only: no build that a client fetches carries them.
 
+## 4.4.0
+
+- Link a folder on your computer to the Open and Save As windows. In Chrome, Edge, Opera and Samsung Internet, pick "Link a folder on this computer…" in the Look in box, and the windows list, open and save the towers in that folder (`.vctower` and SimTower `.TDT` files). The game remembers the folder; after a restart your browser may ask once for your OK, and in Chrome "Allow on every visit" stops it asking. The game never deletes or renames a file in that folder. My Towers and the Auto-save stay as they are.
+- In browsers that can't link a folder (Safari, Firefox, and every browser on iPhone and iPad), the Open window has "From a folder…", which copies the towers in a folder you pick into My Towers.
+- Saving under a name that's already taken now offers the next free numbered name, the way Windows does: Save As asks to save as "Sky (2)" (picked for you), to replace the old tower, or to cancel. In a linked folder, a file another program put there under that name is never replaced; the tower goes in as the next free number.
+- The game installed on a phone no longer offers Options > Full Screen, which only made it look worse there. Browser tabs, tablets and computers keep it.
+
 ## 4.3.0
 
 - Modern towers get Tower > Call Exterminator…, lit while a hotel room has cockroaches and no crew is on the way, and Call Fire Rescue… is now grayed out unless a fire is burning.
