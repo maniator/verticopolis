@@ -25,6 +25,21 @@ prompt already tells players it is an engine update and shows the new version.
 Entries below 1.51.1 were curated from the commit history after the fact, so they
 are documentation only: no build that a client fetches carries them.
 
+## 4.2.0
+
+- Tower > Call Fire Rescue… brings the fire rescue offer back while a fire burns, so declining it the first time no longer rules it out, as in the 1994 game.
+- People no longer change their looks when they step into an elevator: each rider in a car is the same person you saw get on, in the same clothes, and in Modern with the same shading.
+- Modern: a full elevator car no longer stops at every floor where people are waiting. It passes them and stops only to let its riders off, and another car comes for the people waiting. At a busy rush, riders on the upper floors no longer wait an hour or more while full cars crawl past.
+- The game draws each frame a little faster in big towers: it no longer works out the whole tower's elevator congestion on every frame for a reading nothing showed.
+- In Classic towers, fires now start only once the tower has Security, as in the 1994 game. Modern towers can still catch fire without it.
+- In Modern towers, a hotel room whose guest sleeps in now pays for the night at the 8 AM checkout with everyone else, so bulldozing it or losing it to a fire before the guest leaves no longer loses that night's rent.
+- Recovering from a graphics reset no longer leaves stray keyboard listeners behind, so a long session with several resets holds less memory.
+- When an export that stopped responding finishes later, or the game gives up waiting on it, the message now shows inside any window you have open instead of hiding behind it.
+- Shops, bars, clubs, arcades and daycares built deep in the basement now show their full colors instead of repeating one color for some props.
+- The editor's warning on a gutted room shows a drawn warning icon, so it no longer appears as an empty box on systems without symbol fonts.
+- If the game hits an error while it starts, the message now has a Reload button, and the title screen behind it no longer reacts to keys or autosaves a half-started game.
+- When the device resets the game's graphics, a "Recovering graphics" window now holds the game for the few seconds the restart takes, so no key or click can change the tower while the picture is frozen.
+
 ## 4.1.1
 
 - Big towers run faster: a game day on a maxed Classic tower takes about a quarter less work, a maxed Modern tower about a sixth less, and a Modern tower with a long elevator jam about a tenth less.
