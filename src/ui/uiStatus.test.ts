@@ -3,7 +3,7 @@ import { PortCodes } from "../simport/portCodes";
 import type { SimView } from "../simport/view";
 import { catalogFor } from "../tests/catalogFixture";
 import { mockPort, record } from "../tests/portKit/mockPort";
-import { onHistoryClick, resetLog, setHistoryButtons, toast, update, type HudSource } from "./uiStatus";
+import { clearToasts, onHistoryClick, resetLog, setHistoryButtons, toast, update, type HudSource } from "./uiStatus";
 import type { Catalog } from "../catalog/catalogTypes";
 import type { GameMode } from "../shared/types";
 import type { UI } from "./UI";
@@ -98,6 +98,18 @@ describe("toast rail", () => {
     expect(rail.children.length).toBe(1); // still present, mid-fade
     vi.advanceTimersByTime(300); // fade elapses, node removes itself
     expect(rail.children.length).toBe(0);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("clearToasts empties the rail and its timers but keeps the sticky notice", () => {
+    const { ui, rail } = makeUI();
+    showSaveWarning(rail, "storage blocked", () => {});
+    toast(ui, "a");
+    toast(ui, "b");
+    vi.advanceTimersByTime(3600); // "a" and "b" are mid-fade, removal timers pending
+    toast(ui, "c");
+    clearToasts(ui);
+    expect(Array.from(rail.children, (n) => n.id)).toEqual([SAVE_WARNING_ID]);
     expect(vi.getTimerCount()).toBe(0);
   });
 

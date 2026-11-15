@@ -6,12 +6,14 @@ const importer = vi.hoisted(() => ({ openImport: vi.fn() }));
 const store = vi.hoisted(() => new Map<string, string>());
 const movable = vi.hoisted(() => vi.fn());
 const sponsor = vi.hoisted(() => ({ offered: true, track: vi.fn() }));
+const closer = vi.hoisted(() => ({ closeTower: vi.fn() }));
 
 vi.mock("./overviewMapWiring", () => ({
   overviewMapOpen: () => map.open,
   setOverviewMapOpen: map.set,
 }));
 vi.mock("../ui/uiImport", () => importer);
+vi.mock("./titleScreen", () => closer);
 vi.mock("../ui/movableWindow", () => ({ MovableWindow: movable }));
 vi.mock("../ui/splashTemplate", () => ({ SPONSOR_URL: "https://sponsor.example/", sponsorOffered: () => sponsor.offered }));
 vi.mock("../analytics", () => ({ trackAppAction: sponsor.track }));
@@ -40,7 +42,7 @@ function mount(): void {
       <div class="mb-menu">
         <button class="mb-title" id="mb-file" aria-expanded="false" aria-controls="mb-file-menu"><u>F</u>ile</button>
         <div class="mb-pop" id="mb-file-menu" role="menu" hidden>
-          ${item("mb-quick-save")}${item("mb-import")}${item("mb-export")}${item("mb-undo")}${item("mb-redo")}
+          ${item("mb-quick-save")}${item("mb-close")}${item("mb-import")}${item("mb-export")}${item("mb-undo")}${item("mb-redo")}
           ${item("mb-rename")}${item("mb-rules")}${item("mb-compare")}${item("mb-replay")}
           ${item("mb-win-tools", "menuitemcheckbox")}${item("mb-win-map", "menuitemcheckbox")}
           ${item("mb-win-tower", "menuitemcheckbox")}${item("mb-win-bulletin", "menuitemcheckbox")}
@@ -110,6 +112,7 @@ describe("wireMenus", () => {
     $("btn-undo").addEventListener("click", undo);
     wireMenus(app);
     $("mb-quick-save").click();
+    $("mb-close").click();
     $("mb-import").click();
     $("mb-export").click();
     $("mb-undo").click();
@@ -118,6 +121,7 @@ describe("wireMenus", () => {
     $("mb-sound").click();
     $("mb-replay").click();
     expect(ui.cb.onSave).toHaveBeenCalledOnce();
+    expect(closer.closeTower).toHaveBeenCalledWith(app);
     expect(importer.openImport).toHaveBeenCalledWith(ui);
     expect(ui.promptExport).toHaveBeenCalledOnce();
     expect(undo).toHaveBeenCalledOnce(); // the toolbar's own button, so its rules hold
@@ -209,6 +213,18 @@ describe("wireMenus", () => {
     expect($("mb-redo").hasAttribute("aria-disabled")).toBe(false);
   });
 
+  it("Close grays out once the game stopped on its engine, and comes back with a live tower", () => {
+    const { app } = fakeApp();
+    const bar = wireMenus(app)!;
+    document.body.insertAdjacentHTML("beforeend", '<div id="engine-failure"></div>');
+    bar.open($("mb-file") as HTMLButtonElement, false);
+    expect($("mb-close").getAttribute("aria-disabled")).toBe("true");
+    bar.close(false);
+    $("engine-failure").remove();
+    bar.open($("mb-file") as HTMLButtonElement, false);
+    expect($("mb-close").hasAttribute("aria-disabled")).toBe(false);
+  });
+
   it("Sponsor links to the tip jar and counts a tap from the menu; the Android app leaves it out", () => {
     wireMenus(fakeApp().app);
     const link = $("mb-sponsor") as HTMLAnchorElement;
@@ -238,7 +254,7 @@ describe("wireMenus", () => {
     const gameNew = vi.fn();
     $("btn-new").addEventListener("click", gameNew);
     bar.open($("mb-file") as HTMLButtonElement, false);
-    for (const id of ["mb-quick-save", "mb-export", "btn-stats", "mb-win-tower", "mb-replay"]) expect($(id).getAttribute("aria-disabled"), id).toBe("true");
+    for (const id of ["mb-quick-save", "mb-close", "mb-export", "btn-stats", "mb-win-tower", "mb-replay"]) expect($(id).getAttribute("aria-disabled"), id).toBe("true");
     $("btn-stats").click();
     $("mb-quick-save").click();
     expect(stats).not.toHaveBeenCalled();

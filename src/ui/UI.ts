@@ -374,6 +374,10 @@ export class UI {
     status.toast(this, text, kind);
   }
 
+  clearToasts(): void {
+    status.clearToasts(this);
+  }
+
   renderEditor(tpl: TemplateResult): void {
     panels.renderEditor(this, tpl);
   }

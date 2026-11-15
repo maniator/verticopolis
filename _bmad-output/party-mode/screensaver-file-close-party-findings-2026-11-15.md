@@ -381,3 +381,37 @@ the save or the sim; every egg reachable without a mouse; the count is
 public; the hunt post goes out when the desktop ships, and the 4.0 post may
 only tease. A Steam achievement for it later goes through the native
 client's store-neutral sink.
+
+### Round 2f: should Maximize mean full screen? (Naftali, 02:31Z)
+
+🕸️ **Theo:** Browser full screen is fragile as a window state. The browser
+drops it on Escape and on every tab switch, shows its own "press Esc to
+exit" banner each time, and iPhone Safari can't do it from a page at all. If
+Maximize meant full screen, the window would fall out of "maximized" behind
+the player's back.
+
+♿ **Wren:** And Escape is ours: it cancels a tool and closes dialogs. In
+full screen the first Escape belongs to the browser. A player who maximized
+just to get room would lose their Escape key.
+
+🎨 **Sally:** So three states, each meaning one thing. Restore: a window on
+the desktop. Maximize: fills the browser tab (today's game). Full Screen:
+also hides the browser, from the Window menu, where it already is.
+
+🏢 **Kenji:** And give Full Screen the old key: Alt+Enter. That's what
+flipped a DOS game between a window and the whole screen.
+
+🖥️ **Kai:** I'd still want one click from the title bar.
+
+📐 **Juno:** Then double-click the title bar toggles Restore and Maximize,
+the way it always did, and Alt+Enter is the one-key Full Screen. No fourth
+button.
+
+Options laid out for Naftali:
+A. Maximize fills the tab; Full Screen stays in the Window menu, with
+   Alt+Enter as its key. (Room's pick.)
+B. Maximize goes straight to browser full screen. One click, but Escape and
+   tab switches knock it out, the browser banner shows each time, and iPhone
+   can't do it.
+C. A fourth title-bar button for Full Screen. Room against: no period
+   program had one.

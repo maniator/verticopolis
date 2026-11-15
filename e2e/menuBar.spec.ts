@@ -111,6 +111,23 @@ test.describe("the menu bar on a desktop", () => {
     await page.locator("#mb-fullscreen").click();
     await expect.poll(() => page.evaluate(() => Boolean(document.fullscreenElement))).toBe(false);
   });
+
+  test("File > Close saves the tower, shows the title screen, and Continue brings it back paused", async ({ page }) => {
+    await boot(page);
+    const name = await page.evaluate(() => (window as any).game.enginePort.towerName() as string);
+    await page.locator("#mb-file").click();
+    await page.locator("#mb-close").click();
+    await expect(page.locator("#splash")).toBeVisible();
+    await expect(page.locator('#splash [data-splash="continue"]')).toBeFocused();
+    // Close is grayed on the title screen.
+    await page.locator("#mb-file").click();
+    await expect(page.locator("#mb-close")).toHaveAttribute("aria-disabled", "true");
+    await page.keyboard.press("Escape");
+    await page.locator('#splash [data-splash="continue"]').click();
+    await expect(page.locator("#splash")).toHaveCount(0);
+    await expect.poll(() => page.evaluate(() => (window as any).game.speed)).toBe(0);
+    expect(await page.evaluate(() => (window as any).game.enginePort.towerName())).toBe(name);
+  });
 });
 
 test.describe("the menu bar on a phone", () => {

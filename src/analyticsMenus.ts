@@ -22,6 +22,7 @@ export const MENU_ITEM_CODES = {
   "btn-new": "new_tower",
   "btn-load": "saves",
   "mb-quick-save": "quick_save",
+  "mb-close": "close",
   "mb-import": "import",
   "mb-export": "export",
   "btn-install-menu": "install_app",

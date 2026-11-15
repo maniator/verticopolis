@@ -389,13 +389,26 @@ export function toast(ui: UI, text: string, kind: LogEntry["kind"] = "info"): vo
   // neither counted nor pruned: it leaves only when dismissed or resolved.
   // One pass over the rail (at most TOAST_MAX + 2 nodes), then prune from it.
   const fading = Array.from(ui.el.toast.children).filter((node) => !node.classList.contains("toast--sticky"));
-  for (let i = 0; i < fading.length - TOAST_MAX; i++) {
-    const oldest = fading[i];
-    const pending = toastTimers.get(oldest);
-    if (pending !== undefined) {
-      clearTimeout(pending);
-      toastTimers.delete(oldest);
-    }
-    oldest.remove();
+  for (let i = 0; i < fading.length - TOAST_MAX; i++) dropToast(fading[i]);
+}
+
+/** Removes one toast and cancels its pending hold or fade timer, so the timer
+ *  can never fire after the node has left the DOM. */
+function dropToast(node: Element): void {
+  const pending = toastTimers.get(node);
+  if (pending !== undefined) {
+    clearTimeout(pending);
+    toastTimers.delete(node);
+  }
+  node.remove();
+}
+
+/** Empties the toast rail when the tower leaves the screen (File > Close), so
+ *  the closed tower's last few seconds of news never sit over the title screen.
+ *  A sticky notice (./saveWarning) stays: it leaves only when dismissed or
+ *  resolved. */
+export function clearToasts(ui: UI): void {
+  for (const node of Array.from(ui.el.toast.children)) {
+    if (!node.classList.contains("toast--sticky")) dropToast(node);
   }
 }
