@@ -24,6 +24,12 @@ pub(crate) enum MaidSent {
 /// Housekeepers ready for a room, as crowd indexes by crew.
 pub(crate) type FreeMaids = FastMap<i64, Vec<usize>>;
 
+/// The crew of `p` when they are a housekeeper free to take a room.
+fn free_maid_crew(p: &crate::crowd::Person) -> Option<i64> {
+    let ready = matches!(p.staff_trip, Some(StaffTrip::Base | StaffTrip::Free));
+    p.crew_id.filter(|_| ready && p.state != PState::Done)
+}
+
 impl Simulation {
     /// The hours a crew is in the building: from two hours before the shift,
     /// so they are at their housekeeping room when it starts even in a busy
@@ -42,16 +48,24 @@ impl Simulation {
             .then(|| (u.floor, u.x as f64 + u.width as f64 / 2.0))
     }
 
-    /// One walk of the crowd for a dispatch pass: who is ready for a room.
+    /// One walk of the crowd: who is ready for a room.
+    #[cfg(test)]
     pub(crate) fn free_maids(&self) -> FreeMaids {
+        self.free_maids_counted().0
+    }
+
+    /// One walk of the crowd for a dispatch pass: who is ready for a room,
+    /// by crew, and how many they are.
+    pub(crate) fn free_maids_counted(&self) -> (FreeMaids, usize) {
         let mut free = FreeMaids::default();
+        let mut count = 0;
         for (i, p) in self.crowd.people.iter().enumerate() {
-            let ready = matches!(p.staff_trip, Some(StaffTrip::Base | StaffTrip::Free));
-            if let (true, Some(crew), false) = (ready, p.crew_id, p.state == PState::Done) {
+            if let Some(crew) = free_maid_crew(p) {
                 free.get_or_insert_with(crew, Vec::new).push(i);
+                count += 1;
             }
         }
-        free
+        (free, count)
     }
 
     /// Send the crew's free housekeeper nearest the room to clean it.

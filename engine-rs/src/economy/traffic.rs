@@ -52,7 +52,9 @@ impl Simulation {
                     h
                 }
             };
-            if !draws || !kind.is_open_at(hour) {
+            // A venue earns only in its hours and once its staff are in.
+            let open = self.tower.units[i].open_for_business(hour, self.tower.mode);
+            if !draws || !open {
                 if state == UnitState::Occupied {
                     let (u, at) = self.tower.marked(i);
                     let occupants = u.visitor_occupants().unwrap_or(0);

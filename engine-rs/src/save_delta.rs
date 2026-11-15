@@ -21,7 +21,7 @@
 //! yet) asks the caller for a full save, which primes the mirror again. The
 //! simulation is never changed: the units are lent out of the tower only
 //! while the rest of the save is written.
-use serde_json::{json, Value};
+use serde_json::Value;
 
 use crate::sim::Simulation;
 use crate::tower::Unit;
@@ -99,20 +99,13 @@ impl SaveMirror {
             self.clear();
             return None;
         }
-        // The rest of the save, written with the units lent out of the tower
-        // so they are not serialized a second time, and put straight back.
-        // The version is read first: the floor runs it counts are in the
-        // units.
-        let version = sim.written_save_version();
-        let units = std::mem::take(&mut sim.tower.units);
-        let rest = sim.serialize();
-        sim.tower.units = units;
-        let Value::Object(mut rest) = rest else {
+        // The rest of the save, without the units, so they are not
+        // serialized a second time. The units stay in the tower: the save
+        // reads them for its version and for the desks (`desksStale`).
+        let Value::Object(rest) = sim.serialize_without(&["units"]) else {
             self.clear();
             return None;
         };
-        rest.remove("units");
-        rest.insert("version".into(), json!(version));
         // The text `{"units":[..],"rest":{..}}` as a tree of the two would
         // write it, with each changed record's text as the mirror holds it.
         let rest = Value::Object(rest).to_string();

@@ -27,6 +27,7 @@ use serde::ser::{Serialize, SerializeMap, Serializer};
 use serde_json::{json, Map, Value};
 
 use super::commuters::Commute;
+use super::commuters_save::CrowdMarks;
 use super::spawn::seed_for;
 use super::staff_shift::StaffTrip;
 use super::trip::{Errand, ErrandPlace};
@@ -108,6 +109,7 @@ impl ErrandPlace {
         match self {
             ErrandPlace::Office => "office",
             ErrandPlace::Home => "home",
+            ErrandPlace::Work => "work",
         }
     }
 
@@ -115,6 +117,7 @@ impl ErrandPlace {
         match s {
             "office" => Some(ErrandPlace::Office),
             "home" => Some(ErrandPlace::Home),
+            "work" => Some(ErrandPlace::Work),
             _ => None,
         }
     }
@@ -224,7 +227,7 @@ impl Person {
         let commute = match o.get("commute") {
             None | Some(Value::Null) => None,
             Some(c) => Some(Commute {
-                office_id: c.get("officeId")?.as_f64().and_then(whole)?,
+                workplace_id: c.get("officeId")?.as_f64().and_then(whole)?,
                 inbound: c.get("inbound")?.as_bool()?,
             }),
         };
@@ -347,7 +350,8 @@ impl SaveEntries for Person {
             )?;
         }
         if let Some(c) = self.commute {
-            let office = Scalar::Int(c.office_id);
+            // The key keeps its first name; it holds a venue's id too.
+            let office = Scalar::Int(c.workplace_id);
             put(
                 "commute",
                 EntryValue::Pair("officeId", office, "inbound", Scalar::Bool(c.inbound)),
@@ -358,8 +362,9 @@ impl SaveEntries for Person {
 }
 
 /// The crowd as the save writes it: [`Crowd::save_json`]'s object, each
-/// person written straight to the save (`save_entry`).
-pub(crate) struct SavedCrowd<'a>(pub &'a Crowd);
+/// person written straight to the save (`save_entry`), and the marks beside
+/// its desks (`CrowdMarks`).
+pub(crate) struct SavedCrowd<'a>(pub &'a Crowd, pub CrowdMarks);
 
 impl Serialize for SavedCrowd<'_> {
     fn serialize<S: Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
@@ -368,7 +373,7 @@ impl Serialize for SavedCrowd<'_> {
         for (key, value) in c.save_head() {
             m.serialize_entry(&key, &value)?;
         }
-        c.commuters_write(&mut m)?;
+        c.commuters_write(&mut m, self.1)?;
         m.serialize_entry("walkIns", &Each(&c.walk_ins, walk_in_json))?;
         m.serialize_entry("people", &WrittenAll(&c.people))?;
         m.end()
@@ -412,9 +417,9 @@ impl Crowd {
 
     /// The crowd's save object: the same keys and values [`SavedCrowd`]
     /// writes.
-    pub(crate) fn save_json(&self) -> Value {
+    pub(crate) fn save_json(&self, marks: CrowdMarks) -> Value {
         let mut m = self.save_head();
-        self.commuters_save(&mut m);
+        self.commuters_save(&mut m, marks);
         let walk_ins = self.walk_ins.iter().map(walk_in_json).collect();
         m.insert("walkIns".into(), Value::Array(walk_ins));
         let people = self.people.iter().map(Person::save_form).collect();

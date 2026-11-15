@@ -112,7 +112,7 @@ pub(super) fn spawn_meal_outbound(
             venue_kinds.contains(&u.kind)
                 && u.is_tenanted()
                 && open_for_visits(u.kind, hour)
-                && venue_has_room(u)
+                && venue_has_room(u, tower.mode)
         })
         .collect();
     if venue_candidates.is_empty() {

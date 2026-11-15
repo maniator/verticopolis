@@ -83,7 +83,7 @@ fn reference(p: &Person) -> Value {
     if let Some(c) = p.commute {
         m.insert(
             "commute".into(),
-            json!({ "officeId": c.office_id, "inbound": c.inbound }),
+            json!({ "officeId": c.workplace_id, "inbound": c.inbound }),
         );
     }
     Value::Object(m)
@@ -183,7 +183,7 @@ fn a_person_with_every_key_writes_as_before() {
             inbound: i % 2 == 0,
         });
         p.commute = Some(Commute {
-            office_id: 99,
+            workplace_id: 99,
             inbound: i % 2 == 1,
         });
         same(&p, &format!("every key, {n}"));

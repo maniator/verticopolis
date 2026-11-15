@@ -1,29 +1,26 @@
 //! Office workers who really come to work (the real-tenant-arrivals plan,
-//! step 5, which the owner approved). An office's head count is the
-//! workers at their desks: each one comes in at the ground lobby or a
-//! served Metro platform, rides to the office and only then counts, and
-//! leaves the same way at the end of the day. Nobody appears or vanishes
-//! on an office floor (owner, 2026-11-14).
-//!
-//! Only Modern offices commute this way for now (owner, 2026-11-14,
-//! `GameMode::office_workers_commute_in_person`). Classic offices keep the
-//! hourly head count of 8 AM to 6 PM until a run of the 1994 game measures
-//! how it spreads its rush: with today's car timing a full rush jams the
-//! shared elevators of healthy 1990s towers.
+//! step 5). An office's head count is the workers at their desks: each
+//! comes in at the ground lobby or a served Metro platform, rides to the
+//! office and only then counts, and leaves the same way. Nobody appears or
+//! vanishes on an office floor (owner, 2026-11-14). Only Modern offices
+//! commute this way; Classic keeps the hourly head count of 8 AM to 6 PM.
 //!
 //! The rush is spread (owner, 2026-11-14): on weekdays the workers arrive
 //! over 7 to 10 AM, a third of those missing at 7, half at 8 and the rest
 //! at 9, and leave over 4 to 7 PM the same way. Each hour the simulation
-//! books that hour's share of the arrivals an office is still missing and
-//! the departures it still owes at random minutes of the hour
-//! (`Crowd::book_commutes`), and every step starts the ones whose minute
-//! has come (`start_commutes`). Anyone still missing after 10 AM is booked
-//! in full each hour. A slow tower fills late, and an office no route
-//! reaches never fills. Workers who give up on the way in go back
-//! out and are booked again the next hour; one who gives up on the way
-//! out goes back to the desk and leaves later, unless the desk was taken
-//! meanwhile, when they head out again. An office never holds more workers
-//! than its population.
+//! books that hour's share of the arrivals an office still misses and the
+//! departures it owes at random minutes (`Crowd::book_commutes`), and each
+//! step starts the ones due (`start_commutes`). Anyone still missing after
+//! 10 AM is booked in full each hour; an office no route reaches never
+//! fills. Workers who give up on the way in go back out and are booked
+//! again; one who gives up on the way out goes back to the desk and leaves
+//! later, unless the desk was taken meanwhile. An office never holds more
+//! workers than its population, nor a venue more staff than its crew.
+//!
+//! A Modern venue's staff commute the same way (`workplace.rs`), booked in
+//! full in the hour they are called in (`Kind::staffed_at`: four hours
+//! before it opens, or at once for a venue built while open), leave over the hour after it closes, and it opens
+//! once one of them is in.
 //!
 //! The crowd keeps each office's workers in a [`Desk`]: who is inside, who
 //! is on the way in and who is booked to leave. The office's `occupants`
@@ -34,53 +31,29 @@
 //! saved head counts as the workers inside, and the next hour books whoever
 //! is missing.
 
-use std::collections::BTreeMap;
-
+use super::commuters_save::adopt_head_counts;
 use super::metro_train;
 use super::motion::finish;
 use super::spawn::{add, inside_x};
 use super::trip::{Errand, ErrandPlace};
 use super::walk_ins::{entrances, Entrances};
+use super::workplace::{due, head_count_of, held, stranded};
+use super::workplace::{sync_head_count, working, Workplace, LEAVE_BY, LEAVE_FROM};
 use super::{Crowd, PState};
-use crate::clock::{Clock, GameMode};
-use crate::tower::{Tower, Unit};
+use crate::clock::Clock;
+use crate::tower::Tower;
+use std::collections::BTreeMap;
 
 /// The floor of the street doors.
 const STREET_FLOOR: i64 = 1;
 
-/// The hour the first workers set out, and the hour by which all are booked.
-const ARRIVE_FROM: i64 = 7;
-const ARRIVE_BY: i64 = 10;
-/// The hour the first workers leave, and the hour by which all are booked.
-const LEAVE_FROM: i64 = 16;
-const LEAVE_BY: i64 = 19;
-
-/// Whether office workers come in at `hour` (weekdays, 7 AM to 4 PM)
-/// instead of going home.
-pub fn office_hours(weekend: bool, hour: i64) -> bool {
-    !weekend && (ARRIVE_FROM..LEAVE_FROM).contains(&hour)
-}
-
-/// The share of `n` workers to book at `hour` when the rest of them are
-/// spread over the hours left until `by`: all of them once `by` has come.
-fn hour_share(n: i64, hour: i64, by: i64) -> i64 {
-    if n <= 0 {
-        return 0;
-    }
-    let hours_left = by - hour;
-    if hours_left <= 1 {
-        return n;
-    }
-    (n + hours_left - 1) / hours_left
-}
-
-/// One office's workers, as the crowd keeps them.
+/// One workplace's workers, as the crowd keeps them.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Desk {
     pub floor: i64,
     pub x: i64,
     pub width: i64,
-    /// At their desks: the office's head count.
+    /// At work: the office's head count, or the venue's staff in.
     pub inside: i64,
     /// Booked to come in, or on the way.
     pub coming: i64,
@@ -88,43 +61,24 @@ pub struct Desk {
     pub going: i64,
 }
 
-/// An arrival (`inbound`) or a departure booked for `office_id` at clock
-/// minute `at`. An arrival held for the Metro's train names the `station`
-/// it comes in by (`metro_train::hold_for_train`), saved with the booking.
+/// An arrival (`inbound`) or a departure booked for `workplace_id` at
+/// clock minute `at`. An arrival held for the Metro's train names the
+/// `station` it comes in by (`metro_train::hold_for_train`), saved with the
+/// booking.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Shift {
     pub at: f64,
-    pub office_id: i64,
+    pub workplace_id: i64,
     pub inbound: bool,
     pub station: Option<i64>,
 }
 
-/// The office a commuting worker belongs to, and which way they are going.
+/// The workplace a commuting worker belongs to, and which way they are
+/// going.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Commute {
-    pub office_id: i64,
+    pub workplace_id: i64,
     pub inbound: bool,
-}
-
-pub(super) fn is_office(u: &Unit, mode: GameMode) -> bool {
-    u.kind.commutes_in_person(mode)
-}
-
-/// The office `id`, if it still stands and has a tenant whose workers come.
-fn working_office(tower: &Tower, id: i64) -> Option<&Unit> {
-    tower
-        .get_unit(id)
-        .filter(|u| is_office(u, tower.mode) && !u.is_dormant())
-}
-
-/// Sets the office's head count to the workers at their desks.
-fn sync_head_count(tower: &mut Tower, id: i64, inside: i64) {
-    let mode = tower.mode;
-    if let Some((u, at)) = tower.marked_by_id(id) {
-        if is_office(u, mode) {
-            u.set_occupants(at, inside);
-        }
-    }
 }
 
 impl Crowd {
@@ -134,50 +88,65 @@ impl Crowd {
     /// the hour. An office that lost its tenant (or burned) sends its
     /// workers out at once.
     pub fn book_commutes(&mut self, tower: &mut Tower, clock: &Clock) {
-        // Nothing to book where offices count by the clock.
+        // Nothing to book where workplaces count by the clock.
         if !tower.mode.office_workers_commute_in_person() {
             return;
         }
-        reconcile(self, tower);
+        reconcile(self, tower, clock.hour(), true);
+        self.book(tower, clock, false);
+    }
+
+    /// Calls the crews of venues that just opened mid-hour (construction
+    /// done) at once, as an edit does, instead of at the next hour's pass.
+    pub(crate) fn book_venue_crews(&mut self, tower: &Tower, clock: &Clock) {
+        if tower.mode.venue_staff_commute_in_person() {
+            self.book(tower, clock, true);
+        }
+    }
+
+    /// Books the hour's arrivals and departures from `clock.minutes` to the
+    /// end of the hour: for every workplace, or only the venues when the
+    /// tower was edited mid-hour, so a venue built while it should be open
+    /// calls its staff in at once. It books only what no booking already
+    /// covers.
+    fn book(&mut self, tower: &Tower, clock: &Clock, venues_only: bool) {
         let from = clock.minutes;
         let until = (from / 60.0).floor() * 60.0 + 60.0;
         let (weekend, hour) = (clock.is_weekend(), clock.hour());
-        let working = office_hours(weekend, hour);
-        // Weekday evenings spread the departures; any other hour sends
-        // whoever still owes one.
+        // Weekday evenings spread the office departures; any other hour
+        // sends whoever still owes one.
         let leave_by = if !weekend && (LEAVE_FROM..LEAVE_BY).contains(&hour) {
             LEAVE_BY
         } else {
             hour
         };
         for u in tower.room_units() {
-            if !is_office(u, tower.mode) {
+            let Some(place) = Workplace::of(u, tower.mode) else {
+                continue;
+            };
+            if venues_only && place == Workplace::Office {
                 continue;
             }
-            let desk = self.desks.entry(u.id).or_default();
+            // Read and written back only when it holds someone: an idle desk
+            // is never inserted to be dropped again below.
+            let mut desk = self.desks.get(&u.id).copied().unwrap_or_default();
             (desk.floor, desk.x, desk.width) = (u.floor, u.x, u.width);
-            let (dormant, out) = (u.is_dormant(), u.out_for_meal.unwrap_or(0));
-            let mut desk = *desk;
-            if working && !dormant {
-                let missing = u.kind.facility().population - desk.inside - desk.coming;
-                let missing = hour_share(missing, hour, ARRIVE_BY);
+            let dormant = !place.can_work(u);
+            let (at_work, count) = due(place, u, &desk, (weekend, hour), leave_by);
+            if at_work {
+                let missing = count;
                 for _ in 0..missing {
                     let at = from + self.rng.next() * (until - from);
                     self.shifts.push(Shift {
                         at,
-                        office_id: u.id,
+                        workplace_id: u.id,
                         inbound: true,
                         station: None,
                     });
                 }
                 desk.coming += missing;
             } else {
-                let owed = desk.inside - out - desk.going;
-                let owed = if dormant {
-                    owed.max(0)
-                } else {
-                    hour_share(owed, hour, leave_by)
-                };
+                let owed = count;
                 for _ in 0..owed {
                     let at = if dormant {
                         from
@@ -186,17 +155,19 @@ impl Crowd {
                     };
                     self.shifts.push(Shift {
                         at,
-                        office_id: u.id,
+                        workplace_id: u.id,
                         inbound: false,
                         station: None,
                     });
                 }
                 desk.going += owed;
             }
-            self.desks.insert(u.id, desk);
+            match held(&desk) {
+                true => self.desks.insert(u.id, desk),
+                false => self.desks.remove(&u.id),
+            };
         }
-        self.desks
-            .retain(|_, d| d.inside > 0 || d.coming > 0 || d.going > 0);
+        self.desks.retain(|_, d| held(d));
         self.sort_shifts();
     }
 
@@ -210,49 +181,47 @@ impl Crowd {
 /// The order the shifts are kept in: latest first.
 pub(super) fn later_first(a: &Shift, b: &Shift) -> std::cmp::Ordering {
     b.at.total_cmp(&a.at)
-        .then_with(|| b.office_id.cmp(&a.office_id))
+        .then_with(|| b.workplace_id.cmp(&a.workplace_id))
         .then_with(|| b.inbound.cmp(&a.inbound))
 }
 
-/// Squares the desks with the tower: on the first call (a fresh crowd,
-/// after a load) the saved head counts become the workers inside; an
-/// office bulldozed with workers inside, or one whose head count something
-/// else cleared (a fire), sends them out from where it stood; and a head
-/// count raised from outside (an undo) drops back to the workers really
-/// there. Runs each hour and whenever the tower is edited.
-pub fn reconcile(crowd: &mut Crowd, tower: &mut Tower) {
+/// The desk revision a load leaves when the save's desks were not squared
+/// with its last edit: no tower revision matches it, so the first step
+/// squares them without taking the head counts again.
+pub(super) const UNSQUARED: i64 = i64::MIN;
+
+/// Squares the desks with the tower: on the first call (a fresh crowd) the
+/// head counts become the workers inside (`adopt_head_counts`); a workplace
+/// bulldozed with workers inside, one whose head count something else
+/// cleared (a fire), or a venue gone dormant sends them out from where it
+/// stood; and a head count raised from outside (an undo) drops back to the
+/// workers really there. A venue's `staff_in` is not saved, so it is
+/// written from the desk. Runs each hour and whenever the tower is edited.
+/// A load squares through `restore_desks` instead.
+pub fn reconcile(crowd: &mut Crowd, tower: &mut Tower, hour: i64, send_out: bool) {
     if !tower.mode.office_workers_commute_in_person() {
         return;
     }
     if crowd.desk_revision.is_none() {
-        for u in tower.room_units() {
-            if is_office(u, tower.mode) && u.occupants > 0 {
-                let desk = crowd.desks.entry(u.id).or_default();
-                (desk.floor, desk.x, desk.width) = (u.floor, u.x, u.width);
-                desk.inside = u.occupants;
-            }
-        }
+        adopt_head_counts(crowd, tower, Some(hour));
     }
+    square(crowd, tower, send_out);
+}
+
+/// [`reconcile`] past the first call: squares the desks with the tower as it
+/// stands, and sends stranded workers out when `send_out` is set.
+pub(super) fn square(crowd: &mut Crowd, tower: &mut Tower, send_out: bool) {
     crowd.desk_revision = Some(tower.revision);
     let mut doors: Option<Entrances> = None;
     let ids: Vec<i64> = crowd.desks.keys().copied().collect();
     for id in ids {
         let desk = crowd.desks[&id];
-        let counted = tower
-            .get_unit(id)
-            .filter(|u| is_office(u, tower.mode))
-            .map(|u| u.occupants);
-        let stranded = match counted {
-            None => desk.inside,
-            Some(n) if n < desk.inside => desk.inside - n,
-            Some(n) => {
-                if n > desk.inside {
-                    sync_head_count(tower, id, desk.inside);
-                }
-                0
-            }
-        };
-        if stranded <= 0 {
+        let (counted, stranded) = stranded(tower, id, &desk);
+        let standing = counted.is_some() && head_count_of(tower, id) != Some(desk.inside);
+        if stranded == 0 && standing {
+            sync_head_count(tower, id, desk.inside);
+        }
+        if stranded <= 0 || !send_out {
             continue;
         }
         let doors = doors.get_or_insert_with(|| entrances(tower));
@@ -280,7 +249,8 @@ pub fn start_commutes(crowd: &mut Crowd, tower: &mut Tower, clock: &Clock) {
         return;
     }
     if crowd.desk_revision != Some(tower.revision) {
-        reconcile(crowd, tower);
+        reconcile(crowd, tower, clock.hour(), true);
+        crowd.book(tower, clock, true);
     }
     let now = clock.minutes;
     if crowd.shifts.last().is_none_or(|s| s.at > now) {
@@ -292,36 +262,40 @@ pub fn start_commutes(crowd: &mut Crowd, tower: &mut Tower, clock: &Clock) {
             break;
         }
         crowd.shifts.pop();
-        let Some(desk) = crowd.desks.get(&s.office_id).copied() else {
+        let Some(desk) = crowd.desks.get(&s.workplace_id).copied() else {
             continue;
         };
         let late = now - s.at > 60.0;
         if s.inbound {
-            if late || !arrive(crowd, tower, &doors, s.office_id, (now, s.station)) {
-                crowd.desks.get_mut(&s.office_id).unwrap().coming -= 1;
+            if late || !arrive(crowd, tower, &doors, s.workplace_id, (now, s.station)) {
+                crowd.desks.get_mut(&s.workplace_id).unwrap().coming -= 1;
             }
             continue;
         }
-        let d = crowd.desks.get_mut(&s.office_id).unwrap();
+        let d = crowd.desks.get_mut(&s.workplace_id).unwrap();
         d.going = (d.going - 1).max(0);
         if late || desk.inside <= 0 {
             continue;
         }
-        if leave(crowd, tower, &doors, s.office_id, &desk) {
-            let d = crowd.desks.get_mut(&s.office_id).unwrap();
+        if leave(crowd, tower, &doors, s.workplace_id, &desk) {
+            let d = crowd.desks.get_mut(&s.workplace_id).unwrap();
             d.inside -= 1;
             let inside = d.inside;
-            sync_head_count(tower, s.office_id, inside);
+            sync_head_count(tower, s.workplace_id, inside);
         }
     }
 }
 
-/// Marks person `i` as a commuting worker of `office_id`.
-fn stamp(crowd: &mut Crowd, i: usize, office_id: i64, inbound: bool) {
+/// Marks person `i` as a commuting worker of `workplace_id`, a workplace
+/// of kind `place` (unknown once bulldozed: still to or from work).
+fn stamp(crowd: &mut Crowd, i: usize, workplace_id: i64, place: Option<Workplace>, inbound: bool) {
     let p = &mut crowd.people[i];
-    p.commute = Some(Commute { office_id, inbound });
+    p.commute = Some(Commute {
+        workplace_id,
+        inbound,
+    });
     p.errand = Some(Errand {
-        place: ErrandPlace::Office,
+        place: place.map_or(ErrandPlace::Work, Workplace::errand),
         inbound,
     });
     if !p.commuter {
@@ -330,17 +304,18 @@ fn stamp(crowd: &mut Crowd, i: usize, office_id: i64, inbound: bool) {
     }
 }
 
-/// One worker sets out for `office_id` at clock minute `now`, by the station
-/// `held` for them if any; at a station with no train in they wait for it
-/// (`metro_train::hold_for_train`). False when the office is gone or unreachable.
+/// One worker sets out for `workplace_id` at clock minute `now`, by the
+/// station `held` for them if any; at a station with no train in they wait
+/// for it (`metro_train::hold_for_train`). False when the workplace is gone
+/// or no route reaches it.
 fn arrive(
     crowd: &mut Crowd,
     tower: &Tower,
     doors: &Entrances,
-    office_id: i64,
+    workplace_id: i64,
     (now, held): (f64, Option<i64>),
 ) -> bool {
-    let Some(office) = working_office(tower, office_id) else {
+    let Some((office, place)) = working(tower, workplace_id) else {
         return false;
     };
     let (ox, ow, of) = (office.x, office.width, office.floor);
@@ -350,7 +325,7 @@ fn arrive(
     };
     let minute = now.rem_euclid(1440.0);
     if let Some(sid) = station.filter(|&s| !metro_train::train_in_at(tower, minute, s)) {
-        if metro_train::hold_for_train(crowd, tower, now, office_id, sid) {
+        if metro_train::hold_for_train(crowd, tower, now, workplace_id, sid) {
             return true;
         }
         station = None;
@@ -366,13 +341,19 @@ fn arrive(
         crowd.people[i].start_x = crowd.people[i].x;
         crowd.people[i].from_metro = true;
     }
-    stamp(crowd, i, office_id, true);
+    stamp(crowd, i, workplace_id, Some(place), true);
     true
 }
 
 /// One worker walks out of the office at `desk` for an exit. False when no
 /// route leads out, and the worker stays at their desk.
-fn leave(crowd: &mut Crowd, tower: &Tower, doors: &Entrances, office_id: i64, desk: &Desk) -> bool {
+fn leave(
+    crowd: &mut Crowd,
+    tower: &Tower,
+    doors: &Entrances,
+    workplace_id: i64,
+    desk: &Desk,
+) -> bool {
     let x = crowd.rng.int(desk.x, desk.x + desk.width - 1);
     let (to, to_x) = exit(crowd, tower, doors);
     let Some(i) = add(crowd, tower, desk.floor, to, Some(x), to_x) else {
@@ -380,7 +361,10 @@ fn leave(crowd: &mut Crowd, tower: &Tower, doors: &Entrances, office_id: i64, de
     };
     crowd.people[i].x = x as f64;
     crowd.people[i].start_x = x as f64;
-    stamp(crowd, i, office_id, false);
+    let place = tower
+        .get_unit(workplace_id)
+        .and_then(|u| Workplace::of(u, tower.mode));
+    stamp(crowd, i, workplace_id, place, false);
     true
 }
 
@@ -396,43 +380,43 @@ fn exit(crowd: &mut Crowd, tower: &Tower, doors: &Entrances) -> (i64, Option<i64
     }
 }
 
-/// A commuting worker at the end of a walk. On the way in, they sit down
-/// at their desk (or, with the office gone or full, head back out); on the way
-/// out, they leave the tower; one who turned back on the way out goes back
-/// to their desk.
-///
-/// Nobody sits down in an office that is already full: a worker who turned
-/// back on the way out may find their desk taken by one booked while they
-/// were gone, and heads out again instead. An office never holds more than
-/// its workers, so a save's head counts are always ones a load keeps.
+/// A commuting worker at the end of a walk. On the way in, they start work
+/// (or, with the workplace gone or full, head back out); on the way out,
+/// they leave the tower; one who turned back on the way out goes back to
+/// work, unless one booked while they were gone took their place, when they
+/// head out again. A workplace never holds more than its crew, so a save's
+/// head counts are always ones a load keeps.
 pub fn at_destination(crowd: &mut Crowd, i: usize, tower: &mut Tower, c: Commute) {
     let returning = crowd.people[i].returning;
-    let inside = crowd.desks.get(&c.office_id).map_or(0, |d| d.inside);
-    // A desk to sit at: the office stands, has a tenant, and is not full.
-    let free_desk =
-        working_office(tower, c.office_id).is_some_and(|u| inside < u.kind.facility().population);
+    let inside = crowd.desks.get(&c.workplace_id).map_or(0, |d| d.inside);
+    // A place to work: the workplace stands, can have its workers in, and
+    // is not full.
+    let free_desk = working(tower, c.workplace_id).is_some_and(|(u, w)| inside < w.crew(u));
     match (c.inbound, returning) {
         (true, false) if free_desk => {
-            let d = crowd.desks.entry(c.office_id).or_default();
+            let d = crowd.desks.entry(c.workplace_id).or_default();
             d.coming = (d.coming - 1).max(0);
             d.inside += 1;
             let inside = d.inside;
-            sync_head_count(tower, c.office_id, inside);
+            sync_head_count(tower, c.workplace_id, inside);
             crowd.people[i].commute = None;
             finish(crowd, i, tower);
         }
         (true, false) => {
-            if let Some(d) = crowd.desks.get_mut(&c.office_id) {
+            if let Some(d) = crowd.desks.get_mut(&c.workplace_id) {
                 d.coming = (d.coming - 1).max(0);
             }
-            stamp(crowd, i, c.office_id, false);
+            let place = tower
+                .get_unit(c.workplace_id)
+                .and_then(|u| Workplace::of(u, tower.mode));
+            stamp(crowd, i, c.workplace_id, place, false);
             send_out(crowd, i, tower);
         }
         (false, true) if free_desk => {
-            let d = crowd.desks.entry(c.office_id).or_default();
+            let d = crowd.desks.entry(c.workplace_id).or_default();
             d.inside += 1;
             let inside = d.inside;
-            sync_head_count(tower, c.office_id, inside);
+            sync_head_count(tower, c.workplace_id, inside);
             crowd.people[i].commute = None;
             finish(crowd, i, tower);
         }
@@ -482,16 +466,16 @@ pub(super) fn on_finish(crowd: &mut Crowd, i: usize) {
     p.commuter = false;
     crowd.commuter_count = (crowd.commuter_count - 1).max(0);
     if let Some(c) = p.commute.take().filter(|c| c.inbound) {
-        if let Some(d) = crowd.desks.get_mut(&c.office_id) {
+        if let Some(d) = crowd.desks.get_mut(&c.workplace_id) {
             d.coming = (d.coming - 1).max(0);
         }
     }
 }
 
-/// The workers on the way to `office_id`, booked or walking, for the room
+/// The workers on the way to `workplace_id`, booked or walking, for the room
 /// card.
-pub fn coming_to(crowd: &Crowd, office_id: i64) -> i64 {
-    crowd.desks.get(&office_id).map_or(0, |d| d.coming)
+pub fn coming_to(crowd: &Crowd, workplace_id: i64) -> i64 {
+    crowd.desks.get(&workplace_id).map_or(0, |d| d.coming)
 }
 
 /// The desks in id order, for tests and the hot-path record.

@@ -205,7 +205,7 @@ pub fn spawn_venue_visit(
                 } else {
                     u.is_tenanted()
                 })
-                && venue_has_room(u)
+                && venue_has_room(u, tower.mode)
         })
         .collect();
     if candidates.is_empty() {

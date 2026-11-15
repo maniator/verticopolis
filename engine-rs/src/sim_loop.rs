@@ -313,6 +313,7 @@ impl Simulation {
             return;
         }
         let ids: Vec<i64> = self.constructing.iter().copied().collect();
+        let mut crew_wanted = false;
         for id in ids {
             let Some(u) = self.tower.get_unit(id) else {
                 self.constructing.shift_remove(&id);
@@ -347,6 +348,7 @@ impl Simulation {
                 if kind == Kind::Security {
                     self.join_bomb_search(floor, x);
                 }
+                crew_wanted |= kind.waits_for_staff(mode);
                 // A theater opens with its mode's first film free: a Classic
                 // new film fills the house tonight (#1932), so it is a
                 // blockbuster from its first evening rather than from the
@@ -355,6 +357,11 @@ impl Simulation {
                     self.blockbusters.push(id as f64);
                 }
             }
+        }
+        // A venue that opens mid-hour calls its crew in now, so a save
+        // never holds it open with nobody booked.
+        if crew_wanted {
+            self.crowd.book_venue_crews(&self.tower, &self.clock);
         }
     }
 

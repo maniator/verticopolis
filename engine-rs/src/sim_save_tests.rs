@@ -95,7 +95,7 @@ fn reference(sim: &Simulation) -> Value {
     m.insert("milestones".into(), json!(sim.milestones));
     m.insert("ledger".into(), sim.ledger.serialize());
     // Added since: the people and the cars' timers (`crowd::save`).
-    m.insert("crowd".into(), sim.crowd.save_json());
+    m.insert("crowd".into(), sim.crowd.save_json(sim.crowd_marks()));
     m.insert("dispatch".into(), sim.elevators.save_json());
     if let Some(tallies) = sim.housekeeping.save_json() {
         m.insert("housekeeping".into(), tallies);

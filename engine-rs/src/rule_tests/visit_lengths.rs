@@ -58,7 +58,9 @@ fn two_days(sim: &mut Simulation) -> Seen {
         sim.tick(1.0);
         let minute = minute as f64;
         let mut here = HashSet::new();
-        for p in sim.crowd.people.iter().filter(|p| !p.staff) {
+        // Housekeepers and a venue's own staff come and go through the
+        // lobby too, but go in to work, not to visit.
+        for p in sim.crowd.people.iter().filter(|p| !p.staff && !p.commuter) {
             here.insert(p.id);
             if last_floor.insert(p.id, p.floor).is_none() {
                 seen.first_floors.insert(p.floor);

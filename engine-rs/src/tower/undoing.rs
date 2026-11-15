@@ -29,6 +29,7 @@ impl Unit {
         Unit {
             customers_in: None,
             hotel_customers_in: None,
+            staff_in: 0,
             out_for_meal: None,
             occupants: if counted { 0 } else { self.occupants },
             ..self.clone()

@@ -66,6 +66,11 @@ pub struct Unit {
     pub occupants: i64,
     pub customers_in: Option<i64>,
     pub hotel_customers_in: Option<i64>,
+    /// A venue's staff at work inside it (`crowd::commuters`), the people
+    /// who came in and have not left. Never saved, like `customers_in`: the
+    /// crowd's desks hold the count and write it here. A byte holds the
+    /// largest staff (`Kind::staff_size`) and keeps a unit small.
+    pub staff_in: u8,
     pub out_for_meal: Option<i64>,
     pub residents: Option<i64>,
     /// The census a room carries from the day before (`economy::visitors`,

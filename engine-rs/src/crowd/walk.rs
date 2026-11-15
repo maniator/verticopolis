@@ -42,9 +42,14 @@ pub fn way_is_cut(p: &Person, target_x: f64, tower: &Tower) -> bool {
     if p.floor == 1 {
         return false;
     }
-    let here = tower.run_at(p.floor, jsmath::round(p.x) as i64);
-    let there = tower.run_at(p.floor, jsmath::round(target_x) as i64);
-    here.is_some() && there.is_some() && here != there
+    let (here, there) = (jsmath::round(p.x) as i64, jsmath::round(target_x) as i64);
+    if here == there {
+        return false;
+    }
+    // `run_at` for both ends from one read of the floor's runs.
+    let runs = tower.segment_runs(p.floor);
+    let run_at = |x: i64| runs.iter().take_while(|r| x >= r.0).find(|r| x <= r.1);
+    matches!((run_at(here), run_at(there)), (Some(a), Some(b)) if a != b)
 }
 
 /// Where a walker on their own run of the floor reaches a shaft or flight

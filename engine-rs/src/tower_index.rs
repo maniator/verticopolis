@@ -97,6 +97,21 @@ pub struct DispatchFloors {
     pub served: Vec<i64>,
     /// `lobbyFloors`.
     pub lobbies: Vec<i64>,
+    /// Each floor's place in `served`, plus one (0 for a floor not served),
+    /// from `served`'s first floor up, so a room finds its slot by index.
+    slot_of: Vec<u32>,
+}
+
+impl DispatchFloors {
+    /// `floor`'s place in `served`, when it is served.
+    pub fn slot(&self, floor: i64) -> Option<usize> {
+        let first = *self.served.first()?;
+        let at = usize::try_from(floor - first).ok()?;
+        match self.slot_of.get(at) {
+            Some(&s) if s > 0 => Some(s as usize - 1),
+            _ => None,
+        }
+    }
 }
 
 /// The memo slot for [`DispatchFloors`].
@@ -399,10 +414,21 @@ impl Tower {
             .iter()
             .filter(|t| !t.kind.is_staff_only_transport())
             .fold((1, 1), |(lo, hi), t| (lo.min(t.bottom), hi.max(t.top)));
-        let served = (lo..=hi).filter(|&f| self.is_floor_served(f)).collect();
+        let served: Vec<i64> = (lo..=hi).filter(|&f| self.is_floor_served(f)).collect();
         let lobbies = self.lobby_floors();
         debug_assert!(lobbies.windows(2).all(|w| w[0] < w[1]));
-        let floors = Arc::new(DispatchFloors { served, lobbies });
+        let mut slot_of = Vec::new();
+        if let (Some(&first), Some(&last)) = (served.first(), served.last()) {
+            slot_of = vec![0; (last - first + 1) as usize];
+            for (slot, &f) in served.iter().enumerate() {
+                slot_of[(f - first) as usize] = slot as u32 + 1;
+            }
+        }
+        let floors = Arc::new(DispatchFloors {
+            served,
+            lobbies,
+            slot_of,
+        });
         self.memo.borrow_mut().floors = Some((key, floors.clone()));
         floors
     }

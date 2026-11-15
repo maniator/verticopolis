@@ -18,6 +18,7 @@ pub mod motion;
 pub mod routines;
 pub mod routing;
 pub(crate) mod save;
+pub(crate) mod seg_set;
 pub mod spawn;
 pub mod spawn_floors;
 pub mod staff_shift;
@@ -26,6 +27,7 @@ pub mod trip;
 pub mod visits;
 pub mod walk;
 pub mod walk_ins;
+pub mod workplace;
 
 use std::collections::{BTreeSet, HashMap, HashSet};
 
@@ -123,8 +125,7 @@ pub struct Person {
     pub routine: Option<&'static str>,
     pub linger_for: Option<f64>,
     /// Whether the trip began on a Metro platform, so its wait belongs to
-    /// the tenant floor it heads for (#1971). Engine-internal: not in the
-    /// `Person` shape.
+    /// the tenant floor it heads for (#1971). Engine-internal.
     pub from_metro: bool,
     /// The housekeeping room a housekeeper works from, and where they are in
     /// their working day (`staff_shift`). Engine-internal: not in the
@@ -132,23 +133,21 @@ pub struct Person {
     pub crew_id: Option<i64>,
     pub staff_trip: Option<staff_shift::StaffTrip>,
     /// A customer who came in from outside (`walk_ins`), counted in
-    /// `Crowd::walk_in_count` instead of the 140-person sample.
-    /// Engine-internal: not in the `Person` shape.
+    /// `Crowd::walk_in_count` instead of the 140-person sample. Engine-internal.
     pub walk_in: bool,
     /// An office worker on their way in or out (`commuters`), counted in
     /// `Crowd::commuter_count` instead of the 140-person sample, and the
-    /// office and direction while the desk still owes for the trip.
-    /// Engine-internal: not in the `Person` shape.
+    /// office and direction while the desk still owes for the trip
+    /// (engine-internal, like the rest below).
     pub commuter: bool,
     pub commute: Option<commuters::Commute>,
     /// Why a plain commute set out (the floor-list trips of `spawn_trips`),
     /// for the person card (`trip`). Stamped at spawn, draws nothing, and
-    /// saved with the person. Engine-internal: not in the `Person` shape.
+    /// saved with the person.
     pub errand: Option<trip::Errand>,
     /// The tile the person first stood on, so the card can name the room a
     /// plain commute left, and so one who gives up before boarding walks back
     /// there and leaves the way they came (`motion::turn_back`).
-    /// Engine-internal: not in the `Person` shape.
     pub start_x: f64,
 }
 
@@ -222,7 +221,8 @@ pub struct Edge {
     pub walk_kind: Option<Kind>,
 }
 
-pub type AdjGraph = HashMap<i64, Vec<Edge>>;
+/// Looked up by segment, never walked in its hash order.
+pub type AdjGraph = fasthash::FastMap<i64, Vec<Edge>>;
 
 /// The part of the staff graph each segment lies in (`graph_parts` in
 /// `routing.rs`), only looked up.
@@ -256,18 +256,16 @@ pub struct Crowd {
     pub commute_wait_by_floor: fasthash::FastMap<i64, f64>,
     pub commute_revision: u32,
     pub adj: Option<(i64, AdjGraph)>,
-    /// The staff graph and the part of it each segment lies in, built
-    /// together and keyed on the tower revision (`staff_adjacency`). Never
-    /// saved: a load builds it again.
+    /// The staff graph and the part of it each segment lies in, keyed on
+    /// the tower revision (`staff_adjacency`). Never saved.
     pub staff_adj: Option<(i64, AdjGraph, StaffParts)>,
-    pub shaft_banks: Option<(i64, HashMap<(Kind, Vec<i64>, Vec<i64>), Vec<i64>>)>,
+    pub shaft_banks: Option<(i64, banks::Banks)>,
     /// The part of the passenger graph each segment lies in, keyed like
     /// `adj` on the tower revision (`routing::passenger_parts`).
     pub passenger_parts: Option<(i64, StaffParts)>,
     pub seg_served: Option<(i64, fasthash::FastSet<i64>)>,
     /// The segments the Classic walk-budget search reaches from a lobby
-    /// segment (see `graph.rs`). Built from `adj`, so keyed like it on the
-    /// tower revision; never saved.
+    /// segment (`graph.rs`), keyed like `adj`; never saved.
     pub lobby_reach: Option<(i64, fasthash::FastSet<i64>)>,
     pub blockbusters: HashSet<i64>,
     pub staff_done: Vec<StaffResult>,
@@ -286,8 +284,7 @@ pub struct Crowd {
     /// index, floor), ascending: the only cars a person boards or leaves.
     /// Swapped in from the dispatch each step; never saved.
     pub open_cars: Vec<(i64, i64, i64)>,
-    /// The queue projection and the (step, tower revision) it was built
-    /// for (`queue_view`, `render_reads.rs`). Never saved.
+    /// The queue projection and its (step, tower revision). Never saved.
     pub queue_cache: Option<((i64, i64), crate::render_reads::QueueView)>,
     /// The clock hour of the step, so nobody stays in or walks into a venue
     /// after it closes. `None` (a crowd stepped on its own) leaves every
@@ -323,6 +320,8 @@ pub struct Crowd {
     pub shaft_lines: fasthash::FastMap<(i64, i64), line_count::Line>,
     /// The waits Modern riders had at each stop, fading (`waits_seen`). Saved as `waitsSeen`.
     pub waits_seen: line_count::waits_seen::WaitsSeen,
+    /// The route search's seen set, kept between searches. Never saved.
+    pub(crate) route_seen: seg_set::SegSet,
 }
 
 impl Crowd {
@@ -371,6 +370,7 @@ impl Crowd {
             router: None,
             shaft_lines: fasthash::FastMap::default(),
             waits_seen: Default::default(),
+            route_seen: Default::default(),
         }
     }
 
