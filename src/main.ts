@@ -360,7 +360,7 @@ class GameApp implements GameAppPorts {
   loadFromSlot(slot: "auto"): void { loadFromSlot(this, slot); }
   /** Save the tower in My Towers as `name` (File > Save As…); answers its id. */
   saveFile(name: string): Promise<string> { return saveFile(this, name); }
-  /** Open My Towers file `id` (File > Load); settles once the tower is in. */
+  /** Open My Towers file `id` (the Open window); settles once the tower is in. */
   openFile(id: string): Promise<void> { return openFile(this, id); }
 
   /** Set the game speed (index into {@link SPEEDS}): updates the engine's pause

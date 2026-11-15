@@ -79,7 +79,7 @@ export interface UICallbacks {
   onShowStats(): void;
   /** The inspector card's ✕ was clicked — dismiss it and latch it closed. */
   onInspectorClose(): void;
-  /** Load the Auto-save (File > Load, the Open window's Auto-save row). */
+  /** Load the Auto-save (the Open window's Auto-save row). */
   onLoadSlot(slot: "auto"): void;
 }
 
