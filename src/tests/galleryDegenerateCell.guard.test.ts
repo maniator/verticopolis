@@ -31,7 +31,7 @@ vi.mock("../render/sprites", () => ({
   },
   drawCar: () => {},
 }));
-vi.mock("../telemetry", () => ({ injectVercelTelemetry: () => {} }));
+vi.mock("../telemetry", () => ({ injectPageTelemetry: () => {} }));
 vi.mock("../analytics", () => ({ trackAppAction: () => {} }));
 // The gallery reads the Rust engine's catalog before it draws. This run has no
 // engine package, so the engine's stand-in answers with the Rust catalog's

@@ -18,6 +18,8 @@ const SERIAL_SPEC_PATTERN = new RegExp(`(?:^|[\\\\/])(?:${SERIAL_SPECS.join("|")
 
 export default defineConfig({
   testDir: "./e2e",
+  // Fails the run at once on a build without the window.game handle (#2281).
+  globalSetup: "./e2e/global-setup.ts",
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,

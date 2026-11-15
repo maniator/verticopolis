@@ -59,7 +59,7 @@ export function telemetryHostAllowed(): boolean {
   );
 }
 
-export function injectVercelTelemetry(): void {
+export function injectPageTelemetry(): void {
   if (!telemetryHostAllowed()) return;
   try {
     analyticsAdapter().injectPageTelemetry();

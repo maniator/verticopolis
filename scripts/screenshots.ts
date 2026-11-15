@@ -56,6 +56,7 @@ import { armPhaseWatch, judgeAndPromote, markPhaseTarget, phaseCapturePath, stop
 import { SCENES } from "./screenshot-scenes.ts";
 import { SETTLE_AFTER_SETUP, assertEnginePackage, HOSTED_FIX, beginSettleStep, checkHosted, checkSettleList, hostedSnapshot, installShotHelpers, settleUnlessSettled } from "./screenshot-engine.ts";
 import { resolveOnlyFilter } from "../src/tests/screenshotOnlyFilter.ts";
+import { distPublishesHandle } from "../src/build/toolingHandle.ts";
 
 // ---- Runner -----------------------------------------------------------------
 
@@ -201,20 +202,7 @@ class MissingHandleError extends Error {}
  *  the whole run needs positive proof the dist is wrong. */
 let distHasHandle: Promise<boolean> | undefined;
 function servedDistPublishesHandle(): Promise<boolean> {
-  distHasHandle ??= (async () => {
-    try {
-      const html = await (await fetch(BASE)).text();
-      const bundles = [...new Set(html.match(/assets\/[\w.-]+\.js/g) ?? [])];
-      for (const path of bundles) {
-        const js = await (await fetch(`${BASE}/${path}`)).text();
-        if (/\.game\s*=[^=]|window\.game/.test(js)) return true;
-      }
-      // No bundle carried it; only a non-empty scan proves absence.
-      return bundles.length === 0;
-    } catch {
-      return true;
-    }
-  })();
+  distHasHandle ??= distPublishesHandle(BASE, async (url) => (await fetch(url)).text());
   return distHasHandle;
 }
 

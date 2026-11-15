@@ -1,11 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { hasWebGL, showBootMessage, bootGame, hideBootCover, showCrashReload, showEngineFailure } from "./bootstrap";
 import { isEngineStopped } from "./game/interactionState";
-import { injectSpeedInsights } from "@vercel/speed-insights";
-import { inject as injectWebAnalytics } from "@vercel/analytics";
+import { autosaveIfLive } from "./game/autosaveSchedule";
 
-// The telemetry SDKs are gated on the host and best-effort; stub them so the
-// gate and its catch can be asserted without touching the real endpoints.
+// The telemetry SDKs are gated on the host and best-effort; stub them so boot
+// never touches the real endpoints (the gate's own tests are in
+// bootstrap.telemetry.test.ts).
 vi.mock("@vercel/speed-insights", () => ({ injectSpeedInsights: vi.fn() }));
 vi.mock("@vercel/analytics", () => ({ inject: vi.fn() }));
 // Mock `virtual:pwa-register` (Vite virtual module via bootstrap.ts/pwa.ts) so the import resolves on Windows too (as pwa.test.ts does).
@@ -420,6 +420,23 @@ describe("bootGame", () => {
     expect(html).toContain("kaboom");
   });
 
+  it("stops the game behind a boot error so the title screen and autosave stay off (#2282)", async () => {
+    document.body.innerHTML = `<div id="stage"></div><div id="splash"><button id="behind">Continue</button></div>`;
+    stubWebGL();
+    const create = vi.fn(() => {
+      throw new Error("kaboom");
+    });
+    await expect(bootGame(create)).rejects.toThrow("kaboom");
+    expect(isEngineStopped()).toBe(true);
+    expect((document.getElementById("splash") as HTMLElement).inert).toBe(true);
+    const reload = document.querySelector<HTMLButtonElement>("#boot-fallback button:not([data-act])");
+    expect(reload?.textContent).toBe("Reload");
+    expect(document.activeElement).toBe(reload);
+    const saveLoad = { autosave: vi.fn(async () => {}) };
+    autosaveIfLive(saveLoad);
+    expect(saveLoad.autosave).not.toHaveBeenCalled();
+  });
+
   it("defers boot until DOMContentLoaded while the document is still loading", async () => {
     stubWebGL();
     const ready = vi.spyOn(document, "readyState", "get").mockReturnValue("loading");
@@ -433,58 +450,5 @@ describe("bootGame", () => {
     document.dispatchEvent(new Event("DOMContentLoaded"));
     await booted;
     expect(create).toHaveBeenCalledTimes(1);
-  });
-});
-
-describe("bootGame telemetry gate", () => {
-  const localhost = "http://localhost:3000/";
-
-  afterEach(() => {
-    vi.restoreAllMocks();
-    vi.mocked(injectSpeedInsights).mockReset();
-    vi.mocked(injectWebAnalytics).mockReset();
-    window.location.href = localhost; // restore host for the rest of the suite
-    document.body.innerHTML = "";
-    delete (window as unknown as { game?: unknown }).game;
-  });
-
-  it("injects Vercel telemetry on the production host", () => {
-    stubWebGL();
-    window.location.href = "https://verticopolis.com/";
-    bootGame(vi.fn(() => ({ onUpdateAvailable: vi.fn() })));
-
-    expect(injectSpeedInsights).toHaveBeenCalledTimes(1);
-    expect(injectWebAnalytics).toHaveBeenCalledTimes(1);
-  });
-
-  it("injects telemetry on a Vercel preview host too", () => {
-    stubWebGL();
-    window.location.href = "https://feature-branch.vercel.app/";
-    bootGame(vi.fn(() => ({ onUpdateAvailable: vi.fn() })));
-
-    expect(injectSpeedInsights).toHaveBeenCalledTimes(1);
-    expect(injectWebAnalytics).toHaveBeenCalledTimes(1);
-  });
-
-  it("skips telemetry on any other host", () => {
-    stubWebGL();
-    window.location.href = localhost;
-    bootGame(vi.fn(() => ({ onUpdateAvailable: vi.fn() })));
-
-    expect(injectSpeedInsights).not.toHaveBeenCalled();
-    expect(injectWebAnalytics).not.toHaveBeenCalled();
-  });
-
-  it("never lets a telemetry failure block boot", async () => {
-    stubWebGL();
-    window.location.href = "https://verticopolis.com/";
-    vi.mocked(injectSpeedInsights).mockImplementationOnce(() => {
-      throw new Error("telemetry down");
-    });
-    const app = { onUpdateAvailable: vi.fn() };
-
-    await expect(bootGame(vi.fn(() => app))).resolves.toBeUndefined();
-    // Boot still finished: the game handle is published despite the telemetry throw.
-    expect((window as unknown as { game?: unknown }).game).toBe(app);
   });
 });

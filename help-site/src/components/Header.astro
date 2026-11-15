@@ -21,11 +21,11 @@ import logo from "../assets/logo.png";
 
 <script>
   import { backToOpenGame, takeFromGameFlag } from "../../../src/ui/fromGame";
-  import { injectVercelTelemetry } from "../../../src/telemetry";
+  import { injectPageTelemetry } from "../../../src/telemetry";
   import { trackAppAction } from "../../../src/analytics";
   import { helpPageDetail, landingAction, sponsorTapListener } from "../../site.mjs";
 
-  injectVercelTelemetry();
+  injectPageTelemetry();
   const landing = landingAction(location.pathname, document.referrer, location.origin);
   if (landing) trackAppAction(landing);
   // Every page view, landing or not, names its page, so the help pages

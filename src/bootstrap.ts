@@ -1,6 +1,6 @@
 import { html, nothing, render, type TemplateResult } from "lit-html";
 import { registerPWA, type UpdateInfo } from "./pwa";
-import { injectVercelTelemetry } from "./telemetry";
+import { injectPageTelemetry } from "./telemetry";
 import { startGameplaySession, trackAppActionOnce } from "./analytics";
 import { installErrorTracking } from "./analyticsErrors";
 import { initPwaInstall } from "./pwaInstall";
@@ -176,6 +176,19 @@ export function showCrashReload(line: string): void {
   );
 }
 
+/** A boot step threw after the title screen may already be up. The game
+ *  stops behind the message like an engine failure (it carries
+ *  `ENGINE_FAILURE_ID`), so the title screen's keys, autosave and dialogs
+ *  stay off behind it and Reload is the one control left (#2282). */
+export function showBootError(message: string): void {
+  stopGame(
+    html`<div id=${ENGINE_FAILURE_ID} data-stage="boot" role="alert" aria-live="assertive">
+      <p>Something went wrong starting the game: ${message}</p>
+    </div>`,
+    true,
+  );
+}
+
 /** Stop the game behind `message` (it carries `ENGINE_FAILURE_ID`, which
  *  `isEngineStopped` reads, so no key, autosave or dialog reaches the engine). */
 function stopGame(message: TemplateResult, withReload: boolean): void {
@@ -247,7 +260,7 @@ export function bootGame(create: (tower: BootTower) => BootApp): Promise<void> {
     // helper (the same inject the gallery and the Help site use), so a
     // telemetry hiccup can never throw past this line and suppress the WebGL
     // fallback below.
-    injectVercelTelemetry();
+    injectPageTelemetry();
     if (!hasWebGL()) {
       // The copy leads with the remedy (every current browser, Firefox
       // included, runs WebGL once hardware acceleration is on; most real hits
@@ -424,7 +437,7 @@ export function bootGame(create: (tower: BootTower) => BootApp): Promise<void> {
       const message = err instanceof Error ? err.message : String(err);
       // A throw that skipped the settle row still sends it, from the boot state.
       if (created) settle();
-      if (!document.getElementById(ENGINE_FAILURE_ID)) showBootMessage("Something went wrong starting the game: " + message);
+      if (!document.getElementById(ENGINE_FAILURE_ID)) showBootError(message);
       throw err;
     }
   };

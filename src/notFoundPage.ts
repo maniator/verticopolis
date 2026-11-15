@@ -1,6 +1,6 @@
 import { html, render, type TemplateResult } from "lit-html";
 import { pageShell } from "./ui/templates/pageShell";
-import { injectVercelTelemetry } from "./telemetry";
+import { injectPageTelemetry } from "./telemetry";
 import { takeFromGameFlag } from "./ui/fromGame";
 
 /**
@@ -46,7 +46,7 @@ export function notFoundPageTemplate(path: string, fromGame = false): TemplateRe
 }
 
 function main(): void {
-  injectVercelTelemetry();
+  injectPageTelemetry();
   const root = document.getElementById("app");
   if (!root) return;
   const fallback = [...root.childNodes];
