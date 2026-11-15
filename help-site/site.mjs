@@ -65,7 +65,7 @@ export const sidebar = [
   { label: "How to Play", link: "/" },
   {
     label: "Getting started",
-    items: [{ slug: "first-tower" }, { slug: "classic-vs-modern" }, { slug: "differences" }, { slug: "controls" }],
+    items: [{ slug: "first-tower" }, { slug: "classic-vs-modern" }, { slug: "differences" }, { slug: "controls" }, { slug: "desktop" }],
   },
   {
     label: "Your towers",
