@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { BOOT_READY_CLASS } from "../bootCover";
 import type { GameApp } from "../main";
 import { wireControllers, runBootFlow, bootReason, APP_VERSION } from "./appBoot";
 import { RESUME_AFTER_RECOVERY_KEY } from "./saveLoad";
@@ -352,18 +353,17 @@ describe("runBootFlow", () => {
     expect(arg.hasSave).toBe(true);
   });
 
-  it("removes the static boot cover once the boot screen is decided (both paths)", () => {
-    // Splash path: the cover comes down so the identical title sky underneath
-    // (the mounted splash) shows through.
+  it("ends the static boot cover once the boot screen is decided (both paths)", () => {
+    // Splash path, then resume path: the startup screen starts its dawn and
+    // fade (bootCover.test.ts follows it out), uncovering what is underneath.
+    const ending = () => document.getElementById("boot-cover")?.classList.contains(BOOT_READY_CLASS);
     document.body.innerHTML = `<div id="boot-cover"></div>`;
     runBootFlow(makeApp({ hadReadableSave: false }));
-    expect(document.getElementById("boot-cover")).toBeNull();
-
-    // Resume path: same removal, uncovering the resumed tower.
+    expect(ending()).toBe(true);
     document.body.innerHTML = `<div id="boot-cover"></div>`;
     sessionStorage.setItem(RESUME_AFTER_UPDATE_KEY, String(Date.now()));
     runBootFlow(makeApp({ hadReadableSave: true }));
-    expect(document.getElementById("boot-cover")).toBeNull();
+    expect(ending()).toBe(true);
   });
 
   it("wires the onboarding + splash callbacks back to the app", () => {

@@ -14,7 +14,7 @@ import { showCrashScreen } from "../ui/crashScreen";
 import { showGraphicsRecovery } from "../ui/graphicsRecovery";
 import { OnboardingController, isOnboarded } from "../ui/Onboarding";
 import { resolveBootScreen } from "../bootScreen";
-import { hideBootCover } from "../bootstrap";
+import { finishBootCover } from "../bootCover";
 import { rebuildEngine } from "./engineWiring";
 import { RESUME_AFTER_UPDATE_KEY, RESUME_RELOAD_MAX_AGE_MS } from "./updateFlow";
 import { gameplaySession, setCommonProps } from "../analytics";
@@ -48,6 +48,7 @@ import { reducedMotionActive } from "../storage/Prefs";
 import { APP_VERSION } from "../appVersion";
 import { touchOverviewMap, wireOverviewMap } from "./overviewMapWiring";
 import { wireMovableWindows } from "./movableWindows";
+import { wireDesk } from "../ui/desk/deskController";
 import { refuseAppPlacementWhilePaused } from "./pausedBuild";
 import { createPersonCard } from "./personCardWiring";
 export { APP_VERSION };
@@ -259,6 +260,7 @@ export function runBootFlow(app: GameApp, savedAtBoot?: number): void {
   // The facility card and the dialogs move by their title bars too.
   wireMovableWindows(app);
   wireMenus(app); // the menu bar, its Tower Info and Bulletin windows, the status bar
+  wireDesk(); // on a computer, every part of the game in its own window (option C)
   void openFileSpace(app); // My Towers, and the one-time copy of the save slots
   wireTowerDrop(app); // a tower file dropped on the game opens
   wireScreenSaver(app); // Options > Screen Saver… and its idle and return triggers
@@ -397,9 +399,10 @@ export function runBootFlow(app: GameApp, savedAtBoot?: number): void {
   }
 
   // The first real screen (the splash, or the resumed tower) is now mounted, so
-  // drop the static boot cover: on the splash path it uncovers the identical
-  // title sky underneath, on the resume path the running tower.
-  hideBootCover();
+  // end the startup screen: the sunrise finishes in a moment and the cover
+  // fades, on the splash path to the identical title sky underneath, on the
+  // resume path to the running tower.
+  finishBootCover();
 
   // The welcome fireworks, each boot until the player closes them, never over an unreadable save.
   maybeLaunchFireworks(app.ui, () => reducedMotionActive(app.prefs, app.reduceMq.matches), app.saveWasCorrupt);
