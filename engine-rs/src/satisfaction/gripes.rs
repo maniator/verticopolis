@@ -81,6 +81,18 @@ impl Simulation {
                 noise_base_erosion_for(u.kind, u.ever_occupied) * self.mode.noise_erosion_scale(),
             )
         };
+        // A far walk wears at the full noise rate in either mode, and a far
+        // lobby at its band's erosion; a steeper unmet-demand drain outranks
+        // either, as it does noise (#548, #550).
+        let unmet_outranks_far_walk =
+            || unmet_outranks(noise_base_erosion_for(u.kind, u.ever_occupied));
+        let unmet_outranks_lobby = || {
+            unmet_outranks(
+                self.mode
+                    .lobby_distance_drain(self.tower.nearest_lobby_floor_distance(u.floor))
+                    .erosion,
+            )
+        };
         let over_rent = |kind: Kind| {
             rent_config(kind).is_some_and(|cfg| cfg.over_neutral(rent_of(kind, u.rent, u.no_rate)))
         };
@@ -88,10 +100,10 @@ impl Simulation {
             if over_rent(Kind::Office) {
                 return Some("rent");
             }
-            if u.floor != 1 && r.far_walk {
+            if u.floor != 1 && r.far_walk && !unmet_outranks_far_walk() {
                 return Some("transportFar");
             }
-            if very_far {
+            if very_far && !unmet_outranks_lobby() {
                 return Some("lobbyFar");
             }
             if r.noisy && !unmet_outranks_noise() {
@@ -115,10 +127,14 @@ impl Simulation {
             if over_rent(u.kind) {
                 return Some("rent");
             }
-            if u.kind == Kind::RentalApartment && u.floor != 1 && r.far_walk {
+            if u.kind == Kind::RentalApartment
+                && u.floor != 1
+                && r.far_walk
+                && !unmet_outranks_far_walk()
+            {
                 return Some("transportFar");
             }
-            if very_far {
+            if very_far && !unmet_outranks_lobby() {
                 return Some("lobbyFar");
             }
             if r.noisy && !unmet_outranks_noise() {
@@ -138,7 +154,7 @@ impl Simulation {
             }
             return holding_short;
         }
-        if very_far {
+        if very_far && !unmet_outranks_lobby() {
             return Some("lobbyFar");
         }
         if r.noisy && !unmet_outranks_noise() {
