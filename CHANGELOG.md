@@ -25,6 +25,19 @@ prompt already tells players it is an engine update and shows the new version.
 Entries below 1.51.1 were curated from the commit history after the fact, so they
 are documentation only: no build that a client fetches carries them.
 
+## 4.1.0
+
+- Options > Screen Saver… picks one of five screen savers (Night Shift, your own tower at night, is the default) to come up when the tower sits paused and untouched, or when you come back to the tab after a while. Any key or mouse move brings your tower back.
+- The File menu reads like a 90s program's: Open… (Ctrl+O) opens a tower file, Save (Ctrl+S) saves into the Auto-save, and Save As… (Ctrl+Shift+S) downloads the tower as a file. Saves… is now Saved Towers…. On a Mac, Cmd works in place of Ctrl.
+- File > Load lists the Auto-save and each saved slot with its tower's name, so loading one takes a single pick. It works from the title screen too, and on a phone it opens in place in the File menu.
+- Give a save slot a name of your own with Rename… in Saved Towers…. The name stays with the slot and shows in File > Load and on the title screen.
+- In Modern towers, someone who has stood an hour in one elevator line looks for another way up and walks to it when it is now quicker, and people choosing a route count how long each line has already kept its riders. On a tower whose Metro line jams in the morning rush, far fewer riders wait over an hour. Each hour the Bulletin names the worst landing where someone passed an hour in line.
+- The Map now shows the open air between buildings, such as two Modern towers on one lot, as a gap you can see on a computer or a phone. A gap of a few tiles used to vanish, so the buildings ran together.
+- A tower saved on its first day and reloaded now pays its first maintenance and collects its first office rent at the end of that day, as it would have without the reload.
+- Modern towers run smoother at the morning and evening rush: finding each person's quickest way up takes about half the work it did, so a busy office tower keeps up at top speed.
+- Modern towers with long elevator lines run faster: the game works out each line's wait once a step instead of at every look, and reuses a route it has just found while nobody has joined a line since.
+- Metro riders now arrive on a real train too. Someone coming in by the Metro, office workers included, steps off the train while it stands at the platform, rather than appearing on an empty platform between trains. A worker due between trains comes on the next one, and the Metro brings as many riders a day as before.
+
 ## 4.0.0
 
 - Verticopolis 4.0: a classic 90s-style menu bar replaces the panel on the right. File, Edit, Tower, Window, Options and Help hold every command that was there, so the tower gets the whole width of the screen.
