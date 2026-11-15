@@ -49,7 +49,7 @@ export const INSTANCE_METHODS = [
   // The engine port (slice 7, `src/simport/enginePort.ts`): PR 1a's commands,
   // quotes and HUD queries.
   "chooseAutoBridge", "answerChoice", "viewLayout", "lastReason", "buildAt", "paintTiles",
-  "buildShaft", "demolish", "changeCars", "extendShaft", "bookExterminator", "setCamera",
+  "buildShaft", "demolish", "changeCars", "extendShaft", "bookExterminator", "callFireRescue", "setCamera",
   "setFilm", "changeFilm", "setTicketPrice", "quoteBuild", "quoteShaft", "statsStrip", "hotspot", "onboarding", "evaluatedTower", "markStop",
   "expressStops", "dropStops", "stepRent", "noRate", "setRent", "rentBatch", "rerollUnit",
   "flipAutoBridge", "startExtend", "stopExtend", "labelUnit", "nameTower",

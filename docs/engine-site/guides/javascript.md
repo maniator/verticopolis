@@ -191,6 +191,7 @@ shapes for each one.
 | `sellAt(floor, x)` | Remove whatever covers a tile. `true` when something went. |
 | `adjustRent(id, dir)`, `priceUnit(id, target)`, `setNoRate(id)` | Change a room's rent: one step up (`1`) or down (`-1`), a chosen price, or off the market. |
 | `pendingChoice()`, `resolveChoice(accept)` | A question the game is asking the player (a ransom, a VIP), as `{ kind, cost, message }`, and the answer to it. |
+| `callFireRescue()` | Puts the fire rescue offer up again while a fire burns (the player's "Call Fire Rescue" command), as a record with its `cost`. It is refused with `none` when nothing is burning and `pending` while a question already waits. Answer the offer with `resolveChoice`. |
 | `setTowerName(name)`, `towerName()` | The tower's name. |
 
 ### Reading the game

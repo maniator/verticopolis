@@ -36,6 +36,7 @@ export const MENU_ITEM_CODES = {
   "mb-win-map": "map",
   "btn-stats": "statistics",
   "mb-rename": "rename",
+  "mb-fire-rescue": "fire_rescue",
   "mb-rules": "rules",
   "mb-win-tools": "tools",
   "mb-win-bulletin": "bulletin",
