@@ -1,6 +1,6 @@
 import * as ex from "excalibur";
 import type { FacilityKind, SerializedView } from "../../shared/types";
-import type { SimView, UnitView, TransportView } from "../../simport/view";
+import type { SimView, UnitView } from "../../simport/view";
 import type { RenderSim } from "../renderSim";
 import { PinchTracker } from "../pinchTracker";
 import type { DrawCtx } from "../sprites";
@@ -23,6 +23,7 @@ import { beginFrame } from "./towerFrame";
 import { drainRegions, type RegionRec } from "./towerRegions";
 import { NOT_BAKED } from "./sceneBake";
 import type { CrowdActor, Walker } from "./towerCrowd";
+import type { CabActor } from "./cabGraphics";
 import type { MetroTrain } from "./towerMetro";
 import type { PeopleGraphics } from "./peopleGfx";
 import type { ViewFocus, Picked, ScreenRect } from "./towerInputCamera";
@@ -188,18 +189,7 @@ export class TowerEngine {
   transportSig = new Map<number, string>();
   flightPass = reconcile.emptyFlightPass(); // flights beside a venue (venueFlights.ts), per structure
   // Engine-animated actors, regenerated when the layout changes.
-  carActors: {
-    actor: ex.Actor;
-    t: TransportView;
-    i: number;
-    seed: number;
-    w: number;
-    /** Elevator kind, threaded to drawCar so each cab wears its type's look. */
-    kind: FacilityKind;
-    /** Lazily-built cab graphics keyed by indicator state (riders:arrow:full). */
-    gfx: Map<string, ex.Canvas>;
-    shown: string;
-  }[] = [];
+  carActors: CabActor[] = [];
   trainActors: MetroTrain[] = [];
   /** The metro's tunnel row, either side of the station. */
   tunnelActors: ex.Actor[] = [];

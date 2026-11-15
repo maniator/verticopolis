@@ -3,15 +3,14 @@ import { Z } from "../depthPlanes";
 import { isElevatorKind } from "../../presentation/viewKinds";
 import { catalogFacility } from "../../catalog/catalogTypes";
 import { towerCatalog } from "../../catalog/towerCatalog";
-import type { FacilityKind } from "../../shared/types";
 import { isOperational } from "../../shared/unitState";
-import { drawCar, drawGarbageTruck, drawStreetCar } from "../sprites";
+import { drawGarbageTruck, drawStreetCar } from "../sprites";
 import { GARBAGE_TRUCK_H } from "../sprites/facilities/vehicles";
 import { metroTrainAt } from "../metroTrainSchedule";
 import { addMetros } from "./towerMetro";
 import { buildWalkers } from "./towerWalkerBuild";
-import { cabFit, carIndicator, type CarIndicator } from "../carIndicator";
-import { cabRidersOf, ridersAboard } from "./cabRiders";
+import { cabLoad, cabRidersOf } from "./cabRiders";
+import { cabWant, carGfx, carKey, IDLE_CAR } from "./cabGraphics";
 import { glideCar, newCarDraw, type CarDrawState } from "../carMotion";
 import type { PersonView } from "../../simport/view";
 import { FLOOR, TILE } from "../scale";
@@ -30,9 +29,6 @@ import { pushThroughDoors, turnHallDoors, type Pusher } from "./towerHallDoors";
  * `TowerEngine.ts`; the class keeps thin delegations. Pure code move: the
  * positioning, cadence and Excalibur calls are unchanged.
  */
-
-/** The empty, idle cab state used to seed a fresh car's graphic. */
-const IDLE_CAR: CarIndicator = { riders: 0, arrow: null, full: false };
 
 
 /** Retained-actor reconciliation tail: kill and forget every entry the
@@ -231,32 +227,6 @@ export function clearMotion(engine: TowerEngine): void {
   engine.walkers = [];
 }
 
-/** Stable cache key for a cab graphic's indicator state. */
-function carKey(ind: CarIndicator): string {
-  return `${ind.riders}:${ind.arrow ?? "x"}:${ind.full ? "f" : "e"}`;
-}
-
-/** Get-or-create the cab graphic for a given indicator state. Keying and
- *  drawing both derive from the one {@link CarIndicator} plus the entry's
- *  fixed kind; the key can skip the kind only because each cache map belongs
- *  to a single car whose shaft never changes kind (any rebuild goes through
- *  syncMotion, which recreates the entry). */
-function carGfx(entry: { seed: number; w: number; kind: FacilityKind; gfx: Map<string, ex.Canvas> }, ind: CarIndicator): ex.Canvas {
-  const key = carKey(ind);
-  let cv = entry.gfx.get(key);
-  if (!cv) {
-    const { seed, w, kind } = entry;
-    cv = new ex.Canvas({
-      width: w,
-      height: FLOOR,
-      cache: true,
-      draw: (ctx) => drawCar(ctx, seed, w, FLOOR, ind.riders, ind.arrow, ind.full, kind),
-    });
-    entry.gfx.set(key, cv);
-  }
-  return cv;
-}
-
 export function syncMotion(engine: TowerEngine): void {
   // Carry each car's glide state across the rebuild, keyed by shaft id +
   // car index: structural edits run syncMotion on every revision bump, and
@@ -274,14 +244,13 @@ export function syncMotion(engine: TowerEngine): void {
     if (!isElevatorKind(t.kind)) continue;
     const w = t.width * TILE;
     for (let i = 0; i < t.cars; i++) {
-      const seed = (i * 7 + t.id) | 0;
-      // Cab graphics are built lazily and cached by indicator state (rider
-      // count, direction lantern, FULL) so we only ever draw each variant once.
-      const gfx = new Map<string, ex.Canvas>();
+      // Cab graphics are built lazily and kept by indicator state (who rides,
+      // direction lantern, FULL), a few per car (`cabGraphics.ts`).
+      const gfx = new Map<string, ex.Graphic>();
       const a = new ex.Actor({ pos: ex.vec(engine.worldX(t.x), -t.carPositions[i] * FLOOR), width: w, height: FLOOR, anchor: ex.vec(0, 0), z: Z.cab });
-      a.graphics.use(carGfx({ seed, w, kind: t.kind, gfx }, IDLE_CAR));
+      a.graphics.use(carGfx({ w, kind: t.kind, gfx }, IDLE_CAR));
       engine.engine.add(a);
-      const entry = { actor: a, t, i, seed, w, kind: t.kind, gfx, shown: carKey(IDLE_CAR) };
+      const entry = { actor: a, t, i, w, kind: t.kind, gfx, shown: carKey(IDLE_CAR) };
       const prev = carried.get(`${t.id}:${i}`);
       if (prev) carDrawStates.set(entry, prev);
       freshCabs.add(entry);
@@ -390,7 +359,9 @@ export function updateMotion(engine: TowerEngine, elapsedMs = 1000 / 60): void {
   // sibling reconcileCrowd pass.
   if (applyCrowdCull(engine)) return;
   const anim = engine.d.anim;
-  const aboard = cabRidersOf(engine, clock.stepped);
+  const catalog = towerCatalog(engine.sim);
+  const rules = catalog.rules;
+  const aboard = cabRidersOf(engine, clock.stepped, { fedUpWait: rules.fedUpWait, lit: rules.shadedLook });
   for (const c of engine.carActors) {
     const target = c.t.carPositions[c.i];
     let drawn = carDrawStates.get(c);
@@ -405,14 +376,15 @@ export function updateMotion(engine: TowerEngine, elapsedMs = 1000 / 60): void {
     if (typeof c.t.bottom === "number" && drawn.pos < c.t.bottom) drawn.pos = c.t.bottom;
     if (typeof c.t.top === "number" && drawn.pos > c.t.top) drawn.pos = c.t.top;
     c.actor.pos = ex.vec(engine.worldX(c.t.x), -drawn.pos * FLOOR);
-    // carIndicator turns the boarded riders, the lantern and FULL into the
-    // cab's state; its graphic is cached per state and redrawn on a change.
-    const [load, cap] = [c.t.carLoad?.[c.i] ?? 0, catalogFacility(towerCatalog(engine.sim), c.t.kind).carCapacity ?? 0];
-    const ind = carIndicator(c.t.carDir?.[c.i] ?? 0, load, cap, cabFit(c.w), ridersAboard(aboard, c.t.id, c.i));
+    // The boarded riders, the lantern and FULL make the cab's state
+    // (`cabWant`, worked out again only when one changes); its graphic is
+    // kept per state and redrawn on a change.
+    const cap = catalogFacility(catalog, c.t.kind).carCapacity ?? 0;
+    const want = cabWant(c, c.t.carDir?.[c.i] ?? 0, c.t.carLoad?.[c.i] ?? 0, cap, cabLoad(aboard, c.t.id, c.i));
     // The cab's riders change when the drawn car gets there, on the same rule
     // as the people getting in or out (`positionPerson`), so nobody shows in
     // the cab and on the landing at once, or in neither.
-    const key = carKey(ind);
+    const key = want.key;
     const fresh = freshCabs.delete(c);
     if (key === c.shown) cabChangeStep.delete(c);
     else {
@@ -420,7 +392,7 @@ export function updateMotion(engine: TowerEngine, elapsedMs = 1000 / 60): void {
       if (progress >= 1 || clock.steps > since || fresh) {
         c.shown = key;
         cabChangeStep.delete(c);
-        c.actor.graphics.use(carGfx(c, ind));
+        c.actor.graphics.use(carGfx(c, want.ind));
       } else cabChangeStep.set(c, since);
     }
   }

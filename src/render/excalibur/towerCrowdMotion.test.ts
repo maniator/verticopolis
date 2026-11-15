@@ -73,7 +73,7 @@ describe("car glide wiring (GH #688, #2097)", () => {
       // (the test DOM has no 2d canvas); the glide only reads positions.
       t: { x: 12, kind: "elevatorStandard", carPositions: [8], carLoad: [0], carDir: [0] },
       i: 0, seed: 0, w: 4 * TILE, kind: "elevatorStandard",
-      gfx: new Map<string, ex.Graphic>(), shown: "0:x:e",
+      gfx: new Map<string, ex.Graphic>(), shown: "0:x:e:",
     };
     const e = eng({ carActors: [car] });
     updateMotion(e); // frame 1 lazily seeds AT the sim position (the rebuild snap)
@@ -92,7 +92,7 @@ describe("car glide wiring (GH #688, #2097)", () => {
       actor: actor(),
       t: { x: 12, kind: "elevatorStandard", carPositions: [10], bottom: 1, top: 10, carLoad: [0], carDir: [0] },
       i: 0, seed: 0, w: 4 * TILE, kind: "elevatorStandard",
-      gfx: new Map<string, ex.Graphic>(), shown: "0:x:e",
+      gfx: new Map<string, ex.Graphic>(), shown: "0:x:e:",
     };
     const e = eng({ carActors: [car] });
     updateMotion(e); // seeds at 10 (the top)
