@@ -7,7 +7,8 @@ import { openImport } from "../ui/uiImport";
 import { SPONSOR_URL, sponsorOffered } from "../ui/splashTemplate";
 import { trackAppAction } from "../analytics";
 import { menuItemCodeOf, menuNameOf, trackMenuDismiss, trackMenuOpen, trackMenuPick, type MenuScreen } from "../analyticsMenus";
-import { isSplashUp } from "./interactionState";
+import { isEngineStopped, isSplashUp } from "./interactionState";
+import { closeTower } from "./titleScreen";
 import { overviewMapOpen, setOverviewMapOpen } from "./overviewMapWiring";
 
 /**
@@ -15,7 +16,7 @@ import { overviewMapOpen, setOverviewMapOpen } from "./overviewMapWiring";
  * `ui/menuBar.ts`). The items whose ids predate the bar (btn-new, btn-load,
  * btn-settings, btn-stats, btn-help, btn-about, btn-install-menu) keep the
  * click handlers `UI.wireControls` gives them; this wires the rest: Quick
- * Save, Import, Export, Undo and Redo, Rename, the rules, the windows the
+ * Save, Close, Import, Export, Undo and Redo, Rename, the rules, the windows the
  * Tower and Window menus open, Full Screen, Sound, Classic vs Modern and Replay Getting
  * Started.
  *
@@ -52,6 +53,7 @@ export const STATUS_BAR_HIDDEN_CLASS = "statusbar-off";
  *  up, the way a 1995 program grays Save until a document is open. */
 export const NEEDS_A_TOWER = [
   "mb-quick-save",
+  "mb-close",
   "mb-export",
   "mb-undo",
   "mb-redo",
@@ -163,6 +165,7 @@ export function wireMenus(app: GameApp): MenuBar | null {
 
   // File.
   on("mb-quick-save", () => ui.cb.onSave());
+  on("mb-close", () => closeTower(app));
   on("mb-import", () => openImport(ui));
   on("mb-export", () => ui.promptExport());
   // Edit: the toolbar's own buttons, so the gray-out and the gesture rules hold.
@@ -256,6 +259,8 @@ export function wireMenus(app: GameApp): MenuBar | null {
         if (noTower) document.getElementById(id)?.setAttribute("aria-disabled", "true");
         else if (id !== "mb-undo" && id !== "mb-redo") document.getElementById(id)?.removeAttribute("aria-disabled");
       }
+      // A tower the game stopped on cannot be saved, so it cannot be closed either.
+      if (isEngineStopped()) document.getElementById("mb-close")?.setAttribute("aria-disabled", "true");
       // The Tools fold exists on the desktop layout only.
       const tools = document.getElementById("mb-win-tools");
       if (tools) tools.hidden = !document.getElementById(PALETTE_COLLAPSE_BUTTON_ID)?.offsetParent;
