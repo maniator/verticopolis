@@ -8,6 +8,8 @@
 //! count until the 1994 rush is measured.
 use std::collections::HashMap;
 
+use serde_json::json;
+
 use crate::clock::{CalendarKind, GameMode};
 use crate::crowd::PState;
 use crate::facilities::Kind;
@@ -412,5 +414,44 @@ fn a_reload_mid_rush_plays_on_as_it_would_have() {
     assert_eq!(loaded.crowd.desks, sim.crowd.desks);
     for id in offices {
         assert_eq!(occupants(&loaded, id), occupants(&sim, id));
+    }
+}
+
+#[test]
+fn a_worker_who_turned_back_never_overfills_the_office() {
+    // 10:30 AM, both offices full; one worker who had set out for home
+    // waited too long, turned back, and walks to a desk filled meanwhile.
+    let (sim, offices) = at_work(GameMode::Modern);
+    let office = sim.tower.get_unit(offices[0]).unwrap().clone();
+    let shaft = sim.tower.transports[0].id;
+    let mut save = sim.serialize();
+    let desk_x = (office.x + 4) as f64;
+    save["crowd"]["people"].as_array_mut().unwrap().push(json!({
+        "id": 9_000, "state": "toDest", "floor": OFFICE_FLOOR, "fy": OFFICE_FLOOR as f64,
+        "x": desk_x + 3.0, "startX": desk_x, "floors": [OFFICE_FLOOR, 1],
+        "originFloor": OFFICE_FLOOR, "shafts": [shaft], "leg": 0, "shaftId": shaft,
+        "destX": desk_x, "wait": 0.0, "tripWait": 0.0, "age": 0.0, "linger": 0.0,
+        "returning": true, "errand": { "place": "office", "inbound": false },
+        "commute": { "officeId": office.id, "inbound": false },
+    }));
+    let mut sim = load_save_text(save.to_string().as_bytes()).unwrap();
+    assert_eq!(sim.crowd.commuter_count, 1, "the worker loads");
+    let w = watch(&mut sim, &offices, 30);
+    // They found the office full and left by the lobby.
+    assert!(w.peak <= STAFF, "{} at the desks", w.peak);
+    assert_eq!(occupants(&sim, offices[0]), STAFF);
+    assert_eq!(
+        w.last.get(&9_000).map(|l| l.0),
+        Some(1),
+        "left by the lobby"
+    );
+    // So a save taken any minute of it loads as the same game.
+    let mut sim = load_save_text(save.to_string().as_bytes()).unwrap();
+    let mut reloaded = load_save_text(save.to_string().as_bytes()).unwrap();
+    for minute in 1..=30 {
+        sim.tick(1.0);
+        reloaded = load_save_text(reloaded.save_text().as_bytes()).unwrap();
+        reloaded.tick(1.0);
+        assert_eq!(reloaded.save_text(), sim.save_text(), "minute {minute}");
     }
 }
