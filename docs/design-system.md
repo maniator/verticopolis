@@ -25,7 +25,8 @@ Everything derives from `:root` custom properties. Swap these to re-theme.
 | `--r-hi` / `--r-light` / `--r-shadow` / `--r-dark` | bevel ramp |
 | `--r-title` / `--r-title-fg` | title-bar navy / white |
 | `--r-ink`, `--muted` | body / secondary text |
-| `--r-desktop` | the teal desktop behind everything |
+| `--r-desktop` | the teal desktop behind full pages (the help site) and a restored window |
+| `--r-workspace` | the game's own background, the face of a maximized window (an alias of `--r-face`) |
 | `--good` / `--bad` / `--bad-ink` / `--money` | semantic states (bad-ink is the AA-safe danger text on gray) |
 | `--bevel-out` / `--bevel-in` | the signature two-pixel bevels (raised / sunken) |
 | `--win-shadow` | the one hard drop shadow floating windows cast |

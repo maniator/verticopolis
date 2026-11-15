@@ -20,7 +20,7 @@ body {
   user-select: none;
   font-family: var(--r-font);
   font-size: 12px;
-  background: var(--r-desktop);
+  background: var(--r-workspace);
   color: var(--r-ink);
   -webkit-font-smoothing: none;
 }

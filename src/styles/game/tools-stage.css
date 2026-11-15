@@ -6,7 +6,7 @@
   flex: 1;
   display: flex;
   min-height: 0;
-  background: var(--r-desktop);
+  background: var(--r-workspace);
 }
 
 /* ---- Tool palette ("Tools" window) ---- */
