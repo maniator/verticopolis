@@ -3,6 +3,7 @@ import { showCrashScreen } from "../../ui/crashScreen";
 import type { CrashScreenOptions } from "../../ui/crashScreen";
 import { crashTower } from "../../game/crashReport.fixture";
 import { downloadFile } from "../../ui/downloadFile";
+import { GRAPHICS_RECOVERY_ID, showGraphicsRecovery } from "../../ui/graphicsRecovery";
 
 vi.mock("../../ui/downloadFile", () => ({ downloadFile: vi.fn() }));
 
@@ -33,6 +34,15 @@ afterEach(() => {
 });
 
 describe("crash screen wording and wiring", () => {
+  it("replaces the recovery card when a second loss lands during an in-place recovery (#321)", () => {
+    const endWait = showGraphicsRecovery();
+    const { card } = show({ crash: { kind: "webgl-context-lost", repeat: true, saveFlushed: true, behindSplash: false, recoveryFailed: false } });
+    expect(document.getElementById(GRAPHICS_RECOVERY_ID)).toBeNull();
+    expect((card as HTMLDialogElement).open).toBe(true);
+    endWait(); // the attempt still ends later; taking down a card already gone leaves the crash card up
+    expect(document.getElementById("crash-screen")).not.toBeNull();
+  });
+
   it("the clean case says the tower was saved and explains the crash", () => {
     const { card } = show();
     expect(card.textContent).toContain("The game crashed");
