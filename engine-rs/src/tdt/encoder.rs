@@ -8,7 +8,7 @@ use super::byte_writer::{to_int32, ByteWriter};
 use super::export_gather::{
     car_homes, js_finite, js_max, js_min, js_num, js_truthy, FloorKey, GatheredTower,
 };
-use super::export_parking::connected_stall_count;
+use super::export_parking::{linked_to_a_ramp, ParkingExport, TDT_HEADER_PARKING_COLUMN_AT};
 use super::export_tables::OutTenant;
 use super::format::*;
 use super::pacing::frame_for_minute_of_day;
@@ -88,7 +88,7 @@ pub fn encode_tower(
         class_pop,
         counts,
         retail_rows,
-        rooms,
+        rooms: _,
     } = gathered;
 
     for tenants in tenants_by_tdt.values() {
@@ -152,6 +152,7 @@ pub fn encode_tower(
     let empty: Vec<OutTenant> = vec![];
     let mut venue_halves: Vec<PlacedHalf> = vec![];
     let mut retail_ids = vec![0; retail_rows.len()];
+    let mut parking = ParkingExport::default();
     for index in 0..TDT_FLOOR_COUNT {
         let ours = index - TDT_FLOOR_OFFSET;
         let tenants = tenants_by_tdt
@@ -174,7 +175,19 @@ pub fn encode_tower(
                 .unwrap_or(std::cmp::Ordering::Equal)
         });
         let ids = logical_ids(&ordered.iter().map(|t| t.type_id).collect::<Vec<_>>());
-        for (t, &id) in ordered.into_iter().zip(&ids) {
+        let spans: Vec<_> = ordered
+            .iter()
+            .map(|t| {
+                (
+                    clamp_tile(Some(t.left)),
+                    clamp_tile(Some(t.right)),
+                    t.type_id,
+                )
+            })
+            .collect();
+        let linked = linked_to_a_ramp(&spans);
+        for (k, (t, &id)) in ordered.into_iter().zip(&ids).enumerate() {
+            parking.place(index as usize, spans[k], id, w.len(), linked[k]);
             if let (Some(row), Some(id)) = (t.retail_row, id) {
                 retail_ids[row as usize] = id;
             }
@@ -195,6 +208,7 @@ pub fn encode_tower(
         }
         w.bytes(&index_map(&ids));
     }
+    w.set_u16(TDT_HEADER_PARKING_COLUMN_AT, parking.header_column());
 
     let finite_pop = if people_pop.is_finite() {
         round(*people_pop)
@@ -348,16 +362,8 @@ pub fn encode_tower(
     }
     w.pad(TDT_UNKNOWN_FLAGS_SIZE + TDT_UNKNOWN_BYTES_SIZE);
 
-    // The connected stalls are numbered from 0 up, the way the game lists them.
-    let stalls = connected_stall_count(rooms).min(((TDT_PARKING_SIZE - 2) / 2) as i64);
-    w.u16(stalls);
-    for index in 0..(TDT_PARKING_SIZE - 2) / 2 {
-        w.u16(if (index as i64) < stalls {
-            index as i64
-        } else {
-            0
-        });
-    }
+    // The connected stalls, by their records in the stall table (#307).
+    parking.write_connected_list(&mut w);
 
     // The medical clinics, numbered from 0 up as in a tower that has them all.
     let clinics = header.medical.min(TDT_CLINIC_MAX as i64);
@@ -457,7 +463,9 @@ pub fn encode_tower(
         w.u16(0);
     }
 
+    let tail_at = w.len();
     write_venue_tail(&mut w, &venue_halves);
+    parking.write_stall_table(&mut w, tail_at);
     write_format_stamp(&mut w);
 
     let express_len = elevators
