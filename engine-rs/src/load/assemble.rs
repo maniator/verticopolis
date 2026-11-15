@@ -430,6 +430,12 @@ pub(crate) fn assemble(
     }
     sim.weather = weather_for(sim.clock.day());
     sim.last_day = sim.clock.day();
+    // A save from before the shops' day ended at 10:00 closed it at
+    // midnight, so today's is already closed (#1500).
+    sim.morning_venue_day = data
+        .get("morningVenueDay")
+        .and_then(Value::as_i64)
+        .unwrap_or(sim.last_day);
     sim.last_quarter_money = num(data.get("lastQuarterMoney"), 0.0);
     sim.set_marks_from_clock();
     if let Some(marks) = data.get("periodMarks") {

@@ -39,7 +39,10 @@ const JSON_BYTES: &[u8] = b"{}[],:\"0-.e\\ ";
 /// started carrying the day's move-ins (`moveIns`), again for that reason,
 /// and 141 became 155 when a first-day game's saves started carrying its
 /// period marks (`periodMarks`), the base saves being first-day games.
-const STREAMED: usize = 155;
+/// 155 became 144 when a save before 10:00 started carrying the day the
+/// shops' day last closed (`morningVenueDay`, #1500), the base saves being
+/// first-day games at 07:00, for that reason again.
+const STREAMED: usize = 144;
 
 /// Seeded edits of engine saves, a few bytes each: dropped, inserted,
 /// changed or copied, or the text cut short. Whatever comes out, both

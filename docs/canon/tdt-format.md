@@ -564,9 +564,15 @@ serviced-only.
   save. Shops, fast food and restaurants are seeded from each retail row's
   byte 8 (yesterday's served visitors), which is their census in both the
   original and our engine, so the app matches the file's three lines on the
-  observation saves (`engine-rs/tests/tdt_observed_census.rs`). One known gap:
-  TOWER5's finance line counts 80 shop visitors where its rows sum to 40,
-  tracked in #1500. Party halls and theatres take the audience section 11
+  observation saves (`engine-rs/tests/tdt_observed_census.rs`). A shop's and
+  a fast food's byte 8, and the finance lines that sum them, change together
+  around 10:00 (between the original's ticks 202 and 247), and a
+  restaurant's overnight: 23 saves of TOWER5 over four days on the PC parity
+  run of 2026-11-15 (#1500). The engine closes their days at those times
+  (`MORNING_VENUE_DAY_ENDS_AT_HOUR`). A `.TDT` saved before 10:00 still has
+  that morning's close to come. TOWER5's file, saved by its player, counts 80
+  shop visitors where its rows sum to 40; the parity run's own saves always
+  added up, so that file's split is unexplained. Party halls and theatres take the audience section 11
   gives them (a theatre's from its byte 15) when the class adds up to the
   finance line. A save taken after a film's draw fell but before the morning
   census does not add up; when the line splits evenly into an audience each

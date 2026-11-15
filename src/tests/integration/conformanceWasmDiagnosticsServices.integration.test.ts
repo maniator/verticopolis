@@ -223,9 +223,10 @@ const nearCapacity = (card: Card): boolean => card.slots[CARD_NEAR_CAPACITY] ===
  *  Once no edit could land during a bomb search, ransom-ignored-modern waits
  *  a day for its search to end before it sells Security, and the direct
  *  threat's blast after that guts a cinema, a parking floor and ramp, a
- *  restaurant and a shop. With walk-ins off (`WALK_INS_ON`, 3.12.2) the
- *  Classic ransom scenario runs 783 hours to its threat, and an infested
- *  hotel room left out of the counts arrived. */
+ *  restaurant and a shop. An infested hotel room left out of the counts
+ *  comes from `hotel-infested-four-star-modern`, whose four-star hotel loses
+ *  its housekeeping (#1500 moved the ransom run's threat earlier, and that
+ *  run no longer reaches one). */
 const CORPUS_SECTIONS: readonly string[] = [
   "commercial:lobbyFar:false", "commercial:lobbyFar:true",
   "hotel:counts:dirty", "hotel:counts:infested", "hotel:counts:other", "hotel:excluded:dirty", "hotel:excluded:infested", "hotel:excluded:other",

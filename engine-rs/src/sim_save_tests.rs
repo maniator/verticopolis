@@ -51,6 +51,9 @@ fn reference(sim: &Simulation) -> Value {
         m.insert("founder".into(), json!(true));
     }
     m.insert("lastQuarterMoney".into(), json!(sim.last_quarter_money));
+    if sim.morning_venue_day != sim.clock.day() {
+        m.insert("morningVenueDay".into(), json!(sim.morning_venue_day));
+    }
     if let Some(marks) = sim.period_marks_json() {
         m.insert("periodMarks".into(), marks);
     }
@@ -272,7 +275,7 @@ fn edited_games_write_the_trees_text() {
     let distinct: HashSet<&str> = keys.iter().copied().collect();
     assert_eq!(
         (keys.len(), distinct.len()),
-        (36, 36),
+        (37, 37),
         "every field once: {keys:?}"
     );
     same(&sim, "an edited game");

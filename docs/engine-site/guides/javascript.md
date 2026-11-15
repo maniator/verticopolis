@@ -252,7 +252,10 @@ builds them, for the web game's own tests and tooling.
   so far, so a loaded game's people, cars and crews carry on where they
   were and the evening's move-in report counts the whole day. A save from a
   game's first day also carries `periodMarks`, so that day's end bills the
-  first maintenance and office rent as it would have unsaved. The elevator
+  first maintenance and office rent as it would have unsaved. A save taken
+  before 10:00 carries `morningVenueDay`, the day the shops' and fast
+  food's day last closed, since theirs ends at 10:00 (a save without it
+  counts today's as closed). The elevator
   panels' hourly figures start over on a load. A save from before the crowd
   was saved loads with nobody in the building, and the tower fills again
   from the lobby; one from before `waitsSeen` starts with no waits

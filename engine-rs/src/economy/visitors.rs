@@ -53,6 +53,20 @@ pub fn counts_daily_visitors(kind: Kind) -> bool {
     daily_visitor_cap(kind, false).is_some()
 }
 
+/// The hour a shop's or fast food's day ends and its count of the visitors it
+/// served is taken, the hour shops open (#1500). Saves of the original taken
+/// through a day (TOWER5, the PC parity run of 2026-11-15) show a shop's and a
+/// fast food's served count, and the finance block's line that sums it, change
+/// together around 10:00, between the original's ticks 202 and 247, while a
+/// restaurant's changes overnight, with the theatres and party halls.
+pub const MORNING_VENUE_DAY_ENDS_AT_HOUR: i64 = 10;
+
+/// Whether `kind`'s day ends at [`MORNING_VENUE_DAY_ENDS_AT_HOUR`] rather
+/// than at midnight: shops and fast food.
+pub fn venue_day_ends_in_the_morning(kind: Kind) -> bool {
+    matches!(kind, Kind::Shop | Kind::FastFood)
+}
+
 /// What an open party hall counts in the census.
 pub const PARTY_HALL_AUDIENCE: i64 = 50;
 /// What a theatre counts for each step of its film's draw.

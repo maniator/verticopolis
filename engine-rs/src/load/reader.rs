@@ -40,6 +40,13 @@ pub fn deserialize(raw: &Value) -> Result<Simulation, String> {
 #[doc(hidden)]
 pub fn deserialize_tdt(raw: &Value) -> Result<Simulation, String> {
     let mut sim = deserialize(raw)?;
+    // The original closes a shop's day at 10:00 (#1500), so a tower saved
+    // before 10:00 still has today's close to come.
+    if raw.get("morningVenueDay").is_none()
+        && sim.clock.hour() < crate::economy::visitors::MORNING_VENUE_DAY_ENDS_AT_HOUR
+    {
+        sim.morning_venue_day = sim.clock.day() - 1;
+    }
     let Some(source) = raw.get("transports").and_then(Value::as_array) else {
         return Ok(sim);
     };
