@@ -1,11 +1,13 @@
 //! What the Modern router reads at the first step after a load, saved with
-//! the crowd: the lines at each shaft (`lines`) and the cars the schedule
-//! stood down (`closedCars`). Both are written by `save.rs`; a save without
-//! them loads with none, as the router starts on a fresh crowd.
+//! the crowd: the lines at each shaft (`lines`), the cars the schedule
+//! stood down (`closedCars`) and the waits riders had at each stop
+//! (`waitsSeen`). All are written by `save.rs`; a save without them loads
+//! with none, as the router starts on a fresh crowd.
 
-use serde_json::Value;
+use serde_json::{json, Value};
 
 use crate::charges::whole;
+use crate::crowd::line_count::waits_seen::{Seen, MAX_SAVED_STOPS};
 use crate::crowd::save::MAX_SAVED_PEOPLE;
 use crate::crowd::Crowd;
 
@@ -55,5 +57,34 @@ impl Crowd {
         }
         self.closed_cars.sort_unstable();
         self.closed_cars.dedup();
+    }
+
+    /// The remembered waits as save rows, `[[shaft, floor, wait, fade],
+    /// ...]`, ascending.
+    pub(crate) fn waits_seen_json(&self) -> Value {
+        let rows: Vec<Value> = (self.waits_seen.rows().into_iter())
+            .map(|(shaft, floor, wait, fade)| json!([shaft, floor, wait, fade]))
+            .collect();
+        Value::Array(rows)
+    }
+
+    /// The waits riders had at each stop (`waits_seen`), as the last step
+    /// left them. A row that does not read is skipped.
+    pub(crate) fn restore_waits_seen(&mut self, rows: Option<&Value>) {
+        let Some(rows) = rows.and_then(Value::as_array) else {
+            return;
+        };
+        for row in rows.iter().take(MAX_SAVED_STOPS) {
+            let Some(row) = row.as_array().filter(|r| r.len() == 4) else {
+                continue;
+            };
+            let at = |i: usize| row[i].as_f64();
+            let (Some(shaft), Some(floor)) = (at(0).and_then(whole), at(1).and_then(whole)) else {
+                continue;
+            };
+            if let (Some(wait), Some(fade)) = (at(2), at(3)) {
+                self.waits_seen.restore(shaft, floor, Seen { wait, fade });
+            }
+        }
     }
 }

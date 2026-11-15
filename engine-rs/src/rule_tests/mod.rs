@@ -82,6 +82,7 @@ mod playthrough;
 mod pricing_split;
 mod pricing_split_snap;
 mod reflow_migration;
+mod remembered_waits;
 mod rental_nightclub_gripe;
 mod retail_yardstick;
 mod review_fixes;

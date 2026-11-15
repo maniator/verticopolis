@@ -18,6 +18,9 @@ impl Simulation {
         self.crowd.bound_gone_desks(&self.tower);
         let crowd = &mut self.crowd;
         super::line_count::restore_oldest(&mut crowd.shaft_lines, &crowd.people);
+        // The last step folded the remembered waits into its lines; a save
+        // keeps only their riders, so they are folded in again here.
+        crowd.waits_seen.fold(0.0, &mut crowd.shaft_lines);
         let mut touched_meals = false;
         for i in 0..self.crowd.people.len() {
             let p = &self.crowd.people[i];

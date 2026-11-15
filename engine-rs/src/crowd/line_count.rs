@@ -1,6 +1,9 @@
 //! The lines the Modern router (`expected_time`) reads next step, counted
 //! in the crowd's motion pass.
 
+#[path = "waits_seen.rs"]
+pub mod waits_seen;
+
 use super::expected_time::join_line;
 use super::fasthash::FastMap;
 use super::routing::plan;
