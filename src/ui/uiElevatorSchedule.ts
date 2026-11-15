@@ -186,6 +186,14 @@ export function showElevatorScheduleDialog(
   // model (never parsed back out of the rendered copy, which a copy tweak
   // would silently break): the auto-unfold keys on this.
   let adviceCritical = false;
+  /** The working copy as text, to tell an edit that changed it from a press
+   *  that did not (#669). */
+  const scheduleKey = (): string => JSON.stringify(state.schedule);
+  /** The working copy as the last recompute left it. Recompute adopts the
+   *  engine's homes (a stop edit snaps them on the stored schedule too, and
+   *  a day switch reads that day's facts), so what it leaves is the baseline
+   *  an edit is measured against, never an unsaved edit of its own. */
+  let settledKey = "";
   const recompute = (): void => {
     const isWeekend = state.day === "weekend";
     tune = ctx.autoTune(workingDraft(), isWeekend);
@@ -221,6 +229,7 @@ export function showElevatorScheduleDialog(
     if (!sum) {
       state.simMsg = "";
       state.originFloors = [];
+      settledKey = scheduleKey();
       return;
     }
     // floorLabel keeps the pinned B-n basement grammar for below-ground bases.
@@ -241,6 +250,7 @@ export function showElevatorScheduleDialog(
       `${peakClause}: ${sum.upTowerCars} staged up-tower, ` +
       `${sum.lobbyCars} ${baseClause}, ${sum.activeAtPeak} of ${ctx.cars} cars on shift.` +
       originClause(state.originFloors);
+    settledKey = scheduleKey();
   };
 
   function rerender(): void {
@@ -253,9 +263,12 @@ export function showElevatorScheduleDialog(
       state.advancedOpen = true;
     }
   };
-  /** A schedule edit landed: mark dirty, disarm a pending discard, recompute, repaint. */
+  /** A schedule edit landed: mark dirty if it changed the working copy,
+   *  disarm a pending discard, recompute, repaint. A press that changed
+   *  nothing (a preset already in place, All cars on a full strip) leaves a
+   *  clean dialog clean, so Cancel never asks to discard nothing (#669). */
   const after = (): void => {
-    state.dirty = true;
+    if (scheduleKey() !== settledKey) state.dirty = true;
     state.cancelArmed = false;
     recompute();
     unfoldOnAdvice();
