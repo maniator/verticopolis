@@ -19,12 +19,18 @@
 //! segment. A shaft with `n` stops adds a few links per stop and way,
 //! where the fewest-rides graph links every pair of stops (`n²`), and the
 //! search is an A* bounded by the floors still to ride plus, off the goal,
-//! the least a segment's way out costs.
+//! the least a segment's way out costs (`expected_time_bound`).
+//!
+//! Ground lobbies that do not touch are joined by the street: a rider may
+//! step out of one and walk the sidewalk into the next, for the walk across
+//! the open ground between them (`crowd::street`).
 
 use std::cmp::Reverse;
 use std::collections::BinaryHeap;
 
 use super::fasthash::FastMap;
+use super::staff_shift::STREET_FLOOR;
+use super::street;
 use super::{Crowd, Route, CROWD_SECONDS_PER_MINUTE, RIDE_SECONDS_PER_FLOOR};
 use crate::{dispatch::DWELL_MINUTES, facilities::Kind, tower::Tower, tower_query::floor_of_seg};
 
@@ -69,6 +75,8 @@ enum Move {
     Alight { shaft: i64 },
     /// Climb a flight of stairs or ride an escalator.
     Flight { shaft: i64 },
+    /// Walk the street to the next ground lobby: no ride, so no leg.
+    Street,
 }
 
 #[derive(Clone, Copy)]
@@ -235,6 +243,10 @@ fn build(tower: &Tower) -> Router {
             }
         }
     }
+    for (from, to, seconds) in street::links(tower) {
+        let (from, to) = (Node::Segment(from), Node::Segment(to));
+        g.add(from, to, STREET_FLOOR, seconds, Move::Street);
+    }
     let n = g.nodes.len();
     let per_floor = (per_floor * TENTHS).floor() as i64;
     let exit = exit_costs(&g, &shafts, per_floor);
@@ -254,40 +266,6 @@ fn build(tower: &Tower) -> Router {
         waiting: FastMap::default(),
         running: FastMap::default(),
     }
-}
-
-/// The least each segment's way out costs beyond the floors it covers, by
-/// place: a boarding with no line and every car running, or a flight. Any
-/// route off a segment other than its goal takes one of these first, and
-/// the bound adds it. Keeping it at or under each link's own cost beyond
-/// its floors keeps the bound consistent, so A* still finds the cheapest
-/// route (`the_exit_bound_never_overtakes_a_link`).
-fn exit_costs(g: &Places, shafts: &FastMap<i64, Shaft>, per_floor: i64) -> Vec<i64> {
-    let floor_of = |p: usize| match g.nodes[p] {
-        Node::Segment(s) => Some(floor_of_seg(s)),
-        Node::Car(..) => None,
-    };
-    (0..g.nodes.len())
-        .map(|p| {
-            let Some(floor) = floor_of(p) else {
-                return 0;
-            };
-            let least = g.links[p].iter().map(|l| {
-                let wait = match l.how {
-                    Move::Board { shaft, .. } => tenths(least_headway(&shafts[&shaft])),
-                    _ => 0,
-                };
-                l.tenths + wait - floors_bound(floor, l.floor, per_floor)
-            });
-            least.min().unwrap_or(0).max(0)
-        })
-        .collect()
-}
-
-/// Half the time between cars with every car running: the least a boarding
-/// waits.
-fn least_headway(s: &Shaft) -> f64 {
-    s.round_trip / (2.0 * s.cars.max(1) as f64)
 }
 
 /// The router for this tower revision, with the lines counted for this
@@ -341,24 +319,6 @@ fn stand_down(router: &mut Router, closed: &[(i64, i64)]) {
             router.running.insert(shaft, running);
         }
     }
-}
-
-/// The least any route can cost from `floor` to `to`: every ride and flight
-/// costs at least `per_floor` whole tenths a floor, so it never overestimates.
-fn floors_bound(floor: i64, to: i64, per_floor: i64) -> i64 {
-    (floor - to).abs() * per_floor
-}
-
-/// The A* bound from the node at `place`, standing at `floor`, to the
-/// segment `goal` on `to_floor`: the floors still to ride, plus the least
-/// way out of a segment that is not the goal.
-fn bound_to(router: &Router, (place, floor): (u32, i64), (goal, to_floor): (u32, i64)) -> i64 {
-    let exit = if place == goal {
-        0
-    } else {
-        router.exit[place as usize]
-    };
-    floors_bound(floor, to_floor, router.per_floor) + exit
 }
 
 /// What `l` costs, the wait and the line at a boarding included: half the
@@ -466,7 +426,7 @@ fn walk_back(router: &Router, start: u32, goal: u32) -> Route {
             }
             Move::Alight { shaft } => shafts.push(shaft),
             Move::Board { .. } => floors.push(seg(back)),
-            Move::Ride => {}
+            Move::Ride | Move::Street => {}
         }
         cur = back;
     }
@@ -492,6 +452,12 @@ pub fn join_line(crowd: &mut Crowd, r: &Route) {
         }
     }
 }
+
+#[path = "expected_time_bound.rs"]
+mod bound;
+use bound::{bound_to, exit_costs};
+#[cfg(test)]
+use bound::{floors_bound, least_headway};
 
 #[cfg(test)]
 #[path = "expected_time_tests.rs"]

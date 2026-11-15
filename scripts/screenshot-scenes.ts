@@ -21,6 +21,7 @@
  *   - scenes/tallLobbies.ts: tall lobbies (#308) for the Help site.
  *   - scenes/venueFlights.ts: spiral stairs and switchback escalators beside venues.
  *   - scenes/paletteFit.ts: the desktop Tools window fitting every tool.
+ *   - scenes/splitLot.ts: two Modern towers joined by the street.
  * The Node-side drivers (fixture load, star assertions) live in
  * screenshot-scenes-drivers.ts. Keep every file ERASABLE.
  */
@@ -41,6 +42,7 @@ import { SECURITY_SCENES } from "./scenes/security.ts";
 import { TALL_LOBBY_SCENES } from "./scenes/tallLobbies.ts";
 import { VENUE_FLIGHT_SCENES } from "./scenes/venueFlights.ts";
 import { PALETTE_FIT_SCENES } from "./scenes/paletteFit.ts";
+import { SPLIT_LOT_SCENES } from "./scenes/splitLot.ts";
 
 export const SCENES: Scene[] = [
   ...SHOWCASE_SCENES,
@@ -59,4 +61,5 @@ export const SCENES: Scene[] = [
   ...TALL_LOBBY_SCENES,
   ...VENUE_FLIGHT_SCENES,
   ...PALETTE_FIT_SCENES,
+  ...SPLIT_LOT_SCENES,
 ];

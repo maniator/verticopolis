@@ -22,6 +22,7 @@ Every tower runs one of two sets of rules. You choose when you found the tower, 
 | Parking | Any spare space serves every office | Counted per office and per home, halved by a Metro ([Services](/help/rooms/services/#parking)) |
 | Metro stations | One per tower | Up to three on one line ([Services](/help/rooms/services/#more-than-one-station)) |
 | Climbing | Nobody walks more than 4 flights of stairs or 7 of escalator | People climb as far as they must ([Stairs and escalators](/help/building/stairs-and-escalators/)) |
+| Towers side by side | Joined only through the building, as in 1994 | People walk the street between ground lobbies ([People and traffic](/help/tower/people/#how-people-get-around)) |
 | Escalators | Never to an office floor | Anywhere |
 | Elevator speed | One speed for every car, express included | Cars twice as fast, express cars four times ([Elevators](/help/building/elevators/#express-elevators-and-sky-lobbies)) |
 | Elevator schedules | The hour-by-hour grid | Adds presets, auto-tune and advice ([Elevators](/help/building/elevators/)) |

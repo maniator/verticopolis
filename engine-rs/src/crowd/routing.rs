@@ -5,6 +5,7 @@ use std::collections::HashMap;
 use super::banks::balance_shafts;
 use super::expected_time;
 use super::fasthash::{FastMap, FastSet};
+use super::street::street_start;
 use super::{AdjGraph, Crowd, Edge, ElevatorCalls, PState, Route, StaffParts};
 use crate::facilities::{LOT_WIDTH, MIN_FLOOR};
 use crate::tower::{Tower, Transport};
@@ -205,7 +206,8 @@ pub fn route(
     to_floor: i64,
     to_x: Option<f64>,
 ) -> Option<Route> {
-    let a = tower.seg_at(from_floor, from_x);
+    let a =
+        street_start(tower, from_floor, from_x).unwrap_or_else(|| tower.seg_at(from_floor, from_x));
     let b = tower.seg_at(to_floor, to_x);
     if let Some(decided) = off_run_pair(a, b, from_floor, from_x, to_floor, to_x) {
         return decided.map(|r| balance_shafts(crowd, tower, r));

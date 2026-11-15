@@ -1,14 +1,18 @@
 //! Port of `crowd/walk.ts`.
 
 use super::motion::{give_up, reroute};
+use super::street::walks_off_run;
 use super::{Crowd, Person, WALK_SPEED};
 use crate::jsmath;
 use crate::tower::Tower;
 
-/// Walk toward a tile x on the current floor; true once arrived.
+/// Walk toward a tile x on the current floor; true once arrived. A walker
+/// stops at the end of their run, except on the street floor in a mode
+/// that walks the street, where they carry on along the sidewalk
+/// (`crowd::street`).
 pub fn walk_to(p: &mut Person, target_x: f64, dt: f64, tower: &Tower) -> bool {
     let dir = jsmath::sign(target_x - p.x);
-    if dir != 0.0 {
+    if dir != 0.0 && !walks_off_run(tower, p.floor) {
         if let Some((start, end)) = tower.run_at(p.floor, jsmath::round(p.x) as i64) {
             if dir > 0.0 && target_x > end as f64 {
                 p.x = end as f64;
