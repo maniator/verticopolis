@@ -180,6 +180,29 @@ describe("MenuBar", () => {
     expect(document.activeElement).toBe($("i-redo"));
   });
 
+  it("Left, Right and Alt letters skip a menu that is hidden or that the layout leaves out", () => {
+    const { bar, $, key } = setup();
+    // The layout leaves Edit out (a phone's `.mb-desktop-only`, display: none).
+    $("t-edit").parentElement!.style.display = "none";
+    key($("t-file"), "ArrowRight");
+    expect(document.activeElement).toBe($("t-file"));
+    key(document.body, "e", { altKey: true });
+    expect(bar.current()).toBeNull();
+    // Hidden (the title screen hides the menus that need a tower).
+    $("t-edit").parentElement!.style.display = "";
+    $("t-edit").parentElement!.hidden = true;
+    key($("t-file"), "ArrowLeft");
+    expect(document.activeElement).toBe($("t-file"));
+    key(document.body, "e", { altKey: true });
+    expect(bar.current()).toBeNull();
+    // Back on the bar, both reach it again.
+    $("t-edit").parentElement!.hidden = false;
+    key($("t-file"), "ArrowRight");
+    expect(document.activeElement).toBe($("t-edit"));
+    key(document.body, "e", { altKey: true });
+    expect(bar.current()).toBe($("t-edit"));
+  });
+
   it("Alt with a letter does nothing while a dialog is open", () => {
     const { $, key } = setup();
     const dialog = document.createElement("dialog");

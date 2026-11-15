@@ -3,7 +3,8 @@ import type { GameApp } from "../main";
 import { SaveGame } from "../storage/SaveGame";
 import { scheduleReviewEntry } from "../ui/templates/scheduleReview";
 import { canCallExterminator, statsScreen, statsTemplate } from "../ui/templates/stats";
-import { trackAppAction } from "../analytics";
+import { trackAppAction, trackEconomyAction } from "../analytics";
+import type { ExterminatorSurface } from "../analyticsCore";
 import { outcome } from "../simport/portCodes";
 import { statsReport } from "../simport/statsSheet";
 import { catalogOf } from "./portAccess";
@@ -59,8 +60,13 @@ export async function showStats(app: GameApp): Promise<void> {
  *  surface a refusal the gate above should already have prevented. The stats
  *  modal reopens once the engine has answered, so it shows the answer. The
  *  modal's button calls it; a failed coverage answer toasts and throws, as
- *  `showStats` does. */
-export async function confirmExterminate(app: GameApp): Promise<void> {
+ *  `showStats` does. Tower > Call Exterminator… passes `reopenStats: false`:
+ *  no stats modal was open, so none opens after, and the answer is the
+ *  Bulletin line the engine or the refusal writes. */
+export async function confirmExterminate(app: GameApp, opts: { readonly reopenStats?: boolean } = {}): Promise<void> {
+  const fromMenu = opts.reopenStats === false;
+  const after = (): Promise<void> => (fromMenu ? Promise.resolve() : showStats(app));
+  const surface: ExterminatorSurface = fromMenu ? "menu" : "stats";
   const asked = app.enginePort.generation();
   const bad = app.portCodes.code("logKinds", "bad");
   let infested: number;
@@ -80,7 +86,7 @@ export async function confirmExterminate(app: GameApp): Promise<void> {
     // instead of a silent no-op.
     const why = recovery ? "No infested rooms left to treat." : "The exterminator is unavailable.";
     app.enginePort.logLine(why, bad);
-    await showStats(app);
+    await after();
     return;
   }
   const cost = recovery.calloutFee + recovery.perRoomFee * infested;
@@ -92,6 +98,7 @@ export async function confirmExterminate(app: GameApp): Promise<void> {
       if (app.enginePort.generation() !== asked) return;
       const rec = app.enginePort.bookExterminator();
       const res = outcome(app.enginePort, rec);
+      if (res.ok) trackEconomyAction("exterminator", surface);
       // Surface every refusal, not just funds: the tower can change between
       // rendering the stats modal and confirming (rooms cleared, or another
       // dispatch already booked), so a silent no-op would leave the player
@@ -113,7 +120,7 @@ export async function confirmExterminate(app: GameApp): Promise<void> {
         }
         app.enginePort.logLine(why, bad);
       }
-      void showStats(app);
+      void after();
     },
     "Call exterminator",
   );

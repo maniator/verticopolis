@@ -291,8 +291,10 @@ export interface GameplayEvents {
  *  reports. `demolish` fires per action (with a `sell` | `bulldoze` detail);
  *  `price_tune` and `capacity_tune` are latched once per session (their gestures
  *  repeat, so the signal is "did the player tune pricing / capacity at all",
- *  never the value or the count). */
-export type EconomyActionName = "demolish" | "price_tune" | "capacity_tune";
+ *  never the value or the count). `exterminator`: each Modern booking (4.3). */
+export type EconomyActionName = "demolish" | "price_tune" | "capacity_tune" | "exterminator";
+/** Where it was booked: Tower > Call Exterminator…, or Tower Statistics. */
+export type ExterminatorSurface = "menu" | "stats";
 
 /** The emergency kinds the player can be prompted to resolve (see `emergency_choice`). */
 export type EmergencyKind = "fireRescue" | "bombThreat";

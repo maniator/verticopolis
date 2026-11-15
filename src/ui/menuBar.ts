@@ -41,6 +41,16 @@ function keepOnScreen(menu: HTMLElement): void {
 /** An item the player can pick: shown and not grayed out. */
 const PICKABLE = ".mb-item:not([hidden]):not([aria-disabled='true'])";
 
+/** Whether a title's menu is on the bar: not `hidden` (the title screen
+ *  hides the menus that need a tower) and not left out by the layout (a
+ *  layout's `.mb-desktop-only`), on a page that still holds it. One style
+ *  read per title, on a key press only. */
+function onBar(title: HTMLElement): boolean {
+  if (!title.isConnected || title.closest("[hidden]")) return false;
+  const menu = title.parentElement;
+  return !menu || menu.ownerDocument.defaultView?.getComputedStyle(menu).display !== "none";
+}
+
 /** How the menus closed: an item was picked, or one of the dismissals. */
 export type MenuCloseHow = "pick" | MenuDismissHow;
 
@@ -182,7 +192,7 @@ export class MenuBar {
   }
 
   private neighbor(title: HTMLButtonElement, step: 1 | -1): HTMLButtonElement {
-    const shown = this.titles.filter((t) => !t.closest("[hidden]"));
+    const shown = this.titles.filter(onBar);
     const at = shown.indexOf(title);
     return shown[(at + step + shown.length) % shown.length] ?? title;
   }
@@ -241,7 +251,7 @@ export class MenuBar {
     if (!e.altKey || e.ctrlKey || e.metaKey || e.shiftKey || e.key.length !== 1) return;
     if (this.root.ownerDocument.querySelector("dialog[open]")) return;
     const letter = e.key.toLowerCase();
-    const title = this.titles.find((t) => !t.closest("[hidden]") && t.querySelector("u")?.textContent?.toLowerCase() === letter);
+    const title = this.titles.find((t) => onBar(t) && t.querySelector("u")?.textContent?.toLowerCase() === letter);
     if (!title) return;
     e.preventDefault();
     this.open(title, true, "alt");

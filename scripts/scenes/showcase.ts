@@ -443,21 +443,21 @@ export const SHOWCASE_SCENES: Scene[] = [
         wait: 500,
       },
       {
-        // The phone's menu bar with its logo, the Window menu open.
+        // The phone's menu bar with its logo, the Tower menu open.
         name: "19-mobile-menu",
         setup: async (page) => {
           await page.evaluate(() => document.querySelector('#modal [data-act="close"]')?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
-          await page.evaluate(() => document.getElementById("mb-window")?.click());
-          await page.waitForSelector("#mb-window-menu:not([hidden])", { timeout: 4000 });
+          await page.evaluate(() => document.getElementById("mb-tower")?.click());
+          await page.waitForSelector("#mb-tower-menu:not([hidden])", { timeout: 4000 });
         },
         wait: 400,
       },
       {
         name: "20-mobile-palette",
         setup: async (page) => {
-          // Close the Window menu the last shot left open (its title toggles it).
+          // Close the Tower menu the last shot left open (its title toggles it).
           await page.evaluate(() => {
-            const title = document.getElementById("mb-window");
+            const title = document.getElementById("mb-tower");
             if (title?.getAttribute("aria-expanded") === "true") title.click();
           });
           await page.evaluate(() => {

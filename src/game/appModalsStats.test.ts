@@ -16,6 +16,12 @@ import { makeApp, makeSim, settle, withExterminator, type Refusal } from "./appM
  * answers from the fake sim's state at the time of each ask.
  */
 
+const analytics = vi.hoisted(() => ({ economy: vi.fn() }));
+vi.mock("../analytics", async (importActual) => ({
+  ...(await importActual<typeof import("../analytics")>()),
+  trackEconomyAction: analytics.economy,
+}));
+
 vi.mock("../ui/templates/stats", async (importActual) => {
   const actual = await importActual<typeof import("../ui/templates/stats")>();
   return { ...actual, statsTemplate: vi.fn(() => "STATS_BODY") };
@@ -162,6 +168,40 @@ describe("confirmExterminate refusals surfaced by the confirm callback", () => {
     expect(sim.emit).not.toHaveBeenCalled();
     // showStats runs again after the confirm (initial open + reopen).
     expect(ui.showStats).toHaveBeenCalledTimes(2);
+  });
+
+  it("counts a booking the engine took by where it was made, and never a refusal", async () => {
+    const booked = makeSim({ callExterminator: vi.fn(() => ({ ok: true })) });
+    const fromStats = makeApp(booked);
+    analytics.economy.mockClear();
+    await confirmExterminate(fromStats.app);
+    await (fromStats.ui.confirmModal.mock.calls[0][2] as () => Promise<void>)();
+    expect(analytics.economy).toHaveBeenCalledExactlyOnceWith("exterminator", "stats");
+    const fromMenu = makeApp(makeSim({ callExterminator: vi.fn(() => ({ ok: true })) }));
+    await confirmExterminate(fromMenu.app, { reopenStats: false });
+    await (fromMenu.ui.confirmModal.mock.calls[0][2] as () => Promise<void>)();
+    expect(analytics.economy).toHaveBeenLastCalledWith("exterminator", "menu");
+    analytics.economy.mockClear();
+    const refused = makeApp(makeSim({ callExterminator: vi.fn(() => ({ ok: false, reason: "pending" })) }));
+    await confirmExterminate(refused.app, { reopenStats: false });
+    await (refused.ui.confirmModal.mock.calls[0][2] as () => Promise<void>)();
+    expect(analytics.economy).not.toHaveBeenCalled();
+  });
+
+  it("from the Tower menu, books without opening Tower Statistics, before or after", async () => {
+    const sim = makeSim({ callExterminator: vi.fn(() => ({ ok: true })) });
+    const { app, ui } = makeApp(sim);
+    await confirmExterminate(app, { reopenStats: false });
+    expect(ui.confirmModal).toHaveBeenCalledTimes(1);
+    await (ui.confirmModal.mock.calls[0][2] as () => Promise<void>)();
+    await settle();
+    expect(sim.callExterminator).toHaveBeenCalledTimes(1);
+    expect(ui.showStats).not.toHaveBeenCalled();
+    // Nothing left to treat: the reason goes to the Bulletin, still with no Statistics.
+    sim.housekeepingCoverage.mockReturnValue({ infested: 0 });
+    await confirmExterminate(app, { reopenStats: false });
+    expect(sim.emit).toHaveBeenCalledExactlyOnceWith("No infested rooms left to treat.", "bad");
+    expect(ui.showStats).not.toHaveBeenCalled();
   });
 
   it("bails with a reason before confirming when the tower cleared between render and click", async () => {
