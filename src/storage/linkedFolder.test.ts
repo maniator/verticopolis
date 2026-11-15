@@ -10,6 +10,10 @@ function fakeFolder(name: string, files: Record<string, number[]>, dirs: string[
   const disk = new Map(Object.entries(files).map(([n, b]) => [n, { bytes: new Uint8Array(b), modified: 1000 }]));
   const writes: { name: string; bytes: Uint8Array }[] = [];
   const failNextWrite = { on: false };
+  /** Files another program holds (a cloud drive syncing them), and whether
+   *  walking the folder fails as a whole. */
+  const locked = new Set<string>();
+  const walk = { fails: false };
   const writer = (file: string) => {
     let pending: Uint8Array<ArrayBuffer> | null = null;
     return {
@@ -34,6 +38,7 @@ function fakeFolder(name: string, files: Record<string, number[]>, dirs: string[
     getFile: async () => {
       const f = disk.get(file);
       if (!f) throw new DOMException("gone", "NotFoundError");
+      if (locked.has(file)) throw new DOMException("in use", "NotReadableError");
       return { size: f.bytes.byteLength, lastModified: f.modified, arrayBuffer: async () => f.bytes.slice().buffer } as unknown as File;
     },
     createWritable: vi.fn(async () => {
@@ -50,6 +55,7 @@ function fakeFolder(name: string, files: Record<string, number[]>, dirs: string[
     requestPermission: vi.fn(async () => "granted" as PermissionState),
     removeEntry: vi.fn(),
     async *values() {
+      if (walk.fails) throw new DOMException("folder busy", "NotReadableError");
       for (const n of disk.keys()) yield { kind: "file" as const, name: n };
       for (const n of dirs) yield { kind: "directory" as const, name: n };
     },
@@ -59,7 +65,7 @@ function fakeFolder(name: string, files: Record<string, number[]>, dirs: string[
       return fileHandle(file);
     }),
   };
-  return { handle, disk, writes, writers, failNextWrite };
+  return { handle, disk, writes, writers, failNextWrite, locked, walk };
 }
 
 type Folder = ReturnType<typeof fakeFolder>;
@@ -280,5 +286,51 @@ describe("the player's files", () => {
     await linkedFolder.refresh();
     expect(linkedFolder.state(), "the handle is gone from IndexedDB too").toBeNull();
     expect(folder.disk.has("Sky.vctower")).toBe(true);
+  });
+});
+
+describe("a file it can't read right now", () => {
+  it("leaves it out of the list and links the folder anyway", async () => {
+    const folder = fakeFolder("Towers", { "Sky.vctower": [1], "Synced.vctower": [2] });
+    folder.locked.add("Synced.vctower");
+    expect(await link(folder)).toBe(true);
+    expect(linkedFolder.list().map((e) => e.id)).toEqual(["Sky.vctower"]);
+  });
+
+  it("keeps the folder linked after a restart when it can't be listed", async () => {
+    const folder = fakeFolder("Towers", { "Sky.vctower": [1] });
+    await link(folder);
+    reload();
+    folder.walk.fails = true;
+    await linkedFolder.restore();
+    expect(linkedFolder.state()).toEqual({ name: "Towers", access: "granted" });
+    expect(localStorage.getItem("verticopolis-linked-folder")).toBe("Towers");
+  });
+
+  it("reports a save that was written as saved, even when the list can't be read again", async () => {
+    const folder = fakeFolder("Towers", {});
+    await link(folder);
+    folder.walk.fails = true;
+    const entry = await linkedFolder.save("Sky", Uint8Array.of(5), false);
+    expect(entry.id).toBe("Sky.vctower");
+    expect(folder.writes.map((w) => w.name)).toEqual(["Sky.vctower"]);
+  });
+});
+
+describe("saving over the file a tower came from", () => {
+  it("writes the file by its name on disk, however it is spelled", async () => {
+    const folder = fakeFolder("Towers", { "My  Tower: v2.vctower": [1] });
+    await link(folder);
+    await linkedFolder.saveOver("My  Tower: v2.vctower", Uint8Array.of(8));
+    expect(folder.writes).toEqual([{ name: "My  Tower: v2.vctower", bytes: Uint8Array.of(8) }]);
+    expect([...folder.disk.keys()]).toEqual(["My  Tower: v2.vctower"]);
+  });
+
+  it("matches a typed name to that file before cleaning it, so Save As replaces it", async () => {
+    const folder = fakeFolder("Towers", { "My  Tower.vctower": [1] });
+    await link(folder);
+    await expect(linkedFolder.save("My  Tower", Uint8Array.of(3), false)).rejects.toBeInstanceOf(FileNameTakenError);
+    await linkedFolder.save("My  Tower", Uint8Array.of(3), true);
+    expect(folder.writes.map((w) => w.name)).toEqual(["My  Tower.vctower"]);
   });
 });

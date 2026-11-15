@@ -136,10 +136,22 @@ async function scan(entry: Linked): Promise<void> {
   for await (const item of entry.handle.values()) {
     const kind = item.kind === "file" ? linkedFileKind(item.name) : null;
     if (!kind) continue;
-    const file = await (await entry.handle.getFileHandle(item.name)).getFile();
-    entries.push({ id: item.name, name: shownName(item.name), kind, size: file.size, modified: file.lastModified });
+    const file = await readEntry(entry.handle, item.name);
+    if (file) entries.push({ id: item.name, name: shownName(item.name), kind, size: file.size, modified: file.lastModified });
   }
   entry.entries = entries;
+}
+
+/** A listed file, or null when it can't be read right now: removed since the
+ *  folder was walked, or held by another program (a cloud drive syncing it).
+ *  One such file leaves the rest of the folder usable. */
+async function readEntry(folder: FolderHandle, name: string): Promise<File | null> {
+  try {
+    return await (await folder.getFileHandle(name)).getFile();
+  } catch (err) {
+    if (err instanceof DOMException && (err.name === "NotFoundError" || err.name === "NotReadableError")) return null;
+    throw err;
+  }
 }
 
 function readMark(): string | null {
@@ -191,10 +203,12 @@ export const linkedFolder = {
           return;
         }
         const entry: Linked = { handle, access: await handle.queryPermission(READ_WRITE), entries: [] };
-        await refreshEntry(entry);
         linked = entry;
+        // A folder that can't be listed right now stays linked; the next
+        // window that shows it lists it again.
+        await refreshEntry(entry).catch(() => {});
       } catch {
-        // A handle the browser no longer reads, or a folder gone from the disk.
+        // A handle the browser no longer reads.
         writeMark(null);
       } finally {
         changed();
@@ -251,7 +265,10 @@ export const linkedFolder = {
   /** Ask the browser for the player's OK to use the linked folder again. Run
    *  it from a click: the browser refuses to ask otherwise. */
   async allow(): Promise<Access> {
-    await linkedFolder.restore();
+    // A folder already read back this visit asks before any await. One that
+    // isn't is read from IndexedDB first; the click still counts then, since
+    // the browser keeps a click's activation for a few seconds.
+    if (!linked) await linkedFolder.restore();
     if (!linked) return "denied";
     linked.access = await linked.handle.requestPermission(READ_WRITE);
     await refreshEntry(linked);
@@ -301,13 +318,22 @@ export const linkedFolder = {
     const folder = need();
     const clean = cleanFileName(name);
     if (!clean) throw new Error("Type a name for the tower.");
-    const same = folder.entries.find((e) => e.kind === "tower" && e.name.toLocaleLowerCase() === clean.toLocaleLowerCase());
+    // The name as the folder spells it first: a file named in a way this game
+    // would not write (two spaces, a long name) is still the same file.
+    const towers = folder.entries.filter((e) => e.kind === "tower");
+    const same = towers.find((e) => e.name === name) ?? towers.find((e) => e.name.toLocaleLowerCase() === clean.toLocaleLowerCase());
     if (same && !replace) throw new FileNameTakenError(clean);
     const filename = same ? same.id : `${clean}.vctower`;
     // A file another program wrote since the list was read is never replaced
     // without asking either.
     if (!same && (await exists(folder, filename))) throw new FileNameTakenError(clean);
     return writeFile(folder, filename, bytes);
+  },
+
+  /** Write `bytes` over the file `id` itself, by its name on disk, for File >
+   *  Save of a tower opened from the folder. */
+  async saveOver(id: string, bytes: Uint8Array): Promise<TowerFileEntry> {
+    return writeFile(need(), id, bytes);
   },
 
   /** Copy a file beside itself as "Copy of …", never over another file. */
@@ -345,7 +371,9 @@ async function writeFile(folder: Linked, filename: string, bytes: Uint8Array): P
     throw err;
   }
   await out.close();
-  await scan(folder);
+  // The file is written; a folder that can't be listed again right now keeps
+  // its old list rather than calling the save a failure.
+  await scan(folder).catch(() => {});
   changed();
   return folder.entries.find((e) => e.id === filename) ?? { id: filename, name: shownName(filename), kind: linkedFileKind(filename) ?? "tower", size: bytes.byteLength, modified: Date.now() };
 }

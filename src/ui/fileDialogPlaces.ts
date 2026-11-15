@@ -27,7 +27,8 @@ export interface LinkedPlaceCtx {
   /** Ask for a folder and link it. Calls the browser's picker before its
    *  first await, so the click that asked still counts. */
   link(): Promise<"linked" | "cancel" | FileNote>;
-  /** Ask the browser for the player's OK again. Same rule as {@link link}. */
+  /** Ask the browser for the player's OK again. Run it from a click; see
+   *  `linkedFolder.allow` for when it can ask. */
   allow(): Promise<FileNote | null>;
   unlink(): Promise<FileNote | null>;
   /** Open a row. The window is closed before this runs. */

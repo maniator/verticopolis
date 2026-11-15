@@ -28,9 +28,17 @@ Towers once (Safari 11.1+, Firefox 50+, iOS 18.4+).
 - Saving asks before replacing a file, and checks the disk as well as its list
   so a file another program wrote is not replaced without asking. The browser
   writes to a scratch file and swaps it in on close, so a failed write leaves
-  the old file intact.
+  the old file intact. That guarantee covers replacing a file, not creating
+  one: Chromium makes a new file empty before the bytes go in, so a save under
+  a new name that fails can leave an empty `.vctower` behind (backlog
+  `linked-folder-empty-file-on-failed-new-save`, #2337).
 - A tower opened from the folder, or saved there, is the live tower's file:
-  File > Save writes it back there, and Save As starts in the folder.
+  File > Save writes it back over that very file by its name on disk, and Save
+  As starts in the folder. Linking a different folder forgets it, so Save
+  never writes over a file of the same name in the new folder.
+- A file that can't be read while the folder is listed (removed meanwhile, or
+  held by another program such as a cloud drive syncing it) is left out of the
+  list; the rest of the folder still works, and the link is kept.
 
 ## Permission
 

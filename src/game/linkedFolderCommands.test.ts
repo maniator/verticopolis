@@ -16,6 +16,7 @@ const m = vi.hoisted(() => ({
     unlink: vi.fn(async () => {}),
     read: vi.fn(async () => Uint8Array.of(1) as Uint8Array | null),
     save: vi.fn(async (name: string) => ({ id: `${name}.vctower`, name })),
+    saveOver: vi.fn(async (id: string) => ({ id, name: id.replace(/\.[^.]+$/, "") })),
     duplicate: vi.fn(async () => ({ id: "Copy of A.vctower", name: "Copy of A" })),
     find: vi.fn((id: string) => ({ id, name: id.replace(/\.[^.]+$/, "") }) as { id: string; name: string } | undefined),
   },
@@ -161,13 +162,31 @@ describe("File > Save for a tower from the linked folder", () => {
   it("does nothing when the live tower isn't a linked file", async () => {
     expect(await saveCurrentLinked(app as unknown as GameApp)).toBe(false);
     expect(m.folder.save).not.toHaveBeenCalled();
+    expect(m.folder.saveOver).not.toHaveBeenCalled();
+  });
+
+  it("forgets the file when another folder is linked, so Save never writes over a same-named file there", async () => {
+    setCurrentLinkedFile("Sky.vctower");
+    expect(await place().link()).toBe("linked");
+    expect(currentLinkedFile()).toBeNull();
+    expect(await saveCurrentLinked(app as unknown as GameApp)).toBe(false);
+    expect(m.folder.saveOver).not.toHaveBeenCalled();
+    expect(m.folder.save).not.toHaveBeenCalled();
+  });
+
+  it("keeps the file when the player cancels the folder picker", async () => {
+    setCurrentLinkedFile("Sky.vctower");
+    m.folder.link.mockResolvedValueOnce(false);
+    await place().link();
+    expect(currentLinkedFile()).toBe("Sky.vctower");
   });
 
   it("writes the same file again", async () => {
     setCurrentLinkedFile("Sky.vctower");
     expect(await saveCurrentLinked(app as unknown as GameApp)).toBe(true);
     expect(m.folder.allow).not.toHaveBeenCalled();
-    expect(m.folder.save).toHaveBeenCalledExactlyOnceWith("Sky", Uint8Array.of(7, 7, 7), true);
+    expect(m.folder.saveOver).toHaveBeenCalledExactlyOnceWith("Sky.vctower", Uint8Array.of(7, 7, 7));
+    expect(m.folder.save).not.toHaveBeenCalled();
     expect(m.track).toHaveBeenCalledWith("folder_save", "current");
   });
 
@@ -176,7 +195,7 @@ describe("File > Save for a tower from the linked folder", () => {
     m.folder.state.mockImplementation(() => ({ name: "Towers", access: "prompt" }));
     m.folder.allow.mockResolvedValueOnce("denied");
     expect(await saveCurrentLinked(app as unknown as GameApp)).toBe(true);
-    expect(m.folder.save).not.toHaveBeenCalled();
+    expect(m.folder.saveOver).not.toHaveBeenCalled();
     expect(app.ui.sayVisibly).toHaveBeenCalledOnce();
   });
 });

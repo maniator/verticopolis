@@ -1,6 +1,6 @@
 import type { GameApp } from "../main";
 import { trackAppAction } from "../analytics";
-import { FileNameTakenError } from "../storage/fileSpace";
+import { FileNameTakenError, type TowerFileEntry } from "../storage/fileSpace";
 import { canLinkFolder, linkedFolder } from "../storage/linkedFolder";
 import { currentStamp } from "../storage/saveStamp";
 import type { FileNote } from "../ui/fileDialog";
@@ -61,11 +61,11 @@ async function openLinkedRow(app: GameApp, row: FileRow): Promise<void> {
   if (app.enginePort.generation() !== before) setCurrentLinkedFile(row.id);
 }
 
-/** Write the live tower into the folder as `name`, and make it the live
- *  tower's file. */
-async function saveLinked(app: GameApp, name: string, why: "new" | "replace" | "current"): Promise<string> {
+/** Write the live tower into the folder with `write`, and make the file it
+ *  wrote the live tower's file. */
+async function saveLinked(app: GameApp, why: "new" | "replace" | "current", write: (bytes: Uint8Array) => Promise<TowerFileEntry>): Promise<string> {
   const bytes = exportFile(app.enginePort, app.engine.viewState(), currentStamp());
-  const entry = await linkedFolder.save(name, bytes, why !== "new");
+  const entry = await write(bytes);
   setCurrentLinkedFile(entry.id);
   trackAppAction("folder_save", why);
   return entry.name;
@@ -82,12 +82,16 @@ export function linkedPlace(app: GameApp): LinkedPlaceCtx | null {
     usage: () => linkedFolder.usage(),
     onChange: (listener) => linkedFolder.onChange(listener),
     refresh: () => linkedFolder.refresh(),
-    // The picker and the permission prompt are called before any await, so
-    // the click that asked for them still counts.
+    // The picker is called before any await, so the click that asked for it
+    // still counts; so is the permission prompt once the folder is read back
+    // (`linkedFolder.allow`).
     link: () =>
       linkedFolder.link().then(
         (linked) => {
           trackAppAction("folder_link", linked ? "linked" : "cancel");
+          // A new folder may hold a file of the same name: File > Save must
+          // never write over it without asking.
+          if (linked && currentLinkedFile() !== null) setCurrentLinkedFile(null);
           return linked ? "linked" : "cancel";
         },
         (err: unknown) => {
@@ -116,7 +120,7 @@ export function linkedPlace(app: GameApp): LinkedPlaceCtx | null {
     open: (row) => void openLinkedRow(app, row),
     save: async (name, replace) => {
       try {
-        const saved = await saveLinked(app, name, replace ? "replace" : "new");
+        const saved = await saveLinked(app, replace ? "replace" : "new", (bytes) => linkedFolder.save(name, bytes, replace));
         app.ui.toast(`Saved "${saved}" in ${linkedFolder.state()?.name ?? "the linked folder"}.`, "good");
         return null;
       } catch (err) {
@@ -141,14 +145,14 @@ export function linkedPlace(app: GameApp): LinkedPlaceCtx | null {
 export async function saveCurrentLinked(app: GameApp): Promise<boolean> {
   const id = currentLinkedFile();
   if (id === null) return false;
-  const entry = linkedFolder.find(id);
   try {
     // Ctrl+S is a key press, so the browser may ask for its OK here.
     if (linkedFolder.state()?.access !== "granted" && (await linkedFolder.allow()) !== "granted") {
       app.ui.sayVisibly("Your browser didn't allow the game to save in the linked folder. Use File > Save As… to save it somewhere else.");
       return true;
     }
-    const name = await saveLinked(app, (entry ?? linkedFolder.find(id))?.name ?? id.slice(0, id.lastIndexOf(".")), "current");
+    // By its name on disk: the very file the tower was opened from.
+    const name = await saveLinked(app, "current", (bytes) => linkedFolder.saveOver(id, bytes));
     app.ui.toast(`Saved "${name}" in ${linkedFolder.state()?.name ?? "the linked folder"}.`, "good");
   } catch (err) {
     app.ui.sayVisibly(folderFailed(err).text);
