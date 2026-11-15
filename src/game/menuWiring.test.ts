@@ -8,6 +8,8 @@ const movable = vi.hoisted(() => vi.fn());
 const sponsor = vi.hoisted(() => ({ offered: true, track: vi.fn() }));
 const closer = vi.hoisted(() => ({ closeTower: vi.fn() }));
 const calls = vi.hoisted(() => ({ towerCalls: vi.fn(), exterminate: vi.fn(), fire: vi.fn() }));
+const installed = vi.hoisted(() => ({ isInstalledStandalone: vi.fn(() => false) }));
+vi.mock("../ui/standalone", () => installed);
 vi.mock("./towerCallItems", async (real) => ({
   ...(await real<typeof import("./towerCallItems")>()),
   towerCalls: calls.towerCalls,
@@ -260,6 +262,18 @@ describe("wireMenus", () => {
     expect(checked("mb-sound")).toBe("false");
     expect($("mb-undo").getAttribute("aria-disabled")).toBe("true");
     expect($("mb-redo").hasAttribute("aria-disabled")).toBe(false);
+  });
+
+  it("opening a menu leaves Full Screen out of the installed app on a phone, and keeps it in a browser tab", () => {
+    const { app } = fakeApp(true);
+    const bar = wireMenus(app)!;
+    installed.isInstalledStandalone.mockReturnValue(true);
+    bar.open($("mb-file") as HTMLButtonElement, false);
+    expect($("mb-fullscreen").hidden).toBe(true);
+    bar.close(false);
+    installed.isInstalledStandalone.mockReturnValue(false);
+    bar.open($("mb-file") as HTMLButtonElement, false);
+    expect($("mb-fullscreen").hidden).toBe(false);
   });
 
   it("Close, Open, Save and Save As gray out once the game stopped on its engine, and come back with a live tower", () => {

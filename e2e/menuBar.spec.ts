@@ -9,7 +9,8 @@ test.afterEach(async ({ page }) => expectEngineHosted(page));
  * menus open by mouse and keyboard, Tower Info and Bulletin open from the
  * Tower menu and remember it across a reload, the status bar names the tower,
  * the phone keeps a logo on the menu bar, Full Screen (in Options) fills the
- * screen, and the title screen shows only File, Options and Help.
+ * screen, and the title screen shows only File, Options and Help. The
+ * installed app on a phone leaves Full Screen out (owner, 2026-11-15).
  */
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -158,7 +159,9 @@ test.describe("the menu bar on a phone", () => {
     await expect(page.locator("#statusbar")).toBeHidden();
     // Options leaves out Tools and Status Bar, which only a computer's layout has.
     await page.locator("#mb-options").tap();
+    // A phone's browser tab keeps Full Screen; only the installed app drops it.
     await expect(page.locator("#mb-fullscreen")).toBeVisible();
+    await expect(page.locator("#mb-display-sep")).toBeVisible();
     for (const item of ["#mb-win-tools", "#mb-win-statusbar"]) await expect(page.locator(item)).toBeHidden();
     await page.locator("#mb-options").tap();
     const bar = await page.locator("#menubar").boundingBox();
@@ -209,5 +212,44 @@ test.describe("the menu bar on a phone", () => {
     const tower = (await page.locator("#tower-win").boundingBox())!;
     const news = (await page.locator("#bulletin-win").boundingBox())!;
     expect(news.x + news.width).toBeLessThanOrEqual(tower.x);
+  });
+});
+
+/** Run the page as the installed app: Android and the desktop browsers answer
+ *  `display-mode: standalone` (the manifest's display), an iPhone's home-screen
+ *  app sets `navigator.standalone`. Playwright can emulate neither, so the
+ *  first answers that query as the always-true `all` and the second defines
+ *  the flag, before any of the game's code runs. */
+const INSTALLED = {
+  android: () => {
+    const real = window.matchMedia.bind(window);
+    window.matchMedia = (q: string) => real(q.includes("display-mode: standalone") ? "all" : q);
+  },
+  iphone: () => Object.defineProperty(navigator, "standalone", { configurable: true, get: () => true }),
+} as const;
+
+test.describe("the installed app on a phone", () => {
+  test.use({ viewport: PHONE, isMobile: true, hasTouch: true });
+
+  for (const [device, install] of Object.entries(INSTALLED)) {
+    test(`Options leaves out Full Screen and the line above it (${device})`, async ({ page }) => {
+      await page.addInitScript(install);
+      await boot(page);
+      await page.locator("#mb-options").tap();
+      await expect(page.locator("#mb-screensaver")).toBeVisible();
+      await expect(page.locator("#mb-fullscreen")).toBeHidden();
+      await expect(page.locator("#mb-display-sep")).toBeHidden();
+    });
+  }
+});
+
+test.describe("the installed app on a computer", () => {
+  test.use({ viewport: DESKTOP });
+
+  test("Options keeps Full Screen", async ({ page }) => {
+    await page.addInitScript(INSTALLED.android);
+    await boot(page);
+    await page.locator("#mb-options").click();
+    await expect(page.locator("#mb-fullscreen")).toBeVisible();
   });
 });

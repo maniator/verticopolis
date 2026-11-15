@@ -585,6 +585,17 @@ function buildInsights(ids) {
       query: trends([series("menu_pick", "Picks")], { breakdown: ["item", "grayed"], display: "ActionsTable", breakdownLimit: 60 }),
     },
     {
+      name: "Menu bar: Full Screen by display mode",
+      description:
+        "menu_pick for Options > Full Screen (item full_screen), split by display (standalone: the installed app; browser: a tab) and state (on / off), production. From the release after 4.3.0 the installed app on a phone no longer offers it, so standalone rows come from tablets and computers only.",
+      query: trends([series("menu_pick", "Full Screen picks")], {
+        breakdown: ["display", "state"],
+        display: "ActionsTable",
+        breakdownLimit: 10,
+        where: [{ key: "item", operator: "exact", type: "event", value: ["full_screen"] }],
+      }),
+    },
+    {
       name: "Menu bar: what follows what",
       description: "menu_pick split by the page life's previous real pick (after) and this pick (item), production: the click path through the menus as a table. 'none' is the first pick of a page life.",
       query: trends([series("menu_pick", "Picks")], { breakdown: ["after", "item"], display: "ActionsTable", breakdownLimit: 100 }),
