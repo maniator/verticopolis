@@ -538,8 +538,59 @@ function buildInsights(ids) {
     },
     {
       name: "Sponsor link taps",
-      description: "Taps on a link to the GitHub Sponsors page (app_action sponsor_click), split by where (detail: splash for the title screen, help for the help site), production. The tap only: whether anyone sponsored is not known. The Android app shows no Sponsor link.",
+      description: "Taps on a link to the GitHub Sponsors page (app_action sponsor_click), split by where (detail: splash for the title screen, menu for the menu bar's Help menu, help for the help site), production. The tap only: whether anyone sponsored is not known. The Android app shows no Sponsor link.",
       query: trends([series("app_action", "Sponsor taps")], { breakdown: "detail", display: "ActionsBar", where: [inAction(["sponsor_click"])] }),
+    },
+    // The version 4 menu bar (owner, 2026-11-14): menu_open, menu_pick and
+    // menu_dismiss (src/analyticsMenus.ts, docs/analytics-data-map.md "The
+    // menu bar"), and the app_action codes for its windows and the welcome.
+    {
+      name: "Menu bar: open to pick funnel",
+      description:
+        "Trips into the menu bar (menu_open) that went on to a pick (menu_pick) within a minute, production. A grayed click is a pick row too, so the grayed tile below says how many went nowhere. Per session (cookieless), never a person.",
+      query: {
+        kind: "InsightVizNode",
+        source: {
+          kind: "FunnelsQuery",
+          series: [
+            { kind: "EventsNode", event: "menu_open", name: "Opened a menu" },
+            { kind: "EventsNode", event: "menu_pick", name: "Picked an item" },
+          ],
+          dateRange: LAST_30D,
+          properties: PROD_ONLY,
+          funnelsFilter: { funnelOrderType: "ordered", funnelVizType: "steps", funnelWindowInterval: 1, funnelWindowIntervalUnit: "minute" },
+        },
+      },
+    },
+    {
+      name: "Menu bar: picks by item",
+      description: "menu_pick split by item and grayed (true: the item was grayed out, so nothing happened), production. The command's own event (settings_open and the like) still counts its total from every surface.",
+      query: trends([series("menu_pick", "Picks")], { breakdown: ["item", "grayed"], display: "ActionsTable", breakdownLimit: 60 }),
+    },
+    {
+      name: "Menu bar: what follows what",
+      description: "menu_pick split by the page life's previous real pick (after) and this pick (item), production: the click path through the menus as a table. 'none' is the first pick of a page life.",
+      query: trends([series("menu_pick", "Picks")], { breakdown: ["after", "item"], display: "ActionsTable", breakdownLimit: 100 }),
+    },
+    {
+      name: "Menu bar: how menus open and close",
+      description: "menu_open by menu and how it opened (click, keys, alt), and menu_dismiss by menu and how a trip ended with no pick (outside, escape, tab, title, blur), production.",
+      query: trends([series("menu_open", "Opens"), series("menu_dismiss", "Dismissals")], { breakdown: ["menu", "via"], display: "ActionsTable", breakdownLimit: 40 }),
+    },
+    {
+      name: "Menu bar: dismissals by how",
+      description: "menu_dismiss split by menu and how (outside, escape, tab, title, blur), with browsed as the menus each trip looked through, production.",
+      query: trends([series("menu_dismiss", "Dismissals")], { breakdown: ["menu", "how"], display: "ActionsTable", breakdownLimit: 40 }),
+    },
+    {
+      name: "Version 4 windows and welcome",
+      description: "app_action for the windows and cards that came with the menu bar: window_close and window_move (detail tower or bulletin), tool_card_close, welcome_shown, welcome_close (detail ok, x, escape, backdrop, displaced) and welcome_link (first_tower, modes, whats_new), production.",
+      query: trends([series("app_action", "Actions")], {
+        breakdown: ["action", "detail"],
+        display: "ActionsTable",
+        breakdownLimit: 40,
+        where: [inAction(["window_close", "window_move", "tool_card_close", "welcome_shown", "welcome_close", "welcome_link"])],
+      }),
     },
     {
       name: "Mute toggles by state",

@@ -6,6 +6,7 @@ import { PALETTE_COLLAPSE_BUTTON_ID, PALETTE_COLLAPSED_CLASS } from "../ui/palet
 import { openImport } from "../ui/uiImport";
 import { SPONSOR_URL, sponsorOffered } from "../ui/splashTemplate";
 import { trackAppAction } from "../analytics";
+import { menuItemCodeOf, menuNameOf, trackMenuDismiss, trackMenuOpen, trackMenuPick, type MenuScreen } from "../analyticsMenus";
 import { isSplashUp } from "./interactionState";
 import { overviewMapOpen, setOverviewMapOpen } from "./overviewMapWiring";
 
@@ -28,6 +29,11 @@ import { overviewMapOpen, setOverviewMapOpen } from "./overviewMapWiring";
  *
  * Nothing here runs per frame: the menus' check marks and the grayed
  * Undo and Redo are read once, as their menu opens.
+ *
+ * Analytics (owner, 2026-11-14): each trip into the menus sends `menu_open`,
+ * then `menu_pick` (grayed clicks included) or `menu_dismiss`; the windows'
+ * ✕ and their first drag send `window_close` and `window_move`
+ * (`analyticsMenus.ts`, `docs/analytics-data-map.md`).
  */
 
 /** The floating windows the Tower and Window menus show or hide, and whether
@@ -121,12 +127,20 @@ export function wireMenus(app: GameApp): MenuBar | null {
 
   // Tower Info and Bulletin. A phone starts both closed.
   const onPhone = app.mobileMq?.matches ?? false;
-  const floating = Object.values(MENU_WINDOW).map((w) => {
+  const floating = Object.entries(MENU_WINDOW).map(([name, w]) => {
     const win = document.getElementById(w.id);
     if (win) {
-      new MovableWindow({ win, title: `#${w.id} > .win-title`, within: stage });
+      let moved = false;
+      const placed = () => {
+        if (!moved) trackAppAction("window_move", name);
+        moved = true;
+      };
+      new MovableWindow({ win, title: `#${w.id} > .win-title`, within: stage, placed });
       win.hidden = !stored(storage, w.key, w.openOnDesktop && !onPhone);
-      win.querySelector(`[data-close="${w.id}"]`)?.addEventListener("click", () => setShown(false));
+      win.querySelector(`[data-close="${w.id}"]`)?.addEventListener("click", () => {
+        trackAppAction("window_close", name);
+        setShown(false);
+      });
     }
     function setShown(open: boolean): void {
       if (!win) return;
@@ -175,6 +189,7 @@ export function wireMenus(app: GameApp): MenuBar | null {
   // The same test Settings uses (`isSplashUp`): the title screen is up while
   // its element is on the page, whatever body class a removal left behind.
   const titleScreenUp = isSplashUp;
+  const screen = (): MenuScreen => (titleScreenUp() ? "title" : "tower");
   // Capture runs before an item's own handlers: a grayed item does nothing,
   // and on the title screen a routed item presses the title screen's button.
   root.addEventListener(
@@ -182,6 +197,7 @@ export function wireMenus(app: GameApp): MenuBar | null {
     (e) => {
       const item = e.target instanceof Element ? e.target.closest<HTMLElement>(".mb-item") : null;
       if (!item) return;
+      reportPick(item, e);
       if (item.getAttribute("aria-disabled") === "true") {
         e.preventDefault();
         e.stopPropagation();
@@ -198,7 +214,34 @@ export function wireMenus(app: GameApp): MenuBar | null {
   );
   keepMenuBarHeight(root);
 
+  /** One `menu_pick`, while a menu is open (a script's click is not a pick). */
+  function reportPick(item: HTMLElement, e: MouseEvent): void {
+    const open = bar.current();
+    const menu = menuNameOf(item.closest("[role='menu']")?.id ?? "");
+    if (!open || !menu) return;
+    const grayed = item.getAttribute("aria-disabled") === "true";
+    const checked = item.getAttribute("aria-checked");
+    trackMenuPick({
+      menu,
+      item: menuItemCodeOf(item.id),
+      via: e.detail === 0 ? "keys" : "pointer",
+      screen: screen(),
+      browsed: bar.browsed(),
+      grayed,
+      // The check mark was set as the menu opened; a pick flips it.
+      ...(checked !== null && !grayed ? { state: checked === "true" ? ("off" as const) : ("on" as const) } : {}),
+    });
+  }
+
   const bar = new MenuBar(root, {
+    onTrip: (title, via) => {
+      const menu = menuNameOf(title.id);
+      if (menu) trackMenuOpen({ menu, via, screen: screen() });
+    },
+    onDismiss: (title, how, browsed) => {
+      const menu = menuNameOf(title.id);
+      if (menu) trackMenuDismiss({ menu, how, screen: screen(), browsed });
+    },
     onOpen: () => {
       check("mb-win-tools", !document.getElementById("palette")?.classList.contains(PALETTE_COLLAPSED_CLASS));
       check("mb-win-map", overviewMapOpen(app));

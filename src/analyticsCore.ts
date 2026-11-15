@@ -3,6 +3,7 @@ import { APP_VERSION } from "./appVersion";
 import { telemetryHostAllowed } from "./telemetry";
 import type { EngagedBy } from "./analyticsEngagement";
 import type { TdtImportReadProps, TowerFileProps } from "./analyticsFiles";
+import type { MenuDismissProps, MenuOpenProps, MenuPickProps } from "./analyticsMenus";
 import type { PageViewProps } from "./analyticsPageView";
 import type { EngineBuild, EngineKind, EngineStatusReason, EngineStatusTrigger } from "./analyticsEngineStatus";
 import type { GameplayMilestoneId } from "./events/gameplayEvents";
@@ -203,6 +204,14 @@ export interface GameplayEvents {
    *  sent at the next frame's drain, at most 40 per page in each
    *  one-minute window. */
   economy_action: { action: EconomyActionName; detail?: string };
+  /** A trip into the menu bar began (owner, 2026-11-14). The trip then ends in
+   *  one `menu_pick` or one `menu_dismiss`. Fields: `analyticsMenus.ts`. */
+  menu_open: MenuOpenProps;
+  /** A menu item was clicked or chosen from the keyboard, grayed ones
+   *  included (`grayed`), with the item picked before it (`after`). */
+  menu_pick: MenuPickProps;
+  /** A trip into the menus ended with no pick, and how. */
+  menu_dismiss: MenuDismissProps;
   /** The player answered an in-game emergency prompt (pay for rescue, or gamble
    *  the containment / bomb search). Per occurrence, so the accept/decline split
    *  is visible per emergency kind. Only a real click emits: a timed-out
@@ -369,7 +378,21 @@ export type AppActionName =
   // which surface: `splash` (the title screen's corner link), `menu` (the
   // game's Help menu) or `help` (any help site link to the Sponsors page). NOT latched, like install_offer. It
   // counts the tap only; whether anyone went on to sponsor is never known here.
-  | "sponsor_click";
+  | "sponsor_click"
+  // The version 4 windows and cards (owner, 2026-11-14, with the menu events).
+  // `window_close` is a Tower Info or Bulletin window's ✕, `detail` `tower` or
+  // `bulletin`; `window_move` is the first drag of that window this page life
+  // (latched per window, same `detail`). `tool_card_close` is the phone tool
+  // card's ✕. `welcome_shown` is the welcome window opening;
+  // `welcome_close` is how it went, `detail` `ok`, `x`, `escape`, `backdrop`
+  // or `displaced` (another dialog took its place); `welcome_link` is one of
+  // its help links, `detail` `first_tower`, `modes` or `whats_new`.
+  | "window_close"
+  | "window_move"
+  | "tool_card_close"
+  | "welcome_shown"
+  | "welcome_close"
+  | "welcome_link";
 
 /**
  * Cross-cutting props merged into EVERY event: the platform and

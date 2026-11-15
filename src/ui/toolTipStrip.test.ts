@@ -1,5 +1,9 @@
 import { html } from "lit-html";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+const analytics = vi.hoisted(() => ({ trackAppAction: vi.fn() }));
+vi.mock("../analytics", () => analytics);
+
 import { hideToolTip, noteUndoDepth, showToolTip } from "./toolTipStrip";
 
 beforeEach(() => {
@@ -34,13 +38,16 @@ describe("the phone's tool card", () => {
     expect(tip().hidden).toBe(false);
   });
 
-  it("folds away from its close button, and hideToolTip folds it too", () => {
+  it("folds away from its close button, counting tool_card_close; hideToolTip folds it without counting", () => {
+    analytics.trackAppAction.mockClear();
     showToolTip(card("Office"));
     tip().querySelector<HTMLButtonElement>(".tt-close")!.click();
     expect(tip().hidden).toBe(true);
+    expect(analytics.trackAppAction).toHaveBeenCalledExactlyOnceWith("tool_card_close");
     showToolTip(card("Office"));
     hideToolTip();
     expect(tip().hidden).toBe(true);
+    expect(analytics.trackAppAction).toHaveBeenCalledOnce();
   });
 
   it("does nothing on a page without it", () => {

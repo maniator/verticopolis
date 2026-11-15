@@ -81,6 +81,9 @@ an event sent before boot carries `version` only.
 | `session_fps` | `p50`, `low`, `samples` | Session end | Frame rate |
 | `app_action` | `action`, `detail` | An app-chrome action | Which saves, dialogs and settings get used, and whether saves, loads and imports fail (see below) |
 | `economy_action` | `action`, `detail` | Demolish, price or capacity tuning | The removal and tuning side of play |
+| `menu_open` | `menu`, `via`, `screen` | A trip into the menu bar begins (owner, 2026-11-14) | Which menus players open, and how (see below) |
+| `menu_pick` | `menu`, `item`, `via`, `screen`, `browsed`, `after`, `grayed`, `state` | A menu item is clicked or chosen from the keyboard, grayed items included | Which commands players use from the menus, in what order, and what they look for that is grayed (see below) |
+| `menu_dismiss` | `menu`, `how`, `screen`, `browsed` | A trip into the menus ends with no pick | Where players look and give up (see below) |
 | `emergency_choice` | `kind`, `decision` | An answered emergency prompt | Accept and decline split |
 | `bomb_outcome` | `outcome` | A bomb threat ends: `paid`, `found` or `exploded` | How bomb threats end, and whether Security wins the race |
 | `session_emergencies` | `fires`, `firesGutRooms`, `bombs` | Session end | How often emergencies happen |
@@ -127,7 +130,50 @@ to 10 and 24 say what they can and cannot support.
 
 ## Sponsor link taps
 
-`app_action` `sponsor_click` counts a tap on a link to the GitHub Sponsors page (owner, 2026-11-14). `detail` is `splash` for the title screen's corner link or `help` for any help site link to that page (the sidebar's "Sponsor Verticopolis" entry and the front page's text). It is the tap only: whether anyone went on to sponsor is never known here, and the Android app shows no Sponsor link. It is not latched, so read taps, or sessions that tapped, and say which. A click, keyboard Enter or middle-click counts; a link opened from the right-click menu does not. The "Sponsor link taps" dashboard tile splits it by `detail`.
+`app_action` `sponsor_click` counts a tap on a link to the GitHub Sponsors page (owner, 2026-11-14). `detail` is `splash` for the title screen's corner link, `menu` for the menu bar's Help > Sponsor Verticopolis, or `help` for any help site link to that page (the sidebar's "Sponsor Verticopolis" entry and the front page's text). It is the tap only: whether anyone went on to sponsor is never known here, and the Android app shows no Sponsor link. It is not latched, so read taps, or sessions that tapped, and say which. A click, keyboard Enter or middle-click counts; a link opened from the right-click menu does not. The "Sponsor link taps" dashboard tile splits it by `detail`.
+
+## The menu bar
+
+Three events follow the version 4 menu bar (owner, 2026-11-14), from
+`src/analyticsMenus.ts`. A trip into the menus is the time from a menu opening
+with none open until the menus close. Each trip sends one `menu_open`, then one
+`menu_pick` or one `menu_dismiss`; pointing from menu to menu inside a trip
+sends nothing and is counted in `browsed` instead. A grayed item's click sends
+a `menu_pick` with `grayed: true` and the trip goes on, so a trip can carry
+more than one pick row. Every value is a code from a closed list: never an
+item's label, and never anything the player typed (Rename reports the pick,
+never the name).
+
+| Field | Values | Meaning |
+| --- | --- | --- |
+| `menu` | `file`, `edit`, `tower`, `window`, `options`, `help` | The menu opened, picked from, or open when the trip ended |
+| `via` (open) | `click`, `keys`, `alt` | A click on a title, the keyboard on a focused title, or Alt with the underlined letter |
+| `via` (pick) | `pointer`, `keys` | A mouse, pen or finger, or the keyboard |
+| `screen` | `title`, `tower` | Over the title screen, or over a tower |
+| `item` | `new_tower`, `saves`, `quick_save`, `import`, `export`, `install_app`, `undo`, `redo`, `tower_info`, `map`, `statistics`, `rename`, `rules`, `tools`, `bulletin`, `status_bar`, `full_screen`, `settings`, `sound`, `manual`, `compare`, `replay`, `sponsor`, `about`, `other` | The item, by a code that does not change with its label (`MENU_ITEM_CODES`) |
+| `browsed` | a count | Menus the trip showed, the last one included |
+| `after` | an `item` code or `none` | The page life's previous real pick, so a breakdown shows what follows what without a paths query. A grayed click never becomes the next pick's `after` |
+| `grayed` | `true`, `false` | The item was grayed out, so nothing happened |
+| `state` | `on`, `off` | A checkmark item's new state (Tower Info, Map, Tools, Bulletin, Status Bar, Full Screen, Sound); absent on the others and on a grayed click |
+| `how` | `outside`, `escape`, `tab`, `title`, `blur` | How a trip ended with no pick: a press outside the menus, Escape, Tab, the open menu's own title, or the window losing focus |
+
+The commands keep their own events too, so Settings from the menu sends
+`menu_pick` `settings` and then `app_action` `settings_open`. Count the menu's
+share of a command from `menu_pick`, and the command's total from its own event.
+A funnel reads `menu_open` to `menu_pick`, and PostHog's paths read the order
+of picks within a session; the "Menu bar" dashboard tiles are both
+(`scripts/posthog-dashboard.mjs`).
+
+The windows and cards that came with the menu bar report through `app_action`:
+
+| `action` | `detail` | When |
+| --- | --- | --- |
+| `window_close` | `tower` or `bulletin` | The Tower Info or Bulletin window's ✕ (the menus' own toggles are `menu_pick` rows) |
+| `window_move` | `tower` or `bulletin` | The first drag of that window in a page life (latched per window) |
+| `tool_card_close` | none | The phone tool card's ✕ |
+| `welcome_shown` | none | The welcome window opened |
+| `welcome_close` | `ok`, `x`, `escape`, `backdrop` or `displaced` | How it went: its OK, its ✕, Escape, a click beside it, or another dialog taking its place. A page closed while it is up sends none |
+| `welcome_link` | `first_tower`, `modes` or `whats_new` | One of its help links |
 
 ## `engine_status`
 
