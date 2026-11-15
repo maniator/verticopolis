@@ -67,16 +67,17 @@ const editorShell = (
 ): TemplateResult =>
   html`${keyed(key, html`${titleBar(name)}<div class="ed-stats kv">${rows}</div>${diagnostics}${actions}`)}`;
 
-/** A quarterly or monthly rent as one collection pays it on the tower's
- *  calendar (#2107). Where the calendar scales the rent (Modern, which
- *  collects a quarterly rent every maintenance period, #2255), the card leads with what lands each collection and names
- *  the rate the price controls set, so a $10,000 office reads "$333" rather
- *  than a figure it never pays. */
 /** Modern's real-world calendar pays lease rent each month, not each quarter (#2255). */
 function leaseLandsMonthly(calendar: CatalogCalendar): boolean {
   return calendar.leasePeriodDays !== calendar.quarterDays;
 }
 
+/** A quarterly or monthly rent as one collection pays it on the tower's
+ *  calendar (#2107). Where the calendar scales the rent (Modern), the card
+ *  leads with what lands each collection and names the rate the price
+ *  controls set, so a $10,000 office reads "$333" on the canon calendar's
+ *  3-day quarter and "$3,333" on the real-world calendar's 30-day month
+ *  (#2255), rather than a figure it never pays. */
 function rentLine(cadence: CatalogRentCadence, price: number, calendar: CatalogCalendar): string {
   const paid = rentPerCollection(cadence, price, calendar);
   if (paid === price) return `$${groupDigits(price)}`;
