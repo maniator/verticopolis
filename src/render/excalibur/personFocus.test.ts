@@ -54,20 +54,58 @@ describe("pickPersonAt", () => {
 });
 
 describe("the follow", () => {
+  /** The page clock: each call moves it on by `ms` and returns the time. */
+  let now = 0;
+  const after = (ms: number) => (now += ms);
+
   it("glides the camera toward the person and keeps the zoom", () => {
     const e = engine([[7, figure(500, 0)]]);
     focusPerson(e, 7);
-    stepFollow(e, 16);
+    stepFollow(e, after(16));
     expect(e.applyView).not.toHaveBeenCalled(); // not following yet
     setFollow(e, true);
-    stepFollow(e, 500);
+    stepFollow(e, after(500));
     const spot = focusSpot(e)!;
     expect(e.applyView).toHaveBeenCalledTimes(1);
     expect(e.cam.pos.x).toBeGreaterThan(0);
     expect(e.cam.pos.x).toBeLessThan(spot.x);
     expect(e.applyView.mock.lastCall![0].zoom).toBe(1);
-    for (let i = 0; i < 20; i++) stepFollow(e, 500);
+    for (let i = 0; i < 20; i++) stepFollow(e, after(500));
     expect(e.cam.pos.x).toBeCloseTo(spot.x, 0);
+  });
+
+  it("glides by the page clock, so a slow device's long frames still close the gap", () => {
+    const e = engine([[7, figure(500, 0)]]);
+    focusPerson(e, 7);
+    setFollow(e, true);
+    stepFollow(e, after(16));
+    const spot = focusSpot(e)!;
+    const gap = () => spot.x - e.cam.pos.x;
+    // Three frames a second: each step covers its whole 333 ms, up to the
+    // 250 ms cap (0.02 ** 0.25 of the gap stays), never the 1 ms a slow
+    // frame's engine time arrives as.
+    const before = gap();
+    stepFollow(e, after(333));
+    expect(gap()).toBeCloseTo(before * Math.pow(0.02, 0.25), 3);
+    for (let i = 0; i < 6; i++) stepFollow(e, after(333));
+    expect(gap()).toBeLessThan(1);
+  });
+
+  it("does not leap after a stalled tab, and Follow again starts from a fresh clock", () => {
+    const e = engine([[7, figure(500, 0)]]);
+    focusPerson(e, 7);
+    setFollow(e, true);
+    stepFollow(e, after(16));
+    const spot = focusSpot(e)!;
+    const before = spot.x - e.cam.pos.x;
+    stepFollow(e, after(30_000));
+    expect(spot.x - e.cam.pos.x).toBeCloseTo(before * Math.pow(0.02, 0.25), 3);
+    // Off, then on again a minute later: the first step is one frame long.
+    setFollow(e, false);
+    setFollow(e, true);
+    const resumed = spot.x - e.cam.pos.x;
+    stepFollow(e, after(60_000));
+    expect(spot.x - e.cam.pos.x).toBeCloseTo(resumed * Math.pow(0.02, 1 / 60), 3);
   });
 
   it("hands the camera back when the player pans", () => {
@@ -76,7 +114,7 @@ describe("the follow", () => {
     setFollow(e, true);
     e.gesture = "pan";
     e.moved = 40;
-    stepFollow(e, 16);
+    stepFollow(e, after(16));
     expect(e.applyView).not.toHaveBeenCalled();
     expect(focusedPerson(e)?.follow).toBe(false);
   });
@@ -85,21 +123,21 @@ describe("the follow", () => {
     const e = engine([[7, figure(500, 0)]]);
     focusPerson(e, 7);
     setFollow(e, true);
-    stepFollow(e, 16);
+    stepFollow(e, after(16));
     // A zoom re-centers on the person: the follow holds.
     e.cam.zoom = 2;
     e.cam.pos = ex.vec(e.cam.pos.x + 30, e.cam.pos.y);
-    stepFollow(e, 16);
+    stepFollow(e, after(16));
     expect(e.applyView).toHaveBeenCalledTimes(2);
     expect(focusedPerson(e)?.follow).toBe(true);
     // The keyboard cursor nudges the camera one tile: the player has it back.
     e.cam.pos = ex.vec(e.cam.pos.x - TILE, e.cam.pos.y);
-    stepFollow(e, 16);
+    stepFollow(e, after(16));
     expect(e.applyView).toHaveBeenCalledTimes(2);
     expect(focusedPerson(e)?.follow).toBe(false);
     // Pressing Follow again starts afresh from wherever the camera is.
     setFollow(e, true);
-    stepFollow(e, 16);
+    stepFollow(e, after(16));
     expect(e.applyView).toHaveBeenCalledTimes(3);
     expect(focusedPerson(e)?.follow).toBe(true);
   });

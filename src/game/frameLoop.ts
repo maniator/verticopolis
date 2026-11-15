@@ -78,8 +78,9 @@ export function runFrame(app: GameApp, dtMs: number): void {
   // modal freeze returns early on below (fps is a render metric, not a sim-tick
   // one).
   gameplaySession.noteFrame();
-  // A followed person keeps the camera on them, paused or not (#2092).
-  stepFollow(app.engine, dtMs);
+  // A followed person keeps the camera on them, paused or not (#2092), on
+  // the page's clock (a slow frame's dtMs arrives clamped to 1 ms).
+  stepFollow(app.engine, performance.now());
   // Fold the engine's gameplay events into analytics (#873 phase 2): builds,
   // stars, emergencies and their answers, pricing and capacity. Drained every
   // frame and ahead of the modal freeze below, so an emergency answered in a
