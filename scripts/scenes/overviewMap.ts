@@ -6,9 +6,34 @@
  * closed behind the pill until a tap.
  */
 import { type Scene, PHONE } from "../screenshot-env.ts";
-import { buildOverlayTower } from "../screenshot-builders.ts";
+import { buildOverlayTower, buildSplitGapTowers } from "../screenshot-builders.ts";
 
 export const OVERVIEW_MAP_SCENES: Scene[] = [
+  // Open air of 2, 3 and 7 tiles between four towers: each gap shows on the
+  // Map, at least 4 CSS pixels wide, on a computer and on a phone.
+  {
+    id: "overview-map-gaps",
+    outDir: "features",
+    build: buildSplitGapTowers,
+    shots: [{ name: "map-window-gaps", crop: "#overview-map", frame: { floor: 8, zoom: 0.6 } }],
+  },
+  {
+    id: "overview-map-gaps-phone",
+    outDir: "features",
+    viewport: PHONE,
+    build: buildSplitGapTowers,
+    shots: [
+      {
+        name: "map-phone-gaps",
+        crop: "#overview-map",
+        frame: { floor: 8, zoom: 0.5 },
+        setup: async (page) => {
+          await page.click("#btn-map");
+          await page.waitForSelector("#overview-map:not([hidden])");
+        },
+      },
+    ],
+  },
   {
     id: "overview-map",
     outDir: "features",

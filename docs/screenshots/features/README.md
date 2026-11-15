@@ -22,6 +22,8 @@ hotel rooms, a cinema, shops, food, 5 elevators) after warming up a quarter.
 | `map-window.png` | The Map window alone: the rooms in their colors and patterns, fitted to the tower with a margin at each side, and the view box. |
 | `map-phone-pill.png` | On a phone the Map starts closed behind the **Map** pill at the bottom right. |
 | `map-phone-open.png` | The open phone Map card at the top-left of the tower view. |
+| `map-window-gaps.png` | The Map window over four towers with open air of 2, 3 and 7 tiles between them: every gap shows, at least 4 CSS pixels wide. |
+| `map-phone-gaps.png` | The same four towers on the open phone Map card, each gap still visible. |
 | `map-phone-traffic.png` | The phone Map card on its **Traffic** view, with the floor counts under the map. |
 | `map-eval-view.png` | The Map's **Eval** view on a deliberately varied tower: each room in the color of its tenants' rating. |
 | `map-pricing-view.png` | The Map's **Pricing** view on the same tower: each priced room in the color of its rent tier. |

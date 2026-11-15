@@ -99,7 +99,7 @@ export const SHARDS: Record<string, string[]> = {
   // the folded strip draws every settle frame (the canvas resizes in view),
   // about 15s in the pinned image locally, roughly twice that under CI's
   // two-leg contention.
-  misc: ["tablet", "mobile", "mobile-landscape", "construction", "crowd", "fire", "install-affordance-mobile", "overview-map", "overview-map-phone", "palette-fit"],
+  misc: ["tablet", "mobile", "mobile-landscape", "construction", "crowd", "fire", "install-affordance-mobile", "overview-map", "overview-map-phone", "overview-map-gaps", "overview-map-gaps-phone", "palette-fit"],
 };
 
 function allSceneIds(): string[] {
