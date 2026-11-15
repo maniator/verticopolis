@@ -77,6 +77,7 @@ describe.skipIf(noEngine)("the storage code's saves on the engine", () => {
     const downloads: { filename: string; contents: string | Uint8Array }[] = [];
     const ui = {
       toast: () => {},
+      sayVisibly: () => {},
       downloadFile: (filename: string, contents: string | Uint8Array) => (downloads.push({ filename, contents }), true),
     };
     await runExportFlow({ ui, reader: () => newViewReader(source) }, () => ({ file: SaveGame.export(source.serialize()), towerName }));

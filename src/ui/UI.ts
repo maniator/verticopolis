@@ -22,7 +22,7 @@ import * as panels from "./uiPanels";
 import * as status from "./uiStatus";
 import type { HudSource } from "./uiStatus";
 import { buildPalette } from "./uiPalette";
-import { ModalPrecedence, routeNotice, type ModalOpts } from "./modalPrecedence";
+import { ModalPrecedence, routeNotice, type ModalOpts, type NoticeKind } from "./modalPrecedence";
 import { finishModal } from "./uiModal";
 
 export type Tool = { type: "build"; kind: FacilityKind } | { type: "bulldoze" } | { type: "inspect" };
@@ -320,9 +320,10 @@ export class UI {
    *  announced to nobody (GH #658). This routes the line into the dialog in the
    *  way, and uses a toast only when there is no dialog to be behind. `again`
    *  false leaves any line the dialog already shows alone, for a caller asking each frame.
-   *  @internal friend-module access (uiDialogs / saveLoad / uiImport / frameLoop). */
-  sayVisibly(text: string, kind: "bad" | "info" = "bad", again = true): void {
-    routeNotice(this.el.modal as HTMLDialogElement, this.precedence, text, (t) => this.toast(t, kind), again);
+   *  Only `kind` "bad" is styled and announced as an error (calm good news, #785).
+   *  @internal friend-module access (uiDialogs / saveLoad / uiImport / frameLoop / exportFlow). */
+  sayVisibly(text: string, kind: NoticeKind = "bad", again = true): void {
+    routeNotice(this.el.modal as HTMLDialogElement, this.precedence, text, (t) => this.toast(t, kind), again, kind);
   }
 
   /** True while any modal is on screen (the shared `<dialog>` is open). Callers

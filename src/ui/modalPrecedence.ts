@@ -63,7 +63,7 @@ export class ModalPrecedence {
   private leash: Leash | null = null;
   /** A line to mount into the next dialog, set when something must be said
    *  while the shared dialog is mid-replace and has no body to write into. */
-  private pendingNotice: string | null = null;
+  private pendingNotice: { readonly text: string; readonly kind: NoticeKind } | null = null;
   /** The incumbent dialog's goodbye, if it registered one. */
   private onDisplaced: (() => void) | null = null;
 
@@ -126,15 +126,15 @@ export class ModalPrecedence {
   }
 
   /** Hold a line for the next dialog to mount. */
-  deferNotice(text: string): void {
-    this.pendingNotice = text;
+  deferNotice(text: string, kind: NoticeKind = "bad"): void {
+    this.pendingNotice = { text, kind };
   }
 
   /** Mount any held line into a dialog body that has just been built. */
   drainNotice(box: HTMLElement): void {
     const notice = this.pendingNotice;
     this.pendingNotice = null;
-    if (notice) mountNotice(box, notice);
+    if (notice) mountNotice(box, notice.text, notice.kind);
   }
 
   private breakLeash(reason: BrokenReason): void {
@@ -157,6 +157,7 @@ export function routeNotice(
   text: string,
   toast: (text: string) => void,
   again = true,
+  kind: NoticeKind = "bad",
 ): void {
   if (!dialog.open) {
     toast(text);
@@ -170,22 +171,29 @@ export function routeNotice(
   // the very dialog the caller was waiting for; the next ask finds the new one.
   const box = dialog.querySelector<HTMLElement>(".modal-box");
   if (!box) {
-    if (again) precedence.deferNotice(text);
+    if (again) precedence.deferNotice(text, kind);
     return;
   }
   if (!again && box.querySelector(":scope > .modal-notice")) return;
-  mountNotice(box, text);
+  mountNotice(box, text, kind);
 }
 
+/** What a notice says about the game: a failure, or plain or good news. */
+export type NoticeKind = "bad" | "info" | "good";
+
 /** Put a notice at the top of a dialog body, under the title bar where the eye
- *  lands first. `role="alert"` so it is announced as well as shown. */
-export function mountNotice(box: HTMLElement, text: string): void {
+ *  lands first. A failure is drawn in danger ink with `role="alert"`, so it
+ *  interrupts; plain and good news use ordinary ink and `role="status"`, so a
+ *  late "it finished after all" is neither shown nor announced as an error
+ *  (#785). */
+export function mountNotice(box: HTMLElement, text: string, kind: NoticeKind = "bad"): void {
   // One notice per body: a second would stack under the first and the two can
   // disagree, which is worse than either alone.
   box.querySelector(":scope > .modal-notice")?.remove();
   const p = document.createElement("p");
-  p.className = "modal-notice";
-  p.setAttribute("role", "alert");
+  const bad = kind === "bad";
+  p.className = bad ? "modal-notice" : "modal-notice modal-notice-calm";
+  p.setAttribute("role", bad ? "alert" : "status");
   p.textContent = text;
   const title = box.querySelector(":scope > h2");
   if (title) title.after(p);

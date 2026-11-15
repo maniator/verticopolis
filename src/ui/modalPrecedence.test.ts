@@ -58,6 +58,34 @@ describe("routeNotice", () => {
     expect([...box.querySelectorAll(".modal-notice")].map((n) => n.textContent)).toEqual(["Saved"]);
   });
 
+  it("draws and announces only a failure as an error; plain and good news stay calm (#785)", () => {
+    const { dialog, box } = openDialog();
+    routeNotice(dialog, new ModalPrecedence(), "Export failed", vi.fn());
+    const bad = box.querySelector(".modal-notice")!;
+    expect(bad.getAttribute("role")).toBe("alert");
+    expect(bad.classList.contains("modal-notice-calm")).toBe(false);
+    for (const kind of ["info", "good"] as const) {
+      routeNotice(dialog, new ModalPrecedence(), `A ${kind} line`, vi.fn(), true, kind);
+      const calm = box.querySelector(".modal-notice")!;
+      expect(calm.textContent).toBe(`A ${kind} line`);
+      expect(calm.getAttribute("role"), kind).toBe("status");
+      expect(calm.classList.contains("modal-notice-calm"), kind).toBe(true);
+    }
+  });
+
+  it("keeps a held line's kind for the dialog that mounts it", () => {
+    const dialog = document.createElement("dialog");
+    document.body.append(dialog);
+    dialog.open = true; // open, but its body is not built yet
+    const precedence = new ModalPrecedence();
+    routeNotice(dialog, precedence, "The earlier export finished after all", vi.fn(), true, "good");
+    const box = document.createElement("div");
+    precedence.drainNotice(box);
+    const held = box.querySelector(".modal-notice")!;
+    expect(held.textContent).toBe("The earlier export finished after all");
+    expect(held.getAttribute("role")).toBe("status");
+  });
+
   it("toasts when no dialog is open", () => {
     const { dialog } = openDialog();
     dialog.open = false;
