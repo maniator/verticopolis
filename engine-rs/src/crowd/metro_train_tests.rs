@@ -165,3 +165,44 @@ fn a_metro_visitor_out_after_the_last_train_heads_for_the_lobby() {
         assert_eq!(p.floors.last(), Some(&out), "at minute {minute}");
     }
 }
+
+/// `metro_tower` with an occupied office on floor 2 that the platform's
+/// elevator reaches, so the morning sends Metro riders to it.
+fn metro_tower_with_office() -> Simulation {
+    let (mut sim, _) = metro_tower();
+    for x in 0..80 {
+        assert!(sim.tower.place(Kind::Floor, 2, x).ok);
+    }
+    let shaft = sim.tower.transports[0].id;
+    assert!(sim.tower.resize_transport(shaft, -1, 2).ok);
+    let id = sim.tower.place(Kind::Office, 2, 10).unit_id.unwrap();
+    sim.tower.get_unit_mut(id).unwrap().state = crate::tower::UnitState::Occupied;
+    sim
+}
+
+/// How many Metro riders the crowd's spawns send in at `hour:minute` over
+/// many draws.
+fn metro_arrivals_at(hour: i64, minute: i64) -> usize {
+    let mut sim = metro_tower_with_office();
+    sim.clock.minutes = 1440.0 + at(hour, minute);
+    for _ in 0..400 {
+        let population = sim.tower.total_population();
+        crate::crowd::spawn::spawn_step(
+            &mut sim.crowd,
+            0.5,
+            &mut sim.tower,
+            &sim.clock,
+            Some(crate::sim_loop::Weather::Clear),
+            population,
+        );
+    }
+    sim.crowd.people.iter().filter(|p| p.from_metro).count()
+}
+
+#[test]
+fn a_metro_rider_arrives_only_off_a_train_standing_at_the_station() {
+    // The 8 o'clock train stands at the station from 8:06 to 8:20. Between
+    // trains nobody steps onto the platform from nowhere.
+    assert!(metro_arrivals_at(8, 10) > 0, "riders step off the train");
+    assert_eq!(metro_arrivals_at(8, 30), 0, "no train, no arrivals");
+}

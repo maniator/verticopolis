@@ -34,9 +34,14 @@ fn desk_json(id: i64, d: &Desk) -> Value {
     json!([id, d.floor, d.x, d.width, d.inside, d.coming, d.going])
 }
 
-/// A booking as the save writes it: `[at, officeId, inbound]`.
+/// A booking's row: `[at, office, inbound]`, with the station it is held
+/// for as a fourth entry only when it has one, so a save without held
+/// arrivals is written as before.
 fn shift_json(s: &Shift) -> Value {
-    json!([s.at, s.office_id, s.inbound])
+    match s.station {
+        Some(sid) => json!([s.at, s.office_id, s.inbound, sid]),
+        None => json!([s.at, s.office_id, s.inbound]),
+    }
 }
 
 fn desk_from(v: &Value) -> Option<(i64, Desk)> {
@@ -65,11 +70,16 @@ fn desk_from(v: &Value) -> Option<(i64, Desk)> {
 }
 
 fn shift_from(v: &Value) -> Option<Shift> {
-    let row = v.as_array().filter(|r| r.len() == 3)?;
+    let row = v.as_array().filter(|r| r.len() == 3 || r.len() == 4)?;
+    let station = match row.get(3) {
+        Some(sid) => Some(sid.as_f64().and_then(whole)?),
+        None => None,
+    };
     Some(Shift {
         at: row[0].as_f64().filter(|n| n.is_finite())?,
         office_id: row[1].as_f64().and_then(whole)?,
         inbound: row[2].as_bool()?,
+        station,
     })
 }
 

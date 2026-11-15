@@ -72,7 +72,7 @@ pub fn start_walk_ins(crowd: &mut Crowd, tower: &Tower, clock: &Clock) {
     if crowd.walk_ins.last().is_none_or(|w| w.at > now) {
         return;
     }
-    let hour = clock.hour();
+    let (hour, minute) = (clock.hour(), clock.minute_of_day());
     let doors = entrances(tower);
     while let Some(w) = crowd.walk_ins.last().copied() {
         if w.at > now {
@@ -82,11 +82,17 @@ pub fn start_walk_ins(crowd: &mut Crowd, tower: &Tower, clock: &Clock) {
         if now - w.at > 60.0 || crowd.walk_in_count >= MAX_WALK_INS {
             continue;
         }
-        start_walk_in(crowd, tower, &doors, w.unit_id, hour);
+        start_walk_in(crowd, tower, &doors, w.unit_id, (hour, minute));
     }
 }
 
-fn start_walk_in(crowd: &mut Crowd, tower: &Tower, doors: &Entrances, unit_id: i64, hour: i64) {
+fn start_walk_in(
+    crowd: &mut Crowd,
+    tower: &Tower,
+    doors: &Entrances,
+    unit_id: i64,
+    (hour, minute): (i64, f64),
+) {
     let Some(venue) = tower.get_unit(unit_id) else {
         return;
     };
@@ -99,6 +105,11 @@ fn start_walk_in(crowd: &mut Crowd, tower: &Tower, doors: &Entrances, unit_id: i
     }
     let (vx, vw, vf) = (venue.x, venue.width, venue.floor);
     let station = doors.pick(crowd);
+    // Nobody steps onto a platform no train stands at: that walk-in stays
+    // away (`metro_train`).
+    if station.is_some_and(|sid| !super::metro_train::train_in_at(tower, minute, sid)) {
+        return;
+    }
     // From the station's own platform, or the ground lobby nearest the
     // venue (`add` picks it), so a lot of separate towers is entered under
     // the venue.

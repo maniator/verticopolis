@@ -295,18 +295,15 @@ pub struct Crowd {
     /// Whether the step's day is a weekend, for the elevator schedules.
     /// Saved with the crowd, as `hour` is.
     pub weekend: bool,
-    /// The walk-ins booked for this hour, latest first (`walk_ins`), saved
-    /// with the crowd.
+    /// The walk-ins booked for this hour, latest first (`walk_ins`). Saved.
     pub walk_ins: Vec<walk_ins::WalkIn>,
     /// The walk-ins in the crowd, on their way or inside.
     pub walk_in_count: i64,
-    /// Each office's workers: inside, on the way in, booked to leave
-    /// (`commuters`), by office id. Saved with the crowd
-    /// (`commuters_save.rs`); a save without them takes the head counts as
-    /// the workers inside.
+    /// Each office's workers (inside, on the way in, booked to leave) by
+    /// office id (`commuters`). Saved (`commuters_save.rs`); a save without
+    /// them takes the head counts as the workers inside.
     pub desks: std::collections::BTreeMap<i64, commuters::Desk>,
-    /// The office arrivals and departures booked for this hour, latest
-    /// first (`commuters`). Saved with the crowd (`commuters_save.rs`).
+    /// The office arrivals and departures booked this hour, latest first. Saved.
     pub shifts: Vec<commuters::Shift>,
     /// The commuting workers in the crowd, on their way in or out. Counted
     /// again from the people on load.
@@ -315,8 +312,7 @@ pub struct Crowd {
     /// before the first time (`commuters::reconcile`).
     pub desk_revision: Option<i64>,
     /// Commuting workers who boarded an elevator this hour, by shaft and
-    /// the floor they boarded at, for the shaft's origin rings
-    /// (`sample_elevator_util`). Never saved.
+    /// floor, for the shaft's origin rings (`sample_elevator_util`). Not saved.
     pub commuter_boardings: indexmap::IndexMap<i64, indexmap::IndexMap<i64, f64>>,
     /// The Modern router's transit graph and this step's lines. Never saved.
     pub router: Option<expected_time::Router>,
