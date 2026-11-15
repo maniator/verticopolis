@@ -159,7 +159,7 @@ impl Kept {
             sim.population() as f64,
             "{what}: kept population"
         );
-        let (centers, population) = (sim.recycling_centers(), sim.tower.total_population());
+        let (centers, population) = (sim.recycling_centers(), sim.recycling_population());
         let counted = RecyclingCounts {
             centers,
             population,

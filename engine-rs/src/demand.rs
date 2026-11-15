@@ -86,7 +86,7 @@ fn tower_demand_bonus(sim: &Simulation) -> f64 {
     let centers = sim.count_operational(Kind::Recycling);
     let mut recycling = 0.0;
     if centers > 0 {
-        let pop = sim.tower.total_population() as f64;
+        let pop = sim.recycling_population() as f64;
         let capacity = centers as f64 * RECYCLING_POP_PER_CENTER;
         recycling = 0.1 * (capacity / pop.max(1.0)).min(1.0);
     }

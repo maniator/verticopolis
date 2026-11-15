@@ -179,8 +179,20 @@ impl Simulation {
         recycling_capacity_of(self.recycling_centers())
     }
 
+    /// The population the recycling centers serve: every room's
+    /// `recycling_census_share`. It is the total population without the
+    /// live customers of the Modern venues, so a lunch crowd cannot flip
+    /// the recycling gate or re-arm its nudge each day (#358). A Classic
+    /// tower has no such venue, so it reads its total population.
+    pub(crate) fn recycling_population(&self) -> i64 {
+        self.tower
+            .room_units()
+            .map(|u| u.recycling_census_share())
+            .sum()
+    }
+
     pub fn recycling_demand_met(&self) -> bool {
-        recycling_demand_met_of(self.tower.total_population(), self.recycling_capacity())
+        recycling_demand_met_of(self.recycling_population(), self.recycling_capacity())
     }
 
     pub fn suite_parking_short(&self) -> bool {
@@ -191,7 +203,7 @@ impl Simulation {
     pub fn nudge_service_shortfalls(&mut self) {
         let waste_short = self.star >= 3 && !self.recycling_demand_met();
         if waste_short && !self.waste_nudged {
-            let pop = self.tower.total_population();
+            let pop = self.recycling_population();
             let need = (pop as f64 / RECYCLING_POP_PER_CENTER).ceil();
             let msg = waste_nudge_message(pop as f64, need, self.recycling_centers());
             self.emit(&msg, LogKind::Info);

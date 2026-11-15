@@ -108,6 +108,23 @@ pub fn census_follows_the_day(kind: Kind) -> bool {
     counts_daily_visitors(kind) || counts_set_audience(kind)
 }
 
+/// Whether `kind`'s census is the customers inside it right now: a venue
+/// whose census does not follow the day (the Modern venues, such as the
+/// nightclub, the spa and the food hall). Every Classic room's census
+/// follows the day or counts the people who live or work there.
+/// The tests pin `Unit::recycling_census_share` against it; the share
+/// decides the same in one pass.
+#[cfg(test)]
+pub(crate) fn census_counts_live_customers(kind: Kind) -> bool {
+    venue_seats_customers(kind) && !census_follows_the_day(kind)
+}
+
+/// Whether `kind` is a venue that seats customers (a commercial room with a
+/// population): its live load is the customers inside it.
+pub(crate) fn venue_seats_customers(kind: Kind) -> bool {
+    kind.is_commercial() && kind.facility().population > 0
+}
+
 /// The audience `kind` counts, for a theatre at film draw `film_draw` (held to
 /// 0 through `NEW_FILM_DRAW`), or `None` for a room without a set audience.
 pub fn set_audience(kind: Kind, film_draw: i64) -> Option<i64> {

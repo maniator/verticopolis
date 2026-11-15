@@ -45,7 +45,7 @@ fn read(e: &mut Engine) -> Reads {
 fn counted(e: &Engine) -> RecyclingCounts {
     RecyclingCounts {
         centers: e.sim.recycling_centers(),
-        population: e.sim.tower.total_population(),
+        population: e.sim.recycling_population(),
     }
 }
 

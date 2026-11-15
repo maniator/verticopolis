@@ -20,7 +20,8 @@ use super::reader::compare_all;
 use crate::facilities::Kind;
 use crate::tower::{Tower, Unit};
 
-/// The working recycling centers and the population.
+/// The working recycling centers and the population they serve (each
+/// room's `recycling_census_share`).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct RecyclingCounts {
     pub centers: i64,
@@ -36,7 +37,7 @@ struct Share {
 
 fn share(u: &Unit) -> Share {
     Share {
-        census: u.census_share(),
+        census: u.recycling_census_share(),
         working_center: u.kind == Kind::Recycling && u.is_operational(),
     }
 }
