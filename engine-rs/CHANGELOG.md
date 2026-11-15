@@ -15,6 +15,13 @@ raised the version, so they are documentation only.
 There is no entry for 0.17.0, which only
 existed as a step inside a stacked branch.
 
+## 1.40.0 (2026-11-15)
+
+- A walker whose shaft or flight stands over a gap in their floor walks to its nearest column on their own run instead of finding another way that leads back to the same shaft every step (`crowd::walk::reach_on_run`).
+- The binary `.vctower` file: the line `VCTOWER2`, a newline, then the raw deflate bytes of the same stamped save (`TOWER_FILE_MAGIC_BINARY`). `load::encode_simulation_vctower_binary` and the binding's `exportVctowerBytes(appVersion, savedAtMs)` write one.
+- `load::decode_vctower_bytes`, `Engine.fromVctowerBytes(bytes, mode?)` and the port's `loadVctowerBytes(bytes)` read a file's bytes of either kind. The text readers refuse a `VCTOWER2` file as damaged, since decoding one as text changes its bytes, and a later version (`VCTOWER3`, or a number that starts with 2 such as `VCTOWER21`) still asks for an update.
+- View layout version 25: the port's `loadVctowerBytes` entry moves the exported layout pin.
+
 ## 1.39.0 (2026-11-15)
 
 - The Modern router links ground lobby runs that do not touch through the street, priced by the walk across the open ground between them, and a walker on the ground floor carries on past a lobby's end (`GameMode::walks_the_street`, `crowd::street`).

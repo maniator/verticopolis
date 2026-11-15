@@ -25,6 +25,11 @@ prompt already tells players it is an engine update and shows the new version.
 Entries below 1.51.1 were curated from the commit history after the fact, so they
 are documentation only: no build that a client fetches carries them.
 
+## 3.15.0
+
+- Fixed people standing still forever beside an escalator, stairway or elevator that stands over a gap in their floor. They now step onto it from their own side of the gap, so a sky lobby with a gap under an escalator no longer fills up with a crowd that never leaves, and busy towers like that run much faster.
+- Exported `.vctower` files are now binary and about a quarter smaller. They open in this version and newer; an older version says the file was made by a newer version. Older `.vctower` files still open.
+
 ## 3.14.0
 
 - Modern towers side by side on one lot are joined by the street: people walk out of one ground lobby, along the sidewalk and in by the other, so a trip next door no longer needs a shared basement.
