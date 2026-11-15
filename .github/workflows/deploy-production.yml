@@ -207,6 +207,8 @@ jobs:
       # A preview build swaps dist/sw.js for a worker that unregisters itself
       # (src/build/previewDeploy.ts). Production must ship Workbox's
       # precaching worker, so stop here if the build carries anything else.
+      # It also checks dist/help/sw.js, the worker help.verticopolis.com serves
+      # to remove a game worker a browser installed there.
       - name: Check the build ships the precaching service worker
         run: node scripts/check-production-worker.ts dist/sw.js
 
