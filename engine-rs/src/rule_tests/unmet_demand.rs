@@ -131,6 +131,30 @@ fn a_reachable_tenant_whose_retail_is_all_on_an_island_gripes_about_it() {
 }
 
 #[test]
+fn a_steeper_unmet_demand_drain_outranks_a_far_lobby() {
+    // Floor 14 is very far from the only lobby (a 0.055 erosion in Modern);
+    // with every shop on the island, unmet demand wears harder and is the
+    // gripe the card and a notice name (#548 residue, #550).
+    let mut sim = island_retail(24);
+    let tenant = put(&mut sim, Kind::Office, 14, C - 15);
+    seat(&mut sim, tenant, UnitState::Occupied, 0.5);
+    let u = unit(&sim, tenant).clone();
+    assert!(sim.tower.nearest_lobby_floor_distance(14) > 11, "very far");
+    assert_eq!(coverage(&mut sim, tenant), Some(0.0));
+    let g = sim.diagnostic_facts(tenant).unwrap().gripe.unwrap();
+    assert_eq!(g.cause, "unmetDemand");
+    // Covered again, the far lobby is the gripe once more.
+    assert!(
+        sim.tower
+            .place_transport(Kind::ElevatorStandard, C + 24, 30, 35)
+            .ok
+    );
+    assert_eq!(coverage(&mut sim, tenant), Some(1.0));
+    let g = sim.diagnostic_facts(tenant).unwrap().gripe.unwrap();
+    assert_eq!((g.cause, u.floor), ("lobbyFar", 14));
+}
+
+#[test]
 fn unmet_demand_outranks_noise_while_steeper_and_noise_returns_once_covered() {
     let mut sim = island_retail(22);
     let tenant = put(&mut sim, Kind::Office, 2, C - 15);

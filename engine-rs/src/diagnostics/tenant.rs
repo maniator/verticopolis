@@ -343,9 +343,12 @@ impl Simulation {
         let short = flags.service_short;
         let first = self.dominant_gripe(u, &flags);
         // A shortfall that only holds the rating ranks under unmet demand, so
-        // it reads coverage too.
+        // it reads coverage too, as do the causes a steeper unmet-demand drain
+        // outranks (noise, a far walk and a far lobby).
         let holding_short = flags.service_short.filter(|s| !s.sinks).map(|s| s.cause);
-        let reads_coverage = first.is_none() || first == Some("noise") || first == holding_short;
+        let reads_coverage = first.is_none()
+            || matches!(first, Some("noise" | "transportFar" | "lobbyFar"))
+            || first == holding_short;
         if !reads_coverage || !(served && u.kind.is_unmet_demand_kind()) {
             return first.map(|cause| self.gripe_facts(u, cause, None, short, att.as_ref()));
         }
