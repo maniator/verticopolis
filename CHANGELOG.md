@@ -25,6 +25,11 @@ prompt already tells players it is an engine update and shows the new version.
 Entries below 1.51.1 were curated from the commit history after the fact, so they
 are documentation only: no build that a client fetches carries them.
 
+## 4.5.0
+
+- The Player's Manual now has the game's menu bar across the top, as in the game: File goes back to the game or prints the page, Edit finds a page or copies its link, Options picks light, dark or your device's look, and Help has What's New, Report a Problem and Sponsor.
+- The Player's Manual has its own address, help.verticopolis.com, with shorter page addresses like help.verticopolis.com/rooms/. Old verticopolis.com/help links still work and take you to the same page. In the installed app on Android, Help now opens over the game instead of in its place.
+
 ## 4.4.0
 
 - Link a folder on your computer to the Open and Save As windows. In Chrome, Edge, Opera and Samsung Internet, pick "Link a folder on this computer…" in the Look in box, and the windows list, open and save the towers in that folder (`.vctower` and SimTower `.TDT` files). The game remembers the folder; after a restart your browser may ask once for your OK, and in Chrome "Allow on every visit" stops it asking. The game never deletes or renames a file in that folder. My Towers and the Auto-save stay as they are.
