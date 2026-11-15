@@ -1,63 +1,60 @@
 import { describe, it, expect } from "vitest";
-import {
-  METRO_TRAIN_ARRIVED_AT,
-  METRO_TRAIN_DEPARTS_AT,
-  METRO_TRAIN_GONE_AT,
-  metroLineTimes,
-  metroTrainAt,
-  metroTrainOffset,
-} from "./metroTrainSchedule";
+import type { CatalogMetroTrain } from "../catalog/catalogTypes";
+import { metroLineTimes, metroTrainAt } from "./metroTrainSchedule";
 
+/** The catalog's `world.metroTrain` as the engine publishes it, the canned
+ *  answer these pure functions read. */
+const TIMETABLE: CatalogMetroTrain = { firstHour: 6, lastHour: 20, legMinutes: 6, dwellMinutes: 14, runMinutes: 54 };
 const SPAN = 100;
-const at = (hour: number, minute: number, night = false): number => metroTrainOffset(hour * 60 + minute, SPAN, night);
 
-describe("metroTrainOffset", () => {
+describe("metroTrainAt: one station", () => {
+  const at = (hour: number, minute: number): number => metroTrainAt(hour * 60 + minute, [0], SPAN, TIMETABLE);
+
   it("slides in from the left tunnel, waits, then leaves to the right", () => {
     expect(at(12, 0)).toBe(-SPAN);
-    expect(at(12, METRO_TRAIN_ARRIVED_AT / 2)).toBeCloseTo(-SPAN / 2, 6);
-    expect(at(12, METRO_TRAIN_ARRIVED_AT)).toBe(0);
-    expect(at(12, METRO_TRAIN_DEPARTS_AT - 1)).toBe(0);
-    expect(at(12, METRO_TRAIN_DEPARTS_AT)).toBe(0);
-    expect(at(12, (METRO_TRAIN_DEPARTS_AT + METRO_TRAIN_GONE_AT) / 2)).toBeCloseTo(SPAN / 2, 6);
+    expect(at(12, 3)).toBeCloseTo(-SPAN / 2, 6);
+    expect(at(12, 6)).toBe(0);
+    expect(at(12, 19.5)).toBe(0);
+    expect(at(12, 23)).toBeCloseTo(SPAN / 2, 6);
   });
 
   it("is out of sight for the rest of the hour", () => {
-    expect(Math.abs(at(12, METRO_TRAIN_GONE_AT))).toBe(SPAN);
+    expect(Math.abs(at(12, 26))).toBe(SPAN);
     expect(Math.abs(at(12, 45))).toBe(SPAN);
     expect(Math.abs(at(12, 59))).toBe(SPAN);
   });
 
-  it("calls once every daytime hour, the same way each time", () => {
-    for (let hour = 6; hour < 21; hour++) {
+  it("calls once every hour of the timetable, the same way each time", () => {
+    for (let hour = TIMETABLE.firstHour; hour <= TIMETABLE.lastHour; hour++) {
       const present = Array.from({ length: 60 }, (_, m) => at(hour, m)).filter((x) => Math.abs(x) < SPAN);
-      expect(present.length).toBe(METRO_TRAIN_GONE_AT - 1);
+      expect(present.length).toBe(25);
       expect(at(hour, 10)).toBe(0);
     }
   });
 
-  it("runs no trains at night", () => {
+  it("runs no trains outside the timetable's hours", () => {
     for (const hour of [21, 23, 0, 3, 5]) {
-      for (let m = 0; m < 60; m += 5) expect(at(hour, m, true)).toBe(-SPAN);
+      for (let m = 0; m < 60; m += 5) expect(at(hour, m)).toBe(-SPAN);
     }
+  });
+
+  it("follows the timetable it is given", () => {
+    const late: CatalogMetroTrain = { ...TIMETABLE, firstHour: 8, legMinutes: 4, dwellMinutes: 10 };
+    expect(metroTrainAt(7 * 60 + 10, [0], SPAN, late)).toBe(-SPAN);
+    expect(metroTrainAt(8 * 60 + 4, [0], SPAN, late)).toBe(0);
+    expect(metroTrainAt(8 * 60 + 16, [0], SPAN, late)).toBeCloseTo(SPAN / 2, 6);
   });
 });
 
 describe("metroTrainAt: one train along a line of stations", () => {
   const LINE = [0, 400, 900];
-  const where = (minute: number, line: readonly number[] = LINE): number => metroTrainAt(12 * 60 + minute, line, SPAN, false);
+  const where = (minute: number, line: readonly number[] = LINE): number => metroTrainAt(12 * 60 + minute, line, SPAN, TIMETABLE);
   /** The stations the train stands in (overlaps) at `minute`. */
   const calling = (minute: number, line: readonly number[] = LINE): number[] =>
     line.flatMap((x, i) => (Math.abs(where(minute, line) - x) < SPAN ? [i] : []));
 
-  it("is metroTrainOffset for a single station", () => {
-    for (let m = 0; m < 60; m++) {
-      expect(metroTrainAt(12 * 60 + m, [250], SPAN, false)).toBeCloseTo(250 + metroTrainOffset(12 * 60 + m, SPAN, false), 9);
-    }
-    expect(metroTrainAt(2 * 60, [250], SPAN, true)).toBe(250 - SPAN);
-  });
-
   it("calls at each station in turn, left to right, and leaves out the right tunnel", () => {
-    const { leg, dwell } = metroLineTimes(LINE.length);
+    const { leg, dwell } = metroLineTimes(TIMETABLE, LINE.length);
     expect(where(0)).toBe(-SPAN);
     let t = leg;
     for (const x of LINE) {
@@ -80,16 +77,17 @@ describe("metroTrainAt: one train along a line of stations", () => {
 
   it("keeps the run inside the hour however many stations a save holds", () => {
     for (const n of [1, 2, 3, 6, 12]) {
-      const { leg, dwell } = metroLineTimes(n);
+      const { leg, dwell } = metroLineTimes(TIMETABLE, n);
       expect(leg * (n + 1) + dwell * n).toBeLessThanOrEqual(60);
       expect(dwell).toBeGreaterThan(0);
     }
-    expect(metroLineTimes(1)).toEqual({ leg: METRO_TRAIN_ARRIVED_AT, dwell: METRO_TRAIN_DEPARTS_AT - METRO_TRAIN_ARRIVED_AT });
+    expect(metroLineTimes(TIMETABLE, 1)).toEqual({ leg: 6, dwell: 14 });
+    expect(metroLineTimes(TIMETABLE, 3)).toEqual({ leg: 6, dwell: 10 });
     // Asked every frame, so the same answer comes back without a new object.
-    expect(metroLineTimes(3)).toBe(metroLineTimes(3));
+    expect(metroLineTimes(TIMETABLE, 3)).toBe(metroLineTimes(TIMETABLE, 3));
   });
 
   it("waits in the left tunnel overnight", () => {
-    expect(metroTrainAt(23 * 60 + 10, LINE, SPAN, true)).toBe(-SPAN);
+    expect(metroTrainAt(23 * 60 + 10, LINE, SPAN, TIMETABLE)).toBe(-SPAN);
   });
 });

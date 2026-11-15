@@ -1,4 +1,5 @@
 use super::*;
+use crate::crowd::metro_train;
 
 /// The catalog for `mode`.
 pub fn catalog(mode: GameMode) -> Catalog {
@@ -12,6 +13,13 @@ pub fn catalog(mode: GameMode) -> Catalog {
             ground_floor: 1,
             ground_floor_structure: ground_floor_structure_kind(Kind::Floor, 1).as_str(),
             lobby_interval: LOBBY_INTERVAL,
+            metro_train: MetroTrain {
+                first_hour: metro_train::FIRST_HOUR,
+                last_hour: metro_train::LAST_HOUR,
+                leg_minutes: metro_train::LEG_MINUTES,
+                dwell_minutes: metro_train::DWELL_MINUTES,
+                run_minutes: metro_train::RUN_MINUTES,
+            },
         },
         economy: Economy {
             starting_money: STARTING_MONEY,

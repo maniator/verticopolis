@@ -55,7 +55,7 @@ pub use rules::Rules;
 
 /// The version of the catalog's shape. It moves when a field is added,
 /// renamed or removed, so a frontend can refuse a shape it does not know.
-pub const CATALOG_VERSION: u32 = 18;
+pub const CATALOG_VERSION: u32 = 19;
 
 /// Every price, size and build rule of one mode.
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -98,6 +98,30 @@ pub struct World {
     /// Floors between lobbies: besides the ground floor, a sky lobby may sit
     /// on every floor from 2 up that is a multiple of it (15, 30, ...).
     pub lobby_interval: i64,
+    /// The Metro's timetable, which riders leaving by train keep.
+    pub metro_train: MetroTrain,
+}
+
+/// When the one train on a Metro line runs, in game time
+/// (`crowd::metro_train`). Each hour from `first_hour` to `last_hour` it
+/// comes out of the left tunnel, takes `leg_minutes` to each station, waits
+/// at each, and leaves by the right tunnel. On a line of `n` stations it
+/// waits `min(dwell_minutes, floor((run_minutes - leg_minutes * (n + 1)) /
+/// n))` minutes, or, when that is under one, every leg and wait takes
+/// `run_minutes / (2n + 1)`.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MetroTrain {
+    /// The first hour a train runs.
+    pub first_hour: i64,
+    /// The last hour a train runs; its run ends before the next.
+    pub last_hour: i64,
+    /// Minutes from a tunnel mouth, or the station before, to a station.
+    pub leg_minutes: f64,
+    /// The longest wait at a station.
+    pub dwell_minutes: f64,
+    /// Minutes of each hour the run along a line may take.
+    pub run_minutes: f64,
 }
 
 /// The mode's economy constants a UI shows, in dollars.

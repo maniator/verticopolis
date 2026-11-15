@@ -424,11 +424,12 @@ export function updateMotion(engine: TowerEngine, elapsedMs = 1000 / 60): void {
       } else cabChangeStep.set(c, since);
     }
   }
-  // The metro's one train per line runs on GAME time like the garbage truck:
-  // a run per daytime hour, none overnight, held while the game is paused.
+  // The metro's one train per line runs on GAME time like the garbage truck,
+  // on the engine's timetable (riders leaving by train board it): a run per
+  // daytime hour, none overnight, held while the game is paused.
+  const timetable = towerCatalog(engine.sim).world.metroTrain;
   for (const tr of engine.trainActors) {
-    const c = engine.sim.clock;
-    tr.shift(metroTrainAt(c.minuteOfDay, tr.line, tr.w + 12, c.isNight()) - tr.line[tr.stop]);
+    tr.shift(metroTrainAt(engine.sim.clock.minuteOfDay, tr.line, tr.w + 12, timetable) - tr.line[tr.stop]);
   }
   // The garbage truck runs on GAME time (the collection is a sim event, not
   // ambience): during the collection hour it drives in along the center's

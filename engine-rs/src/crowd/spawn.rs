@@ -17,7 +17,8 @@ mod staff;
 
 use lists::{list_of, stamp_errand, List};
 use meal_trips::{push_meal_options, spawn_meal_outbound};
-use metro_trips::{metro_arrival, metro_departure};
+pub(crate) use metro_trips::metro_arrival;
+use metro_trips::metro_departure;
 pub use staff::spawn_step;
 
 // ---- trips.ts -------------------------------------------------------------

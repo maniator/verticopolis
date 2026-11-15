@@ -19,7 +19,7 @@ fn far_end_x(crowd: &Crowd, tower: &Tower, floor: i64) -> i64 {
     pick_x(tower, floor, seed_for(crowd.next_id))
 }
 
-pub(super) fn metro_arrival(
+pub(crate) fn metro_arrival(
     crowd: &mut Crowd,
     tower: &Tower,
     station: &Unit,

@@ -340,6 +340,12 @@ fn json_takes_the_typescript_keys_and_number_forms() {
     assert_eq!(office["rent"]["shape"], "ladder");
     assert_eq!(office["rent"]["noRate"], true);
     assert_eq!(v["world"]["lotWidth"], 375);
+    // The Metro's timetable the renderer draws the train from, the same one
+    // riders leaving by train keep (`crowd::metro_train`).
+    assert_eq!(
+        v["world"]["metroTrain"],
+        serde_json::json!({"firstHour": 6, "lastHour": 20, "legMinutes": 6.0, "dwellMinutes": 14.0, "runMinutes": 54.0})
+    );
     assert!(v["economy"].get("addCarCost").is_some());
     let modern = catalog_value(GameMode::Modern);
     assert_eq!(json_entry(&modern, "office")["rent"]["shape"], "band");

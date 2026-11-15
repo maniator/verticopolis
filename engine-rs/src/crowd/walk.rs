@@ -1,8 +1,8 @@
 //! Port of `crowd/walk.ts`.
 
-use super::motion::{give_up, reroute};
+use super::motion::give_up;
 use super::street::walks_off_run;
-use super::{Crowd, Person, WALK_SPEED};
+use super::{Crowd, PState, Person, WALK_SPEED};
 use crate::jsmath;
 use crate::tower::Tower;
 
@@ -65,4 +65,31 @@ pub fn find_another_way(crowd: &mut Crowd, i: usize, tower: &mut Tower) {
     if crowd.people[i].staff_trip.is_some() || !reroute(crowd, i, tower) {
         give_up(crowd, i, tower);
     }
+}
+
+/// Sends someone on foot partway through a trip on to the trip's last floor
+/// by a new route from where they stand. `false` when there is none.
+pub(super) fn reroute(crowd: &mut Crowd, i: usize, tower: &Tower) -> bool {
+    let p = &crowd.people[i];
+    let (from, from_x, dest_x) = (p.floor, p.x, p.dest_x);
+    let Some(&to) = p.floors.last() else {
+        return false;
+    };
+    let Some(r) = crowd.route(tower, from, to, Some(from_x), Some(dest_x)) else {
+        return false;
+    };
+    let p = &mut crowd.people[i];
+    p.state = if r.shafts.is_empty() {
+        PState::ToDest
+    } else {
+        PState::ToShaft
+    };
+    p.shaft_id = r.shafts.first().copied();
+    p.floors = r.floors;
+    p.shafts = r.shafts;
+    p.leg = 0;
+    p.car_index = None;
+    p.fy = from as f64;
+    p.wait = 0.0;
+    true
 }

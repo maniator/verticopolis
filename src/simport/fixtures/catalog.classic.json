@@ -2081,13 +2081,20 @@
     "variantHouseholds": false,
     "venueFlights": false
   },
-  "version": 18,
+  "version": 19,
   "world": {
     "groundFloor": 1,
     "groundFloorStructure": "lobby",
     "lobbyInterval": 15,
     "lotWidth": 375,
     "maxFloor": 100,
+    "metroTrain": {
+      "dwellMinutes": 14,
+      "firstHour": 6,
+      "lastHour": 20,
+      "legMinutes": 6,
+      "runMinutes": 54
+    },
     "minFloor": -9
   }
 }

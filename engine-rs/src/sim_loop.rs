@@ -129,8 +129,12 @@ impl Simulation {
         let move_minutes = dt_minutes.min(CROWD_MAX_STEP / CROWD_SECONDS_PER_MINUTE);
         let mut left = move_minutes;
         let mut staff_moved = false;
+        let step_ends = self.clock.minute_of_day();
         while left > 0.0 {
             let chunk = left.min(2.5);
+            // The walks end with the step, so a chunk ends `left - chunk`
+            // minutes before it does: the minute the Metro's train reads.
+            self.crowd.minute = Some((step_ends - left + chunk).rem_euclid(1440.0));
             let calls = self.crowd.elevator_calls(&self.tower);
             let (hour, weekend) = (self.clock.hour(), self.clock.is_weekend());
             self.elevators

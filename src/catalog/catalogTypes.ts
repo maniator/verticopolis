@@ -39,7 +39,7 @@ export interface CatalogTicketPrice {
 
 /** The version of the catalog's shape. It moves when a field is added,
  *  renamed or removed, so a frontend can refuse a shape it does not know. */
-export const CATALOG_VERSION = 18;
+export const CATALOG_VERSION = 19;
 
 /** Every price, size and build rule of one mode. */
 export interface Catalog {
@@ -74,6 +74,18 @@ export interface CatalogWorld {
   /** Floors between lobbies: besides the ground floor, a sky lobby may sit on
    *  every floor from 2 up that is a multiple of it (15, 30, ...). */
   readonly lobbyInterval: number;
+  /** The Metro's timetable, which riders leaving by train keep. */
+  readonly metroTrain: CatalogMetroTrain;
+}
+
+/** When the one train on a Metro line runs, in game time: each hour from
+ *  `firstHour` to `lastHour` (`metroLineTimes` works out its calls). */
+export interface CatalogMetroTrain {
+  readonly firstHour: number;
+  readonly lastHour: number;
+  readonly legMinutes: number;
+  readonly dwellMinutes: number;
+  readonly runMinutes: number;
 }
 
 /** The mode's economy constants a UI shows, in dollars. */
