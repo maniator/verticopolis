@@ -1,7 +1,7 @@
 //! What the tower pays and earns: overhead, taxes, rent cadence, films, the
 //! metro's draw, retail demand and the view premium.
 
-use crate::clock::GameMode;
+use crate::clock::{Calendar, GameMode};
 use crate::economy::films::{FilmRules, CLASSIC_FILMS, MODERN_FILMS};
 use crate::economy::{
     CONDO_MONTHLY_TAX_RATE, OVERHEAD_PER_LEASABLE_UNIT_MONTHLY, REAL_WORLD_QUARTER_DAYS,
@@ -31,12 +31,33 @@ impl GameMode {
         }
     }
 
-    /// `quarterlyRentScale(quarterDays)`: Classic lands the full canon lump
-    /// every quarter; Modern rescales it to the quarter's length.
-    pub fn quarterly_rent_scale(self, quarter_days: i64) -> f64 {
+    /// Whether lease rent (offices, clinics, fitness clubs) lands every
+    /// maintenance period instead of every quarter. Classic collects it each
+    /// quarter, as SimTower does. Modern collects it with the monthly
+    /// overhead, so a real-world calendar never runs 90 days on overhead
+    /// alone before the first rent arrives (#2255).
+    pub fn lease_rent_lands_monthly(self) -> bool {
+        self == GameMode::Modern
+    }
+
+    /// Days between two lease rent collections on `calendar`.
+    pub fn lease_period_days(self, calendar: &Calendar) -> i64 {
+        if self.lease_rent_lands_monthly() {
+            calendar.maint_period_days
+        } else {
+            calendar.quarter_days
+        }
+    }
+
+    /// `quarterlyRentScale`: what a quarterly rent is multiplied by on each
+    /// lease collection. Classic lands the full canon lump every quarter;
+    /// Modern rescales it to the lease period's share of a real-world
+    /// quarter (a third on the real-world calendar's 30-day month, 3/90 on
+    /// the short calendar's three days).
+    pub fn quarterly_rent_scale(self, calendar: &Calendar) -> f64 {
         match self {
             GameMode::Classic => 1.0,
-            GameMode::Modern => quarter_days as f64 / REAL_WORLD_QUARTER_DAYS,
+            GameMode::Modern => self.lease_period_days(calendar) as f64 / REAL_WORLD_QUARTER_DAYS,
         }
     }
 

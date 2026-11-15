@@ -92,12 +92,12 @@ describe("the tower's calendar and one collection's rent (#2107)", () => {
     expect(catalogCalendar(catalogFor("classic"), "realWorld").key).toBe("canon");
   });
 
-  const SHORT: CatalogCalendar = { key: "canon", quarterDays: 3, maintenancePeriodDays: 3, maintenanceScale: 0.1, quarterlyRentScale: 1 / 30 };
-  const FULL: CatalogCalendar = { ...SHORT, key: "realWorld", maintenanceScale: 1, quarterlyRentScale: 1 };
+  const SHORT: CatalogCalendar = { key: "canon", quarterDays: 3, leasePeriodDays: 3, maintenancePeriodDays: 3, maintenanceScale: 0.1, quarterlyRentScale: 1 / 30 };
+  const FULL: CatalogCalendar = { ...SHORT, key: "realWorld", quarterDays: 90, leasePeriodDays: 30, maintenancePeriodDays: 30, maintenanceScale: 1, quarterlyRentScale: 1 / 3 };
 
   it("scales a quarterly rent by the calendar's quarterly scale, rounded to whole dollars", () => {
     expect(rentPerCollection("quarterly", 10_000, SHORT)).toBe(333);
-    expect(rentPerCollection("quarterly", 10_000, FULL)).toBe(10_000);
+    expect(rentPerCollection("quarterly", 10_000, FULL)).toBe(3_333);
   });
 
   it("scales a monthly rent by the calendar's maintenance scale", () => {

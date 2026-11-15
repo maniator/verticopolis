@@ -55,7 +55,7 @@ pub use rules::Rules;
 
 /// The version of the catalog's shape. It moves when a field is added,
 /// renamed or removed, so a frontend can refuse a shape it does not know.
-pub const CATALOG_VERSION: u32 = 19;
+pub const CATALOG_VERSION: u32 = 20;
 
 /// Every price, size and build rule of one mode.
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -190,7 +190,10 @@ pub struct CalendarEntry {
     /// What a `...Monthly` figure and a monthly rent are multiplied by on
     /// each maintenance period.
     pub maintenance_scale: f64,
-    /// What a quarterly rent is multiplied by when the quarter lands.
+    /// Days between lease rent collections (offices and the lease
+    /// amenities): the quarter in Classic, the maintenance period in Modern.
+    pub lease_period_days: i64,
+    /// What a quarterly rent is multiplied by on each lease collection.
     pub quarterly_rent_scale: f64,
 }
 
@@ -398,14 +401,16 @@ fn calendars_for(mode: GameMode) -> Vec<CalendarEntry> {
                 quarter_days: c.quarter_days,
                 maintenance_period_days: c.maint_period_days,
                 maintenance_scale: c.maint_period_days as f64 / REAL_WORLD_MAINT_PERIOD_DAYS,
-                quarterly_rent_scale: mode.quarterly_rent_scale(c.quarter_days),
+                lease_period_days: mode.lease_period_days(&c),
+                quarterly_rent_scale: mode.quarterly_rent_scale(&c),
             }
         })
         .collect()
 }
 
 /// When a priced kind's price is collected: `quarterly` (offices and the
-/// lease amenities, scaled by the calendar's `quarterlyRentScale`),
+/// lease amenities, every `leasePeriodDays`, scaled by the calendar's
+/// `quarterlyRentScale`),
 /// `maintenancePeriod` (rental living, every maintenance period, scaled by
 /// `maintenanceScale`), `sale` (a condo, once) or `nightly` (hotel rooms).
 /// A priced kind with no collector here is a programming error, so the

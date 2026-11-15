@@ -192,16 +192,24 @@ impl Simulation {
         self.weather = weather_for(self.clock.day());
         let period =
             (self.clock.day() as f64 / self.clock.calendar.maint_period_days as f64).floor() as i64;
+        let lease_monthly = self.mode.lease_rent_lands_monthly();
+        let mut lease_due = false;
         if period != self.last_month {
             self.last_month = period;
             self.collect_monthly_rent();
             self.pay_maintenance();
             self.roll_condo_relocations();
+            lease_due = lease_monthly;
         }
         let q = self.clock.quarter();
         if q != self.last_quarter {
             self.last_quarter = q;
             self.last_quarter_money = self.money;
+            lease_due |= !lease_monthly;
+        }
+        // Lease rent lands after the quarter's opening balance is noted, on
+        // either cadence, as it always has (#2255).
+        if lease_due {
             self.collect_rent();
         }
         self.maybe_random_event();

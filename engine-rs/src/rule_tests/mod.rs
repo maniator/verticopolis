@@ -51,6 +51,7 @@ mod housekeeping_maids;
 mod housekeeping_triage;
 mod infestation;
 mod lease_amenity_gripe;
+mod lease_rent_cadence;
 mod ledger;
 mod legibility;
 mod legibility_move_ins;

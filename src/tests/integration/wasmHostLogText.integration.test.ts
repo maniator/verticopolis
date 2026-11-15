@@ -68,6 +68,7 @@ const COUNTED = /(\d[\d,]*) (office|condo|clinic|club|rental|hotel room)(s?)\b(?
  *  that opens with `prefix` must read exactly as `pattern`. */
 const MONEY_LINES = [
   { prefix: "Quarterly office rent collected:", pattern: /^Quarterly office rent collected: \$[\d,]+ \(\d[\d,]* offices?\)\.$/ },
+  { prefix: "Monthly office rent collected:", pattern: /^Monthly office rent collected: \$[\d,]+ \(\d[\d,]* offices?\)\.$/ },
   { prefix: "Monthly maintenance paid:", pattern: /^Monthly maintenance paid: \$[\d,]+\.$/ },
   { prefix: "Maintenance paid:", pattern: /^Maintenance paid: \$[\d,]+\.$/ },
   { prefix: "Hotel guests checked out:", pattern: /^Hotel guests checked out: \$[\d,]+ earned overnight\.$/ },

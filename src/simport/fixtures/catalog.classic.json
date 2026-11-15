@@ -5,6 +5,7 @@
     "calendars": [
       {
         "key": "canon",
+        "leasePeriodDays": 3,
         "maintenancePeriodDays": 3,
         "maintenanceScale": 0.1,
         "quarterDays": 3,
@@ -2081,7 +2082,7 @@
     "variantHouseholds": false,
     "venueFlights": false
   },
-  "version": 19,
+  "version": 20,
   "world": {
     "groundFloor": 1,
     "groundFloorStructure": "lobby",

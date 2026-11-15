@@ -5,13 +5,15 @@
     "calendars": [
       {
         "key": "realWorld",
+        "leasePeriodDays": 30,
         "maintenancePeriodDays": 30,
         "maintenanceScale": 1,
         "quarterDays": 90,
-        "quarterlyRentScale": 1
+        "quarterlyRentScale": 0.3333333333333333
       },
       {
         "key": "canon",
+        "leasePeriodDays": 3,
         "maintenancePeriodDays": 3,
         "maintenanceScale": 0.1,
         "quarterDays": 3,
@@ -2452,7 +2454,7 @@
     "variantHouseholds": true,
     "venueFlights": true
   },
-  "version": 19,
+  "version": 20,
   "world": {
     "groundFloor": 1,
     "groundFloorStructure": "lobby",

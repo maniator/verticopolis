@@ -279,7 +279,8 @@ refund, the per-floor transport cost, upkeep and bookings, the exterminator
 fees where the mode has them, whether bridging can be switched off, and the
 calendars the mode runs with the factor each applies to the monthly and
 quarterly figures, since a canon calendar charges a tenth of a monthly
-figure every three days), the
+figure every three days, and how many days apart a lease rent lands, a
+quarter in Classic and a maintenance period in Modern), the
 pooled caps, and per facility kind its key, name, category, size, cost, star
 gate, population, attendance, flags, whether the mode can build it, build
 minutes, resale refund, build cap and pool, transport span, cars and car
