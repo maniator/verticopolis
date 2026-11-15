@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { buildMapGaps, type MapGapSource } from "./gaps";
+import { FloorSpans } from "./floorSpans";
+import { buildMapGaps, mapGaps, type MapGapSource } from "./gaps";
 import { fitLayout, lineToMapY, tileToMapX } from "./geometry";
 
 // 400 tiles across 300 pixels (0.75 px a tile, as a desktop map at a pixel
@@ -87,4 +88,26 @@ describe("buildMapGaps", () => {
     expect(gaps).toEqual([{ x: 75, y: 50, w: 75, h: 10 }]);
   });
 
+
+  it("keeps a floor whose runs touch as one span, so a tower in one piece answers no gaps without a walk", () => {
+    const spans = new FloorSpans(layout);
+    spans.add(5, 100, 120);
+    spans.add(5, 120, 140);
+    spans.add(6, 100, 140);
+    expect(spans.split).toBe(false);
+    expect(spans.rows[5 - spans.lowest]).toEqual([100, 140]);
+    expect(mapGaps(layout, spans, 4)).toEqual([]);
+    spans.add(6, 150, 160);
+    expect(spans.split).toBe(true);
+    expect(mapGaps(layout, spans, 0)).toHaveLength(1);
+  });
+
+  it("records nothing for a floor off the map or a span that is not finite", () => {
+    const spans = new FloorSpans(layout);
+    spans.add(50, 0, 10);
+    spans.add(-5, 0, 10);
+    spans.add(5, Number.NaN, 10);
+    spans.add(5, 10, 10);
+    expect(spans.rows.every((row) => row === undefined)).toBe(true);
+  });
 });

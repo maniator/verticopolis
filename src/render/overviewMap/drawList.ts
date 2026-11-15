@@ -19,6 +19,7 @@
 import type { FacilityKind } from "../../shared/types";
 import type { StructureRunView, TransportView, UnitView } from "../../simport/view";
 import type { HallRun } from "../lobbyHalls";
+import type { FloorSpans } from "./floorSpans";
 import { snappedBlock, type MapLayout, type MapRect } from "./geometry";
 
 /** Which painting layer a mark belongs to. */
@@ -70,22 +71,28 @@ export function floorsFor(source: Pick<MapSource, "floorsOf">, kind: FacilityKin
  * Rooms and floor runs do not overlap inside a layer, so the grouping changes no
  * pixel. Shafts keep their order, since a stairway can cross a shaft's column.
  * The layers still paint in order: structure, rooms, then shafts.
+ *
+ * Given `spans`, the same walk records each floor's built space there, for
+ * the gaps between buildings (`gaps.ts`): a run once, a tall hall's stories
+ * and a tall room's upper floors (a room's bottom floor stands on runs the
+ * walk already recorded).
  */
-export function buildMapDrawList(layout: MapLayout, source: MapSource): MapMark[] {
+export function buildMapDrawList(layout: MapLayout, source: MapSource, spans?: FloorSpans): MapMark[] {
   const heights = new Map<FacilityKind, number>();
   const structure = new Map<FacilityKind, MapMark[]>();
-  const rooms = new Map<FacilityKind, MapMark[]>();
+  const rooms = new Map<FacilityKind, { readonly floors: number; readonly marks: MapMark[] }>();
   const transports: MapMark[] = [];
-  const bucket = (into: Map<FacilityKind, MapMark[]>, kind: FacilityKind): MapMark[] => {
-    let list = into.get(kind);
-    if (!list) into.set(kind, (list = []));
+  const bucket = (kind: FacilityKind): MapMark[] => {
+    let list = structure.get(kind);
+    if (!list) structure.set(kind, (list = []));
     return list;
   };
   for (const run of source.structure) {
     // A run's width is its tile width times its tile count; a bad count draws nothing.
     if (!(run.count >= 1) || !Number.isFinite(run.count)) continue;
+    spans?.add(run.floor, run.x, run.x + run.width * run.count);
     const rect = snappedBlock(layout, run.x, run.width * run.count, run.floor, 1);
-    if (rect) bucket(structure, run.kind).push({ layer: "structure", kind: run.kind, rect });
+    if (rect) bucket(run.kind).push({ layer: "structure", kind: run.kind, rect });
   }
   // A tall hall's lobby tiles sit on its floor alone, so the runs above drew
   // one story of it. The hall's own mark covers every story, columns `x0` to
@@ -93,12 +100,18 @@ export function buildMapDrawList(layout: MapLayout, source: MapSource): MapMark[
   // solid lobby fill, which changes no pixel there.
   for (const hall of source.tallLobbies()) {
     if (!(hall.height > 1) || !(hall.x1 >= hall.x0)) continue;
+    if (spans) for (let story = 1; story < hall.height; story++) spans.add(hall.floor + story, hall.x0, hall.x1 + 1);
     const rect = snappedBlock(layout, hall.x0, hall.x1 - hall.x0 + 1, hall.floor, Math.floor(hall.height));
-    if (rect) bucket(structure, "lobby").push({ layer: "structure", kind: "lobby", rect });
+    if (rect) bucket("lobby").push({ layer: "structure", kind: "lobby", rect });
   }
   for (const room of source.rooms) {
-    const rect = snappedBlock(layout, room.x, room.width, room.floor, floorsFor(source, room.kind, heights));
-    if (rect) bucket(rooms, room.kind).push({ layer: "room", kind: room.kind, rect });
+    // One lookup a room: the kind's height and its marks together.
+    let kind = rooms.get(room.kind);
+    if (!kind) rooms.set(room.kind, (kind = { floors: floorsFor(source, room.kind, heights), marks: [] }));
+    const floors = kind.floors;
+    if (spans) for (let story = 1; story < floors; story++) spans.add(room.floor + story, room.x, room.x + room.width);
+    const rect = snappedBlock(layout, room.x, room.width, room.floor, floors);
+    if (rect) kind.marks.push({ layer: "room", kind: room.kind, rect });
   }
   for (const t of source.transports) {
     // A shaft serves every floor from `bottom` to `top`, both included, whichever
@@ -108,5 +121,10 @@ export function buildMapDrawList(layout: MapLayout, source: MapSource): MapMark[
     const rect = snappedBlock(layout, t.x, t.width, lo, hi - lo + 1);
     if (rect) transports.push({ layer: "transport", kind: t.kind, rect });
   }
-  return [...structure.values(), ...rooms.values()].flat().concat(transports);
+  // One array, filled in painting order, with no copies on the way.
+  const out: MapMark[] = [];
+  for (const list of structure.values()) for (const mark of list) out.push(mark);
+  for (const kind of rooms.values()) for (const mark of kind.marks) out.push(mark);
+  for (const mark of transports) out.push(mark);
+  return out;
 }

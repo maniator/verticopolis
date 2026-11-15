@@ -18,49 +18,33 @@
  * so the map's backdrop (sky above the ground line, earth below it) shows
  * through, and a shaft standing beside a gap still draws whole.
  *
- * Cost: built only with the draw list (a tower edit, a band crossed, a new
- * box), one pass over the runs, rooms and tall halls, and a walk of each
- * floor's few spans (sorted only on a floor a hall or a tall room adds to). Rows that repeat floor over floor join into one
- * rectangle, so a tower pair 70 floors tall adds one rectangle per gap.
+ * Cost: no walk of its own. The draw list's walk records each floor's spans
+ * (`FloorSpans`, a few numbers a floor); a tower in one piece stops there.
+ * Otherwise one walk of the floors that hold two spans or more, sorting a
+ * floor's few spans only where a hall or a tall room added one out of order.
+ * Rows that repeat floor over floor join into one rectangle, so a tower pair
+ * 70 floors tall adds one rectangle per gap.
  */
-import type { FacilityKind } from "../../shared/types";
-import { floorsFor, type MapSource } from "./drawList";
+import { buildMapDrawList, type MapSource } from "./drawList";
+import { FloorSpans } from "./floorSpans";
 import { lineToMapY, tileToMapX, type MapLayout, type MapRect } from "./geometry";
 
 /** The narrowest a gap between buildings draws, in CSS pixels. The window
  *  multiplies it by the device pixel ratio. */
 export const MAP_MIN_GAP_CSS_PX = 4;
 
-/** A hand-built extent taller than any world is held to this many floors. */
-const MAX_ROWS = 4096;
+/** No gap: what a tower in one piece answers. */
+const NO_GAPS: readonly MapRect[] = Object.freeze([]);
 
-/** What the gaps are found from: the draw list's own source. */
+/** What `buildMapGaps` finds the gaps from: the draw list's own source. */
 export type MapGapSource = Pick<MapSource, "structure" | "rooms" | "floorsOf" | "tallLobbies">;
-
-/** One floor's built spans, as tile columns `[from, to)`, flat. */
-type Spans = number[];
-
-/** Each floor's spans, by the floor's row from the map's bottom line. */
-interface FloorSpans {
-  readonly rows: Array<Spans | undefined>;
-  readonly lowest: number;
-}
-
-function addSpan(byFloor: FloorSpans, floor: number, from: number, to: number): void {
-  const row = floor - byFloor.lowest;
-  // A floor off the map (or not a whole number) draws no gap.
-  if (!(row >= 0 && row < byFloor.rows.length && Number.isInteger(row) && Number.isFinite(from) && Number.isFinite(to) && to > from)) return;
-  const list = byFloor.rows[row];
-  if (list) list.push(from, to);
-  else byFloor.rows[row] = [from, to];
-}
 
 /** Sort a floor's spans by their start, in place, and join the ones that
  *  touch or overlap. Returns how many numbers of `flat` now hold the joined
  *  `[from, to)` pairs. A floor holds a few spans, and the view lists its runs
  *  left to right, so the insertion sort moves only what a hall or a tall room
  *  added. */
-function joinSpans(flat: Spans): number {
+function joinSpans(flat: number[]): number {
   for (let i = 2; i < flat.length; i += 2) {
     const from = flat[i];
     const to = flat[i + 1];
@@ -87,33 +71,25 @@ function joinSpans(flat: Spans): number {
 }
 
 /**
- * The gaps between buildings for a source and a layout, as map rectangles in
- * device pixels, each at least `minPx` wide where the buildings beside it
- * leave room. A gap off the map, or a source entry with a coordinate that is
- * not finite, is skipped; nothing throws on odd input.
+ * The gaps between buildings on a source alone: the draw list's walk with
+ * `FloorSpans`, then `mapGaps`. The window's model takes the two steps itself,
+ * so it walks the tower once.
  */
-export function buildMapGaps(layout: MapLayout, source: MapGapSource, minPx: number): MapRect[] {
-  // The floors the map shows: the one under its bottom line up to the one
-  // on its top line.
-  const lowest = Math.floor(layout.extent.bottomLine);
-  const rows = Math.max(0, Math.ceil(layout.extent.topLine) - lowest + 1);
-  const byFloor: FloorSpans = { rows: new Array<Spans | undefined>(Number.isFinite(rows) ? Math.min(rows, MAX_ROWS) : 0), lowest };
-  for (const run of source.structure) {
-    if (!(run.count >= 1)) continue;
-    addSpan(byFloor, run.floor, run.x, run.x + run.width * run.count);
-  }
-  // A tall hall's raised stories have no tiles of their own.
-  for (const hall of source.tallLobbies()) {
-    for (let story = 0; story < hall.height; story++) addSpan(byFloor, hall.floor + story, hall.x0, hall.x1 + 1);
-  }
-  // A room stands on its bottom floor's tiles, which the runs above already
-  // hold, so only the upper floors of a room taller than one floor add a span.
-  const heights = new Map<FacilityKind, number>();
-  for (const room of source.rooms) {
-    const floors = floorsFor(source, room.kind, heights);
-    for (let story = 1; story < floors; story++) addSpan(byFloor, room.floor + story, room.x, room.x + room.width);
-  }
+export function buildMapGaps(layout: MapLayout, source: MapGapSource, minPx: number): readonly MapRect[] {
+  const spans = new FloorSpans(layout);
+  buildMapDrawList(layout, { ...source, transports: [] }, spans);
+  return mapGaps(layout, spans, minPx);
+}
 
+/**
+ * The gaps between buildings in the spans the draw list recorded, as map
+ * rectangles in device pixels, each at least `minPx` wide where the buildings
+ * beside it leave room. A tower with no floor of two spans answers at once.
+ * Sorts each floor's spans in place.
+ */
+export function mapGaps(layout: MapLayout, byFloor: FloorSpans, minPx: number): readonly MapRect[] {
+  if (!byFloor.split) return NO_GAPS;
+  const lowest = byFloor.lowest;
   // Every gap shows, a pixel wide at the least.
   const need = Number.isFinite(minPx) && minPx > 1 ? Math.ceil(minPx) : 1;
   const mapW = Math.max(1, Math.floor(layout.width));

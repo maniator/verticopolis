@@ -6,8 +6,9 @@
  *
  * - The draw list and the gaps between buildings are rebuilt only when the
  *   identity of `structure`, `rooms` or `tower.transports` changes, or the
- *   box, the extent (a band crossed) or the narrowest gap does. `tower.revision` alone is not a reason: a host can
- *   repeat a revision over other units (#1296).
+ *   box, the extent (a band crossed) or the narrowest gap does.
+ *   `tower.revision` alone is not a reason: a host can repeat a revision over
+ *   other units (#1296).
  *   The band check is constant work on every sync (a couple of small extent
  *   objects and a few comparisons), never a walk.
  * - The camera placement is recomputed only when the camera's center, zoom or
@@ -24,7 +25,8 @@
 import type { FacilityKind } from "../../shared/types";
 import type { HallRun } from "../lobbyHalls";
 import { buildMapDrawList, type MapMark, type MapSource } from "./drawList";
-import { buildMapGaps } from "./gaps";
+import { FloorSpans } from "./floorSpans";
+import { mapGaps } from "./gaps";
 import { bandedExtent, sameExtent, viewPlacement, type BuiltFloors, type ViewPlacement } from "./extent";
 import { fitLayout, type MapCamera, type MapLayout, type MapRect, type MapWorld } from "./geometry";
 
@@ -75,7 +77,7 @@ export class OverviewMapModel {
   private placementLayout: MapLayout | null = null;
   layout: MapLayout | null = null;
   marks: readonly MapMark[] = [];
-  /** The open air between buildings (`buildMapGaps`), rebuilt with `marks`. */
+  /** The open air between buildings (`mapGaps`), rebuilt with `marks`. */
   gaps: readonly MapRect[] = [];
   placement: ViewPlacement | null = null;
 
@@ -114,17 +116,17 @@ export class OverviewMapModel {
       this.layout = fitLayout(extent, boxWidth, boxHeight);
       this.placement = null;
     }
-    const halls = input.tallLobbies();
     const source: MapSource = {
       structure: input.view.structure,
       rooms: input.view.rooms,
       transports: input.view.tower.transports,
       floorsOf: (kind) => input.floorsOf(kind),
-      // Asked once per rebuild: the draw list and the gaps both read it.
-      tallLobbies: () => halls,
+      tallLobbies: () => input.tallLobbies(),
     };
-    this.marks = buildMapDrawList(this.layout, source);
-    this.gaps = buildMapGaps(this.layout, source, input.minGapPx);
+    // One walk of the tower: the draw list records the floors' spans as it goes.
+    const spans = new FloorSpans(this.layout);
+    this.marks = buildMapDrawList(this.layout, source, spans);
+    this.gaps = mapGaps(this.layout, spans, input.minGapPx);
     return true;
   }
 

@@ -185,7 +185,9 @@ export function blockRect(layout: MapLayout, x: number, width: number, floor: nu
  * last column or the bottom row still shows.
  */
 export function snappedBlock(layout: MapLayout, x: number, width: number, floor: number, floors: number): MapRect | null {
-  if (![x, width, floor, floors].every(Number.isFinite) || width <= 0 || floors < 1) return null;
+  // One check at a time: this runs for every mark of a rebuild, and an
+  // array per call would be garbage.
+  if (!(Number.isFinite(x) && Number.isFinite(width) && Number.isFinite(floor) && Number.isFinite(floors)) || width <= 0 || floors < 1) return null;
   const mapW = Math.max(1, Math.floor(layout.width));
   const mapH = Math.max(1, Math.floor(layout.height));
   const rawLeft = tileToMapX(layout, x);
