@@ -50,8 +50,8 @@ afterEach(() => {
 });
 
 /**
- * The Load Tower action (SPEC-splash-load-tower CAP-1). The picker it opens is
- * pinned in `./templates/towerPicker.test.ts`; the dismissal contract lives in
+ * The Load Tower action (SPEC-splash-load-tower CAP-1). The Open window it
+ * opens is pinned in `./fileDialog.test.ts`; the dismissal contract lives in
  * the onboarding integration tests.
  */
 describe("splash Load Tower action (SPEC-splash-load-tower CAP-1)", () => {
