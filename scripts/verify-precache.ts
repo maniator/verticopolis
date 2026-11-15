@@ -86,6 +86,18 @@ if (dupes.length > 0) fail(`duplicate precache entries (each asset must be liste
 const missing = REQUIRED_ICONS.filter((icon) => !seen.has(icon));
 if (missing.length > 0) fail(`expected icons missing from the precache manifest (a narrowed glob or moved file?): ${missing.join(", ")}`);
 
+// A tooling build (VC_TOOLING=1, the one CI builds and tests) precaches the
+// tooling engine, which carries test hooks a player never downloads. The
+// budget is about what a player installs, so the engine files count at their
+// player-build size (src/public/engine/, built alongside) when that package is
+// there. Without it they count as built, which is the stricter reading.
+const PLAYER_ENGINE = resolve(dirname(fileURLToPath(import.meta.url)), "..", "src", "public", ENGINE_DIR);
+const playerSize = (u: string): number | null => {
+  if (process.env.VC_TOOLING !== "1" || !u.startsWith(ENGINE_DIR)) return null;
+  const player = resolve(PLAYER_ENGINE, u.slice(ENGINE_DIR.length));
+  return existsSync(player) ? statSync(player).size : null;
+};
+
 const realDist = realpathSync(DIST);
 const total = urls.reduce((sum, u) => {
   let file: string;
@@ -97,7 +109,7 @@ const total = urls.reduce((sum, u) => {
   if (!existsSync(file)) fail(`precache entry ${u} has no file under dist/; cannot size the precache`);
   const real = relative(realDist, realpathSync(file));
   if (real === "" || real === ".." || real.startsWith(`..${sep}`) || isAbsolute(real)) fail(`precache entry ${u} links outside dist/`);
-  return sum + statSync(file).size;
+  return sum + (playerSize(u) ?? statSync(file).size);
 }, 0);
 if (total > PRECACHE_BUDGET_BYTES) {
   fail(`the precache is ${(total / 1048576).toFixed(2)} MiB, over its ${PRECACHE_BUDGET_BYTES / 1048576} MiB budget; every install downloads it, so shrink it or raise PRECACHE_BUDGET_BYTES with the reason`);
