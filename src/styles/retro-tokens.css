@@ -28,6 +28,12 @@
   --r-title-fg: #ffffff;
   --r-ink: #000000;
   --r-desktop: #008080;
+  /* The game's own background: the face of a maximized window, as in Windows
+     95, where the desktop never shows through. The gap around the Tools window
+     and the tower view wears it, so the tower is the only color on screen. The
+     teal desktop above is for full pages (the help site) and for a restored
+     window, never for the inside of the game window. */
+  --r-workspace: var(--r-face);
   --r-font: "MS Sans Serif", "Tahoma", "Geneva", "Segoe UI", sans-serif;
   --bevel-out: inset -1px -1px var(--r-dark), inset 1px 1px var(--r-hi),
     inset -2px -2px var(--r-shadow), inset 2px 2px var(--r-light);
