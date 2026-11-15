@@ -15,6 +15,12 @@ raised the version, so they are documentation only.
 There is no entry for 0.17.0, which only
 existed as a step inside a stacked branch.
 
+## 1.39.0 (2026-11-15)
+
+- The Modern router links ground lobby runs that do not touch through the street, priced by the walk across the open ground between them, and a walker on the ground floor carries on past a lobby's end (`GameMode::walks_the_street`, `crowd::street`).
+- Modern lays a ground lobby tile apart from the tower (`GameMode::lays_ground_lobbies_apart`), and undo puts one back the same way.
+- Modern sells ground lobby tiles under the floor-tile rules, refusing only the tower's last one (`GameMode::removes_lobby_tiles`).
+
 ## 1.38.0 (2026-11-14)
 
 - A save carries the crowd (`crowd`: every person, the crowd's id source and random stream, the commute-stress averages and the walk-ins booked for the hour) and the elevator cars' timers mid-stop (`dispatch`), and a load rebuilds the venue, meal and housekeeping counts from the people, so the people and the cars carry on where they were. The crowd also keeps the last step's hour, the Modern router's line counts, and the office commuters' desks and bookings when there are any. The elevator panels' hourly figures, the day's move-in report and the rooms cleaned today still start over on a load. Older saves load with an empty crowd as before, and older builds ignore both keys.
