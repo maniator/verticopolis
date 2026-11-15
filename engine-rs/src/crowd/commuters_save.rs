@@ -15,11 +15,13 @@ use std::collections::BTreeMap;
 use serde::ser::{Serialize, SerializeMap, SerializeSeq, Serializer};
 use serde_json::{json, Map, Value};
 
-use super::commuters::{Desk, Shift};
-use super::save::MAX_SAVED_WALK_INS;
+use super::commuters::{is_office, Desk, Shift};
+use super::save::{MAX_SAVED_PEOPLE, MAX_SAVED_WALK_INS};
 use super::Crowd;
 use crate::charges::whole;
+use crate::facilities::Kind;
 use crate::sim_save::Each;
+use crate::tower::Tower;
 
 /// The most desks a save restores, one per office: far above the offices
 /// any tower holds, it only bounds what a hand-edited save can make the
@@ -47,13 +49,17 @@ fn desk_from(v: &Value) -> Option<(i64, Desk)> {
     if n[3] < 1 || n[4..].iter().any(|&c| c < 0) {
         return None;
     }
+    // No more workers than an office holds: each one inside may be sent out
+    // as a person on the first hourly pass (`commuters::reconcile`), so a
+    // forged count must not make that pass endless (#2230).
+    let most = Kind::Office.facility().population;
     let desk = Desk {
         floor: n[1],
         x: n[2],
         width: n[3],
-        inside: n[4],
-        coming: n[5],
-        going: n[6],
+        inside: n[4].min(most),
+        coming: n[5].min(most),
+        going: n[6].min(most),
     };
     Some((n[0], desk))
 }
@@ -125,5 +131,27 @@ impl Crowd {
             self.shifts.extend(rows.filter_map(shift_from));
             self.sort_shifts();
         }
+    }
+
+    /// Bounds the workers a save's desks can send out at once. The first
+    /// pass after a load (`commuters::reconcile`) walks the workers of an
+    /// office that no longer stands out of the building, one person each. A
+    /// save taken just after a bulldoze holds a few such desks; a forged one
+    /// could hold thousands. Desks of offices that are gone are kept in id
+    /// order while their workers fit beside the saved people under the
+    /// people a save may hold, and the rest are dropped.
+    pub(crate) fn bound_gone_desks(&mut self, tower: &Tower) {
+        let mut room = MAX_SAVED_PEOPLE.saturating_sub(self.people.len()) as i64;
+        self.desks.retain(|&id, desk| {
+            let stands = tower.get_unit(id).is_some_and(|u| is_office(u, tower.mode));
+            if stands {
+                return true;
+            }
+            let fits = desk.inside <= room;
+            if fits {
+                room -= desk.inside;
+            }
+            fits
+        });
     }
 }

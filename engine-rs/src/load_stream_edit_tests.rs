@@ -33,9 +33,10 @@ const JSON_BYTES: &[u8] = b"{}[],:\"0-.e\\ ";
 /// 167 became 154 when saves started carrying the people and the cars'
 /// timers: the base saves gained the `crowd` and `dispatch` keys, so the
 /// seeded edits fall on different bytes. No reader disagreement came with
-/// it. 154 became 153 when the crowd started carrying the last step's hour:
-/// the edits shift again.
-const STREAMED: usize = 153;
+/// it. 154 became 153 when the crowd started carrying the last step's hour,
+/// and 153 became 136 when saves started carrying the housekeeping
+/// tallies (`housekeeping`), for the same reason.
+const STREAMED: usize = 136;
 
 /// Seeded edits of engine saves, a few bytes each: dropped, inserted,
 /// changed or copied, or the text cut short. Whatever comes out, both

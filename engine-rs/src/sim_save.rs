@@ -167,7 +167,7 @@ impl Simulation {
     /// are listed one by one, as the state view (`snapshot::state_view`)
     /// reads them, so a conformance digest does not depend on the encoding.
     fn save_fields(&self, fold: bool) -> Vec<(&'static str, Field<'_>)> {
-        let mut m: Vec<(&'static str, Field<'_>)> = Vec::with_capacity(32);
+        let mut m: Vec<(&'static str, Field<'_>)> = Vec::with_capacity(33);
         let tall_lobbies = self.tower.tall_lobby_runs();
         let version = if fold {
             self.written_save_version()
@@ -232,6 +232,11 @@ impl Simulation {
         m.push(("crowd", Field::Crowd(&self.crowd)));
         // The cars' timers mid-stop, so the riders' cars carry on too.
         m.push(("dispatch", Field::Dispatch(&self.elevators)));
+        // Today's rooms cleaned and yesterday's shift, so the checkout line
+        // and the stats sheet read the same after a reload.
+        if let Some(tallies) = self.housekeeping.save_json() {
+            m.push(own("housekeeping", tallies));
+        }
         if let Some(v) = &self.view {
             m.push(("view", Field::Borrowed(v)));
         }
@@ -316,9 +321,10 @@ impl Simulation {
     /// unfold; the rest carries the version `serialize()` stamps.
     #[cfg_attr(not(feature = "wasm"), allow(dead_code))]
     pub(crate) fn save_without_units(&self) -> (Value, impl Iterator<Item = Value> + '_) {
-        // The `.TDT` format has no place for the crowd or the cars' timers.
+        // The `.TDT` format has no place for the crowd, the cars' timers or
+        // the housekeeping tallies.
         (
-            self.serialize_without(&["units", "crowd", "dispatch"]),
+            self.serialize_without(&["units", "crowd", "dispatch", "housekeeping"]),
             self.tower.units.iter().map(Unit::serialize),
         )
     }

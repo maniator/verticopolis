@@ -227,9 +227,10 @@ export function stashSave(arg: { name: string; save: string }): number {
  * directly with the Node check's. Both engines' saves pass through the same
  * JSON.parse and the same printer here. The save must list every floor tile
  * on its own, as `serializeUnfolded()` writes it (the state view's form); a
- * version 11 save's floor runs would hash differently. The save's `crowd`
- * and `dispatch` keys are left out, as the engine's state view leaves them
- * out; the Node check compares the crowd with the conformance crowd digest.
+ * version 11 save's floor runs would hash differently. The save's `crowd`,
+ * `dispatch` and `housekeeping` keys are left out, as the engine's state view
+ * leaves them out; the Node check compares the crowd with the conformance
+ * crowd digest.
  */
 export async function digestStashed(key: string): Promise<string> {
   const w = window as any;
@@ -242,7 +243,7 @@ export async function digestStashed(key: string): Promise<string> {
     const keys = Object.keys(o).filter((k) => o[k] !== undefined).sort();
     return `{${keys.map((k) => `${JSON.stringify(k)}:${stable(o[k])}`).join(",")}}`;
   };
-  const { crowd: _crowd, dispatch: _dispatch, ...data } = (typeof save === "string" ? JSON.parse(save) : save) as Record<string, unknown>;
+  const { crowd: _crowd, dispatch: _dispatch, housekeeping: _housekeeping, ...data } = (typeof save === "string" ? JSON.parse(save) : save) as Record<string, unknown>;
   if (Array.isArray(data.log)) data.log = (data.log as Record<string, unknown>[]).map(({ text: _t, ...rest }) => rest);
   const ev = data.events as { pending?: Record<string, unknown> | null } | undefined;
   if (ev?.pending) {

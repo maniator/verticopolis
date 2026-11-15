@@ -136,3 +136,76 @@ fn the_modern_routers_lines_come_back_for_the_next_step() {
     let empty = load_with_crowd(json!({}));
     assert!(empty.serialize()["crowd"].get("lines").is_none());
 }
+
+#[test]
+fn the_stood_down_cars_come_back_for_the_routers_first_step() {
+    let cars = json!([[7, 2], [3, 0], [7, 2], [3, "x"], [4]]);
+    let sim = load_with_crowd(json!({ "closedCars": cars }));
+    assert_eq!(
+        sim.crowd.closed_cars,
+        vec![(3, 0), (7, 2)],
+        "ascending, once each"
+    );
+    let crowd = &sim.serialize()["crowd"];
+    assert_eq!(crowd["closedCars"], json!([[3, 0], [7, 2]]));
+    let empty = load_with_crowd(json!({}));
+    assert!(empty.serialize()["crowd"].get("closedCars").is_none());
+}
+
+#[test]
+fn a_forged_head_count_cannot_send_out_more_workers_than_an_office_holds() {
+    let most = crate::facilities::Kind::Office.facility().population;
+    let huge = 9_007_199_254_740_991_i64;
+    let sim = load_with_crowd(json!({ "desks": [[4, 5, 10, 9, huge, huge, huge]] }));
+    let desk = sim.crowd.desks[&4];
+    assert_eq!((desk.inside, desk.coming, desk.going), (most, most, most));
+    // The office's own head count is held to the same ceiling.
+    let mut save = Simulation::new_game(5, GameMode::Modern).serialize();
+    save["units"].as_array_mut().unwrap().push(json!({
+        "id": 77, "kind": "office", "floor": 2, "x": 100, "width": 9,
+        "state": "occupied", "occupants": huge,
+    }));
+    let loaded = load_save_text(save.to_string().as_bytes()).unwrap();
+    let office = loaded.tower.get_unit(77).expect("the office loads");
+    assert_eq!(office.occupants, most);
+}
+
+#[test]
+fn a_save_cannot_send_out_more_workers_of_gone_offices_than_it_holds_people() {
+    let most = crate::facilities::Kind::Office.facility().population;
+    let cap = crate::crowd::save::MAX_SAVED_PEOPLE as i64;
+    let mut sim = Simulation::new_game(5, GameMode::Modern);
+    // Office ids no unit carries, each full: far more workers than a save
+    // may hold people.
+    let gone = cap / most + 200;
+    for id in 0..gone {
+        let desk = Desk {
+            inside: most,
+            ..Desk::default()
+        };
+        sim.crowd.desks.insert(10_000 + id, desk);
+    }
+    sim.crowd.bound_gone_desks(&sim.tower);
+    let kept: i64 = sim.crowd.desks.values().map(|d| d.inside).sum();
+    assert_eq!(kept, cap / most * most);
+    // The lowest ids are the ones kept, so a load keeps the same desks.
+    assert_eq!(sim.crowd.desks.keys().next(), Some(&10_000));
+    assert_eq!(sim.crowd.desks.len() as i64, cap / most);
+    // Saved people take their share of the room first.
+    let people: Vec<Value> = (1..=5).map(walker).collect();
+    sim.crowd.people = load_with_crowd(json!({ "people": people })).crowd.people;
+    assert_eq!(sim.crowd.people.len(), 5);
+    sim.crowd.bound_gone_desks(&sim.tower);
+    let kept: i64 = sim.crowd.desks.values().map(|d| d.inside).sum();
+    assert_eq!(kept, (cap - 5) / most * most);
+    // Through a whole load: whether the first pass walks them out as people
+    // or leaves them at their desks, the workers stay under the cap.
+    let rows: Vec<Value> = (0..gone)
+        .map(|id| json!([10_000 + id, 5, 30, 9, most, 0, 0]))
+        .collect();
+    let loaded = load_with_crowd(json!({ "desks": rows }));
+    let at_desks: i64 = loaded.crowd.desks.values().map(|d| d.inside).sum();
+    let total = loaded.crowd.people.len() as i64 + at_desks;
+    assert!(total <= cap, "{total} workers after the load");
+    assert!(total > 0, "the bound keeps the desks that fit");
+}

@@ -101,7 +101,7 @@ pub struct Commute {
     pub inbound: bool,
 }
 
-fn is_office(u: &Unit, mode: GameMode) -> bool {
+pub(super) fn is_office(u: &Unit, mode: GameMode) -> bool {
     u.kind.commutes_in_person(mode)
 }
 

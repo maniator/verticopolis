@@ -440,6 +440,9 @@ pub(crate) fn assemble(
     if let Some(cars) = data.get("dispatch") {
         sim.elevators.restore(cars, &sim.tower);
     }
+    if let Some(tallies) = data.get("housekeeping") {
+        sim.housekeeping.restore_tallies(tallies);
+    }
     // The saved office head counts are the workers at their desks, so a
     // bulldoze before the first step still sends them out. Both readers
     // come through here, so they square the desks the same way.

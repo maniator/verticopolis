@@ -273,7 +273,15 @@ pub(crate) fn unit_from_value(u: &Value, modern: bool) -> Option<(Unit, Option<i
         occupants: if kind.counts_visitors() || kind.is_structural() {
             0
         } else {
-            num(u.get("occupants"), 0.0).clamp(0.0, MAX_SAFE_INTEGER) as i64
+            let occupants = num(u.get("occupants"), 0.0).clamp(0.0, MAX_SAFE_INTEGER) as i64;
+            // An office's head count is its workers at their desks, each of
+            // whom may leave as a person (`crowd::commuters`): never more
+            // than the office holds (#2230).
+            if kind == Kind::Office {
+                occupants.min(kind.facility().population)
+            } else {
+                occupants
+            }
         },
         customers_in: None,
         hotel_customers_in: None,
