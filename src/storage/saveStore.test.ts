@@ -163,6 +163,18 @@ describe("writes once open", () => {
     expect(fake.row("verticopolis", "saves", AUTO)).toEqual({ text: "t2:auto" });
   });
 
+  it("keep a writer's deflate bytes as they are, with the text in memory and in the mirror", async () => {
+    const packed = new Uint8Array([9, 8, 7]);
+    // The bytes are the writer's word for the text's payload: the store
+    // keeps them without decoding the text to check, so a mismatch shows here.
+    const value = STORE_MAGIC + toBase64(new Uint8Array([1, 2, 3]));
+    saveStore.set(AUTO, value, packed);
+    expect(saveStore.get(AUTO)).toBe(value);
+    expect(localStorage.getItem(AUTO)).toBe(value);
+    await saveStore.settled();
+    expect(fake.row("verticopolis", "saves", AUTO)).toEqual({ packed });
+  });
+
   it("land in the order they were made", async () => {
     saveStore.set(SLOT, "t1:first");
     saveStore.set(SLOT, "t2:second");

@@ -128,13 +128,17 @@ async function readAll(db: IDBDatabase, keys: readonly string[]): Promise<Map<st
   return values;
 }
 
-/** Write `entries` (a null value deletes) in one transaction and wait for it. */
-async function writeAll(db: IDBDatabase, entries: readonly (readonly [string, string | null])[], migrated = false): Promise<void> {
+/** One write: a key, its value (null deletes), and the value's deflate
+ *  bytes when the writer already has them (`saveStore.set`). */
+type Entry = readonly [key: string, value: string | null, packed?: Uint8Array];
+
+/** Write `entries` in one transaction and wait for it. */
+async function writeAll(db: IDBDatabase, entries: readonly Entry[], migrated = false): Promise<void> {
   const tx = db.transaction([SAVES, META], "readwrite");
   const store = tx.objectStore(SAVES);
-  for (const [key, value] of entries) {
+  for (const [key, value, packed] of entries) {
     if (value === null) store.delete(key);
-    else store.put(toStored(value), key);
+    else store.put(packed ? { packed } : toStored(value), key);
   }
   if (migrated) tx.objectStore(META).put(true, MIGRATED);
   await committed(tx);
@@ -285,11 +289,11 @@ function heard(data: { key?: unknown; value?: unknown }): void {
 }
 
 /** Queue `key`'s new value (null deletes) for the database, after the writes before it. */
-function persist(o: Open, key: string, value: string | null): void {
+function persist(o: Open, key: string, value: string | null, packed?: Uint8Array): void {
   o.channel?.postMessage({ key, value });
   o.pending = o.pending.then(
     () =>
-      writeAll(o.db, [[key, value]]).catch((err: unknown) => {
+      writeAll(o.db, [[key, value, packed]]).catch((err: unknown) => {
         o.failed ??= err;
         // A mirrored key is still whole in localStorage, which wins at boot
         // when the database copy is older, so only the others are reported.
@@ -310,13 +314,16 @@ export const saveStore = {
   },
   /** Store `value` under `key`. Throws, writing nothing, when localStorage
    *  refuses a write it takes (a full quota); a database write that fails
-   *  later is reported to {@link saveStore.onFailure} and by `settled`. */
-  set(key: string, value: string): void {
+   *  later is reported to {@link saveStore.onFailure} and by `settled`.
+   *  `packed`, when given, must be the deflate bytes `value` (`VCZ1:` and
+   *  their base64) carries: the database keeps them as they are, with no
+   *  base64 decoded or checked on the main thread. */
+  set(key: string, value: string, packed?: Uint8Array): void {
     const o = managed(key);
     if (!o || o.keys.mirrored.includes(key)) localStorage.setItem(key, value);
     if (!o) return;
     o.values.set(key, value);
-    persist(o, key, value);
+    persist(o, key, value, packed);
   },
   /** Remove `key`, from localStorage too (an old copy there would come back
    *  in an older build). */

@@ -195,11 +195,11 @@ export interface EnginePortLifecycle {
   ): PortRecord;
   /** The save; JSON is the save format. */
   serialize(): string;
-  /** The `stored` source: `[status, generation]`. A save with no
-   *  `appVersion` is a founder's tower (before 2.0). */
+  /** `serialize()` stamped with `savedAt` and `appVersion`, as UTF-8 bytes. */
+  saveBytes(appVersion: string, savedAtMs: number): Uint8Array;
+  /** The `stored` source: `[status, generation]`. A save with no `appVersion` is a founder's tower (before 2.0). */
   loadSave(text: string): PortRecord;
-  /** The `history` source: keeps the live camera and auto-bridge
-   *  preference, and never applies the founder rule. */
+  /** The `history` source: keeps the live camera and auto-bridge preference, and never applies the founder rule. */
   restore(text: string): PortRecord;
   /** The `found` source. */
   foundTower(

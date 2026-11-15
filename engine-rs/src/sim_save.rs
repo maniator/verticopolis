@@ -359,6 +359,27 @@ impl Simulation {
         serde_json::to_string(&Fields(self.save_fields(true))).expect("a save writes as JSON")
     }
 
+    /// The save text as UTF-8 bytes with `"savedAt"` and `"appVersion"`
+    /// appended as the last two keys, the bytes the web game's `stampText`
+    /// and `TextEncoder` make from `serialize()`. A host that stores the save
+    /// takes it this way, without holding a megabyte of save as a JavaScript
+    /// string. The stamp is written as `JSON.stringify` writes it.
+    pub fn stamped_save_bytes(&self, app_version: &str, saved_at_ms: f64) -> Vec<u8> {
+        let mut buf = Vec::new();
+        // The same write as `save_text`, which cannot fail (see there).
+        serde_json::to_writer(&mut buf, &Fields(self.save_fields(true)))
+            .expect("a save writes as JSON");
+        // A save is a JSON object with keys, so it ends in its closing brace.
+        buf.pop();
+        let mut stamp = String::from(",\"savedAt\":");
+        crate::canonical::write_js_json(&mut stamp, &json!(saved_at_ms));
+        stamp.push_str(",\"appVersion\":");
+        crate::canonical::write_js_string(&mut stamp, app_version);
+        stamp.push('}');
+        buf.extend_from_slice(stamp.as_bytes());
+        buf
+    }
+
     /// The same text, written into `buf`, so the memory tests can reserve the
     /// buffer first and count only what the write builds beside it.
     #[cfg(test)]

@@ -448,6 +448,12 @@ export class Engine {
      */
     roomTiers(): Float64Array;
     /**
+     * `serialize()` stamped with `savedAt` and `appVersion` (appended as the
+     * last two keys, as `JSON.stringify` writes them), as UTF-8 bytes: what
+     * the game stores for a save, without a JavaScript string in between.
+     */
+    saveBytes(app_version: string, saved_at_ms: number): Uint8Array;
+    /**
      * What moved in the save since the last sync: `{ units, rest }` as JSON
      * text (the changed unit records, and every other top-level key).
      * `undefined` when units were added, removed or reordered, or no full

@@ -4,6 +4,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { FakeIndexedDb } from "../tests/fakeIndexedDb";
 import { SaveGame, UNREADABLE_KEY, openSaves } from "./SaveGame";
 import { closeSaveStoreForTests, saveStore } from "./saveStore";
+import { inflateCapped, STORE_MAGIC, toBase64 } from "./saveCompression";
+import { resetSavePackerForTests } from "./savePacker";
+import { stampText } from "./saveStamp";
 
 /**
  * SaveGame through the save store, on a real tower: every read and write the
@@ -101,6 +104,46 @@ describe("SaveGame on the save store", () => {
     localStorage.setItem(AUTO_KEY, packedAt(1, renamed("Stale")));
     await reload();
     expect(nameOf(autosaveText())).toBe("Async");
+  });
+
+  it("an autosave of the engine's stamped bytes stores their deflate as it is, and reloads as that save", async () => {
+    await openSaves(fake.asFactory());
+    const bytes = new TextEncoder().encode(stampText(renamed("Bytes")).json);
+    await SaveGame.saveAsync(() => bytes.slice());
+    await saveStore.settled();
+    const row = fake.row("verticopolis", "saves", AUTO_KEY) as { packed: Uint8Array };
+    expect(inflateCapped(row.packed)).toEqual(bytes);
+    expect(saveStore.get(AUTO_KEY)).toBe(STORE_MAGIC + toBase64(row.packed));
+    await reload();
+    expect(nameOf(autosaveText())).toBe("Bytes");
+  });
+
+  it("a packer that dies with the bytes has the save made again and packed on the page", async () => {
+    await openSaves(fake.asFactory());
+    resetSavePackerForTests();
+    vi.stubGlobal(
+      "Worker",
+      class {
+        onerror: (() => void) | null = null;
+        onmessage = null;
+        onmessageerror = null;
+        postMessage() {
+          queueMicrotask(() => this.onerror?.());
+        }
+        terminate() {}
+      },
+    );
+    let made = 0;
+    try {
+      await SaveGame.saveAsync(() => (made++, new TextEncoder().encode(stampText(renamed("Again")).json)));
+    } finally {
+      vi.unstubAllGlobals();
+      resetSavePackerForTests();
+    }
+    expect(made).toBe(2);
+    await saveStore.settled();
+    await reload();
+    expect(nameOf(autosaveText())).toBe("Again");
   });
 
   it("a slot saves, reloads and deletes through the store", async () => {

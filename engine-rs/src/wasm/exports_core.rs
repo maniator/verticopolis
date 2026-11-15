@@ -99,6 +99,14 @@ impl Engine {
         self.sim.save_text()
     }
 
+    /// `serialize()` stamped with `savedAt` and `appVersion` (appended as the
+    /// last two keys, as `JSON.stringify` writes them), as UTF-8 bytes: what
+    /// the game stores for a save, without a JavaScript string in between.
+    #[wasm_bindgen(js_name = saveBytes)]
+    pub fn save_bytes(&self, app_version: &str, saved_at_ms: f64) -> Vec<u8> {
+        self.sim.stamped_save_bytes(app_version, saved_at_ms)
+    }
+
     /// The hashed state view: the saved game minus prose, as canonical JSON.
     #[wasm_bindgen(js_name = stateView)]
     pub fn state_view(&self) -> String {

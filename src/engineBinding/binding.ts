@@ -34,7 +34,7 @@ export const INSTANCE_METHODS = [
   "setView", "setAutoBridge", "emit", "fires",
   "callExterminator", "autoBridge", "toggleAutoBridge", "setFilmPolicy", "rerollSubtype", "applyRentBatch",
   "pendingChoice", "bombSearch", "resolveChoice", "tick",
-  "serialize", "stateView", "crowdView", "stateDigest", "crowdDigest", "frameView", "logSince",
+  "serialize", "saveBytes", "stateView", "crowdView", "stateDigest", "crowdDigest", "frameView", "logSince",
   "elevatorTelemetry", "loopMemos",
   "housekeepingReport", "commuteStress", "commuteStressRevision", "drainGameplayEvents",
   "gameplayEventsPending", "gameplayEventsDropped", "serializeForSync", "saveDelta", "addCar",

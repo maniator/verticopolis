@@ -45,6 +45,20 @@ export function saveText(port: Pick<EnginePort, "setCamera" | "serialize">, view
   return port.serialize();
 }
 
+/** {@link saveText} as the engine writes it for the store: the save stamped
+ *  with `stamp` (`savedAt`, `appVersion`), as UTF-8 bytes, so the megabyte of
+ *  save never becomes a JavaScript string on its way to the store. The same
+ *  trapped-engine refusal and camera stamp come first. */
+export function saveBytes(
+  port: Pick<EnginePort, "setCamera" | "saveBytes">,
+  view: SerializedView | null,
+  stamp: { appVersion: string; savedAt: number },
+): Uint8Array {
+  if (engineTrapped()) throw new Error(TRAPPED_SAVE_REFUSED);
+  stampCamera(port, view);
+  return port.saveBytes(stamp.appVersion, stamp.savedAt);
+}
+
 /** The binary `.vctower` file (`VCTOWER2`) of the live tower, written by the
  *  engine and stamped with this build and the time (`stamp`): the file the
  *  player downloads.

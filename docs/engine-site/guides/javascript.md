@@ -207,6 +207,7 @@ shapes for each one.
 | `personCard(id)` | One walking person's trip, for a host's person card: why they are out (a code in the layout's `personPurposes`), where the leg they are on began and where it ends (each a code in `tripPlaces` with the room's id and kind, or the floor), a housekeeper's step (`shiftSteps`), and their wait. The layout's `personCard` record names the slots. Empty once the person has left the tower. Read it while the card is open; the frame carries none of it. |
 | `setPeopleWindow(floorLo, floorHi, xLo, xHi)` | The floors and tiles on screen, so the next `viewFrame` calls carry only the people there (padded so every rider of a car on screen comes along). A number that is not finite clears it. It is the camera only: the game steps every person and nothing saves it. |
 | `serialize()` | The whole game as save JSON. |
+| `saveBytes(appVersion, savedAtMs)` | The same save JSON with `savedAt` and `appVersion` added as its last two keys, as UTF-8 bytes. A host that stores saves takes them this way, without holding the save as a JavaScript string. |
 | `stateDigest()` | A short hash of the game state. Two engines that agree on it hold the same game. |
 
 ### Reference data and identity

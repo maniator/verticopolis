@@ -187,6 +187,8 @@ export function installRecorder(speed: number): { loafSupported: boolean } {
   };
   time(g.enginePort, "advance", "engine steps");
   time(g.enginePort, "serialize", "engine serialize");
+  // The autosave asks for its stamped save as bytes.
+  time(g.enginePort, "saveBytes", "engine save bytes");
   time(g.reader, "update", "view decode");
   time(g.ui, "update", "HUD update");
   time(g.engine, "runTick", "whole frame tick");
