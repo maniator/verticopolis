@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { applyPreviewWorker, isPreviewDeploy, PRECACHE_CALL, productionWorkerProblem, RETIRING_SERVICE_WORKER, RETIRING_WORKER_MARKER } from "./previewDeploy";
+import { applyHelpHostWorker, applyPreviewWorker, HELP_HOST_SERVICE_WORKER, isPreviewDeploy, PRECACHE_CALL, productionWorkerProblem, RETIRING_SERVICE_WORKER, RETIRING_WORKER_MARKER } from "./previewDeploy";
 
 describe("isPreviewDeploy", () => {
   it("is true only for a Vercel preview build", () => {
@@ -18,7 +18,7 @@ type Listener = (event: { waitUntil: (work: Promise<unknown>) => void }) => void
 
 /** Run the retiring worker's source against a stand-in `self` and fire one
  *  lifecycle event, waiting for whatever it hands to `waitUntil`. */
-function retiringWorker() {
+function retiringWorker(source: string) {
   const listeners = new Map<string, Listener>();
   const order: string[] = [];
   const navigate = vi.fn(async (url: string) => {
@@ -48,7 +48,7 @@ function retiringWorker() {
       ]),
     },
   };
-  new Function("self", RETIRING_SERVICE_WORKER)(self);
+  new Function("self", source)(self);
   const fire = async (type: string) => {
     const pending: Promise<unknown>[] = [];
     listeners.get(type)?.({ waitUntil: (work) => pending.push(work) });
@@ -57,20 +57,23 @@ function retiringWorker() {
   return { self, fire, listeners, order, navigate };
 }
 
-describe("RETIRING_SERVICE_WORKER", () => {
+describe.each([
+  ["RETIRING_SERVICE_WORKER", RETIRING_SERVICE_WORKER],
+  ["HELP_HOST_SERVICE_WORKER", HELP_HOST_SERVICE_WORKER],
+])("%s", (_name, source) => {
   it("handles no fetches, so it never serves a request from a cache", () => {
-    const { listeners } = retiringWorker();
+    const { listeners } = retiringWorker(source);
     expect([...listeners.keys()].sort()).toEqual(["activate", "install"]);
   });
 
   it("takes over at once instead of waiting for old tabs to close", async () => {
-    const { self, fire } = retiringWorker();
+    const { self, fire } = retiringWorker(source);
     await fire("install");
     expect(self.skipWaiting).toHaveBeenCalledTimes(1);
   });
 
   it("on activate deletes Workbox's caches, unregisters, then reloads each window from the network", async () => {
-    const { self, fire, order } = retiringWorker();
+    const { self, fire, order } = retiringWorker(source);
     await fire("activate");
     expect(self.clients.matchAll).toHaveBeenCalledWith({ type: "window" });
     // Unregistering before the navigation is what sends it to the network.
@@ -83,7 +86,7 @@ describe("RETIRING_SERVICE_WORKER", () => {
   });
 
   it("still finishes when a window refuses to navigate", async () => {
-    const { fire, navigate, self } = retiringWorker();
+    const { fire, navigate, self } = retiringWorker(source);
     navigate.mockRejectedValueOnce(new TypeError("not controlled"));
     await expect(fire("activate")).resolves.toBeUndefined();
     expect(self.registration.unregister).toHaveBeenCalledTimes(1);
@@ -91,7 +94,7 @@ describe("RETIRING_SERVICE_WORKER", () => {
   });
 
   it("still unregisters and reloads when Cache Storage fails", async () => {
-    const { fire, navigate, self } = retiringWorker();
+    const { fire, navigate, self } = retiringWorker(source);
     self.caches.keys.mockRejectedValueOnce(new DOMException("blocked", "SecurityError"));
     await fire("activate");
     expect(self.caches.delete).not.toHaveBeenCalled();
@@ -124,6 +127,30 @@ describe("applyPreviewWorker (scripts/preview-service-worker.ts)", () => {
     const io = files(false);
     expect(applyPreviewWorker({ VERCEL_ENV: "preview" }, SW, io)).toEqual({ code: 1, message: `preview-service-worker: ${SW} does not exist; did the build output move?` });
     expect(io.write).not.toHaveBeenCalled();
+  });
+});
+
+describe("applyHelpHostWorker (scripts/preview-service-worker.ts)", () => {
+  const HELP = "/build/dist/help";
+  const SW = "/build/dist/help/sw.js";
+  const files = (exists: boolean) => ({ exists: vi.fn(() => exists), write: vi.fn() });
+
+  it("writes the manual host's retiring worker on every build, production included", () => {
+    const io = files(true);
+    expect(applyHelpHostWorker(HELP, SW, io)).toEqual({ code: 0, message: expect.stringContaining("dist/help/sw.js") });
+    expect(io.exists).toHaveBeenCalledWith(HELP);
+    expect(io.write).toHaveBeenCalledExactlyOnceWith(SW, HELP_HOST_SERVICE_WORKER);
+  });
+
+  it("fails when the help site was not built, and writes nothing", () => {
+    const io = files(false);
+    expect(applyHelpHostWorker(HELP, SW, io)).toEqual({ code: 1, message: expect.stringContaining("build the help site first") });
+    expect(io.write).not.toHaveBeenCalled();
+  });
+
+  it("does not carry the preview marker, which only the game's own worker is checked for", () => {
+    expect(HELP_HOST_SERVICE_WORKER).not.toContain(RETIRING_WORKER_MARKER);
+    expect(HELP_HOST_SERVICE_WORKER).not.toContain(PRECACHE_CALL);
   });
 });
 

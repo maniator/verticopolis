@@ -61,7 +61,11 @@ export const PRECACHE_CALL = "precacheAndRoute(";
  * Cache Storage failure never stops the unregister or the reload.
  */
 export const RETIRING_SERVICE_WORKER = `// ${RETIRING_WORKER_MARKER}: no service worker (src/build/previewDeploy.ts).
-self.addEventListener("install", () => {
+${retiringWorkerBody()}`;
+
+/** The lifecycle code {@link RETIRING_SERVICE_WORKER} and {@link HELP_HOST_SERVICE_WORKER} share. */
+function retiringWorkerBody(): string {
+  return `self.addEventListener("install", () => {
   self.skipWaiting();
 });
 self.addEventListener("activate", (event) => {
@@ -76,6 +80,35 @@ self.addEventListener("activate", (event) => {
   );
 });
 `;
+}
+
+/**
+ * The `sw.js` the manual's own host serves (help.verticopolis.com/sw.js, from
+ * dist/help/sw.js). The manual never registers a worker, but the game's did:
+ * a browser that opened that host while it still served the game keeps the
+ * game's worker there, and it answers every manual page with the game. The
+ * browser's update check after a navigation fetches this file, installs it,
+ * and it unregisters itself and reloads the page from the network, as
+ * {@link RETIRING_SERVICE_WORKER} does on a preview. It is served on every
+ * deployment, production included, so it has its own first line rather than
+ * the preview marker the production deploy refuses.
+ */
+export const HELP_HOST_SERVICE_WORKER = `// Verticopolis manual host: no service worker (src/build/previewDeploy.ts).
+${retiringWorkerBody()}`;
+
+/**
+ * scripts/preview-service-worker.ts: on every build, write
+ * {@link HELP_HOST_SERVICE_WORKER} as the manual's `sw.js` at `swPath`. A
+ * missing manual build fails, since the host would then answer that address
+ * with nothing to replace a stale worker.
+ */
+export function applyHelpHostWorker(helpDir: string, swPath: string, files: WorkerFiles): WorkerOutcome {
+  if (!files.exists(helpDir)) {
+    return { code: 1, message: `preview-service-worker: ${helpDir} does not exist; build the help site first` };
+  }
+  files.write(swPath, HELP_HOST_SERVICE_WORKER);
+  return { code: 0, message: "preview-service-worker: dist/help/sw.js unregisters any worker left on the manual's host" };
+}
 
 /** The file system calls {@link applyPreviewWorker} makes, so a test can stand in for them. */
 export interface WorkerFiles {
