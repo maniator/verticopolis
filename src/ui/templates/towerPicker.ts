@@ -72,7 +72,7 @@ export function towerPickerTemplate(
           : html`<li class="picker-none">${emptyLine}</li>`}
         ${fileRow(h, !anyPresent)}
       </ul>
-      <div class="modal-actions">
+      <div class="modal-actions modal-footer">
         <button class="btn primary" data-picker="back" @click=${h.onBack}>Back</button>
       </div>`;
 }

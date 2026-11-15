@@ -232,7 +232,7 @@ describe("Tenancy vacancies split off-market (No Rate) counts out", () => {
 
 describe("the exterminator row is never a dialog footer", () => {
   it("renders nested, so the sticky-footer rule cannot reach it", () => {
-    // `.modal-box > .modal-actions:last-child` pins the DIALOG FOOTER. Tower
+    // `.modal-box > .modal-footer` pins the DIALOG FOOTER (#671). Tower
     // Statistics also renders a `.modal-actions` mid-body for the exterminator,
     // and pinning that would park a button on an opaque band over the sections
     // the player is scrolling through. The CSS guard
@@ -252,6 +252,10 @@ describe("the exterminator row is never a dialog footer", () => {
     // and this test would pass by rendering nothing.
     expect(exterm).not.toBeNull();
     expect(footers[0].contains(exterm)).toBe(false);
+    // The footer is the one row the template marks as such; the exterminator
+    // row never is.
+    expect(footers[0].classList.contains("modal-footer")).toBe(true);
+    expect(exterm!.closest(".modal-footer")).toBeNull();
   });
 });
 

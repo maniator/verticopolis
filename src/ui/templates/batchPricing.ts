@@ -137,7 +137,7 @@ export function batchRungTemplate(
       })}</div>
       <label class="bp-only"><input id="bp-only" type="checkbox" ?checked=${state.only} @change=${h.onOnlyChange} /> Only ${ctx.noun} still on Average</label>
       <p id="bp-preview" class="bp-preview" aria-live="polite">${state.previewMsg || nothing}</p>
-      <div class="modal-actions">
+      <div class="modal-actions modal-footer">
         <button class="btn primary" id="bp-apply" data-act="apply" ?disabled=${state.applyDisabled} @click=${h.onApply}>${state.noRateArmed ? "Confirm No Rate" : "Apply"}</button>
         <button class="btn" data-act="close" @click=${h.onCancel}>Cancel</button>
       </div>`;
@@ -161,7 +161,7 @@ export function batchPricingTemplate(
       </div>
       <label class="bp-only"><input id="bp-only" type="checkbox" ?checked=${state.only} @change=${h.onOnlyChange} /> Only ${noun} still on the default price</label>
       <p id="bp-preview" class="bp-preview" aria-live="polite">${state.previewMsg || nothing}</p>
-      <div class="modal-actions">
+      <div class="modal-actions modal-footer">
         <button class="btn primary" id="bp-apply" data-act="apply" ?disabled=${state.applyDisabled} @click=${h.onApply}>${state.resetArmed ? "Confirm reset" : "Apply"}</button>
         <button class="btn" data-act="close" @click=${h.onCancel}>Cancel</button>
       </div>`;

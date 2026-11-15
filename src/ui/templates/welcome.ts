@@ -31,6 +31,6 @@ export function welcomeModalTemplate(): TemplateResult {
         <li>${helpLink(WELCOME_LINKS.modes)}</li>
       </ul>
       <p>Coming back? There's a new menu bar across the top. ${helpLink(WELCOME_LINKS.whatsNew)}. Thanks for building with us.</p>
-      <div class="modal-actions"><button class="btn primary" data-act="close" autofocus>OK</button></div>
+      <div class="modal-actions modal-footer"><button class="btn primary" data-act="close" autofocus>OK</button></div>
     `;
 }

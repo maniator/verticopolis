@@ -43,7 +43,7 @@ export function compareModalTemplate(): TemplateResult {
   return html`
       <h2>Classic vs Modern</h2>
       ${compareTemplate()}
-      <div class="modal-actions"><button class="btn primary" data-act="close" autofocus>Got it</button></div>
+      <div class="modal-actions modal-footer"><button class="btn primary" data-act="close" autofocus>Got it</button></div>
     `;
 }
 
@@ -62,6 +62,6 @@ export function towerRulesModalTemplate(name: string, mode: GameMode): TemplateR
       <h2>This Tower's Rules</h2>
       <p class="tower-rules-lead">${name || "Your tower"} plays by <b>${rules}</b> rules, chosen when it was founded. Here is what that means.</p>
       <div class="help-md tower-rules" data-rules=${mode} @click=${openLinksInNewTab}>${classicVsModern.intro()}</div>
-      <div class="modal-actions"><button class="btn primary" data-act="close" autofocus>Got it</button></div>
+      <div class="modal-actions modal-footer"><button class="btn primary" data-act="close" autofocus>Got it</button></div>
     `;
 }

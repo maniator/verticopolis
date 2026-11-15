@@ -33,7 +33,7 @@ export function exportConfirmTemplate(exportsTo1994: boolean): TemplateResult {
       <h2>Save As</h2>
       <p>Your tower will be packed into a <b>${TOWER_FILE_EXT}</b> file and downloaded.</p>
       <p style="color:var(--muted);font-size:12px">${legacyLine}</p>
-      <div class="modal-actions">
+      <div class="modal-actions modal-footer">
         <button class="btn" data-act="close">Cancel</button>
         <button class="btn" data-act="legacy" ?disabled=${!exportsTo1994} title=${exportsTo1994 ? nothing : "Classic towers only"}>For SimTower (1994)…</button>
         <button class="btn primary" data-act="export" autofocus>Save ${TOWER_FILE_EXT}</button>
@@ -59,7 +59,7 @@ export function importReportTemplate(report: ImportReport): TemplateResult {
       <h3>Couldn't bring over</h3>
       <ul class="import-list">${listItems(report.couldNotBring)}</ul>
       <p style="color:var(--muted);font-size:12px">Nothing is adopted until you open it. Your current tower is kept in its autosave, and the import is copied to a free save slot when one is available.</p>
-      <div class="modal-actions">
+      <div class="modal-actions modal-footer">
         <button class="btn" data-act="close">Cancel</button>
         <button class="btn primary" data-act="open" autofocus>Open tower</button>
       </div>`;
@@ -82,7 +82,7 @@ export function exportReportTemplate(report: ExportReport): TemplateResult {
       <h3>Stays behind</h3>
       <ul class="import-list">${listItems(report.staysBehind)}</ul>
       <p style="color:var(--muted);font-size:12px">Downloads as <b>${report.filename}</b>. Your tower here is untouched.</p>
-      <div class="modal-actions">
+      <div class="modal-actions modal-footer">
         <button class="btn" data-act="close">Cancel</button>
         <button class="btn primary" data-act="download" autofocus>Download .TDT</button>
       </div>`;

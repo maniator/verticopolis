@@ -58,7 +58,7 @@ export function scheduleReviewTemplate(rows: readonly ReviewRow[]): TemplateResu
           <ul class="sched-review-list" role="list">
             ${rows.map(rowTemplate)}
           </ul>`}
-    <div class="modal-actions">
+    <div class="modal-actions modal-footer">
       <button class="btn primary" data-act="close">Close</button>
     </div>`;
 }

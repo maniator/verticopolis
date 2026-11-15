@@ -37,7 +37,7 @@ export function confirmTemplate(
   actions: ConfirmActions,
 ): TemplateResult {
   return html`<h2>${title}</h2><p>${body}</p>
-       <div class="modal-actions"><button class="btn" data-act="no" @click=${actions.onCancel}>Cancel</button><button class="btn primary" data-act="yes" @click=${actions.onYes}>${yesLabel}</button></div>`;
+       <div class="modal-actions modal-footer"><button class="btn" data-act="no" @click=${actions.onCancel}>Cancel</button><button class="btn primary" data-act="yes" @click=${actions.onYes}>${yesLabel}</button></div>`;
 }
 
 /** Which honest "add to your device" how-to a session gets when no native
@@ -67,5 +67,5 @@ export function installHelpTemplate(onClose: () => void, variant: InstallHelpVar
   return html`<h2>Add Verticopolis to your Home Screen</h2>
        <p>Play offline and fullscreen, and open it straight from your home screen with no browser bar.</p>
        ${steps}
-       <div class="modal-actions"><button class="btn primary" data-act="close" @click=${onClose}>Got it</button></div>`;
+       <div class="modal-actions modal-footer"><button class="btn primary" data-act="close" @click=${onClose}>Got it</button></div>`;
 }

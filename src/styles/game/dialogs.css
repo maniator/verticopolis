@@ -80,14 +80,16 @@
    button they were not looking at. Two Esc presses then discarded the edits
    with the warning off-screen at every step.
 
-   The selector is load-bearing twice over. `.modal-box >` excludes the action
-   rows that are not a dialog footer at all: Tower Statistics renders one
-   mid-body for the exterminator, and pinning that would park a button on an
-   opaque band over the sections the player is scrolling through. The
-   `:nth-last-child(2)` arm is for a dialog that renders one trailing line
-   after the actions. Settings used to be that dialog; it now keeps its
-   version line above the Close row, because the band under an upward-only
-   strip shows scrolled content on a phone. Prefer `:last-child`.
+   A footer says so: its template marks the row `modal-actions modal-footer`
+   (#671). The rule used to find it by position (the box's last or
+   second-to-last child), which failed open both ways: a dialog that wrapped
+   its body or added a trailing line silently lost its pin, and a mid-body
+   action row that happened to sit second-to-last would have been pinned as
+   a footer. Tower Statistics renders one mid-body for the exterminator, and
+   pinning that would park a button on an opaque band over the sections the
+   player is scrolling through, so it is a plain `.modal-actions`. `.modal-box >`
+   stays: a footer nested inside a form or a wrapper is not the box's to pin.
+   Keep the footer last; only a last child gets the downward cover below.
 
    DELIBERATELY MINIMAL. Only `position`, `bottom`, `z-index` and paint, all of
    which are inert on a box that is not overflowing. Three earlier cuts added
@@ -137,16 +139,17 @@
    draws for itself, which is the point: the strip is invisible until it has
    something to hide.
 
-   The downward cover belongs ONLY to the `:last-child` arm, and that split is
-   load-bearing. It assumes the space below the strip is the container's
-   padding, which is true only when the strip really is the last child. Under
-   the `:nth-last-child(2)` arm that space is the dialog's own trailing content:
-   applying it to Settings painted the redrawn bevel across the dialog, as a
-   heavy double rule above the build-id line, on a dialog that does not even
-   scroll. Giving that trailing element a higher z-index does not save it, since
-   the element's own box is transparent and the lines show around its text. So
-   the second arm pins and covers upward only, and the band below it shows what
-   the dialog itself put there.
+   The downward cover belongs ONLY to a footer that is the box's last child,
+   and that split is load-bearing. It assumes the space below the strip is the
+   container's padding, which is true only when the strip really is the last
+   child. When something follows the footer, that space is the dialog's own
+   trailing content: applying the cover to Settings (whose build-id line once
+   followed its Close row) painted the redrawn bevel across the dialog, as a
+   heavy double rule above that line, on a dialog that does not even scroll.
+   Giving that trailing element a higher z-index does not save it, since the
+   element's own box is transparent and the lines show around its text. So a
+   footer that is not last pins and covers upward only, and the band below it
+   shows what the dialog itself put there.
 
    Every offset is a literal. An unresolved custom property invalidates the
    whole declaration and would silently take the covers with it, which is why
@@ -154,8 +157,7 @@
    `stickyDialogActions.guard.test.ts` ties these numbers to `--pad-y` and to
    the bevel's width and colors in the token file, so they cannot drift apart
    unnoticed. */
-.modal-box > .modal-actions:last-child,
-.modal-box > .modal-actions:nth-last-child(2) {
+.modal-box > .modal-footer {
   position: sticky;
   bottom: 0;
   /* Under the title bar's z-index 2 so the two stuck strips layer cleanly. */
@@ -163,9 +165,10 @@
   background: var(--panel);
   box-shadow: 0 -12px 0 var(--panel);
 }
-/* Only a true last child sits over the container's padding, so only it may
-   paint downward. See the note above for what this cost Settings. */
-.modal-box > .modal-actions:last-child {
+/* Only a footer that is the true last child sits over the container's
+   padding, so only it may paint downward. See the note above for what this
+   cost Settings. */
+.modal-box > .modal-footer:last-child {
   box-shadow:
     0 -12px 0 var(--panel),
     0 16px 0 var(--panel),
@@ -211,9 +214,19 @@
    reads as a sentence about the dialog rather than as another control.
    `align-self` is set HERE rather than `align-items` on the strip, so every
    other dialog's button alignment is left exactly as it was. */
-.modal-warn {
+.modal-footer > .modal-warn {
   margin-right: auto;
   align-self: center;
+  /* Takes the room the buttons leave and wraps inside it, so the warning
+     sits beside OK and Discard on one strip (#672): on a desktop the armed
+     warning used to push Discard to a line of its own, and on a phone the
+     warning took two lines of its own above the buttons, more than doubling
+     the pinned strip (29px to 67px) over the content it pins above. 9em is
+     the narrowest it may get before the buttons drop below it instead: any
+     narrower and the sentence runs to four lines, taller than the two-row
+     strip it replaces. */
+  flex: 1 1 0;
+  min-width: 9em;
   font-size: 12px;
   font-weight: 700;
   color: var(--bad-ink);
