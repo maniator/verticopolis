@@ -5,7 +5,8 @@
 //! each value's bytes rest on `serde_json` writing a borrowed value as it
 //! writes that value's `Value`, which the tests pin. The ledger's and the
 //! events' objects are the two shapes written twice. The text is written as
-//! it goes: each unit, transport, log line and ledger day becomes its own
+//! it goes: each unit and each person is written straight from its record
+//! (`save_entry`), each transport, log line and ledger day becomes its own
 //! `Value` that is written and dropped before the next, and the tower's name,
 //! the pending choice's message and each excavated tile, room id, blockbuster
 //! cinema and milestone are written from their own values, so a save never
@@ -21,7 +22,7 @@ use crate::events::{EventSystem, PendingChoice};
 use crate::ledger::{totals_json, Ledger};
 use crate::save_floor_runs::{SavedUnits, FLOOR_RUN_SAVE_VERSION};
 use crate::sim::{stamped_save_version, LogEntry, Simulation, LOG_SAVE_CAP};
-use crate::tower::{Transport, Unit};
+use crate::tower::{SavedUnit, Transport, Unit};
 
 /// One top-level value of the save. The lists stay borrowed until they are
 /// written, one entry at a time.
@@ -64,7 +65,7 @@ impl Field<'_> {
             Field::Owned(v) => v,
             Field::Borrowed(v) => v.clone(),
             Field::Text(t) => json!(t),
-            Field::Units(us) => Value::Array(SavedUnits::new(us).collect()),
+            Field::Units(us) => Value::Array(SavedUnits::new(us).map(|e| e.to_value()).collect()),
             Field::PlainUnits(us) => Value::Array(us.iter().map(Unit::serialize).collect()),
             Field::Transports(ts) => Value::Array(ts.iter().map(Transport::serialize).collect()),
             Field::Strings(ss) => json!(ss),
@@ -85,7 +86,9 @@ impl Serialize for Field<'_> {
             Field::Owned(v) => v.serialize(s),
             Field::Borrowed(v) => v.serialize(s),
             Field::Units(us) => s.collect_seq(SavedUnits::new(us)),
-            Field::PlainUnits(us) => Each(us, Unit::serialize).serialize(s),
+            Field::PlainUnits(us) => {
+                s.collect_seq(us.iter().map(|unit| SavedUnit { unit, run: None }))
+            }
             Field::Transports(ts) => Each(ts, Transport::serialize).serialize(s),
             // A `Value::String` writes as its string does, a
             // `Value::Number` holding an integer as its digits do, and one

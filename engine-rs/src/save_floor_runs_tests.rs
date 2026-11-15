@@ -6,6 +6,7 @@ use crate::clock::GameMode;
 use crate::load::{deserialize, each_listed_unit};
 use crate::load_stream::load_save_text;
 use crate::sim::Simulation;
+use serde_json::{json, Value};
 
 /// A new game with a lobby from x 90 to 210 and floor tiles laid on
 /// `floor` (2 or 3) from `from` up to `to`.
@@ -189,7 +190,7 @@ fn a_run_stops_at_the_lot_width_the_loader_reads() {
             ..tile.clone()
         })
         .collect();
-    let entries: Vec<Value> = SavedUnits::new(&row).collect();
+    let entries: Vec<Value> = SavedUnits::new(&row).map(|e| e.to_value()).collect();
     let runs: Vec<(i64, i64)> = entries
         .iter()
         .map(|e| (e["x"].as_i64().unwrap(), e[FLOOR_RUN_KEY].as_i64().unwrap()))

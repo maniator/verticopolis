@@ -14,10 +14,8 @@
 //! in the same order, with the same ids. The loader unfolds it
 //! (`load::floor_runs`).
 
-use serde_json::{json, Value};
-
 use crate::facilities::{Kind, LOT_WIDTH};
-use crate::tower::{Tower, Unit};
+use crate::tower::{SavedUnit, Tower, Unit};
 
 /// The key on a run's first floor tile: how many tiles the run holds.
 pub const FLOOR_RUN_KEY: &str = "run";
@@ -71,64 +69,54 @@ impl Tower {
 /// Whether a unit's save entry is a plain floor tile, nothing but `id`,
 /// `kind`, `floor` and `x`: only such a tile joins a run, so a tile that
 /// carries any other fact keeps its own entry.
-fn is_plain_floor_entry(unit: &Unit, entry: &Value) -> bool {
-    unit.kind == Kind::Floor && entry.as_object().is_some_and(|m| m.len() == 4)
+fn is_plain_floor_tile(unit: &Unit) -> bool {
+    unit.kind == Kind::Floor && unit.saves_only_position()
 }
 
 /// Each unit's save entry in list order, with every run of plain floor tiles
-/// folded into its first tile's entry. Each unit is serialized once, as the
-/// plain list did.
+/// folded into its first tile's entry. Nothing is built: each entry is
+/// written straight from its unit (`SavedUnit`).
 pub(crate) struct SavedUnits<'a> {
     units: &'a [Unit],
     next: usize,
-    /// The entry of the unit at `next`, when a run already serialized it to
-    /// see whether it could join and it could not, so it is not written twice.
-    pending: Option<Value>,
 }
 
 impl<'a> SavedUnits<'a> {
     pub(crate) fn new(units: &'a [Unit]) -> Self {
-        SavedUnits {
-            units,
-            next: 0,
-            pending: None,
-        }
+        SavedUnits { units, next: 0 }
     }
 }
 
-impl Iterator for SavedUnits<'_> {
-    type Item = Value;
+impl<'a> Iterator for SavedUnits<'a> {
+    type Item = SavedUnit<'a>;
 
-    fn next(&mut self) -> Option<Value> {
+    fn next(&mut self) -> Option<SavedUnit<'a>> {
         let first = self.units.get(self.next)?;
         self.next += 1;
-        let mut entry = self.pending.take().unwrap_or_else(|| first.serialize());
-        if !is_plain_floor_entry(first, &entry) {
-            return Some(entry);
+        if !is_plain_floor_tile(first) {
+            return Some(SavedUnit {
+                unit: first,
+                run: None,
+            });
         }
         let mut tiles = 1usize;
         while let Some(unit) = self.units.get(self.next) {
             // A run never holds more tiles than the lot is wide: the loader
-            // reads a longer one as its first tile alone.
-            if tiles >= LOT_WIDTH as usize || !could_continue_run(&self.units[self.next - 1], unit)
+            // reads a longer one as its first tile alone. A labeled tile ends
+            // the run and opens the next entry.
+            if tiles >= LOT_WIDTH as usize
+                || !could_continue_run(&self.units[self.next - 1], unit)
+                || !is_plain_floor_tile(unit)
             {
-                break;
-            }
-            let next_entry = unit.serialize();
-            if !is_plain_floor_entry(unit, &next_entry) {
-                // A labeled tile ends the run and opens the next entry.
-                self.pending = Some(next_entry);
                 break;
             }
             tiles += 1;
             self.next += 1;
         }
-        if tiles > 1 {
-            if let Some(m) = entry.as_object_mut() {
-                m.insert(FLOOR_RUN_KEY.into(), json!(tiles));
-            }
-        }
-        Some(entry)
+        Some(SavedUnit {
+            unit: first,
+            run: (tiles > 1).then_some(tiles),
+        })
     }
 }
 

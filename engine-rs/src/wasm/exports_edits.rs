@@ -96,7 +96,7 @@ impl Engine {
         self.sim
             .tower
             .unit_at(floor.into(), x.into())
-            .map(|u| u.serialize().to_string())
+            .map(|u| u.save_text())
     }
 
     /// The shaft covering a tile, serialized as the save would, or null.

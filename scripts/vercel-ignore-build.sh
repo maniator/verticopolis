@@ -94,7 +94,7 @@ affects_deploy() {
     conformance/catalog-digests.json | conformance/expected.json) return 0 ;;
     conformance/loader-cases.json | conformance/tdt-cases.json) return 0 ;;
     # The fixtures the engine's rule tests compile in (include_str!, include_bytes!).
-    conformance/fixtures/sixseven_2.vctower | conformance/fixtures/split-tower.vctower | conformance/fixtures/towerone_6.vctower) return 0 ;;
+    conformance/fixtures/sixseven_2.vctower | conformance/fixtures/split-tower.vctower | conformance/fixtures/split-tower-4.vctower | conformance/fixtures/towerone_6.vctower) return 0 ;;
     conformance/fixtures/regression/split-tower-26.vctower | conformance/fixtures/regression/split-tower-26-remembered.vctower) return 0 ;;
     conformance/*) return 1 ;;
 

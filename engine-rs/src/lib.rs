@@ -159,6 +159,7 @@ pub mod rules;
 pub mod satisfaction;
 #[doc(hidden)]
 pub mod save_delta;
+mod save_entry;
 pub mod save_floor_runs;
 #[cfg(any(test, feature = "wasm"))]
 mod vctower_import;
