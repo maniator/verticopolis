@@ -72,6 +72,7 @@ describe.skipIf(noEngine)("SaveLoad stamps the live camera onto the CURRENT towe
         showExportReport: () => {},
       },
       showCrashScreen: () => {},
+      showRecoveryWait: () => () => {},
       attemptGraphicsRecovery: () => {},
       armOnboarding: () => {},
     }));
@@ -91,6 +92,7 @@ describe.skipIf(noEngine)("SaveLoad stamps the live camera onto the CURRENT towe
       adoptSim: () => {},
       ui: { toast: () => {}, sayVisibly: () => {}, downloadFile: () => true, showImportReport: () => {}, showExportReport: () => {} },
       showCrashScreen: () => {},
+      showRecoveryWait: () => () => {},
       attemptGraphicsRecovery: () => {},
       armOnboarding: () => {},
     }));
@@ -121,6 +123,7 @@ describe.skipIf(noEngine)("SaveLoad stamps the live camera onto the CURRENT towe
         showExportReport: () => {},
       },
       showCrashScreen: () => {},
+      showRecoveryWait: () => () => {},
       attemptGraphicsRecovery: () => {},
       armOnboarding: () => {},
     }));

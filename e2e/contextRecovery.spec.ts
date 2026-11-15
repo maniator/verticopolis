@@ -46,6 +46,9 @@ test.describe("WebGL context loss: in-place recovery", () => {
       (gl.getExtension("WEBGL_lose_context") as WEBGL_lose_context).loseContext();
     });
     await expect(page.locator("#crash-screen")).toHaveCount(0); // recovering, no dead end
+    // The wait holds the page (#321): a modal card is up, so a game key does
+    // not reach the frozen tower.
+    await expect(page.locator("#graphics-recovery")).toBeVisible();
     await page.evaluate(() => ((window as unknown as Record<string, unknown>).__ext as WEBGL_lose_context).restoreContext());
 
     // The rebuild swaps in a fresh engine on a fresh canvas.
@@ -67,6 +70,7 @@ test.describe("WebGL context loss: in-place recovery", () => {
       };
     });
     expect(after.crashScreen).toBe(false);
+    await expect(page.locator("#graphics-recovery")).toHaveCount(0); // the card came down
     expect(after.freshCanvas).toBe(true);
     expect(after.view.tile).toBeCloseTo(before.tile, 3);
     expect(after.view.floor).toBeCloseTo(before.floor, 3);

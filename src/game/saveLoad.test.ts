@@ -71,6 +71,7 @@ function setup(
     ...answers,
   });
   const codes = new PortCodes(port);
+  const endWait = vi.fn();
   const deps = {
     enginePort: () => port,
     portCodes: () => codes,
@@ -85,10 +86,11 @@ function setup(
       showExportReport: vi.fn(),
     },
     showCrashScreen: vi.fn(),
+    showRecoveryWait: vi.fn(() => endWait),
     attemptGraphicsRecovery: vi.fn(),
     armOnboarding: vi.fn(),
   } satisfies SaveLoadDeps;
-  return { port, codes, deps, saves: new SaveLoad(deps) };
+  return { port, codes, deps, endWait, saves: new SaveLoad(deps) };
 }
 
 type CrashInfo = Parameters<SaveLoadDeps["showCrashScreen"]>[0];
@@ -158,18 +160,20 @@ describe("SaveLoad.saveBeforeUpdate", () => {
 
 describe("SaveLoad.recoverFromContextLoss", () => {
   it("a first loss with a clean flush recovers in place and logs the trace in the same tower", () => {
-    const { saves, port, codes, deps } = setup();
+    const { saves, port, codes, deps, endWait } = setup();
     saves.recoverFromContextLoss();
     expect(SaveGame.save).toHaveBeenCalledOnce();
     expect(deps.showCrashScreen).not.toHaveBeenCalled();
-    expect(deps.ui.toast).toHaveBeenCalledExactlyOnceWith(
-      "The device reset the game's graphics. Recovering...",
-      "info",
-    );
+    // The recovery card holds the page for the wait, in place of a toast a
+    // dialog could cover (#321).
+    expect(deps.showRecoveryWait).toHaveBeenCalledOnce();
+    expect(deps.ui.toast).not.toHaveBeenCalled();
     const done = deps.attemptGraphicsRecovery.mock.calls[0][0] as (
       ok: boolean,
     ) => void;
+    expect(endWait).not.toHaveBeenCalled();
     done(true);
+    expect(endWait).toHaveBeenCalledOnce();
     expect(port.logLine).toHaveBeenCalledExactlyOnceWith(
       expect.stringContaining("Your tower was saved first."),
       codes.code("logKinds", "info"),
@@ -196,18 +200,23 @@ describe("SaveLoad.recoverFromContextLoss", () => {
     );
     vi.mocked(isCrashed).mockReturnValue(true);
     done(true);
-    expect(deps.ui.toast).toHaveBeenCalledTimes(2);
+    expect(deps.ui.toast).toHaveBeenCalledTimes(1); // only the first recovery spoke
   });
 
   it("a failed recovery shows the crash screen, whose reload stamps the resume flag", () => {
     const reload = vi.fn();
     vi.stubGlobal("location", { reload });
     try {
-      const { saves, deps } = setup();
+      const { saves, deps, endWait } = setup();
       saves.recoverFromContextLoss();
+      deps.showCrashScreen.mockImplementation(() => {
+        // The card is down before the crash screen goes up.
+        expect(endWait).toHaveBeenCalledOnce();
+      });
       (deps.attemptGraphicsRecovery.mock.calls[0][0] as (ok: boolean) => void)(
         false,
       );
+      expect(deps.showCrashScreen).toHaveBeenCalledOnce();
       const info = deps.showCrashScreen.mock.calls[0][0] as CrashInfo;
       expect(info.crash).toMatchObject({
         kind: "webgl-context-lost",

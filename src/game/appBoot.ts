@@ -10,6 +10,7 @@ import { catalogOf, isUnlocked } from "./portAccess";
 import { attemptContextRecovery } from "./contextRecovery";
 import { autosaveIfLive, startAutosave } from "./autosaveSchedule";
 import { showCrashScreen } from "../ui/crashScreen";
+import { showGraphicsRecovery } from "../ui/graphicsRecovery";
 import { OnboardingController, isOnboarded } from "../ui/Onboarding";
 import { resolveBootScreen } from "../bootScreen";
 import { hideBootCover } from "../bootstrap";
@@ -197,6 +198,7 @@ export function wireControllers(app: GameApp): void {
       // inside, so it can never break crash recovery.
       reportCrashException(info.crash);
     },
+    showRecoveryWait: () => showGraphicsRecovery(),
     attemptGraphicsRecovery: (done) =>
       attemptContextRecovery(
         {

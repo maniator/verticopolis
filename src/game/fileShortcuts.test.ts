@@ -1,10 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
 
-const state = vi.hoisted(() => ({ splash: false, dialog: false, stopped: false }));
+const state = vi.hoisted(() => ({ splash: false, dialog: false, stopped: false, recovering: false }));
 vi.mock("./interactionState", () => ({
   isSplashUp: () => state.splash,
   isDialogOpen: () => state.dialog,
   isEngineStopped: () => state.stopped,
+  isRecoveringGraphics: () => state.recovering,
 }));
 
 import { fileCommandFor, typesText, wireFileShortcuts, type FileCommands } from "./fileShortcuts";
@@ -14,7 +15,7 @@ let commands: { [K in keyof FileCommands]: Mock<() => void> };
 let report: Mock<(command: keyof FileCommands, grayed: boolean) => void>;
 
 beforeEach(() => {
-  Object.assign(state, { splash: false, dialog: false, stopped: false });
+  Object.assign(state, { splash: false, dialog: false, stopped: false, recovering: false });
   target = new EventTarget();
   commands = { open: vi.fn<() => void>(), save: vi.fn<() => void>(), saveAs: vi.fn<() => void>() };
   report = vi.fn<(command: keyof FileCommands, grayed: boolean) => void>();
@@ -78,13 +79,16 @@ describe("the File menu's keys", () => {
     ]);
   });
 
-  it("do nothing over an open dialog, after the engine stopped, or on a held key's repeats", () => {
+  it("do nothing over an open dialog, after the engine stopped, while the graphics recover, or on a held key's repeats", () => {
     state.dialog = true;
     expect(press("s", { ctrlKey: true })).toBe(true);
     state.dialog = false;
     state.stopped = true;
     press("o", { ctrlKey: true });
     state.stopped = false;
+    state.recovering = true; // #321
+    press("o", { ctrlKey: true });
+    state.recovering = false;
     press("s", { ctrlKey: true, repeat: true });
     expect(Object.values(commands).every((c) => c.mock.calls.length === 0)).toBe(true);
     expect(report).not.toHaveBeenCalled();
