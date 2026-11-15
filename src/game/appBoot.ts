@@ -22,6 +22,7 @@ import { clockOf } from "../simport/headerClock";
 import { bootCommonProps, distributionChannelLabel, platformLabel } from "../analyticsEnrichment";
 import { isStandalone } from "../pwaInstall";
 import { wireMenus } from "./menuWiring";
+import { wireScreenSaver } from "./screenSaverWiring";
 import { initInstallAffordance } from "./installAffordance";
 import { showTitleScreen, welcomeFounder } from "./titleScreen";
 import { clearSaveWarning, showSaveWarning } from "../ui/saveWarning";
@@ -263,6 +264,7 @@ export function runBootFlow(app: GameApp, savedAtBoot?: number): void {
   // The facility card and the dialogs move by their title bars too.
   wireMovableWindows(app);
   wireMenus(app); // the menu bar, its Tower Info and Bulletin windows, the status bar
+  wireScreenSaver(app); // Options > Screen Saver… and its idle and return triggers
   // First-run splash + onboarding (chrome only; the engine is untouched).
   app.onboarding = new OnboardingController({
     mq: app.mobileMq,

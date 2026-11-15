@@ -150,7 +150,7 @@ never the name).
 | `via` (open) | `click`, `keys`, `alt` | A click on a title, the keyboard on a focused title, or Alt with the underlined letter |
 | `via` (pick) | `pointer`, `keys` | A mouse, pen or finger, or the keyboard |
 | `screen` | `title`, `tower` | Over the title screen, or over a tower |
-| `item` | `new_tower`, `saves`, `quick_save`, `close`, `import`, `export`, `install_app`, `undo`, `redo`, `tower_info`, `map`, `statistics`, `rename`, `rules`, `tools`, `bulletin`, `status_bar`, `full_screen`, `settings`, `sound`, `manual`, `compare`, `replay`, `sponsor`, `about`, `other` | The item, by a code that does not change with its label (`MENU_ITEM_CODES`) |
+| `item` | `new_tower`, `saves`, `quick_save`, `close`, `import`, `export`, `install_app`, `undo`, `redo`, `tower_info`, `map`, `statistics`, `rename`, `rules`, `tools`, `bulletin`, `status_bar`, `full_screen`, `settings`, `sound`, `screen_saver`, `manual`, `compare`, `replay`, `sponsor`, `about`, `other` | The item, by a code that does not change with its label (`MENU_ITEM_CODES`) |
 | `browsed` | a count | Menus the trip showed, the last one included |
 | `after` | an `item` code or `none` | The page life's previous real pick, so a breakdown shows what follows what without a paths query. A grayed click never becomes the next pick's `after` |
 | `grayed` | `true`, `false` | The item was grayed out, so nothing happened |
@@ -173,6 +173,9 @@ The windows and cards that came with the menu bar report through `app_action`:
 | `welcome_shown` | none | The welcome window opened |
 | `welcome_close` | `ok`, `x`, `escape`, `backdrop` or `displaced` | How it went: its OK, its ✕, Escape, a click beside it, or another dialog taking its place. A page closed while it is up sends none |
 | `welcome_link` | `first_tower`, `modes` or `whats_new` | One of its help links |
+| `screensaver_start` | `idle`, `return` or `preview` | The screen saver came up: the paused tower sat untouched for the wait, the player came back to the tab after the wait, or the dialog's Preview |
+| `screensaver_end` | `under_1m`, `1_5m` or `over_5m` | The screen saver ended, with how long it was up as a bucket |
+| `screensaver_set` | `night`, `stars`, `express`, `endless`, `marquee` or `none` | The Screen Saver dialog's OK, with the saver picked |
 
 ## `engine_status`
 
