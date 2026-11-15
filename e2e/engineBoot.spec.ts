@@ -113,8 +113,10 @@ test.describe("starts on the WASM engine", () => {
       for (let f = 2; f <= 3; f++) for (let x = 150; x < 175; x++) built.push(g.sim.build("floor", f, x).ok);
       built.push(g.sim.build("office", 2, 152).ok, g.sim.build("office", 3, 152).ok);
       built.push(g.sim.buildTransport("elevatorStandard", 168, 1, 3).ok);
-      const digest = (window as any).__vcEngine.port.stateDigest() as string;
       const id = (await g.saveFile("Replay test")) as string;
+      // Read after the save: a tower file carries the camera, which the save
+      // stamps into the tower first.
+      const digest = (window as any).__vcEngine.port.stateDigest() as string;
       return { built: built.every(Boolean), digest, id };
     });
     expect(setup.built, "the setup tower built").toBe(true);
