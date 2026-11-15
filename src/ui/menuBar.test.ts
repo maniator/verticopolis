@@ -107,7 +107,7 @@ describe("MenuBar", () => {
     expect(under).toHaveBeenCalledTimes(2);
   });
 
-  it("a menu that would run off the window's right edge slides left to fit, never past the left edge", () => {
+  it("a menu that would run off either edge of the window slides back onto it, and the left edge wins", () => {
     const { $ } = setup();
     Object.defineProperty(document.documentElement, "clientWidth", { configurable: true, value: 400 });
     const rect = vi.spyOn($("m-edit"), "getBoundingClientRect").mockReturnValue({ left: 230, right: 450 } as DOMRect);
@@ -121,6 +121,12 @@ describe("MenuBar", () => {
     rect.mockReturnValue({ left: 20, right: 240 } as DOMRect);
     $("t-edit").click();
     expect($("m-edit").style.translate).toBe("");
+    $("t-edit").click();
+    // A menu that starts before the left edge slides right (#2329: a
+    // right-aligned Help on the title screen's short bar was cut off).
+    rect.mockReturnValue({ left: -60, right: 160 } as DOMRect);
+    $("t-edit").click();
+    expect($("m-edit").style.translate).toBe("60px 0");
     // @ts-expect-error drop the test's own property, back to jsdom's
     delete document.documentElement.clientWidth;
   });

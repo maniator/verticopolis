@@ -28,14 +28,16 @@ import type { MenuDismissHow, MenuOpenVia } from "../analyticsMenus";
  *  next real press always lands. */
 const SWALLOW_MS = 1000;
 
-/** Slide an open menu left by as much as it overflows the window's right
- *  edge (a middle menu on a phone), never past the left edge. One layout read
- *  per open. */
+/** Keep an open menu inside the window: slide it left by as much as it runs
+ *  past the right edge (a menu near the end of a phone's bar), and right by
+ *  as much as it starts before the left edge, which wins when the window is
+ *  narrower than the menu. One layout read per open. */
 function keepOnScreen(menu: HTMLElement): void {
   menu.style.translate = "";
   const r = menu.getBoundingClientRect();
   const over = r.right - menu.ownerDocument.documentElement.clientWidth;
-  if (over > 0) menu.style.translate = `${-Math.min(over, Math.max(0, r.left))}px 0`;
+  const shift = Math.max(over > 0 ? -over : 0, -r.left);
+  if (shift !== 0) menu.style.translate = `${shift}px 0`;
 }
 
 /** An item the player can pick: shown and not grayed out. */

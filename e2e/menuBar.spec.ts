@@ -167,6 +167,31 @@ test.describe("the menu bar on a phone", () => {
     expect(help!.y).toBeLessThan(bar!.y + bar!.height);
   });
 
+  test("every menu opens inside the screen, on the title screen and in a tower", async ({ page }) => {
+    /** Open each menu on the bar and check its box sits inside the phone's
+     *  width (#2329: Help hung off the left edge of the title screen's short bar). */
+    async function eachMenuFits(expected: number): Promise<void> {
+      const titles = page.locator("#menubar .mb-title:visible");
+      await expect(titles).toHaveCount(expected);
+      for (const id of await titles.evaluateAll((els) => els.map((el) => el.id))) {
+        await page.locator(`#${id}`).tap();
+        const box = (await page.locator(`#${id}-menu`).boundingBox())!;
+        expect(box.x, `${id} starts on screen`).toBeGreaterThanOrEqual(0);
+        expect(box.x + box.width, `${id} ends on screen`).toBeLessThanOrEqual(PHONE.width);
+        await page.locator(`#${id}`).tap();
+      }
+    }
+    await page.goto("/");
+    await page.waitForFunction(() => Boolean((window as any).game));
+    await expect(page.locator("#splash")).toBeVisible();
+    await eachMenuFits(3);
+    await page.evaluate(() => {
+      document.getElementById("splash")?.remove();
+      document.getElementById("onboard")?.remove();
+    });
+    await eachMenuFits(5);
+  });
+
   test("Help opens on screen and Tower Info sits clear of Bulletin", async ({ page }) => {
     await boot(page);
     await page.locator("#mb-help").tap();
