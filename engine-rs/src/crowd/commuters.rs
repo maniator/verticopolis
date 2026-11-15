@@ -36,6 +36,7 @@
 
 use std::collections::BTreeMap;
 
+use super::metro_train;
 use super::motion::finish;
 use super::spawn::{add, inside_x};
 use super::trip::{Errand, ErrandPlace};
@@ -88,12 +89,14 @@ pub struct Desk {
 }
 
 /// An arrival (`inbound`) or a departure booked for `office_id` at clock
-/// minute `at`.
+/// minute `at`. An arrival held for the Metro's train names the `station`
+/// it comes in by (`metro_train::hold_for_train`), saved with the booking.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Shift {
     pub at: f64,
     pub office_id: i64,
     pub inbound: bool,
+    pub station: Option<i64>,
 }
 
 /// The office a commuting worker belongs to, and which way they are going.
@@ -164,6 +167,7 @@ impl Crowd {
                         at,
                         office_id: u.id,
                         inbound: true,
+                        station: None,
                     });
                 }
                 desk.coming += missing;
@@ -184,6 +188,7 @@ impl Crowd {
                         at,
                         office_id: u.id,
                         inbound: false,
+                        station: None,
                     });
                 }
                 desk.going += owed;
@@ -198,12 +203,15 @@ impl Crowd {
     /// Orders the booked arrivals and departures latest first, so the next
     /// one due is last (`start_commutes` pops it).
     pub(crate) fn sort_shifts(&mut self) {
-        self.shifts.sort_by(|a, b| {
-            b.at.total_cmp(&a.at)
-                .then_with(|| b.office_id.cmp(&a.office_id))
-                .then_with(|| b.inbound.cmp(&a.inbound))
-        });
+        self.shifts.sort_by(later_first);
     }
+}
+
+/// The order the shifts are kept in: latest first.
+pub(super) fn later_first(a: &Shift, b: &Shift) -> std::cmp::Ordering {
+    b.at.total_cmp(&a.at)
+        .then_with(|| b.office_id.cmp(&a.office_id))
+        .then_with(|| b.inbound.cmp(&a.inbound))
 }
 
 /// Squares the desks with the tower: on the first call (a fresh crowd,
@@ -289,7 +297,7 @@ pub fn start_commutes(crowd: &mut Crowd, tower: &mut Tower, clock: &Clock) {
         };
         let late = now - s.at > 60.0;
         if s.inbound {
-            if late || !arrive(crowd, tower, &doors, s.office_id) {
+            if late || !arrive(crowd, tower, &doors, s.office_id, (now, s.station)) {
                 crowd.desks.get_mut(&s.office_id).unwrap().coming -= 1;
             }
             continue;
@@ -322,14 +330,31 @@ fn stamp(crowd: &mut Crowd, i: usize, office_id: i64, inbound: bool) {
     }
 }
 
-/// One worker sets out from an entrance for `office_id`. False when the
-/// office is gone or no route reaches it.
-fn arrive(crowd: &mut Crowd, tower: &Tower, doors: &Entrances, office_id: i64) -> bool {
+/// One worker sets out for `office_id` at clock minute `now`, by the station
+/// `held` for them if any; at a station with no train in they wait for it
+/// (`metro_train::hold_for_train`). False when the office is gone or unreachable.
+fn arrive(
+    crowd: &mut Crowd,
+    tower: &Tower,
+    doors: &Entrances,
+    office_id: i64,
+    (now, held): (f64, Option<i64>),
+) -> bool {
     let Some(office) = working_office(tower, office_id) else {
         return false;
     };
     let (ox, ow, of) = (office.x, office.width, office.floor);
-    let station = doors.pick(crowd);
+    let mut station = match held {
+        Some(sid) if tower.get_unit(sid).is_some() => Some(sid),
+        _ => doors.pick(crowd),
+    };
+    let minute = now.rem_euclid(1440.0);
+    if let Some(sid) = station.filter(|&s| !metro_train::train_in_at(tower, minute, s)) {
+        if metro_train::hold_for_train(crowd, tower, now, office_id, sid) {
+            return true;
+        }
+        station = None;
+    }
     let from = station.map_or(STREET_FLOOR, |sid| tower.get_unit(sid).unwrap().floor + 1);
     let Some(i) = add(crowd, tower, from, of, None, Some(ox)) else {
         return false;

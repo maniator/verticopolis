@@ -224,7 +224,7 @@ pub fn venue_has_room(u: &Unit) -> bool {
 enum Opt {
     /// `trip(from, to)` where either end may be a list pick.
     Trip(End, End),
-    MetroArrival(List),
+    MetroArrival(List, f64),
     MetroDeparture(List),
     MealOutbound(usize),
     /// A visit to one of `kind`'s venues on the listed floors, drawn with
@@ -281,7 +281,7 @@ impl Options {
         weighted_index(
             r,
             self.opts.iter().map(|o| match o {
-                Opt::VenueVisit(_, _, _, w) => *w,
+                Opt::VenueVisit(_, _, _, w) | Opt::MetroArrival(_, w) => *w,
                 _ => 1.0,
             }),
         )
@@ -348,12 +348,20 @@ pub fn spawn_trips(crowd: &mut Crowd, tower: &mut Tower, clock: &Clock, floors: 
         .filter(|&id| tower.is_metro_platform_served(tower.get_unit(id).unwrap()))
         .collect();
     let has_metro = !reachable_metros.is_empty();
+    // A rider arrives only off a train standing at their station.
+    let minute = clock.minute_of_day();
+    let arriving: Vec<i64> = reachable_metros
+        .iter()
+        .copied()
+        .filter(|&id| super::metro_train::train_in_at(tower, minute, id))
+        .collect();
+    let off_train = super::metro_train::arrival_weight(tower, &reachable_metros);
     let mut options = Options {
         opts: Vec::new(),
         pools: Vec::new(),
         venue_floors: Vec::new(),
         venue_kinds: &[],
-        weighted: false,
+        weighted: !arriving.is_empty(),
     };
     let o = &mut options.opts;
     // Modern office workers come and go as real commuters (`commuters`);
@@ -370,8 +378,8 @@ pub fn spawn_trips(crowd: &mut Crowd, tower: &mut Tower, clock: &Clock, floors: 
             o.push(Opt::Trip(End::Pick(List::Homes), End::Fixed(1)));
         }
         if has_metro {
-            if lo {
-                o.push(Opt::MetroArrival(List::LeasedOffices));
+            if lo && !arriving.is_empty() {
+                o.push(Opt::MetroArrival(List::LeasedOffices, off_train));
             }
             if hm {
                 o.push(Opt::MetroDeparture(List::Homes));
@@ -388,8 +396,8 @@ pub fn spawn_trips(crowd: &mut Crowd, tower: &mut Tower, clock: &Clock, floors: 
             if so {
                 o.push(Opt::MetroDeparture(List::StaffedOffices));
             }
-            if hm {
-                o.push(Opt::MetroArrival(List::Homes));
+            if hm && !arriving.is_empty() {
+                o.push(Opt::MetroArrival(List::Homes, off_train));
             }
         }
     } else if day && lo && crowd.rng.chance(0.3) {
@@ -430,8 +438,8 @@ pub fn spawn_trips(crowd: &mut Crowd, tower: &mut Tower, clock: &Clock, floors: 
                 _ => {}
             }
         }
-        Opt::MetroArrival(l) => {
-            let sid = *crowd.rng.pick(&reachable_metros);
+        Opt::MetroArrival(l, _) => {
+            let sid = *crowd.rng.pick(&arriving);
             let to = *crowd.rng.pick(list_of(floors, *l));
             let station = tower.get_unit(sid).unwrap().clone();
             let i = metro_arrival(crowd, tower, &station, to);

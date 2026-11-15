@@ -48,13 +48,13 @@ fn office_tower(mode: GameMode) -> (Simulation, [i64; 2]) {
     (sim, [a, b])
 }
 
-fn occupants(sim: &Simulation, id: i64) -> i64 {
+pub(super) fn occupants(sim: &Simulation, id: i64) -> i64 {
     sim.tower.get_unit(id).map_or(0, |u| u.occupants)
 }
 
 /// The workers you can see in the offices: at their desks and not out for
 /// lunch or a sales call.
-fn visible(sim: &Simulation, offices: &[i64]) -> i64 {
+pub(super) fn visible(sim: &Simulation, offices: &[i64]) -> i64 {
     offices
         .iter()
         .filter_map(|&id| sim.tower.get_unit(id))

@@ -68,7 +68,7 @@ fn the_commuters_desks_and_bookings_come_back() {
             [6, 5, 30, 0, 1, 0, 0],
             [7, 5, 30, 9, 1],
         ],
-        "shifts": [[400.0, 4, false], [500.5, 4, true], ["x", 4, true], [1.0, 4]],
+        "shifts": [[400.0, 4, false], [500.5, 4, true], ["x", 4, true], [1.0, 4], [600.0, 4, true, 9], [700.0, 4, true, "x"]],
     });
     let sim = load_with_crowd(crowd);
     let worker = &sim.crowd.people[0];
@@ -92,21 +92,28 @@ fn the_commuters_desks_and_bookings_come_back() {
     assert_eq!(sim.crowd.desks.len(), 1);
     assert_eq!(sim.crowd.desks[&4], desk);
     // Latest first, so the next one due is last.
-    let shift = |at, inbound| Shift {
+    // A fourth entry names the station an arrival is held for (the Metro's
+    // train); one that does not read drops the row.
+    let shift = |at, inbound, station| Shift {
         at,
         office_id: 4,
         inbound,
+        station,
     };
     assert_eq!(
         sim.crowd.shifts,
-        vec![shift(500.5, true), shift(400.0, false)]
+        vec![
+            shift(600.0, true, Some(9)),
+            shift(500.5, true, None),
+            shift(400.0, false, None)
+        ]
     );
     // And they are written back as they were read.
     let crowd = &sim.serialize()["crowd"];
     assert_eq!(crowd["desks"], json!([[4, 5, 10, 9, 2, 1, 0]]));
     assert_eq!(
         crowd["shifts"],
-        json!([[500.5, 4, true], [400.0, 4, false]])
+        json!([[600.0, 4, true, 9], [500.5, 4, true], [400.0, 4, false]])
     );
     assert_eq!(
         crowd["people"][0]["commute"],
