@@ -125,4 +125,9 @@ export interface SerializedGame {
    * so the cars carry on after a reload. The engine owns the shape
    * (`engine-rs/src/dispatch_save.rs`); absent in older saves. */
   dispatch?: unknown;
+  /** Housekeeping's rooms cleaned today and yesterday's shift (cleaned, left
+   * dirty), so the checkout line and the stats sheet read the same after a
+   * reload. The engine owns the shape (`engine-rs/src/housekeeping_save.rs`);
+   * absent while there is nothing to tally and in older saves. */
+  housekeeping?: unknown;
 }

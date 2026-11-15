@@ -15,6 +15,7 @@ impl Simulation {
     pub(crate) fn adopt_saved_crowd(&mut self, saved: Option<&Value>) {
         let Some(saved) = saved else { return };
         self.crowd.restore(saved);
+        self.crowd.bound_gone_desks(&self.tower);
         let mut touched_meals = false;
         for i in 0..self.crowd.people.len() {
             let p = &self.crowd.people[i];

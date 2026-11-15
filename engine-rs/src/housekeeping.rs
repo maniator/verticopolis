@@ -104,7 +104,8 @@ pub struct Housekeeping {
     cleaned_today: i64,
     /// `hkYesterday`: yesterday's shift result (rooms cleaned, rooms left
     /// dirty), latched at the morning checkout; `None` before the first one.
-    /// Read by the stats screen and the facility diagnostics, never saved.
+    /// Read by the stats screen and the facility diagnostics; saved with
+    /// `cleaned_today` (`housekeeping_save.rs`).
     pub yesterday: Option<(i64, i64)>,
     /// Day the "can't reach" nudge last fired; -1 before the first.
     nudged_day: i64,
@@ -483,6 +484,9 @@ impl Simulation {
         }
     }
 }
+
+#[path = "housekeeping_save.rs"]
+mod save;
 
 #[cfg(test)]
 #[path = "housekeeping_dispatch_tests.rs"]

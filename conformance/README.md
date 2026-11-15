@@ -242,7 +242,7 @@ Commands run in order. Units and shafts are named by a tile they cover
 | `clearStops` | `floor`, `x` | Every floor stops again on the shaft at that tile (an express keeps its lobby-only rule). |
 | `setStop` | `floor`, `x`, `stopFloor`, `stop` | Serve or skip `stopFloor` on the shaft at that tile; an error outside the span or for an express stop off a lobby. |
 | `priceUnit` | `floor`, `x`, `target` | Set the unit's price to `target` through the one choke point every price write takes; an error when the unit is not repriceable. |
-| `reload` | | Save the game and load the save (`serialize()`, a JSON round trip, `deserialize`), replacing the running engine. The hashed `state` view must come back unchanged; a difference is an error. Live state that saves do not carry (the crowd, elevator dispatch) restarts as a load restarts it (see Checkpoints). |
+| `reload` | | Save the game and load the save (`serialize()`, a JSON round trip, `deserialize`), replacing the running engine. The hashed `state` view must come back unchanged, and so must the crowd; a difference is an error. The save carries the people, the elevator cars' timers and the housekeeping tallies, so the game plays on as it would have. |
 | `tick` | `dt`, `times?`, `checkpointEvery?` | Call `tick(dt)` `times` times (default 1). All three are whole positive numbers. After every `checkpointEvery`th call, take a checkpoint labeled `t+<minutes>`, where minutes counts every tick's `dt` since the start of the scenario. |
 | `checkpoint` | `label` | Take a checkpoint. |
 
@@ -348,9 +348,12 @@ Labels are unique within a scenario. Each checkpoint records three hashes:
 - `state`: the saved game (what `serialize()` returns) with prose removed: each
   log entry drops `text` and a pending event choice drops `message`, and every
   other field of both stays. Prose is player copy with locale-formatted money,
-  so it is not part of the contract. The save's `crowd` (the people) and
-  `dispatch` (the elevator cars' timers mid-stop) are left out too: the
-  people are hashed in their own channel, below.
+  so it is not part of the contract. The save's `crowd` (the people),
+  `dispatch` (the elevator cars' timers mid-stop) and `housekeeping` (the
+  rooms cleaned today, yesterday's shift and the days the housekeeping
+  nudges last fired) are left out too: the people are hashed in their own
+  channel, below. The tallies still reach the hash through the log entries
+  they decide on, such as whether the morning checkout line is written.
 - `crowd`: `{ "nextId": n, "rng": s, "people": [...] }`, the crowd's person id
   source, its random stream's current state as an unsigned 32-bit integer, and
   every live person in order. A new game starts the crowd empty with `nextId`

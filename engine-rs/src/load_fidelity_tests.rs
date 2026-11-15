@@ -160,7 +160,8 @@ fn saved_whole_numbers_clamp_to_the_safe_integers() {
         .iter()
         .find(|u| u.kind == Kind::Office)
         .unwrap();
-    assert_eq!(o.occupants, MAX_SAFE as i64);
+    // An office holds no more than its kind's head count, however large the saved figure.
+    assert_eq!(o.occupants, Kind::Office.facility().population);
     let load_of = |v: Value| edited(|s| s["transports"][0]["load"] = v).tower.transports[0].load;
     assert_eq!(load_of(json!(1e300)), MAX_SAFE as i64);
     assert_eq!(load_of(json!(-1e300)), -(MAX_SAFE as i64));

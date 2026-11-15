@@ -277,7 +277,7 @@ pub struct Crowd {
     pub step: i64,
     /// The cars the schedule has stood down, as (shaft id, car index),
     /// ascending: nobody boards one, even one still finishing its riders.
-    /// Swapped in from the dispatch each step; never saved.
+    /// Swapped in from the dispatch each step; saved as `closedCars`.
     pub closed_cars: Vec<(i64, i64)>,
     /// The cars standing at a stop with their doors open, as (shaft id, car
     /// index, floor), ascending: the only cars a person boards or leaves.

@@ -5,8 +5,8 @@
 //! A save carries the people and the few crowd values a step reads back
 //! (the crowd's random stream, its next id, the spawn accumulator, the
 //! frustration level, the commute-stress averages, the last step's hour, the
-//! lines the Modern router reads next and the walk-ins booked for the rest
-//! of the hour). Everything else the crowd keeps is either
+//! lines and the stood-down cars the Modern router reads next, and the
+//! walk-ins booked for the rest of the hour). Everything else the crowd keeps is either
 //! rebuilt from the people on load (`adopt.rs`: who
 //! rides each car, the venue and meal head counts, the housekeeping crews
 //! and the rooms they hold) or rebuilt each step (routes, landings, the
@@ -18,6 +18,10 @@
 //! unknown state, a route that does not fit its legs, a floor off the lot) is
 //! left out rather than trusted, so a forged save cannot send the motion code
 //! past the end of a route.
+
+// The router's saved lines and stood-down cars (`router_save.rs`).
+#[path = "router_save.rs"]
+mod router_save;
 
 use serde::ser::{Serialize, SerializeMap, Serializer};
 use serde_json::{json, Map, Value};
@@ -360,24 +364,6 @@ impl Serialize for SavedCrowd<'_> {
 }
 
 impl Crowd {
-    /// The lines the Modern router reads at the next step (`shaft_lines`):
-    /// `[[shaft, floor, riders], ...]`. A row that does not read, or names
-    /// nobody, is skipped.
-    fn restore_lines(&mut self, rows: Option<&Value>) {
-        let Some(rows) = rows.and_then(Value::as_array) else {
-            return;
-        };
-        for row in rows.iter().take(MAX_SAVED_PEOPLE) {
-            let n: Option<Vec<i64>> = (row.as_array().filter(|r| r.len() == 3))
-                .and_then(|r| r.iter().map(|v| v.as_f64().and_then(whole)).collect());
-            if let Some(&[shaft, floor, riders]) = n.as_deref() {
-                if riders > 0 {
-                    self.shaft_lines.insert((shaft, floor), riders);
-                }
-            }
-        }
-    }
-
     /// The crowd's save values ahead of the walk-ins and the people: the
     /// random stream and counters a step reads back, the hour the last step
     /// ran in. The commuters' desks and bookings follow them.
@@ -399,6 +385,9 @@ impl Crowd {
                 .map(|(&(shaft, floor), &n)| [shaft, floor, n])
                 .collect();
             m.insert("lines".into(), json!(rows));
+        }
+        if !self.closed_cars.is_empty() {
+            m.insert("closedCars".into(), json!(self.closed_cars));
         }
         m
     }
@@ -436,6 +425,7 @@ impl Crowd {
         self.hour = num("hour").and_then(whole).filter(|h| (0..24).contains(h));
         self.weekend = o.get("weekend") == Some(&Value::Bool(true));
         self.restore_lines(o.get("lines"));
+        self.restore_closed_cars(o.get("closedCars"));
         self.commuters_restore(o);
         if let Some(rows) = o.get("commuteStress") {
             // A malformed list keeps the empty averages a load starts with.
