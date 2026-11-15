@@ -451,6 +451,13 @@ from TOWER7 that set a new film in one theatre and a classic in another on
 the same morning saw the new film hold 2 for six mornings and the classic 1,
 and both fall to 0 together. Changing either film sets the count to 0.
 
+The original reads the film table we export (#1932, PC parity run of
+2026-11-15 on SimTower 1.0). Towers exported with a new film on its first day,
+a new film on its seventh day and a classic on its second day loaded with
+those ages: each count went up every morning, the new films drew 2 while the
+count was under 6, 1 from 6 to 8 and 0 from 9, and the classic held 1 until 9.
+The theatre line added up to 40 x (draw + 1) for each theatre, as above.
+
 The 12 undecoded flag bytes and the 42 undecoded bytes after the finance block
 are written as zeros.
 
