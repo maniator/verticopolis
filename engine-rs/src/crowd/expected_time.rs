@@ -18,21 +18,21 @@
 //! its stops, a car rides stop to stop, and a rider steps off onto a
 //! segment. A shaft with `n` stops adds a few links per stop and way,
 //! where the fewest-rides graph links every pair of stops (`n²`), and the
-//! search is an A* bounded by the floors still to ride plus, off the goal,
-//! the least a segment's way out costs (`expected_time_bound`).
+//! search is an A* bounded by the least a route to the goal can cost with
+//! no lines and every car running, searched back from the goal once per
+//! goal and kept while the graph stays the same (`expected_bound`).
 //!
 //! Ground lobbies that do not touch are joined by the street: a rider may
 //! step out of one and walk the sidewalk into the next, for the walk across
 //! the open ground between them (`crowd::street`).
 
 use std::cmp::Reverse;
-use std::collections::BinaryHeap;
+use std::collections::{BinaryHeap, VecDeque};
 
 use super::fasthash::FastMap;
-use super::staff_shift::STREET_FLOOR;
 use super::street;
 use super::{Crowd, Route, CROWD_SECONDS_PER_MINUTE, RIDE_SECONDS_PER_FLOOR};
-use crate::{dispatch::DWELL_MINUTES, facilities::Kind, tower::Tower, tower_query::floor_of_seg};
+use crate::{dispatch::DWELL_MINUTES, facilities::Kind, tower::Tower};
 
 /// Costs are kept in tenths of a crowd second.
 const TENTHS: f64 = 10.0;
@@ -83,8 +83,6 @@ enum Move {
 struct Link {
     /// The node it leads to, by its place in `Router::nodes`.
     to: u32,
-    /// The floor `to` stands at.
-    floor: i64,
     /// The cost apart from any line, in tenths of a second.
     tenths: i64,
     how: Move,
@@ -97,6 +95,9 @@ struct Shaft {
     /// Riders one car carries.
     capacity: f64,
     cars: i64,
+    /// The most cars the shaft can hold, which the bound counts as running
+    /// so adding or taking away a car keeps it (`least_cost`).
+    most_cars: i64,
 }
 
 /// The transit graph for one tower revision, and the lines and the cars in
@@ -104,17 +105,19 @@ struct Shaft {
 /// fresh crowd.
 pub struct Router {
     revision: i64,
-    /// The fastest car's ride per floor in tenths, rounded down (`floors_bound`).
-    per_floor: i64,
     /// Each node, and the place of each in that list.
     nodes: Vec<Node>,
     place: FastMap<Node, u32>,
     /// The links out of each node, by its place.
     links: Vec<Vec<Link>>,
-    /// The least that leaving each segment costs beyond the floors it
-    /// covers, by place (0 for a car), which the A* bound adds off the goal
-    /// (`exit_costs`).
-    exit: Vec<i64>,
+    /// The links into each node with the least each can cost.
+    into: Inbound,
+    /// The A* bound toward each goal searched so far, by the goal's place:
+    /// the least any route from each node can cost (`bound_toward`).
+    toward: Vec<Option<Toward>>,
+    /// The goals with a bound kept, oldest first, to hold the bounds under
+    /// `BOUND_CELLS`.
+    kept: VecDeque<u32>,
     /// The search's scratch, by node place: its best cost and how it was
     /// reached, and the places it touched, to reset them after.
     best: Vec<i64>,
@@ -123,6 +126,8 @@ pub struct Router {
     /// The open nodes: (cost plus bound, push order, place, cost). Kept
     /// between searches so a search allocates nothing (hot-path HP-3).
     heap: BinaryHeap<Reverse<(i64, u64, u32, i64)>>,
+    /// The bound search's scratch, kept the same way.
+    bound_scratch: BoundScratch,
     shafts: FastMap<i64, Shaft>,
     step: i64,
     /// Riders in line or on the way to one, by (shaft id, floor).
@@ -136,10 +141,9 @@ fn tenths(seconds: f64) -> i64 {
     (seconds * TENTHS).round() as i64
 }
 
-fn link(to: u32, floor: i64, seconds: f64, how: Move) -> Link {
+fn link(to: u32, seconds: f64, how: Move) -> Link {
     Link {
         to,
-        floor,
         tenths: tenths(seconds),
         how,
     }
@@ -165,9 +169,9 @@ impl Places {
         p
     }
 
-    fn add(&mut self, from: Node, to: Node, floor: i64, seconds: f64, how: Move) {
+    fn add(&mut self, from: Node, to: Node, seconds: f64, how: Move) {
         let (a, b) = (self.of(from), self.of(to));
-        self.links[a as usize].push(link(b, floor, seconds, how));
+        self.links[a as usize].push(link(b, seconds, how));
     }
 }
 
@@ -175,7 +179,6 @@ fn build(tower: &Tower) -> Router {
     let mut g = Places::default();
     let mut shafts: FastMap<i64, Shaft> = FastMap::default();
     let dwell = DWELL_MINUTES * CROWD_SECONDS_PER_MINUTE;
-    let mut per_floor = RIDE_SECONDS_PER_FLOOR; // under every flight's climb per floor
     let passengers = tower.transports.iter();
     for t in passengers.filter(|t| !t.kind.is_staff_only_transport()) {
         let stops = tower.stops_of(t);
@@ -192,7 +195,7 @@ fn build(tower: &Tower) -> Router {
                     for &s in here {
                         for &e in there {
                             let (s, e) = (Node::Segment(s), Node::Segment(e));
-                            g.add(s, e, stops[b], seconds, how);
+                            g.add(s, e, seconds, how);
                         }
                     }
                 }
@@ -200,13 +203,13 @@ fn build(tower: &Tower) -> Router {
             continue;
         }
         let ride = RIDE_SECONDS_PER_FLOOR / tower.mode.speed_of(t.kind);
-        per_floor = per_floor.min(ride);
         let span = (t.top - t.bottom).max(1) as f64;
         let round_trip = 2.0 * (span * ride + stops.len() as f64 * dwell);
         let shaft = Shaft {
             round_trip,
             capacity: t.kind.car_capacity().max(1.0),
             cars: t.cars,
+            most_cars: t.kind.max_cars(),
         };
         shafts.insert(t.id, shaft);
         // Each hop to the next stop carries a share of a dwell, which a ride
@@ -225,7 +228,7 @@ fn build(tower: &Tower) -> Router {
                 if behind.is_some() {
                     for &s in here {
                         let off = Move::Alight { shaft: t.id };
-                        g.add(car, Node::Segment(s), floor, 0.0, off);
+                        g.add(car, Node::Segment(s), 0.0, off);
                     }
                 }
                 let Some((next, &to)) = next.and_then(|n| Some((n, stops.get(n)?))) else {
@@ -235,32 +238,33 @@ fn build(tower: &Tower) -> Router {
                 let hop = (to - floor).abs() as f64 * ride + passed;
                 for &s in here {
                     let on = Move::Board { shaft: t.id, floor };
-                    g.add(Node::Segment(s), ahead, to, board + hop, on);
+                    g.add(Node::Segment(s), ahead, board + hop, on);
                 }
                 if behind.is_some() {
-                    g.add(car, ahead, to, hop, Move::Ride);
+                    g.add(car, ahead, hop, Move::Ride);
                 }
             }
         }
     }
     for (from, to, seconds) in street::links(tower) {
         let (from, to) = (Node::Segment(from), Node::Segment(to));
-        g.add(from, to, STREET_FLOOR, seconds, Move::Street);
+        g.add(from, to, seconds, Move::Street);
     }
     let n = g.nodes.len();
-    let per_floor = (per_floor * TENTHS).floor() as i64;
-    let exit = exit_costs(&g, &shafts, per_floor);
+    let into = Inbound::of(&g.nodes, &g.links, &shafts);
     Router {
-        per_floor,
         revision: tower.revision,
         nodes: g.nodes,
         place: g.place,
         links: g.links,
-        exit,
+        into,
+        toward: (0..n).map(|_| None).collect(),
+        kept: VecDeque::new(),
         best: vec![i64::MAX; n],
         prev: vec![(0, Move::Ride); n],
         touched: Vec::new(),
         heap: BinaryHeap::new(),
+        bound_scratch: BoundScratch::default(),
         shafts,
         step: -1,
         waiting: FastMap::default(),
@@ -280,10 +284,13 @@ fn fresh<'a>(crowd: &'a mut Crowd, tower: &Tower) -> &'a mut Router {
         // shaft and floor, not by the graph, and the crowd's count was
         // already taken at the step's first route.
         let mut rebuilt = build(tower);
-        if let Some(old) = crowd.router.take().filter(|r| r.step == crowd.step) {
-            rebuilt.step = old.step;
-            rebuilt.waiting = old.waiting;
-            stand_down(&mut rebuilt, &crowd.closed_cars);
+        if let Some(mut old) = crowd.router.take() {
+            carry_bounds(&mut rebuilt, &mut old);
+            if old.step == crowd.step {
+                rebuilt.step = old.step;
+                rebuilt.waiting = old.waiting;
+                stand_down(&mut rebuilt, &crowd.closed_cars);
+            }
         }
         crowd.router = Some(rebuilt);
     }
@@ -361,18 +368,18 @@ fn cheapest(router: &mut Router, from: i64, to: i64) -> Option<Route> {
 /// by more than a link costs, so the first time `goal` comes off the heap
 /// its cost is the least.
 fn search(router: &mut Router, start: u32, goal: u32) -> bool {
-    let to_floor = floor_of_seg(segment(router, goal));
-    let bound = |router: &Router, place: u32, floor: i64| {
-        bound_to(router, (place, floor), (goal, to_floor))
-    };
+    let (bound, fresh) = bound_toward(router, goal, Some(start));
+    let radius = bound.least[start as usize];
+    if radius == UNREACHABLE {
+        keep_bound(router, goal, (bound, fresh));
+        return false;
+    }
     let mut heap = std::mem::take(&mut router.heap);
     heap.clear();
     let mut order = 0_u64;
-    let from_floor = floor_of_seg(segment(router, start));
     router.best[start as usize] = 0;
     router.touched.push(start);
-    let first = bound(router, start, from_floor);
-    heap.push(Reverse((first, order, start, 0_i64)));
+    heap.push(Reverse((i64::from(radius), order, start, 0_i64)));
     let mut found = false;
     while let Some(Reverse((_, _, at, cost))) = heap.pop() {
         if cost > router.best[at as usize] {
@@ -385,6 +392,9 @@ fn search(router: &mut Router, start: u32, goal: u32) -> bool {
         for i in 0..router.links[at as usize].len() {
             let l = router.links[at as usize][i];
             let next = cost + cost_of(router, &l);
+            let Some(ahead) = bound.ahead(l.to, radius) else {
+                continue;
+            };
             if router.best[l.to as usize] <= next {
                 continue;
             }
@@ -394,10 +404,10 @@ fn search(router: &mut Router, start: u32, goal: u32) -> bool {
             router.best[l.to as usize] = next;
             router.prev[l.to as usize] = (at, l.how);
             order += 1;
-            let ahead = bound(router, l.to, l.floor);
-            heap.push(Reverse((next + ahead, order, l.to, next)));
+            heap.push(Reverse((next + i64::from(ahead), order, l.to, next)));
         }
     }
+    keep_bound(router, goal, (bound, fresh));
     router.heap = heap;
     found
 }
@@ -453,12 +463,14 @@ pub fn join_line(crowd: &mut Crowd, r: &Route) {
     }
 }
 
-#[path = "expected_time_bound.rs"]
+#[path = "expected_bound.rs"]
 mod bound;
-use bound::{bound_to, exit_costs};
-#[cfg(test)]
-use bound::{floors_bound, least_headway};
+use bound::{bound_toward, carry_bounds, keep_bound, BoundScratch, Inbound, Toward, UNREACHABLE};
 
 #[cfg(test)]
 #[path = "expected_time_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "expected_bound_tests.rs"]
+mod bound_tests;

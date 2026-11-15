@@ -11,7 +11,7 @@ const WIDTH: i64 = 40;
 
 /// A lobby on floors 1 and 15, plain floors between and up to `top`, over
 /// 40 columns.
-fn tower(mode: GameMode, top: i64) -> Simulation {
+pub(super) fn tower(mode: GameMode, top: i64) -> Simulation {
     let mut sim = Simulation::new(1, mode, CalendarKind::RealWorld, false);
     for floor in 1..=top {
         let kind = if floor == 1 || floor == 15 {
@@ -28,7 +28,7 @@ fn tower(mode: GameMode, top: i64) -> Simulation {
 
 /// Lays a basement under the lobby and past it, and a second ground lobby
 /// on it at 50 to 69, apart from the first by open ground.
-fn apart(sim: &mut Simulation) {
+pub(super) fn apart(sim: &mut Simulation) {
     for x in 0..70 {
         assert!(sim.tower.place(Kind::Floor, 0, x).ok, "B1 at {x}");
     }
@@ -38,7 +38,7 @@ fn apart(sim: &mut Simulation) {
 }
 
 /// The shaft a rider from floor 1 to `to` takes first, routed now.
-fn first_shaft(sim: &mut Simulation, to: i64) -> i64 {
+pub(super) fn first_shaft(sim: &mut Simulation, to: i64) -> i64 {
     let r = sim
         .crowd
         .route(&sim.tower, 1, to, None, None)
@@ -196,14 +196,9 @@ fn the_router_follows_the_tower_when_a_shaft_goes() {
 }
 
 #[test]
-fn the_bound_never_exceeds_the_cheapest_link_per_floor() {
-    // Every link costs at least a car's ride per floor it covers, which is
-    // what keeps the A* bound from overestimating.
-    let per_floor = floors_bound(0, 1, tenths(RIDE_SECONDS_PER_FLOOR));
-    assert!(tenths(STAIRS_FLIGHT_SECONDS) >= per_floor);
-    assert!(tenths(ESCALATOR_FLIGHT_SECONDS) >= per_floor);
-    assert_eq!(per_floor, tenths(RIDE_SECONDS_PER_FLOOR));
-    // Boarding gives back a share of a dwell, but never more than it costs:
+fn a_boarding_never_costs_less_than_nothing() {
+    // The bound's search back from a goal needs every link to cost at
+    // least nothing. Boarding gives back a share of a dwell, but never more than it costs:
     // a negative link would let the search undercount a route.
     let dwell = DWELL_MINUTES * CROWD_SECONDS_PER_MINUTE;
     assert!(tenths(BOARDING_SECONDS - STOPS_MADE * dwell) >= 0);
@@ -212,8 +207,7 @@ fn the_bound_never_exceeds_the_cheapest_link_per_floor() {
 #[test]
 fn a_ride_costs_what_the_cars_speed_makes_it() {
     // Modern cars move faster than the base speed, the express fastest; the
-    // router's rides and round trips follow, and the A* bound takes the
-    // fastest car's floor so it still never overestimates.
+    // router's rides and round trips follow.
     let mut sim = tower(GameMode::Modern, 15);
     let express = shaft(&mut sim, Kind::ElevatorExpress, 4, 1, 15);
     let local = shaft(&mut sim, Kind::ElevatorStandard, 20, 1, 15);
@@ -236,8 +230,6 @@ fn a_ride_costs_what_the_cars_speed_makes_it() {
             "{kind:?}"
         );
     }
-    let fastest = RIDE_SECONDS_PER_FLOOR / GameMode::Modern.speed_of(Kind::ElevatorExpress);
-    assert_eq!(router.per_floor, (fastest * TENTHS).floor() as i64);
 }
 
 #[test]
@@ -281,69 +273,6 @@ fn cars_the_schedule_stands_down_lengthen_the_wait() {
         sim.crowd.begin_step();
         assert_eq!(first_shaft(&mut sim, 15), up);
     }
-}
-
-#[test]
-fn the_exit_bound_never_overtakes_a_link() {
-    // A* finds the cheapest route only while the bound drops by no more
-    // than each link costs (a consistent bound). Check every link of a
-    // tower with every kind of way up, toward every goal.
-    let mut sim = tower(GameMode::Modern, 20);
-    shaft(&mut sim, Kind::ElevatorExpress, 4, 1, 20);
-    shaft(&mut sim, Kind::ElevatorStandard, 10, 1, 15);
-    shaft(&mut sim, Kind::ElevatorStandard, 16, 15, 20);
-    shaft(&mut sim, Kind::Escalator, 24, 1, 2);
-    shaft(&mut sim, Kind::Stairs, 30, 15, 16);
-    // A second ground lobby apart from the first, over a basement, and an
-    // elevator in it: the street joins the two.
-    apart(&mut sim);
-    shaft(&mut sim, Kind::ElevatorStandard, 60, 0, 1);
-    sim.crowd.begin_step();
-    let router = fresh(&mut sim.crowd, &sim.tower);
-    // Each node's floor: a segment's own, a car's from the links into it.
-    let mut floor_of: Vec<Option<i64>> = router
-        .nodes
-        .iter()
-        .map(|n| match *n {
-            Node::Segment(s) => Some(floor_of_seg(s)),
-            Node::Car(..) => None,
-        })
-        .collect();
-    for l in router.links.iter().flatten() {
-        floor_of[l.to as usize] = Some(l.floor);
-    }
-    let least = |l: &Link| match l.how {
-        Move::Board { shaft, .. } => l.tenths + tenths(least_headway(&router.shafts[&shaft])),
-        _ => l.tenths,
-    };
-    let goals = router.nodes.iter().enumerate();
-    let goals: Vec<u32> = goals
-        .filter(|(_, n)| matches!(n, Node::Segment(_)))
-        .map(|(p, _)| p as u32)
-        .collect();
-    let mut checked = 0;
-    let mut streets = 0;
-    let mut exits_above_zero = 0;
-    for &goal in &goals {
-        let to_floor = floor_of_seg(segment(router, goal));
-        for (p, links) in router.links.iter().enumerate() {
-            let Some(here) = floor_of[p] else { continue };
-            let from = bound_to(router, (p as u32, here), (goal, to_floor));
-            for l in links {
-                let to = bound_to(router, (l.to, l.floor), (goal, to_floor));
-                assert!(from <= least(l) + to, "node {p} to {} toward {goal}", l.to);
-                checked += 1;
-                streets += usize::from(matches!(l.how, Move::Street));
-            }
-        }
-    }
-    for e in &router.exit {
-        exits_above_zero += usize::from(*e > 0);
-    }
-    assert!(checked > 1000, "only {checked} links checked");
-    assert!(streets > 0, "the street's links were checked");
-    // The bound does add something, or this test pins nothing.
-    assert!(exits_above_zero > 0);
 }
 
 #[test]
