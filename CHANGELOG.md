@@ -27,7 +27,7 @@ are documentation only: no build that a client fetches carries them.
 
 ## 4.1.1
 
-- Big towers run faster: a game day on a maxed Classic tower takes about a quarter less work, a maxed Modern tower about a sixth less, and a Modern tower with a long elevator jam a little less than before the 4.1 line fix.
+- Big towers run faster: a game day on a maxed Classic tower takes about a quarter less work, a maxed Modern tower about a sixth less, and a Modern tower with a long elevator jam about a tenth less.
 
 ## 4.1.0
 
