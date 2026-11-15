@@ -460,3 +460,24 @@ fn the_access_line_gate_matches_the_catalog_values() {
         }
     }
 }
+
+#[test]
+fn the_unmet_demand_line_reads_the_rooms_own_stretch_of_floor() {
+    // Floor 2 has two stretches: the elevator lands on the left one, so the
+    // floor is reachable while a room on the right one is not (#663).
+    let mut sim = Simulation::new_game(9, GameMode::Classic);
+    sim.money = 1e12;
+    for x in 0..LOT_WIDTH {
+        assert!(sim.tower.place(Kind::Lobby, 1, x).ok);
+    }
+    for x in (C - 10..C + 10).chain(C + 20..C + 40) {
+        assert!(sim.tower.place(Kind::Floor, 2, x).ok);
+    }
+    assert!(sim.build_transport(Kind::ElevatorStandard, C, 1, 2).ok);
+    let stranded = sim.tower.place(Kind::Office, 2, C + 25).unit_id.unwrap();
+    assert!(sim.floor_reachable(2));
+    assert!(!sim.position_reachable(2, C + 25));
+    let u = sim.tower.get_unit(stranded).unwrap().clone();
+    let g = sim.gripe_facts(&u, "unmetDemand", Some(0.0), None, None);
+    assert_eq!(g.floor_reachable, Some(false));
+}

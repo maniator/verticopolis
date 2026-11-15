@@ -22,6 +22,7 @@ mod congestion_gripe_copy;
 mod crowd;
 mod demand_pools;
 mod demographic_routines;
+mod departure_cause;
 mod diagnostics_towers;
 mod diner_head_count;
 mod dominant_gripe;

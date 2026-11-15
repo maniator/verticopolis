@@ -11,6 +11,7 @@ use crate::sim::Simulation;
 use crate::tower::Unit;
 
 mod gripes;
+pub(crate) use gripes::feels_nightclub_halo;
 pub mod shortfall;
 mod update;
 
