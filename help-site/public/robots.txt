@@ -1,0 +1,6 @@
+# The Verticopolis player's manual (https://help.verticopolis.com/). Every
+# page is public; let every well-behaved crawler index it.
+User-agent: *
+Allow: /
+
+Sitemap: https://help.verticopolis.com/sitemap-index.xml

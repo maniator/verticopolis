@@ -14,6 +14,7 @@ import type { DiagnosticsReport } from "../wasmhost/engineDiagnostics";
 import { copyText } from "./copyText";
 import { announceLive } from "../game/liveRegion";
 import { isGameMode } from "../shared/types";
+import { HELP_ADDRESS, helpUrl } from "../helpAddress";
 
 /**
  * The in-game Help: About this game (the game panel's "About…") and the
@@ -168,10 +169,10 @@ export function showHelp(ui: UI): void {
   // The manual is online only (the service worker leaves /help to the
   // network), so offline say so rather than open a tab that cannot load.
   if (!navigator.onLine) {
-    ui.sayVisibly("The manual needs an internet connection. It is at verticopolis.com/help.");
+    ui.sayVisibly(`The manual needs an internet connection. It is at ${HELP_ADDRESS}.`);
     return;
   }
-  openPageInTab(ui, "/help/", () => ui.sayVisibly("The guide could not open. It is at verticopolis.com/help."));
+  openPageInTab(ui, "/help/", () => ui.sayVisibly(`The guide could not open. It is at ${HELP_ADDRESS}.`));
 }
 
 /**
@@ -183,7 +184,7 @@ export function showHelp(ui: UI): void {
  */
 function openPageInTab(ui: UI, href: string, blocked: () => void, e?: MouseEvent): boolean {
   const background = !!e && (e.ctrlKey || e.metaKey);
-  const tab = window.open(fromGameHref(href), "_blank");
+  const tab = window.open(fromGameHref(helpUrl(href)), "_blank");
   if (!tab) {
     blocked();
     return false;
@@ -253,7 +254,7 @@ function wirePrivacyLink(ui: UI, box: HTMLElement): void {
   link?.addEventListener("click", (e) => {
     if (!navigator.onLine) {
       e.preventDefault();
-      if (status) status.textContent = "The privacy page needs an internet connection. It is at verticopolis.com/help/privacy.";
+      if (status) status.textContent = `The privacy page needs an internet connection. It is at ${HELP_ADDRESS}/privacy.`;
       return;
     }
     leaveForTab(ui, e);

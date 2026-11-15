@@ -14,7 +14,7 @@ import { resolve } from "node:path";
 const ROOT = resolve(__dirname, "../..");
 const PARITY = readFileSync(resolve(ROOT, "PARITY.md"), "utf8");
 const HELP_PAGE = readFileSync(resolve(ROOT, "help-site/src/content/docs/differences.mdx"), "utf8");
-const HELP_URL = "https://verticopolis.com/help/differences/#";
+const HELP_URL = "https://help.verticopolis.com/differences/#";
 
 /** The lines under `heading` (an exact `## ` or `### ` line) up to the next heading of the same or a higher level. */
 function sectionLines(markdown: string, heading: string): string[] | undefined {
@@ -92,6 +92,6 @@ describe("PARITY.md and the help site's differences page", () => {
 
   it("is the page the parity report form sends players to", () => {
     const form = readFileSync(resolve(ROOT, ".github/ISSUE_TEMPLATE/parity_report.yml"), "utf8");
-    expect(form).toContain("https://verticopolis.com/help/differences/");
+    expect(form).toContain("https://help.verticopolis.com/differences/");
   });
 });
