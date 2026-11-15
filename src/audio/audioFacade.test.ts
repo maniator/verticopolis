@@ -22,6 +22,7 @@ class StubEngine {
   sfxVol = 1;
   program = "game";
   lastFocus: unknown = null;
+  cues: string[] = [];
   constructor() {
     built.push(this);
   }
@@ -42,7 +43,9 @@ class StubEngine {
   update(focus: unknown): void {
     this.lastFocus = focus;
   }
-  sfx(): void {}
+  sfx(name: string): void {
+    this.cues.push(name);
+  }
   dispose(): void {
     this.disposed = true;
     this.started = false;
@@ -258,5 +261,48 @@ describe("AudioEngine facade lazy loading", () => {
     });
     expect(flaky).toHaveBeenCalledTimes(2);
     expect(built).toHaveLength(1);
+  });
+
+  describe("the first gesture's cue (#554)", () => {
+    afterEach(() => vi.restoreAllMocks());
+
+    it("plays the latest cue fired while the engine loaded, once it starts", async () => {
+      const audio = new AudioEngine(loader);
+      audio.start(); // the gesture starts the load...
+      audio.sfx("click"); // ...and fires its own cues before the engine exists
+      audio.sfx("build");
+      await vi.waitFor(() => expect(audio.started).toBe(true));
+      expect(built[0].cues).toEqual(["build"]);
+      audio.sfx("sell");
+      expect(built[0].cues).toEqual(["build", "sell"]);
+    });
+
+    it("drops a cue that waited longer than a second for the load", async () => {
+      const now = vi.spyOn(performance, "now").mockReturnValue(0);
+      const audio = new AudioEngine(loader);
+      audio.start();
+      audio.sfx("build");
+      now.mockReturnValue(1001);
+      await vi.waitFor(() => expect(audio.started).toBe(true));
+      expect(built[0].cues).toEqual([]);
+    });
+
+    it("keeps no cue fired before any gesture started the load", async () => {
+      const audio = new AudioEngine(loader);
+      audio.sfx("build");
+      audio.start();
+      await vi.waitFor(() => expect(audio.started).toBe(true));
+      expect(built[0].cues).toEqual([]);
+    });
+
+    it("forgets the waiting cue when dispose() interrupts the load", async () => {
+      const audio = new AudioEngine(loader);
+      audio.start();
+      audio.sfx("build");
+      audio.dispose();
+      audio.start();
+      await vi.waitFor(() => expect(audio.started).toBe(true));
+      expect(built[0].cues).toEqual([]);
+    });
   });
 });

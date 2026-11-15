@@ -67,6 +67,8 @@ export class AudioEngine {
   /** Latest focus seen before the engine loaded, replayed once it's ready so the
    *  correct scene is showing immediately rather than a frame later. */
   private lastFocus: ViewFocus | null = null;
+  /** The latest cue fired while the engine was loading, and when. */
+  private pendingCue: { name: SfxName; at: number } | null = null;
 
   /**
    * @param loadEngine Loader for the heavy Tone engine chunk. Defaults to the
@@ -109,11 +111,16 @@ export class AudioEngine {
         impl.start();
         this.started = impl.started;
         if (this.lastFocus) impl.update(this.lastFocus);
+        const cue = this.takePendingCue();
+        if (cue) impl.sfx(cue);
       })
       .catch(() => {
         // Chunk failed to load (offline first-run, blocked request) — stay
         // silent and let a later gesture retry. Only clear our own guard.
-        if (generation === this.generation) this.loading = false;
+        if (generation === this.generation) {
+          this.loading = false;
+          this.pendingCue = null;
+        }
       });
   }
 
@@ -162,7 +169,23 @@ export class AudioEngine {
   }
 
   sfx(name: SfxName): void {
-    this.impl?.sfx(name);
+    if (this.impl) {
+      this.impl.sfx(name);
+      return;
+    }
+    // The first gesture starts the engine, but its chunk loads asynchronously,
+    // so the cue that same gesture fires arrives before there is an engine to
+    // play it. Keep the latest one and hand it over when the engine starts,
+    // unless the load took so long that it would sound late (#554).
+    if (this.loading) this.pendingCue = { name, at: nowMs() };
+  }
+
+  /** The cue fired while the engine loaded, if it is still fresh enough to
+   *  play; taking it clears it. */
+  private takePendingCue(): SfxName | null {
+    const cue = this.pendingCue;
+    this.pendingCue = null;
+    return cue && nowMs() - cue.at <= FIRST_CUE_MAX_DELAY_MS ? cue.name : null;
   }
 
   dispose(): void {
@@ -170,11 +193,18 @@ export class AudioEngine {
     // guard so a later start() can retry cleanly.
     this.generation++;
     this.loading = false;
+    this.pendingCue = null;
     this.impl?.dispose();
     this.impl = null;
     this.started = false;
   }
 }
+
+/** The longest a cue fired during the engine's load may wait and still play:
+ *  past this, it would sound detached from the click that made it. */
+const FIRST_CUE_MAX_DELAY_MS = 1000;
+
+const nowMs = (): number => performance.now();
 
 /** How far the music dips while a bomb search counts down. */
 const MUSIC_DUCK = 0.5;
