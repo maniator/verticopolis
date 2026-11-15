@@ -2,7 +2,7 @@
 
 The developer's checklist of how a **Classic** tower matches the 1994 game,
 one line per mechanic. Players read the same story in the manual:
-**[Differences from the 1994 game](https://verticopolis.com/help/differences/)**.
+**[Differences from the 1994 game](https://help.verticopolis.com/differences/)**.
 The rules themselves live in the Rust engine (`engine-rs/`), and its catalog
 publishes the prices, sizes and caps, so this page names mechanics and issues
 rather than copying numbers. Status: ✅ implemented · ◑ a faithful
@@ -70,18 +70,18 @@ other does not.
 - ✅ Mobile layout with touch pan and pinch
 
 ## Deliberate divergences
-- Commuters are individually pathfound, with an aggregate congestion model underneath and a capped on-screen crowd. [Help](https://verticopolis.com/help/differences/#every-commuter-is-a-real-person)
-- The Cathedral is a religion-agnostic Wedding Hall. [Help](https://verticopolis.com/help/differences/#the-wedding-hall)
-- The census counts occupants (hotel guests until 4★, shoppers inside venues), with the TOWER at the canon 15,000 on the 375-tile lot. [Help](https://verticopolis.com/help/differences/#who-counts-toward-population)
-- Housekeeping fields six simulated maids per unit on stairs and service elevators, with no 1994 long-trip pathfinding decay and no housekeeping build cap (1.54, 1.57). [Help](https://verticopolis.com/help/differences/#housekeeping-maids)
-- Cockroach infestations are visible rooms with a full lifecycle; Classic cures only by bulldozing (1.53). [Help](https://verticopolis.com/help/differences/#cockroaches-you-can-see)
-- Shop and restaurant patronage comes from the reachable nearby population; the original's opaque per-venue counters are not reproduced (#393). [Help](https://verticopolis.com/help/differences/#shoppers-come-from-nearby-floors)
-- A rule-set (Classic or Modern) is chosen at founding and fixed for the tower's life; saves with no mode load as Classic. [Help](https://verticopolis.com/help/differences/#two-ways-to-play)
-- Modern builds while paused; Classic refuses, as 1994 does (#1936). [Help](https://verticopolis.com/help/differences/#building-while-paused)
+- Commuters are individually pathfound, with an aggregate congestion model underneath and a capped on-screen crowd. [Help](https://help.verticopolis.com/differences/#every-commuter-is-a-real-person)
+- The Cathedral is a religion-agnostic Wedding Hall. [Help](https://help.verticopolis.com/differences/#the-wedding-hall)
+- The census counts occupants (hotel guests until 4★, shoppers inside venues), with the TOWER at the canon 15,000 on the 375-tile lot. [Help](https://help.verticopolis.com/differences/#who-counts-toward-population)
+- Housekeeping fields six simulated maids per unit on stairs and service elevators, with no 1994 long-trip pathfinding decay and no housekeeping build cap (1.54, 1.57). [Help](https://help.verticopolis.com/differences/#housekeeping-maids)
+- Cockroach infestations are visible rooms with a full lifecycle; Classic cures only by bulldozing (1.53). [Help](https://help.verticopolis.com/differences/#cockroaches-you-can-see)
+- Shop and restaurant patronage comes from the reachable nearby population; the original's opaque per-venue counters are not reproduced (#393). [Help](https://help.verticopolis.com/differences/#shoppers-come-from-nearby-floors)
+- A rule-set (Classic or Modern) is chosen at founding and fixed for the tower's life; saves with no mode load as Classic. [Help](https://help.verticopolis.com/differences/#two-ways-to-play)
+- Modern builds while paused; Classic refuses, as 1994 does (#1936). [Help](https://help.verticopolis.com/differences/#building-while-paused)
 
 ## Known parity gaps
-- Lobby-distance pressure: Verticopolis drops the 1994 mid-block cap once every legal sky lobby is built (owner ruling 2026-07-16, #394); re-keying it on elevator reach is #436. [Help](https://verticopolis.com/help/differences/#lobby-distance)
-- Other actions while paused: whether 1994 also refuses bulldozing, elevator or rent edits and the inspector, and whether a loaded tower starts paused, waits on a PC check (#1974). [Help](https://verticopolis.com/help/differences/#other-actions-while-paused)
+- Lobby-distance pressure: Verticopolis drops the 1994 mid-block cap once every legal sky lobby is built (owner ruling 2026-07-16, #394); re-keying it on elevator reach is #436. [Help](https://help.verticopolis.com/differences/#lobby-distance)
+- Other actions while paused: whether 1994 also refuses bulldozing, elevator or rent edits and the inspector, and whether a loaded tower starts paused, waits on a PC check (#1974). [Help](https://help.verticopolis.com/differences/#other-actions-while-paused)
 
 The gaps from the 2026-07-15 r/SimTower optimization-thread review have
 shipped (#393, #395 to #401); the review is

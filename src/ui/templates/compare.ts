@@ -2,6 +2,7 @@ import { html, type TemplateResult } from "lit-html";
 import * as classicVsModern from "../../../help-site/src/content/docs/classic-vs-modern.md";
 import type { GameMode } from "../../shared/types";
 import { fromGameHref } from "../fromGame";
+import { helpUrl } from "../../helpAddress";
 
 /**
  * The Classic vs Modern comparison body: the Help site's Classic and Modern
@@ -29,7 +30,7 @@ function openLinksInNewTab(e: MouseEvent): void {
   const href = link?.getAttribute("href");
   if (!href || !href.startsWith("/")) return;
   e.preventDefault();
-  window.open(fromGameHref(href), "_blank", "noopener");
+  window.open(fromGameHref(helpUrl(href)), "_blank", "noopener");
 }
 
 /**

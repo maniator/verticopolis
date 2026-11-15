@@ -358,6 +358,10 @@ export default defineConfig(({ command }) => ({
     // validated by `toolingBuild()` above; scripts/verify-game-handle.ts
     // asserts the resulting dist matches the mode on every `npm run build`.
     __TOOLING_BUILD__: JSON.stringify(TOOLING_BUILD),
+    // The player's manual's own host in a production build
+    // (scripts/vercel-build.sh), or "" for /help on the game's host
+    // (src/helpAddress.ts).
+    __HELP_ORIGIN__: JSON.stringify(process.env.VC_HELP_ORIGIN ?? ""),
     // Whether the engine this run serves is the tooling package with the
     // binding's tier 3 ops (#1057), so the boot check asks for them only
     // then: a tooling build, or a dev serve that found the package.

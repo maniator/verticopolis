@@ -11,6 +11,7 @@ import { bindViewWorld } from "./presentation/viewWorld";
 import { bindViewKinds } from "./presentation/viewKinds";
 import { readCatalog } from "./engineBinding/catalog";
 import { loadWasmEngine } from "./wasmhost/rustEngine";
+import { helpUrl } from "./helpAddress";
 
 /** The Rust engine's Modern catalog, read before the page draws. The engine is
  *  the one the game runs on, so every size, name and variant list on this page
@@ -245,8 +246,8 @@ render(
       <div class="gallery-scroll"><canvas id="gallery"></canvas></div>
     `,
     links: [
-      { href: "/help", label: "Help" },
-      { href: "/help/changelog", label: "Release notes" },
+      { href: helpUrl("/help"), label: "Help" },
+      { href: helpUrl("/help/changelog"), label: "Release notes" },
     ],
     fromGame: takeFromGameFlag(location, history),
   }),

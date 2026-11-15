@@ -94,3 +94,14 @@ jobs:
       # Every link between help pages reaches a real page, and a real section.
       - name: Check the links
         run: node help-site/scripts/check-links.mjs
+
+      # Production builds the manual for its own host, help.verticopolis.com,
+      # at the root (scripts/vercel-build.sh). Build it that way too and check
+      # its links: no page may still point under /help.
+      - name: Check the links of the help host build
+        env:
+          VC_HELP_ORIGIN: https://help.verticopolis.com
+        run: |
+          npm run build --prefix help-site
+          if grep -rlE '(href|src)="/help(/|")' dist/help --include=*.html; then echo "::error::a page above still links under /help"; exit 1; fi
+          node help-site/scripts/check-links.mjs

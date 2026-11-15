@@ -1,8 +1,36 @@
 // What the help site's config and its tests share: where it lives, its side
 // menu, and the script that sends an old /help#section link to its new page.
 
-/** The site's path on verticopolis.com. */
-export const HELP_BASE = "/help";
+/** The manual's own host, help.verticopolis.com, in a production build
+ *  (scripts/vercel-build.sh sets VC_HELP_ORIGIN there), or empty in every
+ *  other build: a preview, staging, CI and a local build keep the manual under
+ *  /help on the game's host, which is the only host they have. Read at build
+ *  time; in a page's script `process` is absent and this is empty, so browser
+ *  code takes the base from Astro (`import.meta.env.BASE_URL`) instead. */
+export const HELP_ORIGIN = globalThis.process?.env?.VC_HELP_ORIGIN ?? "";
+
+/** The site's path: the root of its own host, or /help on the game's. */
+export const HELP_BASE = HELP_ORIGIN ? "" : "/help";
+
+/** The game's address as the manual links it: the game's own host when the
+ *  manual has a host of its own, else the same host (an empty prefix). */
+export const GAME_ORIGIN = HELP_ORIGIN ? "https://verticopolis.com" : "";
+
+/**
+ * A link as the help pages write it, `/` and other root paths for the game
+ * and `/help/...` for the manual, as this build serves it: a manual path
+ * moves under {@link HELP_BASE}, and a game path goes to {@link GAME_ORIGIN}.
+ * Any other link (another site, a #section, a relative path) is left alone.
+ * The Markdown keeps writing /help/... because the game's own Help window
+ * reads the same files.
+ */
+export function siteHref(href, base = HELP_BASE, gameOrigin = GAME_ORIGIN) {
+  if (!href.startsWith("/") || href.startsWith("//")) return href;
+  const manual = href.match(/^\/help(?=[/?#]|$)(.*)$/);
+  if (!manual) return gameOrigin + href;
+  const rest = manual[1].startsWith("/") ? manual[1] : `/${manual[1]}`;
+  return base + rest;
+}
 
 /** The engine developer docs (docs/engine-site), for players who want the
  *  rules as code. */
@@ -26,7 +54,7 @@ export const sharedHead = [
   { tag: "meta", attrs: { property: "og:image:width", content: "1200" } },
   { tag: "meta", attrs: { property: "og:image:height", content: "630" } },
   { tag: "meta", attrs: { name: "theme-color", content: "#c0c0c0" } },
-  { tag: "link", attrs: { rel: "apple-touch-icon", href: "/apple-touch-icon.png" } },
+  { tag: "link", attrs: { rel: "apple-touch-icon", href: `${GAME_ORIGIN}/apple-touch-icon.png` } },
 ];
 
 /** Starlight's sidebar. A `slug` entry takes its label from the page's title.
@@ -151,10 +179,10 @@ export function sponsorTapListener(track) {
 /**
  * The analytics landing a page view counts as: `page_changelog` on the release
  * notes, `page_help` on any other page, or null for a step from one help page
- * to another (a referrer under /help on the same site), so a visit counts once
+ * to another (a referrer under the site's base on the same host), so a visit counts once
  * however many pages it reads, as the old one-page /help did.
  */
-export function landingAction(pathname, referrer, origin) {
+export function landingAction(pathname, referrer, origin, base = HELP_BASE) {
   let from = null;
   try {
     const ref = new URL(referrer);
@@ -162,9 +190,9 @@ export function landingAction(pathname, referrer, origin) {
   } catch {
     // No referrer, or not a URL: a landing.
   }
-  const inSite = (path) => path === HELP_BASE || path.startsWith(HELP_BASE + "/");
+  const inSite = (path) => path === base || path.startsWith(base + "/");
   if (from !== null && inSite(from)) return null;
-  return /^\/help\/changelog\/?$/.test(pathname) ? "page_changelog" : "page_help";
+  return /^\/changelog\/?$/.test(pathname.slice(base.length)) ? "page_changelog" : "page_help";
 }
 
 /** The longest page path `helpPageDetail` reports; today's longest is
@@ -173,7 +201,7 @@ const MAX_PAGE_DETAIL = 80;
 
 /**
  * The page a help page view reports in its `help_page_view` event's `detail`:
- * the path under /help without its slashes ("rooms/hotels"), "home" for the
+ * the path under the site's base (`base`, /help or the root) without its slashes ("rooms/hotels"), "home" for the
  * front page, or "other" for a path that is not a plain lowercase page path.
  * The pattern checks only the format, so a well-formed but unknown slug
  * passes it. What keeps a mistyped or crafted address out of
@@ -184,16 +212,17 @@ const MAX_PAGE_DETAIL = 80;
  * page list first. Only the path is read: the query (the game's ?from=game
  * mark) and the hash stay out of it.
  */
-export function helpPageDetail(pathname) {
-  const inSite = pathname === HELP_BASE || pathname.startsWith(HELP_BASE + "/");
+export function helpPageDetail(pathname, base = HELP_BASE) {
+  const inSite = pathname === base || pathname.startsWith(base + "/");
   if (!inSite) return "other";
-  const slug = pathname.slice(HELP_BASE.length).replace(/^\/+|\/+$/g, "");
+  const slug = pathname.slice(base.length).replace(/^\/+|\/+$/g, "");
   if (slug === "") return "home";
   return slug.length <= MAX_PAGE_DETAIL && /^[a-z0-9-]+(\/[a-z0-9-]+)*$/.test(slug) ? slug : "other";
 }
 
-/** The site's address, for the structured data below. */
-const SITE_ORIGIN = "https://verticopolis.com";
+/** The site's address, for its canonical links and the structured data
+ *  below: its own host, or the game's with the manual under /help. */
+export const SITE_ORIGIN = HELP_ORIGIN || "https://verticopolis.com";
 
 /** The section folders and the names a breadcrumb shows for them. Only a
  *  folder with an index page of its own (rooms) gets a crumb, since every

@@ -3,6 +3,7 @@ import type { DiagnosticsReport } from "../../wasmhost/engineDiagnostics";
 import { fromGameHref } from "../fromGame";
 import { diagnosticsBlock } from "./diagnostics";
 import { helpAboutBody } from "./helpContent";
+import { helpUrl } from "../../helpAddress";
 
 /**
  * About this game, the window the game panel's About… opens: the version, the
@@ -19,7 +20,7 @@ import { helpAboutBody } from "./helpContent";
 
 /** The Help site's privacy page, marked `?from=game` so its "Back to game"
  *  closes that tab instead of loading a second game (src/ui/fromGame.ts). */
-export const PRIVACY_HREF = fromGameHref("/help/privacy/");
+export const PRIVACY_HREF = fromGameHref(helpUrl("/help/privacy/"));
 
 /** The actions About this game binds inline. */
 export interface AboutActions {

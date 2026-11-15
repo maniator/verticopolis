@@ -5,6 +5,8 @@
 // the game's own title screen (src/ui/splashTemplate.ts, splash.css). Starlight renders it from the page's `hero` front matter.
 // A button that starts the game (link "/") is marked `data-game-link`, so in a
 // tab the game opened it reads Back to game and closes the tab (Header.astro).
+// Each link goes through siteHref, which points it at this build's address.
+import { siteHref } from "../../site.mjs";
 const { data } = Astro.locals.starlightRoute.entry;
 const { tagline, actions = [] } = data.hero || {};
 ---
@@ -27,7 +29,7 @@ const { tagline, actions = [] } = data.hero || {};
       {actions.map((action) => (
         <a
           class:list={["ts-btn", { primary: action.variant === "primary" }]}
-          href={action.link}
+          href={siteHref(action.link)}
           data-game-link={action.link === "/" ? "" : undefined}>
           {action.text}
         </a>

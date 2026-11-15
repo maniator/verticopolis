@@ -6,14 +6,14 @@
 // and each item's data-help-item is the code its pick reports. The game item
 // reads "Play Verticopolis" until the script finds a tab the game opened,
 // where it becomes "Back to Game".
-import { GITHUB_ISSUES, HELP_BASE, SPONSOR_URL } from "../../site.mjs";
+import { GITHUB_ISSUES, SPONSOR_URL, siteHref } from "../../site.mjs";
 ---
 
 <nav id="help-menubar" class="menubar help-menubar print:hidden" aria-label="Help menu">
   <div class="mb-menu">
     <button type="button" class="mb-title" id="hm-file" aria-haspopup="menu" aria-expanded="false" aria-controls="hm-file-menu"><u>F</u>ile</button>
     <div class="mb-pop" id="hm-file-menu" role="menu" aria-labelledby="hm-file" hidden>
-      <a role="menuitem" class="mb-item" href="/" data-help-item="game">Play Verticopolis</a>
+      <a role="menuitem" class="mb-item" href={siteHref("/")} data-help-item="game">Play Verticopolis</a>
       <hr class="mb-sep" />
       <button type="button" role="menuitem" class="mb-item" data-help-item="print">Print…<kbd>Ctrl+P</kbd></button>
     </div>
@@ -36,7 +36,7 @@ import { GITHUB_ISSUES, HELP_BASE, SPONSOR_URL } from "../../site.mjs";
   <div class="mb-menu">
     <button type="button" class="mb-title" id="hm-help" aria-haspopup="menu" aria-expanded="false" aria-controls="hm-help-menu"><u>H</u>elp</button>
     <div class="mb-pop" id="hm-help-menu" role="menu" aria-labelledby="hm-help" hidden>
-      <a role="menuitem" class="mb-item" href={`${HELP_BASE}/changelog/`} data-help-item="whats_new">What's New</a>
+      <a role="menuitem" class="mb-item" href={siteHref("/help/changelog/")} data-help-item="whats_new">What's New</a>
       <a role="menuitem" class="mb-item" href={GITHUB_ISSUES} target="_blank" rel="noopener noreferrer" data-help-item="report">Report a Problem…</a>
       <hr class="mb-sep" />
       <a role="menuitem" class="mb-item" href={SPONSOR_URL} target="_blank" rel="noopener noreferrer" data-help-item="sponsor">Sponsor Verticopolis</a>

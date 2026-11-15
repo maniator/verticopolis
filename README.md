@@ -1,9 +1,9 @@
 # 🏙️ Verticopolis™: a browser SimTower clone
 
 **Play it: [verticopolis.com](https://verticopolis.com)** ·
-[How to play](https://verticopolis.com/help/) ·
+[How to play](https://help.verticopolis.com/) ·
 [Engine docs](https://docs.verticopolis.com/) ·
-[Release notes](https://verticopolis.com/help/changelog/) ·
+[Release notes](https://help.verticopolis.com/changelog/) ·
 [Sponsor](https://github.com/sponsors/maniator)
 
 A from-scratch, browser-native homage to the classic **SimTower** (1994): a
@@ -27,29 +27,29 @@ drawn in code.
 
 - **Two ways to play.** *Classic* is the 1994 game, rule for rule; *Modern*
   keeps it and adds what the original couldn't do.
-  ([Classic and Modern](https://verticopolis.com/help/classic-vs-modern/))
+  ([Classic and Modern](https://help.verticopolis.com/classic-vs-modern/))
 - **Every room from the original**: offices, condos, hotels, shops and
   restaurants, the cinema and party hall, services, the metro and the Wedding
-  Hall, each one drawn on the [Rooms](https://verticopolis.com/help/rooms/)
+  Hall, each one drawn on the [Rooms](https://help.verticopolis.com/rooms/)
   pages of the manual.
 - **Stairs, escalators and three kinds of elevator**, with cars and stops you
-  set yourself. ([Elevators](https://verticopolis.com/help/building/elevators/))
+  set yourself. ([Elevators](https://help.verticopolis.com/building/elevators/))
 - **A living tower** on one game clock: rush hours, quiet nights, people riding
   the cars, lights in the windows, the metro train pulling in.
-  ([People](https://verticopolis.com/help/tower/people/))
+  ([People](https://help.verticopolis.com/tower/people/))
 - **Stars, events and the TOWER**: fires, bomb threats, the VIP and the final
-  inspection. ([Stars and the TOWER](https://verticopolis.com/help/tower/stars/),
-  [Events](https://verticopolis.com/help/tower/events/))
+  inspection. ([Stars and the TOWER](https://help.verticopolis.com/tower/stars/),
+  [Events](https://help.verticopolis.com/tower/events/))
 - **Your towers, kept**: the Auto-save, a My Towers folder with classic Open
   and Save As windows, `.vctower` files, and the
   original game's `.TDT` saves (opened here, and written back out from a
   Classic tower).
-  ([Saving and loading](https://verticopolis.com/help/your-towers/saving/))
+  ([Saving and loading](https://help.verticopolis.com/your-towers/saving/))
 - **Installable and offline** on desktop and phone.
-  ([Installing and updates](https://verticopolis.com/help/your-towers/installing/))
+  ([Installing and updates](https://help.verticopolis.com/your-towers/installing/))
 
 Where a Classic tower differs from the original, on purpose or not yet, is on
-[Differences from the 1994 game](https://verticopolis.com/help/differences/);
+[Differences from the 1994 game](https://help.verticopolis.com/differences/);
 the developer's checklist is [PARITY.md](PARITY.md).
 
 ## Quick start
@@ -68,12 +68,12 @@ it in one step.
 
 | Playing | Building it |
 | --- | --- |
-| [Your first tower](https://verticopolis.com/help/first-tower/) | [CONTRIBUTING.md](CONTRIBUTING.md): setup, quality gates, tests and coverage, versioning, review |
-| [Controls](https://verticopolis.com/help/controls/) (mouse, touch, keyboard) | [ARCHITECTURE.md](ARCHITECTURE.md): source layout, the frame loop, input, saves, the PWA |
-| [Rooms](https://verticopolis.com/help/rooms/) | [engine-rs/README.md](engine-rs/README.md): working on the simulation |
-| [Map and windows](https://verticopolis.com/help/tower/map-and-windows/) | [docs.verticopolis.com](https://docs.verticopolis.com/): the engine package, crate, API and conformance |
-| [Importing and exporting](https://verticopolis.com/help/your-towers/importing-exporting/) | [docs/canon/tdt-format.md](docs/canon/tdt-format.md): the `.TDT` save format |
-| [The whole manual](https://verticopolis.com/help/) | [docs/screenshots.md](docs/screenshots.md): the screenshot gallery and how it is rendered, including the [1★ to TOWER ladder](docs/screenshots/milestones/) |
+| [Your first tower](https://help.verticopolis.com/first-tower/) | [CONTRIBUTING.md](CONTRIBUTING.md): setup, quality gates, tests and coverage, versioning, review |
+| [Controls](https://help.verticopolis.com/controls/) (mouse, touch, keyboard) | [ARCHITECTURE.md](ARCHITECTURE.md): source layout, the frame loop, input, saves, the PWA |
+| [Rooms](https://help.verticopolis.com/rooms/) | [engine-rs/README.md](engine-rs/README.md): working on the simulation |
+| [Map and windows](https://help.verticopolis.com/tower/map-and-windows/) | [docs.verticopolis.com](https://docs.verticopolis.com/): the engine package, crate, API and conformance |
+| [Importing and exporting](https://help.verticopolis.com/your-towers/importing-exporting/) | [docs/canon/tdt-format.md](docs/canon/tdt-format.md): the `.TDT` save format |
+| [The whole manual](https://help.verticopolis.com/) | [docs/screenshots.md](docs/screenshots.md): the screenshot gallery and how it is rendered, including the [1★ to TOWER ladder](docs/screenshots/milestones/) |
 
 ## License
 

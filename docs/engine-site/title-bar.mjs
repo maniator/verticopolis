@@ -1,5 +1,5 @@
 // The title bar the three docs surfaces share: the player help site at
-// verticopolis.com/help, the engine docs at docs.verticopolis.com, and the
+// help.verticopolis.com, the engine docs at docs.verticopolis.com, and the
 // Rust API reference cargo doc writes under docs.verticopolis.com/rust/.
 // Both Starlight sites draw it with src/components/TitleBar.astro (each
 // site's Header override), scripts/rustdoc-chrome.mjs writes the same markup
