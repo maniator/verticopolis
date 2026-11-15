@@ -1,6 +1,21 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, html } from "lit-html";
-import { CLOSE_TAB_NOTE, FROM_GAME_STORAGE_KEY, LEGACY_FROM_GAME_STORAGE_KEY, backToOpenGame, fromGameHref, openedFromGame, takeFromGameFlag } from "./fromGame";
+import {
+  CLOSE_TAB_NOTE,
+  FROM_GAME_STORAGE_KEY,
+  LEGACY_FROM_GAME_STORAGE_KEY,
+  PRESENCE_ASK,
+  PRESENCE_HERE,
+  PRESENCE_WAIT_MS,
+  answerGamePresence,
+  backToOpenGame,
+  fromGameHref,
+  gameStillOpen,
+  openedFromGame,
+  takeFromGameFlag,
+  type BackToGameDeps,
+  type PresenceChannel,
+} from "./fromGame";
 import { pageShell } from "./templates/pageShell";
 
 /** A page the game opened, in the shared shell, mounted in the test DOM. */
@@ -28,6 +43,9 @@ describe("fromGameHref and openedFromGame", () => {
   });
 });
 
+/** A browser tab: Back to game closes the tab without asking anything. */
+const browserTab: BackToGameDeps = { installed: () => false, stillOpen: () => Promise.resolve(true) };
+
 describe("backToOpenGame", () => {
   it("says to close the tab, and focuses that note, when the browser keeps it open", () => {
     vi.useFakeTimers();
@@ -35,7 +53,7 @@ describe("backToOpenGame", () => {
       mountFromGame();
       const win = { close: vi.fn(), closed: false, setTimeout: window.setTimeout.bind(window), document } as unknown as Window;
       const e = new MouseEvent("click", { cancelable: true });
-      backToOpenGame(e, win);
+      backToOpenGame(e, win, browserTab);
       const note = document.getElementById("back-note")!;
       expect(note.hidden).toBe(true);
       vi.advanceTimersByTime(300);
@@ -52,12 +70,101 @@ describe("backToOpenGame", () => {
     try {
       mountFromGame();
       const win = { close: vi.fn(), closed: true, setTimeout: window.setTimeout.bind(window), document } as unknown as Window;
-      backToOpenGame(new MouseEvent("click", { cancelable: true }), win);
+      backToOpenGame(new MouseEvent("click", { cancelable: true }), win, browserTab);
       vi.advanceTimersByTime(300);
       expect(document.getElementById("back-note")!.hidden).toBe(true);
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("never asks after the game from a browser tab", () => {
+    const stillOpen = vi.fn(() => Promise.resolve(false));
+    const win = { close: vi.fn(), closed: true, setTimeout: vi.fn(), document, location: { replace: vi.fn() } } as unknown as Window;
+    backToOpenGame(new MouseEvent("click", { cancelable: true }), win, { installed: () => false, stillOpen });
+    expect(stillOpen).not.toHaveBeenCalled();
+    expect(win.close).toHaveBeenCalledTimes(1);
+  });
+
+  /** Click the shell's Back to game link in an installed app whose game does or doesn't answer. */
+  async function clickInstalled(gameAnswers: boolean): Promise<{ win: Window; e: MouseEvent; stillOpen: ReturnType<typeof vi.fn> }> {
+    mountFromGame();
+    const replace = vi.fn();
+    const win = { close: vi.fn(), closed: true, setTimeout: vi.fn(), document, location: { replace } } as unknown as Window;
+    const stillOpen = vi.fn(() => Promise.resolve(gameAnswers));
+    const link = document.querySelector<HTMLAnchorElement>("a[data-act=back-to-game]")!;
+    const e = new MouseEvent("click", { cancelable: true });
+    link.addEventListener("click", (ev) => backToOpenGame(ev, win, { installed: () => true, stillOpen }), { once: true });
+    link.dispatchEvent(e);
+    await Promise.resolve();
+    await Promise.resolve();
+    return { win, e, stillOpen };
+  }
+
+  it("loads the game in place in an installed app whose game is no longer running", async () => {
+    const { win, e, stillOpen } = await clickInstalled(false);
+    expect(e.defaultPrevented).toBe(true);
+    expect(stillOpen).toHaveBeenCalledTimes(1);
+    expect(win.close).not.toHaveBeenCalled();
+    expect(win.location.replace).toHaveBeenCalledWith(new URL("/", location.href).href);
+  });
+
+  it("closes its window in an installed app whose game still answers elsewhere", async () => {
+    const { win } = await clickInstalled(true);
+    expect(win.close).toHaveBeenCalledTimes(1);
+    expect(win.location.replace).not.toHaveBeenCalled();
+  });
+});
+
+/** A stand-in channel that records what it sends and lets a test deliver a message. */
+function fakeChannel(): PresenceChannel & { postMessage: ReturnType<typeof vi.fn>; close: ReturnType<typeof vi.fn>; deliver: (data: unknown) => void } {
+  const channel = {
+    onmessage: null as ((ev: MessageEvent) => void) | null,
+    postMessage: vi.fn(),
+    close: vi.fn(),
+    deliver: (data: unknown) => channel.onmessage?.(new MessageEvent("message", { data })),
+  };
+  return channel;
+}
+
+describe("game presence", () => {
+  it("the game answers an ask, and only an ask", () => {
+    const channel = fakeChannel();
+    answerGamePresence(() => channel);
+    channel.deliver("something else");
+    expect(channel.postMessage).not.toHaveBeenCalled();
+    channel.deliver(PRESENCE_ASK);
+    expect(channel.postMessage).toHaveBeenCalledWith(PRESENCE_HERE);
+  });
+
+  it("a page hears the game answer before the wait runs out", async () => {
+    const channel = fakeChannel();
+    const timers: Array<() => void> = [];
+    const answer = gameStillOpen(() => channel, (fn) => timers.push(fn));
+    expect(channel.postMessage).toHaveBeenCalledWith(PRESENCE_ASK);
+    channel.deliver(PRESENCE_HERE);
+    timers.forEach((fn) => fn());
+    await expect(answer).resolves.toBe(true);
+    expect(channel.close).toHaveBeenCalledTimes(1);
+  });
+
+  it("a page decides the game is gone when the wait runs out unanswered", async () => {
+    const channel = fakeChannel();
+    let waited = 0;
+    const answer = gameStillOpen(
+      () => channel,
+      (fn, ms) => {
+        waited = ms;
+        fn();
+      },
+    );
+    await expect(answer).resolves.toBe(false);
+    expect(waited).toBe(PRESENCE_WAIT_MS);
+    expect(channel.close).toHaveBeenCalledTimes(1);
+  });
+
+  it("assumes the game is still open where the browser cannot ask", async () => {
+    await expect(gameStillOpen(() => null)).resolves.toBe(true);
   });
 });
 

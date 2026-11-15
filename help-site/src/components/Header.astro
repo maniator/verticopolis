@@ -6,7 +6,8 @@
 // tab the game opened (?from=game, src/ui/fromGame.ts) that button and the
 // front page's Play button both read Back to game and close this tab instead
 // of loading a second copy of the game; the note below says so when the
-// browser keeps the tab open.
+// browser keeps the tab open. In an installed app the button first checks the
+// game still runs, and loads it here when it doesn't (backToOpenGame).
 import Search from "@astrojs/starlight/components/Search.astro";
 import ThemeSelect from "@astrojs/starlight/components/ThemeSelect.astro";
 import TitleBar from "../../../docs/engine-site/src/components/TitleBar.astro";
