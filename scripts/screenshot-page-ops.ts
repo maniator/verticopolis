@@ -178,6 +178,19 @@ export function pgAdoptTestClock(): "adopted" | "none" | "failed" {
   return "adopted";
 }
 
+/** Wait two frames, so a ResizeObserver callback the page has queued (Excalibur
+ *  sizing its canvas to the stage, DisplayMode.FillContainer) runs now. Those
+ *  callbacks come on the browser's schedule, not the stepped clock: a stage
+ *  that changed size before a settle (the Tools window widening to two columns
+ *  when a setup unlocks tools) would otherwise resize the canvas at a
+ *  wall-dependent moment, sometimes after the settle's final draw, which
+ *  clears the canvas and leaves the stage blank in the capture. Observers
+ *  deliver before paint, and the stopped clock advances no sim or animation
+ *  time. Runs in the browser. */
+export function pgFlushFrames(): Promise<void> {
+  return new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r())));
+}
+
 /** Step the adopted TestClock forward `frames` whole 60fps frames. Returns
  *  whether stepping happened, so the runner can fall back to a real wait on
  *  pages that have no engine clock (gallery/preview route pages, composite

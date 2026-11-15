@@ -51,7 +51,7 @@ import { chromium, type Browser, type Page } from "playwright";
 import { spawn, type ChildProcess } from "node:child_process";
 import { join } from "node:path";
 import { DIRS, DESKTOP, EXECUTABLE, PORT, BASE, assertReady, captureCrop, isPhoneViewport, mapForShot, restoreMapAfterShot, type OutDir, type Scene, type Shot } from "./screenshot-env.ts";
-import { pgAdoptTestClock, pgClearTransients, pgDismissSplash, pgFrame, pgMaskVersion, pgRefreshUi, pgSetClock, pgSetMapView, pgStep, pgStepNoDraw } from "./screenshot-builders.ts";
+import { pgAdoptTestClock, pgClearTransients, pgDismissSplash, pgFlushFrames, pgFrame, pgMaskVersion, pgRefreshUi, pgSetClock, pgSetMapView, pgStep, pgStepNoDraw } from "./screenshot-builders.ts";
 import { armPhaseWatch, judgeAndPromote, markPhaseTarget, phaseCapturePath, stopPhaseWatch } from "./screenshot-phase-check.ts";
 import { SCENES } from "./screenshot-scenes.ts";
 import { SETTLE_AFTER_SETUP, assertEnginePackage, HOSTED_FIX, beginSettleStep, checkHosted, checkSettleList, hostedSnapshot, installShotHelpers, settleUnlessSettled } from "./screenshot-engine.ts";
@@ -92,6 +92,9 @@ async function settle(page: Page, ms: number, drawEveryFrame = false): Promise<v
   // settles also draw every frame (see runScene): a live-engine route page is
   // draw-sensitive.
   const step = drawEveryFrame ? pgStep : pgStepNoDraw;
+  // A resize queued before the settle (a setup that widens the Tools window)
+  // lands now, before the frames draw, never after the final one.
+  await page.evaluate(pgFlushFrames);
   const stepped = await page.evaluate(step, Math.ceil(ms / FRAME_MS));
   if (!stepped) await page.waitForTimeout(Math.max(0, ms));
 }
@@ -116,12 +119,9 @@ async function takeShot(page: Page, scene: Scene, shot: Shot): Promise<void> {
     // If we start stepping before it runs, the resize (canvas dims + camera) lands
     // at a wall-dependent moment relative to the frames and the capture, so a
     // viewport-override shot on a live engine (e.g. tablet-compact) drifts
-    // run to run. Flush the observer with two rAFs first (observers deliver
-    // before paint; the stopped Excalibur clock means this advances no sim or
-    // animation time) so the new size is fully applied before the settle steps.
-    await page.evaluate(
-      () => new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r()))),
-    );
+    // run to run. Flush the observer (pgFlushFrames) so the new size is fully
+    // applied before the settle steps.
+    await page.evaluate(pgFlushFrames);
   }
   try {
     if (shot.clock !== undefined) {
