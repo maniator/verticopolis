@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { applyHelpHostWorker, applyPreviewWorker, HELP_HOST_SERVICE_WORKER, isPreviewDeploy, PRECACHE_CALL, productionWorkerProblem, RETIRING_SERVICE_WORKER, RETIRING_WORKER_MARKER } from "./previewDeploy";
+import { applyHelpHostWorker, applyPreviewWorker, HELP_HOST_SERVICE_WORKER, helpHostWorkerProblem, isPreviewDeploy, PRECACHE_CALL, productionWorkerProblem, RETIRING_SERVICE_WORKER, RETIRING_WORKER_MARKER } from "./previewDeploy";
 
 describe("isPreviewDeploy", () => {
   it("is true only for a Vercel preview build", () => {
@@ -178,5 +178,18 @@ describe("productionWorkerProblem (scripts/check-production-worker.ts)", () => {
     expect(productionWorkerProblem("self.addEventListener('fetch', () => {});")).toMatch(/no Workbox precacheAndRoute/);
     // The bare name without the call is not enough.
     expect(productionWorkerProblem("// precacheAndRoute is gone")).toMatch(/no Workbox precacheAndRoute/);
+  });
+});
+
+describe("helpHostWorkerProblem (scripts/check-production-worker.ts)", () => {
+  it("passes the manual host's self-removing worker", () => {
+    expect(helpHostWorkerProblem(HELP_HOST_SERVICE_WORKER)).toBeNull();
+  });
+
+  it("fails a missing worker, the game's precaching one, the preview's, or an empty file", () => {
+    expect(helpHostWorkerProblem(null)).toMatch(/missing/);
+    for (const other of [`e.precacheAndRoute([{url:"index.html",revision:"abc"}],{});`, RETIRING_SERVICE_WORKER, ""]) {
+      expect(helpHostWorkerProblem(other)).toMatch(/not the manual host's self-removing worker/);
+    }
   });
 });
