@@ -30,6 +30,7 @@ use std::cmp::Reverse;
 use std::collections::{BinaryHeap, VecDeque};
 
 use super::fasthash::FastMap;
+use super::line_count::Line;
 use super::street;
 use super::{Crowd, Route, CROWD_SECONDS_PER_MINUTE, RIDE_SECONDS_PER_FLOOR};
 use crate::{dispatch::DWELL_MINUTES, facilities::Kind, tower::Tower};
@@ -130,8 +131,11 @@ pub struct Router {
     bound_scratch: BoundScratch,
     shafts: FastMap<i64, Shaft>,
     step: i64,
-    /// Riders in line or on the way to one, by (shaft id, floor).
-    waiting: FastMap<(i64, i64), i64>,
+    /// Riders in line or on the way to one, and the longest wait in each
+    /// line, by (shaft id, floor).
+    waiting: FastMap<(i64, i64), Line>,
+    /// The step before's lines, kept for the next count to fill.
+    spare: FastMap<(i64, i64), Line>,
     /// The cars in service this step of each shaft the schedule stood cars
     /// down on; a shaft not listed has all its cars running.
     running: FastMap<i64, f64>,
@@ -268,6 +272,7 @@ fn build(tower: &Tower) -> Router {
         shafts,
         step: -1,
         waiting: FastMap::default(),
+        spare: FastMap::default(),
         running: FastMap::default(),
     }
 }
@@ -304,7 +309,7 @@ fn fresh<'a>(crowd: &'a mut Crowd, tower: &Tower) -> &'a mut Router {
     let router = router.as_mut().expect("built above");
     if router.step != *step {
         router.step = *step;
-        router.waiting = std::mem::take(shaft_lines);
+        router.spare = std::mem::replace(&mut router.waiting, std::mem::take(shaft_lines));
         stand_down(router, closed_cars);
     }
     router
@@ -330,17 +335,25 @@ fn stand_down(router: &mut Router, closed: &[(i64, i64)]) {
 
 /// What `l` costs, the wait and the line at a boarding included: half the
 /// time between cars, plus the line ahead over the seats a round trip of
-/// every car in service brings.
+/// every car in service brings, or the longest anyone in that line has
+/// already waited when that is longer (a line the cars arrive at full, say
+/// below a shaft that fills on the floors above, moves slower than its
+/// length says).
 fn cost_of(router: &Router, l: &Link) -> i64 {
     let Move::Board { shaft, floor } = l.how else {
         return l.tenths;
     };
-    let line = router.waiting.get(&(shaft, floor)).copied().unwrap_or(0) as f64;
+    let line = router
+        .waiting
+        .get(&(shaft, floor))
+        .copied()
+        .unwrap_or_default();
     let s = &router.shafts[&shaft];
     let cars = s.cars.max(1) as f64;
     let running = router.running.get(&shaft).copied().unwrap_or(cars);
     let headway = s.round_trip / (2.0 * running);
-    l.tenths + tenths(headway + line / (running * s.capacity) * s.round_trip)
+    let expected = headway + line.riders as f64 / (running * s.capacity) * s.round_trip;
+    l.tenths + tenths(expected.max(line.oldest))
 }
 
 /// The cheapest route from segment `from` to segment `to`. Ties go to the
@@ -450,18 +463,11 @@ pub fn fastest_path(crowd: &mut Crowd, tower: &Tower, from: i64, to: i64) -> Opt
     cheapest(fresh(crowd, tower), from, to)
 }
 
-/// Puts a rider routed this step in the line for their first car, so the
-/// next rider routed in the step sees it.
-pub fn join_line(crowd: &mut Crowd, r: &Route) {
-    let (Some(&shaft), Some(&floor)) = (r.shafts.first(), r.floors.first()) else {
-        return;
-    };
-    if let Some(router) = crowd.router.as_mut() {
-        if router.shafts.contains_key(&shaft) {
-            *router.waiting.get_or_insert_with((shaft, floor), || 0) += 1;
-        }
-    }
-}
+#[path = "expected_lines.rs"]
+mod lines;
+#[cfg(test)]
+pub use lines::router_lines;
+pub use lines::{join_line, keep_lines, spare_lines};
 
 #[path = "expected_bound.rs"]
 mod bound;

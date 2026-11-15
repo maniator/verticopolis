@@ -271,8 +271,7 @@ pub struct Crowd {
     /// Housekeepers who reached their housekeeping room or finished a room
     /// this step, by person id, for the shift to send on (`staff_shift`).
     pub staff_ready: Vec<i64>,
-    /// Housekeepers in the building, by the housekeeping room they work
-    /// from.
+    /// Housekeepers in the building, by the housekeeping room they work at.
     pub crew_roster: HashMap<i64, i64>,
     pub step: i64,
     /// The cars the schedule has stood down, as (shaft id, car index),
@@ -292,8 +291,7 @@ pub struct Crowd {
     pub hour: Option<i64>,
     /// The game minute the step reached, for the train (`metro_train`). Not saved.
     pub minute: Option<f64>,
-    /// Whether the step's day is a weekend, for the elevator schedules.
-    /// Saved with the crowd, as `hour` is.
+    /// Whether the step's day is a weekend, for the elevator schedules. Saved.
     pub weekend: bool,
     /// The walk-ins booked for this hour, latest first (`walk_ins`). Saved.
     pub walk_ins: Vec<walk_ins::WalkIn>,
@@ -316,11 +314,10 @@ pub struct Crowd {
     pub commuter_boardings: indexmap::IndexMap<i64, indexmap::IndexMap<i64, f64>>,
     /// The Modern router's transit graph and this step's lines. Never saved.
     pub router: Option<expected_time::Router>,
-    /// Riders waiting for or walking to each shaft, keyed (shaft, floor), as
-    /// the last motion slice counted them (`line_count::LineCount`). The
-    /// Modern router takes it at the start of each step. Saved with the
-    /// crowd as `lines`, so a reloaded step routes as the live one would.
-    pub shaft_lines: fasthash::FastMap<(i64, i64), i64>,
+    /// Each shaft's line, keyed (shaft, floor), as the last motion slice
+    /// counted it (`line_count::LineCount`), for the Modern router's next
+    /// step. Its riders are saved as `lines`; a load counts the waits again.
+    pub shaft_lines: fasthash::FastMap<(i64, i64), line_count::Line>,
 }
 
 impl Crowd {

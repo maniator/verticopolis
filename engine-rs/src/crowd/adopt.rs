@@ -16,6 +16,8 @@ impl Simulation {
         let Some(saved) = saved else { return };
         self.crowd.restore(saved);
         self.crowd.bound_gone_desks(&self.tower);
+        let crowd = &mut self.crowd;
+        super::line_count::restore_oldest(&mut crowd.shaft_lines, &crowd.people);
         let mut touched_meals = false;
         for i in 0..self.crowd.people.len() {
             let p = &self.crowd.people[i];
