@@ -376,3 +376,46 @@ fn the_save_without_units_and_its_units_are_the_trees_save() {
         assert_eq!(rest, whole);
     }
 }
+
+/// `stamped_save_bytes` is `save_text` with the two stamp keys appended as
+/// the web game's `stampText` appends them (`"savedAt":<number>,"appVersion":
+/// <string>` before the closing brace, each as `JSON.stringify` writes it),
+/// and the stamped save loads back as the same game.
+#[test]
+fn stamped_save_bytes_are_the_text_with_the_stamp_appended() {
+    for mode in [GameMode::Classic, GameMode::Modern] {
+        let sim = played(mode);
+        let text = sim.save_text();
+        let body = text.strip_suffix('}').expect("a save is an object");
+        for (version, at, written) in [
+            (
+                "4.1.1",
+                1_763_222_400_000.0,
+                r#""savedAt":1763222400000,"appVersion":"4.1.1""#,
+            ),
+            ("dev", 0.0, r#""savedAt":0,"appVersion":"dev""#),
+            (
+                "a \"quoted\" \u{1F3E2} build",
+                1.5,
+                r#""savedAt":1.5,"appVersion":"a \"quoted\" 🏢 build""#,
+            ),
+            ("x", f64::NAN, r#""savedAt":null,"appVersion":"x""#),
+        ] {
+            let bytes = sim.stamped_save_bytes(version, at);
+            assert_eq!(
+                String::from_utf8(bytes).expect("UTF-8"),
+                format!("{body},{written}}}"),
+                "{mode:?} stamped {version}"
+            );
+        }
+        let stamped = sim.stamped_save_bytes("4.1.1", 1_763_222_400_000.0);
+        let back: Value = serde_json::from_slice(&stamped).expect("the stamped save is JSON");
+        let loaded = deserialize(&back).expect("the stamped save loads");
+        let unstamped = deserialize(&sim.serialize()).expect("the save loads");
+        assert_eq!(
+            loaded.save_text(),
+            unstamped.save_text(),
+            "{mode:?}: the stamp changes nothing the game loads"
+        );
+    }
+}
