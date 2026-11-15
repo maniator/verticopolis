@@ -8,6 +8,8 @@
  * browser keeps the tab open.
  */
 
+import { isInstalledStandalone } from "./standalone";
+
 /** The query the game adds to a link it opens in a new tab. */
 export const FROM_GAME_PARAM = "from";
 export const FROM_GAME_VALUE = "game";
@@ -77,13 +79,109 @@ export const CLOSE_TAB_NOTE = "Your tower is still open in its own tab. Close th
  *  browser refused it. */
 const CLOSE_GRACE_MS = 250;
 
+/** The channel a running game answers on, so a page it opened can tell
+ *  whether the game is still open anywhere on this origin. */
+export const GAME_PRESENCE_CHANNEL = "vc-game-presence";
+
+/** What a page asks on {@link GAME_PRESENCE_CHANNEL}, and what the game says back. */
+export const PRESENCE_ASK = "ask";
+export const PRESENCE_HERE = "here";
+
+/** How long a page waits for the game to answer before deciding it is gone. */
+export const PRESENCE_WAIT_MS = 300;
+
+/** The part of a `BroadcastChannel` the presence check uses. */
+export type PresenceChannel = Pick<BroadcastChannel, "postMessage" | "close"> & {
+  onmessage: ((ev: MessageEvent) => void) | null;
+};
+
+/** A fresh presence channel, or null where the browser has no BroadcastChannel. */
+function openPresenceChannel(): PresenceChannel | null {
+  return typeof BroadcastChannel === "undefined" ? null : new BroadcastChannel(GAME_PRESENCE_CHANNEL);
+}
+
 /**
- * "Back to game" on a page the game opened: the tab tries to close itself,
- * and if the browser refuses (it may once this tab has navigated), it says so
- * and moves focus to the note, which reads it out.
+ * The game's side of the presence check: answer every ask for as long as this
+ * page lives. It costs one idle channel and runs nothing until a page asks.
  */
-export function backToOpenGame(e: MouseEvent, win: Window = window): void {
+export function answerGamePresence(open: () => PresenceChannel | null = openPresenceChannel): void {
+  const channel = open();
+  if (!channel) return;
+  channel.onmessage = (ev) => {
+    if (ev.data === PRESENCE_ASK) channel.postMessage(PRESENCE_HERE);
+  };
+}
+
+/**
+ * Whether a running game answers within {@link PRESENCE_WAIT_MS}. With no
+ * BroadcastChannel there is no way to ask, so the answer is "still open",
+ * which keeps the old close-the-tab behavior.
+ */
+export function gameStillOpen(
+  open: () => PresenceChannel | null = openPresenceChannel,
+  setTimer: (fn: () => void, ms: number) => unknown = (fn, ms) => setTimeout(fn, ms),
+): Promise<boolean> {
+  const channel = open();
+  if (!channel) return Promise.resolve(true);
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (answer: boolean): void => {
+      if (settled) return;
+      settled = true;
+      channel.onmessage = null;
+      channel.close();
+      resolve(answer);
+    };
+    channel.onmessage = (ev) => {
+      if (ev.data === PRESENCE_HERE) finish(true);
+    };
+    setTimer(() => finish(false), PRESENCE_WAIT_MS);
+    channel.postMessage(PRESENCE_ASK);
+  });
+}
+
+/** What "Back to game" needs from the page around it, so tests can stand in. */
+export interface BackToGameDeps {
+  /** True in an installed app window (the home-screen app on a phone). */
+  installed: () => boolean;
+  /** Whether the game still answers from another window or tab. */
+  stillOpen: () => Promise<boolean>;
+}
+
+const liveDeps: BackToGameDeps = { installed: isInstalledStandalone, stillOpen: () => gameStillOpen() };
+
+/**
+ * "Back to game" on a page the game opened.
+ *
+ * In a browser tab the tab tries to close itself, and if the browser refuses
+ * (it may once this tab has navigated), it says so and moves focus to the
+ * note, which reads it out.
+ *
+ * In an installed app the page first asks whether the game is still running.
+ * An installed app on Android opens the manual in the app's own window, in
+ * place of the game, so closing that window closed the whole app, and once
+ * the player had moved to another manual page the close was refused and the
+ * note wrongly said the game was open elsewhere. When nothing answers, the
+ * button loads the game here instead (its tower was saved when the page went
+ * away, so the title screen offers Continue). When the game does answer, it
+ * is in another window and this one closes as in a browser tab.
+ */
+export function backToOpenGame(e: MouseEvent, win: Window = window, deps: BackToGameDeps = liveDeps): void {
   e.preventDefault();
+  if (!deps.installed()) {
+    closeOrSay(win);
+    return;
+  }
+  const link = e.currentTarget as HTMLAnchorElement | null;
+  const gameHref = link?.href || "/";
+  void deps.stillOpen().then((open) => {
+    if (open) closeOrSay(win);
+    else win.location.replace(gameHref);
+  });
+}
+
+/** Close this tab, or say why it stayed open. */
+function closeOrSay(win: Window): void {
   win.close();
   win.setTimeout(() => {
     if (win.closed) return;

@@ -24,6 +24,7 @@ import { bootCommonProps, distributionChannelLabel, platformLabel } from "../ana
 import { isStandalone } from "../pwaInstall";
 import { wireMenus } from "./menuWiring";
 import { wireScreenSaver } from "./screenSaverWiring";
+import { answerGamePresence } from "../ui/fromGame";
 import { initInstallAffordance } from "./installAffordance";
 import { showTitleScreen, welcomeFounder } from "./titleScreen";
 import { clearSaveWarning, showSaveWarning } from "../ui/saveWarning";
@@ -267,6 +268,9 @@ export function runBootFlow(app: GameApp, savedAtBoot?: number): void {
   wireMovableWindows(app);
   wireMenus(app); // the menu bar, its Tower Info and Bulletin windows, the status bar
   wireScreenSaver(app); // Options > Screen Saver… and its idle and return triggers
+  // A help page the game opened asks whether the game is still running before
+  // its Back to game closes its window (src/ui/fromGame.ts).
+  answerGamePresence();
   // First-run splash + onboarding (chrome only; the engine is untouched).
   app.onboarding = new OnboardingController({
     mq: app.mobileMq,
