@@ -59,6 +59,9 @@ import { SCENES } from "./screenshot-scenes.ts";
 // To go below the ~55s tablet floor, the lever is the scene itself (its shots draw
 // many settle frames), not the split.
 export const SHARDS: Record<string, string[]> = {
+  // The "page not found" page (owner, 2026-11-15): four DOM-only route
+  // shots, no engine and no tower, a few seconds; its own shard.
+  "not-found": ["not-found", "not-found-phone", "not-found-help", "not-found-help-phone"],
   // ~64s: feature panels + two light HUD scenes + the three schedule-dialog
   // scenes (#305 Phase 3: small frozen towers, DOM dialog shots, cheap) + the
   // two CAP-8 escalator-on-office stills (small frozen towers, one shot each)

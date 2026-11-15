@@ -1,0 +1,335 @@
+/* The "page not found" page (src/404.html, src/notFoundPage.ts): a message box
+   on the teal 1994 desk, the startup screen's sunrise skyline across its top,
+   and a taskbar along the bottom of the screen. It imports retro-page.css
+   (tokens, .win, .btn and the dark-desk override) so that file always comes
+   first in the build: as two <link>s, Vite wrote the entry's own CSS ahead of
+   the shared chunk and these rules lost to the ones they override. */
+
+@import "./retro-page.css";
+
+body.nf-page {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding: 0;
+}
+
+body.nf-page > #app {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.nf-desk {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  padding: 24px 14px 52px;
+}
+
+/* ---- The message box ---- */
+.nf-win {
+  width: min(520px, 100%);
+  padding: 3px;
+}
+.nf-win > .win-title {
+  gap: 4px;
+  padding: 2px 2px 2px 3px;
+  font-size: 12px;
+}
+.nf-title-icon {
+  display: grid;
+  flex: none;
+}
+.nf-title-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+/* The close box: a plain link to the game, sized like the desk's. */
+.nf-win .nf-close {
+  width: 18px;
+  height: 16px;
+  padding: 0;
+  justify-content: center;
+  font-size: 11px;
+  line-height: 1;
+  flex: none;
+}
+
+.nf-body {
+  padding: 16px 14px 14px;
+}
+.nf-msg {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+.nf-icon {
+  flex: none;
+  image-rendering: pixelated;
+  shape-rendering: crispEdges;
+}
+.nf-msg h1 {
+  margin: 4px 0 8px;
+  font-size: 17px;
+  line-height: 1.3;
+  text-wrap: balance;
+}
+.nf-msg p {
+  margin: 0 0 8px;
+  font-size: 14px;
+}
+/* The missing address can be one long unbroken word; it wraps instead of
+   widening a phone screen. */
+.nf-msg code {
+  overflow-wrap: anywhere;
+  font-size: 13px;
+}
+
+/* The buttons sit at the bottom right, as in a 1995 message box. */
+.nf-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 14px;
+}
+.nf-buttons .btn {
+  justify-content: center;
+  min-width: 96px;
+  min-height: 28px;
+  padding: 4px 12px;
+  font-size: 13px;
+}
+
+/* ---- The sunrise skyline (the startup screen's colors) ---- */
+.nf-sky {
+  position: relative;
+  height: 150px;
+  overflow: hidden;
+  background: var(--splash-sky);
+  box-shadow: var(--bevel-in);
+  margin-top: 3px;
+}
+.nf-star {
+  position: absolute;
+  width: 2px;
+  height: 2px;
+  background: var(--splash-cream);
+  opacity: 0.8;
+}
+.nf-sun {
+  position: absolute;
+  left: 50%;
+  bottom: -38px;
+  width: 116px;
+  height: 116px;
+  margin-left: -58px;
+  border-radius: 50%;
+  background: var(--splash-sun);
+  box-shadow: 0 0 40px 18px var(--splash-sun-glow);
+  animation: nf-sunrise 1.6s ease-out both;
+}
+@keyframes nf-sunrise {
+  from {
+    transform: translateY(70px);
+  }
+}
+
+/* A building: a dark block with rows of lit windows. */
+.nf-bldg,
+.nf-tower-top,
+.nf-tower-base {
+  position: absolute;
+  bottom: 0;
+  background: var(--splash-building);
+  box-shadow: inset 0 0 0 1px var(--splash-ink);
+}
+.nf-bldg::before,
+.nf-tower-top::before,
+.nf-tower-base::before {
+  content: "";
+  position: absolute;
+  inset: 8px 6px 6px;
+  background: repeating-linear-gradient(
+    to bottom,
+    #ffd47a 0 4px,
+    transparent 4px 11px
+  );
+  -webkit-mask: repeating-linear-gradient(
+    to right,
+    #000 0 5px,
+    transparent 5px 10px
+  );
+  mask: repeating-linear-gradient(to right, #000 0 5px, transparent 5px 10px);
+  opacity: var(--lit, 0.5);
+}
+
+/* The tower in the middle is missing a floor: the sky shows through between
+   its top and its base, held up by two columns, with the game's floor tag. */
+.nf-tower {
+  position: absolute;
+  left: 36%;
+  bottom: 0;
+  width: 22%;
+  height: 124px;
+}
+.nf-tower-base {
+  left: 0;
+  right: 0;
+  height: 46px;
+}
+.nf-tower-top {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: auto;
+  height: 50px;
+}
+.nf-tower-top::after {
+  /* The roof's antenna. */
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 100%;
+  width: 2px;
+  height: 10px;
+  background: var(--splash-building);
+}
+.nf-gap {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50px;
+  height: 28px;
+  border-left: 3px solid var(--splash-building);
+  border-right: 3px solid var(--splash-building);
+  outline: 1px dashed rgba(255, 240, 200, 0.9);
+  outline-offset: -6px;
+}
+/* The floor number, as the game tags its floors at the tower's left. */
+.nf-tag {
+  position: absolute;
+  right: calc(100% + 5px);
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 0 3px;
+  background: #1b1b22;
+  color: #f2f2f2;
+  font: 700 10px/14px var(--r-font);
+}
+
+/* ---- The taskbar ---- */
+.nf-taskbar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 30px;
+  padding: 2px 2px 2px 3px;
+  background: var(--r-face);
+  color: var(--r-ink);
+  box-shadow:
+    inset 0 1px var(--r-light),
+    inset 0 2px var(--r-hi);
+  font-size: 12px;
+}
+.nf-start,
+.nf-task {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 24px;
+  padding: 0 8px 0 5px;
+  color: var(--r-ink);
+  text-decoration: none;
+}
+.nf-start {
+  font-weight: 700;
+  box-shadow: var(--bevel-out);
+}
+.nf-start:active {
+  box-shadow: var(--bevel-in);
+}
+/* The open window's button, pressed in, with the checkered face of an
+   active task. */
+.nf-task {
+  width: 170px;
+  max-width: 40vw;
+  overflow: hidden;
+  white-space: nowrap;
+  box-shadow: var(--bevel-in);
+  background: var(--r-light);
+  background: repeating-conic-gradient(var(--r-hi) 0 25%, var(--r-face) 0 50%) 0
+    0 / 2px 2px;
+  font-weight: 700;
+}
+.nf-task svg {
+  fill: #b08000;
+  flex: none;
+}
+.nf-tray {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 10px;
+  box-shadow:
+    inset 1px 1px var(--r-shadow),
+    inset -1px -1px var(--r-hi);
+}
+
+@media (max-width: 560px) {
+  .nf-desk {
+    align-items: start;
+    padding-top: 16px;
+  }
+  .nf-sky {
+    height: 120px;
+  }
+  .nf-tower {
+    height: 102px;
+  }
+  .nf-tower-top {
+    height: 40px;
+  }
+  .nf-gap {
+    top: 40px;
+  }
+  .nf-sun {
+    width: 92px;
+    height: 92px;
+    margin-left: -46px;
+    bottom: -30px;
+  }
+  .nf-msg {
+    gap: 12px;
+  }
+  /* A phone stacks the buttons full width, the default on top. */
+  .nf-buttons {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .nf-buttons .btn {
+    min-height: 40px;
+    font-size: 14px;
+  }
+  .nf-task {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nf-sun {
+    animation: none;
+  }
+}

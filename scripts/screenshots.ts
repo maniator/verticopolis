@@ -266,7 +266,7 @@ async function runScene(browser: Browser, scene: Scene): Promise<void> {
       try {
         await page.waitForFunction(() => {
           const w = window as any;
-          return w.galleryReady === true || w.previewReady === true;
+          return w.galleryReady === true || w.previewReady === true || w.notFoundReady === true;
         }, null, { timeout: READY_TIMEOUT_MS });
       } catch {
         for (const shot of scene.shots) {
