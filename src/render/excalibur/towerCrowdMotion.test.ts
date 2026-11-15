@@ -38,7 +38,7 @@ function rider(id: number, x: number, fy: number): any {
 function eng(over: Record<string, any> = {}): any {
   return {
     engine: { add: vi.fn() },
-    d: { anim: 0, stress: 0 },
+    d: { anim: 0 },
     cam: { zoom: 1 },
     crowdCulled: false,
     crowdActors: new Map(),
@@ -252,7 +252,7 @@ describe("decorative passers-by (#2091)", () => {
     const quiet = mkWalker({ floor: 9 }); // rank 0.5 above floor 9's 0.25
     const firstOnQuiet = mkWalker({ floor: 9, rank: 0.2 });
     const empty = mkWalker({ floor: 12, rank: 0.01 });
-    const e = eng({ walkers: [busy, quiet, firstOnQuiet, empty], d: { anim: 3, stress: 0 }, sim: lively() });
+    const e = eng({ walkers: [busy, quiet, firstOnQuiet, empty], d: { anim: 3 }, sim: lively() });
     updateMotion(e);
     expect([busy, quiet, firstOnQuiet, empty].map((w) => w.actor.graphics.isVisible)).toEqual([true, false, true, false]);
     expect(e.floorLive.get(7)).toBeCloseTo(1, 6);
@@ -291,11 +291,11 @@ describe("decorative passers-by (#2091)", () => {
     expect(w.actor.graphics.isVisible).toBe(false);
   });
 
-  it("never turns a passer-by red, however stressed the tower is", () => {
+  it("never turns a passer-by red", () => {
     // A mood color tells the player a real person has waited too long; a
     // passer-by has no wait, so it keeps its own figure.
     const w = mkWalker();
-    const e = eng({ walkers: [w], d: { anim: 1, stress: 1 }, sim: lively() });
+    const e = eng({ walkers: [w], d: { anim: 1 }, sim: lively() });
     for (let i = 0; i < 20; i++) {
       e.d.anim = 1 + i * 0.13;
       updateMotion(e);

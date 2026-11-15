@@ -57,7 +57,7 @@ function eng(over: Record<string, any> = {}): any {
 
   const e: any = {
     engine: { add: vi.fn() },
-    d: { anim: 0, stress: 0 },
+    d: { anim: 0 },
     // The zoom cull (crowdCull.ts) reads these at the top of every pass; a
     // legible zoom keeps the moving layer live for the motion assertions.
     cam: { zoom: 1 },
@@ -450,7 +450,7 @@ describe("updateMotion repositions the moving actors", () => {
 
   it("cruises garage cars only during a rush with cars parked", () => {
     const car = { actor: actor(), floor: -1, x0w: 100, x1w: 300, seed: 3 };
-    const rush = eng({ garageCars: [car], displayParkingUse: 0.5, d: { anim: 2, stress: 0 }, sim: { ...eng().sim, clock: { hour: 8, minuteOfDay: 480, isMorning: () => true, isEvening: () => false, isNight: () => false } } });
+    const rush = eng({ garageCars: [car], displayParkingUse: 0.5, d: { anim: 2 }, sim: { ...eng().sim, clock: { hour: 8, minuteOfDay: 480, isMorning: () => true, isEvening: () => false, isNight: () => false } } });
     updateMotion(rush);
     expect(car.actor.graphics.isVisible).toBe(true);
     expect(car.actor.pos.x).toBeGreaterThanOrEqual(100);

@@ -319,7 +319,7 @@ export class TowerEngine {
       },
       handleContextRestored: () => this.onContextRestored?.(),
     });
-    this.d = { ctx: null as unknown as CanvasRenderingContext2D, lit: false, anim: 0, hour: 9, stress: 0 };
+    this.d = { ctx: null as unknown as CanvasRenderingContext2D, lit: false, anim: 0, hour: 9 };
     this.engine.currentScene.onPostUpdate = (_e: ex.Engine, elapsed: number) => this.tick(elapsed);
   }
 

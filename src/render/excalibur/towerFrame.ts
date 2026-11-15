@@ -42,7 +42,6 @@ export function beginFrame(engine: TowerEngine, elapsedMs: number): void {
   // beacon); the lighting flip (cab window) rides the scene sync instead,
   // so it lands once, aligned with the room repaint (towerSyncSchedule).
   if (engine.craneGfx && animating) engine.craneGfx.flagDirty();
-  engine.d.stress = Math.max(0, Math.min(1, engine.sim.congestion() - 1));
   // Read-only queue + car-fill projection for the transport render path.
   // Memoized on the (step, revision) key in the engine, so this per-frame read
   // returns the cached snapshot without re-scanning the crowd, except on the

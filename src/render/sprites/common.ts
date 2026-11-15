@@ -39,8 +39,6 @@ export interface DrawCtx {
   anim: number;
   /** In-game hour 0..23, for time-of-day behavior. */
   hour: number;
-  /** 0..1 transport overcrowding; tints walking crowds "angry" when high. */
-  stress?: number;
   /** False when the tower holds nobody at all, which hides the entrance staff so
    *  a brand-new tower reads as empty as it is. Undefined means staffed, so the
    *  sprite gallery and any caller that does not thread it keep their current
@@ -57,8 +55,8 @@ export interface DrawCtx {
    *  garbage piles up through the day until the morning truck collection. */
   recycleFill?: number;
   /** Read-only elevator queue + car-fill projection, memoized once per sim step
-   *  by the engine ({@link ElevatorQueueView}) and threaded here the same way
-   *  `stress` is. A VIEW of tracked crowd state, so the transport render path can
+   *  by the engine ({@link ElevatorQueueView}) and set once per frame by the
+   *  frame prelude. A VIEW of tracked crowd state, so the transport render path can
    *  read landing queues and cab fill without a draw routine calling the engine.
    *  Populated by TowerEngine; the queue render that consumes it is a follow-up. */
   elevatorQueue?: ElevatorQueueView;

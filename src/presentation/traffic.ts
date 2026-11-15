@@ -12,10 +12,9 @@
  * pushes past 0.8–1.5, and a real jam runs 1.5+.
  *
  * This is NOT the walker-red gate. Red frustrated walkers are an ACUTE per-person
- * symptom driven by `stress = clamp(congestion - 1)` on the rider's own floor
- * (red once that floor crosses ~1.0+); the chip is an EARLIER tower-level warning
- * that a floor is tightening before anyone turns red. The two are distinct
- * signals on purpose — don't recouple them.
+ * symptom of that person's own wait (the crowd's mood); the chip is an EARLIER
+ * tower-level warning that a floor is tightening before anyone turns red. The
+ * two are distinct signals on purpose; don't recouple them.
  */
 export type TrafficTier = 0 | 1 | 2 | 3;
 

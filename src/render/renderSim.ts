@@ -15,7 +15,10 @@ import type { LobbyHalls } from "./lobbyHalls";
  * Reads are grouped by how often they happen:
  *
  * - Per frame, cheap: `clock`, `tower.revision`, the effect counters, `weather`.
- * - Per frame, memoized by the engine: `congestion`, `crowd.queueView`.
+ * - Per frame, memoized by the engine: `crowd.queueView`.
+ * - Never per frame: `congestion`. It builds the per-floor congestion map, a
+ *   walk over every room, and its answer moves with every step, so the
+ *   engine's memo misses on each running frame (#338). Tests and tools read it.
  * - Per step or per HUD tick: `population` (it walks every room, so it is never
  *   read per frame, #1234).
  * - Per scene sync or hourly: `floorHeatmap`, `peakCongestion`, `parkingUsage`,

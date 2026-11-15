@@ -28,7 +28,7 @@ const gfx = () => ({ width: 9, height: 25 }) as ex.Graphic;
 function eng(): any {
   return {
     engine: { add: vi.fn() },
-    d: { anim: 0, stress: 0 },
+    d: { anim: 0 },
     cam: { zoom: 1 },
     crowdCulled: false,
     crowdActors: new Map(),
