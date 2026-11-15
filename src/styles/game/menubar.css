@@ -59,12 +59,6 @@
 .mb-pop[hidden] {
   display: none;
 }
-/* The last menu (Help) opens leftward when the bar is narrow, so it stays on
-   the screen. */
-.mb-menu:last-child .mb-pop {
-  left: auto;
-  right: 0;
-}
 .mb-item {
   display: flex;
   justify-content: space-between;

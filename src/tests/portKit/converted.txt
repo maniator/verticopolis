@@ -29,3 +29,4 @@ src/tests/integration/roomCountsEngine.integration.test.ts
 src/tests/integration/chargeBindingRaw.integration.test.ts
 src/tests/integration/portServiceDiagnostics.integration.test.ts
 src/tests/integration/relayedCommandRaw.integration.test.ts
+src/tests/integration/towerCallItems.integration.test.ts

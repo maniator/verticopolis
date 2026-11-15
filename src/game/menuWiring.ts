@@ -12,17 +12,27 @@ import { wireFileShortcuts, type FileCommands } from "./fileShortcuts";
 import { showOpenDialog, showSaveAsDialog } from "./fileSpaceCommands";
 import { overviewMapOpen, setOverviewMapOpen } from "./overviewMapWiring";
 import { callFireRescue } from "./fireRescueCall";
+import { confirmExterminate } from "./appModals";
+import { TOWER_CALL_ITEM, showTowerCalls, towerCalls, type TowerCalls } from "./towerCallItems";
 
 /**
  * The menu bar's commands (index.html `#menubar`, behavior in
  * `ui/menuBar.ts`). The items whose ids predate the bar (btn-new,
  * btn-settings, btn-stats, btn-help, btn-about, btn-install-menu) keep the
  * click handlers `UI.wireControls` gives them; this wires the rest: Quick
- * Save, Close, Import, Export, Undo and Redo, Rename, Call Fire Rescue, the rules, the windows the
- * Tower and Window menus open, Full Screen, Sound, Classic vs Modern and Replay Getting
- * Started.
+ * Save, Close, Import, Export, Undo and Redo, Rename, Call Fire Rescue, Call
+ * Exterminator, the rules, the windows the Tower menu shows, Tools, Status
+ * Bar, Full Screen, Sound, Classic vs Modern and Replay Getting Started.
  *
- * Tower Info (Tower menu) and Bulletin (Window menu) are small windows over
+ * The order is the party's (2026-11-15,
+ * `_bmad-output/party-mode/menu-bar-order-party-findings-2026-11-15.md`):
+ * the Tower menu holds the tower's windows (Tower Info, Map, Bulletin), and
+ * Options holds the display toggles: Tools and Status Bar (a computer's
+ * layout only) and Full Screen. The Window menu that held those was folded
+ * into Options (owner, 2026-11-15). The title screen shows only File,
+ * Options and Help, and leaves out what needs a tower.
+ *
+ * Tower Info and Bulletin (both in the Tower menu) are small windows over
  * the tower that replaced the old right sidebar. They move by their title
  * bars like the Map and remember whether the player left them open. With no
  * choice stored, Tower Info starts closed, and the Bulletin starts open on a
@@ -39,7 +49,7 @@ import { callFireRescue } from "./fireRescueCall";
  * (`analyticsMenus.ts`, `docs/analytics-data-map.md`).
  */
 
-/** The floating windows the Tower and Window menus show or hide, and whether
+/** The floating windows the Tower menu shows or hides, and whether
  *  each starts open on a desktop when the player has stored no choice. */
 export const MENU_WINDOW = {
   tower: { id: "tower-win", item: "mb-win-tower", key: "vc.window.tower", openOnDesktop: false },
@@ -50,23 +60,21 @@ export const MENU_WINDOW = {
 export const STATUS_BAR_KEY = "vc.window.statusbar";
 export const STATUS_BAR_HIDDEN_CLASS = "statusbar-off";
 
-/** The commands that act on the tower in play. The title screen has no tower
- *  chosen yet (a placeholder runs behind it), so they are grayed while it is
- *  up, the way a 1995 program grays Save until a document is open. */
-export const NEEDS_A_TOWER = [
+/** The menus, by title, with nothing to offer until a tower is open. The
+ *  title screen has no tower chosen yet (a placeholder runs behind it), so
+ *  they leave the bar while it is up, the way a 1995 program's menu bar
+ *  shrinks to File and Help with no document open (party 2026-11-15). */
+export const TOWER_ONLY_MENUS = ["mb-edit", "mb-tower"] as const;
+
+/** The items of the menus the title screen keeps that act on a tower, and
+ *  the lines above them: they leave those menus while it is up. */
+export const TOWER_ONLY_ITEMS = [
+  "mb-save-sep",
   "mb-quick-save",
-  "mb-close",
   "mb-export",
-  "mb-undo",
-  "mb-redo",
-  "btn-stats",
-  "mb-rename",
-  "mb-fire-rescue",
-  "mb-rules",
+  "mb-close-sep",
+  "mb-close",
   "mb-win-tools",
-  "mb-win-map",
-  "mb-win-tower",
-  "mb-win-bulletin",
   "mb-win-statusbar",
   "mb-replay",
 ] as const;
@@ -74,7 +82,7 @@ export const NEEDS_A_TOWER = [
 /** On the title screen these items press the title screen's own button, so it
  *  leaves the way it always does (and the mute glyph stays in step). Open is
  *  not among them: it opens the Open window straight away, as the title
- *  screen's Load Tower does. */
+ *  screen's Open Tower… does. */
 export const ON_TITLE_SCREEN: Readonly<Record<string, string>> = {
   "btn-new": "new",
   "mb-sound": "mute",
@@ -117,6 +125,18 @@ function on(id: string, run: () => void): void {
 
 function check(id: string, checked: boolean): void {
   document.getElementById(id)?.setAttribute("aria-checked", String(checked));
+}
+
+/** Show the menus and items that need a tower only when one is open. */
+function fitToScreen(titleScreenUp: boolean): void {
+  for (const id of TOWER_ONLY_MENUS) {
+    const menu = document.getElementById(id)?.parentElement;
+    if (menu) menu.hidden = titleScreenUp;
+  }
+  for (const id of TOWER_ONLY_ITEMS) {
+    const item = document.getElementById(id);
+    if (item) item.hidden = titleScreenUp;
+  }
 }
 
 /** Gray a menu item out the way the toolbar grays its twin. */
@@ -174,10 +194,11 @@ export function wireMenus(app: GameApp): MenuBar | null {
 
   // File: Open…, Save and Save As… also answer to their keys. Open and Save
   // As show My Towers (fileSpaceCommands.ts).
-  const file = { open: () => showOpenDialog(app), save: () => ui.cb.onSave(), saveAs: () => showSaveAsDialog(app) };
+  // The analytics tell a menu pick from its Ctrl+O key.
+  const file = { open: () => showOpenDialog(app, "key"), save: () => ui.cb.onSave(), saveAs: () => showSaveAsDialog(app) };
   on("mb-quick-save", file.save);
   on("mb-close", () => closeTower(app));
-  on("mb-import", file.open);
+  on("mb-import", () => showOpenDialog(app, "menu"));
   on("mb-export", file.saveAs);
   wireFileShortcuts(file, window, reportKey);
   // Edit: the toolbar's own buttons, so the gray-out and the gesture rules hold.
@@ -189,14 +210,14 @@ export function wireMenus(app: GameApp): MenuBar | null {
     ui.el.towerName.focus();
     ui.el.towerName.select();
   });
-  on("mb-fire-rescue", () => callFireRescue(app));
+  on(TOWER_CALL_ITEM.fireRescue, () => callFireRescue(app));
+  on(TOWER_CALL_ITEM.exterminator, () => void confirmExterminate(app, { reopenStats: false }));
   on("mb-rules", () => ui.showTowerRules());
   on("mb-win-map", () => setOverviewMapOpen(app, !overviewMapOpen(app)));
-  // Window.
-  on("mb-win-tools", () => document.getElementById(PALETTE_COLLAPSE_BUTTON_ID)?.click());
-  on("mb-fullscreen", () => toggleFullScreen(ui));
   // Options.
   on("mb-sound", () => ui.cb.onToggleAudio());
+  on("mb-win-tools", () => document.getElementById(PALETTE_COLLAPSE_BUTTON_ID)?.click());
+  on("mb-fullscreen", () => toggleFullScreen(ui));
   // Help.
   on("mb-compare", () => ui.showCompare());
   on("mb-replay", () => ui.cb.onReplayOnboarding());
@@ -206,6 +227,14 @@ export function wireMenus(app: GameApp): MenuBar | null {
   // its element is on the page, whatever body class a removal left behind.
   const titleScreenUp = isSplashUp;
   const screen = (): MenuScreen => (titleScreenUp() ? "title" : "tower");
+  // The title screen is a child of the body with a body class of its own
+  // (ui/Onboarding.ts): the bar follows either one changing at once, not
+  // only when a menu next opens. The callback is a lookup and ten
+  // attribute writes, on a body child or class change only.
+  fitToScreen(titleScreenUp());
+  if (typeof MutationObserver === "function") {
+    new MutationObserver(() => fitToScreen(titleScreenUp())).observe(document.body, { childList: true, attributes: true, attributeFilter: ["class"] });
+  }
   // Capture runs before an item's own handlers: a grayed item does nothing,
   // and on the title screen a routed item presses the title screen's button.
   root.addEventListener(
@@ -264,7 +293,7 @@ export function wireMenus(app: GameApp): MenuBar | null {
       const menu = menuNameOf(title.id);
       if (menu) trackMenuDismiss({ menu, how, screen: screen(), browsed });
     },
-    onOpen: () => {
+    onOpen: (menu) => {
       check("mb-win-tools", !document.getElementById("palette")?.classList.contains(PALETTE_COLLAPSED_CLASS));
       check("mb-win-map", overviewMapOpen(app));
       for (const w of floating) check(w.item, !!w.win && !w.win.hidden);
@@ -274,19 +303,32 @@ export function wireMenus(app: GameApp): MenuBar | null {
       grayLike("mb-undo", ui.el.undo);
       grayLike("mb-redo", ui.el.redo);
       const noTower = titleScreenUp();
-      for (const id of NEEDS_A_TOWER) {
-        if (noTower) document.getElementById(id)?.setAttribute("aria-disabled", "true");
-        else if (id !== "mb-undo" && id !== "mb-redo") document.getElementById(id)?.removeAttribute("aria-disabled");
-      }
+      fitToScreen(noTower);
       // A tower the game stopped on cannot be saved, so it cannot be closed either.
       // Nor can it be opened over, saved or saved as (the File keys refuse them too).
-      // Open is the one of them the title screen allows, so it ungrays here.
       const stopped = isEngineStopped();
-      if (stopped) for (const id of ENGINE_FILE_ITEMS) document.getElementById(id)?.setAttribute("aria-disabled", "true");
-      else document.getElementById("mb-import")?.removeAttribute("aria-disabled");
-      // The Tools fold exists on the desktop layout only.
+      for (const id of ENGINE_FILE_ITEMS) {
+        if (stopped) document.getElementById(id)?.setAttribute("aria-disabled", "true");
+        else document.getElementById(id)?.removeAttribute("aria-disabled");
+      }
+      // Fire Rescue and the exterminator, read from the engine only as the
+      // Tower menu opens (towerCallItems.ts). A stopped engine answers
+      // nothing, so both stay grayed.
+      if (menu.id === "mb-tower-menu" && !noTower) {
+        let calls: TowerCalls = { fireRescue: false, exterminator: null };
+        if (!stopped) {
+          try {
+            calls = towerCalls(app);
+          } catch {
+            // An engine that cannot answer leaves both grayed; the calls
+            // themselves would refuse anyway.
+          }
+        }
+        showTowerCalls(calls);
+      }
+      // The Tools fold exists on the desktop layout only, and in a tower.
       const tools = document.getElementById("mb-win-tools");
-      if (tools) tools.hidden = !document.getElementById(PALETTE_COLLAPSE_BUTTON_ID)?.offsetParent;
+      if (tools) tools.hidden = noTower || !document.getElementById(PALETTE_COLLAPSE_BUTTON_ID)?.offsetParent;
       // Install app's separator shows with it (installAffordance.ts shows the item).
       const install = document.getElementById("btn-install-menu");
       const installSep = root.querySelector<HTMLElement>(".mb-install-sep");

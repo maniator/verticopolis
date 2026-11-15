@@ -13,8 +13,9 @@ import { trackEvent } from "./analyticsCore";
  * menus it showed.
  */
 
-/** The menus, by their title button's id (`mb-file` is `file`). */
-export const MENU_NAMES = ["file", "edit", "tower", "window", "options", "help"] as const;
+/** The menus, by their title button's id (`mb-file` is `file`). The
+ *  Window menu (`window`) was folded into Options in 4.3. */
+export const MENU_NAMES = ["file", "edit", "tower", "options", "help"] as const;
 export type MenuName = (typeof MENU_NAMES)[number];
 
 /** Each menu item's element id and the code its events carry. */
@@ -32,6 +33,7 @@ export const MENU_ITEM_CODES = {
   "btn-stats": "statistics",
   "mb-rename": "rename",
   "mb-fire-rescue": "fire_rescue",
+  "mb-exterminator": "exterminator",
   "mb-rules": "rules",
   "mb-win-tools": "tools",
   "mb-win-bulletin": "bulletin",

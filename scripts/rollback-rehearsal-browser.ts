@@ -181,7 +181,7 @@ export async function verifyProfile(opts: BrowserOptions & { savesDir: string; p
       await picker.or(openWindow).first().waitFor({ timeout: 10_000 });
     }
     if (await openWindow.count()) {
-      // From 4.3, Load Tower opens File > Open…: the Auto-save's row, and the
+      // From 4.3, Open Tower… (Load Tower before) opens File > Open…: the Auto-save's row, and the
       // slots copied into My Towers as files named for their towers. A row
       // shows a name, type, size and time, so the check is the tower's name.
       await page.locator("#modal .fd-row").first().waitFor({ timeout: 10_000 });
@@ -204,7 +204,7 @@ export async function verifyProfile(opts: BrowserOptions & { savesDir: string; p
       }
       await page.locator('[data-picker="back"]').click().catch(() => undefined);
     } else {
-      problems.push("the title screen has no Load Tower button, so the stored towers could not be read from the page");
+      problems.push("the title screen has no Open Tower… (Load Tower before 4.3) button, so the stored towers could not be read from the page");
     }
 
     // A void run (the wrong build is running) must not play: the wrong build would rewrite the profile's saves.

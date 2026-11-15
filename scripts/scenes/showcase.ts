@@ -151,7 +151,7 @@ export const SHOWCASE_SCENES: Scene[] = [
   // The two scenes above boot fresh, so every committed splash shot has shown
   // the first-run stack and the gallery has never carried ▶ Continue at all.
   // These stage the returning-player state instead, which is the fuller stack
-  // (Continue / Load Tower / New Tower) and the one the load picker opens from.
+  // (Continue / Open Tower… / New Tower) and the one the load picker opens from.
   // Their own scenes on purpose: re-mounting the splash inside `first-run`
   // would put Continue behind that scene's later modal shots and churn pixels
   // this has no business touching.
@@ -166,7 +166,7 @@ export const SHOWCASE_SCENES: Scene[] = [
         wait: 400,
       },
       {
-        // Load Tower on the title screen opens File > Open… over it.
+        // Open Tower… on the title screen opens File > Open… over it.
         name: "00c-load-tower",
         keepDialogs: true,
         setup: pgShowOpenWindow,
@@ -443,21 +443,21 @@ export const SHOWCASE_SCENES: Scene[] = [
         wait: 500,
       },
       {
-        // The phone's menu bar with its logo, the Window menu open.
+        // The phone's menu bar with its logo, the Tower menu open.
         name: "19-mobile-menu",
         setup: async (page) => {
           await page.evaluate(() => document.querySelector('#modal [data-act="close"]')?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
-          await page.evaluate(() => document.getElementById("mb-window")?.click());
-          await page.waitForSelector("#mb-window-menu:not([hidden])", { timeout: 4000 });
+          await page.evaluate(() => document.getElementById("mb-tower")?.click());
+          await page.waitForSelector("#mb-tower-menu:not([hidden])", { timeout: 4000 });
         },
         wait: 400,
       },
       {
         name: "20-mobile-palette",
         setup: async (page) => {
-          // Close the Window menu the last shot left open (its title toggles it).
+          // Close the Tower menu the last shot left open (its title toggles it).
           await page.evaluate(() => {
-            const title = document.getElementById("mb-window");
+            const title = document.getElementById("mb-tower");
             if (title?.getAttribute("aria-expanded") === "true") title.click();
           });
           await page.evaluate(() => {

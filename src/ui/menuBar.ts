@@ -28,18 +28,30 @@ import type { MenuDismissHow, MenuOpenVia } from "../analyticsMenus";
  *  next real press always lands. */
 const SWALLOW_MS = 1000;
 
-/** Slide an open menu left by as much as it overflows the window's right
- *  edge (a middle menu on a phone), never past the left edge. One layout read
- *  per open. */
+/** Keep an open menu inside the window: slide it left by as much as it runs
+ *  past the right edge (a menu near the end of a phone's bar), and right by
+ *  as much as it starts before the left edge, which wins when the window is
+ *  narrower than the menu. One layout read per open. */
 function keepOnScreen(menu: HTMLElement): void {
   menu.style.translate = "";
   const r = menu.getBoundingClientRect();
   const over = r.right - menu.ownerDocument.documentElement.clientWidth;
-  if (over > 0) menu.style.translate = `${-Math.min(over, Math.max(0, r.left))}px 0`;
+  const shift = Math.max(over > 0 ? -over : 0, -r.left);
+  if (shift !== 0) menu.style.translate = `${shift}px 0`;
 }
 
 /** An item the player can pick: shown and not grayed out. */
 const PICKABLE = ".mb-item:not([hidden]):not([aria-disabled='true'])";
+
+/** Whether a title's menu is on the bar: not `hidden` (the title screen
+ *  hides the menus that need a tower) and not left out by the layout (a
+ *  layout's `.mb-desktop-only`), on a page that still holds it. One style
+ *  read per title, on a key press only. */
+function onBar(title: HTMLElement): boolean {
+  if (!title.isConnected || title.closest("[hidden]")) return false;
+  const menu = title.parentElement;
+  return !menu || menu.ownerDocument.defaultView?.getComputedStyle(menu).display !== "none";
+}
 
 /** How the menus closed: an item was picked, or one of the dismissals. */
 export type MenuCloseHow = "pick" | MenuDismissHow;
@@ -182,7 +194,7 @@ export class MenuBar {
   }
 
   private neighbor(title: HTMLButtonElement, step: 1 | -1): HTMLButtonElement {
-    const shown = this.titles.filter((t) => !t.closest("[hidden]"));
+    const shown = this.titles.filter(onBar);
     const at = shown.indexOf(title);
     return shown[(at + step + shown.length) % shown.length] ?? title;
   }
@@ -241,7 +253,7 @@ export class MenuBar {
     if (!e.altKey || e.ctrlKey || e.metaKey || e.shiftKey || e.key.length !== 1) return;
     if (this.root.ownerDocument.querySelector("dialog[open]")) return;
     const letter = e.key.toLowerCase();
-    const title = this.titles.find((t) => !t.closest("[hidden]") && t.querySelector("u")?.textContent?.toLowerCase() === letter);
+    const title = this.titles.find((t) => onBar(t) && t.querySelector("u")?.textContent?.toLowerCase() === letter);
     if (!title) return;
     e.preventDefault();
     this.open(title, true, "alt");

@@ -7,6 +7,13 @@ const store = vi.hoisted(() => new Map<string, string>());
 const movable = vi.hoisted(() => vi.fn());
 const sponsor = vi.hoisted(() => ({ offered: true, track: vi.fn() }));
 const closer = vi.hoisted(() => ({ closeTower: vi.fn() }));
+const calls = vi.hoisted(() => ({ towerCalls: vi.fn(), exterminate: vi.fn(), fire: vi.fn() }));
+vi.mock("./towerCallItems", async (real) => ({
+  ...(await real<typeof import("./towerCallItems")>()),
+  towerCalls: calls.towerCalls,
+}));
+vi.mock("./appModals", () => ({ confirmExterminate: calls.exterminate }));
+vi.mock("./fireRescueCall", () => ({ callFireRescue: calls.fire }));
 
 vi.mock("./overviewMapWiring", () => ({
   overviewMapOpen: () => map.open,
@@ -32,7 +39,7 @@ vi.mock("../ui/overviewMapPrefs", () => ({
 }));
 
 import * as fileShortcuts from "./fileShortcuts";
-import { MENU_WINDOW, NO_FULL_SCREEN, STATUS_BAR_HIDDEN_CLASS, STATUS_BAR_KEY, toggleFullScreen, wireMenus } from "./menuWiring";
+import { MENU_WINDOW, NO_FULL_SCREEN, STATUS_BAR_HIDDEN_CLASS, STATUS_BAR_KEY, TOWER_ONLY_ITEMS, TOWER_ONLY_MENUS, toggleFullScreen, wireMenus } from "./menuWiring";
 
 /** The menu bar's items as index.html has them, plus the windows and the
  *  toolbar twins the wiring reaches. */
@@ -52,6 +59,17 @@ function mount(): void {
           <a class="mb-item" id="mb-sponsor" hidden>Sponsor</a>
           ${item("btn-new")}${item("btn-stats")}
           <hr class="mb-sep mb-install-sep" hidden /><button class="mb-item" id="btn-install-menu" hidden>Install</button>
+          <hr class="mb-sep" id="mb-save-sep" /><hr class="mb-sep" id="mb-close-sep" />
+        </div>
+      </div>
+      <div class="mb-menu">
+        <button class="mb-title" id="mb-edit" aria-expanded="false" aria-controls="mb-edit-menu"><u>E</u>dit</button>
+        <div class="mb-pop" id="mb-edit-menu" role="menu" hidden>${item("mb-edit-probe")}</div>
+      </div>
+      <div class="mb-menu">
+        <button class="mb-title" id="mb-tower" aria-expanded="false" aria-controls="mb-tower-menu"><u>T</u>ower</button>
+        <div class="mb-pop" id="mb-tower-menu" role="menu" hidden>
+          ${item("mb-fire-rescue")}<button class="mb-item" id="mb-exterminator" role="menuitem" hidden>Call Exterminator</button>
         </div>
       </div>
     </nav>
@@ -90,6 +108,7 @@ beforeEach(() => {
   map.open = false;
   sponsor.offered = true;
   vi.clearAllMocks();
+  calls.towerCalls.mockReset();
   document.body.className = "";
   mount();
 });
@@ -116,7 +135,7 @@ describe("wireMenus", () => {
     keys.open();
     keys.save();
     keys.saveAs();
-    expect(files.showOpenDialog).toHaveBeenCalledWith(app);
+    expect(files.showOpenDialog).toHaveBeenCalledExactlyOnceWith(app, "key");
     expect(ui.cb.onSave).toHaveBeenCalledOnce();
     expect(files.showSaveAsDialog).toHaveBeenCalledWith(app);
     // A key that ran reports app_action file_key, and never a menu_pick: no
@@ -152,7 +171,7 @@ describe("wireMenus", () => {
     $("mb-replay").click();
     expect(ui.cb.onSave).toHaveBeenCalledOnce();
     expect(closer.closeTower).toHaveBeenCalledWith(app);
-    expect(files.showOpenDialog).toHaveBeenCalledWith(app);
+    expect(files.showOpenDialog).toHaveBeenCalledExactlyOnceWith(app, "menu");
     expect(files.showSaveAsDialog).toHaveBeenCalledWith(app);
     expect(undo).toHaveBeenCalledOnce(); // the toolbar's own button, so its rules hold
     expect(ui.showTowerRules).toHaveBeenCalledOnce(); // this tower's column, not the whole comparison
@@ -271,69 +290,59 @@ describe("wireMenus", () => {
     expect($("mb-sponsor").hasAttribute("href")).toBe(false);
   });
 
-  it("on the title screen, tower commands gray out and do nothing, and New Tower presses the title screen's own button", () => {
-    const { app, ui } = fakeApp();
+  it("on the title screen, the menus and items that need a tower leave the bar, and New Tower presses the title screen's own button", async () => {
+    const { app } = fakeApp();
     const bar = wireMenus(app)!;
+    const towerOnly = () => [...TOWER_ONLY_MENUS.map((id) => $(id).parentElement!), ...TOWER_ONLY_ITEMS.map($)];
+    expect(towerOnly().map((el) => el.hidden)).toEqual(towerOnly().map(() => false));
     const splashNew = vi.fn();
-    const stats = vi.fn();
     const splash = document.createElement("div");
     splash.id = "splash";
     splash.innerHTML = `<button data-splash="new"></button>`;
+    // The title screen mounts the way ui/Onboarding.ts mounts it: the element,
+    // then its body class, which the bar follows before any menu opens.
     document.body.append(splash);
+    document.body.classList.add("splash-up");
+    await Promise.resolve();
+    expect(towerOnly().map((el) => el.hidden)).toEqual(towerOnly().map(() => true));
+    expect($("mb-file").parentElement!.hidden).toBe(false);
+    for (const id of ["btn-new", "mb-import"]) expect($(id).hidden, id).toBe(false);
+    // The arrow keys and the Alt letters skip a menu that left the bar.
+    $("mb-file").dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }));
+    expect(document.activeElement).toBe($("mb-file"));
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "t", altKey: true }));
+    expect(bar.current()).toBeNull();
     splash.querySelector("button")!.addEventListener("click", splashNew);
-    $("btn-stats").addEventListener("click", stats);
     const gameNew = vi.fn();
     $("btn-new").addEventListener("click", gameNew);
     bar.open($("mb-file") as HTMLButtonElement, false);
-    for (const id of ["mb-quick-save", "mb-close", "mb-export", "btn-stats", "mb-win-tower", "mb-replay"]) expect($(id).getAttribute("aria-disabled"), id).toBe("true");
-    $("btn-stats").click();
-    $("mb-quick-save").click();
-    expect(stats).not.toHaveBeenCalled();
-    expect(ui.cb.onSave).not.toHaveBeenCalled();
+    // Opening a menu keeps them out, Tools' layout check included.
+    expect(towerOnly().map((el) => el.hidden)).toEqual(towerOnly().map(() => true));
     $("btn-new").click();
     expect(splashNew).toHaveBeenCalledOnce();
     expect(gameNew).not.toHaveBeenCalled(); // the title screen leaves its own way
     expect(bar.current()).toBeNull();
-    // Once the title screen is gone, the commands come back, even when its
-    // body class stays behind (a harness that removes the element).
+    // The title screen comes down the way it goes up: the bar is whole again.
+    splash.remove();
+    document.body.classList.remove("splash-up");
+    await Promise.resolve();
+    expect(towerOnly().map((el) => el.hidden)).toEqual(towerOnly().map(() => false));
+    $("btn-new").click();
+    expect(gameNew).toHaveBeenCalledOnce();
+  });
+
+  it("follows the title screen element alone, whatever body class a removal left behind", async () => {
+    wireMenus(fakeApp().app);
+    const splash = document.createElement("div");
+    splash.id = "splash";
+    document.body.append(splash);
+    await Promise.resolve();
+    expect($("mb-tower").parentElement!.hidden).toBe(true);
     document.body.classList.add("splash-up");
     splash.remove();
-    bar.open($("mb-file") as HTMLButtonElement, false);
-    expect($("btn-stats").hasAttribute("aria-disabled")).toBe(false);
-    $("btn-new").click();
-    expect(gameNew).toHaveBeenCalledOnce();
-    document.body.classList.remove("splash-up");
-  });
-
-  it("on the title screen, an item whose title-screen button is missing runs its own command", () => {
-    const { app } = fakeApp();
-    const bar = wireMenus(app)!;
-    const splash = document.createElement("div");
-    splash.id = "splash";
-    document.body.append(splash);
-    const gameNew = vi.fn();
-    $("btn-new").addEventListener("click", gameNew);
-    bar.open($("mb-file") as HTMLButtonElement, false);
-    $("btn-new").click();
-    expect(gameNew).toHaveBeenCalledOnce();
-    splash.remove();
-  });
-
-  it("on the title screen, Open shows the Open window itself, without pressing the title screen's Load Tower", () => {
-    const { app } = fakeApp();
-    const bar = wireMenus(app)!;
-    files.showOpenDialog.mockClear();
-    const splashLoad = vi.fn();
-    const splash = document.createElement("div");
-    splash.id = "splash";
-    splash.innerHTML = `<button data-splash="load"></button>`;
-    document.body.append(splash);
-    splash.querySelector("button")!.addEventListener("click", splashLoad);
-    bar.open($("mb-file") as HTMLButtonElement, false);
-    $("mb-import").click();
-    expect(files.showOpenDialog).toHaveBeenCalledExactlyOnceWith(app);
-    expect(splashLoad).not.toHaveBeenCalled();
-    splash.remove();
+    await Promise.resolve();
+    expect($("mb-tower").parentElement!.hidden).toBe(false);
+    expect($("mb-quick-save").hidden).toBe(false);
   });
 
   it("Install app's separator shows only while the install item does", () => {

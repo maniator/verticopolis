@@ -126,19 +126,19 @@ export function splashTemplate(hasSave: boolean, premise: string, muted: boolean
       </svg>
       <p class="splash-premise">${premise}</p>
     </div>
-    <!-- Continue, Load Tower, New Tower, then How to Play
-         (SPEC-splash-load-tower CAP-1). New Tower comes AFTER Load Tower
+    <!-- Continue, Open Tower…, New Tower, then How to Play
+         (SPEC-splash-load-tower CAP-1). New Tower comes AFTER Open Tower…
          because it is the only action here that can cost the player
          something, so it sits furthest from the default focus and from the
          Esc/backdrop safe dismiss (both of which resolve toward Continue).
-         Load Tower never takes the primary class: exactly one amber plate is
+         Open Tower… never takes the primary class: exactly one amber plate is
          on screen at a time, Continue when a save exists and New Tower when
          none does, so the eye always has a single default.
          NOTE: no backticks in this comment. It sits inside a tagged template
          literal, so one would end the template. -->
     <div class="splash-actions">
       ${hasSave ? html`<button class="splash-btn primary" data-splash="continue" @click=${h.onContinue}>${iconTemplate("play", { size: 14 })}Continue</button>` : nothing}
-      <button class="splash-btn" data-splash="load" @click=${h.onLoadTower}>${iconTemplate("folder", { size: 14 })}Load Tower</button>
+      <button class="splash-btn" data-splash="load" @click=${h.onLoadTower}>${iconTemplate("folder", { size: 14 })}Open Tower…</button>
       <button class="splash-btn ${hasSave ? "" : "primary"}" data-splash="new" @click=${h.onNewTower}>${iconTemplate("plus", { size: 14 })}New Tower</button>
       <button class="splash-btn ghost" data-splash="help" @click=${h.onHelp}>${iconTemplate("help", { size: 14 })}How to Play</button>
     </div>

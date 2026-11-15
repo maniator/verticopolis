@@ -50,11 +50,11 @@ afterEach(() => {
 });
 
 /**
- * The Load Tower action (SPEC-splash-load-tower CAP-1). The Open window it
+ * The Open Tower… action (SPEC-splash-load-tower CAP-1). The Open window it
  * opens is pinned in `./fileDialog.test.ts`; the dismissal contract lives in
  * the onboarding integration tests.
  */
-describe("splash Load Tower action (SPEC-splash-load-tower CAP-1)", () => {
+describe("splash Open Tower… action (SPEC-splash-load-tower CAP-1)", () => {
   const order = (el: HTMLElement) =>
     Array.from(el.querySelectorAll<HTMLElement>(".splash-actions button")).map((b) =>
       b.getAttribute("data-splash"),
@@ -65,6 +65,11 @@ describe("splash Load Tower action (SPEC-splash-load-tower CAP-1)", () => {
     // can cost the player something, so it stays furthest from the default
     // focus and from the Esc/backdrop safe dismiss.
     expect(order(mountSplash({ hasSave: true }))).toEqual(["continue", "load", "new", "help"]);
+  });
+
+  it("reads Open Tower…, the File menu's word, with the ellipsis for the window it opens", () => {
+    const button = mountSplash({ hasSave: true }).querySelector<HTMLElement>('[data-splash="load"]');
+    expect(button?.textContent?.trim()).toBe("Open Tower…");
   });
 
   it("renders on a first run too, when there is nothing saved yet", () => {

@@ -80,7 +80,7 @@ an event sent before boot carries `version` only.
 | `session_peak_floors` | `floors` | Session end | Height reached |
 | `session_fps` | `p50`, `low`, `samples` | Session end | Frame rate |
 | `app_action` | `action`, `detail` | An app-chrome action | Which saves, dialogs and settings get used, and whether saves, loads and imports fail (see below) |
-| `economy_action` | `action`, `detail` | Demolish, price or capacity tuning | The removal and tuning side of play |
+| `economy_action` | `action`, `detail` | Demolish, price or capacity tuning, or a Modern exterminator booking (`exterminator`, `detail` `menu` or `stats`, since 4.3) | The removal and tuning side of play, and which surface books the exterminator |
 | `menu_open` | `menu`, `via`, `screen` | A trip into the menu bar begins (owner, 2026-11-14) | Which menus players open, and how (see below) |
 | `menu_pick` | `menu`, `item`, `via`, `screen`, `browsed`, `after`, `grayed`, `state` | A menu item is clicked or chosen from the keyboard, grayed items included | Which commands players use from the menus, in what order, and what they look for that is grayed (see below) |
 | `menu_dismiss` | `menu`, `how`, `screen`, `browsed` | A trip into the menus ends with no pick | Where players look and give up (see below) |
@@ -133,7 +133,7 @@ player's own text and is never sent, and neither is a tower's contents.
 
 | `action` | `detail` | When |
 | --- | --- | --- |
-| `files_open` | `open` or `save_as` | The Open or Save As window opened (File > Open…, Save As…, Load > More…, the title screen's Load Tower) |
+| `files_open` | `open`, `open_key`, `open_title` or `save_as` | The Open or Save As window opened. Open says where the player asked: `open` for File > Open… in the menu, `open_key` for its Ctrl+O key, and `open_title` for the title screen's Open Tower… button (called Load Tower up to 4.2). `save_as` is File > Save As… |
 | `file_open` | `tower`, `tdt` or `auto` | A row opened: a tower file, a 1994 `.TDT` file, or the Auto-save |
 | `file_save` | `new`, `replace` or `current` | The tower written into My Towers: under a new name, over a file the player agreed to replace, or into the live tower's own file by File > Save |
 | `file_add` | `picked` or `drop` | A file added to My Towers: `picked` once a file opened from the device has loaded, `drop` for a file dropped onto the Open or Save As window |
@@ -174,16 +174,24 @@ never the name).
 
 | Field | Values | Meaning |
 | --- | --- | --- |
-| `menu` | `file`, `edit`, `tower`, `window`, `options`, `help` | The menu opened, picked from, or open when the trip ended |
+| `menu` | `file`, `edit`, `tower`, `window` (up to 4.2), `options`, `help` | The menu opened, picked from, or open when the trip ended |
 | `via` (open) | `click`, `keys`, `alt` | A click on a title, the keyboard on a focused title, or Alt with the underlined letter |
 | `via` (pick) | `pointer`, `keys` | A mouse, pen or finger, or the keyboard |
 | `screen` | `title`, `tower` | Over the title screen, or over a tower |
-| `item` | `new_tower`, `quick_save`, `close`, `import`, `export`, `install_app`, `undo`, `redo`, `tower_info`, `map`, `statistics`, `rename`, `fire_rescue`, `rules`, `tools`, `bulletin`, `status_bar`, `full_screen`, `settings`, `sound`, `screen_saver`, `manual`, `compare`, `replay`, `sponsor`, `about`, `other` | The item, by a code that does not change with its label (`MENU_ITEM_CODES`) |
+| `item` | `new_tower`, `quick_save`, `close`, `import`, `export`, `install_app`, `undo`, `redo`, `tower_info`, `map`, `statistics`, `rename`, `fire_rescue`, `exterminator`, `rules`, `tools`, `bulletin`, `status_bar`, `full_screen`, `settings`, `sound`, `screen_saver`, `manual`, `compare`, `replay`, `sponsor`, `about`, `other` | The item, by a code that does not change with its label (`MENU_ITEM_CODES`) |
 | `browsed` | a count | Menus the trip showed, the last one included |
 | `after` | an `item` code or `none` | The page life's previous real pick, so a breakdown shows what follows what without a paths query. A grayed click never becomes the next pick's `after` |
 | `grayed` | `true`, `false` | The item was grayed out, so nothing happened |
 | `state` | `on`, `off` | A checkmark item's new state (Tower Info, Map, Tools, Bulletin, Status Bar, Full Screen, Sound); absent on the others and on a grayed click |
 | `how` | `outside`, `escape`, `tab`, `title`, `blur` | How a trip ended with no pick: a press outside the menus, Escape, Tab, the open menu's own title, or the window losing focus |
+
+Version 4.3 removed the Window menu (party and owner, 2026-11-15): Bulletin
+moved to Tower, and Tools, Status Bar and Full Screen to Options. They kept
+their codes, so their `menu` changes from that version on while `item` runs
+on: count `bulletin`, `tools`, `status_bar` and `full_screen` by `item` across
+the move, and expect no new `menu: window` rows. It also took Edit and Tower,
+and File's Save, Save As and Close, Options' Tools and Status Bar and Help's
+Replay, off the title screen, so `screen: title` rows for those end there.
 
 Version 4.1 renamed the File items and kept their codes, so a series runs on
 across the rename: `import` is Open…, `export` is Save As…, `quick_save` is
