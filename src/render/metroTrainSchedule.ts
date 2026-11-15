@@ -1,50 +1,34 @@
+import type { CatalogMetroTrain } from "../catalog/catalogTypes";
+
 /**
- * When the metro train is in the station, on game time. One train calls each
- * game hour from 6:00 to 20:59 and none run overnight (the sim's night is
- * 21:00 to 5:59). It slides in from the left tunnel mouth, waits at the
- * platform, then leaves out the right one. The offsets are in the train's
- * station-wide canvas: -span is fully inside the left tunnel, +span fully inside
- * the right. Pure, so the schedule is pinned without a renderer.
+ * Where the Metro's train is, on game time, drawn from the engine's timetable
+ * (the catalog's `world.metroTrain`, which riders leaving by train keep too).
+ * One train runs each line and calls each game hour from `firstHour` to
+ * `lastHour`; none runs overnight. It slides in from the left tunnel mouth,
+ * waits at each station in turn, then leaves out the right one. Pure, so the
+ * schedule is pinned without a renderer.
  */
 
-/** Minutes past the hour the train finishes sliding in. */
-export const METRO_TRAIN_ARRIVED_AT = 6;
-/** Minutes past the hour it starts to pull out. */
-export const METRO_TRAIN_DEPARTS_AT = 20;
-/** Minutes past the hour it has fully left. */
-export const METRO_TRAIN_GONE_AT = 26;
-
-/** Where the train sits at `minuteOfDay`: `-span` to `span`, 0 at the platform. */
-export function metroTrainOffset(minuteOfDay: number, span: number, night: boolean): number {
-  if (night) return -span;
-  const m = ((minuteOfDay % 60) + 60) % 60;
-  if (m < METRO_TRAIN_ARRIVED_AT) return -span * (1 - m / METRO_TRAIN_ARRIVED_AT);
-  if (m < METRO_TRAIN_DEPARTS_AT) return 0;
-  if (m < METRO_TRAIN_GONE_AT) return span * ((m - METRO_TRAIN_DEPARTS_AT) / (METRO_TRAIN_GONE_AT - METRO_TRAIN_DEPARTS_AT));
-  return -span;
-}
-
-/** Minutes in the daytime hour a train has for its run along a line. */
-const RUN_MINUTES = 54;
-
-/** Each line length's timing, worked out once. */
-const lineTimes = new Map<number, Readonly<{ leg: number; dwell: number }>>();
+/** Each timetable's line timings by line length, worked out once. */
+const lineTimes = new WeakMap<CatalogMetroTrain, Map<number, Readonly<{ leg: number; dwell: number }>>>();
 
 /** How long the train takes between two calls (or a tunnel mouth and a call)
  *  and how long it waits at each, on a line of `stops` stations. One station
- *  keeps the schedule above; more stations share the hour, so the train waits
- *  less at each and is gone before the next hour's run. */
-export function metroLineTimes(stops: number): Readonly<{ leg: number; dwell: number }> {
+ *  waits the timetable's full dwell; more stations share the hour, so the
+ *  train waits less at each and is gone before the next hour's run. The
+ *  engine works out the same (`crowd::metro_train::line_times`). */
+export function metroLineTimes(timetable: CatalogMetroTrain, stops: number): Readonly<{ leg: number; dwell: number }> {
   const n = Math.max(1, stops);
   // Asked every frame for every station, so each line length's answer is kept.
-  const known = lineTimes.get(n);
-  if (known) return known;
-  const leg = METRO_TRAIN_ARRIVED_AT;
-  const usual = METRO_TRAIN_DEPARTS_AT - METRO_TRAIN_ARRIVED_AT;
-  const dwell = Math.min(usual, Math.floor((RUN_MINUTES - leg * (n + 1)) / n));
-  const even = RUN_MINUTES / (2 * n + 1);
+  let known = lineTimes.get(timetable);
+  if (!known) lineTimes.set(timetable, (known = new Map()));
+  const kept = known.get(n);
+  if (kept) return kept;
+  const { legMinutes: leg, dwellMinutes, runMinutes } = timetable;
+  const dwell = Math.min(dwellMinutes, Math.floor((runMinutes - leg * (n + 1)) / n));
+  const even = runMinutes / (2 * n + 1);
   const times = Object.freeze(dwell >= 1 ? { leg, dwell } : { leg: even, dwell: even });
-  lineTimes.set(n, times);
+  known.set(n, times);
   return times;
 }
 
@@ -54,14 +38,14 @@ export function metroLineTimes(stops: number): Readonly<{ leg: number; dwell: nu
  * the stations along the line from left to right. It comes out of the left
  * tunnel into the first station, waits, runs through the tunnel to the next,
  * and so on, then leaves out the right tunnel past the last. Only one station
- * has the train at a time. Overnight, and once it has gone, it waits in the
- * tunnel `span` left of the first station. With one station this is that
- * station's left edge plus `metroTrainOffset`.
+ * has the train at a time. Outside the timetable's hours, and once it has
+ * gone, it waits in the tunnel `span` left of the first station.
  */
-export function metroTrainAt(minuteOfDay: number, stops: readonly number[], span: number, night: boolean): number {
+export function metroTrainAt(minuteOfDay: number, stops: readonly number[], span: number, timetable: CatalogMetroTrain): number {
   const first = stops[0] ?? 0;
-  if (night || stops.length === 0) return first - span;
-  const { leg, dwell } = metroLineTimes(stops.length);
+  const hour = Math.floor((((minuteOfDay % 1440) + 1440) % 1440) / 60);
+  if (hour < timetable.firstHour || hour > timetable.lastHour || stops.length === 0) return first - span;
+  const { leg, dwell } = metroLineTimes(timetable, stops.length);
   let t = ((minuteOfDay % 60) + 60) % 60;
   if (t < leg) return first - span * (1 - t / leg);
   t -= leg;

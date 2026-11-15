@@ -6,7 +6,7 @@ use super::landing::{landing_slots, Landings};
 use super::spawn::{inside_x, metro_station_for_platform, pick_x, pick_x_in_segment};
 use super::staff_shift;
 use super::visits::{begin_dwell, leave_venue};
-use super::walk::{find_another_way, reach_on_run, walk_to, way_is_cut};
+use super::walk::{find_another_way, reach_on_run, reroute, walk_to, way_is_cut};
 use super::{
     Crowd, PState, Person, StaffResult, GIVE_UP, RIDE_SECONDS_PER_FLOOR, STAFF_GIVE_UP, STRESS_WAIT,
 };
@@ -266,6 +266,11 @@ fn step(crowd: &mut Crowd, i: usize, dt: f64, tower: &mut Tower, landings: &mut 
                 let p = &mut crowd.people[i];
                 p.linger += dt;
                 if p.linger > p.linger_for.unwrap_or(2.0) {
+                    // Nobody leaves from an empty platform (`metro_train`).
+                    if super::metro_train::waits_for_train(crowd, i, tower) {
+                        return;
+                    }
+                    let p = &crowd.people[i];
                     // An office worker sits down at their desk, or leaves.
                     if let Some(c) = p.commute {
                         return commuters::at_destination(crowd, i, tower, c);
@@ -309,12 +314,13 @@ fn transition_to_return(crowd: &mut Crowd, tower: &mut Tower, i: usize) {
         crowd.people[i].origin_unit_id = None;
     }
     let venue_floor = crowd.people[i].floor;
+    let from_x = crowd.people[i].x;
     let origin_floor = match origin {
         Some(o) => o.0,
         None if home_gone => 1,
-        None => crowd.people[i].floors[0],
+        // A Metro visitor out after the last train leaves by the lobby.
+        None => super::metro_train::way_out(crowd, tower, crowd.people[i].floors[0], from_x),
     };
-    let from_x = crowd.people[i].x;
     // With no room to go back to (a customer from outside, someone whose
     // room went), leave by the run of the floor nearest the venue that a
     // route reaches: the lobby under it, not the lot's leftmost (`doors`).
@@ -425,33 +431,6 @@ pub(super) fn give_up(crowd: &mut Crowd, i: usize, tower: &mut Tower) {
     } else if crowd.people[i].state == PState::Riding || !reroute(crowd, i, tower) {
         finish(crowd, i, tower);
     }
-}
-
-/// Sends someone on foot partway through a trip on to the trip's last floor
-/// by a new route from where they stand. `false` when there is none.
-pub(super) fn reroute(crowd: &mut Crowd, i: usize, tower: &Tower) -> bool {
-    let p = &crowd.people[i];
-    let (from, from_x, dest_x) = (p.floor, p.x, p.dest_x);
-    let Some(&to) = p.floors.last() else {
-        return false;
-    };
-    let Some(r) = crowd.route(tower, from, to, Some(from_x), Some(dest_x)) else {
-        return false;
-    };
-    let p = &mut crowd.people[i];
-    p.state = if r.shafts.is_empty() {
-        PState::ToDest
-    } else {
-        PState::ToShaft
-    };
-    p.shaft_id = r.shafts.first().copied();
-    p.floors = r.floors;
-    p.shafts = r.shafts;
-    p.leg = 0;
-    p.car_index = None;
-    p.fy = from as f64;
-    p.wait = 0.0;
-    true
 }
 
 pub fn finish(crowd: &mut Crowd, i: usize, tower: &mut Tower) {

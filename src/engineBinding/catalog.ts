@@ -76,7 +76,9 @@ const WORLD: Shape = {
   groundFloor: int,
   groundFloorStructure: text,
   lobbyInterval: size,
+  metroTrain: isRecord,
 };
+const METRO_TRAIN: Shape = { firstHour: count, lastHour: count, legMinutes: positive, dwellMinutes: positive, runMinutes: positive };
 const ECONOMY: Shape = {
   startingMoney: amount,
   addCarCost: amount,
@@ -203,6 +205,8 @@ function checkCatalog(c: Record<string, unknown>): void {
   const world = checkShape(c.world, WORLD, "world");
   const [minFloor, groundFloor, maxFloor] = [world.minFloor, world.groundFloor, world.maxFloor] as number[];
   if (minFloor > groundFloor || groundFloor > maxFloor) refuse("world", "the ground floor lies outside the floor range");
+  const train = checkShape(world.metroTrain, METRO_TRAIN, "world.metroTrain");
+  if ((train.firstHour as number) > (train.lastHour as number) || (train.lastHour as number) > 23) refuse("world.metroTrain", "the hours are out of order");
 
   const economy = checkShape(c.economy, ECONOMY, "economy");
   if (economy.exterminator !== null) checkShape(economy.exterminator, EXTERMINATOR, "economy.exterminator");

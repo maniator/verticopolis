@@ -13,6 +13,7 @@ pub mod graph;
 pub mod landing;
 pub mod line_count;
 pub mod meals;
+pub mod metro_train;
 pub mod motion;
 pub mod routines;
 pub mod routing;
@@ -275,8 +276,7 @@ pub struct Crowd {
     pub crew_roster: HashMap<i64, i64>,
     pub step: i64,
     /// The cars the schedule has stood down, as (shaft id, car index),
-    /// ascending: a person waiting at a floor does not board one, even one
-    /// still finishing the riders it carries.
+    /// ascending: nobody boards one, even one still finishing its riders.
     /// Swapped in from the dispatch each step; never saved.
     pub closed_cars: Vec<(i64, i64)>,
     /// The cars standing at a stop with their doors open, as (shaft id, car
@@ -286,11 +286,12 @@ pub struct Crowd {
     /// The queue projection and the (step, tower revision) it was built
     /// for (`queue_view`, `render_reads.rs`). Never saved.
     pub queue_cache: Option<((i64, i64), crate::render_reads::QueueView)>,
-    /// The clock hour of the step, so a venue's visitors keep its opening
-    /// hours: nobody stays in or walks into a venue after it closes. `None`
-    /// (a crowd stepped on its own) leaves every venue open. Set by the
-    /// step, and saved with the crowd as the last step left it.
+    /// The clock hour of the step, so nobody stays in or walks into a venue
+    /// after it closes. `None` (a crowd stepped on its own) leaves every
+    /// venue open. Set by the step, and saved as the last step left it.
     pub hour: Option<i64>,
+    /// The game minute the step reached, for the train (`metro_train`). Not saved.
+    pub minute: Option<f64>,
     /// Whether the step's day is a weekend, for the elevator schedules.
     /// Saved with the crowd, as `hour` is.
     pub weekend: bool,
@@ -359,6 +360,7 @@ impl Crowd {
             open_cars: Default::default(),
             queue_cache: None,
             hour: None,
+            minute: None,
             weekend: false,
             walk_ins: Vec::new(),
             walk_in_count: 0,
