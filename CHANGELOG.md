@@ -25,6 +25,41 @@ prompt already tells players it is an engine update and shows the new version.
 Entries below 1.51.1 were curated from the commit history after the fact, so they
 are documentation only: no build that a client fetches carries them.
 
+## 4.3.0
+
+- Modern towers get Tower > Call Exterminator…, lit while a hotel room has cockroaches and no crew is on the way, and Call Fire Rescue… is now grayed out unless a fire is burning.
+- The menu bar is tidier: the Window menu is gone, with Bulletin now in the Tower menu and Tools, Status Bar and Full Screen in Options. The opening screen shows only File, Options and Help, with nothing in them that needs a tower, and its Load Tower button is now Open Tower…, matching File > Open….
+- File > Open… and File > Save As… now open classic Open and Save As windows over My Towers, a folder of tower files the game keeps on your device, with no limit on how many. Each tower is listed with its name, type, size and when it was saved; sort by any column, rename, duplicate, delete, right-click for every choice, or copy and paste a tower with Ctrl+C and Ctrl+V.
+- Saved Towers… and its three save slots are gone: your slots are copied into My Towers the first time you open this version, under their names. File > Load lists the Auto-save and your five newest towers, and Load Tower on the opening screen opens the Open window.
+- Once a tower has a file in My Towers, File > Save (Ctrl+S) saves into that file as well as the Auto-save.
+- A tower file opened from your computer, or dropped onto the game, is kept in My Towers once it opens, and so is a 1994 .TDT file you import. Drag tower files onto the Open or Save As window to add them. Saving to or opening from a file on your computer is still there, under "To a file on your computer…" and "From a file on your computer…".
+- In Modern towers, every shop, restaurant and venue has staff who really come to work: they ride in from the ground lobby or the Metro up to four hours before opening, the doors open once the first of them is in, and they go home the same way after closing. A shop no elevator reaches stays shut.
+- About this game no longer lists a "Build: wasm-only" line in its diagnostics, and an engine that is not running now reads "not running" instead of "none".
+- Saving a big tower is faster again: the engine now writes the save several times faster, so the autosave's pause, the save when you switch away or update, and Export are all shorter.
+- The regular autosave no longer stutters the game for as long on big towers: on a maxed tower the pause is about half as long, and on a large mid-game tower about a third. The compression now runs in the background.
+- The border around the tower and the Tools window is now the same classic window gray as the menu bar, instead of the teal of a desktop, so the tower is the only color on screen.
+- File > Load is gone from the File menu: the Auto-save and every tower in My Towers open from File > Open… (Ctrl+O), which lists the Auto-save first.
+- File > Open… and Save As… always open the game's own window. The first time My Towers opened on a phone it could take a moment, and the game showed the phone's file picker instead, with none of your towers in it. The window now says "Opening My Towers…", shows the Auto-save at once and fills in the rest when it is ready.
+- Replace and Delete ask in a classic message box in the middle of the window, with Yes and No, instead of a line at the bottom that was easy to miss.
+- The menu you get by right-clicking or pressing and holding a tower in the Open window stays on screen near the edge.
+- The Open window shows how big the Auto-save is, like every other tower, and the count at the top includes it.
+- File > New Tower… is now File > New….
+- Tidier service rooms: the parked car no longer hides a stall line, the ramp's joists, chevrons and hazard stripes sit evenly, the ramp car's wheels and lamps show, the security key rack sits below the alarm light, the medical lamps, beds and IV stand line up, the housekeeping cart's towels and bottles all show, the recycling hall's brackets, ribs, belt, bins, lamps and cubes are evenly spaced, and the Sky Bar's bartender stands clear of the stools.
+- Modern: the lunch crowd in nightclubs, spas, food halls and the other Modern venues no longer counts toward recycling, so a tower right at its recycling limit stops losing and regaining the 4★ recycling requirement every day, and the "Garbage is piling up" warning stops coming back each noon.
+- When too few reachable shops wear a tenant down faster than a far walk to transport or a far lobby, the tenant's complaint and its notice now name the missing shops.
+- A tenant that leaves at the end of its notice is now named for what keeps it unhappy now. Before, if you fixed the problem it gave notice for (say, the rent) while another problem kept it down (say, a lobby too far away), the message still blamed the one you fixed.
+- The first click or build after the game loads now makes its sound, instead of staying silent while the audio wakes up.
+- The elevator schedule window no longer says "You have unsaved changes" after a button that changed nothing, such as All cars on a schedule that already runs every car.
+- The Elevator Schedule's "unsaved changes" warning now sits beside OK and Discard instead of pushing the buttons onto a second row, so the pinned button strip stays short and covers less of the dialog, on phones most of all.
+- Modern: people remember how long the last riders really waited at each elevator stop, for a few minutes after they board. A stop the cars reach already full, such as a Metro basement below a busy shaft, no longer looks quick, so riders take the escalators or another shaft. A saved tower keeps the memory, and a tower saved before loads with none.
+- In the installed app on a phone, Back to game on a help page takes you back to the game instead of closing the app, including after you move to another help page.
+- Classic express elevators now stop where the 1994 game's do: the ground floor, every 15th floor (sky lobby or not) and every basement. Each of those stops can be turned off in the Schedule window, and an express has to reach the ground floor or a 15th floor. An end off those floors is passed, not stopped at. Modern express elevators are unchanged.
+- The Tenant ratings help now says a tenant that moves out names the problem that holds now, and that too few shops can be named ahead of a far walk or a far lobby.
+- A shop's and a fast food's visitor count, and the population it adds to, now changes when shops open at 10 AM, as in the original game, instead of at midnight. A restaurant's still changes overnight.
+- Turning off an elevator stop no longer makes the people riding to that floor disappear from the car. They get off at the nearest stop and find the rest of the way from there, or leave through the lobby when there is none.
+- Parking stalls in a tower exported for SimTower (1994) now stay connected in the old game. Before, the old game dropped every stall's connection a few days after loading.
+- The help now says a Classic movie theater's old film still draws a third of a full house, and that a tower saved for SimTower (1994) keeps each theater's film and how long it has shown, which the original game was checked to read.
+
 ## 4.2.0
 
 - Tower > Call Fire Rescue… brings the fire rescue offer back while a fire burns, so declining it the first time no longer rules it out, as in the 1994 game.
