@@ -175,14 +175,13 @@ function infoFrom(slot: number | "auto", raws: readonly (string | null)[]): Slot
       slot,
       exists: true,
       present: true,
+      size: raw?.length, // base64, a byte a character (see SlotInfo.size)
       towerName: data.towerName,
       star: data.star,
       population,
       funds: data.money,
-      // Same trust posture as every other save field: a forged savedAt reads as
-      // absent (see parseSavedAt), so the dialog shows an empty timestamp
-      // instead of "Invalid Date". Absent, not clamped: a clamped forgery would
-      // display a confidently wrong date.
+      // A forged savedAt reads as absent (see parseSavedAt): the dialog shows an
+      // empty timestamp instead of "Invalid Date" or a confidently wrong date.
       savedAt: parseSavedAt(data.savedAt),
       // Founded mode, coerced the way a load reads it (absent/forged = classic),
       // so the chip can never carry a raw file string.

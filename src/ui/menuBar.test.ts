@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { MenuBar, type MenuBarOptions } from "./menuBar";
 
@@ -300,5 +303,17 @@ describe("MenuBar trips (the menu analytics' hooks)", () => {
     expect(bar.browsed()).toBe(1);
     expect(onDismiss).not.toHaveBeenCalled();
     bar.close();
+  });
+});
+
+describe("the game's File menu (index.html)", () => {
+  it("reads New…, Open…, Save, Save As… and Close, with no Load submenu (4.3)", () => {
+    const indexHtml = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "../index.html"), "utf8");
+    const page = new DOMParser().parseFromString(indexHtml, "text/html");
+    const menu = page.getElementById("mb-file-menu")!;
+    const label = (item: Element) => [...item.childNodes].filter((n) => n.nodeType === Node.TEXT_NODE).map((n) => n.textContent).join("").trim();
+    const shown = [...menu.querySelectorAll(".mb-item:not([hidden])")].map(label);
+    expect(shown).toEqual(["New…", "Open…", "Save", "Save As…", "Close"]);
+    expect(menu.querySelector(".mb-sub, [aria-haspopup]"), "File > Load and its submenu are gone").toBeNull();
   });
 });

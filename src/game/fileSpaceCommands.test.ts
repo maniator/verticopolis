@@ -22,6 +22,7 @@ vi.mock("./interactionState", () => ({ isDialogOpen: () => m.dialogOpen, isEngin
 
 import type { GameApp } from "../main";
 import { closeFileSpaceForTests, fileSpace } from "../storage/fileSpace";
+import { SaveGame } from "../storage/SaveGame";
 import { FakeIndexedDb } from "../tests/fakeIndexedDb";
 import { currentFileId, setCurrentFile } from "./currentFile";
 import { openFile, openFileSpace, saveCurrentFile, saveFile, showOpenDialog, showSaveAsDialog, towerFileKind, wireTowerDrop } from "./fileSpaceCommands";
@@ -78,6 +79,80 @@ describe("File > Open…", () => {
     expect(m.dialog).not.toHaveBeenCalled();
   });
 
+  it("shows the window while My Towers is still opening, and fills it in once the old slots are in", async () => {
+    // Staging, 2026-11-15: on a phone the folder took a moment to open the
+    // first time, and File > Open… fell back to the device's picker, which
+    // showed none of the player's towers.
+    closeFileSpaceForTests();
+    let copyDone = () => {};
+    m.copySlots.mockClear();
+    m.copySlots.mockImplementationOnce(() => new Promise<number>((r) => (copyDone = () => r(2))));
+    void fileSpace.open(new FakeIndexedDb().asFactory());
+    const ready = openFileSpace(app as unknown as GameApp);
+    expect(fileSpace.isOpening()).toBe(true);
+    showOpenDialog(app as unknown as GameApp, "menu");
+    expect(m.openImport).not.toHaveBeenCalled();
+    const ctx = lastCtx();
+    expect(ctx.loading()).toBe(true);
+    expect(m.track).toHaveBeenCalledWith("files_waited", "open");
+    const heard = vi.fn();
+    ctx.onChange(heard);
+    await vi.waitFor(() => expect(m.copySlots, "the folder opened and the copy began").toHaveBeenCalled());
+    expect(fileSpace.isOpen()).toBe(true);
+    expect(heard, "the window heard the folder open").toHaveBeenCalled();
+    expect(ctx.loading(), "still copying the slots in").toBe(true);
+    heard.mockClear();
+    copyDone();
+    await ready;
+    await settle();
+    expect(ctx.loading()).toBe(false);
+    expect(heard, "the window draws once more when the copy is done").toHaveBeenCalled();
+    expect(m.track).toHaveBeenCalledWith("files_copied", "2");
+  });
+
+  it("Save As… also waits for a folder that is still opening, and stops listening when closed", async () => {
+    closeFileSpaceForTests();
+    let copyDone = () => {};
+    m.copySlots.mockClear();
+    m.copySlots.mockImplementationOnce(() => new Promise<number>((r) => (copyDone = () => r(0))));
+    void fileSpace.open(new FakeIndexedDb().asFactory());
+    const ready = openFileSpace(app as unknown as GameApp);
+    showSaveAsDialog(app as unknown as GameApp);
+    expect(app.ui.promptExport).not.toHaveBeenCalled();
+    const ctx = lastCtx();
+    expect(ctx.loading()).toBe(true);
+    expect(m.track).toHaveBeenCalledWith("files_waited", "save_as");
+    const heard = vi.fn();
+    ctx.onChange(heard)();
+    await vi.waitFor(() => expect(m.copySlots).toHaveBeenCalled());
+    copyDone();
+    await ready;
+    await settle();
+    expect(heard, "an unsubscribed window is not drawn").not.toHaveBeenCalled();
+  });
+
+  it("gives the Auto-save row its tower's name and the size it takes", () => {
+    const slots = vi.spyOn(SaveGame, "listSlots").mockReturnValue([{ slot: "auto", exists: true, present: true, size: 20_480, towerName: "Sky", savedAt: 5 }]);
+    try {
+      showOpenDialog(app as unknown as GameApp, "menu");
+      expect(lastCtx().auto()).toEqual({ id: "auto", name: "Auto-save (Sky)", type: "auto", size: 20_480, modified: 5 });
+    } finally {
+      slots.mockRestore();
+    }
+  });
+
+  it("lists a stored Auto-save even when it does not read now, under its plain name", () => {
+    localStorage.setItem("verticopolis-save", "VCZ1:not a save");
+    try {
+      showOpenDialog(app as unknown as GameApp, "menu");
+      expect(lastCtx().auto()).toEqual({ id: "auto", name: "Auto-save", type: "auto", modified: undefined });
+    } finally {
+      localStorage.removeItem("verticopolis-save");
+    }
+    showOpenDialog(app as unknown as GameApp, "menu");
+    expect(lastCtx().auto(), "no row with nothing stored").toBeNull();
+  });
+
   it("opens the window and counts it, telling the menu, its key and the title screen apart", () => {
     showOpenDialog(app as unknown as GameApp, "menu");
     expect(lastCtx().mode).toBe("open");
@@ -86,6 +161,9 @@ describe("File > Open…", () => {
     expect(m.track).toHaveBeenLastCalledWith("files_open", "open_key");
     showOpenDialog(app as unknown as GameApp, "title");
     expect(m.track).toHaveBeenLastCalledWith("files_open", "open_title");
+    expect(m.track, "a ready folder kept nobody waiting").not.toHaveBeenCalledWith("files_waited", expect.anything());
+    lastCtx().asked!("delete");
+    expect(m.track).toHaveBeenCalledWith("file_ask", "delete");
   });
 
   it("adds dropped tower files and names the ones it refused", async () => {

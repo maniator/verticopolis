@@ -21,6 +21,7 @@ function makeCtx(mode: "open" | "saveAs", over: Partial<FileDialogCtx> = {}) {
     auto: () => AUTO,
     files: () => files,
     usage: () => ({ count: files.length, bytes: 0 }),
+    loading: () => false,
     onChange: (l) => {
       listeners.push(l);
       return () => (listeners = listeners.filter((x) => x !== l));
@@ -32,6 +33,7 @@ function makeCtx(mode: "open" | "saveAs", over: Partial<FileDialogCtx> = {}) {
     remove: vi.fn(ok),
     add: vi.fn(ok),
     fromComputer: vi.fn(),
+    asked: vi.fn(),
     downloadKept: null,
     ...over,
   } as typeof ctx;
@@ -114,11 +116,92 @@ describe("the Open window", () => {
     expect(ctx.open).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ id: "a" }));
   });
 
+  it("shows the Auto-save's size and counts it in the header with the files", () => {
+    const sized = { auto: () => ({ ...AUTO, size: 20 * 1024 }), usage: () => ({ count: 2, bytes: 40 * 1024 }) };
+    show("open", sized);
+    expect(q(".fd-row .fd-size-cell").textContent).toBe("20 KB");
+    expect(q(".fd-usage").textContent).toBe("3 towers, 60 KB");
+    box?.remove();
+    show("open", { ...sized, usage: () => ({ count: 0, bytes: 0 }) });
+    expect(q(".fd-usage").textContent, "the Auto-save alone is a tower").toBe("1 tower, 20 KB");
+    box?.remove();
+    show("saveAs", sized);
+    expect(q(".fd-usage").textContent, "Save As lists no Auto-save, so counts none").toBe("2 towers, 40 KB");
+  });
+
+  it("says My Towers is opening and holds Open until the list is in", () => {
+    let loading = true;
+    files = [];
+    show("open", { loading: () => loading });
+    expect(q(".fd-usage").textContent).toBe("Opening My Towers…");
+    expect(rowNames(), "the Auto-save shows at once").toEqual(["Auto-save (Sky)"]);
+    expect(q<HTMLButtonElement>(".fd-primary").disabled).toBe(true);
+    const name = q<HTMLInputElement>("#fd-name");
+    name.value = "Alpha";
+    name.dispatchEvent(new Event("input"));
+    name.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
+    expect(box!.querySelector(".fd-line"), "no 'no tower named' before the list is in").toBeNull();
+    loading = false;
+    files = [entry("a", "Alpha", 10)];
+    for (const l of listeners) l();
+    expect(q(".fd-usage").textContent).not.toContain("Opening");
+    expect(rowNames()).toEqual(["Auto-save (Sky)", "Alpha"]);
+    expect(q<HTMLButtonElement>(".fd-primary").disabled).toBe(false);
+  });
+
+  it("blocks the window behind its message box, keeps Tab inside it, and gives the focus back on No", () => {
+    show("open");
+    q("#fd-row-a").click();
+    key(q(".fd-rows"), "Delete");
+    expect(q(".fd-ask-layer [role='alertdialog']").getAttribute("aria-modal")).toBe("true");
+    expect(q(".fd-tools"), "the window's buttons stay drawn under the box").not.toBeNull();
+    const [yes, no] = [q('[data-fd-ask="yes"]'), q('[data-fd-ask="no"]')];
+    key(no, "Tab");
+    expect(document.activeElement).toBe(yes);
+    key(yes, "Tab");
+    expect(document.activeElement).toBe(no);
+    no.click();
+    expect(box!.querySelector(".fd-ask-layer")).toBeNull();
+    expect(ctx.remove).not.toHaveBeenCalled();
+    expect(document.activeElement).toBe(q(".fd-rows"));
+  });
+
+  it("keeps the right-click menu inside the window near its right and bottom edges", () => {
+    show("open");
+    q(".fd").getBoundingClientRect = () => ({ left: 10, top: 20, width: 300, height: 400, right: 310, bottom: 420, x: 10, y: 20, toJSON: () => ({}) });
+    const proto = HTMLElement.prototype;
+    const width = Object.getOwnPropertyDescriptor(proto, "offsetWidth")!;
+    const height = Object.getOwnPropertyDescriptor(proto, "offsetHeight")!;
+    const menuSize = (size: number) => ({ configurable: true, get(this: HTMLElement) { return this.classList.contains("fd-menu") ? size : 0; } });
+    Object.defineProperty(proto, "offsetWidth", menuSize(140));
+    Object.defineProperty(proto, "offsetHeight", menuSize(150));
+    try {
+      const press = (x: number, y: number) => q(".fd-row").dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true, clientX: x, clientY: y }));
+      press(300, 400);
+      expect([q(".fd-menu").style.left, q(".fd-menu").style.top], "moved left and up to fit").toEqual(["160px", "250px"]);
+      press(50, 60);
+      expect([q(".fd-menu").style.left, q(".fd-menu").style.top], "a menu that fits stays at the pointer").toEqual(["40px", "40px"]);
+    } finally {
+      Object.defineProperty(proto, "offsetWidth", width);
+      Object.defineProperty(proto, "offsetHeight", height);
+    }
+  });
+
+  it("says My Towers is opening in an empty list", () => {
+    files = [];
+    show("saveAs", { loading: () => true });
+    expect(q(".fd-empty").textContent).toBe("Opening My Towers…");
+  });
+
   it("asks before deleting, and Esc drops the question before the window", () => {
     show("open");
     q("#fd-row-a").click();
     key(q(".fd-rows"), "Delete");
-    expect(q(".fd-ask").textContent).toContain(`Delete "Alpha"? This can't be undone.`);
+    expect(q(".fd-ask").textContent).toContain(`Are you sure you want to delete "Alpha"?`);
+    expect(q(".fd-ask").textContent).toContain("It can't be undone.");
+    expect(q("#fd-ask-title").textContent).toBe("Confirm File Delete");
+    expect(document.activeElement, "No has the focus").toBe(q('[data-fd-ask="no"]'));
+    expect(ctx.asked).toHaveBeenCalledExactlyOnceWith("delete");
     key(q(".fd-ask"), "Escape");
     expect(box!.querySelector(".fd-ask")).toBeNull();
     expect(ctx.remove).not.toHaveBeenCalled();
@@ -226,8 +309,8 @@ describe("the Open window", () => {
     expect(box!.querySelector(".fd-menu")).toBeNull();
     q("#fd-row-c").dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true }));
     menuItem("Delete").click();
-    expect(q(".fd-ask").textContent).toContain(`Delete "charlie 10"?`);
-    q(".fd-ask .btn:not([data-fd-ask])").click();
+    expect(q(".fd-ask").textContent).toContain(`delete "charlie 10"?`);
+    q('[data-fd-ask="no"]').click();
     expect(box!.querySelector(".fd-ask")).toBeNull();
     q("#fd-row-c").dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true }));
     menuItem("Copy").click();
@@ -327,9 +410,11 @@ describe("the Save As window", () => {
     name.value = "alpha";
     name.dispatchEvent(new Event("input"));
     key(name, "Enter");
-    expect(q(".fd-ask").textContent).toContain(`"alpha" already exists. Replace it?`);
+    expect(q(".fd-ask").textContent).toContain(`"alpha" already exists.`);
+    expect(q(".fd-ask").textContent).toContain("Do you want to replace it?");
+    expect(q("#fd-ask-title").textContent).toBe("Save As");
     expect(ctx.save).not.toHaveBeenCalled();
-    button("Replace").click();
+    button("Yes").click();
     expect(ctx.save).toHaveBeenCalledExactlyOnceWith("alpha", true);
   });
 

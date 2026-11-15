@@ -42,6 +42,9 @@ export interface FileDialogCtx {
   auto(): FileRow | null;
   files(): readonly TowerFileEntry[];
   usage(): { count: number; bytes: number };
+  /** True while My Towers is still opening or the old save slots are still
+   *  being copied in; the list fills in when it is done. */
+  loading(): boolean;
   onChange(listener: () => void): () => void;
   /** Open a row. The window is closed before this runs, since an import may
    *  open a window of its own. */
@@ -55,6 +58,8 @@ export interface FileDialogCtx {
   remove(id: string): Promise<FileNote | null>;
   /** Files dropped on the window. */
   add(files: readonly File[]): Promise<FileNote | null>;
+  /** The window asked before replacing or deleting a file (analytics). */
+  asked?(kind: FileAsk["kind"]): void;
   /** The way to or from a file on the device. The window is closed first. */
   fromComputer(): void;
   /** Download the autosave this version couldn't read, when one is kept
@@ -72,6 +77,12 @@ export function clearFileClipboardForTests(): void {
 }
 
 const TYPE_ORDER: Readonly<Record<FileRow["type"], number>> = { auto: 0, tower: 1, tdt: 2 };
+
+/** The window's tower count and size, with the Auto-save when it is listed,
+ *  so the header counts every tower the window shows. */
+export function withAuto(usage: { count: number; bytes: number }, auto: FileRow | null): { count: number; bytes: number } {
+  return auto ? { count: usage.count + 1, bytes: usage.bytes + (auto.size ?? 0) } : usage;
+}
 
 /** The rows a window shows: the Auto-save first, then the files that pass
  *  the filter, in the chosen order. */
@@ -122,9 +133,10 @@ export function showFileDialog(ui: Pick<UI, "openModalTemplate" | "closeModal">,
       off();
       return;
     }
-    rows = fileRows(opening ? ctx.auto() : null, ctx.files(), state.filter, state.sort);
+    const auto = opening ? ctx.auto() : null;
+    rows = fileRows(auto, ctx.files(), state.filter, state.sort);
     if (state.selected !== null && !rowOf(state.selected)) state.selected = null;
-    const view = { ...state, mode: ctx.mode, rows, usage: ctx.usage(), canPaste: copied !== null, kept: ctx.downloadKept !== null };
+    const view = { ...state, mode: ctx.mode, rows, usage: withAuto(ctx.usage(), auto), loading: ctx.loading(), canPaste: copied !== null, kept: ctx.downloadKept !== null };
     render(fileDialogTemplate(view, handlers), host);
   }
   const off = ctx.onChange(draw);
@@ -168,7 +180,9 @@ export function showFileDialog(ui: Pick<UI, "openModalTemplate" | "closeModal">,
   }
 
   function primary(): void {
-    if (state.busy || state.ask) return;
+    // Not before the list is in: a name check against half a list could
+    // save over a tower without asking.
+    if (state.busy || state.ask || ctx.loading()) return;
     const name = cleanFileName(state.name);
     if (!name) {
       set({ line: { text: "Type a name for the tower.", kind: "bad" } });
@@ -181,7 +195,7 @@ export function showFileDialog(ui: Pick<UI, "openModalTemplate" | "closeModal">,
       return;
     }
     const taken = ctx.files().some((f) => f.name.toLocaleLowerCase() === name.toLocaleLowerCase());
-    if (taken) set({ ask: { kind: "replace", name } });
+    if (taken) ask({ kind: "replace", name });
     else void save(name, false);
   }
 
@@ -190,11 +204,22 @@ export function showFileDialog(ui: Pick<UI, "openModalTemplate" | "closeModal">,
     if (note === null && box.isConnected) ui.closeModal();
   }
 
+  /** Put a question in its message box, with the focus on No: both
+   *  questions guard a step that can't be taken back. */
+  function ask(question: FileAsk): void {
+    set({ ask: question, menu: null });
+    host.querySelector<HTMLElement>('[data-fd-ask="no"]')?.focus();
+    ctx.asked?.(question.kind);
+  }
+
   function answer(yes: boolean): void {
-    const ask = state.ask;
+    const asked = state.ask;
     set({ ask: null });
-    if (!yes || !ask) return;
-    if (ask.kind === "replace") void save(ask.name, true);
+    if (!yes || !asked) {
+      focusAfterAsk(asked);
+      return;
+    }
+    if (asked.kind === "replace") void save(asked.name, true);
     else {
       const target = fileOf(state.selected);
       if (target) void run(() => ctx.remove(target.id));
@@ -224,7 +249,7 @@ export function showFileDialog(ui: Pick<UI, "openModalTemplate" | "closeModal">,
 
   function remove(): void {
     const target = fileOf(state.selected);
-    if (target && !state.busy) set({ ask: { kind: "delete", name: target.name }, menu: null });
+    if (target && !state.busy) ask({ kind: "delete", name: target.name });
   }
 
   function copy(): void {
@@ -252,6 +277,13 @@ export function showFileDialog(ui: Pick<UI, "openModalTemplate" | "closeModal">,
 
   function focusList(): void {
     host.querySelector<HTMLElement>(".fd-rows")?.focus();
+  }
+
+  /** Back where the question came from once it is dropped: the File name box
+   *  after Save As asked about a name, else the list. */
+  function focusAfterAsk(asked: FileAsk | null): void {
+    if (asked?.kind === "replace") host.querySelector<HTMLElement>("#fd-name")?.focus();
+    else focusList();
   }
 
   function listKey(e: KeyboardEvent): void {
@@ -289,9 +321,18 @@ export function showFileDialog(ui: Pick<UI, "openModalTemplate" | "closeModal">,
   }
 
   /** The menu opens at the pointer, placed within the window's body. */
+  /** The right-click menu at (x, y) on the screen, kept inside the window:
+   *  a press near the right or bottom edge (a phone's long-press) opens it
+   *  to the left of or above the finger instead of off the edge. */
   function openMenu(id: string, x: number, y: number): void {
     const frame = (host.querySelector(".fd") ?? box).getBoundingClientRect();
     set({ selected: id, name: rowOf(id)?.name ?? state.name, menu: { id, x: x - frame.left, y: y - frame.top } });
+    const menu = host.querySelector<HTMLElement>(".fd-menu");
+    if (menu) {
+      const inside = (at: number, size: number, room: number) => Math.max(0, Math.min(at, room - size));
+      const kept = { id, x: inside(x - frame.left, menu.offsetWidth, frame.width), y: inside(y - frame.top, menu.offsetHeight, frame.height) };
+      if (kept.x !== state.menu?.x || kept.y !== state.menu?.y) set({ menu: kept });
+    }
     host.querySelector<HTMLElement>(".fd-menu .mb-item")?.focus();
   }
 
@@ -328,13 +369,21 @@ export function showFileDialog(ui: Pick<UI, "openModalTemplate" | "closeModal">,
     },
   };
 
-  // Esc closes what is open inside the window before the window itself.
+  // Esc closes what is open inside the window before the window itself, and
+  // Tab stays inside a message box until it is answered.
   box.addEventListener("keydown", (e) => {
+    if (e.key === "Tab" && state.ask) {
+      e.preventDefault();
+      const [yes, no] = [...host.querySelectorAll<HTMLElement>(".fd-ask .btn")];
+      (document.activeElement === yes ? no : yes)?.focus();
+      return;
+    }
     if (e.key !== "Escape" || !(state.menu || state.ask)) return;
     e.preventDefault();
     e.stopPropagation();
+    const asked = state.ask;
     set({ menu: null, ask: null });
-    focusList();
+    focusAfterAsk(asked);
   });
   box.addEventListener("dragenter", (e) => {
     if (!carriesFiles(e)) return;

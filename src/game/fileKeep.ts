@@ -37,7 +37,8 @@ async function holds(entry: TowerFileEntry, bytes: Uint8Array): Promise<boolean>
  * folder is closed or the write failed (the tower is open either way).
  */
 export async function keepOpenedFile(filename: string, bytes: Uint8Array, kind: TowerFileKind): Promise<TowerFileEntry | null> {
-  if (!fileSpace.isOpen()) return null;
+  // A file picked while the folder is still opening waits for it.
+  if (!(await fileSpace.open())) return null;
   try {
     const name = baseName(filename) || "Tower";
     const same = fileSpace.find(name);

@@ -62,6 +62,32 @@ describe("fileSpace", () => {
     expect(() => fileSpace.save("a", "tower", bytes(1))).toThrow("isn't open");
   });
 
+  it("is not left opening when the factory throws at once (a SecurityError)", async () => {
+    const throwing = { open: () => { throw new DOMException("denied", "SecurityError"); } } as unknown as IDBFactory;
+    expect(await fileSpace.open(throwing)).toBe(false);
+    expect(fileSpace.isOpening()).toBe(false);
+    expect(fileSpace.isOpen()).toBe(false);
+  });
+
+  it("is not left opening when the database refuses", async () => {
+    fake.failOpen = true;
+    expect(await open()).toBe(false);
+    expect(fileSpace.isOpening()).toBe(false);
+  });
+
+  it("is opening until the database answers, and tells its listeners once it is open", async () => {
+    const heard = vi.fn();
+    const off = fileSpace.onChange(heard);
+    const opened = open();
+    expect(fileSpace.isOpening()).toBe(true);
+    expect(fileSpace.isOpen()).toBe(false);
+    expect(await fileSpace.open(), "a second open joins the first, with no factory of its own").toBe(true);
+    expect(await opened).toBe(true);
+    expect(fileSpace.isOpening()).toBe(false);
+    expect(heard).toHaveBeenCalledOnce();
+    off();
+  });
+
   it("keeps a saved file's bytes exactly and lists it after a reload", async () => {
     await open();
     const saved = await fileSpace.save("  Spire  ", "tower", bytes(1, 2, 3), 1000);
