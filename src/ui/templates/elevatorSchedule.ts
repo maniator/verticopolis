@@ -417,7 +417,7 @@ export function elevatorScheduleTemplate(ctx: SchedCtx, state: SchedState, h: Sc
         ${ctx.ux.advice && state.adviceMsg ? html`<p class="es-advice" aria-live="polite">${state.adviceMsg}</p>` : nothing}
         <div class="es-sim" aria-live="polite">${state.simMsg}</div>
       </div>
-      <div class="modal-actions">
+      <div class="modal-actions modal-footer">
         ${state.dirty
           ? html`<span class="modal-warn" role=${state.cancelArmed ? "alert" : "status"}>${state.cancelArmed
               ? "You have unsaved changes. Press again to discard them."

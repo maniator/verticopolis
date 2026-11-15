@@ -30,7 +30,7 @@ export function savesTemplate(slots: SlotInfo[], keptUnreadable = false, guard: 
       </div>
       ${guard.undo ? undoNote(guard.undo) : nothing}
       ${keptUnreadable ? keptUnreadableNote : nothing}
-      <div class="modal-actions">
+      <div class="modal-actions modal-footer">
         <button class="btn primary" data-act="close">Close</button>
       </div>`;
 }
@@ -95,7 +95,7 @@ export function replaceSlotTemplate(
       <div class="slots well"><div class="slot"><div class="slot-head">${slotDetail(target)}</div></div></div>
       <p>Saving here replaces it with <b>${liveName}</b>, the tower you're playing now.${sameName ? " They have the same name, so check the date and population." : ""}
         To keep both, save to an empty slot or use Save As.</p>
-      <div class="modal-actions"><button class="btn primary" data-act="no" @click=${actions.onCancel}>Cancel</button><button class="btn danger" data-act="yes" @click=${actions.onReplace}>Replace</button></div>`;
+      <div class="modal-actions modal-footer"><button class="btn primary" data-act="no" @click=${actions.onCancel}>Cancel</button><button class="btn danger" data-act="yes" @click=${actions.onReplace}>Replace</button></div>`;
 }
 
 /** An autosave this version couldn't read is kept aside (SaveGame.preserveUnreadable).

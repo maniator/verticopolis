@@ -51,7 +51,7 @@ export const DIALOG_PIN_SHOTS: Shot[] = [
       await page.waitForSelector("#modal .help-diagnostics", { timeout: 4000 });
       await page.evaluate(() => {
         const box = document.querySelector("#modal .modal-box") as HTMLElement | null;
-        const strip = document.querySelector("#modal .modal-box > .modal-actions") as HTMLElement | null;
+        const strip = document.querySelector("#modal .modal-box > .modal-footer") as HTMLElement | null;
         if (!box || !strip) throw new Error("the Help dialog did not mount");
         box.scrollTop = Math.floor((box.scrollHeight - box.clientHeight) / 2);
         // Same floor as the schedule shots: enough content must remain below
@@ -74,7 +74,7 @@ export const DIALOG_PIN_SHOTS: Shot[] = [
       await page.waitForSelector("#modal #vol-music", { timeout: 4000 });
       await page.evaluate(() => {
         const box = document.querySelector("#modal .modal-box") as HTMLElement | null;
-        const strip = document.querySelector("#modal .modal-box > .modal-actions") as HTMLElement | null;
+        const strip = document.querySelector("#modal .modal-box > .modal-footer") as HTMLElement | null;
         if (!box || !strip) throw new Error("the Settings dialog did not mount");
         // The premise of this shot: the action row is the box's last child
         // (the build line sits above it), so the full downward cover applies

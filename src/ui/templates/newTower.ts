@@ -82,7 +82,7 @@ export function newTowerTemplate(hasSave: boolean): TemplateResult {
          ${compareTemplate()}
        </details>
        ${abandon}
-       <div class="modal-actions">
+       <div class="modal-actions modal-footer">
          <button class="btn" data-act="cancel">Cancel</button>
          <button class="btn primary" data-act="found">Found Tower</button>
        </div>`;

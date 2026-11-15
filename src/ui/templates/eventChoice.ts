@@ -34,7 +34,7 @@ export function eventChoiceTemplate(
   return html`
       <h2>${iconTemplate("warning", { size: 16 })}Emergency</h2>
       <p>${messageWithIcons(message)}</p>
-      <div class="modal-actions">
+      <div class="modal-actions modal-footer">
         <button class="btn primary" data-act="accept" @click=${actions.onAccept}>Pay ${costLabel}</button>
         <button class="btn" data-act="decline" @click=${actions.onDecline}>Decline</button>
       </div>

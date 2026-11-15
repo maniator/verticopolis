@@ -18,5 +18,5 @@ export function congratsTemplate(topFloor: number, onClose: () => void): Templat
     <p>
       Your skyscraper has earned the legendary <b>TOWER</b>${cheers}
     </p>
-    <div class="modal-actions"><button class="btn primary" data-act="close" @click=${onClose}>Continue</button></div>`;
+    <div class="modal-actions modal-footer"><button class="btn primary" data-act="close" @click=${onClose}>Continue</button></div>`;
 }

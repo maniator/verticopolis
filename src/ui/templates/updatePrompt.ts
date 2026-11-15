@@ -119,7 +119,7 @@ export function updatePromptTemplate(
       ${notesBlock !== nothing && options.releaseNotesLink ? releaseNotesLink(info?.version) : nothing}
       ${engineLine}
       ${buildLine}
-      <div class="modal-actions">
+      <div class="modal-actions modal-footer">
         <button class="btn" data-act="later" autofocus @click=${actions.onLater}>Later</button>
         <button class="btn primary" data-act="update" @click=${actions.onUpdate}>Update now</button>
       </div>

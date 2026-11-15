@@ -70,7 +70,7 @@ export function screenSaverTemplate(p: SaverPrefs, h: SaverDialogHandlers): Temp
       </label>
     </fieldset>
     <p class="saver-note">Any key, click or tap, or moving the mouse, brings your tower back, and that input never builds anything.</p>
-    <div class="modal-actions">
+    <div class="modal-actions modal-footer">
       <button class="btn primary" data-saver="ok" @click=${h.onOk}>OK</button>
       <button class="btn" data-saver="cancel" @click=${h.onCancel}>Cancel</button>
     </div>

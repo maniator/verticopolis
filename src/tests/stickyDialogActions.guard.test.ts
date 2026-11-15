@@ -37,10 +37,10 @@ function block(selector: string): string {
 /** `.win`'s inset bevel occupies this many pixels inside the padding box. */
 const BEVEL_PX = 2;
 
-const STRIP_SELECTOR =
-  ".modal-box > .modal-actions:last-child,\n.modal-box > .modal-actions:nth-last-child(2)";
-/** The downward cover, which only a true last child is allowed to paint. */
-const DOWN_SELECTOR = ".modal-box > .modal-actions:last-child";
+/** A footer is the row its template marks `modal-footer` (#671). */
+const STRIP_SELECTOR = ".modal-box > .modal-footer";
+/** The downward cover, which only a footer that is the last child may paint. */
+const DOWN_SELECTOR = ".modal-box > .modal-footer:last-child";
 /** The crash card is a bare `<dialog>`, not a `.modal-box`, so it pins its own
  *  footer (#668). Its action row is always the card's last child. */
 const CRASH_STRIP_SELECTOR = ".crash-card > .modal-actions";
@@ -80,16 +80,16 @@ describe("pinned dialog action strip", () => {
   it("targets the dialog FOOTER only, never a mid-body action row", () => {
     // Tower Statistics renders a .modal-actions mid-body for the exterminator;
     // pinning that would park a button on an opaque band over the sections the
-    // player is scrolling past. Settings renders its version line AFTER the
-    // actions, so :last-child alone would skip the dialog most likely to
-    // scroll on a phone. Both arms are required.
+    // player is scrolling past, so the rule pins the row a template marks
+    // as the footer, never a row by its position (#671).
     //
     // Read off the stylesheet rather than off the selector this test looked
     // the rule up by, which would only restate itself: EVERY sticky rule that
-    // mentions .modal-actions has to be one of the two named footers, so a
+    // mentions .modal-actions or .modal-footer has to be one of the two named
+    // footers, so a
     // later `.modal-actions { position: sticky }` or a descendant-combinator
     // variant fails here.
-    const pinned = stickyRules.filter(([sel]) => sel.includes(".modal-actions"));
+    const pinned = stickyRules.filter(([sel]) => sel.includes(".modal-actions") || sel.includes(".modal-footer"));
     expect(pinned.map(([sel]) => sel)).toEqual([STRIP_SELECTOR, CRASH_STRIP_SELECTOR]);
   });
 
@@ -201,7 +201,7 @@ describe("pinned dialog action strip", () => {
   });
 
   it("styles the unsaved-changes warning as the strip's leading text", () => {
-    const warn = block(".modal-warn");
+    const warn = block(".modal-footer > .modal-warn");
     expect(warn).toMatch(/margin-right:\s*auto/);
     // align-self, NOT align-items: the latter would re-align every other
     // dialog's buttons, so the block that must stay clear of it is the SHARED

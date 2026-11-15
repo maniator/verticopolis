@@ -66,7 +66,7 @@ async function openScheduleDialog(page: import("playwright").Page, kind: string,
       // and holds the dialog open.
       document.getElementById("modal")?.dispatchEvent(new Event("cancel", { cancelable: true }));
       const warn = box.querySelector(".modal-warn") as HTMLElement | null;
-      const strip = box.querySelector(":scope > .modal-actions") as HTMLElement | null;
+      const strip = box.querySelector(":scope > .modal-footer") as HTMLElement | null;
       if (!warn || !strip) throw new Error("the unsaved-changes warning did not mount");
       // The warning shows whenever the copy is dirty; the Esc is what this
       // shot is about, so check the guard actually armed: the warning turns
@@ -166,6 +166,32 @@ export const SCHEDULE_SCENES: Scene[] = [
         },
         wait: 300,
       },
+      {
+        // The same armed warning at phone width, where the strip has the
+        // least room (#672). The warning wraps beside OK and Discard rather
+        // than taking lines of its own above them.
+        name: "27d-elevator-schedule-unsaved-phone",
+        crop: "#modal .modal-box",
+        keepDialogs: true,
+        viewport: PHONE,
+        // A per-shot viewport resize is draw-coupled; draw every settle frame.
+        drawSettle: true,
+        phaseWatch: true,
+        setup: async (page) => {
+          await openScheduleDialog(page, "elevatorStandard", true);
+          await page.evaluate(() => {
+            const strip = document.querySelector("#modal .modal-box > .modal-footer") as HTMLElement | null;
+            const close = strip?.querySelector('[data-act="close"]') as HTMLElement | null;
+            const warn = strip?.querySelector(".modal-warn") as HTMLElement | null;
+            if (!strip || !close || !warn) throw new Error("the armed strip did not mount");
+            // One row: the warning and the buttons share a line.
+            if (Math.abs(warn.getBoundingClientRect().top - close.getBoundingClientRect().top) > close.offsetHeight) {
+              throw new Error("the warning took a row of its own above the buttons");
+            }
+          });
+        },
+        wait: 300,
+      },
     ],
   },
   {
@@ -261,7 +287,7 @@ export const SCHEDULE_SCENES: Scene[] = [
           await openScheduleDialog(page, "elevatorStandard");
           await page.evaluate(() => {
             const box = document.querySelector("#modal .modal-box") as HTMLElement | null;
-            const strip = document.querySelector("#modal .modal-box > .modal-actions") as HTMLElement | null;
+            const strip = document.querySelector("#modal .modal-box > .modal-footer") as HTMLElement | null;
             if (!box || !strip) throw new Error("the schedule dialog did not mount");
             // Text-bearing leaves only. Containers span the whole dialog and
             // would report an intrusion at every offset, which would make the
