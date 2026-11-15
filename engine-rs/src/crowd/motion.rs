@@ -6,7 +6,7 @@ use super::landing::{landing_slots, Landings};
 use super::spawn::{inside_x, metro_station_for_platform, pick_x, pick_x_in_segment};
 use super::staff_shift;
 use super::visits::{begin_dwell, leave_venue};
-use super::walk::{find_another_way, walk_to, way_is_cut};
+use super::walk::{find_another_way, reach_on_run, walk_to, way_is_cut};
 use super::{
     Crowd, PState, Person, StaffResult, GIVE_UP, RIDE_SECONDS_PER_FLOOR, STAFF_GIVE_UP, STRESS_WAIT,
 };
@@ -92,13 +92,18 @@ fn step(crowd: &mut Crowd, i: usize, dt: f64, tower: &mut Tower, landings: &mut 
             let (shaft_id, is_elevator) = (shaft.id, shaft.kind.is_elevator());
             // An elevator rider walks straight to the back of the line, and a
             // climber to the middle of the stairs or the escalator (#2116).
-            let target_x = if is_elevator {
+            let mut target_x = if is_elevator {
                 landings.back_of_line(tower, shaft, p.floor)
             } else {
                 shaft.x as f64 + shaft.width as f64 / 2.0
             };
             if way_is_cut(p, target_x, tower) {
-                return find_another_way(crowd, i, tower);
+                // A shaft or flight wide enough to stand over the gap is
+                // reached from this side of it, the way the route reached it.
+                match reach_on_run(p, shaft.x, shaft.width, target_x, tower) {
+                    Some(x) => target_x = x,
+                    None => return find_another_way(crowd, i, tower),
+                }
             }
             let p = &mut crowd.people[i];
             if walk_to(p, target_x, dt, tower) {
