@@ -188,8 +188,8 @@ describe("the linked folder's list", () => {
     await settle();
     expect(ctx.save).not.toHaveBeenCalled();
     expect(linked.save).not.toHaveBeenCalled();
-    expect(box!.textContent).toContain("Sky");
-    button("Yes").click();
+    expect(box!.textContent).toContain(`Save this tower as "Sky (2)", or replace it?`);
+    button("Replace").click();
     await settle();
     expect(linked.save).toHaveBeenCalledExactlyOnceWith("Sky", true);
   });

@@ -220,12 +220,16 @@ describe("saving", () => {
     expect(folder.writes, "the replace keeps the file's own name").toEqual([{ name: "Sky.vctower", bytes: new Uint8Array([2]) }]);
   });
 
-  it("never replaces a file another program wrote since the list was read", async () => {
+  it("never replaces a file another program wrote since the list was read, and numbers the save instead", async () => {
     const folder = fakeFolder("Towers", {});
     await link(folder);
     folder.disk.set("Sky.vctower", { bytes: new Uint8Array([5]), modified: 1 });
-    await expect(linkedFolder.save("Sky", new Uint8Array([2]), false)).rejects.toBeInstanceOf(FileNameTakenError);
+    folder.disk.set("Sky (2).vctower", { bytes: new Uint8Array([6]), modified: 1 });
+    const entry = await linkedFolder.save("Sky", new Uint8Array([2]), false);
+    expect(entry.name).toBe("Sky (3)");
     expect(folder.disk.get("Sky.vctower")!.bytes).toEqual(new Uint8Array([5]));
+    expect(folder.disk.get("Sky (2).vctower")!.bytes).toEqual(new Uint8Array([6]));
+    expect(folder.writes).toEqual([{ name: "Sky (3).vctower", bytes: new Uint8Array([2]) }]);
   });
 
   it("saves beside a 1994 file of the same name without touching it", async () => {

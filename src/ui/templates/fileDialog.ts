@@ -32,7 +32,14 @@ export interface FileRow {
 export interface FileAsk {
   readonly kind: "replace" | "delete";
   readonly name: string;
+  /** For a replace: the next free numbered name ("Sky (2)"), offered
+   *  instead of replacing, the way Windows does. */
+  readonly alt?: string;
 }
+
+/** A message box's answer: Yes (replace, delete), No (cancel), or the
+ *  numbered name instead. */
+export type FileAnswer = "yes" | "no" | "alt";
 
 export interface FileDialogView {
   readonly mode: FileDialogMode;
@@ -79,7 +86,7 @@ export interface FileDialogHandlers {
   paste(): void;
   duplicate(): void;
   remove(): void;
-  answer(yes: boolean): void;
+  answer(choice: FileAnswer): void;
   openMenu(id: string, x: number, y: number): void;
   closeMenu(): void;
   listKey(e: KeyboardEvent): void;
@@ -282,8 +289,10 @@ function tools(opening: boolean, fileSelected: boolean, v: FileDialogView, h: Fi
 function askBox(ask: FileAsk, h: FileDialogHandlers): TemplateResult {
   const replacing = ask.kind === "replace";
   const [title, line1, line2] = replacing
-    ? ["Save As", `"${ask.name}" already exists.`, "Do you want to replace it?"]
+    ? ["Save As", `"${ask.name}" already exists.`, ask.alt ? `Save this tower as "${ask.alt}", or replace it?` : "Do you want to replace it?"]
     : ["Confirm File Delete", `Are you sure you want to delete "${ask.name}"?`, "It can't be undone."];
+  const button = (choice: FileAnswer, label: string) =>
+    html`<button type="button" class="btn" data-fd-ask=${choice} @click=${() => h.answer(choice)}>${label}</button>`;
   return html`<div class="fd-ask-layer" @click=${(e: Event) => e.stopPropagation()}>
     <div class="win fd-ask" role="alertdialog" aria-modal="true" aria-labelledby="fd-ask-title" aria-describedby="fd-ask-text">
       <div class="win-title" id="fd-ask-title">${title}</div>
@@ -292,8 +301,9 @@ function askBox(ask: FileAsk, h: FileDialogHandlers): TemplateResult {
         <p id="fd-ask-text">${line1}<br />${line2}</p>
       </div>
       <div class="fd-ask-buttons">
-        <button type="button" class="btn" data-fd-ask="yes" @click=${() => h.answer(true)}>Yes</button>
-        <button type="button" class="btn" data-fd-ask="no" @click=${() => h.answer(false)}>No</button>
+        ${replacing && ask.alt
+          ? html`${button("alt", `Save as "${ask.alt}"`)}${button("yes", "Replace")}${button("no", "Cancel")}`
+          : html`${button("yes", "Yes")}${button("no", "No")}`}
       </div>
     </div>
   </div>`;

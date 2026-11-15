@@ -142,7 +142,7 @@ player's own text and is never sent, and neither is a tower's contents.
 | `file_rename` | none | A file renamed |
 | `file_copy` | none | A file duplicated (Duplicate, or Copy then Paste) |
 | `file_delete` | none | A file deleted |
-| `file_ask` | `replace` or `delete` | The window asked in its message box before replacing or deleting a file. A Yes goes on to `file_save` `replace` or `file_delete`, so the asks a player declined are the asks less those |
+| `file_ask` | `replace` or `delete` | The window asked in its message box before replacing or deleting a file. A Yes (Replace) goes on to `file_save` `replace` or `file_delete`; from 4.4 the replace box also offers the next numbered name ("Sky (2)"), which goes on to `file_save` `new`. So the asks a player declined are the asks less all three |
 | `file_failed` | `full` or `error` | A write to My Towers refused: the device is out of room, or another error |
 | `files_copied` | a count | Once per device: the old save slots copied into My Towers, and how many |
 

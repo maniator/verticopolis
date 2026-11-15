@@ -1,12 +1,13 @@
 import { render } from "lit-html";
 import { html } from "lit-html";
 import type { UI } from "./UI";
-import { cleanFileName, type TowerFileEntry } from "../storage/fileSpace";
+import { cleanFileName, freeName, type TowerFileEntry } from "../storage/fileSpace";
 import type { FilePlace } from "./templates/fileDialogPlaces";
 import { lastPlace, pickFolderFiles, placeHandlers, rememberPlace, whereWords, type LinkedPlaceCtx } from "./fileDialogPlaces";
 import {
   fileDialogTemplate,
   rowDomId,
+  type FileAnswer,
   type FileAsk,
   type FileDialogMode,
   type FileDialogView,
@@ -238,8 +239,9 @@ export function showFileDialog(ui: Pick<UI, "openModalTemplate" | "closeModal">,
     }
     // Saving writes a .vctower, so in the linked folder only another
     // .vctower of that name is replaced; a .TDT beside it stays.
-    const taken = placeFiles().some((f) => (!inLinked() || f.kind === "tower") && f.name.toLocaleLowerCase() === name.toLocaleLowerCase());
-    if (taken) ask({ kind: "replace", name });
+    const towers = placeFiles().filter((f) => !inLinked() || f.kind === "tower");
+    const taken = towers.some((f) => f.name.toLocaleLowerCase() === name.toLocaleLowerCase());
+    if (taken) ask({ kind: "replace", name, alt: freeName(name, towers) });
     else void save(name, false);
   }
 
@@ -248,22 +250,23 @@ export function showFileDialog(ui: Pick<UI, "openModalTemplate" | "closeModal">,
     if (note === null && box.isConnected) ui.closeModal();
   }
 
-  /** Put a question in its message box, with the focus on No: both
-   *  questions guard a step that can't be taken back. */
+  /** Put a question in its message box, with the focus on the numbered
+   *  name where there is one, else on No: both questions guard a step that
+   *  can't be taken back. */
   function ask(question: FileAsk): void {
     set({ ask: question, menu: null });
-    host.querySelector<HTMLElement>('[data-fd-ask="no"]')?.focus();
+    host.querySelector<HTMLElement>(question.alt ? '[data-fd-ask="alt"]' : '[data-fd-ask="no"]')?.focus();
     ctx.asked?.(question.kind);
   }
 
-  function answer(yes: boolean): void {
+  function answer(choice: FileAnswer): void {
     const asked = state.ask;
     set({ ask: null });
-    if (!yes || !asked) {
+    if (choice === "no" || !asked) {
       focusAfterAsk(asked);
       return;
     }
-    if (asked.kind === "replace") void save(asked.name, true);
+    if (asked.kind === "replace") void (choice === "alt" && asked.alt ? save(asked.alt, false) : save(asked.name, true));
     else {
       const target = fileOf(state.selected);
       if (target) void run(() => ctx.remove(target.id));
@@ -436,8 +439,9 @@ export function showFileDialog(ui: Pick<UI, "openModalTemplate" | "closeModal">,
   box.addEventListener("keydown", (e) => {
     if (e.key === "Tab" && state.ask) {
       e.preventDefault();
-      const [yes, no] = [...host.querySelectorAll<HTMLElement>(".fd-ask .btn")];
-      (document.activeElement === yes ? no : yes)?.focus();
+      const buttons = [...host.querySelectorAll<HTMLElement>(".fd-ask .btn")];
+      const at = buttons.indexOf(document.activeElement as HTMLElement);
+      buttons[(at + (e.shiftKey ? buttons.length - 1 : 1)) % buttons.length]?.focus();
       return;
     }
     if (e.key !== "Escape" || !(state.menu || state.ask || state.look)) return;

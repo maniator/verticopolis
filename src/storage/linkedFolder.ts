@@ -1,4 +1,4 @@
-import { cleanFileName, copyName, FileNameTakenError, type TowerFileEntry, type TowerFileKind } from "./fileSpace";
+import { cleanFileName, copyName, FileNameTakenError, freeName, type TowerFileEntry, type TowerFileKind } from "./fileSpace";
 
 /**
  * A folder on the player's own computer, linked to the Open and Save As
@@ -323,11 +323,17 @@ export const linkedFolder = {
     const towers = folder.entries.filter((e) => e.kind === "tower");
     const same = towers.find((e) => e.name === name) ?? towers.find((e) => e.name.toLocaleLowerCase() === clean.toLocaleLowerCase());
     if (same && !replace) throw new FileNameTakenError(clean);
-    const filename = same ? same.id : `${clean}.vctower`;
+    if (same) return writeFile(folder, same.id, bytes);
     // A file another program wrote since the list was read is never replaced
-    // without asking either.
-    if (!same && (await exists(folder, filename))) throw new FileNameTakenError(clean);
-    return writeFile(folder, filename, bytes);
+    // without asking either: the tower goes in as "name (2)" and up instead,
+    // the first such name free on disk.
+    const taken = [...towers];
+    let pick = clean;
+    while (await exists(folder, `${pick}.vctower`)) {
+      taken.push({ id: "", name: pick, kind: "tower", size: 0, modified: 0 });
+      pick = freeName(clean, taken);
+    }
+    return writeFile(folder, `${pick}.vctower`, bytes);
   },
 
   /** Write `bytes` over the file `id` itself, by its name on disk, for File >
