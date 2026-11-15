@@ -195,13 +195,13 @@
       {"minute":2019780.1071148822,"state":"a80eab41365ef240","crowd":"0a76d25e38c0b3c9","events":"4f53cda18c2baa0c","count":0},
       {"minute":2019842.1071148822,"state":"58e68bff6d9931b7","crowd":"6c92e7259ff46452","events":"4f53cda18c2baa0c","count":0},
       {"minute":2019901.1071148822,"state":"40a3122a7e181851","crowd":"302b2db38b237fbd","events":"4f53cda18c2baa0c","count":0},
-      {"minute":2019960.1071148822,"state":"efec8d5b303068c3","crowd":"efde76cfdd07ece6","events":"4f53cda18c2baa0c","count":0},
-      {"minute":2020023.1071148822,"state":"57dffe9fcd901939","crowd":"8d72189d37d604d9","events":"4f53cda18c2baa0c","count":0},
-      {"minute":2020083.1071148822,"state":"cc4c4f79bdb38738","crowd":"c390336fe24c6ef2","events":"4f53cda18c2baa0c","count":0},
-      {"minute":2020143.1071148822,"state":"d2514f5f587dacfc","crowd":"5e3cb3de8ceb18f6","events":"4f53cda18c2baa0c","count":0},
-      {"minute":2020202.1071148822,"state":"12589e2e52895df6","crowd":"2bc09c2e5f732fda","events":"4f53cda18c2baa0c","count":0},
-      {"minute":2020261.1071148822,"state":"b8f0f9ce47735fb0","crowd":"3547b3df58286319","events":"4f53cda18c2baa0c","count":0},
-      {"minute":2020280.1071148822,"state":"d7a1fc61122f3613","crowd":"f26acd59fcc75a9c","events":"4f53cda18c2baa0c","count":0}
+      {"minute":2019960.1071148822,"state":"7e86dd5c1944f4bd","crowd":"c81f57f491e799f5","events":"4f53cda18c2baa0c","count":0},
+      {"minute":2020023.1071148822,"state":"1a1dfcc2f8d06c68","crowd":"1d03333d3033231c","events":"4f53cda18c2baa0c","count":0},
+      {"minute":2020083.1071148822,"state":"2df1efca74fce849","crowd":"ab9c4683f5890b77","events":"4f53cda18c2baa0c","count":0},
+      {"minute":2020143.1071148822,"state":"828b04ddadac19ef","crowd":"a708df3b9a792a90","events":"4f53cda18c2baa0c","count":0},
+      {"minute":2020202.1071148822,"state":"2bf244835306779d","crowd":"da132f40538e9724","events":"4f53cda18c2baa0c","count":0},
+      {"minute":2020261.1071148822,"state":"4f9338ba061c4f3e","crowd":"8b1025873e81ddaf","events":"4f53cda18c2baa0c","count":0},
+      {"minute":2020280.1071148822,"state":"c94c8ed2bef6b30a","crowd":"a6faf4f09b38ebc0","events":"4f53cda18c2baa0c","count":0}
     ],
     "split-tower-4 at speed 2": [
       {"minute":2018840.1071148822,"state":"0bb50933f20140e4","crowd":"de04d7e36650c504","events":"4f53cda18c2baa0c","count":0},
@@ -224,13 +224,13 @@
       {"minute":2019780.1071148822,"state":"a80eab41365ef240","crowd":"0a76d25e38c0b3c9","events":"4f53cda18c2baa0c","count":0},
       {"minute":2019840.1071148822,"state":"10e9cdaae938ca02","crowd":"a42a6a6b4b8b7df7","events":"4f53cda18c2baa0c","count":0},
       {"minute":2019900.1071148822,"state":"7b16cb80ea767b7a","crowd":"138c7c0d2411f28e","events":"4f53cda18c2baa0c","count":0},
-      {"minute":2019960.1071148822,"state":"efec8d5b303068c3","crowd":"efde76cfdd07ece6","events":"4f53cda18c2baa0c","count":0},
-      {"minute":2020021.1071148822,"state":"eaf66c30971ea8d3","crowd":"e1461733ab6bdafe","events":"4f53cda18c2baa0c","count":0},
-      {"minute":2020081.1071148822,"state":"3a66f4f9ba0b2e02","crowd":"3019402c14402e16","events":"4f53cda18c2baa0c","count":0},
-      {"minute":2020141.1071148822,"state":"bca536559b22b1b5","crowd":"9a7ac3535dab2302","events":"4f53cda18c2baa0c","count":0},
-      {"minute":2020201.1071148822,"state":"b9ab09f058188f94","crowd":"cf53a5069a715446","events":"4f53cda18c2baa0c","count":0},
-      {"minute":2020261.1071148822,"state":"b8f0f9ce47735fb0","crowd":"3547b3df58286319","events":"4f53cda18c2baa0c","count":0},
-      {"minute":2020281.1071148822,"state":"d315cfd177bd5a4b","crowd":"9e48812b3b978baa","events":"4f53cda18c2baa0c","count":0}
+      {"minute":2019960.1071148822,"state":"7e86dd5c1944f4bd","crowd":"c81f57f491e799f5","events":"4f53cda18c2baa0c","count":0},
+      {"minute":2020021.1071148822,"state":"8c8bd0f3933df869","crowd":"abf71770d058c25f","events":"4f53cda18c2baa0c","count":0},
+      {"minute":2020081.1071148822,"state":"0a08ba382466de9d","crowd":"476285ecd482d357","events":"4f53cda18c2baa0c","count":0},
+      {"minute":2020141.1071148822,"state":"8142d026c9a0c96b","crowd":"41315407a4aa8a7f","events":"4f53cda18c2baa0c","count":0},
+      {"minute":2020201.1071148822,"state":"5aa2a231df94106c","crowd":"95150bf8144ca2ba","events":"4f53cda18c2baa0c","count":0},
+      {"minute":2020261.1071148822,"state":"4f9338ba061c4f3e","crowd":"8b1025873e81ddaf","events":"4f53cda18c2baa0c","count":0},
+      {"minute":2020281.1071148822,"state":"69e501762e9d52e6","crowd":"c56573c10f84b747","events":"4f53cda18c2baa0c","count":0}
     ],
     "split-tower-4 at speed 3": [
       {"minute":2018840.1071148822,"state":"0bb50933f20140e4","crowd":"de04d7e36650c504","events":"4f53cda18c2baa0c","count":0},
@@ -253,13 +253,13 @@
       {"minute":2019786.1071148822,"state":"18177731b0bc5e73","crowd":"adfcdabdeeab9d41","events":"4f53cda18c2baa0c","count":0},
       {"minute":2019846.1071148822,"state":"63e546e4bfc94820","crowd":"87fb1387bc9540ba","events":"4f53cda18c2baa0c","count":0},
       {"minute":2019903.1071148822,"state":"2cecc68bd45e4630","crowd":"1d96516d549871f5","events":"4f53cda18c2baa0c","count":0},
-      {"minute":2019963.1071148822,"state":"1b1e0021b288406d","crowd":"2f1776294f562745","events":"4f53cda18c2baa0c","count":0},
-      {"minute":2020026.1071148822,"state":"8802c7c8fcf5bfb2","crowd":"07c4c9aabe7c4ec7","events":"4f53cda18c2baa0c","count":0},
-      {"minute":2020082.1071148822,"state":"bfad3ca109825781","crowd":"36d3d8622402e58b","events":"4f53cda18c2baa0c","count":0},
-      {"minute":2020144.1071148822,"state":"83e590499f7c0058","crowd":"80d368a3ae7375d2","events":"4f53cda18c2baa0c","count":0},
-      {"minute":2020200.1071148822,"state":"a989d3811a3cb443","crowd":"0c47a954ade3b7f6","events":"4f53cda18c2baa0c","count":0},
-      {"minute":2020260.1071148822,"state":"8965212cfc7a7b3e","crowd":"5bf08988677e533c","events":"4f53cda18c2baa0c","count":0},
-      {"minute":2020280.1071148822,"state":"cfc61783189609e7","crowd":"b227f6471b571156","events":"4f53cda18c2baa0c","count":0}
+      {"minute":2019963.1071148822,"state":"8ecc0ebfdcd248b1","crowd":"e231dd973d392d3e","events":"4f53cda18c2baa0c","count":0},
+      {"minute":2020026.1071148822,"state":"de56a2576d21bf90","crowd":"431802b6d21a7163","events":"4f53cda18c2baa0c","count":0},
+      {"minute":2020082.1071148822,"state":"5bd26ae6250a5212","crowd":"c0139a482e9d3005","events":"4f53cda18c2baa0c","count":0},
+      {"minute":2020144.1071148822,"state":"50bf46a14dbf19a8","crowd":"b83051ffde4d454a","events":"4f53cda18c2baa0c","count":0},
+      {"minute":2020200.1071148822,"state":"41c1ec40361fca8d","crowd":"0f0e420e41bcb1e7","events":"4f53cda18c2baa0c","count":0},
+      {"minute":2020260.1071148822,"state":"07c48f8e2964981a","crowd":"15728285c398d1d5","events":"4f53cda18c2baa0c","count":0},
+      {"minute":2020280.1071148822,"state":"c15d06285e31a633","crowd":"53b6cd720beb46b5","events":"4f53cda18c2baa0c","count":0}
     ],
     "split-tower at speed 1": [
       {"minute":377558.77102088183,"state":"d807828cbca95e92","crowd":"61c90625539f02a9","events":"4f53cda18c2baa0c","count":0},

@@ -184,3 +184,65 @@ fn a_landing_line_follows_the_floor_built_beside_it() {
         "kept equals measured"
     );
 }
+
+/// A line that fills the built floor beside the shaft sets its back place
+/// past the floor's last tile. A rider bound there walks to the end of the
+/// floor at walking speed, and so does everyone already in the line: nobody
+/// jumps along the floor to it (it once moved them up to 46 tiles in one
+/// step on a big tower).
+#[test]
+fn a_rider_bound_past_the_end_of_the_floor_walks_there() {
+    let mut sim = Simulation::new_game(5, GameMode::Classic);
+    sim.money = 1e12;
+    for x in 100..200 {
+        assert!(sim.tower.place(Kind::Lobby, 1, x).ok);
+    }
+    // Floors 2 to 4 are built from x 140 to 169 only.
+    for floor in 2..=4 {
+        for x in 140..170 {
+            assert!(sim.tower.place(Kind::Floor, floor, x).ok);
+        }
+    }
+    assert!(
+        sim.tower
+            .place_transport(Kind::ElevatorStandard, 150, 1, 4)
+            .ok
+    );
+    let shaft = sim.tower.transports.last().unwrap().id;
+    let face = right_face(&sim, shaft);
+    let end = 169.0;
+    // Twenty riders already wait, so the line is squeezed to the floor's
+    // end and its back place lies past the last tile.
+    for k in 0..20 {
+        let i = rider(&mut sim, shaft, face + 1.0);
+        let p = &mut sim.crowd.people[i];
+        p.state = PState::Waiting;
+        p.wait = 100.0 - k as f64;
+    }
+    let t = sim.tower.get_transport(shaft).unwrap().clone();
+    assert!(landing_slots(&sim.crowd, &sim.tower).back_of_line(&sim.tower, &t, 2) > end);
+    let new = rider(&mut sim, shaft, 141.0);
+    let new_id = sim.crowd.people[new].id;
+    let dt = 0.1;
+    let stride = crate::crowd::WALK_SPEED * dt + 1e-9;
+    let mut arrived = false;
+    for _ in 0..200 {
+        let before: Vec<(i64, f64)> = sim.crowd.people.iter().map(|p| (p.id, p.x)).collect();
+        advance(&mut sim.crowd, dt, &mut sim.tower);
+        for (id, x) in before {
+            let p = sim.crowd.people.iter().find(|p| p.id == id).unwrap();
+            assert!(
+                p.state == PState::Riding || (p.x - x).abs() <= stride,
+                "person {id} moved from {x} to {} in one step",
+                p.x
+            );
+        }
+        let p = sim.crowd.people.iter().find(|p| p.id == new_id).unwrap();
+        if p.state == PState::Waiting {
+            arrived = true;
+            assert!(p.x <= end, "stands on the floor, at {}", p.x);
+            break;
+        }
+    }
+    assert!(arrived, "the rider reached the back of the line");
+}
