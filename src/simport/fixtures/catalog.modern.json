@@ -2444,6 +2444,7 @@
     "buildsWhilePaused": true,
     "decorativePassersBy": true,
     "exportsTo1994": false,
+    "expressStopsOn15thFloors": false,
     "fedUpWait": 25,
     "maxLobbyHeight": 3,
     "previewNamesRefusal": true,
@@ -2454,7 +2455,7 @@
     "variantHouseholds": true,
     "venueFlights": true
   },
-  "version": 20,
+  "version": 21,
   "world": {
     "groundFloor": 1,
     "groundFloorStructure": "lobby",

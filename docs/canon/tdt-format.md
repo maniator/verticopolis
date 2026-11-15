@@ -388,10 +388,20 @@ how the file is read:
   such a tower, so a file with them is malformed: the importer keeps the first and
   drops the later one with a warning, and the export warns about any it writes.
 
-Our loader does not yet keep those basement stops on a Classic tower loaded from a
-`.TDT`: it re-asserts a lobby-only express rule and drops them (#1532, with the
-consequence for parking reachability in
-[classic-parking-audit.md](./classic-parking-audit.md)).
+The stops themselves follow the original's rule, measured on SimTower 1.0 in the
+parity run of 2026-11-15 (#1527): an express is placed on the ground floor or a
+15th floor, its ends can be dragged anywhere, and it stops at the ground floor,
+every 15th floor (lobby or not) and every basement. An end that is not on one of
+those floors is not a stop, and its serviced byte is 0. Each allowed stop can be
+switched off in the game's Elevator window and the file records it; no other
+floor can be switched on. The game keeps whatever stops a file gives an express.
+
+The importer keeps the file's serviced bytes on every express floor, its ends
+included, and marks the shaft (`preserveBasementStops`, `classicExpressStops`) so
+every load path keeps them. The exporter writes a serviced byte of 0 for an
+express end the shaft does not stop at, and 1 for the ends of any other shaft.
+Before #1527 the loader kept a lobby-only rule above ground and the importer
+forced both ends of an express to stop.
 
 Canon car capacities (not read from the file): express 42, standard 21, service 17 (the Windows Help file). The exporter still writes 10 in a service shaft's header byte, because that byte is unreliable (one PC save showed 21) and the referee pins the bytes.
 Limits: 24 shafts, 8 cars, spans in `engine-rs/src/facilities.rs` (`POOLED_CAPS`, `Kind::max_cars`, `Kind::max_span`).

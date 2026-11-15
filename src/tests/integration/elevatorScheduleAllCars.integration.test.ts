@@ -17,7 +17,7 @@ const press = (sel: string): void => dialog().querySelector<HTMLButtonElement>(s
 
 const stops = () => ({
   read: () =>
-    [4, 3, 2, 1].map((floor) => ({ floor, served: true, lobby: floor === 1, endpoint: floor === 1 || floor === 4 })),
+    [4, 3, 2, 1].map((floor) => ({ floor, served: true, lobby: floor === 1, endpoint: floor === 1 || floor === 4, toggles: floor !== 1 && floor !== 4 })),
   setServe: vi.fn(async () => {}),
   expressStops: vi.fn(async () => {}),
   allStops: vi.fn(async () => {}),

@@ -371,8 +371,10 @@ fn the_bottom_basement_row_takes_only_the_metro_and_its_tunnel() {
 #[test]
 fn express_extension_reclassifies_former_endpoints_without_waiting_for_reload() {
     // Reproduce the repeated two-floor drag that left fake stops in a player's
-    // 1..60 express after its top passed floor 45 (#1572).
+    // 1..60 express after its top passed floor 45 (#1572). Modern: its ends
+    // always stop, and its other stops follow the lobbies.
     let mut tower = Tower::new();
+    tower.mode = crate::clock::GameMode::Modern;
     let lobby_width = Kind::Lobby.facility().width;
     for x in (0..24 - lobby_width + 1).step_by(lobby_width as usize) {
         must(tower.place(Kind::Lobby, 1, x));
@@ -420,7 +422,9 @@ fn express_extension_reclassifies_former_endpoints_without_waiting_for_reload() 
         assert!(!shaft.stops_at(15));
     }
 
-    let loaded = crate::load::deserialize(&game(tower).serialize())
+    let mut modern = game(tower);
+    modern.mode = crate::clock::GameMode::Modern;
+    let loaded = crate::load::deserialize(&modern.serialize())
         .expect("valid in-memory stops should persist unchanged");
     assert_eq!(
         loaded

@@ -144,7 +144,7 @@ export class Cards {
     const s = this.stopAt;
     const width = this.layout.records.stopRow.length;
     for (let n = 0; n < r[at.stops]; n++, i += width) {
-      stops.push({ floor: r[i + s.floor], served: r[i + s.served] === 1, lobby: r[i + s.lobby] === 1, endpoint: r[i + s.endpoint] === 1 });
+      stops.push({ floor: r[i + s.floor], served: r[i + s.served] === 1, lobby: r[i + s.lobby] === 1, endpoint: r[i + s.endpoint] === 1, toggles: r[i + s.toggles] === 1 });
     }
     let origins: OriginsView | null = null;
     if (r[at.origins] === 1) {

@@ -23,7 +23,7 @@ const byLabel = (sel: string, label: string): HTMLButtonElement =>
   Array.from(dialog().querySelectorAll<HTMLButtonElement>(sel)).find((b) => b.textContent === label)!;
 
 const stops = () => ({
-  read: () => [4, 3, 2, 1].map((floor) => ({ floor, served: true, lobby: floor === 1, endpoint: floor === 1 || floor === 4 })),
+  read: () => [4, 3, 2, 1].map((floor) => ({ floor, served: true, lobby: floor === 1, endpoint: floor === 1 || floor === 4, toggles: floor !== 1 && floor !== 4 })),
   setServe: vi.fn(async () => {}),
   expressStops: vi.fn(async () => {}),
   allStops: vi.fn(async () => {}),

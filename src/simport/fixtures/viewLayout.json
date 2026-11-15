@@ -1,5 +1,5 @@
 {
-  "version": 26,
+  "version": 27,
   "header": {
     "minutes": 0,
     "towerRevision": 1,
@@ -518,7 +518,8 @@
       "floor",
       "served",
       "lobby",
-      "endpoint"
+      "endpoint",
+      "toggles"
     ],
     "roomTier": [
       "id",

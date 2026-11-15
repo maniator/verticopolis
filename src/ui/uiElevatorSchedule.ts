@@ -40,6 +40,8 @@ export interface ScheduleDialogCtx {
   title: string;
   ux: ElevatorScheduleUX;
   isExpress: boolean;
+  /** See {@link SchedCtx.classicExpress}. */
+  classicExpress?: boolean;
   cars: number;
   bottom: number;
   top: number;
@@ -168,6 +170,7 @@ export function showElevatorScheduleDialog(
     title: ctx.title,
     ux: ctx.ux,
     isExpress: ctx.isExpress,
+    classicExpress: ctx.classicExpress,
     cars: ctx.cars,
     hasMeasured: dayWarmed(),
     hourly: dayCurve(),

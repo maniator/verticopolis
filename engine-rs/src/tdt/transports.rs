@@ -53,10 +53,11 @@ impl OutTransport {
         if let Some(s) = &self.skip_floors {
             m.insert("skipFloors".into(), json!(s));
         }
-        // The file's basement skips on an express are its own: the marker
-        // tells every loader (`fromSave` included) to keep them.
+        // The file's skips on an express are its own (the original keeps the
+        // stops a file gives it): the markers tell every loader to keep them.
         if self.kind == Kind::ElevatorExpress {
             m.insert("preserveBasementStops".into(), json!(true));
+            m.insert("classicExpressStops".into(), json!(true));
         }
         Value::Object(m)
     }
@@ -160,6 +161,16 @@ pub fn transports_from_decoded(
             }
         }
         stops.push(top);
+        // The original's express does not stop at an end it may not stop at
+        // (one off the ground floor or a 15th floor), and its file says so.
+        if kind == Kind::ElevatorExpress {
+            for end in [bottom, top] {
+                if e.serviced[(end + TDT_FLOOR_OFFSET) as usize] == 0 {
+                    skip_floors.push(end);
+                }
+            }
+            skip_floors.sort_unstable();
+        }
         // Each car starts on its waiting floor and returns there when idle.
         // A home the shaft does not stop at snaps to the nearest stop (the
         // lower one on a tie), as an authored home does on a stop edit.

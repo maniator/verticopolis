@@ -32,15 +32,20 @@ export interface FloorRow {
   floor: number;
   served: boolean;
   lobby: boolean;
-  /** A span endpoint: always a stop (the shaft cannot disconnect from itself),
-   *  so the grid renders a fixed mark there, never a toggle. */
+  /** A span endpoint. Most shafts always stop there (the shaft cannot
+   *  disconnect from itself); a Classic express follows its own rule. */
   endpoint?: boolean;
+  /** Whether the engine lets the player turn this stop on or off. */
+  toggles: boolean;
 }
 
 export interface SchedCtx {
   title: string;
   ux: ElevatorScheduleUX;
   isExpress: boolean;
+  /** A Classic express: it stops at the ground floor, every 15th floor and
+   *  every basement, and each of those stops can be turned off. */
+  classicExpress?: boolean;
   cars: number;
   /** Whether the CURRENT DAY TAB has a warmed measured curve (#466): drives the
    *  ghost legend and the advice fallback; the controller updates it on day switch. */
@@ -286,31 +291,34 @@ function steppersTemplate(state: SchedState, h: SchedHandlers): TemplateResult {
 
 /** The express caption: its fixed policy, naming the basements when the span
  *  reaches them (an express stops at every basement floor it passes), and
- *  offering the toggle only when a basement row has one (not an endpoint). */
-function expressCaption(floors: readonly FloorRow[]): string {
+ *  offering the toggle only when a basement row has one. A Classic express
+ *  states the original's rule instead. */
+function expressCaption(ctx: SchedCtx, floors: readonly FloorRow[]): string {
+  if (ctx.classicExpress) return "Stops at the ground floor, every 15th floor and every basement; any of those stops can be turned off";
   if (!floors.some((f) => isBasementFloor(f.floor))) return "Serves all lobbies and sky lobbies";
-  return floors.some((f) => isBasementFloor(f.floor) && !f.endpoint)
+  return floors.some((f) => isBasementFloor(f.floor) && f.toggles)
     ? "Stops at every lobby and basement floor; a basement stop can be turned off"
     : "Stops at every lobby and basement floor";
 }
 
-/** One row's Serve cell. Endpoints always stop; a standard or service shaft
- *  toggles every other floor; an express toggles a basement floor or a skipped
- *  lobby, shows the always-on check on a served lobby, and nothing on the
- *  floors it passes above ground. */
+/** One row's Serve cell. A floor the engine lets the player toggle gets a
+ *  checkbox. A fixed stop (a shaft end, or a Modern express's served lobby)
+ *  shows the always-on check, and a floor an express passes shows nothing. */
 function serveCellTemplate(ctx: SchedCtx, f: FloorRow, h: SchedHandlers): TemplateResult {
-  if (f.endpoint) {
-    return html`<span class="es-cell-serve es-always" title="The top and bottom stay connected: endpoints always stop">✓</span>`;
-  }
-  const toggles = !ctx.isExpress || isBasementFloor(f.floor) || (f.lobby && !f.served);
-  if (toggles) {
+  if (f.toggles) {
     return html`<span class="es-cell-serve"><input type="checkbox" aria-label="Serve floor ${floorLabel(f.floor)}"
       .checked=${live(f.served)} @change=${(e: Event) => h.onServe(f.floor, (e.target as HTMLInputElement).checked)} /></span>`;
   }
-  if (f.lobby) {
+  if (f.served && f.endpoint) {
+    return html`<span class="es-cell-serve es-always" title="The top and bottom stay connected: endpoints always stop">✓</span>`;
+  }
+  if (f.served && f.lobby) {
     return html`<span class="es-cell-serve es-always" title="An express always stops at its lobbies">✓</span>`;
   }
-  return html`<span class="es-cell-serve" title="An express stops only at lobbies above ground"></span>`;
+  const passes = ctx.classicExpress
+    ? "An express stops only at the ground floor, every 15th floor and the basements"
+    : "An express stops only at lobbies above ground";
+  return html`<span class="es-cell-serve" title="${passes}"></span>`;
 }
 
 /** The floors grid: the dialog's primary surface (spec §4 as amended §16), one row
@@ -327,7 +335,7 @@ function floorsTemplate(ctx: SchedCtx, state: SchedState, h: SchedHandlers): Tem
   return html`
     <div class="es-floors">
       <div class="es-row es-heading-row"><span class="es-heading">Serviced floors and home cars</span></div>
-      ${ctx.isExpress ? html`<p class="es-hint">${expressCaption(state.floors)}</p>` : nothing}
+      ${ctx.isExpress ? html`<p class="es-hint">${expressCaption(ctx, state.floors)}</p>` : nothing}
       <div class="es-row es-quick">
         ${ctx.isExpress
           ? nothing

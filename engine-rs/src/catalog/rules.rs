@@ -46,6 +46,11 @@ pub struct Rules {
     /// venue as a spiral staircase or a switchback escalator. Drawing only;
     /// when false every one-story flight is drawn straight, as in 1994.
     pub venue_flights: bool,
+    /// Whether an express elevator keeps the 1994 game's stops (#1527): the
+    /// ground floor, every 15th floor and every basement, each of which can
+    /// be turned off, with an end off those floors passed. When false an
+    /// express stops at its lobbies, every basement and both ends.
+    pub express_stops_on_15th_floors: bool,
     /// How long, in seconds, a person waits before the wait counts as stress
     /// and the frontend shows them fed up (red). The same in both modes.
     pub fed_up_wait: f64,

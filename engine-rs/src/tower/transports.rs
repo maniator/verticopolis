@@ -94,6 +94,9 @@ impl Tower {
         if let Some(r) = self.span_reason(kind, x, bottom, top) {
             return PlaceResult::fail(r);
         }
+        if let Some(r) = self.express_anchor_reason(kind, bottom, top) {
+            return PlaceResult::fail(r);
+        }
         if let Some(r) = self.tall_lobby_shaft_reason(x, f.width, bottom, top) {
             return PlaceResult::fail(r);
         }
@@ -158,6 +161,8 @@ impl Tower {
             load: 0,
             skip_floors: None,
             preserve_basement_stops: kind == Kind::ElevatorExpress,
+            classic_express_stops: kind == Kind::ElevatorExpress
+                && self.mode.express_stops_on_15th_floors(),
             schedule: None,
             rides: 0,
         };
@@ -186,13 +191,16 @@ impl Tower {
         if floor < t.bottom || floor > t.top {
             return false;
         }
-        if floor == t.bottom || floor == t.top {
+        let express = t.kind == Kind::ElevatorExpress;
+        // A Classic express's ends follow the same rule as its other floors;
+        // every other shaft always stops at both ends.
+        let ends_toggle = express && self.mode.express_stops_on_15th_floors();
+        if (floor == t.bottom || floor == t.top) && !ends_toggle {
             return true;
         }
-        let lobby_only =
-            t.kind == Kind::ElevatorExpress && !is_basement(floor) && !self.floor_has_lobby(floor);
+        let express_cannot_stop = express && !self.express_may_stop(floor);
         let in_tall_lobby = self.raised_lobby_at(floor, t.x, t.width).is_some();
-        if stop && (lobby_only || in_tall_lobby) {
+        if stop && (express_cannot_stop || in_tall_lobby) {
             return false;
         }
         let mut skip: Vec<f64> = self.transports[i].skip_floors.clone().unwrap_or_default();
@@ -202,17 +210,18 @@ impl Tower {
         } else if !skip.contains(&floor) {
             skip.push(floor);
         }
+        // A Classic express keeps at least one stop: with none its cars
+        // would stand and its riders have nowhere to get off.
+        if ends_toggle && !(t.bottom..=t.top).any(|fl| !skip.contains(&(fl as f64))) {
+            return false;
+        }
         skip.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
         // The TypeScript rebuilds the list from a Set, so a loaded duplicate
         // goes away on the first toggle.
         skip.dedup();
         self.transports[i].skip_floors = Some(skip);
         self.revision += 1;
-        if self.transports[i].schedule.is_some() {
-            let stops = self.stops_of(&self.transports[i]);
-            let t = &mut self.transports[i];
-            t.schedule = Some(t.schedule.as_ref().unwrap().snap_homes_to_stops(&stops));
-        }
+        self.snap_schedule_homes(i);
         true
     }
 
@@ -266,6 +275,10 @@ impl Tower {
         };
         if let Some(reason) = self
             .span_reason(kind, tx, new_bottom, new_top)
+            .or_else(|| {
+                self.express_anchor_reason(kind, new_bottom, new_top)
+                    .map(String::from)
+            })
             .or_else(|| self.tall_lobby_shaft_reason(tx, twidth, new_bottom, new_top))
         {
             return ResizeResult::fail(reason);
@@ -310,7 +323,9 @@ impl Tower {
                 *p = p.min(new_top as f64).max(new_bottom as f64);
             }
         }
-        if kind == Kind::ElevatorExpress {
+        if kind == Kind::ElevatorExpress && self.mode.express_stops_on_15th_floors() {
+            self.transports[i].skip_floors = Some(self.classic_express_resized_skips(i));
+        } else if kind == Kind::ElevatorExpress {
             // Keep old strict-interior choices, drop the new endpoints, and
             // skip newly interior non-lobby floors above the basements.
             // Former endpoints no longer
@@ -358,8 +373,8 @@ impl Tower {
         }
     }
 
-    /// `clearStops(id)`: every floor stops again (an express keeps its
-    /// lobby-only rule).
+    /// `clearStops(id)`: every floor stops again (an express goes back to
+    /// every stop its rule allows).
     pub fn clear_stops(&mut self, id: i64) -> bool {
         let Some(i) = self.transport_index_edit(id) else {
             return false;

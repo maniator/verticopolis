@@ -2625,6 +2625,7 @@ describe.skipIf(noEngine)("showElevatorScheduleDialog — the per-shaft Schedule
           served: served.has(floor),
           lobby: lobbySet.has(floor),
           endpoint: floor === 1 || floor === top,
+          toggles: floor !== 1 && floor !== top,
         })),
       // Async like the real port: the dialog re-reads once the answer settles.
       setServe: vi.fn(async (floor: number, serve: boolean) => {

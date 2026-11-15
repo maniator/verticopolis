@@ -833,22 +833,22 @@ describe.skipIf(noEngine)("EditorActions (dialogs, extend billing, per-kind butt
     expect(undo.commits).toBe(2);
   });
 
-  it("an express is locked to lobbies: the engine refuses a non-lobby stop and clearStops stays lobby-only", () => {
+  it("a Classic express stops only where the original's may: the engine refuses another stop and clearStops keeps the rule", () => {
     const r = sim.tower.placeTransport("elevatorExpress", 10, 1, 4);
     expect(r.ok).toBe(true);
     const ex = shaftOf(sim, r.transportId!)!;
-    // Seeded lobby-only on placement: floors 1 & 4 are endpoints, 2 & 3 are
-    // non-lobby middles and start skipped.
-    expect(shaftOf(sim, ex.id)!.skipFloors).toEqual([2, 3]);
-    // The engine lock refuses turning a non-lobby middle into a stop.
+    // Seeded on placement (#1527): floor 1 stops; 2 and 3 are passed, and so
+    // is the top end, 4, which is not a 15th floor.
+    expect(shaftOf(sim, ex.id)!.skipFloors).toEqual([2, 3, 4]);
+    // The engine refuses turning a passed floor into a stop.
     expect(markStop(sim, ex.id, 2, true)).toBe(false);
     expect(stopsAt(sim, ex.id, 2)).toBe(false);
-    // clearStops on an express restores the lobby-only skip list, NOT all floors.
+    // clearStops on an express restores its rule's skip list, NOT all floors.
     expect(portOf(sim).dropStops(ex.id)[0]).toBe(1);
-    expect(shaftOf(sim, ex.id)!.skipFloors).toEqual([2, 3]);
+    expect(shaftOf(sim, ex.id)!.skipFloors).toEqual([2, 3, 4]);
   });
 
-  it("a forged non-lobby express stop is coerced back to lobby-only on load", () => {
+  it("a forged stop on a Classic express is coerced back to the rule on load", () => {
     const r = sim.tower.placeTransport("elevatorExpress", 10, 1, 4);
     expect(r.ok).toBe(true);
     const data = sim.serialize();
@@ -857,20 +857,20 @@ describe.skipIf(noEngine)("EditorActions (dialogs, extend billing, per-kind butt
     const forged = (data.transports as unknown as Transport[]).find((t) => t.id === r.transportId)!;
     forged.skipFloors = [];
     const ex = shaftsOf(draftFromSave(data)).find((t) => t.kind === "elevatorExpress")!;
-    // The trust-boundary coercion re-skips the non-lobby middles after load.
-    expect(ex.skipFloors).toEqual([2, 3]);
+    // The trust-boundary coercion re-skips every floor the rule passes, the top end included.
+    expect(ex.skipFloors).toEqual([2, 3, 4]);
   });
 
-  it("coercion scrubs a forged endpoint out of an express skip list (endpoints always stop)", () => {
+  it("coercion turns back on a Classic express's only stop, so the shaft never stops nowhere", () => {
     const r = sim.tower.placeTransport("elevatorExpress", 10, 1, 4);
     expect(r.ok).toBe(true);
     const data = sim.serialize();
-    // Forge the top endpoint (floor 4) into the skip list: a shaft must never
-    // skip its own endpoint. Coercion removes it and still skips the non-lobby
-    // middles.
-    (data.transports as unknown as Transport[]).find((t) => t.id === r.transportId)!.skipFloors = [4];
+    // Forge the bottom end (floor 1), the shaft's only stop, into the skip
+    // list. A shaft with no stop would strand its riders, so coercion turns
+    // the ground floor back on and still skips the floors the rule passes.
+    (data.transports as unknown as Transport[]).find((t) => t.id === r.transportId)!.skipFloors = [1];
     const ex = shaftsOf(draftFromSave(data)).find((t) => t.kind === "elevatorExpress")!;
-    expect(ex.skipFloors).toEqual([2, 3]);
+    expect(ex.skipFloors).toEqual([2, 3, 4]);
   });
 
   it("no card carries stop-config buttons anymore: Schedule… is the one config surface (#464)", () => {

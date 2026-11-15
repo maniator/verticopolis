@@ -178,6 +178,10 @@ export interface StopRow {
   readonly served: boolean;
   readonly lobby: boolean;
   readonly endpoint: boolean;
+  /** Whether the player can turn this floor's stop on or off: the engine's
+   *  rule for the shaft (a Classic express toggles the ground floor, every
+   *  15th floor and every basement; other shafts keep both ends). */
+  readonly toggles: boolean;
 }
 
 /** An hour-by-hour figure for weekdays and weekends. */

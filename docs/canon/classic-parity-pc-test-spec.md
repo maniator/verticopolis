@@ -61,6 +61,8 @@ Setup: from B4, offices on floor 15 with a standard shaft 1 to 15 and an express
 
 ### E1 to E4: express stops (Q3)
 
+Result (run 2026-11-15, SimTower 1.0): E1 to E4 passed as the Help file says, with ends off a 15th floor not stopped at and every allowed stop switchable; built in #1527.
+
 Goal: confirm the Help file rule (every 15th floor whether or not a lobby is built, plus every underground floor) and its edges.
 
 - E1, a 15th floor with no lobby: from B3, lobbies on floors 1 and 30 only, an express shaft 1 to 30, 6 offices on floor 15 beside the shaft (no lobby there, reachable only by that shaft). Pass: workers arrive on floor 15, so the express stops there (Help file correct). Fail: floor 15 stays vacant (lobby-only stops, as ours).

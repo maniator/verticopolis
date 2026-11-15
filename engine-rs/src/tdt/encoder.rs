@@ -306,7 +306,8 @@ pub fn encode_tower(
             let ours = (fl - TDT_FLOOR_OFFSET) as f64;
             let stops = ours >= e.bottom
                 && ours <= e.top
-                && (!e.skip_floors.contains(&ours) || ours == e.bottom || ours == e.top);
+                && (!e.skip_floors.contains(&ours)
+                    || (e.kind != Kind::ElevatorExpress && (ours == e.bottom || ours == e.top)));
             w.u8(if stops { 1 } else { 0 });
         }
         for c in 0..8 {
