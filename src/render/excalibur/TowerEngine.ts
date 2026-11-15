@@ -16,6 +16,7 @@ import * as crowd from "./towerCrowd";
 import * as camera from "./towerInputCamera";
 import { clearLongPress } from "./longPress";
 import { guardPointerButtons } from "./pointerButtonGuard";
+import { keyboardHost } from "./keyboardHost";
 import * as overlayFx from "./towerOverlay";
 import { displayLit, runSceneSync } from "./towerSyncSchedule";
 import { clockOf } from "../../simport/headerClock";
@@ -306,6 +307,9 @@ export class TowerEngine {
       suppressPlayButton: true,
       suppressConsoleBootMessage: true,
       backgroundColor: ex.Color.fromHex("#7fb0e0"),
+      // Excalibur's keyboard listens here instead of on `window`, so its
+      // listeners go away with the engine (#322); the game reads keys itself.
+      global: keyboardHost(),
       // No gameplay uses collisions — actors are positioned directly and picking
       // goes through Actor.contains(), which reads collider geometry without the
       // simulation. Left on, Excalibur's broadphase/narrowphase/solver dominates
