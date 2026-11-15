@@ -7,6 +7,7 @@
 use crate::clock::GameMode;
 use crate::crowd::motion::finish;
 use crate::crowd::spawn::add;
+use crate::crowd::PState;
 use crate::facilities::Kind;
 use crate::load::deserialize;
 use crate::rules::{CLASSIC_WAIT_LIMIT, MODERN_WAIT_LIMIT};
@@ -212,4 +213,57 @@ fn a_jammed_commute_names_congestion_as_the_gripe() {
         (step.cong, step.next)
     );
     assert_eq!(sim.dominant_gripe(&office, &step), Some("congestion"));
+}
+
+/// A lone tenant two elevators away in an otherwise idle tower (#514): the
+/// 1994 game charges each Sim every landing it waits at, so the far floor
+/// must carry the waits of both legs, summed, even though nobody else rides.
+#[test]
+fn a_lone_far_tenant_carries_the_wait_of_every_landing_it_changes_at() {
+    let mut sim = Simulation::new_game(5, GameMode::Classic);
+    sim.money = 1e9;
+    for x in C..C + 30 {
+        assert!(sim.tower.place(Kind::Lobby, 1, x).ok);
+        for floor in 2..=24 {
+            assert!(sim.tower.place(Kind::Floor, floor, x).ok);
+        }
+    }
+    let low = sim
+        .tower
+        .place_transport(Kind::ElevatorStandard, C + 4, 1, 12);
+    let high = sim
+        .tower
+        .place_transport(Kind::ElevatorStandard, C + 20, 12, 24);
+    assert!(low.ok && high.ok);
+    // Heading home to the lobby: both cars idle at their bottom floors, so
+    // each landing waits for a car to come up.
+    let i = add(&mut sim.crowd, &sim.tower, 24, 1, Some(C + 26), Some(C + 2)).unwrap();
+    let id = sim.crowd.people[i].id;
+    let mut leg_waits = Vec::new();
+    let mut last_wait = 0.0;
+    let mut was_waiting = false;
+    for _ in 0..3_000 {
+        sim.tick(0.25);
+        let Some(p) = sim.crowd.people.iter().find(|p| p.id == id) else {
+            break;
+        };
+        let waiting = p.state == PState::Waiting;
+        if was_waiting && !waiting {
+            leg_waits.push(last_wait);
+        }
+        (was_waiting, last_wait) = (waiting, p.wait);
+    }
+    assert!(
+        sim.crowd.people.iter().all(|p| p.id != id),
+        "the rider arrives"
+    );
+    assert_eq!(leg_waits.len(), 2, "one wait per elevator: {leg_waits:?}");
+    assert!(leg_waits.iter().all(|&w| w > 0.0), "{leg_waits:?}");
+    let summed: f64 = leg_waits.iter().sum();
+    let recorded = stress(&sim, 24);
+    assert!(
+        recorded >= summed && recorded > leg_waits[0].max(leg_waits[1]),
+        "the far floor carries both landings: {recorded} vs {leg_waits:?}"
+    );
+    assert_eq!(stress(&sim, 12), 0.0, "the transfer floor is no one's home");
 }
