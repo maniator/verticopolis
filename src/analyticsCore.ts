@@ -330,6 +330,16 @@ export type AppActionName =
   | "file_delete"
   | "file_failed"
   | "files_copied" | "files_waited" | "file_ask"
+  // The folder linked on the player's computer (owner, 2026-11-15): linking,
+  // the browser's OK again after a restart, unlinking, and opening, saving
+  // and copying a tower there. Codes only, never a folder's or file's name.
+  | "folder_link"
+  | "folder_allow"
+  | "folder_unlink"
+  | "folder_open"
+  | "folder_save"
+  | "folder_copy"
+  | "folder_failed"
   | "export_save"
   | "import_save"
   | "export_tdt"

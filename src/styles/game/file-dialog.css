@@ -14,6 +14,7 @@
   width: min(620px, 88vw);
 }
 .fd-where {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -21,12 +22,109 @@
 .fd-where-label {
   min-width: 6.5em;
 }
-.fd-folder {
+
+/* The Look in / Save in box: a 1995 drop-down list, the place it shows on a
+   white field with the arrow button at its right. Its menu lists My Towers,
+   the linked folder, and Link and Unlink (templates/fileDialogPlaces.ts). */
+.fd-look {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 2px 6px;
-  flex: 0 1 16em;
+  padding: 2px 0 2px 6px;
+  flex: 0 1 22em;
+  min-width: 0;
+  text-align: left;
+  cursor: default;
+}
+.fd-look:focus-visible .fd-look-name {
+  outline: 1px dotted currentColor;
+}
+.fd-look-now {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex: 1;
+  min-width: 0;
+}
+.fd-look-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.fd-look-sub {
+  margin-left: auto;
+  color: var(--muted);
+  white-space: nowrap;
+  font-size: 11px;
+}
+.fd-look-arrow {
+  align-self: stretch;
+  display: grid;
+  place-items: center;
+  width: 16px;
+  margin: -1px 1px -1px 4px;
+  font-size: 8px;
+  background: var(--r-face);
+  box-shadow: var(--bevel-out);
+}
+.fd-look-pop {
+  position: absolute;
+  z-index: 4;
+  top: calc(100% + 1px);
+  left: calc(6.5em + 8px);
+  width: min(22em, 70%);
+  padding: 2px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 1px 1px 0 #000, var(--bevel-in);
+}
+.fd-look-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 6px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: default;
+}
+.fd-look-item.selected,
+.fd-look-item:not([aria-disabled="true"]):hover,
+.fd-look-item:not([aria-disabled="true"]):focus-visible {
+  background: var(--r-title);
+  color: var(--r-title-fg);
+  outline: none;
+}
+.fd-look-item.selected .fd-look-sub,
+.fd-look-item:hover .fd-look-sub,
+.fd-look-item:focus-visible .fd-look-sub {
+  color: inherit;
+}
+.fd-look-item.quiet {
+  color: var(--muted);
+}
+.fd-icon-pad {
+  width: 16px;
+  flex: none;
+}
+.fd-look-sep {
+  margin: 3px 2px;
+  border-top: 1px solid #808080;
+  border-bottom: 1px solid #fff;
+}
+
+/* The linked folder's list while the browser wants the player's OK again. */
+.fd-allow {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 22px 12px;
+  text-align: center;
+}
+.fd-allow p {
+  margin: 0;
 }
 .fd-usage {
   color: var(--muted);
@@ -219,6 +317,34 @@
   .fd-head,
   .fd-on-desktop {
     display: none;
+  }
+  /* The Look in box takes the whole row, its count under it, and its menu
+     items grow to a finger's size. */
+  .fd-where {
+    flex-wrap: wrap;
+  }
+  .fd-look {
+    flex: 1 1 100%;
+    padding: 6px 0 6px 6px;
+  }
+  .fd-look-arrow {
+    width: 28px;
+    font-size: 10px;
+  }
+  .fd-usage {
+    margin-left: 0;
+    font-size: 12px;
+  }
+  .fd-look-pop {
+    left: 0;
+    top: 34px;
+    width: 100%;
+  }
+  .fd-look-item {
+    padding: 10px 8px;
+  }
+  .fd-look-sub {
+    font-size: 12px;
   }
   .fd-on-phone {
     display: inline;

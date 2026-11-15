@@ -10,7 +10,9 @@ import { showFileDialog, type FileNote } from "../ui/fileDialog";
 import type { FileRow } from "../ui/templates/fileDialog";
 import { decodeTowerText, isBinaryTowerFile, openImport, readPickedFile } from "../ui/uiImport";
 import { isDialogOpen, isEngineStopped } from "./interactionState";
-import { currentFileId, setCurrentFile } from "./currentFile";
+import { linkedFolder } from "../storage/linkedFolder";
+import { currentFileId, currentLinkedFile, setCurrentFile } from "./currentFile";
+import { linkedPlace, saveCurrentLinked } from "./linkedFolderCommands";
 import { baseName, failed } from "./fileKeep";
 import { loadSave } from "./loadMenu";
 import { exportFile } from "./portLifecycle";
@@ -132,8 +134,9 @@ export function towerFileKind(name: string, bytes: Uint8Array): TowerFileKind | 
   return /^\s*VCTOWER\d+/.test(decodeTowerText(bytes.subarray(0, 64))) ? "tower" : null;
 }
 
-/** Add files dropped on the Open or Save As window. */
-async function addDropped(files: readonly File[]): Promise<FileNote | null> {
+/** Add files dropped on the Open or Save As window, or the towers of a folder
+ *  picked with From a folder…, to My Towers. */
+async function addDropped(files: readonly File[], how: "drop" | "folder" = "drop"): Promise<FileNote | null> {
   let added = 0;
   const refused: string[] = [];
   for (const file of files) {
@@ -148,7 +151,7 @@ async function addDropped(files: readonly File[]): Promise<FileNote | null> {
     } catch (err) {
       return failed(err);
     }
-    trackAppAction("file_add", "drop");
+    trackAppAction("file_add", how);
     added++;
   }
   if (refused.length > 0) {
@@ -261,6 +264,7 @@ export function showOpenDialog(app: GameApp, from: OpenFrom): void {
     fromComputer: () => openImport(app.ui),
     downloadKept: keptDownload(app),
     ...folderCommands(),
+    ...places(app),
   });
 }
 
@@ -285,6 +289,19 @@ export async function saveFile(app: GameApp, name: string): Promise<string> {
   return (await saveTowerAs(app, clean, fileSpace.find(clean) ? "replace" : "new")).id;
 }
 
+/** The linked folder for both windows where the browser can link one, and
+ *  From a folder… where it can't but can pick a folder's files. */
+function places(app: GameApp) {
+  const linked = linkedPlace(app);
+  return { linked, canPickFolder: !linked && typeof HTMLInputElement !== "undefined" && "webkitdirectory" in HTMLInputElement.prototype };
+}
+
+/** The live tower's file name in the linked folder, when it came from there. */
+function linkedName(): string | null {
+  const id = currentLinkedFile();
+  return id === null ? null : (linkedFolder.find(id)?.name ?? id.slice(0, id.lastIndexOf(".")));
+}
+
 /** File > Save As…: the Save As window, or the download while My Towers is
  *  closed. */
 export function showSaveAsDialog(app: GameApp): void {
@@ -296,7 +313,7 @@ export function showSaveAsDialog(app: GameApp): void {
   if (!settled) trackAppAction("files_waited", "save_as");
   showFileDialog(app.ui, {
     mode: "saveAs",
-    initialName: currentFile()?.name ?? cleanFileName(app.enginePort.towerName() ?? ""),
+    initialName: currentFile()?.name ?? linkedName() ?? cleanFileName(app.enginePort.towerName() ?? ""),
     auto: () => null,
     open: () => {},
     save: async (name, replace) => {
@@ -311,13 +328,18 @@ export function showSaveAsDialog(app: GameApp): void {
     fromComputer: () => app.ui.promptExport(),
     downloadKept: null,
     ...folderCommands(),
+    ...places(app),
+    // A tower opened from the linked folder saves there by default.
+    ...(currentLinkedFile() !== null ? { startIn: "linked" as const } : {}),
   });
 }
 
-/** File > Save also writes the live tower's My Towers file, when it has one
+/** File > Save also writes the live tower's file, in My Towers or in the
+ *  linked folder, when it has one
  *  (the quick save to the Auto-save runs first, as before). Never rejects. */
 export async function saveCurrentFile(): Promise<void> {
   const app = live;
+  if (app && (await saveCurrentLinked(app))) return;
   const file = currentFile();
   if (!app || !file || file.kind !== "tower") return;
   try {

@@ -255,7 +255,7 @@ describe("the Open window", () => {
     const drop = new Event("drop", { bubbles: true, cancelable: true }) as DragEvent;
     Object.defineProperty(drop, "dataTransfer", { value: { types: ["Files"], files: [dropped] } });
     q(".fd").dispatchEvent(drop);
-    expect(ctx.add).toHaveBeenCalledExactlyOnceWith([dropped]);
+    expect(ctx.add).toHaveBeenCalledExactlyOnceWith([dropped], "drop");
     expect(drop.defaultPrevented).toBe(true);
   });
 
