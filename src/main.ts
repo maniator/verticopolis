@@ -9,7 +9,7 @@ import { SaveGame } from "./storage/SaveGame";
 import { loadPrefs, type Prefs } from "./storage/Prefs";
 import { type TrafficTier } from "./presentation/traffic";
 import { UI, type Tool } from "./ui/UI";
-import { setHistoryButtons } from "./ui/uiStatus";
+import { setHistoryButtons, showTower } from "./ui/uiStatus";
 import { refreshEditorCard } from "./game/editorCard";
 import { type PlaceOutcome } from "./ui/placement";
 import { OnboardingController } from "./ui/Onboarding";
@@ -278,13 +278,11 @@ class GameApp implements GameAppPorts {
     // Prime the UI once before the first paint. The palette starts with every
     // facility button present; without this pass a returning player (who skips
     // the splash) would briefly see the full locked catalog before the throttled
-    // render loop first hides the locked tools, a visible collapse/reflow.
-    this.ui.update(hudSource(this));
-    // Adopt the boot sim's log baseline the same way adoptSim does for later
-    // swaps: the boot sim is assigned directly (never through adoptSim), and
-    // without this the bulletin history a save carries would sit unrendered
-    // after a plain page reload, the restore path players hit most.
-    this.ui.resetLog(hudSource(this));
+    // render loop first hides the locked tools, a visible collapse/reflow. It
+    // adopts the boot sim's log baseline first, the same way a swap does: the
+    // bulletin history a save carries is rendered, and none of it replays as
+    // toasts over the title screen.
+    showTower(this.ui, hudSource(this));
     void this.engine.start();
 
     // Accessibility: apply reduced motion now and whenever the OS pref flips.
