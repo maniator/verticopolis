@@ -1,3 +1,4 @@
+import { APP_VERSION } from "./appVersion";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   bootCommonProps,
@@ -127,19 +128,19 @@ describe("bootCommonProps", () => {
     // error reporting. It survived because the error reporter's own suite MOCKS
     // `getCommonProps` to return a version, so those tests asserted a contract
     // the production path never met. Asserting it on the real builder is what
-    // closes that gap.
+    // closes that gap. The builder reads the constant itself, so no caller can
+    // pass a stale or missing one (#805).
     expect(
       bootCommonProps({
         platform: "web",
         distributionChannel: "web",
-        version: "2.22.0",
         onboarded: false,
         tenureDay: undefined,
         savedAt: undefined,
         standalone: false,
         now: 0,
       }).version,
-    ).toBe("2.22.0");
+    ).toBe(APP_VERSION);
   });
 
   it("maps each live signal to its bucket and passes both dimensions + returning through", () => {
@@ -152,7 +153,6 @@ describe("bootCommonProps", () => {
       bootCommonProps({
         platform: "twa",
         distributionChannel: "twa",
-        version: "9.9.9",
         onboarded: true,
         tenureDay: 12,
         savedAt: now - 3 * DAY,
@@ -162,7 +162,7 @@ describe("bootCommonProps", () => {
     ).toEqual({
       platform: "twa",
       distribution_channel: "twa",
-      version: "9.9.9",
+      version: APP_VERSION,
       returning: true,
       tenure: "d7-29",
       recency: "7d",
@@ -176,7 +176,6 @@ describe("bootCommonProps", () => {
       bootCommonProps({
         platform: "web",
         distributionChannel: "web",
-        version: "9.9.9",
         onboarded: false,
         tenureDay: undefined,
         savedAt: undefined,
@@ -186,7 +185,7 @@ describe("bootCommonProps", () => {
     ).toEqual({
       platform: "web",
       distribution_channel: "web",
-      version: "9.9.9",
+      version: APP_VERSION,
       returning: false,
       tenure: "unknown",
       recency: "unknown",
@@ -202,7 +201,6 @@ describe("bootCommonProps", () => {
     const base = {
       platform: "web",
       distributionChannel: "web",
-      version: "9.9.9",
       onboarded: false,
       tenureDay: 3,
       standalone: false,
@@ -220,7 +218,6 @@ describe("bootCommonProps", () => {
       bootCommonProps({
         platform: "twa",
         distributionChannel: "twa",
-        version: "9.9.9",
         onboarded: true,
         tenureDay: 0,
         savedAt: now - 10 * DAY,
@@ -230,7 +227,7 @@ describe("bootCommonProps", () => {
     ).toEqual({
       platform: "twa",
       distribution_channel: "twa",
-      version: "9.9.9",
+      version: APP_VERSION,
       returning: true,
       tenure: "d0",
       recency: "30d",

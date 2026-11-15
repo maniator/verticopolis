@@ -451,7 +451,6 @@ describe("the platform and distribution-channel dimensions ride every event", ()
       bootCommonProps({
         platform: "twa",
         distributionChannel: "twa",
-        version: "9.9.9",
         onboarded: true,
         tenureDay: 3,
         savedAt: undefined,

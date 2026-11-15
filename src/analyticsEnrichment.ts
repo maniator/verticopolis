@@ -1,3 +1,4 @@
+import { APP_VERSION } from "./appVersion";
 import type { EventProps } from "./analyticsAdapter";
 
 /**
@@ -139,14 +140,6 @@ export function displayModeBucket(standalone: boolean): string {
 export function bootCommonProps(input: {
   platform: PlatformLabel;
   distributionChannel: DistributionChannelLabel;
-  /** The build the CLIENT is running. It has to come from the client and cannot
-   *  be stamped server-side like `environment`: the service worker precaches the
-   *  bundle, so a returning player keeps running an older build until the worker
-   *  updates, which is the whole reason the update prompt exists. A relay-stamped
-   *  version would label those sessions with whatever release was deployed at the
-   *  time, making an error from an already-fixed build read as a fresh
-   *  regression. Untrusted, like every other client-supplied dimension here. */
-  version: string;
   onboarded: boolean;
   tenureDay: number | undefined;
   savedAt: number | undefined;
@@ -163,7 +156,14 @@ export function bootCommonProps(input: {
   return {
     platform: input.platform,
     distribution_channel: input.distributionChannel,
-    version: input.version,
+    // The build the CLIENT is running, read here so no caller can drop or
+    // misstate it (#805). It has to come from the client and cannot be stamped
+    // server-side like `environment`: the service worker precaches the bundle,
+    // so a returning player keeps running an older build until the worker
+    // updates. A relay-stamped version would label those sessions with
+    // whatever release was deployed at the time. Untrusted, like every other
+    // client-supplied dimension here.
+    version: APP_VERSION,
     returning: input.onboarded,
     tenure: tenureBucket(input.tenureDay),
     recency: recencyBucket(msSinceSave),
