@@ -26,6 +26,7 @@ Every tower runs one of two sets of rules. You choose when you found the tower, 
 | Escalators | Never to an office floor | Anywhere |
 | Elevator speed | One speed for every car, express included | Cars twice as fast, express cars four times ([Elevators](/help/building/elevators/#express-elevators-and-sky-lobbies)) |
 | Elevator shafts | 24 per tower, as in 1994 | 48 per tower ([Build limits](/help/building/limits/#transport)) |
+| Full elevator cars | Stop at every call they answer | Pass a waiting floor and stop only to let riders off ([Elevators](/help/building/elevators/#keeping-the-waits-short)) |
 | Elevator schedules | The hour-by-hour grid | Adds presets, auto-tune and advice ([Elevators](/help/building/elevators/)) |
 | Building while paused | Not allowed | Allowed |
 | Towers on one lot | One tower: the ground lobby is one stretch | Several, each on its own stretch of ground lobby ([Floors and lobbies](/help/building/floors-and-lobbies/#the-ground-lobby)) |

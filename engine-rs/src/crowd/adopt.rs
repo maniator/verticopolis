@@ -22,8 +22,18 @@ impl Simulation {
         for i in 0..self.crowd.people.len() {
             let p = &self.crowd.people[i];
             if let (Some(shaft), Some(car)) = (p.shaft_id, p.car_index) {
-                *self.crowd.car_riders.get_or_insert_with((shaft, car), || 0) += 1;
+                let aboard = self.crowd.car_riders.get_or_insert_with((shaft, car), || 0);
+                *aboard += 1;
+                let aboard = *aboard as f64;
+                let cap = self
+                    .tower
+                    .get_transport(shaft)
+                    .map(|t| t.kind.car_capacity());
+                if cap.is_some_and(|cap| aboard >= cap) {
+                    super::motion::mark_full(&mut self.crowd, &self.tower, (shaft, car));
+                }
             }
+            let p = &self.crowd.people[i];
             if p.walk_in {
                 self.crowd.walk_in_count += 1;
             }

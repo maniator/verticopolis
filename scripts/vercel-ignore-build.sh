@@ -93,8 +93,9 @@ affects_deploy() {
     # the fixtures, scenarios and fuzz corpus are read only by tests.
     conformance/catalog-digests.json | conformance/expected.json) return 0 ;;
     conformance/loader-cases.json | conformance/tdt-cases.json) return 0 ;;
-    # The fixtures the engine's rule tests compile in with include_str!.
+    # The fixtures the engine's rule tests compile in (include_str!, include_bytes!).
     conformance/fixtures/sixseven_2.vctower | conformance/fixtures/split-tower.vctower | conformance/fixtures/towerone_6.vctower) return 0 ;;
+    conformance/fixtures/regression/split-tower-26.vctower) return 0 ;;
     conformance/*) return 1 ;;
 
     # Standalone dev scripts that no build step imports or runs.

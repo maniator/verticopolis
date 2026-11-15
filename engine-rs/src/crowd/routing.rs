@@ -428,6 +428,7 @@ pub fn elevator_calls(crowd: &Crowd, tower: &Tower) -> ElevatorCalls {
             }
         }
     }
+    calls.full.clone_from(&crowd.full_cars);
     calls
 }
 

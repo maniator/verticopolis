@@ -79,8 +79,10 @@ export const CARD_TEXT_TICK_MINUTES = 10;
 /** The least load the crowded lift must read, in percent, by mode. A Modern
  *  car moves twice as fast (`MODERN_CAR_SPEED` in
  *  `engine-rs/src/rules/elevators.rs`), so the same riders fill it for about
- *  half as long and its average load reads about half. */
-const CROWDED_LIFT_LEAST_LOAD: Readonly<Record<CardTextMode, number>> = { classic: 80, modern: 40 };
+ *  half as long, and a full Modern car passes the floors it has no room for
+ *  instead of standing there full (`full_cars_pass_hall_calls`), so its
+ *  average load reads well under half (36% today). */
+const CROWDED_LIFT_LEAST_LOAD: Readonly<Record<CardTextMode, number>> = { classic: 80, modern: 30 };
 /** The engine's near-capacity line, in percent (`NEAR_CAPACITY_UTILIZATION`
  *  in `engine-rs/src/panels/elevators.rs`). */
 const NEAR_CAPACITY_PERCENT = 85;
@@ -148,8 +150,8 @@ export function expectRealLines(g: CardTextGolden): void {
   else if (isOneOf(["lobby distance, unhappy", "winning tower, unhappy"])) expect(starting("Main gripe:"), `${label}: no tenant printed a gripe`).toBeGreaterThan(0);
   // The crowded lift runs close to full in Classic. Riders stay aboard to
   // their floors since 3.7.3, so its one car stops for each of them and its
-  // load peaks past the engine's near-capacity line; the faster Modern car
-  // reads about half. The card must word the load it reads, near capacity
+  // load peaks past the engine's near-capacity line; the faster Modern car,
+  // which passes floors while full, reads well under half. The card must word the load it reads, near capacity
   // only above 85%.
   if (is("crowded lift")) {
     const loads = g.transports.flatMap((t) => t.lines).filter((l) => l.startsWith("Avg load:"));

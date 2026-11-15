@@ -234,6 +234,8 @@ pub type StaffParts = fasthash::FastMap<i64, i64>;
 pub struct ElevatorCalls {
     pub hall: fasthash::FastMap<i64, fasthash::FastMap<i64, f64>>,
     pub cab: fasthash::FastMap<i64, fasthash::FastMap<i64, BTreeSet<i64>>>,
+    /// The cars (shaft, car) a Modern crowd fills, ascending (`full_cars`).
+    pub full: Vec<(i64, i64)>,
 }
 
 pub struct StaffResult {
@@ -248,6 +250,8 @@ pub struct Crowd {
     pub spawn_acc: f64,
     /// Riders aboard each car, keyed (shaft, car).
     pub car_riders: fasthash::FastMap<(i64, i64), i64>,
+    /// The Modern cars their riders fill, ascending, which pass hall calls.
+    pub full_cars: Vec<(i64, i64)>,
     pub frustration: f64,
     pub commute_wait_by_floor: fasthash::FastMap<i64, f64>,
     pub commute_revision: u32,
@@ -334,6 +338,7 @@ impl Crowd {
             next_id: 1,
             spawn_acc: 0.0,
             car_riders: fasthash::FastMap::default(),
+            full_cars: Vec::new(),
             frustration: 0.0,
             commute_wait_by_floor: Default::default(),
             commute_revision: 0,

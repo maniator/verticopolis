@@ -255,6 +255,9 @@ impl ElevatorDispatch {
             }
             let car_load = t.car_load.as_mut().unwrap();
             let cap = kind.car_capacity();
+            // Most steps fill no car, and then nothing is looked up.
+            let any_full = rules.full_car_passes && !calls.full.is_empty();
+            let full = |j: usize| any_full && calls.full.binary_search(&(id, j as i64)).is_ok();
 
             let hall_at = |fl: i64| hall.and_then(|h| h.get(&fl)).copied().unwrap_or(0.0);
             // `calls` and `claimed` as bit sets over the stops. `stops` is
@@ -285,14 +288,10 @@ impl ElevatorDispatch {
                 for j in 0..active_count.min(cars) {
                     let cab = cabs.and_then(|c| c.get(&(j as i64)));
                     let (pos, dir) = (t.car_positions[j], t.car_dir[j]);
-                    self.best.push(CarView::of(
-                        pos,
-                        dir,
-                        dwell[j],
-                        cab,
-                        shaft_dwell,
-                        floors_per_minute,
-                    ));
+                    self.best.push(
+                        CarView::of(pos, dir, dwell[j], cab, shaft_dwell, floors_per_minute),
+                        full(j),
+                    );
                 }
             }
             for i in 0..cars {
@@ -330,7 +329,7 @@ impl ElevatorDispatch {
                     continue;
                 }
                 let mut car_dt = dt;
-                if dwell[i] > 0.0 && rules.departure_restarts && !stood_down {
+                if dwell[i] > 0.0 && rules.departure_restarts && !stood_down && !full(i) {
                     // Standard Floor Departure: whoever arrives while the car
                     // waits boards and starts the wait over, up to the limit.
                     let fl = jsmath::round(t.car_positions[i]) as i64;
