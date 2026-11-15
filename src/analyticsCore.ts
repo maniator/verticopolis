@@ -360,12 +360,12 @@ export type AppActionName =
   | "page_help"
   | "page_gallery"
   | "page_changelog"
-  // One help site page view (help-site/src/components/Header.astro), on every
-  // page and not only a landing, with `detail` = the page's path under /help
-  // ("rooms/hotels", "home" for the front page, "other" for anything that is
-  // not a plain page path; help-site/site.mjs helpPageDetail). page_help and
-  // page_changelog still count the landing once per visit.
+  // One help page view on every page (help-site/src/components/Header.astro);
+  // `detail` = its path under the site's base ("rooms/hotels", "home" or
+  // "other": site.mjs helpPageDetail). page_help/page_changelog count landings.
   | "help_page_view"
+  // A help site menu bar pick; `detail` = its data-help-item code (MenuBar.astro).
+  | "help_menu_pick"
   // Preference toggles (detail carries the new on/off state).
   | "mute"
   | "reduced_motion"

@@ -1,5 +1,6 @@
 ---
-// The help site's header: the shared title bar (docs/engine-site's
+// The help site's header: the game's menu bar on top (MenuBar.astro), then
+// the shared title bar (docs/engine-site's
 // TitleBar.astro, the same bar the engine docs and the Rust API reference
 // draw), handed this site's own Starlight search and theme switch, with its
 // game button pointed at the game on this same origin. In a
@@ -11,9 +12,11 @@
 import Search from "@astrojs/starlight/components/Search.astro";
 import ThemeSelect from "@astrojs/starlight/components/ThemeSelect.astro";
 import TitleBar from "../../../docs/engine-site/src/components/TitleBar.astro";
+import MenuBar from "./MenuBar.astro";
 import logo from "../assets/logo.png";
 ---
 
+<MenuBar />
 <TitleBar logo={logo} short="Help" game="/">
   <Search slot="search" />
   <ThemeSelect slot="theme" />
