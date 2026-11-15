@@ -2419,7 +2419,7 @@
   "mode": "modern",
   "pools": [
     {
-      "cap": 24,
+      "cap": 48,
       "key": "elevators",
       "kinds": [
         "elevatorStandard",

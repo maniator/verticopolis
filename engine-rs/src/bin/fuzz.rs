@@ -208,9 +208,10 @@ fn main() {
         let s = Scenario::parse(&text).expect("the fuzzer only emits valid commands");
         run_scenario(&s, &suite)
     };
-    // A tall tower starts with a burst of shafts and stairs that overruns the
-    // 24-shaft and 64-link pools, so both engines also agree on the refusal at
-    // each cap. The burst runs before the random commands and is not part of
+    // A tall tower starts with a burst of shafts and stairs that overruns
+    // Classic's 24-shaft pool and the 64-link pool, so both engines also agree
+    // on the refusal at each cap. Modern's pool holds 48 shafts, so there the
+    // burst's 27 shafts all fit and only the stairs reach their cap. The burst runs before the random commands and is not part of
     // the command budget. Its standard shafts and stairs need no star; the
     // escalators, service and express shafts that unlock higher come from the
     // random commands, at the stars the seed opens with.

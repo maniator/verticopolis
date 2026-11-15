@@ -101,19 +101,24 @@ fn classic_publishes_the_venue_pool_and_modern_does_not() {
     }
 }
 
-/// The canon pooling of CLAUDE.md, read back through the catalog.
+/// The canon pooling of CLAUDE.md, read back through the catalog: Classic's
+/// one pool of 24 shafts, and Modern's same pool with room for 48.
 #[test]
 fn pools_caps_and_spans_follow_canon() {
+    for (mode, shafts) in [(GameMode::Classic, 24), (GameMode::Modern, 48)] {
+        let c = catalog(mode);
+        assert_eq!(
+            (c.pools[0].key, c.pools[0].cap, c.pools[0].kinds.clone()),
+            (
+                "elevators",
+                shafts,
+                vec!["elevatorStandard", "elevatorService", "elevatorExpress"]
+            ),
+            "{mode:?}"
+        );
+    }
     let c = catalog(GameMode::Modern);
     assert_eq!(c.pools.len(), 2);
-    assert_eq!(
-        (c.pools[0].key, c.pools[0].cap, c.pools[0].kinds.clone()),
-        (
-            "elevators",
-            24,
-            vec!["elevatorStandard", "elevatorService", "elevatorExpress"]
-        )
-    );
     assert_eq!(
         (c.pools[1].key, c.pools[1].cap, c.pools[1].kinds.clone()),
         ("walkways", 64, vec!["stairs", "escalator"])

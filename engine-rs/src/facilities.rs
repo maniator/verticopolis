@@ -391,47 +391,11 @@ pub fn build_cap_in(mode: crate::clock::GameMode, kind: Kind) -> Option<i64> {
     }
 }
 
-#[doc(hidden)]
-pub struct Pool {
-    pub kinds: &'static [Kind],
-    pub cap: i64,
-    pub label: &'static str,
-}
-
-#[doc(hidden)]
-/// `POOLED_CAPS`.
-pub static POOLED_CAPS: [Pool; 2] = [
-    Pool {
-        kinds: &[
-            Kind::ElevatorStandard,
-            Kind::ElevatorService,
-            Kind::ElevatorExpress,
-        ],
-        cap: 24,
-        label: "elevator shafts",
-    },
-    Pool {
-        kinds: &[Kind::Stairs, Kind::Escalator],
-        cap: 64,
-        label: "stairs/escalators",
-    },
-];
-
-/// Classic's party hall and theater pool (#1932): the 1994 save keeps one
-/// table of 16 records shared by every party hall and theater, so the two
-/// kinds share one cap of 16. Modern keeps a cap of 16 for each.
-pub static CLASSIC_VENUE_POOL: Pool = Pool {
-    kinds: &[Kind::Cinema, Kind::PartyHall],
-    cap: 16,
-    label: "party halls and theaters",
+mod pools;
+pub use pools::{
+    pools_for, transport_cap, transport_pools, Pool, CLASSIC_VENUE_POOL, MODERN_ELEVATOR_SHAFT_CAP,
+    MODERN_POOLED_CAPS, POOLED_CAPS,
 };
-
-/// Every pooled cap `mode` enforces: the transport pools, then Classic's
-/// venue pool.
-pub fn pools_for(mode: crate::clock::GameMode) -> impl Iterator<Item = &'static Pool> {
-    let venues = mode.shares_venue_cap().then_some(&CLASSIC_VENUE_POOL);
-    POOLED_CAPS.iter().chain(venues)
-}
 
 #[doc(hidden)]
 pub fn is_lobby_floor(floor: i64) -> bool {

@@ -191,7 +191,7 @@ pub(crate) fn assemble(
         }
     }
     // ---- transports ----
-    let pool_cap: usize = POOLED_CAPS.iter().map(|p| p.cap as usize).sum();
+    let pool_cap = transport_cap(mode) as usize;
     let mut transports: Vec<(Transport, Option<i64>)> = Vec::new();
     let mut kept: Vec<Transport> = Vec::new();
     if let Some(arr) = data.get("transports").and_then(Value::as_array) {

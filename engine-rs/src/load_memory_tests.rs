@@ -3,7 +3,7 @@
 //! grows in, with no tree beside it (#1242). Allocations are counted per
 //! thread, so the tests running beside these do not move their figures.
 use super::*;
-use crate::facilities::{Kind, Pool, LOT_WIDTH, MIN_FLOOR, POOLED_CAPS};
+use crate::facilities::{transport_pools, Kind, Pool, LOT_WIDTH, MIN_FLOOR};
 use std::alloc::{GlobalAlloc, Layout, System};
 use std::cell::Cell;
 
@@ -83,9 +83,10 @@ const OFFICE_STEP: usize = 9;
 const MANY: usize = 2_000;
 const LONG: usize = 20_000;
 
-/// The pool a transport kind counts against.
+/// The pool a transport kind counts against in the Modern game the large
+/// save holds, whose elevator pool is the widest.
 fn pool_of(kind: Kind) -> &'static Pool {
-    POOLED_CAPS
+    transport_pools(GameMode::Modern)
         .iter()
         .find(|p| p.kinds.contains(&kind))
         .unwrap()
@@ -124,11 +125,16 @@ pub(crate) fn large_save() -> String {
     }
     let mut transports = Vec::new();
     let shaft = Kind::ElevatorStandard.facility().width;
+    // Two banks of shafts, one over the other, so the whole pool fits
+    // across the lot.
+    const PER_BANK: i64 = 24;
     for k in 0..pool_of(Kind::ElevatorStandard).cap {
         id += 1;
+        let bottom = 1 + (k / PER_BANK) * 30;
         transports.push(format!(
-            "{{\"id\":{id},\"kind\":\"elevatorStandard\",\"x\":{},\"width\":{shaft},\"bottom\":1,\"top\":30,\"cars\":8,\"carPositions\":[1,1,1,1,1,1,1,1],\"carDir\":[0,0,0,0,0,0,0,0],\"load\":0}}",
-            15 * k
+            "{{\"id\":{id},\"kind\":\"elevatorStandard\",\"x\":{},\"width\":{shaft},\"bottom\":{bottom},\"top\":{},\"cars\":8,\"carPositions\":[{bottom},{bottom},{bottom},{bottom},{bottom},{bottom},{bottom},{bottom}],\"carDir\":[0,0,0,0,0,0,0,0],\"load\":0}}",
+            15 * (k % PER_BANK),
+            bottom + 29
         ));
     }
     let stairs = Kind::Stairs.facility().width;

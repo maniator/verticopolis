@@ -25,6 +25,7 @@ Every tower runs one of two sets of rules. You choose when you found the tower, 
 | Towers side by side | Joined only through the building, as in 1994 | People walk the street between ground lobbies ([People and traffic](/help/tower/people/#how-people-get-around)) |
 | Escalators | Never to an office floor | Anywhere |
 | Elevator speed | One speed for every car, express included | Cars twice as fast, express cars four times ([Elevators](/help/building/elevators/#express-elevators-and-sky-lobbies)) |
+| Elevator shafts | 24 per tower, as in 1994 | 48 per tower ([Build limits](/help/building/limits/#transport)) |
 | Elevator schedules | The hour-by-hour grid | Adds presets, auto-tune and advice ([Elevators](/help/building/elevators/)) |
 | Building while paused | Not allowed | Allowed |
 | Towers on one lot | One tower: the ground lobby is one stretch | Several, each on its own stretch of ground lobby ([Floors and lobbies](/help/building/floors-and-lobbies/#the-ground-lobby)) |
