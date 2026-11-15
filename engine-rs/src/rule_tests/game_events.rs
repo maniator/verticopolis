@@ -70,7 +70,7 @@ fn fire_day(sim: &mut Simulation) {
 
 #[test]
 fn a_low_roll_sets_a_fire_and_offers_the_rescue() {
-    let mut sim = office_tower(GameMode::Classic, 2, false);
+    let mut sim = office_tower(GameMode::Modern, 2, false);
     fire_day(&mut sim);
     assert_eq!(sim.events.count(), 1);
     let offer = sim.events.pending.as_ref().unwrap();
@@ -78,9 +78,32 @@ fn a_low_roll_sets_a_fire_and_offers_the_rescue() {
     assert!(logged(&sim, "Fire broke out"));
 }
 
+/// The SimTower manual: fires, like terrorists, strike only a tower with
+/// security personnel (#1889). The same low roll burns a Classic tower with
+/// a Security office and a Modern tower without one, and leaves a Classic
+/// tower without Security untouched.
+#[test]
+fn a_classic_tower_burns_only_once_it_has_security() {
+    for (mode, security, burns) in [
+        (GameMode::Classic, false, false),
+        (GameMode::Classic, true, true),
+        (GameMode::Modern, false, true),
+    ] {
+        let mut sim = office_tower(mode, 2, security);
+        script_main(&mut sim, |r| r.next() < BASE_FIRE_CHANCE * 0.45);
+        sim.maybe_random_event();
+        assert_eq!(
+            any_in(&sim, UnitState::Fire),
+            burns,
+            "{mode:?}, Security {security}"
+        );
+        assert_eq!(logged(&sim, "Fire broke out"), burns);
+    }
+}
+
 #[test]
 fn a_paid_rescue_charges_the_fee_ends_the_blaze_and_guts_the_room() {
-    let mut sim = office_tower(GameMode::Classic, 2, false);
+    let mut sim = office_tower(GameMode::Modern, 2, false);
     fire_day(&mut sim);
     sim.resolve_choice(true);
     assert_eq!(sim.money, 1_000_000.0 - 150_000.0);
@@ -91,7 +114,7 @@ fn a_paid_rescue_charges_the_fee_ends_the_blaze_and_guts_the_room() {
 
 #[test]
 fn a_declined_rescue_leaves_the_fire_burning() {
-    let mut sim = office_tower(GameMode::Classic, 2, false);
+    let mut sim = office_tower(GameMode::Modern, 2, false);
     fire_day(&mut sim);
     sim.resolve_choice(false);
     assert_eq!(sim.money, 1_000_000.0);
@@ -101,7 +124,7 @@ fn a_declined_rescue_leaves_the_fire_burning() {
 
 #[test]
 fn an_uncontained_blaze_climbs_to_the_room_above() {
-    let mut sim = office_tower(GameMode::Classic, 2, false);
+    let mut sim = office_tower(GameMode::Modern, 2, false);
     // Ignite, pick the first of the four offices, then fail containment.
     script_main(&mut sim, |r| {
         r.next() < BASE_FIRE_CHANCE && r.next() < 0.25 && r.next() >= FIRE_CONTROL_WITHOUT_SERVICES
@@ -122,7 +145,7 @@ fn an_uncontained_blaze_climbs_to_the_room_above() {
 
 #[test]
 fn an_unanswered_choice_is_declined_on_the_next_roll() {
-    let mut sim = office_tower(GameMode::Classic, 2, false);
+    let mut sim = office_tower(GameMode::Modern, 2, false);
     script_main(&mut sim, |r| {
         r.next() < BASE_FIRE_CHANCE && {
             r.next();
