@@ -38,9 +38,9 @@ are documentation only: no build that a client fetches carries them.
 - The menu bar is on the title screen too. Commands that need a tower stay grayed until you start or load one.
 - Tower > This Tower's Rules shows the rules your tower plays by, instead of the whole Classic vs Modern table.
 - Founding a Modern tower now asks "Bridge floors between rooms" with the box checked, worded as in Settings, instead of a "Don't bridge" box that read backwards.
-- Rest the pointer on a tool, or tab to it, and the status bar says what it does. On a phone, picking a tool shows a small card with its price and what it does until you place it.
+- Rest the pointer on a tool, or tab to it, and the status bar says what it does.
 - A tower you load or come back to whose Bulletin has no saved messages yet opens it with a line saying so, so it is never blank.
-- Menus stay on screen on a phone, and a tap that closes a menu no longer builds on the tower under it.
+- On a phone, menus fit on the screen, and a tap that closes a menu never builds on the tower under it.
 - The first time you open version 4, a short fireworks show welcomes you, with links to get started and to see what is new. The welcome stays until you close it, and once you do it does not show again.
 - Following a person keeps up on a slow computer or phone. Before, a device drawing fewer than five frames a second barely moved the camera toward them.
 - File > Close saves your tower and takes you back to the opening screen, where Continue brings it back.
@@ -51,7 +51,6 @@ are documentation only: no build that a client fetches carries them.
 - The evening "New tenants:" report counts everyone who moved in that day, even when you reloaded the tower mid-day.
 - The title screen no longer pops your tower's latest bulletin news as toasts when you reopen the game. The news is still in the tower's bulletin.
 - The Player's Manual and the bug report form now point to the menu bar's commands (Edit > Undo, Tower > Map, File > Export to file… and the rest) where they still named old buttons.
-- On a phone, picking a tool no longer covers the bottom of the tower with a card about it. The tool's button already shows its name and price.
 - Metro riders now leave on a real train. Someone heading home by the Metro waits on the platform until the train pulls in and boards it, rather than disappearing on an empty platform.
 - Trains run once an hour from 6 AM through the 8 PM hour. A rider who reaches the platform after the last train goes up to the ground lobby and leaves by the street, and a Metro visitor finishing a visit at night heads straight for the lobby.
 - Fixed people jumping along the floor to an elevator line. When the line beside an elevator filled the floor right up to its end, people joining it, and people already in it, could leap up to 46 tiles in an instant. They now walk there like everyone else.
