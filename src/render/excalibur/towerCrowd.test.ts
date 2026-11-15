@@ -2,7 +2,8 @@ import { describe, it, expect, vi } from "vitest";
 import { kindFacts } from "../../tests/catalogKinds";
 import * as ex from "excalibur";
 import { FLOOR, TILE } from "../scale";
-import { cabFit, carIndicator, type CarIndicator } from "../carIndicator";
+import { cabFit, carIndicator } from "../carIndicator";
+import { carKey } from "./cabGraphics";
 import { reap, reconcileCrowd, clearCrowd, clearMotion, tickCrowdClock, updateMotion } from "./towerCrowd";
 import { Z } from "../depthPlanes";
 import { HallDoorLayer } from "./towerHallDoors";
@@ -33,7 +34,6 @@ const gfx = () => ({ width: 9, height: 25 }) as ex.Graphic;
 // Match the walker bake footprint (9x25) the production actors adopt from their
 // canvas, so fixtures never encode the legacy 8x14 size.
 const actor = () => new ex.Actor({ pos: ex.vec(0, 0), width: 9, height: 25 });
-const carKey = (ind: CarIndicator) => `${ind.riders}:${ind.arrow ?? "x"}:${ind.full ? "f" : "e"}`;
 
 /** A fake engine carrying the fields the motion/crowd functions read, plus the
  *  two pure world-coordinate helpers the class exposes. */
@@ -360,7 +360,7 @@ describe("zoom cull skips the per-frame loops (CAP-1's cost mechanism)", () => {
       actor: actor(),
       t: { x: 12, kind: "elevatorStandard", carPositions: [8], carLoad: [0], carDir: [0] },
       i: 0, seed: 0, w: 4 * TILE, kind: "elevatorStandard",
-      gfx: new Map<string, ex.Graphic>(), shown: "0:x:e",
+      gfx: new Map<string, ex.Graphic>(), shown: "0:x:e:",
     };
     const e = eng({ carActors: [car], cam: { zoom: 0.06 } });
     updateMotion(e);
@@ -418,13 +418,13 @@ describe("updateMotion repositions the moving actors", () => {
       kind: "elevatorStandard",
       // Pre-seed the cached graphic for the new state so carGfx never bakes a Canvas.
       gfx: new Map<string, ex.Graphic>([[changedKey, gfx()]]),
-      shown: "0:x:e", // idle: forces the "state changed" repaint branch
+      shown: "0:x:e:", // idle: forces the "state changed" repaint branch
     };
     const e = eng({ carActors: [car] });
     updateMotion(e, 1);
     // The riders change once the drawn car gets there, with the people
     // getting in and out (the step's glide ends, or the next step comes).
-    expect(car.shown).toBe("0:x:e");
+    expect(car.shown).toBe("0:x:e:");
     updateMotion(e, MAX_STEP_MS);
     expect(car.actor.pos.x).toBeCloseTo(12 * TILE, 6);
     expect(car.actor.pos.y).toBeCloseTo(-8 * FLOOR, 6);

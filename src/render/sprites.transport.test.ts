@@ -13,7 +13,8 @@ import {
   drawStreetCar,
   type DrawCtx,
 } from "./sprites";
-import { RESERVED_COLORS } from "./pixelSprites/common";
+import { personRider, RESERVED_COLORS } from "./pixelSprites/common";
+import { cabRiderFoot, cabRiderX, drawCarBack, drawCarFront } from "./sprites/transport";
 import { drawSanta, drawExplosion, drawThief, drawTreasure, drawVipLimo } from "./sprites/events";
 import { FLOOR, TILE } from "./scale";
 
@@ -94,6 +95,22 @@ describe("transport, crane & event sprites paint", () => {
     expect(svc.sig()).not.toBe(std.sig());
     expect(exp2.sig()).not.toBe(std.sig());
     expect(exp2.sig()).not.toBe(svc.sig());
+  });
+
+  it("draws a cab as its back, its riders, then its front, so the game can put a cab together from those parts", () => {
+    const whole = spyCtx();
+    drawCar(whole.ctx, 1, 44, 44, 3, "up", true, "elevatorExpress");
+    const parts = spyCtx();
+    drawCarBack(parts.ctx, 44, 44, "elevatorExpress");
+    for (let p = 0; p < 3; p++) personRider(parts.ctx, cabRiderX(44, 3, p) ?? NaN, cabRiderFoot(44), (p * 13 + 1) | 0);
+    drawCarFront(parts.ctx, 44, 44, "up", true);
+    expect(parts.sig()).toBe(whole.sig());
+  });
+
+  it("packs riders tighter as the cab fills and never past its far wall", () => {
+    expect(cabRiderX(44, 1, 0)).toBe(3);
+    expect((cabRiderX(44, 9, 1) ?? 0) - (cabRiderX(44, 9, 0) ?? 0)).toBeLessThan((cabRiderX(44, 2, 1) ?? 0) - (cabRiderX(44, 2, 0) ?? 0));
+    expect(cabRiderX(44, 30, 29)).toBeNull();
   });
 
   it("omitting the kind draws the standard cab, so existing call sites are unchanged", () => {

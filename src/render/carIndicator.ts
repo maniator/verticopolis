@@ -11,11 +11,22 @@ export interface CarIndicator {
    *  many as it has room for (`cabFit`), so the line that boards is the crowd
    *  in the cab (#2116). The car's load never adds figures (3.7.3). */
   riders: number;
+  /** Who those riders are: each one's figure (`figureKey`, standing, with
+   *  their own look and mood), in the crowd's order. The cab draws the first
+   *  `riders` of them, so a person keeps their look when they step into the
+   *  car and when they step out. */
+  figures: readonly number[];
+  /** The figures as one string, for the cab's graphic cache: two cabs with
+   *  the same people in them share it. */
+  cast: string;
   /** Direction lantern: which way the car is moving, or null when idle. */
   arrow: CarArrow;
   /** True once the car is at (or over) capacity — drives the FULL sign. */
   full: boolean;
 }
+
+/** No riders: the figures of an empty cab. */
+export const NO_FIGURES: readonly number[] = [];
 
 /** The pixel step between riders packed into a full cab, and the margin
  *  `drawCar` keeps clear at each side of the cab. */
@@ -35,8 +46,9 @@ export function cabFit(cabWidth: number): number {
  * @param cap  car capacity
  * @param fit  rider figures the cab has room for (`cabFit`)
  * @param aboard people the crowd shows boarding this car (`countCabRiders`)
+ * @param figures who they are (`loadFigures`), and `cast` the same as one string
  */
-export function carIndicator(dir: number, load: number, cap: number, fit: number, aboard: number): CarIndicator {
+export function carIndicator(dir: number, load: number, cap: number, fit: number, aboard: number, figures: readonly number[] = NO_FIGURES, cast = ""): CarIndicator {
   // Treat any non-finite input as a safe default so a stray NaN can never leak
   // into a cache key or the draw call.
   const validCap = Number.isFinite(cap) && cap > 0;
@@ -48,5 +60,5 @@ export function carIndicator(dir: number, load: number, cap: number, fit: number
   if (safeDir > 0) arrow = "up";
   else if (safeDir < 0) arrow = "down";
   const full = validCap && safeLoad >= cap;
-  return { riders, arrow, full };
+  return { riders, figures, cast, arrow, full };
 }

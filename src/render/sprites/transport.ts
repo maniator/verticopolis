@@ -249,7 +249,9 @@ function drawStairFlight(ctx: CanvasRenderingContext2D, sx: number, w: number, b
 }
 
 /** A single elevator car graphic, drawn at (0,0) into a w×floorH rect, carrying
- *  `riders` passengers. `arrow` is the direction lantern (null when idle) and
+ *  `riders` passengers, their faces picked by the cab's seed (the gallery and
+ *  the atlas; the game draws its riders as themselves, `cabGraphics.ts`, from
+ *  the same back, slots and front). `arrow` is the direction lantern (null when idle) and
  *  `full` flags a car at capacity. `kind` dresses the cab per elevator type
  *  (anything but service/express renders the standard cab). The car is its own
  *  Excalibur Actor that the engine moves along the shaft (and swaps as it
@@ -264,6 +266,40 @@ export function drawCar(
   full = false,
   kind: FacilityKind = "elevatorStandard",
 ): void {
+  drawCarBack(ctx, w, floorH, kind);
+  // The cab is the back; its riders are the furniture, and the door frames,
+  // the center seam, the FULL bar and the lantern drawn over them are the
+  // front (depth layers, `pixelSprites/layers.ts`). The floor band stays on
+  // the back: the riders stand on it (#999).
+  layerBreak(ctx);
+  const cw = Math.max(1, Math.round(w));
+  const rc = Math.max(0, Math.floor(riders));
+  for (let p = 0; p < rc; p++) {
+    const rx = cabRiderX(cw, rc, p);
+    if (rx === null) break;
+    personRider(ctx, rx, cabRiderFoot(floorH), (p * 13 + seed) | 0);
+  }
+  layerEnd(ctx);
+  drawCarFront(ctx, w, floorH, arrow, full);
+}
+
+/** Where rider `p` of `rc` stands in a cab `cw` pixels wide: one per
+ *  passenger up to the cab's room (`cabFit`), packed tighter as the car fills
+ *  so a crowded cab reads at a glance; null past the cab's far wall. */
+export function cabRiderX(cw: number, rc: number, p: number): number | null {
+  const gap = Math.max(RIDER_STEP, Math.min(7, (cw - 8) / rc));
+  const rx = 3 + p * gap;
+  return rx > cw - 5 ? null : rx; // never overflow the cab
+}
+
+/** The line a cab's riders stand on: the cab floor, at their size on the
+ *  floor. */
+export function cabRiderFoot(floorH: number): number {
+  return floorH - 3;
+}
+
+/** The back of a cab: its frame, interior and kind band, under the riders. */
+export function drawCarBack(ctx: CanvasRenderingContext2D, w: number, floorH: number, kind: FacilityKind = "elevatorStandard"): void {
   // Per-kind cab dressing, keyed to the catalog palette so the cab echoes its
   // shaft and toolbar identity. All three cabs share the warm brass-and-walnut
   // read; the kind cue is carried by the interior tint and a distinct
@@ -315,24 +351,12 @@ export function drawCar(
     ctx.fillStyle = shade(accent, 120);
     ctx.fillRect(2, floorH - 5, cw - 4, 1);
   }
-  // The cab is the back; its riders are the furniture, and the door frames,
-  // the center seam, the FULL bar and the lantern drawn over them are the
-  // front (depth layers, `pixelSprites/layers.ts`). The floor band stays on
-  // the back: the riders stand on it (#999).
-  layerBreak(ctx);
-  // Riders stand on the cab floor at their size on the floor, one per
-  // passenger up to the cab's room (`cabFit`), packed tighter as the car fills
-  // so a crowded cab reads at a glance.
-  const rc = Math.max(0, Math.floor(riders));
-  if (rc > 0) {
-    const gap = Math.max(RIDER_STEP, Math.min(7, (cw - 8) / rc));
-    for (let p = 0; p < rc; p++) {
-      const rx = 3 + p * gap;
-      if (rx > cw - 5) break; // never overflow the cab
-      personRider(ctx, rx, floorH - 3, (p * 13 + seed) | 0);
-    }
-  }
-  layerEnd(ctx);
+}
+
+/** The front of a cab, over its riders: the door frames, the center seam,
+ *  the FULL bar and the direction lantern. */
+export function drawCarFront(ctx: CanvasRenderingContext2D, w: number, floorH: number, arrow: CarArrow = null, full = false): void {
+  const cw = Math.max(1, Math.round(w));
   // Door frames + the central seam, drawn over the riders so the cab reads as
   // an enclosed car.
   ctx.fillStyle = "rgba(40,44,54,0.24)";
