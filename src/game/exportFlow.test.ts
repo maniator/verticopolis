@@ -168,19 +168,19 @@ describe("export single-flight latch (GH #760)", () => {
 
   it("REGRESSION: the watchdog frees a latch held by a stuck export and says so", async () => {
     vi.useFakeTimers();
-    const { ui, toasts } = fakeUi();
+    const { ui, said } = fakeUi();
     void runExportFlow(flowDeps(ui), saved(new Promise<string>(() => {})));
     await vi.advanceTimersByTimeAsync(EXPORT_WATCHDOG_MS - 1);
-    expect(toasts).toEqual([]);
+    expect(said).toEqual([]);
     await vi.advanceTimersByTimeAsync(1);
-    expect(toasts).toEqual([HUNG_TOAST]);
+    expect(said).toEqual([HUNG_TOAST]);
   });
 
   it("REGRESSION: a late settle never unlocks the export that took over the latch", async () => {
     vi.useFakeTimers();
     const slow = deferred<string>();
     const retry = deferred<string>();
-    const { ui, toasts, downloads } = fakeUi();
+    const { ui, toasts, said, downloads } = fakeUi();
     const first = runExportFlow(flowDeps(ui), saved(slow.promise));
     await vi.advanceTimersByTimeAsync(EXPORT_WATCHDOG_MS);
     const second = runExportFlow(flowDeps(ui), saved(retry.promise));
@@ -193,32 +193,37 @@ describe("export single-flight latch (GH #760)", () => {
     retry.resolve("VCTOWER1\nfake");
     await second;
     expect(downloads).toHaveLength(2);
-    expect(toasts).toEqual([HUNG_TOAST, LATE_TOAST, LIVE_TOAST]);
+    expect(toasts).toEqual([LIVE_TOAST]);
+    expect(said).toEqual([HUNG_TOAST, LATE_TOAST]);
   });
 
   it("REGRESSION (GH #997): an export that settles after the watchdog says it finished after all", async () => {
     vi.useFakeTimers();
     const slow = deferred<string>();
-    const { ui, toasts, downloads } = fakeUi();
+    const { ui, toasts, said, downloads } = fakeUi();
     const run = runExportFlow(flowDeps(ui), saved(slow.promise));
     await vi.advanceTimersByTimeAsync(EXPORT_WATCHDOG_MS);
     slow.resolve("VCTOWER1\nfake");
     await run;
     expect(downloads).toHaveLength(1);
-    expect(toasts).toEqual([HUNG_TOAST, LATE_TOAST]);
+    // Both late lines go through sayVisibly, so a dialog opened in the
+    // meantime shows them instead of covering a toast (#785).
+    expect(said).toEqual([HUNG_TOAST, LATE_TOAST]);
+    expect(toasts).toEqual([]);
   });
 
   it("a late settle whose download fails ends on the failure alone, with no success line", async () => {
     vi.useFakeTimers();
     const slow = deferred<string>();
-    const { ui, toasts, downloads } = fakeUi([false]);
+    const { ui, toasts, said, downloads } = fakeUi([false]);
     const run = runExportFlow(flowDeps(ui), saved(slow.promise));
     await vi.advanceTimersByTimeAsync(EXPORT_WATCHDOG_MS);
     slow.resolve("VCTOWER1\nfake");
     await run;
     expect(downloads).toHaveLength(1);
     // The fake stands in for UI.downloadFile, which has already toasted its failure.
-    expect(toasts).toEqual([HUNG_TOAST]);
+    expect(said).toEqual([HUNG_TOAST]);
+    expect(toasts).toEqual([]);
   });
 });
 
@@ -288,10 +293,10 @@ describe("legacy (.TDT) download shares the export latch (GH #760 follow-on)", (
 
   it("the watchdog frees a latch held by a hung legacy download and says so", async () => {
     vi.useFakeTimers();
-    const { ui, toasts } = fakeUi();
+    const { ui, said } = fakeUi();
     void runLegacyDownload(ui, () => new Promise<void>(() => {})); // never settles
     await vi.advanceTimersByTimeAsync(EXPORT_WATCHDOG_MS + 1);
-    expect(toasts).toEqual([{ text: "The export is not responding. You can try exporting again.", kind: "bad" }]);
+    expect(said).toEqual([HUNG_TOAST]);
     // The freed latch lets a fresh legacy download run.
     let ran = false;
     await runLegacyDownload(ui, () => {

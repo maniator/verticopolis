@@ -197,6 +197,13 @@
   font-weight: 700;
 }
 
+/* Plain or good news said from inside a dialog (a late export that finished
+   after all, a file waiting its turn): the same place, in ordinary ink, so it
+   does not read as a failure. */
+.modal-notice-calm {
+  color: var(--ink);
+}
+
 /* The unsaved-work warning, shown in the pinned strip itself rather than by
    renaming a button. Esc leaves the player looking at the dialog, not at the
    action row, so the state has to announce itself as text where their eyes

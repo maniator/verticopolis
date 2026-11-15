@@ -16,7 +16,7 @@ import type { UI } from "../ui/UI";
 
 /** The slice of {@link import("./saveLoad").SaveLoadDeps} the flow touches. */
 export interface ExportFlowDeps {
-  ui: Pick<UI, "toast" | "downloadFile">;
+  ui: Pick<UI, "toast" | "sayVisibly" | "downloadFile">;
   /** The tower being exported, for the `file_exported` event. */
   reader(): Pick<ViewReader, "header">;
 }
@@ -79,7 +79,9 @@ export async function runExportFlow(
     if (latchOwner !== run) return;
     latchOwner = 0;
     timedOut = true;
-    deps.ui.toast("The export is not responding. You can try exporting again.", "bad");
+    // Both late lines land at least the watchdog's wait after the click, when
+    // the player has likely opened a dialog that would cover a toast (#785).
+    deps.ui.sayVisibly("The export is not responding. You can try exporting again.", "bad");
   }, EXPORT_WATCHDOG_MS);
   try {
     // The engine writes the `.vctower` of the tower it holds now, with the
@@ -94,12 +96,8 @@ export async function runExportFlow(
     // A binary file's length is its size on disk, and the text container is
     // pure ASCII, so its string length is too.
     const size = `${(file.length / 1024).toFixed(1)} KB`;
-    deps.ui.toast(
-      timedOut
-        ? `The earlier export finished after all (${size}). Check your downloads.`
-        : `Tower exported (${size}). Check your downloads.`,
-      "good",
-    );
+    if (timedOut) deps.ui.sayVisibly(`The earlier export finished after all (${size}). Check your downloads.`, "good");
+    else deps.ui.toast(`Tower exported (${size}). Check your downloads.`, "good");
   } catch (err) {
     // Never fail silently: main.ts fires this with `void`, so an unhandled
     // rejection here would leave the player with no download and no feedback.
@@ -146,7 +144,7 @@ export async function runLegacyDownload(
   const watchdog = setTimeout(() => {
     if (latchOwner !== run) return;
     latchOwner = 0;
-    ui.toast("The export is not responding. You can try exporting again.", "bad");
+    ui.sayVisibly("The export is not responding. You can try exporting again.", "bad");
   }, EXPORT_WATCHDOG_MS);
   try {
     await download();
