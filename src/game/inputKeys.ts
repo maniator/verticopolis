@@ -1,5 +1,5 @@
 import type { GameApp } from "../main";
-import { isCrashed, isEngineStopped, isSplashUp, isDialogOpen } from "./interactionState";
+import { isCrashed, isEngineStopped, isRecoveringGraphics, isSplashUp, isDialogOpen } from "./interactionState";
 import { flushPrefsSave } from "./audioPrefs";
 import { isPrimaryPress, noButtonHeld } from "../ui/overviewMapInput";
 import { keyId } from "../ui/overviewMapKeys";
@@ -85,10 +85,11 @@ function isCursorKey(key: string): boolean {
   return cursorStep(key, 1) !== null;
 }
 
-/** A dialog, the splash, the crash card or the engine-failure card covers the
- *  world: nothing behind it pans, and Space belongs to its controls. */
+/** A dialog, the splash, the crash card, the graphics-recovery card or the
+ *  engine-failure card covers the world: nothing behind it pans, and Space
+ *  belongs to its controls. */
 function worldCovered(): boolean {
-  return isDialogOpen() || isSplashUp() || isCrashed() || isEngineStopped();
+  return isDialogOpen() || isSplashUp() || isCrashed() || isRecoveringGraphics() || isEngineStopped();
 }
 
 /** The keyboard build cursor's step for a movement key (arrows and W A S D),
@@ -107,7 +108,7 @@ function cursorStep(key: string, step: number): [dx: number, dy: number] | null 
  *  of the game right now. Shared by the press and the Space release, so both
  *  apply the same focus, dialog, splash and crash rules. */
 function blocksGameKey(e: KeyboardEvent): boolean {
-  if (isCrashed() || isEngineStopped()) return true;
+  if (isCrashed() || isRecoveringGraphics() || isEngineStopped()) return true;
   // Never hijack other browser/OS shortcuts (Ctrl/Cmd/Alt + key).
   if (e.ctrlKey || e.metaKey || e.altKey) return true;
   // Typing controls swallow every game key.
@@ -291,8 +292,9 @@ export function bindKeys(app: GameApp, signal?: AbortSignal): void {
     // and the tower was just flushed, so game shortcuts (undo especially)
     // must not silently mutate the sim behind the card. Checked before the
     // undo/redo block below, which deliberately runs ahead of the #modal
-    // guard and would otherwise stay live.
-    if (isCrashed() || isEngineStopped()) return;
+    // guard and would otherwise stay live. The graphics-recovery card holds the
+    // page the same way while the canvas is frozen (#321).
+    if (isCrashed() || isRecoveringGraphics() || isEngineStopped()) return;
     // Undo / redo (Ctrl/Cmd+Z, Ctrl/Cmd+Shift+Z or +Y), handled BEFORE the
     // modifier bail below so it isn't swallowed; yielded to a focused field that
     // keeps its own undo history (INPUT/TEXTAREA/contentEditable, e.g. the rename

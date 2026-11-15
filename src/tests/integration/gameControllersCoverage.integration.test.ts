@@ -35,6 +35,8 @@ import { hasWasmPackage } from "../conformance/wasmEngine";
  *  where it is built (CI builds it for every project). */
 const itTdt = (name: string, body: () => Promise<void>) => it.skipIf(!hasWasmPackage())(name, body);
 import { saveOf, loadAuto, loadSlotSim, withPorts } from "../fixtures/saveText";
+import { showGraphicsRecovery } from "../../ui/graphicsRecovery";
+import { isRecoveringGraphics } from "../../game/interactionState";
 
 /** Coverage companion to gameControllers.integration.test.ts: the same harness idioms
  *  (recording fakes, fixture placements asserted with .ok, the Rust engine)
@@ -1102,6 +1104,7 @@ describe.skipIf(noEngine)("SaveLoad (persistence, update flush, GPU-loss recover
       },
       ui: f.ui,
       showCrashScreen: (info) => crashScreens.push(info),
+      showRecoveryWait: () => showGraphicsRecovery(),
       attemptGraphicsRecovery: (done) => recoveries.push(done),
       armOnboarding: () => armed++,
     }));
@@ -1343,7 +1346,8 @@ describe.skipIf(noEngine)("SaveLoad (persistence, update flush, GPU-loss recover
     expect(crashScreens).toHaveLength(0);
     expect(recoveries).toHaveLength(1);
     expect(reload).not.toHaveBeenCalled();
-    expect(last(f.toasts)).toEqual({ text: "The device reset the game's graphics. Recovering...", kind: "info" });
+    // The wait is a card that holds the page, not a toast (#321).
+    expect(isRecoveringGraphics()).toBe(true);
     // The loss itself is stamped, so a second loss inside 90s reads as a
     // repeat even when no reload ever happens.
     expect(Number(sessionStorage.getItem("vc-gl-lost-reload"))).toBeGreaterThan(0);
@@ -1351,6 +1355,7 @@ describe.skipIf(noEngine)("SaveLoad (persistence, update flush, GPU-loss recover
     // The rebuild succeeds: the player gets a confirmation toast and a durable
     // bulletin entry (the old silent reload erased all evidence of the crash).
     recoveries[0](true);
+    expect(isRecoveringGraphics()).toBe(false);
     expect(crashScreens).toHaveLength(0);
     expect(last(f.toasts)).toEqual({ text: "Graphics recovered. Your tower was saved.", kind: "good" });
     expect(sim.log!.some((e) => e.text.includes("recovered on the spot"))).toBe(true);

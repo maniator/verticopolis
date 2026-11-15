@@ -4,6 +4,7 @@ import type { CrashDescription, FrameErrorEntry } from "../game/crashReport";
 import { escapeHtml } from "./escape";
 import { readRecoveryText } from "../storage/recoveryCopy";
 import { downloadRecoveryCopy, RECOVERY_COPY_STATUS } from "./recoveryCopy";
+import { GRAPHICS_RECOVERY_ID } from "./graphicsRecovery";
 
 /**
  * The full-screen crash card. Shown when the game can no longer draw (the GPU
@@ -53,6 +54,9 @@ function saveLineFor(save: CrashScreenOptions["save"]): string {
 
 export function showCrashScreen(opts: CrashScreenOptions): void {
   if (document.getElementById(CRASH_SCREEN_ID)) return;
+  // A second loss during an in-place recovery lands here while the "Recovering
+  // graphics" card is up; this card replaces it rather than stacking on it.
+  document.getElementById(GRAPHICS_RECOVERY_ID)?.remove();
 
   const saveLine = saveLineFor(opts.save);
   // Device-distress advice: shown for a rapid double crash AND for a first

@@ -1,10 +1,11 @@
 import type { GameApp } from "../main";
 import { CRASH_SCREEN_ID } from "../ui/crashScreen";
+import { GRAPHICS_RECOVERY_ID } from "../ui/graphicsRecovery";
 
 /**
  * The single owner of "can the player interact right now" (issue #716).
  *
- * Five sources answer that question, and before this module nothing required
+ * Six sources answer that question, and before this module nothing required
  * them to agree:
  *
  *  1. `app.shownChoice` — an emergency-choice modal is up (freezes the sim).
@@ -13,6 +14,7 @@ import { CRASH_SCREEN_ID } from "../ui/crashScreen";
  *     picker sets this with NEITHER flag above).
  *  4. the title screen is up (`#splash`).
  *  5. `#crash-screen` exists — the renderer died.
+ *  6. `#graphics-recovery` exists: the renderer is restarting in place (#321).
  *
  * The class of bug this prevents is two of those sources disagreeing in one
  * state: one consumer reading the flags while another reads the element (the
@@ -22,10 +24,11 @@ import { CRASH_SCREEN_ID } from "../ui/crashScreen";
  *
  * This is a facade, not a store (party ruling 2026-07-30): plain synchronous
  * reads of the DOM and `GameApp` chrome fields, no reactive graph, no
- * subscription to `sim`. It reads `src/engine` never (AD-4/AD-5): the five
- * sources are all UI chrome. The five WRITERS stay where they are (AD-8):
+ * subscription to `sim`. It reads `src/engine` never (AD-4/AD-5): the six
+ * sources are all UI chrome. The six WRITERS stay where they are (AD-8):
  * `shownChoice` in `frameLoop`, `shownUpdate` in `updateFlow`, the `#modal`
- * element in `UI`, `#splash` in `Onboarding`, `#crash-screen` in `crashScreen`.
+ * element in `UI`, `#splash` in `Onboarding`, `#crash-screen` in `crashScreen`,
+ * `#graphics-recovery` in `graphicsRecovery`.
  * This module owns the READS.
  */
 
@@ -35,6 +38,13 @@ import { CRASH_SCREEN_ID } from "../ui/crashScreen";
  *  read of `app.ui` here could throw before the crash is even reported. */
 export function isCrashed(): boolean {
   return !!document.getElementById(CRASH_SCREEN_ID);
+}
+
+/** The game is restarting its graphics in place after a context loss: the
+ *  canvas is frozen and the recovery card holds the page, so no game key may
+ *  act (#321). Read from the card's element, like the crash card. */
+export function isRecoveringGraphics(): boolean {
+  return !!document.getElementById(GRAPHICS_RECOVERY_ID);
 }
 
 /** The engine-failure message's element id (bootstrap.ts renders it). */

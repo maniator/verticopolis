@@ -364,6 +364,7 @@ describe.skipIf(noEngine)("SaveLoad (tower-swap contracts)", () => {
       },
       ui: f.ui,
       showCrashScreen: () => {},
+      showRecoveryWait: () => () => {},
       attemptGraphicsRecovery: () => {},
       armOnboarding: () => {},
     }));
@@ -437,6 +438,7 @@ describe.skipIf(noEngine)("SaveLoad (tower-swap contracts)", () => {
       adoptSim: () => {},
       ui: f2.ui,
       showCrashScreen: () => {},
+      showRecoveryWait: () => () => {},
       attemptGraphicsRecovery: () => {},
       armOnboarding: () => {},
     }));

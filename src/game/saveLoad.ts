@@ -68,6 +68,8 @@ export interface SaveLoadDeps {
    *  src/game/contextRecovery.ts). Reports exactly one outcome: `true` when
    *  the fresh engine is running, `false` on failure or timeout. */
   attemptGraphicsRecovery(done: (recovered: boolean) => void): void;
+  /** Show the card that holds the page during recovery; returns its closer (#321). */
+  showRecoveryWait(): () => void;
   /** Arm first-run onboarding on the just-adopted sim. */
   armOnboarding(): void;
 }
@@ -310,15 +312,13 @@ export class SaveLoad {
       showScreen(false);
       return;
     }
-    // Captured so a tower swap during the wait (Load/New stay reachable) is
-    // detectable at completion: the "your tower was saved" trace belongs to
-    // THIS tower, and must not land in a different one's bulletin log.
+    // A swap begun just before the loss is caught at completion: the saved-tower trace belongs to THIS tower.
     const towerAtLoss = this.deps.enginePort().generation();
-    this.deps.ui.toast("The device reset the game's graphics. Recovering...", "info");
+    const endWait = this.deps.showRecoveryWait();
     this.deps.attemptGraphicsRecovery((recovered) => {
-      // Re-anchor the repeat window at the attempt's END too: a background
-      // eviction can restore minutes after the loss, and a fresh loss soon
-      // after play resumes must still read as a repeat.
+      endWait();
+      // Re-anchor the repeat window at the attempt's END too: an eviction can restore minutes
+      // after the loss, and a fresh loss soon after play resumes must still read as a repeat.
       this.stampLoss(Date.now());
       if (!recovered) {
         showScreen(true);

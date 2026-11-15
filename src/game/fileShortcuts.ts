@@ -1,4 +1,4 @@
-import { isDialogOpen, isEngineStopped, isSplashUp } from "./interactionState";
+import { isDialogOpen, isEngineStopped, isRecoveringGraphics, isSplashUp } from "./interactionState";
 
 /** What the File menu's keys run: the same calls its items make. */
 export interface FileCommands {
@@ -61,7 +61,7 @@ export function wireFileShortcuts(
     const command = fileCommandFor(e);
     if (!command || typesText(e.target)) return;
     e.preventDefault();
-    if (e.repeat || isDialogOpen() || isEngineStopped()) return;
+    if (e.repeat || isDialogOpen() || isRecoveringGraphics() || isEngineStopped()) return;
     const grayed = command !== "open" && isSplashUp();
     report(command, grayed);
     if (!grayed) commands[command]();

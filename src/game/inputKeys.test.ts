@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { flushPrefsSave } from "./audioPrefs";
 import { CRASH_SCREEN_ID } from "../ui/crashScreen";
+import { GRAPHICS_RECOVERY_ID } from "../ui/graphicsRecovery";
 import { setHistoryButtons } from "../ui/uiStatus";
 import { makeApp, press, tap } from "./inputKeys.fixture";
 
@@ -275,6 +276,21 @@ describe("early-return guards", () => {
     expect(app.undo).not.toHaveBeenCalled();
     expect(app.setSpeed).not.toHaveBeenCalled();
     expect(app.keyboard.moveCursor).not.toHaveBeenCalled();
+  });
+
+  it("the graphics-recovery card swallows ALL keys while the canvas is frozen (#321)", () => {
+    const app = makeApp({ tile: 1, floor: 1 });
+    const card = document.createElement("dialog");
+    card.id = GRAPHICS_RECOVERY_ID;
+    document.body.appendChild(card);
+    press("z", { ctrlKey: true });
+    press("2");
+    press("ArrowLeft");
+    press(" ");
+    expect(app.undo).not.toHaveBeenCalled();
+    expect(app.setSpeed).not.toHaveBeenCalled();
+    expect(app.keyboard.moveCursor).not.toHaveBeenCalled();
+    expect(app.keyboard.commitCursor).not.toHaveBeenCalled();
   });
 
   it("a focused INPUT swallows game keys", () => {
