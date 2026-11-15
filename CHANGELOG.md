@@ -25,6 +25,12 @@ prompt already tells players it is an engine update and shows the new version.
 Entries below 1.51.1 were curated from the commit history after the fact, so they
 are documentation only: no build that a client fetches carries them.
 
+## 3.14.0
+
+- Modern towers side by side on one lot are joined by the street: people walk out of one ground lobby, along the sidewalk and in by the other, so a trip next door no longer needs a shared basement.
+- Modern towers can have more than one ground lobby: with floor bridging off, lay a lobby anywhere on the ground line to start another tower.
+- Modern can bulldoze ground lobby tiles, so a lobby bridged across open ground can be parted into two towers' front doors. The lot keeps its last ground lobby tile.
+
 ## 3.13.0
 
 - People stay in the tower when you reload a save: everyone walking, waiting, riding, eating, shopping or cleaning picks up where they were, and the elevators carry on mid-stop, instead of the building emptying and filling again from the lobby. If the game hits an engine error and reloads itself, that one reload still starts the tower empty, so the error is not replayed.
