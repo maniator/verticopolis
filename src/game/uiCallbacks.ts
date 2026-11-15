@@ -148,7 +148,11 @@ export function createUICallbacks(app: GameAppPorts): UICallbacks {
     isPassersBy: () => app.isPassersBy(),
     // The preference the engine holds after the toggle (a Classic tower
     // always bridges, so there it stays on).
-    onToggleAutoBridge: async () => app.portCodes.slot(app.enginePort.flipAutoBridge(), "flipAutoBridge", "value") === 1,
+    onToggleAutoBridge: async () => {
+      const on = app.portCodes.slot(app.enginePort.flipAutoBridge(), "flipAutoBridge", "value") === 1;
+      trackAppAction("auto_bridge", on ? "on" : "off"); // the engine's new state
+      return on;
+    },
     isAutoBridge: () => app.enginePort.autoBridge(),
     onReplayOnboarding: () => {
       trackAppAction("replay_onboarding");

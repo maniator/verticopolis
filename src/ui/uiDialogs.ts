@@ -14,6 +14,7 @@ import type { ImportReport } from "../storage/tdtImportReport";
 import type { ExportReport } from "../storage/tdtExportReport";
 import type { UpdateInfo } from "../pwa";
 import { isInstalledStandalone } from "./standalone";
+import { trackAppAction } from "../analytics";
 
 /**
  * Dialog and modal controllers for {@link UI}, as friend functions taking the
@@ -105,9 +106,11 @@ export function newTowerModal(
         if (mode === "modern") {
           const pickedCal = box.querySelector<HTMLInputElement>('input[name="nt-cal"]:checked')?.value;
           if (pickedCal === "canon") modernCalendar = "canon";
-          // "Bridge floors between rooms" starts checked, as in Settings; only
-          // a box the player cleared founds the tower unbridged.
-          startUnbridged = box.querySelector<HTMLInputElement>('input[name="nt-bridged"]')?.checked === false;
+          // "Bridge floors between rooms" starts cleared (owner, 2026-11-15), so
+          // a new Modern tower keeps separate sections apart unless the player
+          // ticks the box. Only a ticked box founds the tower bridged.
+          startUnbridged = box.querySelector<HTMLInputElement>('input[name="nt-bridged"]')?.checked !== true;
+          trackAppAction("found_bridged", startUnbridged ? "off" : "on");
         }
         ui.closeModal();
         opts.onFound(mode, modernCalendar, startUnbridged);

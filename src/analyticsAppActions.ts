@@ -72,6 +72,10 @@ export type AppActionName =
   | "mute"
   | "reduced_motion"
   | "steady_clock"
+  // Modern's "Bridge floors between rooms", detail on/off: found_bridged is the
+  // box at a Modern founding (unticked by default), auto_bridge the Settings switch.
+  | "found_bridged"
+  | "auto_bridge"
   // Coarse engagement bit, latched once per session via `trackAppActionOnce`:
   // `volume` = the player touched the audio sliders (latched so the pointer-move
   // slider cannot flood; no value, just the fact). (Deliberately NOT tracked, per
