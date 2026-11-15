@@ -1,8 +1,8 @@
 //! Modern's hotel late checkout (#304), from the retired
 //! `hotelLateCheckout.integration.test.ts`: Classic checks every guest out
 //! at 08:00 and the late checkout does nothing; Modern holds round(0.2 x N)
-//! asleep rooms in tower order (no draw), charges each room once across the
-//! two checkouts, dirties the held rooms in a 14:00 to 17:00 window without
+//! asleep rooms in tower order (no draw), charges every room at the morning
+//! checkout (so a held room destroyed before 14:00 still paid), dirties the held rooms in a 14:00 to 17:00 window without
 //! re-running the morning's housekeeping latch, sends their guests to lunch,
 //! lifts the midday census by exactly those rooms without moving the star,
 //! and a maid turns the late rooms over like any others. The no-maid half
@@ -14,6 +14,7 @@ use std::collections::HashSet;
 use crate::clock::GameMode;
 use crate::econ::rent_of;
 use crate::facilities::Kind;
+use crate::gameplay::RemovalMethod;
 use crate::rules::HOTEL_DAYTIME_PRESENCE;
 use crate::sim::Simulation;
 use crate::tower::UnitState;
@@ -119,19 +120,41 @@ fn an_empty_hotel_holds_nobody_and_earns_nothing() {
 }
 
 #[test]
-fn each_room_is_charged_once_across_the_two_checkouts() {
+fn every_room_pays_at_the_morning_checkout_and_the_late_one_charges_nothing() {
     let mut sim = hotel_tower(GameMode::Modern, ROOMS, 2024);
     let rent = rent_of(HOTEL, None, false);
-    let kept = held(ROOMS) as f64;
+    assert!(held(ROOMS) > 0, "the premise: some rooms are held");
     let start = sim.money;
     sim.hotel_checkout();
     let morning = sim.money;
-    assert_eq!(morning - start, (ROOMS as f64 - kept) * rent);
+    assert_eq!(morning - start, ROOMS as f64 * rent);
     sim.hotel_late_checkout();
-    assert_eq!(sim.money - morning, kept * rent);
-    let settled = sim.money;
+    assert_eq!(sim.money, morning, "the held rooms already paid");
     sim.hotel_late_checkout();
-    assert_eq!(sim.money, settled, "a second firing charges nothing");
+    assert_eq!(sim.money, morning, "a second firing charges nothing");
+}
+
+/// A held room bulldozed between the two checkouts still paid for its
+/// night: the day's hotel income does not depend on when it was destroyed
+/// (#2283).
+#[test]
+fn a_held_room_destroyed_before_the_late_checkout_still_paid() {
+    let income = |destroy_held: bool| {
+        let mut sim = hotel_tower(GameMode::Modern, ROOMS, 2024);
+        sim.hotel_checkout();
+        let held_rooms = rooms_in(&sim, UnitState::Asleep);
+        assert_eq!(held_rooms.len(), held(ROOMS));
+        if destroy_held {
+            for id in held_rooms {
+                assert!(sim.remove_facility(id, RemovalMethod::Bulldoze).ok);
+            }
+        }
+        sim.hotel_late_checkout();
+        sim.ledger.today.get("hotels").copied().unwrap_or(0.0)
+    };
+    let rent = rent_of(HOTEL, None, false);
+    assert_eq!(income(false), ROOMS as f64 * rent);
+    assert_eq!(income(true), income(false));
 }
 
 /// The late checkout dirties the held rooms without the morning's
