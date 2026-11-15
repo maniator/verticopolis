@@ -255,7 +255,7 @@ describe("the Open window", () => {
     const drop = new Event("drop", { bubbles: true, cancelable: true }) as DragEvent;
     Object.defineProperty(drop, "dataTransfer", { value: { types: ["Files"], files: [dropped] } });
     q(".fd").dispatchEvent(drop);
-    expect(ctx.add).toHaveBeenCalledExactlyOnceWith([dropped]);
+    expect(ctx.add).toHaveBeenCalledExactlyOnceWith([dropped], "drop");
     expect(drop.defaultPrevented).toBe(true);
   });
 
@@ -411,11 +411,28 @@ describe("the Save As window", () => {
     name.dispatchEvent(new Event("input"));
     key(name, "Enter");
     expect(q(".fd-ask").textContent).toContain(`"alpha" already exists.`);
-    expect(q(".fd-ask").textContent).toContain("Do you want to replace it?");
+    expect(q(".fd-ask").textContent).toContain(`Save this tower as "alpha (2)", or replace it?`);
     expect(q("#fd-ask-title").textContent).toBe("Save As");
+    expect(document.activeElement, "the numbered name has the focus").toBe(q('[data-fd-ask="alt"]'));
     expect(ctx.save).not.toHaveBeenCalled();
-    button("Yes").click();
+    button("Replace").click();
     expect(ctx.save).toHaveBeenCalledExactlyOnceWith("alpha", true);
+  });
+
+  it("offers the next free numbered name instead of replacing, the way Windows does", () => {
+    files.push(entry("d", "Alpha (2)", 5));
+    show("saveAs");
+    const name = q<HTMLInputElement>("#fd-name");
+    name.value = "Alpha";
+    name.dispatchEvent(new Event("input"));
+    key(name, "Enter");
+    const alt = q('[data-fd-ask="alt"]');
+    expect(alt.textContent).toBe(`Save as "Alpha (3)"`);
+    expect(button("Cancel")).toBeTruthy();
+    key(alt, "Tab");
+    expect(document.activeElement, "Tab walks all three buttons").toBe(q('[data-fd-ask="yes"]'));
+    alt.click();
+    expect(ctx.save).toHaveBeenCalledExactlyOnceWith("Alpha (3)", false);
   });
 
   it("refuses an empty name", () => {

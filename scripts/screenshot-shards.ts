@@ -99,6 +99,10 @@ export const SHARDS: Record<string, string[]> = {
   // the folded strip draws every settle frame (the canvas resizes in view),
   // about 15s in the pinned image locally, roughly twice that under CI's
   // two-leg contention.
+  // The folder linked on the player's computer (owner, 2026-11-15): three
+  // scenes of DOM window stills over the default new tower, desktop and
+  // phone, about 10s; its own shard as the owner asked.
+  "linked-folder": ["linked-folder", "linked-folder-unsupported", "linked-folder-mobile"],
   misc: ["tablet", "mobile", "mobile-landscape", "construction", "crowd", "fire", "install-affordance-mobile", "overview-map", "overview-map-phone", "overview-map-gaps", "overview-map-gaps-phone", "palette-fit"],
 };
 

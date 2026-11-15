@@ -24,6 +24,12 @@ const view = (over: Partial<FileDialogView> = {}): FileDialogView => ({
   dropping: false,
   canPaste: false,
   kept: false,
+  place: "local",
+  linked: null,
+  canLink: false,
+  canPickFolder: false,
+  where: "computer",
+  lookOpen: false,
   ...over,
 });
 const draw = (v: FileDialogView) => {

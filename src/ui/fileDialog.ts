@@ -1,10 +1,13 @@
 import { render } from "lit-html";
 import { html } from "lit-html";
 import type { UI } from "./UI";
-import { cleanFileName, type TowerFileEntry } from "../storage/fileSpace";
+import { cleanFileName, freeName, type TowerFileEntry } from "../storage/fileSpace";
+import type { FilePlace } from "./templates/fileDialogPlaces";
+import { lastPlace, pickFolderFiles, placeHandlers, rememberPlace, whereWords, type LinkedPlaceCtx } from "./fileDialogPlaces";
 import {
   fileDialogTemplate,
   rowDomId,
+  type FileAnswer,
   type FileAsk,
   type FileDialogMode,
   type FileDialogView,
@@ -56,8 +59,18 @@ export interface FileDialogCtx {
   rename(id: string, name: string): Promise<FileNote | null>;
   duplicate(id: string): Promise<FileNote | null>;
   remove(id: string): Promise<FileNote | null>;
-  /** Files dropped on the window. */
-  add(files: readonly File[]): Promise<FileNote | null>;
+  /** Files dropped on the window (`drop`), or the towers of a folder the
+   *  player picked with From a folder… (`folder`), added to My Towers. */
+  add(files: readonly File[], how?: "drop" | "folder"): Promise<FileNote | null>;
+  /** The folder linked on the player's computer, where the browser can link
+   *  one (`linkedFolderCommands.ts`); null where it can't. */
+  linked?: LinkedPlaceCtx | null;
+  /** Where linking is not possible: offer From a folder…, which copies a
+   *  picked folder's towers into My Towers once. */
+  canPickFolder?: boolean;
+  /** The place the window starts in, when the caller knows better than the
+   *  last one the player looked in (Save As for a tower from the folder). */
+  startIn?: FilePlace;
   /** The window asked before replacing or deleting a file (analytics). */
   asked?(kind: FileAsk["kind"]): void;
   /** The way to or from a file on the device. The window is closed first. */
@@ -116,7 +129,15 @@ export function showFileDialog(ui: Pick<UI, "openModalTemplate" | "closeModal">,
     menu: null as FileDialogView["menu"],
     busy: false,
     dropping: false,
+    place: (ctx.startIn ?? lastPlace()) as FilePlace,
+    look: false,
   };
+  const linked = ctx.linked ?? null;
+  /** The list shows the linked folder (one is linked and chosen). */
+  const inLinked = (): boolean => state.place === "linked" && !!linked?.state();
+  const placeFiles = (): readonly TowerFileEntry[] => (inLinked() ? linked!.files() : ctx.files());
+  const allowed = (): boolean => !inLinked() || linked!.state()?.access === "granted";
+  const placeName = (): string => (inLinked() ? `"${linked!.state()!.name}"` : "My Towers");
   const box = ui.openModalTemplate(html`<h2>${opening ? "Open" : "Save As"}</h2><div class="fd-host"></div>`, { displaceable: opening });
   const host = box.querySelector<HTMLElement>(".fd-host")!;
   box.classList.add("fd-window");
@@ -133,13 +154,34 @@ export function showFileDialog(ui: Pick<UI, "openModalTemplate" | "closeModal">,
       off();
       return;
     }
-    const auto = opening ? ctx.auto() : null;
-    rows = fileRows(auto, ctx.files(), state.filter, state.sort);
+    const here = inLinked();
+    const auto = opening && !here ? ctx.auto() : null;
+    rows = fileRows(auto, placeFiles(), state.filter, state.sort);
     if (state.selected !== null && !rowOf(state.selected)) state.selected = null;
-    const view = { ...state, mode: ctx.mode, rows, usage: withAuto(ctx.usage(), auto), loading: ctx.loading(), canPaste: copied !== null, kept: ctx.downloadKept !== null };
+    const folder = linked?.state() ?? null;
+    const view = {
+      ...state,
+      mode: ctx.mode,
+      rows,
+      usage: here ? linked!.usage() : withAuto(ctx.usage(), auto),
+      loading: !here && ctx.loading(),
+      canPaste: copied !== null,
+      kept: ctx.downloadKept !== null,
+      place: here ? ("linked" as const) : ("local" as const),
+      linked: folder ? { name: folder.name, allowed: folder.access === "granted" } : null,
+      canLink: !!linked?.canLink,
+      canPickFolder: !!ctx.canPickFolder,
+      where: whereWords(),
+      lookOpen: state.look,
+    };
     render(fileDialogTemplate(view, handlers), host);
   }
-  const off = ctx.onChange(draw);
+  const offFiles = ctx.onChange(draw);
+  const offLinked = linked?.onChange(draw);
+  const off = () => {
+    offFiles();
+    offLinked?.();
+  };
 
   function set(change: Partial<typeof state>): void {
     Object.assign(state, change);
@@ -171,7 +213,8 @@ export function showFileDialog(ui: Pick<UI, "openModalTemplate" | "closeModal">,
     if (!r) return;
     if (opening) {
       ui.closeModal();
-      ctx.open(r);
+      if (inLinked()) linked!.open(r);
+      else ctx.open(r);
       return;
     }
     if (r.type === "auto") return;
@@ -182,7 +225,7 @@ export function showFileDialog(ui: Pick<UI, "openModalTemplate" | "closeModal">,
   function primary(): void {
     // Not before the list is in: a name check against half a list could
     // save over a tower without asking.
-    if (state.busy || state.ask || ctx.loading()) return;
+    if (state.busy || state.ask || (!inLinked() && ctx.loading()) || !allowed()) return;
     const name = cleanFileName(state.name);
     if (!name) {
       set({ line: { text: "Type a name for the tower.", kind: "bad" } });
@@ -191,35 +234,39 @@ export function showFileDialog(ui: Pick<UI, "openModalTemplate" | "closeModal">,
     const match = rows.find((r) => r.name.toLocaleLowerCase() === name.toLocaleLowerCase());
     if (opening) {
       if (match) activate(match.id);
-      else set({ line: { text: `There's no tower named "${name}" in My Towers.`, kind: "bad" } });
+      else set({ line: { text: `There's no tower named "${name}" in ${placeName()}.`, kind: "bad" } });
       return;
     }
-    const taken = ctx.files().some((f) => f.name.toLocaleLowerCase() === name.toLocaleLowerCase());
-    if (taken) ask({ kind: "replace", name });
+    // Saving writes a .vctower, so in the linked folder only another
+    // .vctower of that name is replaced; a .TDT beside it stays.
+    const towers = placeFiles().filter((f) => !inLinked() || f.kind === "tower");
+    const taken = towers.some((f) => f.name.toLocaleLowerCase() === name.toLocaleLowerCase());
+    if (taken) ask({ kind: "replace", name, alt: freeName(name, towers) });
     else void save(name, false);
   }
 
   async function save(name: string, replace: boolean): Promise<void> {
-    const note = await run(() => ctx.save(name, replace));
+    const note = await run(() => (inLinked() ? linked!.save(name, replace) : ctx.save(name, replace)));
     if (note === null && box.isConnected) ui.closeModal();
   }
 
-  /** Put a question in its message box, with the focus on No: both
-   *  questions guard a step that can't be taken back. */
+  /** Put a question in its message box, with the focus on the numbered
+   *  name where there is one, else on No: both questions guard a step that
+   *  can't be taken back. */
   function ask(question: FileAsk): void {
     set({ ask: question, menu: null });
-    host.querySelector<HTMLElement>('[data-fd-ask="no"]')?.focus();
+    host.querySelector<HTMLElement>(question.alt ? '[data-fd-ask="alt"]' : '[data-fd-ask="no"]')?.focus();
     ctx.asked?.(question.kind);
   }
 
-  function answer(yes: boolean): void {
+  function answer(choice: FileAnswer): void {
     const asked = state.ask;
     set({ ask: null });
-    if (!yes || !asked) {
+    if (choice === "no" || !asked) {
       focusAfterAsk(asked);
       return;
     }
-    if (asked.kind === "replace") void save(asked.name, true);
+    if (asked.kind === "replace") void (choice === "alt" && asked.alt ? save(asked.alt, false) : save(asked.name, true));
     else {
       const target = fileOf(state.selected);
       if (target) void run(() => ctx.remove(target.id));
@@ -228,7 +275,8 @@ export function showFileDialog(ui: Pick<UI, "openModalTemplate" | "closeModal">,
 
   function startRename(): void {
     const target = fileOf(state.selected);
-    if (!target || state.busy) return;
+    // The game never renames a file on the player's computer.
+    if (!target || state.busy || inLinked()) return;
     set({ renaming: target.id, menu: null, line: null });
     const input = host.querySelector<HTMLInputElement>(".fd-rename");
     input?.focus();
@@ -249,19 +297,20 @@ export function showFileDialog(ui: Pick<UI, "openModalTemplate" | "closeModal">,
 
   function remove(): void {
     const target = fileOf(state.selected);
-    if (target && !state.busy) ask({ kind: "delete", name: target.name });
+    // Nor deletes one (owner, 2026-11-15).
+    if (target && !state.busy && !inLinked()) ask({ kind: "delete", name: target.name });
   }
 
   function copy(): void {
     const target = fileOf(state.selected);
-    if (!target) return;
+    if (!target || inLinked()) return;
     copied = target.id;
     set({ line: { text: `Copied "${target.name}". Paste makes a copy of it here.`, kind: "info" }, menu: null });
   }
 
   function paste(): void {
     const id = copied;
-    if (id === null || state.busy) return;
+    if (id === null || state.busy || inLinked()) return;
     if (!ctx.files().some((f) => f.id === id)) {
       copied = null;
       set({ line: { text: "The tower you copied has been deleted.", kind: "bad" } });
@@ -272,7 +321,7 @@ export function showFileDialog(ui: Pick<UI, "openModalTemplate" | "closeModal">,
 
   function duplicate(): void {
     const target = fileOf(state.selected);
-    if (target && !state.busy) void run(() => ctx.duplicate(target.id));
+    if (target && !state.busy) void run(() => (inLinked() ? linked!.duplicate(target.id) : ctx.duplicate(target.id)));
   }
 
   function focusList(): void {
@@ -356,7 +405,7 @@ export function showFileDialog(ui: Pick<UI, "openModalTemplate" | "closeModal">,
     answer,
     openMenu,
     closeMenu: () => {
-      if (state.menu) set({ menu: null });
+      if (state.menu || state.look) set({ menu: null, look: false });
     },
     listKey,
     fromComputer: () => {
@@ -367,6 +416,22 @@ export function showFileDialog(ui: Pick<UI, "openModalTemplate" | "closeModal">,
       ui.closeModal();
       ctx.downloadKept?.();
     },
+    fromFolder: () =>
+      pickFolderFiles((files) => {
+        if (!box.isConnected) return;
+        if (files.length === 0) set({ line: { text: "There are no tower files (.vctower or .TDT) in that folder.", kind: "bad" } });
+        else void run(() => ctx.add(files, "folder")).then(() => set({ place: "local" }));
+      }),
+    allow: () => void run(() => linked!.allow()),
+    places: placeHandlers({
+      state: () => state,
+      set,
+      linked,
+      run,
+      host,
+      focusList,
+      remember: rememberPlace,
+    }),
   };
 
   // Esc closes what is open inside the window before the window itself, and
@@ -374,16 +439,19 @@ export function showFileDialog(ui: Pick<UI, "openModalTemplate" | "closeModal">,
   box.addEventListener("keydown", (e) => {
     if (e.key === "Tab" && state.ask) {
       e.preventDefault();
-      const [yes, no] = [...host.querySelectorAll<HTMLElement>(".fd-ask .btn")];
-      (document.activeElement === yes ? no : yes)?.focus();
+      const buttons = [...host.querySelectorAll<HTMLElement>(".fd-ask .btn")];
+      const at = buttons.indexOf(document.activeElement as HTMLElement);
+      buttons[(at + (e.shiftKey ? buttons.length - 1 : 1)) % buttons.length]?.focus();
       return;
     }
-    if (e.key !== "Escape" || !(state.menu || state.ask)) return;
+    if (e.key !== "Escape" || !(state.menu || state.ask || state.look)) return;
     e.preventDefault();
     e.stopPropagation();
     const asked = state.ask;
-    set({ menu: null, ask: null });
-    focusAfterAsk(asked);
+    const looking = state.look && !asked;
+    set({ menu: null, ask: null, look: false });
+    if (looking) host.querySelector<HTMLElement>(".fd-look")?.focus();
+    else focusAfterAsk(asked);
   });
   box.addEventListener("dragenter", (e) => {
     if (!carriesFiles(e)) return;
@@ -404,10 +472,14 @@ export function showFileDialog(ui: Pick<UI, "openModalTemplate" | "closeModal">,
     e.stopPropagation();
     set({ dropping: false });
     const files = Array.from(e.dataTransfer?.files ?? []);
-    if (files.length > 0) void run(() => ctx.add(files));
+    // Dropped files go to My Towers, so the list shows them there.
+    if (files.length > 0) void run(() => ctx.add(files, "drop")).then(() => set({ place: "local" }));
   });
 
   draw();
+  // The folder is read back only when a window shows it, and its files may
+  // have changed on disk since it was last read.
+  if (inLinked()) void linked!.refresh().catch(() => {});
   if (opening) focusList();
   else {
     const input = host.querySelector<HTMLInputElement>("#fd-name");

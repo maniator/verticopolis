@@ -43,6 +43,7 @@ import { TALL_LOBBY_SCENES } from "./scenes/tallLobbies.ts";
 import { VENUE_FLIGHT_SCENES } from "./scenes/venueFlights.ts";
 import { PALETTE_FIT_SCENES } from "./scenes/paletteFit.ts";
 import { SPLIT_LOT_SCENES } from "./scenes/splitLot.ts";
+import { LINKED_FOLDER_SCENES } from "./scenes/linkedFolder.ts";
 
 export const SCENES: Scene[] = [
   ...SHOWCASE_SCENES,
@@ -62,4 +63,5 @@ export const SCENES: Scene[] = [
   ...VENUE_FLIGHT_SCENES,
   ...PALETTE_FIT_SCENES,
   ...SPLIT_LOT_SCENES,
+  ...LINKED_FOLDER_SCENES,
 ];

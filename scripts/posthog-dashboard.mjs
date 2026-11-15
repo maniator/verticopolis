@@ -525,6 +525,16 @@ function buildInsights(ids) {
       query: trends([series("app_action", "Windows opened")], { breakdown: "detail", display: "ActionsBar", where: [inAction(["files_open"])] }),
     },
     {
+      name: "Linked folder (Open, Save As)",
+      description:
+        "The folder a player links on their computer in the Open and Save As windows (Chromium browsers only), by action, production: folders linked (folder_link: linked, cancel, refused), the browser's OK asked again (folder_allow: granted, denied), unlinked (folder_unlink), towers opened from it (folder_open: tower, tdt), saved into it (folder_save: new, replace, current), copied (folder_copy) and failed steps (folder_failed). Codes only, never a folder's or a file's name. From a folder… in other browsers counts as file_add folder on the My Towers tile. See docs/analytics-data-map.md, Linked folder.",
+      query: trends([series("app_action", "Actions")], {
+        breakdown: "action",
+        display: "ActionsBar",
+        where: [inAction(["folder_link", "folder_allow", "folder_unlink", "folder_open", "folder_save", "folder_copy", "folder_failed"])],
+      }),
+    },
+    {
       name: "Persistence failures (counts, not rates)",
       description:
         "autosave_failed, load_failed, import_failed and export_failed events, by action, production (#1533, #1701). These are COUNTS. A rate needs attempts: imports have them (import_save, import_tdt) and Auto-save loads have them (load_slot plus load_failed; up to 4.2 the numbered slots counted too); autosave has none, so its rate is unavailable, and an export's attempts are sent at the click, so no export rate is printed. scripts/engine-reliability.mjs prints the rates and bounds. Only builds from 2.78.4 send the first three codes and only builds from 2.78.10 send export_failed (the tile has no version filter, so read it from the 2026-11-03 deploy), so an earlier range reads Not measurable, not zero. See docs/analytics-measurement-status.md.",

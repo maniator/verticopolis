@@ -60,3 +60,22 @@ export function warningIcon(): SVGTemplateResult {
     <rect x="14" y="23" width="4" height="4" fill=${INK} />
   </svg>`;
 }
+
+/** A folder on the player's own computer, linked to the windows: the yellow
+ *  folder with a small gray drive at its corner. */
+export function linkedFolderIcon(): SVGTemplateResult {
+  return svg`<svg class="fd-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" shape-rendering="crispEdges">
+    <path d="M1.5 3.5h5l1 2h7v8h-13z" fill="#ffd400" stroke=${INK} />
+    <path d="M2 6h12" stroke="#fff4a0" />
+    <rect x="8.5" y="9.5" width="7" height="5" fill="#c0c0c0" stroke=${INK} />
+    <rect x="10" y="12" width="2" height="1" fill="#008000" />
+  </svg>`;
+}
+
+/** Link a folder: an open white folder with a navy plus. */
+export function linkFolderIcon(): SVGTemplateResult {
+  return svg`<svg class="fd-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" shape-rendering="crispEdges">
+    <path d="M1.5 3.5h5l1 2h7v8h-13z" fill=${PAPER} stroke=${INK} />
+    <path d="M10 8v5M7.5 10.5h5" stroke="#000080" stroke-width="2" />
+  </svg>`;
+}

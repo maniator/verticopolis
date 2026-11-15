@@ -137,12 +137,12 @@ player's own text and is never sent, and neither is a tower's contents.
 | `files_waited` | `open` or `save_as` | That window opened while My Towers was still getting ready (its first open on the device, or the old slots still copying in); it said "Opening My Towers…" and filled in once ready. Before 4.3 shipped, File > Open… showed the device's file picker at that moment |
 | `file_open` | `tower`, `tdt` or `auto` | A row opened: a tower file, a 1994 `.TDT` file, or the Auto-save |
 | `file_save` | `new`, `replace` or `current` | The tower written into My Towers: under a new name, over a file the player agreed to replace, or into the live tower's own file by File > Save |
-| `file_add` | `picked` or `drop` | A file added to My Towers: `picked` once a file opened from the device has loaded, `drop` for a file dropped onto the Open or Save As window |
+| `file_add` | `picked`, `drop` or `folder` | A file added to My Towers: `picked` once a file opened from the device has loaded, `drop` for a file dropped onto the Open or Save As window, `folder` for each tower file From a folder… copied in (from 4.4) |
 | `file_dropped` | none | A file dropped on the game itself, to open as a picked file does |
 | `file_rename` | none | A file renamed |
 | `file_copy` | none | A file duplicated (Duplicate, or Copy then Paste) |
 | `file_delete` | none | A file deleted |
-| `file_ask` | `replace` or `delete` | The window asked in its message box before replacing or deleting a file. A Yes goes on to `file_save` `replace` or `file_delete`, so the asks a player declined are the asks less those |
+| `file_ask` | `replace` or `delete` | The window asked in its message box before replacing or deleting a file. A Yes (Replace) goes on to `file_save` `replace` or `file_delete`; from 4.4 the replace box also offers the next numbered name ("Sky (2)"), which goes on to `file_save` `new`. So the asks a player declined are the asks less all three |
 | `file_failed` | `full` or `error` | A write to My Towers refused: the device is out of room, or another error |
 | `files_copied` | a count | Once per device: the old save slots copied into My Towers, and how many |
 
@@ -155,6 +155,26 @@ no build from 4.3 sends them, so a series that reads them stops there. A
 `file_open` is not also an `import_save` or `import_tdt`: those still count
 files picked from the device. A tower that opens sends `file_imported` either
 way.
+
+### Linked folder
+
+The Open and Save As windows can also use a folder the player links on their
+computer, in Chromium browsers (`docs/architecture/linked-folder.md`). Each
+event is an `app_action` with a code in `detail`. A folder's name and a file's
+name are the player's own text and are never sent.
+
+| `action` | `detail` | When |
+| --- | --- | --- |
+| `folder_link` | `linked`, `cancel` or `refused` | The player chose Link a folder…: a folder linked, the picker closed without one, or the browser refused it |
+| `folder_allow` | `granted` or `denied` | The player clicked Allow access… (or File > Save needed the OK again) and the browser answered |
+| `folder_unlink` | none | The folder unlinked. Its files stay on disk |
+| `folder_open` | `tower` or `tdt` | A file in the folder opened: a tower file or a 1994 `.TDT` file. It is not also a `file_open` or an `import_save`/`import_tdt` |
+| `folder_save` | `new`, `replace` or `current` | The tower written into the folder: under a new name, over a tower file the player agreed to replace, or into the live tower's own file by File > Save |
+| `folder_copy` | none | A file in the folder duplicated |
+| `folder_failed` | none | A folder step failed: the browser refused access, the disk was full, a name was taken, or another error |
+
+There is no `folder_delete` or `folder_rename`: the game never deletes or
+renames a file on the player's computer (owner, 2026-11-15).
 
 `app_action` `file_key` counts a File key that ran its command (version 4.1): `detail` is `open` (Ctrl+O, or Cmd+O on a Mac), `save` (Ctrl+S) or `save_as` (Ctrl+Shift+S). A key pressed in a text box, over a dialog, after the engine stopped, as a held key's repeat, or for a save on the title screen runs nothing and sends nothing. Its command's own event follows (`quick_save`, `files_open` and the rest), so a command's total stays the command's own event; `file_key` says how many of them came from the keys.
 

@@ -2,7 +2,8 @@ import { html, nothing, type TemplateResult } from "lit-html";
 import { classMap } from "lit-html/directives/class-map.js";
 import { live } from "lit-html/directives/live.js";
 import { FILE_NAME_MAX } from "../../storage/fileSpace";
-import { fileIcon, folderIcon, warningIcon } from "../fileIcons";
+import { fileIcon, warningIcon } from "../fileIcons";
+import { allowNote, placesTemplate, type FilePlace, type LinkedView, type PlacesHandlers } from "./fileDialogPlaces";
 
 /**
  * The Open and Save As windows over My Towers (owner, 2026-11-15, layout A):
@@ -31,7 +32,14 @@ export interface FileRow {
 export interface FileAsk {
   readonly kind: "replace" | "delete";
   readonly name: string;
+  /** For a replace: the next free numbered name ("Sky (2)"), offered
+   *  instead of replacing, the way Windows does. */
+  readonly alt?: string;
 }
+
+/** A message box's answer: Yes (replace, delete), No (cancel), or the
+ *  numbered name instead. */
+export type FileAnswer = "yes" | "no" | "alt";
 
 export interface FileDialogView {
   readonly mode: FileDialogMode;
@@ -53,6 +61,15 @@ export interface FileDialogView {
   readonly dropping: boolean;
   /** An autosave this version couldn't read is kept, and can be downloaded. */
   readonly kept: boolean;
+  /** Where the list comes from: My Towers, or the linked folder. */
+  readonly place: FilePlace;
+  readonly linked: LinkedView | null;
+  /** This browser can link a folder on the player's computer. */
+  readonly canLink: boolean;
+  /** This browser can't link one but can copy a picked folder's towers in. */
+  readonly canPickFolder: boolean;
+  readonly where: "computer" | "device";
+  readonly lookOpen: boolean;
 }
 
 export interface FileDialogHandlers {
@@ -69,12 +86,15 @@ export interface FileDialogHandlers {
   paste(): void;
   duplicate(): void;
   remove(): void;
-  answer(yes: boolean): void;
+  answer(choice: FileAnswer): void;
   openMenu(id: string, x: number, y: number): void;
   closeMenu(): void;
   listKey(e: KeyboardEvent): void;
   fromComputer(): void;
+  fromFolder(): void;
   downloadKept(): void;
+  allow(): void;
+  places: PlacesHandlers;
 }
 
 export const FILE_TYPE_LABEL: Readonly<Record<FileRowType, string>> = {
@@ -114,8 +134,19 @@ export function usageText(usage: { count: number; bytes: number }): string {
   return usage.count === 0 ? "No towers yet" : `${towers}, ${fileSizeText(usage.bytes)}`;
 }
 
-/** The row element's id, for the list's active descendant. */
-export const rowDomId = (id: string): string => `fd-row-${id}`;
+/** The row element's id, for the list's active descendant. A file in the
+ *  linked folder is named by its file name, so any character an element id
+ *  can't hold is spelled out. */
+export const rowDomId = (id: string): string => `fd-row-${id.replace(/[^A-Za-z0-9-]/g, (c) => `_${c.codePointAt(0)!.toString(16)}_`)}`;
+
+/** The header's count, or why there is none yet. */
+function usageLine(v: FileDialogView): string {
+  if (v.place === "linked") return v.linked?.allowed ? usageText(v.usage) : "Needs your OK";
+  return v.loading ? "Opening My Towers…" : usageText(v.usage);
+}
+
+/** The linked folder is shown but the browser wants the player's OK first. */
+const waitingForOk = (v: FileDialogView): boolean => v.place === "linked" && !v.linked?.allowed;
 
 export function fileDialogTemplate(v: FileDialogView, h: FileDialogHandlers): TemplateResult {
   const opening = v.mode === "open";
@@ -123,11 +154,7 @@ export function fileDialogTemplate(v: FileDialogView, h: FileDialogHandlers): Te
   const fileSelected = !!selectedRow && selectedRow.type !== "auto";
   return html`
     <div class=${classMap({ fd: true, "fd-dropping": v.dropping })}>
-      <div class="fd-where">
-        <span class="fd-where-label">${opening ? "Look in:" : "Save in:"}</span>
-        <span class="fd-folder field">${folderIcon()}My Towers</span>
-        <span class="fd-usage">${v.loading ? "Opening My Towers…" : usageText(v.usage)}</span>
-      </div>
+      ${placesTemplate({ ...v, usage: usageLine(v) }, h.places)}
       <div class="fd-list well" @click=${h.closeMenu}>
         <div class="fd-head" role="presentation">
           ${COLUMNS.map(
@@ -135,9 +162,9 @@ export function fileDialogTemplate(v: FileDialogView, h: FileDialogHandlers): Te
               aria-label="Sort by ${c.label}">${c.label}${sortMark(v, c.key)}</button>`,
           )}
         </div>
-        <div class="fd-rows" role="listbox" tabindex="0" aria-label="My Towers"
+        <div class="fd-rows" role="listbox" tabindex="0" aria-label=${v.place === "linked" && v.linked ? v.linked.name : "My Towers"}
           aria-activedescendant=${selectedRow ? rowDomId(selectedRow.id) : nothing} @keydown=${h.listKey}>
-          ${v.rows.length === 0 ? html`<div class="fd-empty">${emptyText(v)}</div>` : v.rows.map((r) => row(r, v, h))}
+          ${listBody(v, h)}
         </div>
         ${v.dropping ? html`<div class="fd-drop-note">Drop tower files here to add them to My Towers</div>` : nothing}
       </div>
@@ -153,7 +180,7 @@ export function fileDialogTemplate(v: FileDialogView, h: FileDialogHandlers): Te
               h.primary();
             }
           }} />
-        <button type="button" class="btn primary fd-primary" ?disabled=${v.busy || v.loading} @click=${h.primary}>${opening ? "Open" : "Save"}</button>
+        <button type="button" class="btn primary fd-primary" ?disabled=${v.busy || v.loading || waitingForOk(v)} @click=${h.primary}>${opening ? "Open" : "Save"}</button>
         <label class="fd-label" for="fd-type">${opening ? "Files of type:" : "Save as type:"}</label>
         ${opening
           ? html`<select id="fd-type" class="field fd-type" .value=${v.filter}
@@ -167,6 +194,14 @@ export function fileDialogTemplate(v: FileDialogView, h: FileDialogHandlers): Te
       ${tools(opening, fileSelected, v, h)}
       ${v.ask ? askBox(v.ask, h) : nothing}
     </div>`;
+}
+
+/** The rows, a note that the list is empty, or the linked folder's Allow
+ *  access… while the browser wants the player's OK. */
+function listBody(v: FileDialogView, h: FileDialogHandlers): TemplateResult | TemplateResult[] {
+  if (waitingForOk(v)) return allowNote({ ...v, usage: "" }, h.allow);
+  if (v.rows.length === 0) return html`<div class="fd-empty">${emptyText(v)}</div>`;
+  return v.rows.map((r) => row(r, v, h));
 }
 
 /** The autosave this version couldn't read stays on the device, and the Open
@@ -185,6 +220,10 @@ function sortMark(v: FileDialogView, key: FileSortKey): string {
 }
 
 function emptyText(v: FileDialogView): string {
+  if (v.place === "linked") {
+    if (v.filter !== "all") return "No towers of this type in this folder.";
+    return v.mode === "open" ? "No towers in this folder yet." : "No towers in this folder yet. Save one here.";
+  }
   if (v.loading) return "Opening My Towers…";
   if (v.filter !== "all") return "No towers of this type.";
   return v.mode === "open" ? "No towers yet. Add one from a file, or drop it here." : "No towers yet.";
@@ -224,15 +263,20 @@ function renameBox(r: FileRow, h: FileDialogHandlers): TemplateResult {
     @blur=${(e: Event) => h.renameDone((e.target as HTMLInputElement).value)} />`;
 }
 
+/** The buttons under the list. A file in the linked folder can be copied
+ *  beside itself, but the game never renames or deletes a file on the
+ *  player's computer (owner, 2026-11-15), so those two buttons are not there. */
 function tools(opening: boolean, fileSelected: boolean, v: FileDialogView, h: FileDialogHandlers): TemplateResult {
+  const local = v.place === "local";
   return html`<div class="fd-tools">
-    <button type="button" class="btn" ?disabled=${!fileSelected || v.busy} @click=${h.rename}>Rename</button>
+    ${local ? html`<button type="button" class="btn" ?disabled=${!fileSelected || v.busy} @click=${h.rename}>Rename</button>` : nothing}
     <button type="button" class="btn" ?disabled=${!fileSelected || v.busy} @click=${h.duplicate}>Duplicate</button>
-    <button type="button" class="btn" ?disabled=${!fileSelected || v.busy} @click=${h.remove}>Delete</button>
+    ${local ? html`<button type="button" class="btn" ?disabled=${!fileSelected || v.busy} @click=${h.remove}>Delete</button>` : nothing}
     <button type="button" class="btn fd-computer" @click=${h.fromComputer}>
       <span class="fd-on-desktop">${opening ? "From a file on your computer…" : "To a file on your computer…"}</span>
       <span class="fd-on-phone">${opening ? "From your device…" : "To your device…"}</span>
     </button>
+    ${opening && v.canPickFolder ? html`<button type="button" class="btn fd-from-folder" ?disabled=${v.busy} @click=${h.fromFolder}>From a folder…</button>` : nothing}
   </div>`;
 }
 
@@ -245,8 +289,10 @@ function tools(opening: boolean, fileSelected: boolean, v: FileDialogView, h: Fi
 function askBox(ask: FileAsk, h: FileDialogHandlers): TemplateResult {
   const replacing = ask.kind === "replace";
   const [title, line1, line2] = replacing
-    ? ["Save As", `"${ask.name}" already exists.`, "Do you want to replace it?"]
+    ? ["Save As", `"${ask.name}" already exists.`, ask.alt ? `Save this tower as "${ask.alt}", or replace it?` : "Do you want to replace it?"]
     : ["Confirm File Delete", `Are you sure you want to delete "${ask.name}"?`, "It can't be undone."];
+  const button = (choice: FileAnswer, label: string) =>
+    html`<button type="button" class="btn" data-fd-ask=${choice} @click=${() => h.answer(choice)}>${label}</button>`;
   return html`<div class="fd-ask-layer" @click=${(e: Event) => e.stopPropagation()}>
     <div class="win fd-ask" role="alertdialog" aria-modal="true" aria-labelledby="fd-ask-title" aria-describedby="fd-ask-text">
       <div class="win-title" id="fd-ask-title">${title}</div>
@@ -255,8 +301,9 @@ function askBox(ask: FileAsk, h: FileDialogHandlers): TemplateResult {
         <p id="fd-ask-text">${line1}<br />${line2}</p>
       </div>
       <div class="fd-ask-buttons">
-        <button type="button" class="btn" data-fd-ask="yes" @click=${() => h.answer(true)}>Yes</button>
-        <button type="button" class="btn" data-fd-ask="no" @click=${() => h.answer(false)}>No</button>
+        ${replacing && ask.alt
+          ? html`${button("alt", `Save as "${ask.alt}"`)}${button("yes", "Replace")}${button("no", "Cancel")}`
+          : html`${button("yes", "Yes")}${button("no", "No")}`}
       </div>
     </div>
   </div>`;
@@ -265,6 +312,9 @@ function askBox(ask: FileAsk, h: FileDialogHandlers): TemplateResult {
 function contextMenu(v: FileDialogView, h: FileDialogHandlers): TemplateResult {
   const menu = v.menu!;
   const isFile = v.rows.find((r) => r.id === menu.id)?.type !== "auto";
+  // The linked folder's files are never renamed or deleted, and Copy and
+  // Paste work in My Towers only.
+  const local = v.place === "local";
   const item = (label: string, run: () => void, enabled = true) =>
     html`<button type="button" role="menuitem" class="mb-item" aria-disabled=${enabled ? "false" : "true"}
       @click=${() => {
@@ -273,10 +323,10 @@ function contextMenu(v: FileDialogView, h: FileDialogHandlers): TemplateResult {
       }}>${label}</button>`;
   return html`<div class="mb-pop fd-menu" role="menu" aria-label="File" style="left:${menu.x}px;top:${menu.y}px">
     ${item(v.mode === "open" ? "Open" : "Save", () => h.activate(menu.id))}
-    ${isFile ? item("Rename", h.rename) : nothing}
-    ${isFile ? item("Copy", h.copy) : nothing}
-    ${item("Paste", h.paste, v.canPaste)}
+    ${isFile && local ? item("Rename", h.rename) : nothing}
+    ${isFile && local ? item("Copy", h.copy) : nothing}
+    ${local ? item("Paste", h.paste, v.canPaste) : nothing}
     ${isFile ? item("Duplicate", h.duplicate) : nothing}
-    ${isFile ? item("Delete", h.remove) : nothing}
+    ${isFile && local ? item("Delete", h.remove) : nothing}
   </div>`;
 }
