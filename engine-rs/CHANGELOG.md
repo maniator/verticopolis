@@ -15,6 +15,10 @@ raised the version, so they are documentation only.
 There is no entry for 0.17.0, which only
 existed as a step inside a stacked branch.
 
+## 1.41.2 (2026-11-15)
+
+- Exact speed-ups, with every game the same: the parking check fills room by room, the demand pool, crew floors, commute averages and the lobby reach sets use the fast hasher, the lobby distance walks the tall halls once, the landing lines read each shaft once per line and are kept by place in the crowd, and the Modern router prices a line only when the link could still win. The conformance lock and the fuzz corpus do not move.
+
 ## 1.41.1 (2026-11-15)
 
 - A save from a game's first day carries the step loop's hour, maintenance-period and quarter marks that the clock does not give (`periodMarks`), so a reload bills the first day's end as the unsaved game does. From the second day on the key is absent and a load sets the marks from the clock as before. The conformance state hash leaves it out; the fuzz goldens gained the field where a corpus entry saves on its first day.
