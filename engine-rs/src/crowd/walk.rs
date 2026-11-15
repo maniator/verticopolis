@@ -2,7 +2,7 @@
 
 use super::motion::give_up;
 use super::street::walks_off_run;
-use super::{Crowd, PState, Person, Route, WALK_SPEED};
+use super::{Crowd, PState, Person, WALK_SPEED};
 use crate::jsmath;
 use crate::tower::Tower;
 
@@ -78,13 +78,6 @@ pub(super) fn reroute(crowd: &mut Crowd, i: usize, tower: &Tower) -> bool {
     let Some(r) = crowd.route(tower, from, to, Some(from_x), Some(dest_x)) else {
         return false;
     };
-    take_route(crowd, i, r);
-    true
-}
-
-/// Sets someone standing at `p.floor` on route `r` from there.
-pub(super) fn take_route(crowd: &mut Crowd, i: usize, r: Route) {
-    let from = crowd.people[i].floor;
     let p = &mut crowd.people[i];
     p.state = if r.shafts.is_empty() {
         PState::ToDest
@@ -98,4 +91,5 @@ pub(super) fn take_route(crowd: &mut Crowd, i: usize, r: Route) {
     p.car_index = None;
     p.fy = from as f64;
     p.wait = 0.0;
+    true
 }

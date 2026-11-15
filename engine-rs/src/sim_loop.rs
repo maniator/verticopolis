@@ -1,7 +1,7 @@
 // The time step (from the TypeScript reference's `sim/loop.ts`) and the
 // weather hash.
 
-use crate::crowd::{motion, spawn, PState, CROWD_SECONDS_PER_MINUTE, GIVE_UP};
+use crate::crowd::{motion, spawn, CROWD_SECONDS_PER_MINUTE};
 use crate::economy::films::fills_blockbuster_slot;
 use crate::facilities::Kind;
 use crate::sim::{LogKind, Simulation};
@@ -185,41 +185,6 @@ impl Simulation {
         self.collect_traffic_income();
         self.sample_elevator_util();
         self.evaluate_star();
-        self.warn_long_lines();
-    }
-
-    /// A line in which someone has waited past an hour since the last
-    /// hourly pass is news: the longest such wait, with the shaft and the
-    /// floor, so the player sees where transit is jammed. Modern only, since
-    /// Classic riders give up within the hour. Read from the people
-    /// themselves, whose waits a save carries, so a reload warns as the game
-    /// that saved would.
-    fn warn_long_lines(&mut self) {
-        if !self.tower.mode.routes_by_expected_time() {
-            return;
-        }
-        let hour = 60.0 * CROWD_SECONDS_PER_MINUTE;
-        let news = |w: f64| (GIVE_UP..GIVE_UP + hour).contains(&w);
-        let waiting = self
-            .crowd
-            .people
-            .iter()
-            .filter(|p| p.state == PState::Waiting);
-        let worst = (waiting.filter(|p| news(p.wait)))
-            .filter_map(|p| Some(((p.shaft_id?, p.floor), p.wait)))
-            .max_by(|a, b| a.1.total_cmp(&b.1).then(b.0.cmp(&a.0)));
-        let Some(((shaft, floor), _)) = worst else {
-            return;
-        };
-        let Some(t) = self.tower.transports.iter().find(|t| t.id == shaft) else {
-            return;
-        };
-        let msg = format!(
-            "Riders on {} have waited over an hour for the {} there. Add cars, or another way up, to clear the line.",
-            self.floor_label(floor),
-            t.kind.facility().name,
-        );
-        self.emit(&msg, LogKind::Bad);
     }
 
     #[doc(hidden)]

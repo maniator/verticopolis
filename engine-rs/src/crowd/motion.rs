@@ -26,8 +26,7 @@ pub fn advance(crowd: &mut Crowd, dt_sec: f64, tower: &mut Tower) {
     let mut frustrated = 0;
     let mut travelling = 0;
     let mut landings = landing_slots(crowd, tower);
-    let room = super::expected_time::spare_lines(crowd);
-    let mut lines = super::line_count::LineCount::new(tower, room);
+    let mut lines = super::line_count::LineCount::new(tower);
     for i in 0..crowd.people.len() {
         crowd.people[i].age += dt_sec;
         let p = &crowd.people[i];
@@ -57,9 +56,7 @@ pub fn advance(crowd: &mut Crowd, dt_sec: f64, tower: &mut Tower) {
                 continue;
             }
         }
-        let waited = crowd.people[i].wait;
         step(crowd, i, dt_sec, tower, &mut landings);
-        super::line_count::rethink_long_wait(crowd, i, waited, tower);
         let p = &crowd.people[i];
         lines.see(p);
         if !p.staff
@@ -80,7 +77,7 @@ pub fn advance(crowd: &mut Crowd, dt_sec: f64, tower: &mut Tower) {
         0.0
     };
     crowd.frustration += (target - crowd.frustration) * (dt_sec * 0.5).min(1.0);
-    super::expected_time::keep_lines(crowd, lines.counted());
+    crowd.shaft_lines = lines.counted();
     crowd.people.retain(|p| p.state != PState::Done);
 }
 

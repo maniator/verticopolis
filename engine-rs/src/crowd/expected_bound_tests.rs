@@ -25,11 +25,7 @@ fn the_bound_never_overtakes_a_link() {
     // elevator in it: the street joins the two.
     apart(&mut sim);
     shaft(&mut sim, Kind::ElevatorStandard, 60, 0, 1);
-    let line = |riders| crate::crowd::line_count::Line {
-        riders,
-        oldest: 0.0,
-    };
-    sim.crowd.shaft_lines = FastMap::from_iter([((express, 1), line(30)), ((local, 1), line(5))]);
+    sim.crowd.shaft_lines = FastMap::from_iter([((express, 1), 30), ((local, 1), 5)]);
     sim.crowd.begin_step();
     let router = fresh(&mut sim.crowd, &sim.tower);
     let goals: Vec<u32> = (0..router.nodes.len() as u32)

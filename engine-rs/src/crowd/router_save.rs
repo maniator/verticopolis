@@ -30,11 +30,7 @@ impl Crowd {
         for row in rows.iter().take(MAX_SAVED_PEOPLE) {
             if let Some(&[shaft, floor, riders]) = row_of(row, 3).as_deref() {
                 if riders > 0 {
-                    let line = crate::crowd::line_count::Line {
-                        riders,
-                        oldest: 0.0,
-                    };
-                    self.shaft_lines.insert((shaft, floor), line);
+                    self.shaft_lines.insert((shaft, floor), riders);
                 }
             }
         }

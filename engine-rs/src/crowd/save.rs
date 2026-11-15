@@ -382,7 +382,7 @@ impl Crowd {
         }
         if !self.shaft_lines.is_empty() {
             let rows: Vec<[i64; 3]> = (self.shaft_lines.sorted().into_iter())
-                .map(|(&(shaft, floor), line)| [shaft, floor, line.riders])
+                .map(|(&(shaft, floor), &n)| [shaft, floor, n])
                 .collect();
             m.insert("lines".into(), json!(rows));
         }

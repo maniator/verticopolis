@@ -206,28 +206,11 @@ pub fn route(
     to_floor: i64,
     to_x: Option<f64>,
 ) -> Option<Route> {
-    let (r, joins) = plan(crowd, tower, (from_floor, from_x), (to_floor, to_x))?;
-    if joins {
-        expected_time::join_line(crowd, &r);
-    }
-    Some(r)
-}
-
-/// The route `route` takes, and whether its rider joins the line for its
-/// first car as they set out (the Modern router's own routes), without
-/// joining it yet: someone weighing another way joins only the line they
-/// pick (`line_count::rethink_long_wait`).
-pub fn plan(
-    crowd: &mut Crowd,
-    tower: &Tower,
-    (from_floor, from_x): (i64, Option<f64>),
-    (to_floor, to_x): (i64, Option<f64>),
-) -> Option<(Route, bool)> {
     let a =
         street_start(tower, from_floor, from_x).unwrap_or_else(|| tower.seg_at(from_floor, from_x));
     let b = tower.seg_at(to_floor, to_x);
     if let Some(decided) = off_run_pair(a, b, from_floor, from_x, to_floor, to_x) {
-        return decided.map(|r| (balance_shafts(crowd, tower, r), false));
+        return decided.map(|r| balance_shafts(crowd, tower, r));
     }
     if tower.mode.routes_by_expected_time() {
         // No random bank pick here: the search already takes the shorter of
@@ -236,11 +219,12 @@ pub fn plan(
         // a shaft whose cars the schedule stood down.
         let mut r = expected_time::fastest_path(crowd, tower, a, b)?;
         to_real_floors(&mut r);
-        return Some((r, true));
+        expected_time::join_line(crowd, &r);
+        return Some(r);
     }
     let mut r = passenger_path(crowd, tower, a, b)?;
     to_real_floors(&mut r);
-    Some((balance_shafts(crowd, tower, r), false))
+    Some(balance_shafts(crowd, tower, r))
 }
 
 pub fn reachable(
