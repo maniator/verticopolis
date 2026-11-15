@@ -137,9 +137,9 @@ function wasmRunning(input: DiagnosticsInput): boolean {
 }
 
 /** The Rust engine is the only engine (#1875), so a tower it does not run has
- *  no engine at all. */
+ *  no engine running at all. */
 function engineName(input: DiagnosticsInput): string {
-  if (!wasmRunning(input)) return "none";
+  if (!wasmRunning(input)) return "not running";
   return input.host?.placement === "worker"
     ? "Rust engine (worker)"
     : "Rust engine";
@@ -207,8 +207,9 @@ export function buildDiagnostics(input: DiagnosticsInput): DiagnosticsReport {
   if (input.date) rows.push({ label: "Date", value: input.date });
   if (input.userAgent)
     rows.push({ label: "Browser", value: cap(input.userAgent) });
+  // No "Build" row: every build runs the Rust engine alone (#1875), so the
+  // boot state's bundle kind always read "wasm-only" and told a player nothing.
   rows.push({ label: "Engine in use", value: engineName(input) });
-  if (boot) rows.push({ label: "Build", value: boot.build });
   if (failure) {
     rows.push({ label: "Failed at", value: failure.stage });
     rows.push({ label: "Reason", value: failure.reason });

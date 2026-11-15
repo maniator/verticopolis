@@ -176,8 +176,8 @@ test.describe("never falls back to the TypeScript engine", () => {
     await expect(page.locator(".engine-failure-copy-status")).toHaveText("Copied.");
     const copied = await page.evaluate(() => (window as any).__copied as string);
     expect(copied).toContain("Failed at: load");
-    expect(copied).toContain("Engine in use: none");
-    expect(copied).toContain("Build: wasm-only");
+    expect(copied).toContain("Engine in use: not running");
+    expect(copied).not.toContain("wasm-only");
   });
 
   test("a corrupted engine binary stops boot", async ({ page }) => {
