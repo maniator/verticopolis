@@ -9,6 +9,25 @@ use crate::services::with_thousands;
 use crate::sim::{LogKind, Simulation};
 use crate::tower::UnitState;
 
+/// Why [`Simulation::call_fire_rescue`] refused.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FireRescueRefusal {
+    /// No fire is burning.
+    None,
+    /// An emergency choice is already waiting for the player's answer.
+    Pending,
+}
+
+impl FireRescueRefusal {
+    /// The port's `reason` string.
+    pub fn reason(&self) -> &'static str {
+        match self {
+            FireRescueRefusal::None => "none",
+            FireRescueRefusal::Pending => "pending",
+        }
+    }
+}
+
 #[doc(hidden)]
 impl Simulation {
     /// `startFireOn`: set the room at index `i` ablaze as a new outbreak. A
@@ -47,6 +66,22 @@ impl Simulation {
                 LogKind::Bad,
             );
         }
+    }
+
+    /// Options > Call Fire Rescue (manual p.62): a player who declined the
+    /// offer can still call the rescue for as long as a fire burns. This puts
+    /// the same offer up again, at today's price, and returns that price;
+    /// [`Simulation::resolve_choice`] answers it as it answers the first one.
+    /// It takes no money and draws nothing from the random stream.
+    pub fn call_fire_rescue(&mut self) -> Result<f64, FireRescueRefusal> {
+        if self.events.pending.is_some() {
+            return Err(FireRescueRefusal::Pending);
+        }
+        if self.events.active.is_empty() {
+            return Err(FireRescueRefusal::None);
+        }
+        self.offer_fire_rescue();
+        Ok(self.fire_rescue_cost())
     }
 
     /// Tooling only: the daily roll's outbreak in room `id` instead of a

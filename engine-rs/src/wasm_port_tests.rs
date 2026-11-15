@@ -172,7 +172,7 @@ fn office(e: &Engine) -> f64 {
 
 /// The exported layout's hash; raise `VIEW_LAYOUT_VERSION` (and append its
 /// pin in `view/layout_tests.rs`) in the same commit as any change here.
-const EXPORTED_LAYOUT_PIN: &str = "1bc4e54a86d166d6";
+const EXPORTED_LAYOUT_PIN: &str = "7c730448a91c77ba";
 
 #[test]
 fn the_exported_layout_is_pinned() {
@@ -448,4 +448,27 @@ fn every_edit_command_is_refused_while_security_searches() {
     // The search over, the kept step undoes.
     e.sim.events.bomb = None;
     assert_eq!(e.port_undo()[STATUS], 1.0, "{:?}", e.last_reason_text());
+}
+
+#[test]
+fn call_fire_rescue_puts_the_offer_up_again_and_names_its_refusals() {
+    let mut e = built();
+    let none = e.port_call_fire_rescue();
+    assert_eq!((none[STATUS], none[2]), (0.0, 0.0));
+    assert_eq!(e.last_reason_text().as_deref(), Some("none"));
+    let id = office(&e);
+    assert!(e.sim.start_fire_at(id as i64));
+    let up = e.port_call_fire_rescue();
+    assert_eq!(up[STATUS], 0.0);
+    assert_eq!(e.last_reason_text().as_deref(), Some("pending"));
+    assert_eq!(e.port_answer_choice(false)[STATUS], 1.0);
+    let money = e.sim.money;
+    let called = e.port_call_fire_rescue();
+    assert_eq!(called[STATUS], 1.0, "{:?}", e.last_reason_text());
+    assert_eq!(called[DELTA], 0.0, "the call only offers");
+    assert_eq!(
+        Some(called[2]),
+        e.sim.events.pending.as_ref().map(|p| p.cost)
+    );
+    assert_eq!(e.sim.money, money);
 }

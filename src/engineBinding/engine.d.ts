@@ -91,6 +91,7 @@ export class Engine {
      * and on the "funds" refusal, the other refusals carry the reason alone.
      */
     callExterminator(): string;
+    callFireRescue(): Float64Array;
     /**
      * `canBuild(kind, floor, x)`: JSON `{ ok, reason?, cost }`, the dry run
      * `build` makes first. When the placement fits, `cost` is its full

@@ -112,9 +112,11 @@ fn a_reload_keeps_santas_once_a_year_guard() {
 
 /// Isolated offices one per floor (no spread), optionally with Security
 /// and Medical on floor 2.
+/// Modern, so a tower with no Security can burn (Classic needs Security
+/// first, #1889); the fire rules are otherwise the same in both modes.
 fn fire_tower(defended: bool, star: i64) -> Simulation {
     const WIDTH: i64 = 44;
-    let mut sim = Simulation::new_game(7, GameMode::Classic);
+    let mut sim = Simulation::new_game(7, GameMode::Modern);
     sim.money = 1_000_000.0;
     sim.star = star;
     for x in 0..WIDTH {

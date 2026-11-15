@@ -165,7 +165,9 @@ fn ample_parking_fills_new_offices_faster() {
 /// A four-star tower of flammable offices, run day by day until the roll
 /// raises a choice.
 fn tower_with_a_choice() -> Simulation {
-    let mut sim = seeded_game(1, GameMode::Classic);
+    // Modern: a Classic tower with no Security gets neither a fire nor a
+    // ransom call (#1889).
+    let mut sim = seeded_game(1, GameMode::Modern);
     sim.money = 1e9;
     sim.star = 4;
     lay(&mut sim, Kind::Lobby, 1);

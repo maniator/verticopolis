@@ -12,13 +12,14 @@ import { closeTower } from "./titleScreen";
 import { wireFileShortcuts, type FileCommands } from "./fileShortcuts";
 import { fillLoadMenu, wireLoadMenu } from "./loadMenu";
 import { overviewMapOpen, setOverviewMapOpen } from "./overviewMapWiring";
+import { callFireRescue } from "./fireRescueCall";
 
 /**
  * The menu bar's commands (index.html `#menubar`, behavior in
  * `ui/menuBar.ts`). The items whose ids predate the bar (btn-new, btn-load,
  * btn-settings, btn-stats, btn-help, btn-about, btn-install-menu) keep the
  * click handlers `UI.wireControls` gives them; this wires the rest: Quick
- * Save, Close, Import, Export, Undo and Redo, Rename, the rules, the windows the
+ * Save, Close, Import, Export, Undo and Redo, Rename, Call Fire Rescue, the rules, the windows the
  * Tower and Window menus open, Full Screen, Sound, Classic vs Modern and Replay Getting
  * Started.
  *
@@ -61,6 +62,7 @@ export const NEEDS_A_TOWER = [
   "mb-redo",
   "btn-stats",
   "mb-rename",
+  "mb-fire-rescue",
   "mb-rules",
   "mb-win-tools",
   "mb-win-map",
@@ -189,6 +191,7 @@ export function wireMenus(app: GameApp): MenuBar | null {
     ui.el.towerName.focus();
     ui.el.towerName.select();
   });
+  on("mb-fire-rescue", () => callFireRescue(app));
   on("mb-rules", () => ui.showTowerRules());
   on("mb-win-map", () => setOverviewMapOpen(app, !overviewMapOpen(app)));
   // Window.

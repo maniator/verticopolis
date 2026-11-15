@@ -1,5 +1,5 @@
 {
-  "version": 25,
+  "version": 26,
   "header": {
     "minutes": 0,
     "towerRevision": 1,
@@ -375,6 +375,11 @@
     "scheduleShaft": [
       "status",
       "delta"
+    ],
+    "callFireRescue": [
+      "status",
+      "delta",
+      "cost"
     ],
     "quoteBuild": [
       "ok",
