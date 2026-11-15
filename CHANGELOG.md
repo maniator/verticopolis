@@ -25,6 +25,10 @@ prompt already tells players it is an engine update and shows the new version.
 Entries below 1.51.1 were curated from the commit history after the fact, so they
 are documentation only: no build that a client fetches carries them.
 
+## 4.1.1
+
+- Big towers run faster: a game day on a maxed Classic tower takes about a quarter less work, a maxed Modern tower about a sixth less, and a Modern tower with a long elevator jam a little less than before the 4.1 line fix.
+
 ## 4.1.0
 
 - Options > Screen Saver… picks one of five screen savers (Night Shift, your own tower at night, is the default) to come up when the tower sits paused and untouched, or when you come back to the tab after a while. Any key or mouse move brings your tower back.
