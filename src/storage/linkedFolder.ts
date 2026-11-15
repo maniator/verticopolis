@@ -112,8 +112,11 @@ function done<T>(req: IDBRequest<T>): Promise<T> {
   });
 }
 
+/** The IndexedDB the handle is kept in; tests hand in a fake. */
+let idb: () => IDBFactory = () => indexedDB;
+
 function openDb(): Promise<IDBDatabase> {
-  const req = indexedDB.open(DB_NAME, 1);
+  const req = idb().open(DB_NAME, 1);
   req.onupgradeneeded = () => req.result.createObjectStore(STORE);
   return done(req);
 }
@@ -347,9 +350,11 @@ async function writeFile(folder: Linked, filename: string, bytes: Uint8Array): P
   return folder.entries.find((e) => e.id === filename) ?? { id: filename, name: shownName(filename), kind: linkedFileKind(filename) ?? "tower", size: bytes.byteLength, modified: Date.now() };
 }
 
-/** Forget everything, for tests. */
-export function resetLinkedFolderForTests(): void {
+/** Forget everything this page knew, as a reload does, for tests; `factory`
+ *  replaces the IndexedDB the handle is kept in. */
+export function resetLinkedFolderForTests(factory?: IDBFactory): void {
   linked = null;
   restoring = null;
   listeners.clear();
+  if (factory) idb = () => factory;
 }
