@@ -66,11 +66,14 @@ kept in localStorage (`verticopolis-autosave-mirror`).
 - Its first write in a folder takes `Auto-save.vctower`, or `Auto-save (2)`
   and up when the list or the disk has that name (`linkedFolder.saveNew`), so
   it never replaces a file it didn't write. It then writes that same file
-  (`saveOver`), remembered beside the setting together with the link's id
-  (`linkedFolder.linkId`, made new by every link). A file remembered for
-  another link is never written over, even when the new folder has a file of
-  that name, and a copy whose folder was unlinked or linked again while it
-  packed is dropped. Unlinking also turns the copy off. Turning it
+  (`saveOver`), remembered beside the setting by the link's id
+  (`linkedFolder.linkId`, made new by every link and held per page). Each
+  link keeps its own file, so two tabs on two folders each write theirs, and
+  a file remembered for another link is never written over, even when the new
+  folder has a file of that name. The files of the last eight links are kept;
+  linking again or unlinking drops the old link's. A copy whose folder was
+  unlinked or linked again while it packed is dropped. Unlinking also turns
+  the copy off. Turning it
   off leaves the file in the folder.
 - A failed write says nothing on screen (the in-browser Auto-save worked or
   told the player itself) and tries again a minute later; it is counted once a

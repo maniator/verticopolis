@@ -90,14 +90,37 @@ describe("the Auto-save copy in the linked folder", () => {
     expect(m.saveNew).toHaveBeenCalledTimes(2);
   });
 
-  it("starts a new file after another folder is linked", async () => {
+  it("forgets only the file of the link it is told to", async () => {
     setMirror(true);
     await mirrorAutosave(app, 0);
-    forgetMirrorFile();
-    expect(mirrorOn()).toBe(true);
+    forgetMirrorFile("another link");
     await mirrorAutosave(app, MIRROR_EVERY_MS);
+    expect(m.saveOver, "L1's file is still remembered").toHaveBeenCalledOnce();
+    forgetMirrorFile("L1");
+    expect(mirrorOn()).toBe(true);
+    await mirrorAutosave(app, 2 * MIRROR_EVERY_MS);
     expect(m.saveNew).toHaveBeenCalledTimes(2);
-    expect(m.saveOver).not.toHaveBeenCalled();
+  });
+
+  it("keeps one file per folder when two tabs on two folders take turns", async () => {
+    setMirror(true);
+    for (let turn = 0; turn < 6; turn++) {
+      m.link = turn % 2 === 0 ? "L1" : "L2";
+      resetMirrorForTests();
+      expect(await mirrorAutosave(app, turn * MIRROR_EVERY_MS)).toBe(true);
+    }
+    expect(m.saveNew, "one new file in each folder").toHaveBeenCalledTimes(2);
+    expect(m.saveOver).toHaveBeenCalledTimes(4);
+  });
+
+  it("remembers the files of the last eight links at most", async () => {
+    setMirror(true);
+    for (let i = 0; i < 9; i++) {
+      m.link = `L${i}`;
+      await mirrorAutosave(app, 0, true);
+    }
+    const files = (JSON.parse(localStorage.getItem("verticopolis-autosave-mirror")!) as { files: Record<string, string> }).files;
+    expect(Object.keys(files)).toEqual(["L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8"]);
   });
 
   it("writes the same file again when turned off and on again", async () => {

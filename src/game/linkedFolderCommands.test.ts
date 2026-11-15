@@ -9,6 +9,7 @@ const m = vi.hoisted(() => ({
   mirror: { on: false, forget: vi.fn(), set: vi.fn(), copy: vi.fn(async () => true) },
   folder: {
     state: vi.fn(() => ({ name: "Towers", access: "granted" }) as { name: string; access: string } | null),
+    linkId: vi.fn(() => "L1" as string | null),
     list: vi.fn(() => []),
     usage: vi.fn(() => "1 tower"),
     onChange: vi.fn(() => () => {}),
@@ -206,13 +207,13 @@ describe("the Auto-save copy in the linked folder", () => {
     await place().link();
     expect(m.mirror.forget).not.toHaveBeenCalled();
     await place().link();
-    expect(m.mirror.forget).toHaveBeenCalledOnce();
+    expect(m.mirror.forget, "the replaced link's file").toHaveBeenCalledExactlyOnceWith("L1");
   });
 
   it("stops copying and forgets the file on unlink", async () => {
     await place().unlink();
     expect(m.mirror.set).toHaveBeenCalledExactlyOnceWith(false);
-    expect(m.mirror.forget).toHaveBeenCalledOnce();
+    expect(m.mirror.forget).toHaveBeenCalledExactlyOnceWith("L1");
   });
 });
 

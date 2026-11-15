@@ -88,22 +88,24 @@ export function linkedPlace(app: GameApp): LinkedPlaceCtx | null {
     // The picker is called before any await, so the click that asked for it
     // still counts; so is the permission prompt once the folder is read back
     // (`linkedFolder.allow`).
-    link: () =>
-      linkedFolder.link().then(
+    link: () => {
+      const before = linkedFolder.linkId();
+      return linkedFolder.link().then(
         (linked) => {
           trackAppAction("folder_link", linked ? "linked" : "cancel");
           // A new folder may hold a file of the same name: File > Save must
-          // never write over it without asking.
+          // never write over it without asking. The Auto-save copy starts a
+          // new file there by itself (a new link); the old link's is dropped.
           if (linked && currentLinkedFile() !== null) setCurrentLinkedFile(null);
-          // Nor may the Auto-save copy: it starts a new file there.
-          if (linked) forgetMirrorFile();
+          if (linked) forgetMirrorFile(before);
           return linked ? "linked" : "cancel";
         },
         (err: unknown) => {
           trackAppAction("folder_link", "refused");
           return folderFailed(err);
         },
-      ),
+      );
+    },
     allow: () =>
       linkedFolder.allow().then(
         (access): FileNote | null => {
@@ -113,11 +115,12 @@ export function linkedPlace(app: GameApp): LinkedPlaceCtx | null {
         (err: unknown) => folderFailed(err),
       ),
     unlink: async () => {
+      const before = linkedFolder.linkId();
       try {
         await linkedFolder.unlink();
         if (currentLinkedFile() !== null) setCurrentLinkedFile(null);
         setMirror(false);
-        forgetMirrorFile();
+        forgetMirrorFile(before);
         trackAppAction("folder_unlink");
         return null;
       } catch (err) {

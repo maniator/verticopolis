@@ -20,9 +20,10 @@ import { saveBytes } from "./portLifecycle";
  * starts copying again once Open or Save As shows the folder. Its first write
  * in a folder takes "Auto-save", or "Auto-save (2)" and up when a file of that
  * name is there already, so it never replaces a file it didn't write; after
- * that it writes the same file. The file is remembered with the link it was
+ * that it writes the same file. The file is remembered by the link it was
  * written through ({@link linkedFolder.linkId}), so linking another folder,
- * even one with a file of that name, starts a new file.
+ * even one with a file of that name, starts a new file, and two tabs on two
+ * folders each keep writing their own.
  *
  * The file is the binary `.vctower` Save As writes (`VCTOWER2`, a newline,
  * then the raw DEFLATE of the stamped save), built from the same stamped
@@ -40,23 +41,28 @@ export const MIRROR_EVERY_MS = 60_000;
 
 interface MirrorPref {
   readonly on: boolean;
-  /** The file the copy writes, once it has written one in this folder. Kept
-   *  while the copy is off, so turning it on again writes the same file. */
-  readonly file: string | null;
-  /** The link the file was written through: a file from another link is
-   *  another folder's, so it is never written over. */
-  readonly link: string | null;
+  /** The file the copy writes in each folder, by the link's id, once it has
+   *  written one there. Kept while the copy is off, so turning it on again
+   *  writes the same file. One per link: two tabs on two folders each keep
+   *  their own, and a file from another link is never written over. */
+  readonly files: Readonly<Record<string, string>>;
 }
 
-const OFF: MirrorPref = { on: false, file: null, link: null };
+const OFF: MirrorPref = { on: false, files: {} };
+/** The most links whose files are remembered; the oldest goes first. A link
+ *  forgotten this way only starts one new file if it copies again. */
+const MAX_LINKS = 8;
 
 function readPref(): MirrorPref {
   try {
     const raw = localStorage.getItem(KEY);
     if (raw === null) return OFF;
-    const pref = JSON.parse(raw) as { on?: unknown; file?: unknown; link?: unknown };
-    const text = (v: unknown) => (typeof v === "string" ? v : null);
-    return { on: pref.on === true, file: text(pref.file), link: text(pref.link) };
+    const pref = JSON.parse(raw) as { on?: unknown; files?: unknown };
+    const files: Record<string, string> = {};
+    if (pref.files && typeof pref.files === "object") {
+      for (const [link, file] of Object.entries(pref.files)) if (typeof file === "string") files[link] = file;
+    }
+    return { on: pref.on === true, files };
   } catch {
     return OFF;
   }
@@ -64,11 +70,18 @@ function readPref(): MirrorPref {
 
 function writePref(pref: MirrorPref): void {
   try {
-    if (pref.on || pref.file !== null) localStorage.setItem(KEY, JSON.stringify(pref));
+    if (pref.on || Object.keys(pref.files).length > 0) localStorage.setItem(KEY, JSON.stringify(pref));
     else localStorage.removeItem(KEY);
   } catch {
     /* storage refused: the setting lasts this visit at most */
   }
+}
+
+/** Remember `file` for `link`, newest last. */
+function rememberFile(link: string, file: string): void {
+  const pref = readPref();
+  const kept = Object.entries(pref.files).filter(([l]) => l !== link);
+  writePref({ ...pref, files: Object.fromEntries([...kept.slice(-(MAX_LINKS - 1)), [link, file]]) });
 }
 
 let lastCopy = -Infinity;
@@ -85,10 +98,13 @@ export function setMirror(on: boolean): void {
   lastCopy = -Infinity;
 }
 
-/** Forget the copy's file, so the next copy starts a new one: another folder
- *  may hold a file of that name that the game didn't write. */
-export function forgetMirrorFile(): void {
-  writePref({ ...readPref(), file: null, link: null });
+/** Forget the file remembered for `link` (a link being replaced or
+ *  unlinked), so the list of files stays short. */
+export function forgetMirrorFile(link: string | null): void {
+  if (link === null) return;
+  const pref = readPref();
+  if (!(link in pref.files)) return;
+  writePref({ ...pref, files: Object.fromEntries(Object.entries(pref.files).filter(([l]) => l !== link)) });
 }
 
 /** The stamp and newline that open a binary `.vctower` file. */
@@ -123,10 +139,12 @@ export async function mirrorAutosave(app: Pick<GameApp, "enginePort" | "engine">
     // Unlinked or linked again while the save packed: this file was for the
     // folder that was linked then.
     if (link === null || linkedFolder.linkId() !== link || linkedFolder.state()?.access !== "granted") return false;
-    if (pref.file !== null && pref.link === link) await linkedFolder.saveOver(pref.file, bytes);
+    // Read again: another tab may have written this link's file meanwhile.
+    const file = readPref().files[link];
+    if (file !== undefined) await linkedFolder.saveOver(file, bytes);
     else {
       const entry = await linkedFolder.saveNew(MIRROR_NAME, bytes);
-      if (linkedFolder.linkId() === link) writePref({ ...readPref(), file: entry.id, link });
+      if (linkedFolder.linkId() === link) rememberFile(link, entry.id);
     }
     return true;
   } catch {
