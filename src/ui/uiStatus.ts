@@ -2,7 +2,6 @@ import type { LogEntry } from "../shared/types";
 import { catalogFacility, type Catalog } from "../catalog/catalogTypes";
 import type { FacilityKind, GameMode } from "../shared/types";
 import { showNewsInStatusBar, showTowerInStatusBar } from "./statusBar";
-import { noteUndoDepth } from "./toolTipStrip";
 import type { EnginePort } from "../simport/enginePort";
 import type { PortCodes } from "../simport/portCodes";
 import { clockOf } from "../simport/headerClock";
@@ -197,7 +196,6 @@ export function update(ui: UI, src: HudSource): void {
  *  per call; the DOM is written only when a state flips. */
 export function setHistoryButtons(ui: UI, port: Pick<EnginePort, "undoDepths">): void {
   const [undoSteps, redoSteps] = port.undoDepths();
-  noteUndoDepth(undoSteps); // a placement folds the phone's tool card away
   grayWhen(ui.el.undo, undoSteps === 0);
   grayWhen(ui.el.redo, redoSteps === 0);
 }

@@ -170,7 +170,6 @@ The windows and cards that came with the menu bar report through `app_action`:
 | --- | --- | --- |
 | `window_close` | `tower` or `bulletin` | The Tower Info or Bulletin window's ✕ (the menus' own toggles are `menu_pick` rows) |
 | `window_move` | `tower` or `bulletin` | The first drag of that window in a page life (latched per window) |
-| `tool_card_close` | none | The phone tool card's ✕ |
 | `welcome_shown` | none | The welcome window opened |
 | `welcome_close` | `ok`, `x`, `escape`, `backdrop` or `displaced` | How it went: its OK, its ✕, Escape, a click beside it, or another dialog taking its place. A page closed while it is up sends none |
 | `welcome_link` | `first_tower`, `modes` or `whats_new` | One of its help links |

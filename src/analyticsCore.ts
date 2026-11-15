@@ -382,14 +382,12 @@ export type AppActionName =
   // The version 4 windows and cards (owner, 2026-11-14, with the menu events).
   // `window_close` is a Tower Info or Bulletin window's ✕, `detail` `tower` or
   // `bulletin`; `window_move` is the first drag of that window this page life
-  // (latched per window, same `detail`). `tool_card_close` is the phone tool
-  // card's ✕. `welcome_shown` is the welcome window opening;
+  // (latched per window, same `detail`). `welcome_shown` is the welcome window opening;
   // `welcome_close` is how it went, `detail` `ok`, `x`, `escape`, `backdrop`
   // or `displaced` (another dialog took its place); `welcome_link` is one of
   // its help links, `detail` `first_tower`, `modes` or `whats_new`.
   | "window_close"
   | "window_move"
-  | "tool_card_close"
   | "welcome_shown"
   | "welcome_close"
   | "welcome_link";
