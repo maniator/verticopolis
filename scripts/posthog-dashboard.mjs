@@ -519,6 +519,12 @@ function buildInsights(ids) {
       }),
     },
     {
+      name: "Open window: where players asked for it",
+      description:
+        "app_action files_open split by detail, production, from 4.3: open for File > Open… in the menu, open_key for its Ctrl+O key, open_title for the title screen's Open Tower… button, and save_as for File > Save As…. See docs/analytics-data-map.md, My Towers.",
+      query: trends([series("app_action", "Windows opened")], { breakdown: "detail", display: "ActionsBar", where: [inAction(["files_open"])] }),
+    },
+    {
       name: "Persistence failures (counts, not rates)",
       description:
         "autosave_failed, load_failed, import_failed and export_failed events, by action, production (#1533, #1701). These are COUNTS. A rate needs attempts: imports have them (import_save, import_tdt) and Auto-save loads have them (load_slot plus load_failed; up to 4.2 the numbered slots counted too); autosave has none, so its rate is unavailable, and an export's attempts are sent at the click, so no export rate is printed. scripts/engine-reliability.mjs prints the rates and bounds. Only builds from 2.78.4 send the first three codes and only builds from 2.78.10 send export_failed (the tile has no version filter, so read it from the 2026-11-03 deploy), so an earlier range reads Not measurable, not zero. See docs/analytics-measurement-status.md.",

@@ -171,7 +171,7 @@ describe("wireMenus: the Tower menu's calls for help", () => {
     splash.remove();
   });
 
-  it("on the title screen, Open shows the Open window itself, without pressing the title screen's Load Tower", () => {
+  it("on the title screen, Open shows the Open window itself, without pressing the title screen's Open Tower…", () => {
     const { app } = fakeApp();
     const bar = wireMenus(app)!;
     files.showOpenDialog.mockClear();
@@ -183,7 +183,7 @@ describe("wireMenus: the Tower menu's calls for help", () => {
     splash.querySelector("button")!.addEventListener("click", splashLoad);
     bar.open($("mb-file") as HTMLButtonElement, false);
     $("mb-import").click();
-    expect(files.showOpenDialog).toHaveBeenCalledExactlyOnceWith(app);
+    expect(files.showOpenDialog).toHaveBeenCalledExactlyOnceWith(app, "menu");
     expect(splashLoad).not.toHaveBeenCalled();
     splash.remove();
   });

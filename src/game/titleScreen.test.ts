@@ -5,6 +5,8 @@ import { ENGINE_FAILURE_ID } from "./interactionState";
 
 vi.mock("../analyticsRelay", () => ({ sendToRelay: vi.fn() }));
 vi.mock("virtual:pwa-register", () => ({ registerSW: () => () => {} }));
+const files = vi.hoisted(() => ({ showOpenDialog: vi.fn() }));
+vi.mock("./fileSpaceCommands", () => files);
 
 /** The app File > Close and the title screen talk to, as spies. */
 function makeApp(save: () => void = () => {}): GameApp {
@@ -21,7 +23,7 @@ function makeApp(save: () => void = () => {}): GameApp {
   } as unknown as GameApp;
 }
 
-type SplashOpts = { hasSave: boolean; onContinue: () => void };
+type SplashOpts = { hasSave: boolean; onContinue: () => void; onLoadTower: () => void };
 const splashOpts = (app: GameApp) => vi.mocked(app.onboarding.showSplash).mock.calls[0]?.[0] as unknown as SplashOpts;
 
 describe("File > Close", () => {
@@ -94,5 +96,14 @@ describe("showTitleScreen", () => {
     showTitleScreen(app, false);
     expect(app.events.setBackdrop).toHaveBeenCalledWith(true);
     expect(splashOpts(app).hasSave).toBe(false);
+  });
+});
+
+describe("the title screen's Open Tower…", () => {
+  it("shows the Open window and says it came from the title screen, for the analytics", () => {
+    const app = makeApp();
+    showTitleScreen(app, false);
+    splashOpts(app).onLoadTower();
+    expect(files.showOpenDialog).toHaveBeenCalledExactlyOnceWith(app, "title");
   });
 });

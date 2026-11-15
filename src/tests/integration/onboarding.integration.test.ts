@@ -258,7 +258,7 @@ describe("Onboarding — splash / title screen", () => {
     expect(onContinue).toHaveBeenCalledOnce();
   });
 
-  it("Load Tower keeps the splash up and hands the host NO dismiss callback", () => {
+  it("Open Tower… keeps the splash up and hands the host NO dismiss callback", () => {
     // SPEC-splash-load-tower CAP-5: the title screen is dismissed by a tower
     // arriving, never by a dialog opening. Handing out a dismiss callback here
     // is exactly how a cancelled picker, or a failed load, would end up

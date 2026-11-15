@@ -73,19 +73,23 @@ describe("which kind of tower file a picked file is", () => {
 describe("File > Open…", () => {
   it("falls back to the device's picker while My Towers is closed", () => {
     closeFileSpaceForTests();
-    showOpenDialog(app as unknown as GameApp);
+    showOpenDialog(app as unknown as GameApp, "menu");
     expect(m.openImport).toHaveBeenCalledOnce();
     expect(m.dialog).not.toHaveBeenCalled();
   });
 
-  it("opens the window and counts it", () => {
-    showOpenDialog(app as unknown as GameApp);
+  it("opens the window and counts it, telling the menu, its key and the title screen apart", () => {
+    showOpenDialog(app as unknown as GameApp, "menu");
     expect(lastCtx().mode).toBe("open");
-    expect(m.track).toHaveBeenCalledWith("files_open", "open");
+    expect(m.track).toHaveBeenLastCalledWith("files_open", "open");
+    showOpenDialog(app as unknown as GameApp, "key");
+    expect(m.track).toHaveBeenLastCalledWith("files_open", "open_key");
+    showOpenDialog(app as unknown as GameApp, "title");
+    expect(m.track).toHaveBeenLastCalledWith("files_open", "open_title");
   });
 
   it("adds dropped tower files and names the ones it refused", async () => {
-    showOpenDialog(app as unknown as GameApp);
+    showOpenDialog(app as unknown as GameApp, "menu");
     const note = await lastCtx().add([new File([BINARY], "Spire.vctower"), new File(["hi"], "notes.txt")]);
     expect(note).toEqual({ text: `"notes.txt" isn't a tower file (.vctower or .TDT). Added the other 1.`, kind: "bad" });
     expect(fileSpace.list().map((f) => [f.name, f.kind])).toEqual([["Spire", "tower"]]);
@@ -95,7 +99,7 @@ describe("File > Open…", () => {
   it("deleting the live tower's file forgets it", async () => {
     const saved = await fileSpace.save("Mine", "tower", BINARY);
     setCurrentFile(saved.id);
-    showOpenDialog(app as unknown as GameApp);
+    showOpenDialog(app as unknown as GameApp, "menu");
     expect(await lastCtx().remove(saved.id)).toBeNull();
     expect(currentFileId()).toBeNull();
     expect(m.track).toHaveBeenCalledWith("file_delete");
@@ -130,7 +134,7 @@ describe("opening a My Towers file", () => {
   });
 
   it("opens the Auto-save row the Auto-save's way", () => {
-    showOpenDialog(app as unknown as GameApp);
+    showOpenDialog(app as unknown as GameApp, "menu");
     lastCtx().open({ id: "auto", name: "Auto-save (Sky)", type: "auto" });
     expect(m.loadSave).toHaveBeenCalledExactlyOnceWith(app, "auto");
   });

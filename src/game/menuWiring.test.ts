@@ -135,7 +135,7 @@ describe("wireMenus", () => {
     keys.open();
     keys.save();
     keys.saveAs();
-    expect(files.showOpenDialog).toHaveBeenCalledWith(app);
+    expect(files.showOpenDialog).toHaveBeenCalledExactlyOnceWith(app, "key");
     expect(ui.cb.onSave).toHaveBeenCalledOnce();
     expect(files.showSaveAsDialog).toHaveBeenCalledWith(app);
     // A key that ran reports app_action file_key, and never a menu_pick: no
@@ -171,7 +171,7 @@ describe("wireMenus", () => {
     $("mb-replay").click();
     expect(ui.cb.onSave).toHaveBeenCalledOnce();
     expect(closer.closeTower).toHaveBeenCalledWith(app);
-    expect(files.showOpenDialog).toHaveBeenCalledWith(app);
+    expect(files.showOpenDialog).toHaveBeenCalledExactlyOnceWith(app, "menu");
     expect(files.showSaveAsDialog).toHaveBeenCalledWith(app);
     expect(undo).toHaveBeenCalledOnce(); // the toolbar's own button, so its rules hold
     expect(ui.showTowerRules).toHaveBeenCalledOnce(); // this tower's column, not the whole comparison

@@ -151,7 +151,7 @@ export const SHOWCASE_SCENES: Scene[] = [
   // The two scenes above boot fresh, so every committed splash shot has shown
   // the first-run stack and the gallery has never carried ▶ Continue at all.
   // These stage the returning-player state instead, which is the fuller stack
-  // (Continue / Load Tower / New Tower) and the one the load picker opens from.
+  // (Continue / Open Tower… / New Tower) and the one the load picker opens from.
   // Their own scenes on purpose: re-mounting the splash inside `first-run`
   // would put Continue behind that scene's later modal shots and churn pixels
   // this has no business touching.
@@ -166,7 +166,7 @@ export const SHOWCASE_SCENES: Scene[] = [
         wait: 400,
       },
       {
-        // Load Tower on the title screen opens File > Open… over it.
+        // Open Tower… on the title screen opens File > Open… over it.
         name: "00c-load-tower",
         keepDialogs: true,
         setup: pgShowOpenWindow,

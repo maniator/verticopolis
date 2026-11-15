@@ -30,7 +30,7 @@ import { exportFile } from "./portLifecycle";
  * it (`towerFollow.ts`), and Save then writes the Auto-save alone.
  *
  * Analytics (`docs/analytics-data-map.md`): `app_action` `files_open`
- * (`open` or `save_as`), `file_open` (`tower`, `tdt` or `auto`), `file_save`
+ * (`open`, `open_key`, `open_title` or `save_as`: see `OPEN_DETAIL`), `file_open` (`tower`, `tdt` or `auto`), `file_save`
  * (`new`, `replace` or `current`), `file_add` (`picked` or `drop`),
  * `file_rename`, `file_copy`, `file_delete`, and `file_failed` (`full` or
  * `error`), plus `files_copied` once with the number of slots copied in.
@@ -196,14 +196,27 @@ function keptDownload(app: GameApp): (() => void) | null {
   return () => void app.ui.downloadFile(name, text);
 }
 
+/** Where the player asked for the Open window: File > Open… in the menu,
+ *  its Ctrl+O key, or the title screen's Open Tower… button. */
+export type OpenFrom = "menu" | "key" | "title";
+
+/** The `files_open` detail each place reports (owner, 2026-11-15: tell the
+ *  title screen's button from the File menu). */
+export const OPEN_DETAIL: Readonly<Record<OpenFrom, string>> = {
+  menu: "open",
+  key: "open_key",
+  title: "open_title",
+};
+
 /** File > Open…: the Open window, or the device's picker while My Towers is
- *  closed (a private window that refuses storage). */
-export function showOpenDialog(app: GameApp): void {
+ *  closed (a private window that refuses storage). `from` says where the
+ *  player asked for it, for the analytics. */
+export function showOpenDialog(app: GameApp, from: OpenFrom): void {
   if (!fileSpace.isOpen()) {
     openImport(app.ui);
     return;
   }
-  trackAppAction("files_open", "open");
+  trackAppAction("files_open", OPEN_DETAIL[from]);
   showFileDialog(app.ui, {
     mode: "open",
     initialName: "",

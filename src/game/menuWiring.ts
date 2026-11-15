@@ -82,7 +82,7 @@ export const TOWER_ONLY_ITEMS = [
 /** On the title screen these items press the title screen's own button, so it
  *  leaves the way it always does (and the mute glyph stays in step). Open is
  *  not among them: it opens the Open window straight away, as the title
- *  screen's Load Tower does. */
+ *  screen's Open Tower… does. */
 export const ON_TITLE_SCREEN: Readonly<Record<string, string>> = {
   "btn-new": "new",
   "mb-sound": "mute",
@@ -194,10 +194,11 @@ export function wireMenus(app: GameApp): MenuBar | null {
 
   // File: Open…, Save and Save As… also answer to their keys. Open and Save
   // As show My Towers (fileSpaceCommands.ts).
-  const file = { open: () => showOpenDialog(app), save: () => ui.cb.onSave(), saveAs: () => showSaveAsDialog(app) };
+  // The analytics tell a menu pick from its Ctrl+O key.
+  const file = { open: () => showOpenDialog(app, "key"), save: () => ui.cb.onSave(), saveAs: () => showSaveAsDialog(app) };
   on("mb-quick-save", file.save);
   on("mb-close", () => closeTower(app));
-  on("mb-import", file.open);
+  on("mb-import", () => showOpenDialog(app, "menu"));
   on("mb-export", file.saveAs);
   wireFileShortcuts(file, window, reportKey);
   // Edit: the toolbar's own buttons, so the gray-out and the gesture rules hold.

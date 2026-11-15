@@ -70,7 +70,7 @@ export function showTitleScreen(app: GameApp, hasSave: boolean): void {
     // boot, not just when `hasSave`: My Towers is invisible to `hasSave` (it
     // reads the autosave keys alone), and the window's "From a file on your
     // computer…" is how a new device gets its towers back.
-    onLoadTower: () => showOpenDialog(app),
+    onLoadTower: () => showOpenDialog(app, "title"),
     onNewTower: (dismiss) => {
       // The rule-set picker (Classic vs Modern) warns that New Tower abandons
       // the current tower only when one is continuable (`hasSave`); on a

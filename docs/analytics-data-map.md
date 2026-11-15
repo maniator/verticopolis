@@ -133,7 +133,7 @@ player's own text and is never sent, and neither is a tower's contents.
 
 | `action` | `detail` | When |
 | --- | --- | --- |
-| `files_open` | `open` or `save_as` | The Open or Save As window opened (File > Open…, Save As…, Load > More…, the title screen's Load Tower) |
+| `files_open` | `open`, `open_key`, `open_title` or `save_as` | The Open or Save As window opened. Open says where the player asked: `open` for File > Open… in the menu, `open_key` for its Ctrl+O key, and `open_title` for the title screen's Open Tower… button (called Load Tower up to 4.2). `save_as` is File > Save As… |
 | `file_open` | `tower`, `tdt` or `auto` | A row opened: a tower file, a 1994 `.TDT` file, or the Auto-save |
 | `file_save` | `new`, `replace` or `current` | The tower written into My Towers: under a new name, over a file the player agreed to replace, or into the live tower's own file by File > Save |
 | `file_add` | `picked` or `drop` | A file added to My Towers: `picked` once a file opened from the device has loaded, `drop` for a file dropped onto the Open or Save As window |
