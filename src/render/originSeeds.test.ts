@@ -29,7 +29,14 @@ const CASES: ReadonlyArray<{ label: string; unit: Unit }> = [
   { label: "security in the basement", unit: unitOf("security", { floor: -3, x: 2 }) },
   { label: "medical in the basement", unit: unitOf("medical", { floor: -3, x: 2 }) },
   { label: "housekeeping in the basement", unit: unitOf("housekeeping", { floor: -3, x: 2 }) },
-  // A basement sky bar is left out: its bottles index a negative seed (#1029).
+  // Basement rooms give a negative floor, so these pin the unsigned seeds the
+  // sprites now take (#1029): a signed seed indexed a palette at a negative slot.
+  { label: "skyBar in the basement", unit: unitOf("skyBar", { floor: -3, x: 2 }) },
+  { label: "nightclub in the basement", unit: unitOf("nightclub", { floor: -3, x: 2 }) },
+  { label: "boutique (florist) in the basement", unit: unitOf("boutiqueBay", { subtype: "Florist", floor: -3, x: 2 }) },
+  { label: "boutique (record store) in the basement", unit: unitOf("boutiqueBay", { subtype: "Record Store", floor: -3, x: 2 }) },
+  { label: "boutique (gallery) in the basement", unit: unitOf("boutiqueBay", { subtype: "Gallery", floor: -3, x: 2 }) },
+  { label: "amusements (classic arcade) in the basement", unit: unitOf("amusements", { subtype: "Classic Arcade", floor: -3, x: 2 }) },
   { label: "boutique (phone repair)", unit: unitOf("boutiqueBay", { subtype: "Phone Repair" }) },
   { label: "clinic (pharmacy)", unit: unitOf("clinic", { subtype: "Pharmacy" }) },
   { label: "amusements (claw parlor)", unit: unitOf("amusements", { subtype: "Claw Parlor" }) },
@@ -58,6 +65,15 @@ describe("room details follow the room wherever it is painted (#915)", () => {
       });
     }
   }
+
+  it("a basement daycare paints the same pixels at every region offset (#1029)", () => {
+    // The daycare is shuttered at the evening hour the cases above paint, so
+    // its open scene is checked at noon.
+    const unit = unitOf("daycare", { floor: -3, x: 2 });
+    const [first, ...rest] = OFFSETS.map(([ox, oy]) => paintAt(unit, ox, oy, true, 12));
+    expect(first.some((v) => v !== 0)).toBe(true);
+    for (const other of rest) expect(other).toEqual(first);
+  });
 
   it("still varies the details from room to room", () => {
     // The seeds moved to the room's floor and column; placements of one kind

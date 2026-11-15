@@ -44,10 +44,9 @@ describe("room details follow the room wherever it is painted (#915), every kind
       for (const subtype of [undefined, ...(kindFacts(kind).subtypes ?? [])]) {
         for (const look of SWEEP) {
           const occupants = look.occ ?? (kindFacts(kind).population);
-          // The second basement floor (floor 0 is B1, so -1 is B2), at a column
-          // that keeps every raw geography seed positive (a negative one is
-          // #1029).
-          const where = look.basement ? { floor: -1, x: 40 } : {};
+          // A deep basement floor (floor 0 is B1, so -3 is B4) at a small
+          // column, where the raw geography seed is negative (#1029).
+          const where = look.basement ? { floor: -3, x: 2 } : {};
           const unit = unitOf(kind, { subtype, state: look.state, occupants, ...where });
           const dead = kind === "parking" && look.dead === true;
           const [first, ...rest] = OFFSETS.map(([ox, oy]) => paintAt(unit, ox, oy, look.lit, look.hour, dead));
