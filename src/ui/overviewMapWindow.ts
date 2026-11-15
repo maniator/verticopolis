@@ -15,7 +15,8 @@ import { SKY_HEADROOM_FLOORS } from "../render/cameraBounds";
 import type { ViewPlacement } from "../render/overviewMap/extent";
 import { dragCenter, mapPointToCenter, rectContains, type MapLayout, type MapRect } from "../render/overviewMap/geometry";
 import { OverviewMapModel, type MapFrameInput } from "../render/overviewMap/model";
-import { createPatternSource, paintMapMarks, paintTransportMarks, type PatternSource } from "../render/overviewMap/paint";
+import { createPatternSource, paintGapsAndShafts, paintMapMarks, type PatternSource } from "../render/overviewMap/paint";
+import { MAP_MIN_GAP_CSS_PX } from "../render/overviewMap/gaps";
 import { MAP_BACKDROP, groundShare, paintViewMark, viewMarkBand } from "../render/overviewMap/viewMark";
 import { buildMapDom, ContextWatch } from "./overviewMapDom";
 import { MapKeyKeeper, PointerFocusClaim } from "./overviewMapKeys";
@@ -93,6 +94,7 @@ export class OverviewMapWindow {
       boxWidth: 1,
       boxHeight: 1,
       topReserve: 0,
+      minGapPx: 0,
       floorsOf: deps.floorsOf,
       tallLobbies: () => deps.tallLobbies?.() ?? [],
     };
@@ -236,6 +238,7 @@ export class OverviewMapWindow {
     // The selected view's legend covers the body's top; the crop adds sky
     // for it, so no floor sits under the legend (#1769).
     input.topReserve = (this.deps.views?.legendReserve(input.boxWidth) ?? 0) * this.px;
+    input.minGapPx = MAP_MIN_GAP_CSS_PX * this.px;
     const rebuilt = this.model.sync(input);
     const layout = this.model.layout;
     if (!layout) return;
@@ -244,9 +247,9 @@ export class OverviewMapWindow {
     if (this.deps.views?.due(layout, rebuilt) || rebuilt) {
       // Marked only once painted: the gallery runner reads it (`mapForShot`).
       if (this.towerCtx && this.patterns) {
-        paintMapMarks(this.towerCtx, layout.width, layout.height, this.model.marks, this.patterns);
-        // A view's rooms go under the shafts, as on the Edit view.
-        if (this.deps.views?.paintOver(this.towerCtx, this.patterns)) paintTransportMarks(this.towerCtx, this.model.marks, this.patterns);
+        paintMapMarks(this.towerCtx, layout.width, layout.height, this.model.marks, this.model.gaps, this.patterns);
+        // A view's rooms go under the gaps and the shafts, as on the Edit view.
+        if (this.deps.views?.paintOver(this.towerCtx, this.patterns)) paintGapsAndShafts(this.towerCtx, this.model.marks, this.model.gaps, this.patterns);
         this.root.dataset.mapDrawn = "true";
       }
       const ground = `${(groundShare(layout) * 100).toFixed(2)}%`;

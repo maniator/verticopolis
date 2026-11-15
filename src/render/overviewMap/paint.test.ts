@@ -4,7 +4,7 @@ import {
   PATTERN_TILE,
   createPatternSource,
   paintMapMarks,
-  paintTransportMarks,
+  paintGapsAndShafts,
   patternCells,
   type MapPaintContext,
   type PatternSource,
@@ -163,7 +163,7 @@ describe("paintMapMarks", () => {
   it("clears the whole map first, then fills one rectangle per mark in order", () => {
     const ctx = fakeCtx();
     const marks = [mark("floor"), mark("office"), mark("elevatorExpress")];
-    const n = paintMapMarks(ctx, 120, 80, marks, plain);
+    const n = paintMapMarks(ctx, 120, 80, marks, [], plain);
     expect(n).toBe(3);
     expect(ctx.calls[0]).toEqual({ op: "clear", args: [0, 0, 120, 80] });
     expect(ctx.calls.filter((c) => c.op === "fill")).toHaveLength(3);
@@ -172,54 +172,71 @@ describe("paintMapMarks", () => {
   it("resolves a kind's style once per run of same-kind marks", () => {
     const asked: string[] = [];
     const counting: PatternSource = { get: (fill, pattern) => (asked.push(`${pattern}:${fill}`), fill) };
-    paintMapMarks(fakeCtx(), 10, 10, [mark("office"), mark("office"), mark("office"), mark("condo"), mark("condo")], counting);
+    paintMapMarks(fakeCtx(), 10, 10, [mark("office"), mark("office"), mark("office"), mark("condo"), mark("condo")], [], counting);
     // Two kinds, each asked once for its patterned and once for its plain fill.
     expect(asked).toHaveLength(4);
   });
 
   it("paints an unknown kind in the placeholder instead of throwing", () => {
     const ctx = fakeCtx();
-    expect(() => paintMapMarks(ctx, 10, 10, [mark("notAKind" as never)], plain)).not.toThrow();
+    expect(() => paintMapMarks(ctx, 10, 10, [mark("notAKind" as never)], [], plain)).not.toThrow();
     expect(String(ctx.styleSets[0])).toContain("#ff00ff");
   });
 
   it("sets the fill style only when the style changes", () => {
     const ctx = fakeCtx();
-    paintMapMarks(ctx, 10, 10, [mark("office"), mark("office"), mark("office"), mark("elevatorExpress")], plain);
+    paintMapMarks(ctx, 10, 10, [mark("office"), mark("office"), mark("office"), mark("elevatorExpress")], [], plain);
     expect(ctx.styleSets).toHaveLength(2);
   });
 
   it("paints a mark too small to read a pattern in as a plain fill", () => {
     const ctx = fakeCtx();
-    paintMapMarks(ctx, 50, 50, [mark("condo", MIN_PATTERN_SIDE - 1, 10)], plain);
+    paintMapMarks(ctx, 50, 50, [mark("condo", MIN_PATTERN_SIDE - 1, 10)], [], plain);
     expect(ctx.styleSets[0]).not.toContain(":");
     const big = fakeCtx();
-    paintMapMarks(big, 50, 50, [mark("condo", MIN_PATTERN_SIDE, 10)], plain);
+    paintMapMarks(big, 50, 50, [mark("condo", MIN_PATTERN_SIDE, 10)], [], plain);
     expect(String(big.styleSets[0])).toContain("dots:");
   });
 
   it("draws every kind, stairs and escalators included", () => {
     const marks = [mark("floor", 40, 4), mark("stairs", 8, 8), mark("escalator", 8, 8), mark("elevatorStandard", 4, 20)];
     const ctx = fakeCtx();
-    expect(paintMapMarks(ctx, 60, 30, marks, plain)).toBe(4);
+    expect(paintMapMarks(ctx, 60, 30, marks, [], plain)).toBe(4);
     expect(ctx.calls.filter((c) => c.op === "fill")).toHaveLength(4);
   });
 
   it("paints an empty list as a cleared map", () => {
     const ctx = fakeCtx();
-    expect(paintMapMarks(ctx, 5, 5, [], plain)).toBe(0);
+    expect(paintMapMarks(ctx, 5, 5, [], [], plain)).toBe(0);
     expect(ctx.calls).toHaveLength(1);
   });
 });
 
-describe("paintTransportMarks", () => {
-  it("paints only the trailing transport marks again, without clearing", () => {
+describe("paintGapsAndShafts", () => {
+  it("clears the gaps, then paints only the trailing transport marks again, without clearing the map", () => {
     const shaft = (x: number): MapMark => ({ layer: "transport", kind: "elevatorStandard", rect: { x, y: 0, w: 1, h: 20 } });
+    const gap = { x: 5, y: 0, w: 4, h: 20 };
     const ctx = fakeCtx();
-    expect(paintTransportMarks(ctx, [mark("office"), mark("hotelSingle"), shaft(3), shaft(7)], plain)).toBe(2);
-    expect(ctx.calls.map((c) => c.op)).toEqual(["fill", "fill"]);
-    expect(ctx.calls.map((c) => c.args[0])).toEqual([3, 7]);
-    expect(paintTransportMarks(fakeCtx(), [mark("office")], plain)).toBe(0);
-    expect(paintTransportMarks(fakeCtx(), [], plain)).toBe(0);
+    expect(paintGapsAndShafts(ctx, [mark("office"), mark("hotelSingle"), shaft(3), shaft(7)], [gap], plain)).toBe(2);
+    expect(ctx.calls.map((c) => c.op)).toEqual(["clear", "fill", "fill"]);
+    expect(ctx.calls.map((c) => c.args[0])).toEqual([5, 3, 7]);
+    expect(paintGapsAndShafts(fakeCtx(), [mark("office")], [], plain)).toBe(0);
+    expect(paintGapsAndShafts(fakeCtx(), [], [], plain)).toBe(0);
+  });
+});
+
+describe("paintMapMarks gaps", () => {
+  it("clears each gap after the rooms and before the shafts", () => {
+    const shaft: MapMark = { layer: "transport", kind: "elevatorStandard", rect: { x: 2, y: 0, w: 1, h: 20 } };
+    const ctx = fakeCtx();
+    expect(paintMapMarks(ctx, 30, 20, [mark("floor"), mark("office"), shaft], [{ x: 11, y: 0, w: 4, h: 20 }], plain)).toBe(3);
+    // The whole map, the floor and the room, the gap, then the shaft.
+    expect(ctx.calls.map((c) => [c.op, c.args[0]])).toEqual([
+      ["clear", 0],
+      ["fill", 0],
+      ["fill", 0],
+      ["clear", 11],
+      ["fill", 2],
+    ]);
   });
 });

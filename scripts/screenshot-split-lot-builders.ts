@@ -72,3 +72,57 @@ export function buildSplitLotTower(): void {
   g.speed = 0;
   g.engine.paused = false;
 }
+
+/** Four Modern towers of different heights on one lot with open air of 2, 3
+ *  and 7 tiles between them, offices on their floors and an elevator in each,
+ *  for the Map's gallery shots of narrow gaps between buildings
+ *  (`scripts/scenes/overviewMap.ts`). Fails closed when a lobby is refused
+ *  or two towers touch. */
+export function buildSplitGapTowers(): void {
+  const w = window as unknown as { game: any };
+  const g = w.game;
+  const Sim = g.sim.constructor;
+  g.sim = Sim.newGame(7301, "modern");
+  const s = g.sim;
+  s.money = 90_000_000;
+  s.star = 3;
+  const cx = Math.floor(g.grid.width / 2);
+  const left = cx - 86;
+  // [first column, last column, top floor] of each tower.
+  const towers: [number, number, number][] = [
+    [left, left + 39, 24],
+    [left + 42, left + 81, 18],
+    [left + 85, left + 124, 24],
+    [left + 132, left + 171, 14],
+  ];
+  const right = towers[towers.length - 1][1];
+  if (!s.tower.place("lobby", 1, left).ok) throw new Error("the first lobby tile was refused");
+  for (let x = left; x <= right; x++) s.tower.place("floor", 0, x);
+  for (const [lo, hi, top] of towers) {
+    for (let x = lo; x <= hi; x++) {
+      if (x !== left && !s.tower.place("lobby", 1, x).ok) throw new Error(`the lobby at ${x} was refused`);
+    }
+    for (let f = 2; f <= top; f++) for (let x = lo; x <= hi; x++) s.tower.place("floor", f, x);
+    if (!s.tower.placeTransport("elevatorStandard", lo + 1, 1, top).ok) throw new Error(`no elevator at ${lo + 1}`);
+    for (let f = 2; f <= top; f++) {
+      for (let x = lo + 6; x + 9 <= hi + 1; ) {
+        const r = s.tower.place(f % 6 === 0 ? "condo" : "office", f, x);
+        if (!r.ok) {
+          x += 1;
+          continue;
+        }
+        x += s.tower.getUnit(r.unitId).width;
+      }
+    }
+  }
+  for (let i = 1; i < towers.length; i++) {
+    for (let x = towers[i - 1][1] + 1; x < towers[i][0]; x++) {
+      if (s.tower.unitAt(1, x)) throw new Error(`the lobbies touch at ${x}`);
+    }
+  }
+  s.evaluateStar();
+  g.engine.setSim(g.enginePort.sim ? s : (g.syncSim(), g.renderSim));
+  g.engine.setCamera(cx, 8, 0.6);
+  g.speed = 0;
+  g.engine.paused = false;
+}

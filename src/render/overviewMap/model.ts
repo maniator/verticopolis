@@ -4,9 +4,9 @@
  * so the window does neither on a frame where nothing changed. No canvas and no
  * DOM, so the rules are unit-tested on their own.
  *
- * - The draw list is rebuilt only when the identity of `structure`, `rooms` or
- *   `tower.transports` changes, or the box or the extent does (a band
- *   crossed). `tower.revision` alone is not a reason: a host can
+ * - The draw list and the gaps between buildings are rebuilt only when the
+ *   identity of `structure`, `rooms` or `tower.transports` changes, or the
+ *   box, the extent (a band crossed) or the narrowest gap does. `tower.revision` alone is not a reason: a host can
  *   repeat a revision over other units (#1296).
  *   The band check is constant work on every sync (a couple of small extent
  *   objects and a few comparisons), never a walk.
@@ -24,8 +24,9 @@
 import type { FacilityKind } from "../../shared/types";
 import type { HallRun } from "../lobbyHalls";
 import { buildMapDrawList, type MapMark, type MapSource } from "./drawList";
+import { buildMapGaps } from "./gaps";
 import { bandedExtent, sameExtent, viewPlacement, type BuiltFloors, type ViewPlacement } from "./extent";
-import { fitLayout, type MapCamera, type MapLayout, type MapWorld } from "./geometry";
+import { fitLayout, type MapCamera, type MapLayout, type MapRect, type MapWorld } from "./geometry";
 
 /** What the map reads from the view on each sync. Only identities and two
  *  numbers are compared, never the arrays' contents. */
@@ -46,6 +47,9 @@ export interface MapFrameInput {
    *  legend covers (0 for none): the crop adds sky above the tower for it,
    *  so the legend hides no floor (`bandedExtent`). */
   readonly topReserve: number;
+  /** The narrowest a gap between buildings draws, in map (device) pixels
+   *  (`MAP_MIN_GAP_CSS_PX` times the pixel ratio). A change rebuilds. */
+  readonly minGapPx: number;
   /** A kind's height in floors. It is not part of the rebuild key: the catalog
    *  is bound per tower, and a new tower comes with new arrays. */
   floorsOf(kind: FacilityKind): number;
@@ -66,10 +70,13 @@ export class OverviewMapModel {
   private transports: unknown = null;
   private boxWidth = NaN;
   private boxHeight = NaN;
+  private minGapPx = NaN;
   private cam: MapCamera | null = null;
   private placementLayout: MapLayout | null = null;
   layout: MapLayout | null = null;
   marks: readonly MapMark[] = [];
+  /** The open air between buildings (`buildMapGaps`), rebuilt with `marks`. */
+  gaps: readonly MapRect[] = [];
   placement: ViewPlacement | null = null;
 
   /**
@@ -91,13 +98,15 @@ export class OverviewMapModel {
       sameGeometry &&
       this.structure === input.view.structure &&
       this.rooms === input.view.rooms &&
-      this.transports === input.view.tower.transports;
+      this.transports === input.view.tower.transports &&
+      this.minGapPx === input.minGapPx;
     if (same) return false;
     this.structure = input.view.structure;
     this.rooms = input.view.rooms;
     this.transports = input.view.tower.transports;
     this.boxWidth = boxWidth;
     this.boxHeight = boxHeight;
+    this.minGapPx = input.minGapPx;
     this.cam = null;
     // A tower edit inside the same geometry keeps the layout object; only the
     // one placement the rebuild re-arms is recomputed for it.
@@ -105,14 +114,17 @@ export class OverviewMapModel {
       this.layout = fitLayout(extent, boxWidth, boxHeight);
       this.placement = null;
     }
+    const halls = input.tallLobbies();
     const source: MapSource = {
       structure: input.view.structure,
       rooms: input.view.rooms,
       transports: input.view.tower.transports,
       floorsOf: (kind) => input.floorsOf(kind),
-      tallLobbies: () => input.tallLobbies(),
+      // Asked once per rebuild: the draw list and the gaps both read it.
+      tallLobbies: () => halls,
     };
     this.marks = buildMapDrawList(this.layout, source);
+    this.gaps = buildMapGaps(this.layout, source, input.minGapPx);
     return true;
   }
 
@@ -123,6 +135,7 @@ export class OverviewMapModel {
   reset(): void {
     this.layout = null;
     this.marks = [];
+    this.gaps = [];
     this.placement = null;
     this.placementLayout = null;
     this.cam = null;
