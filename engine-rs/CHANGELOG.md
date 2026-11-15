@@ -15,6 +15,13 @@ raised the version, so they are documentation only.
 There is no entry for 0.17.0, which only
 existed as a step inside a stacked branch.
 
+## 1.42.0 (2026-11-15)
+
+- Modern dispatch: a car its crowd fills owns no hall call and does not restart Standard Floor Departure for riders who cannot board (`GameMode::full_cars_pass_hall_calls`). The crowd keeps those cars in `Crowd::full_cars` (marked at the last seat, cleared when a seat is left, rebuilt on load, never saved), and `ElevatorCalls` gains `full`, a copy of it for dispatch.
+- `Simulation::call_fire_rescue` (port command `callFireRescue`, record slot `cost`) puts the fire rescue offer up again while a fire burns, refusing with `none` when nothing burns and `pending` while a choice waits. View layout version 26 (#1889).
+- `GameMode::fire_needs_security` (Classic): the daily roll starts a fire only in a tower with a Security office, the same gate the ransom call has (#1889).
+- `hotel_checkout` books every asleep room's rent, including the rooms Modern holds for late checkout, and `hotel_late_checkout` only turns the held rooms over, so a held room removed before 14:00 no longer drops its night's rent (#2283).
+
 ## 1.41.2 (2026-11-15)
 
 - Exact speed-ups, with every game the same: the parking check fills room by room, the demand pool, crew floors, commute averages and the lobby reach sets use the fast hasher, the lobby distance walks the tall halls once, the landing lines read each shaft once per line and are kept by place in the crowd, and the Modern router prices a line only when the link could still win. The conformance lock and the fuzz corpus do not move.
