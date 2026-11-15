@@ -134,3 +134,23 @@ fn a_chain_reaches_out_both_ways_and_breaks_at_a_gap() {
         vec![true, true, false, true, false, false]
     );
 }
+
+#[test]
+fn connected_stalls_take_the_first_records() {
+    // B2's stall sits four tiles from its ramp, so B1's connected stall,
+    // written after it, still takes record 0.
+    let save = save_with(vec![
+        unit(1, "parkingRamp", B1, RAMP_X, 16),
+        unit(2, "parking", B1, RAMP_X + 16, 4),
+        unit(3, "parkingRamp", B2, RAMP_X, 16),
+        unit(4, "parking", B2, RAMP_X - 8, 4),
+    ]);
+    let bytes = build_tdt(&save).expect("exports").bytes;
+    let (tail_at, parking_at) = blocks_at(&bytes);
+    let table = &bytes[tail_at + STALL_TABLE_IN_ROUTING_TAIL..];
+    let b2 = (B2 + TDT_FLOOR_OFFSET) as u8;
+    let b1 = (B1 + TDT_FLOOR_OFFSET) as u8;
+    assert_eq!(&table[..12], &[b1, 1, 0, 0, 0, 0, b2, 0, 0, 0, 0, 0]);
+    let list: Vec<u16> = (0..3).map(|k| u16_at(&bytes, parking_at + k * 2)).collect();
+    assert_eq!(list, vec![1, 0, 0]);
+}

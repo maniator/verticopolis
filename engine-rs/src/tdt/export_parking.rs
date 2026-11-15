@@ -92,8 +92,7 @@ pub struct ParkingExport {
 
 impl ParkingExport {
     /// Note a tenant the encoder just wrote at `record_at` on TDT floor
-    /// `floor`. A stall past the table's last record, or without a logical
-    /// id, stays out of the table.
+    /// `floor`. A stall without a logical id stays out of the table.
     pub fn place(
         &mut self,
         floor: usize,
@@ -110,14 +109,25 @@ impl ParkingExport {
         let Some(id) = id.filter(|_| is_stall(type_id)) else {
             return;
         };
-        if self.stalls.len() < TDT_STALL_SLOTS {
-            self.stalls.push(PlacedStall {
-                floor,
-                id,
-                record_at,
-                connected,
-            });
-        }
+        self.stalls.push(PlacedStall {
+            floor,
+            id,
+            record_at,
+            connected,
+        });
+    }
+
+    /// The stalls the table holds, by record: the connected ones first, so
+    /// a tower with more stalls than records keeps every connected stall it
+    /// can (#307), then the rest, each group in the order written.
+    fn table(&self) -> Vec<&PlacedStall> {
+        let (connected, loose): (Vec<&PlacedStall>, Vec<&PlacedStall>) =
+            self.stalls.iter().partition(|s| s.connected);
+        connected
+            .into_iter()
+            .chain(loose)
+            .take(TDT_STALL_SLOTS)
+            .collect()
     }
 
     /// Header bytes 36 and 37: the column's x, or `FFFF` with no B1 ramp.
@@ -126,23 +136,25 @@ impl ParkingExport {
     }
 
     /// The parking block: the connected stalls' table indexes, count first.
+    /// The connected stalls lead the table, so the list is its first
+    /// records in order.
     pub fn write_connected_list(&self, w: &mut ByteWriter) {
-        let connected: Vec<usize> = (0..self.stalls.len())
-            .filter(|&i| self.stalls[i].connected)
-            .collect();
-        w.u16(connected.len() as i64);
+        let connected = self.table().iter().filter(|s| s.connected).count();
+        w.u16(connected as i64);
         for slot in 0..TDT_STALL_SLOTS {
-            w.u16(connected.get(slot).map_or(0, |&i| i as i64));
+            w.u16(if slot < connected { slot as i64 } else { 0 });
         }
     }
 
     /// Fill the stall table of the routing tail starting at `tail_at`, and
-    /// point each stall's tenant record at its record.
+    /// point each stall's tenant record at its record. A stall past the
+    /// table's last record keeps the 0 the encoder wrote.
     pub fn write_stall_table(&self, w: &mut ByteWriter, tail_at: usize) {
         let table_at = tail_at + STALL_TABLE_IN_ROUTING_TAIL;
+        let table = self.table();
         for slot in 0..TDT_STALL_SLOTS {
             let at = table_at + slot * STALL_RECORD_SIZE;
-            let record: [u8; STALL_RECORD_SIZE] = match self.stalls.get(slot) {
+            let record: [u8; STALL_RECORD_SIZE] = match table.get(slot) {
                 Some(s) => [s.floor as u8, s.id as u8, 0, 0, 0, 0],
                 None => [EMPTY_STALL_RECORD, 0, 0, 0, 0, 0],
             };
@@ -150,7 +162,7 @@ impl ParkingExport {
                 w.set_u8(at + k, byte as i64);
             }
         }
-        for (i, s) in self.stalls.iter().enumerate() {
+        for (i, s) in table.iter().enumerate() {
             w.set_u16(s.record_at + TABLE_INDEX_IN_TENANT_RECORD, i as i64);
         }
     }
