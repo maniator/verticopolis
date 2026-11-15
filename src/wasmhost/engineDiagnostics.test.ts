@@ -35,7 +35,7 @@ describe("buildDiagnostics", () => {
     const r = buildDiagnostics({ appVersion: "dev" });
     expect(r.state).toBe("not-running");
     expect(r.summary).toBe("The Rust engine is not running this tower.");
-    expect(row(r, "Engine in use")).toEqual(["none"]);
+    expect(row(r, "Engine in use")).toEqual(["not running"]);
     expect(r.rows[0]).toEqual({ label: "App", value: "vdev" });
     expect(r.text).toContain("Verticopolis diagnostics");
   });
@@ -43,7 +43,7 @@ describe("buildDiagnostics", () => {
   it("names no engine, and no TypeScript engine, when the Rust engine is not running (#1875)", () => {
     const r = buildDiagnostics({ ...base, boot: { build: "wasm-only", engine: "none", failure: null } });
     expect(r.state).toBe("not-running");
-    expect(row(r, "Engine in use")).toEqual(["none"]);
+    expect(row(r, "Engine in use")).toEqual(["not running"]);
     expect(row(r, "App")).toEqual(["v1.2.3 (abc1234)"]);
     expect(r.text).not.toMatch(/TypeScript|fallback/i);
   });
@@ -58,6 +58,9 @@ describe("buildDiagnostics", () => {
     expect(r.state).toBe("ok");
     expect(row(r, "Engine in use")).toEqual(["Rust engine"]);
     expect(row(r, "Engine crate")).toEqual(["example-engine 9.8.7"]);
+    // The bundle kind is always wasm-only now, so it is not shown.
+    expect(row(r, "Build")).toEqual([]);
+    expect(r.text).not.toMatch(/wasm-only/i);
     expect(row(r, "Save version")).toEqual(["7 (loads back to 1)"]);
     expect(row(r, "Frame layout")).toEqual(["2"]);
     expect(row(r, "Catalog")).toEqual([
@@ -135,7 +138,7 @@ describe("buildDiagnostics", () => {
     const r = buildDiagnostics({ ...base, boot, expected: expected() });
     expect(r.state).toBe("not-loaded");
     expect(r.summary).toBe("The Rust engine did not load, and this build has no other engine.");
-    expect(row(r, "Engine in use")).toEqual(["none"]);
+    expect(row(r, "Engine in use")).toEqual(["not running"]);
     expect(row(r, "Failed at")).toEqual(["load"]);
     expect(row(r, "Reason")).toEqual(["boot-timeout"]);
     expect(row(r, "Detail")).toEqual(["no answer in 90 seconds"]);
@@ -151,7 +154,7 @@ describe("buildDiagnostics", () => {
     };
     const r = buildDiagnostics({ ...base, boot });
     expect(r.state).toBe("not-loaded");
-    expect(row(r, "Engine in use")).toEqual(["none"]);
+    expect(row(r, "Engine in use")).toEqual(["not running"]);
     expect(r.summary).toContain("no other engine");
   });
 
@@ -337,7 +340,7 @@ describe("which engine is running, by the host's status", () => {
     });
     expect(r.state).toBe("not-running");
     expect(r.summary).toBe("The Rust engine is not running this tower.");
-    expect(row(r, "Engine in use")).toEqual(["none"]);
+    expect(row(r, "Engine in use")).toEqual(["not running"]);
     expect(r.text).not.toMatch(/TypeScript|fallback/i);
   });
 
