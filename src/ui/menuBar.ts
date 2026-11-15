@@ -14,7 +14,14 @@
  *
  * Cost: nothing runs per frame. Opening a menu calls `onOpen` once, so the
  * wiring can refresh check marks and grayed items only when someone looks.
+ *
+ * A trip is the time from a menu opening with none open to the menus
+ * closing. `onTrip` hears it begin and `onDismiss` hears it end with no pick
+ * (the analytics in `game/menuWiring.ts`); pointing from menu to menu inside
+ * a trip is neither.
  */
+
+import type { MenuDismissHow, MenuOpenVia } from "../analyticsMenus";
 
 /** How long a press that closed a menu keeps swallowing its own pointerup and
  *  click, in milliseconds: long enough for a slow tap, short enough that the
@@ -34,9 +41,16 @@ function keepOnScreen(menu: HTMLElement): void {
 /** An item the player can pick: shown and not grayed out. */
 const PICKABLE = ".mb-item:not([hidden]):not([aria-disabled='true'])";
 
+/** How the menus closed: an item was picked, or one of the dismissals. */
+export type MenuCloseHow = "pick" | MenuDismissHow;
+
 export interface MenuBarOptions {
   /** Runs as a menu opens, before it shows, with the menu's popup. */
   readonly onOpen?: (menu: HTMLElement) => void;
+  /** A trip begins: `title`'s menu opened with none open before it. */
+  readonly onTrip?: (title: HTMLButtonElement, via: MenuOpenVia) => void;
+  /** A trip ended with no pick; `title` is the menu that was open. */
+  readonly onDismiss?: (title: HTMLButtonElement, how: MenuDismissHow, browsed: number) => void;
 }
 
 export class MenuBar {
@@ -44,6 +58,8 @@ export class MenuBar {
   private openTitle: HTMLButtonElement | null = null;
   /** Until when a press that closed a menu still swallows its pointerup and click. */
   private swallowUntil = -Infinity;
+  /** The menus this trip has shown. */
+  private readonly tripMenus = new Set<HTMLButtonElement>();
 
   constructor(
     private readonly root: HTMLElement,
@@ -51,7 +67,11 @@ export class MenuBar {
   ) {
     this.titles = [...root.querySelectorAll<HTMLButtonElement>(".mb-title")];
     for (const title of this.titles) {
-      title.addEventListener("click", () => (this.openTitle === title ? this.close() : this.open(title, false)));
+      // A keyboard press on a focused title arrives as a click with no
+      // pointer behind it (`detail` 0).
+      title.addEventListener("click", (e) =>
+        this.openTitle === title ? this.close(true, "title") : this.open(title, false, e.detail === 0 ? "keys" : "click"),
+      );
       // A mouse switches menus by pointing. A finger's tap also fires
       // pointerenter just before its click, which would open the menu and
       // then close it again, so a tap switches by its click alone.
@@ -80,7 +100,7 @@ export class MenuBar {
       "pointerdown",
       (e) => {
         if (!this.openTitle || !outside(e)) return;
-        this.close();
+        this.close(true, "outside");
         this.swallowUntil = e.timeStamp + SWALLOW_MS;
         e.preventDefault();
         e.stopPropagation();
@@ -96,7 +116,7 @@ export class MenuBar {
     win?.addEventListener("pointerup", swallow, true);
     win?.addEventListener("click", swallow, true);
     doc.addEventListener("keydown", (e) => this.accelerator(e));
-    win?.addEventListener("blur", () => this.close());
+    win?.addEventListener("blur", () => this.close(true, "blur"));
   }
 
   /** The title whose menu is open, or null. */
@@ -104,11 +124,22 @@ export class MenuBar {
     return this.openTitle;
   }
 
-  /** Open `title`'s menu, closing any other; `focusItem` focuses its first item. */
-  open(title: HTMLButtonElement, focusItem: boolean): void {
-    if (this.openTitle && this.openTitle !== title) this.close(false);
+  /** How many menus this trip has shown (0 with none open). */
+  browsed(): number {
+    return this.tripMenus.size;
+  }
+
+  /** Open `title`'s menu, closing any other; `focusItem` focuses its first
+   *  item. `via` says how a trip that this open begins was started. */
+  open(title: HTMLButtonElement, focusItem: boolean, via: MenuOpenVia = "click"): void {
     const menu = this.menuOf(title);
     if (!menu) return;
+    if (this.openTitle && this.openTitle !== title) this.hide(false);
+    else if (!this.openTitle) {
+      this.tripMenus.clear();
+      this.opts.onTrip?.(title, via);
+    }
+    this.tripMenus.add(title);
     this.opts.onOpen?.(menu);
     menu.hidden = false;
     keepOnScreen(menu);
@@ -117,9 +148,19 @@ export class MenuBar {
     if (focusItem) this.items(menu)[0]?.focus();
   }
 
-  /** Close the open menu. `refocus` gives the focus back to its title when
-   *  the focus was inside the menu, so the keyboard is not dropped. */
-  close(refocus = true): void {
+  /** Close the open menu, ending the trip. `refocus` gives the focus back to
+   *  its title when the focus was inside the menu, so the keyboard is not
+   *  dropped. `how` is `pick` when an item closed it. */
+  close(refocus = true, how: MenuCloseHow = "pick"): void {
+    const title = this.openTitle;
+    if (!title) return;
+    this.hide(refocus);
+    if (how !== "pick") this.opts.onDismiss?.(title, how, this.tripMenus.size);
+    this.tripMenus.clear();
+  }
+
+  /** Hide the open menu without ending the trip. */
+  private hide(refocus: boolean): void {
     const title = this.openTitle;
     if (!title) return;
     const menu = this.menuOf(title);
@@ -151,9 +192,9 @@ export class MenuBar {
       next.focus();
       if (this.openTitle) this.open(next, false);
     } else if (e.key === "ArrowDown" || e.key === "Enter" || e.key === " ") {
-      this.open(title, true);
+      this.open(title, true, "keys");
     } else if (e.key === "Escape" && this.openTitle) {
-      this.close();
+      this.close(true, "escape");
       title.focus();
     } else {
       return;
@@ -180,11 +221,11 @@ export class MenuBar {
         break;
       }
       case "Escape":
-        this.close();
+        this.close(true, "escape");
         title.focus();
         break;
       case "Tab":
-        this.close(false);
+        this.close(false, "tab");
         return; // let the focus move on
       default:
         return;
@@ -202,6 +243,6 @@ export class MenuBar {
     const title = this.titles.find((t) => !t.closest("[hidden]") && t.querySelector("u")?.textContent?.toLowerCase() === letter);
     if (!title) return;
     e.preventDefault();
-    this.open(title, true);
+    this.open(title, true, "alt");
   }
 }

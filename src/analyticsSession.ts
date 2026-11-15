@@ -2,6 +2,7 @@ import { telemetryHostAllowed } from "./telemetry";
 import type { GameplayMilestoneId } from "./events/gameplayEvents";
 import { trackEvent, setCommonProps, type GameplayEvents } from "./analyticsCore";
 import { clearActionLatches } from "./analyticsActions";
+import { clearMenuPicks } from "./analyticsMenus";
 import { trackPageView } from "./analyticsPageView";
 import { noteCrash as reportCrash, releaseCrashThrottle as releaseCrashSlots, takeCrashCount } from "./analyticsCrash";
 import { resetEngineStatus } from "./analyticsEngineStatus";
@@ -404,6 +405,7 @@ class GameplaySession {
     this.played = false;
     this.emergReported = false;
     clearActionLatches();
+    clearMenuPicks();
     // Re-anchor a running foreground segment on now, so the clock keeps running
     // for the new window while the time already spent in the old one is dropped
     // with everything else.

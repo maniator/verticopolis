@@ -1,4 +1,5 @@
 import { html, render, type TemplateResult } from "lit-html";
+import { trackAppAction } from "../analytics";
 
 /**
  * The phone's tool card (party, 2026-11-14). A phone has no status bar, so a
@@ -29,12 +30,18 @@ export function showToolTip(card: TemplateResult, doc: Document = document): voi
   const tip = doc.getElementById("tool-tip");
   if (!tip) return;
   render(
-    html`<button type="button" class="tt-close" aria-label="Close the tool card" @click=${() => hideToolTip(doc)}>✕</button><div class="tt-body">${card}</div>`,
+    html`<button type="button" class="tt-close" aria-label="Close the tool card" @click=${() => closeToolTip(doc)}>✕</button><div class="tt-body">${card}</div>`,
     tip,
   );
   tip.hidden = false;
   upTip = tip;
   seenAtDepth = undefined;
+}
+
+/** The card's ✕: fold it away and count the close (`tool_card_close`). */
+function closeToolTip(doc: Document): void {
+  trackAppAction("tool_card_close");
+  hideToolTip(doc);
 }
 
 /** Fold the card away. */

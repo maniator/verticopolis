@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { MenuBar } from "./menuBar";
+import { MenuBar, type MenuBarOptions } from "./menuBar";
 
 /** Two menus, the second with a grayed and a hidden item, the way index.html
  *  lays out `#menubar`. */
-function setup(onOpen = vi.fn()) {
+function setup(onOpen = vi.fn(), more: MenuBarOptions = {}) {
   document.body.innerHTML = `
     <nav id="menubar">
       <div class="mb-menu">
@@ -24,14 +24,22 @@ function setup(onOpen = vi.fn()) {
     </nav>
     <div id="outside"></div>`;
   const root = document.getElementById("menubar")!;
-  const bar = new MenuBar(root, { onOpen });
+  const bar = new MenuBar(root, { ...more, onOpen });
+  bars.push(bar);
   const $ = (id: string) => document.getElementById(id) as HTMLElement;
   const key = (el: Element, k: string, init: KeyboardEventInit = {}) =>
     el.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true, cancelable: true, ...init }));
   return { bar, $, key, onOpen };
 }
 
+/** Every bar a test made. Its window listeners outlive the test, and a bar
+ *  left open, or still swallowing a press that closed it, would eat the next
+ *  test's clicks: so each is closed, and one click spends any swallow. */
+const bars: MenuBar[] = [];
+
 afterEach(() => {
+  for (const bar of bars.splice(0)) bar.close(false);
+  document.body.dispatchEvent(new MouseEvent("click", { bubbles: true }));
   document.body.innerHTML = "";
 });
 
@@ -186,5 +194,82 @@ describe("MenuBar", () => {
     $("t-file").click();
     window.dispatchEvent(new Event("blur"));
     expect($("m-file").hidden).toBe(true);
+  });
+});
+
+describe("MenuBar trips (the menu analytics' hooks)", () => {
+  const pointerClick = (el: HTMLElement) => el.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, detail: 1 }));
+  function tripSetup() {
+    const onTrip = vi.fn();
+    const onDismiss = vi.fn();
+    return { ...setup(vi.fn(), { onTrip, onDismiss }), onTrip, onDismiss };
+  }
+
+  it("a trip begins once, however many menus it shows, and counts them", () => {
+    const { bar, $, onTrip, onDismiss } = tripSetup();
+    pointerClick($("t-file"));
+    expect(onTrip).toHaveBeenCalledExactlyOnceWith($("t-file"), "click");
+    $("t-edit").dispatchEvent(new PointerEvent("pointerenter", { pointerType: "mouse" }));
+    $("t-file").dispatchEvent(new PointerEvent("pointerenter", { pointerType: "mouse" }));
+    expect(onTrip).toHaveBeenCalledOnce();
+    expect(bar.browsed()).toBe(2);
+    pointerClick($("i-new"));
+    expect(onDismiss).not.toHaveBeenCalled(); // a pick is not a dismissal
+    expect(bar.browsed()).toBe(0);
+    pointerClick($("t-edit"));
+    expect(onTrip).toHaveBeenLastCalledWith($("t-edit"), "click");
+    expect(bar.browsed()).toBe(1);
+  });
+
+  it("says how a trip began: a click, the keyboard on a title, or Alt with its letter", () => {
+    const { bar, $, key, onTrip } = tripSetup();
+    key($("t-file"), "ArrowDown");
+    expect(onTrip).toHaveBeenLastCalledWith($("t-file"), "keys");
+    bar.close();
+    $("t-edit").click(); // Enter or Space on a focused button: a click with no pointer
+    expect(onTrip).toHaveBeenLastCalledWith($("t-edit"), "keys");
+    bar.close();
+    key(document.body, "e", { altKey: true });
+    expect(onTrip).toHaveBeenLastCalledWith($("t-edit"), "alt");
+    bar.close();
+  });
+
+  it("reports each way a trip ends with no pick, with the menu last open and the menus it showed", () => {
+    const { $, key, onDismiss } = tripSetup();
+    key($("t-file"), "ArrowDown");
+    key($("i-new"), "Escape");
+    expect(onDismiss).toHaveBeenLastCalledWith($("t-file"), "escape", 1);
+
+    key($("t-file"), "ArrowDown");
+    key($("i-new"), "Tab");
+    expect(onDismiss).toHaveBeenLastCalledWith($("t-file"), "tab", 1);
+
+    pointerClick($("t-file"));
+    pointerClick($("t-file"));
+    expect(onDismiss).toHaveBeenLastCalledWith($("t-file"), "title", 1);
+
+    pointerClick($("t-file"));
+    window.dispatchEvent(new Event("blur"));
+    expect(onDismiss).toHaveBeenLastCalledWith($("t-file"), "blur", 1);
+
+    window.dispatchEvent(new Event("blur")); // nothing open: nothing to report
+    expect(onDismiss).toHaveBeenCalledTimes(4);
+
+    // Last, since the press that closes a menu swallows the clicks after it.
+    pointerClick($("t-file"));
+    $("t-edit").dispatchEvent(new PointerEvent("pointerenter", { pointerType: "mouse" }));
+    $("outside").dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, cancelable: true }));
+    expect(onDismiss).toHaveBeenLastCalledWith($("t-edit"), "outside", 2);
+    expect(onDismiss).toHaveBeenCalledTimes(5);
+  });
+
+  it("a grayed item keeps the trip going", () => {
+    const { bar, $, onDismiss } = tripSetup();
+    pointerClick($("t-edit"));
+    pointerClick($("i-undo"));
+    expect(bar.current()).toBe($("t-edit"));
+    expect(bar.browsed()).toBe(1);
+    expect(onDismiss).not.toHaveBeenCalled();
+    bar.close();
   });
 });

@@ -31,7 +31,8 @@ import { APP_VERSION } from "../appVersion";
 import { PREVIEW_DEPLOY } from "../deployTarget";
 import { DEBUG_FLAG, debugFlagOn } from "../debugFlags";
 import type { TemplateResult } from "lit-html";
-import { welcomeModalTemplate } from "./templates/welcome";
+import { WELCOME_LINKS, welcomeModalTemplate } from "./templates/welcome";
+import { trackAppAction } from "../analytics";
 
 /** The localStorage latch, set once the player has closed the welcome here. */
 export const LAUNCH_FIREWORKS_SEEN_KEY = "vc-launch-fireworks-4";
@@ -272,19 +273,67 @@ export interface ShowDeps {
  * content of a dialog that stays open and reports it through `onDisplaced`.
  * So `onClosed` runs on a `close` unless the welcome was displaced first.
  */
+/** The welcome's analytics: `welcome_shown` now, then one `welcome_close`
+ *  naming how it closed (OK, the ✕, Escape or a backdrop click; a
+ *  displacement reports itself), and a `welcome_link` per help link. Returns
+ *  the call that stops listening. */
+function trackWelcome(dialog: HTMLDialogElement): () => void {
+  trackAppAction("welcome_shown");
+  let how = "other";
+  const onClick = (e: MouseEvent) => {
+    if (e.target === dialog) how = "backdrop";
+    const el = e.target instanceof Element ? e.target : null;
+    if (el?.closest("[data-act='close']")) how = "ok";
+    const href = el?.closest("a")?.getAttribute("href") ?? "";
+    if (href.startsWith(WELCOME_LINKS.firstTower.href)) trackAppAction("welcome_link", "first_tower");
+    else if (href.startsWith(WELCOME_LINKS.modes.href)) trackAppAction("welcome_link", "modes");
+    else if (href.startsWith(WELCOME_LINKS.whatsNew.href)) trackAppAction("welcome_link", "whats_new");
+  };
+  // Escape reaches the dialog as a keydown, then its cancel; the ✕ sends a
+  // cancel alone.
+  let escape = false;
+  const onKey = (e: KeyboardEvent) => {
+    escape = e.key === "Escape";
+  };
+  const onCancel = () => {
+    how = escape ? "escape" : "x";
+  };
+  const onClose = () => {
+    stop();
+    trackAppAction("welcome_close", how);
+  };
+  // The dialog element outlives the welcome when another dialog displaces
+  // it, so a displacement stops listening at once.
+  const stop = () => {
+    dialog.removeEventListener("click", onClick, true);
+    dialog.removeEventListener("keydown", onKey, true);
+    dialog.removeEventListener("cancel", onCancel, true);
+    dialog.removeEventListener("close", onClose);
+  };
+  dialog.addEventListener("click", onClick, true);
+  dialog.addEventListener("keydown", onKey, true);
+  dialog.addEventListener("cancel", onCancel, true);
+  dialog.addEventListener("close", onClose);
+  return stop;
+}
+
 export function showLaunchFireworks(deps: ShowDeps): void {
   const rand = deps.rand ?? Math.random;
   const raf = deps.raf ?? ((cb: FrameRequestCallback) => requestAnimationFrame(cb));
   let displaced = false;
+  let stopTracking = (): void => {};
   const box = deps.ui.openModalTemplate(welcomeModalTemplate(), {
     displaceable: true,
     onDisplaced: () => {
       displaced = true;
+      stopTracking();
+      trackAppAction("welcome_close", "displaced");
     },
   });
   deps.ui.wireActions(box);
   const dialog = box.closest("dialog");
   if (!dialog) return;
+  stopTracking = trackWelcome(dialog);
   const onClosed = deps.onClosed;
   if (onClosed) dialog.addEventListener("close", () => !displaced && onClosed(), { once: true });
 

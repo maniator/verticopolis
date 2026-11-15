@@ -23,6 +23,8 @@ import {
 // A preview deployment plays the show whatever the build's version, so the
 // boot tests below can reach the playing path on this 3.x checkout.
 vi.mock("../deployTarget", () => ({ PREVIEW_DEPLOY: true }));
+const analytics = vi.hoisted(() => ({ trackAppAction: vi.fn() }));
+vi.mock("../analytics", () => analytics);
 
 /** A storage double: a map behind spied getItem/setItem. */
 function memoryStorage(seed: Record<string, string> = {}) {
@@ -239,6 +241,57 @@ describe("the show", () => {
     ui.openModalTemplate.mock.calls[0]![1]!.onDisplaced!();
     dialog.dispatchEvent(new Event("close")); // the replacing dialog closes
     expect(onClosed).not.toHaveBeenCalled();
+  });
+
+  it("counts the welcome showing, each help link, and how it closed: OK, the ✕, Escape or a backdrop click", () => {
+    stubCanvas();
+    const actions = () => analytics.trackAppAction.mock.calls;
+    const ways: [string, (dialog: HTMLDialogElement, box: HTMLElement) => void][] = [
+      ["ok", (_d, box) => box.querySelector<HTMLElement>("[data-act='close']")!.click()],
+      ["x", (d) => d.dispatchEvent(new Event("cancel", { cancelable: true }))],
+      ["escape", (d, box) => {
+        box.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+        d.dispatchEvent(new Event("cancel", { cancelable: true }));
+      }],
+      ["backdrop", (d) => d.click()],
+    ];
+    for (const [how, close] of ways) {
+      analytics.trackAppAction.mockClear();
+      const { ui, dialog, box } = modalPort();
+      showLaunchFireworks({ ui, reducedMotion: true, raf: vi.fn() });
+      expect(actions()).toEqual([["welcome_shown"]]);
+      close(dialog, box);
+      dialog.dispatchEvent(new Event("close"));
+      expect(actions(), how).toEqual([["welcome_shown"], ["welcome_close", how]]);
+      dialog.dispatchEvent(new Event("close")); // a later dialog's close
+      expect(actions()).toHaveLength(2);
+      dialog.remove();
+    }
+    analytics.trackAppAction.mockClear();
+    const { ui, box } = modalPort();
+    showLaunchFireworks({ ui, reducedMotion: true, raf: vi.fn() });
+    for (const a of box.querySelectorAll("a")) {
+      a.addEventListener("click", (e) => e.preventDefault()); // no navigation in the test page
+      a.click();
+    }
+    expect(actions()).toEqual([
+      ["welcome_shown"],
+      ["welcome_link", "first_tower"],
+      ["welcome_link", "modes"],
+      ["welcome_link", "whats_new"],
+    ]);
+  });
+
+  it("counts a displacement once, and stops listening to the dialog that took its place", () => {
+    stubCanvas();
+    analytics.trackAppAction.mockClear();
+    const { ui, dialog, box } = modalPort();
+    showLaunchFireworks({ ui, reducedMotion: true, raf: vi.fn() });
+    ui.openModalTemplate.mock.calls[0]![1]!.onDisplaced!();
+    box.querySelector("a")!.addEventListener("click", (e) => e.preventDefault());
+    box.querySelector("a")!.click(); // the replacing dialog's own link, as it were
+    dialog.dispatchEvent(new Event("close"));
+    expect(analytics.trackAppAction.mock.calls).toEqual([["welcome_shown"], ["welcome_close", "displaced"]]);
   });
 
   it("puts the fireworks canvas inside the dialog, ahead of the window's box", () => {

@@ -15,6 +15,13 @@ vi.mock("../ui/uiImport", () => importer);
 vi.mock("../ui/movableWindow", () => ({ MovableWindow: movable }));
 vi.mock("../ui/splashTemplate", () => ({ SPONSOR_URL: "https://sponsor.example/", sponsorOffered: () => sponsor.offered }));
 vi.mock("../analytics", () => ({ trackAppAction: sponsor.track }));
+const menus = vi.hoisted(() => ({ open: vi.fn(), pick: vi.fn(), dismiss: vi.fn() }));
+vi.mock("../analyticsMenus", async (real) => ({
+  ...(await real<typeof import("../analyticsMenus")>()),
+  trackMenuOpen: menus.open,
+  trackMenuPick: menus.pick,
+  trackMenuDismiss: menus.dismiss,
+}));
 vi.mock("../ui/overviewMapPrefs", () => ({
   browserStorage: () => ({
     getItem: (k: string) => store.get(k) ?? null,
@@ -291,6 +298,70 @@ describe("wireMenus", () => {
     $("btn-install-menu").hidden = false;
     bar.open($("mb-file") as HTMLButtonElement, false);
     expect(sep.hidden).toBe(false);
+  });
+});
+
+describe("wireMenus analytics", () => {
+  const pointerClick = (el: HTMLElement) => el.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, detail: 1 }));
+
+  it("a trip sends menu_open, then one menu_pick naming the item, its menu, the menus shown and how", () => {
+    const bar = wireMenus(fakeApp().app)!;
+    pointerClick($("mb-file"));
+    expect(menus.open).toHaveBeenCalledExactlyOnceWith({ menu: "file", via: "click", screen: "tower" });
+    pointerClick($("mb-quick-save"));
+    expect(menus.pick).toHaveBeenCalledExactlyOnceWith({ menu: "file", item: "quick_save", via: "pointer", screen: "tower", browsed: 1, grayed: false });
+    expect(bar.current()).toBeNull();
+    expect(menus.dismiss).not.toHaveBeenCalled();
+  });
+
+  it("a keyboard pick says keys, and a checkmark item reports the state it flips to", () => {
+    const bar = wireMenus(fakeApp().app)!;
+    bar.open($("mb-file") as HTMLButtonElement, true, "keys");
+    $("mb-win-bulletin").click(); // Enter on a focused item: a click with no pointer
+    expect(menus.pick).toHaveBeenLastCalledWith(expect.objectContaining({ item: "bulletin", via: "keys", state: "off" }));
+    bar.open($("mb-file") as HTMLButtonElement, false);
+    pointerClick($("mb-win-bulletin"));
+    expect(menus.pick).toHaveBeenLastCalledWith(expect.objectContaining({ item: "bulletin", via: "pointer", state: "on" }));
+  });
+
+  it("a grayed item reports a grayed pick with no state, and the menu stays open", () => {
+    const bar = wireMenus(fakeApp().app)!; // the toolbar's Undo is grayed
+    pointerClick($("mb-file"));
+    pointerClick($("mb-undo"));
+    expect(menus.pick).toHaveBeenCalledExactlyOnceWith({ menu: "file", item: "undo", via: "pointer", screen: "tower", browsed: 1, grayed: true });
+    expect(bar.current()).toBe($("mb-file"));
+    bar.close(true, "escape");
+    expect(menus.dismiss).toHaveBeenCalledExactlyOnceWith({ menu: "file", how: "escape", screen: "tower", browsed: 1 });
+  });
+
+  it("a click with no menu open (a script's) is not a pick", () => {
+    wireMenus(fakeApp().app);
+    $("mb-quick-save").click();
+    expect(menus.pick).not.toHaveBeenCalled();
+  });
+
+  it("on the title screen the events say so, and a routed item still counts as its pick", () => {
+    const bar = wireMenus(fakeApp().app)!;
+    const splash = document.createElement("div");
+    splash.id = "splash";
+    splash.innerHTML = `<button data-splash="new"></button>`;
+    document.body.append(splash);
+    pointerClick($("mb-file"));
+    expect(menus.open).toHaveBeenLastCalledWith({ menu: "file", via: "click", screen: "title" });
+    pointerClick($("btn-new"));
+    expect(menus.pick).toHaveBeenLastCalledWith(expect.objectContaining({ item: "new_tower", screen: "title", grayed: false }));
+    expect(bar.current()).toBeNull();
+    splash.remove();
+  });
+
+  it("a window's close button sends window_close, and its first move window_move, once", () => {
+    wireMenus(fakeApp().app);
+    const bulletin = movable.mock.calls.find(([o]) => o.win === $("bulletin-win"))![0] as { placed: (s: unknown) => void };
+    bulletin.placed({ x: 1, y: 2 });
+    bulletin.placed({ x: 3, y: 4 });
+    expect(sponsor.track.mock.calls.filter(([a]) => a === "window_move")).toEqual([["window_move", "bulletin"]]);
+    $("bulletin-win").querySelector<HTMLElement>("[data-close]")!.click();
+    expect(sponsor.track).toHaveBeenCalledWith("window_close", "bulletin");
   });
 });
 
