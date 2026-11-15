@@ -477,9 +477,17 @@ Both blocks are laid out in the byte map
 ([parking](./tdt-byte-map.md#75-parking-f274-1026-bytes),
 [clinic list](./tdt-byte-map.md#76-clinic-list-f1300-22-bytes)). The parking
 list holds only the stalls the game counts as connected to a ramp; header byte 50
-counts all of them. Our exporter writes the same list, and numbers the clinic ids
-from 0 up. What makes a stall connected in our engine is in
-[classic-parking-audit.md](./classic-parking-audit.md).
+counts all of them. The list names records of the stall table in the tail
+([byte map section 8](./tdt-byte-map.md#8-tail-17242-bytes)), one per stall
+holding its floor index and logical unit id, and each stall's tenant record
+names its own record in bytes 6 and 7. The game rebuilds the list from that
+table, so before #307 our exports, which wrote the list but left the table
+empty, lost every stall's connection a few days after loading. Our exporter
+now writes the table, points each stall at its record, lists the connected
+stalls by record, and puts the x of the B1 ramp in header bytes 36 and 37
+(`FFFF` with no ramp), the column the game holds every deeper ramp to. It
+numbers the clinic ids from 0 up. What makes a stall connected in our engine is
+in [classic-parking-audit.md](./classic-parking-audit.md).
 
 ## 13. Lobby and reachability table [TD]
 

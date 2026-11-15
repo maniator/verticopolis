@@ -1592,14 +1592,19 @@ describeWithCodec("buildTDT: real-game loadability (people, routing tail, schedu
     // the 0xFF run ends where the stamp begins, not at EOF.
     const tail = bytes.subarray(bytes.length - TDT_STAMP_SIZE - TDT_ROUTING_TAIL_SIZE, bytes.length - TDT_STAMP_SIZE);
     expect(tail).toHaveLength(TDT_ROUTING_TAIL_SIZE);
-    // All 0xFF but the party hall and theatre table (#1932), whose 16 empty
-    // 12-byte records read FE FE then zeros.
+    // All 0xFF but the stall table (#307), whose 512 empty 6-byte records
+    // read FF then zeros, and the party hall and theatre table (#1932), whose
+    // 16 empty 12-byte records read FE FE then zeros.
+    const stalls = 4_012;
+    for (let r = 0; r < 512; r++) {
+      expect(Array.from(tail.subarray(stalls + r * 6, stalls + r * 6 + 6))).toEqual([0xff, 0, 0, 0, 0, 0]);
+    }
     const table = 7_220;
     const records = tail.subarray(table, table + 16 * 12);
     for (let r = 0; r < 16; r++) {
       expect(Array.from(records.subarray(r * 12, r * 12 + 12))).toEqual([0xfe, 0xfe, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
     }
-    const rest = [...tail.subarray(0, table), ...tail.subarray(table + 16 * 12)];
+    const rest = [...tail.subarray(0, stalls), ...tail.subarray(stalls + 512 * 6, table), ...tail.subarray(table + 16 * 12)];
     expect(rest.every((x) => x === 0xff)).toBe(true);
   });
 
