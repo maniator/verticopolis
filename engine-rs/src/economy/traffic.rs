@@ -171,11 +171,14 @@ impl Simulation {
                 continue;
             }
             if u.state == UnitState::Asleep {
+                // Every guest of the night pays now. A room held for late
+                // checkout (Modern) only keeps its guest until 14:00, so its
+                // rent cannot be lost if the room is destroyed before then.
+                revenue += rent_of(u.kind, u.rent, u.no_rate);
                 if deferred < defer_count {
                     deferred += 1.0;
                     continue;
                 }
-                revenue += rent_of(u.kind, u.rent, u.no_rate);
                 u.set_state(at, UnitState::Dirty);
                 u.set_occupants(at, 0);
             }
@@ -194,26 +197,17 @@ impl Simulation {
         self.housekeeping.reset_shift();
     }
 
-    /// `hotelLateCheckout` (Modern only).
+    /// `hotelLateCheckout` (Modern only): the guests held past the morning
+    /// leave. Their rent was booked at the morning checkout.
     pub fn hotel_late_checkout(&mut self) {
         if self.mode.hotel_daytime_presence() <= 0.0 {
             return;
         }
-        let mut revenue = 0.0;
         for (u, at) in self.tower.marked_units() {
             if u.kind.is_hotel() && u.state == UnitState::Asleep {
-                revenue += rent_of(u.kind, u.rent, u.no_rate);
                 u.set_state(at, UnitState::Dirty);
                 u.set_occupants(at, 0);
             }
-        }
-        if revenue > 0.0 {
-            self.money += revenue;
-            self.record_money("hotels", revenue);
-            self.emit(
-                &format!("Late hotel checkouts: ${} earned.", with_thousands(revenue)),
-                LogKind::Money,
-            );
         }
     }
 }
