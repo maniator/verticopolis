@@ -15,6 +15,16 @@ raised the version, so they are documentation only.
 There is no entry for 0.17.0, which only
 existed as a step inside a stacked branch.
 
+## 1.46.0 (2026-11-16)
+
+- Modern climbing speeds are now an escalator at 0.4 floors per crowd second and stairs at 0.25 (they were 1.3 and 0.85, faster than a Modern car), and the Modern router prices a floor on foot from that speed: the ride plus a step off for an escalator, the climb plus an effort cost for stairs. Classic is unchanged. The conformance lock moves for the Modern scenarios with stairs or escalators.
+- Modern hotel guests check in and out as crowd people (`crowd::commuters`, new `Workplace::Hotel`): `GameMode::hotel_guests_arrive_in_person` (`REAL_HOTEL_GUESTS_ON`) and `Kind::stays_in_person`, which `Kind::arrives_in_person` now includes. A let room's `occupants` is the guests in it; they are booked at once in the hour after the room is let and leave over the hour of their checkout. These rooms no longer feed the dispatch's waiting estimate or its lobby share. The hour's checkouts now run before the commute bookings. The Modern conformance cases and goldens move.
+- Each elevator demand ring keeps the hours it has sampled, so a measured zero counts toward the Auto-tune warm-up gate, and `elevatorTelemetry()` carries `weekdaySampled` and `weekendSampled` (#474).
+- Classic climbing speed is now 1/24 floors per crowd second for stairs and escalators alike (it was 0.85 and 1.3), the ratio measured in SimTower v1.0: every flight takes 16 ticks, up or down, however crowded, while a standard car runs floor 1 to 10 and stops in 15. The conformance lock moves for the Classic scenarios with stairs or escalators, and ransom-declined-classic now ticks 1,192 hours to its bomb threat.
+- The catalog's `rules` adds `frontDoorPerTower`, true where ground lobbies may stand apart (Modern), and the catalog version moves to 23.
+- Modern sets no limit on stairs and escalators (`GameMode::limits_stairs_and_escalators`, Classic only): `transport_pools(mode)` now returns a slice, `MODERN_POOLED_CAPS` holds the elevator pool alone, and Modern's catalog lists no `walkways` pool, with `pool: null` on stairs and escalators. Classic's catalog is unchanged.
+- `transport_cap(mode)` adds the lot's room for flights (`facilities::lot_flight_room`, 46 one-story flights on each of 109 stories) where a mode sets no limit, so a Modern save keeps every flight on load.
+
 ## 1.45.0 (2026-11-16)
 
 - The catalog publishes `rules.starDuties`, what each star rating starts asking of a tower as `{ star, id }` records (`star_duties::star_duties`), and `rules.announcesStarDuties` (`GameMode::announces_star_duties`, Modern only), catalog version 22. The ratings the duties begin at are named constants the rules read (`EMERGENCIES_FROM_STAR`, `VIP_VISITS_FROM_STAR`, `HOTEL_GUESTS_UNCOUNTED_FROM_STAR`, `BOMB_THREATS_FROM_STAR`), with no change in behavior.
