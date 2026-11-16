@@ -168,6 +168,7 @@ impl Simulation {
         }
         let mut revenue = 0.0;
         let mut deferred = 0.0;
+        let in_person = self.mode.hotel_guests_arrive_in_person();
         for (u, at) in self.tower.marked_units() {
             if !u.kind.is_hotel() {
                 continue;
@@ -182,7 +183,11 @@ impl Simulation {
                     continue;
                 }
                 u.set_state(at, UnitState::Dirty);
-                u.set_occupants(at, 0);
+                // Guests who check out in person walk out over the hour
+                // (`crowd::commuters`); the room counts them until they do.
+                if !in_person {
+                    u.set_occupants(at, 0);
+                }
             }
         }
         if revenue > 0.0 {
@@ -205,10 +210,13 @@ impl Simulation {
         if self.mode.hotel_daytime_presence() <= 0.0 {
             return;
         }
+        let in_person = self.mode.hotel_guests_arrive_in_person();
         for (u, at) in self.tower.marked_units() {
             if u.kind.is_hotel() && u.state == UnitState::Asleep {
                 u.set_state(at, UnitState::Dirty);
-                u.set_occupants(at, 0);
+                if !in_person {
+                    u.set_occupants(at, 0);
+                }
             }
         }
     }

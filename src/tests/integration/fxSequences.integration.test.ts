@@ -36,7 +36,7 @@ const PINNED: Record<string, Nonzero> = {
   // the last two days, with Security sold and nobody to search (#1973). Venue
   // staff coming in as people (#2238) moved the run onto a path where only
   // the direct threat detonates, on floor 42.
-  "scenarios/ransom-ignored-modern.json": { explosionSeq: 1, explosionFloor: 42, explosionX: 142, thiefFloor: 1, bombs: 1 },
+  "scenarios/ransom-ignored-modern.json": { explosionSeq: 1, explosionFloor: 8, explosionX: 121, thiefFloor: 1, bombs: 1 },
   "scenarios/fire-rescue-ignored-modern.json": { thiefFloor: 1, vipFxSeq: 1, fires: 2, firesGutRooms: 17 },
   "scenarios/vip-review-modern.json": { thiefFloor: 1, vipFxSeq: 1 },
   "fuzz-corpus/fx-thief-uncaught.json": { thiefSeq: 3, thiefFloor: 1 },

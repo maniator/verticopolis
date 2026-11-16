@@ -227,14 +227,15 @@ const nearCapacity = (card: Card): boolean => card.slots[CARD_NEAR_CAPACITY] ===
  *  comes from `hotel-infested-four-star-modern`, whose four-star hotel loses
  *  its housekeeping (#1500 moved the ransom run's threat earlier, and that
  *  run no longer reaches one). Once venue staff came in as people (#2238),
- *  the Modern ransom scenario's one blast lands on floor 42 and guts no
- *  cinema, parking, restaurant or shop, and no housekeeping room goes
- *  inert. */
+ *  the Modern ransom scenario's one blast landed on floor 42 and gutted no
+ *  cinema, parking, restaurant or shop, and no housekeeping room went
+ *  inert. Once hotel guests check in and out as people, that blast lands on
+ *  floor 8 and guts a cinema again. */
 const CORPUS_SECTIONS: readonly string[] = [
   "commercial:lobbyFar:false", "commercial:lobbyFar:true",
   "hotel:counts:dirty", "hotel:counts:infested", "hotel:counts:other", "hotel:excluded:dirty", "hotel:excluded:infested", "hotel:excluded:other",
   "housekeeping:adequate", "housekeeping:nominalShortfall", "housekeeping:observedShortfall",
-  "inert:amusements", "inert:boutiqueBay", "inert:daycare", "inert:fastFood", "inert:foodHall",
+  "inert:amusements", "inert:boutiqueBay", "inert:cinema", "inert:daycare", "inert:fastFood", "inert:foodHall",
   "inert:nightclub",
   "inert:skyBar", "inert:spa",
   "parking:connected", "parking:connected:short", "parking:disconnected", "parking:ramp", "parking:ramp:short",

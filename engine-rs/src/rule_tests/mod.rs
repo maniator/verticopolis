@@ -49,6 +49,7 @@ mod golden_master;
 mod heatmap;
 mod home_commute;
 mod home_parking;
+mod hotel_guests;
 mod hotel_late_checkout;
 mod housekeeping_commute;
 mod housekeeping_legibility;
@@ -303,6 +304,7 @@ pub fn at_time(sim: &mut Simulation, day: i64, hour: i64) {
     crate::crowd::workplace::staff_at_work(&mut sim.crowd, &mut sim.tower, hour);
     let weekend = sim.clock.is_weekend();
     crate::crowd::workplace::residents_at_home(&mut sim.crowd, &mut sim.tower, weekend, hour);
+    crate::crowd::workplace::guests_in_rooms(&mut sim.crowd, &mut sim.tower);
 }
 
 /// The decoded save of `conformance/fixtures/<name>.vctower`.

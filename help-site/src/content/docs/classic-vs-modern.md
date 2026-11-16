@@ -15,6 +15,7 @@ Every tower runs one of two sets of rules. You choose when you found the tower, 
 | Calendar | 3-day weeks, 3-day quarters, 12-day years | The real-world calendar or the 1994 one, your choice ([Calendar and clock](/help/tower/clock/)) |
 | Office workers | Fill the offices at 8 AM by the clock | Ride in from the lobby or the Metro over 7 to 10 AM, and count once they reach their desks ([Offices](/help/rooms/offices/#getting-to-work)) |
 | Residents | Counted home by the clock | Leave through the lobby or the Metro over 7 to 10 AM on weekdays and ride home over 4 to 7 PM ([Homes](/help/rooms/homes/#coming-and-going)) |
+| Hotel guests | In the room as soon as it is let, gone at checkout | Ride up from the lobby or the Metro after check-in, and ride out after checkout ([Hotels](/help/rooms/hotels/#a-night-in-the-hotel)) |
 | Office rent | The whole quarter's rent every three days | Smoothed, so a tower earns the same each day on either calendar, and paid monthly on the real-world calendar ([Money](/help/tower/money/)) |
 | Setting rents | A four-step ladder, plus No Rate | A slider |
 | Condos | A family of three, sold for good | Households of two to five, where a bigger household pays more, and families sometimes move away ([Homes](/help/rooms/homes/#condo)) |

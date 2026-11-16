@@ -41,6 +41,9 @@ pub(super) fn party_hall_tower() -> (Simulation, i64, i64) {
     );
     let guests = Kind::HotelSingle.facility().population;
     let room = place_seated(&mut sim, Kind::HotelSingle, 4, 0, UnitState::Asleep, guests);
+    // A clinic's patients still come by the dispatch's estimate.
+    let patients = Kind::Clinic.facility().population;
+    place_seated(&mut sim, Kind::Clinic, 4, 20, UnitState::Occupied, patients);
     (sim, hall, room)
 }
 
@@ -96,7 +99,7 @@ fn a_full_house_adds_no_statistical_elevator_demand() {
     );
     assert!(
         sim.elevators.waiting_at(4) > 0.0,
-        "the hotel guest's floor does wait"
+        "the clinic's floor does wait"
     );
 }
 
