@@ -109,7 +109,7 @@ export const FACILITY_PRESENTATION: Readonly<Record<FacilityKind, FacilityPresen
   },
   escalator: {
     color: "#c8c0a0",
-    description: "Moves crowds between adjacent floors. Great for lobbies, shops and food courts.",
+    description: "Moves crowds between adjacent floors with no wait. Great for lobbies, shops and food courts. In Modern, people happily ride a long run of them.",
   },
   elevatorStandard: {
     color: "#5a5a6a",
