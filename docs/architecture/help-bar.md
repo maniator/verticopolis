@@ -56,3 +56,14 @@ timers (to once a minute after a few minutes in Chrome), so the bar cannot
 count on the game's own ticks: the answers to hellos keep it fed, and it
 waits 9 seconds (two hello gaps and a tick) before it decides the game is
 gone.
+
+## Tests
+
+The protocol, the host and the bar are unit tests beside their files, and
+`src/tests/integration/helpBar.integration.test.ts` runs the game's side on
+the real UI over a real channel. `e2e/helpBar.spec.ts` runs the real game on
+`game.test` with a manual page on `help.game.test` in a Chromium that
+partitions storage (Playwright turns that off by default), and checks that a
+frame of the game's host hears the game and pauses one tower of two. Its
+second test puts the manual page on another site and checks it hears
+nothing, the case this page warns about above.

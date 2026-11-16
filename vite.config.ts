@@ -587,6 +587,12 @@ export default defineConfig(({ command }) => ({
     open: false,
     host: true,
   },
+  preview: {
+    // e2e/helpBar.spec.ts serves the game and a manual page from two hosts of
+    // one site (game.test and help.game.test, mapped to the preview server),
+    // as production does; `.test` names never resolve outside a test.
+    allowedHosts: [".game.test"],
+  },
   build: {
     target: "esnext",
     outDir: "../dist",
