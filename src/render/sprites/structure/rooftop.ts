@@ -26,6 +26,8 @@ export const CRANE_H = CRANE_BASE_H * CRANE_SCALE;
  *  of the drawing's middle. */
 const CRANE_BASE_MAST_X = 56;
 const CRANE_BASE_PAD_W = 14;
+/** How far the counter-jib reaches left of the mast on the base grid. */
+const CRANE_BASE_COUNTER_JIB = 26;
 /** The mast's x in the scaled crane graphic, as a share of its width: the
  *  crane actor's anchor, so the mast (not the middle of the jib) stands over
  *  the roof it is perched on. */
@@ -73,6 +75,27 @@ export function craneRoof(builtTiles: Iterable<number>): { center: number; width
   return { center: (bestStart + bestEnd + 1) / 2, width: bestEnd + 1 - bestStart };
 }
 
+/** How far the drawing reaches left of the mast (the counter-jib's end) and
+ *  right of it (the jib's tip and the canvas edge), in tiles. */
+export const CRANE_REACH_LEFT_TILES = (CRANE_BASE_COUNTER_JIB * CRANE_SCALE) / TILE;
+export const CRANE_REACH_RIGHT_TILES = ((CRANE_BASE_W - CRANE_BASE_MAST_X) * CRANE_SCALE) / TILE;
+
+/**
+ * Where the crane's mast stands, in world-tile units, on `roof` (from
+ * {@link craneRoof}) in a lot `lotWidth` tiles wide. It is the roof's center,
+ * moved along the roof only when the jib or the counter-jib would otherwise
+ * reach past the lot's edge (a narrow top flush to an edge, #334). The pad
+ * always stays on the roof: when the lot can't hold the whole drawing, the
+ * mast keeps the pad's end at the roof's edge and lets the arm overhang.
+ */
+export function craneMastTile(roof: { center: number; width: number }, lotWidth: number): number {
+  const padHalf = (CRANE_BASE_PAD_W * CRANE_SCALE) / TILE / 2;
+  const onRoofLo = roof.center - roof.width / 2 + padHalf;
+  const onRoofHi = roof.center + roof.width / 2 - padHalf;
+  const inLot = Math.min(Math.max(roof.center, CRANE_REACH_LEFT_TILES), lotWidth - CRANE_REACH_RIGHT_TILES);
+  return Math.min(Math.max(inLot, onRoofLo), onRoofHi);
+}
+
 /**
  * The rooftop tower crane that crowns the build while the tower is still
  * climbing (it comes down once the 100th floor caps the tower, as in the
@@ -115,7 +138,7 @@ export function drawCrane(ctx: CanvasRenderingContext2D, t: number, lit: boolean
   ctx.stroke();
   // Jib out to the right, counter-jib to the left.
   const jibEnd = CRANE_BASE_W - 4;
-  const cjEnd = mx - 26;
+  const cjEnd = mx - CRANE_BASE_COUNTER_JIB;
   ctx.fillStyle = steel;
   ctx.fillRect(cjEnd, jibY, jibEnd - cjEnd, 2);
   ctx.fillRect(mx + 3, jibY + 4, jibEnd - mx - 6, 1);

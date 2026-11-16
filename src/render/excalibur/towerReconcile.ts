@@ -10,6 +10,7 @@ import {
   CRANE_MAST_ANCHOR_X,
   CRANE_MIN_ROOF_TILES,
   CRANE_W,
+  craneMastTile,
   craneRoof,
   AWNING_W,
   drawCrane,
@@ -298,7 +299,9 @@ function syncCrane(engine: TowerEngine, hi: number, topTiles: Set<number>): void
   // the widest run IS the whole span, so this matches the old midpoint.
   // The mast, not the middle of the drawing, stands over the run's center:
   // the jib reaches right, so the drawing's middle is right of the mast.
-  const pos = ex.vec(roof.center * TILE, engine.worldYTop(hi));
+  // A narrow top flush to the lot's edge shifts the mast along its roof so
+  // the arms stay over the lot (#334).
+  const pos = ex.vec(craneMastTile(roof, viewWorld().lotWidth) * TILE, engine.worldYTop(hi));
   if (!engine.craneActor) {
     // cache:true + flagDirty from tick(): the crane re-rasterizes only while
     // the decorative clock advances, so pause/reduced-motion stops the
