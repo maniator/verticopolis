@@ -320,3 +320,32 @@ fn a_bridge_beside_a_tall_hall_is_one_story() {
     let next_to_hall = sim.tower.unit_at(SKY, right_wing(GAP).start - 1).unwrap();
     assert_eq!(sim.tower.unit_stories(next_to_hall), 1);
 }
+
+/// A half bridge saved before the Sky Bridge tool survives a `.vctower`
+/// round trip tile for tile (the save format is unchanged), still joins
+/// nothing, and the tool then finishes it for the missing tiles' price.
+#[test]
+fn a_saved_half_bridge_loads_as_it_was_and_the_tool_finishes_it() {
+    use crate::load::{decode_vctower, deserialize, encode_simulation_vctower};
+    let mut sim = towers(GameMode::Modern, GAP, SKY);
+    half_bridge(&mut sim, 3);
+    let bytes = encode_simulation_vctower(&sim, "4.8.0", 0.0).unwrap();
+    let raw = decode_vctower(std::str::from_utf8(&bytes).unwrap()).unwrap();
+    let mut loaded = deserialize(&raw).unwrap();
+    for x in gap_tiles(GAP) {
+        let laid = x < LEFT.end + 3;
+        assert_eq!(loaded.tower.is_skybridge_tile(SKY, x), laid, "column {x}");
+    }
+    let left = loaded.tower.seg_at(SKY, Some(LEFT.start as f64));
+    let right = loaded.tower.seg_at(SKY, Some(right_wing(GAP).start as f64));
+    assert_ne!(left, right);
+    let money = loaded.money;
+    let r = loaded.build_skybridge(SKY, LEFT.end + 5);
+    assert!(r.ok, "{:?}", r.reason);
+    assert_eq!(money - loaded.money, tile_price() * (GAP - 3) as f64);
+    for x in gap_tiles(GAP) {
+        assert!(loaded.tower.is_skybridge_tile(SKY, x), "column {x}");
+    }
+    let right = loaded.tower.seg_at(SKY, Some(right_wing(GAP).start as f64));
+    assert_eq!(loaded.tower.seg_at(SKY, Some(LEFT.start as f64)), right);
+}

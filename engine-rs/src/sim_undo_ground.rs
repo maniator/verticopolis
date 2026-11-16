@@ -205,7 +205,7 @@ impl<'a> Ground<'a> {
 
     /// Whether lobby tile `u` stands as a sky bridge once the step applies:
     /// over open air on a floor a bridge may cross, hanging from a wing's
-    /// lobby across a gap a lobby closes (`Tower::skybridge_reason`).
+    /// lobby across a gap a lobby closes (`Tower::skybridge_span`).
     fn bridges(&self, u: &Unit) -> bool {
         if u.kind != Kind::Lobby || !self.tower.bridges_floor(u.floor) {
             return false;
