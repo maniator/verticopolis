@@ -1,9 +1,20 @@
 import { test, expect } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import { buildToStar, hideMapBeforeLoad, expectEngineHosted } from "./helpers";
+import { DETERMINISTIC_RASTER_ARGS } from "../scripts/chromium-raster-flags.ts";
 
 /** Release 3.2.0's player notes, for the long-release update prompt baselines. */
 const longReleaseNotes = JSON.parse(readFileSync(new URL("./longReleaseNotes.json", import.meta.url), "utf8")) as string[];
+
+// The baselines render with the gallery's raster flags (#797), so two
+// browsers in one container settle every raster the same way. This replaces
+// the config's launchOptions, so it carries PW_CHROMIUM_PATH over too.
+test.use({
+  launchOptions: {
+    ...(process.env.PW_CHROMIUM_PATH ? { executablePath: process.env.PW_CHROMIUM_PATH } : {}),
+    args: [...DETERMINISTIC_RASTER_ARGS],
+  },
+});
 
 // Every test must end with its tower still on the engine.
 test.afterEach(async ({ page }) => expectEngineHosted(page));

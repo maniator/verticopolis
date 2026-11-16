@@ -55,6 +55,7 @@ import { pgAdoptTestClock, pgClearTransients, pgDismissSplash, pgFlushFrames, pg
 import { armPhaseWatch, judgeAndPromote, markPhaseTarget, phaseCapturePath, stopPhaseWatch } from "./screenshot-phase-check.ts";
 import { SCENES } from "./screenshot-scenes.ts";
 import { pgNoStarUpBox } from "./scenes/starUp.ts";
+import { DETERMINISTIC_RASTER_ARGS } from "./chromium-raster-flags.ts";
 import { SETTLE_AFTER_SETUP, assertEnginePackage, HOSTED_FIX, beginSettleStep, checkHosted, checkSettleList, hostedSnapshot, installShotHelpers, settleUnlessSettled } from "./screenshot-engine.ts";
 import { resolveOnlyFilter } from "../src/tests/screenshotOnlyFilter.ts";
 import { runSceneShots } from "../src/tests/screenshotChain.ts";
@@ -433,23 +434,10 @@ async function main(): Promise<void> {
   // captures against a stale build).
   let browser: Browser | undefined;
   try {
-    // Compositor flags added for #762 by PR #871. Its evidence held (the only
-    // differing pixels in 27c-elevator-schedule-unsaved were the dialog's two
-    // sticky layers, a subpixel text phase apart) but its cause did not hold.
-    // The race happens before the scroll: a composited layer keeps the
-    // subpixel phase of its first raster, and 27c's dialog moved by a
-    // fraction of a pixel after a first render that CI load decided whether
-    // to make. Measured with these flags on, 8 of 24 renders still took the
-    // raster that differs from the committed PNG. The fix lives in the 27c
-    // scene (scripts/scenes/schedule.ts), and takeShot guards that shot with
-    // the dialog phase watch (Shot.phaseWatch; other dialog shots are #889).
-    // The flags stay because every committed PNG was minted with them on, so
-    // dropping them is a gallery-wide pixel change of its own: running every
-    // compositor stage to completion before a draw (the flag Chromium's own
-    // pixel tests use), no checker imaging, no off-main-thread animation.
+    // The raster flags every committed pixel is minted with (#762, #797).
     browser = await chromium.launch({
       executablePath: EXECUTABLE,
-      args: ["--run-all-compositor-stages-before-draw", "--disable-checker-imaging", "--disable-threaded-animation"],
+      args: [...DETERMINISTIC_RASTER_ARGS],
     });
     for (const scene of scenes) {
       // A scene's setup (game wait / build / assertReady) can throw; keep it from
