@@ -40,11 +40,13 @@ const TENTHS: f64 = 10.0;
 /// What stepping onto a car costs beyond its wait and ride: nobody changes
 /// cars to save a second.
 const BOARDING_SECONDS: f64 = 10.0;
-/// One flight of stairs, the climb included: a floor or two on foot beats a
-/// long line, a tower on foot does not.
-const STAIRS_FLIGHT_SECONDS: f64 = 15.0;
-/// One escalator flight, the ride included.
-const ESCALATOR_FLIGHT_SECONDS: f64 = 8.0;
+/// What a floor of stairs costs beyond the climb: the effort, so a floor or
+/// two on foot beats a long line and a tower on foot does not.
+const STAIRS_EFFORT_SECONDS: f64 = 11.0;
+/// What a floor of escalator costs beyond the ride: stepping off onto the
+/// next one. An escalator is a ride, so nobody minds taking it a long way
+/// (owner, 2026-11-16).
+const ESCALATOR_STEP_OFF_SECONDS: f64 = 1.0;
 /// The share of the stops between a rider's floors that a car makes.
 const STOPS_MADE: f64 = 0.5;
 /// Which way a car carries a rider: one leg rides one way.
@@ -183,6 +185,18 @@ impl Places {
     }
 }
 
+/// What one floor of stairs or escalator costs: the time it takes at the
+/// mode's climbing speed, plus the effort of stairs or the step off an
+/// escalator. Pricing from the speed keeps the router and the motion
+/// agreeing about how long a flight takes.
+fn floor_on_foot_seconds(tower: &Tower, kind: Kind) -> f64 {
+    let ride = 1.0 / tower.mode.climb_speed(kind);
+    match kind {
+        Kind::Escalator => ride + ESCALATOR_STEP_OFF_SECONDS,
+        _ => ride + STAIRS_EFFORT_SECONDS,
+    }
+}
+
 fn build(tower: &Tower) -> Router {
     let mut g = Places::default();
     let mut shafts: FastMap<i64, Shaft> = FastMap::default();
@@ -192,10 +206,7 @@ fn build(tower: &Tower) -> Router {
         let stops = tower.stops_of(t);
         let segs: Vec<Vec<i64>> = stops.iter().map(|&f| tower.landing_segs(t, f)).collect();
         if t.kind.is_walkway() {
-            let climb = match t.kind {
-                Kind::Escalator => ESCALATOR_FLIGHT_SECONDS,
-                _ => STAIRS_FLIGHT_SECONDS,
-            };
+            let climb = floor_on_foot_seconds(tower, t.kind);
             for (a, here) in segs.iter().enumerate() {
                 for (b, there) in segs.iter().enumerate().filter(|&(b, _)| b != a) {
                     let seconds = climb * (stops[b] - stops[a]).abs() as f64;
