@@ -556,6 +556,7 @@ export default defineConfig(({ command }) => ({
         // reaches the file itself.
         navigateFallbackDenylist: [
           /gallery/,
+          // Also `/help-bridge.html`, the Help bar's frame page (#2035).
           /help/,
           /preview/,
           /version\.json$/,

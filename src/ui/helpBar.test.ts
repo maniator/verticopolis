@@ -3,12 +3,22 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { BAR_SHOWING_CLASS, BRIDGE_PATH, bridgeHelpBar, linkToGame, startHelpBar, stateText, type GameLink } from "./helpBar";
 import { GONE_AFTER_MS, HELLO_EVERY_MS, type BarChannel, type GameStatus } from "./helpBarProtocol";
 
+const TAB = "00000000000000aa";
+const OTHER = "00000000000000bb";
+
 const STATUS: GameStatus = {
   game: "status",
+  tab: TAB,
   speed: 0,
   heldForHelp: true,
   visible: false,
-  hud: { date: "Wed, 1st WD", time: "9:00 AM", money: "$1,000", population: "120", stars: "★★☆☆☆" },
+  hud: {
+    date: "Wed, 1st WD",
+    time: "9:00 AM",
+    money: "$1,000",
+    population: "120",
+    stars: "★★☆☆☆",
+  },
 };
 
 /** The bar's markup, as HelpBar.astro writes it. */
@@ -28,7 +38,10 @@ function mountBar(): HTMLElement {
 function bar() {
   const root = mountBar();
   const sent: string[] = [];
-  const link: GameLink = { send: vi.fn((r) => sent.push(r)), onStatus: null };
+  const link: GameLink = {
+    send: vi.fn((r, tab) => sent.push(tab === undefined ? r : `${r} ${tab}`)),
+    onStatus: null,
+  };
   let hello: (() => void) | null = null;
   let gone: (() => void) | null = null;
   const deps = {
@@ -116,7 +129,7 @@ describe("the Help bar", () => {
     b.say();
     b.run.focus();
     b.run.click();
-    expect(b.sent[b.sent.length - 1]).toBe("run");
+    expect(b.sent[b.sent.length - 1]).toBe(`run ${TAB}`);
     expect(b.deps.track).toHaveBeenCalledWith("run");
     b.say({ speed: 2, heldForHelp: false, visible: false });
     expect(b.state.textContent).toBe("Your tower will run when you can see it.");
@@ -124,9 +137,68 @@ describe("the Help bar", () => {
     expect(b.pause.hidden).toBe(false);
     expect(document.activeElement).toBe(b.pause);
     b.pause.click();
-    expect(b.sent[b.sent.length - 1]).toBe("pause");
+    expect(b.sent[b.sent.length - 1]).toBe(`pause ${TAB}`);
     b.say();
     expect(document.activeElement).toBe(b.run);
+  });
+
+  it("keeps to the first tab that answers, and names it from then on", () => {
+    const b = bar();
+    b.say();
+    b.say({ tab: OTHER, speed: 3, hud: { ...STATUS.hud, money: "$9" } });
+    expect(b.root.querySelector('[data-hud="money"]')!.textContent).toBe("$1,000");
+    expect(b.state.textContent).toBe("Paused while you read.");
+    b.hello();
+    expect(b.sent[b.sent.length - 1]).toBe(`hello ${TAB}`);
+    b.run.click();
+    expect(b.sent[b.sent.length - 1]).toBe(`run ${TAB}`);
+  });
+
+  it("lets go of a tab that went quiet, and takes the next that answers", () => {
+    const b = bar();
+    b.say();
+    b.goQuiet();
+    b.hello();
+    expect(b.sent[b.sent.length - 1]).toBe("hello");
+    b.say({ tab: OTHER, hud: { ...STATUS.hud, money: "$9" } });
+    expect(b.root.hidden).toBe(false);
+    expect(b.root.querySelector('[data-hud="money"]')!.textContent).toBe("$9");
+  });
+
+  it("sends nothing from a button before any tab has answered", () => {
+    const b = bar();
+    b.run.hidden = false;
+    b.run.click();
+    expect(b.sent).toEqual(["hello"]);
+    expect(b.deps.track).not.toHaveBeenCalled();
+  });
+
+  it("stays up while a hidden game tab answers only its hellos, even with one lost", () => {
+    // Real timers, faked: the game's own ticks are throttled away, and the
+    // only statuses are its answers to hellos, one of which never arrives.
+    vi.useFakeTimers();
+    try {
+      const root = mountBar();
+      const link: GameLink = { send: vi.fn(), onStatus: null };
+      startHelpBar(root, { link, backToGame: vi.fn(), track: vi.fn() });
+      let lost = false;
+      vi.mocked(link.send).mockImplementation((request) => {
+        if (request !== "hello") return;
+        if (lost) lost = false;
+        else link.onStatus?.(STATUS);
+      });
+      link.onStatus!(STATUS);
+      vi.advanceTimersByTime(HELLO_EVERY_MS);
+      lost = true;
+      vi.advanceTimersByTime(HELLO_EVERY_MS * 2 + 500);
+      expect(root.hidden).toBe(false);
+      // Then the game tab closes: no more answers, and the bar goes.
+      vi.mocked(link.send).mockImplementation(() => {});
+      vi.advanceTimersByTime(GONE_AFTER_MS);
+      expect(root.hidden).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("writes the state line only when it changes, so it is read out once", () => {
@@ -148,13 +220,23 @@ describe("the Help bar", () => {
 
 /** A stand-in channel. */
 function fakeChannel() {
-  const channel: BarChannel = { postMessage: vi.fn(), close: vi.fn(), onmessage: null };
-  return { channel, hear: (data: unknown) => channel.onmessage?.({ data } as MessageEvent) };
+  const channel: BarChannel = {
+    postMessage: vi.fn(),
+    close: vi.fn(),
+    onmessage: null,
+  };
+  return {
+    channel,
+    hear: (data: unknown) => channel.onmessage?.({ data } as MessageEvent),
+  };
 }
 
 /** An iframe the page makes, with a window a test can watch (happy-dom loads
  *  no frame pages). */
-function watchedFrame(): { frame: HTMLIFrameElement; win: { postMessage: ReturnType<typeof vi.fn> } } {
+function watchedFrame(): {
+  frame: HTMLIFrameElement;
+  win: { postMessage: ReturnType<typeof vi.fn> };
+} {
   const make = document.createElement.bind(document);
   const frame = make("iframe");
   const win = { postMessage: vi.fn() };
@@ -169,8 +251,10 @@ describe("the bar's line to the game", () => {
     const link = linkToGame(location.origin, window, () => channel)!;
     const heard = vi.fn();
     link.onStatus = heard;
-    link.send("run");
-    expect(channel.postMessage).toHaveBeenCalledWith({ bar: "run" });
+    link.send("hello");
+    expect(channel.postMessage).toHaveBeenCalledWith({ bar: "hello" });
+    link.send("run", TAB);
+    expect(channel.postMessage).toHaveBeenCalledWith({ bar: "run", tab: TAB });
     hear({ junk: true });
     hear(STATUS);
     expect(heard).toHaveBeenCalledTimes(1);
@@ -207,15 +291,18 @@ describe("the bar's line to the game", () => {
     const post = win.postMessage;
     link.send("hello");
     link.send("hello");
-    link.send("run");
+    link.send("run", TAB);
+    link.send("run", TAB);
+    link.send("run", OTHER);
     expect(post).not.toHaveBeenCalled();
     frame.dispatchEvent(new Event("load"));
     expect(post.mock.calls).toEqual([
       [{ bar: "hello" }, game],
-      [{ bar: "run" }, game],
+      [{ bar: "run", tab: TAB }, game],
+      [{ bar: "run", tab: OTHER }, game],
     ]);
-    link.send("pause");
-    expect(post).toHaveBeenLastCalledWith({ bar: "pause" }, game);
+    link.send("pause", TAB);
+    expect(post).toHaveBeenLastCalledWith({ bar: "pause", tab: TAB }, game);
   });
 });
 
@@ -228,7 +315,11 @@ describe("the game's bridge page", () => {
       parent,
       addEventListener: (_: string, fn: (ev: MessageEvent) => void) => listeners.push(fn),
     } as unknown as Window;
-    return { win, parent, hear: (ev: Partial<MessageEvent>) => listeners.forEach((fn) => fn(ev as MessageEvent)) };
+    return {
+      win,
+      parent,
+      hear: (ev: Partial<MessageEvent>) => listeners.forEach((fn) => fn(ev as MessageEvent)),
+    };
   }
   const HELP = "https://help.verticopolis.com";
 
@@ -236,12 +327,30 @@ describe("the game's bridge page", () => {
     const { channel } = fakeChannel();
     const f = framed();
     bridgeHelpBar(f.win, HELP, () => channel);
-    f.hear({ origin: "https://evil.example", source: f.parent as unknown as Window, data: { bar: "run" } });
+    f.hear({
+      origin: "https://evil.example",
+      source: f.parent as unknown as Window,
+      data: { bar: "run" },
+    });
     f.hear({ origin: HELP, source: null, data: { bar: "run" } });
-    f.hear({ origin: HELP, source: f.parent as unknown as Window, data: { bar: "quit" } });
+    f.hear({
+      origin: HELP,
+      source: f.parent as unknown as Window,
+      data: { bar: "quit" },
+    });
     expect(channel.postMessage).not.toHaveBeenCalled();
-    f.hear({ origin: HELP, source: f.parent as unknown as Window, data: { bar: "run", extra: 1 } });
-    expect(channel.postMessage).toHaveBeenCalledWith({ bar: "run" });
+    f.hear({
+      origin: HELP,
+      source: f.parent as unknown as Window,
+      data: { bar: "run", tab: TAB, extra: 1 },
+    });
+    expect(channel.postMessage).toHaveBeenCalledWith({ bar: "run", tab: TAB });
+    f.hear({
+      origin: HELP,
+      source: f.parent as unknown as Window,
+      data: { bar: "hello" },
+    });
+    expect(channel.postMessage).toHaveBeenLastCalledWith({ bar: "hello" });
   });
 
   it("passes the game's answers to the manual alone", () => {
@@ -256,7 +365,9 @@ describe("the game's bridge page", () => {
 
   it("does nothing when nothing framed it", () => {
     const open = vi.fn();
-    const win = { addEventListener: vi.fn() } as unknown as Window & { parent: unknown };
+    const win = { addEventListener: vi.fn() } as unknown as Window & {
+      parent: unknown;
+    };
     (win as { parent: unknown }).parent = win;
     bridgeHelpBar(win, HELP, open);
     expect(open).not.toHaveBeenCalled();

@@ -19,17 +19,20 @@ import {
   GONE_AFTER_MS,
   HELLO_EVERY_MS,
   HUD_FIELDS,
+  barMessage,
   isBarMessage,
   isGameStatus,
   openBarChannel,
   type BarChannel,
+  type BarMessage,
   type BarRequest,
   type GameStatus,
 } from "./helpBarProtocol";
 
 /** The page's line to the game. */
 export interface GameLink {
-  send(request: BarRequest): void;
+  /** Send a request, to the tab named or (a hello with no tab) to every tab. */
+  send(request: BarRequest, tab?: string): void;
   /** Set by the bar: called with each status the game sends. */
   onStatus: ((status: GameStatus) => void) | null;
 }
@@ -43,11 +46,7 @@ export const BRIDGE_PATH = "/help-bridge.html";
  * host) it is a hidden frame of the game's bridge page, which passes messages
  * through. Null where the browser has no channel.
  */
-export function linkToGame(
-  gameOrigin: string,
-  win: Window = window,
-  open: () => BarChannel | null = openBarChannel,
-): GameLink | null {
+export function linkToGame(gameOrigin: string, win: Window = window, open: () => BarChannel | null = openBarChannel): GameLink | null {
   if (gameOrigin === win.location.origin) return channelLink(open);
   return bridgeLink(gameOrigin, win);
 }
@@ -56,7 +55,7 @@ function channelLink(open: () => BarChannel | null): GameLink | null {
   const channel = open();
   if (!channel) return null;
   const link: GameLink = {
-    send: (request) => channel.postMessage({ bar: request }),
+    send: (request, tab) => channel.postMessage(barMessage(request, tab)),
     onStatus: null,
   };
   channel.onmessage = (ev) => {
@@ -74,12 +73,13 @@ function bridgeLink(gameOrigin: string, win: Window): GameLink {
   frame.title = "Link to your tower";
   frame.setAttribute("aria-hidden", "true");
   let ready = false;
-  const queued: BarRequest[] = [];
-  const post = (request: BarRequest) => frame.contentWindow?.postMessage({ bar: request }, gameOrigin);
+  const queued: BarMessage[] = [];
+  const post = (message: BarMessage) => frame.contentWindow?.postMessage(message, gameOrigin);
   const link: GameLink = {
-    send: (request) => {
-      if (ready) post(request);
-      else if (!queued.includes(request)) queued.push(request);
+    send: (request, tab) => {
+      const message = barMessage(request, tab);
+      if (ready) post(message);
+      else if (!queued.some((q) => q.bar === message.bar && q.tab === message.tab)) queued.push(message);
     },
     onStatus: null,
   };
@@ -107,7 +107,7 @@ export function bridgeHelpBar(win: Window, parentOrigin: string, open: () => Bar
   if (!channel) return;
   win.addEventListener("message", (ev) => {
     if (ev.source !== win.parent || ev.origin !== parentOrigin || !isBarMessage(ev.data)) return;
-    channel.postMessage({ bar: ev.data.bar });
+    channel.postMessage(barMessage(ev.data.bar, ev.data.tab));
   });
   channel.onmessage = (ev) => {
     if (isGameStatus(ev.data)) win.parent.postMessage(ev.data, parentOrigin);
@@ -140,6 +140,11 @@ export const BAR_SHOWING_CLASS = "vc-help-bar-showing";
  * Run the bar in `root` (help-site/src/components/HelpBar.astro): say hello
  * now and every few seconds, show the bar on the game's first answer, keep
  * it current, and hide it when the game goes quiet.
+ *
+ * The bar keeps to the first game tab that answers and names it in every
+ * request, so a second tower open in another tab neither shows here nor
+ * moves on a press. Once that tab goes quiet the bar hides and lets go, and
+ * the next tab to answer (the same tower reloaded, say) takes its place.
  */
 export function startHelpBar(root: HTMLElement, deps: HelpBarDeps): void {
   const every = deps.setInterval ?? ((fn: () => void, ms: number) => setInterval(fn, ms));
@@ -152,8 +157,11 @@ export function startHelpBar(root: HTMLElement, deps: HelpBarDeps): void {
   const back = root.querySelector<HTMLAnchorElement>('a[data-bar="back"]');
   const html = root.ownerDocument.documentElement;
   let gone: unknown = null;
+  /** The game tab this bar keeps to, once one has answered. */
+  let tab: string | undefined;
 
   const hide = () => {
+    tab = undefined;
     root.hidden = true;
     html.classList.remove(BAR_SHOWING_CLASS);
   };
@@ -163,6 +171,8 @@ export function startHelpBar(root: HTMLElement, deps: HelpBarDeps): void {
   };
 
   deps.link.onStatus = (status) => {
+    if (tab !== undefined && status.tab !== tab) return;
+    tab = status.tab;
     cancel(gone);
     gone = later(hide, GONE_AFTER_MS);
     root.hidden = false;
@@ -179,18 +189,22 @@ export function startHelpBar(root: HTMLElement, deps: HelpBarDeps): void {
     else if (hadFocus === pause && !running) run?.focus();
   };
 
+  // The buttons show only once a tab has answered, so a press always has a
+  // tab to name; without one it would be ignored anyway.
   run?.addEventListener("click", () => {
+    if (tab === undefined) return;
     deps.track("run");
-    deps.link.send("run");
+    deps.link.send("run", tab);
   });
   pause?.addEventListener("click", () => {
+    if (tab === undefined) return;
     deps.track("pause");
-    deps.link.send("pause");
+    deps.link.send("pause", tab);
   });
   back?.addEventListener("click", (e) => {
     deps.track("back");
     deps.backToGame(e);
   });
   deps.link.send("hello");
-  every(() => deps.link.send("hello"), HELLO_EVERY_MS);
+  every(() => deps.link.send("hello", tab), HELLO_EVERY_MS);
 }

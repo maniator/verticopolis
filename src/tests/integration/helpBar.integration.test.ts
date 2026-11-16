@@ -13,7 +13,11 @@ import { HELP_BAR_CHANNEL, isGameStatus, type BarRequest, type GameStatus } from
 /** A speed the controller reads back after it sets it, as the game's does. */
 function speedAt(start: number) {
   let speed = start;
-  return { onSpeed: vi.fn((s: number) => (speed = s)), getSpeed: () => speed, now: () => speed };
+  return {
+    onSpeed: vi.fn((s: number) => (speed = s)),
+    getSpeed: () => speed,
+    now: () => speed,
+  };
 }
 
 function leaveAndReturn(): void {
@@ -26,14 +30,18 @@ function leaveAndReturn(): void {
 
 let bar: BroadcastChannel;
 
-/** Send `request` as a Help bar and wait for the game's answer. */
-function ask(request: BarRequest): Promise<GameStatus> {
-  return new Promise((resolve) => {
-    bar.onmessage = (ev: MessageEvent) => {
-      if (isGameStatus(ev.data)) resolve(ev.data);
-    };
-    bar.postMessage({ bar: request });
-  });
+/** Send `request` as a Help bar and wait for the game's answer. A run or
+ *  pause names the tab that answered a hello first, as the bar does. */
+async function ask(request: BarRequest): Promise<GameStatus> {
+  const answer = (message: object) =>
+    new Promise<GameStatus>((resolve) => {
+      bar.onmessage = (ev: MessageEvent) => {
+        if (isGameStatus(ev.data)) resolve(ev.data);
+      };
+      bar.postMessage(message);
+    });
+  const hello = await answer({ bar: "hello" });
+  return request === "hello" ? hello : answer({ bar: request, tab: hello.tab });
 }
 
 describe("the game's side of the Help bar", () => {
@@ -72,6 +80,14 @@ describe("the game's side of the Help bar", () => {
     expect(await ask("pause")).toMatchObject({ speed: 0, heldForHelp: true });
     leaveAndReturn();
     expect(speed.now()).toBe(3);
+  });
+
+  it("ignores a run that names no tab", async () => {
+    const speed = speedAt(0);
+    makeUI({ getSpeed: speed.getSpeed, onSpeed: speed.onSpeed });
+    bar.postMessage({ bar: "run" });
+    expect(await ask("hello")).toMatchObject({ speed: 0 });
+    expect(speed.onSpeed).not.toHaveBeenCalled();
   });
 
   it("starts a tower the player had paused at slow speed", async () => {
