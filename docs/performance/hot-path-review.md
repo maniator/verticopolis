@@ -108,7 +108,7 @@ real towers can be bigger.
 | drawn people (P) | at most 140 trip spawns (`MAX_PEOPLE`), plus up to 6 housekeepers per housekeeping unit (`HK_MAIDS_PER_UNIT`) | the crowd that walks and rides; housekeepers are in the building from two hours before their shift to its end and do not count toward `MAX_PEOPLE` |
 | housekeeping units | 15 medium (up to 90 staff); 8 owner's save (up to 48); 24 hotel-heavy (up to 144, with 852 hotel rooms); none on the large tower | estimate a staff or housekeeping path on the hotel-heavy tower, the `perf:compare` scenario built by `buildHotelTower({ seed: 21, floors: 62, crews: 24 })` (#1279), since the large tower has none |
 | floors (F) | up to 110 (floors -9 to 100; floor 0 is the first basement) | |
-| transports (T) | up to 24 elevator shafts and 64 stair and escalator links | 8 cars per shaft |
+| transports (T) | up to 24 elevator shafts (48 in Modern) and 64 stair and escalator links in Classic; Modern sets no limit on links, so up to the lot's room, 5,014 (`lot_flight_room`) | 8 cars per shaft. The benchmark towers hold 64 links or fewer, and a Modern tower holds more only when its player builds them |
 | x positions | 375 per floor (`LOT_WIDTH`) | |
 | route graph | segments and links across every floor | route searches, reachability and flood fills walk it |
 
@@ -180,10 +180,12 @@ may cost depends on the tier:
   on screen), audio follows the per-step budget, and autosave may make one
   linear pass.
 
-A pass over a small collection (the 110 floors, the 24 shafts and their cars,
-the 64 stair and escalator links, the drawn crowd) is fine at any tier while
+A pass over a small collection (the 110 floors, the shafts and their cars,
+the stair and escalator links, the drawn crowd) is fine at any tier while
 one occurrence of the tier stays under about 1,000 item visits on the large
-tower, the work per item included.
+tower, the work per item included. A Modern tower's links have no limit, so a
+new per-frame or per-person pass over every transport should skip the links
+or read a list of the shafts alone.
 
 Two more patterns count at every tier:
 

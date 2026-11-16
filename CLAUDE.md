@@ -284,7 +284,8 @@ review skill. The BMAD agent rules live in `_bmad-output/project-context.md`.
   express is **not** counted separately. Modern widens that one pool to **48
   shafts** (`MODERN_ELEVATOR_SHAFT_CAP`, `facilities::transport_pools`; owner and
   party, 2026-11-15), still with express inside it. Stairs + escalators share a
-  separate **64-link pool** in both modes. Cars/shaft: 8 for every elevator kind (service included: it
+  separate **64-link pool** in Classic; Modern sets no limit on them, only the
+  lot's room (`lot_flight_room`; owner, 2026-11-16). Cars/shaft: 8 for every elevator kind (service included: it
   is a staff-only standard elevator, not a reduced one). Spans: standard &
   service 30 floors, express the whole tower, stairs/escalators a fixed 2 floors.
   Do not "fix" express out of the elevator pool; that would break canon.

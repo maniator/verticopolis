@@ -88,6 +88,7 @@ describe("analytics adapter seam", () => {
         star: 4,
         floors: 42,
         population: 1200,
+        flights: 70,
       });
       gameplaySession.noteNewGame("modern");
       gameplaySession.noteBuild("office", 5, 2); // first_build + depth counting

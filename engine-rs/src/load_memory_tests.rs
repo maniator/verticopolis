@@ -92,10 +92,16 @@ fn pool_of(kind: Kind) -> &'static Pool {
         .unwrap()
 }
 
+/// The stairs the large save holds. Modern sets no limit on them; this is
+/// Classic's 64, the most a tower held before, and keeps the save's text
+/// where `LONG` puts it.
+const FLIGHTS: i64 = 64;
+
 /// A modern game with a lobby on floor 1 and floors 2 to `TOP_FLOOR` of tiles
 /// above it, with a row of occupied offices on each of those floors: 41,460
 /// units, close to the large perf tower's 43,358. Three lists are at their
-/// caps: the whole elevator and stair pools, a full log and a full ledger.
+/// caps: the whole elevator pool, a full log and a full ledger. It holds
+/// `FLIGHTS` stairs.
 /// The other lists and strings are large: all ten basement floors excavated
 /// (the loader keeps any distinct tile), an exterminator booked for every
 /// office (room ids are capped at `UNIT_CAP`, far above that), `MANY`
@@ -138,7 +144,7 @@ pub(crate) fn large_save() -> String {
         ));
     }
     let stairs = Kind::Stairs.facility().width;
-    for floor in 1..=pool_of(Kind::Stairs).cap {
+    for floor in 1..=FLIGHTS {
         id += 1;
         transports.push(format!(
             "{{\"id\":{id},\"kind\":\"stairs\",\"x\":{},\"width\":{stairs},\"bottom\":{floor},\"top\":{}}}",
@@ -242,7 +248,7 @@ fn a_large_save_peaks_near_its_text() {
     let basement_floors = (MIN_FLOOR..=0).count();
     assert_eq!(sim.excavated.len(), basement_floors * LOT_WIDTH as usize);
     assert_eq!(sim.log.len(), crate::sim::LOG_SAVE_CAP);
-    let pools = pool_of(Kind::ElevatorStandard).cap + pool_of(Kind::Stairs).cap;
+    let pools = pool_of(Kind::ElevatorStandard).cap + FLIGHTS;
     assert_eq!(sim.tower.transports.len(), pools as usize);
     let offices = OFFICE_XS.step_by(OFFICE_STEP).count() * (2..=TOP_FLOOR).count();
     let rooms = sim.extermination_room_ids.as_ref().map_or(0, Vec::len);

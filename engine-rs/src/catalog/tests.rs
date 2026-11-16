@@ -117,12 +117,22 @@ fn pools_caps_and_spans_follow_canon() {
             "{mode:?}"
         );
     }
-    let c = catalog(GameMode::Modern);
-    assert_eq!(c.pools.len(), 2);
+    // Classic's stairs and escalators share SimTower's 64; Modern sets no
+    // limit on them, so its catalog lists no pool for them.
+    let classic = catalog(GameMode::Classic);
     assert_eq!(
-        (c.pools[1].key, c.pools[1].cap, c.pools[1].kinds.clone()),
+        (
+            classic.pools[1].key,
+            classic.pools[1].cap,
+            classic.pools[1].kinds.clone()
+        ),
         ("walkways", 64, vec!["stairs", "escalator"])
     );
+    for key in ["stairs", "escalator"] {
+        assert_eq!(entry(&classic, key).pool, Some("walkways"), "{key}");
+    }
+    let c = catalog(GameMode::Modern);
+    assert_eq!(c.pools.len(), 1);
     for key in ["elevatorStandard", "elevatorService", "elevatorExpress"] {
         let e = entry(&c, key);
         assert_eq!(e.pool, Some("elevators"));
@@ -137,7 +147,7 @@ fn pools_caps_and_spans_follow_canon() {
     );
     for key in ["stairs", "escalator"] {
         let e = entry(&c, key);
-        assert_eq!(e.pool, Some("walkways"));
+        assert_eq!(e.pool, None, "{key}");
         assert_eq!(
             (e.max_span, e.max_cars, e.fixed_span),
             (Some(1), None, true)

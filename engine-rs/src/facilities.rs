@@ -393,8 +393,8 @@ pub fn build_cap_in(mode: crate::clock::GameMode, kind: Kind) -> Option<i64> {
 
 mod pools;
 pub use pools::{
-    pools_for, transport_cap, transport_pools, Pool, CLASSIC_VENUE_POOL, MODERN_ELEVATOR_SHAFT_CAP,
-    MODERN_POOLED_CAPS, POOLED_CAPS,
+    lot_flight_room, pools_for, transport_cap, transport_pools, Pool, CLASSIC_VENUE_POOL,
+    MODERN_ELEVATOR_SHAFT_CAP, MODERN_POOLED_CAPS, POOLED_CAPS,
 };
 
 #[doc(hidden)]

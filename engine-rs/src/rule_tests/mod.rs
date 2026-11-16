@@ -69,6 +69,7 @@ mod modern_amenity_halos;
 mod modern_economy;
 mod modern_elevator_dispatch;
 mod modern_elevator_pool;
+mod modern_flights;
 mod modern_halo_table;
 mod move_in_gate_legibility;
 mod move_in_gate_rentals;

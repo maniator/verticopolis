@@ -134,6 +134,9 @@ export interface GameplayEvents {
     star: number;
     floors: number;
     population: number;
+    /** Stairs and escalators the tower holds, so a read can see how many
+     *  Modern towers build past Classic's 64 (Modern has no limit). */
+    flights: number;
   };
   /** The game hit a crash screen (today only a lost WebGL context). Carries the
    *  crash description flattened to primitives so a reliability read has the

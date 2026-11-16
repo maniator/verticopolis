@@ -1795,7 +1795,7 @@
       "openHours": null,
       "ownHousehold": false,
       "paysForFloor": false,
-      "pool": "walkways",
+      "pool": null,
       "population": 0,
       "rent": null,
       "resaleRefund": 2500,
@@ -1835,7 +1835,7 @@
       "openHours": null,
       "ownHousehold": false,
       "paysForFloor": false,
-      "pool": "walkways",
+      "pool": null,
       "population": 0,
       "rent": null,
       "resaleRefund": 10000,
@@ -2429,15 +2429,6 @@
         "elevatorExpress"
       ],
       "label": "elevator shafts"
-    },
-    {
-      "cap": 64,
-      "key": "walkways",
-      "kinds": [
-        "stairs",
-        "escalator"
-      ],
-      "label": "stairs/escalators"
     }
   ],
   "rules": {
