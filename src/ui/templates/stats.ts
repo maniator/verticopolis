@@ -6,6 +6,12 @@ import { floorTag, groupDigits } from "../format";
 import { clockOf, type ClockHeader } from "../../simport/headerClock";
 import type { ElevatorStatsRow, NextStarView, StarGateId, StatsReport } from "../../simport/panels";
 import type { HeaderView } from "../../simport/view";
+import type { HelpTopic } from "../helpTopics";
+import { helpTopicLink } from "./helpTopicLink";
+
+/** A problem row's Help link (#2036), or nothing while the row reads fine. */
+const helpIf = (problem: boolean, topic: HelpTopic): TemplateResult | typeof nothing =>
+  problem ? helpTopicLink(topic, "stats") : nothing;
 
 /**
  * The Tower Statistics dialog body as a lit template. It was authored to match
@@ -171,12 +177,12 @@ export function statsTemplate(screen: StatsScreen): TemplateResult {
         <span class="k">Rooms to clean</span><span class="v" style="color:${s.dirty ? "var(--bad)" : "var(--good)"}">${s.dirty}</span>
         ${
           hk.rooms > 0
-            ? html`<span class="k">Housekeeping</span><span class="v" style="color:${hkShort ? "var(--bad)" : "var(--good)"}">${fmt(hk.crews)} crew${hk.crews === 1 ? "" : "s"} (${fmt(hk.maids)} maid${hk.maids === 1 ? "" : "s"}) for ${fmt(hk.rooms)} room(s)${hkReport && hkReport.leftover > 0 ? `, ${fmt(hkReport.leftover)} unserved yesterday` : ""}${hk.infested > 0 ? `, ${fmt(hk.infested)} infested` : ""}${hk.outOfReach > 0 ? `, ${fmt(hk.outOfReach)} out of reach` : ""}</span>`
+            ? html`<span class="k">Housekeeping</span><span class="v" style="color:${hkShort ? "var(--bad)" : "var(--good)"}">${fmt(hk.crews)} crew${hk.crews === 1 ? "" : "s"} (${fmt(hk.maids)} maid${hk.maids === 1 ? "" : "s"}) for ${fmt(hk.rooms)} room(s)${hkReport && hkReport.leftover > 0 ? `, ${fmt(hkReport.leftover)} unserved yesterday` : ""}${hk.infested > 0 ? `, ${fmt(hk.infested)} infested` : ""}${hk.outOfReach > 0 ? `, ${fmt(hk.outOfReach)} out of reach` : ""}${helpIf(hkShort, "housekeeping")}</span>`
             : nothing
         }
         ${
           hk.infested > 0
-            ? html`<span class="k">Infested</span><span class="v" style="color:var(--bad)">${fmt(hk.infested)} (${extermRecovery ? "exterminate or bulldoze" : "bulldoze to clear"})</span>`
+            ? html`<span class="k">Infested</span><span class="v" style="color:var(--bad)">${fmt(hk.infested)} (${extermRecovery ? "exterminate or bulldoze" : "bulldoze to clear"})${helpTopicLink("cockroaches", "stats")}</span>`
             : nothing
         }
         <span class="k">Shops / Food</span><span class="v">${s.shops} / ${s.restaurants}</span>
@@ -186,15 +192,15 @@ export function statsTemplate(screen: StatsScreen): TemplateResult {
       ${catalog.rules.variantHouseholds ? householdSection(report.households) : nothing}
       <div class="stats-section win-title sm">Transport &amp; access</div>
       <div class="col kv">
-        <span class="k">Stranded floors</span><span class="v" style="color:${stranded ? "var(--bad)" : "var(--good)"}">${stranded || "None"}</span>
+        <span class="k">Stranded floors</span><span class="v" style="color:${stranded ? "var(--bad)" : "var(--good)"}">${stranded || "None"}${helpIf(stranded > 0, "access")}</span>
         ${
           s.parkingSpaces > 0
-            ? html`<span class="k">Parking spaces</span><span class="v" style="color:${parkingWorking < s.parkingSpaces ? "var(--bad)" : "var(--good)"}">${parkingWorking} / ${s.parkingSpaces} working</span>`
+            ? html`<span class="k">Parking spaces</span><span class="v" style="color:${parkingWorking < s.parkingSpaces ? "var(--bad)" : "var(--good)"}">${parkingWorking} / ${s.parkingSpaces} working${helpIf(parkingWorking < s.parkingSpaces, "parking")}</span>`
             : nothing
         }
         ${
           s.parkingSpaces > 0 || parkingDemand.total > 0
-            ? html`<span class="k">Parking demand</span><span class="v" style="color:${parkingDemand.short ? "var(--bad)" : "var(--good)"}">${fmt(parkingDemand.total)} needed (${fmt(parkingDemand.offices)} offices + ${fmt(parkingDemand.suites)} suites${parkingDemand.homes > 0 ? ` + ${fmt(parkingDemand.homes)} homes` : ""})${parkingDemand.coverage !== null ? ` · ${Math.round(parkingDemand.coverage * 100)}% covered` : ""}</span>`
+            ? html`<span class="k">Parking demand</span><span class="v" style="color:${parkingDemand.short ? "var(--bad)" : "var(--good)"}">${fmt(parkingDemand.total)} needed (${fmt(parkingDemand.offices)} offices + ${fmt(parkingDemand.suites)} suites${parkingDemand.homes > 0 ? ` + ${fmt(parkingDemand.homes)} homes` : ""})${parkingDemand.coverage !== null ? ` · ${Math.round(parkingDemand.coverage * 100)}% covered` : ""}${helpIf(parkingDemand.short, "parking")}</span>`
             : nothing
         }
         ${
@@ -203,7 +209,7 @@ export function statsTemplate(screen: StatsScreen): TemplateResult {
                 recyclingCap === 0
                   ? `${fmt(s.population)} population, no center (build one)`
                   : `${fmt(s.population)} / ${fmt(recyclingCap)} processed${recyclingShort ? " (build more)" : ""}`
-              }</span>`
+              }${helpIf(recyclingShort, "recycling")}</span>`
             : nothing
         }
       </div>
@@ -246,7 +252,9 @@ export function elevatorSection(shafts: StatsReport["elevators"]): TemplateResul
   const shown = shafts.slice(0, 8);
   const half = Math.ceil(shown.length / 2);
   const col = (items: typeof shown) => html`<div class="col kv">${items.map(row)}</div>`;
-  return html`<div class="stats-section win-title sm">Elevators (avg load, busiest first)</div>${col(shown.slice(0, half))}${col(shown.slice(half))}`;
+  // A shaft the list draws as full (over 85%) means waits to read up on.
+  const crowded = shown.some((sh) => Math.round(sh.utilization * 100) > 85);
+  return html`<div class="stats-section win-title sm">Elevators (avg load, busiest first)${helpIf(crowded, "elevatorWaits")}</div>${col(shown.slice(0, half))}${col(shown.slice(half))}`;
 }
 
 /** The per-category income breakdown, the lone renderer since the string builders retired. */
@@ -314,7 +322,7 @@ export function nextStarSection(req: NextStarView | null, topFloor: number): Tem
     ),
   ];
   const head = html`<div class="stats-section win-title sm">Next: ${goal}${
-    req.allMet ? html`<span class="nsr-ready"> · ready</span>` : nothing
+    req.allMet ? html`<span class="nsr-ready"> · ready</span>` : helpTopicLink("nextStar", "stats")
   }</div>`;
   const half = Math.ceil(rows.length / 2);
   const col = (items: TemplateResult[]) => html`<div class="col nsr kv">${items}</div>`;

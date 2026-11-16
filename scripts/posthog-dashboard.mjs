@@ -624,13 +624,19 @@ function buildInsights(ids) {
     {
       name: "Help landings by source",
       description:
-        "Manual and release notes landings (app_action page_help / page_changelog) by page and by where the visit started (detail, #2037): a place in the game (game_menu, title, mode_badge, compare, welcome, update_prompt, about; inspector, stats from #2036), game (an older build) or direct (not opened by the game), production. One per visit; older builds send no detail.",
+        "Manual and release notes landings (app_action page_help / page_changelog) by page and by where the visit started (detail, #2037): a place in the game (game_menu, title, mode_badge, compare, welcome, update_prompt, about, inspector or stats for a problem line's Help link, help_key for F1 with no card up), game (an older build) or direct (not opened by the game), production. One per visit; older builds send no detail.",
       query: trends([series("app_action", "Landings")], { breakdown: ["action", "detail"], display: "ActionsTable", where: [inAction(["page_help", "page_changelog"])] }),
     },
     {
       name: "In-game Help opens",
-      description: "The game opening the manual in a new tab (app_action help_open), split by where (detail: game_menu for Help > Player's Manual, title for the title screen's How to Play), production. Builds before #2037 send no detail. The visit the tab then makes is the \"Help landings by source\" tile.",
+      description: "The game opening the manual in a new tab (app_action help_open), split by where (detail: game_menu for Help > Player's Manual, title for the title screen's How to Play, help_key for F1 with no card up), production. Builds before #2037 send no detail. The visit the tab then makes is the \"Help landings by source\" tile.",
       query: trends([series("app_action", "Help opens")], { breakdown: "detail", display: "ActionsBar", where: [inAction(["help_open"])] }),
+    },
+    {
+      name: "Help links from problem lines",
+      description:
+        "Presses on a problem line's Help link in the game (app_action help_topic_open, #2036), split by detail: the surface (inspector for the room card, stats for Tower Statistics) then the topic (parking, recycling, noise, elevatorWaits and the rest in src/ui/helpTopics.ts), production. F1 on the room card counts as the inspector link it opens; F1 with no card up is help_open help_key.",
+      query: trends([series("app_action", "Help link presses")], { breakdown: "detail", display: "ActionsBar", where: [inAction(["help_topic_open"])] }),
     },
     {
       name: "Help menu picks",

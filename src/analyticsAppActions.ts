@@ -52,6 +52,10 @@ export type AppActionName =
   // The manual opened in a new tab; `detail` = where (src/ui/fromGame.ts
   // GameHelpSource): `game_menu` (Help > Player's Manual) or `title` (How to Play).
   | "help_open"
+  // A problem line's Help link (#2036), or F1 on the room card; `detail` is
+  // the surface and the topic, `inspector_parking` or `stats_recycling`
+  // (src/ui/helpTopics.ts names the topics).
+  | "help_topic_open"
   // The game panel's About…, which opens About this game (the version, the
   // engine diagnostics, the privacy link); help_open is the manual itself.
   | "about_open"

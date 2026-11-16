@@ -74,7 +74,8 @@ describe("statsTemplate structure", () => {
     expect(body().textContent).not.toContain("Parking demand");
     const demand = { officePop: 6, offices: 1, suites: 0, homes: 0, total: 1, coverage: null, short: false };
     expect(body({ stats: { star: 3 }, report: { parkingDemand: demand } }).textContent).toContain("Parking demand");
-    expect(cellAfter(body({ stats: { parkingSpaces: 2 } }), "Parking spaces")!.textContent).toBe("0 / 2 working");
+    // None of the two works, so the row also carries its Help link (#2036).
+    expect(cellAfter(body({ stats: { parkingSpaces: 2 } }), "Parking spaces")!.textContent).toBe("0 / 2 working Help");
   });
 
   it("names the homes in the parking demand only when Modern homes need spaces (#1973)", () => {
@@ -304,5 +305,53 @@ describe("milestone copy", () => {
     const fragment = renderToFragment(milestonesSection({ achieved: 1, total: 1, list: [{ id: "moonBase", done: true }] }));
     const [label, desc] = [...fragment.querySelectorAll(".ms .k, .ms .v")].map((el) => el.textContent ?? "");
     expect([label.includes("moonBase"), desc]).toEqual([true, ""]);
+  });
+});
+
+describe("the problem rows' Help links (#2036)", () => {
+  /** The topic of the Help link in the value cell after `key`, if any. */
+  const topicAfter = (frag: DocumentFragment, key: string) =>
+    cellAfter(frag, key)?.querySelector<HTMLAnchorElement>("a.help-topic")?.dataset.helpTopic;
+  const demand = { officePop: 48, offices: 2, suites: 0, homes: 0, total: 2, coverage: null as number | null, short: false };
+
+  it("links parking only while it falls short", () => {
+    const fine = body({ stats: { star: 3, parkingSpaces: 2 }, report: { functionalParking: 2, parkingDemand: demand } });
+    expect(topicAfter(fine, "Parking spaces")).toBeUndefined();
+    expect(topicAfter(fine, "Parking demand")).toBeUndefined();
+    const short = body({ stats: { star: 3, parkingSpaces: 2 }, report: { functionalParking: 1, parkingDemand: { ...demand, short: true } } });
+    expect(topicAfter(short, "Parking spaces")).toBe("parking");
+    expect(topicAfter(short, "Parking demand")).toBe("parking");
+  });
+
+  it("links recycling and stranded floors only while they are a problem", () => {
+    const fine = body({ stats: { star: 3 }, report: { recycling: { capacity: 2500, demandMet: true } } });
+    expect(topicAfter(fine, "Recycling")).toBeUndefined();
+    expect(topicAfter(fine, "Stranded floors")).toBeUndefined();
+    const bad = body({ stats: { star: 3 }, report: { recycling: { capacity: 0, demandMet: false }, strandedFloors: [5] } });
+    expect(topicAfter(bad, "Recycling")).toBe("recycling");
+    expect(topicAfter(bad, "Stranded floors")).toBe("access");
+  });
+
+  it("links the elevators heading only when a shaft runs full", () => {
+    const heading = (utilization: number) =>
+      [...body({ report: { elevators: [{ id: 1, kind: "elevatorStandard", bottom: 1, top: 2, cars: 1, capacity: 21, utilization }] } }).querySelectorAll(".stats-section")]
+        .find((h) => h.textContent?.startsWith("Elevators"))!
+        .querySelector<HTMLAnchorElement>("a.help-topic")?.dataset.helpTopic;
+    expect(heading(0.5)).toBeUndefined();
+    expect(heading(0.9)).toBe("elevatorWaits");
+  });
+
+  it("links the next star's heading until every gate is met", () => {
+    const heading = (frag: DocumentFragment) =>
+      [...frag.querySelectorAll(".stats-section")].find((h) => h.textContent?.startsWith("Next:"));
+    const gates = { star: 3, isTower: false, popHave: 100, popNeed: 300, popMet: false, gates: [], allMet: false };
+    expect(heading(body({ report: { nextStar: gates } }))?.querySelector<HTMLAnchorElement>("a.help-topic")?.dataset.helpTopic).toBe("nextStar");
+    expect(heading(body({ report: { nextStar: { ...gates, popMet: true, allMet: true } } }))?.querySelector("a.help-topic")).toBeNull();
+  });
+
+  it("points every link at the manual, marked as opened by the game", () => {
+    const link = cellAfter(body({ stats: { parkingSpaces: 2 } }), "Parking spaces")!.querySelector<HTMLAnchorElement>("a.help-topic")!;
+    expect(link.getAttribute("href")).toBe("/help/rooms/services/?from=game&via=stats#parking");
+    expect(link.getAttribute("aria-label")).toBe("Help on parking");
   });
 });

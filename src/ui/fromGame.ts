@@ -36,10 +36,11 @@ export const HELP_SOURCE_PARAM = "via";
  * the Classic vs Modern table (the founding screen, the in-game comparison,
  * This Tower's Rules), `welcome` the version 4 welcome's links,
  * `update_prompt` the update prompt's All release notes, `about` About this
- * game's privacy link, and `inspector` and `stats` for the facility card's and
- * the Tower Info window's links to a problem's help page (#2036).
+ * game's privacy link, `inspector` and `stats` for the room card's and Tower
+ * Statistics' links to a problem's help page (#2036), and `help_key` for F1
+ * pressed with no room card up (the guide's front page).
  */
-export const GAME_HELP_SOURCES = ["game_menu", "title", "mode_badge", "compare", "welcome", "update_prompt", "about", "inspector", "stats"] as const;
+export const GAME_HELP_SOURCES = ["game_menu", "title", "mode_badge", "compare", "welcome", "update_prompt", "about", "inspector", "stats", "help_key"] as const;
 
 /** A place in the game that opens the manual. */
 export type GameHelpSource = (typeof GAME_HELP_SOURCES)[number];

@@ -303,6 +303,25 @@
   display: none;
   pointer-events: auto;
 }
+/* A problem line's Help link (#2036), on the room card and in Tower
+   Statistics: small, after the line's own words. The desktop hover card lets
+   the pointer through, so there it names F1, which opens the card's first
+   one (src/ui/uiHelp.ts wireHelpTopics); showInspector marks such a card
+   with .has-help. */
+.help-topic {
+  margin-left: 4px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+@media (hover: hover) and (pointer: fine) {
+  #inspector.has-help::after {
+    content: "Press F1 for help with this.";
+    display: block;
+    margin-top: 4px;
+    color: var(--muted);
+    font-size: 11px;
+  }
+}
 /* The build-refusal card's hover-tier translucency lives with the other
    capability/tier rules in section 5 MEDIA (the block after the coarse-pointer
    rules), because its gate is the complement of the phone block's query. */

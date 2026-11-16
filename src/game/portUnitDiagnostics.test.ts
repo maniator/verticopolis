@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { html, type TemplateResult } from "lit-html";
 import { LAYOUT_TEXT } from "../tests/portKit/mockPort";
 import { createPortUnitDiagnostics, createPortUnitParts, joinParts, type SupplementalLines } from "./portUnitDiagnostics";
+import { renderToFragment } from "../ui/testing/litTestUtils";
 
 /** The Rust engine's view layout (the checked-in fixture), with the tables these tests code by. */
 type CodeTable = "vacateReasons" | "bindings" | "accessLines" | "noRateLines";
@@ -237,5 +238,69 @@ describe("Rust port tenant explanations", () => {
     name.mockClear();
     expect(render(facts({ access: code("accessLines", "reachable") }))).not.toContain("Helped by");
     expect(name).not.toHaveBeenCalled();
+  });
+});
+
+describe("the problem lines' Help links (#2036)", () => {
+  /** Each line's text with the topic of its Help link, if any. */
+  function linked(record: Float64Array): Array<{ text: string; topic: string | undefined }> {
+    const diag = createPortUnitDiagnostics({ viewLayout: () => LAYOUT_TEXT, unitFacts: () => record }, MODERN_RULES);
+    return diag(73).map((line) => {
+      const frag = renderToFragment(line);
+      const link = frag.querySelector<HTMLAnchorElement>("a.help-topic");
+      return { text: (frag.textContent ?? "").trim(), topic: link?.dataset.helpTopic };
+    });
+  }
+
+  it("links a gripe to the page its cause names", () => {
+    const lines = linked(facts({
+      gripe: 1,
+      gripeCause: code("vacateReasons", "parking"),
+      gripeCoverage: 0.5,
+      access: code("accessLines", "reachable"),
+    }));
+    expect(lines.find((l) => l.text.startsWith("Main gripe:"))?.topic).toBe("parking");
+    // A good line has nothing to look up.
+    expect(lines.find((l) => l.text.startsWith("Access:"))?.topic).toBeUndefined();
+  });
+
+  it("links a jam on the stairs to the stairs page and an elevator jam to the elevators page", () => {
+    const jam = (binding: string) => linked(facts({
+      gripe: 1,
+      gripeCause: code("vacateReasons", "congestion"),
+      gripeBinding: code("bindings", binding),
+    }))[0].topic;
+    expect(jam("stairs")).toBe("walkwayWaits");
+    expect(jam("elevator")).toBe("elevatorWaits");
+  });
+
+  it("links Won't lease to its cause, or to finding the trouble when it names none", () => {
+    const withCause = linked(facts({ wontLease: 1, leaseGripe: 1, leaseGripeCause: code("vacateReasons", "noise"), carry: 0 }));
+    expect(withCause[0]).toMatchObject({ topic: "noise" });
+    expect(withCause[0].text).toMatch(/^Won't lease: a noisy neighbor/);
+    expect(linked(facts({ wontLease: 1, carry: 0 }))[0]).toMatchObject({ topic: "wontLease" });
+  });
+
+  it("links a bad access line, a long walk and a notice, but never a relocation", () => {
+    expect(linked(facts({ access: code("accessLines", "notConnected") }))[0].topic).toBe("access");
+    expect(linked(facts({ farWalk: 1 }))[0].topic).toBe("farWalk");
+    const notice = (reason: string) => linked(facts({
+      notice: 1,
+      noticeReason: code("vacateReasons", reason),
+      minutesLeft: 120,
+      noticeSatisfaction: 0.1,
+      keepAt: 0.4,
+    }));
+    expect(notice("noise").map((l) => l.topic)).toEqual(["notice", undefined]);
+    expect(notice("relocation").map((l) => l.topic)).toEqual([undefined, undefined]);
+  });
+
+  it("says Help after the line's own words and points the link at the manual", () => {
+    const frag = renderToFragment(createPortUnitDiagnostics({ viewLayout: () => LAYOUT_TEXT, unitFacts: () => facts({ farWalk: 1 }) }, MODERN_RULES)(73)[0]);
+    const link = frag.querySelector<HTMLAnchorElement>("a.help-topic")!;
+    expect(link.textContent).toBe("Help");
+    expect(link.getAttribute("aria-label")).toBe("Help on long walks");
+    expect(link.getAttribute("href")).toContain("stairs-and-escalators/?from=game&via=inspector#how-far-will-people-walk");
+    expect(link.target).toBe("_blank");
   });
 });
