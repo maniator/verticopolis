@@ -45,7 +45,7 @@ describe("the Classic and Modern summary", () => {
     ...CATALOG_RULE_TO_HELP,
     sellCondo: "a bigger household pays more",
     allowsEscalatorOnOfficeFloors: "Never to an office floor",
-    walkwayWillingnessApplies: "People climb as far as they must", // #384/#503/#509
+    walkwayWillingnessApplies: "No limit on flights", // #384/#503/#509
     walksTheStreet: "People walk the street between ground lobbies",
     priceOptions: "A four-step ladder, plus No Rate",
     condoRelocationChance: "families sometimes move away",
