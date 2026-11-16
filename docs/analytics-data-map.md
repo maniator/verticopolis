@@ -130,7 +130,7 @@ One `app_action` counts the WebGL losses the game survived (2026-11-16). The fac
 
 | `action` | `detail` | When | Reading |
 | --- | --- | --- | --- |
-| `graphics_recovered` | `game` or `title` | The device dropped the game's WebGL graphics and the game rebuilt them in place, mid-game (`game`) or behind the title screen (`title`) | Counted per recovery. A loss that ends on the crash screen is the `crash` event instead, so the two together give every first loss |
+| `graphics_recovered` | `game` or `title` | The device dropped the game's WebGL graphics and the game rebuilt them in place, mid-game (`game`) or behind the title screen (`title`) | Counted per recovery, a lower bound like every client event. Read it beside `crash` with `repeat` false (a first loss that ended on the crash screen). `crash` is deduped per page life on its flag set, so do not add the two as a count of first losses |
 
 ## My Towers (Open, Save As, Load)
 

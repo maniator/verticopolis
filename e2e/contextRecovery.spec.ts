@@ -104,6 +104,7 @@ test.describe("WebGL context loss: in-place recovery", () => {
       const g = (window as unknown as { game?: { sim?: unknown } }).game;
       return Boolean(g?.sim) && Boolean(document.getElementById("splash"));
     });
+    const minutesBefore = await page.evaluate(() => (window as unknown as { game: { sim: { clock: { minutes: number } } } }).game.sim.clock.minutes);
     await page.evaluate(() => {
       (window as unknown as Record<string, unknown>).__oldEngine = (window as unknown as { game: { engine: unknown } }).game.engine;
       const gl = (document.getElementById("view") as HTMLCanvasElement).getContext("webgl2")!;
@@ -126,5 +127,9 @@ test.describe("WebGL context loss: in-place recovery", () => {
       (window as unknown as { game: { sim: { log: { text: string }[] } } }).game.sim.log.some((e) => e.text.includes("recovered on the spot")),
     );
     expect(logged).toBe(false);
+    // The fresh engine starts paused behind the title screen: the clock has not moved.
+    await page.waitForTimeout(500);
+    const minutesAfter = await page.evaluate(() => (window as unknown as { game: { sim: { clock: { minutes: number } } } }).game.sim.clock.minutes);
+    expect(minutesAfter).toBe(minutesBefore);
   });
 });
