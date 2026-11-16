@@ -201,6 +201,8 @@ mod sim_save;
 pub mod snapshot;
 #[doc(hidden)]
 pub mod star;
+#[doc(hidden)]
+pub mod star_duties;
 #[cfg(any(test, feature = "conformance"))]
 pub mod suite;
 #[doc(hidden)]

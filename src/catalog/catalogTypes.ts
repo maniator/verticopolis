@@ -39,7 +39,7 @@ export interface CatalogTicketPrice {
 
 /** The version of the catalog's shape. It moves when a field is added,
  *  renamed or removed, so a frontend can refuse a shape it does not know. */
-export const CATALOG_VERSION = 21;
+export const CATALOG_VERSION = 22;
 
 /** Every price, size and build rule of one mode. */
 export interface Catalog {
@@ -197,6 +197,29 @@ export interface CatalogRules {
   /** Seconds a person waits before the wait counts as stress and the
    *  frontend shows them fed up (red). The same in both modes. */
   readonly fedUpWait: number;
+  /** Whether the star-up message box adds the heads-up: what the new rating
+   *  starts asking of the tower (`starDuties`) and what the next rating needs.
+   *  When false (Classic) it names the rating and the rooms it opens. */
+  readonly announcesStarDuties: boolean;
+  /** What each rating starts asking of the tower, by the rating it begins at. */
+  readonly starDuties: ReadonlyArray<CatalogStarDuty>;
+}
+
+/** The ids of the duties a star rating can start (`star_duties.rs`). */
+export type StarDutyId =
+  | "emergencies"
+  | "suiteParking"
+  | "officeParking"
+  | "homeParking"
+  | "recycling"
+  | "vipVisits"
+  | "hotelGuestsUncounted"
+  | "bombThreats";
+
+/** One duty: the rating it begins at and its id. */
+export interface CatalogStarDuty {
+  readonly star: number;
+  readonly id: StarDutyId;
 }
 
 /** One calendar a tower can run and how it scales the quoted figures. */

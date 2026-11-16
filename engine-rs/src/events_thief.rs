@@ -9,10 +9,11 @@ use super::THIEF_DAILY_CHANCE;
 use crate::facilities::Kind;
 use crate::services::with_thousands;
 use crate::sim::{LogKind, Simulation, ThiefFx};
+use crate::star::EMERGENCIES_FROM_STAR;
 
 impl Simulation {
     pub(super) fn maybe_thief(&mut self) {
-        if self.star < 2 {
+        if self.star < EMERGENCIES_FROM_STAR {
             return;
         }
         if !self.events.extra.chance(THIEF_DAILY_CHANCE) {

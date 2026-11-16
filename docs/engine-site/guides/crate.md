@@ -155,7 +155,7 @@ fails CI until that page and the example host follow.
 | Draw a frame | `view::structure_view(&sim)` and `view::ViewReader::frame`, or `frame::frame_view(&sim)`, flat number arrays read through the named slots in `view::layout` and `frame`. `ViewReader::set_people_window` with a `view::PeopleWindow` (the floors and tiles on screen) makes the frame carry only the people a view draws |
 | A person's trip | `crowd::trip::trip_facts(&person, &sim.tower)` for a `Person` in `sim.crowd.people` (kept in `id` order, so a binary search finds one): why they are out, where the leg they are on began and where it ends, for a host's person card. Read it while the card is open; the frame carries none of it |
 | Gameplay events | `sim.gameplay.drain()` after each frame; the names and payloads are in `gameplay::CATALOG_JSON` |
-| Reference data | `catalog::catalog(mode)`: every price, size, cap and rule a frontend shows |
+| Reference data | `catalog::catalog(mode)`: every price, size, cap and rule a frontend shows, including `rules.star_duties` (what each star rating starts asking of a tower, from `star_duties::star_duties(mode)`) |
 | Identity | `identity::identity()`: the crate version and the save, layout, catalog and conformance versions it speaks |
 | State hash | `canonical::digest(&snapshot::state_view(&sim))` |
 | Saves | `load::encode_simulation_vctower`, `load::encode_simulation_vctower_binary`, `load::decode_vctower`, `load::decode_vctower_bytes`, `load::deserialize`, `import_tdt`, `export_tdt` |

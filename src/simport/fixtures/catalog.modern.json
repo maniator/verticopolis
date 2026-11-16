@@ -2441,6 +2441,7 @@
     }
   ],
   "rules": {
+    "announcesStarDuties": true,
     "buildsWhilePaused": true,
     "decorativePassersBy": true,
     "exportsTo1994": false,
@@ -2451,11 +2452,45 @@
     "quotesLobbyDistance": true,
     "scheduleAssist": true,
     "shadedLook": true,
+    "starDuties": [
+      {
+        "id": "emergencies",
+        "star": 2
+      },
+      {
+        "id": "suiteParking",
+        "star": 3
+      },
+      {
+        "id": "officeParking",
+        "star": 3
+      },
+      {
+        "id": "homeParking",
+        "star": 3
+      },
+      {
+        "id": "recycling",
+        "star": 3
+      },
+      {
+        "id": "vipVisits",
+        "star": 3
+      },
+      {
+        "id": "hotelGuestsUncounted",
+        "star": 4
+      },
+      {
+        "id": "bombThreats",
+        "star": 4
+      }
+    ],
     "tallSkyLobbies": true,
     "variantHouseholds": true,
     "venueFlights": true
   },
-  "version": 21,
+  "version": 22,
   "world": {
     "groundFloor": 1,
     "groundFloorStructure": "lobby",

@@ -6,6 +6,14 @@ use crate::clock::GameMode;
 
 #[doc(hidden)]
 impl GameMode {
+    /// Whether the star-up message box adds a heads-up on what the new
+    /// rating starts asking of the tower (the catalog's `starDuties`) and
+    /// what the next rating needs (Modern). Classic shows the rating and the
+    /// rooms it opens, as the 1994 game did.
+    pub fn announces_star_duties(self) -> bool {
+        self == GameMode::Modern
+    }
+
     /// Whether the tower can be exported for SimTower (1994) as a `.TDT`.
     /// Only a Classic tower can: the 1994 format has no place for Modern's
     /// mechanics, so `build_tdt` refuses a Modern save and a frontend

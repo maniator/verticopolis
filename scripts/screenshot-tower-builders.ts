@@ -405,10 +405,12 @@ export function buildScheduleTowerClassic(): void {
  *    Metro. Offices (population 6) are the population workhorse; we build enough to clear each
  *    threshold with margin, add exactly the amenities that tier needs, leave star at 1, then let
  *    evaluateStar() raise it. place() has no minStar gate, so a 1★ tower can host a 5★ Metro. */
-export function pgGrowToStar(target: number): number {
+export function pgGrowToStar(arg: number | { target: number; mode: "classic" | "modern" }): number {
+  // A bare rating grows a Classic tower; the star-up scenes name the mode.
+  const { target, mode } = typeof arg === "number" ? { target: arg, mode: "classic" } : arg;
   const g = (window as unknown as { game: any }).game;
   const Sim = g.sim.constructor;
-  g.sim = Sim.newGame(2024 + target);
+  g.sim = Sim.newGame(2024 + target, mode);
   const s = g.sim;
   s.money = 1e12;
   s.star = 1; // build UP from 1★; evaluateStar only ever raises

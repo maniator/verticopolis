@@ -8,6 +8,7 @@ import { engineTrapped } from "./engineFault";
 import { positionPanels } from "./panelAnchoring";
 import { tickOverviewMap, touchOverviewMap } from "./overviewMapWiring";
 import { maybeSurfaceUpdatePrompt } from "./updateFlow";
+import { maybeShowStarUp, noteStarUp } from "./starUpFlow";
 import { gameplaySession } from "../analytics";
 import { drainEngineEvents } from "../analyticsEngineBridge";
 import { hudSource } from "./hudSource";
@@ -160,6 +161,7 @@ export function runFrame(app: GameApp, dtMs: number): void {
     // header is this frame's.
     const header = app.reader.header;
     if (header.star > app.lastStar) {
+      noteStarUp(app, app.lastStar, header.star);
       app.lastStar = header.star;
       if (header.star < 6) app.audio.sfx("promote");
     }
@@ -219,6 +221,9 @@ export function runFrame(app: GameApp, dtMs: number): void {
     // chip is already visible from the instant the build was found, so if a
     // calm moment never comes the player still has a way in.
     maybeSurfaceUpdatePrompt(app);
+    // The star-up box waits behind the choice and the update prompt, and the
+    // congratulations below wait behind it.
+    maybeShowStarUp(app, splashUp);
     // The congratulations replace the shared dialog, so they wait for a later
     // pass while the emergency choice or the update prompt is up. Opened over
     // either one they would wipe its buttons and strand the freeze latch it

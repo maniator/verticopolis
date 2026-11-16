@@ -167,7 +167,10 @@ impl Simulation {
         let mut out = Map::new();
         out.insert("stats".into(), self.tower_stats());
         out.insert("ratingPopulation".into(), json!(self.rating_population()));
-        out.insert("hotelsCountTowardRating".into(), json!(self.star < 4));
+        out.insert(
+            "hotelsCountTowardRating".into(),
+            json!(crate::star::hotel_guests_count_at(self.star)),
+        );
         out.insert("functionalParking".into(), json!(spots));
         out.insert(
             "parkingDemand".into(),

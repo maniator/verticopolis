@@ -2,6 +2,8 @@
 
 use serde::Serialize;
 
+use crate::star_duties::StarDuty;
+
 /// Mode rules a frontend shows the player, each stated from the engine's own
 /// rule method, so a frontend reads them here instead of deciding them from
 /// the mode's name.
@@ -57,4 +59,12 @@ pub struct Rules {
     /// The most stories a lobby can rise (#308). A floor's first lobby
     /// placement sets its height, and it never changes after.
     pub max_lobby_height: i64,
+    /// Whether the star-up message box adds the heads-up: what the new
+    /// rating starts asking of the tower ([`Rules::star_duties`]) and what
+    /// the next rating needs. When false it names the rating and the rooms
+    /// it opens.
+    pub announces_star_duties: bool,
+    /// What each rating starts asking of the tower, by the rating it begins
+    /// at (`star_duties`): stable ids, with the words left to the frontend.
+    pub star_duties: Vec<StarDuty>,
 }

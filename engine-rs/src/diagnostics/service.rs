@@ -199,7 +199,7 @@ impl Simulation {
         let mut facts = ServiceDiagnosticFacts::default();
 
         if unit.kind.is_hotel() {
-            facts.hotel.rating = if self.star < 4 {
+            facts.hotel.rating = if crate::star::hotel_guests_count_at(self.star) {
                 HotelRating::Counts
             } else {
                 HotelRating::Excluded

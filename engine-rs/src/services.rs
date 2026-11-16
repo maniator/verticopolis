@@ -4,7 +4,7 @@ use crate::demand::RECYCLING_POP_PER_CENTER;
 use crate::facilities::Kind;
 use crate::rules::OfficeParking;
 use crate::sim::{LogKind, Simulation};
-use crate::star::is_tenant_floor_unit;
+use crate::star::{is_tenant_floor_unit, VIP_VISITS_FROM_STAR};
 use crate::tower::{Unit, UnitState};
 
 pub const PARKING_WORKERS_PER_SPACE: f64 = 24.0;
@@ -378,7 +378,7 @@ impl Simulation {
 
     /// `maybeVipStay`.
     pub fn maybe_vip_stay(&mut self) {
-        if self.vip_favorable || self.star < 3 {
+        if self.vip_favorable || self.star < VIP_VISITS_FROM_STAR {
             return;
         }
         let suites: Vec<f64> = self

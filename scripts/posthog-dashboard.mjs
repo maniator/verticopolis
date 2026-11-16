@@ -372,6 +372,12 @@ function buildInsights(ids) {
       description: "star_reached events by star level (2-6), production.",
       query: trends([series("star_reached", "Star reached")], { breakdown: "star", display: "ActionsBar" }),
     },
+    {
+      name: "Star-up message box",
+      description:
+        "The star-up message box opening (app_action star_notice), by mode and rating (detail classic-2 to modern-5), production, beside the star_reached tile above. See docs/analytics-data-map.md, The star-up message box.",
+      query: trends([series("app_action", "Star-up box")], { breakdown: "detail", display: "ActionsBar", where: [inAction(["star_notice"])] }),
+    },
     // Table + KPI tiles for precise at-a-glance numbers.
     { name: "Boots (30d)", description: "Total boot events, production, 30d.", query: trends([series("boot", "Boots")], { display: "BoldNumber" }) },
     { name: "Distinct play sessions (30d)", description: "Unique per-tab session ids, production, 30d.", query: trends([series("boot", "Play sessions", "dau")], { display: "BoldNumber" }) },
