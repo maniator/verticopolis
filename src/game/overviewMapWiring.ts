@@ -24,7 +24,7 @@ import { browserStorage, type MapLayoutClass } from "../ui/overviewMapPrefs";
 import { rememberMapSpot, storedMapSpot } from "../ui/overviewMapSpot";
 import { MovableWindow, WITHIN_PARENT } from "../ui/movableWindow";
 import { DESK_CHANGE_EVENT, deskActive } from "../ui/desk/deskController";
-import { MOVABLE_TITLE } from "./movableWindows";
+import { MOVABLE_TITLE, wireMapWindowAnalytics } from "./movableWindows";
 import { OverviewMapWindow, type MutableMapCamera, type OverviewMapSource } from "../ui/overviewMapWindow";
 import { OverviewMapViews, type MapHeatSource } from "../ui/overviewMapViews";
 import { viewWorld, viewWorldBound } from "../presentation/viewWorld";
@@ -137,13 +137,16 @@ export function wireOverviewMap(app: GameApp): void {
   });
   // The window moves by its title bar and remembers the spot per layout class.
   const layoutClass = (): MapLayoutClass => (app.mobileMq.matches ? "phone" : "desktop");
+  const firstMove = wireMapWindowAnalytics(win.root, deskActive);
   const mover = new MovableWindow({
     win: win.root,
     title: MOVABLE_TITLE.map,
     within: WITHIN_PARENT,
     // On the 1994 desk the desk keeps the Map's place (src/ui/desk/), so a
-    // move there never overwrites the spot the desktop layout remembers.
+    // move there never overwrites the spot the desktop layout remembers, and
+    // the desk counts it (desk_window map_move) in place of window_move.
     placed: (spot) => {
+      firstMove(spot);
       if (!deskActive()) rememberMapSpot(storage, layoutClass(), spot);
     },
   });

@@ -438,13 +438,20 @@ describe("wireMenus analytics", () => {
     splash.remove();
   });
 
-  it("a window's close button sends window_close, and its first move window_move, once", () => {
+  it("a window's close button sends window_close, and its first move off the desk window_move, once", () => {
     wireMenus(fakeApp().app);
     const bulletin = movable.mock.calls.find(([o]) => o.win === $("bulletin-win"))![0] as { placed: (s: unknown) => void };
+    document.body.classList.add("desk"); // the desk sends desk_window bulletin_move instead
     bulletin.placed({ x: 1, y: 2 });
+    expect(sponsor.track).not.toHaveBeenCalledWith("window_move", "bulletin");
+    document.body.classList.remove("desk");
     bulletin.placed({ x: 3, y: 4 });
     expect(sponsor.track.mock.calls.filter(([a]) => a === "window_move")).toEqual([["window_move", "bulletin"]]);
-    $("bulletin-win").querySelector<HTMLElement>("[data-close]")!.click();
+    const close = $("bulletin-win").querySelector<HTMLElement>("[data-close]")!;
+    close.click(); // the desk's window menu: closes, but is the menu's pick
+    expect(sponsor.track).not.toHaveBeenCalledWith("window_close", "bulletin");
+    expect($("bulletin-win").hidden).toBe(true);
+    close.dispatchEvent(Object.defineProperty(new MouseEvent("click", { bubbles: true }), "isTrusted", { value: true }));
     expect(sponsor.track).toHaveBeenCalledWith("window_close", "bulletin");
   });
 });

@@ -15,6 +15,8 @@ import { callFireRescue } from "./fireRescueCall";
 import { confirmExterminate } from "./appModals";
 import { TOWER_CALL_ITEM, showTowerCalls, towerCalls, type TowerCalls } from "./towerCallItems";
 import { fitFullScreenItem } from "./fullScreenItem";
+import { firstDragReporter, reportWindowClose } from "./movableWindows";
+import { deskActive } from "../ui/desk/deskController";
 
 /**
  * The menu bar's commands (index.html `#menubar`, behavior in
@@ -159,18 +161,15 @@ export function wireMenus(app: GameApp): MenuBar | null {
 
   // Tower Info and Bulletin. A phone starts both closed.
   const onPhone = app.mobileMq?.matches ?? false;
-  const floating = Object.entries(MENU_WINDOW).map(([name, w]) => {
+  const floating = (Object.entries(MENU_WINDOW) as [keyof typeof MENU_WINDOW, (typeof MENU_WINDOW)[keyof typeof MENU_WINDOW]][]).map(([name, w]) => {
     const win = document.getElementById(w.id);
     if (win) {
-      let moved = false;
-      const placed = () => {
-        if (!moved) trackAppAction("window_move", name);
-        moved = true;
-      };
+      // On the 1994 desk the desk counts the move (desk_window <window>_move).
+      const placed = firstDragReporter(name, () => !deskActive());
       new MovableWindow({ win, title: `#${w.id} > .win-title`, within: WITHIN_PARENT, placed });
       win.hidden = !stored(storage, w.key, w.openOnDesktop && !onPhone);
-      win.querySelector(`[data-close="${w.id}"]`)?.addEventListener("click", () => {
-        trackAppAction("window_close", name);
+      win.querySelector(`[data-close="${w.id}"]`)?.addEventListener("click", (e) => {
+        reportWindowClose(e, name);
         setShown(false);
       });
     }

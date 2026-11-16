@@ -651,12 +651,22 @@ function buildInsights(ids) {
     },
     {
       name: "Version 4 windows and welcome",
-      description: "app_action for the windows and cards that came with the menu bar: window_close and window_move (detail tower or bulletin), welcome_shown, welcome_close (detail ok, x, escape, backdrop, displaced) and welcome_link (first_tower, modes, whats_new), production.",
+      description: "app_action for the windows and cards that came with the menu bar: window_close (detail tower, bulletin or map) and window_move (tower, bulletin, map, dialog or card), welcome_shown, welcome_close (detail ok, x, escape, backdrop, displaced) and welcome_link (first_tower, modes, whats_new), production.",
       query: trends([series("app_action", "Actions")], {
         breakdown: ["action", "detail"],
         display: "ActionsTable",
         breakdownLimit: 40,
         where: [inAction(["window_close", "window_move", "welcome_shown", "welcome_close", "welcome_link"])],
+      }),
+    },
+    {
+      name: "Windows: moved, resized, minimized, maximized and closed",
+      description: "Every window change in one table, production: desk_window (<window>_<verb>: min, restore, max, unmax, resize, first move, close) on the 1994 desk, plus window_close (a window's own ✕: tower, bulletin, map) and window_move (first drag: tower, bulletin and map off the desk; dialog and card anywhere). See docs/analytics-data-map.md.",
+      query: trends([series("app_action", "Window changes")], {
+        breakdown: ["action", "detail"],
+        display: "ActionsTable",
+        breakdownLimit: 100,
+        where: [inAction(["desk_window", "window_close", "window_move"])],
       }),
     },
     // The 1994 desk (docs/ui/desk-windows.md): its app_action codes.
