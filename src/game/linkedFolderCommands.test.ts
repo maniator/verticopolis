@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { FileNameTakenError } from "../storage/fileSpace";
+import { recentTowers } from "../storage/recentTowers";
 
 const m = vi.hoisted(() => ({
   track: vi.fn(),
@@ -38,7 +39,7 @@ vi.mock("./autosaveMirror", () => ({
 import type { GameApp } from "../main";
 import type { FileRow } from "../ui/templates/fileDialog";
 import { currentFileId, currentLinkedFile, setCurrentFile, setCurrentLinkedFile } from "./currentFile";
-import { linkedPlace, saveCurrentLinked } from "./linkedFolderCommands";
+import { linkedPlace, openLinkedRow, saveCurrentLinked } from "./linkedFolderCommands";
 
 const BINARY = new TextEncoder().encode("VCTOWER2\nrest");
 const TDT = Uint8Array.of(0x00, 0x24, 1, 2);
@@ -60,6 +61,7 @@ const place = () => linkedPlace(app as unknown as GameApp)!;
 
 beforeEach(() => {
   vi.clearAllMocks();
+  localStorage.clear();
   m.canLink = true;
   m.folder.state.mockImplementation(() => ({ name: "Towers", access: "granted" }));
   m.folder.allow.mockImplementation(async () => "granted");
@@ -117,7 +119,16 @@ describe("the linked folder in the Open and Save As windows", () => {
     expect(m.folder.read).toHaveBeenCalledExactlyOnceWith("A.vctower");
     expect(app.saveLoad.importGame).toHaveBeenCalledExactlyOnceWith(BINARY);
     expect(currentLinkedFile()).toBe("A.vctower");
+    expect(recentTowers()).toEqual([{ place: "folder", id: "A.vctower", name: "A.vctower", kind: "tower", link: "L1" }]);
     expect(m.track).toHaveBeenCalledWith("folder_open", "tower");
+  });
+
+  it("answers whether the file was there, for File > Open Recent", async () => {
+    expect(await openLinkedRow(app as unknown as GameApp, row("A.vctower"))).toBe(true);
+    m.folder.read.mockResolvedValueOnce(null);
+    expect(await openLinkedRow(app as unknown as GameApp, row("Gone.vctower"))).toBe(false);
+    m.folder.read.mockRejectedValueOnce(new DOMException("no", "NotAllowedError"));
+    expect(await openLinkedRow(app as unknown as GameApp, row("B.vctower"))).toBe(true);
   });
 
   it("keeps the old file when the importer refuses the tower", async () => {
@@ -126,6 +137,7 @@ describe("the linked folder in the Open and Save As windows", () => {
     place().open(row("A.vctower"));
     await settle();
     expect(currentLinkedFile()).toBe("Old.vctower");
+    expect(recentTowers()).toEqual([]);
   });
 
   it("hands a 1994 file to the legacy importer by its name", async () => {
@@ -170,6 +182,7 @@ describe("the linked folder in the Open and Save As windows", () => {
     expect(await place().save("Sky", false)).toBeNull();
     expect(m.folder.save).toHaveBeenCalledExactlyOnceWith("Sky", Uint8Array.of(7, 7, 7), false);
     expect(currentLinkedFile()).toBe("Sky.vctower");
+    expect(recentTowers()).toEqual([{ place: "folder", id: "Sky.vctower", name: "Sky.vctower", kind: "tower", link: "L1" }]);
     expect(m.track).toHaveBeenCalledWith("folder_save", "new");
     expect(app.ui.toast).toHaveBeenCalledWith(`Saved "Sky" in Towers.`, "good");
     await place().save("Sky", true);

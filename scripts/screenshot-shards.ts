@@ -106,6 +106,10 @@ export const SHARDS: Record<string, string[]> = {
   // scenes of DOM window stills over the default new tower, desktop and
   // phone, about 10s; its own shard as the owner asked.
   "linked-folder": ["linked-folder", "linked-folder-unsupported", "linked-folder-mobile"],
+  // File > Open Recent (owner, 2026-11-16): the empty and full submenu, a
+  // gone tower's note, the title screen's menu and the phone's in-place
+  // submenu, DOM stills over the default new tower; its own shard.
+  "open-recent": ["open-recent", "open-recent-title", "open-recent-mobile"],
   // The 1994 desk and the sunrise startup screen (owner, 2026-11-15: their own
   // shard, every design and option): one canon tower on the desk, the
   // README's day and night pair on a second one, the title window, and the

@@ -119,6 +119,20 @@
           <div class="mb-pop" id="mb-file-menu" role="menu" aria-labelledby="mb-file" hidden>
             <button type="button" role="menuitem" class="mb-item" id="btn-new">New…</button>
             <button type="button" role="menuitem" class="mb-item" id="mb-import">Open…<kbd>Ctrl+O</kbd></button>
+            <!-- Open Recent: the last five towers opened or saved, newest
+                 first and numbered, filled in as the File menu opens
+                 (src/game/recentMenu.ts). -->
+            <div class="mb-sub" role="none">
+              <button type="button" role="menuitem" class="mb-item mb-sub-title" id="mb-recent" aria-haspopup="menu" aria-expanded="false" aria-controls="mb-recent-menu">Open Recent</button>
+              <div class="mb-pop mb-subpop" id="mb-recent-menu" role="menu" aria-labelledby="mb-recent" hidden>
+                <button type="button" role="menuitem" class="mb-item mb-recent" id="mb-recent-1" hidden></button>
+                <button type="button" role="menuitem" class="mb-item mb-recent" id="mb-recent-2" hidden></button>
+                <button type="button" role="menuitem" class="mb-item mb-recent" id="mb-recent-3" hidden></button>
+                <button type="button" role="menuitem" class="mb-item mb-recent" id="mb-recent-4" hidden></button>
+                <button type="button" role="menuitem" class="mb-item mb-recent" id="mb-recent-5" hidden></button>
+                <button type="button" role="menuitem" class="mb-item" id="mb-recent-none" aria-disabled="true">No recent towers</button>
+              </div>
+            </div>
             <hr class="mb-sep" id="mb-save-sep" />
             <button type="button" role="menuitem" class="mb-item" id="mb-quick-save">Save<kbd>Ctrl+S</kbd></button>
             <button type="button" role="menuitem" class="mb-item" id="mb-export">Save As…<kbd>Ctrl+Shift+S</kbd></button>

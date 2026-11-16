@@ -26,9 +26,10 @@ vi.mock("./interactionState", () => ({ isDialogOpen: () => m.dialogOpen, isEngin
 import type { GameApp } from "../main";
 import { closeFileSpaceForTests, fileSpace } from "../storage/fileSpace";
 import { SaveGame } from "../storage/SaveGame";
+import { recentTowers } from "../storage/recentTowers";
 import { FakeIndexedDb } from "../tests/fakeIndexedDb";
 import { currentFileId, setCurrentFile } from "./currentFile";
-import { openFile, openFileSpace, saveCurrentFile, saveFile, showOpenDialog, showSaveAsDialog, towerFileKind, wireTowerDrop } from "./fileSpaceCommands";
+import { openFile, openFileSpace, openTowersFile, saveCurrentFile, saveFile, showOpenDialog, showSaveAsDialog, towerFileKind, wireTowerDrop } from "./fileSpaceCommands";
 
 const text = (s: string) => new TextEncoder().encode(s);
 const TDT = Uint8Array.of(0x00, 0x24, 1, 2);
@@ -54,6 +55,7 @@ let refuseNext: () => void;
 
 beforeEach(async () => {
   vi.clearAllMocks();
+  localStorage.clear();
   m.dialogOpen = false;
   m.stopped = false;
   setCurrentFile(null);
@@ -213,6 +215,7 @@ describe("opening a My Towers file", () => {
     expect(m.openingFile.mock.invocationCallOrder[0]).toBeLessThan(app.saveLoad.importGame.mock.invocationCallOrder[0]!);
     expect(currentFileId()).toBe(f.id);
     expect(fileSpace.list()).toHaveLength(1);
+    expect(recentTowers()).toEqual([{ place: "towers", id: f.id, name: "Spire", kind: "tower" }]);
     expect(m.track).toHaveBeenCalledWith("file_open", "tower");
     expect(m.track).not.toHaveBeenCalledWith("import_save");
   });
@@ -223,6 +226,16 @@ describe("opening a My Towers file", () => {
     await openFile(app as unknown as GameApp, f.id);
     expect(app.saveLoad.importGame).toHaveBeenCalledExactlyOnceWith(BINARY);
     expect(currentFileId()).toBeNull();
+    expect(recentTowers()).toEqual([]);
+  });
+
+  it("answers whether the file opened, is gone, or My Towers itself is closed (File > Open Recent)", async () => {
+    const f = await fileSpace.save("Spire", "tower", text("VCTOWER1\nabc\n"));
+    expect(await openTowersFile(app as unknown as GameApp, f.id)).toBe("opened");
+    expect(await openTowersFile(app as unknown as GameApp, "no-such-id")).toBe("gone");
+    closeFileSpaceForTests();
+    expect(await openTowersFile(app as unknown as GameApp, f.id)).toBe("closed");
+    expect(app.saveLoad.importGame).toHaveBeenCalledOnce();
   });
 
   it("sends a 1994 file to the legacy import under its own name", async () => {
@@ -248,6 +261,7 @@ describe("saving into My Towers", () => {
     const [f] = fileSpace.list();
     expect(await fileSpace.read(f.id)).toEqual(Uint8Array.of(7, 7, 7));
     expect(currentFileId()).toBe(f.id);
+    expect(recentTowers()).toEqual([{ place: "towers", id: f.id, name: "Sky Hotel", kind: "tower" }]);
     expect(app.ui.toast).toHaveBeenCalledWith(`Saved "Sky Hotel" in My Towers.`, "good");
     expect(m.track).toHaveBeenCalledWith("file_save", "new");
   });

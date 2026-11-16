@@ -101,7 +101,7 @@ test("links a folder, saves a tower into it, and lists it in Open without Delete
   ).toEqual(["Linked One.vctower"]);
 
   // Save As remembered the folder, and the Open window starts there too.
-  await fileMenu(page, /^Open/);
+  await fileMenu(page, /^Open…/);
   await expect(page.locator(".fd-look-now")).toContainText(FOLDER);
   await expect.poll(() => rowNames(page)).toEqual(["Linked One"]);
   await page.locator(".fd-row").first().click();
@@ -135,7 +135,7 @@ test("after a reload the folder comes back in Look in, and a tower opens from it
   const before = await page.evaluate(() =>
     (window as any).game.enginePort.generation(),
   );
-  await fileMenu(page, /^Open/);
+  await fileMenu(page, /^Open…/);
   await page.locator(".fd-look").click();
   await page
     .getByRole("menuitem", { name: `${FOLDER} on this computer` })
@@ -150,7 +150,7 @@ test("after a reload the folder comes back in Look in, and a tower opens from it
   );
 
   // Unlinking keeps the file on disk.
-  await fileMenu(page, /^Open/);
+  await fileMenu(page, /^Open…/);
   await page.locator(".fd-look").click();
   await page.locator(".fd-look-item", { hasText: "Unlink" }).click();
   await expect(page.locator(".fd-look-now")).toContainText("My Towers");

@@ -164,7 +164,7 @@ player's own text and is never sent, and neither is a tower's contents.
 
 | `action` | `detail` | When |
 | --- | --- | --- |
-| `files_open` | `open`, `open_key`, `open_title` or `save_as` | The Open or Save As window opened. Open says where the player asked: `open` for File > Open… in the menu, `open_key` for its Ctrl+O key, and `open_title` for the title screen's Open Tower… button (called Load Tower up to 4.2). `save_as` is File > Save As… |
+| `files_open` | `open`, `open_key`, `open_title`, `recent` or `save_as` | The Open or Save As window opened, or a tower was asked for without it. Open says where the player asked: `open` for File > Open… in the menu, `open_key` for its Ctrl+O key, and `open_title` for the title screen's Open Tower… button (called Load Tower up to 4.2). `recent` is a tower picked from File > Open Recent (2026-11-16): no window shows, and the tower opens as its row would, so `file_open` or `folder_open` follows. `save_as` is File > Save As… |
 | `files_waited` | `open` or `save_as` | That window opened while My Towers was still getting ready (its first open on the device, or the old slots still copying in); it said "Opening My Towers…" and filled in once ready. Before 4.3 shipped, File > Open… showed the device's file picker at that moment |
 | `file_open` | `tower`, `tdt` or `auto` | A row opened: a tower file, a 1994 `.TDT` file, or the Auto-save |
 | `file_save` | `new`, `replace` or `current` | The tower written into My Towers: under a new name, over a file the player agreed to replace, or into the live tower's own file by File > Save |
@@ -177,6 +177,15 @@ player's own text and is never sent, and neither is a tower's contents.
 | `file_failed` | `full` or `error` | A write to My Towers refused: the device is out of room, or another error |
 | `files_copied` | a count | Once per device: the old save slots copied into My Towers, and how many |
 | `tower_kept` | `file`, `new`, `offered`, `download` or `failed` | From 4.9.0: another tower opened (File > Open…, New…, a picked or dropped file, or a 1994 import) and the tower left behind was kept: in its own My Towers file (`file`), as a new file under its name (`new`), or not at all (`failed`, said to the player). When My Towers couldn't take it, a message box offered it as a `.vctower` file (`offered`), and `download` follows when the player's click downloads it. Loading the Auto-save (Continue, or its row in the Open window) brings the same tower back, so it leaves nothing behind and sends nothing |
+| `recent_missing` | `towers` or `folder` | A tower picked from File > Open Recent was gone: deleted from My Towers, or moved, renamed or deleted in the linked folder (or that folder unlinked). The game said so and took it off the list; nothing else changed |
+
+File > Open Recent (2026-11-16) lists the last five towers opened or saved,
+from My Towers or the linked folder, newest first. The list is a preference
+on the device (`vc.recentTowers` in localStorage) and is never sent: a pick
+sends its `menu_pick` (`recent_1` to `recent_5`, by line), then `files_open`
+`recent`, then the open's own event. A file deleted from My Towers drops off
+the list quietly as the File menu opens, so `recent_missing` counts only the
+gone files a player actually picked.
 
 `load_slot` still counts the Auto-save loading as the live tower (its row in
 the Open window; File > Load in 4.1 and 4.2), and `load_failed` a load that
@@ -313,7 +322,7 @@ never the name).
 | `via` (open) | `click`, `keys`, `alt` | A click on a title, the keyboard on a focused title, or Alt with the underlined letter |
 | `via` (pick) | `pointer`, `keys` | A mouse, pen or finger, or the keyboard |
 | `screen` | `title`, `tower` | Over the title screen, or over a tower |
-| `item` | `new_tower`, `quick_save`, `close`, `import`, `export`, `install_app`, `undo`, `redo`, `tower_info`, `map`, `statistics`, `rename`, `fire_rescue`, `exterminator`, `rules`, `tools`, `bulletin`, `status_bar`, `full_screen`, `settings`, `sound`, `screen_saver`, `manual`, `compare`, `replay`, `sponsor`, `about`, `window_tools`, `window_info`, `window_map`, `window_bulletin`, `window_tower_info`, `other` | The item, by a code that does not change with its label (`MENU_ITEM_CODES`) |
+| `item` | `new_tower`, `quick_save`, `close`, `import`, `export`, `install_app`, `undo`, `redo`, `tower_info`, `map`, `statistics`, `rename`, `fire_rescue`, `exterminator`, `rules`, `tools`, `bulletin`, `status_bar`, `full_screen`, `settings`, `sound`, `screen_saver`, `manual`, `compare`, `replay`, `sponsor`, `about`, `window_tools`, `window_info`, `window_map`, `window_bulletin`, `window_tower_info`, `recent_1` to `recent_5`, `recent_none`, `other` | The item, by a code that does not change with its label (`MENU_ITEM_CODES`) |
 | `browsed` | a count | Menus the trip showed, the last one included |
 | `after` | an `item` code or `none` | The page life's previous real pick, so a breakdown shows what follows what without a paths query. A grayed click never becomes the next pick's `after` |
 | `grayed` | `true`, `false` | The item was grayed out, so nothing happened |
@@ -324,6 +333,11 @@ The 1994 desk (owner, 2026-11-15) has a Window menu of its own, with
 `window_*` codes so its picks never mix with the Tower and Options items of
 the same windows; on the desk, Status Bar and Full Screen move into it and keep
 their codes, with `menu` reading `window`.
+
+File > Open Recent is a submenu: opening it sends nothing, and a pick from it
+counts in the File menu (`menu: file`) as `recent_1` to `recent_5`, its line's
+number, newest first. `recent_none` is the grayed "No recent towers" line, so
+it only arrives with `grayed: true`.
 
 Version 4.3 removed the Window menu (party and owner, 2026-11-15): Bulletin
 moved to Tower, and Tools, Status Bar and Full Screen to Options. They kept
