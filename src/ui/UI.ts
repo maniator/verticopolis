@@ -25,7 +25,7 @@ import { wireBulletinReadBack } from "./bulletinReadBack";
 import { ModalPrecedence, routeNotice, type ModalOpts, type NoticeKind } from "./modalPrecedence";
 import { finishModal } from "./uiModal";
 
-export type Tool = { type: "build"; kind: FacilityKind } | { type: "bulldoze" } | { type: "inspect" };
+export type Tool = { type: "build"; kind: FacilityKind } | { type: "bulldoze" } | { type: "inspect" } | { type: "skyBridge" };
 
 export interface UICallbacks {
   /** The live tower's catalog (#921), re-read per call. */

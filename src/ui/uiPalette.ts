@@ -12,6 +12,7 @@ import { applySectionFolds, wireSectionFolds } from "./paletteSections";
 import { browserStorage } from "./overviewMapPrefs";
 import { descriptionId, wirePaletteHints } from "./paletteHints";
 import { TOOL_DESCRIPTION } from "./templates/toolInfo";
+import { labelSkyBridgeButton, skyBridgeButton, SKY_BRIDGE_TOOL } from "./skyBridgePalette";
 
 /**
  * Build-palette construction for {@link UI}, as friend functions taking the UI
@@ -77,7 +78,7 @@ function layoutKey(catalog: Catalog): string {
       .filter((f) => g.cats.includes(f.category))
       .map((f) => (f.modernOnly ? `${f.key}+` : f.key))
       .join(","),
-  ).join("|");
+  ).join("|") + (catalog.rules.skyBridge ? "|bridge" : "");
 }
 
 /** The layout key each palette was built from. */
@@ -112,12 +113,19 @@ function buildPaletteFrom(ui: UI, catalog: Catalog): void {
     for (const kind of classic) section.appendChild(facilityButton(ui, catalog, kind, group.title));
     // Modern venues sit under their own labeled sub-band (the 1.83 Sprite Gallery
     // idea), hidden by the scan when none are unlocked (Classic, or below 3 stars).
-    if (modern.length > 0) {
+    // The Sky Bridge tool (Modern) joins Structure's Modern sub-band.
+    const bridge = group.title === "Structure" ? catalog.rules.skyBridge : null;
+    if (modern.length > 0 || bridge) {
       const sub = groupTitle("Modern", undefined);
       sub.classList.add("pal-sub");
       sub.dataset.subGroup = group.title;
       section.appendChild(sub);
       for (const kind of modern) section.appendChild(facilityButton(ui, catalog, kind, group.title, true));
+      if (bridge) {
+        const item = skyBridgeButton(bridge, group.title);
+        makeActivatable(item, item.getAttribute("aria-label") ?? "Sky Bridge", () => ui.selectTool({ type: SKY_BRIDGE_TOOL }));
+        section.appendChild(item);
+      }
     }
     groups.appendChild(section);
   }
@@ -345,6 +353,8 @@ export function relabelPalette(ui: UI, catalog: Catalog): void {
     const kind = item.dataset.kind as FacilityKind;
     labelFacility(item, kind, catalog);
   });
+  const bridge = ui.el.palette.querySelector<HTMLElement>(`.pal-item[data-tool="${SKY_BRIDGE_TOOL}"]`);
+  if (bridge && catalog.rules.skyBridge) labelSkyBridgeButton(bridge, catalog.rules.skyBridge);
   // The lock classes follow the catalog's `available` and `minStar`, which a
   // new catalog may state differently: clear the scan key so the pump's next
   // pass rewrites them.

@@ -89,6 +89,9 @@ export type AppActionName =
   // box at a Modern founding (unticked by default), auto_bridge the Settings switch.
   | "found_bridged"
   | "auto_bridge"
+  // The Sky Bridge tool laid a bridge (Modern, 2026-11-16): detail `new`, or
+  // `finish` for the rest of a half bridge from a save made before the tool.
+  | "sky_bridge"
   // The star-up message box opened, detail the mode and the rating it
   // announces, such as `modern-3`.
   | "star_notice"

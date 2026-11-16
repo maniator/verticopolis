@@ -14,6 +14,7 @@ import type { ThiefSpan, TowerEngine } from "./TowerEngine";
 import { drawShaftNumbers } from "./towerShaftNumbers";
 import { drawHaloRings } from "./towerHaloRings";
 import { drawNoiseReach } from "./towerNoiseReach";
+import { drawGhostLabel } from "./towerGhostLabel";
 import { guardPosition } from "./guardPosition";
 
 export { guardPosition };
@@ -367,10 +368,8 @@ function paintRain(ctx: CanvasRenderingContext2D, W: number, H: number, t: numbe
   ctx.stroke();
 }
 
-/** The translucent placement ghost: gold when valid, red when not. One
- *  explicit stroke width for both ghost kinds, the old transport ghost
- *  never set its own and inherited whatever the overlay context last used
- *  (1, 1.5, or 2 depending on rain/selection), a nondeterminism this pins. */
+/** The translucent placement ghost: gold when valid, red when not, with one
+ *  explicit stroke width so no ghost inherits the overlay context's last one. */
 function drawGhostRect(ctx: CanvasRenderingContext2D, sx: number, sy: number, sw: number, sh: number, valid: boolean): void {
   ctx.globalAlpha = 0.5;
   ctx.fillStyle = valid ? "#ffd24a" : "#cc3333";
@@ -406,6 +405,7 @@ function drawPreview(engine: TowerEngine, ctx: CanvasRenderingContext2D): void {
     const sw = w * TILE * engine.cam.zoom;
     const sh = hgt * FLOOR * engine.cam.zoom;
     drawGhostRect(ctx, sx, sy, sw, sh, p.valid);
+    if (p.label) drawGhostLabel(ctx, sx + sw / 2, sy, p.label, p.valid);
   }
   if (engine.transportPreview) {
     const p = engine.transportPreview;

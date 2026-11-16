@@ -13,6 +13,7 @@ import { groupDigits } from "./format";
 import { paletteWindow, relabelPalette, syncPaletteTabs } from "./uiPalette";
 import { refitPalette } from "./paletteFit";
 import { toolInfoFor } from "./templates/toolInfo";
+import { scanSkyBridgeButton, skyBridgeUnlocked } from "./skyBridgePalette";
 import { towerStatsTemplate, type TowerStatsSnapshot } from "./templates/towerStats";
 import { bindViewWorld } from "../presentation/viewWorld";
 import { bindViewKinds } from "../presentation/viewKinds";
@@ -132,6 +133,8 @@ export function update(ui: UI, src: HudSource): void {
   // always. The key is a cheap string over engine data (no DOM reads).
   let scanKey = mode + ":" + star;
   for (const f of catalog.facilities) scanKey += money >= f.cost ? "1" : "0";
+  const bridge = catalog.rules.skyBridge;
+  if (bridge) scanKey += money >= bridge.tileCost ? "b" : "-";
   if (scanKey !== ui.paletteScanKey) {
     ui.paletteScanKey = scanKey;
     // Palette unlock state. Parity with the original: a locked facility is HIDDEN
@@ -147,6 +150,7 @@ export function update(ui: UI, src: HudSource): void {
       item.classList.toggle("locked", locked);
       item.classList.toggle("unaffordable", !locked && !affordable);
     });
+    if (scanSkyBridgeButton(ui.el.palette, bridge, star, money)) shownToolsChanged = true;
     // Reads the `.locked` classes just written: hides a category section and its
     // tab when everything beneath is still locked (e.g. Leisure below 3★, no
     // dangling section title), hides the Modern sub-band until a Modern venue
@@ -164,7 +168,8 @@ export function update(ui: UI, src: HudSource): void {
     // matches what the palette shows. (Fires once: the tool is Inspect afterward.)
     // Gated with the scan: the tool can only BECOME locked when the star drops
     // (a key change) or a new catalog withholds its kind (which clears the key).
-    if (ui.tool.type === "build" && !unlocked(catalog, ui.tool.kind, star)) {
+    const toolLocked = ui.tool.type === "skyBridge" ? !skyBridgeUnlocked(bridge, star) : ui.tool.type === "build" && !unlocked(catalog, ui.tool.kind, star);
+    if (toolLocked) {
       ui.selectTool({ type: "inspect" });
     }
   }

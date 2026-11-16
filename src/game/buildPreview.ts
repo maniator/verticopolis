@@ -9,6 +9,8 @@ import { FLOOR } from "../render/scale";
 import { catalogOf, isUnlocked, quoteBuild, quoteShaft, type BuildQuote } from "./portAccess";
 import { NOT_ENOUGH_MONEY } from "../simport/request";
 import { lobbyHeightFor } from "./lobbyHeight";
+import { quoteSkyBridge, quotedTiles, skyBridgeLabel } from "./skyBridgeTool";
+import { groupDigits } from "../ui/format";
 
 /**
  * How far above the touch point a room's placement ghost floats, in SCREEN pixels
@@ -185,11 +187,30 @@ const lastPreview = new WeakMap<GameApp, { tile: number; floor: number; showReas
  *  lobby height changed (#308) and the pointer did not move. */
 export function refreshBuildPreview(app: GameApp): void {
   const last = lastPreview.get(app);
-  if (last && app.engine.preview && app.tool.type === "build") updateBuildPreview(app, last.tile, last.floor, last.showReasonCard);
+  if (last && app.engine.preview && (app.tool.type === "build" || app.tool.type === "skyBridge")) updateBuildPreview(app, last.tile, last.floor, last.showReasonCard);
+}
+
+/** The Sky Bridge tool's ghost (Modern): every tile one click lays across the
+ *  gap, from one sky lobby to the other, with the bridge's full price on a tag
+ *  above it; red, with the engine's reason, when the click would lay nothing.
+ *  Off any gap it marks the pointed tile red. */
+function updateSkyBridgePreview(app: GameApp, tile: number, floor: number, showReasonCard: boolean): void {
+  const q = quoteSkyBridge(app.enginePort, app.portCodes, floor, tile);
+  const tiles = quotedTiles(q);
+  const x = tiles > 0 ? q.from : tile;
+  const label = skyBridgeLabel(q, groupDigits);
+  app.engine.preview = { kind: "lobby", floor, x, span: Math.max(1, tiles), valid: q.ok, reason: q.reason, stories: 1, label };
+  app.engine.transportPreview = null;
+  if (showReasonCard) updateBuildRefusal(app, q.reason, floor, x + Math.floor(Math.max(1, tiles) / 2));
+  else clearBuildRefusal(app);
 }
 
 export function updateBuildPreview(app: GameApp, tile: number, floor: number, showReasonCard = true): void {
   lastPreview.set(app, { tile, floor, showReasonCard });
+  if (app.tool.type === "skyBridge") {
+    updateSkyBridgePreview(app, tile, floor, showReasonCard);
+    return;
+  }
   if (app.tool.type !== "build") {
     app.engine.preview = null;
     app.engine.transportPreview = null;

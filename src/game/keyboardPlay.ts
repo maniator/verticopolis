@@ -9,6 +9,7 @@ import type { EnginePort } from "../simport/enginePort";
 import { outcome, type PortCodes } from "../simport/portCodes";
 import type { ViewReader } from "../simport/viewReader";
 import { quoteShaft } from "./portAccess";
+import { SKY_BRIDGE_STEP } from "./skyBridgeTool";
 
 /**
  * Keyboard play (F50–52): the virtual build cursor moved with arrows/WASD,
@@ -63,6 +64,8 @@ export interface KeyboardPlayDeps {
    *  a drag-sized shaft, otherwise the engine's outcome. */
   placeSimpleBuild(kind: FacilityKind, tile: number, floor: number): PlaceOutcome | null;
   updateBuildPreview(tile: number, floor: number): void;
+  /** Lay the whole sky bridge at a cell (Modern; `skyBridgeGestures`). */
+  placeSkyBridge(tile: number, floor: number): { ok: boolean; reason?: string; tiles: number };
   /** Refuse a new placement while paused where the mode says so
    *  (`pausedBuild.ts`, #1936): true when refused, with its feedback shown. */
   refusePausedPlacement(): boolean;
@@ -171,6 +174,14 @@ export class KeyboardPlay {
     }
     if (tool.type === "bulldoze") {
       this.bulldozeCursor();
+      return;
+    }
+    if (tool.type === "skyBridge") {
+      this.deps.captureUndo(SKY_BRIDGE_STEP);
+      const laid = this.deps.placeSkyBridge(c.tile, c.floor);
+      this.deps.commitUndo();
+      this.deps.announce(laid.ok ? `Sky bridge built, ${laid.tiles} ${laid.tiles === 1 ? "tile" : "tiles"}` : (laid.reason ?? "Can't build a sky bridge here"));
+      this.refreshCursorPreview();
       return;
     }
     if (tool.type !== "build") return;
