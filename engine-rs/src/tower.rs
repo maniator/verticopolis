@@ -22,8 +22,8 @@ mod undoing;
 mod unit_save;
 
 pub use lobby_halls::HallRun;
-pub use skybridge::SKYBRIDGE_MAX_SPAN;
-pub(crate) use skybridge::{Row as BridgeRow, PEOPLE_CROSSING, SKYBRIDGE_PRICE_FACTOR};
+pub(crate) use skybridge::{OverAir, Row as BridgeRow, PEOPLE_CROSSING, SKYBRIDGE_PRICE_FACTOR};
+pub use skybridge::{SkybridgeSpan, SKYBRIDGE_MAX_SPAN, SKYBRIDGE_MIN_STAR};
 pub use types::{Extras, ExtrasMut, PlaceResult, ResizeResult, Transport, Unit, UnitState};
 pub(crate) use unit_save::SavedUnit;
 

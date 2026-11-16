@@ -63,6 +63,7 @@ pub fn catalog(mode: GameMode) -> Catalog {
             max_lobby_height: crate::facilities::MAX_LOBBY_HEIGHT,
             announces_star_duties: mode.announces_star_duties(),
             star_duties: crate::star_duties::star_duties(mode),
+            sky_bridge: mode.builds_skybridges().then(sky_bridge_rule),
         },
         pools: keyed_pools(mode)
             .map(|(key, p)| PoolEntry {
@@ -123,5 +124,16 @@ fn facility_entry(mode: GameMode, kind: Kind) -> FacilityEntry {
         unmet_demand: kind.is_unmet_demand_kind(),
         halo: halo::halo_entry(mode, kind),
         noise: noise::noise_entries(mode, kind),
+    }
+}
+
+/// The Sky Bridge tool's rule, from the engine's own constants and prices.
+fn sky_bridge_rule() -> super::rules::SkyBridgeRule {
+    use crate::facilities::Kind;
+    let bare = Kind::Lobby.facility().cost + Kind::Floor.facility().cost;
+    super::rules::SkyBridgeRule {
+        min_star: crate::tower::SKYBRIDGE_MIN_STAR,
+        max_span: crate::tower::SKYBRIDGE_MAX_SPAN,
+        tile_cost: bare * crate::tower::SKYBRIDGE_PRICE_FACTOR,
     }
 }

@@ -112,7 +112,7 @@ impl Simulation {
     /// for the lobby's price alone.
     /// A sky bridge tile, a lobby tile over open air, costs
     /// `SKYBRIDGE_PRICE_FACTOR` times a lobby tile on a story.
-    fn structure_tile_cost(&self, kind: Kind, floor: i64, x: i64, stories: i64) -> f64 {
+    pub(crate) fn structure_tile_cost(&self, kind: Kind, floor: i64, x: i64, stories: i64) -> f64 {
         if self.tower.has_structure(floor, x) {
             kind.facility().cost * stories as f64
         } else if kind == Kind::Lobby && self.tower.lays_skybridge_at(floor, x) {

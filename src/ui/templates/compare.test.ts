@@ -40,6 +40,7 @@ describe("the Classic and Modern summary", () => {
     fedUpWait: null, // the same wait turns a person red in both modes
     announcesStarDuties: "warns what the rating starts asking for",
     starDuties: null, // the duties themselves, which the star-up box words
+    skyBridge: "the Sky Bridge tool joins two towers' sky lobbies",
   };
   const RULE_TO_HELP: Record<string, string | null> = {
     ...CATALOG_RULE_TO_HELP,

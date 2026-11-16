@@ -1,5 +1,6 @@
 //! Sky bridges (Modern): lobby tiles over open air on a sky lobby floor,
-//! from one wing's sky lobby to another's, with nothing built on them.
+//! from one wing's sky lobby to another's, with nothing built on them, laid
+//! whole by the Sky Bridge tool.
 
 use super::*;
 use crate::clock::GameMode;
@@ -50,14 +51,32 @@ fn reason(sim: &Simulation, floor: i64, x: i64) -> Option<String> {
     sim.tower.can_place(Kind::Lobby, floor, x).reason
 }
 
+/// The Sky Bridge tool's click on the gap, which must lay the bridge.
+fn lay(sim: &mut Simulation) {
+    let r = sim.build_skybridge(SKY, LEFT.end + 2);
+    assert!(r.ok, "{:?}", r.reason);
+}
+
+/// The first `n` tiles of the gap from the left wing, laid one by one as a
+/// save from before the Sky Bridge tool could hold them.
+fn half_bridge(sim: &mut Simulation, n: i64) {
+    for x in LEFT.end..LEFT.end + n {
+        assert!(sim.tower.place_as(Kind::Lobby, SKY, x, OverAir::Bridge).ok);
+    }
+}
+
+/// The price of one bridge tile: twice a lobby tile on bare ground.
+fn tile_price() -> f64 {
+    (Kind::Lobby.facility().cost + Kind::Floor.facility().cost) * SKYBRIDGE_PRICE_FACTOR
+}
+
 #[test]
 fn a_bridge_joins_two_wings_on_their_sky_lobby_floor() {
     let mut sim = towers(GameMode::Modern, GAP, SKY);
     let left = sim.tower.seg_at(SKY, Some(LEFT.start as f64));
     let right = sim.tower.seg_at(SKY, Some(right_wing(GAP).start as f64));
     assert_ne!(left, right, "two wings before the bridge");
-    let laid = sim.paint_brush(Kind::Lobby, SKY, &gap_tiles(GAP));
-    assert_eq!(laid.placed, GAP, "{:?}", laid.reason);
+    lay(&mut sim);
     assert!(gap_tiles(GAP)
         .into_iter()
         .all(|x| sim.tower.is_skybridge_tile(SKY, x)));
@@ -68,48 +87,156 @@ fn a_bridge_joins_two_wings_on_their_sky_lobby_floor() {
 }
 
 #[test]
+fn one_click_lays_the_whole_gap_and_charges_its_full_price() {
+    let mut sim = towers(GameMode::Modern, GAP, SKY);
+    // Any tile of the gap quotes the same bridge, wing to wing.
+    for x in [LEFT.end, LEFT.end + 5, LEFT.end + GAP - 1] {
+        let quote = sim.quote_skybridge(SKY, x);
+        assert!(quote.ok, "{:?}", quote.reason);
+        assert_eq!(quote.tiles, LEFT.end..LEFT.end + GAP);
+        assert_eq!(quote.cost, tile_price() * GAP as f64);
+    }
+    let money = sim.money;
+    sim.gameplay.drain();
+    lay(&mut sim);
+    assert_eq!(money - sim.money, tile_price() * GAP as f64);
+    let placed = sim.gameplay.drain();
+    assert_eq!(
+        placed,
+        vec![crate::gameplay::GameplayEvent::FacilityPlaced {
+            kind: Kind::Lobby,
+            floor: SKY,
+            count: GAP
+        }]
+    );
+}
+
+#[test]
+fn the_lobby_tool_lays_no_tile_over_open_air() {
+    let mut sim = towers(GameMode::Modern, GAP, SKY);
+    assert_eq!(
+        reason(&sim, SKY, LEFT.end).as_deref(),
+        Some(LOBBY_OVER_OPEN_AIR)
+    );
+    let brushed = sim.paint_brush(Kind::Lobby, SKY, &gap_tiles(GAP));
+    assert_eq!(brushed.placed, 0);
+    assert_eq!(brushed.reason.as_deref(), Some(LOBBY_OVER_OPEN_AIR));
+    // The quote the Lobby tool's ghost shows says the same.
+    let ghost = sim.can_build(Kind::Lobby, SKY, LEFT.end);
+    assert_eq!(ghost.reason.as_deref(), Some(LOBBY_OVER_OPEN_AIR));
+}
+
+#[test]
 fn classic_builds_no_bridge() {
     let sim = towers(GameMode::Classic, GAP, SKY);
     assert!(reason(&sim, SKY, LEFT.end).is_some_and(|r| r.contains("no floating overhangs")));
+    let quote = sim.quote_skybridge(SKY, LEFT.end);
+    assert_eq!(
+        quote.reason.as_deref(),
+        Some(crate::sim_skybridge_build::MODERN_ONLY)
+    );
+}
+
+#[test]
+fn the_sky_bridge_opens_at_three_stars() {
+    let mut sim = towers(GameMode::Modern, GAP, SKY);
+    sim.star = SKYBRIDGE_MIN_STAR - 1;
+    let quote = sim.quote_skybridge(SKY, LEFT.end);
+    assert_eq!(quote.reason.as_deref(), Some("Sky Bridge unlocks at 3★."));
+    assert!(!sim.build_skybridge(SKY, LEFT.end).ok);
+    assert!(sim.tower.unit_at(SKY, LEFT.end).is_none());
+    sim.star = SKYBRIDGE_MIN_STAR;
+    assert!(sim.quote_skybridge(SKY, LEFT.end).ok);
 }
 
 #[test]
 fn a_bridge_needs_a_sky_lobby_across_the_gap() {
     // The right wing stops below the sky lobby floor.
-    let sim = towers(GameMode::Modern, GAP, SKY - 1);
-    assert_eq!(
-        reason(&sim, SKY, LEFT.end).as_deref(),
-        Some(REACHES_A_LOBBY)
-    );
+    let mut sim = towers(GameMode::Modern, GAP, SKY - 1);
+    let quote = sim.quote_skybridge(SKY, LEFT.end);
+    assert_eq!(quote.reason.as_deref(), Some(REACHES_A_LOBBY));
+    assert!(quote.tiles.is_empty());
+    assert!(!sim.build_skybridge(SKY, LEFT.end).ok);
+    assert!(sim.tower.unit_at(SKY, LEFT.end).is_none());
 }
 
 #[test]
 fn a_bridge_spans_at_most_its_limit() {
     let mut sim = towers(GameMode::Modern, SKYBRIDGE_MAX_SPAN, SKY);
-    let laid = sim.paint_brush(Kind::Lobby, SKY, &gap_tiles(SKYBRIDGE_MAX_SPAN));
-    assert_eq!(laid.placed, SKYBRIDGE_MAX_SPAN, "{:?}", laid.reason);
+    lay(&mut sim);
+    assert!(sim
+        .tower
+        .is_skybridge_tile(SKY, LEFT.end + SKYBRIDGE_MAX_SPAN - 1));
     let sim = towers(GameMode::Modern, SKYBRIDGE_MAX_SPAN + 1, SKY);
-    assert_eq!(reason(&sim, SKY, LEFT.end).as_deref(), Some(SPAN_TOO_LONG));
+    let quote = sim.quote_skybridge(SKY, LEFT.end);
+    assert_eq!(quote.reason.as_deref(), Some(SPAN_TOO_LONG));
 }
 
 #[test]
-fn a_bridge_tile_hangs_from_a_lobby_beside_it() {
-    let sim = towers(GameMode::Modern, GAP, SKY);
+fn the_tool_points_only_at_open_air_on_a_sky_lobby_floor() {
+    let mut sim = towers(GameMode::Modern, GAP, SKY);
+    let refused = |sim: &Simulation, floor, x| sim.quote_skybridge(floor, x).reason;
     assert_eq!(
-        reason(&sim, SKY, LEFT.end + 3).as_deref(),
-        Some(STARTS_AT_A_LOBBY)
+        refused(&sim, SKY, LEFT.start).as_deref(),
+        Some(POINT_AT_THE_GAP)
     );
-    assert_eq!(reason(&sim, SKY, LEFT.end), None);
-    // Only sky lobby floors are crossed: a lobby can't go on floor 14 at
-    // all, and floor never goes over open air.
-    let floor = sim.tower.can_place(Kind::Floor, SKY - 1, LEFT.end);
-    assert!(!floor.ok);
+    assert_eq!(
+        refused(&sim, SKY - 1, LEFT.end).as_deref(),
+        Some(NOT_A_SKY_LOBBY_FLOOR)
+    );
+    assert_eq!(refused(&sim, SKY, -1).as_deref(), Some(POINT_AT_THE_GAP));
+    lay(&mut sim);
+    assert_eq!(
+        refused(&sim, SKY, LEFT.end + 3).as_deref(),
+        Some(ALREADY_BRIDGED)
+    );
+}
+
+#[test]
+fn a_bridge_the_money_does_not_cover_is_quoted_and_not_laid() {
+    let mut sim = towers(GameMode::Modern, GAP, SKY);
+    sim.money = tile_price() * GAP as f64 - 1.0;
+    let quote = sim.quote_skybridge(SKY, LEFT.end);
+    assert_eq!(quote.reason.as_deref(), Some("Not enough money."));
+    assert_eq!(
+        quote.tiles,
+        LEFT.end..LEFT.end + GAP,
+        "the ghost still shows the whole bridge"
+    );
+    assert_eq!(quote.cost, tile_price() * GAP as f64);
+    let money = sim.money;
+    assert!(!sim.build_skybridge(SKY, LEFT.end).ok);
+    assert_eq!(sim.money, money);
+    assert!(gap_tiles(GAP)
+        .into_iter()
+        .all(|x| sim.tower.unit_at(SKY, x).is_none()));
+}
+
+#[test]
+fn the_tool_finishes_a_half_bridge_for_its_missing_tiles() {
+    let mut sim = towers(GameMode::Modern, GAP, SKY);
+    half_bridge(&mut sim, 4);
+    // The two wings are not joined until the last tile goes in.
+    let left = sim.tower.seg_at(SKY, Some(LEFT.start as f64));
+    let right = sim.tower.seg_at(SKY, Some(right_wing(GAP).start as f64));
+    assert_ne!(left, right);
+    // Pointing at the half bridge or the open air past it quotes the rest.
+    for x in [LEFT.end + 1, LEFT.end + 6] {
+        let quote = sim.quote_skybridge(SKY, x);
+        assert_eq!(quote.tiles, LEFT.end + 4..LEFT.end + GAP);
+        assert_eq!(quote.cost, tile_price() * (GAP - 4) as f64);
+    }
+    let money = sim.money;
+    lay(&mut sim);
+    assert_eq!(money - sim.money, tile_price() * (GAP - 4) as f64);
+    let right = sim.tower.seg_at(SKY, Some(right_wing(GAP).start as f64));
+    assert_eq!(sim.tower.seg_at(SKY, Some(LEFT.start as f64)), right);
 }
 
 #[test]
 fn nothing_stands_on_a_bridge() {
     let mut sim = towers(GameMode::Modern, GAP, SKY);
-    sim.paint_brush(Kind::Lobby, SKY, &gap_tiles(GAP));
+    lay(&mut sim);
     let x = LEFT.end + 4;
     assert!(!sim.tower.can_place(Kind::Floor, SKY + 1, x).ok);
     assert!(!sim.tower.shaft_has_structure_at(SKY, x, 1));
@@ -122,17 +249,6 @@ fn nothing_stands_on_a_bridge() {
         .all(|&(floor, _)| floor != SKY + 1));
 }
 
-#[test]
-fn a_bridge_tile_costs_twice_a_lobby_tile() {
-    let sim = towers(GameMode::Modern, GAP, SKY);
-    let on_story = sim.can_build(Kind::Lobby, SKY + 15, LEFT.start).cost;
-    let bridge = sim.can_build(Kind::Lobby, SKY, LEFT.end);
-    assert!(bridge.ok, "{:?}", bridge.reason);
-    let bare = Kind::Lobby.facility().cost + Kind::Floor.facility().cost;
-    assert_eq!(bridge.cost, bare * SKYBRIDGE_PRICE_FACTOR);
-    assert!(bridge.cost > on_story);
-}
-
 fn sell(sim: &mut Simulation, x: i64) -> Option<String> {
     let id = sim.tower.unit_at(SKY, x).unwrap().id;
     sim.remove_facility(id, RemovalMethod::Bulldoze).reason
@@ -141,7 +257,7 @@ fn sell(sim: &mut Simulation, x: i64) -> Option<String> {
 #[test]
 fn the_bulldozer_takes_a_bridge_whole() {
     let mut sim = towers(GameMode::Modern, GAP, SKY);
-    sim.paint_brush(Kind::Lobby, SKY, &gap_tiles(GAP));
+    lay(&mut sim);
     // A wing's lobby tile stays while a bridge hangs from it.
     assert_eq!(
         sell(&mut sim, LEFT.end - 1).as_deref(),
@@ -165,16 +281,15 @@ fn the_bulldozer_takes_a_bridge_whole() {
 #[test]
 fn the_bulldozer_takes_a_half_bridge_to_its_open_end() {
     let mut sim = towers(GameMode::Modern, GAP, SKY);
-    let half: Vec<i64> = gap_tiles(GAP).into_iter().take(4).collect();
-    sim.paint_brush(Kind::Lobby, SKY, &half);
+    half_bridge(&mut sim, 4);
     assert_eq!(sell(&mut sim, LEFT.end + 3), None);
-    assert!(half.iter().all(|&x| sim.tower.unit_at(SKY, x).is_none()));
+    assert!((LEFT.end..LEFT.end + 4).all(|x| sim.tower.unit_at(SKY, x).is_none()));
 }
 
 #[test]
 fn nobody_is_left_on_open_air() {
     let mut sim = towers(GameMode::Modern, GAP, SKY);
-    sim.paint_brush(Kind::Lobby, SKY, &gap_tiles(GAP));
+    lay(&mut sim);
     // Someone walks along the bridge toward the left wing.
     let from = Some(LEFT.end + 2);
     let at = add(&mut sim.crowd, &sim.tower, SKY, SKY, from, Some(LEFT.start));
@@ -190,27 +305,18 @@ fn nobody_is_left_on_open_air() {
 }
 
 #[test]
-fn a_half_built_bridge_still_reaches_across() {
-    let mut sim = towers(GameMode::Modern, GAP, SKY);
-    let half: Vec<i64> = gap_tiles(GAP).into_iter().take(4).collect();
-    assert_eq!(sim.paint_brush(Kind::Lobby, SKY, &half).placed, 4);
-    // The two wings are not joined until the last tile goes in.
-    let left = sim.tower.seg_at(SKY, Some(LEFT.start as f64));
-    let right = sim.tower.seg_at(SKY, Some(right_wing(GAP).start as f64));
-    assert_ne!(left, right);
-    // The right wing builds out to meet it.
-    assert_eq!(reason(&sim, SKY, right_wing(GAP).start - 1), None);
-}
-
-#[test]
 fn a_bridge_beside_a_tall_hall_is_one_story() {
     let mut sim = towers(GameMode::Modern, GAP, SKY - 1);
     // The right wing's sky lobby rises two stories.
     let right: Vec<i64> = right_wing(GAP).collect();
     let tall = sim.with_lobby_height(2, |sim| sim.paint_brush(Kind::Lobby, SKY, &right));
     assert_eq!(tall.placed, right.len() as i64, "{:?}", tall.reason);
-    let laid = sim.paint_brush(Kind::Lobby, SKY, &gap_tiles(GAP));
-    assert_eq!(laid.placed, GAP, "{:?}", laid.reason);
+    // A one-story bridge tile costs the same beside it.
+    assert_eq!(
+        sim.quote_skybridge(SKY, LEFT.end).cost,
+        tile_price() * GAP as f64
+    );
+    lay(&mut sim);
     let next_to_hall = sim.tower.unit_at(SKY, right_wing(GAP).start - 1).unwrap();
     assert_eq!(sim.tower.unit_stories(next_to_hall), 1);
 }

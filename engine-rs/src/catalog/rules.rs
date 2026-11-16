@@ -74,4 +74,22 @@ pub struct Rules {
     /// What each rating starts asking of the tower, by the rating it begins
     /// at (`star_duties`): stable ids, with the words left to the frontend.
     pub star_duties: Vec<StarDuty>,
+    /// The Sky Bridge tool (`tower/skybridge.rs`), or null where the mode
+    /// builds no bridges (Classic, as in 1994).
+    pub sky_bridge: Option<SkyBridgeRule>,
+}
+
+/// What the Sky Bridge tool shows: when it opens, how far it reaches and
+/// what a tile costs. One click lays the whole gap between two sky lobbies;
+/// the engine's `quoteSkyBridge` prices a gap.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SkyBridgeRule {
+    /// The star rating the tool opens at.
+    pub min_star: i64,
+    /// The most tiles of open air one bridge spans.
+    pub max_span: i64,
+    /// The price of one bridge tile over open air: a bare lobby tile's
+    /// (the lobby's price plus the floor's) times the bridge's factor.
+    pub tile_cost: f64,
 }

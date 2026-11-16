@@ -100,9 +100,10 @@ const ECONOMY: Shape = {
   ticketPriceDefault: (v) => v === null || typeof v === "string",
   autoBridgeToggleable: bool,
 };
-const RULES: Shape = { variantHouseholds: bool, previewNamesRefusal: bool, scheduleAssist: bool, buildsWhilePaused: bool, exportsTo1994: bool, quotesLobbyDistance: bool, tallSkyLobbies: bool, maxLobbyHeight: size, decorativePassersBy: bool, shadedLook: bool, venueFlights: bool, frontDoorPerTower: bool, expressStopsOn15thFloors: bool, fedUpWait: positive, announcesStarDuties: bool, starDuties: Array.isArray };
+const RULES: Shape = { variantHouseholds: bool, previewNamesRefusal: bool, scheduleAssist: bool, buildsWhilePaused: bool, exportsTo1994: bool, quotesLobbyDistance: bool, tallSkyLobbies: bool, maxLobbyHeight: size, decorativePassersBy: bool, shadedLook: bool, venueFlights: bool, frontDoorPerTower: bool, expressStopsOn15thFloors: bool, fedUpWait: positive, announcesStarDuties: bool, starDuties: Array.isArray, skyBridge: (v) => v === null || isRecord(v) };
 const STAR_DUTY: Shape = { star: size, id: oneOf("emergencies", "suiteParking", "officeParking", "homeParking", "recycling", "vipVisits", "hotelGuestsUncounted", "bombThreats") };
 const EXTERMINATOR: Shape = { calloutFee: amount, perRoomFee: amount };
+const SKY_BRIDGE: Shape = { minStar: count, maxSpan: size, tileCost: amount };
 const FILM: Shape = { key: (v) => v === "new" || v === "classic" || v === "blockbuster", label: (v) => typeof v === "string", price: amount };
 const TICKET_PRICE: Shape = { key: text, label: text, incomeMult: positive, pickMult: positive };
 const FILM_REBOOK: Shape = { policy: (v) => typeof v === "string", film: (v) => v === null || v === "new" || v === "classic" || v === "blockbuster" };
@@ -221,6 +222,7 @@ function checkCatalog(c: Record<string, unknown>): void {
   calendars.forEach((cal, i) => checkShape(cal, CALENDAR, `economy.calendars[${i}]`));
   const rules = checkShape(c.rules, RULES, "rules");
   (rules.starDuties as unknown[]).forEach((d, i) => checkShape(d, STAR_DUTY, `rules.starDuties[${i}]`));
+  if (rules.skyBridge !== null) checkShape(rules.skyBridge, SKY_BRIDGE, "rules.skyBridge");
 
   const facilities = c.facilities as unknown[];
   if (facilities.length === 0) refuse("facilities", "no facility");

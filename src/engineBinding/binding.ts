@@ -58,6 +58,8 @@ export const INSTANCE_METHODS = [
   "undo", "redo", "undoNotice", "undoDepths", "drainEvents", "eventText",
   "setBackdrop", "unitMetaChanged", "unitLabel", "unitSubtype", "logAfter", "logText", "logLine",
   "scheduleShaft",
+  // The Sky Bridge tool (Modern, 2026-11-16).
+  "buildSkyBridge", "quoteSkyBridge",
   // PR 1c's panel queries.
   "heatCells", "crewCoverage", "unitCard", "shaftCard", "personCard",
   // PR 1d's report queries and file members.

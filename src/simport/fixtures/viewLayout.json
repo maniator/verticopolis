@@ -1,5 +1,5 @@
 {
-  "version": 27,
+  "version": 28,
   "header": {
     "minutes": 0,
     "towerRevision": 1,
@@ -246,6 +246,11 @@
       "delta",
       "placed"
     ],
+    "buildSkyBridge": [
+      "status",
+      "delta",
+      "tiles"
+    ],
     "buildShaft": [
       "status",
       "delta"
@@ -387,6 +392,12 @@
     ],
     "quoteShaft": [
       "ok"
+    ],
+    "quoteSkyBridge": [
+      "ok",
+      "cost",
+      "from",
+      "to"
     ],
     "quoteRentBatch": [
       "ok",

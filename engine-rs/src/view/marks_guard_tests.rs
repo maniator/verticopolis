@@ -421,14 +421,14 @@ fn the_brush_fills_only_an_emptied_slot() {
     );
     assert!(take.contains("self.settle_removals("), "{take}");
     assert!(body(removal, "settle_removals").contains("self.revision+=gone.len()as i64;"));
-    // `place` is the one caller, and its slot is `take_floor_slot`'s or none.
+    // `place_as` (behind `place`) is the one caller, and its slot is `take_floor_slot`'s or none.
     let callers: Vec<&str> = sources
         .iter()
         .filter(|s| s.code.contains(".add_unit("))
         .map(|s| s.rel.as_str())
         .collect();
     assert_eq!(callers, ["tower/placement.rs"]);
-    let place = body(code("tower/placement.rs"), "place");
+    let place = body(code("tower/placement.rs"), "place_as");
     assert_eq!(place.matches(".add_unit(").count(), 1);
     assert!(place.contains("self.add_unit(unit,slot)"));
     assert_eq!(place.matches("slot=").count(), 2, "{place}");
