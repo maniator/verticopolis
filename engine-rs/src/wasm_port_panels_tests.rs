@@ -261,13 +261,10 @@ fn the_shaft_card_is_the_transport_detail() {
     e.port_mark_stop(id as f64, 2.0, false);
     e.sim.telemetry.util.insert(id, 0.25);
     let hours: Vec<f64> = (0..24).map(f64::from).collect();
-    e.sim.telemetry.hourly.insert(
-        id,
-        HourlyByDay {
-            weekday: hours.clone(),
-            weekend: hours,
-        },
-    );
+    e.sim
+        .telemetry
+        .hourly
+        .insert(id, HourlyByDay::measured(hours.clone(), hours));
     let mut rings = OriginRings::empty();
     let mut slot = IndexMap::new();
     slot.insert(1, 2.5);

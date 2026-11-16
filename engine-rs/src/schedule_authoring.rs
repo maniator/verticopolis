@@ -95,19 +95,19 @@ impl AutoTuneProposal {
     }
 }
 
-/// The hours of a day's ring with a measured load, the count the warm gate
-/// reads.
-fn sampled_hours(curve: &[f64]) -> usize {
-    curve.iter().filter(|v| **v > 0.0).count()
+/// The hours of a day's ring that have been sampled, a measured zero
+/// included (#474): the count the warm gate reads.
+fn sampled_hours(sampled: &[bool]) -> usize {
+    sampled.iter().filter(|s| **s).count()
 }
 
 /// The ring when the day is warm, for a caller that only reads it.
-pub(crate) fn warm_curve(curve: &[f64]) -> Option<&[f64]> {
-    (sampled_hours(curve) >= WARMED_MIN_HOURS).then_some(curve)
+pub(crate) fn warm_curve<'a>((curve, sampled): (&'a [f64], &[bool])) -> Option<&'a [f64]> {
+    (sampled_hours(sampled) >= WARMED_MIN_HOURS).then_some(curve)
 }
 
-pub(crate) fn readiness(curve: &[f64]) -> DayReadiness {
-    let sampled = sampled_hours(curve);
+pub(crate) fn readiness((curve, sampled): (&[f64], &[bool])) -> DayReadiness {
+    let sampled = sampled_hours(sampled);
     let warm = sampled >= WARMED_MIN_HOURS;
     DayReadiness {
         warm,
@@ -193,12 +193,9 @@ impl Simulation {
         if !t.kind.is_elevator() {
             return AutoTuneProposal::refused(ProposalStatus::NotAnElevator);
         }
-        let empty = HourlyByDay {
-            weekday: Vec::new(),
-            weekend: Vec::new(),
-        };
+        let empty = HourlyByDay::default();
         let rings = self.telemetry.hourly.get(&id).unwrap_or(&empty);
-        let (wd, we) = (readiness(&rings.weekday), readiness(&rings.weekend));
+        let (wd, we) = (readiness(rings.day(false)), readiness(rings.day(true)));
         // Readiness is the shaft's, whatever the mode offers: the Classic grid
         // still shows a measured curve, it just gets no proposal.
         let unavailable = if !self.mode.schedule_assist() {

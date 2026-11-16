@@ -791,9 +791,10 @@ so the spec and the build cannot drift silently:
   hint above.
 - **Stop edits do not arm the discard guard**: they apply live with their own undo steps, so
   Cancel could not honestly take them back; the guard covers only the schedule working copy.
-- **Known ghost limit**: the demand accumulator cannot tell "measured zero" from "hour not
-  yet sampled", so an unsampled hour draws no dash rather than a zero dash. Tracked as
-  `schedule-ring-sampled-mask` (#474).
+- **Measured zero (#474)**: each demand ring keeps the hours it has sampled, so an hour
+  measured at zero load counts toward the warm-up gate. A dead weekend warms after six
+  sampled hours and draws zero-height dashes, and Auto-tune can tune its row down. A warm
+  day's hours that are not yet sampled still draw a zero dash.
 - **Origin accumulator (#465, v1.61.0)**: the dispatcher tallies boardings by origin floor
   at its board site (only at stops with a live call, so a homecoming car cannot credit its
   own home floor and feed the staging aim back into itself); `sampleElevatorUtil` drains the

@@ -382,3 +382,40 @@ fn a_shaft_with_no_cars_gets_its_own_status_with_readiness_filled_in() {
         ProposalStatus::UnavailableInMode
     );
 }
+
+/// A day with no traffic at all still warms once it has been sampled long
+/// enough, so Auto-tune can tune a dead weekend down from measurement (#474),
+/// and the telemetry document carries the sampled hours across a seed.
+#[test]
+fn a_sampled_day_with_no_traffic_warms_and_round_trips() {
+    let (mut sim, id) = tower(GameMode::Modern, 4);
+    let cal = sim.clock.calendar;
+    let weekend_day = (cal.week_days - cal.weekend_days) as f64;
+    for hour in 8..8 + WARMED_MIN_HOURS {
+        sim.clock.minutes = weekend_day * 1440.0 + hour as f64 * 60.0;
+        assert!(sim.clock.is_weekend());
+        sim.sample_elevator_util();
+    }
+    let p = sim.auto_tune_proposal(id, None, true);
+    assert_eq!(
+        p.weekend,
+        DayReadiness {
+            warm: true,
+            sampled_hours: WARMED_MIN_HOURS,
+            curve: Some(vec![0.0; 24])
+        },
+        "six sampled hours of an empty shaft are a measured, warm day"
+    );
+    assert_eq!(
+        p.weekday.sampled_hours, 0,
+        "the weekday ring was never sampled"
+    );
+    assert_eq!(p.status, ProposalStatus::Available);
+
+    let doc: serde_json::Value = sim.telemetry_json();
+    let (mut copy, copy_id) = tower(GameMode::Modern, 4);
+    assert_eq!(copy_id, id);
+    copy.seed_telemetry(&doc)
+        .expect("the engine's own document");
+    assert_eq!(copy.auto_tune_proposal(id, None, true).weekend, p.weekend);
+}
