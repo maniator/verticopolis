@@ -6,6 +6,7 @@
 //! (`housekeeping_shift.rs`) decides where they go next.
 
 use super::doors::{passenger_joins, tiles_nearest};
+use super::fasthash::FastMap;
 use super::motion::{finish, release_seat};
 use super::spawn::{make_person, seed_for};
 use super::{Crowd, PState, Route, StaffResult};
@@ -71,9 +72,52 @@ pub fn way_on(
     })
 }
 
-/// Bring one housekeeper of the crew at (`floor`, `x`) in from the lobby.
-/// False when no route leads from the lobby to the housekeeping room.
-pub fn spawn_commuter(crowd: &mut Crowd, tower: &Tower, crew_id: i64, floor: i64, x: f64) -> bool {
+/// How many housekeepers wait for each shaft on each floor, keyed by
+/// (floor, shaft): what `spawn_commuter` reads to keep a crew in step with
+/// the car it would board. Guests are left out: on a commute by the guests'
+/// elevator their line is no crew's doing, and a crew held behind it would
+/// never come in.
+pub type Queues = FastMap<(i64, i64), i64>;
+
+/// The housekeepers' queue at every shaft, from one walk over the crowd.
+pub fn queues(crowd: &Crowd) -> Queues {
+    let mut q = Queues::default();
+    for p in &crowd.people {
+        if p.staff && matches!(p.state, PState::Waiting | PState::ToShaft) {
+            if let Some(&sid) = p.shafts.get(p.leg) {
+                let n = q.get(&(p.floor, sid)).copied().unwrap_or(0);
+                q.insert((p.floor, sid), n + 1);
+            }
+        }
+    }
+    q
+}
+
+/// What bringing a housekeeper in came to.
+#[derive(Debug, PartialEq, Eq)]
+pub enum BringIn {
+    /// On the way in from the lobby.
+    Coming,
+    /// Kept out for now: an elevator on their way in already has housekeepers
+    /// enough to fill every car waiting for it on the floor they would board
+    /// (#2332).
+    /// They come at a later hour, as the queue clears.
+    Held,
+    /// No route leads from the lobby to the housekeeping room.
+    NoRoute,
+}
+
+/// Bring one housekeeper of the crew at (`floor`, `x`) in from the lobby,
+/// unless an elevator on the way already has a full load waiting for it in
+/// `queues`, which counts them once they come.
+pub fn spawn_commuter(
+    crowd: &mut Crowd,
+    tower: &Tower,
+    queues: &mut Queues,
+    crew_id: i64,
+    floor: i64,
+    x: f64,
+) -> BringIn {
     // Where the new person will stand, as `add` picks it for a visitor: on
     // a lot with several separate towers, the lobby nearest the
     // housekeeping room that a route leads from.
@@ -93,8 +137,27 @@ pub fn spawn_commuter(crowd: &mut Crowd, tower: &Tower, crew_id: i64, floor: i64
         }
     }
     let Some((r, street_x)) = found else {
-        return false;
+        return BringIn::NoRoute;
     };
+    // Only a car has a load to fill; stairs carry anyone who comes.
+    let lifts = || {
+        r.floors
+            .iter()
+            .copied()
+            .zip(r.shafts.iter().copied())
+            .filter_map(|(from, sid)| {
+                let t = tower.get_transport(sid).filter(|t| t.kind.is_elevator())?;
+                Some(((from, sid), t.cars as f64 * t.kind.car_capacity()))
+            })
+    };
+    let waiting = |queues: &Queues, leg| queues.get(&leg).copied().unwrap_or(0);
+    if lifts().any(|(leg, load)| waiting(queues, leg) as f64 >= load) {
+        return BringIn::Held;
+    }
+    for (leg, _) in lifts() {
+        let n = waiting(queues, leg);
+        queues.insert(leg, n + 1);
+    }
     let i = make_person(crowd, tower, r, x, Some(street_x));
     let p = &mut crowd.people[i];
     p.staff = true;
@@ -102,7 +165,7 @@ pub fn spawn_commuter(crowd: &mut Crowd, tower: &Tower, crew_id: i64, floor: i64
     p.staff_trip = Some(StaffTrip::In);
     crowd.staff_count += 1;
     *crowd.crew_roster.entry(crew_id).or_insert(0) += 1;
-    true
+    BringIn::Coming
 }
 
 /// Send housekeeper `i` from where they stand to (`floor`, `x`) as `trip`.

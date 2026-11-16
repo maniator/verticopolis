@@ -2,7 +2,8 @@
 //! the 16:30 cutoff, Modern from 08:00), the staff network of service
 //! elevators and stairs (escalators carry no staff), six maids per crew and
 //! one per floor at a time cycling through a floor's rooms, the crew that
-//! walks in from the lobby at the start of the shift, and the cleaning
+//! walks in from the lobby at the start of the shift (no faster than the
+//! cars can carry it), and the cleaning
 //! dwell. Crew choice and order
 //! on a split network are covered by `housekeeping_dispatch_tests`; the
 //! morning checkout latch by `housekeeping::tests::the_morning_checkout_latches_yesterdays_shift`.
@@ -206,6 +207,66 @@ fn a_crew_the_lobby_cannot_reach_stays_home_with_a_note() {
         .iter()
         .filter(|e| e.text.contains("can't get from the lobby"));
     assert_eq!(notes.count(), 1, "one note a day");
+}
+
+/// Four crews over one small car: a crew comes in only as far as one load
+/// of every car can carry from the lobby, and the rest follow at a later
+/// hour, so no queue outgrows the cars (#2332).
+#[test]
+fn crews_come_in_no_faster_than_the_car_can_carry_them() {
+    let mut sim = seeded_game(41, GameMode::Classic);
+    sim.star = 2;
+    for floor in 2..=5 {
+        slab(&mut sim, floor);
+        place(&mut sim, Kind::Housekeeping, floor, X0 + 8);
+    }
+    let built = sim.build_transport(Kind::ElevatorStandard, X0 + 26, 1, 5);
+    assert!(built.ok);
+    let car = sim.tower.transports.last().unwrap();
+    let load = (car.cars as f64 * car.kind.car_capacity()) as usize;
+    let all = 4 * HK_MAIDS_PER_UNIT as usize;
+    assert!(load < all, "the test needs more maids than one load");
+    sim.clock.minutes = 12.0 * HOUR;
+    sim.bring_in_crews();
+    assert_eq!(maids(&sim), load, "one load of the car, no more");
+    let notes = |sim: &Simulation| {
+        sim.log
+            .iter()
+            .filter(|e| e.text.contains("coming in late"))
+            .count()
+    };
+    assert_eq!(notes(&sim), 1, "the bulletin says why");
+    sim.bring_in_crews();
+    assert_eq!(maids(&sim), load, "still held while the first load waits");
+    assert_eq!(notes(&sim), 1, "one note a day");
+    hours(&mut sim, 2);
+    let rostered: i64 = sim.crowd.crew_roster.values().sum();
+    assert_eq!(
+        rostered as usize, all,
+        "the rest come once the queue clears"
+    );
+}
+
+/// A crew whose only way in is the guests' elevator still comes in behind a
+/// long line of guests: only housekeepers count toward the hold.
+#[test]
+fn a_line_of_guests_never_holds_a_crew_out() {
+    let mut sim = base_tower(42, GameMode::Classic);
+    let crew = place(&mut sim, Kind::Housekeeping, 2, X0 + 8);
+    let car = sim.tower.transports.last().unwrap();
+    let load = (car.cars as f64 * car.kind.car_capacity()) as usize;
+    for _ in 0..=load {
+        let Simulation {
+            ref mut crowd,
+            ref tower,
+            ..
+        } = sim;
+        crate::crowd::spawn::add(crowd, tower, 1, 2, None, Some(X0 + 20)).expect("a way up");
+    }
+    sim.clock.minutes = 12.0 * HOUR;
+    sim.bring_in_crews();
+    assert_eq!(sim.crowd.crew_roster.get(&crew), Some(&HK_MAIDS_PER_UNIT));
+    assert!(!sim.log.iter().any(|e| e.text.contains("coming in late")));
 }
 
 #[test]

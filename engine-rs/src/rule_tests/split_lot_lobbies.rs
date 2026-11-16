@@ -6,7 +6,7 @@
 //! (`crowd::doors`).
 use crate::clock::{CalendarKind, GameMode};
 use crate::crowd::spawn::{add, pick_x};
-use crate::crowd::staff_shift::{send_out, spawn_commuter, STREET_FLOOR};
+use crate::crowd::staff_shift::{send_out, spawn_commuter, BringIn, Queues, STREET_FLOOR};
 use crate::crowd::PState;
 use crate::facilities::Kind;
 use crate::sim::Simulation;
@@ -254,7 +254,7 @@ fn housekeepers_come_and_go_by_the_lobby_under_their_room() {
                 ..
             } = sim;
             assert!(
-                spawn_commuter(crowd, tower, 1, 3, x),
+                spawn_commuter(crowd, tower, &mut Queues::default(), 1, 3, x) == BringIn::Coming,
                 "{mode:?}: in to tower {k}"
             );
             let i = crowd.people.len() - 1;
@@ -294,7 +294,10 @@ fn housekeepers_take_the_service_elevator_from_their_own_lobby() {
             ref mut tower,
             ..
         } = sim;
-        assert!(spawn_commuter(crowd, tower, 1, 3, x), "{mode:?}");
+        assert!(
+            spawn_commuter(crowd, tower, &mut Queues::default(), 1, 3, x) == BringIn::Coming,
+            "{mode:?}"
+        );
         let i = crowd.people.len() - 1;
         assert_eq!(crowd.people[i].shafts, [service], "{mode:?}: staff first");
         assert_eq!(tower_of(crowd.people[i].start_x), 2, "{mode:?}");
