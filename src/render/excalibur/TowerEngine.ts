@@ -85,7 +85,7 @@ export class TowerEngine {
   // Set by the controller each frame; rendered by the overlay. `reason` is the
   // refusal string (only when `valid` is false AND the tower's catalog says the
   // preview names a refusal, `rules.previewNamesRefusal`; presentation only).
-  preview: { kind: FacilityKind; floor: number; x: number; valid: boolean; span?: number; reason?: string; stories?: number } | null = null;
+  preview: { kind: FacilityKind; floor: number; x: number; valid: boolean; span?: number; reason?: string; stories?: number; label?: string } | null = null;
   transportPreview: { kind: FacilityKind; x: number; bottom: number; top: number; valid: boolean } | null = null;
   selectedId: number | null = null;
 

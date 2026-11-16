@@ -3,6 +3,7 @@ import { bulldozeToolInfo, INSPECT_TOOL_INFO, toolInfoFor } from "./templates/to
 import { bulldozePickerFor, syncBulldozeDragStrip } from "./bulldozeDragStrip";
 import { lobbyPickerFor, syncLobbyHeightStrip } from "./lobbyHeightStrip";
 import type { Tool, UI } from "./UI";
+import { skyBridgeToolInfo } from "./skyBridgePalette";
 
 /** Draw `tool`'s card into the tool-info panel and show the strip that
  *  belongs to it: the Lobby tool's height, or what a bulldoze drag clears.
@@ -13,6 +14,7 @@ import type { Tool, UI } from "./UI";
 export function renderToolCard(ui: Pick<UI, "cb" | "tool" | "el">, tool: Tool): void {
   let card: TemplateResult;
   if (tool.type === "build") card = toolInfoFor(ui.cb.getCatalog(), tool.kind, lobbyPickerFor(ui));
+  else if (tool.type === "skyBridge") card = skyBridgeToolInfo(ui.cb.getCatalog().rules.skyBridge);
   else card = tool.type === "bulldoze" ? bulldozeToolInfo(bulldozePickerFor(ui)) : INSPECT_TOOL_INFO;
   render(card, ui.el.toolInfo);
   ui.el.toolInfo.title = cardNotes(ui.el.toolInfo);

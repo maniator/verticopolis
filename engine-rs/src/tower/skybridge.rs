@@ -4,23 +4,32 @@
 //! walkable floor and routing needs nothing new. What makes a tile a bridge
 //! tile is only where it stands: a lobby tile with no story under it.
 //!
+//! A bridge goes in whole, with the Sky Bridge tool (party, 2026-11-16): one
+//! click on the open air between two sky lobbies lays every tile of the gap
+//! ([`Tower::skybridge_span`], `Simulation::build_skybridge`), and the Lobby
+//! tool lays no tile over open air ([`LOBBY_OVER_OPEN_AIR`]). The gap needs a
+//! sky lobby on each side within [`SKYBRIDGE_MAX_SPAN`] tiles, so a bridge
+//! never juts into the sky. A half bridge from a save made before the tool
+//! loads as it was, and the tool finishes it, laying only its missing tiles.
+//!
 //! A bridge carries nothing: no story stands on it and no shaft lands on
-//! it. A bridge tile goes in beside a lobby tile, and only across a gap
-//! that a sky lobby closes on the far side within [`SKYBRIDGE_MAX_SPAN`]
-//! tiles, so a bridge never juts into the sky. While one is half built, each
-//! piece hangs from the wing it started from. A bridge is one story high,
-//! beside a tall lobby hall too. The bulldozer takes a bridge whole, every
-//! tile from wing to wing (or to a half bridge's open end), so it never cuts
-//! one in two, and only while nobody is crossing it
-//! (`Simulation::remove_skybridge`); it leaves a wing's lobby tile standing
-//! while a bridge hangs from it. Classic has no bridges, as in 1994
-//! (`GameMode::builds_skybridges`).
+//! it. A bridge is one story high, beside a tall lobby hall too. The
+//! bulldozer takes a bridge whole, every tile from wing to wing (or to a half
+//! bridge's open end), so it never cuts one in two, and only while nobody is
+//! crossing it (`Simulation::remove_skybridge`); it leaves a wing's lobby
+//! tile standing while a bridge hangs from it. Classic has no bridges, as in
+//! 1994 (`GameMode::builds_skybridges`).
 
 use super::{Tower, Unit};
 use crate::facilities::{is_sky_lobby_floor, Kind, LOT_WIDTH};
 
 /// The most tiles of open air one bridge spans, wall to wall.
 pub const SKYBRIDGE_MAX_SPAN: i64 = 24;
+
+/// The star rating the Sky Bridge tool opens at, the Express Elevator's
+/// (party, 2026-11-16): a bridge between sky lobbies pays off once
+/// expresses carry people up to them.
+pub const SKYBRIDGE_MIN_STAR: i64 = 3;
 
 /// What a bridge tile costs against a lobby tile on a story: a bridge is
 /// built out over the street, so it costs twice as much.
@@ -36,6 +45,43 @@ pub(crate) const REACHES_A_LOBBY: &str =
 
 /// The refusal for a gap wider than a bridge spans.
 pub(crate) const SPAN_TOO_LONG: &str = "A sky bridge spans at most 24 tiles of open air.";
+
+/// The Lobby tool's refusal for a tile over open air on a floor a bridge
+/// may cross: only the Sky Bridge tool lays one, and it lays the gap whole.
+pub(crate) const LOBBY_OVER_OPEN_AIR: &str =
+    "A lobby can't hang over open air. To join two sky lobbies, use the Sky Bridge tool.";
+
+/// The Sky Bridge tool's refusal off the open air between two wings.
+pub(crate) const POINT_AT_THE_GAP: &str =
+    "A sky bridge crosses open air. Point at the gap between two sky lobbies.";
+
+/// The Sky Bridge tool's refusal on a floor no bridge may cross.
+pub(crate) const NOT_A_SKY_LOBBY_FLOOR: &str =
+    "A sky bridge goes on a sky lobby floor (15, 30, 45…).";
+
+/// The Sky Bridge tool's refusal over a finished bridge.
+pub(crate) const ALREADY_BRIDGED: &str = "This sky bridge is already finished.";
+
+/// How a placement treats a lobby tile over open air on a floor a bridge
+/// may cross.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum OverAir {
+    /// The Lobby tool: refused with [`LOBBY_OVER_OPEN_AIR`].
+    Refuse,
+    /// The Sky Bridge tool, laying a gap [`Tower::skybridge_span`] checked.
+    Bridge,
+}
+
+/// The bridge one click of the Sky Bridge tool lays.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SkybridgeSpan {
+    /// The gap's columns, from the tile after one wing's sky lobby to the
+    /// tile before the other's.
+    pub cols: std::ops::Range<i64>,
+    /// The columns in the gap with no tile yet, left to right: the whole gap
+    /// for a new bridge, the missing part of a half bridge.
+    pub missing: Vec<i64>,
+}
 
 /// The refusal for selling a wing's lobby tile that a bridge hangs from.
 pub(crate) const BRIDGE_HANGS_HERE: &str =
@@ -156,12 +202,34 @@ impl Tower {
         (x..x + w).any(|c| self.is_skybridge_tile(floor, c))
     }
 
-    /// Why a lobby tile can't go over open air at (`floor`, `x`) as a sky
-    /// bridge, or `None` when it can. Only asked for a lobby tile with no
-    /// story under it on a floor a bridge may cross.
-    pub(crate) fn skybridge_reason(&self, floor: i64, x: i64, w: i64) -> Option<&'static str> {
+    /// The bridge the Sky Bridge tool lays for a click at (`floor`, `x`),
+    /// or why it lays none: `x` must be open air, or a half bridge's tile,
+    /// on a floor a bridge may cross, in a gap with a wing's sky lobby on
+    /// each side within [`SKYBRIDGE_MAX_SPAN`] tiles. It looks at most twice
+    /// that span each way, as a tile's own check does.
+    pub fn skybridge_span(&self, floor: i64, x: i64) -> Result<SkybridgeSpan, &'static str> {
+        if !self.bridges_floor(floor) || !self.lot().holds_floor(floor) {
+            return Err(NOT_A_SKY_LOBBY_FLOOR);
+        }
         let row = self.bridge_row(floor);
-        (x..x + w).find_map(|c| row.fault(c))
+        let open = (row.kind_at)(x).is_none() && !(row.rests)(x);
+        if !(0..LOT_WIDTH).contains(&x) || !(open || row.is_bridge(x)) {
+            return Err(POINT_AT_THE_GAP);
+        }
+        let left = row.far_anchor(x, -1)?;
+        let right = row.far_anchor(x, 1)?;
+        if right - left - 1 > SKYBRIDGE_MAX_SPAN {
+            return Err(SPAN_TOO_LONG);
+        }
+        let cols = left + 1..right;
+        let missing: Vec<i64> = cols
+            .clone()
+            .filter(|&c| (row.kind_at)(c).is_none())
+            .collect();
+        if missing.is_empty() {
+            return Err(ALREADY_BRIDGED);
+        }
+        Ok(SkybridgeSpan { cols, missing })
     }
 
     /// The columns of the whole bridge that lobby tile `u` is part of, or

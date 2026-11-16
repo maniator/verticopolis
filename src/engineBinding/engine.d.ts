@@ -76,6 +76,12 @@ export class Engine {
     buildAt(kind: number, floor: number, x: number): Float64Array;
     buildShaft(kind: number, x: number, bottom: number, top: number): Float64Array;
     /**
+     * `buildSkyBridge(floor, x)` (Modern): lays the whole sky bridge a
+     * click at the cell asks for, every missing tile of the gap between
+     * two sky lobbies, or nothing. `[status, delta, tiles]`.
+     */
+    buildSkyBridge(floor: number, x: number): Float64Array;
+    /**
      * `buildTransport(kind, x, bottom, top)`: JSON `{ ok, reason? }`. An
      * unknown kind is refused with "Unknown facility.".
      */
@@ -390,6 +396,12 @@ export class Engine {
     quoteBuild(kind: number, floor: number, x: number): Float64Array;
     quoteRentBatch(kind: number, target: number, only_default: boolean): Float64Array;
     quoteShaft(kind: number, x: number, bottom: number, top: number): Float64Array;
+    /**
+     * `quoteSkyBridge(floor, x)` (Modern): `[ok, cost, from, to]`, the
+     * tiles `from..to` a click would lay and their full price, for the
+     * tool's ghost; a refusal's text is `lastReason()`.
+     */
+    quoteSkyBridge(floor: number, x: number): Float64Array;
     recyclingCapacity(): number;
     recyclingDemandMet(): boolean;
     recyclingFill(): number;

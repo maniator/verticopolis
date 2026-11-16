@@ -1,6 +1,7 @@
 //! Placing rooms and structure, and the support rules behind it.
 
 use super::removal::GROUND_FLOOR;
+use super::skybridge::{OverAir, LOBBY_OVER_OPEN_AIR};
 use super::{PlaceResult, Tower, Unit, UnitState};
 use crate::facilities::*;
 
@@ -147,6 +148,18 @@ impl Tower {
     }
 
     pub fn can_place(&self, kind: Kind, floor: i64, x: i64) -> PlaceResult {
+        self.can_place_as(kind, floor, x, OverAir::Refuse)
+    }
+
+    /// [`Self::can_place`], with a lobby tile over open air on a floor a
+    /// bridge may cross laid as `over_air` says.
+    pub(crate) fn can_place_as(
+        &self,
+        kind: Kind,
+        floor: i64,
+        x: i64,
+        over_air: OverAir,
+    ) -> PlaceResult {
         let f = kind.facility();
         if !self.lot().holds_floor(floor) {
             return PlaceResult::fail("Outside the buildable range.");
@@ -177,8 +190,8 @@ impl Tower {
             }
             let bridge = kind == Kind::Lobby && self.bridges_floor(floor);
             if bridge && !self.is_supported(floor, x, f.width) {
-                if let Some(r) = self.skybridge_reason(floor, x, f.width) {
-                    return PlaceResult::fail(r);
+                if over_air == OverAir::Refuse {
+                    return PlaceResult::fail(LOBBY_OVER_OPEN_AIR);
                 }
             } else if !self.is_supported(floor, x, f.width) && !self.opens_ground_lobby(kind, floor)
             {
@@ -245,7 +258,18 @@ impl Tower {
     // ---- mutation --------------------------------------------------------
 
     pub fn place(&mut self, kind: Kind, floor: i64, x: i64) -> PlaceResult {
-        let check = self.can_place(kind, floor, x);
+        self.place_as(kind, floor, x, OverAir::Refuse)
+    }
+
+    /// [`Self::place`], with a lobby tile over open air laid as `over_air` says.
+    pub(crate) fn place_as(
+        &mut self,
+        kind: Kind,
+        floor: i64,
+        x: i64,
+        over_air: OverAir,
+    ) -> PlaceResult {
+        let check = self.can_place_as(kind, floor, x, over_air);
         if !check.ok {
             return check;
         }

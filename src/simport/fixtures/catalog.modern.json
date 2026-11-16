@@ -2444,6 +2444,11 @@
     "quotesLobbyDistance": true,
     "scheduleAssist": true,
     "shadedLook": true,
+    "skyBridge": {
+      "maxSpan": 24,
+      "minStar": 3,
+      "tileCost": 11000
+    },
     "starDuties": [
       {
         "id": "emergencies",
@@ -2482,7 +2487,7 @@
     "variantHouseholds": true,
     "venueFlights": true
   },
-  "version": 23,
+  "version": 24,
   "world": {
     "groundFloor": 1,
     "groundFloorStructure": "lobby",

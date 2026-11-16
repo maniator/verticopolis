@@ -48,6 +48,7 @@ import { VENUE_FLIGHT_SCENES } from "./scenes/venueFlights.ts";
 import { PALETTE_FIT_SCENES } from "./scenes/paletteFit.ts";
 import { SPLIT_LOT_SCENES } from "./scenes/splitLot.ts";
 import { FRONT_DOOR_SCENES } from "./scenes/frontDoors.ts";
+import { SKY_BRIDGE_SCENES } from "./scenes/skyBridge.ts";
 import { LINKED_FOLDER_SCENES } from "./scenes/linkedFolder.ts";
 import { OPEN_RECENT_SCENES } from "./scenes/openRecent.ts";
 import { DESK_SCENES } from "./scenes/desk.ts";
@@ -72,6 +73,7 @@ export const SCENES: Scene[] = [
   ...VENUE_FLIGHT_SCENES,
   ...PALETTE_FIT_SCENES,
   ...SPLIT_LOT_SCENES,
+  ...SKY_BRIDGE_SCENES,
   ...LINKED_FOLDER_SCENES,
   ...OPEN_RECENT_SCENES,
   ...DESK_SCENES,

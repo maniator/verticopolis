@@ -8,6 +8,22 @@ use super::{err, Engine};
 
 #[wasm_bindgen]
 impl Engine {
+    /// `buildSkyBridge(floor, x)` (Modern): lays the whole sky bridge a
+    /// click at the cell asks for, every missing tile of the gap between
+    /// two sky lobbies, or nothing. `[status, delta, tiles]`.
+    #[wasm_bindgen(js_name = buildSkyBridge)]
+    pub fn build_sky_bridge(&mut self, floor: f64, x: f64) -> Vec<f64> {
+        self.port_build_skybridge(floor, x)
+    }
+
+    /// `quoteSkyBridge(floor, x)` (Modern): `[ok, cost, from, to]`, the
+    /// tiles `from..to` a click would lay and their full price, for the
+    /// tool's ghost; a refusal's text is `lastReason()`.
+    #[wasm_bindgen(js_name = quoteSkyBridge)]
+    pub fn quote_sky_bridge(&mut self, floor: f64, x: f64) -> Vec<f64> {
+        self.port_quote_skybridge(floor, x).to_vec()
+    }
+
     /// `previewRentBatch(kind, target, onlyDefaultPriced)` with the target as
     /// JSON text, as for `applyRentBatch`: the counters that call would
     /// report, as JSON, with nothing written; null where it would not apply.

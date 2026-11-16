@@ -13,6 +13,8 @@ import { noteFrameError } from "./frameErrors";
 import { engineTrapped, noteEngineThrow } from "./engineFault";
 import { appPlacementPaused, refuseAppPlacementWhilePaused } from "./pausedBuild";
 import { pickPersonAt } from "../render/excalibur/personFocus";
+import { placeSkyBridge, tapSkyBridge } from "./skyBridgeGestures";
+import { SKY_BRIDGE_STEP } from "./skyBridgeTool";
 
 /**
  * Engine wiring and post-context-loss engine rebuild, split out of the `GameApp`
@@ -101,6 +103,9 @@ export function wireEngine(app: GameApp): void {
     // A held pan key (Space or Shift on a touchscreen laptop) promises the
     // press only pans, so its tap builds and bulldozes nothing either (#589).
     if (pressPanKey) return;
+    // The Sky Bridge tool shows the bridge and its price on a first tap and
+    // lays it on a second (skyBridgeGestures), opening its own step.
+    if (app.tool.type === "skyBridge") return tapSkyBridge(app, tile, floor);
     // A mode that refuses building while paused (Classic, #1936) places nothing.
     if (app.tool.type === "build" && refuseAppPlacementWhilePaused(app)) return;
     app.captureUndo(app.tool.type === "bulldoze" ? "Bulldoze" : `Build ${catalogFacility(catalogOf(app), app.tool.kind).name}`);
@@ -130,6 +135,15 @@ export function wireEngine(app: GameApp): void {
     // nothing and opens no step; with no drag, the moves and the release that
     // follow place nothing either.
     if (app.tool.type === "build" && refuseAppPlacementWhilePaused(app)) return;
+    // A mouse click with the Sky Bridge tool lays the whole bridge (a touch
+    // pans and taps instead: classifyGesture); the release closes the step.
+    if (app.tool.type === "skyBridge") {
+      app.captureUndo(SKY_BRIDGE_STEP);
+      drag = { gesture: app.undoGesture(), generation: app.enginePort.generation() };
+      placeSkyBridge(app, tile, floor);
+      updateBuildPreview(app, tile, floor);
+      return;
+    }
     if (app.tool.type === "bulldoze" || app.tool.type === "build") {
       app.captureUndo(app.tool.type === "bulldoze" ? "Bulldoze" : `Build ${catalogFacility(catalogOf(app), app.tool.kind).name}`);
       drag = { gesture: app.undoGesture(), generation: app.enginePort.generation() };
@@ -293,7 +307,7 @@ export function wireEngine(app: GameApp): void {
 
   app.engine.onHover = (tile, floor, picked) => {
     app.keyboard.pointerDrew();
-    if (app.tool.type === "build") {
+    if (app.tool.type === "build" || app.tool.type === "skyBridge") {
       updateBuildPreview(app, tile, floor);
     } else {
       app.engine.preview = null;

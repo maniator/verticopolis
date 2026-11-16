@@ -11,6 +11,8 @@ import { brushTiles, dragRunTiles, isOffLot, snapX } from "../ui/placement";
 import { groupDigits } from "../ui/format";
 import { quoteShaft } from "./portAccess";
 import { lobbyHeightFor } from "./lobbyHeight";
+import { finishesHalfBridge, quoteSkyBridge } from "./skyBridgeTool";
+import { trackAppAction } from "../analyticsActions";
 
 /**
  * The money boundary of the game shell: every gesture that buys, paints, or
@@ -74,6 +76,26 @@ export class BuildActions {
       this.deps.ui.toast(res.reason, "bad");
     }
     return res.ok;
+  }
+
+  /** Lay the whole sky bridge a click at `(floor, tile)` names (Modern), with
+   *  the usual build/error feedback; nothing is laid on a refusal. Reports the
+   *  `sky_bridge` action, `finish` when it completes a half bridge from an old
+   *  save, `new` otherwise. */
+  buildSkyBridge(tile: number, floor: number): { ok: boolean; reason?: string; tiles: number } {
+    const port = this.deps.enginePort();
+    const codes = this.deps.portCodes();
+    const quote = quoteSkyBridge(port, codes, floor, tile);
+    const finishing = finishesHalfBridge(this.deps.reader(), floor, quote);
+    const rec = port.buildSkyBridge(floor, tile);
+    const res = outcome(port, rec);
+    this.deps.audio.sfx(res.ok ? "build" : "error");
+    if (!res.ok) {
+      if (res.reason) this.deps.ui.toast(res.reason, "bad");
+      return { ok: false, reason: res.reason, tiles: 0 };
+    }
+    trackAppAction("sky_bridge", finishing ? "finish" : "new");
+    return { ok: true, tiles: codes.slot(rec, "buildSkyBridge", "tiles") };
   }
 
   /** Place a transport span with the usual build/error feedback. On a refusal

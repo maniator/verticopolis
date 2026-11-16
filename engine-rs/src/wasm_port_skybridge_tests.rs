@@ -43,9 +43,8 @@ fn bridge_tiles(e: &Engine) -> usize {
 #[test]
 fn undo_and_redo_take_a_bridge_down_and_put_it_back() {
     let mut e = wings();
-    let gap: Vec<i64> = (LEFT.end..RIGHT.start).collect();
-    e.port_undo_capture("Build Lobby");
-    assert_eq!(e.sim.paint_brush(Kind::Lobby, SKY, &gap).placed, 10);
+    e.port_undo_capture("Build Sky Bridge");
+    assert!(e.sim.build_skybridge(SKY, LEFT.end).ok);
     e.port_undo_commit();
     assert_eq!(e.port_undo()[STATUS], 1.0, "{:?}", e.last_reason_text());
     assert_eq!(bridge_tiles(&e), 0);
@@ -62,4 +61,25 @@ fn undo_and_redo_take_a_bridge_down_and_put_it_back() {
     assert_eq!(bridge_tiles(&e), 10);
     assert_eq!(e.port_redo()[STATUS], 1.0, "{:?}", e.last_reason_text());
     assert_eq!(bridge_tiles(&e), 0);
+}
+
+#[test]
+fn the_port_quotes_and_lays_a_whole_bridge() {
+    let mut e = wings();
+    let quote = e.port_quote_skybridge(SKY as f64, (LEFT.end + 3) as f64);
+    assert_eq!(quote[0], 1.0, "{:?}", e.last_reason_text());
+    assert_eq!([quote[2], quote[3]], [LEFT.end as f64, RIGHT.start as f64]);
+    let rec = e.port_build_skybridge(SKY as f64, (LEFT.end + 3) as f64);
+    assert_eq!(rec[STATUS], 1.0, "{:?}", e.last_reason_text());
+    assert_eq!(rec[2], 10.0, "the tiles slot counts the tiles laid");
+    assert_eq!(rec[1], -quote[1], "the delta is the quoted price");
+    assert_eq!(bridge_tiles(&e), 10);
+    // A second click finds the bridge finished and says so.
+    let again = e.port_build_skybridge(SKY as f64, (LEFT.end + 3) as f64);
+    assert_eq!(again[STATUS], 0.0);
+    assert!(e
+        .last_reason_text()
+        .is_some_and(|r| r.contains("already finished")));
+    let refused = e.port_quote_skybridge(SKY as f64, 0.5);
+    assert_eq!(refused, [0.0; 4]);
 }

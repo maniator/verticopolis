@@ -74,7 +74,8 @@ fn wings(pillars: bool) -> Simulation {
             assert!(sim.tower.place(Kind::Lobby, SKY, x).ok);
         }
     } else {
-        assert_eq!(sim.paint_brush(Kind::Lobby, SKY, &gap).placed, 12);
+        let laid = sim.build_skybridge(SKY, gap[0]);
+        assert!(laid.ok, "{:?}", laid.reason);
     }
     assert_eq!(sim.tower.is_skybridge_tile(SKY, MIDDLE), !pillars);
     at_time(&mut sim, 0, 11);

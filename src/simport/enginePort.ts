@@ -1,21 +1,20 @@
 // The engine port (facade slice 7, the 2026-10-28 redesign). The contract is
 // `_bmad-output/planning-artifacts/architecture/architecture-rust-facade-2026-10-20/engine-port-contract.md`.
 //
-// One synchronous, numeric interface that the binding's `Engine` (Rust) and
-// `TsEngine` (TypeScript) both implement, so the game holds one `EnginePort`
-// and calls it directly. Arguments are numbers, booleans, a `Float64Array` or
-// one of the few strings the contract's section 4 lists; answers are a number,
-// a boolean, a `Float64Array` record, or a text getter's string. Kinds, modes,
-// calendars, film policies, log kinds and states cross as codes into the
-// tables of `viewLayout()`.
+// One synchronous, numeric interface the binding's `Engine` implements, so the
+// game holds one `EnginePort` and calls it directly. Arguments are numbers,
+// booleans, a `Float64Array` or one of the few strings the contract's section 4
+// lists; answers are a number, a boolean, a `Float64Array` record, or a text
+// getter's string. Kinds, modes, calendars, film policies, log kinds and states
+// cross as codes into the tables of `viewLayout()`.
 //
 // A command answers a result record: slot 0 the status (1 done, 0 refused),
 // slot 1 the money delta the engine measured around it, then the op's own
 // slots named in `viewLayout().records`. Only the members that answer a
 // status clear and set `lastReason()`.
 //
-// `src/simport/enginePort.types.test.ts` holds both engines to this shape; a
-// member goes here only when both have it.
+// `src/simport/enginePort.types.test.ts` holds the engine to this shape.
+import type { EnginePortSkyBridge } from "./skyBridgePort";
 
 /** Low-frequency keyed inspector facts. Rust produces the status verdicts
  * and the numbers; neither the UI nor the binding recomputes game rules. */
@@ -497,4 +496,5 @@ export interface EnginePort
     EnginePortCommands,
     EnginePortQueries,
     EnginePortFiles,
-    EnginePortRender {}
+    EnginePortRender,
+    EnginePortSkyBridge {}

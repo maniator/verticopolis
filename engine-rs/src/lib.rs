@@ -209,6 +209,8 @@ pub mod suite;
 pub mod tdt;
 pub use tdt::{export_tdt, import_tdt};
 mod sim_skybridge;
+mod sim_skybridge_build;
+pub use sim_skybridge_build::SkybridgeQuote;
 mod sim_undo;
 mod sim_undo_caps;
 mod sim_undo_check;

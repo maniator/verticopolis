@@ -143,6 +143,16 @@ back on. Each carries the new state only.
 | `found_bridged` | `on` or `off` | A Modern tower is founded from the New Tower window: whether its box was ticked. A Classic founding sends nothing, since Classic always bridges |
 | `auto_bridge` | `on` or `off` | The Settings switch was flipped in a Modern tower, with the state the engine answered |
 
+## Sky bridges (Modern)
+
+From the release after 4.8, the Sky Bridge tool lays a whole bridge between two
+towers' sky lobbies in one click, at 3 stars and up (party, 2026-11-16). One
+`app_action` code counts the bridges laid. It carries no floor, place or price.
+
+| `action` | `detail` | When |
+| --- | --- | --- |
+| `sky_bridge` | `new` or `finish` | The tool laid a bridge. `finish` means it completed a half bridge from a save made before the tool (a bridge tile already stood beside the gap), `new` any other bridge |
+
 ## The star-up message box
 
 `app_action` with `action` `star_notice` reports that the star-up message box

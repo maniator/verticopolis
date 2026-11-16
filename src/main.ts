@@ -31,6 +31,7 @@ import { wireEngine } from "./game/engineWiring";
 import { bindKeys } from "./game/inputKeys";
 import { watchLostRelease } from "./game/lostRelease";
 import { SPEEDS, applySpeed } from "./game/frameLoop";
+import { disarmSkyBridge } from "./game/skyBridgeGestures";
 import { placeSimpleBuild, updateBuildPreview, isTransportTool, pickedAt, clearBuildRefusal, refreshBuildPreview } from "./game/buildPreview";
 import { LobbyHeightChoice, trackLobbyHeightKeys } from "./game/lobbyHeight";
 import { BulldozeDragChoice } from "./game/bulldozeDrag";
@@ -321,6 +322,7 @@ class GameApp implements GameAppPorts {
     if (label !== prevLabel) gameplaySession.noteToolUsed(label);
     this.tool = tool;
     this.keyboard.resetAnchor(); // don't carry a pending transport anchor across tools
+    disarmSkyBridge(this); // nor a phone's first Sky Bridge tap
     // Drop any in-flight paint gesture too: onActionUp/onActionMove read the LIVE
     // tool, so a press-then-switch-then-release would stamp at the old press point.
     this.paintAnchor = null;

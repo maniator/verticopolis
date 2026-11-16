@@ -374,6 +374,9 @@ mod port_render;
 #[path = "wasm_port_undo.rs"]
 mod port_undo;
 
+#[path = "wasm_port_skybridge.rs"]
+mod port_skybridge;
+
 // The exported members of `Engine`, grouped by what they do. Each file holds
 // plain `#[wasm_bindgen] impl Engine` blocks; the logic they forward to is in
 // the `wasm_*.rs` modules above and in the rest of the crate.

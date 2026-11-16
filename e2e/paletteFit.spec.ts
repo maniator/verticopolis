@@ -3,7 +3,7 @@ import { expectEngineHosted } from "./helpers";
 
 /**
  * The desktop Tools window shows every tool without scrolling. A Modern tower
- * at five stars lists the most tools (39 under 11 headers), so it is the case
+ * at five stars lists the most tools (40 under 12 headers), so it is the case
  * checked here, at common desktop window sizes. The window picks compact rows,
  * two columns, or both (src/ui/paletteFit.ts), and the happy-dom tests cannot
  * check that, since they lay nothing out. Phones and tablets keep their own
@@ -51,7 +51,9 @@ function paletteState(page: Page) {
 
 const DESKTOPS = [
   { width: 1920, height: 1300, classes: ["pal-fit-compact"] },
-  { width: 1600, height: 1150, classes: ["pal-fit-compact"] },
+  // Since the Sky Bridge row this size sits on the compact/columns boundary,
+  // where font metrics pick the side, so it only has to fit somehow.
+  { width: 1600, height: 1150, classes: undefined },
   { width: 1366, height: 768, classes: ["pal-fit-columns", "pal-fit-compact"] },
   { width: 1280, height: 800, classes: ["pal-fit-columns", "pal-fit-compact"] },
 ];
@@ -61,10 +63,11 @@ for (const vp of DESKTOPS) {
     await page.setViewportSize({ width: vp.width, height: vp.height });
     await fullModernPalette(page);
     const state = await paletteState(page);
-    expect(state.shown).toBe(39);
+    expect(state.shown).toBe(40);
     expect(state.overflows).toBe(false);
     expect(state.allInside).toBe(true);
-    expect(state.classes).toEqual(vp.classes);
+    if (vp.classes) expect(state.classes).toEqual(vp.classes);
+    else expect(state.classes.length).toBeGreaterThan(0);
   });
 }
 
@@ -75,7 +78,7 @@ test.describe("a touch tablet held sideways", () => {
     await fullModernPalette(page);
     expect(await page.evaluate(() => matchMedia("(pointer: coarse)").matches)).toBe(true);
     const state = await paletteState(page);
-    expect(state.shown).toBe(39);
+    expect(state.shown).toBe(40);
     expect(state.overflows).toBe(false);
     expect(state.allInside).toBe(true);
     expect(state.classes).toContain("pal-fit-compact");
@@ -91,7 +94,7 @@ test.describe("a touch tablet held sideways", () => {
 });
 
 test("a tall desktop keeps the normal rows, and a shorter window refits as it resizes", async ({ page }) => {
-  await page.setViewportSize({ width: 1920, height: 1440 });
+  await page.setViewportSize({ width: 1920, height: 1600 });
   await fullModernPalette(page);
   expect((await paletteState(page)).classes).toEqual([]);
   await page.setViewportSize({ width: 1280, height: 800 });
@@ -99,7 +102,7 @@ test("a tall desktop keeps the normal rows, and a shorter window refits as it re
   const short = await paletteState(page);
   expect(short.classes).toContain("pal-fit-columns");
   expect(short.allInside).toBe(true);
-  await page.setViewportSize({ width: 1920, height: 1440 });
+  await page.setViewportSize({ width: 1920, height: 1600 });
   await expect.poll(async () => (await paletteState(page)).classes).toEqual([]);
 });
 
