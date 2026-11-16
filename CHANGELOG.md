@@ -25,6 +25,12 @@ prompt already tells players it is an engine update and shows the new version.
 Entries below 1.51.1 were curated from the commit history after the fact, so they
 are documentation only: no build that a client fetches carries them.
 
+## 4.10.0
+
+- File > Open Recent lists the last five towers you opened or saved, numbered 1 to 5 the way 90s programs did, from My Towers or your linked folder. Press a tower's number to open it from the keyboard, and it works from the opening screen too. A tower that has since been deleted or moved says so and drops off the list.
+- Modern towers get a Sky Bridge tool at 3 stars, under Structure. Point it at the open air between two towers' sky lobbies and the ghost shows the whole bridge with its full price; one click builds all of it, or nothing. On a phone, tap once to see it and tap again to build.
+- The Lobby tool no longer lays tiles out over open air, so a sky bridge can't be left half built. A half bridge in an older save stays, and the Sky Bridge tool finishes it for the price of the missing tiles.
+
 ## 4.9.0
 
 - A manual page the game opened now has a bar along the bottom with your tower's date, money, population and stars, and buttons to keep the tower running while you read, pause it again, or go back to it.

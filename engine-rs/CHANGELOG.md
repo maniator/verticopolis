@@ -15,6 +15,11 @@ raised the version, so they are documentation only.
 There is no entry for 0.17.0, which only
 existed as a step inside a stacked branch.
 
+## 1.47.0 (2026-11-16)
+
+- `Simulation::quote_skybridge` and `build_skybridge` (the binding's `quoteSkyBridge` and `buildSkyBridge` port records) quote and lay a whole sky bridge in one command; a lobby tile over open air is now refused.
+- The catalog's `rules.sky_bridge` (`skyBridge` in JSON) publishes the tool's star, longest span and tile price; catalog version 23, view layout version 28.
+
 ## 1.46.0 (2026-11-16)
 
 - Modern climbing speeds are now an escalator at 0.4 floors per crowd second and stairs at 0.25 (they were 1.3 and 0.85, faster than a Modern car), and the Modern router prices a floor on foot from that speed: the ride plus a step off for an escalator, the climb plus an effort cost for stairs. Classic is unchanged. The conformance lock moves for the Modern scenarios with stairs or escalators.
