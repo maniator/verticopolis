@@ -1,6 +1,6 @@
 ---
 app: patch
-crate: patch
+crate: minor
 readmes: unchanged
 ---
 ## Player

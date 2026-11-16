@@ -216,9 +216,13 @@ impl Simulation {
     }
 
     /// The telemetry as JSON for the WASM host's read model:
-    /// `{ util: [[id, v]], hourly: [[id, { weekday, weekend }]],
-    /// origins: [[id, { weekday: [[[floor, n]]], weekend }]] }`, each list
-    /// in the store's insertion order.
+    /// `{ util: [[id, v]], hourly: [[id, { weekday, weekend, weekdaySampled,
+    /// weekendSampled }]], origins: [[id, { weekday: [[[floor, n]]], weekend }]] }`,
+    /// each list in the store's insertion order. `weekday` and `weekend` are
+    /// 24 loads each; `weekdaySampled` and `weekendSampled` are 24 booleans
+    /// each, true for an hour the sampler has measured (a zero load included).
+    /// A document handed to `seed_telemetry` may leave the sampled lists out:
+    /// its loaded hours then count as sampled.
     pub fn telemetry_json(&self) -> Value {
         let ring = |slots: &Vec<IndexMap<i64, f64>>| -> Value {
             Value::Array(
