@@ -15,6 +15,10 @@ raised the version, so they are documentation only.
 There is no entry for 0.17.0, which only
 existed as a step inside a stacked branch.
 
+## 1.44.0 (2026-11-16)
+
+- Modern home residents commute as crowd people (`crowd::commuters`, new `Workplace::Home`): `GameMode::residents_commute_in_person` (`REAL_RESIDENT_TRIPS_ON`), `Kind::lives_in_person`, `Kind::arrives_in_person` and `Kind::residents_home_by_day`. A home's `occupants` is the residents at home; the hourly presence pass skips these homes, and they no longer feed the dispatch's waiting estimate (`ElevatorDispatch::accumulate`), whose lobby share now leaves out the population that arrives in person. The sampled school run is off where residents commute themselves. The Modern conformance cases, the frame-day golden and the Modern fuzz-corpus golden move.
+
 ## 1.43.0 (2026-11-15)
 
 - `serialize`, `saveBytes` and the `.vctower` writers write each unit and each person straight to the text instead of building it as a JSON tree first. The output is byte for byte the same, and on a maxed tower the save is written about four times faster.
