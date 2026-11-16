@@ -10,6 +10,7 @@ import { isEngineStopped, isSplashUp } from "./interactionState";
 import { closeTower } from "./titleScreen";
 import { wireFileShortcuts, type FileCommands } from "./fileShortcuts";
 import { showOpenDialog, showSaveAsDialog } from "./fileSpaceCommands";
+import { fillRecentMenu, wireRecentMenu } from "./recentMenu";
 import { overviewMapOpen, setOverviewMapOpen } from "./overviewMapWiring";
 import { callFireRescue } from "./fireRescueCall";
 import { confirmExterminate } from "./appModals";
@@ -92,8 +93,8 @@ export const ON_TITLE_SCREEN: Readonly<Record<string, string>> = {
 };
 
 /** The File items that need a live engine: Close saves the tower first, Open
- *  hands a file to it, Save and Save As read the tower from it. */
-const ENGINE_FILE_ITEMS = ["mb-close", "mb-import", "mb-quick-save", "mb-export"] as const;
+ *  and Open Recent hand a file to it, Save and Save As read the tower from it. */
+const ENGINE_FILE_ITEMS = ["mb-close", "mb-import", "mb-recent", "mb-quick-save", "mb-export"] as const;
 
 /** The `detail` a File key reports as `app_action` `file_key`. */
 const FILE_KEY_DETAIL: Readonly<Record<keyof FileCommands, string>> = { open: "open", save: "save", saveAs: "save_as" };
@@ -199,6 +200,7 @@ export function wireMenus(app: GameApp): MenuBar | null {
   on("mb-quick-save", file.save);
   on("mb-close", () => closeTower(app));
   on("mb-import", () => showOpenDialog(app, "menu"));
+  wireRecentMenu(app);
   on("mb-export", file.saveAs);
   wireFileShortcuts(file, window, reportKey);
   // Edit: the toolbar's own buttons, so the gray-out and the gesture rules hold.
@@ -246,7 +248,8 @@ export function wireMenus(app: GameApp): MenuBar | null {
     "click",
     (e) => {
       const item = e.target instanceof Element ? e.target.closest<HTMLElement>(".mb-item") : null;
-      if (!item) return;
+      // A submenu's title only opens its submenu (ui/menuBar.ts): not a pick.
+      if (!item || item.matches(".mb-sub-title")) return;
       reportPick(item, e);
       if (item.getAttribute("aria-disabled") === "true") {
         e.preventDefault();
@@ -267,7 +270,8 @@ export function wireMenus(app: GameApp): MenuBar | null {
   /** One `menu_pick`, while a menu is open (a script's click is not a pick). */
   function reportPick(item: HTMLElement, e: MouseEvent): void {
     const open = bar.current();
-    const menu = menuNameOf(item.closest(".mb-pop")?.id ?? "");
+    // An item of a submenu counts in the menu it opens from (File > Open Recent).
+    const menu = menuNameOf(item.closest(".mb-pop:not(.mb-subpop)")?.id ?? "");
     if (!open || !menu) return;
     const grayed = item.getAttribute("aria-disabled") === "true";
     const checked = item.getAttribute("aria-checked");
@@ -299,6 +303,7 @@ export function wireMenus(app: GameApp): MenuBar | null {
       if (menu) trackMenuDismiss({ menu, how, screen: screen(), browsed });
     },
     onOpen: (menu) => {
+      if (menu.id === "mb-file-menu") fillRecentMenu();
       check("mb-win-tools", !document.getElementById("palette")?.classList.contains(PALETTE_COLLAPSED_CLASS));
       check("mb-win-map", overviewMapOpen(app));
       for (const w of floating) check(w.item, !!w.win && !w.win.hidden);

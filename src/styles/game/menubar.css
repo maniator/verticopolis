@@ -4,6 +4,41 @@
    src/ui/menuBar.ts, src/game/menuWiring.ts).
    Part of the game's stylesheet: src/styles.css imports the parts in order. */
 
+/* ---- A submenu (File > Open Recent) ----
+   It opens to the right of its title, its first item level with the title,
+   and the arrow marks the title as one (src/ui/menuBar.ts). */
+.mb-sub {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+.mb-sub-title::after {
+  content: "\25B8";
+}
+.mb-pop.mb-subpop {
+  top: -3px;
+  left: 100%;
+  right: auto;
+  min-width: 200px;
+}
+/* A recent tower's line: its number, underlined as the key that picks it,
+   then its name, cut short with an ellipsis when it runs long, the way a
+   1995 program's list of recent files reads. */
+.mb-recent {
+  justify-content: flex-start;
+  gap: 0;
+  max-width: 340px;
+}
+.mb-recent-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mb-recent u {
+  flex: none;
+  width: 1.4em;
+  text-decoration: underline;
+}
+
 /* ---- Status bar ---- */
 .statusbar {
   display: flex;

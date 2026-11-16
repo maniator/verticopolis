@@ -2,6 +2,7 @@ import type { GameApp } from "../main";
 import { trackAppAction } from "../analytics";
 import { FileNameTakenError, type TowerFileEntry } from "../storage/fileSpace";
 import { canLinkFolder, linkedFolder } from "../storage/linkedFolder";
+import { noteFolderFile } from "../storage/recentTowers";
 import { currentStamp } from "../storage/saveStamp";
 import type { FileNote } from "../ui/fileDialog";
 import type { LinkedPlaceCtx } from "../ui/fileDialogPlaces";
@@ -41,33 +42,41 @@ function folderFailed(err: unknown): FileNote {
   return { text: `Couldn't use the linked folder: ${err instanceof Error ? err.message : String(err)}`, kind: "bad" };
 }
 
-/** Open a row of the linked folder. */
-async function openLinkedRow(app: GameApp, row: FileRow): Promise<void> {
+/** Open a row of the linked folder (or a file File > Open Recent names).
+ *  Answers false when the file isn't there any more (said on screen); true
+ *  otherwise, a refused or failed open included (also said). */
+export async function openLinkedRow(app: GameApp, row: Pick<FileRow, "id" | "name" | "type">): Promise<boolean> {
   let bytes: Uint8Array | null;
   try {
     bytes = await linkedFolder.read(row.id);
   } catch (err) {
     app.ui.sayVisibly(folderFailed(err).text);
-    return;
+    return true;
   }
   if (!bytes) {
     app.ui.sayVisibly(`"${row.name}" isn't in the folder any more. It may have been moved or deleted.`);
-    return;
+    return false;
   }
   if (bytes.byteLength === 0) {
     trackAppAction("folder_failed", "empty");
     const reuse = row.type === "tower" ? " A save that didn't finish can leave one; saving under that name uses it." : "";
     app.ui.sayVisibly(`"${row.name}" is an empty file, so there's no tower in it.${reuse}`);
-    return;
+    return true;
   }
   trackAppAction("folder_open", row.type);
   if (row.type === "tdt") {
+    // Once its report's Open tower adopts it, the 1994 file is kept in My
+    // Towers, and that copy is the one File > Open Recent lists (`fileKeep.ts`).
     void app.saveLoad.importLegacy(bytes.slice().buffer, row.id);
-    return;
+    return true;
   }
   const before = app.enginePort.generation();
   await app.saveLoad.importGame(isBinaryTowerFile(bytes) ? bytes : decodeTowerText(bytes));
-  if (app.enginePort.generation() !== before) setCurrentLinkedFile(row.id);
+  if (app.enginePort.generation() !== before) {
+    setCurrentLinkedFile(row.id);
+    noteFolderFile({ id: row.id, kind: "tower" }, linkedFolder.linkId());
+  }
+  return true;
 }
 
 /** Write the live tower into the folder with `write`, and make the file it
@@ -76,6 +85,8 @@ async function saveLinked(app: GameApp, why: "new" | "replace" | "current", writ
   const bytes = exportFile(app.enginePort, app.engine.viewState(), currentStamp());
   const entry = await write(bytes);
   setCurrentLinkedFile(entry.id);
+  // The folder only ever gets .vctower files from the game.
+  noteFolderFile({ id: entry.id, kind: "tower" }, linkedFolder.linkId());
   trackAppAction("folder_save", why);
   return entry.name;
 }

@@ -8,6 +8,15 @@
  * Escape closes it and gives the focus back to its title, and Tab closes it.
  * Alt with a title's underlined letter opens that menu.
  *
+ * An item can open a submenu (`.mb-sub-title`, File > Open Recent): a click,
+ * Enter, Space or Right on it opens the submenu beside it (under it on a
+ * phone), a mouse opens it by pointing, Left or Escape inside it goes back to
+ * its title, and pointing at another item closes it. A submenu's title is
+ * never a pick; the items inside it are. A grayed title opens nothing.
+ *
+ * An item with an underlined character (Open Recent's numbers) is picked by
+ * pressing that key while its menu has the focus, as in a 1995 menu.
+ *
  * What an item does is not this module's business: each item is a real
  * button whose click the game wires (`game/menuWiring.ts`). A click on an
  * item that is not grayed out closes the menu after its own handlers run.
@@ -53,6 +62,10 @@ function onBar(title: HTMLElement): boolean {
   return !menu || menu.ownerDocument.defaultView?.getComputedStyle(menu).display !== "none";
 }
 
+/** A submenu's title item, and its popup. */
+const SUB_TITLE = ".mb-sub-title";
+const SUB_POP = ".mb-subpop";
+
 /** How the menus closed: an item was picked, or one of the dismissals. */
 export type MenuCloseHow = "pick" | MenuDismissHow;
 
@@ -68,6 +81,10 @@ export interface MenuBarOptions {
 export class MenuBar {
   private readonly titles: HTMLButtonElement[];
   private openTitle: HTMLButtonElement | null = null;
+  /** The sub title whose submenu is open, or null. */
+  private openSubTitle: HTMLElement | null = null;
+  /** Whether the last press in a menu was a mouse's (a tap toggles a submenu's title). */
+  private mouseDown = false;
   /** Until when a press that closed a menu still swallows its pointerup and click. */
   private swallowUntil = -Infinity;
   /** The menus this trip has shown. */
@@ -98,7 +115,22 @@ export class MenuBar {
       // before this bubbling listener on the popup runs).
       menu?.addEventListener("click", (e) => {
         const item = e.target instanceof Element ? e.target.closest(".mb-item") : null;
-        if (item && item.getAttribute("aria-disabled") !== "true") this.close();
+        if (!item || item.getAttribute("aria-disabled") === "true") return;
+        if (!item.matches(SUB_TITLE)) this.close();
+        // A mouse already opened it by pointing, so its click keeps it open.
+        // A tap or a key toggles it, and a key also moves into it.
+        else if (this.mouseDown && (e as MouseEvent).detail > 0) this.openSub(item as HTMLElement, false);
+        else this.toggleSub(item as HTMLElement, (e as MouseEvent).detail === 0);
+      });
+      menu?.addEventListener("pointerdown", (e) => (this.mouseDown = e.pointerType === "mouse"));
+      // A mouse opens a submenu by pointing at its title, and closes it by
+      // pointing at another item of the same menu.
+      menu?.addEventListener("pointerover", (e) => {
+        if (e.pointerType !== "mouse" || !(e.target instanceof Element)) return;
+        const item = e.target.closest(".mb-item");
+        if (!item || item.closest(SUB_POP)) return;
+        if (item.matches(SUB_TITLE)) this.openSub(item as HTMLElement, false);
+        else this.closeSub(false);
       });
     }
     const doc = root.ownerDocument;
@@ -177,6 +209,7 @@ export class MenuBar {
     if (!title) return;
     const menu = this.menuOf(title);
     const hadFocus = !!menu && menu.contains(this.root.ownerDocument.activeElement);
+    this.closeSub(false);
     if (menu) menu.hidden = true;
     title.setAttribute("aria-expanded", "false");
     this.openTitle = null;
@@ -188,9 +221,43 @@ export class MenuBar {
     return id ? this.root.ownerDocument.getElementById(id) : null;
   }
 
-  /** The pickable items of `menu`. */
+  /** The pickable items of `menu`, leaving out those of a submenu inside it. */
   private items(menu: HTMLElement): HTMLElement[] {
-    return [...menu.querySelectorAll<HTMLElement>(PICKABLE)];
+    return [...menu.querySelectorAll<HTMLElement>(PICKABLE)].filter((i) => i.closest(`${SUB_POP}, .mb-pop`) === menu);
+  }
+
+  /** The submenu a sub title opens. */
+  private subOf(title: HTMLElement): HTMLElement | null {
+    const id = title.getAttribute("aria-controls");
+    return id ? this.root.ownerDocument.getElementById(id) : null;
+  }
+
+  /** Open `title`'s submenu; `focusItem` focuses its first item. */
+  private openSub(title: HTMLElement, focusItem: boolean): void {
+    const sub = this.subOf(title);
+    if (!sub || title.getAttribute("aria-disabled") === "true") return;
+    if (this.openSubTitle && this.openSubTitle !== title) this.closeSub(false);
+    sub.hidden = false;
+    keepOnScreen(sub);
+    title.setAttribute("aria-expanded", "true");
+    this.openSubTitle = title;
+    if (focusItem) this.items(sub)[0]?.focus();
+  }
+
+  /** Close the open submenu; `refocus` puts the focus back on its title. */
+  private closeSub(refocus: boolean): void {
+    const title = this.openSubTitle;
+    if (!title) return;
+    const sub = this.subOf(title);
+    if (sub) sub.hidden = true;
+    title.setAttribute("aria-expanded", "false");
+    this.openSubTitle = null;
+    if (refocus) title.focus();
+  }
+
+  private toggleSub(title: HTMLElement, focusItem: boolean): void {
+    if (this.openSubTitle === title) this.closeSub(true);
+    else this.openSub(title, focusItem);
   }
 
   private neighbor(title: HTMLButtonElement, step: 1 | -1): HTMLButtonElement {
@@ -217,8 +284,23 @@ export class MenuBar {
   }
 
   private menuKey(e: KeyboardEvent, title: HTMLButtonElement): void {
-    const menu = this.menuOf(title);
-    if (!menu) return;
+    const top = this.menuOf(title);
+    if (!top) return;
+    const active = this.root.ownerDocument.activeElement as HTMLElement | null;
+    const inSub = !!this.openSubTitle && !!active?.closest(SUB_POP);
+    if (inSub && (e.key === "ArrowLeft" || e.key === "Escape")) {
+      this.closeSub(true);
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+    if (!inSub && e.key === "ArrowRight" && active?.matches(SUB_TITLE)) {
+      this.openSub(active, true);
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+    const menu = inSub ? this.subOf(this.openSubTitle!) ?? top : top;
     const items = this.items(menu);
     const at = items.indexOf(this.root.ownerDocument.activeElement as HTMLElement);
     const focusAt = (i: number) => items[(i + items.length) % items.length]?.focus();
@@ -241,10 +323,21 @@ export class MenuBar {
         this.close(false, "tab");
         return; // let the focus move on
       default:
-        return;
+        if (!this.pickByKey(items, e)) return;
+        break;
     }
     e.preventDefault();
     e.stopPropagation();
+  }
+
+  /** Pick the item of `items` whose underlined character is the key pressed
+   *  (no Ctrl, Alt or Cmd). A keyboard pick, so its click has no pointer. */
+  private pickByKey(items: readonly HTMLElement[], e: KeyboardEvent): boolean {
+    if (e.ctrlKey || e.altKey || e.metaKey || e.key.length !== 1) return false;
+    const key = e.key.toLowerCase();
+    const item = items.find((i) => i.querySelector("u")?.textContent?.toLowerCase() === key);
+    item?.click();
+    return !!item;
   }
 
   /** Alt with a title's underlined letter opens that menu, unless a dialog is

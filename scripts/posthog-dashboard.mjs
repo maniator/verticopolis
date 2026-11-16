@@ -563,11 +563,11 @@ function buildInsights(ids) {
     {
       name: "My Towers (Open, Save As, files)",
       description:
-        "The My Towers folder from 4.3, by action, production: windows opened (files_open), files opened by kind (file_open), saved (file_save: new, replace, or current from File > Save), added (file_add: picked once it opened, or dropped on a window), files dropped on the game (file_dropped), renamed, duplicated, deleted, writes refused (file_failed: full or error), the one-time copy of the old save slots (files_copied), windows that opened while My Towers was still getting ready (files_waited), and the questions before a replace or delete (file_ask: replace or delete). Codes only, never a file's name. See docs/analytics-data-map.md, My Towers.",
+        "The My Towers folder from 4.3, by action, production: windows opened (files_open), files opened by kind (file_open), saved (file_save: new, replace, or current from File > Save), added (file_add: picked once it opened, or dropped on a window), files dropped on the game (file_dropped), renamed, duplicated, deleted, writes refused (file_failed: full or error), the one-time copy of the old save slots (files_copied), windows that opened while My Towers was still getting ready (files_waited), the questions before a replace or delete (file_ask: replace or delete), and towers picked from File > Open Recent that were gone (recent_missing: towers or folder). Codes only, never a file's name. See docs/analytics-data-map.md, My Towers.",
       query: trends([series("app_action", "Actions")], {
         breakdown: "action",
         display: "ActionsBar",
-        where: [inAction(["files_open", "files_waited", "file_open", "file_save", "file_ask", "file_add", "file_dropped", "file_rename", "file_copy", "file_delete", "file_failed", "files_copied"])],
+        where: [inAction(["files_open", "files_waited", "file_open", "file_save", "file_ask", "file_add", "file_dropped", "file_rename", "file_copy", "file_delete", "file_failed", "files_copied", "recent_missing"])],
       }),
     },
     {
@@ -579,7 +579,7 @@ function buildInsights(ids) {
     {
       name: "Open window: where players asked for it",
       description:
-        "app_action files_open split by detail, production, from 4.3: open for File > Open… in the menu, open_key for its Ctrl+O key, open_title for the title screen's Open Tower… button, and save_as for File > Save As…. See docs/analytics-data-map.md, My Towers.",
+        "app_action files_open split by detail, production, from 4.3: open for File > Open… in the menu, open_key for its Ctrl+O key, open_title for the title screen's Open Tower… button, recent for a tower picked from File > Open Recent (no window shows), and save_as for File > Save As…. See docs/analytics-data-map.md, My Towers.",
       query: trends([series("app_action", "Windows opened")], { breakdown: "detail", display: "ActionsBar", where: [inAction(["files_open"])] }),
     },
     {

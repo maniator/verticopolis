@@ -40,7 +40,7 @@ async function boot(page: Page): Promise<void> {
 
 async function openWindow(page: Page): Promise<void> {
   await page.locator("#menubar .mb-title", { hasText: "File" }).click();
-  await page.getByRole("menuitem", { name: /^Open/ }).click();
+  await page.getByRole("menuitem", { name: /^Open…/ }).click();
   await expect(page.locator(".fd")).toBeVisible();
 }
 

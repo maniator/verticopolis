@@ -23,6 +23,9 @@ export type AppActionName =
   | "files_copied" | "files_waited" | "file_ask"
   // The tower left behind by a swap, kept in My Towers (owner, 2026-11-16).
   | "tower_kept"
+  // File > Open Recent found the file it named gone at its pick
+  // (2026-11-16): `towers` (My Towers) or `folder` (the linked folder).
+  | "recent_missing"
   // The folder linked on the player's computer (owner, 2026-11-15), in the
   // data map's "Linked folder" section. Codes only, never a name.
   | "folder_link" | "folder_allow" | "folder_unlink" | "folder_open"

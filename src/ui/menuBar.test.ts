@@ -307,13 +307,21 @@ describe("MenuBar trips (the menu analytics' hooks)", () => {
 });
 
 describe("the game's File menu (index.html)", () => {
-  it("reads New…, Open…, Save, Save As… and Close, with no Load submenu (4.3)", () => {
+  it("reads New…, Open…, Open Recent, Save, Save As… and Close, Open Recent opening five numbered lines", () => {
     const indexHtml = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "../index.html"), "utf8");
     const page = new DOMParser().parseFromString(indexHtml, "text/html");
     const menu = page.getElementById("mb-file-menu")!;
     const label = (item: Element) => [...item.childNodes].filter((n) => n.nodeType === Node.TEXT_NODE).map((n) => n.textContent).join("").trim();
-    const shown = [...menu.querySelectorAll(".mb-item:not([hidden])")].map(label);
-    expect(shown).toEqual(["New…", "Open…", "Save", "Save As…", "Close"]);
-    expect(menu.querySelector(".mb-sub, [aria-haspopup]"), "File > Load and its submenu are gone").toBeNull();
+    const own = [...menu.querySelectorAll(".mb-item:not([hidden])")].filter((i) => !i.closest(".mb-subpop"));
+    expect(own.map(label)).toEqual(["New…", "Open…", "Open Recent", "Save", "Save As…", "Close"]);
+    const title = page.getElementById("mb-recent")!;
+    const sub = page.getElementById(title.getAttribute("aria-controls")!)!;
+    expect(title.classList.contains("mb-sub-title")).toBe(true);
+    expect(sub.classList.contains("mb-subpop")).toBe(true);
+    // Filled in as the menu opens: five lines start hidden, the grayed one shows.
+    expect([...sub.querySelectorAll(".mb-recent")].map((i) => [i.id, i.hasAttribute("hidden")])).toEqual(
+      [1, 2, 3, 4, 5].map((n) => [`mb-recent-${n}`, true]),
+    );
+    expect(page.getElementById("mb-recent-none")?.getAttribute("aria-disabled")).toBe("true");
   });
 });

@@ -260,6 +260,17 @@ export const linkedFolder = {
     return linkIdNow ?? storedLinkId();
   },
 
+  /** The link id kept on this device now, which another tab's newer link
+   *  may have replaced; null when none is kept or storage is refused. Unlike
+   *  {@link linkId} it never changes this page's link. */
+  keptLinkId(): string | null {
+    try {
+      return localStorage.getItem(LINK_ID);
+    } catch {
+      return null;
+    }
+  },
+
   list(): readonly TowerFileEntry[] {
     return linked?.access === "granted" ? linked.entries : [];
   },

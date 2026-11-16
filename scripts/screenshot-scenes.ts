@@ -49,6 +49,7 @@ import { PALETTE_FIT_SCENES } from "./scenes/paletteFit.ts";
 import { SPLIT_LOT_SCENES } from "./scenes/splitLot.ts";
 import { FRONT_DOOR_SCENES } from "./scenes/frontDoors.ts";
 import { LINKED_FOLDER_SCENES } from "./scenes/linkedFolder.ts";
+import { OPEN_RECENT_SCENES } from "./scenes/openRecent.ts";
 import { DESK_SCENES } from "./scenes/desk.ts";
 import { STAR_UP_SCENES } from "./scenes/starUp.ts";
 
@@ -72,6 +73,7 @@ export const SCENES: Scene[] = [
   ...PALETTE_FIT_SCENES,
   ...SPLIT_LOT_SCENES,
   ...LINKED_FOLDER_SCENES,
+  ...OPEN_RECENT_SCENES,
   ...DESK_SCENES,
   ...STAR_UP_SCENES,
   ...FRONT_DOOR_SCENES,

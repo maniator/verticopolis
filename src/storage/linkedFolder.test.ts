@@ -350,6 +350,8 @@ describe("the link's id", () => {
     await linkedFolder.refresh();
     localStorage.setItem("verticopolis-linked-folder-link", "another tab's link");
     expect(linkedFolder.linkId(), "the id this page read with the folder").toBe(mine);
+    expect(linkedFolder.keptLinkId(), "the device's newer link, read without taking it").toBe("another tab's link");
+    expect(linkedFolder.linkId(), "still this page's").toBe(mine);
   });
 
   it("is made once for a folder linked before links had ids, and kept", async () => {

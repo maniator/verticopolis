@@ -11,6 +11,7 @@ import type { FileRow } from "../ui/templates/fileDialog";
 import { decodeTowerText, isBinaryTowerFile, openImport, readPickedFile } from "../ui/uiImport";
 import { isDialogOpen, isEngineStopped } from "./interactionState";
 import { linkedFolder } from "../storage/linkedFolder";
+import { noteTowersFile } from "../storage/recentTowers";
 import { currentFileId, currentLinkedFile, setCurrentFile } from "./currentFile";
 import { linkedPlace, saveCurrentLinked } from "./linkedFolderCommands";
 import { baseName, failed } from "./fileKeep";
@@ -38,6 +39,8 @@ import { keptSettled, openingFile } from "./keepOutgoing";
  * `folder`),
  * `file_rename`, `file_copy`, `file_delete`, and `file_failed` (`full` or
  * `error`), plus `files_copied` once with the number of slots copied in.
+ * File > Open Recent (`recentMenu.ts`) sends `files_open` `recent` as it
+ * opens a file.
  * Codes and counts only: a name is the player's own text and is never sent.
  */
 
@@ -88,7 +91,10 @@ async function openTowerBytes(app: GameApp, id: string, bytes: Uint8Array): Prom
   const before = app.enginePort.generation();
   openingFile(id);
   await app.saveLoad.importGame(isBinaryTowerFile(bytes) ? bytes : decodeTowerText(bytes));
-  if (app.enginePort.generation() !== before) setCurrentFile(id);
+  if (app.enginePort.generation() === before) return;
+  setCurrentFile(id);
+  const f = fileSpace.get(id);
+  if (f) noteTowersFile(f);
 }
 
 /** Open a row of the Open window. */
@@ -110,12 +116,26 @@ async function openRow(app: GameApp, row: FileRow): Promise<void> {
   else await openTowerBytes(app, row.id, bytes);
 }
 
+/** What opening a My Towers file by id came to: it opened (or its open was
+ *  refused and said so), there is no such file, or My Towers itself could
+ *  not open (a private window), so nothing can be told about the file. */
+export type TowersFileOpen = "opened" | "gone" | "closed";
+
 /** Open My Towers file `id`, as its row in the Open window would (File >
- *  Load lists the newest). Settles once the tower is in, or refused. */
-export async function openFile(app: GameApp, id: string): Promise<void> {
+ *  Open Recent, and the tests' `game.openFile`). Settles once the tower is
+ *  in, or refused. */
+export async function openTowersFile(app: GameApp, id: string): Promise<TowersFileOpen> {
   await ready;
+  if (!fileSpace.isOpen()) return "closed";
   const f = fileSpace.get(id);
-  if (f) await openRow(app, { id: f.id, name: f.name, type: f.kind, size: f.size, modified: f.modified });
+  if (!f) return "gone";
+  await openRow(app, { id: f.id, name: f.name, type: f.kind, size: f.size, modified: f.modified });
+  return "opened";
+}
+
+/** Open My Towers file `id`; nothing happens when there is none. */
+export async function openFile(app: GameApp, id: string): Promise<void> {
+  await openTowersFile(app, id);
 }
 
 /** The Auto-save's row, whenever one is stored. One that did not read now
@@ -281,6 +301,7 @@ async function saveTowerAs(app: GameApp, name: string, why: "new" | "replace" | 
   // refuses the write, and the window asks again.
   const entry = await fileSpace.save(name, "tower", bytes, Date.now(), why !== "new");
   setCurrentFile(entry.id);
+  noteTowersFile(entry);
   trackAppAction("file_save", why);
   return entry;
 }

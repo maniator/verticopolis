@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const track = vi.hoisted(() => vi.fn());
 vi.mock("../analytics", () => ({ trackAppAction: track }));
 import { closeFileSpaceForTests, fileSpace, FileSpaceFullError } from "../storage/fileSpace";
+import { recentTowers } from "../storage/recentTowers";
 import { FakeIndexedDb } from "../tests/fakeIndexedDb";
 import { currentFileId, setCurrentFile } from "./currentFile";
 import { baseName, failed, keepOpenedFile } from "./fileKeep";
@@ -10,6 +11,7 @@ const bytes = (...v: number[]) => Uint8Array.from(v);
 
 beforeEach(async () => {
   track.mockReset();
+  localStorage.clear();
   setCurrentFile(null);
   await fileSpace.open(new FakeIndexedDb().asFactory());
 });
@@ -27,6 +29,7 @@ describe("keeping a tower file that just opened", () => {
     expect(kept).toMatchObject({ name: "Spire", kind: "tower", size: 3 });
     expect(await fileSpace.read(kept!.id)).toEqual(bytes(1, 2, 3));
     expect(currentFileId()).toBe(kept!.id);
+    expect(recentTowers()).toEqual([{ place: "towers", id: kept!.id, name: "Spire", kind: "tower" }]);
     expect(track).toHaveBeenCalledExactlyOnceWith("file_add", "picked");
   });
 
@@ -34,6 +37,8 @@ describe("keeping a tower file that just opened", () => {
     const kept = await keepOpenedFile("OLD.TDT", bytes(9), "tdt");
     expect(kept).toMatchObject({ name: "OLD", kind: "tdt" });
     expect(currentFileId()).toBeNull();
+    // File > Open Recent opens the kept copy again.
+    expect(recentTowers()).toEqual([{ place: "towers", id: kept!.id, name: "OLD", kind: "tdt" }]);
   });
 
   it("does not add a file opened from My Towers a second time", async () => {
@@ -63,6 +68,7 @@ describe("keeping a tower file that just opened", () => {
     expect(await keepOpenedFile("Spire.vctower", bytes(1), "tower")).toBeNull();
     expect(track).toHaveBeenCalledExactlyOnceWith("file_failed", "full");
     expect(currentFileId()).toBeNull();
+    expect(recentTowers()).toEqual([]);
   });
 
   it("puts a failure in the player's words and counts its kind", () => {

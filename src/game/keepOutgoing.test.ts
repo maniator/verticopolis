@@ -20,6 +20,7 @@ vi.mock("../storage/SaveGame", () => ({
 }));
 
 import { closeFileSpaceForTests, fileSpace } from "../storage/fileSpace";
+import { recentTowers } from "../storage/recentTowers";
 import { FakeIndexedDb } from "../tests/fakeIndexedDb";
 import { setCurrentFile, setCurrentLinkedFile } from "./currentFile";
 import { captureOutgoing, dropOutgoing, keepOutgoing, keptSettled, openingFile, resetOutgoingForTests } from "./keepOutgoing";
@@ -53,6 +54,7 @@ beforeEach(async () => {
   m.live = true;
   m.stored = STORED;
   m.autoName = "Harmony Tower 2.0";
+  localStorage.clear();
   setCurrentFile(null);
   resetOutgoingForTests();
   await fileSpace.open(new FakeIndexedDb().asFactory());
@@ -73,6 +75,7 @@ describe("the tower left by opening another", () => {
     expect(m.packSave).toHaveBeenCalledExactlyOnceWith(SAVE);
     expect(m.track).toHaveBeenCalledExactlyOnceWith("tower_kept", "file");
     expect(raw.ui.toast).toHaveBeenCalledWith('Saved "Harmony" in My Towers.', "good");
+    expect(recentTowers()[0], "the kept file tops Open Recent").toMatchObject({ place: "towers", id: own.id, name: "Harmony" });
   });
 
   it("opening its own file again to go back keeps the minutes since as a new file, never over the file being read", async () => {
@@ -104,6 +107,7 @@ describe("the tower left by opening another", () => {
     expect(await fileSpace.read(fileSpace.find("Harmony Tower 2.0")!.id), "the other file is left alone").toEqual(Uint8Array.from([0]));
     expect(m.track).toHaveBeenCalledExactlyOnceWith("tower_kept", "new");
     expect(raw.ui.toast).toHaveBeenCalledWith('Kept your last tower in My Towers as "Harmony Tower 2.0 (2)".', "good");
+    expect(recentTowers()[0], "the kept file tops Open Recent").toMatchObject({ place: "towers", id: kept!.id, name: "Harmony Tower 2.0 (2)" });
   });
 
   it("from the linked folder is kept in My Towers, never written back to the player's own file", async () => {

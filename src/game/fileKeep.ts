@@ -1,5 +1,6 @@
 import { trackAppAction } from "../analytics";
 import { cleanFileName, fileSpace, FileSpaceFullError, type TowerFileEntry, type TowerFileKind } from "../storage/fileSpace";
+import { noteTowersFile } from "../storage/recentTowers";
 import type { FileNote } from "../ui/fileDialog";
 import { setCurrentFile } from "./currentFile";
 
@@ -45,6 +46,8 @@ export async function keepOpenedFile(filename: string, bytes: Uint8Array, kind: 
     const entry = same && same.kind === kind && (await holds(same, bytes)) ? same : await fileSpace.add(name, kind, bytes);
     if (entry !== same) trackAppAction("file_add", "picked");
     if (kind === "tower") setCurrentFile(entry.id);
+    // The file now in My Towers is the one File > Open Recent opens again.
+    noteTowersFile(entry);
     return entry;
   } catch (err) {
     failed(err);
