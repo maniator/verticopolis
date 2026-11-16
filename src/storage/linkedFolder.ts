@@ -57,6 +57,9 @@ const KEY = "folder";
 /** The linked folder's name, kept in localStorage beside the handle so the
  *  windows can name it without reading the handle back (see {@link restore}). */
 const MARK = "verticopolis-linked-folder";
+/** A random id for the current link, made new by each {@link linkedFolder.link},
+ *  so a file remembered for one folder is never taken for another's. */
+const LINK_ID = "verticopolis-linked-folder-link";
 
 /** What the windows show for the linked folder. */
 export interface LinkedFolderState {
@@ -74,6 +77,8 @@ interface Linked {
 }
 
 let linked: Linked | null = null;
+/** This visit's link id, so a storage that refuses writes still keeps one. */
+let linkIdNow: string | null = null;
 let restoring: Promise<void> | null = null;
 const listeners = new Set<() => void>();
 
@@ -171,6 +176,28 @@ function writeMark(name: string | null): void {
   }
 }
 
+function newLinkId(): string {
+  linkIdNow = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+  try {
+    localStorage.setItem(LINK_ID, linkIdNow);
+  } catch {
+    // Storage refused: the id lasts this visit.
+  }
+  return linkIdNow;
+}
+
+/** The id kept for the link, or a new one when none is kept, held for this
+ *  page: another tab that links a folder changes the kept id, never this
+ *  page's, so this page's files stay tied to the folder it has. */
+function storedLinkId(): string {
+  try {
+    linkIdNow = localStorage.getItem(LINK_ID);
+  } catch {
+    linkIdNow = null;
+  }
+  return linkIdNow ?? newLinkId();
+}
+
 /** Take a granted folder's list, or keep it empty until the player's OK. */
 async function refreshEntry(entry: Linked): Promise<void> {
   if (entry.access === "granted") await scan(entry);
@@ -203,6 +230,7 @@ export const linkedFolder = {
           return;
         }
         const entry: Linked = { handle, access: await handle.queryPermission(READ_WRITE), entries: [] };
+        storedLinkId();
         linked = entry;
         // A folder that can't be listed right now stays linked; the next
         // window that shows it lists it again.
@@ -223,6 +251,13 @@ export const linkedFolder = {
     if (linked) return { name: linked.handle.name, access: linked.access };
     const mark = readMark();
     return mark ? { name: mark, access: "prompt" } : null;
+  },
+
+  /** The current link's id, or null with nothing linked. A folder linked
+   *  before links had ids gets one the first time it is asked. */
+  linkId(): string | null {
+    if (!linked && !readMark()) return null;
+    return linkIdNow ?? storedLinkId();
   },
 
   list(): readonly TowerFileEntry[] {
@@ -256,6 +291,7 @@ export const linkedFolder = {
     await refreshEntry(entry);
     await withStore("readwrite", (s) => s.put(handle, KEY));
     writeMark(handle.name);
+    newLinkId();
     linked = entry;
     restoring = Promise.resolve();
     changed();
@@ -280,6 +316,12 @@ export const linkedFolder = {
   async unlink(): Promise<void> {
     await withStore("readwrite", (s) => s.delete(KEY));
     writeMark(null);
+    linkIdNow = null;
+    try {
+      localStorage.removeItem(LINK_ID);
+    } catch {
+      // Storage refused: the next link makes a new id anyway.
+    }
     linked = null;
     restoring = null;
     changed();
@@ -324,16 +366,16 @@ export const linkedFolder = {
     const same = towers.find((e) => e.name === name) ?? towers.find((e) => e.name.toLocaleLowerCase() === clean.toLocaleLowerCase());
     if (same && !replace) throw new FileNameTakenError(clean);
     if (same) return writeFile(folder, same.id, bytes);
-    // A file another program wrote since the list was read is never replaced
-    // without asking either: the tower goes in as "name (2)" and up instead,
-    // the first such name free on disk.
-    const taken = [...towers];
-    let pick = clean;
-    while (await exists(folder, `${pick}.vctower`)) {
-      taken.push({ id: "", name: pick, kind: "tower", size: 0, modified: 0 });
-      pick = freeName(clean, taken);
-    }
-    return writeFile(folder, `${pick}.vctower`, bytes);
+    return writeFresh(folder, clean, towers, bytes);
+  },
+
+  /** Save under `name`, or the first "name (2)" and up free in the list and
+   *  on disk, never over any file (the Auto-save copy's first write). */
+  async saveNew(name: string, bytes: Uint8Array): Promise<TowerFileEntry> {
+    const folder = need();
+    const clean = cleanFileName(name);
+    if (!clean) throw new Error("Type a name for the tower.");
+    return writeFresh(folder, clean, folder.entries.filter((e) => e.kind === "tower"), bytes);
   },
 
   /** Write `bytes` over the file `id` itself, by its name on disk, for File >
@@ -354,6 +396,19 @@ export const linkedFolder = {
     return writeFile(folder, `${name}${ext}`, bytes);
   },
 };
+
+/** Write a new file `clean.vctower`, or the first "clean (2)" and up that
+ *  neither `towers` nor the disk has: a file another program wrote since the
+ *  list was read is never replaced without asking. */
+async function writeFresh(folder: Linked, clean: string, towers: readonly TowerFileEntry[], bytes: Uint8Array): Promise<TowerFileEntry> {
+  const taken = [...towers];
+  let pick = freeName(clean, taken);
+  while (await exists(folder, `${pick}.vctower`)) {
+    taken.push({ id: "", name: pick, kind: "tower", size: 0, modified: 0 });
+    pick = freeName(clean, taken);
+  }
+  return writeFile(folder, `${pick}.vctower`, bytes);
+}
 
 /** Whether the folder holds a file named `filename` right now. */
 async function exists(folder: Linked, filename: string): Promise<boolean> {
@@ -388,6 +443,7 @@ async function writeFile(folder: Linked, filename: string, bytes: Uint8Array): P
  *  replaces the IndexedDB the handle is kept in. */
 export function resetLinkedFolderForTests(factory?: IDBFactory): void {
   linked = null;
+  linkIdNow = null;
   restoring = null;
   listeners.clear();
   if (factory) idb = () => factory;

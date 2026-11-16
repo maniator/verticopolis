@@ -527,11 +527,11 @@ function buildInsights(ids) {
     {
       name: "Linked folder (Open, Save As)",
       description:
-        "The folder a player links on their computer in the Open and Save As windows (Chromium browsers only), by action, production: folders linked (folder_link: linked, cancel, refused), the browser's OK asked again (folder_allow: granted, denied), unlinked (folder_unlink), towers opened from it (folder_open: tower, tdt), saved into it (folder_save: new, replace, current), copied (folder_copy) and failed steps (folder_failed). Codes only, never a folder's or a file's name. From a folder… in other browsers counts as file_add folder on the My Towers tile. See docs/analytics-data-map.md, Linked folder.",
+        "The folder a player links on their computer in the Open and Save As windows (Chromium browsers only), by action, production: folders linked (folder_link: linked, cancel, refused), the browser's OK asked again (folder_allow: granted, denied), unlinked (folder_unlink), towers opened from it (folder_open: tower, tdt), saved into it (folder_save: new, replace, current), copied (folder_copy), failed steps (folder_failed) and the Auto-save copy turned on, off or failing (folder_mirror: on, off, failed). Codes only, never a folder's or a file's name. From a folder… in other browsers counts as file_add folder on the My Towers tile. See docs/analytics-data-map.md, Linked folder.",
       query: trends([series("app_action", "Actions")], {
         breakdown: "action",
         display: "ActionsBar",
-        where: [inAction(["folder_link", "folder_allow", "folder_unlink", "folder_open", "folder_save", "folder_copy", "folder_failed"])],
+        where: [inAction(["folder_link", "folder_allow", "folder_unlink", "folder_open", "folder_save", "folder_copy", "folder_failed", "folder_mirror"])],
       }),
     },
     {

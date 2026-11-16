@@ -15,8 +15,15 @@ export const AUTOSAVE_INTERVAL_MS = 30000;
  *  engine: the tower is no longer the engine's, and the save the message points
  *  back to must stay. The timer, the tab-hide save and every tower swap share
  *  these guards. */
-export function autosaveIfLive(saveLoad: Pick<SaveLoad, "autosave">): void {
-  if (!isSplashUp() && !isEngineStopped()) void saveLoad.autosave();
+export function autosaveIfLive(saveLoad: Pick<SaveLoad, "autosave">): boolean {
+  if (!autosaveLive()) return false;
+  void saveLoad.autosave();
+  return true;
+}
+
+/** Whether the live tower may be autosaved now (the guards above). */
+export function autosaveLive(): boolean {
+  return !isSplashUp() && !isEngineStopped();
 }
 
 /** Save when the tab goes to the background, with the same guards as the timer.
@@ -26,7 +33,7 @@ export function autosaveIfLive(saveLoad: Pick<SaveLoad, "autosave">): void {
  *  by the silent save, and the player is not toasted over a tab they cannot
  *  see; the next visible tick tells them. */
 export function saveOnHide(saveLoad: Pick<SaveLoad, "save">): void {
-  if (isSplashUp() || isEngineStopped()) return;
+  if (!autosaveLive()) return;
   try {
     saveLoad.save(true);
   } catch {
@@ -36,9 +43,12 @@ export function saveOnHide(saveLoad: Pick<SaveLoad, "save">): void {
 
 /** Start the periodic autosave, and save once when the tab goes to the
  *  background (#1533): waiting for the next tick could lose up to 30 seconds of
- *  play from a tab that never comes back. */
-export function startAutosave(saveLoad: Pick<SaveLoad, "autosave" | "save">): void {
-  window.setInterval(() => autosaveIfLive(saveLoad), AUTOSAVE_INTERVAL_MS);
+ *  play from a tab that never comes back. `afterTick` runs after each timer
+ *  autosave that ran (the copy in the linked folder, `autosaveMirror.ts`). */
+export function startAutosave(saveLoad: Pick<SaveLoad, "autosave" | "save">, afterTick: () => void = () => {}): void {
+  window.setInterval(() => {
+    if (autosaveIfLive(saveLoad)) afterTick();
+  }, AUTOSAVE_INTERVAL_MS);
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "hidden") saveOnHide(saveLoad);
   });

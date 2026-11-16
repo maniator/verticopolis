@@ -7,6 +7,8 @@ import type { FileNote } from "../ui/fileDialog";
 import type { LinkedPlaceCtx } from "../ui/fileDialogPlaces";
 import type { FileRow } from "../ui/templates/fileDialog";
 import { decodeTowerText, isBinaryTowerFile } from "../ui/uiImport";
+import { autosaveLive } from "./autosaveSchedule";
+import { forgetMirrorFile, mirrorAutosave, mirrorOn, setMirror } from "./autosaveMirror";
 import { currentLinkedFile, setCurrentLinkedFile } from "./currentFile";
 import { exportFile } from "./portLifecycle";
 
@@ -21,8 +23,9 @@ import { exportFile } from "./portLifecycle";
  * Analytics (`docs/analytics-data-map.md`, "Linked folder"): `app_action`
  * `folder_link` (`linked`, `cancel` or `refused`), `folder_allow` (`granted`
  * or `denied`), `folder_unlink`, `folder_open` (`tower` or `tdt`),
- * `folder_save` (`new`, `replace` or `current`), `folder_copy` and
- * `folder_failed`. Codes only, never a folder's or a file's name.
+ * `folder_save` (`new`, `replace` or `current`), `folder_copy`,
+ * `folder_failed` and `folder_mirror` (`on`, `off`, or `failed` once a visit,
+ * `autosaveMirror.ts`). Codes only, never a folder's or a file's name.
  */
 
 /** A failed folder step in the player's words. */
@@ -85,20 +88,24 @@ export function linkedPlace(app: GameApp): LinkedPlaceCtx | null {
     // The picker is called before any await, so the click that asked for it
     // still counts; so is the permission prompt once the folder is read back
     // (`linkedFolder.allow`).
-    link: () =>
-      linkedFolder.link().then(
+    link: () => {
+      const before = linkedFolder.linkId();
+      return linkedFolder.link().then(
         (linked) => {
           trackAppAction("folder_link", linked ? "linked" : "cancel");
           // A new folder may hold a file of the same name: File > Save must
-          // never write over it without asking.
+          // never write over it without asking. The Auto-save copy starts a
+          // new file there by itself (a new link); the old link's is dropped.
           if (linked && currentLinkedFile() !== null) setCurrentLinkedFile(null);
+          if (linked) forgetMirrorFile(before);
           return linked ? "linked" : "cancel";
         },
         (err: unknown) => {
           trackAppAction("folder_link", "refused");
           return folderFailed(err);
         },
-      ),
+      );
+    },
     allow: () =>
       linkedFolder.allow().then(
         (access): FileNote | null => {
@@ -108,14 +115,35 @@ export function linkedPlace(app: GameApp): LinkedPlaceCtx | null {
         (err: unknown) => folderFailed(err),
       ),
     unlink: async () => {
+      const before = linkedFolder.linkId();
       try {
         await linkedFolder.unlink();
         if (currentLinkedFile() !== null) setCurrentLinkedFile(null);
+        setMirror(false);
+        forgetMirrorFile(before);
         trackAppAction("folder_unlink");
         return null;
       } catch (err) {
         return folderFailed(err);
       }
+    },
+    mirror: () => mirrorOn(),
+    setMirror: async (on) => {
+      const name = linkedFolder.state()?.name ?? "the linked folder";
+      setMirror(on);
+      trackAppAction("folder_mirror", on ? "on" : "off");
+      if (!on) return { text: `The Auto-save is no longer copied to "${name}". The copy there stays.`, kind: "info" };
+      // The copy never asks the browser, so a folder still waiting for its
+      // OK gets the copy only once a window has the OK.
+      if (linkedFolder.state()?.access !== "granted") {
+        return { text: `The Auto-save will be copied to "${name}" once your browser allows the folder.`, kind: "info" };
+      }
+      // Write it now, so the player sees the file arrive. A tower that can't
+      // be saved yet starts later.
+      if (autosaveLive() && !(await mirrorAutosave(app, Date.now(), true))) {
+        return { text: `Couldn't copy the Auto-save to "${name}". The game tries again every minute.`, kind: "bad" };
+      }
+      return { text: `The Auto-save is copied to "${name}" every minute while you play.`, kind: "info" };
     },
     open: (row) => void openLinkedRow(app, row),
     save: async (name, replace) => {

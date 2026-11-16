@@ -7,6 +7,7 @@ vi.mock("./interactionState", () => ({ isEngineStopped: vi.fn(() => false), isSp
 describe("startAutosave", () => {
   const autosave = vi.fn(() => Promise.resolve());
   const save = vi.fn((_silent?: boolean) => {});
+  const afterTick = vi.fn();
   let listener: EventListener | undefined;
 
   beforeEach(() => {
@@ -19,7 +20,8 @@ describe("startAutosave", () => {
     vi.spyOn(document, "addEventListener").mockImplementation((type, fn) => {
       if (type === "visibilitychange") listener = fn as EventListener;
     });
-    startAutosave({ autosave, save });
+    afterTick.mockClear();
+    startAutosave({ autosave, save }, afterTick);
   });
   afterEach(() => {
     vi.useRealTimers();
@@ -30,6 +32,14 @@ describe("startAutosave", () => {
     vi.spyOn(document, "visibilityState", "get").mockReturnValue(state);
     listener!(new Event("visibilitychange"));
   };
+
+  it("runs the after-tick step only after a tick that autosaved", () => {
+    vi.advanceTimersByTime(AUTOSAVE_INTERVAL_MS);
+    expect(afterTick).toHaveBeenCalledOnce();
+    vi.mocked(isSplashUp).mockReturnValue(true);
+    vi.advanceTimersByTime(AUTOSAVE_INTERVAL_MS);
+    expect(afterTick).toHaveBeenCalledOnce();
+  });
 
   it("autosaves on every tick", () => {
     vi.advanceTimersByTime(AUTOSAVE_INTERVAL_MS * 2);

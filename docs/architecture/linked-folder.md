@@ -40,6 +40,45 @@ Towers once (Safari 11.1+, Firefox 50+, iOS 18.4+).
   held by another program such as a cloud drive syncing it) is left out of the
   list; the rest of the folder still works, and the link is kept.
 
+## The Auto-save copy
+
+The player may keep a copy of the Auto-save in the folder too (owner,
+2026-11-15, the follow-up to #2335): **Keep the Auto-save here too**, a check
+item in the Look in box while a folder is linked. It is off by default and
+kept in localStorage (`verticopolis-autosave-mirror`).
+
+- The Auto-save in the browser stays the one the game loads. The copy is only
+  written, never read back on its own; the player opens it from the folder
+  like any tower.
+- After a timer autosave (`startAutosave`'s `afterTick`), the game writes the
+  live tower as a binary `.vctower` (`VCTOWER2`, a newline, then the raw
+  DEFLATE of the stamped save), at most once a minute. It costs nothing while
+  the copy is off. While on, it asks the engine for the same stamped bytes the
+  autosave stores (`saveBytes`, about 2 ms on the split-tower-4 fixture) and
+  packs them in the save packer's worker, so no compression runs on the frame.
+  The engine's own file export compresses on the main thread (median 19 ms on
+  split-tower-4, 10 ms on the large fixture), which is why the copy does not
+  use it.
+- It writes only while the folder is open this visit with the browser's OK.
+  It never asks the browser and never reads the handle back on its own (see
+  Permission below), so after a restart it starts again once Open or Save As
+  shows the folder.
+- Its first write in a folder takes `Auto-save.vctower`, or `Auto-save (2)`
+  and up when the list or the disk has that name (`linkedFolder.saveNew`), so
+  it never replaces a file it didn't write. It then writes that same file
+  (`saveOver`), remembered beside the setting by the link's id
+  (`linkedFolder.linkId`, made new by every link and held per page). Each
+  link keeps its own file, so two tabs on two folders each write theirs, and
+  a file remembered for another link is never written over, even when the new
+  folder has a file of that name. The files of the last eight links are kept;
+  linking again or unlinking drops the old link's. A copy whose folder was
+  unlinked or linked again while it packed is dropped. Unlinking also turns
+  the copy off. Turning it
+  off leaves the file in the folder.
+- A failed write says nothing on screen (the in-browser Auto-save worked or
+  told the player itself) and tries again a minute later; it is counted once a
+  page life.
+
 ## Permission
 
 The folder's handle is kept in its own IndexedDB database
@@ -58,5 +97,5 @@ its mark in localStorage.
 ## Analytics
 
 `app_action` `folder_link`, `folder_allow`, `folder_unlink`, `folder_open`,
-`folder_save`, `folder_copy`, `folder_failed`, and `file_add` `folder` for
+`folder_save`, `folder_copy`, `folder_failed`, `folder_mirror`, and `file_add` `folder` for
 From a folder…. See `docs/analytics-data-map.md`.

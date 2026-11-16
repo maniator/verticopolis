@@ -31,6 +31,10 @@ export interface LinkedPlaceCtx {
    *  `linkedFolder.allow` for when it can ask. */
   allow(): Promise<FileNote | null>;
   unlink(): Promise<FileNote | null>;
+  /** Whether the Auto-save is copied into the folder too. */
+  mirror(): boolean;
+  /** Turn that copy on (writing it now) or off. */
+  setMirror(on: boolean): Promise<FileNote | null>;
   /** Open a row. The window is closed before this runs. */
   open(row: FileRow): void;
   save(name: string, replace: boolean): Promise<FileNote | null>;
@@ -147,6 +151,12 @@ export function placeHandlers(d: PlaceDeps): PlacesHandlers {
         d.set({ place: "local", selected: null });
         return { text: `Unlinked "${name}". Its files are still there.`, kind: "info" };
       });
+    },
+    toggleMirror() {
+      const linked = d.linked;
+      if (!linked?.state()) return;
+      d.set({ look: false });
+      void d.run(() => linked.setMirror(!linked.mirror()));
     },
   };
 }

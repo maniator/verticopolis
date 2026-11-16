@@ -24,7 +24,7 @@ export type AppActionName =
   // The folder linked on the player's computer (owner, 2026-11-15), in the
   // data map's "Linked folder" section. Codes only, never a name.
   | "folder_link" | "folder_allow" | "folder_unlink" | "folder_open"
-  | "folder_save" | "folder_copy" | "folder_failed"
+  | "folder_save" | "folder_copy" | "folder_failed" | "folder_mirror"
   | "export_save"
   | "import_save"
   | "export_tdt"

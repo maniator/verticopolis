@@ -232,6 +232,23 @@ describe("saving", () => {
     expect(folder.writes).toEqual([{ name: "Sky (3).vctower", bytes: new Uint8Array([2]) }]);
   });
 
+  it("saves a new file without asking, numbered past a listed tower and a file only on disk (the Auto-save copy)", async () => {
+    const folder = fakeFolder("Towers", { "Auto-save.vctower": [1] });
+    await link(folder);
+    folder.disk.set("Auto-save (2).vctower", { bytes: new Uint8Array([6]), modified: 1 });
+    const entry = await linkedFolder.saveNew("Auto-save", new Uint8Array([3]));
+    expect(entry.id).toBe("Auto-save (3).vctower");
+    expect(folder.disk.get("Auto-save.vctower")!.bytes).toEqual(new Uint8Array([1]));
+    expect(folder.disk.get("Auto-save (2).vctower")!.bytes).toEqual(new Uint8Array([6]));
+    expect(folder.writes).toEqual([{ name: "Auto-save (3).vctower", bytes: new Uint8Array([3]) }]);
+  });
+
+  it("saves a new file under its own name when nothing has it", async () => {
+    const folder = fakeFolder("Towers", {});
+    await link(folder);
+    expect((await linkedFolder.saveNew("Auto-save", new Uint8Array([3]))).id).toBe("Auto-save.vctower");
+  });
+
   it("saves beside a 1994 file of the same name without touching it", async () => {
     const folder = fakeFolder("Towers", { "TOWER2.TDT": [9] });
     await link(folder);
@@ -248,6 +265,41 @@ describe("saving", () => {
     expect(folder.writers[0]!.abort).toHaveBeenCalledOnce();
     expect(folder.writers[0]!.close).not.toHaveBeenCalled();
     expect(folder.disk.get("Sky.vctower")!.bytes).toEqual(new Uint8Array([1]));
+  });
+});
+
+describe("the link's id", () => {
+  it("is new for every link, kept across a reload, and gone after Unlink", async () => {
+    expect(linkedFolder.linkId(), "nothing linked").toBeNull();
+    await link(fakeFolder("Towers", {}));
+    const first = linkedFolder.linkId();
+    expect(first).toEqual(expect.any(String));
+    reload();
+    expect(linkedFolder.linkId(), "the same link after a reload").toBe(first);
+    await link(fakeFolder("Towers", {}));
+    expect(linkedFolder.linkId(), "a folder of the same name linked again").not.toBe(first);
+    await linkedFolder.unlink();
+    expect(linkedFolder.linkId()).toBeNull();
+  });
+
+  it("stays this page's once the folder is read back, when another tab links a folder", async () => {
+    await link(fakeFolder("Towers", {}));
+    const mine = linkedFolder.linkId();
+    reload();
+    await linkedFolder.refresh();
+    localStorage.setItem("verticopolis-linked-folder-link", "another tab's link");
+    expect(linkedFolder.linkId(), "the id this page read with the folder").toBe(mine);
+  });
+
+  it("is made once for a folder linked before links had ids, and kept", async () => {
+    await link(fakeFolder("Towers", {}));
+    localStorage.removeItem("verticopolis-linked-folder-link");
+    reload();
+    const made = linkedFolder.linkId();
+    expect(made).toEqual(expect.any(String));
+    expect(linkedFolder.linkId()).toBe(made);
+    reload();
+    expect(linkedFolder.linkId()).toBe(made);
   });
 });
 
