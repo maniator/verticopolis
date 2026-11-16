@@ -83,13 +83,19 @@
 .mode-badge.is-classic {
   color: #5a3d00;
 }
-/* ---- Bulletin / event log ---- */
+/* ---- Bulletin / event log ----
+   The lines sit newest first in the DOM (src/ui/uiStatus.ts), so a plain
+   column scrolls from the newest line. A reversed column would scroll from
+   its bottom and open the window on the oldest line. The game keeps a
+   scrolled reader's place itself (renderLog), so the browser's anchoring
+   is off. */
 #log {
   flex: 1;
   overflow-y: auto;
   font-size: 11px;
   display: flex;
-  flex-direction: column-reverse;
+  flex-direction: column;
+  overflow-anchor: none;
   gap: 3px;
   padding: 4px 6px;
 }

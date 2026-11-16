@@ -67,7 +67,7 @@ function unlocked(catalog: Catalog, kind: FacilityKind, star: number): boolean {
 }
 
 /** Hard ceiling on rendered bulletin lines. The DOM node count is held CONSTANT
- *  at this, append the newest, prune the oldest, so scrollback is generous yet
+ *  at this, add the newest, prune the oldest, so scrollback is generous yet
  *  a long session can never grow the log big enough to jank a slow phone. */
 const LOG_DOM_CAP = 300;
 
@@ -283,10 +283,18 @@ function renderLog(ui: UI, src: HudSource): void {
   const toastAt = new Set(
     batch.flatMap((e, i) => (e.kind === "good" || e.kind === "bad" ? [i] : [])).slice(-TOAST_MAX),
   );
+  // Newest first in the DOM: the log scrolls from its top, so the window opens
+  // on the newest line. A reader scrolled down to older lines keeps their
+  // place: the lines added above them push the content down by exactly the
+  // growth in scrollHeight, which is added back below. The browser's own
+  // scroll anchoring is off on #log (Safari has none, and Chromium would
+  // correct twice), and at the top nothing is read or moved.
+  const log = ui.el.log;
+  const heightBefore = log.scrollTop > 0 ? log.scrollHeight : -1;
   batch.forEach((e, i) => {
-    // Append the bulletin line FIRST, it's the durable record; a throwing
+    // Add the bulletin line FIRST, it's the durable record; a throwing
     // toast() must never drop it or stall the rest of the batch.
-    ui.el.log.appendChild(logLine(e)); // column-reverse ⇒ newest lands on top
+    log.prepend(logLine(e));
     if (toastAt.has(i)) {
       try {
         ui.toast(e.text, e.kind);
@@ -297,9 +305,13 @@ function renderLog(ui: UI, src: HudSource): void {
   });
   // APPEND + PRUNE, never rebuild: the bulletin keeps accepting new lines forever
   // (it never freezes at the cap) while the DOM node count stays CONSTANT, so a
-  // long session can't grow it big enough to jank a slow phone. Oldest is the
-  // first child under column-reverse.
-  while (ui.el.log.childElementCount > LOG_DOM_CAP) ui.el.log.firstElementChild!.remove();
+  // long session can't grow it big enough to jank a slow phone. The oldest
+  // line is the last child.
+  // Measured before the prune: lines dropped at the bottom never move the
+  // ones above the reader, and at the cap they would cancel the growth out.
+  const grew = heightBefore >= 0 ? log.scrollHeight - heightBefore : 0;
+  while (log.childElementCount > LOG_DOM_CAP) log.lastElementChild!.remove();
+  if (grew) log.scrollTop += grew;
   // The toast rail already spoke a toasted newest line.
   showNewsInStatusBar(batch[batch.length - 1].text, document, !toastAt.has(batch.length - 1));
 }
@@ -342,7 +354,8 @@ export function resetLog(ui: UI, src: HudSource, greeting?: string): void {
   ui.lastLogSeq = lines.length ? lines[lines.length - 1].seq : 0;
   const shown: Pick<LogEntry, "text" | "kind">[] = lines.slice(-LOG_DOM_CAP);
   if (greeting && shown.length === 0) shown.push({ text: greeting, kind: "info" });
-  ui.el.log.replaceChildren(...shown.map((e) => logLine(e)));
+  // Newest first, as `renderLog` adds them.
+  ui.el.log.replaceChildren(...shown.map((e) => logLine(e)).reverse());
   showNewsInStatusBar(shown[shown.length - 1]?.text ?? "");
 }
 

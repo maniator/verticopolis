@@ -89,6 +89,61 @@ test.describe("the menu bar on a desktop", () => {
     await expect(page.locator("#tower-win")).toBeHidden();
   });
 
+  test("the Bulletin opens on its newest line and keeps a scrolled reader in place", async ({ page }) => {
+    await boot(page);
+    // Real engine lines: a row of offices opens one by one, each saying so.
+    const opened = await page.evaluate(() => {
+      const g = (window as any).game;
+      g.setSpeed(0);
+      g.sim.money = 1e9;
+      const built = [] as boolean[];
+      for (let x = 100; x < 280; x++) built.push(g.sim.build("lobby", 1, x).ok);
+      for (let f = 2; f <= 4; f++) for (let x = 100; x < 280; x++) built.push(g.sim.build("floor", f, x).ok);
+      for (let f = 2; f <= 4; f++) for (let x = 100; x + 9 <= 280; x += 9) built.push(g.sim.build("office", f, x).ok);
+      g.syncSim();
+      g.sim.tick(24 * 60);
+      return built.every(Boolean);
+    });
+    expect(opened, "the setup tower built").toBe(true);
+    const log = page.locator("#bulletin-win #log");
+    await expect(log.locator(".log-line").first()).toBeVisible();
+    // The log overflows its window, so where it opens matters.
+    const fit = await log.evaluate((el) => ({ scroll: el.scrollHeight, client: el.clientHeight }));
+    expect(fit.scroll).toBeGreaterThan(fit.client);
+    // Closed and opened again, it shows its newest line at the top.
+    await page.locator('#bulletin-win [data-close="bulletin-win"]').click();
+    await page.locator("#mb-tower").click();
+    await page.locator("#mb-win-bulletin").click();
+    await expect(page.locator("#bulletin-win")).toBeVisible();
+    const top = await log.evaluate((el) => {
+      const box = el.getBoundingClientRect();
+      const hit = document.elementFromPoint(box.left + box.width / 2, box.top + 8)?.closest(".log-line");
+      return { hit: hit?.textContent ?? null, newest: ((g) => g.enginePort.logText(g.reader.header.logSeq) ?? null)((window as any).game) };
+    });
+    expect(top.newest).not.toBeNull();
+    expect(top.hit).toBe(top.newest);
+    // A reader scrolled back stays on the same line while new ones arrive.
+    const lineAt = () =>
+      log.evaluate((el) => {
+        const box = el.getBoundingClientRect();
+        const hit = document.elementFromPoint(box.left + box.width / 2, box.top + 8)?.closest(".log-line");
+        return hit ? Array.prototype.indexOf.call(el.children, hit) : -1;
+      });
+    await log.evaluate((el) => (el.scrollTop = 120));
+    const before = await lineAt();
+    const added = await page.evaluate(() => {
+      const g = (window as any).game;
+      const seq = g.reader.header.logSeq;
+      for (let x = 100; x < 280; x++) g.sim.build("floor", 5, x);
+      for (let x = 100; x + 9 <= 280; x += 9) g.sim.build("office", 5, x);
+      g.syncSim();
+      g.sim.tick(24 * 60);
+      return g.reader.header.logSeq - seq;
+    });
+    expect(added).toBeGreaterThan(0);
+    await expect.poll(lineAt).toBe(before + added);
+  });
+
   test("with no fire or pests, the Tower menu grays both calls for help, and only Modern lists the exterminator", async ({ page }) => {
     await boot(page);
     const modern = await page.evaluate(() => (window as any).game.reader.header.mode === "modern");

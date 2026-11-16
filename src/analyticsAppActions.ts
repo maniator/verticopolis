@@ -120,6 +120,9 @@ export type AppActionName =
   // its help links, `detail` `first_tower`, `modes` or `whats_new`.
   | "window_close"
   | "window_move"
+  // The player scrolled the Bulletin down to older lines, latched once per
+  // page life (src/ui/bulletinReadBack.ts). No detail.
+  | "bulletin_read_back"
   | "welcome_shown"
   | "welcome_close"
   | "welcome_link"
