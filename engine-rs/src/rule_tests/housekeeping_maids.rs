@@ -247,6 +247,28 @@ fn crews_come_in_no_faster_than_the_car_can_carry_them() {
     );
 }
 
+/// A crew whose only way in is the guests' elevator still comes in behind a
+/// long line of guests: only housekeepers count toward the hold.
+#[test]
+fn a_line_of_guests_never_holds_a_crew_out() {
+    let mut sim = base_tower(42, GameMode::Classic);
+    let crew = place(&mut sim, Kind::Housekeeping, 2, X0 + 8);
+    let car = sim.tower.transports.last().unwrap();
+    let load = (car.cars as f64 * car.kind.car_capacity()) as usize;
+    for _ in 0..=load {
+        let Simulation {
+            ref mut crowd,
+            ref tower,
+            ..
+        } = sim;
+        crate::crowd::spawn::add(crowd, tower, 1, 2, None, Some(X0 + 20)).expect("a way up");
+    }
+    sim.clock.minutes = 12.0 * HOUR;
+    sim.bring_in_crews();
+    assert_eq!(sim.crowd.crew_roster.get(&crew), Some(&HK_MAIDS_PER_UNIT));
+    assert!(!sim.log.iter().any(|e| e.text.contains("coming in late")));
+}
+
 #[test]
 fn a_maid_carries_the_cleaning_hold() {
     let mut sim = base_tower(37, GameMode::Classic);

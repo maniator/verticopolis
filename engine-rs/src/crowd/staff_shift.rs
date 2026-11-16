@@ -72,16 +72,18 @@ pub fn way_on(
     })
 }
 
-/// How many people wait for each shaft on each floor, keyed by (floor,
-/// shaft): what `spawn_commuter` reads to keep a crew in step with the car
-/// it would board.
+/// How many housekeepers wait for each shaft on each floor, keyed by
+/// (floor, shaft): what `spawn_commuter` reads to keep a crew in step with
+/// the car it would board. Guests are left out: on a commute by the guests'
+/// elevator their line is no crew's doing, and a crew held behind it would
+/// never come in.
 pub type Queues = FastMap<(i64, i64), i64>;
 
-/// The queue at every shaft, from one walk over the crowd.
+/// The housekeepers' queue at every shaft, from one walk over the crowd.
 pub fn queues(crowd: &Crowd) -> Queues {
     let mut q = Queues::default();
     for p in &crowd.people {
-        if matches!(p.state, PState::Waiting | PState::ToShaft) {
+        if p.staff && matches!(p.state, PState::Waiting | PState::ToShaft) {
             if let Some(&sid) = p.shafts.get(p.leg) {
                 let n = q.get(&(p.floor, sid)).copied().unwrap_or(0);
                 q.insert((p.floor, sid), n + 1);
@@ -96,8 +98,9 @@ pub fn queues(crowd: &Crowd) -> Queues {
 pub enum BringIn {
     /// On the way in from the lobby.
     Coming,
-    /// Kept out for now: an elevator on their way in already has a full load
-    /// of every car waiting for it on the floor they would board (#2332).
+    /// Kept out for now: an elevator on their way in already has housekeepers
+    /// enough to fill every car waiting for it on the floor they would board
+    /// (#2332).
     /// They come at a later hour, as the queue clears.
     Held,
     /// No route leads from the lobby to the housekeeping room.
