@@ -105,6 +105,9 @@ export interface Scene {
   expectBootFallback?: boolean;
   build?: () => void; // stage the sim once for this scene (runs in-page)
   assertUnits?: number; // after build, assert the tower has ≥ this many units
+  // The shots build on one another (milestones grows the tower rank by rank):
+  // once one fails, the rest are recorded failed and never taken (#931).
+  chained?: boolean;
   shots: Shot[];
 }
 

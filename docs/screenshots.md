@@ -101,7 +101,10 @@ builder reads **canon facility widths from the sim** (never hardcoded strides,
 which would overlap and gap a floor), and a pre-capture sweep clears stray toasts
 / event dialogs a running sim may pop. One flake logs `✗ name` and the run
 continues; the tail prints a per-directory count and a non-zero exit on any
-failure.
+failure. A scene whose shots build on one another (`milestones` grows the tower
+rank by rank) sets `chained: true`: once one of its shots fails, the rest are
+logged as failed, naming the one that failed first, and are never taken, so
+they can't write pictures of a half-built state over the committed files.
 
 The gallery renders on the Rust engine (#1353), which loads the tower at set
 points (`scripts/screenshot-engine.ts`): before a ticking builder's ticks, once a

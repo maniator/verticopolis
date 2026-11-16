@@ -13,6 +13,8 @@ export const MILESTONE_SCENES: Scene[] = [
   {
     id: "milestones",
     outDir: "milestones",
+    // Each star grows the last one's tower, so a failed rank stops the rest.
+    chained: true,
     shots: [
       { name: "1-star", setup: (page) => growToStar(page, 1), wait: 700 },
       { name: "2-star", setup: (page) => growToStar(page, 2), wait: 700 },
