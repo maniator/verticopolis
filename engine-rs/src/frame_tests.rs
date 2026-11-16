@@ -38,12 +38,29 @@ fn the_named_slots_read_their_values() {
     // and again when Modern homes began needing parking in #1973), and once
     // Modern residents came home as people it matched the star, so people
     // leave until the crowd differs from the shafts and the small set values.
+    // Once Modern stairs and escalators moved slower than the cars, too few
+    // people were left to leave, so a small crowd grows by copies instead.
     let small = [STAR_SET, WEATHER_SET, THIEF_SET, 0.0];
-    sim.crowd.people.pop();
-    while sim.crowd.people.len() == sim.tower.transports.len()
-        || small.contains(&(sim.crowd.people.len() as f64))
-    {
-        assert!(sim.crowd.people.pop().is_some(), "a crowd to set apart");
+    let someone = sim
+        .crowd
+        .people
+        .first()
+        .cloned()
+        .expect("a crowd to set apart");
+    let grow = sim.crowd.people.len() <= small.len() + 1;
+    let crowd_matches =
+        |n: usize, sim: &Simulation| n == sim.tower.transports.len() || small.contains(&(n as f64));
+    if grow {
+        sim.crowd.people.push(someone.clone());
+    } else {
+        sim.crowd.people.pop();
+    }
+    while crowd_matches(sim.crowd.people.len(), &sim) {
+        if grow {
+            sim.crowd.people.push(someone.clone());
+        } else {
+            assert!(sim.crowd.people.pop().is_some(), "a crowd to set apart");
+        }
     }
     sim.clock.minutes = 1001.0;
     sim.tower.revision = 1002;

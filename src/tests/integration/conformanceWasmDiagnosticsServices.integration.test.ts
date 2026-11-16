@@ -230,13 +230,15 @@ const nearCapacity = (card: Card): boolean => card.slots[CARD_NEAR_CAPACITY] ===
  *  the Modern ransom scenario's one blast landed on floor 42 and gutted no
  *  cinema, parking, restaurant or shop, and no housekeeping room went
  *  inert. Once hotel guests check in and out as people, that blast lands on
- *  floor 8 and guts a cinema again. */
+ *  floor 8 and guts a cinema again. Once Modern escalators and stairs moved
+ *  slower than the cars, it lands in the lobby and guts a cinema, a
+ *  housekeeping room, a parking floor and ramp, a restaurant and a shop. */
 const CORPUS_SECTIONS: readonly string[] = [
   "commercial:lobbyFar:false", "commercial:lobbyFar:true",
   "hotel:counts:dirty", "hotel:counts:infested", "hotel:counts:other", "hotel:excluded:dirty", "hotel:excluded:infested", "hotel:excluded:other",
   "housekeeping:adequate", "housekeeping:nominalShortfall", "housekeeping:observedShortfall",
   "inert:amusements", "inert:boutiqueBay", "inert:cinema", "inert:daycare", "inert:fastFood", "inert:foodHall",
-  "inert:nightclub",
+  "inert:housekeeping", "inert:nightclub", "inert:parking", "inert:parkingRamp", "inert:restaurant", "inert:shop",
   "inert:skyBar", "inert:spa",
   "parking:connected", "parking:connected:short", "parking:disconnected", "parking:ramp", "parking:ramp:short",
   "recycling:met:filling",

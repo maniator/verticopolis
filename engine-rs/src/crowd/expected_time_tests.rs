@@ -169,6 +169,46 @@ fn a_floor_or_two_goes_on_foot_but_a_tower_does_not() {
 }
 
 #[test]
+fn an_escalator_is_a_ride_people_take_a_long_way() {
+    // The same eleven floors as the stairs above, by escalator: a ride, so
+    // it beats the elevator's wait and boarding all the way up.
+    let mut sim = tower(GameMode::Modern, 12);
+    shaft(&mut sim, Kind::ElevatorStandard, 4, 1, 12);
+    let mut flights = Vec::new();
+    for floor in 1..12 {
+        flights.push(shaft(&mut sim, Kind::Escalator, 20, floor, floor + 1));
+    }
+    sim.crowd.begin_step();
+    let r = sim.crowd.route(&sim.tower, 1, 12, None, None).unwrap();
+    assert_eq!(r.shafts, flights, "eleven floors up rides the escalators");
+}
+
+#[test]
+fn a_flight_costs_the_climb_the_motion_takes() {
+    // The router's price for a floor on foot is the time the mode's
+    // climbing speed takes, plus the effort of stairs or the step off an
+    // escalator, so the router and the people agree.
+    let mut sim = tower(GameMode::Modern, 3);
+    let stairs = shaft(&mut sim, Kind::Stairs, 4, 1, 2);
+    let escalator = shaft(&mut sim, Kind::Escalator, 20, 2, 3);
+    let router = build(&sim.tower);
+    let flight = |id: i64| {
+        let costs: Vec<i64> = (router.links.iter().flatten())
+            .filter(|l| matches!(l.how, Move::Flight { shaft } if shaft == id))
+            .map(|l| l.tenths)
+            .collect();
+        assert!(!costs.is_empty(), "no flight on shaft {id}");
+        assert!(costs.iter().all(|&c| c == costs[0]), "{costs:?}");
+        costs[0]
+    };
+    let climb = |kind: Kind| 1.0 / GameMode::Modern.climb_speed(kind);
+    let on_foot = climb(Kind::Stairs) + STAIRS_EFFORT_SECONDS;
+    let riding = climb(Kind::Escalator) + ESCALATOR_STEP_OFF_SECONDS;
+    assert_eq!(flight(stairs), tenths(on_foot));
+    assert_eq!(flight(escalator), tenths(riding));
+}
+
+#[test]
 fn a_transfer_route_names_each_floor_it_changes_at() {
     let mut sim = tower(GameMode::Modern, 25);
     let express = shaft(&mut sim, Kind::ElevatorExpress, 4, 1, 15);
