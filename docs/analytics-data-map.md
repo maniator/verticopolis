@@ -258,6 +258,20 @@ counts a press on its links to the game (owner, 2026-11-16): `detail` is
 reads Back to game and closes the tab. The File menu's Play
 Verticopolis/Back to Game item is `help_menu_pick` `game` instead.
 
+## Help links on problem lines
+
+`app_action` `help_topic_open` counts a press on a problem line's **Help**
+link (#2036): the room card's gripe, Won't lease, notice, access, long walk
+and lobby lines, and the Tower Statistics rows that read as a problem.
+`detail` is the surface and the topic joined by an underscore: `inspector`
+(the room card, the hover card's F1 included) or `stats`, then a topic code
+from `src/ui/helpTopics.ts` (`parking`, `recycling`, `noise`, `rent`,
+`elevatorWaits`, `walkwayWaits`, `shops`, `access`, `farWalk`, `lobby`,
+`wontLease`, `notice`, `housekeeping`, `cockroaches`, `nextStar`). It carries
+no room, floor or tower detail. F1 with no card up opens the guide and counts
+as `help_open`. The "Help links from problem lines" dashboard tile splits it
+by `detail`.
+
 ## Sponsor link taps
 
 `app_action` `sponsor_click` counts a tap on a link to the GitHub Sponsors page (owner, 2026-11-14). `detail` is `splash` for the title screen's corner link, `menu` for the menu bar's Help > Sponsor Verticopolis, or `help` for any help site link to that page (the sidebar's "Sponsor Verticopolis" entry and the front page's text). It is the tap only: whether anyone went on to sponsor is never known here, and the Android app shows no Sponsor link. It is not latched, so read taps, or sessions that tapped, and say which. A click, keyboard Enter or middle-click counts; a link opened from the right-click menu does not. The "Sponsor link taps" dashboard tile splits it by `detail`.

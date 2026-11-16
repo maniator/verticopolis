@@ -15,6 +15,7 @@ import { copyText } from "./copyText";
 import { announceLive } from "../game/liveRegion";
 import { isGameMode } from "../shared/types";
 import { HELP_ADDRESS, helpUrl } from "../helpAddress";
+import { HELP_TOPIC_PATH, isHelpTopic } from "./helpTopics";
 
 /**
  * The in-game Help: About this game (the game panel's "About…") and the
@@ -201,6 +202,66 @@ function openPageInTab(ui: UI, href: string, source: GameHelpSource, blocked: ()
   pause.begin();
   pause.untilReturn({ win: window, doc: document });
   return true;
+}
+
+/** A Help link's surface, read from where it sits: the room card (the hover
+ *  card or the phone's editor fold-in) or Tower Statistics. */
+function topicSurface(link: Element): "inspector" | "stats" {
+  return link.closest("#inspector, #editor") ? "inspector" : "stats";
+}
+
+/**
+ * The problem lines' Help links (#2036): the room card's and Tower
+ * Statistics'. One listener on the page catches a press on any of them and
+ * opens its page the way the Help menu does, in a new tab with the tower
+ * paused until the player is back; offline it says where the page is
+ * instead. A middle-click follows the link's own href.
+ *
+ * The desktop hover card lets the pointer through, so its links cannot be
+ * pressed there: F1 opens the first one on the card showing, and with no card
+ * up it opens the guide, as F1 does in a Windows program. With a dialog open,
+ * F1 is left alone.
+ *
+ * Cost: two idle listeners; nothing runs until a click or a key.
+ */
+export function wireHelpTopics(ui: UI): void {
+  // One pair of listeners for the page, whichever UI asked last (the game
+  // makes one; a test makes one per case), so a press never opens two tabs.
+  topicUi = ui;
+  if (topicsWired) return;
+  topicsWired = true;
+  document.addEventListener("click", (e) => {
+    const link = (e.target as Element | null)?.closest?.<HTMLAnchorElement>("a[data-help-topic]");
+    if (link && topicUi) openHelpTopic(topicUi, link, e);
+  });
+  window.addEventListener("keydown", (e) => {
+    if (e.key !== "F1" || e.repeat || e.ctrlKey || e.metaKey || e.altKey || e.shiftKey || !topicUi) return;
+    if ((topicUi.el.modal as HTMLDialogElement).open) return;
+    e.preventDefault();
+    const card = topicUi.el.inspector;
+    const link = card.classList.contains("hidden") ? null : card.querySelector<HTMLAnchorElement>("a[data-help-topic]");
+    if (link) openHelpTopic(topicUi, link);
+    else showHelp(topicUi);
+  });
+}
+
+/** The UI the page's Help link listeners serve ({@link wireHelpTopics}). */
+let topicUi: UI | null = null;
+let topicsWired = false;
+
+/** Open a Help link's page, counted as `help_topic_open` with
+ *  `surface_topic` (inspector_parking, stats_recycling). */
+function openHelpTopic(ui: UI, link: HTMLAnchorElement, e?: MouseEvent): void {
+  const topic = link.dataset.helpTopic;
+  if (!isHelpTopic(topic)) return;
+  e?.preventDefault();
+  const path = HELP_TOPIC_PATH[topic];
+  if (!navigator.onLine) {
+    ui.sayVisibly(`The manual needs an internet connection. It is at ${HELP_ADDRESS}.`);
+    return;
+  }
+  trackAppAction("help_topic_open", `${topicSurface(link)}_${topic}`);
+  openPageInTab(ui, path, () => ui.sayVisibly(`The manual could not open. It is at ${HELP_ADDRESS}.`), e);
 }
 
 /** About this game, from the game panel's "About…": the version, the engine

@@ -199,9 +199,18 @@ export function expectRealLines(g: CardTextGolden): void {
   }
 }
 
-/** A card's parts as the text a player reads, one entry per line. */
+/** A card's parts as the text a player reads, one entry per line. A problem
+ *  line's Help link (#2036) is left out: it points at the manual and says no
+ *  more than "Help", and src/game/portUnitDiagnostics.test.ts holds which
+ *  lines carry one. */
 export const textOf = (parts: readonly unknown[]): string[] =>
-  parts.map((p) => (renderToFragment(html`${p}`).textContent ?? "").trim()).filter(Boolean);
+  parts
+    .map((p) => {
+      const frag = renderToFragment(html`${p}`);
+      for (const link of frag.querySelectorAll("a.help-topic")) link.remove();
+      return (frag.textContent ?? "").trim();
+    })
+    .filter(Boolean);
 
 export function readCardTextGolden(mode: CardTextMode, name: string): CardTextGolden {
   return JSON.parse(readFileSync(pathOf(mode, name, "json"), "utf8")) as CardTextGolden;

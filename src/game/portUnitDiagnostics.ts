@@ -13,6 +13,8 @@ import {
   wontLeaseCopy,
   type GripeCopyFacts,
 } from "../ui/tenantDiagnosticCopy";
+import { gripeTopic, type HelpTopic } from "../ui/helpTopics";
+import { helpTopicLink } from "../ui/templates/helpTopicLink";
 
 /**
  * Decode the active engine's diagnostic facts into presentation text.
@@ -32,10 +34,13 @@ interface Layout {
 const bad = "var(--bad)";
 const good = "var(--good)";
 
-function line(copy: string, color?: string): TemplateResult {
+/** One card line, with a Help link to its page in the manual (#2036) when
+ *  the line names a problem the manual answers. */
+function line(copy: string, color?: string, topic?: HelpTopic): TemplateResult {
+  const help = topic ? helpTopicLink(topic, "inspector") : "";
   return color
-    ? html`<div style="color:${color}">${copy}</div>`
-    : html`<div>${copy}</div>`;
+    ? html`<div style="color:${color}">${copy}${help}</div>`
+    : html`<div>${copy}${help}</div>`;
 }
 
 /** Lines from another fact record and where the card puts them: `lines`
@@ -99,8 +104,9 @@ export function createPortUnitParts(
     Number.isSafeInteger(code) && code >= 0 ? values[code] : undefined;
   const flag = (r: PortRecord, field: string): boolean => at(r, field) === 1;
 
-  /** Engine supplies cause and contributing flags, never a TypeScript recomputation. */
-  const cause = (r: PortRecord, prefix: "gripe" | "leaseGripe"): string | undefined => {
+  /** Engine supplies cause and contributing flags, never a TypeScript
+   *  recomputation. The words, and the manual page that answers them. */
+  const cause = (r: PortRecord, prefix: "gripe" | "leaseGripe"): { copy: string; topic?: HelpTopic } | undefined => {
     if (!flag(r, prefix)) return undefined;
     const reason = named(layout.vacateReasons, at(r, `${prefix}Cause`));
     if (!reason) return undefined;
@@ -113,7 +119,8 @@ export function createPortUnitParts(
       coverage: at(r, `${prefix}Coverage`),
       floorReachable: flag(r, `${prefix}FloorReachable`),
     };
-    return gripeCopy(facts);
+    const copy = gripeCopy(facts);
+    return copy === undefined ? undefined : { copy, topic: gripeTopic(reason, facts.binding) };
   };
 
   return (id) => {
@@ -123,12 +130,12 @@ export function createPortUnitParts(
     const head: TemplateResult[] = [];
     let out = head;
     const access = accessCopy(named(layout.accessLines, at(r, "access")) ?? "");
-    if (access) out.push(line(access.text, access.bad ? bad : good));
+    if (access) out.push(access.bad ? line(access.text, bad, "access") : line(access.text, good));
     const rate = noRateCopy(named(layout.noRateLines, at(r, "noRate")) ?? "");
     if (rate) out.push(line(rate));
     const extra = supplemental?.(id);
     if (extra) out.push(...extra.lines);
-    if (flag(r, "farWalk")) out.push(line(FAR_WALK_COPY, bad));
+    if (flag(r, "farWalk")) out.push(line(FAR_WALK_COPY, bad, "farWalk"));
 
     if (flag(r, "lobby")) {
       const sinking = flag(r, "sinking");
@@ -142,16 +149,17 @@ export function createPortUnitParts(
         needsSupport: flag(r, "needsSupport"),
         clearFirst: flag(r, "clearFirst"),
       });
-      out.push(line(advice, sinking || hasSlot ? bad : undefined));
+      out.push(line(advice, sinking || hasSlot ? bad : undefined, "lobby"));
     }
     const tail: TemplateResult[] = [];
     out = tail;
 
     const main = cause(r, "gripe");
-    if (main) out.push(line(`Main gripe: ${main}`, bad));
+    if (main) out.push(line(`Main gripe: ${main.copy}`, bad, main.topic));
 
     if (flag(r, "wontLease")) {
-      out.push(line(wontLeaseCopy(cause(r, "leaseGripe"), at(r, "carry")), bad));
+      const lease = cause(r, "leaseGripe");
+      out.push(line(wontLeaseCopy(lease?.copy, at(r, "carry")), bad, lease?.topic ?? "wontLease"));
     }
 
     if (flag(r, "notice")) {
@@ -163,7 +171,10 @@ export function createPortUnitParts(
           satisfaction: at(r, "noticeSatisfaction"),
           keepAt: at(r, "keepAt"),
         });
-        lines.forEach((copy, index) => out.push(line(copy, index === 0 ? bad : undefined)));
+        // The notice's first line carries the link; a relocation is a life
+        // event no fix keeps, so it has none.
+        const topic = reason === "relocation" ? undefined : "notice";
+        lines.forEach((copy, index) => out.push(index === 0 ? line(copy, bad, topic) : line(copy)));
       }
     }
     // The amenity helping the room (#1980), named as the catalog names it.

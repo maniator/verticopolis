@@ -203,6 +203,7 @@ export class UI {
     document.getElementById("btn-help")!.addEventListener("click", () => this.showHelp("game_menu"));
     document.getElementById("btn-about")!.addEventListener("click", () => this.showAbout());
     this.el.modeBadge.addEventListener("click", (e) => help.showModeHelp(this, e)); // "tell me more"
+    help.wireHelpTopics(this); // the problem lines' Help links and F1
     document.getElementById("btn-stats")!.addEventListener("click", () => this.cb.onShowStats());
 
     this.el.towerName.addEventListener("change", () => {
