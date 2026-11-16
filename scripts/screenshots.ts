@@ -54,6 +54,7 @@ import { DIRS, DESKTOP, EXECUTABLE, PORT, BASE, assertReady, captureCrop, isPhon
 import { pgAdoptTestClock, pgClearTransients, pgDismissSplash, pgFlushFrames, pgFrame, pgMaskVersion, pgRefreshUi, pgSetClock, pgSetMapView, pgStep, pgStepNoDraw } from "./screenshot-builders.ts";
 import { armPhaseWatch, judgeAndPromote, markPhaseTarget, phaseCapturePath, stopPhaseWatch } from "./screenshot-phase-check.ts";
 import { SCENES } from "./screenshot-scenes.ts";
+import { pgNoStarUpBox } from "./scenes/starUp.ts";
 import { SETTLE_AFTER_SETUP, assertEnginePackage, HOSTED_FIX, beginSettleStep, checkHosted, checkSettleList, hostedSnapshot, installShotHelpers, settleUnlessSettled } from "./screenshot-engine.ts";
 import { resolveOnlyFilter } from "../src/tests/screenshotOnlyFilter.ts";
 import { runSceneShots } from "../src/tests/screenshotChain.ts";
@@ -241,6 +242,10 @@ async function runScene(browser: Browser, scene: Scene): Promise<void> {
     }
     // The 1994 desk a computer gets by default shows only in the `desk` scenes.
     if (!scene.desk) await page.addInitScript(() => localStorage.setItem("vc-desk", "off"));
+    // The star-up box opens only in the star-up scenes. Every other builder sets
+    // a tower's rating outright, which the frame loop reads as a climb; there the
+    // latch the box waits on stays empty, and the jingle and Bulletin line stay.
+    if (!scene.starUp) await page.addInitScript(pgNoStarUpBox);
     if (scene.initScript) await page.addInitScript(scene.initScript);
     await installShotHelpers(page);
     await page.goto(scene.route ? `${BASE}/${scene.route}` : BASE, { waitUntil: "networkidle" });

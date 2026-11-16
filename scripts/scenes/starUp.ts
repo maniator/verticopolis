@@ -69,10 +69,25 @@ const box = (name: string, star: number, mode: Mode, { crop = true, parked = fal
   setup: (page) => starUp(page, star, mode, parked),
 });
 
+/** In-page, before the app boots: once `window.game` is published, its
+ *  star-up latch (`pendingStarUp`) holds nothing, so the box never opens. */
+export function pgNoStarUpBox(): void {
+  let app: object | undefined;
+  Object.defineProperty(window, "game", {
+    configurable: true,
+    get: () => app,
+    set(v: object) {
+      app = v;
+      Object.defineProperty(v, "pendingStarUp", { configurable: true, get: () => null, set: () => {} });
+    },
+  });
+}
+
 export const STAR_UP_SCENES: Scene[] = [
   {
     id: "star-up",
     outDir: "features",
+    starUp: true,
     shots: [
       box("star-up-classic-2", 2, "classic"),
       box("star-up-classic-3", 3, "classic"),
@@ -86,6 +101,7 @@ export const STAR_UP_SCENES: Scene[] = [
   {
     id: "star-up-mobile",
     outDir: "features",
+    starUp: true,
     viewport: PHONE,
     shots: [box("star-up-classic-2-mobile", 2, "classic", { crop: false }), box("star-up-modern-3-mobile", 3, "modern", { crop: false })],
   },
