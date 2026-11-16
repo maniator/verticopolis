@@ -520,7 +520,10 @@ export default defineConfig(({ command }) => ({
         // the game shell: the PWA needs nothing that large, so it stays out
         // of every web player's offline precache (a review catch on the PR
         // that added it).
-        globIgnores: ["**/gallery*", "**/404.html", "**/notFound-*.js", "**/preview*", "**/og-image*", "help/**", "**/icon-1024x1024.png", "**/sw-navigation-fallback.js", "**/debugHud-*.js"],
+        // `help-bridge.html` and its `helpBridge-*.js` entry are the frame the
+        // manual's Help bar reaches the game through (#2035), only ever loaded
+        // inside the manual, so they stay out of the precache too.
+        globIgnores: ["**/gallery*", "**/404.html", "**/notFound-*.js", "**/preview*", "**/og-image*", "help/**", "**/icon-1024x1024.png", "**/sw-navigation-fallback.js", "**/debugHud-*.js", "**/help-bridge.html", "**/helpBridge-*.js"],
         // The worker's own helper, loaded by importScripts and updated with it,
         // so it stays out of the precache.
         importScripts: ["sw-navigation-fallback.js"],
@@ -596,6 +599,9 @@ export default defineConfig(({ command }) => ({
         // output root, with a 404 status, for any path nothing else answers.
         notFound: resolve(__dirname, "src/404.html"),
         preview: resolve(__dirname, "src/preview.html"),
+        // The frame the manual's Help bar reaches the running game through
+        // (src/helpBridge.ts, #2035); network only, like the pages above.
+        helpBridge: resolve(__dirname, "src/help-bridge.html"),
       },
       output: {
         // Split the Excalibur engine into its own vendor chunk, separate from our

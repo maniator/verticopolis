@@ -259,6 +259,12 @@ counts a press on its links to the game (owner, 2026-11-16): `detail` is
 reads Back to game and closes the tab. The File menu's Play
 Verticopolis/Back to Game item is `help_menu_pick` `game` instead.
 
+`app_action` `help_bar_pick` counts a press on the Help bar along the bottom
+of a page the game opened (#2035): `detail` is `run` (Keep my tower running),
+`pause` (Pause it) or `back` (Back to game). The bar shows the tower's date,
+money, population and stars, which the game sends to the page over the
+browser's own channel; none of them is ever reported.
+
 ## Help links on problem lines
 
 `app_action` `help_topic_open` counts a press on a problem line's **Help**

@@ -17,6 +17,7 @@ import { isGameMode } from "../shared/types";
 import { HELP_ADDRESS, helpUrl } from "../helpAddress";
 import { HELP_TOPIC_PATH, isHelpTopic } from "./helpTopics";
 import type { HelpTopicSurface } from "./templates/helpTopicLink";
+import { hostHelpBar } from "./helpBarHost";
 
 /**
  * The in-game Help: About this game (the game panel's "About…") and the
@@ -245,6 +246,40 @@ export function wireHelpTopics(ui: UI): void {
     else showHelp(topicUi, "help_key");
   });
 }
+
+/**
+ * The game's side of the Help bar on a page it opened (#2035,
+ * src/ui/helpBarHost.ts): the tower's state for the bar's mini HUD, and its
+ * "Keep my tower running" and "Pause it" buttons, which work through this
+ * UI's Help pause. One host for the page, serving whichever UI asked last,
+ * as {@link wireHelpTopics} does.
+ */
+export function wireHelpBar(ui: UI): void {
+  barUi = ui;
+  if (barHosted) return;
+  barHosted = true;
+  const pause = () => helpPause(barUi!);
+  hostHelpBar({
+    active: () => barUi !== null && !isSplashUp(),
+    getSpeed: () => barUi!.cb.getSpeed(),
+    setSpeed: (speed) => barUi!.cb.onSpeed(speed),
+    heldForHelp: () => pause().held,
+    endHelpPause: () => pause().end(),
+    pauseForHelp: () => {
+      pause().begin();
+      pause().untilReturn({ win: window, doc: document });
+    },
+    visible: () => document.visibilityState === "visible",
+    hud: () => {
+      const text = (el: HTMLElement) => (el.textContent ?? "").trim();
+      const el = barUi!.el;
+      return { date: text(el.date), time: text(el.time), money: text(el.money), population: text(el.pop), stars: text(el.star) };
+    },
+  });
+}
+
+let barUi: UI | null = null;
+let barHosted = false;
 
 /** The UI the page's Help link listeners serve ({@link wireHelpTopics}). */
 let topicUi: UI | null = null;

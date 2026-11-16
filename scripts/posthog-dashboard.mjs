@@ -644,6 +644,12 @@ function buildInsights(ids) {
       query: trends([series("app_action", "Help menu picks")], { breakdown: "detail", display: "ActionsBar", where: [inAction(["help_menu_pick"])] }),
     },
     {
+      name: "Help bar presses",
+      description:
+        "Presses on the Help bar of a page the game opened (app_action help_bar_pick, #2035), split by detail: run (Keep my tower running), pause (Pause it) or back (Back to game), production.",
+      query: trends([series("app_action", "Help bar presses")], { breakdown: "detail", display: "ActionsBar", where: [inAction(["help_bar_pick"])] }),
+    },
+    {
       name: "Help site: Play and Back to game",
       description:
         "Presses on the help site's links to the game (app_action help_game_link), split by detail: bar_ or front_ (the title bar's button or the front page's Play) then play (loads the game) or back (Back to game in a tab the game opened, which closes it), production. The File menu's Play/Back to Game item is help_menu_pick game instead.",

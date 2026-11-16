@@ -52,6 +52,16 @@ Build a thriving high-rise, keep the people in it happy, and earn your way to th
 - [Installing and updates](/help/your-towers/installing/): play offline from your home screen
 - [Settings](/help/your-towers/settings/)
 
+## Reading while you play
+
+When the game opens this manual (from its **Help** menu, a room card's **Help** link or <kbd>F1</kbd>), your tower pauses while you read and starts again when you go back to it. A bar along the bottom of these pages then shows your tower's date, money, population and stars, and whether it is running:
+
+- **Keep my tower running** starts it again, at the speed it had. Your browser only runs a tower whose window you can see, so with the game in another tab the bar says it will run when you can see it. Put the game and this manual side by side to watch it while you read.
+- **Pause it** stops it again until you go back.
+- **Back to game** closes this page and takes you back to your tower.
+
+The bar goes away when you close the game. A page you reach from a search or a link someone sent you has no bar.
+
 Something not right, or an idea? [Report a problem](https://github.com/maniator/verticopolis/issues/new/choose). Curious how the engine works? Read the [engine docs](https://docs.verticopolis.com/).
 
 ## Supporting Verticopolis

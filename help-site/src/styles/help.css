@@ -1,6 +1,68 @@
 /* Help-only rules over the engine docs theme (docs/engine-site/src/styles/theme.css). */
 
 /* "Close this tab" when the browser keeps a game-opened tab open. */
+/* The Help bar (#2035, HelpBar.astro): the game's status bar along the
+   bottom of a page the game opened, a sunken strip of cells like the
+   game's own, with its buttons at the right. The page's end gets room for it
+   while it shows, so nothing hides under it. */
+.vc-help-bar {
+  position: fixed;
+  z-index: 30;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.75rem;
+  margin: 0;
+  padding: 0.25rem 0.5rem;
+  color: var(--r-ink);
+  background: var(--r-face);
+  box-shadow: var(--bevel-out);
+  font-size: 0.875rem;
+}
+.vc-help-bar[hidden] {
+  display: none;
+}
+.vc-help-bar p {
+  margin: 0;
+}
+.vc-help-bar-hud {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+.vc-help-bar-cell {
+  padding: 0 0.4rem;
+  box-shadow: var(--bevel-in);
+  white-space: nowrap;
+}
+.vc-help-bar-actions {
+  display: flex;
+  gap: 0.4rem;
+  margin-left: auto;
+}
+.vc-help-bar-btn {
+  padding: 0.15rem 0.6rem;
+  color: var(--r-ink);
+  background: var(--r-face);
+  border: 0;
+  box-shadow: var(--bevel-out);
+  font: inherit;
+  text-decoration: none;
+  cursor: pointer;
+}
+.vc-help-bar-btn:active {
+  box-shadow: var(--bevel-in);
+}
+.vc-help-bar-btn[hidden] {
+  display: none;
+}
+html.vc-help-bar-showing body {
+  padding-bottom: 4rem;
+}
+
 .vc-back-note {
   position: fixed;
   z-index: 20;
