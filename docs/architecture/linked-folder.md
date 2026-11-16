@@ -30,8 +30,15 @@ Towers once (Safari 11.1+, Firefox 50+, iOS 18.4+).
   writes to a scratch file and swaps it in on close, so a failed write leaves
   the old file intact. That guarantee covers replacing a file, not creating
   one: Chromium makes a new file empty before the bytes go in, so a save under
-  a new name that fails can leave an empty `.vctower` behind (backlog
-  `linked-folder-empty-file-on-failed-new-save`, #2337).
+  a new name that fails can leave an empty `.vctower` behind (#2337). The game
+  does not delete it. Instead an empty file is a free name: Save As and the
+  Auto-save copy write over a file that is empty on disk at that moment
+  without asking (nothing in it can be lost), and opening one says plainly
+  that it holds no tower. A file that has bytes again is asked about as usual.
+  Saves that pick a name (Save As and the Auto-save copy) hold one Web Lock
+  shared by every tab (`verticopolis-linked-folder-save`), so a second tab
+  can't take a file the first is still writing, which is empty until its
+  write closes, for a free one.
 - A tower opened from the folder, or saved there, is the live tower's file:
   File > Save writes it back over that very file by its name on disk, and Save
   As starts in the folder. Linking a different folder forgets it, so Save

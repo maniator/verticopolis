@@ -62,6 +62,8 @@ function fakeFolder(name: string, files: Record<string, number[]>, dirs: string[
     getFileHandle: vi.fn(async (file: string, options?: { create?: boolean }) => {
       if (dirs.includes(file)) throw new DOMException("a folder", "TypeMismatchError");
       if (!disk.has(file) && !options?.create) throw new DOMException("none", "NotFoundError");
+      // Chromium puts an empty file on disk as soon as the handle is created.
+      if (!disk.has(file)) disk.set(file, { bytes: new Uint8Array(), modified: 1500 });
       return fileHandle(file);
     }),
   };
@@ -255,6 +257,65 @@ describe("saving", () => {
     await linkedFolder.save("TOWER2", new Uint8Array([3]), false);
     expect(folder.disk.get("TOWER2.TDT")!.bytes).toEqual(new Uint8Array([9]));
     expect(folder.disk.get("TOWER2.vctower")!.bytes).toEqual(new Uint8Array([3]));
+  });
+
+  it("takes the name of the empty file a failed new-name save leaves, without asking (#2337)", async () => {
+    const folder = fakeFolder("Towers", {});
+    await link(folder);
+    folder.failNextWrite.on = true;
+    await expect(linkedFolder.save("Sky", new Uint8Array([2]), false)).rejects.toThrow("disk full");
+    expect(folder.disk.get("Sky.vctower")!.bytes, "the browser left an empty file").toEqual(new Uint8Array());
+    await linkedFolder.refresh();
+    const entry = await linkedFolder.save("Sky", new Uint8Array([3]), false);
+    expect(entry.id).toBe("Sky.vctower");
+    expect(folder.disk.get("Sky.vctower")!.bytes).toEqual(new Uint8Array([3]));
+    expect(folder.disk.has("Sky (2).vctower")).toBe(false);
+  });
+
+  it("takes an empty file's name for the Auto-save copy too, listed or only on disk", async () => {
+    const folder = fakeFolder("Towers", { "Auto-save.vctower": [] });
+    await link(folder);
+    expect((await linkedFolder.saveNew("Auto-save", new Uint8Array([3]))).id).toBe("Auto-save.vctower");
+    folder.disk.set("Sky.vctower", { bytes: new Uint8Array(), modified: 1 });
+    expect((await linkedFolder.saveNew("Sky", new Uint8Array([4]))).id).toBe("Sky.vctower");
+  });
+
+  it("still asks before writing over a listed empty tower that has bytes on disk again", async () => {
+    const folder = fakeFolder("Towers", { "Sky.vctower": [] });
+    await link(folder);
+    folder.disk.set("Sky.vctower", { bytes: new Uint8Array([5]), modified: 1 });
+    await expect(linkedFolder.save("Sky", new Uint8Array([2]), false)).rejects.toBeInstanceOf(FileNameTakenError);
+    expect((await linkedFolder.saveNew("Sky", new Uint8Array([3]))).id).toBe("Sky (2).vctower");
+    expect(folder.disk.get("Sky.vctower")!.bytes).toEqual(new Uint8Array([5]));
+  });
+
+  it("picks a name under one Web Lock shared by every tab, so two tabs never take the same empty file", async () => {
+    const held: string[] = [];
+    let tail = Promise.resolve();
+    const request = vi.fn((name: string, run: () => Promise<unknown>) => {
+      const turn = tail.then(async () => {
+        held.push(name);
+        try {
+          return await run();
+        } finally {
+          held.pop();
+        }
+      });
+      tail = turn.then(() => undefined, () => undefined);
+      return turn;
+    });
+    vi.stubGlobal("navigator", { ...navigator, locks: { request } });
+    try {
+      const folder = fakeFolder("Towers", {});
+      await link(folder);
+      const [a, b] = await Promise.all([linkedFolder.save("Sky", new Uint8Array([1]), false), linkedFolder.saveNew("Sky", new Uint8Array([2]))]);
+      expect(request.mock.calls.map(([n]) => n)).toEqual(["verticopolis-linked-folder-save", "verticopolis-linked-folder-save"]);
+      expect([a.id, b.id]).toEqual(["Sky.vctower", "Sky (2).vctower"]);
+      expect(folder.disk.get("Sky.vctower")!.bytes).toEqual(new Uint8Array([1]));
+      expect(folder.disk.get("Sky (2).vctower")!.bytes).toEqual(new Uint8Array([2]));
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it("drops a write that fails partway and keeps the old file", async () => {
