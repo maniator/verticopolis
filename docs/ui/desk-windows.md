@@ -59,7 +59,7 @@ ordinary layout. The code is `src/ui/desk/`; the numbers below live in
   `control_panel` and verbs `min`, `restore`, `max`, `unmax`, `resize`,
   `move` (the first move in a page life) and `close` (the tower's and the
   Control Panel's ✕; the Map, Bulletin and Tower Info ✕ keep their own
-  events), from whichever button, double-click, taskbar press or window menu
+  `window_close`, which a window-menu Close does not send), from whichever button, double-click, taskbar press or window menu
   did it; `desk_task` is a taskbar window button, detail `<window>_front`,
   `_min` or `_restore` (`title` on the title screen); `desk_start_open` is the
   Verticopolis button opening its menu (`title` or `tower`) and `desk_start` a

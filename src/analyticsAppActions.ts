@@ -100,9 +100,10 @@ export type AppActionName =
   // counts the tap only; whether anyone went on to sponsor is never known here.
   | "sponsor_click"
   // The version 4 windows and cards (owner, 2026-11-14, with the menu events).
-  // `window_close` is a Tower Info or Bulletin window's ✕, `detail` `tower` or
-  // `bulletin`; `window_move` is the first drag of that window this page life
-  // (latched per window, same `detail`). `welcome_shown` is the welcome window opening;
+  // `window_close` is a player's press on a Tower Info, Bulletin or Map
+  // window's ✕, `detail` `tower`, `bulletin` or `map`; `window_move` is the
+  // first drag of a window this page life (latched per window), `detail`
+  // `tower`, `bulletin`, `map` (off the desk), `dialog` or `card`. `welcome_shown` is the welcome window opening;
   // `welcome_close` is how it went, `detail` `ok`, `x`, `escape`, `backdrop`
   // or `displaced` (another dialog took its place); `welcome_link` is one of
   // its help links, `detail` `first_tower`, `modes` or `whats_new`.

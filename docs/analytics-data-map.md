@@ -310,8 +310,8 @@ The windows and cards that came with the menu bar report through `app_action`:
 
 | `action` | `detail` | When |
 | --- | --- | --- |
-| `window_close` | `tower` or `bulletin` | The Tower Info or Bulletin window's ✕ (the menus' own toggles are `menu_pick` rows) |
-| `window_move` | `tower` or `bulletin` | The first drag of that window in a page life (latched per window) |
+| `window_close` | `tower`, `bulletin` or `map` | The player's press on the Tower Info, Bulletin or Map window's own ✕ (`map` from the release after 4.7.0; through 4.7.0 a window-menu Close on the desk also sent `tower` or `bulletin`). Esc on the Map, the menus' own toggles (`menu_pick` rows) and the desk's window menu (`desk_win_menu <window>_close`, which presses the ✕ from a script) are not counted here |
+| `window_move` | `tower`, `bulletin`, `map`, `dialog` or `card` | The first drag of that window in a page life (latched per window): Tower Info, the Bulletin and the Map off the 1994 desk (on it the desk sends `desk_window <window>_move`), any dialog (one latch for all of them) or the facility card, on the desk or off it. A double-click that puts a window home is not a drag. Through 4.7.0, `tower` and `bulletin` also fired on the desk beside `desk_window`, and `map`, `dialog` and `card` did not exist; from the release after 4.7.0 they read as above |
 | `welcome_shown` | none | The welcome window opened |
 | `welcome_close` | `ok`, `x`, `escape`, `backdrop` or `displaced` | How it went: its OK, its ✕, Escape, a click beside it, or another dialog taking its place. A page closed while it is up sends none |
 | `welcome_link` | `first_tower`, `modes` or `whats_new` | One of its help links |

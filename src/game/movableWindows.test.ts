@@ -1,6 +1,9 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { GameApp } from "../main";
-import { editorPlacedByPlayer, forgetEditorPlacement, wireMovableWindows } from "./movableWindows";
+import { trackAppAction } from "../analytics";
+import { editorPlacedByPlayer, firstDragReporter, forgetEditorPlacement, reportWindowClose, wireMapWindowAnalytics, wireMovableWindows } from "./movableWindows";
+
+vi.mock("../analytics", () => ({ trackAppAction: vi.fn() }));
 
 /**
  * The facility card's and the dialog's movers: wired once, the card's spot
@@ -83,5 +86,60 @@ describe("wireMovableWindows", () => {
     mq.dispatchEvent(new Event("change"));
     expect(editorPlacedByPlayer(app)).toBe(false);
     expect(editor.style.top).toBe("");
+  });
+});
+
+describe("window analytics", () => {
+  beforeEach(() => vi.mocked(trackAppAction).mockClear());
+  afterEach(() => {
+    vi.restoreAllMocks();
+    document.body.replaceChildren();
+  });
+
+  it("sends window_move card for the facility card's first drag only", () => {
+    const { app, title } = makeApp();
+    wireMovableWindows(app);
+    dragTitle(title);
+    dragTitle(title);
+    expect(vi.mocked(trackAppAction).mock.calls).toEqual([["window_move", "card"]]);
+  });
+
+  it("reports a window's first drag once, never a move home, and only while it counts", () => {
+    let counts = false;
+    const placed = firstDragReporter("map", () => counts);
+    placed({ x: 1, y: 2 });
+    expect(trackAppAction).not.toHaveBeenCalled();
+    counts = true;
+    placed(null);
+    expect(trackAppAction).not.toHaveBeenCalled();
+    placed({ x: 3, y: 4 });
+    placed({ x: 5, y: 6 });
+    expect(vi.mocked(trackAppAction).mock.calls).toEqual([["window_move", "map"]]);
+  });
+
+  it("counts a player's press on a window's ✕ and never a script's click", () => {
+    reportWindowClose({ isTrusted: false }, "map");
+    expect(trackAppAction).not.toHaveBeenCalled();
+    reportWindowClose({ isTrusted: true }, "map");
+    expect(trackAppAction).toHaveBeenCalledWith("window_close", "map");
+  });
+
+  it("wires the Map's ✕ and its first drag off the desk", () => {
+    const root = document.createElement("div");
+    root.innerHTML = `<div class="win-title"><button type="button" class="overview-map-close">✕</button></div>`;
+    let onDesk = true;
+    const placed = wireMapWindowAnalytics(root, () => onDesk);
+    const close = root.querySelector<HTMLElement>(".overview-map-close")!;
+    close.click();
+    expect(trackAppAction).not.toHaveBeenCalled();
+    close.dispatchEvent(Object.defineProperty(new MouseEvent("click", { bubbles: true }), "isTrusted", { value: true }));
+    expect(trackAppAction).toHaveBeenCalledWith("window_close", "map");
+    vi.mocked(trackAppAction).mockClear();
+    placed({ x: 1, y: 2 });
+    expect(trackAppAction).not.toHaveBeenCalled();
+    onDesk = false;
+    placed({ x: 3, y: 4 });
+    placed({ x: 5, y: 6 });
+    expect(vi.mocked(trackAppAction).mock.calls).toEqual([["window_move", "map"]]);
   });
 });
