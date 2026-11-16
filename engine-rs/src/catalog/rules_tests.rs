@@ -134,3 +134,20 @@ fn the_1994_export_refuses_what_the_catalog_rules_out() {
         assert!(!refused_for_mode, "{save}");
     }
 }
+
+/// Modern's star-up box adds the heads-up and Classic's does not, and both
+/// catalogs publish the duties by rating as `{ star, id }` records.
+#[test]
+fn star_duties_are_published() {
+    let classic = catalog(GameMode::Classic);
+    let modern = catalog(GameMode::Modern);
+    assert!(!classic.rules.announces_star_duties && modern.rules.announces_star_duties);
+    for mode in MODES {
+        let c = catalog(mode);
+        assert_eq!(c.rules.star_duties, crate::star_duties::star_duties(mode));
+        let v = serde_json::to_value(&c).unwrap();
+        let first = &v["rules"]["starDuties"][0];
+        assert_eq!(first["star"], serde_json::json!(2));
+        assert_eq!(first["id"], serde_json::json!("emergencies"));
+    }
+}

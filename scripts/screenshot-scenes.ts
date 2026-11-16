@@ -48,6 +48,7 @@ import { PALETTE_FIT_SCENES } from "./scenes/paletteFit.ts";
 import { SPLIT_LOT_SCENES } from "./scenes/splitLot.ts";
 import { LINKED_FOLDER_SCENES } from "./scenes/linkedFolder.ts";
 import { DESK_SCENES } from "./scenes/desk.ts";
+import { STAR_UP_SCENES } from "./scenes/starUp.ts";
 
 export const SCENES: Scene[] = [
   ...SHOWCASE_SCENES,
@@ -70,4 +71,5 @@ export const SCENES: Scene[] = [
   ...SPLIT_LOT_SCENES,
   ...LINKED_FOLDER_SCENES,
   ...DESK_SCENES,
+  ...STAR_UP_SCENES,
 ];

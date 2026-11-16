@@ -148,6 +148,10 @@ class GameApp implements GameAppPorts {
   /** Last star rating we played a promotion jingle for (so 2★–5★ promotions
    * each get the jingle FR-58 promises, not only the final TOWER win). @internal */
   lastStar = 1;
+  /** A climb the star-up box has yet to announce (`starUpFlow`). @internal */
+  pendingStarUp: { from: number; to: number } | null = null;
+  /** Whether the star-up box is up: it stops time while open. @internal */
+  shownStar = false;
   /** In-progress transport drag (anchor tile/floor). @internal */
   transportStart: { x: number; floor: number } | null = null;
   /** Deferred touch paint-tool press (tile/floor). On touch a strip is NOT laid on

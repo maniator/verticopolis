@@ -37,6 +37,8 @@ describe("the Classic and Modern summary", () => {
     venueFlights: "Spiral stairs and switchback escalators beside venues",
     expressStopsOn15thFloors: "Express stops", // #1527
     fedUpWait: null, // the same wait turns a person red in both modes
+    announcesStarDuties: "warns what the rating starts asking for",
+    starDuties: null, // the duties themselves, which the star-up box words
   };
   const RULE_TO_HELP: Record<string, string | null> = {
     ...CATALOG_RULE_TO_HELP,

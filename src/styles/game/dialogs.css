@@ -337,3 +337,24 @@ dialog.crash-card::backdrop {
   min-height: 1.2em;
   color: var(--muted);
 }
+
+/* The star-up message box: the new rating as a row of stars, the duties as a
+   plain list, and the parking line red while the tower is short. */
+.modal-box .star-up-rating {
+  margin: 4px 0 2px;
+  font-size: 22px;
+  letter-spacing: 2px;
+  color: #a07000;
+  text-align: center;
+}
+.modal-box .star-up-duties {
+  /* Keeps the shared list indent, so each dot sits inside the text margin. */
+  margin: 0 0 6px 18px;
+}
+.modal-box .star-up-parking.short {
+  color: var(--bad-ink);
+}
+/* The next rating's checklist keeps each count on one line ("5,760 / 10,000"). */
+.modal-box .star-up-next .col.nsr .v {
+  white-space: nowrap;
+}

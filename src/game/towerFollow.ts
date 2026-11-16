@@ -49,6 +49,8 @@ export function followEngineTower(app: GameApp, follow: TowerFollow): void {
   const drawn = app.reader.tower.revision;
   app.reader.update();
   app.lastStar = app.reader.header.star;
+  // A box not yet shown belongs to the tower or the step it was earned in.
+  app.pendingStarUp = null;
   // A step keeps the scene, whose syncs follow the revision the step raised, as after an
   // edit. One that did not raise it (the TypeScript reference engine's) rebuilds it instead,
   // under the same camera. Any other tower gets a new render view, since the renderer's

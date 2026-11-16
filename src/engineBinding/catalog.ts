@@ -22,6 +22,7 @@ export type {
   CatalogRentCadence,
   CatalogRules,
 } from "../catalog/catalogTypes";
+export type { CatalogStarDuty, StarDutyId } from "../catalog/starDutyTypes";
 
 /** The catalog for `mode`, parsed and checked. Refuses, by name, a binding
  *  without the export, a refusal or unparsable reply, a shape version other
@@ -99,7 +100,8 @@ const ECONOMY: Shape = {
   ticketPriceDefault: (v) => v === null || typeof v === "string",
   autoBridgeToggleable: bool,
 };
-const RULES: Shape = { variantHouseholds: bool, previewNamesRefusal: bool, scheduleAssist: bool, buildsWhilePaused: bool, exportsTo1994: bool, quotesLobbyDistance: bool, tallSkyLobbies: bool, maxLobbyHeight: size, decorativePassersBy: bool, shadedLook: bool, venueFlights: bool, expressStopsOn15thFloors: bool, fedUpWait: positive };
+const RULES: Shape = { variantHouseholds: bool, previewNamesRefusal: bool, scheduleAssist: bool, buildsWhilePaused: bool, exportsTo1994: bool, quotesLobbyDistance: bool, tallSkyLobbies: bool, maxLobbyHeight: size, decorativePassersBy: bool, shadedLook: bool, venueFlights: bool, expressStopsOn15thFloors: bool, fedUpWait: positive, announcesStarDuties: bool, starDuties: Array.isArray };
+const STAR_DUTY: Shape = { star: size, id: oneOf("emergencies", "suiteParking", "officeParking", "homeParking", "recycling", "vipVisits", "hotelGuestsUncounted", "bombThreats") };
 const EXTERMINATOR: Shape = { calloutFee: amount, perRoomFee: amount };
 const FILM: Shape = { key: (v) => v === "new" || v === "classic" || v === "blockbuster", label: (v) => typeof v === "string", price: amount };
 const TICKET_PRICE: Shape = { key: text, label: text, incomeMult: positive, pickMult: positive };
@@ -217,7 +219,8 @@ function checkCatalog(c: Record<string, unknown>): void {
   const calendars = economy.calendars as unknown[];
   if (calendars.length === 0) refuse("economy.calendars", "no calendar");
   calendars.forEach((cal, i) => checkShape(cal, CALENDAR, `economy.calendars[${i}]`));
-  checkShape(c.rules, RULES, "rules");
+  const rules = checkShape(c.rules, RULES, "rules");
+  (rules.starDuties as unknown[]).forEach((d, i) => checkShape(d, STAR_DUTY, `rules.starDuties[${i}]`));
 
   const facilities = c.facilities as unknown[];
   if (facilities.length === 0) refuse("facilities", "no facility");

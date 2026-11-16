@@ -76,6 +76,9 @@ export type AppActionName =
   // box at a Modern founding (unticked by default), auto_bridge the Settings switch.
   | "found_bridged"
   | "auto_bridge"
+  // The star-up message box opened, detail the mode and the rating it
+  // announces, such as `modern-3`.
+  | "star_notice"
   // Coarse engagement bit, latched once per session via `trackAppActionOnce`:
   // `volume` = the player touched the audio sliders (latched so the pointer-move
   // slider cannot flood; no value, just the fact). (Deliberately NOT tracked, per

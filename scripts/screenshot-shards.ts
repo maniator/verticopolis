@@ -110,6 +110,9 @@ export const SHARDS: Record<string, string[]> = {
   // shard, every design and option): one canon tower on the desk, the title
   // window, and the startup screen on a computer and a phone.
   desk: ["desk", "desk-title", "startup-sunrise", "startup-sunrise-phone"],
+  // The star-up message box (r/SimTower feedback, 2026-11-16): every rating's
+  // box in both modes and one on a phone, each over a small frozen tower.
+  "star-up": ["star-up", "star-up-mobile"],
   misc: ["tablet", "mobile", "mobile-landscape", "construction", "crowd", "fire", "install-affordance-mobile", "overview-map", "overview-map-phone", "overview-map-gaps", "overview-map-gaps-phone", "palette-fit"],
 };
 

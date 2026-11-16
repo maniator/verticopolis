@@ -14,6 +14,7 @@ use crate::gameplay::{EmergencyDecision, EmergencyKind, EmergencySource, Gamepla
 use crate::rng::Rng;
 use crate::services::with_thousands;
 use crate::sim::{LogKind, Simulation};
+use crate::star::{BOMB_THREATS_FROM_STAR, EMERGENCIES_FROM_STAR};
 use crate::tower::UnitState;
 
 #[path = "events_fire.rs"]
@@ -129,7 +130,7 @@ impl Simulation {
         self.process_fires();
         self.maybe_santa();
         self.maybe_thief();
-        if self.star < 2 {
+        if self.star < EMERGENCIES_FROM_STAR {
             return;
         }
         let roll = self.rng.next();
@@ -145,7 +146,7 @@ impl Simulation {
         }
         let ransom_allowed = self.events.bomb.is_none()
             && (!self.mode.ransom_needs_security() || self.has_any(Kind::Security));
-        if self.star >= 4 && roll < fire_chance + 0.05 && ransom_allowed {
+        if self.star >= BOMB_THREATS_FROM_STAR && roll < fire_chance + 0.05 && ransom_allowed {
             let message = "💣 A caller demands a $300,000 ransom or a bomb detonates. Pay, or have Security search the tower.".to_string();
             self.events.pending = Some(PendingChoice {
                 kind: "bombThreat",
