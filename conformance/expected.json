@@ -88,14 +88,14 @@
     "express-basements-classic": [
       {"label":"start","state":"a4d043bbec335bd6","crowd":"7cb294222cbe0188","events":"4f53cda18c2baa0c"},
       {"label":"built","state":"bf1350b00668b030","crowd":"7cb294222cbe0188","events":"39dcbbdc2e273270"},
-      {"label":"t+720","state":"fc7f0f1b2cb24287","crowd":"7eb63a7107694022","events":"4f53cda18c2baa0c"},
-      {"label":"t+1440","state":"f7dcf2fa22801925","crowd":"cc5b0f1944ec6b2f","events":"4f53cda18c2baa0c"},
-      {"label":"b2-off-reloaded","state":"f7dcf2fa22801925","crowd":"cc5b0f1944ec6b2f","events":"4f53cda18c2baa0c"},
-      {"label":"extended-down","state":"c4db145edd351e0b","crowd":"cc5b0f1944ec6b2f","events":"cbd823f9ebed5799"},
-      {"label":"t+2160","state":"f3120596b528a183","crowd":"402de906fb703700","events":"4f53cda18c2baa0c"},
-      {"label":"t+2880","state":"4e05842dbf9270c9","crowd":"b80ecdcbda6b6495","events":"d0d104edd547fe26"},
-      {"label":"extended-reloaded","state":"4e05842dbf9270c9","crowd":"b80ecdcbda6b6495","events":"4f53cda18c2baa0c"},
-      {"label":"final","state":"4e05842dbf9270c9","crowd":"b80ecdcbda6b6495","events":"4f53cda18c2baa0c"}
+      {"label":"t+720","state":"52c335092d88cbcb","crowd":"e8c2c04fca4df047","events":"4f53cda18c2baa0c"},
+      {"label":"t+1440","state":"e42c4ff2506c33ea","crowd":"cc71b65e707c32b0","events":"4f53cda18c2baa0c"},
+      {"label":"b2-off-reloaded","state":"e42c4ff2506c33ea","crowd":"cc71b65e707c32b0","events":"4f53cda18c2baa0c"},
+      {"label":"extended-down","state":"c76a933e67a15819","crowd":"cc71b65e707c32b0","events":"cbd823f9ebed5799"},
+      {"label":"t+2160","state":"3aa63934e90a54bb","crowd":"8b318645bc90dc20","events":"4f53cda18c2baa0c"},
+      {"label":"t+2880","state":"e36e841ad370475a","crowd":"9803bd9f48b952e0","events":"d0d104edd547fe26"},
+      {"label":"extended-reloaded","state":"e36e841ad370475a","crowd":"9803bd9f48b952e0","events":"4f53cda18c2baa0c"},
+      {"label":"final","state":"e36e841ad370475a","crowd":"9803bd9f48b952e0","events":"4f53cda18c2baa0c"}
     ],
     "fire-rescue-ignored-modern": [
       {"label":"start","state":"8d349c3c29e96f2d","crowd":"7cb294222cbe0188","events":"4f53cda18c2baa0c"},
@@ -432,11 +432,11 @@
       {"label":"edited","state":"fd455d1ea2b9a7e2","crowd":"7cb294222cbe0188","events":"4f53cda18c2baa0c"},
       {"label":"offices-off-market","state":"555b91e3e98e3238","crowd":"7cb294222cbe0188","events":"14d20142df968562"},
       {"label":"repriced","state":"69baf3fec1753128","crowd":"7cb294222cbe0188","events":"a8441de0e3d2e8ab"},
-      {"label":"t+360","state":"158010eff08fa283","crowd":"701afd3307154e0f","events":"4f53cda18c2baa0c"},
-      {"label":"t+720","state":"f6a5899c5d5ca7aa","crowd":"2825a1b0403d9265","events":"4f53cda18c2baa0c"},
-      {"label":"t+1080","state":"1c4a46f8af657b61","crowd":"ff78379961735b91","events":"4f53cda18c2baa0c"},
-      {"label":"t+1440","state":"412ec8ca5d155eeb","crowd":"8a9314178466435c","events":"4f53cda18c2baa0c"},
-      {"label":"final","state":"412ec8ca5d155eeb","crowd":"8a9314178466435c","events":"4f53cda18c2baa0c"}
+      {"label":"t+360","state":"0601a1107efffc1e","crowd":"611d351dfd630ccb","events":"4f53cda18c2baa0c"},
+      {"label":"t+720","state":"fcf19826bda1c033","crowd":"4cf3d7b5852b10ff","events":"4f53cda18c2baa0c"},
+      {"label":"t+1080","state":"7a725c550c099e2c","crowd":"34f5fdbe314bbb28","events":"4f53cda18c2baa0c"},
+      {"label":"t+1440","state":"22adec3cac5b5090","crowd":"530ae26b10b34000","events":"4f53cda18c2baa0c"},
+      {"label":"final","state":"22adec3cac5b5090","crowd":"530ae26b10b34000","events":"4f53cda18c2baa0c"}
     ],
     "player-edits-modern": [
       {"label":"start","state":"335c99a2e6da3b0c","crowd":"7cb294222cbe0188","events":"4f53cda18c2baa0c"},
@@ -450,18 +450,21 @@
     ],
     "ransom-declined-classic": [
       {"label":"start","state":"a4d043bbec335bd6","crowd":"7cb294222cbe0188","events":"4f53cda18c2baa0c"},
-      {"label":"t+15000","state":"148bc13fa689177a","crowd":"438deffa8ff97d27","events":"d0d104edd547fe26"},
-      {"label":"ransom-demanded","state":"e465b545996a1c07","crowd":"1f18b57b18a524f0","events":"4f53cda18c2baa0c"},
-      {"label":"ransom-refused","state":"997ef8cd9e64d6fc","crowd":"1f18b57b18a524f0","events":"24515c05ffd7214a"},
-      {"label":"t+18600","state":"19fb99a517557783","crowd":"1f18b57b18a524f0","events":"4f53cda18c2baa0c"},
-      {"label":"t+18960","state":"064a9ba17957685b","crowd":"1f18b57b18a524f0","events":"4f53cda18c2baa0c"},
-      {"label":"t+19320","state":"fbd584a7c27234c1","crowd":"6c5935e94cd25785","events":"4fd5bfad7081b4a6"},
-      {"label":"t+19680","state":"d65d397f65a0f00b","crowd":"969cc4c764c09fb6","events":"4f53cda18c2baa0c"},
-      {"label":"t+20040","state":"5019b45afa3dd808","crowd":"e89b5ee8c3523a5b","events":"4f53cda18c2baa0c"},
-      {"label":"t+20400","state":"50f312ce439c8195","crowd":"9ac2ab4a5e61c628","events":"4f53cda18c2baa0c"},
-      {"label":"t+20760","state":"377e80750356360c","crowd":"6d5ee0d9ce4828cc","events":"4f53cda18c2baa0c"},
-      {"label":"t+21120","state":"f668d0d8f710263b","crowd":"d90c6cf14e914949","events":"4f53cda18c2baa0c"},
-      {"label":"final","state":"f668d0d8f710263b","crowd":"d90c6cf14e914949","events":"4f53cda18c2baa0c"}
+      {"label":"t+15000","state":"23a9e36b56ff9268","crowd":"4c6771f0fa82cc5f","events":"4f53cda18c2baa0c"},
+      {"label":"t+30000","state":"42c1dccaab2c2d1b","crowd":"0043ca85c07cc951","events":"4f53cda18c2baa0c"},
+      {"label":"t+45000","state":"4f658a3feb68bb54","crowd":"62ab6d1b02d510c3","events":"4f53cda18c2baa0c"},
+      {"label":"t+60000","state":"be23f2047d5ebd59","crowd":"2c4c04669d38bfa6","events":"4f53cda18c2baa0c"},
+      {"label":"ransom-demanded","state":"84d70ac47211c7b9","crowd":"891bd57e65f394f4","events":"4f53cda18c2baa0c"},
+      {"label":"ransom-refused","state":"28601ae96679d984","crowd":"891bd57e65f394f4","events":"24515c05ffd7214a"},
+      {"label":"t+71880","state":"e181e888400cab0b","crowd":"891bd57e65f394f4","events":"4f53cda18c2baa0c"},
+      {"label":"t+72240","state":"27f64be685ee92e9","crowd":"891bd57e65f394f4","events":"4f53cda18c2baa0c"},
+      {"label":"t+72600","state":"437c6c498238a742","crowd":"bb5e085a1929f49f","events":"e77180e908cff894"},
+      {"label":"t+72960","state":"a3c0b0b2fa565b42","crowd":"b5cea144a95c7081","events":"4f53cda18c2baa0c"},
+      {"label":"t+73320","state":"0a5ca70ada77de69","crowd":"005a11373f8cf439","events":"4f53cda18c2baa0c"},
+      {"label":"t+73680","state":"94f741bf2524f9d2","crowd":"86e9068512b166f3","events":"4f53cda18c2baa0c"},
+      {"label":"t+74040","state":"93f90db49aa9f22a","crowd":"345632f41e4850ca","events":"4f53cda18c2baa0c"},
+      {"label":"t+74400","state":"8410e8683cfdbc9e","crowd":"8e0227c611dc723f","events":"8776d2c62a248a70"},
+      {"label":"final","state":"8410e8683cfdbc9e","crowd":"8e0227c611dc723f","events":"4f53cda18c2baa0c"}
     ],
     "ransom-declined-modern": [
       {"label":"start","state":"335c99a2e6da3b0c","crowd":"7cb294222cbe0188","events":"4f53cda18c2baa0c"},
@@ -529,11 +532,11 @@
     "star-climb-classic": [
       {"label":"start","state":"856c1ad16f6c9c3e","crowd":"7cb294222cbe0188","events":"4f53cda18c2baa0c"},
       {"label":"two-stars","state":"890bd63667b52f84","crowd":"7cb294222cbe0188","events":"f7216981caf7a527"},
-      {"label":"t+1440","state":"bda301a02954708f","crowd":"5903d2076c646e20","events":"9eff04bacf4ce3a0"},
-      {"label":"t+2880","state":"2543542899e35097","crowd":"e53a82ddc237a21f","events":"d0d104edd547fe26"},
-      {"label":"t+4320","state":"0ffc7e29509d7e72","crowd":"e1d04eea0e569ca1","events":"4f53cda18c2baa0c"},
-      {"label":"three-stars","state":"0ffc7e29509d7e72","crowd":"e1d04eea0e569ca1","events":"4f53cda18c2baa0c"},
-      {"label":"final","state":"19042c741a1fd45c","crowd":"5a3197a1377d0842","events":"4f53cda18c2baa0c"}
+      {"label":"t+1440","state":"babf557d731d6b12","crowd":"9e41c3bc4cc94039","events":"9eff04bacf4ce3a0"},
+      {"label":"t+2880","state":"432378a4e5966966","crowd":"506a7503cf558e70","events":"4f53cda18c2baa0c"},
+      {"label":"t+4320","state":"7107167d1f5cd36e","crowd":"6d23b231588a6115","events":"4f53cda18c2baa0c"},
+      {"label":"three-stars","state":"7107167d1f5cd36e","crowd":"6d23b231588a6115","events":"4f53cda18c2baa0c"},
+      {"label":"final","state":"8f11c537b8014eb6","crowd":"93e13664646a4aa5","events":"4f53cda18c2baa0c"}
     ],
     "starter-classic": [
       {"label":"start","state":"55800d6aacc6a4a5","crowd":"ffab01a633931504","events":"61704aba4769df8d"},
