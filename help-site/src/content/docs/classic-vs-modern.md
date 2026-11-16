@@ -33,7 +33,7 @@ Every tower runs one of two sets of rules. You choose when you found the tower, 
 | Full elevator cars | Stop at every call they answer | Pass a waiting floor and stop only to let riders off ([Elevators](/help/building/elevators/#keeping-the-waits-short)) |
 | Elevator schedules | The hour-by-hour grid | Adds presets, auto-tune and advice ([Elevators](/help/building/elevators/)) |
 | Building while paused | Not allowed | Allowed |
-| Towers on one lot | One tower: the ground lobby is one stretch | Several, each on its own stretch of ground lobby ([Floors and lobbies](/help/building/floors-and-lobbies/#the-ground-lobby)) |
+| Towers on one lot | One tower: the ground lobby is one stretch | Several, each on its own stretch of ground lobby with its own front door and doorman ([Floors and lobbies](/help/building/floors-and-lobbies/#the-ground-lobby)) |
 | Bulldozing lobbies | Lobbies stay for good | Any lobby tile sells; the lot keeps its last ground lobby tile ([Bulldoze and undo](/help/building/bulldoze-and-undo/)) |
 | Tall lobbies | Only the ground lobby can rise 2 or 3 stories | Sky lobbies can rise too ([Floors and lobbies](/help/building/floors-and-lobbies/#tall-lobbies)) |
 | Build hints | A refused spot says why when you click | Hovering a refused spot says why first |

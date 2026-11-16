@@ -5,6 +5,8 @@ import { lobbyVariant } from "../sprites";
 import type { TowerEngine } from "./TowerEngine";
 import { hallDoors } from "../lobbyHalls";
 import { relightHallDoors, syncHallDoors } from "./towerHallDoors";
+import { stampGroundEntrances } from "../groundEntrances";
+import { towerCatalog } from "../../catalog/towerCatalog";
 
 /**
  * The scene sync's structure pass: the floor and lobby cells of the structure
@@ -66,14 +68,24 @@ export function syncStructureTiles(engine: TowerEngine): readonly UnitView[] {
   // between halls of different heights (#2068).
   const hallFloors = new Map<number, Set<number>>();
   for (const r of tall.runs) hallFloors.set(r.floor, new Set());
-  const floor1Lobbies: UnitView[] = [];
+  // The floor-1 lobby columns, and, when each tower on the lot has its own
+  // front door, every column a ground-floor unit covers (the towers' extents).
+  const groundLobby: number[] = [];
+  const buildings: number[] | null = towerCatalog(engine.sim).rules.frontDoorPerTower ? [] : null;
   const seenS = new Set<ex.Tile>();
   for (const u of units) {
     if (u.kind !== "floor" && u.kind !== "lobby") {
       rooms.push(u);
+      if (buildings && u.floor === 1) for (let dx = 0; dx < u.width; dx++) buildings.push(u.x + dx);
       continue;
     }
-    if (u.kind === "lobby" && u.floor === 1) floor1Lobbies.push(u);
+    if (u.floor === 1) {
+      // Tiles are one wide in the sim; reading the width costs nothing.
+      for (let dx = 0; dx < u.width; dx++) {
+        if (u.kind === "lobby") groundLobby.push(u.x + dx);
+        buildings?.push(u.x + dx);
+      }
+    }
     if (u.kind === "lobby") hallFloors.get(u.floor)?.add(u.x);
     // Floor/lobby units are one tile wide, so a unit maps to one cell.
     const cell = engine.structTileMap.getTile(u.x, topFloor - u.floor);
@@ -97,7 +109,8 @@ export function syncStructureTiles(engine: TowerEngine): readonly UnitView[] {
   // The floor-1 entrance map comes from this pass's own lobby list, and the
   // lobby cells are painted after it, so a newly placed leftmost tile takes
   // the grand entrance graphic on the same sync it is added.
-  refreshFloor1EntranceMap(engine, floor1Lobbies);
+  groundLobby.sort((a, b) => a - b);
+  stampGroundEntrances(engine.floor1EntranceMap, groundLobby, buildings);
   syncHallDoors(engine, hallDoors(tall, (floor, x) => hallFloors.get(floor)?.has(x) ?? false));
   for (const [cell, u, story, height] of lobbies) paintCell(cell, lobbyTileGfx(engine, u, story, height));
   for (const cell of engine.structTiles) {
@@ -154,69 +167,9 @@ function entranceGfx(engine: TowerEngine, kind: "grand-left" | "grand-right" | "
 
 /** Which entrance (if any) the floor-1 lobby tile at grid `x` should render
  *  as. A plain lookup in the per-tile map computed by
- *  {@link refreshFloor1EntranceMap} on each full tile pass of syncScene,
+ *  `stampGroundEntrances` (`../groundEntrances`) on each full tile pass of syncScene,
  *  and read by that pass and by a lighting-only lobby repaint (the only
  *  syncs that read it). */
 function floor1EntranceKind(engine: TowerEngine, x: number): "grand-left" | "grand-right" | "grand-solo" | "service" | "none" {
   return engine.floor1EntranceMap.get(x) ?? "none";
-}
-
-/** Walk the tower's floor-1 lobby tiles, group them into contiguous runs,
- *  and stamp the grand entrance onto the LEFTMOST run and the service door
- *  onto the RIGHTMOST run. Populating a per-tile map (rather than checking
- *  global min/max) keeps every entrance sprite anchored to real neighboring
- *  tiles, so a gap in the middle of the lobby (mid-remodel bulldoze) cannot
- *  produce an orphan grand-left half-facade with nothing next to it.
- *
- *  Rules:
- *    - Leftmost run of width ≥ 2: `runStart` -> grand-left, `runStart+1` -> grand-right.
- *    - Leftmost run of width 1 (toy tower): `runStart` -> grand-solo.
- *    - Rightmost run's rightmost tile -> service, IFF that tile is not
- *      already claimed by the grand entrance AND there is room past the
- *      grand span. When the rightmost run is the SAME as the leftmost run,
- *      "room past the grand span" means the run has more tiles than the
- *      grand takes (so 1/2-tile lobbies are all grand, no service). When
- *      the rightmost run is DIFFERENT from the leftmost run, it always has
- *      room by construction, so any distinct rightmost run gets service on
- *      its rightmost tile (even width 1). */
-function refreshFloor1EntranceMap(engine: TowerEngine, floor1Lobbies: readonly UnitView[]): void {
-  engine.floor1EntranceMap.clear();
-  // Every floor-1 lobby tile position (lobby units are always width 1 in the
-  // sim, but reading u.width for defense costs nothing).
-  const tiles: number[] = [];
-  for (const u of floor1Lobbies) {
-    for (let dx = 0; dx < u.width; dx++) tiles.push(u.x + dx);
-  }
-  if (tiles.length === 0) return;
-  tiles.sort((a, b) => a - b);
-  // Find the leftmost and rightmost contiguous runs. Both come from the same
-  // sorted list; a single pass locates the first run's end and the last
-  // run's start.
-  let firstRunEnd = 0;
-  while (firstRunEnd + 1 < tiles.length && tiles[firstRunEnd + 1] === tiles[firstRunEnd] + 1) {
-    firstRunEnd++;
-  }
-  let lastRunStart = tiles.length - 1;
-  while (lastRunStart > 0 && tiles[lastRunStart - 1] === tiles[lastRunStart] - 1) {
-    lastRunStart--;
-  }
-  const firstStart = tiles[0];
-  const firstEnd = tiles[firstRunEnd] + 1; // exclusive
-  const firstWidth = firstEnd - firstStart;
-  // Grand entrance on the leftmost run.
-  if (firstWidth >= 2) {
-    engine.floor1EntranceMap.set(firstStart, "grand-left");
-    engine.floor1EntranceMap.set(firstStart + 1, "grand-right");
-  } else {
-    engine.floor1EntranceMap.set(firstStart, "grand-solo");
-  }
-  // Service door on the rightmost run's rightmost tile, but only if that
-  // tile isn't already claimed by the grand entrance.
-  const lastRightX = tiles[tiles.length - 1];
-  const grandSpan = firstWidth >= 2 ? 2 : 1;
-  const sameRunAsFirst = lastRunStart <= firstRunEnd;
-  const roomPastGrand = sameRunAsFirst ? firstWidth > grandSpan : true;
-  if (roomPastGrand && !engine.floor1EntranceMap.has(lastRightX)) {
-    engine.floor1EntranceMap.set(lastRightX, "service");
-  }
 }

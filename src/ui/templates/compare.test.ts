@@ -35,6 +35,7 @@ describe("the Classic and Modern summary", () => {
     decorativePassersBy: "Decorative passers-by stroll busy corridors", // #2091
     shadedLook: "People lit from the upper left, in shaded rooms", // #2097
     venueFlights: "Spiral stairs and switchback escalators beside venues",
+    frontDoorPerTower: "with its own front door and doorman",
     expressStopsOn15thFloors: "Express stops", // #1527
     fedUpWait: null, // the same wait turns a person red in both modes
     announcesStarDuties: "warns what the rating starts asking for",
