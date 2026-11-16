@@ -16,6 +16,7 @@ import { announceLive } from "../game/liveRegion";
 import { isGameMode } from "../shared/types";
 import { HELP_ADDRESS, helpUrl } from "../helpAddress";
 import { HELP_TOPIC_PATH, isHelpTopic } from "./helpTopics";
+import type { HelpTopicSurface } from "./templates/helpTopicLink";
 
 /**
  * The in-game Help: About this game (the game panel's "About…") and the
@@ -164,8 +165,8 @@ function leaveForTab(ui: UI, e: MouseEvent): void {
 }
 
 /** The guide: the Help site's front page in a new tab, from the Help menu's
- *  Player's Manual (`game_menu`), the title screen's How to Play (`title`)
- *  and the tooling handle `ui.showHelp(source)`. `help_open` and the page's
+ *  Player's Manual (`game_menu`), the title screen's How to Play (`title`),
+ *  F1 with no room card up (`help_key`) and the tooling handle `ui.showHelp(source)`. `help_open` and the page's
  *  landing both report `source` (#2037). */
 export function showHelp(ui: UI, source: GameHelpSource): void {
   trackAppAction("help_open", source);
@@ -206,7 +207,7 @@ function openPageInTab(ui: UI, href: string, source: GameHelpSource, blocked: ()
 
 /** A Help link's surface, read from where it sits: the room card (the hover
  *  card or the phone's editor fold-in) or Tower Statistics. */
-function topicSurface(link: Element): "inspector" | "stats" {
+function topicSurface(link: Element): HelpTopicSurface {
   return link.closest("#inspector, #editor") ? "inspector" : "stats";
 }
 
@@ -241,7 +242,7 @@ export function wireHelpTopics(ui: UI): void {
     const card = topicUi.el.inspector;
     const link = card.classList.contains("hidden") ? null : card.querySelector<HTMLAnchorElement>("a[data-help-topic]");
     if (link) openHelpTopic(topicUi, link);
-    else showHelp(topicUi);
+    else showHelp(topicUi, "help_key");
   });
 }
 
@@ -260,8 +261,9 @@ function openHelpTopic(ui: UI, link: HTMLAnchorElement, e?: MouseEvent): void {
     ui.sayVisibly(`The manual needs an internet connection. It is at ${HELP_ADDRESS}.`);
     return;
   }
-  trackAppAction("help_topic_open", `${topicSurface(link)}_${topic}`);
-  openPageInTab(ui, path, () => ui.sayVisibly(`The manual could not open. It is at ${HELP_ADDRESS}.`), e);
+  const surface = topicSurface(link);
+  trackAppAction("help_topic_open", `${surface}_${topic}`);
+  openPageInTab(ui, path, surface, () => ui.sayVisibly(`The manual could not open. It is at ${HELP_ADDRESS}.`), e);
 }
 
 /** About this game, from the game panel's "About…": the version, the engine

@@ -243,13 +243,14 @@ link never carries them. The codes: `game_menu` (Help > Player's Manual, or
 the desk's Verticopolis menu), `title` (How to Play), `mode_badge` (the Tower
 panel's mode badge), `compare` (a link in the Classic vs Modern table),
 `welcome` (the version 4 welcome), `update_prompt` (All release notes),
-`about` (the privacy link), and `inspector` and `stats`, reserved for a
-problem's help link (sent once #2036 lands); `game` for a page the game opened without naming where (an older build,
+`about` (the privacy link), `inspector` and `stats` (a problem line's Help
+link on the room card or in Tower Statistics, #2036), and `help_key` (F1 with
+no room card up); `game` for a page the game opened without naming where (an older build,
 still cached in a tab or an installed app); `direct` for every visit the game did not open (a
 shared or saved link, a search, the gallery or the "page not found" page). A
 reload of a tab the game opened reports its source again from that tab's
 `sessionStorage`. Landings from builds before the change carry no `detail`.
-In the game, `help_open` carries `detail` `game_menu` or `title` the same way.
+In the game, `help_open` carries `detail` `game_menu`, `title` or `help_key` the same way.
 The "Help landings by source" and "In-game Help opens" dashboard tiles split
 them. `app_action` `help_game_link`
 counts a press on its links to the game (owner, 2026-11-16): `detail` is

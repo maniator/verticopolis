@@ -72,7 +72,7 @@ describe("the problem lines' Help links", () => {
     link.dispatchEvent(press);
     expect(press.defaultPrevented).toBe(true);
     expect(open).toHaveBeenCalledTimes(1);
-    expect(open).toHaveBeenCalledWith("/help/tower/ratings/?from=game#what-wears-a-rating-down", "_blank");
+    expect(open).toHaveBeenCalledWith("/help/tower/ratings/?from=game&via=inspector#what-wears-a-rating-down", "_blank");
     expect(sent.trackAppAction).toHaveBeenCalledWith("help_topic_open", "inspector_noise");
     expect(speed.now()).toBe(0);
     leaveAndReturn();
@@ -124,7 +124,7 @@ describe("the problem lines' Help links", () => {
     const open = vi.spyOn(window, "open").mockReturnValue({} as Window);
     showCard();
     expect(pressF1().defaultPrevented).toBe(true);
-    expect(open).toHaveBeenCalledWith("/help/rooms/services/?from=game#parking", "_blank");
+    expect(open).toHaveBeenCalledWith("/help/rooms/services/?from=game&via=inspector#parking", "_blank");
     expect(sent.trackAppAction).toHaveBeenCalledWith("help_topic_open", "inspector_parking");
   });
 
@@ -133,8 +133,8 @@ describe("the problem lines' Help links", () => {
     const open = vi.spyOn(window, "open").mockReturnValue({} as Window);
     showCard().classList.add("hidden");
     pressF1();
-    expect(open).toHaveBeenCalledWith("/help/?from=game", "_blank");
-    expect(sent.trackAppAction).toHaveBeenCalledWith("help_open");
+    expect(open).toHaveBeenCalledWith("/help/?from=game&via=help_key", "_blank");
+    expect(sent.trackAppAction).toHaveBeenCalledWith("help_open", "help_key");
   });
 
   it("marks a room card that holds a Help link, so the desktop card names F1", () => {

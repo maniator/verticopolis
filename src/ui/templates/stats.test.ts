@@ -351,7 +351,7 @@ describe("the problem rows' Help links (#2036)", () => {
 
   it("points every link at the manual, marked as opened by the game", () => {
     const link = cellAfter(body({ stats: { parkingSpaces: 2 } }), "Parking spaces")!.querySelector<HTMLAnchorElement>("a.help-topic")!;
-    expect(link.getAttribute("href")).toBe("/help/rooms/services/?from=game#parking");
+    expect(link.getAttribute("href")).toBe("/help/rooms/services/?from=game&via=stats#parking");
     expect(link.getAttribute("aria-label")).toBe("Help on parking");
   });
 });

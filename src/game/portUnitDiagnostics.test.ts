@@ -300,7 +300,7 @@ describe("the problem lines' Help links (#2036)", () => {
     const link = frag.querySelector<HTMLAnchorElement>("a.help-topic")!;
     expect(link.textContent).toBe("Help");
     expect(link.getAttribute("aria-label")).toBe("Help on long walks");
-    expect(link.getAttribute("href")).toContain("stairs-and-escalators/?from=game#how-far-will-people-walk");
+    expect(link.getAttribute("href")).toContain("stairs-and-escalators/?from=game&via=inspector#how-far-will-people-walk");
     expect(link.target).toBe("_blank");
   });
 });
