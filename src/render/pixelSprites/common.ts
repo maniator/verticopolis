@@ -137,8 +137,14 @@ export function busyStations(stations: number, people: number, seed: number): Se
   // not meant to reach here, and would come out one lower than the atlas.
   const want = Math.max(0, Math.min(Math.floor(people), stations));
   if (!(want > 0)) return new Set(); // nobody here, or a nonsense count
+  // Mix the seed before the station index joins it (#1069). Callers pass
+  // `figureSeed * k`, so with `hash(seed + i)` two rooms whose figure seeds
+  // differ by one ranked station `i + k` of one like station `i` of the other,
+  // and a floor of identical rooms showed one scatter shifted k seats along.
+  const room = (hash(seed) * 4294967296) | 0;
+  const rank = (i: number) => hash(room ^ Math.imul(i + 1, 0x9e3779b9));
   const ranked = Array.from({ length: stations }, (_, i) => i);
-  ranked.sort((a, b) => hash(seed + b) - hash(seed + a) || a - b); // index breaks a tie
+  ranked.sort((a, b) => rank(b) - rank(a) || a - b); // index breaks a tie
   return new Set(ranked.slice(0, want));
 }
 
