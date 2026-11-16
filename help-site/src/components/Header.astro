@@ -31,7 +31,7 @@ import { siteHref } from "../../site.mjs";
   import { backToOpenGame, takeFromGameFlag } from "../../../src/ui/fromGame";
   import { injectPageTelemetry } from "../../../src/telemetry";
   import { trackAppAction } from "../../../src/analytics";
-  import { helpPageDetail, landingAction, sponsorTapListener } from "../../site.mjs";
+  import { gameLinkDetail, helpPageDetail, landingAction, sponsorTapListener } from "../../site.mjs";
 
   // The site's base as Astro built it: "" at the root of the manual's own
   // host, "/help" on the game's.
@@ -47,15 +47,19 @@ import { siteHref } from "../../site.mjs";
   const noteSponsorTap = sponsorTapListener(() => trackAppAction("sponsor_click", "help"));
   document.addEventListener("click", noteSponsorTap);
   document.addEventListener("auxclick", noteSponsorTap);
-  if (takeFromGameFlag(location, history)) {
-    // The title bar's game button and the front page's Play button: the
-    // game is already open in another tab. The bar writes its label twice
-    // (the full one and a phone's short one), so each copy changes.
-    for (const play of document.querySelectorAll<HTMLAnchorElement>("a[data-game-link]")) {
-      const labels = play.querySelectorAll<HTMLElement>(".vc-full, .vc-short");
-      if (labels.length === 0) play.textContent = "Back to game";
-      for (const label of labels) label.textContent = "Back to game";
-      play.addEventListener("click", (e) => backToOpenGame(e));
-    }
+  const fromGame = takeFromGameFlag(location, history);
+  for (const play of document.querySelectorAll<HTMLAnchorElement>("a[data-game-link]")) {
+    // Each press on the title bar's game button or the front page's Play
+    // counts as help_game_link (site.mjs gameLinkDetail), before Back to
+    // game closes the tab; the beacon still leaves.
+    const detail = gameLinkDetail(!!play.closest(".title-screen"), fromGame);
+    play.addEventListener("click", () => trackAppAction("help_game_link", detail));
+    if (!fromGame) continue;
+    // The game is already open in another tab. The bar writes its label
+    // twice (the full one and a phone's short one), so each copy changes.
+    const labels = play.querySelectorAll<HTMLElement>(".vc-full, .vc-short");
+    if (labels.length === 0) play.textContent = "Back to game";
+    for (const label of labels) label.textContent = "Back to game";
+    play.addEventListener("click", (e) => backToOpenGame(e));
   }
 </script>

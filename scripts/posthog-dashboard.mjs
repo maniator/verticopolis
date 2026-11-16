@@ -582,6 +582,12 @@ function buildInsights(ids) {
       query: trends([series("app_action", "Help menu picks")], { breakdown: "detail", display: "ActionsBar", where: [inAction(["help_menu_pick"])] }),
     },
     {
+      name: "Help site: Play and Back to game",
+      description:
+        "Presses on the help site's links to the game (app_action help_game_link), split by detail: bar_ or front_ (the title bar's button or the front page's Play) then play (loads the game) or back (Back to game in a tab the game opened, which closes it), production. The File menu's Play/Back to Game item is help_menu_pick game instead.",
+      query: trends([series("app_action", "Game link presses")], { breakdown: "detail", display: "ActionsBar", where: [inAction(["help_game_link"])] }),
+    },
+    {
       name: "Page not found",
       description: "The 404 page (app_action not_found_view, detail game or help for whose missing page it was) and where people went from it (not_found_pick, detail game, manual, changelog, rooms, close or taskbar), production. The missing address is never sent.",
       query: trends([series("app_action", "Actions")], { breakdown: ["action", "detail"], display: "ActionsTable", where: [inAction(["not_found_view", "not_found_pick"])] }),
@@ -657,13 +663,37 @@ function buildInsights(ids) {
     {
       name: "The desk: windows, taskbar and Control Panel",
       description:
-        "app_action for the 1994 desk on a computer: desk_shown (once per page life it comes up), desk_window (<window>_<verb>, such as map_min or tower_max), desk_start (the Verticopolis menu's item) and desk_control (the Control Panel icon), production.",
+        "app_action for the 1994 desk on a computer: desk_shown and desk_title_shown (once per page life the desk comes up over a tower, or around the title screen), desk_window (<window>_<verb>, such as map_min, tower_max or tower_close), desk_task (a taskbar button: <window>_front, _min or _restore), desk_start_open (the Verticopolis menu opened, title or tower) and desk_start (its item), desk_tray (display or sound), desk_win_menu_open (taskbar or title_bar) and desk_win_menu (<window>_<command>), and desk_control (the Control Panel icon), production.",
       query: trends([series("app_action", "Actions")], {
         breakdown: ["action", "detail"],
         display: "ActionsTable",
-        breakdownLimit: 60,
-        where: [inAction(["desk_shown", "desk_window", "desk_start", "desk_control"])],
+        breakdownLimit: 100,
+        where: [inAction(["desk_shown", "desk_title_shown", "desk_window", "desk_task", "desk_start_open", "desk_start", "desk_tray", "desk_win_menu_open", "desk_win_menu", "desk_control"])],
       }),
+    },
+    {
+      name: "The desk: Verticopolis menu opened to picked",
+      description:
+        "Sessions that opened the taskbar's Verticopolis menu (app_action desk_start_open) and then picked an item from it (desk_start) within a minute, production. A drop is a menu opened and closed again. Per session (cookieless), never a person.",
+      query: {
+        kind: "InsightVizNode",
+        source: {
+          kind: "FunnelsQuery",
+          series: [
+            { kind: "EventsNode", event: "app_action", name: "Opened the Verticopolis menu", properties: [inAction(["desk_start_open"])] },
+            { kind: "EventsNode", event: "app_action", name: "Picked an item", properties: [inAction(["desk_start"])] },
+          ],
+          dateRange: LAST_30D,
+          properties: PROD_ONLY,
+          funnelsFilter: { funnelOrderType: "ordered", funnelVizType: "steps", funnelWindowInterval: 1, funnelWindowIntervalUnit: "minute" },
+        },
+      },
+    },
+    {
+      name: "Title screen: buttons pressed",
+      description:
+        "Presses on the title screen's buttons (app_action title_pick), split by detail: continue (its button, Esc or a click on the title screen's empty background), open, new, help, mute, install or sponsor, production. Each button's own event still follows (files_open open_title, help_open and the rest). A menu item that presses a title button from a script counts as the menu's pick only.",
+      query: trends([series("app_action", "Title picks")], { breakdown: "detail", display: "ActionsBar", where: [inAction(["title_pick"])] }),
     },
     {
       name: "Mute toggles by state",

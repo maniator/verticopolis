@@ -10,6 +10,7 @@
  * rebuilt only when a window opens, closes, minimizes or takes the focus.
  */
 
+import type { DeskTrayIcon } from "./deskAnalytics";
 import { WindowMenu, type WindowMenuHandlers } from "./deskWindowMenu";
 
 /** A window's button on the taskbar. */
@@ -57,6 +58,10 @@ export interface TaskbarHandlers {
   /** The window menu a right-click on a window's button opens; without it a
    *  right-click does nothing (the title screen's one window). */
   readonly windowMenu?: WindowMenuHandlers;
+  /** The Verticopolis button opened its menu (for the analytics). */
+  readonly opened?: () => void;
+  /** A tray button was pressed (for the analytics). */
+  readonly tray?: (icon: DeskTrayIcon) => void;
 }
 
 export class DeskTaskbar {
@@ -133,7 +138,10 @@ export class DeskTaskbar {
     const sound = doc.createElement("button");
     sound.type = "button";
     sound.className = "desk-tray-sound";
-    sound.addEventListener("click", () => doc.getElementById("mb-sound")?.click());
+    sound.addEventListener("click", () => {
+      handlers.tray?.("sound");
+      doc.getElementById("mb-sound")?.click();
+    });
     const clock = doc.createElement("span");
     clock.className = "desk-tray-clock";
     if (handlers.controlPanel) {
@@ -142,7 +150,10 @@ export class DeskTaskbar {
       display.className = "desk-tray-display";
       display.setAttribute("aria-label", "Control Panel");
       display.title = "Control Panel";
-      display.addEventListener("click", () => handlers.controlPanel?.());
+      display.addEventListener("click", () => {
+        handlers.tray?.("display");
+        handlers.controlPanel?.();
+      });
       tray.append(display);
     }
     tray.append(sound, clock);
@@ -262,6 +273,7 @@ export class DeskTaskbar {
     this.menu.hidden = false;
     this.startButton.setAttribute("aria-expanded", "true");
     this.startButton.classList.add("on");
+    this.handlers.opened?.();
     this.menu.querySelector<HTMLElement>(".mb-item:not([hidden])")?.focus();
   }
 

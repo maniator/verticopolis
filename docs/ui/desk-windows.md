@@ -51,10 +51,24 @@ ordinary layout. The code is `src/ui/desk/`; the numbers below live in
 - When the browser window gets smaller, every open window is pulled back onto
   the desk (once per frame at most, on `resize` only); a maximized tower
   already fills it.
-- Analytics (`app_action`): `desk_shown` is the desk coming up (once per
-  page life); `desk_window` is a title-bar button, the size grip or a window's first move
-  in a page life, detail `<window>_<verb>` with windows `tower`, `info`,
-  `tools`, `map`, `bulletin`, `tower_info`, `control_panel` and verbs `min`, `restore`, `max`,
-  `unmax`, `resize`, `move`; `desk_start` is a pick on the Verticopolis
-  button's menu, detail the game menu item it ran (`btn-new`, `mb-import`,
-  `btn-help`, `mb-screensaver`, `desk-control-panel`, `btn-settings`, `btn-about`, `mb-close`); `desk_control` is a Control Panel icon, detail `display`, `sounds` or `settings`. The Window menu's picks are `menu_pick` events with `menu` `window` and `window_*` item codes (docs/analytics-data-map.md).
+- Analytics (`app_action`, codes in `src/ui/desk/deskAnalytics.ts`, every
+  row in docs/analytics-data-map.md): `desk_shown` is the desk coming up over
+  a tower and `desk_title_shown` around the title screen (each once per page
+  life); `desk_window` is a window changing, detail `<window>_<verb>` with
+  windows `tower`, `info`, `tools`, `map`, `bulletin`, `tower_info`,
+  `control_panel` and verbs `min`, `restore`, `max`, `unmax`, `resize`,
+  `move` (the first move in a page life) and `close` (the tower's and the
+  Control Panel's ✕; the Map, Bulletin and Tower Info ✕ keep their own
+  events), from whichever button, double-click, taskbar press or window menu
+  did it; `desk_task` is a taskbar window button, detail `<window>_front`,
+  `_min` or `_restore` (`title` on the title screen); `desk_start_open` is the
+  Verticopolis button opening its menu (`title` or `tower`) and `desk_start` a
+  pick on it, detail the game menu item it ran (`btn-new`, `mb-import`,
+  `btn-help`, `mb-screensaver`, `desk-control-panel`, `btn-settings`,
+  `btn-about`, `mb-close`); `desk_tray` is the tray's `display` or `sound`;
+  `desk_win_menu_open` is a window menu opening from the `taskbar` or a
+  `title_bar`, and `desk_win_menu` its pick, `<window>_<command>`;
+  `desk_control` is a Control Panel icon, detail `display`, `sounds` or
+  `settings`. The Window menu's picks are `menu_pick` events with `menu`
+  `window` and `window_*` item codes. The title screen's own buttons are
+  `title_pick` (`src/game/titlePicks.ts`).

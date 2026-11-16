@@ -2,6 +2,8 @@ import type { GameApp } from "../main";
 import { shouldWelcomeFounder } from "../founder";
 import { activateInstall, splashInstallOffered } from "./installAffordance";
 import { showOpenDialog } from "./fileSpaceCommands";
+import { TITLE_PICK_CONTINUE } from "./titlePicks";
+import { trackAppAction } from "../analyticsActions";
 import { isEngineStopped, isSplashUp } from "./interactionState";
 
 /**
@@ -58,6 +60,9 @@ export function showTitleScreen(app: GameApp, hasSave: boolean): void {
     // version, shown only when the loaded tower predates 2.0 (`founder()`).
     founder: () => app.enginePort.founder(),
     onContinue: () => {
+      // The button, Esc or a click on the title screen's empty background:
+      // every way counts.
+      trackAppAction("title_pick", TITLE_PICK_CONTINUE);
       // Only rendered when `hasSave`. teardownSplash() resumes the engine to
       // play speed, so re-pause: a returning player lands back in their tower
       // paused, the ▶ Play control being the single resume (as in the reload

@@ -1,10 +1,11 @@
-import { trackAppAction, trackAppActionOnce } from "../../analytics";
+import { trackAppAction, trackAppActionOnce } from "../../analyticsActions";
 import { browserStorage } from "../overviewMapPrefs";
 import { PALETTE_COLLAPSE_BUTTON_ID, PALETTE_COLLAPSED_CLASS } from "../paletteCollapse";
 import { defaultLayout, fitRect, parseLayout, TOOLS_LIMITS, TOWER_LIMITS, type DeskRect, type DeskWindowId } from "./deskGeometry";
 import { read, write, type Store } from "./deskStore";
 import { DeskTitle } from "./deskTitle";
 import { buildControlPanel } from "./deskControlPanel";
+import { deskTaskResult, trackDeskClose, trackDeskStartOpen, trackDeskTask, trackDeskTray, trackDeskWindow, trackWindowMenuOpen, trackWindowMenuPick } from "./deskAnalytics";
 import { DeskTaskbar, type TaskEntry } from "./deskTaskbar";
 import { runWindowCommand, windowMenuState } from "./deskWindowMenu";
 import { buildFrame, DESK_ACTIVE_CLASS, DeskWindow, titleButton, type DeskChange, type DeskWindowSpec } from "./deskWindow";
@@ -54,8 +55,6 @@ export function deskActive(doc: Document = document): boolean {
 
 /** The taskbar order: the tower first, then the small windows. */
 const ORDER: readonly DeskWindowId[] = ["tower", "info", "tools", "map", "bulletin", "towerInfo", "control"];
-/** Analytics names for the windows (the `desk_window` detail's first half). */
-const NAME: Record<DeskWindowId, string> = { tower: "tower", info: "info", tools: "tools", map: "map", bulletin: "bulletin", towerInfo: "tower_info", control: "control_panel" };
 
 /** One element the desk moved, and where it came from. */
 interface Moved {
@@ -172,7 +171,10 @@ export class DeskController {
     const tower = buildFrame(doc, "desk-win-tower", this.towerTitleText());
     this.towerTitle = tower.titleText;
     const towerClose = titleButton(doc, "close", "Close the tower");
-    towerClose.addEventListener("click", () => doc.getElementById("mb-close")?.click());
+    towerClose.addEventListener("click", () => {
+      trackDeskClose("tower");
+      doc.getElementById("mb-close")?.click();
+    });
     tower.root.querySelector(".win-title")?.appendChild(towerClose);
     desk.appendChild(tower.root);
     this.move(doc.getElementById("menubar"), tower.body);
@@ -210,7 +212,7 @@ export class DeskController {
       ...rest,
     });
     const add = (s: DeskWindowSpec) => this.wins.set(s.id, new DeskWindow(s));
-    add(spec("tower", tower.root, () => this.towerTitleText(), { layer: "app", limits: TOWER_LIMITS, canMax: true, isOpen: () => true, close: () => towerClose.click() }));
+    add(spec("tower", tower.root, () => this.towerTitleText(), { layer: "app", limits: TOWER_LIMITS, canMax: true, isOpen: () => true, close: () => doc.getElementById("mb-close")?.click() }));
     add(spec("info", info.root, () => "Info", { isOpen: () => true }));
     if (palette) add(spec("tools", palette, () => "Tools", { limits: TOOLS_LIMITS, heightOnly: true, isOpen: () => true }));
     if (map) add(spec("map", map, () => "Map", { isOpen: () => !map.hidden, open: item("mb-win-map"), close: () => map.querySelector<HTMLElement>(".overview-map-close")?.click() }));
@@ -218,7 +220,7 @@ export class DeskController {
     if (towerInfo) add(spec("towerInfo", towerInfo, () => "Tower Info", { isOpen: () => !towerInfo.hidden, open: item("mb-win-tower"), close: () => towerInfo.querySelector<HTMLElement>('[data-close="tower-win"]')?.click() }));
 
     // The Control Panel: closed until the Verticopolis menu or the tray opens it.
-    const control = buildControlPanel(doc, (icon) => trackAppAction("desk_control", icon));
+    const control = buildControlPanel(doc, (icon) => trackAppAction("desk_control", icon), () => trackDeskClose("control"));
     desk.appendChild(control.root);
     add(spec("control", control.root, () => "Control Panel", { isOpen: control.isOpen, open: control.open, close: control.close }));
     this.syncControl = control.sync;
@@ -234,9 +236,15 @@ export class DeskController {
         doc.getElementById(itemId)?.click();
       },
       controlPanel: openControl,
+      opened: () => trackDeskStartOpen("tower"),
+      tray: trackDeskTray,
       windowMenu: {
         state: (id) => windowMenuState(this.wins.get(id as DeskWindowId), this.active),
-        run: (id, command) => runWindowCommand(this.wins.get(id as DeskWindowId), command, (w) => (w.minimized ? this.bringUp(w.spec.id) : this.focus(w))),
+        run: (id, command) => {
+          trackWindowMenuPick(id, command);
+          runWindowCommand(this.wins.get(id as DeskWindowId), command, (w) => (w.minimized ? this.bringUp(w.spec.id) : this.focus(w)));
+        },
+        opened: (_id, from) => trackWindowMenuOpen(from),
       },
     });
     app.appendChild(this.taskbar.root);
@@ -398,8 +406,10 @@ export class DeskController {
   private taskPressed(id: DeskWindowId): void {
     const w = this.wins.get(id);
     if (!w) return;
-    if (w.minimized) this.bringUp(id);
-    else if (w === this.active) w.minimize();
+    const result = deskTaskResult(w.minimized, w === this.active);
+    trackDeskTask(id, result);
+    if (result === "restore") this.bringUp(id);
+    else if (result === "min") w.minimize();
     else this.focus(w);
   }
 
@@ -412,10 +422,8 @@ export class DeskController {
       this.save();
     }
     if (this.restoring) return;
-    if (what === "move") {
-      if (!this.movedOnce.has(id)) trackAppAction("desk_window", `${NAME[id]}_move`);
-      this.movedOnce.add(id);
-    } else trackAppAction("desk_window", `${NAME[id]}_${what}`);
+    if (what !== "move" || !this.movedOnce.has(id)) trackDeskWindow(id, what);
+    if (what === "move") this.movedOnce.add(id);
     if (what === "min") this.focusNext();
     else if (what === "restore" || what === "max" || what === "unmax") this.focus(this.wins.get(id) ?? null);
     else this.refresh();

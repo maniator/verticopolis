@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
-import { HELP_BASE, OLD_ANCHORS, SPONSOR_URL, siteHref, cardAlt, cardFile, cardUrl, helpPageDetail, isSponsorLink, landingAction, sponsorTapListener, oldAnchorRedirects, pageJsonLd, sharedHead, sidebar, type SidebarEntry } from "../../help-site/site.mjs";
+import { HELP_BASE, OLD_ANCHORS, SPONSOR_URL, siteHref, cardAlt, cardFile, cardUrl, gameLinkDetail, helpPageDetail, isSponsorLink, landingAction, sponsorTapListener, oldAnchorRedirects, pageJsonLd, sharedHead, sidebar, type SidebarEntry } from "../../help-site/site.mjs";
 import { catalogFor } from "./catalogFixture";
 import { SPONSOR_URL as GAME_SPONSOR_URL } from "../ui/splashTemplate";
 import { HELP_PAGES_DIR } from "../build/helpMarkdown";
@@ -425,5 +425,14 @@ describe("sponsorTapListener (the help site's sponsor_click listener)", () => {
     listen(tap("click", linkTo("https://github.com/maniator/verticopolis")));
     listen(tap("click", document.createElement("p")));
     expect(track).not.toHaveBeenCalled();
+  });
+});
+
+describe("the manual's links to the game", () => {
+  it("names where the link sits and whether it loads the game or goes back to it", () => {
+    expect(gameLinkDetail(false, false)).toBe("bar_play");
+    expect(gameLinkDetail(false, true)).toBe("bar_back");
+    expect(gameLinkDetail(true, false)).toBe("front_play");
+    expect(gameLinkDetail(true, true)).toBe("front_back");
   });
 });

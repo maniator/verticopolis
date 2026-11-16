@@ -20,6 +20,7 @@ export function sponsorTapListener(track: () => void): (e: MouseEvent) => void;
 export function landingAction(pathname: string, referrer: string, origin: string, base?: string): "page_help" | "page_changelog" | null;
 /** The page a help page view reports: "rooms/hotels", "home" or "other". */
 export function helpPageDetail(pathname: string, base?: string): string;
+export function gameLinkDetail(inFrontPage: boolean, fromGame: boolean): string;
 /** Where each section of the old one-page /help went. */
 export const OLD_ANCHORS: Record<string, string>;
 export function oldAnchorRedirects(helpIds: Record<string, string>): string;

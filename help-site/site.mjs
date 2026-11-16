@@ -220,6 +220,18 @@ export function helpPageDetail(pathname, base = HELP_BASE) {
   return slug.length <= MAX_PAGE_DETAIL && /^[a-z0-9-]+(\/[a-z0-9-]+)*$/.test(slug) ? slug : "other";
 }
 
+/**
+ * The `help_game_link` detail of a press on a link to the game (owner,
+ * 2026-11-16: every new button reports): where it sits, `bar` for the title
+ * bar's button and `front` for the front page's Play, then what it does,
+ * `back` in a tab the game opened (Back to game closes the tab) and `play`
+ * otherwise (it loads the game). `inFrontPage` is whether the link sits in
+ * the front page's title screen.
+ */
+export function gameLinkDetail(inFrontPage, fromGame) {
+  return `${inFrontPage ? "front" : "bar"}_${fromGame ? "back" : "play"}`;
+}
+
 /** The site's address, for its canonical links and the structured data
  *  below: its own host, or the game's with the manual under /help. */
 export const SITE_ORIGIN = HELP_ORIGIN || "https://verticopolis.com";

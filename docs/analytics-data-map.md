@@ -198,6 +198,36 @@ renames a file on the player's computer (owner, 2026-11-15).
 
 `app_action` `file_key` counts a File key that ran its command (version 4.1): `detail` is `open` (Ctrl+O, or Cmd+O on a Mac), `save` (Ctrl+S) or `save_as` (Ctrl+Shift+S). A key pressed in a text box, over a dialog, after the engine stopped, as a held key's repeat, or for a save on the title screen runs nothing and sends nothing. Its command's own event follows (`quick_save`, `files_open` and the rest), so a command's total stays the command's own event; `file_key` says how many of them came from the keys.
 
+## The title screen's buttons
+
+`app_action` `title_pick` counts a press on a title-screen button (owner,
+2026-11-16), on a phone or a computer alike. `detail` is the button:
+`continue`, `open` (Open Tower…), `new` (New Tower), `help` (How to Play),
+`mute` (the speaker corner button), `install` or `sponsor`. Continue counts
+however it was chosen: its button, Escape, or a click on the title
+screen's empty background (on the 1994 desk that is the title window's own
+empty face or poster; a click on the desk outside it does nothing). Each button's own event still follows (`files_open`
+`open_title`, `help_open`, `mute`, `install_offer` `splash`, `sponsor_click`
+`splash`; New Tower's `new_game_started` once the tower is founded), so a
+command's total stays its own event and `title_pick` says what people did on
+the title screen. A menu item that presses a title button for the player (File
+> New… and Options > Sound on the title screen, or the desk's Verticopolis
+menu) is that menu's own `menu_pick` or `desk_start`, never a `title_pick`.
+The "Title screen: buttons pressed" dashboard tile splits it by `detail`. Read
+it beside `desk_title_shown` to tell a computer's title screen from a phone's.
+
+## The manual's links to the game
+
+The help site (help.verticopolis.com) reports through the same relay:
+`page_help` and `page_changelog` count a visit's landing, `help_page_view`
+every page read (`detail` its path), and `help_menu_pick` a pick on its menu
+bar (`detail` the item's `data-help-item` code). `app_action` `help_game_link`
+counts a press on its links to the game (owner, 2026-11-16): `detail` is
+`bar_` for the title bar's button or `front_` for the front page's Play, then
+`play` when it loads the game or `back` in a tab the game opened, where it
+reads Back to game and closes the tab. The File menu's Play
+Verticopolis/Back to Game item is `help_menu_pick` `game` instead.
+
 ## Sponsor link taps
 
 `app_action` `sponsor_click` counts a tap on a link to the GitHub Sponsors page (owner, 2026-11-14). `detail` is `splash` for the title screen's corner link, `menu` for the menu bar's Help > Sponsor Verticopolis, or `help` for any help site link to that page (the sidebar's "Sponsor Verticopolis" entry and the front page's text). It is the tap only: whether anyone went on to sponsor is never known here, and the Android app shows no Sponsor link. It is not latched, so read taps, or sessions that tapped, and say which. A click, keyboard Enter or middle-click counts; a link opened from the right-click menu does not. The "Sponsor link taps" dashboard tile splits it by `detail`.
@@ -288,9 +318,15 @@ The windows and cards that came with the menu bar report through `app_action`:
 | `screensaver_start` | `idle`, `return` or `preview` | The screen saver came up: the paused tower sat untouched for the wait, the player came back to the tab after the wait, or the dialog's Preview |
 | `screensaver_end` | `under_1m`, `1_5m` or `over_5m` | The screen saver ended, with how long it was up as a bucket |
 | `screensaver_set` | `night`, `stars`, `express`, `endless`, `marquee` or `none` | The Screen Saver dialog's OK, with the saver picked |
-| `desk_shown` | none | The 1994 desk came up on a computer (once per page life) |
-| `desk_window` | `<window>_<verb>`: windows `tower`, `info`, `tools`, `map`, `bulletin`, `tower_info`, `control_panel`; verbs `min`, `restore`, `max`, `unmax`, `resize`, `move` | A desk window's title-bar button or size grip, or its first move in a page life (`docs/ui/desk-windows.md`) |
-| `desk_start` | the menu item it ran (`btn-new`, `mb-import`, `btn-help`, `mb-screensaver`, `desk-control-panel`, `btn-settings`, `btn-about`, `mb-close`) | A pick on the taskbar's Verticopolis menu |
+| `desk_shown` | none | The 1994 desk came up over a tower on a computer (once per page life) |
+| `desk_title_shown` | none | The title screen came up in its window on the desk (once per page life) |
+| `desk_window` | `<window>_<verb>`: windows `tower`, `info`, `tools`, `map`, `bulletin`, `tower_info`, `control_panel`; verbs `min`, `restore`, `max`, `unmax`, `resize`, `move`, `close` | A desk window changed: minimized, brought back, maximized or put back (from its title-bar buttons, a double-click on its title, its taskbar button or its window menu), resized from its grip, or moved for the first time in a page life. `close` is the tower's ✕ (it runs File > Close) or the Control Panel's ✕ only; the Map, Bulletin and Tower Info ✕ keep their own events (`docs/ui/desk-windows.md`) |
+| `desk_task` | `<window>_front`, `<window>_min` or `<window>_restore`, the window `title` on the title screen | A taskbar window button: it brought the window to the front, minimized the front window, or brought a minimized one back. The change itself is also a `desk_window` row, so `desk_task` says how many came from the taskbar |
+| `desk_start_open` | `title` or `tower` | The taskbar's Verticopolis button opened its menu, over the title screen or a tower |
+| `desk_start` | the menu item it ran (`btn-new`, `mb-import`, `btn-help`, `mb-screensaver`, `desk-control-panel`, `btn-settings`, `btn-about`, `mb-close`) | A pick on the taskbar's Verticopolis menu. It is never also a `menu_pick` |
+| `desk_tray` | `display` or `sound` | A tray button: the monitor (opens the Control Panel) or the speaker (sound on or off, which also sends `mute`) |
+| `desk_win_menu_open` | `taskbar` or `title_bar` | A window menu opened, from a taskbar button (right-click, Shift+F10 or the context menu key) or a window's title bar (right-click) |
+| `desk_win_menu` | `<window>_<command>`, commands `restore`, `minimize`, `maximize`, `close` | A window menu pick. Restore, Minimize and Maximize also send their `desk_window` row |
 | `desk_control` | `display`, `sounds` or `settings` | A Control Panel icon (the Screen Saver dialog, sound on or off, or Settings) |
 
 ## `engine_status`

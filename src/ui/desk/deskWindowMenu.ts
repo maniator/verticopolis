@@ -8,6 +8,7 @@
  * Cost: one menu built once with the taskbar; each opening sets four items.
  */
 
+import type { WindowMenuFrom } from "./deskAnalytics";
 import type { DeskWindow } from "./deskWindow";
 
 /** A window menu command. */
@@ -52,6 +53,9 @@ export interface WindowMenuHandlers {
   readonly state: (id: string) => WindowMenuState | null;
   /** Run `command` on window `id`. */
   readonly run: (id: string, command: WindowCommand) => void;
+  /** The menu opened for window `id` (for the analytics): from a taskbar
+   *  button (`above`) or a window's title bar. */
+  readonly opened?: (id: string, from: WindowMenuFrom) => void;
 }
 
 export class WindowMenu {
@@ -119,6 +123,7 @@ export class WindowMenu {
     root.style.left = `${Math.max(0, Math.min(x, maxX))}px`;
     root.style.top = `${Math.max(0, Math.min(top, maxY))}px`;
     this.first()?.focus();
+    this.handlers.opened?.(id, above ? "taskbar" : "title_bar");
     return true;
   }
 
