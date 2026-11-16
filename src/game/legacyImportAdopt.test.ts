@@ -27,6 +27,8 @@ function setup(stage: Float64Array = OK, adopt: Float64Array = OK) {
     portCodes: () => ({ code: () => 0 }) as never,
     reader: vi.fn(() => ({ header: HEADER }) as never),
     towerSwapped: vi.fn(),
+    beforeSwap: vi.fn(),
+    swapRefused: vi.fn(),
     ui: { toast: vi.fn() },
   };
   return { port, deps };
@@ -79,5 +81,22 @@ describe("adopting a confirmed .TDT import", () => {
     expect(refusedAdopt.deps.towerSwapped).not.toHaveBeenCalled();
     expect(trackFileImported).not.toHaveBeenCalled();
     expect(keepOpenedFile).not.toHaveBeenCalled();
+  });
+});
+
+describe("the tower an adopted .TDT replaces", () => {
+  it("is left to be kept: told before the engine stages the 1994 file", () => {
+    const { port, deps } = setup();
+    adoptConfirmedLegacyImport(deps as never, "Old Tower", () => {}, FILE);
+    expect(deps.beforeSwap).toHaveBeenCalledExactlyOnceWith("tdt");
+    expect(deps.beforeSwap.mock.invocationCallOrder[0]).toBeLessThan(port.loadTdt.mock.invocationCallOrder[0]!);
+    expect(deps.swapRefused).not.toHaveBeenCalled();
+  });
+
+  it("is forgotten when the file no longer adopts, since it stays the live tower", () => {
+    const { deps } = setup(OK, REFUSED);
+    adoptConfirmedLegacyImport(deps as never, "Old Tower", () => {}, FILE);
+    expect(deps.swapRefused).toHaveBeenCalledOnce();
+    expect(deps.towerSwapped).not.toHaveBeenCalled();
   });
 });

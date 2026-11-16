@@ -77,6 +77,8 @@ function setup(
     portCodes: () => codes,
     reader: () => ({ rooms: rooms as never, structure: [] as never, header: HEADER as never }),
     towerSwapped: vi.fn(),
+    beforeSwap: vi.fn(),
+    swapRefused: vi.fn(),
     getView: () => null,
     ui: {
       toast: vi.fn(),
@@ -438,5 +440,46 @@ describe("SaveLoad .vctower import", () => {
     expect(loadVctower).toHaveBeenCalledExactlyOnceWith("VCTOWER1\nxx");
     expect(loadVctowerBytes).toHaveBeenCalledOnce();
     expect(deps.towerSwapped).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("SaveLoad leaves the outgoing tower to be kept (NO LOST SAVES)", () => {
+  /** `beforeSwap` must run before the port swaps: after it the engine holds the next tower. */
+  const before = (deps: { beforeSwap: ReturnType<typeof vi.fn> }, swap: ReturnType<typeof vi.fn>) =>
+    expect(deps.beforeSwap.mock.invocationCallOrder[0]).toBeLessThan(swap.mock.invocationCallOrder[0]!);
+
+  it("an opened file: told before the engine reads it, and told again when the file is refused", async () => {
+    const loadVctower = vi.fn(() => Float64Array.of(1, 0));
+    const { saves, deps } = setup({ loadVctower });
+    await saves.importGame("VCTOWER1\nxx");
+    expect(deps.beforeSwap).toHaveBeenCalledExactlyOnceWith("open");
+    before(deps, loadVctower);
+    expect(deps.swapRefused).not.toHaveBeenCalled();
+
+    loadVctower.mockReturnValue(Float64Array.of(0, 0));
+    await saves.importGame("not a tower");
+    expect(deps.swapRefused).toHaveBeenCalledOnce();
+    expect(deps.towerSwapped).toHaveBeenCalledOnce();
+  });
+
+  it("a new tower: told before the engine founds it", () => {
+    const foundTower = vi.fn(() => Float64Array.of(1, 0));
+    const { saves, deps } = setup({ foundTower });
+    saves.newGame("modern");
+    expect(deps.beforeSwap).toHaveBeenCalledExactlyOnceWith("new");
+    before(deps, foundTower);
+  });
+
+  it("the Auto-save: told as a load before the stored tower goes in, and refused when there is none", () => {
+    const loadSave = vi.fn(() => Float64Array.of(1, 0));
+    const { saves, deps } = setup({ loadSave });
+    vi.spyOn(SaveGame, "load").mockImplementation((swap) => swap("SAVE"));
+    saves.load();
+    expect(deps.beforeSwap).toHaveBeenCalledExactlyOnceWith("load");
+    before(deps, loadSave);
+
+    vi.spyOn(SaveGame, "load").mockReturnValue(false);
+    saves.load();
+    expect(deps.swapRefused).toHaveBeenCalledOnce();
   });
 });

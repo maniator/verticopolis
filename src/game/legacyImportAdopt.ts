@@ -19,7 +19,7 @@ import type { SaveLoadDeps } from "./saveLoad";
  * `SaveLoad` where its tests live.
  */
 export function adoptConfirmedLegacyImport(
-  deps: Pick<SaveLoadDeps, "enginePort" | "portCodes" | "reader" | "towerSwapped" | "ui">,
+  deps: Pick<SaveLoadDeps, "enginePort" | "portCodes" | "reader" | "towerSwapped" | "beforeSwap" | "swapRefused" | "ui">,
   towerName: string,
   flushCurrent: () => void,
   file: { readonly bytes: Uint8Array; readonly filename: string },
@@ -36,11 +36,15 @@ export function adoptConfirmedLegacyImport(
     flushFailed = true;
   }
   const port = deps.enginePort();
+  // The flushed Auto-save is about to hold the 1994 tower: keep this one in
+  // My Towers once it does (`keepOutgoing.ts`).
+  deps.beforeSwap?.("tdt");
   try {
     swapDone(port, port.loadTdt(file.bytes, file.filename));
     swapDone(port, port.adoptTdt());
   } catch (err) {
     // The file no longer reads or adopts: nothing swapped.
+    deps.swapRefused?.();
     deps.ui.toast(`The tower could not be opened: ${(err as Error).message}`, "bad");
     return;
   }

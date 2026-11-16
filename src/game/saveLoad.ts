@@ -17,6 +17,7 @@ import { currentStamp } from "../storage/saveStamp";
 import { exportFacts, importFacts } from "../simport/tdtRecords";
 import { isCrashed, isEngineStopped, isSplashUp } from "./interactionState";
 import type { UI } from "../ui/UI";
+import type { SwapKind } from "./keepOutgoing";
 
 /**
  * Save/load/new-game flows for the game shell. Split out of the GameApp class
@@ -38,6 +39,10 @@ export interface SaveLoadDeps {
    *  brings a *different* tower, so the undo trail goes too; only the app's
    *  own undo and redo keep it, and they do not come through here. */
   towerSwapped(): void;
+  /** Right before a swap of that kind, while the engine still holds the tower
+   *  being left (`keepOutgoing.ts`); `refused` forgets it when none swapped. */
+  beforeSwap?(kind: SwapKind): void;
+  swapRefused?(): void;
   /** The live camera as save cargo (GameApp reads TowerEngine.viewState).
    *  Stamped onto the sim right before every save/export of the CURRENT
    *  tower so the view travels with it; an imported sim keeps the view its
@@ -124,11 +129,8 @@ export class SaveLoad {
 
   save(silent = false): void {
     try {
-      // Stamp inside the try: a disposed or context-lost engine can throw
-      // from viewState() too, and the manual path's no-escaped-throw contract
-      // must cover it (saveToSlot makes the same call the same way). Silent
-      // callers see no change: they caught a stampView throw before this
-      // reorder too, via the rethrow below.
+      // Stamp inside the try: a disposed or context-lost engine can throw from
+      // viewState() too, and the no-escaped-throw contract must cover it.
       SaveGame.save(this.saveText());
     } catch (err) {
       // Silent callers rely on the THROW: saveBeforeUpdate's caller must not
@@ -148,10 +150,8 @@ export class SaveLoad {
         }
         throw err;
       }
-      // A manual Quick Save must never fail silently: without this catch the
-      // throw escapes the button handler as an uncaught error, the player
-      // gets no feedback at all, and believes the tower saved. A failed
-      // setItem is atomic (it never clobbers), so any prior save is intact.
+      // A manual Quick Save must never fail silently (the player would believe
+      // it saved). A failed write is atomic, so any prior save is intact.
       this.notice.manualFailed(err);
       return;
     }
@@ -347,6 +347,7 @@ export class SaveLoad {
 
   load(): void {
     const port = this.deps.enginePort();
+    this.deps.beforeSwap?.("load");
     const swap = loadStored(port);
     let newer = false;
     const loaded = SaveGame.load((text) => {
@@ -358,6 +359,7 @@ export class SaveLoad {
       this.deps.towerSwapped();
       this.deps.ui.toast("Tower loaded.", "good");
     } else {
+      this.deps.swapRefused?.();
       this.deps.ui.toast(newer ? NEWER_SAVE_REFUSAL : "No saved tower found.", "bad");
     }
   }
@@ -428,12 +430,14 @@ export class SaveLoad {
       // player's words (`vctower_import.rs`); the page only shows it. The
       // founder rule for a file without a build stamp is the engine's too.
       const port = this.deps.enginePort();
+      this.deps.beforeSwap?.("open");
       const loaded = typeof data === "string" ? port.loadVctower(data) : port.loadVctowerBytes(data);
       if (loaded[0] !== 1) throw new Error(port.lastReason() ?? SWAP_REFUSED);
       this.deps.towerSwapped();
       trackFileImported("vctower", () => this.deps.reader().header);
       this.deps.ui.toast("Tower imported.", "good");
     } catch (err) {
+      this.deps.swapRefused?.();
       trackAppAction("import_failed", "save");
       this.deps.ui.sayVisibly("Import failed: " + (err as Error).message);
     }
@@ -462,11 +466,8 @@ export class SaveLoad {
     const facts = importFacts(rec, this.deps.portCodes(), port);
     const report = importReport(facts);
     this.deps.ui.showImportReport(report, {
-      // The confirmed-adoption flow (flush, adopt, fresh-slot copy, honest
-      // toasts) lives in ./legacyImportAdopt, split out at the 500-line guard.
-      // The flush stays a bound thunk so its throw contract is owned here.
-      // The engine stages one file at a time, so the confirmation stages its
-      // own file again: a second read finished meanwhile cannot swap in.
+      // The confirmed adoption is ./legacyImportAdopt. The engine stages one
+      // file at a time, so the confirmation stages its own file again.
       onOpen: () =>
         adoptConfirmedLegacyImport(this.deps, report.towerName, () => this.saveBeforeUpdate(), { bytes, filename }),
       // Sent once the report is on screen: one dropped while it waits is not a read.
@@ -480,12 +481,10 @@ export class SaveLoad {
   newGame(mode: GameMode = "classic", modernCalendar: CalendarKind = "realWorld", startUnbridged = false): void {
     const port = this.deps.enginePort();
     const codes = this.deps.portCodes();
+    this.deps.beforeSwap?.("new");
     swapDone(port, port.foundTower(Date.now() & 0x7fffffff, codes.code("modes", mode), codes.code("calendars", modernCalendar), startUnbridged));
     this.deps.towerSwapped();
-    // Both rule-sets found an empty lot now, so the toast is the actionable
-    // first-lobby cue (the engine's welcome log entry is rebased past by the UI
-    // cursor, so the toast is the one visible signal). Keyed on tower state,
-    // never on the mode string, so it stays correct if founding ever seeds again.
+    // The toast is the first-lobby cue, keyed on tower state, never the mode.
     const founded = this.deps.reader();
     this.deps.ui.toast(
       founded.rooms.length === 0 && founded.structure.length === 0

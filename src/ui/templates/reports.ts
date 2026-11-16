@@ -58,7 +58,7 @@ export function importReportTemplate(report: ImportReport): TemplateResult {
       <ul class="import-list">${listItems(report.broughtOver)}</ul>
       <h3>Couldn't bring over</h3>
       <ul class="import-list">${listItems(report.couldNotBring)}</ul>
-      <p class="import-note" style="color:var(--muted);font-size:12px">Nothing is adopted until you open it. Your current tower is kept in its autosave, and the 1994 file goes into My Towers once the tower opens.</p>
+      <p class="import-note" style="color:var(--muted);font-size:12px">Nothing is adopted until you open it. Your current tower is kept in My Towers, and the 1994 file goes there too once the tower opens.</p>
       <div class="modal-actions modal-footer">
         <button class="btn" data-act="close">Cancel</button>
         <button class="btn primary" data-act="open" autofocus>Open tower</button>

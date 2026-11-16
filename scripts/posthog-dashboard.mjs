@@ -571,6 +571,12 @@ function buildInsights(ids) {
       }),
     },
     {
+      name: "Towers kept when another opened",
+      description:
+        "app_action tower_kept split by detail, production, from 4.9.0: the tower a player left by opening another (File > Open…, New…, a picked or dropped file, or a 1994 import) was kept in its own My Towers file (file), as a new file under its name (new), offered as a download because My Towers couldn't take it (offered, then download on the click), or lost (failed). Before 4.9.0 the swap's autosave wrote over it. See docs/analytics-data-map.md, My Towers.",
+      query: trends([series("app_action", "Towers kept")], { breakdown: "detail", display: "ActionsBar", where: [inAction(["tower_kept"])] }),
+    },
+    {
       name: "Open window: where players asked for it",
       description:
         "app_action files_open split by detail, production, from 4.3: open for File > Open… in the menu, open_key for its Ctrl+O key, open_title for the title screen's Open Tower… button, and save_as for File > Save As…. See docs/analytics-data-map.md, My Towers.",
