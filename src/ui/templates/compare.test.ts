@@ -109,7 +109,7 @@ describe("a manual link in the summary", () => {
     const click = new MouseEvent("click", { bubbles: true, cancelable: true });
     link.dispatchEvent(click);
     expect(click.defaultPrevented).toBe(true);
-    expect(open).toHaveBeenCalledWith("/help/tower/clock/?from=game", "_blank", "noopener");
+    expect(open).toHaveBeenCalledWith("/help/tower/clock/?from=game&via=compare", "_blank", "noopener");
     host.remove();
   });
 });

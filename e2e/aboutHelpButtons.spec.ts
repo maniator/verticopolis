@@ -8,7 +8,7 @@ import { expectEngineHosted } from "./helpers";
  * (src/tests/integration/helpAbout.integration.test.ts), and the other specs
  * open About through the tooling handle, so this is the one place a real
  * click on each item is checked end to end: About opens About this game, and
- * the manual opens the Help site in a new tab marked `?from=game`.
+ * the manual opens the Help site in a new tab marked `?from=game&via=game_menu`.
  * Follow-up to the post-merge reviews of #2063 and #2069.
  */
 
@@ -36,7 +36,7 @@ test("Help > About opens About this game with its privacy link and no What's new
   const about = page.getByRole("dialog", { name: /About this game/ });
   await expect(about).toBeVisible();
   await expect(about.locator(".help-diagnostics")).toBeVisible();
-  await expect(about.locator('a[data-act="privacy"]')).toHaveAttribute("href", "/help/privacy/?from=game");
+  await expect(about.locator('a[data-act="privacy"]')).toHaveAttribute("href", "/help/privacy/?from=game&via=about");
   await expect(about.locator('a[data-act="report"]')).toHaveAttribute("href", /^https:\/\/github\.com\/maniator\/verticopolis\/issues\/new\?template=bug_report\.yml&/);
   // The old Help menu's What's new went away with #2063.
   await expect(about.locator('[data-act="whats-new"]')).toHaveCount(0);
@@ -54,7 +54,7 @@ test("Help > Player's Manual opens the Help site in a new tab marked as coming f
   await pickFromHelp(page, "#btn-help");
   const tab = await popup;
   // The new tab starts blank (its URL can read "" or about:blank) before it navigates.
-  await expect.poll(() => tab.url()).toBe(new URL("/help/?from=game", page.url()).href);
+  await expect.poll(() => tab.url()).toBe(new URL("/help/?from=game&via=game_menu", page.url()).href);
   await expect(tab).toHaveTitle("Help");
   // Help is a tab, never a dialog in the game.
   await expect(page.locator("#modal[open]")).toHaveCount(0);

@@ -233,7 +233,25 @@ it beside `desk_title_shown` to tell a computer's title screen from a phone's.
 The help site (help.verticopolis.com) reports through the same relay:
 `page_help` and `page_changelog` count a visit's landing, `help_page_view`
 every page read (`detail` its path), and `help_menu_pick` a pick on its menu
-bar (`detail` the item's `data-help-item` code). `app_action` `help_game_link`
+bar (`detail` the item's `data-help-item` code).
+
+A landing's `detail` says where the visit started (#2037, owner 2026-11-12),
+always one fixed code, never a URL or a referrer. A link the game opens carries
+`?from=game&via=CODE` (`fromGameHref` in `src/ui/fromGame.ts`), the page reads
+it once and takes both marks out of the address bar, so a copied or shared
+link never carries them. The codes: `game_menu` (Help > Player's Manual, or
+the desk's Verticopolis menu), `title` (How to Play), `mode_badge` (the Tower
+panel's mode badge), `compare` (a link in the Classic vs Modern table),
+`welcome` (the version 4 welcome), `update_prompt` (All release notes),
+`about` (the privacy link), and `inspector` and `stats`, reserved for a
+problem's help link (sent once #2036 lands); `game` for a page the game opened without naming where (an older build,
+still cached in a tab or an installed app); `direct` for every visit the game did not open (a
+shared or saved link, a search, the gallery or the "page not found" page). A
+reload of a tab the game opened reports its source again from that tab's
+`sessionStorage`. Landings from builds before the change carry no `detail`.
+In the game, `help_open` carries `detail` `game_menu` or `title` the same way.
+The "Help landings by source" and "In-game Help opens" dashboard tiles split
+them. `app_action` `help_game_link`
 counts a press on its links to the game (owner, 2026-11-16): `detail` is
 `bar_` for the title bar's button or `front_` for the front page's Play, then
 `play` when it loads the game or `back` in a tab the game opened, where it

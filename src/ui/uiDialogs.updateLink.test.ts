@@ -31,7 +31,7 @@ describe("showUpdatePrompt release notes link", () => {
     const { ui, openModalTemplate } = fakeUI();
     showUpdatePrompt(ui, () => {}, () => {}, info);
     expect(standalone.isInstalledStandalone).toHaveBeenCalled();
-    expect(shownLink(openModalTemplate)?.getAttribute("href")).toBe("/help/changelog?from=game#3.2.0");
+    expect(shownLink(openModalTemplate)?.getAttribute("href")).toBe("/help/changelog?from=game&via=update_prompt#3.2.0");
   });
 
   it("leaves it out in the installed app", () => {

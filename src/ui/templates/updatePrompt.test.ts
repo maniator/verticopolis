@@ -172,7 +172,7 @@ describe("updatePromptTemplate release notes link", () => {
 
   it("links to the incoming version's section of the release notes page, in a new tab", () => {
     const a = link(renderToFragment(updatePromptTemplate(withNotes, noop, { releaseNotesLink: true })));
-    expect(a?.getAttribute("href")).toBe("/help/changelog?from=game#1.6.0");
+    expect(a?.getAttribute("href")).toBe("/help/changelog?from=game&via=update_prompt#1.6.0");
     expect(a?.getAttribute("target")).toBe("_blank");
     expect(a?.getAttribute("rel")).toBe("noopener noreferrer");
     expect(a?.textContent).toBe("All release notes (opens in a new tab)");
@@ -190,7 +190,7 @@ describe("updatePromptTemplate release notes link", () => {
 
   it("also follows the skipped-versions log", () => {
     const skipped = info({ notes: ["New."], releases: [{ version: "1.6.0", notes: ["New."] }, { version: "1.5.0", notes: ["Old."] }], since: "1.4.0" });
-    expect(link(renderToFragment(updatePromptTemplate(skipped, noop, { releaseNotesLink: true })))?.getAttribute("href")).toBe("/help/changelog?from=game#1.6.0");
+    expect(link(renderToFragment(updatePromptTemplate(skipped, noop, { releaseNotesLink: true })))?.getAttribute("href")).toBe("/help/changelog?from=game&via=update_prompt#1.6.0");
   });
 
   it("is absent unless the controller asks for it (the installed app)", () => {
@@ -203,8 +203,8 @@ describe("updatePromptTemplate release notes link", () => {
   });
 
   it("encodes the version into the fragment and falls back to the page top", () => {
-    expect(releaseNotesHref("1.6.0")).toBe("/help/changelog?from=game#1.6.0");
-    expect(releaseNotesHref("1.6.0 beta")).toBe("/help/changelog?from=game#1.6.0%20beta");
-    expect(releaseNotesHref(undefined)).toBe("/help/changelog?from=game");
+    expect(releaseNotesHref("1.6.0")).toBe("/help/changelog?from=game&via=update_prompt#1.6.0");
+    expect(releaseNotesHref("1.6.0 beta")).toBe("/help/changelog?from=game&via=update_prompt#1.6.0%20beta");
+    expect(releaseNotesHref(undefined)).toBe("/help/changelog?from=game&via=update_prompt");
   });
 });

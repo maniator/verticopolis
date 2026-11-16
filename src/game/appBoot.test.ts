@@ -383,7 +383,7 @@ describe("runBootFlow", () => {
       }
     ).opts;
     opts.showHelp();
-    expect(app.ui.showHelp).toHaveBeenCalled();
+    expect(app.ui.showHelp).toHaveBeenCalledWith("title");
     opts.pauseForSplash(true);
     expect(app.setSpeed).toHaveBeenCalledWith(0);
     opts.pauseForSplash(false);

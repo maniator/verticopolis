@@ -28,7 +28,7 @@ import { siteHref } from "../../site.mjs";
 <p id="back-note" class="vc-back-note" tabindex="-1" hidden></p>
 
 <script>
-  import { backToOpenGame, takeFromGameFlag } from "../../../src/ui/fromGame";
+  import { backToOpenGame, helpVisitSource, repeatsEarlierLoad, takeFromGameFlag } from "../../../src/ui/fromGame";
   import { injectPageTelemetry } from "../../../src/telemetry";
   import { trackAppAction } from "../../../src/analytics";
   import { gameLinkDetail, helpPageDetail, landingAction, sponsorTapListener } from "../../site.mjs";
@@ -37,8 +37,13 @@ import { siteHref } from "../../site.mjs";
   // host, "/help" on the game's.
   const base = import.meta.env.BASE_URL.replace(/\/+$/, "");
   injectPageTelemetry();
+  // A landing names where the visit started (#2037): the place in the game
+  // that opened it, read from its ?from=game&via= marks before
+  // takeFromGameFlag clears them (a reload reads them back from this tab), or
+  // direct. A fixed code, never an address.
+  const source = helpVisitSource(location.search, repeatsEarlierLoad());
   const landing = landingAction(location.pathname, document.referrer, location.origin, base);
-  if (landing) trackAppAction(landing);
+  if (landing) trackAppAction(landing, source);
   // Every page view, landing or not, names its page, so the help pages
   // people read show up in PostHog and not only where they arrived.
   trackAppAction("help_page_view", helpPageDetail(location.pathname, base));

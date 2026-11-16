@@ -9,8 +9,12 @@ import {
   PRESENCE_WAIT_MS,
   answerGamePresence,
   backToOpenGame,
+  GAME_HELP_SOURCES,
+  HELP_SOURCE_STORAGE_KEY,
+  repeatsEarlierLoad,
   fromGameHref,
   gameStillOpen,
+  helpVisitSource,
   openedFromGame,
   takeFromGameFlag,
   type BackToGameDeps,
@@ -26,14 +30,14 @@ function mountFromGame(): void {
 }
 
 describe("fromGameHref and openedFromGame", () => {
-  it("marks a path, keeping its fragment and any query", () => {
-    expect(fromGameHref("/help")).toBe("/help?from=game");
-    expect(fromGameHref("/help#classic-vs-modern")).toBe("/help?from=game#classic-vs-modern");
-    expect(fromGameHref("/gallery?x=1")).toBe("/gallery?x=1&from=game");
+  it("marks a path with the game and the place it opened from, keeping its fragment and any query", () => {
+    expect(fromGameHref("/help", "game_menu")).toBe("/help?from=game&via=game_menu");
+    expect(fromGameHref("/help#classic-vs-modern", "compare")).toBe("/help?from=game&via=compare#classic-vs-modern");
+    expect(fromGameHref("https://help.verticopolis.com/changelog?x=1", "update_prompt")).toBe("https://help.verticopolis.com/changelog?x=1&from=game&via=update_prompt");
   });
 
   it("reads back what it writes", () => {
-    expect(openedFromGame(new URL(fromGameHref("/help#a"), "https://example.test").search)).toBe(true);
+    expect(openedFromGame(new URL(fromGameHref("/help#a", "about"), "https://example.test").search)).toBe(true);
   });
 
   it("reads only the game's marker", () => {
@@ -196,6 +200,12 @@ describe("takeFromGameFlag", () => {
     expect(store.getItem(FROM_GAME_STORAGE_KEY)).toBe("game");
   });
 
+  it("takes the place the game named (via) out with it", () => {
+    const hist = { replaceState: vi.fn() };
+    takeFromGameFlag({ pathname: "/help/", search: "?from=game&via=stats&ref=x", hash: "" }, hist, memoryStorage);
+    expect(hist.replaceState).toHaveBeenCalledWith(null, "", "/help/?ref=x");
+  });
+
   it("leaves no bare question mark when from=game was the only param", () => {
     const hist = { replaceState: vi.fn() };
     takeFromGameFlag({ pathname: "/help/changelog", search: "?from=game", hash: "" }, hist, memoryStorage);
@@ -230,5 +240,79 @@ describe("takeFromGameFlag", () => {
     expect(takeFromGameFlag({ pathname: "/help/changelog", search: "?from=game", hash: "" }, hist, blocked)).toBe(true);
     expect(hist.replaceState).toHaveBeenCalledTimes(1);
     expect(takeFromGameFlag({ pathname: "/help/changelog", search: "", hash: "" }, hist, blocked)).toBe(false);
+  });
+});
+
+describe("helpVisitSource", () => {
+  const memoryStorage = (): Storage => {
+    const items = new Map<string, string>();
+    return {
+      getItem: (k: string) => items.get(k) ?? null,
+      setItem: (k: string, v: string) => void items.set(k, v),
+    } as unknown as Storage;
+  };
+
+  it("reports every place the game names, read back from the link the game writes", () => {
+    for (const source of GAME_HELP_SOURCES) {
+      const search = new URL(fromGameHref("/help/rooms/", source), "https://example.test").search;
+      expect(helpVisitSource(search, false, memoryStorage)).toBe(source);
+    }
+  });
+
+  it("is direct for a visit the game did not open, even one carrying a via", () => {
+    expect(helpVisitSource("", false, memoryStorage)).toBe("direct");
+    expect(helpVisitSource("?via=game_menu", false, memoryStorage)).toBe("direct");
+    expect(helpVisitSource("?from=search&via=title", false, memoryStorage)).toBe("direct");
+  });
+
+  it("is game for a page the game opened without a known place (an older build, or a crafted value)", () => {
+    expect(helpVisitSource("?from=game", false, memoryStorage)).toBe("game");
+    expect(helpVisitSource("?from=game&via=https%3A%2F%2Felsewhere.test", false, memoryStorage)).toBe("game");
+  });
+
+  it("reports the stored source again on a reload of the same tab, once the marks are gone", () => {
+    const store = memoryStorage();
+    expect(helpVisitSource("?from=game&via=welcome", false, () => store)).toBe("welcome");
+    expect(store.getItem(HELP_SOURCE_STORAGE_KEY)).toBe("welcome");
+    expect(helpVisitSource("", true, () => store)).toBe("welcome");
+  });
+
+  it("is direct for a fresh unmarked visit in a tab the game once opened", () => {
+    const store = memoryStorage();
+    helpVisitSource("?from=game&via=welcome", false, () => store);
+    expect(helpVisitSource("", false, () => store)).toBe("direct");
+  });
+
+  it("ignores a stored value that is not one of its codes", () => {
+    const store = memoryStorage();
+    store.setItem(HELP_SOURCE_STORAGE_KEY, "https://elsewhere.test/");
+    expect(helpVisitSource("", true, () => store)).toBe("direct");
+  });
+
+  it("still reports this load when the browser blocks storage", () => {
+    const blocked = (): Storage => {
+      throw new DOMException("blocked", "SecurityError");
+    };
+    expect(helpVisitSource("?from=game&via=inspector", false, blocked)).toBe("inspector");
+    expect(helpVisitSource("", true, blocked)).toBe("direct");
+  });
+});
+
+describe("repeatsEarlierLoad", () => {
+  const withType = (type: string | undefined) => ({
+    getEntriesByType: vi.fn(() => (type === undefined ? [] : [{ type }])),
+  }) as unknown as Pick<Performance, "getEntriesByType">;
+
+  it("is true for a reload or a step back or forward, and reads the navigation entry", () => {
+    const reload = withType("reload");
+    expect(repeatsEarlierLoad(reload)).toBe(true);
+    expect(reload.getEntriesByType).toHaveBeenCalledWith("navigation");
+    expect(repeatsEarlierLoad(withType("back_forward"))).toBe(true);
+  });
+
+  it("is false for a fresh navigation, a prerender, or no entry at all", () => {
+    expect(repeatsEarlierLoad(withType("navigate"))).toBe(false);
+    expect(repeatsEarlierLoad(withType("prerender"))).toBe(false);
+    expect(repeatsEarlierLoad(withType(undefined))).toBe(false);
   });
 });
