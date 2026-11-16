@@ -47,9 +47,10 @@ export type SourceView = (label: string, data: Buffer) => Buffer | null;
  * Not modeled: Rust code compiled in from outside the crate through a
  * `#[path]` attribute or a Cargo path dependency, and files a build script
  * reads from outside the crate. The engine has none of these; a change that
- * adds one should widen this hash. The cache only serves CI's
- * test runs (every deploy builds the package from source), so a miss here
- * could stale a test run, never a release.
+ * adds one should widen this hash. The caches keyed on it serve CI's test
+ * runs and Vercel previews (src/build/engineCache.ts); a production deploy
+ * builds the package from source, so a miss here could stale a test run or a
+ * preview, never a release.
  *
  * With a `view`, each file hashes as the view returns it (see `SourceView`);
  * without one, as it is.
