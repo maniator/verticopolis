@@ -19,11 +19,16 @@ const PRUNE_BELOW: f64 = 0.05;
 /// `Number.MAX_SAFE_INTEGER`: the largest id a seed may carry.
 const MAX_SAFE_INTEGER: f64 = 9007199254740991.0;
 
-/// `HourlyByDay`: one shaft's demand curve per day type, a 24-slot ring each.
-#[derive(Clone, Debug, PartialEq)]
+/// `HourlyByDay`: one shaft's demand curve per day type, a 24-slot ring each,
+/// with the hours each ring has sampled. A sampled hour can hold a measured
+/// zero (a dead weekend), which a slot's value alone cannot tell from an hour
+/// not yet sampled (#474).
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct HourlyByDay {
     pub weekday: Vec<f64>,
     pub weekend: Vec<f64>,
+    pub weekday_sampled: Vec<bool>,
+    pub weekend_sampled: Vec<bool>,
 }
 
 impl HourlyByDay {
@@ -31,6 +36,29 @@ impl HourlyByDay {
         HourlyByDay {
             weekday: vec![0.0; 24],
             weekend: vec![0.0; 24],
+            weekday_sampled: vec![false; 24],
+            weekend_sampled: vec![false; 24],
+        }
+    }
+
+    /// Rings from their values alone, as a seeded curve gives them: an hour
+    /// with a load is a sampled hour.
+    pub fn measured(weekday: Vec<f64>, weekend: Vec<f64>) -> HourlyByDay {
+        let loaded = |ring: &[f64]| ring.iter().map(|v| *v > 0.0).collect();
+        HourlyByDay {
+            weekday_sampled: loaded(&weekday),
+            weekend_sampled: loaded(&weekend),
+            weekday,
+            weekend,
+        }
+    }
+
+    /// One day type's ring and the hours it has sampled.
+    pub fn day(&self, weekend: bool) -> (&[f64], &[bool]) {
+        if weekend {
+            (&self.weekend, &self.weekend_sampled)
+        } else {
+            (&self.weekday, &self.weekday_sampled)
         }
     }
 }
@@ -150,19 +178,26 @@ impl Simulation {
             };
             alive_hourly.push(t.id);
             let rings = tel.hourly.entry(t.id).or_insert_with(HourlyByDay::empty);
-            if rings.weekday.len() != 24 || rings.weekend.len() != 24 {
+            let sized = |n: usize| n == 24;
+            if !(sized(rings.weekday.len())
+                && sized(rings.weekend.len())
+                && sized(rings.weekday_sampled.len())
+                && sized(rings.weekend_sampled.len()))
+            {
                 *rings = HourlyByDay::empty();
             }
-            let ring = if weekend {
-                &mut rings.weekend
+            let (ring, sampled) = if weekend {
+                (&mut rings.weekend, &mut rings.weekend_sampled)
             } else {
-                &mut rings.weekday
+                (&mut rings.weekday, &mut rings.weekday_sampled)
             };
-            ring[hour] = if ring[hour] == 0.0 && frac > 0.0 {
+            // The first sample of an hour seeds it, a measured zero included.
+            ring[hour] = if !sampled[hour] {
                 frac
             } else {
                 0.3 * frac + 0.7 * ring[hour]
             };
+            sampled[hour] = true;
             let origins = tel.origins.entry(t.id).or_insert_with(OriginRings::empty);
             fold_origins(origins, origin_weekend, origin_hour, boardings.get(&t.id));
             if t.kind.is_staff_only_transport() {
@@ -199,7 +234,14 @@ impl Simulation {
             "hourly": tel
                 .hourly
                 .iter()
-                .map(|(id, r)| json!([id, { "weekday": r.weekday, "weekend": r.weekend }]))
+                .map(|(id, r)| {
+                    json!([id, {
+                        "weekday": r.weekday,
+                        "weekend": r.weekend,
+                        "weekdaySampled": r.weekday_sampled,
+                        "weekendSampled": r.weekend_sampled,
+                    }])
+                })
                 .collect::<Vec<_>>(),
             "origins": tel
                 .origins
@@ -249,6 +291,20 @@ impl Simulation {
             }
             a.iter().map(num).collect()
         }
+        fn hours24(v: &Value) -> Result<Vec<bool>, String> {
+            let a = v
+                .as_array()
+                .ok_or("telemetry: a sampled-hours list is not a list")?;
+            if a.len() != 24 {
+                return Err("telemetry: a sampled-hours list does not have 24 slots".into());
+            }
+            a.iter()
+                .map(|b| {
+                    b.as_bool()
+                        .ok_or_else(|| format!("telemetry: {b} is not true or false"))
+                })
+                .collect()
+        }
         fn slots(v: Option<&Value>) -> Result<Vec<IndexMap<i64, f64>>, String> {
             let a = v
                 .and_then(Value::as_array)
@@ -278,10 +334,16 @@ impl Simulation {
         }
         for p in pairs(doc.get("hourly"))? {
             let (id, r) = pair(p)?;
-            let rings = HourlyByDay {
-                weekday: ring24(r.get("weekday"))?,
-                weekend: ring24(r.get("weekend"))?,
-            };
+            let mut rings =
+                HourlyByDay::measured(ring24(r.get("weekday"))?, ring24(r.get("weekend"))?);
+            // A document that names its sampled hours keeps them; one without
+            // (a seeded curve) samples the hours with a load.
+            if let Some(v) = r.get("weekdaySampled") {
+                rings.weekday_sampled = hours24(v)?;
+            }
+            if let Some(v) = r.get("weekendSampled") {
+                rings.weekend_sampled = hours24(v)?;
+            }
             tel.hourly.insert(id_of(id)?, rings);
         }
         for p in pairs(doc.get("origins"))? {

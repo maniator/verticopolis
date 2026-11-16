@@ -10,7 +10,9 @@ import type { OriginRings } from "../shared/engineTypes";
  */
 export interface TelemetryDocument {
   util: [number, number][];
-  hourly: [number, HourlyByDay][];
+  /** Each ring with the hours it has sampled (#474); a seeded document may
+   *  leave them out, and the engine then samples the hours with a load. */
+  hourly: [number, HourlyByDay & { weekdaySampled?: boolean[]; weekendSampled?: boolean[] }][];
   origins: [number, { weekday: [number, number][][]; weekend: [number, number][][] }][];
 }
 

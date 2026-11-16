@@ -231,16 +231,9 @@ impl Simulation {
             return ScheduleFacts::refused(FactsStatus::NotAnElevator);
         }
         let geo = self.shaft_geometry(t);
-        let empty = HourlyByDay {
-            weekday: Vec::new(),
-            weekend: Vec::new(),
-        };
+        let empty = HourlyByDay::default();
         let rings = self.telemetry.hourly.get(&id).unwrap_or(&empty);
-        let curve = warm_curve(if weekend_view {
-            &rings.weekend
-        } else {
-            &rings.weekday
-        });
+        let curve = warm_curve(rings.day(weekend_view));
         let row = draft.and_then(|d| {
             if weekend_view {
                 d.weekend.as_ref()
