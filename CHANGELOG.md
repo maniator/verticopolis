@@ -25,6 +25,21 @@ prompt already tells players it is an engine update and shows the new version.
 Entries below 1.51.1 were curated from the commit history after the fact, so they
 are documentation only: no build that a client fetches carries them.
 
+## 4.9.0
+
+- A manual page the game opened now has a bar along the bottom with your tower's date, money, population and stars, and buttons to keep the tower running while you read, pause it again, or go back to it.
+- A room card's problem lines and the problem rows in Tower Statistics now end in a Help link to the manual page that explains them. On a computer, press F1 while peeking at a room to open its first one, or with no card up to open the manual.
+- In Modern, every tower on the lot now has its own grand front entrance and doorman at the left end of its ground lobby, and its own service door at the right end.
+- Modern towers can build as many stairs and escalators as the lot has room for. Classic keeps SimTower's limit of 64.
+- Opening another tower no longer loses the one you were playing. File > Open…, New…, a file from your computer and a 1994 import first keep the tower you're leaving in My Towers: in its own file, or as a new file under its name.
+- In Modern, escalators and stairs now move slower than elevators, and people happily ride escalators a long way instead of avoiding them.
+- The Privacy page now says the manual's anonymous counts include where a visit started: the place in the game it was opened from, or simply outside the game. It is a fixed label, never a page address.
+- In Modern towers, hotel guests really check in and check out. Once a room is let, its guests ride up from the ground lobby or the Metro within the hour, and after checkout they ride back down and leave. Sleeping guests no longer call elevators, so fewer cars run up and down at night for guests nobody can see. Classic hotels still fill and empty by the clock.
+- An elevator schedule's Auto-tune now learns from quiet days too: a weekend with no riders counts as measured after six hours instead of never.
+- The report shown before you open a 1994 SimTower `.TDT` file now says the file goes into My Towers once the tower opens, instead of mentioning save slots, which the game no longer has.
+- In Classic, stairs and escalators now take as long as they did in the 1994 game: one flight takes about as long as an elevator car needs for ten floors, where people used to climb faster than the cars could carry them.
+- The Bulletin opens on its newest message at the top again, instead of scrolled down to the oldest one.
+
 ## 4.8.0
 
 - Earning a new star now stops the game with a message box that shows the new rating and the rooms it opens, as the 1994 game did. In Modern the box also warns what the rating starts asking for, such as parking from three stars with the spaces your tower needs and has, and lists what the next rating needs.
