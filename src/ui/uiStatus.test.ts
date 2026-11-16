@@ -181,7 +181,7 @@ describe("resetLog", () => {
     const { ui, el } = hud();
     resetLog(ui, source().src, "Loaded Skyspire.");
     expect(el.log.textContent).toBe("Loaded Skyspire.");
-    expect(el.log.lastElementChild!.className).toBe("log-line info");
+    expect(el.log.firstElementChild!.className).toBe("log-line info");
     expect(ui.lastLogSeq).toBe(0); // the engine's cursor, untouched by the game's line
     expect(document.getElementById("sb-news")!.textContent).toBe("Loaded Skyspire.");
     resetLog(ui, source().src);

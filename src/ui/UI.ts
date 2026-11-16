@@ -21,6 +21,7 @@ import * as panels from "./uiPanels";
 import * as status from "./uiStatus";
 import type { HudSource } from "./uiStatus";
 import { buildPalette } from "./uiPalette";
+import { wireBulletinReadBack } from "./bulletinReadBack";
 import { ModalPrecedence, routeNotice, type ModalOpts, type NoticeKind } from "./modalPrecedence";
 import { finishModal } from "./uiModal";
 
@@ -152,6 +153,8 @@ export class UI {
     // delegated listener on the container, so lit re-renders never need
     // rewiring (E6-S1).
     panels.wireEditorActions(this);
+    // One app_action the first time the player scrolls back through the Bulletin.
+    wireBulletinReadBack(this.el.log);
     // While the pointer is pressed inside the editor card, suppress the periodic
     // refresh. lit's diff already keeps a pressed button's identity (the
     // "+ rent sometimes does nothing" bug), so this is belt-and-suspenders
