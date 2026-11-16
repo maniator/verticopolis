@@ -25,6 +25,20 @@ prompt already tells players it is an engine update and shows the new version.
 Entries below 1.51.1 were curated from the commit history after the fact, so they
 are documentation only: no build that a client fetches carries them.
 
+## 4.8.0
+
+- Earning a new star now stops the game with a message box that shows the new rating and the rooms it opens, as the 1994 game did. In Modern the box also warns what the rating starts asking for, such as parking from three stars with the spaces your tower needs and has, and lists what the next rating needs.
+- The Privacy page now says the anonymous counts include how windows are used: opened, moved, resized, minimized, maximized or closed.
+- Neighboring rooms of the same kind, such as a row of nightclubs or sky bars, now seat their people in their own spots instead of one pattern repeated along the floor.
+- On big hotels, housekeepers no longer wait hours for the service elevator at the start of their shift. A crew now comes in only as fast as the elevators can carry it, and the bulletin suggests more service elevators when they come in late.
+- A save into a linked folder that fails partway no longer leaves a name you can't use: your next save under that name writes into the empty file the browser left, and opening the empty file says it holds no tower.
+- On a computer, a click on the opening screen's gray face or its poster no longer drops you into your tower. Continue or Esc still do.
+- The rooftop crane on a narrow top floor at the edge of the lot now stands back along the roof, so its arm no longer hangs out past the lot.
+
+### Contributors
+
+- easterbunni on r/SimTower asked for a heads-up when the tower earns a star, after tenants left over parking the new rating needed.
+
 ## 4.7.0
 
 - In Modern towers, condo, apartment and studio residents really leave for the day and come home. On weekdays all but one of each household (everyone in a studio) walk out through the ground lobby or the Metro between 7 and 10 AM and ride home between 4 and 7 PM; at night and on weekends everyone is home. Elevators no longer run up and down for residents nobody can see, so far fewer cars move with nobody aboard. Classic homes still count residents by the clock.

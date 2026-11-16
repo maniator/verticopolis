@@ -15,6 +15,15 @@ raised the version, so they are documentation only.
 There is no entry for 0.17.0, which only
 existed as a step inside a stacked branch.
 
+## 1.45.0 (2026-11-16)
+
+- The catalog publishes `rules.starDuties`, what each star rating starts asking of a tower as `{ star, id }` records (`star_duties::star_duties`), and `rules.announcesStarDuties` (`GameMode::announces_star_duties`, Modern only), catalog version 22. The ratings the duties begin at are named constants the rules read (`EMERGENCIES_FROM_STAR`, `VIP_VISITS_FROM_STAR`, `HOTEL_GUESTS_UNCOUNTED_FROM_STAR`, `BOMB_THREATS_FROM_STAR`), with no change in behavior.
+- Housekeepers coming in for a shift are not sent in while an elevator on their way in already has a full load waiting for every car, and come at a later hour (#2332).
+
+### Contributors
+
+- easterbunni on r/SimTower asked for a heads-up when the tower earns a star, after tenants left over parking the new rating needed.
+
 ## 1.44.0 (2026-11-16)
 
 - Modern home residents commute as crowd people (`crowd::commuters`, new `Workplace::Home`): `GameMode::residents_commute_in_person` (`REAL_RESIDENT_TRIPS_ON`), `Kind::lives_in_person`, `Kind::arrives_in_person` and `Kind::residents_home_by_day`. A home's `occupants` is the residents at home; the hourly presence pass skips these homes, and they no longer feed the dispatch's waiting estimate (`ElevatorDispatch::accumulate`), whose lobby share now leaves out the population that arrives in person. The sampled school run is off where residents commute themselves. The Modern conformance cases, the frame-day golden and the Modern fuzz-corpus golden move.
