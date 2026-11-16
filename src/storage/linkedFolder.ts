@@ -360,13 +360,15 @@ export const linkedFolder = {
     const folder = need();
     const clean = cleanFileName(name);
     if (!clean) throw new Error("Type a name for the tower.");
-    // The name as the folder spells it first: a file named in a way this game
-    // would not write (two spaces, a long name) is still the same file.
-    const towers = folder.entries.filter((e) => e.kind === "tower");
-    const same = towers.find((e) => e.name === name) ?? towers.find((e) => e.name.toLocaleLowerCase() === clean.toLocaleLowerCase());
-    if (same && !replace) throw new FileNameTakenError(clean);
-    if (same) return writeFile(folder, same.id, bytes);
-    return writeFresh(folder, clean, towers, bytes);
+    return oneSaveAtATime(async () => {
+      // The name as the folder spells it first: a file named in a way this game
+      // would not write (two spaces, a long name) is still the same file.
+      const towers = folder.entries.filter((e) => e.kind === "tower");
+      const same = towers.find((e) => e.name === name) ?? towers.find((e) => e.name.toLocaleLowerCase() === clean.toLocaleLowerCase());
+      if (same && !replace && !(await emptyOnDisk(folder, same.id))) throw new FileNameTakenError(clean);
+      if (same) return writeFile(folder, same.id, bytes);
+      return writeFresh(folder, clean, towers, bytes);
+    });
   },
 
   /** Save under `name`, or the first "name (2)" and up free in the list and
@@ -375,7 +377,7 @@ export const linkedFolder = {
     const folder = need();
     const clean = cleanFileName(name);
     if (!clean) throw new Error("Type a name for the tower.");
-    return writeFresh(folder, clean, folder.entries.filter((e) => e.kind === "tower"), bytes);
+    return oneSaveAtATime(() => writeFresh(folder, clean, folder.entries.filter((e) => e.kind === "tower"), bytes));
   },
 
   /** Write `bytes` over the file `id` itself, by its name on disk, for File >
@@ -401,9 +403,10 @@ export const linkedFolder = {
  *  neither `towers` nor the disk has: a file another program wrote since the
  *  list was read is never replaced without asking. */
 async function writeFresh(folder: Linked, clean: string, towers: readonly TowerFileEntry[], bytes: Uint8Array): Promise<TowerFileEntry> {
-  const taken = [...towers];
+  // An empty file is free to take: it is what a failed new-name save leaves.
+  const taken = towers.filter((e) => e.size > 0);
   let pick = freeName(clean, taken);
-  while (await exists(folder, `${pick}.vctower`)) {
+  while ((await exists(folder, `${pick}.vctower`)) && !(await emptyOnDisk(folder, `${pick}.vctower`))) {
     taken.push({ id: "", name: pick, kind: "tower", size: 0, modified: 0 });
     pick = freeName(clean, taken);
   }
@@ -420,6 +423,28 @@ async function exists(folder: Linked, filename: string): Promise<boolean> {
     if (err instanceof DOMException && err.name === "TypeMismatchError") return true;
     throw err;
   }
+}
+
+/** The Web Lock that saves picking a name hold, shared by every tab of the
+ *  game. A new file stays empty until its write closes, so without it a
+ *  second tab saving the same name could take that file for a free one and
+ *  write over the first tab's tower without asking. */
+const SAVE_LOCK = "verticopolis-linked-folder-save";
+
+/** Run a name-picking save while no other tab runs one. Where the browser has
+ *  no Web Locks, the save runs at once. */
+async function oneSaveAtATime<T>(run: () => Promise<T>): Promise<T> {
+  const locks = typeof navigator === "undefined" ? undefined : navigator.locks;
+  return locks ? await locks.request(SAVE_LOCK, run) : run();
+}
+
+/** Whether `filename` is an empty file on disk right now. Chromium creates a
+ *  new file empty before its bytes go in, so a save under a new name that
+ *  fails leaves one behind (#2337). Nothing is lost by writing over it, so a
+ *  save takes its name without asking; the game still never deletes it. */
+async function emptyOnDisk(folder: Linked, filename: string): Promise<boolean> {
+  const file = await readEntry(folder.handle, filename).catch(() => null);
+  return file !== null && file.size === 0;
 }
 
 async function writeFile(folder: Linked, filename: string, bytes: Uint8Array): Promise<TowerFileEntry> {

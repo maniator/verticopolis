@@ -24,7 +24,7 @@ import { exportFile } from "./portLifecycle";
  * `folder_link` (`linked`, `cancel` or `refused`), `folder_allow` (`granted`
  * or `denied`), `folder_unlink`, `folder_open` (`tower` or `tdt`),
  * `folder_save` (`new`, `replace` or `current`), `folder_copy`,
- * `folder_failed` and `folder_mirror` (`on`, `off`, or `failed` once a visit,
+ * `folder_failed` (`empty` for an empty file opened) and `folder_mirror` (`on`, `off`, or `failed` once a visit,
  * `autosaveMirror.ts`). Codes only, never a folder's or a file's name.
  */
 
@@ -52,6 +52,12 @@ async function openLinkedRow(app: GameApp, row: FileRow): Promise<void> {
   }
   if (!bytes) {
     app.ui.sayVisibly(`"${row.name}" isn't in the folder any more. It may have been moved or deleted.`);
+    return;
+  }
+  if (bytes.byteLength === 0) {
+    trackAppAction("folder_failed", "empty");
+    const reuse = row.type === "tower" ? " A save that didn't finish can leave one; saving under that name uses it." : "";
+    app.ui.sayVisibly(`"${row.name}" is an empty file, so there's no tower in it.${reuse}`);
     return;
   }
   trackAppAction("folder_open", row.type);

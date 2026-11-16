@@ -145,6 +145,27 @@ describe("the linked folder in the Open and Save As windows", () => {
     expect(app.saveLoad.importGame).not.toHaveBeenCalled();
   });
 
+  it("says an empty file holds no tower, and counts it, without importing (#2337)", async () => {
+    m.folder.read.mockResolvedValueOnce(new Uint8Array());
+    place().open(row("Sky.vctower"));
+    await settle();
+    expect(app.ui.sayVisibly).toHaveBeenCalledExactlyOnceWith(
+      `"Sky" is an empty file, so there's no tower in it. A save that didn't finish can leave one; saving under that name uses it.`,
+    );
+    expect(app.saveLoad.importGame).not.toHaveBeenCalled();
+    expect(m.track).toHaveBeenCalledExactlyOnceWith("folder_failed", "empty");
+    expect(currentLinkedFile()).toBeNull();
+  });
+
+  it("says an empty 1994 file holds no tower, without promising a save reuses it", async () => {
+    m.folder.read.mockResolvedValueOnce(new Uint8Array());
+    place().open(row("OLD.TDT", "tdt"));
+    await settle();
+    expect(app.ui.sayVisibly).toHaveBeenCalledExactlyOnceWith(`"OLD" is an empty file, so there's no tower in it.`);
+    expect(app.saveLoad.importLegacy).not.toHaveBeenCalled();
+    expect(m.track).toHaveBeenCalledExactlyOnceWith("folder_failed", "empty");
+  });
+
   it("saves the exported bytes under the typed name and toasts where", async () => {
     expect(await place().save("Sky", false)).toBeNull();
     expect(m.folder.save).toHaveBeenCalledExactlyOnceWith("Sky", Uint8Array.of(7, 7, 7), false);
