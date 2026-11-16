@@ -334,7 +334,7 @@ impl Engine {
             second.map_or(f64::NAN, |f| code_of(&FILM_POLICIES, f.policy)),
             second.map_or(f64::NAN, |f| f.days_shown() as f64),
             second.map_or(f64::NAN, |f| film_tier_code(f.tier)),
-            if u.kind.commutes_in_person(mode) {
+            if u.kind.arrives_in_person(mode) {
                 crate::crowd::commuters::coming_to(&self.sim.crowd, u.id) as f64
             } else {
                 f64::NAN

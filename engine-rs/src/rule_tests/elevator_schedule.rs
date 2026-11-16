@@ -15,7 +15,7 @@
 //! and `telemetry::tests::a_negligible_floor_is_pruned_and_hours_wrap`.
 use serde_json::json;
 
-use crate::clock::{CalendarKind, GameMode};
+use crate::clock::{resolve_calendar, CalendarKind, GameMode};
 use crate::facilities::Kind;
 use crate::load::{deserialize, migrate_save};
 use crate::schedule::SCHEDULE_HOURS;
@@ -29,7 +29,12 @@ const HOUR: f64 = 60.0;
 
 /// One standard elevator over floors 1 to 8, 24 tiles wide, Modern.
 fn tower_with_elevator() -> Simulation {
-    let mut sim = Simulation::new(2024, GameMode::Modern, CalendarKind::RealWorld, false);
+    tower_with_elevator_in(GameMode::Modern)
+}
+
+/// [`tower_with_elevator`] in a `mode` tower.
+fn tower_with_elevator_in(mode: GameMode) -> Simulation {
+    let mut sim = Simulation::new(2024, mode, CalendarKind::RealWorld, false);
     sim.money = 10_000_000.0;
     for x in 0..WIDTH {
         assert!(sim.tower.place(Kind::Lobby, 1, x).ok);
@@ -249,7 +254,10 @@ fn the_canon_calendar_splits_its_weekend_day_too() {
 
 /// An occupied condo on floor 5 whose residents the cars board. (A Modern
 /// office's workers ride in as real people, outside the dispatch's estimate.)
+/// A condo whose residents the dispatch's estimate carries: a Classic one,
+/// as a Modern home's residents ride as the crowd (`crowd::commuters`).
 fn busy_condo(sim: &mut Simulation) {
+    assert_eq!(sim.tower.mode, GameMode::Classic);
     let id = sim.tower.place(Kind::Condo, 5, 2).unit_id.unwrap();
     let u = sim.tower.get_unit_mut(id).unwrap();
     u.state = UnitState::Occupied;
@@ -273,7 +281,7 @@ fn origin_mass(slot: &indexmap::IndexMap<i64, f64>) -> f64 {
 
 #[test]
 fn boardings_fold_into_the_hour_they_happened_in() {
-    let mut sim = tower_with_elevator();
+    let mut sim = tower_with_elevator_in(GameMode::Classic);
     let id = shaft(&sim).id;
     busy_condo(&mut sim);
     sim.clock.minutes = 8.0 * HOUR;
@@ -302,7 +310,10 @@ fn boardings_fold_into_the_hour_they_happened_in() {
 
 #[test]
 fn a_midnight_drain_files_under_yesterdays_last_hour_and_day_type() {
-    let mut sim = tower_with_elevator();
+    let mut sim = tower_with_elevator_in(GameMode::Classic);
+    // The real-world week, as the Modern tower this test ran on before its
+    // condo had to be a Classic one (its days are the ones below).
+    sim.clock.calendar = resolve_calendar(GameMode::Modern, CalendarKind::RealWorld);
     let id = shaft(&sim).id;
     busy_condo(&mut sim);
     sim.clock.minutes = 6.0 * DAY + 23.0 * HOUR; // Sunday 23:00

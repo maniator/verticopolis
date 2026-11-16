@@ -46,6 +46,7 @@ mod game_events;
 mod gap_flight_walkers;
 mod golden_master;
 mod heatmap;
+mod home_commute;
 mod home_parking;
 mod hotel_late_checkout;
 mod housekeeping_commute;
@@ -298,6 +299,8 @@ pub fn place_seated(
 pub fn at_time(sim: &mut Simulation, day: i64, hour: i64) {
     sim.clock = Clock::new(((day * 24 + hour) * 60) as f64, sim.clock.calendar);
     crate::crowd::workplace::staff_at_work(&mut sim.crowd, &mut sim.tower, hour);
+    let weekend = sim.clock.is_weekend();
+    crate::crowd::workplace::residents_at_home(&mut sim.crowd, &mut sim.tower, weekend, hour);
 }
 
 /// The decoded save of `conformance/fixtures/<name>.vctower`.

@@ -28,9 +28,10 @@ impl Simulation {
         let mode = self.tower.mode;
         for i in self.tower.room_indices() {
             let (u, at) = self.tower.marked(i);
-            // A Modern office counts the workers who got to their desks
-            // (`crowd::commuters`), not the clock.
-            if u.kind.commutes_in_person(mode) {
+            // A Modern office counts the workers who got to their desks, and
+            // a Modern home the residents who got home (`crowd::commuters`),
+            // not the clock.
+            if u.kind.arrives_in_person(mode) {
                 continue;
             }
             let f = u.kind.facility();

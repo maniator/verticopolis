@@ -196,6 +196,33 @@ impl Kind {
     }
 
     #[doc(hidden)]
+    /// A home whose residents leave for the day and come home as people in a
+    /// `mode` tower (`crowd::commuters`): a condo, apartment or studio. Its
+    /// head count is the residents at home, and the dispatch estimate skips
+    /// it, since they ride the cars themselves. Modern homes today.
+    pub fn lives_in_person(self, mode: crate::clock::GameMode) -> bool {
+        (self == Kind::Condo || self.is_rental()) && mode.residents_commute_in_person()
+    }
+
+    #[doc(hidden)]
+    /// A kind whose head count is the people who really got there in a
+    /// `mode` tower: an office whose workers commute
+    /// ([`Kind::commutes_in_person`]) or a home whose residents do
+    /// ([`Kind::lives_in_person`]). The hourly head count and the dispatch
+    /// estimate leave it alone.
+    pub fn arrives_in_person(self, mode: crate::clock::GameMode) -> bool {
+        self.commutes_in_person(mode) || self.lives_in_person(mode)
+    }
+
+    #[doc(hidden)]
+    /// How many residents of a home of this kind stay in on a weekday while
+    /// the rest are out (the hourly head count's daytime figure): one in a
+    /// condo or apartment, nobody in a studio.
+    pub fn residents_home_by_day(self) -> i64 {
+        i64::from(self.has_household())
+    }
+
+    #[doc(hidden)]
     /// `isCommercialKind`.
     pub fn is_commercial(self) -> bool {
         matches!(

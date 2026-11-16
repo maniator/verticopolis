@@ -117,33 +117,28 @@ fn the_routine_weights_are_modern_only_probabilities() {
     assert_eq!(GameMode::Classic.demographic_routines(), (0.0, 0.0));
 }
 
+/// Modern residents leave for the day and come home as people of their own
+/// (`crowd::commuters`), so the sampled school run gives way to them: the
+/// condos still empty toward the lobby on a weekday morning, and nobody is
+/// tagged for school.
 #[test]
-fn the_morning_school_run_leaves_occupied_condos_for_the_lobby() {
-    let run = pumped_at(GameMode::Modern, 0, 7, 60);
-    let departures: Vec<&Tagged> = run
-        .tagged
-        .iter()
-        .filter(|t| t.routine == SCHOOL_RUN)
-        .collect();
-    assert!(!departures.is_empty());
-    for d in departures {
-        assert!(CONDO_FLOORS.contains(&d.origin) && d.dest == LOBBY);
-        assert_eq!(d.origin_kind, Some(Kind::Condo), "keyed to its condo");
+fn residents_who_commute_take_the_school_run_themselves() {
+    assert!(GameMode::Modern.residents_commute_in_person());
+    for hour in [7, 15] {
+        let run = pumped_at(GameMode::Modern, 0, hour, 60);
+        assert_eq!(run.count(SCHOOL_RUN), 0, "hour {hour}");
     }
-}
-
-#[test]
-fn the_afternoon_school_run_rides_from_the_lobby_home() {
-    let run = pumped_at(GameMode::Modern, 0, 15, 60);
-    let returns: Vec<&Tagged> = run
-        .tagged
-        .iter()
-        .filter(|t| t.routine == SCHOOL_RUN)
-        .collect();
-    assert!(!returns.is_empty());
-    for r in returns {
-        assert!(r.origin == LOBBY && CONDO_FLOORS.contains(&r.dest));
+    let mut sim = routine_tower(GameMode::Modern, true);
+    at_time(&mut sim, 0, 6);
+    let mut leaving = 0;
+    for _ in 0..4 * 60 {
+        sim.tick(1.0);
+        leaving += (sim.crowd.people.iter())
+            .filter(|p| p.commuter && CONDO_FLOORS.contains(&p.floors[0]))
+            .filter(|p| p.floors.last() == Some(&LOBBY))
+            .count();
     }
+    assert!(leaving > 0, "residents ride down to the lobby");
 }
 
 #[test]

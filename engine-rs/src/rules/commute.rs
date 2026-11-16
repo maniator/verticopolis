@@ -25,6 +25,13 @@ pub const MODERN_WAIT_LIMIT: f64 = 1.5 * GIVE_UP;
 /// hourly head count and its cars back at the Classic speed.
 pub const REAL_OFFICE_COMMUTES_ON: bool = true;
 
+/// Residents of Modern condos, apartments and studios who really leave for
+/// the day and come home (owner, 2026-11-15, the real-tenant-arrivals plan's
+/// homes step). Before, the dispatch's estimate stood in for them: cars
+/// drove to their floors and carried riders nobody could see. Setting this to
+/// `false` puts Modern homes back on the hourly head count and the estimate.
+pub const REAL_RESIDENT_TRIPS_ON: bool = true;
+
 /// Whether real office commutes are on in this build.
 pub(crate) fn real_office_commutes_on() -> bool {
     REAL_OFFICE_COMMUTES_ON
@@ -52,6 +59,17 @@ impl GameMode {
     /// and times its cars.
     pub fn office_workers_commute_in_person(self) -> bool {
         self == GameMode::Modern && real_office_commutes_on()
+    }
+
+    /// Whether the residents of a home (a condo, apartment or studio) leave
+    /// for the day and come home as people (`crowd::commuters`) instead of
+    /// an hourly head count and the dispatch's estimate. Modern only, with
+    /// the office commutes, and only while [`REAL_RESIDENT_TRIPS_ON`]
+    /// (owner, 2026-11-15: a car carries only riders the player can see).
+    /// Classic homes keep the head count until a run of the 1994 game
+    /// measures its rush.
+    pub fn residents_commute_in_person(self) -> bool {
+        self.office_workers_commute_in_person() && REAL_RESIDENT_TRIPS_ON
     }
 
     /// Whether a venue's staff (`Kind::staff_size`) come in and go home as

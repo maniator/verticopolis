@@ -375,7 +375,9 @@ pub fn spawn_trips(crowd: &mut Crowd, tower: &mut Tower, clock: &Clock, floors: 
     let clock_offices = !tower.mode.office_workers_commute_in_person();
     let lo = clock_offices && !floors.leased_offices.is_empty();
     let so = clock_offices && !floors.staffed_offices.is_empty();
-    let hm = !floors.homes.is_empty();
+    // Modern residents leave and come home as real people (`commuters`)
+    // too; Classic homes keep the clock's trips.
+    let hm = !tower.mode.residents_commute_in_person() && !floors.homes.is_empty();
     if morning {
         if lo {
             o.push(Opt::Trip(End::Fixed(1), End::Pick(List::LeasedOffices)));
