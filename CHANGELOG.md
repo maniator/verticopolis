@@ -25,6 +25,12 @@ prompt already tells players it is an engine update and shows the new version.
 Entries below 1.51.1 were curated from the commit history after the fact, so they
 are documentation only: no build that a client fetches carries them.
 
+## 4.6.0
+
+- On a computer, Verticopolis now runs as a 1994 desktop: the tower, Tools, Info, the Map and the Bulletin are each their own window you can move, minimize and (for the tower) resize or maximize, with Info as a strip across the top and a taskbar along the bottom. A Window menu brings any window back, a right-click on a title bar or taskbar button opens its window menu, and Info and Tools never close. Phones and tablets keep today's layout.
+- The game now opens on a startup screen: the sky starts at night and the sun comes up while Verticopolis loads, then the title screen takes over. On a computer the title screen opens in its own Verticopolis window on the desktop. An installed app's launch screen wears the same night sky.
+- In the installed app, Back to Game in the Player's Manual now closes the manual and returns to your game, instead of opening a second copy of the game inside the manual's window.
+
 ## 4.5.1
 
 - Fixed help.verticopolis.com and old /help links opening the game's title screen instead of the Player's Manual in a browser that visited that address while it was being set up. The page now clears the leftover game files and reloads the manual by itself.
