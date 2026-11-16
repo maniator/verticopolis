@@ -9,8 +9,11 @@
  */
 export const GRAPHICS_RECOVERY_ID = "graphics-recovery";
 
-/** Put the card up and return the function that takes it down. */
-export function showGraphicsRecovery(): () => void {
+/** Put the card up and return the function that takes it down. Over the title
+ *  screen no tower is in play (a first-timer has none), so the card speaks of
+ *  the saved towers instead of "your tower". */
+export function showGraphicsRecovery(onTitleScreen = false): () => void {
+  const safe = onTitleScreen ? "Your saved towers are untouched." : "Your tower is safe.";
   document.getElementById(GRAPHICS_RECOVERY_ID)?.remove();
   const dialog = document.createElement("dialog");
   dialog.id = GRAPHICS_RECOVERY_ID;
@@ -18,7 +21,7 @@ export function showGraphicsRecovery(): () => void {
   dialog.setAttribute("aria-labelledby", "graphics-recovery-title");
   dialog.innerHTML = `
       <h2 id="graphics-recovery-title" class="win-title">Recovering graphics</h2>
-      <p role="status">The device reset the game's graphics. The game is restarting them, which takes a few seconds. Your tower is safe.</p>`;
+      <p role="status">The device reset the game's graphics. The game is restarting them, which takes a few seconds. ${safe}</p>`;
   // Esc would close a modal dialog; the wait ends only when the recovery does.
   dialog.addEventListener("cancel", (e) => e.preventDefault());
   document.body.append(dialog);

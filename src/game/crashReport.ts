@@ -26,8 +26,8 @@ export interface CrashDescription {
   repeat: boolean;
   /** An in-place renderer recovery was attempted for this loss and failed
    *  (rebuild error or the restore signal never came inside the visible-time
-   *  budget). False when the crash screen showed without an attempt (repeat,
-   *  behind the splash, or a failed flush). */
+   *  budget). False when the crash screen showed without an attempt (a repeat
+   *  or a failed flush). */
   recoveryFailed: boolean;
   /** Whether the tower was persisted going into the crash: the pre-crash
    *  autosave flush succeeded, or nothing needed flushing (the crash happened

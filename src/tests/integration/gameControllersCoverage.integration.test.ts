@@ -1106,7 +1106,7 @@ describe.skipIf(noEngine)("SaveLoad (persistence, update flush, GPU-loss recover
       },
       ui: f.ui,
       showCrashScreen: (info) => crashScreens.push(info),
-      showRecoveryWait: () => showGraphicsRecovery(),
+      showRecoveryWait: (behindSplash) => showGraphicsRecovery(behindSplash),
       attemptGraphicsRecovery: (done) => recoveries.push(done),
       armOnboarding: () => armed++,
     }));
@@ -1125,7 +1125,7 @@ describe.skipIf(noEngine)("SaveLoad (persistence, update flush, GPU-loss recover
    *  least invasive seam. */
   function stubReload() {
     const reload = vi.fn();
-    vi.stubGlobal("location", { reload } as unknown as Location);
+    vi.stubGlobal("location", { reload, hostname: "localhost" } as unknown as Location);
     return reload;
   }
 
@@ -1578,19 +1578,39 @@ describe.skipIf(noEngine)("SaveLoad (persistence, update flush, GPU-loss recover
     spy.mockRestore();
   });
 
-  it("a context loss behind the splash shows the screen without persisting the boot sim", () => {
+  it("a context loss behind the splash recovers in place without persisting or changing the tower", () => {
+    const splash = document.createElement("div");
+    splash.id = "splash";
+    document.body.appendChild(splash);
+    const logBefore = sim.log!.length;
+    saveLoad.recoverFromContextLoss();
+    expect(SaveGame.hasSave()).toBe(false);
+    // A phone drops a backgrounded app's GL on the title screen too, and the
+    // DOM title screen survives a renderer swap, so this is no crash.
+    expect(crashScreens).toHaveLength(0);
+    expect(recoveries).toHaveLength(1);
+    recoveries[0](true);
+    expect(last(f.toasts)).toEqual({ text: "Graphics recovered.", kind: "good" });
+    // "Nothing changes behind the splash": no bulletin line, still no save.
+    expect(sim.log!.length).toBe(logBefore);
+    expect(SaveGame.hasSave()).toBe(false);
+    expect(crashScreens).toHaveLength(0);
+  });
+
+  it("a context loss behind the splash whose recovery fails shows the screen worded for no tower in play", () => {
+    stubReload();
     const splash = document.createElement("div");
     splash.id = "splash";
     document.body.appendChild(splash);
     saveLoad.recoverFromContextLoss();
-    expect(SaveGame.hasSave()).toBe(false);
-    // No session to preserve behind the splash, so no in-place recovery.
-    expect(recoveries).toHaveLength(0);
+    recoveries[0](false);
     expect(crashScreens).toHaveLength(1);
     // Nothing needed flushing (the splash pauses the sim); the screen words
     // this case separately instead of claiming a tower was saved.
     expect(crashScreens[0].save.flushed).toBe(true);
     expect(crashScreens[0].save.behindSplash).toBe(true);
+    expect(crashScreens[0].crash.recoveryFailed).toBe(true);
+    expect(SaveGame.hasSave()).toBe(false);
   });
 });
 

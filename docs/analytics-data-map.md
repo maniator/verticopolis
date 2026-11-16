@@ -124,6 +124,14 @@ These are lower bounds like every client event: a failure that kills the tab, or
 a blocked relay, reports nothing. `docs/analytics-measurement-status.md` rows 8
 to 10 and 24 say what they can and cannot support.
 
+## Graphics recovery
+
+One `app_action` counts the WebGL losses the game survived (2026-11-16). The fact and where it happened only.
+
+| `action` | `detail` | When | Reading |
+| --- | --- | --- | --- |
+| `graphics_recovered` | `game` or `title` | The device dropped the game's WebGL graphics and the game rebuilt them in place, mid-game (`game`) or behind the title screen (`title`) | Counted per recovery. A loss that ends on the crash screen is the `crash` event instead, so the two together give every first loss |
+
 ## My Towers (Open, Save As, Load)
 
 Version 4.3 replaced Saved Towers… and its three numbered slots with My Towers,
