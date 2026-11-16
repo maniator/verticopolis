@@ -72,6 +72,10 @@ sound, ask whether it thickens that soundscape or merely announces an event.
 | `src/audio/toneVoices.ts` | Action jingles: the `SfxVoices` instrument set and `playSfx`. |
 | `src/audio/tonePercussion.ts` | The chest-hit thump and object-tap membrane voices. |
 | `src/audio/toneRain.ts` | The outdoor rain bed, on a dry path. |
+| `src/audio/toneRoomTone.ts` | The per-scene room-tone bed (filtered pink noise). |
+| `src/audio/toneMusicVoices.ts` | The tracks' pitched voices: arpeggio, bass and melody. |
+| `src/audio/toneContext.ts` | The one playback context, and `ContextSleep`, which suspends it while the player is away. |
+| `src/audio/awayWatch.ts` | Reports the player leaving the page (hidden tab or lost focus) and coming back. |
 | `src/audio/toneCrowd.ts` | The crowd/venue ambience layer: talkers, per-scene details, venue programs. |
 | `src/audio/toneCrowdData.ts` | Crowd specs and math, including the `pseudo` hash the layer varies itself with. |
 | `src/audio/toneCrowdVoices.ts` | Slices the two seed mp3s into murmur grains. |
@@ -130,11 +134,21 @@ torn-down audio engine.
 `setProgram("splash" | "game")` picks the track; the splash theme crossfades to
 the in-game bed on entry.
 
+Leaving the page silences it. `src/audio/awayWatch.ts` reports the player
+away while the tab is hidden or the page has lost focus (another tab, another
+app in front of the installed app), and `setAway` on the facade and engine
+fades the master out, skips the music part's notes and any cues, quiets the
+crowd, and suspends the context once the fade has played, so the music holds
+its place (`ContextSleep` in `toneContext.ts`). Coming
+back resumes the context at the player's own mute. This is kept apart from the
+player's mute. It fixed static heard in a background tab: a backgrounded or
+unfocused page gets a throttled, lower-priority main thread, so the notes it
+builds only 0.1 s ahead (Tone's look-ahead) arrived late and crackled.
+
 Known runtime behavior, from the audio plan's audit: pausing the game keeps
-music and ambience playing; a blocking modal freezes ambience updates; there
-is no `visibilitychange` handling, so a hidden tab keeps playing; and the app
-never calls `dispose()`, so the crowd's `humSwell` gain is never released. The
-last two are `web-audio-lifecycle-a11y` (#973).
+music and ambience playing; a blocking modal freezes ambience updates; and the
+app never calls `dispose()`, so the crowd's `humSwell` gain is never released.
+The last is part of `web-audio-lifecycle-a11y` (#973).
 
 ## The cue vocabulary
 

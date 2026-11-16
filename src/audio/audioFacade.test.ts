@@ -28,9 +28,17 @@ class StubEngine {
   }
   start(): void {
     this.started = true;
+    this.calls.push("start");
   }
   setMuted(m: boolean): void {
     this.muted = m;
+  }
+  away: boolean | null = null;
+  /** The order of start and setAway calls, for the load-time hand-over. */
+  calls: string[] = [];
+  setAway(away: boolean): void {
+    this.away = away;
+    this.calls.push("setAway");
   }
   setVolumes(music: number, ambience: number, sfx: number): void {
     this.music = music;
@@ -303,6 +311,30 @@ describe("AudioEngine facade lazy loading", () => {
       audio.start();
       await vi.waitFor(() => expect(audio.started).toBe(true));
       expect(built[0].cues).toEqual([]);
+    });
+  });
+
+  describe("the player leaving the page", () => {
+    it("forwards leaving and coming back to the loaded engine, keeping the player's mute", async () => {
+      const audio = new AudioEngine(loader);
+      audio.start();
+      await vi.waitFor(() => expect(audio.started).toBe(true));
+      audio.setAway(true);
+      expect(built[0].away).toBe(true);
+      expect(audio.muted).toBe(false);
+      expect(built[0].muted).toBe(false);
+      audio.setAway(false);
+      expect(built[0].away).toBe(false);
+    });
+
+    it("hands an away state set before the load to the engine once it starts", async () => {
+      const audio = new AudioEngine(loader);
+      audio.setAway(true);
+      audio.start();
+      await vi.waitFor(() => expect(audio.started).toBe(true));
+      expect(built[0].away).toBe(true);
+      // Before start(), so the engine builds silent rather than fading out.
+      expect(built[0].calls).toEqual(["setAway", "start"]);
     });
   });
 });

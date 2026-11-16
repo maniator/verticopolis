@@ -26,6 +26,9 @@ export const graph: { nodes: NodeRec[] } = { nodes: [] };
 /** Every Tone.setContext call, in order: the context passed and whether the
  *  previous one was disposed. Cleared by {@link resetToneFaults}. */
 export const contextSwaps: Array<{ context: unknown; disposeOld: boolean }> = [];
+/** Every `suspend` and `resume` asked of any audio context (Tone's or its raw
+ *  one), in order. Cleared by {@link resetToneFaults}. */
+export const contextCalls: string[] = [];
 
 /** Ways a test can make the mocked Tone misbehave the way the real one can:
  *  the state every audio context reports, and an error every note trigger
@@ -39,6 +42,7 @@ export function resetToneFaults(): void {
   toneFaults.contextState = "running";
   toneFaults.triggerError = null;
   contextSwaps.length = 0;
+  contextCalls.length = 0;
 }
 
 /** A self-returning chainable stub for a Tone node: any property access or
@@ -58,6 +62,11 @@ export function node(kind = "anon", args: unknown[] = []): unknown {
       if (prop === "then") return undefined; // never a thenable
       if (prop === "__rec") return rec;
       if (prop === "state" && kind === "Context") return toneFaults.contextState;
+      if ((prop === "suspend" || prop === "resume") && kind === "Context")
+        return () => {
+          contextCalls.push(prop);
+          return p;
+        };
       if (prop === "connect")
         return (target: any) => {
           if (target?.__rec) rec.connects.push(target.__rec);
