@@ -46,8 +46,9 @@ not replace it.
    `IndexSet` and `Vec` where order reaches the hash or a save. A `HashMap`
    or an unstable sort there is nondeterminism waiting for a scenario.
 7. **Canon caps come from one place.** Per-tower build caps, the single
-   24-shaft elevator pool (express included), the 64-link stair and
-   escalator pool, 8 cars per shaft and the span rules live in
+   24-shaft elevator pool (express included; 48 in Modern), the 64-link
+   stair and escalator pool (Classic only; Modern has no limit on links),
+   8 cars per shaft and the span rules live in
    `engine-rs/src/facilities.rs`, the source of truth, pinned by the
    `canon_caps_and_pools` test and published through the catalog
    (`conformance/catalog-digests.json`). Do not accept a "fix" that moves

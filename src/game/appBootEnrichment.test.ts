@@ -112,6 +112,18 @@ describe("runBootFlow analytics enrichment wiring (S4)", () => {
     bootSpy.mockRestore();
   });
 
+  it("counts the opened tower's stairs and escalators into the boot snapshot", () => {
+    const bootSpy = vi.spyOn(gameplaySession, "noteBoot");
+    const reader = readerAt({ mode: "modern", star: 3, population: 100, highestFloor: 10, day: 12 });
+    const kinds = ["stairs", "escalator", "elevatorStandard", "stairs", "elevatorExpress"];
+    const app = makeApp({ reader: { ...reader, tower: { ...reader.tower, transports: kinds.map((kind) => ({ kind })) } } });
+
+    runBootFlow(app, Date.now());
+
+    expect(bootSpy).toHaveBeenCalledWith(expect.objectContaining({ mode: "modern", flights: 3 }));
+    bootSpy.mockRestore();
+  });
+
   it("maps tenure off clock.day and recency off savedAtBoot independently (guards a field swap)", () => {
     const setSpy = vi.spyOn(analyticsModule, "setCommonProps");
     // A day-0 tower (tenure "d0") last saved 10 days ago (recency "30d"): the two

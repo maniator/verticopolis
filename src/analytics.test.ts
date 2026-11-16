@@ -53,6 +53,7 @@ describe("gameplay analytics events", () => {
       star: 3,
       floors: 20,
       population: 500,
+      flights: 12,
     });
     expect(sendToRelay).not.toHaveBeenCalled();
   });
@@ -65,6 +66,7 @@ describe("gameplay analytics events", () => {
       star: 4,
       floors: 42,
       population: 1200,
+      flights: 80,
     };
     gameplaySession.noteBoot(snapshot);
     expect(sendToRelay).toHaveBeenCalledWith("boot", snapshot);
@@ -374,7 +376,7 @@ const EVERY_EVENT: { [K in keyof GameplayEvents]: GameplayEvents[K] } = {
   star_reached: { star: 3 },
   milestone_reached: { id: "pop-500" },
   session_end: { seconds: 42, final: true },
-  boot: { reason: "continue", version: "1.0.0", mode: "modern", star: 2, floors: 10, population: 90 },
+  boot: { reason: "continue", version: "1.0.0", mode: "modern", star: 2, floors: 10, population: 90, flights: 6 },
   crash: {
     kind: "webgl-context-lost",
     repeat: false,

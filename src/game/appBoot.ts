@@ -246,6 +246,16 @@ export function wireControllers(app: GameApp): void {
   });
 }
 
+/** The stairs and escalators among `transports`, for the boot snapshot's
+ *  `flights`. Modern has no limit on them, so this shows how many towers build
+ *  past Classic's 64. A missing list counts none: a telemetry read never
+ *  throws. */
+export function flightCount(transports: ReadonlyArray<{ readonly kind: string }> | undefined): number {
+  let n = 0;
+  for (const t of transports ?? []) if (t.kind === "stairs" || t.kind === "escalator") n++;
+  return n;
+}
+
 /** First-paint boot flow: build the onboarding controller, consume the two
  *  resume flags, show the splash (or drop straight back into the tower on a
  *  resume reload), report an unreadable save, and start the autosave timer.
@@ -374,6 +384,7 @@ export function runBootFlow(app: GameApp, savedAtBoot?: number): void {
     star: app.reader?.header.star ?? 0,
     floors: app.reader?.tower.highestFloor ?? 0,
     population: app.reader?.header.population ?? 0,
+    flights: flightCount(app.reader?.tower.transports),
   });
 
   // The 2.0 "Ground floor" recognition (party 2026-07-23): the STATUS lives on

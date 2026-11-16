@@ -38,7 +38,7 @@ describe("trackEvent routing", () => {
 
   it("sends nothing when the gate is closed, and keeps nothing for later", () => {
     vi.mocked(telemetryHostAllowed).mockReturnValue(false);
-    trackEvent("boot", { reason: "fresh", version: "1.0.0", mode: "modern", star: 1, floors: 0, population: 0 });
+    trackEvent("boot", { reason: "fresh", version: "1.0.0", mode: "modern", star: 1, floors: 0, population: 0, flights: 0 });
     vi.mocked(telemetryHostAllowed).mockReturnValue(true);
     trackEvent("star_reached", { star: 2 });
     expect(sent.map((e) => e.event), "the closed-gate event is dropped rather than queued").toEqual(["star_reached"]);
@@ -57,6 +57,6 @@ describe("trackEvent routing", () => {
       },
       injectPageTelemetry: () => {},
     });
-    expect(() => trackEvent("boot", { reason: "fresh", version: "1", mode: "modern", star: 1, floors: 0, population: 0 })).not.toThrow();
+    expect(() => trackEvent("boot", { reason: "fresh", version: "1", mode: "modern", star: 1, floors: 0, population: 0, flights: 0 })).not.toThrow();
   });
 });

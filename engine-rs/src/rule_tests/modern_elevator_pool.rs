@@ -1,11 +1,11 @@
 //! Modern's elevator pool: 48 shafts of every elevator kind together, where
-//! Classic keeps SimTower's 24 (owner, 2026-11-15). The stairs and
-//! escalators keep their 64 in both modes, a tower at the limit refuses the
-//! next shaft with the limit in its reason, and a saved Modern tower with
-//! every shaft and flight built loads all of them back.
+//! Classic keeps SimTower's 24 (owner, 2026-11-15). A tower at the limit
+//! refuses the next shaft with the limit in its reason, and a saved Modern
+//! tower with every shaft built loads all of them back. Stairs and
+//! escalators have their own rules (`modern_flights.rs`).
 
 use crate::clock::GameMode;
-use crate::facilities::{transport_cap, transport_pools, Kind, MODERN_ELEVATOR_SHAFT_CAP};
+use crate::facilities::{transport_pools, Kind, MODERN_ELEVATOR_SHAFT_CAP};
 use crate::load::deserialize;
 use crate::sim::Simulation;
 
@@ -55,11 +55,10 @@ fn modern_holds_twice_classics_elevator_shafts_in_one_pool() {
     // Still one pool for standard, service and express.
     assert_eq!(modern[0].kinds, classic[0].kinds);
     assert!(modern[0].kinds.contains(&Kind::ElevatorExpress));
-    // The stairs and escalators keep their 64 in both modes.
-    assert_eq!(modern[1].cap, 64);
-    assert_eq!(modern[1].kinds, classic[1].kinds);
-    assert_eq!(transport_cap(GameMode::Classic), 24 + 64);
-    assert_eq!(transport_cap(GameMode::Modern), 48 + 64);
+    // Classic's second pool holds its 64 stairs and escalators; Modern
+    // sets no limit on them, so it has no second pool.
+    assert_eq!(classic[1].cap, 64);
+    assert_eq!(modern.len(), 1);
 }
 
 #[test]
@@ -83,10 +82,10 @@ fn each_mode_refuses_the_shaft_past_its_limit() {
 }
 
 #[test]
-fn a_modern_tower_at_every_limit_loads_every_transport_back() {
+fn a_modern_tower_with_every_shaft_loads_every_transport_back() {
     let mut sim = tower(GameMode::Modern);
     build_elevators(&mut sim, MODERN_ELEVATOR_SHAFT_CAP);
-    // The 64 stairs, eleven to a column end to end, right of the shafts.
+    // 64 stairs too, eleven to a column end to end, right of the shafts.
     for n in 0..64 {
         let (x, bottom) = (60 + (n / 11) * 8, 1 + n % 11);
         let r = sim.build_transport(Kind::Stairs, x, bottom, bottom + 1);

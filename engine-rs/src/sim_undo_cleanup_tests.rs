@@ -5,8 +5,9 @@
 //! answer kept out of the step, a name the simulation gave since kept, and
 //! the pooled shaft caps.
 use super::check_tests::{lift, meanwhile, refused, sell};
-use super::tests::{gesture, office, tower};
+use super::tests::{gesture, office, tower, tower_in};
 use super::StepRefused;
+use crate::clock::GameMode;
 use crate::crowd::spawn::make_person;
 use crate::crowd::{motion, PState, Route};
 use crate::events::PendingChoice;
@@ -267,30 +268,52 @@ fn build_at(sim: &mut Simulation, (kind, x, bottom, top): (Kind, i64, i64, i64))
 
 #[test]
 fn a_shaft_is_never_put_back_past_its_pooled_cap() {
-    let elevators = [
-        Kind::ElevatorStandard,
-        Kind::ElevatorService,
-        Kind::ElevatorExpress,
-    ];
-    for kinds in [&elevators[..], &[Kind::Stairs, Kind::Escalator]] {
-        let mut sim = tower();
+    let modern = transport_pools(GameMode::Modern).iter();
+    // Classic's flights pool too, which Modern does not keep. Its express
+    // shafts must reach a lobby, which the stacked spots here do not.
+    let classic_flights = transport_pools(GameMode::Classic)
+        .iter()
+        .filter(|p| p.kinds.contains(&Kind::Stairs));
+    let pools = (modern.map(|p| (GameMode::Modern, p)))
+        .chain(classic_flights.map(|p| (GameMode::Classic, p)));
+    for (mode, pool) in pools {
+        let kinds = pool.kinds;
+        let mut sim = tower_in(mode);
         for floor in 5..=12 {
             for x in 10..70 {
                 assert!(sim.tower.place(Kind::Floor, floor, x).ok);
             }
         }
-        let cap = transport_pools(sim.tower.mode)
-            .iter()
-            .find(|p| p.kinds.contains(&kinds[0]))
-            .unwrap()
-            .cap;
-        for n in 0..cap - 1 {
+        for n in 0..pool.cap - 1 {
             build_at(&mut sim, spot(kinds, n));
         }
-        let last = gesture(&mut sim, |s| build_at(s, spot(kinds, cap - 1))).unwrap();
+        let last = gesture(&mut sim, |s| build_at(s, spot(kinds, pool.cap - 1))).unwrap();
         let redo = sim.apply_undo_step(&last).unwrap();
         assert_eq!(sim.check_undo_step(&redo), Ok(()), "the pool has room");
-        build_at(&mut sim, spot(kinds, cap));
+        build_at(&mut sim, spot(kinds, pool.cap));
         refused(&mut sim, &redo, StepRefused::Blocked);
     }
+}
+
+/// Modern sets no limit on stairs and escalators, so a flight a redo puts
+/// back past Classic's 64 goes back like any other.
+#[test]
+fn modern_puts_back_a_flight_past_classics_limit() {
+    let kinds = [Kind::Stairs, Kind::Escalator];
+    let mut sim = tower_in(GameMode::Modern);
+    for floor in 5..=12 {
+        for x in 10..70 {
+            assert!(sim.tower.place(Kind::Floor, floor, x).ok);
+        }
+    }
+    for n in 0..64 {
+        build_at(&mut sim, spot(&kinds, n));
+    }
+    let last = gesture(&mut sim, |s| build_at(s, spot(&kinds, 64))).unwrap();
+    let redo = sim.apply_undo_step(&last).unwrap();
+    build_at(&mut sim, spot(&kinds, 65));
+    assert_eq!(sim.check_undo_step(&redo), Ok(()));
+    sim.apply_undo_step(&redo).expect("the flight goes back");
+    let flights = sim.tower.transports.iter().filter(|t| t.kind.is_walkway());
+    assert_eq!(flights.count(), 66);
 }
