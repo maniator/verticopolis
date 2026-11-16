@@ -60,7 +60,7 @@
   display: none;
 }
 html.vc-help-bar-showing body {
-  padding-bottom: 4rem;
+  padding-bottom: 6rem;
 }
 
 .vc-back-note {
