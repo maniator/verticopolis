@@ -36,8 +36,9 @@ const PINNED: Record<string, Nonzero> = {
   // the last two days, with Security sold and nobody to search (#1973). Venue
   // staff coming in as people (#2238) moved the run onto a path where only
   // the direct threat detonates. Slower Modern escalators and stairs moved
-  // that blast into the lobby. Rider-direction changes may move this pinned point again.
-  "scenarios/ransom-ignored-modern.json": { explosionSeq: 1, explosionX: 273, thiefFloor: 1, bombs: 1 },
+  // that blast into the lobby, and riders boarding only a car going their
+  // way moved it to floor 42.
+  "scenarios/ransom-ignored-modern.json": { explosionSeq: 1, explosionFloor: 42, explosionX: 142, thiefFloor: 1, bombs: 1 },
   "scenarios/fire-rescue-ignored-modern.json": { thiefFloor: 1, vipFxSeq: 1, fires: 2, firesGutRooms: 17 },
   "scenarios/vip-review-modern.json": { thiefFloor: 1, vipFxSeq: 1 },
   "fuzz-corpus/fx-thief-uncaught.json": { thiefSeq: 3, thiefFloor: 1 },
