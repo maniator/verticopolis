@@ -207,6 +207,7 @@ export class UI {
     document.getElementById("btn-about")!.addEventListener("click", () => this.showAbout());
     this.el.modeBadge.addEventListener("click", (e) => help.showModeHelp(this, e)); // "tell me more"
     help.wireHelpTopics(this); // the problem lines' Help links and F1
+    help.wireHelpBar(this); // a game-opened Help page's bar (#2035)
     document.getElementById("btn-stats")!.addEventListener("click", () => this.cb.onShowStats());
 
     this.el.towerName.addEventListener("change", () => {

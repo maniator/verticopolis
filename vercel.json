@@ -28,6 +28,11 @@
       "continue": true
     },
     {
+      "src": "^/help-bridge\\.html$",
+      "headers": { "Content-Security-Policy": "frame-ancestors 'self' https://help.verticopolis.com" },
+      "continue": true
+    },
+    {
       "src": "^/version\\.json$",
       "headers": { "Cache-Control": "no-store" },
       "continue": true

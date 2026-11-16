@@ -73,6 +73,9 @@ export type AppActionName =
   // `detail` = where the visit started (src/ui/fromGame.ts HelpSource: a place
   // in the game, `game` or `direct`; #2037).
   | "help_page_view"
+  // A press on the Help bar of a page the game opened (#2035, HelpBar.astro);
+  // `detail` = run (Keep my tower running), pause (Pause it) or back.
+  | "help_bar_pick"
   // A help site menu bar pick; `detail` = its data-help-item code (MenuBar.astro).
   | "help_menu_pick"
   // The 404 page (src/notFoundPage.ts): a view (detail game or help) and a pick (its NotFoundPick).

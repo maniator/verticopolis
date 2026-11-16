@@ -16,6 +16,7 @@ import Search from "@astrojs/starlight/components/Search.astro";
 import ThemeSelect from "@astrojs/starlight/components/ThemeSelect.astro";
 import TitleBar from "../../../docs/engine-site/src/components/TitleBar.astro";
 import MenuBar from "./MenuBar.astro";
+import HelpBar from "./HelpBar.astro";
 import logo from "../assets/logo.png";
 import { siteHref } from "../../site.mjs";
 ---
@@ -26,6 +27,7 @@ import { siteHref } from "../../site.mjs";
   <ThemeSelect slot="theme" />
 </TitleBar>
 <p id="back-note" class="vc-back-note" tabindex="-1" hidden></p>
+<HelpBar />
 
 <script>
   import { backToOpenGame, helpVisitSource, repeatsEarlierLoad, takeFromGameFlag } from "../../../src/ui/fromGame";

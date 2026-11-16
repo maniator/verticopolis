@@ -1,0 +1,45 @@
+---
+// The Help bar (#2035): a status bar along the bottom of a manual page the
+// game opened, with the tower's date, money, population and stars, whether
+// it runs, and buttons to keep it running, pause it or go back to it. It
+// stays hidden until the game answers (src/ui/helpBar.ts), so a page reached
+// from a link or a search never shows it, and it goes away when the game
+// tab closes.
+import { siteHref } from "../../site.mjs";
+---
+
+<section id="vc-help-bar" class="vc-help-bar print:hidden" aria-label="Your tower" hidden>
+  <p class="vc-help-bar-hud">
+    <span class="vc-help-bar-cell"><span data-hud="date"></span> <span data-hud="time"></span></span>
+    <span class="vc-help-bar-cell" data-hud="money"></span>
+    <span class="vc-help-bar-cell"><span data-hud="population"></span> people</span>
+    <span class="vc-help-bar-cell" data-hud="stars"></span>
+  </p>
+  <p class="vc-help-bar-state" role="status" data-bar-state></p>
+  <div class="vc-help-bar-actions">
+    <button type="button" class="vc-help-bar-btn" data-bar="run">Keep my tower running</button>
+    <button type="button" class="vc-help-bar-btn" data-bar="pause" hidden>Pause it</button>
+    <a class="vc-help-bar-btn" data-bar="back" href={siteHref("/")}>Back to game</a>
+  </div>
+</section>
+
+<script>
+  import { backToOpenGame, takeFromGameFlag } from "../../../src/ui/fromGame";
+  import { linkToGame, startHelpBar } from "../../../src/ui/helpBar";
+  import { GAME_HOME } from "../../../src/helpAddress";
+  import { trackAppAction } from "../../../src/analytics";
+
+  const root = document.getElementById("vc-help-bar");
+  // Header.astro has already taken ?from=game off the address; the flag
+  // lives on in this tab's storage, which takeFromGameFlag reads.
+  if (root && takeFromGameFlag(location, history)) {
+    const link = linkToGame(new URL(GAME_HOME, location.href).origin);
+    if (link) {
+      startHelpBar(root, {
+        link,
+        backToGame: (e) => backToOpenGame(e),
+        track: (pick) => trackAppAction("help_bar_pick", pick),
+      });
+    }
+  }
+</script>
