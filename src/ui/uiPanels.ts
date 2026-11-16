@@ -120,6 +120,9 @@ export function setInspectorPeek(ui: UI, on: boolean): void {
   ui.el.inspector.classList.toggle("peek", on);
 }
 
+/** The class a room card takes while it holds a Help link (#2036). */
+export const HAS_HELP_CLASS = "has-help";
+
 export function showInspector(ui: UI, tpl: TemplateResult | null): void {
   if (!tpl) {
     // Hide only; the stale card stays in the container (as it always did) and
@@ -134,6 +137,10 @@ export function showInspector(ui: UI, tpl: TemplateResult | null): void {
   // exclusively; hover picks re-render every move and lit patches the changed
   // text in place.
   render(tpl, ui.el.inspector);
+  // A card with a problem line's Help link names F1 on a desktop, where the
+  // hover card lets the pointer through (#2036, tools-stage.css). One query
+  // of the card's few nodes per render.
+  ui.el.inspector.classList.toggle(HAS_HELP_CLASS, ui.el.inspector.querySelector("a.help-topic") !== null);
   // ✕ in the title strip (shown on mobile only, via CSS): the docked card has
   // no hover-away to dismiss it there. On that coarse tier the non-peek card
   // also takes pointer input (so a height-capped card can scroll by touch);

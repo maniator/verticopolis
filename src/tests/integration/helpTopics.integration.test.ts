@@ -137,6 +137,15 @@ describe("the problem lines' Help links", () => {
     expect(sent.trackAppAction).toHaveBeenCalledWith("help_open");
   });
 
+  it("marks a room card that holds a Help link, so the desktop card names F1", () => {
+    const { ui } = makeUI();
+    const card = document.getElementById("inspector")!;
+    ui.showInspector(html`<h4 class="win-title">Office</h4><div>Main gripe: noise.${helpTopicLink("noise", "inspector")}</div>`);
+    expect(card.classList.contains("has-help")).toBe(true);
+    ui.showInspector(html`<h4 class="win-title">Office</h4><div>Access: reachable from the lobby.</div>`);
+    expect(card.classList.contains("has-help")).toBe(false);
+  });
+
   it("leaves F1 alone with a dialog open, with a modifier, or held down", () => {
     makeUI();
     const open = vi.spyOn(window, "open").mockReturnValue({} as Window);

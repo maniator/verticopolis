@@ -306,14 +306,15 @@
 /* A problem line's Help link (#2036), on the room card and in Tower
    Statistics: small, after the line's own words. The desktop hover card lets
    the pointer through, so there it names F1, which opens the card's first
-   one (src/ui/uiHelp.ts wireHelpTopics). */
+   one (src/ui/uiHelp.ts wireHelpTopics); showInspector marks such a card
+   with .has-help. */
 .help-topic {
   margin-left: 4px;
   font-size: 11px;
   white-space: nowrap;
 }
 @media (hover: hover) and (pointer: fine) {
-  #inspector:has(a.help-topic)::after {
+  #inspector.has-help::after {
     content: "Press F1 for help with this.";
     display: block;
     margin-top: 4px;
