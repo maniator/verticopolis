@@ -134,11 +134,7 @@ fn step(crowd: &mut Crowd, i: usize, dt: f64, tower: &mut Tower, landings: &mut 
             if dir == 0.0 {
                 dir = 1.0;
             }
-            let speed = if shaft.kind == crate::facilities::Kind::Escalator {
-                1.3
-            } else {
-                0.85
-            };
+            let speed = tower.mode.climb_speed(shaft.kind);
             p.fy += dir * speed * dt;
             p.x = shaft.x as f64 + shaft.width as f64 / 2.0;
             if (dir > 0.0 && p.fy >= dest as f64) || (dir < 0.0 && p.fy <= dest as f64) {
