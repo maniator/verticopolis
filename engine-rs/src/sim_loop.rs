@@ -158,21 +158,23 @@ impl Simulation {
     pub fn on_hour(&mut self) {
         self.on_hour_runs += 1;
         self.update_presence();
-        // Office workers come in and go home as people (`commuters`).
-        self.crowd.book_commutes(&mut self.tower, &self.clock);
         let hour = self.clock.hour();
+        // Checkout comes before the commute bookings, so guests who check
+        // out in person are booked to leave this hour.
         if hour == 8 {
             self.hotel_checkout();
         }
+        if (14..17).contains(&hour) {
+            self.hotel_late_checkout();
+        }
+        // Office workers come in and go home as people (`commuters`).
+        self.crowd.book_commutes(&mut self.tower, &self.clock);
         let today = self.clock.day();
         if hour == crate::economy::visitors::MORNING_VENUE_DAY_ENDS_AT_HOUR
             && self.morning_venue_day != today
         {
             self.morning_venue_day = today;
             self.roll_over_morning_venues();
-        }
-        if (14..17).contains(&hour) {
-            self.hotel_late_checkout();
         }
         let shift = self.mode.housekeeping_shift();
         // Crews come in two hours early, and none sets out during a bomb

@@ -205,13 +205,23 @@ impl Kind {
     }
 
     #[doc(hidden)]
+    /// A hotel room whose guests check in and out as people in a `mode`
+    /// tower (`crowd::commuters`): its head count is the guests in the room,
+    /// and the dispatch estimate skips it, since they ride the cars
+    /// themselves. Modern hotels today.
+    pub fn stays_in_person(self, mode: crate::clock::GameMode) -> bool {
+        self.is_hotel() && mode.hotel_guests_arrive_in_person()
+    }
+
+    #[doc(hidden)]
     /// A kind whose head count is the people who really got there in a
     /// `mode` tower: an office whose workers commute
-    /// ([`Kind::commutes_in_person`]) or a home whose residents do
-    /// ([`Kind::lives_in_person`]). The hourly head count and the dispatch
+    /// ([`Kind::commutes_in_person`]), a home whose residents do
+    /// ([`Kind::lives_in_person`]) or a hotel room whose guests do
+    /// ([`Kind::stays_in_person`]). The hourly head count and the dispatch
     /// estimate leave it alone.
     pub fn arrives_in_person(self, mode: crate::clock::GameMode) -> bool {
-        self.commutes_in_person(mode) || self.lives_in_person(mode)
+        self.commutes_in_person(mode) || self.lives_in_person(mode) || self.stays_in_person(mode)
     }
 
     #[doc(hidden)]

@@ -15,6 +15,7 @@ use super::{at_time, place_seated, shaft, strip_tower};
 
 const FOOD_FLOOR: i64 = 2;
 const HOTEL_FLOOR: i64 = 4;
+const CLINIC_FLOOR: i64 = 3;
 
 /// A Modern strip to floor 5 with an elevator at x 36, an open fast food on
 /// floor 2 and an asleep hotel single on floor 4. Returns the sim, the fast
@@ -38,6 +39,16 @@ fn food_tower() -> (Simulation, i64, i64) {
         0,
         UnitState::Asleep,
         guests,
+    );
+    // A clinic's patients still come by the dispatch's estimate.
+    let patients = Kind::Clinic.facility().population;
+    place_seated(
+        &mut sim,
+        Kind::Clinic,
+        CLINIC_FLOOR,
+        20,
+        UnitState::Occupied,
+        patients,
     );
     (sim, food, hotel)
 }
@@ -156,7 +167,7 @@ fn seated_diners_add_no_statistical_elevator_demand() {
         "the diners' floor"
     );
     assert!(
-        sim.elevators.waiting_at(HOTEL_FLOOR) > 0.0,
-        "the hotel guest waits"
+        sim.elevators.waiting_at(CLINIC_FLOOR) > 0.0,
+        "the clinic's patients wait"
     );
 }

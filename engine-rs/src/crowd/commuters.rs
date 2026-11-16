@@ -131,7 +131,7 @@ impl Crowd {
             // is never inserted to be dropped again below.
             let mut desk = self.desks.get(&u.id).copied().unwrap_or_default();
             (desk.floor, desk.x, desk.width) = (u.floor, u.x, u.width);
-            let dormant = !place.can_work(u);
+            let dormant = place.sends_out_at_once(u);
             let (at_work, count) = due(place, u, &desk, (weekend, hour), leave_by);
             if at_work {
                 let missing = count;

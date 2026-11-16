@@ -235,7 +235,7 @@ impl CrowdMarks {
 pub(super) fn adopt_head_counts(crowd: &mut Crowd, tower: &Tower, venues_at: Option<i64>) {
     for u in tower.room_units() {
         let inside = match Workplace::of(u, tower.mode) {
-            Some(Workplace::Office | Workplace::Home) => u.occupants,
+            Some(Workplace::Office | Workplace::Home | Workplace::Hotel) => u.occupants,
             Some(Workplace::Venue)
                 if !crowd.desks.contains_key(&u.id)
                     && u.is_operational()

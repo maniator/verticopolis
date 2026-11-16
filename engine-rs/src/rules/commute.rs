@@ -32,6 +32,14 @@ pub const REAL_OFFICE_COMMUTES_ON: bool = true;
 /// `false` puts Modern homes back on the hourly head count and the estimate.
 pub const REAL_RESIDENT_TRIPS_ON: bool = true;
 
+/// Guests of Modern hotel rooms who really check in and check out (owner,
+/// 2026-11-16, the real-tenant-arrivals plan's hotels step). Before, a room
+/// filled the moment it was let and emptied at checkout, and the dispatch's
+/// estimate kept sending cars to hotel floors for guests nobody could see,
+/// sleeping ones included. Setting this to `false` puts Modern hotels back
+/// on the hourly head count and the estimate.
+pub const REAL_HOTEL_GUESTS_ON: bool = true;
+
 /// Whether real office commutes are on in this build.
 pub(crate) fn real_office_commutes_on() -> bool {
     REAL_OFFICE_COMMUTES_ON
@@ -70,6 +78,17 @@ impl GameMode {
     /// measures its rush.
     pub fn residents_commute_in_person(self) -> bool {
         self.office_workers_commute_in_person() && REAL_RESIDENT_TRIPS_ON
+    }
+
+    /// Whether hotel guests ride in from the lobby or the Metro once their
+    /// room is let and ride out again at checkout (`crowd::commuters`),
+    /// instead of appearing in the room and the dispatch's estimate. Modern
+    /// only, with the residents, and only while [`REAL_HOTEL_GUESTS_ON`]
+    /// (owner, 2026-11-16: a car carries only riders the player can see).
+    /// Classic hotels keep the head count until a run of the 1994 game
+    /// measures its check-in.
+    pub fn hotel_guests_arrive_in_person(self) -> bool {
+        self.residents_commute_in_person() && REAL_HOTEL_GUESTS_ON
     }
 
     /// Whether a venue's staff (`Kind::staff_size`) come in and go home as
