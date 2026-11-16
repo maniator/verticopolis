@@ -38,8 +38,16 @@ import { checkCatalog, renderGameplayEventRules, renderGameplayEventsDts } from 
 const CRATES: Record<string, { dir: string; lib: string }> = {
   engine: { dir: "engine-rs", lib: "verticopolis_engine" },
 };
-if (process.argv.length > 3) throw new Error(`expected at most one argument (the crate), got ${process.argv.slice(2).join(" ")}`);
-const which = process.argv[2] ?? "engine";
+// `--player-only` builds the engine's player package alone and skips the
+// tooling build. A Vercel deploy uses it: a deploy never ships the tooling
+// package (vite.config.ts refuses VC_TOOLING=1 there), so compiling it would
+// only spend build minutes.
+const args = process.argv.slice(2);
+const playerOnly = args.includes("--player-only");
+const positional = args.filter((a) => a !== "--player-only");
+if (positional.length > 1) throw new Error(`expected at most one argument (the crate) besides --player-only, got ${args.join(" ")}`);
+const which = positional[0] ?? "engine";
+if (playerOnly && which !== "engine") throw new Error("--player-only applies to the engine only");
 const target = Object.hasOwn(CRATES, which) ? CRATES[which] : undefined;
 if (!target) throw new Error(`unknown crate ${which}; expected one of ${Object.keys(CRATES).join(", ")}`);
 const crate = resolve(dirname(fileURLToPath(import.meta.url)), "..", target.dir);
@@ -164,28 +172,31 @@ if (which === "engine") {
   // place (#955). One feature list for each record and its compile, so they
   // describe the same build.
   const playerRecord = engineThirdParty(crate, PLAYER_FEATURES);
-  const toolingRecord = engineThirdParty(crate, TOOLING_FEATURES);
+  const toolingRecord = playerOnly ? undefined : engineThirdParty(crate, TOOLING_FEATURES);
   // The old packages go first, so a failed run leaves no stale package behind
   // for the suite to replay.
   for (const dir of ["pkg", "pkg-player", "pkg-web-tooling"]) rmSync(resolve(crate, dir), { recursive: true, force: true });
   compile(PLAYER_FEATURES);
   webPackage(resolve(crate, "../src/public/engine"), "src/public/engine", playerRecord);
   nodePackage("pkg-player");
-  compile(TOOLING_FEATURES);
-  nodePackage("pkg");
-  webPackage(resolve(crate, "pkg-web-tooling"), `${target.dir}/pkg-web-tooling`, toolingRecord);
-  // The class declaration is the same for both targets; the tooling Node copy
-  // is the committed one (`src/engineBinding/binding.ts` types against it),
-  // so the tooling harnesses type against the tier 3 ops the player build
-  // leaves out.
-  copyFileSync(resolve(crate, "pkg/verticopolis_engine.d.ts"), resolve(crate, "../src/engineBinding/engine.d.ts"));
+  if (toolingRecord) {
+    compile(TOOLING_FEATURES);
+    nodePackage("pkg");
+    webPackage(resolve(crate, "pkg-web-tooling"), `${target.dir}/pkg-web-tooling`, toolingRecord);
+    // The class declaration is the same for both targets; the tooling Node copy
+    // is the committed one (`src/engineBinding/binding.ts` types against it),
+    // so the tooling harnesses type against the tier 3 ops the player build
+    // leaves out. A player-only build leaves the committed copy as it is.
+    copyFileSync(resolve(crate, "pkg/verticopolis_engine.d.ts"), resolve(crate, "../src/engineBinding/engine.d.ts"));
+  }
   // The gameplay event types and the bridge's runtime rules come from the
   // catalog both engines are held to, so they are refreshed with the
   // binding's own declaration.
   const catalog = checkCatalog(JSON.parse(readFileSync(resolve(crate, "src/gameplay/catalog.json"), "utf8")));
   writeFileSync(resolve(crate, "../src/events/gameplayEvents.d.ts"), renderGameplayEventsDts(catalog));
   writeFileSync(resolve(crate, "../src/events/gameplayEventRules.ts"), renderGameplayEventRules(catalog));
-  console.log("src/public/engine and engine-rs/pkg-player (player build), engine-rs/pkg and engine-rs/pkg-web-tooling (tooling build): built; src/engineBinding/engine.d.ts, src/events/gameplayEvents.d.ts and gameplayEventRules.ts refreshed");
+  if (toolingRecord) console.log("src/public/engine and engine-rs/pkg-player (player build), engine-rs/pkg and engine-rs/pkg-web-tooling (tooling build): built; src/engineBinding/engine.d.ts, src/events/gameplayEvents.d.ts and gameplayEventRules.ts refreshed");
+  else console.log("src/public/engine and engine-rs/pkg-player (player build): built, tooling build skipped (--player-only); src/events/gameplayEvents.d.ts and gameplayEventRules.ts refreshed");
 } else {
   // The old package goes first here too, so a failed compile leaves none.
   rmSync(resolve(crate, "pkg"), { recursive: true, force: true });

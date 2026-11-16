@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # The Vercel build. The Rust engine's WASM package (src/public/engine/) is
-# build output and is not checked in, so every deploy builds it here before
-# Vite runs (scripts/build-engine-wasm.sh installs the pinned toolchain).
+# build output and is not checked in, so every deploy builds it (or, on a
+# preview, restores it; see below) before Vite runs
+# (scripts/build-engine-wasm.sh installs the pinned toolchain).
 # A failed engine build fails the deploy: the app would otherwise ship without
 # the engine it runs on.
 set -euo pipefail
@@ -16,7 +17,22 @@ if [ -n "${VC_ENGINE:-}" ]; then
   echo "vercel-build: VC_ENGINE is no longer honored (every build is the Rust-only build); remove it from the project settings" >&2
 fi
 
-bash scripts/build-engine-wasm.sh
+# A preview reuses the engine package an earlier deployment built from the
+# same Rust sources and build scripts (scripts/vercel-engine-cache.ts keeps one
+# in Vercel's build cache), so a push that leaves the engine alone skips
+# installing Rust and compiling it. The script uses the cache only when
+# VERCEL_ENV is preview: for production (or anything else) restore is a miss
+# and save does nothing, so the engine is built from source.
+# Every Vercel build compiles the player package alone (--player-only): no
+# deploy ships the tooling package (vite.config.ts refuses VC_TOOLING=1 here).
+if node scripts/vercel-engine-cache.ts restore; then
+  # The engine build also writes these from the event catalog; a restore
+  # writes them the same way so the bundle cannot differ from a full build.
+  npm run gen:events
+else
+  bash scripts/build-engine-wasm.sh --player-only
+  node scripts/vercel-engine-cache.ts save
+fi
 
 # Where the player's manual is served. Production puts it at the root of its
 # own host, help.verticopolis.com (vercel.json serves that host from
@@ -38,7 +54,7 @@ npm run build
 
 # The player help site (help-site/, Astro + Starlight) builds into dist/help/
 # after the game, from the same Markdown the game's Help window reads.
-npm ci --prefix help-site
+bash scripts/vercel-install.sh help-site
 npm run build --prefix help-site
 
 # A preview deployment ships a worker that removes itself instead of the

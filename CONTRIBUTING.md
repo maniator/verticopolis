@@ -146,8 +146,17 @@ Verticopolis has **two test tiers**:
     engine (it cannot run the game, and a dev serve without the package stops on the engine failure screen; it exists for tooling that never boots one). A stale local build fails the unit test that checks its source
     hash. CI restores it from the
     Actions cache, keyed on the engine's source hash, and builds it once per
-    engine change (`.github/actions/engine-wasm`); Vercel builds it on every
-    deploy through `scripts/vercel-build.sh`. Every build (`npm run build`, a dev serve and the
+    engine change (`.github/actions/engine-wasm`). Vercel builds it through
+    `scripts/vercel-build.sh`: a preview (`VERCEL_ENV=preview`, staging
+    included) reuses the package an earlier deployment built from the same
+    sources and build scripts when its files match their `BUILD.json`
+    (`scripts/vercel-engine-cache.ts`, kept in Vercel's build cache with the
+    same key inputs as CI's), and every other build, production included,
+    compiles it from source. A deploy builds the player package alone
+    (`--player-only`), since none ships the tooling one. A preview also keeps
+    the restored `node_modules` when it is exactly the tree `npm ci` left for
+    the same lockfile, Node and npm (`scripts/vercel-install.sh`); every other
+    build runs `npm ci`. Every build (`npm run build`, a dev serve and the
     deploy alike) is the Rust-only build: the WASM engine is the only engine, and
     an engine that cannot start stops the game with a message instead of
     falling back. Its postbuild check (`scripts/verify-engine-bundle.ts`)
