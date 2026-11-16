@@ -40,6 +40,7 @@ mod express_basement_stops;
 mod faq_complete;
 mod faq_complete_mechanics;
 mod fixed_step;
+mod flight_scans;
 mod floor_run_lockstep;
 mod full_car_passes;
 mod game_events;

@@ -184,8 +184,10 @@ A pass over a small collection (the 110 floors, the shafts and their cars,
 the stair and escalator links, the drawn crowd) is fine at any tier while
 one occurrence of the tier stays under about 1,000 item visits on the large
 tower, the work per item included. A Modern tower's links have no limit, so a
-new per-frame or per-person pass over every transport should skip the links
-or read a list of the shafts alone.
+per-step, per-frame or per-person pass over the transports reads a list kept
+per tower revision instead: `DispatchFloors::elevators` for the shafts alone
+(the car mover and the hourly sample use it), or a per-revision table such
+as the congestion reading's (`Simulation::congestion_shafts`).
 
 Two more patterns count at every tier:
 

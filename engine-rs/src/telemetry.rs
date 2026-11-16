@@ -160,10 +160,9 @@ impl Simulation {
         let tel = &mut self.telemetry;
         let mut alive_util: Vec<i64> = Vec::new();
         let mut alive_hourly: Vec<i64> = Vec::new();
-        for t in &self.tower.transports {
-            if !t.kind.is_elevator() {
-                continue;
-            }
+        let floors = self.tower.dispatch_floors();
+        for &ti in &floors.elevators {
+            let t = &self.tower.transports[ti];
             let cap = t.cars as f64 * t.kind.car_capacity();
             let load: f64 = t
                 .car_load

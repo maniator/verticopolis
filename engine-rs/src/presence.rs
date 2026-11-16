@@ -1,6 +1,6 @@
 //! Port of `sim/presence.ts` and `sim/congestion.ts` (the parts the sim reads).
 
-use std::collections::HashMap;
+use std::sync::Arc;
 
 use indexmap::IndexMap;
 
@@ -15,6 +15,18 @@ pub struct CongestionAttribution {
     pub elevator: f64,
     pub stairs: f64,
     pub escalator: f64,
+}
+
+/// The congestion reading's passenger transports, kept per tower revision
+/// (`Simulation::congestion_shafts`).
+#[derive(Default)]
+pub struct ShaftsByFloor {
+    /// Each served floor's total capacity and its transports, as (slot,
+    /// capacity, kind), in the order the reading folds them.
+    floors: IndexMap<i64, (f64, Vec<(usize, f64, Kind)>)>,
+    /// How many transports hold a slot: one per transport that stops at a
+    /// served floor, numbered in list order.
+    slots: usize,
 }
 
 #[doc(hidden)]
@@ -157,54 +169,29 @@ impl Simulation {
         }
         let parking = self.tower.functional_parking_spots();
         let relief = (1.0 - metro as f64 * 0.25 - parking as f64 * 0.02).max(0.4);
-        let served = self.tower.served_floors();
-        let mut shafts_by_floor: IndexMap<i64, Vec<(i64, f64, Kind)>> = IndexMap::new();
-        for t in &self.tower.transports {
-            if t.kind.is_staff_only_transport() {
-                continue;
-            }
-            let stops = self.tower.stops_of(t);
-            let active = stops.iter().any(|f| served.contains(f));
-            if !active {
-                continue;
-            }
-            let cap = Simulation::transport_capacity(t.kind, t.cars);
-            for &f in &stops {
-                if served.contains(&f) {
-                    shafts_by_floor
-                        .entry(f)
-                        .or_default()
-                        .push((t.id, cap, t.kind));
-                }
-            }
-        }
-        let mut load_by_shaft: HashMap<i64, f64> = HashMap::new();
+        let shafts_by_floor = self.congestion_shafts();
+        let mut load_by_shaft = vec![0.0; shafts_by_floor.slots];
         for (f, pop) in &pop_by_floor {
-            let Some(shafts) = shafts_by_floor.get(f) else {
+            let Some((total_cap, shafts)) = shafts_by_floor.floors.get(f) else {
                 continue;
             };
-            if shafts.is_empty() {
-                continue;
-            }
-            let total_cap: f64 = shafts.iter().fold(0.0, |s, (_, c, _)| s + c);
-            if total_cap <= 0.0 {
+            if *total_cap <= 0.0 {
                 continue;
             }
             let demand = pop * relief;
-            for (id, cap, _) in shafts {
-                let share = demand * (cap / total_cap);
-                *load_by_shaft.entry(*id).or_insert(0.0) += share;
+            for &(slot, cap, _) in shafts {
+                load_by_shaft[slot] += demand * (cap / total_cap);
             }
         }
-        for (f, shafts) in &shafts_by_floor {
+        for (f, (_, shafts)) in &shafts_by_floor.floors {
             if *f != 1 && !pop_by_floor.contains_key(f) {
                 continue;
             }
             let mut c = 0.0;
             let mut att = CongestionAttribution::default();
-            for (id, cap, kind) in shafts {
+            for (slot, cap, kind) in shafts {
                 let cong = if *cap > 0.0 {
-                    (load_by_shaft.get(id).copied().unwrap_or(0.0) * rush) / (cap * HEADROOM)
+                    (load_by_shaft[*slot] * rush) / (cap * HEADROOM)
                 } else {
                     99.0
                 };
@@ -234,6 +221,44 @@ impl Simulation {
             }
         }
         (result, attribution)
+    }
+
+    /// The congestion reading's transports per served floor, built once per
+    /// tower revision: the HUD reads congestion several times a second and a
+    /// Modern tower may hold thousands of flights. Placing, removing or
+    /// resizing a transport, a stop edit and a car count change each bump
+    /// the revision, and so does every edit that changes the served floors.
+    fn congestion_shafts(&self) -> Arc<ShaftsByFloor> {
+        let tower = &self.tower;
+        if let Some((rev, table)) = &tower.memo.borrow().congestion_shafts {
+            if *rev == tower.revision {
+                return table.clone();
+            }
+        }
+        let served = tower.served_floors();
+        let mut table = ShaftsByFloor::default();
+        for t in &tower.transports {
+            if t.kind.is_staff_only_transport() {
+                continue;
+            }
+            let stops = tower.stops_of(t);
+            if !stops.iter().any(|f| served.contains(f)) {
+                continue;
+            }
+            let (slot, cap) = (table.slots, Simulation::transport_capacity(t.kind, t.cars));
+            table.slots += 1;
+            for f in stops.into_iter().filter(|f| served.contains(f)) {
+                let (_, shafts) = table.floors.entry(f).or_default();
+                shafts.push((slot, cap, t.kind));
+            }
+        }
+        // Each floor's total, summed in the order the reading once summed it.
+        for (total, shafts) in table.floors.values_mut() {
+            *total = shafts.iter().fold(0.0, |sum, (_, cap, _)| sum + cap);
+        }
+        let table = Arc::new(table);
+        tower.memo.borrow_mut().congestion_shafts = Some((tower.revision, table.clone()));
+        table
     }
 
     /// `congestion()`: the mean over populated floors, the lobby excluded.

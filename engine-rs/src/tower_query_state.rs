@@ -71,6 +71,9 @@ pub struct Memo {
     /// Whether the unit list holds a floor run the save folds
     /// (`Tower::lists_a_floor_run`), per revision.
     pub floor_run: Option<(crate::tower_index::IndexKey, bool)>,
+    /// Each served floor's passenger transports for the congestion reading
+    /// (`Simulation::congestion_shafts`), per revision.
+    pub congestion_shafts: Option<(i64, std::sync::Arc<crate::presence::ShaftsByFloor>)>,
 }
 
 // ---- unit state predicates (types.ts) --------------------------------------

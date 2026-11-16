@@ -151,20 +151,18 @@ impl ElevatorDispatch {
         is_weekend: bool,
     ) {
         let floors = tower.dispatch_floors();
-        let n = tower.transports.len();
         let rules = self
             .profile
             .unwrap_or_else(|| DispatchRules::for_mode(tower.mode));
         self.closed_cars.clear();
         self.open_cars.clear();
-        for ti in 0..n {
+        // The elevators alone: a tower may hold thousands of flights.
+        for &ti in &floors.elevators {
             let (kind, id) = {
                 let t = &tower.transports[ti];
                 (t.kind, t.id)
             };
-            if !kind.is_elevator() {
-                continue;
-            }
+            debug_assert!(kind.is_elevator(), "the elevator list is stale");
             let staff_only = kind.is_staff_only_transport();
             let hall = calls.hall.get(&id);
             let cabs = calls.cab.get(&id);
