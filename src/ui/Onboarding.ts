@@ -4,6 +4,7 @@ import { splashTemplate, type SplashHandlers } from "./splashTemplate";
 import { isDialogOpen, isEngineStopped } from "../game/interactionState";
 import { iconElement } from "./icons";
 import { openFoldedPaletteAround } from "./paletteCollapse";
+import { DESK_TITLE_CLASS } from "./desk/deskTitle";
 
 /**
  * First-run experience — splash/title screen + a non-blocking "Getting Started"
@@ -290,9 +291,8 @@ export class OnboardingController {
       }
     });
 
-    // Esc / backdrop resolve to the SAFE default: Continue if a save exists,
-    // otherwise no-op (New Tower must be an explicit press so intent is never
-    // wiped). Backdrop = a click on the overlay outside the card.
+    // Esc / backdrop: Continue if a save exists, else no-op. On the desk the
+    // overlay IS the title window, so a click on its face never dismisses (#2355).
     const safeDismiss = () => {
       if (!o.hasSave) return;
       // A stacked modal (How to Play / New Tower) owns Esc and the backdrop while
@@ -306,7 +306,7 @@ export class OnboardingController {
       o.onContinue();
     };
     el.addEventListener("click", (e) => {
-      if (e.target === el) safeDismiss();
+      if (e.target === el && !el.ownerDocument.body.classList.contains(DESK_TITLE_CLASS)) safeDismiss();
     });
     this.splashKey = (e: KeyboardEvent) => {
       // Behind a wasm-only engine-failure message the title screen stays put.
