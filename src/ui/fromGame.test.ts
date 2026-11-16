@@ -87,10 +87,11 @@ describe("backToOpenGame", () => {
   });
 
   /** Click the shell's Back to game link in an installed app whose game does or doesn't answer. */
-  async function clickInstalled(gameAnswers: boolean): Promise<{ win: Window; e: MouseEvent; stillOpen: ReturnType<typeof vi.fn> }> {
+  async function clickInstalled(gameAnswers: boolean, pageAt: string = location.href): Promise<{ win: Window; e: MouseEvent; stillOpen: ReturnType<typeof vi.fn> }> {
     mountFromGame();
     const replace = vi.fn();
-    const win = { close: vi.fn(), closed: true, setTimeout: vi.fn(), document, location: { replace } } as unknown as Window;
+    const page = new URL(pageAt);
+    const win = { close: vi.fn(), closed: true, setTimeout: vi.fn(), document, location: { replace, href: page.href, origin: page.origin } } as unknown as Window;
     const stillOpen = vi.fn(() => Promise.resolve(gameAnswers));
     const link = document.querySelector<HTMLAnchorElement>("a[data-act=back-to-game]")!;
     const e = new MouseEvent("click", { cancelable: true });
@@ -111,6 +112,15 @@ describe("backToOpenGame", () => {
 
   it("closes its window in an installed app whose game still answers elsewhere", async () => {
     const { win } = await clickInstalled(true);
+    expect(win.close).toHaveBeenCalledTimes(1);
+    expect(win.location.replace).not.toHaveBeenCalled();
+  });
+
+  it("closes the browser view the app opened for a manual on another host, without asking or loading the game there", async () => {
+    // The shell's link points at this test origin's "/", so a page on any other host sees the game elsewhere.
+    const { win, e, stillOpen } = await clickInstalled(false, "https://help.example.test/rooms/");
+    expect(e.defaultPrevented).toBe(true);
+    expect(stillOpen).not.toHaveBeenCalled();
     expect(win.close).toHaveBeenCalledTimes(1);
     expect(win.location.replace).not.toHaveBeenCalled();
   });
