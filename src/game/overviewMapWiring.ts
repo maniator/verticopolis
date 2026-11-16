@@ -22,7 +22,8 @@ import type { HallRun } from "../render/lobbyHalls";
 import { FLOOR, TILE } from "../render/scale";
 import { browserStorage, type MapLayoutClass } from "../ui/overviewMapPrefs";
 import { rememberMapSpot, storedMapSpot } from "../ui/overviewMapSpot";
-import { MovableWindow } from "../ui/movableWindow";
+import { MovableWindow, WITHIN_PARENT } from "../ui/movableWindow";
+import { DESK_CHANGE_EVENT, deskActive } from "../ui/desk/deskController";
 import { MOVABLE_TITLE } from "./movableWindows";
 import { OverviewMapWindow, type MutableMapCamera, type OverviewMapSource } from "../ui/overviewMapWindow";
 import { OverviewMapViews, type MapHeatSource } from "../ui/overviewMapViews";
@@ -139,8 +140,12 @@ export function wireOverviewMap(app: GameApp): void {
   const mover = new MovableWindow({
     win: win.root,
     title: MOVABLE_TITLE.map,
-    within: stage,
-    placed: (spot) => rememberMapSpot(storage, layoutClass(), spot),
+    within: WITHIN_PARENT,
+    // On the 1994 desk the desk keeps the Map's place (src/ui/desk/), so a
+    // move there never overwrites the spot the desktop layout remembers.
+    placed: (spot) => {
+      if (!deskActive()) rememberMapSpot(storage, layoutClass(), spot);
+    },
   });
   const restoreSpot = () => {
     mover.reset();
@@ -151,6 +156,12 @@ export function wireOverviewMap(app: GameApp): void {
   app.mobileMq.addEventListener("change", () => {
     win.layoutChanged();
     restoreSpot();
+  });
+  // The desk takes the Map onto the desktop and gives it back: back in the
+  // tower view it returns to the spot this layout remembers.
+  document.addEventListener(DESK_CHANGE_EVENT, () => {
+    win.layoutChanged();
+    if (!deskActive()) restoreSpot();
   });
   windows.set(app, win);
   // The browser perf test reaches the window here (`e2e/overviewMapPerf.spec.ts`), in

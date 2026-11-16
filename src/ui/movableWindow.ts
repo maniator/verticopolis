@@ -62,11 +62,31 @@ export interface MovableWindowOptions {
   /** The title bar's selector, matched from the pressed element up to `win`. */
   readonly title: string;
   /** The box the window moves inside: an element's padding box, or the
-   *  browser window when null. */
-  readonly within: HTMLElement | null;
+   *  browser window when null. `"parent"` reads the window's parent element
+   *  at each press, so a window the 1994 desk moves to another parent
+   *  (src/ui/desk/) keeps moving inside wherever it now sits. */
+  readonly within: HTMLElement | null | typeof WITHIN_PARENT;
   /** Heard when a move ends with the spot the player chose, and with null when
    *  a double-click puts the window back. */
   readonly placed?: (spot: Spot | null) => void;
+  /** Heard on a double-click on the title bar in place of putting the window
+   *  back where the game keeps it (the desk's windows maximize instead). */
+  readonly doubleClick?: () => void;
+  /** Asked at each press; false keeps the window still (a maximized desk
+   *  window). Absent, the window always moves. */
+  readonly canMove?: () => boolean;
+}
+
+/** `within` for a window that moves inside its current parent element. */
+export const WITHIN_PARENT = "parent";
+
+/** Every movable window by its element, so the desk can place a window it
+ *  takes over and give it back (src/ui/desk/deskController.ts). */
+const MOVERS = new WeakMap<HTMLElement, MovableWindow>();
+
+/** The mover of `win`, when one was made for it. */
+export function moverOf(win: HTMLElement): MovableWindow | undefined {
+  return MOVERS.get(win);
 }
 
 /** One move in progress: the pointer, where on the window it grabbed, and the
@@ -85,11 +105,14 @@ export class MovableWindow {
   private drag: Drag | null = null;
   private readonly resizeObserver: ResizeObserver | null = null;
   private readonly onViewportResize = () => this.refit();
+  /** Others hearing each move beside the window's owner (the 1994 desk). */
+  private readonly hearers = new Set<(spot: Spot | null) => void>();
   private readonly listeners: ReadonlyArray<readonly [string, (e: Event) => void]>;
 
   constructor(private readonly opts: MovableWindowOptions) {
     const { win } = opts;
     win.classList.add(MOVABLE_CLASS);
+    MOVERS.set(win, this);
     this.listeners = [
       ["pointerdown", (e) => this.down(e as PointerEvent)],
       ["pointermove", (e) => this.move(e as PointerEvent)],
@@ -103,9 +126,22 @@ export class MovableWindow {
     if (typeof ResizeObserver !== "undefined") {
       this.resizeObserver = new ResizeObserver(() => this.refit());
       this.resizeObserver.observe(win);
-      if (opts.within) this.resizeObserver.observe(opts.within);
+      const box = this.box();
+      if (box) this.resizeObserver.observe(box);
     }
-    if (!opts.within) win.ownerDocument.defaultView?.addEventListener("resize", this.onViewportResize);
+    if (opts.within === WITHIN_PARENT || !opts.within) win.ownerDocument.defaultView?.addEventListener("resize", this.onViewportResize);
+  }
+
+  /** Hear each move the player makes, as `placed` does; returns the unhook.
+   *  The desk keeps the game's own windows' places this way. */
+  hear(fn: (spot: Spot | null) => void): () => void {
+    this.hearers.add(fn);
+    return () => this.hearers.delete(fn);
+  }
+
+  private placed(spot: Spot | null): void {
+    this.opts.placed?.(spot);
+    for (const fn of this.hearers) fn(spot);
   }
 
   /** Where the player put the window, or null while it sits where the game
@@ -149,6 +185,7 @@ export class MovableWindow {
   /** Remove the listeners. */
   dispose(): void {
     for (const [type, fn] of this.listeners) this.opts.win.removeEventListener(type, fn);
+    if (MOVERS.get(this.opts.win) === this) MOVERS.delete(this.opts.win);
     this.resizeObserver?.disconnect();
     this.opts.win.ownerDocument.defaultView?.removeEventListener("resize", this.onViewportResize);
   }
@@ -168,7 +205,7 @@ export class MovableWindow {
     if ((this.drag && this.drag.pointerId !== e.pointerId) || !isPrimaryPress(e)) return;
     this.drag = null;
     const title = this.titleOf(e);
-    if (!title) return;
+    if (!title || this.opts.canMove?.() === false) return;
     const rect = this.opts.win.getBoundingClientRect();
     const bounds = this.bounds();
     this.drag = {
@@ -198,7 +235,7 @@ export class MovableWindow {
     // window never heard: the move is over, and hovering moves nothing.
     if (e.pointerType !== "touch" && noButtonHeld(e)) {
       this.drag = null;
-      if (drag.moved && this.spot) this.opts.placed?.(this.spot);
+      if (drag.moved && this.spot) this.placed(this.spot);
       return;
     }
     const { bounds } = drag;
@@ -212,7 +249,7 @@ export class MovableWindow {
     const drag = this.drag;
     if (!drag || drag.pointerId !== e.pointerId) return;
     this.drag = null;
-    if (drag.moved && this.spot) this.opts.placed?.(this.spot);
+    if (drag.moved && this.spot) this.placed(this.spot);
   }
 
   /** Name the move on the title bar's tooltip. Runs as the pointer enters
@@ -226,9 +263,13 @@ export class MovableWindow {
   /** A double-click on the title bar puts the window back where the game
    *  keeps it. */
   private home(e: Event): void {
+    if (this.opts.doubleClick) {
+      if (this.titleOf(e)) this.opts.doubleClick();
+      return;
+    }
     if (!this.spot || !this.titleOf(e)) return;
     this.reset();
-    this.opts.placed?.(null);
+    this.placed(null);
   }
 
   /** Pull a moved window back inside its bounds after a size change. Reads
@@ -247,8 +288,14 @@ export class MovableWindow {
 
   /** The bounds in client coordinates: the element's padding box (the space
    *  `left` and `top` count from), or the browser window. */
-  private bounds(): Bounds {
+  /** The element the window moves inside, or null for the browser window. */
+  private box(): HTMLElement | null {
     const within = this.opts.within;
+    return within === WITHIN_PARENT ? this.opts.win.parentElement : within;
+  }
+
+  private bounds(): Bounds {
+    const within = this.box();
     if (!within) {
       const root = this.opts.win.ownerDocument.documentElement;
       return { left: 0, top: 0, w: root.clientWidth, h: root.clientHeight };

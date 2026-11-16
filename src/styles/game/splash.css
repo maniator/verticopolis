@@ -31,14 +31,115 @@
   position: fixed;
   inset: 0;
   z-index: 50;
+  overflow: hidden;
   background: var(--splash-sky);
+}
+/* The sunrise (owner, 2026-11-15): the cover opens at night and the sun comes
+   up from below the horizon to where the title screen's sun sits, while the
+   bar fills. When the game is ready first, bootCover.ts plays what is left in
+   a moment and fades the cover, so a fast load is a quick dawn and the title
+   never waits on the show. Only opacity and transforms move. */
+.boot-night,
+.boot-stars,
+.boot-sun {
+  position: absolute;
+  pointer-events: none;
+}
+.boot-night {
+  inset: 0;
+  background: #07061a;
+  opacity: 0;
+  animation: boot-night 2.8s ease-in-out both;
+}
+@keyframes boot-night {
+  from { opacity: 0.78; }
+  to { opacity: 0; }
+}
+.boot-stars {
+  inset: 0 0 50% 0;
+  background-image:
+    radial-gradient(1.5px 1.5px at 18% 14%, #fff 40%, transparent),
+    radial-gradient(1.5px 1.5px at 70% 9%, #fff 40%, transparent),
+    radial-gradient(1.5px 1.5px at 86% 22%, #fff 40%, transparent),
+    radial-gradient(1.5px 1.5px at 40% 7%, #fff 40%, transparent),
+    radial-gradient(1px 1px at 56% 26%, #fff 40%, transparent),
+    radial-gradient(1px 1px at 9% 31%, #fff 40%, transparent);
+  opacity: 0.55;
+  animation: boot-stars 2.6s ease-in both;
+}
+@keyframes boot-stars {
+  from { opacity: 1; }
+  to { opacity: 0.55; }
+}
+/* Ends exactly where .splash-sun sits, so the title screen takes over in place. */
+.boot-sun {
+  top: 82%;
+  left: 50%;
+  width: min(44vmin, 210px);
+  height: min(44vmin, 210px);
+  border-radius: 50%;
+  background: var(--splash-sun);
+  box-shadow: 0 0 60px 16px var(--splash-sun-glow);
+  transform: translate(-50%, -50%);
+  animation: boot-sun 2.8s ease-in-out both;
+}
+@keyframes boot-sun {
+  from { transform: translate(-50%, calc(-50% + 34vh)); }
+  to { transform: translate(-50%, -50%); }
+}
+.boot-brand {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 30%;
+  pointer-events: none;
+}
+/* The 1994 progress bar. It eases toward most of the way while the engine
+   loads; bootCover.ts fills the rest as the game starts. */
+.boot-bar {
+  position: absolute;
+  left: 50%;
+  top: 52%;
+  width: min(280px, 70vw);
+  height: 14px;
+  padding: 2px;
+  transform: translateX(-50%);
+  background: #000;
+  box-shadow: inset 1px 1px #808080, inset -1px -1px #fff;
+  box-sizing: border-box;
+}
+.boot-bar i {
+  display: block;
+  height: 100%;
+  background: repeating-linear-gradient(90deg, #000080 0 9px, transparent 9px 11px);
+  transform-origin: left;
+  transform: scaleX(var(--boot-done, 0.7));
+  animation: boot-bar 2.8s ease-out backwards;
+  transition: transform 0.25s;
+}
+@keyframes boot-bar {
+  from { transform: scaleX(0.04); }
+}
+/* Ready: clicks reach the title screen at once while the cover fades. */
+#boot-cover.boot-ready {
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .boot-night,
+  .boot-stars,
+  .boot-sun,
+  .boot-bar i {
+    animation: none;
+  }
 }
 /* The loading line the boot flow adds after a short wait on the WASM engine
    (src/engineLoading.ts). */
 .boot-loading {
   position: absolute;
   left: 50%;
-  bottom: 18%;
+  top: calc(52% + 24px);
   max-width: min(32em, 86vw);
   margin: 0;
   transform: translateX(-50%);

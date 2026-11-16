@@ -106,6 +106,10 @@ export const SHARDS: Record<string, string[]> = {
   // scenes of DOM window stills over the default new tower, desktop and
   // phone, about 10s; its own shard as the owner asked.
   "linked-folder": ["linked-folder", "linked-folder-unsupported", "linked-folder-mobile"],
+  // The 1994 desk and the sunrise startup screen (owner, 2026-11-15: their own
+  // shard, every design and option): one canon tower on the desk, the title
+  // window, and the startup screen on a computer and a phone.
+  desk: ["desk", "desk-title", "startup-sunrise", "startup-sunrise-phone"],
   misc: ["tablet", "mobile", "mobile-landscape", "construction", "crowd", "fire", "install-affordance-mobile", "overview-map", "overview-map-phone", "overview-map-gaps", "overview-map-gaps-phone", "palette-fit"],
 };
 

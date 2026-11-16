@@ -23,7 +23,7 @@ vi.mock("./overviewMapWiring", () => ({
 }));
 vi.mock("./fileSpaceCommands", () => files);
 vi.mock("./titleScreen", () => closer);
-vi.mock("../ui/movableWindow", () => ({ MovableWindow: movable }));
+vi.mock("../ui/movableWindow", () => ({ MovableWindow: movable, WITHIN_PARENT: "parent" }));
 vi.mock("../ui/splashTemplate", () => ({ SPONSOR_URL: "https://sponsor.example/", sponsorOffered: () => sponsor.offered }));
 vi.mock("../analytics", () => ({ trackAppAction: sponsor.track }));
 const menus = vi.hoisted(() => ({ open: vi.fn(), pick: vi.fn(), dismiss: vi.fn() }));
@@ -73,6 +73,10 @@ function mount(): void {
         <div class="mb-pop" id="mb-tower-menu" role="menu" hidden>
           ${item("mb-fire-rescue")}<button class="mb-item" id="mb-exterminator" role="menuitem" hidden>Call Exterminator</button>
         </div>
+      </div>
+      <div class="mb-menu">
+        <button class="mb-title" id="mb-window" aria-expanded="false" aria-controls="mb-window-menu"><u>W</u>indow</button>
+        <div class="mb-pop" id="mb-window-menu" role="menu" hidden></div>
       </div>
     </nav>
     <div id="palette"></div>
@@ -182,12 +186,22 @@ describe("wireMenus", () => {
     expect(ui.cb.onReplayOnboarding).toHaveBeenCalledOnce();
   });
 
-  it("on a desktop Tower Info starts closed and the Bulletin open; both move within the stage, toggle and remember", () => {
+
+  it("checks Sound at once when it is picked, so the desk's tray and Control Panel follow without a menu opening", () => {
+    const { app, ui } = fakeApp();
+    wireMenus(app);
+    ui.cb.isMuted.mockReturnValue(true);
+    $("mb-sound").click();
+    expect(ui.cb.onToggleAudio).toHaveBeenCalledOnce();
+    expect($("mb-sound").getAttribute("aria-checked")).toBe("false");
+  });
+  it("on a desktop Tower Info starts closed and the Bulletin open; both move within their parent (the stage, or the desk on a computer), toggle and remember", () => {
     const { app } = fakeApp();
     wireMenus(app);
     expect($("tower-win").hidden).toBe(true);
     expect($("bulletin-win").hidden).toBe(false);
-    expect(movable).toHaveBeenCalledWith(expect.objectContaining({ win: $("tower-win"), within: $("stage") }));
+    expect(movable).toHaveBeenCalledWith(expect.objectContaining({ win: $("tower-win"), within: "parent" }));
+    expect($("tower-win").parentElement).toBe($("stage"));
     $("mb-win-tower").click();
     expect($("tower-win").hidden).toBe(false);
     expect(store.get(MENU_WINDOW.tower.key)).toBe("open");

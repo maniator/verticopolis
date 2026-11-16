@@ -1,6 +1,6 @@
 import type { GameApp } from "../main";
 import { MenuBar } from "../ui/menuBar";
-import { MovableWindow } from "../ui/movableWindow";
+import { MovableWindow, WITHIN_PARENT } from "../ui/movableWindow";
 import { browserStorage } from "../ui/overviewMapPrefs";
 import { PALETTE_COLLAPSE_BUTTON_ID, PALETTE_COLLAPSED_CLASS } from "../ui/paletteCollapse";
 import { SPONSOR_URL, sponsorOffered } from "../ui/splashTemplate";
@@ -65,7 +65,7 @@ export const STATUS_BAR_HIDDEN_CLASS = "statusbar-off";
  *  title screen has no tower chosen yet (a placeholder runs behind it), so
  *  they leave the bar while it is up, the way a 1995 program's menu bar
  *  shrinks to File and Help with no document open (party 2026-11-15). */
-export const TOWER_ONLY_MENUS = ["mb-edit", "mb-tower"] as const;
+export const TOWER_ONLY_MENUS = ["mb-edit", "mb-tower", "mb-window"] as const;
 
 /** The items of the menus the title screen keeps that act on a tower, and
  *  the lines above them: they leave those menus while it is up. */
@@ -167,7 +167,7 @@ export function wireMenus(app: GameApp): MenuBar | null {
         if (!moved) trackAppAction("window_move", name);
         moved = true;
       };
-      new MovableWindow({ win, title: `#${w.id} > .win-title`, within: stage, placed });
+      new MovableWindow({ win, title: `#${w.id} > .win-title`, within: WITHIN_PARENT, placed });
       win.hidden = !stored(storage, w.key, w.openOnDesktop && !onPhone);
       win.querySelector(`[data-close="${w.id}"]`)?.addEventListener("click", () => {
         trackAppAction("window_close", name);
@@ -216,7 +216,12 @@ export function wireMenus(app: GameApp): MenuBar | null {
   on("mb-rules", () => ui.showTowerRules());
   on("mb-win-map", () => setOverviewMapOpen(app, !overviewMapOpen(app)));
   // Options.
-  on("mb-sound", () => ui.cb.onToggleAudio());
+  // Its check follows at once, so the desk's tray speaker and Control Panel
+  // show the change without a menu opening.
+  on("mb-sound", () => {
+    ui.cb.onToggleAudio();
+    check("mb-sound", !ui.cb.isMuted());
+  });
   on("mb-win-tools", () => document.getElementById(PALETTE_COLLAPSE_BUTTON_ID)?.click());
   on("mb-fullscreen", () => toggleFullScreen(ui));
   // Help.
@@ -331,6 +336,7 @@ export function wireMenus(app: GameApp): MenuBar | null {
       }
       // The Tools fold exists on the desktop layout only, and in a tower.
       const tools = document.getElementById("mb-win-tools");
+      // On the 1994 desk Tools never folds; its Window menu brings it up.
       if (tools) tools.hidden = noTower || !document.getElementById(PALETTE_COLLAPSE_BUTTON_ID)?.offsetParent;
       // Install app's separator shows with it (installAffordance.ts shows the item).
       const install = document.getElementById("btn-install-menu");

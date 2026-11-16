@@ -23,6 +23,7 @@
  *   - scenes/venueFlights.ts: spiral stairs and switchback escalators beside venues.
  *   - scenes/paletteFit.ts: the desktop Tools window fitting every tool.
  *   - scenes/splitLot.ts: two Modern towers joined by the street.
+ *   - scenes/desk.ts: the 1994 desk, its title window and the sunrise startup.
  * The Node-side drivers (fixture load, star assertions) live in
  * screenshot-scenes-drivers.ts. Keep every file ERASABLE.
  */
@@ -46,6 +47,7 @@ import { VENUE_FLIGHT_SCENES } from "./scenes/venueFlights.ts";
 import { PALETTE_FIT_SCENES } from "./scenes/paletteFit.ts";
 import { SPLIT_LOT_SCENES } from "./scenes/splitLot.ts";
 import { LINKED_FOLDER_SCENES } from "./scenes/linkedFolder.ts";
+import { DESK_SCENES } from "./scenes/desk.ts";
 
 export const SCENES: Scene[] = [
   ...SHOWCASE_SCENES,
@@ -67,4 +69,5 @@ export const SCENES: Scene[] = [
   ...PALETTE_FIT_SCENES,
   ...SPLIT_LOT_SCENES,
   ...LINKED_FOLDER_SCENES,
+  ...DESK_SCENES,
 ];

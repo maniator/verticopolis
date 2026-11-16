@@ -98,6 +98,7 @@ export interface Scene {
   route?: string; // navigate here instead of building a tower (gallery/preview)
   keepSplash?: boolean; // firstRun scene captures splash states, so don't dismiss
   initScript?: () => void; // runs before page scripts, for per-scene localStorage/bootstrap tweaks
+  desk?: boolean; // keep the 1994 desk on (every other scene turns it off: Options > Desktop)
   // This scene stages a BOOT FAILURE (e.g. initScript disables WebGL): the app
   // never mounts, so the runner waits for the #boot-fallback overlay instead of
   // `window.game` and skips clock adoption, splash dismissal, and builds.

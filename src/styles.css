@@ -54,3 +54,5 @@
 @import "./styles/game/media-phone.css";
 @import "./styles/game/media-landscape.css";
 @import "./styles/game/media-tablet-touch.css";
+@import "./styles/game/desk.css";
+@import "./styles/game/desk-title.css";

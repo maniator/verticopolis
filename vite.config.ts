@@ -421,7 +421,9 @@ export default defineConfig(({ command }) => ({
         description: "A browser-native SimTower clone: build a high-rise floor by floor.",
         // The Win95 window face (--r-face), matching the game's menu bar.
         theme_color: "#c0c0c0",
-        background_color: "#c0c0c0",
+        // The launch screen wears the startup screen's night sky (#boot-cover),
+        // so an installed app opens straight into the sunrise.
+        background_color: "#161634",
         display: "standalone",
         orientation: "any",
         start_url: "./",

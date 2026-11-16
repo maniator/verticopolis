@@ -14,8 +14,9 @@ import { trackEvent } from "./analyticsCore";
  */
 
 /** The menus, by their title button's id (`mb-file` is `file`). The
- *  Window menu (`window`) was folded into Options in 4.3. */
-export const MENU_NAMES = ["file", "edit", "tower", "options", "help"] as const;
+ *  Window menu (`window`) was folded into Options in 4.3 and is back on the
+ *  1994 desk only. */
+export const MENU_NAMES = ["file", "edit", "tower", "window", "options", "help"] as const;
 export type MenuName = (typeof MENU_NAMES)[number];
 
 /** Each menu item's element id and the code its events carry. */
@@ -36,6 +37,11 @@ export const MENU_ITEM_CODES = {
   "mb-exterminator": "exterminator",
   "mb-rules": "rules",
   "mb-win-tools": "tools",
+  "mb-dw-tools": "window_tools",
+  "mb-dw-info": "window_info",
+  "mb-dw-map": "window_map",
+  "mb-dw-bulletin": "window_bulletin",
+  "mb-dw-tower-info": "window_tower_info",
   "mb-win-bulletin": "bulletin",
   "mb-win-statusbar": "status_bar",
   "mb-fullscreen": "full_screen",

@@ -31,6 +31,10 @@
     "title": "Controls",
     "description": "Every way to play Verticopolis, with a mouse, by touch on a phone or tablet, or from the keyboard alone."
   },
+  "desktop.png": {
+    "title": "The desktop",
+    "description": "How Verticopolis runs on a computer, as a 1994 desktop where the tower, Tools, Info, the Map and the Bulletin are each their own window, with a Window menu and a taskbar along the bottom."
+  },
   "differences.png": {
     "title": "Differences from the 1994 game",
     "description": "Where a Classic Verticopolis tower plays just like SimTower (1994), the few things done differently on purpose, and what isn't in yet."
