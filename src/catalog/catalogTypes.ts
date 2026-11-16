@@ -8,6 +8,7 @@
 import type { CalendarKind } from "../shared/engineTypes";
 import type { FacilityCategory, FacilityKind, GameMode } from "../shared/types";
 import type { FilmPolicy, FilmTier, TicketPrice } from "../simport/commands";
+import type { CatalogStarDutyRules } from "./starDutyTypes";
 
 /** A film a theater can show, as the catalog publishes it (#1950). */
 export interface CatalogFilm {
@@ -147,10 +148,9 @@ export interface CatalogEconomy {
   readonly autoBridgeToggleable: boolean;
 }
 
-/** Mode rules a frontend shows the player, each stated from the engine's own
- *  rule method, so a frontend reads them here instead of deciding them from
- *  the mode's name. */
-export interface CatalogRules {
+/** Mode rules a frontend shows the player, each from the engine's own rule
+ *  method, so a frontend reads them here instead of deciding by mode name. */
+export interface CatalogRules extends CatalogStarDutyRules {
   /** Whether a sold condo carries its own household of 2 to 5 that prices
    *  the sale and counts its residents. When false every condo houses the
    *  flat family and stores no household. */
@@ -197,29 +197,6 @@ export interface CatalogRules {
   /** Seconds a person waits before the wait counts as stress and the
    *  frontend shows them fed up (red). The same in both modes. */
   readonly fedUpWait: number;
-  /** Whether the star-up message box adds the heads-up: what the new rating
-   *  starts asking of the tower (`starDuties`) and what the next rating needs.
-   *  When false (Classic) it names the rating and the rooms it opens. */
-  readonly announcesStarDuties: boolean;
-  /** What each rating starts asking of the tower, by the rating it begins at. */
-  readonly starDuties: ReadonlyArray<CatalogStarDuty>;
-}
-
-/** The ids of the duties a star rating can start (`star_duties.rs`). */
-export type StarDutyId =
-  | "emergencies"
-  | "suiteParking"
-  | "officeParking"
-  | "homeParking"
-  | "recycling"
-  | "vipVisits"
-  | "hotelGuestsUncounted"
-  | "bombThreats";
-
-/** One duty: the rating it begins at and its id. */
-export interface CatalogStarDuty {
-  readonly star: number;
-  readonly id: StarDutyId;
 }
 
 /** One calendar a tower can run and how it scales the quoted figures. */

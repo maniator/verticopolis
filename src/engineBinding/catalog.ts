@@ -21,9 +21,8 @@ export type {
   CatalogWorld,
   CatalogRentCadence,
   CatalogRules,
-  CatalogStarDuty,
-  StarDutyId,
 } from "../catalog/catalogTypes";
+export type { CatalogStarDuty, StarDutyId } from "../catalog/starDutyTypes";
 
 /** The catalog for `mode`, parsed and checked. Refuses, by name, a binding
  *  without the export, a refusal or unparsable reply, a shape version other

@@ -80,7 +80,7 @@ export function isDialogOpen(): boolean {
 export function hasBlockingModal(app: GameApp): boolean {
   // The star-up box blocks only while a dialog is up, so a box that closed
   // some way its handlers missed can never leave time stopped.
-  return app.shownChoice || app.shownUpdate || (app.shownStar && isDialogOpen());
+  return app.shownChoice || app.shownUpdate || (app.shownStar === true && isDialogOpen());
 }
 
 /**

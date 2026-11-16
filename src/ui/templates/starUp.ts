@@ -1,5 +1,6 @@
 import { html, nothing, type TemplateResult } from "lit-html";
-import type { Catalog, StarDutyId } from "../../catalog/catalogTypes";
+import type { Catalog } from "../../catalog/catalogTypes";
+import type { StarDutyId } from "../../catalog/starDutyTypes";
 import type { NextStarView, StatsReport } from "../../simport/panels";
 import { groupDigits } from "../format";
 import { iconTemplate } from "../icons";
@@ -79,9 +80,12 @@ export function starUpTemplate(screen: StarUpScreen, onOk: () => void): Template
           <ul class="star-up-duties">${h.duties.map((d) => html`<li>${STAR_DUTY_LABELS[d]}</li>`)}</ul>
           ${parking}`
       : nothing;
+  // Inside the Statistics dialog's grid, as there: a bare `.win-title` child of
+  // the box would take the box's sticky title-bar rule and cover the text above.
+  const next = h?.next ? html`<div class="stats-grid star-up-next">${nextStarSection(h.next, screen.topFloor)}</div>` : nothing;
   return html`<h2>${iconTemplate("milestone", { size: 20 })}Star Rating</h2>
     <p class="star-up-rating" aria-label=${`${screen.star} stars`}>${stars(screen.star)}</p>
     <p>Congratulations! Your tower is now rated <b>${screen.star} stars</b>.</p>
-    ${rooms}${duties}${h ? nextStarSection(h.next, screen.topFloor) : nothing}
+    ${rooms}${duties}${next}
     <div class="modal-actions modal-footer"><button class="btn primary" data-act="ok" @click=${onOk}>OK</button></div>`;
 }

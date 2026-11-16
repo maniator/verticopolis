@@ -348,8 +348,13 @@ dialog.crash-card::backdrop {
   text-align: center;
 }
 .modal-box .star-up-duties {
-  margin: 0 0 6px;
+  /* Keeps the shared list indent, so each dot sits inside the text margin. */
+  margin: 0 0 6px 18px;
 }
 .modal-box .star-up-parking.short {
   color: var(--bad-ink);
+}
+/* The next rating's checklist keeps each count on one line ("5,760 / 10,000"). */
+.modal-box .star-up-next .col.nsr .v {
+  white-space: nowrap;
 }

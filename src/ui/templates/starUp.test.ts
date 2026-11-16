@@ -90,6 +90,8 @@ describe("starUpTemplate", () => {
     expect(parking.textContent).toContain("needs 12 spaces and has 3 working");
     expect(parking.classList.contains("short")).toBe(true);
     expect(text(frag)).toContain("Next: 4★");
+    // Inside the stats grid, so the header never takes the box's sticky title-bar rule.
+    expect(frag.querySelector(".stats-section")!.parentElement!.classList.contains("stats-grid")).toBe(true);
     expect(text(frag)).toContain("1,234 / 5,000");
   });
 
