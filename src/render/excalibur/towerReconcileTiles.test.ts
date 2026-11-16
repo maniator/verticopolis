@@ -29,7 +29,9 @@ vi.mock("./roomSignature", () => ({
   isDeadParking: () => false,
 }));
 vi.mock("../regionPaint", () => ({ paintAnimatedUnit: vi.fn() }));
-vi.mock("../../catalog/towerCatalog", () => ({ towerCatalog: () => ({ rules: {} }) }));
+// The catalog's rules, which a test may set (Classic's answers by default).
+const catalogRules = vi.hoisted(() => ({ frontDoorPerTower: false }));
+vi.mock("../../catalog/towerCatalog", () => ({ towerCatalog: () => ({ rules: catalogRules }) }));
 vi.mock("../../catalog/catalogTypes", () => ({ catalogFacility: () => ({ floors: 1 }) }));
 vi.mock("./towerCrowd", () => ({
   clearMotion: vi.fn(),
@@ -378,5 +380,30 @@ describe("the scene sync walks the structure tiles only when what they draw from
     // The old service tile is now a plain ground-floor lobby tile.
     expect(String(cell(7, 1)?.gfx[0])).toMatch(/^ground 0:/);
     expect(cell(8, 1)?.gfx).toEqual(["service 0"]);
+  });
+
+  it("gives each tower on the lot its own front door only where the catalog says so", () => {
+    // Two towers standing apart: lobby 4..7 and lobby 12..15.
+    const state = tower();
+    for (let x = 12; x < 16; x++) state.units.push(tile("lobby", 1, x));
+    try {
+      catalogRules.frontDoorPerTower = true;
+      const modern = fakeEngine(state);
+      syncScene(modern.engine);
+      expect(modern.cell(4, 1)?.gfx).toEqual(["grand-left 0"]);
+      expect(modern.cell(7, 1)?.gfx).toEqual(["service 0"]);
+      expect(modern.cell(12, 1)?.gfx).toEqual(["grand-left 0"]);
+      expect(modern.cell(13, 1)?.gfx).toEqual(["grand-right 0"]);
+      expect(modern.cell(15, 1)?.gfx).toEqual(["service 0"]);
+      catalogRules.frontDoorPerTower = false;
+      const classic = fakeEngine({ ...state, units: [...state.units] });
+      syncScene(classic.engine);
+      expect(classic.cell(4, 1)?.gfx).toEqual(["grand-left 0"]);
+      expect(String(classic.cell(7, 1)?.gfx[0])).toMatch(/^ground 0:/);
+      expect(String(classic.cell(12, 1)?.gfx[0])).toMatch(/^ground 0:/);
+      expect(classic.cell(15, 1)?.gfx).toEqual(["service 0"]);
+    } finally {
+      catalogRules.frontDoorPerTower = false;
+    }
   });
 });

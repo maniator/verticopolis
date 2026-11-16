@@ -27,6 +27,8 @@
  *     three metro stations.
  *   - `screenshot-split-lot-builders.ts`: `buildSplitLotTower`, two Modern
  *     towers on separate ground lobbies, joined by the street.
+ *   - `screenshot-front-door-builders.ts`: `buildFrontDoorTowers`, two Modern
+ *     towers apart, each with its own front door.
  *
  * Keep re-exports only here (erasable): no enums / namespaces / parameter
  * properties.
@@ -42,3 +44,4 @@ export * from "./screenshot-tall-lobby-builders.ts";
 export * from "./screenshot-venue-flights-builders.ts";
 export * from "./screenshot-metro-builders.ts";
 export * from "./screenshot-split-lot-builders.ts";
+export * from "./screenshot-front-door-builders.ts";

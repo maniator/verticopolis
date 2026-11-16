@@ -48,6 +48,13 @@ pub struct Rules {
     /// venue as a spiral staircase or a switchback escalator. Drawing only;
     /// when false every one-story flight is drawn straight, as in 1994.
     pub venue_flights: bool,
+    /// Whether every tower on the lot shows its own front door: a frontend
+    /// draws the grand entrance and its doorman at the left end of each
+    /// tower's ground lobby, and the service door at its right end. Drawing
+    /// only, stated from `GameMode::lays_ground_lobbies_apart`, since only
+    /// a mode that lets ground lobbies stand apart has several towers. When
+    /// false the tower has one grand entrance, on its leftmost ground lobby.
+    pub front_door_per_tower: bool,
     /// Whether an express elevator keeps the 1994 game's stops (#1527): the
     /// ground floor, every 15th floor and every basement, each of which can
     /// be turned off, with an end off those floors passed. When false an

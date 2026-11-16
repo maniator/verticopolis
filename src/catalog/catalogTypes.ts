@@ -40,7 +40,7 @@ export interface CatalogTicketPrice {
 
 /** The version of the catalog's shape. It moves when a field is added,
  *  renamed or removed, so a frontend can refuse a shape it does not know. */
-export const CATALOG_VERSION = 22;
+export const CATALOG_VERSION = 23;
 
 /** Every price, size and build rule of one mode. */
 export interface Catalog {
@@ -173,17 +173,14 @@ export interface CatalogRules extends CatalogStarDutyRules {
   /** Whether the tenant card's lobby warning quotes the floors to the
    *  nearest lobby. When false it names the problem without the number. */
   readonly quotesLobbyDistance: boolean;
-  /** Whether a sky lobby may rise more than one story (#308). The ground
-   *  lobby always may, up to `maxLobbyHeight`; when false it is the only one
-   *  that can. */
+  /** Whether a sky lobby may rise more than one story (#308). The ground lobby always may,
+   *  up to `maxLobbyHeight`; when false it is the only one that can. */
   readonly tallSkyLobbies: boolean;
   /** The most stories a lobby can rise (#308). A floor's first lobby sets its
    *  height, and it never changes after. */
   readonly maxLobbyHeight: number;
-  /** Whether the frontend may draw decorative passers-by: figures that pace
-   *  the corridors for life but are not people the engine knows about
-   *  (#2091). When false (Classic, as in SimTower) it draws only the
-   *  engine's own people. */
+  /** Whether the frontend may draw decorative passers-by: figures that pace the corridors for life but are not
+   *  people the engine knows about (#2091). When false (Classic, as in SimTower) it draws only the engine's own people. */
   readonly decorativePassersBy: boolean;
   /** Whether the frontend draws the lit look (#2097): people lit from the
    *  upper left with a four-frame walk, and rooms shaded to match. When false
@@ -192,6 +189,9 @@ export interface CatalogRules extends CatalogStarDutyRules {
   /** Whether a one-story stair beside a venue draws as a spiral and an escalator as a
    *  switchback. Drawing only; when false (Classic) every flight is straight, as in 1994. */
   readonly venueFlights: boolean;
+  /** Whether each tower on the lot draws its own front door: the grand entrance and doorman at the left end of its
+   *  ground lobby, the service door at the right. Drawing only; when false (Classic) the leftmost ground lobby has it. */
+  readonly frontDoorPerTower: boolean;
   /** Whether an express keeps the 1994 stops (#1527): ground, every 15th floor, every basement. */
   readonly expressStopsOn15thFloors: boolean;
   /** Seconds a person waits before the wait counts as stress and the

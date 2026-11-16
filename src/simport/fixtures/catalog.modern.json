@@ -2438,6 +2438,7 @@
     "exportsTo1994": false,
     "expressStopsOn15thFloors": false,
     "fedUpWait": 25,
+    "frontDoorPerTower": true,
     "maxLobbyHeight": 3,
     "previewNamesRefusal": true,
     "quotesLobbyDistance": true,
@@ -2481,7 +2482,7 @@
     "variantHouseholds": true,
     "venueFlights": true
   },
-  "version": 22,
+  "version": 23,
   "world": {
     "groundFloor": 1,
     "groundFloorStructure": "lobby",

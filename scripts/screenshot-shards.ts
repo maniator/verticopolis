@@ -114,6 +114,9 @@ export const SHARDS: Record<string, string[]> = {
   // The star-up message box (r/SimTower feedback, 2026-11-16): every rating's
   // box in both modes and one on a phone, each over a small frozen tower.
   "star-up": ["star-up", "star-up-mobile"],
+  // Each Modern tower's own front door (owner, 2026-11-16): one small frozen
+  // pair of towers, day and night; its own shard, as new features get.
+  "front-doors": ["front-doors"],
   misc: ["tablet", "mobile", "mobile-landscape", "construction", "crowd", "fire", "install-affordance-mobile", "overview-map", "overview-map-phone", "overview-map-gaps", "overview-map-gaps-phone", "palette-fit"],
 };
 
