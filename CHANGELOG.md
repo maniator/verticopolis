@@ -25,6 +25,15 @@ prompt already tells players it is an engine update and shows the new version.
 Entries below 1.51.1 were curated from the commit history after the fact, so they
 are documentation only: no build that a client fetches carries them.
 
+## 4.7.0
+
+- In Modern towers, condo, apartment and studio residents really leave for the day and come home. On weekdays all but one of each household (everyone in a studio) walk out through the ground lobby or the Metro between 7 and 10 AM and ride home between 4 and 7 PM; at night and on weekends everyone is home. Elevators no longer run up and down for residents nobody can see, so far fewer cars move with nobody aboard. Classic homes still count residents by the clock.
+- Keep a copy of the Auto-save in your linked folder: pick "Keep the Auto-save here too" in the Look in box of the Open or Save As window. While you play, the game copies your tower into a file called Auto-save there every minute, so your backup or cloud drive picks it up. The Auto-save in the browser is still the one the game opens, and a file of yours with that name is never replaced.
+- A new Modern tower now starts with "Bridge floors between rooms" off, so separate sections of a floor stay apart until you choose to join them. Tick the box in the New Tower window, or turn it on in Settings at any time. Towers you already have keep their setting.
+- The Player's Manual's Desktop page now walks through every part of the 1994 desktop: what each window holds, every title bar button, the Info strip's meters and buttons, the Verticopolis menu item by item, the opening screen's buttons, and the keys for the taskbar and window menus.
+- When a phone drops the game's graphics while the title screen is up (often after switching away from the app), the game now restarts them on the spot instead of showing the crash screen.
+- The game goes quiet while you're in another tab or another program, which stops the static the music picked up in the background. The sound comes back at your own settings when you return.
+
 ## 4.6.0
 
 - On a computer, Verticopolis now runs as a 1994 desktop: the tower, Tools, Info, the Map and the Bulletin are each their own window you can move, minimize and (for the tower) resize or maximize, with Info as a strip across the top and a taskbar along the bottom. A Window menu brings any window back, a right-click on a title bar or taskbar button opens its window menu, and Info and Tools never close. Phones and tablets keep today's layout.
