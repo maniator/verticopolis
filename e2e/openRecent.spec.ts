@@ -95,9 +95,11 @@ test("lists the towers saved last, newest first, opens one by mouse or by its nu
   before = await generation(page);
   await page.keyboard.press("2");
   await waitForNewTower(page, before);
-  // After the reload the live tower has no file of its own any more (#2380),
-  // so the tower left is kept as a new file and goes on top.
-  await expect.poll(() => recentLines(page)).toEqual(["1Alpha (2)", "2Alpha", "3Beta"]);
+  // Reload returns to the title screen. Its Auto-save still holds "Tower One",
+  // so opening Alpha keeps Tower One in My Towers and notes it as newest.
+  // The numbered choice must still open Alpha, not simply rearrange the list.
+  await expect.poll(() => page.evaluate(() => (window as any).game.enginePort.towerName())).toBe("Alpha");
+  await expect.poll(() => recentLines(page)).toEqual(["1Tower One", "2Alpha", "3Beta"]);
 });
 
 test("a tower deleted from My Towers drops off the list, and the other towers stay", async () => {
