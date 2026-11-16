@@ -40,6 +40,8 @@ async function starUp(page: Page, star: number, mode: Mode, parked = false): Pro
   await page.evaluate(() => {
     (window as unknown as { game: any }).game.engine.paused = true;
   });
+  // The parked shot stands for the plain line; a short deck would bless the red one twice.
+  if (parked && (await page.$("#modal .star-up-parking.short"))) throw new Error("star-up: the parked tower is still short of parking");
 }
 
 /** Two basement decks of parking, a ramp and a row of spaces each, so the
@@ -50,7 +52,7 @@ function pgParkTheOffices(): void {
   const s = g.sim;
   const W = g.grid.width;
   for (const f of [0, -1]) {
-    for (let x = 2; x <= W - 3; x++) s.tower.place("floor", f, x);
+    for (let x = 2; x <= W - 3; x++) if (!s.tower.place("floor", f, x).ok) throw new Error(`star-up: no floor at ${f}:${x}`);
     if (!s.tower.place("parkingRamp", f, 6).ok) throw new Error(`star-up: no parking ramp on floor ${f}`);
     for (let x = 22; x + 1 <= W - 3; ) {
       const r = s.tower.place("parking", f, x);

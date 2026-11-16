@@ -3,6 +3,7 @@
 use crate::demand::RECYCLING_POP_PER_CENTER;
 use crate::facilities::Kind;
 use crate::rules::OfficeParking;
+use crate::satisfaction::shortfall::SHORTFALL_MIN_STAR;
 use crate::sim::{LogKind, Simulation};
 use crate::star::{is_tenant_floor_unit, VIP_VISITS_FROM_STAR};
 use crate::tower::{Unit, UnitState};
@@ -201,7 +202,8 @@ impl Simulation {
     }
 
     pub fn nudge_service_shortfalls(&mut self) {
-        let waste_short = self.star >= 3 && !self.recycling_demand_met();
+        // The ratings `star_duties` announces these duties at.
+        let waste_short = self.star >= SHORTFALL_MIN_STAR && !self.recycling_demand_met();
         if waste_short && !self.waste_nudged {
             let pop = self.recycling_population();
             let need = (pop as f64 / RECYCLING_POP_PER_CENTER).ceil();
@@ -209,7 +211,8 @@ impl Simulation {
             self.emit(&msg, LogKind::Info);
         }
         self.waste_nudged = waste_short;
-        let suite_short = self.star >= 3 && self.suite_parking_short();
+        let suite_short =
+            self.star >= Kind::Parking.facility().min_star && self.suite_parking_short();
         if suite_short && !self.suite_parking_nudged {
             let d = self.parking_demand();
             let msg = suite_nudge_message(d.suites, self.tower.functional_parking_spots());

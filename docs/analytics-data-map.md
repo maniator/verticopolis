@@ -146,8 +146,10 @@ back on. Each carries the new state only.
 ## The star-up message box
 
 `app_action` with `action` `star_notice` reports that the star-up message box
-opened. It opens once for each climb `star_reached` counts (two climbs before it
-can open make one box, for the higher rating), so the two compare per rating.
+opened. It opens at most once per climb and never for the TOWER. Two climbs
+before it can open make one box, for the higher rating, and a box still waiting
+when the tower is swapped, loaded or undone is dropped, so `star_notice` can run
+below `star_reached` for a rating without players having missed it.
 
 | `action` | `detail` | When |
 | --- | --- | --- |
