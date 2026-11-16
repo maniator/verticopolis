@@ -473,15 +473,22 @@ function buildInsights(ids) {
     {
       name: "WebGL crashes by recovery outcome",
       // Not a recovery success rate, in either era. `recoveryFailed` can only be
-      // true on a FIRST mid-game loss whose flush succeeded, so every later loss
+      // true on a FIRST loss (mid-game or behind the title screen) whose flush
+      // succeeded, so every later loss
       // in a loop reports false, conflating "recovery succeeded" with "recovery
       // was never attempted". Before the dedup a long loop pushed the false
       // bucket up by its occurrence count; now one looping session contributes at
       // most one row to each bucket, so the split is pulled toward 1:1 by the
       // dedup rather than by how devices behave.
       description:
-        "The typed crash event split by whether in-place recovery was tried and failed, production. NOT a recovery success rate: false also covers every loss where recovery was never attempted (a repeat, a loss behind the splash, a failed flush). Deduped per page life on the crash's flag set since 2026-09-14, which pulls the split toward 1:1, so counts before and after that date are not comparable.",
+        "The typed crash event split by whether in-place recovery was tried and failed, production. NOT a recovery success rate: false also covers every loss where recovery was never attempted (a repeat or a failed flush; before the build that ships graphics_recovered, also a loss behind the title screen). Recoveries that worked are in \"WebGL losses recovered in place\". Deduped per page life on the crash's flag set since 2026-09-14, which pulls the split toward 1:1, so counts before and after that date are not comparable.",
       query: trends([series("crash", "Crashes")], { breakdown: "recoveryFailed", display: "ActionsBar" }),
+    },
+    {
+      name: "WebGL losses recovered in place",
+      description:
+        "app_action graphics_recovered by where the loss happened (game: mid-game, title: behind the title screen), production, from the build that ships it (2026-11-16). One event per recovery that worked, a lower bound like every client event. Read it beside the crash event with repeat false; crash is deduped per page life on its flag set, so do not add the two as a count of first losses.",
+      query: trends([series("app_action", "Recoveries")], { breakdown: "detail", display: "ActionsBar", where: [inAction(["graphics_recovered"])] }),
     },
     // App-chrome actions (the app_action event). COOKIELESS: every tile here is
     // per-session and cohort, never per-person. "8% of sessions exported, more

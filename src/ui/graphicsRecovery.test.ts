@@ -22,6 +22,16 @@ describe("the graphics-recovery card (#321)", () => {
     expect(isRecoveringGraphics()).toBe(false);
   });
 
+  it("over the title screen it speaks of the saved towers, not a tower in play", () => {
+    const end = showGraphicsRecovery(true);
+    const text = document.getElementById(GRAPHICS_RECOVERY_ID)?.textContent ?? "";
+    expect(text).toContain("Your saved towers are untouched.");
+    expect(text).not.toContain("Your tower is safe.");
+    end();
+    showGraphicsRecovery();
+    expect(document.getElementById(GRAPHICS_RECOVERY_ID)?.textContent).toContain("Your tower is safe.");
+  });
+
   it("keeps one card when a second loss puts it up again", () => {
     showGraphicsRecovery();
     const end = showGraphicsRecovery();

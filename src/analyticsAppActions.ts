@@ -43,6 +43,10 @@ export type AppActionName =
   | "load_failed"
   | "import_failed"
   | "export_failed"
+  // A lost WebGL context the game rebuilt in place (2026-11-16): `detail`
+  // `game` (mid-game) or `title` (behind the title screen). A failed or
+  // repeat loss is the `crash` event instead.
+  | "graphics_recovered"
   // Dialogs / navigation.
   | "settings_open"
   | "help_open"

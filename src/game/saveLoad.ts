@@ -68,8 +68,9 @@ export interface SaveLoadDeps {
    *  src/game/contextRecovery.ts). Reports exactly one outcome: `true` when
    *  the fresh engine is running, `false` on failure or timeout. */
   attemptGraphicsRecovery(done: (recovered: boolean) => void): void;
-  /** Show the card that holds the page during recovery; returns its closer (#321). */
-  showRecoveryWait(): () => void;
+  /** Show the card that holds the page during recovery; returns its closer (#321).
+   *  `behindSplash` words it for the title screen, where no tower is in play. */
+  showRecoveryWait(behindSplash: boolean): () => void;
   /** Arm first-run onboarding on the just-adopted sim. */
   armOnboarding(): void;
 }
@@ -215,18 +216,18 @@ export class SaveLoad {
    * GPU resources, so nothing draws until a fresh engine exists. Flush the
    * tower to the autosave slot first, then pick the recovery path:
    *
-   * - First mid-game loss with a clean flush: recover IN PLACE. The sim is
-   *   intact in memory and every graphic is code-generated, so GameApp can
-   *   swap in a fresh engine the moment the browser restores the context.
-   *   Mobile systems reset GL contexts routinely (memory pressure elsewhere,
-   *   GPU process restarts, backgrounding); a one-off reset should cost the
-   *   player a moment of stillness and nothing more.
-   * - Repeat loss (within 90s), a loss behind the splash, a failed flush, or
-   *   a failed/timed-out recovery: the full crash screen. It says what
-   *   happened and whether the tower was saved, offers the crash-report zip
-   *   and a prefilled bug-report link, and reloads only when the player
-   *   chooses; their reload stamps the recovery flag so the fresh boot drops
-   *   them straight back into the tower.
+   * - First loss with a clean flush, or behind the title screen (nothing to
+   *   flush there): recover IN PLACE. The sim is intact in memory and every
+   *   graphic is code-generated, so GameApp can swap in a fresh engine the
+   *   moment the browser restores the context. Mobile systems reset GL
+   *   contexts routinely (memory pressure, GPU process restarts, a
+   *   backgrounded app, title screen included); a one-off reset should cost
+   *   the player a moment of stillness and nothing more.
+   * - Repeat loss (within 90s), a failed flush, or a failed/timed-out
+   *   recovery: the full crash screen. It says what happened and whether the
+   *   tower was saved, offers the crash-report zip and a prefilled bug-report
+   *   link, and reloads only when the player chooses; their reload stamps the
+   *   recovery flag so the fresh boot drops them straight back into the tower.
    */
   recoverFromContextLoss(): void {
     // A wasm-only build that stopped on its engine already owns the session:
@@ -303,18 +304,16 @@ export class SaveLoad {
         },
       });
 
-    // In-place recovery is reserved for the healthy one-off case: a first
-    // mid-game loss whose flush succeeded. A repeat says the device is
-    // genuinely struggling (the screen's advice matters more than seamlessness
-    // would); behind the splash there is no session to preserve; and a failed
-    // flush is storage news the player must see, on the screen that words it.
-    if (repeat || behindSplash || !flushed) {
+    // In-place recovery is reserved for the one-off case. A repeat says the
+    // device is struggling (the screen's advice matters more than seamlessness
+    // would); a failed flush is storage news the player must see on the screen.
+    if (repeat || !flushed) {
       showScreen(false);
       return;
     }
     // A swap begun just before the loss is caught at completion: the saved-tower trace belongs to THIS tower.
     const towerAtLoss = this.deps.enginePort().generation();
-    const endWait = this.deps.showRecoveryWait();
+    const endWait = this.deps.showRecoveryWait(behindSplash);
     this.deps.attemptGraphicsRecovery((recovered) => {
       endWait();
       // Re-anchor the repeat window at the attempt's END too: an eviction can restore minutes
@@ -329,7 +328,8 @@ export class SaveLoad {
       // contradict it with a success toast.
       if (isCrashed()) return;
       const port = this.deps.enginePort();
-      if (port.generation() === towerAtLoss) {
+      // Behind the title screen nothing was saved and the sim must not change, so no log line.
+      if (!behindSplash && port.generation() === towerAtLoss) {
         // Leave a durable trace in the bulletin log (the old silent reload
         // erased all evidence; recovering must not repeat that mistake).
         port.logLine(
@@ -338,10 +338,10 @@ export class SaveLoad {
         );
         this.deps.ui.toast("Graphics recovered. Your tower was saved.", "good");
       } else {
-        // The player swapped towers during the wait; the saved-tower claim
-        // would be about the previous one, so keep the toast to the facts.
+        // Title screen, or a tower swapped during the wait: no saved-tower claim.
         this.deps.ui.toast("Graphics recovered.", "good");
       }
+      trackAppAction("graphics_recovered", behindSplash ? "title" : "game");
     });
   }
 

@@ -97,4 +97,39 @@ test.describe("WebGL context loss: in-place recovery", () => {
     await expect(page.locator("#crash-screen")).toBeVisible();
     await expect(page.locator("#crash-screen")).toContainText("second crash in a row");
   });
+
+  test("a loss behind the title screen recovers in place and leaves the title screen up", async ({ page }) => {
+    await page.goto("/");
+    await page.waitForFunction(() => {
+      const g = (window as unknown as { game?: { sim?: unknown } }).game;
+      return Boolean(g?.sim) && Boolean(document.getElementById("splash"));
+    });
+    const minutesBefore = await page.evaluate(() => (window as unknown as { game: { sim: { clock: { minutes: number } } } }).game.sim.clock.minutes);
+    await page.evaluate(() => {
+      (window as unknown as Record<string, unknown>).__oldEngine = (window as unknown as { game: { engine: unknown } }).game.engine;
+      const gl = (document.getElementById("view") as HTMLCanvasElement).getContext("webgl2")!;
+      (window as unknown as Record<string, unknown>).__ext = gl.getExtension("WEBGL_lose_context");
+      (gl.getExtension("WEBGL_lose_context") as WEBGL_lose_context).loseContext();
+    });
+    // A phone drops a backgrounded app's graphics on the title screen too: no crash card.
+    await expect(page.locator("#crash-screen")).toHaveCount(0);
+    await expect(page.locator("#graphics-recovery")).toContainText("Your saved towers are untouched.");
+    await page.evaluate(() => ((window as unknown as Record<string, unknown>).__ext as WEBGL_lose_context).restoreContext());
+    await page.waitForFunction(() => {
+      const w = window as unknown as { game: { engine: unknown } };
+      return w.game.engine !== (window as unknown as Record<string, unknown>).__oldEngine;
+    });
+    await expect(page.locator("#graphics-recovery")).toHaveCount(0);
+    await expect(page.locator("#crash-screen")).toHaveCount(0);
+    // The DOM title screen survives the renderer swap, and nothing was written behind it.
+    await expect(page.locator("#splash")).toBeVisible();
+    const logged = await page.evaluate(() =>
+      (window as unknown as { game: { sim: { log: { text: string }[] } } }).game.sim.log.some((e) => e.text.includes("recovered on the spot")),
+    );
+    expect(logged).toBe(false);
+    // The fresh engine starts paused behind the title screen: the clock has not moved.
+    await page.waitForTimeout(500);
+    const minutesAfter = await page.evaluate(() => (window as unknown as { game: { sim: { clock: { minutes: number } } } }).game.sim.clock.minutes);
+    expect(minutesAfter).toBe(minutesBefore);
+  });
 });

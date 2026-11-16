@@ -70,14 +70,16 @@ export function takeCrashCount(): number {
  * whatever arrives later. What keeps that off a real device is REACHABILITY,
  * not the key's width. `recoverFromContextLoss` produces six of the sixteen,
  * `kind` has one value, and a real loop settles on two, so six sits inside ten
- * with room. The three constraints that get you from sixteen to six, because a
- * count you cannot reproduce is no use to the next editor: `behindSplash` leaves
- * `saveFlushed` at its `true` initializer and always takes the early return, so
- * it forbids `recoveryFailed` (two tuples); `recoveryFailed` is reachable only
- * PAST that early return, which needs `!repeat && !behindSplash && saveFlushed`
- * (one tuple); and that same early return is why such a loss never reports
- * `recoveryFailed: false`, since it goes to the recovery attempt instead and a
- * successful one shows no screen at all (three tuples, not four). Add a fifth
+ * with room. The constraints that get you from sixteen to six, because a
+ * count you cannot reproduce is no use to the next editor: `recoveryFailed`
+ * is reachable only past the early return, which needs `!repeat &&
+ * saveFlushed` (six tuples gone, behind the splash or not); `behindSplash`
+ * leaves `saveFlushed` at its `true` initializer (two gone); and a first loss
+ * with a clean flush goes to the in-place recovery instead of the screen, so
+ * it never reports `recoveryFailed: false` (two gone). That leaves three
+ * repeats, one failed flush and two failed recoveries. A recovery that works
+ * shows no screen and reports `app_action` `graphics_recovered` instead
+ * (`src/game/saveLoad.ts`). Add a fifth
  * flag or a second `kind` and re-derive this before assuming it still holds.
  *
  * What this event still cannot say is HOW MANY times each shape recurred: a

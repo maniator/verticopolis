@@ -200,7 +200,7 @@ export function wireControllers(app: GameApp): void {
       // inside, so it can never break crash recovery.
       reportCrashException(info.crash);
     },
-    showRecoveryWait: () => showGraphicsRecovery(),
+    showRecoveryWait: (behindSplash) => showGraphicsRecovery(behindSplash),
     attemptGraphicsRecovery: (done) =>
       attemptContextRecovery(
         {

@@ -97,6 +97,7 @@ type CrashInfo = Parameters<SaveLoadDeps["showCrashScreen"]>[0];
 
 beforeEach(() => {
   sessionStorage.clear();
+  vi.mocked(trackAppAction).mockClear();
   vi.spyOn(SaveGame, "save").mockImplementation(() => {});
   vi.spyOn(SaveGame, "hasSave").mockReturnValue(false);
 });
@@ -182,6 +183,8 @@ describe("SaveLoad.recoverFromContextLoss", () => {
       "Graphics recovered. Your tower was saved.",
       "good",
     );
+    expect(deps.showRecoveryWait).toHaveBeenCalledExactlyOnceWith(false);
+    expect(trackAppAction).toHaveBeenCalledExactlyOnceWith("graphics_recovered", "game");
   });
 
   it("a recovery after a tower swap claims no save; one under a crash screen stays quiet", () => {
@@ -257,18 +260,44 @@ describe("SaveLoad.recoverFromContextLoss", () => {
     });
   });
 
-  it("behind the splash nothing is flushed and the screen says so; a stopped engine does nothing", () => {
+  it("behind the splash nothing is flushed and the graphics recover in place without touching the tower", () => {
+    vi.mocked(isSplashUp).mockReturnValue(true);
+    const { saves, port, deps } = setup();
+    saves.recoverFromContextLoss();
+    expect(SaveGame.save).not.toHaveBeenCalled();
+    expect(deps.showCrashScreen, "a first loss on the title screen is not a crash").not.toHaveBeenCalled();
+    expect(deps.showRecoveryWait).toHaveBeenCalledExactlyOnceWith(true);
+    (deps.attemptGraphicsRecovery.mock.calls[0][0] as (ok: boolean) => void)(true);
+    expect(port.logLine, "the sim does not change behind the splash").not.toHaveBeenCalled();
+    expect(deps.ui.toast).toHaveBeenCalledExactlyOnceWith("Graphics recovered.", "good");
+    expect(trackAppAction).toHaveBeenCalledExactlyOnceWith("graphics_recovered", "title");
+  });
+
+  it("behind the splash a failed recovery or a repeat shows the screen, worded for no tower in play", () => {
     vi.mocked(isSplashUp).mockReturnValue(true);
     const { saves, deps } = setup();
     saves.recoverFromContextLoss();
-    expect(SaveGame.save).not.toHaveBeenCalled();
-    expect(
-      (deps.showCrashScreen.mock.calls[0][0] as CrashInfo).crash.behindSplash,
-    ).toBe(true);
+    (deps.attemptGraphicsRecovery.mock.calls[0][0] as (ok: boolean) => void)(false);
+    expect((deps.showCrashScreen.mock.calls[0][0] as CrashInfo).crash).toMatchObject({
+      behindSplash: true,
+      saveFlushed: true,
+      recoveryFailed: true,
+    });
+    saves.recoverFromContextLoss();
+    expect(deps.attemptGraphicsRecovery, "a repeat does not try again").toHaveBeenCalledOnce();
+    expect((deps.showCrashScreen.mock.calls[1][0] as CrashInfo).crash).toMatchObject({
+      behindSplash: true,
+      repeat: true,
+    });
+    expect(trackAppAction).not.toHaveBeenCalledWith("graphics_recovered", expect.anything());
+  });
+
+  it("a stopped engine does nothing", () => {
     vi.mocked(isEngineStopped).mockReturnValue(true);
     const stopped = setup();
     stopped.saves.recoverFromContextLoss();
     expect(stopped.deps.showCrashScreen).not.toHaveBeenCalled();
+    expect(stopped.deps.attemptGraphicsRecovery).not.toHaveBeenCalled();
   });
 });
 
