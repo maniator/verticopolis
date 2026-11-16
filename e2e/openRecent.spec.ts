@@ -95,10 +95,9 @@ test("lists the towers saved last, newest first, opens one by mouse or by its nu
   before = await generation(page);
   await page.keyboard.press("2");
   await waitForNewTower(page, before);
-  // Reload returns to the title screen. Its Auto-save still holds "Tower One",
-  // so opening Alpha keeps Tower One in My Towers and notes it as newest.
-  // The numbered choice must still open Alpha, not simply rearrange the list.
-  await expect.poll(() => page.evaluate(() => (window as any).game.enginePort.towerName())).toBe("Alpha");
+  // The file called Alpha still contains a tower named "Tower One": Save As
+  // changes the file name, not the tower name. The exact list pins that the
+  // numbered pick opened the file and the departing tower was kept on top.
   await expect.poll(() => recentLines(page)).toEqual(["1Tower One", "2Alpha", "3Beta"]);
 });
 
