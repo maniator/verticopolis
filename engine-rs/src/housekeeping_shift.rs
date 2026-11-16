@@ -5,7 +5,9 @@
 //! crowd walks them (`crowd/staff_shift.rs`).
 
 use crate::crowd::fasthash::FastMap;
-use crate::crowd::staff_shift::{index_of, send, send_out, spawn_commuter, Network, StaffTrip};
+use crate::crowd::staff_shift::{
+    index_of, queues, send, send_out, spawn_commuter, BringIn, Network, Queues, StaffTrip,
+};
 use crate::crowd::{PState, CROWD_SECONDS_PER_MINUTE};
 use crate::facilities::Kind;
 use crate::housekeeping::{StepRooms, HK_CLEAN_MINUTES, HK_MAIDS_PER_UNIT};
@@ -270,22 +272,34 @@ impl Simulation {
             .map(|u| (u.id, u.floor, u.x as f64 + u.width as f64 / 2.0))
             .collect();
         let mut stranded = None;
+        let mut held = false;
+        // The queues are read once, and only when a crew is short.
+        let mut lines: Option<Queues> = None;
         for (crew, floor, x) in crews {
             let on_roster = self.crowd.crew_roster.get(&crew).copied().unwrap_or(0);
             for _ in on_roster..HK_MAIDS_PER_UNIT {
-                if !spawn_commuter(&mut self.crowd, &self.tower, crew, floor, x) {
-                    stranded = Some(floor);
-                    break;
+                let lines = lines.get_or_insert_with(|| queues(&self.crowd));
+                match spawn_commuter(&mut self.crowd, &self.tower, lines, crew, floor, x) {
+                    BringIn::Coming => {}
+                    BringIn::Held => {
+                        held = true;
+                        break;
+                    }
+                    BringIn::NoRoute => {
+                        stranded = Some(floor);
+                        break;
+                    }
                 }
             }
         }
         let day = self.clock.day();
-        if let Some(floor) = stranded.filter(|_| self.housekeeping.commute_nudged_day != day) {
+        if (stranded.is_some() || held) && self.housekeeping.commute_nudged_day != day {
             self.housekeeping.commute_nudged_day = day;
-            self.emit(
-                &format!("🧹 Housekeepers can't get from the lobby to the housekeeping room on floor {floor}."),
-                LogKind::Bad,
-            );
+            let note = match stranded {
+                Some(floor) => format!("🧹 Housekeepers can't get from the lobby to the housekeeping room on floor {floor}."),
+                None => "🧹 Housekeepers are coming in late because the elevators from the lobby are full. More service elevators would bring them in sooner.".to_string(),
+            };
+            self.emit(&note, LogKind::Bad);
         }
     }
 
