@@ -132,6 +132,17 @@ One `app_action` counts the WebGL losses the game survived (2026-11-16). The fac
 | --- | --- | --- | --- |
 | `graphics_recovered` | `game` or `title` | The device dropped the game's WebGL graphics and the game rebuilt them in place, mid-game (`game`) or behind the title screen (`title`) | Counted per recovery, a lower bound like every client event. Read it beside `crash` with `repeat` false (a first loss that ended on the crash screen). `crash` is deduped per page life on its flag set, so do not add the two as a count of first losses |
 
+## Bridge floors between rooms (Modern)
+
+From the release after 4.6.0, a new Modern tower starts with **Bridge floors between rooms**
+off (owner, 2026-11-15). Two `app_action` codes say how often players turn it
+back on. Each carries the new state only.
+
+| `action` | `detail` | When |
+| --- | --- | --- |
+| `found_bridged` | `on` or `off` | A Modern tower is founded from the New Tower window: whether its box was ticked. A Classic founding sends nothing, since Classic always bridges |
+| `auto_bridge` | `on` or `off` | The Settings switch was flipped in a Modern tower, with the state the engine answered |
+
 ## My Towers (Open, Save As, Load)
 
 Version 4.3 replaced Saved Towers… and its three numbered slots with My Towers,

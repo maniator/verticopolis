@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
-const files = vi.hoisted(() => ({ saveCurrentFile: vi.fn(), keepOpenedFile: vi.fn() }));
+const files = vi.hoisted(() => ({ saveCurrentFile: vi.fn(), keepOpenedFile: vi.fn(), trackAppAction: vi.fn() }));
+vi.mock("../analytics", async (importOriginal) => ({ ...(await importOriginal<typeof import("../analytics")>()), trackAppAction: files.trackAppAction }));
 vi.mock("./fileSpaceCommands", () => ({ saveCurrentFile: files.saveCurrentFile }));
 vi.mock("./fileKeep", () => ({ keepOpenedFile: files.keepOpenedFile }));
 import { catalogFor } from "../tests/catalogFixture";
@@ -206,6 +207,7 @@ describe("createUICallbacks delegates every callback to its port", () => {
     // true: the switch takes the flip's answer, the getter is asked apart.
     expect(await cb.onToggleAutoBridge()).toBe(false);
     expect(ports.enginePort.flipAutoBridge).toHaveBeenCalledOnce();
+    expect(files.trackAppAction).toHaveBeenCalledWith("auto_bridge", "off"); // reports the engine's answer
     expect(cb.isAutoBridge()).toBe(true);
     expect(ports.enginePort.autoBridge).toHaveBeenCalledOnce();
   });
