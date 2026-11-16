@@ -145,6 +145,35 @@ describe("busyStations fills a room's seats to its occupancy", () => {
     expect(Math.max(...picks)).toBeGreaterThanOrEqual(stations - 2); // and the far one
   });
 
+  it("gives neighboring rooms their own seats, not one pattern shifted along the row (#1069)", () => {
+    // Callers pass figureSeed * k (17 for the nightclub), so two rooms whose
+    // figure seeds differ by one hand in seeds k apart. Hashing seed + i made
+    // room B's station i rank like room A's station i + k, so B's busiest seat
+    // was usually A's busiest seat moved k places. Unrelated rooms match that
+    // way about once in `stations` tries.
+    const k = 17;
+    const stations = 40;
+    let shifted = 0;
+    const rooms = 300;
+    for (let s = 0; s < rooms; s++) {
+      const a = [...busyStations(stations, 1, s * k)][0];
+      const b = [...busyStations(stations, 1, (s + 1) * k)][0];
+      if (b === a - k) shifted++;
+    }
+    expect(shifted / rooms, `${shifted} of ${rooms} rooms repeat the last one's pick shifted ${k} seats`).toBeLessThan(0.08);
+  });
+
+  it("only adds seats as people arrive, so a crowd grows in place", () => {
+    for (let seed = 0; seed < 50; seed++) {
+      let before = new Set<number>();
+      for (let people = 0; people <= 12; people++) {
+        const now = busyStations(12, people, seed * 19);
+        for (const s of before) expect(now.has(s), `seed ${seed}: seat ${s} kept at ${people}`).toBe(true);
+        before = now;
+      }
+    }
+  });
+
   it("gives the same room the same seats every time", () => {
     // These rooms bake to a cached sprite, so the picture may not move unless
     // the crowd does.
