@@ -56,6 +56,7 @@ import { armPhaseWatch, judgeAndPromote, markPhaseTarget, phaseCapturePath, stop
 import { SCENES } from "./screenshot-scenes.ts";
 import { SETTLE_AFTER_SETUP, assertEnginePackage, HOSTED_FIX, beginSettleStep, checkHosted, checkSettleList, hostedSnapshot, installShotHelpers, settleUnlessSettled } from "./screenshot-engine.ts";
 import { resolveOnlyFilter } from "../src/tests/screenshotOnlyFilter.ts";
+import { runSceneShots } from "../src/tests/screenshotChain.ts";
 import { distPublishesHandle } from "../src/build/toolingHandle.ts";
 
 // ---- Runner -----------------------------------------------------------------
@@ -345,15 +346,10 @@ async function runScene(browser: Browser, scene: Scene): Promise<void> {
       if (scene.assertUnits) await assertReady(page, scene.assertUnits);
       await settleUnlessSettled(page, "after the scene build", true);
     }
-    for (const shot of scene.shots) {
-      try {
-        await takeShot(page, scene, shot);
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        failures.push(`${scene.id}/${shot.name}: ${msg}`);
-        console.error(`  ✗ ${shot.name}: ${msg}`);
-      }
-    }
+    await runSceneShots(scene.shots, !!scene.chained, (shot) => takeShot(page, scene, shot), (shot, msg) => {
+      failures.push(`${scene.id}/${shot.name}: ${msg}`);
+      console.error(`  ✗ ${shot.name}: ${msg}`);
+    });
   } finally {
     // page.close() is cleanup: never let it throw past the finally (that would fail
     // a scene whose shots all captured) and never let it skip the timing row. Log a
