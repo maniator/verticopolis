@@ -74,16 +74,17 @@ test("lists the towers saved last, newest first, opens one by mouse or by its nu
   });
   expect(await recentLines(page)).toEqual(["1Beta", "2Alpha"]);
 
-  // A pick opens the tower as its Open window row would, and puts it on top.
+  // A pick opens the tower as its Open window row would. The tower left is
+  // kept in its own file and goes on top, so going back is line 1.
   let before = await generation(page);
   await page.locator("#mb-recent-2").click();
   await waitForNewTower(page, before);
   await expect(page.locator("#mb-file-menu")).toBeHidden();
-  expect(await recentLines(page)).toEqual(["1Alpha", "2Beta"]);
+  await expect.poll(() => recentLines(page)).toEqual(["1Beta", "2Alpha"]);
 
   await page.reload();
   await boot(page);
-  expect(await recentLines(page), "the list is kept on the device").toEqual(["1Alpha", "2Beta"]);
+  expect(await recentLines(page), "the list is kept on the device").toEqual(["1Beta", "2Alpha"]);
 
   // The keyboard: Right opens the list, and a line's number picks it.
   await page.keyboard.press("Escape");
@@ -94,7 +95,9 @@ test("lists the towers saved last, newest first, opens one by mouse or by its nu
   before = await generation(page);
   await page.keyboard.press("2");
   await waitForNewTower(page, before);
-  expect(await recentLines(page)).toEqual(["1Beta", "2Alpha"]);
+  // After the reload the live tower has no file of its own any more (#2380),
+  // so the tower left is kept as a new file and goes on top.
+  await expect.poll(() => recentLines(page)).toEqual(["1Alpha (2)", "2Alpha", "3Beta"]);
 });
 
 test("a tower deleted from My Towers drops off the list, and the other towers stay", async () => {

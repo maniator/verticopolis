@@ -1,6 +1,7 @@
 import type { GameApp } from "../main";
 import { trackAppAction } from "../analytics";
 import { cleanFileName, fileSpace } from "../storage/fileSpace";
+import { noteTowersFile } from "../storage/recentTowers";
 import { autosaveKey, SaveGame } from "../storage/SaveGame";
 import { packSave } from "../storage/savePacker";
 import { currentStamp } from "../storage/saveStamp";
@@ -204,12 +205,14 @@ async function keep(app: Pick<GameApp, "ui">, o: Outgoing): Promise<"file" | "ne
     if (!(await fileSpace.open())) throw new Error("My Towers is not open");
     const own = o.fileId === null ? undefined : fileSpace.get(o.fileId);
     if (own && own.kind === "tower") {
-      await fileSpace.save(own.name, "tower", bytes, Date.now(), true);
+      noteTowersFile(await fileSpace.save(own.name, "tower", bytes, Date.now(), true));
       trackAppAction("tower_kept", "file");
       app.ui.toast(`Saved "${own.name}" in My Towers.`, "good");
       return "file";
     }
     const entry = await fileSpace.add(o.name, "tower", bytes);
+    // The tower just left heads File > Open Recent, so going back is one pick.
+    noteTowersFile(entry);
     trackAppAction("tower_kept", "new");
     app.ui.toast(`Kept your last tower in My Towers as "${entry.name}".`, "good");
     return "new";
