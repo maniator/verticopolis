@@ -16,6 +16,7 @@ import { linkedPlace, saveCurrentLinked } from "./linkedFolderCommands";
 import { baseName, failed } from "./fileKeep";
 import { loadSave } from "./loadMenu";
 import { exportFile } from "./portLifecycle";
+import { keptSettled, openingFile } from "./keepOutgoing";
 
 /**
  * What File > Open…, Save As… and Save do with My Towers (owner,
@@ -85,6 +86,7 @@ export function currentFile(): TowerFileEntry | null {
  *  is the live tower's. */
 async function openTowerBytes(app: GameApp, id: string, bytes: Uint8Array): Promise<void> {
   const before = app.enginePort.generation();
+  openingFile(id);
   await app.saveLoad.importGame(isBinaryTowerFile(bytes) ? bytes : decodeTowerText(bytes));
   if (app.enginePort.generation() !== before) setCurrentFile(id);
 }
@@ -96,6 +98,8 @@ async function openRow(app: GameApp, row: FileRow): Promise<void> {
     loadSave(app, "auto");
     return;
   }
+  // A keep still being written may be this very file: read what it wrote.
+  await keptSettled();
   const bytes = await fileSpace.read(row.id);
   if (!bytes) {
     app.ui.sayVisibly("That tower is gone. It may have been deleted in another window.");

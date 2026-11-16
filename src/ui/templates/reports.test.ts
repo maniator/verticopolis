@@ -76,11 +76,12 @@ describe("importReportTemplate: the fact line and lists", () => {
     expect(lists[1].querySelectorAll("li")).toHaveLength(1);
   });
 
-  it("says the 1994 file goes into My Towers, with no word of the save slots 4.3 removed", () => {
+  it("says the current tower and the 1994 file both go into My Towers, with no word of slots or the Auto-save", () => {
     const frag = renderToFragment(importReportTemplate(importReport()));
     const note = frag.querySelector(".import-note")!.textContent!;
-    expect(note).toContain("kept in its autosave");
-    expect(note).toContain("goes into My Towers once the tower opens");
+    expect(note).toContain("current tower is kept in My Towers");
+    expect(note).toContain("1994 file goes there too once the tower opens");
+    expect(note).not.toMatch(/autosave/i);
     expect(note).not.toMatch(/slot/i);
   });
 

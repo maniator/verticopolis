@@ -176,6 +176,7 @@ player's own text and is never sent, and neither is a tower's contents.
 | `file_ask` | `replace` or `delete` | The window asked in its message box before replacing or deleting a file. A Yes (Replace) goes on to `file_save` `replace` or `file_delete`; from 4.4 the replace box also offers the next numbered name ("Sky (2)"), which goes on to `file_save` `new`. So the asks a player declined are the asks less all three |
 | `file_failed` | `full` or `error` | A write to My Towers refused: the device is out of room, or another error |
 | `files_copied` | a count | Once per device: the old save slots copied into My Towers, and how many |
+| `tower_kept` | `file`, `new`, `offered`, `download` or `failed` | From 4.9.0: another tower opened (File > Open…, New…, a picked or dropped file, or a 1994 import) and the tower left behind was kept: in its own My Towers file (`file`), as a new file under its name (`new`), or not at all (`failed`, said to the player). When My Towers couldn't take it, a message box offered it as a `.vctower` file (`offered`), and `download` follows when the player's click downloads it. Loading the Auto-save (Continue, or its row in the Open window) brings the same tower back, so it leaves nothing behind and sends nothing |
 
 `load_slot` still counts the Auto-save loading as the live tower (its row in
 the Open window; File > Load in 4.1 and 4.2), and `load_failed` a load that

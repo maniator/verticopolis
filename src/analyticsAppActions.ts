@@ -21,6 +21,8 @@ export type AppActionName =
   | "files_open" | "file_open" | "file_save" | "file_add" | "file_dropped"
   | "file_rename" | "file_copy" | "file_delete" | "file_failed"
   | "files_copied" | "files_waited" | "file_ask"
+  // The tower left behind by a swap, kept in My Towers (owner, 2026-11-16).
+  | "tower_kept"
   // The folder linked on the player's computer (owner, 2026-11-15), in the
   // data map's "Linked folder" section. Codes only, never a name.
   | "folder_link" | "folder_allow" | "folder_unlink" | "folder_open"

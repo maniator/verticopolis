@@ -9,6 +9,8 @@ const m = vi.hoisted(() => ({
   exportFile: vi.fn(() => Uint8Array.of(7, 7, 7)),
   loadSave: vi.fn(),
   copySlots: vi.fn(async () => 0),
+  openingFile: vi.fn(),
+  keptSettled: vi.fn(() => Promise.resolve()),
   dialogOpen: false,
   stopped: false,
 }));
@@ -17,6 +19,7 @@ vi.mock("../ui/fileDialog", () => ({ showFileDialog: m.dialog }));
 vi.mock("../ui/uiImport", async (actual) => ({ ...(await actual<typeof import("../ui/uiImport")>()), openImport: m.openImport, readPickedFile: m.readPickedFile }));
 vi.mock("./portLifecycle", () => ({ exportFile: m.exportFile }));
 vi.mock("./loadMenu", () => ({ loadSave: m.loadSave }));
+vi.mock("./keepOutgoing", () => ({ openingFile: m.openingFile, keptSettled: m.keptSettled }));
 vi.mock("../storage/fileSpaceMigrate", () => ({ copySlotsOnce: m.copySlots }));
 vi.mock("./interactionState", () => ({ isDialogOpen: () => m.dialogOpen, isEngineStopped: () => m.stopped }));
 
@@ -185,10 +188,29 @@ describe("File > Open…", () => {
 });
 
 describe("opening a My Towers file", () => {
+  it("waits for the last tower's keep to be written before reading the file", async () => {
+    const f = await fileSpace.save("Spire", "tower", text("VCTOWER1\nabc\n"));
+    let written!: () => void;
+    m.keptSettled.mockReturnValueOnce(new Promise<void>((resolve) => (written = resolve)));
+    const read = vi.spyOn(fileSpace, "read");
+    const opened = openFile(app as unknown as GameApp, f.id);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(m.keptSettled).toHaveBeenCalledOnce();
+    expect(read, "no read while a keep may still write this file").not.toHaveBeenCalled();
+    written();
+    await opened;
+    expect(read).toHaveBeenCalledExactlyOnceWith(f.id);
+    expect(app.saveLoad.importGame).toHaveBeenCalledExactlyOnceWith("VCTOWER1\nabc\n");
+    read.mockRestore();
+  });
+
   it("imports a tower's bytes and makes it the live tower's file once it is in", async () => {
     const f = await fileSpace.save("Spire", "tower", text("VCTOWER1\nabc\n"));
     await openFile(app as unknown as GameApp, f.id);
     expect(app.saveLoad.importGame).toHaveBeenCalledExactlyOnceWith("VCTOWER1\nabc\n");
+    // Named before the swap, so a tower reopening its own file keeps the minutes since as a new file.
+    expect(m.openingFile).toHaveBeenCalledExactlyOnceWith(f.id);
+    expect(m.openingFile.mock.invocationCallOrder[0]).toBeLessThan(app.saveLoad.importGame.mock.invocationCallOrder[0]!);
     expect(currentFileId()).toBe(f.id);
     expect(fileSpace.list()).toHaveLength(1);
     expect(m.track).toHaveBeenCalledWith("file_open", "tower");

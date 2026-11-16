@@ -53,6 +53,7 @@ import { wireDesk } from "../ui/desk/deskController";
 import { wireTitlePicks } from "./titlePicks";
 import { refuseAppPlacementWhilePaused } from "./pausedBuild";
 import { createPersonCard } from "./personCardWiring";
+import { captureOutgoing, dropOutgoing, keepOutgoing } from "./keepOutgoing";
 export { APP_VERSION };
 
 /** Classify why this boot happened, for the analytics boot snapshot. Mirrors
@@ -152,9 +153,14 @@ export function wireControllers(app: GameApp): void {
     // and dialog lifecycle cannot see it: New Tower closes perfectly normally
     // and swaps afterwards. Breaking the leash here covers every swap SaveLoad
     // drives (found, load, import). See SPEC-modal-precedence-reports CAP-5.
+    // The tower being left is kept in My Towers once the next is in, since the
+    // autosave below writes over it (owner, 2026-11-16; `keepOutgoing.ts`).
+    beforeSwap: (kind) => captureOutgoing(app, kind),
+    swapRefused: dropOutgoing,
     towerSwapped: () => {
       app.ui.precedence.towerSwapped();
       app.followSwap();
+      void keepOutgoing(app);
       // Autosave the tower the player just loaded, imported or founded at
       // once, so a Rust crash in the next half minute reloads it rather than
       // the tower before it (#1422).

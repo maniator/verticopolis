@@ -84,7 +84,9 @@ describe("newTowerTemplate structure and defaults", () => {
 describe("newTowerTemplate abandon warning, gated on an existing tower", () => {
   it("folds in the warning when a tower exists to lose", () => {
     const frag = renderToFragment(newTowerTemplate(true));
-    expect(frag.querySelector(".nt-abandon")).not.toBeNull();
+    // Since 4.8.1 the tower being left is kept (keepOutgoing.ts), so the note says where, not that it is lost.
+    expect(frag.querySelector(".nt-abandon")!.textContent).toContain("kept in My Towers");
+    expect(frag.querySelector(".nt-abandon")!.textContent).not.toMatch(/abandon|not auto-saved/i);
     // The Modern-only reveal still renders alongside the warning.
     expect(frag.querySelector(".nt-modern-only")).not.toBeNull();
   });

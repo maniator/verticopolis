@@ -38,7 +38,7 @@ import { iconTemplate } from "../icons";
  */
 export function newTowerTemplate(hasSave: boolean): TemplateResult {
   const abandon = hasSave
-    ? html`<p class="nt-abandon">${iconTemplate("warning", { size: 14 })}This abandons your current tower (it is not auto-saved).</p>`
+    ? html`<p class="nt-abandon">${iconTemplate("warning", { size: 14 })}Your current tower is kept in My Towers first, so you can open it again.</p>`
     : nothing;
   return html`<h2>Found a New Tower</h2>
        <p class="nt-lede">Choose your rule-set. This is set once and <b>cannot be changed</b> for this tower. Start another to play the other way.</p>
