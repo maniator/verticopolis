@@ -1,8 +1,5 @@
 import { describe, it, expect } from "vitest";
 import { subtypesOf } from "../tests/catalogKinds";
-import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
-import { dirname, resolve } from "node:path";
 import type { Unit } from "../shared/types";
 import { drawUnit, drawLobbyEntrance, type EntranceKind, type DrawCtx } from "./sprites";
 import { FLOOR, TILE } from "./scale";
@@ -181,18 +178,5 @@ describe("entrance staff are gated on the tower holding anyone (#552)", () => {
     const bare = entrance("grand-left", false);
     expect(bare.log).not.toContain(FIGURE);
     expect(bare.log).toContain("fillStyle=#6B4A2B"); // the walnut counter stands
-  });
-
-  it("the grand-entrance bake threads staffed through to the draw", () => {
-    // A source guard, because the bake itself allocates an `ex.Canvas` and so
-    // lives on the Playwright tier: the cases above call `drawLobbyEntrance`
-    // directly, which cannot catch the bake handing it a DrawCtx literal that
-    // omits `staffed`. That is exactly how this gate first shipped dead: the
-    // closure built `{ ctx, lit, anim, hour }` by hand, `staffed` came through
-    // undefined, and every tower stayed staffed while the unit tests passed.
-    const here = dirname(fileURLToPath(import.meta.url));
-    const src = readFileSync(resolve(here, "excalibur", "towerScene.ts"), "utf8");
-    const bakeGrand = src.slice(src.indexOf("const bakeGrand"), src.indexOf("const bakeService"));
-    expect(bakeGrand).toContain("staffed: engine.d.staffed");
   });
 });

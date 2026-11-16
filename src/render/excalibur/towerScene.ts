@@ -185,16 +185,18 @@ export function bakeSharedGraphics(engine: TowerEngine): void {
       width: TILE,
       height: FLOOR,
       cache: false,
-      // `staffed` is read live off `engine.d` the same way `anim` is, so this
-      // cache:false canvas never holds a stale baked figure. Unlike `anim` the
-      // VALUE only changes at scene-sync cadence (`syncScene` writes it), which
-      // is the right cadence: tenancy moves on the hour tick, and that tick is
-      // itself a sync trigger, so the entrance follows a frame later.
+      // The staffed slice: a tower nobody is in shows its empty slice instead
+      // (`entranceEmptyGfx`), which the structure cells swap to per tower.
       draw: (ctx) =>
-        drawLobbyEntrance(
-          { ctx, lit, anim: engine.d.anim, hour: lit ? 20 : 12, staffed: engine.d.staffed },
-          kind, 0, 0, TILE, FLOOR,
-        ),
+        drawLobbyEntrance({ ctx, lit, anim: engine.d.anim, hour: lit ? 20 : 12, staffed: true }, kind, 0, 0, TILE, FLOOR),
+    });
+  // No doorman or attendant, so nothing moves: a static bake.
+  const bakeEmpty = (kind: "grand-left" | "grand-right" | "grand-solo") => (lit: boolean): ex.Canvas =>
+    new ex.Canvas({
+      width: TILE,
+      height: FLOOR,
+      cache: true,
+      draw: (ctx) => drawLobbyEntrance({ ctx, lit, anim: 0, hour: lit ? 20 : 12, staffed: false }, kind, 0, 0, TILE, FLOOR),
     });
   const bakeService = (lit: boolean): ex.Canvas =>
     new ex.Canvas({
@@ -207,26 +209,34 @@ export function bakeSharedGraphics(engine: TowerEngine): void {
   engine.entranceGrandRightGfx = [bakeGrand("grand-right")(false), bakeGrand("grand-right")(true)];
   engine.entranceGrandSoloGfx = [bakeGrand("grand-solo")(false), bakeGrand("grand-solo")(true)];
   engine.entranceServiceGfx = [bakeService(false), bakeService(true)];
+  engine.entranceEmptyGfx = {
+    "grand-left": [bakeEmpty("grand-left")(false), bakeEmpty("grand-left")(true)],
+    "grand-right": [bakeEmpty("grand-right")(false), bakeEmpty("grand-right")(true)],
+    "grand-solo": [bakeEmpty("grand-solo")(false), bakeEmpty("grand-solo")(true)],
+  };
   // Tall lobby stories (#308): each cell draws the whole hall shifted up so
   // only its own story lands on the canvas, so the slices line up into one
   // hall. Baked on first use: a tower holds at most a few tall lobbies.
   const tall = new Map<string, ex.Canvas>();
-  engine.tallLobbyGfx = (lit, ground, height, story, slot) => {
-    const key = `${lit ? 1 : 0}|${ground ? 1 : 0}|${height}|${story}|${slot}`;
+  engine.tallLobbyGfx = (lit, ground, height, story, slot, staffed) => {
+    // The grand doors' story carries the swaying doorman of a staffed tower,
+    // so it takes the animated path like the one-story grand entrance; an
+    // empty tower's doors story is static. Staffing keys only that story.
+    const grandDoors = story === 0 && typeof slot === "string" && slot !== "service";
+    const doorman = grandDoors && staffed;
+    const staffing = staffed ? "staffed" : "empty";
+    const key = `${lit ? 1 : 0}|${ground ? 1 : 0}|${height}|${story}|${slot}|${grandDoors ? staffing : ""}`;
     let gfx = tall.get(key);
     if (!gfx) {
       const y = -(height - 1 - story) * FLOOR;
-      // The grand doors' story carries the swaying doorman, so it takes the
-      // animated path (and live staffing) like the one-story grand entrance.
-      const doorman = story === 0 && typeof slot === "string" && slot !== "service";
       gfx = new ex.Canvas({
         width: TILE,
         height: FLOOR,
         cache: !doorman,
         draw: (ctx) => {
           const d = doorman
-            ? { ctx, lit, anim: engine.d.anim, hour: lit ? 20 : 12, staffed: engine.d.staffed }
-            : { ctx, lit, anim: 0, hour: lit ? 20 : 12 };
+            ? { ctx, lit, anim: engine.d.anim, hour: lit ? 20 : 12, staffed: true }
+            : { ctx, lit, anim: 0, hour: lit ? 20 : 12, staffed: !grandDoors };
           if (typeof slot === "string") drawTallLobbyEntrance(d, slot, 0, y, TILE, height * FLOOR, height);
           else drawTallLobbyTile(d, 0, y, TILE, height * FLOOR, slot, ground, height);
         },

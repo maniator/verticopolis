@@ -106,8 +106,15 @@ function fakeEngine(state: { units: UnitView[]; revision: number; tall?: LobbyHa
     entranceGrandRightGfx: ["grand-right 0", "grand-right 1"],
     entranceGrandSoloGfx: ["grand-solo 0", "grand-solo 1"],
     entranceServiceGfx: ["service 0", "service 1"],
+    entranceEmptyGfx: {
+      "grand-left": ["empty grand-left 0", "empty grand-left 1"],
+      "grand-right": ["empty grand-right 0", "empty grand-right 1"],
+      "grand-solo": ["empty grand-solo 0", "empty grand-solo 1"],
+    },
     tallLobbyGfx: vi.fn((lit: boolean, ground: boolean, height: number, story: number, slot: number | string) => `tall ${lit ? 1 : 0}:${ground ? "ground" : "sky"}:${height}:${story}:${slot}`),
     floor1EntranceMap: new Map(),
+    groundTowers: [],
+    towerStaffed: [],
     structTiles: new Set(),
     structPass: emptyStructPass(),
     animatedRooms: new Map(),
@@ -283,17 +290,20 @@ describe("the scene sync walks the structure tiles only when what they draw from
     const state = tower();
     const room = state.units[0] as { state: string };
     const walked = countReads(state);
-    const { engine } = fakeEngine(state);
+    const { engine, cell } = fakeEngine(state);
     syncScene(engine);
-    expect(engine.d.staffed).toBe(true);
+    expect(engine.towerStaffed).toEqual([true]);
+    expect(cell(4, 1)?.gfx).toEqual(["grand-left 0"]);
     walked.reset();
     // The view patches a room's state in place without a revision move.
     room.state = "empty";
     engine.d.hour = 10;
     syncScene(engine);
-    // No read of the unit list at all, so the staffed flag came from the kept rooms.
+    // No read of the unit list at all, so the staffed flag came from the kept
+    // rooms, and the entrance lost its staff on the same sync.
     expect(walked.reads()).toBe(0);
-    expect(engine.d.staffed).toBe(false);
+    expect(engine.towerStaffed).toEqual([false]);
+    expect(cell(4, 1)?.gfx).toEqual(["empty grand-left 0"]);
     expect(engine.roomSig.get(office.id)).toBe("hour 10");
   });
 
@@ -382,10 +392,18 @@ describe("the scene sync walks the structure tiles only when what they draw from
     expect(cell(8, 1)?.gfx).toEqual(["service 0"]);
   });
 
+  /** Two towers apart: lobby 4..7 and lobby 12..15, an office over each,
+   *  each leased only when its flag says so. */
+  function twoTowers(leftLeased: boolean, rightLeased: boolean): { units: UnitView[]; revision: number } {
+    const lease = (x: number, leased: boolean): UnitView =>
+      ({ ...office, id: x, x, width: 4, state: leased ? "occupied" : "empty" }) as unknown as UnitView;
+    const units = [lease(4, leftLeased), lease(12, rightLeased)];
+    for (const x of [4, 5, 6, 7, 12, 13, 14, 15]) units.push(tile("lobby", 1, x), tile("floor", 2, x));
+    return { units, revision: 5 };
+  }
+
   it("gives each tower on the lot its own front door only where the catalog says so", () => {
-    // Two towers standing apart: lobby 4..7 and lobby 12..15.
-    const state = tower();
-    for (let x = 12; x < 16; x++) state.units.push(tile("lobby", 1, x));
+    const state = twoTowers(true, true);
     try {
       catalogRules.frontDoorPerTower = true;
       const modern = fakeEngine(state);
@@ -402,6 +420,40 @@ describe("the scene sync walks the structure tiles only when what they draw from
       expect(String(classic.cell(7, 1)?.gfx[0])).toMatch(/^ground 0:/);
       expect(String(classic.cell(12, 1)?.gfx[0])).toMatch(/^ground 0:/);
       expect(classic.cell(15, 1)?.gfx).toEqual(["service 0"]);
+    } finally {
+      catalogRules.frontDoorPerTower = false;
+    }
+  });
+
+  it("staffs each tower's entrance from its own tenants, and the whole lot's in Classic (#2384)", () => {
+    const state = twoTowers(true, false);
+    try {
+      catalogRules.frontDoorPerTower = true;
+      const modern = fakeEngine(state);
+      syncScene(modern.engine);
+      expect(modern.engine.towerStaffed).toEqual([true, false]);
+      expect(modern.cell(4, 1)?.gfx).toEqual(["grand-left 0"]);
+      expect(modern.cell(5, 1)?.gfx).toEqual(["grand-right 0"]);
+      expect(modern.cell(12, 1)?.gfx).toEqual(["empty grand-left 0"]);
+      expect(modern.cell(13, 1)?.gfx).toEqual(["empty grand-right 0"]);
+      // The service door has no staff either way.
+      expect(modern.cell(15, 1)?.gfx).toEqual(["service 0"]);
+      // A lease in the right tower staffs its door on the next sync, with no
+      // layout change, and the lights keep each tower's staffing.
+      (state.units[1] as { state: string }).state = "occupied";
+      modern.engine.d.hour = 10;
+      syncScene(modern.engine);
+      expect(modern.cell(12, 1)?.gfx).toEqual(["grand-left 0"]);
+      (state.units[0] as { state: string }).state = "empty";
+      modern.engine.litState = true;
+      syncScene(modern.engine);
+      expect(modern.cell(4, 1)?.gfx).toEqual(["empty grand-left 1"]);
+      expect(modern.cell(12, 1)?.gfx).toEqual(["grand-left 1"]);
+      catalogRules.frontDoorPerTower = false;
+      const classic = fakeEngine(twoTowers(false, true));
+      syncScene(classic.engine);
+      expect(classic.engine.towerStaffed).toEqual([true]);
+      expect(classic.cell(4, 1)?.gfx).toEqual(["grand-left 0"]);
     } finally {
       catalogRules.frontDoorPerTower = false;
     }

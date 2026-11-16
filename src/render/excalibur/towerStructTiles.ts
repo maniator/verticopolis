@@ -3,9 +3,13 @@ import type { RenderSim } from "../renderSim";
 import type { UnitView } from "../../simport/view";
 import { lobbyVariant } from "../sprites";
 import type { TowerEngine } from "./TowerEngine";
+import type { EntranceKind } from "../sprites/structure/lobby";
+
+/** The slices of a grand entrance, which carry its staff. */
+type GrandKind = Exclude<EntranceKind, "service">;
 import { hallDoors } from "../lobbyHalls";
 import { relightHallDoors, syncHallDoors } from "./towerHallDoors";
-import { stampGroundEntrances } from "../groundEntrances";
+import { stampGroundEntrances, towerOfSpan } from "../groundEntrances";
 import { towerCatalog } from "../../catalog/towerCatalog";
 
 /**
@@ -24,6 +28,9 @@ export interface StructPass {
   lit: boolean;
   rooms: readonly UnitView[];
   lobbies: readonly LobbyCell[];
+  /** The lobby cells that show a grand entrance, whose doorman and attendant
+   *  come and go with their tower's tenants ({@link repaintEntrances}). */
+  entrances: readonly LobbyCell[];
 }
 
 /** A lobby cell: the tile, its lobby unit, which story of the lobby it shows
@@ -32,7 +39,7 @@ export type LobbyCell = readonly [ex.Tile, UnitView, number, number];
 
 /** A record that matches no sim, so the next sync walks every unit. */
 export function emptyStructPass(): StructPass {
-  return { sim: null, units: null, revision: -1, lit: false, rooms: [], lobbies: [] };
+  return { sim: null, units: null, revision: -1, lit: false, rooms: [], lobbies: [], entrances: [] };
 }
 
 /** Bring the floor and lobby cells of the structure TileMap up to date and
@@ -110,16 +117,21 @@ export function syncStructureTiles(engine: TowerEngine): readonly UnitView[] {
   // lobby cells are painted after it, so a newly placed leftmost tile takes
   // the grand entrance graphic on the same sync it is added.
   groundLobby.sort((a, b) => a - b);
-  stampGroundEntrances(engine.floor1EntranceMap, groundLobby, buildings);
+  stampGroundEntrances(engine.floor1EntranceMap, groundLobby, buildings, engine.groundTowers);
+  const entrances: LobbyCell[] = [];
   syncHallDoors(engine, hallDoors(tall, (floor, x) => hallFloors.get(floor)?.has(x) ?? false));
-  for (const [cell, u, story, height] of lobbies) paintCell(cell, lobbyTileGfx(engine, u, story, height));
+  for (const lc of lobbies) {
+    const [cell, u, story, height] = lc;
+    paintCell(cell, lobbyTileGfx(engine, u, story, height));
+    if (u.floor === 1 && isGrand(floor1EntranceKind(engine, u.x))) entrances.push(lc);
+  }
   for (const cell of engine.structTiles) {
     if (seenS.has(cell)) continue;
     cell.clearGraphics();
     engine.structTiles.delete(cell);
   }
   // Written only once every cell is painted, so a pass that throws walks again.
-  engine.structPass = { sim: engine.sim, units, revision: tower.revision, lit: engine.litState, rooms, lobbies };
+  engine.structPass = { sim: engine.sim, units, revision: tower.revision, lit: engine.litState, rooms, lobbies, entrances };
   return rooms;
 }
 
@@ -145,24 +157,46 @@ function lobbyTileGfx(engine: TowerEngine, u: UnitView, story = 0, height = 1): 
     // entrance's storefront (and its doorman) stands on the bottom story,
     // with the hall's wall carried up over it in place of its own cornice.
     const kind = u.floor === 1 ? floor1EntranceKind(engine, u.x) : "none";
-    return engine.tallLobbyGfx(lit === 1, u.floor === 1, height, story, kind === "none" ? lobbyVariant(u.x) : kind);
+    const slot = kind === "none" ? lobbyVariant(u.x) : kind;
+    return engine.tallLobbyGfx(lit === 1, u.floor === 1, height, story, slot, entranceStaffed(engine, u.x));
   }
   if (u.floor === 1) {
     const kind = floor1EntranceKind(engine, u.x);
-    if (kind !== "none") return entranceGfx(engine, kind, lit);
+    if (kind === "service") return engine.entranceServiceGfx[lit];
+    if (kind !== "none") return entranceStaffed(engine, u.x) ? grandGfx(engine, kind, lit) : engine.entranceEmptyGfx[kind][lit];
     return engine.lobbyGfx[lit][1][lobbyVariant(u.x)];
   }
   return engine.lobbyGfx[lit][0][lobbyVariant(u.x)];
 }
 
-/** The one-story entrance graphic of `kind` for this lighting. */
-function entranceGfx(engine: TowerEngine, kind: "grand-left" | "grand-right" | "grand-solo" | "service", lit: number): ex.Canvas {
+/** The staffed one-story grand entrance graphic of `kind` for this lighting. */
+function grandGfx(engine: TowerEngine, kind: GrandKind, lit: number): ex.Canvas {
   switch (kind) {
     case "grand-left": return engine.entranceGrandLeftGfx[lit];
     case "grand-right": return engine.entranceGrandRightGfx[lit];
     case "grand-solo": return engine.entranceGrandSoloGfx[lit];
-    case "service": return engine.entranceServiceGfx[lit];
   }
+}
+
+/** Whether `kind` is a slice of a grand entrance, which carries the doorman
+ *  or the reception attendant. */
+function isGrand(kind: EntranceKind | "none"): kind is GrandKind {
+  return kind === "grand-left" || kind === "grand-right" || kind === "grand-solo";
+}
+
+/** Whether the tower whose ground floor holds column `x` has anyone in it
+ *  right now, so its entrance shows its staff (#552, per tower since #2384).
+ *  Unknown until the scene sync's room walk answers it, which repaints the
+ *  entrances in the same sync ({@link repaintEntrances}). */
+function entranceStaffed(engine: TowerEngine, x: number): boolean {
+  return engine.towerStaffed[towerOfSpan(engine.groundTowers, x, 1)] === true;
+}
+
+/** Repaint the grand entrance cells for each tower's current staffing
+ *  (`engine.towerStaffed`). The scene sync calls it after its room walk; a
+ *  cell already showing the right graphic is left alone. A handful of cells. */
+export function repaintEntrances(engine: TowerEngine): void {
+  for (const [cell, u, story, height] of engine.structPass.entrances) paintCell(cell, lobbyTileGfx(engine, u, story, height));
 }
 
 /** Which entrance (if any) the floor-1 lobby tile at grid `x` should render
