@@ -47,13 +47,14 @@ fn search(
     cab: Option<&BTreeSet<i64>>,
 ) -> Option<i64> {
     let words = stops.len().div_ceil(WORD);
-    let (mut calls, mut claimed) = (vec![0; words], vec![0; words]);
+    let (mut calls, mut claimed) = (vec![0; words], demand::Claims::default());
+    claimed.reset(words);
     for (k, f) in flags.iter().enumerate() {
         if f & CALL != 0 {
             set_bit(&mut calls, k);
         }
         if f & CLAIMED != 0 {
-            set_bit(&mut claimed, k);
+            claimed.claim(k, None);
         }
     }
     let mut cab_stops = Vec::new();
@@ -65,6 +66,7 @@ fn search(
         calls: &calls,
         claimed: &claimed,
         cab,
+        ways: &Default::default(),
     };
     demand.next_stop(pos, dir).map(|k| stops[k])
 }
@@ -151,4 +153,34 @@ fn the_stop_search_crosses_empty_words() {
             }
         }
     }
+}
+
+/// A stop claimed by a car leaving up still answers a car sweeping down, so
+/// the callers there bound down are not left to the car that will not take
+/// them; a stop claimed both ways answers neither.
+#[test]
+fn a_stop_claimed_one_way_still_answers_a_car_sweeping_the_other() {
+    let stops = [10, 20, 30];
+    let mut claimed = demand::Claims::default();
+    claimed.reset(1);
+    let mut calls = vec![0];
+    set_bit(&mut calls, 1);
+    claimed.claim(1, Some(1));
+    let demand = Demand {
+        stops: &stops,
+        calls: &calls,
+        claimed: &claimed,
+        cab: None,
+        ways: &Default::default(),
+    };
+    assert_eq!(demand.next_stop(25.0, -1), Some(1));
+    assert_eq!(demand.next_stop(15.0, 1), None);
+    let mut both = demand::Claims::default();
+    both.reset(1);
+    both.claim(1, None);
+    let demand = Demand {
+        claimed: &both,
+        ..demand
+    };
+    assert_eq!(demand.next_stop(25.0, -1), None);
 }

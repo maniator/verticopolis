@@ -31,20 +31,68 @@ pub(super) fn fill_cab_stops<'a>(
     bits
 }
 
+/// The stops a car heads for or stands at, by the way it leaves them, as
+/// bit sets over the stops of the shaft in hand. A car claims a stop both
+/// ways unless someone waits there whom it will not take: then it claims
+/// only its own way, and a car sweeping the other way still stops for them.
+#[derive(Default)]
+pub(super) struct Claims {
+    up: Vec<u64>,
+    down: Vec<u64>,
+}
+
+impl Claims {
+    /// Clears the sets for a shaft of `words` words of stops.
+    pub(super) fn reset(&mut self, words: usize) {
+        for bits in [&mut self.up, &mut self.down] {
+            bits.clear();
+            bits.resize(words, 0);
+        }
+    }
+
+    /// Claims stop `k` for a car leaving `way` (1 up, -1 down), or both ways
+    /// with `None`.
+    pub(super) fn claim(&mut self, k: usize, way: Option<i64>) {
+        if way.is_none_or(|w| w > 0) {
+            set_bit(&mut self.up, k);
+        }
+        if way.is_none_or(|w| w < 0) {
+            set_bit(&mut self.down, k);
+        }
+    }
+
+    /// The stops claimed for a car sweeping `dir` (1 up, -1 down).
+    pub(super) fn of(&self, dir: i64) -> &[u64] {
+        if dir > 0 {
+            &self.up
+        } else {
+            &self.down
+        }
+    }
+
+    /// Whether any car has claimed stop `k`, either way.
+    pub(super) fn any(&self, k: usize) -> bool {
+        has_bit(&self.up, k) || has_bit(&self.down, k)
+    }
+}
+
 /// What one car asks of its shaft: the stops in ascending order, the
-/// `calls` and `claimed` bit sets over them, and the car's own cab stops.
+/// `calls` bit set and the claims over them, the car's own cab stops, and
+/// the called stops whose callers are all bound one way.
 pub(super) struct Demand<'a> {
     pub(super) stops: &'a [i64],
     pub(super) calls: &'a [u64],
-    pub(super) claimed: &'a [u64],
+    pub(super) claimed: &'a Claims,
     pub(super) cab: Option<&'a [u64]>,
+    pub(super) ways: &'a super::leaving::Ways,
 }
 
 impl Demand<'_> {
-    /// The stops that answer in word `w`: a live call no car has claimed,
-    /// or one of this car's cab stops (never blocked by a claim).
-    fn word(&self, w: usize) -> u64 {
-        (self.calls[w] & !self.claimed[w]) | self.cab.map_or(0, |c| c[w])
+    /// The stops that answer a car sweeping `dir` in word `w`: a live call
+    /// no car has claimed that way, or one of this car's cab stops (never
+    /// blocked by a claim).
+    fn word(&self, w: usize, dir: i64) -> u64 {
+        (self.calls[w] & !self.claimed.of(dir)[w]) | self.cab.map_or(0, |c| c[w])
     }
 
     /// Whether stop `k` is one of this car's cab stops.
@@ -52,31 +100,31 @@ impl Demand<'_> {
         self.cab.is_some_and(|c| has_bit(c, k))
     }
 
-    /// The lowest answering stop at or above index `from`.
+    /// The lowest stop at or above index `from` that answers a car going up.
     fn first_from(&self, from: usize) -> Option<usize> {
         let mut w = from / WORD;
         if w >= self.calls.len() {
             return None;
         }
-        let mut bits = self.word(w) & (u64::MAX << (from % WORD));
+        let mut bits = self.word(w, 1) & (u64::MAX << (from % WORD));
         while bits == 0 {
             w += 1;
             if w >= self.calls.len() {
                 return None;
             }
-            bits = self.word(w);
+            bits = self.word(w, 1);
         }
         Some(w * WORD + bits.trailing_zeros() as usize)
     }
 
-    /// The highest answering stop below index `end`.
+    /// The highest stop below index `end` that answers a car going down.
     fn last_below(&self, end: usize) -> Option<usize> {
         let last = end.checked_sub(1)?;
         let mut w = last / WORD;
-        let mut bits = self.word(w) & (u64::MAX >> (WORD - 1 - last % WORD));
+        let mut bits = self.word(w, -1) & (u64::MAX >> (WORD - 1 - last % WORD));
         while bits == 0 {
             w = w.checked_sub(1)?;
-            bits = self.word(w);
+            bits = self.word(w, -1);
         }
         Some(w * WORD + (WORD - 1) - bits.leading_zeros() as usize)
     }

@@ -9,7 +9,7 @@
 use crate::clock::GameMode;
 use crate::crowd::fasthash::FastMap;
 use crate::crowd::ElevatorCalls;
-use crate::dispatch::ElevatorDispatch;
+use crate::dispatch::{ElevatorDispatch, Leaving};
 use crate::schedule::Schedule;
 
 use super::classic_elevator_dispatch::{schedule, shaft_tower, HOUR, TOP, WEEKDAY};
@@ -33,7 +33,9 @@ fn who_answers(mode: GameMode, full: bool) -> (Option<usize>, bool) {
     for _ in 0..2 {
         d.move_cars(&mut tower, 0.5, &calls, HOUR, WEEKDAY);
     }
-    calls.hall.insert(id, FastMap::from_iter([(10, 1.0)]));
+    calls
+        .hall
+        .insert(id, FastMap::from_iter([(10, 1.0.into())]));
     let (mut first, mut car_0_stopped) = (None, false);
     for _ in 0..60 {
         let before = tower.transports[0].car_positions.clone();
@@ -80,7 +82,7 @@ fn a_modern_car_is_full_from_the_rider_who_fills_it_until_one_steps_off() {
         crowd.people[i].state = PState::Waiting;
         // One seat left in car 0, standing open at the lobby.
         crowd.car_riders.insert((id, 0), capacity - 1);
-        crowd.open_cars = vec![(id, 0, 1)];
+        crowd.open_cars = vec![(id, 0, 1, Leaving::Either)];
         advance(&mut crowd, 0.5, &mut tower);
         assert_eq!(crowd.people[i].state, PState::Riding, "{mode:?}");
         let calls = crowd.elevator_calls(&tower);
@@ -88,7 +90,7 @@ fn a_modern_car_is_full_from_the_rider_who_fills_it_until_one_steps_off() {
         assert!(!calls.full.contains(&(id, 1)));
         // The car reaches the rider's floor and they step off.
         tower.transports[0].car_positions[0] = TOP as f64;
-        crowd.open_cars = vec![(id, 0, TOP)];
+        crowd.open_cars = vec![(id, 0, TOP, Leaving::Either)];
         advance(&mut crowd, 0.5, &mut tower);
         assert_ne!(crowd.people.get(i).map(|p| p.state), Some(PState::Riding));
         assert!(

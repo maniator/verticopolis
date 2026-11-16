@@ -5,7 +5,7 @@ use super::expected_time;
 use super::fasthash::{FastMap, FastSet};
 use super::seg_set::SegSet;
 use super::street::street_start;
-use super::{AdjGraph, Crowd, Edge, ElevatorCalls, PState, Route, StaffParts};
+use super::{AdjGraph, Crowd, Edge, ElevatorCalls, HallCall, PState, Route, StaffParts};
 use crate::facilities::{LOT_WIDTH, MIN_FLOOR};
 use crate::tower::{Tower, Transport};
 use crate::tower_query::{floor_of_seg, NO_SEGMENT};
@@ -406,21 +406,28 @@ pub fn bfs_route_walk_budget(adj: &AdjGraph, from: i64, to: i64) -> Option<Route
     None
 }
 
-/// `elevatorCalls`.
+/// `elevatorCalls`, with the way each hall caller is bound.
 pub fn elevator_calls(crowd: &Crowd, tower: &Tower) -> ElevatorCalls {
     let mut calls = ElevatorCalls::default();
-    let mut bump = |shaft: i64, floor: i64| {
-        *calls
+    let mut bump = |shaft: i64, floor: i64, to: Option<i64>| {
+        let call = calls
             .hall
             .get_or_insert_with(shaft, Default::default)
-            .get_or_insert_with(floor, || 0.0) += 1.0;
+            .get_or_insert_with(floor, HallCall::default);
+        call.callers += 1.0;
+        match to {
+            Some(to) if to > floor => call.up += 1,
+            Some(to) if to < floor => call.down += 1,
+            _ => {}
+        }
     };
     for p in &crowd.people {
         let Some(sid) = p.shaft_id else { continue };
+        let to = p.floors.get(p.leg + 1).copied();
         if p.state == PState::Waiting {
-            bump(sid, p.floor);
+            bump(sid, p.floor, to);
         } else if p.state == PState::Riding && p.car_index.is_some() {
-            let Some(&dest) = p.floors.get(p.leg + 1) else {
+            let Some(dest) = to else {
                 continue;
             };
             calls
@@ -431,7 +438,7 @@ pub fn elevator_calls(crowd: &Crowd, tower: &Tower) -> ElevatorCalls {
         } else if p.staff && p.state == PState::ToShaft {
             if let Some(shaft) = tower.get_transport(sid) {
                 if shaft.kind.is_staff_only_transport() {
-                    bump(sid, p.floor);
+                    bump(sid, p.floor, to);
                 }
             }
         }

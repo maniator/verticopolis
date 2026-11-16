@@ -169,14 +169,20 @@ fn step(crowd: &mut Crowd, i: usize, dt: f64, tower: &mut Tower, landings: &mut 
                 .slot(i)
                 .unwrap_or(shaft.x as f64 + shaft.width as f64 / 2.0);
             walk_to(&mut crowd.people[i], target, dt, tower);
-            let floor = crowd.people[i].floor;
+            let (floor, to) = (
+                crowd.people[i].floor,
+                crowd.people[i].floors.get(crowd.people[i].leg + 1).copied(),
+            );
             let mut boarded = None;
             for ci in 0..shaft.cars as usize {
                 // Only a car standing here with its doors open takes riders,
-                // never one passing the floor. A car not on the floor is
-                // ruled out before the open list is searched.
+                // never one passing the floor, and only one leaving their way.
+                // A car not on the floor is ruled out before the open list is
+                // searched.
                 if shaft.car_positions[ci] != floor as f64
-                    || !crowd.door_open(shaft.id, ci as i64, floor)
+                    || !crowd
+                        .door_open(shaft.id, ci as i64, floor)
+                        .is_some_and(|way| to.is_none_or(|to| way.takes(floor, to)))
                 {
                     continue;
                 }
@@ -194,6 +200,9 @@ fn step(crowd: &mut Crowd, i: usize, dt: f64, tower: &mut Tower, landings: &mut 
                 crowd.car_riders.insert(key, n + 1);
                 if n + 1 == shaft.kind.car_capacity() as i64 {
                     mark_full(crowd, tower, key);
+                }
+                if let Some(to) = to {
+                    crate::dispatch::first_aboard(&mut crowd.open_cars, key.0, key.1, floor, to);
                 }
                 boarded = Some((shaft.id, ci as i64, shaft.kind.is_elevator()));
                 break;
@@ -233,7 +242,7 @@ fn step(crowd: &mut Crowd, i: usize, dt: f64, tower: &mut Tower, landings: &mut 
             let pos = shaft.car_positions[ci as usize];
             // A rider steps off only once the car has stopped at their floor
             // with its doors open, never from a car passing it.
-            let arrived = pos == dest as f64 && crowd.door_open(shaft.id, ci, dest);
+            let arrived = pos == dest as f64 && crowd.door_open(shaft.id, ci, dest).is_some();
             let p = &mut crowd.people[i];
             p.fy = pos;
             p.x = shaft.x as f64 + shaft.width as f64 / 2.0;

@@ -127,7 +127,7 @@ fn random_calls(tower: &Tower, rng: &mut Lcg) -> ElevatorCalls {
             for _ in 0..rng.next(6) {
                 // Floors off the span and fractions below one are in range.
                 let floor = t.bottom - 2 + rng.next((t.top - t.bottom + 5) as u64) as i64;
-                hall.insert(floor, rng.next(5) as f64 * 0.5);
+                hall.insert(floor, (rng.next(5) as f64 * 0.5).into());
             }
         }
         if rng.next(3) > 0 {
@@ -197,7 +197,7 @@ fn raised_by_the_estimate_alone(
         }
         let hall = calls.hall.get(&t.id);
         for fl in tower.stops_of(t) {
-            let hall_at = hall.and_then(|h| h.get(&fl)).copied().unwrap_or(0.0);
+            let hall_at = hall.and_then(|h| h.get(&fl)).map_or(0.0, |c| c.callers);
             if hall_at < 1.0 && d.waiting_at(fl) >= 1.0 {
                 n += 1;
             }
@@ -316,7 +316,7 @@ fn dispatch_matches_the_hashed_reference_step_for_step() {
             if step % 40 < 20 {
                 let hall = calls.hall.get_or_insert_with(tall_id, Default::default);
                 for floor in (66..=80).step_by(7) {
-                    hall.insert(floor, 2.0);
+                    hall.insert(floor, 2.0.into());
                 }
             }
             let (hour, weekend) = (rng.next(24) as i64, rng.next(5) == 0);

@@ -61,7 +61,9 @@ fn the_car_sent_to_floor_14(mode: GameMode) -> Vec<usize> {
     let t = &tower.transports[0];
     assert!(t.car_positions.iter().zip(homes).all(|(&p, h)| near(p, h)));
     let mut calls = ElevatorCalls::default();
-    calls.hall.insert(id, [(14, 1.0)].into_iter().collect());
+    calls
+        .hall
+        .insert(id, [(14, 1.0.into())].into_iter().collect());
     for _ in 0..2 {
         d.move_cars(&mut tower, 1.0, &calls, HOUR, WEEKDAY);
     }

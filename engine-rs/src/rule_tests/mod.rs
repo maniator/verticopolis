@@ -28,6 +28,7 @@ mod diagnostics_towers;
 mod diner_head_count;
 mod dominant_gripe;
 mod economy_depth;
+mod elevator_direction;
 mod elevator_dispatch_balancing;
 mod elevator_doors;
 mod elevator_schedule;

@@ -32,7 +32,7 @@ fn shaft(cars: &[CarView], response: Option<f64>) -> BestCars {
 /// The car `BestCars` gives the call at `floor`.
 fn owner_of(cars: &[CarView], floor: i64, response: Option<f64>) -> usize {
     let k = STOPS.binary_search(&floor).unwrap();
-    shaft(cars, response).owner(k, floor)
+    shaft(cars, response).owner(k, floor, None)
 }
 
 #[test]
@@ -152,21 +152,41 @@ fn a_car_already_coming_within_the_response_wins_outright() {
 }
 
 #[test]
+fn a_car_that_will_pass_callers_bound_the_other_way_yields_the_call() {
+    // Car 0 climbs from 3 with a rider for 15; car 1 is parked at 10. A
+    // caller at 6 bound down would wait for car 0 to come back from 15.
+    let cab = BTreeSet::from([15]);
+    let climbing = CarView::of(3.0, 1, 0.0, Some(&cab), 0.8, CAR_FLOORS_PER_MINUTE);
+    let best = shaft(&[climbing, parked(10.0)], None);
+    let k6 = 5;
+    assert_eq!(best.owner(k6, 6, Some(-1)), 1, "bound down");
+    // Bound up, or bound either way, car 0 picks them up on its way.
+    for bound in [Some(1), None] {
+        let best = shaft(&[climbing, parked(10.0)], None);
+        assert_eq!(best.owner(k6, 6, bound), 0, "{bound:?}");
+    }
+    // With no rider beyond 6, car 0 turns there, so it still takes them.
+    let turning = moving(3.0, 1);
+    let best = shaft(&[turning, parked(10.0)], None);
+    assert_eq!(best.owner(k6, 6, Some(-1)), 0);
+}
+
+#[test]
 fn a_stop_keeps_the_owner_it_was_first_given() {
     let mut best = shaft(&[parked(1.0), parked(20.0)], None);
     let (k3, k18) = (2, 17);
-    assert_eq!(best.owner(k3, 3), 0);
-    assert_eq!(best.owner(k18, 18), 1);
+    assert_eq!(best.owner(k3, 3, None), 0);
+    assert_eq!(best.owner(k18, 18, None), 1);
     // A car added after the answer does not change it.
     best.push(parked(3.0), false);
-    assert_eq!(best.owner(k3, 3), 0);
+    assert_eq!(best.owner(k3, 3, None), 0);
     // A new step starts every stop over.
     best.start(STOPS.len(), None, SPAN);
     best.push(parked(20.0), false);
-    assert_eq!(best.owner(k3, 3), 0);
+    assert_eq!(best.owner(k3, 3, None), 0);
     // Nobody on shift: the calls stay unowned.
     best.start(STOPS.len(), None, SPAN);
-    assert_eq!(best.owner(k3, 3), NO_CAR);
+    assert_eq!(best.owner(k3, 3, None), NO_CAR);
 }
 
 /// How far the express and the standard car climb in one 2.5-minute chunk
@@ -200,7 +220,7 @@ fn climbs(mode: GameMode) -> (f64, f64) {
         calls
             .hall
             .get_or_insert_with(id, Default::default)
-            .insert(top, 1.0);
+            .insert(top, 1.0.into());
     }
     tower.reindex();
     ElevatorDispatch::new().move_cars(&mut tower, 2.5, &calls, 10, false);

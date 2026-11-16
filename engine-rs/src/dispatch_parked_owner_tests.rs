@@ -5,7 +5,7 @@
 
 use crate::clock::GameMode;
 use crate::crowd::ElevatorCalls;
-use crate::dispatch::ElevatorDispatch;
+use crate::dispatch::{ElevatorDispatch, Leaving};
 use crate::facilities::Kind;
 use crate::schedule::Schedule;
 use crate::tower::Tower;
@@ -93,7 +93,7 @@ fn a_modern_car_parked_at_its_spread_stop_boards_the_estimate_there() {
     assert_eq!(t.rides, rides + 1);
     assert_eq!(t.car_load.as_ref().unwrap()[1], RIDERS);
     assert!(d.car_dwell[&id][1] > 0.0);
-    assert!(d.open_cars().contains(&(id, 1, 11)));
+    assert!(d.open_cars().contains(&(id, 1, 11, Leaving::Either)));
     assert_eq!(d.drain_boardings()[&id][&11], RIDERS);
     // The lobby car stayed home.
     assert_eq!(at(&tower, 0), 1.0);
@@ -141,7 +141,7 @@ fn the_modern_lobby_car_boards_the_lobby_estimate() {
     let (mut tower, id, mut d) = parked_shaft(GameMode::Modern, 2, None, None);
     assert_eq!(estimate_left_after(&mut d, &mut tower, 1, 1), 0.0);
     assert_eq!(tower.transports[0].car_load.as_ref().unwrap()[0], RIDERS);
-    assert!(d.open_cars().contains(&(id, 0, 1)));
+    assert!(d.open_cars().contains(&(id, 0, 1, Leaving::Either)));
     // The car spread to floor 11 is not sent down for it.
     assert_eq!(at(&tower, 1), 11.0);
 }
@@ -182,12 +182,14 @@ fn a_crowd_call_alone_leaves_the_parked_car_open_without_a_dwell() {
     let (mut tower, id, mut d) = parked_shaft(GameMode::Modern, 2, None, None);
     let rides = tower.transports[0].rides;
     let mut calls = ElevatorCalls::default();
-    calls.hall.insert(id, [(11, 1.0)].into_iter().collect());
+    calls
+        .hall
+        .insert(id, [(11, 1.0.into())].into_iter().collect());
     step(&mut d, &mut tower, &calls);
     let t = &tower.transports[0];
     assert_eq!((t.car_dir[1], t.rides), (0, rides));
     assert_eq!(d.car_dwell[&id][1], 0.0);
-    assert!(d.open_cars().contains(&(id, 1, 11)));
+    assert!(d.open_cars().contains(&(id, 1, 11, Leaving::Either)));
     assert_eq!(at(&tower, 0), 1.0);
 }
 
