@@ -165,19 +165,31 @@ const liveDeps: BackToGameDeps = { installed: isInstalledStandalone, stillOpen: 
  * button loads the game here instead (its tower was saved when the page went
  * away, so the title screen offers Continue). When the game does answer, it
  * is in another window and this one closes as in a browser tab.
+ *
+ * When the game lives on another host than this page (the manual at
+ * help.verticopolis.com), this window is never the app's own: the app opens
+ * an address outside its scope in a browser view over itself, and the
+ * presence check cannot reach a game on another origin. Loading the game here
+ * would start a second copy inside that view, so the page closes it instead,
+ * which brings back the app with its game.
  */
 export function backToOpenGame(e: MouseEvent, win: Window = window, deps: BackToGameDeps = liveDeps): void {
   e.preventDefault();
-  if (!deps.installed()) {
+  const link = e.currentTarget as HTMLAnchorElement | null;
+  const gameHref = link?.href || "/";
+  if (!deps.installed() || gameOnAnotherHost(gameHref, win)) {
     closeOrSay(win);
     return;
   }
-  const link = e.currentTarget as HTMLAnchorElement | null;
-  const gameHref = link?.href || "/";
   void deps.stillOpen().then((open) => {
     if (open) closeOrSay(win);
     else win.location.replace(gameHref);
   });
+}
+
+/** True when `gameHref` points at another origin than this page. */
+function gameOnAnotherHost(gameHref: string, win: Window): boolean {
+  return new URL(gameHref, win.location.href).origin !== win.location.origin;
 }
 
 /** Close this tab, or say why it stayed open. */
