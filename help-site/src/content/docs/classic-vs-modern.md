@@ -23,7 +23,8 @@ Every tower runs one of two sets of rules. You choose when you found the tower, 
 | Tenant moods | Noise or too few shops hold a rating down but never empty a room | Problems bite in proportion: a noisy neighbor can wear a tenant down to notice, and so can too few shops nearby. Nearby venues can lift a home. ([Tenant ratings](/help/tower/ratings/)) |
 | Parking | Any spare space serves every office | Counted per office and per home, halved by a Metro ([Services](/help/rooms/services/#parking)) |
 | Metro stations | One per tower | Up to three on one line ([Services](/help/rooms/services/#more-than-one-station)) |
-| Climbing | Nobody walks more than 4 flights of stairs or 7 of escalator | People climb as far as they must ([Stairs and escalators](/help/building/stairs-and-escalators/)) |
+| Climbing | Nobody walks more than 4 flights of stairs or 7 of escalator | No limit on flights: people take a floor or two of stairs to skip a long line, and happily ride a long run of escalators ([Stairs and escalators](/help/building/stairs-and-escalators/)) |
+| Stair and escalator speed | Quicker than an elevator car | Slower than any elevator car, but an escalator has no wait |
 | Towers side by side | Joined only through the building, as in 1994 | People walk the street between ground lobbies ([People and traffic](/help/tower/people/#how-people-get-around)) |
 | Escalators | Never to an office floor | Anywhere |
 | Express stops | The ground floor, every 15th floor and every basement, each one switchable; placed reaching the ground floor or a 15th floor | Lobbies, every basement and both ends, placed anywhere ([Elevators](/help/building/elevators/#express-elevators-and-sky-lobbies)) |
