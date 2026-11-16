@@ -216,7 +216,7 @@ impl Engine {
             .map_or((f64::NAN, f64::NAN), |(c, l)| (c as f64, l as f64));
         let mut r = vec![
             sim.rating_population() as f64,
-            flag(sim.star < 4),
+            flag(crate::star::hotel_guests_count_at(sim.star)),
             spots,
             parking.office_pop,
             parking.offices,

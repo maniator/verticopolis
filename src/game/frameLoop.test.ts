@@ -6,6 +6,7 @@ import { gameplaySession } from "../analytics";
 import * as analyticsActions from "../analyticsActions";
 import { makeApp, makeSim } from "./frameLoop.fixture";
 import { TOAST_SHOWN_MS } from "../ui/uiStatus";
+import { maybeShowStarUp, noteStarUp } from "./starUpFlow";
 
 /**
  * These pin the per-frame simulation + throttled UI/audio refresh (`runFrame`)
@@ -26,6 +27,7 @@ import { TOAST_SHOWN_MS } from "../ui/uiStatus";
 vi.mock("./trafficHud", () => ({ updateTraffic: vi.fn() }));
 vi.mock("./panelAnchoring", () => ({ positionPanels: vi.fn() }));
 vi.mock("./updateFlow", () => ({ maybeSurfaceUpdatePrompt: vi.fn() }));
+vi.mock("./starUpFlow", () => ({ noteStarUp: vi.fn(), maybeShowStarUp: vi.fn() }));
 vi.mock("./mealRush", () => ({ decideMealRush: vi.fn(() => ({ fire: false, dayOfKind: 0 })) }));
 
 afterEach(() => {
@@ -262,6 +264,21 @@ describe("runFrame star-promotion jingle", () => {
     runFrame(app, 16);
     expect(raw.audio.sfx).toHaveBeenCalledWith("promote");
     expect(raw.lastStar).toBe(3);
+  });
+
+  it("notes the climb for the star-up box, from the rating it held, and asks it to open", () => {
+    vi.mocked(noteStarUp).mockClear();
+    vi.mocked(maybeShowStarUp).mockClear();
+    const sim = makeSim({ star: 3 });
+    const { app } = makeApp({ speed: 0, sim, lastStar: 2 });
+    runFrame(app, 16);
+    expect(noteStarUp).toHaveBeenCalledExactlyOnceWith(app, 2, 3);
+    expect(maybeShowStarUp).toHaveBeenCalledWith(app, false);
+    // A frame with no climb notes nothing.
+    vi.mocked(noteStarUp).mockClear();
+    (app as unknown as { lastUiUpdate: number }).lastUiUpdate = -1e9;
+    runFrame(app, 16);
+    expect(noteStarUp).not.toHaveBeenCalled();
   });
 
   it("does NOT play the star jingle at star 6 (the TOWER win owns that)", () => {

@@ -78,7 +78,9 @@ export function isDialogOpen(): boolean {
  *  `#modal.open`; the reverse does not, which is why this is a separate
  *  question from {@link isDialogOpen}. */
 export function hasBlockingModal(app: GameApp): boolean {
-  return app.shownChoice || app.shownUpdate;
+  // The star-up box blocks only while a dialog is up, so a box that closed
+  // some way its handlers missed can never leave time stopped.
+  return app.shownChoice || app.shownUpdate || (app.shownStar === true && isDialogOpen());
 }
 
 /**

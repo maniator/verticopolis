@@ -398,17 +398,18 @@ export function buildScheduleTowerClassic(): void {
 
 /** Build deterministically to a target star rating and return the star the
  *  sim's OWN evaluateStar() awards, so the milestone is honest, not forced.
- *
  *  The ladder's real gates (facilities.ts / Simulation.evaluateStar):
  *    2★ ≥ 300 pop · 3★ ≥ 1,000 + Security · 4★ ≥ 5,000 (non-hotel) + Medical +
  *    recycling demand met + ≥2 Hotel Suites + a favorable VIP · 5★ ≥ 10,000 +
  *    Metro. Offices (population 6) are the population workhorse; we build enough to clear each
  *    threshold with margin, add exactly the amenities that tier needs, leave star at 1, then let
- *    evaluateStar() raise it. place() has no minStar gate, so a 1★ tower can host a 5★ Metro. */
-export function pgGrowToStar(target: number): number {
+ *    evaluateStar() raise it. place() has no minStar gate, so a 1★ tower can host a 5★ Metro.
+ *    A bare rating grows a Classic tower; the star-up scenes pass `{ target, mode }`. */
+export function pgGrowToStar(arg: number | { target: number; mode: "classic" | "modern" }): number {
+  const { target, mode } = typeof arg === "number" ? { target: arg, mode: "classic" } : arg;
   const g = (window as unknown as { game: any }).game;
   const Sim = g.sim.constructor;
-  g.sim = Sim.newGame(2024 + target);
+  g.sim = Sim.newGame(2024 + target, mode);
   const s = g.sim;
   s.money = 1e12;
   s.star = 1; // build UP from 1★; evaluateStar only ever raises
@@ -458,7 +459,7 @@ export function pgGrowToStar(target: number): number {
     // a game build gives them: unpriced, the settle's load snaps them and says so over the star line.
     for (let i = 0; i < 2; i++) {
       const r = s.tower.place("hotelSuite", amenityFloor, left + 48 + i * 12);
-      if (r.ok) Object.assign(s.tower.getUnit(r.unitId), { state: "asleep", rent: g.getCatalog().facilities.find((f: any) => f.key === "hotelSuite").rent.rungs[2].value });
+      if (r.ok) Object.assign(s.tower.getUnit(r.unitId), { state: "asleep", rent: ((r: any) => (r.rungs ? r.rungs[2].value : r.default))(g.getCatalog().facilities.find((f: any) => f.key === "hotelSuite").rent) });
     }
     s.vipFavorable = true; // stands in for a favorable VIP review
     // A basement stack, laid top-down so each deck rests on the one above:

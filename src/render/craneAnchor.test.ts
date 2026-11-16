@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { craneAnchorTile } from "./sprites";
+import { CRANE_REACH_LEFT_TILES, CRANE_REACH_RIGHT_TILES, craneAnchorTile, craneMastTile, craneRoof } from "./sprites";
 import { facadeGeometry } from "./facadeGeometry";
 import { lobbyHalls } from "./lobbyHalls";
 import { catalogFor } from "../tests/catalogFixture";
@@ -160,3 +160,43 @@ function tiles(floor: number, lo: number, hi: number, kind: FacilityKind = "floo
   if (width > 1) return [{ floor, x: lo, width, kind } as unknown as Unit];
   return range(lo, hi).map((x) => ({ floor, x, width: 1, kind } as unknown as Unit));
 }
+
+/**
+ * The mast stands over the roof's center unless an arm would reach past the
+ * lot's edge (#334): then it moves along the roof, and the pad never leaves
+ * the roof. The counter-jib's end and the jib's tip lie at `span` below.
+ */
+describe("craneMastTile", () => {
+  const LOT = 375;
+  const span = (mast: number) => ({ left: mast - CRANE_REACH_LEFT_TILES, right: mast + CRANE_REACH_RIGHT_TILES });
+
+  it("keeps the roof's center away from the edges", () => {
+    const roof = craneRoof(range(100, 160));
+    expect(craneMastTile(roof, LOT)).toBe(roof.center);
+  });
+
+  it("moves the mast left on a narrow top flush to the right edge, so the jib stays on the lot", () => {
+    const roof = craneRoof(range(LOT - 30, LOT - 1));
+    const mast = craneMastTile(roof, LOT);
+    expect(mast).toBeLessThan(roof.center);
+    expect(span(mast).right).toBeLessThanOrEqual(LOT);
+    expect(span(mast).left).toBeGreaterThanOrEqual(0);
+    expect(mast).toBeGreaterThanOrEqual(LOT - 30);
+  });
+
+  it("moves the mast right on a narrow top flush to the left edge, so the counter-jib stays on the lot", () => {
+    const roof = craneRoof(range(0, 11));
+    const mast = craneMastTile(roof, LOT);
+    expect(mast).toBeGreaterThan(roof.center);
+    expect(span(mast).left).toBeGreaterThanOrEqual(0);
+    expect(mast).toBeLessThanOrEqual(12);
+  });
+
+  it("keeps the pad on a roof too narrow to pull the whole jib in, and lets the arm overhang", () => {
+    const roof = craneRoof(range(LOT - 5, LOT - 1));
+    const mast = craneMastTile(roof, LOT);
+    expect(mast).toBeGreaterThan(LOT - 5);
+    expect(mast).toBeLessThan(LOT);
+    expect(span(mast).right).toBeGreaterThan(LOT);
+  });
+});

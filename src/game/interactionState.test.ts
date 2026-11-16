@@ -11,10 +11,11 @@ import {
 import { CRASH_SCREEN_ID } from "../ui/crashScreen";
 
 /** Minimal chrome-state stub. Only the fields the module reads exist. */
-function makeApp(over: Partial<{ shownChoice: boolean; shownUpdate: boolean; editorBusy: boolean }> = {}): GameApp {
+function makeApp(over: Partial<{ shownChoice: boolean; shownUpdate: boolean; shownStar: boolean; editorBusy: boolean }> = {}): GameApp {
   return {
     shownChoice: over.shownChoice ?? false,
     shownUpdate: over.shownUpdate ?? false,
+    shownStar: over.shownStar ?? false,
     ui: { isEditorBusy: () => over.editorBusy ?? false },
   } as unknown as GameApp;
 }
@@ -60,6 +61,16 @@ describe("interactionState reads", () => {
     expect(hasBlockingModal(makeApp())).toBe(false);
     expect(hasBlockingModal(makeApp({ shownChoice: true }))).toBe(true);
     expect(hasBlockingModal(makeApp({ shownUpdate: true }))).toBe(true);
+  });
+
+  it("the star-up box stops time only while a dialog is actually open", () => {
+    // Its handlers clear the flag; one that missed a close path cannot
+    // leave time stopped once the dialog has gone.
+    mount("modal", "dialog");
+    expect(hasBlockingModal(makeApp({ shownStar: true }))).toBe(false);
+    (document.getElementById("modal") as HTMLDialogElement).open = true;
+    expect(hasBlockingModal(makeApp({ shownStar: true }))).toBe(true);
+    expect(hasBlockingModal(makeApp())).toBe(false);
   });
 
   it("isEditorBusy reads the predicate and never throws out", () => {

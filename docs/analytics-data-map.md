@@ -143,6 +143,18 @@ back on. Each carries the new state only.
 | `found_bridged` | `on` or `off` | A Modern tower is founded from the New Tower window: whether its box was ticked. A Classic founding sends nothing, since Classic always bridges |
 | `auto_bridge` | `on` or `off` | The Settings switch was flipped in a Modern tower, with the state the engine answered |
 
+## The star-up message box
+
+`app_action` with `action` `star_notice` reports that the star-up message box
+opened. It opens at most once per climb and never for the TOWER. Two climbs
+before it can open make one box, for the higher rating, and a box still waiting
+when the tower is swapped, loaded or undone is dropped, so `star_notice` can run
+below `star_reached` for a rating without players having missed it.
+
+| `action` | `detail` | When |
+| --- | --- | --- |
+| `star_notice` | the mode and the rating, `classic-2` to `classic-5` or `modern-2` to `modern-5` | The box opened on a calm frame after the tower earned the rating. The TOWER has its own congratulations and sends nothing here |
+
 ## My Towers (Open, Save As, Load)
 
 Version 4.3 replaced Saved Towers… and its three numbered slots with My Towers,

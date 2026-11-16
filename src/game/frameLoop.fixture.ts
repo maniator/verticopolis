@@ -120,6 +120,8 @@ export function makeApp(over: Record<string, unknown> = {}) {
     // Far in the past so the ~6Hz throttle block always runs.
     lastUiUpdate: -1e9,
     lastStar: 1,
+    pendingStarUp: null,
+    shownStar: false,
     shownWin: false,
     winHeldUntil: -Infinity,
     lastMealRushDay: { breakfast: -1, lunch: -1, dinner: -1 } as Record<string, number>,

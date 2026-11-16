@@ -10,6 +10,19 @@ pub const STAR_THRESHOLDS: [i64; 6] = [0, 0, 300, 1000, 5000, 10000];
 pub const TOWER_POPULATION: i64 = 15000;
 /// The Windows Help file asks for more than one Security Office at 3 stars.
 pub const SECURITY_OFFICES_FOR_THREE_STARS: i64 = 2;
+/// The rating from which fires can break out and thieves can strike.
+pub const EMERGENCIES_FROM_STAR: i64 = 2;
+/// The rating from which a VIP may come to stay in a hotel suite.
+pub const VIP_VISITS_FROM_STAR: i64 = 3;
+/// The rating from which hotel guests stop counting toward the rating.
+pub const HOTEL_GUESTS_UNCOUNTED_FROM_STAR: i64 = 4;
+/// The rating from which a caller can threaten the tower with a bomb.
+pub const BOMB_THREATS_FROM_STAR: i64 = 4;
+
+/// Whether hotel guests still count toward the rating of a tower at `star`.
+pub fn hotel_guests_count_at(star: i64) -> bool {
+    star < HOTEL_GUESTS_UNCOUNTED_FROM_STAR
+}
 
 /// `isTenantFloorUnit`.
 pub fn is_tenant_floor_unit(u: &Unit) -> bool {
@@ -42,7 +55,7 @@ impl Simulation {
 
     /// `ratingPopulation`.
     pub fn rating_population(&self) -> i64 {
-        if self.star < 4 {
+        if hotel_guests_count_at(self.star) {
             self.tower.total_population()
         } else {
             self.occupant_population()

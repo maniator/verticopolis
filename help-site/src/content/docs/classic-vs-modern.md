@@ -35,6 +35,7 @@ Every tower runs one of two sets of rules. You choose when you found the tower, 
 | Bulldozing lobbies | Lobbies stay for good | Any lobby tile sells; the lot keeps its last ground lobby tile ([Bulldoze and undo](/help/building/bulldoze-and-undo/)) |
 | Tall lobbies | Only the ground lobby can rise 2 or 3 stories | Sky lobbies can rise too ([Floors and lobbies](/help/building/floors-and-lobbies/#tall-lobbies)) |
 | Build hints | A refused spot says why when you click | Hovering a refused spot says why first |
+| A new star | A message box names the rating and the rooms it opens | It also warns what the rating starts asking for, such as parking, and lists what the next rating needs ([Stars](/help/tower/stars/#when-you-earn-a-star)) |
 | Bulldozing | Some rooms are for keeps, and floors come out from the ends | Everything can be sold, from anywhere ([Bulldoze and undo](/help/building/bulldoze-and-undo/)) |
 | The top floor | Reserved for the Wedding Hall | Yours to use ([Wedding Hall](/help/rooms/wedding-hall/)) |
 | Films | Pay for a New or a Classic film whenever you like | Two screens, three kinds of film, ticket prices ([Venues](/help/rooms/venues/#cinema)) |

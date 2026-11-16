@@ -60,6 +60,8 @@ pub fn catalog(mode: GameMode) -> Catalog {
             express_stops_on_15th_floors: mode.express_stops_on_15th_floors(),
             fed_up_wait: crate::crowd::STRESS_WAIT,
             max_lobby_height: crate::facilities::MAX_LOBBY_HEIGHT,
+            announces_star_duties: mode.announces_star_duties(),
+            star_duties: crate::star_duties::star_duties(mode),
         },
         pools: keyed_pools(mode)
             .map(|(key, p)| PoolEntry {

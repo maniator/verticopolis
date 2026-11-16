@@ -22,6 +22,8 @@ async function fullModernPalette(page: Page): Promise<void> {
     g.sim = g.sim.constructor.newGame(4400, "modern");
     g.sim.money = 500_000_000;
     g.sim.star = 5;
+    // Known to the app, as a loaded tower's rating is, so no star-up box opens.
+    g.lastStar = 5;
   });
   // Unlocked, though a phone shows one category at a time, so it may be off screen.
   await expect(page.locator('#palette .pal-item[data-kind="weddingHall"]:not(.locked)')).toBeAttached();
