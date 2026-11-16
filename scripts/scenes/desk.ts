@@ -1,7 +1,9 @@
 /**
  * The 1994 desk (src/ui/desk/, owner 2026-11-15) and the sunrise startup
  * screen, written into docs/screenshots/features/ for the Help site and the
- * PR review. Every other scene turns the desk off; these keep it on (`desk`).
+ * PR review, plus the README's day and night pair (`desk-hero`), written into
+ * docs/screenshots/. Every other scene turns the desk off; these keep it on
+ * (`desk`).
  * The shots in a scene share one page, so each setup starts from the last
  * one's state and leaves the next a known one. Part of the SCENES manifest
  * (screenshot-scenes.ts). Keep ERASABLE.
@@ -58,6 +60,23 @@ async function startupAt(at: number): Promise<void> {
   set(".boot-stars", { opacity: String(1 - 0.45 * ease) });
   set(".boot-sun", { transform: `translate(-50%, calc(-50% + ${(34 * (1 - ease)).toFixed(2)}vh))` });
   set(".boot-bar i", { transform: `scaleX(${(0.04 + 0.66 * Math.min(1, at * 1.2)).toFixed(3)})` });
+}
+
+/**
+ * Frame the README's pair: close the Bulletin (the canon tower is built in its
+ * first game minute, so it still holds the founding "Lay a lobby" line), hide
+ * the pan and zoom hint, focus the tower window and park the pointer (owner,
+ * 2026-11-16).
+ */
+async function heroFrame(page: Page): Promise<void> {
+  if (await page.locator("#bulletin-win").isVisible()) await press(page, '[data-close="bulletin-win"]');
+  // Closing a window hands focus to the Map; give it back to the tower.
+  await press(page, "#desk-win-tower > .win-title");
+  await page.evaluate(() => {
+    const hint = document.getElementById("hint");
+    if (hint) hint.style.visibility = "hidden";
+  });
+  await park(page);
 }
 
 const startupShots = (suffix: string): Shot[] =>
@@ -121,6 +140,20 @@ export const DESK_SCENES: Scene[] = [
           await park(page);
         },
       },
+    ],
+  },
+  {
+    // The README's day and night pair: the canon tower on the desk a computer
+    // opens to, at the same size and hours as 03-tower-day and 04-tower-night.
+    // Its own scene so the desk shots above keep their clock and state.
+    id: "desk-hero",
+    outDir: "screenshots",
+    desk: true,
+    build: buildCanonTower,
+    assertUnits: 200,
+    shots: [
+      { name: "03b-desk-day", clock: 11, wait: 1200, setup: heroFrame },
+      { name: "04b-desk-night", clock: 22, setup: heroFrame },
     ],
   },
   {

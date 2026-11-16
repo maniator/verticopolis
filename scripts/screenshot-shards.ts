@@ -107,9 +107,10 @@ export const SHARDS: Record<string, string[]> = {
   // phone, about 10s; its own shard as the owner asked.
   "linked-folder": ["linked-folder", "linked-folder-unsupported", "linked-folder-mobile"],
   // The 1994 desk and the sunrise startup screen (owner, 2026-11-15: their own
-  // shard, every design and option): one canon tower on the desk, the title
-  // window, and the startup screen on a computer and a phone.
-  desk: ["desk", "desk-title", "startup-sunrise", "startup-sunrise-phone"],
+  // shard, every design and option): one canon tower on the desk, the
+  // README's day and night pair on a second one, the title window, and the
+  // startup screen on a computer and a phone.
+  desk: ["desk", "desk-hero", "desk-title", "startup-sunrise", "startup-sunrise-phone"],
   // The star-up message box (r/SimTower feedback, 2026-11-16): every rating's
   // box in both modes and one on a phone, each over a small frozen tower.
   "star-up": ["star-up", "star-up-mobile"],
