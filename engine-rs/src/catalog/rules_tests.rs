@@ -90,6 +90,11 @@ fn each_mode_states_its_rules() {
     assert!(!classic.venue_flights && modern.venue_flights);
     assert_eq!(c["rules"]["venueFlights"], Value::Bool(false));
     assert_eq!(v["rules"]["venueFlights"], Value::Bool(true));
+    // Only Modern lays ground lobbies apart, so only Modern has a front door
+    // for each tower on the lot.
+    assert!(!classic.front_door_per_tower && modern.front_door_per_tower);
+    assert_eq!(c["rules"]["frontDoorPerTower"], Value::Bool(false));
+    assert_eq!(v["rules"]["frontDoorPerTower"], Value::Bool(true));
     // A Classic express keeps the 1994 game's stops (#1527).
     assert!(classic.express_stops_on_15th_floors && !modern.express_stops_on_15th_floors);
     assert_eq!(c["rules"]["expressStopsOn15thFloors"], Value::Bool(true));
