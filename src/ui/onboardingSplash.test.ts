@@ -302,3 +302,47 @@ describe("Getting Started card across the phone tier", () => {
   });
 
 });
+
+/**
+ * A click on the overlay itself (its backdrop) continues on a phone, but on
+ * the 1994 desk the overlay is the title window, so a click on its face or
+ * poster must not close it (#2355). Esc still continues on both.
+ */
+describe("splash backdrop click on the desk (#2355)", () => {
+  function mountWithContinue() {
+    const { ctl } = makeController();
+    const onContinue = vi.fn();
+    ctl.showSplash({
+      hasSave: true,
+      onContinue,
+      onLoadTower: vi.fn(),
+      onNewTower: vi.fn(),
+      muted: () => false,
+    });
+    return { el: document.getElementById("splash")!, onContinue };
+  }
+
+  afterEach(() => document.body.classList.remove("desk-title"));
+
+  it("continues on a backdrop click off the desk", () => {
+    const { el, onContinue } = mountWithContinue();
+    el.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(onContinue).toHaveBeenCalledTimes(1);
+  });
+
+  it("ignores a click on the title window's face on the desk", () => {
+    document.body.classList.add("desk-title");
+    const { el, onContinue } = mountWithContinue();
+    el.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(onContinue).not.toHaveBeenCalled();
+    expect(document.getElementById("splash")).not.toBeNull();
+  });
+
+  it("still continues on Esc on the desk", () => {
+    document.body.classList.add("desk-title");
+    const { onContinue } = mountWithContinue();
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+    expect(onContinue).toHaveBeenCalledTimes(1);
+    expect(document.getElementById("splash")).toBeNull();
+  });
+});
