@@ -21,7 +21,7 @@ drawn in code.
 
 | Day | Night |
 | --- | --- |
-| ![A tower by day](docs/screenshots/03-tower-day.png) | ![The same tower at night](docs/screenshots/04-tower-night.png) |
+| ![A tower by day on the 1994 desk](docs/screenshots/03b-desk-day.png) | ![The same tower at night](docs/screenshots/04b-desk-night.png) |
 
 ## What's in it
 
