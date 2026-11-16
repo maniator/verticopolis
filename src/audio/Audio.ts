@@ -13,6 +13,7 @@ interface AudioEngineImpl {
   readonly started: boolean;
   start(): void;
   setMuted(m: boolean): void;
+  setAway(away: boolean): void;
   setVolumes(music: number, ambience: number, sfx: number): void;
   setProgram(program: ProgramKind): void;
   update(focus: ViewFocus): void;
@@ -50,6 +51,9 @@ export class AudioEngine {
   ambienceVolume = 1;
   sfxVolume = 1;
   private musicDucked = false;
+  /** The player left the page (`watchAway`). Kept apart from `muted`, the
+   *  player's own setting, which coming back restores untouched. */
+  private away = false;
   /** Which composed track should play. Stored here (start screen vs. tower) so
    *  a pre-load switch lands on the engine the moment it builds. */
   program: ProgramKind = "game";
@@ -108,6 +112,9 @@ export class AudioEngine {
         impl.setMuted(this.muted);
         impl.setVolumes(this.heardMusic(), this.ambienceVolume, this.sfxVolume);
         impl.setProgram(this.program);
+        // Before start(), so a player who left during the load hears nothing:
+        // the master builds silent and the context goes to sleep.
+        impl.setAway(this.away);
         impl.start();
         this.started = impl.started;
         if (this.lastFocus) impl.update(this.lastFocus);
@@ -127,6 +134,14 @@ export class AudioEngine {
   setMuted(m: boolean): void {
     this.muted = m;
     this.impl?.setMuted(m);
+  }
+
+  /** The player left the page or came back: all sound fades out and the
+   *  audio clock stops while away, then resumes at the player's own mute and
+   *  volume settings. Stored here and forwarded to the engine when it loads. */
+  setAway(away: boolean): void {
+    this.away = away;
+    this.impl?.setAway(away);
   }
 
   /** Choose the composed track: `"splash"` on the start screen, `"game"` in

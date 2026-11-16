@@ -4,6 +4,7 @@ import type { TransportView, UnitView } from "./simport/view";
 import { TowerEngine, type Picked } from "./render/excalibur/TowerEngine";
 import { endArrowDrag } from "./render/excalibur/pressLifecycle";
 import { AudioEngine } from "./audio/Audio";
+import { watchAway } from "./audio/awayWatch";
 import { SaveGame } from "./storage/SaveGame";
 import { loadPrefs, type Prefs } from "./storage/Prefs";
 import { type TrafficTier } from "./presentation/traffic";
@@ -255,6 +256,8 @@ class GameApp implements GameAppPorts {
       this.prefs.ambienceVolume ?? this.prefs.musicVolume ?? 1,
       this.prefs.sfxVolume ?? 1,
     );
+    // Silence the game while the player is in another tab or app.
+    watchAway({ win: window, doc: document }, (away) => this.audio.setAway(away));
 
     // Controller modules, built BEFORE the UI because the UI constructor's
     // initial selectTool fires onSelectTool synchronously (which resets the

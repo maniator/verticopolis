@@ -15,16 +15,20 @@ import {
 import { createSfxVoices, playSfx, type SfxVoices } from "./toneVoices";
 import { createPercussion, type PercVoices } from "./tonePercussion";
 import { createRain, type RainVoices } from "./toneRain";
-import { usePlaybackContext } from "./toneContext";
+import { ContextSleep, usePlaybackContext } from "./toneContext";
 import { programFor, type Program, type ProgramKind, type TrackVoice } from "./toneTracks";
 import { CrowdLayer } from "./toneCrowd";
-import { LightMonoSynth, LightPolySynth } from "./lightSynth";
+import type { LightMonoSynth, LightPolySynth } from "./lightSynth";
+import { createMusicVoices } from "./toneMusicVoices";
+import { createRoomTone } from "./toneRoomTone";
 import { FirstCueLatch } from "./firstCueLatch";
 
 /** Audio context states with a stopped clock, where a cue cannot sound:
  *  autoplay not yet allowed or the tab backgrounded ("suspended"), Safari's
  *  phone-call pause ("interrupted"), and a torn-down context ("closed"). */
 const SILENT_CONTEXT_STATES: ReadonlySet<string> = new Set(["suspended", "interrupted", "closed"]);
+/** How long the master fade into an away sleep plays before the clock stops. */
+const SLEEP_AFTER_FADE_MS = 150;
 
 type NoteVoice = { triggerAttackRelease: (f: number, d: number, t: number, v: number) => unknown };
 
@@ -107,6 +111,11 @@ export class ToneAudioEngine {
   /** Which composed track plays. The app switches this at the splash boundary. */
   private program: ProgramKind = "game";
   muted = false;
+  /** The player left the page (`watchAway`): silent, and asleep once faded. */
+  private away = false;
+  private readonly sleep = new ContextSleep();
+  /** The latest focus `update` saw, so leaving can stop the crowd at once. */
+  private focus: ViewFocus | null = null;
   /** Player-set levels 0..1, kept even while the graph isn't built so start()
    *  can apply them; independent of `muted` (the master kill switch). */
   musicVolume = 1;
@@ -136,7 +145,7 @@ export class ToneAudioEngine {
       this.firstCue.begin();
       Tone.start().then(() => this.sfxIfAny(this.firstCue.release()), () => this.firstCue.release());
 
-      this.master = new Tone.Gain(this.muted ? 0 : 0.35).toDestination();
+      this.master = new Tone.Gain(this.silent ? 0 : 0.35).toDestination();
 
       // Player volume buses: music, ambience (voices, room tone, rain), and
       // effects, each independently mixable. They sit ahead of the shared
@@ -164,29 +173,8 @@ export class ToneAudioEngine {
       this.musicTone = new Tone.Filter({ type: "lowpass", frequency: 2400, Q: 0.7 }).connect(this.musicSub);
       this.musicGain = new Tone.Gain(this.musicLevel).connect(this.musicTone);
 
-      // Rolling sine arpeggio (the bed's main texture): a soft pluck.
-      this.arp = new LightPolySynth({
-        oscillator: { type: "sine" },
-        envelope: { attack: 0.03, decay: 0.5, sustain: 0.05, release: 0.8 },
-      }).connect(this.musicGain);
-      this.arp.volume.value = -9;
-      this.arp.maxPolyphony = 12; // a runaway arpeggio would stack tails
-
-      // Soft triangle bass root under each bar.
-      this.bassVoice = new LightMonoSynth({
-        oscillator: { type: "triangle" },
-        envelope: { attack: 0.05, decay: 0.3, sustain: 0.6, release: 0.6 },
-      }).connect(this.musicGain);
-      this.bassVoice.volume.value = -8;
-
-      // The melody voice: the owner's hummed tune (splash hook and, since the
-      // Two Chapters bed, the in-game lead as well).
-      this.hook = new LightPolySynth({
-        oscillator: { type: "triangle" },
-        envelope: { attack: 0.025, decay: 0.3, sustain: 0.2, release: 0.3 },
-      }).connect(this.musicGain);
-      this.hook.volume.value = -6;
-      this.hook.maxPolyphony = 12;
+      // The melody voices (recipes in toneMusicVoices).
+      ({ arp: this.arp, bass: this.bassVoice, hook: this.hook } = createMusicVoices(this.musicGain));
 
       this.perc = createPercussion(this.musicBus, this.musicLevel);
 
@@ -196,27 +184,9 @@ export class ToneAudioEngine {
       const base = (import.meta as { env?: { BASE_URL?: string } }).env?.BASE_URL ?? "./";
       this.crowd = new CrowdLayer(this.bedFilter, base);
 
-      // Ambient room-tone bed: pink noise seated LOW behind a steep filter, so
-      // it reads as a soft room rush and never bright mid hiss. This applies the
-      // audition's no-static rule (steep rolloff -48, warm cutoff, low level)
-      // to the bed as well. The steepness and the subsonic-clearing highpass
-      // are FIXED here; applyScene re-points the lowpass cutoff and level per
-      // scene from SCENES[].amb (all lowpass now, seated warm), and never
-      // touches the rolloff, so every scene's bed stays steep. The source also
-      // sits a touch quieter than the old bed.
-      this.ambGain = new Tone.Gain(0).connect(this.bedFilter);
-      // Truly subsonic (35 Hz): it clears speaker-flapping rumble without
-      // touching the deep beds of the low-cutoff scenes (metro lowpass 90,
-      // cinema 110), whose rush must survive.
-      this.ambTone = new Tone.Filter({ type: "highpass", frequency: 35, rolloff: -12 }).connect(
-        this.ambGain,
-      );
-      this.ambFilter = new Tone.Filter({ type: "lowpass", frequency: 600, rolloff: -48 }).connect(
-        this.ambTone,
-      );
-      this.ambNoise = new Tone.Noise("pink").connect(this.ambFilter);
-      this.ambNoise.volume.value = -20;
-      this.ambNoise.start();
+      // Ambient room-tone bed (recipe in toneRoomTone).
+      ({ ambGain: this.ambGain, ambTone: this.ambTone, ambFilter: this.ambFilter, ambNoise: this.ambNoise } =
+        createRoomTone(this.bedFilter));
 
       // Outdoor rain layer (dry, off the distance filter; see toneRain).
       this.rain = createRain(this.ambDryBus);
@@ -231,6 +201,7 @@ export class ToneAudioEngine {
       this.buildMusicPart();
 
       this.started = true;
+      if (this.away) this.sleep.sleepAfter(SLEEP_AFTER_FADE_MS); // left during the load
       this.applyScene(this.scene, 0.01);
       this.applyDetail(this.detail, 0.01);
     } catch {
@@ -240,10 +211,30 @@ export class ToneAudioEngine {
 
   setMuted(m: boolean): void {
     this.muted = m;
-    if (this.master) this.master.gain.rampTo(m ? 0 : 0.35, 0.1);
-    // resume() is async and can reject (e.g. called outside a gesture); catch so
-    // unmuting never trips a global unhandled-rejection handler.
-    if (!m) Tone.getContext().resume().catch(() => {});
+    this.applySilence();
+  }
+
+  /** The player left the page or came back. A page in the background or out
+   *  of focus gets a starved, throttled main thread, so notes arrived late and
+   *  the mix crackled; away, everything fades out and the context sleeps. */
+  setAway(away: boolean): void {
+    if (away === this.away) return;
+    this.away = away;
+    // Hidden, the frame loop stops: stop the crowd's own timers now.
+    if (away && this.focus) this.crowd?.update(this.targetScene, this.focus, this.detail, true);
+    this.applySilence();
+  }
+
+  private get silent(): boolean {
+    return this.muted || this.away;
+  }
+
+  /** Fade the master to match; sleep while away, wake once heard again. */
+  private applySilence(): void {
+    if (this.master) this.master.gain.rampTo(this.silent ? 0 : 0.35, 0.1);
+    if (this.away && this.started) this.sleep.sleepAfter(SLEEP_AFTER_FADE_MS);
+    else if (this.silent) this.sleep.cancel();
+    else this.sleep.wake();
   }
 
   /** Player volume levels, 0..1 each (clamped, ramped). Safe before start().
@@ -291,13 +282,14 @@ export class ToneAudioEngine {
    *  focus-driven, so it is untouched here. */
   update(focus: ViewFocus): void {
     if (!this.started) return;
+    this.focus = focus;
     // Any Tone error here is swallowed and retried next frame, so an audio
     // hiccup never escapes into the game loop or leaves the graph half-updated.
     try {
       // A backgrounded/power-saving tab can suspend the context; nudge it back
       // on each update so sound returns instead of staying dead.
       const ctx = Tone.getContext();
-      if (!this.muted && ctx.state === "suspended") void ctx.resume().catch(() => {});
+      if (!this.silent && ctx.state === "suspended") void ctx.resume().catch(() => {});
 
       // Zoom detail: opens the distance filter and fades ambient detail in/out.
       const detail = detailFor(focus.zoom);
@@ -319,7 +311,7 @@ export class ToneAudioEngine {
 
       // The crowd/venue ambience follows the resolved scene, the live focus
       // (occupancy, clock), and zoom every update.
-      this.crowd?.update(s, focus, this.detail, this.muted);
+      this.crowd?.update(s, focus, this.detail, this.silent);
 
       // Outdoor rain only when the sky is visible (overview or the street), so
       // it reads as a real weather tell, not a smear behind indoor scenes.
@@ -346,7 +338,7 @@ export class ToneAudioEngine {
       const prog: Program = programFor(this.program);
       const part = new Tone.Part((time, ev) => {
         try {
-          if (this.muted) return; // a stray Tone error must not stop the Transport
+          if (this.silent) return; // a stray Tone error must not stop the Transport
           this.noteVoice(ev.voice)?.triggerAttackRelease(midiToFreq(ev.midi), ev.dur, time, ev.vel);
         } catch {
           /* skip this note */
@@ -416,7 +408,7 @@ export class ToneAudioEngine {
   // ---- One-shot action jingles ------------------------------------------
 
   sfx(name: SfxName): void {
-    if (!this.started || !this.sfxVoices || this.muted) return;
+    if (!this.started || !this.sfxVoices || this.silent) return;
     // Cues run inside input handlers and the frame loop, so a Tone error here
     // must never escape: a missed jingle beats a dead game.
     try {
@@ -439,6 +431,7 @@ export class ToneAudioEngine {
     // global Transport so no scheduled part keeps ticking after teardown.
     this.crowd?.dispose();
     this.crowd = null;
+    this.sleep.cancel();
     try {
       Tone.getTransport().stop();
     } catch {
