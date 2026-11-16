@@ -1,14 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("../../analyticsActions", () => ({ trackAppAction: vi.fn() }));
+vi.mock("../../analyticsActions", () => ({ trackAppAction: vi.fn(), trackAppActionOnce: vi.fn() }));
 
-import { trackAppAction } from "../../analyticsActions";
+import { trackAppAction, trackAppActionOnce } from "../../analyticsActions";
 import { DESK_TITLE_CLASS, DeskTitle } from "./deskTitle";
 
 beforeEach(() => {
   document.body.innerHTML = `<div id="splash"><button class="splash-btn">Open</button><button class="splash-btn primary">New</button></div><button id="btn-about">About</button><button id="mb-close" hidden>Close</button>`;
   document.body.className = "";
   vi.mocked(trackAppAction).mockClear();
+  vi.mocked(trackAppActionOnce).mockClear();
 });
 
 describe("DeskTitle", () => {
@@ -71,5 +72,20 @@ describe("DeskTitle", () => {
     expect(document.body.classList.contains(DESK_TITLE_CLASS)).toBe(false);
     expect(document.querySelector(".desk-title-bar")).toBeNull();
     expect(document.querySelector(".desk-taskbar-title")).toBeNull();
+  });
+});
+
+describe("DeskTitle analytics", () => {
+  it("counts the title window showing once, its taskbar button, the Verticopolis menu opening and the tray's sound", () => {
+    const title = new DeskTitle(document);
+    title.show();
+    expect(trackAppActionOnce).toHaveBeenCalledWith("desk_title_shown");
+    document.querySelector<HTMLElement>(".desk-task")!.click();
+    expect(trackAppAction).toHaveBeenCalledWith("desk_task", "title_front");
+    document.querySelector<HTMLElement>(".desk-start")!.click();
+    expect(trackAppAction).toHaveBeenCalledWith("desk_start_open", "title");
+    document.querySelector<HTMLElement>(".desk-tray-sound")!.click();
+    expect(trackAppAction).toHaveBeenCalledWith("desk_tray", "sound");
+    title.hide();
   });
 });

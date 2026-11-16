@@ -1,4 +1,5 @@
-import { trackAppAction } from "../../analyticsActions";
+import { trackAppAction, trackAppActionOnce } from "../../analyticsActions";
+import { DESK_TITLE_WINDOW, trackDeskStartOpen, trackDeskTask, trackDeskTray } from "./deskAnalytics";
 import { DeskTaskbar } from "./deskTaskbar";
 
 /**
@@ -46,18 +47,24 @@ export class DeskTitle {
 
     const taskbar = new DeskTaskbar(doc, {
       // The title screen's window is the only one, and it stays up.
-      task: () => doc.querySelector<HTMLElement>("#splash .splash-btn.primary")?.focus(),
+      task: () => {
+        trackDeskTask(DESK_TITLE_WINDOW, "front");
+        doc.querySelector<HTMLElement>("#splash .splash-btn.primary")?.focus();
+      },
       start: (itemId) => {
         trackAppAction("desk_start", itemId);
         doc.getElementById(itemId)?.click();
       },
+      opened: () => trackDeskStartOpen("title"),
+      tray: trackDeskTray,
     });
     taskbar.root.classList.add("desk-taskbar-title");
     doc.body.appendChild(taskbar.root);
     taskbar.start();
-    taskbar.render([{ id: "title", label: "Verticopolis", active: true, minimized: false }]);
+    taskbar.render([{ id: DESK_TITLE_WINDOW, label: "Verticopolis", active: true, minimized: false }]);
     taskbar.syncSound();
     this.taskbar = taskbar;
+    trackAppActionOnce("desk_title_shown");
   }
 
   hide(): void {

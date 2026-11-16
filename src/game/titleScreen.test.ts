@@ -7,6 +7,8 @@ vi.mock("../analyticsRelay", () => ({ sendToRelay: vi.fn() }));
 vi.mock("virtual:pwa-register", () => ({ registerSW: () => () => {} }));
 const files = vi.hoisted(() => ({ showOpenDialog: vi.fn() }));
 vi.mock("./fileSpaceCommands", () => files);
+vi.mock("../analyticsActions", () => ({ trackAppAction: vi.fn() }));
+import { trackAppAction } from "../analyticsActions";
 
 /** The app File > Close and the title screen talk to, as spies. */
 function makeApp(save: () => void = () => {}): GameApp {
@@ -87,6 +89,8 @@ describe("File > Close", () => {
     splashOpts(app).onContinue();
     expect(app.setSpeed).toHaveBeenCalledWith(0);
     expect(app.ui.toast).toHaveBeenLastCalledWith("Welcome back. Press Play to resume.", "info");
+    // Continue counts however it was chosen: its button, Esc or a click outside.
+    expect(trackAppAction).toHaveBeenCalledWith("title_pick", "continue");
   });
 });
 

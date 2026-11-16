@@ -27,11 +27,59 @@ The desktop needs a window at least 1024 by 600 and a mouse or trackpad as your 
 - **Right-click** a window's title bar or its taskbar button for its window menu: **Restore**, **Minimize**, **Maximize** (the tower only) and **Close**, each grayed when it doesn't apply. Info and Tools never close. <kbd>Shift</kbd>+<kbd>F10</kbd> opens it from a taskbar button too.
 - **Resize the tower** by dragging the ridged corner at its bottom right. A dotted outline follows the pointer, and the tower takes the new size when you let go.
 
+### The title bar buttons
+
+Each window's title bar has the buttons that make sense for it, at its right end.
+
+| Button | Does | On |
+| --- | --- | --- |
+| **_** Minimize | Puts the window away on the taskbar. Its taskbar button brings it back | Every window |
+| **□** Maximize | Gives the tower the whole desktop; press it again (or double-click the title bar) to put it back | The tower |
+| **✕** Close | Closes the window. On the tower it's **File > Close**: your tower is saved and you go back to the opening screen, where **Continue** brings it back | The tower, the Map, the Bulletin, Tower Info and the Control Panel |
+
+Info and Tools have no ✕, so the tools and the clock can never get lost.
+
 The game remembers where you put every window, their sizes, and whether the tower was maximized, even after you close it. Make the browser window smaller and any window that would hang off the edge moves back onto the desktop.
 
 ![The tower maximized, with Tools and Info over it below the menus](../../../../docs/screenshots/features/desk-maximized.png)
 
 ![The tower made smaller and the Bulletin moved, with the Map and Bulletin brought back from the taskbar](../../../../docs/screenshots/features/desk-moved-resized.png)
+
+## What each window holds
+
+### The tower
+
+The tower's window holds the game itself. Across its top is the menu bar (**File**, **Edit**, **Tower**, **Window**, **Options** and **Help**; see [the menu bar](/help/tower/map-and-windows/#the-menu-bar) for every item). The floor numbers run down its left edge, and a hint along its foot says what the mouse does with the tool you've picked. At the bottom is the status bar: the tool you've picked and what it costs on the left, the tower's name and its rules (Classic or Modern) in the middle, and the newest Bulletin message on the right. Hide the status bar with **Window > Status Bar**. The window's title reads the tower's name, as in "Tower One - Verticopolis".
+
+### Info
+
+Info is the strip across the top of the desktop, like the one along the top of the 1994 game.
+
+| Part | Shows or does |
+| --- | --- |
+| **Rating** | Your tower's stars, up to the TOWER. See [Stars and the TOWER](/help/tower/stars/) |
+| **Date** | The day, the quarter and the year. On the 1994 calendar it reads the way the original did: **1st WD/1Q/1st Year** is the first weekday of the first quarter of the first year. See [The clock](/help/tower/clock/) |
+| **Time** | The day of the week and the time of day in the tower (**WD1 11:10**) |
+| **Fund** | The money you have to build with. See [Money](/help/tower/money/) |
+| **Pop** | Everyone who lives, works or stays in the tower |
+| **Traffic** | How crowded the busiest floor is: Smooth, Busy, Backed up or Gridlock, with a four-bar meter. Above Smooth it names the floor to look at, such as "Busy · 12F". See [People and traffic](/help/tower/people/) |
+| **❚❚** Pause | Stops the clock (<kbd>0</kbd>). You can still look around |
+| **▶**, **▶▶**, **▶▶▶** | Runs the tower slow, medium or fast. The <kbd>1</kbd> to <kbd>3</kbd> keys do the same |
+| **↶** Undo, **↷** Redo | Takes back the last thing you built or bulldozed, or puts it back (**Edit > Undo**, <kbd>Ctrl</kbd>+<kbd>Z</kbd>) |
+
+When an update to the game is ready, an **Update** button joins the end of the strip; press it to see the update and load it. The first time your browser offers to install the game, an **Install** button shows there once too (**File > Install app** keeps it after that). Saving is on **File > Save** and the sound is on the taskbar's speaker, so Info leaves those buttons out on the desktop. On a narrow desktop the strip wraps onto two lines.
+
+### Tools
+
+Tools holds every tool you have unlocked, in groups (**Structure**, **Transport**, **Commercial**, **Living** and the rest), each with its price. Click a group's name (**▾ COMMERCIAL**) to fold it away, and again to bring it back. **Inspect** opens a room's card and **Bulldoze** sells a room back. Make the window taller or shorter from the ridged corner at its foot; a short window scrolls. On the desktop the window never folds into a strip: minimize it instead. See [the Tools window](/help/tower/map-and-windows/#the-tools-window), [Building](/help/building/floors-and-lobbies/) and [Controls](/help/controls/).
+
+### The Map, the Bulletin and Tower Info
+
+- **The Map** shows the whole tower in miniature, with a box around the part you're looking at. Click a spot to jump there or drag on it to slide the view, and pick a view (Edit, Eval, Pricing, Hotel, Traffic or Occupancy) from its **View** list. See [the Map](/help/tower/map-and-windows/#the-map).
+- **The Bulletin** lists the tower's messages, newest first. See [the Bulletin](/help/tower/map-and-windows/#the-bulletin).
+- **Tower Info** shows the tower's name, its rules and its counts. See [Tower Info](/help/tower/map-and-windows/#tower-info).
+
+A room's card and the game's dialogs open over the desktop as before, and move by their title bars too.
 
 ## The Window menu
 
@@ -57,7 +105,20 @@ At the right end, the tray holds:
 
 ![The Verticopolis menu open from the taskbar](../../../../docs/screenshots/features/desk-start-menu.png)
 
-The **Verticopolis** button at the left of the taskbar opens a menu with **New…**, **Open…**, the **Player's Manual**, **Screen Saver…**, **Control Panel…**, **Settings…**, **About Verticopolis…** and **Close Verticopolis** (which saves your tower and goes back to the opening screen). Use the arrow keys to move through it, and <kbd>Esc</kbd> to close it.
+The **Verticopolis** button at the left of the taskbar opens a menu of the things you'd look for in a program's own menu. Each item does exactly what its twin in the menu bar does.
+
+| Item | Does |
+| --- | --- |
+| **New…** | Starts a new tower (**File > New…**) |
+| **Open…** | Opens a tower from My Towers or a file (**File > Open…**). See [Saving your tower](/help/your-towers/saving/) |
+| **Player's Manual** | Opens this manual (**Help > Player's Manual**) |
+| **Screen Saver…** | Picks the screen saver (**Options > Screen Saver…**) |
+| **Control Panel…** | Opens the Control Panel (below) |
+| **Settings…** | Opens the game's Settings (**Options > Settings…**). See [Settings](/help/your-towers/settings/) |
+| **About Verticopolis…** | The version, and a link to the privacy page (**Help > About Verticopolis…**) |
+| **Close Verticopolis** | Saves your tower and goes back to the opening screen (**File > Close**) |
+
+Use the arrow keys to move through it, <kbd>Enter</kbd> to pick, and <kbd>Esc</kbd> to close it. On the opening screen it leaves out **Control Panel…** and **Close Verticopolis**, since there's no tower open yet.
 
 ## The Control Panel
 
@@ -71,9 +132,21 @@ The **Verticopolis** button at the left of the taskbar opens a menu with **New�
 
 ## The opening screen
 
-On a computer the opening screen sits in its own Verticopolis window on the desktop, with the dusk poster on top and its buttons below.
+On a computer the opening screen sits in its own Verticopolis window on the desktop, with the menu bar (**File**, **Options** and **Help**) across its top, the dusk poster under it, and its buttons below.
 
 ![The opening screen in a window on the desktop](../../../../docs/screenshots/features/desk-title.png)
+
+| Button | Does |
+| --- | --- |
+| **Continue** | Goes back to the tower you were playing, paused; press Play to carry on. It shows only when there's a tower to go back to. <kbd>Esc</kbd> does the same |
+| **Open Tower…** | Opens the **Open** window: My Towers, the Auto-save, or a file from your computer. See [Saving your tower](/help/your-towers/saving/) |
+| **New Tower** | Starts a new tower: name it and pick Classic or Modern. See [Your first tower](/help/first-tower/) |
+| **How to Play** | Opens this manual in a new tab |
+| **Sponsor** | Opens the page where you can help keep Verticopolis going. The game is free either way |
+| **Install** | Installs the game as an app, where your browser offers it. See [Installing](/help/your-towers/installing/) |
+| **The speaker** | Turns the sound on or off |
+
+While the opening screen is up, the taskbar has its own button for the Verticopolis window, the Verticopolis menu, and the speaker and clock in the tray.
 
 ## The startup screen
 
@@ -84,6 +157,17 @@ Every time the game loads, on a computer or a phone, it opens at night. The sun 
 ![The startup screen as the sun comes up](../../../../docs/screenshots/features/startup-sunrise.png)
 
 ![The startup screen on a phone, at dawn](../../../../docs/screenshots/features/startup-dawn-phone.png)
+
+## Keys on the desktop
+
+| Key | Does |
+| --- | --- |
+| <kbd>Shift</kbd>+<kbd>F10</kbd>, or the menu key | On a taskbar button, opens that window's window menu |
+| <kbd>↑</kbd> <kbd>↓</kbd> | Move through the Verticopolis menu or a window menu |
+| <kbd>Enter</kbd> | Picks the item you're on |
+| <kbd>Esc</kbd> | Closes the open menu |
+
+Every other key works as it does anywhere in the game; see [Controls](/help/controls/).
 
 ## Trying the desktop on a tablet
 

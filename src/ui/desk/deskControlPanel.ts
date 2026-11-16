@@ -44,14 +44,18 @@ export interface ControlPanel {
   readonly sync: () => void;
 }
 
-/** Build the Control Panel's window (closed). `picked` hears each icon. */
-export function buildControlPanel(doc: Document, picked: (icon: ControlIcon) => void): ControlPanel {
+/** Build the Control Panel's window (closed). `picked` hears each icon and
+ *  `closed` its ✕ (for the analytics). */
+export function buildControlPanel(doc: Document, picked: (icon: ControlIcon) => void, closed?: () => void): ControlPanel {
   const frame = buildFrame(doc, "desk-win-control", "Control Panel");
   const root = frame.root;
   root.classList.add("desk-control");
   root.hidden = true;
   const close = titleButton(doc, "close", "Close Control Panel");
-  close.addEventListener("click", () => (root.hidden = true));
+  close.addEventListener("click", () => {
+    root.hidden = true;
+    closed?.();
+  });
   frame.root.querySelector(".win-title")?.appendChild(close);
   let soundLabel: HTMLElement | null = null;
   const grid = doc.createElement("div");

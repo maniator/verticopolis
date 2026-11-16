@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("../../analytics", () => ({ trackAppAction: vi.fn(), trackAppActionOnce: vi.fn() }));
+vi.mock("../../analyticsActions", () => ({ trackAppAction: vi.fn(), trackAppActionOnce: vi.fn() }));
 
-import { trackAppAction, trackAppActionOnce } from "../../analytics";
+import { trackAppAction, trackAppActionOnce } from "../../analyticsActions";
 import { DESK_MINIMIZED_CLASS } from "./deskWindow";
 import { DESK_ANY_SCREEN, DESK_ANY_SCREEN_MQ, DESK_CLASS, DESK_KEY, DESK_MQ, DeskController, deskActive, wireDesk } from "./deskController";
 
@@ -362,5 +362,63 @@ describe("DeskController", () => {
     await Promise.resolve();
     expect(doc.querySelector(".desk-tray-sound")!.classList.contains("muted")).toBe(true);
     expect(icon.textContent).toBe("Sounds: Off");
+  });
+});
+
+describe("DeskController analytics", () => {
+  it("counts what each taskbar button press did: front, minimize, then bring back", () => {
+    new DeskController(doc).start();
+    const map = () => doc.querySelector<HTMLElement>('.desk-task[data-win="map"]')!;
+    map().click();
+    expect(trackAppAction).toHaveBeenLastCalledWith("desk_task", "map_front");
+    map().click();
+    expect(trackAppAction).toHaveBeenCalledWith("desk_task", "map_min");
+    expect(trackAppAction).toHaveBeenCalledWith("desk_window", "map_min");
+    map().click();
+    expect(trackAppAction).toHaveBeenCalledWith("desk_task", "map_restore");
+    expect(trackAppAction).toHaveBeenCalledWith("desk_window", "map_restore");
+  });
+
+  it("counts the Verticopolis menu opening on a tower, and each tray button", () => {
+    new DeskController(doc).start();
+    doc.querySelector<HTMLElement>(".desk-start")!.click();
+    expect(trackAppAction).toHaveBeenCalledWith("desk_start_open", "tower");
+    doc.querySelector<HTMLElement>(".desk-tray-display")!.click();
+    expect(trackAppAction).toHaveBeenCalledWith("desk_tray", "display");
+    const sound = vi.fn();
+    doc.getElementById("mb-sound")!.addEventListener("click", sound);
+    doc.querySelector<HTMLElement>(".desk-tray-sound")!.click();
+    expect(trackAppAction).toHaveBeenCalledWith("desk_tray", "sound");
+    expect(sound).toHaveBeenCalledTimes(1);
+  });
+
+  it("counts a window menu opened from the taskbar and from a title bar, and its pick", () => {
+    new DeskController(doc).start();
+    const task = doc.querySelector<HTMLElement>('.desk-task[data-win="map"]')!;
+    task.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true }));
+    expect(trackAppAction).toHaveBeenCalledWith("desk_win_menu_open", "taskbar");
+    doc.querySelector<HTMLElement>('.desk-win-menu [data-command="minimize"]')!.click();
+    expect(trackAppAction).toHaveBeenCalledWith("desk_win_menu", "map_minimize");
+    expect(trackAppAction).toHaveBeenCalledWith("desk_window", "map_min");
+    doc.querySelector("#bulletin-win .win-title")!.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true }));
+    expect(trackAppAction).toHaveBeenCalledWith("desk_win_menu_open", "title_bar");
+  });
+
+  it("counts the tower's and the Control Panel's ✕, and a window menu Close as a menu pick only", () => {
+    new DeskController(doc).start();
+    const close = vi.fn();
+    doc.getElementById("mb-close")!.addEventListener("click", close);
+    doc.querySelector<HTMLElement>("#desk-win-tower .desk-btn-close")!.click();
+    expect(trackAppAction).toHaveBeenCalledWith("desk_window", "tower_close");
+    vi.mocked(trackAppAction).mockClear();
+    doc.querySelector<HTMLElement>('.desk-task[data-win="tower"]')!.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true }));
+    doc.querySelector<HTMLElement>('.desk-win-menu [data-command="close"]')!.click();
+    expect(close).toHaveBeenCalledTimes(2);
+    expect(trackAppAction).toHaveBeenCalledWith("desk_win_menu", "tower_close");
+    expect(trackAppAction).not.toHaveBeenCalledWith("desk_window", "tower_close");
+    doc.querySelector<HTMLElement>(".desk-tray-display")!.click();
+    doc.querySelector<HTMLElement>("#desk-win-control .desk-btn-close")!.click();
+    expect(doc.getElementById("desk-win-control")!.hidden).toBe(true);
+    expect(trackAppAction).toHaveBeenCalledWith("desk_window", "control_panel_close");
   });
 });

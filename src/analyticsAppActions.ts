@@ -121,8 +121,22 @@ export type AppActionName =
   | "screensaver_start"
   | "screensaver_end"
   | "screensaver_set"
-  // The 1994 desk on a computer; names and details in docs/ui/desk-windows.md.
+  // The 1994 desk on a computer; names and details in docs/ui/desk-windows.md
+  // (src/ui/desk/deskAnalytics.ts holds the codes).
   | "desk_shown"
+  | "desk_title_shown"
   | "desk_window"
   | "desk_start"
-  | "desk_control";
+  | "desk_start_open"
+  | "desk_task"
+  | "desk_tray"
+  | "desk_win_menu"
+  | "desk_win_menu_open"
+  | "desk_control"
+  // A press on a title-screen button (src/game/titlePicks.ts): `detail`
+  // `continue`, `open`, `new`, `help`, `mute`, `install` or `sponsor`.
+  | "title_pick"
+  // The manual's Play and Back to game links (help-site Header.astro):
+  // `detail` `<where>_<what>`, where `bar` (the title bar) or `front` (the
+  // front page), what `play` or `back`.
+  | "help_game_link";

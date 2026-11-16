@@ -50,6 +50,7 @@ import { APP_VERSION } from "../appVersion";
 import { touchOverviewMap, wireOverviewMap } from "./overviewMapWiring";
 import { wireMovableWindows } from "./movableWindows";
 import { wireDesk } from "../ui/desk/deskController";
+import { wireTitlePicks } from "./titlePicks";
 import { refuseAppPlacementWhilePaused } from "./pausedBuild";
 import { createPersonCard } from "./personCardWiring";
 export { APP_VERSION };
@@ -262,6 +263,7 @@ export function runBootFlow(app: GameApp, savedAtBoot?: number): void {
   wireMovableWindows(app);
   wireMenus(app); // the menu bar, its Tower Info and Bulletin windows, the status bar
   wireDesk(); // on a computer, every part of the game in its own window (option C)
+  wireTitlePicks(); // each title-screen button press, as app_action title_pick
   void openFileSpace(app); // My Towers, and the one-time copy of the save slots
   wireTowerDrop(app); // a tower file dropped on the game opens
   wireScreenSaver(app); // Options > Screen Saver… and its idle and return triggers
