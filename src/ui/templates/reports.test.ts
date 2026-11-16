@@ -76,6 +76,14 @@ describe("importReportTemplate: the fact line and lists", () => {
     expect(lists[1].querySelectorAll("li")).toHaveLength(1);
   });
 
+  it("says the 1994 file goes into My Towers, with no word of the save slots 4.3 removed", () => {
+    const frag = renderToFragment(importReportTemplate(importReport()));
+    const note = frag.querySelector(".import-note")!.textContent!;
+    expect(note).toContain("kept in its autosave");
+    expect(note).toContain("goes into My Towers once the tower opens");
+    expect(note).not.toMatch(/slot/i);
+  });
+
   it("reads a 6-star import as TOWER, and shows negative funds with a leading minus", () => {
     const frag = renderToFragment(importReportTemplate(importReport({ star: 6, money: -4200 })));
     const facts = frag.querySelector(".import-facts")!.textContent!;
