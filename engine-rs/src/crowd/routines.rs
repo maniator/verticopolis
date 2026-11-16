@@ -30,7 +30,15 @@ pub fn push_routine_options(
         return;
     }
     let hour = clock.hour();
-    if school_run > 0.0 && !clock.is_weekend() && !floors.household_floors.is_empty() {
+    // Where residents leave for the day and come home as people
+    // (`commuters`), the school run is theirs: a sampled child who walked
+    // out of a home would leave it short while its residents commute.
+    let sampled_homes = !tower.mode.residents_commute_in_person();
+    if school_run > 0.0
+        && sampled_homes
+        && !clock.is_weekend()
+        && !floors.household_floors.is_empty()
+    {
         if (SCHOOL_RUN_DEPART_START..SCHOOL_RUN_DEPART_END).contains(&hour)
             && passes(crowd, school_run)
         {

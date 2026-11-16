@@ -52,7 +52,7 @@ describe("the Classic and Modern summary", () => {
     unmetDemandDrain: "too few shops nearby",
     infestationRecovery: "call an exterminator",
     weekendMultiplier: "each kind of shop with its own weekend",
-    demographicRoutines: "school runs",
+    demographicRoutines: "errands",
     rainCrowdFactor: "rain thins the crowd less",
     hotelDaytimePresence: "late checkouts", // #304
     quarterlyRentScale: "The whole quarter's rent every three days",

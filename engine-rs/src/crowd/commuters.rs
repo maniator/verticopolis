@@ -124,7 +124,7 @@ impl Crowd {
             let Some(place) = Workplace::of(u, tower.mode) else {
                 continue;
             };
-            if venues_only && place == Workplace::Office {
+            if venues_only && place != Workplace::Venue {
                 continue;
             }
             // Read and written back only when it holds someone: an idle desk

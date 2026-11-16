@@ -16,6 +16,12 @@ fn busy() -> Simulation {
     at("hotel-exterminator-modern", "booked")
 }
 
+/// The small values the header test sets: the star, rain's weather code and
+/// a caught thief's flag.
+const STAR_SET: f64 = 4.0;
+const WEATHER_SET: f64 = 2.0;
+const THIEF_SET: f64 = 1.0;
+
 /// Each named slot holds the value its name says. Values are set apart
 /// from one another first, so a swapped name fails (two flags that hold
 /// the same 0 or 1 can still trade places unseen); the records are then
@@ -29,11 +35,15 @@ fn the_named_slots_read_their_values() {
     walk_records(&sim, &frame_view(&sim));
     // The scenario's crowd can match its shaft count by chance (it did once
     // #1950 stopped Modern's monthly film booking drawing from the stream,
-    // and again when Modern homes began needing parking in #1973), so people
-    // leave until the two live counts differ.
+    // and again when Modern homes began needing parking in #1973), and once
+    // Modern residents came home as people it matched the star, so people
+    // leave until the crowd differs from the shafts and the small set values.
+    let small = [STAR_SET, WEATHER_SET, THIEF_SET, 0.0];
     sim.crowd.people.pop();
-    while sim.crowd.people.len() == sim.tower.transports.len() {
-        sim.crowd.people.pop();
+    while sim.crowd.people.len() == sim.tower.transports.len()
+        || small.contains(&(sim.crowd.people.len() as f64))
+    {
+        assert!(sim.crowd.people.pop().is_some(), "a crowd to set apart");
     }
     sim.clock.minutes = 1001.0;
     sim.tower.revision = 1002;
@@ -65,14 +75,14 @@ fn the_named_slots_read_their_values() {
         (MEAL_OVERLAY_REVISION, 1003.0),
         (LOG_SEQ, 1004.0),
         (MONEY, 1005.0),
-        (STAR, 4.0),
-        (WEATHER, 2.0),
+        (STAR, STAR_SET),
+        (WEATHER, WEATHER_SET),
         (SANTA_FX_SEQ, 1007.0),
         (EXPLOSION_FX, 1008.0),
         (EXPLOSION_FX + 1, 1009.0),
         (EXPLOSION_FX + 2, 1010.0),
         (THIEF_FX, 1011.0),
-        (THIEF_FX + 1, 1.0),
+        (THIEF_FX + 1, THIEF_SET),
         (THIEF_FX + 2, 1013.0),
         (TREASURE_FX, 1014.0),
         (TREASURE_FX + 1, 1015.0),

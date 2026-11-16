@@ -122,11 +122,12 @@ impl Simulation {
             "filmTier": film.as_ref().map(|e| FilmTier::showing(e).key()),
             "ticketPrice": shown_ticket_price(self.mode, u),
             "screen2": second,
-            // The workers on their way to a Modern office (`crowd::commuters`);
-            // null on any other kind.
+            // The workers on their way to a Modern office, or the residents
+            // on their way home to a Modern home (`crowd::commuters`); null
+            // on any other kind.
             "workersComing": u
                 .kind
-                .commutes_in_person(self.mode)
+                .arrives_in_person(self.mode)
                 .then(|| crate::crowd::commuters::coming_to(&self.crowd, id)),
         }))
     }

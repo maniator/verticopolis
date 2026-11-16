@@ -262,10 +262,10 @@ fn riders_and_walkers_count_on_the_shaft_they_use() {
 
 /// The dispatch's riders, with nobody in the crowd: the people in a condo
 /// the shaft serves fill its halls, and the car that takes them on is
-/// ridden.
+/// ridden. A Classic condo: a Modern home's residents ride as the crowd.
 #[test]
 fn the_dispatch_counts_the_riders_it_takes_on() {
-    let mut sim = tower();
+    let mut sim = tower_in(GameMode::Classic);
     let id = lift(&mut sim);
     assert!(sim.build(Kind::Condo, 3, 30).ok);
     let condo = sim.tower.unit_at(3, 30).unwrap().id;

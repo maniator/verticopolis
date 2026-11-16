@@ -22,10 +22,10 @@ const RAIN_DAY: i64 = 10;
 const SOURCE_FLOORS: [i64; 4] = [4, 5, 6, 7];
 const SPAWN_SECONDS: usize = 90;
 
-/// A Modern strip to floor 7, one elevator, and an occupied office and
+/// A `mode` strip to floor 7, one elevator, and an occupied office and
 /// condo on each of `sources`; floors 2 and 3 stay clear for a cinema.
-fn populated_tower(seed: u32, sources: &[i64]) -> Simulation {
-    let mut sim = strip_tower(seed, GameMode::Modern, 40, 7);
+fn populated_tower(seed: u32, mode: GameMode, sources: &[i64]) -> Simulation {
+    let mut sim = strip_tower(seed, mode, 40, 7);
     sim.star = 5;
     shaft(&mut sim, Kind::ElevatorStandard, 0, 1, 7);
     for &floor in sources {
@@ -45,9 +45,11 @@ fn populated_tower(seed: u32, sources: &[i64]) -> Simulation {
 }
 
 /// The people the spawn layer alone puts on the move in 90 one-second
-/// steps at 08:00 on `day`, told the weather is `weather`.
+/// steps at 08:00 on `day`, told the weather is `weather`. A Classic tower:
+/// Modern office workers and residents set out as real commuters
+/// (`crowd::commuters`), outside the spawn layer's sample.
 fn spawned_over(day: i64, weather: Weather) -> usize {
-    let mut sim = populated_tower(4242, &SOURCE_FLOORS);
+    let mut sim = populated_tower(4242, GameMode::Classic, &SOURCE_FLOORS);
     sim.weather = weather;
     let clock = Clock::new(((day * 24 + 8) * 60) as f64, sim.clock.calendar);
     for _ in 0..SPAWN_SECONDS {
@@ -127,7 +129,7 @@ fn an_attendance_venue_earns_the_same_in_the_rain_at_the_same_fill() {
 /// The cinema's place_seated-minutes over four afternoon hours on `day`, drawn from
 /// one office and condo, so the house does not sit at its cap.
 fn cinema_seat_minutes(day: i64) -> i64 {
-    let mut sim = populated_tower(909, &[4]);
+    let mut sim = populated_tower(909, GameMode::Modern, &[4]);
     let cinema = place_seated(&mut sim, Kind::Cinema, 2, 4, UnitState::Occupied, 0);
     at_time(&mut sim, day, 12);
     sim.weather = weather_for(day);

@@ -30,9 +30,9 @@ use crate::facilities::Kind;
 use crate::sim_save::Each;
 use crate::tower::Tower;
 
-/// The most desks a save restores, one per office: far above the offices
-/// any tower holds, it only bounds what a hand-edited save can make the
-/// loader keep.
+/// The most desks a save restores, one per office, staffed venue or home:
+/// far above the rooms any tower holds, it only bounds what a hand-edited
+/// save can make the loader keep.
 const MAX_SAVED_DESKS: usize = 10_000;
 
 /// A desk as the save writes it: `[officeId, floor, x, width, inside,
@@ -235,7 +235,7 @@ impl CrowdMarks {
 pub(super) fn adopt_head_counts(crowd: &mut Crowd, tower: &Tower, venues_at: Option<i64>) {
     for u in tower.room_units() {
         let inside = match Workplace::of(u, tower.mode) {
-            Some(Workplace::Office) => u.occupants,
+            Some(Workplace::Office | Workplace::Home) => u.occupants,
             Some(Workplace::Venue)
                 if !crowd.desks.contains_key(&u.id)
                     && u.is_operational()

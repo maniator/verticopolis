@@ -1,11 +1,17 @@
-//! The two kinds of workplace whose workers come in and go home as people
-//! (`crowd::commuters`), and what each asks of the commute. A Modern office
+//! The places whose people come in and go out as people (`crowd::commuters`),
+//! and what each asks of the commute. A Modern office
 //! counts the workers at their desks in `occupants` and keeps office hours,
 //! its rush spread over 7 to 10 AM and 4 to 7 PM. A Modern venue with staff
 //! of its own (`Kind::staff_size`: a shop, restaurant, hall, cinema and the
 //! like) counts the staff in `staff_in`, opens only once one of them is in
 //! (`Unit::open_for_business`), and has them in from the hour they are
-//! called in (`Kind::staffed_at`) until it closes, every day of the week.
+//! called in (`Kind::staffed_at`) until it closes, every day of the week. A
+//! Modern home (a condo, apartment or studio) counts the residents at home in
+//! `occupants`: on weekdays all but the one who stays in
+//! (`Kind::residents_home_by_day`) leave over 7 to 10 AM and come home over 4
+//! to 7 PM, and on weekends and at night everyone is home. A home works the
+//! other way round from an office, so its "workers inside" are the
+//! residents at home.
 
 use super::trip::ErrandPlace;
 use crate::clock::GameMode;
@@ -44,6 +50,8 @@ pub(super) enum Workplace {
     Office,
     /// A venue: its staff serve the visitors.
     Venue,
+    /// A home: its residents at home are its head count.
+    Home,
 }
 
 impl Workplace {
@@ -53,6 +61,8 @@ impl Workplace {
             Some(Workplace::Office)
         } else if u.kind.waits_for_staff(mode) {
             Some(Workplace::Venue)
+        } else if u.kind.lives_in_person(mode) {
+            Some(Workplace::Home)
         } else {
             None
         }
@@ -63,15 +73,16 @@ impl Workplace {
         match self {
             Workplace::Office => ErrandPlace::Office,
             Workplace::Venue => ErrandPlace::Work,
+            Workplace::Home => ErrandPlace::Home,
         }
     }
 
-    /// Whether `u` can have its workers in: an office with a tenant, or a
-    /// venue that stands (a venue has no tenant: it opens and closes by its
-    /// hours, `Empty` while closed).
+    /// Whether `u` can have its workers in: an office or home with a
+    /// tenant, or a venue that stands (a venue has no tenant: it opens and
+    /// closes by its hours, `Empty` while closed).
     pub(super) fn can_work(self, u: &Unit) -> bool {
         match self {
-            Workplace::Office => !u.is_dormant(),
+            Workplace::Office | Workplace::Home => !u.is_dormant(),
             Workplace::Venue => u.is_operational(),
         }
     }
@@ -81,13 +92,14 @@ impl Workplace {
         match self {
             Workplace::Office => u.kind.facility().population,
             Workplace::Venue => u.kind.staff_size(),
+            Workplace::Home => u.resident_count(),
         }
     }
 
     /// The workers `u` counts as at work today.
     pub(super) fn head_count(self, u: &Unit) -> i64 {
         match self {
-            Workplace::Office => u.occupants,
+            Workplace::Office | Workplace::Home => u.occupants,
             Workplace::Venue => i64::from(u.staff_in),
         }
     }
@@ -112,7 +124,7 @@ pub(super) fn stranded(
     let counted = tower
         .get_unit(id)
         .and_then(|u| match Workplace::of(u, tower.mode)? {
-            Workplace::Office => Some(u.occupants),
+            Workplace::Office | Workplace::Home => Some(u.occupants),
             Workplace::Venue if !u.is_operational() => Some(0),
             Workplace::Venue => Some(desk.inside),
         });
@@ -135,7 +147,7 @@ pub(super) fn sync_head_count(tower: &mut Tower, id: i64, inside: i64) {
     let mode = tower.mode;
     if let Some((u, at)) = tower.marked_by_id(id) {
         match Workplace::of(u, mode) {
-            Some(Workplace::Office) => u.set_occupants(at, inside),
+            Some(Workplace::Office | Workplace::Home) => u.set_occupants(at, inside),
             Some(Workplace::Venue) => u.staff_in = inside.clamp(0, i64::from(u8::MAX)) as u8,
             None => {}
         }
@@ -161,6 +173,34 @@ pub fn staff_at_work(crowd: &mut super::Crowd, tower: &mut Tower, hour: i64) {
     }
 }
 
+/// Puts every home's residents where they are at `(weekend, hour)` at once:
+/// all home outside weekday office hours, else the one who stays in
+/// (`Kind::residents_home_by_day`), for a test that sets the clock without
+/// the hours that would bring them home or send them out.
+#[cfg(test)]
+pub fn residents_at_home(crowd: &mut super::Crowd, tower: &mut Tower, weekend: bool, hour: i64) {
+    let homes: Vec<(i64, i64, i64, i64, i64)> = tower
+        .room_units()
+        .filter(|u| Workplace::of(u, tower.mode) == Some(Workplace::Home))
+        .filter(|u| !u.is_dormant())
+        .map(|u| {
+            let all = Workplace::Home.crew(u);
+            let home = if office_hours(weekend, hour) {
+                u.kind.residents_home_by_day().min(all)
+            } else {
+                all
+            };
+            (u.id, u.floor, u.x, u.width, home)
+        })
+        .collect();
+    for (id, floor, x, width, home) in homes {
+        let desk = crowd.desks.entry(id).or_default();
+        (desk.floor, desk.x, desk.width) = (floor, x, width);
+        desk.inside = home;
+        sync_head_count(tower, id, home);
+    }
+}
+
 /// Whether `place` `u` has its workers in at `(weekend, hour)`, and the
 /// arrivals it still needs booked then, or else the departures it still
 /// owes, with office departures spread until `leave_by`.
@@ -172,16 +212,20 @@ pub(super) fn due(
     leave_by: i64,
 ) -> (bool, i64) {
     let (dormant, out) = (!place.can_work(u), u.out_for_meal.unwrap_or(0));
+    if place == Workplace::Home {
+        return home_due(u, desk, dormant, (weekend, hour));
+    }
     let at_work = !dormant
         && match place {
             Workplace::Office => office_hours(weekend, hour),
             Workplace::Venue => u.kind.staffed_at(hour),
+            Workplace::Home => unreachable!("homes are booked by `home_due`"),
         };
     if at_work {
         let missing = place.crew(u) - desk.inside - desk.coming;
         return match place {
             Workplace::Office => (true, hour_share(missing, hour, ARRIVE_BY)),
-            Workplace::Venue => (true, missing.max(0)),
+            Workplace::Venue | Workplace::Home => (true, missing.max(0)),
         };
     }
     let owed = desk.inside - out - desk.going;
@@ -189,6 +233,44 @@ pub(super) fn due(
         Workplace::Office if !dormant => (false, hour_share(owed, hour, leave_by)),
         _ => (false, owed.max(0)),
     }
+}
+
+/// [`due`] for a home: whether its residents come home at `(weekend, hour)`
+/// and how many to book now, or else how many leave. On weekday office
+/// hours (7 AM to 4 PM) all but `Kind::residents_home_by_day` go out, spread
+/// until 10 AM, and a home short of the one who stays in (one just bought or
+/// let) has them come home at once; any other hour everyone comes home,
+/// spread from 4 to 7 PM on weekdays and at once otherwise (a home just
+/// bought, a weekend). A home with no tenant sends everyone out at once.
+fn home_due(
+    u: &Unit,
+    desk: &super::commuters::Desk,
+    dormant: bool,
+    (weekend, hour): (bool, i64),
+) -> (bool, i64) {
+    let out = u.out_for_meal.unwrap_or(0);
+    if dormant {
+        return (false, (desk.inside - out - desk.going).max(0));
+    }
+    let residents = Workplace::Home.crew(u);
+    if !office_hours(weekend, hour) {
+        let missing = residents - desk.inside - desk.coming;
+        let by = if !weekend && (LEAVE_FROM..LEAVE_BY).contains(&hour) {
+            LEAVE_BY
+        } else {
+            hour
+        };
+        return (true, hour_share(missing, hour, by));
+    }
+    let stays = u.kind.residents_home_by_day().min(residents);
+    // A home bought or let mid-morning still has its one who stays in come
+    // home at once.
+    let short = stays - desk.inside - desk.coming;
+    if short > 0 {
+        return (true, short);
+    }
+    let owed = desk.inside - out - desk.going - stays;
+    (false, hour_share(owed, hour, ARRIVE_BY))
 }
 
 /// Whether the venue pass after an edit (`Crowd::book` for venues) books

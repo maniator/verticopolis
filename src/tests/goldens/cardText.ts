@@ -81,8 +81,10 @@ export const CARD_TEXT_TICK_MINUTES = 10;
  *  `engine-rs/src/rules/elevators.rs`), so the same riders fill it for about
  *  half as long, and a full Modern car passes the floors it has no room for
  *  instead of standing there full (`full_cars_pass_hall_calls`), so its
- *  average load reads well under half (36% today). */
-const CROWDED_LIFT_LEAST_LOAD: Readonly<Record<CardTextMode, number>> = { classic: 80, modern: 30 };
+ *  average load reads well under half. Modern residents ride as people, so
+ *  the dispatch's unseen estimate no longer boards the car with riders
+ *  nobody draws, and it reads lower still (21% today). */
+const CROWDED_LIFT_LEAST_LOAD: Readonly<Record<CardTextMode, number>> = { classic: 80, modern: 15 };
 /** The engine's near-capacity line, in percent (`NEAR_CAPACITY_UTILIZATION`
  *  in `engine-rs/src/panels/elevators.rs`). */
 const NEAR_CAPACITY_PERCENT = 85;
