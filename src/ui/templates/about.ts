@@ -20,7 +20,7 @@ import { helpUrl } from "../../helpAddress";
 
 /** The Help site's privacy page, marked `?from=game` so its "Back to game"
  *  closes that tab instead of loading a second game (src/ui/fromGame.ts). */
-export const PRIVACY_HREF = fromGameHref(helpUrl("/help/privacy/"));
+export const PRIVACY_HREF = fromGameHref(helpUrl("/help/privacy/"), "about");
 
 /** The actions About this game binds inline. */
 export interface AboutActions {

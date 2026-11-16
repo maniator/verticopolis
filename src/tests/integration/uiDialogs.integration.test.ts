@@ -1215,7 +1215,7 @@ describe("toast — kind class and stack cap", () => {
 });
 
 describe("About this game: the privacy link", () => {
-  const PRIVACY = "/help/privacy/?from=game";
+  const PRIVACY = "/help/privacy/?from=game&via=about";
 
   afterEach(() => {
     vi.restoreAllMocks();
@@ -3160,7 +3160,7 @@ describe("Compare modal (showCompare) pauses the tower and restores speed", () =
     const { onSpeed, getSpeed } = speedAt(2);
     makeUI({ getSpeed, onSpeed }); // constructed for its side effect: the badge click is wired in the ctor
     (document.getElementById("btn-mode") as HTMLButtonElement).click();
-    expect(open).toHaveBeenCalledWith("/help/classic-vs-modern/?from=game", "_blank");
+    expect(open).toHaveBeenCalledWith("/help/classic-vs-modern/?from=game&via=mode_badge", "_blank");
     expect(tab.opener).toBeNull();
     expect(dialog().open).toBe(false);
     expect(onSpeed).toHaveBeenLastCalledWith(0);
@@ -3175,7 +3175,7 @@ describe("Compare modal (showCompare) pauses the tower and restores speed", () =
       const { onSpeed, getSpeed } = speedAt(2);
       makeUI({ getSpeed, onSpeed });
       document.getElementById("btn-mode")!.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, ...mod }));
-      expect(open).toHaveBeenCalledWith("/help/classic-vs-modern/?from=game", "_blank");
+      expect(open).toHaveBeenCalledWith("/help/classic-vs-modern/?from=game&via=mode_badge", "_blank");
       expect(onSpeed).not.toHaveBeenCalled();
       open.mockRestore();
     }

@@ -22,14 +22,92 @@ export const FROM_GAME_STORAGE_KEY = "vc.page.fromGame";
  *  still read so a tab opened by that build keeps its flag across a reload. */
 export const LEGACY_FROM_GAME_STORAGE_KEY = "vc.releaseNotes.fromGame";
 
-/** `href` (a same-origin path, with or without a `#fragment`) marked as opened
- *  by the running game. */
-export function fromGameHref(href: string): string {
+/** The query the game adds beside `from=game` to name where in the game the
+ *  link was (#2037): one of {@link GAME_HELP_SOURCES}. */
+export const HELP_SOURCE_PARAM = "via";
+
+/**
+ * The places in the game that open the manual, each a `via` code that the help
+ * site's landing events report as their `detail` (#2037; a fixed code, never a
+ * URL or a referrer, owner 2026-11-12): `game_menu` the Help menu's Player's
+ * Manual (and the desk's Verticopolis menu, which presses the same item),
+ * `title` the title screen's How to Play, `mode_badge` the Tower panel's mode
+ * badge (the Classic and Modern page, in a browser tab), `compare` a link in
+ * the Classic vs Modern table (the founding screen, the in-game comparison,
+ * This Tower's Rules), `welcome` the version 4 welcome's links,
+ * `update_prompt` the update prompt's All release notes, `about` About this
+ * game's privacy link, and `inspector` and `stats` for the facility card's and
+ * the Tower Info window's links to a problem's help page (#2036).
+ */
+export const GAME_HELP_SOURCES = ["game_menu", "title", "mode_badge", "compare", "welcome", "update_prompt", "about", "inspector", "stats"] as const;
+
+/** A place in the game that opens the manual. */
+export type GameHelpSource = (typeof GAME_HELP_SOURCES)[number];
+
+/**
+ * What a help landing reports: a {@link GameHelpSource}, `game` for a page the
+ * game opened without naming where (a game built before #2037, still cached in
+ * a tab or an installed app), or `direct` for every visit the game did not
+ * open (a shared or saved link, a search, the gallery, the "page not found"
+ * page).
+ */
+export type HelpSource = GameHelpSource | "game" | "direct";
+
+/** Where a tab the game opened remembers its source, so a reload of that same
+ *  page, which lands again once the marks are gone, reports it again. */
+export const HELP_SOURCE_STORAGE_KEY = "vc.page.helpSource";
+
+/** `href` (a same-origin path or a manual address, with or without a
+ *  `#fragment`) marked as opened by the running game from `source`. */
+export function fromGameHref(href: string, source: GameHelpSource): string {
   const hashAt = href.indexOf("#");
   const path = hashAt < 0 ? href : href.slice(0, hashAt);
   const hash = hashAt < 0 ? "" : href.slice(hashAt);
-  const marker = `${FROM_GAME_PARAM}=${FROM_GAME_VALUE}`;
+  const marker = `${FROM_GAME_PARAM}=${FROM_GAME_VALUE}&${HELP_SOURCE_PARAM}=${source}`;
   return `${path}${path.includes("?") ? "&" : "?"}${marker}${hash}`;
+}
+
+function isGameSource(value: string | null): value is GameHelpSource {
+  return (GAME_HELP_SOURCES as readonly (string | null)[]).includes(value);
+}
+
+/**
+ * The source of this help page's visit, read from `search` (the page's own
+ * query, before {@link takeFromGameFlag} takes the marks out). A link the game
+ * opened names its place, or reads `game` when it carries no known `via`; a
+ * `via` without `from=game` is not the game's and counts as `direct`. A page
+ * with no marks reports what this tab stored when the game opened it only when
+ * the load `repeats` an earlier one (a reload, or a step back or forward to
+ * it), so the landing keeps its source; any other unmarked visit is `direct`,
+ * even in a tab the game once opened (a search result followed later, say).
+ * Blocked storage only loses that reload memory.
+ */
+export function helpVisitSource(search: string, repeats: boolean, storage: () => Storage = () => sessionStorage): HelpSource {
+  if (openedFromGame(search)) {
+    const via = new URLSearchParams(search).get(HELP_SOURCE_PARAM);
+    const source: GameHelpSource | "game" = isGameSource(via) ? via : "game";
+    try {
+      storage().setItem(HELP_SOURCE_STORAGE_KEY, source);
+    } catch {
+      // Storage blocked: this load still reports it; a reload reads direct.
+    }
+    return source;
+  }
+  if (!repeats) return "direct";
+  try {
+    const stored = storage().getItem(HELP_SOURCE_STORAGE_KEY);
+    if (stored === "game" || isGameSource(stored)) return stored;
+  } catch {
+    // Storage blocked: nothing remembered.
+  }
+  return "direct";
+}
+
+/** True when this page load repeats an earlier one: a reload, or a step back
+ *  or forward through the history (Navigation Timing's `type`). */
+export function repeatsEarlierLoad(perf: Pick<Performance, "getEntriesByType"> = performance): boolean {
+  const nav = perf.getEntriesByType?.("navigation")[0] as PerformanceNavigationTiming | undefined;
+  return nav?.type === "reload" || nav?.type === "back_forward";
 }
 
 /** True when `search` carries the game's marker. */
@@ -38,9 +116,9 @@ export function openedFromGame(search: string): boolean {
 }
 
 /**
- * Reads the game-opened flag once at load and takes `?from=game` out of the
- * address bar, so a bookmarked, copied or shared URL never carries it into a
- * tab with no game behind it. The flag lives on in this tab's sessionStorage
+ * Reads the game-opened flag once at load and takes `?from=game` (and its
+ * `via` source) out of the address bar, so a bookmarked, copied or shared URL
+ * never carries it into a tab with no game behind it. The flag lives on in this tab's sessionStorage
  * (when the browser allows it) so a reload, or a sibling page reached from
  * this one, keeps the closing behavior.
  */
@@ -52,6 +130,7 @@ export function takeFromGameFlag(
   if (openedFromGame(loc.search)) {
     const rest = new URLSearchParams(loc.search);
     rest.delete(FROM_GAME_PARAM);
+    rest.delete(HELP_SOURCE_PARAM);
     const query = rest.toString();
     hist.replaceState(null, "", `${loc.pathname}${query ? `?${query}` : ""}${loc.hash}`);
     try {

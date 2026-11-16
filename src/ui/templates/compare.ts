@@ -30,7 +30,7 @@ function openLinksInNewTab(e: MouseEvent): void {
   const href = link?.getAttribute("href");
   if (!href || !href.startsWith("/")) return;
   e.preventDefault();
-  window.open(fromGameHref(helpUrl(href)), "_blank", "noopener");
+  window.open(fromGameHref(helpUrl(href), "compare"), "_blank", "noopener");
 }
 
 /**

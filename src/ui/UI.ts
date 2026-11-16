@@ -16,6 +16,7 @@ import { lobbyPickerFor } from "./lobbyHeightStrip";
 import { renderToolCard } from "./toolCard";
 import * as dialogs from "./uiDialogs";
 import * as help from "./uiHelp";
+import type { GameHelpSource } from "./fromGame";
 import * as panels from "./uiPanels";
 import * as status from "./uiStatus";
 import type { HudSource } from "./uiStatus";
@@ -199,7 +200,7 @@ export class UI {
     document.getElementById("btn-save-top")?.addEventListener("click", () => this.cb.onSave());
     document.getElementById("btn-new")!.addEventListener("click", () => this.promptNewTower());
     document.getElementById("btn-settings")!.addEventListener("click", () => this.showSettings());
-    document.getElementById("btn-help")!.addEventListener("click", () => this.showHelp());
+    document.getElementById("btn-help")!.addEventListener("click", () => this.showHelp("game_menu"));
     document.getElementById("btn-about")!.addEventListener("click", () => this.showAbout());
     this.el.modeBadge.addEventListener("click", (e) => help.showModeHelp(this, e)); // "tell me more"
     document.getElementById("btn-stats")!.addEventListener("click", () => this.cb.onShowStats());
@@ -451,7 +452,7 @@ export class UI {
 
   /** The guide (the Help site in a new tab), About this game, and the
    *  Classic vs Modern comparison (src/ui/uiHelp.ts). */
-  showHelp(): void { help.showHelp(this); }
+  showHelp(source: GameHelpSource): void { help.showHelp(this, source); }
   showAbout(): void { help.showAbout(this); }
   showCompare(): void { help.showCompare(this); }
   showTowerRules(): void { help.showTowerRules(this); }

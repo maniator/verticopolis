@@ -3,7 +3,7 @@ import type { UI } from "./UI";
 import { HelpPause, PAUSED_FOR_HELP } from "./helpPause";
 import { aboutTemplate } from "./templates/about";
 import { compareModalTemplate, towerRulesModalTemplate } from "./templates/compare";
-import { fromGameHref } from "./fromGame";
+import { fromGameHref, type GameHelpSource } from "./fromGame";
 import { isSplashUp } from "../game/interactionState";
 import { isInstalledStandalone } from "./standalone";
 import { trackAppAction } from "../analytics";
@@ -162,17 +162,19 @@ function leaveForTab(ui: UI, e: MouseEvent): void {
   ui.closeModal();
 }
 
-/** The guide: the Help site's front page in a new tab, from the game panel's
- *  Help button, the title screen and the tooling handle `ui.showHelp()`. */
-export function showHelp(ui: UI): void {
-  trackAppAction("help_open");
+/** The guide: the Help site's front page in a new tab, from the Help menu's
+ *  Player's Manual (`game_menu`), the title screen's How to Play (`title`)
+ *  and the tooling handle `ui.showHelp(source)`. `help_open` and the page's
+ *  landing both report `source` (#2037). */
+export function showHelp(ui: UI, source: GameHelpSource): void {
+  trackAppAction("help_open", source);
   // The manual is online only (the service worker leaves /help to the
   // network), so offline say so rather than open a tab that cannot load.
   if (!navigator.onLine) {
     ui.sayVisibly(`The manual needs an internet connection. It is at ${HELP_ADDRESS}.`);
     return;
   }
-  openPageInTab(ui, "/help/", () => ui.sayVisibly(`The guide could not open. It is at ${HELP_ADDRESS}.`));
+  openPageInTab(ui, "/help/", source, () => ui.sayVisibly(`The guide could not open. It is at ${HELP_ADDRESS}.`));
 }
 
 /**
@@ -182,9 +184,9 @@ export function showHelp(ui: UI): void {
  * refuses the new tab (a pop-up blocker), so the player is never left with
  * nothing. Returns whether the tab opened.
  */
-function openPageInTab(ui: UI, href: string, blocked: () => void, e?: MouseEvent): boolean {
+function openPageInTab(ui: UI, href: string, source: GameHelpSource, blocked: () => void, e?: MouseEvent): boolean {
   const background = !!e && (e.ctrlKey || e.metaKey);
-  const tab = window.open(fromGameHref(helpUrl(href)), "_blank");
+  const tab = window.open(fromGameHref(helpUrl(href), source), "_blank");
   if (!tab) {
     blocked();
     return false;
@@ -293,7 +295,7 @@ export function showModeHelp(ui: UI, e?: MouseEvent): void {
     showCompare(ui);
     return;
   }
-  if (openPageInTab(ui, "/help/classic-vs-modern/", () => showCompare(ui), e)) trackAppAction("compare_open");
+  if (openPageInTab(ui, "/help/classic-vs-modern/", "mode_badge", () => showCompare(ui), e)) trackAppAction("compare_open");
 }
 
 /** Close the dialog and end the pause, THEN replay, so Getting Started never

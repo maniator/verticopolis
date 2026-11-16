@@ -86,7 +86,7 @@ export interface UpdatePromptOptions {
  *  one. `from=game` tells the page a running game opened it, so its "Back to
  *  game" closes the tab instead of loading a second game (src/ui/fromGame.ts). */
 export function releaseNotesHref(version: string | undefined): string {
-  return fromGameHref(helpUrl(version ? `/help/changelog#${encodeURIComponent(version)}` : "/help/changelog"));
+  return fromGameHref(helpUrl(version ? `/help/changelog#${encodeURIComponent(version)}` : "/help/changelog"), "update_prompt");
 }
 
 /** The "All release notes" link: opens the release notes page in a new tab,

@@ -2,6 +2,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mountAppDom, makeUI } from "../uiFixture";
 import { PAUSED_FOR_HELP } from "../../ui/helpPause";
+import { trackAppAction } from "../../analytics";
 
 /**
  * In-game Help (src/ui/uiHelp.ts) on the real UI, with the game's
@@ -12,6 +13,8 @@ import { PAUSED_FOR_HELP } from "../../ui/helpPause";
 
 const standalone = vi.hoisted(() => ({ isInstalledStandalone: vi.fn(() => false) }));
 vi.mock("../../ui/standalone", () => standalone);
+// The app actions the dialogs report, as a spy (the rest of analytics is real).
+vi.mock("../../analytics", async (importOriginal) => ({ ...(await importOriginal<object>()), trackAppAction: vi.fn() }));
 
 const dialog = (): HTMLDialogElement => document.getElementById("modal") as HTMLDialogElement;
 const inDialog = <T extends Element>(sel: string): T => {
@@ -61,6 +64,7 @@ describe("About… (About this game)", () => {
   beforeEach(() => {
     mountAppDom();
     standalone.isInstalledStandalone.mockReturnValue(false);
+    vi.mocked(trackAppAction).mockClear();
   });
   afterEach(() => {
     document.body.innerHTML = "";
@@ -211,7 +215,8 @@ describe("About… (About this game)", () => {
     makeUI({ getSpeed: speed.getSpeed, onSpeed: speed.onSpeed });
     const open = vi.spyOn(window, "open").mockReturnValue({} as Window);
     (document.getElementById("btn-help") as HTMLButtonElement).click();
-    expect(open).toHaveBeenCalledWith("/help/?from=game", "_blank");
+    expect(open).toHaveBeenCalledWith("/help/?from=game&via=game_menu", "_blank");
+    expect(trackAppAction).toHaveBeenCalledWith("help_open", "game_menu");
     expect(dialog().open).toBe(false);
     expect(speed.now()).toBe(0);
     leaveAndReturn();
@@ -222,8 +227,9 @@ describe("About… (About this game)", () => {
     const speed = speedAt(3);
     const { ui } = makeUI({ getSpeed: speed.getSpeed, onSpeed: speed.onSpeed });
     const open = vi.spyOn(window, "open").mockReturnValue({} as Window);
-    ui.showHelp();
-    expect(open).toHaveBeenCalledWith("/help/?from=game", "_blank");
+    ui.showHelp("title");
+    expect(open).toHaveBeenCalledWith("/help/?from=game&via=title", "_blank");
+    expect(trackAppAction).toHaveBeenCalledWith("help_open", "title");
     expect(dialog().open).toBe(false);
     expect(speed.now()).toBe(0);
     leaveAndReturn();
@@ -236,7 +242,7 @@ describe("About… (About this game)", () => {
     vi.spyOn(navigator, "onLine", "get").mockReturnValue(false);
     const open = vi.spyOn(window, "open");
     const say = vi.spyOn(ui, "sayVisibly");
-    ui.showHelp();
+    ui.showHelp("game_menu");
     expect(open).not.toHaveBeenCalled();
     expect(say).toHaveBeenCalledWith("The manual needs an internet connection. It is at help.verticopolis.com.");
     expect(speed.now()).toBe(3);
@@ -247,7 +253,7 @@ describe("About… (About this game)", () => {
     const { ui } = makeUI({ getSpeed: speed.getSpeed, onSpeed: speed.onSpeed });
     vi.spyOn(window, "open").mockReturnValue(null);
     const say = vi.spyOn(ui, "sayVisibly");
-    ui.showHelp();
+    ui.showHelp("game_menu");
     expect(say).toHaveBeenCalledWith("The guide could not open. It is at help.verticopolis.com.");
     expect(speed.now()).toBe(3);
   });
@@ -306,7 +312,7 @@ describe("About… (About this game)", () => {
 
   it("marks the privacy link as opened by the game", () => {
     openAbout();
-    expect(inDialog('a[data-act="privacy"]').getAttribute("href")).toBe("/help/privacy/?from=game");
+    expect(inDialog('a[data-act="privacy"]').getAttribute("href")).toBe("/help/privacy/?from=game&via=about");
   });
 
   it("ends the pause when another dialog takes the screen", () => {
@@ -333,6 +339,6 @@ describe("About… in the installed app", () => {
   it("opens the same About this game, privacy link included (the browser opens the Help site)", () => {
     openAbout(2);
     expect(inDialog("h2").textContent).toContain("About this game");
-    expect(inDialog('a[data-act="privacy"]').getAttribute("href")).toBe("/help/privacy/?from=game");
+    expect(inDialog('a[data-act="privacy"]').getAttribute("href")).toBe("/help/privacy/?from=game&via=about");
   });
 });

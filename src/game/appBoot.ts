@@ -273,7 +273,7 @@ export function runBootFlow(app: GameApp, savedAtBoot?: number): void {
   // First-run splash + onboarding (chrome only; the engine is untouched).
   app.onboarding = new OnboardingController({
     mq: app.mobileMq,
-    showHelp: () => app.ui.showHelp(),
+    showHelp: () => app.ui.showHelp("title"),
     pauseForSplash: (paused) => app.setSpeed(paused ? 0 : 1),
     chime: () => app.audio.sfx("notify"),
     // A tower arrived over the title screen (SPEC-splash-load-tower CAP-6):

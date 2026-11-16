@@ -20,7 +20,7 @@ export const WELCOME_LINKS = {
 } as const;
 
 function helpLink(link: { label: string; href: string }): TemplateResult {
-  return html`<a href=${fromGameHref(helpUrl(link.href))} target="_blank" rel="noopener noreferrer">${link.label}<span class="visually-hidden"> (opens in a new tab)</span></a>`;
+  return html`<a href=${fromGameHref(helpUrl(link.href), "welcome")} target="_blank" rel="noopener noreferrer">${link.label}<span class="visually-hidden"> (opens in a new tab)</span></a>`;
 }
 
 export function welcomeModalTemplate(): TemplateResult {

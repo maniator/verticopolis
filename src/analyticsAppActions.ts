@@ -49,6 +49,8 @@ export type AppActionName =
   | "graphics_recovered"
   // Dialogs / navigation.
   | "settings_open"
+  // The manual opened in a new tab; `detail` = where (src/ui/fromGame.ts
+  // GameHelpSource): `game_menu` (Help > Player's Manual) or `title` (How to Play).
   | "help_open"
   // The game panel's About…, which opens About this game (the version, the
   // engine diagnostics, the privacy link); help_open is the manual itself.
@@ -61,7 +63,9 @@ export type AppActionName =
   | "page_changelog"
   // One help page view on every page (help-site/src/components/Header.astro);
   // `detail` = its path under the site's base ("rooms/hotels", "home" or
-  // "other": site.mjs helpPageDetail). page_help/page_changelog count landings.
+  // "other": site.mjs helpPageDetail). page_help/page_changelog count landings,
+  // `detail` = where the visit started (src/ui/fromGame.ts HelpSource: a place
+  // in the game, `game` or `direct`; #2037).
   | "help_page_view"
   // A help site menu bar pick; `detail` = its data-help-item code (MenuBar.astro).
   | "help_menu_pick"
