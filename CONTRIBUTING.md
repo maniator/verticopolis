@@ -1,8 +1,9 @@
 # Contributing to Verticopolis
 
 Verticopolis is an unofficial, from-scratch homage to the 1994 game *SimTower*:
-a browser-native high-rise builder written in TypeScript, with its own code and
-art. It is not affiliated with or derived from the original; the canon it mirrors
+a browser-native high-rise builder with its own code and art. The simulation
+is a Rust engine compiled to WebAssembly (`engine-rs/`); the game around it
+(UI, rendering, audio, storage) is TypeScript. It is not affiliated with or derived from the original; the canon it mirrors
 is behavior, not assets.
 
 This is the contributor guide, the source of truth for how work gets done here:
@@ -54,8 +55,8 @@ no engine path already skips the Rust workflow's jobs. Every required check
 still reports a result on a skipped lane.
 
 ```bash
-npm run typecheck   # tsc --noEmit
-npm run lint        # eslint src
+npm run typecheck   # tsc --noEmit, then the api/ project
+npm run lint        # eslint src api
 npm test            # vitest run (Tier-1 unit tests)
 npm run build       # production build must succeed
 ```
@@ -87,6 +88,13 @@ real contract. Do not add a config-text guard merely because a PR description
 promised one; correct the description instead. Do not remove existing tests
 as incidental cleanup; review any existing source-text guards separately.
 
+**No new guard tests** (owner, 2026-11-14). Do not add a `*.guard.test.ts`
+file, or any other meta-test that scans source, workflow or configuration
+files instead of exercising behavior. The guards already in `src/tests/` stay
+until each is reviewed on its own; adding an entry to an existing guard's
+allowlist or shrinking its ratchet is fine. A new rule goes in a review
+checklist, a lint rule or a test of the code it governs.
+
 ## Testing & coverage
 
 Verticopolis has **two test tiers**:
@@ -115,8 +123,8 @@ Verticopolis has **two test tiers**:
     purpose, in the same PR. See
     [conformance/README.md](./conformance/README.md).
 
-    **One engine.** `engine-rs/` is the engine the game runs (app 2.66.0,
-    engine crate 1.0.0). It began as a Rust port of a TypeScript engine, which
+    **One engine.** `engine-rs/` is the only engine the game runs
+    (since app 2.66.0 and engine crate 1.0.0). It began as a Rust port of a TypeScript engine, which
     was deleted in #1875; the rules its tests held are Rust tests now
     (`docs/architecture/ts-engine-retirement-map.md`). The conformance lock, the goldens and the fuzz corpus are the
     Rust engine's own regression records, written by the Rust run and checked
@@ -626,7 +634,22 @@ The release driver cuts a release:
    and publishes the GitHub releases.
 
 A release consumes every pending note. If another note lands on `main` first,
-merge `main` in, reset the release files and run it again.
+cut it again from the new `main`, and never merge `main` into it. For a
+release the **Cut release** workflow made, close its PR, delete its branch and
+run the workflow again (it refuses a branch name that already exists, and the
+version may have moved). For a hand-cut one, `git reset --hard origin/main` on
+the release branch, run `npm run release` again, push with
+`--force-with-lease`, and rename the branch if the version changed.
+
+Rules for the release PR:
+
+- **One release PR at a time.** Check that none is open before cutting one.
+- **Pending notes wait while it is open.** A PR that adds a `.changes` note
+  does not merge until the release lands; turn its auto-merge off meanwhile.
+- **Check `main` is green first.** Two PRs can each pass a check (the
+  500-line ceiling, say) and break it together once both are on `main`.
+- **Screenshots never change on a release branch.** Drift that shows up only
+  there is a bug to fix on `main`, never something to approve on the release.
 
 CI's "Versions and change notes" step in the test job (`npm run
 version:check` locally, after committing) holds both sides to this: a feature
@@ -675,6 +698,13 @@ release's build; `sha256sum -c` against the list checks a download the same
 way. It
 needs the `VERCEL_TOKEN`, `VERCEL_ORG_ID` and `VERCEL_PROJECT_ID` secrets in
 the `production` environment and fails, naming the missing one, without them.
+
+**Staging.** `staging.verticopolis.com` shows `main` before it ships.
+`.github/workflows/staging-mirror.yml` force-pushes `main`'s tip to the
+`staging` branch on every push, and Vercel builds it as a preview in the
+project's `staging` environment (team members only, no service worker, and
+its own saves). `staging` is a mirror: never commit to it or open a pull
+request from it, since the next push to `main` overwrites it.
 
 **Cutting the release.** Run the **Cut release** workflow (`release-pr.yml`)
 from the Actions tab, with an app version such as `3.0.0` for a headline
@@ -984,10 +1014,15 @@ alone.
   immediately after opening/updating the PR), not left to a hypothetical
   pre-merge step that never happens. A PR is not "done" until that review has run
   and its confirmed findings are fixed and re-verified on the branch.
-- **Codex re-reviews automatically on every push; Copilot does not.** Copilot's
-  review is a one-shot snapshot, so after pushing new commits to a PR you must
-  **re-request a review from Copilot** to get it to look at the latest changes
-  (the ↻ next to Copilot under Reviewers).
+- **Outside reviewers.** Copilot's review is a one-shot snapshot, so after
+  pushing new commits **re-request a review from Copilot** (the ↻ next to
+  Copilot under Reviewers). PR-Agent runs only on request: comment `/review`
+  and `/improve` once per round ([`docs/ci/pr-agent.md`](./docs/ci/pr-agent.md)).
+- **When the outside reviewers are down,** the bar does not drop. The review
+  skill runs in a loop until a full pass finds nothing to fix, and the
+  stand-in review skill (`.claude/skills/stand-in-pr-review/`) reports on the
+  PR the way Copilot would. The review comes from someone other than the PR's
+  author. [AGENTS.md](./AGENTS.md) → Code review has the steps.
 - **Resolve Copilot/Codex review threads** once the finding is actually addressed
   in code, and then actually **mark each thread Resolved** ("Resolve
   conversation"). A reply alone does not clear the thread, and unresolved threads
@@ -1007,13 +1042,24 @@ alone.
   emphatic-restatement pattern and AI marketing vocabulary (leverage, seamless,
   robust, comprehensive, elevate, streamline, and the like). Keep copy plain,
   human, and grammatically correct.
+- **Game logic lives in the Rust engine.** Rules, caps, prices, tuning and
+  every gameplay calculation belong in `engine-rs/`; the web game reads them
+  through the catalog and the frame and never keeps its own copy.
+- **Help and analytics change in the same PR.** A change players can see
+  updates the manual in `help-site/` (in its 1990s manual style) and, when it
+  adds or changes something players do, the analytics: the events in
+  [`docs/analytics-data-map.md`](./docs/analytics-data-map.md) and the
+  dashboard tiles that read them.
+- **500 lines per file.** `src/tests/fileSize.guard.test.ts` caps TypeScript
+  files (`.ts`, `.tsx`) in `src/` and `scripts/` and Rust files in `engine-rs/`
+  and `engine-bench/` at 500 lines. Files
+  already over it sit on a shrink-only ratchet
+  (`src/tests/fileSize.ratchet.txt`): split them, never add to them.
 - **Rust follows the same source rules.** The engine port in `engine-rs/` is held to
   the same conventions as the TypeScript, with no grandfathered comments:
   American English, no em-dashes (`src/tests/rustProse.guard.test.ts` keeps the
-  Rust sources at zero), and the 500-line file ceiling that
-  `src/tests/fileSize.guard.test.ts` enforces on `src/` and `scripts/` (it scans
-  `.rs` files too, inline `#[cfg(test)]` modules included; today's oversized
-  Rust files sit on the same shrink-only ratchet, `src/tests/fileSize.ratchet.txt`).
+  Rust sources at zero), and the 500-line ceiling above (inline `#[cfg(test)]`
+  modules count).
   The other gates have Rust counterparts: lint and typecheck map to `cargo fmt
   --check` and `cargo clippy -D warnings` (`engine-rs.yml`), and the engine
   boundary rules to `engine-rs/tests/independence.rs`, which keeps the simulation
@@ -1033,14 +1079,17 @@ alone.
   one commit and forces awkward force-resets for follow-up work. Squashing or
   otherwise tidying your *own* branch/PR history before it merges is fine. The
   rule is only about the merge **into `main`**.
-- **Merges go through the merge queue.** Once a PR's checks are green,
-  "Merge when ready" adds it to the queue, which tests the PR on top of the
-  latest `main` and lands it with a merge commit only when the required checks
-  pass there, so one merge cannot turn `main` red for every open PR. The
-  required checks run on the queue's `merge_group` event too. To save
-  minutes, a queue run skips the screenshot capture behind `drift-gate`,
-  whose queue run passes on the PR run's result. The path filters in `test.yml` and `engine-rs.yml` read the
-  queued change from the compare API.
+- **Rebase onto `main`, never merge `main` in.** Rebase a branch when its PR
+  opens and again right before it merges, fold fixups into the commits they
+  fix, push with `--force-with-lease` and let CI run again. Fetch first: the
+  branch may have been rebased in the GitHub UI.
+- **Merge with auto-merge once the PR is signed off.** When the review is
+  done and its findings are fixed, and every required check is green on a
+  branch rebased onto the latest `main`, arm auto-merge with the merge-commit
+  method. Never arm it early so it fires the moment checks pass. No merge
+  queue is in use today; `test.yml` and `engine-rs.yml` still answer the
+  `merge_group` event so the queue can be turned back on without workflow
+  changes.
 
 ## Where things live
 
@@ -1056,6 +1105,8 @@ alone.
 | `src/ui/` | DOM controls: palette, status bar, native `<dialog>` modals. The `UI` shell delegates to friend-modules: `templates/` (lit-html bodies), `uiDialogs`, `uiPanels`, `uiStatus`, `uiPalette`. |
 | `src/audio/` | Sound, independent of rendering: the `AudioEngine` facade (`Audio.ts`), `ToneAudioEngine` (orchestrator), `toneScenes` (data/math), `toneTracks` (music), `toneVoices` (jingles), `tonePercussion`, `toneRain`, the `toneCrowd*` ambience modules, and `audioAssets`. See [SOUNDS.md](./SOUNDS.md). |
 | `src/storage/` | Save/load, the `VCZ1:` storage container, `.vctower` file handling. Who owns what, and every path: [`docs/architecture/save-paths.md`](./docs/architecture/save-paths.md). |
+| `api/` | Vercel serverless functions, with their own `tsconfig.json` (typecheck and lint cover them). |
+| `help-site/` | The player manual (Astro + Starlight), served at help.verticopolis.com. |
 | `src/main.ts` | Composition root: wires input, engine, and the game loop. |
 | `src/tests/` | Vitest fixtures, integration suites (`*.integration.test.ts`) and the repository-wide guard tests; unit tests colocate next to their source. |
 | `conformance/` | The conformance lock and catalog digests the engine is held to. |

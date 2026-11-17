@@ -337,8 +337,9 @@ These rules sit on top of the two test tiers in
 - **No tests that mirror CI or test config text.** Do not introduce
   standalone test files or add source-text assertions for workflow YAML,
   Playwright/Vitest settings, or other test configuration. Check the resolved
-  tool behavior and actual CI runs instead. See `CONTRIBUTING.md` under
-  **Quality gates** for the canonical policy.
+  tool behavior and actual CI runs instead, and add no new `*.guard.test.ts`
+  file at all. See `CONTRIBUTING.md` under **Quality gates** for the canonical
+  policy.
 
 ## Docker housekeeping: clean up after yourself
 

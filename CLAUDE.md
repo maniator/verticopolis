@@ -62,6 +62,11 @@ review skill. The BMAD agent rules live in `_bmad-output/project-context.md`.
   names breaks. `src/tests/testHonesty.guard.test.ts` enforces the mechanical
   half; reviewers check the rest. See CONTRIBUTING.md → **What every test must
   do**.
+- **No new guard tests** (owner, 2026-11-14). Never add a `*.guard.test.ts`
+  file or any other meta-test that scans source, workflow or configuration
+  files. Existing guards stay until reviewed one by one, and extending an
+  existing guard's allowlist or shrinking its ratchet is fine. See
+  CONTRIBUTING.md → **Quality gates**.
 - **Quality gates before pushing:** `npm run typecheck`, `npm run lint`,
   `npm test`, `npm run build`. All four must be green. The build needs the
   engine package (`npm run wasm:build`), or `VC_ALLOW_NO_ENGINE=1` for a
@@ -93,8 +98,8 @@ review skill. The BMAD agent rules live in `_bmad-output/project-context.md`.
   the same conventions as the TypeScript, with no grandfathered comments:
   American English, no em-dashes (`src/tests/rustProse.guard.test.ts` keeps the
   Rust sources at zero), and the 500-line file ceiling that
-  `src/tests/fileSize.guard.test.ts` enforces on `src/` and `scripts/` (it scans
-  `.rs` files too, inline `#[cfg(test)]` modules included; today's oversized
+  `src/tests/fileSize.guard.test.ts` enforces on TypeScript in `src/`
+  and `scripts/` and Rust in `engine-rs/` and `engine-bench/` (inline `#[cfg(test)]` modules included; today's oversized
   Rust files sit on the same shrink-only ratchet, `src/tests/fileSize.ratchet.txt`).
   The other gates have Rust counterparts: lint and typecheck map to `cargo fmt
   --check` and `cargo clippy -D warnings` (`engine-rs.yml`), and the engine
@@ -256,8 +261,9 @@ review skill. The BMAD agent rules live in `_bmad-output/project-context.md`.
 
 ## Canon reference (don't re-derive from memory)
 
-- **The Rust engine is the only engine the shipped game runs** (app 2.66.0,
-  engine crate 1.0.0; every build is the Rust-only build). A simulation change
+- **The Rust engine is the only engine the shipped game runs** (since app
+  2.66.0 and engine crate 1.0.0; every build is the Rust-only
+  build). A simulation change
   lands in `engine-rs/`. The TypeScript reference engine was deleted (#1875);
   its rules are Rust tests now (`docs/architecture/ts-engine-retirement-map.md`).
 - **The engine crate version (`engine-rs/Cargo.toml`) goes up with the
