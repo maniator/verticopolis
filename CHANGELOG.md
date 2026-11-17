@@ -25,6 +25,10 @@ prompt already tells players it is an engine update and shows the new version.
 Entries below 1.51.1 were curated from the commit history after the fact, so they
 are documentation only: no build that a client fetches carries them.
 
+## 4.10.1
+
+- People now get on only an elevator going their way. Someone on 45 bound for 47 no longer boards a car heading down and rides it to the bottom and back up.
+
 ## 4.10.0
 
 - File > Open Recent lists the last five towers you opened or saved, numbered 1 to 5 the way 90s programs did, from My Towers or your linked folder. Press a tower's number to open it from the keyboard, and it works from the opening screen too. A tower that has since been deleted or moved says so and drops off the list.
