@@ -15,6 +15,13 @@ raised the version, so they are documentation only.
 There is no entry for 0.17.0, which only
 existed as a step inside a stacked branch.
 
+## 1.50.0 (2026-11-17)
+
+- The move-in check (`would_evict_fresh_tenant`) reads a room's placement once per check instead of once per hour of its two-day look-ahead, and `nearest_transport_distance` no longer copies a floor's transport spans. A game day on a tower with many vacant rooms takes up to about a quarter less work; every result is unchanged.
+- A Modern route search allocates its route's floor and shaft lists once at their size, and the floor-tile memo uses the engine's fast hasher, so a game day does slightly less work (up to 0.6% on the bench towers) with every result unchanged.
+- New query `congestionCause(floor)` (and `Simulation::congestion_cause`): the ids of the transports behind one floor's congestion reading, in the tower's transport order. That is the transport with the highest estimate there (every one tied for it), or every passenger elevator stopping there when the floor's real commute wait sets the reading. Empty for a floor with no reading or one that is not a whole number. It builds the reading once, so it is a read for a tap, not a frame. No saved-game, frame, view layout or catalog change.
+- Dispatch runs every car of a shaft whose schedule has `auto_tune` on while the crowd waiting at its stops is more than its on-shift cars hold (`Schedule::cars_for_backlog`). A schedule with Auto off keeps its rows as written.
+
 ## 1.49.0 (2026-11-17)
 
 - The hourly demand ring and utilization (`sample_elevator_util`) count each car's estimate seats plus the crowd's own riders there (`Crowd::car_riders`), each rider once (#2397). The dispatch keeps the estimate's seats beside `car_load` without changing how any car moves, in one per-shaft record with the callers each car has seen and the time it has waited (`dispatch_cars.rs`), so a step looks a shaft up twice where it looked it up three times, and a save's `dispatch` carries them as `estimateSeats`; a save without them loads. The conformance lock is unchanged.

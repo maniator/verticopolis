@@ -25,6 +25,12 @@ prompt already tells players it is an engine update and shows the new version.
 Entries below 1.51.1 were curated from the commit history after the fact, so they
 are documentation only: no build that a client fetches carries them.
 
+## 4.13.0
+
+- Click or tap the Traffic readout when it names a floor, such as "Backed up · B2", and the view zooms in on that floor, centered on what is backing it up. The floor flashes red for a few seconds and the elevators, stairs or escalators backing it up are outlined in yellow.
+- Towers with many empty rooms to let run faster: deciding whether a new tenant would stay now takes a fraction of the time, so a game day on a big tower runs up to a quarter faster.
+- Modern: an elevator on Auto no longer leaves a crowd waiting while its cars sit parked. When more people wait at its stops than its running cars can take in one trip, it puts every car back to work until the line clears. Before, a shaft Auto had cut to one car could never earn its cars back, and lines of a hundred or more built up at its lobbies.
+
 ## 4.12.0
 
 - Modern: elevators can re-tune their own schedules. Tick Auto in an elevator's Schedule window and it sets how many cars run each hour every morning at 5 AM from the traffic it measured, so a schedule never goes stale as the tower grows. Your staging floors, door time and waiting-car response stay as you set them. New Modern elevators start with Auto on; elevators in towers saved before this version start with it off. Classic is unchanged.
