@@ -67,6 +67,41 @@ describe("Rust port tenant explanations", () => {
     expect(rendered).not.toContain("give this floor an elevator stop");
   });
 
+  it("names the elevator with room for cars, or says every one is full (#2251)", () => {
+    const shaft = { kind: VIEW_LAYOUT.kinds.indexOf("elevatorExpress"), bottom: -1, top: 15, cars: 3, maxCars: 8 };
+    const jam = (prefix: "gripe" | "leaseGripe", roomy: boolean) =>
+      facts({
+        [prefix]: 1,
+        [`${prefix}Cause`]: code("vacateReasons", "congestion"),
+        [`${prefix}Binding`]: code("bindings", "elevator"),
+        ...(roomy
+          ? {
+              [`${prefix}ShaftKind`]: shaft.kind,
+              [`${prefix}ShaftBottom`]: shaft.bottom,
+              [`${prefix}ShaftTop`]: shaft.top,
+              [`${prefix}ShaftCars`]: shaft.cars,
+              [`${prefix}ShaftMaxCars`]: shaft.maxCars,
+            }
+          : {}),
+      });
+    const facilityName = vi.fn((kind: string) => (kind === "elevatorExpress" ? "Express Elevator" : undefined));
+    const named = (record: Float64Array) =>
+      text(createPortUnitDiagnostics({ viewLayout: () => LAYOUT_TEXT, unitFacts: () => record }, MODERN_RULES, undefined, facilityName)(73));
+    expect(named(jam("gripe", true))).toContain(
+      "Main gripe: crowded elevators. The express elevator on floors B2–15 runs 3 of 8 cars; add cars to it before building a parallel shaft.",
+    );
+    expect(facilityName).toHaveBeenCalledWith("elevatorExpress");
+    expect(named(jam("gripe", false))).toContain(
+      "Main gripe: crowded elevators. Every elevator stopping here already runs all its cars; add a parallel shaft to this block.",
+    );
+    // The lease gripe reads its own slots.
+    const lease = jam("leaseGripe", true);
+    lease[slots.indexOf("wontLease")] = 1;
+    expect(named(lease)).toContain("The express elevator on floors B2–15 runs 3 of 8 cars");
+    // Without a catalog name the advice still reads.
+    expect(render(jam("gripe", true))).toContain("The elevator on floors B2–15 runs 3 of 8 cars");
+  });
+
   it("suppresses duplicate unmet-demand advice when the unit is unreachable", () => {
     const record = facts({
       access: code("accessLines", "noRoute"),

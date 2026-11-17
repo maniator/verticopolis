@@ -5,7 +5,7 @@
 
 use serde::Serialize;
 
-use super::DiagnosticFacts;
+use super::{DiagnosticFacts, RoomyShaft};
 use crate::churn::CongestionBindingClass;
 use crate::demand::unmet_coverage;
 use crate::econ::rent_of;
@@ -62,6 +62,10 @@ pub struct GripeFacts {
     /// Congestion with a walkway binding: a passenger elevator stops here.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub elevator_here: Option<bool>,
+    /// Congestion with an elevator binding: the elevator stopping here with
+    /// the most room for cars, or `None` when every one is full (#2251).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub roomy_shaft: Option<RoomyShaft>,
     /// Noise: a same-floor office or commercial source (lobby-shieldable).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub adjacent: Option<bool>,
@@ -378,6 +382,7 @@ impl Simulation {
             cause,
             binding: None,
             elevator_here: None,
+            roomy_shaft: None,
             adjacent: None,
             club: None,
             coverage: None,
@@ -387,6 +392,9 @@ impl Simulation {
             "congestion" => {
                 let binding = self.binding_class_from(att, u.floor);
                 g.binding = Some(binding_name(binding));
+                if binding == CongestionBindingClass::Elevator {
+                    g.roomy_shaft = self.roomy_elevator_at(u.floor);
+                }
                 if matches!(
                     binding,
                     CongestionBindingClass::Stairs

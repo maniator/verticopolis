@@ -23,6 +23,9 @@ mod memo;
 mod memo_tests;
 // The native library retains these Rust facts for parity and future consumers;
 // today only the WASM interface calls them outside tests.
+mod roomy_shaft;
+#[cfg(test)]
+mod roomy_shaft_tests;
 #[cfg_attr(not(feature = "wasm"), allow(dead_code))]
 pub(crate) mod service;
 mod tenant;
@@ -31,6 +34,7 @@ mod tenant_tests;
 
 pub use amenity::AmenityFacts;
 pub use memo::DiagMemo;
+pub use roomy_shaft::RoomyShaft;
 pub use tenant::{GripeFacts, LobbyFacts, NoticeFacts, SlotFacts, WontLeaseFacts};
 
 use serde::Serialize;

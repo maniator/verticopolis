@@ -379,17 +379,11 @@ fn check_stats_sheet(e: &mut Engine) {
 
 fn gripe_want(g: &serde_json::Value) -> Vec<f64> {
     if g.is_null() {
-        return vec![
-            0.0,
-            f64::NAN,
-            f64::NAN,
-            f64::NAN,
-            f64::NAN,
-            f64::NAN,
-            f64::NAN,
-            f64::NAN,
-        ];
+        let mut absent = vec![f64::NAN; 13];
+        absent[0] = 0.0;
+        return absent;
     }
+    let s = &g["roomyShaft"];
     vec![
         1.0,
         code_of(&VACATE_REASONS, g["cause"].as_str()),
@@ -399,6 +393,11 @@ fn gripe_want(g: &serde_json::Value) -> Vec<f64> {
         num(&g["club"]),
         num(&g["coverage"]),
         num(&g["floorReachable"]),
+        s["kind"].as_str().map_or(f64::NAN, kind_code),
+        num(&s["bottom"]),
+        num(&s["top"]),
+        num(&s["cars"]),
+        num(&s["maxCars"]),
     ]
 }
 
