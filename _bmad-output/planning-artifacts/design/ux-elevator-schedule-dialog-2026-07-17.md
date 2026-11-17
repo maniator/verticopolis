@@ -803,7 +803,7 @@ so the spec and the build cannot drift silently:
   drain files under yesterday's ring. Three specced surfaces land on it: red hotspot markers
   in the floors grid for the visible day's busiest hour, the Simulate trailing clause ("Most
   riders board on floors 5–7."), and Auto-tune's staging seed aiming the upper half at the
-  busiest boarding floor across the WHOLE day's rings (a single peak-hour slot is often the
+  busiest boarding floor above the base lobby across the WHOLE day's rings (a single peak-hour slot is often the
   lobby-dominated up-rush), preferring the visible day when warm. Presets keep the plain
   lobby split: they are intents, not measurements. Origins are gated on the day's warm demand
   curve, and both the markers and the aim are filtered to floors the shaft still serves, so
