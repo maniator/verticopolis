@@ -47,6 +47,7 @@ context:
 - `src/game/appBoot.ts` -- calls the wiring once
 - `src/game/editorActions.ts` -- remembers tower and facility names on rename
 - `src/ui/uiImport.ts` -- remembers an imported file's name
+- `src/ui/uiDialogs.ts` -- remembers a 1994 tower's name when its import report opens
 - `docs/analytics-data-map.md`, `help-site/src/content/docs/privacy.md` -- privacy copy
 
 ## Tasks & Acceptance
@@ -61,6 +62,10 @@ context:
 **Acceptance Criteria:**
 - Given any tower or file name the player has in My Towers, a linked folder, Recent, the open tower, or a rename or import this page life, when an uncaught error quotes it, then the sent `$exception` holds `<player text>` in its place in every field.
 - Given the analytics vocabulary, when audited, then no other event carries free text (codes from closed lists only).
+
+## Spec Change Log
+
+- 2026-11-17, review round 1 (`bmad-code-review`, lean pass): the whole-word pattern used a lookbehind, which older Safari cannot compile, so a report holding a known name would be dropped there; it now captures the left edge instead. Each field is lowercased once per change rather than once per name. "Tower" and "Tower One" (the game's names for an unnamed tower or file) are no longer treated as player text. KEEP: dedup before scrub, scrub-then-clamp windows.
 
 ## Design Notes
 
