@@ -81,7 +81,6 @@ function makeApp(sim: Draft, ui: UI) {
     refreshEditor: vi.fn(),
     lastUiUpdate: -1e9,
     lastStar: sim.star,
-    lastMealRushDay: { breakfast: -1, lunch: -1, dinner: -1 } as Record<string, number>,
     // The update flow's own state, so the real `maybeSurfaceUpdatePrompt` runs.
     pendingUpdate: null as (() => Promise<void>) | null,
     pendingUpdateInfo: null,

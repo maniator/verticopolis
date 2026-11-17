@@ -27,7 +27,6 @@ function standIn(tier: TrafficTier, stepRaises = true, won = false) {
     frameErrors: [{ at: "t", message: "old tower" }],
     shownWin: true,
     accMinutes: 0.5,
-    lastMealRushDay: { breakfast: 3, lunch: 3, dinner: 2 },
     // A drag the step cut off: its release never reaches onActionUp.
     paintAnchor: { tile: 3, floor: 2 } as unknown,
     buildAnchor: { tile: 3, floor: 2, oTile: 3, oFloor: 2, lifting: false } as unknown,
@@ -81,16 +80,11 @@ describe("followSwap and the traffic chip", () => {
 });
 
 describe("followSwap and the tower's latches", () => {
-  it("starts the win, meal-rush and owed-minute latches and the crash entries over on another tower", () => {
+  it("starts the win and owed-minute latches and the crash entries over on another tower", () => {
     for (const follow of ["swap", "restore"] as const) {
       const app = standIn(0);
       GameApp.prototype.followSwap.call(app as unknown as GameApp, follow);
-      expect([app.shownWin, app.accMinutes, app.lastMealRushDay, app.frameErrors], follow).toEqual([
-        false,
-        0,
-        { breakfast: -1, lunch: -1, dinner: -1 },
-        [],
-      ]);
+      expect([app.shownWin, app.accMinutes, app.frameErrors], follow).toEqual([false, 0, []]);
     }
   });
 
@@ -109,7 +103,6 @@ describe("followSwap and the tower's latches", () => {
     GameApp.prototype.followSwap.call(app as unknown as GameApp, "step");
     expect(app.shownWin, "the TOWER congratulations were already shown").toBe(true);
     expect(app.accMinutes, "time is not rewound, so the owed minutes stay").toBe(0.5);
-    expect(app.lastMealRushDay, "today's meal rushes already fired").toEqual({ breakfast: 3, lunch: 3, dinner: 2 });
     expect(app.frameErrors, "the same tower's crash context").toHaveLength(1);
   });
 });

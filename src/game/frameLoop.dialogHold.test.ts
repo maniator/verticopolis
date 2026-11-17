@@ -12,7 +12,6 @@ import { makeApp, makeSim } from "./frameLoop.fixture";
 vi.mock("./trafficHud", () => ({ updateTraffic: vi.fn() }));
 vi.mock("./panelAnchoring", () => ({ positionPanels: vi.fn() }));
 vi.mock("./updateFlow", () => ({ maybeSurfaceUpdatePrompt: vi.fn() }));
-vi.mock("./mealRush", () => ({ decideMealRush: vi.fn(() => ({ fire: false, dayOfKind: 0 })) }));
 
 afterEach(() => {
   document.body.innerHTML = "";

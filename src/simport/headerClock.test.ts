@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calendarOf, clockOf, type ClockHeader, type ClockView } from "./headerClock";
+import { clockOf, type ClockHeader, type ClockView } from "./headerClock";
 
 /**
  * A panel's clock, derived from the header alone: the time of day from the
@@ -75,10 +75,6 @@ describe("headerClock", () => {
   for (const [name, rows, week] of CALENDARS) {
     it(`${name}: reads the time and names from the header`, () => {
       for (const r of rows) expect(readings(clockOf(headerOf(r, week))), `at minute ${r[0]}`).toEqual(r);
-    });
-
-    it(`${name}: the calendar is the header's`, () => {
-      expect(calendarOf(headerOf(rows[0], week))).toMatchObject(week);
     });
   }
 

@@ -29,7 +29,7 @@ export function followEngineTower(app: GameApp, follow: TowerFollow): void {
   // Getting Started and the engine's trap report follow the swap too.
   app.onboarding.adoptSim(app.enginePort, !startsOver);
   noteTowerSwap(!startsOver);
-  // Another tower starts its win, meal-rush and owed-minute latches over, and drops the crash
+  // Another tower starts its win and owed-minute latches over, and drops the crash
   // report's entries (a report pairs them with the current tower's save). A step keeps them:
   // it is the same tower, and time does not go back.
   if (follow !== "step") {
@@ -42,7 +42,6 @@ export function followEngineTower(app: GameApp, follow: TowerFollow): void {
     app.shownWin = app.enginePort.evaluatedTower();
     app.winHeldUntil = -Infinity;
     app.accMinutes = 0;
-    app.lastMealRushDay = { breakfast: -1, lunch: -1, dinner: -1 };
     app.frameErrors.length = 0;
   }
   // Read the swapped-in tower now, before the renderer takes it.

@@ -1,6 +1,5 @@
 import { stepFollow } from "../render/excalibur/personFocus";
 import type { GameApp } from "../main";
-import { decideMealRush } from "./mealRush";
 import { updateTraffic } from "./trafficHud";
 import { tickInstallAffordance } from "./installAffordance";
 import { dialogHoldsWork, hasBlockingModal, isEditorBusy, isEngineStopped, isSplashUp } from "./interactionState";
@@ -12,7 +11,6 @@ import { maybeShowStarUp, noteStarUp } from "./starUpFlow";
 import { gameplaySession } from "../analytics";
 import { drainEngineEvents } from "../analyticsEngineBridge";
 import { hudSource } from "./hudSource";
-import { calendarOf } from "../simport/headerClock";
 import { groupDigits } from "../ui/format";
 import { TOAST_SHOWN_MS } from "../ui/uiStatus";
 import { frameWindow } from "../render/excalibur/peopleWindow";
@@ -28,9 +26,10 @@ export const CHOICE_WAITING_NOTICE = "An emergency needs your answer. Time is st
  * The per-frame simulation + throttled UI/audio refresh, split out of the
  * `GameApp` class. `runFrame(app, dtMs)` is called from the engine's `onUpdate`
  * (wrapped in the frame-error guard in engineWiring). It reads and writes
- * frame-loop latch state (`accMinutes`, `lastStar`, `shownWin`, `winHeldUntil`, `lastMealRushDay`)
- * ON `app`, so `adoptSim`'s reset of those fields stays authoritative. Behavior
- * unchanged from the former `GameApp.update`/`emitMealRushes`.
+ * frame-loop latch state (`accMinutes`, `lastStar`, `shownWin`, `winHeldUntil`)
+ * ON `app`, so `adoptSim`'s reset of those fields stays authoritative. It
+ * writes nothing to the tower's log: the Bulletin carries the engine's own
+ * lines (money, warnings, events) and no daily flavor (#2090).
  */
 
 /** Game speeds → in-game minutes advanced per real second: pause, a slow
@@ -118,9 +117,6 @@ export function runFrame(app: GameApp, dtMs: number): void {
   // and paceFactor is normalized so a full day costs the same real time, so
   // the speed buttons keep their meaning.
   const steadyClock = app.prefs.steadyClock === true;
-  // The clock as the last frame left it. A swap (another tower) or an undo or
-  // redo step since then moves the generation, and no meal rush is judged across it.
-  const minutesBeforeTicks = app.reader.generation === app.enginePort.generation() ? app.reader.header.minutes : NaN;
   try {
     app.accMinutes = app.enginePort.advance(app.accMinutes, dtMs, minutesPerSecond, steadyClock, true)[1];
   } catch (err) {
@@ -132,7 +128,6 @@ export function runFrame(app: GameApp, dtMs: number): void {
   // The view follows every frame, so the header, the HUD and the painters
   // read this frame's tower.
   readView(app);
-  emitMealRushes(app, minutesBeforeTicks);
 
   // Throttle the comparatively expensive DOM/audio updates (~6Hz) so a busy
   // tower never makes panning feel sluggish.
@@ -252,55 +247,4 @@ export function runFrame(app: GameApp, dtMs: number): void {
   positionPanels(app);
   // The overview map: constant work unless the tower or the camera changed.
   tickOverviewMap(app);
-}
-
-/** Once per weekday, when this frame's ticks actually CROSSED noon with the
- *  breathing clock on, drop a flavor line in the bulletin. It doubles as the
- *  only in-game explanation of why midday plays out in slow motion (UX call:
- *  the clock itself is the indicator; no HUD gauges). Crossing detection
- *  (rather than sampling `hour === 12` after the loop) means loading a save
- *  that already sits inside the noon hour stays quiet, a frozen clock stays
- *  quiet, and a single huge frame that leaps from 11:5x past 13:00 still
- *  fires. Transient, like the log. */
-export function emitMealRushes(app: GameApp, minutesBeforeTicks: number): void {
-  if (app.prefs.steadyClock) return;
-  const after = app.reader.header.minutes;
-  // A tampered save can seed the clock with non-finite minutes (deserialize
-  // passes data.minutes to Clock un-hardened); without this, dayOfKind is NaN,
-  // the once-per-day latch never sticks (NaN !== NaN), and the bulletin spams
-  // every frame. Same defensive posture as timePacing's finite guards.
-  if (!Number.isFinite(after) || !Number.isFinite(minutesBeforeTicks)) return;
-  const cal = calendarOf(app.reader.header);
-  let tenants: number | undefined;
-  // Emit each meal's bulletin once per day at the START of its window.
-  // Anchoring on the frame START keeps the crossing check correct for a
-  // single huge frame that leaps past the hour boundary; the calendar-aware
-  // weekend gate skips weekends for the workday meals only (lunch and
-  // dinner). Breakfast fires every day (hotels serve breakfast on weekends).
-  const emit = (kind: "breakfast" | "lunch" | "dinner", hour: number, text: string, skipWeekend: boolean): void => {
-    const { fire, dayOfKind } = decideMealRush({
-      hour,
-      skipWeekend,
-      before: minutesBeforeTicks,
-      after,
-      weekDays: cal.weekDays,
-      weekendDays: cal.weekendDays,
-      lastFiredDay: app.lastMealRushDay[kind],
-    });
-    if (!fire) return;
-    // Tenant-count floor: silence bulletins in a very small tower (1-star lot
-    // with a handful of rooms), so the log does not chatter through the early
-    // game. 30 occupied tenants is a modest bar; a mid-star tower clears it.
-    // The header's population is the census `totalPopulation()` counts, as
-    // of this frame's update.
-    if (tenants === undefined) tenants = app.reader.header.population;
-    if (tenants < 30) return;
-    app.lastMealRushDay[kind] = dayOfKind;
-    app.enginePort.logLine(text, app.portCodes.code("logKinds", "info"));
-  };
-  // Breakfast at 07:00, dinner at 18:00, lunch at 12:00. Order matches the
-  // day so a slow-motion frame that crosses two boundaries emits both.
-  emit("breakfast", 7, "Breakfast rush! Guests head down for the buffet.", false);
-  emit("lunch", 12, "Lunch rush! Midday plays out in slow motion, just like 1994.", true);
-  emit("dinner", 18, "Dinner rush! Elevators fill for the evening service.", true);
 }

@@ -104,10 +104,6 @@ class GameApp implements GameAppPorts {
   /** The game's Space hold (`bindKeys`) as `press` went down: the camera's pan key. @internal */
   spacePanKey: (press?: Event) => boolean = () => false;
   /** @internal */ accMinutes = 0;
-  /** Last day each meal-rush bulletin fired (transient, like the log). Kept
-   *  per meal so a save reloaded mid-day does not spam an already-fired kind.
-   *  @internal */
-  lastMealRushDay: Record<"breakfast" | "lunch" | "dinner", number> = { breakfast: -1, lunch: -1, dinner: -1 };
   /** @internal */ lastUiUpdate = 0;
   /** The last few failures the frame guard and the traffic chip swallowed to
    *  keep the game alive, kept for the crash report (game/frameErrors.ts).

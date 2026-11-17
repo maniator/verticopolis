@@ -1,7 +1,6 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { SPEEDS, runFrame, emitMealRushes, applySpeed } from "./frameLoop";
+import { describe, it, expect, vi, afterEach } from "vitest";
+import { SPEEDS, runFrame, applySpeed } from "./frameLoop";
 import { MAX_STEP_MS } from "../render/excalibur/crowdLook";
-import { decideMealRush } from "./mealRush";
 import { gameplaySession } from "../analytics";
 import * as analyticsActions from "../analyticsActions";
 import { makeApp, makeSim } from "./frameLoop.fixture";
@@ -12,14 +11,11 @@ import { maybeShowStarUp, noteStarUp } from "./starUpFlow";
 
 /**
  * These pin the per-frame simulation + throttled UI/audio refresh (`runFrame`)
- * and the once-per-day meal-rush bulletins (`emitMealRushes`) against a
- * hand-built fake `GameApp`. The sibling collaborators are mocked so the tests
+ * against a hand-built fake `GameApp`. The sibling collaborators are mocked so the tests
  * isolate frameLoop's own control flow (the freeze latch, the catch-up cap, the
  * ~6Hz throttle, the auto-surfaced modals):
  *   - `updateTraffic` / `positionPanels` / `maybeSurfaceUpdatePrompt` are inert
  *     spies (their behavior is pinned by their own colocated tests).
- *   - `decideMealRush` is a controllable spy so the meal-rush emission can be
- *     forced without restating its pure crossing math.
  * The engine port is a fake whose `advance` hands back the carry it was given
  * unless a test says otherwise: how the engine cuts owed minutes into steps
  * (the pace curve, the quantum, the catch-up cap, a bad amount, a mode
@@ -30,7 +26,6 @@ vi.mock("./trafficHud", () => ({ updateTraffic: vi.fn() }));
 vi.mock("./panelAnchoring", () => ({ positionPanels: vi.fn() }));
 vi.mock("./updateFlow", () => ({ maybeSurfaceUpdatePrompt: vi.fn() }));
 vi.mock("./starUpFlow", () => ({ noteStarUp: vi.fn(), maybeShowStarUp: vi.fn() }));
-vi.mock("./mealRush", () => ({ decideMealRush: vi.fn(() => ({ fire: false, dayOfKind: 0 })) }));
 
 afterEach(() => {
   document.body.innerHTML = "";
@@ -195,16 +190,6 @@ describe("runFrame simulation stepping", () => {
     // window adds two tiles and one floor on each side.
     expect(raw.enginePort.setPeopleWindow).toHaveBeenCalledExactlyOnceWith(9, 41, -2, 102);
     expect(raw.enginePort.setPeopleWindow.mock.invocationCallOrder[0]).toBeLessThan(raw.reader.update.mock.invocationCallOrder[0]);
-  });
-
-  it("judges no meal rush across a swap since the last frame", () => {
-    const { app, raw } = makeApp({ speed: 3, prefs: { steadyClock: false } });
-    runFrame(app, 1000 / 60);
-    expect(decideMealRush).toHaveBeenCalled();
-    vi.mocked(decideMealRush).mockClear();
-    raw.reader.generation = -1; // the view was read in the tower before a load
-    runFrame(app, 1000 / 60);
-    expect(decideMealRush).not.toHaveBeenCalled();
   });
 
   it("hands the engine a non-finite frame as it came, and keeps the carry it answers (#541)", () => {
@@ -394,70 +379,23 @@ describe("runFrame TOWER congratulations", () => {
   });
 });
 
-describe("emitMealRushes", () => {
-  beforeEach(() => {
-    vi.mocked(decideMealRush).mockReset().mockReturnValue({ fire: false, dayOfKind: 0 });
-  });
-
-  it("returns early when the steady clock is on (no bulletins, no decision)", () => {
-    const { app, sim } = makeApp({ prefs: { steadyClock: true } });
-    emitMealRushes(app, 0);
-    expect(decideMealRush).not.toHaveBeenCalled();
-    expect(sim.emit).not.toHaveBeenCalled();
-  });
-
-  it("returns early on non-finite clock minutes (tampered save)", () => {
-    const sim = makeSim({ clock: { minuteOfDay: 0, minutes: NaN, calendar: { weekDays: 7, weekendDays: 2 } } });
-    sim.tower.totalPopulation = vi.fn(() => 100);
-    const { app } = makeApp({ prefs: { steadyClock: false }, sim });
-    emitMealRushes(app, 0);
-    expect(decideMealRush).not.toHaveBeenCalled();
-  });
-
-  it("returns early on non-finite frame-start minutes", () => {
-    const sim = makeSim({ clock: { minuteOfDay: 0, minutes: 500, calendar: { weekDays: 7, weekendDays: 2 } } });
-    sim.tower.totalPopulation = vi.fn(() => 100);
-    const { app } = makeApp({ prefs: { steadyClock: false }, sim });
-    emitMealRushes(app, Number.POSITIVE_INFINITY);
-    expect(decideMealRush).not.toHaveBeenCalled();
-  });
-
-  it("stays quiet in a tiny tower (< 30 tenants)", () => {
-    const sim = makeSim({ clock: { minuteOfDay: 0, minutes: 500, calendar: { weekDays: 7, weekendDays: 2 } } });
-    sim.tower.totalPopulation = vi.fn(() => 29);
-    vi.mocked(decideMealRush).mockReturnValue({ fire: true, dayOfKind: 5 });
-    const { app, raw } = makeApp({ prefs: { steadyClock: false }, sim });
-    raw.reader.update(); // the frame's census
-    emitMealRushes(app, 0);
-    // Every rush was due: nothing fired or latched.
-    expect([sim.tower.totalPopulation.mock.calls.length, vi.mocked(sim.emit).mock.calls.length, raw.lastMealRushDay.breakfast]).toEqual([1, 0, -1]);
-  });
-
-  it("emits breakfast, lunch, and dinner when decideMealRush fires, latching each day", () => {
-    const sim = makeSim({ clock: { minuteOfDay: 0, minutes: 2000, calendar: { weekDays: 7, weekendDays: 2 } } });
+describe("the Bulletin's routine lines (#2090)", () => {
+  it("writes no meal rush line when a busy tower's frame runs through breakfast, lunch and dinner", () => {
+    // A weekday with 40 tenants and the breathing clock on: the frame starts
+    // at 06:40 and its steps end at 18:20, past all three meal hours. The
+    // Bulletin keeps the engine's own lines (rent, maintenance, warnings), so
+    // the frame loop writes none of its own.
+    const sim = makeSim({ clock: { minuteOfDay: 400, minutes: 400, calendar: { weekDays: 7, weekendDays: 2 } } });
     sim.tower.totalPopulation = vi.fn(() => 40);
-    vi.mocked(decideMealRush).mockReturnValue({ fire: true, dayOfKind: 5 });
-    const { app, raw } = makeApp({ prefs: { steadyClock: false }, sim });
-    raw.reader.update(); // the frame's census
-    emitMealRushes(app, 100);
-    expect(decideMealRush).toHaveBeenCalledTimes(3);
-    // Each meal passes its own hour + weekend rule (breakfast fires on weekends).
-    const args = vi.mocked(decideMealRush).mock.calls.map((c) => c[0]);
-    expect(args[0]).toMatchObject({ hour: 7, skipWeekend: false, before: 100, after: 2000 });
-    expect(args[1]).toMatchObject({ hour: 12, skipWeekend: true });
-    expect(args[2]).toMatchObject({ hour: 18, skipWeekend: true });
-    expect(sim.emit).toHaveBeenCalledTimes(3);
-    expect(raw.lastMealRushDay).toEqual({ breakfast: 5, lunch: 5, dinner: 5 });
-  });
-
-  it("emits nothing when decideMealRush declines every meal", () => {
-    const sim = makeSim({ clock: { minuteOfDay: 0, minutes: 2000, calendar: { weekDays: 7, weekendDays: 2 } } });
-    sim.tower.totalPopulation = vi.fn(() => 40);
-    vi.mocked(decideMealRush).mockReturnValue({ fire: false, dayOfKind: 5 });
-    const { app, raw } = makeApp({ prefs: { steadyClock: false }, sim });
-    emitMealRushes(app, 100);
-    expect(decideMealRush).toHaveBeenCalledTimes(3);
+    const { app, raw } = makeApp({ speed: 3, accMinutes: 0, prefs: { steadyClock: false }, sim });
+    raw.reader.update(); // the last frame's view: 06:40, 40 tenants
+    raw.enginePort.advance.mockImplementationOnce(() => {
+      sim.clock.minutes = 1100;
+      return Float64Array.of(700, 0);
+    });
+    runFrame(app, 1000 / 60);
+    expect(raw.reader.header.minutes, "the frame's steps did cross all three meal hours").toBe(1100);
+    expect(raw.enginePort.logLine).not.toHaveBeenCalled();
     expect(sim.emit).not.toHaveBeenCalled();
-    expect(raw.lastMealRushDay).toEqual({ breakfast: -1, lunch: -1, dinner: -1 });
   });
 });

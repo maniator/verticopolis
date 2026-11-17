@@ -124,7 +124,6 @@ export function makeApp(over: Record<string, unknown> = {}) {
     shownStar: false,
     shownWin: false,
     winHeldUntil: -Infinity,
-    lastMealRushDay: { breakfast: -1, lunch: -1, dinner: -1 } as Record<string, number>,
     ...over,
   };
   return { app: app as unknown as GameApp, raw: app, sim };

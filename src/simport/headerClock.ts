@@ -59,8 +59,3 @@ export function clockOf(h: ClockHeader): ClockView {
     formatRetroDate: () => formatRetroDate(h),
   };
 }
-
-/** The tower's calendar lengths, as the engine reports them. */
-export function calendarOf(h: Pick<HeaderView, "weekDays" | "weekendDays">): Pick<HeaderView, "weekDays" | "weekendDays"> {
-  return h;
-}
