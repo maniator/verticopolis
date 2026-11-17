@@ -63,6 +63,10 @@ pub struct Rules {
     /// How long, in seconds, a person waits before the wait counts as stress
     /// and the frontend shows them fed up (red). The same in both modes.
     pub fed_up_wait: f64,
+    /// Whether one free parking space serves every office (#1970), so the
+    /// statistics count the offices' need as one space (#2024). When false
+    /// each office needs spaces for its workers' cars.
+    pub offices_share_one_parking_space: bool,
     /// The most stories a lobby can rise (#308). A floor's first lobby
     /// placement sets its height, and it never changes after.
     pub max_lobby_height: i64,

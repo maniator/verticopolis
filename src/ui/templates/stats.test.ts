@@ -81,7 +81,7 @@ describe("statsTemplate structure", () => {
   it("names the homes in the parking demand only when Modern homes need spaces (#1973)", () => {
     const offices = { officePop: 6, offices: 1, suites: 2, homes: 0, total: 3, coverage: null as number | null, short: false };
     const cell = (demand: typeof offices) =>
-      cellAfter(body({ stats: { star: 3 }, report: { parkingDemand: demand } }), "Parking demand")!.textContent;
+      cellAfter(body({ mode: "modern", stats: { star: 3 }, report: { parkingDemand: demand } }), "Parking demand")!.textContent;
     expect(cell(offices)).toBe("3 needed (1 offices + 2 suites)");
     expect(cell({ ...offices, homes: 4, total: 7 })).toBe("7 needed (1 offices + 2 suites + 4 homes)");
   });
@@ -89,9 +89,21 @@ describe("statsTemplate structure", () => {
   it("shows how much of the parking need is covered only while it falls short (#1973)", () => {
     const demand = { officePop: 6, offices: 1, suites: 2, homes: 4, total: 7, coverage: null as number | null, short: false };
     const cell = (d: typeof demand) =>
-      cellAfter(body({ stats: { star: 3 }, report: { parkingDemand: d } }), "Parking demand")!.textContent;
+      cellAfter(body({ mode: "modern", stats: { star: 3 }, report: { parkingDemand: d } }), "Parking demand")!.textContent;
     expect(cell(demand)).toBe("7 needed (1 offices + 2 suites + 4 homes)");
     expect(cell({ ...demand, coverage: 0.6449 })).toBe("7 needed (1 offices + 2 suites + 4 homes) · 64% covered");
+  });
+
+  it("words the Classic count as the offices' one space plus a space per suite (#2024)", () => {
+    // The engine counts the Classic need by the rule: one space serves every
+    // office, so 48 workers' cars still need one, plus one per suite.
+    const demand = { officePop: 48, offices: 1, suites: 1, homes: 0, total: 2, coverage: null as number | null, short: false };
+    const cell = (d: typeof demand, mode: "classic" | "modern") =>
+      cellAfter(body({ mode, stats: { star: 3 }, report: { parkingDemand: d } }), "Parking demand")!.textContent;
+    expect(cell(demand, "classic")).toBe("2 needed (offices 1 + 1 suite)");
+    expect(cell({ ...demand, suites: 3, total: 4 }, "classic")).toBe("4 needed (offices 1 + 3 suites)");
+    // The same numbers under the Modern rule keep the cars' wording.
+    expect(cell(demand, "modern")).toBe("2 needed (1 offices + 1 suites)");
   });
 
   it("colors the parking demand by the engine's shortage answer alone", () => {

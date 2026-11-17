@@ -59,6 +59,8 @@ pub fn catalog(mode: GameMode) -> Catalog {
             venue_flights: mode.winds_venue_flights(),
             front_door_per_tower: mode.lays_ground_lobbies_apart(),
             express_stops_on_15th_floors: mode.express_stops_on_15th_floors(),
+            offices_share_one_parking_space: mode.office_parking()
+                == crate::rules::OfficeParking::AnyFreeSpace,
             fed_up_wait: crate::crowd::STRESS_WAIT,
             max_lobby_height: crate::facilities::MAX_LOBBY_HEIGHT,
             announces_star_duties: mode.announces_star_duties(),
