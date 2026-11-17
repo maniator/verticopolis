@@ -97,10 +97,10 @@ describe("scrubJsonEcho", () => {
 });
 
 describe("the known player text", () => {
-  it("reads every source at call time, longest first, without duplicates in any case", () => {
+  it("reads every source at call time, longest first, without exact duplicates", () => {
     let name = "Spire";
     addPlayerTextSource(() => [name, "Harbor One Annex"]);
-    addPlayerTextSource(() => ["spire", "Harbor One", null, undefined]);
+    addPlayerTextSource(() => ["Spire", "Harbor One", null, undefined]);
     expect(knownPlayerText()).toEqual(["Harbor One Annex", "Harbor One", "Spire"]);
     name = "Lighthouse";
     expect(knownPlayerText()).toContain("Lighthouse");
@@ -118,6 +118,13 @@ describe("the known player text", () => {
   it("keeps the names the game gives an unnamed tower or file", () => {
     addPlayerTextSource(() => ["Tower", "tower one", "Tower Two"]);
     expect(knownPlayerText()).toEqual(["Tower Two"]);
+  });
+
+  it("keeps two spellings that lowercase alike but fold apart, so both are scrubbed", () => {
+    addPlayerTextSource(() => ["İstanbul", "i\u0307stanbul"]);
+    const known = knownPlayerText();
+    expect(known).toHaveLength(2);
+    expect(scrubPlayerText("open İstanbul, then i\u0307stanbul", playerTextMatcher(known))).toBe(`open ${P}, then ${P}`);
   });
 
   it("stops reading a source once it is removed", () => {

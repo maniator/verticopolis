@@ -90,10 +90,12 @@ export function rememberFileName(name: string | null | undefined): void {
  *  another ("Harbor One Annex", "Harbor One") is replaced whole. A source that
  *  throws is skipped. */
 export function knownPlayerText(): string[] {
-  const seen = new Map<string, string>();
+  // Exact duplicates only: two spellings that lowercase alike may still fold
+  // apart in the pattern (`İstanbul` and `i\u0307stanbul`), so both are kept.
+  const seen = new Set<string>();
   const add = (text: unknown) => {
     const t = usable(text);
-    if (t !== null && !seen.has(t.toLowerCase())) seen.set(t.toLowerCase(), t);
+    if (t !== null) seen.add(t);
   };
   for (const source of sources) {
     try {
@@ -103,7 +105,7 @@ export function knownPlayerText(): string[] {
     }
   }
   for (const text of remembered) add(text);
-  return [...seen.values()].sort((a, b) => b.length - a.length);
+  return [...seen].sort((a, b) => b.length - a.length);
 }
 
 /** `text` with regex metacharacters escaped. */
