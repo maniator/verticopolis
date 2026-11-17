@@ -16,8 +16,8 @@ use super::{Crowd, Route};
 use crate::tower::Tower;
 
 /// The most routes kept at once: past it the kept ones go and are searched
-/// again if asked. A route is a few floors and shafts, so this holds the
-/// memory to a few hundred KiB.
+/// again if asked. A route is a few floors and shafts, so a full map (its
+/// table and the routes' lists) stays under about 0.7 MiB.
 const MOST_ROUTES: usize = 4096;
 
 /// The staff routes kept for one tower revision, by (from segment, to
