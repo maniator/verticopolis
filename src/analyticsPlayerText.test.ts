@@ -85,6 +85,16 @@ describe("scrubJsonEcho", () => {
     expect(scrubJsonEcho(`Unexpected token in JSON: "Secret Spi`)).toBe(`Unexpected token in JSON: "${P}"`);
   });
 
+  it("blanks to the end when the last quote opens text that never closes", () => {
+    expect(scrubJsonEcho(`JSON bad: 'x' "{"a": "Secret`)).toBe(`JSON bad: "${P}"`);
+  });
+
+  it("keeps V8's position after a quoted character", () => {
+    expect(scrubJsonEcho("Expected ',' or '}' after property value in JSON at position 9 (line 1 column 10)")).toBe(
+      `Expected "${P}" after property value in JSON at position 9 (line 1 column 10)`,
+    );
+  });
+
   it("returns a message with no quote as it is", () => {
     const msg = "JSON.parse: unexpected character at line 1 column 1 of the JSON data";
     expect(scrubJsonEcho(msg)).toBe(msg);

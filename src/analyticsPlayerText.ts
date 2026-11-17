@@ -152,6 +152,12 @@ export function mentionsJson(message: string): boolean {
 /** Any opening or closing quote a browser may put around echoed input. */
 const QUOTE = /["'“”]/;
 
+/** What a browser writes after the quoted input: nothing, V8's "is not valid
+ *  JSON", or V8's position (after one of its fixed phrases). Anything else
+ *  after the last quote may be input whose own closing quote is missing, so it
+ *  is blanked too. */
+const JSON_TAIL = /^(?:\.\.\.)?(?: is not valid JSON|(?: after (?:property value|array element|property name))? in JSON at position \d+(?: \(line \d+ column \d+\))?)?\.?$/;
+
 /**
  * A JSON error message with everything from its first quote to its last
  * replaced by one quoted {@link PLAYER_TEXT_PLACEHOLDER}. Browsers quote the
@@ -159,7 +165,8 @@ const QUOTE = /["'“”]/;
  * not valid JSON`; Safari: `JSON Parse error: Unexpected identifier "Spire"`),
  * that text is a file's contents, and it can hold quotes and line breaks of its
  * own, so pairing quotes would leave pieces of it behind. One quote with no
- * partner (a message cut short) blanks to the end. A message with no quote is
+ * partner (a message cut short), or a last quote followed by anything but the
+ * browser's own words, blanks to the end. A message with no quote is
  * returned as it is. Callers apply it only to a message {@link mentionsJson}
  * accepts.
  */
@@ -167,7 +174,7 @@ export function scrubJsonEcho(message: string): string {
   const first = message.search(QUOTE);
   if (first < 0) return message;
   const last = Math.max(message.lastIndexOf('"'), message.lastIndexOf("'"), message.lastIndexOf("”"), message.lastIndexOf("“"));
-  const end = last > first ? last + 1 : message.length;
+  const end = last > first && JSON_TAIL.test(message.slice(last + 1)) ? last + 1 : message.length;
   return `${message.slice(0, first)}"${PLAYER_TEXT_PLACEHOLDER}"${message.slice(end)}`;
 }
 
