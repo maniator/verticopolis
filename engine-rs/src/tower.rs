@@ -423,6 +423,23 @@ impl Tower {
         }
         None
     }
+
+    /// How many more of `kind` the caps [`cap_reason`](Tower::cap_reason)
+    /// enforces let in, `i64::MAX` when none applies: 0 exactly when it
+    /// refuses. A row of rooms stops there (`sim_room_row.rs`).
+    pub(crate) fn cap_headroom(&self, kind: Kind) -> i64 {
+        let mut left = i64::MAX;
+        if let Some(single) = build_cap_in(self.mode, kind) {
+            left = left.min(single - self.count_kind(kind));
+        }
+        for pool in pools_for(self.mode) {
+            if pool.kinds.contains(&kind) {
+                let total: i64 = pool.kinds.iter().map(|&k| self.count_kind(k)).sum();
+                left = left.min(pool.cap - total);
+            }
+        }
+        left.max(0)
+    }
 }
 
 impl Tower {

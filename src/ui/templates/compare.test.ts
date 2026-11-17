@@ -42,6 +42,7 @@ describe("the Classic and Modern summary", () => {
     announcesStarDuties: "warns what the rating starts asking for",
     starDuties: null, // the duties themselves, which the star-up box words
     skyBridge: "the Sky Bridge tool joins two towers' sky lobbies",
+    roomRows: "Drag along a floor to place a row", // #646
   };
   const RULE_TO_HELP: Record<string, string | null> = {
     ...CATALOG_RULE_TO_HELP,

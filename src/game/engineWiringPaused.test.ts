@@ -5,6 +5,7 @@ import { wireEngine } from "./engineWiring";
 import { placeSimpleBuild, isPaintTool, isTransportTool } from "./buildPreview";
 import { NO_GESTURE } from "./appHistory";
 import { UNPAUSE_TO_BUILD } from "./pausedBuild";
+import { pressRoomRow, releaseRoomRow, roomRowPending, startsRoomRow } from "./roomRowGestures";
 
 /**
  * The pointer and touch build paths while paused (#1936). Classic's catalog
@@ -23,6 +24,16 @@ vi.mock("./buildPreview", () => ({
   updateBuildPreview: vi.fn(),
   touchBuildLiftFloors: vi.fn(() => 2),
   clearBuildRefusal: vi.fn(),
+}));
+
+// A Modern room under a mouse starts a row (#646), placed on the release.
+vi.mock("./roomRowGestures", () => ({
+  startsRoomRow: vi.fn(() => false),
+  pressRoomRow: vi.fn(),
+  dragRoomRow: vi.fn(() => false),
+  releaseRoomRow: vi.fn(() => false),
+  roomRowPending: vi.fn(() => false),
+  dropRoomRow: vi.fn(),
 }));
 
 vi.mock("./frameLoop", () => ({ runFrame: vi.fn(), SPEEDS: [0, 3, 15, 50] }));
@@ -80,6 +91,8 @@ const FLOOR = { type: "build", kind: "floor" };
 const ELEVATOR = { type: "build", kind: "elevatorStandard" };
 
 beforeEach(() => {
+  vi.mocked(startsRoomRow).mockReturnValue(false);
+  vi.mocked(roomRowPending).mockReturnValue(false);
   vi.mocked(placeSimpleBuild).mockReturnValue({} as never);
   vi.mocked(isTransportTool).mockReturnValue(false);
   vi.mocked(isPaintTool).mockReturnValue(false);
@@ -101,10 +114,15 @@ describe("a mouse press with a build tool while paused", () => {
     expect(app.audio.sfx).toHaveBeenCalledExactlyOnceWith("error");
   });
 
-  it("places as usual in Modern", () => {
+  it("starts a row as usual in Modern, which its release places", () => {
+    vi.mocked(startsRoomRow).mockReturnValue(true);
     const { app, hooks } = makeApp("modern", PAUSED, OFFICE);
     hooks.onActionDown!(10, 2, false, null);
-    expect(placeSimpleBuild).toHaveBeenCalledOnce();
+    expect(pressRoomRow).toHaveBeenCalledExactlyOnceWith(app, 10, 2);
+    expect(placeSimpleBuild).not.toHaveBeenCalled();
+    vi.mocked(roomRowPending).mockReturnValue(true);
+    hooks.onActionUp!();
+    expect(releaseRoomRow).toHaveBeenCalledExactlyOnceWith(app, true);
     expect(app.ui.toast).not.toHaveBeenCalled();
   });
 

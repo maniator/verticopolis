@@ -147,6 +147,13 @@ impl GameMode {
         self == GameMode::Modern
     }
 
+    /// Whether one drag along a floor places a row of the same room, as
+    /// many as fit, as one command (`sim_room_row.rs`, #646). Modern does
+    /// (owner, 2026-11-17); Classic keeps SimTower's one room per click.
+    pub fn lays_room_rows(self) -> bool {
+        self == GameMode::Modern
+    }
+
     /// Whether a ground lobby tile may be laid apart from the rest of the
     /// tower, with open ground between: the front door of another tower on
     /// the lot. Modern allows it (owner, 2026-11-14), since several towers

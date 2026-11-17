@@ -11,9 +11,9 @@
 // A command answers a result record: slot 0 the status (1 done, 0 refused),
 // slot 1 the money delta the engine measured around it, then the op's own
 // slots named in `viewLayout().records`. Only the members that answer a
-// status clear and set `lastReason()`.
-//
-// `src/simport/enginePort.types.test.ts` holds the engine to this shape.
+// status clear and set `lastReason()`. `enginePort.types.test.ts` holds the
+// engine to this shape.
+import type { EnginePortRoomRow } from "./roomRowPort";
 import type { EnginePortSkyBridge } from "./skyBridgePort";
 import type { EnginePortTraffic } from "./trafficPort";
 
@@ -494,4 +494,5 @@ export interface EnginePort
     EnginePortFiles,
     EnginePortRender,
     EnginePortSkyBridge,
-    EnginePortTraffic {}
+    EnginePortTraffic,
+    EnginePortRoomRow {}

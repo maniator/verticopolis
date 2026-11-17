@@ -16,6 +16,8 @@ import { holdRefusal, sayHeldRefusal, sayPressRefusal } from "./dragRefusal";
 import { pickPersonAt } from "../render/excalibur/personFocus";
 import { placeSkyBridge, tapSkyBridge } from "./skyBridgeGestures";
 import { SKY_BRIDGE_STEP } from "./skyBridgeTool";
+import { dragRoomRow, dropRoomRow, pressRoomRow, releaseRoomRow, roomRowPending, startsRoomRow } from "./roomRowGestures";
+import { dropSeveredGesture } from "./severedGesture";
 
 /**
  * Engine wiring and post-context-loss engine rebuild, split out of the `GameApp`
@@ -159,7 +161,9 @@ export function wireEngine(app: GameApp): void {
       // the press; a drag-sized shaft instead anchors here and sizes with
       // the drag. A TOUCH paint tool defers to move/up (see paintAnchor) so a
       // two-finger pan/zoom never drops a paid-for strip on its first finger.
-      if (touch && isPaintTool(app)) {
+      // A Modern room under a mouse starts a row, placed on the release.
+      if (startsRoomRow(app, touch)) pressRoomRow(app, tile, floor);
+      else if (touch && isPaintTool(app)) {
         app.paintAnchor = { tile, floor };
       } else if (touch && !isTransportTool(app)) {
         // Touch ROOM build: defer to the release. Preview at the FINGER on the
@@ -185,6 +189,7 @@ export function wireEngine(app: GameApp): void {
     // a tower swapped in) builds nothing more, so it drops the anchors and
     // the ghosts of what its release would have built.
     if (drag !== null && !dragActs()) {
+      dropRoomRow(app);
       app.paintAnchor = null;
       app.buildAnchor = null;
       app.transportStart = null;
@@ -200,7 +205,7 @@ export function wireEngine(app: GameApp): void {
       if (dragRemoves(app.bulldozeDrag.clears, drag.bulldozes, picked.kind)) app.build.bulldozePicked(picked, holdRefusal(drag));
       return;
     }
-    if (app.tool.type !== "build") return;
+    if (app.tool.type !== "build" || dragRoomRow(app, tile)) return;
     const kind = app.tool.kind;
     if (isTransportTool(app) && app.transportStart) {
       const bottom = Math.min(app.transportStart.floor, floor);
@@ -245,7 +250,7 @@ export function wireEngine(app: GameApp): void {
     // A drag begun while the clock ran and released after a pause commits
     // nothing in a mode that refuses building while paused (#1936); the
     // release says why once.
-    const pending = app.tool.type === "build" && (app.paintAnchor !== null || app.buildAnchor !== null || app.transportStart !== null);
+    const pending = app.tool.type === "build" && (app.paintAnchor !== null || app.buildAnchor !== null || app.transportStart !== null || roomRowPending(app));
     // A drag whose moves already said why stays refused without a second note.
     const refused = pending && dragActs() && (drag?.pausedNoted ? appPlacementPaused(app) : refuseAppPlacementWhilePaused(app));
     const acts = dragActs() && !refused;
@@ -270,6 +275,7 @@ export function wireEngine(app: GameApp): void {
       app.engine.preview = null;
       if (acts && valid && app.tool.type === "build") placeSimpleBuild(app, app.tool.kind, a.tile, a.floor);
     }
+    releaseRoomRow(app, acts);
     app.build.clearPaint();
     // Only drag-sized transports (elevators) commit on release. Stairs and
     // escalators already placed on the DOWN event, and their hover ghost
@@ -300,6 +306,7 @@ export function wireEngine(app: GameApp): void {
   app.engine.onActionCancel = () => {
     const closes = drag === null || app.undoGesture() === drag.gesture;
     drag = null;
+    dropRoomRow(app);
     app.paintAnchor = null;
     app.buildAnchor = null;
     app.transportStart = null;
@@ -406,23 +413,6 @@ export function wireEngine(app: GameApp): void {
   // pressure / after backgrounding). Recover for the player instead of
   // Excalibur's dead-end "please refresh the page" card.
   app.engine.onContextLost = () => app.saveLoad.recoverFromContextLoss();
-}
-
-/** Drop the app's half of a gesture its pointer can no longer finish: a lost
- *  canvas took the release with it, or the tower changed under the press (a
- *  swap, or an undo or redo step), which resets the engine's input, so the
- *  release never reaches `onActionUp`. A stale `transportStart` suppresses the
- *  update prompt session-long, and a stale paint or build anchor would place
- *  on a later tap or extend the next touch drag across the gap. The refusal
- *  card a refused drag raised goes too, latch first: hiding the shared card
- *  leaves `buildRefusalShowing` set, and a leaked latch offsets the next
- *  card's anchor a floor down (panelAnchoring reads it). */
-export function dropSeveredGesture(app: GameApp): void {
-  app.paintAnchor = null;
-  app.buildAnchor = null;
-  app.transportStart = null;
-  app.build.clearPaint();
-  clearBuildRefusal(app);
 }
 
 /**

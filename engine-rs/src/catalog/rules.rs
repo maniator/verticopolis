@@ -81,6 +81,10 @@ pub struct Rules {
     /// The Sky Bridge tool (`tower/skybridge.rs`), or null where the mode
     /// builds no bridges (Classic, as in 1994).
     pub sky_bridge: Option<SkyBridgeRule>,
+    /// Whether one drag along a floor places a row of the same room
+    /// (`quoteRoomRow`, `buildRoomRow`, #646). When false a room is placed
+    /// one click at a time (Classic, as in 1994).
+    pub room_rows: bool,
 }
 
 /// What the Sky Bridge tool shows: when it opens, how far it reaches and

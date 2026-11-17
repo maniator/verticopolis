@@ -66,6 +66,7 @@ pub fn catalog(mode: GameMode) -> Catalog {
             announces_star_duties: mode.announces_star_duties(),
             star_duties: crate::star_duties::star_duties(mode),
             sky_bridge: mode.builds_skybridges().then(sky_bridge_rule),
+            room_rows: mode.lays_room_rows(),
         },
         pools: keyed_pools(mode)
             .map(|(key, p)| PoolEntry {

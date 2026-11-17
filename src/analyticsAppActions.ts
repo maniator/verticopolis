@@ -101,6 +101,9 @@ export type AppActionName =
   // The Sky Bridge tool laid a bridge (Modern, 2026-11-16): detail `new`, or
   // `finish` for the rest of a half bridge from a save made before the tool.
   | "sky_bridge"
+  // A drag placed a row of two or more rooms (Modern, #646): `detail` is the
+  // row's length band, `2-4`, `5-9` or `10+`.
+  | "room_row"
   // A shaft's Auto checkbox saved changed (Modern daily re-tune,
   // 2026-11-17): detail `on` or `off`. New Modern elevators start on.
   | "elevator_auto_tune"

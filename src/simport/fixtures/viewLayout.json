@@ -1,5 +1,5 @@
 {
-  "version": 32,
+  "version": 33,
   "header": {
     "minutes": 0,
     "towerRevision": 1,
@@ -252,6 +252,11 @@
       "delta",
       "tiles"
     ],
+    "buildRoomRow": [
+      "status",
+      "delta",
+      "placed"
+    ],
     "buildShaft": [
       "status",
       "delta"
@@ -399,6 +404,11 @@
       "cost",
       "from",
       "to"
+    ],
+    "quoteRoomRow": [
+      "ok",
+      "cost",
+      "rooms"
     ],
     "quoteRentBatch": [
       "ok",

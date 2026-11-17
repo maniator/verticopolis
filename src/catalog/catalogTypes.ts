@@ -7,7 +7,7 @@
 import type { CalendarKind } from "../shared/engineTypes";
 import type { FacilityCategory, FacilityKind, GameMode } from "../shared/types";
 import type { FilmPolicy, FilmTier, TicketPrice } from "../simport/commands";
-import type { CatalogSkyBridgeRules } from "./skyBridgeTypes";
+import type { CatalogRoomRowRules, CatalogSkyBridgeRules } from "./skyBridgeTypes";
 import type { CatalogStarDutyRules } from "./starDutyTypes";
 
 /** A film a theater can show, as the catalog publishes it (#1950). */
@@ -40,7 +40,7 @@ export interface CatalogTicketPrice {
 
 /** The version of the catalog's shape. It moves when a field is added,
  *  renamed or removed, so a frontend can refuse a shape it does not know. */
-export const CATALOG_VERSION = 24;
+export const CATALOG_VERSION = 25;
 
 /** Every price, size and build rule of one mode. */
 export interface Catalog {
@@ -150,7 +150,7 @@ export interface CatalogEconomy {
 
 /** Mode rules a frontend shows the player, each from the engine's own rule
  *  method, so a frontend reads them here instead of deciding by mode name. */
-export interface CatalogRules extends CatalogStarDutyRules, CatalogSkyBridgeRules {
+export interface CatalogRules extends CatalogStarDutyRules, CatalogSkyBridgeRules, CatalogRoomRowRules {
   /** Whether a sold condo carries its own household of 2 to 5 that prices the sale and counts
    *  its residents. When false every condo houses the flat family and stores no household. */
   readonly variantHouseholds: boolean;
