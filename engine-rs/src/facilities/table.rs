@@ -131,7 +131,7 @@ const LEADING: [Facility; 22] = [
         HotelDouble,
         "hotelDouble",
         Hotel,
-        "Double Room",
+        "Twin Room",
         6,
         None,
         50000,

@@ -37,7 +37,7 @@ export const FACILITY_PRESENTATION: Readonly<Record<FacilityKind, FacilityPresen
   },
   hotelDouble: {
     color: "#e0a94e",
-    description: "Hotel double room. Higher nightly income than a single.",
+    description: "Hotel twin room. Higher nightly income than a single.",
   },
   hotelSuite: {
     color: "#d99a2e",

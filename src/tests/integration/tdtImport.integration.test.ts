@@ -818,7 +818,7 @@ describeWithCodec("parseTDT: golden mappings", () => {
     expect(report.couldNotBring.join(" ")).not.toMatch(/rebuilt from your floors/);
     expect(report.broughtOver.join(" ")).toMatch(/parking stall/);
     expect(report.broughtOver.join(" ")).toMatch(/Rent levels/);
-    expect(report.broughtOver.join(" ")).toMatch(/Of those, \d+ (are twin rooms|is a twin room), which (are|is a) Double Rooms? here/);
+    expect(report.broughtOver.join(" ")).toMatch(/Of those, \d+ (are Twin Rooms|is a Twin Room)\./);
     expect(report.couldNotBring.join(" ")).not.toMatch(/twin room/i);
     // The sample writes a 12-person roster; the report owns up to not carrying it.
     expect(report.couldNotBring.join(" ")).toMatch(/12 people on the save's roster/);

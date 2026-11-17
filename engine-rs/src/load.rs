@@ -98,6 +98,8 @@ pub use reader::*;
 #[path = "load_assemble_tests.rs"]
 mod assemble_tests;
 #[cfg(test)]
+mod label_tests;
+#[cfg(test)]
 mod loader_cases;
 #[cfg(test)]
 mod save_json_tests;

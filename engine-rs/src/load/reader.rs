@@ -174,6 +174,21 @@ pub(crate) fn founder_keys(raw: &Value) -> Value {
     Value::Object(keys)
 }
 
+/// A kind's default name before it was renamed, which a save may still carry
+/// as the room's label: the Double Room became the Twin Room, its 1994 name
+/// (#380).
+const RETIRED_DEFAULT_NAMES: [(Kind, &str); 1] = [(Kind::HotelDouble, "Double Room")];
+
+/// The label a loaded room shows: a retired default name reads as the kind's
+/// name today, and any other label (one the player chose) stays as it is.
+fn current_label(kind: Kind, label: &str) -> String {
+    if RETIRED_DEFAULT_NAMES.contains(&(kind, label)) {
+        kind.facility().name.to_string()
+    } else {
+        label.to_string()
+    }
+}
+
 /// One entry of a save's `units` array as `deserialize` reads it, with its
 /// saved id; `None` for an entry it skips (null, or a kind the catalog does
 /// not know), exactly when `kind_of` gives `None`, which the unit cap's
@@ -308,7 +323,7 @@ pub(crate) fn unit_from_value(u: &Value, modern: bool) -> Option<(Unit, Option<i
         label: u
             .get("label")
             .and_then(Value::as_str)
-            .map(|s| s.to_string())
+            .map(|s| current_label(kind, s))
             .unwrap_or_else(|| kind.facility().name.to_string()),
         subtype,
         extras: Extras {
