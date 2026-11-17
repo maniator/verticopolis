@@ -64,6 +64,7 @@ impl Boarding<'_> {
     /// riders are the crowd's own callers, who count once each as they step
     /// aboard (`Crowd::elevator_boardings`, #477): tallied here as well, a
     /// car coming back to a call nobody answered would count them again.
+    #[inline]
     pub fn board(
         &mut self,
         id: i64,
@@ -99,7 +100,9 @@ impl Boarding<'_> {
     /// count seen, which this updates). A staff car reads only the crowd, as
     /// its arrival boarding does. Nothing boards until a whole rider is
     /// waiting. The riders count against the car's load, so a car that keeps
-    /// taking arrivals fills and leaves. Returns how many boarded.
+    /// taking arrivals fills and leaves. Returns how many boarded and how
+    /// many of them the estimate gave (none on a staff car), whose seats the
+    /// busy meter counts beside the crowd's own riders (#2397).
     pub fn arrivals(
         &mut self,
         id: i64,
@@ -108,7 +111,7 @@ impl Boarding<'_> {
         room: f64,
         staff_only: bool,
         live_call: bool,
-    ) -> f64 {
+    ) -> (f64, f64) {
         let (now, seen) = hall;
         let newcomers = (now - *seen).max(0.0);
         *seen = now;
@@ -118,10 +121,11 @@ impl Boarding<'_> {
             (self.waiting.get(&floor).copied().unwrap_or(0.0), newcomers)
         };
         if estimate + crowd < 1.0 {
-            return 0.0;
+            return (0.0, 0.0);
         }
         let took = self.board(id, floor, estimate, room, staff_only, live_call);
-        took + (room - took).min(crowd).max(0.0)
+        let total = took + (room - took).min(crowd).max(0.0);
+        (total, if staff_only { 0.0 } else { took })
     }
 }
 

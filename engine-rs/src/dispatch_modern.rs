@@ -19,7 +19,7 @@
 //!   an arrival would: the best-car choice sends no other car, and the sweep
 //!   only looks ahead.
 //! - Standard Floor Departure restarts when a rider arrives, up to twice the
-//!   setting (`ElevatorDispatch::car_held` keeps the time waited).
+//!   setting (`Cars::held` keeps the time waited).
 
 use std::cell::Cell;
 use std::collections::BTreeSet;

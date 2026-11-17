@@ -142,6 +142,7 @@ impl Demand<'_> {
     /// shaft at two words); going down, the tie check makes one more search.
     /// So a car with nothing to serve no longer tests its shaft's stops one
     /// by one.
+    #[inline]
     pub(super) fn next_stop(&self, pos: f64, dir: i64) -> Option<usize> {
         debug_assert_ne!(dir, 0);
         let stops = self.stops;
