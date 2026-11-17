@@ -294,7 +294,7 @@ fn the_crowd_counts_the_riders_who_get_on() {
     let i = make_person(&mut sim.crowd, &sim.tower, route, 30.0, None);
     let p = &mut sim.crowd.people[i];
     (p.state, p.x) = (PState::Waiting, 16.0);
-    sim.crowd.open_cars = vec![(id, 0, 1)];
+    sim.crowd.open_cars = vec![(id, 0, 1, crate::dispatch::Leaving::Either)];
     motion::advance(&mut sim.crowd, 0.1, &mut sim.tower);
     assert_eq!(sim.crowd.people[i].state, PState::Riding);
     assert_eq!(sim.tower.get_transport(id).unwrap().rides, 1);

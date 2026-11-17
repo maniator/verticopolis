@@ -71,7 +71,7 @@ fn parked_car_answers_calls(mode: GameMode, response: f64, from: f64, call_floor
     t.car_positions = vec![1.0, from];
     t.car_dir = vec![0, 1];
     let mut calls = ElevatorCalls::default();
-    let hall = call_floors.iter().map(|&f| (f, 1.0)).collect();
+    let hall = call_floors.iter().map(|&f| (f, 1.0.into())).collect();
     calls.hall.insert(id, hall);
     let rider = FastMap::from_iter([(1, BTreeSet::from([TOP]))]);
     calls.cab.insert(id, rider);
@@ -131,7 +131,7 @@ pub(super) fn stay_at_the_call(mode: GameMode, newcomers: bool) -> (usize, bool)
     let mut calls = ElevatorCalls::default();
     calls
         .hall
-        .insert(id, FastMap::from_iter([(CALL_FLOOR, 1.0)]));
+        .insert(id, FastMap::from_iter([(CALL_FLOOR, 1.0.into())]));
     let mut d = ElevatorDispatch::new();
     let (mut run, mut longest, mut arrived, mut left) = (0, 0, false, false);
     for _ in 0..120 {
@@ -139,12 +139,13 @@ pub(super) fn stay_at_the_call(mode: GameMode, newcomers: bool) -> (usize, bool)
         let on_floor = (tower.transports[0].car_positions[0] - CALL_FLOOR as f64).abs() < 0.05;
         if on_floor {
             if newcomers {
-                *calls
+                calls
                     .hall
                     .get_mut(&id)
                     .unwrap()
                     .get_mut(&CALL_FLOOR)
-                    .unwrap() += 1.0;
+                    .unwrap()
+                    .callers += 1.0;
             }
             arrived = true;
             run += 1;

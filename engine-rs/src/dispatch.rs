@@ -10,7 +10,7 @@ use crate::facilities::Kind;
 use crate::jsmath;
 use crate::schedule::Schedule;
 use crate::tower::Tower;
-use demand::{fill_cab_stops, has_bit, set_bit, Demand};
+use demand::{fill_cab_stops, has_bit, set_bit, Claims, Demand};
 
 #[path = "dispatch_classic.rs"]
 mod classic;
@@ -21,6 +21,14 @@ mod modern;
 
 #[path = "dispatch_save.rs"]
 mod save;
+
+#[path = "dispatch_leaving.rs"]
+mod leaving;
+
+#[path = "dispatch_lists.rs"]
+mod lists;
+use leaving::{departure, toward_riders};
+pub use leaving::{first_aboard, leaving_at, Leaving, OpenCar};
 pub(crate) use modern::{idle_home, DispatchRules};
 use modern::{BestCars, CarView};
 
@@ -60,9 +68,9 @@ pub struct ElevatorDispatch {
     /// Scratch for `move_cars`, bit sets over the stops of the shaft in
     /// hand: the TypeScript's `calls` (a live hall call, the crowd's or the
     /// statistical estimate's) and `claimed` (a car is heading to the stop or
-    /// dwelling at it), and the current car's cab stops.
+    /// dwelling at it, by the way it leaves), and the current car's cab stops.
     call_bits: Vec<u64>,
-    claimed: Vec<u64>,
+    claimed: Claims,
     cab_stops: Vec<u64>,
     /// The cars the schedule has stood down, as (shaft id, car index),
     /// rebuilt by every `move_cars`. A person waiting at a floor boards only a
@@ -73,10 +81,12 @@ pub struct ElevatorDispatch {
     /// `move_cars`, as (shaft id, car index, floor), ascending: a car that
     /// arrived, one still dwelling, or one parked at its home floor. People
     /// step on and off only these cars, so nobody boards or leaves a car
-    /// that is passing a floor.
-    open_cars: Vec<(i64, i64, i64)>,
+    /// that is passing a floor. Each says which way the car leaves.
+    open_cars: Vec<OpenCar>,
     /// Scratch of zero words, the calls a stood-down car answers: none.
     no_calls: Vec<u64>,
+    /// Scratch: the shaft's called stops whose callers are all bound one way.
+    ways: leaving::Ways,
     /// Scratch for Modern's best car: the on-shift cars as the choice sees
     /// them, and each called stop's chosen car.
     best: BestCars,
@@ -88,41 +98,6 @@ pub struct ElevatorDispatch {
 impl ElevatorDispatch {
     pub fn new() -> ElevatorDispatch {
         ElevatorDispatch::default()
-    }
-
-    /// `drainBoardings()`: hand over the tally and clear it.
-    pub fn drain_boardings(&mut self) -> HashMap<i64, IndexMap<i64, f64>> {
-        std::mem::take(&mut self.board_tally)
-    }
-
-    /// The cars a waiting person may not board: stood down by the schedule.
-    /// Ascending, as (shaft id, car index): `move_cars` sorts the list once it
-    /// has walked every shaft, since a save may list its shafts out of id
-    /// order, so a binary search finds a car.
-    pub fn closed_cars(&self) -> &[(i64, i64)] {
-        &self.closed_cars
-    }
-
-    /// Hands the crowd this step's closed cars by swapping the two lists, so
-    /// no step allocates. `move_cars` clears the list it gets back.
-    pub fn swap_closed_cars(&mut self, crowd_list: &mut Vec<(i64, i64)>) {
-        std::mem::swap(&mut self.closed_cars, crowd_list);
-    }
-
-    /// The cars standing at a stop with their doors open, as (shaft id, car
-    /// index, floor), ascending, so a binary search finds a car at a floor.
-    pub fn open_cars(&self) -> &[(i64, i64, i64)] {
-        &self.open_cars
-    }
-
-    /// Hands the crowd this step's open cars by swapping the two lists, as
-    /// `swap_closed_cars` does. `move_cars` clears the list it gets back.
-    pub fn swap_open_cars(&mut self, crowd_list: &mut Vec<(i64, i64, i64)>) {
-        std::mem::swap(&mut self.open_cars, crowd_list);
-    }
-
-    pub fn waiting_at(&self, floor: i64) -> f64 {
-        self.waiting.get(&floor).copied().unwrap_or(0.0)
     }
 
     fn prune_removed_shafts(&mut self, tower: &Tower) {
@@ -206,7 +181,12 @@ impl ElevatorDispatch {
             let any_full = rules.full_car_passes && !calls.full.is_empty();
             let full = |j: usize| any_full && calls.full.binary_search(&(id, j as i64)).is_ok();
 
-            let hall_at = |fl: i64| hall.and_then(|h| h.get(&fl)).copied().unwrap_or(0.0);
+            let call_at = |fl: i64| hall.and_then(|h| h.get(&fl)).copied().unwrap_or_default();
+            let hall_at = |fl: i64| call_at(fl).callers;
+            // The callers at `fl` a car leaving `dir` takes: every one bound
+            // its way, and every one whose way is not known.
+            let ways_known = rules.riders_go_their_way;
+            let takes_at = |fl: i64, dir: i64| leaving::their_way(call_at(fl), ways_known, dir);
             // `calls` and `claimed` as bit sets over the stops. `stops` is
             // ascending, so a floor's stop is a binary search away, and a
             // floor that is not a stop is never asked about.
@@ -214,16 +194,23 @@ impl ElevatorDispatch {
             let (call_bits, claimed) = (&mut self.call_bits, &mut self.claimed);
             call_bits.clear();
             call_bits.resize(words, 0);
-            claimed.clear();
-            claimed.resize(words, 0);
+            claimed.reset(words);
             self.no_calls.clear();
             self.no_calls.resize(words, 0);
+            self.ways
+                .reset(if rules.riders_go_their_way { words } else { 0 });
             for (k, &fl) in stops.iter().enumerate() {
                 // A crowd call already raises the stop, so the estimate is
-                // only looked up when it would decide.
-                if hall_at(fl) >= 1.0
-                    || (!staff_only && self.waiting.get(&fl).copied().unwrap_or(0.0) >= 1.0)
-                {
+                // only looked up when it would decide (or, with riders
+                // bound their way, whether the stop is the crowd's alone).
+                let call = call_at(fl);
+                let callers = call.callers;
+                let estimate =
+                    || !staff_only && self.waiting.get(&fl).copied().unwrap_or(0.0) >= 1.0;
+                if callers >= 1.0 && ways_known {
+                    self.ways.mark(k, call, !estimate());
+                }
+                if callers >= 1.0 || estimate() {
                     set_bit(call_bits, k);
                 }
             }
@@ -286,8 +273,14 @@ impl ElevatorDispatch {
                             tally: &mut self.board_tally,
                         };
                         let (room, live) = (cap - car_load[i], has_bit(call_bits, k));
-                        let got =
-                            b.arrivals(id, fl, (hall_at(fl), &mut seen[i]), room, staff_only, live);
+                        let got = b.arrivals(
+                            id,
+                            fl,
+                            (takes_at(fl, t.car_dir[i]), &mut seen[i]),
+                            room,
+                            staff_only,
+                            live,
+                        );
                         if got > 0.0 {
                             car_load[i] += got;
                             let left = wait_limit.map_or(shaft_dwell, |l| l - held[i]);
@@ -295,6 +288,30 @@ impl ElevatorDispatch {
                         }
                     }
                 }
+                let was_parked = t.car_dir[i] == 0;
+                let mut dir = if was_parked { 1 } else { t.car_dir[i] };
+                // Modern: a call is another car's when that car is its best.
+                // Classic's Waiting Car Response: a parked car leaves a call
+                // to a car already heading there within that many floors.
+                let best = &self.best;
+                let covered = |k: usize| {
+                    if rules.best_car {
+                        return best.owner(k, stops[k], self.ways.bound(k)) != i;
+                    }
+                    let r = response.filter(|_| rules.parked_car_yields && was_parked);
+                    r.is_some_and(|r| {
+                        let floor = stops[k] as f64;
+                        let call = (floor, self.ways.bound(k));
+                        moving_car_covers(&t.car_positions, &t.car_dir, i, active_count, call, r)
+                    })
+                };
+                let calls_now = if stood_down {
+                    &self.no_calls[..]
+                } else {
+                    &call_bits[..]
+                };
+                // A car at a stop this step leaves it, with its riders first.
+                let at_stop = rules.riders_go_their_way && (was_parked || dwell[i] > 0.0);
                 if dwell[i] > 0.0 {
                     let pause = dwell[i].min(car_dt);
                     dwell[i] -= pause;
@@ -302,18 +319,35 @@ impl ElevatorDispatch {
                     car_dt -= pause;
                     if car_dt <= 0.0 {
                         let floor = jsmath::round(t.car_positions[i]) as i64;
-                        if let Some(k) = stop_index(floor) {
-                            set_bit(claimed, k);
+                        // Still dwelling: the doors stay open all step, and
+                        // whoever waits there sees which way the car leaves.
+                        let mut leaving = Leaving::Either;
+                        if rules.riders_go_their_way && hall_at(floor) >= 1.0 {
+                            let cab = cabs
+                                .and_then(|c| c.get(&(i as i64)))
+                                .filter(|c| !c.is_empty())
+                                .map(|c| fill_cab_stops(&stops, c, &mut self.cab_stops));
+                            let demand = Demand {
+                                stops: &stops,
+                                calls: calls_now,
+                                claimed,
+                                cab,
+                                ways: &self.ways,
+                            };
+                            let at = (t.car_positions[i], stop_index(floor));
+                            let (way, shown) =
+                                departure(&demand, &self.no_calls, at, dir, &covered);
+                            (t.car_dir[i], leaving) = (way, shown);
                         }
-                        // Still dwelling: the doors stay open all step.
-                        self.open_cars.push((id, i as i64, floor));
+                        if let Some(k) = stop_index(floor) {
+                            claimed.claim(k, self.ways.claim_way(k, leaving.way()));
+                        }
+                        self.open_cars.push((id, i as i64, floor, leaving));
                         continue;
                     }
                 }
                 let v = car_dt * floors_per_minute;
                 let mut pos = t.car_positions[i];
-                let was_parked = t.car_dir[i] == 0;
-                let mut dir = if t.car_dir[i] == 0 { 1 } else { t.car_dir[i] };
                 let cab_stops = cabs
                     .and_then(|c| c.get(&(i as i64)))
                     .filter(|c| !c.is_empty())
@@ -322,30 +356,16 @@ impl ElevatorDispatch {
                     Some(r) if was_parked && rules.parked_reach_gate => (span - r).max(0.0),
                     _ => f64::INFINITY,
                 };
-                // Modern: a call is another car's when that car is its best.
-                // Classic's Waiting Car Response: a parked car leaves a call
-                // to a car already heading there within that many floors.
-                let best = &self.best;
-                let covered = |k: usize| {
-                    if rules.best_car {
-                        return best.owner(k, stops[k]) != i;
-                    }
-                    let r = response.filter(|_| rules.parked_car_yields && was_parked);
-                    r.is_some_and(|r| {
-                        let floor = stops[k] as f64;
-                        moving_car_covers(&t.car_positions, &t.car_dir, i, active_count, floor, r)
-                    })
-                };
                 let demand = Demand {
                     stops: &stops,
-                    calls: if stood_down {
-                        &self.no_calls[..]
-                    } else {
-                        &call_bits[..]
-                    },
-                    claimed: &claimed[..],
+                    calls: calls_now,
+                    claimed,
                     cab: cab_stops,
+                    ways: &self.ways,
                 };
+                if at_stop {
+                    dir = toward_riders(&demand, &self.no_calls, pos, dir).unwrap_or(dir);
+                }
                 let pick = |dir: i64| first_answering(&demand, pos, dir, reach, covered);
                 // The sweep looks only ahead, so a car parked on a stop whose
                 // call it owns boards the estimate there now, as on arrival.
@@ -354,7 +374,7 @@ impl ElevatorDispatch {
                         .then(|| stop_index(jsmath::round(pos) as i64))
                         .flatten()
                         .filter(|&k| {
-                            let (fl, unclaimed) = (stops[k], !has_bit(claimed, k));
+                            let (fl, unclaimed) = (stops[k], !claimed.any(k));
                             let on_it = (fl as f64 - pos).abs() <= AT_STOP_FLOORS;
                             let estimate = self.waiting.get(&fl).copied().unwrap_or(0.0);
                             on_it && unclaimed && estimate >= 1.0 && !covered(k)
@@ -364,8 +384,12 @@ impl ElevatorDispatch {
                     dir = -dir;
                     target = pick(dir);
                 }
-                if let Some(k) = target {
-                    set_bit(claimed, k);
+                // A car heading for a stop only to turn there claims nothing.
+                let turn = target.filter(|&k| !demand.is_cab(k) && self.ways.against(k, dir));
+                match (turn, target) {
+                    (Some(k), _) => self.ways.turn_at(k),
+                    (None, Some(k)) => claimed.claim(k, self.ways.claim_way(k, dir)),
+                    (None, None) => {}
                 }
                 let target = match target {
                     Some(k) => stops[k] as f64,
@@ -377,7 +401,8 @@ impl ElevatorDispatch {
                             // Parked at home: it settles on the floor and
                             // opens for whoever waits there.
                             t.car_positions[i] = tg;
-                            self.open_cars.push((id, i as i64, car_home));
+                            self.open_cars
+                                .push((id, i as i64, car_home, Leaving::Either));
                             continue;
                         }
                         tg
@@ -390,9 +415,6 @@ impl ElevatorDispatch {
                     pos = target;
                     dwell[i] = shaft_dwell;
                     held[i] = 0.0;
-                    seen[i] = hall_at(target as i64);
-                    // Arrived: the doors open for the rest of the step.
-                    self.open_cars.push((id, i as i64, target as i64));
                     car_load[i] = (car_load[i] - (car_load[i] * 0.45).ceil()).max(0.0);
                     let tf = target as i64;
                     let w = if staff_only {
@@ -417,6 +439,22 @@ impl ElevatorDispatch {
                     } else if pos <= t.bottom as f64 {
                         dir = 1;
                     }
+                    // Arrived: the doors open for the rest of the step, and
+                    // whoever waits there sees which way the car leaves.
+                    let mut leaving = Leaving::Either;
+                    if rules.riders_go_their_way && hall_at(tf) >= 1.0 {
+                        let demand = Demand {
+                            stops: &stops,
+                            calls: calls_now,
+                            claimed,
+                            cab: cab_stops,
+                            ways: &self.ways,
+                        };
+                        let at = (pos, stop_index(tf));
+                        (dir, leaving) = departure(&demand, &self.no_calls, at, dir, &covered);
+                    }
+                    seen[i] = takes_at(tf, dir);
+                    self.open_cars.push((id, i as i64, tf, leaving));
                 } else {
                     dir = if target > pos { 1 } else { -1 };
                     pos += dir as f64 * v;

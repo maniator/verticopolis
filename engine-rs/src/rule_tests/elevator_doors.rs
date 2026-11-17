@@ -15,7 +15,7 @@ use crate::clock::GameMode;
 use crate::crowd::motion::advance;
 use crate::crowd::spawn::make_person;
 use crate::crowd::{ElevatorCalls, PState, Route};
-use crate::dispatch::ElevatorDispatch;
+use crate::dispatch::{ElevatorDispatch, Leaving};
 use crate::facilities::Kind;
 use crate::sim::Simulation;
 
@@ -67,7 +67,7 @@ fn nobody_boards_a_car_passing_their_floor() {
     assert_eq!(sim.crowd.people[i].state, PState::Waiting);
     // The same car standing at floor 3 with its doors open takes them.
     place_car(&mut sim, id, 3.0, 1);
-    sim.crowd.open_cars = vec![(id, 0, 3)];
+    sim.crowd.open_cars = vec![(id, 0, 3, Leaving::Either)];
     advance(&mut sim.crowd, 0.1, &mut sim.tower);
     assert_eq!(sim.crowd.people[i].state, PState::Riding);
 }
@@ -77,7 +77,7 @@ fn a_car_open_at_another_floor_takes_nobody() {
     let (mut sim, id, i) = tower_with_rider(3, 6);
     place_car(&mut sim, id, 3.0, 0);
     // Listed open at floor 4: a stale or mismatched entry boards nobody here.
-    sim.crowd.open_cars = vec![(id, 0, 4)];
+    sim.crowd.open_cars = vec![(id, 0, 4, Leaving::Either)];
     advance(&mut sim.crowd, 0.1, &mut sim.tower);
     assert_eq!(sim.crowd.people[i].state, PState::Waiting);
 }
@@ -85,7 +85,7 @@ fn a_car_open_at_another_floor_takes_nobody() {
 #[test]
 fn a_rider_stays_aboard_a_car_passing_their_floor() {
     let (mut sim, id, i) = tower_with_rider(1, 4);
-    sim.crowd.open_cars = vec![(id, 0, 1)];
+    sim.crowd.open_cars = vec![(id, 0, 1, Leaving::Either)];
     advance(&mut sim.crowd, 0.1, &mut sim.tower);
     assert_eq!(sim.crowd.people[i].state, PState::Riding);
     // The car runs through floor 4 without stopping: a hundredth short of
@@ -98,7 +98,7 @@ fn a_rider_stays_aboard_a_car_passing_their_floor() {
     }
     // It stops at floor 4 and opens: the rider steps off there.
     place_car(&mut sim, id, 4.0, -1);
-    sim.crowd.open_cars = vec![(id, 0, 4)];
+    sim.crowd.open_cars = vec![(id, 0, 4, Leaving::Either)];
     advance(&mut sim.crowd, 0.1, &mut sim.tower);
     let p = &sim.crowd.people[i];
     assert_eq!(p.state, PState::ToDest);
@@ -111,7 +111,7 @@ fn the_dispatch_opens_arriving_dwelling_and_parked_cars_only() {
     let mut d = ElevatorDispatch::new();
     // Parked at the lobby with nothing to do: open there.
     d.move_cars(&mut sim.tower, 0.1, &ElevatorCalls::default(), 9, false);
-    assert_eq!(d.open_cars(), [(id, 0, 1)]);
+    assert_eq!(d.open_cars(), [(id, 0, 1, Leaving::Either)]);
     // A cab call to 5: the car leaves, doors shut while it travels.
     let calls = cab_call(id, 5);
     d.move_cars(&mut sim.tower, 1.0, &calls, 9, false);
@@ -126,11 +126,19 @@ fn the_dispatch_opens_arriving_dwelling_and_parked_cars_only() {
         }
     }
     assert!(arrived, "the car reached floor 5");
-    assert_eq!(d.open_cars(), [(id, 0, 5)], "open on arrival");
+    assert_eq!(
+        d.open_cars(),
+        [(id, 0, 5, Leaving::Either)],
+        "open on arrival"
+    );
     // Still dwelling a short step later: still open.
     d.move_cars(&mut sim.tower, 0.1, &calls, 9, false);
     assert_eq!(sim.tower.get_transport(id).unwrap().car_positions[0], 5.0);
-    assert_eq!(d.open_cars(), [(id, 0, 5)], "open while it dwells");
+    assert_eq!(
+        d.open_cars(),
+        [(id, 0, 5, Leaving::Either)],
+        "open while it dwells"
+    );
 }
 
 #[test]
@@ -140,14 +148,14 @@ fn a_car_ending_a_move_a_hair_short_of_its_stop_lands_on_it() {
     // would turn it around if it ever looked past 3.
     place_car(&mut sim, id, 2.9, 1);
     let mut calls = cab_call(id, 3);
-    calls.hall.insert(id, FastMap::from_iter([(2, 3.0)]));
+    calls.hall.insert(id, FastMap::from_iter([(2, 3.0.into())]));
     let mut d = ElevatorDispatch::new();
     // A step that covers 0.06 of the 0.1 left: moved by that much, the car
     // would stop 0.04 short, inside the search's reach, and never arrive.
     d.move_cars(&mut sim.tower, 0.075, &calls, 9, false);
     let t = sim.tower.get_transport(id).unwrap();
     assert_eq!(t.car_positions[0], 3.0, "landed on its stop");
-    assert_eq!(d.open_cars(), [(id, 0, 3)]);
+    assert_eq!(d.open_cars(), [(id, 0, 3, Leaving::Either)]);
 }
 
 #[test]

@@ -3,8 +3,9 @@
 //!
 //! - Waiting Car Response: when a call comes in, a waiting car stays put if
 //!   a car already moving in that direction is within that many floors.
-//!   Our calls carry no direction, so "in that direction" reads as "heading
-//!   toward the call's floor" (or dwelling on it).
+//!   A call's direction is its callers' way when the crowd alone calls and
+//!   they all agree (`Ways`); otherwise "in that direction" reads as
+//!   "heading toward the call's floor" (or dwelling on it).
 //! - Standard Floor Departure: a car that has loaded waits that long, boards
 //!   anyone who arrives meanwhile, and leaves once a whole wait passes with
 //!   nobody new. A full car leaves, so the wait cannot run forever.
@@ -21,14 +22,15 @@ pub(super) const ON_FLOOR: f64 = 0.05;
 /// Whether a car of the shaft other than `me` already covers a call at
 /// `floor` under Waiting Car Response `response`: it is on shift (its index
 /// is below `active`), moving (`dirs` is 0 only for a parked car), heading
-/// toward the floor or standing on it, and at most `response` floors away.
-/// At most eight cars a shaft, so the walk is short.
+/// toward the floor or standing on it, moving the way its callers are bound
+/// when they all agree (`bound`), and at most `response` floors away. At most
+/// eight cars a shaft, so the walk is short.
 pub(super) fn moving_car_covers(
     positions: &[f64],
     dirs: &[i64],
     me: usize,
     active: usize,
-    floor: f64,
+    (floor, bound): (f64, Option<i64>),
     response: f64,
 ) -> bool {
     positions
@@ -38,7 +40,12 @@ pub(super) fn moving_car_covers(
         .enumerate()
         .any(|(j, (&pos, &dir))| {
             let ahead = (floor - pos) * dir as f64;
-            j != me && dir != 0 && ahead >= -ON_FLOOR && (floor - pos).abs() <= response
+            let their_way = bound.is_none_or(|b| b == dir);
+            j != me
+                && dir != 0
+                && their_way
+                && ahead >= -ON_FLOOR
+                && (floor - pos).abs() <= response
         })
 }
 
@@ -120,8 +127,11 @@ impl Boarding<'_> {
 /// (`covered`). A covered stop is passed over and the search goes on past
 /// it; a stop beyond `reach` ends it, as every later stop is farther. The
 /// search only returns a stop at a finite distance and `reach` is never
-/// NaN, so `<=` is the TypeScript's `!(dist > reach)`. Outside Classic's
-/// Waiting Car Response nothing is covered, so this is one `next_stop`.
+/// NaN, so `<=` is the TypeScript's `!(dist > reach)`. A call whose callers
+/// are all bound against `dir` (`Ways`) is passed too, unless nothing the car
+/// answers lies beyond it: then it is the car's turn, if no other car turns
+/// there already. With nothing covered or
+/// bound one way, this is one `next_stop`.
 pub(super) fn first_answering(
     demand: &Demand,
     pos: f64,
@@ -130,16 +140,26 @@ pub(super) fn first_answering(
     covered: impl Fn(usize) -> bool,
 ) -> Option<usize> {
     let mut from = pos;
+    // The farthest call so far whose callers are all bound against `dir`:
+    // passed while anything lies beyond it, the car's turn when nothing does.
+    let mut turn = None;
     loop {
-        let k = demand.next_stop(from, dir)?;
+        let Some(k) = demand.next_stop(from, dir) else {
+            return turn;
+        };
         if demand.is_cab(k) {
             return Some(k);
         }
         if (demand.stops[k] as f64 - pos).abs() > reach {
-            return None;
+            return turn;
         }
-        if !covered(k) {
-            return Some(k);
+        // The bit tests come before `covered`, which may weigh every car.
+        if !demand.ways.against(k, dir) {
+            if !covered(k) {
+                return Some(k);
+            }
+        } else if !demand.ways.turned_at(k) && !covered(k) {
+            turn = Some(k);
         }
         from = demand.stops[k] as f64;
     }

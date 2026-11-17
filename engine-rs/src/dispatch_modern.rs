@@ -58,6 +58,11 @@ pub struct DispatchRules {
     /// A car its riders fill owns no hall call and starts no wait over for
     /// a rider who cannot board.
     pub full_car_passes: bool,
+    /// A car at a stop shows which way it leaves and riders board only a
+    /// car leaving their way; one leaving with riders aboard heads for their
+    /// floors first (`dispatch_leaving.rs`). Both modes; the plain SCAN
+    /// profile leaves it off.
+    pub riders_go_their_way: bool,
     /// How many times the base speed a standard or service car moves.
     pub car_speed: f64,
     /// How many times the base speed an express car moves.
@@ -76,6 +81,7 @@ impl DispatchRules {
             parked_owner_boards: mode.parked_owner_boards_its_floor(),
             parked_reach_gate: false,
             full_car_passes: mode.full_cars_pass_hall_calls(),
+            riders_go_their_way: true,
             car_speed: mode.car_speed_factor(),
             express_speed: mode.express_speed_factor(),
         }
@@ -97,6 +103,7 @@ impl DispatchRules {
             parked_owner_boards: false,
             parked_reach_gate: true,
             full_car_passes: false,
+            riders_go_their_way: false,
             car_speed: 1.0,
             express_speed: 1.0,
         }
@@ -164,11 +171,23 @@ impl CarView {
         self.dir != 0 && (floor - self.pos) * self.dir as f64 >= -ON_FLOOR
     }
 
-    /// The car's cost to answer a call at `floor`, in floors: the travel
-    /// there, plus `wrong_way` and the trip out to its turn when it is moving
-    /// away, plus what it already owes.
-    fn cost(&self, floor: f64, wrong_way: f64) -> f64 {
-        let travel = if self.dir == 0 || self.heading_to(floor) {
+    /// Whether the car would take callers at `floor` bound `bound` (1 up,
+    /// -1 down, `None` either way) on its way there: it is parked, or moving
+    /// toward the floor, and either moving their way or turning there.
+    fn takes_on_the_way(&self, floor: f64, bound: Option<i64>) -> bool {
+        if self.dir == 0 {
+            return true;
+        }
+        let beyond = (self.turn - floor) * self.dir as f64 > ON_FLOOR;
+        self.heading_to(floor) && (bound.is_none_or(|b| b == self.dir) || !beyond)
+    }
+
+    /// The car's cost to answer a call at `floor` whose callers are bound
+    /// `bound`, in floors: the travel there, plus `wrong_way` and the trip out
+    /// to its turn when it is moving away or will pass them on its way out,
+    /// plus what it already owes.
+    fn cost(&self, floor: f64, wrong_way: f64, bound: Option<i64>) -> f64 {
+        let travel = if self.takes_on_the_way(floor, bound) {
             (floor - self.pos).abs()
         } else {
             (self.turn - self.pos).abs() + (self.turn - floor).abs() + wrong_way
@@ -211,28 +230,40 @@ impl BestCars {
     /// when nobody is on shift. A car heading to the call within the
     /// response wins outright, the nearest such first; otherwise the
     /// cheapest `CarView::cost`. Ties go to the lower index.
-    pub fn owner(&self, k: usize, floor: i64) -> usize {
+    pub fn owner(&self, k: usize, floor: i64, bound: Option<i64>) -> usize {
         let known = self.owner[k].get();
         if known != UNASKED {
             return known;
         }
-        let best = best_car(&self.cars, floor as f64, self.response, self.wrong_way);
+        let best = best_car(
+            &self.cars,
+            (floor as f64, bound),
+            self.response,
+            self.wrong_way,
+        );
         self.owner[k].set(best);
         best
     }
 }
 
-fn best_car(cars: &[CarView], floor: f64, response: Option<f64>, wrong_way: f64) -> usize {
+/// The best car for a call at `floor` whose callers are bound `bound`.
+fn best_car(
+    cars: &[CarView],
+    (floor, bound): (f64, Option<i64>),
+    response: Option<f64>,
+    wrong_way: f64,
+) -> usize {
     let mut coming: Option<(f64, usize)> = None;
     let mut cheapest: Option<(f64, usize)> = None;
     for (j, car) in cars.iter().enumerate().filter(|(_, car)| !car.full) {
         let dist = (floor - car.pos).abs();
-        if response.is_some_and(|r| car.heading_to(floor) && dist <= r)
+        let coming_here = car.heading_to(floor) && car.takes_on_the_way(floor, bound);
+        if response.is_some_and(|r| coming_here && dist <= r)
             && coming.is_none_or(|(d, _)| dist < d)
         {
             coming = Some((dist, j));
         }
-        let cost = car.cost(floor, wrong_way);
+        let cost = car.cost(floor, wrong_way, bound);
         if cheapest.is_none_or(|(c, _)| cost < c) {
             cheapest = Some((cost, j));
         }

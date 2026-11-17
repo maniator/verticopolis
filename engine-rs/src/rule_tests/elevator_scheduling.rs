@@ -70,7 +70,10 @@ fn hall_calls(id: i64, floors: &[i64]) -> ElevatorCalls {
     let mut calls = ElevatorCalls::default();
     calls.hall.insert(
         id,
-        floors.iter().map(|&f| (f, 1.0)).collect::<FastMap<_, _>>(),
+        floors
+            .iter()
+            .map(|&f| (f, 1.0.into()))
+            .collect::<FastMap<_, _>>(),
     );
     calls
 }

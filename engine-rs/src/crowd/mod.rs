@@ -10,6 +10,7 @@ pub mod doors;
 pub mod expected_time;
 pub(crate) mod fasthash;
 pub mod graph;
+mod hall_call;
 pub mod landing;
 pub mod line_count;
 pub mod meals;
@@ -29,6 +30,7 @@ pub mod walk;
 pub mod walk_ins;
 pub mod workplace;
 
+pub use hall_call::HallCall;
 use std::collections::{BTreeSet, HashMap, HashSet};
 
 use serde_json::{json, Map, Value};
@@ -228,11 +230,11 @@ pub type AdjGraph = fasthash::FastMap<i64, Vec<Edge>>;
 /// `routing.rs`), only looked up.
 pub type StaffParts = fasthash::FastMap<i64, i64>;
 
-/// `ElevatorCalls`: hall (shaft -> floor -> count) and cab (shaft -> car -> floors).
-/// A car's cab floors are an ordered set, so dispatch reads them in floor order.
+/// `ElevatorCalls`: hall (shaft -> floor -> callers) and cab (shaft -> car ->
+/// floors, ordered, so dispatch reads them in floor order).
 #[derive(Default)]
 pub struct ElevatorCalls {
-    pub hall: fasthash::FastMap<i64, fasthash::FastMap<i64, f64>>,
+    pub hall: fasthash::FastMap<i64, fasthash::FastMap<i64, HallCall>>,
     pub cab: fasthash::FastMap<i64, fasthash::FastMap<i64, BTreeSet<i64>>>,
     /// The cars (shaft, car) a Modern crowd fills, ascending (`full_cars`).
     pub full: Vec<(i64, i64)>,
@@ -280,10 +282,9 @@ pub struct Crowd {
     /// ascending: nobody boards one, even one still finishing its riders.
     /// Swapped in from the dispatch each step; saved as `closedCars`.
     pub closed_cars: Vec<(i64, i64)>,
-    /// The cars standing at a stop with their doors open, as (shaft id, car
-    /// index, floor), ascending: the only cars a person boards or leaves.
-    /// Swapped in from the dispatch each step; never saved.
-    pub open_cars: Vec<(i64, i64, i64)>,
+    /// The cars standing open at a stop (`dispatch::OpenCar`), ascending: the only
+    /// cars a person boards or leaves. Swapped in from the dispatch each step; never saved.
+    pub open_cars: Vec<crate::dispatch::OpenCar>,
     /// The queue projection and its (step, tower revision). Never saved.
     pub queue_cache: Option<((i64, i64), crate::render_reads::QueueView)>,
     /// The clock hour of the step, so nobody stays in or walks into a venue
@@ -325,10 +326,9 @@ pub struct Crowd {
 }
 
 impl Crowd {
-    /// Whether car `car` of shaft `shaft` stands at `floor` with its doors
-    /// open this step, so a person there may step on or off.
-    pub fn door_open(&self, shaft: i64, car: i64, floor: i64) -> bool {
-        self.open_cars.binary_search(&(shaft, car, floor)).is_ok()
+    /// The way car `car` of `shaft` leaves `floor`, if open there so a person may step on or off.
+    pub fn door_open(&self, shaft: i64, car: i64, floor: i64) -> Option<crate::dispatch::Leaving> {
+        crate::dispatch::leaving_at(&self.open_cars, shaft, car, floor)
     }
 
     pub fn new(seed: u32) -> Crowd {

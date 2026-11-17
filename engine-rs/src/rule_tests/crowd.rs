@@ -40,7 +40,7 @@ fn open_standing_cars(sim: &mut Simulation) {
     for t in sim.tower.transports.iter().filter(|t| t.kind.is_elevator()) {
         for (i, &pos) in t.car_positions.iter().enumerate() {
             if pos.fract() == 0.0 {
-                open.push((t.id, i as i64, pos as i64));
+                open.push((t.id, i as i64, pos as i64, crate::dispatch::Leaving::Either));
             }
         }
     }

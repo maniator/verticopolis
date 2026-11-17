@@ -97,7 +97,7 @@ impl Reference {
             }
             let car_load = t.car_load.as_mut().unwrap();
             let cap = kind.car_capacity();
-            let hall_at = |fl: i64| hall.and_then(|h| h.get(&fl)).copied().unwrap_or(0.0);
+            let hall_at = |fl: i64| hall.and_then(|h| h.get(&fl)).map_or(0.0, |c| c.callers);
             let mut call_set: HashSet<i64> = HashSet::new();
             for &fl in &stops {
                 if hall_at(fl) >= 1.0
