@@ -103,6 +103,50 @@ fn the_morning_pass_writes_the_rows_and_keeps_the_players_settings() {
     assert!(s.auto_tune);
 }
 
+/// On a tower of twins the pass writes, for every Auto shaft, the rows the
+/// dialog's proposal gives against its current schedule, the twins' load
+/// included, though it reads every stop list once for the whole pass.
+#[test]
+fn the_pass_writes_each_shafts_proposal_with_its_twins() {
+    let (mut sim, id) = tower(GameMode::Modern, 8);
+    assert!(sim.build_transport(Kind::ElevatorStandard, 20, 1, TOP).ok);
+    assert!(sim.build_transport(Kind::ElevatorStandard, 40, 1, 5).ok);
+    let ids: Vec<i64> = sim.tower.transports.iter().map(|t| t.id).collect();
+    let warm = |wd: f64, we: f64| {
+        json!({ "weekday": warm_ring(wd), "weekend": warm_ring(we),
+                "weekdaySampled": warm_sampled(), "weekendSampled": warm_sampled() })
+    };
+    let loads = [(0.0, 0.0), (0.5, 0.25), (1.0, 1.0)];
+    let mut hourly = Vec::new();
+    for (&shaft, &(wd, we)) in ids.iter().zip(&loads) {
+        sim.tower.set_cars(shaft, 8);
+        let raw = json!({ "activeCars": { "weekday": vec![8; 24], "weekend": vec![8; 24] },
+                          "autoTune": true });
+        assert!(sim.tower.set_schedule(shaft, &raw));
+        hourly.push(json!([shaft, warm(wd, we)]));
+    }
+    let doc = json!({ "util": [], "hourly": hourly });
+    sim.seed_telemetry(&doc).expect("a telemetry document");
+    let proposed: Vec<_> = ids
+        .iter()
+        .map(|&shaft| {
+            let draft = schedule(&sim, shaft);
+            let p = sim.auto_tune_proposal(shaft, Some(&draft), false);
+            let p = p.proposal.expect("a warm shaft");
+            (p.weekday, p.weekend)
+        })
+        .collect();
+    at_hour(&mut sim, AUTO_TUNE_HOUR);
+    sim.retune_auto_schedules();
+    for (&shaft, (weekday, weekend)) in ids.iter().zip(&proposed) {
+        let s = schedule(&sim, shaft);
+        assert_eq!(&s.weekday, weekday, "shaft {shaft} weekday");
+        assert_eq!(&s.weekend, weekend, "shaft {shaft} weekend");
+    }
+    let idle = schedule(&sim, id);
+    assert_eq!(idle.weekday.unwrap()[9], 5, "its twin's half load");
+}
+
 #[test]
 fn the_pass_runs_at_five_only_and_from_the_hourly_pass() {
     let (mut sim, id) = tower(GameMode::Modern, 8);

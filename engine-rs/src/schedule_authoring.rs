@@ -18,10 +18,13 @@
 use indexmap::IndexMap;
 use serde::Serialize;
 
+use crate::floor_bits::FloorBits;
 use crate::schedule::{Schedule, SCHEDULE_HOURS};
 use crate::schedule_geometry::ShaftGeometry;
 use crate::sim::Simulation;
 use crate::telemetry::{HourlyByDay, OriginRings};
+use crate::tower::Transport;
+use crate::tower_index::floor_slot;
 
 /// Sampled hours (nonzero slots) a day's curve needs before it counts as
 /// measured. One busy hour must not arm Auto-tune against 23 empty slots.
@@ -219,9 +222,10 @@ impl Simulation {
         draft: Option<&Schedule>,
         weekend_view: bool,
     ) -> AutoTuneProposal {
-        let Some(t) = self.tower.get_transport(id) else {
+        let Some(i) = self.tower.transport_index(id) else {
             return AutoTuneProposal::refused(ProposalStatus::MissingShaft);
         };
+        let t = &self.tower.transports[i];
         if !t.kind.is_elevator() {
             return AutoTuneProposal::refused(ProposalStatus::NotAnElevator);
         }
@@ -253,37 +257,8 @@ impl Simulation {
                 proposal: None,
             };
         }
-        let cars = t.cars;
-        // A day that is not warm keeps the draft's own row, held to the cars
-        // installed in case the draft was written for a bigger fleet.
-        let draft_row = |weekend: bool| {
-            let row = draft.and_then(|d| {
-                if weekend {
-                    d.weekend.as_ref()
-                } else {
-                    d.weekday.as_ref()
-                }
-            });
-            row.map(|r| r.iter().map(|&n| n.clamp(0, cars)).collect::<Vec<i64>>())
-        };
-        // A warm day still keeps the hours its ring has not measured (the
-        // hours before a reload, a new shaft's first night) at the draft's
-        // count: read as idle, they would drop to one car, a rush included.
-        let tuned = |weekend: bool| {
-            let (ring, sampled) = rings.day(weekend);
-            let row = tuned_row(&self.twin_load(t, ring, weekend), cars);
-            keep_unmeasured_hours(row, draft_row(weekend).as_deref(), sampled, cars)
-        };
-        let weekday = if wd.warm {
-            Some(tuned(false))
-        } else {
-            draft_row(false)
-        };
-        let weekend = if we.warm {
-            Some(tuned(true))
-        } else {
-            draft_row(true)
-        };
+        let twins = self.twins_of(i, &self.elevator_stop_sets());
+        let (weekday, weekend) = self.tuned_rows(t, draft, &twins).unwrap_or_default();
 
         let geo = self.shaft_geometry(t);
         let authored = draft
@@ -307,7 +282,7 @@ impl Simulation {
         };
         let home_floors = homes
             .into_iter()
-            .take(cars as usize)
+            .take(t.cars as usize)
             .map(|f| geo.snap_to_served(f.clamp(geo.bottom, geo.top)))
             .collect();
         AutoTuneProposal {
@@ -324,26 +299,113 @@ impl Simulation {
     }
 }
 
+/// The rows of one shaft Auto-tune proposes: weekday, then weekend.
+type TunedRows = (Option<Vec<i64>>, Option<Vec<i64>>);
+
 impl Simulation {
-    /// Each hour's load to tune `t` by: its own, or its twins' when they
-    /// carried more. A twin is a shaft of the same kind stopping at every
-    /// floor `t` stops at, so `t` could carry its riders. Modern riders
-    /// route around a shaft cut to one car, so its own reading falls with
-    /// each cut and never wins its cars back (owner, 2026-11-17); the
-    /// twins' reading is what it would carry. Each twin counts on a day it
-    /// has measured (`warm_curve`), and the twins' load is their mean.
-    fn twin_load(&self, t: &crate::tower::Transport, own: &[f64], weekend: bool) -> Vec<f64> {
-        let stops = self.tower.stops_of(t);
-        let (mut sum, mut twins) = (vec![0.0; SCHEDULE_HOURS], 0.0);
-        for other in self.tower.transports.iter() {
-            if other.id == t.id || other.kind != t.kind {
-                continue;
-            }
-            let theirs = self.tower.stops_of(other);
-            if !stops.iter().all(|f| theirs.binary_search(f).is_ok()) {
-                continue;
-            }
-            let Some(rings) = self.telemetry.hourly.get(&other.id) else {
+    /// The active-car rows Auto-tune gives `t` against `draft`: a warm day's
+    /// from the load `t` and its `twins` measured, a cold day's the draft's
+    /// own. `None` when the shaft has no cars or neither day is warm. The
+    /// proposal and the morning pass share it; the pass needs no staging.
+    pub(crate) fn tuned_rows(
+        &self,
+        t: &Transport,
+        draft: Option<&Schedule>,
+        twins: &[i64],
+    ) -> Option<TunedRows> {
+        let empty = HourlyByDay::default();
+        let rings = self.telemetry.hourly.get(&t.id).unwrap_or(&empty);
+        let wd_warm = warm_curve(rings.day(false)).is_some();
+        let we_warm = warm_curve(rings.day(true)).is_some();
+        if t.cars <= 0 || !(wd_warm || we_warm) {
+            return None;
+        }
+        let cars = t.cars;
+        // A day that is not warm keeps the draft's own row, held to the cars
+        // installed in case the draft was written for a bigger fleet.
+        let draft_row = |weekend: bool| {
+            let row = draft.and_then(|d| {
+                if weekend {
+                    d.weekend.as_ref()
+                } else {
+                    d.weekday.as_ref()
+                }
+            });
+            row.map(|r| r.iter().map(|&n| n.clamp(0, cars)).collect::<Vec<i64>>())
+        };
+        // A warm day still keeps the hours its ring has not measured (the
+        // hours before a reload, a new shaft's first night) at the draft's
+        // count: read as idle, they would drop to one car, a rush included.
+        let tuned = |weekend: bool| {
+            let (ring, sampled) = rings.day(weekend);
+            let row = tuned_row(&self.twin_load(twins, ring, weekend), cars);
+            keep_unmeasured_hours(row, draft_row(weekend).as_deref(), sampled, cars)
+        };
+        let weekday = if wd_warm {
+            Some(tuned(false))
+        } else {
+            draft_row(false)
+        };
+        let weekend = if we_warm {
+            Some(tuned(true))
+        } else {
+            draft_row(true)
+        };
+        Some((weekday, weekend))
+    }
+
+    /// Each elevator's stops as a floor set, with its index in
+    /// `tower.transports`, ascending: read once for a caller that looks for
+    /// twins, so a pass over many shafts compares sets, not stop lists.
+    /// Stairs and escalators are left out, so the twin search never walks
+    /// a Modern tower's links.
+    pub(crate) fn elevator_stop_sets(&self) -> Vec<(usize, FloorBits)> {
+        let set = |(i, t): (usize, &Transport)| {
+            t.kind.is_elevator().then(|| {
+                let mut floors = FloorBits::default();
+                for f in self.tower.stops_of(t) {
+                    // Every stop is a buildable floor, which has a slot.
+                    if let Some(slot) = floor_slot(f) {
+                        floors.insert(slot);
+                    }
+                }
+                (i, floors)
+            })
+        };
+        self.tower
+            .transports
+            .iter()
+            .enumerate()
+            .filter_map(set)
+            .collect()
+    }
+
+    /// The ids of the twins of the transport at index `i`: elevators of the
+    /// same kind stopping at every floor it stops at, so it could carry
+    /// their riders. `sets` is [`Self::elevator_stop_sets`]; each pair is
+    /// one set comparison.
+    pub(crate) fn twins_of(&self, i: usize, sets: &[(usize, FloorBits)]) -> Vec<i64> {
+        let Ok(at) = sets.binary_search_by_key(&i, |&(j, _)| j) else {
+            return Vec::new();
+        };
+        let (t, mine) = (&self.tower.transports[i], &sets[at].1);
+        let twin = |&(j, ref theirs): &(usize, FloorBits)| {
+            let other = &self.tower.transports[j];
+            (j != i && other.kind == t.kind && theirs.covers(mine)).then_some(other.id)
+        };
+        sets.iter().filter_map(twin).collect()
+    }
+
+    /// Each hour's load to tune a shaft by: its `own`, or its `twins'`
+    /// ([`Self::twins_of`]) when they carried more. Modern riders route
+    /// around a shaft cut to one car, so its own reading falls with each cut
+    /// and never wins its cars back (owner, 2026-11-17); the twins' reading
+    /// is what it would carry. Each twin counts on a day it has measured
+    /// (`warm_curve`), and the twins' load is their mean.
+    fn twin_load(&self, twins: &[i64], own: &[f64], weekend: bool) -> Vec<f64> {
+        let (mut sum, mut counted) = (vec![0.0; SCHEDULE_HOURS], 0.0);
+        for id in twins {
+            let Some(rings) = self.telemetry.hourly.get(id) else {
                 continue;
             };
             let Some(curve) = warm_curve(rings.day(weekend)) else {
@@ -352,13 +414,13 @@ impl Simulation {
             for (h, load) in sum.iter_mut().zip(curve) {
                 *h += load;
             }
-            twins += 1.0;
+            counted += 1.0;
         }
         (0..SCHEDULE_HOURS)
             .map(|h| {
                 let mine = own.get(h).copied().unwrap_or(0.0);
-                if twins > 0.0 {
-                    mine.max(sum[h] / twins)
+                if counted > 0.0 {
+                    mine.max(sum[h] / counted)
                 } else {
                     mine
                 }

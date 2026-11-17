@@ -35,28 +35,31 @@ impl Simulation {
         if self.clock.hour() != AUTO_TUNE_HOUR || !self.mode.schedule_assist() {
             return;
         }
-        let weekend = self.clock.is_weekend();
+        if !self.tower.runs_an_auto_schedule() {
+            return;
+        }
+        // Each elevator's stops are read once, as a floor set, so finding a
+        // shaft's twins is one set comparison per elevator.
+        let stops = self.elevator_stop_sets();
         let mut retunes: Vec<Retune> = Vec::new();
         for (i, t) in self.tower.transports.iter().enumerate() {
             let Some(current) = t.schedule.as_ref().filter(|s| s.auto_tune) else {
                 continue;
             };
-            // The current schedule is the draft, so a cold day keeps its row;
-            // the proposal's staging is left unread.
-            let Some(rows) = self
-                .auto_tune_proposal(t.id, Some(current), weekend)
-                .proposal
-            else {
+            // The current schedule is the draft, so a cold day keeps its row.
+            let twins = self.twins_of(i, &stops);
+            let Some((weekday, weekend)) = self.tuned_rows(t, Some(current), &twins) else {
                 continue;
             };
-            let moved = rows.weekday != current.weekday || rows.weekend != current.weekend;
+            let moved = weekday != current.weekday || weekend != current.weekend;
             if moved || current.held_back.is_some() {
-                retunes.push((i, rows.weekday, rows.weekend));
+                retunes.push((i, weekday, weekend));
             }
         }
-        if retunes.is_empty() {
-            return;
-        }
+        // No tower revision moves: the rows only pick the cars in service,
+        // which every step reads live (they change on the hour anyway), and
+        // nothing cached by revision reads them. A bump would rebuild the
+        // routing graph and the stop lists every morning for nothing.
         for (i, weekday, weekend) in retunes {
             if let Some(s) = self.tower.transports[i].schedule.as_mut() {
                 s.weekday = weekday;
@@ -66,7 +69,6 @@ impl Simulation {
                 s.held_back = None;
             }
         }
-        self.tower.revision += 1;
     }
 }
 

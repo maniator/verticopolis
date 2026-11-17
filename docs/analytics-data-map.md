@@ -158,7 +158,7 @@ back on. Each carries the new state only.
 
 ## Elevator Auto (Modern)
 
-From the release after 4.10, an elevator's Schedule window has an **Auto** box
+From the release after 4.11, an elevator's Schedule window has an **Auto** box
 (Modern): while it is ticked, the engine re-tunes that shaft's car counts every
 game morning from its measured traffic. New Modern elevators start with it on
 (owner, 2026-11-17), so one `app_action` code says how often players change it.

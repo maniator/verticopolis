@@ -119,6 +119,7 @@ pub mod facilities;
 #[doc(hidden)]
 pub mod fflate;
 pub mod fixed_step;
+mod floor_bits;
 pub mod frame;
 pub mod gameplay;
 #[doc(hidden)]

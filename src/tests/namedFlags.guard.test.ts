@@ -28,7 +28,7 @@ const ALLOWED: Readonly<Record<string, Allowed>> = {
   "engine-rs/src/view/reader.rs": { sites: 1, reason: "the unlocked-kinds mask, bit k = kind code k" },
   "src/simport/viewReader.ts": { sites: 1, reason: "reads the unlocked-kinds mask, bit k = kind code k (the whole catalog, past 32 bits)" },
   "engine-rs/src/dispatch_demand.rs": { sites: 2, reason: "the car's cab-floor bitset, indexed by stop" },
-  "engine-rs/src/crowd/spawn_floors.rs": { sites: 1, reason: "a per-floor bitset, indexed by floor" },
+  "engine-rs/src/floor_bits.rs": { sites: 1, reason: "a per-floor bitset, indexed by floor slot" },
   "engine-rs/src/crowd/seg_set.rs": { sites: 1, reason: "the route search's seen-segment bitset, indexed by segment id" },
   "engine-rs/src/view/window.rs": { sites: 1, reason: "the people window's marked-people bitset, indexed by crowd index" },
   "engine-rs/src/fflate.rs": { sites: 2, reason: "the deflate port: shift widths and masks of the compression format" },

@@ -383,7 +383,11 @@ fn the_proposal_query_answers_its_statuses_and_writes_nothing() {
     assert_eq!(proposal(&e, id, &draft, false), on);
     assert_eq!(e.sim.serialize(), before);
     assert!(e.last_reason_text().is_none());
-    assert!(e.sim.tower.transports[0].schedule.is_none());
+    assert_eq!(
+        e.sim.tower.transports[0].schedule,
+        Some(crate::schedule::Schedule::auto_only()),
+        "the schedule it was built with: Auto alone"
+    );
     // A stair is no elevator, whatever the telemetry says.
     assert!(e.sim.build_transport(Kind::Stairs, 170, 1, 2).ok);
     let stairs = e
@@ -444,7 +448,11 @@ fn the_facts_and_preset_queries_answer_their_statuses_and_write_nothing() {
     assert_eq!(preset(&e, id, "rush"), rush);
     assert_eq!(e.sim.serialize(), before);
     assert!(e.last_reason_text().is_none());
-    assert!(e.sim.tower.transports[0].schedule.is_none());
+    assert_eq!(
+        e.sim.tower.transports[0].schedule,
+        Some(crate::schedule::Schedule::auto_only()),
+        "the schedule it was built with: Auto alone"
+    );
 
     // The preset rows read back through the ordinary draft slots as facts.
     let mut draft = vec![0.0; SCHEDULE_LEN];

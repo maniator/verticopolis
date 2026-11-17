@@ -13,24 +13,9 @@ use std::sync::Arc;
 use crate::clock::Clock;
 use crate::economy::tickets::{charged, ticket_pick_mult};
 use crate::facilities::Kind;
+use crate::floor_bits::FloorBits;
 use crate::tower::{Tower, UnitState};
 use crate::tower_index::{floor_slot, FloorRooms, FLOOR_SLOTS};
-
-/// A bit per floor slot, in two words: a `u128` shift is a library call on
-/// wasm32.
-#[derive(Default)]
-struct FloorBits([u64; 2]);
-
-impl FloorBits {
-    /// Sets slot `i`'s bit; whether it was clear.
-    #[inline]
-    fn insert(&mut self, i: usize) -> bool {
-        let (word, bit) = (i >> 6, 1u64 << (i & 63));
-        let new = self.0[word] & bit == 0;
-        self.0[word] |= bit;
-        new
-    }
-}
 
 /// Floors in the order first added, each once.
 #[derive(Default)]

@@ -112,3 +112,24 @@ fn a_full_one_car_hour_wins_a_car() {
     assert_eq!(super::tuned_row(&[0.5 / 8.0], 8)[0], 1);
     assert_eq!(super::tuned_row(&[0.0], 8)[0], 1);
 }
+
+/// A twin is a shaft of the same kind stopping at every floor the shaft
+/// does: a taller one counts, a shorter one does not, and another kind on
+/// the same floors does not. The morning pass reads them from floor sets
+/// built once for the whole pass.
+#[test]
+fn twins_are_the_same_kind_stopping_at_every_floor() {
+    let (mut sim, id) = tower(GameMode::Modern, 8);
+    assert!(sim.build_transport(Kind::ElevatorStandard, 20, 1, TOP).ok);
+    assert!(sim.build_transport(Kind::ElevatorStandard, 40, 1, 5).ok);
+    assert!(sim.build_transport(Kind::ElevatorService, 60, 1, TOP).ok);
+    let ids: Vec<i64> = sim.tower.transports.iter().map(|t| t.id).collect();
+    let [_, tall, short, service] = ids[..] else {
+        panic!("four shafts, got {ids:?}");
+    };
+    let stops = sim.elevator_stop_sets();
+    let twins = |id: i64| sim.twins_of(sim.tower.transport_index(id).unwrap(), &stops);
+    assert_eq!(twins(id), vec![tall], "the short shaft misses floors");
+    assert_eq!(twins(short), vec![id, tall], "both tall ones cover it");
+    assert!(twins(service).is_empty(), "no other service elevator");
+}

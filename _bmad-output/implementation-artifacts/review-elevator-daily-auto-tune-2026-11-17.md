@@ -36,3 +36,41 @@ No `defer` findings, so no backlog rows.
 | HP-10 | n/a | No optimization; rows are recomputed from the rings every morning. | none |
 | HP-11 | clear | The schedule record crosses as 62 slots (one Auto flag), only on schedule reads and writes; view layout 32 carries no per-frame slot change. Package rebuilt, `packageHash`, `engineIdentity` and the port fixtures pass. | none |
 | HP-12 | clear | Rendering untouched; the dialog re-renders on its own events only. | none |
+
+## Round 2: Codex P1 and the independent review (2026-11-17)
+
+| Id | Source | Class | Finding | Resolution |
+| --- | --- | --- | --- | --- |
+| P5 | Codex P1, independent review R2 | patch | The 05:00 pass ran the whole proposal per Auto shaft, and `twin_load` cloned every same-kind shaft's stop list each time: O(E² x S) copies, over the hourly budget at 48 shafts. | `tuned_rows` is the rows-only helper both the proposal and the pass share. The pass reads each elevator's stops once as a floor set (`elevator_stop_sets`, `floor_bits.rs`), and a twin is one set comparison per elevator (`twins_of`), stairs and escalators left out. Regressions: `the_pass_writes_each_shafts_proposal_with_its_twins`, `twins_are_the_same_kind_stopping_at_every_floor`, `a_set_covers_its_subsets_only`. |
+| P6 | Measurement (this round) | patch | The pass moved the tower revision every morning a row changed, which rebuilt the routing graph, the stop lists and every per-revision cache: 4 to 8 ms more on the 05:00 tick of the large towers. | The pass moves no revision: the rows only pick the cars in service, which every step reads live, and nothing cached by revision reads them. |
+| P7 | Independent review R1 | patch | Three wasm-feature lib tests were red: the exported layout pin, and two port tests that expected a new Modern elevator to have no schedule. | Pin set to layout 32's hash; the tests assert the schedule it was built with (Auto alone). |
+| P8 | Independent review | patch | `telemetry.rs` module doc said the rings are never saved or read back; the change note said layout 31; the data map said "after 4.10". | Fixed. |
+
+### Measurements (release build, maxed towers loaded as Modern, every elevator on Auto with warm rings)
+
+The pass alone (`retune_auto_schedules`, mean of 200 runs):
+
+| Tower | Auto elevators | Before | After |
+| --- | --- | --- | --- |
+| large | 5 | 3.9 us | 3.3 us |
+| many-unit | 24 | 61.7 us | 34.2 us |
+| large + 43 added shafts | 48 | 728.1 us | 163.1 us |
+
+The 05:00 tick against the other hour ticks, median of five game days:
+
+| Tower | main (no pass) | Before | After |
+| --- | --- | --- | --- |
+| large | 1.28 ms (others 1.50) | 6.63 ms (others 1.58) | 1.42 ms (others 1.49) |
+| many-unit | 0.87 ms (others 0.97) | 4.44 ms (others 0.91) | 1.00 ms (others 1.06) |
+| large + 48 shafts | 3.91 ms (others 4.92) | 13.20 ms (others 5.25) | 5.15 ms (others 5.33) |
+
+After the fix the 05:00 tick sits with the other hour ticks on every tower. The rest of the gap to main is the different traffic Auto's rows make, which every hour tick shares. HP-2 for the pass is now E x E set comparisons (2,304 at the 48-shaft cap) plus one stop read per elevator, inside the hourly budget.
+
+## Round 3: Codex P2 and the independent review round 2 (2026-11-17)
+
+| ID | Source | Class | Finding | Resolution |
+| --- | --- | --- | --- | --- |
+| P9 | Codex P2, independent review R7 | patch | Ticking Auto never seeded the staging floors, against story AC 5 ("homes seeded only when the player has none, as the button does"). | The toggle passes `!homesDirty`, as the Auto-tune button's proposal does; the morning pass still leaves staging alone. Regression: "ticking it seeds the staging floors when the player has set none". |
+| P10 | Independent review R6 | patch | `shortFleets` listed Auto shafts as idle cars, so a flat tuned row got the recovery toast and a "Use all installed cars" button the next 05:00 pass would undo. | `shortFleets` skips a schedule on Auto. Regression: "leaves a shaft on Auto alone, since the morning re-tune owns its counts". |
+
+Neither touches a hot path: P9 runs on a click, P10 only when Tower Statistics or the review opens, and both add one flag read.
