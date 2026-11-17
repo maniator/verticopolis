@@ -3,7 +3,7 @@ import { sendException } from "./analyticsRelay";
 import { getCommonProps } from "./analytics";
 import { createEventThrottle } from "./analyticsThrottle";
 import { isBrowserExtensionError } from "./analyticsErrorOrigin";
-import { MAX_PLAYER_TEXT, knownPlayerText, mentionsJson, scrubJsonEcho, scrubPlayerText } from "./analyticsPlayerText";
+import { MAX_PLAYER_TEXT, knownPlayerText, mentionsJson, playerTextMatcher, scrubJsonEcho, scrubPlayerText, type PlayerTextMatcher } from "./analyticsPlayerText";
 
 /**
  * Cookieless JavaScript error tracking (spec CAP-2 posture, the S5 follow-up
@@ -120,11 +120,11 @@ function describe(value: unknown): { type: string; message: string; stack: strin
  * trailing characters as the longest known name before the bound. `prepare`
  * runs on the window before the scrub (the JSON echo blanking).
  */
-function sentField(raw: string, max: number, known: readonly string[], prepare?: (window: string) => string): string {
+function sentField(raw: string, max: number, known: PlayerTextMatcher, prepare?: (window: string) => string): string {
   const head = raw.slice(0, max + MAX_PLAYER_TEXT);
   const scrubbed = scrubPlayerText(prepare ? prepare(head) : head, known);
   if (raw.length <= head.length) return clamp(scrubbed, max);
-  const safe = scrubbed.slice(0, Math.max(0, scrubbed.length - (known[0]?.length ?? 0)));
+  const safe = scrubbed.slice(0, Math.max(0, scrubbed.length - known.longest));
   return `${safe.slice(0, max)}...`;
 }
 
@@ -201,7 +201,7 @@ function report(
     // Replace every piece of player text the game knows about in every field
     // that carries text. A JSON error's echoed input is blanked first, in the
     // message and where V8's stack repeats the message on its first line.
-    const known = knownPlayerText();
+    const known = playerTextMatcher(knownPlayerText());
     const messageHead = message.slice(0, MAX_MESSAGE_LEN + MAX_PLAYER_TEXT);
     const aboutJson = mentionsJson(messageHead);
     const jsonMessage = aboutJson ? scrubJsonEcho(messageHead) : messageHead;

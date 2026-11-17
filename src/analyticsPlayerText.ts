@@ -111,27 +111,35 @@ function escapeRegExp(text: string): string {
   return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+/** The known player text compiled once for a report. */
+export interface PlayerTextMatcher {
+  /** One pattern for every name, or null when there is none. */
+  readonly pattern: RegExp | null;
+  /** The longest name's length, which bounds how much of a name a cut can hide. */
+  readonly longest: number;
+}
+
 /**
- * `text` with every whole-word, any-case occurrence of each known piece of
- * player text replaced by {@link PLAYER_TEXT_PLACEHOLDER}. A plain lowercase
- * `includes` runs first, so a name that is not there builds no pattern. The
- * left edge is a captured character rather than a lookbehind, which older
- * Safari cannot compile.
+ * Compile the known player text into one whole-word, any-case pattern. The
+ * names are tried longest first at each position, so a name that contains
+ * another is replaced whole. The left edge is a captured character rather than
+ * a lookbehind, which older Safari cannot compile. There is no cheaper
+ * prefilter in front of it: a lowercase `includes` disagrees with the
+ * pattern's Unicode case folding (a Greek final sigma, a long s), and would let
+ * a name through that the pattern catches.
  */
-export function scrubPlayerText(text: string, known: readonly string[]): string {
-  if (!text) return text;
-  let out = text;
-  let lower = out.toLowerCase();
-  for (const name of known) {
-    if (!lower.includes(name.toLowerCase())) continue;
-    const word = new RegExp(`(^|[^\\p{L}\\p{N}])${escapeRegExp(name)}(?![\\p{L}\\p{N}])`, "giu");
-    const next = out.replace(word, (_match, edge: string) => edge + PLAYER_TEXT_PLACEHOLDER);
-    if (next !== out) {
-      out = next;
-      lower = out.toLowerCase();
-    }
-  }
-  return out;
+export function playerTextMatcher(known: readonly string[]): PlayerTextMatcher {
+  const names = [...known].sort((a, b) => b.length - a.length);
+  if (names.length === 0) return { pattern: null, longest: 0 };
+  const any = names.map(escapeRegExp).join("|");
+  return { pattern: new RegExp(`(^|[^\\p{L}\\p{N}])(?:${any})(?![\\p{L}\\p{N}])`, "giu"), longest: names[0].length };
+}
+
+/** `text` with every match of the known player text replaced by
+ *  {@link PLAYER_TEXT_PLACEHOLDER}. */
+export function scrubPlayerText(text: string, matcher: PlayerTextMatcher): string {
+  if (!text || !matcher.pattern) return text;
+  return text.replace(matcher.pattern, (_match, edge: string) => edge + PLAYER_TEXT_PLACEHOLDER);
 }
 
 /** Whether a message is a JSON error, whose quotes echo the input. */

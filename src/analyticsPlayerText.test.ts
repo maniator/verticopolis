@@ -6,6 +6,7 @@ import {
   knownPlayerText,
   mentionsJson,
   nameAndStem,
+  playerTextMatcher,
   rememberFileName,
   rememberPlayerText,
   resetPlayerTextForTest,
@@ -15,41 +16,54 @@ import {
 
 beforeEach(() => resetPlayerTextForTest());
 
+/** Scrub `text` against `names`, compiled the way a report compiles them. */
+const scrub = (text: string, names: string[]) => scrubPlayerText(text, playerTextMatcher(names));
+
 describe("scrubPlayerText", () => {
   it("replaces every whole-word occurrence, in any case", () => {
-    expect(scrubPlayerText('Couldn\'t save "Harmony Tower": harmony tower is busy', ["Harmony Tower"])).toBe(
+    expect(scrub('Couldn\'t save "Harmony Tower": harmony tower is busy', ["Harmony Tower"])).toBe(
       `Couldn't save "${P}": ${P} is busy`,
     );
   });
 
   it("leaves a name that sits inside a longer word alone", () => {
-    expect(scrubPlayerText("TowerTooLargeError: Tower is full", ["Tower"])).toBe(`TowerTooLargeError: ${P} is full`);
-    expect(scrubPlayerText("Ångström2 Ångström", ["Ångström"])).toBe(`Ångström2 ${P}`);
+    expect(scrub("TowerTooLargeError: Tower is full", ["Tower"])).toBe(`TowerTooLargeError: ${P} is full`);
+    expect(scrub("Ångström2 Ångström", ["Ångström"])).toBe(`Ångström2 ${P}`);
   });
 
   it("treats a name's regex characters as plain text", () => {
-    expect(scrubPlayerText("open C++ (Tower) failed; open CCC Tower ok", ["C++ (Tower)"])).toBe(
+    expect(scrub("open C++ (Tower) failed; open CCC Tower ok", ["C++ (Tower)"])).toBe(
       `open ${P} failed; open CCC Tower ok`,
     );
   });
 
   it("matches a name next to punctuation and file extensions", () => {
-    expect(scrubPlayerText("at blob:Spire.vctower:1:2", ["Spire"])).toBe(`at blob:${P}.vctower:1:2`);
+    expect(scrub("at blob:Spire.vctower:1:2", ["Spire"])).toBe(`at blob:${P}.vctower:1:2`);
   });
 
   it("replaces back-to-back occurrences that share one separator", () => {
-    expect(scrubPlayerText("Spire Spire,spire", ["Spire"])).toBe(`${P} ${P},${P}`);
+    expect(scrub("Spire Spire,spire", ["Spire"])).toBe(`${P} ${P},${P}`);
   });
 
   it("finds a second name after the first one changed the text", () => {
-    expect(scrubPlayerText("Old Mill then Harbor", ["Old Mill", "Harbor"])).toBe(`${P} then ${P}`);
+    expect(scrub("Old Mill then Harbor", ["Old Mill", "Harbor"])).toBe(`${P} then ${P}`);
+  });
+
+  it("matches the way Unicode case folding does, final sigma and long s included", () => {
+    expect(scrub("ΝΙΚΟΣ.vctower and νικος", ["ΝΙΚΟΣ"])).toBe(`${P}.vctower and ${P}`);
+    expect(scrub("Ruſt Tower", ["Rust"])).toBe(`${P} Tower`);
+  });
+
+  it("has nothing to match when no name is known", () => {
+    expect(playerTextMatcher([])).toEqual({ pattern: null, longest: 0 });
+    expect(scrub("Spire", [])).toBe("Spire");
   });
 
   it("returns the text unchanged when no name is in it", () => {
-    expect(scrubPlayerText("Cannot read properties of undefined (reading 'x')", ["Spire"])).toBe(
+    expect(scrub("Cannot read properties of undefined (reading 'x')", ["Spire"])).toBe(
       "Cannot read properties of undefined (reading 'x')",
     );
-    expect(scrubPlayerText("", ["Spire"])).toBe("");
+    expect(scrub("", ["Spire"])).toBe("");
   });
 });
 
