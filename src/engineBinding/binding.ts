@@ -33,7 +33,7 @@ export const INSTANCE_METHODS = [
   "setSchedule", "setStop", "setExpressStops", "clearStops", "setLabel", "setTowerName",
   "setView", "setAutoBridge", "emit", "fires",
   "callExterminator", "autoBridge", "toggleAutoBridge", "setFilmPolicy", "rerollSubtype", "applyRentBatch",
-  "pendingChoice", "bombSearch", "resolveChoice", "tick",
+  "pendingChoice", "bombSearch", "fireResponse", "resolveChoice", "tick",
   "serialize", "saveBytes", "stateView", "crowdView", "stateDigest", "crowdDigest", "frameView", "logSince",
   "elevatorTelemetry", "loopMemos",
   "housekeepingReport", "commuteStress", "commuteStressRevision", "drainGameplayEvents",

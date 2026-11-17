@@ -205,6 +205,7 @@ fn an_emergency_answered_during_a_gesture_is_no_part_of_its_step() {
         s.resolve_choice(true);
     })
     .unwrap();
+    sim.land_helicopter();
     let u = sim.tower.get_unit(burning).unwrap();
     assert_eq!((u.state, u.label.as_str()), (UnitState::Gutted, "Office"));
     let touched: Vec<i64> = step.units.iter().map(|img| img.id).collect();

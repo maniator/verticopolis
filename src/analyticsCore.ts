@@ -229,6 +229,11 @@ export interface GameplayEvents {
    *  other two), `found` (Security defused it before the deadline, the
    *  engine's `bomb_found`) or `exploded` (the engine's `bomb_detonated`). */
   bomb_outcome: { outcome: BombOutcome };
+  /** How a fire ended, one row per fire (the engine's `fire_out`, #1889):
+   *  `security` (Security's guards had reached it by the emergency stairs),
+   *  `rescue` (the paid helicopter landed on it) or `burnedOut` (nobody
+   *  reached it). */
+  fire_outcome: { outcome: FireOutcome };
   /** Per-session summary of the SIMULATION-fired emergency activity: how many fire
    *  outbreaks ignited, how many rooms they gutted, and how many bombs detonated.
    *  Emitted once at session end like `session_builds`, and emitted EVEN WHEN ALL
@@ -306,6 +311,8 @@ export type EmergencyKind = "fireRescue" | "bombThreat";
 export type EmergencyDecision = "accept" | "decline";
 /** How a bomb threat ended (see `bomb_outcome`). */
 export type BombOutcome = "paid" | "found" | "exploded";
+/** How a fire ended (see `fire_outcome`). */
+export type FireOutcome = "security" | "rescue" | "burnedOut";
 
 export type { AppActionName };
 

@@ -42,6 +42,9 @@ fn one_of_each() -> Vec<GameplayEvent> {
         },
         GameplayEvent::MilestoneReached { id: "full-house" },
         GameplayEvent::BombFound,
+        GameplayEvent::FireOut {
+            by: FireOutcome::Rescue,
+        },
     ]
 }
 
@@ -413,6 +416,7 @@ fn stars_milestones_fires_bombs_and_resolutions_report_in_order() {
         message: String::new(),
     });
     sim.resolve_choice(true);
+    sim.land_helicopter();
     sim.money = 10.0;
     sim.events.pending = Some(crate::events::PendingChoice {
         kind: "fireRescue",
@@ -426,6 +430,7 @@ fn stars_milestones_fires_bombs_and_resolutions_report_in_order() {
             { "name": "fire_started", "payload": {} },
             { "name": "emergency_resolved", "payload": { "kind": "fireRescue", "decision": "accept", "source": "player" } },
             { "name": "fire_gutted", "payload": { "rooms": 1 } },
+            { "name": "fire_out", "payload": { "by": "rescue" } },
             { "name": "emergency_resolved", "payload": { "kind": "fireRescue", "decision": "decline", "source": "player" } }
         ])
     );

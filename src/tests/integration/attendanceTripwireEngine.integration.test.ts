@@ -254,17 +254,19 @@ describeEngines("attendance tally tripwire: mid-visit teardown (issue #302 scena
     // Still balanced mid-blaze: the fire state never touches the tallies.
     expect(hall().state, "still ablaze before the rescue").toBe("fire");
     reconcile(sim);
-    // End the blaze through the real paid-rescue path: accepting runs
-    // extinguishAll, which guts every burning unit. The gut zeroes the
-    // occupants mirror and the tenancy fields but must leave the tallies
-    // alone; the counted visitors are still live people who drain through
-    // finish().
-    const countedAtGut = tallies(sim, hallId).customersIn;
-    expect(countedAtGut).toBeGreaterThan(0);
+    // End the blaze through the real paid-rescue path: the helicopter lands
+    // within the hour (#1889) and runs extinguishAll, which guts every
+    // burning unit. The gut zeroes the occupants mirror and the tenancy
+    // fields but must leave the tallies alone; the counted visitors are
+    // still live people who drain through finish().
+    expect(tallies(sim, hallId).customersIn).toBeGreaterThan(0);
     expect(sim.answerChoice(true), "the rescue is paid").toBe(true);
+    expect(hall().state, "burning until the helicopter lands").toBe("fire");
+    for (let m = 0; m < 60 && hall().state === "fire"; m++) sim.tick(1);
     expect(hall().state).toBe("gutted");
     expect(hall().occupants).toBe(0); // the gut zeroed the mirror
-    expect(tallies(sim, hallId).customersIn).toBe(countedAtGut); // and never the tally
+    // ...and never the tally: it still counts exactly the live visitors.
+    expect(tallies(sim, hallId).customersIn).toBe(liveWith(sim, (p) => p.venueUnitId === hallId));
     reconcile(sim);
     // Drain on the gutted shell: every decrement is a finish() call, and the
     // occupants mirror must hold at 0 on the non-operational unit even as
@@ -297,6 +299,7 @@ describeEngines("attendance tally tripwire: mid-visit teardown (issue #302 scena
     sim.startFireAt(hall);
     refused(food, "a fire already burns, with its offer pending");
     expect(sim.answerChoice(true), "the rescue is paid").toBe(true);
+    for (let m = 0; m < 60 && unitOf(sim, "partyHall", 2).state === "fire"; m++) sim.tick(1);
     expect(unitOf(sim, "partyHall", 2).state).toBe("gutted");
     refused(hall, "a gutted shell cannot re-ignite");
     // With the fire out and the choice answered, a new outbreak is taken.

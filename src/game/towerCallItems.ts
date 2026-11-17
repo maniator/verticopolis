@@ -6,8 +6,9 @@ import { catalogOf } from "./portAccess";
 /**
  * The Tower menu's two calls for help (party 2026-11-15,
  * `_bmad-output/party-mode/menu-bar-order-party-findings-2026-11-15.md`):
- * Call Fire Rescue… is lit only while a fire burns and no choice already
- * waits, the two cases the engine accepts it in (`call_fire_rescue`).
+ * Call Fire Rescue… is lit only while a fire burns, no choice already
+ * waits and no helicopter is already on its way, the cases the engine
+ * accepts it in (`call_fire_rescue`).
  * Call Exterminator… is Modern only: left out of a Classic tower's menu,
  * which has no exterminator, and lit in a Modern one only when a hotel room
  * is infested and no crew is booked yet, the rule the button in Tower
@@ -37,7 +38,8 @@ type CallsApp = Pick<GameApp, "enginePort" | "portCodes" | "reader">;
 /** Which calls the tower in play can make now. */
 export function towerCalls(app: CallsApp): TowerCalls {
   const catalog = catalogOf(app);
-  const choiceWaiting = app.reader.header.pendingChoice !== null;
+  const header = app.reader.header;
+  const choiceWaiting = header.pendingChoice !== null || (header.fireResponse?.helicopter ?? null) !== null;
   if (catalog.economy.exterminator === null) {
     const fires = app.portCodes.slot(app.enginePort.statsStrip(), "statsStrip", "fires");
     return { fireRescue: fires > 0 && !choiceWaiting, exterminator: null };

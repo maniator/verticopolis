@@ -35,4 +35,10 @@ describe("Tower > Call Fire Rescue (#1889)", () => {
     callFireRescue(a.game);
     expect(a.ui.toast).toHaveBeenCalledWith(FIRE_RESCUE_REFUSED.pending, "info");
   });
+
+  it("says the helicopter is already coming when the engine refuses with coming", () => {
+    const a = app(0, "coming");
+    callFireRescue(a.game);
+    expect(a.ui.toast).toHaveBeenCalledWith(FIRE_RESCUE_REFUSED.coming, "info");
+  });
 });

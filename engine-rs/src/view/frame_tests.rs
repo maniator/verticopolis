@@ -46,6 +46,15 @@ fn the_named_slots_read_their_values() {
     sim.events.fires_gut_rooms = 1020;
     sim.events.bombs_detonated = 1021;
     sim.on_hour_runs = 1023;
+    sim.events.fire = Some(crate::events::FireResponse {
+        floor: 1,
+        x: 0,
+        width: 1,
+        guards: Vec::new(),
+        helicopter: None,
+        out: false,
+        seq: 1024,
+    });
     let mut reader = ViewReader::new();
     // Frame 1: full, no thief caught, a choice pending.
     sim.events.pending = Some(crate::events::PendingChoice {
@@ -115,6 +124,7 @@ fn the_named_slots_read_their_values() {
         (WEEK_DAYS, sim.clock.calendar.week_days as f64),
         (WEEKEND_DAYS, sim.clock.calendar.weekend_days as f64),
         (BOMB_SEARCH_SEQ, 0.0),
+        (FIRE_RESPONSE_SEQ, 1024.0),
     ];
     let first = [
         (POPULATION, population),

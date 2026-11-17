@@ -125,6 +125,10 @@ export const SHARDS: Record<string, string[]> = {
   // Each Modern tower's own front door (owner, 2026-11-16): one small frozen
   // pair of towers, day and night; its own shard, as new features get.
   "front-doors": ["front-doors"],
+  // The answer to a fire (#1889): guards on the stairs and at the room, and
+  // the rescue helicopter flying in and spraying; two small frozen towers
+  // run by the engine's own ticks; its own shard, as new features get.
+  "fire-response": ["fire-guards", "fire-helicopter"],
   misc: ["tablet", "mobile", "mobile-landscape", "construction", "crowd", "fire", "install-affordance-mobile", "overview-map", "overview-map-phone", "overview-map-gaps", "overview-map-gaps-phone", "palette-fit"],
 };
 

@@ -107,6 +107,11 @@ fn a_paid_rescue_charges_the_fee_ends_the_blaze_and_guts_the_room() {
     fire_day(&mut sim);
     sim.resolve_choice(true);
     assert_eq!(sim.money, 1_000_000.0 - 150_000.0);
+    assert!(
+        any_in(&sim, UnitState::Fire),
+        "it burns until the helicopter lands"
+    );
+    sim.land_helicopter();
     assert_eq!(sim.events.count(), 0);
     assert!(any_in(&sim, UnitState::Gutted));
     assert!(!any_in(&sim, UnitState::Fire));
@@ -312,6 +317,8 @@ fn a_declined_rescue_can_be_called_again_while_the_fire_burns() {
     assert_eq!(sim.money, money, "calling only offers; the answer pays");
 
     sim.resolve_choice(true);
+    assert_eq!(sim.call_fire_rescue(), Err(FireRescueRefusal::Coming));
+    sim.land_helicopter();
     assert!(
         sim.events.active.is_empty(),
         "the paid rescue puts the fire out"

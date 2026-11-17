@@ -12,6 +12,7 @@ export const GAMEPLAY_EVENT_RULES: GameplayEventRules = {
     emergencyKind: ["fireRescue", "bombThreat"],
     emergencyDecision: ["accept", "decline"],
     emergencySource: ["player", "timeout"],
+    fireOutcome: ["security", "rescue", "burnedOut"],
     milestoneId: ["pop-500", "pop-2500", "pop-7500", "pop-12000", "star-4", "star-5", "cinema", "metro", "skyline", "well-served", "full-house"],
   },
   events: [
@@ -27,5 +28,6 @@ export const GAMEPLAY_EVENT_RULES: GameplayEventRules = {
     { name: "emergency_resolved", payload: { kind: { type: "enum", enum: "emergencyKind" }, decision: { type: "enum", enum: "emergencyDecision" }, source: { type: "enum", enum: "emergencySource" } } },
     { name: "milestone_reached", payload: { id: { type: "enum", enum: "milestoneId" } } },
     { name: "bomb_found", payload: {} },
+    { name: "fire_out", payload: { by: { type: "enum", enum: "fireOutcome" } } },
   ],
 };

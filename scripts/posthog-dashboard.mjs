@@ -833,6 +833,11 @@ function buildInsights(ids) {
       query: trends([series("session_emergencies", "Sessions with a fire")], { display: "BoldNumber", where: [whereGt("fires", 0)] }),
     },
     {
+      name: "How fires end",
+      description: "fire_outcome split by outcome (security / rescue / burnedOut), production, from the release that ships #1889. One event per fire the engine reports out: security when a guard reached it, rescue when the paid helicopter landed, burnedOut when neither came. Rate-limited per page like the other gameplay events, so a lower bound.",
+      query: trends([series("fire_outcome", "Fires out")], { breakdown: "outcome", display: "ActionsPie" }),
+    },
+    {
       name: "Sessions reporting emergencies (30d)",
       description: "Total session_emergencies, production, 30d. Emitted once per played session (zeros included), so it is the denominator for the fire / bomb rates.",
       query: trends([series("session_emergencies", "Sessions")], { display: "BoldNumber" }),

@@ -20,6 +20,11 @@ use crate::tower::UnitState;
 #[path = "events_fire.rs"]
 mod fire;
 pub use fire::FireRescueRefusal;
+#[path = "events_fire_response.rs"]
+#[doc(hidden)]
+pub mod fire_response;
+#[doc(hidden)]
+pub use fire_response::{FireGuard, FireResponse, Helicopter};
 
 #[path = "events_bomb.rs"]
 #[doc(hidden)]
@@ -76,6 +81,10 @@ pub struct EventSystem {
     #[doc(hidden)]
     /// Classic's bomb search while one runs (`events_bomb.rs`).
     pub bomb: Option<BombSearch>,
+    #[doc(hidden)]
+    /// Security's guards and the rescue helicopter answering the fire that
+    /// burns, until both are done (`events_fire_response.rs`).
+    pub fire: Option<FireResponse>,
 }
 
 const SECURITY_RADIUS: i64 = 8;
@@ -94,6 +103,7 @@ impl EventSystem {
             last_santa_year: -1.0,
             pending: None,
             bomb: None,
+            fire: None,
         }
     }
 
@@ -110,6 +120,9 @@ impl EventSystem {
         let mut state = json!({ "lastSantaYear": self.last_santa_year, "rngState": self.extra.seed(), "pending": pending });
         if let Some(b) = &self.bomb {
             state["bomb"] = b.save_state();
+        }
+        if let Some(f) = &self.fire {
+            state["fire"] = f.save_state();
         }
         state
     }
@@ -201,8 +214,7 @@ impl Simulation {
         if kind == EmergencyKind::FireRescue {
             if paid {
                 self.money -= p.cost;
-                self.extinguish_all();
-                self.emit(&format!("🚒 Fire-rescue crews saved the tower for ${}. The rooms that were ablaze are gutted. Bulldoze and rebuild them.", with_thousands(p.cost)), LogKind::Money);
+                self.call_helicopter(p.cost);
             }
             return;
         }
@@ -289,6 +301,9 @@ impl Simulation {
     }
 
     pub(crate) fn fire_rescue_cost(&self) -> f64 {
+        if let Some(price) = self.mode.fire_rescue_fixed_price() {
+            return price;
+        }
         (150_000.0 + ((self.star - 2).max(0) as f64) * 120_000.0).min(500_000.0)
     }
 
@@ -324,8 +339,15 @@ impl Simulation {
     }
 
     #[doc(hidden)]
+    /// The chance a burning room on `floor` is contained today. Security's
+    /// part comes from its guards: one that reached the fire by the stairs
+    /// from an office within `SECURITY_RADIUS` floors. Before any guard was
+    /// sent (a fire no response tracks yet) any office that near counts.
     pub fn control_chance(&self, floor: i64) -> f64 {
-        let sec = self.service_within(Kind::Security, floor, SECURITY_RADIUS);
+        let sec = match &self.events.fire {
+            Some(r) => r.guards_fighting(self.clock.minutes, floor, SECURITY_RADIUS),
+            None => self.service_within(Kind::Security, floor, SECURITY_RADIUS),
+        };
         let med = self.service_within(Kind::Medical, floor, MEDICAL_RADIUS);
         0.5 + (if sec { 0.2 } else { 0.0 }) + (if med { 0.3 } else { 0.0 })
     }

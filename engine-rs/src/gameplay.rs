@@ -95,6 +95,28 @@ impl EmergencyKind {
     }
 }
 
+/// What put a fire out, for [`GameplayEvent::FireOut`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FireOutcome {
+    /// Security's guards had reached it by the emergency stairs.
+    Security,
+    /// The paid rescue helicopter landed on it.
+    Rescue,
+    /// Nobody reached it; it burned itself out.
+    BurnedOut,
+}
+
+impl FireOutcome {
+    /// `security`, `rescue` or `burnedOut`.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            FireOutcome::Security => "security",
+            FireOutcome::Rescue => "rescue",
+            FireOutcome::BurnedOut => "burnedOut",
+        }
+    }
+}
+
 /// What took effect when an offer was answered.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum EmergencyDecision {
@@ -188,6 +210,11 @@ pub enum GameplayEvent {
     },
     /// `bomb_found`: Security found the bomb in time.
     BombFound,
+    /// `fire_out`: the last room of a fire stopped burning.
+    FireOut {
+        /// What put it out.
+        by: FireOutcome,
+    },
     /// `emergency_resolved`: an offer was answered.
     EmergencyResolved {
         /// Which offer.
@@ -208,7 +235,7 @@ pub enum GameplayEvent {
 impl GameplayEvent {
     #[doc(hidden)]
     /// How many variants there are: one more than the highest `ordinal`.
-    pub const VARIANTS: usize = 12;
+    pub const VARIANTS: usize = 13;
 
     #[doc(hidden)]
     /// The event's position in the catalog. Exhaustive, so a new variant
@@ -228,6 +255,7 @@ impl GameplayEvent {
             GameplayEvent::EmergencyResolved { .. } => 9,
             GameplayEvent::MilestoneReached { .. } => 10,
             GameplayEvent::BombFound => 11,
+            GameplayEvent::FireOut { .. } => 12,
         }
     }
 
@@ -246,6 +274,7 @@ impl GameplayEvent {
             GameplayEvent::EmergencyResolved { .. } => "emergency_resolved",
             GameplayEvent::MilestoneReached { .. } => "milestone_reached",
             GameplayEvent::BombFound => "bomb_found",
+            GameplayEvent::FireOut { .. } => "fire_out",
         }
     }
 
@@ -275,6 +304,7 @@ impl GameplayEvent {
                 json!({ "kind": kind.as_str(), "decision": decision.as_str(), "source": source.as_str() })
             }
             GameplayEvent::MilestoneReached { id } => json!({ "id": id }),
+            GameplayEvent::FireOut { by } => json!({ "by": by.as_str() }),
         }
     }
 

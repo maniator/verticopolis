@@ -16,6 +16,7 @@ import { drawShaftNumbers } from "./towerShaftNumbers";
 import { drawHaloRings } from "./towerHaloRings";
 import { drawNoiseReach } from "./towerNoiseReach";
 import { drawGhostLabel } from "./towerGhostLabel";
+import { renderFireResponse } from "./towerFireResponse";
 import { guardPosition } from "./guardPosition";
 
 export { guardPosition, floorRoomSpan, thiefX };
@@ -146,6 +147,7 @@ export function drawOverlay(engine: TowerEngine, ctx: CanvasRenderingContext2D):
   drawShaftNumbers(engine, ctx);
   drawRain(engine, ctx);
   renderBombSearch(engine, ctx);
+  renderFireResponse(engine, ctx);
   renderExplosions(engine, ctx);
   renderTreasures(engine, ctx);
   renderVip(engine, ctx);

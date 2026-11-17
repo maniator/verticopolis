@@ -110,7 +110,8 @@ impl Serialize for Field<'_> {
             // `EventSystem::save_state`'s object; `pending` is a literal null
             // when there is no choice.
             Field::Events(e) => {
-                let mut m = s.serialize_map(Some(3 + usize::from(e.bomb.is_some())))?;
+                let extra = usize::from(e.bomb.is_some()) + usize::from(e.fire.is_some());
+                let mut m = s.serialize_map(Some(3 + extra))?;
                 m.serialize_entry("lastSantaYear", &json!(e.last_santa_year))?;
                 m.serialize_entry("rngState", &json!(e.extra.seed()))?;
                 match &e.pending {
@@ -121,6 +122,10 @@ impl Serialize for Field<'_> {
                 // keeps its exact shape.
                 if let Some(b) = &e.bomb {
                     m.serialize_entry("bomb", &b.save_state())?;
+                }
+                // Likewise the answer to a fire, only while one is out.
+                if let Some(f) = &e.fire {
+                    m.serialize_entry("fire", &f.save_state())?;
                 }
                 m.end()
             }

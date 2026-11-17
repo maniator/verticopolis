@@ -24,11 +24,14 @@ function firePrep(leg: Leg, seed: number, n = 1) {
   expect(sim.state.tower.transports.some((t) => t.kind === "elevatorStandard" && t.bottom <= 1 && t.top >= 2)).toBe(true);
   /** The office `i`, as the engine holds it now. */
   const office = (i: number) => sim.state.tower.units.find((u) => u.id === ids[i])!;
-  return { sim, office, x0 };
+  /** Set the first office ablaze, whatever else the tower holds by then. */
+  const ignite = () => sim.startFireAt(ids[0]!);
+  return { sim, office, x0, ignite };
 }
 
-/** Add Security + Medical AFTER a fire is burning (so they're never the ignited
- *  unit) — control = 0.5 + 0.2 + 0.3 = 1.0 ⇒ contained the next day. */
+/** Add Security + Medical, then set a fire with `ignite` (so they're never the
+ *  ignited unit): Security's guards reach it by the stairs within the hour,
+ *  so control = 0.5 + 0.2 + 0.3 = 1.0 ⇒ contained the next day (#1889). */
 function defend(sim: PortSim, x0: number): void {
   sim.setup((d) => {
     d.star = 4;
@@ -38,9 +41,9 @@ function defend(sim: PortSim, x0: number): void {
 }
 
 /** Ignite an office, staff up, and run days until the blaze is out. */
-function burnDown(sim: PortSim, x0: number): void {
-  sim.startFire();
+function burnDown(sim: PortSim, x0: number, ignite: () => void): void {
   defend(sim, x0);
+  ignite();
   let guard = 0;
   while (sim.state.fires > 0 && guard++ < 20) sim.tick(60 * 24); // one day per tick
   expect(sim.state.fires).toBe(0);
@@ -48,10 +51,10 @@ function burnDown(sim: PortSim, x0: number): void {
 
 describeEngines("Fire aftermath — gutted shells (canon), not auto-repair", (leg) => {
   it("a contained fire leaves a GUTTED shell, not a fresh vacant room (bug regression)", () => {
-    const { sim, office, x0 } = firePrep(leg, 11, 1);
-    sim.startFire();
-    expect(office(0).state).toBe("fire");
+    const { sim, office, x0, ignite } = firePrep(leg, 11, 1);
     defend(sim, x0);
+    ignite();
+    expect(office(0).state).toBe("fire");
     let g = 0;
     while (sim.state.fires > 0 && g++ < 20) sim.tick(60 * 24);
     expect(office(0).state).toBe("gutted"); // NOT "empty"/"occupied" — the old bug
@@ -60,8 +63,8 @@ describeEngines("Fire aftermath — gutted shells (canon), not auto-repair", (le
   });
 
   it("a gutted room never re-leases or earns over time", () => {
-    const { sim, office, x0 } = firePrep(leg, 11, 1);
-    burnDown(sim, x0);
+    const { sim, office, x0, ignite } = firePrep(leg, 11, 1);
+    burnDown(sim, x0, ignite);
     expect(office(0).state).toBe("gutted");
     for (let d = 0; d < 40; d++) sim.tick(60 * 24); // ~6 weeks
     expect(office(0).state).toBe("gutted"); // still a shell — never silently re-let
@@ -69,9 +72,9 @@ describeEngines("Fire aftermath — gutted shells (canon), not auto-repair", (le
   });
 
   it("containment charges no repair fee (the room is destroyed instead)", () => {
-    const { sim, x0 } = firePrep(leg, 11, 1);
-    sim.startFire();
+    const { sim, x0, ignite } = firePrep(leg, 11, 1);
     defend(sim, x0);
+    ignite();
     const before = sim.state.money;
     sim.tick(60 * 24); // one day → contained (control 1.0)
     expect(sim.state.fires).toBe(0);
@@ -81,8 +84,8 @@ describeEngines("Fire aftermath — gutted shells (canon), not auto-repair", (le
   });
 
   it("bulldozing a gutted shell refunds nothing (empty rooms still refund half)", () => {
-    const { sim, office, x0 } = firePrep(leg, 11, 1);
-    burnDown(sim, x0);
+    const { sim, office, x0, ignite } = firePrep(leg, 11, 1);
+    burnDown(sim, x0, ignite);
     expect(office(0).state).toBe("gutted");
     const before = sim.state.money;
     expect(sim.sellAt(office(0).floor, office(0).x)).toBe(true);
@@ -90,8 +93,8 @@ describeEngines("Fire aftermath — gutted shells (canon), not auto-repair", (le
   });
 
   it("a gutted room is not operational and can't re-ignite", () => {
-    const { sim, office, x0 } = firePrep(leg, 11, 1);
-    burnDown(sim, x0);
+    const { sim, office, x0, ignite } = firePrep(leg, 11, 1);
+    burnDown(sim, x0, ignite);
     expect(isOperational(office(0))).toBe(false);
     // Igniting again only picks flammable rooms; a gutted husk is excluded.
     for (let i = 0; i < 5; i++) sim.startFire();
@@ -99,8 +102,8 @@ describeEngines("Fire aftermath — gutted shells (canon), not auto-repair", (le
   });
 
   it("survives save/load as gutted and never re-ignites or re-lets", () => {
-    const { sim, x0 } = firePrep(leg, 11, 1);
-    burnDown(sim, x0);
+    const { sim, x0, ignite } = firePrep(leg, 11, 1);
+    burnDown(sim, x0, ignite);
     const reloaded = new PortSim(leg, sim.save());
     const officeOf = () => reloaded.state.tower.units.find((u) => u.kind === "office")!;
     expect(officeOf().state).toBe("gutted");
@@ -124,9 +127,9 @@ describeEngines("Fire aftermath — gutted shells (canon), not auto-repair", (le
       return shop.id;
     });
     const shop = () => sim.state.tower.units.find((u) => u.id === shopId)!;
-    sim.startFire();
-    expect(shop().state).toBe("fire");
     defend(sim, x0);
+    sim.startFireAt(shopId);
+    expect(shop().state).toBe("fire");
     let g = 0;
     while (sim.state.fires > 0 && g++ < 20) sim.tick(60 * 24);
     expect(shop().state).toBe("gutted");
@@ -162,9 +165,9 @@ describeEngines("Emergency counters — the analytics-only tallies the shell rea
   });
 
   it("counts a room gutted BY FIRE when a blaze is contained", () => {
-    const { sim, x0 } = firePrep(leg, 11, 1);
-    sim.startFire();
+    const { sim, x0, ignite } = firePrep(leg, 11, 1);
     defend(sim, x0);
+    ignite();
     let g = 0;
     while (sim.state.fires > 0 && g++ < 20) sim.tick(60 * 24); // burns down to a gutted shell
     expect(sim.emergencyCounts().firesGutRooms).toBe(1);

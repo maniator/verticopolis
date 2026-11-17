@@ -125,6 +125,12 @@ describe("session_emergencies telemetry", () => {
     expect(propsFor("bomb_outcome")).toEqual([{ outcome: "paid" }, { outcome: "found" }, { outcome: "exploded" }]);
   });
 
+  it("reports how each fire ended: Security, the helicopter, or burned out", () => {
+    const out = (by: string) => ({ name: "fire_out", payload: { by } });
+    forwardGameplayEvents([fire, out("security"), fire, out("rescue"), fire, out("burnedOut")]);
+    expect(propsFor("fire_outcome")).toEqual([{ outcome: "security" }, { outcome: "rescue" }, { outcome: "burnedOut" }]);
+  });
+
   it("emits once at the terminal end EVEN WHEN ALL ZERO (for the denominator)", () => {
     played(); // the frame loop ran: a real play session
     gameplaySession.end(true); // pagehide (terminal)

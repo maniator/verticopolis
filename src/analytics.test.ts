@@ -399,6 +399,7 @@ const EVERY_EVENT: { [K in keyof GameplayEvents]: GameplayEvents[K] } = {
   menu_dismiss: { menu: "help", how: "escape", screen: "title", browsed: 1 },
   emergency_choice: { kind: "fireRescue", decision: "accept" },
   bomb_outcome: { outcome: "found" },
+  fire_outcome: { outcome: "security" },
   session_emergencies: { fires: 1, firesGutRooms: 2, bombs: 0 },
   session_crashes: { crashes: 3 },
   file_imported: { format: "tdt", mode: "classic", star: 3, population: 420 },
