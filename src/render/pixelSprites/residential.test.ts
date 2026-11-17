@@ -246,6 +246,23 @@ describe("occupancy is honest (maps to roomOccupants, no ghost people)", () => {
     drawRoom(room(guest.ctx, { hour: 2 }), hotel, 0, 0, 4 * TILE, FLOOR);
     expect(guest.log).toContain(`fillStyle=${CAST[castIndex((hotel.id * 7) | 0)].skin}`);
   });
+
+  it("dims every lived-in home in the small hours: the condo and both rentals (#1025)", () => {
+    const NIGHT_SCRIM = "fillStyle=rgba(8,10,22,0.5)";
+    const scrimmed = (kind: Unit["kind"], hour: number, occupants: number): boolean => {
+      const s = spyCtx();
+      drawRoom(room(s.ctx, { hour, lit: true }), unit({ kind, width: 16, occupants }), 0, 0, 16 * TILE, FLOOR);
+      return s.log.includes(NIGHT_SCRIM);
+    };
+    for (const kind of ["condo", "rentalStudio", "rentalApartment"] as const) {
+      expect(scrimmed(kind, 2, 2), `${kind} asleep at 2 AM`).toBe(true);
+      expect(scrimmed(kind, 23, 1), `${kind} asleep at 11 PM`).toBe(true);
+      expect(scrimmed(kind, 20, 2), `${kind} awake at 8 PM`).toBe(false);
+      expect(scrimmed(kind, 6, 2), `${kind} awake at 6 AM`).toBe(false);
+    }
+    // A workplace with people in it never takes the asleep scrim.
+    expect(scrimmed("office", 2, 4)).toBe(false);
+  });
 });
 
 describe("hotel state cues render outside the mirror", () => {

@@ -8,9 +8,9 @@ import type { FacilityKind } from "../shared/types";
  * into or out of the window.
  */
 
-/** Kinds whose art changes after 23:00 and before 06:00: the condo (its
- *  asleep scrim and its residents) and the two rentals, which share the
- *  condo's draw (`residentialRentalSprites.ts`) and its hidden-residents rule. */
+/** Kinds whose art changes after 23:00 and before 06:00: the condo and the
+ *  two rentals, which share the condo's draw (`residentialRentalSprites.ts`),
+ *  its hidden-residents rule and its asleep scrim (`drawRoom`, #1025). */
 export const LATE_NIGHT_KINDS: ReadonlySet<FacilityKind> = new Set<FacilityKind>(["condo", "rentalStudio", "rentalApartment"]);
 
 /** True from 23:00 up to (not including) 06:00. */
