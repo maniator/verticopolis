@@ -345,3 +345,24 @@ fn someone_on_the_street_finds_a_way_from_the_nearest_lobby() {
     assert_eq!(r.floors, vec![1, 2]);
     assert_eq!(r.shafts, vec![up]);
 }
+
+/// The walk to the first shaft counts (owner, 2026-11-17): of twin shafts,
+/// a rider takes the one beside them, and the older shaft no longer wins
+/// every tie.
+#[test]
+fn riders_take_the_twin_shaft_nearer_where_they_start() {
+    let mut sim = tower(GameMode::Modern, 15);
+    let left = shaft(&mut sim, Kind::ElevatorExpress, 2, 1, 15);
+    let right = shaft(&mut sim, Kind::ElevatorExpress, 32, 1, 15);
+    sim.crowd.begin_step();
+    let first = |sim: &mut Simulation, from: f64, to: f64| {
+        let r = sim.crowd.route(&sim.tower, 1, 15, Some(from), Some(to));
+        r.expect("a route").shafts[0]
+    };
+    assert_eq!(
+        first(&mut sim, 36.0, 36.0),
+        right,
+        "the newer shaft, nearer"
+    );
+    assert_eq!(first(&mut sim, 1.0, 36.0), left, "the far end walks free");
+}

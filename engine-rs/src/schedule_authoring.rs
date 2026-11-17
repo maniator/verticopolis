@@ -10,8 +10,8 @@
 //! ordinary schedule command (one undo step). No wording lives here; the host
 //! renders the buttons and the copy.
 //!
-//! The tuning is the same simple rule the dialog always used: each hour's
-//! car count follows that hour's measured load fraction, never below one car.
+//! The tuning is a simple rule: each hour gets the fewest cars that carry
+//! that hour's measured load with room, never below one car.
 //! It is not a validated wait-time optimization, and nothing here claims it
 //! is.
 
@@ -116,15 +116,31 @@ pub(crate) fn readiness((curve, sampled): (&[f64], &[bool])) -> DayReadiness {
     }
 }
 
-/// Each hour's cars from its load fraction: proportional, at least one,
-/// at most the installed cars.
+/// The share of capacity at which the cars running an hour count as full at
+/// a sample: riders step off at each stop, so a busy car rarely reads 1.0.
+const SATURATED: f64 = 0.9;
+
+/// Each hour's cars from its load fraction: the fewest that carry the hour's
+/// riders with room ([`cars_for`]), at least one, at most the installed cars.
 fn tuned_row(curve: &[f64], cars: i64) -> Vec<i64> {
     (0..SCHEDULE_HOURS)
-        .map(|h| {
-            let want = crate::jsmath::round(curve.get(h).copied().unwrap_or(0.0) * cars as f64);
-            (want as i64).clamp(1, cars)
-        })
+        .map(|h| cars_for(curve.get(h).copied().unwrap_or(0.0) * cars as f64, cars))
         .collect()
+}
+
+/// The fewest cars, from 1 to `cars`, that carry `load` cars' worth of
+/// riders below [`SATURATED`] each. A proposal of just the load (its rounded
+/// share) left those cars full, and full cars measure no more than they
+/// carry, so a shaft cut to one car never won a car back. Now a tuned row
+/// has room by construction, so tuning it again proposes the same row, and
+/// an hour whose cars ran full measures at least `SATURATED` of each and is
+/// proposed one more car each tune until it has room.
+fn cars_for(load: f64, cars: i64) -> i64 {
+    let mut n = 1;
+    while n < cars && load / n as f64 >= SATURATED {
+        n += 1;
+    }
+    n
 }
 
 /// The origin floors summed over the day's 24 slots, in first-seen order.
@@ -235,12 +251,12 @@ impl Simulation {
             row.map(|r| r.iter().map(|&n| n.clamp(0, cars)).collect::<Vec<i64>>())
         };
         let weekday = if wd.warm {
-            Some(tuned_row(&rings.weekday, cars))
+            Some(tuned_row(&self.twin_load(t, &rings.weekday, false), cars))
         } else {
             draft_row(false)
         };
         let weekend = if we.warm {
-            Some(tuned_row(&rings.weekend, cars))
+            Some(tuned_row(&self.twin_load(t, &rings.weekend, true), cars))
         } else {
             draft_row(true)
         };
@@ -284,6 +300,49 @@ impl Simulation {
     }
 }
 
+impl Simulation {
+    /// Each hour's load to tune `t` by: its own, or its twins' when they
+    /// carried more. A twin is a shaft of the same kind stopping at every
+    /// floor `t` stops at, so `t` could carry its riders. Modern riders
+    /// route around a shaft cut to one car, so its own reading falls with
+    /// each cut and never wins its cars back (owner, 2026-11-17); the
+    /// twins' reading is what it would carry. Each twin counts on a day it
+    /// has measured (`warm_curve`), and the twins' load is their mean.
+    fn twin_load(&self, t: &crate::tower::Transport, own: &[f64], weekend: bool) -> Vec<f64> {
+        let stops = self.tower.stops_of(t);
+        let (mut sum, mut twins) = (vec![0.0; SCHEDULE_HOURS], 0.0);
+        for other in self.tower.transports.iter() {
+            if other.id == t.id || other.kind != t.kind {
+                continue;
+            }
+            let theirs = self.tower.stops_of(other);
+            if !stops.iter().all(|f| theirs.binary_search(f).is_ok()) {
+                continue;
+            }
+            let Some(rings) = self.telemetry.hourly.get(&other.id) else {
+                continue;
+            };
+            let Some(curve) = warm_curve(rings.day(weekend)) else {
+                continue;
+            };
+            for (h, load) in sum.iter_mut().zip(curve) {
+                *h += load;
+            }
+            twins += 1.0;
+        }
+        (0..SCHEDULE_HOURS)
+            .map(|h| {
+                let mine = own.get(h).copied().unwrap_or(0.0);
+                if twins > 0.0 {
+                    mine.max(sum[h] / twins)
+                } else {
+                    mine
+                }
+            })
+            .collect()
+    }
+}
+
 /// Which day type's boarding geography aims the staging: the one on screen
 /// when it is warm, else the other warm day; `None` when neither is warm.
 fn aim_on_weekend(weekend_view: bool, wd_warm: bool, we_warm: bool) -> Option<bool> {
@@ -308,3 +367,6 @@ fn origin_aim(origins: &OriginRings, weekend: bool, served: &[i64]) -> Option<i6
 #[cfg(test)]
 #[path = "schedule_authoring_tests.rs"]
 pub(crate) mod tests;
+#[cfg(test)]
+#[path = "schedule_authoring_twins_tests.rs"]
+mod twins_tests;

@@ -187,12 +187,16 @@ fn each_hour_follows_its_load_with_a_one_car_floor_and_the_installed_cap() {
     seed(&mut sim, id, curve, warm_ring(0.25), None);
     let p = sim.auto_tune_proposal(id, None, false).proposal.unwrap();
     let wd = p.weekday.unwrap();
-    assert_eq!(wd[8], 4);
+    assert_eq!(wd[8], 5, "four cars' worth, carried with room");
     assert_eq!(wd[10], 8);
     assert_eq!(wd[11], 1);
     assert_eq!(wd[12], 8);
     assert_eq!(wd[3], 1, "an unsampled hour still keeps one car");
-    assert_eq!(p.weekend.unwrap()[8], 2);
+    assert_eq!(
+        p.weekend.unwrap()[8],
+        3,
+        "two cars' worth, carried with room"
+    );
     // A shaft that sold cars never gets rows above what it has.
     assert!(sim.tower.set_cars(id, 3), "selling down to three cars");
     let after = sim.auto_tune_proposal(id, None, false).proposal.unwrap();
