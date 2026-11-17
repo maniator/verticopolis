@@ -240,7 +240,7 @@ export function pgCheckHosted(before: string): string {
  * and the engine loads its save. What a load resets is
  * carried over from the engine: the loop's pass memos and the elevator
  * telemetry. What `adoptSim` resets in the app is put back (speed, pause, the star and win
- * latches, the step accumulator, the meal-rush day, the log cursor and
+ * latches, the step accumulator, the log cursor and
  * panel, the selection). Skips while the title screen is up, since
  * `adoptSim` would dismiss it.
  * Returns "settled", "skipped: ...", or why it failed.
@@ -274,7 +274,6 @@ export function pgSettle(): string {
       lastStar: g.lastStar,
       shownWin: g.shownWin,
       accMinutes: g.accMinutes,
-      lastMealRushDay: { ...g.lastMealRushDay },
       uiLogSeq: g.ui.lastLogSeq,
       logLines: [...g.ui.el.log.childNodes],
       selected: g.selected,
@@ -293,7 +292,6 @@ export function pgSettle(): string {
     g.lastStar = keep.lastStar;
     g.shownWin = keep.shownWin;
     g.accMinutes = keep.accMinutes;
-    g.lastMealRushDay = keep.lastMealRushDay;
     g.ui.lastLogSeq = keep.uiLogSeq;
     g.ui.el.log.replaceChildren(...keep.logLines);
     if (keep.selected) {

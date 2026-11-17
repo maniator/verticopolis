@@ -737,7 +737,7 @@ function buildInsights(ids) {
     },
     {
       name: "Version 4 windows and welcome",
-      description: "app_action for the windows and cards that came with the menu bar: window_close (detail tower, bulletin or map) and window_move (tower, bulletin, map, dialog or card), bulletin_read_back (the player scrolled back through the Bulletin, once per page life, from the release after 4.8.0), welcome_shown, welcome_close (detail ok, x, escape, backdrop, displaced) and welcome_link (first_tower, modes, whats_new), production.",
+      description: "app_action for the windows and cards that came with the menu bar: window_close (detail tower, bulletin or map) and window_move (tower, bulletin, map, dialog or card), bulletin_read_back (the player scrolled back through the Bulletin, once per page life, from the release after 4.8.0; from the release after 4.11.1 the Bulletin carries no meal rush lines, #2090), welcome_shown, welcome_close (detail ok, x, escape, backdrop, displaced) and welcome_link (first_tower, modes, whats_new), production.",
       query: trends([series("app_action", "Actions")], {
         breakdown: ["action", "detail"],
         display: "ActionsTable",

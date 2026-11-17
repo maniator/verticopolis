@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { newRenderSim, newViewReader } from "../../game/portAccess";
 import type { HeatmapMode } from "../../shared/engineTypes";
-import { calendarOf, clockOf, type ClockView } from "../../simport/headerClock";
+import { clockOf, type ClockView } from "../../simport/headerClock";
 import { PortCodes, outcome } from "../../simport/portCodes";
 import { PortEvents } from "../../simport/portEvents";
 import { draftTower } from "../portKit/drafts";
@@ -119,7 +119,7 @@ describe.skipIf(noEngine)("the header's clock on the engine", () => {
         const moved = JSON.stringify({ ...(JSON.parse(save) as Record<string, unknown>), minutes });
         expect(readings(clockOf(newViewReader(engineFromSave(moved)).header)), `at minute ${minutes}`).toEqual(expected[i]);
       });
-      expect(calendarOf(newViewReader(newEngine(1, mode, calendar)).header)).toMatchObject(days);
+      expect(newViewReader(newEngine(1, mode, calendar)).header).toMatchObject(days);
     });
   }
 });
