@@ -2,7 +2,7 @@ import type { FacilityKind, UnitState } from "../shared/types";
 import type { UnitView } from "../simport/view";
 import { hasBusinessHours, isOpenAt } from "../presentation/viewKinds";
 import { facilityColor } from "../presentation/facilityPresentation";
-import { isLateHour } from "./lateNight";
+import { LATE_NIGHT_KINDS, isLateHour } from "./lateNight";
 import { POPULATED, closedShutter, noticeBadge, type RoomCtx } from "./pixelSprites/common";
 import { layerEnd } from "./pixelSprites/layers";
 import { condo, hotel, office } from "./pixelSprites/residential";
@@ -138,13 +138,13 @@ export function drawRoom(d: RoomCtx, u: UnitView, x: number, y: number, w: numbe
   // The furniture ends here: the night scrim and the notice badge draw over
   // the room after it, so the atlas's depth layers put them on the shell.
   layerEnd(ctx);
-  // Lights out at night: an empty home/workplace, or a condo whose residents
-  // are asleep in the small hours. The asleep scrim is the condo's only; studios
-  // and apartments hide their residents late at night without it. Whether
-  // they should dim too is backlog row rental-asleep-scrim (GH #1025).
+  // Lights out at night: an empty home/workplace, or a home whose residents
+  // are asleep in the small hours. Every kind in LATE_NIGHT_KINDS (the condo and
+  // both rentals) hides its residents then, so all three dim alike; a rental no
+  // longer reads brighter at 2 AM than the condo beside it (owner, #1025).
   const lateNight = isLateHour(d.hour);
   const emptyAtNight = d.lit && u.occupants <= 0 && POPULATED.has(u.kind);
-  const asleepHome = u.kind === "condo" && u.occupants > 0 && lateNight;
+  const asleepHome = LATE_NIGHT_KINDS.has(u.kind) && u.occupants > 0 && lateNight;
   if ((emptyAtNight || asleepHome) && u.state !== "empty" && u.state !== "construction") {
     ctx.fillStyle = "rgba(8,10,22,0.5)";
     ctx.fillRect(x, y, w, h);
