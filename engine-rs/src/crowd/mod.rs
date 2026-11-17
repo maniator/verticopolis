@@ -4,6 +4,7 @@
 
 pub(crate) mod adopt;
 pub mod banks;
+mod commute_stress;
 pub mod commuters;
 pub(crate) mod commuters_save;
 pub mod doors;
@@ -130,6 +131,11 @@ pub struct Person {
     /// Whether the trip began on a Metro platform, so its wait belongs to
     /// the tenant floor it heads for (#1971). Engine-internal.
     pub from_metro: bool,
+    /// Whether this trip ran out of patience waiting to set out and turned
+    /// back (`motion::advance`), so its wait counts as over the mode's limit
+    /// (#2019). A trip cut short by an edit (a shaft or car removed) is not
+    /// one. Engine-internal.
+    pub gave_up: bool,
     /// The housekeeping room a housekeeper works from, and where they are in
     /// their working day (`staff_shift`). Engine-internal: not in the
     /// `Person` shape.
@@ -381,54 +387,6 @@ impl Crowd {
             "rng": self.rng.seed(),
             "people": self.people.iter().map(Person::to_json).collect::<Vec<_>>(),
         })
-    }
-
-    pub fn record_commute(&mut self, origin_floor: i64, wait_seconds: f64) {
-        self.commute_revision = self.commute_revision.wrapping_add(1);
-        let prev = self
-            .commute_wait_by_floor
-            .get(&origin_floor)
-            .copied()
-            .unwrap_or(wait_seconds);
-        self.commute_wait_by_floor.insert(
-            origin_floor,
-            prev + (wait_seconds - prev) * COMMUTE_STRESS_ALPHA,
-        );
-    }
-
-    /// Replace the commute-stress averages with `[[floor, seconds], ...]`
-    /// rows, the shape [`Crowd::commute_stress_json`] writes: a save carries
-    /// them in its crowd, and a host may seed them at attach (#1083). The revision is
-    /// left alone. Refuses rows that are not whole floors with finite
-    /// seconds, or that name a floor twice, and then changes nothing.
-    pub fn seed_commute_stress(&mut self, rows: &Value) -> Result<(), String> {
-        let bad =
-            || "commuteStress must be [[floor, seconds], ...] with each floor once".to_string();
-        let mut seeded = fasthash::FastMap::default();
-        for row in rows.as_array().ok_or_else(bad)? {
-            let pair = row.as_array().filter(|p| p.len() == 2).ok_or_else(bad)?;
-            let floor = pair[0]
-                .as_f64()
-                .filter(|f| f.fract() == 0.0 && f.abs() < 9007199254740992.0)
-                .ok_or_else(bad)?;
-            let seconds = pair[1].as_f64().filter(|s| s.is_finite()).ok_or_else(bad)?;
-            if seeded.insert(floor as i64, seconds).is_some() {
-                return Err(bad());
-            }
-        }
-        self.commute_wait_by_floor = seeded;
-        Ok(())
-    }
-
-    /// The commute-stress averages as `[[floor, seconds], ...]`, by floor.
-    pub fn commute_stress_json(&self) -> Value {
-        let rows: Vec<(i64, f64)> = self
-            .commute_wait_by_floor
-            .sorted()
-            .into_iter()
-            .map(|(&f, &w)| (f, w))
-            .collect();
-        json!(rows)
     }
 
     pub fn begin_step(&mut self) {

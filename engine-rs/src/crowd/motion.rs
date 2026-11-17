@@ -56,6 +56,7 @@ pub fn advance(crowd: &mut Crowd, dt_sec: f64, tower: &mut Tower) {
                 frustrated += 1;
                 travelling += 1;
                 turn_back(crowd, i);
+                crowd.people[i].gave_up = true;
                 continue;
             }
         }
@@ -475,7 +476,8 @@ pub fn finish(crowd: &mut Crowd, i: usize, tower: &mut Tower) {
             Some(&dest) if p.from_metro || tower.floor_has_lobby(p.origin_floor) => dest,
             _ => p.origin_floor,
         };
-        crowd.record_commute(tenant_floor, p.trip_wait + p.wait);
+        let wait = super::commute_stress::finished_trip_wait(p, tower.mode);
+        crowd.record_commute(tenant_floor, wait);
     }
     let p = &crowd.people[i];
     if let Some(oid) = p.origin_unit_id {
