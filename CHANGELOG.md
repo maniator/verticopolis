@@ -25,6 +25,15 @@ prompt already tells players it is an engine update and shows the new version.
 Entries below 1.51.1 were curated from the commit history after the fact, so they
 are documentation only: no build that a client fetches carries them.
 
+## 4.11.1
+
+- On an iPhone or iPad, touch and hold a tower in the Open or Save As window to open its menu, Previous versions… included. Before, Safari never opened it.
+- Holding a finger in the rename box now selects or pastes text as in any text box, instead of opening the tower's menu.
+- Modern: people now count the walk to the first elevator, so they take the shaft nearer where they stand. A long lobby or Metro platform uses all of its elevators instead of the oldest ones.
+- Modern: auto-tune no longer cuts a shaft that people avoid down to one car for good. Each hour gets the fewest cars that carry its riders with room, so tuning again keeps the same row, an hour whose few cars ran full gets one more car each time you tune, and a shaft few people ride is tuned from the busier shafts that stop at the same floors.
+- A floor that empties now forgets how long its old tenants waited, so new tenants moving in are not charged for a jam that ended with the people before them.
+- The Traffic view, the Traffic box in the status bar, the morning complaint about elevator waits and a room's card now count how long a floor's people really wait, the same reading that costs tenants. A floor losing tenants to long waits no longer shows as Clear.
+
 ## 4.11.0
 
 - Every tower is now a file of its own in My Towers, named after the tower. The game saves your tower into its file every 30 seconds and File > Save saves it right away, so the Auto-save row is gone from the Open window and Continue opens the last tower you played. A tower from your linked folder is saved back into its own file there every minute.

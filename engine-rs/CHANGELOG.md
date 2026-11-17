@@ -15,6 +15,12 @@ raised the version, so they are documentation only.
 There is no entry for 0.17.0, which only
 existed as a step inside a stacked branch.
 
+## 1.48.1 (2026-11-17)
+
+- The Modern router (`crowd::expected_time`) prices the walk from the tile a rider stands on to the first shaft, stair or escalator, at half the walking time (`crowd::expected_time::walk`); the kept routes are keyed by that tile too. The walks between legs and at the far end stay free. `auto_tune_proposal` proposes for each hour the fewest cars that carry its load below 0.9 of capacity each (it proposed the rounded load, which left those cars full and kept a one-car hour at one car), and tunes each hour from the larger of a shaft's own load and the mean load of its twins (same kind, stopping at every floor it does). The conformance lock moved for Modern scenarios only.
+- At the end of each hourly satisfaction pass, the average commute wait of every floor that had no settled occupant when the pass began (no room occupied, asleep or vacating; a room an imported tower left moving in does not count) is dropped, so the floor reads no wait until new trips finish. The pass's own room loop gathers those floors. Saves already carry the averages (#1083), and a loaded tower forgets the same floors. The conformance lock and two fuzz goldens moved.
+- `spatialCongestionByFloor` (and every reader built on it: `peakCongestionHotspot`, `floorHeatmap("congestion")`, `congestion()`, the inspector's congestion and the hourly satisfaction pass) raises each floor's transport estimate to its real average commute wait over the mode's limit where that is higher, and lists a floor with only a real wait after the estimate's floors. The 9 AM wait warning reads the same map. The conformance lock and the frame-day golden moved, and the `ransom-declined-classic` scenario now runs 544 hours to its threat.
+
 ## 1.48.0 (2026-11-17)
 
 - From 512 people the crowd keeps a per-floor index of its people in the step, and a view's people window reads the people on its floors from it, so the frame's cost follows the screen instead of the crowd (#2151). Smaller crowds, today's included, keep no index and cost what they did.
