@@ -207,22 +207,39 @@ fn an_unguarded_blast_flashes_at_the_epicenter_and_a_guarded_sweep_never_does() 
     assert!(logged(&safe, "found nothing"));
 }
 
+/// A tower whose thief rolls today, with the main stream past the fire.
+fn thief_day(mode: GameMode, security: bool) -> Simulation {
+    let mut sim = office_tower(mode, 2, security);
+    script_events(&mut sim, |r| r.next() < THIEF_DAILY_CHANCE);
+    script_main(&mut sim, |r| r.next() >= 0.5);
+    sim.maybe_random_event();
+    sim
+}
+
 #[test]
 fn a_thief_is_caught_with_security_and_gets_away_without() {
-    let mut guarded = office_tower(GameMode::Classic, 2, true);
-    script_events(&mut guarded, |r| r.next() < THIEF_DAILY_CHANCE);
-    script_main(&mut guarded, |r| r.next() >= 0.5);
-    guarded.maybe_random_event();
-    let mut bare = office_tower(GameMode::Classic, 2, false);
-    script_events(&mut bare, |r| r.next() < THIEF_DAILY_CHANCE);
-    script_main(&mut bare, |r| r.next() >= 0.5);
-    bare.maybe_random_event();
+    let guarded = thief_day(GameMode::Classic, true);
+    let bare = thief_day(GameMode::Modern, false);
     // Nobody is inside yet, so the thief prowls the ground lobby.
     let thief = |s: &Simulation| (s.fx.thief.seq, s.fx.thief.caught, s.fx.thief.floor);
     assert_eq!(thief(&guarded), (1, true, 1));
     assert_eq!(thief(&bare), (1, false, 1));
     assert!(bare.money < 1_000_000.0);
     assert_eq!(guarded.money, 1_000_000.0);
+}
+
+#[test]
+fn a_classic_thief_comes_only_to_a_tower_with_security() {
+    // The manual brings emergencies only to a tower with security personnel
+    // (#2364): on the same day, a Classic tower without Security sees no
+    // thief and loses nothing, where a Modern one is robbed.
+    let classic = thief_day(GameMode::Classic, false);
+    assert_eq!(classic.fx.thief.seq, 0);
+    assert_eq!(classic.money, 1_000_000.0);
+    assert!(!logged(&classic, "thief"));
+    let modern = thief_day(GameMode::Modern, false);
+    assert_eq!(modern.fx.thief.seq, 1);
+    assert!(modern.money < 1_000_000.0);
 }
 
 #[test]
