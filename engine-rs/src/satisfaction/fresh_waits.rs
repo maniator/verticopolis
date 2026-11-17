@@ -16,9 +16,8 @@ use crate::sim::Simulation;
 use crate::tower::{Unit, UnitState};
 
 /// The floors where someone settled lives, works in an office or stays,
-/// gathered by the
-/// hourly satisfaction pass's own room loop so no second walk over the
-/// rooms is needed. One flag per floor of the lot, from `MIN_FLOOR` up, so
+/// gathered by the hourly satisfaction pass's own room loop so no second
+/// walk over the rooms is needed. One flag per floor of the lot, from `MIN_FLOOR` up, so
 /// noting a story is an array write. Gathers nothing while no floor has an
 /// average to forget.
 pub(super) struct SettledFloors(Option<Vec<bool>>);
@@ -75,12 +74,14 @@ impl Simulation {
         SettledFloors((!self.crowd.commute_wait_by_floor.is_empty()).then(|| vec![false; floors]))
     }
 
-    /// Forgets the average commute wait of every floor where nobody settled
-    /// lived, worked or stayed when the hourly satisfaction pass began, so
-    /// the next tenants there start from no wait (the neutral value a floor
-    /// with no finished trip has) instead of their predecessors' jam. The
-    /// pass runs it last: a floor with no settled occupant has no rated room
-    /// reading its average this hour. It reads only the rooms and the
+    /// Forgets the average commute wait of every floor where no office
+    /// tenant, household or hotel guest was settled when the hourly
+    /// satisfaction pass began, so the next tenants there start from no wait
+    /// (the neutral value a floor with no finished trip has) instead of their
+    /// predecessors' jam, and a floor of shops alone starts each hour afresh.
+    /// The pass runs it last, so the rooms rated this hour (a shop-only
+    /// floor's shops included) still read the average their floor's trips
+    /// made. It reads only the rooms and the
     /// averages, which a save carries, so a loaded tower forgets the same
     /// floors.
     pub(super) fn forget_waits_of_emptied_floors(&mut self, settled: SettledFloors) {
