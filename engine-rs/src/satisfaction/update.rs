@@ -24,8 +24,9 @@ impl Simulation {
             if self.tower.units[i].is_dormant() {
                 continue;
             }
-            // Every room kind, shops and venues included: the dormant skip
-            // above passes over no settled occupant.
+            // Every room kind is offered and `note` keeps the ones that hold
+            // the floor's average: the dormant skip above passes over no
+            // settled occupant.
             settled.note(self, i);
             // One copy of the room per hour (#1689). The step reads the room
             // by reference and writes nothing to it, so the copy taken before

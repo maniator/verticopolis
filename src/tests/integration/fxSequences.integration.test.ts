@@ -29,8 +29,10 @@ const PINNED: Record<string, Nonzero> = {
   // express elevators stopping at every basement floor onto one that lights
   // none, and Classic express elevators stopping at every 15th floor (#1527)
   // onto one that lights one, gutting two rooms. The fire sites stay pinned
-  // by the events and fire-rescue runs.
-  "scenarios/holidays-classic.json": { santaFxSeq: 2, thiefSeq: 1, thiefCaught: 1, thiefFloor: 77 },
+  // by the events and fire-rescue runs. Shop-only floors forgetting their
+  // wait averages after the hour put it on a path that lights one, gutting
+  // thirteen rooms.
+  "scenarios/holidays-classic.json": { santaFxSeq: 2, thiefSeq: 1, thiefCaught: 1, thiefFloor: 77, fires: 1, firesGutRooms: 13 },
   "scenarios/events-classic.json": { explosionSeq: 1, explosionFloor: 5, explosionX: 174.5, thiefFloor: 1, fires: 1, firesGutRooms: 1, bombs: 1 },
   // After the direct threat detonates, a second threat is called in during
   // the last two days, with Security sold and nobody to search (#1973). Venue
