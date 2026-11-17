@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { displayLit, drainSceneSync, planSceneSync, runSceneSync } from "./towerSyncSchedule";
+import { displayLit, drainSceneSync, MEAL_SYNC_MS, planSceneSync, runSceneSync } from "./towerSyncSchedule";
 import { syncScene, syncFacade } from "./towerReconcile";
 import { syncMotion } from "./towerCrowd";
 
@@ -19,6 +19,7 @@ vi.mock("./towerCrowd", () => ({ syncMotion: vi.fn() }));
 const quiet = {
   structural: false,
   mealOverlay: false,
+  mealDue: true,
   litChanged: false,
   hourChanged: false,
   pending: false,
@@ -46,6 +47,14 @@ describe("planSceneSync (pure one-step scheduler)", () => {
     const f1 = planSceneSync({ ...quiet, mealOverlay: true, simCrossedHour: true });
     expect(f1).toEqual({ syncNow: false, nextPending: true });
     expect(planSceneSync({ ...quiet, pending: true })).toEqual({ syncNow: true, nextPending: false });
+  });
+
+  it("a meal-overlay bump that is not due yet waits, booking nothing (#1747)", () => {
+    expect(planSceneSync({ ...quiet, mealOverlay: true, mealDue: false })).toEqual({ syncNow: false, nextPending: false });
+    expect(planSceneSync({ ...quiet, mealOverlay: true, mealDue: false, simCrossedHour: true })).toEqual({ syncNow: false, nextPending: false });
+    // Anything else that syncs still covers it, since the sync reads live state.
+    expect(planSceneSync({ ...quiet, mealOverlay: true, mealDue: false, structural: true })).toEqual({ syncNow: true, nextPending: false });
+    expect(planSceneSync({ ...quiet, mealOverlay: true, mealDue: false, hourChanged: true })).toEqual({ syncNow: false, nextPending: true });
   });
 
   it("structural changes sync now even on an hour-crossing frame (the player just acted)", () => {
@@ -106,6 +115,7 @@ describe("runSceneSync (engine wiring)", () => {
     builtRev: 1,
     mealOverlayRev: 0,
     hourSyncPending: false,
+    lastSceneSyncAt: -Infinity,
     ...Object.fromEntries(Object.entries(over).filter(([k]) => k !== "sim")),
   });
 
@@ -138,6 +148,23 @@ describe("runSceneSync (engine wiring)", () => {
     expect(syncScene).toHaveBeenCalledTimes(1);
     expect(e.mealOverlayRev).toBe(3);
     expect(syncMotion).not.toHaveBeenCalled();
+  });
+
+  it("meal-overlay bumps on every frame sync at most once per MEAL_SYNC_MS of real time (#1747)", () => {
+    const e = eng();
+    let syncs = 0;
+    // A busy lunch at top speed: a new bump on every 60 Hz frame for a second.
+    for (let frame = 0; frame < 60; frame++) {
+      e.sim.tower.mealOverlayRevision++;
+      runSceneSync(e as never, 1000 + (frame * 1000) / 60);
+      syncs = vi.mocked(syncScene).mock.calls.length;
+    }
+    expect(syncs).toBe(Math.ceil(1000 / MEAL_SYNC_MS));
+    expect(e.hourSyncPending).toBe(false);
+    // The last bump waits for its turn, then lands with nothing new arriving.
+    expect(e.mealOverlayRev).toBeLessThan(e.sim.tower.mealOverlayRevision);
+    runSceneSync(e as never, e.lastSceneSyncAt + MEAL_SYNC_MS);
+    expect(e.mealOverlayRev).toBe(e.sim.tower.mealOverlayRevision);
   });
 
   it("a meal-overlay bump on an hour-crossing frame books for the next frame instead of joining the scans", () => {

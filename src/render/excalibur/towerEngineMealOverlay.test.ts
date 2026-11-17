@@ -33,6 +33,7 @@ function fakeEngine(updateMotion: () => void, reconcileCrowd: () => void): any {
     litState: false,
     lastSyncHour: 12,
     hourSyncPending: false,
+    lastSceneSyncAt: -Infinity,
     regionDirty: new Set(),
     engine: { backgroundColor: null },
     onUpdate: null,

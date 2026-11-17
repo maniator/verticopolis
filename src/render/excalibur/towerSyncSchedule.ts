@@ -22,7 +22,20 @@ import type { TowerEngine } from "./TowerEngine";
  * frame and the drain halves the sync cadence instead of separating them;
  * separating those needs the engine-side onHour amortization, a recorded
  * spec non-goal.
+ *
+ * Meal-overlay bumps are coalesced too (#1747): the engine bumps the meal
+ * overlay revision on each meal return or venue exit, which during a busy
+ * lunch at top speed is most frames, and each sync walks every room. A bump
+ * alone syncs at most once per {@link MEAL_SYNC_MS} of real time; one that
+ * arrives sooner waits (the revision stays unadopted, so the trigger holds)
+ * and the next due frame repaints from live state.
  */
+
+/** The least real time, in milliseconds, between a scene sync and one that a
+ *  meal-overlay bump alone asks for: at most five such room walks a second
+ *  instead of one per frame. At top speed (50 game minutes a second) a meal
+ *  look then trails the sim by up to 10 game minutes. */
+export const MEAL_SYNC_MS = 200;
 
 /** The display-lighting flag, shared by tick() and the boot bake in start()
  *  so the two derivations can never drift (a drift shows one wrong-lighting
@@ -36,6 +49,9 @@ export interface SyncTriggers {
   structural: boolean;
   /** Meal-overlay repaint requested by the sim (mid-hour occupancy dips). */
   mealOverlay: boolean;
+  /** At least {@link MEAL_SYNC_MS} have passed since the last scene sync, so
+   *  a meal-overlay bump may sync. */
+  mealDue: boolean;
   /** The evening/night lighting flag flipped (hour-derived). */
   litChanged: boolean;
   /** The displayed hour bucket changed (shutters, asleep looks, live bits). */
@@ -51,20 +67,24 @@ export interface SyncTriggers {
  *  deferral carries to the next. Structural changes and a pending deferral
  *  sync now and absorb any other trigger arriving in the same frame, because
  *  the sync reads live state and covers everything at once. A meal-overlay
- *  bump syncs now too, UNLESS this frame's sim advance crossed an hour: the
- *  hourly scans just ran, so the repaint books for the next frame's drain
- *  instead of stacking with them. Hour-driven triggers alone always book. */
+ *  bump that is due syncs now too, UNLESS this frame's sim advance crossed an
+ *  hour: the hourly scans just ran, so the repaint books for the next frame's
+ *  drain instead of stacking with them. A bump that is not due yet does
+ *  nothing this frame; it stays a trigger until a sync adopts it. Hour-driven
+ *  triggers alone always book. */
 export function planSceneSync(t: SyncTriggers): { syncNow: boolean; nextPending: boolean } {
-  if (t.structural || t.pending || (t.mealOverlay && !t.simCrossedHour)) {
+  const meal = t.mealOverlay && t.mealDue;
+  if (t.structural || t.pending || (meal && !t.simCrossedHour)) {
     return { syncNow: true, nextPending: false };
   }
-  if (t.litChanged || t.hourChanged || t.mealOverlay) return { syncNow: false, nextPending: true };
+  if (t.litChanged || t.hourChanged || meal) return { syncNow: false, nextPending: true };
   return { syncNow: false, nextPending: false };
 }
 
 /** The sync itself plus the bookkeeping that marks it done, shared by the
  *  frame-start drain and the post-update evaluation. */
-function applySceneSync(engine: TowerEngine): void {
+function applySceneSync(engine: TowerEngine, nowMs: number): void {
+  engine.lastSceneSyncAt = nowMs;
   // The crane's cached canvas draws d.lit live but re-rasterizes only when
   // flagged. Flag it here, exactly when the adopted lighting changes, so the
   // cab window flips once and in the same frame as the room repaint, even
@@ -82,7 +102,7 @@ function applySceneSync(engine: TowerEngine): void {
  *  inside onUpdate, and draining afterward would re-stack the deferred
  *  reconcile with that hour's engine scans, the exact pileup the deferral
  *  exists to prevent. */
-export function drainSceneSync(engine: TowerEngine): void {
+export function drainSceneSync(engine: TowerEngine, nowMs = performance.now()): void {
   if (!engine.hourSyncPending) return;
   // A structural change is already waiting (a tower swap reset builtRev, or
   // an edit landed since last frame): leave the deferral booked and let this
@@ -90,7 +110,7 @@ export function drainSceneSync(engine: TowerEngine): void {
   // instead of running the full reconcile walk twice in one frame.
   if (engine.sim.tower.revision !== engine.builtRev) return;
   engine.hourSyncPending = false;
-  applySceneSync(engine);
+  applySceneSync(engine, nowMs);
 }
 
 /** Post-update sync step, called from tick() after the sim advanced:
@@ -99,7 +119,7 @@ export function drainSceneSync(engine: TowerEngine): void {
  *  where the old inline block kept it. The pending branch normally never
  *  fires here (drainSceneSync ran at frame start); it stays so a drain that
  *  could not run, whatever the reason, still syncs rather than skips. */
-export function runSceneSync(engine: TowerEngine): void {
+export function runSceneSync(engine: TowerEngine, nowMs = performance.now()): void {
   const structural = engine.sim.tower.revision !== engine.builtRev;
   // The scene has not baked the tower it holds (a new engine or a setSim; see
   // sceneBake): the sync below materializes every region fresh, and fresh
@@ -109,6 +129,7 @@ export function runSceneSync(engine: TowerEngine): void {
   const plan = planSceneSync({
     structural,
     mealOverlay: engine.sim.tower.mealOverlayRevision !== engine.mealOverlayRev,
+    mealDue: nowMs - engine.lastSceneSyncAt >= MEAL_SYNC_MS,
     litChanged: engine.d.lit !== engine.litState,
     hourChanged: engine.d.hour !== engine.lastSyncHour,
     pending: engine.hourSyncPending,
@@ -117,7 +138,7 @@ export function runSceneSync(engine: TowerEngine): void {
     simCrossedHour: engine.sim.clock.hour !== engine.d.hour,
   });
   engine.hourSyncPending = plan.nextPending;
-  if (plan.syncNow) applySceneSync(engine);
+  if (plan.syncNow) applySceneSync(engine, nowMs);
   // Clear the queue the initial bake just filled (the load-path exception to
   // the budgeted drain): flagDirty on a never-rastered canvas costs nothing,
   // and without this the first ~20 frames re-upload already-correct regions.

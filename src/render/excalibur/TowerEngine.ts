@@ -223,6 +223,9 @@ export class TowerEngine {
   /** @internal friend-module access (towerSyncSchedule). */
   lastSyncHour = -1;
   hourSyncPending = false; // an hour-driven reconcile booked for the next frame
+  /** When the last scene sync ran, on the page's clock (`performance.now()`),
+   *  so meal-overlay syncs coalesce (towerSyncSchedule). */
+  lastSceneSyncAt = -Infinity;
   /** Set by the controller from the game speed: when paused, the decorative
    *  animation clock stops so on-screen people freeze with everything else. */
   paused = false;
