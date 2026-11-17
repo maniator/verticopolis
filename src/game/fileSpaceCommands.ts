@@ -1,6 +1,6 @@
 import type { GameApp } from "../main";
 import { trackAppAction } from "../analytics";
-import { cleanFileName, fileSpace, type TowerFileEntry, type TowerFileKind } from "../storage/fileSpace";
+import { cleanFileName, FileConflictError, FileGoneError, fileSpace, type TowerFileEntry, type TowerFileKind } from "../storage/fileSpace";
 import { copySlotsOnce } from "../storage/fileSpaceMigrate";
 import { SaveGame } from "../storage/SaveGame";
 import { TOWER_FILE_MAGIC } from "../storage/saveCompression";
@@ -18,7 +18,7 @@ import { baseName, failed } from "./fileKeep";
 import { openLive } from "./loadMenu";
 import { exportFile } from "./portLifecycle";
 import { keptSettled, openingFile } from "./keepOutgoing";
-import { claimTower } from "./towerDocument";
+import { claimTower, liveFileId } from "./towerDocument";
 import { showVersions } from "./versionCommands";
 
 /**
@@ -106,7 +106,7 @@ function openTowerBytes(app: GameApp, id: string, bytes: Uint8Array): Promise<vo
 
 /** Open a row of the Open window. */
 async function openRow(app: GameApp, row: FileRow): Promise<void> {
-  if (row.id === currentFileId()) {
+  if (row.id === liveFileId()) {
     openLive(app, row.name);
     return;
   }
@@ -216,7 +216,7 @@ function folderCommands() {
     },
     remove: async (id: string) => {
       // The live tower is its file: the autosave would only make it again.
-      if (currentFileId() === id) {
+      if (liveFileId() === id) {
         const name = fileSpace.get(id)?.name ?? "That tower";
         return isSplashUp()
           ? { text: `"${name}" is the tower Continue opens, so it can't be deleted. Open or start another tower first.`, kind: "bad" as const }
@@ -297,6 +297,13 @@ export function showOpenDialog(app: GameApp, from: OpenFrom): void {
 /** Write the live tower into My Towers as `name`, replacing a file of that
  *  name, and make it the live tower's file. */
 async function saveTowerAs(app: GameApp, name: string, why: "new" | "replace" | "current"): Promise<TowerFileEntry> {
+  // The crash copy first, as File > Save does: a reload resumes the crash
+  // copy, so it must never be older than the file it names.
+  try {
+    app.saveLoad.save(true);
+  } catch {
+    /* the crash copy follows on the next autosave */
+  }
   const bytes = exportFile(app.enginePort, app.engine.viewState(), currentStamp());
   // A "new" save never replaces: a file of that name another tab just made
   // refuses the write, and the window asks again.
@@ -376,14 +383,24 @@ export async function saveCurrentFile(): Promise<void> {
   const file = currentFile();
   try {
     const bytes = exportFile(app.enginePort, app.engine.viewState(), currentStamp());
-    const entry =
-      file && file.kind === "tower"
-        ? await fileSpace.overwrite(file.id, bytes, Date.now(), true)
-        : await fileSpace.add(cleanFileName(app.enginePort.towerName() ?? "") || "Tower", "tower", bytes);
+    const add = () => fileSpace.add(cleanFileName(app.enginePort.towerName() ?? "") || "Tower", "tower", bytes);
+    let entry: TowerFileEntry;
+    let why: "current" | "created" | "forked" = "created";
+    if (!file || file.kind !== "tower") entry = await add();
+    else
+      try {
+        entry = await fileSpace.overwrite(file.id, bytes, Date.now(), true);
+        why = "current";
+      } catch (err) {
+        // Deleted in another window, or saved there since: a file of its own.
+        if (!(err instanceof FileGoneError || err instanceof FileConflictError)) throw err;
+        entry = await add();
+        if (err instanceof FileConflictError) why = "forked";
+      }
     if (app.enginePort.generation() === generation) setCurrentFile(entry.id);
     noteTowersFile(entry);
-    trackAppAction("file_save", file ? "current" : "created");
-    app.ui.toast(`Saved "${entry.name}" in My Towers.`, "good");
+    trackAppAction("file_save", why);
+    app.ui.toast(why === "forked" ? `Another window saved "${file!.name}" too, so this tower is saved as "${entry.name}".` : `Saved "${entry.name}" in My Towers.`, "good");
   } catch (err) {
     app.ui.sayVisibly(failed(err).text);
   }

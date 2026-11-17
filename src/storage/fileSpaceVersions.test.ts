@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { FakeIndexedDb } from "../tests/fakeIndexedDb";
-import { closeFileSpaceForTests, FileGoneError, FileSpaceFullError, fileSpace } from "./fileSpace";
+import { closeFileSpaceForTests, FileConflictError, FileGoneError, FileSpaceFullError, fileSpace } from "./fileSpace";
 import { VERSION_GAP_MS, VERSIONS_KEPT } from "./fileVersions";
 
 /** My Towers' write by id and the versions it keeps (#2380). */
@@ -9,6 +9,14 @@ const DB = "verticopolis-files";
 const bytes = (...values: number[]) => new Uint8Array(values);
 
 let fake: FakeIndexedDb;
+
+/** Another window writes file `id`, straight into the database. */
+function otherWindowWrites(id: string, body: Uint8Array, modified: number): void {
+  const db = fake.lastDb!;
+  db.store("bodies").set(id, body);
+  const index = db.store("meta").get("index") as { id: string; modified: number }[];
+  db.store("meta").set("index", index.map((e) => (e.id === id ? { ...e, modified } : e)));
+}
 const open = () => fileSpace.open(fake.asFactory());
 const reopen = async () => {
   closeFileSpaceForTests();
@@ -55,7 +63,46 @@ describe("fileSpace.overwrite", () => {
     await expect(fileSpace.overwrite(a.id, bytes(3), 20 + VERSION_GAP_MS)).rejects.toBeInstanceOf(FileSpaceFullError);
     fake.failWrites = false;
     expect(await fileSpace.read(a.id)).toEqual(bytes(2));
-    expect((await fileSpace.versions(a.id)).map((v) => v.at)).toEqual([20]);
+    expect((await fileSpace.versions(a.id)).map((v) => v.at)).toEqual([20, 10]);
+  });
+
+  it("writes the file without a new version when only the version doesn't fit", async () => {
+    const a = await fileSpace.save("Sky", "tower", bytes(1), 0);
+    await fileSpace.overwrite(a.id, bytes(2), VERSION_GAP_MS);
+    fake.failPutsOf = (key) => key.startsWith("v:");
+    expect(await fileSpace.overwrite(a.id, bytes(3), 2 * VERSION_GAP_MS)).toMatchObject({ modified: 2 * VERSION_GAP_MS });
+    fake.failPutsOf = null;
+    expect(await fileSpace.read(a.id), "the save itself landed").toEqual(bytes(3));
+    expect((await fileSpace.versions(a.id)).map((v) => v.at / VERSION_GAP_MS), "the versions are as they were").toEqual([1, 0]);
+  });
+
+  it("writes a file with no room for its original, and never keeps a later body in the original's place", async () => {
+    const a = await fileSpace.save("Sky", "tower", bytes(1), 0);
+    fake.failPutsOf = (key) => key.startsWith("v:");
+    await fileSpace.overwrite(a.id, bytes(2), VERSION_GAP_MS);
+    fake.failPutsOf = null;
+    expect(await fileSpace.read(a.id)).toEqual(bytes(2));
+    await fileSpace.overwrite(a.id, bytes(3), 2 * VERSION_GAP_MS);
+    expect((await fileSpace.versions(a.id)).map((v) => [v.at / VERSION_GAP_MS, v.original ?? false])).toEqual([[2, false]]);
+  });
+
+  it("refuses to write over a file another window wrote since this one read or wrote it, and writes nothing", async () => {
+    const a = await fileSpace.save("Sky", "tower", bytes(1), 10);
+    await fileSpace.overwrite(a.id, bytes(2), 20);
+    otherWindowWrites(a.id, bytes(7), 25);
+    await expect(fileSpace.overwrite(a.id, bytes(3), 30)).rejects.toBeInstanceOf(FileConflictError);
+    expect(fake.row(DB, "bodies", a.id)).toEqual(bytes(7));
+    // Read again, the file is this window's to write.
+    await fileSpace.read(a.id);
+    await fileSpace.overwrite(a.id, bytes(3), 30);
+    expect(await fileSpace.read(a.id)).toEqual(bytes(3));
+  });
+
+  it("writes a file this window never read (the one its crash copy names at boot)", async () => {
+    const a = await fileSpace.save("Sky", "tower", bytes(1), 10);
+    await reopen();
+    otherWindowWrites(a.id, bytes(7), 25);
+    expect(await fileSpace.overwrite(a.id, bytes(3), 30)).toMatchObject({ modified: 30 });
   });
 });
 
@@ -66,9 +113,18 @@ describe("a tower file's versions in My Towers", () => {
     await fileSpace.overwrite(a.id, bytes(99), 99 * VERSION_GAP_MS, true);
     await reopen();
     const versions = await fileSpace.versions(a.id);
-    expect(versions.map((v) => [v.at / VERSION_GAP_MS, v.manual ?? false])).toEqual([[99, true], [6, false], [5, false], [4, false], [3, false], [2, false]]);
+    expect(versions.map((v) => [v.at / VERSION_GAP_MS, v.manual ?? false, v.original ?? false])).toEqual([
+      [99, true, false],
+      [6, false, false],
+      [5, false, false],
+      [4, false, false],
+      [3, false, false],
+      [2, false, false],
+      [0, false, true],
+    ]);
     expect(await fileSpace.readVersion(versions[0].key)).toEqual(bytes(99));
     expect(await fileSpace.readVersion(versions[5].key)).toEqual(bytes(2));
+    expect(await fileSpace.readVersion(versions[6].key), "the file as it was before the first write").toEqual(bytes(0));
     expect(fake.row(DB, "bodies", `v:${a.id}:${VERSION_GAP_MS}`), "the dropped version's bytes are gone").toBeUndefined();
   });
 

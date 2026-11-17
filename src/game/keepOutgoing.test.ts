@@ -22,7 +22,7 @@ vi.mock("../storage/savePacker", () => ({ packSave: m.packSave }));
 vi.mock("../storage/saveStore", () => ({ saveStore: { get: (key: string) => (key === "verticopolis-save" ? m.stored : null) } }));
 vi.mock("../storage/SaveGame", () => ({
   autosaveKey: () => "verticopolis-save",
-  SaveGame: { listSlots: () => [{ slot: "auto", exists: m.stored !== null, towerName: m.autoName }] },
+  SaveGame: { listSlots: () => [{ slot: "auto", exists: m.stored !== null, towerName: m.autoName, savedAt: 5 }] },
 }));
 
 import { closeFileSpaceForTests, fileSpace } from "../storage/fileSpace";
@@ -153,13 +153,44 @@ describe("the tower left by opening another", () => {
   it("behind the title screen is written into the tower's own file, the one Continue opens", async () => {
     m.live = false;
     const own = await fileSpace.save("Harmony", "tower", Uint8Array.from([0]));
-    setCurrentFile(own.id);
+    localStorage.setItem("verticopolis-tower-file", JSON.stringify({ file: own.id, savedAt: 5 }));
     const { app, swap } = makeApp("Throwaway");
     captureOutgoing(app, "open");
     swap();
     expect(await keepOutgoing(app)).toBe("file");
     expect(fileSpace.list()).toHaveLength(1);
     expect(new TextDecoder().decode((await fileSpace.read(own.id))!)).toBe(`VCTOWER1\n${STORED.slice("VCZ1:".length)}\n`);
+  });
+
+  it("behind the title screen never writes the file this window booted with once another window put another tower in the Auto-save", async () => {
+    m.live = false;
+    const sky = await fileSpace.save("Sky", "tower", Uint8Array.from([0]));
+    // This window booted with Sky's file; another window has since written Harbor into the Auto-save.
+    setCurrentFile(sky.id);
+    m.autoName = "Harbor";
+    localStorage.setItem("verticopolis-tower-file", JSON.stringify({ file: sky.id, savedAt: 4 }));
+    const { app, swap } = makeApp("Throwaway");
+    captureOutgoing(app, "open");
+    swap();
+    expect(await keepOutgoing(app)).toBe("new");
+    expect(await fileSpace.read(sky.id), "Sky's file is untouched").toEqual(Uint8Array.from([0]));
+    expect(fileSpace.find("Harbor"), "Harbor gets a file of its own").toBeDefined();
+  });
+
+  it("is kept in a new file when another window wrote its own file since this one read it", async () => {
+    const fake = new FakeIndexedDb();
+    closeFileSpaceForTests();
+    await fileSpace.open(fake.asFactory());
+    const own = await fileSpace.save("Harmony", "tower", Uint8Array.from([0]), 10);
+    setCurrentFile(own.id);
+    const index = fake.lastDb!.store("meta").get("index") as { id: string; modified: number }[];
+    fake.lastDb!.store("meta").set("index", index.map((e) => ({ ...e, modified: 20 })));
+    const { app, swap } = makeApp();
+    captureOutgoing(app, "open");
+    swap();
+    expect(await keepOutgoing(app)).toBe("new");
+    expect(fileSpace.find("Harmony Tower 2.0"), "kept under the tower's name").toBeDefined();
+    expect(await fileSpace.read(own.id)).toEqual(Uint8Array.from([0]));
   });
 
   it("behind the title screen is the Auto-save's tower, kept re-headered without a decode", async () => {

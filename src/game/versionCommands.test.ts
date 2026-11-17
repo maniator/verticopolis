@@ -32,7 +32,7 @@ describe("Previous versions… on a My Towers tower", () => {
     await showVersions(app() as never, a.id, vi.fn());
     const ctx = m.show.mock.calls[0][1] as VersionsCtx;
     expect(ctx.name).toBe("Sky");
-    expect(ctx.versions.map((v) => v.at)).toEqual([2 * VERSION_GAP_MS, VERSION_GAP_MS]);
+    expect(ctx.versions.map((v) => v.at), "the file as it was first, last").toEqual([2 * VERSION_GAP_MS, VERSION_GAP_MS, 0]);
     expect(m.track).toHaveBeenCalledExactlyOnceWith("file_versions", "list");
   });
 
@@ -57,7 +57,7 @@ describe("Previous versions… on a My Towers tower", () => {
     expect(openFile).toHaveBeenCalledExactlyOnceWith(made.id);
     expect(shown.ui.closeModal).toHaveBeenCalledOnce();
     expect(await fileSpace.read(a.id)).toEqual(bytes(3));
-    expect(await fileSpace.versions(a.id)).toHaveLength(2);
+    expect(await fileSpace.versions(a.id)).toHaveLength(3);
     expect(m.track).toHaveBeenCalledExactlyOnceWith("file_versions", "open");
   });
 

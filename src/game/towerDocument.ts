@@ -1,6 +1,6 @@
 import type { GameApp } from "../main";
 import { trackAppAction, trackAppActionOnce } from "../analytics";
-import { cleanFileName, FileGoneError, fileSpace } from "../storage/fileSpace";
+import { cleanFileName, FileConflictError, FileGoneError, fileSpace, type TowerFileEntry } from "../storage/fileSpace";
 import { linkedFolder } from "../storage/linkedFolder";
 import { autosaveKey, SaveGame } from "../storage/SaveGame";
 import { saveStore } from "../storage/saveStore";
@@ -8,6 +8,7 @@ import { toTowerFile } from "../storage/towerFileCodec";
 import { autosaveIfLive } from "./autosaveSchedule";
 import { mirrorAutosave, vctowerFileOf, writeLinkedTower } from "./autosaveMirror";
 import { currentFileId, currentLinkedFile, onCurrentFileChange, setCurrentFile, setCurrentLinkedFile } from "./currentFile";
+import { isSplashUp } from "./interactionState";
 
 /**
  * The tower is the document (owner, 2026-11-16; save-model party verdict
@@ -33,9 +34,15 @@ import { currentFileId, currentLinkedFile, onCurrentFileChange, setCurrentFile, 
  * crash copy just packed in the save packer's worker, so it compresses
  * nothing more on the page.
  *
+ * Two windows playing the same tower each write its file only while it is
+ * as that window last read or wrote it (`fileSpace.overwrite`); the window
+ * that finds it written by the other since moves its tower to a file of its
+ * own ("Name (2)") and says so, so the two games never take turns in one
+ * file.
+ *
  * Analytics (`docs/analytics-data-map.md`): `app_action` `tower_file`
- * (`founded`, `adopted` or `synced`), and `autosave_failed` `file` once a
- * page life when the file could not be written.
+ * (`founded`, `adopted`, `synced` or `forked`), and `autosave_failed` `file`
+ * once a page life when the file could not be written.
  */
 
 /** Where the crash copy's file is remembered. */
@@ -118,6 +125,32 @@ function crashCopyFile(): Uint8Array | null {
   }
 }
 
+/**
+ * The file the crash copy's tower is, while the ref names the crash copy as
+ * it is now. Behind the title screen that is the tower Continue opens, and
+ * another window may have written another tower into the crash copy since
+ * this one booted, so this, not the live file, says which file it is
+ * (review of #2411).
+ */
+export function crashCopyRef(): TowerRef | null {
+  const ref = readRef();
+  const { savedAt } = crashListing();
+  return ref && savedAt !== undefined && ref.savedAt === savedAt ? ref : null;
+}
+
+/** The live tower's My Towers file: behind the title screen, the one
+ *  Continue opens ({@link crashCopyRef}). */
+export function liveFileId(): string | null {
+  return isSplashUp() ? (crashCopyRef()?.file ?? null) : currentFileId();
+}
+
+/** The live tower's file in the linked folder, as {@link liveFileId}. */
+export function liveLinkedFile(): string | null {
+  if (!isSplashUp()) return currentLinkedFile();
+  const linked = crashCopyRef()?.linked;
+  return linked && linked.link === linkedFolder.linkId() ? linked.id : null;
+}
+
 /** The crash copy's write time and tower name, from its listing. */
 function crashListing(): { savedAt?: number; name: string } {
   try {
@@ -149,14 +182,16 @@ function writeFailed(app: DocApp, err: unknown): void {
 }
 let fileFailSaid = false;
 
-/** Give the live tower (generation `generation`) a new My Towers file. */
-async function found(app: DocApp, generation: number, bytes: Uint8Array, modified: number, why: "founded" | "adopted"): Promise<void> {
+/** Give the live tower (generation `generation`) a new My Towers file;
+ *  answers it once it is the live tower's. */
+async function found(app: DocApp, generation: number, bytes: Uint8Array, modified: number, why: "founded" | "forked"): Promise<TowerFileEntry | null> {
   const entry = await fileSpace.add(fileName(app.enginePort.towerName()), "tower", bytes, modified);
   // Another tower arrived, or an open named the file, while it was written:
   // the file stays (it holds this tower), but it is not the live tower's.
-  if (app.enginePort.generation() !== generation || currentFileId() !== null || currentLinkedFile() !== null) return;
+  if (app.enginePort.generation() !== generation || currentFileId() !== null || currentLinkedFile() !== null) return null;
   setCurrentFile(entry.id);
   trackAppAction("tower_file", why);
+  return entry;
 }
 
 /** Write the live tower's file with an autosave's bytes. */
@@ -174,10 +209,14 @@ async function writeFile(app: DocApp, generation: number, savedAt: number, packe
       try {
         await fileSpace.overwrite(id, bytes, savedAt, false, true);
       } catch (err) {
-        // Deleted in another window: the live tower gets a new file.
-        if (!(err instanceof FileGoneError)) throw err;
+        // Deleted in another window, or written there since (two windows on
+        // one tower): the live tower gets a new file.
+        if (!(err instanceof FileGoneError || err instanceof FileConflictError)) throw err;
+        const was = fileSpace.get(id)?.name;
         if (currentFileId() === id) setCurrentFile(null);
-        await found(app, generation, bytes, savedAt, "founded");
+        const entry = await found(app, generation, bytes, savedAt, err instanceof FileConflictError ? "forked" : "founded");
+        if (entry && err instanceof FileConflictError)
+          app.ui.toast(`Another window saved "${was ?? entry.name}" too, so this window's tower is now "${entry.name}".`, "info");
       }
     } else if (claims === 0) {
       await found(app, generation, bytes, savedAt, "founded");

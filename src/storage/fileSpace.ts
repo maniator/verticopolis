@@ -16,20 +16,10 @@
  */
 
 import { cleanFileName, copyName, freeName, sameName } from "./fileNames";
-import { planVersions, readVersions, versionsKey, type TowerVersion } from "./fileVersions";
+import { originalVersion, planVersions, readVersions, versionsKey, type TowerVersion } from "./fileVersions";
+import { asWriteError, committed, done, FileConflictError, FileGoneError, FileNameTakenError, FileSpaceFullError, readIndex, type TowerFileEntry, type TowerFileKind } from "./fileSpaceDb";
+export { FileConflictError, FileGoneError, FileNameTakenError, FileSpaceFullError, type TowerFileEntry, type TowerFileKind } from "./fileSpaceDb";
 export { cleanFileName, copyName, FILE_NAME_MAX, freeName } from "./fileNames";
-
-export type TowerFileKind = "tower" | "tdt";
-
-export interface TowerFileEntry {
-  readonly id: string;
-  readonly name: string;
-  readonly kind: TowerFileKind;
-  /** The file's size in bytes. */
-  readonly size: number;
-  /** When it was last written, in milliseconds since 1970. */
-  readonly modified: number;
-}
 
 const DB_NAME = "verticopolis-files";
 const DB_VERSION = 1;
@@ -39,76 +29,19 @@ const META = "meta";
 const INDEX = "index";
 const CHANNEL = "verticopolis-files";
 
-/** A write the device had no room for. */
-export class FileSpaceFullError extends Error {
-  constructor() {
-    super("There's no room left on this device for that tower. Delete some towers and try again.");
-    this.name = "FileSpaceFullError";
-  }
-}
-
-/** A write to a file that is no longer there (deleted in another tab). */
-export class FileGoneError extends Error {
-  constructor() {
-    super("That tower is gone. It may have been deleted in another window.");
-    this.name = "FileGoneError";
-  }
-}
-
-/** A name another file already has. */
-export class FileNameTakenError extends Error {
-  constructor(name: string) {
-    super(`A tower named "${name}" already exists.`);
-    this.name = "FileNameTakenError";
-  }
-}
-
 interface Open {
   readonly db: IDBDatabase;
   entries: TowerFileEntry[];
   readonly channel: BroadcastChannel | null;
   pending: Promise<unknown>;
+  /** The write time of each file as this tab last read or wrote it, so a
+   *  write over a file another tab wrote since is refused. */
+  readonly seen: Map<string, number>;
 }
 
 let open: Open | null = null;
 let opening: Promise<boolean> | null = null;
 const listeners = new Set<() => void>();
-
-function done<T>(req: IDBRequest<T>): Promise<T> {
-  return new Promise((resolve, reject) => {
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  });
-}
-
-function committed(tx: IDBTransaction): Promise<void> {
-  return new Promise((resolve, reject) => {
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-    tx.onabort = () => reject(tx.error ?? new Error("The tower folder's write was aborted."));
-  });
-}
-
-/** A failed write as the player's reason: a full device, or the error itself. */
-function asWriteError(err: unknown): unknown {
-  const name = (err as { name?: unknown } | null)?.name;
-  return name === "QuotaExceededError" ? new FileSpaceFullError() : err;
-}
-
-/** The index record as entries, dropping any row that is not one. */
-function readIndex(value: unknown): TowerFileEntry[] {
-  if (!Array.isArray(value)) return [];
-  return value.filter(
-    (e): e is TowerFileEntry =>
-      typeof e === "object" &&
-      e !== null &&
-      typeof e.id === "string" &&
-      typeof e.name === "string" &&
-      (e.kind === "tower" || e.kind === "tdt") &&
-      typeof e.size === "number" &&
-      typeof e.modified === "number",
-  );
-}
 
 async function loadIndex(db: IDBDatabase): Promise<TowerFileEntry[]> {
   const tx = db.transaction(META, "readonly");
@@ -204,7 +137,7 @@ async function connect(factory: IDBFactory): Promise<boolean> {
     };
     const db = await done(req);
     const channel = typeof BroadcastChannel === "undefined" ? null : new BroadcastChannel(CHANNEL);
-    const o: Open = { db, entries: await loadIndex(db), channel, pending: Promise.resolve() };
+    const o: Open = { db, entries: await loadIndex(db), channel, pending: Promise.resolve(), seen: new Map() };
     open = o;
     // A window shown while the folder was still opening fills in now.
     changed();
@@ -228,6 +161,85 @@ async function connect(factory: IDBFactory): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+/** Note `entry`'s write time as this tab's own, and answer it. */
+function seen(o: Open, entry: TowerFileEntry): TowerFileEntry {
+  o.seen.set(entry.id, entry.modified);
+  return entry;
+}
+
+interface WriteOver {
+  readonly id: string;
+  readonly bytes: Uint8Array;
+  readonly modified: number;
+  readonly manual: boolean;
+  readonly onlyNewer: boolean;
+}
+
+/** One {@link fileSpace.overwrite} transaction, with its versions when
+ *  `withVersions`, else the file alone and its versions as they were. */
+async function writeOver(o: Open, w: WriteOver, withVersions: boolean): Promise<TowerFileEntry> {
+  const tx = o.db.transaction([META, BODIES], "readwrite");
+  const meta = tx.objectStore(META);
+  const bodies = tx.objectStore(BODIES);
+  const out: { entries: TowerFileEntry[] | null; entry: TowerFileEntry | null; refused: Error | null } = { entries: null, entry: null, refused: null };
+  const indexReq = meta.get(INDEX);
+  const versionsReq = meta.get(versionsKey(w.id));
+  // The body is read only for a file with no versions yet: its original.
+  const write = (oldBody: unknown) => {
+    const list = readIndex(indexReq.result);
+    const old = list.find((e) => e.id === w.id);
+    if (!old || old.kind !== "tower") return;
+    const last = o.seen.get(w.id);
+    if (last !== undefined && last !== old.modified) {
+      out.refused = new FileConflictError();
+      return;
+    }
+    if (w.onlyNewer && old.modified > w.modified) {
+      out.entries = list;
+      out.entry = old;
+      return;
+    }
+    const entry: TowerFileEntry = { ...old, size: w.bytes.byteLength, modified: w.modified };
+    bodies.put(w.bytes, w.id);
+    if (withVersions) {
+      let kept = readVersions(versionsReq.result);
+      if (versionsReq.result === undefined && oldBody instanceof Uint8Array) {
+        const original = originalVersion(w.id, old.modified, oldBody.byteLength);
+        bodies.put(oldBody, original.key);
+        kept = [original];
+      }
+      const plan = planVersions(kept, w.id, w.modified, w.bytes.byteLength, w.manual);
+      if (plan.put) bodies.put(w.bytes, plan.put.key);
+      for (const key of plan.drop) bodies.delete(key);
+      meta.put(plan.versions, versionsKey(w.id));
+    } else if (versionsReq.result === undefined) {
+      // No room for the original: it can't be kept, and a later write must
+      // not keep this one in its place as if it were.
+      meta.put([], versionsKey(w.id));
+    }
+    out.entries = list.map((e) => (e.id === w.id ? entry : e));
+    out.entry = entry;
+    meta.put(out.entries, INDEX);
+  };
+  versionsReq.onsuccess = () => {
+    if (!withVersions || versionsReq.result !== undefined) return write(null);
+    const bodyReq = bodies.get(w.id);
+    bodyReq.onsuccess = () => write(bodyReq.result);
+  };
+  try {
+    await committed(tx);
+  } catch (err) {
+    throw asWriteError(err);
+  }
+  if (out.refused) throw out.refused;
+  if (!out.entries || !out.entry) throw new FileGoneError();
+  if (out.entry.modified === w.modified) o.seen.set(w.id, w.modified);
+  o.entries = out.entries;
+  o.channel?.postMessage("changed");
+  changed();
+  return out.entry;
 }
 
 export const fileSpace = {
@@ -271,11 +283,14 @@ export const fileSpace = {
     const entries = open?.entries ?? [];
     return { count: entries.length, bytes: entries.reduce((sum, e) => sum + e.size, 0) };
   },
-  /** A file's bytes, or null when it is gone. */
+  /** A file's bytes, or null when it is gone. Notes the write time read. */
   async read(id: string): Promise<Uint8Array | null> {
     const o = need();
-    const tx = o.db.transaction(BODIES, "readonly");
+    const tx = o.db.transaction([META, BODIES], "readonly");
+    const indexReq = tx.objectStore(META).get(INDEX);
     const bytes = await done(tx.objectStore(BODIES).get(id));
+    const entry = readIndex(indexReq.result).find((e) => e.id === id);
+    if (entry && bytes instanceof Uint8Array) o.seen.set(id, entry.modified);
     return bytes instanceof Uint8Array ? bytes : null;
   },
   /**
@@ -296,7 +311,7 @@ export const fileSpace = {
       const entry: TowerFileEntry = { id: old?.id ?? newId(), name: clean, kind, size: bytes.byteLength, modified };
       const entries = old ? list.map((e) => (e.id === old.id ? entry : e)) : [...list, entry];
       return { entries, body: { id: entry.id, bytes }, result: entry };
-    });
+    }).then((entry) => seen(o, entry));
   },
   /**
    * Add `bytes` as a new file, under `name` or, when that is taken, the first
@@ -309,7 +324,7 @@ export const fileSpace = {
     return update(o, (list) => {
       const entry: TowerFileEntry = { id: newId(), name: freeName(clean, list), kind, size: bytes.byteLength, modified };
       return { entries: [...list, entry], body: { id: entry.id, bytes }, result: entry };
-    });
+    }).then((entry) => seen(o, entry));
   },
   /** Give file `id` a new name; rejects with {@link FileNameTakenError} when
    *  another file has it. */
@@ -343,50 +358,25 @@ export const fileSpace = {
   /**
    * Write `bytes` over tower file `id`, keeping its name and place, and keep a
    * version of them when one is due (`fileVersions.ts`; `manual` for a save
-   * by hand). With `onlyNewer`, a file already written after `modified` (a
-   * save by hand while an autosave packed) is left as it is. Rejects with
+   * by hand); the first write over a file also keeps what it held. With
+   * `onlyNewer`, a file already written after `modified` (a save by hand
+   * while an autosave packed) is left as it is. Rejects with
    * {@link FileGoneError} when there is no such tower file (deleted in another
-   * tab), and with {@link FileSpaceFullError} when the device has no room;
-   * nothing changes then.
+   * tab), with {@link FileConflictError} when another tab wrote it since this
+   * one last read or wrote it, and with {@link FileSpaceFullError} when the
+   * device has no room even for the file alone; nothing changes then.
+   * Versions never cost the save: when they don't fit, the file is written
+   * without them.
    */
   overwrite(id: string, bytes: Uint8Array, modified = Date.now(), manual = false, onlyNewer = false): Promise<TowerFileEntry> {
     const o = need();
     return queue(o, async () => {
-      const tx = o.db.transaction([META, BODIES], "readwrite");
-      const meta = tx.objectStore(META);
-      const bodies = tx.objectStore(BODIES);
-      const out: { entries: TowerFileEntry[] | null; entry: TowerFileEntry | null } = { entries: null, entry: null };
-      const indexReq = meta.get(INDEX);
-      const versionsReq = meta.get(versionsKey(id));
-      versionsReq.onsuccess = () => {
-        const list = readIndex(indexReq.result);
-        const old = list.find((e) => e.id === id);
-        if (!old || old.kind !== "tower") return;
-        if (onlyNewer && old.modified > modified) {
-          out.entries = list;
-          out.entry = old;
-          return;
-        }
-        const entry: TowerFileEntry = { ...old, size: bytes.byteLength, modified };
-        bodies.put(bytes, id);
-        const plan = planVersions(readVersions(versionsReq.result), id, modified, bytes.byteLength, manual);
-        if (plan.put) bodies.put(bytes, plan.put.key);
-        for (const key of plan.drop) bodies.delete(key);
-        meta.put(plan.versions, versionsKey(id));
-        out.entries = list.map((e) => (e.id === id ? entry : e));
-        out.entry = entry;
-        meta.put(out.entries, INDEX);
-      };
       try {
-        await committed(tx);
+        return await writeOver(o, { id, bytes, modified, manual, onlyNewer }, true);
       } catch (err) {
-        throw asWriteError(err);
+        if (!(err instanceof FileSpaceFullError)) throw err;
+        return writeOver(o, { id, bytes, modified, manual, onlyNewer }, false);
       }
-      if (!out.entries || !out.entry) throw new FileGoneError();
-      o.entries = out.entries;
-      o.channel?.postMessage("changed");
-      changed();
-      return out.entry;
     });
   },
   /** File `id`'s earlier versions, newest first. */

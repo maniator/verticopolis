@@ -162,21 +162,17 @@ test("a tower saved online loads in a fresh offline browser session, runs, saves
       (window as any).game.syncSim();
     });
     savedAt = await advanceClock(page);
-    fileId = await page.evaluate(async () => {
-      const id = (await (window as any).game.saveFile("Cold start")) as string;
-      // Closing the page saves its tower when it goes to the background. This
-      // test is about the My Towers file, so keep that tower out of the
-      // autosave and let the offline session start a new one.
-      (window as any).game.saveLoad.save = () => {};
-      return id;
-    });
+    fileId = await page.evaluate(async () => (await (window as any).game.saveFile("Cold start")) as string);
     savedState = await engineSave(page);
+    // This test is about the My Towers file: another tower comes in, so the
+    // offline session resumes that one and "Cold start" is a file to open.
+    await page.evaluate(() => (window as any).game.saveLoad.newGame("classic"));
   });
 
   const context = await launch(dir, baseURL!, launchOptions, true);
   try {
     const { page, seen } = await offlineStart(context);
-    expect(await lobbyAt(page, 160), "the offline session starts on its own tower before the load").toBe(false);
+    expect(await lobbyAt(page, 160), "the offline session resumes the other tower before the load").toBe(false);
     // Load the online save on the engine.
     await page.evaluate(async (id) => {
       const g = (window as any).game;
@@ -195,10 +191,11 @@ test("a tower saved online loads in a fresh offline browser session, runs, saves
       const ok = g.sim.build("lobby", 1, 200).ok;
       (window as any).game.syncSim();
       const id = (await g.saveFile("Cold start")) as string;
-      g.saveLoad.save = () => {}; // as above: the reload starts a new tower, not this one
       return { ok, id, minutes: g.sim.clock.minutes as number };
     });
     const resavedState = await engineSave(page);
+    // As above: another tower comes in, so the reload resumes that one.
+    await page.evaluate(() => (window as any).game.saveLoad.newGame("classic"));
     expect(resaved.ok, "the offline lobby was built").toBe(true);
     expect(resaved.id, "saving under the same name replaces the file").toBe(fileId);
 
@@ -206,7 +203,7 @@ test("a tower saved online loads in a fresh offline browser session, runs, saves
     // clock come back.
     await page.reload();
     await hostedGame(page);
-    expect(await lobbyAt(page, 200), "the reload starts on its own tower before the load").toBe(false);
+    expect(await lobbyAt(page, 200), "the reload resumes the other tower before the load").toBe(false);
     await page.evaluate(async (id) => {
       const g = (window as any).game;
       g.setSpeed(0);

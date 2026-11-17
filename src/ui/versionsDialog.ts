@@ -70,6 +70,13 @@ interface VersionsHandlers {
   picked(): TowerVersion | null;
 }
 
+/** How a version came to be, as the How column says it. */
+function versionHow(v: TowerVersion): string {
+  if (v.manual) return "Saved by you";
+  if (v.original) return "Original";
+  return "Autosaved";
+}
+
 function versionsTemplate(
   ctx: VersionsCtx,
   state: { selected: string | null; busy: boolean; line: FileNote | null },
@@ -81,7 +88,7 @@ function versionsTemplate(
       @click=${() => h.select(v.key)} @dblclick=${() => h.open(v)}>
       ${fileIcon("tower")}
       <span class="fd-cell">${versionWhen(v.at)}</span>
-      <span class="fd-cell pv-how">${v.manual ? "Saved by you" : "Autosaved"}</span>
+      <span class="fd-cell pv-how">${versionHow(v)}</span>
       <span class="fd-cell fd-size-cell">${fileSizeText(v.size)}</span>
     </button>`,
   );

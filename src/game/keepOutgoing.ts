@@ -1,6 +1,6 @@
 import type { GameApp } from "../main";
 import { trackAppAction } from "../analytics";
-import { cleanFileName, fileSpace } from "../storage/fileSpace";
+import { cleanFileName, FileConflictError, FileGoneError, fileSpace } from "../storage/fileSpace";
 import { noteTowersFile } from "../storage/recentTowers";
 import { autosaveKey, SaveGame } from "../storage/SaveGame";
 import { packSave } from "../storage/savePacker";
@@ -12,6 +12,7 @@ import { vctowerFileOf } from "./autosaveMirror";
 import { linkedFolder } from "../storage/linkedFolder";
 import { currentFileId, currentLinkedFile } from "./currentFile";
 import { saveBytes } from "./portLifecycle";
+import { crashCopyRef } from "./towerDocument";
 
 /**
  * Never lose the tower the player leaves (owner, 2026-11-16, NO LOST SAVES).
@@ -130,9 +131,11 @@ export function captureOutgoing(app: Pick<GameApp, "enginePort">, kind: SwapKind
     // player's tower is the Auto-save. Loading it brings it back, so only
     // another tower arriving leaves it behind.
     if (kind === "load") return;
-    // Its file is the one the Auto-save's tower is (`towerDocument.ts`).
+    // Its file is the one the ref names for the Auto-save as it is now, never
+    // the one this window booted with: another window may have written
+    // another tower into the Auto-save since (`towerDocument.ts`).
     const file = storedAutosave();
-    if (file) pending = { file, name: towerFileName(storedName()), ...ownFile(reopened), generation };
+    if (file) pending = { file, name: towerFileName(storedName()), ...crashCopyOwnFile(reopened), generation };
   } catch {
     // Counted only if the swap goes ahead (`keepOutgoing`); one refused is no loss.
     try {
@@ -149,6 +152,13 @@ function ownFile(reopened: string | null): Pick<Outgoing, "fileId" | "linked"> {
   const linked = currentLinkedFile();
   if (linked !== null && linked !== reopened) return { fileId: null, linked: { id: linked, link: linkedFolder.linkId() } };
   return { fileId: fileId === reopened ? null : fileId };
+}
+
+/** The Auto-save's own file, unless it is the one about to open again. */
+function crashCopyOwnFile(reopened: string | null): Pick<Outgoing, "fileId" | "linked"> {
+  const ref = crashCopyRef();
+  if (ref?.linked && ref.linked.id !== reopened) return { fileId: null, linked: { id: ref.linked.id, link: ref.linked.link } };
+  return { fileId: ref?.file !== undefined && ref.file !== reopened ? ref.file : null };
 }
 
 /** Forget a capture whose swap was refused (the file didn't read). */
@@ -222,8 +232,7 @@ async function keep(app: Pick<GameApp, "ui">, o: Outgoing): Promise<"file" | "fo
   try {
     if (!(await fileSpace.open())) throw new Error("My Towers is not open");
     const own = o.fileId === null ? undefined : fileSpace.get(o.fileId);
-    if (own && own.kind === "tower") {
-      noteTowersFile(await fileSpace.overwrite(own.id, bytes));
+    if (own && own.kind === "tower" && (await keptInOwnFile(own.id, bytes))) {
       trackAppAction("tower_kept", "file");
       app.ui.toast(`Saved "${own.name}" in My Towers.`, "good");
       return "file";
@@ -237,6 +246,18 @@ async function keep(app: Pick<GameApp, "ui">, o: Outgoing): Promise<"file" | "fo
   } catch {
     // Nowhere in the browser to keep it: offer it as a file.
     return offerDownload(app, o.name, bytes);
+  }
+}
+
+/** Write the tower into its own My Towers file. False when the file is gone
+ *  or another window wrote it since, so the tower gets a new file instead. */
+async function keptInOwnFile(id: string, bytes: Uint8Array): Promise<boolean> {
+  try {
+    noteTowersFile(await fileSpace.overwrite(id, bytes));
+    return true;
+  } catch (err) {
+    if (err instanceof FileGoneError || err instanceof FileConflictError) return false;
+    throw err;
   }
 }
 

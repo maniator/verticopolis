@@ -26,7 +26,9 @@ import {
   bootTowerDocument,
   claimTower,
   crashCopyLoaded,
+  crashCopyRef,
   crashCopyWritten,
+  liveFileId,
   readRef,
   REF_KEY,
   resetTowerDocumentForTests,
@@ -61,6 +63,7 @@ function listing(savedAt: number | undefined, towerName = "Sky Hotel") {
 }
 
 let app: ReturnType<typeof makeApp>["app"];
+let fake: FakeIndexedDb;
 let swap: () => void;
 
 beforeEach(async () => {
@@ -72,7 +75,8 @@ beforeEach(async () => {
   setCurrentFile(null);
   ({ app, swap } = makeApp());
   closeFileSpaceForTests();
-  await fileSpace.open(new FakeIndexedDb().asFactory());
+  fake = new FakeIndexedDb();
+  await fileSpace.open(fake.asFactory());
   wireTowerDocument(app as never);
 });
 afterEach(() => closeFileSpaceForTests());
@@ -94,7 +98,7 @@ describe("the tower's own file, written by the autosave", () => {
     expect(fileSpace.list().map((f) => f.id), "no second file").toEqual([file.id]);
     expect((await fileSpace.read(file.id))!.subarray(9)).toEqual(Uint8Array.of(9));
     expect(fileSpace.get(file.id)!.modified).toBe(2000);
-    expect((await fileSpace.versions(file.id)).map((v) => v.at), "its first version, made on its first write").toEqual([2000]);
+    expect((await fileSpace.versions(file.id)).map((v) => v.at), "its first write keeps a version, and the file as it was founded").toEqual([2000, 1000]);
   });
 
   it("names a new file 'Name (2)' when that name is taken, never writing over the other", async () => {
@@ -154,6 +158,42 @@ describe("the tower's own file, written by the autosave", () => {
     await towerDocumentSettled();
     expect(m.mirror).toHaveBeenCalledExactlyOnceWith(app, 7, false, expect.any(Uint8Array));
     expect((m.mirror.mock.calls[0] as unknown[])[3]).toEqual(await fileSpace.read(currentFileId()!));
+  });
+});
+
+describe("two windows playing the same tower", () => {
+  it("moves this window's tower to a file of its own once the other window wrote the file, and says so", async () => {
+    crashCopyWritten(1, 1000, PACKED);
+    await towerDocumentSettled();
+    const [sky] = fileSpace.list();
+    // The other window writes the same file, straight into the database.
+    const index = fake.lastDb!.store("meta").get("index") as { id: string; modified: number }[];
+    fake.lastDb!.store("meta").set("index", index.map((e) => ({ ...e, modified: 1500 })));
+    fake.lastDb!.store("bodies").set(sky.id, Uint8Array.of(5));
+    crashCopyWritten(1, 2000, Uint8Array.of(9));
+    await towerDocumentSettled();
+    expect(fake.row("verticopolis-files", "bodies", sky.id), "the other window's write stays").toEqual(Uint8Array.of(5));
+    const fork = fileSpace.find("Sky Hotel (2)")!;
+    expect(currentFileId()).toBe(fork.id);
+    expect((await fileSpace.read(fork.id))!.subarray(9)).toEqual(Uint8Array.of(9));
+    expect(m.track).toHaveBeenLastCalledWith("tower_file", "forked");
+    expect(app.ui.toast).toHaveBeenCalledWith(`Another window saved "Sky Hotel" too, so this window's tower is now "Sky Hotel (2)".`, "info");
+    // From then on it writes its own file.
+    crashCopyWritten(1, 3000, Uint8Array.of(4));
+    await towerDocumentSettled();
+    expect((await fileSpace.read(fork.id))!.subarray(9)).toEqual(Uint8Array.of(4));
+  });
+});
+
+describe("the file behind the title screen", () => {
+  it("is the one the ref names for the crash copy as it is now, not the one this window booted with", () => {
+    setCurrentFile("booted with");
+    localStorage.setItem(REF_KEY, JSON.stringify({ file: "Sky", savedAt: 1000 }));
+    listing(1000);
+    expect(crashCopyRef()).toEqual({ file: "Sky", savedAt: 1000 });
+    listing(1200);
+    expect(crashCopyRef(), "another window wrote the crash copy since").toBeNull();
+    expect(liveFileId(), "in a tower, the live file").toBe("booted with");
   });
 });
 

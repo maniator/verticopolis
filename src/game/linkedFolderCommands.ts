@@ -12,7 +12,7 @@ import { autosaveLive } from "./autosaveSchedule";
 import { forgetMirrorFile, mirrorAutosave, mirrorOn, setMirror } from "./autosaveMirror";
 import { currentFileId, currentLinkedFile, setCurrentLinkedFile } from "./currentFile";
 import { openLive } from "./loadMenu";
-import { claimTower } from "./towerDocument";
+import { claimTower, liveLinkedFile } from "./towerDocument";
 import { exportFile } from "./portLifecycle";
 
 /**
@@ -51,7 +51,7 @@ function folderFailed(err: unknown): FileNote {
  *  Answers false when the file isn't there any more (said on screen); true
  *  otherwise, a refused or failed open included (also said). */
 export async function openLinkedRow(app: GameApp, row: Pick<FileRow, "id" | "name" | "type">): Promise<boolean> {
-  if (row.id === currentLinkedFile()) {
+  if (row.id === liveLinkedFile()) {
     openLive(app, row.name);
     return true;
   }

@@ -116,7 +116,7 @@ test("links a folder, saves a tower into it, and lists it in Open without Delete
 
   // My Towers is a separate place and gained nothing.
   await page.locator(".fd-look").click();
-  await page.locator(".fd-look-item", { hasText: "My Towers" }).click();
+  await page.getByRole("menuitem", { name: /^My Towers/ }).click();
   expect(await rowNames(page)).not.toContain("Linked One");
 });
 

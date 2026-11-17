@@ -101,7 +101,7 @@ test("the autosave writes the tower's own file, and after a reload it opens to t
   await page.evaluate(() => (window as any).game.saveLoad.autosave());
   const left = await towerState(page);
   await previousVersions(page, OWN);
-  await expect(page.locator(".pv-row .pv-how"), "the autosave reached the file and kept a version").toHaveText(["Autosaved"]);
+  await expect(page.locator(".pv-row .pv-how"), "the autosave reached the file and kept a version, after the file as it first was").toHaveText(["Autosaved", "Original"]);
 
   await page.reload();
   await boot(page);
@@ -133,4 +133,24 @@ test("File > Save keeps a version by hand, and Previous versions… opens it as 
   await openWindow(page);
   await expect.poll(() => rowNames(page), { timeout: 15_000 }).toContain(OWN);
   expect((await rowNames(page)).some((n) => n.startsWith(`${OWN} (`)), "the version is a new file beside the tower").toBe(true);
+});
+
+test("opening a 4.2 save slot's file keeps it as it was, and Previous versions… brings that original back", async ({ page }) => {
+  await seed(page);
+  await boot(page);
+  await openRow(page, "My Old Slot One");
+  const opened = await towerState(page);
+  // Play on and save, so the file now holds a later game than the 4.2 slot.
+  await play(page);
+  await fileMenu(page, /^Save(?! As)/);
+  await expect(page.locator(".toast", { hasText: 'Saved "My Old Slot One" in My Towers.' })).toBeVisible();
+
+  await previousVersions(page, "My Old Slot One");
+  const original = page.locator(".pv-row", { has: page.locator(".pv-how", { hasText: "Original" }) });
+  await expect(original, "the file as 4.2 left it is kept").toHaveCount(1);
+  await original.click();
+  const before = await page.evaluate(() => (window as any).game.enginePort.generation());
+  await page.locator(".pv-buttons .btn", { hasText: "Open" }).click();
+  await page.waitForFunction((g) => (window as any).game.enginePort.generation() !== g, before, { timeout: 15_000 });
+  expect(await towerState(page), "the original opens to the game the 4.2 slot held").toEqual(opened);
 });
