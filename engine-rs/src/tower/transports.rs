@@ -9,6 +9,7 @@ use crate::schedule::Schedule;
 impl Tower {
     // ---- transports ------------------------------------------------------
 
+    #[inline]
     pub fn transport_index(&self, id: i64) -> Option<usize> {
         debug_assert_eq!(self.transport_by_id.len(), self.transports.len());
         let i = *self.transport_by_id.get(&id)?;

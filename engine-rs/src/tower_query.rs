@@ -22,6 +22,7 @@ pub fn floor_of_seg(seg: i64) -> i64 {
 }
 
 impl Tower {
+    #[inline]
     pub fn get_transport(&self, id: i64) -> Option<&Transport> {
         self.transport_index(id).map(|i| &self.transports[i])
     }

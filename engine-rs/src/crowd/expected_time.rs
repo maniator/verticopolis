@@ -378,11 +378,11 @@ fn cheapest(router: &mut Router, from: i64, x: Option<f64>, to: i64) -> Option<R
     route
 }
 
-/// The A* search itself, on the router's scratch: whether `goal` was
-/// reached. A heap entry carries the cost it was pushed with, and one whose
-/// node has since been reached for less is skipped. The bound never drops
-/// by more than a link costs, so the first time `goal` comes off the heap
-/// its cost is the least.
+/// The A* search on the router's scratch: whether `goal` was reached. An
+/// entry whose node was since reached for less is skipped, and the bound
+/// drops by at most a link's cost, so `goal`'s first pop is the cheapest.
+/// Out of line so its heap pushes stay inlined however the crate is split.
+#[inline(never)]
 fn search(router: &mut Router, start: u32, goal: u32) -> bool {
     let (bound, fresh) = bound_toward(router, goal, Some(start));
     let radius = bound.least[start as usize];
