@@ -175,6 +175,11 @@ export interface TowerView {
    *  `SimView.structure`; neither walks this per frame or per step. */
   readonly units: ReadonlyArray<UnitView>;
   readonly transports: ReadonlyArray<TransportView>;
+  /** The transports that run cars (the elevators), in `transports` order.
+   *  A per-frame pass over cars walks this instead of `transports`, which
+   *  in Modern can hold thousands of stairs and escalators. A reader that
+   *  leaves it out has its passes walk `transports`. */
+  readonly elevators?: ReadonlyArray<TransportView>;
   readonly revision: number;
   readonly mealOverlayRevision: number;
   readonly towerName: string;

@@ -86,6 +86,15 @@ describe("cabRidersOf", () => {
     engine.sim.crowd = { people: [] }; // a new crowd (a load) counts at once
     expect(ridersAboard(cabRidersOf(engine, false, FLAT), 1, 0)).toBe(0);
   });
+  it("counts over the tower's elevator list when the reader keeps one", () => {
+    const a = shaft(1, 10, 1, 30, [3]);
+    const b = shaft(2, 30, 1, 30, [3]);
+    const people: any[] = [person(1, "riding", 12, 3), person(2, "riding", 32, 3)];
+    // `b` stands in `transports` only, so a count over `elevators` skips it.
+    const engine = { sim: { crowd: { people }, tower: { transports: [a, b], elevators: [a] } } };
+    const counts = cabRidersOf(engine, true, FLAT);
+    expect([ridersAboard(counts, 1, 0), counts.has(2)]).toEqual([1, false]);
+  });
 });
 
 describe("each rider rides as themselves", () => {

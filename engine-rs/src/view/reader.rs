@@ -9,8 +9,8 @@ use std::sync::Arc;
 
 use super::layout::header::PEOPLE;
 use super::layout::{HEADER, PERSON_RECORD, UNIT_RECORD};
-use super::window::PeopleWindow;
-use crate::frame::{person_state_code, push_transports, transports_len, unit_fields, weather_code};
+use super::window::{widest_shaft, PeopleWindow};
+use crate::frame::{person_state_code, push_transport, transport_len, unit_fields, weather_code};
 use crate::sim::Simulation;
 use crate::tower::Unit;
 
@@ -29,6 +29,13 @@ pub struct ViewReader {
     changed: Vec<f64>,
     /// The part of the tower the view draws; `None` sends every person.
     window: Option<PeopleWindow>,
+    /// The places in the tower's transport list of the elevators, in list
+    /// order, and the widest transport's width, both read on a full frame
+    /// (so once per revision): a flight of stairs or an escalator runs no
+    /// car, so its record could not change between two revisions, and a
+    /// Modern tower may hold thousands of them.
+    carried: Vec<usize>,
+    widest: i64,
 }
 
 impl ViewReader {
@@ -55,7 +62,7 @@ impl ViewReader {
     /// counts as `frameView` carries them, a pending choice (0 or 1),
     /// onHourRuns, the room count the slots index, the full flag, this
     /// reader's frame number (1 for its first), then the people, room record
-    /// and transport counts.
+    /// and transport record counts.
     ///
     /// Then `people` records of `PERSON_RECORD`, every person in the crowd
     /// as [`crate::frame::frame_view`] sends them: id, seed, staff (0 or 1), state, floor, x,
@@ -64,7 +71,11 @@ impl ViewReader {
     /// screen comes along ([`PeopleWindow::padded`]), in crowd order. Then `units` room records of `UNIT_RECORD`:
     /// the room's slot (its position in the structural snapshot's room list),
     /// then state, occupants, customersIn, hotelCustomersIn, outForMeal (an
-    /// absent counter is -1). Then every transport as [`crate::frame::frame_view`] writes it.
+    /// absent counter is -1). Then every elevator, in the tower's order, as
+    /// [`crate::frame::frame_view`] writes it. A flight of stairs or an
+    /// escalator runs no car, so its record never changes between revisions:
+    /// the frame leaves it out, and a host reads it from the structural
+    /// snapshot.
     ///
     /// The room records are every room, in slot order, with the full flag
     /// set, when `full` is true, on this reader's first frame, or when the
@@ -103,6 +114,16 @@ impl ViewReader {
             self.census.reserve(rooms.len());
             self.changed.reserve(rooms.len() * UNIT_RECORD);
             self.population = 0;
+            self.carried.clear();
+            self.carried.extend(
+                tower
+                    .transports
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, t)| t.kind.is_elevator())
+                    .map(|(i, _)| i),
+            );
+            self.widest = widest_shaft(&tower.transports);
             for (slot, &i) in rooms.iter().enumerate() {
                 let u = &tower.units[i];
                 let fields = unit_fields(u);
@@ -143,11 +164,14 @@ impl ViewReader {
         self.seq += 1;
         let population = self.population;
         let people = &sim.crowd.people;
-        let window = self.window.map(|w| w.padded(&tower.transports));
+        let window = self.window.map(|w| w.padded_by(self.widest));
+        // The reader's key holds the revision, and every transport edit moves
+        // it, so the places index the list a full frame read them from.
+        let carried = || self.carried.iter().filter_map(|&i| tower.transports.get(i));
         let shown = |p: &&crate::crowd::Person| window.is_none_or(|w| w.holds(p));
         // Reserved for every person, so the frame is one allocation whatever
         // the window keeps; the people count is written once they are in.
-        let rest = self.changed.len() + transports_len(&tower.transports);
+        let rest = self.changed.len() + carried().map(transport_len).sum::<usize>();
         let mut v = Vec::with_capacity(HEADER + people.len() * PERSON_RECORD + rest);
         let fx = &sim.fx;
         let clock = &sim.clock;
@@ -188,7 +212,7 @@ impl ViewReader {
             // The people count, set below.
             0.0,
             (self.changed.len() / UNIT_RECORD) as f64,
-            tower.transports.len() as f64,
+            self.carried.len() as f64,
             clock.day() as f64,
             clock.day_of_week() as f64,
             if clock.is_weekend() { 1.0 } else { 0.0 },
@@ -216,7 +240,9 @@ impl ViewReader {
         }
         v[PEOPLE] = sent as f64;
         v.extend_from_slice(&self.changed);
-        push_transports(&mut v, &tower.transports);
+        for t in carried() {
+            push_transport(&mut v, t);
+        }
         debug_assert_eq!(v.len(), HEADER + sent * PERSON_RECORD + rest);
         v
     }

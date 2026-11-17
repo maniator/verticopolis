@@ -10,7 +10,7 @@
 //! without a revision fails it.
 use std::collections::HashMap;
 
-use super::frame_tests::agrees_with_frame_view;
+use super::frame_tests::{agrees_with_frame_view, elevators_len};
 use super::layout::{
     header, room, run, shaft, structure, unit, CALENDARS, HEADER, MODES, PERSON_RECORD,
     ROOM_RECORD, RUN_RECORD, SHAFT_FIXED, STRUCTURE_HEADER, UNIT_RECORD,
@@ -20,7 +20,7 @@ use super::signature_tests::ts_sig;
 use super::*;
 use crate::clock::{CalendarKind, GameMode};
 use crate::facilities::Kind;
-use crate::frame::{transports_len, unit_fields};
+use crate::frame::unit_fields;
 use crate::tower::Tower;
 use sha2::{Digest, Sha256};
 
@@ -168,7 +168,7 @@ impl Kept {
         let tail = at + rooms.len() * UNIT_RECORD;
         assert_eq!(
             fresh.len() - tail,
-            transports_len(&sim.tower.transports),
+            elevators_len(&sim.tower.transports),
             "{what}"
         );
         for u in &sim.tower.units {

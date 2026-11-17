@@ -64,6 +64,27 @@ fn the_pads_are_one_floor_and_half_the_widest_shaft_plus_a_tile() {
     assert_eq!(w.padded(&[]).x_lo, 99.0);
 }
 
+/// A reader keeps the widest shaft per revision: once an edit widens the
+/// tower's widest shaft, the next frame pads the window by the new width.
+#[test]
+fn the_pad_follows_the_widest_shaft_after_an_edit() {
+    let mut sim = busy();
+    let widest = widest_shaft(&sim.tower.transports);
+    assert_eq!(
+        PeopleWindow::new(1.0, 2.0, 3.0, 4.0).map(|w| w.padded(&sim.tower.transports)),
+        PeopleWindow::new(1.0, 2.0, 3.0, 4.0).map(|w| w.padded_by(widest))
+    );
+    let wider = widest as f64 + 10.0;
+    let edge = 200.0 + wider / 2.0 + 1.0;
+    let all = place(&mut sim, &[(edge, 15.0)]);
+    let mut reader = ViewReader::new();
+    reader.set_people_window(PeopleWindow::new(10.0, 20.0, 100.0, 200.0));
+    assert_eq!(ids(&reader.frame(&sim, false)), Vec::<i64>::new());
+    sim.tower.transports[0].width = wider as i64;
+    sim.tower.revision += 1;
+    assert_eq!(ids(&reader.frame(&sim, false)), all);
+}
+
 /// The frame carries the people inside the padded window, in crowd order,
 /// and its people count says how many; clearing the window sends all.
 #[test]

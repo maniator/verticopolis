@@ -4,8 +4,9 @@ use super::layout::{header, person, unit, HEADER, PERSON_RECORD, UNIT_RECORD};
 use super::session_tests::at;
 use super::*;
 use crate::facilities::FACILITIES;
-use crate::frame::{self, frame_view, transports_len};
+use crate::frame::{self, frame_view};
 use crate::sim_loop::Weather;
+use crate::tower::Transport;
 use crate::tower::UnitState;
 
 /// A small tower half a day into play, so it has tenants, people and
@@ -68,6 +69,16 @@ fn the_named_slots_read_their_values() {
         .fold(0u64, |m, (k, _)| m | 1 << k) as f64;
     let n = rooms.len() as f64;
     use header::*;
+    let elevators = sim
+        .tower
+        .transports
+        .iter()
+        .filter(|t| t.kind.is_elevator())
+        .count();
+    assert!(
+        elevators < sim.tower.transports.len(),
+        "the fixture has a flight"
+    );
     let both = [
         (MINUTES, 1001.0),
         (TOWER_REVISION, 1002.0),
@@ -95,7 +106,7 @@ fn the_named_slots_read_their_values() {
         (ON_HOUR_RUNS, 1023.0),
         (ROOMS, n),
         (PEOPLE, sim.crowd.people.len() as f64),
-        (TRANSPORTS, sim.tower.transports.len() as f64),
+        (TRANSPORTS, elevators as f64),
         (DAY, 0.0),
         (DAY_OF_WEEK, 0.0),
         (IS_WEEKEND, 0.0),
@@ -203,11 +214,77 @@ pub(super) fn agrees_with_frame_view(sim: &Simulation, what: &str) {
             "{what}: room {slot}"
         );
     }
-    let tail = transports_len(&sim.tower.transports);
+    let theirs = elevator_records(&sim.tower.transports, &f);
     assert!(
-        super::oracle_tests::same(&v[v.len() - tail..], &f[f.len() - tail..]),
+        super::oracle_tests::same(&v[v.len() - theirs.len()..], &theirs),
         "{what}: transports"
     );
+    let elevators = sim.tower.transports.iter().filter(|t| t.kind.is_elevator());
+    assert_eq!(v[header::TRANSPORTS], elevators.count() as f64, "{what}");
+}
+
+/// `frameView`'s transport records (the end of `f`), kept for the elevators
+/// only: the walk over every transport that the view's frame replaced
+/// (#2383), so the view's records are held to it.
+fn elevator_records(transports: &[Transport], f: &[f64]) -> Vec<f64> {
+    let mut at = f.len() - transports.iter().map(frame::transport_len).sum::<usize>();
+    let mut out = Vec::new();
+    for t in transports {
+        let len = frame::transport_len(t);
+        assert_eq!(f[at + frame::transport::ID], t.id as f64);
+        if t.kind.is_elevator() {
+            out.extend_from_slice(&f[at..at + len]);
+        }
+        at += len;
+    }
+    out
+}
+
+/// The view's slots a frame's elevator records take: the length a frame
+/// grows by with the transports.
+pub(super) fn elevators_len(transports: &[Transport]) -> usize {
+    transports
+        .iter()
+        .filter(|t| t.kind.is_elevator())
+        .map(frame::transport_len)
+        .sum()
+}
+
+/// Stairs and escalators run no car, so the frame leaves them out: a tower
+/// that gains flights sends the same frame, and its elevator records are
+/// still `frameView`'s (#2383).
+#[test]
+fn flights_stay_out_of_the_frame() {
+    use crate::facilities::Kind;
+    let mut sim = busy();
+    let before = ViewReader::new().frame(&sim, true);
+    let units = &sim.tower.units;
+    let (lo, hi) = (
+        units.iter().map(|u| u.floor).min(),
+        units.iter().map(|u| u.floor).max(),
+    );
+    let (left, right) = (
+        units.iter().map(|u| u.x).min(),
+        units.iter().map(|u| u.x).max(),
+    );
+    let mut added = 0;
+    for floor in lo.unwrap()..hi.unwrap() {
+        for x in (left.unwrap()..right.unwrap()).step_by(2) {
+            let placed = sim.tower.place_transport(Kind::Stairs, x, floor, floor + 1);
+            added += usize::from(placed.ok);
+        }
+    }
+    assert!(added >= 2, "the fixture has room for stairs");
+    let flights = sim
+        .tower
+        .transports
+        .iter()
+        .filter(|t| !t.kind.is_elevator());
+    assert!(flights.count() >= added);
+    let after = ViewReader::new().frame(&sim, true);
+    assert_eq!(after.len(), before.len());
+    assert_eq!(after[header::TRANSPORTS], before[header::TRANSPORTS]);
+    agrees_with_frame_view(&sim, "flights");
 }
 
 #[test]

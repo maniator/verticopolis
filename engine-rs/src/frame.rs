@@ -178,10 +178,7 @@ pub fn frame_view(sim: &Simulation) -> Vec<f64> {
                 .map(|p| PERSON_FIXED + p.floors.len() + p.shafts.len())
                 .sum::<usize>()
             + units.len() * UNIT_RECORD
-            + transports
-                .iter()
-                .map(|t| TRANSPORT_FIXED + CAR_RECORD * t.cars as usize)
-                .sum::<usize>(),
+            + transports.iter().map(transport_len).sum::<usize>(),
     );
     let fx = &sim.fx;
     v.extend_from_slice(&[
@@ -295,18 +292,7 @@ pub fn frame_view(sim: &Simulation) -> Vec<f64> {
         ]);
     }
     for t in transports {
-        v.push(t.id as f64);
-        v.push(t.cars as f64);
-        for i in 0..t.cars as usize {
-            v.push(t.car_positions.get(i).copied().unwrap_or(0.0));
-            v.push(
-                t.car_load
-                    .as_ref()
-                    .and_then(|l| l.get(i).copied())
-                    .unwrap_or(-1.0),
-            );
-            v.push(t.car_dir.get(i).copied().unwrap_or(0) as f64);
-        }
+        push_transport(&mut v, t);
     }
     v
 }
@@ -370,30 +356,25 @@ pub(crate) fn unit_fields(u: &crate::tower::Unit) -> [f64; 5] {
     ]
 }
 
-/// The slots `push_transports` writes for these transports.
-pub(crate) fn transports_len(transports: &[crate::tower::Transport]) -> usize {
-    transports
-        .iter()
-        .map(|t| TRANSPORT_FIXED + CAR_RECORD * t.cars as usize)
-        .sum()
+/// The slots [`push_transport`] writes for `t`.
+pub(crate) fn transport_len(t: &crate::tower::Transport) -> usize {
+    TRANSPORT_FIXED + CAR_RECORD * t.cars as usize
 }
 
-/// Every transport's record: id, cars, then per car position, load (-1 when
+/// One transport's record: id, cars, then per car position, load (-1 when
 /// the shaft keeps none) and direction.
-pub(crate) fn push_transports(v: &mut Vec<f64>, transports: &[crate::tower::Transport]) {
-    for t in transports {
-        v.push(t.id as f64);
-        v.push(t.cars as f64);
-        for i in 0..t.cars as usize {
-            v.push(t.car_positions.get(i).copied().unwrap_or(0.0));
-            v.push(
-                t.car_load
-                    .as_ref()
-                    .and_then(|l| l.get(i).copied())
-                    .unwrap_or(-1.0),
-            );
-            v.push(t.car_dir.get(i).copied().unwrap_or(0) as f64);
-        }
+pub(crate) fn push_transport(v: &mut Vec<f64>, t: &crate::tower::Transport) {
+    v.push(t.id as f64);
+    v.push(t.cars as f64);
+    for i in 0..t.cars as usize {
+        v.push(t.car_positions.get(i).copied().unwrap_or(0.0));
+        v.push(
+            t.car_load
+                .as_ref()
+                .and_then(|l| l.get(i).copied())
+                .unwrap_or(-1.0),
+        );
+        v.push(t.car_dir.get(i).copied().unwrap_or(0) as f64);
     }
 }
 

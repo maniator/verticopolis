@@ -5,7 +5,10 @@ import { figureKey, IMPATIENT_SHARE } from "./crowdLook";
 
 /** What `cabRidersOf` reads of the drawn tower. */
 export interface CabSource {
-  readonly sim: { readonly crowd: { readonly people: ReadonlyArray<PersonView> }; readonly tower: { readonly transports: ReadonlyArray<TransportView> } };
+  readonly sim: {
+    readonly crowd: { readonly people: ReadonlyArray<PersonView> };
+    readonly tower: { readonly transports: ReadonlyArray<TransportView>; readonly elevators?: ReadonlyArray<TransportView> };
+  };
 }
 
 /**
@@ -223,7 +226,7 @@ export function cabRidersOf(engine: CabSource, stepped: boolean, look: RiderLook
   const people = engine.sim.crowd.people;
   let c = counted.get(engine);
   if (!c) counted.set(engine, (c = { people: undefined, counts: new Map() }));
-  if (stepped || c.people !== people) countCabRiders(people ?? [], engine.sim.tower.transports ?? [], c.counts, look);
+  if (stepped || c.people !== people) countCabRiders(people ?? [], engine.sim.tower.elevators ?? engine.sim.tower.transports ?? [], c.counts, look);
   c.people = people;
   return c.counts;
 }
