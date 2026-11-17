@@ -148,19 +148,37 @@ export function oldAnchorRedirects(helpIds) {
  *  it wears on its own host. */
 export const HELP_SCHEMES = ["skyline", "high_contrast"];
 export const HELP_SCHEME_KEY = "vc.appearance";
+/** The preference cookie the production game shares on verticopolis.com and
+ *  its subdomains (appearancePrefs.ts SCHEME_COOKIE), so the manual on its own
+ *  host wears a scheme picked since the game last opened it. */
+export const HELP_SCHEME_COOKIE = "vc_scheme";
 
 /**
  * The manual wears the game's appearance scheme (owner, 2026-11-17). An inline
  * head script, so the page is dressed before it paints: a page the game opened
  * (`?from=game`) wears the `scheme` the link names, Standard when it names
- * none, and keeps that on this host; any other visit wears the kept one. It
- * sets `data-scheme` on `<html>`, which the game's retro-tokens.css and
- * src/styles/help-schemes.css key on. Blocked storage only loses the memory.
+ * none, and keeps that on this host. Any other visit wears the kept one.
+ *
+ * On the manual's own host (`readCookie`, a production build) two more
+ * sources apply, because that host cannot read the game's storage: the
+ * game's shared preference cookie, which keeps a direct visit up to date,
+ * and this tab's pin of the link's scheme in `sessionStorage`, so the window
+ * the player clicked from keeps winning over the cookie on a reload and the
+ * next page (the same lifetime as the game-opened flag). Elsewhere the manual
+ * shares the game's origin and storage, and a production cookie must not
+ * reach staging. Order on a later page: the tab's pin, the cookie, the kept
+ * one. It sets `data-scheme` on `<html>`, which the game's retro-tokens.css
+ * and src/styles/help-schemes.css key on. Blocked storage or cookies only lose
+ * the memory.
  */
-export function schemeBootScript() {
+export function schemeBootScript(readCookie = Boolean(HELP_ORIGIN)) {
   const known = JSON.stringify(HELP_SCHEMES);
   const key = JSON.stringify(HELP_SCHEME_KEY);
-  return `(function(){try{var k=${key},ok=${known},q=new URLSearchParams(location.search),s=null;if(q.get("from")==="game"){s=q.get("scheme");if(ok.indexOf(s)<0)s=null;try{localStorage.setItem(k,s||"standard")}catch(e){}}else{try{s=localStorage.getItem(k)}catch(e){}if(ok.indexOf(s)<0)s=null}if(s)document.documentElement.setAttribute("data-scheme",s)}catch(e){}})();`;
+  const pin = readCookie ? "try{sessionStorage.setItem(k,c)}catch(e){}" : "";
+  const later = readCookie
+    ? `try{c=sessionStorage.getItem(k)}catch(e){}if(!v(c)){c=null;try{var m=/(?:^|; *)${HELP_SCHEME_COOKIE}=([a-z_]+)/.exec(document.cookie);if(m&&v(m[1])){c=m[1];try{localStorage.setItem(k,c)}catch(e){}}}catch(e){}}`
+    : "";
+  return `(function(){try{var k=${key},ok=${known},q=new URLSearchParams(location.search),s=null,c=null;function v(x){return x==="standard"||ok.indexOf(x)>=0}if(q.get("from")==="game"){s=q.get("scheme");if(ok.indexOf(s)<0)s=null;c=s||"standard";try{localStorage.setItem(k,c)}catch(e){}${pin}}else{${later}if(c===null){try{c=localStorage.getItem(k)}catch(e){}}s=ok.indexOf(c)<0?null:c}if(s)document.documentElement.setAttribute("data-scheme",s)}catch(e){}})();`;
 }
 
 /**
