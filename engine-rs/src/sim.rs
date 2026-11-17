@@ -426,7 +426,7 @@ impl Simulation {
         if floor == 1 {
             return true;
         }
-        if self.tower.segment_runs(floor).len() <= 1 {
+        if self.tower.segment_run_count(floor) <= 1 {
             return self.floor_reachable(floor);
         }
         self.crowd.position_reachable(&self.tower, floor, x)
